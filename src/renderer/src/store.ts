@@ -95,7 +95,8 @@ function makeLayer(): LayerState {
     opacity: 1,
     mute: false,
     solo: false,
-    feedback: false
+    feedback: false,
+    feedbackAmount: 0.6
   }
 }
 
@@ -123,6 +124,7 @@ interface StoreState {
   toggleMute: (layer: number) => void
   toggleSolo: (layer: number) => void
   toggleFeedback: (layer: number) => void
+  setFeedbackAmount: (layer: number, v: number) => void
   setSourceShader: (layer: number, slot: 'A' | 'B', shaderId: string | null) => void
   setSourceInput: (
     layer: number,
@@ -205,15 +207,27 @@ export const useStore = create<StoreState>((set, get) => ({
         }))
       }
     })),
+  setFeedbackAmount: (layer, v) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({
+          ...l,
+          feedbackAmount: Math.max(0, Math.min(1, v))
+        }))
+      }
+    })),
   setSourceShader: (layer, slot, shaderId) =>
     set((s) => ({
       composition: {
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => {
+          // null shader ⇒ the slot goes back to 'none' (empty layer).
+          const kind = shaderId ? ('generator' as const) : ('none' as const)
           if (slot === 'A')
-            return { ...l, sourceA: { ...l.sourceA, kind: 'generator', shaderId } }
+            return { ...l, sourceA: { ...l.sourceA, kind, shaderId, inputs: {} } }
           const base = l.sourceB ?? emptySlot()
-          return { ...l, sourceB: { ...base, kind: 'generator', shaderId } }
+          return { ...l, sourceB: { ...base, kind, shaderId, inputs: {} } }
         })
       }
     })),
@@ -248,7 +262,18 @@ export const useStore = create<StoreState>((set, get) => ({
   selection: null,
   setSelection: (sel) => set({ selection: sel }),
 
-  loadSession: (s) => set({ name: s.name, composition: s.composition }),
+  loadSession: (s) =>
+    set({
+      name: s.name,
+      composition: {
+        ...s.composition,
+        // Normalize layers from older session files — new fields get defaults.
+        layers: s.composition.layers.map((l) => ({
+          ...l,
+          feedbackAmount: l.feedbackAmount ?? 0.6
+        }))
+      }
+    }),
   exportSession: () => {
     const s = get()
     return {

@@ -1,15 +1,25 @@
 /**
- * Compositor.ts — WebGL2 4-layer ISF compositor (seed)
+ * Compositor.ts — WebGL2 4-layer ISF compositor
  * ----------------------------------------------------------------------------
  * The heart of the visual instrument. Renders 4 layers (each driven by an ISF
  * shader), blends them with selectable blend modes, runs a master FX pass, and
  * presents to the canvas. Feedback works because each layer keeps its previous
- * frame in a ping-pong FBO that any shader can sample.
+ * frame in a ping-pong FBO.
  *
- * INTEGRATION SEAM: `ISFLayer.render()` is where the `interactive-shader-format`
- * Renderer actually executes a shader into the layer's FBO. This file owns all
- * the plumbing around it (FBOs, blending, master, output) in plain WebGL2 so the
- * architecture is concrete and correct regardless of the ISF runtime's API.
+ * Per-frame pipeline (Phase 2):
+ *   1. each layer's ISF shader draws into the layer's SCRATCH target
+ *      (the ISF runtime insists on binding framebuffer `null` for its final
+ *      pass, so each renderer gets a proxied GL context that redirects null
+ *      binds into the scratch FBO);
+ *   2. a PERSIST pass writes pp.write() = mix(scratch, pp.read(), feedback) —
+ *      the palinopsia itself: exponential decay trails, the disciplined
+ *      register (decay, not additive bloom — brief §1);
+ *   3. layers blend bottom→top into a ping-pong accumulator (read one buffer,
+ *      write the other — never the same texture both ways);
+ *   4. master FX chain (Phase 3 seam), then a copy pass presents to canvas.
+ *
+ * Hot-swap principle (brief §1): loading a new shader onto a layer preserves
+ * its ping-pong buffers, so trails survive the swap — never a reset to black.
  *
  * Target: RTX 4070 / WebGL2. 1080p–4K @ 60 is comfortable.
  */
@@ -45,6 +55,26 @@ void main(){
   o = vec4(mix(B.rgb, c, T.a*opacity), max(B.a, T.a*opacity));
 }`;
 
+// Feedback persist: fresh frame smeared with the layer's previous frame.
+// mix() (not add) keeps trails in the decay register — they always converge
+// back to the fresh image instead of blooming toward white (brief §1).
+const PERSIST_FS = `#version 300 es
+precision highp float;
+in vec2 uv; out vec4 o;
+uniform sampler2D src;    // this frame's ISF output (scratch)
+uniform sampler2D prev;   // this layer's previous persisted frame
+uniform float amount;     // 0 = plain copy, →1 = long trails
+void main(){
+  o = mix(texture(src, uv), texture(prev, uv), amount);
+}`;
+
+// Present / copy pass.
+const COPY_FS = `#version 300 es
+precision highp float;
+in vec2 uv; out vec4 o;
+uniform sampler2D tex;
+void main(){ o = texture(tex, uv); }`;
+
 function compile(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram {
   const mk = (t: number, s: string) => {
     const sh = gl.createShader(t)!; gl.shaderSource(sh, s); gl.compileShader(sh);
@@ -54,6 +84,7 @@ function compile(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgr
   const p = gl.createProgram()!;
   gl.attachShader(p, mk(gl.VERTEX_SHADER, vs));
   gl.attachShader(p, mk(gl.FRAGMENT_SHADER, fs));
+  gl.bindAttribLocation(p, 0, 'p');
   gl.linkProgram(p);
   if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) || 'link');
   return p;
@@ -85,15 +116,73 @@ class PingPong {
   swap() { this.cur = 1 - this.cur; }
 }
 
-/** One layer = one ISF shader rendering into a ping-pong target. */
+/**
+ * The ISF runtime hardcodes `bindFramebuffer(FRAMEBUFFER, null)` for its final
+ * (screen) pass. This proxy hands the runtime a GL context whose null-FBO binds
+ * are redirected to a target of our choosing, so each layer's "screen" is its
+ * own scratch FBO. Everything else passes straight through to the real context
+ * (methods bound + cached; constants and properties as-is).
+ */
+function makeRedirectableGL(gl: WebGL2RenderingContext): {
+  gl: WebGL2RenderingContext;
+  state: { redirect: WebGLFramebuffer | null };
+} {
+  const state = { redirect: null as WebGLFramebuffer | null };
+  const cache = new Map<PropertyKey, unknown>();
+  const proxy = new Proxy(gl, {
+    get(target, prop) {
+      if (prop === 'bindFramebuffer') {
+        return (t: number, fbo: WebGLFramebuffer | null) =>
+          target.bindFramebuffer(t, fbo === null ? state.redirect : fbo);
+      }
+      const v = (target as unknown as Record<PropertyKey, unknown>)[prop];
+      if (typeof v === 'function') {
+        let bound = cache.get(prop);
+        if (!bound) {
+          bound = (v as (...a: unknown[]) => unknown).bind(target);
+          cache.set(prop, bound);
+        }
+        return bound;
+      }
+      return v;
+    }
+  });
+  return { gl: proxy as WebGL2RenderingContext, state };
+}
+
+/** One layer = one ISF shader rendering into scratch, persisted through ping-pong. */
 export class ISFLayer {
   pp: PingPong;
   blend: BlendMode = 'normal';
   opacity = 1;
+  mute = false;
+  solo = false;
+  /** 0 = no feedback (plain copy) · →1 = long decay trails. */
+  feedbackAmount = 0;
   shaderId: string | null = null;
+
   private isf: ISFRenderer | null = null;
-  constructor(private gl: WebGL2RenderingContext, w: number, h: number) {
+  private rgl: WebGL2RenderingContext;
+  private redirect: { redirect: WebGLFramebuffer | null };
+  scratchFbo: WebGLFramebuffer;
+  scratchTex: WebGLTexture;
+
+  constructor(private gl: WebGL2RenderingContext, public w: number, public h: number) {
     this.pp = new PingPong(gl, w, h);
+    const wrapped = makeRedirectableGL(gl);
+    this.rgl = wrapped.gl;
+    this.redirect = wrapped.state;
+    // Scratch target the ISF pass lands in each frame (pre-persist).
+    const t = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    this.scratchTex = t;
+    const f = gl.createFramebuffer()!; gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+    this.scratchFbo = f;
   }
 
   /**
@@ -103,7 +192,7 @@ export class ISFLayer {
    * brief §1). Returns false if the shader failed to compile.
    */
   loadShader(id: string, source: string): boolean {
-    const r = new ISFRenderer(this.gl);
+    const r = new ISFRenderer(this.rgl);
     r.loadSource(source);
     if (!r.valid) {
       console.error('[ISF] load failed for', id, r.error);
@@ -115,25 +204,32 @@ export class ISFLayer {
     return true;
   }
 
+  /** Clear the shader; the layer goes transparent (feedback buffers kept). */
+  unloadShader() {
+    this.isf?.cleanup();
+    this.isf = null;
+    this.shaderId = null;
+  }
+
   setInput(name: string, value: number | number[]) {
     this.isf?.setValue(name, value);
   }
 
-  /**
-   * PHASE 1 (MVP): draw the ISF generator fullscreen straight to the canvas's
-   * default framebuffer (the ISF runtime binds it and sizes the viewport from
-   * `destination`). PHASE 2 redirects this into the ping-pong FBO so the layer
-   * can be blended into the stack and sampled for feedback.
-   */
-  drawFullscreen(w: number, h: number) {
-    this.isf?.draw({ width: w, height: h });
+  /** Draw the ISF shader into the scratch target (empty layer → transparent). */
+  renderISF() {
+    const gl = this.gl;
+    if (!this.isf) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.scratchFbo);
+      gl.viewport(0, 0, this.w, this.h);
+      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      return;
+    }
+    this.redirect.redirect = this.scratchFbo;
+    this.isf.draw({ width: this.w, height: this.h });
+    this.redirect.redirect = null;
   }
 
-  render(_timeMs: number) {
-    // SEAM (Phase 2): draw the ISF into this.pp.write(), exposing this.pp.read()
-    // as the feedback input, then swap. Idle until the FBO redirect lands.
-    this.pp.swap();
-  }
+  /** The persisted (post-feedback) frame — what the blend stack composites. */
   texture(): WebGLTexture { return this.pp.out(); }
 }
 
@@ -141,10 +237,15 @@ export class Compositor {
   gl: WebGL2RenderingContext;
   layers: ISFLayer[] = [];
   private blendProg: WebGLProgram;
+  private persistProg: WebGLProgram;
+  private copyProg: WebGLProgram;
   private vao: WebGLVertexArrayObject;
   private acc: PingPong;            // accumulator for the layer stack
   private uBase: WebGLUniformLocation; private uTop: WebGLUniformLocation;
   private uMode: WebGLUniformLocation; private uOpac: WebGLUniformLocation;
+  private uPSrc: WebGLUniformLocation; private uPPrev: WebGLUniformLocation;
+  private uPAmt: WebGLUniformLocation;
+  private uCTex: WebGLUniformLocation;
   private modeIndex: Record<BlendMode, number> =
     { add:0, screen:1, multiply:2, difference:3, overlay:4, normal:5 };
 
@@ -159,25 +260,34 @@ export class Compositor {
     const buf = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    // Leave the default VAO for the ISF runtime — it sets up its own attribute
+    // state there (WebGL1-style). Our passes bind this.vao explicitly.
+    gl.bindVertexArray(null);
 
     this.blendProg = compile(gl, QUAD_VS, BLEND_FS);
-    gl.bindAttribLocation(this.blendProg, 0, 'p');
     this.uBase = gl.getUniformLocation(this.blendProg, 'base')!;
     this.uTop  = gl.getUniformLocation(this.blendProg, 'top')!;
     this.uMode = gl.getUniformLocation(this.blendProg, 'mode')!;
     this.uOpac = gl.getUniformLocation(this.blendProg, 'opacity')!;
 
+    this.persistProg = compile(gl, QUAD_VS, PERSIST_FS);
+    this.uPSrc  = gl.getUniformLocation(this.persistProg, 'src')!;
+    this.uPPrev = gl.getUniformLocation(this.persistProg, 'prev')!;
+    this.uPAmt  = gl.getUniformLocation(this.persistProg, 'amount')!;
+
+    this.copyProg = compile(gl, QUAD_VS, COPY_FS);
+    this.uCTex = gl.getUniformLocation(this.copyProg, 'tex')!;
+
     this.acc = new PingPong(gl, w, h);
     for (let i = 0; i < 4; i++) this.layers.push(new ISFLayer(gl, w, h));
   }
 
-  /** Composite top texture over the accumulator using the given blend mode. */
+  /** Composite top texture over base into target using the given blend mode. */
   private blendInto(target: WebGLFramebuffer, base: WebGLTexture, top: WebGLTexture, mode: BlendMode, opacity: number) {
     const gl = this.gl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, target);
     gl.viewport(0, 0, this.w, this.h);
     gl.useProgram(this.blendProg);
-    gl.bindVertexArray(this.vao);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, base); gl.uniform1i(this.uBase, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, top);  gl.uniform1i(this.uTop, 1);
     gl.uniform1i(this.uMode, this.modeIndex[mode]);
@@ -185,42 +295,65 @@ export class Compositor {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
-  /** One frame: render every layer, stack them, (master pass TODO), present. */
-  render(timeMs: number) {
+  /** pp.write() = mix(scratch, pp.read(), feedbackAmount), then swap. */
+  private persist(L: ISFLayer) {
     const gl = this.gl;
-
-    // 1. render each layer's ISF shader into its own target
-    for (const L of this.layers) L.render(timeMs);
-
-    // 2. clear accumulator to black, then blend layers bottom→top
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.acc.write());
-    gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
-    let base = this.acc.out();
-    for (const L of this.layers) {
-      this.blendInto(this.acc.write(), base, L.texture(), L.blend, L.opacity);
-      this.acc.swap();
-      base = this.acc.out();
-    }
-
-    // 3. MASTER FX pass goes here (glitch / dither / chroma / grade as an ISF chain),
-    //    sampling `base`. For now we present `base` straight to the canvas.
-
-    // 4. present to screen
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    this.blendInto(null as unknown as WebGLFramebuffer, base, base, 'normal', 0); // base over base = base
-    // NOTE: replace step 4 with a dedicated copy/master program; this keeps the seed self-contained.
-
-    // 5. SEAM: gl.readPixels(...) → IPC → native Spout/Syphon/NDI sender (cheap on a 4070)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, L.pp.write());
+    gl.viewport(0, 0, this.w, this.h);
+    gl.useProgram(this.persistProg);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, L.scratchTex); gl.uniform1i(this.uPSrc, 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, L.pp.read()); gl.uniform1i(this.uPPrev, 1);
+    // Cap just below 1 so trails always decay — infinite persistence is the
+    // blooming failure mode the brief warns about.
+    gl.uniform1f(this.uPAmt, Math.min(L.feedbackAmount, 0.97));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    L.pp.swap();
   }
 
-  /**
-   * PHASE 1 (MVP): draw a single layer's ISF generator straight to the canvas
-   * to prove the runtime end-to-end. Bypasses the blend stack + master pass
-   * (those come online in Phase 2 via `render()`). Defaults to layer 0.
-   */
-  renderMVP(layer = 0) {
-    this.layers[layer]?.drawFullscreen(this.canvas.width, this.canvas.height);
+  /** One frame: ISF passes → persist passes → blend stack → present. */
+  render(_timeMs: number) {
+    const gl = this.gl;
+
+    // 1. ISF draws (default VAO — the runtime owns its own vertex state there).
+    gl.bindVertexArray(null);
+    for (const L of this.layers) L.renderISF();
+
+    // Our fullscreen-triangle passes from here on.
+    gl.bindVertexArray(this.vao);
+
+    // 2. persist (feedback) pass per layer.
+    for (const L of this.layers) this.persist(L);
+
+    // 3. clear one accumulator buffer, then blend layers bottom→top reading
+    //    the previous result and writing the other buffer (never the same
+    //    texture both ways).
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.acc.write());
+    gl.viewport(0, 0, this.w, this.h);
+    gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    this.acc.swap(); // cleared buffer is now acc.read()
+
+    const anySolo = this.layers.some((l) => l.solo);
+    for (const L of this.layers) {
+      const audible = anySolo ? L.solo : !L.mute;
+      if (!audible) continue;
+      this.blendInto(this.acc.write(), this.acc.read(), L.texture(), L.blend, L.opacity);
+      this.acc.swap();
+    }
+    const composite = this.acc.read();
+
+    // 4. MASTER FX chain goes here (Phase 3): glitch / dither / chroma / grade
+    //    as an ISF chain sampling `composite`, then the warp pass (Phase 8).
+
+    // 5. present to canvas.
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    gl.useProgram(this.copyProg);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, composite); gl.uniform1i(this.uCTex, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+    gl.bindVertexArray(null);
+
+    // 6. SEAM (Phase 8): gl.readPixels(composite) → IPC → Spout/Syphon/NDI.
   }
 
   // ---- instrument API (called from React / OSC / modulators) ----
@@ -228,6 +361,7 @@ export class Compositor {
   loadLayerShader(i: number, id: string, source: string): boolean {
     return this.layers[i]?.loadShader(id, source) ?? false;
   }
+  unloadLayerShader(i: number) { this.layers[i]?.unloadShader(); }
   setLayerSourceInput(i: number, name: string, value: number | number[]) { this.layers[i]?.setInput(name, value); }
   setBlend(i: number, mode: BlendMode) { if (this.layers[i]) this.layers[i].blend = mode; }
   setOpacity(i: number, v: number)     { if (this.layers[i]) this.layers[i].opacity = v; }

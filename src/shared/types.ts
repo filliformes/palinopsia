@@ -53,6 +53,8 @@ export interface LayerState {
   mute: boolean
   solo: boolean
   feedback: boolean // does this layer sample its own previous frame
+  // Trail persistence when feedback is on: 0 = none, →1 = long decay trails.
+  feedbackAmount: number
 }
 
 // The whole composition: four layers, a master FX rack, and transport.

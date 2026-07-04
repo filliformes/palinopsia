@@ -9,7 +9,7 @@ import { useEffect, useRef } from 'react'
 import { Compositor } from './engine/Compositor'
 import { LayerPanel } from './components/LayerPanel'
 import { Transport } from './components/Transport'
-import { GENERATORS } from './shaders/isf'
+import { GENERATORS, SHADER_BY_ID } from './shaders/isf'
 import { THEME_ORDER, useStore, type ThemeName } from './store'
 
 export default function App(): JSX.Element {
@@ -35,23 +35,40 @@ export default function App(): JSX.Element {
       return
     }
 
-    // Phase 1 MVP — load the seed ISF generator onto layer 0 and reflect it in
-    // the store so the layer strip shows what's playing. Phase 2 brings the
-    // full 4-layer blend stack online; for now one generator proves the runtime.
-    const seed = GENERATORS[0]
-    if (comp.loadLayerShader(0, seed.id, seed.source)) {
-      useStore.getState().setSourceShader(0, 'A', seed.id)
+    // Seed the session: Drift Field on layer 1 so first launch shows the
+    // instrument's voice. The sync loop below picks it up and loads it.
+    if (!useStore.getState().composition.layers[0].sourceA.shaderId) {
+      useStore.getState().setSourceShader(0, 'A', GENERATORS[0].id)
     }
 
+    const start = performance.now()
     const loop = (): void => {
-      // Push layer-0 source inputs from the store each frame so parameter edits
-      // (and, later, OSC / modulators writing through the same actions) take
-      // effect live. Cheap; the auto-UI (Phase 4) drives these.
-      const l0 = useStore.getState().composition.layers[0]
-      for (const [k, v] of Object.entries(l0.sourceA.inputs)) {
-        comp!.setLayerSourceInput(0, k, v)
+      // Store → engine sync, every frame. One write path for everything:
+      // UI edits, session loads, and (later) OSC / modulators / auto-UI all
+      // mutate the store; the engine follows. Hot-swaps preserve each layer's
+      // feedback buffers (brief §1) — never a reset to black.
+      const layers = useStore.getState().composition.layers
+      for (let i = 0; i < layers.length; i++) {
+        const l = layers[i]
+        const L = comp!.layers[i]
+        const wantId = l.sourceA.kind === 'generator' ? l.sourceA.shaderId : null
+        if (wantId !== L.shaderId) {
+          if (wantId && SHADER_BY_ID[wantId]) {
+            comp!.loadLayerShader(i, wantId, SHADER_BY_ID[wantId].source)
+          } else {
+            comp!.unloadLayerShader(i)
+          }
+        }
+        L.blend = l.blend
+        L.opacity = l.opacity
+        L.mute = l.mute
+        L.solo = l.solo
+        L.feedbackAmount = l.feedback ? l.feedbackAmount : 0
+        for (const [k, v] of Object.entries(l.sourceA.inputs)) {
+          L.setInput(k, v)
+        }
       }
-      comp!.renderMVP(0)
+      comp!.render(performance.now() - start)
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)

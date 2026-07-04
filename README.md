@@ -36,8 +36,9 @@ npm run build:win  # NSIS + portable
 
 - **0 · Scaffold** ✅ — forked dataFLOU's Electron shell (design system, OSC,
   session/autosave), seed WebGL2 compositor wired to the output canvas.
-- **1 · MVP** — one ISF generator on one fullscreen WebGL2 layer.
-- **2 · Compositor** — 4 layers + blend modes + ping-pong feedback.
+- **1 · MVP** ✅ — ISF runtime wired; Drift Field seed generator fullscreen.
+- **2 · Compositor** ✅ — 4 layers + blend modes + per-layer decay-feedback
+  (ping-pong FBOs), solo/mute, hot-swap-safe shader loading; Slabs generator.
 - **3 · FX racks** — per-source / per-layer / master ISF chains.
 - **4 · Auto-UI** — controls generated from each shader's ISF `INPUTS`.
 - **5 · Modulators** — port dataFLOU's 8-mod engine + Meta Controller + mod-matrix.

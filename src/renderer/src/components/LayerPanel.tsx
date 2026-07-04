@@ -5,6 +5,7 @@
 // (selecting a source renders its INPUTS) lands in Phase 4.
 
 import type { BlendMode } from '@shared/types'
+import { GENERATORS } from '../shaders/isf'
 import { useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 
@@ -24,6 +25,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const toggleMute = useStore((s) => s.toggleMute)
   const toggleSolo = useStore((s) => s.toggleSolo)
   const toggleFeedback = useStore((s) => s.toggleFeedback)
+  const setFeedbackAmount = useStore((s) => s.setFeedbackAmount)
+  const setSourceShader = useStore((s) => s.setSourceShader)
   const setSelection = useStore((s) => s.setSelection)
   const selection = useStore((s) => s.selection)
 
@@ -46,19 +49,21 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
         </div>
       </div>
 
-      {/* Source pickers — the ISF generator library populates these in Phase 1+ */}
+      {/* Source pickers — ISF generators (video / capture / HIVE arrive Phase 7) */}
       <div className="grid grid-cols-2 gap-1">
-        <SourceButton
+        <SourceSlot
           label="A"
-          slotLabel={layer.sourceA.shaderId ?? '— empty —'}
+          shaderId={layer.sourceA.shaderId}
           selected={isSelected('A')}
-          onClick={() => setSelection({ layer: index, slot: 'A' })}
+          onSelect={() => setSelection({ layer: index, slot: 'A' })}
+          onPick={(id) => setSourceShader(index, 'A', id)}
         />
-        <SourceButton
+        <SourceSlot
           label="B"
-          slotLabel={layer.sourceB?.shaderId ?? '— empty —'}
+          shaderId={layer.sourceB?.shaderId ?? null}
           selected={isSelected('B')}
-          onClick={() => setSelection({ layer: index, slot: 'B' })}
+          onSelect={() => setSelection({ layer: index, slot: 'B' })}
+          onPick={(id) => setSourceShader(index, 'B', id)}
         />
       </div>
 
@@ -97,6 +102,31 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           />
         </div>
       </div>
+
+      {/* Trail persistence — only meaningful while FB is on */}
+      {layer.feedback && (
+        <div className="flex items-center gap-2">
+          <label className="font-mono text-[10px] text-muted">TRAILS</label>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={layer.feedbackAmount}
+            onChange={(e) => setFeedbackAmount(index, Number(e.target.value))}
+            className="flex-1 accent-accent"
+            title="Feedback persistence — decay trails (capped below infinite bloom)"
+          />
+          <div className="w-12">
+            <BoundedNumberInput
+              value={layer.feedbackAmount}
+              min={0}
+              max={1}
+              onChange={(v) => setFeedbackAmount(index, v)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -127,28 +157,49 @@ function ToggleChip({
   )
 }
 
-function SourceButton({
+function SourceSlot({
   label,
-  slotLabel,
+  shaderId,
   selected,
-  onClick
+  onSelect,
+  onPick
 }: {
   label: string
-  slotLabel: string
+  shaderId: string | null
   selected: boolean
-  onClick: () => void
+  onSelect: () => void
+  onPick: (id: string | null) => void
 }): JSX.Element {
+  // NOTE: the B slot writes to the store today, but the engine renders only
+  // source A until the A/B source mixer lands (Phase 3) — flagged in the title.
+  const bPending = label === 'B'
   return (
-    <button
-      onClick={onClick}
-      className={`flex flex-col items-start rounded border px-2 py-1 text-left transition-colors ${
+    <div
+      onClick={onSelect}
+      className={`flex flex-col gap-0.5 rounded border px-1.5 py-1 transition-colors ${
         selected
           ? 'border-accent bg-panel2 ring-1 ring-accent'
           : 'border-border bg-panel2/50 hover:border-accent/50'
       }`}
+      title={bPending ? 'Source B — mixed with A when the source mixer lands (Phase 3)' : undefined}
     >
-      <span className="font-mono text-[9px] text-muted">SRC {label}</span>
-      <span className="truncate text-[11px]">{slotLabel}</span>
-    </button>
+      <span className="font-mono text-[9px] text-muted">
+        SRC {label}
+        {bPending && shaderId ? ' · pending' : ''}
+      </span>
+      <select
+        className="input w-full text-[11px]"
+        value={shaderId ?? ''}
+        onChange={(e) => onPick(e.target.value || null)}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <option value="">— none —</option>
+        {GENERATORS.map((g) => (
+          <option key={g.id} value={g.id}>
+            {g.name}
+          </option>
+        ))}
+      </select>
+    </div>
   )
 }

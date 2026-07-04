@@ -8,6 +8,7 @@
 // Randomize button (Phase 6).
 
 import driftField from './DriftField.fs?raw'
+import slabs from './Slabs.fs?raw'
 
 export interface IsfShader {
   id: string
@@ -17,7 +18,8 @@ export interface IsfShader {
 }
 
 export const GENERATORS: IsfShader[] = [
-  { id: 'drift-field', name: 'Drift Field', category: 'Generator', source: driftField }
+  { id: 'drift-field', name: 'Drift Field', category: 'Generator', source: driftField },
+  { id: 'slabs', name: 'Slabs', category: 'Generator', source: slabs }
 ]
 
 export const SHADER_BY_ID: Record<string, IsfShader> = Object.fromEntries(
