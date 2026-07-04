@@ -96,7 +96,8 @@ function makeLayer(): LayerState {
     mute: false,
     solo: false,
     feedback: false,
-    feedbackAmount: 0.6
+    feedbackAmount: 0.6,
+    sourceMix: 0.5
   }
 }
 
@@ -107,6 +108,11 @@ export function makeDefaultComposition(): CompositionState {
     bpm: 120
   }
 }
+
+// Addresses one of the four FX racks (per-source, per-layer, or master).
+export type FxScope =
+  | { kind: 'master' }
+  | { kind: 'layer' | 'sourceA' | 'sourceB'; layer: number }
 
 // ── Store ─────────────────────────────────────────────────────────────
 interface StoreState {
@@ -125,6 +131,7 @@ interface StoreState {
   toggleSolo: (layer: number) => void
   toggleFeedback: (layer: number) => void
   setFeedbackAmount: (layer: number, v: number) => void
+  setSourceMix: (layer: number, v: number) => void
   setSourceShader: (layer: number, slot: 'A' | 'B', shaderId: string | null) => void
   setSourceInput: (
     layer: number,
@@ -134,6 +141,13 @@ interface StoreState {
   ) => void
   patchLayer: (layer: number, partial: Partial<LayerState>) => void
   setMasterFx: (fx: FxInstance[]) => void
+
+  // FX racks (Phase 3) — one action surface for all four rack scopes.
+  addFx: (scope: FxScope, shaderId: string) => void
+  removeFx: (scope: FxScope, instId: string) => void
+  toggleFx: (scope: FxScope, instId: string) => void
+  moveFx: (scope: FxScope, instId: string, dir: -1 | 1) => void
+  setFxInput: (scope: FxScope, instId: string, name: string, value: number | number[]) => void
 
   // The currently-selected source/FX whose ISF INPUTS the auto-UI renders
   // (Phase 4). null = nothing selected.
@@ -151,6 +165,23 @@ function updateLayer(
   fn: (l: LayerState) => LayerState
 ): LayerState[] {
   return layers.map((l, idx) => (idx === i ? fn(l) : l))
+}
+
+// Rewrite the FX array addressed by `scope` through `fn`, immutably.
+function updateFxArray(
+  c: CompositionState,
+  scope: FxScope,
+  fn: (fx: FxInstance[]) => FxInstance[]
+): CompositionState {
+  if (scope.kind === 'master') return { ...c, master: fn(c.master) }
+  return {
+    ...c,
+    layers: updateLayer(c.layers, scope.layer, (l) => {
+      if (scope.kind === 'layer') return { ...l, fx: fn(l.fx) }
+      if (scope.kind === 'sourceA') return { ...l, sourceAFx: fn(l.sourceAFx) }
+      return { ...l, sourceBFx: fn(l.sourceBFx) }
+    })
+  }
 }
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -259,6 +290,56 @@ export const useStore = create<StoreState>((set, get) => ({
   setMasterFx: (fx) =>
     set((s) => ({ composition: { ...s.composition, master: fx } })),
 
+  setSourceMix: (layer, v) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({
+          ...l,
+          sourceMix: Math.max(0, Math.min(1, v))
+        }))
+      }
+    })),
+
+  addFx: (scope, shaderId) =>
+    set((s) => ({
+      composition: updateFxArray(s.composition, scope, (fx) => [
+        ...fx,
+        { id: uid(), shaderId, enabled: true, inputs: {} }
+      ])
+    })),
+  removeFx: (scope, instId) =>
+    set((s) => ({
+      composition: updateFxArray(s.composition, scope, (fx) =>
+        fx.filter((f) => f.id !== instId)
+      )
+    })),
+  toggleFx: (scope, instId) =>
+    set((s) => ({
+      composition: updateFxArray(s.composition, scope, (fx) =>
+        fx.map((f) => (f.id === instId ? { ...f, enabled: !f.enabled } : f))
+      )
+    })),
+  moveFx: (scope, instId, dir) =>
+    set((s) => ({
+      composition: updateFxArray(s.composition, scope, (fx) => {
+        const i = fx.findIndex((f) => f.id === instId)
+        const j = i + dir
+        if (i < 0 || j < 0 || j >= fx.length) return fx
+        const next = [...fx]
+        ;[next[i], next[j]] = [next[j], next[i]]
+        return next
+      })
+    })),
+  setFxInput: (scope, instId, name, value) =>
+    set((s) => ({
+      composition: updateFxArray(s.composition, scope, (fx) =>
+        fx.map((f) =>
+          f.id === instId ? { ...f, inputs: { ...f.inputs, [name]: value } } : f
+        )
+      )
+    })),
+
   selection: null,
   setSelection: (sel) => set({ selection: sel }),
 
@@ -270,7 +351,11 @@ export const useStore = create<StoreState>((set, get) => ({
         // Normalize layers from older session files — new fields get defaults.
         layers: s.composition.layers.map((l) => ({
           ...l,
-          feedbackAmount: l.feedbackAmount ?? 0.6
+          feedbackAmount: l.feedbackAmount ?? 0.6,
+          sourceMix: l.sourceMix ?? 0.5,
+          sourceAFx: l.sourceAFx ?? [],
+          sourceBFx: l.sourceBFx ?? [],
+          fx: l.fx ?? []
         }))
       }
     }),

@@ -7,9 +7,10 @@
 
 import { useEffect, useRef } from 'react'
 import { Compositor } from './engine/Compositor'
+import { FxRackPanel } from './components/FxRackPanel'
 import { LayerPanel } from './components/LayerPanel'
 import { Transport } from './components/Transport'
-import { GENERATORS, SHADER_BY_ID } from './shaders/isf'
+import { GENERATORS, shaderSourceById } from './shaders/isf'
 import { THEME_ORDER, useStore, type ThemeName } from './store'
 
 export default function App(): JSX.Element {
@@ -43,31 +44,11 @@ export default function App(): JSX.Element {
 
     const start = performance.now()
     const loop = (): void => {
-      // Store → engine sync, every frame. One write path for everything:
-      // UI edits, session loads, and (later) OSC / modulators / auto-UI all
-      // mutate the store; the engine follows. Hot-swaps preserve each layer's
-      // feedback buffers (brief §1) — never a reset to black.
-      const layers = useStore.getState().composition.layers
-      for (let i = 0; i < layers.length; i++) {
-        const l = layers[i]
-        const L = comp!.layers[i]
-        const wantId = l.sourceA.kind === 'generator' ? l.sourceA.shaderId : null
-        if (wantId !== L.shaderId) {
-          if (wantId && SHADER_BY_ID[wantId]) {
-            comp!.loadLayerShader(i, wantId, SHADER_BY_ID[wantId].source)
-          } else {
-            comp!.unloadLayerShader(i)
-          }
-        }
-        L.blend = l.blend
-        L.opacity = l.opacity
-        L.mute = l.mute
-        L.solo = l.solo
-        L.feedbackAmount = l.feedback ? l.feedbackAmount : 0
-        for (const [k, v] of Object.entries(l.sourceA.inputs)) {
-          L.setInput(k, v)
-        }
-      }
+      // Store → engine reconciliation, every frame. One write path for
+      // everything: UI edits, session loads, and (later) OSC / modulators /
+      // auto-UI all mutate the store; the engine follows. Shader hot-swaps
+      // preserve feedback buffers (brief §1) — never a reset to black.
+      comp!.syncFromState(useStore.getState().composition, shaderSourceById)
       comp!.render(performance.now() - start)
       raf = requestAnimationFrame(loop)
     }
@@ -169,6 +150,10 @@ export default function App(): JSX.Element {
               output · 1920×1080
             </div>
           </div>
+
+          {/* Master FX rack — glitch / dither / chroma / grade (brief §10.5);
+              the warp/mapping stage joins it in Phase 8. */}
+          <MasterRackStrip />
         </section>
 
         {/* Four layer strips (brief §10.2) */}
@@ -183,4 +168,9 @@ export default function App(): JSX.Element {
       <Transport />
     </div>
   )
+}
+
+function MasterRackStrip(): JSX.Element {
+  const master = useStore((s) => s.composition.master)
+  return <FxRackPanel scope={{ kind: 'master' }} fx={master} label="master fx" />
 }

@@ -39,7 +39,10 @@ npm run build:win  # NSIS + portable
 - **1 · MVP** ✅ — ISF runtime wired; Drift Field seed generator fullscreen.
 - **2 · Compositor** ✅ — 4 layers + blend modes + per-layer decay-feedback
   (ping-pong FBOs), solo/mute, hot-swap-safe shader loading; Slabs generator.
-- **3 · FX racks** — per-source / per-layer / master ISF chains.
+- **3 · FX racks** ✅ — per-source / per-layer / master ISF chains + A/B source
+  mixer; 10-FX glitch vocabulary (posterize, dither, chroma, pixelate, displace,
+  scanlines, edge, grade, slice-shuffle, smear); GL-texture bridge into ISF
+  image inputs.
 - **4 · Auto-UI** — controls generated from each shader's ISF `INPUTS`.
 - **5 · Modulators** — port dataFLOU's 8-mod engine + Meta Controller + mod-matrix.
 - **6 · Presets + Randomize** — scene bank + curated-range Randomize.

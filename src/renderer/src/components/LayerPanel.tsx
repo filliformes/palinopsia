@@ -4,10 +4,12 @@
 // per-layer FX rack land in Phase 3; the auto-generated ISF control panel
 // (selecting a source renders its INPUTS) lands in Phase 4.
 
+import type { ReactNode } from 'react'
 import type { BlendMode } from '@shared/types'
 import { GENERATORS } from '../shaders/isf'
 import { useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
+import { FxRackPanel } from './FxRackPanel'
 
 const BLEND_MODES: BlendMode[] = [
   'normal',
@@ -26,6 +28,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const toggleSolo = useStore((s) => s.toggleSolo)
   const toggleFeedback = useStore((s) => s.toggleFeedback)
   const setFeedbackAmount = useStore((s) => s.setFeedbackAmount)
+  const setSourceMix = useStore((s) => s.setSourceMix)
   const setSourceShader = useStore((s) => s.setSourceShader)
   const setSelection = useStore((s) => s.setSelection)
   const selection = useStore((s) => s.selection)
@@ -57,15 +60,38 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           selected={isSelected('A')}
           onSelect={() => setSelection({ layer: index, slot: 'A' })}
           onPick={(id) => setSourceShader(index, 'A', id)}
-        />
+        >
+          <FxRackPanel scope={{ kind: 'sourceA', layer: index }} fx={layer.sourceAFx} label="fx" compact />
+        </SourceSlot>
         <SourceSlot
           label="B"
           shaderId={layer.sourceB?.shaderId ?? null}
           selected={isSelected('B')}
           onSelect={() => setSelection({ layer: index, slot: 'B' })}
           onPick={(id) => setSourceShader(index, 'B', id)}
-        />
+        >
+          <FxRackPanel scope={{ kind: 'sourceB', layer: index }} fx={layer.sourceBFx} label="fx" compact />
+        </SourceSlot>
       </div>
+
+      {/* A/B crossfade — only meaningful while B has a source */}
+      {layer.sourceB?.shaderId && (
+        <div className="flex items-center gap-2">
+          <label className="font-mono text-[10px] text-muted">MIX</label>
+          <span className="font-mono text-[9px] text-muted">A</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={layer.sourceMix}
+            onChange={(e) => setSourceMix(index, Number(e.target.value))}
+            className="flex-1 accent-accent"
+            title="Crossfade between source A and source B"
+          />
+          <span className="font-mono text-[9px] text-muted">B</span>
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         <label className="font-mono text-[10px] text-muted">BLEND</label>
@@ -102,6 +128,9 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           />
         </div>
       </div>
+
+      {/* Per-layer FX rack — applied to the mixed layer, pre-feedback */}
+      <FxRackPanel scope={{ kind: 'layer', layer: index }} fx={layer.fx} label="layer fx" />
 
       {/* Trail persistence — only meaningful while FB is on */}
       {layer.feedback && (
@@ -162,17 +191,16 @@ function SourceSlot({
   shaderId,
   selected,
   onSelect,
-  onPick
+  onPick,
+  children
 }: {
   label: string
   shaderId: string | null
   selected: boolean
   onSelect: () => void
   onPick: (id: string | null) => void
+  children?: ReactNode
 }): JSX.Element {
-  // NOTE: the B slot writes to the store today, but the engine renders only
-  // source A until the A/B source mixer lands (Phase 3) — flagged in the title.
-  const bPending = label === 'B'
   return (
     <div
       onClick={onSelect}
@@ -181,12 +209,8 @@ function SourceSlot({
           ? 'border-accent bg-panel2 ring-1 ring-accent'
           : 'border-border bg-panel2/50 hover:border-accent/50'
       }`}
-      title={bPending ? 'Source B — mixed with A when the source mixer lands (Phase 3)' : undefined}
     >
-      <span className="font-mono text-[9px] text-muted">
-        SRC {label}
-        {bPending && shaderId ? ' · pending' : ''}
-      </span>
+      <span className="font-mono text-[9px] text-muted">SRC {label}</span>
       <select
         className="input w-full text-[11px]"
         value={shaderId ?? ''}
@@ -200,6 +224,8 @@ function SourceSlot({
           </option>
         ))}
       </select>
+      {/* Per-source FX rack (only useful once a source is loaded) */}
+      {shaderId && children}
     </div>
   )
 }

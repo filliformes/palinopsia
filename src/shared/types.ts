@@ -55,6 +55,8 @@ export interface LayerState {
   feedback: boolean // does this layer sample its own previous frame
   // Trail persistence when feedback is on: 0 = none, →1 = long decay trails.
   feedbackAmount: number
+  // A/B source crossfade — 0 = A only, 1 = B only. Ignored while B is empty.
+  sourceMix: number
 }
 
 // The whole composition: four layers, a master FX rack, and transport.

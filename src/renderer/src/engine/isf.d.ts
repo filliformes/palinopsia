@@ -7,8 +7,9 @@ declare module 'interactive-shader-format' {
     constructor(gl: WebGLRenderingContext | WebGL2RenderingContext)
     /** Parse + compile an ISF source (JSON header + GLSL). Sets `valid`. */
     loadSource(fragmentISF: string, vertexISFOpt?: string): void
-    /** Set an ISF INPUT (or a standard uniform) by name. */
-    setValue(name: string, value: number | number[] | boolean): void
+    /** Set an ISF INPUT (or a standard uniform) by name. Image inputs accept
+     *  a TextureHandle via the isfTextureBridge monkeypatch. */
+    setValue(name: string, value: unknown): void
     /** Render the shader; a no-PASSES generator draws to the bound default FBO
      *  at the destination's size. */
     draw(destination: { width: number; height: number }): void
