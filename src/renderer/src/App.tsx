@@ -12,8 +12,10 @@ import { Collapsible } from './components/Collapsible'
 import { FxRackPanel } from './components/FxRackPanel'
 import { Inspector } from './components/Inspector'
 import { LayerPanel } from './components/LayerPanel'
+import { MetaBar } from './components/MetaBar'
 import { ModulationPanel } from './components/ModulationPanel'
 import { Transport } from './components/Transport'
+import { initMidi } from './midi'
 import { GENERATORS, shaderSourceById } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
 import { initUndo, redo, undo, useUndoState } from './undo'
@@ -36,6 +38,11 @@ export default function App(): JSX.Element {
   useEffect(() => {
     localStorage.setItem('opsia.layersWidth', String(layersWidth))
   }, [layersWidth])
+
+  // ── MIDI (Meta Controller CC learn + routing) ───────────────────────
+  useEffect(() => {
+    initMidi()
+  }, [])
 
   // ── Undo/redo (100 levels) + keyboard shortcuts ─────────────────────
   useEffect(() => {
@@ -260,6 +267,9 @@ export default function App(): JSX.Element {
 
       {/* ── Modulation: 8-mod bank + capped matrix (brief §10.4) ── */}
       <ModulationPanel />
+
+      {/* ── Meta Controller: 32 macro knobs / 4 banks (brief §6) ── */}
+      <MetaBar />
 
       {/* ── Transport ───────────────────────────────────────────── */}
       <Transport />

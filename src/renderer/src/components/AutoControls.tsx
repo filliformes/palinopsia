@@ -152,7 +152,7 @@ function FloatControl({
   )
 }
 
-// Inline modulator-binding row: pick M1–8, set depth, or remove.
+// Inline binding row: modulators M1–8 (with depth) and Meta knobs A1–D8.
 function AssignRow({
   target,
   bound
@@ -163,35 +163,46 @@ function AssignRow({
   const assignMod = useStore((s) => s.assignMod)
   const removeAssignment = useStore((s) => s.removeAssignment)
   const setAssignmentDepth = useStore((s) => s.setAssignmentDepth)
+  const toggleMetaDest = useStore((s) => s.toggleMetaDest)
+  const targetKey = modTargetKey(target)
+  // Which Meta knobs already carry this input as a destination.
+  const metaBound = useStore((s) =>
+    s.composition.metaKnobs.map((k) =>
+      k.destinations.some((d) => modTargetKey(d) === targetKey)
+    )
+  )
   return (
-    <div className="flex flex-col gap-0.5 rounded border border-border bg-panel2/60 p-1">
-      <div className="flex flex-wrap gap-0.5">
-        {Array.from({ length: 8 }, (_, i) => {
-          const existing = bound.find((b) => b.mod === i)
-          return (
-            <button
-              key={i}
-              onClick={() => {
-                if (existing) removeAssignment(existing.id)
-                else if (!assignMod(i, target, 0.5)) {
-                  // Cap reached — the matrix stays legible by design.
-                }
-              }}
-              className={`rounded px-1 py-0.5 font-mono text-[9px] transition-colors ${
-                existing
-                  ? 'bg-accent/25 text-accent ring-1 ring-accent'
-                  : 'bg-panel3/60 text-muted hover:text-text'
-              }`}
-              title={existing ? `Unbind M${i + 1}` : `Bind M${i + 1}`}
-            >
-              {i + 1}
-            </button>
-          )
-        })}
+    <div className="flex flex-col gap-1 rounded border border-border bg-panel2/60 p-1">
+      <div className="flex min-w-0 items-center gap-1">
+        <span className="w-8 shrink-0 font-mono text-[8px] uppercase text-muted">mod</span>
+        <div className="flex flex-wrap gap-0.5">
+          {Array.from({ length: 8 }, (_, i) => {
+            const existing = bound.find((b) => b.mod === i)
+            return (
+              <button
+                key={i}
+                onClick={() => {
+                  if (existing) removeAssignment(existing.id)
+                  else if (!assignMod(i, target, 0.5)) {
+                    // Cap reached — the matrix stays legible by design.
+                  }
+                }}
+                className={`rounded px-1 py-0.5 font-mono text-[9px] transition-colors ${
+                  existing
+                    ? 'bg-accent/25 text-accent ring-1 ring-accent'
+                    : 'bg-panel3/60 text-muted hover:text-text'
+                }`}
+                title={existing ? `Unbind M${i + 1}` : `Bind M${i + 1}`}
+              >
+                {i + 1}
+              </button>
+            )
+          })}
+        </div>
       </div>
       {bound.map((b) => (
         <div key={b.id} className="flex items-center gap-1">
-          <span className="w-6 shrink-0 font-mono text-[9px] text-accent">M{b.mod + 1}</span>
+          <span className="w-8 shrink-0 font-mono text-[9px] text-accent">M{b.mod + 1}</span>
           <input
             type="range"
             min={-1}
@@ -204,6 +215,28 @@ function AssignRow({
           />
         </div>
       ))}
+      {/* Meta knobs — A1..D8; a knob drives this input absolutely through
+          its curve over the input's declared range (up to 8 dests/knob). */}
+      <div className="flex min-w-0 items-center gap-1">
+        <span className="w-8 shrink-0 font-mono text-[8px] uppercase text-muted">meta</span>
+        <div className="flex flex-wrap gap-0.5">
+          {metaBound.map((on, i) => (
+            <button
+              key={i}
+              onClick={() => toggleMetaDest(i, target)}
+              className={`rounded px-1 py-0.5 font-mono text-[8px] transition-colors ${
+                on
+                  ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
+                  : 'bg-panel3/60 text-muted hover:text-text'
+              }`}
+              title={`${on ? 'Unbind' : 'Bind'} Meta ${String.fromCharCode(65 + Math.floor(i / 8))}${(i % 8) + 1}`}
+            >
+              {String.fromCharCode(65 + Math.floor(i / 8))}
+              {(i % 8) + 1}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

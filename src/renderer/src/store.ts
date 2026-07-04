@@ -17,7 +17,8 @@ import type {
   Session,
   SourceSlot
 } from '@shared/types'
-import { MAX_MOD_ASSIGNMENTS } from '@shared/types'
+import type { MetaKnobState } from '@shared/types'
+import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulators } from './engine/modulation'
 import { randomizeComposition, type RandomizeScope } from './randomize'
 
@@ -110,13 +111,25 @@ function makeLayer(): LayerState {
   }
 }
 
+export function makeDefaultMetaKnobs(): MetaKnobState[] {
+  return Array.from({ length: META_KNOB_COUNT }, (_, i) => ({
+    name: `Knob ${i + 1}`,
+    value: 0,
+    smoothMs: 10, // masks MIDI's 1/127 steps without perceptible lag
+    curve: 'linear' as const,
+    midiCc: null,
+    destinations: []
+  }))
+}
+
 export function makeDefaultComposition(): CompositionState {
   return {
     layers: [makeLayer(), makeLayer(), makeLayer(), makeLayer()],
     master: [],
     bpm: 120,
     modulators: makeDefaultModulators(),
-    modMatrix: []
+    modMatrix: [],
+    metaKnobs: makeDefaultMetaKnobs()
   }
 }
 
@@ -172,6 +185,16 @@ interface StoreState {
 
   // Randomize (brief §7) — scoped draws from curated aesthetic ranges.
   randomize: (scope: RandomizeScope) => void
+
+  // Meta Controller (Phase 5) — 32 macro knobs / 4 banks.
+  metaBank: number
+  setMetaBank: (b: number) => void
+  midiLearn: number | null // knob index armed for CC learn
+  setMidiLearn: (i: number | null) => void
+  updateMetaKnob: (i: number, partial: Partial<MetaKnobState>) => void
+  setMetaValue: (i: number, v: number) => void
+  // Toggle a destination on a knob (capped at META_MAX_DESTS).
+  toggleMetaDest: (i: number, target: ModTarget) => void
 
   // Modulation (Phase 5) — the 8-slot bank + the capped matrix.
   updateModulator: (i: number, partial: Partial<ModulatorConfig>) => void
@@ -387,6 +410,50 @@ export const useStore = create<StoreState>((set, get) => ({
   randomize: (scope) =>
     set((s) => ({ composition: randomizeComposition(s.composition, scope) })),
 
+  metaBank: 0,
+  setMetaBank: (b) => set({ metaBank: Math.max(0, Math.min(3, b)) }),
+  midiLearn: null,
+  setMidiLearn: (i) => set({ midiLearn: i }),
+  updateMetaKnob: (i, partial) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        metaKnobs: s.composition.metaKnobs.map((k, idx) =>
+          idx === i ? { ...k, ...partial } : k
+        )
+      }
+    })),
+  setMetaValue: (i, v) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        metaKnobs: s.composition.metaKnobs.map((k, idx) =>
+          idx === i ? { ...k, value: Math.max(0, Math.min(1, v)) } : k
+        )
+      }
+    })),
+  toggleMetaDest: (i, target) =>
+    set((s) => {
+      const key = modTargetKey(target)
+      return {
+        composition: {
+          ...s.composition,
+          metaKnobs: s.composition.metaKnobs.map((k, idx) => {
+            if (idx !== i) return k
+            const has = k.destinations.some((d) => modTargetKey(d) === key)
+            if (has) {
+              return {
+                ...k,
+                destinations: k.destinations.filter((d) => modTargetKey(d) !== key)
+              }
+            }
+            if (k.destinations.length >= META_MAX_DESTS) return k // capped
+            return { ...k, destinations: [...k.destinations, target] }
+          })
+        }
+      }
+    }),
+
   updateModulator: (i, partial) =>
     set((s) => ({
       composition: {
@@ -489,7 +556,8 @@ export const useStore = create<StoreState>((set, get) => ({
           fx: l.fx ?? []
         })),
         modulators: s.composition.modulators ?? makeDefaultModulators(),
-        modMatrix: s.composition.modMatrix ?? []
+        modMatrix: s.composition.modMatrix ?? [],
+        metaKnobs: s.composition.metaKnobs ?? makeDefaultMetaKnobs()
       }
     }),
   exportSession: () => {

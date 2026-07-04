@@ -63,16 +63,16 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Population', values: { cells: 26, rate: 0.1, breathe: 0.2, slip: 0.2, lineW: 0.02, density: 0.5 } }
   ],
   'particle-drift': [
-    { name: 'Slow field', values: { count: 12, speed: 0.25, flow: 0.4, size: 0.09, trail: 0.6, jitter: 0.5 } },
-    { name: 'Dust stream', values: { count: 24, speed: 0.7, flow: 0.2, size: 0.05, trail: 1.2, jitter: 0.3 } },
-    { name: 'Rising embers', values: { count: 16, speed: 0.5, flow: 1.5708, size: 0.07, trail: 0.9, jitter: 0.6, tint: [0.9, 0.55, 0.25, 1] } },
-    { name: 'Sparse drifters', values: { count: 6, speed: 0.3, flow: 0.8, size: 0.16, trail: 0.4, jitter: 0.7 } },
-    { name: 'Sideways rain', values: { count: 30, speed: 1.1, flow: 3.4, size: 0.04, trail: 1.6, jitter: 0.2 } },
-    { name: 'Plankton', values: { count: 20, speed: 0.15, flow: 4.7, size: 0.08, trail: 0.15, jitter: 0.9, tint: [0.45, 0.8, 0.75, 1] } },
-    { name: 'Falling slow', values: { count: 14, speed: 0.4, flow: 4.7124, size: 0.1, trail: 0.8, jitter: 0.4 } },
-    { name: 'Comet lane', values: { count: 8, speed: 1.4, flow: 0, size: 0.12, trail: 2, jitter: 0.25 } },
-    { name: 'Still swarm', values: { count: 34, speed: 0.05, flow: 2.3, size: 0.06, trail: 0.1, jitter: 1 } },
-    { name: 'Signal blue', values: { count: 18, speed: 0.6, flow: 5.9, size: 0.07, trail: 1, jitter: 0.5, tint: [0.4, 0.6, 0.95, 1] } }
+    { name: 'Slow field', values: { count: 12, speed: 0.25, flow: 0.4, size: 0.09, trail: 0.6, jitter: 0.5, vary: 0.6 } },
+    { name: 'Dust stream', values: { count: 24, speed: 0.7, flow: 0.2, size: 0.05, trail: 1.2, jitter: 0.3, vary: 0.35 } },
+    { name: 'Rising embers', values: { count: 16, speed: 0.5, flow: 1.5708, size: 0.07, trail: 0.9, jitter: 0.6, vary: 0.75, tint: [0.9, 0.55, 0.25, 1] } },
+    { name: 'Sparse drifters', values: { count: 6, speed: 0.3, flow: 0.8, size: 0.16, trail: 0.4, jitter: 0.7, vary: 0.85 } },
+    { name: 'Sideways rain', values: { count: 30, speed: 1.1, flow: 3.4, size: 0.04, trail: 1.6, jitter: 0.2, vary: 0.25 } },
+    { name: 'Plankton', values: { count: 20, speed: 0.15, flow: 4.7, size: 0.08, trail: 0.15, jitter: 0.9, vary: 0.95, tint: [0.45, 0.8, 0.75, 1] } },
+    { name: 'Falling slow', values: { count: 14, speed: 0.4, flow: 4.7124, size: 0.1, trail: 0.8, jitter: 0.4, vary: 0.5 } },
+    { name: 'Comet lane', values: { count: 8, speed: 1.4, flow: 0, size: 0.12, trail: 2, jitter: 0.25, vary: 0.3 } },
+    { name: 'Still swarm', values: { count: 34, speed: 0.05, flow: 2.3, size: 0.06, trail: 0.1, jitter: 1, vary: 1 } },
+    { name: 'Signal blue', values: { count: 18, speed: 0.6, flow: 5.9, size: 0.07, trail: 1, jitter: 0.5, vary: 0.55, tint: [0.4, 0.6, 0.95, 1] } }
   ],
   interference: [
     { name: 'Silk beat', values: { freq: 40, detune: 0.02, angle: 0.35, skew: 0.1, rate: 0.1, contrast: 1.3 } },

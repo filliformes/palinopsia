@@ -149,6 +149,23 @@ export interface ModAssignment {
 export const MAX_MOD_ASSIGNMENTS = 12
 export const MODULATOR_COUNT = 8
 
+// ── Meta Controller (brief §6 — dataFLOU's macro surface) ─────────────
+// 32 knobs across 4 banks of 8. Each knob maps its 0..1 position through a
+// curve onto up to 8 destinations (ISF float inputs), with per-knob
+// smoothing and MIDI-CC learn.
+export const META_KNOB_COUNT = 32
+export const META_BANKS = 4
+export const META_MAX_DESTS = 8
+
+export interface MetaKnobState {
+  name: string
+  value: number // committed 0..1 position
+  smoothMs: number
+  curve: ModCurve // shapes the 0..1 before mapping to each target's range
+  midiCc: { channel: number; number: number } | null
+  destinations: ModTarget[] // max META_MAX_DESTS
+}
+
 // The whole composition: four layers, a master FX rack, and transport.
 export interface CompositionState {
   layers: LayerState[]
@@ -156,6 +173,7 @@ export interface CompositionState {
   bpm: number
   modulators: ModulatorConfig[]
   modMatrix: ModAssignment[]
+  metaKnobs: MetaKnobState[]
 }
 
 // ── Session persistence (brief §7) ───────────────────────────────────

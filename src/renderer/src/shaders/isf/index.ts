@@ -114,7 +114,8 @@ export const GENERATORS: IsfShader[] = [
       flow: [0, 6.2832],
       size: [0.04, 0.2],
       trail: [0.1, 1.6],
-      jitter: [0.2, 0.9]
+      jitter: [0.2, 0.9],
+      vary: [0.3, 0.9]
     }
   },
   {
