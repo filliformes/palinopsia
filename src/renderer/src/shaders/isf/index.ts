@@ -10,6 +10,12 @@
 
 import driftField from './DriftField.fs?raw'
 import slabs from './Slabs.fs?raw'
+import contour from './Contour.fs?raw'
+import gridDrift from './GridDrift.fs?raw'
+import particleDrift from './ParticleDrift.fs?raw'
+import interference from './Interference.fs?raw'
+import columnScan from './ColumnScan.fs?raw'
+import ash from './Ash.fs?raw'
 import posterize from './fx/Posterize.fs?raw'
 import dither from './fx/Dither.fs?raw'
 import chromaShift from './fx/ChromaShift.fs?raw'
@@ -67,6 +73,90 @@ export const GENERATORS: IsfShader[] = [
       jitter: [0.1, 0.7],
       drift: [0, 0.6],
       accent: [0, 0.5]
+    }
+  },
+  {
+    id: 'contour',
+    name: 'Contour',
+    category: 'Generator',
+    source: contour,
+    curated: {
+      rate: [0.03, 0.3],
+      scale: [1, 5],
+      levels: [5, 20],
+      width: [0.05, 0.3],
+      warp: [0.15, 1.1],
+      fill: [0, 0.5]
+    }
+  },
+  {
+    id: 'grid-drift',
+    name: 'Grid Drift',
+    category: 'Generator',
+    source: gridDrift,
+    curated: {
+      cells: [5, 24],
+      rate: [0.05, 0.4],
+      breathe: [0.1, 0.7],
+      slip: [0.05, 0.6],
+      lineW: [0.02, 0.12],
+      density: [0, 0.35]
+    }
+  },
+  {
+    id: 'particle-drift',
+    name: 'Particle Drift',
+    category: 'Generator',
+    source: particleDrift,
+    curated: {
+      count: [6, 28],
+      speed: [0.1, 1.2],
+      flow: [0, 6.2832],
+      size: [0.04, 0.2],
+      trail: [0.1, 1.6],
+      jitter: [0.2, 0.9]
+    }
+  },
+  {
+    id: 'interference',
+    name: 'Interference',
+    category: 'Generator',
+    source: interference,
+    // detune + skew stay small — big values tip into op-art vibration.
+    curated: {
+      freq: [15, 80],
+      detune: [0.005, 0.08],
+      angle: [0, 6.2832],
+      skew: [0.03, 0.4],
+      rate: [0.03, 0.4],
+      contrast: [0.9, 2.2]
+    }
+  },
+  {
+    id: 'column-scan',
+    name: 'Column Scan',
+    category: 'Generator',
+    source: columnScan,
+    curated: {
+      lines: [20, 80],
+      amp: [0.015, 0.1],
+      scale: [1, 5],
+      rate: [0.05, 0.5],
+      width: [0.06, 0.35]
+    }
+  },
+  {
+    id: 'ash',
+    name: 'Ash',
+    category: 'Generator',
+    source: ash,
+    curated: {
+      count: [10, 45],
+      speed: [0.05, 0.8],
+      size: [0.04, 0.2],
+      wander: [0.15, 0.8],
+      flicker: [0.1, 0.7],
+      accent: [0.05, 0.6]
     }
   }
 ]

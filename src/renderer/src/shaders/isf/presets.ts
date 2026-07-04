@@ -38,6 +38,79 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Panic room', values: { rate: 1.0, bands: 26, density: 0.55, jitter: 1.0, drift: 0.9, accent: 0.45 } }
   ],
 
+  contour: [
+    { name: 'Survey map', values: { rate: 0.06, scale: 2.2, levels: 12, width: 0.1, warp: 0.4, fill: 0.1 } },
+    { name: 'Dense relief', values: { rate: 0.08, scale: 3.5, levels: 20, width: 0.08, warp: 0.6, fill: 0.05 } },
+    { name: 'Wide basins', values: { rate: 0.05, scale: 1.2, levels: 6, width: 0.15, warp: 0.5, fill: 0.25 } },
+    { name: 'Storm chart', values: { rate: 0.25, scale: 2.8, levels: 14, width: 0.12, warp: 1.1, fill: 0.08 } },
+    { name: 'Ink terraces', values: { rate: 0.04, scale: 2, levels: 9, width: 0.28, warp: 0.3, fill: 0.45 } },
+    { name: 'Hairline topo', values: { rate: 0.1, scale: 4.5, levels: 26, width: 0.04, warp: 0.7, fill: 0 } },
+    { name: 'Blue chart', values: { rate: 0.07, scale: 2.5, levels: 12, width: 0.1, warp: 0.5, fill: 0.15, tint: [0.35, 0.55, 0.85, 1] } },
+    { name: 'Amber field', values: { rate: 0.12, scale: 3, levels: 10, width: 0.14, warp: 0.8, fill: 0.2, tint: [0.9, 0.6, 0.2, 1] } },
+    { name: 'Slow melt', values: { rate: 0.02, scale: 1.8, levels: 16, width: 0.09, warp: 1.4, fill: 0.1 } },
+    { name: 'Shoreline', values: { rate: 0.15, scale: 1.5, levels: 5, width: 0.2, warp: 0.9, fill: 0.35, tint: [0.5, 0.75, 0.7, 1] } }
+  ],
+  'grid-drift': [
+    { name: 'Quiet lattice', values: { cells: 12, rate: 0.08, breathe: 0.2, slip: 0.1, lineW: 0.04, density: 0.08 } },
+    { name: 'Loose weave', values: { cells: 8, rate: 0.15, breathe: 0.6, slip: 0.2, lineW: 0.06, density: 0.12 } },
+    { name: 'Slipping floors', values: { cells: 14, rate: 0.2, breathe: 0.3, slip: 0.55, lineW: 0.05, density: 0.15 } },
+    { name: 'Dense mesh', values: { cells: 30, rate: 0.1, breathe: 0.25, slip: 0.15, lineW: 0.03, density: 0.05 } },
+    { name: 'Big rooms', values: { cells: 4, rate: 0.06, breathe: 0.4, slip: 0.3, lineW: 0.09, density: 0.3 } },
+    { name: 'Filing error', values: { cells: 18, rate: 0.35, breathe: 0.5, slip: 0.7, lineW: 0.04, density: 0.2 } },
+    { name: 'Blueprint', values: { cells: 16, rate: 0.05, breathe: 0.15, slip: 0.05, lineW: 0.05, density: 0.1, tint: [0.4, 0.6, 0.9, 1] } },
+    { name: 'Amber ledger', values: { cells: 10, rate: 0.12, breathe: 0.35, slip: 0.25, lineW: 0.06, density: 0.22, tint: [0.9, 0.65, 0.25, 1] } },
+    { name: 'Fault lines', values: { cells: 22, rate: 0.25, breathe: 0.8, slip: 0.45, lineW: 0.03, density: 0.08 } },
+    { name: 'Population', values: { cells: 26, rate: 0.1, breathe: 0.2, slip: 0.2, lineW: 0.02, density: 0.5 } }
+  ],
+  'particle-drift': [
+    { name: 'Slow field', values: { count: 12, speed: 0.25, flow: 0.4, size: 0.09, trail: 0.6, jitter: 0.5 } },
+    { name: 'Dust stream', values: { count: 24, speed: 0.7, flow: 0.2, size: 0.05, trail: 1.2, jitter: 0.3 } },
+    { name: 'Rising embers', values: { count: 16, speed: 0.5, flow: 1.5708, size: 0.07, trail: 0.9, jitter: 0.6, tint: [0.9, 0.55, 0.25, 1] } },
+    { name: 'Sparse drifters', values: { count: 6, speed: 0.3, flow: 0.8, size: 0.16, trail: 0.4, jitter: 0.7 } },
+    { name: 'Sideways rain', values: { count: 30, speed: 1.1, flow: 3.4, size: 0.04, trail: 1.6, jitter: 0.2 } },
+    { name: 'Plankton', values: { count: 20, speed: 0.15, flow: 4.7, size: 0.08, trail: 0.15, jitter: 0.9, tint: [0.45, 0.8, 0.75, 1] } },
+    { name: 'Falling slow', values: { count: 14, speed: 0.4, flow: 4.7124, size: 0.1, trail: 0.8, jitter: 0.4 } },
+    { name: 'Comet lane', values: { count: 8, speed: 1.4, flow: 0, size: 0.12, trail: 2, jitter: 0.25 } },
+    { name: 'Still swarm', values: { count: 34, speed: 0.05, flow: 2.3, size: 0.06, trail: 0.1, jitter: 1 } },
+    { name: 'Signal blue', values: { count: 18, speed: 0.6, flow: 5.9, size: 0.07, trail: 1, jitter: 0.5, tint: [0.4, 0.6, 0.95, 1] } }
+  ],
+  interference: [
+    { name: 'Silk beat', values: { freq: 40, detune: 0.02, angle: 0.35, skew: 0.1, rate: 0.1, contrast: 1.3 } },
+    { name: 'Slow weave', values: { freq: 24, detune: 0.01, angle: 0.9, skew: 0.06, rate: 0.05, contrast: 1.1 } },
+    { name: 'Tight mesh', values: { freq: 80, detune: 0.03, angle: 0.2, skew: 0.2, rate: 0.15, contrast: 1.6 } },
+    { name: 'Broad bands', values: { freq: 14, detune: 0.05, angle: 1.2, skew: 0.15, rate: 0.08, contrast: 1.2 } },
+    { name: 'Crawl', values: { freq: 50, detune: 0.008, angle: 0.5, skew: 0.05, rate: 0.3, contrast: 1.4 } },
+    { name: 'Fabric fault', values: { freq: 60, detune: 0.07, angle: 2.1, skew: 0.35, rate: 0.2, contrast: 1.8 } },
+    { name: 'Deep beat', values: { freq: 30, detune: 0.015, angle: 0.7, skew: 0.08, rate: 0.06, contrast: 2.1 } },
+    { name: 'Cold screen', values: { freq: 70, detune: 0.025, angle: 0.1, skew: 0.12, rate: 0.12, contrast: 1.5, tint: [0.45, 0.6, 0.8, 1] } },
+    { name: 'Warm gauze', values: { freq: 35, detune: 0.04, angle: 1.6, skew: 0.25, rate: 0.1, contrast: 1.2, tint: [0.85, 0.65, 0.4, 1] } },
+    { name: 'Standing wave', values: { freq: 45, detune: 0, angle: 0.4, skew: 0.3, rate: 0.25, contrast: 1.7 } }
+  ],
+  'column-scan': [
+    { name: 'Calm scan', values: { lines: 40, amp: 0.03, scale: 2, rate: 0.1, width: 0.12 } },
+    { name: 'Deep signal', values: { lines: 30, amp: 0.09, scale: 1.5, rate: 0.12, width: 0.15 } },
+    { name: 'Fine raster', values: { lines: 85, amp: 0.02, scale: 3, rate: 0.15, width: 0.08 } },
+    { name: 'Slow sea', values: { lines: 25, amp: 0.06, scale: 1, rate: 0.04, width: 0.2 } },
+    { name: 'Nervous trace', values: { lines: 50, amp: 0.04, scale: 6, rate: 0.45, width: 0.1 } },
+    { name: 'Broad ribbon', values: { lines: 15, amp: 0.1, scale: 2.5, rate: 0.08, width: 0.4 } },
+    { name: 'Green terminal', values: { lines: 45, amp: 0.05, scale: 2.2, rate: 0.18, width: 0.12, tint: [0.4, 0.85, 0.45, 1] } },
+    { name: 'Hot wire', values: { lines: 35, amp: 0.07, scale: 3.5, rate: 0.3, width: 0.09, tint: [0.95, 0.5, 0.2, 1] } },
+    { name: 'Whisper lines', values: { lines: 70, amp: 0.015, scale: 1.8, rate: 0.06, width: 0.06 } },
+    { name: 'Signal storm', values: { lines: 55, amp: 0.13, scale: 5, rate: 0.7, width: 0.14 } }
+  ],
+  ash: [
+    { name: 'Settling', values: { count: 24, speed: 0.2, size: 0.08, wander: 0.4, flicker: 0.3, accent: 0.25 } },
+    { name: 'Slow fall', values: { count: 16, speed: 0.1, size: 0.12, wander: 0.25, flicker: 0.2, accent: 0.15 } },
+    { name: 'Fine soot', values: { count: 45, speed: 0.35, size: 0.04, wander: 0.5, flicker: 0.4, accent: 0.1 } },
+    { name: 'Ember drift', values: { count: 20, speed: 0.3, size: 0.09, wander: 0.6, flicker: 0.55, accent: 0.6, tint: [0.95, 0.45, 0.15, 1] } },
+    { name: 'Grey weather', values: { count: 32, speed: 0.5, size: 0.06, wander: 0.7, flicker: 0.25, accent: 0.05 } },
+    { name: 'Sparse flakes', values: { count: 9, speed: 0.15, size: 0.18, wander: 0.35, flicker: 0.3, accent: 0.3 } },
+    { name: 'Blue static', values: { count: 40, speed: 0.7, size: 0.05, wander: 0.8, flicker: 0.6, accent: 0.4, tint: [0.4, 0.6, 0.95, 1] } },
+    { name: 'Aftermath', values: { count: 28, speed: 0.08, size: 0.07, wander: 0.2, flicker: 0.15, accent: 0.2 } },
+    { name: 'Updraft', values: { count: 22, speed: 0.9, size: 0.06, wander: 0.9, flicker: 0.45, accent: 0.35 } },
+    { name: 'Last sparks', values: { count: 12, speed: 0.25, size: 0.1, wander: 0.5, flicker: 0.8, accent: 0.8, tint: [0.95, 0.6, 0.2, 1] } }
+  ],
+
   // ── FX ──────────────────────────────────────────────────────────────
   'fx-posterize': [
     { name: '2-bit', values: { levels: 2, gamma: 1 } },
