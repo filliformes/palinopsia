@@ -230,8 +230,11 @@ function SourceSlot({
           ))}
         </select>
       </div>
-      {/* Per-source FX rack (only useful once a source is loaded) */}
-      {shaderId && children}
+      {/* Per-source FX rack (only useful once a source is loaded). The wrapper
+          stops click bubbling — otherwise selecting an FX unit here would
+          bubble to the slot's own onClick and instantly overwrite the
+          selection back to the source (the Inspector never showed FX). */}
+      {shaderId && <div onClick={(e) => e.stopPropagation()}>{children}</div>}
     </div>
   )
 }
