@@ -19,6 +19,7 @@ import type {
 } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS } from '@shared/types'
 import { makeDefaultModulators } from './engine/modulation'
+import { randomizeComposition, type RandomizeScope } from './randomize'
 
 export type { FxScope }
 
@@ -169,6 +170,9 @@ interface StoreState {
   moveFx: (scope: FxScope, instId: string, dir: -1 | 1) => void
   setFxInput: (scope: FxScope, instId: string, name: string, value: number | number[]) => void
 
+  // Randomize (brief §7) — scoped draws from curated aesthetic ranges.
+  randomize: (scope: RandomizeScope) => void
+
   // Modulation (Phase 5) — the 8-slot bank + the capped matrix.
   updateModulator: (i: number, partial: Partial<ModulatorConfig>) => void
   // Upserts by (mod, target): re-assigning the same pair updates its depth.
@@ -180,6 +184,12 @@ interface StoreState {
   // The currently-selected source/FX whose ISF INPUTS the auto-UI renders.
   selection: Selection
   setSelection: (s: Selection) => void
+
+  // UI chrome (persisted to localStorage, not to sessions).
+  uiZoom: number
+  setUiZoom: (z: number) => void
+  collapsed: Record<string, boolean>
+  toggleSection: (key: string) => void
 
   // Session round-tripping
   loadSession: (s: Session) => void
@@ -373,6 +383,9 @@ export const useStore = create<StoreState>((set, get) => ({
       )
     })),
 
+  randomize: (scope) =>
+    set((s) => ({ composition: randomizeComposition(s.composition, scope) })),
+
   updateModulator: (i, partial) =>
     set((s) => ({
       composition: {
@@ -425,6 +438,32 @@ export const useStore = create<StoreState>((set, get) => ({
 
   selection: null,
   setSelection: (sel) => set({ selection: sel }),
+
+  uiZoom: (() => {
+    const z = Number(localStorage.getItem('opsia.uiZoom'))
+    return Number.isFinite(z) && z >= 0.6 && z <= 1.6 ? z : 1
+  })(),
+  setUiZoom: (z) => {
+    const clamped = Math.max(0.6, Math.min(1.6, Math.round(z * 20) / 20))
+    localStorage.setItem('opsia.uiZoom', String(clamped))
+    set({ uiZoom: clamped })
+  },
+  collapsed: (() => {
+    try {
+      return JSON.parse(localStorage.getItem('opsia.collapsed') ?? '{}') as Record<
+        string,
+        boolean
+      >
+    } catch {
+      return {}
+    }
+  })(),
+  toggleSection: (key) =>
+    set((s) => {
+      const collapsed = { ...s.collapsed, [key]: !s.collapsed[key] }
+      localStorage.setItem('opsia.collapsed', JSON.stringify(collapsed))
+      return { collapsed }
+    }),
 
   loadSession: (s) =>
     set({

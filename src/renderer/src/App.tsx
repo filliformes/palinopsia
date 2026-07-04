@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Compositor } from './engine/Compositor'
 import { applyModulation, modEngine } from './engine/modulation'
+import { Collapsible } from './components/Collapsible'
 import { FxRackPanel } from './components/FxRackPanel'
 import { Inspector } from './components/Inspector'
 import { LayerPanel } from './components/LayerPanel'
@@ -15,6 +16,7 @@ import { ModulationPanel } from './components/ModulationPanel'
 import { Transport } from './components/Transport'
 import { GENERATORS, shaderSourceById } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
+import { initUndo, redo, undo, useUndoState } from './undo'
 import { THEME_ORDER, useStore, type ThemeName } from './store'
 
 export default function App(): JSX.Element {
@@ -24,6 +26,8 @@ export default function App(): JSX.Element {
   const setTheme = useStore((s) => s.setTheme)
   const name = useStore((s) => s.name)
   const setName = useStore((s) => s.setName)
+  const uiZoom = useStore((s) => s.uiZoom)
+  const setUiZoom = useStore((s) => s.setUiZoom)
   // Layers-column width — draggable via the handle between preview and strips.
   const [layersWidth, setLayersWidth] = useState<number>(() => {
     const saved = Number(localStorage.getItem('opsia.layersWidth'))
@@ -32,6 +36,38 @@ export default function App(): JSX.Element {
   useEffect(() => {
     localStorage.setItem('opsia.layersWidth', String(layersWidth))
   }, [layersWidth])
+
+  // ── Undo/redo (100 levels) + keyboard shortcuts ─────────────────────
+  useEffect(() => {
+    const unsub = initUndo()
+    const onKey = (e: KeyboardEvent): void => {
+      if (!(e.ctrlKey || e.metaKey)) return
+      // Don't hijack typing in inputs for zoom keys; undo is safe globally.
+      const inField = (e.target as HTMLElement)?.tagName === 'INPUT'
+      if (e.key === 'z' || e.key === 'Z') {
+        e.preventDefault()
+        if (e.shiftKey) redo()
+        else undo()
+      } else if (e.key === 'y') {
+        e.preventDefault()
+        redo()
+      } else if (!inField && (e.key === '=' || e.key === '+')) {
+        e.preventDefault()
+        setUiZoom(useStore.getState().uiZoom + 0.05)
+      } else if (!inField && e.key === '-') {
+        e.preventDefault()
+        setUiZoom(useStore.getState().uiZoom - 0.05)
+      } else if (!inField && e.key === '0') {
+        e.preventDefault()
+        setUiZoom(1)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      unsub()
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [setUiZoom])
 
   // ── Engine: mount the Compositor + run the frame loop ───────────────
   useEffect(() => {
@@ -112,7 +148,12 @@ export default function App(): JSX.Element {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-bg font-app text-text">
+    // CSS zoom scales the whole chrome; h-screen compensates by 1/zoom so
+    // the layout still fills the window exactly.
+    <div
+      className="flex flex-col bg-bg font-app text-text"
+      style={{ zoom: uiZoom, height: `calc(100vh / ${uiZoom})` }}
+    >
       {/* ── Top bar ─────────────────────────────────────────────── */}
       <header className="flex items-center gap-4 border-b border-border bg-panel px-4 py-2">
         <h1
@@ -130,6 +171,18 @@ export default function App(): JSX.Element {
           title="Session name"
         />
         <div className="flex-1" />
+        <UndoButtons />
+        <div className="flex items-center gap-0.5" title="UI zoom — Ctrl+= / Ctrl+- / Ctrl+0">
+          <button className="btn px-1.5 text-[12px]" onClick={() => setUiZoom(uiZoom - 0.05)}>
+            −
+          </button>
+          <span className="w-9 text-center font-mono text-[10px] text-muted">
+            {Math.round(uiZoom * 100)}%
+          </span>
+          <button className="btn px-1.5 text-[12px]" onClick={() => setUiZoom(uiZoom + 0.05)}>
+            +
+          </button>
+        </div>
         <button className="btn text-[12px]" onClick={openSession}>
           Open
         </button>
@@ -173,11 +226,15 @@ export default function App(): JSX.Element {
 
           {/* Auto-generated control panel — the selection's ISF INPUTS
               rendered as themed controls (brief §10.3). */}
-          <Inspector />
+          <Collapsible sectionKey="inspector" title="inspector">
+            <Inspector />
+          </Collapsible>
 
-          {/* Master FX rack — glitch / dither / chroma / grade (brief §10.5);
+          {/* Master FX rack — chips layout, zero blank space (brief §10.5);
               the warp/mapping stage joins it in Phase 8. */}
-          <MasterRackStrip />
+          <Collapsible sectionKey="master" title="master fx">
+            <MasterRackStrip />
+          </Collapsible>
         </section>
 
         {/* Drag handle — the layers column is resizable */}
@@ -205,7 +262,21 @@ export default function App(): JSX.Element {
 
 function MasterRackStrip(): JSX.Element {
   const master = useStore((s) => s.composition.master)
-  return <FxRackPanel scope={{ kind: 'master' }} fx={master} label="master fx" />
+  return <FxRackPanel scope={{ kind: 'master' }} fx={master} label="" chips />
+}
+
+function UndoButtons(): JSX.Element {
+  const state = useUndoState()
+  return (
+    <div className="flex items-center gap-0.5" title="Undo / Redo — Ctrl+Z / Ctrl+Shift+Z">
+      <button className="btn px-1.5 text-[12px]" onClick={undo} disabled={!state.undo}>
+        ↩
+      </button>
+      <button className="btn px-1.5 text-[12px]" onClick={redo} disabled={!state.redo}>
+        ↪
+      </button>
+    </div>
+  )
 }
 
 /** Thin draggable divider between the preview and the layers column. */

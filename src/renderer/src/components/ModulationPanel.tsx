@@ -22,19 +22,34 @@ const ARP_MODES: ArpMode[] = ['up', 'down', 'upDown', 'random', 'drunk']
 
 export function ModulationPanel(): JSX.Element {
   const modulators = useStore((s) => s.composition.modulators)
+  const collapsed = useStore((s) => !!s.collapsed['modulation'])
+  const toggleSection = useStore((s) => s.toggleSection)
   return (
-    <div className="flex min-w-0 flex-col gap-2 border-t border-border bg-panel px-3 py-2">
+    <div className="flex min-w-0 flex-col gap-2 border-t border-border bg-panel px-3 py-1.5">
       <div className="flex items-baseline gap-3">
-        <span className="font-mono text-[10px] uppercase tracking-wide text-muted">
-          Modulation
-        </span>
+        <button
+          onClick={() => toggleSection('modulation')}
+          className="flex shrink-0 items-center gap-1.5"
+          title={collapsed ? 'Expand modulation' : 'Collapse modulation'}
+        >
+          <span
+            className={`font-mono text-[9px] text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}
+          >
+            ▶
+          </span>
+          <span className="font-mono text-[10px] uppercase tracking-wide text-muted">
+            Modulation
+          </span>
+        </button>
         <MatrixSummary />
       </div>
-      <div className="flex min-w-0 gap-2 overflow-x-auto pb-1">
-        {modulators.map((_, i) => (
-          <ModCard key={i} index={i} />
-        ))}
-      </div>
+      {!collapsed && (
+        <div className="flex min-w-0 gap-2 overflow-x-auto pb-1">
+          {modulators.map((_, i) => (
+            <ModCard key={i} index={i} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

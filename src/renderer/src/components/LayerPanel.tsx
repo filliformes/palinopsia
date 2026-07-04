@@ -36,10 +36,27 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const isSelected = (slot: 'A' | 'B'): boolean =>
     selection?.type === 'source' && selection.layer === index && selection.slot === slot
 
+  const collapsed = useStore((s) => !!s.collapsed[`layer${index}`])
+  const toggleSection = useStore((s) => s.toggleSection)
+
   return (
     <div className="flex min-w-0 flex-col gap-2 rounded-md border border-border bg-panel p-2">
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[11px] text-muted">LAYER {index + 1}</span>
+        <button
+          onClick={() => toggleSection(`layer${index}`)}
+          className="flex items-center gap-1.5"
+          title={collapsed ? 'Expand layer' : 'Collapse layer'}
+        >
+          <span
+            className={`font-mono text-[9px] text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}
+          >
+            ▶
+          </span>
+          <span className="font-mono text-[11px] text-muted">
+            LAYER {index + 1}
+            {collapsed && layer.sourceA.shaderId ? ' ·' : ''}
+          </span>
+        </button>
         <div className="flex gap-1">
           <ToggleChip on={layer.solo} label="S" title="Solo" onClick={() => toggleSolo(index)} />
           <ToggleChip on={layer.mute} label="M" title="Mute" onClick={() => toggleMute(index)} />
@@ -52,6 +69,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
         </div>
       </div>
 
+      {!collapsed && (
+        <>
       {/* Source pickers — ISF generators (video / capture / HIVE arrive Phase 7).
           Stacked full-width: each slot hosts its own FX rack, so side-by-side
           columns can't breathe in the strip. */}
@@ -159,6 +178,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             />
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   )
