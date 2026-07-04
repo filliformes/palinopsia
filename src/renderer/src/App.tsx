@@ -9,6 +9,7 @@ import { useEffect, useRef } from 'react'
 import { Compositor } from './engine/Compositor'
 import { LayerPanel } from './components/LayerPanel'
 import { Transport } from './components/Transport'
+import { GENERATORS } from './shaders/isf'
 import { THEME_ORDER, useStore, type ThemeName } from './store'
 
 export default function App(): JSX.Element {
@@ -33,9 +34,24 @@ export default function App(): JSX.Element {
       console.error('[Compositor]', (e as Error).message)
       return
     }
-    const start = performance.now()
+
+    // Phase 1 MVP — load the seed ISF generator onto layer 0 and reflect it in
+    // the store so the layer strip shows what's playing. Phase 2 brings the
+    // full 4-layer blend stack online; for now one generator proves the runtime.
+    const seed = GENERATORS[0]
+    if (comp.loadLayerShader(0, seed.id, seed.source)) {
+      useStore.getState().setSourceShader(0, 'A', seed.id)
+    }
+
     const loop = (): void => {
-      comp!.render(performance.now() - start)
+      // Push layer-0 source inputs from the store each frame so parameter edits
+      // (and, later, OSC / modulators writing through the same actions) take
+      // effect live. Cheap; the auto-UI (Phase 4) drives these.
+      const l0 = useStore.getState().composition.layers[0]
+      for (const [k, v] of Object.entries(l0.sourceA.inputs)) {
+        comp!.setLayerSourceInput(0, k, v)
+      }
+      comp!.renderMVP(0)
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)

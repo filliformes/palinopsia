@@ -14,6 +14,8 @@
  * Target: RTX 4070 / WebGL2. 1080p–4K @ 60 is comfortable.
  */
 
+import { Renderer as ISFRenderer } from 'interactive-shader-format';
+
 export type BlendMode = 'add' | 'screen' | 'multiply' | 'difference' | 'overlay' | 'normal';
 
 const QUAD_VS = `#version 300 es
@@ -88,17 +90,48 @@ export class ISFLayer {
   pp: PingPong;
   blend: BlendMode = 'normal';
   opacity = 1;
-  // isfRenderer: import('interactive-shader-format').Renderer  // <-- attach here
+  shaderId: string | null = null;
+  private isf: ISFRenderer | null = null;
   constructor(private gl: WebGL2RenderingContext, w: number, h: number) {
     this.pp = new PingPong(gl, w, h);
   }
-  setInput(_name: string, _value: number | number[]) {
-    // SEAM: forward to the ISF Renderer, e.g. this.isfRenderer.setValue(name, value)
+
+  /**
+   * Load (or hot-swap) the ISF shader that drives this layer. The ping-pong
+   * feedback buffers are deliberately preserved across a swap so rebuilding
+   * the patch mid-performance never resets to black (the hot-swap principle,
+   * brief §1). Returns false if the shader failed to compile.
+   */
+  loadShader(id: string, source: string): boolean {
+    const r = new ISFRenderer(this.gl);
+    r.loadSource(source);
+    if (!r.valid) {
+      console.error('[ISF] load failed for', id, r.error);
+      return false;
+    }
+    this.isf?.cleanup();
+    this.isf = r;
+    this.shaderId = id;
+    return true;
   }
+
+  setInput(name: string, value: number | number[]) {
+    this.isf?.setValue(name, value);
+  }
+
+  /**
+   * PHASE 1 (MVP): draw the ISF generator fullscreen straight to the canvas's
+   * default framebuffer (the ISF runtime binds it and sizes the viewport from
+   * `destination`). PHASE 2 redirects this into the ping-pong FBO so the layer
+   * can be blended into the stack and sampled for feedback.
+   */
+  drawFullscreen(w: number, h: number) {
+    this.isf?.draw({ width: w, height: h });
+  }
+
   render(_timeMs: number) {
-    // SEAM: bind this.pp.write(), expose this.pp.read() as the shader's feedback
-    // input, then this.isfRenderer.draw(target). Plumbing below is real; the ISF
-    // draw call goes here.
+    // SEAM (Phase 2): draw the ISF into this.pp.write(), exposing this.pp.read()
+    // as the feedback input, then swap. Idle until the FBO redirect lands.
     this.pp.swap();
   }
   texture(): WebGLTexture { return this.pp.out(); }
@@ -181,7 +214,20 @@ export class Compositor {
     // 5. SEAM: gl.readPixels(...) → IPC → native Spout/Syphon/NDI sender (cheap on a 4070)
   }
 
+  /**
+   * PHASE 1 (MVP): draw a single layer's ISF generator straight to the canvas
+   * to prove the runtime end-to-end. Bypasses the blend stack + master pass
+   * (those come online in Phase 2 via `render()`). Defaults to layer 0.
+   */
+  renderMVP(layer = 0) {
+    this.layers[layer]?.drawFullscreen(this.canvas.width, this.canvas.height);
+  }
+
   // ---- instrument API (called from React / OSC / modulators) ----
+  /** Load (or hot-swap) an ISF shader onto a layer. */
+  loadLayerShader(i: number, id: string, source: string): boolean {
+    return this.layers[i]?.loadShader(id, source) ?? false;
+  }
   setLayerSourceInput(i: number, name: string, value: number | number[]) { this.layers[i]?.setInput(name, value); }
   setBlend(i: number, mode: BlendMode) { if (this.layers[i]) this.layers[i].blend = mode; }
   setOpacity(i: number, v: number)     { if (this.layers[i]) this.layers[i].opacity = v; }
