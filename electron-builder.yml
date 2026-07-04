@@ -1,0 +1,42 @@
+appId: com.vincentfillion.palinopsia
+productName: Palinopsia
+copyright: Copyright © 2026 Vincent Fillion
+directories:
+  output: release/${version}
+  buildResources: build
+# Palinopsia's engine is pure WebGL2 + ISF in the renderer and its OSC
+# stack (`osc`) is pure-JS — there are NO native `.node` addons in the
+# MVP, so there's nothing to rebuild from source. (Native Spout/Syphon/
+# NDI senders arrive in Phase 8; when they do, add their prebuilds to
+# `files` + `asarUnpack` the same way dataFLOU handles @julusian/midi.)
+npmRebuild: false
+buildDependenciesFromSource: false
+files:
+  - out/**/*
+  - package.json
+  - "!**/*.map"
+  - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
+asar: true
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-win-${arch}.${ext}
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+mac:
+  target:
+    - target: dmg
+      arch:
+        - universal
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+  category: public.app-category.music

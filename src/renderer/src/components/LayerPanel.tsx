@@ -1,0 +1,154 @@
+// One layer strip (brief §10.2). Source A/B pickers, blend + opacity, and the
+// solo/mute/feedback toggles — reading and writing the store, which the
+// Compositor samples each frame. The per-source FX slots and the finite
+// per-layer FX rack land in Phase 3; the auto-generated ISF control panel
+// (selecting a source renders its INPUTS) lands in Phase 4.
+
+import type { BlendMode } from '@shared/types'
+import { useStore } from '../store'
+import { BoundedNumberInput } from './BoundedNumberInput'
+
+const BLEND_MODES: BlendMode[] = [
+  'normal',
+  'add',
+  'screen',
+  'multiply',
+  'difference',
+  'overlay'
+]
+
+export function LayerPanel({ index }: { index: number }): JSX.Element {
+  const layer = useStore((s) => s.composition.layers[index])
+  const setBlend = useStore((s) => s.setBlend)
+  const setOpacity = useStore((s) => s.setOpacity)
+  const toggleMute = useStore((s) => s.toggleMute)
+  const toggleSolo = useStore((s) => s.toggleSolo)
+  const toggleFeedback = useStore((s) => s.toggleFeedback)
+  const setSelection = useStore((s) => s.setSelection)
+  const selection = useStore((s) => s.selection)
+
+  const isSelected = (slot: 'A' | 'B'): boolean =>
+    selection?.layer === index && selection.slot === slot
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-border bg-panel p-2">
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-[11px] text-muted">LAYER {index + 1}</span>
+        <div className="flex gap-1">
+          <ToggleChip on={layer.solo} label="S" title="Solo" onClick={() => toggleSolo(index)} />
+          <ToggleChip on={layer.mute} label="M" title="Mute" onClick={() => toggleMute(index)} />
+          <ToggleChip
+            on={layer.feedback}
+            label="FB"
+            title="Feedback — sample this layer's previous frame"
+            onClick={() => toggleFeedback(index)}
+          />
+        </div>
+      </div>
+
+      {/* Source pickers — the ISF generator library populates these in Phase 1+ */}
+      <div className="grid grid-cols-2 gap-1">
+        <SourceButton
+          label="A"
+          slotLabel={layer.sourceA.shaderId ?? '— empty —'}
+          selected={isSelected('A')}
+          onClick={() => setSelection({ layer: index, slot: 'A' })}
+        />
+        <SourceButton
+          label="B"
+          slotLabel={layer.sourceB?.shaderId ?? '— empty —'}
+          selected={isSelected('B')}
+          onClick={() => setSelection({ layer: index, slot: 'B' })}
+        />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <label className="font-mono text-[10px] text-muted">BLEND</label>
+        <select
+          className="input flex-1 text-[12px]"
+          value={layer.blend}
+          onChange={(e) => setBlend(index, e.target.value as BlendMode)}
+        >
+          {BLEND_MODES.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <label className="font-mono text-[10px] text-muted">OPACITY</label>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={layer.opacity}
+          onChange={(e) => setOpacity(index, Number(e.target.value))}
+          className="flex-1 accent-accent"
+        />
+        <div className="w-12">
+          <BoundedNumberInput
+            value={layer.opacity}
+            min={0}
+            max={1}
+            onChange={(v) => setOpacity(index, v)}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ToggleChip({
+  on,
+  label,
+  title,
+  onClick
+}: {
+  on: boolean
+  label: string
+  title: string
+  onClick: () => void
+}): JSX.Element {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      className={`rounded px-1.5 py-0.5 font-mono text-[10px] leading-none transition-colors ${
+        on
+          ? 'bg-accent/20 text-accent ring-1 ring-accent'
+          : 'bg-panel2 text-muted hover:text-text'
+      }`}
+    >
+      {label}
+    </button>
+  )
+}
+
+function SourceButton({
+  label,
+  slotLabel,
+  selected,
+  onClick
+}: {
+  label: string
+  slotLabel: string
+  selected: boolean
+  onClick: () => void
+}): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex flex-col items-start rounded border px-2 py-1 text-left transition-colors ${
+        selected
+          ? 'border-accent bg-panel2 ring-1 ring-accent'
+          : 'border-border bg-panel2/50 hover:border-accent/50'
+      }`}
+    >
+      <span className="font-mono text-[9px] text-muted">SRC {label}</span>
+      <span className="truncate text-[11px]">{slotLabel}</span>
+    </button>
+  )
+}

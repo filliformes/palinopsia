@@ -1,0 +1,1209 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ======== Fonts ========
+   Bundled as woff2 + loaded via @font-face so Electron's file:// renderer
+   works without hitting any CDN. Vite fingerprints these at build time. */
+@font-face { font-family: 'Inter'; font-weight: 400; font-style: normal; font-display: swap; src: url('./fonts/inter-400.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-weight: 500; font-style: normal; font-display: swap; src: url('./fonts/inter-500.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-weight: 600; font-style: normal; font-display: swap; src: url('./fonts/inter-600.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-weight: 700; font-style: normal; font-display: swap; src: url('./fonts/inter-700.woff2') format('woff2'); }
+@font-face { font-family: 'Roboto'; font-weight: 400; font-style: normal; font-display: swap; src: url('./fonts/roboto-400.woff2') format('woff2'); }
+@font-face { font-family: 'Roboto'; font-weight: 500; font-style: normal; font-display: swap; src: url('./fonts/roboto-500.woff2') format('woff2'); }
+@font-face { font-family: 'Roboto'; font-weight: 700; font-style: normal; font-display: swap; src: url('./fonts/roboto-700.woff2') format('woff2'); }
+@font-face { font-family: 'Work Sans'; font-weight: 400; font-style: normal; font-display: swap; src: url('./fonts/worksans-400.woff2') format('woff2'); }
+@font-face { font-family: 'Work Sans'; font-weight: 500; font-style: normal; font-display: swap; src: url('./fonts/worksans-500.woff2') format('woff2'); }
+@font-face { font-family: 'Work Sans'; font-weight: 600; font-style: normal; font-display: swap; src: url('./fonts/worksans-600.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Sans'; font-weight: 400; font-style: normal; font-display: swap; src: url('./fonts/plexsans-400.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Sans'; font-weight: 500; font-style: normal; font-display: swap; src: url('./fonts/plexsans-500.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Sans'; font-weight: 600; font-style: normal; font-display: swap; src: url('./fonts/plexsans-600.woff2') format('woff2'); }
+
+/* ======== Theme palettes ======== */
+/* Colors are held as space-separated RGB triples so Tailwind's rgb(.../<alpha>)
+   machinery can add opacity variants. Themes also expose an optional
+   --input-inset custom-property (box-shadow) for the Live-12-style inset
+   entry-box treatment; themes that don't set it fall back to `none`. */
+
+/* -------- NEW THEMES (first in the picker). ----------
+   Shared DNA: panel > bg contrast, inputs DARKER than their containing panel
+   with a 1px inner rim shadow — they read as a CRT cutout. */
+
+/* Studio Dark — canonical DAW stock dark (Inter, warm orange).
+   :root prefix bumps specificity so these rules beat the `:root, [data-theme='dark']`
+   default further down the file regardless of source order. */
+:root[data-theme='studio-dark'] {
+  --c-bg: 30 30 30;
+  --c-panel: 42 42 42;
+  --c-panel2: 50 50 50;
+  --c-panel3: 74 74 74;
+  --c-border: 17 17 17;
+  --c-accent: 255 142 15;
+  --c-accent2: 0 190 244;
+  --c-muted: 138 138 138;
+  --c-text: 216 216 216;
+  --c-active: 255 164 50;
+  --c-danger: 235 95 95;
+  --c-success: 110 180 120;
+  --c-input-bg: 21 21 21;
+  --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --input-inset: inset 0 1px 0 rgb(10 10 10 / 0.95), inset 1px 0 0 rgb(10 10 10 / 0.5);
+}
+
+/* Warm Charcoal — warm take on the studio-dark DNA (Inter). */
+:root[data-theme='warm-charcoal'] {
+  --c-bg: 29 29 29;
+  --c-panel: 42 42 42;
+  --c-panel2: 52 52 52;
+  --c-panel3: 62 62 62;
+  --c-border: 17 17 17;
+  --c-accent: 255 140 66;
+  --c-accent2: 110 163 214;
+  --c-muted: 138 138 138;
+  --c-text: 234 234 234;
+  --c-active: 255 166 96;
+  --c-danger: 224 102 102;
+  --c-success: 110 180 120;
+  --c-input-bg: 20 20 20;
+  --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --input-inset: inset 0 1px 0 rgb(8 8 8 / 0.8);
+}
+
+/* Graphite — cool flat dark (Roboto). */
+:root[data-theme='graphite'] {
+  --c-bg: 28 28 28;
+  --c-panel: 38 38 38;
+  --c-panel2: 48 48 48;
+  --c-panel3: 64 64 64;
+  --c-border: 14 14 14;
+  --c-accent: 238 126 17;
+  --c-accent2: 97 196 200;
+  --c-muted: 154 154 154;
+  --c-text: 224 224 224;
+  --c-active: 250 150 50;
+  --c-danger: 229 90 90;
+  --c-success: 110 180 120;
+  --c-input-bg: 18 18 18;
+  --font-app: 'Roboto', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --input-inset: inset 0 1px 0 rgb(6 6 6 / 0.9);
+}
+
+/* Cream — repainted to match Rainbow Circuit's "Peaks" plugin: warm
+   cream paper with mustard-ochre accents and a desaturated warm-grey
+   inverted card for readouts. Rich theme — opts into bespoke arc
+   sliders, icon-row mode pickers, card-wrap sections, and console
+   readouts (see RICH_THEMES in store.ts). */
+:root[data-theme='cream'] {
+  --c-bg: 229 224 213;
+  --c-panel: 237 232 220;
+  --c-panel2: 240 235 224;
+  --c-panel3: 216 210 194;
+  --c-border: 184 176 160;
+  --c-accent: 212 176 72;
+  --c-accent2: 122 133 144;
+  --c-muted: 126 120 104;
+  --c-text: 63 64 71;
+  --c-active: 220 184 80;
+  --c-danger: 180 60 50;
+  --c-success: 122 153 96;
+  --c-input-bg: 234 228 214;
+  --font-app: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --input-inset: inset 0 1px 2px rgb(0 0 0 / 0.05);
+  /* Rich-theme tonal-spectrum endpoints — drive the gradient on
+     bespoke arc sliders + step bars. Peaks-style: a single ochre
+     family from light cream-yellow to deeper amber. */
+  --c-rich-warm: 232 196 110;
+  --c-rich-cool: 184 132 52;
+  /* Inverted readout panel — the dark-grey card Peaks tucks beneath
+     its main panel for metric readouts. */
+  --c-rich-card-bg: 84 80 76;
+  --c-rich-card-text: 232 226 212;
+  --c-rich-card-muted: 156 150 138;
+}
+
+/* Nature — repainted to match Rainbow Circuit's "Hopscotch" plugin:
+   dark warm grey background with a tonal yellow-olive → teal-green
+   gradient for active values and warm orange for accents/locks. Rich
+   theme. */
+:root[data-theme='nature'] {
+  --c-bg: 26 26 26;
+  --c-panel: 38 38 38;
+  --c-panel2: 48 48 48;
+  --c-panel3: 64 64 64;
+  --c-border: 14 14 14;
+  --c-accent: 255 142 15;
+  --c-accent2: 93 212 176;
+  --c-muted: 138 138 138;
+  --c-text: 220 220 220;
+  --c-active: 255 170 64;
+  --c-danger: 235 95 95;
+  --c-success: 125 212 156;
+  --c-input-bg: 22 22 22;
+  --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --input-inset: inset 0 1px 0 rgb(8 8 8 / 0.95);
+  /* Rich-theme tonal spectrum — Hopscotch's signature warm yellow-
+     olive → mossy → teal-green ramp. The arc sliders and step bars
+     interpolate between these endpoints across their length. */
+  --c-rich-warm: 197 196 93;
+  --c-rich-cool: 93 212 176;
+  /* Inverted readout card — slightly darker than the main panel so
+     metric tiles read as embedded displays. */
+  --c-rich-card-bg: 18 18 18;
+  --c-rich-card-text: 220 218 198;
+  --c-rich-card-muted: 138 138 132;
+}
+
+/* Paper Light — cool paper light (Work Sans, blue). */
+:root[data-theme='paper-light'] {
+  --c-bg: 235 236 240;
+  --c-panel: 255 255 255;
+  --c-panel2: 247 248 250;
+  --c-panel3: 232 233 238;
+  --c-border: 199 199 205;
+  --c-accent: 13 153 255;
+  --c-accent2: 255 76 141;
+  --c-muted: 107 107 115;
+  --c-text: 15 15 17;
+  --c-active: 40 170 255;
+  --c-danger: 215 58 58;
+  --c-success: 55 140 85;
+  --c-input-bg: 240 241 245;
+  --font-app: 'Work Sans', ui-sans-serif, system-ui, sans-serif;
+  --input-inset: inset 0 1px 2px rgb(0 0 0 / 0.06);
+}
+
+/* -------- EXISTING THEMES (unchanged) ---------- */
+
+:root,
+[data-theme='dark'] {
+  --c-bg: 29 29 29;
+  --c-panel: 42 42 42;
+  --c-panel2: 54 54 54;
+  --c-panel3: 66 66 66;
+  --c-border: 20 20 20;
+  --c-accent: 255 153 51;
+  --c-accent2: 123 167 217;
+  --c-muted: 138 138 138;
+  --c-text: 212 212 212;
+  --c-active: 255 169 77;
+  --c-danger: 216 75 75;
+  --c-success: 119 192 122;
+  --c-input-bg: 26 26 26;
+  --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* Light — bright but with enough contrast to actually read; darker accent
+   + visible borders so panels read as distinct surfaces. */
+[data-theme='light'] {
+  --c-bg: 214 214 214;
+  --c-panel: 236 236 236;
+  --c-panel2: 224 224 224;
+  --c-panel3: 200 200 200;
+  --c-border: 160 160 160;
+  --c-accent: 200 95 20;
+  --c-accent2: 40 95 160;
+  --c-muted: 90 90 90;
+  --c-text: 30 30 30;
+  --c-active: 220 110 35;
+  --c-danger: 180 45 45;
+  --c-success: 55 140 85;
+  --c-input-bg: 248 248 248;
+  --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* Pastel — dusty rose + lavender, muted not garish, sans-serif only. */
+[data-theme='pastel'] {
+  --c-bg: 232 218 232;
+  --c-panel: 244 230 242;
+  --c-panel2: 226 210 228;
+  --c-panel3: 208 190 214;
+  --c-border: 180 158 190;
+  --c-accent: 182 108 146;
+  --c-accent2: 128 160 196;
+  --c-muted: 130 110 146;
+  --c-text: 64 48 78;
+  --c-active: 200 130 168;
+  --c-danger: 188 78 94;
+  --c-success: 108 172 130;
+  --c-input-bg: 252 246 250;
+  --font-app: 'Quicksand', 'Nunito', 'Trebuchet MS', sans-serif;
+}
+
+/* Classic — blue-grey, cool, medium-high contrast. */
+[data-theme='reaper'] {
+  --c-bg: 30 30 30;
+  --c-panel: 43 43 43;
+  --c-panel2: 56 56 56;
+  --c-panel3: 72 72 72;
+  --c-border: 16 16 16;
+  --c-accent: 74 144 200;
+  --c-accent2: 122 176 216;
+  --c-muted: 128 128 128;
+  --c-text: 208 208 208;
+  --c-active: 98 160 210;
+  --c-danger: 201 64 64;
+  --c-success: 110 180 120;
+  --c-input-bg: 24 24 24;
+  --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* Smooth — low contrast, warm greys, "easy on the eyes". */
+[data-theme='smooth'] {
+  --c-bg: 44 42 40;
+  --c-panel: 54 52 50;
+  --c-panel2: 64 62 60;
+  --c-panel3: 76 74 72;
+  --c-border: 32 30 28;
+  --c-accent: 164 146 124;
+  --c-accent2: 142 160 172;
+  --c-muted: 120 114 106;
+  --c-text: 186 178 168;
+  --c-active: 188 170 146;
+  --c-danger: 172 108 108;
+  --c-success: 136 160 132;
+  --c-input-bg: 38 36 34;
+  --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* Hydra — desaturated blue-greys with a bright cyan accent. */
+[data-theme='hydra'] {
+  --c-bg: 26 37 48;
+  --c-panel: 37 51 64;
+  --c-panel2: 51 67 80;
+  --c-panel3: 68 85 102;
+  --c-border: 10 18 24;
+  --c-accent: 77 208 225;
+  --c-accent2: 128 203 196;
+  --c-muted: 120 144 156;
+  --c-text: 207 216 220;
+  --c-active: 100 220 235;
+  --c-danger: 229 115 115;
+  --c-success: 129 199 132;
+  --c-input-bg: 20 28 38;
+  --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* DarkSide — near-black with a hot red-orange accent. */
+[data-theme='darkside'] {
+  --c-bg: 10 10 10;
+  --c-panel: 20 20 20;
+  --c-panel2: 30 30 30;
+  --c-panel3: 42 42 42;
+  --c-border: 0 0 0;
+  --c-accent: 255 87 34;
+  --c-accent2: 255 138 101;
+  --c-muted: 112 112 112;
+  --c-text: 224 224 224;
+  --c-active: 255 112 67;
+  --c-danger: 255 61 0;
+  --c-success: 118 196 122;
+  --c-input-bg: 5 5 5;
+  --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* Solaris — cool blue-dominated. */
+[data-theme='solaris'] {
+  --c-bg: 26 40 56;
+  --c-panel: 34 51 72;
+  --c-panel2: 42 63 88;
+  --c-panel3: 53 77 106;
+  --c-border: 15 26 38;
+  --c-accent: 41 182 246;
+  --c-accent2: 129 212 250;
+  --c-muted: 106 138 165;
+  --c-text: 207 226 234;
+  --c-active: 79 195 247;
+  --c-danger: 224 96 96;
+  --c-success: 129 199 132;
+  --c-input-bg: 21 34 47;
+  --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* Flame — dark grey with a hot orange. */
+[data-theme='flame'] {
+  --c-bg: 28 28 28;
+  --c-panel: 40 40 40;
+  --c-panel2: 52 52 52;
+  --c-panel3: 66 66 66;
+  --c-border: 12 12 12;
+  --c-accent: 255 122 0;
+  --c-accent2: 255 169 77;
+  --c-muted: 140 140 140;
+  --c-text: 224 224 224;
+  --c-active: 255 145 30;
+  --c-danger: 216 60 60;
+  --c-success: 98 198 122;
+  --c-input-bg: 22 22 22;
+  --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* Analog — warm wood/cream. */
+[data-theme='analog'] {
+  --c-bg: 58 46 34;
+  --c-panel: 74 59 44;
+  --c-panel2: 86 70 52;
+  --c-panel3: 106 86 63;
+  --c-border: 40 30 20;
+  --c-accent: 230 180 94;
+  --c-accent2: 216 146 98;
+  --c-muted: 168 144 120;
+  --c-text: 240 228 200;
+  --c-active: 240 194 116;
+  --c-danger: 216 101 96;
+  --c-success: 152 188 122;
+  --c-input-bg: 48 37 25;
+  --font-app: 'Georgia', 'Iowan Old Style', serif;
+}
+
+/* ======== Base ======== */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-app);
+  font-size: 13px;
+  background: rgb(var(--c-bg));
+  color: rgb(var(--c-text));
+  -webkit-user-select: none;
+  user-select: none;
+  /* Enable Inter's single-storey 'a' (ss01) and cv11 alt glyphs for a more
+     Ableton-Sans-ish feel. Other fonts silently ignore features they don't
+     ship. We deliberately do NOT set letter-spacing here — Inter's intrinsic
+     metrics plus any extra tracking push the top-bar wide enough that the
+     rightmost buttons (Stop All / Panic) clipped off-screen. */
+  font-feature-settings: 'ss01', 'cv11';
+}
+
+input,
+select,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--c-panel3));
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--c-muted) / 0.6);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Strip the native up/down spinner arrows from all number inputs. */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* ======== Show / kiosk mode ========
+   When [data-show-mode='true'] is set on <html>, every element tagged with
+   `data-hide-in-show="true"` disappears. This lets components opt individual
+   pieces of their own UI out of show mode without centralizing a big switch
+   here. Use it on edit-only controls: Inspector, Buttons box, sub-toolbars,
+   scene/message edit chrome, etc.
+
+   The app root also gains a faint pulsing dot in the top-right corner so
+   performers always have a visible "yes you're locked" indicator. */
+html[data-show-mode='true'] [data-hide-in-show='true'] {
+  display: none !important;
+}
+/* Show-mode badge now lives inside the TopBar React tree so it sits
+   naturally in the toolbar's flex row, centered both axes. See
+   TopBar.tsx. Animation class below is applied to that element. */
+.show-badge {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  color: rgb(var(--c-danger));
+  background: rgb(var(--c-panel) / 0.8);
+  padding: 2px 8px;
+  border: 1px solid rgb(var(--c-danger));
+  border-radius: 3px;
+  pointer-events: none;
+  animation: show-pulse 2s ease-in-out infinite;
+  white-space: nowrap;
+}
+@keyframes show-pulse {
+  0%, 100% { opacity: 0.65; }
+  50%      { opacity: 1.0; }
+}
+
+/* Armed-scene marker — applied to palette pills, sequence slots, and
+   scene column headers when a scene is primed to fire on the next GO.
+   accent2 (blue) ring + soft glow so it never reads as "currently
+   playing" (which uses accent / orange). */
+.armed-ring {
+  box-shadow:
+    0 0 0 2px rgb(var(--c-accent2)),
+    0 0 10px 0 rgb(var(--c-accent2) / 0.6);
+  animation: armed-pulse 1.4s ease-in-out infinite;
+  border-radius: inherit;
+}
+@keyframes armed-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgb(var(--c-accent2) / 0.9), 0 0 6px 0 rgb(var(--c-accent2) / 0.5); }
+  50%      { box-shadow: 0 0 0 2px rgb(var(--c-accent2)), 0 0 14px 2px rgb(var(--c-accent2) / 0.8); }
+}
+.armed-chevron {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  z-index: 5;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  color: rgb(var(--c-accent2));
+  pointer-events: none;
+  text-shadow: 0 0 3px rgb(var(--c-panel));
+}
+
+/* ======== LFO/Sequencer clockwise sweep on the trigger square ======== */
+
+@property --lfo-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* Sweep overlays: filled wedge = accent, unfilled = dark panel (so the sweep
+   is visible even when the button's own bg is accent). */
+.lfo-sweep {
+  background: conic-gradient(
+    from 0deg,
+    rgb(var(--c-accent)) 0deg,
+    rgb(var(--c-accent)) var(--lfo-angle),
+    rgb(var(--c-panel2)) var(--lfo-angle) 360deg
+  );
+  animation-name: lfo-spin;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.scene-fill {
+  background: conic-gradient(
+    from 0deg,
+    rgb(var(--c-accent)) 0deg,
+    rgb(var(--c-accent)) var(--lfo-angle),
+    rgb(var(--c-panel2)) var(--lfo-angle) 360deg
+  );
+  animation-name: lfo-spin;
+  animation-timing-function: linear;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+
+@keyframes lfo-spin {
+  from {
+    --lfo-angle: 0deg;
+  }
+  to {
+    --lfo-angle: 360deg;
+  }
+}
+
+/* ======== Step blink ======== */
+/* When a cell's sequencer is on the active step, its step-value input or the
+   cell tile itself pulses with accent color. */
+
+@keyframes seq-pulse {
+  0% {
+    box-shadow: 0 0 0 2px rgb(var(--c-accent) / 0.8) inset;
+    background: rgb(var(--c-accent) / 0.2);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(var(--c-accent) / 0) inset;
+    background: rgb(var(--c-accent) / 0);
+  }
+}
+
+.seq-pulse {
+  animation: seq-pulse 400ms ease-out;
+}
+
+/* Muted variant of the step pulse — same shape, but in the muted/
+   border colour instead of accent. Tells the user "the playhead is
+   here but this step is gated off in the current cycle (Euclidean
+   miss, Cellular dead bit, etc) — receiver will hold." */
+@keyframes seq-pulse-muted {
+  0% {
+    box-shadow: 0 0 0 2px rgb(var(--c-muted) / 0.7) inset;
+    background: rgb(var(--c-muted) / 0.2);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(var(--c-muted) / 0) inset;
+    background: rgb(var(--c-muted) / 0);
+  }
+}
+.seq-pulse-muted {
+  animation: seq-pulse-muted 400ms ease-out;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Rainbow-Circuit-flavoured visualisers for the sequencer previews.
+
+   Three building blocks the previews share:
+   - .rc-cell — one slot in a row. Soft rounded square or circle
+     (variants below), uses the cell's `--rc-hue` custom property to
+     paint itself; smooth transitions on every state change so the
+     row feels alive when params drag.
+   - .rc-cell.is-hit — the cell is part of the active pattern; tints
+     itself in its hue at low opacity, gets a coloured outline, and
+     casts a soft halo glow that blends across neighbours.
+   - .rc-cell.is-now — the live playhead is over this cell; bumps
+     scale, pumps the glow, and triggers a one-shot pulse animation.
+
+   Each preview sets `style={{ '--rc-hue': '...' }}` per cell so the
+   row spreads across the rainbow wheel based on step index. The
+   colours are HSL-derived in the components; the CSS just consumes
+   them, so theme switches don't need rewriting here.
+
+   ──────────────────────────────────────────────────────────────── */
+
+.rc-cell {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid rgb(var(--c-border) / 0.5);
+  background: transparent;
+  position: relative;
+  /* All visual state (hit, now, hue change) animates in on a single
+     transition stack so dragging Density / Bias / Rule feels fluid
+     instead of step-frame-snapping. */
+  transition:
+    background-color 220ms ease-out,
+    border-color 220ms ease-out,
+    box-shadow 220ms ease-out,
+    transform 220ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+.rc-cell.is-hit {
+  border-color: hsl(var(--rc-hue) 75% 60%);
+  background: hsl(var(--rc-hue) 75% 55% / 0.28);
+  /* Soft Rainbow-Circuit-ish bloom: two stacked glows give the cell a
+     halo that bleeds onto the next-door cell, much like Tinge's discs
+     blending colour at their overlaps. */
+  box-shadow:
+    0 0 6px hsl(var(--rc-hue) 80% 60% / 0.45),
+    0 0 14px hsl(var(--rc-hue) 80% 60% / 0.18);
+}
+
+.rc-cell.is-now {
+  border-color: hsl(var(--rc-hue) 90% 70%);
+  background: hsl(var(--rc-hue) 80% 60% / 0.95);
+  transform: scale(1.18);
+  z-index: 1;
+  box-shadow:
+    0 0 8px hsl(var(--rc-hue) 95% 70% / 0.85),
+    0 0 22px hsl(var(--rc-hue) 90% 65% / 0.45);
+  animation: rc-cell-pulse 480ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+/* When a step is BOTH a hit and the live playhead, the .is-now rules
+   above already win — no extra rule needed. The pulse on each new
+   "now" frame triggers because React re-mounts the class via the
+   playhead key changing, restarting the animation. */
+
+@keyframes rc-cell-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow:
+      0 0 0 0 hsl(var(--rc-hue) 95% 70% / 0.95),
+      0 0 0 0 hsl(var(--rc-hue) 90% 65% / 0.6);
+  }
+  60% {
+    transform: scale(1.28);
+    box-shadow:
+      0 0 14px hsl(var(--rc-hue) 95% 70% / 0.95),
+      0 0 28px hsl(var(--rc-hue) 90% 65% / 0.5);
+  }
+  100% {
+    transform: scale(1.18);
+    box-shadow:
+      0 0 8px hsl(var(--rc-hue) 95% 70% / 0.85),
+      0 0 22px hsl(var(--rc-hue) 90% 65% / 0.45);
+  }
+}
+
+/* Round variant — used by Drift's clock ring + Polyrhythm's rings,
+   where circles read more naturally than rounded squares. */
+.rc-cell.is-round {
+  border-radius: 50%;
+}
+
+/* The "rest" state for cellular's older generations: dimmer, smaller,
+   no glow. The fade-down (controlled by inline `opacity` in the
+   component) communicates "this row is older history". */
+.rc-cell.is-faded {
+  border-color: rgb(var(--c-border) / 0.4);
+}
+
+/* Bar-fill cell used by the Density preview — the cell itself is
+   transparent; an inner div fills from the bottom up, tinted by the
+   cell's hue. The :before sliver gives the bar a subtle highlight
+   along the top so it reads as a glass tube rather than a flat fill. */
+.rc-bar-cell {
+  width: 18px;
+  height: 28px;
+  border-radius: 5px;
+  border: 1.5px solid rgb(var(--c-border) / 0.5);
+  background: rgb(var(--c-panel2) / 0.4);
+  position: relative;
+  overflow: hidden;
+  transition:
+    border-color 220ms ease-out,
+    box-shadow 220ms ease-out,
+    transform 220ms ease-out;
+}
+.rc-bar-cell.is-hit {
+  border-color: hsl(var(--rc-hue) 75% 60%);
+  box-shadow: 0 0 8px hsl(var(--rc-hue) 80% 60% / 0.35);
+}
+.rc-bar-cell.is-now {
+  border-color: hsl(var(--rc-hue) 90% 70%);
+  box-shadow:
+    0 0 10px hsl(var(--rc-hue) 95% 70% / 0.7),
+    0 0 22px hsl(var(--rc-hue) 90% 65% / 0.4);
+  transform: scale(1.08);
+}
+.rc-bar-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 0 0 3px 3px;
+  /* Rainbow-Circuit gradient — the bar's own hue at the top fades
+     down into a deeper, slightly desaturated foot. Reads as glassy. */
+  background: linear-gradient(
+    180deg,
+    hsl(var(--rc-hue) 90% 70% / 0.95) 0%,
+    hsl(var(--rc-hue) 70% 45% / 0.7) 100%
+  );
+  /* Smooth fill changes when Density slider moves. */
+  transition: height 220ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.rc-bar-fill.is-rest {
+  background: rgb(var(--c-border) / 0.35);
+}
+
+/* Ratchet's per-step burst meter — concentric inner dots that scale
+   with the step's burst probability so high-prob steps look denser. */
+.rc-ratchet-cell {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1.5px solid rgb(var(--c-border) / 0.5);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--rc-hue) 60% 50% / 0.06);
+  transition:
+    border-color 220ms ease-out,
+    box-shadow 220ms ease-out,
+    transform 220ms ease-out;
+}
+.rc-ratchet-cell.is-now {
+  border-color: hsl(var(--rc-hue) 90% 70%);
+  background: hsl(var(--rc-hue) 80% 55% / 0.22);
+  box-shadow: 0 0 12px hsl(var(--rc-hue) 95% 70% / 0.7);
+  transform: scale(1.12);
+}
+.rc-ratchet-dot {
+  border-radius: 50%;
+  background: hsl(var(--rc-hue) 90% 65%);
+  /* Each dot's size is set inline based on probability; the smooth
+     transition makes the slider feel responsive without lag. */
+  transition:
+    width 220ms ease-out,
+    height 220ms ease-out,
+    box-shadow 220ms ease-out;
+}
+
+/* One-shot red flash for the Stop All / Panic buttons on click. */
+@keyframes flash-red {
+  0% {
+    background: rgb(var(--c-danger));
+    color: #000;
+    border-color: rgb(var(--c-danger));
+  }
+  100% {
+    background: rgb(var(--c-panel2));
+    color: inherit;
+    border-color: rgb(var(--c-border));
+  }
+}
+.flash-red {
+  animation: flash-red 400ms ease-out;
+}
+
+/* One-shot blue flash for the Save button on a successful write. */
+@keyframes flash-blue {
+  0% {
+    background: rgb(var(--c-accent2));
+    color: #000;
+    border-color: rgb(var(--c-accent2));
+  }
+  100% {
+    background: rgb(var(--c-panel2));
+    color: inherit;
+    border-color: rgb(var(--c-border));
+  }
+}
+.flash-blue {
+  animation: flash-blue 500ms ease-out;
+}
+
+/* ======== Form controls ======== */
+
+.input {
+  background: rgb(var(--c-input-bg));
+  border: 1px solid rgb(var(--c-border));
+  border-radius: 2px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: rgb(var(--c-text));
+  outline: none;
+  /* Themes that define --input-inset get a Live-12-style inset shadow;
+     existing themes that don't set it fall back to none (no change). */
+  box-shadow: var(--input-inset, none);
+  transition: border-color 120ms;
+}
+.input:hover:not(:disabled):not(:focus) {
+  border-color: rgb(var(--c-panel3));
+}
+.input:focus {
+  border-color: rgb(var(--c-accent));
+  background: rgb(var(--c-input-bg) / 1);
+}
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Compact native-select style — used where we need the dropdown to fit in
+   a narrow column (e.g. SceneColumn's "Next" follow-action). Strips the
+   platform's native dropdown arrow (which eats ~20 px on Windows and
+   ~24 px on macOS) and replaces it with a small chevron drawn as a
+   background SVG. The extra right-padding (16 px) leaves room for the
+   chevron without cropping the label. */
+.select-compact {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 16px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 5px center;
+  background-size: 8px 5px;
+}
+/* Hide the dropdown arrow that IE / Edge legacy still renders. */
+.select-compact::-ms-expand {
+  display: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  background: rgb(var(--c-input-bg));
+  border: 1px solid rgb(var(--c-border));
+}
+
+.btn {
+  padding: 4px 8px;
+  border-radius: 2px;
+  border: 1px solid rgb(var(--c-border));
+  background: rgb(var(--c-panel2));
+  font-size: 12px;
+  color: inherit;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) {
+  background: rgb(var(--c-panel3));
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-accent {
+  padding: 4px 8px;
+  border-radius: 2px;
+  background: rgb(var(--c-accent));
+  color: #000;
+  font-size: 12px;
+  font-weight: 500;
+}
+.btn-accent:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.btn-accent:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgb(var(--c-muted));
+}
+
+/* ======== Clip top bar ======== */
+/* A scene-color strip at the top edge of every filled clip. Thickness is
+   per-theme via [data-theme='x'] .clip-top-bar rules below. Default 0 so
+   the bar is invisible on themes that don't opt in (existing 10 themes). */
+.clip-top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 0;
+  background: var(--scene-color, transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+[data-theme='studio-dark']   .clip-top-bar { height: 3px; }
+[data-theme='warm-charcoal'] .clip-top-bar { height: 2px; opacity: 0.85; }
+[data-theme='graphite']      .clip-top-bar { height: 2px; }
+[data-theme='cream']         .clip-top-bar { height: 3px; }
+[data-theme='paper-light']   .clip-top-bar { height: 3px; }
+
+/* ======== MIDI Learn overlays ======== */
+/* Rendered on top of scene triggers and track rows while learn mode is on.
+   Blue = unbound, bright blue = selected as learn target, green = already
+   bound. pointer-events: none so the underlying button still captures clicks. */
+
+.midi-learn-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 2px;
+  transition: background 120ms, box-shadow 120ms;
+  z-index: 40;
+}
+.midi-learn-blue {
+  background: rgba(90, 150, 255, 0.28);
+  box-shadow: 0 0 0 1px rgba(90, 150, 255, 0.7) inset;
+}
+.midi-learn-selected {
+  background: rgba(90, 150, 255, 0.5);
+  box-shadow: 0 0 0 2px rgba(90, 150, 255, 1) inset;
+  animation: midi-learn-pulse 700ms ease-in-out infinite alternate;
+}
+.midi-learn-green {
+  background: rgba(80, 210, 130, 0.3);
+  box-shadow: 0 0 0 1px rgba(80, 210, 130, 0.7) inset;
+}
+@keyframes midi-learn-pulse {
+  from {
+    box-shadow: 0 0 0 1px rgba(90, 150, 255, 0.5) inset;
+  }
+  to {
+    box-shadow: 0 0 0 3px rgba(90, 150, 255, 1) inset;
+  }
+}
+
+/* Resize handles. The visible width is tiny (set inline via Tailwind
+   `w-[4px]` / `h-[4px]`) but a transparent `::before` overlay extends
+   the pointer-event hit area ±5 px on each side so the user doesn't
+   have to nail a 4-pixel target. Pseudo inherits the cursor and
+   forwards clicks to the parent (mouseDown listener on the host). */
+.resize-h {
+  cursor: row-resize;
+}
+.resize-v {
+  cursor: col-resize;
+}
+/* Only set `position: relative` when the host hasn't already opted
+   into another positioning scheme via a Tailwind utility class
+   (`absolute`, `fixed`, `sticky`). Otherwise this rule was clobbering
+   the Inspector's `absolute` handle and pulling it out of its
+   anchored position so the user couldn't grab it. The :not() chain
+   keeps the pseudo-anchoring behaviour for the common case (no
+   positioning class) without breaking the explicitly-positioned
+   handles. */
+.resize-h:not(.absolute):not(.fixed):not(.sticky),
+.resize-v:not(.absolute):not(.fixed):not(.sticky) {
+  position: relative;
+}
+.resize-h::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -5px;
+  bottom: -5px;
+  /* Above neighbouring content so the cursor change + click capture
+     fire even when an adjacent button's hover zone overlaps. */
+  z-index: 5;
+}
+.resize-v::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -5px;
+  right: -5px;
+  z-index: 5;
+}
+.resize-h:hover,
+.resize-v:hover {
+  background: rgb(var(--c-accent) / 0.35);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Routing matrix — Pure Data `vradio`-style square toggles.
+   Two button styles sharing the same square footprint so a column
+   of them reads as a tight vertical strip:
+     .routing-tick      — the per-slot Mod / Seq toggle. Hollow
+                          square when "routed off"; accent-filled
+                          when routed on. Borderless to avoid the
+                          double-border look that two stacked .btn
+                          gave us.
+     .routing-bulk      — the header-row ⇆ buttons. Same footprint
+                          but rendered with a glyph instead of a
+                          fill state so the user can tell apart
+                          "toggle one slot" vs "toggle all slots".
+   Both read CSS variables so themes (Nature, Cream, etc.) pick
+   their own colour palette automatically.
+   ──────────────────────────────────────────────────────────────── */
+.routing-tick,
+.routing-bulk {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 3px;
+  border: 1px solid rgb(var(--c-border));
+  background: rgb(var(--c-panel2));
+  color: rgb(var(--c-text));
+  cursor: pointer;
+  transition: background 80ms ease, border-color 80ms ease;
+  /* Centre the square inside its grid track so the Mod / Seq pair
+     reads as a tight vertical strip even when the track is only a
+     hair wider than the square. While painting (mouse-down + drag)
+     keep crosshair-style cursor so the user knows it's active. */
+  justify-self: center;
+  user-select: none;
+}
+.routing-tick:hover,
+.routing-bulk:hover {
+  border-color: rgb(var(--c-accent) / 0.6);
+  background: rgb(var(--c-panel3));
+}
+.routing-tick.routing-tick-on {
+  /* Filled square = "routed on" — same accent colour the rest of
+     the app uses for active states. The inset shadow gives a tiny
+     bevel that reads as "lit lamp" on darker themes. */
+  background: rgb(var(--c-accent));
+  border-color: rgb(var(--c-accent));
+  box-shadow: inset 0 0 0 2px rgb(var(--c-panel) / 0.25);
+}
+.routing-tick.routing-tick-on:hover {
+  background: rgb(var(--c-accent) / 0.85);
+  border-color: rgb(var(--c-accent));
+}
+.routing-bulk {
+  font-size: 11px;
+  line-height: 1;
+  /* The glyph itself — use the accent colour so it pops without
+     competing with the routing-tick fills. */
+  color: rgb(var(--c-accent));
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Live modulation overlay — applied to Modulation 1 controls
+   (sliders, number inputs, dropdowns) when Modulation 2 is actively
+   driving their value. The control's displayed value tracks the
+   live engine-effective number while the user's typed / dragged
+   input still writes the BASE (stored) value. Visual treatment:
+   subtle accent-tint outline + accent text colour so the user sees
+   "this is being modulated right now" without losing legibility.
+   ──────────────────────────────────────────────────────────────── */
+.live-overlay {
+  /* Tint the input chrome so the user can tell at a glance the
+     value is animating. Soft accent ring + accent text colour. */
+  outline: 1px solid rgb(var(--c-accent) / 0.6);
+  outline-offset: -1px;
+  color: rgb(var(--c-accent));
+}
+/* Range sliders need a different cue — Chromium / Electron's range
+   thumb ignores `outline`, so we tint the thumb + track via accent. */
+input[type='range'].live-overlay {
+  accent-color: rgb(var(--c-accent));
+  outline: none;
+  box-shadow: 0 0 0 1px rgb(var(--c-accent) / 0.4);
+  border-radius: 4px;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Rich-theme styling. Activated by ThemeName ∈ RICH_THEMES (Nature,
+   Cream-as-Peaks). Components opt in by reading `isRichTheme()` from
+   the store and either rendering bespoke variants of their controls
+   or applying these classes. Other themes are unaffected.
+   ──────────────────────────────────────────────────────────────── */
+
+/* Section card — softly rounded panel with a subtle border and inner
+   padding. Wraps each CollapsibleSection in rich themes so they feel
+   modular instead of merging into one continuous form. */
+.rich-card {
+  background: rgb(var(--c-panel2) / 0.7);
+  border: 1px solid rgb(var(--c-border) / 0.65);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 6px;
+  /* Replace the default top-border divider — the card IS the
+     visual separator now. */
+  border-top: 1px solid rgb(var(--c-border) / 0.65);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    inset 0 1px 0 rgb(255 255 255 / 0.03);
+  transition: background-color 220ms ease-out, border-color 220ms ease-out;
+}
+.rich-card:hover {
+  border-color: rgb(var(--c-border) / 0.95);
+}
+
+/* Console readout — replaces the BoundedNumberInput's default look
+   when not focused. The number sits softly tinted in the accent hue
+   on a dark embedded card, like a vintage instrument display. On
+   focus the input border returns so editing feels familiar. */
+.rich-readout {
+  background: rgb(var(--c-rich-card-bg) / 0.6);
+  color: rgb(var(--c-accent));
+  border: 1px solid rgb(var(--c-border) / 0.6);
+  border-radius: 4px;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 11px;
+  text-align: right;
+  padding: 2px 6px;
+  transition:
+    background-color 180ms ease-out,
+    color 180ms ease-out,
+    border-color 180ms ease-out;
+}
+.rich-readout:hover {
+  border-color: rgb(var(--c-accent) / 0.45);
+}
+.rich-readout:focus {
+  background: rgb(var(--c-input-bg));
+  color: rgb(var(--c-text));
+  border-color: rgb(var(--c-accent) / 0.7);
+  outline: none;
+}
+
+/* Mode-icon button — used by RcModeIcons in place of the Pattern
+   <select>. Each mode is a 26×26 square with a tiny SVG pictogram.
+   Rests muted; the active mode lights up in the accent hue with a
+   soft halo. */
+.rc-mode-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1px solid rgb(var(--c-border) / 0.7);
+  background: rgb(var(--c-panel) / 0.8);
+  color: rgb(var(--c-muted));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 180ms ease-out,
+    border-color 180ms ease-out,
+    color 180ms ease-out,
+    transform 180ms cubic-bezier(0.2, 0.9, 0.3, 1.2),
+    box-shadow 180ms ease-out;
+  flex-shrink: 0;
+}
+.rc-mode-btn:hover {
+  border-color: rgb(var(--c-accent) / 0.55);
+  color: rgb(var(--c-text));
+}
+.rc-mode-btn.is-active {
+  background: rgb(var(--c-accent) / 0.18);
+  border-color: rgb(var(--c-accent));
+  color: rgb(var(--c-accent));
+  box-shadow:
+    0 0 0 1px rgb(var(--c-accent) / 0.45),
+    0 0 8px rgb(var(--c-accent) / 0.35);
+}
+.rc-mode-btn.is-active svg {
+  filter: drop-shadow(0 0 3px rgb(var(--c-accent) / 0.6));
+}
+
+/* Arc slider — half-circle arc of N vertical bars, tonal warm→cool
+   gradient via --c-rich-warm / --c-rich-cool. Bars left of the
+   active position fill in their hue; bars to the right are dim
+   placeholders. The active position pumps slightly. Click + drag
+   on the SVG sets the value. */
+.rc-arc {
+  display: inline-block;
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+}
+.rc-arc-bar {
+  transition:
+    fill 180ms ease-out,
+    opacity 180ms ease-out,
+    transform 180ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.rc-arc-bar.is-lit {
+  /* Active bars get a soft glow halo via SVG filter. Inline because
+     it depends on a component-passed colour. Default opacity here. */
+  opacity: 1;
+}
+.rc-arc-bar.is-rest {
+  opacity: 0.28;
+}
+.rc-arc-bar.is-now {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  transform: scaleY(1.15);
+}
+.rc-arc-label {
+  fill: rgb(var(--c-muted));
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 10px;
+  text-anchor: middle;
+}
+.rc-arc-readout {
+  fill: rgb(var(--c-accent));
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 11px;
+  text-anchor: middle;
+  font-weight: 600;
+}

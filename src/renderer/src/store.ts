@@ -1,0 +1,264 @@
+// Zustand store — the renderer's single source of truth.
+// Holds the theme (design system lifted from dataFLOU) and the live
+// CompositionState (four layers + master rack + transport). The Compositor
+// engine reads this on each frame; OSC / modulators mutate it through the
+// same actions the UI uses, so there's one path for every parameter change.
+
+import { create } from 'zustand'
+import type {
+  BlendMode,
+  CompositionState,
+  FxInstance,
+  LayerState,
+  Session,
+  SourceSlot
+} from '@shared/types'
+
+// ── Themes (lifted from dataFLOU; palettes live in styles.css) ────────
+export type ThemeName =
+  | 'nature'
+  | 'studio-dark'
+  | 'warm-charcoal'
+  | 'graphite'
+  | 'cream'
+  | 'paper-light'
+  | 'dark'
+  | 'light'
+  | 'pastel'
+  | 'reaper'
+  | 'smooth'
+  | 'hydra'
+  | 'darkside'
+  | 'solaris'
+  | 'flame'
+  | 'analog'
+
+export const THEME_ORDER: ThemeName[] = [
+  'studio-dark',
+  'warm-charcoal',
+  'graphite',
+  'nature',
+  'cream',
+  'paper-light',
+  'dark',
+  'hydra',
+  'darkside',
+  'solaris',
+  'flame',
+  'analog',
+  'smooth',
+  'reaper',
+  'pastel',
+  'light'
+]
+
+// Themes that opt into the bespoke "rich" UI surface (console-readout
+// numerics, etc.). Consumed by BoundedNumberInput.
+export const RICH_THEMES: ReadonlySet<ThemeName> = new Set<ThemeName>(['nature', 'cream'])
+export function isRichTheme(t: ThemeName): boolean {
+  return RICH_THEMES.has(t)
+}
+
+// Palinopsia's default: near-black canvas, one accent — restraint as
+// identity (brief §1). Hydra's dark palette is the closest fit for a
+// glitch/digital-arts instrument out of the box.
+const DEFAULT_THEME: ThemeName = 'hydra'
+
+function loadTheme(): ThemeName {
+  const saved = localStorage.getItem('opsia.theme') as ThemeName | null
+  return saved && THEME_ORDER.includes(saved) ? saved : DEFAULT_THEME
+}
+
+function applyTheme(t: ThemeName): void {
+  document.documentElement.setAttribute('data-theme', t)
+}
+
+// ── Composition factory ───────────────────────────────────────────────
+const uid = (): string =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2)
+
+function emptySlot(): SourceSlot {
+  return { kind: 'none', shaderId: null, inputs: {} }
+}
+
+function makeLayer(): LayerState {
+  return {
+    id: uid(),
+    sourceA: emptySlot(),
+    sourceB: null,
+    sourceAFx: [],
+    sourceBFx: [],
+    fx: [],
+    blend: 'normal',
+    opacity: 1,
+    mute: false,
+    solo: false,
+    feedback: false
+  }
+}
+
+export function makeDefaultComposition(): CompositionState {
+  return {
+    layers: [makeLayer(), makeLayer(), makeLayer(), makeLayer()],
+    master: [],
+    bpm: 120
+  }
+}
+
+// ── Store ─────────────────────────────────────────────────────────────
+interface StoreState {
+  theme: ThemeName
+  setTheme: (t: ThemeName) => void
+
+  name: string
+  setName: (n: string) => void
+
+  composition: CompositionState
+  // Layer parameter actions — the Compositor reads composition each frame,
+  // so these double as the OSC / modulator write path.
+  setBlend: (layer: number, mode: BlendMode) => void
+  setOpacity: (layer: number, v: number) => void
+  toggleMute: (layer: number) => void
+  toggleSolo: (layer: number) => void
+  toggleFeedback: (layer: number) => void
+  setSourceShader: (layer: number, slot: 'A' | 'B', shaderId: string | null) => void
+  setSourceInput: (
+    layer: number,
+    slot: 'A' | 'B',
+    name: string,
+    value: number | number[]
+  ) => void
+  patchLayer: (layer: number, partial: Partial<LayerState>) => void
+  setMasterFx: (fx: FxInstance[]) => void
+
+  // The currently-selected source/FX whose ISF INPUTS the auto-UI renders
+  // (Phase 4). null = nothing selected.
+  selection: { layer: number; slot: 'A' | 'B' } | null
+  setSelection: (s: { layer: number; slot: 'A' | 'B' } | null) => void
+
+  // Session round-tripping
+  loadSession: (s: Session) => void
+  exportSession: () => Session
+}
+
+function updateLayer(
+  layers: LayerState[],
+  i: number,
+  fn: (l: LayerState) => LayerState
+): LayerState[] {
+  return layers.map((l, idx) => (idx === i ? fn(l) : l))
+}
+
+export const useStore = create<StoreState>((set, get) => ({
+  theme: loadTheme(),
+  setTheme: (t) => {
+    applyTheme(t)
+    localStorage.setItem('opsia.theme', t)
+    set({ theme: t })
+  },
+
+  name: 'Untitled',
+  setName: (n) => set({ name: n }),
+
+  composition: makeDefaultComposition(),
+
+  setBlend: (layer, mode) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({ ...l, blend: mode }))
+      }
+    })),
+  setOpacity: (layer, v) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({
+          ...l,
+          opacity: Math.max(0, Math.min(1, v))
+        }))
+      }
+    })),
+  toggleMute: (layer) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({ ...l, mute: !l.mute }))
+      }
+    })),
+  toggleSolo: (layer) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({ ...l, solo: !l.solo }))
+      }
+    })),
+  toggleFeedback: (layer) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({
+          ...l,
+          feedback: !l.feedback
+        }))
+      }
+    })),
+  setSourceShader: (layer, slot, shaderId) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => {
+          if (slot === 'A')
+            return { ...l, sourceA: { ...l.sourceA, kind: 'generator', shaderId } }
+          const base = l.sourceB ?? emptySlot()
+          return { ...l, sourceB: { ...base, kind: 'generator', shaderId } }
+        })
+      }
+    })),
+  setSourceInput: (layer, slot, name, value) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => {
+          if (slot === 'A')
+            return {
+              ...l,
+              sourceA: { ...l.sourceA, inputs: { ...l.sourceA.inputs, [name]: value } }
+            }
+          if (!l.sourceB) return l
+          return {
+            ...l,
+            sourceB: { ...l.sourceB, inputs: { ...l.sourceB.inputs, [name]: value } }
+          }
+        })
+      }
+    })),
+  patchLayer: (layer, partial) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({ ...l, ...partial }))
+      }
+    })),
+  setMasterFx: (fx) =>
+    set((s) => ({ composition: { ...s.composition, master: fx } })),
+
+  selection: null,
+  setSelection: (sel) => set({ selection: sel }),
+
+  loadSession: (s) => set({ name: s.name, composition: s.composition }),
+  exportSession: () => {
+    const s = get()
+    return {
+      version: 1,
+      name: s.name,
+      composition: s.composition,
+      ui: { theme: s.theme }
+    }
+  }
+}))
+
+// Apply the persisted theme on module load so first paint is themed.
+applyTheme(useStore.getState().theme)

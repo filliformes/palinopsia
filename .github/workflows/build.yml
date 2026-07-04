@@ -1,0 +1,38 @@
+name: build
+
+# Builds Windows (NSIS + portable) and macOS (DMG) artifacts together on a
+# tag push. Mirrors dataFLOU's release recipe. No native modules in the MVP,
+# so no rebuild toolchain is needed (electron-builder npmRebuild:false).
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            script: build:win
+          - os: macos-latest
+            script: build:mac
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run ${{ matrix.script }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: palinopsia-${{ matrix.os }}
+          path: |
+            release/**/*.exe
+            release/**/*.dmg
+          if-no-files-found: ignore
