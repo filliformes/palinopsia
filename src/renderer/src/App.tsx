@@ -14,6 +14,7 @@ import { Inspector } from './components/Inspector'
 import { LayerPanel } from './components/LayerPanel'
 import { MetaBar } from './components/MetaBar'
 import { ModulationPanel } from './components/ModulationPanel'
+import { SceneBank } from './components/SceneBank'
 import { Transport } from './components/Transport'
 import { initMidi } from './midi'
 import { GENERATORS, shaderSourceById } from './shaders/isf'
@@ -48,9 +49,19 @@ export default function App(): JSX.Element {
   useEffect(() => {
     const unsub = initUndo()
     const onKey = (e: KeyboardEvent): void => {
-      if (!(e.ctrlKey || e.metaKey)) return
       // Don't hijack typing in inputs for zoom keys; undo is safe globally.
       const inField = (e.target as HTMLElement)?.tagName === 'INPUT'
+      // Bare 1–9: recall scenes (the playing-surface shortcut).
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && /^[1-9]$/.test(e.key)) {
+        const st = useStore.getState()
+        const scene = st.scenes[Number(e.key) - 1]
+        if (scene) {
+          e.preventDefault()
+          st.recallScene(scene.id)
+        }
+        return
+      }
+      if (!(e.ctrlKey || e.metaKey)) return
       if (e.key === 'z' || e.key === 'Z') {
         e.preventDefault()
         if (e.shiftKey) redo()
@@ -237,6 +248,11 @@ export default function App(): JSX.Element {
               output · 1920×1080
             </div>
           </div>
+
+          {/* Scene bank — recallable full-instrument states (brief §10.7) */}
+          <Collapsible sectionKey="scenes" title="scenes">
+            <SceneBank />
+          </Collapsible>
 
           {/* Auto-generated control panel — the selection's ISF INPUTS
               rendered as themed controls (brief §10.3). */}

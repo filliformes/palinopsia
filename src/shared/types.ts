@@ -176,11 +176,22 @@ export interface CompositionState {
   metaKnobs: MetaKnobState[]
 }
 
+// ── Scenes (brief §7, §10.7) — recallable full-instrument states ──────
+export interface SceneEntry {
+  id: string
+  name: string
+  composition: CompositionState
+}
+
 // ── Session persistence (brief §7) ───────────────────────────────────
 export interface Session {
   version: 1
   name: string
   composition: CompositionState
+  // The scene bank travels with the session. It lives OUTSIDE composition:
+  // recalling a scene replaces the composition without touching the bank,
+  // and undo (which snapshots composition) never rewinds the bank itself.
+  scenes?: SceneEntry[]
   // Opaque renderer UI snapshot (theme, panel sizes, selection). The main
   // process never inspects it — it just round-trips it to disk.
   ui?: unknown

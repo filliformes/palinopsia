@@ -14,6 +14,7 @@ import type {
   ModAssignment,
   ModTarget,
   ModulatorConfig,
+  SceneEntry,
   Session,
   SourceSlot
 } from '@shared/types'
@@ -213,6 +214,18 @@ interface StoreState {
   setUiZoom: (z: number) => void
   collapsed: Record<string, boolean>
   toggleSection: (key: string) => void
+
+  // Scenes (Phase 6) — recallable full-instrument states, drag-arranged.
+  scenes: SceneEntry[]
+  activeSceneId: string | null
+  saveScene: () => void
+  // Save a Randomize-All result as a scene WITHOUT touching the live state
+  // (the brief's randomize-into-scene).
+  randomSceneIntoBank: () => void
+  recallScene: (id: string) => void
+  renameScene: (id: string, name: string) => void
+  deleteScene: (id: string) => void
+  reorderScene: (id: string, beforeId: string | null) => void
 
   // Session round-tripping
   newSession: () => void
@@ -533,17 +546,75 @@ export const useStore = create<StoreState>((set, get) => ({
       return { collapsed }
     }),
 
+  scenes: [],
+  activeSceneId: null,
+  saveScene: () =>
+    set((s) => ({
+      scenes: [
+        ...s.scenes,
+        {
+          id: uid(),
+          name: `Scene ${s.scenes.length + 1}`,
+          // Compositions are immutable — the snapshot is a reference.
+          composition: s.composition
+        }
+      ]
+    })),
+  randomSceneIntoBank: () =>
+    set((s) => ({
+      scenes: [
+        ...s.scenes,
+        {
+          id: uid(),
+          name: `Random ${s.scenes.length + 1}`,
+          composition: randomizeComposition(s.composition, 'all')
+        }
+      ]
+    })),
+  recallScene: (id) =>
+    set((s) => {
+      const scene = s.scenes.find((x) => x.id === id)
+      if (!scene) return s
+      // Goes through the composition write path: undoable, hot-swap-safe
+      // (the engine reconciles; feedback buffers survive the recall).
+      return { composition: scene.composition, activeSceneId: id }
+    }),
+  renameScene: (id, name) =>
+    set((s) => ({
+      scenes: s.scenes.map((x) => (x.id === id ? { ...x, name: name.trim() || x.name } : x))
+    })),
+  deleteScene: (id) =>
+    set((s) => ({
+      scenes: s.scenes.filter((x) => x.id !== id),
+      activeSceneId: s.activeSceneId === id ? null : s.activeSceneId
+    })),
+  reorderScene: (id, beforeId) =>
+    set((s) => {
+      const moving = s.scenes.find((x) => x.id === id)
+      if (!moving || id === beforeId) return s
+      const rest = s.scenes.filter((x) => x.id !== id)
+      const idx = beforeId ? rest.findIndex((x) => x.id === beforeId) : rest.length
+      if (idx < 0) return s
+      const next = [...rest]
+      next.splice(idx, 0, moving)
+      return { scenes: next }
+    }),
+
   newSession: () =>
     // A blank slate. Goes through the normal composition write path, so it
     // lands in undo history — an accidental New is one Ctrl+Z away.
     set({
       name: 'Untitled',
       composition: makeDefaultComposition(),
-      selection: null
+      selection: null,
+      scenes: [],
+      activeSceneId: null
     }),
   loadSession: (s) =>
     set({
       name: s.name,
+      scenes: s.scenes ?? [],
+      activeSceneId: null,
       composition: {
         ...s.composition,
         // Normalize layers from older session files — new fields get defaults.
@@ -566,6 +637,7 @@ export const useStore = create<StoreState>((set, get) => ({
       version: 1,
       name: s.name,
       composition: s.composition,
+      scenes: s.scenes,
       ui: { theme: s.theme }
     }
   }

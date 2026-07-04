@@ -50,7 +50,9 @@ npm run build:win  # NSIS + portable
   ADSR, Arp, Random, S&H, Slew, Chaos; BPM-sync divisions; 14 output curves),
   frame-locked in the renderer; capped mod-matrix (12); Meta Controller
   (32 knobs / 4 banks, smoothing, MIDI-CC learn via Web MIDI, ≤8 dests/knob).
-- **6 · Presets + Randomize** — scene bank + curated-range Randomize.
+- **6 · Presets + Randomize** ✅ — structural scoped Randomize from curated
+  aesthetic ranges; 280 per-shader presets; scene bank (save/recall full
+  states, randomize-into-scene, drag-arrange, keys 1–9), session-persisted.
 - **7 · Video + HIVE** — `<video>` → texture + synthify; HIVE WebCodecs live-in.
 - **8 · Output** — in-shader warp/mapping + Spout/Syphon/NDI + OSCQuery.
 - **9 · WebGPU** *(post-MVP)* — compute passes for true pixel-sort / particles.
