@@ -1,7 +1,8 @@
 // Transport bar (brief §10.6): clock/BPM (synced to Pandore over OSC later)
-// and the Randomize split-button — main click = Randomize All; the chevron
-// opens scoped variants. Every draw comes from curated aesthetic ranges
-// (brief §7) — the taste layer, not raw min/max.
+// and the Randomize control. The chevron SELECTS a mode (shown in full on
+// the button); pressing the button FIRES the selected mode — so you always
+// know which randomize you're about to play. Every draw comes from curated
+// aesthetic ranges (brief §7) — the taste layer, not raw min/max.
 
 import { useEffect, useRef, useState } from 'react'
 import type { RandomizeScope } from '../randomize'
@@ -17,15 +18,27 @@ const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
   { scope: 'modulators', label: 'Randomize Modulators' }
 ]
 
+function loadScope(): RandomizeScope {
+  const s = localStorage.getItem('opsia.randScope') as RandomizeScope | null
+  return s && SCOPES.some((x) => x.scope === s) ? s : 'all'
+}
+
 export function Transport(): JSX.Element {
   const bpm = useStore((s) => s.composition.bpm)
   const randomize = useStore((s) => s.randomize)
   const setComposition = useStore.setState
   const [menuOpen, setMenuOpen] = useState(false)
+  const [scope, setScope] = useState<RandomizeScope>(loadScope)
   const menuRef = useRef<HTMLDivElement | null>(null)
 
   function setBpm(v: number): void {
     setComposition((s) => ({ composition: { ...s.composition, bpm: v } }))
+  }
+
+  function selectScope(s: RandomizeScope): void {
+    setScope(s)
+    localStorage.setItem('opsia.randScope', s)
+    setMenuOpen(false)
   }
 
   // Close the scope menu on any outside click.
@@ -37,6 +50,8 @@ export function Transport(): JSX.Element {
     window.addEventListener('mousedown', close)
     return () => window.removeEventListener('mousedown', close)
   }, [menuOpen])
+
+  const current = SCOPES.find((s) => s.scope === scope) ?? SCOPES[0]
 
   return (
     <div className="flex items-center gap-4 border-t border-border bg-panel px-4 py-1.5">
@@ -55,33 +70,33 @@ export function Transport(): JSX.Element {
 
       <div className="flex-1" />
 
-      {/* Randomize split-button */}
+      {/* Randomize: chevron selects the mode, button fires it. */}
       <div ref={menuRef} className="relative flex">
         <button
-          onClick={() => randomize('all')}
+          onClick={() => randomize(scope)}
           className="rounded-l border border-accent/60 bg-accent/10 px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent transition-colors hover:bg-accent/20"
-          title="Randomize All — every draw from curated aesthetic ranges"
+          title={`Fire ${current.label} — every draw from curated aesthetic ranges`}
         >
-          Randomize
+          {current.label}
         </button>
         <button
           onClick={() => setMenuOpen((o) => !o)}
           className="rounded-r border border-l-0 border-accent/60 bg-accent/10 px-1.5 font-mono text-[10px] text-accent transition-colors hover:bg-accent/20"
-          title="Scoped randomize"
+          title="Choose which randomize the button fires"
         >
           ▾
         </button>
         {menuOpen && (
-          <div className="absolute bottom-full right-0 z-20 mb-1 flex min-w-[190px] flex-col rounded border border-border bg-panel2 py-1 shadow-lg">
+          <div className="absolute bottom-full right-0 z-20 mb-1 flex min-w-[210px] flex-col rounded border border-border bg-panel2 py-1 shadow-lg">
             {SCOPES.map((s) => (
               <button
                 key={s.scope}
-                onClick={() => {
-                  randomize(s.scope)
-                  setMenuOpen(false)
-                }}
-                className="px-3 py-1 text-left text-[11px] transition-colors hover:bg-accent/15 hover:text-accent"
+                onClick={() => selectScope(s.scope)}
+                className={`flex items-center gap-2 px-3 py-1 text-left text-[11px] transition-colors hover:bg-accent/15 hover:text-accent ${
+                  s.scope === scope ? 'text-accent' : ''
+                }`}
               >
+                <span className="w-3 font-mono text-[10px]">{s.scope === scope ? '✓' : ''}</span>
                 {s.label}
               </button>
             ))}
