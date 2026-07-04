@@ -34,7 +34,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const selection = useStore((s) => s.selection)
 
   const isSelected = (slot: 'A' | 'B'): boolean =>
-    selection?.layer === index && selection.slot === slot
+    selection?.type === 'source' && selection.layer === index && selection.slot === slot
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-border bg-panel p-2">
@@ -58,7 +58,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           label="A"
           shaderId={layer.sourceA.shaderId}
           selected={isSelected('A')}
-          onSelect={() => setSelection({ layer: index, slot: 'A' })}
+          onSelect={() => setSelection({ type: 'source', layer: index, slot: 'A' })}
           onPick={(id) => setSourceShader(index, 'A', id)}
         >
           <FxRackPanel scope={{ kind: 'sourceA', layer: index }} fx={layer.sourceAFx} label="fx" compact />
@@ -67,7 +67,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           label="B"
           shaderId={layer.sourceB?.shaderId ?? null}
           selected={isSelected('B')}
-          onSelect={() => setSelection({ layer: index, slot: 'B' })}
+          onSelect={() => setSelection({ type: 'source', layer: index, slot: 'B' })}
           onPick={(id) => setSourceShader(index, 'B', id)}
         >
           <FxRackPanel scope={{ kind: 'sourceB', layer: index }} fx={layer.sourceBFx} label="fx" compact />

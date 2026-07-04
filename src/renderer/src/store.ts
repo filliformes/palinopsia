@@ -114,6 +114,13 @@ export type FxScope =
   | { kind: 'master' }
   | { kind: 'layer' | 'sourceA' | 'sourceB'; layer: number }
 
+// What the Inspector's auto-UI is pointed at: a source slot or an FX unit
+// (brief §10.3 — "selecting any source or FX renders its ISF INPUTS").
+export type Selection =
+  | { type: 'source'; layer: number; slot: 'A' | 'B' }
+  | { type: 'fx'; scope: FxScope; instId: string }
+  | null
+
 // ── Store ─────────────────────────────────────────────────────────────
 interface StoreState {
   theme: ThemeName
@@ -149,10 +156,9 @@ interface StoreState {
   moveFx: (scope: FxScope, instId: string, dir: -1 | 1) => void
   setFxInput: (scope: FxScope, instId: string, name: string, value: number | number[]) => void
 
-  // The currently-selected source/FX whose ISF INPUTS the auto-UI renders
-  // (Phase 4). null = nothing selected.
-  selection: { layer: number; slot: 'A' | 'B' } | null
-  setSelection: (s: { layer: number; slot: 'A' | 'B' } | null) => void
+  // The currently-selected source/FX whose ISF INPUTS the auto-UI renders.
+  selection: Selection
+  setSelection: (s: Selection) => void
 
   // Session round-tripping
   loadSession: (s: Session) => void
@@ -302,12 +308,18 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
 
   addFx: (scope, shaderId) =>
-    set((s) => ({
-      composition: updateFxArray(s.composition, scope, (fx) => [
-        ...fx,
-        { id: uid(), shaderId, enabled: true, inputs: {} }
-      ])
-    })),
+    set((s) => {
+      const instId = uid()
+      return {
+        composition: updateFxArray(s.composition, scope, (fx) => [
+          ...fx,
+          { id: instId, shaderId, enabled: true, inputs: {} }
+        ]),
+        // Land the Inspector on the fresh unit — its controls are the next
+        // thing the player reaches for.
+        selection: { type: 'fx', scope, instId }
+      }
+    }),
   removeFx: (scope, instId) =>
     set((s) => ({
       composition: updateFxArray(s.composition, scope, (fx) =>

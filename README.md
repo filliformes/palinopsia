@@ -43,7 +43,9 @@ npm run build:win  # NSIS + portable
   mixer; 10-FX glitch vocabulary (posterize, dither, chroma, pixelate, displace,
   scanlines, edge, grade, slice-shuffle, smear); GL-texture bridge into ISF
   image inputs.
-- **4 · Auto-UI** — controls generated from each shader's ISF `INPUTS`.
+- **4 · Auto-UI** ✅ — Inspector renders the selection's ISF `INPUTS` as themed
+  controls (float→slider, bool→toggle, enum→dropdown, color→swatch+alpha,
+  point2D→XY pad), honouring declared ranges and defaults.
 - **5 · Modulators** — port dataFLOU's 8-mod engine + Meta Controller + mod-matrix.
 - **6 · Presets + Randomize** — scene bank + curated-range Randomize.
 - **7 · Video + HIVE** — `<video>` → texture + synthify; HIVE WebCodecs live-in.

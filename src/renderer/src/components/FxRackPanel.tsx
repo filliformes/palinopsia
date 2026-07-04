@@ -1,7 +1,7 @@
 // One FX rack (per-source, per-layer, or master) — finite, reorderable ISF
 // chains (brief §5, §10). Each unit: enable toggle, move up/down, remove.
-// Parameter editing arrives with the auto-UI (Phase 4) — units run on their
-// declared ISF defaults until then.
+// Clicking a unit's name selects it — the Inspector renders its ISF INPUTS
+// as themed controls (the Phase-4 auto-UI).
 
 import type { FxInstance } from '@shared/types'
 import { FX_SHADERS, SHADER_BY_ID } from '../shaders/isf'
@@ -22,6 +22,12 @@ export function FxRackPanel({
   const removeFx = useStore((s) => s.removeFx)
   const toggleFx = useStore((s) => s.toggleFx)
   const moveFx = useStore((s) => s.moveFx)
+  const selection = useStore((s) => s.selection)
+  const setSelection = useStore((s) => s.setSelection)
+
+  const isSelected = (instId: string): boolean =>
+    selection?.type === 'fx' &&
+    selection.instId === instId
 
   return (
     <div className={`flex flex-col gap-1 ${compact ? '' : 'rounded border border-border bg-panel2/40 p-1.5'}`}>
@@ -58,11 +64,15 @@ export function FxRackPanel({
                 }`}
                 title={f.enabled ? 'Enabled — click to bypass' : 'Bypassed — click to enable'}
               />
-              <span
-                className={`flex-1 truncate text-[11px] ${f.enabled ? '' : 'text-muted line-through'}`}
+              <button
+                onClick={() => setSelection({ type: 'fx', scope, instId: f.id })}
+                className={`flex-1 truncate text-left text-[11px] transition-colors ${
+                  f.enabled ? '' : 'text-muted line-through'
+                } ${isSelected(f.id) ? 'text-accent' : 'hover:text-accent'}`}
+                title="Edit this FX's controls in the Inspector"
               >
                 {SHADER_BY_ID[f.shaderId ?? '']?.name ?? f.shaderId}
-              </span>
+              </button>
               <button
                 className="px-0.5 font-mono text-[10px] text-muted hover:text-text disabled:opacity-30"
                 onClick={() => moveFx(scope, f.id, -1)}

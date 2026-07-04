@@ -8,6 +8,7 @@
 import { useEffect, useRef } from 'react'
 import { Compositor } from './engine/Compositor'
 import { FxRackPanel } from './components/FxRackPanel'
+import { Inspector } from './components/Inspector'
 import { LayerPanel } from './components/LayerPanel'
 import { Transport } from './components/Transport'
 import { GENERATORS, shaderSourceById } from './shaders/isf'
@@ -37,9 +38,10 @@ export default function App(): JSX.Element {
     }
 
     // Seed the session: Drift Field on layer 1 so first launch shows the
-    // instrument's voice. The sync loop below picks it up and loads it.
+    // instrument's voice, with its controls up in the Inspector.
     if (!useStore.getState().composition.layers[0].sourceA.shaderId) {
       useStore.getState().setSourceShader(0, 'A', GENERATORS[0].id)
+      useStore.getState().setSelection({ type: 'source', layer: 0, slot: 'A' })
     }
 
     const start = performance.now()
@@ -150,6 +152,10 @@ export default function App(): JSX.Element {
               output · 1920×1080
             </div>
           </div>
+
+          {/* Auto-generated control panel — the selection's ISF INPUTS
+              rendered as themed controls (brief §10.3). */}
+          <Inspector />
 
           {/* Master FX rack — glitch / dither / chroma / grade (brief §10.5);
               the warp/mapping stage joins it in Phase 8. */}
