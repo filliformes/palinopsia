@@ -192,6 +192,7 @@ interface StoreState {
   toggleSection: (key: string) => void
 
   // Session round-tripping
+  newSession: () => void
   loadSession: (s: Session) => void
   exportSession: () => Session
 }
@@ -465,6 +466,14 @@ export const useStore = create<StoreState>((set, get) => ({
       return { collapsed }
     }),
 
+  newSession: () =>
+    // A blank slate. Goes through the normal composition write path, so it
+    // lands in undo history — an accidental New is one Ctrl+Z away.
+    set({
+      name: 'Untitled',
+      composition: makeDefaultComposition(),
+      selection: null
+    }),
   loadSession: (s) =>
     set({
       name: s.name,

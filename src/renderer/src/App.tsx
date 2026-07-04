@@ -183,6 +183,13 @@ export default function App(): JSX.Element {
             +
           </button>
         </div>
+        <button
+          className="btn text-[12px]"
+          onClick={() => useStore.getState().newSession()}
+          title="New blank session (undoable)"
+        >
+          New
+        </button>
         <button className="btn text-[12px]" onClick={openSession}>
           Open
         </button>
