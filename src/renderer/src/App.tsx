@@ -5,7 +5,7 @@
 // skeleton: preview + layers + transport, ready for the ISF runtime (Phase 1),
 // the FX racks (Phase 3), the auto-UI (Phase 4), and modulation (Phase 5).
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Compositor } from './engine/Compositor'
 import { FxRackPanel } from './components/FxRackPanel'
 import { Inspector } from './components/Inspector'
@@ -21,6 +21,14 @@ export default function App(): JSX.Element {
   const setTheme = useStore((s) => s.setTheme)
   const name = useStore((s) => s.name)
   const setName = useStore((s) => s.setName)
+  // Layers-column width — draggable via the handle between preview and strips.
+  const [layersWidth, setLayersWidth] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('opsia.layersWidth'))
+    return Number.isFinite(saved) && saved >= 240 ? saved : 320
+  })
+  useEffect(() => {
+    localStorage.setItem('opsia.layersWidth', String(layersWidth))
+  }, [layersWidth])
 
   // ── Engine: mount the Compositor + run the frame loop ───────────────
   useEffect(() => {
@@ -133,7 +141,7 @@ export default function App(): JSX.Element {
       </header>
 
       {/* ── Body: preview + layer strips ────────────────────────── */}
-      <main className="flex flex-1 gap-3 overflow-hidden p-3">
+      <main className="flex min-h-0 flex-1 gap-2 overflow-hidden p-3">
         {/* Output preview — the live composite, front and centre (brief §10.1) */}
         <section className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="relative flex-1 overflow-hidden rounded-md border border-border bg-black">
@@ -162,8 +170,14 @@ export default function App(): JSX.Element {
           <MasterRackStrip />
         </section>
 
+        {/* Drag handle — the layers column is resizable */}
+        <LayerColumnHandle onResize={setLayersWidth} width={layersWidth} />
+
         {/* Four layer strips (brief §10.2) */}
-        <aside className="flex w-72 shrink-0 flex-col gap-2 overflow-y-auto">
+        <aside
+          className="flex shrink-0 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-0.5"
+          style={{ width: layersWidth }}
+        >
           {[0, 1, 2, 3].map((i) => (
             <LayerPanel key={i} index={i} />
           ))}
@@ -179,4 +193,40 @@ export default function App(): JSX.Element {
 function MasterRackStrip(): JSX.Element {
   const master = useStore((s) => s.composition.master)
   return <FxRackPanel scope={{ kind: 'master' }} fx={master} label="master fx" />
+}
+
+/** Thin draggable divider between the preview and the layers column. */
+function LayerColumnHandle({
+  width,
+  onResize
+}: {
+  width: number
+  onResize: (w: number) => void
+}): JSX.Element {
+  const drag = useRef<{ startX: number; startW: number; pointerId: number } | null>(null)
+  return (
+    <div
+      className="w-1 shrink-0 cursor-col-resize rounded bg-border/60 transition-colors hover:bg-accent/60"
+      style={{ touchAction: 'none' }}
+      title="Drag to resize the layers column · double-click to reset"
+      onPointerDown={(e: ReactPointerEvent<HTMLDivElement>) => {
+        drag.current = { startX: e.clientX, startW: width, pointerId: e.pointerId }
+        ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+      }}
+      onPointerMove={(e: ReactPointerEvent<HTMLDivElement>) => {
+        const d = drag.current
+        if (!d || e.pointerId !== d.pointerId) return
+        // Handle sits left of the column: dragging left widens it.
+        const w = d.startW + (d.startX - e.clientX)
+        onResize(Math.max(240, Math.min(560, w)))
+      }}
+      onPointerUp={() => {
+        drag.current = null
+      }}
+      onPointerCancel={() => {
+        drag.current = null
+      }}
+      onDoubleClick={() => onResize(320)}
+    />
+  )
 }

@@ -30,11 +30,15 @@ export function FxRackPanel({
     selection.instId === instId
 
   return (
-    <div className={`flex flex-col gap-1 ${compact ? '' : 'rounded border border-border bg-panel2/40 p-1.5'}`}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{label}</span>
+    <div
+      className={`flex min-w-0 flex-col gap-1 ${compact ? '' : 'rounded border border-border bg-panel2/40 p-1.5'}`}
+    >
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span className="w-10 shrink-0 truncate font-mono text-[9px] uppercase tracking-wide text-muted">
+          {label}
+        </span>
         <select
-          className="input max-w-[110px] text-[10px]"
+          className="input select-compact min-w-0 flex-1 text-[10px]"
           value=""
           onChange={(e) => {
             if (e.target.value) addFx(scope, e.target.value)
@@ -55,7 +59,7 @@ export function FxRackPanel({
           {fx.map((f, i) => (
             <li
               key={f.id}
-              className="flex items-center gap-1 rounded border border-border bg-panel px-1.5 py-0.5"
+              className="flex min-w-0 items-center gap-1 rounded border border-border bg-panel px-1.5 py-0.5"
             >
               <button
                 onClick={() => toggleFx(scope, f.id)}
@@ -66,7 +70,7 @@ export function FxRackPanel({
               />
               <button
                 onClick={() => setSelection({ type: 'fx', scope, instId: f.id })}
-                className={`flex-1 truncate text-left text-[11px] transition-colors ${
+                className={`min-w-0 flex-1 truncate text-left text-[11px] transition-colors ${
                   f.enabled ? '' : 'text-muted line-through'
                 } ${isSelected(f.id) ? 'text-accent' : 'hover:text-accent'}`}
                 title="Edit this FX's controls in the Inspector"
@@ -74,7 +78,7 @@ export function FxRackPanel({
                 {SHADER_BY_ID[f.shaderId ?? '']?.name ?? f.shaderId}
               </button>
               <button
-                className="px-0.5 font-mono text-[10px] text-muted hover:text-text disabled:opacity-30"
+                className="shrink-0 px-0.5 font-mono text-[10px] text-muted hover:text-text disabled:opacity-30"
                 onClick={() => moveFx(scope, f.id, -1)}
                 disabled={i === 0}
                 title="Move earlier in the chain"
@@ -82,7 +86,7 @@ export function FxRackPanel({
                 ↑
               </button>
               <button
-                className="px-0.5 font-mono text-[10px] text-muted hover:text-text disabled:opacity-30"
+                className="shrink-0 px-0.5 font-mono text-[10px] text-muted hover:text-text disabled:opacity-30"
                 onClick={() => moveFx(scope, f.id, 1)}
                 disabled={i === fx.length - 1}
                 title="Move later in the chain"
@@ -90,7 +94,7 @@ export function FxRackPanel({
                 ↓
               </button>
               <button
-                className="px-0.5 font-mono text-[10px] text-muted hover:text-danger"
+                className="shrink-0 px-0.5 font-mono text-[10px] text-muted hover:text-danger"
                 onClick={() => removeFx(scope, f.id)}
                 title="Remove from rack"
               >

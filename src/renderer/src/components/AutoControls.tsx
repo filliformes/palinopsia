@@ -81,11 +81,17 @@ function FloatControl({
   const v = typeof value === 'number' ? value : def
   const step = (max - min) / 200 || 0.005
   return (
-    <div className="flex w-48 flex-col gap-0.5">
-      <div className="flex items-center justify-between">
+    <div className="flex w-44 min-w-0 flex-col gap-0.5">
+      <div className="flex min-w-0 items-center justify-between gap-2">
         {labelEl(inp)}
-        <div className="w-14">
-          <BoundedNumberInput value={v} min={min} max={max} onChange={(n) => onChange(inp.name, n)} />
+        <div className="w-14 shrink-0">
+          <BoundedNumberInput
+            value={v}
+            min={min}
+            max={max}
+            onChange={(n) => onChange(inp.name, n)}
+            className="input w-full px-1 py-0.5 text-right text-[11px]"
+          />
         </div>
       </div>
       <input
@@ -96,7 +102,7 @@ function FloatControl({
         value={v}
         onChange={(e) => onChange(inp.name, Number(e.target.value))}
         onDoubleClick={() => onChange(inp.name, def)}
-        className="accent-accent"
+        className="min-w-0 accent-accent"
         title={`${inp.label} — double-click to reset (${def})`}
       />
     </div>

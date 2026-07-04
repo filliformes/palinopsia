@@ -37,7 +37,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
     selection?.type === 'source' && selection.layer === index && selection.slot === slot
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-border bg-panel p-2">
+    <div className="flex min-w-0 flex-col gap-2 rounded-md border border-border bg-panel p-2">
       <div className="flex items-center justify-between">
         <span className="font-mono text-[11px] text-muted">LAYER {index + 1}</span>
         <div className="flex gap-1">
@@ -52,8 +52,10 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
         </div>
       </div>
 
-      {/* Source pickers — ISF generators (video / capture / HIVE arrive Phase 7) */}
-      <div className="grid grid-cols-2 gap-1">
+      {/* Source pickers — ISF generators (video / capture / HIVE arrive Phase 7).
+          Stacked full-width: each slot hosts its own FX rack, so side-by-side
+          columns can't breathe in the strip. */}
+      <div className="flex min-w-0 flex-col gap-1">
         <SourceSlot
           label="A"
           shaderId={layer.sourceA.shaderId}
@@ -76,9 +78,9 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
 
       {/* A/B crossfade — only meaningful while B has a source */}
       {layer.sourceB?.shaderId && (
-        <div className="flex items-center gap-2">
-          <label className="font-mono text-[10px] text-muted">MIX</label>
-          <span className="font-mono text-[9px] text-muted">A</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <label className="w-12 shrink-0 font-mono text-[10px] text-muted">MIX</label>
+          <span className="shrink-0 font-mono text-[9px] text-muted">A</span>
           <input
             type="range"
             min={0}
@@ -86,17 +88,17 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             step={0.01}
             value={layer.sourceMix}
             onChange={(e) => setSourceMix(index, Number(e.target.value))}
-            className="flex-1 accent-accent"
+            className="min-w-0 flex-1 accent-accent"
             title="Crossfade between source A and source B"
           />
-          <span className="font-mono text-[9px] text-muted">B</span>
+          <span className="shrink-0 font-mono text-[9px] text-muted">B</span>
         </div>
       )}
 
-      <div className="flex items-center gap-2">
-        <label className="font-mono text-[10px] text-muted">BLEND</label>
+      <div className="flex min-w-0 items-center gap-2">
+        <label className="w-12 shrink-0 font-mono text-[10px] text-muted">BLEND</label>
         <select
-          className="input flex-1 text-[12px]"
+          className="input select-compact min-w-0 flex-1 text-[12px]"
           value={layer.blend}
           onChange={(e) => setBlend(index, e.target.value as BlendMode)}
         >
@@ -108,8 +110,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
         </select>
       </div>
 
-      <div className="flex items-center gap-2">
-        <label className="font-mono text-[10px] text-muted">OPACITY</label>
+      <div className="flex min-w-0 items-center gap-2">
+        <label className="w-12 shrink-0 font-mono text-[10px] text-muted">OPAC</label>
         <input
           type="range"
           min={0}
@@ -117,14 +119,15 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           step={0.01}
           value={layer.opacity}
           onChange={(e) => setOpacity(index, Number(e.target.value))}
-          className="flex-1 accent-accent"
+          className="min-w-0 flex-1 accent-accent"
         />
-        <div className="w-12">
+        <div className="w-12 shrink-0">
           <BoundedNumberInput
             value={layer.opacity}
             min={0}
             max={1}
             onChange={(v) => setOpacity(index, v)}
+            className="input w-full px-1 py-0.5 text-right text-[11px]"
           />
         </div>
       </div>
@@ -134,8 +137,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
 
       {/* Trail persistence — only meaningful while FB is on */}
       {layer.feedback && (
-        <div className="flex items-center gap-2">
-          <label className="font-mono text-[10px] text-muted">TRAILS</label>
+        <div className="flex min-w-0 items-center gap-2">
+          <label className="w-12 shrink-0 font-mono text-[10px] text-muted">TRAILS</label>
           <input
             type="range"
             min={0}
@@ -143,15 +146,16 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             step={0.01}
             value={layer.feedbackAmount}
             onChange={(e) => setFeedbackAmount(index, Number(e.target.value))}
-            className="flex-1 accent-accent"
+            className="min-w-0 flex-1 accent-accent"
             title="Feedback persistence — decay trails (capped below infinite bloom)"
           />
-          <div className="w-12">
+          <div className="w-12 shrink-0">
             <BoundedNumberInput
               value={layer.feedbackAmount}
               min={0}
               max={1}
               onChange={(v) => setFeedbackAmount(index, v)}
+              className="input w-full px-1 py-0.5 text-right text-[11px]"
             />
           </div>
         </div>
@@ -204,26 +208,28 @@ function SourceSlot({
   return (
     <div
       onClick={onSelect}
-      className={`flex flex-col gap-0.5 rounded border px-1.5 py-1 transition-colors ${
+      className={`flex min-w-0 flex-col gap-1 rounded border px-1.5 py-1 transition-colors ${
         selected
           ? 'border-accent bg-panel2 ring-1 ring-accent'
           : 'border-border bg-panel2/50 hover:border-accent/50'
       }`}
     >
-      <span className="font-mono text-[9px] text-muted">SRC {label}</span>
-      <select
-        className="input w-full text-[11px]"
-        value={shaderId ?? ''}
-        onChange={(e) => onPick(e.target.value || null)}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <option value="">— none —</option>
-        {GENERATORS.map((g) => (
-          <option key={g.id} value={g.id}>
-            {g.name}
-          </option>
-        ))}
-      </select>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span className="w-10 shrink-0 font-mono text-[9px] text-muted">SRC {label}</span>
+        <select
+          className="input select-compact min-w-0 flex-1 text-[11px]"
+          value={shaderId ?? ''}
+          onChange={(e) => onPick(e.target.value || null)}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <option value="">— none —</option>
+          {GENERATORS.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </select>
+      </div>
       {/* Per-source FX rack (only useful once a source is loaded) */}
       {shaderId && children}
     </div>
