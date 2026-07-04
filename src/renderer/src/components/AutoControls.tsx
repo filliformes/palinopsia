@@ -4,8 +4,10 @@
 // each input's declared range and default. This is the simplexité payoff:
 // the shader header IS the control surface.
 
-import { useRef, type PointerEvent as ReactPointerEvent } from 'react'
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import type { ModTarget } from '@shared/types'
 import type { IsfInputDesc } from '../shaders/isf/inputs'
+import { modTargetKey, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 
 type Value = number | number[]
@@ -13,11 +15,15 @@ type Value = number | number[]
 export function AutoControls({
   inputs,
   values,
-  onChange
+  onChange,
+  modTargetFor
 }: {
   inputs: IsfInputDesc[]
   values: Record<string, Value>
   onChange: (name: string, value: Value) => void
+  // When provided, float controls grow an "M" button that binds a modulator
+  // to this input (the capped mod-matrix, brief §6).
+  modTargetFor?: (inputName: string) => ModTarget
 }): JSX.Element {
   if (inputs.length === 0) {
     return <div className="p-2 text-[11px] text-muted">This shader exposes no controls.</div>
@@ -25,7 +31,13 @@ export function AutoControls({
   return (
     <div className="flex flex-wrap gap-x-5 gap-y-2 p-2">
       {inputs.map((inp) => (
-        <Control key={inp.name} inp={inp} value={values[inp.name]} onChange={onChange} />
+        <Control
+          key={inp.name}
+          inp={inp}
+          value={values[inp.name]}
+          onChange={onChange}
+          modTargetFor={modTargetFor}
+        />
       ))}
     </div>
   )
@@ -34,15 +46,17 @@ export function AutoControls({
 function Control({
   inp,
   value,
-  onChange
+  onChange,
+  modTargetFor
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
+  modTargetFor?: (inputName: string) => ModTarget
 }): JSX.Element | null {
   switch (inp.type) {
     case 'float':
-      return <FloatControl inp={inp} value={value} onChange={onChange} />
+      return <FloatControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} />
     case 'bool':
     case 'event':
       return <BoolControl inp={inp} value={value} onChange={onChange} />
@@ -65,33 +79,61 @@ function labelEl(inp: IsfInputDesc): JSX.Element {
   )
 }
 
-// ── float → slider + number ──────────────────────────────────────────
+// ── float → slider + number (+ optional mod-assign) ──────────────────
 function FloatControl({
   inp,
   value,
-  onChange
+  onChange,
+  modTargetFor
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
+  modTargetFor?: (inputName: string) => ModTarget
 }): JSX.Element {
   const min = typeof inp.min === 'number' ? inp.min : 0
   const max = typeof inp.max === 'number' ? inp.max : 1
   const def = typeof inp.def === 'number' ? inp.def : min
   const v = typeof value === 'number' ? value : def
   const step = (max - min) / 200 || 0.005
+  const [assignOpen, setAssignOpen] = useState(false)
+  const target = modTargetFor?.(inp.name)
+  const targetKey = target ? modTargetKey(target) : null
+  // Existing assignments on this input (any modulator).
+  const bound = useStore((s) =>
+    targetKey
+      ? s.composition.modMatrix.filter((a) => modTargetKey(a.target) === targetKey)
+      : []
+  )
   return (
     <div className="flex w-44 min-w-0 flex-col gap-0.5">
       <div className="flex min-w-0 items-center justify-between gap-2">
         {labelEl(inp)}
-        <div className="w-14 shrink-0">
-          <BoundedNumberInput
-            value={v}
-            min={min}
-            max={max}
-            onChange={(n) => onChange(inp.name, n)}
-            className="input w-full px-1 py-0.5 text-right text-[11px]"
-          />
+        <div className="flex shrink-0 items-center gap-1">
+          {target && (
+            <button
+              onClick={() => setAssignOpen((o) => !o)}
+              className={`rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
+                bound.length > 0
+                  ? 'bg-accent/20 text-accent ring-1 ring-accent'
+                  : assignOpen
+                    ? 'bg-panel3 text-text'
+                    : 'bg-panel3/60 text-muted hover:text-text'
+              }`}
+              title="Bind a modulator to this input"
+            >
+              M{bound.length > 0 ? bound.map((b) => b.mod + 1).join('') : ''}
+            </button>
+          )}
+          <div className="w-14">
+            <BoundedNumberInput
+              value={v}
+              min={min}
+              max={max}
+              onChange={(n) => onChange(inp.name, n)}
+              className="input w-full px-1 py-0.5 text-right text-[11px]"
+            />
+          </div>
         </div>
       </div>
       <input
@@ -105,6 +147,63 @@ function FloatControl({
         className="min-w-0 accent-accent"
         title={`${inp.label} — double-click to reset (${def})`}
       />
+      {assignOpen && target && <AssignRow target={target} bound={bound} />}
+    </div>
+  )
+}
+
+// Inline modulator-binding row: pick M1–8, set depth, or remove.
+function AssignRow({
+  target,
+  bound
+}: {
+  target: ModTarget
+  bound: Array<{ id: string; mod: number; depth: number }>
+}): JSX.Element {
+  const assignMod = useStore((s) => s.assignMod)
+  const removeAssignment = useStore((s) => s.removeAssignment)
+  const setAssignmentDepth = useStore((s) => s.setAssignmentDepth)
+  return (
+    <div className="flex flex-col gap-0.5 rounded border border-border bg-panel2/60 p-1">
+      <div className="flex flex-wrap gap-0.5">
+        {Array.from({ length: 8 }, (_, i) => {
+          const existing = bound.find((b) => b.mod === i)
+          return (
+            <button
+              key={i}
+              onClick={() => {
+                if (existing) removeAssignment(existing.id)
+                else if (!assignMod(i, target, 0.5)) {
+                  // Cap reached — the matrix stays legible by design.
+                }
+              }}
+              className={`rounded px-1 py-0.5 font-mono text-[9px] transition-colors ${
+                existing
+                  ? 'bg-accent/25 text-accent ring-1 ring-accent'
+                  : 'bg-panel3/60 text-muted hover:text-text'
+              }`}
+              title={existing ? `Unbind M${i + 1}` : `Bind M${i + 1}`}
+            >
+              {i + 1}
+            </button>
+          )
+        })}
+      </div>
+      {bound.map((b) => (
+        <div key={b.id} className="flex items-center gap-1">
+          <span className="w-6 shrink-0 font-mono text-[9px] text-accent">M{b.mod + 1}</span>
+          <input
+            type="range"
+            min={-1}
+            max={1}
+            step={0.01}
+            value={b.depth}
+            onChange={(e) => setAssignmentDepth(b.id, Number(e.target.value))}
+            className="min-w-0 flex-1 accent-accent"
+            title={`Depth ${b.depth.toFixed(2)} — bipolar swing around the base value`}
+          />
+        </div>
+      ))}
     </div>
   )
 }

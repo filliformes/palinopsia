@@ -28,7 +28,7 @@
 
 import { Renderer as ISFRenderer } from 'interactive-shader-format';
 import { handle, installTextureBridge } from './isfTextureBridge';
-import type { CompositionState, FxInstance } from '@shared/types';
+import type { CompositionState, FxInstance, FxScope } from '@shared/types';
 
 installTextureBridge();
 
@@ -235,6 +235,11 @@ class FxRack {
     return this.units.some((u) => u.enabled);
   }
 
+  /** Direct write to one unit's ISF input (the modulation path). */
+  setUnitInput(instId: string, name: string, value: number | number[]): void {
+    this.units.find((u) => u.instId === instId)?.isf.setValue(name, value);
+  }
+
   /** Run the chain on `input`; returns the last written texture. */
   apply(input: WebGLTexture, chain: ChainBuffers): WebGLTexture {
     let cur = input;
@@ -433,6 +438,19 @@ export class Compositor {
       L.rackLayer.sync(l.fx, sourceById);
     }
     this.masterRack.sync(c.master, sourceById);
+  }
+
+  /** Direct write to an FX unit's ISF input in any rack (modulation path). */
+  setFxInput(scope: FxScope, instId: string, name: string, value: number | number[]): void {
+    if (scope.kind === 'master') {
+      this.masterRack.setUnitInput(instId, name, value);
+      return;
+    }
+    const L = this.layers[scope.layer];
+    if (!L) return;
+    const rack =
+      scope.kind === 'layer' ? L.rackLayer : scope.kind === 'sourceA' ? L.rackA : L.rackB;
+    rack.setUnitInput(instId, name, value);
   }
 
   /** Composite top texture over base into target using the given blend mode. */

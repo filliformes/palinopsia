@@ -3,7 +3,7 @@
 // themed controls, and writes edits back through the store — the same path
 // OSC and the modulators (Phase 5) use, so the engine follows automatically.
 
-import type { FxInstance, SourceSlot } from '@shared/types'
+import type { FxInstance, ModTarget, SourceSlot } from '@shared/types'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { inputsForShader } from '../shaders/isf/inputs'
 import { useStore, type FxScope } from '../store'
@@ -27,6 +27,7 @@ export function Inspector(): JSX.Element {
   let shaderId: string | null = null
   let values: Record<string, number | number[]> = {}
   let onChange: (name: string, value: number | number[]) => void = () => {}
+  let modTargetFor: ((inputName: string) => ModTarget) | undefined
 
   if (selection?.type === 'source') {
     const layer = composition.layers[selection.layer]
@@ -39,6 +40,7 @@ export function Inspector(): JSX.Element {
       context = `layer ${selection.layer + 1} · src ${selection.slot}`
       const { layer: li, slot: sl } = selection
       onChange = (n, v) => setSourceInput(li, sl, n, v)
+      modTargetFor = (input) => ({ kind: 'source', layer: li, slot: sl, input })
     }
   } else if (selection?.type === 'fx') {
     const { scope, instId } = selection
@@ -65,6 +67,7 @@ export function Inspector(): JSX.Element {
           ? SCOPE_LABEL.master
           : `layer ${scope.layer + 1} · ${SCOPE_LABEL[scope.kind]}`
       onChange = (n, v) => setFxInput(scope, instId, n, v)
+      modTargetFor = (input) => ({ kind: 'fx', scope, instId, input })
     }
   }
 
@@ -83,7 +86,12 @@ export function Inspector(): JSX.Element {
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{context}</span>
       </div>
       <div className="max-h-44 overflow-y-auto">
-        <AutoControls inputs={inputsForShader(shaderId)} values={values} onChange={onChange} />
+        <AutoControls
+          inputs={inputsForShader(shaderId)}
+          values={values}
+          onChange={onChange}
+          modTargetFor={modTargetFor}
+        />
       </div>
     </div>
   )

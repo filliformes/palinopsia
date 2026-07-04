@@ -9,10 +9,18 @@ import type {
   BlendMode,
   CompositionState,
   FxInstance,
+  FxScope,
   LayerState,
+  ModAssignment,
+  ModTarget,
+  ModulatorConfig,
   Session,
   SourceSlot
 } from '@shared/types'
+import { MAX_MOD_ASSIGNMENTS } from '@shared/types'
+import { makeDefaultModulators } from './engine/modulation'
+
+export type { FxScope }
 
 // ── Themes (lifted from dataFLOU; palettes live in styles.css) ────────
 export type ThemeName =
@@ -105,14 +113,11 @@ export function makeDefaultComposition(): CompositionState {
   return {
     layers: [makeLayer(), makeLayer(), makeLayer(), makeLayer()],
     master: [],
-    bpm: 120
+    bpm: 120,
+    modulators: makeDefaultModulators(),
+    modMatrix: []
   }
 }
-
-// Addresses one of the four FX racks (per-source, per-layer, or master).
-export type FxScope =
-  | { kind: 'master' }
-  | { kind: 'layer' | 'sourceA' | 'sourceB'; layer: number }
 
 // What the Inspector's auto-UI is pointed at: a source slot or an FX unit
 // (brief §10.3 — "selecting any source or FX renders its ISF INPUTS").
@@ -120,6 +125,14 @@ export type Selection =
   | { type: 'source'; layer: number; slot: 'A' | 'B' }
   | { type: 'fx'; scope: FxScope; instId: string }
   | null
+
+/** Stable identity for a mod target — used to find existing assignments. */
+export function modTargetKey(t: ModTarget): string {
+  if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
+  const s = t.scope
+  const scopeKey = s.kind === 'master' ? 'master' : `${s.kind}:${s.layer}`
+  return `fx:${scopeKey}:${t.instId}:${t.input}`
+}
 
 // ── Store ─────────────────────────────────────────────────────────────
 interface StoreState {
@@ -155,6 +168,14 @@ interface StoreState {
   toggleFx: (scope: FxScope, instId: string) => void
   moveFx: (scope: FxScope, instId: string, dir: -1 | 1) => void
   setFxInput: (scope: FxScope, instId: string, name: string, value: number | number[]) => void
+
+  // Modulation (Phase 5) — the 8-slot bank + the capped matrix.
+  updateModulator: (i: number, partial: Partial<ModulatorConfig>) => void
+  // Upserts by (mod, target): re-assigning the same pair updates its depth.
+  // Returns false when the cap would be exceeded (legibility = simplexité).
+  assignMod: (mod: number, target: ModTarget, depth: number) => boolean
+  removeAssignment: (id: string) => void
+  setAssignmentDepth: (id: string, depth: number) => void
 
   // The currently-selected source/FX whose ISF INPUTS the auto-UI renders.
   selection: Selection
@@ -352,6 +373,56 @@ export const useStore = create<StoreState>((set, get) => ({
       )
     })),
 
+  updateModulator: (i, partial) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        modulators: s.composition.modulators.map((m, idx) =>
+          idx === i ? { ...m, ...partial } : m
+        )
+      }
+    })),
+  assignMod: (mod, target, depth) => {
+    const s = get()
+    const key = modTargetKey(target)
+    const existing = s.composition.modMatrix.find(
+      (a) => a.mod === mod && modTargetKey(a.target) === key
+    )
+    if (existing) {
+      set((st) => ({
+        composition: {
+          ...st.composition,
+          modMatrix: st.composition.modMatrix.map((a) =>
+            a.id === existing.id ? { ...a, depth } : a
+          )
+        }
+      }))
+      return true
+    }
+    if (s.composition.modMatrix.length >= MAX_MOD_ASSIGNMENTS) return false
+    const entry: ModAssignment = { id: uid(), mod, target, depth }
+    set((st) => ({
+      composition: { ...st.composition, modMatrix: [...st.composition.modMatrix, entry] }
+    }))
+    return true
+  },
+  removeAssignment: (id) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        modMatrix: s.composition.modMatrix.filter((a) => a.id !== id)
+      }
+    })),
+  setAssignmentDepth: (id, depth) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        modMatrix: s.composition.modMatrix.map((a) =>
+          a.id === id ? { ...a, depth: Math.max(-1, Math.min(1, depth)) } : a
+        )
+      }
+    })),
+
   selection: null,
   setSelection: (sel) => set({ selection: sel }),
 
@@ -368,7 +439,9 @@ export const useStore = create<StoreState>((set, get) => ({
           sourceAFx: l.sourceAFx ?? [],
           sourceBFx: l.sourceBFx ?? [],
           fx: l.fx ?? []
-        }))
+        })),
+        modulators: s.composition.modulators ?? makeDefaultModulators(),
+        modMatrix: s.composition.modMatrix ?? []
       }
     }),
   exportSession: () => {

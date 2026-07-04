@@ -46,7 +46,10 @@ npm run build:win  # NSIS + portable
 - **4 · Auto-UI** ✅ — Inspector renders the selection's ISF `INPUTS` as themed
   controls (float→slider, bool→toggle, enum→dropdown, color→swatch+alpha,
   point2D→XY pad), honouring declared ranges and defaults.
-- **5 · Modulators** — port dataFLOU's 8-mod engine + Meta Controller + mod-matrix.
+- **5 · Modulators** ✅ *(core)* — dataFLOU's 8-mod engine ported (LFO×7 shapes,
+  Ramp, ADSR, Arp, Random, S&H, Slew, Chaos; BPM-sync divisions; 14 output
+  curves), frame-locked in the renderer; capped mod-matrix (12) bindable from
+  any float control's M button. Meta Controller + MIDI learn: next chunk.
 - **6 · Presets + Randomize** — scene bank + curated-range Randomize.
 - **7 · Video + HIVE** — `<video>` → texture + synthify; HIVE WebCodecs live-in.
 - **8 · Output** — in-shader warp/mapping + Spout/Syphon/NDI + OSCQuery.

@@ -59,11 +59,103 @@ export interface LayerState {
   sourceMix: number
 }
 
+// ── Modulation (brief §6 — ported from dataFLOU) ─────────────────────
+export type ModulatorType =
+  | 'lfo'
+  | 'ramp'
+  | 'adsr'
+  | 'arp'
+  | 'random'
+  | 'sh'
+  | 'slew'
+  | 'chaos'
+
+export type LfoShape =
+  | 'sine'
+  | 'triangle'
+  | 'square'
+  | 'sawtooth'
+  | 'rndStep'
+  | 'rndSmooth'
+  | 'spastic'
+
+// The 14 output curves (dataFLOU's scaleMetaValue vocabulary).
+export type ModCurve =
+  | 'linear'
+  | 'log'
+  | 'exp'
+  | 'geom'
+  | 'easeIn'
+  | 'easeOut'
+  | 'cubic'
+  | 'sqrt'
+  | 'sigmoid'
+  | 'smoothstep'
+  | 'db'
+  | 'gamma'
+  | 'step'
+  | 'invert'
+
+export type ArpMode = 'up' | 'down' | 'upDown' | 'random' | 'drunk'
+
+// One modulator slot's configuration (runtime state lives in the engine).
+export interface ModulatorConfig {
+  type: ModulatorType
+  enabled: boolean
+  // Clock — shared vocabulary with dataFLOU: free Hz or BPM-synced division.
+  sync: 'free' | 'bpm'
+  rateHz: number
+  divisionIdx: number
+  dotted: boolean
+  triplet: boolean
+  // Output shaping.
+  curve: ModCurve
+  // Type-specific parameter blocks (only the active type's block is read).
+  shape: LfoShape // lfo
+  ramp: { rampMs: number; curvePct: number; mode: 'normal' | 'inverted' | 'loop' }
+  adsr: {
+    attackMs: number
+    decayMs: number
+    sustainMs: number
+    releaseMs: number
+    sustainLevel: number
+    loop: boolean
+  }
+  arp: { steps: number; mode: ArpMode }
+  random: { distribution: number } // 0.5 = uniform; >0.5 centre-hug, <0.5 edge-weight
+  sh: { probability: number; smooth: boolean; distribution: number }
+  slew: { riseMs: number; fallMs: number; randomTarget: boolean }
+  chaos: { r: number } // logistic-map r in [3.4, 4.0]
+}
+
+// What an assignment modulates. Phase 5 targets float ISF inputs.
+export type ModTarget =
+  | { kind: 'source'; layer: number; slot: 'A' | 'B'; input: string }
+  | { kind: 'fx'; scope: FxScope; instId: string; input: string }
+
+// Addresses one of the four FX racks (per-source, per-layer, or master).
+export type FxScope =
+  | { kind: 'master' }
+  | { kind: 'layer' | 'sourceA' | 'sourceB'; layer: number }
+
+export interface ModAssignment {
+  id: string
+  mod: number // modulator slot 0..7
+  target: ModTarget
+  depth: number // -1..+1 — bipolar swing around the base value
+}
+
+// The cap is deliberate (simplexité): bounded modulation stays followable.
+export const MAX_MOD_ASSIGNMENTS = 12
+export const MODULATOR_COUNT = 8
+
 // The whole composition: four layers, a master FX rack, and transport.
 export interface CompositionState {
   layers: LayerState[]
   master: FxInstance[] // glitch / dither / chroma / grade + warp
   bpm: number
+  modulators: ModulatorConfig[]
+  modMatrix: ModAssignment[]
 }
 
 // ── Session persistence (brief §7) ───────────────────────────────────

@@ -7,11 +7,14 @@
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Compositor } from './engine/Compositor'
+import { applyModulation, modEngine } from './engine/modulation'
 import { FxRackPanel } from './components/FxRackPanel'
 import { Inspector } from './components/Inspector'
 import { LayerPanel } from './components/LayerPanel'
+import { ModulationPanel } from './components/ModulationPanel'
 import { Transport } from './components/Transport'
 import { GENERATORS, shaderSourceById } from './shaders/isf'
+import { inputsForShader } from './shaders/isf/inputs'
 import { THEME_ORDER, useStore, type ThemeName } from './store'
 
 export default function App(): JSX.Element {
@@ -54,12 +57,19 @@ export default function App(): JSX.Element {
 
     const start = performance.now()
     const loop = (): void => {
-      // Store → engine reconciliation, every frame. One write path for
-      // everything: UI edits, session loads, and (later) OSC / modulators /
-      // auto-UI all mutate the store; the engine follows. Shader hot-swaps
-      // preserve feedback buffers (brief §1) — never a reset to black.
-      comp!.syncFromState(useStore.getState().composition, shaderSourceById)
-      comp!.render(performance.now() - start)
+      const now = performance.now()
+      const c = useStore.getState().composition
+      // 1. Store → engine reconciliation (base values). One write path for
+      //    everything: UI edits, session loads, OSC — the engine follows.
+      //    Shader hot-swaps preserve feedback buffers (brief §1).
+      comp!.syncFromState(c, shaderSourceById)
+      // 2. Modulation: tick the 8-slot engine, then overlay the mod-matrix
+      //    on top of the base values — straight into the Compositor, never
+      //    through React (no 60 Hz re-renders).
+      const modValues = modEngine.tick(now, c.modulators, c.bpm)
+      applyModulation(comp!, c, modValues, inputsForShader)
+      // 3. Render the frame.
+      comp!.render(now - start)
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
@@ -183,6 +193,9 @@ export default function App(): JSX.Element {
           ))}
         </aside>
       </main>
+
+      {/* ── Modulation: 8-mod bank + capped matrix (brief §10.4) ── */}
+      <ModulationPanel />
 
       {/* ── Transport ───────────────────────────────────────────── */}
       <Transport />

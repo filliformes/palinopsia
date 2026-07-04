@@ -1,0 +1,419 @@
+// Modulation panel (brief §10.4): the 8-modulator bank + the capped
+// mod-matrix. Each card: type, clock (free Hz / BPM division), the active
+// type's key parameters, output curve, and a live meter. The meters are
+// painted by ONE rAF loop writing DOM styles directly from modEngine.values —
+// modulation never re-renders React at 60 Hz.
+
+import { useEffect, useRef, type ReactNode } from 'react'
+import type { ArpMode, LfoShape, ModCurve, ModulatorType } from '@shared/types'
+import { MAX_MOD_ASSIGNMENTS } from '@shared/types'
+import { DIVISIONS, modEngine } from '../engine/modulation'
+import { SHADER_BY_ID } from '../shaders/isf'
+import { modTargetKey, useStore } from '../store'
+import { BoundedNumberInput } from './BoundedNumberInput'
+
+const MOD_TYPES: ModulatorType[] = ['lfo', 'ramp', 'adsr', 'arp', 'random', 'sh', 'slew', 'chaos']
+const LFO_SHAPES: LfoShape[] = ['sine', 'triangle', 'square', 'sawtooth', 'rndStep', 'rndSmooth', 'spastic']
+const CURVES: ModCurve[] = [
+  'linear', 'log', 'exp', 'geom', 'easeIn', 'easeOut', 'cubic', 'sqrt',
+  'sigmoid', 'smoothstep', 'db', 'gamma', 'step', 'invert'
+]
+const ARP_MODES: ArpMode[] = ['up', 'down', 'upDown', 'random', 'drunk']
+
+export function ModulationPanel(): JSX.Element {
+  const modulators = useStore((s) => s.composition.modulators)
+  return (
+    <div className="flex min-w-0 flex-col gap-2 border-t border-border bg-panel px-3 py-2">
+      <div className="flex items-baseline gap-3">
+        <span className="font-mono text-[10px] uppercase tracking-wide text-muted">
+          Modulation
+        </span>
+        <MatrixSummary />
+      </div>
+      <div className="flex min-w-0 gap-2 overflow-x-auto pb-1">
+        {modulators.map((_, i) => (
+          <ModCard key={i} index={i} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── One modulator card ────────────────────────────────────────────────
+function ModCard({ index }: { index: number }): JSX.Element {
+  const m = useStore((s) => s.composition.modulators[index])
+  const update = useStore((s) => s.updateModulator)
+
+  return (
+    <div
+      className={`flex w-44 shrink-0 flex-col gap-1 rounded border p-1.5 transition-colors ${
+        m.enabled ? 'border-accent/60 bg-panel2' : 'border-border bg-panel2/40'
+      }`}
+    >
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => update(index, { enabled: !m.enabled })}
+          className={`h-2.5 w-2.5 shrink-0 rounded-full transition-colors ${
+            m.enabled ? 'bg-accent' : 'bg-panel3'
+          }`}
+          title={m.enabled ? 'On — click to disable' : 'Off — click to enable'}
+        />
+        <span className="font-mono text-[10px] text-muted">M{index + 1}</span>
+        <select
+          className="input select-compact min-w-0 flex-1 text-[10px]"
+          value={m.type}
+          onChange={(e) => update(index, { type: e.target.value as ModulatorType })}
+        >
+          {MOD_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => modEngine.retrigger(index)}
+          className="shrink-0 rounded bg-panel3/60 px-1 font-mono text-[9px] text-muted hover:text-accent"
+          title="Retrigger — restart ramp/ADSR/arp from zero"
+        >
+          ⟳
+        </button>
+      </div>
+
+      {/* live meter */}
+      <Meter index={index} />
+
+      {/* clock — everything except ramp/adsr is clock-driven */}
+      {m.type !== 'ramp' && m.type !== 'adsr' && (
+        <div className="flex min-w-0 items-center gap-1">
+          <button
+            onClick={() => update(index, { sync: m.sync === 'bpm' ? 'free' : 'bpm' })}
+            className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
+              m.sync === 'bpm' ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'
+            }`}
+            title="Clock: free Hz or BPM-synced division"
+          >
+            {m.sync === 'bpm' ? 'BPM' : 'HZ'}
+          </button>
+          {m.sync === 'bpm' ? (
+            <select
+              className="input select-compact min-w-0 flex-1 text-[10px]"
+              value={m.divisionIdx}
+              onChange={(e) => update(index, { divisionIdx: Number(e.target.value) })}
+            >
+              {DIVISIONS.map((d, i) => (
+                <option key={d.label} value={i}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <>
+              <input
+                type="range"
+                min={-2}
+                max={1.3}
+                step={0.01}
+                value={Math.log10(Math.max(0.01, m.rateHz))}
+                onChange={(e) => update(index, { rateHz: Math.pow(10, Number(e.target.value)) })}
+                className="min-w-0 flex-1 accent-accent"
+                title={`Rate: ${m.rateHz.toFixed(2)} Hz (log)`}
+              />
+              <span className="w-10 shrink-0 text-right font-mono text-[9px] text-muted">
+                {m.rateHz < 1 ? m.rateHz.toFixed(2) : m.rateHz.toFixed(1)}
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* type-specific params */}
+      <TypeParams index={index} />
+
+      {/* output curve */}
+      <div className="flex min-w-0 items-center gap-1">
+        <span className="w-10 shrink-0 font-mono text-[9px] text-muted">CURVE</span>
+        <select
+          className="input select-compact min-w-0 flex-1 text-[10px]"
+          value={m.curve}
+          onChange={(e) => update(index, { curve: e.target.value as ModCurve })}
+        >
+          {CURVES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )
+}
+
+function TypeParams({ index }: { index: number }): JSX.Element | null {
+  const m = useStore((s) => s.composition.modulators[index])
+  const update = useStore((s) => s.updateModulator)
+
+  switch (m.type) {
+    case 'lfo':
+      return (
+        <Row label="SHAPE">
+          <select
+            className="input select-compact min-w-0 flex-1 text-[10px]"
+            value={m.shape}
+            onChange={(e) => update(index, { shape: e.target.value as LfoShape })}
+          >
+            {LFO_SHAPES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </Row>
+      )
+    case 'ramp':
+      return (
+        <>
+          <NumRow label="MS" value={m.ramp.rampMs} min={50} max={120000}
+            onChange={(v) => update(index, { ramp: { ...m.ramp, rampMs: v } })} />
+          <NumRow label="CURVE%" value={m.ramp.curvePct} min={-100} max={100}
+            onChange={(v) => update(index, { ramp: { ...m.ramp, curvePct: v } })} />
+          <Row label="MODE">
+            <select
+              className="input select-compact min-w-0 flex-1 text-[10px]"
+              value={m.ramp.mode}
+              onChange={(e) =>
+                update(index, { ramp: { ...m.ramp, mode: e.target.value as 'normal' | 'inverted' | 'loop' } })
+              }
+            >
+              <option value="loop">loop</option>
+              <option value="normal">one-shot</option>
+              <option value="inverted">inverted</option>
+            </select>
+          </Row>
+        </>
+      )
+    case 'adsr':
+      return (
+        <>
+          <div className="grid grid-cols-2 gap-1">
+            <NumRow label="A" value={m.adsr.attackMs} min={0} max={30000}
+              onChange={(v) => update(index, { adsr: { ...m.adsr, attackMs: v } })} />
+            <NumRow label="D" value={m.adsr.decayMs} min={0} max={30000}
+              onChange={(v) => update(index, { adsr: { ...m.adsr, decayMs: v } })} />
+            <NumRow label="S" value={m.adsr.sustainMs} min={0} max={60000}
+              onChange={(v) => update(index, { adsr: { ...m.adsr, sustainMs: v } })} />
+            <NumRow label="R" value={m.adsr.releaseMs} min={0} max={30000}
+              onChange={(v) => update(index, { adsr: { ...m.adsr, releaseMs: v } })} />
+          </div>
+          <SliderRow label="SUS LVL" value={m.adsr.sustainLevel} min={0} max={1}
+            onChange={(v) => update(index, { adsr: { ...m.adsr, sustainLevel: v } })} />
+          <ToggleRow label="LOOP" on={m.adsr.loop}
+            onToggle={() => update(index, { adsr: { ...m.adsr, loop: !m.adsr.loop } })} />
+        </>
+      )
+    case 'arp':
+      return (
+        <>
+          <NumRow label="STEPS" value={m.arp.steps} min={2} max={16} integer
+            onChange={(v) => update(index, { arp: { ...m.arp, steps: v } })} />
+          <Row label="MODE">
+            <select
+              className="input select-compact min-w-0 flex-1 text-[10px]"
+              value={m.arp.mode}
+              onChange={(e) => update(index, { arp: { ...m.arp, mode: e.target.value as ArpMode } })}
+            >
+              {ARP_MODES.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </Row>
+        </>
+      )
+    case 'random':
+      return (
+        <SliderRow label="DIST" value={m.random.distribution} min={0} max={1}
+          title="Distribution — 0.5 uniform · >0.5 centre-hug · <0.5 edge-weight"
+          onChange={(v) => update(index, { random: { distribution: v } })} />
+      )
+    case 'sh':
+      return (
+        <>
+          <SliderRow label="PROB" value={m.sh.probability} min={0} max={1}
+            title="Chance a clock draws a fresh sample — below 1 locks patterns"
+            onChange={(v) => update(index, { sh: { ...m.sh, probability: v } })} />
+          <SliderRow label="DIST" value={m.sh.distribution} min={0} max={1}
+            onChange={(v) => update(index, { sh: { ...m.sh, distribution: v } })} />
+          <ToggleRow label="SMOOTH" on={m.sh.smooth}
+            onToggle={() => update(index, { sh: { ...m.sh, smooth: !m.sh.smooth } })} />
+        </>
+      )
+    case 'slew':
+      return (
+        <>
+          <NumRow label="RISE" value={m.slew.riseMs} min={1} max={10000}
+            onChange={(v) => update(index, { slew: { ...m.slew, riseMs: v } })} />
+          <NumRow label="FALL" value={m.slew.fallMs} min={1} max={10000}
+            onChange={(v) => update(index, { slew: { ...m.slew, fallMs: v } })} />
+          <ToggleRow label="RANDOM" on={m.slew.randomTarget}
+            onToggle={() => update(index, { slew: { ...m.slew, randomTarget: !m.slew.randomTarget } })} />
+        </>
+      )
+    case 'chaos':
+      return (
+        <SliderRow label="R" value={m.chaos.r} min={3.4} max={4} step={0.005}
+          title="Logistic-map r — toward 4 = wilder"
+          onChange={(v) => update(index, { chaos: { r: v } })} />
+      )
+    default:
+      return null
+  }
+}
+
+// ── Small row helpers ─────────────────────────────────────────────────
+function Row({ label, children }: { label: string; children: ReactNode }): JSX.Element {
+  return (
+    <div className="flex min-w-0 items-center gap-1">
+      <span className="w-10 shrink-0 font-mono text-[9px] text-muted">{label}</span>
+      {children}
+    </div>
+  )
+}
+
+function NumRow({
+  label, value, min, max, integer, onChange
+}: {
+  label: string; value: number; min: number; max: number; integer?: boolean
+  onChange: (v: number) => void
+}): JSX.Element {
+  return (
+    <Row label={label}>
+      <BoundedNumberInput
+        value={value}
+        min={min}
+        max={max}
+        integer={integer}
+        onChange={onChange}
+        className="input w-full min-w-0 px-1 py-0.5 text-right text-[10px]"
+      />
+    </Row>
+  )
+}
+
+function SliderRow({
+  label, value, min, max, step = 0.01, title, onChange
+}: {
+  label: string; value: number; min: number; max: number; step?: number; title?: string
+  onChange: (v: number) => void
+}): JSX.Element {
+  return (
+    <Row label={label}>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="min-w-0 flex-1 accent-accent"
+        title={title}
+      />
+    </Row>
+  )
+}
+
+function ToggleRow({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }): JSX.Element {
+  return (
+    <Row label={label}>
+      <button
+        onClick={onToggle}
+        className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${
+          on ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'
+        }`}
+      >
+        {on ? 'ON' : 'OFF'}
+      </button>
+    </Row>
+  )
+}
+
+// ── Live meter — one rAF per meter, direct style writes ───────────────
+function Meter({ index }: { index: number }): JSX.Element {
+  const barRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    let raf = 0
+    const paint = (): void => {
+      const el = barRef.current
+      if (el) el.style.width = `${Math.round(modEngine.values[index] * 100)}%`
+      raf = requestAnimationFrame(paint)
+    }
+    raf = requestAnimationFrame(paint)
+    return () => cancelAnimationFrame(raf)
+  }, [index])
+  return (
+    <div className="h-1 w-full overflow-hidden rounded bg-panel3/50">
+      <div ref={barRef} className="h-full bg-accent/80" style={{ width: '0%' }} />
+    </div>
+  )
+}
+
+// ── Matrix summary — every assignment, with depth + remove ────────────
+function MatrixSummary(): JSX.Element {
+  const matrix = useStore((s) => s.composition.modMatrix)
+  const composition = useStore((s) => s.composition)
+  const removeAssignment = useStore((s) => s.removeAssignment)
+  const setAssignmentDepth = useStore((s) => s.setAssignmentDepth)
+
+  function describe(a: (typeof matrix)[number]): string {
+    const t = a.target
+    if (t.kind === 'source') return `L${t.layer + 1}·${t.slot} ${t.input}`
+    const inst =
+      t.scope.kind === 'master'
+        ? composition.master.find((f) => f.id === t.instId)
+        : (t.scope.kind === 'layer'
+            ? composition.layers[t.scope.layer]?.fx
+            : t.scope.kind === 'sourceA'
+              ? composition.layers[t.scope.layer]?.sourceAFx
+              : composition.layers[t.scope.layer]?.sourceBFx
+          )?.find((f) => f.id === t.instId)
+    const fxName = inst?.shaderId ? (SHADER_BY_ID[inst.shaderId]?.name ?? '?') : '?'
+    const where = t.scope.kind === 'master' ? 'MST' : `L${t.scope.layer + 1}`
+    return `${where}·${fxName} ${t.input}`
+  }
+
+  return (
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+      <span className="font-mono text-[9px] text-muted">
+        {matrix.length}/{MAX_MOD_ASSIGNMENTS}
+      </span>
+      {matrix.map((a) => (
+        <span
+          key={a.id}
+          className="flex items-center gap-1 rounded border border-border bg-panel2 px-1.5 py-0.5 font-mono text-[9px]"
+        >
+          <span className="text-accent">M{a.mod + 1}</span>
+          <span className="max-w-[160px] truncate text-muted" title={describe(a)}>
+            {describe(a)}
+          </span>
+          <input
+            type="range"
+            min={-1}
+            max={1}
+            step={0.01}
+            value={a.depth}
+            onChange={(e) => setAssignmentDepth(a.id, Number(e.target.value))}
+            className="w-14 accent-accent"
+            title={`Depth ${a.depth.toFixed(2)} (bipolar)`}
+          />
+          <button
+            onClick={() => removeAssignment(a.id)}
+            className="text-muted hover:text-danger"
+            title="Remove assignment"
+          >
+            ×
+          </button>
+        </span>
+      ))}
+    </div>
+  )
+}
