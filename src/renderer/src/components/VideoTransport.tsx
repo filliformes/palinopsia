@@ -39,7 +39,7 @@ export function VideoTransport({
     setVideoPlayback(layer, slot, patch)
 
   const playing = state.videoPlaying ?? true
-  const reverse = state.videoReverse ?? false
+  const direction = state.videoDirection ?? (state.videoReverse ? 'reverse' : 'forward')
   const loop = state.videoLoop ?? true
   const speed = state.videoSpeed ?? 1
   const inN = state.videoIn ?? 0
@@ -107,11 +107,16 @@ export function VideoTransport({
           {playing ? '⏸ pause' : '▶ play'}
         </button>
         <button
-          onClick={() => set({ videoReverse: !reverse })}
-          className={btn(reverse)}
-          title={reverse ? 'Playing backward — click for forward' : 'Playing forward — click for backward'}
+          onClick={() =>
+            set({
+              videoDirection:
+                direction === 'forward' ? 'reverse' : direction === 'reverse' ? 'pendulum' : 'forward'
+            })
+          }
+          className={btn(direction !== 'forward')}
+          title={`Play mode: ${direction} — click to cycle forward → reverse → pendulum`}
         >
-          {reverse ? '◀ rev' : 'fwd ▶'}
+          {direction === 'forward' ? 'fwd ▶' : direction === 'reverse' ? '◀ rev' : '⇄ pend'}
         </button>
         <button
           onClick={() => set({ videoLoop: !loop })}

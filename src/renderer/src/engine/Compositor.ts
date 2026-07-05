@@ -507,7 +507,7 @@ export class ISFLayer {
     v.setPlayback({
       playing: s.videoPlaying ?? true,
       speed: s.videoSpeed ?? 1,
-      reverse: s.videoReverse ?? false,
+      direction: s.videoDirection ?? (s.videoReverse ? 'reverse' : 'forward'),
       loop: s.videoLoop ?? true,
       inN: s.videoIn ?? 0,
       outN: s.videoOut ?? 1

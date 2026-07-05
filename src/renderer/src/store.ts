@@ -273,7 +273,19 @@ interface StoreState {
     patch: Partial<
       Pick<
         SourceSlot,
-        'videoPlaying' | 'videoSpeed' | 'videoReverse' | 'videoLoop' | 'videoIn' | 'videoOut'
+        | 'videoPlaying'
+        | 'videoSpeed'
+        | 'videoDirection'
+        | 'videoLoop'
+        | 'videoIn'
+        | 'videoOut'
+        | 'zoom'
+        | 'panX'
+        | 'panY'
+        | 'cropL'
+        | 'cropR'
+        | 'cropT'
+        | 'cropB'
       >
     >
   ) => void
@@ -688,7 +700,7 @@ export const useStore = create<StoreState>((set, get) => ({
             mediaName,
             videoPlaying: true,
             videoSpeed: 1,
-            videoReverse: false,
+            videoDirection: 'forward' as const,
             videoLoop: true,
             videoIn: 0,
             videoOut: 1

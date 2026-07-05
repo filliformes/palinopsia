@@ -31,10 +31,12 @@ export function uploadVideoFrame(
   return tex
 }
 
+export type PlayDirection = 'forward' | 'reverse' | 'pendulum'
+
 export interface VideoPlayback {
   playing: boolean
   speed: number // base clip speed (× the engine dt this receives)
-  reverse: boolean
+  direction: PlayDirection
   loop: boolean
   inN: number // normalized start 0..1
   outN: number // normalized stop 0..1
@@ -43,10 +45,13 @@ export interface VideoPlayback {
 export class VideoSource {
   readonly video: HTMLVideoElement
   private tex: WebGLTexture | null = null
+  private pos = -1 // internal playhead (seconds) for manual/reverse stepping
+  private pendDir = 1 // pendulum instantaneous direction (1 fwd, -1 rev)
+  private seekBusy = false // a manual seek is in flight (wait for 'seeked')
   private pb: VideoPlayback = {
     playing: true,
     speed: 1,
-    reverse: false,
+    direction: 'forward',
     loop: true,
     inN: 0,
     outN: 1
@@ -54,12 +59,16 @@ export class VideoSource {
 
   constructor(private gl: WebGL2RenderingContext) {
     this.video = document.createElement('video')
-    // We drive currentTime ourselves (reverse + arbitrary speed need it), so
-    // native looping/playback is off — the decoder just has to be warm.
+    // Native looping off — we own the loop/trim/direction.
     this.video.loop = false
     this.video.muted = true
     this.video.playsInline = true
     this.video.preload = 'auto'
+    // Manual reverse/step seeks: only issue the next once the last one settled,
+    // otherwise the element seeks forever and never paints a frame (stays black).
+    this.video.addEventListener('seeked', () => {
+      this.seekBusy = false
+    })
   }
 
   load(src: string): void {
@@ -101,37 +110,60 @@ export class VideoSource {
       return
     }
 
-    // Native forward playback handles the common case smoothly.
-    const nativeOk = !this.pb.reverse && rate >= 0.0625 && rate <= 16
+    // Instantaneous direction: pendulum bounces between +1 and -1 at the trims.
+    let dir = 1
+    if (this.pb.direction === 'reverse') dir = -1
+    else if (this.pb.direction === 'pendulum') dir = this.pendDir
+
+    // Native playback handles smooth FORWARD-in-range motion. Reverse and
+    // out-of-range speeds step currentTime manually.
+    const nativeOk = dir > 0 && rate >= 0.0625 && rate <= 16
     if (nativeOk) {
       if (v.playbackRate !== rate) v.playbackRate = rate
       if (v.paused) void v.play().catch(() => {})
-      // Only touch currentTime at the trim boundaries — not every frame.
-      if (v.currentTime >= hi - 0.02 || v.currentTime < lo - 0.02) {
-        if (this.pb.loop) v.currentTime = lo
-        else {
+      this.pos = v.currentTime // keep the manual clock synced for a later flip
+      if (v.currentTime >= hi - 0.02) {
+        if (this.pb.direction === 'pendulum') {
+          this.pendDir = -1 // bounce back — manual reverse takes over next frame
+          this.pos = hi
+        } else if (this.pb.loop) {
+          v.currentTime = lo
+        } else {
           v.currentTime = hi
           v.pause()
         }
+      } else if (v.currentTime < lo - 0.02) {
+        v.currentTime = lo
       }
       return
     }
 
-    // Manual stepping (reverse / very slow / very fast). Only issue a new seek
-    // once the previous one finished, or it never settles a frame (black).
+    // Manual stepping — decouple from the element clock (internal `pos`) and
+    // gate on the previous seek finishing so each frame actually paints.
     if (!v.paused) v.pause()
-    if (v.seeking) return
-    let t = v.currentTime
-    if (t < lo || t > hi) t = this.pb.reverse ? hi : lo
-    t += rawDt * rate * (this.pb.reverse ? -1 : 1)
-    if (t > hi) t = this.pb.loop ? lo + ((t - lo) % span) : hi
-    else if (t < lo) t = this.pb.loop ? hi - ((lo - t) % span) : lo
-    if (!Number.isFinite(t)) t = lo
-    if (Math.abs(t - v.currentTime) > 1e-4) {
+    if (this.pos < 0) this.pos = v.currentTime
+    if (this.seekBusy) return
+    this.pos += rawDt * rate * dir
+    if (this.pb.direction === 'pendulum') {
+      if (this.pos >= hi) {
+        this.pos = hi
+        this.pendDir = 1
+      } else if (this.pos <= lo) {
+        this.pos = lo
+        this.pendDir = -1
+      }
+    } else if (this.pos < lo) {
+      this.pos = this.pb.loop ? hi : lo
+    } else if (this.pos > hi) {
+      this.pos = this.pb.loop ? lo : hi
+    }
+    if (!Number.isFinite(this.pos)) this.pos = lo
+    if (Math.abs(this.pos - v.currentTime) > 1e-4) {
+      this.seekBusy = true
       try {
-        v.currentTime = t
+        v.currentTime = this.pos
       } catch {
-        /* a seek can race a src reload — ignore, next frame retries */
+        this.seekBusy = false // a seek can race a src reload — retry next frame
       }
     }
   }

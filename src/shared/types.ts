@@ -68,10 +68,19 @@ export interface SourceSlot extends ShaderInstance {
   // For kind:'video' — transport (all optional; engine applies defaults).
   videoPlaying?: boolean // default true
   videoSpeed?: number // 1/28..128, default 1 (× layer speed × global speed)
-  videoReverse?: boolean // play direction, default false (forward)
+  videoReverse?: boolean // legacy; superseded by videoDirection
+  videoDirection?: 'forward' | 'reverse' | 'pendulum' // default 'forward'
   videoLoop?: boolean // default true
   videoIn?: number // normalized start point 0..1, default 0
   videoOut?: number // normalized stop point 0..1, default 1
+  // Source framing (video + capture): sample transform applied on upload.
+  zoom?: number // scale about centre, default 1
+  panX?: number // -1..1, default 0
+  panY?: number // -1..1, default 0
+  cropL?: number // trim left edge 0..0.9, default 0
+  cropR?: number // trim right edge 0..0.9, default 0
+  cropT?: number // trim top edge 0..0.9, default 0
+  cropB?: number // trim bottom edge 0..0.9, default 0
 }
 
 // One FX in a rack. Every FX is an ISF shader (per brief §5).
