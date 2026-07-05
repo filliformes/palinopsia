@@ -321,6 +321,18 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Dark · Graphite', values: { stops: 4, blend: 1, dither: 0.14, mixSrc: 0, autoLevel: 0.254, gamma: 0.926, contrast: 1.287, saturation: 0.992, sharpen: 0.061, splitTone: 0.254, shadowTint: [0.231, 0.244, 0.276, 1], highTint: [0.554, 0.542, 0.526, 1], colorA: [0.051, 0.051, 0.051, 1], colorB: [0.173, 0.173, 0.18, 1], colorC: [0.302, 0.302, 0.302, 1], colorD: [0.557, 0.557, 0.576, 1] } },
     { name: 'Dark · Slate', values: { stops: 5, blend: 1, dither: 0.14, mixSrc: 0, autoLevel: 0.428, gamma: 0.831, contrast: 1.135, saturation: 1.09, sharpen: 0.146, splitTone: 0.353, shadowTint: [0.263, 0.277, 0.312, 1], highTint: [0.688, 0.676, 0.66, 1], colorA: [0.11, 0.11, 0.118, 1], colorB: [0.173, 0.173, 0.18, 1], colorC: [0.337, 0.353, 0.4, 1], colorD: [0.78, 0.78, 0.8, 1], colorE: [0.857, 0.857, 0.87, 1] } }
   ],
+  'fx-context': [
+    { name: 'Clean', values: { trails: 0, blur: 0, bloom: 0.1, depth: 0.12, haze: 0, lightGlow: 0, light: [0.5, 0.55], atmosphere: [0.5, 0.58, 0.72, 1] } },
+    { name: 'Gentle depth', values: { trails: 0.2, blur: 0.08, bloom: 0.3, depth: 0.35, haze: 0.15, lightGlow: 0.25, light: [0.5, 0.55], atmosphere: [0.5, 0.58, 0.72, 1] } },
+    { name: 'Deep space', values: { trails: 0.3, blur: 0.12, bloom: 0.4, depth: 0.7, haze: 0.5, lightGlow: 0.2, light: [0.5, 0.5], atmosphere: [0.12, 0.16, 0.3, 1] } },
+    { name: 'Dreamy bloom', values: { trails: 0.4, blur: 0.3, bloom: 0.75, depth: 0.3, haze: 0.2, lightGlow: 0.5, light: [0.5, 0.5], atmosphere: [0.75, 0.68, 0.85, 1] } },
+    { name: 'Long trails', values: { trails: 0.62, blur: 0.18, bloom: 0.35, depth: 0.4, haze: 0.1, lightGlow: 0.2, light: [0.5, 0.55], atmosphere: [0.5, 0.58, 0.72, 1] } },
+    { name: 'Soft focus', values: { trails: 0.15, blur: 0.5, bloom: 0.4, depth: 0.3, haze: 0.15, lightGlow: 0.25, light: [0.5, 0.55], atmosphere: [0.6, 0.6, 0.7, 1] } },
+    { name: 'Candlelight', values: { trails: 0.3, blur: 0.15, bloom: 0.55, depth: 0.45, haze: 0.25, lightGlow: 0.6, light: [0.5, 0.42], atmosphere: [0.85, 0.6, 0.35, 1] } },
+    { name: 'Underwater', values: { trails: 0.35, blur: 0.28, bloom: 0.3, depth: 0.5, haze: 0.6, lightGlow: 0.3, light: [0.5, 0.3], atmosphere: [0.18, 0.5, 0.6, 1] } },
+    { name: 'Void', values: { trails: 0.25, blur: 0.1, bloom: 0.2, depth: 0.72, haze: 0.35, lightGlow: 0.15, light: [0.5, 0.5], atmosphere: [0.08, 0.1, 0.18, 1] } },
+    { name: 'Aurora', values: { trails: 0.5, blur: 0.2, bloom: 0.62, depth: 0.4, haze: 0.3, lightGlow: 0.45, light: [0.4, 0.35], atmosphere: [0.25, 0.75, 0.6, 1] } }
+  ],
   // ── Generators ──────────────────────────────────────────────────────
   'drift-field': [
     { name: 'Slow tide', values: { rate: 0.07, scale: 1.6, warp: 0.3, steps: 4, contrast: 1.05, split: 0.08 } },
