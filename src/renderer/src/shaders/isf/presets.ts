@@ -322,7 +322,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Dark · Slate', values: { stops: 5, blend: 1, dither: 0.14, mixSrc: 0, autoLevel: 0.428, gamma: 0.831, contrast: 1.135, saturation: 1.09, sharpen: 0.146, splitTone: 0.353, shadowTint: [0.263, 0.277, 0.312, 1], highTint: [0.688, 0.676, 0.66, 1], colorA: [0.11, 0.11, 0.118, 1], colorB: [0.173, 0.173, 0.18, 1], colorC: [0.337, 0.353, 0.4, 1], colorD: [0.78, 0.78, 0.8, 1], colorE: [0.857, 0.857, 0.87, 1] } }
   ],
   'fx-context': [
-    { name: 'Clean', values: { trails: 0, blur: 0, bloom: 0.1, depth: 0.12, haze: 0, atmosphere: [0.5, 0.58, 0.72, 1], lightGlow: 0, lightSize: 0.6, lightColor: [1, 0.92, 0.8, 1], light: [0.5, 0.55] } },
+    { name: 'Clean', values: { trails: 0, blur: 0, bloom: 0.1, depth: 0.12, haze: 0, atmosphere: [0.5, 0.58, 0.72, 1], lightGlow: 0, lightSize: 0.5, lightColor: [1, 0.92, 0.8, 1], light: [0.5, 0.55] } },
     { name: 'Gentle depth', values: { trails: 0.2, blur: 0.08, bloom: 0.3, depth: 0.35, haze: 0.15, atmosphere: [0.5, 0.58, 0.72, 1], lightGlow: 0.1, lightSize: 0.5, lightColor: [1, 0.92, 0.8, 1], light: [0.5, 0.55] } },
     { name: 'Deep space', values: { trails: 0.3, blur: 0.12, bloom: 0.4, depth: 0.7, haze: 0.5, atmosphere: [0.12, 0.16, 0.3, 1], lightGlow: 0.2, lightSize: 0.75, lightColor: [0.7, 0.8, 1, 1], light: [0.5, 0.5] } },
     { name: 'Dreamy bloom', values: { trails: 0.4, blur: 0.3, bloom: 0.75, depth: 0.3, haze: 0.2, atmosphere: [0.75, 0.68, 0.85, 1], lightGlow: 0.5, lightSize: 0.85, lightColor: [1, 0.85, 0.95, 1], light: [0.5, 0.5] } },

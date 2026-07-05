@@ -157,14 +157,16 @@ export function makeContext(): FxInstance {
     shaderId: 'fx-context',
     enabled: true,
     locked: true,
+    // Loads on the "Clean" preset — a near-passthrough whisper of depth, not
+    // an intense default (turn it up or pick a preset via C / Shift+C).
     inputs: {
-      trails: 0.2,
-      blur: 0.08,
-      bloom: 0.3,
-      depth: 0.35,
-      haze: 0.15,
+      trails: 0,
+      blur: 0,
+      bloom: 0.1,
+      depth: 0.12,
+      haze: 0,
       atmosphere: [0.5, 0.58, 0.72, 1],
-      lightGlow: 0.1,
+      lightGlow: 0,
       lightSize: 0.5,
       lightColor: [1.0, 0.92, 0.8, 1],
       light: [0.5, 0.55]

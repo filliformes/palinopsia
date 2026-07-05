@@ -361,11 +361,6 @@ export default function App(): JSX.Element {
           <Collapsible sectionKey="master" title="master fx">
             <MasterRackStrip />
           </Collapsible>
-
-          {/* OSC input — the instrument is played over OSC by Pandore */}
-          <Collapsible sectionKey="osc" title="osc">
-            <OscPanel />
-          </Collapsible>
         </section>
 
         {/* Drag handle — the layers column is resizable */}
@@ -403,6 +398,11 @@ export default function App(): JSX.Element {
 
       {/* ── Transport ───────────────────────────────────────────── */}
       <Transport />
+
+      {/* ── OSC input — pinned last, like dataFLOU's network bar ── */}
+      <Collapsible sectionKey="osc" title="osc">
+        <OscPanel />
+      </Collapsible>
     </div>
   )
 }

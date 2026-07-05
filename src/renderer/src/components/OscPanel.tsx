@@ -75,6 +75,18 @@ export function OscPanel(): JSX.Element {
           className="input w-16 px-1 py-0.5 text-right text-[11px]"
           title="Local UDP port to listen on (Pandore sends here)"
         />
+        {/* Live status rides the same line as the port. */}
+        <span
+          className={`font-mono text-[9px] ${
+            oscEnabled && oscListening
+              ? 'text-accent'
+              : oscEnabled
+                ? 'text-danger'
+                : 'text-muted'
+          }`}
+        >
+          {oscEnabled && oscListening ? 'live' : oscEnabled ? 'bind failed' : 'not listening'}
+        </span>
         <div className="flex-1" />
         <span
           ref={dotRef}
@@ -84,45 +96,24 @@ export function OscPanel(): JSX.Element {
         />
       </div>
 
-      {/* Status line — tells the user exactly what to do next. */}
-      {!oscEnabled ? (
-        <div className="font-mono text-[9px] leading-relaxed text-muted">
-          Not listening. Click <span className="text-text">OSC OFF</span> to enable, then point
-          Pandore at this machine below.
-        </div>
-      ) : oscListening ? (
-        <div className="font-mono text-[9px] leading-relaxed text-muted">
-          Live — Pandore plays the instrument.
-        </div>
-      ) : (
-        <div className="font-mono text-[9px] leading-relaxed text-danger">
-          Couldn&apos;t bind port {oscPort} — it may be in use. Try another port.
-        </div>
-      )}
-
-      {/* Where to send + how — shown always (greyed when off) so it's ready. */}
+      {/* Two compact info lines with · separators. */}
       <div
         className={`flex flex-col gap-0.5 rounded border border-border bg-panel2/40 p-1.5 font-mono text-[9px] leading-relaxed ${
           oscEnabled && oscListening ? 'text-muted' : 'text-muted/60'
         }`}
       >
         <div>
-          send OSC to{' '}
+          send →{' '}
           <span className={oscEnabled && oscListening ? 'text-accent' : 'text-text'}>
             {oscAddresses.length ? oscAddresses.join(' · ') : 'localhost'}
-          </span>{' '}
-          : <span className={oscEnabled && oscListening ? 'text-accent' : 'text-text'}>{oscPort}</span>{' '}
-          (UDP)
+          </span>
+          :<span className={oscEnabled && oscListening ? 'text-accent' : 'text-text'}>{oscPort}</span>{' '}
+          (UDP) · values <span className="text-text">0–1</span> · <span className="text-text">/opsia/…</span>
         </div>
         <div>
-          values <span className="text-text">0.0–1.0</span> · addresses under{' '}
-          <span className="text-text">/opsia/…</span>
-        </div>
-        <div className="text-muted/70">
-          e.g. /opsia/meta/1 · /opsia/layer/1/opacity · /opsia/scene/2
-        </div>
-        <div>
-          OSCQuery (auto-discovery) <span className="text-text">http://…:{oscPort + 1}</span>
+          e.g. <span className="text-text">/opsia/meta/1</span> ·{' '}
+          <span className="text-text">/opsia/layer/1/opacity</span> · OSCQuery{' '}
+          <span className="text-text">:{oscPort + 1}</span>
         </div>
       </div>
 
