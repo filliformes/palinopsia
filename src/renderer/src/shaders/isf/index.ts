@@ -48,6 +48,7 @@ import byteCorrupt from './fx/ByteCorrupt.fs?raw'
 import ringing from './fx/Ringing.fs?raw'
 import tracking from './fx/Tracking.fs?raw'
 import feedbackZoom from './fx/FeedbackZoom.fs?raw'
+import vibe from './fx/Vibe.fs?raw'
 
 export interface IsfShader {
   id: string
@@ -265,7 +266,9 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-threshold', name: 'Threshold', category: 'FX', source: threshold,
-    curated: { level: [0.3, 0.7], soft: [0.02, 0.3] }
+    // Curated level sits LOW: the seed generators live near black, and a
+    // mid threshold gates them entirely to black (the Randomize-black bug).
+    curated: { level: [0.08, 0.35], soft: [0.05, 0.3] }
   },
   {
     id: 'fx-solarize', name: 'Solarize', category: 'FX', source: solarize,
@@ -277,7 +280,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-grain', name: 'Grain', category: 'FX', source: grain,
-    curated: { amount: [0.05, 0.35], size: [1, 3] }
+    curated: { amount: [0.05, 0.35], size: [1, 3], parasites: [0.05, 0.5] }
   },
   {
     id: 'fx-streak', name: 'Streak', category: 'FX', source: streak,
@@ -310,7 +313,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-byte-corrupt', name: 'Byte Corrupt', category: 'FX', source: byteCorrupt,
-    curated: { depth: [3, 10], scramble: [0.15, 0.7], blocks: [4, 32], rate: [0.1, 0.7] }
+    curated: { depth: [3, 10], scramble: [0.15, 0.7], blocks: [4, 32], rate: [0.1, 0.7], chaos: [0, 0.6] }
   },
   {
     id: 'fx-ringing', name: 'Ringing', category: 'FX', source: ringing,
@@ -326,7 +329,16 @@ export const FX_SHADERS: IsfShader[] = [
   }
 ]
 
-export const ALL_SHADERS: IsfShader[] = [...GENERATORS, ...FX_SHADERS]
+// The Vibe mastering stage — pinned to the master rack's end (store-locked),
+// deliberately NOT in FX_SHADERS so racks and Randomize can't add a second.
+export const VIBE_SHADER: IsfShader = {
+  id: 'fx-vibe',
+  name: 'Vibe',
+  category: 'FX',
+  source: vibe
+}
+
+export const ALL_SHADERS: IsfShader[] = [...GENERATORS, ...FX_SHADERS, VIBE_SHADER]
 
 export const SHADER_BY_ID: Record<string, IsfShader> = Object.fromEntries(
   ALL_SHADERS.map((s) => [s.id, s])

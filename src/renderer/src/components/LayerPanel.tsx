@@ -183,8 +183,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             <input
               type="range"
               min={0}
-              max={4}
-              step={0.01}
+              max={20}
+              step={0.05}
               value={layer.speed}
               onChange={(e) => setLayerSpeed(index, Number(e.target.value))}
               className="min-w-0 flex-1 accent-accent"
@@ -194,7 +194,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               <BoundedNumberInput
                 value={layer.speed}
                 min={0}
-                max={8}
+                max={20}
                 onChange={(v) => setLayerSpeed(index, v)}
                 className="input w-full px-1 py-0.5 text-right text-[11px]"
               />

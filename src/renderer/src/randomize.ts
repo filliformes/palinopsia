@@ -134,9 +134,13 @@ function drawCount(weights: number[]): number {
 }
 
 /** Build a rack of n DISTINCT random FX, each with randomized params. */
-function randomRack(countWeights: number[], endWithColor = false): FxInstance[] {
+function randomRack(
+  countWeights: number[],
+  endWithColor = false,
+  exclude: string[] = []
+): FxInstance[] {
   const n = drawCount(countWeights)
-  const pool = [...FX_SHADERS]
+  const pool = FX_SHADERS.filter((f) => !exclude.includes(f.id))
   const picked: typeof FX_SHADERS = []
   for (let i = 0; i < n && pool.length > 0; i++) {
     const idx = Math.floor(rnd() * pool.length)
@@ -234,6 +238,7 @@ function collectFloatTargets(c: CompositionState): ModTarget[] {
 
 function targetKey(t: ModTarget): string {
   if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
+  if (t.kind === 'meta') return `meta:${t.knob}`
   const s = t.scope
   return `fx:${s.kind === 'master' ? 'master' : `${s.kind}:${s.layer}`}:${t.instId}:${t.input}`
 }
@@ -358,8 +363,14 @@ export function randomizeComposition(
 
   if (doMaster) {
     // The pinned Vibe Palette survives every randomize — it's the user's look.
+    // Threshold is excluded from the MASTER pool: on a whole near-black
+    // composition it can gate the entire output to black (the black-window
+    // report); it stays available in layer/source racks where it carves.
     const locked = next.master.filter((f) => f.locked)
-    next = { ...next, master: [...randomRack([0, 0.35, 0.4, 0.25], true), ...locked] }
+    next = {
+      ...next,
+      master: [...randomRack([0, 0.35, 0.4, 0.25], true, ['fx-threshold']), ...locked]
+    }
   }
 
   if (doMods) {

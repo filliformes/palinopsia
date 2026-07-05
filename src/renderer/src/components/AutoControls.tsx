@@ -180,13 +180,16 @@ function FloatControl({
   )
 }
 
-// Inline binding row: modulators M1–8 (with depth) and Meta knobs A1–D8.
-function AssignRow({
+// Inline binding row: modulators M1–8 (with depth) and Meta knobs K1–K16.
+// Exported — MetaBar reuses it for binding modulators TO knobs (hideMeta).
+export function AssignRow({
   target,
-  bound
+  bound,
+  hideMeta = false
 }: {
   target: ModTarget
   bound: Array<{ id: string; mod: number; depth: number }>
+  hideMeta?: boolean
 }): JSX.Element {
   const assignMod = useStore((s) => s.assignMod)
   const removeAssignment = useStore((s) => s.removeAssignment)
@@ -243,28 +246,29 @@ function AssignRow({
           />
         </div>
       ))}
-      {/* Meta knobs — A1..D8; a knob drives this input absolutely through
+      {/* Meta knobs — K1..K16; a knob drives this input absolutely through
           its curve over the input's declared range (up to 8 dests/knob). */}
-      <div className="flex min-w-0 items-center gap-1">
-        <span className="w-8 shrink-0 font-mono text-[8px] uppercase text-muted">meta</span>
-        <div className="flex flex-wrap gap-0.5">
-          {metaBound.map((on, i) => (
-            <button
-              key={i}
-              onClick={() => toggleMetaDest(i, target)}
-              className={`rounded px-1 py-0.5 font-mono text-[8px] transition-colors ${
-                on
-                  ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
-                  : 'bg-panel3/60 text-muted hover:text-text'
-              }`}
-              title={`${on ? 'Unbind' : 'Bind'} Meta ${String.fromCharCode(65 + Math.floor(i / 8))}${(i % 8) + 1}`}
-            >
-              {String.fromCharCode(65 + Math.floor(i / 8))}
-              {(i % 8) + 1}
-            </button>
-          ))}
+      {!hideMeta && (
+        <div className="flex min-w-0 items-center gap-1">
+          <span className="w-8 shrink-0 font-mono text-[8px] uppercase text-muted">meta</span>
+          <div className="flex flex-wrap gap-0.5">
+            {metaBound.map((on, i) => (
+              <button
+                key={i}
+                onClick={() => toggleMetaDest(i, target)}
+                className={`rounded px-1 py-0.5 font-mono text-[8px] transition-colors ${
+                  on
+                    ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
+                    : 'bg-panel3/60 text-muted hover:text-text'
+                }`}
+                title={`${on ? 'Unbind' : 'Bind'} Meta knob ${i + 1}`}
+              >
+                K{i + 1}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

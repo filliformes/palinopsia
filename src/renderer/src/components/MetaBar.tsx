@@ -1,22 +1,22 @@
-// Meta Controller bar (brief §6/§10.4) — 32 macro knobs across 4 banks of 8.
-// The knob visual + drag behaviour follow dataFLOU's MetaKnob (270° arc,
-// LaunchControl orientation, 200px vertical travel, Shift = fine, double-
-// click resets); the value you see IS the value the destinations receive —
-// the dial reads from the smoother's display value, never applies directly.
-//
-// Per knob: CC learn (arm → next CC binds; click again to clear), rename on
-// double-click of the name, smoothing + curve in the knob's title strip.
+// Meta Controller (brief §6) — 16 macro knobs, one flat bank. Each tile
+// matches the modulator-card chrome: bordered, aligned rows, everything
+// legible at a glance. A knob shows: dial (destination count under it),
+// name (double-click renames), CC learn, curve, and an M button binding
+// MODULATORS to the knob — modulated knobs' dials move live (accent2 arc).
 
 import {
+  useEffect,
   useRef,
   useState,
   useSyncExternalStore,
   type PointerEvent as ReactPointerEvent
 } from 'react'
 import type { ModCurve } from '@shared/types'
-import { META_BANKS } from '@shared/types'
+import { META_KNOB_COUNT } from '@shared/types'
+import { metaLiveValues } from '../engine/modulation'
 import { knobDisplayValue, knobDisplayVersion, setKnobTarget, subscribeKnobDisplay } from '../metaSmooth'
-import { useStore } from '../store'
+import { modTargetKey, useStore } from '../store'
+import { AssignRow } from './AutoControls'
 
 const KNOB_PX = 44
 const ARC_SWEEP_DEG = 270
@@ -27,46 +27,27 @@ const CURVES: ModCurve[] = [
 ]
 
 export function MetaBar(): JSX.Element {
-  const bank = useStore((s) => s.metaBank)
-  const setBank = useStore((s) => s.setMetaBank)
   const collapsed = useStore((s) => !!s.collapsed['meta'])
   const toggleSection = useStore((s) => s.toggleSection)
 
   return (
-    <div className="flex min-w-0 flex-col border-t border-border bg-panel px-3 py-1">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => toggleSection('meta')}
-          className="flex shrink-0 items-center gap-1.5"
-          title={collapsed ? 'Expand Meta Controller' : 'Collapse Meta Controller'}
+    <div className="flex min-w-0 flex-col gap-1.5 border-t border-border bg-panel px-3 py-1.5">
+      <button
+        onClick={() => toggleSection('meta')}
+        className="flex shrink-0 items-center gap-1.5 self-start"
+        title={collapsed ? 'Expand Meta Controller' : 'Collapse Meta Controller'}
+      >
+        <span
+          className={`font-mono text-[9px] text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}
         >
-          <span
-            className={`font-mono text-[9px] text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}
-          >
-            ▶
-          </span>
-          <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Meta</span>
-        </button>
-        <div className="flex gap-0.5">
-          {Array.from({ length: META_BANKS }, (_, b) => (
-            <button
-              key={b}
-              onClick={() => setBank(b)}
-              className={`rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
-                bank === b
-                  ? 'bg-accent/20 text-accent ring-1 ring-accent'
-                  : 'bg-panel2 text-muted hover:text-text'
-              }`}
-            >
-              {String.fromCharCode(65 + b)}
-            </button>
-          ))}
-        </div>
-      </div>
+          ▶
+        </span>
+        <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Meta</span>
+      </button>
       {!collapsed && (
-        <div className="flex min-w-0 items-start gap-1 overflow-x-auto py-1">
-          {Array.from({ length: 8 }, (_, i) => (
-            <MetaKnob key={bank * 8 + i} index={bank * 8 + i} />
+        <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-1">
+          {Array.from({ length: META_KNOB_COUNT }, (_, i) => (
+            <MetaKnobTile key={i} index={i} />
           ))}
         </div>
       )}
@@ -74,24 +55,49 @@ export function MetaBar(): JSX.Element {
   )
 }
 
-function MetaKnob({ index }: { index: number }): JSX.Element {
+function MetaKnobTile({ index }: { index: number }): JSX.Element {
   const knob = useStore((s) => s.composition.metaKnobs[index])
   const updateMetaKnob = useStore((s) => s.updateMetaKnob)
   const midiLearn = useStore((s) => s.midiLearn)
   const setMidiLearn = useStore((s) => s.setMidiLearn)
   const [renaming, setRenaming] = useState(false)
+  const [assignOpen, setAssignOpen] = useState(false)
 
-  // Display value from the smoother — re-renders while tweening.
+  // Which modulators drive this knob (target kind 'meta').
+  const target = { kind: 'meta', knob: index } as const
+  const targetKey = modTargetKey(target)
+  const bound = useStore((s) =>
+    s.composition.modMatrix.filter((a) => modTargetKey(a.target) === targetKey)
+  )
+  const isModulated = bound.length > 0
+
+  // Dial position: the smoother's display value; while modulated, the live
+  // modulated position (painted at rAF rate through local state — only
+  // modulated knobs pay this cost).
   useSyncExternalStore(subscribeKnobDisplay, knobDisplayVersion)
-  const display = knobDisplayValue(index)
+  const [liveTick, setLiveTick] = useState(0)
+  useEffect(() => {
+    if (!isModulated) return
+    let raf = 0
+    const paint = (): void => {
+      setLiveTick((n) => n + 1)
+      raf = requestAnimationFrame(paint)
+    }
+    raf = requestAnimationFrame(paint)
+    return () => cancelAnimationFrame(raf)
+  }, [isModulated])
+  void liveTick
+  const display = isModulated
+    ? (metaLiveValues.get(index) ?? knobDisplayValue(index))
+    : knobDisplayValue(index)
 
   const dragRef = useRef<{ startY: number; startValue: number; pointerId: number } | null>(null)
 
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>): void {
     if (e.button !== 0) return
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-    dragRef.current = { startY: e.clientY, startValue: display, pointerId: e.pointerId }
-    document.body.style.cursor = 'none' // hardware-DAW convention
+    dragRef.current = { startY: e.clientY, startValue: knobDisplayValue(index), pointerId: e.pointerId }
+    document.body.style.cursor = 'none'
   }
   function onPointerMove(e: ReactPointerEvent<HTMLDivElement>): void {
     const d = dragRef.current
@@ -113,7 +119,7 @@ function MetaKnob({ index }: { index: number }): JSX.Element {
     document.body.style.cursor = ''
   }
 
-  // Geometry — deg 0 = 12 o'clock, clockwise; min at 7:30, max at 4:30.
+  // Dial geometry — min at 7:30, max at 4:30 (LaunchControl orientation).
   const cx = KNOB_PX / 2
   const cy = KNOB_PX / 2
   const radius = KNOB_PX / 2 - 5
@@ -124,11 +130,18 @@ function MetaKnob({ index }: { index: number }): JSX.Element {
   const arcEnd = rad(currentDeg)
   const largeArc = currentDeg - startDeg > 180 ? 1 : 0
   const bgEnd = rad(startDeg + ARC_SWEEP_DEG)
+  const arcColor = isModulated ? 'rgb(var(--c-accent2))' : 'rgb(var(--c-accent))'
 
   const learning = midiLearn === index
 
   return (
-    <div className="flex w-16 shrink-0 flex-col items-center gap-0.5 select-none">
+    <div
+      className={`flex w-[76px] shrink-0 flex-col items-center gap-1 rounded border p-1.5 transition-colors ${
+        knob.destinations.length > 0 || isModulated
+          ? 'border-accent/40 bg-panel2'
+          : 'border-border bg-panel2/40'
+      }`}
+    >
       <div
         className="relative cursor-pointer"
         style={{ width: KNOB_PX, height: KNOB_PX, touchAction: 'none' }}
@@ -137,7 +150,7 @@ function MetaKnob({ index }: { index: number }): JSX.Element {
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         onDoubleClick={() => setKnobTarget(index, 0, knob.smoothMs)}
-        title={`${knob.name} — drag vertically · Shift = fine · double-click resets · ${knob.destinations.length}/8 destinations`}
+        title={`${knob.name} — drag vertically · Shift = fine · double-click resets`}
       >
         <svg width={KNOB_PX} height={KNOB_PX} className="absolute inset-0">
           <path
@@ -153,7 +166,7 @@ function MetaKnob({ index }: { index: number }): JSX.Element {
               d={`M ${cx + radius * Math.cos(arcStart)} ${cy + radius * Math.sin(arcStart)}
                   A ${radius} ${radius} 0 ${largeArc} 1 ${cx + radius * Math.cos(arcEnd)} ${cy + radius * Math.sin(arcEnd)}`}
               fill="none"
-              stroke="rgb(var(--c-accent))"
+              stroke={arcColor}
               strokeWidth={3}
               strokeLinecap="round"
             />
@@ -164,15 +177,17 @@ function MetaKnob({ index }: { index: number }): JSX.Element {
             y1={cy + (radius - 8) * Math.sin(rad(currentDeg))}
             x2={cx + radius * Math.cos(rad(currentDeg))}
             y2={cy + radius * Math.sin(rad(currentDeg))}
-            stroke="rgb(var(--c-accent))"
+            stroke={arcColor}
             strokeWidth={2}
             strokeLinecap="round"
           />
         </svg>
-        {knob.destinations.length > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-accent2" />
-        )}
       </div>
+
+      {/* destinations count — what this knob drives */}
+      <span className="font-mono text-[8px] leading-none text-muted">
+        {knob.destinations.length > 0 ? `${knob.destinations.length} dest` : '—'}
+      </span>
 
       {renaming ? (
         <input
@@ -191,15 +206,14 @@ function MetaKnob({ index }: { index: number }): JSX.Element {
       ) : (
         <button
           onDoubleClick={() => setRenaming(true)}
-          className="w-full truncate text-center font-mono text-[9px] text-muted"
-          title="Double-click to rename"
+          className="w-full truncate text-center font-mono text-[9px] text-muted hover:text-text"
+          title={`${knob.name} — double-click to rename`}
         >
           {knob.name}
         </button>
       )}
 
-      <div className="flex items-center gap-0.5">
-        {/* CC learn: arm → next CC binds; click again clears the binding. */}
+      <div className="flex w-full items-center justify-center gap-0.5">
         <button
           onClick={() => {
             if (learning) setMidiLearn(null)
@@ -235,7 +249,24 @@ function MetaKnob({ index }: { index: number }): JSX.Element {
             </option>
           ))}
         </select>
+        <button
+          onClick={() => setAssignOpen((o) => !o)}
+          className={`rounded px-1 py-px font-mono text-[8px] leading-none transition-colors ${
+            isModulated
+              ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2'
+              : 'bg-panel3/60 text-muted hover:text-text'
+          }`}
+          title="Bind a modulator to this knob"
+        >
+          M{isModulated ? bound.map((b) => b.mod + 1).join('') : ''}
+        </button>
       </div>
+
+      {assignOpen && (
+        <div className="w-full">
+          <AssignRow target={target} bound={bound} hideMeta />
+        </div>
+      )}
     </div>
   )
 }

@@ -164,10 +164,12 @@ export interface ModulatorConfig {
   chaos: { r: number } // logistic-map r in [3.4, 4.0]
 }
 
-// What an assignment modulates. Phase 5 targets float ISF inputs.
+// What an assignment modulates: float ISF inputs, or a Meta knob (the
+// modulator then drives every destination the knob carries — macro motion).
 export type ModTarget =
   | { kind: 'source'; layer: number; slot: 'A' | 'B'; input: string }
   | { kind: 'fx'; scope: FxScope; instId: string; input: string }
+  | { kind: 'meta'; knob: number }
 
 // Addresses one of the four FX racks (per-source, per-layer, or master).
 export type FxScope =
@@ -186,11 +188,10 @@ export const MAX_MOD_ASSIGNMENTS = 12
 export const MODULATOR_COUNT = 8
 
 // ── Meta Controller (brief §6 — dataFLOU's macro surface) ─────────────
-// 32 knobs across 4 banks of 8. Each knob maps its 0..1 position through a
-// curve onto up to 8 destinations (ISF float inputs), with per-knob
-// smoothing and MIDI-CC learn.
-export const META_KNOB_COUNT = 32
-export const META_BANKS = 4
+// 16 knobs, one flat bank. Each knob maps its 0..1 position through a curve
+// onto up to 8 destinations (ISF float inputs), with per-knob smoothing and
+// MIDI-CC learn. Modulators can drive knobs (ModTarget kind 'meta').
+export const META_KNOB_COUNT = 16
 export const META_MAX_DESTS = 8
 
 export interface MetaKnobState {

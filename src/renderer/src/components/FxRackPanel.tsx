@@ -5,6 +5,7 @@
 // Locked units (the master Vibe Palette) render pinned: no bypass dot, no
 // remove, no reorder — just the name (click to edit) and a pin glyph.
 
+import { useRef, type DragEvent } from 'react'
 import type { FxInstance } from '@shared/types'
 import { FX_SHADERS, SHADER_BY_ID } from '../shaders/isf'
 import { useStore, type FxScope } from '../store'
@@ -32,9 +33,20 @@ export function FxAddSelect({ scope, className = '' }: { scope: FxScope; classNa
 
 export function FxChips({ scope, fx }: { scope: FxScope; fx: FxInstance[] }): JSX.Element | null {
   const selection = useStore((s) => s.selection)
+  const reorderFx = useStore((s) => s.reorderFx)
+  const dragId = useRef<string | null>(null)
   if (fx.length === 0) return null
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1">
+    <div
+      className="flex min-w-0 flex-wrap items-center gap-1"
+      // Tail drop: releasing on the row (not on a chip) moves to the end.
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e: DragEvent) => {
+        e.preventDefault()
+        if (dragId.current) reorderFx(scope, dragId.current, null)
+        dragId.current = null
+      }}
+    >
       {fx.map((f, i) => (
         <FxUnit
           key={f.id}
@@ -43,6 +55,13 @@ export function FxChips({ scope, fx }: { scope: FxScope; fx: FxInstance[] }): JS
           count={fx.length}
           scope={scope}
           selected={selection?.type === 'fx' && selection.instId === f.id}
+          onDragStart={() => {
+            dragId.current = f.id
+          }}
+          onDropOn={() => {
+            if (dragId.current) reorderFx(scope, dragId.current, f.id)
+            dragId.current = null
+          }}
         />
       ))}
     </div>
@@ -76,13 +95,17 @@ function FxUnit({
   i,
   count,
   scope,
-  selected
+  selected,
+  onDragStart,
+  onDropOn
 }: {
   f: FxInstance
   i: number
   count: number
   scope: FxScope
   selected: boolean
+  onDragStart?: () => void
+  onDropOn?: () => void
 }): JSX.Element {
   const removeFx = useStore((s) => s.removeFx)
   const toggleFx = useStore((s) => s.toggleFx)
@@ -111,7 +134,15 @@ function FxUnit({
 
   return (
     <span
-      className={`flex min-w-0 shrink-0 items-center gap-1 rounded border bg-panel px-1.5 py-0.5 ${
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault()
+        e.stopPropagation() // don't fall through to the row's tail drop
+        onDropOn?.()
+      }}
+      className={`flex min-w-0 shrink-0 cursor-grab items-center gap-1 rounded border bg-panel px-1.5 py-0.5 ${
         selected ? 'border-accent/70' : 'border-border'
       }`}
     >

@@ -468,9 +468,12 @@ export function makeDefaultModulators(): ModulatorConfig[] {
 // to move with the modulation (the dataFLOU behaviour). Key format matches
 // the store's modTargetKey exactly.
 export const liveModValues = new Map<string, number>()
+// Live modulated Meta-knob positions (0..1) — the dials read these each rAF.
+export const metaLiveValues = new Map<number, number>()
 
 function liveKey(t: import('@shared/types').ModTarget): string {
   if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
+  if (t.kind === 'meta') return `meta:${t.knob}`
   const s = t.scope
   const scopeKey = s.kind === 'master' ? 'master' : `${s.kind}:${s.layer}`
   return `fx:${scopeKey}:${t.instId}:${t.input}`
@@ -497,15 +500,65 @@ export function applyModulation(
     shaderId: string
   ) => Array<{ name: string; type: string; min?: number | number[]; max?: number | number[]; def?: number | number[] }>
 ): void {
+  metaLiveValues.clear()
+  // Resolve one ISF-input target's shader + write the given value everywhere
+  // it needs to land (engine + live map). Shared by direct and meta paths.
+  const writeTarget = (
+    t: Exclude<import('@shared/types').ModTarget, { kind: 'meta' }>,
+    shaped01: number
+  ): void => {
+    let shaderId: string | null = null
+    if (t.kind === 'source') {
+      const layer = c.layers[t.layer]
+      const slot = t.slot === 'A' ? layer?.sourceA : layer?.sourceB
+      shaderId = slot?.shaderId ?? null
+    } else {
+      const s = t.scope
+      const arr =
+        s.kind === 'master'
+          ? c.master
+          : s.kind === 'layer'
+            ? c.layers[s.layer]?.fx
+            : s.kind === 'sourceA'
+              ? c.layers[s.layer]?.sourceAFx
+              : c.layers[s.layer]?.sourceBFx
+      shaderId = arr?.find((f) => f.id === t.instId)?.shaderId ?? null
+    }
+    if (!shaderId) return
+    const d = descFor(shaderId).find((x) => x.name === t.input)
+    if (!d || d.type !== 'float') return
+    const min = typeof d.min === 'number' ? d.min : 0
+    const max = typeof d.max === 'number' ? d.max : 1
+    const value = min + shaped01 * (max - min)
+    liveModValues.set(liveKey(t), value)
+    if (t.kind === 'source') comp.layers[t.layer]?.setInput(t.slot, t.input, value)
+    else comp.setFxInput(t.scope, t.instId, t.input, value)
+  }
+
   for (const a of c.modMatrix) {
     const v = values[a.mod]
     if (v === undefined) continue
+    if (a.target.kind === 'meta') {
+      // Meta target: swing the knob's position, then fan out through the
+      // knob's curve to every destination it carries — macro modulation.
+      const knob = c.metaKnobs[a.target.knob]
+      if (!knob) continue
+      const v01 = Math.max(0, Math.min(1, knob.value + (v - 0.5) * 2 * a.depth))
+      metaLiveValues.set(a.target.knob, v01)
+      const shaped = shapeCurve(v01, knob.curve)
+      for (const dest of knob.destinations) {
+        if (dest.kind === 'meta') continue // knobs never chain into knobs
+        writeTarget(dest, shaped)
+      }
+      continue
+    }
     if (a.target.kind === 'source') {
       const layer = c.layers[a.target.layer]
       if (!layer) continue
       const slot = a.target.slot === 'A' ? layer.sourceA : layer.sourceB
       if (!slot?.shaderId) continue
-      const d = descFor(slot.shaderId).find((x) => x.name === a.target.input)
+      const inputName = a.target.input
+      const d = descFor(slot.shaderId).find((x) => x.name === inputName)
       if (!d || d.type !== 'float') continue
       const min = typeof d.min === 'number' ? d.min : 0
       const max = typeof d.max === 'number' ? d.max : 1
@@ -530,7 +583,8 @@ export function applyModulation(
       }
       const inst = arr.find((f) => f.id === instId)
       if (!inst?.shaderId) continue
-      const d = descFor(inst.shaderId).find((x) => x.name === a.target.input)
+      const inputName = a.target.input
+      const d = descFor(inst.shaderId).find((x) => x.name === inputName)
       if (!d || d.type !== 'float') continue
       const min = typeof d.min === 'number' ? d.min : 0
       const max = typeof d.max === 'number' ? d.max : 1

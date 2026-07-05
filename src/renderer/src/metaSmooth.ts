@@ -42,6 +42,7 @@ export function knobDisplayVersion(): number {
 
 /** Map the knob position onto one destination and write it to the store. */
 function applyDest(target: ModTarget, shaped: number): void {
+  if (target.kind === 'meta') return // knobs never chain into knobs
   const st = useStore.getState()
   const c = st.composition
   let shaderId: string | null = null

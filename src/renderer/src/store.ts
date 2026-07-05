@@ -115,11 +115,12 @@ function makeLayer(): LayerState {
 }
 
 // The always-on master Vibe Palette (pinned last in the master rack): the
-// unified-look stage. Default: black background, white recoloring.
+// color-MASTERING stage — palette map + built-in saturation / contrast /
+// gamma / sharpen. Default: black background, white recoloring, neutral tone.
 export function makeVibePalette(): FxInstance {
   return {
     id: uid(),
-    shaderId: 'fx-palette',
+    shaderId: 'fx-vibe',
     enabled: true,
     locked: true,
     inputs: {
@@ -127,6 +128,10 @@ export function makeVibePalette(): FxInstance {
       blend: 1,
       dither: 0,
       mixSrc: 0,
+      saturation: 1,
+      contrast: 1,
+      gamma: 1,
+      sharpen: 0,
       colorA: [0.0, 0.0, 0.0, 1],
       colorB: [1.0, 1.0, 1.0, 1]
     }
@@ -165,6 +170,7 @@ export type Selection =
 /** Stable identity for a mod target — used to find existing assignments. */
 export function modTargetKey(t: ModTarget): string {
   if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
+  if (t.kind === 'meta') return `meta:${t.knob}`
   const s = t.scope
   const scopeKey = s.kind === 'master' ? 'master' : `${s.kind}:${s.layer}`
   return `fx:${scopeKey}:${t.instId}:${t.input}`
@@ -215,14 +221,14 @@ interface StoreState {
   removeFx: (scope: FxScope, instId: string) => void
   toggleFx: (scope: FxScope, instId: string) => void
   moveFx: (scope: FxScope, instId: string, dir: -1 | 1) => void
+  // Drag-and-drop reorder: place instId before beforeId (null = end of chain).
+  reorderFx: (scope: FxScope, instId: string, beforeId: string | null) => void
   setFxInput: (scope: FxScope, instId: string, name: string, value: number | number[]) => void
 
   // Randomize (brief §7) — scoped draws from curated aesthetic ranges.
   randomize: (scope: RandomizeScope) => void
 
-  // Meta Controller (Phase 5) — 32 macro knobs / 4 banks.
-  metaBank: number
-  setMetaBank: (b: number) => void
+  // Meta Controller (Phase 5) — 16 macro knobs.
   midiLearn: number | null // knob index armed for CC learn
   setMidiLearn: (i: number | null) => void
   updateMetaKnob: (i: number, partial: Partial<MetaKnobState>) => void
@@ -460,7 +466,7 @@ export const useStore = create<StoreState>((set, get) => ({
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => ({
           ...l,
-          speed: Math.max(0, Math.min(8, v))
+          speed: Math.max(0, Math.min(20, v))
         }))
       }
     })),
@@ -558,6 +564,22 @@ export const useStore = create<StoreState>((set, get) => ({
         return next
       })
     })),
+  reorderFx: (scope, instId, beforeId) =>
+    set((s) => ({
+      composition: updateFxArray(s.composition, scope, (fx) => {
+        const moving = fx.find((f) => f.id === instId)
+        if (!moving || moving.locked || instId === beforeId) return fx
+        const rest = fx.filter((f) => f.id !== instId)
+        // null target = end of chain, but always before any locked unit.
+        let idx = beforeId ? rest.findIndex((f) => f.id === beforeId) : rest.length
+        if (idx < 0) return fx
+        const lockedAt = rest.findIndex((f) => f.locked)
+        if (lockedAt >= 0 && idx > lockedAt) idx = lockedAt
+        const next = [...rest]
+        next.splice(idx, 0, moving)
+        return next
+      })
+    })),
   setFxInput: (scope, instId, name, value) =>
     set((s) => ({
       composition: updateFxArray(s.composition, scope, (fx) =>
@@ -570,8 +592,6 @@ export const useStore = create<StoreState>((set, get) => ({
   randomize: (scope) =>
     set((s) => ({ composition: randomizeComposition(s.composition, scope) })),
 
-  metaBank: 0,
-  setMetaBank: (b) => set({ metaBank: Math.max(0, Math.min(3, b)) }),
   midiLearn: null,
   setMidiLearn: (i) => set({ midiLearn: i }),
   updateMetaKnob: (i, partial) =>
@@ -818,14 +838,25 @@ export const useStore = create<StoreState>((set, get) => ({
           sourceBFx: l.sourceBFx ?? [],
           fx: l.fx ?? []
         })),
-        // The Vibe Palette must exist and sit last — older sessions get one.
+        // The Vibe Palette must exist and sit last — older sessions get one;
+        // sessions whose locked unit was the plain Palette migrate to fx-vibe
+        // (color inputs carry over; mastering params get neutral defaults).
         master: (() => {
-          const m = s.composition.master ?? []
+          const m = (s.composition.master ?? []).map((f) =>
+            f.locked && f.shaderId === 'fx-palette'
+              ? { ...makeVibePalette(), id: f.id, inputs: { ...makeVibePalette().inputs, ...f.inputs } }
+              : f
+          )
           return m.some((f) => f.locked) ? m : [...m, makeVibePalette()]
         })(),
         modulators: s.composition.modulators ?? makeDefaultModulators(),
         modMatrix: s.composition.modMatrix ?? [],
-        metaKnobs: s.composition.metaKnobs ?? makeDefaultMetaKnobs()
+        // 16 knobs now — older 32-knob sessions truncate; short arrays pad.
+        metaKnobs: (() => {
+          const k = s.composition.metaKnobs ?? []
+          const defaults = makeDefaultMetaKnobs()
+          return defaults.map((d, i) => k[i] ?? d)
+        })()
       }
     }),
   exportSession: () => {
