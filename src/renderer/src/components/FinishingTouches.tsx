@@ -87,7 +87,7 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
     ac === 'accent' ? 'border-accent/40' : ac === 'active' ? 'border-active/40' : 'border-accent2/40'
 
   return (
-    <div className={`overflow-hidden rounded-md border bg-panel ${flashing ? 'animate-pulse border-danger' : ringCls}`}>
+    <div className={`rounded-md border bg-panel ${flashing ? 'animate-pulse border-danger' : ringCls}`}>
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 px-2 py-1">
         <button
           onClick={() => toggleSection(sectionKey)}
