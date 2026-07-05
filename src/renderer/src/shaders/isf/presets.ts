@@ -12,6 +12,114 @@ export interface ShaderPreset {
 }
 
 export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
+  'congeal': [
+    { name: 'Slow drift', values: { rate: 0.3, decay: 0.96, warp: 0.4, seed: 0.35, scale: 2.5 } },
+    { name: 'Congealing', values: { rate: 0.5, decay: 0.985, warp: 0.5, seed: 0.25, scale: 2 } },
+    { name: 'Sparse embers', values: { rate: 0.4, decay: 0.94, warp: 0.3, seed: 0.15, scale: 3, tint: [0.9, 0.55, 0.25, 1] } },
+    { name: 'Dense soup', values: { rate: 0.6, decay: 0.97, warp: 0.7, seed: 0.55, scale: 4 } },
+    { name: 'Frozen', values: { rate: 0.1, decay: 0.99, warp: 0.15, seed: 0.2, scale: 2.2 } },
+    { name: 'Boiling', values: { rate: 1.1, decay: 0.92, warp: 0.8, seed: 0.5, scale: 3.5 } },
+    { name: 'Ink in water', values: { rate: 0.35, decay: 0.98, warp: 0.6, seed: 0.3, scale: 1.5, tint: [0.4, 0.55, 0.85, 1] } },
+    { name: 'Neural', values: { rate: 0.45, decay: 0.975, warp: 0.45, seed: 0.4, scale: 5, tint: [0.7, 0.9, 0.75, 1] } },
+    { name: 'Decay fast', values: { rate: 0.5, decay: 0.9, warp: 0.35, seed: 0.35, scale: 2.5 } },
+    { name: 'Violet cells', values: { rate: 0.4, decay: 0.98, warp: 0.55, seed: 0.28, scale: 2.8, tint: [0.6, 0.35, 0.7, 1] } }
+  ],
+  'slit-scan': [
+    { name: 'History', values: { rate: 0.6, span: 8, freq: 8, bands: 6 } },
+    { name: 'Seismograph', values: { rate: 1, span: 12, freq: 5, bands: 4 } },
+    { name: 'Fine bands', values: { rate: 0.5, span: 6, freq: 18, bands: 12 } },
+    { name: 'Slow tide', values: { rate: 0.25, span: 16, freq: 4, bands: 5 } },
+    { name: 'Vertical scan', values: { rate: 0.7, span: 10, freq: 9, bands: 7, vertical: 1 } },
+    { name: 'Dense weave', values: { rate: 0.8, span: 20, freq: 14, bands: 10 } },
+    { name: 'Broad', values: { rate: 0.4, span: 5, freq: 3, bands: 3 } },
+    { name: 'Amber log', values: { rate: 0.6, span: 9, freq: 7, bands: 6, tint: [0.9, 0.6, 0.25, 1] } },
+    { name: 'Teal log', values: { rate: 0.55, span: 11, freq: 10, bands: 8, tint: [0.35, 0.7, 0.72, 1] } },
+    { name: 'Nervous', values: { rate: 1.5, span: 14, freq: 20, bands: 9 } }
+  ],
+  'ramps': [
+    { name: 'H ramp', values: { shape: 0, freq: 1, steps: 1, rate: 0.1, angle: 0 } },
+    { name: 'V ramp', values: { shape: 1, freq: 1, steps: 1, rate: 0.1, angle: 0 } },
+    { name: 'Stepped H', values: { shape: 0, freq: 1, steps: 8, rate: 0, angle: 0 } },
+    { name: 'Diagonal', values: { shape: 2, freq: 1.5, steps: 1, rate: 0.2, angle: 0.4 } },
+    { name: 'Radial', values: { shape: 3, freq: 2, steps: 1, rate: 0.15, angle: 0 } },
+    { name: 'Diamond steps', values: { shape: 4, freq: 2, steps: 6, rate: 0.1, angle: 0 } },
+    { name: 'Zebra', values: { shape: 0, freq: 6, steps: 2, rate: 0.3, angle: 0 } },
+    { name: 'Rotated bars', values: { shape: 1, freq: 4, steps: 8, rate: 0.2, angle: 0.9 } },
+    { name: 'Radial rings', values: { shape: 3, freq: 5, steps: 10, rate: 0.25, angle: 0 } },
+    { name: 'Amber sweep', values: { shape: 0, freq: 1, steps: 1, rate: 0.5, angle: 0.2, tint: [0.9, 0.6, 0.25, 1] } }
+  ],
+  'fx-slit-buffer': [
+    { name: 'Slow sweep', values: { rate: 0.15, width: 0.03 } },
+    { name: 'Fast head', values: { rate: 0.8, width: 0.02 } },
+    { name: 'Wide freeze', values: { rate: 0.3, width: 0.08 } },
+    { name: 'Vertical', values: { rate: 0.25, width: 0.03, vertical: 1 } },
+    { name: 'Time crawl', values: { rate: 0.08, width: 0.04 } },
+    { name: 'Thin scan', values: { rate: 0.5, width: 0.01 } },
+    { name: 'Vertical fast', values: { rate: 0.6, width: 0.02, vertical: 1 } },
+    { name: 'Broad smear', values: { rate: 0.2, width: 0.12 } },
+    { name: 'Ripple freeze', values: { rate: 1, width: 0.05 } },
+    { name: 'Glacial', values: { rate: 0.05, width: 0.06 } }
+  ],
+  'fx-difference-bloom': [
+    { name: 'Motion trace', values: { gain: 3, spread: 0.012, keep: 0 } },
+    { name: 'Ghost motion', values: { gain: 2, spread: 0.02, keep: 0.25 } },
+    { name: 'Sharp edges', values: { gain: 5, spread: 0.006, keep: 0 } },
+    { name: 'Wide bloom', values: { gain: 2.5, spread: 0.035, keep: 0.1 } },
+    { name: 'Faint', values: { gain: 1.5, spread: 0.01, keep: 0 } },
+    { name: 'Hot motion', values: { gain: 6, spread: 0.015, keep: 0, tint: [0.95, 0.55, 0.25, 1] } },
+    { name: 'Cyan trace', values: { gain: 3.5, spread: 0.012, keep: 0, tint: [0.4, 0.85, 0.9, 1] } },
+    { name: 'Keep half', values: { gain: 3, spread: 0.014, keep: 0.35 } },
+    { name: 'Edge only', values: { gain: 4, spread: 0.008, keep: 0 } },
+    { name: 'Storm', values: { gain: 5, spread: 0.04, keep: 0.05 } }
+  ],
+  'fx-triangle-flicker': [
+    { name: 'Slow pulse', values: { rate: 2, depth: 0.5, hard: 0, swap: 0 } },
+    { name: 'Strobe', values: { rate: 8, depth: 0.9, hard: 1, swap: 0 } },
+    { name: 'Beat swap', values: { rate: 4, depth: 0.6, hard: 1, swap: 0.5 } },
+    { name: 'Gentle breathe', values: { rate: 1, depth: 0.35, hard: 0, swap: 0 } },
+    { name: 'Machine gun', values: { rate: 16, depth: 0.8, hard: 1, swap: 0 } },
+    { name: 'Soft swap', values: { rate: 3, depth: 0.5, hard: 0, swap: 0.4 } },
+    { name: 'Hard cut', values: { rate: 6, depth: 1, hard: 1, swap: 0 } },
+    { name: 'Flutter', values: { rate: 12, depth: 0.6, hard: 0, swap: 0.2 } },
+    { name: 'Half strobe', values: { rate: 5, depth: 0.7, hard: 0.5, swap: 0.3 } },
+    { name: 'Panic', values: { rate: 20, depth: 0.9, hard: 1, swap: 0.5 } }
+  ],
+  'fx-colorizer': [
+    { name: 'Duotone plum', values: { gain: 1, bias: 0, fold: 0, mixSrc: 0, low: [0.05, 0.06, 0.12, 1], mid: [0.7, 0.3, 0.35, 1], high: [0.95, 0.9, 0.7, 1] } },
+    { name: 'High contrast', values: { gain: 2.2, bias: 0, fold: 0, mixSrc: 0, low: [0.02, 0.02, 0.03, 1], mid: [0.5, 0.5, 0.5, 1], high: [1, 1, 1, 1] } },
+    { name: 'Teal gold', values: { gain: 1.2, bias: 0, fold: 0, mixSrc: 0.1, low: [0.02, 0.08, 0.1, 1], mid: [0.1, 0.45, 0.5, 1], high: [0.95, 0.8, 0.35, 1] } },
+    { name: 'Folded CV', values: { gain: 1.5, bias: 0.1, fold: 0.5, mixSrc: 0, low: [0.05, 0.02, 0.08, 1], mid: [0.6, 0.2, 0.5, 1], high: [0.9, 0.9, 0.95, 1] } },
+    { name: 'Warm bias', values: { gain: 1, bias: 0.25, fold: 0, mixSrc: 0, low: [0.1, 0.05, 0.03, 1], mid: [0.6, 0.35, 0.2, 1], high: [1, 0.92, 0.75, 1] } },
+    { name: 'Cold bias', values: { gain: 1, bias: -0.2, fold: 0, mixSrc: 0, low: [0.02, 0.04, 0.1, 1], mid: [0.2, 0.4, 0.6, 1], high: [0.85, 0.92, 1, 1] } },
+    { name: 'Fold storm', values: { gain: 2, bias: 0, fold: 0.9, mixSrc: 0, low: [0.03, 0.05, 0.04, 1], mid: [0.3, 0.6, 0.35, 1], high: [0.9, 0.95, 0.8, 1] } },
+    { name: 'Soft tint', values: { gain: 0.8, bias: 0, fold: 0, mixSrc: 0.25, low: [0.08, 0.08, 0.1, 1], mid: [0.45, 0.4, 0.5, 1], high: [0.9, 0.88, 0.85, 1] } },
+    { name: 'Amber CRT', values: { gain: 1.4, bias: 0.05, fold: 0.2, mixSrc: 0, low: [0.03, 0.02, 0.01, 1], mid: [0.6, 0.4, 0.12, 1], high: [1, 0.9, 0.7, 1] } },
+    { name: 'Blue print', values: { gain: 1.6, bias: -0.1, fold: 0, mixSrc: 0, low: [0.02, 0.04, 0.12, 1], mid: [0.15, 0.35, 0.7, 1], high: [0.9, 0.95, 1, 1] } }
+  ],
+  'fx-wavefold': [
+    { name: 'Gentle fold', values: { fold: 0.3, bias: 0, symmetry: 0.5, perChannel: 0, wet: 1 } },
+    { name: 'Deep contours', values: { fold: 0.7, bias: 0, symmetry: 0.5, perChannel: 0, wet: 1 } },
+    { name: 'Channel tear', values: { fold: 0.5, bias: 0, symmetry: 0.4, perChannel: 1, wet: 1 } },
+    { name: 'Bias up', values: { fold: 0.4, bias: 0.3, symmetry: 0.6, perChannel: 0, wet: 1 } },
+    { name: 'Bias down', values: { fold: 0.4, bias: -0.3, symmetry: 0.4, perChannel: 0, wet: 1 } },
+    { name: 'Asymmetric', values: { fold: 0.55, bias: 0.1, symmetry: 1, perChannel: 0, wet: 1 } },
+    { name: 'Subtle', values: { fold: 0.2, bias: 0, symmetry: 0.5, perChannel: 0, wet: 0.6 } },
+    { name: 'RGB fold', values: { fold: 0.65, bias: 0.05, symmetry: 0.5, perChannel: 1, wet: 0.9 } },
+    { name: 'Hard bands', values: { fold: 0.8, bias: 0, symmetry: 0.3, perChannel: 0, wet: 1 } },
+    { name: 'Half wet', values: { fold: 0.5, bias: 0, symmetry: 0.5, perChannel: 0, wet: 0.5 } }
+  ],
+  'fx-rutt': [
+    { name: 'Relief', values: { lines: 80, amp: 0.08, width: 0.2, color: 0.6 } },
+    { name: 'Deep relief', values: { lines: 60, amp: 0.18, width: 0.25, color: 0.5 } },
+    { name: 'Fine wire', values: { lines: 160, amp: 0.05, width: 0.1, color: 0.4 } },
+    { name: 'Mono topo', values: { lines: 90, amp: 0.1, width: 0.15, color: 0 } },
+    { name: 'Full color', values: { lines: 70, amp: 0.09, width: 0.3, color: 1 } },
+    { name: 'Broad ribbons', values: { lines: 40, amp: 0.14, width: 0.5, color: 0.7 } },
+    { name: 'Sharp lines', values: { lines: 120, amp: 0.07, width: 0.08, color: 0.3 } },
+    { name: 'Extreme push', values: { lines: 80, amp: 0.28, width: 0.2, color: 0.6 } },
+    { name: 'Whisper', values: { lines: 100, amp: 0.03, width: 0.12, color: 0.5 } },
+    { name: 'Dense color', values: { lines: 140, amp: 0.06, width: 0.15, color: 0.9 } }
+  ],
   'fx-vibe': [
     { name: 'Pastel · Rose Quartz', values: { stops: 4, blend: 1, dither: 0.08, mixSrc: 0, colorA: [0.29, 0.306, 0.412, 1], colorB: [0.604, 0.549, 0.596, 1], colorC: [0.788, 0.678, 0.655, 1], colorD: [0.949, 0.914, 0.894, 1] } },
     { name: 'Pastel · Dusk', values: { stops: 4, blend: 1, dither: 0.08, mixSrc: 0, colorA: [0.239, 0.192, 0.357, 1], colorB: [0.439, 0.502, 0.565, 1], colorC: [0.973, 0.694, 0.584, 1], colorD: [0.976, 0.945, 0.945, 1] } },

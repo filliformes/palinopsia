@@ -57,7 +57,8 @@ vec3 blendMode(int mode, vec3 b, vec3 t){
   if(mode==11) return b+t-2.0*b*t;                          // exclusion
   if(mode==12) return clamp(b/max(1.0-t, 1e-4), 0.0, 1.0);  // color dodge
   if(mode==13) return 1.0-clamp((1.0-b)/max(t, 1e-4), 0.0, 1.0); // color burn
-  return fract(b+t);                                        // wrap
+  if(mode==14) return fract(b+t);                           // wrap
+  return t;                                                 // weave (mixer-only) / fallback
 }`;
 
 // Pairwise blend of two textures with opacity on the top layer.
@@ -103,6 +104,19 @@ ${BLEND_GLSL}
 void main(){
   vec4 A = texture(a, uv);
   vec4 B = texture(b, uv);
+  if(mode==15){
+    // WEAVE (Signal Culture Weaver): each source's luminance displaces the
+    // OTHER's sampling, then they interleave — a woven two-source warp.
+    // x scales the displacement depth.
+    vec3 lw = vec3(0.299,0.587,0.114);
+    float la = dot(A.rgb, lw);
+    float lb = dot(B.rgb, lw);
+    float d = 0.06 * x;
+    vec3 aw = texture(a, uv + vec2(0.0, (lb-0.5)*2.0*d)).rgb;
+    vec3 bw = texture(b, uv + vec2((la-0.5)*2.0*d, 0.0)).rgb;
+    o = vec4(mix(aw, bw, 0.5), max(A.a, B.a));
+    return;
+  }
   vec3 c = blendMode(mode, A.rgb, B.rgb);
   o = vec4(mix(A.rgb, c, x), max(A.a, B.a * x));
 }`;
@@ -426,7 +440,7 @@ export class Compositor {
   private modeIndex: Record<BlendMode, number> = {
     normal: 0, add: 1, subtract: 2, multiply: 3, screen: 4, overlay: 5,
     softlight: 6, hardlight: 7, darken: 8, lighten: 9, difference: 10,
-    exclusion: 11, dodge: 12, burn: 13, wrap: 14
+    exclusion: 11, dodge: 12, burn: 13, wrap: 14, weave: 15
   };
 
   constructor(public canvas: HTMLCanvasElement, public w = 1920, public h = 1080) {

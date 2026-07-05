@@ -22,6 +22,9 @@ import erosion from './Erosion.fs?raw'
 import membrane from './Membrane.fs?raw'
 import mycelium from './Mycelium.fs?raw'
 import swell from './Swell.fs?raw'
+import congeal from './Congeal.fs?raw'
+import slitScan from './SlitScan.fs?raw'
+import ramps from './Ramps.fs?raw'
 import posterize from './fx/Posterize.fs?raw'
 import dither from './fx/Dither.fs?raw'
 import chromaShift from './fx/ChromaShift.fs?raw'
@@ -42,6 +45,12 @@ import sharpen from './fx/Sharpen.fs?raw'
 import fold from './fx/Fold.fs?raw'
 import transform from './fx/Transform.fs?raw'
 import stutter from './fx/Stutter.fs?raw'
+import slitBuffer from './fx/SlitBuffer.fs?raw'
+import differenceBloom from './fx/DifferenceBloom.fs?raw'
+import triangleFlicker from './fx/TriangleFlicker.fs?raw'
+import colorizer from './fx/Colorizer.fs?raw'
+import wavefold from './fx/Wavefold.fs?raw'
+import rutt from './fx/Rutt.fs?raw'
 import syncLoss from './fx/SyncLoss.fs?raw'
 import rowEcho from './fx/RowEcho.fs?raw'
 import byteCorrupt from './fx/ByteCorrupt.fs?raw'
@@ -216,6 +225,27 @@ export const GENERATORS: IsfShader[] = [
     category: 'Generator',
     source: swell,
     curated: { rate: [0.1, 1.2], scale: [2, 8], chop: [0.15, 0.8], direction: [0, 6.2832], spread: [0.15, 0.7] }
+  },
+  {
+    id: 'congeal',
+    name: 'Congeal',
+    category: 'Generator',
+    source: congeal,
+    curated: { rate: [0.15, 1.2], decay: [0.9, 0.99], warp: [0.15, 0.8], seed: [0.15, 0.6], scale: [1, 5] }
+  },
+  {
+    id: 'slit-scan',
+    name: 'Slit Scan',
+    category: 'Generator',
+    source: slitScan,
+    curated: { rate: [0.2, 1.5], span: [3, 20], freq: [3, 20], bands: [3, 14] }
+  },
+  {
+    id: 'ramps',
+    name: 'Ramps',
+    category: 'Generator',
+    source: ramps,
+    curated: { freq: [1, 6], steps: [1, 16], rate: [0, 1], angle: [0, 6.2832] }
   }
 ]
 
@@ -331,6 +361,30 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-distort', name: 'Distort', category: 'FX', source: distort,
     curated: { amount: [0.1, 0.6], scale: [1, 12], angle: [0, 6.2832], rate: [0.1, 2] }
+  },
+  {
+    id: 'fx-slit-buffer', name: 'Slit Buffer', category: 'FX', source: slitBuffer,
+    curated: { rate: [0.05, 1], width: [0.01, 0.1] }
+  },
+  {
+    id: 'fx-difference-bloom', name: 'Difference Bloom', category: 'FX', source: differenceBloom,
+    curated: { gain: [1.5, 6], spread: [0.004, 0.03], keep: [0, 0.4] }
+  },
+  {
+    id: 'fx-triangle-flicker', name: 'Triangle Flicker', category: 'FX', source: triangleFlicker,
+    curated: { rate: [1, 12], depth: [0.2, 0.9], hard: [0, 1], swap: [0, 0.6] }
+  },
+  {
+    id: 'fx-colorizer', name: 'Colorizer', category: 'FX', source: colorizer,
+    curated: { gain: [0.5, 2.5], bias: [-0.4, 0.4], fold: [0, 0.6], mixSrc: [0, 0.3] }
+  },
+  {
+    id: 'fx-wavefold', name: 'Wavefold', category: 'FX', source: wavefold,
+    curated: { fold: [0.1, 0.8], bias: [-0.3, 0.3], symmetry: [0, 1], wet: [0.4, 1] }
+  },
+  {
+    id: 'fx-rutt', name: 'Rutt', category: 'FX', source: rutt,
+    curated: { lines: [40, 160], amp: [0.03, 0.2], width: [0.08, 0.4], color: [0, 1] }
   }
 ]
 

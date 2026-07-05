@@ -22,6 +22,7 @@ export type BlendMode =
   | 'dodge'
   | 'burn'
   | 'wrap'
+  | 'weave'
 
 export const BLEND_MODES: BlendMode[] = [
   'normal',
@@ -38,7 +39,8 @@ export const BLEND_MODES: BlendMode[] = [
   'exclusion',
   'dodge',
   'burn',
-  'wrap'
+  'wrap',
+  'weave'
 ]
 
 // What feeds a layer slot. ISF generator is the MVP path; the rest land
