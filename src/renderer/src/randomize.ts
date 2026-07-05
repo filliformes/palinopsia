@@ -40,6 +40,33 @@ export type RandomizeScope =
 
 const rnd = (): number => Math.random()
 const range = (lo: number, hi: number): number => lo + rnd() * (hi - lo)
+
+// Brightness-critical finalizer params, held to tight NEUTRAL bands during a
+// Finishing randomize so the master output can't crush to black or blow out.
+// Everything else on these shaders (tints, split-tone, posterize, saturation,
+// dither, sharpen, blur, trails, atmosphere hue) still randomizes freely.
+const FINISHING_SAFE: Record<string, Record<string, [number, number]>> = {
+  'fx-finalizer': {
+    black: [0.0, 0.04], // small shadow lift only — never a hard crush
+    white: [0.95, 1.0], // stay near full white — never dim the highlights
+    gamma: [0.9, 1.15], // gentle either way
+    rGain: [0.92, 1.1], // near-unity per-channel gain (mild tint, stable luma)
+    gGain: [0.92, 1.1],
+    bGain: [0.92, 1.1],
+    alpha: [1.0, 1.0]
+  },
+  'fx-vibe': {
+    gamma: [0.9, 1.15],
+    contrast: [0.9, 1.25],
+    autoLevel: [0.0, 0.5] // auto-levels normalizes — safe, but keep it moderate
+  },
+  'fx-context': {
+    bloom: [0.0, 0.35], // capped so highlights don't bloom to white
+    lightGlow: [0.0, 0.2],
+    haze: [0.0, 0.28], // haze washes toward its colour — keep it light
+    depth: [0.0, 0.5] // depth vignette darkens edges — cap it
+  }
+}
 const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(rnd() * arr.length)]
 const chance = (p: number): boolean => rnd() < p
 const uid = (): string =>
@@ -363,14 +390,20 @@ export function randomizeComposition(
     }
   }
 
-  // Finishing — re-roll the three pinned finalizers' params within curated
-  // ranges (Vibe Palette · Context · Finalizer). Deliberate, user-triggered.
+  // Finishing — re-roll the three pinned finalizers' params (Vibe · Context ·
+  // Finalizer). CONTROLLED: the brightness-critical params (levels, gamma,
+  // gains, bloom, haze) are held in tight neutral bands so the result can never
+  // come out crushed-black or blown-out — only the "look" params roam freely.
   if (scope === 'finishing') {
     return {
       ...c,
-      master: c.master.map((f) =>
-        f.locked && f.shaderId ? { ...f, inputs: randomizeInputs(f.shaderId, f.inputs) } : f
-      )
+      master: c.master.map((f) => {
+        if (!f.locked || !f.shaderId) return f
+        const inputs = randomizeInputs(f.shaderId, f.inputs)
+        const safe = FINISHING_SAFE[f.shaderId]
+        if (safe) for (const [k, [lo, hi]] of Object.entries(safe)) inputs[k] = range(lo, hi)
+        return { ...f, inputs }
+      })
     }
   }
 
