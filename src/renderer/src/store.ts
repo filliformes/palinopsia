@@ -100,10 +100,12 @@ function emptySlot(): SourceSlot {
   return { kind: 'none', shaderId: null, inputs: {} }
 }
 
-function makeLayer(): LayerState {
+function makeLayer(sourceShaderId: string | null = null): LayerState {
   return {
     id: uid(),
-    sourceA: emptySlot(),
+    sourceA: sourceShaderId
+      ? { kind: 'generator', shaderId: sourceShaderId, inputs: {} }
+      : emptySlot(),
     sourceB: null,
     sourceAFx: [],
     sourceBFx: [],
@@ -159,7 +161,8 @@ export function makeDefaultMetaKnobs(): MetaKnobState[] {
 
 export function makeDefaultComposition(): CompositionState {
   return {
-    layers: [makeLayer(), makeLayer(), makeLayer(), makeLayer()],
+    // Layer 1 opens on Ash so a fresh session shows something living.
+    layers: [makeLayer('ash'), makeLayer(), makeLayer(), makeLayer()],
     master: [makeVibePalette()],
     bpm: 120,
     modulators: makeDefaultModulators(),

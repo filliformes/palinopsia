@@ -10,7 +10,7 @@
     { "NAME": "steps",    "TYPE": "float", "MIN": 2.0, "MAX": 16.0, "DEFAULT": 5.0 },
     { "NAME": "contrast", "TYPE": "float", "MIN": 0.5, "MAX": 2.0,  "DEFAULT": 1.15 },
     { "NAME": "split",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.25 },
-    { "NAME": "tint",     "TYPE": "color", "DEFAULT": [0.16, 0.82, 0.74, 1.0] }
+    { "NAME": "tint",     "TYPE": "color", "DEFAULT": [1.0, 1.0, 1.0, 1.0] }
   ]
 }*/
 

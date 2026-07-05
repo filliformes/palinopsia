@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Slit Buffer — time-smear of the input: a write head sweeps across the frame, freezing the live image into the persistent buffer as it passes, so columns behind the head hold older moments. A real slit-scan of whatever feeds the layer (Signal Culture SSSScan / PXLMSH register). Direction flips the sweep; Jitter breaks the seam into a ragged edge; Jumps teleports the whole playhead to random spots before/after its swept position.",
+  "DESCRIPTION": "Slit Buffer — time-smear of the input: a write head sweeps across the frame, freezing the live image into the persistent buffer as it passes, so columns behind the head hold older moments. A real slit-scan of whatever feeds the layer (Signal Culture SSSScan / PXLMSH register). Direction sets the sweep (normal / inverted / pendulum ping-pong); Jitter breaks the seam into a ragged edge; Jumps teleports the whole playhead to random spots before/after its swept position.",
   "CREDIT": "Palinopsia (after Signal Culture SSSScan)",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch", "Scan"],
@@ -10,7 +10,7 @@
     { "NAME": "jitter",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0, "DEFAULT": 0.0 },
     { "NAME": "jumps",     "TYPE": "float", "MIN": 0.0,  "MAX": 1.0, "DEFAULT": 0.0 },
     { "NAME": "vertical",  "TYPE": "bool",  "DEFAULT": false },
-    { "NAME": "direction", "TYPE": "long",  "VALUES": [0, 1], "LABELS": ["normal", "inverted"], "DEFAULT": 0 }
+    { "NAME": "direction", "TYPE": "long",  "VALUES": [0, 1, 2], "LABELS": ["normal", "inverted", "pendulum"], "DEFAULT": 0 }
   ],
   "PASSES": [
     { "TARGET": "buf", "PERSISTENT": true },
@@ -29,7 +29,10 @@ void main() {
   if (PASSINDEX == 0) {
     float t = TIME * rate;
     float sweep = fract(t);                       // 0→1, wraps
-    float head = (direction == 1) ? 1.0 - sweep : sweep; // inverted flips it
+    // 0 normal · 1 inverted · 2 pendulum (ping-pongs 0→1→0, no wrap seam).
+    float head = sweep;
+    if (direction == 1) head = 1.0 - sweep;
+    else if (direction == 2) head = abs(fract(t * 0.5) * 2.0 - 1.0);
 
     // Jumps: on a stepped clock the WHOLE playhead teleports to a random spot
     // before or after its swept position (uniform across the frame — a real
