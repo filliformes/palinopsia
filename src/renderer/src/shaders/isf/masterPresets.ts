@@ -20,7 +20,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     name: 'Cyanotype Print',
     fx: [
       { shaderId: 'fx-palette', inputs: { stops: 4, blend: 1, dither: 0.15, mixSrc: 0, colorA: [0.02, 0.03, 0.08, 1], colorB: [0.05, 0.15, 0.4, 1], colorC: [0.2, 0.5, 0.75, 1], colorD: [0.85, 0.92, 0.95, 1] } },
-      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.12, size: 1.8, mono: 1 } }
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.12, size: 1.8, chroma: 0 } }
     ],
     vibe: { mixSrc: 1, contrast: 1, saturation: 0.95, gamma: 1, autoLevel: 0.25, splitTone: 0.2, shadowTint: [0.44, 0.47, 0.56, 1], highTint: [0.52, 0.53, 0.5, 1] }
   },
@@ -36,7 +36,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
   {
     name: 'Broadcast 1986',
     fx: [
-      { shaderId: 'fx-grain', inputs: { character: 2, amount: 0.2, size: 2, mono: 0 } },
+      { shaderId: 'fx-grain', inputs: { character: 2, amount: 0.2, size: 2, chroma: 0.5 } },
       { shaderId: 'fx-scanlines', inputs: { count: 400, darkness: 0.3, roll: 0.1 } },
       { shaderId: 'fx-chroma-shift', inputs: { amount: 0.008, angle: 0 } }
     ],
@@ -45,7 +45,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
   {
     name: 'Soft Film',
     fx: [
-      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.15, size: 1.5, mono: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.15, size: 1.5, chroma: 0 } },
       { shaderId: 'fx-grade', inputs: { lift: 0.06, saturation: 0.85, contrast: 0.95 } },
       { shaderId: 'fx-streak', inputs: { reach: 0.02, angle: 0 } }
     ],
@@ -83,14 +83,14 @@ export const MASTER_PRESETS: MasterPreset[] = [
     fx: [
       { shaderId: 'fx-palette', inputs: { stops: 5, blend: 1, dither: 0.12, mixSrc: 0, colorA: [0.02, 0.02, 0.06, 1], colorB: [0.25, 0.08, 0.3, 1], colorC: [0.65, 0.15, 0.2, 1], colorD: [0.9, 0.55, 0.2, 1], colorE: [0.95, 0.9, 0.75, 1] } },
       { shaderId: 'fx-pixelate', inputs: { cells: 160 } },
-      { shaderId: 'fx-grain', inputs: { character: 0, amount: 0.1, size: 2, mono: 1 } }
+      { shaderId: 'fx-grain', inputs: { character: 0, amount: 0.1, size: 2, chroma: 0 } }
     ],
     vibe: { mixSrc: 1, contrast: 1.05, saturation: 1.05, gamma: 1, autoLevel: 0.5, splitTone: 0 }
   },
   {
     name: 'Dusty Projector',
     fx: [
-      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.25, size: 2, mono: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.25, size: 2, chroma: 0 } },
       { shaderId: 'fx-solarize', inputs: { level: 0.75, strength: 0.3, soft: 0.2 } },
       { shaderId: 'fx-streak', inputs: { reach: 0.03, angle: 0 } }
     ],
@@ -100,7 +100,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     name: 'Xerox',
     fx: [
       { shaderId: 'fx-threshold', inputs: { level: 0.55, soft: 0.3, invert: 0 } },
-      { shaderId: 'fx-grain', inputs: { character: 0, amount: 0.2, size: 2, mono: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 0, amount: 0.2, size: 2, chroma: 0 } },
       { shaderId: 'fx-sharpen', inputs: { amount: 1.2 } }
     ],
     vibe: { mixSrc: 1, contrast: 1.25, saturation: 0.7, gamma: 1, autoLevel: 0.6, splitTone: 0 }
@@ -118,7 +118,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     name: 'Night Bus',
     fx: [
       { shaderId: 'fx-grade', inputs: { brightness: -0.1, contrast: 1.3, saturation: 0.55, lift: 0.08 } },
-      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.12, size: 1.5, mono: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.12, size: 1.5, chroma: 0 } },
       { shaderId: 'fx-scanlines', inputs: { count: 600, darkness: 0.1, roll: 0 } }
     ],
     vibe: { mixSrc: 1, contrast: 1.05, saturation: 0.85, gamma: 1.15, autoLevel: 0.1, splitTone: 0.4, shadowTint: [0.44, 0.47, 0.56, 1], highTint: [0.55, 0.52, 0.46, 1] }
@@ -137,7 +137,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     fx: [
       { shaderId: 'fx-stutter', inputs: { rate: 5, chance: 0.35 } },
       { shaderId: 'fx-chroma-shift', inputs: { amount: 0.02, angle: 0 } },
-      { shaderId: 'fx-grain', inputs: { character: 2, amount: 0.25, size: 2, mono: 0 } }
+      { shaderId: 'fx-grain', inputs: { character: 2, amount: 0.25, size: 2, chroma: 0.5 } }
     ],
     vibe: { mixSrc: 1, contrast: 0.95, saturation: 0.75, gamma: 1, autoLevel: 0.15, splitTone: 0.3, shadowTint: [0.45, 0.5, 0.53, 1], highTint: [0.53, 0.52, 0.5, 1] }
   },
@@ -172,7 +172,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     name: 'Concrete',
     fx: [
       { shaderId: 'fx-grade', inputs: { saturation: 0, contrast: 1.2, lift: 0.03 } },
-      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.2, size: 2.5, mono: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.2, size: 2.5, chroma: 0 } },
       { shaderId: 'fx-edge', inputs: { gain: 1.2, blend: 0.25 } }
     ],
     vibe: { mixSrc: 1, contrast: 1.15, saturation: 0.6, gamma: 1, autoLevel: 0.4, splitTone: 0.2, shadowTint: [0.47, 0.48, 0.51, 1], highTint: [0.53, 0.52, 0.49, 1] }
@@ -182,7 +182,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     fx: [
       { shaderId: 'fx-solarize', inputs: { level: 0.5, strength: 0.9, soft: 0.15 } },
       { shaderId: 'fx-palette', inputs: { stops: 3, blend: 1, dither: 0.2, mixSrc: 0, colorA: [0.03, 0.02, 0.05, 1], colorB: [0.4, 0.2, 0.55, 1], colorC: [0.95, 0.92, 0.98, 1] } },
-      { shaderId: 'fx-grain', inputs: { character: 0, amount: 0.12, size: 1.5, mono: 1 } }
+      { shaderId: 'fx-grain', inputs: { character: 0, amount: 0.12, size: 1.5, chroma: 0 } }
     ],
     vibe: { mixSrc: 1, contrast: 1.1, saturation: 1.1, gamma: 0.95, autoLevel: 0.25, splitTone: 0 }
   },
@@ -190,7 +190,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     name: 'Chiaroscuro',
     fx: [
       { shaderId: 'fx-grade', inputs: { contrast: 1.6, saturation: 0.6, brightness: -0.05, lift: 0 } },
-      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.1, size: 1.5, mono: 1 } }
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.1, size: 1.5, chroma: 0 } }
     ],
     vibe: { mixSrc: 1, contrast: 1.4, saturation: 0.5, autoLevel: 0.3, splitTone: 0.3, shadowTint: [0.42, 0.44, 0.5, 1], highTint: [0.55, 0.52, 0.46, 1] }
   },
@@ -214,7 +214,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     name: 'Daguerreotype',
     fx: [
       { shaderId: 'fx-grade', inputs: { saturation: 0, contrast: 1.3, lift: 0.03 } },
-      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.12, size: 1.5, mono: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.12, size: 1.5, chroma: 0 } },
       { shaderId: 'fx-sharpen', inputs: { amount: 0.8 } }
     ],
     vibe: { mixSrc: 1, contrast: 1.2, saturation: 0, gamma: 1.05, autoLevel: 0.4, splitTone: 0.3, shadowTint: [0.44, 0.46, 0.5, 1], highTint: [0.54, 0.52, 0.48, 1] }
@@ -246,7 +246,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     name: 'Etching',
     fx: [
       { shaderId: 'fx-edge', inputs: { gain: 2, blend: 0.5 } },
-      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.15, size: 2, mono: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.15, size: 2, chroma: 0 } },
       { shaderId: 'fx-colorizer', inputs: { gain: 1.2, bias: 0.05, fold: 0, mixSrc: 0, low: [0.08, 0.05, 0.03, 1], mid: [0.5, 0.38, 0.24, 1], high: [0.95, 0.9, 0.78, 1] } }
     ],
     vibe: { mixSrc: 1, contrast: 1.1, saturation: 1, autoLevel: 0.2 }
@@ -272,7 +272,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     name: 'Fresco',
     fx: [
       { shaderId: 'fx-grade', inputs: { saturation: 0.7, contrast: 0.95, lift: 0.06 } },
-      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.18, size: 2.5, mono: 0 } }
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.18, size: 2.5, chroma: 0.5 } }
     ],
     vibe: { mixSrc: 1, contrast: 0.95, saturation: 0.8, gamma: 1.05, autoLevel: 0.15, splitTone: 0.35, shadowTint: [0.47, 0.46, 0.5, 1], highTint: [0.57, 0.53, 0.45, 1] }
   },
@@ -331,7 +331,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
   {
     name: 'Kinetoscope',
     fx: [
-      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.2, size: 2, mono: 1, parasites: 0.4 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.2, size: 2, chroma: 0, parasites: 0.4 } },
       { shaderId: 'fx-scanlines', inputs: { count: 400, darkness: 0.2, roll: 0.05 } },
       { shaderId: 'fx-triangle-flicker', inputs: { rate: 6, depth: 0.2, hard: 0, swap: 0 } }
     ],
@@ -341,7 +341,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     name: 'Zoetrope',
     fx: [
       { shaderId: 'fx-triangle-flicker', inputs: { rate: 8, depth: 0.5, hard: 1, swap: 0 } },
-      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.15, size: 2, mono: 1 } }
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.15, size: 2, chroma: 0 } }
     ],
     vibe: { mixSrc: 1, contrast: 1.1, saturation: 0.85, autoLevel: 0.2 }
   },
@@ -357,7 +357,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     name: 'Infrared Film',
     fx: [
       { shaderId: 'fx-palette', inputs: { stops: 4, blend: 1, dither: 0.1, mixSrc: 0.1, colorA: [0.05, 0.02, 0.08, 1], colorB: [0.5, 0.1, 0.4, 1], colorC: [0.9, 0.4, 0.5, 1], colorD: [1, 0.95, 0.9, 1] } },
-      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.12, size: 1.5, mono: 0 } }
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.12, size: 1.5, chroma: 0.5 } }
     ],
     vibe: { mixSrc: 1, contrast: 1.05, saturation: 1.1, autoLevel: 0.2 }
   },

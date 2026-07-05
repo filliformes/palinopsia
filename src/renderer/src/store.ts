@@ -903,28 +903,35 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     })),
   assignMod: (mod, target, depth) => {
-    const s = get()
     const key = modTargetKey(target)
-    const existing = s.composition.modMatrix.find(
-      (a) => a.mod === mod && modTargetKey(a.target) === key
-    )
-    if (existing) {
-      set((st) => ({
-        composition: {
-          ...st.composition,
-          modMatrix: st.composition.modMatrix.map((a) =>
-            a.id === existing.id ? { ...a, depth } : a
-          )
+    // Check existence + cap AND append inside ONE set() updater — otherwise two
+    // assignMod calls in the same tick (an OSC burst) both pass a stale cap
+    // check and exceed MAX_MOD_ASSIGNMENTS.
+    let result = true
+    set((st) => {
+      const existing = st.composition.modMatrix.find(
+        (a) => a.mod === mod && modTargetKey(a.target) === key
+      )
+      if (existing) {
+        return {
+          composition: {
+            ...st.composition,
+            modMatrix: st.composition.modMatrix.map((a) =>
+              a.id === existing.id ? { ...a, depth } : a
+            )
+          }
         }
-      }))
-      return true
-    }
-    if (s.composition.modMatrix.length >= MAX_MOD_ASSIGNMENTS) return false
-    const entry: ModAssignment = { id: uid(), mod, target, depth }
-    set((st) => ({
-      composition: { ...st.composition, modMatrix: [...st.composition.modMatrix, entry] }
-    }))
-    return true
+      }
+      if (st.composition.modMatrix.length >= MAX_MOD_ASSIGNMENTS) {
+        result = false
+        return {}
+      }
+      const entry: ModAssignment = { id: uid(), mod, target, depth }
+      return {
+        composition: { ...st.composition, modMatrix: [...st.composition.modMatrix, entry] }
+      }
+    })
+    return result
   },
   removeAssignment: (id) =>
     set((s) => ({
@@ -1163,15 +1170,23 @@ export const useStore = create<StoreState>((set, get) => ({
         // unit was the plain Palette migrate to fx-vibe (color inputs carry
         // over; mastering params get neutral defaults).
         master: (() => {
-          let m = (s.composition.master ?? []).map((f) =>
+          const m = (s.composition.master ?? []).map((f) =>
             f.locked && f.shaderId === 'fx-palette'
               ? { ...makeVibePalette(), id: f.id, inputs: { ...makeVibePalette().inputs, ...f.inputs } }
               : f
           )
-          if (!m.some((f) => f.shaderId === 'fx-vibe')) m = [...m, makeVibePalette()]
-          if (!m.some((f) => f.shaderId === 'fx-context')) m = [...m, makeContext()]
-          if (!m.some((f) => f.shaderId === 'fx-finalizer')) m = [...m, makeFinalizer()]
-          return m
+          // Canonicalize the finalizer tail: strip the three locked stages out
+          // (wherever/however they were ordered) and re-append them in the one
+          // correct order — Vibe → Context → Finalizer, always last. Reuse the
+          // existing instance so its ids/inputs carry over; synthesize if absent.
+          const find = (id: string): FxInstance | undefined => m.find((f) => f.shaderId === id)
+          const vibe = find('fx-vibe') ?? makeVibePalette()
+          const context = find('fx-context') ?? makeContext()
+          const finalizer = find('fx-finalizer') ?? makeFinalizer()
+          const rest = m.filter(
+            (f) => f.shaderId !== 'fx-vibe' && f.shaderId !== 'fx-context' && f.shaderId !== 'fx-finalizer'
+          )
+          return [...rest, vibe, context, finalizer]
         })(),
         modulators: s.composition.modulators ?? makeDefaultModulators(),
         modMatrix: s.composition.modMatrix ?? [],

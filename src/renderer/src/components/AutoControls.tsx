@@ -222,6 +222,9 @@ function FloatControl({
   const [assignOpen, setAssignOpen] = useState(false)
   const target = modTargetFor?.(inp.name)
   const targetKey = target ? modTargetKey(target) : null
+  // Close the assign row when the control is reused for a different target
+  // (selection change to another shader that happens to share this input name).
+  useEffect(() => setAssignOpen(false), [targetKey])
   // Existing assignments on this input (any modulator). useShallow so this
   // fresh-array selector doesn't re-render every FloatControl on every store
   // mutation (the Inspector renders one per float input).
