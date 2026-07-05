@@ -35,20 +35,40 @@ export function AutoControls({
     return <div className="p-2 text-[11px] text-muted">This shader exposes no controls.</div>
   }
   if (layout === 'twoRow') {
+    // XY pads (point2D) are tall — flowing them through the two-row grid
+    // leaves a ragged column and dead space. Pull them out and stand them to
+    // the RIGHT of the scalar controls, vertically centred.
+    const pads = inputs.filter((i) => i.type === 'point2D')
+    const rest = inputs.filter((i) => i.type !== 'point2D')
     return (
-      <div
-        className="grid grid-flow-col content-start gap-x-5 gap-y-2 p-2"
-        style={{ gridTemplateRows: 'repeat(2, min-content)', gridAutoColumns: '11rem' }}
-      >
-        {inputs.map((inp) => (
-          <Control
-            key={inp.name}
-            inp={inp}
-            value={values[inp.name]}
-            onChange={onChange}
-            modTargetFor={modTargetFor}
-          />
-        ))}
+      <div className="flex items-center gap-5 p-2">
+        <div
+          className="grid grid-flow-col content-start gap-x-5 gap-y-2"
+          style={{ gridTemplateRows: 'repeat(2, min-content)', gridAutoColumns: '11rem' }}
+        >
+          {rest.map((inp) => (
+            <Control
+              key={inp.name}
+              inp={inp}
+              value={values[inp.name]}
+              onChange={onChange}
+              modTargetFor={modTargetFor}
+            />
+          ))}
+        </div>
+        {pads.length > 0 && (
+          <div className="flex shrink-0 items-center gap-5">
+            {pads.map((inp) => (
+              <Control
+                key={inp.name}
+                inp={inp}
+                value={values[inp.name]}
+                onChange={onChange}
+                modTargetFor={modTargetFor}
+              />
+            ))}
+          </div>
+        )}
       </div>
     )
   }

@@ -5,7 +5,7 @@
 // modulation never re-renders React at 60 Hz.
 
 import { useEffect, useRef, type ReactNode } from 'react'
-import type { ArpMode, LfoShape, ModCurve, ModulatorType } from '@shared/types'
+import type { ArpMode, LfoShape, ModulatorType } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS } from '@shared/types'
 import { DIVISIONS, modEngine } from '../engine/modulation'
 import { SHADER_BY_ID } from '../shaders/isf'
@@ -14,10 +14,6 @@ import { BoundedNumberInput } from './BoundedNumberInput'
 
 const MOD_TYPES: ModulatorType[] = ['lfo', 'ramp', 'adsr', 'arp', 'random', 'sh', 'slew', 'chaos']
 const LFO_SHAPES: LfoShape[] = ['sine', 'triangle', 'square', 'sawtooth', 'rndStep', 'rndSmooth', 'spastic']
-const CURVES: ModCurve[] = [
-  'linear', 'log', 'exp', 'geom', 'easeIn', 'easeOut', 'cubic', 'sqrt',
-  'sigmoid', 'smoothstep', 'db', 'gamma', 'step', 'invert'
-]
 const ARP_MODES: ArpMode[] = ['up', 'down', 'upDown', 'random', 'drunk']
 
 export function ModulationPanel(): JSX.Element {
@@ -63,9 +59,9 @@ function ModCard({ index }: { index: number }): JSX.Element {
 
   return (
     // Fixed height + min-w-0 so all eight cards are identical regardless of
-    // type; the output curve is pinned to the bottom (mt-auto below).
+    // type — the section keeps one silhouette as types are swapped.
     <div
-      className={`flex h-52 min-w-0 flex-col gap-1 rounded border p-1.5 transition-colors ${
+      className={`flex h-44 min-w-0 flex-col gap-1 rounded border p-1.5 transition-colors ${
         m.enabled ? 'border-accent/60 bg-panel2' : 'border-border bg-panel2/40'
       }`}
     >
@@ -149,24 +145,9 @@ function ModCard({ index }: { index: number }): JSX.Element {
         </div>
       )}
 
-      {/* type-specific params */}
+      {/* type-specific params (output shaping lives on the Meta knobs, not
+          here — modulators emit their raw signal) */}
       <TypeParams index={index} />
-
-      {/* output curve — pinned to the card bottom for a uniform silhouette */}
-      <div className="mt-auto flex min-w-0 items-center gap-1">
-        <span className="w-10 shrink-0 font-mono text-[9px] text-muted">CURVE</span>
-        <select
-          className="input select-compact min-w-0 flex-1 text-[10px]"
-          value={m.curve}
-          onChange={(e) => update(index, { curve: e.target.value as ModCurve })}
-        >
-          {CURVES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      </div>
     </div>
   )
 }
