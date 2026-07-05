@@ -12,6 +12,7 @@ import { Collapsible } from './components/Collapsible'
 import { FxRackPanel } from './components/FxRackPanel'
 import { Inspector } from './components/Inspector'
 import { LayerPanel } from './components/LayerPanel'
+import { MixerPanel } from './components/MixerPanel'
 import { MetaBar } from './components/MetaBar'
 import { ModulationPanel } from './components/ModulationPanel'
 import { SceneBank } from './components/SceneBank'
@@ -64,6 +65,7 @@ export default function App(): JSX.Element {
   const setName = useStore((s) => s.setName)
   const uiZoom = useStore((s) => s.uiZoom)
   const setUiZoom = useStore((s) => s.setUiZoom)
+  const mixerView = useStore((s) => s.mixerView)
   // Layers-column width — draggable via the handle between preview and strips.
   const [layersWidth, setLayersWidth] = useState<number>(() => {
     const saved = Number(localStorage.getItem('opsia.layersWidth'))
@@ -99,6 +101,12 @@ export default function App(): JSX.Element {
         e.preventDefault()
         if (e.shiftKey) cycleVibePreset()
         else openVibeInInspector()
+        return
+      }
+      // M: swap the layer strips for the compact Mixer surface (and back).
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'm') {
+        e.preventDefault()
+        useStore.getState().toggleMixerView()
         return
       }
       if (!(e.ctrlKey || e.metaKey)) return
@@ -317,14 +325,27 @@ export default function App(): JSX.Element {
         {/* Drag handle — the layers column is resizable */}
         <LayerColumnHandle onResize={setLayersWidth} width={layersWidth} />
 
-        {/* Four layer strips (brief §10.2) */}
+        {/* Four layer strips (brief §10.2) — or the compact Mixer (M key) */}
         <aside
           className="flex shrink-0 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-0.5"
           style={{ width: layersWidth }}
         >
-          {[0, 1, 2, 3].map((i) => (
-            <LayerPanel key={i} index={i} />
-          ))}
+          {mixerView ? (
+            <MixerPanel />
+          ) : (
+            <>
+              <button
+                onClick={() => useStore.getState().toggleMixerView()}
+                className="self-start rounded border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted hover:text-accent"
+                title="Open the Mixer — opacity/speed/blend for all 4 layers (M)"
+              >
+                ▸ mixer
+              </button>
+              {[0, 1, 2, 3].map((i) => (
+                <LayerPanel key={i} index={i} />
+              ))}
+            </>
+          )}
         </aside>
       </main>
 

@@ -61,7 +61,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
     // Fixed height + min-w-0 so all eight cards are identical regardless of
     // type — the section keeps one silhouette as types are swapped.
     <div
-      className={`flex h-44 min-w-0 flex-col gap-1 rounded border p-1.5 transition-colors ${
+      className={`flex h-40 min-w-0 flex-col gap-1 rounded border p-1.5 transition-colors ${
         m.enabled ? 'border-accent/60 bg-panel2' : 'border-border bg-panel2/40'
       }`}
     >
@@ -138,9 +138,23 @@ function ModCard({ index }: { index: number }): JSX.Element {
                 min={0.01}
                 max={20}
                 onChange={(v) => update(index, { rateHz: v })}
-                className="input w-10 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+                className="input w-12 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
               />
             </>
+          )}
+          {/* Slew's target-pick mode rides the rate line to save a row. */}
+          {m.type === 'slew' && (
+            <button
+              onClick={() => update(index, { slew: { ...m.slew, randomTarget: !m.slew.randomTarget } })}
+              className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
+                m.slew.randomTarget
+                  ? 'bg-accent/20 text-accent ring-1 ring-accent'
+                  : 'bg-panel3/60 text-muted'
+              }`}
+              title="Random target — slew toward a fresh random value each step (vs. alternating)"
+            >
+              RND
+            </button>
           )}
         </div>
       )}
@@ -253,14 +267,13 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
         </>
       )
     case 'slew':
+      // RND lives on the rate line (see the clock row) — only RISE/FALL here.
       return (
         <>
           <NumRow label="RISE" value={m.slew.riseMs} min={1} max={10000}
             onChange={(v) => update(index, { slew: { ...m.slew, riseMs: v } })} />
           <NumRow label="FALL" value={m.slew.fallMs} min={1} max={10000}
             onChange={(v) => update(index, { slew: { ...m.slew, fallMs: v } })} />
-          <ToggleRow label="RANDOM" on={m.slew.randomTarget}
-            onToggle={() => update(index, { slew: { ...m.slew, randomTarget: !m.slew.randomTarget } })} />
         </>
       )
     case 'chaos':
@@ -345,7 +358,7 @@ function SliderRow({
         min={min}
         max={max}
         onChange={onChange}
-        className="input w-10 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+        className="input w-12 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
       />
     </Row>
   )

@@ -223,6 +223,18 @@ interface StoreState {
   copiedLayer: LayerState | null
   copyLayer: (layer: number) => void
   pasteLayer: (layer: number) => void
+  // Mixer view — a compact 4-column opacity/speed/blend surface that replaces
+  // the layer strips (toggle with the M key). Its own app-persistent presets.
+  mixerView: boolean
+  toggleMixerView: () => void
+  mixerPresets: Array<{
+    id: string
+    name: string
+    layers: Array<{ opacity: number; speed: number; blend: BlendMode }>
+  }>
+  saveMixerPreset: (name: string) => void
+  applyMixerPreset: (presetId: string) => void
+  deleteMixerPreset: (presetId: string) => void
   setSourceInput: (
     layer: number,
     slot: 'A' | 'B',
@@ -487,6 +499,50 @@ export const useStore = create<StoreState>((set, get) => ({
           }))
         }
       }
+    }),
+
+  mixerView: false,
+  toggleMixerView: () => set((s) => ({ mixerView: !s.mixerView })),
+  mixerPresets: (() => {
+    try {
+      return JSON.parse(localStorage.getItem('opsia.mixerPresets') ?? '[]')
+    } catch {
+      return []
+    }
+  })(),
+  saveMixerPreset: (name) =>
+    set((s) => {
+      const layers = s.composition.layers.map((l) => ({
+        opacity: l.opacity,
+        speed: l.speed,
+        blend: l.blend
+      }))
+      const mixerPresets = [
+        ...s.mixerPresets,
+        { id: uid(), name: name.trim() || `Mix ${s.mixerPresets.length + 1}`, layers }
+      ]
+      localStorage.setItem('opsia.mixerPresets', JSON.stringify(mixerPresets))
+      return { mixerPresets }
+    }),
+  applyMixerPreset: (presetId) =>
+    set((s) => {
+      const p = s.mixerPresets.find((x) => x.id === presetId)
+      if (!p) return s
+      return {
+        composition: {
+          ...s.composition,
+          layers: s.composition.layers.map((l, i) => {
+            const m = p.layers[i]
+            return m ? { ...l, opacity: m.opacity, speed: m.speed, blend: m.blend } : l
+          })
+        }
+      }
+    }),
+  deleteMixerPreset: (presetId) =>
+    set((s) => {
+      const mixerPresets = s.mixerPresets.filter((x) => x.id !== presetId)
+      localStorage.setItem('opsia.mixerPresets', JSON.stringify(mixerPresets))
+      return { mixerPresets }
     }),
 
   setFeedbackAmount: (layer, v) =>

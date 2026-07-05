@@ -203,29 +203,6 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             </select>
           </Row>
 
-          {/* SPEED — the layer's global clock multiplier */}
-          <Row label="SPEED">
-            <input
-              type="range"
-              min={0}
-              max={20}
-              step={0.05}
-              value={layer.speed}
-              onChange={(e) => setLayerSpeed(index, Number(e.target.value))}
-              className="min-w-0 flex-1 accent-accent"
-              title="Layer time — scales every source and FX clock on this layer (1 = realtime)"
-            />
-            <div className="w-11 shrink-0">
-              <BoundedNumberInput
-                value={layer.speed}
-                min={0}
-                max={20}
-                onChange={(v) => setLayerSpeed(index, v)}
-                className="input w-full px-1 py-0.5 text-right text-[11px]"
-              />
-            </div>
-          </Row>
-
           {/* TRAIL persistence — only while FB is on */}
           {layer.feedback && (
             <Row label="TRAIL">
@@ -250,6 +227,29 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               </div>
             </Row>
           )}
+
+          {/* SPEED — the layer's global clock multiplier; always the last row */}
+          <Row label="SPEED">
+            <input
+              type="range"
+              min={0}
+              max={20}
+              step={0.05}
+              value={layer.speed}
+              onChange={(e) => setLayerSpeed(index, Number(e.target.value))}
+              className="min-w-0 flex-1 accent-accent"
+              title="Layer time — scales every source and FX clock on this layer (1 = realtime)"
+            />
+            <div className="w-11 shrink-0">
+              <BoundedNumberInput
+                value={layer.speed}
+                min={0}
+                max={20}
+                onChange={(v) => setLayerSpeed(index, v)}
+                className="input w-full px-1 py-0.5 text-right text-[11px]"
+              />
+            </div>
+          </Row>
         </>
       )}
 
