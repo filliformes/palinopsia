@@ -51,12 +51,19 @@ void main() {
 
   vec2 c = uv; // the coordinate we sample from
 
+  // Direction / perpendicular from `angle`, shared by the oriented modes.
+  vec2 dir = vec2(cos(angle), sin(angle));
+  vec2 perp = vec2(-dir.y, dir.x);
+
   if (mode == 0) {
-    // WAVE — independent sine displacement on each axis.
-    c = uv + vec2(
-      sin(uv.y * scale * 6.2832 + t) ,
-      sin(uv.x * scale * 6.2832 + t * 1.3)
-    ) * 0.06 * amt;
+    // WAVE — a 2D sine wave oriented along `angle`, its phase measured from
+    // `center` (moving the pad shifts the nodes; angle turns the grain).
+    vec2 rel = uv - center;
+    float along = dot(rel, dir);
+    float across = dot(rel, perp);
+    float d1 = sin(across * scale * 6.2832 + t);
+    float d2 = sin(along * scale * 6.2832 + t * 1.3);
+    c = uv + (dir * d1 + perp * d2) * 0.06 * amt;
   } else if (mode == 1) {
     // RIPPLE — concentric rings travelling out from the center.
     float ring = sin(r * scale * 6.2832 - t * 3.0);
@@ -87,41 +94,49 @@ void main() {
     pr.x /= aspect;
     c = center + pr;
   } else if (mode == 5) {
-    // SHEAR — skew perpendicular to `angle`, proportional to position along it.
-    vec2 dir = vec2(cos(angle), sin(angle));
-    vec2 perp = vec2(-dir.y, dir.x);
-    float along = dot(uv - 0.5, dir);
+    // SHEAR — skew ⟂ `angle`, proportional to distance from `center` along it
+    // (center is the shear pivot — the line that stays put).
+    float along = dot(uv - center, dir);
     c = uv + perp * along * amt * 2.0;
   } else if (mode == 6) {
-    // GLASS — quantize into cells, each refracts by its own offset: the
-    // frosted / pressed-glass look. Matte, digital.
-    vec2 cells = vec2(scale * aspect, scale) * 2.0;
-    vec2 cell = floor(uv * cells);
+    // GLASS — cell-refracted textured glass. The tile grid is rotated by
+    // `angle` and originates at `center`, so the panes turn and shift.
+    vec2 rel = uv - center;
+    rel.x *= aspect;
+    vec2 g = vec2(rel.x * dir.x + rel.y * dir.y, -rel.x * dir.y + rel.y * dir.x); // rotate −angle
+    vec2 cells = vec2(scale) * 2.0;
+    vec2 cell = floor(g * cells);
     vec2 off = (hash22(cell) - 0.5) * 0.12 * amt;
-    // soften toward cell edges so blocks aren't hard-cut
-    vec2 f = fract(uv * cells) - 0.5;
+    vec2 f = fract(g * cells) - 0.5;
     off *= 1.0 - dot(f, f) * 1.5;
-    c = uv + off;
+    // rotate the offset back into uv space, undo aspect
+    vec2 offW = vec2(off.x * dir.x - off.y * dir.y, off.x * dir.y + off.y * dir.x);
+    offW.x /= aspect;
+    c = uv + offW;
   } else if (mode == 7) {
-    // CORRUGATE — accordion ribs: triangle-wave fold along `angle`.
-    vec2 dir = vec2(cos(angle), sin(angle));
-    vec2 perp = vec2(-dir.y, dir.x);
-    float along = dot(uv, dir) * scale;
+    // CORRUGATE — accordion ribs along `angle`, phase measured from `center`.
+    float along = dot(uv - center, dir) * scale;
     float tri = abs(fract(along) * 2.0 - 1.0);
     c = uv + perp * (tri - 0.5) * 0.1 * amt;
   } else if (mode == 8) {
-    // PULL — directional drag from the centre point along `angle`, strong
-    // near the point and fading out (a smear-warp handle).
-    vec2 dir = vec2(cos(angle), sin(angle));
+    // PULL — directional drag from `center` along `angle`, strong near the
+    // point and fading out (a smear-warp handle).
     float pull = amt * 0.35 / (r * scale + 1.0);
     c = uv - dir * pull;
   } else {
-    // TURBULENT — curl-like domain warp: fbm flow rotated 90° so it swirls
-    // rather than pushing straight (distinct from Displace).
-    vec2 q = uv * scale + vec2(t * 0.3, -t * 0.2);
-    vec2 flow = vec2(fbm(q), fbm(q + vec2(5.2, 1.3))) - 0.5;
+    // TURBULENT — curl-noise domain warp. The field is rotated by `angle`
+    // and sampled about `center`, with a soft radial emphasis so the pad
+    // point is the eye of the turbulence.
+    vec2 rel = uv - center;
+    rel.x *= aspect;
+    vec2 dom = vec2(rel.x * dir.x + rel.y * dir.y, -rel.x * dir.y + rel.y * dir.x) * scale
+             + vec2(t * 0.3, -t * 0.2);
+    vec2 flow = vec2(fbm(dom), fbm(dom + vec2(5.2, 1.3))) - 0.5;
     vec2 curl = vec2(-flow.y, flow.x);
-    c = uv + curl * 0.2 * amt;
+    vec2 curlW = vec2(curl.x * dir.x - curl.y * dir.y, curl.x * dir.y + curl.y * dir.x);
+    curlW.x /= aspect;
+    float w = 0.55 + 0.45 * exp(-r * r * 1.5);
+    c = uv + curlW * 0.2 * amt * w;
   }
 
   c = clamp(c, 0.0, 1.0);
