@@ -145,6 +145,25 @@ in vec2 uv; out vec4 o;
 uniform sampler2D tex;
 void main(){ o = texture(tex, uv); }`;
 
+// Source framing: zoom about centre, pan, and per-edge crop (crop-to-fill).
+// Sampling outside the visible region → transparent, so zoom-out shows black.
+const XFORM_FS = `#version 300 es
+precision highp float;
+in vec2 uv; out vec4 o;
+uniform sampler2D tex;
+uniform float zoom;    // scale about centre (1 = none)
+uniform vec2 pan;      // -1..1 shift
+uniform vec4 crop;     // L, R, T, B  (0..~0.9)
+void main(){
+  // zoom + pan about centre → the visible region p in [0,1]
+  vec2 p = (uv - 0.5) / max(zoom, 0.0001) + 0.5 - pan;
+  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) { o = vec4(0.0); return; }
+  // crop-to-fill: p maps into [cropL, 1-cropR] x [cropB, 1-cropT]
+  vec2 s = vec2(crop.x + p.x * (1.0 - crop.x - crop.y),
+                crop.w + p.y * (1.0 - crop.z - crop.w));
+  o = texture(tex, s);
+}`;
+
 function compile(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram {
   const mk = (t: number, s: string) => {
     const sh = gl.createShader(t)!; gl.shaderSource(sh, s); gl.compileShader(sh);
@@ -276,7 +295,20 @@ interface SharedGL {
   // Copy a texture straight into a framebuffer (used to draw a video frame into
   // a layer's scratch target). Set by the Compositor once copyProg exists.
   blit?: (src: WebGLTexture, dstFbo: WebGLFramebuffer) => void;
+  // Framed blit — zoom / pan / crop a source frame into a target (video/capture).
+  blitXform?: (src: WebGLTexture, dstFbo: WebGLFramebuffer, f: Framing) => void;
 }
+
+export interface Framing {
+  zoom: number;
+  panX: number;
+  panY: number;
+  cropL: number;
+  cropR: number;
+  cropT: number;
+  cropB: number;
+}
+const IDENTITY_FRAMING: Framing = { zoom: 1, panX: 0, panY: 0, cropL: 0, cropR: 0, cropT: 0, cropB: 0 };
 
 const LOADS_PER_FRAME = 4;
 
@@ -428,6 +460,9 @@ export class ISFLayer {
   private captureB: CaptureSource | null = null;
   private captureIdA: string | null = null;
   private captureIdB: string | null = null;
+  // Per-slot framing (zoom/pan/crop) for video + capture sources.
+  private framingA: Framing = { ...IDENTITY_FRAMING };
+  private framingB: Framing = { ...IDENTITY_FRAMING };
   rackA: FxRack;
   rackB: FxRack;
   rackLayer: FxRack;
@@ -500,6 +535,22 @@ export class ISFLayer {
     else { this.captureB = next; this.captureIdB = spec; }
   }
 
+  /** Push framing (zoom/pan/crop) to a video or capture slot. */
+  setFraming(slot: 'A' | 'B', s: SourceSlot | null | undefined): void {
+    if (!s) return;
+    const f: Framing = {
+      zoom: s.zoom ?? 1,
+      panX: s.panX ?? 0,
+      panY: s.panY ?? 0,
+      cropL: s.cropL ?? 0,
+      cropR: s.cropR ?? 0,
+      cropT: s.cropT ?? 0,
+      cropB: s.cropB ?? 0
+    };
+    if (slot === 'A') this.framingA = f;
+    else this.framingB = f;
+  }
+
   /** Push transport params (play/speed/reverse/loop/in/out) to a video slot. */
   setVideoPlayback(slot: 'A' | 'B', s: SourceSlot | null | undefined): void {
     const v = slot === 'A' ? this.videoA : this.videoB;
@@ -556,12 +607,14 @@ export class ISFLayer {
     const video = slot === 'A' ? this.videoA : this.videoB;
     const capture = slot === 'A' ? this.captureA : this.captureB;
 
-    // Video or live-capture slot: upload the current frame and blit into scratch.
+    // Video or live-capture slot: upload the current frame and blit (with the
+    // slot's zoom/pan/crop framing) into scratch.
     const feed = video ?? capture;
     if (feed) {
       const tex = feed.upload();
-      if (tex && this.shared.blit) {
-        this.shared.blit(tex, scratch.fbo);
+      const framing = slot === 'A' ? this.framingA : this.framingB;
+      if (tex && this.shared.blitXform) {
+        this.shared.blitXform(tex, scratch.fbo, framing);
       } else {
         gl.bindFramebuffer(gl.FRAMEBUFFER, scratch.fbo);
         gl.viewport(0, 0, this.w, this.h);
@@ -642,6 +695,9 @@ export class Compositor {
   private uMA: WebGLUniformLocation; private uMB: WebGLUniformLocation;
   private uMX: WebGLUniformLocation; private uMMode: WebGLUniformLocation;
   private uCTex: WebGLUniformLocation;
+  private xformProg!: WebGLProgram;
+  private uXTex!: WebGLUniformLocation; private uXZoom!: WebGLUniformLocation;
+  private uXPan!: WebGLUniformLocation; private uXCrop!: WebGLUniformLocation;
   private modeIndex: Record<BlendMode, number> = {
     normal: 0, add: 1, subtract: 2, multiply: 3, screen: 4, overlay: 5,
     softlight: 6, hardlight: 7, darken: 8, lighten: 9, difference: 10,
@@ -690,6 +746,12 @@ export class Compositor {
     this.copyProg = compile(gl, QUAD_VS, COPY_FS);
     this.uCTex = gl.getUniformLocation(this.copyProg, 'tex')!;
 
+    this.xformProg = compile(gl, QUAD_VS, XFORM_FS);
+    this.uXTex = gl.getUniformLocation(this.xformProg, 'tex')!;
+    this.uXZoom = gl.getUniformLocation(this.xformProg, 'zoom')!;
+    this.uXPan = gl.getUniformLocation(this.xformProg, 'pan')!;
+    this.uXCrop = gl.getUniformLocation(this.xformProg, 'crop')!;
+
     this.acc = new PingPong(gl, w, h);
     this.chain = new ChainBuffers(gl, w, h);
     this.mixTarget = makeTarget(gl, w, h);
@@ -706,6 +768,18 @@ export class Compositor {
       return t.tex;
     };
     this.shared.blit = (src, dstFbo) => this.copyInto(dstFbo, src);
+    this.shared.blitXform = (src, dstFbo, f) => {
+      gl.bindVertexArray(this.vao);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, dstFbo);
+      gl.viewport(0, 0, this.w, this.h);
+      gl.useProgram(this.xformProg);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src); gl.uniform1i(this.uXTex, 0);
+      gl.uniform1f(this.uXZoom, f.zoom);
+      gl.uniform2f(this.uXPan, f.panX, f.panY);
+      gl.uniform4f(this.uXCrop, f.cropL, f.cropR, f.cropT, f.cropB);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.bindVertexArray(null);
+    };
     this.masterRack = new FxRack(this.shared);
     for (let i = 0; i < 4; i++) this.layers.push(new ISFLayer(this.shared, w, h));
   }
@@ -765,6 +839,8 @@ export class Compositor {
       L.setCapture('B', wantCapB);
       L.setVideoPlayback('A', l.sourceA);
       L.setVideoPlayback('B', l.sourceB);
+      L.setFraming('A', l.sourceA);
+      L.setFraming('B', l.sourceB);
       L.blend = l.blend;
       L.opacity = l.opacity;
       L.mute = l.mute;
@@ -968,6 +1044,7 @@ export class Compositor {
     gl.deleteProgram(this.persistProg);
     gl.deleteProgram(this.mixProg);
     gl.deleteProgram(this.copyProg);
+    gl.deleteProgram(this.xformProg);
     gl.deleteVertexArray(this.vao);
     gl.deleteBuffer(this.quadBuf);
   }

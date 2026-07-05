@@ -274,20 +274,16 @@ interface StoreState {
     patch: Partial<
       Pick<
         SourceSlot,
-        | 'videoPlaying'
-        | 'videoSpeed'
-        | 'videoDirection'
-        | 'videoLoop'
-        | 'videoIn'
-        | 'videoOut'
-        | 'zoom'
-        | 'panX'
-        | 'panY'
-        | 'cropL'
-        | 'cropR'
-        | 'cropT'
-        | 'cropB'
+        'videoPlaying' | 'videoSpeed' | 'videoDirection' | 'videoLoop' | 'videoIn' | 'videoOut'
       >
+    >
+  ) => void
+  // Framing (zoom/pan/crop) for a video OR capture slot.
+  setSourceTransform: (
+    layer: number,
+    slot: 'A' | 'B',
+    patch: Partial<
+      Pick<SourceSlot, 'zoom' | 'panX' | 'panY' | 'cropL' | 'cropR' | 'cropT' | 'cropB'>
     >
   ) => void
   setLayerSpeed: (layer: number, v: number) => void
@@ -737,6 +733,18 @@ export const useStore = create<StoreState>((set, get) => ({
         layers: updateLayer(s.composition.layers, layer, (l) => {
           const cur = slot === 'A' ? l.sourceA : l.sourceB
           if (!cur || cur.kind !== 'video') return l
+          const next = { ...cur, ...patch }
+          return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
+        })
+      }
+    })),
+  setSourceTransform: (layer, slot, patch) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => {
+          const cur = slot === 'A' ? l.sourceA : l.sourceB
+          if (!cur || (cur.kind !== 'video' && cur.kind !== 'capture')) return l
           const next = { ...cur, ...patch }
           return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
         })

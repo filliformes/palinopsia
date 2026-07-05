@@ -11,6 +11,7 @@ import { useStore, type FxScope } from '../store'
 import { AutoControls } from './AutoControls'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
+import { SourceFraming } from './SourceFraming'
 import { VideoTransport } from './VideoTransport'
 
 // The Vibe Palette's "main" colour = its most characterful stop (highest
@@ -136,6 +137,9 @@ export function Inspector(): JSX.Element {
           </p>
           {vslot?.kind === 'video' && (
             <VideoTransport layer={selection.layer} slot={selection.slot} state={vslot} />
+          )}
+          {vslot && (
+            <SourceFraming layer={selection.layer} slot={selection.slot} state={vslot} />
           )}
         </div>
       )
