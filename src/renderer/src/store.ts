@@ -261,6 +261,9 @@ interface StoreState {
   setSourceMix: (layer: number, v: number) => void
   setSourceBlend: (layer: number, mode: BlendMode) => void
   setSourceShader: (layer: number, slot: 'A' | 'B', shaderId: string | null) => void
+  // Point a slot at an imported video clip (kind:'video'). mediaId is the clip's
+  // object URL; mediaName is shown in the picker.
+  setSourceVideo: (layer: number, slot: 'A' | 'B', mediaId: string, mediaName: string) => void
   setLayerSpeed: (layer: number, v: number) => void
   // Replace the master chain; the chain's vibe settings merge onto the
   // pinned Vibe Palette (which stays pinned, keeps identity + enable state).
@@ -648,16 +651,28 @@ export const useStore = create<StoreState>((set, get) => ({
       composition: {
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => {
-          // null shader ⇒ the slot goes back to 'none' (empty layer).
+          // null shader ⇒ the slot goes back to 'none' (empty layer). A clean
+          // slot — no stale mediaId/mediaName carried over from a prior video.
           const kind = shaderId ? ('generator' as const) : ('none' as const)
-          if (slot === 'A')
-            return { ...l, sourceA: { ...l.sourceA, kind, shaderId, inputs: {} } }
-          const base = l.sourceB ?? emptySlot()
-          return { ...l, sourceB: { ...base, kind, shaderId, inputs: {} } }
+          const next = { kind, shaderId, inputs: {} }
+          if (slot === 'A') return { ...l, sourceA: next }
+          return { ...l, sourceB: next }
         })
       },
       // Picking a source lands its controls in the Inspector immediately.
       selection: shaderId ? { type: 'source', layer, slot } : s.selection
+    })),
+  setSourceVideo: (layer, slot, mediaId, mediaName) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => {
+          const vid = { kind: 'video' as const, shaderId: null, inputs: {}, mediaId, mediaName }
+          if (slot === 'A') return { ...l, sourceA: vid }
+          return { ...l, sourceB: vid }
+        })
+      },
+      selection: { type: 'source', layer, slot }
     })),
   setLayerSpeed: (layer, v) =>
     set((s) => ({

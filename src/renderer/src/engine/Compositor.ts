@@ -28,6 +28,7 @@
 
 import { Renderer as ISFRenderer } from 'interactive-shader-format';
 import { handle, installTextureBridge } from './isfTextureBridge';
+import { VideoSource } from './VideoSource';
 import type { CompositionState, FxInstance, FxScope } from '@shared/types';
 
 installTextureBridge();
@@ -269,6 +270,9 @@ interface SharedGL {
   // can't collide with the chain buffers. Set by the Compositor once its blend
   // program is ready. Returns the texture holding mix(dry, wet, opacity).
   blendDryWet?: (dry: WebGLTexture, wet: WebGLTexture, opacity: number) => WebGLTexture;
+  // Copy a texture straight into a framebuffer (used to draw a video frame into
+  // a layer's scratch target). Set by the Compositor once copyProg exists.
+  blit?: (src: WebGLTexture, dstFbo: WebGLFramebuffer) => void;
 }
 
 const LOADS_PER_FRAME = 4;
@@ -410,6 +414,12 @@ export class ISFLayer {
 
   private isfA: ISFRenderer | null = null;
   private isfB: ISFRenderer | null = null;
+  // Video-source slots (kind:'video'). Tracked alongside the ISF renderers; a
+  // slot is EITHER an ISF generator OR a video, never both at once.
+  private videoA: VideoSource | null = null;
+  private videoB: VideoSource | null = null;
+  private mediaIdA: string | null = null;
+  private mediaIdB: string | null = null;
   rackA: FxRack;
   rackB: FxRack;
   rackLayer: FxRack;
@@ -450,11 +460,28 @@ export class ISFLayer {
     }
   }
 
+  /** Load/swap/clear a VIDEO source. Passing null (or a new mediaId) disposes
+   *  the current clip. Cheap when the id is unchanged (the common per-frame
+   *  case), so syncFromState can call it every frame. */
+  setVideo(slot: 'A' | 'B', mediaId: string | null): void {
+    const curId = slot === 'A' ? this.mediaIdA : this.mediaIdB;
+    if (mediaId === curId) return; // no change
+    const cur = slot === 'A' ? this.videoA : this.videoB;
+    cur?.dispose();
+    let next: VideoSource | null = null;
+    if (mediaId) {
+      next = new VideoSource(this.shared.gl);
+      next.load(mediaId);
+    }
+    if (slot === 'A') { this.videoA = next; this.mediaIdA = mediaId; }
+    else { this.videoB = next; this.mediaIdB = mediaId; }
+  }
+
   setInput(slot: 'A' | 'B', name: string, value: number | number[]) {
     (slot === 'A' ? this.isfA : this.isfB)?.setValue(name, value);
   }
 
-  hasB(): boolean { return this.isfB !== null; }
+  hasB(): boolean { return this.isfB !== null || this.videoB !== null; }
 
   /** Advance the layer clock and stamp it onto every renderer it owns. */
   advanceClock(dtSec: number): void {
@@ -467,11 +494,27 @@ export class ISFLayer {
     this.rackLayer.setTime(t);
   }
 
-  /** Draw a source's ISF into its scratch target (empty → transparent). */
+  /** Draw a source (ISF generator or video frame) into its scratch target.
+   *  Empty/not-yet-ready → transparent. */
   renderSource(slot: 'A' | 'B') {
     const gl = this.shared.gl;
-    const isf = slot === 'A' ? this.isfA : this.isfB;
     const scratch = slot === 'A' ? this.scratchA : this.scratchB;
+    const isf = slot === 'A' ? this.isfA : this.isfB;
+    const video = slot === 'A' ? this.videoA : this.videoB;
+
+    // Video slot: upload the current frame and blit it into scratch.
+    if (video) {
+      const tex = video.upload();
+      if (tex && this.shared.blit) {
+        this.shared.blit(tex, scratch.fbo);
+      } else {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, scratch.fbo);
+        gl.viewport(0, 0, this.w, this.h);
+        gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      }
+      return;
+    }
+
     if (!isf) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, scratch.fbo);
       gl.viewport(0, 0, this.w, this.h);
@@ -491,6 +534,8 @@ export class ISFLayer {
     const gl = this.shared.gl;
     this.isfA?.cleanup();
     this.isfB?.cleanup();
+    this.videoA?.dispose();
+    this.videoB?.dispose();
     this.rackA.dispose();
     this.rackB.dispose();
     this.rackLayer.dispose();
@@ -603,6 +648,7 @@ export class Compositor {
       this.blendInto(t.fbo, dry, wet, 'normal', opacity);
       return t.tex;
     };
+    this.shared.blit = (src, dstFbo) => this.copyInto(dstFbo, src);
     this.masterRack = new FxRack(this.shared);
     for (let i = 0; i < 4; i++) this.layers.push(new ISFLayer(this.shared, w, h));
   }
@@ -646,10 +692,16 @@ export class Compositor {
     for (let i = 0; i < this.layers.length && i < c.layers.length; i++) {
       const l = c.layers[i];
       const L = this.layers[i];
+      // Each slot is a generator, a video, or empty — reconcile both engines so
+      // switching kinds swaps cleanly (video↔generator never overlap).
       const wantA = l.sourceA.kind === 'generator' ? l.sourceA.shaderId : null;
+      const wantVidA = l.sourceA.kind === 'video' ? (l.sourceA.mediaId ?? null) : null;
       if (wantA !== L.shaderIdA) L.setShader('A', wantA, wantA ? sourceById(wantA) : null);
+      L.setVideo('A', wantVidA);
       const wantB = l.sourceB && l.sourceB.kind === 'generator' ? l.sourceB.shaderId : null;
+      const wantVidB = l.sourceB && l.sourceB.kind === 'video' ? (l.sourceB.mediaId ?? null) : null;
       if (wantB !== L.shaderIdB) L.setShader('B', wantB, wantB ? sourceById(wantB) : null);
+      L.setVideo('B', wantVidB);
       L.blend = l.blend;
       L.opacity = l.opacity;
       L.mute = l.mute;

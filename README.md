@@ -53,7 +53,9 @@ npm run build:win  # NSIS + portable
 - **6 · Presets + Randomize** ✅ — structural scoped Randomize from curated
   aesthetic ranges; 280 per-shader presets; scene bank (save/recall full
   states, randomize-into-scene, drag-arrange, keys 1–9), session-persisted.
-- **7 · Video + HIVE** — `<video>` → texture + synthify; HIVE WebCodecs live-in.
+- **7 · Video + HIVE** 🚧 — imported `<video>` → GL texture as a layer source
+  (synthify via the source's FX rack) ✅; webcam capture + HIVE WebCodecs
+  live-in still to come.
 - **8 · Output** — in-shader warp/mapping + Spout/Syphon/NDI + OSCQuery.
 - **9 · WebGPU** *(post-MVP)* — compute passes for true pixel-sort / particles.
 

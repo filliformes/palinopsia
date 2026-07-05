@@ -63,6 +63,8 @@ export function Inspector(): JSX.Element {
   let modTargetFor: ((inputName: string) => ModTarget) | undefined
   // For FX selections: the dry/wet control shown above the shader's own params.
   let fxOpacity: { value: number; set: (v: number) => void } | null = null
+  // For a video source (no ISF controls) — the clip name shown in a small panel.
+  let videoName: string | null = null
 
   if (selection?.type === 'source') {
     const layer = composition.layers[selection.layer]
@@ -76,6 +78,9 @@ export function Inspector(): JSX.Element {
       const { layer: li, slot: sl } = selection
       onChange = (n, v) => setSourceInput(li, sl, n, v)
       modTargetFor = (input) => ({ kind: 'source', layer: li, slot: sl, input })
+    } else if (slot?.kind === 'video') {
+      videoName = slot.mediaName ?? 'video'
+      context = `layer ${selection.layer + 1} · src ${selection.slot}`
     }
   } else if (selection?.type === 'fx') {
     const { scope, instId } = selection
@@ -108,6 +113,20 @@ export function Inspector(): JSX.Element {
   }
 
   if (!shaderId) {
+    if (videoName) {
+      return (
+        <div className="rounded-md border border-border bg-panel p-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] font-semibold">🎞 {videoName}</span>
+            <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{context}</span>
+          </div>
+          <p className="mt-1.5 text-[11px] text-muted">
+            Video source. Add FX to this source&apos;s rack to synthify it
+            (posterize · dither · key · chroma-shift · feedback).
+          </p>
+        </div>
+      )
+    }
     return (
       <div className="rounded-md border border-border bg-panel p-3 text-[11px] text-muted">
         Select a source or an FX to edit its controls.

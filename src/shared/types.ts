@@ -61,8 +61,10 @@ export interface SourceSlot extends ShaderInstance {
   kind: SourceKind
   // For kind:'feedback' — index of the layer whose previous frame we sample.
   feedbackLayer?: number
-  // For kind:'video' — absolute path or media id of the imported clip.
+  // For kind:'video' — the clip's object URL (or path) the engine loads.
   mediaId?: string
+  // For kind:'video' — the file's display name, shown in the source picker.
+  mediaName?: string
 }
 
 // One FX in a rack. Every FX is an ISF shader (per brief §5).

@@ -4,8 +4,8 @@
 // space. Right-click anywhere on the strip: Init, Randomize layer, layer
 // presets (save/apply/delete — app-persistent).
 
-import { useState, type MouseEvent, type ReactNode } from 'react'
-import type { BlendMode } from '@shared/types'
+import { useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import type { BlendMode, SourceKind } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
 import { GENERATORS_ALPHA } from '../shaders/isf'
 import { useStore } from '../store'
@@ -26,6 +26,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const setSourceMix = useStore((s) => s.setSourceMix)
   const setSourceBlend = useStore((s) => s.setSourceBlend)
   const setSourceShader = useStore((s) => s.setSourceShader)
+  const setSourceVideo = useStore((s) => s.setSourceVideo)
   const setLayerSpeed = useStore((s) => s.setLayerSpeed)
   const setSelection = useStore((s) => s.setSelection)
   const selection = useStore((s) => s.selection)
@@ -135,11 +136,14 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           <SourceRow
             label="A"
             shaderId={layer.sourceA.shaderId}
+            sourceKind={layer.sourceA.kind}
+            mediaName={layer.sourceA.mediaName}
             selected={isSelected('A')}
             scope={{ kind: 'sourceA', layer: index }}
             fx={layer.sourceAFx}
             onSelect={() => setSelection({ type: 'source', layer: index, slot: 'A' })}
             onPick={(id) => setSourceShader(index, 'A', id)}
+            onPickVideo={(url, name) => setSourceVideo(index, 'A', url, name)}
           />
 
           {/* MIX: combinator mode + depth — ALWAYS visible (fixed layout);
@@ -173,11 +177,14 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           <SourceRow
             label="B"
             shaderId={layer.sourceB?.shaderId ?? null}
+            sourceKind={layer.sourceB?.kind ?? 'none'}
+            mediaName={layer.sourceB?.mediaName}
             selected={isSelected('B')}
             scope={{ kind: 'sourceB', layer: index }}
             fx={layer.sourceBFx}
             onSelect={() => setSelection({ type: 'source', layer: index, slot: 'B' })}
             onPick={(id) => setSourceShader(index, 'B', id)}
+            onPickVideo={(url, name) => setSourceVideo(index, 'B', url, name)}
           />
 
           {/* LAYER FX */}
@@ -335,39 +342,67 @@ function Indented({ children }: { children: ReactNode }): JSX.Element {
 function SourceRow({
   label,
   shaderId,
+  sourceKind,
+  mediaName,
   selected,
   scope,
   fx,
   onSelect,
-  onPick
+  onPick,
+  onPickVideo
 }: {
   label: string
   shaderId: string | null
+  sourceKind: SourceKind
+  mediaName?: string
   selected: boolean
   scope: Parameters<typeof FxAddSelect>[0]['scope']
   fx: Parameters<typeof FxChips>[0]['fx']
   onSelect: () => void
   onPick: (id: string | null) => void
+  onPickVideo: (url: string, name: string) => void
 }): JSX.Element {
+  const fileRef = useRef<HTMLInputElement | null>(null)
+  const isVideo = sourceKind === 'video'
+  // The select's value: a generator id, the sentinel for the active video, or ''.
+  const value = isVideo ? '__video__' : (shaderId ?? '')
+  const active = isVideo || !!shaderId
   return (
     <>
       <div className="flex min-w-0 items-center gap-1.5" onClick={onSelect}>
         <span
           className={`w-[34px] shrink-0 text-center font-app text-[14px] font-bold leading-none ${
-            selected ? 'text-accent' : shaderId ? 'text-text' : 'text-muted'
+            selected ? 'text-accent' : active ? 'text-text' : 'text-muted'
           }`}
         >
           {label}
         </span>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) onPickVideo(URL.createObjectURL(file), file.name)
+            e.target.value = '' // allow re-picking the same file
+          }}
+        />
         <select
           className={`input select-compact min-w-0 flex-1 text-[11px] ${
             selected ? 'border-accent' : ''
           }`}
-          value={shaderId ?? ''}
-          onChange={(e) => onPick(e.target.value || null)}
+          value={value}
+          onChange={(e) => {
+            const v = e.target.value
+            if (v === '__video_pick__') fileRef.current?.click()
+            else if (v !== '__video__') onPick(v || null)
+          }}
           onClick={(e) => e.stopPropagation()}
         >
           <option value="">— none —</option>
+          {isVideo && <option value="__video__">🎞 {mediaName ?? 'video'}</option>}
+          <option value="__video_pick__">🎞 Import video…</option>
           {GENERATORS_ALPHA.map((g) => (
             <option key={g.id} value={g.id}>
               {g.name}
