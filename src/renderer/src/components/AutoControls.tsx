@@ -566,7 +566,7 @@ function ColorControl({
 }
 
 // ── point2D → XY pad ─────────────────────────────────────────────────
-function XYControl({
+export function XYControl({
   inp,
   value,
   onChange

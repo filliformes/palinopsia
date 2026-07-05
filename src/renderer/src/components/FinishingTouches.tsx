@@ -9,7 +9,7 @@ import { SHADER_BY_ID } from '../shaders/isf'
 import { inputsForShader } from '../shaders/isf/inputs'
 import { PRESETS_BY_ID } from '../shaders/isf/presets'
 import { useStore } from '../store'
-import { AutoControls } from './AutoControls'
+import { AutoControls, XYControl } from './AutoControls'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 
@@ -63,7 +63,6 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
   const sectionKey = `ft-${shaderId.replace('fx-', '')}`
   const collapsed = useStore((s) => s.collapsed[sectionKey] ?? true)
   const toggleSection = useStore((s) => s.toggleSection)
-  const composition = useStore((s) => s.composition)
   const setFxInput = useStore((s) => s.setFxInput)
   const toggleFx = useStore((s) => s.toggleFx)
   const vibePresetName = useStore((s) => s.vibePresetName)
@@ -107,18 +106,6 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
           {name}
         </span>
         <div className="flex-1" />
-        {isContext && (
-          <button
-            onClick={() => {
-              const vibe = composition.master.find((f) => f.shaderId === 'fx-vibe')
-              if (vibe) onChange('lightColor', vibeMainColor(vibe.inputs))
-            }}
-            className="shrink-0 rounded border border-accent2/50 bg-accent2/10 px-1.5 py-0.5 font-mono text-[10px] text-accent2 hover:bg-accent2/20"
-            title="Set the light colour from the Vibe Palette's main colour (brightened)"
-          >
-            Vibe Color
-          </button>
-        )}
         <button
           onClick={() => {
             const next = randomizeInputs(shaderId, values)
@@ -145,9 +132,51 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
       </div>
       {!collapsed && (
         <div className="border-t border-border">
-          <AutoControls inputs={inputsForShader(shaderId)} values={values} onChange={onChange} modTargetFor={modTargetFor} layout="vertical" />
+          {isContext ? (
+            <ContextBody inst={inst} onChange={onChange} modTargetFor={modTargetFor} />
+          ) : (
+            <AutoControls inputs={inputsForShader(shaderId)} values={values} onChange={onChange} modTargetFor={modTargetFor} layout="vertical" />
+          )}
         </div>
       )}
     </div>
+  )
+}
+
+// Context has a "light" XY pad. Render the scalar/colour controls normally,
+// then a centered row: the pad, with the "Vibe Color" button to its right.
+function ContextBody({
+  inst,
+  onChange,
+  modTargetFor
+}: {
+  inst: FxInstance
+  onChange: (n: string, v: number | number[]) => void
+  modTargetFor: (input: string) => ModTarget
+}): JSX.Element {
+  const composition = useStore((s) => s.composition)
+  const values = inst.inputs
+  const all = inputsForShader('fx-context')
+  const scalars = all.filter((i) => i.type !== 'point2D')
+  const pad = all.find((i) => i.type === 'point2D')
+  return (
+    <>
+      <AutoControls inputs={scalars} values={values} onChange={onChange} modTargetFor={modTargetFor} layout="vertical" />
+      {pad && (
+        <div className="flex items-center justify-center gap-3 border-t border-border px-2 py-2">
+          <XYControl inp={pad} value={values[pad.name]} onChange={onChange} />
+          <button
+            onClick={() => {
+              const vibe = composition.master.find((f) => f.shaderId === 'fx-vibe')
+              if (vibe) onChange('lightColor', vibeMainColor(vibe.inputs))
+            }}
+            className="shrink-0 rounded border border-accent2/50 bg-accent2/10 px-1.5 py-0.5 font-mono text-[10px] text-accent2 hover:bg-accent2/20"
+            title="Set the light colour from the Vibe Palette's main colour (brightened)"
+          >
+            Vibe Color
+          </button>
+        </div>
+      )}
+    </>
   )
 }
