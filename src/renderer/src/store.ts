@@ -973,10 +973,13 @@ export const useStore = create<StoreState>((set, get) => ({
   collapsed: (() => {
     // Fresh-load layout: Meta and Modulation start collapsed (deep controls,
     // opened on demand); Master FX and Inspector stay open (always in play).
-    const DEFAULT_COLLAPSED: Record<string, boolean> = { meta: true, modulation: true }
+    // The three Finishing-Touches sub-sections start collapsed too — seeded so
+    // toggleSection works from a defined value (and existing sessions inherit it).
+    const FT: Record<string, boolean> = { 'ft-vibe': true, 'ft-context': true, 'ft-finalizer': true }
+    const DEFAULT_COLLAPSED: Record<string, boolean> = { meta: true, modulation: true, ...FT }
     try {
       const saved = localStorage.getItem('opsia.collapsed')
-      if (saved) return JSON.parse(saved) as Record<string, boolean>
+      if (saved) return { ...FT, ...(JSON.parse(saved) as Record<string, boolean>) }
       return DEFAULT_COLLAPSED
     } catch {
       return DEFAULT_COLLAPSED

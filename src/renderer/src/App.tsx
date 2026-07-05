@@ -10,6 +10,7 @@ import { Compositor } from './engine/Compositor'
 import { applyModulation, modEngine } from './engine/modulation'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel } from './components/FxRackPanel'
+import { FinishingTouches } from './components/FinishingTouches'
 import { Inspector } from './components/Inspector'
 import { LayerPanel } from './components/LayerPanel'
 import { MixerPanel } from './components/MixerPanel'
@@ -33,12 +34,15 @@ import { PRESETS_BY_ID } from './shaders/isf/presets'
 let vibePresetIndex = -1
 let contextPresetIndex = -1
 
-function openVibeInInspector(): void {
+// Reveal a Finishing Touches sub-section (expand the panel + the sub-row).
+function revealFinishing(sub: 'ft-vibe' | 'ft-context'): void {
   const st = useStore.getState()
-  const vibe = st.composition.master.find((f) => f.shaderId === 'fx-vibe')
-  if (!vibe) return
-  if (st.collapsed['inspector']) st.toggleSection('inspector')
-  st.setSelection({ type: 'fx', scope: { kind: 'master' }, instId: vibe.id })
+  if (st.collapsed['finishing']) st.toggleSection('finishing')
+  if (st.collapsed[sub] ?? true) st.toggleSection(sub)
+}
+
+function openVibeInInspector(): void {
+  revealFinishing('ft-vibe')
 }
 
 function cycleVibePreset(): void {
@@ -53,17 +57,11 @@ function cycleVibePreset(): void {
     st.setFxInput({ kind: 'master' }, vibe.id, k, v)
   }
   st.setVibePresetName(p.name)
-  // Show the change in the Inspector.
-  if (st.collapsed['inspector']) st.toggleSection('inspector')
-  st.setSelection({ type: 'fx', scope: { kind: 'master' }, instId: vibe.id })
+  revealFinishing('ft-vibe')
 }
 
 function openContextInInspector(): void {
-  const st = useStore.getState()
-  const ctx = st.composition.master.find((f) => f.shaderId === 'fx-context')
-  if (!ctx) return
-  if (st.collapsed['inspector']) st.toggleSection('inspector')
-  st.setSelection({ type: 'fx', scope: { kind: 'master' }, instId: ctx.id })
+  revealFinishing('ft-context')
 }
 
 function cycleContextPreset(): void {
@@ -77,8 +75,7 @@ function cycleContextPreset(): void {
   for (const [k, v] of Object.entries(p.values)) {
     st.setFxInput({ kind: 'master' }, ctx.id, k, v)
   }
-  if (st.collapsed['inspector']) st.toggleSection('inspector')
-  st.setSelection({ type: 'fx', scope: { kind: 'master' }, instId: ctx.id })
+  revealFinishing('ft-context')
 }
 import { initUndo, redo, undo, useUndoState } from './undo'
 import { THEME_ORDER, useStore, type ThemeName } from './store'
@@ -366,6 +363,10 @@ export default function App(): JSX.Element {
           <Collapsible sectionKey="master" title="master fx">
             <MasterRackStrip />
           </Collapsible>
+
+          <Collapsible sectionKey="finishing" title="finishing touches">
+            <FinishingTouches />
+          </Collapsible>
         </section>
 
         {/* Drag handle — the layers column is resizable */}
@@ -418,11 +419,13 @@ function MasterRackStrip(): JSX.Element {
   // The select keeps showing the applied chain's name.
   const [applied, setApplied] = useState('')
   const [flashing, flash] = useFlash()
+  // The three finalizers (Vibe / Context / Finalizer) live in Finishing Touches
+  // now — the master strip carries only the user-added FX (which may wrap).
+  const rackFx = master.filter((f) => !f.locked)
   return (
-    // Everything on ONE line: chain label · dice · preset box · + fx · the FX
-    // chips (Vibe, Context, Finalizer). Scrolls horizontally rather than wrapping.
+    // Line 1: chain label · dice · preset box · + fx; the regular FX chips wrap.
     <div
-      className={`flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto rounded-md border bg-panel2/40 p-2 transition-colors ${
+      className={`flex min-w-0 flex-wrap items-center gap-1.5 rounded-md border bg-panel2/40 p-2 transition-colors ${
         flashing ? 'animate-pulse border-danger ring-1 ring-danger' : 'border-border'
       }`}
     >
@@ -462,9 +465,9 @@ function MasterRackStrip(): JSX.Element {
           </option>
         ))}
       </select>
-      {/* FX rack joins the same line (no wrap — the whole strip scrolls) */}
-      <div className="ml-3 flex shrink-0 items-center">
-        <FxRackPanel scope={{ kind: 'master' }} fx={master} label="" nowrap />
+      {/* Regular FX rack — wraps to more rows if the chain is deep */}
+      <div className="ml-3 flex min-w-0 items-center">
+        <FxRackPanel scope={{ kind: 'master' }} fx={rackFx} label="" />
       </div>
     </div>
   )

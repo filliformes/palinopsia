@@ -29,7 +29,9 @@ export function AutoControls({
   // 'wrap' (default): flex-wrap, height follows param count.
   // 'twoRow': a fixed two-row grid that fills top→bottom then flows into new
   //   columns, overflowing horizontally — the Inspector's shape never changes.
-  layout?: 'wrap' | 'twoRow'
+  // 'vertical': one full-width control per row, stacked — for narrow tall panels
+  //   (the Finishing Touches finalizers).
+  layout?: 'wrap' | 'twoRow' | 'vertical'
 }): JSX.Element {
   if (inputs.length === 0) {
     return <div className="p-2 text-[11px] text-muted">This shader exposes no controls.</div>
@@ -51,6 +53,15 @@ export function AutoControls({
         modTargetFor={modTargetFor}
       />
     )
+  if (layout === 'vertical') {
+    // Full-width controls stacked — `[&>*]:w-full` overrides each control's
+    // fixed w-44 so sliders/swatches span the panel.
+    return (
+      <div className="flex flex-col gap-2 p-2 [&>*]:w-full">
+        {visible(inputs).map(renderControl)}
+      </div>
+    )
+  }
   if (layout === 'twoRow') {
     // XY pads (point2D) are tall — flowing them through the two-row grid
     // leaves a ragged column and dead space. Pull them out and stand them to
