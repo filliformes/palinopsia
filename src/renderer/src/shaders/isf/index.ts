@@ -464,6 +464,57 @@ export const SHADER_BY_ID: Record<string, IsfShader> = Object.fromEntries(
   ALL_SHADERS.map((s) => [s.id, s])
 )
 
+// ── Menu ordering ─────────────────────────────────────────────────────
+// Sources list alphabetically; FX group by their sub-category (from the ISF
+// header CATEGORIES), colour first. These drive the pickers only — the raw
+// arrays keep their authoring order for Randomize's pools.
+
+export const GENERATORS_ALPHA: IsfShader[] = [...GENERATORS].sort((a, b) =>
+  a.name.localeCompare(b.name)
+)
+
+// A shader's display group = its first CATEGORIES tag that isn't the top-level
+// "FX" (Color, Glitch, Distortion, …).
+function fxGroup(sh: IsfShader): string {
+  const m = sh.source.match(/"CATEGORIES"\s*:\s*\[([^\]]*)\]/)
+  if (!m) return 'Other'
+  const cats = m[1].split(',').map((x) => x.replace(/["'\s]/g, ''))
+  return cats.find((c) => c && c !== 'FX') ?? 'Other'
+}
+
+// Colour first, then a sensible descent through the families.
+const FX_GROUP_ORDER = [
+  'Color',
+  'Stylize',
+  'Distortion',
+  'Blur',
+  'Glitch',
+  'Feedback',
+  'Texture',
+  'Scan',
+  'Utility'
+]
+function fxGroupRank(g: string): number {
+  const i = FX_GROUP_ORDER.indexOf(g)
+  return i < 0 ? FX_GROUP_ORDER.length : i
+}
+
+/** FX bucketed by sub-category, colour first, alphabetical within each. */
+export const FX_GROUPS: Array<{ group: string; shaders: IsfShader[] }> = (() => {
+  const buckets = new Map<string, IsfShader[]>()
+  for (const sh of FX_SHADERS) {
+    const g = fxGroup(sh)
+    if (!buckets.has(g)) buckets.set(g, [])
+    buckets.get(g)!.push(sh)
+  }
+  return [...buckets.entries()]
+    .sort((a, b) => fxGroupRank(a[0]) - fxGroupRank(b[0]) || a[0].localeCompare(b[0]))
+    .map(([group, shaders]) => ({
+      group,
+      shaders: [...shaders].sort((x, y) => x.name.localeCompare(y.name))
+    }))
+})()
+
 /** Source lookup the engine's syncFromState consumes. */
 export function shaderSourceById(id: string): string | null {
   return SHADER_BY_ID[id]?.source ?? null

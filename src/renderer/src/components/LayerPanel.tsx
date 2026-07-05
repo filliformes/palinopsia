@@ -7,7 +7,7 @@
 import { useState, type MouseEvent, type ReactNode } from 'react'
 import type { BlendMode } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
-import { GENERATORS } from '../shaders/isf'
+import { GENERATORS_ALPHA } from '../shaders/isf'
 import { useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { ContextMenu, type MenuItem } from './ContextMenu'
@@ -368,7 +368,7 @@ function SourceRow({
           onClick={(e) => e.stopPropagation()}
         >
           <option value="">— none —</option>
-          {GENERATORS.map((g) => (
+          {GENERATORS_ALPHA.map((g) => (
             <option key={g.id} value={g.id}>
               {g.name}
             </option>

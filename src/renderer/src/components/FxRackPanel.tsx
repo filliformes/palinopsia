@@ -7,7 +7,7 @@
 
 import { useRef, type DragEvent } from 'react'
 import type { FxInstance } from '@shared/types'
-import { FX_SHADERS, SHADER_BY_ID } from '../shaders/isf'
+import { FX_GROUPS, SHADER_BY_ID } from '../shaders/isf'
 import { useStore, type FxScope } from '../store'
 
 export function FxAddSelect({ scope, className = '' }: { scope: FxScope; className?: string }): JSX.Element {
@@ -22,10 +22,14 @@ export function FxAddSelect({ scope, className = '' }: { scope: FxScope; classNa
       title="Add an FX to this rack"
     >
       <option value="">+ fx</option>
-      {FX_SHADERS.map((f) => (
-        <option key={f.id} value={f.id}>
-          {f.name}
-        </option>
+      {FX_GROUPS.map((grp) => (
+        <optgroup key={grp.group} label={grp.group}>
+          {grp.shaders.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
+          ))}
+        </optgroup>
       ))}
     </select>
   )
