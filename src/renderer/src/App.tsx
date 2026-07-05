@@ -20,6 +20,36 @@ import { initMidi } from './midi'
 import { GENERATORS, shaderSourceById } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
 import { MASTER_PRESETS } from './shaders/isf/masterPresets'
+import { PRESETS_BY_ID } from './shaders/isf/presets'
+
+// ── Vibe Palette shortcuts (P / Shift+P) ──────────────────────────────
+// Cursor into the Vibe's preset list, kept at module scope so it survives
+// re-renders and advances across Shift+P presses.
+let vibePresetIndex = -1
+
+function openVibeInInspector(): void {
+  const st = useStore.getState()
+  const vibe = st.composition.master.find((f) => f.locked)
+  if (!vibe) return
+  if (st.collapsed['inspector']) st.toggleSection('inspector')
+  st.setSelection({ type: 'fx', scope: { kind: 'master' }, instId: vibe.id })
+}
+
+function cycleVibePreset(): void {
+  const st = useStore.getState()
+  const vibe = st.composition.master.find((f) => f.locked)
+  if (!vibe) return
+  const presets = PRESETS_BY_ID['fx-vibe'] ?? []
+  if (presets.length === 0) return
+  vibePresetIndex = (vibePresetIndex + 1) % presets.length
+  const p = presets[vibePresetIndex]
+  for (const [k, v] of Object.entries(p.values)) {
+    st.setFxInput({ kind: 'master' }, vibe.id, k, v)
+  }
+  // Show the change in the Inspector.
+  if (st.collapsed['inspector']) st.toggleSection('inspector')
+  st.setSelection({ type: 'fx', scope: { kind: 'master' }, instId: vibe.id })
+}
 import { initUndo, redo, undo, useUndoState } from './undo'
 import { THEME_ORDER, useStore, type ThemeName } from './store'
 
@@ -60,6 +90,13 @@ export default function App(): JSX.Element {
           e.preventDefault()
           st.recallScene(scene.id)
         }
+        return
+      }
+      // P: open the Vibe Palette in the Inspector · Shift+P: cycle its presets.
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'p') {
+        e.preventDefault()
+        if (e.shiftKey) cycleVibePreset()
+        else openVibeInInspector()
         return
       }
       if (!(e.ctrlKey || e.metaKey)) return
