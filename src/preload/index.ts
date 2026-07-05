@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { ExposedApi, OscEvent, OscErrorEvent, OscInEvent, Session } from '@shared/types'
 
 const api: ExposedApi = {
@@ -36,6 +36,11 @@ const api: ExposedApi = {
     return () => ipcRenderer.off('osc:received', h)
   },
   oscQueryPublish: (nodes) => ipcRenderer.invoke('oscquery:publish', nodes),
+
+  // ── Media ────────────────────────────────────────────────────────
+  // Resolve a picked <input type=file> File to its absolute path (Electron 33
+  // removed File.path). The renderer turns this into an opsia-media:// URL.
+  getMediaPath: (file: File) => webUtils.getPathForFile(file),
 
   // ── App lifecycle ────────────────────────────────────────────────
   appCloseProceed: () => ipcRenderer.invoke('app:close-proceed'),

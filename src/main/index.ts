@@ -13,6 +13,10 @@ import * as sessionIO from './session'
 import * as autosave from './autosave'
 import { ModulationEngine } from './modulators'
 import { OscQueryServer, type OscQueryNode } from './oscquery'
+import { registerMediaScheme, handleMediaProtocol } from './media'
+
+// Must run before app ready — makes opsia-media:// a privileged streaming scheme.
+registerMediaScheme()
 
 let mainWindow: BrowserWindow | null = null
 
@@ -93,9 +97,13 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
-  // Allow Web MIDI in the renderer (MIDI-CC learn lives there — Phase 5).
+  // Serve local video clips over opsia-media:// (range-capable, persistent).
+  handleMediaProtocol()
+
+  // Allow Web MIDI + camera/mic/screen capture in the renderer (all local,
+  // user-initiated: MIDI-CC learn and video-capture sources).
   electronSession.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => {
-    if (permission === 'midi' || permission === 'midiSysex') return cb(true)
+    if (permission === 'midi' || permission === 'midiSysex' || permission === 'media') return cb(true)
     cb(false)
   })
 

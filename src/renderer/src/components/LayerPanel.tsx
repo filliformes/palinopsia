@@ -333,6 +333,19 @@ function Row({ label, children }: { label: string; children: ReactNode }): JSX.E
   )
 }
 
+// A picked video's loadable URL: the persistent opsia-media:// scheme (from its
+// absolute path) so it survives reload, falling back to a session-only object
+// URL if the path can't be resolved.
+function mediaUrlForFile(file: File): string {
+  try {
+    const path = window.api.getMediaPath(file)
+    if (path) return `opsia-media://local/${encodeURIComponent(path)}`
+  } catch {
+    /* getMediaPath unavailable — fall back */
+  }
+  return URL.createObjectURL(file)
+}
+
 // FX chips rows sit indented under their owner's row, inside the gutter.
 function Indented({ children }: { children: ReactNode }): JSX.Element {
   return <div className="min-w-0 pl-[40px]">{children}</div>
@@ -384,7 +397,7 @@ function SourceRow({
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]
-            if (file) onPickVideo(URL.createObjectURL(file), file.name)
+            if (file) onPickVideo(mediaUrlForFile(file), file.name)
             e.target.value = '' // allow re-picking the same file
           }}
         />

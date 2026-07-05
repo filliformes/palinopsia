@@ -332,4 +332,6 @@ export interface ExposedApi {
   // App lifecycle — save-before-quit handshake
   appCloseProceed: () => Promise<void>
   onAppBeforeClose: (cb: () => void) => () => void
+  // Absolute path for a picked File (Electron 33 removed File.path).
+  getMediaPath: (file: File) => string
 }
