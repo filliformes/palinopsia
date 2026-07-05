@@ -11,6 +11,20 @@ import type { CompositionState, FxInstance, LayerState, SourceSlot } from '@shar
 
 let state: { from: CompositionState; startMs: number; ms: number } | null = null
 
+// A pending framebuffer crossfade the render loop should pick up. Set whenever
+// a morph begins; the loop reads it once and tells the Compositor to dissolve
+// the frozen old frame into the new scene — the only way a STRUCTURAL change
+// (Randomize All swaps shaders) can visibly morph, since params snap.
+let pendingCrossfadeMs: number | null = null
+
+/** The render loop calls this once per frame; returns the ms for a crossfade
+ *  that just began (and clears it), else null. */
+export function consumeCrossfade(): number | null {
+  const v = pendingCrossfadeMs
+  pendingCrossfadeMs = null
+  return v
+}
+
 /** Start easing FROM `from` toward whatever the store holds, over `ms`. */
 export function beginMorph(from: CompositionState, ms: number, now: number): void {
   if (ms <= 20) {
@@ -18,6 +32,7 @@ export function beginMorph(from: CompositionState, ms: number, now: number): voi
     return
   }
   state = { from: structuredClone(from), startMs: now, ms }
+  pendingCrossfadeMs = ms
 }
 
 export function morphActive(): boolean {

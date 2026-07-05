@@ -480,6 +480,14 @@ export class Compositor {
   // Dedicated dry/wet ping-pong for per-FX opacity (kept off the main chain).
   private fxOpac: [{ fbo: WebGLFramebuffer; tex: WebGLTexture }, { fbo: WebGLFramebuffer; tex: WebGLTexture }] | null = null;
   private fxOpacI = 0;
+  // Scene crossfade (Randomize / scene morph). `snapshot` always holds the last
+  // presented frame; when a morph begins we freeze it and dissolve into the new
+  // scene over `xfadeMs`, so even a structural change (new shaders) morphs.
+  private snapshot!: { fbo: WebGLFramebuffer; tex: WebGLTexture };
+  private xfadeTarget!: { fbo: WebGLFramebuffer; tex: WebGLTexture };
+  private xfadeActive = false;
+  private xfadeStartMs = -1;
+  private xfadeMs = 0;
   // Global time multiplier (1/64×…64×) — scales every visual clock.
   private globalSpeed = 1;
   private blendProg: WebGLProgram;
@@ -541,6 +549,8 @@ export class Compositor {
     this.acc = new PingPong(gl, w, h);
     this.chain = new ChainBuffers(gl, w, h);
     this.mixTarget = makeTarget(gl, w, h);
+    this.snapshot = makeTarget(gl, w, h);
+    this.xfadeTarget = makeTarget(gl, w, h);
     this.fxOpac = [makeTarget(gl, w, h), makeTarget(gl, w, h)];
     // Now that the blend program + its uniforms exist, expose the dry/wet mix
     // to the racks. Alternating the two targets guarantees dst ≠ dry.
@@ -557,6 +567,27 @@ export class Compositor {
   /** Global time multiplier (1/64×…64×) — scales the master + layer clocks. */
   setGlobalSpeed(x: number): void {
     this.globalSpeed = Math.max(1 / 64, Math.min(64, x));
+  }
+
+  /** Begin dissolving the frozen last frame into the new scene over `ms`.
+   *  Driven by the render loop from a morph (Randomize / scene recall). */
+  beginCrossfade(ms: number): void {
+    if (ms <= 20) return;
+    this.xfadeActive = true;
+    this.xfadeStartMs = -1; // stamped on the next render (loop clock)
+    this.xfadeMs = ms;
+  }
+
+  /** Blit `tex` into `fbo` unchanged (used to keep the crossfade snapshot). */
+  private copyInto(fbo: WebGLFramebuffer, tex: WebGLTexture): void {
+    const gl = this.gl;
+    gl.bindVertexArray(this.vao);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.viewport(0, 0, this.w, this.h);
+    gl.useProgram(this.copyProg);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(this.uCTex, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindVertexArray(null);
   }
 
   /**
@@ -717,12 +748,31 @@ export class Compositor {
     gl.bindVertexArray(null);
     composite = this.masterRack.apply(composite, this.chain);
 
+    // Scene crossfade: dissolve the frozen old frame into the new composite.
+    // The only way a STRUCTURAL morph (Randomize All swaps shaders) can read as
+    // a transition — parameter easing can't cross a shader change.
+    let present = composite;
+    if (this.xfadeActive) {
+      if (this.xfadeStartMs < 0) this.xfadeStartMs = timeMs;
+      let k = (timeMs - this.xfadeStartMs) / this.xfadeMs;
+      if (k >= 1) {
+        this.xfadeActive = false;
+      } else {
+        k = k * k * (3 - 2 * k); // smoothstep
+        this.blendInto(this.xfadeTarget.fbo, this.snapshot.tex, composite, 'normal', k);
+        present = this.xfadeTarget.tex;
+      }
+    }
+    // Keep the freshest frame around (except mid-crossfade, so the snapshot
+    // stays frozen at the pre-morph scene) for the NEXT crossfade to start from.
+    if (!this.xfadeActive) this.copyInto(this.snapshot.fbo, composite);
+
     // Present to canvas.
     gl.bindVertexArray(this.vao);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.useProgram(this.copyProg);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, composite); gl.uniform1i(this.uCTex, 0);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, present); gl.uniform1i(this.uCTex, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindVertexArray(null);
 

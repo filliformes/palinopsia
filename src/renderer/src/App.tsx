@@ -19,7 +19,7 @@ import { ModulationPanel } from './components/ModulationPanel'
 import { OscPanel } from './components/OscPanel'
 import { SceneBank } from './components/SceneBank'
 import { initOscInput, applyOscListen } from './oscInput'
-import { morphedComposition } from './morph'
+import { morphedComposition, consumeCrossfade } from './morph'
 import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
 import { initMidi } from './midi'
@@ -205,6 +205,9 @@ export default function App(): JSX.Element {
       try {
         const now = performance.now()
         const st = useStore.getState()
+        // A morph just began → dissolve the frozen old frame into the new scene.
+        const xfadeMs = consumeCrossfade()
+        if (xfadeMs) comp!.beginCrossfade(xfadeMs)
         // Morph: while a scene recall / randomize is easing, the engine renders
         // an interpolated composition (the store still holds the target).
         const c = morphedComposition(now, st.composition)
