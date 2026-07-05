@@ -5,7 +5,7 @@
   "CATEGORIES": ["Generator", "Particles", "Organic"],
   "INPUTS": [
     { "NAME": "count",    "TYPE": "float", "MIN": 8.0,  "MAX": 60.0, "DEFAULT": 28.0 },
-    { "NAME": "speed",    "TYPE": "float", "MIN": 0.0,  "MAX": 5.0,  "DEFAULT": 0.6 },
+    { "NAME": "speed",    "TYPE": "float", "MIN": 0.0,  "MAX": 20.0,  "DEFAULT": 0.6 },
     { "NAME": "cohesion", "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.7 },
     { "NAME": "size",     "TYPE": "float", "MIN": 0.02, "MAX": 0.3,  "DEFAULT": 0.07 },
     { "NAME": "stretch",  "TYPE": "float", "MIN": 0.0,  "MAX": 1.5,  "DEFAULT": 0.5 },

@@ -8,7 +8,7 @@
     { "NAME": "count", "TYPE": "float", "MIN": 1.0, "MAX": 24.0, "DEFAULT": 4.0 },
     { "NAME": "size",  "TYPE": "float", "MIN": 0.05,"MAX": 0.9,  "DEFAULT": 0.5 },
     { "NAME": "soft",  "TYPE": "float", "MIN": 0.0, "MAX": 0.5,  "DEFAULT": 0.05 },
-    { "NAME": "rate",  "TYPE": "float", "MIN": 0.0, "MAX": 5.0,  "DEFAULT": 0.2 },
+    { "NAME": "rate",  "TYPE": "float", "MIN": 0.0, "MAX": 20.0,  "DEFAULT": 0.2 },
     { "NAME": "invert","TYPE": "bool",  "DEFAULT": false },
     { "NAME": "tint",  "TYPE": "color", "DEFAULT": [0.85, 0.86, 0.82, 1.0] }
   ]

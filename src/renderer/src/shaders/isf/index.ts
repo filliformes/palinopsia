@@ -413,7 +413,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-colorizer', name: 'Colorizer', category: 'FX', source: colorizer,
-    curated: { gain: [0.5, 2.5], bias: [-0.4, 0.4], fold: [0, 0.6], mixSrc: [0, 0.3] }
+    curated: { gain: [0.5, 2.5], bias: [-0.4, 0.4], fold: [0, 0.6], mixSrc: [0.15, 0.4] }
   },
   {
     id: 'fx-wavefold', name: 'Wavefold', category: 'FX', source: wavefold,

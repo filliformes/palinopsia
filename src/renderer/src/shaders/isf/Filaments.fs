@@ -5,7 +5,7 @@
   "CATEGORIES": ["Generator", "Organic"],
   "INPUTS": [
     { "NAME": "strands", "TYPE": "float", "MIN": 3.0,  "MAX": 40.0, "DEFAULT": 14.0 },
-    { "NAME": "rate",    "TYPE": "float", "MIN": 0.0,  "MAX": 5.0,  "DEFAULT": 0.4 },
+    { "NAME": "rate",    "TYPE": "float", "MIN": 0.0,  "MAX": 20.0,  "DEFAULT": 0.4 },
     { "NAME": "sway",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.45 },
     { "NAME": "width",   "TYPE": "float", "MIN": 0.05, "MAX": 0.6,  "DEFAULT": 0.18 },
     { "NAME": "lean",    "TYPE": "float", "MIN": -1.0, "MAX": 1.0,  "DEFAULT": 0.15 },

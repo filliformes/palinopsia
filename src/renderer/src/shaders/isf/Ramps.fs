@@ -7,7 +7,7 @@
     { "NAME": "shape", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4], "LABELS": ["horizontal", "vertical", "diagonal", "radial", "diamond"], "DEFAULT": 0 },
     { "NAME": "freq",  "TYPE": "float", "MIN": 0.5, "MAX": 12.0, "DEFAULT": 1.0 },
     { "NAME": "steps", "TYPE": "float", "MIN": 1.0, "MAX": 32.0, "DEFAULT": 1.0 },
-    { "NAME": "rate",  "TYPE": "float", "MIN": 0.0, "MAX": 5.0,  "DEFAULT": 0.2 },
+    { "NAME": "rate",  "TYPE": "float", "MIN": 0.0, "MAX": 20.0,  "DEFAULT": 0.2 },
     { "NAME": "angle", "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 0.0 },
     { "NAME": "tint",  "TYPE": "color", "DEFAULT": [0.7, 0.72, 0.68, 1.0] }
   ]

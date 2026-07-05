@@ -4,7 +4,7 @@
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Glitch", "Geometry"],
   "INPUTS": [
-    { "NAME": "rate",    "TYPE": "float", "MIN": 0.0, "MAX": 5.0,  "DEFAULT": 0.3 },
+    { "NAME": "rate",    "TYPE": "float", "MIN": 0.0, "MAX": 20.0,  "DEFAULT": 0.3 },
     { "NAME": "bands",   "TYPE": "float", "MIN": 4.0, "MAX": 80.0, "DEFAULT": 24.0 },
     { "NAME": "density", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.35 },
     { "NAME": "jitter",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.35 },

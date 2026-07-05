@@ -4,7 +4,7 @@
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Feedback"],
   "INPUTS": [
-    { "NAME": "rate",  "TYPE": "float", "MIN": 0.0,  "MAX": 5.0,  "DEFAULT": 0.4 },
+    { "NAME": "rate",  "TYPE": "float", "MIN": 0.0,  "MAX": 20.0,  "DEFAULT": 0.4 },
     { "NAME": "decay", "TYPE": "float", "MIN": 0.8,  "MAX": 0.995,"DEFAULT": 0.96 },
     { "NAME": "warp",  "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.4 },
     { "NAME": "seed",  "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.35 },

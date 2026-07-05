@@ -223,22 +223,37 @@ function makeRedirectableGL(gl: WebGL2RenderingContext): {
   return { gl: proxy as WebGL2RenderingContext, state };
 }
 
-/** Load an ISF source into a fresh renderer; null on compile failure. */
+/** Load an ISF source into a fresh renderer; null on compile failure.
+ *  Wrapped in try/catch because the ISF parser can THROW (not just set
+ *  valid=false) on some sources — an uncaught throw here would propagate out
+ *  of the render loop and freeze the whole app. Never let that happen. */
 function loadIsf(rgl: WebGL2RenderingContext, id: string, source: string): ISFRenderer | null {
-  const r = new ISFRenderer(rgl);
-  r.loadSource(source);
-  if (!r.valid) {
-    console.error('[ISF] load failed for', id, r.error);
+  try {
+    const r = new ISFRenderer(rgl);
+    r.loadSource(source);
+    if (!r.valid) {
+      console.error('[ISF] load failed for', id, r.error);
+      return null;
+    }
+    return r;
+  } catch (e) {
+    console.error('[ISF] threw while loading', id, e);
     return null;
   }
-  return r;
 }
 
 interface SharedGL {
   gl: WebGL2RenderingContext;               // the real context
   rgl: WebGL2RenderingContext;              // proxied for ISF renderers
   redirect: { redirect: WebGLFramebuffer | null };
+  // Per-frame shader-compile budget. Randomize can request ~20 new shaders at
+  // once; compiling them all in one frame stalls the driver (looks like a
+  // freeze), so we cap loads per frame and let the rest come in over the next
+  // few frames. Reset at the top of syncFromState.
+  budget: { n: number };
 }
+
+const LOADS_PER_FRAME = 4;
 
 /** One live FX unit inside a rack. `isf` is null when the shader failed to
  *  compile — the unit still exists (so it isn't reloaded every frame) and
@@ -273,6 +288,12 @@ class FxRack {
       }
       if (!unit) {
         const src = sourceById(inst.shaderId);
+        // A compile costs from the per-frame budget; if spent, defer this
+        // unit to a later frame (it just isn't in the chain this frame).
+        if (src) {
+          if (this.shared.budget.n <= 0) continue;
+          this.shared.budget.n--;
+        }
         // Create the unit even if the source is missing or the compile fails
         // (isf stays null) so we don't re-attempt the load every frame.
         const isf = src ? loadIsf(this.shared.rgl, inst.shaderId, src) : null;
@@ -382,6 +403,12 @@ export class ISFLayer {
    *  every frame (a 60 Hz shader-compile storm that stalls the driver). A
    *  failed shader just renders transparent until a different one is chosen. */
   setShader(slot: 'A' | 'B', id: string | null, source: string | null): void {
+    // A real compile costs from the per-frame budget; if it's spent, defer —
+    // leave the id unrecorded so syncFromState retries next frame.
+    if (id && source) {
+      if (this.shared.budget.n <= 0) return;
+      this.shared.budget.n--;
+    }
     const cur = slot === 'A' ? this.isfA : this.isfB;
     cur?.cleanup();
     let next: ISFRenderer | null = null;
@@ -464,7 +491,7 @@ export class Compositor {
     gl.getExtension('EXT_color_buffer_float'); // RGBA16F render targets
     this.gl = gl;
     const wrapped = makeRedirectableGL(gl);
-    this.shared = { gl, rgl: wrapped.gl, redirect: wrapped.state };
+    this.shared = { gl, rgl: wrapped.gl, redirect: wrapped.state, budget: { n: 0 } };
 
     const quad = new Float32Array([-1,-1, 3,-1, -1,3]); // fullscreen triangle
     this.vao = gl.createVertexArray()!; gl.bindVertexArray(this.vao);
@@ -508,6 +535,7 @@ export class Compositor {
    * OSC, and modulators. Shader hot-swaps preserve feedback buffers (brief §1).
    */
   syncFromState(c: CompositionState, sourceById: (id: string) => string | null) {
+    this.shared.budget.n = LOADS_PER_FRAME; // cap new shader compiles this frame
     for (let i = 0; i < this.layers.length && i < c.layers.length; i++) {
       const l = c.layers[i];
       const L = this.layers[i];

@@ -4,7 +4,7 @@
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Scan"],
   "INPUTS": [
-    { "NAME": "rate",  "TYPE": "float", "MIN": 0.0,  "MAX": 5.0,  "DEFAULT": 0.6 },
+    { "NAME": "rate",  "TYPE": "float", "MIN": 0.0,  "MAX": 20.0,  "DEFAULT": 0.6 },
     { "NAME": "span",  "TYPE": "float", "MIN": 1.0,  "MAX": 30.0, "DEFAULT": 8.0 },
     { "NAME": "freq",  "TYPE": "float", "MIN": 1.0,  "MAX": 40.0, "DEFAULT": 8.0 },
     { "NAME": "bands", "TYPE": "float", "MIN": 2.0,  "MAX": 24.0, "DEFAULT": 6.0 },

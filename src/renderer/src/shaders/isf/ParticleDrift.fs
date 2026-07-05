@@ -5,7 +5,7 @@
   "CATEGORIES": ["Generator", "Particles"],
   "INPUTS": [
     { "NAME": "count",  "TYPE": "float", "MIN": 4.0,  "MAX": 40.0,   "DEFAULT": 14.0 },
-    { "NAME": "speed",  "TYPE": "float", "MIN": 0.0,  "MAX": 10.0,   "DEFAULT": 0.4 },
+    { "NAME": "speed",  "TYPE": "float", "MIN": 0.0,  "MAX": 20.0,   "DEFAULT": 0.4 },
     { "NAME": "flow",   "TYPE": "float", "MIN": 0.0,  "MAX": 6.2832, "DEFAULT": 0.5 },
     { "NAME": "size",   "TYPE": "float", "MIN": 0.02, "MAX": 0.4,    "DEFAULT": 0.09 },
     { "NAME": "trail",  "TYPE": "float", "MIN": 0.0,  "MAX": 2.0,    "DEFAULT": 0.7 },

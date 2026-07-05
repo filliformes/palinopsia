@@ -4,7 +4,7 @@
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Noise", "Glitch"],
   "INPUTS": [
-    { "NAME": "rate",     "TYPE": "float", "MIN": 0.0, "MAX": 5.0,  "DEFAULT": 0.15 },
+    { "NAME": "rate",     "TYPE": "float", "MIN": 0.0, "MAX": 20.0,  "DEFAULT": 0.15 },
     { "NAME": "scale",    "TYPE": "float", "MIN": 0.5, "MAX": 8.0,  "DEFAULT": 2.6 },
     { "NAME": "warp",     "TYPE": "float", "MIN": 0.0, "MAX": 1.5,  "DEFAULT": 0.55 },
     { "NAME": "steps",    "TYPE": "float", "MIN": 2.0, "MAX": 16.0, "DEFAULT": 5.0 },

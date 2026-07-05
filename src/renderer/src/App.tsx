@@ -151,19 +151,26 @@ export default function App(): JSX.Element {
 
     const start = performance.now()
     const loop = (): void => {
-      const now = performance.now()
-      const c = useStore.getState().composition
-      // 1. Store → engine reconciliation (base values). One write path for
-      //    everything: UI edits, session loads, OSC — the engine follows.
-      //    Shader hot-swaps preserve feedback buffers (brief §1).
-      comp!.syncFromState(c, shaderSourceById)
-      // 2. Modulation: tick the 8-slot engine, then overlay the mod-matrix
-      //    on top of the base values — straight into the Compositor, never
-      //    through React (no 60 Hz re-renders).
-      const modValues = modEngine.tick(now, c.modulators, c.bpm)
-      applyModulation(comp!, c, modValues, inputsForShader)
-      // 3. Render the frame.
-      comp!.render(now - start)
+      // The whole body is guarded: a shader that throws at load or draw time
+      // must never kill the loop (that's a permanent freeze). Lose one frame,
+      // keep scheduling — the offending layer simply doesn't render.
+      try {
+        const now = performance.now()
+        const c = useStore.getState().composition
+        // 1. Store → engine reconciliation (base values). One write path for
+        //    everything: UI edits, session loads, OSC — the engine follows.
+        //    Shader hot-swaps preserve feedback buffers (brief §1).
+        comp!.syncFromState(c, shaderSourceById)
+        // 2. Modulation: tick the 8-slot engine, then overlay the mod-matrix
+        //    on top of the base values — straight into the Compositor, never
+        //    through React (no 60 Hz re-renders).
+        const modValues = modEngine.tick(now, c.modulators, c.bpm)
+        applyModulation(comp!, c, modValues, inputsForShader)
+        // 3. Render the frame.
+        comp!.render(now - start)
+      } catch (e) {
+        console.error('[render loop]', e)
+      }
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)

@@ -4,7 +4,7 @@
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic"],
   "INPUTS": [
-    { "NAME": "rate",    "TYPE": "float", "MIN": 0.0,  "MAX": 5.0,  "DEFAULT": 0.25 },
+    { "NAME": "rate",    "TYPE": "float", "MIN": 0.0,  "MAX": 20.0,  "DEFAULT": 0.25 },
     { "NAME": "scale",   "TYPE": "float", "MIN": 1.0,  "MAX": 10.0, "DEFAULT": 4.0 },
     { "NAME": "width",   "TYPE": "float", "MIN": 0.02, "MAX": 0.5,  "DEFAULT": 0.12 },
     { "NAME": "density", "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.5 },

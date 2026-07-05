@@ -7,7 +7,7 @@
     { "NAME": "lines", "TYPE": "float", "MIN": 10.0, "MAX": 100.0, "DEFAULT": 40.0 },
     { "NAME": "amp",   "TYPE": "float", "MIN": 0.0,  "MAX": 0.15,  "DEFAULT": 0.05 },
     { "NAME": "scale", "TYPE": "float", "MIN": 0.5,  "MAX": 8.0,   "DEFAULT": 2.0 },
-    { "NAME": "rate",  "TYPE": "float", "MIN": 0.0,  "MAX": 5.0,   "DEFAULT": 0.15 },
+    { "NAME": "rate",  "TYPE": "float", "MIN": 0.0,  "MAX": 20.0,   "DEFAULT": 0.15 },
     { "NAME": "width", "TYPE": "float", "MIN": 0.02, "MAX": 0.5,   "DEFAULT": 0.12 },
     { "NAME": "tint",  "TYPE": "color", "DEFAULT": [0.7, 0.75, 0.7, 1.0] }
   ]

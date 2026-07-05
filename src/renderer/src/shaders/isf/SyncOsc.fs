@@ -7,7 +7,7 @@
     { "NAME": "freq",  "TYPE": "float", "MIN": 1.0,  "MAX": 60.0,  "DEFAULT": 12.0 },
     { "NAME": "shape", "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.5, "LABEL": "saw↔tri↔sine" },
     { "NAME": "sync",  "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.3, "LABEL": "scroll↔H↔V" },
-    { "NAME": "rate",  "TYPE": "float", "MIN": 0.0,  "MAX": 5.0,   "DEFAULT": 0.4 },
+    { "NAME": "rate",  "TYPE": "float", "MIN": 0.0,  "MAX": 20.0,   "DEFAULT": 0.4 },
     { "NAME": "angle", "TYPE": "float", "MIN": 0.0,  "MAX": 6.2832,"DEFAULT": 0.0 },
     { "NAME": "loA",   "TYPE": "color", "DEFAULT": [0.04, 0.05, 0.08, 1.0] },
     { "NAME": "hiA",   "TYPE": "color", "DEFAULT": [0.85, 0.82, 0.7, 1.0] }
@@ -31,15 +31,12 @@ void main() {
   vec2 p = vec2(c.x * cs - c.y * sn, c.x * sn + c.y * cs) + 0.5;
   float t = TIME * rate;
 
-  // Sync morphs the scan axis: 0 = horizontal lines scrolling in time,
-  // 0.5 = frozen horizontal (no time term), 1 = frozen vertical.
-  float axisH = p.y;
-  float axisV = p.x;
-  float axis = mix(axisH, axisV, smoothstep(0.5, 1.0, sync));
-  // Time scroll fades out as sync approaches the frozen middle.
-  float scroll = t * (1.0 - smoothstep(0.0, 0.5, sync)) * (1.0 - smoothstep(0.5, 1.0, sync) * 0.0);
+  // Sync (Lumen): as it rises the orientation rotates horizontal→vertical
+  // AND the motion slows to a freeze — unsynced moves, fully synced is still.
+  float axis = mix(p.y, p.x, sync);
+  float motion = t * (1.0 - sync) * 3.0; // rate clearly drives the scroll
 
-  float v = wave(axis * freq + scroll, shape);
+  float v = wave(axis * freq + motion, shape);
 
   vec3 col = mix(loA.rgb, hiA.rgb, v);
   gl_FragColor = vec4(col, 1.0);

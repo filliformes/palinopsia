@@ -8,8 +8,8 @@
     { "NAME": "scale",  "TYPE": "float", "MIN": 0.6, "MAX": 0.95, "DEFAULT": 0.78 },
     { "NAME": "angle",  "TYPE": "float", "MIN": 0.0, "MAX": 1.2,  "DEFAULT": 0.4 },
     { "NAME": "drift",  "TYPE": "float", "MIN": 0.0, "MAX": 0.5,  "DEFAULT": 0.15 },
-    { "NAME": "width",  "TYPE": "float", "MIN": 0.01,"MAX": 0.2,  "DEFAULT": 0.05 },
-    { "NAME": "rate",   "TYPE": "float", "MIN": 0.0, "MAX": 5.0,  "DEFAULT": 0.15 },
+    { "NAME": "width",  "TYPE": "float", "MIN": 0.002,"MAX": 0.2,  "DEFAULT": 0.035 },
+    { "NAME": "rate",   "TYPE": "float", "MIN": 0.0, "MAX": 20.0,  "DEFAULT": 0.15 },
     { "NAME": "tint",   "TYPE": "color", "DEFAULT": [0.72, 0.76, 0.7, 1.0] }
   ]
 }*/

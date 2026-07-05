@@ -4,7 +4,7 @@
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic", "Noise"],
   "INPUTS": [
-    { "NAME": "rate",      "TYPE": "float", "MIN": 0.0, "MAX": 5.0,    "DEFAULT": 0.4 },
+    { "NAME": "rate",      "TYPE": "float", "MIN": 0.0, "MAX": 20.0,    "DEFAULT": 0.4 },
     { "NAME": "scale",     "TYPE": "float", "MIN": 1.0, "MAX": 12.0,   "DEFAULT": 4.0 },
     { "NAME": "chop",      "TYPE": "float", "MIN": 0.0, "MAX": 1.0,    "DEFAULT": 0.4 },
     { "NAME": "direction", "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 0.6 },
