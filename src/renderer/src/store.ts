@@ -354,6 +354,9 @@ interface StoreState {
   setUiZoom: (z: number) => void
   collapsed: Record<string, boolean>
   toggleSection: (key: string) => void
+  // Finishing view: exclusively open one finalizer sub-section (Vibe / Context /
+  // Finalizer), collapsing the other two — or collapse it if already open.
+  showFinishingSub: (shaderId: string) => void
 
   // Global tempo — drives BPM-synced modulator clocks; OSC-controllable.
   setBpm: (bpm: number) => void
@@ -1000,6 +1003,22 @@ export const useStore = create<StoreState>((set, get) => ({
       const collapsed = { ...s.collapsed, [key]: !s.collapsed[key] }
       localStorage.setItem('opsia.collapsed', JSON.stringify(collapsed))
       return { collapsed }
+    }),
+
+  showFinishingSub: (shaderId) =>
+    set((s) => {
+      const sub = `ft-${shaderId.replace('fx-', '')}`
+      // Second click on an already-open sub (while Finishing is showing) closes it.
+      const isOpen = s.rightView === 'finishing' && !(s.collapsed[sub] ?? true)
+      const collapsed = {
+        ...s.collapsed,
+        'ft-vibe': true,
+        'ft-context': true,
+        'ft-finalizer': true,
+        [sub]: isOpen // open ⇒ collapse; closed ⇒ expand (the others stay collapsed)
+      }
+      localStorage.setItem('opsia.collapsed', JSON.stringify(collapsed))
+      return { collapsed, rightView: 'finishing', mixerView: false }
     }),
 
   userShaderPresets: (() => {
