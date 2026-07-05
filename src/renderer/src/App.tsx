@@ -15,6 +15,7 @@ import { LayerPanel } from './components/LayerPanel'
 import { MetaBar } from './components/MetaBar'
 import { ModulationPanel } from './components/ModulationPanel'
 import { SceneBank } from './components/SceneBank'
+import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
 import { initMidi } from './midi'
 import { GENERATORS, shaderSourceById } from './shaders/isf'
@@ -46,6 +47,7 @@ function cycleVibePreset(): void {
   for (const [k, v] of Object.entries(p.values)) {
     st.setFxInput({ kind: 'master' }, vibe.id, k, v)
   }
+  st.setVibePresetName(p.name)
   // Show the change in the Inspector.
   if (st.collapsed['inspector']) st.toggleSection('inspector')
   st.setSelection({ type: 'fx', scope: { kind: 'master' }, instId: vibe.id })
@@ -337,15 +339,27 @@ function MasterRackStrip(): JSX.Element {
   const randomizeMasterParams = useStore((s) => s.randomizeMasterParams)
   // The select keeps showing the applied chain's name.
   const [applied, setApplied] = useState('')
+  const [flashing, flash] = useFlash()
   return (
-    <div className="flex min-w-0 flex-col gap-1.5 rounded-md border border-border bg-panel2/40 p-2">
+    <div
+      className={`flex min-w-0 flex-col gap-1.5 rounded-md border bg-panel2/40 p-2 transition-colors ${
+        flashing ? 'animate-pulse border-danger ring-1 ring-danger' : 'border-border'
+      }`}
+    >
       <div className="flex min-w-0 items-center gap-2">
         <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">
           chain
         </span>
         <button
-          onClick={() => randomizeMasterParams()}
-          className="shrink-0 rounded border border-accent/50 bg-accent/10 px-1 font-mono text-[10px] leading-4 text-accent transition-colors hover:bg-accent/20"
+          onClick={() => {
+            randomizeMasterParams()
+            flash()
+          }}
+          className={`shrink-0 rounded border px-1 font-mono text-[10px] leading-4 transition-colors ${
+            flashing
+              ? 'animate-pulse border-danger bg-danger/25 text-danger'
+              : 'border-accent/50 bg-accent/10 text-accent hover:bg-accent/20'
+          }`}
           title="Randomize the master FX parameters (keeps the chain + your Vibe)"
         >
           ⚄

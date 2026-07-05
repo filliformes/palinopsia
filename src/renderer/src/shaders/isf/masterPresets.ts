@@ -185,5 +185,254 @@ export const MASTER_PRESETS: MasterPreset[] = [
       { shaderId: 'fx-grain', inputs: { character: 0, amount: 0.12, size: 1.5, mono: 1 } }
     ],
     vibe: { mixSrc: 1, contrast: 1.1, saturation: 1.1, gamma: 0.95, autoLevel: 0.25, splitTone: 0 }
+  },
+  {
+    name: 'Chiaroscuro',
+    fx: [
+      { shaderId: 'fx-grade', inputs: { contrast: 1.6, saturation: 0.6, brightness: -0.05, lift: 0 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.1, size: 1.5, mono: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.4, saturation: 0.5, autoLevel: 0.3, splitTone: 0.3, shadowTint: [0.42, 0.44, 0.5, 1], highTint: [0.55, 0.52, 0.46, 1] }
+  },
+  {
+    name: 'Sfumato',
+    fx: [
+      { shaderId: 'fx-streak', inputs: { reach: 0.03, angle: 1.5708 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 0.9, saturation: 0.85, lift: 0.05 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 0.95, saturation: 0.85, gamma: 1.05, autoLevel: 0.15, splitTone: 0.25, shadowTint: [0.46, 0.48, 0.52, 1], highTint: [0.55, 0.52, 0.47, 1] }
+  },
+  {
+    name: 'Pointillism',
+    fx: [
+      { shaderId: 'fx-pixelate', inputs: { cells: 220 } },
+      { shaderId: 'fx-dither', inputs: { levels: 3, scale: 2, amount: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 1.15, autoLevel: 0.2 }
+  },
+  {
+    name: 'Daguerreotype',
+    fx: [
+      { shaderId: 'fx-grade', inputs: { saturation: 0, contrast: 1.3, lift: 0.03 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.12, size: 1.5, mono: 1 } },
+      { shaderId: 'fx-sharpen', inputs: { amount: 0.8 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.2, saturation: 0, gamma: 1.05, autoLevel: 0.4, splitTone: 0.3, shadowTint: [0.44, 0.46, 0.5, 1], highTint: [0.54, 0.52, 0.48, 1] }
+  },
+  {
+    name: 'Solarisation',
+    fx: [
+      { shaderId: 'fx-solarize', inputs: { level: 0.55, strength: 0.85, soft: 0.12 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.15, saturation: 0.8 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 0.75, autoLevel: 0.25 }
+  },
+  {
+    name: 'Photogram',
+    fx: [
+      { shaderId: 'fx-threshold', inputs: { level: 0.4, soft: 0.1, invert: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 0, autoLevel: 0.5 }
+  },
+  {
+    name: 'Woodcut',
+    fx: [
+      { shaderId: 'fx-edge', inputs: { gain: 2.5, blend: 0.7 } },
+      { shaderId: 'fx-threshold', inputs: { level: 0.5, soft: 0.05, invert: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.2, saturation: 0, autoLevel: 0.3 }
+  },
+  {
+    name: 'Etching',
+    fx: [
+      { shaderId: 'fx-edge', inputs: { gain: 2, blend: 0.5 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.15, size: 2, mono: 1 } },
+      { shaderId: 'fx-colorizer', inputs: { gain: 1.2, bias: 0.05, fold: 0, mixSrc: 0, low: [0.08, 0.05, 0.03, 1], mid: [0.5, 0.38, 0.24, 1], high: [0.95, 0.9, 0.78, 1] } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 1, autoLevel: 0.2 }
+  },
+  {
+    name: 'Serigraphy',
+    fx: [
+      { shaderId: 'fx-posterize', inputs: { levels: 4, gamma: 1.1 } },
+      { shaderId: 'fx-palette', inputs: { stops: 4, blend: 0.2, dither: 0.1, mixSrc: 0, colorA: [0.05, 0.05, 0.08, 1], colorB: [0.85, 0.2, 0.3, 1], colorC: [0.95, 0.8, 0.2, 1], colorD: [0.95, 0.95, 0.9, 1] } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 1.1, autoLevel: 0.2 }
+  },
+  {
+    name: 'Halftone',
+    fx: [
+      { shaderId: 'fx-posterize', inputs: { levels: 3, gamma: 1 } },
+      { shaderId: 'fx-dither', inputs: { levels: 2, scale: 3, amount: 1 } },
+      { shaderId: 'fx-sharpen', inputs: { amount: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.15, saturation: 1, autoLevel: 0.3 }
+  },
+  {
+    name: 'Fresco',
+    fx: [
+      { shaderId: 'fx-grade', inputs: { saturation: 0.7, contrast: 0.95, lift: 0.06 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.18, size: 2.5, mono: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 0.95, saturation: 0.8, gamma: 1.05, autoLevel: 0.15, splitTone: 0.35, shadowTint: [0.47, 0.46, 0.5, 1], highTint: [0.57, 0.53, 0.45, 1] }
+  },
+  {
+    name: 'Impasto',
+    fx: [
+      { shaderId: 'fx-displace', inputs: { amount: 0.02, scale: 6, rate: 0.05 } },
+      { shaderId: 'fx-sharpen', inputs: { amount: 1.5 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 1.05, autoLevel: 0.2 }
+  },
+  {
+    name: 'Collage',
+    fx: [
+      { shaderId: 'fx-slice-shuffle', inputs: { slices: 16, amount: 0.12, chance: 0.35, rate: 0.3 } },
+      { shaderId: 'fx-mosh-blocks', inputs: { blocks: 16, amount: 0.15, chance: 0.3, rate: 0.4, freak: 0.2 } },
+      { shaderId: 'fx-chroma-shift', inputs: { amount: 0.008, angle: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 1.05, autoLevel: 0.2 }
+  },
+  {
+    name: 'Photomontage',
+    fx: [
+      { shaderId: 'fx-mosh-blocks', inputs: { blocks: 12, amount: 0.2, chance: 0.25, rate: 0.3, freak: 0.35 } },
+      { shaderId: 'fx-chroma-shift', inputs: { amount: 0.012, angle: 1.5708 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 1, autoLevel: 0.2 }
+  },
+  {
+    name: 'Glitch Art',
+    fx: [
+      { shaderId: 'fx-byte-corrupt', inputs: { depth: 6, scramble: 0.4, blocks: 12, rate: 0.4, chaos: 0.3 } },
+      { shaderId: 'fx-slice-shuffle', inputs: { slices: 24, amount: 0.15, chance: 0.4, rate: 0.6 } },
+      { shaderId: 'fx-chroma-shift', inputs: { amount: 0.015, angle: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 1.1, autoLevel: 0.2 }
+  },
+  {
+    name: 'Datamosh',
+    fx: [
+      { shaderId: 'fx-mosh-blocks', inputs: { blocks: 20, amount: 0.25, chance: 0.4, rate: 0.6, freak: 0.4 } },
+      { shaderId: 'fx-smear', inputs: { reach: 0.12, threshold: 0.35, angle: 1.5708 } },
+      { shaderId: 'fx-stutter', inputs: { rate: 6, chance: 0.4, bands: 1, jitter: 0, blackout: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 1, autoLevel: 0.15 }
+  },
+  {
+    name: 'Teletext',
+    fx: [
+      { shaderId: 'fx-pixelate', inputs: { cells: 80 } },
+      { shaderId: 'fx-posterize', inputs: { levels: 3, gamma: 1 } },
+      { shaderId: 'fx-palette', inputs: { stops: 4, blend: 0, dither: 0, mixSrc: 0, colorA: [0, 0, 0, 1], colorB: [0.1, 0.9, 0.9, 1], colorC: [0.95, 0.9, 0.15, 1], colorD: [0.95, 0.95, 0.95, 1] } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 1.15, autoLevel: 0.2 }
+  },
+  {
+    name: 'Kinetoscope',
+    fx: [
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.2, size: 2, mono: 1, parasites: 0.4 } },
+      { shaderId: 'fx-scanlines', inputs: { count: 400, darkness: 0.2, roll: 0.05 } },
+      { shaderId: 'fx-triangle-flicker', inputs: { rate: 6, depth: 0.2, hard: 0, swap: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 0.6, gamma: 1.05, autoLevel: 0.2, splitTone: 0.35, shadowTint: [0.46, 0.45, 0.5, 1], highTint: [0.58, 0.53, 0.44, 1] }
+  },
+  {
+    name: 'Zoetrope',
+    fx: [
+      { shaderId: 'fx-triangle-flicker', inputs: { rate: 8, depth: 0.5, hard: 1, swap: 0 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.15, size: 2, mono: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 0.85, autoLevel: 0.2 }
+  },
+  {
+    name: 'Camera Obscura',
+    fx: [
+      { shaderId: 'fx-streak', inputs: { reach: 0.04, angle: 1.5708 } },
+      { shaderId: 'fx-solarize', inputs: { level: 0.7, strength: 0.3, soft: 0.2 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 0.95, saturation: 0.7, gamma: 1.1, autoLevel: 0.15 }
+  },
+  {
+    name: 'Infrared Film',
+    fx: [
+      { shaderId: 'fx-palette', inputs: { stops: 4, blend: 1, dither: 0.1, mixSrc: 0.1, colorA: [0.05, 0.02, 0.08, 1], colorB: [0.5, 0.1, 0.4, 1], colorC: [0.9, 0.4, 0.5, 1], colorD: [1, 0.95, 0.9, 1] } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.12, size: 1.5, mono: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 1.1, autoLevel: 0.2 }
+  },
+  {
+    name: 'X-Ray',
+    fx: [
+      { shaderId: 'fx-colorizer', inputs: { gain: 1.4, bias: 0, fold: 0, mixSrc: 0, low: [0.9, 0.95, 1, 1], mid: [0.2, 0.4, 0.6, 1], high: [0.02, 0.03, 0.08, 1] } },
+      { shaderId: 'fx-sharpen', inputs: { amount: 0.6 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.15, saturation: 0.9, autoLevel: 0.4 }
+  },
+  {
+    name: 'Thermogram',
+    fx: [
+      { shaderId: 'fx-pixelate', inputs: { cells: 120 } },
+      { shaderId: 'fx-colorizer', inputs: { gain: 1.3, bias: 0, fold: 0.2, mixSrc: 0, low: [0.02, 0.02, 0.1, 1], mid: [0.7, 0.15, 0.4, 1], high: [0.95, 0.9, 0.3, 1] } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 1.1, autoLevel: 0.5 }
+  },
+  {
+    name: 'Op Art',
+    fx: [
+      { shaderId: 'fx-displace', inputs: { amount: 0.03, scale: 8, rate: 0.1 } },
+      { shaderId: 'fx-posterize', inputs: { levels: 2, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.3, saturation: 0, autoLevel: 0.3 }
+  },
+  {
+    name: 'De Stijl',
+    fx: [
+      { shaderId: 'fx-posterize', inputs: { levels: 3, gamma: 1 } },
+      { shaderId: 'fx-palette', inputs: { stops: 5, blend: 0, dither: 0, mixSrc: 0, colorA: [0.05, 0.05, 0.05, 1], colorB: [0.9, 0.15, 0.12, 1], colorC: [0.95, 0.85, 0.1, 1], colorD: [0.1, 0.3, 0.75, 1], colorE: [0.97, 0.97, 0.95, 1] } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.15, saturation: 1.2, autoLevel: 0.2 }
+  },
+  {
+    name: 'Constructivism',
+    fx: [
+      { shaderId: 'fx-threshold', inputs: { level: 0.5, soft: 0.08, invert: 0 } },
+      { shaderId: 'fx-palette', inputs: { stops: 3, blend: 0.3, dither: 0.1, mixSrc: 0, colorA: [0.05, 0.03, 0.03, 1], colorB: [0.8, 0.12, 0.1, 1], colorC: [0.95, 0.92, 0.88, 1] } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.2, saturation: 1.1, autoLevel: 0.3 }
+  },
+  {
+    name: 'Futurism',
+    fx: [
+      { shaderId: 'fx-streak', inputs: { reach: 0.12, angle: 0 } },
+      { shaderId: 'fx-chroma-shift', inputs: { amount: 0.01, angle: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 1.05, autoLevel: 0.2 }
+  },
+  {
+    name: 'Vorticism',
+    fx: [
+      { shaderId: 'fx-distort', inputs: { mode: 4, amount: 0.4, scale: 3, center: [0.5, 0.5], angle: 0, rate: 0 } },
+      { shaderId: 'fx-edge', inputs: { gain: 1.5, blend: 0.4 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 0.9, autoLevel: 0.2 }
+  },
+  {
+    name: 'Ukiyo-e',
+    fx: [
+      { shaderId: 'fx-edge', inputs: { gain: 1.5, blend: 0.25 } },
+      { shaderId: 'fx-posterize', inputs: { levels: 5, gamma: 1.1 } },
+      { shaderId: 'fx-palette', inputs: { stops: 4, blend: 0.6, dither: 0.05, mixSrc: 0.2, colorA: [0.08, 0.1, 0.14, 1], colorB: [0.3, 0.4, 0.45, 1], colorC: [0.75, 0.6, 0.5, 1], colorD: [0.95, 0.92, 0.85, 1] } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 1, autoLevel: 0.2 }
+  },
+  {
+    name: 'Demoscene',
+    fx: [
+      { shaderId: 'fx-feedback-zoom', inputs: { zoom: 1.03, twist: 0.03, amount: 0.6 } },
+      { shaderId: 'fx-chroma-shift', inputs: { amount: 0.012, angle: 0 } },
+      { shaderId: 'fx-palette', inputs: { stops: 4, blend: 1, dither: 0.1, mixSrc: 0.15, colorA: [0.02, 0.02, 0.08, 1], colorB: [0.2, 0.1, 0.6, 1], colorC: [0.7, 0.2, 0.6, 1], colorD: [0.95, 0.9, 0.95, 1] } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 1.15, autoLevel: 0.2 }
   }
 ]

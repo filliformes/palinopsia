@@ -13,11 +13,17 @@ import { ConfirmModal, PromptModal } from './PromptModal'
 export function PresetPicker({
   shaderId,
   values,
-  onChange
+  onChange,
+  appliedName,
+  onApplied
 }: {
   shaderId: string
   values: Record<string, number | number[]>
   onChange: (name: string, value: number | number[]) => void
+  // Controlled applied-name (the Vibe shares it with P/Shift+P). When
+  // provided, the picker displays it instead of its own local state.
+  appliedName?: string | null
+  onApplied?: (name: string | null) => void
 }): JSX.Element | null {
   const userPresets = useStore((s) => s.userShaderPresets[shaderId] ?? [])
   const addUserShaderPreset = useStore((s) => s.addUserShaderPreset)
@@ -25,7 +31,9 @@ export function PresetPicker({
 
   const factory = PRESETS_BY_ID[shaderId] ?? []
   const [open, setOpen] = useState(false)
-  const [applied, setApplied] = useState<string | null>(null)
+  const [localApplied, setLocalApplied] = useState<string | null>(null)
+  const controlled = appliedName !== undefined
+  const applied = controlled ? appliedName : localApplied
   const [addPrompt, setAddPrompt] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement | null>(null)
@@ -44,7 +52,8 @@ export function PresetPicker({
 
   function apply(p: ShaderPreset): void {
     for (const [k, v] of Object.entries(p.values)) onChange(k, v)
-    setApplied(p.name)
+    setLocalApplied(p.name)
+    onApplied?.(p.name)
     setOpen(false)
   }
 
@@ -122,7 +131,8 @@ export function PresetPicker({
           confirmLabel="Save"
           onConfirm={(name) => {
             addUserShaderPreset(shaderId, name, snapshotValues())
-            setApplied(name)
+            setLocalApplied(name)
+            onApplied?.(name)
             setAddPrompt(false)
           }}
           onCancel={() => setAddPrompt(false)}
@@ -133,7 +143,10 @@ export function PresetPicker({
           title={`Are you sure you want to delete the preset "${deleteTarget}"?`}
           onYes={() => {
             deleteUserShaderPreset(shaderId, deleteTarget)
-            if (applied === deleteTarget) setApplied(null)
+            if (applied === deleteTarget) {
+              setLocalApplied(null)
+              onApplied?.(null)
+            }
             setDeleteTarget(null)
           }}
           onNo={() => setDeleteTarget(null)}

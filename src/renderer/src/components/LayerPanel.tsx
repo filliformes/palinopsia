@@ -13,6 +13,7 @@ import { BoundedNumberInput } from './BoundedNumberInput'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxAddSelect, FxChips } from './FxRackPanel'
 import { ConfirmModal, PromptModal } from './PromptModal'
+import { useFlash } from './useFlash'
 
 export function LayerPanel({ index }: { index: number }): JSX.Element {
   const layer = useStore((s) => s.composition.layers[index])
@@ -40,6 +41,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [savePrompt, setSavePrompt] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const [flashing, flash] = useFlash()
 
   const isSelected = (slot: 'A' | 'B'): boolean =>
     selection?.type === 'source' && selection.layer === index && selection.slot === slot
@@ -64,7 +66,9 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
 
   return (
     <div
-      className="flex min-w-0 flex-col gap-1.5 rounded-md border border-border bg-panel p-2"
+      className={`flex min-w-0 flex-col gap-1.5 rounded-md border bg-panel p-2 transition-colors ${
+        flashing ? 'animate-pulse border-danger ring-1 ring-danger' : 'border-border'
+      }`}
       onContextMenu={onContextMenu}
     >
       {/* Header: chevron · LAYER n · opacity · S/M/FB */}
@@ -101,9 +105,14 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             title="Feedback — this layer samples its own previous frame (trails)"
           />
           <button
-            onClick={() => randomizeLayer(index)}
+            onClick={() => {
+              randomizeLayer(index)
+              flash()
+            }}
             title="Randomize this whole layer (sources, FX, blend, feedback)"
-            className="rounded px-1.5 py-0.5 font-mono text-[11px] leading-none text-muted transition-colors hover:bg-accent/15 hover:text-accent"
+            className={`rounded px-1.5 py-0.5 font-mono text-[11px] leading-none transition-colors ${
+              flashing ? 'animate-pulse text-danger' : 'text-muted hover:bg-accent/15 hover:text-accent'
+            }`}
           >
             ⚄
           </button>

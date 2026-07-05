@@ -246,6 +246,11 @@ interface StoreState {
   // keep the Vibe) — the ⚄ next to the Master title.
   randomizeMasterParams: () => void
 
+  // Name of the Vibe palette currently applied (P/Shift+P + the picker share
+  // it so the Inspector always shows what's on). Transient UI, not persisted.
+  vibePresetName: string | null
+  setVibePresetName: (n: string | null) => void
+
   // Meta Controller (Phase 5) — 16 macro knobs.
   midiLearn: number | null // knob index armed for CC learn
   setMidiLearn: (i: number | null) => void
@@ -499,7 +504,8 @@ export const useStore = create<StoreState>((set, get) => ({
         enabled: true,
         inputs: { ...f.inputs }
       }))
-      return { composition: { ...s.composition, master: [...units, ...locked] } }
+      // A chain preset sets its own vibe — no longer a named palette.
+      return { composition: { ...s.composition, master: [...units, ...locked] }, vibePresetName: vibe ? null : s.vibePresetName }
     }),
   setSourceInput: (layer, slot, name, value) =>
     set((s) => ({
@@ -632,6 +638,9 @@ export const useStore = create<StoreState>((set, get) => ({
       })
       return { composition: { ...s.composition, metaKnobs } }
     }),
+  vibePresetName: null,
+  setVibePresetName: (n) => set({ vibePresetName: n }),
+
   randomizeMasterParams: () =>
     set((s) => ({
       composition: {
@@ -872,7 +881,8 @@ export const useStore = create<StoreState>((set, get) => ({
       composition: makeDefaultComposition(),
       selection: null,
       scenes: [],
-      activeSceneId: null
+      activeSceneId: null,
+      vibePresetName: null
     }),
   loadSession: (s) =>
     set({

@@ -25,6 +25,7 @@ import {
 } from '../metaSmooth'
 import { modTargetKey, useStore } from '../store'
 import { AssignRow } from './AutoControls'
+import { useFlash } from './useFlash'
 
 const KNOB_PX = 44
 const ARC_SWEEP_DEG = 270
@@ -37,9 +38,14 @@ const CURVES: ModCurve[] = [
 export function MetaBar(): JSX.Element {
   const collapsed = useStore((s) => !!s.collapsed['meta'])
   const toggleSection = useStore((s) => s.toggleSection)
+  const [flashing, flash] = useFlash()
 
   return (
-    <div className="flex min-w-0 flex-col gap-1.5 border-t border-border bg-panel px-3 py-1.5">
+    <div
+      className={`flex min-w-0 flex-col gap-1.5 border-t bg-panel px-3 py-1.5 transition-colors ${
+        flashing ? 'animate-pulse border-danger ring-1 ring-inset ring-danger' : 'border-border'
+      }`}
+    >
       <div className="flex shrink-0 items-center gap-2 self-start">
         <button
           onClick={() => toggleSection('meta')}
@@ -54,8 +60,15 @@ export function MetaBar(): JSX.Element {
           <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Meta</span>
         </button>
         <button
-          onClick={() => shuffleMetaValues()}
-          className="rounded border border-accent/50 bg-accent/10 px-1 font-mono text-[10px] leading-4 text-accent transition-colors hover:bg-accent/20"
+          onClick={() => {
+            shuffleMetaValues()
+            flash()
+          }}
+          className={`rounded border px-1 font-mono text-[10px] leading-4 transition-colors ${
+            flashing
+              ? 'animate-pulse border-danger bg-danger/25 text-danger'
+              : 'border-accent/50 bg-accent/10 text-accent hover:bg-accent/20'
+          }`}
           title="Randomize the knob positions (keeps bindings)"
         >
           ⚄

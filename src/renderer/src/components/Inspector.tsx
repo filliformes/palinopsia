@@ -10,6 +10,7 @@ import { inputsForShader } from '../shaders/isf/inputs'
 import { useStore, type FxScope } from '../store'
 import { AutoControls } from './AutoControls'
 import { PresetPicker } from './PresetPicker'
+import { useFlash } from './useFlash'
 
 const SCOPE_LABEL: Record<FxScope['kind'], string> = {
   master: 'master',
@@ -23,6 +24,9 @@ export function Inspector(): JSX.Element {
   const composition = useStore((s) => s.composition)
   const setSourceInput = useStore((s) => s.setSourceInput)
   const setFxInput = useStore((s) => s.setFxInput)
+  const vibePresetName = useStore((s) => s.vibePresetName)
+  const setVibePresetName = useStore((s) => s.setVibePresetName)
+  const [flashing, flash] = useFlash()
 
   let title = ''
   let context = ''
@@ -81,8 +85,15 @@ export function Inspector(): JSX.Element {
     )
   }
 
+  // The Vibe's preset name is shared with P/Shift+P (controlled picker).
+  const isVibe = shaderId === 'fx-vibe'
+
   return (
-    <div className="rounded-md border border-border bg-panel">
+    <div
+      className={`rounded-md border bg-panel transition-colors ${
+        flashing ? 'animate-pulse border-danger ring-1 ring-danger' : 'border-border'
+      }`}
+    >
       <div className="flex items-center gap-2 border-b border-border px-2 py-1">
         <span className="text-[12px] font-semibold">{title}</span>
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{context}</span>
@@ -92,14 +103,27 @@ export function Inspector(): JSX.Element {
             // Curated-range randomize of THIS shader's params only.
             const next = randomizeInputs(shaderId, values)
             for (const [k, v] of Object.entries(next)) onChange(k, v)
+            if (isVibe) setVibePresetName(null)
+            flash()
           }}
-          className="shrink-0 rounded border border-accent/50 bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] text-accent transition-colors hover:bg-accent/20"
+          className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
+            flashing
+              ? 'animate-pulse border-danger bg-danger/25 text-danger'
+              : 'border-accent/50 bg-accent/10 text-accent hover:bg-accent/20'
+          }`}
           title="Randomize this shader's parameters (curated ranges)"
         >
           ⚄
         </button>
         {/* key resets the picker's applied-name when the selection moves */}
-        <PresetPicker key={`${shaderId}:${context}`} shaderId={shaderId} values={values} onChange={onChange} />
+        <PresetPicker
+          key={`${shaderId}:${context}`}
+          shaderId={shaderId}
+          values={values}
+          onChange={onChange}
+          appliedName={isVibe ? vibePresetName : undefined}
+          onApplied={isVibe ? setVibePresetName : undefined}
+        />
       </div>
       <div className="max-h-44 overflow-y-auto">
         <AutoControls
