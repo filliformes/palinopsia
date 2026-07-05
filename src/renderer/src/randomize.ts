@@ -101,7 +101,9 @@ function randomizeOneInput(
   }
 }
 
-function randomizeInputs(
+/** Randomize every input of one shader within curated ranges — used by
+ *  Randomize scopes and by the Inspector's ⚄ button. */
+export function randomizeInputs(
   shaderId: string,
   current: Record<string, number | number[]>
 ): Record<string, number | number[]> {

@@ -301,7 +301,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-stutter', name: 'Stutter', category: 'FX', source: stutter,
-    curated: { rate: [2, 12], chance: [0.2, 0.7] }
+    curated: { rate: [2, 12], chance: [0.2, 0.7], bands: [1, 12], jitter: [0, 0.8], blackout: [0, 0.5] }
   },
   {
     id: 'fx-sync-loss', name: 'Sync Loss', category: 'FX', source: syncLoss,

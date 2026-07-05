@@ -116,33 +116,32 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             onPick={(id) => setSourceShader(index, 'A', id)}
           />
 
-          {/* MIX: combinator mode + depth — between the two sources */}
-          {layer.sourceB?.shaderId && (
-            <Row label="MIX">
-              <select
-                className="input select-compact w-20 shrink-0 text-[10px]"
-                value={layer.sourceBlend}
-                onChange={(e) => setSourceBlend(index, e.target.value as BlendMode)}
-                title="How B combines with A — the slider is the depth"
-              >
-                {BLEND_MODES.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={layer.sourceMix}
-                onChange={(e) => setSourceMix(index, Number(e.target.value))}
-                className="min-w-0 flex-1 accent-accent"
-                title="Mix depth — 0 = A only, 1 = full blend result"
-              />
-            </Row>
-          )}
+          {/* MIX: combinator mode + depth — ALWAYS visible (fixed layout);
+              inert until B has a source. */}
+          <Row label="MIX">
+            <select
+              className="input select-compact w-20 shrink-0 text-[10px]"
+              value={layer.sourceBlend}
+              onChange={(e) => setSourceBlend(index, e.target.value as BlendMode)}
+              title="How B combines with A — the slider is the depth"
+            >
+              {BLEND_MODES.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={layer.sourceMix}
+              onChange={(e) => setSourceMix(index, Number(e.target.value))}
+              className="min-w-0 flex-1 accent-accent"
+              title="Mix depth — 0 = A only, 1 = full blend result"
+            />
+          </Row>
 
           {/* SOURCE B */}
           <SourceRow
@@ -349,13 +348,13 @@ function SourceRow({
             </option>
           ))}
         </select>
-        {shaderId && (
-          <span onClick={(e) => e.stopPropagation()}>
-            <FxAddSelect scope={scope} className="w-16 shrink-0" />
-          </span>
-        )}
+        {/* +fx always present — the layout never shifts when sources load */}
+        <span onClick={(e) => e.stopPropagation()}>
+          <FxAddSelect scope={scope} className="w-16 shrink-0" />
+        </span>
       </div>
-      {shaderId && fx.length > 0 && (
+      {/* Only the FX the user adds appear below the row */}
+      {fx.length > 0 && (
         <div onClick={(e) => e.stopPropagation()}>
           <Indented>
             <FxChips scope={scope} fx={fx} />

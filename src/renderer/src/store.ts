@@ -128,10 +128,12 @@ export function makeVibePalette(): FxInstance {
       blend: 1,
       dither: 0,
       mixSrc: 0,
+      autoLevel: 0,
       saturation: 1,
       contrast: 1,
       gamma: 1,
       sharpen: 0,
+      splitTone: 0,
       colorA: [0.0, 0.0, 0.0, 1],
       colorB: [1.0, 1.0, 1.0, 1]
     }
@@ -197,8 +199,12 @@ interface StoreState {
   setSourceBlend: (layer: number, mode: BlendMode) => void
   setSourceShader: (layer: number, slot: 'A' | 'B', shaderId: string | null) => void
   setLayerSpeed: (layer: number, v: number) => void
-  // Replace the master chain (Vibe Palette preserved at the end).
-  applyMasterPreset: (fx: Array<{ shaderId: string; inputs: Record<string, number | number[]> }>) => void
+  // Replace the master chain; the chain's vibe settings merge onto the
+  // pinned Vibe Palette (which stays pinned, keeps identity + enable state).
+  applyMasterPreset: (
+    fx: Array<{ shaderId: string; inputs: Record<string, number | number[]> }>,
+    vibe?: Record<string, number | number[]>
+  ) => void
   // Layer lifecycle (context menu): reset to factory / structural randomize.
   initLayer: (layer: number) => void
   randomizeLayer: (layer: number) => void
@@ -470,11 +476,11 @@ export const useStore = create<StoreState>((set, get) => ({
         }))
       }
     })),
-  applyMasterPreset: (fx) =>
+  applyMasterPreset: (fx, vibe) =>
     set((s) => {
-      // Replace the chain but keep the pinned Vibe Palette (with its current
-      // settings) at the end — presets are chains, the vibe is the user's.
-      const locked = s.composition.master.filter((f) => f.locked)
+      const locked = s.composition.master
+        .filter((f) => f.locked)
+        .map((f) => (vibe ? { ...f, inputs: { ...f.inputs, ...vibe } } : f))
       const units: FxInstance[] = fx.map((f) => ({
         id: uid(),
         shaderId: f.shaderId,
@@ -548,8 +554,10 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
   toggleFx: (scope, instId) =>
     set((s) => ({
+      // Locked units stay pinned and unremovable, but CAN be bypassed —
+      // turning the Vibe off is a legitimate look.
       composition: updateFxArray(s.composition, scope, (fx) =>
-        fx.map((f) => (f.id === instId && !f.locked ? { ...f, enabled: !f.enabled } : f))
+        fx.map((f) => (f.id === instId ? { ...f, enabled: !f.enabled } : f))
       )
     })),
   moveFx: (scope, instId, dir) =>

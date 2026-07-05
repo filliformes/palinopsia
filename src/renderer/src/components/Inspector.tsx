@@ -4,6 +4,7 @@
 // OSC and the modulators (Phase 5) use, so the engine follows automatically.
 
 import type { FxInstance, ModTarget, SourceSlot } from '@shared/types'
+import { randomizeInputs } from '../randomize'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { inputsForShader } from '../shaders/isf/inputs'
 import { useStore, type FxScope } from '../store'
@@ -86,6 +87,17 @@ export function Inspector(): JSX.Element {
         <span className="text-[12px] font-semibold">{title}</span>
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{context}</span>
         <div className="flex-1" />
+        <button
+          onClick={() => {
+            // Curated-range randomize of THIS shader's params only.
+            const next = randomizeInputs(shaderId, values)
+            for (const [k, v] of Object.entries(next)) onChange(k, v)
+          }}
+          className="shrink-0 rounded border border-accent/50 bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] text-accent transition-colors hover:bg-accent/20"
+          title="Randomize this shader's parameters (curated ranges)"
+        >
+          ⚄
+        </button>
         {/* key resets the picker's applied-name when the selection moves */}
         <PresetPicker key={`${shaderId}:${context}`} shaderId={shaderId} values={values} onChange={onChange} />
       </div>

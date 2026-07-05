@@ -113,18 +113,27 @@ function FxUnit({
   const setSelection = useStore((s) => s.setSelection)
 
   if (f.locked) {
-    // The pinned Vibe Palette — always on, always last, always editable.
+    // The pinned Vibe Palette — always last, unremovable, but bypassable.
     return (
       <span
         className={`flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 ${
           selected ? 'border-accent2' : 'border-accent2/40'
         } bg-panel`}
-        title="Vibe Palette — the always-on unified-look stage. Click to edit its colors."
+        title="Vibe Palette — the pinned unified-look stage. Dot bypasses; click the name to edit."
       >
+        <button
+          onClick={() => toggleFx(scope, f.id)}
+          className={`h-2.5 w-2.5 shrink-0 rounded-full transition-colors ${
+            f.enabled ? 'bg-accent2' : 'bg-panel3'
+          }`}
+          title={f.enabled ? 'Vibe on — click to bypass' : 'Vibe bypassed — click to enable'}
+        />
         <span className="font-mono text-[9px] text-accent2">◆</span>
         <button
           onClick={() => setSelection({ type: 'fx', scope, instId: f.id })}
-          className={`text-[11px] transition-colors ${selected ? 'text-accent2' : 'hover:text-accent2'}`}
+          className={`text-[11px] transition-colors ${
+            f.enabled ? '' : 'text-muted line-through'
+          } ${selected ? 'text-accent2' : 'hover:text-accent2'}`}
         >
           Vibe Palette
         </button>

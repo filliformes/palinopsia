@@ -297,6 +297,8 @@ export default function App(): JSX.Element {
 function MasterRackStrip(): JSX.Element {
   const master = useStore((s) => s.composition.master)
   const applyMasterPreset = useStore((s) => s.applyMasterPreset)
+  // The select keeps showing the applied chain's name.
+  const [applied, setApplied] = useState('')
   return (
     <div className="flex min-w-0 flex-col gap-1.5 rounded-md border border-border bg-panel2/40 p-2">
       <div className="flex min-w-0 items-center gap-2">
@@ -305,12 +307,15 @@ function MasterRackStrip(): JSX.Element {
         </span>
         <select
           className="input select-compact w-40 min-w-0 text-[10px]"
-          value=""
+          value={applied}
           onChange={(e) => {
             const p = MASTER_PRESETS.find((x) => x.name === e.target.value)
-            if (p) applyMasterPreset(p.fx)
+            if (p) {
+              applyMasterPreset(p.fx, p.vibe)
+              setApplied(p.name)
+            }
           }}
-          title="Master chain presets — replaces the chain, keeps your Vibe Palette"
+          title="Master chain presets — replaces the chain and sets the Vibe accordingly"
         >
           <option value="">chain presets…</option>
           {MASTER_PRESETS.map((p) => (

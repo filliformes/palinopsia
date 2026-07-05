@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Vibe — the always-on end-of-chain color-mastering stage: gamma-shaped luminance mapped through a 2–5 stop palette (with dither breakup and source-color mix-back), then finishing controls — contrast, saturation, and a luma-driven sharpen. One unit that decides the whole output's look.",
+  "DESCRIPTION": "Vibe — the always-on end-of-chain color-mastering stage: AUTO-LEVELS (temporally smoothed frame min/max, remaps luminance to full range), gamma tone placement, pre-map luma sharpen, dither, 2–5 stop palette map, source mix-back, contrast, saturation, and SPLIT-TONE (independent shadow/highlight tints). One unit that decides the whole output's look.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color", "Master"],
@@ -9,15 +9,23 @@
     { "NAME": "blend",      "TYPE": "float", "MIN": 0.0,  "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "bands↔smooth" },
     { "NAME": "dither",     "TYPE": "float", "MIN": 0.0,  "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "dither breakup" },
     { "NAME": "mixSrc",     "TYPE": "float", "MIN": 0.0,  "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "source mix" },
+    { "NAME": "autoLevel",  "TYPE": "float", "MIN": 0.0,  "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "auto-levels" },
     { "NAME": "gamma",      "TYPE": "float", "MIN": 0.4,  "MAX": 2.5, "DEFAULT": 1.0, "LABEL": "tone gamma" },
     { "NAME": "contrast",   "TYPE": "float", "MIN": 0.25, "MAX": 2.5, "DEFAULT": 1.0 },
     { "NAME": "saturation", "TYPE": "float", "MIN": 0.0,  "MAX": 2.0, "DEFAULT": 1.0 },
     { "NAME": "sharpen",    "TYPE": "float", "MIN": 0.0,  "MAX": 2.0, "DEFAULT": 0.0 },
+    { "NAME": "splitTone",  "TYPE": "float", "MIN": 0.0,  "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "split-tone" },
+    { "NAME": "shadowTint", "TYPE": "color", "DEFAULT": [0.45, 0.48, 0.55, 1.0], "LABEL": "shadow tint" },
+    { "NAME": "highTint",   "TYPE": "color", "DEFAULT": [0.55, 0.52, 0.45, 1.0], "LABEL": "highlight tint" },
     { "NAME": "colorA", "TYPE": "color", "DEFAULT": [0.0, 0.0, 0.0, 1.0] },
     { "NAME": "colorB", "TYPE": "color", "DEFAULT": [1.0, 1.0, 1.0, 1.0] },
     { "NAME": "colorC", "TYPE": "color", "DEFAULT": [0.5, 0.5, 0.5, 1.0] },
     { "NAME": "colorD", "TYPE": "color", "DEFAULT": [0.75, 0.75, 0.75, 1.0] },
     { "NAME": "colorE", "TYPE": "color", "DEFAULT": [1.0, 1.0, 1.0, 1.0] }
+  ],
+  "PASSES": [
+    { "TARGET": "lumBuf", "PERSISTENT": true, "WIDTH": "$WIDTH/64", "HEIGHT": "$HEIGHT/64" },
+    { }
   ]
 }*/
 
@@ -47,6 +55,16 @@ float lumaAt(vec2 c) {
 
 void main() {
   vec2 uv = isf_FragNormCoord;
+
+  if (PASSINDEX == 0) {
+    // Downsampled luma with temporal smoothing — feeds auto-levels. The
+    // 0.92 lerp keeps level estimates from pumping with flicker content.
+    float l = lumaAt(uv);
+    float prev = IMG_NORM_PIXEL(lumBuf, uv).r;
+    gl_FragColor = vec4(mix(l, prev, 0.92), 0.0, 0.0, 1.0);
+    return;
+  }
+
   vec4 src = IMG_NORM_PIXEL(inputImage, uv);
   float l = clamp(dot(src.rgb, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
 
@@ -59,6 +77,23 @@ void main() {
     vec2 cd = uv + vec2(0.0, -px.y);
     float blur = (lumaAt(cl) + lumaAt(cr) + lumaAt(cu) + lumaAt(cd)) * 0.25;
     l = clamp(l + (l - blur) * sharpen, 0.0, 1.0);
+  }
+
+  // AUTO-LEVELS: estimate the frame's smoothed min/max from the small buffer
+  // (36 taps) and stretch luminance to span the palette fully.
+  if (autoLevel > 0.001) {
+    float mn = 1.0;
+    float mx = 0.0;
+    for (int j = 0; j < 6; j++) {
+      for (int i = 0; i < 6; i++) {
+        vec2 p = (vec2(float(i), float(j)) + 0.5) / 6.0;
+        float s = IMG_NORM_PIXEL(lumBuf, p).r;
+        mn = min(mn, s);
+        mx = max(mx, s);
+      }
+    }
+    float stretched = clamp((l - mn) / max(mx - mn, 0.05), 0.0, 1.0);
+    l = mix(l, stretched, autoLevel);
   }
 
   // Tone gamma shapes WHERE the palette stops land on the image.
@@ -76,11 +111,20 @@ void main() {
   float k = mix(step(0.5, f), f, blend);
   vec3 col = mix(stopColor(i), stopColor(i + 1.0), k);
 
-  // Source color mix-back, then the finishing pair.
+  // Source color mix-back, then the finishing chain.
   col = mix(col, src.rgb, mixSrc);
   col = (col - 0.5) * contrast + 0.5;
   float l2 = dot(col, vec3(0.299, 0.587, 0.114));
   col = mix(vec3(l2), col, saturation);
+
+  // SPLIT-TONE: multiplicative tints (0.5-grey = neutral), shadows and
+  // highlights independently, crossing at the mids.
+  if (splitTone > 0.001) {
+    vec3 sh = col * (shadowTint.rgb * 2.0);
+    vec3 hi = col * (highTint.rgb * 2.0);
+    float zone = smoothstep(0.25, 0.75, clamp(l2, 0.0, 1.0));
+    col = mix(col, mix(sh, hi, zone), splitTone);
+  }
 
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), src.a);
 }
