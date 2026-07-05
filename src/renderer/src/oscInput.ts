@@ -229,7 +229,18 @@ function route(address: string, args: Args): void {
 
     case 'randomize': {
       const scope = segs[2] ?? 'all'
-      const valid = ['all', 'sources', 'sourceparams', 'sourcefx', 'master', 'modulators']
+      const valid = [
+        'all',
+        'sources',
+        'sourceparams',
+        'sourcefx',
+        'sourcefxonly',
+        'layerfxonly',
+        'layer',
+        'master',
+        'finishing',
+        'modulators'
+      ]
       if (!valid.includes(scope)) return // ignore unknown scopes (don't track their edge)
       if (!rising(address, n)) return
       st.randomize(scope as RandomizeScope)

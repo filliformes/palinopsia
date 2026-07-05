@@ -15,8 +15,11 @@ const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
   { scope: 'sources', label: 'Randomize Sources' },
   { scope: 'sourceparams', label: 'Randomize Source Parameters' },
   { scope: 'sourcefx', label: 'Randomize Source + FX' },
+  { scope: 'sourcefxonly', label: 'Randomize Source FX' },
   { scope: 'layer', label: 'Randomize Layers' },
+  { scope: 'layerfxonly', label: 'Randomize Layer FX' },
   { scope: 'master', label: 'Randomize Master FX' },
+  { scope: 'finishing', label: 'Randomize Finishing' },
   { scope: 'modulators', label: 'Randomize Modulators' },
   { scope: 'meta', label: 'Randomize Meta Knobs' }
 ]

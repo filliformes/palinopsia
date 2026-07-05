@@ -30,8 +30,11 @@ export type RandomizeScope =
   | 'sources'
   | 'sourceparams'
   | 'sourcefx'
+  | 'sourcefxonly' // rebuild ONLY the source FX racks (keep sources)
+  | 'layerfxonly' // rebuild ONLY the per-layer FX racks
   | 'layer'
   | 'master'
+  | 'finishing' // re-roll the three finalizers' params (Vibe/Context/Finalizer)
   | 'modulators'
   | 'meta' // handled in the UI layer (needs the knob smoother), not here
 
@@ -330,6 +333,44 @@ export function randomizeComposition(
             ? { ...l.sourceB, inputs: randomizeInputs(l.sourceB.shaderId, l.sourceB.inputs) }
             : l.sourceB
       }))
+    }
+  }
+
+  // A slot carries a real source (generator OR video/capture) — used to gate FX.
+  const slotActive = (s: SourceSlot | null | undefined): boolean =>
+    !!s && s.kind !== 'none' && (s.kind !== 'generator' || !!s.shaderId)
+
+  // Source FX racks only — new random chains over whatever sources exist.
+  if (scope === 'sourcefxonly') {
+    return {
+      ...c,
+      layers: c.layers.map((l) => ({
+        ...l,
+        sourceAFx: slotActive(l.sourceA) ? randomRack([0.45, 0.4, 0.15]) : l.sourceAFx,
+        sourceBFx: slotActive(l.sourceB) ? randomRack([0.55, 0.35, 0.1]) : l.sourceBFx
+      }))
+    }
+  }
+
+  // Per-layer FX rack only.
+  if (scope === 'layerfxonly') {
+    return {
+      ...c,
+      layers: c.layers.map((l) => ({
+        ...l,
+        fx: slotActive(l.sourceA) || slotActive(l.sourceB) ? randomRack([0.35, 0.4, 0.2, 0.05]) : l.fx
+      }))
+    }
+  }
+
+  // Finishing — re-roll the three pinned finalizers' params within curated
+  // ranges (Vibe Palette · Context · Finalizer). Deliberate, user-triggered.
+  if (scope === 'finishing') {
+    return {
+      ...c,
+      master: c.master.map((f) =>
+        f.locked && f.shaderId ? { ...f, inputs: randomizeInputs(f.shaderId, f.inputs) } : f
+      )
     }
   }
 
