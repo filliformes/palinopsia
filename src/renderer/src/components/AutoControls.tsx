@@ -57,7 +57,7 @@ export function AutoControls({
     // Full-width controls stacked — `[&>*]:w-full` overrides each control's
     // fixed w-44 so sliders/swatches span the panel.
     return (
-      <div className="flex flex-col gap-2 p-2 [&>*]:w-full">
+      <div className="flex flex-col gap-0.5 px-2 py-1.5 [&>*]:w-full">
         {visible(inputs).map(renderControl)}
       </div>
     )
