@@ -21,7 +21,7 @@ import type {
 import type { MetaKnobState } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulators } from './engine/modulation'
-import { randomizeComposition, type RandomizeScope } from './randomize'
+import { randomizeComposition, randomizeSingleLayer, type RandomizeScope } from './randomize'
 
 export type { FxScope }
 
@@ -108,7 +108,8 @@ function makeLayer(): LayerState {
     solo: false,
     feedback: false,
     feedbackAmount: 0.6,
-    sourceMix: 0.5
+    sourceMix: 0.5,
+    sourceBlend: 'normal'
   }
 }
 
@@ -167,7 +168,16 @@ interface StoreState {
   toggleFeedback: (layer: number) => void
   setFeedbackAmount: (layer: number, v: number) => void
   setSourceMix: (layer: number, v: number) => void
+  setSourceBlend: (layer: number, mode: BlendMode) => void
   setSourceShader: (layer: number, slot: 'A' | 'B', shaderId: string | null) => void
+  // Layer lifecycle (context menu): reset to factory / structural randomize.
+  initLayer: (layer: number) => void
+  randomizeLayer: (layer: number) => void
+  // Layer presets — whole-layer states (sources + all racks), app-persistent.
+  layerPresets: Array<{ id: string; name: string; layer: LayerState }>
+  saveLayerPreset: (layer: number, name: string) => void
+  applyLayerPreset: (layer: number, presetId: string) => void
+  deleteLayerPreset: (presetId: string) => void
   setSourceInput: (
     layer: number,
     slot: 'A' | 'B',
@@ -215,10 +225,18 @@ interface StoreState {
   collapsed: Record<string, boolean>
   toggleSection: (key: string) => void
 
+  // User shader presets — app-persistent (localStorage), per shader id.
+  userShaderPresets: Record<string, Array<{ name: string; values: Record<string, number | number[]> }>>
+  addUserShaderPreset: (shaderId: string, name: string, values: Record<string, number | number[]>) => void
+  deleteUserShaderPreset: (shaderId: string, name: string) => void
+
   // Scenes (Phase 6) — recallable full-instrument states, drag-arranged.
   scenes: SceneEntry[]
   activeSceneId: string | null
   saveScene: () => void
+  // Overwrite an existing scene with the current live state.
+  updateSceneFromLive: (id: string) => void
+  duplicateScene: (id: string) => void
   // Save a Randomize-All result as a scene WITHOUT touching the live state
   // (the brief's randomize-into-scene).
   randomSceneIntoBank: () => void
@@ -312,6 +330,81 @@ export const useStore = create<StoreState>((set, get) => ({
         }))
       }
     })),
+  setSourceBlend: (layer, mode) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({
+          ...l,
+          sourceBlend: mode
+        }))
+      }
+    })),
+
+  initLayer: (layer) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        // Fresh factory layer — keeps its identity (id) so mod-matrix
+        // source targets pointing at this layer index stay coherent.
+        layers: updateLayer(s.composition.layers, layer, (l) => ({
+          ...makeLayer(),
+          id: l.id
+        }))
+      }
+    })),
+  randomizeLayer: (layer) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => randomizeSingleLayer(l))
+      }
+    })),
+
+  layerPresets: (() => {
+    try {
+      return JSON.parse(localStorage.getItem('opsia.layerPresets') ?? '[]')
+    } catch {
+      return []
+    }
+  })(),
+  saveLayerPreset: (layer, name) =>
+    set((s) => {
+      const l = s.composition.layers[layer]
+      if (!l) return s
+      const layerPresets = [
+        ...s.layerPresets,
+        { id: uid(), name: name.trim() || `Layer preset ${s.layerPresets.length + 1}`, layer: l }
+      ]
+      localStorage.setItem('opsia.layerPresets', JSON.stringify(layerPresets))
+      return { layerPresets }
+    }),
+  applyLayerPreset: (layer, presetId) =>
+    set((s) => {
+      const p = s.layerPresets.find((x) => x.id === presetId)
+      if (!p) return s
+      return {
+        composition: {
+          ...s.composition,
+          layers: updateLayer(s.composition.layers, layer, (l) => ({
+            ...p.layer,
+            // Fresh FX instance ids so mod-matrix entries from another life
+            // of this preset can't alias; keep the target layer's identity.
+            id: l.id,
+            sourceAFx: p.layer.sourceAFx.map((f) => ({ ...f, id: uid() })),
+            sourceBFx: p.layer.sourceBFx.map((f) => ({ ...f, id: uid() })),
+            fx: p.layer.fx.map((f) => ({ ...f, id: uid() }))
+          }))
+        }
+      }
+    }),
+  deleteLayerPreset: (presetId) =>
+    set((s) => {
+      const layerPresets = s.layerPresets.filter((x) => x.id !== presetId)
+      localStorage.setItem('opsia.layerPresets', JSON.stringify(layerPresets))
+      return { layerPresets }
+    }),
+
   setFeedbackAmount: (layer, v) =>
     set((s) => ({
       composition: {
@@ -546,8 +639,51 @@ export const useStore = create<StoreState>((set, get) => ({
       return { collapsed }
     }),
 
+  userShaderPresets: (() => {
+    try {
+      return JSON.parse(localStorage.getItem('opsia.userShaderPresets') ?? '{}')
+    } catch {
+      return {}
+    }
+  })(),
+  addUserShaderPreset: (shaderId, name, values) =>
+    set((s) => {
+      const list = s.userShaderPresets[shaderId] ?? []
+      const clean = name.trim()
+      if (!clean) return s
+      // Same name replaces (update-in-place semantics).
+      const userShaderPresets = {
+        ...s.userShaderPresets,
+        [shaderId]: [...list.filter((p) => p.name !== clean), { name: clean, values }]
+      }
+      localStorage.setItem('opsia.userShaderPresets', JSON.stringify(userShaderPresets))
+      return { userShaderPresets }
+    }),
+  deleteUserShaderPreset: (shaderId, name) =>
+    set((s) => {
+      const userShaderPresets = {
+        ...s.userShaderPresets,
+        [shaderId]: (s.userShaderPresets[shaderId] ?? []).filter((p) => p.name !== name)
+      }
+      localStorage.setItem('opsia.userShaderPresets', JSON.stringify(userShaderPresets))
+      return { userShaderPresets }
+    }),
+
   scenes: [],
   activeSceneId: null,
+  updateSceneFromLive: (id) =>
+    set((s) => ({
+      scenes: s.scenes.map((x) => (x.id === id ? { ...x, composition: s.composition } : x))
+    })),
+  duplicateScene: (id) =>
+    set((s) => {
+      const i = s.scenes.findIndex((x) => x.id === id)
+      if (i < 0) return s
+      const copy = { ...s.scenes[i], id: uid(), name: `${s.scenes[i].name} copy` }
+      const scenes = [...s.scenes]
+      scenes.splice(i + 1, 0, copy)
+      return { scenes }
+    }),
   saveScene: () =>
     set((s) => ({
       scenes: [
@@ -622,6 +758,7 @@ export const useStore = create<StoreState>((set, get) => ({
           ...l,
           feedbackAmount: l.feedbackAmount ?? 0.6,
           sourceMix: l.sourceMix ?? 0.5,
+          sourceBlend: l.sourceBlend ?? 'normal',
           sourceAFx: l.sourceAFx ?? [],
           sourceBFx: l.sourceBFx ?? [],
           fx: l.fx ?? []

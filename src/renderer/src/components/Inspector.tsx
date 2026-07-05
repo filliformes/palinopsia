@@ -6,9 +6,9 @@
 import type { FxInstance, ModTarget, SourceSlot } from '@shared/types'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { inputsForShader } from '../shaders/isf/inputs'
-import { PRESETS_BY_ID } from '../shaders/isf/presets'
 import { useStore, type FxScope } from '../store'
 import { AutoControls } from './AutoControls'
+import { PresetPicker } from './PresetPicker'
 
 const SCOPE_LABEL: Record<FxScope['kind'], string> = {
   master: 'master',
@@ -80,35 +80,14 @@ export function Inspector(): JSX.Element {
     )
   }
 
-  const presets = PRESETS_BY_ID[shaderId] ?? []
-
   return (
     <div className="rounded-md border border-border bg-panel">
       <div className="flex items-center gap-2 border-b border-border px-2 py-1">
         <span className="text-[12px] font-semibold">{title}</span>
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{context}</span>
         <div className="flex-1" />
-        {presets.length > 0 && (
-          <select
-            className="input select-compact w-36 min-w-0 text-[10px]"
-            value=""
-            onChange={(e) => {
-              const p = presets.find((x) => x.name === e.target.value)
-              if (!p) return
-              // Apply through the normal write path — undoable, and
-              // modulation overlays presets like any base value.
-              for (const [k, v] of Object.entries(p.values)) onChange(k, v)
-            }}
-            title="Apply a preset to this shader"
-          >
-            <option value="">presets…</option>
-            {presets.map((p) => (
-              <option key={p.name} value={p.name}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        )}
+        {/* key resets the picker's applied-name when the selection moves */}
+        <PresetPicker key={`${shaderId}:${context}`} shaderId={shaderId} values={values} onChange={onChange} />
       </div>
       <div className="max-h-44 overflow-y-auto">
         <AutoControls

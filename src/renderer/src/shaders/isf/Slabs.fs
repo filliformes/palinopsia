@@ -4,12 +4,13 @@
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Glitch", "Geometry"],
   "INPUTS": [
-    { "NAME": "rate",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.3 },
+    { "NAME": "rate",    "TYPE": "float", "MIN": 0.0, "MAX": 5.0,  "DEFAULT": 0.3 },
     { "NAME": "bands",   "TYPE": "float", "MIN": 4.0, "MAX": 80.0, "DEFAULT": 24.0 },
     { "NAME": "density", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.35 },
     { "NAME": "jitter",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.35 },
     { "NAME": "drift",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.2 },
     { "NAME": "accent",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.2 },
+    { "NAME": "chaos",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0 },
     { "NAME": "tint",    "TYPE": "color", "DEFAULT": [0.9, 0.5, 0.18, 1.0] }
   ]
 }*/
@@ -28,21 +29,39 @@ void main() {
 
   float band = floor(uv.y * bands);
 
+  // CHAOTIC bands: a chaos-sized minority of bands break the grid's rules —
+  // wildly different cell widths, oversized displacement, thin sub-stripes
+  // carving the slab, occasionally running on their own faster clock.
+  float chaosPick = hash(vec2(band, 99.7));
+  float isChaos = step(1.0 - chaos * 0.6, chaosPick);
+  float tC = mix(t, floor(TIME * (2.0 + hash(vec2(band, 55.0)) * 20.0)), isChaos * step(0.5, hash(vec2(band, 71.0))));
+
   // A minority of bands get horizontally displaced this step (slice-shuffle).
-  float pick = hash(vec2(band, t));
-  float disp = step(1.0 - jitter * 0.5, pick) * (hash(vec2(band, t + 13.7)) - 0.5) * 0.4;
+  float pick = hash(vec2(band, tC));
+  float dispAmt = mix(0.4, 1.6, isChaos); // chaotic bands throw much further
+  float disp = step(1.0 - jitter * 0.5, pick) * (hash(vec2(band, tC + 13.7)) - 0.5) * dispAmt;
 
   // Slow per-band scroll keeps it asymmetric even between cuts.
   float x = fract(uv.x + disp + drift * TIME * 0.03 * (hash(vec2(band, 3.0)) - 0.5) * 2.0);
 
-  // Coarse cells along the band; sparse subset lit.
+  // Coarse cells along the band; sparse subset lit. Chaotic bands get cell
+  // counts far outside the family — hair-thin shards or one giant slab.
   float cells = 5.0 + floor(hash(vec2(band, 27.0)) * 6.0);
+  float cellsChaos = mix(1.0, 40.0, pow(hash(vec2(band, 61.0)), 2.0));
+  cells = mix(cells, cellsChaos, isChaos);
   float cell = floor(x * cells);
-  float v = hash(vec2(cell * 17.0 + band * 131.0, t));
-  float lit = step(1.0 - density, v);
+  float v = hash(vec2(cell * 17.0 + band * 131.0, tC));
+  float lit = step(1.0 - density * mix(1.0, 1.6, isChaos), v);
 
   // Matte grey slab values — mid-tones, never neon.
   float shade = lit * (0.18 + 0.55 * hash(vec2(cell + 7.0, band)));
+
+  // Chaotic bands: thin broken sub-stripes carve the slab vertically, and
+  // some flip to a bright-on-dark inversion.
+  float subN = 2.0 + floor(hash(vec2(band, 83.0)) * 5.0);
+  float sub = step(0.35, fract(uv.y * bands * subN));
+  shade = mix(shade, shade * sub, isChaos * step(0.4, hash(vec2(band, 91.0))));
+  shade = mix(shade, lit * (0.75 - shade), isChaos * step(0.75, hash(vec2(band, tC + 5.0))));
   vec3 col = vec3(0.03, 0.03, 0.035) + vec3(shade);
 
   // Rare accent cells carry the single tint.

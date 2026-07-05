@@ -8,7 +8,7 @@
     { "NAME": "detune",   "TYPE": "float", "MIN": 0.0,  "MAX": 0.2,    "DEFAULT": 0.03 },
     { "NAME": "angle",    "TYPE": "float", "MIN": 0.0,  "MAX": 6.2832, "DEFAULT": 0.35 },
     { "NAME": "skew",     "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,    "DEFAULT": 0.12 },
-    { "NAME": "rate",     "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,    "DEFAULT": 0.15 },
+    { "NAME": "rate",     "TYPE": "float", "MIN": 0.0,  "MAX": 5.0,    "DEFAULT": 0.15 },
     { "NAME": "contrast", "TYPE": "float", "MIN": 0.5,  "MAX": 3.0,    "DEFAULT": 1.4 },
     { "NAME": "tint",     "TYPE": "color", "DEFAULT": [0.6, 0.62, 0.58, 1.0] }
   ]

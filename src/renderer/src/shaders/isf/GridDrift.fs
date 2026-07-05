@@ -5,7 +5,7 @@
   "CATEGORIES": ["Generator", "Geometry", "Glitch"],
   "INPUTS": [
     { "NAME": "cells",   "TYPE": "float", "MIN": 3.0,  "MAX": 40.0, "DEFAULT": 12.0 },
-    { "NAME": "rate",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.12 },
+    { "NAME": "rate",    "TYPE": "float", "MIN": 0.0,  "MAX": 5.0,  "DEFAULT": 0.12 },
     { "NAME": "breathe", "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.35 },
     { "NAME": "slip",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.25 },
     { "NAME": "lineW",   "TYPE": "float", "MIN": 0.01, "MAX": 0.2,  "DEFAULT": 0.05 },

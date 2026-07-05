@@ -4,8 +4,9 @@
 // Randomize-All AS a scene without touching the live state (the brief's
 // randomize-into-scene). Keys 1–9 recall the first nine scenes.
 
-import { useRef, useState, type DragEvent } from 'react'
+import { useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import { useStore } from '../store'
+import { ContextMenu } from './ContextMenu'
 
 export function SceneBank(): JSX.Element {
   const scenes = useStore((s) => s.scenes)
@@ -16,7 +17,12 @@ export function SceneBank(): JSX.Element {
   const renameScene = useStore((s) => s.renameScene)
   const deleteScene = useStore((s) => s.deleteScene)
   const reorderScene = useStore((s) => s.reorderScene)
+  const updateSceneFromLive = useStore((s) => s.updateSceneFromLive)
+  const duplicateScene = useStore((s) => s.duplicateScene)
   const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; sceneId: string; name: string } | null>(
+    null
+  )
   const dragId = useRef<string | null>(null)
 
   function onDrop(e: DragEvent, beforeId: string | null): void {
@@ -51,6 +57,10 @@ export function SceneBank(): JSX.Element {
           }}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => onDrop(e, scene.id)}
+          onContextMenu={(e: MouseEvent) => {
+            e.preventDefault()
+            setMenu({ x: e.clientX, y: e.clientY, sceneId: scene.id, name: scene.name })
+          }}
           className={`flex shrink-0 cursor-grab items-center gap-1 rounded border px-1.5 py-0.5 transition-colors ${
             activeSceneId === scene.id
               ? 'border-accent bg-accent/15 text-accent'
@@ -103,6 +113,25 @@ export function SceneBank(): JSX.Element {
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => onDrop(e, null)}
           title="Drop here to move to the end"
+        />
+      )}
+
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          header={menu.name}
+          items={[
+            {
+              label: 'Save scene (overwrite with live state)',
+              onClick: () => updateSceneFromLive(menu.sceneId)
+            },
+            { label: 'Duplicate scene', onClick: () => duplicateScene(menu.sceneId) },
+            { label: 'Rename scene…', onClick: () => setRenamingId(menu.sceneId) },
+            { divider: true, label: '' },
+            { label: 'Delete scene', onClick: () => deleteScene(menu.sceneId), danger: true }
+          ]}
+          onClose={() => setMenu(null)}
         />
       )}
     </div>

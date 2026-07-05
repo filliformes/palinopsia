@@ -5,7 +5,7 @@
   "CATEGORIES": ["Generator", "Particles"],
   "INPUTS": [
     { "NAME": "count",   "TYPE": "float", "MIN": 6.0,  "MAX": 60.0, "DEFAULT": 24.0 },
-    { "NAME": "speed",   "TYPE": "float", "MIN": 0.0,  "MAX": 1.5,  "DEFAULT": 0.25 },
+    { "NAME": "speed",   "TYPE": "float", "MIN": 0.0,  "MAX": 7.5,  "DEFAULT": 0.25 },
     { "NAME": "size",    "TYPE": "float", "MIN": 0.02, "MAX": 0.35, "DEFAULT": 0.08 },
     { "NAME": "wander",  "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.4 },
     { "NAME": "flicker", "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.3 },

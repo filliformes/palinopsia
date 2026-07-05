@@ -4,7 +4,7 @@
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Noise", "Geometry"],
   "INPUTS": [
-    { "NAME": "rate",   "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.1 },
+    { "NAME": "rate",   "TYPE": "float", "MIN": 0.0,  "MAX": 5.0,  "DEFAULT": 0.1 },
     { "NAME": "scale",  "TYPE": "float", "MIN": 0.5,  "MAX": 8.0,  "DEFAULT": 2.2 },
     { "NAME": "levels", "TYPE": "float", "MIN": 3.0,  "MAX": 30.0, "DEFAULT": 12.0 },
     { "NAME": "width",  "TYPE": "float", "MIN": 0.02, "MAX": 0.5,  "DEFAULT": 0.12 },

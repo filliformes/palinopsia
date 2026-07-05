@@ -72,7 +72,8 @@ export const GENERATORS: IsfShader[] = [
       density: [0.15, 0.6],
       jitter: [0.1, 0.7],
       drift: [0, 0.6],
-      accent: [0, 0.5]
+      accent: [0, 0.5],
+      chaos: [0, 0.6]
     }
   },
   {
@@ -218,7 +219,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-mosh-blocks', name: 'Mosh Blocks', category: 'FX', source: moshBlocks,
-    curated: { blocks: [10, 48], amount: [0.05, 0.3], chance: [0.1, 0.5], rate: [0.1, 0.8] }
+    curated: { blocks: [10, 48], amount: [0.05, 0.3], chance: [0.1, 0.5], rate: [0.1, 0.8], freak: [0, 0.5] }
   },
   {
     id: 'fx-grain', name: 'Grain', category: 'FX', source: grain,

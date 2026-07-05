@@ -1,24 +1,18 @@
-// One layer strip (brief §10.2). Source A/B pickers, blend + opacity, and the
-// solo/mute/feedback toggles — reading and writing the store, which the
-// Compositor samples each frame. The per-source FX slots and the finite
-// per-layer FX rack land in Phase 3; the auto-generated ISF control panel
-// (selecting a source renders its INPUTS) lands in Phase 4.
+// One layer strip (brief §10.2), compact form: opacity rides the header row;
+// SRC A and SRC B sit side by side (their FX racks live BELOW as chips, so
+// the columns stay narrow); every rack uses the chips layout — no blank
+// space. Right-click anywhere on the strip: Init, Randomize layer, layer
+// presets (save/apply/delete — app-persistent).
 
-import type { ReactNode } from 'react'
+import { useState, type MouseEvent } from 'react'
 import type { BlendMode } from '@shared/types'
+import { BLEND_MODES } from '@shared/types'
 import { GENERATORS } from '../shaders/isf'
 import { useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
+import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxRackPanel } from './FxRackPanel'
-
-const BLEND_MODES: BlendMode[] = [
-  'normal',
-  'add',
-  'screen',
-  'multiply',
-  'difference',
-  'overlay'
-]
+import { ConfirmModal, PromptModal } from './PromptModal'
 
 export function LayerPanel({ index }: { index: number }): JSX.Element {
   const layer = useStore((s) => s.composition.layers[index])
@@ -29,22 +23,54 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const toggleFeedback = useStore((s) => s.toggleFeedback)
   const setFeedbackAmount = useStore((s) => s.setFeedbackAmount)
   const setSourceMix = useStore((s) => s.setSourceMix)
+  const setSourceBlend = useStore((s) => s.setSourceBlend)
   const setSourceShader = useStore((s) => s.setSourceShader)
   const setSelection = useStore((s) => s.setSelection)
   const selection = useStore((s) => s.selection)
+  const collapsed = useStore((s) => !!s.collapsed[`layer${index}`])
+  const toggleSection = useStore((s) => s.toggleSection)
+  const initLayer = useStore((s) => s.initLayer)
+  const randomizeLayer = useStore((s) => s.randomizeLayer)
+  const layerPresets = useStore((s) => s.layerPresets)
+  const saveLayerPreset = useStore((s) => s.saveLayerPreset)
+  const applyLayerPreset = useStore((s) => s.applyLayerPreset)
+  const deleteLayerPreset = useStore((s) => s.deleteLayerPreset)
+
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const [savePrompt, setSavePrompt] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
 
   const isSelected = (slot: 'A' | 'B'): boolean =>
     selection?.type === 'source' && selection.layer === index && selection.slot === slot
 
-  const collapsed = useStore((s) => !!s.collapsed[`layer${index}`])
-  const toggleSection = useStore((s) => s.toggleSection)
+  function onContextMenu(e: MouseEvent): void {
+    e.preventDefault()
+    setMenu({ x: e.clientX, y: e.clientY })
+  }
+
+  const menuItems: MenuItem[] = [
+    { label: 'Init layer', onClick: () => initLayer(index) },
+    { label: 'Randomize layer', onClick: () => randomizeLayer(index) },
+    { divider: true, label: '' },
+    { label: 'Save layer as preset…', onClick: () => setSavePrompt(true) },
+    ...layerPresets.map((p) => ({
+      label: p.name,
+      onClick: () => applyLayerPreset(index, p.id),
+      onDelete: () => setDeleteTarget({ id: p.id, name: p.name }),
+      deleteTitle: `Delete layer preset "${p.name}"`
+    }))
+  ]
 
   return (
-    <div className="flex min-w-0 flex-col gap-2 rounded-md border border-border bg-panel p-2">
-      <div className="flex items-center justify-between">
+    <div
+      className="flex min-w-0 flex-col gap-1.5 rounded-md border border-border bg-panel p-2"
+      onContextMenu={onContextMenu}
+    >
+      {/* Header: chevron · LAYER n · opacity · S/M/FB */}
+      <div className="flex min-w-0 items-center gap-2">
         <button
           onClick={() => toggleSection(`layer${index}`)}
-          className="flex items-center gap-1.5"
+          className="flex shrink-0 items-center gap-1"
           title={collapsed ? 'Expand layer' : 'Collapse layer'}
         >
           <span
@@ -52,85 +78,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           >
             ▶
           </span>
-          <span className="font-mono text-[11px] text-muted">
-            LAYER {index + 1}
-            {collapsed && layer.sourceA.shaderId ? ' ·' : ''}
-          </span>
+          <span className="font-mono text-[11px] text-muted">L{index + 1}</span>
         </button>
-        <div className="flex gap-1">
-          <ToggleChip on={layer.solo} label="S" title="Solo" onClick={() => toggleSolo(index)} />
-          <ToggleChip on={layer.mute} label="M" title="Mute" onClick={() => toggleMute(index)} />
-          <ToggleChip
-            on={layer.feedback}
-            label="FB"
-            title="Feedback — sample this layer's previous frame"
-            onClick={() => toggleFeedback(index)}
-          />
-        </div>
-      </div>
-
-      {!collapsed && (
-        <>
-      {/* Source pickers — ISF generators (video / capture / HIVE arrive Phase 7).
-          Stacked full-width: each slot hosts its own FX rack, so side-by-side
-          columns can't breathe in the strip. */}
-      <div className="flex min-w-0 flex-col gap-1">
-        <SourceSlot
-          label="A"
-          shaderId={layer.sourceA.shaderId}
-          selected={isSelected('A')}
-          onSelect={() => setSelection({ type: 'source', layer: index, slot: 'A' })}
-          onPick={(id) => setSourceShader(index, 'A', id)}
-        >
-          <FxRackPanel scope={{ kind: 'sourceA', layer: index }} fx={layer.sourceAFx} label="fx" compact />
-        </SourceSlot>
-        <SourceSlot
-          label="B"
-          shaderId={layer.sourceB?.shaderId ?? null}
-          selected={isSelected('B')}
-          onSelect={() => setSelection({ type: 'source', layer: index, slot: 'B' })}
-          onPick={(id) => setSourceShader(index, 'B', id)}
-        >
-          <FxRackPanel scope={{ kind: 'sourceB', layer: index }} fx={layer.sourceBFx} label="fx" compact />
-        </SourceSlot>
-      </div>
-
-      {/* A/B crossfade — only meaningful while B has a source */}
-      {layer.sourceB?.shaderId && (
-        <div className="flex min-w-0 items-center gap-2">
-          <label className="w-12 shrink-0 font-mono text-[10px] text-muted">MIX</label>
-          <span className="shrink-0 font-mono text-[9px] text-muted">A</span>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={layer.sourceMix}
-            onChange={(e) => setSourceMix(index, Number(e.target.value))}
-            className="min-w-0 flex-1 accent-accent"
-            title="Crossfade between source A and source B"
-          />
-          <span className="shrink-0 font-mono text-[9px] text-muted">B</span>
-        </div>
-      )}
-
-      <div className="flex min-w-0 items-center gap-2">
-        <label className="w-12 shrink-0 font-mono text-[10px] text-muted">BLEND</label>
-        <select
-          className="input select-compact min-w-0 flex-1 text-[12px]"
-          value={layer.blend}
-          onChange={(e) => setBlend(index, e.target.value as BlendMode)}
-        >
-          {BLEND_MODES.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="flex min-w-0 items-center gap-2">
-        <label className="w-12 shrink-0 font-mono text-[10px] text-muted">OPAC</label>
         <input
           type="range"
           min={0}
@@ -139,69 +88,176 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           value={layer.opacity}
           onChange={(e) => setOpacity(index, Number(e.target.value))}
           className="min-w-0 flex-1 accent-accent"
+          title={`Opacity ${layer.opacity.toFixed(2)}`}
         />
-        <div className="w-12 shrink-0">
-          <BoundedNumberInput
-            value={layer.opacity}
-            min={0}
-            max={1}
-            onChange={(v) => setOpacity(index, v)}
-            className="input w-full px-1 py-0.5 text-right text-[11px]"
+        <div className="flex shrink-0 gap-1">
+          <ToggleChip label="S" active={layer.solo} onClick={() => toggleSolo(index)} title="Solo" />
+          <ToggleChip label="M" active={layer.mute} onClick={() => toggleMute(index)} title="Mute" />
+          <ToggleChip
+            label="FB"
+            active={layer.feedback}
+            onClick={() => toggleFeedback(index)}
+            title="Feedback — this layer samples its own previous frame (trails)"
           />
         </div>
       </div>
 
-      {/* Per-layer FX rack — applied to the mixed layer, pre-feedback */}
-      <FxRackPanel scope={{ kind: 'layer', layer: index }} fx={layer.fx} label="layer fx" />
-
-      {/* Trail persistence — only meaningful while FB is on */}
-      {layer.feedback && (
-        <div className="flex min-w-0 items-center gap-2">
-          <label className="w-12 shrink-0 font-mono text-[10px] text-muted">TRAILS</label>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={layer.feedbackAmount}
-            onChange={(e) => setFeedbackAmount(index, Number(e.target.value))}
-            className="min-w-0 flex-1 accent-accent"
-            title="Feedback persistence — decay trails (capped below infinite bloom)"
-          />
-          <div className="w-12 shrink-0">
-            <BoundedNumberInput
-              value={layer.feedbackAmount}
-              min={0}
-              max={1}
-              onChange={(v) => setFeedbackAmount(index, v)}
-              className="input w-full px-1 py-0.5 text-right text-[11px]"
+      {!collapsed && (
+        <>
+          {/* Sources side by side — compact: label + picker only */}
+          <div className="grid min-w-0 grid-cols-2 gap-1">
+            <SourceCell
+              label="A"
+              shaderId={layer.sourceA.shaderId}
+              selected={isSelected('A')}
+              onSelect={() => setSelection({ type: 'source', layer: index, slot: 'A' })}
+              onPick={(id) => setSourceShader(index, 'A', id)}
+            />
+            <SourceCell
+              label="B"
+              shaderId={layer.sourceB?.shaderId ?? null}
+              selected={isSelected('B')}
+              onSelect={() => setSelection({ type: 'source', layer: index, slot: 'B' })}
+              onPick={(id) => setSourceShader(index, 'B', id)}
             />
           </div>
-        </div>
-      )}
+
+          {/* Per-source FX as chips rows (only when the source exists) */}
+          {layer.sourceA.shaderId && (
+            <FxRackPanel scope={{ kind: 'sourceA', layer: index }} fx={layer.sourceAFx} label="A fx" chips />
+          )}
+          {layer.sourceB?.shaderId && (
+            <FxRackPanel scope={{ kind: 'sourceB', layer: index }} fx={layer.sourceBFx} label="B fx" chips />
+          )}
+
+          {/* A/B mix: blend-mode combinator + depth (brief §4) */}
+          {layer.sourceB?.shaderId && (
+            <div className="flex min-w-0 items-center gap-1.5">
+              <label className="w-8 shrink-0 font-mono text-[9px] text-muted">MIX</label>
+              <select
+                className="input select-compact w-20 shrink-0 text-[10px]"
+                value={layer.sourceBlend}
+                onChange={(e) => setSourceBlend(index, e.target.value as BlendMode)}
+                title="How B combines with A — mix is the depth of the combination"
+              >
+                {BLEND_MODES.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={layer.sourceMix}
+                onChange={(e) => setSourceMix(index, Number(e.target.value))}
+                className="min-w-0 flex-1 accent-accent"
+                title="Mix depth — 0 = A only, 1 = full blend result"
+              />
+            </div>
+          )}
+
+          {/* Layer FX rack — chips */}
+          <FxRackPanel scope={{ kind: 'layer', layer: index }} fx={layer.fx} label="fx" chips />
+
+          {/* Blend against the stack below */}
+          <div className="flex min-w-0 items-center gap-1.5">
+            <label className="w-8 shrink-0 font-mono text-[9px] text-muted">BLEND</label>
+            <select
+              className="input select-compact min-w-0 flex-1 text-[11px]"
+              value={layer.blend}
+              onChange={(e) => setBlend(index, e.target.value as BlendMode)}
+            >
+              {BLEND_MODES.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Trail persistence — only while FB is on */}
+          {layer.feedback && (
+            <div className="flex min-w-0 items-center gap-1.5">
+              <label className="w-8 shrink-0 font-mono text-[9px] text-muted">TRAIL</label>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={layer.feedbackAmount}
+                onChange={(e) => setFeedbackAmount(index, Number(e.target.value))}
+                className="min-w-0 flex-1 accent-accent"
+                title="Feedback persistence — decay trails (capped below infinite bloom)"
+              />
+              <div className="w-11 shrink-0">
+                <BoundedNumberInput
+                  value={layer.feedbackAmount}
+                  min={0}
+                  max={1}
+                  onChange={(v) => setFeedbackAmount(index, v)}
+                  className="input w-full px-1 py-0.5 text-right text-[11px]"
+                />
+              </div>
+            </div>
+          )}
         </>
+      )}
+
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          header={`Layer ${index + 1}`}
+          items={menuItems}
+          onClose={() => setMenu(null)}
+        />
+      )}
+      {savePrompt && (
+        <PromptModal
+          title="Layer preset name?"
+          placeholder="e.g. Contour + trails"
+          confirmLabel="Save"
+          onConfirm={(name) => {
+            saveLayerPreset(index, name)
+            setSavePrompt(false)
+          }}
+          onCancel={() => setSavePrompt(false)}
+        />
+      )}
+      {deleteTarget && (
+        <ConfirmModal
+          title={`Are you sure you want to delete the layer preset "${deleteTarget.name}"?`}
+          onYes={() => {
+            deleteLayerPreset(deleteTarget.id)
+            setDeleteTarget(null)
+          }}
+          onNo={() => setDeleteTarget(null)}
+        />
       )}
     </div>
   )
 }
 
 function ToggleChip({
-  on,
   label,
-  title,
-  onClick
+  active,
+  onClick,
+  title
 }: {
-  on: boolean
   label: string
-  title: string
+  active: boolean
   onClick: () => void
+  title: string
 }): JSX.Element {
   return (
     <button
-      title={title}
       onClick={onClick}
-      className={`rounded px-1.5 py-0.5 font-mono text-[10px] leading-none transition-colors ${
-        on
+      title={title}
+      className={`rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
+        active
           ? 'bg-accent/20 text-accent ring-1 ring-accent'
           : 'bg-panel2 text-muted hover:text-text'
       }`}
@@ -211,51 +267,42 @@ function ToggleChip({
   )
 }
 
-function SourceSlot({
+function SourceCell({
   label,
   shaderId,
   selected,
   onSelect,
-  onPick,
-  children
+  onPick
 }: {
   label: string
   shaderId: string | null
   selected: boolean
   onSelect: () => void
   onPick: (id: string | null) => void
-  children?: ReactNode
 }): JSX.Element {
   return (
     <div
       onClick={onSelect}
-      className={`flex min-w-0 flex-col gap-1 rounded border px-1.5 py-1 transition-colors ${
+      className={`flex min-w-0 items-center gap-1 rounded border px-1 py-0.5 transition-colors ${
         selected
           ? 'border-accent bg-panel2 ring-1 ring-accent'
           : 'border-border bg-panel2/50 hover:border-accent/50'
       }`}
     >
-      <div className="flex min-w-0 items-center gap-1.5">
-        <span className="w-10 shrink-0 font-mono text-[9px] text-muted">SRC {label}</span>
-        <select
-          className="input select-compact min-w-0 flex-1 text-[11px]"
-          value={shaderId ?? ''}
-          onChange={(e) => onPick(e.target.value || null)}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <option value="">— none —</option>
-          {GENERATORS.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      {/* Per-source FX rack (only useful once a source is loaded). The wrapper
-          stops click bubbling — otherwise selecting an FX unit here would
-          bubble to the slot's own onClick and instantly overwrite the
-          selection back to the source (the Inspector never showed FX). */}
-      {shaderId && <div onClick={(e) => e.stopPropagation()}>{children}</div>}
+      <span className="shrink-0 font-mono text-[9px] text-muted">{label}</span>
+      <select
+        className="input select-compact min-w-0 flex-1 text-[11px]"
+        value={shaderId ?? ''}
+        onChange={(e) => onPick(e.target.value || null)}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <option value="">—</option>
+        {GENERATORS.map((g) => (
+          <option key={g.id} value={g.id}>
+            {g.name}
+          </option>
+        ))}
+      </select>
     </div>
   )
 }

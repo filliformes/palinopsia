@@ -32,11 +32,33 @@ import type { CompositionState, FxInstance, FxScope } from '@shared/types';
 
 installTextureBridge();
 
-export type BlendMode = 'add' | 'screen' | 'multiply' | 'difference' | 'overlay' | 'normal';
+import type { BlendMode } from '@shared/types';
+export type { BlendMode };
 
 const QUAD_VS = `#version 300 es
 in vec2 p; out vec2 uv;
 void main(){ uv = p*0.5+0.5; gl_Position = vec4(p,0.,1.); }`;
+
+// The 15 blend modes (indices match modeIndex below) — shared by the layer
+// stack pass and the A/B source-mix pass. 'wrap' is the digital-native one.
+const BLEND_GLSL = `
+vec3 blendMode(int mode, vec3 b, vec3 t){
+  if(mode==0) return t;                                     // normal
+  if(mode==1) return min(b+t, 1.0);                         // add
+  if(mode==2) return max(b-t, 0.0);                         // subtract
+  if(mode==3) return b*t;                                   // multiply
+  if(mode==4) return 1.0-(1.0-b)*(1.0-t);                   // screen
+  if(mode==5) return mix(2.0*b*t, 1.0-2.0*(1.0-b)*(1.0-t), step(0.5,b)); // overlay
+  if(mode==6) return (1.0-2.0*t)*b*b + 2.0*t*b;             // soft light (pegtop)
+  if(mode==7) return mix(2.0*b*t, 1.0-2.0*(1.0-b)*(1.0-t), step(0.5,t)); // hard light
+  if(mode==8) return min(b, t);                             // darken
+  if(mode==9) return max(b, t);                             // lighten
+  if(mode==10) return abs(b-t);                             // difference
+  if(mode==11) return b+t-2.0*b*t;                          // exclusion
+  if(mode==12) return clamp(b/max(1.0-t, 1e-4), 0.0, 1.0);  // color dodge
+  if(mode==13) return 1.0-clamp((1.0-b)/max(t, 1e-4), 0.0, 1.0); // color burn
+  return fract(b+t);                                        // wrap
+}`;
 
 // Pairwise blend of two textures with opacity on the top layer.
 const BLEND_FS = `#version 300 es
@@ -46,18 +68,11 @@ uniform sampler2D base;   // accumulator below
 uniform sampler2D top;    // layer above
 uniform int mode;
 uniform float opacity;
-vec3 blend(vec3 b, vec3 t){
-  if(mode==0) return b+t;                                   // add
-  if(mode==1) return 1.0-(1.0-b)*(1.0-t);                   // screen
-  if(mode==2) return b*t;                                   // multiply
-  if(mode==3) return abs(b-t);                              // difference
-  if(mode==4) return mix(2.0*b*t, 1.0-2.0*(1.0-b)*(1.0-t), step(0.5,b)); // overlay
-  return t;                                                 // normal
-}
+${BLEND_GLSL}
 void main(){
   vec4 B = texture(base, uv);
   vec4 T = texture(top, uv);
-  vec3 c = blend(B.rgb, T.rgb);
+  vec3 c = blendMode(mode, B.rgb, T.rgb);
   o = vec4(mix(B.rgb, c, T.a*opacity), max(B.a, T.a*opacity));
 }`;
 
@@ -74,15 +89,22 @@ void main(){
   o = mix(texture(src, uv), texture(prev, uv), amount);
 }`;
 
-// A/B source crossfade.
+// A/B source mix: out = mix(A, blendMode(A,B), x) — 'normal' degenerates to
+// the plain crossfade; every other mode makes the mixer a two-source
+// combinator with x as its depth.
 const MIX_FS = `#version 300 es
 precision highp float;
 in vec2 uv; out vec4 o;
 uniform sampler2D a;
 uniform sampler2D b;
-uniform float x;          // 0 = A only, 1 = B only
+uniform int mode;
+uniform float x;          // 0 = A only, 1 = full blend result
+${BLEND_GLSL}
 void main(){
-  o = mix(texture(a, uv), texture(b, uv), x);
+  vec4 A = texture(a, uv);
+  vec4 B = texture(b, uv);
+  vec3 c = blendMode(mode, A.rgb, B.rgb);
+  o = vec4(mix(A.rgb, c, x), max(A.a, B.a * x));
 }`;
 
 // Present / copy pass.
@@ -151,6 +173,17 @@ function makeRedirectableGL(gl: WebGL2RenderingContext): {
       if (prop === 'bindFramebuffer') {
         return (t: number, fbo: WebGLFramebuffer | null) =>
           target.bindFramebuffer(t, fbo === null ? state.redirect : fbo);
+      }
+      if (prop === 'bindTexture') {
+        // The runtime defensively unbinds the ACTIVE texture unit between
+        // passes (bindTexture(target, null)) — which strips a multi-pass
+        // shader's persistent-buffer texture off its unit before the final
+        // pass samples it (Stutter rendered black). Ignoring null binds
+        // keeps every unit intact; the runtime always binds what it needs
+        // before drawing, so nothing depends on the unbind.
+        return (t: number, tex: WebGLTexture | null) => {
+          if (tex !== null) target.bindTexture(t, tex);
+        };
       }
       const v = (target as unknown as Record<PropertyKey, unknown>)[prop];
       if (typeof v === 'function') {
@@ -283,8 +316,10 @@ export class ISFLayer {
   solo = false;
   /** 0 = no feedback (plain copy) · →1 = long decay trails. */
   feedbackAmount = 0;
-  /** A/B crossfade — 0 = A only. Ignored while B is empty. */
+  /** A/B mix depth — 0 = A only. Ignored while B is empty. */
   sourceMix = 0;
+  /** How B combines with A before the crossfade. */
+  sourceBlend: BlendMode = 'normal';
   shaderIdA: string | null = null;
   shaderIdB: string | null = null;
 
@@ -364,10 +399,13 @@ export class Compositor {
   private uPSrc: WebGLUniformLocation; private uPPrev: WebGLUniformLocation;
   private uPAmt: WebGLUniformLocation;
   private uMA: WebGLUniformLocation; private uMB: WebGLUniformLocation;
-  private uMX: WebGLUniformLocation;
+  private uMX: WebGLUniformLocation; private uMMode: WebGLUniformLocation;
   private uCTex: WebGLUniformLocation;
-  private modeIndex: Record<BlendMode, number> =
-    { add:0, screen:1, multiply:2, difference:3, overlay:4, normal:5 };
+  private modeIndex: Record<BlendMode, number> = {
+    normal: 0, add: 1, subtract: 2, multiply: 3, screen: 4, overlay: 5,
+    softlight: 6, hardlight: 7, darken: 8, lighten: 9, difference: 10,
+    exclusion: 11, dodge: 12, burn: 13, wrap: 14
+  };
 
   constructor(public canvas: HTMLCanvasElement, public w = 1920, public h = 1080) {
     const gl = canvas.getContext('webgl2', { premultipliedAlpha: false })!;
@@ -401,6 +439,7 @@ export class Compositor {
     this.uMA = gl.getUniformLocation(this.mixProg, 'a')!;
     this.uMB = gl.getUniformLocation(this.mixProg, 'b')!;
     this.uMX = gl.getUniformLocation(this.mixProg, 'x')!;
+    this.uMMode = gl.getUniformLocation(this.mixProg, 'mode')!;
 
     this.copyProg = compile(gl, QUAD_VS, COPY_FS);
     this.uCTex = gl.getUniformLocation(this.copyProg, 'tex')!;
@@ -431,6 +470,7 @@ export class Compositor {
       L.solo = l.solo;
       L.feedbackAmount = l.feedback ? l.feedbackAmount : 0;
       L.sourceMix = l.sourceMix;
+      L.sourceBlend = l.sourceBlend ?? 'normal';
       for (const [k, v] of Object.entries(l.sourceA.inputs)) L.setInput('A', k, v);
       if (l.sourceB) for (const [k, v] of Object.entries(l.sourceB.inputs)) L.setInput('B', k, v);
       L.rackA.sync(l.sourceAFx, sourceById);
@@ -468,8 +508,8 @@ export class Compositor {
     gl.bindVertexArray(null);
   }
 
-  /** A/B crossfade into the shared mix target. */
-  private mixSources(a: WebGLTexture, b: WebGLTexture, x: number): WebGLTexture {
+  /** A/B mix into the shared mix target: mix(A, blendMode(A,B), x). */
+  private mixSources(a: WebGLTexture, b: WebGLTexture, x: number, mode: BlendMode): WebGLTexture {
     const gl = this.gl;
     gl.bindVertexArray(this.vao);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.mixTarget.fbo);
@@ -477,6 +517,7 @@ export class Compositor {
     gl.useProgram(this.mixProg);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, a); gl.uniform1i(this.uMA, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, b); gl.uniform1i(this.uMB, 1);
+    gl.uniform1i(this.uMMode, this.modeIndex[mode] ?? 0);
     gl.uniform1f(this.uMX, x);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindVertexArray(null);
@@ -514,7 +555,7 @@ export class Compositor {
       if (L.hasB()) {
         L.renderSource('B');
         const sigB = L.rackB.apply(L.scratchB.tex, this.chain);
-        sig = this.mixSources(sig, sigB, L.sourceMix);
+        sig = this.mixSources(sig, sigB, L.sourceMix, L.sourceBlend);
       }
       gl.bindVertexArray(null);
       sig = L.rackLayer.apply(sig, this.chain);
@@ -529,10 +570,22 @@ export class Compositor {
     this.acc.swap(); // cleared buffer is now acc.read()
 
     const anySolo = this.layers.some((l) => l.solo);
+    let first = true;
     for (const L of this.layers) {
       const audible = anySolo ? L.solo : !L.mute;
       if (!audible) continue;
-      this.blendInto(this.acc.write(), this.acc.read(), L.texture(), L.blend, L.opacity);
+      // The first visible layer has nothing real below it — the accumulator
+      // is cleared black, so multiply/overlay/burn would eat it. Standard
+      // compositor semantics: the bottom of the stack composites 'normal';
+      // blend modes act BETWEEN layers.
+      this.blendInto(
+        this.acc.write(),
+        this.acc.read(),
+        L.texture(),
+        first ? 'normal' : L.blend,
+        L.opacity
+      );
+      first = false;
       this.acc.swap();
     }
     let composite = this.acc.read();

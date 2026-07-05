@@ -2,15 +2,44 @@
 // Kept framework-free so it imports cleanly on both the Node and web sides.
 
 // ── Engine / signal model ────────────────────────────────────────────
-// The six blend modes implemented in the Compositor's BLEND_FS. Extend
-// here AND in blend.glsl / Compositor's modeIndex together.
+// The 15 blend modes implemented in the Compositor's BLEND_GLSL — shared by
+// the layer stack AND each layer's A/B source mix. Extend here AND in the
+// Compositor's modeIndex together. 'wrap' (fract(b+t)) is the digital-native
+// one: hard value wrap-around.
 export type BlendMode =
   | 'normal'
   | 'add'
-  | 'screen'
+  | 'subtract'
   | 'multiply'
-  | 'difference'
+  | 'screen'
   | 'overlay'
+  | 'softlight'
+  | 'hardlight'
+  | 'darken'
+  | 'lighten'
+  | 'difference'
+  | 'exclusion'
+  | 'dodge'
+  | 'burn'
+  | 'wrap'
+
+export const BLEND_MODES: BlendMode[] = [
+  'normal',
+  'add',
+  'subtract',
+  'multiply',
+  'screen',
+  'overlay',
+  'softlight',
+  'hardlight',
+  'darken',
+  'lighten',
+  'difference',
+  'exclusion',
+  'dodge',
+  'burn',
+  'wrap'
+]
 
 // What feeds a layer slot. ISF generator is the MVP path; the rest land
 // in later phases (video + synthify → Phase 7, capture/HIVE → Phase 7,
@@ -57,6 +86,8 @@ export interface LayerState {
   feedbackAmount: number
   // A/B source crossfade — 0 = A only, 1 = B only. Ignored while B is empty.
   sourceMix: number
+  // How B combines with A before the crossfade: out = mix(A, blend(A,B), mix).
+  sourceBlend: BlendMode
 }
 
 // ── Modulation (brief §6 — ported from dataFLOU) ─────────────────────
