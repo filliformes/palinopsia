@@ -323,7 +323,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
   ],
   'fx-context': [
     { name: 'Clean', values: { trails: 0, blur: 0, bloom: 0.1, depth: 0.12, haze: 0, atmosphere: [0.5, 0.58, 0.72, 1], lightGlow: 0, lightSize: 0.6, lightColor: [1, 0.92, 0.8, 1], light: [0.5, 0.55] } },
-    { name: 'Gentle depth', values: { trails: 0.2, blur: 0.08, bloom: 0.3, depth: 0.35, haze: 0.15, atmosphere: [0.5, 0.58, 0.72, 1], lightGlow: 0.25, lightSize: 0.6, lightColor: [1, 0.92, 0.8, 1], light: [0.5, 0.55] } },
+    { name: 'Gentle depth', values: { trails: 0.2, blur: 0.08, bloom: 0.3, depth: 0.35, haze: 0.15, atmosphere: [0.5, 0.58, 0.72, 1], lightGlow: 0.1, lightSize: 0.5, lightColor: [1, 0.92, 0.8, 1], light: [0.5, 0.55] } },
     { name: 'Deep space', values: { trails: 0.3, blur: 0.12, bloom: 0.4, depth: 0.7, haze: 0.5, atmosphere: [0.12, 0.16, 0.3, 1], lightGlow: 0.2, lightSize: 0.75, lightColor: [0.7, 0.8, 1, 1], light: [0.5, 0.5] } },
     { name: 'Dreamy bloom', values: { trails: 0.4, blur: 0.3, bloom: 0.75, depth: 0.3, haze: 0.2, atmosphere: [0.75, 0.68, 0.85, 1], lightGlow: 0.5, lightSize: 0.85, lightColor: [1, 0.85, 0.95, 1], light: [0.5, 0.5] } },
     { name: 'Long trails', values: { trails: 0.62, blur: 0.18, bloom: 0.35, depth: 0.4, haze: 0.1, atmosphere: [0.5, 0.58, 0.72, 1], lightGlow: 0.2, lightSize: 0.6, lightColor: [1, 0.92, 0.8, 1], light: [0.5, 0.55] } },
@@ -331,7 +331,22 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Candlelight', values: { trails: 0.3, blur: 0.15, bloom: 0.55, depth: 0.45, haze: 0.25, atmosphere: [0.3, 0.28, 0.35, 1], lightGlow: 0.6, lightSize: 0.4, lightColor: [1, 0.78, 0.45, 1], light: [0.5, 0.42] } },
     { name: 'Underwater', values: { trails: 0.35, blur: 0.28, bloom: 0.3, depth: 0.5, haze: 0.6, atmosphere: [0.18, 0.5, 0.6, 1], lightGlow: 0.3, lightSize: 0.8, lightColor: [0.7, 0.95, 1, 1], light: [0.5, 0.3] } },
     { name: 'Void', values: { trails: 0.25, blur: 0.1, bloom: 0.2, depth: 0.72, haze: 0.35, atmosphere: [0.08, 0.1, 0.18, 1], lightGlow: 0.15, lightSize: 0.5, lightColor: [0.6, 0.7, 1, 1], light: [0.5, 0.5] } },
-    { name: 'Aurora', values: { trails: 0.5, blur: 0.2, bloom: 0.62, depth: 0.4, haze: 0.3, atmosphere: [0.25, 0.75, 0.6, 1], lightGlow: 0.45, lightSize: 0.9, lightColor: [0.6, 1, 0.85, 1], light: [0.4, 0.35] } }
+    { name: 'Aurora', values: { trails: 0.5, blur: 0.2, bloom: 0.62, depth: 0.4, haze: 0.3, atmosphere: [0.25, 0.75, 0.6, 1], lightGlow: 0.45, lightSize: 0.9, lightColor: [0.6, 1, 0.85, 1], light: [0.4, 0.35] } },
+    { name: 'Cathedral', values: { trails: 0.25, blur: 0.1, bloom: 0.5, depth: 0.55, haze: 0.3, atmosphere: [0.28, 0.26, 0.22, 1], lightGlow: 0.4, lightSize: 0.45, lightColor: [1, 0.85, 0.55, 1], light: [0.5, 0.2] } },
+    { name: 'Nebula', values: { trails: 0.6, blur: 0.25, bloom: 0.7, depth: 0.5, haze: 0.4, atmosphere: [0.3, 0.14, 0.4, 1], lightGlow: 0.35, lightSize: 0.85, lightColor: [0.85, 0.6, 1, 1], light: [0.45, 0.5] } },
+    { name: 'Fog bank', values: { trails: 0.3, blur: 0.45, bloom: 0.25, depth: 0.4, haze: 0.7, atmosphere: [0.55, 0.6, 0.66, 1], lightGlow: 0.15, lightSize: 0.9, lightColor: [0.9, 0.92, 0.95, 1], light: [0.5, 0.6] } },
+    { name: 'Spotlight', values: { trails: 0.1, blur: 0.06, bloom: 0.35, depth: 0.6, haze: 0.12, atmosphere: [0.06, 0.07, 0.1, 1], lightGlow: 0.7, lightSize: 0.2, lightColor: [1, 0.97, 0.9, 1], light: [0.5, 0.45] } },
+    { name: 'Golden hour', values: { trails: 0.2, blur: 0.12, bloom: 0.5, depth: 0.4, haze: 0.3, atmosphere: [0.7, 0.5, 0.3, 1], lightGlow: 0.4, lightSize: 0.7, lightColor: [1, 0.8, 0.5, 1], light: [0.7, 0.35] } },
+    { name: 'Moonlit', values: { trails: 0.25, blur: 0.15, bloom: 0.4, depth: 0.5, haze: 0.35, atmosphere: [0.15, 0.2, 0.35, 1], lightGlow: 0.3, lightSize: 0.6, lightColor: [0.7, 0.8, 1, 1], light: [0.55, 0.25] } },
+    { name: 'Ectoplasm', values: { trails: 0.6, blur: 0.2, bloom: 0.55, depth: 0.35, haze: 0.3, atmosphere: [0.1, 0.25, 0.15, 1], lightGlow: 0.4, lightSize: 0.7, lightColor: [0.6, 1, 0.7, 1], light: [0.5, 0.5] } },
+    { name: 'Ice cave', values: { trails: 0.3, blur: 0.3, bloom: 0.45, depth: 0.5, haze: 0.5, atmosphere: [0.2, 0.4, 0.55, 1], lightGlow: 0.35, lightSize: 0.8, lightColor: [0.75, 0.95, 1, 1], light: [0.4, 0.4] } },
+    { name: 'Furnace', values: { trails: 0.35, blur: 0.15, bloom: 0.65, depth: 0.45, haze: 0.35, atmosphere: [0.35, 0.12, 0.05, 1], lightGlow: 0.55, lightSize: 0.65, lightColor: [1, 0.5, 0.2, 1], light: [0.5, 0.55] } },
+    { name: 'Dream drift', values: { trails: 0.75, blur: 0.4, bloom: 0.5, depth: 0.3, haze: 0.25, atmosphere: [0.6, 0.62, 0.78, 1], lightGlow: 0.25, lightSize: 0.85, lightColor: [1, 0.95, 1, 1], light: [0.5, 0.5] } },
+    { name: 'Starfield', values: { trails: 0.15, blur: 0.05, bloom: 0.7, depth: 0.65, haze: 0.15, atmosphere: [0.04, 0.05, 0.1, 1], lightGlow: 0.12, lightSize: 0.35, lightColor: [0.9, 0.95, 1, 1], light: [0.5, 0.5] } },
+    { name: 'Sunrise', values: { trails: 0.25, blur: 0.15, bloom: 0.55, depth: 0.4, haze: 0.35, atmosphere: [0.8, 0.45, 0.5, 1], lightGlow: 0.45, lightSize: 0.75, lightColor: [1, 0.7, 0.55, 1], light: [0.5, 0.7] } },
+    { name: 'Deep sea', values: { trails: 0.4, blur: 0.3, bloom: 0.3, depth: 0.6, haze: 0.6, atmosphere: [0.05, 0.15, 0.22, 1], lightGlow: 0.2, lightSize: 0.7, lightColor: [0.5, 0.85, 0.95, 1], light: [0.5, 0.15] } },
+    { name: 'Halo', values: { trails: 0.3, blur: 0.18, bloom: 0.8, depth: 0.4, haze: 0.2, atmosphere: [0.4, 0.45, 0.6, 1], lightGlow: 0.6, lightSize: 0.55, lightColor: [1, 1, 0.95, 1], light: [0.5, 0.5] } },
+    { name: 'Vapor', values: { trails: 0.55, blur: 0.5, bloom: 0.45, depth: 0.3, haze: 0.4, atmosphere: [0.7, 0.55, 0.75, 1], lightGlow: 0.3, lightSize: 0.9, lightColor: [0.85, 0.9, 1, 1], light: [0.45, 0.45] } }
   ],
   // ── Generators ──────────────────────────────────────────────────────
   'drift-field': [

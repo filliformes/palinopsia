@@ -24,10 +24,11 @@ import { inputsForShader } from './shaders/isf/inputs'
 import { MASTER_PRESETS } from './shaders/isf/masterPresets'
 import { PRESETS_BY_ID } from './shaders/isf/presets'
 
-// ── Vibe Palette shortcuts (P / Shift+P) ──────────────────────────────
-// Cursor into the Vibe's preset list, kept at module scope so it survives
-// re-renders and advances across Shift+P presses.
+// ── Vibe Palette (P / Shift+P) & Context (C / Shift+C) shortcuts ───────
+// Cursors into each finalizer's preset list, kept at module scope so they
+// survive re-renders and advance across Shift presses.
 let vibePresetIndex = -1
+let contextPresetIndex = -1
 
 function openVibeInInspector(): void {
   const st = useStore.getState()
@@ -52,6 +53,29 @@ function cycleVibePreset(): void {
   // Show the change in the Inspector.
   if (st.collapsed['inspector']) st.toggleSection('inspector')
   st.setSelection({ type: 'fx', scope: { kind: 'master' }, instId: vibe.id })
+}
+
+function openContextInInspector(): void {
+  const st = useStore.getState()
+  const ctx = st.composition.master.find((f) => f.shaderId === 'fx-context')
+  if (!ctx) return
+  if (st.collapsed['inspector']) st.toggleSection('inspector')
+  st.setSelection({ type: 'fx', scope: { kind: 'master' }, instId: ctx.id })
+}
+
+function cycleContextPreset(): void {
+  const st = useStore.getState()
+  const ctx = st.composition.master.find((f) => f.shaderId === 'fx-context')
+  if (!ctx) return
+  const presets = PRESETS_BY_ID['fx-context'] ?? []
+  if (presets.length === 0) return
+  contextPresetIndex = (contextPresetIndex + 1) % presets.length
+  const p = presets[contextPresetIndex]
+  for (const [k, v] of Object.entries(p.values)) {
+    st.setFxInput({ kind: 'master' }, ctx.id, k, v)
+  }
+  if (st.collapsed['inspector']) st.toggleSection('inspector')
+  st.setSelection({ type: 'fx', scope: { kind: 'master' }, instId: ctx.id })
 }
 import { initUndo, redo, undo, useUndoState } from './undo'
 import { THEME_ORDER, useStore, type ThemeName } from './store'
@@ -101,6 +125,13 @@ export default function App(): JSX.Element {
         e.preventDefault()
         if (e.shiftKey) cycleVibePreset()
         else openVibeInInspector()
+        return
+      }
+      // C: open Context in the Inspector · Shift+C: cycle its presets.
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'c') {
+        e.preventDefault()
+        if (e.shiftKey) cycleContextPreset()
+        else openContextInInspector()
         return
       }
       // M: swap the layer strips for the compact Mixer surface (and back).
