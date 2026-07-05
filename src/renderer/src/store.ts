@@ -175,6 +175,33 @@ export function makeContext(): FxInstance {
   }
 }
 
+// The always-on Finalizer — the last master stage after Context. A final
+// grade (levels) + sharpen + physically-modelled grain over the whole output.
+// Neutral at defaults (a whisper of film grain, everything else identity).
+export function makeFinalizer(): FxInstance {
+  return {
+    id: uid(),
+    shaderId: 'fx-finalizer',
+    enabled: true,
+    locked: true,
+    inputs: {
+      black: 0,
+      white: 1,
+      gamma: 1,
+      rGain: 1,
+      gGain: 1,
+      bGain: 1,
+      alpha: 1,
+      sharpen: 0,
+      character: 1,
+      grain: 0.06,
+      grainSize: 1.5,
+      chroma: 0,
+      parasites: 0.1
+    }
+  }
+}
+
 export function makeDefaultMetaKnobs(): MetaKnobState[] {
   return Array.from({ length: META_KNOB_COUNT }, (_, i) => ({
     name: `Knob ${i + 1}`,
@@ -190,7 +217,7 @@ export function makeDefaultComposition(): CompositionState {
   return {
     // Layer 1 opens on Ash so a fresh session shows something living.
     layers: [makeLayer('ash'), makeLayer(), makeLayer(), makeLayer()],
-    master: [makeVibePalette(), makeContext()],
+    master: [makeVibePalette(), makeContext(), makeFinalizer()],
     bpm: 120,
     modulators: makeDefaultModulators(),
     modMatrix: [],
@@ -1109,6 +1136,7 @@ export const useStore = create<StoreState>((set, get) => ({
           )
           if (!m.some((f) => f.shaderId === 'fx-vibe')) m = [...m, makeVibePalette()]
           if (!m.some((f) => f.shaderId === 'fx-context')) m = [...m, makeContext()]
+          if (!m.some((f) => f.shaderId === 'fx-finalizer')) m = [...m, makeFinalizer()]
           return m
         })(),
         modulators: s.composition.modulators ?? makeDefaultModulators(),

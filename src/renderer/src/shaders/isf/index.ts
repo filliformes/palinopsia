@@ -73,6 +73,7 @@ import feedbackZoom from './fx/FeedbackZoom.fs?raw'
 import distort from './fx/Distort.fs?raw'
 import vibe from './fx/Vibe.fs?raw'
 import context from './fx/Context.fs?raw'
+import finalizer from './fx/Finalizer.fs?raw'
 
 export interface IsfShader {
   id: string
@@ -377,7 +378,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-grain', name: 'Grain', category: 'FX', source: grain,
-    curated: { amount: [0.05, 0.35], size: [1, 3], parasites: [0.05, 0.5] }
+    curated: { amount: [0.05, 0.35], size: [1, 3], chroma: [0, 0.6], parasites: [0.05, 0.5] }
   },
   {
     id: 'fx-streak', name: 'Streak', category: 'FX', source: streak,
@@ -513,11 +514,34 @@ export const CONTEXT_SHADER: IsfShader = {
   }
 }
 
+// The Finalizer — the last always-on master stage after Context (grade + grain
+// + sharpen). Store-locked, kept out of FX_SHADERS.
+export const FINALIZER_SHADER: IsfShader = {
+  id: 'fx-finalizer',
+  name: 'Finalizer',
+  category: 'FX',
+  source: finalizer,
+  curated: {
+    black: [0, 0.15],
+    white: [0.85, 1],
+    gamma: [0.8, 1.3],
+    rGain: [0.85, 1.15],
+    gGain: [0.85, 1.15],
+    bGain: [0.85, 1.15],
+    sharpen: [0, 0.6],
+    grain: [0, 0.3],
+    grainSize: [1, 2.5],
+    chroma: [0, 0.4],
+    parasites: [0, 0.3]
+  }
+}
+
 export const ALL_SHADERS: IsfShader[] = [
   ...GENERATORS,
   ...FX_SHADERS,
   VIBE_SHADER,
-  CONTEXT_SHADER
+  CONTEXT_SHADER,
+  FINALIZER_SHADER
 ]
 
 export const SHADER_BY_ID: Record<string, IsfShader> = Object.fromEntries(

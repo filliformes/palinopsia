@@ -117,30 +117,21 @@ function FxUnit({
   const setSelection = useStore((s) => s.setSelection)
 
   if (f.locked) {
-    // A pinned finalizer (Vibe Palette, then Context) — always last,
-    // unremovable, but bypassable. Name comes from the registry. The two
-    // finalizers wear different accents so they're easy to tell apart:
-    // Vibe = accent2, Context = accent.
+    // Pinned finalizers (Vibe → Context → Finalizer) — always last, unremovable,
+    // bypassable. Each wears a different accent so they're easy to tell apart:
+    // Vibe = accent2, Context = accent, Finalizer = active.
     const lockedName = SHADER_BY_ID[f.shaderId ?? '']?.name ?? f.shaderId
-    const isCtx = f.shaderId === 'fx-context'
-    const borderCls = selected
-      ? isCtx
-        ? 'border-accent'
-        : 'border-accent2'
-      : isCtx
-        ? 'border-accent/40'
-        : 'border-accent2/40'
-    const dotCls = f.enabled ? (isCtx ? 'bg-accent' : 'bg-accent2') : 'bg-panel3'
-    const glyphCls = isCtx ? 'text-accent' : 'text-accent2'
-    const nameCls = `${f.enabled ? '' : 'text-muted line-through'} ${
-      selected
-        ? isCtx
-          ? 'text-accent'
-          : 'text-accent2'
-        : isCtx
-          ? 'hover:text-accent'
-          : 'hover:text-accent2'
-    }`
+    // Literal class strings (Tailwind JIT needs them spelled out).
+    const S =
+      f.shaderId === 'fx-context'
+        ? { on: 'border-accent', off: 'border-accent/40', bg: 'bg-accent', tx: 'text-accent', hv: 'hover:text-accent' }
+        : f.shaderId === 'fx-finalizer'
+          ? { on: 'border-active', off: 'border-active/40', bg: 'bg-active', tx: 'text-active', hv: 'hover:text-active' }
+          : { on: 'border-accent2', off: 'border-accent2/40', bg: 'bg-accent2', tx: 'text-accent2', hv: 'hover:text-accent2' }
+    const borderCls = selected ? S.on : S.off
+    const dotCls = f.enabled ? S.bg : 'bg-panel3'
+    const glyphCls = S.tx
+    const nameCls = `${f.enabled ? '' : 'text-muted line-through'} ${selected ? S.tx : S.hv}`
     return (
       <span
         className={`flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 ${borderCls} bg-panel`}

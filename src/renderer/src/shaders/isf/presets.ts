@@ -411,6 +411,16 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Halo', values: { trails: 0.3, blur: 0.18, bloom: 0.8, depth: 0.4, haze: 0.2, atmosphere: [0.4, 0.45, 0.6, 1], lightGlow: 0.6, lightSize: 0.55, lightColor: [1, 1, 0.95, 1], light: [0.5, 0.5] } },
     { name: 'Vapor', values: { trails: 0.55, blur: 0.5, bloom: 0.45, depth: 0.3, haze: 0.4, atmosphere: [0.7, 0.55, 0.75, 1], lightGlow: 0.3, lightSize: 0.9, lightColor: [0.85, 0.9, 1, 1], light: [0.45, 0.45] } }
   ],
+  'fx-finalizer': [
+    { name: 'Clean', values: { black: 0, white: 1, gamma: 1, rGain: 1, gGain: 1, bGain: 1, alpha: 1, sharpen: 0, character: 1, grain: 0.05, grainSize: 1.5, chroma: 0, parasites: 0 } },
+    { name: 'Punch', values: { black: 0.05, white: 0.96, gamma: 1.05, rGain: 1, gGain: 1, bGain: 1, sharpen: 0.35, character: 1, grain: 0.08, grainSize: 1.4, chroma: 0 } },
+    { name: 'Warm film', values: { black: 0.02, white: 1, gamma: 1.05, rGain: 1.06, gGain: 1, bGain: 0.94, sharpen: 0.1, character: 1, grain: 0.18, grainSize: 1.6, chroma: 0.15 } },
+    { name: 'Cool digital', values: { black: 0.02, white: 1, gamma: 1, rGain: 0.95, gGain: 1, bGain: 1.07, sharpen: 0.2, character: 0, grain: 0.12, grainSize: 1, chroma: 0.1 } },
+    { name: 'Crush blacks', values: { black: 0.1, white: 1, gamma: 0.9, rGain: 1, gGain: 1, bGain: 1, sharpen: 0, character: 1, grain: 0.06, grainSize: 1.5, chroma: 0 } },
+    { name: 'Faded lift', values: { black: 0.04, white: 0.92, gamma: 1.15, rGain: 1.02, gGain: 1, bGain: 0.98, sharpen: 0, character: 1, grain: 0.12, grainSize: 1.8, chroma: 0.1 } },
+    { name: 'Heavy grain', values: { black: 0, white: 1, gamma: 1, rGain: 1, gGain: 1, bGain: 1, sharpen: 0.15, character: 1, grain: 0.4, grainSize: 2, chroma: 0.25 } },
+    { name: 'Broadcast', values: { black: 0.02, white: 0.98, gamma: 1, rGain: 1, gGain: 1, bGain: 1, sharpen: 0.45, character: 0, grain: 0.1, grainSize: 1, chroma: 0.2 } }
+  ],
   'fx-granular': [
     { name: 'Fine grain', values: { grain: 0.7, density: 0.9, scatter: 0.1, rotate: 0.1, smear: 0.2, rate: 0.6 } },
     { name: 'Coarse tiles', values: { grain: 0.25, density: 0.95, scatter: 0.05, rotate: 0.05, smear: 0.15, rate: 0.3 } },
@@ -804,16 +814,18 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Checker slip', values: { blocks: 12, amount: 0.06, chance: 0.5, rate: 0.15 } }
   ],
   'fx-grain': [
-    { name: 'Film light', values: { amount: 0.08, size: 1, mono: 1 } },
-    { name: 'Film heavy', values: { amount: 0.25, size: 1.5, mono: 1 } },
-    { name: 'Coarse static', values: { amount: 0.3, size: 3, mono: 1 } },
-    { name: 'Color noise', values: { amount: 0.15, size: 1.5, mono: 0 } },
-    { name: 'Chunky RGB', values: { amount: 0.35, size: 4, mono: 0 } },
-    { name: 'Whisper', values: { amount: 0.04, size: 1, mono: 1 } },
-    { name: 'Broadcast floor', values: { amount: 0.12, size: 2, mono: 1 } },
-    { name: 'Sandpaper', values: { amount: 0.45, size: 2, mono: 1 } },
-    { name: 'Soft color wash', values: { amount: 0.1, size: 5, mono: 0 } },
-    { name: 'Blizzard', values: { amount: 0.7, size: 3, mono: 1 } }
+    { name: 'Film light', values: { character: 1, amount: 0.1, size: 1.2, chroma: 0 } },
+    { name: 'Film heavy', values: { character: 1, amount: 0.3, size: 1.6, chroma: 0.15 } },
+    { name: 'Color stock', values: { character: 1, amount: 0.22, size: 1.5, chroma: 0.6 } },
+    { name: 'Fine 100 ISO', values: { character: 1, amount: 0.08, size: 1, chroma: 0.1 } },
+    { name: 'Push 3200', values: { character: 1, amount: 0.4, size: 2.2, chroma: 0.3 } },
+    { name: 'Sensor low', values: { character: 0, amount: 0.12, size: 1, chroma: 0 } },
+    { name: 'High ISO sensor', values: { character: 0, amount: 0.35, size: 1, chroma: 0.4 } },
+    { name: 'Chroma noise', values: { character: 0, amount: 0.2, size: 1.2, chroma: 0.8 } },
+    { name: 'CRT snow', values: { character: 2, amount: 0.18, size: 1.5, chroma: 0.3, parasites: 0.25 } },
+    { name: 'VHS worn', values: { character: 3, amount: 0.2, size: 2, chroma: 0, parasites: 0.4 } },
+    { name: 'Whisper', values: { character: 1, amount: 0.05, size: 1, chroma: 0 } },
+    { name: 'Broadcast floor', values: { character: 0, amount: 0.1, size: 1, chroma: 0.2 } }
   ],
   'fx-streak': [
     { name: 'Slight drag', values: { reach: 0.02, angle: 0 } },
