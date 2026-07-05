@@ -288,7 +288,7 @@ export function publishOscQuery(): void {
     const knob = st.composition.metaKnobs[k - 1]
     f(`/opsia/meta/${k}`, 0, 1, knob?.value ?? 0, knob?.name ?? `Meta knob ${k}`)
   }
-  nodes.push({ full_path: '/opsia/bpm', type: 'f', range: { min: 20, max: 300 }, value: st.composition.bpm, description: 'Tempo (raw BPM)' })
+  nodes.push({ full_path: '/opsia/bpm', type: 'f', range: { min: 20, max: 800 }, value: st.composition.bpm, description: 'Tempo (raw BPM)' })
   for (const [key, sid] of [['vibe', 'fx-vibe'], ['context', 'fx-context']] as const) {
     for (const d of inputsForShader(sid)) {
       if (d.type !== 'float') continue

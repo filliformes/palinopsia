@@ -96,31 +96,35 @@ export function OscPanel(): JSX.Element {
         />
       </div>
 
-      {/* Two compact info lines with · separators. */}
-      <div
-        className={`flex flex-col gap-0.5 rounded border border-border bg-panel2/40 p-1.5 font-mono text-[9px] leading-relaxed ${
-          oscEnabled && oscListening ? 'text-muted' : 'text-muted/60'
-        }`}
-      >
-        <div>
-          send →{' '}
-          <span className={oscEnabled && oscListening ? 'text-accent' : 'text-text'}>
-            {oscAddresses.length ? oscAddresses.join(' · ') : 'localhost'}
-          </span>
-          :<span className={oscEnabled && oscListening ? 'text-accent' : 'text-text'}>{oscPort}</span>{' '}
-          (UDP) · values <span className="text-text">0–1</span> · <span className="text-text">/opsia/…</span>
-        </div>
-        <div>
-          e.g. <span className="text-text">/opsia/meta/1</span> ·{' '}
-          <span className="text-text">/opsia/layer/1/opacity</span> · OSCQuery{' '}
-          <span className="text-text">:{oscPort + 1}</span>
-        </div>
-      </div>
+      {/* Enabling OSC de-collapses this info block; disabling collapses it. */}
+      {oscEnabled && (
+        <>
+          <div
+            className={`flex flex-col gap-0.5 rounded border border-border bg-panel2/40 p-1.5 font-mono text-[9px] leading-relaxed ${
+              oscListening ? 'text-muted' : 'text-muted/60'
+            }`}
+          >
+            <div>
+              send →{' '}
+              <span className={oscListening ? 'text-accent' : 'text-text'}>
+                {oscAddresses.length ? oscAddresses.join(' · ') : 'localhost'}
+              </span>
+              :<span className={oscListening ? 'text-accent' : 'text-text'}>{oscPort}</span> (UDP) ·
+              values <span className="text-text">0–1</span> · <span className="text-text">/opsia/…</span>
+            </div>
+            <div>
+              e.g. <span className="text-text">/opsia/meta/1</span> ·{' '}
+              <span className="text-text">/opsia/layer/1/opacity</span> · OSCQuery{' '}
+              <span className="text-text">:{oscPort + 1}</span>
+            </div>
+          </div>
 
-      {last && (
-        <div className="truncate font-mono text-[9px] text-accent/80" title={last}>
-          ↙ {last}
-        </div>
+          {last && (
+            <div className="truncate font-mono text-[9px] text-accent/80" title={last}>
+              ↙ {last}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

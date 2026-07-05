@@ -243,7 +243,9 @@ export function collectFloatTargets(c: CompositionState): ModTarget[] {
     addFxTargets(l.sourceBFx, { kind: 'sourceB', layer: li })
     addFxTargets(l.fx, { kind: 'layer', layer: li })
   })
-  addFxTargets(c.master, { kind: 'master' })
+  // Context is deliberately excluded from random modulation targets — it's the
+  // depth finalizer and too powerful to be re-rolled by the Randomizer.
+  addFxTargets(c.master.filter((f) => f.shaderId !== 'fx-context'), { kind: 'master' })
   return out
 }
 

@@ -75,11 +75,12 @@ export function Transport(): JSX.Element {
     <div className="flex items-center gap-4 border-t border-border bg-panel px-4 py-1.5">
       <div className="flex items-center gap-2">
         <span className="font-mono text-[10px] text-muted">BPM</span>
-        <div className="w-16">
+        <div className="w-10">
           <BoundedNumberInput
             value={bpm}
             min={20}
-            max={300}
+            max={800}
+            integer
             onChange={setBpm}
             className="input w-full px-1 py-0.5 text-right text-[11px]"
           />

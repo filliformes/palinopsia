@@ -398,10 +398,9 @@ export default function App(): JSX.Element {
       {/* ── Meta Controller: 32 macro knobs / 4 banks (brief §6) ── */}
       <MetaBar />
 
-      {/* ── OSC input — pinned just above the transport bar (dataFLOU) ── */}
-      <Collapsible sectionKey="osc" title="osc">
-        <OscPanel />
-      </Collapsible>
+      {/* ── OSC input — just above the transport bar; the ON/OFF button IS
+             the collapse (info shows only while listening) ── */}
+      <OscPanel />
 
       {/* ── Transport (BPM + Randomize) ───────────────────────────── */}
       <Transport />

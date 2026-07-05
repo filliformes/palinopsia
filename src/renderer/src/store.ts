@@ -627,7 +627,7 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
   setBpm: (bpm) =>
     set((s) => ({
-      composition: { ...s.composition, bpm: Math.max(20, Math.min(300, bpm)) }
+      composition: { ...s.composition, bpm: Math.max(20, Math.min(800, bpm)) }
     })),
   globalSpeed: 1,
   setGlobalSpeed: (x) => set({ globalSpeed: Math.max(1 / 64, Math.min(64, x)) }),
@@ -894,7 +894,15 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
 
   selection: null,
-  setSelection: (sel) => set({ selection: sel }),
+  setSelection: (sel) =>
+    set((s) => {
+      // Selecting anything (source / FX / Vibe / Context) opens the Inspector
+      // so its controls are immediately visible.
+      if (!sel || !s.collapsed['inspector']) return { selection: sel }
+      const collapsed = { ...s.collapsed, inspector: false }
+      localStorage.setItem('opsia.collapsed', JSON.stringify(collapsed))
+      return { selection: sel, collapsed }
+    }),
 
   uiZoom: (() => {
     const z = Number(localStorage.getItem('opsia.uiZoom'))
