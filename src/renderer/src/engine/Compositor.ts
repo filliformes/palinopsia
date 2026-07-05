@@ -240,11 +240,13 @@ interface SharedGL {
   redirect: { redirect: WebGLFramebuffer | null };
 }
 
-/** One live FX unit inside a rack. */
+/** One live FX unit inside a rack. `isf` is null when the shader failed to
+ *  compile — the unit still exists (so it isn't reloaded every frame) and
+ *  simply passes the image through. */
 interface FxUnit {
   instId: string;
   shaderId: string;
-  isf: ISFRenderer;
+  isf: ISFRenderer | null;
   enabled: boolean;
 }
 
@@ -266,24 +268,24 @@ class FxRack {
       if (!inst.shaderId) continue;
       let unit = byInst.get(inst.id);
       if (unit && unit.shaderId !== inst.shaderId) {
-        unit.isf.cleanup();
+        unit.isf?.cleanup();
         unit = undefined;
       }
       if (!unit) {
         const src = sourceById(inst.shaderId);
-        if (!src) continue;
-        const isf = loadIsf(this.shared.rgl, inst.shaderId, src);
-        if (!isf) continue;
+        // Create the unit even if the source is missing or the compile fails
+        // (isf stays null) so we don't re-attempt the load every frame.
+        const isf = src ? loadIsf(this.shared.rgl, inst.shaderId, src) : null;
         unit = { instId: inst.id, shaderId: inst.shaderId, isf, enabled: inst.enabled };
       }
       unit.enabled = inst.enabled;
       // Push declared param values (auto-UI / OSC write these to the store).
-      for (const [k, v] of Object.entries(inst.inputs)) unit.isf.setValue(k, v);
+      if (unit.isf) for (const [k, v] of Object.entries(inst.inputs)) unit.isf.setValue(k, v);
       byInst.delete(inst.id);
       next.push(unit);
     }
     // Anything left in the map was removed from the rack.
-    for (const gone of byInst.values()) gone.isf.cleanup();
+    for (const gone of byInst.values()) gone.isf?.cleanup();
     this.units = next;
   }
 
@@ -293,13 +295,13 @@ class FxRack {
 
   /** Direct write to one unit's ISF input (the modulation path). */
   setUnitInput(instId: string, name: string, value: number | number[]): void {
-    this.units.find((u) => u.instId === instId)?.isf.setValue(name, value);
+    this.units.find((u) => u.instId === instId)?.isf?.setValue(name, value);
   }
 
   /** Assign this rack's clock (per-layer Speed — see isfTextureBridge). */
   setTime(tSec: number): void {
     for (const u of this.units) {
-      (u.isf as unknown as { __opsiaTimeSec?: number }).__opsiaTimeSec = tSec;
+      if (u.isf) (u.isf as unknown as { __opsiaTimeSec?: number }).__opsiaTimeSec = tSec;
     }
   }
 
@@ -307,7 +309,7 @@ class FxRack {
   apply(input: WebGLTexture, chain: ChainBuffers): WebGLTexture {
     let cur = input;
     for (const u of this.units) {
-      if (!u.enabled) continue;
+      if (!u.enabled || !u.isf) continue;
       const target = chain.next();
       u.isf.setValue('inputImage', handle(cur, chain.w, chain.h) as unknown as number);
       this.shared.redirect.redirect = target.fbo;
@@ -319,7 +321,7 @@ class FxRack {
   }
 
   dispose() {
-    for (const u of this.units) u.isf.cleanup();
+    for (const u of this.units) u.isf?.cleanup();
     this.units = [];
   }
 }
@@ -374,7 +376,11 @@ export class ISFLayer {
     this.rackLayer = new FxRack(shared);
   }
 
-  /** Load/swap/clear a source shader. Feedback buffers survive (brief §1). */
+  /** Load/swap/clear a source shader. Feedback buffers survive (brief §1).
+   *  Records the requested id even when the compile FAILS — otherwise
+   *  syncFromState would see the id still unmatched and re-attempt the load
+   *  every frame (a 60 Hz shader-compile storm that stalls the driver). A
+   *  failed shader just renders transparent until a different one is chosen. */
   setShader(slot: 'A' | 'B', id: string | null, source: string | null): void {
     const cur = slot === 'A' ? this.isfA : this.isfB;
     cur?.cleanup();
@@ -382,10 +388,10 @@ export class ISFLayer {
     if (id && source) next = loadIsf(this.shared.rgl, id, source);
     if (slot === 'A') {
       this.isfA = next;
-      this.shaderIdA = next ? id : null;
+      this.shaderIdA = id;
     } else {
       this.isfB = next;
-      this.shaderIdB = next ? id : null;
+      this.shaderIdB = id;
     }
   }
 

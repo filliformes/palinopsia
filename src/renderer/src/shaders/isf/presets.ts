@@ -12,6 +12,54 @@ export interface ShaderPreset {
 }
 
 export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
+  'sync-osc': [
+    { name: 'Scrolling lines', values: { freq: 12, shape: 0.5, sync: 0.1, rate: 0.5, angle: 0 } },
+    { name: 'Frozen horizontal', values: { freq: 20, shape: 0.3, sync: 0.5, rate: 0, angle: 0 } },
+    { name: 'Frozen vertical', values: { freq: 20, shape: 0.3, sync: 1, rate: 0, angle: 0 } },
+    { name: 'Saw sweep', values: { freq: 8, shape: 0, sync: 0.2, rate: 0.6, angle: 0 } },
+    { name: 'Sine soft', values: { freq: 10, shape: 1, sync: 0.3, rate: 0.3, angle: 0 } },
+    { name: 'Diagonal', values: { freq: 16, shape: 0.4, sync: 0.15, rate: 0.4, angle: 0.79 } },
+    { name: 'Fine raster', values: { freq: 40, shape: 0.5, sync: 0.4, rate: 0.2, angle: 0 } },
+    { name: 'Slow drift', values: { freq: 6, shape: 0.6, sync: 0.05, rate: 0.1, angle: 0 } },
+    { name: 'Amber scan', values: { freq: 14, shape: 0.4, sync: 0.6, rate: 0.15, angle: 0, loA: [0.03, 0.02, 0.01, 1], hiA: [0.95, 0.65, 0.2, 1] } },
+    { name: 'Cold V-hold', values: { freq: 24, shape: 0.5, sync: 0.9, rate: 0.1, angle: 0, loA: [0.02, 0.04, 0.08, 1], hiA: [0.55, 0.8, 0.9, 1] } }
+  ],
+  'fx-light-trails': [
+    { name: 'Long exposure', values: { decay: 0.99, drift: 0, angle: 1.5708 } },
+    { name: 'Fading streaks', values: { decay: 0.95, drift: 0, angle: 1.5708 } },
+    { name: 'Comet drift', values: { decay: 0.97, drift: 0.006, angle: 0 } },
+    { name: 'Rising light', values: { decay: 0.98, drift: 0.004, angle: 1.5708 } },
+    { name: 'Permanent', values: { decay: 1, drift: 0, angle: 0 } },
+    { name: 'Short trails', values: { decay: 0.9, drift: 0, angle: 0 } },
+    { name: 'Diagonal smear', values: { decay: 0.97, drift: 0.008, angle: 0.79 } },
+    { name: 'Falling', values: { decay: 0.96, drift: 0.005, angle: 4.7124 } },
+    { name: 'Slow bloom drift', values: { decay: 0.985, drift: 0.012, angle: 3.1416 } },
+    { name: 'Gentle persist', values: { decay: 0.93, drift: 0.002, angle: 1.5708 } }
+  ],
+  'fx-hue-rotate': [
+    { name: 'Quarter turn', values: { shift: 0.25, byLuma: 0 } },
+    { name: 'Complement', values: { shift: 0.5, byLuma: 0 } },
+    { name: 'Slight warm', values: { shift: 0.08, byLuma: 0 } },
+    { name: 'Lights shift', values: { shift: 0.3, byLuma: 0.6 } },
+    { name: 'Shadows shift', values: { shift: 0.3, byLuma: -0.6 } },
+    { name: 'Third turn', values: { shift: 0.33, byLuma: 0 } },
+    { name: 'Full cycle base', values: { shift: 0.75, byLuma: 0 } },
+    { name: 'Subtle drift', values: { shift: 0.05, byLuma: 0.2 } },
+    { name: 'Split hue', values: { shift: 0.4, byLuma: 0.4 } },
+    { name: 'Reverse split', values: { shift: 0.6, byLuma: -0.3 } }
+  ],
+  'fx-rgb-shift': [
+    { name: 'Light fringe', values: { offset: 0.006, scale: 0.01, angle: 0, wobble: 0 } },
+    { name: 'Strong split', values: { offset: 0.025, scale: 0.04, angle: 0, wobble: 0 } },
+    { name: 'Vertical split', values: { offset: 0.012, scale: 0.02, angle: 1.5708, wobble: 0 } },
+    { name: 'Breathing', values: { offset: 0.01, scale: 0.03, angle: 0, wobble: 0.6 } },
+    { name: 'Scale only', values: { offset: 0, scale: 0.05, angle: 0, wobble: 0 } },
+    { name: 'Offset only', values: { offset: 0.03, scale: 0, angle: 0.4, wobble: 0 } },
+    { name: 'Diagonal drift', values: { offset: 0.015, scale: 0.025, angle: 0.79, wobble: 0.3 } },
+    { name: 'Extreme', values: { offset: 0.04, scale: 0.06, angle: 0, wobble: 0.4 } },
+    { name: 'Micro fringe', values: { offset: 0.004, scale: 0.005, angle: 0, wobble: 0 } },
+    { name: 'Wobble split', values: { offset: 0.018, scale: 0.03, angle: 1.5708, wobble: 0.9 } }
+  ],
   'rgb-osc': [
     { name: 'Colour crawl', values: { waveform: 0, freq: 6, spread: 0.25, symmetry: 0.5, angle: 0.3, rate: 0.3, level: 0.8 } },
     { name: 'Fine weave', values: { waveform: 0, freq: 18, spread: 0.15, symmetry: 0.5, angle: 0.2, rate: 0.15, level: 0.75 } },

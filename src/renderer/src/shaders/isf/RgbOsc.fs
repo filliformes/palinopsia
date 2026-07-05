@@ -22,10 +22,12 @@ float osc(float x, float wf) {
 }
 
 // One channel: mix of a horizontal and vertical oscillator (symmetry blends
-// the axes), at frequency f with time/phase offset ph.
+// the axes), at frequency f with time/phase offset ph. `waveform` is an ISF
+// 'long' → a GLSL `int` uniform, so cast it before the float-typed osc().
 float chan(vec2 p, float f, float ph, float t) {
-  float h = osc(p.x * f + t + ph, waveform);
-  float v = osc(p.y * f - t * 0.9 + ph * 1.3, waveform);
+  float wf = float(waveform);
+  float h = osc(p.x * f + t + ph, wf);
+  float v = osc(p.y * f - t * 0.9 + ph * 1.3, wf);
   return mix(h, v, symmetry);
 }
 

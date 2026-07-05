@@ -28,6 +28,7 @@ import ramps from './Ramps.fs?raw'
 import rgbOsc from './RgbOsc.fs?raw'
 import recurse from './Recurse.fs?raw'
 import shapes from './Shapes.fs?raw'
+import syncOsc from './SyncOsc.fs?raw'
 import posterize from './fx/Posterize.fs?raw'
 import dither from './fx/Dither.fs?raw'
 import chromaShift from './fx/ChromaShift.fs?raw'
@@ -56,6 +57,9 @@ import wavefold from './fx/Wavefold.fs?raw'
 import rutt from './fx/Rutt.fs?raw'
 import crtScreen from './fx/CrtScreen.fs?raw'
 import pixelmask from './fx/Pixelmask.fs?raw'
+import lightTrails from './fx/LightTrails.fs?raw'
+import hueRotate from './fx/HueRotate.fs?raw'
+import rgbShift from './fx/RgbShift.fs?raw'
 import syncLoss from './fx/SyncLoss.fs?raw'
 import rowEcho from './fx/RowEcho.fs?raw'
 import byteCorrupt from './fx/ByteCorrupt.fs?raw'
@@ -272,6 +276,13 @@ export const GENERATORS: IsfShader[] = [
     category: 'Generator',
     source: shapes,
     curated: { count: [1, 12], size: [0.2, 0.85], soft: [0.02, 0.3], rate: [0.05, 1.2] }
+  },
+  {
+    id: 'sync-osc',
+    name: 'Sync Osc',
+    category: 'Generator',
+    source: syncOsc,
+    curated: { freq: [3, 40], shape: [0, 1], sync: [0, 1], rate: [0.05, 1.5], angle: [0, 6.2832] }
   }
 ]
 
@@ -419,7 +430,23 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-pixelmask', name: 'Pixelmask', category: 'FX', source: pixelmask,
     curated: { scale: [1.5, 8], amount: [0.3, 0.9] }
+  },
+  {
+    id: 'fx-light-trails', name: 'Light Trails', category: 'FX', source: lightTrails,
+    curated: { decay: [0.9, 0.99], drift: [0, 0.012], angle: [0, 6.2832] }
+  },
+  {
+    id: 'fx-hue-rotate', name: 'Hue Rotate', category: 'FX', source: hueRotate,
+    curated: { shift: [0, 1], byLuma: [-0.6, 0.6] }
+  },
+  {
+    id: 'fx-rgb-shift', name: 'RGB Shift', category: 'FX', source: rgbShift,
+    curated: { offset: [0.003, 0.04], scale: [0, 0.06], angle: [0, 6.2832], wobble: [0, 0.7] }
   }
+  // PHASE 9 (post-MVP experiment): Cross-FM — a source that takes ANOTHER
+  // layer's frame as a video-rate FM input (Lumen A→B→C→A cross-oscillator
+  // feedback). Needs engine plumbing (a second image input bound to a layer
+  // buffer), so it waits with WebGPU (brief §15.1). Not built here.
 ]
 
 // The Vibe mastering stage — pinned to the master rack's end (store-locked),
