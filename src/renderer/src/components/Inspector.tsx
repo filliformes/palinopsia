@@ -11,6 +11,7 @@ import { useStore, type FxScope } from '../store'
 import { AutoControls } from './AutoControls'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
+import { VideoTransport } from './VideoTransport'
 
 // The Vibe Palette's "main" colour = its most characterful stop (highest
 // chroma, luma as a tiebreak), brightened a touch so it reads as a light
@@ -113,17 +114,24 @@ export function Inspector(): JSX.Element {
   }
 
   if (!shaderId) {
-    if (videoName) {
+    if (videoName && selection?.type === 'source') {
+      const vslot =
+        selection.slot === 'A'
+          ? composition.layers[selection.layer]?.sourceA
+          : composition.layers[selection.layer]?.sourceB
       return (
-        <div className="rounded-md border border-border bg-panel p-3">
-          <div className="flex items-center gap-2">
+        <div className="rounded-md border border-border bg-panel">
+          <div className="flex items-center gap-2 px-3 pt-3">
             <span className="text-[12px] font-semibold">🎞 {videoName}</span>
             <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{context}</span>
           </div>
-          <p className="mt-1.5 text-[11px] text-muted">
+          <p className="px-3 pb-2 pt-1.5 text-[11px] text-muted">
             Video source. Add FX to this source&apos;s rack to synthify it
             (posterize · dither · key · chroma-shift · feedback).
           </p>
+          {vslot && (
+            <VideoTransport layer={selection.layer} slot={selection.slot} state={vslot} />
+          )}
         </div>
       )
     }

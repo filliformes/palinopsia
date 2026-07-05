@@ -65,6 +65,13 @@ export interface SourceSlot extends ShaderInstance {
   mediaId?: string
   // For kind:'video' — the file's display name, shown in the source picker.
   mediaName?: string
+  // For kind:'video' — transport (all optional; engine applies defaults).
+  videoPlaying?: boolean // default true
+  videoSpeed?: number // 1/28..128, default 1 (× layer speed × global speed)
+  videoReverse?: boolean // play direction, default false (forward)
+  videoLoop?: boolean // default true
+  videoIn?: number // normalized start point 0..1, default 0
+  videoOut?: number // normalized stop point 0..1, default 1
 }
 
 // One FX in a rack. Every FX is an ISF shader (per brief §5).

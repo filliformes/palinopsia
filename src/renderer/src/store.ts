@@ -264,6 +264,17 @@ interface StoreState {
   // Point a slot at an imported video clip (kind:'video'). mediaId is the clip's
   // object URL; mediaName is shown in the picker.
   setSourceVideo: (layer: number, slot: 'A' | 'B', mediaId: string, mediaName: string) => void
+  // Patch a video slot's transport (play/speed/reverse/loop/in/out).
+  setVideoPlayback: (
+    layer: number,
+    slot: 'A' | 'B',
+    patch: Partial<
+      Pick<
+        SourceSlot,
+        'videoPlaying' | 'videoSpeed' | 'videoReverse' | 'videoLoop' | 'videoIn' | 'videoOut'
+      >
+    >
+  ) => void
   setLayerSpeed: (layer: number, v: number) => void
   // Replace the master chain; the chain's vibe settings merge onto the
   // pinned Vibe Palette (which stays pinned, keeps identity + enable state).
@@ -667,12 +678,36 @@ export const useStore = create<StoreState>((set, get) => ({
       composition: {
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => {
-          const vid = { kind: 'video' as const, shaderId: null, inputs: {}, mediaId, mediaName }
+          const vid = {
+            kind: 'video' as const,
+            shaderId: null,
+            inputs: {},
+            mediaId,
+            mediaName,
+            videoPlaying: true,
+            videoSpeed: 1,
+            videoReverse: false,
+            videoLoop: true,
+            videoIn: 0,
+            videoOut: 1
+          }
           if (slot === 'A') return { ...l, sourceA: vid }
           return { ...l, sourceB: vid }
         })
       },
       selection: { type: 'source', layer, slot }
+    })),
+  setVideoPlayback: (layer, slot, patch) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => {
+          const cur = slot === 'A' ? l.sourceA : l.sourceB
+          if (!cur || cur.kind !== 'video') return l
+          const next = { ...cur, ...patch }
+          return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
+        })
+      }
     })),
   setLayerSpeed: (layer, v) =>
     set((s) => ({

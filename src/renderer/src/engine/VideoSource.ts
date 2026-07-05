@@ -6,22 +6,84 @@
 // luma/edge key → chroma shift → optional feedback) runs as ISF FX on top of
 // this texture — it lives in the FX rack, not here. No Hap dependency.
 
+export interface VideoPlayback {
+  playing: boolean
+  speed: number // base clip speed (× the engine dt this receives)
+  reverse: boolean
+  loop: boolean
+  inN: number // normalized start 0..1
+  outN: number // normalized stop 0..1
+}
+
 export class VideoSource {
   readonly video: HTMLVideoElement
   private tex: WebGLTexture | null = null
+  private pb: VideoPlayback = {
+    playing: true,
+    speed: 1,
+    reverse: false,
+    loop: true,
+    inN: 0,
+    outN: 1
+  }
 
   constructor(private gl: WebGL2RenderingContext) {
     this.video = document.createElement('video')
-    this.video.loop = true
+    // We drive currentTime ourselves (reverse + arbitrary speed need it), so
+    // native looping/playback is off — the decoder just has to be warm.
+    this.video.loop = false
     this.video.muted = true
     this.video.playsInline = true
+    this.video.preload = 'auto'
   }
 
   load(src: string): void {
     this.video.src = src
-    // Autoplay may defer until a user gesture; the app is always gesture-driven
-    // (the user just clicked to import), so this resolves in practice.
-    void this.video.play().catch(() => {})
+    // Play once to warm the decoder (so seeks decode frames), then pause — from
+    // there tick() owns the playhead. Autoplay is allowed: import is a gesture.
+    void this.video
+      .play()
+      .then(() => this.video.pause())
+      .catch(() => {})
+  }
+
+  setPlayback(p: VideoPlayback): void {
+    this.pb = p
+  }
+
+  duration(): number {
+    const d = this.video.duration
+    return Number.isFinite(d) && d > 0 ? d : 0
+  }
+
+  time(): number {
+    return this.video.currentTime
+  }
+
+  /** Advance the playhead by `effDt` seconds of engine time (already scaled by
+   *  the layer + global speed); the clip's own speed and direction apply here.
+   *  Wraps within the [in, out] trim when looping, else clamps at the ends. */
+  tick(effDt: number): void {
+    const d = this.duration()
+    if (d <= 0) return
+    const inSec = Math.max(0, Math.min(1, this.pb.inN)) * d
+    const outSec = Math.max(0, Math.min(1, this.pb.outN)) * d
+    const lo = Math.min(inSec, outSec)
+    const hi = Math.max(inSec, outSec)
+    const span = Math.max(0.001, hi - lo)
+    let t = this.video.currentTime
+    // Snap into the trim window if the playhead is outside it.
+    if (t < lo || t > hi) t = this.pb.reverse ? hi : lo
+    if (!this.pb.playing) return
+    t += effDt * this.pb.speed * (this.pb.reverse ? -1 : 1)
+    if (t > hi) t = this.pb.loop ? lo + ((t - lo) % span) : hi
+    else if (t < lo) t = this.pb.loop ? hi - ((lo - t) % span) : lo
+    if (!Number.isFinite(t)) t = lo
+    try {
+      this.video.currentTime = t
+    } catch {
+      /* a seek can race a src reload — ignore, next frame retries */
+    }
   }
 
   /** Upload the current frame to a GL texture and return it (null until the

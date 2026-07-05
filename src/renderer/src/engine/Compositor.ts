@@ -29,6 +29,8 @@
 import { Renderer as ISFRenderer } from 'interactive-shader-format';
 import { handle, installTextureBridge } from './isfTextureBridge';
 import { VideoSource } from './VideoSource';
+import { videoPlayheads, videoKey } from './videoState';
+import type { SourceSlot } from '@shared/types';
 import type { CompositionState, FxInstance, FxScope } from '@shared/types';
 
 installTextureBridge();
@@ -477,6 +479,35 @@ export class ISFLayer {
     else { this.videoB = next; this.mediaIdB = mediaId; }
   }
 
+  /** Push transport params (play/speed/reverse/loop/in/out) to a video slot. */
+  setVideoPlayback(slot: 'A' | 'B', s: SourceSlot | null | undefined): void {
+    const v = slot === 'A' ? this.videoA : this.videoB;
+    if (!v || !s) return;
+    v.setPlayback({
+      playing: s.videoPlaying ?? true,
+      speed: s.videoSpeed ?? 1,
+      reverse: s.videoReverse ?? false,
+      loop: s.videoLoop ?? true,
+      inN: s.videoIn ?? 0,
+      outN: s.videoOut ?? 1
+    });
+  }
+
+  /** Advance video playheads by this layer's effective dt and publish them for
+   *  the Inspector timeline. `effDt` already folds in layer + global speed. */
+  tickVideos(layerIndex: number, effDt: number): void {
+    for (const slot of ['A', 'B'] as const) {
+      const v = slot === 'A' ? this.videoA : this.videoB;
+      const key = videoKey(layerIndex, slot);
+      if (v) {
+        v.tick(effDt);
+        videoPlayheads.set(key, { time: v.time(), duration: v.duration() });
+      } else {
+        videoPlayheads.delete(key);
+      }
+    }
+  }
+
   setInput(slot: 'A' | 'B', name: string, value: number | number[]) {
     (slot === 'A' ? this.isfA : this.isfB)?.setValue(name, value);
   }
@@ -702,6 +733,8 @@ export class Compositor {
       const wantVidB = l.sourceB && l.sourceB.kind === 'video' ? (l.sourceB.mediaId ?? null) : null;
       if (wantB !== L.shaderIdB) L.setShader('B', wantB, wantB ? sourceById(wantB) : null);
       L.setVideo('B', wantVidB);
+      L.setVideoPlayback('A', l.sourceA);
+      L.setVideoPlayback('B', l.sourceB);
       L.blend = l.blend;
       L.opacity = l.opacity;
       L.mute = l.mute;
@@ -799,8 +832,12 @@ export class Compositor {
     // Per layer: sources → per-source racks → mix → layer rack → persist.
     // The result of each stage lives in shared buffers only until persist
     // writes it into the layer's own ping-pong pair.
-    for (const L of this.layers) {
+    for (let li = 0; li < this.layers.length; li++) {
+      const L = this.layers[li];
       L.advanceClock(dtSec);
+      // Video playheads advance by the layer's effective dt (dt·globalSpeed
+      // already, times the layer Speed) — so both scale the clip's playback.
+      L.tickVideos(li, dtSec * L.speed);
       gl.bindVertexArray(null); // ISF draws own the default VAO
       L.renderSource('A');
       let sig = L.rackA.apply(L.scratchA.tex, this.chain);
