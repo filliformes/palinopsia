@@ -29,6 +29,7 @@ import rgbOsc from './RgbOsc.fs?raw'
 import recurse from './Recurse.fs?raw'
 import shapes from './Shapes.fs?raw'
 import syncOsc from './SyncOsc.fs?raw'
+import differential from './Differential.fs?raw'
 import posterize from './fx/Posterize.fs?raw'
 import dither from './fx/Dither.fs?raw'
 import chromaShift from './fx/ChromaShift.fs?raw'
@@ -60,6 +61,8 @@ import pixelmask from './fx/Pixelmask.fs?raw'
 import lightTrails from './fx/LightTrails.fs?raw'
 import hueRotate from './fx/HueRotate.fs?raw'
 import rgbShift from './fx/RgbShift.fs?raw'
+import granular from './fx/Granular.fs?raw'
+import mosaic from './fx/Mosaic.fs?raw'
 import syncLoss from './fx/SyncLoss.fs?raw'
 import rowEcho from './fx/RowEcho.fs?raw'
 import byteCorrupt from './fx/ByteCorrupt.fs?raw'
@@ -285,6 +288,22 @@ export const GENERATORS: IsfShader[] = [
     category: 'Generator',
     source: syncOsc,
     curated: { freq: [3, 40], shape: [0, 1], sync: [0, 1], rate: [0.05, 1.5], angle: [0, 6.2832] }
+  },
+  {
+    id: 'differential',
+    name: 'Differential',
+    category: 'Generator',
+    source: differential,
+    curated: {
+      count: [2, 6],
+      ratio: [1.5, 3],
+      rate: [0.1, 2],
+      freq: [1.5, 8],
+      thickness: [0.05, 0.3],
+      lines: [3, 12],
+      skew: [0.1, 0.7],
+      angle: [0, 6.2832]
+    }
   }
 ]
 
@@ -444,6 +463,14 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-rgb-shift', name: 'RGB Shift', category: 'FX', source: rgbShift,
     curated: { offset: [0.003, 0.04], scale: [0, 0.06], angle: [0, 6.2832], wobble: [0, 0.7] }
+  },
+  {
+    id: 'fx-granular', name: 'Granular', category: 'FX', source: granular,
+    curated: { grain: [0.2, 0.8], density: [0.5, 1], scatter: [0, 0.5], rotate: [0, 0.5], smear: [0, 0.6], rate: [0.1, 3] }
+  },
+  {
+    id: 'fx-mosaic', name: 'Mosaic', category: 'FX', source: mosaic,
+    curated: { grid: [0.2, 0.7], size: [0.5, 1], lumaSize: [0.2, 0.9], soft: [0.02, 0.2], shape: [0, 3], gapMix: [0, 0.4] }
   }
   // PHASE 9 (post-MVP experiment): Cross-FM — a source that takes ANOTHER
   // layer's frame as a video-rate FM input (Lumen A→B→C→A cross-oscillator

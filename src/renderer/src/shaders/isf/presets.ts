@@ -348,7 +348,37 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Halo', values: { trails: 0.3, blur: 0.18, bloom: 0.8, depth: 0.4, haze: 0.2, atmosphere: [0.4, 0.45, 0.6, 1], lightGlow: 0.6, lightSize: 0.55, lightColor: [1, 1, 0.95, 1], light: [0.5, 0.5] } },
     { name: 'Vapor', values: { trails: 0.55, blur: 0.5, bloom: 0.45, depth: 0.3, haze: 0.4, atmosphere: [0.7, 0.55, 0.75, 1], lightGlow: 0.3, lightSize: 0.9, lightColor: [0.85, 0.9, 1, 1], light: [0.45, 0.45] } }
   ],
+  'fx-granular': [
+    { name: 'Fine grain', values: { grain: 0.7, density: 0.9, scatter: 0.1, rotate: 0.1, smear: 0.2, rate: 0.6 } },
+    { name: 'Coarse tiles', values: { grain: 0.25, density: 0.95, scatter: 0.05, rotate: 0.05, smear: 0.15, rate: 0.3 } },
+    { name: 'Scatter storm', values: { grain: 0.5, density: 0.7, scatter: 0.5, rotate: 0.4, smear: 0.35, rate: 2 } },
+    { name: 'Slow smear', values: { grain: 0.45, density: 0.85, scatter: 0.2, rotate: 0.15, smear: 0.6, rate: 0.2 } },
+    { name: 'Sparse flecks', values: { grain: 0.6, density: 0.45, scatter: 0.35, rotate: 0.25, smear: 0.4, rate: 1 } },
+    { name: 'Spin grains', values: { grain: 0.55, density: 0.9, scatter: 0.15, rotate: 0.6, smear: 0.25, rate: 1.5 } },
+    { name: 'Echo cloud', values: { grain: 0.4, density: 0.75, scatter: 0.3, rotate: 0.2, smear: 0.55, rate: 0.8 } },
+    { name: 'Freeze dust', values: { grain: 0.75, density: 0.6, scatter: 0.45, rotate: 0.3, smear: 0.5, rate: 0.1 } }
+  ],
+  'fx-mosaic': [
+    { name: 'Dot screen', values: { grid: 0.5, size: 0.85, lumaSize: 0.7, soft: 0.06, shape: 1, gapMix: 0 } },
+    { name: 'Fine tiles', values: { grid: 0.7, size: 0.95, lumaSize: 0.3, soft: 0.04, shape: 0, gapMix: 0.1 } },
+    { name: 'Big blocks', values: { grid: 0.2, size: 0.9, lumaSize: 0.2, soft: 0.05, shape: 0, gapMix: 0 } },
+    { name: 'Luma dots', values: { grid: 0.55, size: 0.8, lumaSize: 0.9, soft: 0.08, shape: 1, gapMix: 0 } },
+    { name: 'Diamond weave', values: { grid: 0.45, size: 0.85, lumaSize: 0.5, soft: 0.05, shape: 2, gapMix: 0.15 } },
+    { name: 'Cross-stitch', values: { grid: 0.4, size: 0.9, lumaSize: 0.4, soft: 0.04, shape: 3, gapMix: 0.05 } },
+    { name: 'Soft bokeh', values: { grid: 0.35, size: 0.9, lumaSize: 0.6, soft: 0.2, shape: 1, gapMix: 0.2 } },
+    { name: 'Ghost grid', values: { grid: 0.5, size: 0.7, lumaSize: 0.5, soft: 0.1, shape: 1, gapMix: 0.4 } }
+  ],
   // ── Generators ──────────────────────────────────────────────────────
+  differential: [
+    { name: 'Octaves', values: { count: 4, ratio: 2, rate: 0.4, freq: 3, thickness: 0.12, lines: 6, skew: 0.35, angle: 0.4 } },
+    { name: 'Triads', values: { count: 3, ratio: 1.5, rate: 0.3, freq: 4, thickness: 0.1, lines: 5, skew: 0.5, angle: 0.8 } },
+    { name: 'Dense weave', values: { count: 6, ratio: 2, rate: 0.5, freq: 7, thickness: 0.08, lines: 10, skew: 0.3, angle: 1.2 } },
+    { name: 'Slow drift', values: { count: 3, ratio: 2.5, rate: 0.12, freq: 2, thickness: 0.18, lines: 4, skew: 0.4, angle: 0.2 } },
+    { name: 'Beat lattice', values: { count: 5, ratio: 3, rate: 0.7, freq: 5, thickness: 0.1, lines: 8, skew: 0.6, angle: 2 } },
+    { name: 'Broad bands', values: { count: 2, ratio: 2, rate: 0.25, freq: 1.5, thickness: 0.28, lines: 3, skew: 0.2, angle: 0.5, tint: [0.7, 0.72, 0.68, 1] } },
+    { name: 'Nervous', values: { count: 6, ratio: 2.7, rate: 1.4, freq: 8, thickness: 0.06, lines: 12, skew: 0.55, angle: 3, tint: [0.8, 0.55, 0.3, 1] } },
+    { name: 'Tidal', values: { count: 4, ratio: 1.8, rate: 0.18, freq: 2.5, thickness: 0.15, lines: 5, skew: 0.45, angle: 1.5, tint: [0.5, 0.68, 0.7, 1] } }
+  ],
   'drift-field': [
     { name: 'Slow tide', values: { rate: 0.07, scale: 1.6, warp: 0.3, steps: 4, contrast: 1.05, split: 0.08 } },
     { name: 'Topo map', values: { rate: 0.12, scale: 3.4, warp: 0.85, steps: 9, contrast: 1.3, split: 0.05 } },
