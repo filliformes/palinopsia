@@ -33,8 +33,17 @@ function loadScope(): RandomizeScope {
   return s && SCOPES.some((x) => x.scope === s) ? s : 'all'
 }
 
+// 1/64×…64× shown as a compact fraction/multiple.
+function fmtSpeed(s: number): string {
+  if (Math.abs(s - 1) < 0.02) return '1×'
+  if (s > 1) return (s < 10 ? s.toFixed(1).replace(/\.0$/, '') : String(Math.round(s))) + '×'
+  return '1/' + Math.round(1 / s) + '×'
+}
+
 export function Transport(): JSX.Element {
   const bpm = useStore((s) => s.composition.bpm)
+  const globalSpeed = useStore((s) => s.globalSpeed)
+  const setGlobalSpeed = useStore((s) => s.setGlobalSpeed)
   const setComposition = useStore.setState
   const [menuOpen, setMenuOpen] = useState(false)
   const [scope, setScope] = useState<RandomizeScope>(loadScope)
@@ -75,6 +84,23 @@ export function Transport(): JSX.Element {
             className="input w-full px-1 py-0.5 text-right text-[11px]"
           />
         </div>
+      </div>
+
+      {/* Global speed — scales every visual clock, 1/64×…64× (log). */}
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-[10px] text-muted">SPEED</span>
+        <input
+          type="range"
+          min={-6}
+          max={6}
+          step={0.02}
+          value={Math.log2(globalSpeed)}
+          onChange={(e) => setGlobalSpeed(Math.pow(2, Number(e.target.value)))}
+          onDoubleClick={() => setGlobalSpeed(1)}
+          className="w-28 accent-accent"
+          title={`Global speed ${fmtSpeed(globalSpeed)} — double-click to reset to 1×`}
+        />
+        <span className="w-9 shrink-0 font-mono text-[10px] text-muted">{fmtSpeed(globalSpeed)}</span>
       </div>
 
       <div className="flex-1" />

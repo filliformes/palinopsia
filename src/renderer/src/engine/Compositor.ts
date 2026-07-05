@@ -251,6 +251,10 @@ interface SharedGL {
   // freeze), so we cap loads per frame and let the rest come in over the next
   // few frames. Reset at the top of syncFromState.
   budget: { n: number };
+  // Dry/wet blend for per-FX opacity — writes into a dedicated ping-pong so it
+  // can't collide with the chain buffers. Set by the Compositor once its blend
+  // program is ready. Returns the texture holding mix(dry, wet, opacity).
+  blendDryWet?: (dry: WebGLTexture, wet: WebGLTexture, opacity: number) => WebGLTexture;
 }
 
 const LOADS_PER_FRAME = 4;
@@ -263,6 +267,7 @@ interface FxUnit {
   shaderId: string;
   isf: ISFRenderer | null;
   enabled: boolean;
+  opacity: number; // dry/wet
 }
 
 /**
@@ -297,9 +302,10 @@ class FxRack {
         // Create the unit even if the source is missing or the compile fails
         // (isf stays null) so we don't re-attempt the load every frame.
         const isf = src ? loadIsf(this.shared.rgl, inst.shaderId, src) : null;
-        unit = { instId: inst.id, shaderId: inst.shaderId, isf, enabled: inst.enabled };
+        unit = { instId: inst.id, shaderId: inst.shaderId, isf, enabled: inst.enabled, opacity: 1 };
       }
       unit.enabled = inst.enabled;
+      unit.opacity = inst.opacity ?? 1;
       // Push declared param values (auto-UI / OSC write these to the store).
       if (unit.isf) for (const [k, v] of Object.entries(inst.inputs)) unit.isf.setValue(k, v);
       byInst.delete(inst.id);
@@ -331,12 +337,17 @@ class FxRack {
     let cur = input;
     for (const u of this.units) {
       if (!u.enabled || !u.isf) continue;
+      const dry = cur;
       const target = chain.next();
       u.isf.setValue('inputImage', handle(cur, chain.w, chain.h) as unknown as number);
       this.shared.redirect.redirect = target.fbo;
       u.isf.draw({ width: chain.w, height: chain.h });
       this.shared.redirect.redirect = null;
-      cur = target.tex;
+      // Per-FX opacity: blend the wet result back over the dry input.
+      cur =
+        u.opacity < 0.999 && this.shared.blendDryWet
+          ? this.shared.blendDryWet(dry, target.tex, u.opacity)
+          : target.tex;
     }
     return cur;
   }
@@ -466,6 +477,11 @@ export class Compositor {
   private shared: SharedGL;
   private chain: ChainBuffers;
   private mixTarget: { fbo: WebGLFramebuffer; tex: WebGLTexture };
+  // Dedicated dry/wet ping-pong for per-FX opacity (kept off the main chain).
+  private fxOpac: [{ fbo: WebGLFramebuffer; tex: WebGLTexture }, { fbo: WebGLFramebuffer; tex: WebGLTexture }] | null = null;
+  private fxOpacI = 0;
+  // Global time multiplier (1/64×…64×) — scales every visual clock.
+  private globalSpeed = 1;
   private blendProg: WebGLProgram;
   private persistProg: WebGLProgram;
   private mixProg: WebGLProgram;
@@ -525,8 +541,22 @@ export class Compositor {
     this.acc = new PingPong(gl, w, h);
     this.chain = new ChainBuffers(gl, w, h);
     this.mixTarget = makeTarget(gl, w, h);
+    this.fxOpac = [makeTarget(gl, w, h), makeTarget(gl, w, h)];
+    // Now that the blend program + its uniforms exist, expose the dry/wet mix
+    // to the racks. Alternating the two targets guarantees dst ≠ dry.
+    this.shared.blendDryWet = (dry, wet, opacity) => {
+      this.fxOpacI = 1 - this.fxOpacI;
+      const t = this.fxOpac![this.fxOpacI];
+      this.blendInto(t.fbo, dry, wet, 'normal', opacity);
+      return t.tex;
+    };
     this.masterRack = new FxRack(this.shared);
     for (let i = 0; i < 4; i++) this.layers.push(new ISFLayer(this.shared, w, h));
+  }
+
+  /** Global time multiplier (1/64×…64×) — scales the master + layer clocks. */
+  setGlobalSpeed(x: number): void {
+    this.globalSpeed = Math.max(1 / 64, Math.min(64, x));
   }
 
   /**
@@ -629,8 +659,11 @@ export class Compositor {
     const gl = this.gl;
 
     // Per-layer clocks (the Speed control): dt · speed, master at realtime.
-    const dtSec = this.lastNowMs > 0 ? Math.min(0.2, (timeMs - this.lastNowMs) / 1000) : 1 / 60;
+    // The global-speed multiplier scales the real delta before it feeds any
+    // clock, so 1/64×…64× stretches/compresses ALL motion without time jumps.
+    const rawDt = this.lastNowMs > 0 ? Math.min(0.2, (timeMs - this.lastNowMs) / 1000) : 1 / 60;
     this.lastNowMs = timeMs;
+    const dtSec = rawDt * this.globalSpeed;
     this.masterClockSec += dtSec;
     this.masterRack.setTime(this.masterClockSec);
 

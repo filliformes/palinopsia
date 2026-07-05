@@ -69,6 +69,9 @@ export interface SourceSlot extends ShaderInstance {
 export interface FxInstance extends ShaderInstance {
   id: string
   enabled: boolean
+  // Dry/wet — the engine blends the FX output back over its input by this
+  // amount (1 = fully wet). Undefined ⇒ 1 for older sessions.
+  opacity?: number
   // Pinned rack units (the master Vibe Palette): always on, not removable,
   // always last in the chain.
   locked?: boolean

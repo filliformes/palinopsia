@@ -34,6 +34,23 @@ export function AutoControls({
   if (inputs.length === 0) {
     return <div className="p-2 text-[11px] text-muted">This shader exposes no controls.</div>
   }
+  // posX + posY collapse into one "POS" cell with the two sliders side by side.
+  const hasPosPair =
+    inputs.some((i) => i.name === 'posX') && inputs.some((i) => i.name === 'posY')
+  const visible = (arr: IsfInputDesc[]): IsfInputDesc[] =>
+    hasPosPair ? arr.filter((i) => i.name !== 'posY') : arr
+  const renderControl = (inp: IsfInputDesc): JSX.Element =>
+    hasPosPair && inp.name === 'posX' ? (
+      <PosPairControl key="pos" inputs={inputs} values={values} onChange={onChange} />
+    ) : (
+      <Control
+        key={inp.name}
+        inp={inp}
+        value={values[inp.name]}
+        onChange={onChange}
+        modTargetFor={modTargetFor}
+      />
+    )
   if (layout === 'twoRow') {
     // XY pads (point2D) are tall — flowing them through the two-row grid
     // leaves a ragged column and dead space. Pull them out and stand them to
@@ -46,31 +63,13 @@ export function AutoControls({
     return (
       <div className={`flex h-full items-center gap-5 p-2 ${singleRow ? 'justify-center' : ''}`}>
         {singleRow ? (
-          <div className="flex items-center gap-5">
-            {rest.map((inp) => (
-              <Control
-                key={inp.name}
-                inp={inp}
-                value={values[inp.name]}
-                onChange={onChange}
-                modTargetFor={modTargetFor}
-              />
-            ))}
-          </div>
+          <div className="flex items-center gap-5">{visible(rest).map(renderControl)}</div>
         ) : (
           <div
             className="grid grid-flow-col content-start gap-x-5 gap-y-2"
             style={{ gridTemplateRows: 'repeat(2, min-content)', gridAutoColumns: '11rem' }}
           >
-            {rest.map((inp) => (
-              <Control
-                key={inp.name}
-                inp={inp}
-                value={values[inp.name]}
-                onChange={onChange}
-                modTargetFor={modTargetFor}
-              />
-            ))}
+            {visible(rest).map(renderControl)}
           </div>
         )}
         {pads.length > 0 && (
@@ -90,16 +89,62 @@ export function AutoControls({
     )
   }
   return (
-    <div className="flex flex-wrap gap-x-5 gap-y-2 p-2">
-      {inputs.map((inp) => (
-        <Control
-          key={inp.name}
-          inp={inp}
-          value={values[inp.name]}
-          onChange={onChange}
-          modTargetFor={modTargetFor}
-        />
-      ))}
+    <div className="flex flex-wrap gap-x-5 gap-y-2 p-2">{visible(inputs).map(renderControl)}</div>
+  )
+}
+
+// posX + posY as two sliders on ONE line (a compact stand-in for an XY pad).
+function PosPairControl({
+  inputs,
+  values,
+  onChange
+}: {
+  inputs: IsfInputDesc[]
+  values: Record<string, Value>
+  onChange: (name: string, value: Value) => void
+}): JSX.Element {
+  const dx = inputs.find((i) => i.name === 'posX')
+  const dy = inputs.find((i) => i.name === 'posY')
+  const rng = (d?: IsfInputDesc): [number, number, number] => {
+    const mn = typeof d?.min === 'number' ? d.min : -1
+    const mx = typeof d?.max === 'number' ? d.max : 1
+    const df = typeof d?.def === 'number' ? d.def : 0
+    return [mn, mx, df]
+  }
+  const [minx, maxx, defx] = rng(dx)
+  const [miny, maxy, defy] = rng(dy)
+  const vx = typeof values.posX === 'number' ? values.posX : defx
+  const vy = typeof values.posY === 'number' ? values.posY : defy
+  const axis = (
+    label: string,
+    v: number,
+    min: number,
+    max: number,
+    def: number,
+    name: string
+  ): JSX.Element => (
+    <div className="flex min-w-0 flex-1 items-center gap-1">
+      <span className="font-mono text-[9px] text-muted">{label}</span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={(max - min) / 200 || 0.01}
+        value={v}
+        onChange={(e) => onChange(name, Number(e.target.value))}
+        onDoubleClick={() => onChange(name, def)}
+        className="min-w-0 flex-1 accent-accent"
+        title={`${name} ${v.toFixed(2)} — double-click to reset`}
+      />
+    </div>
+  )
+  return (
+    <div className="flex w-44 min-w-0 flex-col gap-0.5">
+      <span className="font-mono text-[9px] uppercase tracking-wide text-muted">pos</span>
+      <div className="flex min-w-0 items-center gap-2">
+        {axis('X', vx, minx, maxx, defx, 'posX')}
+        {axis('Y', vy, miny, maxy, defy, 'posY')}
+      </div>
     </div>
   )
 }

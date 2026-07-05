@@ -277,6 +277,7 @@ interface StoreState {
   addFx: (scope: FxScope, shaderId: string) => void
   removeFx: (scope: FxScope, instId: string) => void
   toggleFx: (scope: FxScope, instId: string) => void
+  setFxOpacity: (scope: FxScope, instId: string, v: number) => void
   moveFx: (scope: FxScope, instId: string, dir: -1 | 1) => void
   // Drag-and-drop reorder: place instId before beforeId (null = end of chain).
   reorderFx: (scope: FxScope, instId: string, beforeId: string | null) => void
@@ -324,6 +325,9 @@ interface StoreState {
 
   // Global tempo — drives BPM-synced modulator clocks; OSC-controllable.
   setBpm: (bpm: number) => void
+  // Global time multiplier (1/64×…64×, 1 = realtime) — scales every visual clock.
+  globalSpeed: number
+  setGlobalSpeed: (x: number) => void
 
   // OSC input config (persisted to localStorage). `enabled`/`port` are the
   // user's intent; `listening`/`addresses` reflect the main-process result.
@@ -625,6 +629,8 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => ({
       composition: { ...s.composition, bpm: Math.max(20, Math.min(300, bpm)) }
     })),
+  globalSpeed: 1,
+  setGlobalSpeed: (x) => set({ globalSpeed: Math.max(1 / 64, Math.min(64, x)) }),
   applyMasterPreset: (fx, vibe) =>
     set((s) => {
       // Locked finalizers (Vibe, then Context) survive a chain preset; the
@@ -710,6 +716,12 @@ export const useStore = create<StoreState>((set, get) => ({
       // turning the Vibe off is a legitimate look.
       composition: updateFxArray(s.composition, scope, (fx) =>
         fx.map((f) => (f.id === instId ? { ...f, enabled: !f.enabled } : f))
+      )
+    })),
+  setFxOpacity: (scope, instId, v) =>
+    set((s) => ({
+      composition: updateFxArray(s.composition, scope, (fx) =>
+        fx.map((f) => (f.id === instId ? { ...f, opacity: Math.max(0, Math.min(1, v)) } : f))
       )
     })),
   moveFx: (scope, instId, dir) =>

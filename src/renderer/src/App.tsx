@@ -205,10 +205,12 @@ export default function App(): JSX.Element {
       // keep scheduling — the offending layer simply doesn't render.
       try {
         const now = performance.now()
-        const c = useStore.getState().composition
+        const st = useStore.getState()
+        const c = st.composition
         // 1. Store → engine reconciliation (base values). One write path for
         //    everything: UI edits, session loads, OSC — the engine follows.
         //    Shader hot-swaps preserve feedback buffers (brief §1).
+        comp!.setGlobalSpeed(st.globalSpeed)
         comp!.syncFromState(c, shaderSourceById)
         // 2. Modulation: tick the 8-slot engine, then overlay the mod-matrix
         //    on top of the base values — straight into the Compositor, never
@@ -396,13 +398,13 @@ export default function App(): JSX.Element {
       {/* ── Meta Controller: 32 macro knobs / 4 banks (brief §6) ── */}
       <MetaBar />
 
-      {/* ── Transport ───────────────────────────────────────────── */}
-      <Transport />
-
-      {/* ── OSC input — pinned last, like dataFLOU's network bar ── */}
+      {/* ── OSC input — pinned just above the transport bar (dataFLOU) ── */}
       <Collapsible sectionKey="osc" title="osc">
         <OscPanel />
       </Collapsible>
+
+      {/* ── Transport (BPM + Randomize) ───────────────────────────── */}
+      <Transport />
     </div>
   )
 }

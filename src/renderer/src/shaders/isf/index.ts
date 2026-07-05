@@ -30,6 +30,7 @@ import recurse from './Recurse.fs?raw'
 import shapes from './Shapes.fs?raw'
 import syncOsc from './SyncOsc.fs?raw'
 import differential from './Differential.fs?raw'
+import solidColor from './SolidColor.fs?raw'
 import posterize from './fx/Posterize.fs?raw'
 import dither from './fx/Dither.fs?raw'
 import chromaShift from './fx/ChromaShift.fs?raw'
@@ -304,6 +305,13 @@ export const GENERATORS: IsfShader[] = [
       skew: [0.1, 0.7],
       angle: [0, 6.2832]
     }
+  },
+  {
+    id: 'solid-color',
+    name: 'Solid Color',
+    category: 'Generator',
+    source: solidColor,
+    curated: { gradient: [0, 1], angle: [0, 6.2832], midpoint: [0.3, 0.7], dither: [0.3, 0.7] }
   }
 ]
 
@@ -386,7 +394,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-transform', name: 'Transform', category: 'FX', source: transform,
-    curated: { zoom: [0.7, 1.6], posX: [-0.3, 0.3], posY: [-0.3, 0.3], rotate: [-0.6, 0.6] }
+    curated: { zoom: [0.7, 1.6], posX: [-0.3, 0.3], posY: [-0.3, 0.3], rotate: [-0.6, 0.6], shape: [0, 0] }
   },
   {
     id: 'fx-stutter', name: 'Stutter', category: 'FX', source: stutter,

@@ -50,6 +50,7 @@ export function Inspector(): JSX.Element {
   const composition = useStore((s) => s.composition)
   const setSourceInput = useStore((s) => s.setSourceInput)
   const setFxInput = useStore((s) => s.setFxInput)
+  const setFxOpacity = useStore((s) => s.setFxOpacity)
   const vibePresetName = useStore((s) => s.vibePresetName)
   const setVibePresetName = useStore((s) => s.setVibePresetName)
   const [flashing, flash] = useFlash()
@@ -60,6 +61,8 @@ export function Inspector(): JSX.Element {
   let values: Record<string, number | number[]> = {}
   let onChange: (name: string, value: number | number[]) => void = () => {}
   let modTargetFor: ((inputName: string) => ModTarget) | undefined
+  // For FX selections: the dry/wet control shown above the shader's own params.
+  let fxOpacity: { value: number; set: (v: number) => void } | null = null
 
   if (selection?.type === 'source') {
     const layer = composition.layers[selection.layer]
@@ -93,6 +96,7 @@ export function Inspector(): JSX.Element {
     if (inst?.shaderId) {
       shaderId = inst.shaderId
       values = inst.inputs
+      fxOpacity = { value: inst.opacity ?? 1, set: (v) => setFxOpacity(scope, instId, v) }
       title = SHADER_BY_ID[inst.shaderId]?.name ?? inst.shaderId
       context =
         scope.kind === 'master'
@@ -166,6 +170,25 @@ export function Inspector(): JSX.Element {
           onApplied={isVibe ? setVibePresetName : undefined}
         />
       </div>
+      {/* Per-FX dry/wet opacity — every effect blends over its input. */}
+      {fxOpacity && (
+        <div className="flex items-center gap-2 border-b border-border px-2 py-1">
+          <span className="w-14 shrink-0 font-mono text-[9px] uppercase text-muted">opacity</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={fxOpacity.value}
+            onChange={(e) => fxOpacity!.set(Number(e.target.value))}
+            className="min-w-0 flex-1 accent-accent"
+            title={`FX dry/wet — ${fxOpacity.value.toFixed(2)}`}
+          />
+          <span className="w-8 shrink-0 text-right font-mono text-[10px] text-muted">
+            {fxOpacity.value.toFixed(2)}
+          </span>
+        </div>
+      )}
       {/* Fixed shape: always exactly two rows of controls; more params flow
           into new columns and scroll horizontally, so the panel never jumps. */}
       <div className="h-[8.5rem] overflow-x-auto overflow-y-hidden">
