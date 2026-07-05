@@ -17,6 +17,10 @@
     { "NAME": "splitTone",  "TYPE": "float", "MIN": 0.0,  "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "split-tone" },
     { "NAME": "shadowTint", "TYPE": "color", "DEFAULT": [0.45, 0.48, 0.55, 1.0], "LABEL": "shadow tint" },
     { "NAME": "highTint",   "TYPE": "color", "DEFAULT": [0.55, 0.52, 0.45, 1.0], "LABEL": "highlight tint" },
+    { "NAME": "harmony",  "TYPE": "long",  "VALUES": [0, 1, 2, 3, 4, 5], "LABELS": ["off", "analogous", "complementary", "triad", "split", "tetrad"], "DEFAULT": 0 },
+    { "NAME": "baseHue",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "chord hue" },
+    { "NAME": "chroma",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.55, "LABEL": "chord chroma" },
+    { "NAME": "spread",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "chord spread" },
     { "NAME": "colorA", "TYPE": "color", "DEFAULT": [0.0, 0.0, 0.0, 1.0] },
     { "NAME": "colorB", "TYPE": "color", "DEFAULT": [1.0, 1.0, 1.0, 1.0] },
     { "NAME": "colorC", "TYPE": "color", "DEFAULT": [0.5, 0.5, 0.5, 1.0] },
@@ -40,7 +44,33 @@ float bayer4(vec2 p) {
   return (v + 0.5) / 16.0;
 }
 
+vec3 hsv2rgb(vec3 c) {
+  vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
+// Colour CHORDS (after Collopy): generate the palette stops from one base hue
+// plus a harmony relationship, on a dark→light value ramp. Value carries the
+// tonal placement; the harmony carries the hue relationships.
+vec3 chordColor(float idx) {
+  float n = floor(stops + 0.5);
+  float ii = clamp(idx, 0.0, n - 1.0);
+  float ti = n > 1.5 ? ii / (n - 1.0) : 0.0;
+  float off = 0.0;
+  if (harmony == 1) off = (ti - 0.5) * spread * 0.4;                 // analogous (adjacent hues)
+  else if (harmony == 2) off = mod(ii, 2.0) < 0.5 ? 0.0 : 0.5;       // complementary (180deg)
+  else if (harmony == 3) off = mod(ii, 3.0) / 3.0;                   // triad (120deg)
+  else if (harmony == 4) { float m = mod(ii, 3.0); off = m < 0.5 ? 0.0 : (m < 1.5 ? 0.42 : 0.58); } // split-comp
+  else off = mod(ii, 4.0) * 0.25;                                    // tetrad (90deg)
+  float hue = fract(baseHue + off);
+  float val = mix(0.06, 1.0, ti);          // dark shadows → light highlights
+  float sat = chroma * mix(1.0, 0.55, ti); // ease saturation up top (matte)
+  return hsv2rgb(vec3(hue, sat, val));
+}
+
 vec3 stopColor(float idx) {
+  if (harmony >= 1) return chordColor(idx); // colour-chord mode overrides the manual stops
   if (idx < 0.5) return colorA.rgb;
   if (idx < 1.5) return colorB.rgb;
   if (idx < 2.5) return colorC.rgb;
