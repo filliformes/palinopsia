@@ -213,24 +213,26 @@ function route(address: string, args: Args): void {
     }
 
     case 'bpm':
-      st.setBpm(n)
+      if (Number.isFinite(n)) st.setBpm(n) // setBpm clamps 20..800; guard NaN
       return
 
     case 'scene': {
       const idx = segs[2] !== undefined ? parseInt(segs[2], 10) - 1 : Math.round(n) - 1
       if (idx < 0) return
+      const sc = st.scenes[idx]
+      if (!sc) return // validate BEFORE rising() so unknown addresses can't grow the edge map
       // A dedicated /scene/{n} address is a trigger — fire on the rising edge.
       if (segs[2] !== undefined && !rising(address, n)) return
-      const sc = st.scenes[idx]
-      if (sc) st.recallScene(sc.id)
+      st.recallScene(sc.id)
       return
     }
 
     case 'randomize': {
-      if (!rising(address, n)) return
       const scope = segs[2] ?? 'all'
       const valid = ['all', 'sources', 'sourceparams', 'sourcefx', 'master', 'modulators']
-      st.randomize((valid.includes(scope) ? scope : 'all') as RandomizeScope)
+      if (!valid.includes(scope)) return // ignore unknown scopes (don't track their edge)
+      if (!rising(address, n)) return
+      st.randomize(scope as RandomizeScope)
       return
     }
 

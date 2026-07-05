@@ -71,8 +71,18 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    // Only hand http(s) URLs to the OS shell; never file:/other schemes.
+    if (/^https?:\/\//i.test(details.url)) shell.openExternal(details.url)
     return { action: 'deny' }
+  })
+
+  // Never let the renderer navigate the main window away from the app itself
+  // (dev server URL or the packaged file://). A first-party bug can't turn into
+  // a full-page redirect to a remote origin.
+  mainWindow.webContents.on('will-navigate', (e, url) => {
+    const devUrl = process.env.ELECTRON_RENDERER_URL
+    const allowed = devUrl ? url.startsWith(devUrl) : url.startsWith('file://')
+    if (!allowed) e.preventDefault()
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -186,14 +196,12 @@ app.whenReady().then(async () => {
   })
 
   // ---------- IPC: Session I/O ----------
-  ipcMain.handle('session:saveAs', (_e, s: Session) => sessionIO.saveAs(mainWindow, s))
-  ipcMain.handle('session:saveTo', (_e, s: Session, path: string) =>
-    sessionIO.saveTo(path, s)
-  )
-  ipcMain.handle('session:saveToDefault', (_e, s: Session) =>
-    sessionIO.saveToDefault(s as Session)
-  )
-  ipcMain.handle('session:open', () => sessionIO.open(mainWindow))
+  // All wrapped in safeHandle so a filesystem throw (path vanished, read-only
+  // dir) is logged and returns undefined rather than an uncaught rejection.
+  safeHandle('session:saveAs', (_e, s) => sessionIO.saveAs(mainWindow, s as Session))
+  safeHandle('session:saveTo', (_e, s, path) => sessionIO.saveTo(path as string, s as Session))
+  safeHandle('session:saveToDefault', (_e, s) => sessionIO.saveToDefault(s as Session))
+  safeHandle('session:open', () => sessionIO.open(mainWindow))
   safeHandle('session:setCurrent', (_e, s) => autosave.setCurrentSession(s as Session))
 
   // ---------- IPC: Autosave / crash recovery ----------
@@ -202,7 +210,7 @@ app.whenReady().then(async () => {
     return { crashed: prevRunCrashed, entries }
   })
   safeHandle('autosave:list', () => autosave.listAutosaves())
-  ipcMain.handle('autosave:load', (_e, path: string) => autosave.loadAutosave(path))
+  safeHandle('autosave:load', (_e, path) => autosave.loadAutosave(path as string))
 
   // ---------- IPC: App lifecycle ----------
   safeHandle('app:close-proceed', () => {

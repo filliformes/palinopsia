@@ -79,7 +79,9 @@ export class OscQueryServer {
     this.oscPort = oscPort
     return new Promise((resolve, reject) => {
       const server = createServer((req, res) => {
-        res.setHeader('Access-Control-Allow-Origin', '*')
+        // No wildcard CORS: OSCQuery clients are native, and the server is
+        // localhost-bound below — we don't want arbitrary web origins reading
+        // the live parameter tree.
         res.setHeader('Content-Type', 'application/json')
         const url = req.url ?? '/'
         if (url.includes('HOST_INFO')) {
@@ -99,7 +101,10 @@ export class OscQueryServer {
         this.server = null
         reject(e)
       })
-      server.listen(httpPort, () => {
+      // Bind to loopback only — the OSCQuery tree (which advertises the OSC
+      // port and serves live parameter values) should not be a LAN-visible
+      // service. OSC control itself still arrives over the UDP receiver.
+      server.listen(httpPort, '127.0.0.1', () => {
         this.server = server
         resolve()
       })
