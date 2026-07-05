@@ -117,20 +117,22 @@ function FxUnit({
   const setSelection = useStore((s) => s.setSelection)
 
   if (f.locked) {
-    // The pinned Vibe Palette — always last, unremovable, but bypassable.
+    // A pinned finalizer (Vibe Palette, then Context) — always last,
+    // unremovable, but bypassable. Name comes from the registry.
+    const lockedName = SHADER_BY_ID[f.shaderId ?? '']?.name ?? f.shaderId
     return (
       <span
         className={`flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 ${
           selected ? 'border-accent2' : 'border-accent2/40'
         } bg-panel`}
-        title="Vibe Palette — the pinned unified-look stage. Dot bypasses; click the name to edit."
+        title={`${lockedName} — a pinned finalizer stage. Dot bypasses; click the name to edit.`}
       >
         <button
           onClick={() => toggleFx(scope, f.id)}
           className={`h-2.5 w-2.5 shrink-0 rounded-full transition-colors ${
             f.enabled ? 'bg-accent2' : 'bg-panel3'
           }`}
-          title={f.enabled ? 'Vibe on — click to bypass' : 'Vibe bypassed — click to enable'}
+          title={f.enabled ? `${lockedName} on — click to bypass` : `${lockedName} bypassed — click to enable`}
         />
         <span className="font-mono text-[9px] text-accent2">◆</span>
         <button
@@ -139,7 +141,7 @@ function FxUnit({
             f.enabled ? '' : 'text-muted line-through'
           } ${selected ? 'text-accent2' : 'hover:text-accent2'}`}
         >
-          Vibe Palette
+          {lockedName}
         </button>
       </span>
     )

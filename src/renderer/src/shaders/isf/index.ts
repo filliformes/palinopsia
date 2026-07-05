@@ -68,6 +68,7 @@ import tracking from './fx/Tracking.fs?raw'
 import feedbackZoom from './fx/FeedbackZoom.fs?raw'
 import distort from './fx/Distort.fs?raw'
 import vibe from './fx/Vibe.fs?raw'
+import context from './fx/Context.fs?raw'
 
 export interface IsfShader {
   id: string
@@ -459,7 +460,29 @@ export const VIBE_SHADER: IsfShader = {
   source: vibe
 }
 
-export const ALL_SHADERS: IsfShader[] = [...GENERATORS, ...FX_SHADERS, VIBE_SHADER]
+// The Context depth finalizer — pinned AFTER Vibe, also store-locked and kept
+// out of FX_SHADERS. Curated ranges keep the Inspector dice tasteful.
+export const CONTEXT_SHADER: IsfShader = {
+  id: 'fx-context',
+  name: 'Context',
+  category: 'FX',
+  source: context,
+  curated: {
+    trails: [0, 0.6],
+    blur: [0, 0.4],
+    bloom: [0.1, 0.7],
+    depth: [0.1, 0.7],
+    haze: [0, 0.5],
+    lightGlow: [0, 0.6]
+  }
+}
+
+export const ALL_SHADERS: IsfShader[] = [
+  ...GENERATORS,
+  ...FX_SHADERS,
+  VIBE_SHADER,
+  CONTEXT_SHADER
+]
 
 export const SHADER_BY_ID: Record<string, IsfShader> = Object.fromEntries(
   ALL_SHADERS.map((s) => [s.id, s])

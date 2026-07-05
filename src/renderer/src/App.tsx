@@ -31,7 +31,7 @@ let vibePresetIndex = -1
 
 function openVibeInInspector(): void {
   const st = useStore.getState()
-  const vibe = st.composition.master.find((f) => f.locked)
+  const vibe = st.composition.master.find((f) => f.shaderId === 'fx-vibe')
   if (!vibe) return
   if (st.collapsed['inspector']) st.toggleSection('inspector')
   st.setSelection({ type: 'fx', scope: { kind: 'master' }, instId: vibe.id })
@@ -39,7 +39,7 @@ function openVibeInInspector(): void {
 
 function cycleVibePreset(): void {
   const st = useStore.getState()
-  const vibe = st.composition.master.find((f) => f.locked)
+  const vibe = st.composition.master.find((f) => f.shaderId === 'fx-vibe')
   if (!vibe) return
   const presets = PRESETS_BY_ID['fx-vibe'] ?? []
   if (presets.length === 0) return

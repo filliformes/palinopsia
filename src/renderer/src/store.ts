@@ -148,6 +148,28 @@ export function makeVibePalette(): FxInstance {
   }
 }
 
+// The always-on Context depth finalizer — pinned AFTER the Vibe Palette at the
+// very end of the master rack. Adds trails, bloom, a key light, haze and a
+// depth vignette. Defaults are a gentle, lifelike amount (not a passthrough).
+export function makeContext(): FxInstance {
+  return {
+    id: uid(),
+    shaderId: 'fx-context',
+    enabled: true,
+    locked: true,
+    inputs: {
+      trails: 0.2,
+      blur: 0.08,
+      bloom: 0.3,
+      depth: 0.35,
+      haze: 0.15,
+      lightGlow: 0.25,
+      light: [0.5, 0.55],
+      atmosphere: [0.5, 0.58, 0.72, 1]
+    }
+  }
+}
+
 export function makeDefaultMetaKnobs(): MetaKnobState[] {
   return Array.from({ length: META_KNOB_COUNT }, (_, i) => ({
     name: `Knob ${i + 1}`,
@@ -163,7 +185,7 @@ export function makeDefaultComposition(): CompositionState {
   return {
     // Layer 1 opens on Ash so a fresh session shows something living.
     layers: [makeLayer('ash'), makeLayer(), makeLayer(), makeLayer()],
-    master: [makeVibePalette()],
+    master: [makeVibePalette(), makeContext()],
     bpm: 120,
     modulators: makeDefaultModulators(),
     modMatrix: [],
@@ -586,9 +608,11 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
   applyMasterPreset: (fx, vibe) =>
     set((s) => {
+      // Locked finalizers (Vibe, then Context) survive a chain preset; the
+      // preset's vibe values land ONLY on the Vibe unit, never on Context.
       const locked = s.composition.master
         .filter((f) => f.locked)
-        .map((f) => (vibe ? { ...f, inputs: { ...f.inputs, ...vibe } } : f))
+        .map((f) => (vibe && f.shaderId === 'fx-vibe' ? { ...f, inputs: { ...f.inputs, ...vibe } } : f))
       const units: FxInstance[] = fx.map((f) => ({
         id: uid(),
         shaderId: f.shaderId,
@@ -1002,16 +1026,19 @@ export const useStore = create<StoreState>((set, get) => ({
           sourceBFx: l.sourceBFx ?? [],
           fx: l.fx ?? []
         })),
-        // The Vibe Palette must exist and sit last — older sessions get one;
-        // sessions whose locked unit was the plain Palette migrate to fx-vibe
-        // (color inputs carry over; mastering params get neutral defaults).
+        // The Vibe Palette then the Context finalizer must exist and sit last,
+        // in that order. Older sessions get them appended; sessions whose locked
+        // unit was the plain Palette migrate to fx-vibe (color inputs carry
+        // over; mastering params get neutral defaults).
         master: (() => {
-          const m = (s.composition.master ?? []).map((f) =>
+          let m = (s.composition.master ?? []).map((f) =>
             f.locked && f.shaderId === 'fx-palette'
               ? { ...makeVibePalette(), id: f.id, inputs: { ...makeVibePalette().inputs, ...f.inputs } }
               : f
           )
-          return m.some((f) => f.locked) ? m : [...m, makeVibePalette()]
+          if (!m.some((f) => f.shaderId === 'fx-vibe')) m = [...m, makeVibePalette()]
+          if (!m.some((f) => f.shaderId === 'fx-context')) m = [...m, makeContext()]
+          return m
         })(),
         modulators: s.composition.modulators ?? makeDefaultModulators(),
         modMatrix: s.composition.modMatrix ?? [],
