@@ -455,7 +455,7 @@ export const FX_SHADERS: IsfShader[] = [
 // deliberately NOT in FX_SHADERS so racks and Randomize can't add a second.
 export const VIBE_SHADER: IsfShader = {
   id: 'fx-vibe',
-  name: 'Vibe',
+  name: 'Vibe Palette',
   category: 'FX',
   source: vibe
 }

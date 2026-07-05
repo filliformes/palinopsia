@@ -12,6 +12,32 @@ import { AutoControls } from './AutoControls'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 
+// The Vibe Palette's "main" colour = its most characterful stop (highest
+// chroma, luma as a tiebreak), brightened a touch so it reads as a light
+// source. Fed into Context's light colour for an instant unified look.
+function vibeMainColor(inputs: Record<string, number | number[]>): number[] {
+  const stops = ['colorA', 'colorB', 'colorC', 'colorD', 'colorE']
+    .map((k) => inputs[k])
+    .filter((c): c is number[] => Array.isArray(c) && c.length >= 3)
+  let best = stops[0] ?? [1, 1, 1, 1]
+  let bestScore = -1
+  for (const c of stops) {
+    const chroma = Math.max(c[0], c[1], c[2]) - Math.min(c[0], c[1], c[2])
+    const luma = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
+    const score = chroma * 2 + luma * 0.4
+    if (score > bestScore) {
+      bestScore = score
+      best = c
+    }
+  }
+  return [
+    Math.min(1, best[0] * 1.25 + 0.08),
+    Math.min(1, best[1] * 1.25 + 0.08),
+    Math.min(1, best[2] * 1.25 + 0.08),
+    1
+  ]
+}
+
 const SCOPE_LABEL: Record<FxScope['kind'], string> = {
   master: 'master',
   layer: 'layer fx',
@@ -87,6 +113,7 @@ export function Inspector(): JSX.Element {
 
   // The Vibe's preset name is shared with P/Shift+P (controlled picker).
   const isVibe = shaderId === 'fx-vibe'
+  const isContext = shaderId === 'fx-context'
 
   return (
     <div
@@ -98,6 +125,20 @@ export function Inspector(): JSX.Element {
         <span className="text-[12px] font-semibold">{title}</span>
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{context}</span>
         <div className="flex-1" />
+        {isContext && (
+          <button
+            onClick={() => {
+              // Pull the Vibe Palette's signature colour into the key light
+              // (brightened) so the whole frame reads as one lit space.
+              const vibe = composition.master.find((f) => f.shaderId === 'fx-vibe')
+              if (vibe) onChange('lightColor', vibeMainColor(vibe.inputs))
+            }}
+            className="shrink-0 rounded border border-accent2/50 bg-accent2/10 px-1.5 py-0.5 font-mono text-[10px] text-accent2 transition-colors hover:bg-accent2/20"
+            title="Set the light colour from the Vibe Palette's main colour (brightened) — an instant unified look"
+          >
+            Vibe Color
+          </button>
+        )}
         <button
           onClick={() => {
             // Curated-range randomize of THIS shader's params only.

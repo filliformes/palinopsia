@@ -421,14 +421,14 @@ function ColorControl({
   const v = Array.isArray(value) && value.length >= 3 ? value : def
   const alpha = v[3] ?? 1
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex w-44 min-w-0 flex-col gap-0.5">
       {labelEl(inp)}
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2">
         <input
           type="color"
           value={toHex(v)}
           onChange={(e) => onChange(inp.name, fromHex(e.target.value, alpha))}
-          className="h-6 w-9 cursor-pointer rounded border border-border bg-panel2"
+          className="h-6 w-9 shrink-0 cursor-pointer rounded border border-border bg-panel2"
           title={`${inp.label} — RGB`}
         />
         <input
@@ -438,7 +438,7 @@ function ColorControl({
           step={0.01}
           value={alpha}
           onChange={(e) => onChange(inp.name, [v[0], v[1], v[2], Number(e.target.value)])}
-          className="w-16 accent-accent"
+          className="min-w-0 flex-1 accent-accent"
           title="Alpha"
         />
       </div>

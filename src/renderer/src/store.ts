@@ -163,9 +163,10 @@ export function makeContext(): FxInstance {
       bloom: 0.3,
       depth: 0.35,
       haze: 0.15,
+      atmosphere: [0.5, 0.58, 0.72, 1],
       lightGlow: 0.25,
-      light: [0.5, 0.55],
-      atmosphere: [0.5, 0.58, 0.72, 1]
+      lightColor: [1.0, 0.92, 0.8, 1],
+      light: [0.5, 0.55]
     }
   }
 }

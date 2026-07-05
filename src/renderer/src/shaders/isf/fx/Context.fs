@@ -10,9 +10,10 @@
     { "NAME": "bloom",      "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3,  "LABEL": "bloom" },
     { "NAME": "depth",      "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "depth" },
     { "NAME": "haze",       "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "haze" },
+    { "NAME": "atmosphere", "TYPE": "color", "DEFAULT": [0.5, 0.58, 0.72, 1.0], "LABEL": "atmosphere" },
     { "NAME": "lightGlow",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.25, "LABEL": "light" },
-    { "NAME": "light",      "TYPE": "point2D", "DEFAULT": [0.5, 0.55] },
-    { "NAME": "atmosphere", "TYPE": "color", "DEFAULT": [0.5, 0.58, 0.72, 1.0], "LABEL": "atmosphere" }
+    { "NAME": "lightColor", "TYPE": "color", "DEFAULT": [1.0, 0.92, 0.8, 1.0], "LABEL": "light color" },
+    { "NAME": "light",      "TYPE": "point2D", "DEFAULT": [0.5, 0.55] }
   ],
   "PASSES": [
     { "TARGET": "buf", "PERSISTENT": true },
@@ -82,11 +83,11 @@ void main() {
   vec3 bright = bsum * smoothstep(0.5, 0.95, bl);
   col += bright * bloom * 1.4;
 
-  // ── KEY LIGHT — a soft, round radial glow from the light position, tinted
-  //    by the atmosphere: a sense of a 3D light source sitting in the space. ──
+  // ── KEY LIGHT — a soft, round radial glow from the light position in its
+  //    own colour: a sense of a 3D light source sitting in the space. ──
   vec2 dl = (uv - light) * vec2(aspect, 1.0);
   float lg = exp(-dot(dl, dl) * 5.0);
-  col += atmosphere.rgb * lg * lightGlow * 1.2;
+  col += lightColor.rgb * lg * lightGlow * 1.2;
 
   // ── HAZE — shadows and distance recede toward the atmosphere colour (aerial
   //    perspective), pushing the darker material back into space. ──
