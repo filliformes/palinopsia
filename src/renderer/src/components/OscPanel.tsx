@@ -84,20 +84,50 @@ export function OscPanel(): JSX.Element {
         />
       </div>
 
-      {oscEnabled && oscListening && (
+      {/* Status line — tells the user exactly what to do next. */}
+      {!oscEnabled ? (
         <div className="font-mono text-[9px] leading-relaxed text-muted">
-          send to{' '}
-          <span className="text-text">
-            {oscAddresses.length ? oscAddresses.join(' · ') : 'localhost'}
-          </span>{' '}
-          : <span className="text-text">{oscPort}</span>
-          <br />
-          OSCQuery <span className="text-text">http://&lt;ip&gt;:{oscPort + 1}</span> · addresses under{' '}
-          <span className="text-text">/opsia/…</span>
+          Not listening. Click <span className="text-text">OSC OFF</span> to enable, then point
+          Pandore at this machine below.
+        </div>
+      ) : oscListening ? (
+        <div className="font-mono text-[9px] leading-relaxed text-muted">
+          Live — Pandore plays the instrument.
+        </div>
+      ) : (
+        <div className="font-mono text-[9px] leading-relaxed text-danger">
+          Couldn&apos;t bind port {oscPort} — it may be in use. Try another port.
         </div>
       )}
+
+      {/* Where to send + how — shown always (greyed when off) so it's ready. */}
+      <div
+        className={`flex flex-col gap-0.5 rounded border border-border bg-panel2/40 p-1.5 font-mono text-[9px] leading-relaxed ${
+          oscEnabled && oscListening ? 'text-muted' : 'text-muted/60'
+        }`}
+      >
+        <div>
+          send OSC to{' '}
+          <span className={oscEnabled && oscListening ? 'text-accent' : 'text-text'}>
+            {oscAddresses.length ? oscAddresses.join(' · ') : 'localhost'}
+          </span>{' '}
+          : <span className={oscEnabled && oscListening ? 'text-accent' : 'text-text'}>{oscPort}</span>{' '}
+          (UDP)
+        </div>
+        <div>
+          values <span className="text-text">0.0–1.0</span> · addresses under{' '}
+          <span className="text-text">/opsia/…</span>
+        </div>
+        <div className="text-muted/70">
+          e.g. /opsia/meta/1 · /opsia/layer/1/opacity · /opsia/scene/2
+        </div>
+        <div>
+          OSCQuery (auto-discovery) <span className="text-text">http://…:{oscPort + 1}</span>
+        </div>
+      </div>
+
       {last && (
-        <div className="truncate font-mono text-[9px] text-muted" title={last}>
+        <div className="truncate font-mono text-[9px] text-accent/80" title={last}>
           ↙ {last}
         </div>
       )}
