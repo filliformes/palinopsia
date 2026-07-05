@@ -157,16 +157,16 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Amber sweep', values: { shape: 0, freq: 1, steps: 1, rate: 0.5, angle: 0.2, tint: [0.9, 0.6, 0.25, 1] } }
   ],
   'fx-slit-buffer': [
-    { name: 'Slow sweep', values: { rate: 0.15, width: 0.03 } },
-    { name: 'Fast head', values: { rate: 0.8, width: 0.02 } },
-    { name: 'Wide freeze', values: { rate: 0.3, width: 0.08 } },
-    { name: 'Vertical', values: { rate: 0.25, width: 0.03, vertical: 1 } },
-    { name: 'Time crawl', values: { rate: 0.08, width: 0.04 } },
-    { name: 'Thin scan', values: { rate: 0.5, width: 0.01 } },
-    { name: 'Vertical fast', values: { rate: 0.6, width: 0.02, vertical: 1 } },
-    { name: 'Broad smear', values: { rate: 0.2, width: 0.12 } },
-    { name: 'Ripple freeze', values: { rate: 1, width: 0.05 } },
-    { name: 'Glacial', values: { rate: 0.05, width: 0.06 } }
+    { name: 'Slow sweep', values: { rate: 0.15, width: 0.03, jitter: 0, direction: 0 } },
+    { name: 'Fast head', values: { rate: 0.8, width: 0.02, jitter: 0, direction: 0 } },
+    { name: 'Wide freeze', values: { rate: 0.3, width: 0.08, jitter: 0.15, direction: 0 } },
+    { name: 'Reverse crawl', values: { rate: 0.12, width: 0.04, jitter: 0.1, direction: 1 } },
+    { name: 'Ragged seam', values: { rate: 0.35, width: 0.03, jitter: 0.55, direction: 0 } },
+    { name: 'Thin scan', values: { rate: 0.5, width: 0.01, jitter: 0.2, direction: 0 } },
+    { name: 'Vertical chaos', values: { rate: 0.6, width: 0.02, jitter: 0.6, vertical: 1, direction: 0 } },
+    { name: 'Broken reverse', values: { rate: 0.25, width: 0.05, jitter: 0.7, direction: 1 } },
+    { name: 'Storm freeze', values: { rate: 1, width: 0.05, jitter: 0.85, direction: 0 } },
+    { name: 'Glacial drift', values: { rate: 0.05, width: 0.06, jitter: 0.3, direction: 1 } }
   ],
   'fx-difference-bloom': [
     { name: 'Motion trace', values: { gain: 3, spread: 0.012, keep: 0 } },

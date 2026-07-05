@@ -401,7 +401,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-slit-buffer', name: 'Slit Buffer', category: 'FX', source: slitBuffer,
-    curated: { rate: [0.05, 1], width: [0.01, 0.1] }
+    curated: { rate: [0.05, 1], width: [0.01, 0.1], jitter: [0, 0.7], direction: [0, 1] }
   },
   {
     id: 'fx-difference-bloom', name: 'Difference Bloom', category: 'FX', source: differenceBloom,

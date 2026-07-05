@@ -40,22 +40,39 @@ export function AutoControls({
     // the RIGHT of the scalar controls, vertically centred.
     const pads = inputs.filter((i) => i.type === 'point2D')
     const rest = inputs.filter((i) => i.type !== 'point2D')
+    // Too few controls to justify two rows → lay them in a single row and
+    // centre the whole group (both axes) instead of a sparse, top-left grid.
+    const singleRow = rest.length <= 4
     return (
-      <div className="flex items-center gap-5 p-2">
-        <div
-          className="grid grid-flow-col content-start gap-x-5 gap-y-2"
-          style={{ gridTemplateRows: 'repeat(2, min-content)', gridAutoColumns: '11rem' }}
-        >
-          {rest.map((inp) => (
-            <Control
-              key={inp.name}
-              inp={inp}
-              value={values[inp.name]}
-              onChange={onChange}
-              modTargetFor={modTargetFor}
-            />
-          ))}
-        </div>
+      <div className={`flex h-full items-center gap-5 p-2 ${singleRow ? 'justify-center' : ''}`}>
+        {singleRow ? (
+          <div className="flex items-center gap-5">
+            {rest.map((inp) => (
+              <Control
+                key={inp.name}
+                inp={inp}
+                value={values[inp.name]}
+                onChange={onChange}
+                modTargetFor={modTargetFor}
+              />
+            ))}
+          </div>
+        ) : (
+          <div
+            className="grid grid-flow-col content-start gap-x-5 gap-y-2"
+            style={{ gridTemplateRows: 'repeat(2, min-content)', gridAutoColumns: '11rem' }}
+          >
+            {rest.map((inp) => (
+              <Control
+                key={inp.name}
+                inp={inp}
+                value={values[inp.name]}
+                onChange={onChange}
+                modTargetFor={modTargetFor}
+              />
+            ))}
+          </div>
+        )}
         {pads.length > 0 && (
           <div className="flex shrink-0 items-center gap-5">
             {pads.map((inp) => (
