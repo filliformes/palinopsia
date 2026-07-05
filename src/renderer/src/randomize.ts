@@ -28,10 +28,12 @@ import { inputsForShader, type IsfInputDesc } from './shaders/isf/inputs'
 export type RandomizeScope =
   | 'all'
   | 'sources'
+  | 'sourceparams'
   | 'sourcefx'
   | 'layer'
   | 'master'
   | 'modulators'
+  | 'meta' // handled in the UI layer (needs the knob smoother), not here
 
 const rnd = (): number => Math.random()
 const range = (lo: number, hi: number): number => lo + rnd() * (hi - lo)
@@ -303,6 +305,24 @@ export function randomizeComposition(
   scope: RandomizeScope
 ): CompositionState {
   let next = c
+
+  // Source PARAMETERS only — keep the chosen generators, re-roll their ISF
+  // inputs within curated ranges (unlike 'sources', which picks new ones).
+  if (scope === 'sourceparams') {
+    return {
+      ...c,
+      layers: c.layers.map((l) => ({
+        ...l,
+        sourceA: l.sourceA.shaderId
+          ? { ...l.sourceA, inputs: randomizeInputs(l.sourceA.shaderId, l.sourceA.inputs) }
+          : l.sourceA,
+        sourceB:
+          l.sourceB && l.sourceB.shaderId
+            ? { ...l.sourceB, inputs: randomizeInputs(l.sourceB.shaderId, l.sourceB.inputs) }
+            : l.sourceB
+      }))
+    }
+  }
 
   const doSources = scope === 'all' || scope === 'sources' || scope === 'sourcefx'
   const doSourceFx = scope === 'all' || scope === 'sourcefx'

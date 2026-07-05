@@ -5,6 +5,7 @@
 // aesthetic ranges (brief §7) — the taste layer, not raw min/max.
 
 import { useEffect, useRef, useState } from 'react'
+import { randomizeMetaKnobs } from '../metaSmooth'
 import type { RandomizeScope } from '../randomize'
 import { useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
@@ -12,11 +13,20 @@ import { BoundedNumberInput } from './BoundedNumberInput'
 const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
   { scope: 'all', label: 'Randomize All' },
   { scope: 'sources', label: 'Randomize Sources' },
+  { scope: 'sourceparams', label: 'Randomize Source Parameters' },
   { scope: 'sourcefx', label: 'Randomize Source + FX' },
   { scope: 'layer', label: 'Randomize Layers' },
   { scope: 'master', label: 'Randomize Master FX' },
-  { scope: 'modulators', label: 'Randomize Modulators' }
+  { scope: 'modulators', label: 'Randomize Modulators' },
+  { scope: 'meta', label: 'Randomize Meta Knobs' }
 ]
+
+// Meta is a UI-layer action (drives the knob smoother); everything else is a
+// pure composition transform through the store.
+function fireRandomize(scope: RandomizeScope): void {
+  if (scope === 'meta') randomizeMetaKnobs()
+  else useStore.getState().randomize(scope)
+}
 
 function loadScope(): RandomizeScope {
   const s = localStorage.getItem('opsia.randScope') as RandomizeScope | null
@@ -25,7 +35,6 @@ function loadScope(): RandomizeScope {
 
 export function Transport(): JSX.Element {
   const bpm = useStore((s) => s.composition.bpm)
-  const randomize = useStore((s) => s.randomize)
   const setComposition = useStore.setState
   const [menuOpen, setMenuOpen] = useState(false)
   const [scope, setScope] = useState<RandomizeScope>(loadScope)
@@ -73,7 +82,7 @@ export function Transport(): JSX.Element {
       {/* Randomize: chevron selects the mode, button fires it. */}
       <div ref={menuRef} className="relative flex">
         <button
-          onClick={() => randomize(scope)}
+          onClick={() => fireRandomize(scope)}
           className="rounded-l border border-accent/60 bg-accent/10 px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent transition-colors hover:bg-accent/20"
           title={`Fire ${current.label} — every draw from curated aesthetic ranges`}
         >

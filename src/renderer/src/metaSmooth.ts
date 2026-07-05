@@ -116,3 +116,11 @@ export function setKnobTarget(i: number, v: number, smoothMs: number): void {
 export function reapplyKnob(i: number): void {
   applyKnob(i, knobDisplayValue(i))
 }
+
+/** Randomize every knob's position — like grabbing all 16 at once. Glides via
+ *  each knob's own smoothing and fans out to every destination (the smoother
+ *  commits the settled value to the store, so it's one undo step). */
+export function randomizeMetaKnobs(): void {
+  const knobs = useStore.getState().composition.metaKnobs
+  knobs.forEach((k, i) => setKnobTarget(i, Math.random(), k.smoothMs))
+}
