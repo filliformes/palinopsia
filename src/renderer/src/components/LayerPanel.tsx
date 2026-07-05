@@ -37,6 +37,9 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const saveLayerPreset = useStore((s) => s.saveLayerPreset)
   const applyLayerPreset = useStore((s) => s.applyLayerPreset)
   const deleteLayerPreset = useStore((s) => s.deleteLayerPreset)
+  const copyLayer = useStore((s) => s.copyLayer)
+  const pasteLayer = useStore((s) => s.pasteLayer)
+  const hasCopiedLayer = useStore((s) => s.copiedLayer !== null)
 
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [savePrompt, setSavePrompt] = useState(false)
@@ -54,6 +57,13 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const menuItems: MenuItem[] = [
     { label: 'Init layer', onClick: () => initLayer(index) },
     { label: 'Randomize layer', onClick: () => randomizeLayer(index) },
+    { divider: true, label: '' },
+    { label: 'Copy layer', onClick: () => copyLayer(index) },
+    {
+      label: hasCopiedLayer ? 'Paste layer' : 'Paste layer (empty)',
+      onClick: () => pasteLayer(index),
+      disabled: !hasCopiedLayer
+    },
     { divider: true, label: '' },
     { label: 'Save layer as preset…', onClick: () => setSavePrompt(true) },
     ...layerPresets.map((p) => ({

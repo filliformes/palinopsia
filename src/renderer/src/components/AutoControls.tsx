@@ -17,7 +17,8 @@ export function AutoControls({
   inputs,
   values,
   onChange,
-  modTargetFor
+  modTargetFor,
+  layout = 'wrap'
 }: {
   inputs: IsfInputDesc[]
   values: Record<string, Value>
@@ -25,9 +26,31 @@ export function AutoControls({
   // When provided, float controls grow an "M" button that binds a modulator
   // to this input (the capped mod-matrix, brief §6).
   modTargetFor?: (inputName: string) => ModTarget
+  // 'wrap' (default): flex-wrap, height follows param count.
+  // 'twoRow': a fixed two-row grid that fills top→bottom then flows into new
+  //   columns, overflowing horizontally — the Inspector's shape never changes.
+  layout?: 'wrap' | 'twoRow'
 }): JSX.Element {
   if (inputs.length === 0) {
     return <div className="p-2 text-[11px] text-muted">This shader exposes no controls.</div>
+  }
+  if (layout === 'twoRow') {
+    return (
+      <div
+        className="grid grid-flow-col content-start gap-x-5 gap-y-2 p-2"
+        style={{ gridTemplateRows: 'repeat(2, min-content)', gridAutoColumns: '11rem' }}
+      >
+        {inputs.map((inp) => (
+          <Control
+            key={inp.name}
+            inp={inp}
+            value={values[inp.name]}
+            onChange={onChange}
+            modTargetFor={modTargetFor}
+          />
+        ))}
+      </div>
+    )
   }
   return (
     <div className="flex flex-wrap gap-x-5 gap-y-2 p-2">

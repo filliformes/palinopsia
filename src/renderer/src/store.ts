@@ -133,7 +133,7 @@ export function makeVibePalette(): FxInstance {
       stops: 2,
       blend: 1,
       dither: 0,
-      mixSrc: 0,
+      mixSrc: 0.5,
       autoLevel: 0,
       saturation: 1,
       contrast: 1,
@@ -219,6 +219,10 @@ interface StoreState {
   saveLayerPreset: (layer: number, name: string) => void
   applyLayerPreset: (layer: number, presetId: string) => void
   deleteLayerPreset: (presetId: string) => void
+  // Volatile layer clipboard — copy one layer's whole state, paste onto another.
+  copiedLayer: LayerState | null
+  copyLayer: (layer: number) => void
+  pasteLayer: (layer: number) => void
   setSourceInput: (
     layer: number,
     slot: 'A' | 'B',
@@ -455,6 +459,34 @@ export const useStore = create<StoreState>((set, get) => ({
       const layerPresets = s.layerPresets.filter((x) => x.id !== presetId)
       localStorage.setItem('opsia.layerPresets', JSON.stringify(layerPresets))
       return { layerPresets }
+    }),
+
+  copiedLayer: null,
+  copyLayer: (layer) =>
+    set((s) => {
+      const l = s.composition.layers[layer]
+      if (!l) return s
+      // Deep snapshot so later edits to the source layer don't mutate the copy.
+      return { copiedLayer: structuredClone(l) }
+    }),
+  pasteLayer: (layer) =>
+    set((s) => {
+      const src = s.copiedLayer
+      if (!src) return s
+      return {
+        composition: {
+          ...s.composition,
+          layers: updateLayer(s.composition.layers, layer, (l) => ({
+            ...structuredClone(src),
+            // Keep the target's identity; fresh FX ids so the mod-matrix can't
+            // alias between the copied layer and this one (same as presets).
+            id: l.id,
+            sourceAFx: src.sourceAFx.map((f) => ({ ...f, id: uid() })),
+            sourceBFx: src.sourceBFx.map((f) => ({ ...f, id: uid() })),
+            fx: src.fx.map((f) => ({ ...f, id: uid() }))
+          }))
+        }
+      }
     }),
 
   setFeedbackAmount: (layer, v) =>
@@ -760,13 +792,15 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ uiZoom: clamped })
   },
   collapsed: (() => {
+    // Fresh-load layout: Meta and Modulation start collapsed (deep controls,
+    // opened on demand); Master FX and Inspector stay open (always in play).
+    const DEFAULT_COLLAPSED: Record<string, boolean> = { meta: true, modulation: true }
     try {
-      return JSON.parse(localStorage.getItem('opsia.collapsed') ?? '{}') as Record<
-        string,
-        boolean
-      >
+      const saved = localStorage.getItem('opsia.collapsed')
+      if (saved) return JSON.parse(saved) as Record<string, boolean>
+      return DEFAULT_COLLAPSED
     } catch {
-      return {}
+      return DEFAULT_COLLAPSED
     }
   })(),
   toggleSection: (key) =>
@@ -876,13 +910,20 @@ export const useStore = create<StoreState>((set, get) => ({
   newSession: () =>
     // A blank slate. Goes through the normal composition write path, so it
     // lands in undo history — an accidental New is one Ctrl+Z away.
-    set({
-      name: 'Untitled',
-      composition: makeDefaultComposition(),
-      selection: null,
-      scenes: [],
-      activeSceneId: null,
-      vibePresetName: null
+    set((s) => {
+      // New session resets the section layout too: Meta/Modulation collapsed,
+      // Master FX/Inspector open. Persist so it survives the next reload.
+      const collapsed = { ...s.collapsed, meta: true, modulation: true, master: false, inspector: false }
+      localStorage.setItem('opsia.collapsed', JSON.stringify(collapsed))
+      return {
+        name: 'Untitled',
+        composition: makeDefaultComposition(),
+        selection: null,
+        scenes: [],
+        activeSceneId: null,
+        vibePresetName: null,
+        collapsed
+      }
     }),
   loadSession: (s) =>
     set({

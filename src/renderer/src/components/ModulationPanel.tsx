@@ -44,7 +44,9 @@ export function ModulationPanel(): JSX.Element {
         <MatrixSummary />
       </div>
       {!collapsed && (
-        <div className="flex min-w-0 gap-2 overflow-x-auto pb-1">
+        // Eight equal columns across the full width — every card the same
+        // size, so the section's shape never changes as types are swapped.
+        <div className="grid min-w-0 grid-cols-8 gap-2 pb-1">
           {modulators.map((_, i) => (
             <ModCard key={i} index={i} />
           ))}
@@ -60,8 +62,10 @@ function ModCard({ index }: { index: number }): JSX.Element {
   const update = useStore((s) => s.updateModulator)
 
   return (
+    // Fixed height + min-w-0 so all eight cards are identical regardless of
+    // type; the output curve is pinned to the bottom (mt-auto below).
     <div
-      className={`flex w-44 shrink-0 flex-col gap-1 rounded border p-1.5 transition-colors ${
+      className={`flex h-52 min-w-0 flex-col gap-1 rounded border p-1.5 transition-colors ${
         m.enabled ? 'border-accent/60 bg-panel2' : 'border-border bg-panel2/40'
       }`}
     >
@@ -133,9 +137,13 @@ function ModCard({ index }: { index: number }): JSX.Element {
                 className="min-w-0 flex-1 accent-accent"
                 title={`Rate: ${m.rateHz.toFixed(2)} Hz (log)`}
               />
-              <span className="w-10 shrink-0 text-right font-mono text-[9px] text-muted">
-                {m.rateHz < 1 ? m.rateHz.toFixed(2) : m.rateHz.toFixed(1)}
-              </span>
+              <BoundedNumberInput
+                value={m.rateHz}
+                min={0.01}
+                max={20}
+                onChange={(v) => update(index, { rateHz: v })}
+                className="input w-10 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+              />
             </>
           )}
         </div>
@@ -144,8 +152,8 @@ function ModCard({ index }: { index: number }): JSX.Element {
       {/* type-specific params */}
       <TypeParams index={index} />
 
-      {/* output curve */}
-      <div className="flex min-w-0 items-center gap-1">
+      {/* output curve — pinned to the card bottom for a uniform silhouette */}
+      <div className="mt-auto flex min-w-0 items-center gap-1">
         <span className="w-10 shrink-0 font-mono text-[9px] text-muted">CURVE</span>
         <select
           className="input select-compact min-w-0 flex-1 text-[10px]"
@@ -209,14 +217,14 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
     case 'adsr':
       return (
         <>
-          <div className="grid grid-cols-2 gap-1">
-            <NumRow label="A" value={m.adsr.attackMs} min={0} max={30000}
+          <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+            <NumRow label="A" compact value={m.adsr.attackMs} min={0} max={30000}
               onChange={(v) => update(index, { adsr: { ...m.adsr, attackMs: v } })} />
-            <NumRow label="D" value={m.adsr.decayMs} min={0} max={30000}
+            <NumRow label="D" compact value={m.adsr.decayMs} min={0} max={30000}
               onChange={(v) => update(index, { adsr: { ...m.adsr, decayMs: v } })} />
-            <NumRow label="S" value={m.adsr.sustainMs} min={0} max={60000}
+            <NumRow label="S" compact value={m.adsr.sustainMs} min={0} max={60000}
               onChange={(v) => update(index, { adsr: { ...m.adsr, sustainMs: v } })} />
-            <NumRow label="R" value={m.adsr.releaseMs} min={0} max={30000}
+            <NumRow label="R" compact value={m.adsr.releaseMs} min={0} max={30000}
               onChange={(v) => update(index, { adsr: { ...m.adsr, releaseMs: v } })} />
           </div>
           <SliderRow label="SUS LVL" value={m.adsr.sustainLevel} min={0} max={1}
@@ -296,11 +304,28 @@ function Row({ label, children }: { label: string; children: ReactNode }): JSX.E
 }
 
 function NumRow({
-  label, value, min, max, integer, onChange
+  label, value, min, max, integer, compact, onChange
 }: {
-  label: string; value: number; min: number; max: number; integer?: boolean
+  label: string; value: number; min: number; max: number; integer?: boolean; compact?: boolean
   onChange: (v: number) => void
 }): JSX.Element {
+  // Compact: a hair-thin label so the number never clips in a narrow grid
+  // cell (the ADSR a/d/s/r fields, which run to five digits).
+  if (compact) {
+    return (
+      <div className="flex min-w-0 items-center gap-1">
+        <span className="w-2.5 shrink-0 font-mono text-[9px] text-muted">{label}</span>
+        <BoundedNumberInput
+          value={value}
+          min={min}
+          max={max}
+          integer={integer}
+          onChange={onChange}
+          className="input w-full min-w-0 px-0.5 py-0.5 text-right text-[10px]"
+        />
+      </div>
+    )
+  }
   return (
     <Row label={label}>
       <BoundedNumberInput
@@ -332,6 +357,14 @@ function SliderRow({
         onChange={(e) => onChange(Number(e.target.value))}
         className="min-w-0 flex-1 accent-accent"
         title={title}
+      />
+      {/* Every slider carries an editable numeric readout. */}
+      <BoundedNumberInput
+        value={value}
+        min={min}
+        max={max}
+        onChange={onChange}
+        className="input w-10 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
       />
     </Row>
   )

@@ -125,12 +125,15 @@ export function Inspector(): JSX.Element {
           onApplied={isVibe ? setVibePresetName : undefined}
         />
       </div>
-      <div className="max-h-44 overflow-y-auto">
+      {/* Fixed shape: always exactly two rows of controls; more params flow
+          into new columns and scroll horizontally, so the panel never jumps. */}
+      <div className="h-[8.5rem] overflow-x-auto overflow-y-hidden">
         <AutoControls
           inputs={inputsForShader(shaderId)}
           values={values}
           onChange={onChange}
           modTargetFor={modTargetFor}
+          layout="twoRow"
         />
       </div>
     </div>

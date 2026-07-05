@@ -8,7 +8,7 @@
     { "NAME": "stops",      "TYPE": "float", "MIN": 2.0,  "MAX": 5.0, "DEFAULT": 2.0, "LABEL": "color stops" },
     { "NAME": "blend",      "TYPE": "float", "MIN": 0.0,  "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "bands↔smooth" },
     { "NAME": "dither",     "TYPE": "float", "MIN": 0.0,  "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "dither breakup" },
-    { "NAME": "mixSrc",     "TYPE": "float", "MIN": 0.0,  "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "source mix" },
+    { "NAME": "mixSrc",     "TYPE": "float", "MIN": 0.0,  "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "source mix" },
     { "NAME": "autoLevel",  "TYPE": "float", "MIN": 0.0,  "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "auto-levels" },
     { "NAME": "gamma",      "TYPE": "float", "MIN": 0.4,  "MAX": 2.5, "DEFAULT": 1.0, "LABEL": "tone gamma" },
     { "NAME": "contrast",   "TYPE": "float", "MIN": 0.25, "MAX": 2.5, "DEFAULT": 1.0 },

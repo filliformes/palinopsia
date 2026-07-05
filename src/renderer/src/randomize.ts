@@ -152,7 +152,14 @@ function randomRack(
     pool.splice(idx, 1)
   }
   // Master-rack habit: often close the chain with a unifying color pass.
-  if (endWithColor && n > 0 && chance(0.6) && !picked.some((p) => p.id === 'fx-palette' || p.id === 'fx-grade')) {
+  // Guarded so the rack never exceeds the requested maximum length.
+  if (
+    endWithColor &&
+    n > 0 &&
+    picked.length < countWeights.length - 1 &&
+    chance(0.6) &&
+    !picked.some((p) => p.id === 'fx-palette' || p.id === 'fx-grade')
+  ) {
     picked.push(pick(FX_SHADERS.filter((f) => f.id === 'fx-palette' || f.id === 'fx-grade')))
   }
   return picked.map((s) => ({
@@ -391,7 +398,12 @@ export function randomizeComposition(
     const locked = next.master.filter((f) => f.locked)
     next = {
       ...next,
-      master: [...randomRack([0, 0.35, 0.4, 0.25], true, ['fx-threshold']), ...locked]
+      // Up to 8 distinct effects (index = count); peak around 3–4, long tail
+      // out to a full 8-deep master chain.
+      master: [
+        ...randomRack([0, 0.12, 0.16, 0.18, 0.16, 0.14, 0.1, 0.08, 0.06], true, ['fx-threshold']),
+        ...locked
+      ]
     }
   }
 

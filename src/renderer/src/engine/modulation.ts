@@ -539,16 +539,20 @@ export function applyModulation(
     const v = values[a.mod]
     if (v === undefined) continue
     if (a.target.kind === 'meta') {
-      // Meta target: swing the knob's position, then fan out through the
-      // knob's curve to every destination it carries — macro modulation.
+      // Meta target: the knob's curve is its SCALING FUNCTION — the raw
+      // modulator signal is shaped by the curve first (modulator × scaling
+      // function), then swung around the knob's base position by depth. The
+      // same shaped value is what the dial animates to AND what fans out to
+      // the destinations, so what you see the knob doing is exactly what it
+      // sends.
       const knob = c.metaKnobs[a.target.knob]
       if (!knob) continue
-      const v01 = Math.max(0, Math.min(1, knob.value + (v - 0.5) * 2 * a.depth))
+      const scaled = shapeCurve(Math.max(0, Math.min(1, v)), knob.curve)
+      const v01 = Math.max(0, Math.min(1, knob.value + (scaled - 0.5) * 2 * a.depth))
       metaLiveValues.set(a.target.knob, v01)
-      const shaped = shapeCurve(v01, knob.curve)
       for (const dest of knob.destinations) {
         if (dest.kind === 'meta') continue // knobs never chain into knobs
-        writeTarget(dest, shaped)
+        writeTarget(dest, v01)
       }
       continue
     }

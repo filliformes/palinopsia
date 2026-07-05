@@ -9,6 +9,8 @@ export interface MenuItem {
   onClick?: () => void
   danger?: boolean
   divider?: boolean
+  /** Greyed and non-interactive (e.g. Paste with an empty clipboard). */
+  disabled?: boolean
   /** Optional trailing × — e.g. delete a preset without applying it. */
   onDelete?: () => void
   deleteTitle?: string
@@ -67,12 +69,15 @@ export function ContextMenu({
         ) : (
           <div key={i} className="flex items-center">
             <button
+              disabled={item.disabled}
               onClick={() => {
                 item.onClick?.()
                 onClose()
               }}
-              className={`flex-1 px-3 py-1 text-left text-[11px] transition-colors hover:bg-accent/15 ${
-                item.danger ? 'text-danger hover:text-danger' : 'hover:text-accent'
+              className={`flex-1 px-3 py-1 text-left text-[11px] transition-colors ${
+                item.disabled
+                  ? 'cursor-default text-muted/40'
+                  : `hover:bg-accent/15 ${item.danger ? 'text-danger hover:text-danger' : 'hover:text-accent'}`
               }`}
             >
               {item.label}

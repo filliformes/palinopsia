@@ -24,7 +24,6 @@ import {
   subscribeKnobDisplay
 } from '../metaSmooth'
 import { modTargetKey, useStore } from '../store'
-import { AssignRow } from './AutoControls'
 import { useFlash } from './useFlash'
 
 const KNOB_PX = 44
@@ -302,10 +301,66 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
         </button>
       </div>
 
-      {assignOpen && (
-        <div className="w-full">
-          <AssignRow target={target} bound={bound} hideMeta />
-        </div>
+      {assignOpen && <KnobModAssign index={index} bound={bound} />}
+    </div>
+  )
+}
+
+// Compact single-modulator assignment for a Meta knob: two rows of four
+// modulator buttons (only ONE can drive a knob at a time) plus a full-width
+// depth slider. No "mod"/"meta" text labels — the tiles are narrow.
+function KnobModAssign({
+  index,
+  bound
+}: {
+  index: number
+  bound: Array<{ id: string; mod: number; depth: number }>
+}): JSX.Element {
+  const assignMod = useStore((s) => s.assignMod)
+  const removeAssignment = useStore((s) => s.removeAssignment)
+  const setAssignmentDepth = useStore((s) => s.setAssignmentDepth)
+  const target = { kind: 'meta', knob: index } as const
+  // One modulator per knob — bound[0] is the current driver, if any.
+  const current = bound[0]
+
+  return (
+    <div className="flex w-full flex-col gap-1">
+      <div className="grid grid-cols-4 gap-0.5">
+        {Array.from({ length: 8 }, (_, i) => {
+          const active = current?.mod === i
+          return (
+            <button
+              key={i}
+              onClick={() => {
+                // Single-select: clear whatever drives this knob, then bind the
+                // clicked modulator (unless it was already the active one).
+                const keepDepth = current?.depth ?? 0.5
+                bound.forEach((b) => removeAssignment(b.id))
+                if (!active) assignMod(i, target, keepDepth)
+              }}
+              className={`rounded py-0.5 font-mono text-[9px] transition-colors ${
+                active
+                  ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
+                  : 'bg-panel3/60 text-muted hover:text-text'
+              }`}
+              title={active ? `Unbind M${i + 1}` : `Bind M${i + 1} (replaces current)`}
+            >
+              {i + 1}
+            </button>
+          )
+        })}
+      </div>
+      {current && (
+        <input
+          type="range"
+          min={-1}
+          max={1}
+          step={0.01}
+          value={current.depth}
+          onChange={(e) => setAssignmentDepth(current.id, Number(e.target.value))}
+          className="w-full accent-accent2"
+          title={`M${current.mod + 1} depth ${current.depth.toFixed(2)} — bipolar swing around the base`}
+        />
       )}
     </div>
   )
