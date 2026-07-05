@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import type { ModTarget } from '@shared/types'
 import { liveModValues } from '../engine/modulation'
 import type { IsfInputDesc } from '../shaders/isf/inputs'
+import { useShallow } from 'zustand/react/shallow'
 import { modTargetKey, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 
@@ -221,11 +222,15 @@ function FloatControl({
   const [assignOpen, setAssignOpen] = useState(false)
   const target = modTargetFor?.(inp.name)
   const targetKey = target ? modTargetKey(target) : null
-  // Existing assignments on this input (any modulator).
-  const bound = useStore((s) =>
-    targetKey
-      ? s.composition.modMatrix.filter((a) => modTargetKey(a.target) === targetKey)
-      : []
+  // Existing assignments on this input (any modulator). useShallow so this
+  // fresh-array selector doesn't re-render every FloatControl on every store
+  // mutation (the Inspector renders one per float input).
+  const bound = useStore(
+    useShallow((s) =>
+      targetKey
+        ? s.composition.modMatrix.filter((a) => modTargetKey(a.target) === targetKey)
+        : []
+    )
   )
   const isModulated = bound.length > 0
 
@@ -375,10 +380,13 @@ export function AssignRow({
   const setAssignmentDepth = useStore((s) => s.setAssignmentDepth)
   const toggleMetaDest = useStore((s) => s.toggleMetaDest)
   const targetKey = modTargetKey(target)
-  // Which Meta knobs already carry this input as a destination.
-  const metaBound = useStore((s) =>
-    s.composition.metaKnobs.map((k) =>
-      k.destinations.some((d) => modTargetKey(d) === targetKey)
+  // Which Meta knobs already carry this input as a destination. useShallow so
+  // this fresh boolean-array selector doesn't re-render on every store change.
+  const metaBound = useStore(
+    useShallow((s) =>
+      s.composition.metaKnobs.map((k) =>
+        k.destinations.some((d) => modTargetKey(d) === targetKey)
+      )
     )
   )
   return (

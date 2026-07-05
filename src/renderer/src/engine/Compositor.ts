@@ -517,6 +517,9 @@ export class Compositor {
   private xfadeActive = false;
   private xfadeStartMs = -1;
   private xfadeMs = 0;
+  // The texture presented last frame — snapshotted into `snapshot` the moment a
+  // crossfade begins (so no per-frame blit in the steady state).
+  private lastPresent: WebGLTexture | null = null;
   // Global time multiplier (1/64×…64×) — scales every visual clock.
   private globalSpeed = 1;
   private blendProg: WebGLProgram;
@@ -602,9 +605,12 @@ export class Compositor {
   }
 
   /** Begin dissolving the frozen last frame into the new scene over `ms`.
-   *  Driven by the render loop from a morph (Randomize / scene recall). */
+   *  Driven by the render loop from a morph (Randomize / scene recall). Called
+   *  BEFORE this frame's render(), while `lastPresent` still holds the previous
+   *  (old-scene) frame — snapshot it here rather than blitting every frame. */
   beginCrossfade(ms: number): void {
     if (ms <= 20) return;
+    if (this.lastPresent) this.copyInto(this.snapshot.fbo, this.lastPresent);
     this.xfadeActive = true;
     this.xfadeStartMs = -1; // stamped on the next render (loop clock)
     this.xfadeMs = ms;
@@ -800,10 +806,6 @@ export class Compositor {
         present = this.xfadeTarget.tex;
       }
     }
-    // Keep the freshest frame around (except mid-crossfade, so the snapshot
-    // stays frozen at the pre-morph scene) for the NEXT crossfade to start from.
-    if (!this.xfadeActive) this.copyInto(this.snapshot.fbo, composite);
-
     // Present to canvas.
     gl.bindVertexArray(this.vao);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -812,6 +814,10 @@ export class Compositor {
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, present); gl.uniform1i(this.uCTex, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindVertexArray(null);
+
+    // Remember what we just showed — beginCrossfade() snapshots this next time a
+    // morph starts, so the dissolve begins from the exact frame on screen.
+    this.lastPresent = present;
 
     // SEAM (Phase 8): gl.readPixels(composite) → IPC → Spout/Syphon/NDI.
   }

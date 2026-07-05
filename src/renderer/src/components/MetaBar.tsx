@@ -23,6 +23,7 @@ import {
   shuffleMetaValues,
   subscribeKnobDisplay
 } from '../metaSmooth'
+import { useShallow } from 'zustand/react/shallow'
 import { modTargetKey, useStore } from '../store'
 import { useFlash } from './useFlash'
 
@@ -100,8 +101,12 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
   // Which modulators drive this knob (target kind 'meta').
   const target = { kind: 'meta', knob: index } as const
   const targetKey = modTargetKey(target)
-  const bound = useStore((s) =>
-    s.composition.modMatrix.filter((a) => modTargetKey(a.target) === targetKey)
+  // useShallow so all 16 always-mounted knob tiles don't re-render on every
+  // store mutation (this selector builds a fresh array each call).
+  const bound = useStore(
+    useShallow((s) =>
+      s.composition.modMatrix.filter((a) => modTargetKey(a.target) === targetKey)
+    )
   )
   const isModulated = bound.length > 0
 
