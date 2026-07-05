@@ -280,8 +280,12 @@ interface StoreState {
   copiedLayer: LayerState | null
   copyLayer: (layer: number) => void
   pasteLayer: (layer: number) => void
-  // Mixer view — a compact 4-column opacity/speed/blend surface that replaces
-  // the layer strips (toggle with the M key). Its own app-persistent presets.
+  // Right-side panel view — Layers strips, the compact Mixer (M key), or the
+  // Finishing Touches (Vibe/Context/Finalizer) stack. All three occupy the same
+  // column; a small tab row switches between them.
+  rightView: 'layers' | 'mixer' | 'finishing'
+  setRightView: (v: 'layers' | 'mixer' | 'finishing') => void
+  // Back-compat: the M key still toggles the Mixer on/off against Layers.
   mixerView: boolean
   toggleMixerView: () => void
   mixerPresets: Array<{
@@ -576,8 +580,14 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     }),
 
+  rightView: 'layers',
+  setRightView: (v) => set({ rightView: v, mixerView: v === 'mixer' }),
   mixerView: false,
-  toggleMixerView: () => set((s) => ({ mixerView: !s.mixerView })),
+  toggleMixerView: () =>
+    set((s) => {
+      const next = s.rightView === 'mixer' ? 'layers' : 'mixer'
+      return { rightView: next, mixerView: next === 'mixer' }
+    }),
   mixerPresets: (() => {
     try {
       return JSON.parse(localStorage.getItem('opsia.mixerPresets') ?? '[]')

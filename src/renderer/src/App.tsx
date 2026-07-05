@@ -34,10 +34,11 @@ import { PRESETS_BY_ID } from './shaders/isf/presets'
 let vibePresetIndex = -1
 let contextPresetIndex = -1
 
-// Reveal a Finishing Touches sub-section (expand the panel + the sub-row).
+// Reveal a Finishing Touches sub-section: switch the right column to the
+// Finishing view and expand the relevant sub-row.
 function revealFinishing(sub: 'ft-vibe' | 'ft-context'): void {
   const st = useStore.getState()
-  if (st.collapsed['finishing']) st.toggleSection('finishing')
+  st.setRightView('finishing')
   if (st.collapsed[sub] ?? true) st.toggleSection(sub)
 }
 
@@ -89,7 +90,7 @@ export default function App(): JSX.Element {
   const setName = useStore((s) => s.setName)
   const uiZoom = useStore((s) => s.uiZoom)
   const setUiZoom = useStore((s) => s.setUiZoom)
-  const mixerView = useStore((s) => s.mixerView)
+  const rightView = useStore((s) => s.rightView)
   // Layers-column width — draggable via the handle between preview and strips.
   const [layersWidth, setLayersWidth] = useState<number>(() => {
     const saved = Number(localStorage.getItem('opsia.layersWidth'))
@@ -363,35 +364,24 @@ export default function App(): JSX.Element {
           <Collapsible sectionKey="master" title="master fx">
             <MasterRackStrip />
           </Collapsible>
-
-          <Collapsible sectionKey="finishing" title="finishing touches">
-            <FinishingTouches />
-          </Collapsible>
         </section>
 
         {/* Drag handle — the layers column is resizable */}
         <LayerColumnHandle onResize={setLayersWidth} width={layersWidth} />
 
-        {/* Four layer strips (brief §10.2) — or the compact Mixer (M key) */}
+        {/* Right column — three switchable views: Layers strips, the compact
+            Mixer (M key), or the Finishing Touches finalizers stack. */}
         <aside
           className="flex shrink-0 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-0.5"
           style={{ width: layersWidth }}
         >
-          {mixerView ? (
+          <RightViewTabs />
+          {rightView === 'mixer' ? (
             <MixerPanel />
+          ) : rightView === 'finishing' ? (
+            <FinishingTouches />
           ) : (
-            <>
-              <button
-                onClick={() => useStore.getState().toggleMixerView()}
-                className="self-start rounded border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted hover:text-accent"
-                title="Open the Mixer — opacity/speed/blend for all 4 layers (M)"
-              >
-                ▸ mixer
-              </button>
-              {[0, 1, 2, 3].map((i) => (
-                <LayerPanel key={i} index={i} />
-              ))}
-            </>
+            [0, 1, 2, 3].map((i) => <LayerPanel key={i} index={i} />)
           )}
         </aside>
       </main>
@@ -408,6 +398,35 @@ export default function App(): JSX.Element {
 
       {/* ── Transport (BPM + Randomize) ───────────────────────────── */}
       <Transport />
+    </div>
+  )
+}
+
+// Segmented switch at the top of the right column: Layers / Mixer / Finishing.
+function RightViewTabs(): JSX.Element {
+  const rightView = useStore((s) => s.rightView)
+  const setRightView = useStore((s) => s.setRightView)
+  const tabs: Array<{ id: 'layers' | 'mixer' | 'finishing'; label: string; title: string }> = [
+    { id: 'layers', label: 'layers', title: 'The 4 layer strips' },
+    { id: 'mixer', label: 'mixer', title: 'Compact opacity/speed/blend for all 4 layers (M)' },
+    { id: 'finishing', label: 'finishing', title: 'Finishing Touches — Vibe Palette · Context · Finalizer' }
+  ]
+  return (
+    <div className="flex shrink-0 gap-1">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => setRightView(t.id)}
+          title={t.title}
+          className={`rounded border px-2 py-0.5 font-mono text-[9px] transition-colors ${
+            rightView === t.id
+              ? 'border-accent bg-accent/10 text-accent'
+              : 'border-border text-muted hover:text-accent'
+          }`}
+        >
+          {t.label}
+        </button>
+      ))}
     </div>
   )
 }

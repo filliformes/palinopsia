@@ -15,7 +15,6 @@ export function MixerPanel(): JSX.Element {
   const setOpacity = useStore((s) => s.setOpacity)
   const setLayerSpeed = useStore((s) => s.setLayerSpeed)
   const setBlend = useStore((s) => s.setBlend)
-  const toggleMixerView = useStore((s) => s.toggleMixerView)
   const mixerPresets = useStore((s) => s.mixerPresets)
   const saveMixerPreset = useStore((s) => s.saveMixerPreset)
   const applyMixerPreset = useStore((s) => s.applyMixerPreset)
@@ -24,16 +23,9 @@ export function MixerPanel(): JSX.Element {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 rounded-md border border-border bg-panel p-2">
-      {/* Header: title · presets · save · back to layers */}
+      {/* Header: title · presets · save */}
       <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-1.5">
         <span className="font-mono text-[11px] uppercase tracking-wide text-muted">Mixer</span>
-        <button
-          onClick={() => toggleMixerView()}
-          className="rounded border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted hover:text-accent"
-          title="Back to the layer strips (M)"
-        >
-          ▸ layers
-        </button>
         <div className="flex-1" />
         <div className="flex min-w-0 flex-wrap items-center gap-1">
           {mixerPresets.map((p) => (
