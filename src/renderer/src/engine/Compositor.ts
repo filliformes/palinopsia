@@ -117,6 +117,15 @@ void main(){
     o = vec4(mix(aw, bw, 0.5), max(A.a, B.a));
     return;
   }
+  if(mode==16){
+    // LUMAKEY (Lumen-style keyer): A shows where it's bright, B fills A's
+    // dark areas (composite A over B, keying out A's near-black background).
+    // x is the key threshold, with a soft knee.
+    float la = dot(A.rgb, vec3(0.299,0.587,0.114));
+    float k = smoothstep(x - 0.08, x + 0.08, la);
+    o = vec4(mix(B.rgb, A.rgb, k), max(A.a, B.a));
+    return;
+  }
   vec3 c = blendMode(mode, A.rgb, B.rgb);
   o = vec4(mix(A.rgb, c, x), max(A.a, B.a * x));
 }`;
@@ -440,7 +449,7 @@ export class Compositor {
   private modeIndex: Record<BlendMode, number> = {
     normal: 0, add: 1, subtract: 2, multiply: 3, screen: 4, overlay: 5,
     softlight: 6, hardlight: 7, darken: 8, lighten: 9, difference: 10,
-    exclusion: 11, dodge: 12, burn: 13, wrap: 14, weave: 15
+    exclusion: 11, dodge: 12, burn: 13, wrap: 14, weave: 15, lumakey: 16
   };
 
   constructor(public canvas: HTMLCanvasElement, public w = 1920, public h = 1080) {

@@ -25,6 +25,9 @@ import swell from './Swell.fs?raw'
 import congeal from './Congeal.fs?raw'
 import slitScan from './SlitScan.fs?raw'
 import ramps from './Ramps.fs?raw'
+import rgbOsc from './RgbOsc.fs?raw'
+import recurse from './Recurse.fs?raw'
+import shapes from './Shapes.fs?raw'
 import posterize from './fx/Posterize.fs?raw'
 import dither from './fx/Dither.fs?raw'
 import chromaShift from './fx/ChromaShift.fs?raw'
@@ -51,6 +54,8 @@ import triangleFlicker from './fx/TriangleFlicker.fs?raw'
 import colorizer from './fx/Colorizer.fs?raw'
 import wavefold from './fx/Wavefold.fs?raw'
 import rutt from './fx/Rutt.fs?raw'
+import crtScreen from './fx/CrtScreen.fs?raw'
+import pixelmask from './fx/Pixelmask.fs?raw'
 import syncLoss from './fx/SyncLoss.fs?raw'
 import rowEcho from './fx/RowEcho.fs?raw'
 import byteCorrupt from './fx/ByteCorrupt.fs?raw'
@@ -246,6 +251,27 @@ export const GENERATORS: IsfShader[] = [
     category: 'Generator',
     source: ramps,
     curated: { freq: [1, 6], steps: [1, 16], rate: [0, 1], angle: [0, 6.2832] }
+  },
+  {
+    id: 'rgb-osc',
+    name: 'RGB Oscillators',
+    category: 'Generator',
+    source: rgbOsc,
+    curated: { freq: [2, 20], spread: [0.05, 0.6], symmetry: [0, 1], angle: [0, 6.2832], rate: [0.05, 1.5], level: [0.5, 0.95] }
+  },
+  {
+    id: 'recurse',
+    name: 'Recurse',
+    category: 'Generator',
+    source: recurse,
+    curated: { iterations: [4, 9], scale: [0.68, 0.9], angle: [0.1, 0.9], drift: [0.05, 0.35], width: [0.02, 0.12], rate: [0.05, 1] }
+  },
+  {
+    id: 'shapes',
+    name: 'Shapes',
+    category: 'Generator',
+    source: shapes,
+    curated: { count: [1, 12], size: [0.2, 0.85], soft: [0.02, 0.3], rate: [0.05, 1.2] }
   }
 ]
 
@@ -385,6 +411,14 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-rutt', name: 'Rutt', category: 'FX', source: rutt,
     curated: { lines: [40, 160], amp: [0.03, 0.2], width: [0.08, 0.4], color: [0, 1] }
+  },
+  {
+    id: 'fx-crt-screen', name: 'CRT Screen', category: 'FX', source: crtScreen,
+    curated: { curve: [0.05, 0.4], aberration: [0.002, 0.02], scanline: [0.1, 0.5], vignette: [0.15, 0.7], corner: [0.02, 0.12] }
+  },
+  {
+    id: 'fx-pixelmask', name: 'Pixelmask', category: 'FX', source: pixelmask,
+    curated: { scale: [1.5, 8], amount: [0.3, 0.9] }
   }
 ]
 

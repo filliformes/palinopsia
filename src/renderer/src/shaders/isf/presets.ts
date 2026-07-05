@@ -12,6 +12,66 @@ export interface ShaderPreset {
 }
 
 export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
+  'rgb-osc': [
+    { name: 'Colour crawl', values: { waveform: 0, freq: 6, spread: 0.25, symmetry: 0.5, angle: 0.3, rate: 0.3, level: 0.8 } },
+    { name: 'Fine weave', values: { waveform: 0, freq: 18, spread: 0.15, symmetry: 0.5, angle: 0.2, rate: 0.15, level: 0.75 } },
+    { name: 'Broad bands', values: { waveform: 1, freq: 3, spread: 0.4, symmetry: 0.3, angle: 0.9, rate: 0.2, level: 0.85 } },
+    { name: 'Hard cells', values: { waveform: 2, freq: 8, spread: 0.3, symmetry: 0.5, angle: 0.4, rate: 0.25, level: 0.8 } },
+    { name: 'Horizontal', values: { waveform: 0, freq: 10, spread: 0.2, symmetry: 0, angle: 0, rate: 0.4, level: 0.8 } },
+    { name: 'Vertical drift', values: { waveform: 0, freq: 12, spread: 0.35, symmetry: 1, angle: 0, rate: 0.3, level: 0.78 } },
+    { name: 'Wide split', values: { waveform: 1, freq: 5, spread: 0.6, symmetry: 0.5, angle: 1.2, rate: 0.5, level: 0.85 } },
+    { name: 'Slow plasma', values: { waveform: 0, freq: 4, spread: 0.3, symmetry: 0.6, angle: 0.5, rate: 0.08, level: 0.8 } },
+    { name: 'Grid squares', values: { waveform: 2, freq: 14, spread: 0.1, symmetry: 0.5, angle: 0.79, rate: 0.35, level: 0.75 } },
+    { name: 'Interference', values: { waveform: 0, freq: 22, spread: 0.5, symmetry: 0.4, angle: 2.1, rate: 0.6, level: 0.8 } }
+  ],
+  'recurse': [
+    { name: 'Cascade', values: { iterations: 7, scale: 0.78, angle: 0.4, drift: 0.15, width: 0.05, rate: 0.15 } },
+    { name: 'Deep spiral', values: { iterations: 9, scale: 0.85, angle: 0.6, drift: 0.1, width: 0.03, rate: 0.2 } },
+    { name: 'Loose', values: { iterations: 5, scale: 0.72, angle: 0.3, drift: 0.3, width: 0.08, rate: 0.1 } },
+    { name: 'Tight coil', values: { iterations: 8, scale: 0.88, angle: 0.9, drift: 0.08, width: 0.04, rate: 0.3 } },
+    { name: 'Off-axis', values: { iterations: 6, scale: 0.8, angle: 0.5, drift: 0.35, width: 0.06, rate: 0.25 } },
+    { name: 'Bold frames', values: { iterations: 5, scale: 0.7, angle: 0.4, drift: 0.2, width: 0.12, rate: 0.12 } },
+    { name: 'Blue nest', values: { iterations: 7, scale: 0.82, angle: 0.55, drift: 0.12, width: 0.05, rate: 0.18, tint: [0.4, 0.6, 0.9, 1] } },
+    { name: 'Fast turn', values: { iterations: 8, scale: 0.8, angle: 0.85, drift: 0.15, width: 0.05, rate: 0.8 } },
+    { name: 'Amber cascade', values: { iterations: 6, scale: 0.78, angle: 0.45, drift: 0.18, width: 0.07, rate: 0.2, tint: [0.9, 0.6, 0.25, 1] } },
+    { name: 'Minimal', values: { iterations: 4, scale: 0.75, angle: 0.35, drift: 0.25, width: 0.06, rate: 0.1 } }
+  ],
+  'shapes': [
+    { name: 'Circles', values: { shape: 0, count: 4, size: 0.5, soft: 0.05, rate: 0.2, invert: 0 } },
+    { name: 'Ring grid', values: { shape: 1, count: 6, size: 0.6, soft: 0.04, rate: 0.15, invert: 0 } },
+    { name: 'Bars', values: { shape: 2, count: 3, size: 0.7, soft: 0.03, rate: 0.1, invert: 0 } },
+    { name: 'Cross field', values: { shape: 3, count: 5, size: 0.5, soft: 0.05, rate: 0.25, invert: 0 } },
+    { name: 'Triangles', values: { shape: 4, count: 4, size: 0.55, soft: 0.06, rate: 0.4, invert: 0 } },
+    { name: 'Big dot', values: { shape: 0, count: 1, size: 0.8, soft: 0.1, rate: 0.1, invert: 0 } },
+    { name: 'Dense dots', values: { shape: 0, count: 16, size: 0.4, soft: 0.08, rate: 0.3, invert: 0 } },
+    { name: 'Negative rings', values: { shape: 1, count: 8, size: 0.5, soft: 0.05, rate: 0.2, invert: 1 } },
+    { name: 'Mask bars', values: { shape: 2, count: 10, size: 0.6, soft: 0.02, rate: 0, invert: 0 } },
+    { name: 'Pulsing cross', values: { shape: 3, count: 3, size: 0.7, soft: 0.1, rate: 0.9, invert: 0 } }
+  ],
+  'fx-crt-screen': [
+    { name: 'Studio tube', values: { curve: 0.15, aberration: 0.008, scanline: 0.25, vignette: 0.4, corner: 0.06 } },
+    { name: 'Heavy curve', values: { curve: 0.4, aberration: 0.015, scanline: 0.3, vignette: 0.5, corner: 0.1 } },
+    { name: 'Flat glass', values: { curve: 0.05, aberration: 0.004, scanline: 0.15, vignette: 0.25, corner: 0.03 } },
+    { name: 'Worn CRT', values: { curve: 0.25, aberration: 0.02, scanline: 0.4, vignette: 0.6, corner: 0.08 } },
+    { name: 'Portable TV', values: { curve: 0.35, aberration: 0.012, scanline: 0.35, vignette: 0.55, corner: 0.12 } },
+    { name: 'Clean monitor', values: { curve: 0.1, aberration: 0.006, scanline: 0.2, vignette: 0.3, corner: 0.04 } },
+    { name: 'Fringe heavy', values: { curve: 0.2, aberration: 0.035, scanline: 0.25, vignette: 0.4, corner: 0.06 } },
+    { name: 'Deep vignette', values: { curve: 0.15, aberration: 0.008, scanline: 0.2, vignette: 0.85, corner: 0.05 } },
+    { name: 'Grille strong', values: { curve: 0.12, aberration: 0.007, scanline: 0.6, vignette: 0.35, corner: 0.05 } },
+    { name: 'Subtle', values: { curve: 0.08, aberration: 0.003, scanline: 0.12, vignette: 0.2, corner: 0.03 } }
+  ],
+  'fx-pixelmask': [
+    { name: 'Aperture grille', values: { pattern: 0, scale: 3, amount: 0.6, invert: 0 } },
+    { name: 'Shadow mask', values: { pattern: 1, scale: 3, amount: 0.7, invert: 0 } },
+    { name: 'Dot matrix', values: { pattern: 2, scale: 4, amount: 0.6, invert: 0 } },
+    { name: 'Grid stencil', values: { pattern: 3, scale: 5, amount: 0.5, invert: 0 } },
+    { name: 'Static mask', values: { pattern: 4, scale: 3, amount: 0.5, invert: 0 } },
+    { name: 'Fine grille', values: { pattern: 0, scale: 1.5, amount: 0.7, invert: 0 } },
+    { name: 'Coarse dots', values: { pattern: 2, scale: 8, amount: 0.8, invert: 0 } },
+    { name: 'Phosphor RGB', values: { pattern: 1, scale: 2, amount: 0.85, invert: 0 } },
+    { name: 'Inverted grid', values: { pattern: 3, scale: 4, amount: 0.6, invert: 1 } },
+    { name: 'Heavy static', values: { pattern: 4, scale: 2, amount: 0.9, invert: 0 } }
+  ],
   'congeal': [
     { name: 'Slow drift', values: { rate: 0.3, decay: 0.96, warp: 0.4, seed: 0.35, scale: 2.5 } },
     { name: 'Congealing', values: { rate: 0.5, decay: 0.985, warp: 0.5, seed: 0.25, scale: 2 } },
