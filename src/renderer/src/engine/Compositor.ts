@@ -87,7 +87,11 @@ uniform sampler2D src;    // this frame's processed layer output
 uniform sampler2D prev;   // this layer's previous persisted frame
 uniform float amount;     // 0 = plain copy, →1 = long trails
 void main(){
-  o = mix(texture(src, uv), texture(prev, uv), amount);
+  vec4 p = mix(texture(src, uv), texture(prev, uv), amount);
+  // NaN/Inf guard: a single bad frame from any source would otherwise lock the
+  // feedback buffer forever (NaN self-perpetuates through prev, and feedback
+  // survives shader swaps). Fall back to the live source when the trail is bad.
+  o = all(equal(p, p)) ? p : texture(src, uv);
 }`;
 
 // A/B source mix: out = mix(A, blendMode(A,B), x) — 'normal' degenerates to
@@ -545,7 +549,11 @@ export class Compositor {
   constructor(public canvas: HTMLCanvasElement, public w = 1920, public h = 1080) {
     const gl = canvas.getContext('webgl2', { premultipliedAlpha: false })!;
     if (!gl) throw new Error('WebGL2 unavailable');
-    gl.getExtension('EXT_color_buffer_float'); // RGBA16F render targets
+    // RGBA16F render targets need this — without it every FBO is incomplete and
+    // the whole engine renders black. Surface it rather than fail silently.
+    if (!gl.getExtension('EXT_color_buffer_float')) {
+      console.error('[Compositor] EXT_color_buffer_float unavailable — float render targets will fail (black output)');
+    }
     this.gl = gl;
     const wrapped = makeRedirectableGL(gl);
     this.shared = { gl, rgl: wrapped.gl, redirect: wrapped.state, budget: { n: 0 } };

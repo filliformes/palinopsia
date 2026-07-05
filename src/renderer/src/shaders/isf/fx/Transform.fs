@@ -58,7 +58,10 @@ float shapeDist(int s, vec2 p, float r) {
   if (s == 17) {                                                       // heart (up)
     vec2 hp = p / (r * 1.15); hp.y = -hp.y + 0.35;
     float hx = abs(hp.x);
-    return pow(hx * hx + hp.y * hp.y - 1.0, 3.0) - hx * hx * hp.y * hp.y * hp.y;
+    // b can be negative; pow(neg, 3.0) is undefined in GLSL (NaN on strict
+    // drivers) — cube it directly instead.
+    float b = hx * hx + hp.y * hp.y - 1.0;
+    return b * b * b - hx * hx * hp.y * hp.y * hp.y;
   }
   if (s == 18) return max(length(p) - r, -(length(p - vec2(r * 0.5, 0.0)) - r * 0.95)); // crescent
   if (s == 19) {                                                       // trapezoid
