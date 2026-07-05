@@ -20,6 +20,7 @@ import {
   knobDisplayVersion,
   setKnobImmediate,
   setKnobTarget,
+  shuffleMetaValues,
   subscribeKnobDisplay
 } from '../metaSmooth'
 import { modTargetKey, useStore } from '../store'
@@ -39,18 +40,27 @@ export function MetaBar(): JSX.Element {
 
   return (
     <div className="flex min-w-0 flex-col gap-1.5 border-t border-border bg-panel px-3 py-1.5">
-      <button
-        onClick={() => toggleSection('meta')}
-        className="flex shrink-0 items-center gap-1.5 self-start"
-        title={collapsed ? 'Expand Meta Controller' : 'Collapse Meta Controller'}
-      >
-        <span
-          className={`font-mono text-[9px] text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}
+      <div className="flex shrink-0 items-center gap-2 self-start">
+        <button
+          onClick={() => toggleSection('meta')}
+          className="flex items-center gap-1.5"
+          title={collapsed ? 'Expand Meta Controller' : 'Collapse Meta Controller'}
         >
-          ▶
-        </span>
-        <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Meta</span>
-      </button>
+          <span
+            className={`font-mono text-[9px] text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}
+          >
+            ▶
+          </span>
+          <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Meta</span>
+        </button>
+        <button
+          onClick={() => shuffleMetaValues()}
+          className="rounded border border-accent/50 bg-accent/10 px-1 font-mono text-[10px] leading-4 text-accent transition-colors hover:bg-accent/20"
+          title="Randomize the knob positions (keeps bindings)"
+        >
+          ⚄
+        </button>
+      </div>
       {!collapsed && (
         // 16 tiles spread to fill the full width; columns never shrink below
         // the knob so it can't overlap, scrolling only on a very narrow window.

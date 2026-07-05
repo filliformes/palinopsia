@@ -210,8 +210,8 @@ function freshModulator(base: ModulatorConfig, enabled: boolean): ModulatorConfi
   }
 }
 
-/** Every modulatable float input in the current composition. */
-function collectFloatTargets(c: CompositionState): ModTarget[] {
+/** Every modulatable float input in the current composition (source + FX). */
+export function collectFloatTargets(c: CompositionState): ModTarget[] {
   const out: ModTarget[] = []
   const addFxTargets = (fx: FxInstance[], scope: FxScope): void => {
     for (const inst of fx) {

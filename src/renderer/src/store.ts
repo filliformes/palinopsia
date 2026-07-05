@@ -21,7 +21,13 @@ import type {
 import type { MetaKnobState } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulators } from './engine/modulation'
-import { randomizeComposition, randomizeSingleLayer, type RandomizeScope } from './randomize'
+import {
+  collectFloatTargets,
+  randomizeComposition,
+  randomizeInputs,
+  randomizeSingleLayer,
+  type RandomizeScope
+} from './randomize'
 
 export type { FxScope }
 
@@ -233,6 +239,12 @@ interface StoreState {
 
   // Randomize (brief §7) — scoped draws from curated aesthetic ranges.
   randomize: (scope: RandomizeScope) => void
+  // Re-roll each Meta knob's destinations (up to 8) + value — a fresh macro
+  // surface (fired by 'Randomize Meta Knobs'; the smoother applies it).
+  randomizeMetaBank: () => void
+  // Randomize the master chain's FX PARAMETERS in place (keep the chain,
+  // keep the Vibe) — the ⚄ next to the Master title.
+  randomizeMasterParams: () => void
 
   // Meta Controller (Phase 5) — 16 macro knobs.
   midiLearn: number | null // knob index armed for CC learn
@@ -599,6 +611,40 @@ export const useStore = create<StoreState>((set, get) => ({
 
   randomize: (scope) =>
     set((s) => ({ composition: randomizeComposition(s.composition, scope) })),
+
+  randomizeMetaBank: () =>
+    set((s) => {
+      const targets = collectFloatTargets(s.composition)
+      const metaKnobs = s.composition.metaKnobs.map((k) => {
+        const value = Math.random()
+        if (targets.length === 0) return { ...k, value }
+        // 1..8 distinct destinations per knob (8 is META_MAX_DESTS).
+        const maxN = Math.min(META_MAX_DESTS, targets.length)
+        const n = 1 + Math.floor(Math.random() * maxN)
+        const pool = targets.slice()
+        const destinations: typeof k.destinations = []
+        for (let j = 0; j < n && pool.length > 0; j++) {
+          const idx = Math.floor(Math.random() * pool.length)
+          destinations.push(pool[idx])
+          pool.splice(idx, 1)
+        }
+        return { ...k, destinations, value }
+      })
+      return { composition: { ...s.composition, metaKnobs } }
+    }),
+  randomizeMasterParams: () =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        // Keep the chain and the pinned Vibe; re-roll every other unit's
+        // inputs within curated ranges.
+        master: s.composition.master.map((f) =>
+          f.shaderId && !f.locked
+            ? { ...f, inputs: randomizeInputs(f.shaderId, f.inputs) }
+            : f
+        )
+      }
+    })),
 
   midiLearn: null,
   setMidiLearn: (i) => set({ midiLearn: i }),

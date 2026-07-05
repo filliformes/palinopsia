@@ -136,10 +136,19 @@ export function reapplyKnob(i: number): void {
   applyKnob(i, knobDisplayValue(i))
 }
 
-/** Randomize every knob's position — like grabbing all 16 at once. Glides via
- *  each knob's own smoothing and fans out to every destination (the smoother
- *  commits the settled value to the store, so it's one undo step). */
-export function randomizeMetaKnobs(): void {
+/** Glide every knob to a new random POSITION, keeping its bindings — the ⚄
+ *  next to the Meta title (shuffle the macro positions). */
+export function shuffleMetaValues(): void {
   const knobs = useStore.getState().composition.metaKnobs
   knobs.forEach((k, i) => setKnobTarget(i, Math.random(), k.smoothMs))
+}
+
+/** Full 'Randomize Meta Knobs': re-roll each knob's destinations (up to 8)
+ *  AND its position — a fresh macro surface. The store sets bindings+values;
+ *  the smoother then glides each knob to its new value, applying the new
+ *  destinations along the way. */
+export function randomizeMetaKnobs(): void {
+  useStore.getState().randomizeMetaBank()
+  const knobs = useStore.getState().composition.metaKnobs
+  knobs.forEach((k, i) => setKnobTarget(i, k.value, k.smoothMs))
 }

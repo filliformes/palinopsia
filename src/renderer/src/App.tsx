@@ -297,6 +297,7 @@ export default function App(): JSX.Element {
 function MasterRackStrip(): JSX.Element {
   const master = useStore((s) => s.composition.master)
   const applyMasterPreset = useStore((s) => s.applyMasterPreset)
+  const randomizeMasterParams = useStore((s) => s.randomizeMasterParams)
   // The select keeps showing the applied chain's name.
   const [applied, setApplied] = useState('')
   return (
@@ -305,6 +306,13 @@ function MasterRackStrip(): JSX.Element {
         <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">
           chain
         </span>
+        <button
+          onClick={() => randomizeMasterParams()}
+          className="shrink-0 rounded border border-accent/50 bg-accent/10 px-1 font-mono text-[10px] leading-4 text-accent transition-colors hover:bg-accent/20"
+          title="Randomize the master FX parameters (keeps the chain + your Vibe)"
+        >
+          ⚄
+        </button>
         <select
           className="input select-compact w-40 min-w-0 text-[10px]"
           value={applied}
