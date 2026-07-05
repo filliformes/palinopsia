@@ -503,6 +503,9 @@ export class Compositor {
   private shared: SharedGL;
   private chain: ChainBuffers;
   private mixTarget: { fbo: WebGLFramebuffer; tex: WebGLTexture };
+  // Off-chain hold for source A's post-rack signal while source B's rack runs
+  // (both racks share one ChainBuffers, so B could otherwise clobber A).
+  private abHold!: { fbo: WebGLFramebuffer; tex: WebGLTexture };
   // Dedicated dry/wet ping-pong for per-FX opacity (kept off the main chain).
   private fxOpac: [{ fbo: WebGLFramebuffer; tex: WebGLTexture }, { fbo: WebGLFramebuffer; tex: WebGLTexture }] | null = null;
   private fxOpacI = 0;
@@ -577,6 +580,7 @@ export class Compositor {
     this.acc = new PingPong(gl, w, h);
     this.chain = new ChainBuffers(gl, w, h);
     this.mixTarget = makeTarget(gl, w, h);
+    this.abHold = makeTarget(gl, w, h);
     this.snapshot = makeTarget(gl, w, h);
     this.xfadeTarget = makeTarget(gl, w, h);
     this.fxOpac = [makeTarget(gl, w, h), makeTarget(gl, w, h)];
@@ -735,6 +739,11 @@ export class Compositor {
       L.renderSource('A');
       let sig = L.rackA.apply(L.scratchA.tex, this.chain);
       if (L.hasB()) {
+        // rackA + rackB ping-pong through the SAME ChainBuffers, so rackB can
+        // land a write back on the buffer holding A's result (parity-dependent,
+        // e.g. A=1 FX, B=2 FX). Park A off-chain before B runs.
+        this.copyInto(this.abHold.fbo, sig);
+        sig = this.abHold.tex;
         L.renderSource('B');
         const sigB = L.rackB.apply(L.scratchB.tex, this.chain);
         sig = this.mixSources(sig, sigB, L.sourceMix, L.sourceBlend);
@@ -818,6 +827,7 @@ export class Compositor {
     this.acc.dispose(gl);
     this.chain.dispose(gl);
     disposeTarget(gl, this.mixTarget);
+    disposeTarget(gl, this.abHold);
     disposeTarget(gl, this.snapshot);
     disposeTarget(gl, this.xfadeTarget);
     if (this.fxOpac) { disposeTarget(gl, this.fxOpac[0]); disposeTarget(gl, this.fxOpac[1]); }

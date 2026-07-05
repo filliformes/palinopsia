@@ -21,7 +21,7 @@ import type {
 import type { MetaKnobState } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulators } from './engine/modulation'
-import { beginMorph } from './morph'
+import { beginMorph, cancelMorph } from './morph'
 import {
   collectFloatTargets,
   randomizeComposition,
@@ -1124,6 +1124,7 @@ export const useStore = create<StoreState>((set, get) => ({
     // A blank slate. Goes through the normal composition write path, so it
     // lands in undo history — an accidental New is one Ctrl+Z away.
     set((s) => {
+      cancelMorph() // the composition is being replaced — stop any in-flight ease
       // New session resets the section layout too: Meta/Modulation collapsed,
       // Master FX/Inspector open. Persist so it survives the next reload.
       const collapsed = { ...s.collapsed, meta: true, modulation: true, master: false, inspector: false }
@@ -1138,8 +1139,9 @@ export const useStore = create<StoreState>((set, get) => ({
         collapsed
       }
     }),
-  loadSession: (s) =>
-    set({
+  loadSession: (s) => {
+    cancelMorph() // replacing the whole composition — abort any in-flight morph
+    return set({
       name: s.name,
       scenes: s.scenes ?? [],
       activeSceneId: null,
@@ -1180,7 +1182,8 @@ export const useStore = create<StoreState>((set, get) => ({
           return defaults.map((d, i) => k[i] ?? d)
         })()
       }
-    }),
+    })
+  },
   exportSession: () => {
     const s = get()
     return {

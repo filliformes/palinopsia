@@ -39,6 +39,14 @@ export function morphActive(): boolean {
   return state !== null
 }
 
+/** Abort any in-flight morph (and drop a not-yet-consumed crossfade). Call when
+ *  the composition is REPLACED out from under the morph — New, Load, Undo, Redo
+ *  — so the engine stops easing toward a target that no longer exists. */
+export function cancelMorph(): void {
+  state = null
+  pendingCrossfadeMs = null
+}
+
 const easeInOut = (k: number): number => k * k * (3 - 2 * k)
 
 function lerpN(a: number, b: number, k: number): number {

@@ -10,6 +10,7 @@
 import { useSyncExternalStore } from 'react'
 import type { CompositionState } from '@shared/types'
 import { useStore } from './store'
+import { cancelMorph } from './morph'
 
 const CAPACITY = 100
 const QUIET_MS = 300
@@ -73,6 +74,7 @@ export function undo(): void {
   const cur = useStore.getState().composition
   future.push(cur)
   if (future.length > CAPACITY) future.shift()
+  cancelMorph() // the composition is being swapped — don't ease toward a stale target
   applying = true
   useStore.setState({ composition: prev })
   committed = prev
@@ -87,6 +89,7 @@ export function redo(): void {
   const cur = useStore.getState().composition
   past.push(cur)
   if (past.length > CAPACITY) past.shift()
+  cancelMorph() // the composition is being swapped — don't ease toward a stale target
   applying = true
   useStore.setState({ composition: next })
   committed = next
