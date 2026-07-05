@@ -369,50 +369,53 @@ function MasterRackStrip(): JSX.Element {
   const [applied, setApplied] = useState('')
   const [flashing, flash] = useFlash()
   return (
+    // Everything on one cohesive wrapping row: chain label · dice · preset box,
+    // then the FX rack (+ fx, chips, Vibe) spaced a little to the right.
     <div
-      className={`flex min-w-0 flex-col gap-1.5 rounded-md border bg-panel2/40 p-2 transition-colors ${
+      className={`flex min-w-0 flex-wrap items-center gap-1.5 rounded-md border bg-panel2/40 p-2 transition-colors ${
         flashing ? 'animate-pulse border-danger ring-1 ring-danger' : 'border-border'
       }`}
     >
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">
-          chain
-        </span>
-        <button
-          onClick={() => {
-            randomizeMasterParams()
-            flash()
-          }}
-          className={`shrink-0 rounded border px-1 font-mono text-[10px] leading-4 transition-colors ${
-            flashing
-              ? 'animate-pulse border-danger bg-danger/25 text-danger'
-              : 'border-accent/50 bg-accent/10 text-accent hover:bg-accent/20'
-          }`}
-          title="Randomize the master FX parameters (keeps the chain + your Vibe)"
-        >
-          ⚄
-        </button>
-        <select
-          className="input select-compact w-40 min-w-0 text-[10px]"
-          value={applied}
-          onChange={(e) => {
-            const p = MASTER_PRESETS.find((x) => x.name === e.target.value)
-            if (p) {
-              applyMasterPreset(p.fx, p.vibe)
-              setApplied(p.name)
-            }
-          }}
-          title="Master chain presets — replaces the chain and sets the Vibe accordingly"
-        >
-          <option value="">chain presets…</option>
-          {MASTER_PRESETS.map((p) => (
-            <option key={p.name} value={p.name}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+      <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">
+        chain
+      </span>
+      <button
+        onClick={() => {
+          randomizeMasterParams()
+          flash()
+        }}
+        className={`shrink-0 rounded border px-1 font-mono text-[10px] leading-4 transition-colors ${
+          flashing
+            ? 'animate-pulse border-danger bg-danger/25 text-danger'
+            : 'border-accent/50 bg-accent/10 text-accent hover:bg-accent/20'
+        }`}
+        title="Randomize the master FX parameters (keeps the chain + your Vibe)"
+      >
+        ⚄
+      </button>
+      <select
+        className="input select-compact w-32 shrink-0 text-[10px]"
+        value={applied}
+        onChange={(e) => {
+          const p = MASTER_PRESETS.find((x) => x.name === e.target.value)
+          if (p) {
+            applyMasterPreset(p.fx, p.vibe)
+            setApplied(p.name)
+          }
+        }}
+        title="Master chain presets — replaces the chain and sets the Vibe accordingly"
+      >
+        <option value="">chain presets…</option>
+        {MASTER_PRESETS.map((p) => (
+          <option key={p.name} value={p.name}>
+            {p.name}
+          </option>
+        ))}
+      </select>
+      {/* FX rack joins the same line, nudged right for a cohesive feel */}
+      <div className="ml-4 flex min-w-0 items-center">
+        <FxRackPanel scope={{ kind: 'master' }} fx={master} label="" />
       </div>
-      <FxRackPanel scope={{ kind: 'master' }} fx={master} label="" />
     </div>
   )
 }

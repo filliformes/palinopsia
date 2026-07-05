@@ -1,6 +1,7 @@
 // Mixer — a compact 4-column surface: just each layer's Opacity, Speed and
 // Blend, with no source/FX detail. Toggled in place of the layer strips with
-// the M key (or the header button). Carries its own app-persistent presets.
+// the M key (or the header button). Fills the full column height, with tall
+// vertical faders. Carries its own app-persistent presets.
 
 import { useState } from 'react'
 import type { BlendMode } from '@shared/types'
@@ -22,9 +23,9 @@ export function MixerPanel(): JSX.Element {
   const [savePrompt, setSavePrompt] = useState(false)
 
   return (
-    <div className="flex min-w-0 flex-col gap-2 rounded-md border border-border bg-panel p-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-2 rounded-md border border-border bg-panel p-2">
       {/* Header: title · presets · save · back to layers */}
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+      <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-1.5">
         <span className="font-mono text-[11px] uppercase tracking-wide text-muted">Mixer</span>
         <button
           onClick={() => toggleMixerView()}
@@ -66,70 +67,48 @@ export function MixerPanel(): JSX.Element {
         </div>
       </div>
 
-      {/* Four columns — one per layer */}
-      <div className="grid grid-cols-4 gap-2">
+      {/* Four columns — one per layer — filling the section height */}
+      <div className="grid min-h-0 flex-1 grid-cols-4 gap-2">
         {layers.map((l, i) => (
           <div
             key={l.id}
-            className="flex min-w-0 flex-col gap-1.5 rounded border border-border bg-panel2/50 p-1.5"
+            className="flex min-h-0 flex-col items-center gap-2 rounded border border-border bg-panel2/50 p-1.5"
           >
-            <span className="text-center font-mono text-[10px] text-muted">L{i + 1}</span>
+            <span className="shrink-0 font-mono text-[10px] text-muted">L{i + 1}</span>
 
-            <Field label="OPACITY">
-              <input
-                type="range"
+            {/* Two tall vertical faders side by side, filling the height */}
+            <div className="flex min-h-0 w-full flex-1 justify-center gap-1">
+              <VFader
+                label="OPA"
+                value={l.opacity}
                 min={0}
                 max={1}
                 step={0.01}
-                value={l.opacity}
-                onChange={(e) => setOpacity(i, Number(e.target.value))}
-                className="min-w-0 flex-1 accent-accent"
-                title={`Opacity ${l.opacity.toFixed(2)}`}
-              />
-              <BoundedNumberInput
-                value={l.opacity}
-                min={0}
-                max={1}
                 onChange={(v) => setOpacity(i, v)}
-                className="input w-11 shrink-0 px-1 py-0.5 text-right text-[10px]"
               />
-            </Field>
-
-            <Field label="SPEED">
-              <input
-                type="range"
+              <VFader
+                label="SPD"
+                value={l.speed}
                 min={0}
                 max={20}
                 step={0.05}
-                value={l.speed}
-                onChange={(e) => setLayerSpeed(i, Number(e.target.value))}
-                className="min-w-0 flex-1 accent-accent"
-                title={`Speed ${l.speed.toFixed(2)}× (1 = realtime)`}
-              />
-              <BoundedNumberInput
-                value={l.speed}
-                min={0}
-                max={20}
                 onChange={(v) => setLayerSpeed(i, v)}
-                className="input w-11 shrink-0 px-1 py-0.5 text-right text-[10px]"
               />
-            </Field>
-
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <span className="font-mono text-[9px] uppercase text-muted">Blend</span>
-              <select
-                className="input select-compact min-w-0 text-[10px]"
-                value={l.blend}
-                onChange={(e) => setBlend(i, e.target.value as BlendMode)}
-                title="Blend against the stack below"
-              >
-                {BLEND_MODES.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
             </div>
+
+            {/* Blend — full column width so the longest name shows in full */}
+            <select
+              className="input w-full shrink-0 px-0.5 py-0.5 text-center text-[9px]"
+              value={l.blend}
+              onChange={(e) => setBlend(i, e.target.value as BlendMode)}
+              title="Blend against the stack below"
+            >
+              {BLEND_MODES.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
           </div>
         ))}
       </div>
@@ -150,11 +129,46 @@ export function MixerPanel(): JSX.Element {
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
+// One tall vertical fader: label on top, the fader filling the column, an
+// editable numeric readout at the bottom.
+function VFader({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  step: number
+  onChange: (v: number) => void
+}): JSX.Element {
   return (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      <span className="font-mono text-[9px] uppercase text-muted">{label}</span>
-      <div className="flex min-w-0 items-center gap-1">{children}</div>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center gap-1">
+      <span className="shrink-0 font-mono text-[8px] uppercase text-muted">{label}</span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        // Modern vertical range: writing-mode makes it vertical, rtl puts the
+        // minimum at the bottom (up = more).
+        style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
+        className="min-h-[48px] flex-1 accent-accent"
+        title={`${label} ${value.toFixed(2)}`}
+      />
+      <BoundedNumberInput
+        value={value}
+        min={min}
+        max={max}
+        onChange={onChange}
+        className="input w-full min-w-0 px-0 py-0.5 text-center text-[8px]"
+      />
     </div>
   )
 }
