@@ -18,6 +18,7 @@ import { ModulationPanel } from './components/ModulationPanel'
 import { OscPanel } from './components/OscPanel'
 import { SceneBank } from './components/SceneBank'
 import { initOscInput, applyOscListen } from './oscInput'
+import { morphedComposition } from './morph'
 import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
 import { initMidi } from './midi'
@@ -206,7 +207,9 @@ export default function App(): JSX.Element {
       try {
         const now = performance.now()
         const st = useStore.getState()
-        const c = st.composition
+        // Morph: while a scene recall / randomize is easing, the engine renders
+        // an interpolated composition (the store still holds the target).
+        const c = morphedComposition(now, st.composition)
         // 1. Store → engine reconciliation (base values). One write path for
         //    everything: UI edits, session loads, OSC — the engine follows.
         //    Shader hot-swaps preserve feedback buffers (brief §1).

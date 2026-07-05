@@ -21,6 +21,7 @@ import type {
 import type { MetaKnobState } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulators } from './engine/modulation'
+import { beginMorph } from './morph'
 import {
   collectFloatTargets,
   randomizeComposition,
@@ -328,6 +329,9 @@ interface StoreState {
   // Global time multiplier (1/64×…64×, 1 = realtime) — scales every visual clock.
   globalSpeed: number
   setGlobalSpeed: (x: number) => void
+  // Scene/Randomize morph time in ms (0…30000, 100 = quick) — crossfade, not snap.
+  morphMs: number
+  setMorphMs: (ms: number) => void
 
   // OSC input config (persisted to localStorage). `enabled`/`port` are the
   // user's intent; `listening`/`addresses` reflect the main-process result.
@@ -631,6 +635,8 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
   globalSpeed: 1,
   setGlobalSpeed: (x) => set({ globalSpeed: Math.max(1 / 64, Math.min(64, x)) }),
+  morphMs: 100,
+  setMorphMs: (ms) => set({ morphMs: Math.max(0, Math.min(30000, ms)) }),
   applyMasterPreset: (fx, vibe) =>
     set((s) => {
       // Locked finalizers (Vibe, then Context) survive a chain preset; the
@@ -762,7 +768,11 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
 
   randomize: (scope) =>
-    set((s) => ({ composition: randomizeComposition(s.composition, scope) })),
+    set((s) => {
+      const composition = randomizeComposition(s.composition, scope)
+      beginMorph(s.composition, s.morphMs, performance.now()) // crossfade to the new draw
+      return { composition }
+    }),
 
   randomizeMetaBank: () =>
     set((s) => {
@@ -1025,7 +1035,9 @@ export const useStore = create<StoreState>((set, get) => ({
       const scene = s.scenes.find((x) => x.id === id)
       if (!scene) return s
       // Goes through the composition write path: undoable, hot-swap-safe
-      // (the engine reconciles; feedback buffers survive the recall).
+      // (the engine reconciles; feedback buffers survive the recall). The
+      // engine crossfades to it over morphMs (App loop reads morph.ts).
+      beginMorph(s.composition, s.morphMs, performance.now())
       return { composition: scene.composition, activeSceneId: id }
     }),
   renameScene: (id, name) =>

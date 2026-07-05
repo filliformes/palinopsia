@@ -39,11 +39,20 @@ function fmtSpeed(s: number): string {
   if (s > 1) return (s < 10 ? s.toFixed(1).replace(/\.0$/, '') : String(Math.round(s))) + '×'
   return '1/' + Math.round(1 / s) + '×'
 }
+// Morph slider ↔ ms, power-curved so the low end (fast morphs) is easy to hit.
+const MORPH_POW = 2.5
+const msToT = (ms: number): number => Math.pow(ms / 30000, 1 / MORPH_POW)
+const tToMs = (t: number): number => Math.round(Math.pow(t, MORPH_POW) * 30000)
+function fmtMorph(ms: number): string {
+  return ms >= 1000 ? (ms / 1000).toFixed(1).replace(/\.0$/, '') + 's' : Math.round(ms) + 'ms'
+}
 
 export function Transport(): JSX.Element {
   const bpm = useStore((s) => s.composition.bpm)
   const globalSpeed = useStore((s) => s.globalSpeed)
   const setGlobalSpeed = useStore((s) => s.setGlobalSpeed)
+  const morphMs = useStore((s) => s.morphMs)
+  const setMorphMs = useStore((s) => s.setMorphMs)
   const setComposition = useStore.setState
   const [menuOpen, setMenuOpen] = useState(false)
   const [scope, setScope] = useState<RandomizeScope>(loadScope)
@@ -102,6 +111,23 @@ export function Transport(): JSX.Element {
           title={`Global speed ${fmtSpeed(globalSpeed)} — double-click to reset to 1×`}
         />
         <span className="w-9 shrink-0 font-mono text-[10px] text-muted">{fmtSpeed(globalSpeed)}</span>
+      </div>
+
+      {/* Morph — scene recalls & Randomize crossfade over this time. */}
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-[10px] text-muted">MORPH</span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.004}
+          value={msToT(morphMs)}
+          onChange={(e) => setMorphMs(tToMs(Number(e.target.value)))}
+          onDoubleClick={() => setMorphMs(100)}
+          className="w-24 accent-accent"
+          title={`Scene / Randomize morph ${fmtMorph(morphMs)} — double-click for 100ms`}
+        />
+        <span className="w-11 shrink-0 font-mono text-[10px] text-muted">{fmtMorph(morphMs)}</span>
       </div>
 
       <div className="flex-1" />
