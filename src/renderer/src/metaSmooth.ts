@@ -104,12 +104,31 @@ function tick(): void {
   if (active) raf = requestAnimationFrame(tick)
 }
 
-/** Move knob i toward v (0..1) over smoothMs, applying destinations en route. */
+/** Move knob i toward v (0..1) over smoothMs, applying destinations en route.
+ *  For MIDI CC (glide across 1/127 steps) and randomize — NOT mouse drag. */
 export function setKnobTarget(i: number, v: number, smoothMs: number): void {
   const from = knobDisplayValue(i)
   const to = Math.max(0, Math.min(1, v))
   tweens[i] = { from, to, startedAt: performance.now(), ms: Math.max(0, smoothMs) }
   if (!raf) raf = requestAnimationFrame(tick)
+}
+
+/** Direct, UNSMOOTHED set — for live mouse drag (the pointer is its own
+ *  smoothing; a tween on top only adds lag and the steppy burst-update feel).
+ *  Cancels any glide, moves the dial + fans out to destinations immediately,
+ *  and re-renders now. Does not commit to the store — call commitKnob on
+ *  release so the gesture is a single undo step. */
+export function setKnobImmediate(i: number, v: number): void {
+  const val = v < 0 ? 0 : v > 1 ? 1 : v
+  tweens[i] = null
+  knobDisplay[i] = val
+  applyKnob(i, val)
+  bump()
+}
+
+/** Persist a knob's current display value to the store (undo checkpoint). */
+export function commitKnob(i: number): void {
+  useStore.getState().setMetaValue(i, knobDisplayValue(i))
 }
 
 /** Re-apply a knob's destinations at its current position (after re-binding). */

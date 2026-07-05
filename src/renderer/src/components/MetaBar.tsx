@@ -14,7 +14,14 @@ import {
 import type { ModCurve } from '@shared/types'
 import { META_KNOB_COUNT } from '@shared/types'
 import { metaLiveValues } from '../engine/modulation'
-import { knobDisplayValue, knobDisplayVersion, setKnobTarget, subscribeKnobDisplay } from '../metaSmooth'
+import {
+  commitKnob,
+  knobDisplayValue,
+  knobDisplayVersion,
+  setKnobImmediate,
+  setKnobTarget,
+  subscribeKnobDisplay
+} from '../metaSmooth'
 import { modTargetKey, useStore } from '../store'
 import { AssignRow } from './AutoControls'
 
@@ -110,7 +117,8 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
     const dy = d.startY - e.clientY
     const sensitivity = e.shiftKey ? 4 : 1
     const next = Math.max(0, Math.min(1, d.startValue + dy / (DRAG_PIXELS_FOR_FULL_RANGE * sensitivity)))
-    setKnobTarget(index, next, knob.smoothMs)
+    // Direct 1:1 tracking — no tween lag (the pointer is the smoothing).
+    setKnobImmediate(index, next)
   }
   function onPointerUp(e: ReactPointerEvent<HTMLDivElement>): void {
     const d = dragRef.current
@@ -120,6 +128,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
     } catch {
       /* ignore */
     }
+    commitKnob(index) // one undo checkpoint per gesture
     dragRef.current = null
     document.body.style.cursor = ''
   }
