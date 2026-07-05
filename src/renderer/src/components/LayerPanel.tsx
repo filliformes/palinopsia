@@ -27,6 +27,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const setSourceBlend = useStore((s) => s.setSourceBlend)
   const setSourceShader = useStore((s) => s.setSourceShader)
   const setSourceVideo = useStore((s) => s.setSourceVideo)
+  const setSourceCapture = useStore((s) => s.setSourceCapture)
   const setLayerSpeed = useStore((s) => s.setLayerSpeed)
   const setSelection = useStore((s) => s.setSelection)
   const selection = useStore((s) => s.selection)
@@ -137,6 +138,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             label="A"
             shaderId={layer.sourceA.shaderId}
             sourceKind={layer.sourceA.kind}
+            mediaId={layer.sourceA.mediaId}
             mediaName={layer.sourceA.mediaName}
             selected={isSelected('A')}
             scope={{ kind: 'sourceA', layer: index }}
@@ -144,6 +146,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             onSelect={() => setSelection({ type: 'source', layer: index, slot: 'A' })}
             onPick={(id) => setSourceShader(index, 'A', id)}
             onPickVideo={(url, name) => setSourceVideo(index, 'A', url, name)}
+            onPickCapture={(kind) => setSourceCapture(index, 'A', kind)}
           />
 
           {/* MIX: combinator mode + depth — ALWAYS visible (fixed layout);
@@ -178,6 +181,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             label="B"
             shaderId={layer.sourceB?.shaderId ?? null}
             sourceKind={layer.sourceB?.kind ?? 'none'}
+            mediaId={layer.sourceB?.mediaId}
             mediaName={layer.sourceB?.mediaName}
             selected={isSelected('B')}
             scope={{ kind: 'sourceB', layer: index }}
@@ -185,6 +189,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             onSelect={() => setSelection({ type: 'source', layer: index, slot: 'B' })}
             onPick={(id) => setSourceShader(index, 'B', id)}
             onPickVideo={(url, name) => setSourceVideo(index, 'B', url, name)}
+            onPickCapture={(kind) => setSourceCapture(index, 'B', kind)}
           />
 
           {/* LAYER FX */}
@@ -356,17 +361,20 @@ function SourceRow({
   label,
   shaderId,
   sourceKind,
+  mediaId,
   mediaName,
   selected,
   scope,
   fx,
   onSelect,
   onPick,
-  onPickVideo
+  onPickVideo,
+  onPickCapture
 }: {
   label: string
   shaderId: string | null
   sourceKind: SourceKind
+  mediaId?: string
   mediaName?: string
   selected: boolean
   scope: Parameters<typeof FxAddSelect>[0]['scope']
@@ -374,12 +382,21 @@ function SourceRow({
   onSelect: () => void
   onPick: (id: string | null) => void
   onPickVideo: (url: string, name: string) => void
+  onPickCapture: (kind: 'webcam' | 'screen') => void
 }): JSX.Element {
   const fileRef = useRef<HTMLInputElement | null>(null)
   const isVideo = sourceKind === 'video'
-  // The select's value: a generator id, the sentinel for the active video, or ''.
-  const value = isVideo ? '__video__' : (shaderId ?? '')
-  const active = isVideo || !!shaderId
+  const isCapture = sourceKind === 'capture'
+  // The select's value: a generator id, or a sentinel for the active video /
+  // capture source, or '' for none.
+  const value = isVideo
+    ? '__video__'
+    : isCapture
+      ? mediaId === 'screen'
+        ? '__cap_screen__'
+        : '__cap_webcam__'
+      : (shaderId ?? '')
+  const active = isVideo || isCapture || !!shaderId
   return (
     <>
       <div className="flex min-w-0 items-center gap-1.5" onClick={onSelect}>
@@ -409,6 +426,8 @@ function SourceRow({
           onChange={(e) => {
             const v = e.target.value
             if (v === '__video_pick__') fileRef.current?.click()
+            else if (v === '__cap_webcam__') onPickCapture('webcam')
+            else if (v === '__cap_screen__') onPickCapture('screen')
             else if (v !== '__video__') onPick(v || null)
           }}
           onClick={(e) => e.stopPropagation()}
@@ -416,6 +435,8 @@ function SourceRow({
           <option value="">— none —</option>
           {isVideo && <option value="__video__">🎞 {mediaName ?? 'video'}</option>}
           <option value="__video_pick__">🎞 Import video…</option>
+          <option value="__cap_webcam__">📷 Webcam</option>
+          <option value="__cap_screen__">🖥 Screen</option>
           {GENERATORS_ALPHA.map((g) => (
             <option key={g.id} value={g.id}>
               {g.name}

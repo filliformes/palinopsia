@@ -29,6 +29,7 @@
 import { Renderer as ISFRenderer } from 'interactive-shader-format';
 import { handle, installTextureBridge } from './isfTextureBridge';
 import { VideoSource } from './VideoSource';
+import { CaptureSource, type CaptureKind } from './CaptureSource';
 import { videoPlayheads, videoKey } from './videoState';
 import type { SourceSlot } from '@shared/types';
 import type { CompositionState, FxInstance, FxScope } from '@shared/types';
@@ -422,6 +423,11 @@ export class ISFLayer {
   private videoB: VideoSource | null = null;
   private mediaIdA: string | null = null;
   private mediaIdB: string | null = null;
+  // Live capture slots (kind:'capture'). Like video: a slot is one kind at once.
+  private captureA: CaptureSource | null = null;
+  private captureB: CaptureSource | null = null;
+  private captureIdA: string | null = null;
+  private captureIdB: string | null = null;
   rackA: FxRack;
   rackB: FxRack;
   rackLayer: FxRack;
@@ -479,6 +485,21 @@ export class ISFLayer {
     else { this.videoB = next; this.mediaIdB = mediaId; }
   }
 
+  /** Load/swap/clear a live CAPTURE source ('webcam' | 'screen'). */
+  setCapture(slot: 'A' | 'B', kind: string | null): void {
+    const curId = slot === 'A' ? this.captureIdA : this.captureIdB;
+    if (kind === curId) return;
+    const cur = slot === 'A' ? this.captureA : this.captureB;
+    cur?.dispose();
+    let next: CaptureSource | null = null;
+    if (kind === 'webcam' || kind === 'screen') {
+      next = new CaptureSource(this.shared.gl);
+      void next.start(kind as CaptureKind);
+    }
+    if (slot === 'A') { this.captureA = next; this.captureIdA = kind; }
+    else { this.captureB = next; this.captureIdB = kind; }
+  }
+
   /** Push transport params (play/speed/reverse/loop/in/out) to a video slot. */
   setVideoPlayback(slot: 'A' | 'B', s: SourceSlot | null | undefined): void {
     const v = slot === 'A' ? this.videoA : this.videoB;
@@ -512,7 +533,7 @@ export class ISFLayer {
     (slot === 'A' ? this.isfA : this.isfB)?.setValue(name, value);
   }
 
-  hasB(): boolean { return this.isfB !== null || this.videoB !== null; }
+  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null; }
 
   /** Advance the layer clock and stamp it onto every renderer it owns. */
   advanceClock(dtSec: number): void {
@@ -532,10 +553,12 @@ export class ISFLayer {
     const scratch = slot === 'A' ? this.scratchA : this.scratchB;
     const isf = slot === 'A' ? this.isfA : this.isfB;
     const video = slot === 'A' ? this.videoA : this.videoB;
+    const capture = slot === 'A' ? this.captureA : this.captureB;
 
-    // Video slot: upload the current frame and blit it into scratch.
-    if (video) {
-      const tex = video.upload();
+    // Video or live-capture slot: upload the current frame and blit into scratch.
+    const feed = video ?? capture;
+    if (feed) {
+      const tex = feed.upload();
       if (tex && this.shared.blit) {
         this.shared.blit(tex, scratch.fbo);
       } else {
@@ -567,6 +590,8 @@ export class ISFLayer {
     this.isfB?.cleanup();
     this.videoA?.dispose();
     this.videoB?.dispose();
+    this.captureA?.dispose();
+    this.captureB?.dispose();
     this.rackA.dispose();
     this.rackB.dispose();
     this.rackLayer.dispose();
@@ -727,12 +752,16 @@ export class Compositor {
       // switching kinds swaps cleanly (video↔generator never overlap).
       const wantA = l.sourceA.kind === 'generator' ? l.sourceA.shaderId : null;
       const wantVidA = l.sourceA.kind === 'video' ? (l.sourceA.mediaId ?? null) : null;
+      const wantCapA = l.sourceA.kind === 'capture' ? (l.sourceA.mediaId ?? null) : null;
       if (wantA !== L.shaderIdA) L.setShader('A', wantA, wantA ? sourceById(wantA) : null);
       L.setVideo('A', wantVidA);
+      L.setCapture('A', wantCapA);
       const wantB = l.sourceB && l.sourceB.kind === 'generator' ? l.sourceB.shaderId : null;
       const wantVidB = l.sourceB && l.sourceB.kind === 'video' ? (l.sourceB.mediaId ?? null) : null;
+      const wantCapB = l.sourceB && l.sourceB.kind === 'capture' ? (l.sourceB.mediaId ?? null) : null;
       if (wantB !== L.shaderIdB) L.setShader('B', wantB, wantB ? sourceById(wantB) : null);
       L.setVideo('B', wantVidB);
+      L.setCapture('B', wantCapB);
       L.setVideoPlayback('A', l.sourceA);
       L.setVideoPlayback('B', l.sourceB);
       L.blend = l.blend;

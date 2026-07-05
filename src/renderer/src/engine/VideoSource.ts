@@ -6,6 +6,31 @@
 // luma/edge key → chroma shift → optional feedback) runs as ISF FX on top of
 // this texture — it lives in the FX rack, not here. No Hap dependency.
 
+/** Upload the current frame of a <video> into a GL texture (creating it on
+ *  first use), matching the engine's bottom-left orientation. Returns the
+ *  texture, or the passed-in one unchanged if no frame is decodable yet. Shared
+ *  by VideoSource (files) and CaptureSource (webcam / screen). */
+export function uploadVideoFrame(
+  gl: WebGL2RenderingContext,
+  video: HTMLVideoElement,
+  tex: WebGLTexture | null
+): WebGLTexture | null {
+  if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) return tex
+  if (!tex) {
+    tex = gl.createTexture()
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+  }
+  gl.bindTexture(gl.TEXTURE_2D, tex)
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video)
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+  return tex
+}
+
 export interface VideoPlayback {
   playing: boolean
   speed: number // base clip speed (× the engine dt this receives)
@@ -89,24 +114,7 @@ export class VideoSource {
   /** Upload the current frame to a GL texture and return it (null until the
    *  first frame is decodable). Called once per frame for a video slot. */
   upload(): WebGLTexture | null {
-    const gl = this.gl
-    const v = this.video
-    // HAVE_CURRENT_DATA and a real size — else there's nothing to upload yet.
-    if (v.readyState < 2 || v.videoWidth === 0 || v.videoHeight === 0) return this.tex
-    if (!this.tex) {
-      this.tex = gl.createTexture()
-      gl.bindTexture(gl.TEXTURE_2D, this.tex)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-    }
-    gl.bindTexture(gl.TEXTURE_2D, this.tex)
-    // Video frames are top-row-first; flip so the texture matches the engine's
-    // bottom-left GL orientation (same as every other layer buffer).
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, v)
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+    this.tex = uploadVideoFrame(this.gl, this.video, this.tex)
     return this.tex
   }
 

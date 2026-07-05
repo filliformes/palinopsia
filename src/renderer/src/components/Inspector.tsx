@@ -79,8 +79,8 @@ export function Inspector(): JSX.Element {
       const { layer: li, slot: sl } = selection
       onChange = (n, v) => setSourceInput(li, sl, n, v)
       modTargetFor = (input) => ({ kind: 'source', layer: li, slot: sl, input })
-    } else if (slot?.kind === 'video') {
-      videoName = slot.mediaName ?? 'video'
+    } else if (slot?.kind === 'video' || slot?.kind === 'capture') {
+      videoName = slot.mediaName ?? (slot.kind === 'capture' ? 'capture' : 'video')
       context = `layer ${selection.layer + 1} · src ${selection.slot}`
     }
   } else if (selection?.type === 'fx') {
@@ -119,17 +119,22 @@ export function Inspector(): JSX.Element {
         selection.slot === 'A'
           ? composition.layers[selection.layer]?.sourceA
           : composition.layers[selection.layer]?.sourceB
+      const isCap = vslot?.kind === 'capture'
+      const icon = isCap ? (vslot?.mediaId === 'screen' ? '🖥' : '📷') : '🎞'
       return (
         <div className="rounded-md border border-border bg-panel">
           <div className="flex items-center gap-2 px-3 pt-3">
-            <span className="text-[12px] font-semibold">🎞 {videoName}</span>
+            <span className="text-[12px] font-semibold">
+              {icon} {videoName}
+            </span>
             <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{context}</span>
           </div>
           <p className="px-3 pb-2 pt-1.5 text-[11px] text-muted">
-            Video source. Add FX to this source&apos;s rack to synthify it
-            (posterize · dither · key · chroma-shift · feedback).
+            {isCap ? 'Live capture source' : 'Video source'}. Add FX to this
+            source&apos;s rack to synthify it (posterize · dither · key ·
+            chroma-shift · feedback).
           </p>
-          {vslot && (
+          {vslot?.kind === 'video' && (
             <VideoTransport layer={selection.layer} slot={selection.slot} state={vslot} />
           )}
         </div>

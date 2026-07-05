@@ -4,7 +4,14 @@
 // pure logic + IO — OSC in/out, file I/O, and the output/OSCQuery seams that
 // later phases fill in.
 
-import { app, BrowserWindow, ipcMain, shell, session as electronSession } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  shell,
+  session as electronSession,
+  desktopCapturer
+} from 'electron'
 import { join } from 'path'
 import type { OscEvent, OscErrorEvent, Session } from '@shared/types'
 import { OscSender } from './osc'
@@ -106,6 +113,18 @@ app.whenReady().then(async () => {
     if (permission === 'midi' || permission === 'midiSysex' || permission === 'media') return cb(true)
     cb(false)
   })
+
+  // Screen capture: getDisplayMedia needs a source. Grant the primary display
+  // (a source picker can come later). Webcam getUserMedia needs no handler.
+  electronSession.defaultSession.setDisplayMediaRequestHandler(
+    (_request, callback) => {
+      desktopCapturer
+        .getSources({ types: ['screen'] })
+        .then((sources) => callback(sources[0] ? { video: sources[0] } : {}))
+        .catch(() => callback({}))
+    },
+    { useSystemPicker: true }
+  )
 
   // Bind the OSC UDP socket on an ephemeral local port for outgoing sends.
   await oscSender.start(0)
