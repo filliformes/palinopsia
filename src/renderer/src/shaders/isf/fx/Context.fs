@@ -12,6 +12,7 @@
     { "NAME": "haze",       "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "haze" },
     { "NAME": "atmosphere", "TYPE": "color", "DEFAULT": [0.5, 0.58, 0.72, 1.0], "LABEL": "atmosphere" },
     { "NAME": "lightGlow",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.25, "LABEL": "light" },
+    { "NAME": "lightSize",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6,  "LABEL": "light size" },
     { "NAME": "lightColor", "TYPE": "color", "DEFAULT": [1.0, 0.92, 0.8, 1.0], "LABEL": "light color" },
     { "NAME": "light",      "TYPE": "point2D", "DEFAULT": [0.5, 0.55] }
   ],
@@ -84,15 +85,19 @@ void main() {
   col += bright * bloom * 1.4;
 
   // ── KEY LIGHT — a soft, round radial glow from the light position in its
-  //    own colour: a sense of a 3D light source sitting in the space. ──
+  //    own colour. lightSize sweeps it from a tight spot to a broad ambient
+  //    wash across the whole frame. ──
+  float falloff = mix(11.0, 0.35, lightSize);
   vec2 dl = (uv - light) * vec2(aspect, 1.0);
-  float lg = exp(-dot(dl, dl) * 5.0);
-  col += lightColor.rgb * lg * lightGlow * 1.2;
+  float lg = exp(-dot(dl, dl) * falloff);
+  col += lightColor.rgb * lg * lightGlow * 1.3;
 
-  // ── HAZE — shadows and distance recede toward the atmosphere colour (aerial
-  //    perspective), pushing the darker material back into space. ──
+  // ── HAZE — the whole frame settles toward the atmosphere colour, strongest
+  //    in the shadows/distance (aerial perspective), with a lighter global veil
+  //    over the midtones and highlights so the tint always reads. ──
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  col = mix(col, atmosphere.rgb, haze * (1.0 - smoothstep(0.0, 0.55, lum)) * 0.7);
+  float atmoAmt = haze * (0.18 + 0.82 * (1.0 - smoothstep(0.0, 0.6, lum)));
+  col = mix(col, atmosphere.rgb, atmoAmt);
 
   // ── DEPTH vignette — a lifted, luminous centre falling to a darker,
   //    receding rim, seating the frame in a volume. ──

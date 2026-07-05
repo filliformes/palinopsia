@@ -473,7 +473,8 @@ export const CONTEXT_SHADER: IsfShader = {
     bloom: [0.1, 0.7],
     depth: [0.1, 0.7],
     haze: [0, 0.5],
-    lightGlow: [0, 0.6]
+    lightGlow: [0, 0.6],
+    lightSize: [0.3, 0.9]
   }
 }
 
