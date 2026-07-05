@@ -255,6 +255,30 @@ export interface OscErrorEvent {
   message: string
 }
 
+// ── Inbound OSC (Pandore → instrument) ───────────────────────────────
+export interface OscInEvent {
+  timestamp: number
+  address: string
+  args: Array<{ type: string; value: number | string | boolean }>
+}
+
+export interface OscListenResult {
+  ok: boolean
+  listening: boolean
+  port: number
+  addresses: string[]
+  error?: string
+}
+
+/** One leaf of the OSCQuery address tree the renderer publishes to main. */
+export interface OscQueryLeaf {
+  full_path: string
+  type?: string
+  range?: { min?: number; max?: number }
+  value?: number | number[]
+  description?: string
+}
+
 // ── Autosave / crash recovery ────────────────────────────────────────
 export interface AutosaveEntry {
   path: string
@@ -287,6 +311,11 @@ export interface ExposedApi {
   ) => Promise<void>
   onOscIn: (cb: (batch: OscEvent[]) => void) => () => void
   onOscErrors: (cb: (batch: OscErrorEvent[]) => void) => () => void
+
+  // OSC input — start/stop the listener + OSCQuery, and subscribe to messages
+  oscListen: (port: number, enabled: boolean) => Promise<OscListenResult>
+  onOscReceived: (cb: (batch: OscInEvent[]) => void) => () => void
+  oscQueryPublish: (nodes: OscQueryLeaf[]) => Promise<void>
 
   // App lifecycle — save-before-quit handshake
   appCloseProceed: () => Promise<void>

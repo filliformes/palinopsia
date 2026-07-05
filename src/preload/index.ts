@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ExposedApi, OscEvent, OscErrorEvent, Session } from '@shared/types'
+import type { ExposedApi, OscEvent, OscErrorEvent, OscInEvent, Session } from '@shared/types'
 
 const api: ExposedApi = {
   // ── Session I/O ──────────────────────────────────────────────────
@@ -27,6 +27,15 @@ const api: ExposedApi = {
     ipcRenderer.on('osc:errors', h)
     return () => ipcRenderer.off('osc:errors', h)
   },
+
+  // ── OSC input (Pandore → instrument) ─────────────────────────────
+  oscListen: (port, enabled) => ipcRenderer.invoke('osc:listen', port, enabled),
+  onOscReceived: (cb) => {
+    const h = (_e: Electron.IpcRendererEvent, batch: OscInEvent[]): void => cb(batch)
+    ipcRenderer.on('osc:received', h)
+    return () => ipcRenderer.off('osc:received', h)
+  },
+  oscQueryPublish: (nodes) => ipcRenderer.invoke('oscquery:publish', nodes),
 
   // ── App lifecycle ────────────────────────────────────────────────
   appCloseProceed: () => ipcRenderer.invoke('app:close-proceed'),

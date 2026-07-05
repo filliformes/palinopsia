@@ -15,7 +15,9 @@ import { LayerPanel } from './components/LayerPanel'
 import { MixerPanel } from './components/MixerPanel'
 import { MetaBar } from './components/MetaBar'
 import { ModulationPanel } from './components/ModulationPanel'
+import { OscPanel } from './components/OscPanel'
 import { SceneBank } from './components/SceneBank'
+import { initOscInput, applyOscListen } from './oscInput'
 import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
 import { initMidi } from './midi'
@@ -102,6 +104,14 @@ export default function App(): JSX.Element {
   // ── MIDI (Meta Controller CC learn + routing) ───────────────────────
   useEffect(() => {
     initMidi()
+  }, [])
+
+  // ── OSC input (Pandore plays the instrument) ────────────────────────
+  useEffect(() => {
+    const unsub = initOscInput()
+    // Restore the saved listen state (starts the listener if it was on).
+    void applyOscListen()
+    return unsub
   }, [])
 
   // ── Undo/redo (100 levels) + keyboard shortcuts ─────────────────────
@@ -350,6 +360,11 @@ export default function App(): JSX.Element {
               the warp/mapping stage joins it in Phase 8. */}
           <Collapsible sectionKey="master" title="master fx">
             <MasterRackStrip />
+          </Collapsible>
+
+          {/* OSC input — the instrument is played over OSC by Pandore */}
+          <Collapsible sectionKey="osc" title="osc">
+            <OscPanel />
           </Collapsible>
         </section>
 

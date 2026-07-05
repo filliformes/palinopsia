@@ -320,6 +320,17 @@ interface StoreState {
   collapsed: Record<string, boolean>
   toggleSection: (key: string) => void
 
+  // Global tempo — drives BPM-synced modulator clocks; OSC-controllable.
+  setBpm: (bpm: number) => void
+
+  // OSC input config (persisted to localStorage). `enabled`/`port` are the
+  // user's intent; `listening`/`addresses` reflect the main-process result.
+  oscEnabled: boolean
+  oscPort: number
+  oscListening: boolean
+  oscAddresses: string[]
+  setOscConfig: (partial: Partial<{ enabled: boolean; port: number; listening: boolean; addresses: string[] }>) => void
+
   // User shader presets — app-persistent (localStorage), per shader id.
   userShaderPresets: Record<string, Array<{ name: string; values: Record<string, number | number[]> }>>
   addUserShaderPreset: (shaderId: string, name: string, values: Record<string, number | number[]>) => void
@@ -608,6 +619,10 @@ export const useStore = create<StoreState>((set, get) => ({
         }))
       }
     })),
+  setBpm: (bpm) =>
+    set((s) => ({
+      composition: { ...s.composition, bpm: Math.max(20, Math.min(300, bpm)) }
+    })),
   applyMasterPreset: (fx, vibe) =>
     set((s) => {
       // Locked finalizers (Vibe, then Context) survive a chain preset; the
@@ -876,6 +891,26 @@ export const useStore = create<StoreState>((set, get) => ({
     localStorage.setItem('opsia.uiZoom', String(clamped))
     set({ uiZoom: clamped })
   },
+
+  oscEnabled: localStorage.getItem('opsia.oscEnabled') === '1',
+  oscPort: (() => {
+    const p = Number(localStorage.getItem('opsia.oscPort'))
+    return Number.isInteger(p) && p >= 1 && p <= 65535 ? p : 9000
+  })(),
+  oscListening: false,
+  oscAddresses: [],
+  setOscConfig: (partial) =>
+    set((s) => {
+      if (partial.enabled !== undefined)
+        localStorage.setItem('opsia.oscEnabled', partial.enabled ? '1' : '0')
+      if (partial.port !== undefined) localStorage.setItem('opsia.oscPort', String(partial.port))
+      return {
+        oscEnabled: partial.enabled ?? s.oscEnabled,
+        oscPort: partial.port ?? s.oscPort,
+        oscListening: partial.listening ?? s.oscListening,
+        oscAddresses: partial.addresses ?? s.oscAddresses
+      }
+    }),
   collapsed: (() => {
     // Fresh-load layout: Meta and Modulation start collapsed (deep controls,
     // opened on demand); Master FX and Inspector stay open (always in play).

@@ -8,19 +8,23 @@ import { app, BrowserWindow, ipcMain, shell, session as electronSession } from '
 import { join } from 'path'
 import type { OscEvent, OscErrorEvent, Session } from '@shared/types'
 import { OscSender } from './osc'
+import { OscReceiver, localIPv4s, type OscInMessage } from './osc-receive'
 import * as sessionIO from './session'
 import * as autosave from './autosave'
 import { ModulationEngine } from './modulators'
-import { OscQueryServer } from './oscquery'
+import { OscQueryServer, type OscQueryNode } from './oscquery'
 
 let mainWindow: BrowserWindow | null = null
 
-// OSC out (renderer → instrument fan-out) + an incoming-listener seam.
+// OSC out (renderer → instrument fan-out).
 const oscSender = new OscSender()
+// OSC in — the instrument is PLAYED through this: Pandore/TouchOSC send here
+// and the renderer maps addresses onto the store (see renderer/oscInput.ts).
+const oscReceiver = new OscReceiver()
 // Modulation brain (Phase 5 port) — started idle so its tick seam exists.
 const modulation = new ModulationEngine()
-// OSCQuery publisher (Phase 8) — instantiated so the renderer can push its
-// parameter tree as soon as the auto-UI can enumerate it.
+// OSCQuery publisher — serves the self-describing address tree over HTTP so
+// Pandore/dataFLOU can auto-discover every control.
 const oscquery = new OscQueryServer()
 
 let appQuitting = false
@@ -32,6 +36,7 @@ function shutdown(): void {
   shutdownComplete = true
   modulation.stop()
   oscSender.stop()
+  oscReceiver.stop()
   oscquery.stop()
   autosave.stopAutosave()
 }
@@ -115,6 +120,21 @@ app.whenReady().then(async () => {
   }, 50)
   app.on('before-quit', () => clearInterval(oscFlushTimer))
 
+  // Inbound OSC — buffer messages and flush to the renderer once per frame
+  // (~16ms) so a control flood can't drown IPC, but latency stays playable.
+  let oscInBuffer: OscInMessage[] = []
+  oscReceiver.setOnMessage((m) => {
+    if (oscInBuffer.length < OSC_BUFFER_MAX) oscInBuffer.push(m)
+  })
+  const oscInFlush = setInterval(() => {
+    if (oscInBuffer.length > 0) {
+      const batch = oscInBuffer
+      oscInBuffer = []
+      mainWindow?.webContents.send('osc:received', batch)
+    }
+  }, 16)
+  app.on('before-quit', () => clearInterval(oscInFlush))
+
   function safeHandle(
     channel: string,
     handler: (...args: unknown[]) => unknown
@@ -138,6 +158,32 @@ app.whenReady().then(async () => {
       args as Array<{ type: 'i' | 'f' | 's' | 'T' | 'F'; value: number | string | boolean }>
     )
   )
+
+  // Start/stop the inbound OSC listener (and, alongside it, the OSCQuery HTTP
+  // server). Returns the bound port + this machine's addresses so the UI can
+  // tell the user where to point Pandore.
+  safeHandle('osc:listen', async (_e, port, enabled) => {
+    const addresses = localIPv4s()
+    if (!enabled) {
+      oscReceiver.stop()
+      oscquery.stop()
+      return { ok: true, listening: false, port: 0, addresses }
+    }
+    try {
+      await oscReceiver.start(port as number)
+      await oscquery.start((port as number) + 1, port as number) // HTTP on port+1
+      return { ok: true, listening: true, port: port as number, addresses }
+    } catch (e) {
+      oscReceiver.stop()
+      oscquery.stop()
+      return { ok: false, listening: false, port: 0, addresses, error: (e as Error).message }
+    }
+  })
+
+  // Renderer pushes the self-describing parameter tree; OSCQuery serves it.
+  safeHandle('oscquery:publish', (_e, nodes) => {
+    oscquery.publishTree(nodes as OscQueryNode[])
+  })
 
   // ---------- IPC: Session I/O ----------
   ipcMain.handle('session:saveAs', (_e, s: Session) => sessionIO.saveAs(mainWindow, s))
