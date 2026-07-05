@@ -264,8 +264,9 @@ interface StoreState {
   // Point a slot at an imported video clip (kind:'video'). mediaId is the clip's
   // object URL; mediaName is shown in the picker.
   setSourceVideo: (layer: number, slot: 'A' | 'B', mediaId: string, mediaName: string) => void
-  // Point a slot at a live capture source (webcam or screen).
-  setSourceCapture: (layer: number, slot: 'A' | 'B', kind: 'webcam' | 'screen') => void
+  // Point a slot at a live capture source. `spec` is 'webcam', 'screen', or
+  // 'desktop:<sourceId>' for a specific window/screen; `name` labels it.
+  setSourceCapture: (layer: number, slot: 'A' | 'B', spec: string, name: string) => void
   // Patch a video slot's transport (play/speed/reverse/loop/in/out).
   setVideoPlayback: (
     layer: number,
@@ -711,7 +712,7 @@ export const useStore = create<StoreState>((set, get) => ({
       },
       selection: { type: 'source', layer, slot }
     })),
-  setSourceCapture: (layer, slot, kind) =>
+  setSourceCapture: (layer, slot, spec, name) =>
     set((s) => ({
       composition: {
         ...s.composition,
@@ -720,8 +721,8 @@ export const useStore = create<StoreState>((set, get) => ({
             kind: 'capture' as const,
             shaderId: null,
             inputs: {},
-            mediaId: kind,
-            mediaName: kind === 'screen' ? 'Screen' : 'Webcam'
+            mediaId: spec,
+            mediaName: name
           }
           if (slot === 'A') return { ...l, sourceA: cap }
           return { ...l, sourceB: cap }

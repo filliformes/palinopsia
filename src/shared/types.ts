@@ -308,6 +308,13 @@ export interface AutosaveEntry {
 }
 
 // ── Preload surface exposed on window.api ────────────────────────────
+export interface CaptureSourceInfo {
+  id: string
+  name: string
+  isScreen: boolean
+  thumbnail: string // data URL
+}
+
 export interface ExposedApi {
   // Session I/O
   sessionSaveAs: (s: Session) => Promise<string | null>
@@ -343,4 +350,6 @@ export interface ExposedApi {
   onAppBeforeClose: (cb: () => void) => () => void
   // Absolute path for a picked File (Electron 33 removed File.path).
   getMediaPath: (file: File) => string
+  // Screens + windows for the capture source picker.
+  captureListSources: () => Promise<CaptureSourceInfo[]>
 }

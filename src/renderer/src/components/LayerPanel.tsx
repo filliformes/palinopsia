@@ -10,6 +10,7 @@ import { BLEND_MODES } from '@shared/types'
 import { GENERATORS_ALPHA } from '../shaders/isf'
 import { useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
+import { CapturePicker } from './CapturePicker'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxAddSelect, FxChips } from './FxRackPanel'
 import { ConfirmModal, PromptModal } from './PromptModal'
@@ -146,7 +147,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             onSelect={() => setSelection({ type: 'source', layer: index, slot: 'A' })}
             onPick={(id) => setSourceShader(index, 'A', id)}
             onPickVideo={(url, name) => setSourceVideo(index, 'A', url, name)}
-            onPickCapture={(kind) => setSourceCapture(index, 'A', kind)}
+            onPickCapture={(spec, name) => setSourceCapture(index, 'A', spec, name)}
           />
 
           {/* MIX: combinator mode + depth — ALWAYS visible (fixed layout);
@@ -189,7 +190,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             onSelect={() => setSelection({ type: 'source', layer: index, slot: 'B' })}
             onPick={(id) => setSourceShader(index, 'B', id)}
             onPickVideo={(url, name) => setSourceVideo(index, 'B', url, name)}
-            onPickCapture={(kind) => setSourceCapture(index, 'B', kind)}
+            onPickCapture={(spec, name) => setSourceCapture(index, 'B', spec, name)}
           />
 
           {/* LAYER FX */}
@@ -382,9 +383,10 @@ function SourceRow({
   onSelect: () => void
   onPick: (id: string | null) => void
   onPickVideo: (url: string, name: string) => void
-  onPickCapture: (kind: 'webcam' | 'screen') => void
+  onPickCapture: (spec: string, name: string) => void
 }): JSX.Element {
   const fileRef = useRef<HTMLInputElement | null>(null)
+  const [showCapture, setShowCapture] = useState(false)
   const isVideo = sourceKind === 'video'
   const isCapture = sourceKind === 'capture'
   // The select's value: a generator id, or a sentinel for the active video /
@@ -392,9 +394,9 @@ function SourceRow({
   const value = isVideo
     ? '__video__'
     : isCapture
-      ? mediaId === 'screen'
-        ? '__cap_screen__'
-        : '__cap_webcam__'
+      ? mediaId === 'webcam'
+        ? '__cap_webcam__'
+        : '__cap_screen__'
       : (shaderId ?? '')
   const active = isVideo || isCapture || !!shaderId
   return (
@@ -426,8 +428,8 @@ function SourceRow({
           onChange={(e) => {
             const v = e.target.value
             if (v === '__video_pick__') fileRef.current?.click()
-            else if (v === '__cap_webcam__') onPickCapture('webcam')
-            else if (v === '__cap_screen__') onPickCapture('screen')
+            else if (v === '__cap_webcam__') onPickCapture('webcam', 'Webcam')
+            else if (v === '__cap_screen__') setShowCapture(true)
             else if (v !== '__video__') onPick(v || null)
           }}
           onClick={(e) => e.stopPropagation()}
@@ -436,7 +438,7 @@ function SourceRow({
           {isVideo && <option value="__video__">🎞 {mediaName ?? 'video'}</option>}
           <option value="__video_pick__">🎞 Import video…</option>
           <option value="__cap_webcam__">📷 Webcam</option>
-          <option value="__cap_screen__">🖥 Screen</option>
+          <option value="__cap_screen__">🖥 Screen…</option>
           {GENERATORS_ALPHA.map((g) => (
             <option key={g.id} value={g.id}>
               {g.name}
@@ -455,6 +457,15 @@ function SourceRow({
             <FxChips scope={scope} fx={fx} />
           </Indented>
         </div>
+      )}
+      {showCapture && (
+        <CapturePicker
+          onPick={(spec, name) => {
+            onPickCapture(spec, name)
+            setShowCapture(false)
+          }}
+          onCancel={() => setShowCapture(false)}
+        />
       )}
     </>
   )

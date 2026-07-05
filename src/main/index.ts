@@ -222,6 +222,22 @@ app.whenReady().then(async () => {
     oscquery.publishTree(nodes as OscQueryNode[])
   })
 
+  // ---------- IPC: Capture ----------
+  // Enumerate screens + windows (with thumbnails) so the renderer can offer a
+  // source picker for screen capture.
+  safeHandle('capture:listSources', async () => {
+    const sources = await desktopCapturer.getSources({
+      types: ['screen', 'window'],
+      thumbnailSize: { width: 320, height: 180 }
+    })
+    return sources.map((s) => ({
+      id: s.id,
+      name: s.name,
+      isScreen: s.id.startsWith('screen'),
+      thumbnail: s.thumbnail.toDataURL()
+    }))
+  })
+
   // ---------- IPC: Session I/O ----------
   // All wrapped in safeHandle so a filesystem throw (path vanished, read-only
   // dir) is logged and returns undefined rather than an uncaught rejection.

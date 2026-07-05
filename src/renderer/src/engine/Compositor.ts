@@ -29,7 +29,7 @@
 import { Renderer as ISFRenderer } from 'interactive-shader-format';
 import { handle, installTextureBridge } from './isfTextureBridge';
 import { VideoSource } from './VideoSource';
-import { CaptureSource, type CaptureKind } from './CaptureSource';
+import { CaptureSource } from './CaptureSource';
 import { videoPlayheads, videoKey } from './videoState';
 import type { SourceSlot } from '@shared/types';
 import type { CompositionState, FxInstance, FxScope } from '@shared/types';
@@ -485,19 +485,19 @@ export class ISFLayer {
     else { this.videoB = next; this.mediaIdB = mediaId; }
   }
 
-  /** Load/swap/clear a live CAPTURE source ('webcam' | 'screen'). */
-  setCapture(slot: 'A' | 'B', kind: string | null): void {
+  /** Load/swap/clear a live CAPTURE source ('webcam' | 'screen' | 'desktop:id'). */
+  setCapture(slot: 'A' | 'B', spec: string | null): void {
     const curId = slot === 'A' ? this.captureIdA : this.captureIdB;
-    if (kind === curId) return;
+    if (spec === curId) return;
     const cur = slot === 'A' ? this.captureA : this.captureB;
     cur?.dispose();
     let next: CaptureSource | null = null;
-    if (kind === 'webcam' || kind === 'screen') {
+    if (spec) {
       next = new CaptureSource(this.shared.gl);
-      void next.start(kind as CaptureKind);
+      void next.start(spec);
     }
-    if (slot === 'A') { this.captureA = next; this.captureIdA = kind; }
-    else { this.captureB = next; this.captureIdB = kind; }
+    if (slot === 'A') { this.captureA = next; this.captureIdA = spec; }
+    else { this.captureB = next; this.captureIdB = spec; }
   }
 
   /** Push transport params (play/speed/reverse/loop/in/out) to a video slot. */
