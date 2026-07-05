@@ -514,14 +514,15 @@ export class ISFLayer {
     });
   }
 
-  /** Advance video playheads by this layer's effective dt and publish them for
-   *  the Inspector timeline. `effDt` already folds in layer + global speed. */
-  tickVideos(layerIndex: number, effDt: number): void {
+  /** Drive video playheads and publish them for the Inspector timeline.
+   *  `rawDt` is the real frame delta; `mul` is this layer's speed × global speed
+   *  (the rate over realtime) — so both scale the clip on top of its own speed. */
+  tickVideos(layerIndex: number, rawDt: number, mul: number): void {
     for (const slot of ['A', 'B'] as const) {
       const v = slot === 'A' ? this.videoA : this.videoB;
       const key = videoKey(layerIndex, slot);
       if (v) {
-        v.tick(effDt);
+        v.tick(rawDt, mul);
         videoPlayheads.set(key, { time: v.time(), duration: v.duration() });
       } else {
         videoPlayheads.delete(key);
@@ -864,9 +865,9 @@ export class Compositor {
     for (let li = 0; li < this.layers.length; li++) {
       const L = this.layers[li];
       L.advanceClock(dtSec);
-      // Video playheads advance by the layer's effective dt (dt·globalSpeed
-      // already, times the layer Speed) — so both scale the clip's playback.
-      L.tickVideos(li, dtSec * L.speed);
+      // Video: pass the REAL delta + the layer×global rate multiplier so the
+      // clip plays natively (smooth) at speed·layer·global over realtime.
+      L.tickVideos(li, rawDt, this.globalSpeed * L.speed);
       gl.bindVertexArray(null); // ISF draws own the default VAO
       L.renderSource('A');
       let sig = L.rackA.apply(L.scratchA.tex, this.chain);

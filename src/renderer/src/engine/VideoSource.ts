@@ -64,12 +64,9 @@ export class VideoSource {
 
   load(src: string): void {
     this.video.src = src
-    // Play once to warm the decoder (so seeks decode frames), then pause — from
-    // there tick() owns the playhead. Autoplay is allowed: import is a gesture.
-    void this.video
-      .play()
-      .then(() => this.video.pause())
-      .catch(() => {})
+    // Start native playback (import is a user gesture, so autoplay is allowed);
+    // tick() takes over rate/direction/loop from here.
+    void this.video.play().catch(() => {})
   }
 
   setPlayback(p: VideoPlayback): void {
@@ -85,29 +82,57 @@ export class VideoSource {
     return this.video.currentTime
   }
 
-  /** Advance the playhead by `effDt` seconds of engine time (already scaled by
-   *  the layer + global speed); the clip's own speed and direction apply here.
-   *  Wraps within the [in, out] trim when looping, else clamps at the ends. */
-  tick(effDt: number): void {
+  /** Drive the clip each frame. `rawDt` is the real frame delta (seconds);
+   *  `mul` is the layer×global speed multiplier over realtime. The total rate is
+   *  `mul × clip speed`. FORWARD in-range playback runs NATIVELY (smooth — no
+   *  per-frame seeking, which would keep the element perpetually seeking and
+   *  black); reverse or out-of-range speed steps currentTime manually. */
+  tick(rawDt: number, mul: number): void {
+    const v = this.video
     const d = this.duration()
     if (d <= 0) return
-    const inSec = Math.max(0, Math.min(1, this.pb.inN)) * d
-    const outSec = Math.max(0, Math.min(1, this.pb.outN)) * d
-    const lo = Math.min(inSec, outSec)
-    const hi = Math.max(inSec, outSec)
+    const lo = Math.max(0, Math.min(1, Math.min(this.pb.inN, this.pb.outN))) * d
+    const hi = Math.max(0, Math.min(1, Math.max(this.pb.inN, this.pb.outN))) * d
     const span = Math.max(0.001, hi - lo)
-    let t = this.video.currentTime
-    // Snap into the trim window if the playhead is outside it.
+    const rate = Math.max(0, mul * this.pb.speed) // over realtime
+
+    if (!this.pb.playing) {
+      if (!v.paused) v.pause()
+      return
+    }
+
+    // Native forward playback handles the common case smoothly.
+    const nativeOk = !this.pb.reverse && rate >= 0.0625 && rate <= 16
+    if (nativeOk) {
+      if (v.playbackRate !== rate) v.playbackRate = rate
+      if (v.paused) void v.play().catch(() => {})
+      // Only touch currentTime at the trim boundaries — not every frame.
+      if (v.currentTime >= hi - 0.02 || v.currentTime < lo - 0.02) {
+        if (this.pb.loop) v.currentTime = lo
+        else {
+          v.currentTime = hi
+          v.pause()
+        }
+      }
+      return
+    }
+
+    // Manual stepping (reverse / very slow / very fast). Only issue a new seek
+    // once the previous one finished, or it never settles a frame (black).
+    if (!v.paused) v.pause()
+    if (v.seeking) return
+    let t = v.currentTime
     if (t < lo || t > hi) t = this.pb.reverse ? hi : lo
-    if (!this.pb.playing) return
-    t += effDt * this.pb.speed * (this.pb.reverse ? -1 : 1)
+    t += rawDt * rate * (this.pb.reverse ? -1 : 1)
     if (t > hi) t = this.pb.loop ? lo + ((t - lo) % span) : hi
     else if (t < lo) t = this.pb.loop ? hi - ((lo - t) % span) : lo
     if (!Number.isFinite(t)) t = lo
-    try {
-      this.video.currentTime = t
-    } catch {
-      /* a seek can race a src reload — ignore, next frame retries */
+    if (Math.abs(t - v.currentTime) > 1e-4) {
+      try {
+        v.currentTime = t
+      } catch {
+        /* a seek can race a src reload — ignore, next frame retries */
+      }
     }
   }
 
