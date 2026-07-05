@@ -100,6 +100,13 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             onClick={() => toggleFeedback(index)}
             title="Feedback — this layer samples its own previous frame (trails)"
           />
+          <button
+            onClick={() => randomizeLayer(index)}
+            title="Randomize this whole layer (sources, FX, blend, feedback)"
+            className="rounded px-1.5 py-0.5 font-mono text-[11px] leading-none text-muted transition-colors hover:bg-accent/15 hover:text-accent"
+          >
+            ⚄
+          </button>
         </div>
       </div>
 
