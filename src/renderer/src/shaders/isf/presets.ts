@@ -494,6 +494,18 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Almost fine', values: { band: 0.03, wobble: 0.01, noise: 0.15, rate: 0.35 } },
     { name: 'Full chew', values: { band: 0.4, wobble: 0.2, noise: 1, rate: 0.9 } }
   ],
+  'fx-distort': [
+    { name: 'Gentle wave', values: { mode: 0, amount: 0.25, scale: 3, angle: 0, rate: 0.5 } },
+    { name: 'Pond ripple', values: { mode: 1, amount: 0.4, scale: 6, center: [0.5, 0.5], rate: 1.2 } },
+    { name: 'Fisheye bulge', values: { mode: 2, amount: 0.6, scale: 4, center: [0.5, 0.5] } },
+    { name: 'Black hole pinch', values: { mode: 3, amount: 0.7, scale: 4, center: [0.45, 0.55] } },
+    { name: 'Slow swirl', values: { mode: 4, amount: 0.5, scale: 3, center: [0.55, 0.45] } },
+    { name: 'Lean shear', values: { mode: 5, amount: 0.35, angle: 1.5708 } },
+    { name: 'Pressed glass', values: { mode: 6, amount: 0.5, scale: 8 } },
+    { name: 'Accordion', values: { mode: 7, amount: 0.4, scale: 10, angle: 0 } },
+    { name: 'Drag handle', values: { mode: 8, amount: 0.6, scale: 3, center: [0.35, 0.5], angle: 0 } },
+    { name: 'Turbulence', values: { mode: 9, amount: 0.45, scale: 5, rate: 0.8 } }
+  ],
   'fx-feedback-zoom': [
     { name: 'Slow dive', values: { zoom: 1.03, twist: 0.02, amount: 0.65 } },
     { name: 'Pull out', values: { zoom: 0.97, twist: -0.01, amount: 0.6 } },

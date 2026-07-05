@@ -48,6 +48,7 @@ import byteCorrupt from './fx/ByteCorrupt.fs?raw'
 import ringing from './fx/Ringing.fs?raw'
 import tracking from './fx/Tracking.fs?raw'
 import feedbackZoom from './fx/FeedbackZoom.fs?raw'
+import distort from './fx/Distort.fs?raw'
 import vibe from './fx/Vibe.fs?raw'
 
 export interface IsfShader {
@@ -326,6 +327,10 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-feedback-zoom', name: 'Feedback Zoom', category: 'FX', source: feedbackZoom,
     curated: { zoom: [0.95, 1.08], twist: [-0.08, 0.08], amount: [0.35, 0.85] }
+  },
+  {
+    id: 'fx-distort', name: 'Distort', category: 'FX', source: distort,
+    curated: { amount: [0.1, 0.6], scale: [1, 12], angle: [0, 6.2832], rate: [0.1, 2] }
   }
 ]
 

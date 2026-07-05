@@ -65,9 +65,10 @@ float dustField(vec2 uv, vec2 cells, float frameSeed, float coverage, float hard
       float sz = 0.14 + hash21(cell + 8.1) * 0.5;
       float soft = mix(0.15 + hash21(cell + 11.2) * 0.7, 0.05, hardness);
       float v = 1.0 - smoothstep(sz * (1.0 - soft), sz, dd);
-      // Mostly dark specks (dust blocks light); some bright flecks.
-      float tone = hash21(cell + frameSeed + 2.2) < 0.35 ? 0.9 : -1.5;
-      float c = v * tone;
+      // Dust/dirt blocks light → DARK specks only (no bright particles —
+      // bright round flecks read as sparkle, not film/sensor debris). Depth
+      // varies per speck.
+      float c = v * -(1.0 + hash21(cell + frameSeed + 2.2) * 0.8);
       if (abs(c) > abs(acc)) acc = c;
     }
   }
@@ -87,8 +88,10 @@ float hairScratch(vec2 uv, float seed, float coverage) {
   float hair = on *
     (1.0 - smoothstep(thick * 0.4, thick * 2.0, abs(uv.x - xC))) *
     step(0.0, yRel) * step(yRel, 1.0);
-  float light = step(0.8, hash21(vec2(seed, 71.0)));
-  return hair * mix(-0.9, 0.7, light);
+  // Hairs are dirt/emulsion lines — dark, with depth variety (a rare one
+  // is a faint light scratch, kept subtle so it never reads as a particle).
+  float light = step(0.94, hash21(vec2(seed, 71.0)));
+  return hair * mix(-(0.6 + hash21(vec2(seed, 83.0)) * 0.4), 0.35, light);
 }
 
 void main() {
