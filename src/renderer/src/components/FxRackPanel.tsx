@@ -35,14 +35,22 @@ export function FxAddSelect({ scope, className = '' }: { scope: FxScope; classNa
   )
 }
 
-export function FxChips({ scope, fx }: { scope: FxScope; fx: FxInstance[] }): JSX.Element | null {
+export function FxChips({
+  scope,
+  fx,
+  nowrap = false
+}: {
+  scope: FxScope
+  fx: FxInstance[]
+  nowrap?: boolean
+}): JSX.Element | null {
   const selection = useStore((s) => s.selection)
   const reorderFx = useStore((s) => s.reorderFx)
   const dragId = useRef<string | null>(null)
   if (fx.length === 0) return null
   return (
     <div
-      className="flex min-w-0 flex-wrap items-center gap-1"
+      className={`flex min-w-0 items-center gap-1 ${nowrap ? 'flex-nowrap' : 'flex-wrap'}`}
       // Tail drop: releasing on the row (not on a chip) moves to the end.
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e: DragEvent) => {
@@ -75,21 +83,23 @@ export function FxChips({ scope, fx }: { scope: FxScope; fx: FxInstance[] }): JS
 export function FxRackPanel({
   scope,
   fx,
-  label
+  label,
+  nowrap = false
 }: {
   scope: FxScope
   fx: FxInstance[]
   label: string
+  nowrap?: boolean
 }): JSX.Element {
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+    <div className={`flex min-w-0 items-center gap-1.5 ${nowrap ? 'flex-nowrap' : 'flex-wrap'}`}>
       {label && (
         <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">
           {label}
         </span>
       )}
       <FxAddSelect scope={scope} />
-      <FxChips scope={scope} fx={fx} />
+      <FxChips scope={scope} fx={fx} nowrap={nowrap} />
     </div>
   )
 }

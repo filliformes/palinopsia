@@ -419,10 +419,10 @@ function MasterRackStrip(): JSX.Element {
   const [applied, setApplied] = useState('')
   const [flashing, flash] = useFlash()
   return (
-    // Everything on one cohesive wrapping row: chain label · dice · preset box,
-    // then the FX rack (+ fx, chips, Vibe) spaced a little to the right.
+    // Everything on ONE line: chain label · dice · preset box · + fx · the FX
+    // chips (Vibe, Context, Finalizer). Scrolls horizontally rather than wrapping.
     <div
-      className={`flex min-w-0 flex-wrap items-center gap-1.5 rounded-md border bg-panel2/40 p-2 transition-colors ${
+      className={`flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto rounded-md border bg-panel2/40 p-2 transition-colors ${
         flashing ? 'animate-pulse border-danger ring-1 ring-danger' : 'border-border'
       }`}
     >
@@ -462,9 +462,9 @@ function MasterRackStrip(): JSX.Element {
           </option>
         ))}
       </select>
-      {/* FX rack joins the same line, nudged right for a cohesive feel */}
-      <div className="ml-4 flex min-w-0 items-center">
-        <FxRackPanel scope={{ kind: 'master' }} fx={master} label="" />
+      {/* FX rack joins the same line (no wrap — the whole strip scrolls) */}
+      <div className="ml-3 flex shrink-0 items-center">
+        <FxRackPanel scope={{ kind: 'master' }} fx={master} label="" nowrap />
       </div>
     </div>
   )
