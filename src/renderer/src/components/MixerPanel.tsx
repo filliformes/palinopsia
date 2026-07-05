@@ -97,9 +97,11 @@ export function MixerPanel(): JSX.Element {
               />
             </div>
 
-            {/* Blend — full column width so the longest name shows in full */}
+            {/* Blend — full width, no native arrow / chevron, tiny padding so
+                even the longest mode name ("difference") shows without cropping. */}
             <select
-              className="input w-full shrink-0 px-0.5 py-0.5 text-center text-[9px]"
+              className="input w-full shrink-0 appearance-none !px-1 !py-0.5 text-center !text-[9px]"
+              style={{ backgroundImage: 'none' }}
               value={l.blend}
               onChange={(e) => setBlend(i, e.target.value as BlendMode)}
               title="Blend against the stack below"
@@ -168,7 +170,8 @@ function VFader({
         min={min}
         max={max}
         onChange={onChange}
-        className="input w-12 shrink-0 px-0.5 py-0.5 text-center text-[9px]"
+        // ! overrides the unlayered .input padding/font so the full number fits.
+        className="input w-full shrink-0 !px-0.5 !py-0.5 text-center !text-[9px]"
       />
     </div>
   )

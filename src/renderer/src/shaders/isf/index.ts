@@ -187,6 +187,7 @@ export const GENERATORS: IsfShader[] = [
     curated: {
       count: [10, 45],
       speed: [0.05, 0.8],
+      physics: [0, 0.85],
       size: [0.04, 0.2],
       wander: [0.15, 0.8],
       flicker: [0.1, 0.7],

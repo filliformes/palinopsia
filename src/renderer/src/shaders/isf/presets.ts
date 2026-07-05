@@ -408,16 +408,16 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Signal storm', values: { lines: 55, amp: 0.13, scale: 5, rate: 0.7, width: 0.14 } }
   ],
   ash: [
-    { name: 'Settling', values: { count: 24, speed: 0.2, size: 0.08, wander: 0.4, flicker: 0.3, accent: 0.25 } },
-    { name: 'Slow fall', values: { count: 16, speed: 0.1, size: 0.12, wander: 0.25, flicker: 0.2, accent: 0.15 } },
-    { name: 'Fine soot', values: { count: 45, speed: 0.35, size: 0.04, wander: 0.5, flicker: 0.4, accent: 0.1 } },
-    { name: 'Ember drift', values: { count: 20, speed: 0.3, size: 0.09, wander: 0.6, flicker: 0.55, accent: 0.6, tint: [0.95, 0.45, 0.15, 1] } },
-    { name: 'Grey weather', values: { count: 32, speed: 0.5, size: 0.06, wander: 0.7, flicker: 0.25, accent: 0.05 } },
-    { name: 'Sparse flakes', values: { count: 9, speed: 0.15, size: 0.18, wander: 0.35, flicker: 0.3, accent: 0.3 } },
-    { name: 'Blue static', values: { count: 40, speed: 0.7, size: 0.05, wander: 0.8, flicker: 0.6, accent: 0.4, tint: [0.4, 0.6, 0.95, 1] } },
-    { name: 'Aftermath', values: { count: 28, speed: 0.08, size: 0.07, wander: 0.2, flicker: 0.15, accent: 0.2 } },
-    { name: 'Updraft', values: { count: 22, speed: 0.9, size: 0.06, wander: 0.9, flicker: 0.45, accent: 0.35 } },
-    { name: 'Last sparks', values: { count: 12, speed: 0.25, size: 0.1, wander: 0.5, flicker: 0.8, accent: 0.8, tint: [0.95, 0.6, 0.2, 1] } }
+    { name: 'Settling', values: { count: 24, speed: 0.2, physics: 0.35, size: 0.08, wander: 0.4, flicker: 0.3, accent: 0.25 } },
+    { name: 'Soft float', values: { count: 16, speed: 0.1, physics: 0.85, size: 0.12, wander: 0.25, flicker: 0.2, accent: 0.15 } },
+    { name: 'Fine soot', values: { count: 45, speed: 0.35, physics: 0.5, size: 0.04, wander: 0.5, flicker: 0.4, accent: 0.1 } },
+    { name: 'Ember drift', values: { count: 20, speed: 0.3, physics: 0.6, size: 0.09, wander: 0.6, flicker: 0.55, accent: 0.6, tint: [0.95, 0.45, 0.15, 1] } },
+    { name: 'Grey weather', values: { count: 32, speed: 0.5, physics: 0.3, size: 0.06, wander: 0.7, flicker: 0.25, accent: 0.05 } },
+    { name: 'Heavy grit', values: { count: 9, speed: 0.15, physics: 0, size: 0.18, wander: 0.35, flicker: 0.3, accent: 0.3 } },
+    { name: 'Blue static', values: { count: 40, speed: 0.7, physics: 0.2, size: 0.05, wander: 0.8, flicker: 0.6, accent: 0.4, tint: [0.4, 0.6, 0.95, 1] } },
+    { name: 'Aftermath', values: { count: 28, speed: 0.08, physics: 0.7, size: 0.07, wander: 0.2, flicker: 0.15, accent: 0.2 } },
+    { name: 'Updraft', values: { count: 22, speed: 0.9, physics: 0.9, size: 0.06, wander: 0.9, flicker: 0.45, accent: 0.35 } },
+    { name: 'Last sparks', values: { count: 12, speed: 0.25, physics: 0.15, size: 0.1, wander: 0.5, flicker: 0.8, accent: 0.8, tint: [0.95, 0.6, 0.2, 1] } }
   ],
 
   murmuration: [
