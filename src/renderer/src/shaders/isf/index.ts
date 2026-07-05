@@ -389,7 +389,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-tracking', name: 'Tracking', category: 'FX', source: tracking,
-    curated: { band: [0.05, 0.25], wobble: [0.01, 0.1], noise: [0.2, 0.8], rate: [0.2, 0.8] }
+    curated: { band: [0.05, 0.25], position: [0, 1], roll: [0, 0.6], wobble: [0.01, 0.1], noise: [0.2, 0.8], rate: [0.2, 0.8] }
   },
   {
     id: 'fx-feedback-zoom', name: 'Feedback Zoom', category: 'FX', source: feedbackZoom,

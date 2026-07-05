@@ -755,10 +755,11 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Rental copy', values: { band: 0.08, wobble: 0.03, noise: 0.35, rate: 0.3 } },
     { name: 'Damaged reel', values: { band: 0.25, wobble: 0.09, noise: 0.7, rate: 0.6 } },
     { name: 'Slight flutter', values: { band: 0.05, wobble: 0.015, noise: 0.2, rate: 0.5 } },
-    { name: 'Eaten tape', values: { band: 0.35, wobble: 0.15, noise: 0.9, rate: 0.8 } },
+    { name: 'Eaten tape', values: { band: 0.35, position: 0.06, roll: 0.35, wobble: 0.15, noise: 0.9, rate: 0.8 } },
     { name: 'Pause frame', values: { band: 0.15, wobble: 0.07, noise: 0.6, rate: 0.1 } },
     { name: 'Nth generation', values: { band: 0.18, wobble: 0.06, noise: 0.55, rate: 0.45 } },
-    { name: 'Head clog', values: { band: 0.3, wobble: 0.12, noise: 0.8, rate: 0.7 } },
+    { name: 'Rolling band', values: { band: 0.14, position: 0.2, roll: 0.5, wobble: 0.08, noise: 0.6, rate: 0.6 } },
+    { name: 'Mid-screen tear', values: { band: 0.3, position: 0.5, roll: 0, wobble: 0.12, noise: 0.8, rate: 0.7 } },
     { name: 'Almost fine', values: { band: 0.03, wobble: 0.01, noise: 0.15, rate: 0.35 } },
     { name: 'Full chew', values: { band: 0.4, wobble: 0.2, noise: 1, rate: 0.9 } }
   ],
