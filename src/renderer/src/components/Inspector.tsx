@@ -129,6 +129,25 @@ export function Inspector(): JSX.Element {
         <span className="text-[12px] font-semibold">{title}</span>
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{context}</span>
         <div className="flex-1" />
+        {/* Per-FX dry/wet opacity — centered, sized like a normal control. */}
+        {fxOpacity && (
+          <div className="flex shrink-0 items-center gap-1.5" title={`FX dry/wet — ${fxOpacity.value.toFixed(2)}`}>
+            <span className="font-mono text-[9px] uppercase text-muted">opacity</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={fxOpacity.value}
+              onChange={(e) => fxOpacity!.set(Number(e.target.value))}
+              className="w-24 accent-accent"
+            />
+            <span className="w-7 text-right font-mono text-[10px] text-muted">
+              {fxOpacity.value.toFixed(2)}
+            </span>
+          </div>
+        )}
+        <div className="flex-1" />
         {isContext && (
           <button
             onClick={() => {
@@ -170,25 +189,6 @@ export function Inspector(): JSX.Element {
           onApplied={isVibe ? setVibePresetName : undefined}
         />
       </div>
-      {/* Per-FX dry/wet opacity — every effect blends over its input. */}
-      {fxOpacity && (
-        <div className="flex items-center gap-2 border-b border-border px-2 py-1">
-          <span className="w-14 shrink-0 font-mono text-[9px] uppercase text-muted">opacity</span>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={fxOpacity.value}
-            onChange={(e) => fxOpacity!.set(Number(e.target.value))}
-            className="min-w-0 flex-1 accent-accent"
-            title={`FX dry/wet — ${fxOpacity.value.toFixed(2)}`}
-          />
-          <span className="w-8 shrink-0 text-right font-mono text-[10px] text-muted">
-            {fxOpacity.value.toFixed(2)}
-          </span>
-        </div>
-      )}
       {/* Fixed shape: always exactly two rows of controls; more params flow
           into new columns and scroll horizontally, so the panel never jumps. */}
       <div className="h-[8.5rem] overflow-x-auto overflow-y-hidden">
