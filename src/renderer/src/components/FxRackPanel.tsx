@@ -1,45 +1,26 @@
-// One FX rack (per-source, per-layer, or master) — finite, reorderable ISF
-// chains (brief §5, §10). Each unit: enable toggle, move up/down, remove.
-// Clicking a unit's name selects it — the Inspector renders its ISF INPUTS
-// as themed controls (the Phase-4 auto-UI).
-//
-// Two layouts: 'list' (vertical rows — layer strips) and 'chips' (inline
-// wrapping pills — the master rack, where vertical rows wasted a whole
-// region on blank space).
+// FX rack UI, decomposed so layouts can place the pieces freely:
+//   FxAddSelect — the "+ fx" picker for a scope
+//   FxChips     — the rack's units as wrapping chips
+//   FxRackPanel — label + add + chips on one wrapping row (master & co.)
+// Locked units (the master Vibe Palette) render pinned: no bypass dot, no
+// remove, no reorder — just the name (click to edit) and a pin glyph.
 
 import type { FxInstance } from '@shared/types'
 import { FX_SHADERS, SHADER_BY_ID } from '../shaders/isf'
 import { useStore, type FxScope } from '../store'
 
-export function FxRackPanel({
-  scope,
-  fx,
-  label,
-  compact = false,
-  chips = false
-}: {
-  scope: FxScope
-  fx: FxInstance[]
-  label: string
-  compact?: boolean
-  chips?: boolean
-}): JSX.Element {
+export function FxAddSelect({ scope, className = '' }: { scope: FxScope; className?: string }): JSX.Element {
   const addFx = useStore((s) => s.addFx)
-  const selection = useStore((s) => s.selection)
-
-  const isSelected = (instId: string): boolean =>
-    selection?.type === 'fx' && selection.instId === instId
-
-  const addSelect = (
+  return (
     <select
-      className={`input select-compact min-w-0 text-[10px] ${chips ? 'w-24 shrink-0' : 'flex-1'}`}
+      className={`input select-compact text-[10px] ${className || 'w-20 shrink-0'}`}
       value=""
       onChange={(e) => {
         if (e.target.value) addFx(scope, e.target.value)
       }}
       title="Add an FX to this rack"
     >
-      <option value="">+ add fx</option>
+      <option value="">+ fx</option>
       {FX_SHADERS.map((f) => (
         <option key={f.id} value={f.id}>
           {f.name}
@@ -47,56 +28,45 @@ export function FxRackPanel({
       ))}
     </select>
   )
+}
 
-  if (chips) {
-    // Single wrapping row: label · add · pills. No blank body.
-    return (
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        {label && (
-          <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">
-            {label}
-          </span>
-        )}
-        {addSelect}
-        {fx.map((f, i) => (
-          <FxUnit
-            key={f.id}
-            f={f}
-            i={i}
-            count={fx.length}
-            scope={scope}
-            selected={isSelected(f.id)}
-            pill
-          />
-        ))}
-      </div>
-    )
-  }
-
+export function FxChips({ scope, fx }: { scope: FxScope; fx: FxInstance[] }): JSX.Element | null {
+  const selection = useStore((s) => s.selection)
+  if (fx.length === 0) return null
   return (
-    <div
-      className={`flex min-w-0 flex-col gap-1 ${compact ? '' : 'rounded border border-border bg-panel2/40 p-1.5'}`}
-    >
-      <div className="flex min-w-0 items-center gap-1.5">
-        <span className="w-10 shrink-0 truncate font-mono text-[9px] uppercase tracking-wide text-muted">
+    <div className="flex min-w-0 flex-wrap items-center gap-1">
+      {fx.map((f, i) => (
+        <FxUnit
+          key={f.id}
+          f={f}
+          i={i}
+          count={fx.length}
+          scope={scope}
+          selected={selection?.type === 'fx' && selection.instId === f.id}
+        />
+      ))}
+    </div>
+  )
+}
+
+export function FxRackPanel({
+  scope,
+  fx,
+  label
+}: {
+  scope: FxScope
+  fx: FxInstance[]
+  label: string
+}): JSX.Element {
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+      {label && (
+        <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">
           {label}
         </span>
-        {addSelect}
-      </div>
-      {fx.length > 0 && (
-        <ul className="flex flex-col gap-0.5">
-          {fx.map((f, i) => (
-            <FxUnit
-              key={f.id}
-              f={f}
-              i={i}
-              count={fx.length}
-              scope={scope}
-              selected={isSelected(f.id)}
-            />
-          ))}
-        </ul>
       )}
+      <FxAddSelect scope={scope} />
+      <FxChips scope={scope} fx={fx} />
     </div>
   )
 }
@@ -106,27 +76,44 @@ function FxUnit({
   i,
   count,
   scope,
-  selected,
-  pill = false
+  selected
 }: {
   f: FxInstance
   i: number
   count: number
   scope: FxScope
   selected: boolean
-  pill?: boolean
 }): JSX.Element {
   const removeFx = useStore((s) => s.removeFx)
   const toggleFx = useStore((s) => s.toggleFx)
   const moveFx = useStore((s) => s.moveFx)
   const setSelection = useStore((s) => s.setSelection)
 
-  const Tag = pill ? 'span' : 'li'
+  if (f.locked) {
+    // The pinned Vibe Palette — always on, always last, always editable.
+    return (
+      <span
+        className={`flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 ${
+          selected ? 'border-accent2' : 'border-accent2/40'
+        } bg-panel`}
+        title="Vibe Palette — the always-on unified-look stage. Click to edit its colors."
+      >
+        <span className="font-mono text-[9px] text-accent2">◆</span>
+        <button
+          onClick={() => setSelection({ type: 'fx', scope, instId: f.id })}
+          className={`text-[11px] transition-colors ${selected ? 'text-accent2' : 'hover:text-accent2'}`}
+        >
+          Vibe Palette
+        </button>
+      </span>
+    )
+  }
+
   return (
-    <Tag
-      className={`flex min-w-0 items-center gap-1 rounded border bg-panel px-1.5 py-0.5 ${
+    <span
+      className={`flex min-w-0 shrink-0 items-center gap-1 rounded border bg-panel px-1.5 py-0.5 ${
         selected ? 'border-accent/70' : 'border-border'
-      } ${pill ? 'shrink-0' : ''}`}
+      }`}
     >
       <button
         onClick={() => toggleFx(scope, f.id)}
@@ -138,10 +125,8 @@ function FxUnit({
       <button
         onClick={() => setSelection({ type: 'fx', scope, instId: f.id })}
         className={`min-w-0 truncate text-left text-[11px] transition-colors ${
-          pill ? '' : 'flex-1'
-        } ${f.enabled ? '' : 'text-muted line-through'} ${
-          selected ? 'text-accent' : 'hover:text-accent'
-        }`}
+          f.enabled ? '' : 'text-muted line-through'
+        } ${selected ? 'text-accent' : 'hover:text-accent'}`}
         title="Edit this FX's controls in the Inspector"
       >
         {SHADER_BY_ID[f.shaderId ?? '']?.name ?? f.shaderId}
@@ -152,7 +137,7 @@ function FxUnit({
         disabled={i === 0}
         title="Move earlier in the chain"
       >
-        {pill ? '←' : '↑'}
+        ←
       </button>
       <button
         className="shrink-0 px-0.5 font-mono text-[10px] text-muted hover:text-text disabled:opacity-30"
@@ -160,7 +145,7 @@ function FxUnit({
         disabled={i === count - 1}
         title="Move later in the chain"
       >
-        {pill ? '→' : '↓'}
+        →
       </button>
       <button
         className="shrink-0 px-0.5 font-mono text-[10px] text-muted hover:text-danger"
@@ -169,6 +154,6 @@ function FxUnit({
       >
         ×
       </button>
-    </Tag>
+    </span>
   )
 }

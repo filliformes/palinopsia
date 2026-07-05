@@ -50,6 +50,20 @@ export function installTextureBridge(): void {
   if (patched) return
   patched = true
   const proto = (Renderer as unknown as { prototype: Record<string, unknown> }).prototype
+
+  // ── Per-layer time scaling ─────────────────────────────────────────
+  // The runtime stamps TIME from its own wall clock inside draw(). Layers
+  // need their OWN clocks (the per-layer Speed control), so after the stock
+  // stamping we overwrite TIME with the renderer's assigned clock when one
+  // is set (renderer.__opsiaTimeSec, written by the Compositor each frame).
+  const origDate = proto.setDateUniforms as (this: IsfRendererInternals) => void
+  proto.setDateUniforms = function (this: IsfRendererInternals & { __opsiaTimeSec?: number }): void {
+    origDate.call(this)
+    if (typeof this.__opsiaTimeSec === 'number') {
+      this.setValue('TIME', this.__opsiaTimeSec)
+    }
+  }
+
   const orig = proto.pushTexture as (this: IsfRendererInternals, u: IsfUniform) => void
 
   proto.pushTexture = function (this: IsfRendererInternals, uniform: IsfUniform): void {

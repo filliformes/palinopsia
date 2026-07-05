@@ -111,6 +111,79 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Last sparks', values: { count: 12, speed: 0.25, size: 0.1, wander: 0.5, flicker: 0.8, accent: 0.8, tint: [0.95, 0.6, 0.2, 1] } }
   ],
 
+  murmuration: [
+    { name: 'Evening flock', values: { count: 28, speed: 0.6, cohesion: 0.75, size: 0.07, stretch: 0.5 } },
+    { name: 'Tight swarm', values: { count: 42, speed: 0.9, cohesion: 0.9, size: 0.05, stretch: 0.7 } },
+    { name: 'Scattered', values: { count: 18, speed: 0.4, cohesion: 0.3, size: 0.09, stretch: 0.3 } },
+    { name: 'Storm birds', values: { count: 35, speed: 1.4, cohesion: 0.8, size: 0.06, stretch: 1.2 } },
+    { name: 'Lazy drift', values: { count: 22, speed: 0.2, cohesion: 0.6, size: 0.1, stretch: 0.2 } },
+    { name: 'Insect cloud', values: { count: 55, speed: 0.7, cohesion: 0.2, size: 0.03, stretch: 0.15 } },
+    { name: 'Ember wind', values: { count: 30, speed: 1.1, cohesion: 0.85, size: 0.05, stretch: 0.9, tint: [0.92, 0.5, 0.2, 1] } },
+    { name: 'Deep water fish', values: { count: 25, speed: 0.5, cohesion: 0.7, size: 0.08, stretch: 0.6, tint: [0.4, 0.65, 0.8, 1] } },
+    { name: 'Slow galaxy', values: { count: 48, speed: 0.15, cohesion: 0.5, size: 0.04, stretch: 0.4 } },
+    { name: 'Panic wave', values: { count: 38, speed: 2.2, cohesion: 0.95, size: 0.06, stretch: 1.4 } }
+  ],
+  filaments: [
+    { name: 'Kelp bed', values: { strands: 14, rate: 0.4, sway: 0.45, width: 0.18, lean: 0.15 } },
+    { name: 'Sparse reeds', values: { strands: 6, rate: 0.25, sway: 0.3, width: 0.3, lean: 0.1 } },
+    { name: 'Hair fine', values: { strands: 34, rate: 0.5, sway: 0.5, width: 0.08, lean: 0.2 } },
+    { name: 'Storm current', values: { strands: 16, rate: 1.2, sway: 0.85, width: 0.15, lean: 0.6 } },
+    { name: 'Still pond', values: { strands: 10, rate: 0.1, sway: 0.15, width: 0.22, lean: 0 } },
+    { name: 'Lean hard', values: { strands: 12, rate: 0.6, sway: 0.4, width: 0.2, lean: -0.8 } },
+    { name: 'Green depth', values: { strands: 18, rate: 0.35, sway: 0.5, width: 0.16, lean: 0.25, tint: [0.35, 0.7, 0.45, 1] } },
+    { name: 'Pale anemone', values: { strands: 24, rate: 0.7, sway: 0.65, width: 0.1, lean: 0.05, tint: [0.85, 0.8, 0.7, 1] } },
+    { name: 'Wire farm', values: { strands: 28, rate: 0.15, sway: 0.1, width: 0.06, lean: 0.35 } },
+    { name: 'Deep sway', values: { strands: 8, rate: 0.9, sway: 1, width: 0.35, lean: -0.3 } }
+  ],
+  erosion: [
+    { name: 'Hillside', values: { rate: 0.3, scale: 2.5, streaks: 5, carve: 0.6, sediment: 0.35 } },
+    { name: 'Canyon walls', values: { rate: 0.15, scale: 4, streaks: 8, carve: 0.9, sediment: 0.2 } },
+    { name: 'Mudflow', values: { rate: 0.6, scale: 1.8, streaks: 3, carve: 0.4, sediment: 0.55 } },
+    { name: 'Glacier scrape', values: { rate: 0.05, scale: 3, streaks: 10, carve: 0.75, sediment: 0.25 } },
+    { name: 'Delta', values: { rate: 0.4, scale: 2, streaks: 6, carve: 0.5, sediment: 0.5 } },
+    { name: 'Acid wash', values: { rate: 1.2, scale: 5, streaks: 7, carve: 0.85, sediment: 0.15 } },
+    { name: 'Rust bleed', values: { rate: 0.25, scale: 3.5, streaks: 4, carve: 0.65, sediment: 0.4, tint: [0.75, 0.4, 0.2, 1] } },
+    { name: 'Slate', values: { rate: 0.2, scale: 4.5, streaks: 9, carve: 0.7, sediment: 0.3, tint: [0.55, 0.6, 0.68, 1] } },
+    { name: 'Slow seep', values: { rate: 0.08, scale: 2.2, streaks: 4, carve: 0.45, sediment: 0.6 } },
+    { name: 'Flash flood', values: { rate: 2, scale: 3, streaks: 6, carve: 0.8, sediment: 0.45 } }
+  ],
+  membrane: [
+    { name: 'Breathing body', values: { rate: 0.15, mass: 0.45, warp: 0.6, softness: 0.12, veins: 0.3 } },
+    { name: 'Deep cell', values: { rate: 0.1, mass: 0.6, warp: 0.9, softness: 0.06, veins: 0.6 } },
+    { name: 'Ghost mass', values: { rate: 0.2, mass: 0.35, warp: 0.4, softness: 0.35, veins: 0.1 } },
+    { name: 'Restless organ', values: { rate: 0.5, mass: 0.5, warp: 1.2, softness: 0.1, veins: 0.45 } },
+    { name: 'Amoeba', values: { rate: 0.3, mass: 0.4, warp: 1.4, softness: 0.08, veins: 0.2 } },
+    { name: 'Sleeping giant', values: { rate: 0.04, mass: 0.65, warp: 0.5, softness: 0.15, veins: 0.35 } },
+    { name: 'Violet tissue', values: { rate: 0.18, mass: 0.5, warp: 0.7, softness: 0.1, veins: 0.55, tint: [0.55, 0.35, 0.65, 1] } },
+    { name: 'Pale jelly', values: { rate: 0.25, mass: 0.42, warp: 0.8, softness: 0.25, veins: 0.15, tint: [0.75, 0.78, 0.7, 1] } },
+    { name: 'Blood warm', values: { rate: 0.12, mass: 0.55, warp: 0.65, softness: 0.09, veins: 0.7, tint: [0.7, 0.25, 0.25, 1] } },
+    { name: 'Dissolving', values: { rate: 0.35, mass: 0.3, warp: 1.5, softness: 0.45, veins: 0.25 } }
+  ],
+  mycelium: [
+    { name: 'First colony', values: { rate: 0.25, scale: 4, width: 0.12, density: 0.5, front: 0.35 } },
+    { name: 'Dense web', values: { rate: 0.3, scale: 7, width: 0.18, density: 0.8, front: 0.3 } },
+    { name: 'Sparse threads', values: { rate: 0.2, scale: 3, width: 0.08, density: 0.3, front: 0.4 } },
+    { name: 'Fast bloom', values: { rate: 0.7, scale: 5, width: 0.14, density: 0.6, front: 0.5 } },
+    { name: 'Old growth', values: { rate: 0.08, scale: 6, width: 0.25, density: 0.7, front: 0.2 } },
+    { name: 'Frost creep', values: { rate: 0.15, scale: 8, width: 0.07, density: 0.55, front: 0.65, tint: [0.7, 0.8, 0.88, 1] } },
+    { name: 'Gold veins', values: { rate: 0.22, scale: 4.5, width: 0.15, density: 0.45, front: 0.3, tint: [0.9, 0.72, 0.35, 1] } },
+    { name: 'Nerve net', values: { rate: 0.4, scale: 5.5, width: 0.1, density: 0.65, front: 0.45 } },
+    { name: 'Slow rot', values: { rate: 0.1, scale: 3.5, width: 0.2, density: 0.75, front: 0.25 } },
+    { name: 'Wildfire front', values: { rate: 0.8, scale: 6, width: 0.12, density: 0.6, front: 0.7, tint: [0.95, 0.5, 0.2, 1] } }
+  ],
+  swell: [
+    { name: 'Open water', values: { rate: 0.4, scale: 4, chop: 0.4, direction: 0.6, spread: 0.35 } },
+    { name: 'Glass sea', values: { rate: 0.2, scale: 3, chop: 0.1, direction: 0.4, spread: 0.2 } },
+    { name: 'Whitecaps', values: { rate: 0.7, scale: 5, chop: 0.85, direction: 0.8, spread: 0.4 } },
+    { name: 'Ground swell', values: { rate: 0.25, scale: 2, chop: 0.3, direction: 1.2, spread: 0.15 } },
+    { name: 'Chop cross', values: { rate: 0.5, scale: 6, chop: 0.55, direction: 0.3, spread: 0.8 } },
+    { name: 'Night crossing', values: { rate: 0.3, scale: 4.5, chop: 0.5, direction: 2.1, spread: 0.3, tint: [0.35, 0.45, 0.6, 1] } },
+    { name: 'Mercury', values: { rate: 0.15, scale: 3.5, chop: 0.25, direction: 0.9, spread: 0.25, tint: [0.7, 0.72, 0.75, 1] } },
+    { name: 'Storm face', values: { rate: 1, scale: 7, chop: 0.9, direction: 1.5, spread: 0.6 } },
+    { name: 'Harbour slop', values: { rate: 0.6, scale: 9, chop: 0.6, direction: 4, spread: 0.9 } },
+    { name: 'Oil calm', values: { rate: 0.08, scale: 2.5, chop: 0.05, direction: 0.5, spread: 0.1 } }
+  ],
+
   // ── FX ──────────────────────────────────────────────────────────────
   'fx-posterize': [
     { name: '2-bit', values: { levels: 2, gamma: 1 } },
@@ -339,6 +412,78 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Macro', values: { zoom: 2.4, posX: 0.1, posY: 0.1, rotate: 0, wrap: 0 } },
     { name: 'Corner peek', values: { zoom: 1.6, posX: 0.4, posY: 0.35, rotate: 0, wrap: 0 } },
     { name: 'Upside down', values: { zoom: 1, posX: 0, posY: 0, rotate: 3.1416, wrap: 1 } }
+  ],
+  'fx-sync-loss': [
+    { name: 'Slow climb', values: { roll: 0.1, tear: 0.05, bands: 3, rate: 0.2 } },
+    { name: 'Lost hold', values: { roll: 0.4, tear: 0.12, bands: 4, rate: 0.4 } },
+    { name: 'Catch & slip', values: { roll: 0.25, tear: 0.08, bands: 5, rate: 0.6 } },
+    { name: 'Free fall', values: { roll: 1.2, tear: 0.15, bands: 6, rate: 0.5 } },
+    { name: 'Torn quiet', values: { roll: 0.03, tear: 0.2, bands: 3, rate: 0.3 } },
+    { name: 'Shred', values: { roll: 0.6, tear: 0.35, bands: 10, rate: 0.9 } },
+    { name: 'Heartbeat roll', values: { roll: 0.15, tear: 0.06, bands: 2, rate: 0.15 } },
+    { name: 'Dying set', values: { roll: 0.8, tear: 0.25, bands: 8, rate: 0.7 } },
+    { name: 'Almost stable', values: { roll: 0.05, tear: 0.03, bands: 2, rate: 0.25 } },
+    { name: 'Full collapse', values: { roll: 1.8, tear: 0.4, bands: 12, rate: 1 } }
+  ],
+  'fx-row-echo': [
+    { name: 'Light freeze', values: { rows: 60, chance: 0.2, fade: 0.4, rate: 0.3 } },
+    { name: 'Curtain pull', values: { rows: 30, chance: 0.5, fade: 0.15, rate: 0.2 } },
+    { name: 'Hair stretch', values: { rows: 160, chance: 0.35, fade: 0.5, rate: 0.4 } },
+    { name: 'Deep hold', values: { rows: 20, chance: 0.6, fade: 0.05, rate: 0.1 } },
+    { name: 'Soft smear', values: { rows: 80, chance: 0.4, fade: 0.8, rate: 0.35 } },
+    { name: 'Flicker hold', values: { rows: 100, chance: 0.3, fade: 0.3, rate: 0.9 } },
+    { name: 'Rare stripe', values: { rows: 45, chance: 0.1, fade: 0.2, rate: 0.25 } },
+    { name: 'Waterfall', values: { rows: 120, chance: 0.55, fade: 0.65, rate: 0.5 } },
+    { name: 'Broken blinds', values: { rows: 35, chance: 0.45, fade: 0.1, rate: 0.6 } },
+    { name: 'Full stretch', values: { rows: 70, chance: 0.85, fade: 0.25, rate: 0.3 } }
+  ],
+  'fx-byte-corrupt': [
+    { name: 'Light damage', values: { depth: 8, scramble: 0.2, blocks: 12, rate: 0.3 } },
+    { name: 'Packet loss', values: { depth: 6, scramble: 0.45, blocks: 20, rate: 0.5 } },
+    { name: 'Deep crush', values: { depth: 3, scramble: 0.3, blocks: 8, rate: 0.2 } },
+    { name: 'Overflow', values: { depth: 5, scramble: 0.7, blocks: 16, rate: 0.6 } },
+    { name: 'Big sectors', values: { depth: 6, scramble: 0.5, blocks: 4, rate: 0.15 } },
+    { name: 'Fine static', values: { depth: 10, scramble: 0.35, blocks: 48, rate: 0.7 } },
+    { name: 'Slow decay', values: { depth: 7, scramble: 0.4, blocks: 10, rate: 0.05 } },
+    { name: 'Total loss', values: { depth: 3, scramble: 0.95, blocks: 24, rate: 0.9 } },
+    { name: 'Whisper corrupt', values: { depth: 12, scramble: 0.12, blocks: 14, rate: 0.25 } },
+    { name: 'Channel bleed', values: { depth: 8, scramble: 0.6, blocks: 6, rate: 0.4 } }
+  ],
+  'fx-ringing': [
+    { name: 'Cheap encode', values: { gap: 0.006, intensity: 0.6, angle: 0 } },
+    { name: 'Over-sharpened', values: { gap: 0.003, intensity: 1, angle: 0 } },
+    { name: 'Wide ghosts', values: { gap: 0.02, intensity: 0.7, angle: 0 } },
+    { name: 'Vertical ring', values: { gap: 0.008, intensity: 0.8, angle: 1.5708 } },
+    { name: 'Faint halo', values: { gap: 0.01, intensity: 0.3, angle: 0 } },
+    { name: 'Hard echo', values: { gap: 0.015, intensity: 1.5, angle: 0 } },
+    { name: 'Diagonal ghost', values: { gap: 0.012, intensity: 0.9, angle: 0.7854 } },
+    { name: 'Micro fringe', values: { gap: 0.002, intensity: 0.7, angle: 0 } },
+    { name: 'Broadcast edge', values: { gap: 0.005, intensity: 1.1, angle: 0 } },
+    { name: 'Blown transient', values: { gap: 0.03, intensity: 1.8, angle: 3.1416 } }
+  ],
+  'fx-tracking': [
+    { name: 'Worn tape', values: { band: 0.12, wobble: 0.05, noise: 0.5, rate: 0.4 } },
+    { name: 'Rental copy', values: { band: 0.08, wobble: 0.03, noise: 0.35, rate: 0.3 } },
+    { name: 'Damaged reel', values: { band: 0.25, wobble: 0.09, noise: 0.7, rate: 0.6 } },
+    { name: 'Slight flutter', values: { band: 0.05, wobble: 0.015, noise: 0.2, rate: 0.5 } },
+    { name: 'Eaten tape', values: { band: 0.35, wobble: 0.15, noise: 0.9, rate: 0.8 } },
+    { name: 'Pause frame', values: { band: 0.15, wobble: 0.07, noise: 0.6, rate: 0.1 } },
+    { name: 'Nth generation', values: { band: 0.18, wobble: 0.06, noise: 0.55, rate: 0.45 } },
+    { name: 'Head clog', values: { band: 0.3, wobble: 0.12, noise: 0.8, rate: 0.7 } },
+    { name: 'Almost fine', values: { band: 0.03, wobble: 0.01, noise: 0.15, rate: 0.35 } },
+    { name: 'Full chew', values: { band: 0.4, wobble: 0.2, noise: 1, rate: 0.9 } }
+  ],
+  'fx-feedback-zoom': [
+    { name: 'Slow dive', values: { zoom: 1.03, twist: 0.02, amount: 0.65 } },
+    { name: 'Pull out', values: { zoom: 0.97, twist: -0.01, amount: 0.6 } },
+    { name: 'Deep tunnel', values: { zoom: 1.08, twist: 0.05, amount: 0.85 } },
+    { name: 'Gentle echo', values: { zoom: 1.015, twist: 0, amount: 0.45 } },
+    { name: 'Spiral in', values: { zoom: 1.05, twist: 0.15, amount: 0.75 } },
+    { name: 'Counter spiral', values: { zoom: 1.04, twist: -0.12, amount: 0.7 } },
+    { name: 'Breathing walls', values: { zoom: 0.94, twist: 0.03, amount: 0.8 } },
+    { name: 'Faint doubling', values: { zoom: 1.01, twist: 0.005, amount: 0.3 } },
+    { name: 'Vortex hard', values: { zoom: 1.12, twist: 0.2, amount: 0.9 } },
+    { name: 'Recede quiet', values: { zoom: 0.9, twist: -0.04, amount: 0.55 } }
   ],
   'fx-stutter': [
     { name: 'Rare freeze', values: { rate: 4, chance: 0.2 } },

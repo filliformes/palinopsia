@@ -4,14 +4,14 @@
 // space. Right-click anywhere on the strip: Init, Randomize layer, layer
 // presets (save/apply/delete — app-persistent).
 
-import { useState, type MouseEvent } from 'react'
+import { useState, type MouseEvent, type ReactNode } from 'react'
 import type { BlendMode } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
 import { GENERATORS } from '../shaders/isf'
 import { useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { ContextMenu, type MenuItem } from './ContextMenu'
-import { FxRackPanel } from './FxRackPanel'
+import { FxAddSelect, FxChips } from './FxRackPanel'
 import { ConfirmModal, PromptModal } from './PromptModal'
 
 export function LayerPanel({ index }: { index: number }): JSX.Element {
@@ -25,6 +25,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const setSourceMix = useStore((s) => s.setSourceMix)
   const setSourceBlend = useStore((s) => s.setSourceBlend)
   const setSourceShader = useStore((s) => s.setSourceShader)
+  const setLayerSpeed = useStore((s) => s.setLayerSpeed)
   const setSelection = useStore((s) => s.setSelection)
   const selection = useStore((s) => s.selection)
   const collapsed = useStore((s) => !!s.collapsed[`layer${index}`])
@@ -104,41 +105,25 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
 
       {!collapsed && (
         <>
-          {/* Sources side by side — compact: label + picker only */}
-          <div className="grid min-w-0 grid-cols-2 gap-1">
-            <SourceCell
-              label="A"
-              shaderId={layer.sourceA.shaderId}
-              selected={isSelected('A')}
-              onSelect={() => setSelection({ type: 'source', layer: index, slot: 'A' })}
-              onPick={(id) => setSourceShader(index, 'A', id)}
-            />
-            <SourceCell
-              label="B"
-              shaderId={layer.sourceB?.shaderId ?? null}
-              selected={isSelected('B')}
-              onSelect={() => setSelection({ type: 'source', layer: index, slot: 'B' })}
-              onPick={(id) => setSourceShader(index, 'B', id)}
-            />
-          </div>
+          {/* SOURCE A: label · picker · +fx — its FX chips underneath */}
+          <SourceRow
+            label="A"
+            shaderId={layer.sourceA.shaderId}
+            selected={isSelected('A')}
+            scope={{ kind: 'sourceA', layer: index }}
+            fx={layer.sourceAFx}
+            onSelect={() => setSelection({ type: 'source', layer: index, slot: 'A' })}
+            onPick={(id) => setSourceShader(index, 'A', id)}
+          />
 
-          {/* Per-source FX as chips rows (only when the source exists) */}
-          {layer.sourceA.shaderId && (
-            <FxRackPanel scope={{ kind: 'sourceA', layer: index }} fx={layer.sourceAFx} label="A fx" chips />
-          )}
+          {/* MIX: combinator mode + depth — between the two sources */}
           {layer.sourceB?.shaderId && (
-            <FxRackPanel scope={{ kind: 'sourceB', layer: index }} fx={layer.sourceBFx} label="B fx" chips />
-          )}
-
-          {/* A/B mix: blend-mode combinator + depth (brief §4) */}
-          {layer.sourceB?.shaderId && (
-            <div className="flex min-w-0 items-center gap-1.5">
-              <label className="w-8 shrink-0 font-mono text-[9px] text-muted">MIX</label>
+            <Row label="MIX">
               <select
                 className="input select-compact w-20 shrink-0 text-[10px]"
                 value={layer.sourceBlend}
                 onChange={(e) => setSourceBlend(index, e.target.value as BlendMode)}
-                title="How B combines with A — mix is the depth of the combination"
+                title="How B combines with A — the slider is the depth"
               >
                 {BLEND_MODES.map((m) => (
                   <option key={m} value={m}>
@@ -156,15 +141,30 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                 className="min-w-0 flex-1 accent-accent"
                 title="Mix depth — 0 = A only, 1 = full blend result"
               />
-            </div>
+            </Row>
           )}
 
-          {/* Layer FX rack — chips */}
-          <FxRackPanel scope={{ kind: 'layer', layer: index }} fx={layer.fx} label="fx" chips />
+          {/* SOURCE B */}
+          <SourceRow
+            label="B"
+            shaderId={layer.sourceB?.shaderId ?? null}
+            selected={isSelected('B')}
+            scope={{ kind: 'sourceB', layer: index }}
+            fx={layer.sourceBFx}
+            onSelect={() => setSelection({ type: 'source', layer: index, slot: 'B' })}
+            onPick={(id) => setSourceShader(index, 'B', id)}
+          />
 
-          {/* Blend against the stack below */}
-          <div className="flex min-w-0 items-center gap-1.5">
-            <label className="w-8 shrink-0 font-mono text-[9px] text-muted">BLEND</label>
+          {/* LAYER FX */}
+          <Row label="FX">
+            <FxAddSelect scope={{ kind: 'layer', layer: index }} className="min-w-0 flex-1" />
+          </Row>
+          <Indented>
+            <FxChips scope={{ kind: 'layer', layer: index }} fx={layer.fx} />
+          </Indented>
+
+          {/* BLEND against the stack below */}
+          <Row label="BLEND">
             <select
               className="input select-compact min-w-0 flex-1 text-[11px]"
               value={layer.blend}
@@ -176,12 +176,34 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                 </option>
               ))}
             </select>
-          </div>
+          </Row>
 
-          {/* Trail persistence — only while FB is on */}
+          {/* SPEED — the layer's global clock multiplier */}
+          <Row label="SPEED">
+            <input
+              type="range"
+              min={0}
+              max={4}
+              step={0.01}
+              value={layer.speed}
+              onChange={(e) => setLayerSpeed(index, Number(e.target.value))}
+              className="min-w-0 flex-1 accent-accent"
+              title="Layer time — scales every source and FX clock on this layer (1 = realtime)"
+            />
+            <div className="w-11 shrink-0">
+              <BoundedNumberInput
+                value={layer.speed}
+                min={0}
+                max={8}
+                onChange={(v) => setLayerSpeed(index, v)}
+                className="input w-full px-1 py-0.5 text-right text-[11px]"
+              />
+            </div>
+          </Row>
+
+          {/* TRAIL persistence — only while FB is on */}
           {layer.feedback && (
-            <div className="flex min-w-0 items-center gap-1.5">
-              <label className="w-8 shrink-0 font-mono text-[9px] text-muted">TRAIL</label>
+            <Row label="TRAIL">
               <input
                 type="range"
                 min={0}
@@ -201,7 +223,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                   className="input w-full px-1 py-0.5 text-right text-[11px]"
                 />
               </div>
-            </div>
+            </Row>
           )}
         </>
       )}
@@ -267,42 +289,79 @@ function ToggleChip({
   )
 }
 
-function SourceCell({
+// Fixed 34px label gutter — every row in the strip aligns to it.
+function Row({ label, children }: { label: string; children: ReactNode }): JSX.Element {
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      <label className="w-[34px] shrink-0 font-mono text-[9px] uppercase text-muted">
+        {label}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+// FX chips rows sit indented under their owner's row, inside the gutter.
+function Indented({ children }: { children: ReactNode }): JSX.Element {
+  return <div className="min-w-0 pl-[40px]">{children}</div>
+}
+
+/** One source: [A] [picker] [+fx], with its FX chips underneath. */
+function SourceRow({
   label,
   shaderId,
   selected,
+  scope,
+  fx,
   onSelect,
   onPick
 }: {
   label: string
   shaderId: string | null
   selected: boolean
+  scope: Parameters<typeof FxAddSelect>[0]['scope']
+  fx: Parameters<typeof FxChips>[0]['fx']
   onSelect: () => void
   onPick: (id: string | null) => void
 }): JSX.Element {
   return (
-    <div
-      onClick={onSelect}
-      className={`flex min-w-0 items-center gap-1 rounded border px-1 py-0.5 transition-colors ${
-        selected
-          ? 'border-accent bg-panel2 ring-1 ring-accent'
-          : 'border-border bg-panel2/50 hover:border-accent/50'
-      }`}
-    >
-      <span className="shrink-0 font-mono text-[9px] text-muted">{label}</span>
-      <select
-        className="input select-compact min-w-0 flex-1 text-[11px]"
-        value={shaderId ?? ''}
-        onChange={(e) => onPick(e.target.value || null)}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <option value="">—</option>
-        {GENERATORS.map((g) => (
-          <option key={g.id} value={g.id}>
-            {g.name}
-          </option>
-        ))}
-      </select>
-    </div>
+    <>
+      <div className="flex min-w-0 items-center gap-1.5" onClick={onSelect}>
+        <span
+          className={`w-[34px] shrink-0 text-center font-app text-[14px] font-bold leading-none ${
+            selected ? 'text-accent' : shaderId ? 'text-text' : 'text-muted'
+          }`}
+        >
+          {label}
+        </span>
+        <select
+          className={`input select-compact min-w-0 flex-1 text-[11px] ${
+            selected ? 'border-accent' : ''
+          }`}
+          value={shaderId ?? ''}
+          onChange={(e) => onPick(e.target.value || null)}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <option value="">— none —</option>
+          {GENERATORS.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </select>
+        {shaderId && (
+          <span onClick={(e) => e.stopPropagation()}>
+            <FxAddSelect scope={scope} className="w-16 shrink-0" />
+          </span>
+        )}
+      </div>
+      {shaderId && fx.length > 0 && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Indented>
+            <FxChips scope={scope} fx={fx} />
+          </Indented>
+        </div>
+      )}
+    </>
   )
 }

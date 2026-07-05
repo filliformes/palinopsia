@@ -4,8 +4,9 @@
 // each input's declared range and default. This is the simplexité payoff:
 // the shader header IS the control surface.
 
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import type { ModTarget } from '@shared/types'
+import { liveModValues } from '../engine/modulation'
 import type { IsfInputDesc } from '../shaders/isf/inputs'
 import { modTargetKey, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
@@ -105,6 +106,28 @@ function FloatControl({
       ? s.composition.modMatrix.filter((a) => modTargetKey(a.target) === targetKey)
       : []
   )
+  const isModulated = bound.length > 0
+
+  // Modulated sliders MOVE with the live value (dataFLOU behaviour): one rAF
+  // writes the thumb position straight to the DOM — React keeps rendering the
+  // BASE value; the live overlay never causes re-renders. Paused while the
+  // user is dragging this slider.
+  const sliderRef = useRef<HTMLInputElement | null>(null)
+  useEffect(() => {
+    if (!isModulated || !targetKey) return
+    let raf = 0
+    const paint = (): void => {
+      const el = sliderRef.current
+      const live = liveModValues.get(targetKey)
+      if (el && live !== undefined && document.activeElement !== el) {
+        el.value = String(live)
+      }
+      raf = requestAnimationFrame(paint)
+    }
+    raf = requestAnimationFrame(paint)
+    return () => cancelAnimationFrame(raf)
+  }, [isModulated, targetKey])
+
   return (
     <div className="flex w-44 min-w-0 flex-col gap-0.5">
       <div className="flex min-w-0 items-center justify-between gap-2">
@@ -137,6 +160,7 @@ function FloatControl({
         </div>
       </div>
       <input
+        ref={sliderRef}
         type="range"
         min={min}
         max={max}
@@ -144,8 +168,12 @@ function FloatControl({
         value={v}
         onChange={(e) => onChange(inp.name, Number(e.target.value))}
         onDoubleClick={() => onChange(inp.name, def)}
-        className="min-w-0 accent-accent"
-        title={`${inp.label} — double-click to reset (${def})`}
+        className={`min-w-0 ${isModulated ? 'accent-accent2' : 'accent-accent'}`}
+        title={
+          isModulated
+            ? `${inp.label} — modulated (moving with the live value; drag sets the base)`
+            : `${inp.label} — double-click to reset (${def})`
+        }
       />
       {assignOpen && target && <AssignRow target={target} bound={bound} />}
     </div>

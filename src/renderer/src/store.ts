@@ -109,7 +109,27 @@ function makeLayer(): LayerState {
     feedback: false,
     feedbackAmount: 0.6,
     sourceMix: 0.5,
-    sourceBlend: 'normal'
+    sourceBlend: 'normal',
+    speed: 1
+  }
+}
+
+// The always-on master Vibe Palette (pinned last in the master rack): the
+// unified-look stage. Default: black background, white recoloring.
+export function makeVibePalette(): FxInstance {
+  return {
+    id: uid(),
+    shaderId: 'fx-palette',
+    enabled: true,
+    locked: true,
+    inputs: {
+      stops: 2,
+      blend: 1,
+      dither: 0,
+      mixSrc: 0,
+      colorA: [0.0, 0.0, 0.0, 1],
+      colorB: [1.0, 1.0, 1.0, 1]
+    }
   }
 }
 
@@ -127,7 +147,7 @@ export function makeDefaultMetaKnobs(): MetaKnobState[] {
 export function makeDefaultComposition(): CompositionState {
   return {
     layers: [makeLayer(), makeLayer(), makeLayer(), makeLayer()],
-    master: [],
+    master: [makeVibePalette()],
     bpm: 120,
     modulators: makeDefaultModulators(),
     modMatrix: [],
@@ -170,6 +190,9 @@ interface StoreState {
   setSourceMix: (layer: number, v: number) => void
   setSourceBlend: (layer: number, mode: BlendMode) => void
   setSourceShader: (layer: number, slot: 'A' | 'B', shaderId: string | null) => void
+  setLayerSpeed: (layer: number, v: number) => void
+  // Replace the master chain (Vibe Palette preserved at the end).
+  applyMasterPreset: (fx: Array<{ shaderId: string; inputs: Record<string, number | number[]> }>) => void
   // Layer lifecycle (context menu): reset to factory / structural randomize.
   initLayer: (layer: number) => void
   randomizeLayer: (layer: number) => void
@@ -427,8 +450,33 @@ export const useStore = create<StoreState>((set, get) => ({
           const base = l.sourceB ?? emptySlot()
           return { ...l, sourceB: { ...base, kind, shaderId, inputs: {} } }
         })
+      },
+      // Picking a source lands its controls in the Inspector immediately.
+      selection: shaderId ? { type: 'source', layer, slot } : s.selection
+    })),
+  setLayerSpeed: (layer, v) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({
+          ...l,
+          speed: Math.max(0, Math.min(8, v))
+        }))
       }
     })),
+  applyMasterPreset: (fx) =>
+    set((s) => {
+      // Replace the chain but keep the pinned Vibe Palette (with its current
+      // settings) at the end — presets are chains, the vibe is the user's.
+      const locked = s.composition.master.filter((f) => f.locked)
+      const units: FxInstance[] = fx.map((f) => ({
+        id: uid(),
+        shaderId: f.shaderId,
+        enabled: true,
+        inputs: { ...f.inputs }
+      }))
+      return { composition: { ...s.composition, master: [...units, ...locked] } }
+    }),
   setSourceInput: (layer, slot, name, value) =>
     set((s) => ({
       composition: {
@@ -472,10 +520,15 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const instId = uid()
       return {
-        composition: updateFxArray(s.composition, scope, (fx) => [
-          ...fx,
-          { id: instId, shaderId, enabled: true, inputs: {} }
-        ]),
+        composition: updateFxArray(s.composition, scope, (fx) => {
+          // Locked units (the Vibe Palette) stay last — insert before them.
+          const lockedAt = fx.findIndex((f) => f.locked)
+          const unit = { id: instId, shaderId, enabled: true, inputs: {} }
+          if (lockedAt < 0) return [...fx, unit]
+          const next = [...fx]
+          next.splice(lockedAt, 0, unit)
+          return next
+        }),
         // Land the Inspector on the fresh unit — its controls are the next
         // thing the player reaches for.
         selection: { type: 'fx', scope, instId }
@@ -484,13 +537,13 @@ export const useStore = create<StoreState>((set, get) => ({
   removeFx: (scope, instId) =>
     set((s) => ({
       composition: updateFxArray(s.composition, scope, (fx) =>
-        fx.filter((f) => f.id !== instId)
+        fx.filter((f) => f.id !== instId || f.locked)
       )
     })),
   toggleFx: (scope, instId) =>
     set((s) => ({
       composition: updateFxArray(s.composition, scope, (fx) =>
-        fx.map((f) => (f.id === instId ? { ...f, enabled: !f.enabled } : f))
+        fx.map((f) => (f.id === instId && !f.locked ? { ...f, enabled: !f.enabled } : f))
       )
     })),
   moveFx: (scope, instId, dir) =>
@@ -499,6 +552,7 @@ export const useStore = create<StoreState>((set, get) => ({
         const i = fx.findIndex((f) => f.id === instId)
         const j = i + dir
         if (i < 0 || j < 0 || j >= fx.length) return fx
+        if (fx[i].locked || fx[j].locked) return fx // pinned stays pinned
         const next = [...fx]
         ;[next[i], next[j]] = [next[j], next[i]]
         return next
@@ -759,10 +813,16 @@ export const useStore = create<StoreState>((set, get) => ({
           feedbackAmount: l.feedbackAmount ?? 0.6,
           sourceMix: l.sourceMix ?? 0.5,
           sourceBlend: l.sourceBlend ?? 'normal',
+          speed: l.speed ?? 1,
           sourceAFx: l.sourceAFx ?? [],
           sourceBFx: l.sourceBFx ?? [],
           fx: l.fx ?? []
         })),
+        // The Vibe Palette must exist and sit last — older sessions get one.
+        master: (() => {
+          const m = s.composition.master ?? []
+          return m.some((f) => f.locked) ? m : [...m, makeVibePalette()]
+        })(),
         modulators: s.composition.modulators ?? makeDefaultModulators(),
         modMatrix: s.composition.modMatrix ?? [],
         metaKnobs: s.composition.metaKnobs ?? makeDefaultMetaKnobs()

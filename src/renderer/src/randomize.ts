@@ -343,7 +343,8 @@ export function randomizeComposition(
           opacity: range(0.55, 1),
           feedback: hasSource ? chance(0.3) : false,
           feedbackAmount: range(0.3, 0.8),
-          sourceMix: layer.sourceB?.shaderId ? range(0.2, 0.8) : layer.sourceMix
+          sourceMix: layer.sourceB?.shaderId ? range(0.2, 0.8) : layer.sourceMix,
+          speed: range(0.5, 1.5) // gentle — extreme speeds are a manual move
         }
       }
       return layer
@@ -356,7 +357,9 @@ export function randomizeComposition(
   }
 
   if (doMaster) {
-    next = { ...next, master: randomRack([0, 0.35, 0.4, 0.25], true) }
+    // The pinned Vibe Palette survives every randomize — it's the user's look.
+    const locked = next.master.filter((f) => f.locked)
+    next = { ...next, master: [...randomRack([0, 0.35, 0.4, 0.25], true), ...locked] }
   }
 
   if (doMods) {

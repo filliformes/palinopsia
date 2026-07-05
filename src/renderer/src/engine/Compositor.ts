@@ -273,6 +273,13 @@ class FxRack {
     this.units.find((u) => u.instId === instId)?.isf.setValue(name, value);
   }
 
+  /** Assign this rack's clock (per-layer Speed — see isfTextureBridge). */
+  setTime(tSec: number): void {
+    for (const u of this.units) {
+      (u.isf as unknown as { __opsiaTimeSec?: number }).__opsiaTimeSec = tSec;
+    }
+  }
+
   /** Run the chain on `input`; returns the last written texture. */
   apply(input: WebGLTexture, chain: ChainBuffers): WebGLTexture {
     let cur = input;
@@ -320,6 +327,10 @@ export class ISFLayer {
   sourceMix = 0;
   /** How B combines with A before the crossfade. */
   sourceBlend: BlendMode = 'normal';
+  /** Global time multiplier for this layer's sources + racks. */
+  speed = 1;
+  /** The layer's own clock (seconds) — advances by dt·speed each frame. */
+  clockSec = 0;
   shaderIdA: string | null = null;
   shaderIdB: string | null = null;
 
@@ -360,6 +371,17 @@ export class ISFLayer {
   }
 
   hasB(): boolean { return this.isfB !== null; }
+
+  /** Advance the layer clock and stamp it onto every renderer it owns. */
+  advanceClock(dtSec: number): void {
+    this.clockSec += dtSec * this.speed;
+    const t = this.clockSec;
+    if (this.isfA) (this.isfA as unknown as { __opsiaTimeSec?: number }).__opsiaTimeSec = t;
+    if (this.isfB) (this.isfB as unknown as { __opsiaTimeSec?: number }).__opsiaTimeSec = t;
+    this.rackA.setTime(t);
+    this.rackB.setTime(t);
+    this.rackLayer.setTime(t);
+  }
 
   /** Draw a source's ISF into its scratch target (empty → transparent). */
   renderSource(slot: 'A' | 'B') {
@@ -471,6 +493,7 @@ export class Compositor {
       L.feedbackAmount = l.feedback ? l.feedbackAmount : 0;
       L.sourceMix = l.sourceMix;
       L.sourceBlend = l.sourceBlend ?? 'normal';
+      L.speed = l.speed ?? 1;
       for (const [k, v] of Object.entries(l.sourceA.inputs)) L.setInput('A', k, v);
       if (l.sourceB) for (const [k, v] of Object.entries(l.sourceB.inputs)) L.setInput('B', k, v);
       L.rackA.sync(l.sourceAFx, sourceById);
@@ -541,14 +564,24 @@ export class Compositor {
     L.pp.swap();
   }
 
+  private lastNowMs = 0;
+  private masterClockSec = 0;
+
   /** One frame. */
-  render(_timeMs: number) {
+  render(timeMs: number) {
     const gl = this.gl;
+
+    // Per-layer clocks (the Speed control): dt · speed, master at realtime.
+    const dtSec = this.lastNowMs > 0 ? Math.min(0.2, (timeMs - this.lastNowMs) / 1000) : 1 / 60;
+    this.lastNowMs = timeMs;
+    this.masterClockSec += dtSec;
+    this.masterRack.setTime(this.masterClockSec);
 
     // Per layer: sources → per-source racks → mix → layer rack → persist.
     // The result of each stage lives in shared buffers only until persist
     // writes it into the layer's own ping-pong pair.
     for (const L of this.layers) {
+      L.advanceClock(dtSec);
       gl.bindVertexArray(null); // ISF draws own the default VAO
       L.renderSource('A');
       let sig = L.rackA.apply(L.scratchA.tex, this.chain);

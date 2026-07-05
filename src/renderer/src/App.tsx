@@ -19,6 +19,7 @@ import { Transport } from './components/Transport'
 import { initMidi } from './midi'
 import { GENERATORS, shaderSourceById } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
+import { MASTER_PRESETS } from './shaders/isf/masterPresets'
 import { initUndo, redo, undo, useUndoState } from './undo'
 import { THEME_ORDER, useStore, type ThemeName } from './store'
 
@@ -295,7 +296,33 @@ export default function App(): JSX.Element {
 
 function MasterRackStrip(): JSX.Element {
   const master = useStore((s) => s.composition.master)
-  return <FxRackPanel scope={{ kind: 'master' }} fx={master} label="" chips />
+  const applyMasterPreset = useStore((s) => s.applyMasterPreset)
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5 rounded-md border border-border bg-panel2/40 p-2">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">
+          chain
+        </span>
+        <select
+          className="input select-compact w-40 min-w-0 text-[10px]"
+          value=""
+          onChange={(e) => {
+            const p = MASTER_PRESETS.find((x) => x.name === e.target.value)
+            if (p) applyMasterPreset(p.fx)
+          }}
+          title="Master chain presets — replaces the chain, keeps your Vibe Palette"
+        >
+          <option value="">chain presets…</option>
+          {MASTER_PRESETS.map((p) => (
+            <option key={p.name} value={p.name}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <FxRackPanel scope={{ kind: 'master' }} fx={master} label="" />
+    </div>
+  )
 }
 
 function UndoButtons(): JSX.Element {

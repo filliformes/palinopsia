@@ -464,6 +464,18 @@ export function makeDefaultModulators(): ModulatorConfig[] {
   return Array.from({ length: 8 }, () => makeDefaultModulator())
 }
 
+// Live modulated value per target key — the UI's sliders read this each rAF
+// to move with the modulation (the dataFLOU behaviour). Key format matches
+// the store's modTargetKey exactly.
+export const liveModValues = new Map<string, number>()
+
+function liveKey(t: import('@shared/types').ModTarget): string {
+  if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
+  const s = t.scope
+  const scopeKey = s.kind === 'master' ? 'master' : `${s.kind}:${s.layer}`
+  return `fx:${scopeKey}:${t.instId}:${t.input}`
+}
+
 /**
  * Apply the mod-matrix on top of the store's base values, writing straight
  * into the Compositor (post-syncFromState, pre-render). Base + bipolar swing:
@@ -501,6 +513,7 @@ export function applyModulation(
       const base =
         typeof stored === 'number' ? stored : typeof d.def === 'number' ? d.def : min
       const final = Math.max(min, Math.min(max, base + (v - 0.5) * 2 * a.depth * (max - min)))
+      liveModValues.set(liveKey(a.target), final)
       comp.layers[a.target.layer]?.setInput(a.target.slot, a.target.input, final)
     } else {
       const { scope, instId } = a.target
@@ -525,6 +538,7 @@ export function applyModulation(
       const base =
         typeof stored === 'number' ? stored : typeof d.def === 'number' ? d.def : min
       const final = Math.max(min, Math.min(max, base + (v - 0.5) * 2 * a.depth * (max - min)))
+      liveModValues.set(liveKey(a.target), final)
       comp.setFxInput(scope, instId, a.target.input, final)
     }
   }

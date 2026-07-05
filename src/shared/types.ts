@@ -65,6 +65,9 @@ export interface SourceSlot extends ShaderInstance {
 export interface FxInstance extends ShaderInstance {
   id: string
   enabled: boolean
+  // Pinned rack units (the master Vibe Palette): always on, not removable,
+  // always last in the chain.
+  locked?: boolean
 }
 
 // One of the four layers.
@@ -88,6 +91,8 @@ export interface LayerState {
   sourceMix: number
   // How B combines with A before the crossfade: out = mix(A, blend(A,B), mix).
   sourceBlend: BlendMode
+  // Global time multiplier for this layer's sources + racks (1 = realtime).
+  speed: number
 }
 
 // ── Modulation (brief §6 — ported from dataFLOU) ─────────────────────

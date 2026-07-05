@@ -16,6 +16,12 @@ import particleDrift from './ParticleDrift.fs?raw'
 import interference from './Interference.fs?raw'
 import columnScan from './ColumnScan.fs?raw'
 import ash from './Ash.fs?raw'
+import murmuration from './Murmuration.fs?raw'
+import filaments from './Filaments.fs?raw'
+import erosion from './Erosion.fs?raw'
+import membrane from './Membrane.fs?raw'
+import mycelium from './Mycelium.fs?raw'
+import swell from './Swell.fs?raw'
 import posterize from './fx/Posterize.fs?raw'
 import dither from './fx/Dither.fs?raw'
 import chromaShift from './fx/ChromaShift.fs?raw'
@@ -36,6 +42,12 @@ import sharpen from './fx/Sharpen.fs?raw'
 import fold from './fx/Fold.fs?raw'
 import transform from './fx/Transform.fs?raw'
 import stutter from './fx/Stutter.fs?raw'
+import syncLoss from './fx/SyncLoss.fs?raw'
+import rowEcho from './fx/RowEcho.fs?raw'
+import byteCorrupt from './fx/ByteCorrupt.fs?raw'
+import ringing from './fx/Ringing.fs?raw'
+import tracking from './fx/Tracking.fs?raw'
+import feedbackZoom from './fx/FeedbackZoom.fs?raw'
 
 export interface IsfShader {
   id: string
@@ -160,6 +172,48 @@ export const GENERATORS: IsfShader[] = [
       flicker: [0.1, 0.7],
       accent: [0.05, 0.6]
     }
+  },
+  {
+    id: 'murmuration',
+    name: 'Murmuration',
+    category: 'Generator',
+    source: murmuration,
+    curated: { count: [14, 45], speed: [0.2, 1.5], cohesion: [0.4, 0.95], size: [0.04, 0.15], stretch: [0.2, 1.1] }
+  },
+  {
+    id: 'filaments',
+    name: 'Filaments',
+    category: 'Generator',
+    source: filaments,
+    curated: { strands: [6, 28], rate: [0.1, 1], sway: [0.2, 0.8], width: [0.08, 0.4], lean: [-0.5, 0.5] }
+  },
+  {
+    id: 'erosion',
+    name: 'Erosion',
+    category: 'Generator',
+    source: erosion,
+    curated: { rate: [0.05, 1], scale: [1.5, 5], streaks: [2, 9], carve: [0.3, 0.9], sediment: [0.15, 0.6] }
+  },
+  {
+    id: 'membrane',
+    name: 'Membrane',
+    category: 'Generator',
+    source: membrane,
+    curated: { rate: [0.05, 0.6], mass: [0.3, 0.65], warp: [0.3, 1.2], softness: [0.04, 0.3], veins: [0.1, 0.7] }
+  },
+  {
+    id: 'mycelium',
+    name: 'Mycelium',
+    category: 'Generator',
+    source: mycelium,
+    curated: { rate: [0.1, 0.8], scale: [2.5, 8], width: [0.06, 0.3], density: [0.3, 0.85], front: [0.15, 0.7] }
+  },
+  {
+    id: 'swell',
+    name: 'Swell',
+    category: 'Generator',
+    source: swell,
+    curated: { rate: [0.1, 1.2], scale: [2, 8], chop: [0.15, 0.8], direction: [0, 6.2832], spread: [0.15, 0.7] }
   }
 ]
 
@@ -245,6 +299,30 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-stutter', name: 'Stutter', category: 'FX', source: stutter,
     curated: { rate: [2, 12], chance: [0.2, 0.7] }
+  },
+  {
+    id: 'fx-sync-loss', name: 'Sync Loss', category: 'FX', source: syncLoss,
+    curated: { roll: [0.05, 0.8], tear: [0.02, 0.25], bands: [2, 8], rate: [0.1, 0.7] }
+  },
+  {
+    id: 'fx-row-echo', name: 'Row Echo', category: 'FX', source: rowEcho,
+    curated: { rows: [20, 140], chance: [0.1, 0.6], fade: [0.1, 0.8], rate: [0.1, 0.7] }
+  },
+  {
+    id: 'fx-byte-corrupt', name: 'Byte Corrupt', category: 'FX', source: byteCorrupt,
+    curated: { depth: [3, 10], scramble: [0.15, 0.7], blocks: [4, 32], rate: [0.1, 0.7] }
+  },
+  {
+    id: 'fx-ringing', name: 'Ringing', category: 'FX', source: ringing,
+    curated: { gap: [0.003, 0.02], intensity: [0.3, 1.3], angle: [0, 6.2832] }
+  },
+  {
+    id: 'fx-tracking', name: 'Tracking', category: 'FX', source: tracking,
+    curated: { band: [0.05, 0.25], wobble: [0.01, 0.1], noise: [0.2, 0.8], rate: [0.2, 0.8] }
+  },
+  {
+    id: 'fx-feedback-zoom', name: 'Feedback Zoom', category: 'FX', source: feedbackZoom,
+    curated: { zoom: [0.95, 1.08], twist: [-0.08, 0.08], amount: [0.35, 0.85] }
   }
 ]
 
