@@ -61,7 +61,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
     // Fixed height + min-w-0 so all eight cards are identical regardless of
     // type — the section keeps one silhouette as types are swapped.
     <div
-      className={`flex h-40 min-w-0 flex-col gap-1 rounded border p-1.5 transition-colors ${
+      className={`flex h-36 min-w-0 flex-col gap-1 rounded border p-1.5 transition-colors ${
         m.enabled ? 'border-accent/60 bg-panel2' : 'border-border bg-panel2/40'
       }`}
     >
@@ -156,6 +156,20 @@ function ModCard({ index }: { index: number }): JSX.Element {
               RND
             </button>
           )}
+          {/* S&H's smooth flag rides the rate line too, for the same reason. */}
+          {m.type === 'sh' && (
+            <button
+              onClick={() => update(index, { sh: { ...m.sh, smooth: !m.sh.smooth } })}
+              className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
+                m.sh.smooth
+                  ? 'bg-accent/20 text-accent ring-1 ring-accent'
+                  : 'bg-panel3/60 text-muted'
+              }`}
+              title="Smooth — glide between held samples instead of stepping"
+            >
+              SMTH
+            </button>
+          )}
         </div>
       )}
 
@@ -210,22 +224,43 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
         </>
       )
     case 'adsr':
+      // a/d/s/r are little duration sliders (2×2); SUS level + LOOP share a row.
       return (
         <>
           <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-            <NumRow label="A" compact value={m.adsr.attackMs} min={0} max={30000}
+            <MiniSlider label="A" value={m.adsr.attackMs} min={0} max={30000}
               onChange={(v) => update(index, { adsr: { ...m.adsr, attackMs: v } })} />
-            <NumRow label="D" compact value={m.adsr.decayMs} min={0} max={30000}
+            <MiniSlider label="D" value={m.adsr.decayMs} min={0} max={30000}
               onChange={(v) => update(index, { adsr: { ...m.adsr, decayMs: v } })} />
-            <NumRow label="S" compact value={m.adsr.sustainMs} min={0} max={60000}
+            <MiniSlider label="S" value={m.adsr.sustainMs} min={0} max={60000}
               onChange={(v) => update(index, { adsr: { ...m.adsr, sustainMs: v } })} />
-            <NumRow label="R" compact value={m.adsr.releaseMs} min={0} max={30000}
+            <MiniSlider label="R" value={m.adsr.releaseMs} min={0} max={30000}
               onChange={(v) => update(index, { adsr: { ...m.adsr, releaseMs: v } })} />
           </div>
-          <SliderRow label="SUS LVL" value={m.adsr.sustainLevel} min={0} max={1}
-            onChange={(v) => update(index, { adsr: { ...m.adsr, sustainLevel: v } })} />
-          <ToggleRow label="LOOP" on={m.adsr.loop}
-            onToggle={() => update(index, { adsr: { ...m.adsr, loop: !m.adsr.loop } })} />
+          <div className="flex min-w-0 items-center gap-1">
+            <span className="w-10 shrink-0 font-mono text-[9px] text-muted">SUS</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={m.adsr.sustainLevel}
+              onChange={(e) => update(index, { adsr: { ...m.adsr, sustainLevel: Number(e.target.value) } })}
+              className="min-w-0 flex-1 accent-accent"
+              title={`Sustain level ${m.adsr.sustainLevel.toFixed(2)}`}
+            />
+            <button
+              onClick={() => update(index, { adsr: { ...m.adsr, loop: !m.adsr.loop } })}
+              className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
+                m.adsr.loop
+                  ? 'bg-accent/20 text-accent ring-1 ring-accent'
+                  : 'bg-panel3/60 text-muted'
+              }`}
+              title="Loop the envelope"
+            >
+              LOOP
+            </button>
+          </div>
         </>
       )
     case 'arp':
@@ -255,6 +290,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
           onChange={(v) => update(index, { random: { distribution: v } })} />
       )
     case 'sh':
+      // SMTH lives on the rate line (see the clock row) — only PROB/DIST here.
       return (
         <>
           <SliderRow label="PROB" value={m.sh.probability} min={0} max={1}
@@ -262,8 +298,6 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             onChange={(v) => update(index, { sh: { ...m.sh, probability: v } })} />
           <SliderRow label="DIST" value={m.sh.distribution} min={0} max={1}
             onChange={(v) => update(index, { sh: { ...m.sh, distribution: v } })} />
-          <ToggleRow label="SMOOTH" on={m.sh.smooth}
-            onToggle={() => update(index, { sh: { ...m.sh, smooth: !m.sh.smooth } })} />
         </>
       )
     case 'slew':
@@ -298,28 +332,11 @@ function Row({ label, children }: { label: string; children: ReactNode }): JSX.E
 }
 
 function NumRow({
-  label, value, min, max, integer, compact, onChange
+  label, value, min, max, integer, onChange
 }: {
-  label: string; value: number; min: number; max: number; integer?: boolean; compact?: boolean
+  label: string; value: number; min: number; max: number; integer?: boolean
   onChange: (v: number) => void
 }): JSX.Element {
-  // Compact: a hair-thin label so the number never clips in a narrow grid
-  // cell (the ADSR a/d/s/r fields, which run to five digits).
-  if (compact) {
-    return (
-      <div className="flex min-w-0 items-center gap-1">
-        <span className="w-2.5 shrink-0 font-mono text-[9px] text-muted">{label}</span>
-        <BoundedNumberInput
-          value={value}
-          min={min}
-          max={max}
-          integer={integer}
-          onChange={onChange}
-          className="input w-full min-w-0 px-0.5 py-0.5 text-right text-[10px]"
-        />
-      </div>
-    )
-  }
   return (
     <Row label={label}>
       <BoundedNumberInput
@@ -331,6 +348,31 @@ function NumRow({
         className="input w-full min-w-0 px-1 py-0.5 text-right text-[10px]"
       />
     </Row>
+  )
+}
+
+// A hair-thin label + a small slider — for the ADSR a/d/s/r segment durations,
+// where four have to sit two-up in one card. Value lives in the tooltip.
+function MiniSlider({
+  label, value, min, max, onChange
+}: {
+  label: string; value: number; min: number; max: number
+  onChange: (v: number) => void
+}): JSX.Element {
+  return (
+    <div className="flex min-w-0 items-center gap-1">
+      <span className="w-2.5 shrink-0 font-mono text-[9px] text-muted">{label}</span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={1}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="min-w-0 flex-1 accent-accent"
+        title={`${label} ${Math.round(value)} ms`}
+      />
+    </div>
   )
 }
 
@@ -364,20 +406,6 @@ function SliderRow({
   )
 }
 
-function ToggleRow({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }): JSX.Element {
-  return (
-    <Row label={label}>
-      <button
-        onClick={onToggle}
-        className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${
-          on ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'
-        }`}
-      >
-        {on ? 'ON' : 'OFF'}
-      </button>
-    </Row>
-  )
-}
 
 // ── Live meter — one rAF per meter, direct style writes ───────────────
 function Meter({ index }: { index: number }): JSX.Element {
