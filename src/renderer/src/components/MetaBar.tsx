@@ -45,7 +45,12 @@ export function MetaBar(): JSX.Element {
         <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Meta</span>
       </button>
       {!collapsed && (
-        <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-1">
+        // 16 tiles spread to fill the full width; columns never shrink below
+        // the knob so it can't overlap, scrolling only on a very narrow window.
+        <div
+          className="grid gap-1.5 overflow-x-auto pb-1"
+          style={{ gridTemplateColumns: `repeat(${META_KNOB_COUNT}, minmax(52px, 1fr))` }}
+        >
           {Array.from({ length: META_KNOB_COUNT }, (_, i) => (
             <MetaKnobTile key={i} index={i} />
           ))}
@@ -136,7 +141,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
 
   return (
     <div
-      className={`flex w-[76px] shrink-0 flex-col items-center gap-1 rounded border p-1.5 transition-colors ${
+      className={`flex min-w-0 flex-col items-center gap-1 rounded border p-1.5 transition-colors ${
         knob.destinations.length > 0 || isModulated
           ? 'border-accent/40 bg-panel2'
           : 'border-border bg-panel2/40'
@@ -213,14 +218,29 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
         </button>
       )}
 
-      <div className="flex w-full items-center justify-center gap-0.5">
+      {/* Curve select gets its OWN full-width row so the expressive-function
+          names (smoothstep, sigmoid, gamma…) are readable. */}
+      <select
+        className="input select-compact w-full px-1 py-0.5 text-[9px]"
+        value={knob.curve}
+        onChange={(e) => updateMetaKnob(index, { curve: e.target.value as ModCurve })}
+        title="Output curve (expressive shaping)"
+      >
+        {CURVES.map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </select>
+
+      <div className="flex w-full items-center justify-center gap-1">
         <button
           onClick={() => {
             if (learning) setMidiLearn(null)
             else if (knob.midiCc) updateMetaKnob(index, { midiCc: null })
             else setMidiLearn(index)
           }}
-          className={`rounded border px-1 py-px font-mono text-[8px] leading-none transition-colors ${
+          className={`flex-1 rounded border px-1 py-px font-mono text-[8px] leading-none transition-colors ${
             learning
               ? 'animate-pulse border-accent bg-accent/25 text-accent'
               : knob.midiCc
@@ -237,21 +257,9 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
         >
           {learning ? '···' : knob.midiCc ? `CC${knob.midiCc.number}` : 'CC'}
         </button>
-        <select
-          className="input select-compact w-9 px-0.5 py-0 text-[8px]"
-          value={knob.curve}
-          onChange={(e) => updateMetaKnob(index, { curve: e.target.value as ModCurve })}
-          title="Output curve"
-        >
-          {CURVES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
         <button
           onClick={() => setAssignOpen((o) => !o)}
-          className={`rounded px-1 py-px font-mono text-[8px] leading-none transition-colors ${
+          className={`flex-1 rounded px-1 py-px font-mono text-[8px] leading-none transition-colors ${
             isModulated
               ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2'
               : 'bg-panel3/60 text-muted hover:text-text'
