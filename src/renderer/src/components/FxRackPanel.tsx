@@ -118,28 +118,43 @@ function FxUnit({
 
   if (f.locked) {
     // A pinned finalizer (Vibe Palette, then Context) — always last,
-    // unremovable, but bypassable. Name comes from the registry.
+    // unremovable, but bypassable. Name comes from the registry. The two
+    // finalizers wear different accents so they're easy to tell apart:
+    // Vibe = accent2, Context = accent.
     const lockedName = SHADER_BY_ID[f.shaderId ?? '']?.name ?? f.shaderId
+    const isCtx = f.shaderId === 'fx-context'
+    const borderCls = selected
+      ? isCtx
+        ? 'border-accent'
+        : 'border-accent2'
+      : isCtx
+        ? 'border-accent/40'
+        : 'border-accent2/40'
+    const dotCls = f.enabled ? (isCtx ? 'bg-accent' : 'bg-accent2') : 'bg-panel3'
+    const glyphCls = isCtx ? 'text-accent' : 'text-accent2'
+    const nameCls = `${f.enabled ? '' : 'text-muted line-through'} ${
+      selected
+        ? isCtx
+          ? 'text-accent'
+          : 'text-accent2'
+        : isCtx
+          ? 'hover:text-accent'
+          : 'hover:text-accent2'
+    }`
     return (
       <span
-        className={`flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 ${
-          selected ? 'border-accent2' : 'border-accent2/40'
-        } bg-panel`}
+        className={`flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 ${borderCls} bg-panel`}
         title={`${lockedName} — a pinned finalizer stage. Dot bypasses; click the name to edit.`}
       >
         <button
           onClick={() => toggleFx(scope, f.id)}
-          className={`h-2.5 w-2.5 shrink-0 rounded-full transition-colors ${
-            f.enabled ? 'bg-accent2' : 'bg-panel3'
-          }`}
+          className={`h-2.5 w-2.5 shrink-0 rounded-full transition-colors ${dotCls}`}
           title={f.enabled ? `${lockedName} on — click to bypass` : `${lockedName} bypassed — click to enable`}
         />
-        <span className="font-mono text-[9px] text-accent2">◆</span>
+        <span className={`font-mono text-[9px] ${glyphCls}`}>◆</span>
         <button
           onClick={() => setSelection({ type: 'fx', scope, instId: f.id })}
-          className={`text-[11px] transition-colors ${
-            f.enabled ? '' : 'text-muted line-through'
-          } ${selected ? 'text-accent2' : 'hover:text-accent2'}`}
+          className={`text-[11px] transition-colors ${nameCls}`}
         >
           {lockedName}
         </button>

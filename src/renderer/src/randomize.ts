@@ -392,10 +392,18 @@ export function randomizeComposition(
 
   if (doMaster) {
     // The pinned Vibe Palette survives every randomize — it's the user's look.
+    // Context (the depth finalizer) DOES get re-rolled within its curated
+    // ranges, so a full randomize also reshapes the space/light/trails.
     // Threshold is excluded from the MASTER pool: on a whole near-black
     // composition it can gate the entire output to black (the black-window
     // report); it stays available in layer/source racks where it carves.
-    const locked = next.master.filter((f) => f.locked)
+    const locked = next.master
+      .filter((f) => f.locked)
+      .map((f) =>
+        f.shaderId === 'fx-context'
+          ? { ...f, inputs: randomizeInputs('fx-context', f.inputs) }
+          : f
+      )
     next = {
       ...next,
       // Up to 8 distinct effects (index = count); peak around 3–4, long tail
