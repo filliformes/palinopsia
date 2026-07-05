@@ -15,7 +15,8 @@ export function PresetPicker({
   values,
   onChange,
   appliedName,
-  onApplied
+  onApplied,
+  widthCh
 }: {
   shaderId: string
   values: Record<string, number | number[]>
@@ -24,6 +25,10 @@ export function PresetPicker({
   // provided, the picker displays it instead of its own local state.
   appliedName?: string | null
   onApplied?: (name: string | null) => void
+  // Fixed button/menu width in `ch` (else the default w-36). Used by Finishing
+  // Touches so the three finalizers share one exact width. Never exceeds its
+  // container (max-w-full) so it stays inside a resized panel.
+  widthCh?: number
 }): JSX.Element | null {
   const userPresets = useStore((s) => s.userShaderPresets[shaderId] ?? [])
   const addUserShaderPreset = useStore((s) => s.addUserShaderPreset)
@@ -69,16 +74,20 @@ export function PresetPicker({
   }
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative min-w-0 max-w-full">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="input select-compact w-36 truncate text-left text-[10px]"
+        className={`input select-compact max-w-full truncate text-left text-[10px] ${widthCh ? '' : 'w-36'}`}
+        style={widthCh ? { width: `${widthCh}ch` } : undefined}
         title="Presets"
       >
         {applied ?? 'presets…'}
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-30 mt-1 flex max-h-64 w-44 flex-col overflow-y-auto rounded border border-border bg-panel2 py-1 shadow-lg">
+        <div
+          className="absolute right-0 top-full z-30 mt-1 flex max-h-64 max-w-[14rem] flex-col overflow-y-auto rounded border border-border bg-panel2 py-1 shadow-lg"
+          style={{ width: widthCh ? `${widthCh}ch` : '11rem' }}
+        >
           {factory.map((p) => (
             <button
               key={p.name}

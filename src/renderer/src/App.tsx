@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { Compositor } from './engine/Compositor'
 import { applyModulation, modEngine } from './engine/modulation'
 import { Collapsible } from './components/Collapsible'
-import { FxRackPanel } from './components/FxRackPanel'
+import { FxRackPanel, FxChips } from './components/FxRackPanel'
 import { FinishingTouches } from './components/FinishingTouches'
 import { Inspector } from './components/Inspector'
 import { LayerPanel } from './components/LayerPanel'
@@ -438,9 +438,11 @@ function MasterRackStrip(): JSX.Element {
   // The select keeps showing the applied chain's name.
   const [applied, setApplied] = useState('')
   const [flashing, flash] = useFlash()
-  // The three finalizers (Vibe / Context / Finalizer) live in Finishing Touches
-  // now — the master strip carries only the user-added FX (which may wrap).
+  // Regular (user-added) FX wrap on the left; the three pinned finalizers
+  // (Vibe / Context / Finalizer) stay clustered at the rightmost — clicking one
+  // opens the Finishing view, not the shared Inspector.
   const rackFx = master.filter((f) => !f.locked)
+  const lockedFx = master.filter((f) => f.locked)
   return (
     // Line 1: chain label · dice · preset box · + fx; the regular FX chips wrap.
     <div
@@ -485,9 +487,15 @@ function MasterRackStrip(): JSX.Element {
         ))}
       </select>
       {/* Regular FX rack — wraps to more rows if the chain is deep */}
-      <div className="ml-3 flex min-w-0 items-center">
+      <div className="ml-3 flex min-w-0 flex-1 items-center">
         <FxRackPanel scope={{ kind: 'master' }} fx={rackFx} label="" />
       </div>
+      {/* Pinned finalizers — clustered at the rightmost, never wrapping apart */}
+      {lockedFx.length > 0 && (
+        <div className="ml-auto flex shrink-0 items-center">
+          <FxChips scope={{ kind: 'master' }} fx={lockedFx} nowrap />
+        </div>
+      )}
     </div>
   )
 }

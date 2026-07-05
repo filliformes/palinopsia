@@ -7,6 +7,7 @@ import type { FxInstance, ModTarget } from '@shared/types'
 import { randomizeInputs } from '../randomize'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { inputsForShader } from '../shaders/isf/inputs'
+import { PRESETS_BY_ID } from '../shaders/isf/presets'
 import { useStore } from '../store'
 import { AutoControls } from './AutoControls'
 import { PresetPicker } from './PresetPicker'
@@ -33,6 +34,16 @@ function vibeMainColor(inputs: Record<string, number | number[]>): number[] {
 }
 
 const AC: Record<string, string> = { 'fx-vibe': 'accent2', 'fx-context': 'accent', 'fx-finalizer': 'active' }
+
+// One width for all three pickers: the longest preset name across Vibe,
+// Context and Finalizer (plus a little for the caret / padding).
+const FT_PRESET_WIDTH_CH = (() => {
+  const names = ['fx-vibe', 'fx-context', 'fx-finalizer'].flatMap((id) =>
+    (PRESETS_BY_ID[id] ?? []).map((p) => p.name)
+  )
+  const longest = names.reduce((m, n) => Math.max(m, n.length), 'presets…'.length)
+  return longest + 2.5
+})()
 
 export function FinishingTouches(): JSX.Element {
   const master = useStore((s) => s.composition.master)
@@ -77,8 +88,8 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
     ac === 'accent' ? 'border-accent/40' : ac === 'active' ? 'border-active/40' : 'border-accent2/40'
 
   return (
-    <div className={`rounded-md border bg-panel ${flashing ? 'animate-pulse border-danger' : ringCls}`}>
-      <div className="flex items-center gap-2 px-2 py-1">
+    <div className={`overflow-hidden rounded-md border bg-panel ${flashing ? 'animate-pulse border-danger' : ringCls}`}>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 px-2 py-1">
         <button
           onClick={() => toggleSection(sectionKey)}
           className="flex shrink-0 items-center gap-1"
@@ -129,6 +140,7 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
           onChange={onChange}
           appliedName={isVibe ? vibePresetName : undefined}
           onApplied={isVibe ? setVibePresetName : undefined}
+          widthCh={FT_PRESET_WIDTH_CH}
         />
       </div>
       {!collapsed && (

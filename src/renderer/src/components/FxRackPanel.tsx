@@ -125,6 +125,8 @@ function FxUnit({
   const toggleFx = useStore((s) => s.toggleFx)
   const moveFx = useStore((s) => s.moveFx)
   const setSelection = useStore((s) => s.setSelection)
+  const setRightView = useStore((s) => s.setRightView)
+  const toggleSection = useStore((s) => s.toggleSection)
 
   if (f.locked) {
     // Pinned finalizers (Vibe → Context → Finalizer) — always last, unremovable,
@@ -154,7 +156,12 @@ function FxUnit({
         />
         <span className={`font-mono text-[9px] ${glyphCls}`}>◆</span>
         <button
-          onClick={() => setSelection({ type: 'fx', scope, instId: f.id })}
+          onClick={() => {
+            // Locked finalizers edit in the Finishing view, not the Inspector.
+            setRightView('finishing')
+            const sub = `ft-${(f.shaderId ?? '').replace('fx-', '')}`
+            if (useStore.getState().collapsed[sub] ?? true) toggleSection(sub)
+          }}
           className={`text-[11px] transition-colors ${nameCls}`}
         >
           {lockedName}

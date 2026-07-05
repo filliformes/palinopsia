@@ -41,7 +41,7 @@ export function AutoControls({
     inputs.some((i) => i.name === 'posX') && inputs.some((i) => i.name === 'posY')
   const visible = (arr: IsfInputDesc[]): IsfInputDesc[] =>
     hasPosPair ? arr.filter((i) => i.name !== 'posY') : arr
-  const renderControl = (inp: IsfInputDesc): JSX.Element =>
+  const renderControl = (inp: IsfInputDesc, dense = false): JSX.Element =>
     hasPosPair && inp.name === 'posX' ? (
       <PosPairControl key="pos" inputs={inputs} values={values} onChange={onChange} />
     ) : (
@@ -51,14 +51,15 @@ export function AutoControls({
         value={values[inp.name]}
         onChange={onChange}
         modTargetFor={modTargetFor}
+        dense={dense}
       />
     )
   if (layout === 'vertical') {
-    // Full-width controls stacked — `[&>*]:w-full` overrides each control's
-    // fixed w-44 so sliders/swatches span the panel.
+    // Full-width controls stacked, one dense single-line row each (label · slider
+    // · M · number) — `[&>*]:w-full` overrides each control's fixed w-44.
     return (
-      <div className="flex flex-col gap-0.5 px-2 py-1.5 [&>*]:w-full">
-        {visible(inputs).map(renderControl)}
+      <div className="flex flex-col gap-0.5 px-2 py-1 [&>*]:w-full">
+        {visible(inputs).map((inp) => renderControl(inp, true))}
       </div>
     )
   }
@@ -74,13 +75,13 @@ export function AutoControls({
     return (
       <div className={`flex h-full items-center gap-5 p-2 ${singleRow ? 'justify-center' : ''}`}>
         {singleRow ? (
-          <div className="flex items-center gap-5">{visible(rest).map(renderControl)}</div>
+          <div className="flex items-center gap-5">{visible(rest).map((inp) => renderControl(inp))}</div>
         ) : (
           <div
             className="grid grid-flow-col content-start gap-x-5 gap-y-2"
             style={{ gridTemplateRows: 'repeat(2, min-content)', gridAutoColumns: '11rem' }}
           >
-            {visible(rest).map(renderControl)}
+            {visible(rest).map((inp) => renderControl(inp))}
           </div>
         )}
         {pads.length > 0 && (
@@ -100,7 +101,7 @@ export function AutoControls({
     )
   }
   return (
-    <div className="flex flex-wrap gap-x-5 gap-y-2 p-2">{visible(inputs).map(renderControl)}</div>
+    <div className="flex flex-wrap gap-x-5 gap-y-2 p-2">{visible(inputs).map((inp) => renderControl(inp))}</div>
   )
 }
 
@@ -164,16 +165,18 @@ function Control({
   inp,
   value,
   onChange,
-  modTargetFor
+  modTargetFor,
+  dense = false
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
   modTargetFor?: (inputName: string) => ModTarget
+  dense?: boolean
 }): JSX.Element | null {
   switch (inp.type) {
     case 'float':
-      return <FloatControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} />
+      return <FloatControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} dense={dense} />
     case 'bool':
     case 'event':
       return <BoolControl inp={inp} value={value} onChange={onChange} />
@@ -201,12 +204,14 @@ function FloatControl({
   inp,
   value,
   onChange,
-  modTargetFor
+  modTargetFor,
+  dense = false
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
   modTargetFor?: (inputName: string) => ModTarget
+  dense?: boolean
 }): JSX.Element {
   const min = typeof inp.min === 'number' ? inp.min : 0
   const max = typeof inp.max === 'number' ? inp.max : 1
@@ -243,6 +248,64 @@ function FloatControl({
     raf = requestAnimationFrame(paint)
     return () => cancelAnimationFrame(raf)
   }, [isModulated, targetKey])
+
+  // Dense single-line layout (Finishing view): label · slider · M · number,
+  // all on one row so the stack takes minimal vertical space.
+  if (dense) {
+    return (
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span
+            className="w-16 shrink-0 truncate font-mono text-[9px] uppercase tracking-wide text-muted"
+            title={inp.name}
+          >
+            {inp.label}
+          </span>
+          <input
+            ref={sliderRef}
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={v}
+            onChange={(e) => onChange(inp.name, Number(e.target.value))}
+            onDoubleClick={() => onChange(inp.name, def)}
+            className={`min-w-0 flex-1 ${isModulated ? 'accent-accent2' : 'accent-accent'}`}
+            title={
+              isModulated
+                ? `${inp.label} — modulated (drag sets the base)`
+                : `${inp.label} — double-click to reset (${def})`
+            }
+          />
+          {target && (
+            <button
+              onClick={() => setAssignOpen((o) => !o)}
+              className={`shrink-0 rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
+                bound.length > 0
+                  ? 'bg-accent/20 text-accent ring-1 ring-accent'
+                  : assignOpen
+                    ? 'bg-panel3 text-text'
+                    : 'bg-panel3/60 text-muted hover:text-text'
+              }`}
+              title="Bind a modulator to this input"
+            >
+              M{bound.length > 0 ? bound.map((b) => b.mod + 1).join('') : ''}
+            </button>
+          )}
+          <div className="w-12 shrink-0">
+            <BoundedNumberInput
+              value={v}
+              min={min}
+              max={max}
+              onChange={(n) => onChange(inp.name, n)}
+              className="input w-full px-1 py-0.5 text-right text-[11px]"
+            />
+          </div>
+        </div>
+        {assignOpen && target && <AssignRow target={target} bound={bound} />}
+      </div>
+    )
+  }
 
   return (
     <div className="flex w-44 min-w-0 flex-col gap-0.5">
