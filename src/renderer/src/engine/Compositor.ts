@@ -177,6 +177,16 @@ class PingPong {
   read(): WebGLTexture { return this.tex[1 - this.cur]; }      // previous frame (feedback)
   out(): WebGLTexture { return this.tex[this.cur]; }           // just-written frame
   swap() { this.cur = 1 - this.cur; }
+  dispose(gl: WebGL2RenderingContext) {
+    gl.deleteFramebuffer(this.fbo[0]); gl.deleteFramebuffer(this.fbo[1]);
+    gl.deleteTexture(this.tex[0]); gl.deleteTexture(this.tex[1]);
+  }
+}
+
+/** Free a makeTarget()'s framebuffer + texture. */
+function disposeTarget(gl: WebGL2RenderingContext, t: { fbo: WebGLFramebuffer; tex: WebGLTexture }) {
+  gl.deleteFramebuffer(t.fbo);
+  gl.deleteTexture(t.tex);
 }
 
 /**
@@ -369,6 +379,9 @@ class ChainBuffers {
     this.i = 1 - this.i;
     return this.t[this.i];
   }
+  dispose(gl: WebGL2RenderingContext) {
+    disposeTarget(gl, this.t[0]); disposeTarget(gl, this.t[1]);
+  }
 }
 
 /** One layer: A/B ISF sources with their racks, a layer rack, and feedback. */
@@ -468,6 +481,19 @@ export class ISFLayer {
 
   /** The persisted (post-feedback) frame — what the blend stack composites. */
   texture(): WebGLTexture { return this.pp.out(); }
+
+  /** Release every GL resource this layer owns (renderers, racks, buffers). */
+  dispose(): void {
+    const gl = this.shared.gl;
+    this.isfA?.cleanup();
+    this.isfB?.cleanup();
+    this.rackA.dispose();
+    this.rackB.dispose();
+    this.rackLayer.dispose();
+    this.pp.dispose(gl);
+    disposeTarget(gl, this.scratchA);
+    disposeTarget(gl, this.scratchB);
+  }
 }
 
 export class Compositor {
@@ -495,6 +521,7 @@ export class Compositor {
   private mixProg: WebGLProgram;
   private copyProg: WebGLProgram;
   private vao: WebGLVertexArrayObject;
+  private quadBuf: WebGLBuffer;    // the fullscreen-triangle vertex buffer
   private acc: PingPong;            // accumulator for the layer stack
   private uBase: WebGLUniformLocation; private uTop: WebGLUniformLocation;
   private uMode: WebGLUniformLocation; private uOpac: WebGLUniformLocation;
@@ -520,6 +547,7 @@ export class Compositor {
     const quad = new Float32Array([-1,-1, 3,-1, -1,3]); // fullscreen triangle
     this.vao = gl.createVertexArray()!; gl.bindVertexArray(this.vao);
     const buf = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    this.quadBuf = buf;
     gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     // Leave the default VAO for the ISF runtime — it sets up its own attribute
@@ -777,5 +805,27 @@ export class Compositor {
     gl.bindVertexArray(null);
 
     // SEAM (Phase 8): gl.readPixels(composite) → IPC → Spout/Syphon/NDI.
+  }
+
+  /** Release EVERY GL resource this compositor owns. Call on unmount so a
+   *  React remount (StrictMode double-invoke / HMR) can't orphan a whole
+   *  compositor's worth of programs and RGBA16F targets. */
+  dispose(): void {
+    const gl = this.gl;
+    for (const L of this.layers) L.dispose();
+    this.layers = [];
+    this.masterRack.dispose();
+    this.acc.dispose(gl);
+    this.chain.dispose(gl);
+    disposeTarget(gl, this.mixTarget);
+    disposeTarget(gl, this.snapshot);
+    disposeTarget(gl, this.xfadeTarget);
+    if (this.fxOpac) { disposeTarget(gl, this.fxOpac[0]); disposeTarget(gl, this.fxOpac[1]); }
+    gl.deleteProgram(this.blendProg);
+    gl.deleteProgram(this.persistProg);
+    gl.deleteProgram(this.mixProg);
+    gl.deleteProgram(this.copyProg);
+    gl.deleteVertexArray(this.vao);
+    gl.deleteBuffer(this.quadBuf);
   }
 }

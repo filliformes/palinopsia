@@ -231,6 +231,7 @@ export default function App(): JSX.Element {
     raf = requestAnimationFrame(loop)
     return () => {
       cancelAnimationFrame(raf)
+      comp?.dispose() // free all GL resources so a remount can't orphan them
       compositorRef.current = null
     }
   }, [])

@@ -64,6 +64,29 @@ export function installTextureBridge(): void {
     }
   }
 
+  // ── Program leak fix ───────────────────────────────────────────────
+  // The stock cleanup() destroys renderBuffers but NEVER deletes the two
+  // ISFGLProgram objects (`program` + `paintProgram`), each of which owns a
+  // WebGLProgram, two shaders and a vertex buffer. ISFGLProgram HAS a cleanup()
+  // that frees them — the runtime just never calls it. Palinopsia hot-swaps
+  // shaders constantly (source/FX changes, Randomize up to 4/frame), so this
+  // leaks GPU memory without bound → driver pressure → context loss. Wrap
+  // cleanup() to also release the programs.
+  const origCleanup = proto.cleanup as (this: {
+    program?: { cleanup?: () => void }
+    paintProgram?: { cleanup?: () => void }
+  }) => void
+  proto.cleanup = function (this: {
+    program?: { cleanup?: () => void }
+    paintProgram?: { cleanup?: () => void }
+  }): void {
+    origCleanup.call(this)
+    this.program?.cleanup?.()
+    this.paintProgram?.cleanup?.()
+    this.program = undefined
+    this.paintProgram = undefined
+  }
+
   const orig = proto.pushTexture as (this: IsfRendererInternals, u: IsfUniform) => void
 
   proto.pushTexture = function (this: IsfRendererInternals, uniform: IsfUniform): void {
