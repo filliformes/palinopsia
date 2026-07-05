@@ -76,8 +76,9 @@ export function MixerPanel(): JSX.Element {
           >
             <span className="shrink-0 font-mono text-[10px] text-muted">L{i + 1}</span>
 
-            {/* Two tall vertical faders side by side, filling the height */}
-            <div className="flex min-h-0 w-full flex-1 justify-center gap-1">
+            {/* Opacity then Speed stacked — one clean vertical column, each
+                fader with its readout directly beneath it. */}
+            <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2">
               <VFader
                 label="OPA"
                 value={l.opacity}
@@ -147,7 +148,7 @@ function VFader({
   onChange: (v: number) => void
 }): JSX.Element {
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center gap-1">
+    <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1">
       <span className="shrink-0 font-mono text-[8px] uppercase text-muted">{label}</span>
       <input
         type="range"
@@ -159,7 +160,7 @@ function VFader({
         // Modern vertical range: writing-mode makes it vertical, rtl puts the
         // minimum at the bottom (up = more).
         style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
-        className="min-h-[48px] flex-1 accent-accent"
+        className="min-h-[40px] flex-1 accent-accent"
         title={`${label} ${value.toFixed(2)}`}
       />
       <BoundedNumberInput
@@ -167,7 +168,7 @@ function VFader({
         min={min}
         max={max}
         onChange={onChange}
-        className="input w-full min-w-0 px-0 py-0.5 text-center text-[8px]"
+        className="input w-12 shrink-0 px-0.5 py-0.5 text-center text-[9px]"
       />
     </div>
   )

@@ -77,9 +77,9 @@ export function isRichTheme(t: ThemeName): boolean {
 }
 
 // Palinopsia's default: near-black canvas, one accent — restraint as
-// identity (brief §1). Hydra's dark palette is the closest fit for a
-// glitch/digital-arts instrument out of the box.
-const DEFAULT_THEME: ThemeName = 'hydra'
+// identity (brief §1). Studio-dark is the neutral matte surface the
+// instrument ships on out of the box.
+const DEFAULT_THEME: ThemeName = 'studio-dark'
 
 function loadTheme(): ThemeName {
   const saved = localStorage.getItem('opsia.theme') as ThemeName | null
