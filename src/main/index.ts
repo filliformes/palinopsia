@@ -22,9 +22,12 @@ import * as autosave from './autosave'
 import { ModulationEngine } from './modulators'
 import { OscQueryServer, type OscQueryNode } from './oscquery'
 import { registerMediaScheme, handleMediaProtocol } from './media'
+import { hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
 
 // Must run before app ready — makes opsia-media:// a privileged streaming scheme.
 registerMediaScheme()
+// Ask Chromium to enable the platform HEVC decoder (for HIVE WebCodecs live-in).
+app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport')
 
 let mainWindow: BrowserWindow | null = null
 
@@ -51,6 +54,7 @@ function shutdown(): void {
   oscReceiver.stop()
   oscquery.stop()
   autosave.stopAutosave()
+  hiveDisconnectAll()
 }
 
 function createWindow(): void {
@@ -310,6 +314,12 @@ app.whenReady().then(async () => {
     const target = e.sender === mainWindow?.webContents ? outputWindow : mainWindow
     target?.webContents.send('output:signal', data)
   })
+
+  // ---------- IPC: HIVE live-in ----------
+  ipcMain.on('hive:connect', (e, id, host, port) =>
+    hiveConnect(e.sender, id as string, host as string, port as number)
+  )
+  ipcMain.on('hive:disconnect', (_e, id) => hiveDisconnect(id as string))
 
   // ---------- IPC: Session I/O ----------
   // All wrapped in safeHandle so a filesystem throw (path vanished, read-only

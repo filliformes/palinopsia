@@ -323,6 +323,14 @@ export interface DisplayInfo {
   isPrimary: boolean
 }
 
+// A HIVE HEVC access unit forwarded from the main process to the decoder.
+export interface HiveAU {
+  id: string
+  key: boolean
+  timestamp: number
+  data: Uint8Array
+}
+
 export interface ExposedApi {
   // Session I/O
   sessionSaveAs: (s: Session) => Promise<string | null>
@@ -367,4 +375,8 @@ export interface ExposedApi {
   onOutputClosed: (cb: () => void) => () => void
   outputSignal: (data: unknown) => void
   onOutputSignal: (cb: (data: unknown) => void) => () => void
+  // HIVE live-in.
+  hiveConnect: (id: string, host: string, port: number) => void
+  hiveDisconnect: (id: string) => void
+  onHiveAU: (cb: (au: HiveAU) => void) => () => void
 }

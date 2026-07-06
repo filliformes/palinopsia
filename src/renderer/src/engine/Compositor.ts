@@ -30,6 +30,7 @@ import { Renderer as ISFRenderer } from 'interactive-shader-format';
 import { handle, installTextureBridge } from './isfTextureBridge';
 import { VideoSource } from './VideoSource';
 import { CaptureSource } from './CaptureSource';
+import { HiveSource } from './HiveSource';
 import { videoPlayheads, videoKey } from './videoState';
 import type { SourceSlot } from '@shared/types';
 import type { CompositionState, FxInstance, FxScope } from '@shared/types';
@@ -533,6 +534,11 @@ export class ISFLayer {
   private captureB: CaptureSource | null = null;
   private captureIdA: string | null = null;
   private captureIdB: string | null = null;
+  // Live HIVE (HEVC-over-TCP) slots.
+  private hiveA: HiveSource | null = null;
+  private hiveB: HiveSource | null = null;
+  private hiveIdA: string | null = null;
+  private hiveIdB: string | null = null;
   // Per-slot framing (zoom/pan/crop) for video + capture sources.
   private framingA: Framing = { ...IDENTITY_FRAMING };
   private framingB: Framing = { ...IDENTITY_FRAMING };
@@ -608,6 +614,21 @@ export class ISFLayer {
     else { this.captureB = next; this.captureIdB = spec; }
   }
 
+  /** Load/swap/clear a live HIVE source (spec = 'host:port'). */
+  setHive(slot: 'A' | 'B', spec: string | null): void {
+    const curId = slot === 'A' ? this.hiveIdA : this.hiveIdB;
+    if (spec === curId) return;
+    const cur = slot === 'A' ? this.hiveA : this.hiveB;
+    cur?.dispose();
+    let next: HiveSource | null = null;
+    if (spec) {
+      next = new HiveSource(this.shared.gl);
+      next.start(spec);
+    }
+    if (slot === 'A') { this.hiveA = next; this.hiveIdA = spec; }
+    else { this.hiveB = next; this.hiveIdB = spec; }
+  }
+
   /** Push framing (zoom/pan/crop) to a video or capture slot. */
   setFraming(slot: 'A' | 'B', s: SourceSlot | null | undefined): void {
     if (!s) return;
@@ -658,7 +679,7 @@ export class ISFLayer {
     (slot === 'A' ? this.isfA : this.isfB)?.setValue(name, value);
   }
 
-  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null; }
+  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null; }
 
   /** Advance the layer clock and stamp it onto every renderer it owns. */
   advanceClock(dtSec: number): void {
@@ -679,10 +700,11 @@ export class ISFLayer {
     const isf = slot === 'A' ? this.isfA : this.isfB;
     const video = slot === 'A' ? this.videoA : this.videoB;
     const capture = slot === 'A' ? this.captureA : this.captureB;
+    const hive = slot === 'A' ? this.hiveA : this.hiveB;
 
-    // Video or live-capture slot: upload the current frame and blit (with the
-    // slot's zoom/pan/crop framing) into scratch.
-    const feed = video ?? capture;
+    // Video / live-capture / HIVE slot: upload the current frame and blit (with
+    // the slot's zoom/pan/crop framing) into scratch.
+    const feed = video ?? capture ?? hive;
     if (feed) {
       const tex = feed.upload();
       const framing = slot === 'A' ? this.framingA : this.framingB;
@@ -719,6 +741,8 @@ export class ISFLayer {
     this.videoB?.dispose();
     this.captureA?.dispose();
     this.captureB?.dispose();
+    this.hiveA?.dispose();
+    this.hiveB?.dispose();
     this.rackA.dispose();
     this.rackB.dispose();
     this.rackLayer.dispose();
@@ -947,15 +971,19 @@ export class Compositor {
       const wantA = l.sourceA.kind === 'generator' ? l.sourceA.shaderId : null;
       const wantVidA = l.sourceA.kind === 'video' ? (l.sourceA.mediaId ?? null) : null;
       const wantCapA = l.sourceA.kind === 'capture' ? (l.sourceA.mediaId ?? null) : null;
+      const wantHiveA = l.sourceA.kind === 'hive' ? (l.sourceA.mediaId ?? null) : null;
       if (wantA !== L.shaderIdA) L.setShader('A', wantA, wantA ? sourceById(wantA) : null);
       L.setVideo('A', wantVidA);
       L.setCapture('A', wantCapA);
+      L.setHive('A', wantHiveA);
       const wantB = l.sourceB && l.sourceB.kind === 'generator' ? l.sourceB.shaderId : null;
       const wantVidB = l.sourceB && l.sourceB.kind === 'video' ? (l.sourceB.mediaId ?? null) : null;
       const wantCapB = l.sourceB && l.sourceB.kind === 'capture' ? (l.sourceB.mediaId ?? null) : null;
+      const wantHiveB = l.sourceB && l.sourceB.kind === 'hive' ? (l.sourceB.mediaId ?? null) : null;
       if (wantB !== L.shaderIdB) L.setShader('B', wantB, wantB ? sourceById(wantB) : null);
       L.setVideo('B', wantVidB);
       L.setCapture('B', wantCapB);
+      L.setHive('B', wantHiveB);
       L.setVideoPlayback('A', l.sourceA);
       L.setVideoPlayback('B', l.sourceB);
       L.setFraming('A', l.sourceA);

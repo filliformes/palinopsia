@@ -267,6 +267,8 @@ interface StoreState {
   // Point a slot at a live capture source. `spec` is 'webcam', 'screen', or
   // 'desktop:<sourceId>' for a specific window/screen; `name` labels it.
   setSourceCapture: (layer: number, slot: 'A' | 'B', spec: string, name: string) => void
+  // Point a slot at a live HIVE stream (host:port).
+  setSourceHive: (layer: number, slot: 'A' | 'B', host: string, port: number) => void
   // Patch a video slot's transport (play/speed/reverse/loop/in/out).
   setVideoPlayback: (
     layer: number,
@@ -737,6 +739,24 @@ export const useStore = create<StoreState>((set, get) => ({
           }
           if (slot === 'A') return { ...l, sourceA: cap }
           return { ...l, sourceB: cap }
+        })
+      },
+      selection: { type: 'source', layer, slot }
+    })),
+  setSourceHive: (layer, slot, host, port) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => {
+          const hv = {
+            kind: 'hive' as const,
+            shaderId: null,
+            inputs: {},
+            mediaId: `${host}:${port}`,
+            mediaName: `HIVE ${host}:${port}`
+          }
+          if (slot === 'A') return { ...l, sourceA: hv }
+          return { ...l, sourceB: hv }
         })
       },
       selection: { type: 'source', layer, slot }

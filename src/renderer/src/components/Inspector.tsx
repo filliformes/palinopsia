@@ -86,8 +86,8 @@ export function Inspector(): JSX.Element {
       const { layer: li, slot: sl } = selection
       onChange = (n, v) => setSourceInput(li, sl, n, v)
       modTargetFor = (input) => ({ kind: 'source', layer: li, slot: sl, input })
-    } else if (slot?.kind === 'video' || slot?.kind === 'capture') {
-      videoName = slot.mediaName ?? (slot.kind === 'capture' ? 'capture' : 'video')
+    } else if (slot?.kind === 'video' || slot?.kind === 'capture' || slot?.kind === 'hive') {
+      videoName = slot.mediaName ?? slot.kind
       context = `layer ${selection.layer + 1} · src ${selection.slot}`
     }
   } else if (selection?.type === 'fx') {
@@ -127,10 +127,11 @@ export function Inspector(): JSX.Element {
           ? composition.layers[selection.layer]?.sourceA
           : composition.layers[selection.layer]?.sourceB
       const isCap = vslot?.kind === 'capture'
+      const isHive = vslot?.kind === 'hive'
       const capId = vslot?.mediaId ?? ''
       const isDevice = capId.startsWith('device:')
       const isScreen = isCap && !isDevice && capId !== 'webcam'
-      const icon = !isCap ? '🎞' : isDevice ? '🎥' : capId === 'webcam' ? '📷' : '🖥'
+      const icon = isHive ? '📡' : !isCap ? '🎞' : isDevice ? '🎥' : capId === 'webcam' ? '📷' : '🖥'
       return (
         <div className="rounded-md border border-border bg-panel">
           <div className="flex items-start gap-2 px-3 py-2">

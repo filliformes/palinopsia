@@ -12,6 +12,7 @@ import { useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { CapturePicker } from './CapturePicker'
 import { DevicePicker } from './DevicePicker'
+import { HivePicker } from './HivePicker'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxAddSelect, FxChips } from './FxRackPanel'
 import { ConfirmModal, PromptModal } from './PromptModal'
@@ -30,6 +31,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const setSourceShader = useStore((s) => s.setSourceShader)
   const setSourceVideo = useStore((s) => s.setSourceVideo)
   const setSourceCapture = useStore((s) => s.setSourceCapture)
+  const setSourceHive = useStore((s) => s.setSourceHive)
   const setLayerSpeed = useStore((s) => s.setLayerSpeed)
   const setSelection = useStore((s) => s.setSelection)
   const selection = useStore((s) => s.selection)
@@ -149,6 +151,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             onPick={(id) => setSourceShader(index, 'A', id)}
             onPickVideo={(url, name) => setSourceVideo(index, 'A', url, name)}
             onPickCapture={(spec, name) => setSourceCapture(index, 'A', spec, name)}
+            onPickHive={(host, port) => setSourceHive(index, 'A', host, port)}
           />
 
           {/* MIX: combinator mode + depth — ALWAYS visible (fixed layout);
@@ -192,6 +195,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             onPick={(id) => setSourceShader(index, 'B', id)}
             onPickVideo={(url, name) => setSourceVideo(index, 'B', url, name)}
             onPickCapture={(spec, name) => setSourceCapture(index, 'B', spec, name)}
+            onPickHive={(host, port) => setSourceHive(index, 'B', host, port)}
           />
 
           {/* LAYER FX */}
@@ -371,7 +375,8 @@ function SourceRow({
   onSelect,
   onPick,
   onPickVideo,
-  onPickCapture
+  onPickCapture,
+  onPickHive
 }: {
   label: string
   shaderId: string | null
@@ -385,24 +390,29 @@ function SourceRow({
   onPick: (id: string | null) => void
   onPickVideo: (url: string, name: string) => void
   onPickCapture: (spec: string, name: string) => void
+  onPickHive: (host: string, port: number) => void
 }): JSX.Element {
   const fileRef = useRef<HTMLInputElement | null>(null)
   const [showCapture, setShowCapture] = useState(false)
   const [showDevices, setShowDevices] = useState(false)
+  const [showHive, setShowHive] = useState(false)
   const isVideo = sourceKind === 'video'
   const isCapture = sourceKind === 'capture'
+  const isHive = sourceKind === 'hive'
   // The select's value: a generator id, or a sentinel for the active video /
   // capture source, or '' for none.
   const value = isVideo
     ? '__video__'
-    : isCapture
-      ? mediaId === 'webcam'
-        ? '__cap_webcam__'
-        : mediaId?.startsWith('device:')
-          ? '__cap_live__'
-          : '__cap_screen__'
-      : (shaderId ?? '')
-  const active = isVideo || isCapture || !!shaderId
+    : isHive
+      ? '__cap_hive__'
+      : isCapture
+        ? mediaId === 'webcam'
+          ? '__cap_webcam__'
+          : mediaId?.startsWith('device:')
+            ? '__cap_live__'
+            : '__cap_screen__'
+        : (shaderId ?? '')
+  const active = isVideo || isCapture || isHive || !!shaderId
   return (
     <>
       <div className="flex min-w-0 items-center gap-1.5" onClick={onSelect}>
@@ -435,6 +445,7 @@ function SourceRow({
             else if (v === '__cap_webcam__') onPickCapture('webcam', 'Webcam')
             else if (v === '__cap_screen__') setShowCapture(true)
             else if (v === '__cap_live__') setShowDevices(true)
+            else if (v === '__cap_hive__') setShowHive(true)
             else if (v !== '__video__') onPick(v || null)
           }}
           onClick={(e) => e.stopPropagation()}
@@ -445,6 +456,7 @@ function SourceRow({
           <option value="__cap_webcam__">📷 Webcam</option>
           <option value="__cap_live__">🎥 Live Input…</option>
           <option value="__cap_screen__">🖥 Screen…</option>
+          <option value="__cap_hive__">📡 HIVE stream…</option>
           {GENERATORS_ALPHA.map((g) => (
             <option key={g.id} value={g.id}>
               {g.name}
@@ -480,6 +492,15 @@ function SourceRow({
             setShowDevices(false)
           }}
           onCancel={() => setShowDevices(false)}
+        />
+      )}
+      {showHive && (
+        <HivePicker
+          onPick={(host, port) => {
+            onPickHive(host, port)
+            setShowHive(false)
+          }}
+          onCancel={() => setShowHive(false)}
         />
       )}
     </>

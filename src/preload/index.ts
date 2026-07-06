@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { ExposedApi, OscEvent, OscErrorEvent, OscInEvent, Session } from '@shared/types'
+import type { ExposedApi, HiveAU, OscEvent, OscErrorEvent, OscInEvent, Session } from '@shared/types'
 
 const api: ExposedApi = {
   // ── Session I/O ──────────────────────────────────────────────────
@@ -57,6 +57,16 @@ const api: ExposedApi = {
     const h = (_e: Electron.IpcRendererEvent, data: unknown): void => cb(data)
     ipcRenderer.on('output:signal', h)
     return () => ipcRenderer.off('output:signal', h)
+  },
+
+  // ── HIVE live-in ─────────────────────────────────────────────────
+  hiveConnect: (id: string, host: string, port: number) =>
+    ipcRenderer.send('hive:connect', id, host, port),
+  hiveDisconnect: (id: string) => ipcRenderer.send('hive:disconnect', id),
+  onHiveAU: (cb: (au: HiveAU) => void) => {
+    const h = (_e: Electron.IpcRendererEvent, au: HiveAU): void => cb(au)
+    ipcRenderer.on('hive:au', h)
+    return () => ipcRenderer.off('hive:au', h)
   },
 
   // ── App lifecycle ────────────────────────────────────────────────
