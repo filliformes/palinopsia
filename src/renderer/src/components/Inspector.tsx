@@ -7,8 +7,10 @@ import type { FxInstance, ModTarget, SourceSlot } from '@shared/types'
 import { randomizeInputs } from '../randomize'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { inputsForShader } from '../shaders/isf/inputs'
+import { useState } from 'react'
 import { useStore, type FxScope } from '../store'
 import { AutoControls } from './AutoControls'
+import { CapturePicker } from './CapturePicker'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 import { SourceFraming } from './SourceFraming'
@@ -55,7 +57,9 @@ export function Inspector(): JSX.Element {
   const setFxOpacity = useStore((s) => s.setFxOpacity)
   const vibePresetName = useStore((s) => s.vibePresetName)
   const setVibePresetName = useStore((s) => s.setVibePresetName)
+  const setSourceCapture = useStore((s) => s.setSourceCapture)
   const [flashing, flash] = useFlash()
+  const [switchCapture, setSwitchCapture] = useState(false)
 
   let title = ''
   let context = ''
@@ -137,6 +141,26 @@ export function Inspector(): JSX.Element {
               chroma-shift · feedback).
             </p>
           </div>
+          {isCap && vslot?.mediaId !== 'webcam' && (
+            <div className="px-3 pb-2">
+              <button
+                onClick={() => setSwitchCapture(true)}
+                className="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
+                title="Choose a different screen or window to capture"
+              >
+                🖥 Switch window…
+              </button>
+            </div>
+          )}
+          {switchCapture && (
+            <CapturePicker
+              onPick={(spec, name) => {
+                setSourceCapture(selection.layer, selection.slot, spec, name)
+                setSwitchCapture(false)
+              }}
+              onCancel={() => setSwitchCapture(false)}
+            />
+          )}
           {vslot?.kind === 'video' && (
             <VideoTransport layer={selection.layer} slot={selection.slot} state={vslot} />
           )}
