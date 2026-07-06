@@ -9,19 +9,22 @@
 // Install the module (+ any runtime) and the matching toggle activates; else we
 // log once and no-op. The RGBA8 buffer is GL bottom-up (senders can flip).
 
+import { app } from 'electron'
+import { join } from 'path'
+
 type NdiSender = {
   video: (frame: { data: Buffer; xres: number; yres: number; frameRateN?: number; frameRateD?: number }) => void
   destroy?: () => void
 }
-// Minimal shape a Spout addon must expose (a thin wrapper over SpoutSender's
-// SendImage). Any module providing this works.
-type SpoutSender = {
-  sendFrame: (pixels: Buffer, width: number, height: number) => void
-  release?: () => void
+// Our vendored Spout (DX11) N-API addon — native/spout/build/Release/spout.node.
+type SpoutAddon = {
+  open: (name: string) => boolean
+  send: (pixels: Buffer, width: number, height: number) => void
+  close: () => void
 }
 
 let ndi: NdiSender | null = null
-let spout: SpoutSender | null = null
+let spout: SpoutAddon | null = null
 const warned = new Set<string>()
 
 function warnOnce(key: string, msg: string): void {
@@ -46,20 +49,20 @@ async function ensureNdi(): Promise<NdiSender | null> {
   }
 }
 
-async function ensureSpout(): Promise<SpoutSender | null> {
+function ensureSpout(): SpoutAddon | null {
   if (spout) return spout
   try {
-    const mod = 'spout'
-    const m = (await import(/* @vite-ignore */ mod)) as unknown as {
-      createSender?: (name: string) => SpoutSender
-      default?: { createSender?: (name: string) => SpoutSender }
-    }
-    const create = m.createSender ?? m.default?.createSender
-    spout = create ? create('Palinopsia') : null
-    if (!spout) throw new Error('no createSender export')
+    // Load the native .node directly (dlopen bypasses the bundler). In dev
+    // getAppPath() is the project root; packaged builds unpack it (asarUnpack).
+    const base = app.getAppPath().replace(/app\.asar$/, 'app.asar.unpacked')
+    const addonPath = join(base, 'native', 'spout', 'build', 'Release', 'spout.node')
+    const m = { exports: {} as SpoutAddon }
+    process.dlopen(m as unknown as NodeModule, addonPath)
+    if (!m.exports.open('Palinopsia')) throw new Error('open failed (no DirectX11?)')
+    spout = m.exports
     return spout
-  } catch {
-    warnOnce('spout', '[output] Spout unavailable — add a Spout sender addon (leadedge SDK) to enable Spout output.')
+  } catch (e) {
+    warnOnce('spout', `[output] Spout unavailable — ${(e as Error).message}. Rebuild native/spout for your Electron.`)
     return null
   }
 }
@@ -75,7 +78,7 @@ export class OutputSender {
 
   async setSpout(on: boolean): Promise<boolean> {
     this.spoutOn = on
-    return on ? (await ensureSpout()) !== null : true
+    return on ? ensureSpout() !== null : true
   }
 
   /** Push a presented RGBA8 frame (from the renderer readback) to the sinks. */
@@ -90,13 +93,13 @@ export class OutputSender {
       })
     }
     if (this.spoutOn && spout) {
-      spout.sendFrame(Buffer.from(pixels.buffer, pixels.byteOffset, pixels.byteLength), width, height)
+      spout.send(Buffer.from(pixels.buffer, pixels.byteOffset, pixels.byteLength), width, height)
     }
   }
 
   dispose(): void {
     ndi?.destroy?.()
-    spout?.release?.()
+    spout?.close()
     ndi = null
     spout = null
   }

@@ -4,19 +4,21 @@ copyright: Copyright © 2026 Vincent Fillion
 directories:
   output: release/${version}
   buildResources: build
-# Palinopsia's engine is pure WebGL2 + ISF in the renderer and its OSC
-# stack (`osc`) is pure-JS — there are NO native `.node` addons in the
-# MVP, so there's nothing to rebuild from source. (Native Spout/Syphon/
-# NDI senders arrive in Phase 8; when they do, add their prebuilds to
-# `files` + `asarUnpack` the same way dataFLOU handles @julusian/midi.)
+# The engine is pure WebGL2 + ISF in the renderer and OSC is pure-JS. The one
+# native addon is the Spout (DX11) sender (native/spout, vendored leadedge SDK);
+# its prebuilt .node is bundled and asarUnpack'd (a .node can't be loaded from
+# inside the asar). Rebuild it per Electron ABI: see native/spout/README.md.
 npmRebuild: false
 buildDependenciesFromSource: false
 files:
   - out/**/*
   - package.json
+  - native/spout/build/Release/spout.node
   - "!**/*.map"
   - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
 asar: true
+asarUnpack:
+  - native/spout/build/Release/*.node
 win:
   target:
     - target: nsis

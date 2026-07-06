@@ -1,0 +1,10 @@
+{
+  "name": "palinopsia-spout",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Spout (DX11) sender addon for Palinopsia — vendored leadedge/Spout2 SDK (BSD).",
+  "gypfile": true,
+  "dependencies": {
+    "node-addon-api": "^8.3.0"
+  }
+}
