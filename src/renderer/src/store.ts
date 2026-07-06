@@ -10,6 +10,7 @@ import type {
   CompositionState,
   FxInstance,
   FxScope,
+  LayerCoupling,
   LayerState,
   ModAssignment,
   ModTarget,
@@ -120,7 +121,8 @@ function makeLayer(sourceShaderId: string | null = null): LayerState {
     feedbackAmount: 0.6,
     sourceMix: 0.5,
     sourceBlend: 'normal',
-    speed: 1
+    speed: 1,
+    coupling: { mode: 'off', amount: 0.5, tightness: 0.7, feature: 'transient' }
   }
 }
 
@@ -260,6 +262,7 @@ interface StoreState {
   toggleFeedback: (layer: number) => void
   setFeedbackAmount: (layer: number, v: number) => void
   setSourceMix: (layer: number, v: number) => void
+  setCoupling: (layer: number, partial: Partial<LayerCoupling>) => void
   setSourceBlend: (layer: number, mode: BlendMode) => void
   setSourceShader: (layer: number, slot: 'A' | 'B', shaderId: string | null) => void
   // Point a slot at an imported video clip (kind:'video'). mediaId is the clip's
@@ -881,6 +884,17 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     })),
 
+  setCoupling: (layer, partial) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({
+          ...l,
+          coupling: { ...l.coupling, ...partial }
+        }))
+      }
+    })),
+
   addFx: (scope, shaderId) =>
     set((s) => {
       const instId = uid()
@@ -1390,7 +1404,8 @@ export const useStore = create<StoreState>((set, get) => ({
           speed: l.speed ?? 1,
           sourceAFx: l.sourceAFx ?? [],
           sourceBFx: l.sourceBFx ?? [],
-          fx: l.fx ?? []
+          fx: l.fx ?? [],
+          coupling: l.coupling ?? { mode: 'off', amount: 0.5, tightness: 0.7, feature: 'transient' }
         })),
         // The Vibe Palette then the Context finalizer must exist and sit last,
         // in that order. Older sessions get them appended; sessions whose locked

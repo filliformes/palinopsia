@@ -9,6 +9,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { Compositor } from './engine/Compositor'
 import { hiveEncoder } from './hiveEncoder'
 import { audioBus } from './engine/audioIn'
+import { applyCoupling } from './engine/coupling'
 import { applyModulation, modEngine } from './engine/modulation'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel, FxChips } from './components/FxRackPanel'
@@ -307,6 +308,9 @@ export default function App(): JSX.Element {
         audioBus.tick(now)
         const modValues = modEngine.tick(now, c.modulators, c.bpm)
         applyModulation(comp!, c, modValues, inputsForShader)
+        // 2b. Coupling: audio binds each layer's A/B balance (post-sync so it
+        //     overrides the base mix); returns the coupled mixes for the output.
+        const coupledMix = applyCoupling(comp!, c)
         // 3. Render the frame.
         comp!.render(now - start)
         // 4. Native output window: push the exact render state so it renders
@@ -319,7 +323,8 @@ export default function App(): JSX.Element {
             warpEnabled: st.warpEnabled,
             warpCorners: st.warpCorners,
             warpGrid: st.warpGrid,
-            time: now - start
+            time: now - start,
+            coupledMix
           })
         }
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to

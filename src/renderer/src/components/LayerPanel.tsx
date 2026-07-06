@@ -5,8 +5,9 @@
 // presets (save/apply/delete — app-persistent).
 
 import { useRef, useState, type MouseEvent, type ReactNode } from 'react'
-import type { BlendMode, SourceKind } from '@shared/types'
+import type { AudioFeature, BlendMode, CouplingMode, SourceKind } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
+import { AUDIO_FEATURES } from '../engine/audioIn'
 import { GENERATORS_ALPHA } from '../shaders/isf'
 import { useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
@@ -27,6 +28,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const toggleFeedback = useStore((s) => s.toggleFeedback)
   const setFeedbackAmount = useStore((s) => s.setFeedbackAmount)
   const setSourceMix = useStore((s) => s.setSourceMix)
+  const setCoupling = useStore((s) => s.setCoupling)
   const setSourceBlend = useStore((s) => s.setSourceBlend)
   const setSourceShader = useStore((s) => s.setSourceShader)
   const setSourceVideo = useStore((s) => s.setSourceVideo)
@@ -178,6 +180,53 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               onChange={(e) => setSourceMix(index, Number(e.target.value))}
               className="min-w-0 flex-1 accent-accent"
               title="Mix depth — 0 = A only, 1 = full blend result"
+            />
+          </Row>
+
+          {/* CPL: audio couples the A/B balance — ALWAYS visible (fixed layout);
+              inert until B has a source and Audio is on. */}
+          <Row label="CPL">
+            <select
+              className="input select-compact w-14 shrink-0 text-[10px]"
+              value={layer.coupling.mode}
+              onChange={(e) => setCoupling(index, { mode: e.target.value as CouplingMode })}
+              title="A/B coupling — lean (audio leans toward B) · hocket (audio pumps A↔B)"
+            >
+              <option value="off">off</option>
+              <option value="lean">lean</option>
+              <option value="hocket">hocket</option>
+            </select>
+            <select
+              className="input select-compact w-14 shrink-0 text-[10px]"
+              value={layer.coupling.feature}
+              onChange={(e) => setCoupling(index, { feature: e.target.value as AudioFeature })}
+              title="Audio feature driving the bond (transient/flux read best)"
+            >
+              {AUDIO_FEATURES.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={layer.coupling.amount}
+              onChange={(e) => setCoupling(index, { amount: Number(e.target.value) })}
+              className="min-w-0 flex-1 accent-accent"
+              title={`Coupling amount ${layer.coupling.amount.toFixed(2)}`}
+            />
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={layer.coupling.tightness}
+              onChange={(e) => setCoupling(index, { tightness: Number(e.target.value) })}
+              className="min-w-0 flex-1 accent-accent"
+              title={`Tightness ${layer.coupling.tightness.toFixed(2)} — vestigial (peaks only) ↔ obvious (linear)`}
             />
           </Row>
 

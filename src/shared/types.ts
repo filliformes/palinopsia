@@ -96,6 +96,18 @@ export interface FxInstance extends ShaderInstance {
 }
 
 // One of the four layers.
+// A/B coupling (Slab 1 — the coupling-engine spine). A layer's two "voices"
+// (source A and B) are bound by an audio feature: the A↔B balance leans or
+// pumps with the sound. `tightness` runs obvious↔vestigial (linear response ↔
+// only strong peaks). Slab 2 adds the full synchresis mode catalogue.
+export type CouplingMode = 'off' | 'lean' | 'hocket'
+export interface LayerCoupling {
+  mode: CouplingMode
+  amount: number // 0..1 — depth
+  tightness: number // 0..1 — vestigial (0) ↔ obvious (1)
+  feature: AudioFeature // which audio feature drives the bond
+}
+
 export interface LayerState {
   id: string
   sourceA: SourceSlot
@@ -118,6 +130,8 @@ export interface LayerState {
   sourceBlend: BlendMode
   // Global time multiplier for this layer's sources + racks (1 = realtime).
   speed: number
+  // A/B audio coupling (Slab 1). Off by default.
+  coupling: LayerCoupling
 }
 
 // ── Modulation (brief §6 — ported from dataFLOU) ─────────────────────
@@ -330,6 +344,9 @@ export interface OutputFrame {
   warpCorners: number[]
   warpGrid: boolean
   time: number
+  // Per-layer coupled A/B mix (audio-driven) so the output window matches the
+  // control window; absent when no layer is coupled.
+  coupledMix?: number[] | null
 }
 
 export interface DisplayInfo {
