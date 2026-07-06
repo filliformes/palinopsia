@@ -360,6 +360,28 @@ export default function App(): JSX.Element {
           title="Session name"
         />
         <div className="flex-1" />
+        {(() => {
+          const sinks = [
+            ndiActive && 'NDI',
+            spoutActive && 'Spout',
+            hiveOutActive && 'HIVE'
+          ].filter(Boolean)
+          return sinks.length > 0 ? (
+            <span
+              className="font-mono text-[10px] text-accent"
+              title="External output active"
+            >
+              {sinks.join(' · ')}
+            </span>
+          ) : null
+        })()}
+        <button
+          className={`btn text-[12px] ${outputActive || ndiActive || spoutActive || hiveOutActive ? 'text-accent' : ''}`}
+          onClick={() => useStore.getState().setOutputPageOpen(true)}
+          title="Output & projection mapping — fullscreen output, keystone, NDI/Spout/HIVE"
+        >
+          ⛶ Output
+        </button>
         <UndoButtons />
         <div className="flex items-center gap-0.5" title="UI zoom — Ctrl+= / Ctrl+- / Ctrl+0">
           <button className="btn px-1.5 text-[12px]" onClick={() => setUiZoom(uiZoom - 0.05)}>
@@ -372,13 +394,6 @@ export default function App(): JSX.Element {
             +
           </button>
         </div>
-        <button
-          className={`btn text-[12px] ${outputActive || ndiActive || spoutActive ? 'text-accent' : ''}`}
-          onClick={() => useStore.getState().setOutputPageOpen(true)}
-          title="Output & projection mapping — fullscreen output, keystone, NDI/Spout"
-        >
-          ⛶ Output
-        </button>
         <button
           className="btn text-[12px]"
           onClick={() => useStore.getState().newSession()}
