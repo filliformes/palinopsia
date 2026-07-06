@@ -29,6 +29,10 @@ import { OutputSender } from './output'
 registerMediaScheme()
 // Ask Chromium to enable the platform HEVC decoder (for HIVE WebCodecs live-in).
 app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport')
+// Keep the fullscreen output window rendering when it's on a 2nd display and
+// unfocused — Windows native occlusion detection otherwise pauses it (black).
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
 
 let mainWindow: BrowserWindow | null = null
 
