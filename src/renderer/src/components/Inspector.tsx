@@ -124,17 +124,19 @@ export function Inspector(): JSX.Element {
       const icon = isCap ? (vslot?.mediaId === 'screen' ? '🖥' : '📷') : '🎞'
       return (
         <div className="rounded-md border border-border bg-panel">
-          <div className="flex items-center gap-2 px-3 pt-3">
-            <span className="text-[12px] font-semibold">
+          <div className="flex items-start gap-2 px-3 py-2">
+            <span className="whitespace-nowrap text-[12px] font-semibold">
               {icon} {videoName}
             </span>
-            <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{context}</span>
+            <span className="whitespace-nowrap pt-0.5 font-mono text-[9px] uppercase tracking-wide text-muted">
+              {context}
+            </span>
+            <p className="ml-auto max-w-[60%] text-right text-[10px] leading-tight text-muted">
+              {isCap ? 'Live capture source' : 'Video source'}. Add FX to this
+              source&apos;s rack to synthify it (posterize · dither · key ·
+              chroma-shift · feedback).
+            </p>
           </div>
-          <p className="px-3 pb-2 pt-1.5 text-[11px] text-muted">
-            {isCap ? 'Live capture source' : 'Video source'}. Add FX to this
-            source&apos;s rack to synthify it (posterize · dither · key ·
-            chroma-shift · feedback).
-          </p>
           {vslot?.kind === 'video' && (
             <VideoTransport layer={selection.layer} slot={selection.slot} state={vslot} />
           )}

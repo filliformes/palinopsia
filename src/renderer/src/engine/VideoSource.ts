@@ -88,7 +88,10 @@ export class VideoSource {
   }
 
   time(): number {
-    return this.video.currentTime
+    // `pos` is the true intended playhead (kept in sync with the element during
+    // native playback); during manual/reverse it leads the lagging seek, so the
+    // timeline shows smooth motion at the real rate.
+    return this.pos >= 0 ? this.pos : this.video.currentTime
   }
 
   /** Drive the clip each frame. `rawDt` is the real frame delta (seconds);
@@ -138,11 +141,13 @@ export class VideoSource {
       return
     }
 
-    // Manual stepping — decouple from the element clock (internal `pos`) and
-    // gate on the previous seek finishing so each frame actually paints.
+    // Manual stepping — decouple from the element clock (internal `pos`).
+    // Advance `pos` EVERY frame at the true rate (so reverse covers the same
+    // clip-time per second as forward — no slow-down), and only issue a new seek
+    // once the previous finished (backward seeks are slow), catching up to the
+    // latest pos. The result is choppier than native forward, never slower.
     if (!v.paused) v.pause()
     if (this.pos < 0) this.pos = v.currentTime
-    if (this.seekBusy) return
     this.pos += rawDt * rate * dir
     if (this.pb.direction === 'pendulum') {
       if (this.pos >= hi) {
@@ -158,7 +163,7 @@ export class VideoSource {
       this.pos = this.pb.loop ? lo : hi
     }
     if (!Number.isFinite(this.pos)) this.pos = lo
-    if (Math.abs(this.pos - v.currentTime) > 1e-4) {
+    if (!this.seekBusy && Math.abs(this.pos - v.currentTime) > 1e-4) {
       this.seekBusy = true
       try {
         v.currentTime = this.pos
