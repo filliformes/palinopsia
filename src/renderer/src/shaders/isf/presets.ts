@@ -93,6 +93,18 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Slow bloom drift', values: { decay: 0.985, drift: 0.012, angle: 3.1416 } },
     { name: 'Gentle persist', values: { decay: 0.93, drift: 0.002, angle: 1.5708 } }
   ],
+  'fx-wide-time': [
+    { name: 'Wide scape', values: { width: 30, amount: 1, bias: 0 } },
+    { name: 'Gentle smear', values: { width: 12, amount: 0.85, bias: 0 } },
+    { name: 'Deep time', values: { width: 80, amount: 1, bias: 0 } },
+    { name: 'Slow morph', values: { width: 50, amount: 1, bias: 0.1 } },
+    { name: 'Ghost trails', values: { width: 24, amount: 0.7, bias: 0 } },
+    { name: 'Light painting', values: { width: 60, amount: 1, bias: 0.7 } },
+    { name: 'Comet time', values: { width: 40, amount: 0.9, bias: 0.4 } },
+    { name: 'Subtle blur', values: { width: 8, amount: 0.6, bias: 0 } },
+    { name: 'Frozen bloom', values: { width: 110, amount: 1, bias: 0.2 } },
+    { name: 'Breathing', values: { width: 36, amount: 0.8, bias: 0.05 } }
+  ],
   'fx-hue-rotate': [
     { name: 'Quarter turn', values: { shift: 0.25, byLuma: 0 } },
     { name: 'Complement', values: { shift: 0.5, byLuma: 0 } },

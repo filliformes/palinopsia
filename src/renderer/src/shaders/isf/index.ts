@@ -60,6 +60,7 @@ import rutt from './fx/Rutt.fs?raw'
 import crtScreen from './fx/CrtScreen.fs?raw'
 import pixelmask from './fx/Pixelmask.fs?raw'
 import lightTrails from './fx/LightTrails.fs?raw'
+import wideTime from './fx/WideTime.fs?raw'
 import hueRotate from './fx/HueRotate.fs?raw'
 import rgbShift from './fx/RgbShift.fs?raw'
 import granular from './fx/Granular.fs?raw'
@@ -464,6 +465,10 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-light-trails', name: 'Light Trails', category: 'FX', source: lightTrails,
     curated: { decay: [0.9, 0.99], drift: [0, 0.012], angle: [0, 6.2832] }
+  },
+  {
+    id: 'fx-wide-time', name: 'Wide Time', category: 'FX', source: wideTime,
+    curated: { width: [8, 60], amount: [0.6, 1], bias: [0, 0.4] }
   },
   {
     id: 'fx-hue-rotate', name: 'Hue Rotate', category: 'FX', source: hueRotate,
