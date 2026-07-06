@@ -27,6 +27,7 @@ import {
   randomizeComposition,
   randomizeInputs,
   randomizeSingleLayer,
+  seedRandomStart,
   type RandomizeScope
 } from './randomize'
 
@@ -215,8 +216,8 @@ export function makeDefaultMetaKnobs(): MetaKnobState[] {
 
 export function makeDefaultComposition(): CompositionState {
   return {
-    // Layer 1 opens on Ash so a fresh session shows something living.
-    layers: [makeLayer('ash'), makeLayer(), makeLayer(), makeLayer()],
+    // Blank baseline — a fresh open is randomized on top via seedRandomStart().
+    layers: [makeLayer(), makeLayer(), makeLayer(), makeLayer()],
     master: [makeVibePalette(), makeContext(), makeFinalizer()],
     bpm: 120,
     modulators: makeDefaultModulators(),
@@ -499,7 +500,9 @@ export const useStore = create<StoreState>((set, get) => ({
   name: 'Untitled',
   setName: (n) => set({ name: n }),
 
-  composition: makeDefaultComposition(),
+  // A cold launch opens on a fresh random one-layer scene (overridden if an
+  // autosave/session loads over it in App).
+  composition: seedRandomStart(makeDefaultComposition()),
 
   setBlend: (layer, mode) =>
     set((s) => ({
@@ -1361,8 +1364,9 @@ export const useStore = create<StoreState>((set, get) => ({
       localStorage.setItem('opsia.collapsed', JSON.stringify(collapsed))
       return {
         name: 'Untitled',
-        composition: makeDefaultComposition(),
-        selection: null,
+        // New = a fresh random one-layer scene (not a blank canvas).
+        composition: seedRandomStart(makeDefaultComposition()),
+        selection: { type: 'source', layer: 0, slot: 'A' },
         scenes: [],
         activeSceneId: null,
         vibePresetName: null,

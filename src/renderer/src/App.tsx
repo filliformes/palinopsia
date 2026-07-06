@@ -270,11 +270,15 @@ export default function App(): JSX.Element {
       return
     }
 
-    // Seed the session: Drift Field on layer 1 so first launch shows the
-    // instrument's voice, with its controls up in the Inspector.
-    if (!useStore.getState().composition.layers[0].sourceA.shaderId) {
-      useStore.getState().setSourceShader(0, 'A', GENERATORS[0].id)
-      useStore.getState().setSelection({ type: 'source', layer: 0, slot: 'A' })
+    // A blank open is seeded random (store.seedRandomStart); point the Inspector
+    // at layer 1's source so its controls are up. Safety net: if somehow empty
+    // (no seed, no loaded session), drop the first generator in.
+    {
+      const st0 = useStore.getState()
+      if (!st0.composition.layers[0].sourceA.shaderId) {
+        st0.setSourceShader(0, 'A', GENERATORS[0].id)
+      }
+      if (!st0.selection) st0.setSelection({ type: 'source', layer: 0, slot: 'A' })
     }
 
     const start = performance.now()

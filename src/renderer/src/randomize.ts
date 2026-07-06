@@ -339,6 +339,33 @@ export function randomizeSingleLayer(l: LayerState): LayerState {
   }
 }
 
+/** A fresh "blank open" state: layer 1 gets random source(s) + FX (guaranteed
+ *  at least one FX unit), the other three stay empty. A cold launch or the New
+ *  button lands on a different living one-layer scene each time. */
+export function seedRandomStart(base: CompositionState): CompositionState {
+  let l0 = randomizeSingleLayer(base.layers[0])
+  // Guarantee some treatment — never open on a bare, unprocessed source.
+  if (l0.sourceAFx.length + l0.sourceBFx.length + l0.fx.length === 0) {
+    l0 = { ...l0, sourceAFx: randomRack([0, 1]) } // exactly one
+  }
+  return {
+    ...base,
+    layers: base.layers.map((l, i) =>
+      i === 0
+        ? l0
+        : {
+            ...l,
+            sourceA: emptySlot(),
+            sourceB: null,
+            sourceAFx: [],
+            sourceBFx: [],
+            fx: [],
+            mute: false
+          }
+    )
+  }
+}
+
 export function randomizeComposition(
   c: CompositionState,
   scope: RandomizeScope
