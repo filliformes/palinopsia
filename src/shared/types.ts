@@ -130,6 +130,10 @@ export type ModulatorType =
   | 'sh'
   | 'slew'
   | 'chaos'
+  | 'audio'
+
+// Which audio feature an `audio` modulator follows (bus in engine/audioIn.ts).
+export type AudioFeature = 'level' | 'flux' | 'transient' | 'centroid' | 'band' | 'pitch'
 
 export type LfoShape =
   | 'sine'
@@ -187,6 +191,7 @@ export interface ModulatorConfig {
   sh: { probability: number; smooth: boolean; distribution: number }
   slew: { riseMs: number; fallMs: number; randomTarget: boolean }
   chaos: { r: number } // logistic-map r in [3.4, 4.0]
+  audio: { feature: AudioFeature; band: number; smooth: number } // follows the audio bus
 }
 
 // What an assignment modulates: float ISF inputs, or a Meta knob (the

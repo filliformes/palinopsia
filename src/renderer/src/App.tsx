@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Compositor } from './engine/Compositor'
 import { hiveEncoder } from './hiveEncoder'
+import { audioBus } from './engine/audioIn'
 import { applyModulation, modEngine } from './engine/modulation'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel, FxChips } from './components/FxRackPanel'
@@ -18,6 +19,7 @@ import { MixerPanel } from './components/MixerPanel'
 import { MetaBar } from './components/MetaBar'
 import { ModulationPanel } from './components/ModulationPanel'
 import { OscPanel } from './components/OscPanel'
+import { AudioPanel } from './components/AudioPanel'
 import { OutputPage } from './components/OutputPage'
 import { SceneBank } from './components/SceneBank'
 import { initOscInput, applyOscListen } from './oscInput'
@@ -164,6 +166,33 @@ export default function App(): JSX.Element {
     }
   }, [hiveOutActive, hiveOutPort])
 
+  // ── Audio ingest (Slab 1) — drive the audio bus from OSC + local input ─
+  const audioEnabled = useStore((s) => s.audioEnabled)
+  const audioSource = useStore((s) => s.audioSource)
+  const audioDeviceId = useStore((s) => s.audioDeviceId)
+  useEffect(() => {
+    if (!audioEnabled) {
+      audioBus.mode = 'off'
+      audioBus.stopLocal()
+      return
+    }
+    audioBus.mode = audioSource
+    // The local Web Audio input runs when the source uses it (local or both).
+    const wantLocal = audioSource === 'local' || audioSource === 'both'
+    if (wantLocal && !audioBus.localActive) {
+      void audioBus.startLocal(audioDeviceId).then((ok) => {
+        if (!ok && audioSource === 'local') {
+          alert('Could not open the audio input. Check the device / OS permissions.')
+        }
+      })
+    } else if (!wantLocal) {
+      audioBus.stopLocal()
+    }
+    return () => {
+      audioBus.mode = 'off'
+    }
+  }, [audioEnabled, audioSource, audioDeviceId])
+
   // ── Undo/redo (100 levels) + keyboard shortcuts ─────────────────────
   useEffect(() => {
     const unsub = initUndo()
@@ -268,9 +297,10 @@ export default function App(): JSX.Element {
         comp!.setGlobalSpeed(st.globalSpeed)
         comp!.setWarp(st.warpEnabled ? st.warpCorners : null, st.warpGrid)
         comp!.syncFromState(c, shaderSourceById)
-        // 2. Modulation: tick the 8-slot engine, then overlay the mod-matrix
-        //    on top of the base values — straight into the Compositor, never
-        //    through React (no 60 Hz re-renders).
+        // 2. Modulation: refresh the audio bus (OSC/local features), then tick
+        //    the 8-slot engine and overlay the mod-matrix on top of the base
+        //    values — straight into the Compositor, never through React.
+        audioBus.tick(now)
         const modValues = modEngine.tick(now, c.modulators, c.bpm)
         applyModulation(comp!, c, modValues, inputsForShader)
         // 3. Render the frame.
@@ -486,6 +516,9 @@ export default function App(): JSX.Element {
 
       {/* ── Meta Controller: 32 macro knobs / 4 banks (brief §6) ── */}
       <MetaBar />
+
+      {/* ── Audio ingest — OSC (Pandore) + local Web Audio → audio bus ── */}
+      <AudioPanel />
 
       {/* ── OSC input — just above the transport bar; the ON/OFF button IS
              the collapse (info shows only while listening) ── */}

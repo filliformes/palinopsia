@@ -20,7 +20,7 @@ import type {
 } from '@shared/types'
 import type { MetaKnobState } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
-import { makeDefaultModulators } from './engine/modulation'
+import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
 import { beginMorph, cancelMorph } from './morph'
 import {
   collectFloatTargets,
@@ -404,6 +404,13 @@ interface StoreState {
   setHiveOutActive: (on: boolean) => void
   hiveOutPort: number
   setHiveOutPort: (p: number) => void
+  // Audio ingest (Slab 1) — enable is transient; source/device persist.
+  audioEnabled: boolean
+  setAudioEnabled: (on: boolean) => void
+  audioSource: 'both' | 'osc' | 'local'
+  setAudioSource: (s: 'both' | 'osc' | 'local') => void
+  audioDeviceId: string | null
+  setAudioDeviceId: (id: string | null) => void
   // The full-page Output / Mapping view is showing. Transient.
   outputPageOpen: boolean
   setOutputPageOpen: (on: boolean) => void
@@ -1155,6 +1162,19 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   outputActive: false,
   setOutputActive: (on) => set({ outputActive: on }),
+  audioEnabled: false,
+  setAudioEnabled: (on) => set({ audioEnabled: on }),
+  audioSource: (localStorage.getItem('opsia.audioSource') as 'both' | 'osc' | 'local') || 'both',
+  setAudioSource: (s) => {
+    localStorage.setItem('opsia.audioSource', s)
+    set({ audioSource: s })
+  },
+  audioDeviceId: localStorage.getItem('opsia.audioDeviceId') || null,
+  setAudioDeviceId: (id) => {
+    if (id) localStorage.setItem('opsia.audioDeviceId', id)
+    else localStorage.removeItem('opsia.audioDeviceId')
+    set({ audioDeviceId: id })
+  },
   ndiActive: false,
   setNdiActive: (on) => set({ ndiActive: on }),
   spoutActive: false,
@@ -1391,7 +1411,12 @@ export const useStore = create<StoreState>((set, get) => ({
           )
           return [...rest, vibe, context, finalizer]
         })(),
-        modulators: s.composition.modulators ?? makeDefaultModulators(),
+        // Backfill new modulator blocks (e.g. `audio`) onto older sessions so
+        // switching a slot to a new type can't read undefined.
+        modulators: (s.composition.modulators ?? makeDefaultModulators()).map((m) => ({
+          ...makeDefaultModulator(),
+          ...m
+        })),
         modMatrix: s.composition.modMatrix ?? [],
         // 16 knobs now — older 32-knob sessions truncate; short arrays pad.
         metaKnobs: (() => {

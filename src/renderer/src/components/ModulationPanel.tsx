@@ -5,14 +5,15 @@
 // modulation never re-renders React at 60 Hz.
 
 import { useEffect, useRef, type ReactNode } from 'react'
-import type { ArpMode, LfoShape, ModulatorType } from '@shared/types'
+import type { ArpMode, AudioFeature, LfoShape, ModulatorType } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS } from '@shared/types'
 import { DIVISIONS, modEngine } from '../engine/modulation'
+import { AUDIO_BANDS, AUDIO_FEATURES } from '../engine/audioIn'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { modTargetKey, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 
-const MOD_TYPES: ModulatorType[] = ['lfo', 'ramp', 'adsr', 'arp', 'random', 'sh', 'slew', 'chaos']
+const MOD_TYPES: ModulatorType[] = ['lfo', 'ramp', 'adsr', 'arp', 'random', 'sh', 'slew', 'chaos', 'audio']
 const LFO_SHAPES: LfoShape[] = ['sine', 'triangle', 'square', 'sawtooth', 'rndStep', 'rndSmooth', 'spastic']
 const ARP_MODES: ArpMode[] = ['up', 'down', 'upDown', 'random', 'drunk']
 
@@ -97,8 +98,9 @@ function ModCard({ index }: { index: number }): JSX.Element {
       {/* live meter */}
       <Meter index={index} />
 
-      {/* clock — everything except ramp/adsr is clock-driven */}
-      {m.type !== 'ramp' && m.type !== 'adsr' && (
+      {/* clock — everything except ramp/adsr/audio is clock-driven
+          (audio is driven by the signal itself) */}
+      {m.type !== 'ramp' && m.type !== 'adsr' && m.type !== 'audio' && (
         <div className="flex min-w-0 items-center gap-1">
           <button
             onClick={() => update(index, { sync: m.sync === 'bpm' ? 'free' : 'bpm' })}
@@ -316,6 +318,33 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
           title="Logistic-map r — toward 4 = wilder"
           onChange={(v) => update(index, { chaos: { r: v } })} />
       )
+    case 'audio': {
+      const a = m.audio ?? { feature: 'level' as AudioFeature, band: 0, smooth: 0.2 }
+      return (
+        <>
+          <Row label="FEAT">
+            <select
+              className="input select-compact min-w-0 flex-1 text-[10px]"
+              value={a.feature}
+              onChange={(e) => update(index, { audio: { ...a, feature: e.target.value as AudioFeature } })}
+            >
+              {AUDIO_FEATURES.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          </Row>
+          {a.feature === 'band' && (
+            <NumRow label="BAND" value={a.band + 1} min={1} max={AUDIO_BANDS} integer
+              onChange={(v) => update(index, { audio: { ...a, band: Math.round(v) - 1 } })} />
+          )}
+          <SliderRow label="SMOOTH" value={a.smooth} min={0} max={0.99}
+            title="One-pole smoothing — 0 snaps to the signal, →1 glides"
+            onChange={(v) => update(index, { audio: { ...a, smooth: v } })} />
+        </>
+      )
+    }
     default:
       return null
   }

@@ -12,6 +12,7 @@
 // touch the React store, so nothing re-renders at 60 Hz.
 
 import type { CompositionState, LfoShape, ModCurve, ModulatorConfig } from '@shared/types'
+import { audioBus } from './audioIn'
 
 const TWO_PI = Math.PI * 2
 
@@ -214,6 +215,7 @@ interface SlotState {
   arpStep: number
   arpDir: 1 | -1
   arpLastAdvanceAt: number
+  audioValue: number // one-pole smoothed audio feature (audio type)
   startedAt: number // ramp/adsr time base (reset by retrigger)
 }
 
@@ -236,6 +238,7 @@ function makeSlot(now: number): SlotState {
     arpStep: 0,
     arpDir: 1,
     arpLastAdvanceAt: now,
+    audioValue: 0,
     startedAt: now
   }
 }
@@ -419,6 +422,18 @@ export class ModEngine {
           v01 = s.chaosX
           break
         }
+        case 'audio': {
+          // Follow one feature off the audio bus (OSC/local). Unclocked — the
+          // signal IS the clock. One-pole smoothing tames it toward the value.
+          const a = cfg.audio
+          if (a) {
+            const raw = audioBus.feature(a.feature, a.band)
+            const sm = Math.max(0, Math.min(0.99, a.smooth ?? 0))
+            s.audioValue += (raw - s.audioValue) * (1 - sm)
+            v01 = s.audioValue
+          }
+          break
+        }
       }
 
       this.values[i] = shapeCurve(v01, cfg.curve)
@@ -456,7 +471,8 @@ export function makeDefaultModulator(): ModulatorConfig {
     random: { distribution: 0.5 },
     sh: { probability: 1, smooth: false, distribution: 0.5 },
     slew: { riseMs: 200, fallMs: 400, randomTarget: true },
-    chaos: { r: 3.8 }
+    chaos: { r: 3.8 },
+    audio: { feature: 'level', band: 0, smooth: 0.2 }
   }
 }
 

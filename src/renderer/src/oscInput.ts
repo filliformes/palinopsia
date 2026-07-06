@@ -31,6 +31,7 @@ import type { RandomizeScope } from './randomize'
 import { setKnobTarget } from './metaSmooth'
 import { GENERATORS, SHADER_BY_ID } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
+import { audioBus, type AudioFeatureName } from './engine/audioIn'
 
 type Args = OscInEvent['args']
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v))
@@ -216,6 +217,29 @@ function route(address: string, args: Args): void {
       if (Number.isFinite(n)) st.setBpm(n) // setBpm clamps 20..800; guard NaN
       return
 
+    // Audio features from Pandore (the audio brain). These bypass the store —
+    // they feed the audio bus straight, read per-frame by `audio` modulators.
+    //   /opsia/audio/{level|flux|transient|centroid|pitch}   f 0..1
+    //   /opsia/audio/band/{1..6}                             f 0..1
+    case 'audio': {
+      const feat = segs[2]
+      if (feat === 'band') {
+        const bi = parseInt(segs[3], 10) - 1
+        if (bi >= 0) audioBus.setOscFeature('band', clamp01(n), bi)
+        return
+      }
+      if (
+        feat === 'level' ||
+        feat === 'flux' ||
+        feat === 'transient' ||
+        feat === 'centroid' ||
+        feat === 'pitch'
+      ) {
+        audioBus.setOscFeature(feat as AudioFeatureName, clamp01(n))
+      }
+      return
+    }
+
     case 'scene': {
       const idx = segs[2] !== undefined ? parseInt(segs[2], 10) - 1 : Math.round(n) - 1
       if (idx < 0) return
@@ -302,6 +326,11 @@ export function publishOscQuery(): void {
     f(`/opsia/meta/${k}`, 0, 1, knob?.value ?? 0, knob?.name ?? `Meta knob ${k}`)
   }
   nodes.push({ full_path: '/opsia/bpm', type: 'f', range: { min: 20, max: 800 }, value: st.composition.bpm, description: 'Tempo (raw BPM)' })
+  // Audio features Pandore can push (consumed by `audio` modulators).
+  for (const feat of ['level', 'flux', 'transient', 'centroid', 'pitch'] as const) {
+    f(`/opsia/audio/${feat}`, 0, 1, 0, `Audio ${feat} (0..1)`)
+  }
+  for (let b = 1; b <= 6; b++) f(`/opsia/audio/band/${b}`, 0, 1, 0, `Audio band ${b} energy (0..1)`)
   for (const [key, sid] of [['vibe', 'fx-vibe'], ['context', 'fx-context']] as const) {
     for (const d of inputsForShader(sid)) {
       if (d.type !== 'float') continue
