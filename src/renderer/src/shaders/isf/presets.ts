@@ -94,16 +94,16 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Gentle persist', values: { decay: 0.93, drift: 0.002, angle: 1.5708 } }
   ],
   'fx-wide-time': [
-    { name: 'Wide scape', values: { width: 40, amount: 1, mode: 0, smooth: 0.15, drift: 0, hue: 0 } },
-    { name: 'Gentle smear', values: { width: 14, amount: 0.85, mode: 0, smooth: 0.1, drift: 0, hue: 0 } },
-    { name: 'Deep time', values: { width: 150, amount: 1, mode: 0, smooth: 0.3, drift: 0, hue: 0 } },
-    { name: 'Breathing scape', values: { width: 90, amount: 1, mode: 0, smooth: 0.35, drift: 0.004, hue: 0 } },
-    { name: 'Spectral drift', values: { width: 120, amount: 1, mode: 0, smooth: 0.25, drift: 0.002, hue: 0.02 } },
-    { name: 'Light painting', values: { width: 200, amount: 1, mode: 1, smooth: 0, drift: 0, hue: 0 } },
-    { name: 'Bloom add', values: { width: 60, amount: 1, mode: 2, smooth: 0.2, drift: 0.003, hue: 0 } },
-    { name: 'Screen haze', values: { width: 80, amount: 0.9, mode: 3, smooth: 0.3, drift: 0, hue: 0 } },
-    { name: 'Motion edges', values: { width: 20, amount: 0.9, mode: 4, smooth: 0.15, drift: 0, hue: 0 } },
-    { name: 'Frozen deep', values: { width: 400, amount: 1, mode: 0, smooth: 0.4, drift: 0, hue: 0.01 } }
+    { name: 'Wide scape', values: { width: 40, amount: 1, mode: 0, soften: 0.15, drift: 0, hue: 0 } },
+    { name: 'Gentle smear', values: { width: 14, amount: 0.85, mode: 0, soften: 0.1, drift: 0, hue: 0 } },
+    { name: 'Deep time', values: { width: 150, amount: 1, mode: 0, soften: 0.3, drift: 0, hue: 0 } },
+    { name: 'Breathing scape', values: { width: 90, amount: 1, mode: 0, soften: 0.35, drift: 0.004, hue: 0 } },
+    { name: 'Spectral drift', values: { width: 120, amount: 1, mode: 0, soften: 0.25, drift: 0.002, hue: 0.02 } },
+    { name: 'Light painting', values: { width: 200, amount: 1, mode: 1, soften: 0, drift: 0, hue: 0 } },
+    { name: 'Bloom add', values: { width: 60, amount: 1, mode: 2, soften: 0.2, drift: 0.003, hue: 0 } },
+    { name: 'Screen haze', values: { width: 80, amount: 0.9, mode: 3, soften: 0.3, drift: 0, hue: 0 } },
+    { name: 'Motion edges', values: { width: 20, amount: 0.9, mode: 4, soften: 0.15, drift: 0, hue: 0 } },
+    { name: 'Frozen deep', values: { width: 400, amount: 1, mode: 0, soften: 0.4, drift: 0, hue: 0.01 } }
   ],
   'fx-hue-rotate': [
     { name: 'Quarter turn', values: { shift: 0.25, byLuma: 0 } },
