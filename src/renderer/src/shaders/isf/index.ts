@@ -468,7 +468,10 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-wide-time', name: 'Wide Time', category: 'FX', source: wideTime,
-    curated: { width: [8, 60], amount: [0.6, 1], bias: [0, 0.4] }
+    curated: {
+      width: [12, 140], amount: [0.6, 1], mode: [0, 1],
+      smooth: [0, 0.4], drift: [-0.006, 0.006], hue: [-0.03, 0.03]
+    }
   },
   {
     id: 'fx-hue-rotate', name: 'Hue Rotate', category: 'FX', source: hueRotate,

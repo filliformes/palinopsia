@@ -47,7 +47,6 @@ export class VideoSource {
   private tex: WebGLTexture | null = null
   private pos = -1 // internal playhead (seconds) for manual/reverse stepping
   private pendDir = 1 // pendulum instantaneous direction (1 fwd, -1 rev)
-  private seekBusy = false // a manual seek is in flight (wait for 'seeked')
   private pb: VideoPlayback = {
     playing: true,
     speed: 1,
@@ -64,11 +63,6 @@ export class VideoSource {
     this.video.muted = true
     this.video.playsInline = true
     this.video.preload = 'auto'
-    // Manual reverse/step seeks: only issue the next once the last one settled,
-    // otherwise the element seeks forever and never paints a frame (stays black).
-    this.video.addEventListener('seeked', () => {
-      this.seekBusy = false
-    })
   }
 
   load(src: string): void {
@@ -163,12 +157,15 @@ export class VideoSource {
       this.pos = this.pb.loop ? lo : hi
     }
     if (!Number.isFinite(this.pos)) this.pos = lo
-    if (!this.seekBusy && Math.abs(this.pos - v.currentTime) > 1e-4) {
-      this.seekBusy = true
+    // Gate on the element's own `seeking` flag (self-correcting — unlike a
+    // 'seeked'-event flag, which sticks if the event is skipped for a near-
+    // current seek, freezing the frame). Issue the next seek once the last one
+    // finished; `pos` keeps advancing so we never slow down, only drop frames.
+    if (!v.seeking && Math.abs(this.pos - v.currentTime) > 1e-4) {
       try {
         v.currentTime = this.pos
       } catch {
-        this.seekBusy = false // a seek can race a src reload — retry next frame
+        /* a seek can race a src reload — retry next frame */
       }
     }
   }
