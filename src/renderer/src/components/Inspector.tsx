@@ -135,23 +135,21 @@ export function Inspector(): JSX.Element {
             <span className="whitespace-nowrap pt-0.5 font-mono text-[9px] uppercase tracking-wide text-muted">
               {context}
             </span>
-            <p className="ml-auto max-w-[60%] text-right text-[10px] leading-tight text-muted">
+            {isCap && vslot?.mediaId !== 'webcam' && (
+              <button
+                onClick={() => setSwitchCapture(true)}
+                className="shrink-0 rounded border border-accent/50 bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent transition-colors hover:bg-accent/20"
+                title="Choose a different screen or window to capture"
+              >
+                🖥 Switch window
+              </button>
+            )}
+            <p className="ml-auto max-w-[50%] text-right text-[10px] leading-tight text-muted">
               {isCap ? 'Live capture source' : 'Video source'}. Add FX to this
               source&apos;s rack to synthify it (posterize · dither · key ·
               chroma-shift · feedback).
             </p>
           </div>
-          {isCap && vslot?.mediaId !== 'webcam' && (
-            <div className="px-3 pb-2">
-              <button
-                onClick={() => setSwitchCapture(true)}
-                className="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
-                title="Choose a different screen or window to capture"
-              >
-                🖥 Switch window…
-              </button>
-            </div>
-          )}
           {switchCapture && (
             <CapturePicker
               onPick={(spec, name) => {
