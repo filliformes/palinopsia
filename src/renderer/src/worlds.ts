@@ -24,18 +24,18 @@ export const WORLD_BIAS: Record<WorldMode, WorldBias> = {
     coupling: { mode: 'lean', amount: 0.5, tightness: 0.7, feature: 'flux' },
     context: { trails: 0.22, blur: 0.08, bloom: 0.18, depth: 0.28, haze: 0.16 }
   },
-  // Data remapped — crisp, digital; tight transient pump (Ikeda territory).
+  // Data remapped — crisp, digital; transient flashes (Ikeda territory).
   parametric: {
     label: 'Parametric',
-    blurb: 'Data-mapped — tight transient pump, crisp and digital.',
-    coupling: { mode: 'hocket', amount: 0.7, tightness: 0.9, feature: 'transient' },
+    blurb: 'Data-mapped — transient cut, crisp and digital.',
+    coupling: { mode: 'cut', amount: 0.8, tightness: 0.9, feature: 'transient' },
     context: { trails: 0.05, blur: 0.0, bloom: 0.05, depth: 0.15, haze: 0.03 }
   },
-  // Image as a visual reading of the music — pitch-led.
+  // Image as a visual reading of the music — pitch-led, slow momentum.
   musical: {
     label: 'Musical',
-    blurb: 'Visual reading of the music — pitch leads the balance.',
-    coupling: { mode: 'lean', amount: 0.5, tightness: 0.6, feature: 'pitch' },
+    blurb: 'Visual reading of the music — pitch drifts the balance.',
+    coupling: { mode: 'drift', amount: 0.6, tightness: 0.6, feature: 'pitch' },
     context: { trails: 0.2, blur: 0.06, bloom: 0.22, depth: 0.25, haze: 0.1 }
   },
   // Two different musics — independent voices, no bond.

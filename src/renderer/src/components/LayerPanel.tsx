@@ -190,11 +190,14 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               className="input select-compact w-[4.25rem] shrink-0 text-[10px]"
               value={layer.coupling.mode}
               onChange={(e) => setCoupling(index, { mode: e.target.value as CouplingMode })}
-              title="A/B coupling — lean (audio leans toward B) · hocket (audio pumps A↔B)"
+              title="A/B coupling by audio — lean · hocket (pump) · cut (transient flash) · gate (B while loud) · drift (slow momentum)"
             >
               <option value="off">off</option>
               <option value="lean">lean</option>
               <option value="hocket">hocket</option>
+              <option value="cut">cut</option>
+              <option value="gate">gate</option>
+              <option value="drift">drift</option>
             </select>
             <select
               className="input select-compact w-[5.25rem] shrink-0 text-[10px]"

@@ -100,7 +100,7 @@ export interface FxInstance extends ShaderInstance {
 // (source A and B) are bound by an audio feature: the A↔B balance leans or
 // pumps with the sound. `tightness` runs obvious↔vestigial (linear response ↔
 // only strong peaks). Slab 2 adds the full synchresis mode catalogue.
-export type CouplingMode = 'off' | 'lean' | 'hocket'
+export type CouplingMode = 'off' | 'lean' | 'hocket' | 'cut' | 'gate' | 'drift'
 
 // World / diegesis (Slab 1) — a single, global "proposed world" that biases the
 // whole composition: it sets every layer's A/B coupling character and nudges

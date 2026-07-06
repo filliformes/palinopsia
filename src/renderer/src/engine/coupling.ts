@@ -1,30 +1,43 @@
-// Coupling engine (Slab 1 — the spine of the audiovisual-reactivity chapter).
-// Binds a layer's two "voices" (source A + B) with an audio feature: the A↔B
-// balance leans toward B, or pumps A↔B, with the sound. Runs each frame after
-// modulation, writing the effective sourceMix straight onto the compositor
-// (never through React). Returns the coupled mixes so the output window can
-// mirror them.
+// Coupling engine (Slab 1 spine + Slab 2 mode catalogue). Binds a layer's two
+// voices (source A + B) with an audio feature, writing the effective sourceMix
+// onto the compositor each frame (post-modulation) and returning the coupled
+// mixes so the output window can mirror them.
 //
-// `tightness` shapes the response obvious↔vestigial: at 1 the balance follows
-// the feature linearly; toward 0 only strong peaks register (an exponent). This
-// is the coupling-strength control the synchresis modes (Slab 2) will extend.
+// Modes = the synchresis catalogue as A/B-balance behaviours:
+//   lean   — audio leans the balance toward B (continuous, additive)
+//   hocket — audio SETS the balance A↔B (interpolate; pumps at amount 1)
+//   cut    — transient FLASHES to B, then releases (on-cut; percussive)
+//   gate   — B while loud, A while quiet (sustained threshold)
+//   drift  — slow momentum follow (congruent-movement; shares direction)
+//
+// `tightness` is the universal response-sharpness: for cut it's the release
+// tail, for gate the edge hardness, for drift the follow speed, and for
+// lean/hocket the vestigial↔obvious exponent.
 
 import type { CompositionState } from '@shared/types'
 import { audioBus } from './audioIn'
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
+const smoothstep = (a: number, b: number, x: number): number => {
+  if (a === b) return x < a ? 0 : 1
+  const t = clamp01((x - a) / (b - a))
+  return t * t * (3 - 2 * t)
+}
+
+// Per-layer runtime state (cut's decaying flash, drift's integrator). Fixed to
+// the four layers; index-keyed, lazily created.
+const state: Array<{ held: number }> = []
 
 /**
  * Apply A/B coupling to every layer with a live B voice. Writes the coupled
- * sourceMix onto `comp.layers[i]` and returns a per-layer array of the applied
- * mixes (or null if nothing is coupled — so the caller can skip the push).
+ * sourceMix onto `comp.layers[i]` and returns the per-layer mixes (or null if
+ * nothing is coupled). Inert until audio ingest is on.
  */
 export function applyCoupling(
   comp: { layers: Array<{ sourceMix: number }> },
   c: CompositionState
 ): number[] | null {
-  // Inert until audio ingest is on — otherwise a silent bus would read as "all
-  // A" and a coupled layer would look stuck (esp. hocket).
+  // Inert until audio ingest is on — otherwise a silent bus reads as "all A".
   if (audioBus.mode === 'off') return null
   let any = false
   const out = c.layers.map((l, i) => {
@@ -34,21 +47,42 @@ export function applyCoupling(
     if (!layer || !cp || cp.mode === 'off') return base
     // Needs a real second voice — the crossfade is inert without B.
     if (!l.sourceB || l.sourceB.kind === 'none') return base
+    if (!state[i]) state[i] = { held: 0 }
+    const s = state[i]
 
     const raw = clamp01(audioBus.feature(cp.feature))
     const tight = clamp01(cp.tightness)
-    // Vestigial (only peaks) ↔ obvious (linear) via a response exponent.
-    const shaped = Math.pow(raw, 1 + (1 - tight) * 3)
     const amt = clamp01(cp.amount)
+    const shaped = Math.pow(raw, 1 + (1 - tight) * 3)
+    const toB = (g: number): number => base + g * amt * (1 - base) // lean base→B by g
 
     let eff = base
-    if (cp.mode === 'lean') {
-      // Audio leans the balance toward B; silence rests at the base mix.
-      eff = base + shaped * amt * (1 - base)
-    } else if (cp.mode === 'hocket') {
-      // The signal sets the balance — A on silence, B on peaks; at amount 1
-      // it fully pumps A↔B (the energy-transfer feel).
-      eff = base * (1 - amt) + shaped * amt
+    switch (cp.mode) {
+      case 'lean':
+        eff = toB(shaped)
+        break
+      case 'hocket':
+        eff = base * (1 - amt) + shaped * amt
+        break
+      case 'cut':
+        // Flash to B on a transient, then release. Tight = snappy short flash;
+        // loose = a longer tail (release factor 0.60 … 0.98 per frame).
+        if (raw > 0.4) s.held = 1
+        else s.held *= 0.6 + tight * 0.38
+        eff = toB(s.held)
+        break
+      case 'gate': {
+        // B while loud, A while quiet; tightness hardens the edge.
+        const lo = 0.5 - tight * 0.22
+        eff = toB(smoothstep(lo, lo + 0.16, raw))
+        break
+      }
+      case 'drift': {
+        // Slow one-pole follow — momentum, not morphology (congruent movement).
+        s.held += (raw - s.held) * (0.01 + tight * 0.06)
+        eff = toB(s.held)
+        break
+      }
     }
     eff = clamp01(eff)
     layer.sourceMix = eff
