@@ -126,6 +126,17 @@ export default function App(): JSX.Element {
     return startOutputSender(canvasRef.current)
   }, [outputActive])
 
+  // ── NDI output — attach the compositor readback while active ──────────
+  const ndiActive = useStore((s) => s.ndiActive)
+  useEffect(() => {
+    const comp = compositorRef.current
+    if (!comp) return
+    comp.setOutputCapture(
+      ndiActive ? (w, h, px) => window.api.ndiFrame(w, h, px) : null
+    )
+    return () => comp.setOutputCapture(null)
+  }, [ndiActive])
+
   // ── Undo/redo (100 levels) + keyboard shortcuts ─────────────────────
   useEffect(() => {
     const unsub = initUndo()

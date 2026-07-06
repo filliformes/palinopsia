@@ -776,6 +776,10 @@ export class Compositor {
   // The texture presented last frame — snapshotted into `snapshot` the moment a
   // crossfade begins (so no per-frame blit in the steady state).
   private lastPresent: WebGLTexture | null = null;
+  // Output readback (Spout/NDI seam) — set to a callback to grab the final RGBA8
+  // frame each frame; null (default) → zero cost.
+  private outputCapture: ((w: number, h: number, px: Uint8Array) => void) | null = null;
+  private readbackBuf: Uint8Array | null = null;
   // Global time multiplier (1/64×…64×) — scales every visual clock.
   private globalSpeed = 1;
   private blendProg: WebGLProgram;
@@ -922,6 +926,12 @@ export class Compositor {
     this.xfadeActive = true;
     this.xfadeStartMs = -1; // stamped on the next render (loop clock)
     this.xfadeMs = ms;
+  }
+
+  /** Enable/disable final-frame readback for external output (Spout/NDI). The
+   *  callback gets the presented RGBA8 frame each frame (GL bottom-up). */
+  setOutputCapture(cb: ((w: number, h: number, px: Uint8Array) => void) | null): void {
+    this.outputCapture = cb;
   }
 
   /** Set the projection warp for the present pass. `corners` = 8 normalized
@@ -1177,6 +1187,17 @@ export class Compositor {
     // Remember what we just showed — beginCrossfade() snapshots this next time a
     // morph starts, so the dissolve begins from the exact frame on screen.
     this.lastPresent = present;
+
+    // External output seam (Spout/NDI): read the presented RGBA8 frame from the
+    // default framebuffer and hand it off. Only runs when a sink is attached.
+    if (this.outputCapture) {
+      const w = this.canvas.width, h = this.canvas.height;
+      const need = w * h * 4;
+      if (!this.readbackBuf || this.readbackBuf.length !== need) this.readbackBuf = new Uint8Array(need);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, this.readbackBuf);
+      this.outputCapture(w, h, this.readbackBuf);
+    }
 
     // SEAM (Phase 8): gl.readPixels(composite) → IPC → Spout/Syphon/NDI.
   }

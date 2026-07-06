@@ -53,11 +53,13 @@ npm run build:win  # NSIS + portable
 - **6 · Presets + Randomize** ✅ — structural scoped Randomize from curated
   aesthetic ranges; 280 per-shader presets; scene bank (save/recall full
   states, randomize-into-scene, drag-arrange, keys 1–9), session-persisted.
-- **7 · Video + HIVE** 🚧 — imported `<video>` → GL texture as a layer source
-  with transport/timeline, persistent via `opsia-media://`; webcam + screen
-  capture sources ✅; synthify via the source's FX rack. HIVE WebCodecs
-  live-in still to come.
-- **8 · Output** — in-shader warp/mapping + Spout/Syphon/NDI + OSCQuery.
+- **7 · Video + Live-in** ✅ — imported `<video>` → GL texture with
+  transport/timeline, persistent via `opsia-media://`; webcam / screen-window /
+  specific-device (Live Input) capture; **HIVE** HEVC-over-TCP via WebCodecs;
+  synthify via the source's FX rack.
+- **8 · Output** 🚧 — projection warp/keystone + alignment grid ✅; fullscreen
+  output window on a 2nd display (WebRTC mirror) ✅; OSCQuery ✅. NDI seam wired
+  (activates with the optional native sender); Spout shared-texture still to come.
 - **9 · WebGPU** *(post-MVP)* — compute passes for true pixel-sort / particles.
 
 ## Aesthetic guardrails

@@ -27,6 +27,9 @@ export function OutputPanel(): JSX.Element {
       .catch(() => setDisplays([]))
   }, [])
 
+  const ndiActive = useStore((s) => s.ndiActive)
+  const setNdiActive = useStore((s) => s.setNdiActive)
+
   const openOutput = async (): Promise<void> => {
     if (displayId == null) return
     await window.api.outputOpen(displayId)
@@ -35,6 +38,16 @@ export function OutputPanel(): JSX.Element {
   const closeOutput = async (): Promise<void> => {
     await window.api.outputClose()
     setOutputActive(false)
+  }
+  const toggleNdi = async (): Promise<void> => {
+    const next = !ndiActive
+    const ok = await window.api.ndiSet(next)
+    // If the native sender isn't installed, `ok` is false when turning on.
+    setNdiActive(next && ok)
+    if (next && !ok) {
+      // eslint-disable-next-line no-alert
+      alert('NDI sender not available. Install the optional native module (grandiose) + the NDI runtime to enable NDI output.')
+    }
   }
 
   const warpEnabled = useStore((s) => s.warpEnabled)
@@ -103,6 +116,13 @@ export function OutputPanel(): JSX.Element {
             open ▶
           </button>
         )}
+        <button
+          onClick={toggleNdi}
+          className={btn(ndiActive)}
+          title="NDI output into Resolume/OBS (needs the optional native sender)"
+        >
+          ndi
+        </button>
       </div>
 
       <div className="flex items-center gap-1.5">

@@ -23,6 +23,7 @@ import { ModulationEngine } from './modulators'
 import { OscQueryServer, type OscQueryNode } from './oscquery'
 import { registerMediaScheme, handleMediaProtocol } from './media'
 import { hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
+import { OutputSender } from './output'
 
 // Must run before app ready — makes opsia-media:// a privileged streaming scheme.
 registerMediaScheme()
@@ -33,6 +34,8 @@ let mainWindow: BrowserWindow | null = null
 
 // OSC out (renderer → instrument fan-out).
 const oscSender = new OscSender()
+// External video output (NDI, via optional native sender).
+const outputSender = new OutputSender()
 // OSC in — the instrument is PLAYED through this: Pandore/TouchOSC send here
 // and the renderer maps addresses onto the store (see renderer/oscInput.ts).
 const oscReceiver = new OscReceiver()
@@ -55,6 +58,7 @@ function shutdown(): void {
   oscquery.stop()
   autosave.stopAutosave()
   hiveDisconnectAll()
+  outputSender.dispose()
 }
 
 function createWindow(): void {
@@ -320,6 +324,12 @@ app.whenReady().then(async () => {
     hiveConnect(e.sender, id as string, host as string, port as number)
   )
   ipcMain.on('hive:disconnect', (_e, id) => hiveDisconnect(id as string))
+
+  // ---------- IPC: External output (NDI) ----------
+  safeHandle('ndi:set', (_e, on) => outputSender.setNdi(on as boolean))
+  ipcMain.on('ndi:frame', (_e, w, h, pixels) =>
+    outputSender.send(w as number, h as number, pixels as Uint8Array)
+  )
 
   // ---------- IPC: Session I/O ----------
   // All wrapped in safeHandle so a filesystem throw (path vanished, read-only

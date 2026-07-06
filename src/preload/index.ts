@@ -69,6 +69,10 @@ const api: ExposedApi = {
     return () => ipcRenderer.off('hive:au', h)
   },
 
+  // ── External output (NDI) ────────────────────────────────────────
+  ndiSet: (on: boolean) => ipcRenderer.invoke('ndi:set', on),
+  ndiFrame: (w: number, h: number, pixels: Uint8Array) => ipcRenderer.send('ndi:frame', w, h, pixels),
+
   // ── App lifecycle ────────────────────────────────────────────────
   appCloseProceed: () => ipcRenderer.invoke('app:close-proceed'),
   onAppBeforeClose: (cb) => {
