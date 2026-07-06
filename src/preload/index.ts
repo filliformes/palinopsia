@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { ExposedApi, HiveAU, OscEvent, OscErrorEvent, OscInEvent, Session } from '@shared/types'
+import type {
+  ExposedApi,
+  HiveAU,
+  OutputFrame,
+  OscEvent,
+  OscErrorEvent,
+  OscInEvent,
+  Session
+} from '@shared/types'
 
 const api: ExposedApi = {
   // ── Session I/O ──────────────────────────────────────────────────
@@ -53,11 +61,13 @@ const api: ExposedApi = {
     ipcRenderer.on('output:closed', h)
     return () => ipcRenderer.off('output:closed', h)
   },
-  outputSignal: (data: unknown) => ipcRenderer.send('output:signal', data),
-  onOutputSignal: (cb: (data: unknown) => void) => {
-    const h = (_e: Electron.IpcRendererEvent, data: unknown): void => cb(data)
-    ipcRenderer.on('output:signal', h)
-    return () => ipcRenderer.off('output:signal', h)
+  // Control → output window: push the per-frame render state (composition +
+  // modulation + warp + clock) so the output renders it natively (pixel-perfect).
+  outputFrame: (frame: OutputFrame) => ipcRenderer.send('output:frame', frame),
+  onOutputFrame: (cb: (frame: OutputFrame) => void) => {
+    const h = (_e: Electron.IpcRendererEvent, frame: OutputFrame): void => cb(frame)
+    ipcRenderer.on('output:frame', h)
+    return () => ipcRenderer.off('output:frame', h)
   },
 
   // ── HIVE live-in ─────────────────────────────────────────────────

@@ -1,19 +1,52 @@
-// OutputView — the fullscreen output window's entire content: a bare <video>
-// that plays the control window's mirrored canvas (via the WebRTC loopback).
-// Loaded when the renderer URL carries the #output hash.
+// OutputView — the fullscreen output window's entire content. It runs its OWN
+// WebGL Compositor and renders the exact composition the control window pushes
+// each frame (composition + modulation values + warp + clock). No WebRTC, no
+// transcode → pixel-perfect, full-resolution output. Loaded on the #output hash.
+//
+// Note: for video / capture / HIVE source slots this opens a second decode of
+// its own (generators + shaders are identical); those live sources may drift a
+// touch between the two windows, which is fine for a mirror.
 
 import { useEffect, useRef } from 'react'
-import { startOutputReceiver } from '../outputLink'
+import type { OutputFrame } from '@shared/types'
+import { Compositor } from '../engine/Compositor'
+import { applyModulation } from '../engine/modulation'
+import { shaderSourceById } from '../shaders/isf'
+import { inputsForShader } from '../shaders/isf/inputs'
 
 export function OutputView(): JSX.Element {
-  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
   useEffect(() => {
-    if (!videoRef.current) return
-    return startOutputReceiver(videoRef.current)
+    const canvas = canvasRef.current
+    if (!canvas) return
+    let comp: Compositor | null = null
+    try {
+      comp = new Compositor(canvas, canvas.width, canvas.height)
+    } catch (e) {
+      console.error('[output Compositor]', (e as Error).message)
+      return
+    }
+    const off = window.api.onOutputFrame((f: OutputFrame) => {
+      // The whole drive is guarded, mirroring the control render loop.
+      try {
+        comp!.setGlobalSpeed(f.globalSpeed)
+        comp!.setWarp(f.warpEnabled ? f.warpCorners : null, f.warpGrid)
+        comp!.syncFromState(f.c, shaderSourceById)
+        applyModulation(comp!, f.c, f.modValues, inputsForShader)
+        comp!.render(f.time)
+      } catch (err) {
+        console.error('[output render]', err)
+      }
+    })
+    return () => {
+      off()
+      comp?.dispose()
+    }
   }, [])
+
   return (
     <div className="fixed inset-0 bg-black">
-      <video ref={videoRef} autoPlay muted playsInline className="h-full w-full bg-black object-contain" />
+      <canvas ref={canvasRef} width={1920} height={1080} className="h-full w-full bg-black object-contain" />
     </div>
   )
 }

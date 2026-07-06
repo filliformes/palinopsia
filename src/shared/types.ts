@@ -315,6 +315,18 @@ export interface CaptureSourceInfo {
   thumbnail: string // data URL
 }
 
+// Per-frame render state pushed to the native output window (it drives its own
+// Compositor from this — no WebRTC transcode).
+export interface OutputFrame {
+  c: CompositionState
+  modValues: number[]
+  globalSpeed: number
+  warpEnabled: boolean
+  warpCorners: number[]
+  warpGrid: boolean
+  time: number
+}
+
 export interface DisplayInfo {
   id: number
   label: string
@@ -373,8 +385,8 @@ export interface ExposedApi {
   outputOpen: (displayId: number, windowed?: boolean) => Promise<boolean>
   outputClose: () => Promise<boolean>
   onOutputClosed: (cb: () => void) => () => void
-  outputSignal: (data: unknown) => void
-  onOutputSignal: (cb: (data: unknown) => void) => () => void
+  outputFrame: (frame: OutputFrame) => void
+  onOutputFrame: (cb: (frame: OutputFrame) => void) => () => void
   // HIVE live-in.
   hiveConnect: (id: string, host: string, port: number) => void
   hiveDisconnect: (id: string) => void

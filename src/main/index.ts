@@ -343,11 +343,8 @@ app.whenReady().then(async () => {
     outputWindow?.close()
     return true
   })
-  // WebRTC signalling relay: forward each message to the OTHER window.
-  ipcMain.on('output:signal', (e, data) => {
-    const target = e.sender === mainWindow?.webContents ? outputWindow : mainWindow
-    target?.webContents.send('output:signal', data)
-  })
+  // Per-frame render state: control window → output window.
+  ipcMain.on('output:frame', (_e, frame) => outputWindow?.webContents.send('output:frame', frame))
 
   // ---------- IPC: HIVE live-in ----------
   ipcMain.on('hive:connect', (e, id, host, port) =>

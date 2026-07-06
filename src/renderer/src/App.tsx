@@ -21,7 +21,6 @@ import { OutputPage } from './components/OutputPage'
 import { SceneBank } from './components/SceneBank'
 import { initOscInput, applyOscListen } from './oscInput'
 import { morphedComposition, consumeCrossfade } from './morph'
-import { startOutputSender } from './outputLink'
 import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
 import { initMidi } from './midi'
@@ -115,16 +114,11 @@ export default function App(): JSX.Element {
     return unsub
   }, [])
 
-  // ── Output window mirror (WebRTC) — stream the canvas while it's open ──
+  // ── Output window — reset our flag if the user closes it directly ──────
   const outputActive = useStore((s) => s.outputActive)
   useEffect(() => {
-    // If the user closes the output window itself, reset our flag.
     return window.api.onOutputClosed(() => useStore.getState().setOutputActive(false))
   }, [])
-  useEffect(() => {
-    if (!outputActive || !canvasRef.current) return
-    return startOutputSender(canvasRef.current)
-  }, [outputActive])
 
   // ── External output (NDI / Spout) — attach the readback while active ──
   const ndiActive = useStore((s) => s.ndiActive)
@@ -249,6 +243,19 @@ export default function App(): JSX.Element {
         applyModulation(comp!, c, modValues, inputsForShader)
         // 3. Render the frame.
         comp!.render(now - start)
+        // 4. Native output window: push the exact render state so it renders
+        //    the same composition itself (pixel-perfect, no transcode).
+        if (st.outputActive) {
+          window.api.outputFrame({
+            c,
+            modValues,
+            globalSpeed: st.globalSpeed,
+            warpEnabled: st.warpEnabled,
+            warpCorners: st.warpCorners,
+            warpGrid: st.warpGrid,
+            time: now - start
+          })
+        }
       } catch (e) {
         console.error('[render loop]', e)
       }
