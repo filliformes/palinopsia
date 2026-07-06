@@ -216,6 +216,10 @@ interface SlotState {
   arpDir: 1 | -1
   arpLastAdvanceAt: number
   audioValue: number // one-pole smoothed audio feature (audio type)
+  physPos: number // physics integrator position 0..1
+  physVel: number // physics integrator velocity
+  physTarget: number // physics spring target (flips on clock)
+  physLastAdvanceAt: number // physics clock (re-kick / period base)
   startedAt: number // ramp/adsr time base (reset by retrigger)
 }
 
@@ -239,6 +243,10 @@ function makeSlot(now: number): SlotState {
     arpDir: 1,
     arpLastAdvanceAt: now,
     audioValue: 0,
+    physPos: 0,
+    physVel: 0,
+    physTarget: 1,
+    physLastAdvanceAt: now,
     startedAt: now
   }
 }
@@ -434,9 +442,66 @@ export class ModEngine {
           }
           break
         }
+        case 'organic': {
+          // Irregular periodicity + perpetual variation (Boucher's "water"): a
+          // smooth oscillator whose period AND amplitude drift on slow,
+          // incommensurate LFOs — never quite the same twice.
+          const varn = Math.max(0, Math.min(1, cfg.organic?.variation ?? 0.5))
+          const t = now / 1000
+          const wobble = 0.5 * Math.sin(t * 0.13) + 0.5 * Math.sin(t * 0.077) // ~[-1,1]
+          s.phase += hz * dt * (1 + varn * 0.85 * wobble)
+          const amp = 1 - varn * 0.45 * (0.5 + 0.5 * Math.sin(t * 0.19 + 1.7))
+          v01 = (Math.sin(s.phase * TWO_PI) * amp + 1) / 2
+          break
+        }
+        case 'physics': {
+          // Force-driven scalar motion. The clock re-kicks/relaunches; damping
+          // sets restitution / settle. Integrated with a clamped dt for
+          // stability across frame hitches.
+          const period = hz > 0 ? 1000 / hz : 2000
+          let kicked = false
+          if (now - s.physLastAdvanceAt >= period) {
+            // Snap the clock forward without spamming re-kicks after a stall.
+            s.physLastAdvanceAt += period * Math.floor((now - s.physLastAdvanceAt) / period)
+            kicked = true
+          }
+          const damp = Math.max(0, Math.min(1, cfg.physics?.damping ?? 0.5))
+          const dtc = Math.min(0.05, dt)
+          switch (cfg.physics?.motion ?? 'bounce') {
+            case 'bounce': {
+              if (kicked) {
+                s.physPos = 1
+                s.physVel = 0
+              }
+              s.physVel -= (6 + (1 - damp) * 12) * dtc // gravity
+              s.physPos += s.physVel * dtc
+              if (s.physPos <= 0) {
+                s.physPos = 0
+                s.physVel = -s.physVel * (0.35 + damp * 0.6) // restitution
+              }
+              v01 = s.physPos
+              break
+            }
+            case 'spring': {
+              if (kicked) s.physTarget = s.physTarget > 0.5 ? 0 : 1
+              s.physVel += (s.physTarget - s.physPos) * 60 * dtc
+              s.physVel *= 1 - Math.min(0.9, (1 + damp * 12) * dtc) // damping
+              s.physPos += s.physVel * dtc
+              v01 = s.physPos
+              break
+            }
+            case 'riser': {
+              // Accelerating anticipation ramp, snapping back each period.
+              const k = Math.max(0, Math.min(1, (now - s.physLastAdvanceAt) / period))
+              v01 = k * k
+              break
+            }
+          }
+          break
+        }
       }
 
-      this.values[i] = shapeCurve(v01, cfg.curve)
+      this.values[i] = shapeCurve(Math.max(0, Math.min(1, v01)), cfg.curve)
     }
     return this.values
   }
@@ -472,7 +537,9 @@ export function makeDefaultModulator(): ModulatorConfig {
     sh: { probability: 1, smooth: false, distribution: 0.5 },
     slew: { riseMs: 200, fallMs: 400, randomTarget: true },
     chaos: { r: 3.8 },
-    audio: { feature: 'level', band: 0, smooth: 0.2 }
+    audio: { feature: 'level', band: 0, smooth: 0.2 },
+    organic: { variation: 0.5 },
+    physics: { motion: 'bounce', damping: 0.5 }
   }
 }
 

@@ -5,7 +5,7 @@
 // modulation never re-renders React at 60 Hz.
 
 import { useEffect, useRef, type ReactNode } from 'react'
-import type { ArpMode, AudioFeature, LfoShape, ModulatorType } from '@shared/types'
+import type { ArpMode, AudioFeature, LfoShape, ModulatorType, PhysicsMotion } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS } from '@shared/types'
 import { DIVISIONS, modEngine } from '../engine/modulation'
 import { AUDIO_BANDS, AUDIO_FEATURES } from '../engine/audioIn'
@@ -13,9 +13,10 @@ import { SHADER_BY_ID } from '../shaders/isf'
 import { modTargetKey, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 
-const MOD_TYPES: ModulatorType[] = ['lfo', 'ramp', 'adsr', 'arp', 'random', 'sh', 'slew', 'chaos', 'audio']
+const MOD_TYPES: ModulatorType[] = ['lfo', 'ramp', 'adsr', 'arp', 'random', 'sh', 'slew', 'chaos', 'audio', 'organic', 'physics']
 const LFO_SHAPES: LfoShape[] = ['sine', 'triangle', 'square', 'sawtooth', 'rndStep', 'rndSmooth', 'spastic']
 const ARP_MODES: ArpMode[] = ['up', 'down', 'upDown', 'random', 'drunk']
+const PHYSICS_MOTIONS: PhysicsMotion[] = ['bounce', 'spring', 'riser']
 
 export function ModulationPanel(): JSX.Element {
   const modulators = useStore((s) => s.composition.modulators)
@@ -342,6 +343,37 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
           <SliderRow label="SMOOTH" value={a.smooth} min={0} max={0.99}
             title="One-pole smoothing — 0 snaps to the signal, →1 glides"
             onChange={(v) => update(index, { audio: { ...a, smooth: v } })} />
+        </>
+      )
+    }
+    case 'organic': {
+      const o = m.organic ?? { variation: 0.5 }
+      return (
+        <SliderRow label="VARY" value={o.variation} min={0} max={1}
+          title="Irregularity — 0 near-periodic · →1 wanders (never repeats)"
+          onChange={(v) => update(index, { organic: { variation: v } })} />
+      )
+    }
+    case 'physics': {
+      const p = m.physics ?? { motion: 'bounce' as PhysicsMotion, damping: 0.5 }
+      return (
+        <>
+          <Row label="MOTION">
+            <select
+              className="input select-compact min-w-0 flex-1 text-[10px]"
+              value={p.motion}
+              onChange={(e) => update(index, { physics: { ...p, motion: e.target.value as PhysicsMotion } })}
+            >
+              {PHYSICS_MOTIONS.map((mo) => (
+                <option key={mo} value={mo}>
+                  {mo}
+                </option>
+              ))}
+            </select>
+          </Row>
+          <SliderRow label="DAMP" value={p.damping} min={0} max={1}
+            title="Damping — bounce restitution / spring settle"
+            onChange={(v) => update(index, { physics: { ...p, damping: v } })} />
         </>
       )
     }

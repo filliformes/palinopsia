@@ -165,9 +165,14 @@ export type ModulatorType =
   | 'slew'
   | 'chaos'
   | 'audio'
+  | 'organic'
+  | 'physics'
 
 // Which audio feature an `audio` modulator follows (bus in engine/audioIn.ts).
 export type AudioFeature = 'level' | 'flux' | 'transient' | 'centroid' | 'band' | 'pitch'
+
+// Force-driven motion for the `physics` modulator.
+export type PhysicsMotion = 'bounce' | 'spring' | 'riser'
 
 export type LfoShape =
   | 'sine'
@@ -226,6 +231,8 @@ export interface ModulatorConfig {
   slew: { riseMs: number; fallMs: number; randomTarget: boolean }
   chaos: { r: number } // logistic-map r in [3.4, 4.0]
   audio: { feature: AudioFeature; band: number; smooth: number } // follows the audio bus
+  organic: { variation: number } // 0 = near-LFO, 1 = very irregular (never repeats)
+  physics: { motion: PhysicsMotion; damping: number } // force-driven motion
 }
 
 // What an assignment modulates: float ISF inputs, or a Meta knob (the
