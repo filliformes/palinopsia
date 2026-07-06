@@ -49,7 +49,7 @@ export function OscPanel(): JSX.Element {
   }
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-md border border-border bg-panel p-2 text-[11px]">
+    <div className="flex flex-col gap-1 rounded-md border border-border bg-panel px-2 py-1 text-[11px]">
       <div className="flex min-w-0 items-center gap-2">
         <button
           onClick={toggle}

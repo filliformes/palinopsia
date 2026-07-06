@@ -147,10 +147,10 @@ export class VideoSource {
     if (this.pb.direction === 'pendulum') {
       if (this.pos >= hi) {
         this.pos = hi
-        this.pendDir = 1
+        this.pendDir = -1 // reached the top → swing back down
       } else if (this.pos <= lo) {
         this.pos = lo
-        this.pendDir = -1
+        this.pendDir = 1 // reached the bottom → swing forward again
       }
     } else if (this.pos < lo) {
       this.pos = this.pb.loop ? hi : lo

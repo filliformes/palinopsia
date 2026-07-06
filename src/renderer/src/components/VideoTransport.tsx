@@ -131,13 +131,16 @@ export function VideoTransport({
         </span>
       </div>
 
-      {/* Timeline: trim region + in/out handles + live playhead */}
-      <div
-        ref={barRef}
-        className="relative h-6 select-none rounded bg-panel2"
-        onPointerMove={onMove}
-        onPointerUp={endDrag}
-      >
+      {/* Timeline — inset with the same flanking widths as the Speed row so it
+          lines up to the exact width of the Speed slider. */}
+      <div className="flex items-center gap-2">
+        <span className="w-10 shrink-0" />
+        <div
+          ref={barRef}
+          className="relative h-6 min-w-0 flex-1 select-none rounded bg-panel2"
+          onPointerMove={onMove}
+          onPointerUp={endDrag}
+        >
         <div
           className="absolute inset-y-0 bg-accent/15"
           style={{ left: `${inN * 100}%`, right: `${(1 - outN) * 100}%` }}
@@ -163,6 +166,8 @@ export function VideoTransport({
           className="pointer-events-none absolute inset-y-0 w-px bg-text"
           style={{ left: '0%' }}
         />
+        </div>
+        <span className="w-12 shrink-0" />
       </div>
 
       {/* Speed */}
