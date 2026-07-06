@@ -44,6 +44,70 @@ function zero(): Features {
 
 const OSC_STALE_MS = 500 // in 'both', OSC older than this yields to local
 
+// Pitch mapping span — A1 (55 Hz) to A6 (1760 Hz), log-scaled to 0..1.
+const LOG_FMIN = Math.log2(55)
+const LOG_FMAX = Math.log2(1760)
+
+// Autocorrelation pitch detection (ACF + RMS gate + parabolic interpolation),
+// after Chris Wilson's PitchDetect. Returns the fundamental in Hz, or -1 when
+// the frame is too quiet / unvoiced to trust. Lag search is bounded to the
+// musical range so the cost stays contained.
+function autoCorrelate(buf: Float32Array, sampleRate: number): number {
+  const SIZE = buf.length
+  let rms = 0
+  for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i]
+  rms = Math.sqrt(rms / SIZE)
+  if (rms < 0.01) return -1 // too quiet — unreliable
+
+  // Trim leading/trailing near-silence so the correlation locks on the tone.
+  let r1 = 0
+  let r2 = SIZE - 1
+  const thres = 0.2
+  for (let i = 0; i < SIZE / 2; i++)
+    if (Math.abs(buf[i]) < thres) {
+      r1 = i
+      break
+    }
+  for (let i = 1; i < SIZE / 2; i++)
+    if (Math.abs(buf[SIZE - i]) < thres) {
+      r2 = SIZE - i
+      break
+    }
+  const b = buf.subarray(r1, r2)
+  const n = b.length
+  if (n < 8) return -1
+
+  // Bound the lag to the musical range (min period at FMAX, max at FMIN).
+  const minLag = Math.max(2, Math.floor(sampleRate / 1760))
+  const maxLag = Math.min(n - 1, Math.ceil(sampleRate / 55))
+  const c = new Float32Array(maxLag + 1)
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    let s = 0
+    for (let i = 0; i < n - lag; i++) s += b[i] * b[i + lag]
+    c[lag] = s
+  }
+  // Walk past the initial descent, then take the highest correlation peak.
+  let d = minLag
+  while (d < maxLag && c[d] > c[d + 1]) d++
+  let maxval = -1
+  let maxpos = -1
+  for (let i = d; i <= maxLag; i++)
+    if (c[i] > maxval) {
+      maxval = c[i]
+      maxpos = i
+    }
+  if (maxpos <= 0) return -1
+  let T0 = maxpos
+  // Parabolic interpolation around the peak for sub-sample accuracy.
+  const x1 = c[T0 - 1] ?? 0
+  const x2 = c[T0]
+  const x3 = c[T0 + 1] ?? 0
+  const a = (x1 + x3 - 2 * x2) / 2
+  const bb = (x3 - x1) / 2
+  if (a) T0 = T0 - bb / (2 * a)
+  return T0 > 0 ? sampleRate / T0 : -1
+}
+
 class AudioBus {
   /** Ingest mode — set by the App effect from the store. */
   mode: AudioMode = 'off'
@@ -63,7 +127,10 @@ class AudioBus {
   // (TS 5.7 typed-array generics reject the ArrayBufferLike default).
   private freq: Uint8Array<ArrayBuffer> | null = null
   private time: Uint8Array<ArrayBuffer> | null = null
+  private timeF: Float32Array<ArrayBuffer> | null = null // float waveform (pitch)
   private prevMag: Float32Array<ArrayBuffer> | null = null
+  private sampleRate = 44100
+  private pitchCounter = 0
 
   get localActive(): boolean {
     return this.localOn
@@ -80,14 +147,16 @@ class AudioBus {
       const ctx = new AudioContext()
       const src = ctx.createMediaStreamSource(stream)
       const analyser = ctx.createAnalyser()
-      analyser.fftSize = 1024
+      analyser.fftSize = 2048 // 2048 samples ≈ 46ms — enough window for pitch
       analyser.smoothingTimeConstant = 0.5
       src.connect(analyser)
       this.stream = stream
       this.ctx = ctx
       this.analyser = analyser
+      this.sampleRate = ctx.sampleRate
       this.freq = new Uint8Array(analyser.frequencyBinCount)
       this.time = new Uint8Array(analyser.fftSize)
+      this.timeF = new Float32Array(analyser.fftSize)
       this.prevMag = new Float32Array(analyser.frequencyBinCount)
       this.localOn = true
       return true
@@ -105,6 +174,7 @@ class AudioBus {
     this.ctx = null
     this.analyser = null
     this.freq = this.time = null
+    this.timeF = null
     this.prevMag = null
     this.localOn = false
     this.local = zero()
@@ -157,7 +227,18 @@ class AudioBus {
     L.flux = Math.min(1, flux / (N * 0.15))
     // transient — pulse on an onset (flux over threshold), else decay.
     L.transient = L.flux > 0.32 ? 1 : L.transient * 0.82
-    // pitch — OSC-supplied only for now; local leaves it untouched.
+    // pitch — autocorrelation on the float waveform, throttled (pitch moves
+    // slowly, and the ACF is the heaviest step). Held across unvoiced frames.
+    if (this.timeF && ++this.pitchCounter % 3 === 0) {
+      this.analyser!.getFloatTimeDomainData(this.timeF)
+      const hz = autoCorrelate(this.timeF, this.sampleRate)
+      if (hz > 0) {
+        // Log-map the fundamental over a musical span (A1 55 Hz → A6 1760 Hz).
+        const t = (Math.log2(hz) - LOG_FMIN) / (LOG_FMAX - LOG_FMIN)
+        L.pitch = Math.max(0, Math.min(1, t))
+      }
+      // Unvoiced (hz <= 0): hold the last pitch rather than flicker to 0.
+    }
   }
 
   // ── OSC source ─────────────────────────────────────────────────────
