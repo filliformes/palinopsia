@@ -22,7 +22,15 @@ interface Signal {
 export function startOutputSender(canvas: HTMLCanvasElement): () => void {
   const pc = new RTCPeerConnection()
   const stream = canvas.captureStream(60)
-  stream.getTracks().forEach((t) => pc.addTrack(t, stream))
+  const track = stream.getVideoTracks()[0]
+  // Sharpness over motion-smoothing for detailed visuals.
+  if (track) track.contentHint = 'detail'
+  // High bitrate + no downscale — WebRTC otherwise caps around 1–2 Mbps and
+  // scales the resolution down, which looks lo-fi for a fullscreen VJ output.
+  const tx = pc.addTransceiver(track, {
+    direction: 'sendonly',
+    sendEncodings: [{ maxBitrate: 80_000_000, maxFramerate: 60 }]
+  })
   pc.onicecandidate = (e) => {
     if (e.candidate) window.api.outputSignal({ type: 'ice', candidate: e.candidate.toJSON() } as Signal)
   }
@@ -33,6 +41,18 @@ export function startOutputSender(canvas: HTMLCanvasElement): () => void {
     const offer = await pc.createOffer()
     await pc.setLocalDescription(offer)
     window.api.outputSignal({ type: 'offer', sdp: offer } as Signal)
+    // Keep resolution when bandwidth/CPU is tight (don't degrade sharpness).
+    try {
+      const p = tx.sender.getParameters()
+      p.degradationPreference = 'maintain-resolution'
+      if (p.encodings?.[0]) {
+        p.encodings[0].maxBitrate = 80_000_000
+        p.encodings[0].maxFramerate = 60
+      }
+      await tx.sender.setParameters(p)
+    } catch {
+      /* setParameters unsupported/late — the sendEncodings above still apply */
+    }
   }
   const off = window.api.onOutputSignal(async (raw) => {
     const d = raw as Signal

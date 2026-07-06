@@ -150,7 +150,9 @@ function openOutputWindow(displayId: number, windowed = false): void {
             preload: join(__dirname, '../preload/index.js'),
             sandbox: false,
             contextIsolation: true,
-            nodeIntegration: false
+            nodeIntegration: false,
+            // Never throttle — it's a background window (control has focus).
+            backgroundThrottling: false
           }
         }
       : {
@@ -166,7 +168,8 @@ function openOutputWindow(displayId: number, windowed = false): void {
             preload: join(__dirname, '../preload/index.js'),
             sandbox: false,
             contextIsolation: true,
-            nodeIntegration: false
+            nodeIntegration: false,
+            backgroundThrottling: false
           }
         }
   )
