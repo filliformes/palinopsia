@@ -23,14 +23,8 @@ export function startOutputSender(canvas: HTMLCanvasElement): () => void {
   const pc = new RTCPeerConnection()
   const stream = canvas.captureStream(60)
   const track = stream.getVideoTracks()[0]
-  // Sharpness over motion-smoothing for detailed visuals.
-  if (track) track.contentHint = 'detail'
-  // High bitrate + no downscale — WebRTC otherwise caps around 1–2 Mbps and
-  // scales the resolution down, which looks lo-fi for a fullscreen VJ output.
-  const tx = pc.addTransceiver(track, {
-    direction: 'sendonly',
-    sendEncodings: [{ maxBitrate: 80_000_000, maxFramerate: 60 }]
-  })
+  if (track) track.contentHint = 'detail' // sharpness over motion-smoothing
+  const sender = pc.addTrack(track, stream)
   pc.onicecandidate = (e) => {
     if (e.candidate) window.api.outputSignal({ type: 'ice', candidate: e.candidate.toJSON() } as Signal)
   }
@@ -41,17 +35,15 @@ export function startOutputSender(canvas: HTMLCanvasElement): () => void {
     const offer = await pc.createOffer()
     await pc.setLocalDescription(offer)
     window.api.outputSignal({ type: 'offer', sdp: offer } as Signal)
-    // Keep resolution when bandwidth/CPU is tight (don't degrade sharpness).
+    // Lift the bitrate ceiling above WebRTC's lo-fi default. Wrapped + moderate
+    // so it can never break the connection (unlike a huge sendEncodings value).
     try {
-      const p = tx.sender.getParameters()
-      p.degradationPreference = 'maintain-resolution'
-      if (p.encodings?.[0]) {
-        p.encodings[0].maxBitrate = 80_000_000
-        p.encodings[0].maxFramerate = 60
-      }
-      await tx.sender.setParameters(p)
+      const p = sender.getParameters()
+      if (!p.encodings || p.encodings.length === 0) p.encodings = [{}]
+      p.encodings[0].maxBitrate = 24_000_000 // 24 Mbps
+      await sender.setParameters(p)
     } catch {
-      /* setParameters unsupported/late — the sendEncodings above still apply */
+      /* setParameters unsupported — falls back to the working default */
     }
   }
   const off = window.api.onOutputSignal(async (raw) => {
