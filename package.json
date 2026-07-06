@@ -14,6 +14,7 @@
     "start": "electron-vite preview"
   },
   "dependencies": {
+    "bonjour-service": "^1.4.2",
     "interactive-shader-format": "^2.7.0",
     "osc": "^2.4.5",
     "zustand": "^4.5.5"

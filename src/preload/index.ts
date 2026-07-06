@@ -79,6 +79,15 @@ const api: ExposedApi = {
     ipcRenderer.on('hive:au', h)
     return () => ipcRenderer.off('hive:au', h)
   },
+  // HIVE output (sender).
+  hiveOutStart: (port: number) => ipcRenderer.invoke('hiveout:start', port),
+  hiveOutStop: () => ipcRenderer.invoke('hiveout:stop'),
+  hiveSendChunk: (key: boolean, data: Uint8Array) => ipcRenderer.send('hiveout:chunk', key, data),
+  onHiveForceKey: (cb: () => void) => {
+    const h = (): void => cb()
+    ipcRenderer.on('hive:forceKey', h)
+    return () => ipcRenderer.off('hive:forceKey', h)
+  },
 
   // ── External output (NDI / Spout) ────────────────────────────────
   ndiSet: (on: boolean) => ipcRenderer.invoke('ndi:set', on),

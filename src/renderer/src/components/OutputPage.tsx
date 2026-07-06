@@ -38,6 +38,10 @@ export function OutputPage({
   const setNdiActive = useStore((s) => s.setNdiActive)
   const spoutActive = useStore((s) => s.spoutActive)
   const setSpoutActive = useStore((s) => s.setSpoutActive)
+  const hiveOutActive = useStore((s) => s.hiveOutActive)
+  const setHiveOutActive = useStore((s) => s.setHiveOutActive)
+  const hiveOutPort = useStore((s) => s.hiveOutPort)
+  const setHiveOutPort = useStore((s) => s.setHiveOutPort)
 
   const [displays, setDisplays] = useState<DisplayInfo[]>([])
   const [displayId, setDisplayId] = useState<number | null>(null)
@@ -275,6 +279,32 @@ export function OutputPage({
             <p className="text-[11px] leading-tight text-muted">
               NDI / Spout need an optional native sender installed. Spout is the
               zero-copy path on Windows.
+            </p>
+          </Section>
+
+          <Section title="HIVE (open network output)">
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setHiveOutActive(!hiveOutActive)}
+                className={`flex-1 ${btn(hiveOutActive)}`}
+              >
+                HIVE {hiveOutActive ? 'on' : 'off'}
+              </button>
+              <label className="flex items-center gap-1 text-[11px] text-muted">
+                port
+                <input
+                  type="number"
+                  value={hiveOutPort}
+                  disabled={hiveOutActive}
+                  onChange={(e) => setHiveOutPort(Number(e.target.value) || 51842)}
+                  className="w-16 rounded bg-panel px-1 py-0.5 text-right font-mono text-[11px] text-fg disabled:opacity-50"
+                />
+              </label>
+            </div>
+            <p className="text-[11px] leading-tight text-muted">
+              HEVC over TCP, advertised on the LAN via mDNS — the open NDI
+              alternative. Receive in OBS (HIVE plugin) or any HIVE client.
+              Experimental: needs a hardware HEVC encoder.
             </p>
           </Section>
         </aside>

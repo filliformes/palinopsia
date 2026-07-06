@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Compositor } from './engine/Compositor'
+import { hiveEncoder } from './hiveEncoder'
 import { applyModulation, modEngine } from './engine/modulation'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel, FxChips } from './components/FxRackPanel'
@@ -132,6 +133,37 @@ export default function App(): JSX.Element {
     return () => comp.setOutputCapture(null)
   }, [ndiActive, spoutActive])
 
+  // ── HIVE output (sender) — start the HEVC encoder + TCP fan-out ───────
+  const hiveOutActive = useStore((s) => s.hiveOutActive)
+  const hiveOutPort = useStore((s) => s.hiveOutPort)
+  useEffect(() => {
+    if (!hiveOutActive) return
+    let cancelled = false
+    const canvas = canvasRef.current
+    ;(async () => {
+      const ok = canvas && (await hiveEncoder.start(canvas.width, canvas.height))
+      if (cancelled) {
+        hiveEncoder.stop()
+        return
+      }
+      if (!ok) {
+        // No WebCodecs HEVC encoder on this host — bail out and flip the toggle.
+        alert('HIVE output needs a hardware HEVC encoder, which this machine reports as unavailable.')
+        useStore.getState().setHiveOutActive(false)
+        return
+      }
+      await window.api.hiveOutStart(hiveOutPort)
+    })()
+    // New receivers connect → main asks for a keyframe so they can start.
+    const unsub = window.api.onHiveForceKey(() => hiveEncoder.requestKeyFrame())
+    return () => {
+      cancelled = true
+      unsub()
+      hiveEncoder.stop()
+      void window.api.hiveOutStop()
+    }
+  }, [hiveOutActive, hiveOutPort])
+
   // ── Undo/redo (100 levels) + keyboard shortcuts ─────────────────────
   useEffect(() => {
     const unsub = initUndo()
@@ -256,6 +288,9 @@ export default function App(): JSX.Element {
             time: now - start
           })
         }
+        // 5. HIVE output: encode the composite canvas to HEVC and fan it out to
+        //    HIVE receivers (OBS plugin, Resolume …). Frame-drops if backed up.
+        if (st.hiveOutActive) hiveEncoder.encode(canvas, now * 1000)
       } catch (e) {
         console.error('[render loop]', e)
       }

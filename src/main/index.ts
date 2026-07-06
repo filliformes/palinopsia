@@ -23,12 +23,14 @@ import { ModulationEngine } from './modulators'
 import { OscQueryServer, type OscQueryNode } from './oscquery'
 import { registerMediaScheme, handleMediaProtocol } from './media'
 import { hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
+import { hiveSendStart, hiveSendChunk, hiveSendStop } from './hiveSend'
 import { OutputSender } from './output'
 
 // Must run before app ready — makes opsia-media:// a privileged streaming scheme.
 registerMediaScheme()
-// Ask Chromium to enable the platform HEVC decoder (for HIVE WebCodecs live-in).
-app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport')
+// Ask Chromium to enable the platform HEVC decoder + encoder (HIVE live-in and
+// HIVE output both use WebCodecs HEVC).
+app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport,PlatformHEVCEncoderSupport')
 // Keep the fullscreen output window rendering when it's on a 2nd display and
 // unfocused — Windows native occlusion detection otherwise pauses it (black).
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
@@ -62,6 +64,7 @@ function shutdown(): void {
   oscquery.stop()
   autosave.stopAutosave()
   hiveDisconnectAll()
+  hiveSendStop()
   outputSender.dispose()
 }
 
@@ -351,6 +354,16 @@ app.whenReady().then(async () => {
     hiveConnect(e.sender, id as string, host as string, port as number)
   )
   ipcMain.on('hive:disconnect', (_e, id) => hiveDisconnect(id as string))
+
+  // ---------- IPC: HIVE output (sender) ----------
+  safeHandle('hiveout:start', (e, port) =>
+    hiveSendStart((e as Electron.IpcMainInvokeEvent).sender, port as number)
+  )
+  safeHandle('hiveout:stop', () => {
+    hiveSendStop()
+    return true
+  })
+  ipcMain.on('hiveout:chunk', (_e, key, data) => hiveSendChunk(key as boolean, data as Uint8Array))
 
   // ---------- IPC: External output (NDI / Spout) ----------
   safeHandle('ndi:set', (_e, on) => outputSender.setNdi(on as boolean))

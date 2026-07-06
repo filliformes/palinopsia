@@ -399,6 +399,11 @@ interface StoreState {
   setNdiActive: (on: boolean) => void
   spoutActive: boolean
   setSpoutActive: (on: boolean) => void
+  // HIVE output (open NDI-alternative). hiveOutActive is transient; port persists.
+  hiveOutActive: boolean
+  setHiveOutActive: (on: boolean) => void
+  hiveOutPort: number
+  setHiveOutPort: (p: number) => void
   // The full-page Output / Mapping view is showing. Transient.
   outputPageOpen: boolean
   setOutputPageOpen: (on: boolean) => void
@@ -1154,6 +1159,13 @@ export const useStore = create<StoreState>((set, get) => ({
   setNdiActive: (on) => set({ ndiActive: on }),
   spoutActive: false,
   setSpoutActive: (on) => set({ spoutActive: on }),
+  hiveOutActive: false,
+  setHiveOutActive: (on) => set({ hiveOutActive: on }),
+  hiveOutPort: Number(localStorage.getItem('opsia.hiveOutPort')) || 51842,
+  setHiveOutPort: (p) => {
+    localStorage.setItem('opsia.hiveOutPort', String(p))
+    set({ hiveOutPort: p })
+  },
   outputPageOpen: false,
   setOutputPageOpen: (on) => set({ outputPageOpen: on }),
 
