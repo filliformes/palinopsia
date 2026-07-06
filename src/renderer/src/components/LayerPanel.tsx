@@ -187,7 +187,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               inert until B has a source and Audio is on. */}
           <Row label="CPL">
             <select
-              className="input select-compact w-14 shrink-0 text-[10px]"
+              className="input select-compact w-[4.25rem] shrink-0 text-[10px]"
               value={layer.coupling.mode}
               onChange={(e) => setCoupling(index, { mode: e.target.value as CouplingMode })}
               title="A/B coupling — lean (audio leans toward B) · hocket (audio pumps A↔B)"
@@ -197,7 +197,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               <option value="hocket">hocket</option>
             </select>
             <select
-              className="input select-compact w-14 shrink-0 text-[10px]"
+              className="input select-compact w-[5.25rem] shrink-0 text-[10px]"
               value={layer.coupling.feature}
               onChange={(e) => setCoupling(index, { feature: e.target.value as AudioFeature })}
               title="Audio feature driving the bond (transient/flux read best)"
