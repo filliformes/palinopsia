@@ -24,6 +24,8 @@ export class CaptureSource {
 
   /** Open the capture stream. `spec` is the slot's mediaId:
    *    'webcam'          → default camera (getUserMedia)
+   *    'device:<id>'     → a specific video input device (Live Input — e.g. a
+   *                        USB camera / capture card / DJI Osmo in webcam mode)
    *    'desktop:<id>'    → a specific screen/window (chromeMediaSourceId)
    *    'screen'          → the primary display (getDisplayMedia fallback)
    *  Safe to call once; ignores re-entrancy. */
@@ -40,6 +42,13 @@ export class CaptureSource {
           audio: false,
           video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: id } }
         } as unknown as MediaStreamConstraints)
+      } else if (spec.startsWith('device:')) {
+        const id = spec.slice('device:'.length)
+        // A specific camera / capture device by id, at its highest resolution.
+        this.stream = await md.getUserMedia({
+          audio: false,
+          video: { deviceId: { exact: id }, width: { ideal: 3840 }, height: { ideal: 2160 } }
+        })
       } else if (spec === 'screen') {
         this.stream = await md.getDisplayMedia({ video: true, audio: false })
       } else {

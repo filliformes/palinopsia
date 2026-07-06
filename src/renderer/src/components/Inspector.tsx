@@ -11,6 +11,7 @@ import { useState } from 'react'
 import { useStore, type FxScope } from '../store'
 import { AutoControls } from './AutoControls'
 import { CapturePicker } from './CapturePicker'
+import { DevicePicker } from './DevicePicker'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 import { SourceFraming } from './SourceFraming'
@@ -60,6 +61,7 @@ export function Inspector(): JSX.Element {
   const setSourceCapture = useStore((s) => s.setSourceCapture)
   const [flashing, flash] = useFlash()
   const [switchCapture, setSwitchCapture] = useState(false)
+  const [switchDevice, setSwitchDevice] = useState(false)
 
   let title = ''
   let context = ''
@@ -125,7 +127,10 @@ export function Inspector(): JSX.Element {
           ? composition.layers[selection.layer]?.sourceA
           : composition.layers[selection.layer]?.sourceB
       const isCap = vslot?.kind === 'capture'
-      const icon = isCap ? (vslot?.mediaId === 'screen' ? '🖥' : '📷') : '🎞'
+      const capId = vslot?.mediaId ?? ''
+      const isDevice = capId.startsWith('device:')
+      const isScreen = isCap && !isDevice && capId !== 'webcam'
+      const icon = !isCap ? '🎞' : isDevice ? '🎥' : capId === 'webcam' ? '📷' : '🖥'
       return (
         <div className="rounded-md border border-border bg-panel">
           <div className="flex items-start gap-2 px-3 py-2">
@@ -135,13 +140,22 @@ export function Inspector(): JSX.Element {
             <span className="whitespace-nowrap pt-0.5 font-mono text-[9px] uppercase tracking-wide text-muted">
               {context}
             </span>
-            {isCap && vslot?.mediaId !== 'webcam' && (
+            {isScreen && (
               <button
                 onClick={() => setSwitchCapture(true)}
                 className="shrink-0 rounded border border-accent/50 bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent transition-colors hover:bg-accent/20"
                 title="Choose a different screen or window to capture"
               >
                 🖥 Switch window
+              </button>
+            )}
+            {isDevice && (
+              <button
+                onClick={() => setSwitchDevice(true)}
+                className="shrink-0 rounded border border-accent/50 bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent transition-colors hover:bg-accent/20"
+                title="Choose a different live input device"
+              >
+                🎥 Switch input
               </button>
             )}
             <p className="ml-auto max-w-[50%] text-right text-[10px] leading-tight text-muted">
@@ -157,6 +171,15 @@ export function Inspector(): JSX.Element {
                 setSwitchCapture(false)
               }}
               onCancel={() => setSwitchCapture(false)}
+            />
+          )}
+          {switchDevice && (
+            <DevicePicker
+              onPick={(id, name) => {
+                setSourceCapture(selection.layer, selection.slot, `device:${id}`, name)
+                setSwitchDevice(false)
+              }}
+              onCancel={() => setSwitchDevice(false)}
             />
           )}
           {vslot?.kind === 'video' && (

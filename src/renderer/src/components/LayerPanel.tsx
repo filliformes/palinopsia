@@ -11,6 +11,7 @@ import { GENERATORS_ALPHA } from '../shaders/isf'
 import { useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { CapturePicker } from './CapturePicker'
+import { DevicePicker } from './DevicePicker'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxAddSelect, FxChips } from './FxRackPanel'
 import { ConfirmModal, PromptModal } from './PromptModal'
@@ -387,6 +388,7 @@ function SourceRow({
 }): JSX.Element {
   const fileRef = useRef<HTMLInputElement | null>(null)
   const [showCapture, setShowCapture] = useState(false)
+  const [showDevices, setShowDevices] = useState(false)
   const isVideo = sourceKind === 'video'
   const isCapture = sourceKind === 'capture'
   // The select's value: a generator id, or a sentinel for the active video /
@@ -396,7 +398,9 @@ function SourceRow({
     : isCapture
       ? mediaId === 'webcam'
         ? '__cap_webcam__'
-        : '__cap_screen__'
+        : mediaId?.startsWith('device:')
+          ? '__cap_live__'
+          : '__cap_screen__'
       : (shaderId ?? '')
   const active = isVideo || isCapture || !!shaderId
   return (
@@ -430,6 +434,7 @@ function SourceRow({
             if (v === '__video_pick__') fileRef.current?.click()
             else if (v === '__cap_webcam__') onPickCapture('webcam', 'Webcam')
             else if (v === '__cap_screen__') setShowCapture(true)
+            else if (v === '__cap_live__') setShowDevices(true)
             else if (v !== '__video__') onPick(v || null)
           }}
           onClick={(e) => e.stopPropagation()}
@@ -438,6 +443,7 @@ function SourceRow({
           {isVideo && <option value="__video__">🎞 {mediaName ?? 'video'}</option>}
           <option value="__video_pick__">🎞 Import video…</option>
           <option value="__cap_webcam__">📷 Webcam</option>
+          <option value="__cap_live__">🎥 Live Input…</option>
           <option value="__cap_screen__">🖥 Screen…</option>
           {GENERATORS_ALPHA.map((g) => (
             <option key={g.id} value={g.id}>
@@ -465,6 +471,15 @@ function SourceRow({
             setShowCapture(false)
           }}
           onCancel={() => setShowCapture(false)}
+        />
+      )}
+      {showDevices && (
+        <DevicePicker
+          onPick={(id, name) => {
+            onPickCapture(`device:${id}`, name)
+            setShowDevices(false)
+          }}
+          onCancel={() => setShowDevices(false)}
         />
       )}
     </>
