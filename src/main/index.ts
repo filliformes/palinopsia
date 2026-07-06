@@ -10,7 +10,8 @@ import {
   ipcMain,
   shell,
   session as electronSession,
-  desktopCapturer
+  desktopCapturer,
+  screen
 } from 'electron'
 import { join } from 'path'
 import type { OscEvent, OscErrorEvent, Session } from '@shared/types'
@@ -81,6 +82,12 @@ function createWindow(): void {
     mainWindow?.webContents.send('app:before-close')
   })
 
+  // Closing the control window closes the projector output with it.
+  mainWindow.on('closed', () => {
+    outputWindow?.close()
+    mainWindow = null
+  })
+
   mainWindow.webContents.setWindowOpenHandler((details) => {
     // Only hand http(s) URLs to the OS shell; never file:/other schemes.
     if (/^https?:\/\//i.test(details.url)) shell.openExternal(details.url)
@@ -100,6 +107,47 @@ function createWindow(): void {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+}
+
+// ── Fullscreen output window (2nd display / projector) ──────────────────
+// Runs the same renderer with a #output hash → a bare fullscreen <video> that
+// mirrors the control window's canvas over a WebRTC loopback (hardware-encoded,
+// no second render pipeline, no double camera access). Main just relays signals.
+let outputWindow: BrowserWindow | null = null
+
+function openOutputWindow(displayId: number): void {
+  const displays = screen.getAllDisplays()
+  const d = displays.find((x) => x.id === displayId) ?? screen.getPrimaryDisplay()
+  if (outputWindow) {
+    outputWindow.setBounds(d.bounds)
+    outputWindow.focus()
+    return
+  }
+  outputWindow = new BrowserWindow({
+    x: d.bounds.x,
+    y: d.bounds.y,
+    width: d.bounds.width,
+    height: d.bounds.height,
+    frame: false,
+    fullscreen: true,
+    backgroundColor: '#000000',
+    title: 'Palinopsia — Output',
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: false,
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  })
+  outputWindow.on('closed', () => {
+    outputWindow = null
+    mainWindow?.webContents.send('output:closed')
+  })
+  if (process.env.ELECTRON_RENDERER_URL) {
+    outputWindow.loadURL(`${process.env.ELECTRON_RENDERER_URL}#output`)
+  } else {
+    outputWindow.loadFile(join(__dirname, '../renderer/index.html'), { hash: 'output' })
   }
 }
 
@@ -236,6 +284,31 @@ app.whenReady().then(async () => {
       isScreen: s.id.startsWith('screen'),
       thumbnail: s.thumbnail.toDataURL()
     }))
+  })
+
+  // ---------- IPC: Output window (2nd display) ----------
+  safeHandle('output:displays', () => {
+    const primary = screen.getPrimaryDisplay().id
+    return screen.getAllDisplays().map((d, i) => ({
+      id: d.id,
+      label: d.label || `Display ${i + 1}`,
+      width: d.bounds.width,
+      height: d.bounds.height,
+      isPrimary: d.id === primary
+    }))
+  })
+  safeHandle('output:open', (_e, displayId) => {
+    openOutputWindow(displayId as number)
+    return true
+  })
+  safeHandle('output:close', () => {
+    outputWindow?.close()
+    return true
+  })
+  // WebRTC signalling relay: forward each message to the OTHER window.
+  ipcMain.on('output:signal', (e, data) => {
+    const target = e.sender === mainWindow?.webContents ? outputWindow : mainWindow
+    target?.webContents.send('output:signal', data)
   })
 
   // ---------- IPC: Session I/O ----------

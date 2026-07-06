@@ -2,13 +2,41 @@
 // draggable quad editor + alignment grid, for lining the image up on a
 // projector. (Second-display output + Spout/NDI live here too as they land.)
 
-import { useRef, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import type { DisplayInfo } from '@shared/types'
 import { useStore } from '../store'
 
 const CORNER_LABELS = ['TL', 'TR', 'BR', 'BL']
 
 export function OutputPanel(): JSX.Element {
+  const outputActive = useStore((s) => s.outputActive)
+  const setOutputActive = useStore((s) => s.setOutputActive)
+  const [displays, setDisplays] = useState<DisplayInfo[]>([])
+  const [displayId, setDisplayId] = useState<number | null>(null)
+
+  useEffect(() => {
+    window.api
+      .outputDisplays()
+      .then((ds) => {
+        setDisplays(ds)
+        // Default to the first non-primary display (the projector), else primary.
+        const target = ds.find((d) => !d.isPrimary) ?? ds[0]
+        setDisplayId((cur) => cur ?? target?.id ?? null)
+      })
+      .catch(() => setDisplays([]))
+  }, [])
+
+  const openOutput = async (): Promise<void> => {
+    if (displayId == null) return
+    await window.api.outputOpen(displayId)
+    setOutputActive(true)
+  }
+  const closeOutput = async (): Promise<void> => {
+    await window.api.outputClose()
+    setOutputActive(false)
+  }
+
   const warpEnabled = useStore((s) => s.warpEnabled)
   const warpGrid = useStore((s) => s.warpGrid)
   const corners = useStore(useShallow((s) => s.warpCorners))
@@ -40,6 +68,43 @@ export function OutputPanel(): JSX.Element {
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-border bg-panel2/40 p-2">
+      {/* Fullscreen output to a projector / 2nd display */}
+      <div className="flex items-center gap-1.5">
+        <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">
+          display
+        </span>
+        <select
+          className="input select-compact min-w-0 flex-1 text-[10px]"
+          value={displayId ?? ''}
+          onChange={(e) => setDisplayId(Number(e.target.value))}
+          disabled={outputActive}
+        >
+          {displays.length === 0 && <option value="">no displays</option>}
+          {displays.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.label} · {d.width}×{d.height}
+              {d.isPrimary ? ' (primary)' : ''}
+            </option>
+          ))}
+        </select>
+        {outputActive ? (
+          <button
+            onClick={closeOutput}
+            className="shrink-0 rounded border border-danger/60 bg-danger/15 px-2 py-0.5 font-mono text-[10px] text-danger transition-colors hover:bg-danger/25"
+          >
+            close
+          </button>
+        ) : (
+          <button
+            onClick={openOutput}
+            disabled={displayId == null}
+            className="shrink-0 rounded border border-accent bg-accent/15 px-2 py-0.5 font-mono text-[10px] text-accent transition-colors hover:bg-accent/25 disabled:opacity-40"
+          >
+            open ▶
+          </button>
+        )}
+      </div>
+
       <div className="flex items-center gap-1.5">
         <button onClick={() => setWarpEnabled(!warpEnabled)} className={btn(warpEnabled)}>
           warp {warpEnabled ? 'on' : 'off'}

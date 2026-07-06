@@ -43,6 +43,22 @@ const api: ExposedApi = {
   getMediaPath: (file: File) => webUtils.getPathForFile(file),
   captureListSources: () => ipcRenderer.invoke('capture:listSources'),
 
+  // ── Output window (2nd display) ──────────────────────────────────
+  outputDisplays: () => ipcRenderer.invoke('output:displays'),
+  outputOpen: (displayId: number) => ipcRenderer.invoke('output:open', displayId),
+  outputClose: () => ipcRenderer.invoke('output:close'),
+  onOutputClosed: (cb: () => void) => {
+    const h = (): void => cb()
+    ipcRenderer.on('output:closed', h)
+    return () => ipcRenderer.off('output:closed', h)
+  },
+  outputSignal: (data: unknown) => ipcRenderer.send('output:signal', data),
+  onOutputSignal: (cb: (data: unknown) => void) => {
+    const h = (_e: Electron.IpcRendererEvent, data: unknown): void => cb(data)
+    ipcRenderer.on('output:signal', h)
+    return () => ipcRenderer.off('output:signal', h)
+  },
+
   // ── App lifecycle ────────────────────────────────────────────────
   appCloseProceed: () => ipcRenderer.invoke('app:close-proceed'),
   onAppBeforeClose: (cb) => {

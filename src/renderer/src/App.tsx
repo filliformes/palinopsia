@@ -21,6 +21,7 @@ import { OutputPanel } from './components/OutputPanel'
 import { SceneBank } from './components/SceneBank'
 import { initOscInput, applyOscListen } from './oscInput'
 import { morphedComposition, consumeCrossfade } from './morph'
+import { startOutputSender } from './outputLink'
 import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
 import { initMidi } from './midi'
@@ -113,6 +114,17 @@ export default function App(): JSX.Element {
     void applyOscListen()
     return unsub
   }, [])
+
+  // ── Output window mirror (WebRTC) — stream the canvas while it's open ──
+  const outputActive = useStore((s) => s.outputActive)
+  useEffect(() => {
+    // If the user closes the output window itself, reset our flag.
+    return window.api.onOutputClosed(() => useStore.getState().setOutputActive(false))
+  }, [])
+  useEffect(() => {
+    if (!outputActive || !canvasRef.current) return
+    return startOutputSender(canvasRef.current)
+  }, [outputActive])
 
   // ── Undo/redo (100 levels) + keyboard shortcuts ─────────────────────
   useEffect(() => {

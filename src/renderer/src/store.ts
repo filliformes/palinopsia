@@ -389,6 +389,9 @@ interface StoreState {
   setWarpGrid: (on: boolean) => void
   setWarpCorner: (corner: number, x: number, y: number) => void
   resetWarp: () => void
+  // Fullscreen output window (projector) is open + mirroring. Transient.
+  outputActive: boolean
+  setOutputActive: (on: boolean) => void
   collapsed: Record<string, boolean>
   toggleSection: (key: string) => void
   // Finishing view: exclusively open one finalizer sub-section (Vibe / Context /
@@ -1117,6 +1120,8 @@ export const useStore = create<StoreState>((set, get) => ({
     localStorage.setItem('opsia.warpCorners', JSON.stringify(c))
     set({ warpCorners: c })
   },
+  outputActive: false,
+  setOutputActive: (on) => set({ outputActive: on }),
 
   oscEnabled: localStorage.getItem('opsia.oscEnabled') === '1',
   oscPort: (() => {

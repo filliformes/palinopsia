@@ -315,6 +315,14 @@ export interface CaptureSourceInfo {
   thumbnail: string // data URL
 }
 
+export interface DisplayInfo {
+  id: number
+  label: string
+  width: number
+  height: number
+  isPrimary: boolean
+}
+
 export interface ExposedApi {
   // Session I/O
   sessionSaveAs: (s: Session) => Promise<string | null>
@@ -352,4 +360,11 @@ export interface ExposedApi {
   getMediaPath: (file: File) => string
   // Screens + windows for the capture source picker.
   captureListSources: () => Promise<CaptureSourceInfo[]>
+  // Output window (2nd display / projector) — mirror via WebRTC loopback.
+  outputDisplays: () => Promise<DisplayInfo[]>
+  outputOpen: (displayId: number) => Promise<boolean>
+  outputClose: () => Promise<boolean>
+  onOutputClosed: (cb: () => void) => () => void
+  outputSignal: (data: unknown) => void
+  onOutputSignal: (cb: (data: unknown) => void) => () => void
 }
