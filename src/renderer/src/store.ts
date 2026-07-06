@@ -394,9 +394,14 @@ interface StoreState {
   // Fullscreen output window (projector) is open + mirroring. Transient.
   outputActive: boolean
   setOutputActive: (on: boolean) => void
-  // NDI output on (needs the optional native sender). Transient.
+  // NDI / Spout output on (need the optional native senders). Transient.
   ndiActive: boolean
   setNdiActive: (on: boolean) => void
+  spoutActive: boolean
+  setSpoutActive: (on: boolean) => void
+  // The full-page Output / Mapping view is showing. Transient.
+  outputPageOpen: boolean
+  setOutputPageOpen: (on: boolean) => void
   collapsed: Record<string, boolean>
   toggleSection: (key: string) => void
   // Finishing view: exclusively open one finalizer sub-section (Vibe / Context /
@@ -1147,6 +1152,10 @@ export const useStore = create<StoreState>((set, get) => ({
   setOutputActive: (on) => set({ outputActive: on }),
   ndiActive: false,
   setNdiActive: (on) => set({ ndiActive: on }),
+  spoutActive: false,
+  setSpoutActive: (on) => set({ spoutActive: on }),
+  outputPageOpen: false,
+  setOutputPageOpen: (on) => set({ outputPageOpen: on }),
 
   oscEnabled: localStorage.getItem('opsia.oscEnabled') === '1',
   oscPort: (() => {

@@ -379,7 +379,8 @@ export interface ExposedApi {
   hiveConnect: (id: string, host: string, port: number) => void
   hiveDisconnect: (id: string) => void
   onHiveAU: (cb: (au: HiveAU) => void) => () => void
-  // External output (NDI).
+  // External output (NDI / Spout).
   ndiSet: (on: boolean) => Promise<boolean>
+  spoutSet: (on: boolean) => Promise<boolean>
   ndiFrame: (w: number, h: number, pixels: Uint8Array) => void
 }

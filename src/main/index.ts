@@ -325,8 +325,9 @@ app.whenReady().then(async () => {
   )
   ipcMain.on('hive:disconnect', (_e, id) => hiveDisconnect(id as string))
 
-  // ---------- IPC: External output (NDI) ----------
+  // ---------- IPC: External output (NDI / Spout) ----------
   safeHandle('ndi:set', (_e, on) => outputSender.setNdi(on as boolean))
+  safeHandle('spout:set', (_e, on) => outputSender.setSpout(on as boolean))
   ipcMain.on('ndi:frame', (_e, w, h, pixels) =>
     outputSender.send(w as number, h as number, pixels as Uint8Array)
   )

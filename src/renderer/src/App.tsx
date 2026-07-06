@@ -17,7 +17,7 @@ import { MixerPanel } from './components/MixerPanel'
 import { MetaBar } from './components/MetaBar'
 import { ModulationPanel } from './components/ModulationPanel'
 import { OscPanel } from './components/OscPanel'
-import { OutputPanel } from './components/OutputPanel'
+import { OutputPage } from './components/OutputPage'
 import { SceneBank } from './components/SceneBank'
 import { initOscInput, applyOscListen } from './oscInput'
 import { morphedComposition, consumeCrossfade } from './morph'
@@ -126,16 +126,17 @@ export default function App(): JSX.Element {
     return startOutputSender(canvasRef.current)
   }, [outputActive])
 
-  // ── NDI output — attach the compositor readback while active ──────────
+  // ── External output (NDI / Spout) — attach the readback while active ──
   const ndiActive = useStore((s) => s.ndiActive)
+  const spoutActive = useStore((s) => s.spoutActive)
+  const outputPageOpen = useStore((s) => s.outputPageOpen)
   useEffect(() => {
     const comp = compositorRef.current
     if (!comp) return
-    comp.setOutputCapture(
-      ndiActive ? (w, h, px) => window.api.ndiFrame(w, h, px) : null
-    )
+    const on = ndiActive || spoutActive
+    comp.setOutputCapture(on ? (w, h, px) => window.api.ndiFrame(w, h, px) : null)
     return () => comp.setOutputCapture(null)
-  }, [ndiActive])
+  }, [ndiActive, spoutActive])
 
   // ── Undo/redo (100 levels) + keyboard shortcuts ─────────────────────
   useEffect(() => {
@@ -330,6 +331,13 @@ export default function App(): JSX.Element {
           </button>
         </div>
         <button
+          className={`btn text-[12px] ${outputActive || ndiActive || spoutActive ? 'text-accent' : ''}`}
+          onClick={() => useStore.getState().setOutputPageOpen(true)}
+          title="Output & projection mapping — fullscreen output, keystone, NDI/Spout"
+        >
+          ⛶ Output
+        </button>
+        <button
           className="btn text-[12px]"
           onClick={() => useStore.getState().newSession()}
           title="New blank session (undoable)"
@@ -394,9 +402,6 @@ export default function App(): JSX.Element {
             <MasterRackStrip />
           </Collapsible>
 
-          <Collapsible sectionKey="output" title="output">
-            <OutputPanel />
-          </Collapsible>
         </section>
 
         {/* Drag handle — the layers column is resizable */}
@@ -431,6 +436,10 @@ export default function App(): JSX.Element {
 
       {/* ── Transport (BPM + Randomize) ───────────────────────────── */}
       <Transport />
+
+      {/* ── Output / Mapping page — full-screen takeover (canvas keeps
+             rendering underneath so the live mirror + engine never stop) ── */}
+      {outputPageOpen && <OutputPage canvasRef={canvasRef} />}
     </div>
   )
 }

@@ -69,8 +69,9 @@ const api: ExposedApi = {
     return () => ipcRenderer.off('hive:au', h)
   },
 
-  // ── External output (NDI) ────────────────────────────────────────
+  // ── External output (NDI / Spout) ────────────────────────────────
   ndiSet: (on: boolean) => ipcRenderer.invoke('ndi:set', on),
+  spoutSet: (on: boolean) => ipcRenderer.invoke('spout:set', on),
   ndiFrame: (w: number, h: number, pixels: Uint8Array) => ipcRenderer.send('ndi:frame', w, h, pixels),
 
   // ── App lifecycle ────────────────────────────────────────────────
