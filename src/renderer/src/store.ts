@@ -17,12 +17,14 @@ import type {
   ModulatorConfig,
   SceneEntry,
   Session,
-  SourceSlot
+  SourceSlot,
+  WorldMode
 } from '@shared/types'
 import type { MetaKnobState } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
 import { beginMorph, cancelMorph } from './morph'
+import { applyWorldToComposition } from './worlds'
 import {
   collectFloatTargets,
   randomizeComposition,
@@ -415,6 +417,10 @@ interface StoreState {
   setAudioSource: (s: 'both' | 'osc' | 'local') => void
   audioDeviceId: string | null
   setAudioDeviceId: (id: string | null) => void
+  // World / diegesis (Slab 1) — global. Persisted; selecting one biases the
+  // composition's coupling + Context mood via applyWorldToComposition.
+  world: WorldMode
+  setWorld: (w: WorldMode) => void
   // The full-page Output / Mapping view is showing. Transient.
   outputPageOpen: boolean
   setOutputPageOpen: (on: boolean) => void
@@ -1191,6 +1197,12 @@ export const useStore = create<StoreState>((set, get) => ({
     if (id) localStorage.setItem('opsia.audioDeviceId', id)
     else localStorage.removeItem('opsia.audioDeviceId')
     set({ audioDeviceId: id })
+  },
+  world: (localStorage.getItem('opsia.world') as WorldMode) || 'synthetic',
+  setWorld: (w) => {
+    localStorage.setItem('opsia.world', w)
+    // Selecting a World applies its bias to the current composition (undoable).
+    set((s) => ({ world: w, composition: applyWorldToComposition(s.composition, w) }))
   },
   ndiActive: false,
   setNdiActive: (on) => set({ ndiActive: on }),

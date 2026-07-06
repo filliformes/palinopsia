@@ -101,6 +101,26 @@ export interface FxInstance extends ShaderInstance {
 // pumps with the sound. `tightness` runs obvious↔vestigial (linear response ↔
 // only strong peaks). Slab 2 adds the full synchresis mode catalogue.
 export type CouplingMode = 'off' | 'lean' | 'hocket'
+
+// World / diegesis (Slab 1) — a single, global "proposed world" that biases the
+// whole composition: it sets every layer's A/B coupling character and nudges
+// the Context depth-finalizer's mood. A bias, not a lock — manual edits after
+// still win. Later slabs deepen each world's audio routing + source choices.
+export type WorldMode =
+  | 'synthetic'
+  | 'parametric'
+  | 'musical'
+  | 'incongruent'
+  | 'sublimated'
+  | 'monomedia'
+export const WORLD_MODES: WorldMode[] = [
+  'synthetic',
+  'parametric',
+  'musical',
+  'incongruent',
+  'sublimated',
+  'monomedia'
+]
 export interface LayerCoupling {
   mode: CouplingMode
   amount: number // 0..1 — depth
