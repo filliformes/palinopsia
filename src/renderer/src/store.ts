@@ -334,6 +334,8 @@ interface StoreState {
   addFx: (scope: FxScope, shaderId: string) => void
   removeFx: (scope: FxScope, instId: string) => void
   toggleFx: (scope: FxScope, instId: string) => void
+  // On/Off for the whole master chain — all non-locked master FX at once.
+  toggleMasterChain: () => void
   setFxOpacity: (scope: FxScope, instId: string, v: number) => void
   moveFx: (scope: FxScope, instId: string, dir: -1 | 1) => void
   // Drag-and-drop reorder: place instId before beforeId (null = end of chain).
@@ -855,6 +857,20 @@ export const useStore = create<StoreState>((set, get) => ({
         fx.map((f) => (f.id === instId ? { ...f, enabled: !f.enabled } : f))
       )
     })),
+  toggleMasterChain: () =>
+    set((s) => {
+      // The "chain" On/Off — flips ALL user-added master FX (never the pinned
+      // Finishing Touches finalizers). On if every non-locked unit is enabled;
+      // one click turns them all off, another turns them all back on.
+      const regular = s.composition.master.filter((f) => !f.locked)
+      const target = !(regular.length > 0 && regular.every((f) => f.enabled))
+      return {
+        composition: {
+          ...s.composition,
+          master: s.composition.master.map((f) => (f.locked ? f : { ...f, enabled: target }))
+        }
+      }
+    }),
   setFxOpacity: (scope, instId, v) =>
     set((s) => ({
       composition: updateFxArray(s.composition, scope, (fx) =>

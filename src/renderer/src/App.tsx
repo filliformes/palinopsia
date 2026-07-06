@@ -439,6 +439,7 @@ function MasterRackStrip(): JSX.Element {
   const master = useStore((s) => s.composition.master)
   const applyMasterPreset = useStore((s) => s.applyMasterPreset)
   const randomizeMasterParams = useStore((s) => s.randomizeMasterParams)
+  const toggleMasterChain = useStore((s) => s.toggleMasterChain)
   // The select keeps showing the applied chain's name.
   const [applied, setApplied] = useState('')
   const [flashing, flash] = useFlash()
@@ -447,6 +448,8 @@ function MasterRackStrip(): JSX.Element {
   // opens the Finishing view, not the shared Inspector.
   const rackFx = master.filter((f) => !f.locked)
   const lockedFx = master.filter((f) => f.locked)
+  // The "chain" On/Off state — on when every user FX is enabled.
+  const chainOn = rackFx.length > 0 && rackFx.every((f) => f.enabled)
   return (
     // Line 1: chain label · dice · preset box · + fx; the regular FX chips wrap.
     <div
@@ -454,9 +457,24 @@ function MasterRackStrip(): JSX.Element {
         flashing ? 'animate-pulse border-danger ring-1 ring-danger' : 'border-border'
       }`}
     >
-      <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">
-        chain
-      </span>
+      <button
+        onClick={toggleMasterChain}
+        disabled={rackFx.length === 0}
+        className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide transition-colors disabled:opacity-40 ${
+          chainOn
+            ? 'border-accent bg-accent/15 text-accent'
+            : 'border-border text-muted hover:text-text'
+        }`}
+        title={
+          rackFx.length === 0
+            ? 'No master FX to toggle'
+            : chainOn
+              ? 'Master FX chain ON — click to bypass all (keeps Finishing Touches)'
+              : 'Master FX chain OFF — click to enable all'
+        }
+      >
+        chain {chainOn ? 'on' : 'off'}
+      </button>
       <button
         onClick={() => {
           randomizeMasterParams()
