@@ -45,7 +45,8 @@ const api: ExposedApi = {
 
   // ── Output window (2nd display) ──────────────────────────────────
   outputDisplays: () => ipcRenderer.invoke('output:displays'),
-  outputOpen: (displayId: number) => ipcRenderer.invoke('output:open', displayId),
+  outputOpen: (displayId: number, windowed = false) =>
+    ipcRenderer.invoke('output:open', displayId, windowed),
   outputClose: () => ipcRenderer.invoke('output:close'),
   onOutputClosed: (cb: () => void) => {
     const h = (): void => cb()

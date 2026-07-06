@@ -370,7 +370,7 @@ export interface ExposedApi {
   captureListSources: () => Promise<CaptureSourceInfo[]>
   // Output window (2nd display / projector) — mirror via WebRTC loopback.
   outputDisplays: () => Promise<DisplayInfo[]>
-  outputOpen: (displayId: number) => Promise<boolean>
+  outputOpen: (displayId: number, windowed?: boolean) => Promise<boolean>
   outputClose: () => Promise<boolean>
   onOutputClosed: (cb: () => void) => () => void
   outputSignal: (data: unknown) => void

@@ -118,36 +118,58 @@ function createWindow(): void {
   }
 }
 
-// ── Fullscreen output window (2nd display / projector) ──────────────────
-// Runs the same renderer with a #output hash → a bare fullscreen <video> that
-// mirrors the control window's canvas over a WebRTC loopback (hardware-encoded,
-// no second render pipeline, no double camera access). Main just relays signals.
+// ── Output window (2nd display / projector, or a plain window) ──────────
+// Runs the same renderer with a #output hash → a bare <video> that mirrors the
+// control canvas over a WebRTC loopback (hardware-encoded, no second render
+// pipeline, no double camera access). Main just relays signals. Two modes:
+//   fullscreen → borderless, fills the chosen display (projector)
+//   windowed   → a normal 16:9 window (easy to Window-Capture in OBS/Resolume)
 let outputWindow: BrowserWindow | null = null
 
-function openOutputWindow(displayId: number): void {
+function openOutputWindow(displayId: number, windowed = false): void {
   const displays = screen.getAllDisplays()
   const d = displays.find((x) => x.id === displayId) ?? screen.getPrimaryDisplay()
   if (outputWindow) {
-    outputWindow.setBounds(d.bounds)
+    if (!windowed) outputWindow.setBounds(d.bounds)
     outputWindow.focus()
     return
   }
-  outputWindow = new BrowserWindow({
-    x: d.bounds.x,
-    y: d.bounds.y,
-    width: d.bounds.width,
-    height: d.bounds.height,
-    frame: false,
-    fullscreen: true,
-    backgroundColor: '#000000',
-    title: 'Palinopsia — Output',
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  })
+  outputWindow = new BrowserWindow(
+    windowed
+      ? {
+          // Centred 1280×720 window on the chosen display.
+          x: d.bounds.x + Math.round((d.bounds.width - 1280) / 2),
+          y: d.bounds.y + Math.round((d.bounds.height - 720) / 2),
+          width: 1280,
+          height: 720,
+          frame: true,
+          resizable: true,
+          backgroundColor: '#000000',
+          title: 'Palinopsia — Output',
+          webPreferences: {
+            preload: join(__dirname, '../preload/index.js'),
+            sandbox: false,
+            contextIsolation: true,
+            nodeIntegration: false
+          }
+        }
+      : {
+          x: d.bounds.x,
+          y: d.bounds.y,
+          width: d.bounds.width,
+          height: d.bounds.height,
+          frame: false,
+          fullscreen: true,
+          backgroundColor: '#000000',
+          title: 'Palinopsia — Output',
+          webPreferences: {
+            preload: join(__dirname, '../preload/index.js'),
+            sandbox: false,
+            contextIsolation: true,
+            nodeIntegration: false
+          }
+        }
+  )
   outputWindow.on('closed', () => {
     outputWindow = null
     mainWindow?.webContents.send('output:closed')
@@ -305,8 +327,8 @@ app.whenReady().then(async () => {
       isPrimary: d.id === primary
     }))
   })
-  safeHandle('output:open', (_e, displayId) => {
-    openOutputWindow(displayId as number)
+  safeHandle('output:open', (_e, displayId, windowed) => {
+    openOutputWindow(displayId as number, windowed as boolean)
     return true
   })
   safeHandle('output:close', () => {

@@ -86,9 +86,9 @@ export function OutputPage({
     ]
   }
 
-  const openOutput = async (): Promise<void> => {
+  const openOutput = async (windowed: boolean): Promise<void> => {
     if (displayId == null) return
-    await window.api.outputOpen(displayId)
+    await window.api.outputOpen(displayId, windowed)
     setOutputActive(true)
   }
   const closeOutput = async (): Promise<void> => {
@@ -236,13 +236,24 @@ export function OutputPage({
                 close output
               </button>
             ) : (
-              <button
-                onClick={openOutput}
-                disabled={displayId == null}
-                className="w-full rounded border border-accent bg-accent/15 px-3 py-1 font-mono text-[11px] text-accent hover:bg-accent/25 disabled:opacity-40"
-              >
-                open on display ▶
-              </button>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => openOutput(false)}
+                  disabled={displayId == null}
+                  className="flex-1 rounded border border-accent bg-accent/15 px-2 py-1 font-mono text-[11px] text-accent hover:bg-accent/25 disabled:opacity-40"
+                  title="Borderless fullscreen on the chosen display (projector)"
+                >
+                  fullscreen ▶
+                </button>
+                <button
+                  onClick={() => openOutput(true)}
+                  disabled={displayId == null}
+                  className="flex-1 rounded border border-accent bg-accent/15 px-2 py-1 font-mono text-[11px] text-accent hover:bg-accent/25 disabled:opacity-40"
+                  title="A normal 1280×720 window — easy to Window-Capture in OBS/Resolume"
+                >
+                  window ▶
+                </button>
+              </div>
             )}
           </Section>
 
