@@ -814,7 +814,9 @@ export class Compositor {
   };
 
   constructor(public canvas: HTMLCanvasElement, public w = 1920, public h = 1080) {
-    const gl = canvas.getContext('webgl2', { premultipliedAlpha: false })!;
+    // preserveDrawingBuffer so canvas.captureStream() (the output-window mirror)
+    // reliably reads the frame instead of capturing black after the buffer swap.
+    const gl = canvas.getContext('webgl2', { premultipliedAlpha: false, preserveDrawingBuffer: true })!;
     if (!gl) throw new Error('WebGL2 unavailable');
     // RGBA16F render targets need this — without it every FBO is incomplete and
     // the whole engine renders black. Surface it rather than fail silently.

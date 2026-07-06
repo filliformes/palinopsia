@@ -16,7 +16,9 @@ interface Signal {
   candidate?: RTCIceCandidateInit
 }
 
-/** Control side: stream `canvas` to the output window. Returns a teardown fn. */
+/** Control side: stream `canvas` to the output window. Returns a teardown fn.
+ *  Offers only when the receiver announces 'ready', so window load order never
+ *  matters (the receiver re-announces until an offer arrives). */
 export function startOutputSender(canvas: HTMLCanvasElement): () => void {
   const pc = new RTCPeerConnection()
   const stream = canvas.captureStream(60)
@@ -44,8 +46,6 @@ export function startOutputSender(canvas: HTMLCanvasElement): () => void {
       }
     }
   })
-  // In case the receiver was already 'ready' before we started listening.
-  void makeOffer()
   return () => {
     off()
     pc.close()
@@ -53,9 +53,12 @@ export function startOutputSender(canvas: HTMLCanvasElement): () => void {
   }
 }
 
-/** Output side: play the incoming stream into `video`. Returns a teardown fn. */
+/** Output side: play the incoming stream into `video`. Returns a teardown fn.
+ *  Re-announces 'ready' every 400ms until an offer arrives, then stops — so it
+ *  connects whether it mounts before or after the sender starts. */
 export function startOutputReceiver(video: HTMLVideoElement): () => void {
   const pc = new RTCPeerConnection()
+  let gotOffer = false
   pc.ontrack = (e) => {
     video.srcObject = e.streams[0]
     void video.play().catch(() => {})
@@ -66,6 +69,8 @@ export function startOutputReceiver(video: HTMLVideoElement): () => void {
   const off = window.api.onOutputSignal(async (raw) => {
     const d = raw as Signal
     if (d?.type === 'offer' && d.sdp) {
+      gotOffer = true
+      clearInterval(readyTimer)
       await pc.setRemoteDescription(d.sdp)
       const answer = await pc.createAnswer()
       await pc.setLocalDescription(answer)
@@ -78,10 +83,14 @@ export function startOutputReceiver(video: HTMLVideoElement): () => void {
       }
     }
   })
-  // Announce we're live so the sender creates the offer.
-  window.api.outputSignal({ type: 'ready' } as Signal)
+  const announce = (): void => {
+    if (!gotOffer) window.api.outputSignal({ type: 'ready' } as Signal)
+  }
+  const readyTimer = setInterval(announce, 400)
+  announce()
   return () => {
     off()
+    clearInterval(readyTimer)
     pc.close()
   }
 }

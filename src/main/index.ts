@@ -322,8 +322,9 @@ app.whenReady().then(async () => {
     return screen.getAllDisplays().map((d, i) => ({
       id: d.id,
       label: d.label || `Display ${i + 1}`,
-      width: d.bounds.width,
-      height: d.bounds.height,
+      // Report NATIVE pixels (bounds are DIP — a 4K panel at 250% is 1536-wide DIP).
+      width: Math.round(d.bounds.width * d.scaleFactor),
+      height: Math.round(d.bounds.height * d.scaleFactor),
       isPrimary: d.id === primary
     }))
   })
