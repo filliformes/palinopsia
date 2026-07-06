@@ -145,6 +145,32 @@ in vec2 uv; out vec4 o;
 uniform sampler2D tex;
 void main(){ o = texture(tex, uv); }`;
 
+// Projection warp (keystone / corner-pin): the composite is drawn as a quad
+// with 4 movable corners, perspective-correct via the per-vertex q (w) coord,
+// with an optional alignment grid + border for lining up on a projector.
+const WARP_VS = `#version 300 es
+in vec2 pos;      // clip-space corner
+in vec3 uvq;      // u*q, v*q, q
+out vec3 vUvq;
+void main(){ vUvq = uvq; gl_Position = vec4(pos, 0.0, 1.0); }`;
+const WARP_FS = `#version 300 es
+precision highp float;
+in vec3 vUvq; out vec4 o;
+uniform sampler2D tex;
+uniform float grid;   // >0.5 → draw the alignment overlay
+void main(){
+  vec2 uv = vUvq.xy / vUvq.z;
+  vec4 c = texture(tex, uv);
+  if (grid > 0.5){
+    vec2 g = abs(fract(uv * 8.0) - 0.5);
+    float line = smoothstep(0.47, 0.5, max(g.x, g.y));
+    c.rgb = mix(c.rgb, vec3(0.0, 1.0, 1.0), line * 0.5);
+    float edge = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y));
+    c.rgb = mix(c.rgb, vec3(1.0, 0.2, 0.2), 1.0 - smoothstep(0.0, 0.006, edge));
+  }
+  o = c;
+}`;
+
 // Source framing: zoom about centre, pan, and per-edge crop (crop-to-fill).
 // Sampling outside the visible region → transparent, so zoom-out shows black.
 const XFORM_FS = `#version 300 es
@@ -214,6 +240,53 @@ class PingPong {
 function disposeTarget(gl: WebGL2RenderingContext, t: { fbo: WebGLFramebuffer; tex: WebGLTexture }) {
   gl.deleteFramebuffer(t.fbo);
   gl.deleteTexture(t.tex);
+}
+
+function lineIntersect(a1: number[], a2: number[], b1: number[], b2: number[]): number[] | null {
+  const d = (a2[0] - a1[0]) * (b2[1] - b1[1]) - (a2[1] - a1[1]) * (b2[0] - b1[0]);
+  if (Math.abs(d) < 1e-9) return null;
+  const t = ((b1[0] - a1[0]) * (b2[1] - b1[1]) - (b1[1] - a1[1]) * (b2[0] - b1[0])) / d;
+  return [a1[0] + t * (a2[0] - a1[0]), a1[1] + t * (a2[1] - a1[1])];
+}
+
+/** 4 normalized corners (TL,TR,BR,BL; 0..1, top-left origin) → 6 verts of
+ *  (clipX, clipY, u·q, v·q, q) for a perspective-correct textured quad. The q
+ *  (w) coords come from the diagonal intersection so the mapping is a true
+ *  keystone, not a bilinear smear. */
+function computeWarpVerts(c: number[]): Float32Array {
+  const p = [
+    [c[0], c[1]],
+    [c[2], c[3]],
+    [c[4], c[5]],
+    [c[6], c[7]]
+  ];
+  const q = [1, 1, 1, 1];
+  const inter = lineIntersect(p[0], p[2], p[1], p[3]);
+  if (inter) {
+    const dist = p.map((pt) => Math.hypot(pt[0] - inter[0], pt[1] - inter[1]));
+    for (let i = 0; i < 4; i++) {
+      const dopp = dist[(i + 2) % 4];
+      q[i] = dopp > 1e-6 ? (dist[i] + dopp) / dopp : 1;
+    }
+  }
+  const uv = [
+    [0, 1],
+    [1, 1],
+    [1, 0],
+    [0, 0]
+  ];
+  const clip = p.map((pt) => [pt[0] * 2 - 1, 1 - pt[1] * 2]);
+  const idx = [0, 1, 2, 0, 2, 3];
+  const out = new Float32Array(30);
+  let o = 0;
+  for (const i of idx) {
+    out[o++] = clip[i][0];
+    out[o++] = clip[i][1];
+    out[o++] = uv[i][0] * q[i];
+    out[o++] = uv[i][1] * q[i];
+    out[o++] = q[i];
+  }
+  return out;
 }
 
 /**
@@ -698,6 +771,14 @@ export class Compositor {
   private xformProg!: WebGLProgram;
   private uXTex!: WebGLUniformLocation; private uXZoom!: WebGLUniformLocation;
   private uXPan!: WebGLUniformLocation; private uXCrop!: WebGLUniformLocation;
+  // Projection warp present pass.
+  private warpProg!: WebGLProgram;
+  private warpVao!: WebGLVertexArrayObject;
+  private warpBuf!: WebGLBuffer;
+  private uWTex!: WebGLUniformLocation; private uWGrid!: WebGLUniformLocation;
+  private warpActive = false;
+  private warpGridOn = false;
+  private warpKey = '';
   private modeIndex: Record<BlendMode, number> = {
     normal: 0, add: 1, subtract: 2, multiply: 3, screen: 4, overlay: 5,
     softlight: 6, hardlight: 7, darken: 8, lighten: 9, difference: 10,
@@ -752,6 +833,24 @@ export class Compositor {
     this.uXPan = gl.getUniformLocation(this.xformProg, 'pan')!;
     this.uXCrop = gl.getUniformLocation(this.xformProg, 'crop')!;
 
+    // Warp present pass — its own VAO with a 6-vertex (2-triangle) quad, each
+    // vertex (x,y, u*q,v*q,q) = 5 floats, re-uploaded when the corners move.
+    this.warpProg = compile(gl, WARP_VS, WARP_FS);
+    this.uWTex = gl.getUniformLocation(this.warpProg, 'tex')!;
+    this.uWGrid = gl.getUniformLocation(this.warpProg, 'grid')!;
+    const wpos = gl.getAttribLocation(this.warpProg, 'pos');
+    const wuvq = gl.getAttribLocation(this.warpProg, 'uvq');
+    this.warpVao = gl.createVertexArray()!;
+    gl.bindVertexArray(this.warpVao);
+    this.warpBuf = gl.createBuffer()!;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.warpBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, 30 * 4, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(wpos);
+    gl.vertexAttribPointer(wpos, 2, gl.FLOAT, false, 20, 0);
+    gl.enableVertexAttribArray(wuvq);
+    gl.vertexAttribPointer(wuvq, 3, gl.FLOAT, false, 20, 8);
+    gl.bindVertexArray(null);
+
     this.acc = new PingPong(gl, w, h);
     this.chain = new ChainBuffers(gl, w, h);
     this.mixTarget = makeTarget(gl, w, h);
@@ -799,6 +898,26 @@ export class Compositor {
     this.xfadeActive = true;
     this.xfadeStartMs = -1; // stamped on the next render (loop clock)
     this.xfadeMs = ms;
+  }
+
+  /** Set the projection warp for the present pass. `corners` = 8 normalized
+   *  numbers (TL,TR,BR,BL x,y; top-left origin) or null to disable. */
+  setWarp(corners: number[] | null, grid: boolean): void {
+    if (!corners || corners.length !== 8) {
+      this.warpActive = false;
+      return;
+    }
+    this.warpActive = true;
+    this.warpGridOn = grid;
+    const key = corners.join(',');
+    if (key !== this.warpKey) {
+      this.warpKey = key;
+      const gl = this.gl;
+      gl.bindVertexArray(this.warpVao);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.warpBuf);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, computeWarpVerts(corners));
+      gl.bindVertexArray(null);
+    }
   }
 
   /** Blit `tex` into `fbo` unchanged (used to keep the crossfade snapshot). */
@@ -1009,13 +1128,22 @@ export class Compositor {
         present = this.xfadeTarget.tex;
       }
     }
-    // Present to canvas.
-    gl.bindVertexArray(this.vao);
+    // Present to canvas — warped (keystone quad) or straight full-screen.
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    gl.useProgram(this.copyProg);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, present); gl.uniform1i(this.uCTex, 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (this.warpActive) {
+      gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.bindVertexArray(this.warpVao);
+      gl.useProgram(this.warpProg);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, present); gl.uniform1i(this.uWTex, 0);
+      gl.uniform1f(this.uWGrid, this.warpGridOn ? 1 : 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    } else {
+      gl.bindVertexArray(this.vao);
+      gl.useProgram(this.copyProg);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, present); gl.uniform1i(this.uCTex, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
     gl.bindVertexArray(null);
 
     // Remember what we just showed — beginCrossfade() snapshots this next time a
@@ -1045,7 +1173,10 @@ export class Compositor {
     gl.deleteProgram(this.mixProg);
     gl.deleteProgram(this.copyProg);
     gl.deleteProgram(this.xformProg);
+    gl.deleteProgram(this.warpProg);
     gl.deleteVertexArray(this.vao);
+    gl.deleteVertexArray(this.warpVao);
     gl.deleteBuffer(this.quadBuf);
+    gl.deleteBuffer(this.warpBuf);
   }
 }

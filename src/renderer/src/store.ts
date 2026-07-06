@@ -379,6 +379,16 @@ interface StoreState {
   // UI chrome (persisted to localStorage, not to sessions).
   uiZoom: number
   setUiZoom: (z: number) => void
+  // Projection warp (keystone / corner-pin) — per-machine output alignment,
+  // persisted to localStorage (not part of a scene). Corners are 8 normalized
+  // numbers: TL, TR, BR, BL (x,y each), 0..1 in output space.
+  warpEnabled: boolean
+  warpGrid: boolean
+  warpCorners: number[]
+  setWarpEnabled: (on: boolean) => void
+  setWarpGrid: (on: boolean) => void
+  setWarpCorner: (corner: number, x: number, y: number) => void
+  resetWarp: () => void
   collapsed: Record<string, boolean>
   toggleSection: (key: string) => void
   // Finishing view: exclusively open one finalizer sub-section (Vibe / Context /
@@ -1078,6 +1088,36 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ uiZoom: clamped })
   },
 
+  warpEnabled: localStorage.getItem('opsia.warpEnabled') === '1',
+  warpGrid: false,
+  warpCorners: (() => {
+    try {
+      const s = JSON.parse(localStorage.getItem('opsia.warpCorners') ?? '')
+      if (Array.isArray(s) && s.length === 8 && s.every((n) => typeof n === 'number')) return s
+    } catch {
+      /* fall through */
+    }
+    return [0, 0, 1, 0, 1, 1, 0, 1] // identity: TL, TR, BR, BL
+  })(),
+  setWarpEnabled: (on) => {
+    localStorage.setItem('opsia.warpEnabled', on ? '1' : '0')
+    set({ warpEnabled: on })
+  },
+  setWarpGrid: (on) => set({ warpGrid: on }),
+  setWarpCorner: (corner, x, y) =>
+    set((s) => {
+      const c = [...s.warpCorners]
+      c[corner * 2] = Math.max(-0.5, Math.min(1.5, x))
+      c[corner * 2 + 1] = Math.max(-0.5, Math.min(1.5, y))
+      localStorage.setItem('opsia.warpCorners', JSON.stringify(c))
+      return { warpCorners: c }
+    }),
+  resetWarp: () => {
+    const c = [0, 0, 1, 0, 1, 1, 0, 1]
+    localStorage.setItem('opsia.warpCorners', JSON.stringify(c))
+    set({ warpCorners: c })
+  },
+
   oscEnabled: localStorage.getItem('opsia.oscEnabled') === '1',
   oscPort: (() => {
     const p = Number(localStorage.getItem('opsia.oscPort'))
@@ -1103,10 +1143,15 @@ export const useStore = create<StoreState>((set, get) => ({
     // The three Finishing-Touches sub-sections start collapsed too — seeded so
     // toggleSection works from a defined value (and existing sessions inherit it).
     const FT: Record<string, boolean> = { 'ft-vibe': true, 'ft-context': true, 'ft-finalizer': true }
-    const DEFAULT_COLLAPSED: Record<string, boolean> = { meta: true, modulation: true, ...FT }
+    const DEFAULT_COLLAPSED: Record<string, boolean> = {
+      meta: true,
+      modulation: true,
+      output: true,
+      ...FT
+    }
     try {
       const saved = localStorage.getItem('opsia.collapsed')
-      if (saved) return { ...FT, ...(JSON.parse(saved) as Record<string, boolean>) }
+      if (saved) return { output: true, ...FT, ...(JSON.parse(saved) as Record<string, boolean>) }
       return DEFAULT_COLLAPSED
     } catch {
       return DEFAULT_COLLAPSED

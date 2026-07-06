@@ -17,6 +17,7 @@ import { MixerPanel } from './components/MixerPanel'
 import { MetaBar } from './components/MetaBar'
 import { ModulationPanel } from './components/ModulationPanel'
 import { OscPanel } from './components/OscPanel'
+import { OutputPanel } from './components/OutputPanel'
 import { SceneBank } from './components/SceneBank'
 import { initOscInput, applyOscListen } from './oscInput'
 import { morphedComposition, consumeCrossfade } from './morph'
@@ -215,6 +216,7 @@ export default function App(): JSX.Element {
         //    everything: UI edits, session loads, OSC — the engine follows.
         //    Shader hot-swaps preserve feedback buffers (brief §1).
         comp!.setGlobalSpeed(st.globalSpeed)
+        comp!.setWarp(st.warpEnabled ? st.warpCorners : null, st.warpGrid)
         comp!.syncFromState(c, shaderSourceById)
         // 2. Modulation: tick the 8-slot engine, then overlay the mod-matrix
         //    on top of the base values — straight into the Compositor, never
@@ -367,6 +369,10 @@ export default function App(): JSX.Element {
               the warp/mapping stage joins it in Phase 8. */}
           <Collapsible sectionKey="master" title="master fx">
             <MasterRackStrip />
+          </Collapsible>
+
+          <Collapsible sectionKey="output" title="output">
+            <OutputPanel />
           </Collapsible>
         </section>
 
