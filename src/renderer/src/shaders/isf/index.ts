@@ -398,6 +398,7 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'size', TYPE: 'float', MIN: 0.02, MAX: 1.0, DEFAULT: 0.25, LABEL: 'size' },
         { NAME: 'weight', TYPE: 'float', MIN: 100.0, MAX: 900.0, DEFAULT: 700.0, LABEL: 'weight' },
         { NAME: 'spacing', TYPE: 'float', MIN: -0.15, MAX: 0.8, DEFAULT: 0.0, LABEL: 'spacing' },
+        { NAME: 'stretch', TYPE: 'float', MIN: 0.25, MAX: 4.0, DEFAULT: 1.0, LABEL: 'v stretch' },
         { NAME: 'angle', TYPE: 'float', MIN: -3.1416, MAX: 3.1416, DEFAULT: 0.0, LABEL: 'angle' },
         { NAME: 'posX', TYPE: 'float', MIN: -1.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'pos x' },
         { NAME: 'posY', TYPE: 'float', MIN: -1.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'pos y' },
@@ -408,6 +409,7 @@ export const GENERATORS: IsfShader[] = [
       size: [0.1, 0.5],
       weight: [300, 900],
       spacing: [0, 0.3],
+      stretch: [0.7, 2.2],
       angle: [-0.6, 0.6],
       posX: [-0.4, 0.4],
       posY: [-0.4, 0.4]

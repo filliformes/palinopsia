@@ -22,17 +22,20 @@ void main(){ vUV = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }`
 const FS = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uMask, uFill;
-uniform float uUseFill, uAngle, uAspect;
+uniform float uUseFill, uAngle, uAspect, uStretch;
 uniform vec2 uPos;
 uniform vec4 uColor;
 void main(){
   // Inverse-transform the lookup: position, then rotate about centre in
-  // aspect-corrected space so glyphs don't shear.
+  // aspect-corrected space so glyphs don't shear. The vertical stretch divides
+  // AFTER the rotation, so it acts along the letters' own vertical axis
+  // (condensed ↔ extended type), not the screen's.
   vec2 p = vUV - 0.5 - uPos;
   p.x *= uAspect;
   float ca = cos(-uAngle), sa = sin(-uAngle);
   p = vec2(ca * p.x - sa * p.y, sa * p.x + ca * p.y);
   p.x /= uAspect;
+  p.y /= max(uStretch, 0.05);
   vec2 uv = p + 0.5;
   float m = 0.0;
   if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) m = texture(uMask, uv).a;
@@ -193,6 +196,7 @@ export class TextSource {
     gl.uniform1f(g.u('uUseFill'), sidechainTex ? 1 : 0)
     gl.uniform1f(g.u('uAngle'), num(inp.angle, 0))
     gl.uniform1f(g.u('uAspect'), this.w / this.h)
+    gl.uniform1f(g.u('uStretch'), Math.max(0.25, Math.min(4, num(inp.stretch, 1))))
     gl.uniform2f(g.u('uPos'), num(inp.posX, 0) * 0.5, num(inp.posY, 0) * 0.5)
     const col = Array.isArray(inp.color) ? inp.color : [1, 1, 1, 1]
     gl.uniform4f(g.u('uColor'), col[0] ?? 1, col[1] ?? 1, col[2] ?? 1, col[3] ?? 1)
