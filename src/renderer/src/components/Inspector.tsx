@@ -3,7 +3,7 @@
 // themed controls, and writes edits back through the store — the same path
 // OSC and the modulators (Phase 5) use, so the engine follows automatically.
 
-import type { FxInstance, ModTarget, SourceSlot } from '@shared/types'
+import type { FxInstance, ModTarget, SidechainRef, SourceSlot } from '@shared/types'
 import { randomizeInputs } from '../randomize'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { inputsForShader } from '../shaders/isf/inputs'
@@ -55,6 +55,7 @@ export function Inspector(): JSX.Element {
   const composition = useStore((s) => s.composition)
   const setSourceInput = useStore((s) => s.setSourceInput)
   const setFxInput = useStore((s) => s.setFxInput)
+  const setFxSidechain = useStore((s) => s.setFxSidechain)
   const setFxOpacity = useStore((s) => s.setFxOpacity)
   const vibePresetName = useStore((s) => s.vibePresetName)
   const setVibePresetName = useStore((s) => s.setVibePresetName)
@@ -73,6 +74,9 @@ export function Inspector(): JSX.Element {
   let fxOpacity: { value: number; set: (v: number) => void } | null = null
   // For a video source (no ISF controls) — the clip name shown in a small panel.
   let videoName: string | null = null
+  // For a native convolution node (layer FX): the sidechain picker.
+  let nodeSidechain: { ref: SidechainRef | null; hostLayer: number; set: (r: SidechainRef | null) => void } | null =
+    null
 
   if (selection?.type === 'source') {
     const layer = composition.layers[selection.layer]
@@ -117,6 +121,14 @@ export function Inspector(): JSX.Element {
           : `layer ${scope.layer + 1} · ${SCOPE_LABEL[scope.kind]}`
       onChange = (n, v) => setFxInput(scope, instId, n, v)
       modTargetFor = (input) => ({ kind: 'fx', scope, instId, input })
+      if (SHADER_BY_ID[inst.shaderId]?.native && scope.kind === 'layer') {
+        const sc = scope
+        nodeSidechain = {
+          ref: inst.sidechain ?? null,
+          hostLayer: scope.layer,
+          set: (r) => setFxSidechain(sc, instId, r)
+        }
+      }
     }
   }
 
@@ -273,6 +285,31 @@ export function Inspector(): JSX.Element {
           onApplied={isVibe ? setVibePresetName : undefined}
         />
       </div>
+      {/* Native convolution node: the sidechain (impulse) source picker. */}
+      {nodeSidechain && (
+        <div className="flex items-center gap-2 border-b border-border bg-panel2/40 px-2 py-1">
+          <span className="font-mono text-[9px] uppercase tracking-wide text-accent2" title="The layer whose MOVEMENT is imprinted onto this one">
+            sidechain
+          </span>
+          <select
+            className="input select-compact text-[11px]"
+            value={nodeSidechain.ref?.kind === 'layer' ? `layer:${nodeSidechain.ref.layer}` : ''}
+            onChange={(e) => {
+              const v = e.target.value
+              nodeSidechain!.set(v.startsWith('layer:') ? { kind: 'layer', layer: Number(v.slice(6)) } : null)
+            }}
+          >
+            <option value="">— none —</option>
+            {[0, 1, 2, 3].map((li) => (
+              <option key={li} value={`layer:${li}`}>
+                Layer {li + 1}
+                {li === nodeSidechain!.hostLayer ? ' (self)' : ''}
+              </option>
+            ))}
+          </select>
+          <span className="font-mono text-[9px] text-muted">its motion → this layer</span>
+        </div>
+      )}
       {/* Sources (≤8 params) fit their content — wrap onto as few rows as
           needed (usually one), no fixed height, no horizontal scroll. FX can be
           deep, so they keep the fixed two-row grid that flows into columns. */}

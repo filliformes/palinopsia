@@ -83,7 +83,15 @@ export interface SourceSlot extends ShaderInstance {
   cropB?: number // trim bottom edge 0..0.9, default 0
 }
 
-// One FX in a rack. Every FX is an ISF shader (per brief §5).
+// Where a native convolution node reads its "impulse"/energy source from: another
+// layer's composited output, or an imported still/clip asset. null = inert.
+export type SidechainRef =
+  | { kind: 'layer'; layer: number }
+  | { kind: 'asset'; assetId: string }
+
+// One FX in a rack. Usually an ISF shader (brief §5); a `node-*` shaderId marks a
+// native multi-pass convolution node (visual-convolution spec) run by a TS class
+// instead of the ISF runtime — it carries an extra sidechain source.
 export interface FxInstance extends ShaderInstance {
   id: string
   enabled: boolean
@@ -93,6 +101,8 @@ export interface FxInstance extends ShaderInstance {
   // Pinned rack units (the master Vibe Palette): always on, not removable,
   // always last in the chain.
   locked?: boolean
+  // Native convolution nodes only: the sidechain (impulse) source.
+  sidechain?: SidechainRef | null
 }
 
 // One of the four layers.

@@ -28,6 +28,8 @@
 
 import { Renderer as ISFRenderer } from 'interactive-shader-format';
 import { handle, installTextureBridge } from './isfTextureBridge';
+import { makeConvNode, isNativeNode, type ConvNode } from './convNodes';
+import type { SidechainRef } from '@shared/types';
 import { VideoSource } from './VideoSource';
 import { CaptureSource } from './CaptureSource';
 import { HiveSource } from './HiveSource';
@@ -402,6 +404,18 @@ interface FxUnit {
   isf: ISFRenderer | null;
   enabled: boolean;
   opacity: number; // dry/wet
+  // Native convolution node (`node-*`): the TS class + its live params + the
+  // sidechain ref (resolved to a texture by the compositor at apply time).
+  node?: ConvNode | null;
+  inputs?: Record<string, number | number[]>;
+  sidechain?: SidechainRef | null;
+}
+
+// Everything a native node needs beyond its input texture: the sidechain
+// resolver (ref → texture) and the frame delta. Supplied by the compositor.
+export interface NodeApplyCtx {
+  sidechainTex: (ref: SidechainRef | null | undefined) => WebGLTexture | null;
+  dt: number;
 }
 
 /**
@@ -423,30 +437,46 @@ class FxRack {
       let unit = byInst.get(inst.id);
       if (unit && unit.shaderId !== inst.shaderId) {
         unit.isf?.cleanup();
+        unit.node?.dispose();
         unit = undefined;
       }
+      const native = isNativeNode(inst.shaderId);
       if (!unit) {
-        const src = sourceById(inst.shaderId);
-        // A compile costs from the per-frame budget; if spent, defer this
-        // unit to a later frame (it just isn't in the chain this frame).
-        if (src) {
-          if (this.shared.budget.n <= 0) continue;
-          this.shared.budget.n--;
+        if (native) {
+          unit = {
+            instId: inst.id, shaderId: inst.shaderId, isf: null, enabled: inst.enabled, opacity: 1,
+            node: makeConvNode(this.shared.gl, inst.shaderId)
+          };
+        } else {
+          const src = sourceById(inst.shaderId);
+          // A compile costs from the per-frame budget; if spent, defer this
+          // unit to a later frame (it just isn't in the chain this frame).
+          if (src) {
+            if (this.shared.budget.n <= 0) continue;
+            this.shared.budget.n--;
+          }
+          // Create the unit even if the source is missing or the compile fails
+          // (isf stays null) so we don't re-attempt the load every frame.
+          const isf = src ? loadIsf(this.shared.rgl, inst.shaderId, src) : null;
+          unit = { instId: inst.id, shaderId: inst.shaderId, isf, enabled: inst.enabled, opacity: 1 };
         }
-        // Create the unit even if the source is missing or the compile fails
-        // (isf stays null) so we don't re-attempt the load every frame.
-        const isf = src ? loadIsf(this.shared.rgl, inst.shaderId, src) : null;
-        unit = { instId: inst.id, shaderId: inst.shaderId, isf, enabled: inst.enabled, opacity: 1 };
       }
       unit.enabled = inst.enabled;
       unit.opacity = inst.opacity ?? 1;
-      // Push declared param values (auto-UI / OSC write these to the store).
-      if (unit.isf) for (const [k, v] of Object.entries(inst.inputs)) unit.isf.setValue(k, v);
+      if (native) {
+        // Native node: refresh its base params (modulation overlays these before
+        // render via setUnitInput) and the sidechain ref.
+        unit.inputs = { ...inst.inputs };
+        unit.sidechain = inst.sidechain ?? null;
+      } else if (unit.isf) {
+        // Push declared param values (auto-UI / OSC write these to the store).
+        for (const [k, v] of Object.entries(inst.inputs)) unit.isf.setValue(k, v);
+      }
       byInst.delete(inst.id);
       next.push(unit);
     }
     // Anything left in the map was removed from the rack.
-    for (const gone of byInst.values()) gone.isf?.cleanup();
+    for (const gone of byInst.values()) { gone.isf?.cleanup(); gone.node?.dispose(); }
     this.units = next;
   }
 
@@ -454,9 +484,13 @@ class FxRack {
     return this.units.some((u) => u.enabled);
   }
 
-  /** Direct write to one unit's ISF input (the modulation path). */
+  /** Direct write to one unit's input (the modulation path). ISF units push to
+   *  the renderer; native nodes overlay their live param map (read at render). */
   setUnitInput(instId: string, name: string, value: number | number[]): void {
-    this.units.find((u) => u.instId === instId)?.isf?.setValue(name, value);
+    const u = this.units.find((x) => x.instId === instId);
+    if (!u) return;
+    if (u.node) { if (u.inputs) u.inputs[name] = value; }
+    else u.isf?.setValue(name, value);
   }
 
   /** Assign this rack's clock (per-layer Speed — see isfTextureBridge). */
@@ -466,28 +500,47 @@ class FxRack {
     }
   }
 
-  /** Run the chain on `input`; returns the last written texture. */
-  apply(input: WebGLTexture, chain: ChainBuffers): WebGLTexture {
+  /** Run the chain on `input`; returns the last written texture. `nodeCtx` is
+   *  required for racks that may hold native convolution nodes (layer FX). */
+  apply(input: WebGLTexture, chain: ChainBuffers, nodeCtx?: NodeApplyCtx): WebGLTexture {
     let cur = input;
     for (const u of this.units) {
-      if (!u.enabled || !u.isf) continue;
+      if (!u.enabled) continue;
       const dry = cur;
-      const target = chain.next();
-      u.isf.setValue('inputImage', handle(cur, chain.w, chain.h) as unknown as number);
-      this.shared.redirect.redirect = target.fbo;
-      u.isf.draw({ width: chain.w, height: chain.h });
-      this.shared.redirect.redirect = null;
+      let wet: WebGLTexture;
+      if (u.node) {
+        // Native convolution node — runs its own multi-pass render.
+        if (!nodeCtx) continue; // rack not given a node context this frame
+        wet = u.node.render({
+          gl: this.shared.gl,
+          chain,
+          host: cur,
+          sidechain: nodeCtx.sidechainTex(u.sidechain),
+          inputs: u.inputs ?? {},
+          dt: nodeCtx.dt
+        });
+        if (wet === cur) continue; // node was inert (no sidechain) — passthrough
+      } else if (u.isf) {
+        const target = chain.next();
+        u.isf.setValue('inputImage', handle(cur, chain.w, chain.h) as unknown as number);
+        this.shared.redirect.redirect = target.fbo;
+        u.isf.draw({ width: chain.w, height: chain.h });
+        this.shared.redirect.redirect = null;
+        wet = target.tex;
+      } else {
+        continue;
+      }
       // Per-FX opacity: blend the wet result back over the dry input.
       cur =
         u.opacity < 0.999 && this.shared.blendDryWet
-          ? this.shared.blendDryWet(dry, target.tex, u.opacity)
-          : target.tex;
+          ? this.shared.blendDryWet(dry, wet, u.opacity)
+          : wet;
     }
     return cur;
   }
 
   dispose() {
-    for (const u of this.units) u.isf?.cleanup();
+    for (const u of this.units) { u.isf?.cleanup(); u.node?.dispose(); }
     this.units = [];
   }
 }
@@ -1109,6 +1162,18 @@ export class Compositor {
     this.masterClockSec += dtSec;
     this.masterRack.setTime(this.masterClockSec);
 
+    // Native convolution nodes (layer FX) resolve their sidechain to a live
+    // texture: another layer's persisted output (previous frame for layers not
+    // yet rendered — fine, the node keeps its own history). Assets land later.
+    const nodeCtx: NodeApplyCtx = {
+      dt: rawDt,
+      sidechainTex: (ref) => {
+        if (!ref) return null;
+        if (ref.kind === 'layer') return this.layers[ref.layer]?.texture() ?? null;
+        return null; // imported assets — Commit C
+      }
+    };
+
     // Per layer: sources → per-source racks → mix → layer rack → persist.
     // The result of each stage lives in shared buffers only until persist
     // writes it into the layer's own ping-pong pair.
@@ -1138,7 +1203,7 @@ export class Compositor {
           sig = this.mixSources(sig, sigB, L.sourceMix, L.sourceBlend, L.harmony);
         }
         gl.bindVertexArray(null);
-        sig = L.rackLayer.apply(sig, this.chain);
+        sig = L.rackLayer.apply(sig, this.chain, nodeCtx);
         this.persist(L, sig);
       } catch (e) {
         this.shared.redirect.redirect = null;

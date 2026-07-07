@@ -85,7 +85,52 @@ export interface IsfShader {
   source: string
   /** Randomize's aesthetic sub-range per float input (tighter than MIN/MAX). */
   curated?: Record<string, [number, number]>
+  /** Native convolution node (`node-*`): run by a TS class, not the ISF runtime.
+   *  `source` is a header-only stub so the auto-UI/presets/randomize still parse
+   *  its INPUTS. Excluded from the Randomize FX pool (needs a sidechain). */
+  native?: boolean
 }
+
+// ── Native convolution nodes (visual-convolution spec) ──────────────────
+// Registered like shaders (header-only source ⇒ auto-UI + modulation + presets +
+// randomize) but the engine runs a TS class and hands it a sidechain texture.
+// Kept OUT of FX_SHADERS (the Randomize pool) — added to the picker + lookups.
+export const NATIVE_NODES: IsfShader[] = [
+  {
+    id: 'node-transfert',
+    name: 'Transfert',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Transfert — imprint another layer's MOVEMENT onto this one (optical-flow transfer). Déplacement warps by the sidechain's flow; Traînée is a flow-steered line blur (motion blur painted by another layer's gesture). Pick the sidechain in the Inspector.",
+      "CATEGORIES": ["FX", "Convolution"],
+      "INPUTS": [
+        { "NAME": "mode", "TYPE": "long", "VALUES": [0,1], "LABELS": ["deplacement","trainee"], "DEFAULT": 0, "LABEL": "mode" },
+        { "NAME": "amount", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "amount" },
+        { "NAME": "inertie", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "inertie" },
+        { "NAME": "flowScale", "TYPE": "float", "MIN": 0.25, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "flow scale" },
+        { "NAME": "flowBlur", "TYPE": "float", "MIN": 0.0, "MAX": 24.0, "DEFAULT": 8.0, "LABEL": "flow blur" },
+        { "NAME": "magnitudeGamma", "TYPE": "float", "MIN": 0.25, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "mag gamma" },
+        { "NAME": "channelSpread", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "chroma pull" },
+        { "NAME": "invert", "TYPE": "bool", "DEFAULT": false, "LABEL": "invert" },
+        { "NAME": "taps", "TYPE": "float", "MIN": 2.0, "MAX": 24.0, "DEFAULT": 12.0, "LABEL": "taps" },
+        { "NAME": "falloff", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "falloff" },
+        { "NAME": "bidirectional", "TYPE": "bool", "DEFAULT": true, "LABEL": "bidirectional" },
+        { "NAME": "flowRes", "TYPE": "long", "VALUES": [0,1,2], "LABELS": ["128","256","512"], "DEFAULT": 1, "LABEL": "flow res" }
+      ]
+    }*/`,
+    curated: {
+      amount: [0.15, 0.6],
+      inertie: [0.3, 0.85],
+      flowScale: [0.6, 2.0],
+      flowBlur: [4, 14],
+      magnitudeGamma: [0.6, 1.6],
+      channelSpread: [0, 0.4],
+      taps: [8, 18],
+      falloff: [0.2, 0.8]
+    }
+  }
+]
 
 export const GENERATORS: IsfShader[] = [
   {
@@ -557,6 +602,7 @@ export const FINALIZER_SHADER: IsfShader = {
 export const ALL_SHADERS: IsfShader[] = [
   ...GENERATORS,
   ...FX_SHADERS,
+  ...NATIVE_NODES,
   VIBE_SHADER,
   CONTEXT_SHADER,
   FINALIZER_SHADER
@@ -604,7 +650,8 @@ function fxGroupRank(g: string): number {
 /** FX bucketed by sub-category, colour first, alphabetical within each. */
 export const FX_GROUPS: Array<{ group: string; shaders: IsfShader[] }> = (() => {
   const buckets = new Map<string, IsfShader[]>()
-  for (const sh of FX_SHADERS) {
+  // Native convolution nodes appear in the picker alongside FX (their own group).
+  for (const sh of [...FX_SHADERS, ...NATIVE_NODES]) {
     const g = fxGroup(sh)
     if (!buckets.has(g)) buckets.set(g, [])
     buckets.get(g)!.push(sh)

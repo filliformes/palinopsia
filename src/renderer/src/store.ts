@@ -17,6 +17,7 @@ import type {
   ModulatorConfig,
   SceneEntry,
   Session,
+  SidechainRef,
   SourceSlot,
   World
 } from '@shared/types'
@@ -384,6 +385,8 @@ interface StoreState {
   // Drag-and-drop reorder: place instId before beforeId (null = end of chain).
   reorderFx: (scope: FxScope, instId: string, beforeId: string | null) => void
   setFxInput: (scope: FxScope, instId: string, name: string, value: number | number[]) => void
+  // Native convolution nodes: choose the sidechain (impulse) source.
+  setFxSidechain: (scope: FxScope, instId: string, ref: SidechainRef | null) => void
 
   // Randomize (brief §7) — scoped draws from curated aesthetic ranges.
   // `intensity` 1 = full structural re-roll; <1 = a walk from the current scene.
@@ -1070,6 +1073,12 @@ export const useStore = create<StoreState>((set, get) => ({
         fx.map((f) =>
           f.id === instId ? { ...f, inputs: { ...f.inputs, [name]: value } } : f
         )
+      )
+    })),
+  setFxSidechain: (scope, instId, ref) =>
+    set((s) => ({
+      composition: updateFxArray(s.composition, scope, (fx) =>
+        fx.map((f) => (f.id === instId ? { ...f, sidechain: ref } : f))
       )
     })),
 
