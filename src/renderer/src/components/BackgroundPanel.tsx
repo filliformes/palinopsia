@@ -94,8 +94,8 @@ export function BackgroundPanel(): JSX.Element {
           ))}
         </select>
         <span onClick={(e) => e.stopPropagation()}>
-          {/* fixed narrow — hugs "+ fx", not the widest FX name in the list */}
-          <FxAddSelect scope={{ kind: 'background' }} className="w-11 shrink-0" />
+          {/* w-auto → the native select sizes to its widest option (not clipped) */}
+          <FxAddSelect scope={{ kind: 'background' }} className="w-auto shrink-0" />
         </span>
         <button
           onClick={(e) => {
