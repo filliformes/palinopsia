@@ -393,18 +393,19 @@ function randomizeStructural(
 
   // Source PARAMETERS only — keep the chosen generators, re-roll their ISF
   // inputs within curated ranges (unlike 'sources', which picks new ones).
+  // Text is never touched by a global Randomize (its string / font / layout are
+  // user intent) — only its own Inspector ⚄ re-rolls it.
+  const paramSlot = (s: SourceSlot | null): SourceSlot | null =>
+    s && s.shaderId && s.shaderId !== 'gen-text'
+      ? { ...s, inputs: randomizeInputs(s.shaderId, s.inputs) }
+      : s
   if (scope === 'sourceparams') {
     return {
       ...c,
       layers: c.layers.map((l) => ({
         ...l,
-        sourceA: l.sourceA.shaderId
-          ? { ...l.sourceA, inputs: randomizeInputs(l.sourceA.shaderId, l.sourceA.inputs) }
-          : l.sourceA,
-        sourceB:
-          l.sourceB && l.sourceB.shaderId
-            ? { ...l.sourceB, inputs: randomizeInputs(l.sourceB.shaderId, l.sourceB.inputs) }
-            : l.sourceB
+        sourceA: paramSlot(l.sourceA) as SourceSlot,
+        sourceB: paramSlot(l.sourceB)
       }))
     }
   }
@@ -621,7 +622,8 @@ export function jitterInputs(
 }
 
 function jitterSlot(slot: SourceSlot | null, amount: number): SourceSlot | null {
-  if (!slot || !slot.shaderId) return slot // video/capture/hive/empty: nothing to nudge
+  // video/capture/hive/empty: nothing to nudge. Text: left to user intent.
+  if (!slot || !slot.shaderId || slot.shaderId === 'gen-text') return slot
   return { ...slot, inputs: jitterInputs(slot.shaderId, slot.inputs, amount) }
 }
 
