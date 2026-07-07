@@ -146,7 +146,12 @@ export class VideoSource {
     if (d <= 0) return
     const lo = Math.max(0, Math.min(1, Math.min(this.pb.inN, this.pb.outN))) * d
     const hi = Math.max(0, Math.min(1, Math.max(this.pb.inN, this.pb.outN))) * d
-    const NATIVE_MAX = 16 // Chromium clamps playbackRate here
+    // Native playback is smooth only while the decoder can sustain the rate. Near
+    // its 16× cap it stalls (can't decode 16× realtime; a short clip re-seeking
+    // its loop point every few ms makes it worse) — which reads as a frozen image
+    // even though the playhead moves. Above this we fast-forward with the same
+    // keyframe-seek pump reverse uses (choppier, but it never freezes).
+    const NATIVE_MAX = 8
 
     if (!this.pb.playing) {
       if (!v.paused) v.pause()
