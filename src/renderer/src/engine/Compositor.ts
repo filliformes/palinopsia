@@ -303,7 +303,7 @@ function computeWarpVerts(c: number[]): Float32Array {
  * are redirected to a target of our choosing. One shared instance serves every
  * ISF renderer — draws are strictly sequential within a frame.
  */
-function makeRedirectableGL(gl: WebGL2RenderingContext): {
+export function makeRedirectableGL(gl: WebGL2RenderingContext): {
   gl: WebGL2RenderingContext;
   state: { redirect: WebGLFramebuffer | null };
 } {

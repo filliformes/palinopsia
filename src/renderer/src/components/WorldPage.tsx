@@ -11,7 +11,9 @@ import type { AudioFeature, CouplingMode, World, WorldAudioTarget } from '@share
 import { WORLD_AUDIO_TARGETS } from '@shared/types'
 import { AUDIO_FEATURES } from '../engine/audioIn'
 import { useStore } from '../store'
-import { WorldVisualizer } from './WorldVisualizer'
+import { WorldVisualizer, WORLD_SOURCE_PAIRS, simAudio, type SimAudio } from './WorldVisualizer'
+
+const SIM_SHAPES: SimAudio['shape'][] = ['pulse', 'sine', 'ramp', 'noise']
 
 const COUPLING_MODES: CouplingMode[] = ['off', 'lean', 'hocket', 'cut', 'gate', 'drift']
 const CONTEXT_KEYS: Array<{ k: string; label: string }> = [
@@ -35,6 +37,11 @@ export function WorldPage(): JSX.Element {
   const [selId, setSelId] = useState(activeId)
   const w = worlds.find((x) => x.id === selId) ?? worlds[0]
   const isActive = w.id === activeId
+
+  // Visualizer test material + simulated-audio driver.
+  const [sourceIdx, setSourceIdx] = useState(0)
+  const [audio, setAudio] = useState<SimAudio>({ shape: 'pulse', freqHz: 2, rhythmic: true, gain: 0.9 })
+  const setAud = (p: Partial<SimAudio>): void => setAudio((a) => ({ ...a, ...p }))
 
   const setCoupling = (partial: Partial<typeof w.coupling>): void =>
     updateWorld(w.id, { coupling: { ...w.coupling, ...partial } })
@@ -142,7 +149,7 @@ export function WorldPage(): JSX.Element {
             title="One-line description"
           />
 
-          <div className="grid max-w-5xl grid-cols-2 gap-6">
+          <div className="grid max-w-6xl grid-cols-[340px_minmax(0,1fr)] gap-6">
            <div className="flex flex-col gap-4">
             {/* Coupling */}
             <Section title="A/B Coupling — how the two voices bond">
@@ -192,10 +199,97 @@ export function WorldPage(): JSX.Element {
 
            </div>
 
-           {/* right column — Visualizer + live-code */}
+           {/* right column — big Visualizer + audio driver + live-code */}
            <div className="flex flex-col gap-4">
-              <Section title="World Visualizer — simulated audio + A/B">
-                <WorldVisualizer coupling={w.coupling} context={w.context} />
+              <Section title="World Visualizer — real generators · simulated audio · A/B">
+                <WorldVisualizer
+                  coupling={w.coupling}
+                  context={w.context}
+                  audio={audio}
+                  sourceIdx={sourceIdx}
+                />
+                {/* Test material */}
+                <div className="flex items-center gap-2">
+                  <span className="w-20 shrink-0 font-mono text-[10px] text-muted">material</span>
+                  <select
+                    className="input select-compact min-w-0 flex-1 text-[11px]"
+                    value={sourceIdx}
+                    onChange={(e) => setSourceIdx(Number(e.target.value))}
+                    title="Which pair of real generators to read the World on (A ↔ B)"
+                  >
+                    {WORLD_SOURCE_PAIRS.map((p, i) => (
+                      <option key={p.name} value={i}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {/* Simulated audio driver + VU meter */}
+                <div className="mt-1 flex flex-col gap-2 rounded border border-border bg-panel3/20 p-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-20 shrink-0 font-mono text-[9px] uppercase text-muted">sim audio</span>
+                    <VuMeter audio={audio} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-20 shrink-0 font-mono text-[10px] text-muted">shape</span>
+                    <div className="flex gap-1">
+                      {SIM_SHAPES.map((sh) => (
+                        <button
+                          key={sh}
+                          onClick={() => setAud({ shape: sh })}
+                          className={`rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
+                            audio.shape === sh
+                              ? 'bg-accent/20 text-accent ring-1 ring-accent'
+                              : 'bg-panel2 text-muted hover:text-text'
+                          }`}
+                        >
+                          {sh}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setAud({ rhythmic: !audio.rhythmic })}
+                      className={`ml-auto rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
+                        audio.rhythmic
+                          ? 'bg-accent/20 text-accent ring-1 ring-accent'
+                          : 'bg-panel2 text-muted hover:text-text'
+                      }`}
+                      title="Rhythmic (pulsing beats) ↔ constant (steady modulation)"
+                    >
+                      {audio.rhythmic ? 'rhythmic' : 'constant'}
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-20 shrink-0 font-mono text-[10px] text-muted">rate</span>
+                    <input
+                      type="range"
+                      min={0.2}
+                      max={8}
+                      step={0.1}
+                      value={audio.freqHz}
+                      onChange={(e) => setAud({ freqHz: Number(e.target.value) })}
+                      className="min-w-0 flex-1 accent-accent"
+                    />
+                    <span className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">
+                      {audio.freqHz.toFixed(1)}Hz
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-20 shrink-0 font-mono text-[10px] text-muted">level</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={audio.gain}
+                      onChange={(e) => setAud({ gain: Number(e.target.value) })}
+                      className="min-w-0 flex-1 accent-accent"
+                    />
+                    <span className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">
+                      {audio.gain.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
               </Section>
               <Section title="Live code (JSON) — edit, then Apply">
                 <JsonEditor world={w} onApply={(patch) => updateWorld(w.id, patch)} />
@@ -255,7 +349,7 @@ function JsonEditor({
   return (
     <div className="flex flex-col gap-1.5">
       <textarea
-        className="input h-40 w-full resize-none whitespace-pre font-mono text-[10px] leading-tight"
+        className="input h-72 w-full resize-y whitespace-pre font-mono text-[10px] leading-tight"
         spellCheck={false}
         value={text}
         onChange={(e) => {
@@ -280,6 +374,32 @@ function JsonEditor({
         </button>
         {err && <span className="font-mono text-[10px] text-danger">⚠ {err}</span>}
       </div>
+    </div>
+  )
+}
+
+// ── VU meter — mirrors the simulated-audio level the visualizer sees ─────
+function VuMeter({ audio }: { audio: SimAudio }): JSX.Element {
+  const barRef = useRef<HTMLDivElement | null>(null)
+  const flashRef = useRef<HTMLDivElement | null>(null)
+  const audioRef = useRef(audio)
+  audioRef.current = audio
+  useEffect(() => {
+    let raf = 0
+    const t0 = performance.now()
+    const tick = (): void => {
+      const f = simAudio(audioRef.current, (performance.now() - t0) / 1000)
+      if (barRef.current) barRef.current.style.width = `${Math.round(f.level * 100)}%`
+      if (flashRef.current) flashRef.current.style.opacity = String(Math.min(1, f.transient))
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+  return (
+    <div className="relative h-2.5 min-w-0 flex-1 overflow-hidden rounded bg-panel2">
+      <div ref={barRef} className="h-full rounded bg-accent" style={{ width: '0%' }} />
+      <div ref={flashRef} className="pointer-events-none absolute inset-0 bg-accent2" style={{ opacity: 0 }} />
     </div>
   )
 }
