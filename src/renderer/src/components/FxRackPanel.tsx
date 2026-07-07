@@ -12,6 +12,15 @@ import { useStore, type FxScope } from '../store'
 
 export function FxAddSelect({ scope, className = '' }: { scope: FxScope; className?: string }): JSX.Element {
   const addFx = useStore((s) => s.addFx)
+  // Native convolution nodes (sidechained, multi-pass) only run in a LAYER's FX
+  // rack — hide their group from the master + source pickers, where they'd sit
+  // inert as confusing passthroughs.
+  const groups =
+    scope.kind === 'layer'
+      ? FX_GROUPS
+      : FX_GROUPS.map((g) => ({ ...g, shaders: g.shaders.filter((f) => !f.native) })).filter(
+          (g) => g.shaders.length > 0
+        )
   return (
     <select
       className={`input select-compact text-[10px] ${className || 'w-20 shrink-0'}`}
@@ -22,7 +31,7 @@ export function FxAddSelect({ scope, className = '' }: { scope: FxScope; classNa
       title="Add an FX to this rack"
     >
       <option value="">+ fx</option>
-      {FX_GROUPS.map((grp) => (
+      {groups.map((grp) => (
         <optgroup key={grp.group} label={grp.group}>
           {grp.shaders.map((f) => (
             <option key={f.id} value={f.id}>
