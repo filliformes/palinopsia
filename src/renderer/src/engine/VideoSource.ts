@@ -211,7 +211,12 @@ export class VideoSource {
         try { v.currentTime = this.pos } catch { /* seek can race a reload */ }
       }
     } else {
-      if (this.seeking && performance.now() - this.seekAt > 600) this.seeking = false
+      // A large backward / fast-forward seek can take a while to decode. The
+      // safety must sit ABOVE any real seek time — otherwise it fires mid-seek,
+      // issues a new seek that CANCELS the in-flight one, and the frame never
+      // settles (the >1× reverse / >16× forward freeze). 'seeked' is the primary
+      // release; this only rescues a genuinely hung seek.
+      if (this.seeking && performance.now() - this.seekAt > 4000) this.seeking = false
       if (!this.seeking && Math.abs(this.pos - v.currentTime) > 0.02) {
         try {
           v.currentTime = this.pos
