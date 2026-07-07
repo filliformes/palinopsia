@@ -536,9 +536,10 @@ export function AssignRow({
       {/* Meta knobs — K1..K16; a knob drives this input absolutely through
           its curve over the input's declared range (up to 8 dests/knob). */}
       {!hideMeta && (
-        <div className="flex min-w-0 items-center gap-1">
-          <span className="w-8 shrink-0 font-mono text-[8px] uppercase text-muted">meta</span>
-          <div className="flex flex-wrap gap-0.5">
+        <div className="flex min-w-0 items-start gap-1">
+          <span className="w-8 shrink-0 pt-0.5 font-mono text-[8px] uppercase text-muted">meta</span>
+          {/* 6 columns → K1-6 · K7-12 · K13-16 (three rows, no fourth). */}
+          <div className="grid min-w-0 flex-1 grid-cols-6 gap-0.5">
             {metaBound.map((on, i) => (
               <button
                 key={i}

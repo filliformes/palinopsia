@@ -455,7 +455,7 @@ function AssignPanel({
   )
   return (
     <div className="flex w-56 shrink-0 flex-col border-l border-border bg-panel2/40">
-      <div className="flex items-center gap-2 border-b border-border px-2 py-1">
+      <div className="flex items-center gap-2 border-b border-border py-1 pl-3.5 pr-2">
         <span className="font-mono text-[9px] uppercase tracking-wide text-accent2">modulate</span>
         <span className="min-w-0 flex-1 truncate text-[11px] font-semibold" title={label}>
           {label}
@@ -468,7 +468,7 @@ function AssignPanel({
           ✕
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+      <div className="min-h-0 flex-1 overflow-y-auto py-2 pl-3 pr-1.5">
         <AssignRow target={target} bound={bound} />
       </div>
     </div>
