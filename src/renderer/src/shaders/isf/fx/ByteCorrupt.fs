@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Byte Corrupt — bit-depth quantization with channel entanglement: values crushed to few levels, then per-block arithmetic scrambling folds channels into each other on a stepped clock. Data damage, not noise.",
+  "DESCRIPTION": "Byte Corrupt — bit-depth quantization with channel entanglement: values crushed to few levels, then per-block arithmetic scrambling folds channels into each other on a stepped clock. Data damage, not noise. `warp byte` bends the block grid and gives every block its own rotation / zoom / offset so the mosaic stops reading as clean squares — irregular warped fragments instead.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],
@@ -8,6 +8,7 @@
     { "NAME": "depth",    "TYPE": "float", "MIN": 2.0, "MAX": 16.0, "DEFAULT": 6.0 },
     { "NAME": "scramble", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.4 },
     { "NAME": "blocks",   "TYPE": "float", "MIN": 2.0, "MAX": 64.0, "DEFAULT": 12.0 },
+    { "NAME": "warpByte", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0, "LABEL": "warp byte" },
     { "NAME": "rate",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.3 },
     { "NAME": "chaos",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0 }
   ]
@@ -36,16 +37,44 @@ void main() {
     mix(1.0, mix(0.08, 6.0, hash(chaosCell + 43.0)), isChaos)
   );
   vec2 grid = gridN * warpAspect;
-  vec2 cell = floor(uv * grid);
+
+  // WARP BYTE: a domain warp (re-rolled each byte-step) bends the whole grid so
+  // block boundaries are no longer axis-aligned. Applied to BOTH the cell lookup
+  // and the sampling so content follows its bent block.
+  vec2 domUV = uv;
+  if (warpByte > 0.001) {
+    vec2 bend = vec2(
+      sin(uv.y * 11.0 + t * 0.7) + sin(uv.x * 6.0 - t * 0.5),
+      cos(uv.x * 13.0 + t * 0.6) + sin(uv.y * 8.0 + t * 0.4)
+    ) * warpByte * 0.03;
+    domUV = uv + bend;
+  }
+
+  vec2 cell = floor(domUV * grid);
 
   // Chaos content deformation: shear + sine melt of the sampling coord.
-  vec2 suv = uv;
+  vec2 suv = domUV;
   if (isChaos > 0.5) {
     float shear = (hash(chaosCell + vec2(t, 51.0)) - 0.5) * 0.6;
     float meltA = hash(chaosCell + vec2(t, 61.0)) * 0.08;
     suv.x = fract(suv.x + suv.y * shear + sin(suv.y * 40.0 * hash(chaosCell + 71.0)) * meltA);
     suv.y = fract(suv.y + sin(suv.x * 30.0 * hash(chaosCell + 73.0)) * meltA * 0.6);
   }
+
+  // WARP BYTE per-block interior: each block rotates + zooms + offsets its own
+  // content around its centre, so no two blocks warp the same way — the interiors
+  // read as scattered warped fragments rather than clean square crops.
+  if (warpByte > 0.001) {
+    vec2 lc = fract(domUV * grid) - 0.5;                        // -0.5..0.5 in block
+    float ang = (hash(cell + 91.0) - 0.5) * 3.1416 * warpByte;  // per-block rotation
+    float sc = 1.0 + (hash(cell + 93.0) - 0.5) * 1.2 * warpByte; // per-block zoom
+    float ca = cos(ang), sa = sin(ang);
+    lc = mat2(ca, -sa, sa, ca) * lc / max(sc, 0.2);
+    vec2 blockCentre = (cell + 0.5) / grid;
+    vec2 off = (vec2(hash(cell + 95.0), hash(cell + 97.0)) - 0.5) * warpByte * 0.12;
+    suv = blockCentre + lc / grid + off;
+  }
+
   vec4 src = IMG_NORM_PIXEL(inputImage, suv);
 
   // Bit-crush.

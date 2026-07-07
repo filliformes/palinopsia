@@ -512,7 +512,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-byte-corrupt', name: 'Byte Corrupt', category: 'FX', source: byteCorrupt,
-    curated: { depth: [3, 10], scramble: [0.15, 0.7], blocks: [4, 32], rate: [0.1, 0.7], chaos: [0, 0.6] }
+    curated: { depth: [3, 10], scramble: [0.15, 0.7], blocks: [4, 32], warpByte: [0, 0.6], rate: [0.1, 0.7], chaos: [0, 0.6] }
   },
   {
     id: 'fx-ringing', name: 'Ringing', category: 'FX', source: ringing,

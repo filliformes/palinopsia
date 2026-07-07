@@ -957,7 +957,9 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Slow decay', values: { depth: 7, scramble: 0.4, blocks: 10, rate: 0.05 } },
     { name: 'Total loss', values: { depth: 3, scramble: 0.95, blocks: 24, rate: 0.9 } },
     { name: 'Whisper corrupt', values: { depth: 12, scramble: 0.12, blocks: 14, rate: 0.25 } },
-    { name: 'Channel bleed', values: { depth: 8, scramble: 0.6, blocks: 6, rate: 0.4 } }
+    { name: 'Channel bleed', values: { depth: 8, scramble: 0.6, blocks: 6, rate: 0.4 } },
+    { name: 'Warped shards', values: { depth: 6, scramble: 0.35, blocks: 16, warpByte: 0.7, rate: 0.4 } },
+    { name: 'Melted mosaic', values: { depth: 5, scramble: 0.5, blocks: 10, warpByte: 1.0, rate: 0.3, chaos: 0.3 } }
   ],
   'fx-ringing': [
     { name: 'Cheap encode', values: { gap: 0.006, intensity: 0.6, angle: 0 } },
