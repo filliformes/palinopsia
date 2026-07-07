@@ -580,10 +580,74 @@ function liveKey(t: import('@shared/types').ModTarget): string {
   return `fx:${scopeKey}:${t.instId}:${t.input}`
 }
 
+// A modulatable input descriptor (float / long-enum / bool), widened so the
+// value mappers can reach an enum's declared VALUES.
+interface ModDesc {
+  type: string
+  min?: number | number[]
+  max?: number | number[]
+  def?: number | number[]
+  values?: number[]
+}
+const asNum = (x: unknown, d: number): number => (typeof x === 'number' ? x : d)
+const nearest = (vals: number[], raw: number): number => {
+  let best = vals[0]
+  let bd = Infinity
+  for (const v of vals) {
+    const dd = Math.abs(v - raw)
+    if (dd < bd) { bd = dd; best = v }
+  }
+  return best
+}
+
+/** Map an ABSOLUTE 0..1 position onto a settable value for any modulatable type
+ *  (float spans [min,max]; enum maps across its ordered values; bool thresholds).
+ *  null = not modulatable. Used by Meta destinations (knob position is absolute). */
+export function inputValueFrom01(d: ModDesc, v01: number): number | null {
+  const x = v01 < 0 ? 0 : v01 > 1 ? 1 : v01
+  if (d.type === 'float') return asNum(d.min, 0) + x * (asNum(d.max, 1) - asNum(d.min, 0))
+  if (d.type === 'long') {
+    const vals = d.values ?? []
+    return vals.length ? vals[Math.min(vals.length - 1, Math.floor(x * vals.length))] : null
+  }
+  if (d.type === 'bool' || d.type === 'event') return x >= 0.5 ? 1 : 0
+  return null
+}
+
+/** Bipolar swing around the stored base — the direct-modulator model. Enums snap
+ *  to the nearest declared value; bools threshold. null = not modulatable. */
+function inputValueFromSwing(
+  d: ModDesc,
+  stored: number | number[] | undefined,
+  v: number,
+  depth: number
+): number | null {
+  if (d.type === 'float') {
+    const min = asNum(d.min, 0)
+    const max = asNum(d.max, 1)
+    const base = typeof stored === 'number' ? stored : asNum(d.def, min)
+    return Math.max(min, Math.min(max, base + (v - 0.5) * 2 * depth * (max - min)))
+  }
+  if (d.type === 'long') {
+    const vals = d.values ?? []
+    if (!vals.length) return null
+    const min = Math.min(...vals)
+    const max = Math.max(...vals)
+    const base = typeof stored === 'number' ? stored : asNum(d.def, min)
+    return nearest(vals, base + (v - 0.5) * 2 * depth * (max - min))
+  }
+  if (d.type === 'bool' || d.type === 'event') {
+    const base = typeof stored === 'number' ? stored : asNum(d.def, 0)
+    return base + (v - 0.5) * 2 * depth >= 0.5 ? 1 : 0
+  }
+  return null
+}
+
 /**
  * Apply the mod-matrix on top of the store's base values, writing straight
  * into the Compositor (post-syncFromState, pre-render). Base + bipolar swing:
- * final = clamp(base + (v−0.5)·2·depth·span, min, max).
+ * final = clamp(base + (v−0.5)·2·depth·span, min, max). Enums/bools are driven
+ * too (snap / threshold).
  */
 export function applyModulation(
   comp: {
@@ -597,9 +661,7 @@ export function applyModulation(
   },
   c: CompositionState,
   values: number[],
-  descFor: (
-    shaderId: string
-  ) => Array<{ name: string; type: string; min?: number | number[]; max?: number | number[]; def?: number | number[] }>
+  descFor: (shaderId: string) => Array<{ name: string } & ModDesc>
 ): void {
   metaLiveValues.clear()
   // Resolve one ISF-input target's shader + write the given value everywhere
@@ -629,10 +691,9 @@ export function applyModulation(
     }
     if (!shaderId) return
     const d = descFor(shaderId).find((x) => x.name === t.input)
-    if (!d || d.type !== 'float') return
-    const min = typeof d.min === 'number' ? d.min : 0
-    const max = typeof d.max === 'number' ? d.max : 1
-    const value = min + shaped01 * (max - min)
+    if (!d) return
+    const value = inputValueFrom01(d, shaped01)
+    if (value === null) return
     liveModValues.set(liveKey(t), value)
     if (t.kind === 'source') comp.layers[t.layer]?.setInput(t.slot, t.input, value)
     else comp.setFxInput(t.scope, t.instId, t.input, value)
@@ -664,19 +725,15 @@ export function applyModulation(
       if (!layer) continue
       const slot = a.target.slot === 'A' ? layer.sourceA : layer.sourceB
       if (!slot?.shaderId) continue
-      const inputName = a.target.input
-      const d = descFor(slot.shaderId).find((x) => x.name === inputName)
-      if (!d || d.type !== 'float') continue
-      const min = typeof d.min === 'number' ? d.min : 0
-      const max = typeof d.max === 'number' ? d.max : 1
-      const stored = slot.inputs[a.target.input]
-      const base =
-        typeof stored === 'number' ? stored : typeof d.def === 'number' ? d.def : min
-      const final = Math.max(min, Math.min(max, base + (v - 0.5) * 2 * a.depth * (max - min)))
+      const input = a.target.input
+      const d = descFor(slot.shaderId).find((x) => x.name === input)
+      if (!d) continue
+      const final = inputValueFromSwing(d, slot.inputs[input], v, a.depth)
+      if (final === null) continue
       liveModValues.set(liveKey(a.target), final)
       comp.layers[a.target.layer]?.setInput(a.target.slot, a.target.input, final)
     } else {
-      const { scope, instId } = a.target
+      const { scope, instId, input } = a.target
       let arr = c.master
       if (scope.kind === 'background') {
         arr = c.background?.fx ?? []
@@ -692,17 +749,12 @@ export function applyModulation(
       }
       const inst = arr.find((f) => f.id === instId)
       if (!inst?.shaderId) continue
-      const inputName = a.target.input
-      const d = descFor(inst.shaderId).find((x) => x.name === inputName)
-      if (!d || d.type !== 'float') continue
-      const min = typeof d.min === 'number' ? d.min : 0
-      const max = typeof d.max === 'number' ? d.max : 1
-      const stored = inst.inputs[a.target.input]
-      const base =
-        typeof stored === 'number' ? stored : typeof d.def === 'number' ? d.def : min
-      const final = Math.max(min, Math.min(max, base + (v - 0.5) * 2 * a.depth * (max - min)))
+      const d = descFor(inst.shaderId).find((x) => x.name === input)
+      if (!d) continue
+      const final = inputValueFromSwing(d, inst.inputs[input], v, a.depth)
+      if (final === null) continue
       liveModValues.set(liveKey(a.target), final)
-      comp.setFxInput(scope, instId, a.target.input, final)
+      comp.setFxInput(scope, instId, input, final)
     }
   }
 }

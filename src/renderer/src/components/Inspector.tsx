@@ -7,9 +7,10 @@ import type { FxInstance, ModTarget, SidechainRef, SourceSlot } from '@shared/ty
 import { randomizeInputs } from '../randomize'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { inputsForShader } from '../shaders/isf/inputs'
-import { useState } from 'react'
-import { useStore, type FxScope } from '../store'
-import { AutoControls } from './AutoControls'
+import { useEffect, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { modTargetKey, useStore, type FxScope } from '../store'
+import { AutoControls, AssignContext, AssignRow } from './AutoControls'
 import { CapturePicker } from './CapturePicker'
 import { DevicePicker } from './DevicePicker'
 import { PresetPicker } from './PresetPicker'
@@ -67,6 +68,18 @@ export function Inspector(): JSX.Element {
   const [flashing, flash] = useFlash()
   const [switchCapture, setSwitchCapture] = useState(false)
   const [switchDevice, setSwitchDevice] = useState(false)
+  // The mod-assign side panel: which parameter's M was clicked (null = closed).
+  const [assign, setAssign] = useState<{ target: ModTarget; label: string } | null>(null)
+  // Close the panel whenever the selection moves to a different shader/unit.
+  const selKey =
+    selection?.type === 'source'
+      ? `s:${selection.layer}:${selection.slot}`
+      : selection?.type === 'fx'
+        ? `f:${selection.instId}`
+        : selection?.type === 'background'
+          ? 'bg'
+          : 'none'
+  useEffect(() => setAssign(null), [selKey])
 
   let title = ''
   let context = ''
@@ -380,27 +393,84 @@ export function Inspector(): JSX.Element {
       {/* Sources (≤8 params) fit their content — wrap onto as few rows as
           needed (usually one), no fixed height, no horizontal scroll. FX can be
           deep, so they keep the fixed two-row grid that flows into columns. */}
-      {selection?.type === 'source' || selection?.type === 'background' ? (
-        <div className="min-h-[3.25rem]">
-          <AutoControls
-            inputs={inputsForShader(shaderId)}
-            values={values}
-            onChange={onChange}
-            modTargetFor={modTargetFor}
-            layout="wrap"
-          />
+      {/* Controls on the left; the mod-assign panel slides in on the right,
+          under the header's dice/presets, when an M is clicked. */}
+      <AssignContext.Provider
+        value={{
+          activeKey: assign ? modTargetKey(assign.target) : null,
+          onAssign: (target, label) =>
+            setAssign((cur) =>
+              cur && modTargetKey(cur.target) === modTargetKey(target) ? null : { target, label }
+            )
+        }}
+      >
+        <div className="flex min-w-0 items-stretch">
+          <div className="min-w-0 flex-1">
+            {selection?.type === 'source' || selection?.type === 'background' ? (
+              <div className="min-h-[3.25rem]">
+                <AutoControls
+                  inputs={inputsForShader(shaderId)}
+                  values={values}
+                  onChange={onChange}
+                  modTargetFor={modTargetFor}
+                  layout="wrap"
+                />
+              </div>
+            ) : (
+              <div className="h-[8.5rem] overflow-x-auto overflow-y-hidden">
+                <AutoControls
+                  inputs={inputsForShader(shaderId)}
+                  values={values}
+                  onChange={onChange}
+                  modTargetFor={modTargetFor}
+                  layout="twoRow"
+                />
+              </div>
+            )}
+          </div>
+          {assign && (
+            <AssignPanel target={assign.target} label={assign.label} onClose={() => setAssign(null)} />
+          )}
         </div>
-      ) : (
-        <div className="h-[8.5rem] overflow-x-auto overflow-y-hidden">
-          <AutoControls
-            inputs={inputsForShader(shaderId)}
-            values={values}
-            onChange={onChange}
-            modTargetFor={modTargetFor}
-            layout="twoRow"
-          />
-        </div>
-      )}
+      </AssignContext.Provider>
+    </div>
+  )
+}
+
+// The mod-assign side panel — replaces the old floating popover. Sits at the
+// right of the controls band (under the header's dice/presets), names the
+// parameter it modulates, and hosts the M1–8 / Meta binding row.
+function AssignPanel({
+  target,
+  label,
+  onClose
+}: {
+  target: ModTarget
+  label: string
+  onClose: () => void
+}): JSX.Element {
+  const key = modTargetKey(target)
+  const bound = useStore(
+    useShallow((s) => s.composition.modMatrix.filter((a) => modTargetKey(a.target) === key))
+  )
+  return (
+    <div className="flex w-56 shrink-0 flex-col border-l border-border bg-panel2/40">
+      <div className="flex items-center gap-2 border-b border-border px-2 py-1">
+        <span className="font-mono text-[9px] uppercase tracking-wide text-accent2">modulate</span>
+        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold" title={label}>
+          {label}
+        </span>
+        <button
+          onClick={onClose}
+          className="shrink-0 font-mono text-[11px] text-muted hover:text-text"
+          title="Close"
+        >
+          ✕
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        <AssignRow target={target} bound={bound} />
+      </div>
     </div>
   )
 }

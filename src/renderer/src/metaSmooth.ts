@@ -12,7 +12,7 @@
 // they're OSC-visible later like any base value.
 
 import type { ModTarget } from '@shared/types'
-import { shapeCurve } from './engine/modulation'
+import { shapeCurve, inputValueFrom01 } from './engine/modulation'
 import { inputsForShader } from './shaders/isf/inputs'
 import { useStore } from './store'
 
@@ -66,10 +66,9 @@ function applyDest(target: ModTarget, shaped: number): void {
   }
   if (!shaderId) return
   const d = inputsForShader(shaderId).find((x) => x.name === target.input)
-  if (!d || d.type !== 'float') return
-  const min = typeof d.min === 'number' ? d.min : 0
-  const max = typeof d.max === 'number' ? d.max : 1
-  const value = min + shaped * (max - min)
+  if (!d) return
+  const value = inputValueFrom01(d, shaped) // float span · enum snap · bool threshold
+  if (value === null) return
   if (target.kind === 'source') {
     st.setSourceInput(target.layer, target.slot, target.input, value)
   } else {

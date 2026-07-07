@@ -5,7 +5,9 @@
 // the shader header IS the control surface.
 
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -19,6 +21,70 @@ import { registerLiveOverlay } from './liveOverlay'
 import { useShallow } from 'zustand/react/shallow'
 import { modTargetKey, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
+
+// When an ancestor (the Inspector) provides `onAssign`, clicking an M button
+// opens the mod-assign in the Inspector's side panel instead of the little
+// floating popover. `activeKey` highlights the M whose panel is open. Providers
+// that don't set onAssign (Finishing view, dense stacks) keep the popover.
+type BoundAssignment = { id: string; mod: number; depth: number }
+interface AssignCtx {
+  onAssign?: (target: ModTarget, label: string) => void
+  activeKey?: string | null
+}
+export const AssignContext = createContext<AssignCtx>({})
+
+/** Assignments bound to one target (any modulator). useShallow so this
+ *  fresh-array selector doesn't re-render every control on every store write. */
+function useBound(targetKey: string | null): BoundAssignment[] {
+  return useStore(
+    useShallow((s) =>
+      targetKey ? s.composition.modMatrix.filter((a) => modTargetKey(a.target) === targetKey) : []
+    )
+  )
+}
+
+// The M pill. In Inspector context it toggles the side panel; elsewhere it opens
+// the legacy anchored popover. Highlights when bound OR when its panel is active.
+function ModButton({
+  target,
+  bound,
+  label
+}: {
+  target: ModTarget
+  bound: BoundAssignment[]
+  label: string
+}): JSX.Element {
+  const { onAssign, activeKey } = useContext(AssignContext)
+  const [open, setOpen] = useState(false)
+  const btnRef = useRef<HTMLButtonElement | null>(null)
+  const key = modTargetKey(target)
+  useEffect(() => setOpen(false), [key])
+  const isBound = bound.length > 0
+  const active = activeKey === key
+  return (
+    <>
+      <button
+        ref={btnRef}
+        onClick={() => (onAssign ? onAssign(target, label) : setOpen((o) => !o))}
+        className={`shrink-0 rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
+          isBound
+            ? 'bg-accent/20 text-accent ring-1 ring-accent'
+            : active
+              ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
+              : open
+                ? 'bg-panel3 text-text'
+                : 'bg-panel3/60 text-muted hover:text-text'
+        }`}
+        title={`Modulate ${label}`}
+      >
+        M{isBound ? bound.map((b) => b.mod + 1).join('') : ''}
+      </button>
+      {!onAssign && open && (
+        <AssignPopover target={target} bound={bound} anchor={btnRef} onClose={() => setOpen(false)} />
+      )}
+    </>
+  )
+}
 
 type Value = number | number[]
 
@@ -212,9 +278,9 @@ function Control({
       return <FloatControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} dense={dense} />
     case 'bool':
     case 'event':
-      return <BoolControl inp={inp} value={value} onChange={onChange} />
+      return <BoolControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} />
     case 'long':
-      return <EnumControl inp={inp} value={value} onChange={onChange} />
+      return <EnumControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} />
     case 'color':
       return <ColorControl inp={inp} value={value} onChange={onChange} />
     case 'point2D':
@@ -251,22 +317,9 @@ function FloatControl({
   const def = typeof inp.def === 'number' ? inp.def : min
   const v = typeof value === 'number' ? value : def
   const step = (max - min) / 200 || 0.005
-  const [assignOpen, setAssignOpen] = useState(false)
   const target = modTargetFor?.(inp.name)
   const targetKey = target ? modTargetKey(target) : null
-  // Close the assign row when the control is reused for a different target
-  // (selection change to another shader that happens to share this input name).
-  useEffect(() => setAssignOpen(false), [targetKey])
-  // Existing assignments on this input (any modulator). useShallow so this
-  // fresh-array selector doesn't re-render every FloatControl on every store
-  // mutation (the Inspector renders one per float input).
-  const bound = useStore(
-    useShallow((s) =>
-      targetKey
-        ? s.composition.modMatrix.filter((a) => modTargetKey(a.target) === targetKey)
-        : []
-    )
-  )
+  const bound = useBound(targetKey)
   const isModulated = bound.length > 0
 
   // Modulated sliders MOVE with the live value (dataFLOU behaviour): one rAF
@@ -274,7 +327,6 @@ function FloatControl({
   // BASE value; the live overlay never causes re-renders. Paused while the
   // user is dragging this slider.
   const sliderRef = useRef<HTMLInputElement | null>(null)
-  const btnRef = useRef<HTMLButtonElement | null>(null)
   useEffect(() => {
     const el = sliderRef.current
     if (!isModulated || !targetKey || !el) return
@@ -309,22 +361,7 @@ function FloatControl({
                 : `${inp.label} — double-click to reset (${def})`
             }
           />
-          {target && (
-            <button
-              ref={btnRef}
-              onClick={() => setAssignOpen((o) => !o)}
-              className={`shrink-0 rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
-                bound.length > 0
-                  ? 'bg-accent/20 text-accent ring-1 ring-accent'
-                  : assignOpen
-                    ? 'bg-panel3 text-text'
-                    : 'bg-panel3/60 text-muted hover:text-text'
-              }`}
-              title="Bind a modulator to this input"
-            >
-              M{bound.length > 0 ? bound.map((b) => b.mod + 1).join('') : ''}
-            </button>
-          )}
+          {target && <ModButton target={target} bound={bound} label={inp.label} />}
           <div className="w-12 shrink-0">
             <BoundedNumberInput
               value={v}
@@ -336,9 +373,6 @@ function FloatControl({
             />
           </div>
         </div>
-        {assignOpen && target && (
-          <AssignPopover target={target} bound={bound} anchor={btnRef} onClose={() => setAssignOpen(false)} />
-        )}
       </div>
     )
   }
@@ -348,22 +382,7 @@ function FloatControl({
       <div className="flex min-w-0 items-center justify-between gap-2">
         {labelEl(inp)}
         <div className="flex shrink-0 items-center gap-1">
-          {target && (
-            <button
-              ref={btnRef}
-              onClick={() => setAssignOpen((o) => !o)}
-              className={`rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
-                bound.length > 0
-                  ? 'bg-accent/20 text-accent ring-1 ring-accent'
-                  : assignOpen
-                    ? 'bg-panel3 text-text'
-                    : 'bg-panel3/60 text-muted hover:text-text'
-              }`}
-              title="Bind a modulator to this input"
-            >
-              M{bound.length > 0 ? bound.map((b) => b.mod + 1).join('') : ''}
-            </button>
-          )}
+          {target && <ModButton target={target} bound={bound} label={inp.label} />}
           <div className="w-14">
             <BoundedNumberInput
               value={v}
@@ -392,9 +411,6 @@ function FloatControl({
             : `${inp.label} — double-click to reset (${def})`
         }
       />
-      {assignOpen && target && (
-        <AssignPopover target={target} bound={bound} anchor={btnRef} onClose={() => setAssignOpen(false)} />
-      )}
     </div>
   )
 }
@@ -602,21 +618,41 @@ function CompactCluster({
   )
 }
 
-// ── bool → toggle chip ───────────────────────────────────────────────
+// A label row with an optional M pill on the right (enum / bool controls).
+function LabelRow({
+  inp,
+  modTargetFor
+}: {
+  inp: IsfInputDesc
+  modTargetFor?: (inputName: string) => ModTarget
+}): JSX.Element {
+  const target = modTargetFor?.(inp.name)
+  const bound = useBound(target ? modTargetKey(target) : null)
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-2">
+      {labelEl(inp)}
+      {target && <ModButton target={target} bound={bound} label={inp.label} />}
+    </div>
+  )
+}
+
+// ── bool → toggle chip (+ optional mod-assign) ───────────────────────
 function BoolControl({
   inp,
   value,
-  onChange
+  onChange,
+  modTargetFor
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
+  modTargetFor?: (inputName: string) => ModTarget
 }): JSX.Element {
   const def = typeof inp.def === 'number' ? inp.def : 0
   const on = (typeof value === 'number' ? value : def) >= 0.5
   return (
-    <div className="flex flex-col items-start gap-0.5">
-      {labelEl(inp)}
+    <div className="flex w-24 min-w-0 flex-col items-start gap-0.5">
+      <LabelRow inp={inp} modTargetFor={modTargetFor} />
       <button
         onClick={() => onChange(inp.name, on ? 0 : 1)}
         className={`rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
@@ -629,23 +665,25 @@ function BoolControl({
   )
 }
 
-// ── long → dropdown ──────────────────────────────────────────────────
+// ── long → dropdown (+ optional mod-assign) ──────────────────────────
 function EnumControl({
   inp,
   value,
-  onChange
+  onChange,
+  modTargetFor
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
+  modTargetFor?: (inputName: string) => ModTarget
 }): JSX.Element {
   const def = typeof inp.def === 'number' ? inp.def : 0
   const v = typeof value === 'number' ? value : def
   const values = inp.values ?? []
   const labels = inp.labels ?? values.map(String)
   return (
-    <div className="flex flex-col gap-0.5">
-      {labelEl(inp)}
+    <div className="flex w-44 min-w-0 flex-col gap-0.5">
+      <LabelRow inp={inp} modTargetFor={modTargetFor} />
       <select
         className="input text-[11px]"
         value={v}
