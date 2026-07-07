@@ -51,6 +51,16 @@ export class VideoSource {
   // stops advancing, re-kick play() so a decoder hiccup can't freeze the clip.
   private lastCT = -1
   private stallSince = 0
+  // Frame presentation (requestVideoFrameCallback): only upload when a genuinely
+  // NEW frame is presented. Uploading every render frame while seeking grabs the
+  // pre-seek (frozen) frame — the "playhead moves, image doesn't" bug.
+  private pendingFrame = true
+  private rvfcId = 0
+  private rvfcOn = false
+  // Override-mode seek gate: own ONE in-flight seek so we don't re-seek every
+  // frame (perpetual seeking never settles a frame). Cleared by 'seeked' + safety.
+  private seeking = false
+  private seekAt = 0
   private pb: VideoPlayback = {
     playing: true,
     speed: 1,
@@ -73,6 +83,27 @@ export class VideoSource {
       const e = this.video.error
       console.warn(`[video] load error (${e?.code ?? '?'}): ${e?.message || this.video.currentSrc}`)
     })
+    // A completed seek frees the override seek gate.
+    this.video.addEventListener('seeked', () => {
+      this.seeking = false
+      this.pendingFrame = true // the seeked frame is now presentable
+    })
+  }
+
+  // Upload only when a genuinely new frame is presented (rVFC). This is what lets
+  // a seek's frame reach texImage2D instead of the stale pre-seek one.
+  private startFrameLoop(): void {
+    const v = this.video
+    if (typeof v.requestVideoFrameCallback !== 'function') {
+      this.rvfcOn = false // no rVFC → fall back to uploading every frame
+      return
+    }
+    this.rvfcOn = true
+    const cb = (): void => {
+      this.pendingFrame = true
+      this.rvfcId = v.requestVideoFrameCallback(cb)
+    }
+    this.rvfcId = v.requestVideoFrameCallback(cb)
   }
 
   load(src: string): void {
@@ -83,6 +114,7 @@ export class VideoSource {
     const kick = (): void => void this.video.play().catch(() => {})
     kick()
     this.video.addEventListener('canplay', kick, { once: true })
+    this.startFrameLoop()
   }
 
   setPlayback(p: VideoPlayback): void {
@@ -149,10 +181,12 @@ export class VideoSource {
       this.lastCT = t
       this.pos = t
     } else {
-      // Reverse / pendulum-reverse / above the native cap: keep playing (frames
-      // stay hot) but drive the position ourselves at the TRUE rate and snap
-      // currentTime to it — scrubbing a playing element presents each frame.
-      if (v.playbackRate !== 1) v.playbackRate = 1
+      // Reverse / pendulum-reverse / above the native cap: keep the pipeline hot
+      // at a minimal forward rate, drive the intended playhead ourselves at the
+      // TRUE rate, and seek toward it ONE completed seek at a time (below). We do
+      // NOT seek every frame — that keeps the decoder perpetually seeking and the
+      // presented frame never updates (playhead moves, image freezes).
+      if (v.playbackRate !== 0.1) v.playbackRate = 0.1
       this.pos += rawDt * rate * dir
     }
 
@@ -168,25 +202,46 @@ export class VideoSource {
     if (!Number.isFinite(this.pos)) this.pos = lo
 
     // Correct the element toward the intended playhead. In pure-native forward we
-    // only intervene at the trim boundaries (else it runs free, smooth); when
-    // overriding we set currentTime every frame.
+    // only intervene at the trim boundaries (else it runs free, smooth). When
+    // overriding, issue ONE seek at a time toward `pos` — wait for the previous to
+    // finish ('seeked' clears the gate) so each frame settles and reaches the
+    // texture; a generous safety timeout recovers from a dropped 'seeked'.
     if (pureNative) {
       if (v.currentTime > hi - 0.02 || v.currentTime < lo - 0.05) {
         try { v.currentTime = this.pos } catch { /* seek can race a reload */ }
       }
-    } else if (Math.abs(this.pos - v.currentTime) > 1e-3) {
-      try { v.currentTime = this.pos } catch { /* seek can race a reload */ }
+    } else {
+      if (this.seeking && performance.now() - this.seekAt > 600) this.seeking = false
+      if (!this.seeking && Math.abs(this.pos - v.currentTime) > 0.02) {
+        try {
+          v.currentTime = this.pos
+          this.seeking = true
+          this.seekAt = performance.now()
+        } catch {
+          /* a seek can race a src reload — retry next frame */
+        }
+      }
     }
   }
 
   /** Upload the current frame to a GL texture and return it (null until the
-   *  first frame is decodable). Called once per frame for a video slot. */
+   *  first frame is decodable). Called once per frame for a video slot. Only
+   *  re-uploads when a new frame was actually presented (rVFC) — so a seek's
+   *  frame reaches the texture and steady playback isn't re-uploaded needlessly.
+   *  Without rVFC support it uploads every frame (previous behaviour). */
   upload(): WebGLTexture | null {
-    this.tex = uploadVideoFrame(this.gl, this.video, this.tex)
+    if (this.pendingFrame || !this.rvfcOn || !this.tex) {
+      this.tex = uploadVideoFrame(this.gl, this.video, this.tex)
+      this.pendingFrame = false
+    }
     return this.tex
   }
 
   dispose(): void {
+    const v = this.video
+    if (this.rvfcOn && typeof v.cancelVideoFrameCallback === 'function' && this.rvfcId) {
+      v.cancelVideoFrameCallback(this.rvfcId)
+    }
     this.video.pause()
     this.video.removeAttribute('src')
     this.video.load() // release the decoder
