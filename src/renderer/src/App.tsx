@@ -95,8 +95,13 @@ import type { RandomizeScope } from './randomize'
 function fireSelectedRandomize(): void {
   const raw = localStorage.getItem('opsia.randScope') as RandomizeScope | null
   const scope: RandomizeScope = raw ?? 'all'
-  if (scope === 'meta') randomizeMetaKnobs()
-  else useStore.getState().randomize(scope)
+  if (scope === 'meta') {
+    randomizeMetaKnobs()
+    return
+  }
+  const i = Number(localStorage.getItem('opsia.randIntensity'))
+  const intensity = Number.isFinite(i) && i > 0 ? i : 1
+  useStore.getState().randomize(scope, intensity)
 }
 
 export default function App(): JSX.Element {

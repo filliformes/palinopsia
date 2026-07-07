@@ -367,7 +367,7 @@ export function seedRandomStart(base: CompositionState): CompositionState {
   }
 }
 
-export function randomizeComposition(
+function randomizeStructural(
   c: CompositionState,
   scope: RandomizeScope
 ): CompositionState {
@@ -531,4 +531,188 @@ export function randomizeComposition(
   }
 
   return next
+}
+
+// ── Parameter JITTER (walk / variation) ───────────────────────────────
+// Unlike the structural randomizer, jitter keeps the whole structure (which
+// generators, which FX, which blends, which mod assignments) and only nudges
+// CONTINUOUS values around where they already are. `amount` 0 = no change,
+// 1 = a full-spread nudge (roughly the curated range). Shared by the Randomize
+// intensity "walk" (low %) and the Variation button (baseline-anchored spread).
+const clampN = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v)
+const jn = (base: number, amount: number, span: number, lo: number, hi: number): number =>
+  clampN(base + (rnd() * 2 - 1) * amount * span, lo, hi)
+
+function jitterOneInput(
+  shaderId: string,
+  d: IsfInputDesc,
+  base: number | number[] | undefined,
+  amount: number
+): number | number[] {
+  switch (d.type) {
+    case 'float': {
+      const declaredLo = typeof d.min === 'number' ? d.min : 0
+      const declaredHi = typeof d.max === 'number' ? d.max : 1
+      const [lo, hi] = curatedRange(shaderId, d.name, [declaredLo, declaredHi])
+      const b = typeof base === 'number' ? base : typeof d.def === 'number' ? d.def : lo
+      return jn(b, amount, hi - lo, declaredLo, declaredHi)
+    }
+    case 'bool':
+    case 'event': {
+      const cur = typeof base === 'number' ? base : typeof d.def === 'number' ? d.def : 0
+      return chance(amount * 0.5) ? (cur >= 0.5 ? 0 : 1) : cur
+    }
+    case 'long': {
+      const values = d.values ?? []
+      const cur = typeof base === 'number' ? base : ((d.def as number) ?? values[0] ?? 0)
+      return values.length && chance(amount * 0.4) ? pick(values) : cur
+    }
+    case 'color': {
+      const c = Array.isArray(base) ? base : Array.isArray(d.def) ? d.def : [1, 1, 1, 1]
+      // Nudge RGB within a matte envelope; hold alpha.
+      return [
+        clampN(c[0] + (rnd() * 2 - 1) * amount * 0.35, 0, 1),
+        clampN(c[1] + (rnd() * 2 - 1) * amount * 0.35, 0, 1),
+        clampN(c[2] + (rnd() * 2 - 1) * amount * 0.35, 0, 1),
+        c[3] ?? 1
+      ]
+    }
+    case 'point2D': {
+      const min = Array.isArray(d.min) ? d.min : [0, 0]
+      const max = Array.isArray(d.max) ? d.max : [1, 1]
+      const b = Array.isArray(base) ? base : Array.isArray(d.def) ? d.def : [0, 0]
+      return [
+        jn(b[0], amount, max[0] - min[0], min[0], max[0]),
+        jn(b[1], amount, max[1] - min[1], min[1], max[1])
+      ]
+    }
+    default:
+      return base ?? 0
+  }
+}
+
+/** Nudge every input of one shader around its current value by `amount`. */
+export function jitterInputs(
+  shaderId: string,
+  base: Record<string, number | number[]>,
+  amount: number
+): Record<string, number | number[]> {
+  const out: Record<string, number | number[]> = { ...base }
+  for (const d of inputsForShader(shaderId)) out[d.name] = jitterOneInput(shaderId, d, base[d.name], amount)
+  return out
+}
+
+function jitterSlot(slot: SourceSlot | null, amount: number): SourceSlot | null {
+  if (!slot || !slot.shaderId) return slot // video/capture/hive/empty: nothing to nudge
+  return { ...slot, inputs: jitterInputs(slot.shaderId, slot.inputs, amount) }
+}
+
+function jitterFxArray(fx: FxInstance[], amount: number): FxInstance[] {
+  return fx.map((f) => {
+    if (!f.shaderId) return f
+    // Locked finalizers (Vibe/Context) are brightness-critical — nudge gently.
+    const amt = f.locked ? amount * 0.4 : amount
+    return {
+      ...f,
+      inputs: jitterInputs(f.shaderId, f.inputs, amt),
+      opacity: clampN((f.opacity ?? 1) + (rnd() * 2 - 1) * amt * 0.3, 0, 1)
+    }
+  })
+}
+
+function jitterLayer(l: LayerState, amount: number): LayerState {
+  return {
+    ...l,
+    sourceA: jitterSlot(l.sourceA, amount) as SourceSlot,
+    sourceB: l.sourceB ? jitterSlot(l.sourceB, amount) : l.sourceB,
+    sourceAFx: jitterFxArray(l.sourceAFx, amount),
+    sourceBFx: jitterFxArray(l.sourceBFx, amount),
+    fx: jitterFxArray(l.fx, amount),
+    opacity: clampN(l.opacity + (rnd() * 2 - 1) * amount * 0.3, 0, 1),
+    sourceMix: clampN(l.sourceMix + (rnd() * 2 - 1) * amount * 0.3, 0, 1),
+    harmony: clampN(l.harmony + (rnd() * 2 - 1) * amount * 0.3, 0, 1),
+    feedbackAmount: clampN(l.feedbackAmount + (rnd() * 2 - 1) * amount * 0.3, 0, 1),
+    speed: clampN(l.speed * (1 + (rnd() * 2 - 1) * amount * 0.4), 0, 20)
+  }
+}
+
+function jitterMods(mods: ModulatorConfig[], amount: number): ModulatorConfig[] {
+  return mods.map((m) => ({
+    ...m,
+    rateHz: clampN(m.rateHz * (1 + (rnd() * 2 - 1) * amount * 0.5), 0.01, 40)
+  }))
+}
+
+// Which broad areas a scope disturbs — so the intensity walk only nudges the
+// same parts the full randomize would have touched.
+function scopeAreas(scope: RandomizeScope): { layers: boolean; master: boolean; mods: boolean } {
+  return {
+    layers:
+      scope === 'all' ||
+      scope === 'sources' ||
+      scope === 'sourceparams' ||
+      scope === 'sourcefx' ||
+      scope === 'sourcefxonly' ||
+      scope === 'layer' ||
+      scope === 'layerfxonly',
+    master: scope === 'all' || scope === 'master' || scope === 'finishing',
+    mods: scope === 'all' || scope === 'modulators'
+  }
+}
+
+/**
+ * Randomize the composition for a scope at a given INTENSITY (0..1).
+ *  - 1 (100%): the full structural randomize — new sources / FX / mods.
+ *  - <1: a "random walk" — each unit keeps its structure with probability
+ *    (1 − intensity) and is merely nudged (params jittered by `intensity`);
+ *    otherwise it takes the fresh structural draw. Low % = a gentle drift from
+ *    the current scene; high % approaches a full re-roll.
+ */
+export function randomizeComposition(
+  c: CompositionState,
+  scope: RandomizeScope,
+  intensity = 1
+): CompositionState {
+  const target = randomizeStructural(c, scope)
+  if (intensity >= 0.999) return target
+  const p = Math.max(0, Math.min(1, intensity))
+  const area = scopeAreas(scope)
+  return {
+    ...target,
+    layers: area.layers
+      ? c.layers.map((cl, i) => (chance(p) ? target.layers[i] : jitterLayer(cl, p)))
+      : target.layers,
+    master: area.master ? (chance(p) ? target.master : jitterFxArray(c.master, p)) : target.master,
+    modulators: area.mods
+      ? chance(p)
+        ? target.modulators
+        : jitterMods(c.modulators, p)
+      : target.modulators,
+    modMatrix: area.mods ? (chance(p) ? target.modMatrix : c.modMatrix) : target.modMatrix
+  }
+}
+
+/**
+ * VARIATION — a fresh variant of `base` at distance `amount` (0.001..1). Keeps
+ * the entire structure fixed (same sources, FX, blends, mod assignments) and
+ * nudges every continuous value around the baseline. Re-running with the same
+ * baseline yields siblings at the same spread; larger amount = bolder variants.
+ */
+export function varyComposition(base: CompositionState, amount: number): CompositionState {
+  const a = Math.max(0, Math.min(1, amount))
+  return {
+    ...base,
+    bpm: Math.round(clampN(base.bpm * (1 + (rnd() * 2 - 1) * a * 0.15), 20, 800)),
+    layers: base.layers.map((l) => jitterLayer(l, a)),
+    master: jitterFxArray(base.master, a),
+    modulators: jitterMods(base.modulators, a),
+    modMatrix: base.modMatrix.map((m) => ({
+      ...m,
+      depth: clampN(m.depth + (rnd() * 2 - 1) * a * 0.3, -1, 1)
+    })),
+    metaKnobs: base.metaKnobs.map((k) => ({
+      ...k,
+      value: clampN(k.value + (rnd() * 2 - 1) * a * 0.25, 0, 1)
+    }))
+  }
 }

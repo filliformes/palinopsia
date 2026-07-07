@@ -63,6 +63,7 @@ import {
   randomizeInputs,
   randomizeSingleLayer,
   seedRandomStart,
+  varyComposition,
   type RandomizeScope
 } from './randomize'
 
@@ -385,7 +386,12 @@ interface StoreState {
   setFxInput: (scope: FxScope, instId: string, name: string, value: number | number[]) => void
 
   // Randomize (brief §7) — scoped draws from curated aesthetic ranges.
-  randomize: (scope: RandomizeScope) => void
+  // `intensity` 1 = full structural re-roll; <1 = a walk from the current scene.
+  randomize: (scope: RandomizeScope, intensity?: number) => void
+  // Variation — a baseline-anchored variant of the whole scene (structure fixed,
+  // continuous values nudged by `amount` 0..1). Baseline captured on first press.
+  variationBaseline: CompositionState | null
+  applyVariation: (amount: number) => void
   // Re-roll each Meta knob's destinations (up to 8) + value — a fresh macro
   // surface (fired by 'Randomize Meta Knobs'; the smoother applies it).
   randomizeMetaBank: () => void
@@ -1067,11 +1073,27 @@ export const useStore = create<StoreState>((set, get) => ({
       )
     })),
 
-  randomize: (scope) =>
+  randomize: (scope, intensity = 1) =>
     set((s) => {
-      const composition = randomizeComposition(s.composition, scope)
+      const composition = randomizeComposition(s.composition, scope, intensity)
       beginMorph(s.composition, s.morphMs, performance.now()) // crossfade to the new draw
-      return { composition }
+      // A structural randomize is a fresh starting point — drop the Variation
+      // baseline so the next Variation press anchors on this new scene.
+      return { composition, variationBaseline: null }
+    }),
+
+  // ── Variation (baseline-anchored) ─────────────────────────────────────
+  // The first press captures the current scene as a baseline; every press
+  // yields a fresh variant at the slider's distance FROM that baseline (same
+  // structure, continuous values nudged). recall / randomize / new / load reset
+  // the baseline so it re-anchors on whatever scene you land on next.
+  variationBaseline: null,
+  applyVariation: (amount) =>
+    set((s) => {
+      const base = s.variationBaseline ?? s.composition
+      const composition = varyComposition(base, amount)
+      beginMorph(s.composition, s.morphMs, performance.now())
+      return { composition, variationBaseline: base }
     }),
 
   randomizeMetaBank: () =>
@@ -1496,7 +1518,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const worlds = ensureWorld(s.worlds, scene.world)
       const world = scene.world ? scene.world.id : s.world
       if (scene.world) localStorage.setItem('opsia.world', world)
-      return { composition: scene.composition, activeSceneId: id, worlds, world }
+      return { composition: scene.composition, activeSceneId: id, worlds, world, variationBaseline: null }
     }),
   renameScene: (id, name) =>
     set((s) => ({
@@ -1537,6 +1559,7 @@ export const useStore = create<StoreState>((set, get) => ({
         scenes: [],
         activeSceneId: null,
         vibePresetName: null,
+        variationBaseline: null,
         collapsed
       }
     }),
@@ -1554,6 +1577,7 @@ export const useStore = create<StoreState>((set, get) => ({
       world,
       scenes: s.scenes ?? [],
       activeSceneId: null,
+      variationBaseline: null,
       composition: {
         ...s.composition,
         // Normalize layers from older session files — new fields get defaults.

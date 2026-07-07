@@ -25,16 +25,23 @@ const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
 ]
 
 // Meta is a UI-layer action (drives the knob smoother); everything else is a
-// pure composition transform through the store.
-function fireRandomize(scope: RandomizeScope): void {
+// pure composition transform through the store. `intensity` 1 = full re-roll,
+// <1 = a walk from the current scene (Meta ignores it — it always re-rolls).
+function fireRandomize(scope: RandomizeScope, intensity: number): void {
   if (scope === 'meta') randomizeMetaKnobs()
-  else useStore.getState().randomize(scope)
+  else useStore.getState().randomize(scope, intensity)
 }
 
 function loadScope(): RandomizeScope {
   const s = localStorage.getItem('opsia.randScope') as RandomizeScope | null
   return s && SCOPES.some((x) => x.scope === s) ? s : 'all'
 }
+
+const loadNum = (key: string, dflt: number): number => {
+  const v = Number(localStorage.getItem(key))
+  return Number.isFinite(v) && v > 0 ? v : dflt
+}
+const pct = (v: number): string => Math.round(v * 100) + '%'
 
 // 1/64×…64× shown as a compact fraction/multiple.
 function fmtSpeed(s: number): string {
@@ -66,9 +73,22 @@ export function Transport(): JSX.Element {
   const setProximityAudio = useStore((s) => s.setProximityAudio)
   const activeWorld = worlds.find((w) => w.id === world)
   const setComposition = useStore.setState
+  const applyVariation = useStore((s) => s.applyVariation)
   const [menuOpen, setMenuOpen] = useState(false)
   const [scope, setScope] = useState<RandomizeScope>(loadScope)
+  // Randomize intensity (walk↔full) and Variation spread, both persisted.
+  const [intensity, setIntensity] = useState<number>(() => loadNum('opsia.randIntensity', 1))
+  const [varAmt, setVarAmt] = useState<number>(() => loadNum('opsia.varAmount', 0.3))
   const menuRef = useRef<HTMLDivElement | null>(null)
+
+  const changeIntensity = (v: number): void => {
+    setIntensity(v)
+    localStorage.setItem('opsia.randIntensity', String(v))
+  }
+  const changeVarAmt = (v: number): void => {
+    setVarAmt(v)
+    localStorage.setItem('opsia.varAmount', String(v))
+  }
 
   function setBpm(v: number): void {
     setComposition((s) => ({ composition: { ...s.composition, bpm: v } }))
@@ -195,10 +215,54 @@ export function Transport(): JSX.Element {
 
       <div className="flex-1" />
 
-      {/* Randomize: chevron selects the mode, button fires it. */}
+      {/* Variation — a baseline-anchored variant of the whole scene at `varAmt`
+          (structure fixed, continuous values nudged). */}
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={() => applyVariation(varAmt)}
+          className="rounded border border-accent2/60 bg-accent2/10 px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent2 transition-colors hover:bg-accent2/20"
+          title={`Variation ${pct(varAmt)} — a fresh variant of the current scene (same structure, values nudged). First press sets the baseline; each press is a new sibling at this spread.`}
+        >
+          Vary
+        </button>
+        <input
+          type="range"
+          min={0.01}
+          max={1}
+          step={0.01}
+          value={varAmt}
+          onChange={(e) => changeVarAmt(Number(e.target.value))}
+          className="w-16 accent-accent2"
+          title={`Variation amount ${pct(varAmt)}`}
+        />
+        <span className="w-8 shrink-0 font-mono text-[10px] text-muted">{pct(varAmt)}</span>
+      </div>
+
+      {/* Randomize: chevron selects the mode, button fires it; the amount slider
+          scales it from a gentle walk (low %) to a full re-roll (100%). */}
+      <div className="flex items-center gap-1.5">
+        <span
+          className="font-mono text-[9px] uppercase text-muted"
+          title="Randomize intensity — low = a gentle walk from the current scene, 100% = a full structural re-roll"
+        >
+          amt
+        </span>
+        <input
+          type="range"
+          min={0.02}
+          max={1}
+          step={0.01}
+          value={intensity}
+          onChange={(e) => changeIntensity(Number(e.target.value))}
+          className="w-16 accent-accent"
+          title={`Randomize intensity ${pct(intensity)}`}
+        />
+        <span className="w-8 shrink-0 font-mono text-[10px] text-muted">{pct(intensity)}</span>
+      </div>
+
       <div ref={menuRef} className="relative flex">
         <button
-          onClick={() => fireRandomize(scope)}
+          onClick={() => fireRandomize(scope, intensity)}
           className="rounded-l border border-accent/60 bg-accent/10 px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent transition-colors hover:bg-accent/20"
           title={`Fire ${current.label} — every draw from curated aesthetic ranges`}
         >
