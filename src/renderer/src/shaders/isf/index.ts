@@ -470,7 +470,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-decay', name: 'Decay', category: 'FX', source: decay,
-    curated: { amount: [0.4, 0.9], soften: [0.15, 0.7], bleed: [0.2, 0.7], dropout: [0, 0.4], wobble: [0, 0.012] }
+    curated: { amount: [0.3, 0.8], smear: [0.1, 0.55], chroma: [0.2, 0.75], blocks: [0.1, 0.6], dropout: [0, 0.4], jitter: [0.1, 0.6] }
   },
   {
     id: 'fx-abstraction', name: 'Abstraction', category: 'FX', source: abstraction,

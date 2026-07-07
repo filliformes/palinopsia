@@ -1,15 +1,16 @@
 /*{
-  "DESCRIPTION": "Decay — generation loss / hauntology: a feedback loop that ACCUMULATES degradation. Each frame the fed-back image is re-softened, desaturated and pocked with dropout holes, then blended back with the fresh frame — so the picture disintegrates over generations (tape dubbing, Basinski, Decasia), rather than a single static VHS pass. amount = how much the degraded past dominates; wobble adds generational instability.",
-  "CREDIT": "Palinopsia (after Basinski / Decasia)",
+  "DESCRIPTION": "Decay — analogue generation loss. The picture wears like a tape dub or a worn print: VHS chroma bleed, block/quantization crush, horizontal head-switch jitter, a BOUNDED feedback ghost (capped so it can never run away into feedback fractals), tape noise and flickering dropout lines. It only ever DEGRADES the incoming image — it never invents its own pattern. No psychedelia.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
-    { "NAME": "amount",  "TYPE": "float", "MIN": 0.0, "MAX": 0.99, "DEFAULT": 0.7,  "LABEL": "amount" },
-    { "NAME": "soften",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.4,  "LABEL": "soften" },
-    { "NAME": "bleed",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.4,  "LABEL": "bleed" },
+    { "NAME": "amount",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.5,  "LABEL": "amount" },
+    { "NAME": "smear",   "TYPE": "float", "MIN": 0.0, "MAX": 0.7,  "DEFAULT": 0.25, "LABEL": "smear" },
+    { "NAME": "chroma",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.45, "LABEL": "chroma bleed" },
+    { "NAME": "blocks",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.3,  "LABEL": "blocks" },
     { "NAME": "dropout", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.25, "LABEL": "dropout" },
-    { "NAME": "wobble",  "TYPE": "float", "MIN": 0.0, "MAX": 0.02, "DEFAULT": 0.004,"LABEL": "wobble" }
+    { "NAME": "jitter",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.3,  "LABEL": "jitter" }
   ],
   "PASSES": [
     { "TARGET": "buf", "PERSISTENT": true },
@@ -23,34 +24,68 @@ float dhash(vec2 p) {
   return fract(p.x * p.y);
 }
 
+const vec3 LUMA = vec3(0.299, 0.587, 0.114);
+
 void main() {
   vec2 uv = isf_FragNormCoord;
+
   if (PASSINDEX == 0) {
-    // Generational instability: a slow, spatially-varying wobble of the fed-back
-    // image, plus a soften (5-tap) so each pass loses a little sharpness.
-    vec2 drift = vec2(sin(TIME * 1.3 + uv.y * 20.0), cos(TIME * 1.1 + uv.x * 18.0)) * wobble;
-    float r = soften * 0.004;
-    vec2 sc0 = uv + drift;
-    vec2 scL = sc0 + vec2(-r, 0.0);
-    vec2 scR = sc0 + vec2(r, 0.0);
-    vec2 scU = sc0 + vec2(0.0, r);
-    vec2 scD = sc0 + vec2(0.0, -r);
-    vec3 prev = (IMG_NORM_PIXEL(buf, sc0).rgb * 2.0
-      + IMG_NORM_PIXEL(buf, scL).rgb + IMG_NORM_PIXEL(buf, scR).rgb
-      + IMG_NORM_PIXEL(buf, scU).rgb + IMG_NORM_PIXEL(buf, scD).rgb) / 6.0;
+    float aspect = RENDERSIZE.x / RENDERSIZE.y;
 
-    // Colour rot: pull the fed-back frame toward its luma (bleed) and crush a
-    // touch of contrast so repeated passes wash out.
-    float lp = dot(prev, vec3(0.299, 0.587, 0.114));
-    prev = mix(prev, vec3(lp), bleed * 0.6);
-    prev *= 0.985;
+    // ── Head-switch jitter: a per-scanline horizontal offset that flickers,
+    //    plus a slow whole-frame drift. Bounded — this DISPLACES the source
+    //    lookup, it does not synthesize anything.
+    float line = floor(uv.y * RENDERSIZE.y);
+    float lj = (dhash(vec2(line, floor(TIME * 24.0))) - 0.5) * jitter * 0.018;
+    float dft = sin(TIME * 0.8 + uv.y * 6.0) * jitter * 0.002;
+    vec2 suv = vec2(uv.x + lj + dft, uv.y);
 
-    // Dropout: sparse dark holes that flicker on a coarse grid (film decay).
-    float fl = step(1.0 - dropout * 0.5, dhash(floor(uv * vec2(120.0, 90.0)) + floor(TIME * 8.0)));
-    prev *= (1.0 - fl);
+    // ── Luma from the sharp lookup; chroma from a lookup pulled sideways (the
+    //    classic VHS chroma-luma lag / bleed).
+    vec2 lsuv = suv;
+    vec2 csuv = vec2(suv.x - chroma * 0.014, suv.y);
+    vec3 sharp = IMG_NORM_PIXEL(inputImage, lsuv).rgb;
+    vec3 bled  = IMG_NORM_PIXEL(inputImage, csuv).rgb;
+    float y = dot(sharp, LUMA);
+    vec3 chromaPart = bled - vec3(dot(bled, LUMA)); // colour minus its own luma
+    vec3 col = vec3(y) + chromaPart;
 
-    vec3 live = IMG_NORM_PIXEL(inputImage, uv).rgb;
-    gl_FragColor = vec4(mix(live, prev, amount), 1.0);
+    // ── Tape wash: repeated dubs lose saturation and a little contrast.
+    float lum = dot(col, LUMA);
+    col = mix(col, vec3(lum), amount * 0.35);
+    col = (col - 0.5) * (1.0 - amount * 0.12) + 0.5;
+
+    // ── Block / quantization crush: resample onto a coarse macro-grid and
+    //    posterize the levels (compression breakup on a worn signal).
+    if (blocks > 0.02) {
+      float rows = mix(RENDERSIZE.y, 26.0, blocks);
+      vec2 grid = vec2(rows * aspect, rows);
+      vec2 quv = (floor(suv * grid) + 0.5) / grid;
+      vec3 blk = IMG_NORM_PIXEL(inputImage, quv).rgb;
+      col = mix(col, blk, blocks * 0.8);
+      float levels = mix(255.0, 5.0, blocks);
+      col = floor(col * levels + 0.5) / levels;
+    }
+
+    // ── Bounded feedback ghost: mix in the previous degraded frame, HARD
+    //    capped (max ~0.49 weight) so loop gain stays < 1 — trails/smear, never
+    //    a self-generating feedback pattern.
+    vec2 buv = uv;
+    vec3 prev = IMG_NORM_PIXEL(buf, buv).rgb;
+    col = mix(col, prev, clamp(smear, 0.0, 0.7) * 0.7);
+
+    // ── Tape noise (luma grain).
+    vec2 nseed = floor(uv * RENDERSIZE) + floor(TIME * 30.0);
+    col += (dhash(nseed) - 0.5) * jitter * 0.12;
+
+    // ── Dropout lines: sparse whole-scanline drops to black or white that
+    //    flicker frame to frame (worn oxide / print scratches).
+    float d = dhash(vec2(line, floor(TIME * 10.0)));
+    float drop = step(1.0 - dropout * 0.12, d);
+    float polarity = step(0.5, dhash(vec2(line, 7.0)));
+    col = mix(col, vec3(polarity), drop);
+
+    gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
   } else {
     gl_FragColor = IMG_NORM_PIXEL(buf, uv);
   }

@@ -94,16 +94,16 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Gentle persist', values: { decay: 0.93, drift: 0.002, angle: 1.5708 } }
   ],
   'fx-decay': [
-    { name: 'Tape dub', values: { amount: 0.7, soften: 0.4, bleed: 0.5, dropout: 0.15, wobble: 0.004 } },
-    { name: 'Decasia', values: { amount: 0.85, soften: 0.6, bleed: 0.6, dropout: 0.35, wobble: 0.008 } },
-    { name: 'Gentle age', values: { amount: 0.5, soften: 0.25, bleed: 0.3, dropout: 0.05, wobble: 0.002 } },
-    { name: 'Nth generation', values: { amount: 0.9, soften: 0.7, bleed: 0.7, dropout: 0.2, wobble: 0.006 } },
-    { name: 'Dropout storm', values: { amount: 0.75, soften: 0.3, bleed: 0.4, dropout: 0.6, wobble: 0.005 } },
-    { name: 'Ghost persist', values: { amount: 0.82, soften: 0.5, bleed: 0.35, dropout: 0.1, wobble: 0.003 } },
-    { name: 'Bleach', values: { amount: 0.65, soften: 0.35, bleed: 0.85, dropout: 0.12, wobble: 0.004 } },
-    { name: 'Unstable transport', values: { amount: 0.72, soften: 0.4, bleed: 0.45, dropout: 0.25, wobble: 0.014 } },
-    { name: 'Slow rot', values: { amount: 0.6, soften: 0.55, bleed: 0.55, dropout: 0.18, wobble: 0.005 } },
-    { name: 'Whisper', values: { amount: 0.45, soften: 0.2, bleed: 0.25, dropout: 0.04, wobble: 0.001 } }
+    { name: 'Tape dub', values: { amount: 0.55, smear: 0.3, chroma: 0.5, blocks: 0.2, dropout: 0.15, jitter: 0.3 } },
+    { name: 'Nth generation', values: { amount: 0.8, smear: 0.5, chroma: 0.7, blocks: 0.35, dropout: 0.25, jitter: 0.45 } },
+    { name: 'Gentle age', values: { amount: 0.35, smear: 0.15, chroma: 0.3, blocks: 0.1, dropout: 0.05, jitter: 0.15 } },
+    { name: 'Chroma bleed', values: { amount: 0.5, smear: 0.2, chroma: 0.9, blocks: 0.1, dropout: 0.08, jitter: 0.25 } },
+    { name: 'Dropout storm', values: { amount: 0.6, smear: 0.25, chroma: 0.4, blocks: 0.2, dropout: 0.7, jitter: 0.4 } },
+    { name: 'Compression crush', values: { amount: 0.55, smear: 0.2, chroma: 0.35, blocks: 0.85, dropout: 0.15, jitter: 0.2 } },
+    { name: 'Ghost trails', values: { amount: 0.5, smear: 0.6, chroma: 0.4, blocks: 0.1, dropout: 0.06, jitter: 0.2 } },
+    { name: 'Head-switch tear', values: { amount: 0.5, smear: 0.25, chroma: 0.5, blocks: 0.15, dropout: 0.2, jitter: 0.85 } },
+    { name: 'Worn print', values: { amount: 0.65, smear: 0.35, chroma: 0.55, blocks: 0.3, dropout: 0.3, jitter: 0.35 } },
+    { name: 'Whisper', values: { amount: 0.3, smear: 0.12, chroma: 0.25, blocks: 0.08, dropout: 0.04, jitter: 0.12 } }
   ],
   'fx-abstraction': [
     { name: 'Just off-real', values: { amount: 0.3, disperse: 0.4, posterize: 0.3, desat: 0.3 } },
