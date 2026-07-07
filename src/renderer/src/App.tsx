@@ -10,6 +10,7 @@ import { Compositor } from './engine/Compositor'
 import { hiveEncoder } from './hiveEncoder'
 import { audioBus } from './engine/audioIn'
 import { applyCoupling } from './engine/coupling'
+import { applyProximity } from './engine/field'
 import { applyModulation, modEngine } from './engine/modulation'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel, FxChips } from './components/FxRackPanel'
@@ -326,6 +327,8 @@ export default function App(): JSX.Element {
         // 2b. Coupling: audio binds each layer's A/B balance (post-sync so it
         //     overrides the base mix); returns the coupled mixes for the output.
         const coupledMix = applyCoupling(comp!, c)
+        // 2c. Proximity (Field macro): push the Context mood into a depth zone.
+        const contextProx = applyProximity(comp!, c, st.proximity, st.proximityAudio ? 0.6 : 0)
         // 3. Render the frame.
         comp!.render(now - start)
         // 4. Native output window: push the exact render state so it renders
@@ -339,7 +342,8 @@ export default function App(): JSX.Element {
             warpCorners: st.warpCorners,
             warpGrid: st.warpGrid,
             time: now - start,
-            coupledMix
+            coupledMix,
+            contextProx
           })
         }
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to

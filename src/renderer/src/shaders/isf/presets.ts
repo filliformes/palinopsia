@@ -93,6 +93,30 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Slow bloom drift', values: { decay: 0.985, drift: 0.012, angle: 3.1416 } },
     { name: 'Gentle persist', values: { decay: 0.93, drift: 0.002, angle: 1.5708 } }
   ],
+  'fx-decay': [
+    { name: 'Tape dub', values: { amount: 0.7, soften: 0.4, bleed: 0.5, dropout: 0.15, wobble: 0.004 } },
+    { name: 'Decasia', values: { amount: 0.85, soften: 0.6, bleed: 0.6, dropout: 0.35, wobble: 0.008 } },
+    { name: 'Gentle age', values: { amount: 0.5, soften: 0.25, bleed: 0.3, dropout: 0.05, wobble: 0.002 } },
+    { name: 'Nth generation', values: { amount: 0.9, soften: 0.7, bleed: 0.7, dropout: 0.2, wobble: 0.006 } },
+    { name: 'Dropout storm', values: { amount: 0.75, soften: 0.3, bleed: 0.4, dropout: 0.6, wobble: 0.005 } },
+    { name: 'Ghost persist', values: { amount: 0.82, soften: 0.5, bleed: 0.35, dropout: 0.1, wobble: 0.003 } },
+    { name: 'Bleach', values: { amount: 0.65, soften: 0.35, bleed: 0.85, dropout: 0.12, wobble: 0.004 } },
+    { name: 'Unstable transport', values: { amount: 0.72, soften: 0.4, bleed: 0.45, dropout: 0.25, wobble: 0.014 } },
+    { name: 'Slow rot', values: { amount: 0.6, soften: 0.55, bleed: 0.55, dropout: 0.18, wobble: 0.005 } },
+    { name: 'Whisper', values: { amount: 0.45, soften: 0.2, bleed: 0.25, dropout: 0.04, wobble: 0.001 } }
+  ],
+  'fx-abstraction': [
+    { name: 'Just off-real', values: { amount: 0.3, disperse: 0.4, posterize: 0.3, desat: 0.3 } },
+    { name: 'Currents', values: { amount: 0.6, disperse: 0.8, posterize: 0.3, desat: 0.4 } },
+    { name: 'Dissolve', values: { amount: 0.85, disperse: 0.9, posterize: 0.6, desat: 0.6 } },
+    { name: 'Poster flow', values: { amount: 0.55, disperse: 0.5, posterize: 0.85, desat: 0.4 } },
+    { name: 'Grey matter', values: { amount: 0.7, disperse: 0.6, posterize: 0.4, desat: 0.85 } },
+    { name: 'Smear drift', values: { amount: 0.5, disperse: 0.95, posterize: 0.2, desat: 0.35 } },
+    { name: 'Ink', values: { amount: 0.75, disperse: 0.7, posterize: 0.7, desat: 0.7 } },
+    { name: 'Barely there', values: { amount: 0.25, disperse: 0.3, posterize: 0.2, desat: 0.2 } },
+    { name: 'Molten', values: { amount: 0.8, disperse: 0.85, posterize: 0.5, desat: 0.5 } },
+    { name: 'Full abstract', values: { amount: 1.0, disperse: 0.9, posterize: 0.65, desat: 0.6 } }
+  ],
   'fx-wide-time': [
     { name: 'Wide scape', values: { width: 40, amount: 1, mode: 0, soften: 0.15, drift: 0, hue: 0 } },
     { name: 'Gentle smear', values: { width: 14, amount: 0.85, mode: 0, soften: 0.1, drift: 0, hue: 0 } },

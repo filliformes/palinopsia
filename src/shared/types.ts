@@ -397,6 +397,9 @@ export interface OutputFrame {
   // Per-layer coupled A/B mix (audio-driven) so the output window matches the
   // control window; absent when no layer is coupled.
   coupledMix?: number[] | null
+  // Proximity's Context mood override (haze/blur/bloom/depth), so the output
+  // window mirrors it; absent when Proximity is neutral.
+  contextProx?: { haze: number; blur: number; bloom: number; depth: number } | null
 }
 
 export interface DisplayInfo {

@@ -41,6 +41,17 @@ export function OutputView(): JSX.Element {
             if (layer) layer.sourceMix = f.coupledMix[i]
           }
         }
+        // Mirror Proximity's Context mood push.
+        if (f.contextProx) {
+          const ctx = f.c.master.find((x) => x.shaderId === 'fx-context')
+          if (ctx) {
+            const sc = { kind: 'master' as const }
+            comp!.setFxInput(sc, ctx.id, 'haze', f.contextProx.haze)
+            comp!.setFxInput(sc, ctx.id, 'blur', f.contextProx.blur)
+            comp!.setFxInput(sc, ctx.id, 'depth', f.contextProx.depth)
+            comp!.setFxInput(sc, ctx.id, 'bloom', f.contextProx.bloom)
+          }
+        }
         comp!.render(f.time)
       } catch (err) {
         console.error('[output render]', err)

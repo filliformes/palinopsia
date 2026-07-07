@@ -60,6 +60,10 @@ export function Transport(): JSX.Element {
   const world = useStore((s) => s.world)
   const setWorld = useStore((s) => s.setWorld)
   const setWorldPageOpen = useStore((s) => s.setWorldPageOpen)
+  const proximity = useStore((s) => s.proximity)
+  const setProximity = useStore((s) => s.setProximity)
+  const proximityAudio = useStore((s) => s.proximityAudio)
+  const setProximityAudio = useStore((s) => s.setProximityAudio)
   const activeWorld = worlds.find((w) => w.id === world)
   const setComposition = useStore.setState
   const [menuOpen, setMenuOpen] = useState(false)
@@ -160,6 +164,32 @@ export function Transport(): JSX.Element {
           title="Open the World editor (W)"
         >
           ⧉
+        </button>
+      </div>
+
+      {/* Proximity (Field macro) — one knob places the image in a depth zone,
+          far/vista ↔ close/personal, by pushing the Context mood. */}
+      <div className="flex items-center gap-1.5">
+        <span className="font-mono text-[10px] text-muted">PROX</span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={proximity}
+          onChange={(e) => setProximity(Number(e.target.value))}
+          onDoubleClick={() => setProximity(0.5)}
+          className="w-20 accent-accent"
+          title={`Proximity ${proximity < 0.48 ? 'far' : proximity > 0.52 ? 'close' : 'neutral'} — vista ↔ personal (double-click: neutral)`}
+        />
+        <button
+          onClick={() => setProximityAudio(!proximityAudio)}
+          className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
+            proximityAudio ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'
+          }`}
+          title="Audio brightness (centroid) drives proximity"
+        >
+          ◑
         </button>
       </div>
 

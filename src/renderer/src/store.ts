@@ -444,6 +444,12 @@ interface StoreState {
   // user never sees the audio-relations control. Persisted.
   showCoupling: boolean
   setShowCoupling: (on: boolean) => void
+  // Proximity (Field macro) — 0 far/vista · 0.5 neutral · 1 close/personal.
+  // Pushes the Context mood; optional audio (brightness) drive. Persisted.
+  proximity: number
+  setProximity: (v: number) => void
+  proximityAudio: boolean
+  setProximityAudio: (on: boolean) => void
   // World / diegesis — a bank of editable presets (built-ins + user worlds).
   // Selecting one biases the composition; the World page (W) edits/creates them.
   worlds: World[]
@@ -1236,6 +1242,19 @@ export const useStore = create<StoreState>((set, get) => ({
   setShowCoupling: (on) => {
     localStorage.setItem('opsia.showCoupling', on ? '1' : '0')
     set({ showCoupling: on })
+  },
+  proximity: (() => {
+    const p = localStorage.getItem('opsia.proximity')
+    return p !== null && Number.isFinite(Number(p)) ? Number(p) : 0.5
+  })(),
+  setProximity: (v) => {
+    localStorage.setItem('opsia.proximity', String(v))
+    set({ proximity: v })
+  },
+  proximityAudio: localStorage.getItem('opsia.proximityAudio') === '1',
+  setProximityAudio: (on) => {
+    localStorage.setItem('opsia.proximityAudio', on ? '1' : '0')
+    set({ proximityAudio: on })
   },
   worlds: loadWorlds(),
   world: localStorage.getItem('opsia.world') || 'synthetic',
