@@ -47,14 +47,43 @@ const FT_PRESET_WIDTH_CH = (() => {
 
 export function FinishingTouches(): JSX.Element {
   const master = useStore((s) => s.composition.master)
+  const toggleFinishing = useStore((s) => s.toggleFinishing)
   const order = ['fx-vibe', 'fx-context', 'fx-finalizer']
   const units = order.map((id) => master.find((f) => f.shaderId === id)).filter((u): u is FxInstance => !!u)
+  const on = units.length > 0 && units.every((u) => u.enabled)
   return (
     <div className="flex flex-col gap-1.5">
+      {/* Global bypass for the whole finishing bank. */}
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-[9px] uppercase tracking-wide text-muted">finishing</span>
+        <FinishingToggle on={on} onClick={toggleFinishing} />
+        <span className="font-mono text-[9px] text-muted">
+          Vibe · Context · Finalizer {on ? '' : '— bypassed'}
+        </span>
+      </div>
       {units.map((u) => (
         <FinalizerSection key={u.id} inst={u} />
       ))}
     </div>
+  )
+}
+
+// The global finishing on/off pill — reused (mirrored) in the Master FX strip.
+export function FinishingToggle({ on, onClick }: { on: boolean; onClick: () => void }): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide transition-colors ${
+        on ? 'border-active bg-active/15 text-active' : 'border-border text-muted hover:text-text'
+      }`}
+      title={
+        on
+          ? 'Finishing ON — click to bypass Vibe · Context · Finalizer'
+          : 'Finishing bypassed — click to enable Vibe · Context · Finalizer'
+      }
+    >
+      finishing {on ? 'on' : 'off'}
+    </button>
   )
 }
 

@@ -256,9 +256,20 @@ export function makeDefaultMetaKnobs(): MetaKnobState[] {
   }))
 }
 
-// The Background slab's blank state — off (no source), slow ground clock.
+// The Background slab's default — a solid white ground (a clean canvas to build
+// on / key against). New sessions get this; old sessions with no background
+// normalize to the BLANK (off) one so loading them isn't suddenly washed white.
 export function makeDefaultBackground(): BackgroundState {
-  return { source: emptySlot(), fx: [], opacity: 1, speed: BG_DEFAULT_SPEED }
+  return {
+    source: { kind: 'generator', shaderId: 'solid-color', inputs: { gradient: 0, color: [1, 1, 1, 1] } },
+    fx: [],
+    opacity: 1,
+    speed: BG_DEFAULT_SPEED,
+    depth: 0
+  }
+}
+export function makeBlankBackground(): BackgroundState {
+  return { source: emptySlot(), fx: [], opacity: 1, speed: BG_DEFAULT_SPEED, depth: 0 }
 }
 
 export function makeDefaultComposition(): CompositionState {
@@ -560,6 +571,14 @@ interface StoreState {
   newSession: () => void
   loadSession: (s: Session) => void
   exportSession: () => Session
+  // Path of the file this session is saved to (from Save As / Open) — enables a
+  // plain Save that overwrites in place. Null after New (never saved yet).
+  sessionPath: string | null
+  setSessionPath: (p: string | null) => void
+
+  // Finishing Touches — the three pinned finalizers (Vibe · Context · Finalizer)
+  // as one bank: toggle bypasses/enables all three at once.
+  toggleFinishing: () => void
 }
 
 function updateLayer(
@@ -613,6 +632,9 @@ export const useStore = create<StoreState>((set, get) => ({
 
   name: 'Untitled',
   setName: (n) => set({ name: n }),
+
+  sessionPath: null,
+  setSessionPath: (p) => set({ sessionPath: p }),
 
   // A cold launch opens on a fresh random one-layer scene with the active World
   // applied (overridden if an autosave/session loads over it in App).
@@ -1168,6 +1190,19 @@ export const useStore = create<StoreState>((set, get) => ({
         }
       }
     }),
+  toggleFinishing: () =>
+    set((s) => {
+      // Bypass / enable the three pinned finalizers as one bank. Off if ANY is on
+      // (so a single click always turns the whole thing off).
+      const finalizers = s.composition.master.filter((f) => f.locked)
+      const target = !finalizers.some((f) => f.enabled)
+      return {
+        composition: {
+          ...s.composition,
+          master: s.composition.master.map((f) => (f.locked ? { ...f, enabled: target } : f))
+        }
+      }
+    }),
   setFxOpacity: (scope, instId, v) =>
     set((s) => ({
       composition: updateFxArray(s.composition, scope, (fx) =>
@@ -1704,6 +1739,7 @@ export const useStore = create<StoreState>((set, get) => ({
         activeSceneId: null,
         vibePresetName: null,
         variationBaseline: null,
+        sessionPath: null, // New = no file yet; next Save prompts for one.
         collapsed
       }
     }),
@@ -1724,8 +1760,9 @@ export const useStore = create<StoreState>((set, get) => ({
       variationBaseline: null,
       composition: {
         ...s.composition,
-        // Older sessions have no Background slab — normalize to the blank one.
-        background: s.composition.background ?? makeDefaultBackground(),
+        // Older sessions have no Background slab — normalize to the blank (off)
+        // one so loading them isn't suddenly washed by the new white default.
+        background: s.composition.background ?? makeBlankBackground(),
         // Normalize layers from older session files — new fields get defaults.
         layers: s.composition.layers.map((l) => ({
           ...l,

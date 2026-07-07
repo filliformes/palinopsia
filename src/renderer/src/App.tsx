@@ -14,7 +14,7 @@ import { applyProximity } from './engine/field'
 import { applyModulation, modEngine } from './engine/modulation'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel, FxChips } from './components/FxRackPanel'
-import { FinishingTouches } from './components/FinishingTouches'
+import { FinishingTouches, FinishingToggle } from './components/FinishingTouches'
 import { Inspector } from './components/Inspector'
 import { LayerPanel } from './components/LayerPanel'
 import { MixerPanel } from './components/MixerPanel'
@@ -441,11 +441,24 @@ export default function App(): JSX.Element {
 
   async function openSession(): Promise<void> {
     const res = await window.api.sessionOpen()
-    if (res) useStore.getState().loadSession(res.session)
+    if (res) {
+      useStore.getState().loadSession(res.session)
+      useStore.getState().setSessionPath(res.path) // Save now overwrites this file
+    }
   }
 
+  // Save As — always prompts; remembers the chosen path for later plain Saves.
+  async function saveSessionAs(): Promise<void> {
+    const path = await window.api.sessionSaveAs(useStore.getState().exportSession())
+    if (path) useStore.getState().setSessionPath(path)
+  }
+
+  // Save — overwrites the current file in place (no dialog). Falls back to Save
+  // As the first time (nothing saved/opened yet).
   async function saveSession(): Promise<void> {
-    await window.api.sessionSaveAs(useStore.getState().exportSession())
+    const st = useStore.getState()
+    if (st.sessionPath) await window.api.sessionSave(st.exportSession(), st.sessionPath)
+    else await saveSessionAs()
   }
 
   return (
@@ -516,8 +529,19 @@ export default function App(): JSX.Element {
         <button className="btn text-[12px]" onClick={openSession}>
           Open
         </button>
-        <button className="btn text-[12px]" onClick={saveSession}>
+        <button
+          className="btn text-[12px]"
+          onClick={saveSession}
+          title="Save — overwrites the current file (Save As the first time)"
+        >
           Save
+        </button>
+        <button
+          className="btn text-[12px]"
+          onClick={saveSessionAs}
+          title="Save As — choose a new file"
+        >
+          Save As
         </button>
         <select
           className="input text-[12px]"
@@ -730,9 +754,14 @@ function MasterRackStrip(): JSX.Element {
       <div className="ml-3 flex min-w-0 flex-1 items-center">
         <FxRackPanel scope={{ kind: 'master' }} fx={rackFx} label="" />
       </div>
-      {/* Pinned finalizers — clustered at the rightmost, never wrapping apart */}
+      {/* Pinned finalizers — clustered at the rightmost, never wrapping apart.
+          A global finishing on/off pill mirrors the one in the Finishing view. */}
       {lockedFx.length > 0 && (
-        <div className="ml-auto flex shrink-0 items-center">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <FinishingToggle
+            on={lockedFx.every((f) => f.enabled)}
+            onClick={() => useStore.getState().toggleFinishing()}
+          />
           <FxChips scope={{ kind: 'master' }} fx={lockedFx} nowrap />
         </div>
       )}

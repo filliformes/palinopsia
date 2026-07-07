@@ -67,8 +67,10 @@ export function BackgroundPanel(): JSX.Element {
       onContextMenu={onContextMenu}
       onClick={() => shaderId && setSelection({ type: 'background' })}
     >
-      {/* Header: BG · source picker · +fx · dice · presets */}
-      <div className="flex min-w-0 items-center gap-1.5">
+      {/* Header: BG · source picker · +fx · dice · presets. flex-wrap so a narrow
+          Inspector column drops the presets/dice to a second line instead of
+          overflowing the section; the source select keeps a min width. */}
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
         <span
           className={`w-[34px] shrink-0 font-mono text-[11px] font-bold ${
             selected ? 'text-accent' : shaderId ? 'text-text' : 'text-muted'
@@ -78,7 +80,7 @@ export function BackgroundPanel(): JSX.Element {
           BG
         </span>
         <select
-          className={`input select-compact min-w-0 flex-1 text-[11px] ${selected ? 'border-accent' : ''}`}
+          className={`input select-compact min-w-[5rem] flex-1 text-[11px] ${selected ? 'border-accent' : ''}`}
           value={shaderId ?? ''}
           onChange={(e) => setBackgroundSource(e.target.value || null)}
           onClick={(e) => e.stopPropagation()}
@@ -92,7 +94,8 @@ export function BackgroundPanel(): JSX.Element {
           ))}
         </select>
         <span onClick={(e) => e.stopPropagation()}>
-          <FxAddSelect scope={{ kind: 'background' }} className="w-auto shrink-0" />
+          {/* fixed narrow — hugs "+ fx", not the widest FX name in the list */}
+          <FxAddSelect scope={{ kind: 'background' }} className="w-11 shrink-0" />
         </span>
         <button
           onClick={(e) => {
@@ -108,7 +111,7 @@ export function BackgroundPanel(): JSX.Element {
           ⚄
         </button>
         <select
-          className="input select-compact w-[4.5rem] shrink-0 text-[10px]"
+          className="input select-compact w-[4.75rem] shrink-0 text-[10px]"
           value=""
           onChange={(e) => {
             const v = e.target.value
