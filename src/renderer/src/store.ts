@@ -417,6 +417,10 @@ interface StoreState {
   setAudioSource: (s: 'both' | 'osc' | 'local') => void
   audioDeviceId: string | null
   setAudioDeviceId: (id: string | null) => void
+  // Show the per-layer A/B coupling (CPL) row. Off by default — a visuals-only
+  // user never sees the audio-relations control. Persisted.
+  showCoupling: boolean
+  setShowCoupling: (on: boolean) => void
   // World / diegesis (Slab 1) — global. Persisted; selecting one biases the
   // composition's coupling + Context mood via applyWorldToComposition.
   world: WorldMode
@@ -1197,6 +1201,11 @@ export const useStore = create<StoreState>((set, get) => ({
     if (id) localStorage.setItem('opsia.audioDeviceId', id)
     else localStorage.removeItem('opsia.audioDeviceId')
     set({ audioDeviceId: id })
+  },
+  showCoupling: localStorage.getItem('opsia.showCoupling') === '1',
+  setShowCoupling: (on) => {
+    localStorage.setItem('opsia.showCoupling', on ? '1' : '0')
+    set({ showCoupling: on })
   },
   world: (localStorage.getItem('opsia.world') as WorldMode) || 'synthetic',
   setWorld: (w) => {

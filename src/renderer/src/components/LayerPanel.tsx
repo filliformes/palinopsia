@@ -28,6 +28,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const toggleFeedback = useStore((s) => s.toggleFeedback)
   const setFeedbackAmount = useStore((s) => s.setFeedbackAmount)
   const setSourceMix = useStore((s) => s.setSourceMix)
+  const showCoupling = useStore((s) => s.showCoupling)
   const setCoupling = useStore((s) => s.setCoupling)
   const setSourceBlend = useStore((s) => s.setSourceBlend)
   const setSourceShader = useStore((s) => s.setSourceShader)
@@ -183,8 +184,9 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             />
           </Row>
 
-          {/* CPL: audio couples the A/B balance — ALWAYS visible (fixed layout);
-              inert until B has a source and Audio is on. */}
+          {/* CPL: audio couples the A/B balance. Hidden unless the user turns on
+              coupling (Audio panel) — a visuals-only user never sees it. */}
+          {showCoupling && (
           <Row label="CPL">
             <select
               className="input select-compact w-[4.25rem] shrink-0 text-[10px]"
@@ -232,6 +234,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               title={`Tightness ${layer.coupling.tightness.toFixed(2)} — vestigial (peaks only) ↔ obvious (linear)`}
             />
           </Row>
+          )}
 
           {/* SOURCE B */}
           <SourceRow

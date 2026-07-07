@@ -23,6 +23,8 @@ export function AudioPanel(): JSX.Element {
   const setSource = useStore((s) => s.setAudioSource)
   const deviceId = useStore((s) => s.audioDeviceId)
   const setDeviceId = useStore((s) => s.setAudioDeviceId)
+  const showCoupling = useStore((s) => s.showCoupling)
+  const setShowCoupling = useStore((s) => s.setShowCoupling)
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const showDevice = source === 'local' || source === 'both'
@@ -90,6 +92,17 @@ export function AudioPanel(): JSX.Element {
                 ))}
               </select>
             )}
+
+            {/* Reveal the per-layer A/B coupling (CPL) rows. */}
+            <button
+              onClick={() => setShowCoupling(!showCoupling)}
+              title="Show the A/B coupling row on each layer (audio binds the two sources)"
+              className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] ${
+                showCoupling ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted'
+              }`}
+            >
+              coupling
+            </button>
 
             <div className="flex-1" />
             <Meters />
