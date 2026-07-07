@@ -77,20 +77,31 @@ export function AutoControls({
     // leaves a ragged column and dead space. Pull them out and stand them to
     // the RIGHT of the scalar controls, vertically centred.
     const pads = inputs.filter((i) => i.type === 'point2D')
-    const rest = inputs.filter((i) => i.type !== 'point2D')
+    // COMPACT-flagged inputs (small toggles / tiny enums) stack together into
+    // ONE cluster cell instead of a full cell each — tighter panels, no scroll.
+    const compact = inputs.filter((i) => i.type !== 'point2D' && i.compact)
+    const rest = inputs.filter((i) => i.type !== 'point2D' && !i.compact)
+    const compactCell =
+      compact.length > 0 ? (
+        <CompactCluster key="compact" inputs={compact} values={values} onChange={onChange} />
+      ) : null
     // Too few controls to justify two rows → lay them in a single row and
     // centre the whole group (both axes) instead of a sparse, top-left grid.
-    const singleRow = rest.length <= 4
+    const singleRow = rest.length + (compactCell ? 1 : 0) <= 4
     return (
       <div className={`flex h-full items-center gap-5 p-2 ${singleRow ? 'justify-center' : ''}`}>
         {singleRow ? (
-          <div className="flex items-center gap-5">{visible(rest).map((inp) => renderControl(inp))}</div>
+          <div className="flex items-center gap-5">
+            {visible(rest).map((inp) => renderControl(inp))}
+            {compactCell}
+          </div>
         ) : (
           <div
             className="grid grid-flow-col content-start gap-x-5 gap-y-2"
             style={{ gridTemplateRows: 'repeat(2, min-content)', gridAutoColumns: '11rem' }}
           >
             {visible(rest).map((inp) => renderControl(inp))}
+            {compactCell}
           </div>
         )}
         {pads.length > 0 && (
@@ -521,6 +532,64 @@ export function AssignRow({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── COMPACT cluster — small toggles / tiny enums stacked in one cell ──
+// Inputs flagged "COMPACT": true land here: label left, a tiny control right,
+// one line each. Keeps utility switches (invert · bidir · flow res) from
+// spending a full grid cell apiece.
+function CompactCluster({
+  inputs,
+  values,
+  onChange
+}: {
+  inputs: IsfInputDesc[]
+  values: Record<string, Value>
+  onChange: (name: string, value: Value) => void
+}): JSX.Element {
+  return (
+    <div className="flex w-44 min-w-0 flex-col gap-1">
+      {inputs.map((inp) => {
+        const def = typeof inp.def === 'number' ? inp.def : 0
+        const raw = values[inp.name]
+        const v = typeof raw === 'number' ? raw : def
+        if (inp.type === 'long') {
+          return (
+            <div key={inp.name} className="flex items-center justify-between gap-2">
+              {labelEl(inp)}
+              <select
+                className="input select-compact w-12 shrink-0 !px-1 !py-0 text-[10px]"
+                value={v}
+                onChange={(e) => onChange(inp.name, Number(e.target.value))}
+                title={inp.label}
+              >
+                {(inp.values ?? []).map((val, i) => (
+                  <option key={val} value={val}>
+                    {inp.labels?.[i] ?? val}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )
+        }
+        const on = v >= 0.5
+        return (
+          <div key={inp.name} className="flex items-center justify-between gap-2">
+            {labelEl(inp)}
+            <button
+              onClick={() => onChange(inp.name, on ? 0 : 1)}
+              className={`shrink-0 rounded px-1.5 py-0 font-mono text-[9px] leading-4 transition-colors ${
+                on ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted hover:text-text'
+              }`}
+              title={inp.label}
+            >
+              {on ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        )
+      })}
     </div>
   )
 }

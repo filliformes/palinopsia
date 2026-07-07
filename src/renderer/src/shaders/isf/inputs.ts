@@ -17,6 +17,9 @@ export interface IsfInputDesc {
   // For 'long' (enum) inputs.
   values?: number[]
   labels?: string[]
+  // Opsia extension ("COMPACT": true): small toggles/enums that the Inspector's
+  // two-row grid stacks together into ONE cluster cell instead of a cell each.
+  compact?: boolean
 }
 
 interface RawInput {
@@ -28,6 +31,7 @@ interface RawInput {
   DEFAULT?: number | number[] | boolean
   VALUES?: number[]
   LABELS?: string[]
+  COMPACT?: boolean
 }
 
 const cache = new Map<string, IsfInputDesc[]>()
@@ -66,7 +70,8 @@ export function inputsForShader(shaderId: string): IsfInputDesc[] {
       max: raw.MAX,
       def,
       values: raw.VALUES,
-      labels: raw.LABELS
+      labels: raw.LABELS,
+      compact: raw.COMPACT
     })
   }
   cache.set(shaderId, out)

@@ -112,11 +112,11 @@ export const NATIVE_NODES: IsfShader[] = [
         { "NAME": "flowBlur", "TYPE": "float", "MIN": 0.0, "MAX": 24.0, "DEFAULT": 8.0, "LABEL": "flow blur" },
         { "NAME": "magnitudeGamma", "TYPE": "float", "MIN": 0.25, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "mag gamma" },
         { "NAME": "channelSpread", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "chroma pull" },
-        { "NAME": "invert", "TYPE": "bool", "DEFAULT": false, "LABEL": "invert" },
         { "NAME": "taps", "TYPE": "float", "MIN": 2.0, "MAX": 24.0, "DEFAULT": 12.0, "LABEL": "taps" },
         { "NAME": "falloff", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "falloff" },
-        { "NAME": "bidirectional", "TYPE": "bool", "DEFAULT": true, "LABEL": "bidirectional" },
-        { "NAME": "flowRes", "TYPE": "long", "VALUES": [0,1,2], "LABELS": ["128","256","512"], "DEFAULT": 1, "LABEL": "flow res" }
+        { "NAME": "invert", "TYPE": "bool", "DEFAULT": false, "LABEL": "invert", "COMPACT": true },
+        { "NAME": "bidirectional", "TYPE": "bool", "DEFAULT": true, "LABEL": "bidir", "COMPACT": true },
+        { "NAME": "flowRes", "TYPE": "long", "VALUES": [0,1,2], "LABELS": ["128","256","512"], "DEFAULT": 1, "LABEL": "flow res", "COMPACT": true }
       ]
     }*/`,
     curated: {
