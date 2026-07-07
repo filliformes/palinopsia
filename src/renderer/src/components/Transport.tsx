@@ -155,9 +155,9 @@ export function Transport(): JSX.Element {
           step={0.004}
           value={msToT(morphMs)}
           onChange={(e) => setMorphMs(tToMs(Number(e.target.value)))}
-          onDoubleClick={() => setMorphMs(100)}
+          onDoubleClick={() => setMorphMs(1000)}
           className="w-24 accent-accent"
-          title={`Scene / Randomize morph ${fmtMorph(morphMs)} — double-click for 100ms`}
+          title={`Scene / Randomize morph ${fmtMorph(morphMs)} — double-click for 1s`}
         />
         <span className="w-11 shrink-0 font-mono text-[10px] text-muted">{fmtMorph(morphMs)}</span>
       </div>

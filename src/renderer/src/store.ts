@@ -1065,7 +1065,7 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
   globalSpeed: 1,
   setGlobalSpeed: (x) => set({ globalSpeed: Math.max(1 / 64, Math.min(64, x)) }),
-  morphMs: 100,
+  morphMs: 1000,
   setMorphMs: (ms) => set({ morphMs: Math.max(0, Math.min(30000, ms)) }),
   applyMasterPreset: (fx, vibe) =>
     set((s) => {
