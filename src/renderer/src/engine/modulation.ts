@@ -444,14 +444,21 @@ export class ModEngine {
         }
         case 'organic': {
           // Irregular periodicity + perpetual variation (Boucher's "water"): a
-          // smooth oscillator whose period AND amplitude drift on slow,
-          // incommensurate LFOs — never quite the same twice.
+          // base undulation plus INCOMMENSURATE partials whose phases slowly
+          // DRIFT against each other — so the waveform is non-sinusoidal and
+          // never repeats. `variation` grows the partials + a period wobble.
+          // At variation 0 it degenerates to a clean sine.
           const varn = Math.max(0, Math.min(1, cfg.organic?.variation ?? 0.5))
-          const t = now / 1000
-          const wobble = 0.5 * Math.sin(t * 0.13) + 0.5 * Math.sin(t * 0.077) // ~[-1,1]
-          s.phase += hz * dt * (1 + varn * 0.85 * wobble)
-          const amp = 1 - varn * 0.45 * (0.5 + 0.5 * Math.sin(t * 0.19 + 1.7))
-          v01 = (Math.sin(s.phase * TWO_PI) * amp + 1) / 2
+          const td = now * 0.001
+          const wobble = 0.5 * Math.sin(td * 0.11) + 0.5 * Math.sin(td * 0.067) // ~[-1,1]
+          s.phase += hz * dt * (1 + varn * 0.8 * wobble)
+          const p = s.phase * TWO_PI
+          let v = Math.sin(p)
+          v += varn * 0.7 * Math.sin(p * 1.71 + td * 0.31)
+          v += varn * 0.4 * Math.sin(p * 2.93 + td * 0.47)
+          v += varn * 0.22 * Math.sin(p * 0.51 - td * 0.19)
+          const norm = 1 + varn * 1.32
+          v01 = (v / norm) * 0.5 + 0.5
           break
         }
         case 'physics': {
@@ -466,26 +473,36 @@ export class ModEngine {
             kicked = true
           }
           const damp = Math.max(0, Math.min(1, cfg.physics?.damping ?? 0.5))
-          const dtc = Math.min(0.05, dt)
+          const dtc = Math.min(0.04, dt)
           switch (cfg.physics?.motion ?? 'bounce') {
             case 'bounce': {
+              // A real bouncing ball: launched to apex ≈ 1, losing energy at each
+              // contact (restitution) so successive arcs shrink and quicken
+              // (the Zeno feel), then resting until the next clock kick.
+              const g = 14
+              const r = 0.85 - damp * 0.58 // restitution 0.85 → 0.27
               if (kicked) {
-                s.physPos = 1
-                s.physVel = 0
+                s.physPos = 0
+                s.physVel = Math.sqrt(2 * g) // launch so the apex lands near 1
               }
-              s.physVel -= (6 + (1 - damp) * 12) * dtc // gravity
+              s.physVel -= g * dtc
               s.physPos += s.physVel * dtc
               if (s.physPos <= 0) {
                 s.physPos = 0
-                s.physVel = -s.physVel * (0.35 + damp * 0.6) // restitution
+                s.physVel = -s.physVel * r
               }
               v01 = s.physPos
               break
             }
             case 'spring': {
+              // Damped harmonic oscillator toward an alternating target. `damp`
+              // maps the damping ratio ζ from bouncy-underdamped to smooth-
+              // critical: F = k·(target−x) − c·v, c = 2ζ√k (semi-implicit Euler).
               if (kicked) s.physTarget = s.physTarget > 0.5 ? 0 : 1
-              s.physVel += (s.physTarget - s.physPos) * 60 * dtc
-              s.physVel *= 1 - Math.min(0.9, (1 + damp * 12) * dtc) // damping
+              const k = 90
+              const zeta = 0.1 + damp * 0.9
+              const c = 2 * zeta * Math.sqrt(k)
+              s.physVel += (k * (s.physTarget - s.physPos) - c * s.physVel) * dtc
               s.physPos += s.physVel * dtc
               v01 = s.physPos
               break

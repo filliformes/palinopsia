@@ -12,6 +12,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { isRichTheme, useStore } from '../store'
+import { liveModValues } from '../engine/modulation'
 
 interface Props {
   value: number
@@ -30,6 +31,11 @@ interface Props {
   // the next render — used by the Sequence view to "land" on the
   // Duration field after the user drops a scene into a Scene Step.
   autoFocusToken?: number
+  // When set, the box shows the LIVE modulated value (liveModValues[liveKey])
+  // while idle — written straight to the DOM per rAF, no re-render — so the
+  // readout tracks modulation just like the slider thumb. Typing still edits
+  // the base value.
+  liveKey?: string
 }
 
 export function BoundedNumberInput({
@@ -42,7 +48,8 @@ export function BoundedNumberInput({
   className,
   title,
   disabled,
-  autoFocusToken
+  autoFocusToken,
+  liveKey
 }: Props): JSX.Element {
   const [str, setStr] = useState(formatValue(value, integer))
   const focused = useRef(false)
@@ -114,6 +121,24 @@ export function BoundedNumberInput({
     }
     setStr(formatValue(value, integer))
   }, [value, integer, min, max])
+
+  // Live modulation readout: while idle, mirror liveModValues[liveKey] straight
+  // to the DOM each frame (no re-render) so the number tracks modulation like
+  // the slider thumb. Skips while the user is focused/typing.
+  useEffect(() => {
+    if (!liveKey) return
+    let raf = 0
+    const paint = (): void => {
+      const el = inputRef.current
+      if (el && !focused.current) {
+        const live = liveModValues.get(liveKey)
+        if (live !== undefined) el.value = formatValue(live, integer)
+      }
+      raf = requestAnimationFrame(paint)
+    }
+    raf = requestAnimationFrame(paint)
+    return () => cancelAnimationFrame(raf)
+  }, [liveKey, integer])
 
   const re = integer ? /^-?\d*$/ : /^-?\d*\.?\d*([eE][-+]?\d*)?$/
 

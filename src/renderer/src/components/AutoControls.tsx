@@ -4,7 +4,14 @@
 // each input's declared range and default. This is the simplexité payoff:
 // the shader header IS the control surface.
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject
+} from 'react'
 import type { ModTarget } from '@shared/types'
 import { liveModValues } from '../engine/modulation'
 import type { IsfInputDesc } from '../shaders/isf/inputs'
@@ -242,6 +249,7 @@ function FloatControl({
   // BASE value; the live overlay never causes re-renders. Paused while the
   // user is dragging this slider.
   const sliderRef = useRef<HTMLInputElement | null>(null)
+  const btnRef = useRef<HTMLButtonElement | null>(null)
   useEffect(() => {
     if (!isModulated || !targetKey) return
     let raf = 0
@@ -287,6 +295,7 @@ function FloatControl({
           />
           {target && (
             <button
+              ref={btnRef}
               onClick={() => setAssignOpen((o) => !o)}
               className={`shrink-0 rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
                 bound.length > 0
@@ -306,11 +315,14 @@ function FloatControl({
               min={min}
               max={max}
               onChange={(n) => onChange(inp.name, n)}
+              liveKey={isModulated ? (targetKey ?? undefined) : undefined}
               className="input w-full px-1 py-0.5 text-right text-[11px]"
             />
           </div>
         </div>
-        {assignOpen && target && <AssignRow target={target} bound={bound} />}
+        {assignOpen && target && (
+          <AssignPopover target={target} bound={bound} anchor={btnRef} onClose={() => setAssignOpen(false)} />
+        )}
       </div>
     )
   }
@@ -322,6 +334,7 @@ function FloatControl({
         <div className="flex shrink-0 items-center gap-1">
           {target && (
             <button
+              ref={btnRef}
               onClick={() => setAssignOpen((o) => !o)}
               className={`rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
                 bound.length > 0
@@ -341,6 +354,7 @@ function FloatControl({
               min={min}
               max={max}
               onChange={(n) => onChange(inp.name, n)}
+              liveKey={isModulated ? (targetKey ?? undefined) : undefined}
               className="input w-full px-1 py-0.5 text-right text-[11px]"
             />
           </div>
@@ -362,7 +376,52 @@ function FloatControl({
             : `${inp.label} — double-click to reset (${def})`
         }
       />
-      {assignOpen && target && <AssignRow target={target} bound={bound} />}
+      {assignOpen && target && (
+        <AssignPopover target={target} bound={bound} anchor={btnRef} onClose={() => setAssignOpen(false)} />
+      )}
+    </div>
+  )
+}
+
+// The binding row as a FIXED-position popover anchored to the M button — the
+// Inspector band is `overflow-y-hidden` with a fixed height, so an inline panel
+// would be clipped and would shove its sibling controls. Fixed positioning
+// escapes the clip and leaves the row untouched.
+function AssignPopover({
+  target,
+  bound,
+  anchor,
+  onClose
+}: {
+  target: ModTarget
+  bound: Array<{ id: string; mod: number; depth: number }>
+  anchor: RefObject<HTMLElement>
+  onClose: () => void
+}): JSX.Element | null {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const W = 236
+  useLayoutEffect(() => {
+    const r = anchor.current?.getBoundingClientRect()
+    if (r) {
+      setPos({
+        top: r.bottom + 4,
+        left: Math.max(6, Math.min(r.left, window.innerWidth - W - 6))
+      })
+    }
+  }, [anchor])
+  useEffect(() => {
+    const h = (e: MouseEvent): void => {
+      if (ref.current?.contains(e.target as Node) || anchor.current?.contains(e.target as Node)) return
+      onClose()
+    }
+    window.addEventListener('mousedown', h)
+    return () => window.removeEventListener('mousedown', h)
+  }, [anchor, onClose])
+  if (!pos) return null
+  return (
+    <div ref={ref} style={{ position: 'fixed', top: pos.top, left: pos.left, width: W, zIndex: 60 }}>
+      <AssignRow target={target} bound={bound} />
     </div>
   )
 }
