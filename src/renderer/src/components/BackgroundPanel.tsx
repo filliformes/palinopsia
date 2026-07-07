@@ -94,8 +94,9 @@ export function BackgroundPanel(): JSX.Element {
           ))}
         </select>
         <span onClick={(e) => e.stopPropagation()}>
-          {/* w-auto → the native select sizes to its widest option (not clipped) */}
-          <FxAddSelect scope={{ kind: 'background' }} className="w-auto shrink-0" />
+          {/* snug fixed width — fits "+ fx" + arrow without clipping, but not as
+              wide as the widest option ("Difference Bloom"). Popup still expands. */}
+          <FxAddSelect scope={{ kind: 'background' }} className="w-16 shrink-0" />
         </span>
         <button
           onClick={(e) => {
