@@ -320,9 +320,18 @@ export default function App(): JSX.Element {
       }
     }
     window.addEventListener('keydown', onKey)
+    // Ctrl + mousewheel zooms the whole UI (like the +/- buttons / Ctrl +/-),
+    // matching dataFLOU. preventDefault stops the browser's own page zoom.
+    const onWheel = (e: WheelEvent): void => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      setUiZoom(useStore.getState().uiZoom + (e.deltaY < 0 ? 0.05 : -0.05))
+    }
+    window.addEventListener('wheel', onWheel, { passive: false })
     return () => {
       unsub()
       window.removeEventListener('keydown', onKey)
+      window.removeEventListener('wheel', onWheel)
     }
   }, [setUiZoom])
 

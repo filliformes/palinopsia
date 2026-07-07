@@ -7,7 +7,7 @@ import type { FxInstance, ModTarget, SidechainRef, SourceSlot } from '@shared/ty
 import { randomizeInputs } from '../randomize'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { inputsForShader } from '../shaders/isf/inputs'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { modTargetKey, useStore, type FxScope } from '../store'
 import { AutoControls, AssignContext, AssignRow } from './AutoControls'
@@ -68,8 +68,14 @@ export function Inspector(): JSX.Element {
   const [flashing, flash] = useFlash()
   const [switchCapture, setSwitchCapture] = useState(false)
   const [switchDevice, setSwitchDevice] = useState(false)
-  // The mod-assign side panel: which parameter's M was clicked (null = closed).
+  // The mod-assign side panel: which parameter's M was clicked (null = closed),
+  // and its draggable width (persisted).
   const [assign, setAssign] = useState<{ target: ModTarget; label: string } | null>(null)
+  const [assignW, setAssignW] = useState(() => {
+    const n = Number(localStorage.getItem('opsia.assignPanelW'))
+    return Number.isFinite(n) && n >= 150 ? n : 224
+  })
+  const resize = useRef<{ startX: number; startW: number; last: number } | null>(null)
   // Close the panel whenever the selection moves to a different shader/unit.
   const selKey =
     selection?.type === 'source'
@@ -429,7 +435,39 @@ export function Inspector(): JSX.Element {
             )}
           </div>
           {assign && (
-            <AssignPanel target={assign.target} label={assign.label} onClose={() => setAssign(null)} />
+            <>
+              {/* Drag the left edge to resize the panel (it's on the right, so
+                  dragging left widens it). */}
+              <div
+                className="w-1 shrink-0 cursor-col-resize bg-border/60 transition-colors hover:bg-accent/60"
+                style={{ touchAction: 'none' }}
+                onPointerDown={(e) => {
+                  resize.current = { startX: e.clientX, startW: assignW, last: assignW }
+                  ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+                }}
+                onPointerMove={(e) => {
+                  const r = resize.current
+                  if (!r) return
+                  const w = Math.max(160, Math.min(460, r.startW + (r.startX - e.clientX)))
+                  r.last = w
+                  setAssignW(w)
+                }}
+                onPointerUp={(e) => {
+                  if (resize.current) {
+                    localStorage.setItem('opsia.assignPanelW', String(resize.current.last))
+                    resize.current = null
+                    ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
+                  }
+                }}
+                title="Drag to resize the Modulate panel"
+              />
+              <AssignPanel
+                width={assignW}
+                target={assign.target}
+                label={assign.label}
+                onClose={() => setAssign(null)}
+              />
+            </>
           )}
         </div>
       </AssignContext.Provider>
@@ -443,18 +481,23 @@ export function Inspector(): JSX.Element {
 function AssignPanel({
   target,
   label,
-  onClose
+  onClose,
+  width
 }: {
   target: ModTarget
   label: string
   onClose: () => void
+  width: number
 }): JSX.Element {
   const key = modTargetKey(target)
   const bound = useStore(
     useShallow((s) => s.composition.modMatrix.filter((a) => modTargetKey(a.target) === key))
   )
   return (
-    <div className="flex w-56 shrink-0 flex-col border-l border-border bg-panel2/40">
+    <div
+      className="flex shrink-0 flex-col border-l border-border bg-panel2/40"
+      style={{ width }}
+    >
       <div className="flex items-center gap-2 border-b border-border py-1 pl-3.5 pr-2">
         <span className="font-mono text-[9px] uppercase tracking-wide text-accent2">modulate</span>
         <span className="min-w-0 flex-1 truncate text-[11px] font-semibold" title={label}>

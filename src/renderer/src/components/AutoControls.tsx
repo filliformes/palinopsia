@@ -538,8 +538,8 @@ export function AssignRow({
       {!hideMeta && (
         <div className="flex min-w-0 items-start gap-1">
           <span className="w-8 shrink-0 pt-0.5 font-mono text-[8px] uppercase text-muted">meta</span>
-          {/* 6 columns → K1-6 · K7-12 · K13-16 (three rows, no fourth). */}
-          <div className="grid min-w-0 flex-1 grid-cols-6 gap-0.5">
+          {/* Always THREE rows; columns flow to fit (K1-K16 down each column). */}
+          <div className="grid min-w-0 flex-1 grid-flow-col grid-rows-3 gap-0.5">
             {metaBound.map((on, i) => (
               <button
                 key={i}
