@@ -630,24 +630,8 @@ function fxGroup(sh: IsfShader): string {
   return cats.find((c) => c && c !== 'FX') ?? 'Other'
 }
 
-// Colour first, then a sensible descent through the families.
-const FX_GROUP_ORDER = [
-  'Color',
-  'Stylize',
-  'Distortion',
-  'Blur',
-  'Glitch',
-  'Feedback',
-  'Texture',
-  'Scan',
-  'Utility'
-]
-function fxGroupRank(g: string): number {
-  const i = FX_GROUP_ORDER.indexOf(g)
-  return i < 0 ? FX_GROUP_ORDER.length : i
-}
-
-/** FX bucketed by sub-category, colour first, alphabetical within each. */
+/** FX bucketed by sub-category — groups AND shaders alphabetical (matching the
+ *  alphabetical sources list), so any new group (e.g. Convolution) slots in. */
 export const FX_GROUPS: Array<{ group: string; shaders: IsfShader[] }> = (() => {
   const buckets = new Map<string, IsfShader[]>()
   // Native convolution nodes appear in the picker alongside FX (their own group).
@@ -657,7 +641,7 @@ export const FX_GROUPS: Array<{ group: string; shaders: IsfShader[] }> = (() => 
     buckets.get(g)!.push(sh)
   }
   return [...buckets.entries()]
-    .sort((a, b) => fxGroupRank(a[0]) - fxGroupRank(b[0]) || a[0].localeCompare(b[0]))
+    .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([group, shaders]) => ({
       group,
       shaders: [...shaders].sort((x, y) => x.name.localeCompare(y.name))
