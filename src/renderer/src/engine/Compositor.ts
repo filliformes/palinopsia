@@ -1114,26 +1114,36 @@ export class Compositor {
     // writes it into the layer's own ping-pong pair.
     for (let li = 0; li < this.layers.length; li++) {
       const L = this.layers[li];
-      L.advanceClock(dtSec);
-      // Video: pass the REAL delta + the layer×global rate multiplier so the
-      // clip plays natively (smooth) at speed·layer·global over realtime.
-      L.tickVideos(li, rawDt, this.globalSpeed * L.speed);
-      gl.bindVertexArray(null); // ISF draws own the default VAO
-      L.renderSource('A');
-      let sig = L.rackA.apply(L.scratchA.tex, this.chain);
-      if (L.hasB()) {
-        // rackA + rackB ping-pong through the SAME ChainBuffers, so rackB can
-        // land a write back on the buffer holding A's result (parity-dependent,
-        // e.g. A=1 FX, B=2 FX). Park A off-chain before B runs.
-        this.copyInto(this.abHold.fbo, sig);
-        sig = this.abHold.tex;
-        L.renderSource('B');
-        const sigB = L.rackB.apply(L.scratchB.tex, this.chain);
-        sig = this.mixSources(sig, sigB, L.sourceMix, L.sourceBlend, L.harmony);
+      // Fault-isolate each layer: a throw inside one layer's rack (e.g. an ISF
+      // unit in a bad state after an edit) must not abort the whole frame — that
+      // would freeze EVERY layer, including a video, until the state changed.
+      // Skip the offending layer this frame, keep the rest live, and always
+      // clear the ISF redirect so a throw mid-draw can't leak a stale target.
+      try {
+        L.advanceClock(dtSec);
+        // Video: pass the REAL delta + the layer×global rate multiplier so the
+        // clip plays natively (smooth) at speed·layer·global over realtime.
+        L.tickVideos(li, rawDt, this.globalSpeed * L.speed);
+        gl.bindVertexArray(null); // ISF draws own the default VAO
+        L.renderSource('A');
+        let sig = L.rackA.apply(L.scratchA.tex, this.chain);
+        if (L.hasB()) {
+          // rackA + rackB ping-pong through the SAME ChainBuffers, so rackB can
+          // land a write back on the buffer holding A's result (parity-dependent,
+          // e.g. A=1 FX, B=2 FX). Park A off-chain before B runs.
+          this.copyInto(this.abHold.fbo, sig);
+          sig = this.abHold.tex;
+          L.renderSource('B');
+          const sigB = L.rackB.apply(L.scratchB.tex, this.chain);
+          sig = this.mixSources(sig, sigB, L.sourceMix, L.sourceBlend, L.harmony);
+        }
+        gl.bindVertexArray(null);
+        sig = L.rackLayer.apply(sig, this.chain);
+        this.persist(L, sig);
+      } catch (e) {
+        this.shared.redirect.redirect = null;
+        console.error(`[render] layer ${li} skipped this frame:`, e);
       }
-      gl.bindVertexArray(null);
-      sig = L.rackLayer.apply(sig, this.chain);
-      this.persist(L, sig);
     }
 
     // Blend stack: clear one accumulator buffer, then blend bottom→top

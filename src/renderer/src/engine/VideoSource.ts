@@ -47,6 +47,15 @@ export class VideoSource {
   private tex: WebGLTexture | null = null
   private pos = -1 // internal playhead (seconds) for manual/reverse stepping
   private pendDir = 1 // pendulum instantaneous direction (1 fwd, -1 rev)
+  // Reverse/manual seek pump: we own one in-flight seek at a time, cleared by the
+  // 'seeked' event OR a timeout (the event is sometimes dropped for a near-current
+  // seek — the timeout keeps the pump from stalling forever).
+  private seekPending = false
+  private seekAt = 0
+  // Forward stall watchdog: if the element claims to be playing but currentTime
+  // stops advancing, re-kick play() so a decoder hiccup can't freeze the clip.
+  private lastCT = -1
+  private stallSince = 0
   private pb: VideoPlayback = {
     playing: true,
     speed: 1,
@@ -68,6 +77,10 @@ export class VideoSource {
     this.video.addEventListener('error', () => {
       const e = this.video.error
       console.warn(`[video] load error (${e?.code ?? '?'}): ${e?.message || this.video.currentSrc}`)
+    })
+    // Free the reverse seek pump as soon as a seek completes.
+    this.video.addEventListener('seeked', () => {
+      this.seekPending = false
     })
   }
 
@@ -125,10 +138,27 @@ export class VideoSource {
     // out-of-range speeds step currentTime manually.
     const nativeOk = dir > 0 && rate >= 0.0625 && rate <= 16
     if (nativeOk) {
+      this.seekPending = false // leaving the manual pump
       if (v.playbackRate !== rate) v.playbackRate = rate
       if (v.paused) void v.play().catch(() => {})
-      this.pos = v.currentTime // keep the manual clock synced for a later flip
-      if (v.currentTime >= hi - 0.02) {
+      // Stall watchdog: if the element isn't paused but currentTime has stopped
+      // advancing (a decoder hiccup, a GL-driven stall), re-kick play() so the
+      // clip can't sit frozen. Reset the moment it moves.
+      const t = v.currentTime
+      if (!v.paused) {
+        if (Math.abs(t - this.lastCT) < 1e-4) {
+          if (this.stallSince === 0) this.stallSince = performance.now()
+          else if (performance.now() - this.stallSince > 400) {
+            void v.play().catch(() => {})
+            this.stallSince = performance.now()
+          }
+        } else {
+          this.stallSince = 0
+        }
+      }
+      this.lastCT = t
+      this.pos = t // keep the manual clock synced for a later flip
+      if (t >= hi - 0.02) {
         if (this.pb.direction === 'pendulum') {
           this.pendDir = -1 // bounce back — manual reverse takes over next frame
           this.pos = hi
@@ -138,17 +168,16 @@ export class VideoSource {
           v.currentTime = hi
           v.pause()
         }
-      } else if (v.currentTime < lo - 0.02) {
+      } else if (t < lo - 0.02) {
         v.currentTime = lo
       }
       return
     }
 
-    // Manual stepping — decouple from the element clock (internal `pos`).
-    // Advance `pos` EVERY frame at the true rate (so reverse covers the same
-    // clip-time per second as forward — no slow-down), and only issue a new seek
-    // once the previous finished (backward seeks are slow), catching up to the
-    // latest pos. The result is choppier than native forward, never slower.
+    // Manual stepping (reverse / pendulum-reverse / out-of-range speed) — the
+    // element must be paused and driven by seeks. Advance `pos` EVERY frame at
+    // the true rate (so reverse covers the same clip-time per second as forward),
+    // then pump one seek at a time toward it.
     if (!v.paused) v.pause()
     if (this.pos < 0) this.pos = v.currentTime
     this.pos += rawDt * rate * dir
@@ -166,13 +195,16 @@ export class VideoSource {
       this.pos = this.pb.loop ? lo : hi
     }
     if (!Number.isFinite(this.pos)) this.pos = lo
-    // Gate on the element's own `seeking` flag (self-correcting — unlike a
-    // 'seeked'-event flag, which sticks if the event is skipped for a near-
-    // current seek, freezing the frame). Issue the next seek once the last one
-    // finished; `pos` keeps advancing so we never slow down, only drop frames.
-    if (!v.seeking && Math.abs(this.pos - v.currentTime) > 1e-4) {
+    // Seek pump: own ONE in-flight seek, cleared by the 'seeked' event or a
+    // timeout (the event is dropped for near-current seeks — without the timeout
+    // the pump would stall and the frame would freeze, which is exactly the
+    // reverse-mode bug). `pos` keeps advancing so we drop frames, never slow.
+    if (this.seekPending && performance.now() - this.seekAt > 130) this.seekPending = false
+    if (!this.seekPending && Math.abs(this.pos - v.currentTime) > 1e-3) {
       try {
         v.currentTime = this.pos
+        this.seekPending = true
+        this.seekAt = performance.now()
       } catch {
         /* a seek can race a src reload — retry next frame */
       }
