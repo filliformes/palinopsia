@@ -28,6 +28,13 @@ const smoothstep = (a: number, b: number, x: number): number => {
 // the four layers; index-keyed, lazily created.
 const state: Array<{ held: number }> = []
 
+/** Clear the per-layer coupling state — call when the composition is replaced
+ *  (scene recall / New / session load) so a stale cut/drift value can't seed
+ *  the next scene's coupling. */
+export function resetCouplingState(): void {
+  state.length = 0
+}
+
 /**
  * Apply A/B coupling to every layer with a live B voice. Writes the coupled
  * sourceMix onto `comp.layers[i]` and returns the per-layer mixes (or null if

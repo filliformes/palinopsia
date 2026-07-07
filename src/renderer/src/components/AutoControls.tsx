@@ -5,6 +5,7 @@
 // the shader header IS the control surface.
 
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -401,15 +402,21 @@ function AssignPopover({
   const ref = useRef<HTMLDivElement | null>(null)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const W = 236
-  useLayoutEffect(() => {
+  const place = useCallback((): void => {
     const r = anchor.current?.getBoundingClientRect()
-    if (r) {
-      setPos({
-        top: r.bottom + 4,
-        left: Math.max(6, Math.min(r.left, window.innerWidth - W - 6))
-      })
-    }
+    if (r) setPos({ top: r.bottom + 4, left: Math.max(6, Math.min(r.left, window.innerWidth - W - 6)) })
   }, [anchor])
+  useLayoutEffect(() => place(), [place])
+  // Follow the anchor when the Inspector scrolls or the window resizes (the
+  // popover is position:fixed, so it would otherwise detach from the button).
+  useEffect(() => {
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
+    }
+  }, [place])
   useEffect(() => {
     const h = (e: MouseEvent): void => {
       if (ref.current?.contains(e.target as Node) || anchor.current?.contains(e.target as Node)) return

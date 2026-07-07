@@ -316,6 +316,9 @@ export interface SceneEntry {
   id: string
   name: string
   composition: CompositionState
+  // The World active when the scene was saved (travels for the selector label +
+  // portability; the composition already carries the World's baked effect).
+  world?: World | null
 }
 
 // ── Session persistence (brief §7) ───────────────────────────────────
@@ -327,6 +330,9 @@ export interface Session {
   // recalling a scene replaces the composition without touching the bank,
   // and undo (which snapshots composition) never rewinds the bank itself.
   scenes?: SceneEntry[]
+  // The active World when the session was saved (self-contained, so it resolves
+  // even on another install; added to the bank on load if missing).
+  world?: World | null
   // Opaque renderer UI snapshot (theme, panel sizes, selection). The main
   // process never inspects it — it just round-trips it to disk.
   ui?: unknown

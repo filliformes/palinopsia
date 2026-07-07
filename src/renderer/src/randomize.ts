@@ -21,7 +21,7 @@ import type {
   ModulatorType,
   SourceSlot
 } from '@shared/types'
-import { MAX_MOD_ASSIGNMENTS } from '@shared/types'
+import { MAX_MOD_ASSIGNMENTS, WORLD_AUTOMOD_SLOT } from '@shared/types'
 import { curatedRange, FX_SHADERS, GENERATORS } from './shaders/isf'
 import { inputsForShader, type IsfInputDesc } from './shaders/isf/inputs'
 
@@ -294,6 +294,7 @@ function randomMatrix(c: CompositionState): ModAssignment[] {
   const used = new Set<string>()
   c.modulators.forEach((m, mi) => {
     if (!m.enabled) return
+    if (mi === WORLD_AUTOMOD_SLOT) return // reserved for the World's audio routing
     const n = drawCount([0.15, 0.5, 0.35]) // 0..2 assignments per mod
     for (let i = 0; i < n; i++) {
       if (out.length >= MAX_MOD_ASSIGNMENTS) return
@@ -516,7 +517,9 @@ export function randomizeComposition(
     // them (type included), and roll a fresh capped matrix over whatever
     // sources/FX exist at this point.
     const enabledCount = 2 + drawCount([0.25, 0.35, 0.3, 0.1]) // 2..5
-    const slots = [0, 1, 2, 3, 4, 5, 6, 7]
+    // Slot 8 (WORLD_AUTOMOD_SLOT) is reserved for the active World's audio
+    // routing — leave it out of the randomizer so a World's bond survives.
+    const slots = [0, 1, 2, 3, 4, 5, 6, 7].filter((s) => s !== WORLD_AUTOMOD_SLOT)
     for (let i = slots.length - 1; i > 0; i--) {
       const j = Math.floor(rnd() * (i + 1))
       ;[slots[i], slots[j]] = [slots[j], slots[i]]

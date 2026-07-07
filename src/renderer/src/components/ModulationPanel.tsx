@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { ArpMode, AudioFeature, LfoShape, ModulatorType, PhysicsMotion } from '@shared/types'
-import { MAX_MOD_ASSIGNMENTS } from '@shared/types'
+import { MAX_MOD_ASSIGNMENTS, WORLD_AUTOMOD_SLOT } from '@shared/types'
 import { DIVISIONS, modEngine } from '../engine/modulation'
 import { AUDIO_BANDS, AUDIO_FEATURES } from '../engine/audioIn'
 import { SHADER_BY_ID } from '../shaders/isf'
@@ -76,6 +76,14 @@ function ModCard({ index }: { index: number }): JSX.Element {
           title={m.enabled ? 'On — click to disable' : 'Off — click to enable'}
         />
         <span className="font-mono text-[10px] text-muted">M{index + 1}</span>
+        {index === WORLD_AUTOMOD_SLOT && (
+          <span
+            className="shrink-0 font-mono text-[9px] text-accent2"
+            title="Reserved for the active World's audio routing — set it in the World editor. Skipped by Randomize."
+          >
+            ⊛
+          </span>
+        )}
         <select
           className="input select-compact min-w-0 flex-1 text-[10px]"
           value={m.type}

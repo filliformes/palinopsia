@@ -24,6 +24,7 @@ import type { MetaKnobState } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
 import { beginMorph, cancelMorph } from './morph'
+import { resetCouplingState } from './engine/coupling'
 import { applyWorldToComposition, BUILTIN_WORLDS, cloneWorld } from './worlds'
 
 // User worlds (builtin === false) persist to localStorage; built-ins ship in code.
@@ -41,6 +42,14 @@ function loadWorlds(): World[] {
   } catch {
     return [...BUILTIN_WORLDS]
   }
+}
+// Add a World to the bank if its id isn't already present (session/scene
+// restore of a world this install doesn't have). Persists user worlds.
+function ensureWorld(worlds: World[], w: World | null | undefined): World[] {
+  if (!w || worlds.some((x) => x.id === w.id)) return worlds
+  const merged = [...worlds, w]
+  saveUserWorlds(merged)
+  return merged
 }
 function uniqueWorldName(worlds: World[], base: string): string {
   const names = new Set(worlds.map((w) => w.name))
@@ -540,6 +549,18 @@ function updateFxArray(
   }
 }
 
+// Startup: seed a random one-layer scene, then apply the active World so the
+// composition matches the World selector on a cold launch (else it'd say e.g.
+// "Musical" while the layers are uncoupled).
+const startWorlds = loadWorlds()
+const startWorld =
+  startWorlds.find((w) => w.id === (localStorage.getItem('opsia.world') || 'synthetic')) ??
+  startWorlds[0]
+const startComposition = applyWorldToComposition(
+  seedRandomStart(makeDefaultComposition()),
+  startWorld
+)
+
 export const useStore = create<StoreState>((set, get) => ({
   theme: loadTheme(),
   setTheme: (t) => {
@@ -551,9 +572,9 @@ export const useStore = create<StoreState>((set, get) => ({
   name: 'Untitled',
   setName: (n) => set({ name: n }),
 
-  // A cold launch opens on a fresh random one-layer scene (overridden if an
-  // autosave/session loads over it in App).
-  composition: seedRandomStart(makeDefaultComposition()),
+  // A cold launch opens on a fresh random one-layer scene with the active World
+  // applied (overridden if an autosave/session loads over it in App).
+  composition: startComposition,
 
   setBlend: (layer, mode) =>
     set((s) => ({
@@ -1269,8 +1290,8 @@ export const useStore = create<StoreState>((set, get) => ({
     localStorage.setItem('opsia.proximityAudio', on ? '1' : '0')
     set({ proximityAudio: on })
   },
-  worlds: loadWorlds(),
-  world: localStorage.getItem('opsia.world') || 'synthetic',
+  worlds: startWorlds,
+  world: startWorld.id,
   setWorld: (id) =>
     set((s) => {
       const w = s.worlds.find((x) => x.id === id) ?? s.worlds[0]
@@ -1303,9 +1324,12 @@ export const useStore = create<StoreState>((set, get) => ({
       if (!w || w.builtin) return {} // built-ins can't be deleted
       const worlds = s.worlds.filter((x) => x.id !== id)
       saveUserWorlds(worlds)
-      const world = s.world === id ? 'synthetic' : s.world
-      if (world !== s.world) localStorage.setItem('opsia.world', world)
-      return { worlds, world }
+      if (s.world !== id) return { worlds }
+      // Deleting the ACTIVE world → fall back to Synthetic and apply it so the
+      // composition matches the selector (else it'd keep the deleted bias).
+      localStorage.setItem('opsia.world', 'synthetic')
+      const syn = worlds.find((x) => x.id === 'synthetic') ?? worlds[0]
+      return { worlds, world: 'synthetic', composition: applyWorldToComposition(s.composition, syn) }
     }),
   renameWorld: (id, name) => get().updateWorld(id, { name }),
   worldPageOpen: false,
@@ -1439,7 +1463,8 @@ export const useStore = create<StoreState>((set, get) => ({
           id: uid(),
           name: `Scene ${s.scenes.length + 1}`,
           // Compositions are immutable — the snapshot is a reference.
-          composition: s.composition
+          composition: s.composition,
+          world: s.worlds.find((w) => w.id === s.world) ?? null
         }
       ]
     })),
@@ -1462,7 +1487,13 @@ export const useStore = create<StoreState>((set, get) => ({
       // (the engine reconciles; feedback buffers survive the recall). The
       // engine crossfades to it over morphMs (App loop reads morph.ts).
       beginMorph(s.composition, s.morphMs, performance.now())
-      return { composition: scene.composition, activeSceneId: id }
+      resetCouplingState() // stale cut/drift state mustn't seed the recalled scene
+      // Restore the scene's World for the selector label (composition already
+      // carries its baked effect); add it to the bank if this install lacks it.
+      const worlds = ensureWorld(s.worlds, scene.world)
+      const world = scene.world ? scene.world.id : s.world
+      if (scene.world) localStorage.setItem('opsia.world', world)
+      return { composition: scene.composition, activeSceneId: id, worlds, world }
     }),
   renameScene: (id, name) =>
     set((s) => ({
@@ -1490,6 +1521,7 @@ export const useStore = create<StoreState>((set, get) => ({
     // lands in undo history — an accidental New is one Ctrl+Z away.
     set((s) => {
       cancelMorph() // the composition is being replaced — stop any in-flight ease
+      resetCouplingState()
       // New session resets the section layout too: Meta/Modulation collapsed,
       // Master FX/Inspector open. Persist so it survives the next reload.
       const collapsed = { ...s.collapsed, meta: true, modulation: true, master: false, inspector: false }
@@ -1507,8 +1539,16 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
   loadSession: (s) => {
     cancelMorph() // replacing the whole composition — abort any in-flight morph
+    resetCouplingState()
+    // Restore the session's World (self-contained → add to bank if missing).
+    const cur = get()
+    const worlds = ensureWorld(cur.worlds, s.world)
+    const world = s.world ? s.world.id : cur.world
+    if (s.world) localStorage.setItem('opsia.world', world)
     return set({
       name: s.name,
+      worlds,
+      world,
       scenes: s.scenes ?? [],
       activeSceneId: null,
       composition: {
@@ -1572,6 +1612,7 @@ export const useStore = create<StoreState>((set, get) => ({
       name: s.name,
       composition: s.composition,
       scenes: s.scenes,
+      world: s.worlds.find((w) => w.id === s.world) ?? null,
       ui: { theme: s.theme }
     }
   }

@@ -10,6 +10,7 @@
 
 import type { CompositionState } from '@shared/types'
 import { audioBus } from './audioIn'
+import { liveModValues } from './modulation'
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
 const num = (v: unknown, d: number): number => (typeof v === 'number' ? v : d)
@@ -43,12 +44,16 @@ export function applyProximity(
   if (!ctx) return null
 
   const t = (p - 0.5) * 2 // -1 (far) .. +1 (close)
-  const b = ctx.inputs
+  // Additive on top of the CURRENT value: prefer this frame's modulated value
+  // (liveModValues, written by applyModulation) so Proximity coexists with a
+  // modulator/World-autoMod on the same Context param; else the composition base.
+  const cur = (name: string, dflt: number): number =>
+    liveModValues.get(`fx:master:${ctx.id}:${name}`) ?? num(ctx.inputs[name], dflt)
   const out: ContextProx = {
-    haze: clamp01(num(b.haze, 0.15) - t * 0.22), // far → more haze
-    blur: clamp01(num(b.blur, 0.08) - t * 0.12), // far → softer
-    depth: clamp01(num(b.depth, 0.35) - t * 0.25), // far → deeper vignette
-    bloom: clamp01(num(b.bloom, 0.3) + t * 0.2) // close → more bloom/light
+    haze: clamp01(cur('haze', 0.15) - t * 0.22), // far → more haze
+    blur: clamp01(cur('blur', 0.08) - t * 0.12), // far → softer
+    depth: clamp01(cur('depth', 0.35) - t * 0.25), // far → deeper vignette
+    bloom: clamp01(cur('bloom', 0.3) + t * 0.2) // close → more bloom/light
   }
   const scope = { kind: 'master' as const }
   comp.setFxInput(scope, ctx.id, 'haze', out.haze)

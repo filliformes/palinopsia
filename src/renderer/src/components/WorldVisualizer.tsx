@@ -103,6 +103,9 @@ export function WorldVisualizer({
       const s = gl.createShader(type)!
       gl.shaderSource(s, src)
       gl.compileShader(s)
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        console.error('[world-viz] shader compile:', gl.getShaderInfoLog(s))
+      }
       return s
     }
     const prog = gl.createProgram()!
@@ -110,6 +113,13 @@ export function WorldVisualizer({
     gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS))
     gl.bindAttribLocation(prog, 0, 'p')
     gl.linkProgram(prog)
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      // Driver rejected the program — log and bail rather than spin a rAF on a
+      // dead program (leaves the canvas black, but no runaway loop).
+      console.error('[world-viz] program link:', gl.getProgramInfoLog(prog))
+      gl.deleteProgram(prog)
+      return
+    }
     gl.useProgram(prog)
 
     const quad = gl.createBuffer()
@@ -147,6 +157,14 @@ export function WorldVisualizer({
     let raf = 0
     let last = performance.now()
     const t0 = last
+
+    // A lost GL context (GPU reset / backgrounding) must stop the loop instead
+    // of spinning on dead objects.
+    const onLost = (e: Event): void => {
+      e.preventDefault()
+      cancelAnimationFrame(raf)
+    }
+    canvas.addEventListener('webglcontextlost', onLost)
 
     const loop = (): void => {
       const now = performance.now()
@@ -200,6 +218,7 @@ export function WorldVisualizer({
     raf = requestAnimationFrame(loop)
     return () => {
       cancelAnimationFrame(raf)
+      canvas.removeEventListener('webglcontextlost', onLost)
       gl.deleteProgram(prog)
       gl.deleteBuffer(quad)
       gl.deleteTexture(texA)
