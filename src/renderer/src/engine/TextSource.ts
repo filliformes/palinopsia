@@ -13,16 +13,7 @@
 //     letters like a matte, it doesn't rotate with them).
 
 import type { SidechainRef } from '@shared/types'
-
-// Order must match the gen-text header's font VALUES/LABELS (shaders/isf/index.ts).
-export const TEXT_FONTS = [
-  'Inter',
-  'Space Grotesk',
-  'JetBrains Mono',
-  'Playfair Display',
-  'Bebas Neue',
-  'VT323'
-]
+import { TEXT_FONTS } from '../textFonts'
 
 const VS = `#version 300 es
 in vec2 p; out vec2 vUV;

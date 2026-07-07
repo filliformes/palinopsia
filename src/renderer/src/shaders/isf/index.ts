@@ -9,6 +9,8 @@
 // randomization in the glitch register and out of kaleidoscope soup.
 
 import driftField from './DriftField.fs?raw'
+import organic from './Organic.fs?raw'
+import { TEXT_FONTS } from '../../textFonts'
 import slabs from './Slabs.fs?raw'
 import contour from './Contour.fs?raw'
 import gridDrift from './GridDrift.fs?raw'
@@ -363,6 +365,20 @@ export const GENERATORS: IsfShader[] = [
     curated: { gradient: [0, 1], angle: [0, 6.2832], midpoint: [0.3, 0.7], dither: [0.3, 0.7] }
   },
   {
+    id: 'organic',
+    name: 'Organic',
+    category: 'Generator',
+    source: organic,
+    curated: {
+      rate: [0.15, 1.1],
+      scale: [1.2, 5],
+      detail: [0.3, 0.9],
+      flow: [0.25, 0.85],
+      vary: [0, 0.7],
+      contrast: [0.8, 1.5]
+    }
+  },
+  {
     // Native Text generator (TextSource.ts) — typography as a source, glyphs
     // fillable by a sidechain layer (the convolution move). Header-only source:
     // the auto-UI/presets parse INPUTS; the engine runs the TS class. Font
@@ -371,20 +387,23 @@ export const GENERATORS: IsfShader[] = [
     name: 'Text',
     category: 'Generator',
     native: true,
-    source: `/*{
-      "DESCRIPTION": "Text — typography as a source. Type in the Inspector; pick a font, size, weight and letter-spacing; place it with angle/position. A sidechain layer can FILL the glyphs (the letters become a matte over that layer's texture) — no sidechain = solid colour.",
-      "CATEGORIES": ["Generator"],
-      "INPUTS": [
-        { "NAME": "font", "TYPE": "long", "VALUES": [0,1,2,3,4,5], "LABELS": ["Inter","Space Grotesk","JetBrains Mono","Playfair Display","Bebas Neue","VT323"], "DEFAULT": 1, "LABEL": "font" },
-        { "NAME": "size", "TYPE": "float", "MIN": 0.02, "MAX": 1.0, "DEFAULT": 0.25, "LABEL": "size" },
-        { "NAME": "weight", "TYPE": "float", "MIN": 100.0, "MAX": 900.0, "DEFAULT": 700.0, "LABEL": "weight" },
-        { "NAME": "spacing", "TYPE": "float", "MIN": -0.15, "MAX": 0.8, "DEFAULT": 0.0, "LABEL": "spacing" },
-        { "NAME": "angle", "TYPE": "float", "MIN": -3.1416, "MAX": 3.1416, "DEFAULT": 0.0, "LABEL": "angle" },
-        { "NAME": "posX", "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "pos x" },
-        { "NAME": "posY", "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "pos y" },
-        { "NAME": "color", "TYPE": "color", "DEFAULT": [1.0, 1.0, 1.0, 1.0] }
+    // Header generated from TEXT_FONTS so the picker always matches the
+    // registry (and the bundled @font-face set) — one source of truth.
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        "Text — typography as a source. Type in the Inspector; pick a font, size, weight and letter-spacing; place it with angle/position. A sidechain layer can FILL the glyphs (the letters become a matte over that layer's texture) — no sidechain = solid colour.",
+      CATEGORIES: ['Generator'],
+      INPUTS: [
+        { NAME: 'font', TYPE: 'long', VALUES: TEXT_FONTS.map((_, i) => i), LABELS: TEXT_FONTS, DEFAULT: 1, LABEL: 'font' },
+        { NAME: 'size', TYPE: 'float', MIN: 0.02, MAX: 1.0, DEFAULT: 0.25, LABEL: 'size' },
+        { NAME: 'weight', TYPE: 'float', MIN: 100.0, MAX: 900.0, DEFAULT: 700.0, LABEL: 'weight' },
+        { NAME: 'spacing', TYPE: 'float', MIN: -0.15, MAX: 0.8, DEFAULT: 0.0, LABEL: 'spacing' },
+        { NAME: 'angle', TYPE: 'float', MIN: -3.1416, MAX: 3.1416, DEFAULT: 0.0, LABEL: 'angle' },
+        { NAME: 'posX', TYPE: 'float', MIN: -1.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'pos x' },
+        { NAME: 'posY', TYPE: 'float', MIN: -1.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'pos y' },
+        { NAME: 'color', TYPE: 'color', DEFAULT: [1.0, 1.0, 1.0, 1.0] }
       ]
-    }*/`,
+    })}*/`,
     curated: {
       size: [0.1, 0.5],
       weight: [300, 900],

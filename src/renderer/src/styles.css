@@ -25,6 +25,53 @@
 @font-face { font-family: 'Playfair Display'; font-weight: 400 900; font-style: normal; font-display: swap; src: url('./fonts/PlayfairDisplay.ttf') format('truetype'); }
 @font-face { font-family: 'Bebas Neue'; font-weight: 400; font-style: normal; font-display: swap; src: url('./fonts/BebasNeue.ttf') format('truetype'); }
 @font-face { font-family: 'VT323'; font-weight: 400; font-style: normal; font-display: swap; src: url('./fonts/VT323.ttf') format('truetype'); }
+/* Text-source expansion — 44 more OFL/Apache faces (declared 100 900: variable
+   files map real weights; static files serve all weights without faux-bold). */
+@font-face { font-family: 'Abril Fatface'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/AbrilFatface.ttf') format('truetype'); }
+@font-face { font-family: 'Alfa Slab One'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/AlfaSlabOne.ttf') format('truetype'); }
+@font-face { font-family: 'Anton'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Anton.ttf') format('truetype'); }
+@font-face { font-family: 'Archivo Black'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/ArchivoBlack.ttf') format('truetype'); }
+@font-face { font-family: 'Bangers'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Bangers.ttf') format('truetype'); }
+@font-face { font-family: 'Bungee'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Bungee.ttf') format('truetype'); }
+@font-face { font-family: 'Caveat'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Caveat.ttf') format('truetype'); }
+@font-face { font-family: 'Cinzel'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Cinzel.ttf') format('truetype'); }
+@font-face { font-family: 'Comfortaa'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Comfortaa.ttf') format('truetype'); }
+@font-face { font-family: 'Cormorant'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Cormorant.ttf') format('truetype'); }
+@font-face { font-family: 'Courier Prime'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/CourierPrime.ttf') format('truetype'); }
+@font-face { font-family: 'Creepster'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Creepster.ttf') format('truetype'); }
+@font-face { font-family: 'Crimson Pro'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/CrimsonPro.ttf') format('truetype'); }
+@font-face { font-family: 'DM Sans'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/DMSans.ttf') format('truetype'); }
+@font-face { font-family: 'DM Serif Display'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/DMSerifDisplay.ttf') format('truetype'); }
+@font-face { font-family: 'EB Garamond'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/EBGaramond.ttf') format('truetype'); }
+@font-face { font-family: 'Fira Code'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/FiraCode.ttf') format('truetype'); }
+@font-face { font-family: 'Fraunces'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Fraunces.ttf') format('truetype'); }
+@font-face { font-family: 'Josefin Sans'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/JosefinSans.ttf') format('truetype'); }
+@font-face { font-family: 'Lexend'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Lexend.ttf') format('truetype'); }
+@font-face { font-family: 'Libre Baskerville'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/LibreBaskerville.ttf') format('truetype'); }
+@font-face { font-family: 'Lobster'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Lobster.ttf') format('truetype'); }
+@font-face { font-family: 'Major Mono Display'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/MajorMonoDisplay.ttf') format('truetype'); }
+@font-face { font-family: 'Manrope'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Manrope.ttf') format('truetype'); }
+@font-face { font-family: 'Monoton'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Monoton.ttf') format('truetype'); }
+@font-face { font-family: 'Orbitron'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Orbitron.ttf') format('truetype'); }
+@font-face { font-family: 'Oswald'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Oswald.ttf') format('truetype'); }
+@font-face { font-family: 'Outfit'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Outfit.ttf') format('truetype'); }
+@font-face { font-family: 'Pacifico'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Pacifico.ttf') format('truetype'); }
+@font-face { font-family: 'Permanent Marker'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/PermanentMarker.ttf') format('truetype'); }
+@font-face { font-family: 'Pixelify Sans'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/PixelifySans.ttf') format('truetype'); }
+@font-face { font-family: 'Press Start 2P'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/PressStart2P.ttf') format('truetype'); }
+@font-face { font-family: 'Raleway'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Raleway.ttf') format('truetype'); }
+@font-face { font-family: 'Righteous'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Righteous.ttf') format('truetype'); }
+@font-face { font-family: 'Rubik Mono One'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/RubikMonoOne.ttf') format('truetype'); }
+@font-face { font-family: 'Rubik'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Rubik.ttf') format('truetype'); }
+@font-face { font-family: 'Shrikhand'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Shrikhand.ttf') format('truetype'); }
+@font-face { font-family: 'Silkscreen'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Silkscreen.ttf') format('truetype'); }
+@font-face { font-family: 'Special Elite'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/SpecialElite.ttf') format('truetype'); }
+@font-face { font-family: 'Staatliches'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Staatliches.ttf') format('truetype'); }
+@font-face { font-family: 'Syne'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Syne.ttf') format('truetype'); }
+@font-face { font-family: 'Tektur'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Tektur.ttf') format('truetype'); }
+@font-face { font-family: 'Unbounded'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/Unbounded.ttf') format('truetype'); }
+@font-face { font-family: 'Zilla Slab'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/ZillaSlab.ttf') format('truetype'); }
+
 
 /* ======== Theme palettes ======== */
 /* Colors are held as space-separated RGB triples so Tailwind's rgb(.../<alpha>)
