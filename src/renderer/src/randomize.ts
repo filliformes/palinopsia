@@ -322,8 +322,9 @@ const BLENDS = [
 // Activation odds by layer index — a full stack is possible, a duo is common.
 const LAYER_ACTIVE_P = [0.95, 0.7, 0.45, 0.25]
 
-/** Structural randomize of ONE layer (the layer context menu's action):
- *  fresh source(s), fresh racks, blend/opacity/feedback — always active. */
+/** Structural randomize of ONE layer (the layer dice / context-menu action):
+ *  fresh source(s), fresh racks, blend/feedback — always active. OPACITY is the
+ *  player's mix decision and survives the dice untouched. */
 export function randomizeSingleLayer(l: LayerState): LayerState {
   const withB = chance(0.25)
   return {
@@ -336,7 +337,6 @@ export function randomizeSingleLayer(l: LayerState): LayerState {
     sourceMix: withB ? range(0.25, 0.75) : l.sourceMix,
     sourceBlend: withB ? pick(BLENDS) : l.sourceBlend,
     blend: pick(BLENDS),
-    opacity: range(0.55, 1),
     feedback: chance(0.3),
     feedbackAmount: range(0.3, 0.8),
     mute: false

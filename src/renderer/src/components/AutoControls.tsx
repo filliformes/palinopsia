@@ -152,6 +152,7 @@ function PosPairControl({
   const [miny, maxy, defy] = rng(dy)
   const vx = typeof values.posX === 'number' ? values.posX : defx
   const vy = typeof values.posY === 'number' ? values.posY : defy
+  // One row per axis: label · slider · number box (editable, like every float).
   const axis = (
     label: string,
     v: number,
@@ -160,8 +161,8 @@ function PosPairControl({
     def: number,
     name: string
   ): JSX.Element => (
-    <div className="flex min-w-0 flex-1 items-center gap-1">
-      <span className="font-mono text-[9px] text-muted">{label}</span>
+    <div className="flex min-w-0 items-center gap-1">
+      <span className="w-3 shrink-0 font-mono text-[9px] text-muted">{label}</span>
       <input
         type="range"
         min={min}
@@ -173,15 +174,22 @@ function PosPairControl({
         className="min-w-0 flex-1 accent-accent"
         title={`${name} ${v.toFixed(2)} — double-click to reset`}
       />
+      <div className="w-12 shrink-0">
+        <BoundedNumberInput
+          value={v}
+          min={min}
+          max={max}
+          onChange={(n) => onChange(name, n)}
+          className="input w-full px-1 py-0.5 text-right text-[11px]"
+        />
+      </div>
     </div>
   )
   return (
     <div className="flex w-44 min-w-0 flex-col gap-0.5">
       <span className="font-mono text-[9px] uppercase tracking-wide text-muted">pos</span>
-      <div className="flex min-w-0 items-center gap-2">
-        {axis('X', vx, minx, maxx, defx, 'posX')}
-        {axis('Y', vy, miny, maxy, defy, 'posY')}
-      </div>
+      {axis('X', vx, minx, maxx, defx, 'posX')}
+      {axis('Y', vy, miny, maxy, defy, 'posY')}
     </div>
   )
 }

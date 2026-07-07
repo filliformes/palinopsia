@@ -12,6 +12,18 @@ export interface ShaderPreset {
 }
 
 export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
+  organic: [
+    { name: 'Hearth', values: { mode: 0, rate: 0.45, scale: 2.2, detail: 0.6, flow: 0.5, vary: 0, contrast: 1.0 } },
+    { name: 'Wildfire', values: { mode: 0, rate: 1.1, scale: 3.5, detail: 0.85, flow: 0.8, vary: 0, contrast: 1.3 } },
+    { name: 'Gas flame', values: { mode: 0, rate: 0.7, scale: 2.8, detail: 0.5, flow: 0.45, vary: 0.9, contrast: 1.1 } },
+    { name: 'Embers', values: { mode: 0, rate: 0.2, scale: 4.5, detail: 0.9, flow: 0.3, vary: 0.15, contrast: 1.6 } },
+    { name: 'Deep lake', values: { mode: 1, rate: 0.3, scale: 2.0, detail: 0.5, flow: 0.5, vary: 0, contrast: 0.9 } },
+    { name: 'Caustic pool', values: { mode: 1, rate: 0.65, scale: 3.5, detail: 0.9, flow: 0.7, vary: 0, contrast: 1.5 } },
+    { name: 'Lagoon', values: { mode: 1, rate: 0.4, scale: 2.6, detail: 0.7, flow: 0.6, vary: 0.85, contrast: 1.1 } },
+    { name: 'Canopy', values: { mode: 2, rate: 0.35, scale: 2.4, detail: 0.65, flow: 0.5, vary: 0, contrast: 1.0 } },
+    { name: 'Undergrowth', values: { mode: 2, rate: 0.2, scale: 4.8, detail: 0.9, flow: 0.75, vary: 0.2, contrast: 1.35 } },
+    { name: 'Autumn drift', values: { mode: 2, rate: 0.5, scale: 3.0, detail: 0.7, flow: 0.6, vary: 0.8, contrast: 1.1 } }
+  ],
   'solid-color': [
     { name: 'Black', values: { gradient: 0, color: [0, 0, 0, 1] } },
     { name: 'White', values: { gradient: 0, color: [1, 1, 1, 1] } },
