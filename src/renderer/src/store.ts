@@ -18,13 +18,36 @@ import type {
   SceneEntry,
   Session,
   SourceSlot,
-  WorldMode
+  World
 } from '@shared/types'
 import type { MetaKnobState } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
 import { beginMorph, cancelMorph } from './morph'
-import { applyWorldToComposition } from './worlds'
+import { applyWorldToComposition, BUILTIN_WORLDS, cloneWorld } from './worlds'
+
+// User worlds (builtin === false) persist to localStorage; built-ins ship in code.
+function saveUserWorlds(worlds: World[]): void {
+  try {
+    localStorage.setItem('opsia.userWorlds', JSON.stringify(worlds.filter((w) => !w.builtin)))
+  } catch {
+    /* quota / serialization — non-fatal */
+  }
+}
+function loadWorlds(): World[] {
+  try {
+    const u = JSON.parse(localStorage.getItem('opsia.userWorlds') || '[]')
+    return [...BUILTIN_WORLDS, ...(Array.isArray(u) ? (u as World[]) : [])]
+  } catch {
+    return [...BUILTIN_WORLDS]
+  }
+}
+function uniqueWorldName(worlds: World[], base: string): string {
+  const names = new Set(worlds.map((w) => w.name))
+  if (!names.has(base)) return base
+  for (let i = 2; i < 999; i++) if (!names.has(`${base} ${i}`)) return `${base} ${i}`
+  return `${base} ${Date.now()}`
+}
 import {
   collectFloatTargets,
   randomizeComposition,
@@ -421,10 +444,17 @@ interface StoreState {
   // user never sees the audio-relations control. Persisted.
   showCoupling: boolean
   setShowCoupling: (on: boolean) => void
-  // World / diegesis (Slab 1) — global. Persisted; selecting one biases the
-  // composition's coupling + Context mood via applyWorldToComposition.
-  world: WorldMode
-  setWorld: (w: WorldMode) => void
+  // World / diegesis — a bank of editable presets (built-ins + user worlds).
+  // Selecting one biases the composition; the World page (W) edits/creates them.
+  worlds: World[]
+  world: string // active world id
+  setWorld: (id: string) => void
+  addWorld: (fromId?: string) => string // clone → new user world; returns its id
+  updateWorld: (id: string, partial: Partial<World>) => void
+  deleteWorld: (id: string) => void
+  renameWorld: (id: string, name: string) => void
+  worldPageOpen: boolean
+  setWorldPageOpen: (on: boolean) => void
   // The full-page Output / Mapping view is showing. Transient.
   outputPageOpen: boolean
   setOutputPageOpen: (on: boolean) => void
@@ -1207,12 +1237,47 @@ export const useStore = create<StoreState>((set, get) => ({
     localStorage.setItem('opsia.showCoupling', on ? '1' : '0')
     set({ showCoupling: on })
   },
-  world: (localStorage.getItem('opsia.world') as WorldMode) || 'synthetic',
-  setWorld: (w) => {
-    localStorage.setItem('opsia.world', w)
-    // Selecting a World applies its bias to the current composition (undoable).
-    set((s) => ({ world: w, composition: applyWorldToComposition(s.composition, w) }))
+  worlds: loadWorlds(),
+  world: localStorage.getItem('opsia.world') || 'synthetic',
+  setWorld: (id) =>
+    set((s) => {
+      const w = s.worlds.find((x) => x.id === id) ?? s.worlds[0]
+      localStorage.setItem('opsia.world', w.id)
+      // Applying a World biases the current composition (undoable).
+      return { world: w.id, composition: applyWorldToComposition(s.composition, w) }
+    }),
+  addWorld: (fromId) => {
+    const s = get()
+    const src = s.worlds.find((x) => x.id === (fromId ?? s.world)) ?? BUILTIN_WORLDS[0]
+    const nw = cloneWorld(src, uniqueWorldName(s.worlds, `${src.name} copy`))
+    const worlds = [...s.worlds, nw]
+    saveUserWorlds(worlds)
+    set({ worlds })
+    return nw.id
   },
+  updateWorld: (id, partial) =>
+    set((s) => {
+      const worlds = s.worlds.map((w) => (w.id === id ? { ...w, ...partial } : w))
+      saveUserWorlds(worlds)
+      // If the edited world is the active one, re-apply it live.
+      const active = worlds.find((w) => w.id === s.world)
+      return active && s.world === id
+        ? { worlds, composition: applyWorldToComposition(s.composition, active) }
+        : { worlds }
+    }),
+  deleteWorld: (id) =>
+    set((s) => {
+      const w = s.worlds.find((x) => x.id === id)
+      if (!w || w.builtin) return {} // built-ins can't be deleted
+      const worlds = s.worlds.filter((x) => x.id !== id)
+      saveUserWorlds(worlds)
+      const world = s.world === id ? 'synthetic' : s.world
+      if (world !== s.world) localStorage.setItem('opsia.world', world)
+      return { worlds, world }
+    }),
+  renameWorld: (id, name) => get().updateWorld(id, { name }),
+  worldPageOpen: false,
+  setWorldPageOpen: (on) => set({ worldPageOpen: on }),
   ndiActive: false,
   setNdiActive: (on) => set({ ndiActive: on }),
   spoutActive: false,

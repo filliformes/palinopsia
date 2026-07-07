@@ -22,6 +22,7 @@ import { ModulationPanel } from './components/ModulationPanel'
 import { OscPanel } from './components/OscPanel'
 import { AudioPanel } from './components/AudioPanel'
 import { OutputPage } from './components/OutputPage'
+import { WorldPage } from './components/WorldPage'
 import { SceneBank } from './components/SceneBank'
 import { initOscInput, applyOscListen } from './oscInput'
 import { morphedComposition, consumeCrossfade } from './morph'
@@ -128,6 +129,7 @@ export default function App(): JSX.Element {
   const ndiActive = useStore((s) => s.ndiActive)
   const spoutActive = useStore((s) => s.spoutActive)
   const outputPageOpen = useStore((s) => s.outputPageOpen)
+  const worldPageOpen = useStore((s) => s.worldPageOpen)
   useEffect(() => {
     const comp = compositorRef.current
     if (!comp) return
@@ -228,6 +230,19 @@ export default function App(): JSX.Element {
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'm') {
         e.preventDefault()
         useStore.getState().toggleMixerView()
+        return
+      }
+      // W: open/close the World editor.
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'w') {
+        e.preventDefault()
+        const st = useStore.getState()
+        st.setWorldPageOpen(!st.worldPageOpen)
+        return
+      }
+      // Esc: close the World editor if it's open.
+      if (e.key === 'Escape' && useStore.getState().worldPageOpen) {
+        e.preventDefault()
+        useStore.getState().setWorldPageOpen(false)
         return
       }
       if (!(e.ctrlKey || e.metaKey)) return
@@ -539,6 +554,7 @@ export default function App(): JSX.Element {
       {/* ── Output / Mapping page — full-screen takeover (canvas keeps
              rendering underneath so the live mirror + engine never stop) ── */}
       {outputPageOpen && <OutputPage canvasRef={canvasRef} />}
+      {worldPageOpen && <WorldPage />}
     </div>
   )
 }

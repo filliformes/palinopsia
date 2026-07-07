@@ -121,6 +121,29 @@ export const WORLD_MODES: WorldMode[] = [
   'sublimated',
   'monomedia'
 ]
+
+// An editable World preset. Built-ins ship with the app (id = a WorldMode);
+// user worlds are saved to localStorage. A World biases the composition when
+// selected: A/B coupling character + Context mood + an optional audio-routing
+// default. Vibe (the user's palette) is deliberately NOT touched.
+export interface World {
+  id: string
+  name: string
+  builtin: boolean
+  blurb: string
+  coupling: LayerCoupling // A/B bond character applied to every layer
+  context: Record<string, number> // Context finalizer mood nudges (safe bands)
+  // Audio routing default: an audio modulator the World can install on apply,
+  // driving one common target. null = none.
+  autoMod: { feature: AudioFeature; target: WorldAudioTarget; depth: number } | null
+}
+
+// Where a World's default audio modulator lands. Kept to a few safe Context
+// inputs (all valid mod targets); the World reserves modulator slot 8 for it.
+export type WorldAudioTarget = 'none' | 'haze' | 'bloom' | 'trails'
+export const WORLD_AUDIO_TARGETS: WorldAudioTarget[] = ['none', 'haze', 'bloom', 'trails']
+// Modulator slot the World manages for its audio-routing default (0-based).
+export const WORLD_AUTOMOD_SLOT = 7
 export interface LayerCoupling {
   mode: CouplingMode
   amount: number // 0..1 — depth

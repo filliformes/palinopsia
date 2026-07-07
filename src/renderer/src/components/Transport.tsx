@@ -5,12 +5,9 @@
 // aesthetic ranges (brief §7) — the taste layer, not raw min/max.
 
 import { useEffect, useRef, useState } from 'react'
-import type { WorldMode } from '@shared/types'
-import { WORLD_MODES } from '@shared/types'
 import { randomizeMetaKnobs } from '../metaSmooth'
 import type { RandomizeScope } from '../randomize'
 import { useStore } from '../store'
-import { WORLD_BIAS } from '../worlds'
 import { BoundedNumberInput } from './BoundedNumberInput'
 
 const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
@@ -59,8 +56,11 @@ export function Transport(): JSX.Element {
   const setGlobalSpeed = useStore((s) => s.setGlobalSpeed)
   const morphMs = useStore((s) => s.morphMs)
   const setMorphMs = useStore((s) => s.setMorphMs)
+  const worlds = useStore((s) => s.worlds)
   const world = useStore((s) => s.world)
   const setWorld = useStore((s) => s.setWorld)
+  const setWorldPageOpen = useStore((s) => s.setWorldPageOpen)
+  const activeWorld = worlds.find((w) => w.id === world)
   const setComposition = useStore.setState
   const [menuOpen, setMenuOpen] = useState(false)
   const [scope, setScope] = useState<RandomizeScope>(loadScope)
@@ -138,22 +138,29 @@ export function Transport(): JSX.Element {
         <span className="w-11 shrink-0 font-mono text-[10px] text-muted">{fmtMorph(morphMs)}</span>
       </div>
 
-      {/* World / diegesis — one global "proposed world" that biases coupling
-          + Context mood across the whole composition. */}
-      <div className="flex items-center gap-2">
+      {/* World / diegesis — the active "proposed world" biases coupling + Context
+          mood + audio routing. The ⧉ button opens the World editor (also W). */}
+      <div className="flex items-center gap-1.5">
         <span className="font-mono text-[10px] text-muted">WORLD</span>
         <select
           className="input select-compact text-[11px]"
           value={world}
-          onChange={(e) => setWorld(e.target.value as WorldMode)}
-          title={WORLD_BIAS[world].blurb}
+          onChange={(e) => setWorld(e.target.value)}
+          title={activeWorld?.blurb}
         >
-          {WORLD_MODES.map((w) => (
-            <option key={w} value={w}>
-              {WORLD_BIAS[w].label}
+          {worlds.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.name}
             </option>
           ))}
         </select>
+        <button
+          onClick={() => setWorldPageOpen(true)}
+          className="btn px-1.5 text-[12px]"
+          title="Open the World editor (W)"
+        >
+          ⧉
+        </button>
       </div>
 
       <div className="flex-1" />
