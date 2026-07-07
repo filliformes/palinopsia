@@ -47,11 +47,6 @@ export class VideoSource {
   private tex: WebGLTexture | null = null
   private pos = -1 // internal playhead (seconds) for manual/reverse stepping
   private pendDir = 1 // pendulum instantaneous direction (1 fwd, -1 rev)
-  // Reverse/manual seek pump: we own one in-flight seek at a time, cleared by the
-  // 'seeked' event OR a timeout (the event is sometimes dropped for a near-current
-  // seek — the timeout keeps the pump from stalling forever).
-  private seekPending = false
-  private seekAt = 0
   // Forward stall watchdog: if the element claims to be playing but currentTime
   // stops advancing, re-kick play() so a decoder hiccup can't freeze the clip.
   private lastCT = -1
@@ -77,10 +72,6 @@ export class VideoSource {
     this.video.addEventListener('error', () => {
       const e = this.video.error
       console.warn(`[video] load error (${e?.code ?? '?'}): ${e?.message || this.video.currentSrc}`)
-    })
-    // Free the reverse seek pump as soon as a seek completes.
-    this.video.addEventListener('seeked', () => {
-      this.seekPending = false
     })
   }
 
@@ -110,104 +101,81 @@ export class VideoSource {
     return this.pos >= 0 ? this.pos : this.video.currentTime
   }
 
-  /** Drive the clip each frame. `rawDt` is the real frame delta (seconds);
-   *  `mul` is the layer×global speed multiplier over realtime. The total rate is
-   *  `mul × clip speed`. FORWARD in-range playback runs NATIVELY (smooth — no
-   *  per-frame seeking, which would keep the element perpetually seeking and
-   *  black); reverse or out-of-range speed steps currentTime manually. */
+  /** Drive the clip each frame. `rawDt` is the real frame delta (seconds); `mul`
+   *  is the layer×global speed multiplier over realtime; total rate = mul × clip
+   *  speed. The element is kept PLAYING in every mode — a PAUSED <video> stops
+   *  presenting frames to texImage2D, so a pause+seek approach reads as a frozen
+   *  clip (the reverse / >16× bug). Forward within the browser's native rate cap
+   *  runs on the element's own clock (smoothest); reverse, pendulum-reverse, and
+   *  above-cap speed keep playing but OVERRIDE currentTime each frame. */
   tick(rawDt: number, mul: number): void {
     const v = this.video
     const d = this.duration()
     if (d <= 0) return
     const lo = Math.max(0, Math.min(1, Math.min(this.pb.inN, this.pb.outN))) * d
     const hi = Math.max(0, Math.min(1, Math.max(this.pb.inN, this.pb.outN))) * d
-    const span = Math.max(0.001, hi - lo)
-    const rate = Math.max(0, mul * this.pb.speed) // over realtime
+    const NATIVE_MAX = 16 // Chromium clamps playbackRate here
 
     if (!this.pb.playing) {
       if (!v.paused) v.pause()
       return
     }
+    // Always keep the media pipeline hot so frames flow to the texture.
+    if (v.paused) void v.play().catch(() => {})
 
     // Instantaneous direction: pendulum bounces between +1 and -1 at the trims.
     let dir = 1
     if (this.pb.direction === 'reverse') dir = -1
     else if (this.pb.direction === 'pendulum') dir = this.pendDir
 
-    // Native playback handles smooth FORWARD-in-range motion. Reverse and
-    // out-of-range speeds step currentTime manually.
-    const nativeOk = dir > 0 && rate >= 0.0625 && rate <= 16
-    if (nativeOk) {
-      this.seekPending = false // leaving the manual pump
-      if (v.playbackRate !== rate) v.playbackRate = rate
-      if (v.paused) void v.play().catch(() => {})
-      // Stall watchdog: if the element isn't paused but currentTime has stopped
-      // advancing (a decoder hiccup, a GL-driven stall), re-kick play() so the
-      // clip can't sit frozen. Reset the moment it moves.
+    const rate = Math.max(0, mul * this.pb.speed) // over realtime
+    if (this.pos < 0) this.pos = v.currentTime
+
+    // Pure-native forward: follow the element's own clock (no per-frame seeking).
+    const pureNative = dir > 0 && rate <= NATIVE_MAX
+    if (pureNative) {
+      const pr = Math.max(0.0625, rate)
+      if (v.playbackRate !== pr) v.playbackRate = pr
+      // Stall watchdog — if it claims to be playing but currentTime stops moving,
+      // re-kick play() so a decoder/GL hiccup can't freeze the clip.
       const t = v.currentTime
-      if (!v.paused) {
-        if (Math.abs(t - this.lastCT) < 1e-4) {
-          if (this.stallSince === 0) this.stallSince = performance.now()
-          else if (performance.now() - this.stallSince > 400) {
-            void v.play().catch(() => {})
-            this.stallSince = performance.now()
-          }
-        } else {
-          this.stallSince = 0
+      if (Math.abs(t - this.lastCT) < 1e-4) {
+        if (this.stallSince === 0) this.stallSince = performance.now()
+        else if (performance.now() - this.stallSince > 400) {
+          void v.play().catch(() => {})
+          this.stallSince = performance.now()
         }
-      }
+      } else this.stallSince = 0
       this.lastCT = t
-      this.pos = t // keep the manual clock synced for a later flip
-      if (t >= hi - 0.02) {
-        if (this.pb.direction === 'pendulum') {
-          this.pendDir = -1 // bounce back — manual reverse takes over next frame
-          this.pos = hi
-        } else if (this.pb.loop) {
-          v.currentTime = lo
-        } else {
-          v.currentTime = hi
-          v.pause()
-        }
-      } else if (t < lo - 0.02) {
-        v.currentTime = lo
-      }
-      return
+      this.pos = t
+    } else {
+      // Reverse / pendulum-reverse / above the native cap: keep playing (frames
+      // stay hot) but drive the position ourselves at the TRUE rate and snap
+      // currentTime to it — scrubbing a playing element presents each frame.
+      if (v.playbackRate !== 1) v.playbackRate = 1
+      this.pos += rawDt * rate * dir
     }
 
-    // Manual stepping (reverse / pendulum-reverse / out-of-range speed) — the
-    // element must be paused and driven by seeks. Advance `pos` EVERY frame at
-    // the true rate (so reverse covers the same clip-time per second as forward),
-    // then pump one seek at a time toward it.
-    if (!v.paused) v.pause()
-    if (this.pos < 0) this.pos = v.currentTime
-    this.pos += rawDt * rate * dir
+    // Loop / trim / pendulum-bounce on the intended playhead.
     if (this.pb.direction === 'pendulum') {
-      if (this.pos >= hi) {
-        this.pos = hi
-        this.pendDir = -1 // reached the top → swing back down
-      } else if (this.pos <= lo) {
-        this.pos = lo
-        this.pendDir = 1 // reached the bottom → swing forward again
-      }
+      if (this.pos >= hi) { this.pos = hi; this.pendDir = -1 }
+      else if (this.pos <= lo) { this.pos = lo; this.pendDir = 1 }
+    } else if (this.pos > hi - 0.02) {
+      this.pos = this.pb.loop ? lo : hi - 0.02
     } else if (this.pos < lo) {
-      this.pos = this.pb.loop ? hi : lo
-    } else if (this.pos > hi) {
-      this.pos = this.pb.loop ? lo : hi
+      this.pos = this.pb.loop ? hi - 0.02 : lo
     }
     if (!Number.isFinite(this.pos)) this.pos = lo
-    // Seek pump: own ONE in-flight seek, cleared by the 'seeked' event or a
-    // timeout (the event is dropped for near-current seeks — without the timeout
-    // the pump would stall and the frame would freeze, which is exactly the
-    // reverse-mode bug). `pos` keeps advancing so we drop frames, never slow.
-    if (this.seekPending && performance.now() - this.seekAt > 130) this.seekPending = false
-    if (!this.seekPending && Math.abs(this.pos - v.currentTime) > 1e-3) {
-      try {
-        v.currentTime = this.pos
-        this.seekPending = true
-        this.seekAt = performance.now()
-      } catch {
-        /* a seek can race a src reload — retry next frame */
+
+    // Correct the element toward the intended playhead. In pure-native forward we
+    // only intervene at the trim boundaries (else it runs free, smooth); when
+    // overriding we set currentTime every frame.
+    if (pureNative) {
+      if (v.currentTime > hi - 0.02 || v.currentTime < lo - 0.05) {
+        try { v.currentTime = this.pos } catch { /* seek can race a reload */ }
       }
+    } else if (Math.abs(this.pos - v.currentTime) > 1e-3) {
+      try { v.currentTime = this.pos } catch { /* seek can race a reload */ }
     }
   }
 
