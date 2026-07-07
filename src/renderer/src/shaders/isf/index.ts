@@ -70,6 +70,8 @@ import rowEcho from './fx/RowEcho.fs?raw'
 import byteCorrupt from './fx/ByteCorrupt.fs?raw'
 import ringing from './fx/Ringing.fs?raw'
 import tracking from './fx/Tracking.fs?raw'
+import decay from './fx/Decay.fs?raw'
+import abstraction from './fx/Abstraction.fs?raw'
 import feedbackZoom from './fx/FeedbackZoom.fs?raw'
 import distort from './fx/Distort.fs?raw'
 import vibe from './fx/Vibe.fs?raw'
@@ -465,6 +467,14 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-light-trails', name: 'Light Trails', category: 'FX', source: lightTrails,
     curated: { decay: [0.9, 0.99], drift: [0, 0.012], angle: [0, 6.2832] }
+  },
+  {
+    id: 'fx-decay', name: 'Decay', category: 'FX', source: decay,
+    curated: { amount: [0.4, 0.9], soften: [0.15, 0.7], bleed: [0.2, 0.7], dropout: [0, 0.4], wobble: [0, 0.012] }
+  },
+  {
+    id: 'fx-abstraction', name: 'Abstraction', category: 'FX', source: abstraction,
+    curated: { amount: [0.25, 0.85], disperse: [0.3, 0.9], posterize: [0.2, 0.8], desat: [0.2, 0.8] }
   },
   {
     id: 'fx-wide-time', name: 'Wide Time', category: 'FX', source: wideTime,
