@@ -28,6 +28,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const toggleFeedback = useStore((s) => s.toggleFeedback)
   const setFeedbackAmount = useStore((s) => s.setFeedbackAmount)
   const setSourceMix = useStore((s) => s.setSourceMix)
+  const setHarmony = useStore((s) => s.setHarmony)
   const showCoupling = useStore((s) => s.showCoupling)
   const setCoupling = useStore((s) => s.setCoupling)
   const setSourceBlend = useStore((s) => s.setSourceBlend)
@@ -181,6 +182,17 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               onChange={(e) => setSourceMix(index, Number(e.target.value))}
               className="min-w-0 flex-1 accent-accent"
               title="Mix depth — 0 = A only, 1 = full blend result"
+            />
+            <span className="shrink-0 font-mono text-[9px] text-muted" title="A/B harmony">⚖</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={layer.harmony}
+              onChange={(e) => setHarmony(index, Number(e.target.value))}
+              className="min-w-0 flex-1 accent-accent2"
+              title={`Harmony ${layer.harmony.toFixed(2)} — 0 consonant (B matched) ↔ 1 dissonant (B hue clashes with A)`}
             />
           </Row>
 

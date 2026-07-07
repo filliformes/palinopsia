@@ -109,10 +109,17 @@ uniform sampler2D a;
 uniform sampler2D b;
 uniform int mode;
 uniform float x;          // 0 = A only, 1 = full blend result
+uniform float bHue;       // B hue rotation (radians) — A/B harmony: 0 consonant, π dissonant
 ${BLEND_GLSL}
+vec3 hueRot(vec3 c, float a){
+  vec3 k = vec3(0.57735);
+  float ca = cos(a), sa = sin(a);
+  return c*ca + cross(k,c)*sa + k*dot(k,c)*(1.0-ca);
+}
 void main(){
   vec4 A = texture(a, uv);
   vec4 B = texture(b, uv);
+  B.rgb = clamp(hueRot(B.rgb, bHue), 0.0, 1.0);
   if(mode==15){
     // WEAVE (Signal Culture Weaver): each source's luminance displaces the
     // OTHER's sampling, then they interleave — a woven two-source warp.
@@ -514,6 +521,8 @@ export class ISFLayer {
   sourceMix = 0;
   /** How B combines with A before the crossfade. */
   sourceBlend: BlendMode = 'normal';
+  /** A/B harmony — 0 consonant (matched) · 1 dissonant (B hue clashes with A). */
+  harmony = 0;
   /** Global time multiplier for this layer's sources + racks. */
   speed = 1;
   /** The layer's own clock (seconds) — advances by dt·speed each frame. */
@@ -795,6 +804,7 @@ export class Compositor {
   private uPAmt: WebGLUniformLocation;
   private uMA: WebGLUniformLocation; private uMB: WebGLUniformLocation;
   private uMX: WebGLUniformLocation; private uMMode: WebGLUniformLocation;
+  private uMBHue!: WebGLUniformLocation;
   private uCTex: WebGLUniformLocation;
   private xformProg!: WebGLProgram;
   private uXTex!: WebGLUniformLocation; private uXZoom!: WebGLUniformLocation;
@@ -853,6 +863,7 @@ export class Compositor {
     this.uMB = gl.getUniformLocation(this.mixProg, 'b')!;
     this.uMX = gl.getUniformLocation(this.mixProg, 'x')!;
     this.uMMode = gl.getUniformLocation(this.mixProg, 'mode')!;
+    this.uMBHue = gl.getUniformLocation(this.mixProg, 'bHue')!;
 
     this.copyProg = compile(gl, QUAD_VS, COPY_FS);
     this.uCTex = gl.getUniformLocation(this.copyProg, 'tex')!;
@@ -1007,6 +1018,7 @@ export class Compositor {
       L.feedbackAmount = l.feedback ? l.feedbackAmount : 0;
       L.sourceMix = l.sourceMix;
       L.sourceBlend = l.sourceBlend ?? 'normal';
+      L.harmony = l.harmony ?? 0;
       L.speed = l.speed ?? 1;
       for (const [k, v] of Object.entries(l.sourceA.inputs)) L.setInput('A', k, v);
       if (l.sourceB) for (const [k, v] of Object.entries(l.sourceB.inputs)) L.setInput('B', k, v);
@@ -1046,7 +1058,9 @@ export class Compositor {
   }
 
   /** A/B mix into the shared mix target: mix(A, blendMode(A,B), x). */
-  private mixSources(a: WebGLTexture, b: WebGLTexture, x: number, mode: BlendMode): WebGLTexture {
+  private mixSources(
+    a: WebGLTexture, b: WebGLTexture, x: number, mode: BlendMode, harmony = 0
+  ): WebGLTexture {
     const gl = this.gl;
     gl.bindVertexArray(this.vao);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.mixTarget.fbo);
@@ -1056,6 +1070,7 @@ export class Compositor {
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, b); gl.uniform1i(this.uMB, 1);
     gl.uniform1i(this.uMMode, this.modeIndex[mode] ?? 0);
     gl.uniform1f(this.uMX, x);
+    gl.uniform1f(this.uMBHue, harmony * Math.PI); // 1 = complementary (π rad)
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindVertexArray(null);
     return this.mixTarget.tex;
@@ -1114,7 +1129,7 @@ export class Compositor {
         sig = this.abHold.tex;
         L.renderSource('B');
         const sigB = L.rackB.apply(L.scratchB.tex, this.chain);
-        sig = this.mixSources(sig, sigB, L.sourceMix, L.sourceBlend);
+        sig = this.mixSources(sig, sigB, L.sourceMix, L.sourceBlend, L.harmony);
       }
       gl.bindVertexArray(null);
       sig = L.rackLayer.apply(sig, this.chain);

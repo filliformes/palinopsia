@@ -171,6 +171,10 @@ export interface LayerState {
   sourceMix: number
   // How B combines with A before the crossfade: out = mix(A, blend(A,B), mix).
   sourceBlend: BlendMode
+  // A/B harmony (Basanta's consonant↔dissonant axis) — 0 = consonant (B matched
+  // to A), 1 = dissonant (B hue rotated toward complementary; clashes yet stays
+  // time-locked). A colour-relationship macro on the A/B pair.
+  harmony: number
   // Global time multiplier for this layer's sources + racks (1 = realtime).
   speed: number
   // A/B audio coupling (Slab 1). Off by default.
