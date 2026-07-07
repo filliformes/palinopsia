@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { isRichTheme, useStore } from '../store'
-import { liveModValues } from '../engine/modulation'
+import { registerLiveOverlay } from './liveOverlay'
 
 interface Props {
   value: number
@@ -122,22 +122,14 @@ export function BoundedNumberInput({
     setStr(formatValue(value, integer))
   }, [value, integer, min, max])
 
-  // Live modulation readout: while idle, mirror liveModValues[liveKey] straight
-  // to the DOM each frame (no re-render) so the number tracks modulation like
-  // the slider thumb. Skips while the user is focused/typing.
+  // Live modulation readout: while idle, mirror the modulated value straight to
+  // the DOM each frame (no re-render) so the number tracks modulation like the
+  // slider thumb. The shared overlay loop skips focused inputs, so an active
+  // edit is never clobbered.
   useEffect(() => {
-    if (!liveKey) return
-    let raf = 0
-    const paint = (): void => {
-      const el = inputRef.current
-      if (el && !focused.current) {
-        const live = liveModValues.get(liveKey)
-        if (live !== undefined) el.value = formatValue(live, integer)
-      }
-      raf = requestAnimationFrame(paint)
-    }
-    raf = requestAnimationFrame(paint)
-    return () => cancelAnimationFrame(raf)
+    const el = inputRef.current
+    if (!liveKey || !el) return
+    return registerLiveOverlay({ el, key: liveKey, format: (v) => formatValue(v, integer) })
   }, [liveKey, integer])
 
   const re = integer ? /^-?\d*$/ : /^-?\d*\.?\d*([eE][-+]?\d*)?$/

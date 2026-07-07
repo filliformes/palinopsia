@@ -131,6 +131,7 @@ class AudioBus {
   private prevMag: Float32Array<ArrayBuffer> | null = null
   private sampleRate = 44100
   private pitchCounter = 0
+  private lastTick = 0 // wall-clock of the previous tick(), for dt-aware decays
 
   get localActive(): boolean {
     return this.localOn
@@ -176,11 +177,12 @@ class AudioBus {
     this.freq = this.time = null
     this.timeF = null
     this.prevMag = null
+    this.pitchCounter = 0
     this.localOn = false
     this.local = zero()
   }
 
-  private computeLocal(): void {
+  private computeLocal(dt: number): void {
     const an = this.analyser
     const freq = this.freq
     const time = this.time
@@ -225,8 +227,10 @@ class AudioBus {
       prev[i] = m
     }
     L.flux = Math.min(1, flux / (N * 0.15))
-    // transient — pulse on an onset (flux over threshold), else decay.
-    L.transient = L.flux > 0.32 ? 1 : L.transient * 0.82
+    // transient — pulse on an onset (flux over threshold), else decay. The
+    // decay is normalized to 60fps (^(dt·60)) so it falls at the same wall-clock
+    // rate regardless of the actual frame rate.
+    L.transient = L.flux > 0.32 ? 1 : L.transient * Math.pow(0.82, dt * 60)
     // pitch — autocorrelation on the float waveform, throttled (pitch moves
     // slowly, and the ACF is the heaviest step). Held across unvoiced frames.
     if (this.timeF && ++this.pitchCounter % 3 === 0) {
@@ -253,7 +257,9 @@ class AudioBus {
 
   // ── Per-frame merge (App loop calls this before modEngine.tick) ─────
   tick(now: number): void {
-    if (this.localOn) this.computeLocal()
+    const dt = this.lastTick ? Math.min(0.1, (now - this.lastTick) / 1000) : 1 / 60
+    this.lastTick = now
+    if (this.localOn) this.computeLocal(dt)
     const c = this.current
     const oscFresh = now - this.oscAt < OSC_STALE_MS
     const src =

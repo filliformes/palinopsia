@@ -27,12 +27,16 @@ const smoothstep = (a: number, b: number, x: number): number => {
 // Per-layer runtime state (cut's decaying flash, drift's integrator). Fixed to
 // the four layers; index-keyed, lazily created.
 const state: Array<{ held: number }> = []
+// Wall-clock of the previous applyCoupling(), so the cut release + drift follow
+// run at a fixed rate regardless of frame rate.
+let lastNow = 0
 
 /** Clear the per-layer coupling state — call when the composition is replaced
  *  (scene recall / New / session load) so a stale cut/drift value can't seed
  *  the next scene's coupling. */
 export function resetCouplingState(): void {
   state.length = 0
+  lastNow = 0
 }
 
 /**
@@ -42,10 +46,14 @@ export function resetCouplingState(): void {
  */
 export function applyCoupling(
   comp: { layers: Array<{ sourceMix: number }> },
-  c: CompositionState
+  c: CompositionState,
+  now: number
 ): number[] | null {
   // Inert until audio ingest is on — otherwise a silent bus reads as "all A".
   if (audioBus.mode === 'off') return null
+  // Frame-rate normalizer: 1 at 60fps, larger when frames are longer.
+  const fk = lastNow ? Math.min(6, Math.max(0.1, ((now - lastNow) / 1000) * 60)) : 1
+  lastNow = now
   let any = false
   const out = c.layers.map((l, i) => {
     const layer = comp.layers[i]
@@ -73,9 +81,9 @@ export function applyCoupling(
         break
       case 'cut':
         // Flash to B on a transient, then release. Tight = snappy short flash;
-        // loose = a longer tail (release factor 0.60 … 0.98 per frame).
+        // loose = a longer tail (release factor 0.60 … 0.98 per 60fps frame).
         if (raw > 0.4) s.held = 1
-        else s.held *= 0.6 + tight * 0.38
+        else s.held *= Math.pow(0.6 + tight * 0.38, fk)
         eff = toB(s.held)
         break
       case 'gate': {
@@ -86,7 +94,8 @@ export function applyCoupling(
       }
       case 'drift': {
         // Slow one-pole follow — momentum, not morphology (congruent movement).
-        s.held += (raw - s.held) * (0.01 + tight * 0.06)
+        const a = 1 - Math.pow(1 - (0.01 + tight * 0.06), fk)
+        s.held += (raw - s.held) * a
         eff = toB(s.held)
         break
       }

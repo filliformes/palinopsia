@@ -14,8 +14,8 @@ import {
   type RefObject
 } from 'react'
 import type { ModTarget } from '@shared/types'
-import { liveModValues } from '../engine/modulation'
 import type { IsfInputDesc } from '../shaders/isf/inputs'
+import { registerLiveOverlay } from './liveOverlay'
 import { useShallow } from 'zustand/react/shallow'
 import { modTargetKey, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
@@ -252,18 +252,9 @@ function FloatControl({
   const sliderRef = useRef<HTMLInputElement | null>(null)
   const btnRef = useRef<HTMLButtonElement | null>(null)
   useEffect(() => {
-    if (!isModulated || !targetKey) return
-    let raf = 0
-    const paint = (): void => {
-      const el = sliderRef.current
-      const live = liveModValues.get(targetKey)
-      if (el && live !== undefined && document.activeElement !== el) {
-        el.value = String(live)
-      }
-      raf = requestAnimationFrame(paint)
-    }
-    raf = requestAnimationFrame(paint)
-    return () => cancelAnimationFrame(raf)
+    const el = sliderRef.current
+    if (!isModulated || !targetKey || !el) return
+    return registerLiveOverlay({ el, key: targetKey, format: (x) => String(x) })
   }, [isModulated, targetKey])
 
   // Dense single-line layout (Finishing view): label · slider · M · number,

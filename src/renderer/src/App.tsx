@@ -326,7 +326,7 @@ export default function App(): JSX.Element {
         applyModulation(comp!, c, modValues, inputsForShader)
         // 2b. Coupling: audio binds each layer's A/B balance (post-sync so it
         //     overrides the base mix); returns the coupled mixes for the output.
-        const coupledMix = applyCoupling(comp!, c)
+        const coupledMix = applyCoupling(comp!, c, now)
         // 2c. Proximity (Field macro): push the Context mood into a depth zone.
         const contextProx = applyProximity(comp!, c, st.proximity, st.proximityAudio ? 0.6 : 0)
         // 3. Render the frame.

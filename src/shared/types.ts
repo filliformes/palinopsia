@@ -428,6 +428,13 @@ export interface HiveAU {
   data: Uint8Array
 }
 
+// Connection health for a HIVE live-in source, pushed from the main process.
+export interface HiveStatus {
+  id: string
+  ok: boolean
+  error?: string
+}
+
 export interface ExposedApi {
   // Session I/O
   sessionSaveAs: (s: Session) => Promise<string | null>
@@ -476,6 +483,7 @@ export interface ExposedApi {
   hiveConnect: (id: string, host: string, port: number) => void
   hiveDisconnect: (id: string) => void
   onHiveAU: (cb: (au: HiveAU) => void) => () => void
+  onHiveStatus: (cb: (s: HiveStatus) => void) => () => void
   // HIVE output (sender).
   hiveOutStart: (port: number) => Promise<{ ok: boolean; port: number }>
   hiveOutStop: () => Promise<boolean>

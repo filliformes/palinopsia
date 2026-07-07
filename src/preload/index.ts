@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   ExposedApi,
   HiveAU,
+  HiveStatus,
   OutputFrame,
   OscEvent,
   OscErrorEvent,
@@ -78,6 +79,11 @@ const api: ExposedApi = {
     const h = (_e: Electron.IpcRendererEvent, au: HiveAU): void => cb(au)
     ipcRenderer.on('hive:au', h)
     return () => ipcRenderer.off('hive:au', h)
+  },
+  onHiveStatus: (cb: (s: HiveStatus) => void) => {
+    const h = (_e: Electron.IpcRendererEvent, s: HiveStatus): void => cb(s)
+    ipcRenderer.on('hive:status', h)
+    return () => ipcRenderer.off('hive:status', h)
   },
   // HIVE output (sender).
   hiveOutStart: (port: number) => ipcRenderer.invoke('hiveout:start', port),

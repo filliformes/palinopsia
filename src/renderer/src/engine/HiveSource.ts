@@ -6,7 +6,7 @@
 // EXPERIMENTAL: depends on Chromium's platform HEVC decoder (feature flag set
 // in the main process). If unsupported, the source stays black and logs.
 
-import type { HiveAU } from '@shared/types'
+import type { HiveAU, HiveStatus } from '@shared/types'
 
 // WebCodecs is ambient in Chromium 94+/Electron 33 but not in the TS DOM lib
 // used here — declare the minimum we touch.
@@ -35,9 +35,17 @@ export class HiveSource {
   private configured = false
   private sawKey = false
   private off: (() => void) | null = null
+  private offStatus: (() => void) | null = null
   private id = ''
+  // Last connection health reported by the main process. Readable so a future
+  // UI badge can show it; for now a link error is logged instead of swallowed.
+  private lastStatus: HiveStatus | null = null
 
   constructor(private gl: WebGL2RenderingContext) {}
+
+  get status(): HiveStatus | null {
+    return this.lastStatus
+  }
 
   start(spec: string): void {
     // spec = "host:port"
@@ -59,6 +67,12 @@ export class HiveSource {
       return
     }
     this.off = window.api.onHiveAU((au: HiveAU) => this.onAU(au))
+    this.offStatus = window.api.onHiveStatus((s: HiveStatus) => {
+      if (s.id !== this.id) return
+      this.lastStatus = s
+      if (s.ok) console.info(`[hive] ${this.id} connected`)
+      else console.warn(`[hive] ${this.id} link error: ${s.error ?? 'unknown'}`)
+    })
     window.api.hiveConnect(this.id, host, port)
   }
 
@@ -110,6 +124,8 @@ export class HiveSource {
   dispose(): void {
     this.off?.()
     this.off = null
+    this.offStatus?.()
+    this.offStatus = null
     if (this.id) window.api.hiveDisconnect(this.id)
     this.latest?.close()
     this.latest = null
