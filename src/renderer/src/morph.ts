@@ -117,6 +117,7 @@ function lerpComposition(a: CompositionState, b: CompositionState, k: number): C
             ...b.background,
             opacity: lerpN(a.background.opacity, b.background.opacity, k),
             speed: lerpN(a.background.speed, b.background.speed, k),
+            depth: lerpN(a.background.depth ?? 0, b.background.depth ?? 0, k),
             source: lerpSlot(a.background.source, b.background.source, k) as SourceSlot,
             fx: lerpFx(a.background.fx, b.background.fx, k)
           }

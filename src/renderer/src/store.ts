@@ -331,6 +331,7 @@ interface StoreState {
   setBackgroundInput: (name: string, value: number | number[]) => void
   setBackgroundOpacity: (v: number) => void
   setBackgroundSpeed: (v: number) => void
+  setBackgroundDepth: (v: number) => void
   randomizeBg: () => void // the background's own dice (global Randomize skips it)
   // Apply a materialized background (built-in preset via bgPresetToState, or a
   // user preset's saved state). FX get fresh instance ids.
@@ -955,6 +956,11 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const bg = s.composition.background ?? makeDefaultBackground()
       return { composition: { ...s.composition, background: { ...bg, speed: Math.max(0, Math.min(4, v)) } } }
+    }),
+  setBackgroundDepth: (v) =>
+    set((s) => {
+      const bg = s.composition.background ?? makeDefaultBackground()
+      return { composition: { ...s.composition, background: { ...bg, depth: Math.max(0, Math.min(1, v)) } } }
     }),
   randomizeBg: () =>
     set((s) => ({

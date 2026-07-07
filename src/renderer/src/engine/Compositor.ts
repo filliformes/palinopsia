@@ -30,6 +30,7 @@ import { Renderer as ISFRenderer } from 'interactive-shader-format';
 import { handle, installTextureBridge } from './isfTextureBridge';
 import { makeConvNode, isNativeNode, type ConvNode } from './convNodes';
 import { TextSource } from './TextSource';
+import { DepthShadow } from './depthShadow';
 import type { SidechainRef } from '@shared/types';
 import { VideoSource } from './VideoSource';
 import { CaptureSource } from './CaptureSource';
@@ -867,6 +868,8 @@ export class Compositor {
   private bgClockSec = 0;
   private bgOpacity = 0;
   private bgSpeed = 0.25;
+  private bgDepth = 0;
+  private depthShadow: DepthShadow | null = null;
   private shared: SharedGL;
   private chain: ChainBuffers;
   private mixTarget: { fbo: WebGLFramebuffer; tex: WebGLTexture };
@@ -1159,6 +1162,7 @@ export class Compositor {
     this.bgRack.sync(bg?.fx ?? [], sourceById);
     this.bgOpacity = bg && bg.source.shaderId ? bg.opacity : 0;
     this.bgSpeed = bg?.speed ?? 0.25;
+    this.bgDepth = bg?.depth ?? 0;
   }
 
   /** Direct write to an FX unit's ISF input in any rack (modulation path). */
@@ -1322,6 +1326,19 @@ export class Compositor {
         this.blendInto(this.acc.write(), this.acc.read(), bgTex, 'normal', this.bgOpacity);
         this.acc.swap();
         first = false;
+
+        // Depth: the foreground casts a soft shadow onto the background (now in
+        // acc). Runs BEFORE the layers composite, so the shadow sits in the
+        // background and the foreground lands on top. No-op at depth 0.
+        if (this.bgDepth > 0.001) {
+          if (!this.depthShadow) this.depthShadow = new DepthShadow(this.gl);
+          const anySoloD = this.layers.some((l) => l.solo);
+          const tex = this.layers.map((l) => l.texture());
+          const wts = this.layers.map((l) => ((anySoloD ? l.solo : !l.mute) ? l.opacity : 0));
+          this.depthShadow.apply(this.acc.read(), tex, wts, this.bgDepth, this.acc.write(), this.w, this.h);
+          this.acc.swap();
+          gl.bindVertexArray(null);
+        }
       } catch (e) {
         this.shared.redirect.redirect = null;
         console.error('[render] background skipped this frame:', e);
@@ -1411,6 +1428,7 @@ export class Compositor {
     this.masterRack.dispose();
     this.bgIsf?.cleanup();
     this.bgRack.dispose();
+    this.depthShadow?.dispose();
     disposeTarget(gl, this.bgScratch);
     this.acc.dispose(gl);
     this.chain.dispose(gl);

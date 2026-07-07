@@ -23,6 +23,7 @@ export function BackgroundPanel(): JSX.Element {
   const setBackgroundSource = useStore((s) => s.setBackgroundSource)
   const setBackgroundOpacity = useStore((s) => s.setBackgroundOpacity)
   const setBackgroundSpeed = useStore((s) => s.setBackgroundSpeed)
+  const setBackgroundDepth = useStore((s) => s.setBackgroundDepth)
   const randomizeBg = useStore((s) => s.randomizeBg)
   const applyBgPreset = useStore((s) => s.applyBgPreset)
   const bgPresets = useStore((s) => s.bgPresets)
@@ -37,6 +38,7 @@ export function BackgroundPanel(): JSX.Element {
   const selected = selection?.type === 'background'
   const opacity = bg?.opacity ?? 1
   const speed = bg?.speed ?? 0.25
+  const depth = bg?.depth ?? 0
   const shaderId = bg?.source.shaderId ?? null
 
   function onContextMenu(e: MouseEvent): void {
@@ -194,6 +196,34 @@ export function BackgroundPanel(): JSX.Element {
             className="input w-full px-1 py-0.5 text-right text-[11px]"
           />
         </div>
+      </div>
+
+      {/* DEPTH — the foreground casts a soft contact shadow onto the background
+          (separation). Only meaningful with a background + content above it. */}
+      <div className="flex min-w-0 items-center gap-1.5">
+        <Label>DEPTH</Label>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={depth}
+          onChange={(e) => setBackgroundDepth(Number(e.target.value))}
+          onClick={(e) => e.stopPropagation()}
+          className="min-w-0 flex-1 accent-accent2"
+          title={`Depth ${depth.toFixed(2)} — foreground casts a soft shadow onto the background (0 = flat)`}
+        />
+        <div className="w-11 shrink-0" onClick={(e) => e.stopPropagation()}>
+          <BoundedNumberInput
+            value={depth}
+            min={0}
+            max={1}
+            onChange={setBackgroundDepth}
+            className="input w-full px-1 py-0.5 text-right text-[11px]"
+          />
+        </div>
+        <div className="min-w-0 flex-1" />
+        <span className="w-11 shrink-0" />
       </div>
 
       {menu && (

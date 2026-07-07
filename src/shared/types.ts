@@ -325,6 +325,9 @@ export interface BackgroundState {
   fx: FxInstance[]
   opacity: number // 0..1 (0 = off)
   speed: number // background clock multiplier — default 0.25 (slow ground)
+  // Contact shadow the foreground casts onto the background (separation/depth).
+  // 0 = off (optional). Undefined on older sessions ⇒ 0.
+  depth?: number
 }
 
 // The whole composition: background + four layers + master rack + transport.
