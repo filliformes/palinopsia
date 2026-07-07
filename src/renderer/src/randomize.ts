@@ -9,6 +9,7 @@
 // risks are pre-bounded in the registry; the mod-matrix respects its cap.
 
 import type {
+  BackgroundState,
   CompositionState,
   FxInstance,
   FxScope,
@@ -24,6 +25,7 @@ import type {
 import { MAX_MOD_ASSIGNMENTS, WORLD_AUTOMOD_SLOT } from '@shared/types'
 import { curatedRange, FX_SHADERS, GENERATORS } from './shaders/isf'
 import { inputsForShader, type IsfInputDesc } from './shaders/isf/inputs'
+import { BG_SOURCES, BG_DEFAULT_SPEED } from './bgPresets'
 
 export type RandomizeScope =
   | 'all'
@@ -286,7 +288,7 @@ function targetKey(t: ModTarget): string {
   if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
   if (t.kind === 'meta') return `meta:${t.knob}`
   const s = t.scope
-  return `fx:${s.kind === 'master' ? 'master' : `${s.kind}:${s.layer}`}:${t.instId}:${t.input}`
+  return `fx:${s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`}:${t.instId}:${t.input}`
 }
 
 /** Roll a fresh matrix: 1–2 assignments per enabled mod, capped, deduped. */
@@ -340,6 +342,19 @@ export function randomizeSingleLayer(l: LayerState): LayerState {
     feedback: chance(0.3),
     feedbackAmount: range(0.3, 0.8),
     mute: false
+  }
+}
+
+/** Re-roll the Background slab (its own dice — the GLOBAL Randomize never
+ *  touches the background: the ground stays put while the layers churn).
+ *  Draws from the curated background source set; keeps opacity + speed. */
+export function randomizeBackground(cur: BackgroundState | undefined): BackgroundState {
+  const gen = pick(BG_SOURCES)
+  return {
+    source: { kind: 'generator', shaderId: gen.id, inputs: randomizeInputs(gen.id, {}) },
+    fx: randomRack([0.45, 0.35, 0.2]),
+    opacity: cur?.opacity ?? 1,
+    speed: cur?.speed ?? BG_DEFAULT_SPEED
   }
 }
 

@@ -80,6 +80,7 @@ function fxAt(scope: FxScope, i: number): { id: string; shaderId: string } | nul
   const c = useStore.getState().composition
   let arr
   if (scope.kind === 'master') arr = c.master.filter((f) => !f.locked)
+  else if (scope.kind === 'background') arr = c.background?.fx ?? []
   else {
     const l = c.layers[scope.layer]
     if (!l) return null

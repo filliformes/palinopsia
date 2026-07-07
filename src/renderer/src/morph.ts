@@ -111,6 +111,16 @@ function lerpComposition(a: CompositionState, b: CompositionState, k: number): C
         fx: lerpFx(al.fx, bl.fx, k)
       }
     }),
+    background:
+      b.background && a.background
+        ? {
+            ...b.background,
+            opacity: lerpN(a.background.opacity, b.background.opacity, k),
+            speed: lerpN(a.background.speed, b.background.speed, k),
+            source: lerpSlot(a.background.source, b.background.source, k) as SourceSlot,
+            fx: lerpFx(a.background.fx, b.background.fx, k)
+          }
+        : b.background,
     master: lerpFx(a.master, b.master, k),
     metaKnobs: b.metaKnobs.map((bk, i) => {
       const ak = a.metaKnobs[i]

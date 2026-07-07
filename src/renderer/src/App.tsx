@@ -22,6 +22,7 @@ import { MetaBar } from './components/MetaBar'
 import { ModulationPanel } from './components/ModulationPanel'
 import { OscPanel } from './components/OscPanel'
 import { AudioPanel } from './components/AudioPanel'
+import { BackgroundPanel } from './components/BackgroundPanel'
 import { OutputPage } from './components/OutputPage'
 import { WorldPage } from './components/WorldPage'
 import { SceneBank } from './components/SceneBank'
@@ -587,7 +588,14 @@ export default function App(): JSX.Element {
           ) : rightView === 'finishing' ? (
             <FinishingTouches />
           ) : (
-            [0, 1, 2, 3].map((i) => <LayerPanel key={i} index={i} />)
+            <>
+              {[0, 1, 2, 3].map((i) => (
+                <LayerPanel key={i} index={i} />
+              ))}
+              {/* Background slab — pinned last, matching the stack (renders
+                  under everything). */}
+              <BackgroundPanel />
+            </>
           )}
         </aside>
       </main>

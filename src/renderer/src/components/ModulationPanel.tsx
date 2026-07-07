@@ -513,14 +513,17 @@ function MatrixSummary(): JSX.Element {
     const inst =
       t.scope.kind === 'master'
         ? composition.master.find((f) => f.id === t.instId)
-        : (t.scope.kind === 'layer'
-            ? composition.layers[t.scope.layer]?.fx
-            : t.scope.kind === 'sourceA'
-              ? composition.layers[t.scope.layer]?.sourceAFx
-              : composition.layers[t.scope.layer]?.sourceBFx
-          )?.find((f) => f.id === t.instId)
+        : t.scope.kind === 'background'
+          ? composition.background?.fx.find((f) => f.id === t.instId)
+          : (t.scope.kind === 'layer'
+              ? composition.layers[t.scope.layer]?.fx
+              : t.scope.kind === 'sourceA'
+                ? composition.layers[t.scope.layer]?.sourceAFx
+                : composition.layers[t.scope.layer]?.sourceBFx
+            )?.find((f) => f.id === t.instId)
     const fxName = inst?.shaderId ? (SHADER_BY_ID[inst.shaderId]?.name ?? '?') : '?'
-    const where = t.scope.kind === 'master' ? 'MST' : `L${t.scope.layer + 1}`
+    const where =
+      t.scope.kind === 'master' ? 'MST' : t.scope.kind === 'background' ? 'BG' : `L${t.scope.layer + 1}`
     return `${where}·${fxName} ${t.input}`
   }
 

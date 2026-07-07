@@ -858,6 +858,15 @@ export class Compositor {
   gl: WebGL2RenderingContext;
   layers: ISFLayer[] = [];
   masterRack: FxRack;
+  // Background slab — the ground under the stack: one generator + its own FX
+  // rack + its own slow clock, composited first (blend 'normal').
+  private bgIsf: ISFRenderer | null = null;
+  private bgShaderId: string | null = null;
+  private bgRack: FxRack;
+  private bgScratch!: { fbo: WebGLFramebuffer; tex: WebGLTexture };
+  private bgClockSec = 0;
+  private bgOpacity = 0;
+  private bgSpeed = 0.25;
   private shared: SharedGL;
   private chain: ChainBuffers;
   private mixTarget: { fbo: WebGLFramebuffer; tex: WebGLTexture };
@@ -989,6 +998,7 @@ export class Compositor {
     this.chain = new ChainBuffers(gl, w, h);
     this.mixTarget = makeTarget(gl, w, h);
     this.abHold = makeTarget(gl, w, h);
+    this.bgScratch = makeTarget(gl, w, h);
     this.snapshot = makeTarget(gl, w, h);
     this.xfadeTarget = makeTarget(gl, w, h);
     this.fxOpac = [makeTarget(gl, w, h), makeTarget(gl, w, h)];
@@ -1014,6 +1024,7 @@ export class Compositor {
       gl.bindVertexArray(null);
     };
     this.masterRack = new FxRack(this.shared);
+    this.bgRack = new FxRack(this.shared);
     for (let i = 0; i < 4; i++) this.layers.push(new ISFLayer(this.shared, w, h));
   }
 
@@ -1129,12 +1140,35 @@ export class Compositor {
       L.rackLayer.sync(l.fx, sourceById);
     }
     this.masterRack.sync(c.master, sourceById);
+
+    // ── Background slab reconcile (generator-only source + rack + mix). ──
+    const bg = c.background;
+    const wantBg = bg && bg.source.kind === 'generator' ? bg.source.shaderId : null;
+    if (wantBg !== this.bgShaderId) {
+      const src = wantBg ? sourceById(wantBg) : null;
+      if (!wantBg || !src || this.shared.budget.n > 0) {
+        if (wantBg && src) this.shared.budget.n--;
+        this.bgIsf?.cleanup();
+        this.bgIsf = wantBg && src ? loadIsf(this.shared.rgl, wantBg, src) : null;
+        this.bgShaderId = wantBg;
+      } // else: budget spent — retry next frame (id left unrecorded)
+    }
+    if (this.bgIsf && bg) {
+      for (const [k, v] of Object.entries(bg.source.inputs)) this.bgIsf.setValue(k, v);
+    }
+    this.bgRack.sync(bg?.fx ?? [], sourceById);
+    this.bgOpacity = bg && bg.source.shaderId ? bg.opacity : 0;
+    this.bgSpeed = bg?.speed ?? 0.25;
   }
 
   /** Direct write to an FX unit's ISF input in any rack (modulation path). */
   setFxInput(scope: FxScope, instId: string, name: string, value: number | number[]): void {
     if (scope.kind === 'master') {
       this.masterRack.setUnitInput(instId, name, value);
+      return;
+    }
+    if (scope.kind === 'background') {
+      this.bgRack.setUnitInput(instId, name, value);
       return;
     }
     const L = this.layers[scope.layer];
@@ -1210,6 +1244,10 @@ export class Compositor {
     const dtSec = rawDt * this.globalSpeed;
     this.masterClockSec += dtSec;
     this.masterRack.setTime(this.masterClockSec);
+    // Background's own slow clock (default 0.25×) on top of the global speed.
+    this.bgClockSec += dtSec * this.bgSpeed;
+    if (this.bgIsf) (this.bgIsf as unknown as { __opsiaTimeSec?: number }).__opsiaTimeSec = this.bgClockSec;
+    this.bgRack.setTime(this.bgClockSec);
 
     // Native convolution nodes (layer FX) resolve their sidechain to a live
     // texture: another layer's persisted output (previous frame for layers not
@@ -1269,6 +1307,26 @@ export class Compositor {
 
     const anySolo = this.layers.some((l) => l.solo);
     let first = true;
+
+    // Background slab first — the ground everything blends onto. It composites
+    // 'normal' (it IS the base); once present, even the first layer uses its
+    // own blend mode against it. Fault-isolated like the layers.
+    if (this.bgIsf && this.bgOpacity > 0.001) {
+      try {
+        gl.bindVertexArray(null);
+        this.shared.redirect.redirect = this.bgScratch.fbo;
+        this.bgIsf.draw({ width: this.w, height: this.h });
+        this.shared.redirect.redirect = null;
+        gl.bindVertexArray(null);
+        const bgTex = this.bgRack.apply(this.bgScratch.tex, this.chain);
+        this.blendInto(this.acc.write(), this.acc.read(), bgTex, 'normal', this.bgOpacity);
+        this.acc.swap();
+        first = false;
+      } catch (e) {
+        this.shared.redirect.redirect = null;
+        console.error('[render] background skipped this frame:', e);
+      }
+    }
     for (const L of this.layers) {
       const audible = anySolo ? L.solo : !L.mute;
       if (!audible) continue;
@@ -1351,6 +1409,9 @@ export class Compositor {
     for (const L of this.layers) L.dispose();
     this.layers = [];
     this.masterRack.dispose();
+    this.bgIsf?.cleanup();
+    this.bgRack.dispose();
+    disposeTarget(gl, this.bgScratch);
     this.acc.dispose(gl);
     this.chain.dispose(gl);
     disposeTarget(gl, this.mixTarget);

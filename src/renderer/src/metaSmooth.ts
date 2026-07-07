@@ -55,11 +55,13 @@ function applyDest(target: ModTarget, shaped: number): void {
     const arr =
       s.kind === 'master'
         ? c.master
-        : s.kind === 'layer'
-          ? c.layers[s.layer]?.fx
-          : s.kind === 'sourceA'
-            ? c.layers[s.layer]?.sourceAFx
-            : c.layers[s.layer]?.sourceBFx
+        : s.kind === 'background'
+          ? c.background?.fx
+          : s.kind === 'layer'
+            ? c.layers[s.layer]?.fx
+            : s.kind === 'sourceA'
+              ? c.layers[s.layer]?.sourceAFx
+              : c.layers[s.layer]?.sourceBFx
     shaderId = arr?.find((f) => f.id === target.instId)?.shaderId ?? null
   }
   if (!shaderId) return

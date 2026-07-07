@@ -6,6 +6,7 @@
 
 import { create } from 'zustand'
 import type {
+  BackgroundState,
   BlendMode,
   CompositionState,
   FxInstance,
@@ -60,6 +61,7 @@ function uniqueWorldName(worlds: World[], base: string): string {
 }
 import {
   collectFloatTargets,
+  randomizeBackground,
   randomizeComposition,
   randomizeInputs,
   randomizeSingleLayer,
@@ -67,6 +69,7 @@ import {
   varyComposition,
   type RandomizeScope
 } from './randomize'
+import { BG_DEFAULT_SPEED } from './bgPresets'
 
 export type { FxScope }
 
@@ -253,10 +256,16 @@ export function makeDefaultMetaKnobs(): MetaKnobState[] {
   }))
 }
 
+// The Background slab's blank state — off (no source), slow ground clock.
+export function makeDefaultBackground(): BackgroundState {
+  return { source: emptySlot(), fx: [], opacity: 1, speed: BG_DEFAULT_SPEED }
+}
+
 export function makeDefaultComposition(): CompositionState {
   return {
     // Blank baseline — a fresh open is randomized on top via seedRandomStart().
     layers: [makeLayer(), makeLayer(), makeLayer(), makeLayer()],
+    background: makeDefaultBackground(),
     master: [makeVibePalette(), makeContext(), makeFinalizer()],
     bpm: 120,
     modulators: makeDefaultModulators(),
@@ -270,6 +279,7 @@ export function makeDefaultComposition(): CompositionState {
 export type Selection =
   | { type: 'source'; layer: number; slot: 'A' | 'B' }
   | { type: 'fx'; scope: FxScope; instId: string }
+  | { type: 'background' } // the Background slab's source params
   | null
 
 /** Stable identity for a mod target — used to find existing assignments. */
@@ -277,7 +287,8 @@ export function modTargetKey(t: ModTarget): string {
   if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
   if (t.kind === 'meta') return `meta:${t.knob}`
   const s = t.scope
-  const scopeKey = s.kind === 'master' ? 'master' : `${s.kind}:${s.layer}`
+  const scopeKey =
+    s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
   return `fx:${scopeKey}:${t.instId}:${t.input}`
 }
 
@@ -314,6 +325,20 @@ interface StoreState {
   // Native Text source (gen-text): the string + the glyph-fill sidechain.
   setSourceText: (layer: number, slot: 'A' | 'B', text: string) => void
   setSourceSidechain: (layer: number, slot: 'A' | 'B', ref: SidechainRef | null) => void
+
+  // ── Background slab — the ground under the four layers ───────────────
+  setBackgroundSource: (shaderId: string | null) => void
+  setBackgroundInput: (name: string, value: number | number[]) => void
+  setBackgroundOpacity: (v: number) => void
+  setBackgroundSpeed: (v: number) => void
+  randomizeBg: () => void // the background's own dice (global Randomize skips it)
+  // Apply a materialized background (built-in preset via bgPresetToState, or a
+  // user preset's saved state). FX get fresh instance ids.
+  applyBgPreset: (bg: BackgroundState) => void
+  // User background presets — app-persistent, like layer presets.
+  bgPresets: Array<{ id: string; name: string; bg: BackgroundState }>
+  saveBgPreset: (name: string) => void
+  deleteBgPreset: (id: string) => void
   // Patch a video slot's transport (play/speed/reverse/loop/in/out).
   setVideoPlayback: (
     layer: number,
@@ -551,6 +576,10 @@ function updateFxArray(
   fn: (fx: FxInstance[]) => FxInstance[]
 ): CompositionState {
   if (scope.kind === 'master') return { ...c, master: fn(c.master) }
+  if (scope.kind === 'background') {
+    const bg = c.background ?? makeDefaultBackground()
+    return { ...c, background: { ...bg, fx: fn(bg.fx) } }
+  }
   return {
     ...c,
     layers: updateLayer(c.layers, scope.layer, (l) => {
@@ -895,6 +924,79 @@ export const useStore = create<StoreState>((set, get) => ({
         })
       }
     })),
+  // ── Background slab ────────────────────────────────────────────────
+  setBackgroundSource: (shaderId) =>
+    set((s) => {
+      const bg = s.composition.background ?? makeDefaultBackground()
+      const source: SourceSlot = shaderId
+        ? { kind: 'generator', shaderId, inputs: {} }
+        : emptySlot()
+      return {
+        composition: { ...s.composition, background: { ...bg, source } },
+        selection: shaderId ? { type: 'background' } : s.selection
+      }
+    }),
+  setBackgroundInput: (name, value) =>
+    set((s) => {
+      const bg = s.composition.background ?? makeDefaultBackground()
+      return {
+        composition: {
+          ...s.composition,
+          background: { ...bg, source: { ...bg.source, inputs: { ...bg.source.inputs, [name]: value } } }
+        }
+      }
+    }),
+  setBackgroundOpacity: (v) =>
+    set((s) => {
+      const bg = s.composition.background ?? makeDefaultBackground()
+      return { composition: { ...s.composition, background: { ...bg, opacity: Math.max(0, Math.min(1, v)) } } }
+    }),
+  setBackgroundSpeed: (v) =>
+    set((s) => {
+      const bg = s.composition.background ?? makeDefaultBackground()
+      return { composition: { ...s.composition, background: { ...bg, speed: Math.max(0, Math.min(4, v)) } } }
+    }),
+  randomizeBg: () =>
+    set((s) => ({
+      composition: { ...s.composition, background: randomizeBackground(s.composition.background) }
+    })),
+  applyBgPreset: (bg) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        background: {
+          ...bg,
+          source: { ...bg.source, inputs: { ...bg.source.inputs } },
+          fx: bg.fx.map((f) => ({ ...f, id: uid(), inputs: { ...f.inputs } }))
+        }
+      },
+      selection: { type: 'background' }
+    })),
+  bgPresets: (() => {
+    try {
+      return JSON.parse(localStorage.getItem('opsia.bgPresets') ?? '[]')
+    } catch {
+      return []
+    }
+  })(),
+  saveBgPreset: (name) =>
+    set((s) => {
+      const bg = s.composition.background
+      if (!bg || !bg.source.shaderId) return s
+      const bgPresets = [
+        ...s.bgPresets,
+        { id: uid(), name: name.trim() || `Background ${s.bgPresets.length + 1}`, bg: structuredClone(bg) }
+      ]
+      localStorage.setItem('opsia.bgPresets', JSON.stringify(bgPresets))
+      return { bgPresets }
+    }),
+  deleteBgPreset: (id) =>
+    set((s) => {
+      const bgPresets = s.bgPresets.filter((x) => x.id !== id)
+      localStorage.setItem('opsia.bgPresets', JSON.stringify(bgPresets))
+      return { bgPresets }
+    }),
+
   setVideoPlayback: (layer, slot, patch) =>
     set((s) => ({
       composition: {
@@ -1616,6 +1718,8 @@ export const useStore = create<StoreState>((set, get) => ({
       variationBaseline: null,
       composition: {
         ...s.composition,
+        // Older sessions have no Background slab — normalize to the blank one.
+        background: s.composition.background ?? makeDefaultBackground(),
         // Normalize layers from older session files — new fields get defaults.
         layers: s.composition.layers.map((l) => ({
           ...l,

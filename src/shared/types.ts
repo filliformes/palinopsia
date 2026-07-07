@@ -283,9 +283,10 @@ export type ModTarget =
   | { kind: 'fx'; scope: FxScope; instId: string; input: string }
   | { kind: 'meta'; knob: number }
 
-// Addresses one of the four FX racks (per-source, per-layer, or master).
+// Addresses one of the FX racks (per-source, per-layer, master, or background).
 export type FxScope =
   | { kind: 'master' }
+  | { kind: 'background' }
   | { kind: 'layer' | 'sourceA' | 'sourceB'; layer: number }
 
 export interface ModAssignment {
@@ -315,9 +316,21 @@ export interface MetaKnobState {
   destinations: ModTarget[] // max META_MAX_DESTS
 }
 
-// The whole composition: four layers, a master FX rack, and transport.
+// The Background slab — the stable ground UNDER the four layers. One source
+// (curated generator set), a full FX rack, opacity and its own slow clock.
+// Deliberately untouched by the global Randomize: the ground stays put while
+// the layers churn. Optional on older sessions (normalized on load).
+export interface BackgroundState {
+  source: SourceSlot
+  fx: FxInstance[]
+  opacity: number // 0..1 (0 = off)
+  speed: number // background clock multiplier — default 0.25 (slow ground)
+}
+
+// The whole composition: background + four layers + master rack + transport.
 export interface CompositionState {
   layers: LayerState[]
+  background?: BackgroundState
   master: FxInstance[] // glitch / dither / chroma / grade + warp
   bpm: number
   modulators: ModulatorConfig[]

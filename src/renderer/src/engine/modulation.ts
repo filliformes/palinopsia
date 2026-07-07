@@ -575,7 +575,8 @@ function liveKey(t: import('@shared/types').ModTarget): string {
   if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
   if (t.kind === 'meta') return `meta:${t.knob}`
   const s = t.scope
-  const scopeKey = s.kind === 'master' ? 'master' : `${s.kind}:${s.layer}`
+  const scopeKey =
+    s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
   return `fx:${scopeKey}:${t.instId}:${t.input}`
 }
 
@@ -617,11 +618,13 @@ export function applyModulation(
       const arr =
         s.kind === 'master'
           ? c.master
-          : s.kind === 'layer'
-            ? c.layers[s.layer]?.fx
-            : s.kind === 'sourceA'
-              ? c.layers[s.layer]?.sourceAFx
-              : c.layers[s.layer]?.sourceBFx
+          : s.kind === 'background'
+            ? c.background?.fx
+            : s.kind === 'layer'
+              ? c.layers[s.layer]?.fx
+              : s.kind === 'sourceA'
+                ? c.layers[s.layer]?.sourceAFx
+                : c.layers[s.layer]?.sourceBFx
       shaderId = arr?.find((f) => f.id === t.instId)?.shaderId ?? null
     }
     if (!shaderId) return
@@ -675,7 +678,9 @@ export function applyModulation(
     } else {
       const { scope, instId } = a.target
       let arr = c.master
-      if (scope.kind !== 'master') {
+      if (scope.kind === 'background') {
+        arr = c.background?.fx ?? []
+      } else if (scope.kind !== 'master') {
         const layer = c.layers[scope.layer]
         if (!layer) continue
         arr =

@@ -45,6 +45,7 @@ function vibeMainColor(inputs: Record<string, number | number[]>): number[] {
 
 const SCOPE_LABEL: Record<FxScope['kind'], string> = {
   master: 'master',
+  background: 'background fx',
   layer: 'layer fx',
   sourceA: 'src A fx',
   sourceB: 'src B fx'
@@ -56,6 +57,7 @@ export function Inspector(): JSX.Element {
   const setSourceInput = useStore((s) => s.setSourceInput)
   const setSourceText = useStore((s) => s.setSourceText)
   const setSourceSidechain = useStore((s) => s.setSourceSidechain)
+  const setBackgroundInput = useStore((s) => s.setBackgroundInput)
   const setFxInput = useStore((s) => s.setFxInput)
   const setFxSidechain = useStore((s) => s.setFxSidechain)
   const setFxOpacity = useStore((s) => s.setFxOpacity)
@@ -113,10 +115,21 @@ export function Inspector(): JSX.Element {
       videoName = slot.mediaName ?? slot.kind
       context = `layer ${selection.layer + 1} · src ${selection.slot}`
     }
+  } else if (selection?.type === 'background') {
+    // The Background slab's SOURCE params (its FX go through the fx branch).
+    const bg = composition.background
+    if (bg?.source.shaderId) {
+      shaderId = bg.source.shaderId
+      values = bg.source.inputs
+      title = SHADER_BY_ID[bg.source.shaderId]?.name ?? bg.source.shaderId
+      context = 'background'
+      onChange = (n, v) => setBackgroundInput(n, v)
+    }
   } else if (selection?.type === 'fx') {
     const { scope, instId } = selection
     let arr: FxInstance[] = []
     if (scope.kind === 'master') arr = composition.master
+    else if (scope.kind === 'background') arr = composition.background?.fx ?? []
     else {
       const layer = composition.layers[scope.layer]
       if (layer) {
@@ -135,8 +148,8 @@ export function Inspector(): JSX.Element {
       fxOpacity = { value: inst.opacity ?? 1, set: (v) => setFxOpacity(scope, instId, v) }
       title = SHADER_BY_ID[inst.shaderId]?.name ?? inst.shaderId
       context =
-        scope.kind === 'master'
-          ? SCOPE_LABEL.master
+        scope.kind === 'master' || scope.kind === 'background'
+          ? SCOPE_LABEL[scope.kind]
           : `layer ${scope.layer + 1} · ${SCOPE_LABEL[scope.kind]}`
       onChange = (n, v) => setFxInput(scope, instId, n, v)
       modTargetFor = (input) => ({ kind: 'fx', scope, instId, input })
@@ -367,7 +380,7 @@ export function Inspector(): JSX.Element {
       {/* Sources (≤8 params) fit their content — wrap onto as few rows as
           needed (usually one), no fixed height, no horizontal scroll. FX can be
           deep, so they keep the fixed two-row grid that flows into columns. */}
-      {selection?.type === 'source' ? (
+      {selection?.type === 'source' || selection?.type === 'background' ? (
         <div className="min-h-[3.25rem]">
           <AutoControls
             inputs={inputsForShader(shaderId)}
