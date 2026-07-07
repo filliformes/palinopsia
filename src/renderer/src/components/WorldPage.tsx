@@ -6,11 +6,12 @@
 // Next batch: a JSON live-code editor (both-way synced) and a World Visualizer
 // that simulates audio + A/B on noise so you can SEE the coupling behave.
 
-import { useState } from 'react'
-import type { AudioFeature, CouplingMode, WorldAudioTarget } from '@shared/types'
+import { useEffect, useRef, useState } from 'react'
+import type { AudioFeature, CouplingMode, World, WorldAudioTarget } from '@shared/types'
 import { WORLD_AUDIO_TARGETS } from '@shared/types'
 import { AUDIO_FEATURES } from '../engine/audioIn'
 import { useStore } from '../store'
+import { WorldVisualizer } from './WorldVisualizer'
 
 const COUPLING_MODES: CouplingMode[] = ['off', 'lean', 'hocket', 'cut', 'gate', 'drift']
 const CONTEXT_KEYS: Array<{ k: string; label: string }> = [
@@ -45,7 +46,7 @@ export function WorldPage(): JSX.Element {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-bg/98 backdrop-blur-sm">
+    <div className="fixed inset-0 z-40 flex flex-col bg-bg">
       {/* header */}
       <div className="flex items-center gap-3 border-b border-border bg-panel px-4 py-2">
         <span className="font-mono text-[13px] font-semibold uppercase tracking-wide text-accent">
@@ -141,7 +142,8 @@ export function WorldPage(): JSX.Element {
             title="One-line description"
           />
 
-          <div className="grid max-w-4xl grid-cols-2 gap-6">
+          <div className="grid max-w-5xl grid-cols-2 gap-6">
+           <div className="flex flex-col gap-4">
             {/* Coupling */}
             <Section title="A/B Coupling — how the two voices bond">
               <SelRow label="mode" value={w.coupling.mode} options={COUPLING_MODES}
@@ -188,16 +190,95 @@ export function WorldPage(): JSX.Element {
               </p>
             </Section>
 
-            {/* Visualizer placeholder (next batch) */}
-            <Section title="World Visualizer">
-              <div className="flex h-28 items-center justify-center rounded border border-dashed border-border bg-panel2/40 text-center font-mono text-[10px] text-muted">
-                simulated audio + A/B preview
-                <br />
-                (next batch)
-              </div>
-            </Section>
+           </div>
+
+           {/* right column — Visualizer + live-code */}
+           <div className="flex flex-col gap-4">
+              <Section title="World Visualizer — simulated audio + A/B">
+                <WorldVisualizer coupling={w.coupling} context={w.context} />
+              </Section>
+              <Section title="Live code (JSON) — edit, then Apply">
+                <JsonEditor world={w} onApply={(patch) => updateWorld(w.id, patch)} />
+              </Section>
+            </div>
           </div>
         </main>
+      </div>
+    </div>
+  )
+}
+
+// ── live-code (JSON) editor ─────────────────────────────────────────────
+// The editable fields of a World, serialized. Both-way synced: the text follows
+// the form (when not being edited); Apply parses it back onto the World.
+function worldToJson(w: World): string {
+  return JSON.stringify(
+    { name: w.name, blurb: w.blurb, coupling: w.coupling, context: w.context, autoMod: w.autoMod },
+    null,
+    2
+  )
+}
+
+function JsonEditor({
+  world,
+  onApply
+}: {
+  world: World
+  onApply: (patch: Partial<World>) => void
+}): JSX.Element {
+  const [text, setText] = useState(() => worldToJson(world))
+  const [err, setErr] = useState<string | null>(null)
+  const dirty = useRef(false)
+  // Follow the form while the user isn't editing the text (and on world switch).
+  useEffect(() => {
+    if (!dirty.current) setText(worldToJson(world))
+  }, [world])
+
+  const apply = (): void => {
+    try {
+      const o = JSON.parse(text)
+      if (typeof o !== 'object' || !o) throw new Error('not an object')
+      const patch: Partial<World> = {}
+      if (typeof o.name === 'string') patch.name = o.name
+      if (typeof o.blurb === 'string') patch.blurb = o.blurb
+      if (o.coupling && typeof o.coupling === 'object') patch.coupling = o.coupling
+      if (o.context && typeof o.context === 'object') patch.context = o.context
+      patch.autoMod = o.autoMod ?? null
+      onApply(patch)
+      setErr(null)
+      dirty.current = false
+    } catch (e) {
+      setErr((e as Error).message)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <textarea
+        className="input h-40 w-full resize-none whitespace-pre font-mono text-[10px] leading-tight"
+        spellCheck={false}
+        value={text}
+        onChange={(e) => {
+          dirty.current = true
+          setText(e.target.value)
+        }}
+      />
+      <div className="flex items-center gap-2">
+        <button className="btn text-[11px]" onClick={apply} title="Parse the JSON onto this World">
+          Apply JSON
+        </button>
+        <button
+          className="btn text-[11px]"
+          onClick={() => {
+            dirty.current = false
+            setText(worldToJson(world))
+            setErr(null)
+          }}
+          title="Discard edits and reload from the World"
+        >
+          Revert
+        </button>
+        {err && <span className="font-mono text-[10px] text-danger">⚠ {err}</span>}
       </div>
     </div>
   )
