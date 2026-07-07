@@ -29,6 +29,7 @@
 import { Renderer as ISFRenderer } from 'interactive-shader-format';
 import { handle, installTextureBridge } from './isfTextureBridge';
 import { makeConvNode, isNativeNode, type ConvNode } from './convNodes';
+import { TextSource } from './TextSource';
 import type { SidechainRef } from '@shared/types';
 import { VideoSource } from './VideoSource';
 import { CaptureSource } from './CaptureSource';
@@ -601,6 +602,10 @@ export class ISFLayer {
   private hiveB: HiveSource | null = null;
   private hiveIdA: string | null = null;
   private hiveIdB: string | null = null;
+  // Native Text slots (generator 'gen-text' — typography, glyphs fillable by a
+  // sidechain layer).
+  private textA: TextSource | null = null;
+  private textB: TextSource | null = null;
   // Per-slot framing (zoom/pan/crop) for video + capture sources.
   private framingA: Framing = { ...IDENTITY_FRAMING };
   private framingB: Framing = { ...IDENTITY_FRAMING };
@@ -659,6 +664,30 @@ export class ISFLayer {
     }
     if (slot === 'A') { this.videoA = next; this.mediaIdA = mediaId; }
     else { this.videoB = next; this.mediaIdB = mediaId; }
+  }
+
+  /** Activate/refresh/clear a native TEXT source. Called every frame by
+   *  syncFromState (cheap when unchanged) — cfg carries the base state. */
+  setText(
+    slot: 'A' | 'B',
+    cfg: { text: string; inputs: Record<string, number | number[]>; sidechain: SidechainRef | null } | null
+  ): void {
+    const cur = slot === 'A' ? this.textA : this.textB;
+    if (!cfg) {
+      if (cur) {
+        cur.dispose();
+        if (slot === 'A') this.textA = null;
+        else this.textB = null;
+      }
+      return;
+    }
+    let src = cur;
+    if (!src) {
+      src = new TextSource(this.shared.gl, this.w, this.h);
+      if (slot === 'A') this.textA = src;
+      else this.textB = src;
+    }
+    src.update(cfg.text, cfg.inputs, cfg.sidechain);
   }
 
   /** Load/swap/clear a live CAPTURE source ('webcam' | 'screen' | 'desktop:id'). */
@@ -739,9 +768,10 @@ export class ISFLayer {
 
   setInput(slot: 'A' | 'B', name: string, value: number | number[]) {
     (slot === 'A' ? this.isfA : this.isfB)?.setValue(name, value);
+    (slot === 'A' ? this.textA : this.textB)?.setInput(name, value); // modulation on text params
   }
 
-  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null; }
+  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null || this.textB !== null; }
 
   /** Advance the layer clock and stamp it onto every renderer it owns. */
   advanceClock(dtSec: number): void {
@@ -754,15 +784,23 @@ export class ISFLayer {
     this.rackLayer.setTime(t);
   }
 
-  /** Draw a source (ISF generator or video frame) into its scratch target.
-   *  Empty/not-yet-ready → transparent. */
-  renderSource(slot: 'A' | 'B') {
+  /** Draw a source (ISF generator, video frame, or native text) into its
+   *  scratch target. Empty/not-yet-ready → transparent. `sidechainTex` resolves
+   *  a native source's sidechain ref to a live texture (text glyph fill). */
+  renderSource(slot: 'A' | 'B', sidechainTex?: (ref: SidechainRef | null | undefined) => WebGLTexture | null) {
     const gl = this.shared.gl;
     const scratch = slot === 'A' ? this.scratchA : this.scratchB;
     const isf = slot === 'A' ? this.isfA : this.isfB;
     const video = slot === 'A' ? this.videoA : this.videoB;
     const capture = slot === 'A' ? this.captureA : this.captureB;
     const hive = slot === 'A' ? this.hiveA : this.hiveB;
+    const text = slot === 'A' ? this.textA : this.textB;
+
+    // Native text: rasterized glyphs × (sidechain material | solid colour).
+    if (text) {
+      text.render(scratch.fbo, sidechainTex ? sidechainTex(text.sidechain) : null);
+      return;
+    }
 
     // Video / live-capture / HIVE slot: upload the current frame and blit (with
     // the slot's zoom/pan/crop framing) into scratch.
@@ -805,6 +843,8 @@ export class ISFLayer {
     this.captureB?.dispose();
     this.hiveA?.dispose();
     this.hiveB?.dispose();
+    this.textA?.dispose();
+    this.textB?.dispose();
     this.rackA.dispose();
     this.rackB.dispose();
     this.rackLayer.dispose();
@@ -1043,8 +1083,10 @@ export class Compositor {
       const l = c.layers[i];
       const L = this.layers[i];
       // Each slot is a generator, a video, or empty — reconcile both engines so
-      // switching kinds swaps cleanly (video↔generator never overlap).
-      const wantA = l.sourceA.kind === 'generator' ? l.sourceA.shaderId : null;
+      // switching kinds swaps cleanly (video↔generator never overlap). The Text
+      // generator is NATIVE (a TS class, no ISF compile) — route it to setText.
+      const isTextA = l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-text';
+      const wantA = l.sourceA.kind === 'generator' && !isTextA ? l.sourceA.shaderId : null;
       const wantVidA = l.sourceA.kind === 'video' ? (l.sourceA.mediaId ?? null) : null;
       const wantCapA = l.sourceA.kind === 'capture' ? (l.sourceA.mediaId ?? null) : null;
       const wantHiveA = l.sourceA.kind === 'hive' ? (l.sourceA.mediaId ?? null) : null;
@@ -1052,7 +1094,11 @@ export class Compositor {
       L.setVideo('A', wantVidA);
       L.setCapture('A', wantCapA);
       L.setHive('A', wantHiveA);
-      const wantB = l.sourceB && l.sourceB.kind === 'generator' ? l.sourceB.shaderId : null;
+      L.setText('A', isTextA
+        ? { text: l.sourceA.text ?? 'OPSIA', inputs: l.sourceA.inputs, sidechain: l.sourceA.sidechain ?? null }
+        : null);
+      const isTextB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-text';
+      const wantB = l.sourceB && l.sourceB.kind === 'generator' && !isTextB ? l.sourceB.shaderId : null;
       const wantVidB = l.sourceB && l.sourceB.kind === 'video' ? (l.sourceB.mediaId ?? null) : null;
       const wantCapB = l.sourceB && l.sourceB.kind === 'capture' ? (l.sourceB.mediaId ?? null) : null;
       const wantHiveB = l.sourceB && l.sourceB.kind === 'hive' ? (l.sourceB.mediaId ?? null) : null;
@@ -1060,6 +1106,9 @@ export class Compositor {
       L.setVideo('B', wantVidB);
       L.setCapture('B', wantCapB);
       L.setHive('B', wantHiveB);
+      L.setText('B', isTextB && l.sourceB
+        ? { text: l.sourceB.text ?? 'OPSIA', inputs: l.sourceB.inputs, sidechain: l.sourceB.sidechain ?? null }
+        : null);
       L.setVideoPlayback('A', l.sourceA);
       L.setVideoPlayback('B', l.sourceB);
       L.setFraming('A', l.sourceA);
@@ -1190,7 +1239,7 @@ export class Compositor {
         // clip plays natively (smooth) at speed·layer·global over realtime.
         L.tickVideos(li, rawDt, this.globalSpeed * L.speed);
         gl.bindVertexArray(null); // ISF draws own the default VAO
-        L.renderSource('A');
+        L.renderSource('A', nodeCtx.sidechainTex);
         let sig = L.rackA.apply(L.scratchA.tex, this.chain);
         if (L.hasB()) {
           // rackA + rackB ping-pong through the SAME ChainBuffers, so rackB can
@@ -1198,7 +1247,7 @@ export class Compositor {
           // e.g. A=1 FX, B=2 FX). Park A off-chain before B runs.
           this.copyInto(this.abHold.fbo, sig);
           sig = this.abHold.tex;
-          L.renderSource('B');
+          L.renderSource('B', nodeCtx.sidechainTex);
           const sigB = L.rackB.apply(L.scratchB.tex, this.chain);
           sig = this.mixSources(sig, sigB, L.sourceMix, L.sourceBlend, L.harmony);
         }

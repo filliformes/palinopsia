@@ -361,6 +361,38 @@ export const GENERATORS: IsfShader[] = [
     category: 'Generator',
     source: solidColor,
     curated: { gradient: [0, 1], angle: [0, 6.2832], midpoint: [0.3, 0.7], dither: [0.3, 0.7] }
+  },
+  {
+    // Native Text generator (TextSource.ts) — typography as a source, glyphs
+    // fillable by a sidechain layer (the convolution move). Header-only source:
+    // the auto-UI/presets parse INPUTS; the engine runs the TS class. Font
+    // VALUES/LABELS order must match TEXT_FONTS in engine/TextSource.ts.
+    id: 'gen-text',
+    name: 'Text',
+    category: 'Generator',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Text — typography as a source. Type in the Inspector; pick a font, size, weight and letter-spacing; place it with angle/position. A sidechain layer can FILL the glyphs (the letters become a matte over that layer's texture) — no sidechain = solid colour.",
+      "CATEGORIES": ["Generator"],
+      "INPUTS": [
+        { "NAME": "font", "TYPE": "long", "VALUES": [0,1,2,3,4,5], "LABELS": ["Inter","Space Grotesk","JetBrains Mono","Playfair Display","Bebas Neue","VT323"], "DEFAULT": 1, "LABEL": "font" },
+        { "NAME": "size", "TYPE": "float", "MIN": 0.02, "MAX": 1.0, "DEFAULT": 0.25, "LABEL": "size" },
+        { "NAME": "weight", "TYPE": "float", "MIN": 100.0, "MAX": 900.0, "DEFAULT": 700.0, "LABEL": "weight" },
+        { "NAME": "spacing", "TYPE": "float", "MIN": -0.15, "MAX": 0.8, "DEFAULT": 0.0, "LABEL": "spacing" },
+        { "NAME": "angle", "TYPE": "float", "MIN": -3.1416, "MAX": 3.1416, "DEFAULT": 0.0, "LABEL": "angle" },
+        { "NAME": "posX", "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "pos x" },
+        { "NAME": "posY", "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "pos y" },
+        { "NAME": "color", "TYPE": "color", "DEFAULT": [1.0, 1.0, 1.0, 1.0] }
+      ]
+    }*/`,
+    curated: {
+      size: [0.1, 0.5],
+      weight: [300, 900],
+      spacing: [0, 0.3],
+      angle: [-0.6, 0.6],
+      posX: [-0.4, 0.4],
+      posY: [-0.4, 0.4]
+    }
   }
 ]
 

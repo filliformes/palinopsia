@@ -81,6 +81,10 @@ export interface SourceSlot extends ShaderInstance {
   cropR?: number // trim right edge 0..0.9, default 0
   cropT?: number // trim top edge 0..0.9, default 0
   cropB?: number // trim bottom edge 0..0.9, default 0
+  // For the native Text generator (shaderId 'gen-text'): the string, and an
+  // optional sidechain whose texture FILLS the glyphs (letters as a matte).
+  text?: string
+  sidechain?: SidechainRef | null
 }
 
 // Where a native convolution node reads its "impulse"/energy source from: another

@@ -54,6 +54,8 @@ export function Inspector(): JSX.Element {
   const selection = useStore((s) => s.selection)
   const composition = useStore((s) => s.composition)
   const setSourceInput = useStore((s) => s.setSourceInput)
+  const setSourceText = useStore((s) => s.setSourceText)
+  const setSourceSidechain = useStore((s) => s.setSourceSidechain)
   const setFxInput = useStore((s) => s.setFxInput)
   const setFxSidechain = useStore((s) => s.setFxSidechain)
   const setFxOpacity = useStore((s) => s.setFxOpacity)
@@ -77,6 +79,14 @@ export function Inspector(): JSX.Element {
   // For a native convolution node (layer FX): the sidechain picker.
   let nodeSidechain: { ref: SidechainRef | null; hostLayer: number; set: (r: SidechainRef | null) => void } | null =
     null
+  // For the native Text source: the string field + the glyph-fill sidechain.
+  let textCfg: {
+    text: string
+    setText: (t: string) => void
+    ref: SidechainRef | null
+    setRef: (r: SidechainRef | null) => void
+    hostLayer: number
+  } | null = null
 
   if (selection?.type === 'source') {
     const layer = composition.layers[selection.layer]
@@ -90,6 +100,15 @@ export function Inspector(): JSX.Element {
       const { layer: li, slot: sl } = selection
       onChange = (n, v) => setSourceInput(li, sl, n, v)
       modTargetFor = (input) => ({ kind: 'source', layer: li, slot: sl, input })
+      if (slot.shaderId === 'gen-text') {
+        textCfg = {
+          text: slot.text ?? 'OPSIA',
+          setText: (t) => setSourceText(li, sl, t),
+          ref: slot.sidechain ?? null,
+          setRef: (r) => setSourceSidechain(li, sl, r),
+          hostLayer: li
+        }
+      }
     } else if (slot?.kind === 'video' || slot?.kind === 'capture' || slot?.kind === 'hive') {
       videoName = slot.mediaName ?? slot.kind
       context = `layer ${selection.layer + 1} · src ${selection.slot}`
@@ -285,6 +304,41 @@ export function Inspector(): JSX.Element {
           onApplied={isVibe ? setVibePresetName : undefined}
         />
       </div>
+      {/* Native Text source: the string + the glyph-fill sidechain. */}
+      {textCfg && (
+        <div className="flex items-center gap-2 border-b border-border bg-panel2/40 px-2 py-1">
+          <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">text</span>
+          <input
+            className="input min-w-0 flex-1 px-2 py-0.5 text-[12px]"
+            value={textCfg.text}
+            onChange={(e) => textCfg!.setText(e.target.value)}
+            placeholder={'Your text — \\n for a new line'}
+            spellCheck={false}
+          />
+          <span
+            className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-accent2"
+            title="A layer whose texture FILLS the letters (glyphs as a matte). None = solid colour."
+          >
+            fill
+          </span>
+          <select
+            className="input select-compact text-[11px]"
+            value={textCfg.ref?.kind === 'layer' ? `layer:${textCfg.ref.layer}` : ''}
+            onChange={(e) => {
+              const v = e.target.value
+              textCfg!.setRef(v.startsWith('layer:') ? { kind: 'layer', layer: Number(v.slice(6)) } : null)
+            }}
+          >
+            <option value="">— color —</option>
+            {[0, 1, 2, 3].map((li) => (
+              <option key={li} value={`layer:${li}`}>
+                Layer {li + 1}
+                {li === textCfg!.hostLayer ? ' (self)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {/* Native convolution node: the sidechain (impulse) source picker. */}
       {nodeSidechain && (
         <div className="flex items-center gap-2 border-b border-border bg-panel2/40 px-2 py-1">

@@ -311,6 +311,9 @@ interface StoreState {
   setSourceCapture: (layer: number, slot: 'A' | 'B', spec: string, name: string) => void
   // Point a slot at a live HIVE stream (host:port).
   setSourceHive: (layer: number, slot: 'A' | 'B', host: string, port: number) => void
+  // Native Text source (gen-text): the string + the glyph-fill sidechain.
+  setSourceText: (layer: number, slot: 'A' | 'B', text: string) => void
+  setSourceSidechain: (layer: number, slot: 'A' | 'B', ref: SidechainRef | null) => void
   // Patch a video slot's transport (play/speed/reverse/loop/in/out).
   setVideoPlayback: (
     layer: number,
@@ -867,6 +870,30 @@ export const useStore = create<StoreState>((set, get) => ({
         })
       },
       selection: { type: 'source', layer, slot }
+    })),
+  setSourceText: (layer, slot, text) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => {
+          const cur = slot === 'A' ? l.sourceA : l.sourceB
+          if (!cur || cur.shaderId !== 'gen-text') return l
+          const next = { ...cur, text }
+          return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
+        })
+      }
+    })),
+  setSourceSidechain: (layer, slot, ref) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => {
+          const cur = slot === 'A' ? l.sourceA : l.sourceB
+          if (!cur) return l
+          const next = { ...cur, sidechain: ref }
+          return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
+        })
+      }
     })),
   setVideoPlayback: (layer, slot, patch) =>
     set((s) => ({
