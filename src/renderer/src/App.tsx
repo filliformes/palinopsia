@@ -87,6 +87,17 @@ function cycleContextPreset(): void {
 }
 import { initUndo, redo, undo, useUndoState } from './undo'
 import { THEME_ORDER, useStore, type ThemeName } from './store'
+import { randomizeMetaKnobs } from './metaSmooth'
+import type { RandomizeScope } from './randomize'
+
+// Fire the Randomize mode the Transport's chevron currently points at (persisted
+// in localStorage) — the R shortcut mirrors clicking the Randomize button.
+function fireSelectedRandomize(): void {
+  const raw = localStorage.getItem('opsia.randScope') as RandomizeScope | null
+  const scope: RandomizeScope = raw ?? 'all'
+  if (scope === 'meta') randomizeMetaKnobs()
+  else useStore.getState().randomize(scope)
+}
 
 export default function App(): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -239,6 +250,43 @@ export default function App(): JSX.Element {
         const st = useStore.getState()
         st.setWorldPageOpen(!st.worldPageOpen)
         return
+      }
+      // Bare letters: view / panel shortcuts (guarded against typing in fields).
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField) {
+        const k = e.key.toLowerCase()
+        // L / F: switch the right column to Layers / Finishing.
+        if (k === 'l') {
+          e.preventDefault()
+          useStore.getState().setRightView('layers')
+          return
+        }
+        if (k === 'f') {
+          e.preventDefault()
+          useStore.getState().setRightView('finishing')
+          return
+        }
+        // D / X / I: collapse-toggle the Modulation / Master-FX / Inspector panels.
+        if (k === 'd') {
+          e.preventDefault()
+          useStore.getState().toggleSection('modulation')
+          return
+        }
+        if (k === 'x') {
+          e.preventDefault()
+          useStore.getState().toggleSection('master')
+          return
+        }
+        if (k === 'i') {
+          e.preventDefault()
+          useStore.getState().toggleSection('inspector')
+          return
+        }
+        // R: fire the Transport's currently-selected Randomize.
+        if (k === 'r') {
+          e.preventDefault()
+          fireSelectedRandomize()
+          return
+        }
       }
       // Esc: close the World editor if it's open.
       if (e.key === 'Escape' && useStore.getState().worldPageOpen) {

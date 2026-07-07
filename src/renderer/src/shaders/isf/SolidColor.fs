@@ -4,11 +4,11 @@
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Color"],
   "INPUTS": [
-    { "NAME": "gradient", "TYPE": "bool",  "DEFAULT": false },
     { "NAME": "color",    "TYPE": "color", "DEFAULT": [0.5, 0.55, 0.68, 1.0] },
     { "NAME": "colA",     "TYPE": "color", "DEFAULT": [0.05, 0.06, 0.12, 1.0] },
     { "NAME": "colB",     "TYPE": "color", "DEFAULT": [0.35, 0.2, 0.4, 1.0] },
     { "NAME": "colC",     "TYPE": "color", "DEFAULT": [0.95, 0.55, 0.35, 1.0] },
+    { "NAME": "gradient", "TYPE": "bool",  "DEFAULT": false },
     { "NAME": "angle",    "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 1.5708 },
     { "NAME": "midpoint", "TYPE": "float", "MIN": 0.05, "MAX": 0.95, "DEFAULT": 0.5 },
     { "NAME": "dither",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5 }

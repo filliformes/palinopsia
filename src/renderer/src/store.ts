@@ -147,7 +147,7 @@ function makeLayer(sourceShaderId: string | null = null): LayerState {
     sourceAFx: [],
     sourceBFx: [],
     fx: [],
-    blend: 'normal',
+    blend: 'add',
     opacity: 1,
     mute: false,
     solo: false,
@@ -814,8 +814,11 @@ export const useStore = create<StoreState>((set, get) => ({
             videoIn: 0,
             videoOut: 1
           }
-          if (slot === 'A') return { ...l, sourceA: vid }
-          return { ...l, sourceB: vid }
+          // Clear the slot's inherited source FX — a freshly imported clip must
+          // not land under a random-scene's hold/freeze/key rack (which would
+          // read as "the video won't play"). The user adds FX deliberately after.
+          if (slot === 'A') return { ...l, sourceA: vid, sourceAFx: [] }
+          return { ...l, sourceB: vid, sourceBFx: [] }
         })
       },
       selection: { type: 'source', layer, slot }
@@ -832,8 +835,8 @@ export const useStore = create<StoreState>((set, get) => ({
             mediaId: spec,
             mediaName: name
           }
-          if (slot === 'A') return { ...l, sourceA: cap }
-          return { ...l, sourceB: cap }
+          if (slot === 'A') return { ...l, sourceA: cap, sourceAFx: [] }
+          return { ...l, sourceB: cap, sourceBFx: [] }
         })
       },
       selection: { type: 'source', layer, slot }
@@ -850,8 +853,8 @@ export const useStore = create<StoreState>((set, get) => ({
             mediaId: `${host}:${port}`,
             mediaName: `HIVE ${host}:${port}`
           }
-          if (slot === 'A') return { ...l, sourceA: hv }
-          return { ...l, sourceB: hv }
+          if (slot === 'A') return { ...l, sourceA: hv, sourceAFx: [] }
+          return { ...l, sourceB: hv, sourceBFx: [] }
         })
       },
       selection: { type: 'source', layer, slot }

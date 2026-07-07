@@ -155,7 +155,14 @@ export function BoundedNumberInput({
   // familiar typing chrome on focus and the console-display look at
   // rest. Re-renders when the theme changes — instant flip.
   const rich = useStore((s) => isRichTheme(s.theme))
-  const cls = (className ?? 'input') + (rich ? ' rich-readout' : '')
+  // Compact height: every number readout matches its slider's text label
+  // (~a 9–10px label line box), even if that shrinks the digits — the box should
+  // never tower over the label it sits beside. Forced (!) so per-call padding /
+  // font classes can't reinflate it.
+  const cls =
+    (className ?? 'input') +
+    ' !h-[15px] !py-0 !leading-none !text-[10px]' +
+    (rich ? ' rich-readout' : '')
 
   return (
     <input

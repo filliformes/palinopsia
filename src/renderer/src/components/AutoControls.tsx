@@ -109,8 +109,13 @@ export function AutoControls({
       </div>
     )
   }
+  // 'wrap' — items-start so every control's label sits on the same top line
+  // (colours, sliders and enums have different heights; aligning tops keeps the
+  // label row straight).
   return (
-    <div className="flex flex-wrap gap-x-5 gap-y-2 p-2">{visible(inputs).map((inp) => renderControl(inp))}</div>
+    <div className="flex flex-wrap items-start gap-x-5 gap-y-2 p-2">
+      {visible(inputs).map((inp) => renderControl(inp))}
+    </div>
   )
 }
 

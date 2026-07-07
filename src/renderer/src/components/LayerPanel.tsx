@@ -484,7 +484,7 @@ function SourceRow({
     <>
       <div className="flex min-w-0 items-center gap-1.5" onClick={onSelect}>
         <span
-          className={`w-[34px] shrink-0 text-center font-app text-[14px] font-bold leading-none ${
+          className={`w-[34px] shrink-0 font-app text-[14px] font-bold leading-none ${
             selected ? 'text-accent' : active ? 'text-text' : 'text-muted'
           }`}
         >
@@ -530,9 +530,10 @@ function SourceRow({
             </option>
           ))}
         </select>
-        {/* +fx always present — the layout never shifts when sources load */}
+        {/* +fx always present — the layout never shifts when sources load.
+            w-auto so the box hugs its "+ fx" label instead of a fixed gutter. */}
         <span onClick={(e) => e.stopPropagation()}>
-          <FxAddSelect scope={scope} className="w-16 shrink-0" />
+          <FxAddSelect scope={scope} className="w-auto shrink-0" />
         </span>
       </div>
       {/* Only the FX the user adds appear below the row */}

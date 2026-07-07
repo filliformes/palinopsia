@@ -63,13 +63,22 @@ export class VideoSource {
     this.video.muted = true
     this.video.playsInline = true
     this.video.preload = 'auto'
+    // Surface a failed load instead of a silent black frame (protocol 404, moved
+    // file, unsupported codec) so "the video won't play" is diagnosable.
+    this.video.addEventListener('error', () => {
+      const e = this.video.error
+      console.warn(`[video] load error (${e?.code ?? '?'}): ${e?.message || this.video.currentSrc}`)
+    })
   }
 
   load(src: string): void {
     this.video.src = src
     // Start native playback (import is a user gesture, so autoplay is allowed);
-    // tick() takes over rate/direction/loop from here.
-    void this.video.play().catch(() => {})
+    // tick() takes over rate/direction/loop from here. Re-assert play once the
+    // clip can actually run, in case the eager first play() rejected (no data yet).
+    const kick = (): void => void this.video.play().catch(() => {})
+    kick()
+    this.video.addEventListener('canplay', kick, { once: true })
   }
 
   setPlayback(p: VideoPlayback): void {

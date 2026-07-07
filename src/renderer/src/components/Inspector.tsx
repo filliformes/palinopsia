@@ -273,17 +273,30 @@ export function Inspector(): JSX.Element {
           onApplied={isVibe ? setVibePresetName : undefined}
         />
       </div>
-      {/* Fixed shape: always exactly two rows of controls; more params flow
-          into new columns and scroll horizontally, so the panel never jumps. */}
-      <div className="h-[8.5rem] overflow-x-auto overflow-y-hidden">
-        <AutoControls
-          inputs={inputsForShader(shaderId)}
-          values={values}
-          onChange={onChange}
-          modTargetFor={modTargetFor}
-          layout="twoRow"
-        />
-      </div>
+      {/* Sources (≤8 params) fit their content — wrap onto as few rows as
+          needed (usually one), no fixed height, no horizontal scroll. FX can be
+          deep, so they keep the fixed two-row grid that flows into columns. */}
+      {selection?.type === 'source' ? (
+        <div className="min-h-[3.25rem]">
+          <AutoControls
+            inputs={inputsForShader(shaderId)}
+            values={values}
+            onChange={onChange}
+            modTargetFor={modTargetFor}
+            layout="wrap"
+          />
+        </div>
+      ) : (
+        <div className="h-[8.5rem] overflow-x-auto overflow-y-hidden">
+          <AutoControls
+            inputs={inputsForShader(shaderId)}
+            values={values}
+            onChange={onChange}
+            modTargetFor={modTargetFor}
+            layout="twoRow"
+          />
+        </div>
+      )}
     </div>
   )
 }
