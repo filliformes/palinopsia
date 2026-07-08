@@ -147,6 +147,7 @@ export default function App(): JSX.Element {
   const ndiActive = useStore((s) => s.ndiActive)
   const spoutActive = useStore((s) => s.spoutActive)
   const outputPageOpen = useStore((s) => s.outputPageOpen)
+  const renderScale = useStore((s) => s.renderScale)
   const worldPageOpen = useStore((s) => s.worldPageOpen)
   useEffect(() => {
     const comp = compositorRef.current
@@ -250,6 +251,13 @@ export default function App(): JSX.Element {
         useStore.getState().toggleMixerView()
         return
       }
+      // O: open/close the Output / Mapping view.
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'o') {
+        e.preventDefault()
+        const st = useStore.getState()
+        st.setOutputPageOpen(!st.outputPageOpen)
+        return
+      }
       // W: open/close the World editor.
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'w') {
         e.preventDefault()
@@ -300,6 +308,11 @@ export default function App(): JSX.Element {
         useStore.getState().setWorldPageOpen(false)
         return
       }
+      if (e.key === 'Escape' && useStore.getState().outputPageOpen) {
+        e.preventDefault()
+        useStore.getState().setOutputPageOpen(false)
+        return
+      }
       if (!(e.ctrlKey || e.metaKey)) return
       if (e.key === 'z' || e.key === 'Z') {
         e.preventDefault()
@@ -339,6 +352,11 @@ export default function App(): JSX.Element {
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
+    // Internal render resolution = 1920×1080 × renderScale (lo-fi ↔ 4K). The
+    // canvas backing store IS the render res; CSS object-contain scales it to the
+    // preview (pixelated upscale below 1× for the lo-fi look).
+    canvas.width = Math.max(2, Math.round(1920 * renderScale))
+    canvas.height = Math.max(2, Math.round(1080 * renderScale))
     let raf = 0
     let comp: Compositor | null = null
     try {
@@ -423,7 +441,8 @@ export default function App(): JSX.Element {
       comp?.dispose() // free all GL resources so a remount can't orphan them
       compositorRef.current = null
     }
-  }, [])
+    // Recreate the whole engine when the render resolution changes.
+  }, [renderScale])
 
   // ── Save-before-quit handshake (main asks; we ack) ──────────────────
   useEffect(() => {
@@ -576,14 +595,16 @@ export default function App(): JSX.Element {
               width={1920}
               height={1080}
               className="h-full w-full object-contain"
-              // Subtle scanline signature over the preview (brief §10).
+              // Subtle scanline signature over the preview (brief §10). Below 1×
+              // the low-res backing store upscales with crisp pixels (lo-fi look).
               style={{
                 backgroundImage:
-                  'repeating-linear-gradient(0deg, rgb(255 255 255 / 0.015) 0 1px, transparent 1px 3px)'
+                  'repeating-linear-gradient(0deg, rgb(255 255 255 / 0.015) 0 1px, transparent 1px 3px)',
+                imageRendering: renderScale < 1 ? 'pixelated' : 'auto'
               }}
             />
             <div className="pointer-events-none absolute bottom-2 left-2 font-mono text-[10px] text-muted/70">
-              output · 1920×1080
+              output · {Math.round(1920 * renderScale)}×{Math.round(1080 * renderScale)}
             </div>
           </div>
 

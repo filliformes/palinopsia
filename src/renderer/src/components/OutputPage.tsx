@@ -42,6 +42,10 @@ export function OutputPage({
   const setHiveOutActive = useStore((s) => s.setHiveOutActive)
   const hiveOutPort = useStore((s) => s.hiveOutPort)
   const setHiveOutPort = useStore((s) => s.setHiveOutPort)
+  const renderScale = useStore((s) => s.renderScale)
+  const setRenderScale = useStore((s) => s.setRenderScale)
+  const resW = Math.round(1920 * renderScale)
+  const resH = Math.round(1080 * renderScale)
 
   const [displays, setDisplays] = useState<DisplayInfo[]>([])
   const [displayId, setDisplayId] = useState<number | null>(null)
@@ -214,6 +218,48 @@ export function OutputPage({
               Drag the corners over the live preview to keystone the image onto a
               projector. Turn <span className="text-text">grid</span> on to align,
               off for the show.
+            </p>
+          </Section>
+
+          <Section title="Resolution">
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min={0.1}
+                max={2}
+                step={0.05}
+                value={renderScale}
+                onChange={(e) => setRenderScale(Number(e.target.value))}
+                onDoubleClick={() => setRenderScale(1)}
+                className="min-w-0 flex-1 accent-accent"
+                title={`Render resolution ${resW}×${resH} — the whole engine renders here, then scales to the display`}
+              />
+              <span className="w-24 shrink-0 text-right font-mono text-[11px] text-muted">
+                {resW}×{resH}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                ['½ (lo-fi)', 0.5],
+                ['1080p', 1],
+                ['1440p', 1.3333],
+                ['4K', 2]
+              ].map(([lbl, v]) => (
+                <button
+                  key={lbl as string}
+                  onClick={() => setRenderScale(v as number)}
+                  className={btn(Math.abs(renderScale - (v as number)) < 0.02)}
+                >
+                  {lbl}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] leading-tight text-muted">
+              The whole engine renders at this resolution (every effect, not just a
+              filter). Below <span className="text-text">1080p</span> it upscales
+              with crisp pixels — a genuine lo-fi look; push to{' '}
+              <span className="text-text">4K</span> for hi-fi (heavier on the GPU).
+              Changing it rebuilds the engine — a brief flicker is normal.
             </p>
           </Section>
 

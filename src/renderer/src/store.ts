@@ -524,6 +524,8 @@ interface StoreState {
   // The full-page Output / Mapping view is showing. Transient.
   outputPageOpen: boolean
   setOutputPageOpen: (on: boolean) => void
+  renderScale: number
+  setRenderScale: (v: number) => void
   collapsed: Record<string, boolean>
   toggleSection: (key: string) => void
   // Finishing view: exclusively open one finalizer sub-section (Vibe / Context /
@@ -1551,6 +1553,19 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   outputPageOpen: false,
   setOutputPageOpen: (on) => set({ outputPageOpen: on }),
+
+  // Internal render scale: multiplies the 1920×1080 base. <1 = lo-fi (coarser
+  // everything, upscaled to the display); 1 = 1080p; 2 = 4K (3840×2160). The App
+  // engine recreates the compositor at this resolution when it changes.
+  renderScale: (() => {
+    const n = Number(localStorage.getItem('opsia.renderScale'))
+    return Number.isFinite(n) && n >= 0.1 && n <= 2 ? n : 1
+  })(),
+  setRenderScale: (v) => {
+    const s = Math.max(0.1, Math.min(2, v))
+    localStorage.setItem('opsia.renderScale', String(s))
+    set({ renderScale: s })
+  },
 
   oscEnabled: localStorage.getItem('opsia.oscEnabled') === '1',
   oscPort: (() => {
