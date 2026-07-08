@@ -649,9 +649,9 @@ export default function App(): JSX.Element {
                 imageRendering: renderScale < 1 ? 'pixelated' : 'auto'
               }}
             />
-            {/* FPS bottom-left, mirroring the resolution tag bottom-right. */}
+            {/* FPS bottom-right, mirroring the resolution tag bottom-left. */}
             <FpsTag />
-            <div className="pointer-events-none absolute bottom-2 right-2 font-mono text-[10px] text-muted/70">
+            <div className="pointer-events-none absolute bottom-2 left-2 font-mono text-[10px] text-muted/70">
               output · {Math.round(1920 * renderScale)}×{Math.round(1080 * renderScale)}
             </div>
           </div>
@@ -726,8 +726,8 @@ export default function App(): JSX.Element {
   )
 }
 
-// Live FPS over the preview's bottom-left corner — mirrors the resolution tag
-// on the right, same font. Samples the render-loop meter on a light interval.
+// Live FPS over the preview's bottom-right corner — mirrors the resolution tag
+// on the left, same font. Samples the render-loop meter on a light interval.
 function FpsTag(): JSX.Element {
   const [fps, setFps] = useState(0)
   useEffect(() => {
@@ -735,7 +735,7 @@ function FpsTag(): JSX.Element {
     return () => window.clearInterval(id)
   }, [])
   return (
-    <div className="pointer-events-none absolute bottom-2 left-2 font-mono text-[10px] text-muted/70">
+    <div className="pointer-events-none absolute bottom-2 right-2 font-mono text-[10px] text-muted/70">
       {fps > 0 ? `${Math.round(fps)} fps` : '— fps'}
     </div>
   )
