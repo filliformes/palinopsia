@@ -5,6 +5,7 @@
 
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -12,8 +13,10 @@ import {
   type RefObject
 } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import type { DisplayInfo } from '@shared/types'
+import type { DisplayInfo, PerfStats } from '@shared/types'
 import { useStore } from '../store'
+import { currentFps } from '../perf'
+import { captureScreenshot, OutputRecorder, supportedFormats } from '../recorder'
 
 const CORNER_LABELS = ['TL', 'TR', 'BR', 'BL']
 
@@ -53,6 +56,60 @@ export function OutputPage({
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const padRef = useRef<HTMLDivElement | null>(null)
   const dragging = useRef<number | null>(null)
+
+  // ── Recording + screenshot ──────────────────────────────────────────
+  const formats = useMemo(() => supportedFormats(), [])
+  const [formatId, setFormatId] = useState<string>(() => formats[0]?.id ?? '')
+  const recorderRef = useRef<OutputRecorder>(new OutputRecorder())
+  const [recording, setRecording] = useState(false)
+  const [recElapsed, setRecElapsed] = useState(0) // seconds
+  const [savedMsg, setSavedMsg] = useState<string | null>(null)
+
+  // Tick the recording timer while active.
+  useEffect(() => {
+    if (!recording) return
+    const start = performance.now()
+    setRecElapsed(0)
+    const id = window.setInterval(() => setRecElapsed((performance.now() - start) / 1000), 250)
+    return () => window.clearInterval(id)
+  }, [recording])
+
+  const flashSaved = (path: string | null, kind: string): void => {
+    if (!path) return
+    const name = path.split(/[\\/]/).pop() ?? path
+    setSavedMsg(`${kind}: ${name}`)
+    window.setTimeout(() => setSavedMsg((m) => (m?.endsWith(name) ? null : m)), 4000)
+  }
+
+  const toggleRecord = async (): Promise<void> => {
+    const rec = recorderRef.current
+    if (rec.active) {
+      const path = await rec.stop()
+      setRecording(false)
+      flashSaved(path, 'saved')
+    } else {
+      const canvas = canvasRef.current
+      const fmt = formats.find((f) => f.id === formatId)
+      if (!canvas || !fmt) return
+      const ok = await rec.start(canvas, fmt)
+      if (ok) setRecording(true)
+      else flashSaved('failed', 'recording could not start')
+    }
+  }
+
+  const takeScreenshot = async (): Promise<void> => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    flashSaved(await captureScreenshot(canvas), 'screenshot')
+  }
+
+  // Stop a recording cleanly if the page unmounts mid-take.
+  useEffect(() => {
+    const rec = recorderRef.current
+    return () => {
+      if (rec.active) void rec.stop()
+    }
+  }, [])
 
   // Live mirror of the composite into the editor via canvas.captureStream.
   useEffect(() => {
@@ -161,6 +218,20 @@ export function OutputPage({
             }}
           >
             <video ref={videoRef} autoPlay muted playsInline className="h-full w-full bg-black object-contain" />
+            {/* Realtime resource monitor — floats over the top-left of the preview. */}
+            <ResourceHud />
+            {/* Recording indicator — top-right, pulsing red dot + elapsed. */}
+            {recording && (
+              <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1.5 rounded bg-black/55 px-2 py-1 font-mono text-[11px] text-danger">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-danger" />
+                REC {fmtClock(recElapsed)}
+              </div>
+            )}
+            {savedMsg && (
+              <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded bg-black/60 px-2 py-1 font-mono text-[10px] text-accent">
+                {savedMsg}
+              </div>
+            )}
             <svg
               className="pointer-events-none absolute inset-0 h-full w-full"
               viewBox="0 0 100 100"
@@ -307,6 +378,49 @@ export function OutputPage({
             )}
           </Section>
 
+          <Section title="Record">
+            <select
+              className="input select-compact w-full text-[11px]"
+              value={formatId}
+              onChange={(e) => setFormatId(e.target.value)}
+              disabled={recording || formats.length === 0}
+              title="Recording format"
+            >
+              {formats.length === 0 && <option value="">no encoder available</option>}
+              {formats.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+            <div className="flex gap-1.5">
+              <button
+                onClick={() => void toggleRecord()}
+                disabled={formats.length === 0}
+                className={`flex-1 rounded border px-2 py-1 font-mono text-[11px] transition-colors disabled:opacity-40 ${
+                  recording
+                    ? 'border-danger bg-danger/20 text-danger hover:bg-danger/30'
+                    : 'border-accent bg-accent/15 text-accent hover:bg-accent/25'
+                }`}
+                title={recording ? 'Stop recording' : 'Record the output composition to the Recorded folder'}
+              >
+                {recording ? '■ stop' : '● rec'}
+              </button>
+              <button
+                onClick={() => void takeScreenshot()}
+                className="flex-1 rounded border border-border px-2 py-1 font-mono text-[11px] text-muted hover:text-accent"
+                title="Save a PNG of the output at its current resolution → Recorded folder"
+              >
+                screenshot
+              </button>
+            </div>
+            <p className="text-[11px] leading-tight text-muted">
+              Clips + screenshots land in the <span className="text-text">Recorded</span>{' '}
+              folder, captured at the current output resolution. "Max quality" is
+              visually lossless VP9.
+            </p>
+          </Section>
+
           <Section title="Send (Resolume / OBS)">
             <div className="flex gap-1.5">
               <button
@@ -364,6 +478,68 @@ function Section({ title, children }: { title: string; children: ReactNode }): J
     <div className="flex flex-col gap-2">
       <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{title}</span>
       {children}
+    </div>
+  )
+}
+
+function fmtClock(sec: number): string {
+  const s = Math.floor(sec)
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+}
+
+// Floating realtime resource monitor (top-left of the preview). Polls main for
+// Palinopsia's CPU/RAM + the GPU's VRAM/util once a second; reads the renderer
+// FPS meter every rAF. Pure DOM sampling, no store churn.
+function ResourceHud(): JSX.Element {
+  const [stats, setStats] = useState<PerfStats>({ cpu: null, ram: null, vram: null, gpu: null })
+  const [fps, setFps] = useState(0)
+
+  useEffect(() => {
+    let alive = true
+    const poll = async (): Promise<void> => {
+      try {
+        const s = await window.api.perfStats()
+        if (alive && s) setStats(s)
+      } catch {
+        /* ignore */
+      }
+    }
+    void poll()
+    const id = window.setInterval(() => void poll(), 1000)
+    return () => {
+      alive = false
+      window.clearInterval(id)
+    }
+  }, [])
+
+  useEffect(() => {
+    let raf = 0
+    let last = 0
+    const tick = (t: number): void => {
+      if (t - last >= 250) {
+        setFps(currentFps())
+        last = t
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  const pct = (v: number | null): string => (v == null ? '—' : `${Math.round(v)}%`)
+  const row = (label: string, value: string): JSX.Element => (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-muted">{label}</span>
+      <span className="tabular-nums text-text">{value}</span>
+    </div>
+  )
+  return (
+    <div className="pointer-events-none absolute left-2 top-2 flex w-28 flex-col gap-0.5 rounded bg-black/55 px-2 py-1.5 font-mono text-[10px] leading-tight">
+      {row('FPS', fps > 0 ? String(Math.round(fps)) : '—')}
+      {row('CPU', pct(stats.cpu))}
+      {row('RAM', pct(stats.ram))}
+      {row('VRAM', pct(stats.vram))}
+      {row('GPU', pct(stats.gpu))}
     </div>
   )
 }

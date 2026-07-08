@@ -25,6 +25,8 @@ import { registerMediaScheme, handleMediaProtocol } from './media'
 import { hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
 import { hiveSendStart, hiveSendChunk, hiveSendStop } from './hiveSend'
 import { OutputSender } from './output'
+import { samplePerf } from './perf'
+import * as recording from './recording'
 
 // Must run before app ready — makes opsia-media:// a privileged streaming scheme.
 registerMediaScheme()
@@ -348,6 +350,15 @@ app.whenReady().then(async () => {
   })
   // Per-frame render state: control window → output window.
   ipcMain.on('output:frame', (_e, frame) => outputWindow?.webContents.send('output:frame', frame))
+
+  // ---------- IPC: Resource HUD ----------
+  safeHandle('perf:stats', () => samplePerf())
+
+  // ---------- IPC: Recording + screenshots ----------
+  safeHandle('recording:start', (_e, ext) => recording.recordingStart(ext as string))
+  ipcMain.on('recording:chunk', (_e, data) => recording.recordingChunk(data as Uint8Array))
+  safeHandle('recording:stop', () => recording.recordingStop())
+  safeHandle('screenshot:save', (_e, data) => recording.saveScreenshot(data as Uint8Array))
 
   // ---------- IPC: HIVE live-in ----------
   ipcMain.on('hive:connect', (e, id, host, port) =>

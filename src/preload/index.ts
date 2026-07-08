@@ -100,6 +100,13 @@ const api: ExposedApi = {
   spoutSet: (on: boolean) => ipcRenderer.invoke('spout:set', on),
   ndiFrame: (w: number, h: number, pixels: Uint8Array) => ipcRenderer.send('ndi:frame', w, h, pixels),
 
+  // ── Resource HUD + recording ─────────────────────────────────────
+  perfStats: () => ipcRenderer.invoke('perf:stats'),
+  recordingStart: (ext: string) => ipcRenderer.invoke('recording:start', ext),
+  recordingChunk: (data: Uint8Array) => ipcRenderer.send('recording:chunk', data),
+  recordingStop: () => ipcRenderer.invoke('recording:stop'),
+  saveScreenshot: (data: Uint8Array) => ipcRenderer.invoke('screenshot:save', data),
+
   // ── App lifecycle ────────────────────────────────────────────────
   appCloseProceed: () => ipcRenderer.invoke('app:close-proceed'),
   onAppBeforeClose: (cb) => {

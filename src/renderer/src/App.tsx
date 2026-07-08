@@ -12,6 +12,7 @@ import { audioBus } from './engine/audioIn'
 import { applyCoupling } from './engine/coupling'
 import { applyProximity } from './engine/field'
 import { applyModulation, modEngine } from './engine/modulation'
+import { tickFrame } from './perf'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel, FxChips } from './components/FxRackPanel'
 import { FinishingTouches, FinishingToggle } from './components/FinishingTouches'
@@ -430,6 +431,7 @@ export default function App(): JSX.Element {
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to
         //    HIVE receivers (OBS plugin, Resolume …). Frame-drops if backed up.
         if (st.hiveOutActive) hiveEncoder.encode(canvas, now * 1000)
+        tickFrame(now) // feed the Output HUD's FPS meter
       } catch (e) {
         console.error('[render loop]', e)
       }

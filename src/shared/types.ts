@@ -541,4 +541,22 @@ export interface ExposedApi {
   ndiSet: (on: boolean) => Promise<boolean>
   spoutSet: (on: boolean) => Promise<boolean>
   ndiFrame: (w: number, h: number, pixels: Uint8Array) => void
+  // Host resource monitor (Output HUD).
+  perfStats: () => Promise<PerfStats>
+  // Recording (MediaRecorder chunks streamed to Recorded/) + screenshot.
+  recordingStart: (ext: string) => Promise<string | null>
+  recordingChunk: (data: Uint8Array) => void
+  recordingStop: () => Promise<string | null>
+  saveScreenshot: (data: Uint8Array) => Promise<string | null>
+}
+
+// A snapshot of the host resources Palinopsia is using, for the Output HUD.
+// `cpu`/`ram` are Palinopsia's own share; `vram`/`gpu` are GPU-wide (per-process
+// VRAM isn't reliably attributable). Any field is null when unavailable
+// (e.g. no nvidia-smi).
+export interface PerfStats {
+  cpu: number | null // % CPU (summed across Palinopsia's processes)
+  ram: number | null // % of host RAM used by Palinopsia
+  vram: number | null // % of GPU VRAM in use (whole GPU)
+  gpu: number | null // % GPU utilisation (whole GPU)
 }
