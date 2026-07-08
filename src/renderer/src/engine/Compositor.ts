@@ -890,6 +890,8 @@ export class Compositor {
   private fzBgSrc = 0; // raw outBgSource (0 colour · 1 bg layer)
   private fzBgColor: number[] = [0, 0, 0];
   private fzDepth = 0; // shape drop-shadow onto the fill (float-over feel)
+  private fzShadowAngle = -0.98; // direction the shape's shadow falls
+  private fzPersp = 0; // perspective projection of the cast shadow
   private fzInstId: string | null = null; // the pinned finalizer's instance id
   private pbrLib: PbrLib | null = null; // Context PBR material maps (lazy)
   // Outside fill = the Background slab, only meaningful with a shape active.
@@ -1206,6 +1208,8 @@ export class Compositor {
     this.fzBgSrc = Math.round(numf(fi.outBgSource, 0));
     this.fzBgColor = Array.isArray(fi.outBgColor) ? fi.outBgColor : [0, 0, 0];
     this.fzDepth = numf(fi.outDepth, 0);
+    this.fzShadowAngle = numf(fi.outShadowAngle, -0.98);
+    this.fzPersp = numf(fi.outPerspective, 0);
 
     // Context PBR surface: feed the selected material's maps (or the neutral
     // flat set) into the Context unit's image inputs every frame. Lazy — no
@@ -1241,6 +1245,8 @@ export class Compositor {
           case 'outPosY': this.fzPosY = value; break;
           case 'outBgSource': this.fzBgSrc = Math.round(value); break;
           case 'outDepth': this.fzDepth = value; break;
+          case 'outShadowAngle': this.fzShadowAngle = value; break;
+          case 'outPerspective': this.fzPersp = value; break;
         }
       }
       return;
@@ -1467,7 +1473,8 @@ export class Compositor {
       const fill = this.fzBgLayer && haveBgFill ? this.bgFill.tex : null;
       this.outputShape.apply(
         composite, fill, this.fzBgColor, this.fzShape, this.fzSize, this.fzAngle,
-        this.fzPosX, this.fzPosY, this.fzDepth, this.w / this.h, this.mixTarget.fbo, this.w, this.h
+        this.fzPosX, this.fzPosY, this.fzDepth, this.fzShadowAngle, this.fzPersp,
+        this.w / this.h, this.mixTarget.fbo, this.w, this.h
       );
       composite = this.mixTarget.tex;
     }

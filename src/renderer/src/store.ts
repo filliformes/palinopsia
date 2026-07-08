@@ -14,6 +14,7 @@ import type {
   LayerCoupling,
   LayerState,
   ModAssignment,
+  ModMode,
   ModTarget,
   ModulatorConfig,
   SceneEntry,
@@ -461,9 +462,10 @@ interface StoreState {
   updateModulator: (i: number, partial: Partial<ModulatorConfig>) => void
   // Upserts by (mod, target): re-assigning the same pair updates its depth.
   // Returns false when the cap would be exceeded (legibility = simplexité).
-  assignMod: (mod: number, target: ModTarget, depth: number) => boolean
+  assignMod: (mod: number, target: ModTarget, depth: number, mode?: ModMode) => boolean
   removeAssignment: (id: string) => void
   setAssignmentDepth: (id: string, depth: number) => void
+  setAssignmentMode: (id: string, mode: ModMode) => void
 
   // The currently-selected source/FX whose ISF INPUTS the auto-UI renders.
   selection: Selection
@@ -1372,7 +1374,7 @@ export const useStore = create<StoreState>((set, get) => ({
         )
       }
     })),
-  assignMod: (mod, target, depth) => {
+  assignMod: (mod, target, depth, mode = 'multiply') => {
     const key = modTargetKey(target)
     // Check existence + cap AND append inside ONE set() updater — otherwise two
     // assignMod calls in the same tick (an OSC burst) both pass a stale cap
@@ -1396,7 +1398,8 @@ export const useStore = create<StoreState>((set, get) => ({
         result = false
         return {}
       }
-      const entry: ModAssignment = { id: uid(), mod, target, depth }
+      // New bindings default to Multiply (VCA scaling of the base).
+      const entry: ModAssignment = { id: uid(), mod, target, depth, mode }
       return {
         composition: { ...st.composition, modMatrix: [...st.composition.modMatrix, entry] }
       }
@@ -1417,6 +1420,13 @@ export const useStore = create<StoreState>((set, get) => ({
         modMatrix: s.composition.modMatrix.map((a) =>
           a.id === id ? { ...a, depth: Math.max(-1, Math.min(1, depth)) } : a
         )
+      }
+    })),
+  setAssignmentMode: (id, mode) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        modMatrix: s.composition.modMatrix.map((a) => (a.id === id ? { ...a, mode } : a))
       }
     })),
 

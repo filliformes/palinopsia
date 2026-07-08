@@ -291,11 +291,20 @@ export type FxScope =
   | { kind: 'background' }
   | { kind: 'layer' | 'sourceA' | 'sourceB'; layer: number }
 
+// How a modulator combines with the parameter's base value:
+//  - 'multiply' (default for new bindings): VCA-style — the base is scaled by
+//    the modulator, `|depth|` sets how deep (base·1 → base·mod), negative depth
+//    inverts the signal. A param resting at 0 stays 0 (multiply of nothing).
+//  - 'replace': the modulator swings the value bipolarly around the base over
+//    `depth`·range (the original behaviour; kept for old sessions + randomize).
+export type ModMode = 'multiply' | 'replace'
+
 export interface ModAssignment {
   id: string
   mod: number // modulator slot 0..7
   target: ModTarget
-  depth: number // -1..+1 — bipolar swing around the base value
+  depth: number // -1..+1 — swing/scale amount
+  mode?: ModMode // undefined = 'replace' (back-compat with pre-mode sessions)
 }
 
 // The cap is deliberate (simplexité): bounded modulation stays followable.

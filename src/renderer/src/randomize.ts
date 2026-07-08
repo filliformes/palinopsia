@@ -315,7 +315,8 @@ function randomMatrix(c: CompositionState): ModAssignment[] {
       if (used.has(key)) continue
       used.add(key)
       const sign = chance(0.25) ? -1 : 1
-      out.push({ id: uid(), mod: mi, target: t, depth: sign * range(0.2, 0.75) })
+      // Randomize keeps the bipolar-swing feel it's always had → 'replace'.
+      out.push({ id: uid(), mod: mi, target: t, depth: sign * range(0.2, 0.75), mode: 'replace' })
     }
   })
   return out

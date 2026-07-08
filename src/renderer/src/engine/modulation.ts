@@ -615,8 +615,8 @@ export function inputValueFrom01(d: ModDesc, v01: number): number | null {
   return null
 }
 
-/** Bipolar swing around the stored base — the direct-modulator model. Enums snap
- *  to the nearest declared value; bools threshold. null = not modulatable. */
+/** Bipolar swing around the stored base — the 'replace' direct-modulator model.
+ *  Enums snap to the nearest declared value; bools threshold. null = not modulatable. */
 function inputValueFromSwing(
   d: ModDesc,
   stored: number | number[] | undefined,
@@ -642,6 +642,51 @@ function inputValueFromSwing(
     return base + (v - 0.5) * 2 * depth >= 0.5 ? 1 : 0
   }
   return null
+}
+
+/** VCA-style 'multiply': scale the base by the modulator. `factor` = 1 at
+ *  |depth| 0 (no effect) → `m` at |depth| 1 (full multiply); negative depth
+ *  inverts the signal. Clamped/snapped per type. null = not modulatable. */
+function inputValueFromMultiply(
+  d: ModDesc,
+  stored: number | number[] | undefined,
+  v: number,
+  depth: number
+): number | null {
+  const amt = Math.min(1, Math.abs(depth))
+  const m = depth < 0 ? 1 - v : v
+  const factor = 1 - amt + amt * m
+  if (d.type === 'float') {
+    const min = asNum(d.min, 0)
+    const max = asNum(d.max, 1)
+    const base = typeof stored === 'number' ? stored : asNum(d.def, min)
+    return Math.max(min, Math.min(max, base * factor))
+  }
+  if (d.type === 'long') {
+    const vals = d.values ?? []
+    if (!vals.length) return null
+    const base = typeof stored === 'number' ? stored : asNum(d.def, vals[0])
+    return nearest(vals, base * factor)
+  }
+  if (d.type === 'bool' || d.type === 'event') {
+    const base = typeof stored === 'number' ? stored : asNum(d.def, 0)
+    return base * factor >= 0.5 ? 1 : 0
+  }
+  return null
+}
+
+/** Dispatch on the assignment's mode ('multiply' default; undefined =
+ *  'replace' for pre-mode sessions). */
+function inputValueForMode(
+  d: ModDesc,
+  stored: number | number[] | undefined,
+  v: number,
+  depth: number,
+  mode: import('@shared/types').ModMode | undefined
+): number | null {
+  return mode === 'multiply'
+    ? inputValueFromMultiply(d, stored, v, depth)
+    : inputValueFromSwing(d, stored, v, depth)
 }
 
 /**
@@ -717,7 +762,16 @@ export function applyModulation(
       const knob = c.metaKnobs[a.target.knob]
       if (!knob) continue
       const scaled = shapeCurve(Math.max(0, Math.min(1, v)), knob.curve)
-      const v01 = Math.max(0, Math.min(1, knob.value + (scaled - 0.5) * 2 * a.depth))
+      // Multiply scales the knob's base position (VCA on the macro); Replace
+      // swings it around the base (default for pre-mode sessions).
+      let v01: number
+      if (a.mode === 'multiply') {
+        const amt = Math.min(1, Math.abs(a.depth))
+        const m = a.depth < 0 ? 1 - scaled : scaled
+        v01 = Math.max(0, Math.min(1, knob.value * (1 - amt + amt * m)))
+      } else {
+        v01 = Math.max(0, Math.min(1, knob.value + (scaled - 0.5) * 2 * a.depth))
+      }
       metaLiveValues.set(a.target.knob, v01)
       for (const dest of knob.destinations) {
         if (dest.kind === 'meta') continue // knobs never chain into knobs
@@ -733,7 +787,7 @@ export function applyModulation(
       const input = a.target.input
       const d = descFor(slot.shaderId).find((x) => x.name === input)
       if (!d) continue
-      const final = inputValueFromSwing(d, slot.inputs[input], v, a.depth)
+      const final = inputValueForMode(d, slot.inputs[input], v, a.depth, a.mode)
       if (final === null) continue
       liveModValues.set(liveKey(a.target), final)
       comp.layers[a.target.layer]?.setInput(a.target.slot, a.target.input, final)
@@ -743,7 +797,7 @@ export function applyModulation(
       const input = a.target.input
       const d = descFor(src.shaderId).find((x) => x.name === input)
       if (!d) continue
-      const final = inputValueFromSwing(d, src.inputs[input], v, a.depth)
+      const final = inputValueForMode(d, src.inputs[input], v, a.depth, a.mode)
       if (final === null) continue
       liveModValues.set(liveKey(a.target), final)
       comp.setBgSourceInput(input, final)
@@ -766,7 +820,7 @@ export function applyModulation(
       if (!inst?.shaderId) continue
       const d = descFor(inst.shaderId).find((x) => x.name === input)
       if (!d) continue
-      const final = inputValueFromSwing(d, inst.inputs[input], v, a.depth)
+      const final = inputValueForMode(d, inst.inputs[input], v, a.depth, a.mode)
       if (final === null) continue
       liveModValues.set(liveKey(a.target), final)
       comp.setFxInput(scope, instId, input, final)

@@ -15,7 +15,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject
 } from 'react'
-import type { ModTarget } from '@shared/types'
+import type { ModMode, ModTarget } from '@shared/types'
 import type { IsfInputDesc } from '../shaders/isf/inputs'
 import { registerLiveOverlay } from './liveOverlay'
 import { useShallow } from 'zustand/react/shallow'
@@ -26,7 +26,7 @@ import { BoundedNumberInput } from './BoundedNumberInput'
 // opens the mod-assign in the Inspector's side panel instead of the little
 // floating popover. `activeKey` highlights the M whose panel is open. Providers
 // that don't set onAssign (Finishing view, dense stacks) keep the popover.
-type BoundAssignment = { id: string; mod: number; depth: number }
+type BoundAssignment = { id: string; mod: number; depth: number; mode?: ModMode }
 interface AssignCtx {
   onAssign?: (target: ModTarget, label: string) => void
   activeKey?: string | null
@@ -485,12 +485,13 @@ export function AssignRow({
   hideMeta = false
 }: {
   target: ModTarget
-  bound: Array<{ id: string; mod: number; depth: number }>
+  bound: Array<{ id: string; mod: number; depth: number; mode?: ModMode }>
   hideMeta?: boolean
 }): JSX.Element {
   const assignMod = useStore((s) => s.assignMod)
   const removeAssignment = useStore((s) => s.removeAssignment)
   const setAssignmentDepth = useStore((s) => s.setAssignmentDepth)
+  const setAssignmentMode = useStore((s) => s.setAssignmentMode)
   const toggleMetaDest = useStore((s) => s.toggleMetaDest)
   const targetKey = modTargetKey(target)
   // Which Meta knobs already carry this input as a destination. useShallow so
@@ -533,21 +534,45 @@ export function AssignRow({
           })}
         </div>
       </div>
-      {bound.map((b) => (
-        <div key={b.id} className="flex items-center gap-1">
-          <span className="w-8 shrink-0 font-mono text-[9px] text-accent">M{b.mod + 1}</span>
-          <input
-            type="range"
-            min={-1}
-            max={1}
-            step={0.01}
-            value={b.depth}
-            onChange={(e) => setAssignmentDepth(b.id, Number(e.target.value))}
-            className="min-w-0 flex-1 accent-accent"
-            title={`Depth ${b.depth.toFixed(2)} — bipolar swing around the base value`}
-          />
-        </div>
-      ))}
+      {bound.map((b) => {
+        const mode: ModMode = b.mode ?? 'replace'
+        const mult = mode === 'multiply'
+        return (
+          <div key={b.id} className="flex items-center gap-1">
+            <span className="w-8 shrink-0 font-mono text-[9px] text-accent">M{b.mod + 1}</span>
+            {/* Mode: Multiply (scale the base — default) ↔ Replace (swing over it). */}
+            <button
+              onClick={() => setAssignmentMode(b.id, mult ? 'replace' : 'multiply')}
+              className={`shrink-0 rounded px-1 py-0.5 font-mono text-[8px] uppercase transition-colors ${
+                mult
+                  ? 'bg-accent/20 text-accent ring-1 ring-accent'
+                  : 'bg-accent2/20 text-accent2 ring-1 ring-accent2'
+              }`}
+              title={
+                mult
+                  ? 'Multiply — the modulator scales the base value (|depth| = amount). Click for Replace.'
+                  : 'Replace — the modulator swings the value around the base. Click for Multiply.'
+              }
+            >
+              {mult ? 'mul' : 'rep'}
+            </button>
+            <input
+              type="range"
+              min={-1}
+              max={1}
+              step={0.01}
+              value={b.depth}
+              onChange={(e) => setAssignmentDepth(b.id, Number(e.target.value))}
+              className={`min-w-0 flex-1 ${mult ? 'accent-accent' : 'accent-accent2'}`}
+              title={
+                mult
+                  ? `Amount ${b.depth.toFixed(2)} — how deeply the modulator scales the base (− inverts)`
+                  : `Depth ${b.depth.toFixed(2)} — bipolar swing around the base value`
+              }
+            />
+          </div>
+        )
+      })}
       {/* Meta knobs — K1..K16; a knob drives this input absolutely through
           its curve over the input's declared range (up to 8 dests/knob).
           EXACTLY two rows, row-major: K1–K9 then K10–K16 (with the MOD line

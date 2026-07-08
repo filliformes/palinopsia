@@ -12,7 +12,7 @@ void main(){ vUV = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }`
 const FS = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 frag;
 uniform sampler2D uSrc, uFill;
-uniform float uUseFill, uAspect, uSize, uAngle, uDepth; uniform int uShape;
+uniform float uUseFill, uAspect, uSize, uAngle, uDepth, uShadowAngle, uPersp; uniform int uShape;
 uniform vec2 uPos; uniform vec3 uFillColor;
 
 float sdBox(vec2 p, vec2 b){ vec2 d = abs(p) - b; return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)); }
@@ -65,12 +65,31 @@ void main(){
   float m = smoothstep(0.004, -0.004, d);           // 1 inside the shape
   vec3 src = texture(uSrc, uv).rgb;
   vec3 fill = mix(uFillColor, texture(uFill, uv).rgb, uUseFill);
-  // Depth: the shaped composition FLOATS over the fill — an offset soft drop
-  // shadow cast from the shape's SDF darkens the fill near the silhouette.
+  // Depth: the shaped composition FLOATS over the fill — a soft drop shadow
+  // cast from the shape's SDF darkens the fill. uShadowAngle sets the light
+  // direction (which way the shadow falls, so the depth can read from another
+  // perspective). uPersp PROJECTS that shadow onto a receding ground plane:
+  // it rakes and stretches away from the shape in the fall direction, its
+  // penumbra widening and its density fading with distance — a low-sun cast
+  // shadow rather than a flat sticker offset.
   if (uDepth > 0.001) {
-    vec2 so = vec2(0.02, -0.03) * (0.6 + r) * uDepth;      // light up-left → shadow down-right
-    float d2 = shapeDist(uShape, q - so, r);
-    float shadow = uDepth * 0.8 * (1.0 - smoothstep(0.0, r * (0.12 + 0.3 * uDepth), d2));
+    vec2 dir = vec2(cos(uShadowAngle), sin(uShadowAngle));
+    vec2 prp = vec2(-dir.y, dir.x);
+    // Contact offset (grows a little with perspective — the object lifts).
+    vec2 off = dir * r * (0.06 + 0.20 * uPersp) * uDepth;
+    vec2 sp2 = q - off;
+    // Foreshorten along the fall direction so the silhouette elongates into the
+    // distance; along also drives the distance-based softness + fade.
+    float along = dot(sp2, dir);
+    float across = dot(sp2, prp);
+    float stretch = 1.0 + uPersp * 2.2;
+    vec2 sq = dir * (along / stretch) + prp * across;
+    float d2 = shapeDist(uShape, sq, r);
+    float soft = r * (0.12 + 0.30 * uDepth + 0.65 * uPersp);
+    float shadow = uDepth * 0.8 * (1.0 - smoothstep(0.0, soft, d2));
+    // Cast shadows fade along their length (far end lighter, contact darkest).
+    float far = clamp(along / (r * stretch), 0.0, 1.0);
+    shadow *= 1.0 - uPersp * 0.6 * far;
     fill *= 1.0 - shadow;
   }
   frag = vec4(mix(fill, src, m), 1.0);
@@ -118,6 +137,8 @@ export class OutputShape {
     posX: number,
     posY: number,
     depth: number,
+    shadowAngle: number,
+    perspective: number,
     aspect: number,
     targetFbo: WebGLFramebuffer,
     w: number,
@@ -144,6 +165,8 @@ export class OutputShape {
     gl.uniform1f(this.u('uAngle'), angle)
     gl.uniform2f(this.u('uPos'), posX, posY)
     gl.uniform1f(this.u('uDepth'), Math.max(0, Math.min(1, depth)))
+    gl.uniform1f(this.u('uShadowAngle'), shadowAngle)
+    gl.uniform1f(this.u('uPersp'), Math.max(0, Math.min(1, perspective)))
     gl.uniform3f(this.u('uFillColor'), fillColor[0] ?? 0, fillColor[1] ?? 0, fillColor[2] ?? 0)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
