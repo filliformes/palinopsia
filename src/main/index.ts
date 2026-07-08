@@ -355,9 +355,12 @@ app.whenReady().then(async () => {
   safeHandle('perf:stats', () => samplePerf())
 
   // ---------- IPC: Recording + screenshots ----------
-  safeHandle('recording:start', (_e, ext) => recording.recordingStart(ext as string))
+  safeHandle('recording:formats', () => recording.recordingFormats())
+  safeHandle('recording:start', (_e, ext, codec) =>
+    recording.recordingStart(ext as string, codec as string)
+  )
   ipcMain.on('recording:chunk', (_e, data) => recording.recordingChunk(data as Uint8Array))
-  safeHandle('recording:stop', () => recording.recordingStop())
+  safeHandle('recording:stop', (_e, formatId) => recording.recordingStop(formatId as string))
   safeHandle('screenshot:save', (_e, data) => recording.saveScreenshot(data as Uint8Array))
 
   // ---------- IPC: HIVE live-in ----------

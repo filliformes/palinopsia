@@ -19,6 +19,9 @@ files:
 asar: true
 asarUnpack:
   - native/spout/build/Release/*.node
+  # ffmpeg-static ships a platform binary that must be spawned from disk (not
+  # loaded from inside the asar) — unpack it so recording transcodes work.
+  - node_modules/ffmpeg-static/**
 win:
   target:
     - target: nsis

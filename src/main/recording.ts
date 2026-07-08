@@ -1,12 +1,109 @@
 // Output recording + screenshots → the "Recorded" folder next to the app
 // (project root in dev, install dir when packaged; falls back to <userData>).
-// The renderer records the output canvas with MediaRecorder and streams the
-// encoded chunks here; we append them to an open write stream so a long clip
-// never has to sit in renderer memory or cross IPC as one giant buffer.
+//
+// Pipeline: the renderer records the output canvas with MediaRecorder at a HIGH
+// bitrate using a hardware-accelerated codec (H.264 where available) into a
+// temporary intermediate file, streamed here chunk-by-chunk. On stop we hand it
+// to ffmpeg (ffmpeg-static) to produce the chosen delivery format — a fast
+// stream-copy remux when the codecs already match (no re-encode, no quality
+// loss), or a real transcode for ProRes / FFV1 / uncompressed / H.265 / VP9.
+// No ffmpeg on PATH → we just keep the intermediate as-is.
 
 import { app } from 'electron'
 import { createWriteStream, existsSync, promises as fs, type WriteStream } from 'fs'
+import { execFile } from 'child_process'
 import { join, dirname } from 'path'
+
+// ffmpeg-static ships a per-platform binary; unpack it from the asar when packaged.
+function ffmpegPath(): string | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const p = require('ffmpeg-static') as string | null
+    if (!p) return null
+    return app.isPackaged ? p.replace('app.asar', 'app.asar.unpacked') : p
+  } catch {
+    return null
+  }
+}
+
+export function ffmpegAvailable(): boolean {
+  const p = ffmpegPath()
+  return !!p && existsSync(p)
+}
+
+// Delivery formats. `args(src,out,srcCodec)` returns the ffmpeg argument list.
+// A null entry = passthrough (keep the intermediate container, no ffmpeg).
+type Fmt = {
+  id: string
+  label: string
+  ext: string
+  needsFfmpeg: boolean
+  args?: (src: string, out: string, srcCodec: string) => string[]
+}
+
+const FORMATS: Fmt[] = [
+  {
+    id: 'source',
+    label: 'Fast · no re-encode',
+    ext: 'mkv',
+    needsFfmpeg: false
+  },
+  {
+    id: 'mp4-h264',
+    label: 'MP4 · H.264 (high quality)',
+    ext: 'mp4',
+    needsFfmpeg: true,
+    // Codecs already match → stream-copy remux (instant, lossless). Else x264.
+    args: (src, out, c) =>
+      c === 'h264'
+        ? ['-i', src, '-c', 'copy', '-movflags', '+faststart', out]
+        : ['-i', src, '-c:v', 'libx264', '-preset', 'medium', '-crf', '16', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out]
+  },
+  {
+    id: 'mp4-h265',
+    label: 'MP4 · H.265 / HEVC',
+    ext: 'mp4',
+    needsFfmpeg: true,
+    args: (src, out) => ['-i', src, '-c:v', 'libx265', '-preset', 'medium', '-crf', '20', '-pix_fmt', 'yuv420p', '-tag:v', 'hvc1', out]
+  },
+  {
+    id: 'mov-prores',
+    label: 'MOV · ProRes 422 HQ',
+    ext: 'mov',
+    needsFfmpeg: true,
+    args: (src, out) => ['-i', src, '-c:v', 'prores_ks', '-profile:v', '3', '-pix_fmt', 'yuv422p10le', out]
+  },
+  {
+    id: 'mkv-ffv1',
+    label: 'MKV · FFV1 (lossless)',
+    ext: 'mkv',
+    needsFfmpeg: true,
+    args: (src, out) => ['-i', src, '-c:v', 'ffv1', '-level', '3', '-g', '1', out]
+  },
+  {
+    id: 'avi-raw',
+    label: 'AVI · uncompressed (raw)',
+    ext: 'avi',
+    needsFfmpeg: true,
+    args: (src, out) => ['-i', src, '-c:v', 'rawvideo', '-pix_fmt', 'bgr24', out]
+  },
+  {
+    id: 'webm-vp9',
+    label: 'WebM · VP9',
+    ext: 'webm',
+    needsFfmpeg: true,
+    args: (src, out, c) =>
+      c === 'vp9'
+        ? ['-i', src, '-c', 'copy', out]
+        : ['-i', src, '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '20', '-row-mt', '1', out]
+  }
+]
+
+/** The delivery formats offered to the renderer (ffmpeg ones only when present). */
+export function recordingFormats(): Array<{ id: string; label: string }> {
+  const hasFf = ffmpegAvailable()
+  return FORMATS.filter((f) => !f.needsFfmpeg || hasFf).map((f) => ({ id: f.id, label: f.label }))
+}
 
 function recordedFolder(): string {
   const base = app.isPackaged ? dirname(app.getPath('exe')) : process.cwd()
@@ -32,40 +129,80 @@ function stamp(): string {
 }
 
 let stream: WriteStream | null = null
-let currentPath: string | null = null
+let tmpPath: string | null = null
+let srcCodec = 'h264' // intermediate codec, told to us at start (for remux decisions)
 
-/** Open a new recording file; returns its full path (null on failure). */
-export async function recordingStart(ext: string): Promise<string | null> {
+/** Open a new intermediate recording file. `intermediateExt`/`codec` describe
+ *  what the renderer's MediaRecorder is producing. Returns ok. */
+export async function recordingStart(intermediateExt: string, codec: string): Promise<boolean> {
   try {
-    if (stream) stream.end() // a prior recording never stopped — close it first
+    if (stream) stream.end()
     const dir = await ensureFolder()
-    const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext : 'webm'
-    currentPath = join(dir, `opsia-${stamp()}.${safeExt}`)
-    stream = createWriteStream(currentPath)
-    return currentPath
+    const safeExt = /^[a-z0-9]+$/i.test(intermediateExt) ? intermediateExt : 'mkv'
+    srcCodec = /^[a-z0-9]+$/i.test(codec) ? codec : 'h264'
+    tmpPath = join(dir, `.opsia-rec-${stamp()}.${safeExt}`)
+    stream = createWriteStream(tmpPath)
+    return true
   } catch (e) {
     console.error('[recording] start failed:', (e as Error).message)
     stream = null
-    currentPath = null
-    return null
+    tmpPath = null
+    return false
   }
 }
 
-/** Append one MediaRecorder chunk to the open file. */
 export function recordingChunk(data: Uint8Array): void {
   if (!stream) return
   stream.write(Buffer.from(data.buffer, data.byteOffset, data.byteLength))
 }
 
-/** Close the file; returns the finished clip's path. */
-export function recordingStop(): Promise<string | null> {
-  return new Promise((resolve) => {
-    const path = currentPath
-    if (!stream) return resolve(path)
-    stream.end(() => resolve(path))
-    stream = null
-    currentPath = null
+function runFfmpeg(args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const bin = ffmpegPath()
+    if (!bin) return reject(new Error('ffmpeg unavailable'))
+    execFile(bin, ['-y', '-hide_banner', '-loglevel', 'error', ...args], { windowsHide: true }, (err) =>
+      err ? reject(err) : resolve()
+    )
   })
+}
+
+/** Close the intermediate, then produce the chosen delivery format. Returns the
+ *  finished clip's path (falls back to the raw intermediate if ffmpeg fails). */
+export async function recordingStop(formatId: string): Promise<string | null> {
+  const src = tmpPath
+  await new Promise<void>((resolve) => {
+    if (!stream) return resolve()
+    stream.end(() => resolve())
+  })
+  stream = null
+  tmpPath = null
+  if (!src || !existsSync(src)) return null
+
+  const fmt = FORMATS.find((f) => f.id === formatId) ?? FORMATS[0]
+  const dir = dirname(src)
+  const finalPath = join(dir, `opsia-${stamp()}.${fmt.ext}`)
+
+  // Passthrough (or no ffmpeg): just rename the intermediate into place.
+  if (!fmt.args || !ffmpegAvailable()) {
+    try {
+      await fs.rename(src, finalPath)
+      return finalPath
+    } catch {
+      return src // leave the temp file rather than losing the take
+    }
+  }
+  // Transcode / remux, then delete the intermediate.
+  try {
+    await runFfmpeg(fmt.args(src, finalPath, srcCodec))
+    await fs.rm(src).catch(() => {})
+    return finalPath
+  } catch (e) {
+    console.error('[recording] ffmpeg failed, keeping intermediate:', (e as Error).message)
+    // Keep the intermediate (renamed to a visible name) so the take isn't lost.
+    const fallback = join(dir, `opsia-${stamp()}.mkv`)
+    await fs.rename(src, fallback).catch(() => {})
+    return existsSync(fallback) ? fallback : src
+  }
 }
 
 /** Write a one-shot PNG screenshot into Recorded/; returns its path. */

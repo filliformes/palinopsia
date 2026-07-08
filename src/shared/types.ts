@@ -543,10 +543,12 @@ export interface ExposedApi {
   ndiFrame: (w: number, h: number, pixels: Uint8Array) => void
   // Host resource monitor (Output HUD).
   perfStats: () => Promise<PerfStats>
-  // Recording (MediaRecorder chunks streamed to Recorded/) + screenshot.
-  recordingStart: (ext: string) => Promise<string | null>
+  // Recording: intermediate MediaRecorder chunks streamed to main → ffmpeg
+  // delivery-format transcode/remux on stop → Recorded/. Plus screenshot.
+  recordingFormats: () => Promise<Array<{ id: string; label: string }>>
+  recordingStart: (intermediateExt: string, codec: string) => Promise<boolean>
   recordingChunk: (data: Uint8Array) => void
-  recordingStop: () => Promise<string | null>
+  recordingStop: (formatId: string) => Promise<string | null>
   saveScreenshot: (data: Uint8Array) => Promise<string | null>
 }
 

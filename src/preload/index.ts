@@ -102,9 +102,10 @@ const api: ExposedApi = {
 
   // ── Resource HUD + recording ─────────────────────────────────────
   perfStats: () => ipcRenderer.invoke('perf:stats'),
-  recordingStart: (ext: string) => ipcRenderer.invoke('recording:start', ext),
+  recordingFormats: () => ipcRenderer.invoke('recording:formats'),
+  recordingStart: (ext: string, codec: string) => ipcRenderer.invoke('recording:start', ext, codec),
   recordingChunk: (data: Uint8Array) => ipcRenderer.send('recording:chunk', data),
-  recordingStop: () => ipcRenderer.invoke('recording:stop'),
+  recordingStop: (formatId: string) => ipcRenderer.invoke('recording:stop', formatId),
   saveScreenshot: (data: Uint8Array) => ipcRenderer.invoke('screenshot:save', data),
 
   // ── App lifecycle ────────────────────────────────────────────────

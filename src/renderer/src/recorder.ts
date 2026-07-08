@@ -1,72 +1,81 @@
-// Output recorder — captures the live output canvas with MediaRecorder and
-// streams the encoded chunks to main (→ the Recorded/ folder). MediaRecorder is
-// the GPU-friendly path: it taps the canvas's compositor output without a
-// per-frame gl.readPixels stall, so recording doesn't tank the live show.
+// Output recorder — captures the live output canvas with MediaRecorder into a
+// HIGH-bitrate, hardware-accelerated intermediate (H.264 where the platform
+// offers it — smooth, low CPU), streams the chunks to main, and lets ffmpeg
+// turn that into the chosen delivery format on stop (fast stream-copy remux when
+// codecs match; a real transcode for ProRes / FFV1 / uncompressed / H.265 / VP9).
 //
-// Format choice is what the platform's Chromium actually supports (probed at
-// runtime). "Max quality" is a very-high-bitrate VP9 — the nearest thing to
-// lossless MediaRecorder offers (true uncompressed single-file video would need
-// a bundled ffmpeg + raw-frame readback, which stalls live rendering).
+// MediaRecorder taps the canvas compositor output (no per-frame gl.readPixels),
+// so recording doesn't stall the live show. The lo-fi/glitchy look before was
+// MediaRecorder's ~2.5 Mbps default; we now set a resolution-scaled bitrate.
 
-export interface RecFormat {
-  id: string
-  label: string
-  mime: string
-  ext: string
-  bitrate?: number
-}
-
-const CANDIDATES: RecFormat[] = [
-  { id: 'vp9', label: 'WebM · VP9 (compressed)', mime: 'video/webm;codecs=vp9', ext: 'webm' },
-  { id: 'vp8', label: 'WebM · VP8 (compressed)', mime: 'video/webm;codecs=vp8', ext: 'webm' },
-  { id: 'h264-mp4', label: 'MP4 · H.264 (compressed)', mime: 'video/mp4;codecs=avc1', ext: 'mp4' },
-  { id: 'h264-mkv', label: 'MKV · H.264 (compressed)', mime: 'video/x-matroska;codecs=avc1', ext: 'mkv' },
-  { id: 'av1', label: 'WebM · AV1 (compressed)', mime: 'video/webm;codecs=av01', ext: 'webm' },
-  {
-    id: 'vp9-max',
-    label: 'WebM · VP9 (max quality)',
-    mime: 'video/webm;codecs=vp9',
-    ext: 'webm',
-    bitrate: 240_000_000
-  }
+// Intermediate codec preference: H.264 first (hardware-encoded on Windows/macOS
+// Chromium → smooth + cheap), then VP9, then VP8. Each maps to what we tell main.
+const INTERMEDIATES: Array<{ mime: string; ext: string; codec: string }> = [
+  { mime: 'video/x-matroska;codecs=avc1', ext: 'mkv', codec: 'h264' },
+  { mime: 'video/mp4;codecs=avc1', ext: 'mp4', codec: 'h264' },
+  { mime: 'video/webm;codecs=vp9', ext: 'webm', codec: 'vp9' },
+  { mime: 'video/webm;codecs=vp8', ext: 'webm', codec: 'vp8' }
 ]
 
-/** The subset of formats this build can actually encode, in menu order. */
-export function supportedFormats(): RecFormat[] {
-  if (typeof MediaRecorder === 'undefined') return []
-  return CANDIDATES.filter((f) => {
-    try {
-      return MediaRecorder.isTypeSupported(f.mime)
-    } catch {
-      return false
-    }
-  })
+function pickIntermediate(): { mime: string; ext: string; codec: string } | null {
+  if (typeof MediaRecorder === 'undefined') return null
+  return (
+    INTERMEDIATES.find((i) => {
+      try {
+        return MediaRecorder.isTypeSupported(i.mime)
+      } catch {
+        return false
+      }
+    }) ?? null
+  )
+}
+
+/** Delivery formats offered to the UI — comes from main (ffmpeg-gated). */
+export async function recordingFormats(): Promise<Array<{ id: string; label: string }>> {
+  try {
+    return await window.api.recordingFormats()
+  } catch {
+    return [{ id: 'source', label: 'Fast · no re-encode' }]
+  }
+}
+
+// Near-transparent capture bitrate: ~0.22 bits/pixel/frame, clamped so a 4K take
+// doesn't overwhelm the hardware encoder. This is the intermediate only —
+// ffmpeg re-encodes to the final format afterward.
+function captureBitrate(w: number, h: number, fps: number): number {
+  return Math.min(150_000_000, Math.max(25_000_000, Math.round(w * h * fps * 0.22)))
 }
 
 export class OutputRecorder {
   private rec: MediaRecorder | null = null
   private stream: MediaStream | null = null
-  // Serialize chunk sends: arrayBuffer() is async, and the byte stream must
-  // reach disk strictly in order or the container is corrupt.
+  private formatId = 'source'
+  // Serialize chunk sends: arrayBuffer() is async and the byte stream must reach
+  // disk strictly in order or the container is corrupt.
   private queue: Promise<void> = Promise.resolve()
 
   get active(): boolean {
     return this.rec !== null
   }
 
-  async start(canvas: HTMLCanvasElement, fmt: RecFormat): Promise<boolean> {
+  async start(canvas: HTMLCanvasElement, formatId: string): Promise<boolean> {
     if (this.rec) return false
-    const path = await window.api.recordingStart(fmt.ext)
-    if (!path) return false
+    const inter = pickIntermediate()
+    if (!inter) return false
+    this.formatId = formatId
+    const ok = await window.api.recordingStart(inter.ext, inter.codec)
+    if (!ok) return false
     try {
-      this.stream = canvas.captureStream(60)
-      const opts: MediaRecorderOptions = { mimeType: fmt.mime }
-      if (fmt.bitrate) opts.videoBitsPerSecond = fmt.bitrate
-      this.rec = new MediaRecorder(this.stream, opts)
+      const fps = 60
+      this.stream = canvas.captureStream(fps)
+      this.rec = new MediaRecorder(this.stream, {
+        mimeType: inter.mime,
+        videoBitsPerSecond: captureBitrate(canvas.width, canvas.height, fps)
+      })
     } catch {
       this.stream?.getTracks().forEach((t) => t.stop())
       this.stream = null
-      await window.api.recordingStop()
+      await window.api.recordingStop(formatId)
       return false
     }
     this.rec.ondataavailable = (e): void => {
@@ -76,11 +85,12 @@ export class OutputRecorder {
         window.api.recordingChunk(buf)
       })
     }
-    this.rec.start(1000) // 1s timeslice → periodic chunks streamed to disk
+    // Small timeslice → frequent flushes → lower memory + tighter stop latency.
+    this.rec.start(500)
     return true
   }
 
-  /** Stop, flush all pending chunks, and return the finished clip's path. */
+  /** Stop, flush all chunks, then let main produce the delivery file. */
   async stop(): Promise<string | null> {
     const rec = this.rec
     if (!rec) return null
@@ -91,8 +101,8 @@ export class OutputRecorder {
     this.stream?.getTracks().forEach((t) => t.stop())
     this.rec = null
     this.stream = null
-    await this.queue // ensure every chunk reached main before we close the file
-    return window.api.recordingStop()
+    await this.queue // every chunk reached main before we finalize
+    return window.api.recordingStop(this.formatId)
   }
 }
 

@@ -5,7 +5,6 @@
 
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -16,7 +15,7 @@ import { useShallow } from 'zustand/react/shallow'
 import type { DisplayInfo, PerfStats } from '@shared/types'
 import { useStore } from '../store'
 import { currentFps } from '../perf'
-import { captureScreenshot, OutputRecorder, supportedFormats } from '../recorder'
+import { captureScreenshot, OutputRecorder, recordingFormats } from '../recorder'
 
 const CORNER_LABELS = ['TL', 'TR', 'BR', 'BL']
 
@@ -58,8 +57,15 @@ export function OutputPage({
   const dragging = useRef<number | null>(null)
 
   // ── Recording + screenshot ──────────────────────────────────────────
-  const formats = useMemo(() => supportedFormats(), [])
-  const [formatId, setFormatId] = useState<string>(() => formats[0]?.id ?? '')
+  const [formats, setFormats] = useState<Array<{ id: string; label: string }>>([])
+  const [formatId, setFormatId] = useState<string>('')
+  useEffect(() => {
+    void recordingFormats().then((fs) => {
+      setFormats(fs)
+      // Default to MP4/H.264 when available (fast remux, high quality), else first.
+      setFormatId((cur) => cur || fs.find((f) => f.id === 'mp4-h264')?.id || fs[0]?.id || '')
+    })
+  }, [])
   const recorderRef = useRef<OutputRecorder>(new OutputRecorder())
   const [recording, setRecording] = useState(false)
   const [recElapsed, setRecElapsed] = useState(0) // seconds
@@ -89,9 +95,8 @@ export function OutputPage({
       flashSaved(path, 'saved')
     } else {
       const canvas = canvasRef.current
-      const fmt = formats.find((f) => f.id === formatId)
-      if (!canvas || !fmt) return
-      const ok = await rec.start(canvas, fmt)
+      if (!canvas || !formatId) return
+      const ok = await rec.start(canvas, formatId)
       if (ok) setRecording(true)
       else flashSaved('failed', 'recording could not start')
     }
@@ -201,8 +206,9 @@ export function OutputPage({
       </header>
 
       <div className="flex min-h-0 flex-1">
-        {/* Live keystone editor */}
-        <div className="flex min-w-0 flex-1 items-center justify-center bg-black/40 p-6">
+        {/* Live keystone editor + the resource HUD pinned beneath it */}
+        <div className="flex min-w-0 flex-1 flex-col bg-black/40">
+         <div className="flex min-h-0 flex-1 items-center justify-center p-6">
           <div
             ref={padRef}
             className="relative aspect-video w-full max-w-5xl select-none rounded border border-border bg-black"
@@ -218,8 +224,6 @@ export function OutputPage({
             }}
           >
             <video ref={videoRef} autoPlay muted playsInline className="h-full w-full bg-black object-contain" />
-            {/* Realtime resource monitor — floats over the top-left of the preview. */}
-            <ResourceHud />
             {/* Recording indicator — top-right, pulsing red dot + elapsed. */}
             {recording && (
               <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1.5 rounded bg-black/55 px-2 py-1 font-mono text-[11px] text-danger">
@@ -266,6 +270,9 @@ export function OutputPage({
               />
             ))}
           </div>
+         </div>
+         {/* Resource HUD — one line, spaced across, just under the output. */}
+         <ResourceHud />
         </div>
 
         {/* Controls */}
@@ -416,8 +423,9 @@ export function OutputPage({
             </div>
             <p className="text-[11px] leading-tight text-muted">
               Clips + screenshots land in the <span className="text-text">Recorded</span>{' '}
-              folder, captured at the current output resolution. "Max quality" is
-              visually lossless VP9.
+              folder, at the current output resolution. Captured as a high-bitrate
+              hardware H.264 master, then ffmpeg delivers the chosen format
+              (ProRes / FFV1 / uncompressed included).
             </p>
           </Section>
 
@@ -527,19 +535,19 @@ function ResourceHud(): JSX.Element {
   }, [])
 
   const pct = (v: number | null): string => (v == null ? '—' : `${Math.round(v)}%`)
-  const row = (label: string, value: string): JSX.Element => (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-muted">{label}</span>
-      <span className="tabular-nums text-text">{value}</span>
+  const cell = (label: string, value: string): JSX.Element => (
+    <div className="flex items-baseline gap-2">
+      <span className="text-[10px] uppercase tracking-wide text-muted">{label}</span>
+      <span className="tabular-nums text-[15px] text-text">{value}</span>
     </div>
   )
   return (
-    <div className="pointer-events-none absolute left-2 top-2 flex w-28 flex-col gap-0.5 rounded bg-black/55 px-2 py-1.5 font-mono text-[10px] leading-tight">
-      {row('FPS', fps > 0 ? String(Math.round(fps)) : '—')}
-      {row('CPU', pct(stats.cpu))}
-      {row('RAM', pct(stats.ram))}
-      {row('VRAM', pct(stats.vram))}
-      {row('GPU', pct(stats.gpu))}
+    <div className="flex shrink-0 items-center justify-around gap-4 border-t border-border bg-panel/60 px-8 py-2 font-mono">
+      {cell('FPS', fps > 0 ? String(Math.round(fps)) : '—')}
+      {cell('CPU', pct(stats.cpu))}
+      {cell('RAM', pct(stats.ram))}
+      {cell('VRAM', pct(stats.vram))}
+      {cell('GPU', pct(stats.gpu))}
     </div>
   )
 }
