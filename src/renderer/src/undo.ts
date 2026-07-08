@@ -53,6 +53,19 @@ export function initUndo(): () => void {
   return unsub
 }
 
+/** Run a store mutation WITHOUT recording an undo step — for the auto-sequencer,
+ *  which changes the composition every few seconds and would otherwise evict all
+ *  real history. The new composition becomes the baseline the next edit diffs from. */
+export function runSilently(fn: () => void): void {
+  applying = true
+  try {
+    fn()
+  } finally {
+    committed = useStore.getState().composition
+    applying = false
+  }
+}
+
 /** Flush any pending quiet-timer commit immediately (called before undo). */
 function flushPending(): void {
   if (!quietTimer) return

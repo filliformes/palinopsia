@@ -367,6 +367,51 @@ export interface SceneEntry {
   // The World active when the scene was saved (travels for the selector label +
   // portability; the composition already carries the World's baked effect).
   world?: World | null
+  // Relation tags (macro-form sequencer). Auto-derived on first tag, editable.
+  tags?: SceneTags
+}
+
+// The Boucher/Piché × Boucher scene-relation schema — the sequencer's data model.
+// Diégèse (which world) · Synchrèse (coupling character) · Espace-temps
+// (compressed/dense ↔ decompressed/void) · Climat (affective charge).
+export type SceneClimate = 'tension' | 'expectation' | 'release' | 'resolution'
+export const SCENE_CLIMATES: SceneClimate[] = ['tension', 'expectation', 'release', 'resolution']
+export interface SceneTags {
+  world: string // Diégèse — a World id (built-in WorldMode or a user world's uuid)
+  synchresis: CouplingMode[] // Synchrèse — the coupling character(s) this scene reads as
+  spaceTime: number // Espace-temps — 0 dense/full · 0.5 neutral · 1 void
+  climate: SceneClimate // Climat
+}
+
+// The generative scene / relation sequencer (macro-form engine). Session-scoped,
+// sits BESIDE `scenes` (never inside a composition — that would recurse). See
+// docs/opsia-sequencer-spec.md. S3 fields (cadence/rupture/monomedia) ship inert.
+export type SequenceMode = 'weighted' | 'arc' | 'shuffle'
+export type SequenceTransition = 'morph' | 'cut' | 'auto'
+export type MonomediaStyle = 'black' | 'freeze'
+export interface SequenceState {
+  enabled: boolean
+  running: boolean
+  // Pacing (seconds).
+  dwell: number
+  dwellJitter: number // 0..1 humanise
+  // Transition.
+  transition: SequenceTransition
+  crossfadeMs: number
+  // Selection.
+  mode: SequenceMode
+  noRepeat: number
+  variation: number // 0..1 → varyComposition per recall (no exact repeat)
+  // Macro-form overlays (S2).
+  breathe: { amount: number; periodSec: number } // Espace-temps oscillator
+  arc: { enabled: boolean; lengthSec: number } // Repose–Disturbance–Repose
+  // Punctuation (S3 — inert for now).
+  cadenceEvery: number
+  ruptureChance: number
+  monomediaChance: number
+  monomediaStyle: MonomediaStyle
+  // Deferred synchresis (S4 — inert for now).
+  audioAdvance: 'off' | 'transient' | 'onset'
 }
 
 // ── Session persistence (brief §7) ───────────────────────────────────
@@ -381,6 +426,9 @@ export interface Session {
   // The active World when the session was saved (self-contained, so it resolves
   // even on another install; added to the bank on load if missing).
   world?: World | null
+  // The macro-form sequencer config (session-scoped; auto-starts on load if it
+  // was running). Optional for back-compat with pre-sequencer sessions.
+  sequence?: SequenceState
   // Opaque renderer UI snapshot (theme, panel sizes, selection). The main
   // process never inspects it — it just round-trips it to disk.
   ui?: unknown

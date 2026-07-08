@@ -13,6 +13,7 @@ import { applyCoupling } from './engine/coupling'
 import { applyProximity } from './engine/field'
 import { applyModulation, modEngine } from './engine/modulation'
 import { currentFps, tickFrame } from './perf'
+import { tickSequencer } from './engine/sequencer'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel, FxChips } from './components/FxRackPanel'
 import { FinishingTouches, FinishingToggle } from './components/FinishingTouches'
@@ -26,6 +27,7 @@ import { AudioPanel } from './components/AudioPanel'
 import { BackgroundPanel } from './components/BackgroundPanel'
 import { OutputPage } from './components/OutputPage'
 import { WorldPage } from './components/WorldPage'
+import { SequencePage } from './components/SequencePage'
 import { SceneBank } from './components/SceneBank'
 import { initOscInput, applyOscListen } from './oscInput'
 import { morphedComposition, consumeCrossfade } from './morph'
@@ -150,6 +152,7 @@ export default function App(): JSX.Element {
   const outputPageOpen = useStore((s) => s.outputPageOpen)
   const renderScale = useStore((s) => s.renderScale)
   const worldPageOpen = useStore((s) => s.worldPageOpen)
+  const sequencePageOpen = useStore((s) => s.sequencePageOpen)
   useEffect(() => {
     const comp = compositorRef.current
     if (!comp) return
@@ -266,6 +269,13 @@ export default function App(): JSX.Element {
         st.setWorldPageOpen(!st.worldPageOpen)
         return
       }
+      // Q: open/close the Sequence (macro-form) page.
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'q') {
+        e.preventDefault()
+        const st = useStore.getState()
+        st.setSequencePageOpen(!st.sequencePageOpen)
+        return
+      }
       // Bare letters: view / panel shortcuts (guarded against typing in fields).
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField) {
         const k = e.key.toLowerCase()
@@ -312,6 +322,11 @@ export default function App(): JSX.Element {
       if (e.key === 'Escape' && useStore.getState().outputPageOpen) {
         e.preventDefault()
         useStore.getState().setOutputPageOpen(false)
+        return
+      }
+      if (e.key === 'Escape' && useStore.getState().sequencePageOpen) {
+        e.preventDefault()
+        useStore.getState().setSequencePageOpen(false)
         return
       }
       if (!(e.ctrlKey || e.metaKey)) return
@@ -411,6 +426,8 @@ export default function App(): JSX.Element {
         const coupledMix = applyCoupling(comp!, c, now)
         // 2c. Proximity (Field macro): push the Context mood into a depth zone.
         const contextProx = applyProximity(comp!, c, st.proximity, st.proximityAudio ? 0.6 : 0)
+        // 2d. Macro-form sequencer: auto-advance scenes + Breathe/Arc overlay.
+        if (st.sequence.enabled) tickSequencer(now, comp!, c)
         // 3. Render the frame.
         comp!.render(now - start)
         // 4. Native output window: push the exact render state so it renders
@@ -722,6 +739,7 @@ export default function App(): JSX.Element {
              rendering underneath so the live mirror + engine never stop) ── */}
       {outputPageOpen && <OutputPage canvasRef={canvasRef} />}
       {worldPageOpen && <WorldPage />}
+      {sequencePageOpen && <SequencePage />}
     </div>
   )
 }

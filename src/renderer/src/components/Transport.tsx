@@ -67,6 +67,8 @@ export function Transport(): JSX.Element {
   const world = useStore((s) => s.world)
   const setWorld = useStore((s) => s.setWorld)
   const setWorldPageOpen = useStore((s) => s.setWorldPageOpen)
+  const setSequencePageOpen = useStore((s) => s.setSequencePageOpen)
+  const seqRunning = useStore((s) => s.sequence.running)
   const proximity = useStore((s) => s.proximity)
   const setProximity = useStore((s) => s.setProximity)
   const proximityAudio = useStore((s) => s.proximityAudio)
@@ -184,6 +186,13 @@ export function Transport(): JSX.Element {
           title="Open the World editor (W)"
         >
           ⧉
+        </button>
+        <button
+          onClick={() => setSequencePageOpen(true)}
+          className={`btn px-1.5 text-[12px] ${seqRunning ? 'text-accent' : ''}`}
+          title="Open the Sequence / macro-form auto-pilot (Q)"
+        >
+          {seqRunning ? '▶ seq' : 'seq'}
         </button>
       </div>
 

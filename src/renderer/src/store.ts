@@ -18,6 +18,8 @@ import type {
   ModTarget,
   ModulatorConfig,
   SceneEntry,
+  SceneTags,
+  SequenceState,
   Session,
   SidechainRef,
   SourceSlot,
@@ -28,7 +30,7 @@ import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/ty
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
 import { beginMorph, cancelMorph } from './morph'
 import { resetCouplingState } from './engine/coupling'
-import { applyWorldToComposition, BUILTIN_WORLDS, cloneWorld } from './worlds'
+import { applyWorldToComposition, BUILTIN_WORLDS, cloneWorld, deriveSceneTags } from './worlds'
 
 // User worlds (builtin === false) persist to localStorage; built-ins ship in code.
 function saveUserWorlds(worlds: World[]): void {
@@ -271,6 +273,29 @@ export function makeDefaultBackground(): BackgroundState {
 }
 export function makeBlankBackground(): BackgroundState {
   return { source: emptySlot(), fx: [], opacity: 1, speed: BG_DEFAULT_SPEED, depth: 0 }
+}
+
+// Default macro-form sequencer: off, seconds clock, gentle dwell, subtle
+// variation. S3/S4 fields ship inert (see docs/opsia-sequencer-spec.md).
+export function makeDefaultSequence(): SequenceState {
+  return {
+    enabled: false,
+    running: false,
+    dwell: 8,
+    dwellJitter: 0.2,
+    transition: 'morph',
+    crossfadeMs: 1200,
+    mode: 'weighted',
+    noRepeat: 2,
+    variation: 0.15,
+    breathe: { amount: 0, periodSec: 30 },
+    arc: { enabled: false, lengthSec: 120 },
+    cadenceEvery: 0,
+    ruptureChance: 0,
+    monomediaChance: 0,
+    monomediaStyle: 'black',
+    audioAdvance: 'off'
+  }
 }
 
 export function makeDefaultComposition(): CompositionState {
@@ -572,6 +597,21 @@ interface StoreState {
   renameScene: (id: string, name: string) => void
   deleteScene: (id: string) => void
   reorderScene: (id: string, beforeId: string | null) => void
+  // Scene relation tags (macro-form sequencer). ensureSceneTags fills derived
+  // defaults if a scene has none; setSceneTags edits them.
+  ensureSceneTags: (id: string) => void
+  setSceneTags: (id: string, patch: Partial<SceneTags>) => void
+
+  // Generative scene / relation sequencer (macro-form). Session-scoped.
+  sequence: SequenceState
+  setSequence: (patch: Partial<SequenceState>) => void
+  toggleSequenceRunning: () => void
+  // Recall a scene the SEQUENCER way: morph over `crossfadeMs` (0 = cut), with an
+  // optional per-recall variation. Used by engine/sequencer.ts (wrapped silently
+  // so auto-advances don't flood undo). Not for manual use.
+  sequenceTo: (id: string, variation: number, crossfadeMs: number) => void
+  sequencePageOpen: boolean
+  setSequencePageOpen: (on: boolean) => void
 
   // Session round-tripping
   newSession: () => void
@@ -1751,6 +1791,40 @@ export const useStore = create<StoreState>((set, get) => ({
       next.splice(idx, 0, moving)
       return { scenes: next }
     }),
+  ensureSceneTags: (id) =>
+    set((s) => {
+      const scene = s.scenes.find((x) => x.id === id)
+      if (!scene || scene.tags) return s
+      const tags = deriveSceneTags(scene)
+      return { scenes: s.scenes.map((x) => (x.id === id ? { ...x, tags } : x)) }
+    }),
+  setSceneTags: (id, patch) =>
+    set((s) => ({
+      scenes: s.scenes.map((x) =>
+        x.id === id ? { ...x, tags: { ...(x.tags ?? deriveSceneTags(x)), ...patch } } : x
+      )
+    })),
+
+  sequence: makeDefaultSequence(),
+  setSequence: (patch) => set((s) => ({ sequence: { ...s.sequence, ...patch } })),
+  toggleSequenceRunning: () =>
+    set((s) => ({ sequence: { ...s.sequence, enabled: true, running: !s.sequence.running } })),
+  sequenceTo: (id, variation, crossfadeMs) =>
+    set((s) => {
+      const scene = s.scenes.find((x) => x.id === id)
+      if (!scene) return s
+      beginMorph(s.composition, Math.max(0, crossfadeMs), performance.now())
+      resetCouplingState()
+      // Subtle per-recall variation → long sets never loop verbatim (Basanta).
+      const composition =
+        variation > 0 ? varyComposition(scene.composition, variation) : scene.composition
+      const worlds = ensureWorld(s.worlds, scene.world)
+      const world = scene.world ? scene.world.id : s.world
+      if (scene.world) localStorage.setItem('opsia.world', world)
+      return { composition, activeSceneId: id, worlds, world, variationBaseline: null }
+    }),
+  sequencePageOpen: false,
+  setSequencePageOpen: (on) => set({ sequencePageOpen: on }),
 
   newSession: () =>
     // A blank slate. Goes through the normal composition write path, so it
@@ -1771,6 +1845,7 @@ export const useStore = create<StoreState>((set, get) => ({
         activeSceneId: null,
         vibePresetName: null,
         variationBaseline: null,
+        sequence: makeDefaultSequence(), // empty bank → stop the auto-pilot
         sessionPath: null, // New = no file yet; next Save prompts for one.
         collapsed
       }
@@ -1790,6 +1865,8 @@ export const useStore = create<StoreState>((set, get) => ({
       scenes: s.scenes ?? [],
       activeSceneId: null,
       variationBaseline: null,
+      // Sequencer travels with the session; auto-resumes if it was running.
+      sequence: { ...makeDefaultSequence(), ...(s.sequence ?? {}) },
       composition: {
         ...s.composition,
         // Older sessions have no Background slab — normalize to the blank (off)
@@ -1855,6 +1932,7 @@ export const useStore = create<StoreState>((set, get) => ({
       composition: s.composition,
       scenes: s.scenes,
       world: s.worlds.find((w) => w.id === s.world) ?? null,
+      sequence: s.sequence,
       ui: { theme: s.theme }
     }
   }

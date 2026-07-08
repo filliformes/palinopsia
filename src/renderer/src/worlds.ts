@@ -7,9 +7,38 @@
 // depth ≤ .5) so a World can never crush/blow the output. Built-ins ship here;
 // user worlds live in the store (persisted to localStorage).
 
-import type { CompositionState, World } from '@shared/types'
+import type { CompositionState, CouplingMode, SceneEntry, SceneTags, World } from '@shared/types'
 import { WORLD_AUTOMOD_SLOT } from '@shared/types'
 import { makeDefaultModulator } from './engine/modulation'
+
+const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
+
+/** Auto-derive a scene's relation tags from its composition (editable after).
+ *  Diégèse = saved World · Synchrèse = its layers' coupling modes · Espace-temps
+ *  from mean visible opacity + Context haze/depth · Climat neutral (release). */
+export function deriveSceneTags(scene: SceneEntry): SceneTags {
+  const c = scene.composition
+  const modes = Array.from(
+    new Set(
+      c.layers
+        .map((l) => l.coupling?.mode)
+        .filter((m): m is CouplingMode => !!m && m !== 'off')
+    )
+  )
+  const vis = c.layers.filter((l) => !l.mute)
+  const meanOpac = vis.length ? vis.reduce((a, l) => a + (l.opacity ?? 0), 0) / vis.length : 0.5
+  const ctx = c.master.find((f) => f.shaderId === 'fx-context')?.inputs ?? {}
+  const haze = typeof ctx.haze === 'number' ? ctx.haze : 0
+  const depth = typeof ctx.depth === 'number' ? ctx.depth : 0
+  // Fuller (low spaceTime) = high opacity + low haze; void (high) = sparse + hazy/deep.
+  const spaceTime = clamp01(0.5 + (haze * 0.6 + depth * 0.4) * 0.5 - (meanOpac - 0.5) * 0.6)
+  return {
+    world: scene.world?.id ?? 'synthetic',
+    synchresis: modes.length ? modes : ['lean'],
+    spaceTime,
+    climate: 'release'
+  }
+}
 
 const uid = (): string =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
