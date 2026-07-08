@@ -24,6 +24,7 @@ export function BackgroundPanel(): JSX.Element {
   const setBackgroundOpacity = useStore((s) => s.setBackgroundOpacity)
   const setBackgroundSpeed = useStore((s) => s.setBackgroundSpeed)
   const setBackgroundDepth = useStore((s) => s.setBackgroundDepth)
+  const setBackgroundBlendMode = useStore((s) => s.setBackgroundBlendMode)
   const randomizeBg = useStore((s) => s.randomizeBg)
   const applyBgPreset = useStore((s) => s.applyBgPreset)
   const bgPresets = useStore((s) => s.bgPresets)
@@ -39,6 +40,7 @@ export function BackgroundPanel(): JSX.Element {
   const opacity = bg?.opacity ?? 1
   const speed = bg?.speed ?? 0.25
   const depth = bg?.depth ?? 0
+  const mode = bg?.blendMode ?? 'blend'
   const shaderId = bg?.source.shaderId ?? null
 
   function onContextMenu(e: MouseEvent): void {
@@ -226,8 +228,20 @@ export function BackgroundPanel(): JSX.Element {
             className="input w-full px-1 py-0.5 text-right text-[11px]"
           />
         </div>
-        <div className="min-w-0 flex-1" />
-        <span className="w-11 shrink-0" />
+        {/* How the 4 layers sit over the background. */}
+        <span className="ml-2 shrink-0 font-mono text-[9px] uppercase text-muted" title="How the four layers sit over the background">
+          vs
+        </span>
+        <select
+          className="input select-compact w-[4.5rem] shrink-0 text-[10px]"
+          value={mode}
+          onChange={(e) => setBackgroundBlendMode(e.target.value as 'blend' | 'isolate')}
+          onClick={(e) => e.stopPropagation()}
+          title="Blend — layer 1 blends onto the background (backdrop glows through). Isolate — the 4 layers composite as their own group over the background."
+        >
+          <option value="blend">blend</option>
+          <option value="isolate">isolate</option>
+        </select>
       </div>
 
       {menu && (

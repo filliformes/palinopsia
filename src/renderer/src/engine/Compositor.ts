@@ -869,6 +869,7 @@ export class Compositor {
   private bgOpacity = 0;
   private bgSpeed = 0.25;
   private bgDepth = 0;
+  private bgIsolate = false; // true → the 4 layers composite as their own group
   private depthShadow: DepthShadow | null = null;
   private shared: SharedGL;
   private chain: ChainBuffers;
@@ -1163,6 +1164,7 @@ export class Compositor {
     this.bgOpacity = bg && bg.source.shaderId ? bg.opacity : 0;
     this.bgSpeed = bg?.speed ?? 0.25;
     this.bgDepth = bg?.depth ?? 0;
+    this.bgIsolate = bg?.blendMode === 'isolate';
   }
 
   /** Direct write to an FX unit's ISF input in any rack (modulation path). */
@@ -1325,7 +1327,10 @@ export class Compositor {
         const bgTex = this.bgRack.apply(this.bgScratch.tex, this.chain);
         this.blendInto(this.acc.write(), this.acc.read(), bgTex, 'normal', this.bgOpacity);
         this.acc.swap();
-        first = false;
+        // 'blend' (default): the first layer blends onto the background with its
+        // own mode. 'isolate': keep `first` true so the first layer composites
+        // 'normal' — the background never alters the inter-layer blends.
+        if (!this.bgIsolate) first = false;
 
         // Depth: the foreground casts a soft shadow onto the background (now in
         // acc). Runs BEFORE the layers composite, so the shadow sits in the

@@ -328,6 +328,13 @@ export interface BackgroundState {
   // Contact shadow the foreground casts onto the background (separation/depth).
   // 0 = off (optional). Undefined on older sessions ⇒ 0.
   depth?: number
+  // How the four layers sit over the background:
+  //  'blend'   — layer 1 blends onto the background with its own blend mode
+  //              (Photoshop-standard; additive/screen layers glow it through).
+  //  'isolate' — the four layers composite as their own group (layer 1 forced
+  //              'normal'), then sit over the background; the background is a
+  //              pure backdrop that never alters the inter-layer blends.
+  blendMode?: 'blend' | 'isolate'
 }
 
 // The whole composition: background + four layers + master rack + transport.
