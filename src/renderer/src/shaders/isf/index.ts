@@ -648,7 +648,10 @@ export const FINALIZER_SHADER: IsfShader = {
     grain: [0, 0.3],
     grainSize: [1, 2.5],
     chroma: [0, 0.4],
-    parasites: [0, 0.3]
+    parasites: [0, 0.3],
+    // The output shaper is a deliberate compositional move — never randomized.
+    outShape: [0, 0],
+    outBgSource: [0, 0]
   }
 }
 

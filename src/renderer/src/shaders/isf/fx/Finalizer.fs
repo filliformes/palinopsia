@@ -17,9 +17,22 @@
     { "NAME": "grain",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "grain amount" },
     { "NAME": "grainSize", "TYPE": "float", "MIN": 1.0, "MAX": 6.0, "DEFAULT": 1.5 },
     { "NAME": "chroma",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "chroma grain" },
-    { "NAME": "parasites", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.1, "LABEL": "parasites (crt/vhs)" }
+    { "NAME": "parasites", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.1, "LABEL": "parasites (crt/vhs)" },
+    { "NAME": "outShape", "TYPE": "long", "VALUES": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
+      "LABELS": ["none","circle","square","rectangle","triangle","pentagon","hexagon","heptagon","octagon","diamond","star 5","star 6","ellipse","rounded","cross","ring","half-circle","heart","crescent","trapezoid","capsule"],
+      "DEFAULT": 0, "LABEL": "out shape" },
+    { "NAME": "outSize",  "TYPE": "float", "MIN": 0.1, "MAX": 1.6, "DEFAULT": 0.7, "LABEL": "shape size" },
+    { "NAME": "outAngle", "TYPE": "float", "MIN": -3.1416, "MAX": 3.1416, "DEFAULT": 0.0, "LABEL": "shape angle" },
+    { "NAME": "outPosX",  "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "shape x" },
+    { "NAME": "outPosY",  "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "shape y" },
+    { "NAME": "outBgSource", "TYPE": "long", "VALUES": [0,1], "LABELS": ["color","bg layer"], "DEFAULT": 0, "LABEL": "outside fill" },
+    { "NAME": "outBgColor", "TYPE": "color", "DEFAULT": [0.0, 0.0, 0.0, 1.0], "LABEL": "fill color" }
   ]
 }*/
+// NOTE: outShape / outBg* are applied NATIVELY as the compositor's final output
+// stage (engine/outputShape.ts) — they need the Background-slab texture as the
+// outside fill, which ISF can't reach. Declared here only so the auto-UI shows
+// them in the Finalizer; this shader ignores them.
 
 float hash21(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);

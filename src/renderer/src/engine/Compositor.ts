@@ -31,6 +31,7 @@ import { handle, installTextureBridge } from './isfTextureBridge';
 import { makeConvNode, isNativeNode, type ConvNode } from './convNodes';
 import { TextSource } from './TextSource';
 import { DepthShadow } from './depthShadow';
+import { OutputShape } from './outputShape';
 import type { SidechainRef } from '@shared/types';
 import { VideoSource } from './VideoSource';
 import { CaptureSource } from './CaptureSource';
@@ -871,6 +872,16 @@ export class Compositor {
   private bgDepth = 0;
   private bgIsolate = false; // true → the 4 layers composite as their own group
   private depthShadow: DepthShadow | null = null;
+  // Finalizer output stage (shape + outside fill), applied last.
+  private outputShape: OutputShape | null = null;
+  private bgFill!: { fbo: WebGLFramebuffer; tex: WebGLTexture }; // stable copy of the bg for the fill
+  private fzShape = 0;
+  private fzSize = 0.7;
+  private fzAngle = 0;
+  private fzPosX = 0;
+  private fzPosY = 0;
+  private fzBgLayer = false; // outside fill = the Background slab (moved here)
+  private fzBgColor: number[] = [0, 0, 0];
   private shared: SharedGL;
   private chain: ChainBuffers;
   private mixTarget: { fbo: WebGLFramebuffer; tex: WebGLTexture };
@@ -1003,6 +1014,7 @@ export class Compositor {
     this.mixTarget = makeTarget(gl, w, h);
     this.abHold = makeTarget(gl, w, h);
     this.bgScratch = makeTarget(gl, w, h);
+    this.bgFill = makeTarget(gl, w, h);
     this.snapshot = makeTarget(gl, w, h);
     this.xfadeTarget = makeTarget(gl, w, h);
     this.fxOpac = [makeTarget(gl, w, h), makeTarget(gl, w, h)];
@@ -1165,6 +1177,19 @@ export class Compositor {
     this.bgSpeed = bg?.speed ?? 0.25;
     this.bgDepth = bg?.depth ?? 0;
     this.bgIsolate = bg?.blendMode === 'isolate';
+
+    // Finalizer output-stage params (native shape + outside fill). Read straight
+    // off the pinned finalizer's inputs.
+    const fin = c.master.find((f) => f.shaderId === 'fx-finalizer' && f.enabled);
+    const fi = fin?.inputs ?? {};
+    const numf = (v: number | number[] | undefined, d: number): number => (typeof v === 'number' ? v : d);
+    this.fzShape = fin ? Math.round(numf(fi.outShape, 0)) : 0;
+    this.fzSize = numf(fi.outSize, 0.7);
+    this.fzAngle = numf(fi.outAngle, 0);
+    this.fzPosX = numf(fi.outPosX, 0);
+    this.fzPosY = numf(fi.outPosY, 0);
+    this.fzBgLayer = this.fzShape > 0 && Math.round(numf(fi.outBgSource, 0)) === 1;
+    this.fzBgColor = Array.isArray(fi.outBgColor) ? fi.outBgColor : [0, 0, 0];
   }
 
   /** Direct write to an FX unit's ISF input in any rack (modulation path). */
@@ -1314,35 +1339,43 @@ export class Compositor {
     const anySolo = this.layers.some((l) => l.solo);
     let first = true;
 
-    // Background slab first — the ground everything blends onto. It composites
-    // 'normal' (it IS the base); once present, even the first layer uses its
-    // own blend mode against it. Fault-isolated like the layers.
-    if (this.bgIsf && this.bgOpacity > 0.001) {
+    // Background slab. Rendered whenever it's needed either behind the layers OR
+    // as the finalizer's outside fill (fzBgLayer "moves" it there — so it must
+    // NOT also sit behind the layers). Copied into a STABLE bgFill buffer since
+    // the chain buffer the rack returns is reused by the layer loop below.
+    const wantBg = this.bgIsf && (this.bgOpacity > 0.001 || this.fzBgLayer);
+    let haveBgFill = false;
+    if (wantBg) {
       try {
         gl.bindVertexArray(null);
         this.shared.redirect.redirect = this.bgScratch.fbo;
-        this.bgIsf.draw({ width: this.w, height: this.h });
+        this.bgIsf!.draw({ width: this.w, height: this.h });
         this.shared.redirect.redirect = null;
         gl.bindVertexArray(null);
         const bgTex = this.bgRack.apply(this.bgScratch.tex, this.chain);
-        this.blendInto(this.acc.write(), this.acc.read(), bgTex, 'normal', this.bgOpacity);
-        this.acc.swap();
-        // 'blend' (default): the first layer blends onto the background with its
-        // own mode. 'isolate': keep `first` true so the first layer composites
-        // 'normal' — the background never alters the inter-layer blends.
-        if (!this.bgIsolate) first = false;
+        this.copyInto(this.bgFill.fbo, bgTex);
+        haveBgFill = true;
 
-        // Depth: the foreground casts a soft shadow onto the background (now in
-        // acc). Runs BEFORE the layers composite, so the shadow sits in the
-        // background and the foreground lands on top. No-op at depth 0.
-        if (this.bgDepth > 0.001) {
-          if (!this.depthShadow) this.depthShadow = new DepthShadow(this.gl);
-          const anySoloD = this.layers.some((l) => l.solo);
-          const tex = this.layers.map((l) => l.texture());
-          const wts = this.layers.map((l) => ((anySoloD ? l.solo : !l.mute) ? l.opacity : 0));
-          this.depthShadow.apply(this.acc.read(), tex, wts, this.bgDepth, this.acc.write(), this.w, this.h);
+        // Composite behind the layers UNLESS moved to the finalizer's fill.
+        if (this.bgOpacity > 0.001 && !this.fzBgLayer) {
+          this.blendInto(this.acc.write(), this.acc.read(), this.bgFill.tex, 'normal', this.bgOpacity);
           this.acc.swap();
-          gl.bindVertexArray(null);
+          // 'blend' (default): the first layer blends onto the background with its
+          // own mode. 'isolate': keep `first` true so the background never alters
+          // the inter-layer blends.
+          if (!this.bgIsolate) first = false;
+
+          // Depth: the foreground casts a soft shadow onto the background (now in
+          // acc). No-op at depth 0.
+          if (this.bgDepth > 0.001) {
+            if (!this.depthShadow) this.depthShadow = new DepthShadow(this.gl);
+            const anySoloD = this.layers.some((l) => l.solo);
+            const tex = this.layers.map((l) => l.texture());
+            const wts = this.layers.map((l) => ((anySoloD ? l.solo : !l.mute) ? l.opacity : 0));
+            this.depthShadow.apply(this.acc.read(), tex, wts, this.bgDepth, this.acc.write(), this.w, this.h);
+            this.acc.swap();
+            gl.bindVertexArray(null);
+          }
         }
       } catch (e) {
         this.shared.redirect.redirect = null;
@@ -1371,6 +1404,19 @@ export class Compositor {
     // Master rack (glitch / dither / chroma / grade; warp joins in Phase 8).
     gl.bindVertexArray(null);
     composite = this.masterRack.apply(composite, this.chain);
+
+    // Finalizer output stage: clip the finished frame into a shape, filling
+    // OUTSIDE with a solid colour or the (moved) Background slab. No-op unless a
+    // shape is chosen. mixTarget is free here (the layer loop is long done).
+    if (this.fzShape > 0) {
+      if (!this.outputShape) this.outputShape = new OutputShape(this.gl);
+      const fill = this.fzBgLayer && haveBgFill ? this.bgFill.tex : null;
+      this.outputShape.apply(
+        composite, fill, this.fzBgColor, this.fzShape, this.fzSize, this.fzAngle,
+        this.fzPosX, this.fzPosY, this.w / this.h, this.mixTarget.fbo, this.w, this.h
+      );
+      composite = this.mixTarget.tex;
+    }
 
     // Scene crossfade: dissolve the frozen old frame into the new composite.
     // The only way a STRUCTURAL morph (Randomize All swaps shaders) can read as
@@ -1434,7 +1480,9 @@ export class Compositor {
     this.bgIsf?.cleanup();
     this.bgRack.dispose();
     this.depthShadow?.dispose();
+    this.outputShape?.dispose();
     disposeTarget(gl, this.bgScratch);
+    disposeTarget(gl, this.bgFill);
     this.acc.dispose(gl);
     this.chain.dispose(gl);
     disposeTarget(gl, this.mixTarget);
