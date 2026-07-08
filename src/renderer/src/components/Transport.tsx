@@ -187,39 +187,47 @@ export function Transport(): JSX.Element {
         >
           ⧉
         </button>
-        <button
-          onClick={() => setSequencePageOpen(true)}
-          className={`btn px-1.5 text-[12px] ${seqRunning ? 'text-accent' : ''}`}
-          title="Open the Sequence / macro-form auto-pilot (Q)"
-        >
-          {seqRunning ? '▶ seq' : 'seq'}
-        </button>
       </div>
 
-      {/* Proximity (Field macro) — one knob places the image in a depth zone,
-          far/vista ↔ close/personal, by pushing the Context mood. */}
-      <div className="flex items-center gap-1.5">
-        <span className="font-mono text-[10px] text-muted">PROX</span>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={proximity}
-          onChange={(e) => setProximity(Number(e.target.value))}
-          onDoubleClick={() => setProximity(0.5)}
-          className="w-20 accent-accent"
-          title={`Proximity ${proximity < 0.48 ? 'far' : proximity > 0.52 ? 'close' : 'neutral'} — vista ↔ personal (double-click: neutral)`}
-        />
+      {/* Seq + Proximity — nudged right of the World block so they read as their
+          own macro group, detached from the World section. */}
+      <div className="ml-5 flex items-center gap-3">
         <button
-          onClick={() => setProximityAudio(!proximityAudio)}
-          className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
-            proximityAudio ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'
+          onClick={() => setSequencePageOpen(true)}
+          className={`rounded border px-2 py-1 font-mono text-[11px] transition-colors ${
+            seqRunning
+              ? 'border-accent bg-accent/15 text-accent'
+              : 'border-border text-muted hover:text-accent'
           }`}
-          title="Audio brightness (centroid) drives proximity"
+          title="Open the Sequence / macro-form auto-pilot (Q)"
         >
-          ◑
+          {seqRunning ? '▶ Seq' : 'Seq'}
         </button>
+        {/* Proximity (Field macro) — one knob places the image in a depth zone,
+            far/vista ↔ close/personal, by pushing the Context mood. */}
+        <div className="flex items-center gap-1.5">
+          <span className="font-mono text-[10px] text-muted">PROX</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={proximity}
+            onChange={(e) => setProximity(Number(e.target.value))}
+            onDoubleClick={() => setProximity(0.5)}
+            className="w-20 accent-accent"
+            title={`Proximity ${proximity < 0.48 ? 'far' : proximity > 0.52 ? 'close' : 'neutral'} — vista ↔ personal (double-click: neutral)`}
+          />
+          <button
+            onClick={() => setProximityAudio(!proximityAudio)}
+            className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
+              proximityAudio ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'
+            }`}
+            title="Audio brightness (centroid) drives proximity"
+          >
+            ◑
+          </button>
+        </div>
       </div>
 
       <div className="flex-1" />

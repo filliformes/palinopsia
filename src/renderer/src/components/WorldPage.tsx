@@ -116,7 +116,7 @@ export function WorldPage(): JSX.Element {
         </aside>
 
         {/* ── Editor ────────────────────────────────────────────────── */}
-        <main className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+        <main className="flex min-w-0 flex-1 flex-col gap-3 overflow-hidden p-4">
           {/* name + apply */}
           <div className="flex items-center gap-3">
             <input
@@ -149,8 +149,8 @@ export function WorldPage(): JSX.Element {
             title="One-line description"
           />
 
-          <div className="grid max-w-6xl grid-cols-[340px_minmax(0,1fr)] gap-6">
-           <div className="flex flex-col gap-4">
+          <div className="grid min-h-0 max-w-6xl flex-1 grid-cols-[340px_minmax(0,1fr)] gap-6">
+           <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
             {/* Coupling */}
             <Section title="A/B Coupling — how the two voices bond">
               <SelRow label="mode" value={w.coupling.mode} options={COUPLING_MODES}
@@ -199,15 +199,19 @@ export function WorldPage(): JSX.Element {
 
            </div>
 
-           {/* right column — big Visualizer + audio driver + live-code */}
-           <div className="flex flex-col gap-4">
+           {/* right column — compact Visualizer + audio driver + full-size live-code */}
+           <div className="flex min-h-0 flex-col gap-3 overflow-hidden">
               <Section title="World Visualizer — real generators · simulated audio · A/B">
-                <WorldVisualizer
-                  coupling={w.coupling}
-                  context={w.context}
-                  audio={audio}
-                  sourceIdx={sourceIdx}
-                />
+                {/* Capped width so the whole page fits without scrolling; the
+                    live-code editor below keeps its full height. */}
+                <div className="mx-auto w-full max-w-[380px]">
+                  <WorldVisualizer
+                    coupling={w.coupling}
+                    context={w.context}
+                    audio={audio}
+                    sourceIdx={sourceIdx}
+                  />
+                </div>
                 {/* Test material */}
                 <div className="flex items-center gap-2">
                   <span className="w-20 shrink-0 font-mono text-[10px] text-muted">material</span>
