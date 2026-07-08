@@ -293,6 +293,50 @@ export function SequencePage(): JSX.Element {
             )}
             <ArcMeter enabled={seq.arc.enabled && seq.running} />
           </Section>
+
+          <Section title="Punctuation">
+            <Row label={`cadence · ${seq.cadenceEvery === 0 ? 'off' : `every ${seq.cadenceEvery}`}`}>
+              <input type="range" min={0} max={8} step={1} value={seq.cadenceEvery}
+                onChange={(e) => setSequence({ cadenceEvery: Number(e.target.value) })}
+                className="w-full accent-accent2"
+                title="Resolve to isomorphy (A/B fuse) every N transitions — a felt arrival" />
+            </Row>
+            <Row label={`rupture · ${Math.round(seq.ruptureChance * 100)}%`}>
+              <input type="range" min={0} max={1} step={0.01} value={seq.ruptureChance}
+                onChange={(e) => setSequence({ ruptureChance: Number(e.target.value) })}
+                className="w-full accent-accent2"
+                title="Chance a transition becomes a controlled-chaos burst that resolves into the next scene" />
+            </Row>
+            <Row label={`monomedia · ${Math.round(seq.monomediaChance * 100)}%`}>
+              <input type="range" min={0} max={1} step={0.01} value={seq.monomediaChance}
+                onChange={(e) => setSequence({ monomediaChance: Number(e.target.value) })}
+                className="w-full accent-accent2"
+                title="Chance a transition drops one medium as a tension marker" />
+            </Row>
+            {seq.monomediaChance > 0 && (
+              <Row label="monomedia style">
+                <div className="flex gap-1">
+                  {(['black', 'freeze'] as const).map((st) => (
+                    <button
+                      key={st}
+                      onClick={() => setSequence({ monomediaStyle: st })}
+                      className={`flex-1 rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
+                        seq.monomediaStyle === st
+                          ? 'bg-accent/20 text-accent ring-1 ring-accent'
+                          : 'bg-panel2 text-muted hover:text-text'
+                      }`}
+                    >
+                      {st === 'black' ? 'fade to black' : 'freeze frame'}
+                    </button>
+                  ))}
+                </div>
+              </Row>
+            )}
+            <p className="text-[10px] leading-tight text-muted">
+              Cadence resolves to isomorphy; rupture is a bounded chaos burst; monomedia drops
+              the picture (black or freeze) while audio continues.
+            </p>
+          </Section>
         </aside>
       </div>
     </div>

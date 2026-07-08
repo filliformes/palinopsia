@@ -21,7 +21,20 @@ let nextDwellMs = 8000
 let arcStart = 0
 let breatheStart = 0
 let lastArc = 0 // most recent arc intensity (for the UI meter)
+let stepCount = 0
 const recent: string[] = [] // recently-visited scene ids (no-repeat window)
+
+// ── S3 punctuation timers ────────────────────────────────────────────────
+const CADENCE_MS = 900 // resolve-to-isomorphy pulse
+const RUPTURE_MS = 700 // controlled-chaos burst (recall at midpoint)
+const MONO_MS = 700 // monomedia drop (recall at trough)
+let cadenceUntil = 0
+let ruptureUntil = 0
+let monoUntil = 0
+let monoStyle: 'black' | 'freeze' = 'black'
+let freezeHeld = false
+// A recall deferred to a punctuation's midpoint/trough.
+let pending: { id: string; variation: number; cross: number; at: number } | null = null
 
 /** (Re)seed timers — on start, and whenever the scene set is replaced. */
 function reset(now: number, seq: SequenceState): void {
@@ -29,6 +42,9 @@ function reset(now: number, seq: SequenceState): void {
   arcStart = now
   breatheStart = now
   nextDwellMs = dwellMs(seq)
+  stepCount = 0
+  cadenceUntil = ruptureUntil = monoUntil = 0
+  pending = null
   recent.length = 0
 }
 
@@ -135,20 +151,73 @@ function writeContextOverlay(
   }
 }
 
+// The compositor surface the sequencer writes to.
+interface SeqComp {
+  setFxInput: (scope: { kind: 'master' }, instId: string, name: string, v: number) => void
+  layers: Array<{ sourceMix: number }>
+  setFreeze: (on: boolean) => void
+}
+const MASTER = { kind: 'master' as const }
+
+function doRecall(id: string, variation: number, cross: number): void {
+  runSilently(() => useStore.getState().sequenceTo(id, variation, cross))
+}
+
+// Cadence / Anchoring (Basanta #2): pull every layer's A/B mix toward isomorphy
+// (fused = 0.5) by the decaying pulse — a felt "falling-together" arrival.
+function writeCadence(comp: SeqComp, f: number): void {
+  for (const L of comp.layers) {
+    if (L) L.sourceMix = L.sourceMix + (0.5 - L.sourceMix) * f * 0.9
+  }
+}
+
+// Rupture (Knight-Hill C#9): a controlled-chaos burst — Context bloom/trails/haze
+// surge + a fast chroma throb on the Finalizer — that RESOLVES as it decays into
+// the cut. On-brand (Context's gated exception), bounded, never a strobe.
+function writeRupture(comp: SeqComp, c: CompositionState, now: number, f: number): void {
+  const ctx = c.master.find((x) => x.shaderId === 'fx-context')
+  if (ctx) {
+    comp.setFxInput(MASTER, ctx.id, 'trails', clamp01(0.3 + f * 0.6))
+    comp.setFxInput(MASTER, ctx.id, 'bloom', clamp01(0.2 + f * 0.5))
+    comp.setFxInput(MASTER, ctx.id, 'haze', clamp01(0.05 + f * 0.2))
+  }
+  const fin = c.master.find((x) => x.shaderId === 'fx-finalizer')
+  if (fin) {
+    const throb = Math.sin(now * 0.05) * f * 0.3
+    comp.setFxInput(MASTER, fin.id, 'sharpen', f * 1.4)
+    comp.setFxInput(MASTER, fin.id, 'rGain', 1 + throb)
+    comp.setFxInput(MASTER, fin.id, 'bGain', 1 - throb)
+  }
+}
+
+// Monomedia drop (Boucher/Piché): drop one medium as a transition tension marker.
+// 'black' fades the Finalizer to black at the trough; 'freeze' holds the last
+// frame (the compositor does that) — either way audio continues underneath.
+function writeMonoBlack(comp: SeqComp, c: CompositionState, now: number): void {
+  const p = clamp01(1 - (monoUntil - now) / MONO_MS) // 0..1 across the drop
+  const dark = 1 - Math.abs(2 * p - 1) // 0 at edges → 1 at the trough
+  const g = clamp01(1 - dark)
+  const fin = c.master.find((x) => x.shaderId === 'fx-finalizer')
+  if (fin) {
+    comp.setFxInput(MASTER, fin.id, 'rGain', g)
+    comp.setFxInput(MASTER, fin.id, 'gGain', g)
+    comp.setFxInput(MASTER, fin.id, 'bGain', g)
+  }
+}
+
 /**
  * Tick the sequencer. Called every frame by the App loop (after proximity).
  * Reads its own state from the store; advances + writes overlays. Returns the
  * arc intensity (0..1) for the UI meter, or null when not running.
  */
-export function tickSequencer(
-  now: number,
-  comp: { setFxInput: (scope: { kind: 'master' }, instId: string, name: string, v: number) => void },
-  c: CompositionState
-): number | null {
+export function tickSequencer(now: number, comp: SeqComp, c: CompositionState): number | null {
   const st = useStore.getState()
   const seq = st.sequence
   if (!seq.enabled || !seq.running) {
-    if (running) running = false
+    if (running) {
+      running = false
+      if (freezeHeld) { comp.setFreeze(false); freezeHeld = false } // never leave the screen frozen
+    }
     return null
   }
   const scenes = st.scenes
@@ -161,12 +230,33 @@ export function tickSequencer(
 
   const arcInt = arcIntensity(now, seq.arc.enabled ? seq.arc.lengthSec : 0)
 
-  // Advance when the dwell elapses (and there's somewhere to go).
-  if (now - dwellStart >= nextDwellMs && scenes.length > 1) {
+  // A punctuation's deferred recall (rupture midpoint / monomedia trough).
+  if (pending && now >= pending.at) {
+    doRecall(pending.id, pending.variation, pending.cross)
+    pending = null
+  }
+
+  // Advance when the dwell elapses (unless a punctuation is mid-flight).
+  const busy = now < ruptureUntil || now < monoUntil || pending !== null
+  if (!busy && now - dwellStart >= nextDwellMs && scenes.length > 1) {
     const next = pickNext(scenes, seq, st.activeSceneId, arcInt)
     if (next) {
-      const cross = transitionMs(seq, next)
-      runSilently(() => useStore.getState().sequenceTo(next.id, seq.variation, cross))
+      stepCount++
+      const doRupture = seq.ruptureChance > 0 && Math.random() < seq.ruptureChance
+      const doMono = !doRupture && seq.monomediaChance > 0 && Math.random() < seq.monomediaChance
+      if (doRupture) {
+        ruptureUntil = now + RUPTURE_MS
+        pending = { id: next.id, variation: seq.variation, cross: 0, at: now + RUPTURE_MS / 2 }
+      } else if (doMono) {
+        monoUntil = now + MONO_MS
+        monoStyle = seq.monomediaStyle
+        if (monoStyle === 'freeze') { comp.setFreeze(true); freezeHeld = true }
+        pending = { id: next.id, variation: seq.variation, cross: 0, at: now + MONO_MS / 2 }
+      } else {
+        doRecall(next.id, seq.variation, transitionMs(seq, next))
+        // Cadence: every N steps, resolve to isomorphy on the transition.
+        if (seq.cadenceEvery > 0 && stepCount % seq.cadenceEvery === 0) cadenceUntil = now + CADENCE_MS
+      }
       recent.push(next.id)
       while (recent.length > Math.max(0, seq.noRepeat)) recent.shift()
     }
@@ -177,6 +267,17 @@ export function tickSequencer(
   // Continuous overlay (Breathe + Arc).
   const curTags = scenes.find((s) => s.id === useStore.getState().activeSceneId)?.tags
   writeContextOverlay(comp, c, seq, now, curTags, arcInt)
+
+  // ── S3 punctuation overlays ──
+  if (now < cadenceUntil) writeCadence(comp, (cadenceUntil - now) / CADENCE_MS)
+  if (now < ruptureUntil) writeRupture(comp, c, now, (ruptureUntil - now) / RUPTURE_MS)
+  if (now < monoUntil) {
+    if (monoStyle === 'black') writeMonoBlack(comp, c, now)
+  } else if (freezeHeld) {
+    comp.setFreeze(false) // release the freeze at the end of the drop
+    freezeHeld = false
+  }
+
   lastArc = arcInt
   return arcInt
 }

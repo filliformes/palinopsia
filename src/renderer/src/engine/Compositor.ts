@@ -918,6 +918,11 @@ export class Compositor {
   // The texture presented last frame — snapshotted into `snapshot` the moment a
   // crossfade begins (so no per-frame blit in the steady state).
   private lastPresent: WebGLTexture | null = null;
+  // Monomedia "freeze" drop: hold the last presented frame on screen (the
+  // sequencer's freeze-style punctuation). Captured into `snapshot` on the first
+  // frozen frame; safe because monomedia recalls are hard cuts (no xfade).
+  private freezeActive = false;
+  private freezeCaptured = false;
   // Output readback (Spout/NDI seam) — set to a callback to grab the final RGBA8
   // frame each frame; null (default) → zero cost.
   private outputCapture: ((w: number, h: number, px: Uint8Array) => void) | null = null;
@@ -1075,6 +1080,16 @@ export class Compositor {
     this.xfadeActive = true;
     this.xfadeStartMs = -1; // stamped on the next render (loop clock)
     this.xfadeMs = ms;
+  }
+
+  /** Freeze/unfreeze the presented frame (monomedia freeze-drop). */
+  setFreeze(on: boolean): void {
+    if (on) {
+      if (!this.freezeActive) { this.freezeActive = true; this.freezeCaptured = false; }
+    } else {
+      this.freezeActive = false;
+      this.freezeCaptured = false;
+    }
   }
 
   /** Enable/disable final-frame readback for external output (Spout/NDI). The
@@ -1493,6 +1508,14 @@ export class Compositor {
         this.blendInto(this.xfadeTarget.fbo, this.snapshot.tex, composite, 'normal', k);
         present = this.xfadeTarget.tex;
       }
+    }
+    // Monomedia freeze-drop: hold the last frame (captured once) on screen.
+    if (this.freezeActive) {
+      if (!this.freezeCaptured && this.lastPresent) {
+        this.copyInto(this.snapshot.fbo, this.lastPresent);
+        this.freezeCaptured = true;
+      }
+      if (this.freezeCaptured) present = this.snapshot.tex;
     }
     // Present to canvas — warped (keystone quad) or straight full-screen.
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
