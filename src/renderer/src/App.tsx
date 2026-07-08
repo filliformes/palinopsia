@@ -12,7 +12,7 @@ import { audioBus } from './engine/audioIn'
 import { applyCoupling } from './engine/coupling'
 import { applyProximity } from './engine/field'
 import { applyModulation, modEngine } from './engine/modulation'
-import { tickFrame } from './perf'
+import { currentFps, tickFrame } from './perf'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel, FxChips } from './components/FxRackPanel'
 import { FinishingTouches, FinishingToggle } from './components/FinishingTouches'
@@ -649,7 +649,9 @@ export default function App(): JSX.Element {
                 imageRendering: renderScale < 1 ? 'pixelated' : 'auto'
               }}
             />
-            <div className="pointer-events-none absolute bottom-2 left-2 font-mono text-[10px] text-muted/70">
+            {/* FPS bottom-left, mirroring the resolution tag bottom-right. */}
+            <FpsTag />
+            <div className="pointer-events-none absolute bottom-2 right-2 font-mono text-[10px] text-muted/70">
               output · {Math.round(1920 * renderScale)}×{Math.round(1080 * renderScale)}
             </div>
           </div>
@@ -720,6 +722,21 @@ export default function App(): JSX.Element {
              rendering underneath so the live mirror + engine never stop) ── */}
       {outputPageOpen && <OutputPage canvasRef={canvasRef} />}
       {worldPageOpen && <WorldPage />}
+    </div>
+  )
+}
+
+// Live FPS over the preview's bottom-left corner — mirrors the resolution tag
+// on the right, same font. Samples the render-loop meter on a light interval.
+function FpsTag(): JSX.Element {
+  const [fps, setFps] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => setFps(currentFps()), 400)
+    return () => window.clearInterval(id)
+  }, [])
+  return (
+    <div className="pointer-events-none absolute bottom-2 left-2 font-mono text-[10px] text-muted/70">
+      {fps > 0 ? `${Math.round(fps)} fps` : '— fps'}
     </div>
   )
 }
