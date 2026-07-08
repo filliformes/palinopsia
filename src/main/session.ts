@@ -68,12 +68,10 @@ export async function saveToDefault(session: Session): Promise<string> {
       .replace(/[\\/:*?"<>|]+/g, '_')
       .replace(/\s+/g, ' ')
       .trim() || 'session'
-  let candidate = join(dir, `${safe}.opsia.json`)
-  let n = 1
-  while (existsSync(candidate)) {
-    candidate = join(dir, `${safe} (${n}).opsia.json`)
-    n += 1
-  }
+  // Overwrite in place — this is the "keep the latest state of <name>" path
+  // (quit-save / switch-save). Suffixing "(N)" here used to mint a new file on
+  // every app close, flooding Sessions/ with Untitled (N) duplicates.
+  const candidate = join(dir, `${safe}.opsia.json`)
   await atomicWriteJson(candidate, session)
   return candidate
 }

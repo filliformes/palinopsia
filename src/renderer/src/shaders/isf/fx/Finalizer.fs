@@ -17,7 +17,7 @@
     { "NAME": "grain",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "grain amount" },
     { "NAME": "grainSize", "TYPE": "float", "MIN": 1.0, "MAX": 6.0, "DEFAULT": 1.5 },
     { "NAME": "chroma",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "chroma grain" },
-    { "NAME": "parasites", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.1, "LABEL": "parasites (crt/vhs)" },
+    { "NAME": "parasites", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.1, "LABEL": "parasites" },
     { "NAME": "outShape", "TYPE": "long", "VALUES": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
       "LABELS": ["none","circle","square","rectangle","triangle","pentagon","hexagon","heptagon","octagon","diamond","star 5","star 6","ellipse","rounded","cross","ring","half-circle","heart","crescent","trapezoid","capsule"],
       "DEFAULT": 0, "LABEL": "out shape" },
@@ -26,7 +26,8 @@
     { "NAME": "outPosX",  "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "shape x" },
     { "NAME": "outPosY",  "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "shape y" },
     { "NAME": "outBgSource", "TYPE": "long", "VALUES": [0,1], "LABELS": ["color","bg layer"], "DEFAULT": 0, "LABEL": "outside fill" },
-    { "NAME": "outBgColor", "TYPE": "color", "DEFAULT": [0.0, 0.0, 0.0, 1.0], "LABEL": "fill color" }
+    { "NAME": "outBgColor", "TYPE": "color", "DEFAULT": [0.0, 0.0, 0.0, 1.0], "LABEL": "fill color" },
+    { "NAME": "outDepth", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "shape depth" }
   ]
 }*/
 // NOTE: outShape / outBg* are applied NATIVELY as the compositor's final output

@@ -506,6 +506,7 @@ function MatrixSummary(): JSX.Element {
   function describe(a: (typeof matrix)[number]): string {
     const t = a.target
     if (t.kind === 'source') return `L${t.layer + 1}·${t.slot} ${t.input}`
+    if (t.kind === 'bgSource') return `BG ${t.input}`
     if (t.kind === 'meta') {
       const name = composition.metaKnobs[t.knob]?.name ?? `Knob ${t.knob + 1}`
       return `META K${t.knob + 1} (${name})`

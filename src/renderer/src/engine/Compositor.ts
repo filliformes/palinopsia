@@ -32,6 +32,7 @@ import { makeConvNode, isNativeNode, type ConvNode } from './convNodes';
 import { TextSource } from './TextSource';
 import { DepthShadow } from './depthShadow';
 import { OutputShape } from './outputShape';
+import { PbrLib } from './pbrTextures';
 import type { SidechainRef } from '@shared/types';
 import { VideoSource } from './VideoSource';
 import { CaptureSource } from './CaptureSource';
@@ -496,6 +497,12 @@ class FxRack {
     else u.isf?.setValue(name, value);
   }
 
+  /** Feed a raw GL texture into one ISF unit's image input (via the texture
+   *  bridge) — the Context PBR maps ride this every frame. */
+  setUnitImage(instId: string, name: string, tex: import('./isfTextureBridge').TextureHandle): void {
+    this.units.find((x) => x.instId === instId)?.isf?.setValue(name, tex);
+  }
+
   /** Assign this rack's clock (per-layer Speed — see isfTextureBridge). */
   setTime(tSec: number): void {
     for (const u of this.units) {
@@ -880,8 +887,15 @@ export class Compositor {
   private fzAngle = 0;
   private fzPosX = 0;
   private fzPosY = 0;
-  private fzBgLayer = false; // outside fill = the Background slab (moved here)
+  private fzBgSrc = 0; // raw outBgSource (0 colour · 1 bg layer)
   private fzBgColor: number[] = [0, 0, 0];
+  private fzDepth = 0; // shape drop-shadow onto the fill (float-over feel)
+  private fzInstId: string | null = null; // the pinned finalizer's instance id
+  private pbrLib: PbrLib | null = null; // Context PBR material maps (lazy)
+  // Outside fill = the Background slab, only meaningful with a shape active.
+  private get fzBgLayer(): boolean {
+    return this.fzShape > 0 && this.fzBgSrc === 1;
+  }
   private shared: SharedGL;
   private chain: ChainBuffers;
   private mixTarget: { fbo: WebGLFramebuffer; tex: WebGLTexture };
@@ -1183,19 +1197,52 @@ export class Compositor {
     const fin = c.master.find((f) => f.shaderId === 'fx-finalizer' && f.enabled);
     const fi = fin?.inputs ?? {};
     const numf = (v: number | number[] | undefined, d: number): number => (typeof v === 'number' ? v : d);
+    this.fzInstId = fin?.id ?? null;
     this.fzShape = fin ? Math.round(numf(fi.outShape, 0)) : 0;
     this.fzSize = numf(fi.outSize, 0.7);
     this.fzAngle = numf(fi.outAngle, 0);
     this.fzPosX = numf(fi.outPosX, 0);
     this.fzPosY = numf(fi.outPosY, 0);
-    this.fzBgLayer = this.fzShape > 0 && Math.round(numf(fi.outBgSource, 0)) === 1;
+    this.fzBgSrc = Math.round(numf(fi.outBgSource, 0));
     this.fzBgColor = Array.isArray(fi.outBgColor) ? fi.outBgColor : [0, 0, 0];
+    this.fzDepth = numf(fi.outDepth, 0);
+
+    // Context PBR surface: feed the selected material's maps (or the neutral
+    // flat set) into the Context unit's image inputs every frame. Lazy — no
+    // texture leaves disk until a material is first selected.
+    const ctx = c.master.find((f) => f.shaderId === 'fx-context');
+    if (ctx) {
+      if (!this.pbrLib) this.pbrLib = new PbrLib(this.gl);
+      const idx = Math.round(numf(ctx.inputs.pbrTexture, 0));
+      const maps = idx > 0 ? this.pbrLib.get(idx) : this.pbrLib.neutralMaps();
+      this.masterRack.setUnitImage(ctx.id, 'pbrNormal', maps.normal);
+      this.masterRack.setUnitImage(ctx.id, 'pbrHeight', maps.height);
+      this.masterRack.setUnitImage(ctx.id, 'pbrAO', maps.ao);
+      // Texture "off" hard-zeroes the relief so the stage is a guaranteed
+      // passthrough whatever the sliders hold.
+      if (idx === 0) this.masterRack.setUnitInput(ctx.id, 'pbrAmount', 0);
+    }
   }
 
   /** Direct write to an FX unit's ISF input in any rack (modulation path). */
   setFxInput(scope: FxScope, instId: string, name: string, value: number | number[]): void {
     if (scope.kind === 'master') {
       this.masterRack.setUnitInput(instId, name, value);
+      // The Finalizer's out* params are applied NATIVELY (the shader ignores
+      // them) — mirror modulated writes onto the fz fields, else modulation
+      // moves the sliders but never the picture. syncFromState sets the base
+      // each frame; applyModulation runs after it, so this wins the frame.
+      if (instId === this.fzInstId && typeof value === 'number') {
+        switch (name) {
+          case 'outShape': this.fzShape = Math.round(value); break;
+          case 'outSize': this.fzSize = value; break;
+          case 'outAngle': this.fzAngle = value; break;
+          case 'outPosX': this.fzPosX = value; break;
+          case 'outPosY': this.fzPosY = value; break;
+          case 'outBgSource': this.fzBgSrc = Math.round(value); break;
+          case 'outDepth': this.fzDepth = value; break;
+        }
+      }
       return;
     }
     if (scope.kind === 'background') {
@@ -1207,6 +1254,13 @@ export class Compositor {
     const rack =
       scope.kind === 'layer' ? L.rackLayer : scope.kind === 'sourceA' ? L.rackA : L.rackB;
     rack.setUnitInput(instId, name, value);
+  }
+
+  /** Direct write to the Background slab's source ISF input (modulation path).
+   *  syncFromState re-applies the store base each frame first, so a modulated
+   *  write here wins the frame it lands in — same contract as setFxInput. */
+  setBgSourceInput(name: string, value: number | number[]): void {
+    this.bgIsf?.setValue(name, value);
   }
 
   /** Composite top texture over base into target using the given blend mode. */
@@ -1413,7 +1467,7 @@ export class Compositor {
       const fill = this.fzBgLayer && haveBgFill ? this.bgFill.tex : null;
       this.outputShape.apply(
         composite, fill, this.fzBgColor, this.fzShape, this.fzSize, this.fzAngle,
-        this.fzPosX, this.fzPosY, this.w / this.h, this.mixTarget.fbo, this.w, this.h
+        this.fzPosX, this.fzPosY, this.fzDepth, this.w / this.h, this.mixTarget.fbo, this.w, this.h
       );
       composite = this.mixTarget.tex;
     }
@@ -1481,6 +1535,7 @@ export class Compositor {
     this.bgRack.dispose();
     this.depthShadow?.dispose();
     this.outputShape?.dispose();
+    this.pbrLib?.dispose();
     disposeTarget(gl, this.bgScratch);
     disposeTarget(gl, this.bgFill);
     this.acc.dispose(gl);

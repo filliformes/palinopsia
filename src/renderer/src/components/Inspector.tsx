@@ -143,6 +143,7 @@ export function Inspector(): JSX.Element {
       title = SHADER_BY_ID[bg.source.shaderId]?.name ?? bg.source.shaderId
       context = 'background'
       onChange = (n, v) => setBackgroundInput(n, v)
+      modTargetFor = (input) => ({ kind: 'bgSource', input })
     }
   } else if (selection?.type === 'fx') {
     const { scope, instId } = selection

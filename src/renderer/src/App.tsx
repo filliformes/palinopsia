@@ -448,7 +448,12 @@ export default function App(): JSX.Element {
   useEffect(() => {
     const off = window.api.onAppBeforeClose(async () => {
       try {
-        await window.api.sessionSaveToDefault(useStore.getState().exportSession())
+        // Overwrite the session's own file when it has one; only unnamed
+        // sessions land in Sessions/<name>.opsia.json (also overwritten —
+        // quitting must never mint a new "Untitled (N)" file).
+        const st = useStore.getState()
+        if (st.sessionPath) await window.api.sessionSave(st.exportSession(), st.sessionPath)
+        else await window.api.sessionSaveToDefault(st.exportSession())
       } catch {
         /* best-effort autosave on quit */
       }
@@ -470,23 +475,50 @@ export default function App(): JSX.Element {
   async function openSession(): Promise<void> {
     const res = await window.api.sessionOpen()
     if (res) {
+      // Silently save the session being left so switching A→B→A round-trips
+      // everything (scenes included). Unnamed sessions go to the default
+      // Sessions/<name> file rather than being lost.
+      try {
+        const st = useStore.getState()
+        if (st.sessionPath) await window.api.sessionSave(st.exportSession(), st.sessionPath)
+        else await window.api.sessionSaveToDefault(st.exportSession())
+      } catch {
+        /* best-effort — never block the open */
+      }
       useStore.getState().loadSession(res.session)
       useStore.getState().setSessionPath(res.path) // Save now overwrites this file
     }
   }
 
+  // One-shot blue flash on the Save button (dataFLOU's confirmation gesture) —
+  // class re-add restarts the animation on every successful save.
+  const saveBtnRef = useRef<HTMLButtonElement>(null)
+  function flashSave(): void {
+    const el = saveBtnRef.current
+    if (!el) return
+    el.classList.remove('flash-blue')
+    void el.offsetWidth
+    el.classList.add('flash-blue')
+  }
+
   // Save As — always prompts; remembers the chosen path for later plain Saves.
-  async function saveSessionAs(): Promise<void> {
+  async function saveSessionAs(): Promise<boolean> {
     const path = await window.api.sessionSaveAs(useStore.getState().exportSession())
     if (path) useStore.getState().setSessionPath(path)
+    return path != null
   }
 
   // Save — overwrites the current file in place (no dialog). Falls back to Save
   // As the first time (nothing saved/opened yet).
   async function saveSession(): Promise<void> {
     const st = useStore.getState()
-    if (st.sessionPath) await window.api.sessionSave(st.exportSession(), st.sessionPath)
-    else await saveSessionAs()
+    if (st.sessionPath) {
+      await window.api.sessionSave(st.exportSession(), st.sessionPath)
+      flashSave()
+    } else if (await saveSessionAs()) {
+      // First-time save promotes Save As → Save; confirm that one too.
+      flashSave()
+    }
   }
 
   return (
@@ -549,8 +581,19 @@ export default function App(): JSX.Element {
         </div>
         <button
           className="btn text-[12px]"
-          onClick={() => useStore.getState().newSession()}
-          title="New blank session (undoable)"
+          onClick={async () => {
+            // Same silent save-before-leaving as Open — New must not lose the
+            // current session's scenes.
+            try {
+              const st = useStore.getState()
+              if (st.sessionPath) await window.api.sessionSave(st.exportSession(), st.sessionPath)
+              else await window.api.sessionSaveToDefault(st.exportSession())
+            } catch {
+              /* best-effort */
+            }
+            useStore.getState().newSession()
+          }}
+          title="New blank session (undoable; the current session is saved first)"
         >
           New
         </button>
@@ -558,6 +601,7 @@ export default function App(): JSX.Element {
           Open
         </button>
         <button
+          ref={saveBtnRef}
           className="btn text-[12px]"
           onClick={saveSession}
           title="Save — overwrites the current file (Save As the first time)"
@@ -566,7 +610,7 @@ export default function App(): JSX.Element {
         </button>
         <button
           className="btn text-[12px]"
-          onClick={saveSessionAs}
+          onClick={() => void saveSessionAs()}
           title="Save As — choose a new file"
         >
           Save As

@@ -4,12 +4,14 @@
 // its parameters stacked vertically. Default collapsed.
 
 import type { FxInstance, ModTarget } from '@shared/types'
+import { useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { randomizeInputs } from '../randomize'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { inputsForShader } from '../shaders/isf/inputs'
 import { PRESETS_BY_ID } from '../shaders/isf/presets'
-import { useStore } from '../store'
-import { AutoControls, XYControl } from './AutoControls'
+import { modTargetKey, useStore } from '../store'
+import { AssignContext, AssignRow, AutoControls, XYControl } from './AutoControls'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 
@@ -51,19 +53,73 @@ export function FinishingTouches(): JSX.Element {
   const order = ['fx-vibe', 'fx-context', 'fx-finalizer']
   const units = order.map((id) => master.find((f) => f.shaderId === id)).filter((u): u is FxInstance => !!u)
   const on = units.length > 0 && units.every((u) => u.enabled)
+  // M buttons open the DEDICATED Modulate section pinned at the bottom of this
+  // column (mirrors the main Inspector's side panel) — never the old popover.
+  const [assign, setAssign] = useState<{ target: ModTarget; label: string } | null>(null)
   return (
-    <div className="flex flex-col gap-1.5">
-      {/* Global bypass for the whole finishing bank. */}
-      <div className="flex items-center gap-2">
-        <span className="font-mono text-[9px] uppercase tracking-wide text-muted">finishing</span>
-        <FinishingToggle on={on} onClick={toggleFinishing} />
-        <span className="font-mono text-[9px] text-muted">
-          Vibe · Context · Finalizer {on ? '' : '— bypassed'}
-        </span>
+    <AssignContext.Provider
+      value={{
+        activeKey: assign ? modTargetKey(assign.target) : null,
+        onAssign: (target, label) =>
+          setAssign((cur) =>
+            cur && modTargetKey(cur.target) === modTargetKey(target) ? null : { target, label }
+          )
+      }}
+    >
+      <div className="flex min-h-full flex-col gap-1.5">
+        {/* Global bypass for the whole finishing bank. */}
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[9px] uppercase tracking-wide text-muted">finishing</span>
+          <FinishingToggle on={on} onClick={toggleFinishing} />
+          <span className="font-mono text-[9px] text-muted">
+            Vibe · Context · Finalizer {on ? '' : '— bypassed'}
+          </span>
+        </div>
+        {units.map((u) => (
+          <FinalizerSection key={u.id} inst={u} />
+        ))}
+        {assign && (
+          <FinishingAssign target={assign.target} label={assign.label} onClose={() => setAssign(null)} />
+        )}
       </div>
-      {units.map((u) => (
-        <FinalizerSection key={u.id} inst={u} />
-      ))}
+    </AssignContext.Provider>
+  )
+}
+
+// The Finishing column's Modulate section — pinned to the very bottom (sticky
+// inside the column's scrollport), full column width, min-w-0 throughout so
+// nothing escapes the margins however narrow the column is resized.
+function FinishingAssign({
+  target,
+  label,
+  onClose
+}: {
+  target: ModTarget
+  label: string
+  onClose: () => void
+}): JSX.Element {
+  const key = modTargetKey(target)
+  const bound = useStore(
+    useShallow((s) => s.composition.modMatrix.filter((a) => modTargetKey(a.target) === key))
+  )
+  return (
+    <div className="sticky bottom-0 z-10 mt-auto min-w-0 rounded-md border border-accent2/40 bg-panel pt-0">
+      <div className="flex min-w-0 items-center gap-2 border-b border-border px-2 py-1">
+        <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-accent2">modulate</span>
+        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold" title={label}>
+          {label}
+        </span>
+        <button
+          onClick={onClose}
+          className="shrink-0 font-mono text-[11px] text-muted hover:text-text"
+          title="Close"
+        >
+          ✕
+        </button>
+      </div>
+      <div className="min-w-0 p-1.5">
+        <AssignRow target={target} bound={bound} />
+      </div>
     </div>
   )
 }

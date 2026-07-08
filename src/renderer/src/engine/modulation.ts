@@ -573,6 +573,7 @@ export const metaLiveValues = new Map<number, number>()
 
 function liveKey(t: import('@shared/types').ModTarget): string {
   if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
+  if (t.kind === 'bgSource') return `bgsrc:${t.input}`
   if (t.kind === 'meta') return `meta:${t.knob}`
   const s = t.scope
   const scopeKey =
@@ -658,6 +659,7 @@ export function applyModulation(
       name: string,
       value: number
     ) => void
+    setBgSourceInput: (name: string, value: number) => void
   },
   c: CompositionState,
   values: number[],
@@ -675,6 +677,8 @@ export function applyModulation(
       const layer = c.layers[t.layer]
       const slot = t.slot === 'A' ? layer?.sourceA : layer?.sourceB
       shaderId = slot?.shaderId ?? null
+    } else if (t.kind === 'bgSource') {
+      shaderId = c.background?.source.shaderId ?? null
     } else {
       const s = t.scope
       const arr =
@@ -696,6 +700,7 @@ export function applyModulation(
     if (value === null) return
     liveModValues.set(liveKey(t), value)
     if (t.kind === 'source') comp.layers[t.layer]?.setInput(t.slot, t.input, value)
+    else if (t.kind === 'bgSource') comp.setBgSourceInput(t.input, value)
     else comp.setFxInput(t.scope, t.instId, t.input, value)
   }
 
@@ -732,6 +737,16 @@ export function applyModulation(
       if (final === null) continue
       liveModValues.set(liveKey(a.target), final)
       comp.layers[a.target.layer]?.setInput(a.target.slot, a.target.input, final)
+    } else if (a.target.kind === 'bgSource') {
+      const src = c.background?.source
+      if (!src?.shaderId) continue
+      const input = a.target.input
+      const d = descFor(src.shaderId).find((x) => x.name === input)
+      if (!d) continue
+      const final = inputValueFromSwing(d, src.inputs[input], v, a.depth)
+      if (final === null) continue
+      liveModValues.set(liveKey(a.target), final)
+      comp.setBgSourceInput(input, final)
     } else {
       const { scope, instId, input } = a.target
       let arr = c.master

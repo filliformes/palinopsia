@@ -296,6 +296,7 @@ export type Selection =
 /** Stable identity for a mod target — used to find existing assignments. */
 export function modTargetKey(t: ModTarget): string {
   if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
+  if (t.kind === 'bgSource') return `bgsrc:${t.input}`
   if (t.kind === 'meta') return `meta:${t.knob}`
   const s = t.scope
   const scopeKey =

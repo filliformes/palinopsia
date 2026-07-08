@@ -50,6 +50,8 @@ function applyDest(target: ModTarget, shaped: number): void {
     const layer = c.layers[target.layer]
     const slot = target.slot === 'A' ? layer?.sourceA : layer?.sourceB
     shaderId = slot?.shaderId ?? null
+  } else if (target.kind === 'bgSource') {
+    shaderId = c.background?.source.shaderId ?? null
   } else {
     const s = target.scope
     const arr =
@@ -71,6 +73,8 @@ function applyDest(target: ModTarget, shaped: number): void {
   if (value === null) return
   if (target.kind === 'source') {
     st.setSourceInput(target.layer, target.slot, target.input, value)
+  } else if (target.kind === 'bgSource') {
+    st.setBackgroundInput(target.input, value)
   } else {
     st.setFxInput(target.scope, target.instId, target.input, value)
   }

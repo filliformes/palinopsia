@@ -278,8 +278,10 @@ export interface ModulatorConfig {
 
 // What an assignment modulates: float ISF inputs, or a Meta knob (the
 // modulator then drives every destination the knob carries — macro motion).
+// 'bgSource' addresses the Background slab's single source (no layer/slot).
 export type ModTarget =
   | { kind: 'source'; layer: number; slot: 'A' | 'B'; input: string }
+  | { kind: 'bgSource'; input: string }
   | { kind: 'fx'; scope: FxScope; instId: string; input: string }
   | { kind: 'meta'; knob: number }
 

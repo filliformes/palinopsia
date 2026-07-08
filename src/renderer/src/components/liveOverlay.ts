@@ -8,7 +8,7 @@
 import { liveModValues } from '../engine/modulation'
 
 interface LiveSub {
-  el: HTMLInputElement
+  el: HTMLInputElement | HTMLSelectElement
   key: string
   format: (v: number) => string
 }

@@ -61,11 +61,24 @@ function ModButton({
   useEffect(() => setOpen(false), [key])
   const isBound = bound.length > 0
   const active = activeKey === key
+  // Right-click = kill switch: clear EVERY modulation on this parameter —
+  // all direct M1–8 bindings and every Meta knob carrying it as a destination.
+  function clearAll(): void {
+    const st = useStore.getState()
+    for (const b of bound) st.removeAssignment(b.id)
+    st.composition.metaKnobs.forEach((k, i) => {
+      if (k.destinations.some((d) => modTargetKey(d) === key)) st.toggleMetaDest(i, target)
+    })
+  }
   return (
     <>
       <button
         ref={btnRef}
         onClick={() => (onAssign ? onAssign(target, label) : setOpen((o) => !o))}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          clearAll()
+        }}
         className={`shrink-0 rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
           isBound
             ? 'bg-accent/20 text-accent ring-1 ring-accent'
@@ -75,7 +88,7 @@ function ModButton({
                 ? 'bg-panel3 text-text'
                 : 'bg-panel3/60 text-muted hover:text-text'
         }`}
-        title={`Modulate ${label}`}
+        title={`Modulate ${label} — right-click clears all its modulation`}
       >
         M{isBound ? bound.map((b) => b.mod + 1).join('') : ''}
       </button>
@@ -340,8 +353,8 @@ function FloatControl({
       <div className="flex min-w-0 flex-col gap-0.5">
         <div className="flex min-w-0 items-center gap-1.5">
           <span
-            className="w-16 shrink-0 truncate font-mono text-[9px] uppercase tracking-wide text-muted"
-            title={inp.name}
+            className="w-20 shrink-0 truncate font-mono text-[9px] uppercase tracking-wide text-muted"
+            title={inp.label}
           >
             {inp.label}
           </span>
@@ -493,7 +506,9 @@ export function AssignRow({
     <div className="flex flex-col gap-1 rounded border border-border bg-panel2/60 p-1">
       <div className="flex min-w-0 items-center gap-1">
         <span className="w-8 shrink-0 font-mono text-[8px] uppercase text-muted">mod</span>
-        <div className="flex flex-wrap gap-0.5">
+        {/* Buttons share the row's width evenly so the panel stays inside its
+            margins at ANY width (main side panel, popover, Finishing column). */}
+        <div className="flex min-w-0 flex-1 gap-0.5">
           {Array.from({ length: 8 }, (_, i) => {
             const existing = bound.find((b) => b.mod === i)
             return (
@@ -505,7 +520,7 @@ export function AssignRow({
                     // Cap reached — the matrix stays legible by design.
                   }
                 }}
-                className={`rounded px-1 py-0.5 font-mono text-[9px] transition-colors ${
+                className={`min-w-0 flex-1 rounded px-0.5 py-0.5 font-mono text-[9px] transition-colors ${
                   existing
                     ? 'bg-accent/25 text-accent ring-1 ring-accent'
                     : 'bg-panel3/60 text-muted hover:text-text'
@@ -534,25 +549,33 @@ export function AssignRow({
         </div>
       ))}
       {/* Meta knobs — K1..K16; a knob drives this input absolutely through
-          its curve over the input's declared range (up to 8 dests/knob). */}
+          its curve over the input's declared range (up to 8 dests/knob).
+          EXACTLY two rows, row-major: K1–K9 then K10–K16 (with the MOD line
+          above, the whole panel is the fixed three-row shape). */}
       {!hideMeta && (
         <div className="flex min-w-0 items-start gap-1">
           <span className="w-8 shrink-0 pt-0.5 font-mono text-[8px] uppercase text-muted">meta</span>
-          {/* Always THREE rows; columns flow to fit (K1-K16 down each column). */}
-          <div className="grid min-w-0 flex-1 grid-flow-col grid-rows-3 gap-0.5">
-            {metaBound.map((on, i) => (
-              <button
-                key={i}
-                onClick={() => toggleMetaDest(i, target)}
-                className={`rounded px-1 py-0.5 font-mono text-[8px] transition-colors ${
-                  on
-                    ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
-                    : 'bg-panel3/60 text-muted hover:text-text'
-                }`}
-                title={`${on ? 'Unbind' : 'Bind'} Meta knob ${i + 1}`}
-              >
-                K{i + 1}
-              </button>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            {[metaBound.slice(0, 9), metaBound.slice(9)].map((row, r) => (
+              <div key={r} className="flex min-w-0 gap-0.5">
+                {row.map((on, j) => {
+                  const i = r * 9 + j
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => toggleMetaDest(i, target)}
+                      className={`min-w-0 flex-1 rounded px-0.5 py-0.5 font-mono text-[8px] transition-colors ${
+                        on
+                          ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
+                          : 'bg-panel3/60 text-muted hover:text-text'
+                      }`}
+                      title={`${on ? 'Unbind' : 'Bind'} Meta knob ${i + 1}`}
+                    >
+                      K{i + 1}
+                    </button>
+                  )
+                })}
+              </div>
             ))}
           </div>
         </div>
@@ -682,13 +705,33 @@ function EnumControl({
   const v = typeof value === 'number' ? value : def
   const values = inp.values ?? []
   const labels = inp.labels ?? values.map(String)
+  const target = modTargetFor?.(inp.name)
+  const targetKey = target ? modTargetKey(target) : null
+  const bound = useBound(targetKey)
+  const isModulated = bound.length > 0
+  // A modulated dropdown tracks the LIVE selection (the engine snaps enums to
+  // declared values, so the live value always matches an <option>) and turns
+  // accent2 like modulated sliders. React keeps rendering the BASE value; the
+  // shared overlay repaints the DOM selection each rAF, skipped while focused.
+  const selRef = useRef<HTMLSelectElement | null>(null)
+  useEffect(() => {
+    const el = selRef.current
+    if (!isModulated || !targetKey || !el) return
+    return registerLiveOverlay({ el, key: targetKey, format: (x) => String(Math.round(x)) })
+  }, [isModulated, targetKey])
   return (
     <div className="flex w-44 min-w-0 flex-col gap-0.5">
       <LabelRow inp={inp} modTargetFor={modTargetFor} />
       <select
-        className="input text-[11px]"
+        ref={selRef}
+        className={`input text-[11px] ${isModulated ? '!border-accent2 !text-accent2' : ''}`}
         value={v}
         onChange={(e) => onChange(inp.name, Number(e.target.value))}
+        title={
+          isModulated
+            ? `${inp.label} — modulated (showing the live selection; picking sets the base)`
+            : inp.label
+        }
       >
         {values.map((val, i) => (
           <option key={val} value={val}>

@@ -137,12 +137,18 @@ function randomizeOneInput(
 
 /** Randomize every input of one shader within curated ranges — used by
  *  Randomize scopes and by the Inspector's ⚄ button. */
+// Params Randomize must never touch (like the Text source): the Context PBR
+// surface is a deliberate staging decision, not a texture to dice-roll.
+const RANDOMIZE_SKIP: Record<string, RegExp> = { 'fx-context': /^pbr/ }
+
 export function randomizeInputs(
   shaderId: string,
   current: Record<string, number | number[]>
 ): Record<string, number | number[]> {
   const out: Record<string, number | number[]> = { ...current }
+  const skip = RANDOMIZE_SKIP[shaderId]
   for (const d of inputsForShader(shaderId)) {
+    if (skip?.test(d.name)) continue
     out[d.name] = randomizeOneInput(shaderId, d, current[d.name])
   }
   return out
@@ -286,6 +292,7 @@ export function collectFloatTargets(c: CompositionState): ModTarget[] {
 
 function targetKey(t: ModTarget): string {
   if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
+  if (t.kind === 'bgSource') return `bgsrc:${t.input}`
   if (t.kind === 'meta') return `meta:${t.knob}`
   const s = t.scope
   return `fx:${s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`}:${t.instId}:${t.input}`
