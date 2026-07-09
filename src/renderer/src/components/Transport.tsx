@@ -129,8 +129,8 @@ export function Transport(): JSX.Element {
   const current = SCOPES.find((s) => s.scope === scope) ?? SCOPES[0]
 
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border bg-panel px-2 py-1.5">
-      <div className="flex items-center gap-1.5">
+    <div className="flex flex-nowrap items-center gap-x-2 overflow-hidden border-t border-border bg-panel px-2 py-1.5">
+      <div className="flex shrink-0 items-center gap-1.5">
         <span className="font-mono text-[10px] text-muted">BPM</span>
         <div className="w-10">
           <BoundedNumberInput
@@ -145,7 +145,7 @@ export function Transport(): JSX.Element {
       </div>
 
       {/* Global speed : scales every visual clock, 1/64×…64× (log). */}
-      <div className="flex items-center gap-1">
+      <div className="flex min-w-0 items-center gap-1">
         <span className="font-mono text-[10px] text-muted">SPD</span>
         <input
           type="range"
@@ -155,14 +155,14 @@ export function Transport(): JSX.Element {
           value={Math.log2(globalSpeed)}
           onChange={(e) => setGlobalSpeed(Math.pow(2, Number(e.target.value)))}
           onDoubleClick={() => setGlobalSpeed(1)}
-          className="w-20 accent-accent"
+          className="w-20 min-w-0 accent-accent"
           title={`Global speed ${fmtSpeed(globalSpeed)} : double-click to reset to 1×`}
         />
         <span className="w-7 shrink-0 font-mono text-[9px] text-muted">{fmtSpeed(globalSpeed)}</span>
       </div>
 
       {/* Morph : scene recalls & Randomize crossfade over this time. */}
-      <div className="flex items-center gap-1">
+      <div className="flex min-w-0 items-center gap-1">
         <span className="font-mono text-[10px] text-muted">MRPH</span>
         <input
           type="range"
@@ -172,7 +172,7 @@ export function Transport(): JSX.Element {
           value={msToT(morphMs)}
           onChange={(e) => setMorphMs(tToMs(Number(e.target.value)))}
           onDoubleClick={() => setMorphMs(1000)}
-          className="w-16 accent-accent"
+          className="w-16 min-w-0 accent-accent"
           title={`Scene / Randomize morph ${fmtMorph(morphMs)} : double-click for 1s`}
         />
         <span className="w-8 shrink-0 font-mono text-[9px] text-muted">{fmtMorph(morphMs)}</span>
@@ -180,7 +180,7 @@ export function Transport(): JSX.Element {
 
       {/* World / diegesis : the active "proposed world" biases coupling + Context
           mood + audio routing. The ⧉ button opens the World editor (also W). */}
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <span className="font-mono text-[10px] text-muted">WRLD</span>
         <select
           className="input select-compact text-[11px]"
@@ -205,7 +205,7 @@ export function Transport(): JSX.Element {
 
       {/* Seq + Proximity : nudged right of the World block so they read as their
           own macro group, detached from the World section. */}
-      <div className="ml-1 flex items-center gap-1.5">
+      <div className="ml-1 flex min-w-0 items-center gap-1.5">
         <button
           onClick={() => setSequencePageOpen(true)}
           className={`shrink-0 rounded border px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide transition-colors ${
@@ -219,7 +219,7 @@ export function Transport(): JSX.Element {
         </button>
         {/* Proximity (Field macro) : one knob places the image in a depth zone,
             far/vista ↔ close/personal, by pushing the Context mood. */}
-        <div className="flex items-center gap-1">
+        <div className="flex min-w-0 items-center gap-1">
           <span className="font-mono text-[9px] text-muted">PROX</span>
           <input
             type="range"
@@ -229,7 +229,7 @@ export function Transport(): JSX.Element {
             value={proximity}
             onChange={(e) => setProximity(Number(e.target.value))}
             onDoubleClick={() => setProximity(0.5)}
-            className="w-16 accent-accent"
+            className="w-16 min-w-0 accent-accent"
             title={`Proximity ${proximity < 0.48 ? 'far' : proximity > 0.52 ? 'close' : 'neutral'} : vista ↔ personal (double-click: neutral)`}
           />
           <button
@@ -243,8 +243,9 @@ export function Transport(): JSX.Element {
           </button>
         </div>
         {/* Field macros + temperament : spatial-material + film globals. Grouped
-            with breathing room; the bar wraps (flex-wrap) if the window is narrow. */}
-        <div className="flex items-center gap-2">
+            with breathing room; sliders cram (shrink) rather than ever wrap to a
+          second row on a narrow window. */}
+        <div className="flex min-w-0 items-center gap-2">
           <MacroKnob label="DENS" value={density} onChange={setDensity}
             title="Density : sparse ↔ dense (fades upper layers / fills them in). 0.5 neutral · double-click resets" />
           <MacroKnob label="G↔T" value={gestureTexture} onChange={setGestureTexture}
@@ -266,7 +267,7 @@ export function Transport(): JSX.Element {
           (structure fixed, continuous values nudged). `ml-auto` pushes this +
           amt + Randomize to the right edge when there's room, and keeps them
           together (never off-screen) when the bar wraps on a narrow window. */}
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto flex min-w-0 items-center gap-1">
         <button
           onClick={() => applyVariation(varAmt)}
           className="rounded border border-accent2/60 bg-accent2/10 px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent2 transition-colors hover:bg-accent2/20"
@@ -281,7 +282,7 @@ export function Transport(): JSX.Element {
           step={0.01}
           value={varAmt}
           onChange={(e) => changeVarAmt(Number(e.target.value))}
-          className="w-14 accent-accent2"
+          className="w-14 min-w-0 accent-accent2"
           title={`Variation amount ${pct(varAmt)}`}
         />
         <span className="w-7 shrink-0 font-mono text-[9px] text-muted">{pct(varAmt)}</span>
@@ -289,9 +290,9 @@ export function Transport(): JSX.Element {
 
       {/* Randomize: chevron selects the mode, button fires it; the amount slider
           scales it from a gentle walk (low %) to a full re-roll (100%). */}
-      <div className="flex items-center gap-1">
+      <div className="flex min-w-0 items-center gap-1">
         <span
-          className="font-mono text-[9px] uppercase text-muted"
+          className="shrink-0 font-mono text-[9px] uppercase text-muted"
           title="Randomize intensity : low = a gentle walk from the current scene, 100% = a full structural re-roll"
         >
           amt
@@ -303,7 +304,7 @@ export function Transport(): JSX.Element {
           step={0.01}
           value={intensity}
           onChange={(e) => changeIntensity(Number(e.target.value))}
-          className="w-14 accent-accent"
+          className="w-14 min-w-0 accent-accent"
           title={`Randomize intensity ${pct(intensity)}`}
         />
         <span className="w-7 shrink-0 font-mono text-[9px] text-muted">{pct(intensity)}</span>
@@ -363,8 +364,8 @@ function MacroKnob({
 }): JSX.Element {
   const active = Math.abs(value - neutral) > 0.02
   return (
-    <div className="flex items-center gap-1" title={title}>
-      <span className={`font-mono text-[9px] ${active ? 'text-accent2' : 'text-muted'}`}>{label}</span>
+    <div className="flex min-w-0 items-center gap-1" title={title}>
+      <span className={`shrink-0 font-mono text-[9px] ${active ? 'text-accent2' : 'text-muted'}`}>{label}</span>
       <input
         type="range"
         min={0}
@@ -373,7 +374,7 @@ function MacroKnob({
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         onDoubleClick={() => onChange(neutral)}
-        className="w-11 accent-accent2"
+        className="w-11 min-w-0 accent-accent2"
       />
     </div>
   )
