@@ -1,0 +1,540 @@
+<title>Opsia · OSC Reference</title>
+<style>
+  :root {
+    --bg: #1e1e1e;
+    --panel: #242424;
+    --panel2: #2a2a2a;
+    --line: #383838;
+    --line-soft: #2f2f2f;
+    --accent: #ff8e0f;
+    --cyan: #37c6f2;
+    --text: #dcdcdc;
+    --muted: #8a8a8a;
+    --faint: #6a6a6a;
+    --danger: #eb5f5f;
+    --good: #7bb661;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #e6e1d6;
+      --panel: #ece7db;
+      --panel2: #e1dccf;
+      --line: #c7bfad;
+      --line-soft: #d3cbb9;
+      --accent: #b3610a;
+      --cyan: #2b7f9e;
+      --text: #2b2a24;
+      --muted: #75705f;
+      --faint: #928c7a;
+      --danger: #b23b3b;
+      --good: #4f7a3a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1e1e1e; --panel: #242424; --panel2: #2a2a2a; --line: #383838; --line-soft: #2f2f2f;
+    --accent: #ff8e0f; --cyan: #37c6f2; --text: #dcdcdc; --muted: #8a8a8a; --faint: #6a6a6a;
+    --danger: #eb5f5f; --good: #7bb661;
+  }
+  :root[data-theme="light"] {
+    --bg: #e6e1d6; --panel: #ece7db; --panel2: #e1dccf; --line: #c7bfad; --line-soft: #d3cbb9;
+    --accent: #b3610a; --cyan: #2b7f9e; --text: #2b2a24; --muted: #75705f; --faint: #928c7a;
+    --danger: #b23b3b; --good: #4f7a3a;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: clamp(20px, 5vw, 64px) clamp(16px, 4vw, 40px) 80px; }
+
+  /* ── Masthead ─────────────────────────────────────────── */
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: clamp(30px, 6vw, 52px);
+    letter-spacing: -0.01em;
+    margin: 14px 0 0;
+    line-height: 1.02;
+    text-wrap: balance;
+  }
+  h1 .slash { color: var(--accent); }
+  .lede {
+    max-width: 60ch;
+    margin: 18px 0 0;
+    color: var(--muted);
+    font-size: 16px;
+  }
+  .lede strong { color: var(--text); font-weight: 600; }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 26px;
+  }
+  .chip {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 5px 10px;
+    white-space: nowrap;
+  }
+  .chip b { color: var(--accent); font-weight: 600; }
+  .chip .c { color: var(--cyan); }
+
+  /* ── Section scaffolding ──────────────────────────────── */
+  section { margin-top: 54px; scroll-margin-top: 20px; }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 10px;
+    margin-bottom: 4px;
+  }
+  .sec-num {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+  }
+  h2 {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 19px;
+    letter-spacing: 0.02em;
+    margin: 0;
+  }
+  .sec-note {
+    margin-left: auto;
+    color: var(--faint);
+    font-size: 12.5px;
+    font-family: var(--mono);
+    letter-spacing: 0.02em;
+  }
+  .blurb { color: var(--muted); font-size: 14px; margin: 14px 0 18px; max-width: 72ch; }
+
+  /* ── Address tables ───────────────────────────────────── */
+  .tbl-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--faint);
+    text-align: left;
+    font-weight: 500;
+    padding: 9px 14px;
+    background: var(--panel2);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  tbody td { padding: 10px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+  .addr { font-family: var(--mono); font-size: 13px; color: var(--text); white-space: nowrap; }
+  .addr .v { color: var(--cyan); }          /* placeholder segments */
+  .addr .lit { color: var(--muted); }        /* /opsia prefix, dimmed */
+  .arg {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  td.desc { color: var(--muted); font-size: 13px; line-height: 1.5; min-width: 220px; }
+  td.desc b { color: var(--text); font-weight: 600; }
+  .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--line);
+    color: var(--faint);
+    vertical-align: middle;
+  }
+  .tag.trig { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+
+  /* ── Conventions grid ─────────────────────────────────── */
+  .conv {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .conv > div { background: var(--panel); padding: 14px 16px; }
+  .conv dt {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .conv dd { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .conv dd code { color: var(--text); }
+  code {
+    font-family: var(--mono);
+    font-size: 0.92em;
+    background: color-mix(in srgb, var(--muted) 14%, transparent);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  /* ── Sync cards ───────────────────────────────────────── */
+  .sync { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 8px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--cyan);
+    border-radius: 6px;
+    padding: 16px 18px;
+  }
+  .card h3 {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    margin: 0 0 8px;
+    color: var(--text);
+  }
+  .card p { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+  .card p:last-child { margin-bottom: 0; }
+  .card .flow { font-family: var(--mono); font-size: 12px; color: var(--cyan); word-break: break-all; }
+  .card .flow .a { color: var(--accent); }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    color: var(--faint);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  a { color: var(--cyan); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Palinopsia · Control Surface</div>
+    <h1>Opsia <span class="slash">/</span> OSC Reference</h1>
+    <p class="lede">Every knob, slab and macro in the instrument answers to an <strong>OSC address</strong>.
+      This is the full <code>/opsia/…</code> namespace — how Pandore, TouchDesigner, or any OSC
+      source plays Opsia, and how Opsia mirrors its state back.</p>
+    <div class="facts">
+      <span class="chip">namespace <b>/opsia/…</b></span>
+      <span class="chip">transport <b>UDP</b></span>
+      <span class="chip">values <b>0 – 1</b> normalized</span>
+      <span class="chip">indices <b>1-based</b></span>
+      <span class="chip">discovery <span class="c">OSCQuery : port+1</span></span>
+    </div>
+  </header>
+
+  <!-- ── Conventions ─────────────────────────────────────── -->
+  <section id="conventions">
+    <div class="sec-head">
+      <span class="sec-num">00</span>
+      <h2>Reading the map</h2>
+      <span class="sec-note">one write path, uniform units</span>
+    </div>
+    <p class="blurb">Continuous controls take a single normalized float, rescaled to the target's
+      declared range on arrival — so a controller never needs to know a parameter's real min/max.
+      A handful of address shapes cover everything else.</p>
+    <dl class="conv">
+      <div><dt>Continuous</dt><dd>One float <code>0..1</code>, scaled into the declared range of the target.</dd></div>
+      <div><dt>Enum</dt><dd>An int index, a float <code>0..1</code> across the members, or the mode's <b>name</b> string.</dd></div>
+      <div><dt>Boolean</dt><dd>True at <code>≥ 0.5</code> (mute · solo · feedback · isolate).</dd></div>
+      <div><dt>Trigger</dt><dd>Fires on the <b>rising edge</b> — send <code>1</code>, then <code>0</code> to re-arm.</dd></div>
+      <div><dt>Color</dt><dd>3–4 raw args <code>r g b [a]</code>, or a single value read as grayscale.</dd></div>
+      <div><dt>Point2D</dt><dd>Two normalized args, each scaled to its own axis range.</dd></div>
+      <div><dt>Indices</dt><dd>Layers, Meta, Scenes, bands and FX slots all count from <code>1</code>.</dd></div>
+      <div><dt>Tempo</dt><dd><code>/opsia/bpm</code> is the one raw value — sent in BPM, clamped <code>20..800</code>.</dd></div>
+    </dl>
+  </section>
+
+  <!-- ── Layers ──────────────────────────────────────────── -->
+  <section id="layers">
+    <div class="sec-head">
+      <span class="sec-num">01</span>
+      <h2>Layers</h2>
+      <span class="sec-note">n = 1 … 4</span>
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/opacity</td><td class="arg">f 0..1</td><td class="desc">Layer <b>opacity</b>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/speed</td><td class="arg">f 0..1</td><td class="desc">Layer time multiplier — <code>0..1</code> maps to <b>0 – 20×</b>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/mix</td><td class="arg">f 0..1</td><td class="desc">A/B source <b>crossfade</b> (0 = A, 1 = B).</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/trail</td><td class="arg">f 0..1</td><td class="desc">Feedback <b>trail</b> persistence.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/blend</td><td class="arg">i · f 0..1</td><td class="desc">Layer <b>blend mode</b> — index or 0..1 across the 15 modes.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/sourceblend</td><td class="arg">i · f 0..1</td><td class="desc">How <b>B combines with A</b> before the crossfade.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/mute</td><td class="arg">≥ 0.5</td><td class="desc">Silence the layer.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/solo</td><td class="arg">≥ 0.5</td><td class="desc">Solo the layer.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/feedback</td><td class="arg">≥ 0.5</td><td class="desc">Layer samples its own previous frame.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Sources & FX ────────────────────────────────────── -->
+  <section id="sources">
+    <div class="sec-head">
+      <span class="sec-num">02</span>
+      <h2>Sources &amp; FX racks</h2>
+      <span class="sec-note">slot = A | B · i = 1-based</span>
+    </div>
+    <p class="blurb">Each layer has two source slots and three FX racks — one per source, plus the mixed
+      layer rack. Any shader input is addressable by its declared name; the value auto-scales to that
+      input's type and range (including <b>color</b> and <b>point2D</b> multi-arg forms).</p>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td class="addr"><span class="lit">…/layer/</span><span class="v">{n}</span>/source/<span class="v">{slot}</span></td><td class="arg">s</td><td class="desc">Swap the source generator — <code>shaderId</code>, display <b>name</b>, or <code>none</code>.</td></tr>
+          <tr><td class="addr"><span class="lit">…/</span>source/<span class="v">{slot}</span>/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">A source shader <b>input</b>, scaled to its range.</td></tr>
+          <tr><td class="addr"><span class="lit">…/</span>source/<span class="v">{slot}</span>/fx/<span class="v">{i}</span>/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">An input on the <b>per-source</b> FX unit <code>i</code>.</td></tr>
+          <tr><td class="addr"><span class="lit">…/layer/</span><span class="v">{n}</span>/fx/<span class="v">{i}</span>/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">An input on the <b>per-layer</b> FX unit <code>i</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Coupling ────────────────────────────────────────── -->
+  <section id="coupling">
+    <div class="sec-head">
+      <span class="sec-num">03</span>
+      <h2>A/B Coupling</h2>
+      <span class="sec-note">per layer · Slab 1</span>
+    </div>
+    <p class="blurb">The audio bond between a layer's two voices — how B answers A.</p>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td class="addr"><span class="lit">…/layer/</span><span class="v">{n}</span>/coupling/mode</td><td class="arg">i · f · s</td><td class="desc">Bond character — <code>off · lean · hocket · cut · gate · drift</code>.</td></tr>
+          <tr><td class="addr"><span class="lit">…/layer/</span><span class="v">{n}</span>/coupling/amount</td><td class="arg">f 0..1</td><td class="desc">Coupling <b>depth</b>.</td></tr>
+          <tr><td class="addr"><span class="lit">…/layer/</span><span class="v">{n}</span>/coupling/tightness</td><td class="arg">f 0..1</td><td class="desc">Vestigial (0) ↔ obvious (1).</td></tr>
+          <tr><td class="addr"><span class="lit">…/layer/</span><span class="v">{n}</span>/coupling/feature</td><td class="arg">i · f · s</td><td class="desc">Driving audio feature — <code>level · flux · transient · centroid · band · pitch</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Master ──────────────────────────────────────────── -->
+  <section id="master">
+    <div class="sec-head">
+      <span class="sec-num">04</span>
+      <h2>Master finishing</h2>
+      <span class="sec-note">always-on chain</span>
+    </div>
+    <p class="blurb">Three locked finalizers close every composition — <b>Vibe</b> (palette / colour mastering),
+      <b>Context</b> (atmosphere, depth, PBR relight) and the <b>Finalizer</b> (levels, grain, output shape).
+      Address any of their inputs by name; freely-added master FX use the numbered rack.</p>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td class="addr"><span class="lit">/opsia/master/</span>vibe/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">A <b>Vibe</b> palette input (colour inputs take 3–4 args).</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/master/</span>context/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">A <b>Context</b> input — haze, depth, light (point2D), PBR.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/master/</span>finalizer/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">A <b>Finalizer</b> input — levels, gain, grain, output shape.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/master/</span>fx/<span class="v">{i}</span>/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">An input on a user-added <b>master</b> FX unit <code>i</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Background ───────────────────────────────────────── -->
+  <section id="background">
+    <div class="sec-head">
+      <span class="sec-num">05</span>
+      <h2>Background</h2>
+      <span class="sec-note">the ground the layers sit over</span>
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td class="addr"><span class="lit">/opsia/</span>bg/opacity</td><td class="arg">f 0..1</td><td class="desc">Background <b>opacity</b> (0 = off).</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>bg/speed</td><td class="arg">f 0..1</td><td class="desc">Background clock multiplier.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>bg/depth</td><td class="arg">f 0..1</td><td class="desc">Contact shadow the foreground casts onto it.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>bg/blend</td><td class="arg">≥ 0.5</td><td class="desc"><code>0</code> = blend · <code>1</code> = isolate the layer group.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>bg/source</td><td class="arg">s</td><td class="desc">Swap the background generator (id · name · <code>none</code>).</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>bg/source/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">A background source <b>input</b>, scaled to range.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>bg/fx/<span class="v">{i}</span>/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">An input on background FX unit <code>i</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Field macros ─────────────────────────────────────── -->
+  <section id="macros">
+    <div class="sec-head">
+      <span class="sec-num">06</span>
+      <h2>Field macros &amp; Proximity</h2>
+      <span class="sec-note">0.5 = deadzone</span>
+    </div>
+    <p class="blurb">Four single-float macros sweep the whole field at once. Each rests at <code>0.5</code> —
+      pushing either way pulls the composition along one expressive axis.</p>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td class="addr"><span class="lit">/opsia/</span>density</td><td class="arg">f 0..1</td><td class="desc">Sparse ⇄ <b>dense</b>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>gesture</td><td class="arg">f 0..1</td><td class="desc"><b>Gesture</b> ⇄ Texture.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>coalesce</td><td class="arg">f 0..1</td><td class="desc">Dispersal ⇄ <b>Coalescence</b>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>proximity</td><td class="arg">f 0..1</td><td class="desc">Near ⇄ far — pushes the scene into depth.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── World & Sequencer ────────────────────────────────── -->
+  <section id="transport">
+    <div class="sec-head">
+      <span class="sec-num">07</span>
+      <h2>World &amp; Sequencer</h2>
+      <span class="sec-note">diégèse · macro-form</span>
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td class="addr"><span class="lit">/opsia/</span>world</td><td class="arg">s · i</td><td class="desc">Select the active <b>World</b> — id / name string, or a 1-based index into the bank.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>seq/run</td><td class="arg">≥ 0.5</td><td class="desc">Run (≥ 0.5) or stop the macro-form <b>sequencer</b>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>seq/skip</td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">Advance to the next scene now (respects transition + variation).</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Meta & Tempo ─────────────────────────────────────── -->
+  <section id="meta">
+    <div class="sec-head">
+      <span class="sec-num">08</span>
+      <h2>Meta knobs &amp; Tempo</h2>
+      <span class="sec-note">k = 1 … 16</span>
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td class="addr"><span class="lit">/opsia/meta/</span><span class="v">{k}</span></td><td class="arg">f 0..1</td><td class="desc">Drive <b>Meta knob</b> <code>k</code> — a smoothed macro that fans out to whatever you've mapped to it.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>bpm</td><td class="arg">f 20..800</td><td class="desc">Master <b>tempo</b> — the one raw value, in BPM.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Audio sensors ────────────────────────────────────── -->
+  <section id="audio">
+    <div class="sec-head">
+      <span class="sec-num">09</span>
+      <h2>Audio sensors</h2>
+      <span class="sec-note">inbound only · Pandore → Opsia</span>
+    </div>
+    <p class="blurb">The audio brain pushes analysis features straight to the bus, where <b>audio modulators</b>
+      read them per frame. These bypass the parameter store — they're sensor inputs, not controls, and are
+      never echoed back on the feedback stream.</p>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td class="addr"><span class="lit">/opsia/audio/</span>level</td><td class="arg">f 0..1</td><td class="desc">Overall <b>loudness</b>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/audio/</span>flux</td><td class="arg">f 0..1</td><td class="desc">Spectral <b>flux</b> — rate of change.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/audio/</span>transient</td><td class="arg">f 0..1</td><td class="desc"><b>Onset</b> / attack energy.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/audio/</span>centroid</td><td class="arg">f 0..1</td><td class="desc">Spectral <b>brightness</b>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/audio/</span>pitch</td><td class="arg">f 0..1</td><td class="desc">Estimated <b>pitch</b>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/audio/</span>band/<span class="v">{1-6}</span></td><td class="arg">f 0..1</td><td class="desc">Energy in one of six frequency <b>bands</b>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Triggers ─────────────────────────────────────────── -->
+  <section id="triggers">
+    <div class="sec-head">
+      <span class="sec-num">10</span>
+      <h2>Scenes &amp; Randomize</h2>
+      <span class="sec-note">rising-edge triggers</span>
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td class="addr"><span class="lit">/opsia/scene/</span><span class="v">{n}</span></td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">Recall <b>scene</b> <code>n</code> (1-based) — full-instrument state.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>randomize</td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">Re-roll <b>everything</b> within curated ranges.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>randomize/<span class="v">{scope}</span></td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">Re-roll one scope — <code>sources · sourceparams · sourcefx · sourcefxonly · layerfxonly · layer · master · finishing · modulators</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Two-way sync ─────────────────────────────────────── -->
+  <section id="sync">
+    <div class="sec-head">
+      <span class="sec-num">11</span>
+      <h2>Discovery &amp; feedback</h2>
+      <span class="sec-note">two-way sync</span>
+    </div>
+    <p class="blurb">Opsia doesn't just receive — it describes itself and mirrors its live state, so a
+      controller's surface can auto-bind and stay in lock-step as modulators sweep, scenes recall, or a
+      hand moves a slider. Three routes, one shared address space.</p>
+    <div class="sync">
+      <div class="card">
+        <h3>OSCQuery · HTTP</h3>
+        <p>The whole parameter tree, self-describing (type · range · value · description). Point a client
+          at the HTTP port to auto-discover every address above.</p>
+        <p class="flow">http://&lt;host&gt;:<span class="a">port+1</span>/  ·  ?HOST_INFO</p>
+      </div>
+      <div class="card">
+        <h3>OSCQuery · WebSocket</h3>
+        <p>A live value-stream on the same port for web / no-UDP clients. Subscribe per path, receive
+          value frames as controls move.</p>
+        <p class="flow">→ {COMMAND:<span class="a">"LISTEN"</span>, DATA:"/opsia/…"}<br>← {FULL_PATH, VALUE:[v]}</p>
+      </div>
+      <div class="card">
+        <h3>Outbound feedback</h3>
+        <p>A throttled diff-and-send loop pushes only <b>changed</b> controls back to a configured
+          host:port — same <code>/opsia/…</code> addresses, same <code>0..1</code>. Pandore's UI tracks Opsia's.</p>
+        <p class="flow"><span class="a">Opsia</span> → UDP → host:port</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Palinopsia — OSC visual instrument</span>
+    <span>/opsia · UDP + OSCQuery · v1</span>
+  </footer>
+</div>
