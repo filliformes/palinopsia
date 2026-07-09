@@ -53,14 +53,15 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
   'node-feedback': [
     { name: 'Slow drift', values: { feedback: 0.85, gain: 1.0, zoom: 0.008, rotate: 0.01, driftX: 0.004, driftY: 0, pivot: 0.5, warp: 0.4, hue: 0, blur: 0.25, blend: 0, agc: 0.5, noise: 0.15 } },
     { name: 'Wandering tunnel', values: { feedback: 0.9, gain: 1.02, zoom: 0.03, rotate: 0.02, driftX: 0, driftY: 0, pivot: 0.7, warp: 0.3, hue: 0.01, blur: 0.2, blend: 0, agc: 0.55, noise: 0.12 } },
-    { name: 'Boiling', values: { feedback: 0.88, gain: 1.0, zoom: 0.005, rotate: 0, driftX: 0, driftY: 0, pivot: 0.4, warp: 0.85, hue: 0.02, blur: 0.3, blend: 0, agc: 0.6, noise: 0.2 } },
+    { name: 'Boiling', values: { feedback: 0.88, gain: 1.0, zoom: 0.005, rotate: 0, driftX: 0, driftY: 0, pivot: 0.4, warp: 0.85, hue: 0.02, hueCurve: 0.45, blur: 0.3, blend: 0, agc: 0.6, noise: 0.2 } },
     { name: 'Comet trails', values: { feedback: 0.8, gain: 0.98, zoom: 0, rotate: 0, driftX: 0.02, driftY: 0.01, pivot: 0.3, warp: 0.2, hue: 0, blur: 0.15, blend: 4, agc: 0.4, noise: 0.1 } },
     { name: 'Light painting', values: { feedback: 0.92, gain: 1.04, zoom: 0.006, rotate: 0.005, driftX: 0, driftY: 0, pivot: 0.5, warp: 0.3, hue: 0, blur: 0.1, blend: 2, agc: 0.5, noise: 0.08 } },
     { name: 'Reaction texture', values: { feedback: 0.86, gain: 1.0, zoom: 0.003, rotate: 0, driftX: 0, driftY: 0, pivot: 0.35, warp: 0.9, hue: 0, blur: 0.4, blend: 0, agc: 0.7, noise: 0.25 } },
     { name: 'Oil slick', values: { feedback: 0.9, gain: 1.0, zoom: 0.004, rotate: 0.008, driftX: 0.003, driftY: -0.003, pivot: 0.6, warp: 0.5, hue: 0.05, blur: 0.45, blend: 0, agc: 0.55, noise: 0.15 } },
     { name: 'Edge of chaos', values: { feedback: 0.94, gain: 1.07, zoom: 0.02, rotate: 0.03, driftX: 0.01, driftY: 0.005, pivot: 0.7, warp: 0.6, hue: 0.03, blur: 0.15, blend: 1, agc: 0.35, noise: 0.1 } },
     { name: 'Ghost smear', values: { feedback: 0.82, gain: 0.96, zoom: 0.002, rotate: 0, driftX: 0.015, driftY: 0, pivot: 0.4, warp: 0.25, hue: 0, blur: 0.5, blend: 0, agc: 0.45, noise: 0.12 } },
-    { name: 'Crystalline', values: { feedback: 0.88, gain: 1.03, zoom: 0.015, rotate: 0.015, driftX: 0, driftY: 0, pivot: 0.55, warp: 0.35, hue: 0, blur: 0.02, blend: 3, agc: 0.5, noise: 0.1 } }
+    { name: 'Crystalline', values: { feedback: 0.88, gain: 1.03, zoom: 0.015, rotate: 0.015, driftX: 0, driftY: 0, pivot: 0.55, warp: 0.35, hue: 0, blur: 0.02, blend: 3, agc: 0.5, noise: 0.1 } },
+    { name: 'Keyed shapes', values: { feedback: 0.9, gain: 1.02, zoom: 0.02, rotate: 0.02, driftX: 0.005, driftY: 0, pivot: 0.6, warp: 0.25, hue: 0.01, blur: 0.1, blend: 0, keyMode: 1, keyThresh: 0.45, keySoft: 0.06, border: 0.5, borderHue: 0.55, agc: 0.5, noise: 0.1 } }
   ],
   // ── Motif (spatial counterpoint / transpose echoes) ──
   'fx-motif': [

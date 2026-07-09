@@ -212,7 +212,8 @@ precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uHost, uPrev;
 uniform vec2 uRes, uOff, uPivot;
 uniform float uFeedback, uGain, uZoom, uRot, uWarp, uHue, uBlur, uAgc, uNoise, uSeed;
-uniform int uBlend;
+uniform float uKeyThresh, uKeySoft, uBorder, uBorderHue, uHueCurve;
+uniform int uBlend, uKeyMode;
 
 float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 vec3 rgb2hsv(vec3 c){
@@ -266,15 +267,38 @@ void main(){
   }
   pv *= uGain * agcCorr;
 
-  if (abs(uHue) > 0.001){ vec3 h = rgb2hsv(pv); h.x = fract(h.x + uHue); pv = hsv2rgb(h); }
+  // Hue cycle : linear rate uHue, made NONLINEAR by uHueCurve (Andrei Jay's
+  // sin(x)+c idea) so the palette churns chaotically instead of drifting evenly.
+  if (abs(uHue) > 0.001 || uHueCurve > 0.001){
+    vec3 h = rgb2hsv(pv);
+    h.x = fract(h.x + uHue * (1.0 + uHueCurve * 3.0 * sin(h.x * 12.566371)));
+    pv = hsv2rgb(h);
+  }
 
+  // KEYER : where the source is keyed out (dark for key-black, bright for
+  // key-white) the feedback fills in; elsewhere the source shows. A bright border
+  // around the key edge re-enters the loop → regenerating hard-edged shapes.
   vec3 src = texture(uHost, vUV).rgb;
+  float fbAmt = uFeedback;
+  float keyed = 0.0;
+  if (uKeyMode > 0){
+    float sl = dot(src, vec3(0.299, 0.587, 0.114));
+    float k = smoothstep(uKeyThresh - uKeySoft - 0.001, uKeyThresh + uKeySoft + 0.001, sl);
+    keyed = (uKeyMode == 1) ? (1.0 - k) : k;
+    fbAmt = uFeedback * keyed;
+  }
+
   vec3 outc;
-  if (uBlend == 1) outc = src + pv * uFeedback;
-  else if (uBlend == 2) outc = 1.0 - (1.0 - src) * (1.0 - pv * uFeedback);
-  else if (uBlend == 3) outc = mix(src, abs(src - pv), uFeedback);
-  else if (uBlend == 4) outc = mix(src, max(src, pv), uFeedback);
-  else outc = mix(src, pv, uFeedback);
+  if (uBlend == 1) outc = src + pv * fbAmt;
+  else if (uBlend == 2) outc = 1.0 - (1.0 - src) * (1.0 - pv * fbAmt);
+  else if (uBlend == 3) outc = mix(src, abs(src - pv), fbAmt);
+  else if (uBlend == 4) outc = mix(src, max(src, pv), fbAmt);
+  else outc = mix(src, pv, fbAmt);
+
+  if (uKeyMode > 0 && uBorder > 0.001){
+    float edge = clamp(length(vec2(dFdx(keyed), dFdy(keyed))) * 40.0, 0.0, 1.0);
+    outc = mix(outc, hsv2rgb(vec3(uBorderHue, 0.9, 1.0)), edge * uBorder);
+  }
 
   outc += (hash(vUV * uRes + uSeed) - 0.5) * uNoise * 0.04; // noise floor : never dies flat
   o = vec4(clamp(outc, 0.0, 1.0), 1.0);
@@ -729,8 +753,14 @@ export class FeedbackNode implements ConvNode {
     gl.uniform2f(p.u('uPivot'), pvx, pvy)
     gl.uniform1f(p.u('uWarp'), clampf(num(inp.warp, 0.4), 0, 1))
     gl.uniform1f(p.u('uHue'), clampf(num(inp.hue, 0), -0.5, 0.5))
+    gl.uniform1f(p.u('uHueCurve'), clampf(num(inp.hueCurve, 0), 0, 1))
     gl.uniform1f(p.u('uBlur'), clampf(num(inp.blur, 0.2), 0, 1))
     gl.uniform1i(p.u('uBlend'), Math.round(num(inp.blend, 0)))
+    gl.uniform1i(p.u('uKeyMode'), Math.round(num(inp.keyMode, 0)))
+    gl.uniform1f(p.u('uKeyThresh'), clampf(num(inp.keyThresh, 0.4), 0, 1))
+    gl.uniform1f(p.u('uKeySoft'), clampf(num(inp.keySoft, 0.1), 0.001, 0.5))
+    gl.uniform1f(p.u('uBorder'), clampf(num(inp.border, 0), 0, 1))
+    gl.uniform1f(p.u('uBorderHue'), clampf(num(inp.borderHue, 0.6), 0, 1))
     gl.uniform1f(p.u('uAgc'), clampf(num(inp.agc, 0.5), 0, 1))
     gl.uniform1f(p.u('uNoise'), clampf(num(inp.noise, 0.15), 0, 1))
     gl.uniform1f(p.u('uSeed'), this.frame % 1024)
