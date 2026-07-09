@@ -73,6 +73,12 @@ export function Transport(): JSX.Element {
   const setProximity = useStore((s) => s.setProximity)
   const proximityAudio = useStore((s) => s.proximityAudio)
   const setProximityAudio = useStore((s) => s.setProximityAudio)
+  const density = useStore((s) => s.density)
+  const setDensity = useStore((s) => s.setDensity)
+  const gestureTexture = useStore((s) => s.gestureTexture)
+  const setGestureTexture = useStore((s) => s.setGestureTexture)
+  const coalesce = useStore((s) => s.coalesce)
+  const setCoalesce = useStore((s) => s.setCoalesce)
   const activeWorld = worlds.find((w) => w.id === world)
   const setComposition = useStore.setState
   const applyVariation = useStore((s) => s.applyVariation)
@@ -228,6 +234,13 @@ export function Transport(): JSX.Element {
             ◑
           </button>
         </div>
+        {/* Field macros — spatial-material globals (0.5 = neutral). */}
+        <MacroKnob label="DENS" value={density} onChange={setDensity}
+          title="Density — sparse ↔ dense (fades upper layers / fills them in). 0.5 neutral · double-click resets" />
+        <MacroKnob label="G↔T" value={gestureTexture} onChange={setGestureTexture}
+          title="Gesture ↔ Texture — clean directional (sharpen) ↔ internalised churn (trails). 0.5 neutral" />
+        <MacroKnob label="COAL" value={coalesce} onChange={setCoalesce}
+          title="Coalesce — grain (dither) ↔ mass (blur/smooth). 0.5 neutral" />
       </div>
 
       <div className="flex-1" />
@@ -309,6 +322,36 @@ export function Transport(): JSX.Element {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// A compact field-macro slider (label + narrow range, double-click → neutral).
+function MacroKnob({
+  label,
+  value,
+  onChange,
+  title
+}: {
+  label: string
+  value: number
+  onChange: (v: number) => void
+  title: string
+}): JSX.Element {
+  const active = Math.abs(value - 0.5) > 0.02
+  return (
+    <div className="flex items-center gap-1" title={title}>
+      <span className={`font-mono text-[9px] ${active ? 'text-accent2' : 'text-muted'}`}>{label}</span>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.01}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        onDoubleClick={() => onChange(0.5)}
+        className="w-14 accent-accent2"
+      />
     </div>
   )
 }

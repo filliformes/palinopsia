@@ -275,6 +275,12 @@ export function makeBlankBackground(): BackgroundState {
   return { source: emptySlot(), fx: [], opacity: 1, speed: BG_DEFAULT_SPEED, depth: 0 }
 }
 
+// A persisted field-macro value (0.5 neutral default).
+function readMacro(key: string): number {
+  const v = localStorage.getItem(key)
+  return v !== null && Number.isFinite(Number(v)) ? Number(v) : 0.5
+}
+
 // Default macro-form sequencer: off, seconds clock, gentle dwell, subtle
 // variation. S3/S4 fields ship inert (see docs/opsia-sequencer-spec.md).
 export function makeDefaultSequence(): SequenceState {
@@ -539,6 +545,13 @@ interface StoreState {
   setProximity: (v: number) => void
   proximityAudio: boolean
   setProximityAudio: (on: boolean) => void
+  // Field macros — global spatial-material controls (0.5 = neutral deadzone).
+  density: number
+  setDensity: (v: number) => void
+  gestureTexture: number
+  setGestureTexture: (v: number) => void
+  coalesce: number
+  setCoalesce: (v: number) => void
   // World / diegesis — a bank of editable presets (built-ins + user worlds).
   // Selecting one biases the composition; the World page (W) edits/creates them.
   worlds: World[]
@@ -1553,6 +1566,14 @@ export const useStore = create<StoreState>((set, get) => ({
     localStorage.setItem('opsia.proximityAudio', on ? '1' : '0')
     set({ proximityAudio: on })
   },
+  // Field macros (Slab 2c): each 0.5 = neutral deadzone. density (sparse↔dense),
+  // gestureTexture (gesture↔texture motion character), coalesce (grain↔mass).
+  density: readMacro('opsia.density'),
+  setDensity: (v) => { localStorage.setItem('opsia.density', String(v)); set({ density: v }) },
+  gestureTexture: readMacro('opsia.gestureTexture'),
+  setGestureTexture: (v) => { localStorage.setItem('opsia.gestureTexture', String(v)); set({ gestureTexture: v }) },
+  coalesce: readMacro('opsia.coalesce'),
+  setCoalesce: (v) => { localStorage.setItem('opsia.coalesce', String(v)); set({ coalesce: v }) },
   worlds: startWorlds,
   world: startWorld.id,
   setWorld: (id) =>

@@ -10,7 +10,7 @@ import { Compositor } from './engine/Compositor'
 import { hiveEncoder } from './hiveEncoder'
 import { audioBus } from './engine/audioIn'
 import { applyCoupling } from './engine/coupling'
-import { applyProximity } from './engine/field'
+import { applyProximity, applyFieldMacros } from './engine/field'
 import { applyModulation, modEngine } from './engine/modulation'
 import { currentFps, tickFrame } from './perf'
 import { tickSequencer } from './engine/sequencer'
@@ -428,6 +428,8 @@ export default function App(): JSX.Element {
         const contextProx = applyProximity(comp!, c, st.proximity, st.proximityAudio ? 0.6 : 0)
         // 2d. Macro-form sequencer: auto-advance scenes + Breathe/Arc overlay.
         if (st.sequence.enabled) tickSequencer(now, comp!, c)
+        // 2e. Field macros: Density / Gesture⇄Texture / Coalesce (post-mod, 0.5 deadzone).
+        applyFieldMacros(comp!, c, st.density, st.gestureTexture, st.coalesce)
         // 3. Render the frame.
         comp!.render(now - start)
         // 4. Native output window: push the exact render state so it renders
