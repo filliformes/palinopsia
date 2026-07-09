@@ -188,6 +188,40 @@ export const NATIVE_NODES: IsfShader[] = [
     curated: {
       length: [6, 16], decay: [0.2, 0.9], attack: [0, 0.4], gain: [0.6, 1.4], mix: [0.4, 0.9]
     }
+  },
+  {
+    // Feedback engine : a video-feedback loop (edge-of-chaos). Samples its own
+    // last output through a drifting-pivot transform + self-displacement, mixes
+    // the layer signal, held bounded by a built-in AGC + noise floor. Native
+    // (engine/convNodes FeedbackNode). No sidechain : feeds on the layer.
+    id: 'node-feedback',
+    name: 'Feedback',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Feedback : a video-feedback engine. The layer's own last frame is re-sampled through a drifting off-centre transform (zoom/rotate/drift) plus a self-displacement that boils the image organically, then mixed with the live layer : trails, tunnels-that-wander, reaction-diffusion textures. A built-in AGC + noise floor hold it at the edge of chaos so it never fades to black or blows to white. Off-centre + small transforms keep it matte, not a radial mandala.",
+      "CATEGORIES": ["FX", "Feedback"],
+      "INPUTS": [
+        { "NAME": "feedback", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.85, "LABEL": "feedback" },
+        { "NAME": "gain", "TYPE": "float", "MIN": 0.2, "MAX": 1.6, "DEFAULT": 1.0, "LABEL": "gain (exciter)" },
+        { "NAME": "zoom", "TYPE": "float", "MIN": -0.1, "MAX": 0.1, "DEFAULT": 0.01, "LABEL": "zoom" },
+        { "NAME": "rotate", "TYPE": "float", "MIN": -0.2, "MAX": 0.2, "DEFAULT": 0.0, "LABEL": "rotate" },
+        { "NAME": "driftX", "TYPE": "float", "MIN": -0.05, "MAX": 0.05, "DEFAULT": 0.0, "LABEL": "drift x" },
+        { "NAME": "driftY", "TYPE": "float", "MIN": -0.05, "MAX": 0.05, "DEFAULT": 0.0, "LABEL": "drift y" },
+        { "NAME": "pivot", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "pivot drift" },
+        { "NAME": "warp", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "self-warp" },
+        { "NAME": "hue", "TYPE": "float", "MIN": -0.2, "MAX": 0.2, "DEFAULT": 0.0, "LABEL": "hue cycle" },
+        { "NAME": "blur", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2, "LABEL": "softness" },
+        { "NAME": "blend", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4], "LABELS": ["mix", "add", "screen", "difference", "lighten"], "DEFAULT": 0, "LABEL": "source blend" },
+        { "NAME": "agc", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "auto-gain (safety)" },
+        { "NAME": "noise", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "noise floor" }
+      ]
+    }*/`,
+    curated: {
+      feedback: [0.6, 0.95], gain: [0.9, 1.08], zoom: [-0.05, 0.05], rotate: [-0.08, 0.08],
+      driftX: [-0.02, 0.02], driftY: [-0.02, 0.02], pivot: [0.2, 0.8], warp: [0.2, 0.8],
+      hue: [-0.08, 0.08], blur: [0.05, 0.5], agc: [0.3, 0.8], noise: [0.05, 0.4]
+    }
   }
 ]
 

@@ -203,6 +203,83 @@ interface Prog {
   u: (n: string) => WebGLUniformLocation | null
 }
 
+// ── Feedback engine (video-feedback spike) : sample last output through a
+//    drifting-pivot transform + self-displacement, mix a fresh source, with a
+//    built-in AGC + noise-floor so it sits at the edge of chaos without dying or
+//    blowing out. Ping-pong RGBA16F, owned by FeedbackNode.
+const F_FEEDBACK = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uPrev;
+uniform vec2 uRes, uOff, uPivot;
+uniform float uFeedback, uGain, uZoom, uRot, uWarp, uHue, uBlur, uAgc, uNoise, uSeed;
+uniform int uBlend;
+
+float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+vec3 rgb2hsv(vec3 c){
+  vec4 K = vec4(0., -1./3., 2./3., -1.);
+  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+  float d = q.x - min(q.w, q.y); float e = 1e-10;
+  return vec3(abs(q.z + (q.w - q.y) / (6.*d + e)), d / (q.x + e), q.x);
+}
+vec3 hsv2rgb(vec3 c){
+  vec4 K = vec4(1., 2./3., 1./3., 3.);
+  vec3 p = abs(fract(c.xxx + K.xyz) * 6. - K.www);
+  return c.z * mix(K.xxx, clamp(p - K.xxx, 0., 1.), c.y);
+}
+
+void main(){
+  // Transform the read-UV about the (drifting, off-centre) pivot : zoom + rotate
+  // + per-frame drift. Small values → structure emerges slowly, stays matte.
+  vec2 c = vUV - uPivot;
+  float sc = 1.0 - uZoom;                 // zoom>0 magnifies outward
+  float ca = cos(uRot), sa = sin(uRot);
+  c = mat2(ca, -sa, sa, ca) * (c * sc);
+  vec2 ruv = c + uPivot + uOff;
+
+  // Self-displacement by the buffer's own hue/value (the "alive" term : organic
+  // boiling / reaction-diffusion motion instead of a rigid spiral).
+  vec3 p0 = texture(uPrev, ruv).rgb;
+  vec3 hsv0 = rgb2hsv(p0);
+  vec2 disp = uWarp * 0.03 * (hsv0.z * hsv0.y) * vec2(cos(hsv0.x * 6.2831853), sin(hsv0.x * 6.2831853));
+  ruv += disp;
+
+  vec3 pv;
+  if (uBlur > 0.001){
+    vec2 t = (0.5 + uBlur * 2.0) / uRes;
+    pv = (texture(uPrev, ruv).rgb * 2.0
+        + texture(uPrev, ruv + vec2(t.x, 0.0)).rgb + texture(uPrev, ruv - vec2(t.x, 0.0)).rgb
+        + texture(uPrev, ruv + vec2(0.0, t.y)).rgb + texture(uPrev, ruv - vec2(0.0, t.y)).rgb) / 6.0;
+  } else pv = texture(uPrev, ruv).rgb;
+
+  // AGC : normalise toward a target mean luma (from a coarse read of the buffer,
+  // 1-frame delayed) so gain can sit at G≈1 without runaway / collapse.
+  float agcCorr = 1.0;
+  if (uAgc > 0.001){
+    float m = 0.0;
+    for (int i = 0; i < 9; i++){
+      vec2 sp = vec2(float(i - (i/3)*3), float(i/3)) / 2.0 * 0.9 + 0.05;
+      m += dot(texture(uPrev, sp).rgb, vec3(0.299, 0.587, 0.114));
+    }
+    m /= 9.0;
+    agcCorr = mix(1.0, clamp(0.32 / max(m, 0.02), 0.35, 2.5), uAgc);
+  }
+  pv *= uGain * agcCorr;
+
+  if (abs(uHue) > 0.001){ vec3 h = rgb2hsv(pv); h.x = fract(h.x + uHue); pv = hsv2rgb(h); }
+
+  vec3 src = texture(uHost, vUV).rgb;
+  vec3 outc;
+  if (uBlend == 1) outc = src + pv * uFeedback;
+  else if (uBlend == 2) outc = 1.0 - (1.0 - src) * (1.0 - pv * uFeedback);
+  else if (uBlend == 3) outc = mix(src, abs(src - pv), uFeedback);
+  else if (uBlend == 4) outc = mix(src, max(src, pv), uFeedback);
+  else outc = mix(src, pv, uFeedback);
+
+  outc += (hash(vUV * uRes + uSeed) - 0.5) * uNoise * 0.04; // noise floor : never dies flat
+  o = vec4(clamp(outc, 0.0, 1.0), 1.0);
+}`
+
 class NodeGL {
   quad: WebGLBuffer
   downsample: Prog
@@ -215,6 +292,7 @@ class NodeGL {
   convMix: Prog
   copy: Prog
   echo: Prog
+  feedback: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -230,6 +308,7 @@ class NodeGL {
     this.convMix = this.build(F_CONV_MIX)
     this.copy = this.build(F_COPY)
     this.echo = this.build(F_ECHO)
+    this.feedback = this.build(F_FEEDBACK)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -598,14 +677,86 @@ export class ReponseNode implements ConvNode {
   }
 }
 
+// ── Feedback engine (video-feedback spike) ───────────────────────────────
+// A ping-pong RGBA16F loop: each frame samples its OWN last output through the
+// drifting-pivot transform + self-displacement (F_FEEDBACK), mixes the layer
+// signal (host), and writes the new frame. Ignores the sidechain : it feeds on
+// the host. Returns its own write buffer (valid through this frame's downstream
+// use; only re-touched two frames later, so no read/write aliasing).
+export class FeedbackNode implements ConvNode {
+  private bufs: [RGBA, RGBA] | null = null
+  private w = 0
+  private h = 0
+  private cur = 0
+  private t = 0
+  private frame = 0
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  private ensure(w: number, h: number): void {
+    if (this.bufs && this.w === w && this.h === h) return
+    const gl = this.gl
+    if (this.bufs) for (const b of this.bufs) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
+    this.bufs = [makeRGBA(gl, w, h, true), makeRGBA(gl, w, h, true)]
+    this.w = w; this.h = h; this.cur = 0
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl)
+    const W = ctx.chain.w, H = ctx.chain.h
+    this.ensure(W, H)
+    const inp = ctx.inputs
+    this.t += ctx.dt; this.frame++
+    const read = this.bufs![this.cur]
+    const write = this.bufs![1 - this.cur]
+
+    // Drifting off-centre pivot : the anti-mandala key (keeps feedback organic
+    // and wandering rather than a centred radial tunnel).
+    const drift = clampf(num(inp.pivot, 0.4), 0, 1)
+    const pvx = 0.5 + Math.sin(this.t * 0.13) * drift * 0.3
+    const pvy = 0.5 + Math.cos(this.t * 0.11) * drift * 0.3
+
+    const p = g.use(g.feedback)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, read.tex); gl.uniform1i(p.u('uPrev'), 1)
+    gl.uniform2f(p.u('uRes'), W, H)
+    gl.uniform1f(p.u('uFeedback'), clampf(num(inp.feedback, 0.85), 0, 1))
+    gl.uniform1f(p.u('uGain'), clampf(num(inp.gain, 1.0), 0.2, 2.0))
+    gl.uniform1f(p.u('uZoom'), clampf(num(inp.zoom, 0.01), -0.2, 0.2))
+    gl.uniform1f(p.u('uRot'), clampf(num(inp.rotate, 0), -0.3, 0.3))
+    gl.uniform2f(p.u('uOff'), clampf(num(inp.driftX, 0), -0.1, 0.1), clampf(num(inp.driftY, 0), -0.1, 0.1))
+    gl.uniform2f(p.u('uPivot'), pvx, pvy)
+    gl.uniform1f(p.u('uWarp'), clampf(num(inp.warp, 0.4), 0, 1))
+    gl.uniform1f(p.u('uHue'), clampf(num(inp.hue, 0), -0.5, 0.5))
+    gl.uniform1f(p.u('uBlur'), clampf(num(inp.blur, 0.2), 0, 1))
+    gl.uniform1i(p.u('uBlend'), Math.round(num(inp.blend, 0)))
+    gl.uniform1f(p.u('uAgc'), clampf(num(inp.agc, 0.5), 0, 1))
+    gl.uniform1f(p.u('uNoise'), clampf(num(inp.noise, 0.15), 0, 1))
+    gl.uniform1f(p.u('uSeed'), this.frame % 1024)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo)
+    gl.viewport(0, 0, W, H)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    this.cur = 1 - this.cur // next frame reads what we just wrote
+    return write.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    if (this.bufs) { for (const b of this.bufs) { this.gl.deleteTexture(b.tex); this.gl.deleteFramebuffer(b.fbo) } this.bufs = null }
+  }
+}
+
 /** Instantiate the native node for a reserved `node-*` shaderId (null if none). */
 export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): ConvNode | null {
   if (shaderId === 'node-transfert') return new TransfertNode(gl)
   if (shaderId === 'node-convolve') return new ConvolveNode(gl)
   if (shaderId === 'node-reponse') return new ReponseNode(gl)
+  if (shaderId === 'node-feedback') return new FeedbackNode(gl)
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)
