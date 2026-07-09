@@ -345,6 +345,11 @@ export default function App(): JSX.Element {
       } else if (e.key === 'y') {
         e.preventDefault()
         redo()
+      } else if (e.key === 's' || e.key === 'S') {
+        // Save the session in place (Save As the first time). Global — Ctrl/Cmd+S
+        // is universally "save", so it fires even while an input is focused.
+        e.preventDefault()
+        void saveSession()
       } else if (!inField && (e.key === '=' || e.key === '+')) {
         e.preventDefault()
         setUiZoom(useStore.getState().uiZoom + 0.05)
@@ -640,7 +645,7 @@ export default function App(): JSX.Element {
           ref={saveBtnRef}
           className="btn text-[12px]"
           onClick={saveSession}
-          title="Save — overwrites the current file (Save As the first time)"
+          title="Save (Ctrl+S) — overwrites the current file (Save As the first time)"
         >
           Save
         </button>
