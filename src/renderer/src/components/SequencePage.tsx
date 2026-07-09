@@ -383,10 +383,16 @@ export function SequencePage({
   )
 }
 
-// Live mirror of the main composite canvas (via captureStream), compact + fixed
-// height so the scene rail above keeps room for ≥16 cards.
+// Live mirror of the main composite canvas (via captureStream). Height is
+// resizable (drag the top edge); the scene rail above flexes to what's left.
 function SeqPreview({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null> }): JSX.Element {
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const [height, setHeight] = useState<number>(() => {
+    const v = Number(localStorage.getItem('opsia.seqPreviewH'))
+    return Number.isFinite(v) && v >= 100 ? v : 150
+  })
+  const drag = useRef<{ startY: number; startH: number; last: number } | null>(null)
+
   useEffect(() => {
     const canvas = canvasRef.current
     const video = videoRef.current
@@ -404,17 +410,44 @@ function SeqPreview({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | nu
       if (video) video.srcObject = null
     }
   }, [canvasRef])
+
   return (
-    <div className="flex shrink-0 items-center gap-2 border-t border-border bg-black/40 p-2">
-      <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">live</span>
-      <video
-        ref={videoRef}
-        autoPlay
-        muted
-        playsInline
-        className="h-[132px] rounded border border-border bg-black object-contain"
-        style={{ aspectRatio: '16 / 9' }}
+    <div className="flex shrink-0 flex-col border-t border-border bg-black/40">
+      {/* Drag the top edge to resize (up = taller). */}
+      <div
+        className="h-1.5 shrink-0 cursor-row-resize bg-border/60 transition-colors hover:bg-accent/60"
+        style={{ touchAction: 'none' }}
+        onPointerDown={(e) => {
+          drag.current = { startY: e.clientY, startH: height, last: height }
+          ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current
+          if (!d) return
+          const h = Math.max(100, Math.min(560, d.startH + (d.startY - e.clientY)))
+          d.last = h
+          setHeight(h)
+        }}
+        onPointerUp={(e) => {
+          if (drag.current) {
+            localStorage.setItem('opsia.seqPreviewH', String(drag.current.last))
+            drag.current = null
+            ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
+          }
+        }}
+        title="Drag to resize the live monitor"
       />
+      <div className="flex min-h-0 items-center gap-2 p-2" style={{ height }}>
+        <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">live</span>
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          className="h-full max-w-full rounded border border-border bg-black object-contain"
+          style={{ aspectRatio: '16 / 9' }}
+        />
+      </div>
     </div>
   )
 }
