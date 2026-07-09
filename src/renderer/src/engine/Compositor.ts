@@ -937,6 +937,10 @@ export class Compositor {
   private cfFlutter = 0.2;
   private cfBlank = 0;
   private cfBlankMode = 0;
+  private cfDust = 0;
+  private cfScratch = 0;
+  private cfGranule = 0;
+  private cfSplice = 0;
   private pbrLib: PbrLib | null = null; // Context PBR material maps (lazy)
   // Outside fill = the Background slab, only meaningful with a shape active.
   private get fzBgLayer(): boolean {
@@ -1283,6 +1287,10 @@ export class Compositor {
     this.cfFlutter = numf(fi.filmFlutter, 0.2);
     this.cfBlank = numf(fi.filmBlank, 0);
     this.cfBlankMode = Math.round(numf(fi.filmBlankMode, 0));
+    this.cfDust = numf(fi.filmDust, 0);
+    this.cfScratch = numf(fi.filmScratch, 0);
+    this.cfGranule = numf(fi.filmGranule, 0);
+    this.cfSplice = numf(fi.filmSplice, 0);
 
     // Context PBR surface: feed the selected material's maps (or the neutral
     // flat set) into the Context unit's image inputs every frame. Lazy — no
@@ -1327,6 +1335,10 @@ export class Compositor {
           case 'filmFlutter': this.cfFlutter = value; break;
           case 'filmBlank': this.cfBlank = value; break;
           case 'filmBlankMode': this.cfBlankMode = Math.round(value); break;
+          case 'filmDust': this.cfDust = value; break;
+          case 'filmScratch': this.cfScratch = value; break;
+          case 'filmGranule': this.cfGranule = value; break;
+          case 'filmSplice': this.cfSplice = value; break;
         }
       }
       return;
@@ -1564,13 +1576,15 @@ export class Compositor {
     // artifacts) — skipped entirely so it costs nothing and passes through clean.
     if (this.cfHold > 0) {
       const active =
-        this.cfRate < 58 || this.cfBoil > 0.001 || this.cfFlutter > 0.001 || this.cfBlank > 0.001;
+        this.cfRate < 58 || this.cfBoil > 0.001 || this.cfFlutter > 0.001 || this.cfBlank > 0.001 ||
+        this.cfDust > 0.001 || this.cfScratch > 0.001 || this.cfGranule > 0.001 || this.cfSplice > 0.001;
       if (active) {
         if (!this.cameraless) this.cameraless = new Cameraless(gl);
         composite = this.cameraless.apply(
           composite, rawDt,
           { hold: this.cfHold, rate: this.cfRate, jitter: this.cfJitter, boil: this.cfBoil,
-            flutter: this.cfFlutter, blank: this.cfBlank, blankMode: this.cfBlankMode },
+            flutter: this.cfFlutter, blank: this.cfBlank, blankMode: this.cfBlankMode,
+            dust: this.cfDust, scratch: this.cfScratch, granule: this.cfGranule, splice: this.cfSplice },
           this.w, this.h
         );
       }
