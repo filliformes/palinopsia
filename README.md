@@ -29,23 +29,36 @@ A↔B mixer, per-source FX racks, a per-layer FX rack, a blend mode into the sta
 and decay-feedback (ping-pong FBOs). Layers stack bottom→top; solo/mute per layer;
 shader hot-swaps preserve feedback buffers (no reset-to-black mid-performance).
 
-**67 ISF shaders.** ~23 generative sources (Drift Field, Slabs, Murmuration,
-Mycelium, Erosion, Slit Scan, RGB Oscillators, Recurse, Sync Osc…) and ~44 rack
-effects across Color · Stylize · Distortion · Blur · Glitch · Feedback · Texture ·
-Scan · Utility. Each carries **curated aesthetic sub-ranges** so Randomize stays
-on-brand. Physically-modelled Grain (film clumping / digital sensor noise /
-CRT·VHS parasites). Includes **Wide Time** — a temporal-average / time-smear FX
-(Jean Piché's AE "CC Wide Time" lineage) with motion-blur and frame-blend parity.
+**~75 shaders + native nodes.** ~26 generative sources (Drift Field, Slabs,
+Murmuration, Mycelium, Erosion, Slit Scan, RGB Oscillators, Recurse, Organic…) and
+~47 rack effects across Color · Stylize · Distortion · Blur · Glitch · Feedback ·
+Texture · Scan · Convolution · Utility. Each carries **curated aesthetic sub-ranges**
+so Randomize stays on-brand. Physically-modelled Grain (film clumping / digital
+sensor noise / CRT·VHS parasites), a rebuilt VHS **Tracking** and generation-loss
+**Decay**, and **Wide Time** (Jean Piché's AE "CC Wide Time" lineage). Plus
+**native nodes** — a header-only ISF gives the auto-UI while a TS class does the GL:
+**Text** (50 fonts, sidechain glyph-fill), **Parametric** (the audio buffer as
+raster / waveform / bars / spectrogram, Ikeda), **Transfert** (optical-flow motion
+transfer), and **Motif** (spatial-counterpoint transpose echoes).
 
 **A modulation brain.** An 8-modulator engine (LFO ×7 shapes · Ramp · ADSR · Arp ·
-Random · S&H · Slew · Chaos), BPM-syncable, frame-locked in the renderer and
-written straight to the compositor (never through React). A capped mod-matrix
-feeds a **16-knob Meta Controller** — each knob shapes its own modulator via its
-curve, drives up to 8 destinations, and learns a MIDI CC.
+Random · S&H · Slew · Chaos · **Audio**-follower · **Organic** · **Physics** ·
+**Motion**-archetype), BPM-syncable, frame-locked in the renderer and written
+straight to the compositor (never through React). Modulation reaches **float, enum,
+and bool** inputs, in **Multiply** (VCA-scale the base) or **Replace** (swing) mode.
+A capped mod-matrix feeds a **16-knob Meta Controller** — each knob shapes its own
+modulator via its curve, drives up to 8 destinations, and learns a MIDI CC.
+
+**A Background slab.** A fifth "ground" beneath the four layers — its own curated
+source + FX rack, a slow clock, a foreground contact-shadow **Depth**, blend/isolate
+against the stack, and its own preset bank. Never touched by Randomize.
 
 **Three always-on master finalizers.** Vibe Palette (colour mastering + 50
-palettes) → Context (depth: trails, bloom, haze, 3D key light) → Finalizer
-(levels, sharpen, grain). Bypassable, pinned, kept out of Randomize.
+palettes) → Context (depth: trails, bloom, haze, 3D key light, **+ PBR texture
+mapping** — project the whole composition onto a material) → Finalizer (levels,
+sharpen, grain, **+ an output shaper**: clip the frame to any of 21 silhouettes with
+a floating drop-shadow, filled by a colour or the Background). Bypassable, pinned,
+kept out of Randomize.
 
 **Presets, scenes, Randomize.** ~626 per-shader presets · 50 master-chain presets ·
 layer & mixer presets · a scene bank (save/recall full instrument states,
@@ -57,11 +70,29 @@ morph-crossfade between them, keys `1`–`9`) · structural scoped Randomize
 Live Input, and **HIVE** live-in (HEVC-over-TCP via WebCodecs) — all treatable
 through the source's own FX rack.
 
+**An audiovisual-relations layer.** Opsia *reads* audio rather than just pulsing to
+it — a research direction distilled from the Chion → Coulter → Basanta →
+Boucher/Piché lineage, made playable. A shared **audio bus** (local Web Audio / OSC);
+an A↔B **coupling engine** (the synchresis catalogue as balance behaviours: lean ·
+hocket · cut · gate · drift, with a tightness dial); global **World / diegesis**
+presets that bias the whole composition; a **Proximity** depth-zone macro; and named
+**field macros** — Density, Gesture⇄Texture, Coalesce.
+
+**A generative macro-form sequencer.** An auto-pilot over the scene bank driven by
+each scene's relation tags (**Diégèse · Synchrèse · Espace-temps · Climat**):
+weighted / arc / shuffle selection with no-repeat, morph/cut transitions,
+subtle no-exact-repeat variation; the **Breathe** (dense↔void) and **Climate-arc**
+(repose–disturbance–repose) overlays; **cadence / rupture / monomedia** punctuation;
+audio/chaos-armed deferred advance; and a Markdown **relation-score** export. A live
+composition monitor and per-scene tag editor sit in its own page.
+
 **Output & mapping.** A full-page Output view: projection warp / keystone +
 alignment grid, a fullscreen output window on a second display (native
-second-compositor, pixel-perfect), and network / texture senders — **Spout**
-(native DX11 addon), **NDI** (optional), and **HIVE** output (the open
-NDI-alternative: HEVC-over-TCP + mDNS, receive in OBS / Resolume).
+second-compositor, pixel-perfect), network / texture senders — **Spout** (native
+DX11 addon), **NDI** (optional), and **HIVE** output (HEVC-over-TCP + mDNS) — a
+realtime **resource HUD** (FPS · CPU · RAM · VRAM · GPU), and **recording** (a
+hardware-H.264 master → ffmpeg delivery to MP4/H.265/ProRes/FFV1/uncompressed/VP9)
+plus screenshots, into a `Recorded/` folder. Render resolution scales lo-fi↔4K.
 
 **Control plane.** Inbound OSC listener + **OSCQuery** self-describing address
 tree (so Pandore / dataFLOU auto-bind every parameter), plus Web MIDI CC.
@@ -82,8 +113,10 @@ tree (so Pandore / dataFLOU auto-bind every parameter), plus Web MIDI CC.
 ```
 
 **Keyboard:** `1`–`9` recall scenes · `P`/`Shift+P` Vibe open/cycle ·
-`C`/`Shift+C` Context open/cycle · `M` toggle Mixer view · `Ctrl+Z`/`Shift+Z`/`Y`
-undo/redo (100 levels) · `Ctrl` `+`/`-`/`0` UI zoom.
+`C`/`Shift+C` Context open/cycle · `W` World editor · `Q` Sequence page · `O`
+Output view · `L`/`F` Layers/Finishing · `D`/`X`/`I` collapse panels · `R` fire
+Randomize · `Ctrl+Z`/`Shift+Z`/`Y` undo/redo (100 levels) · `Ctrl` `+`/`-`/`0` (and
+`Ctrl`+wheel) UI zoom.
 
 **MIDI:** per-knob CC learn on the Meta Controller (Web MIDI).
 
@@ -96,7 +129,8 @@ undo/redo (100 levels) · `Ctrl` `+`/`-`/`0` UI zoom.
 | Shell | Electron + electron-vite + TypeScript + React 18 + Tailwind + Zustand (forked from dataFLOU) |
 | Engine | WebGL2 + [`interactive-shader-format`](https://github.com/msfeldstein/interactive-shader-format-js) runtime; WebGPU compute is post-MVP |
 | Control | `osc` (main) in/out + OSCQuery HTTP tree; Web MIDI in the renderer |
-| Video | WebCodecs (HEVC decode/encode), `<video>` hardware decode |
+| Video | WebCodecs (HEVC decode/encode), `<video>` hardware decode; `ffmpeg-static` for recording delivery |
+| Audio | Web Audio (local) + OSC audio bus |
 | Output | Fullscreen HDMI · Spout (native DX11) · NDI (optional) · HIVE (HEVC/TCP + mDNS) |
 | Host | Gigabyte Aero 16, RTX 4070, Windows (portable to Mac M2) |
 
@@ -109,7 +143,8 @@ src/
   preload/    contextBridge API surface (window.api)
   renderer/   React UI + the WebGL2 engine
     engine/   Compositor (per-layer ISF → blend → stack), modulation engine,
-              VideoSource, HiveSource
+              audio bus, coupling, field macros + Proximity, macro-form sequencer,
+              Video/Capture/Hive/Text/Parametric sources, output shaper, PBR
     shaders/  ISF .fs files + registry (curated ranges) + presets
   shared/     types shared across processes
 native/spout/ N-API DX11 Spout sender addon (vendored Spout2 SDK)
@@ -144,13 +179,14 @@ without it (the Spout toggle simply reports unavailable).
 | 5 | Modulators — 8-mod engine + 16-knob Meta Controller + mod-matrix | ✅ |
 | 6 | Presets + Randomize — curated scopes · scene bank · morph | ✅ |
 | 7 | Video + Live-in — video transport · capture · HIVE HEVC live-in | ✅ |
-| 8 | Output — warp/keystone · 2nd-display window · Spout · NDI · HIVE out · OSCQuery | ✅ |
-| 9 | WebGPU — compute passes for true pixel-sort / particles | ⬜ post-MVP |
+| 8 | Output — warp/keystone · 2nd-display window · Spout · NDI · HIVE out · OSCQuery · recording · HUD | ✅ |
+| 9 | Audiovisual relations — audio bus · coupling engine · World modes · Proximity · field macros | ✅ |
+| 10 | Macro-form — generative scene/relation sequencer (S1–S4) + relation-score export | ✅ |
+| 11 | WebGPU — compute passes for true pixel-sort / particles | ⬜ post-MVP |
 
-**Next chapter — audiovisual reactivity.** An audio-reactive layer (Pandore-over-OSC
-+ local Web Audio), a coupling engine binding the A/B pair, singular "World" modes,
-and a generative macro-form sequencer — a research direction distilled from the
-Chion → Coulter → Basanta → Boucher/Piché lineage on sound/image relations.
+The **audiovisual-relations** work (phases 9–10) distils the Chion → Coulter →
+Basanta → Boucher/Piché lineage on sound/image relations into playable structure —
+see [`docs/opsia-sequencer-spec.md`](docs/opsia-sequencer-spec.md).
 
 ## Aesthetic guardrails
 
@@ -167,7 +203,10 @@ set — never an open-ended pile of knobs.
 
 Built by **Vincent Fillion** ([filliformes](https://github.com/filliformes)).
 Vendors the [Spout2](https://github.com/leadedge/Spout2) SDK (BSD) for the native
-sender. HIVE interop follows [gllm/HIVE](https://codeberg.org/gllm/HIVE).
-Wide Time after Jean Piché's AE "CC Wide Time."
+sender; bundles [`ffmpeg-static`](https://github.com/eugeneware/ffmpeg-static) for
+recording delivery; PBR materials from [ambientCG](https://ambientcg.com) (CC0).
+HIVE interop follows [gllm/HIVE](https://codeberg.org/gllm/HIVE). Wide Time after
+Jean Piché's AE "CC Wide Time." The audiovisual-relations design draws on Chion,
+Coulter, Basanta, and Boucher/Piché.
 
 MIT — see [LICENSE](LICENSE).
