@@ -13,8 +13,11 @@
 > stop-motion. The **Direct Marks** (§4.1, `direct-marks`) and **Dye Field** (§5.1,
 > `dye-field`, subtractive + internal crystallise feedback) sources are now BUILT
 > too (a mockup comparison confirmed Op-Art can't do the dot/scratch marks and
-> Congeal is additive where Dye needs subtractive). Still open: superimposition
-> flicker (§5.2); `drawSync` BPM division (§3.1); the animated-sound loop (§4.4, with S4).
+> Congeal is additive where Dye needs subtractive). **Superimposition flicker**
+> (§5.2, `engine/flicker.ts`, Transport SUPER — rate follows the film draw clock)
+> and the **animated-sound loop** (§4.4, `engine/markSignal.ts` +
+> `Compositor.readMarkStrip` → `/opsia/av/mark-*` to Pandore) are BUILT. **The spec
+> is essentially complete** — only `drawSync` BPM-locked ticks (§3.1) remain, a minor add.
 > Companion to `opsia-convolution-spec.md` (T = M·K). This spec covers the
 > **cameraless / direct-on-film** family: making the continuous procedural engine
 > read as hand-made, frame-by-frame film after Brakhage, McLaren, and Len Lye.
