@@ -255,7 +255,7 @@ export function Transport(): JSX.Element {
           <MacroKnob label="TONE" value={tonicity} onChange={setTonicity} neutral={0}
             title="Tonicity : tonal/harmonic audio pulls colour in, noise pulls toward black-and-white (needs Audio on). 0 = off · double-click resets." />
           <MacroKnob label="SHUT" value={shutter} onChange={setShutter} neutral={0}
-            title="Shutter : GLOBAL full-freeze stop-motion: dead-holds the whole present, then jumps (24fps → 2fps). 0 = off. For a filmic hold with gate-weave + materiality (feedback keeps running underneath), use Finishing → film hold (Cameraless) instead." />
+            title="Shutter : GLOBAL full-freeze stop-motion: dead-holds the whole present, then jumps. 0 = off, low = slow/chunky (~2fps) → high = fast/fluid (~24fps). For a filmic hold with gate-weave + materiality (feedback keeps running underneath), use Finishing → film hold (Cameraless) instead." />
           <MacroKnob label="DRIFT" value={drift} onChange={setDrift} neutral={0}
             title="Drift : slow analog-instability wander over the grade + rare 'accidents'. 0 = off." />
           <MacroKnob label="SUPER" value={superFlicker} onChange={setSuperFlicker} neutral={0}

@@ -56,7 +56,7 @@ export function applyTonicity(comp: MacroComp, c: CompositionState, amount: numb
 let lastStep = -1
 let holding = false
 /** Returns whether THIS frame should hold (freeze) the last rendered frame.
- *  `shutter` 0 = off (always false); →1 chunkier (fewer fresh frames/sec). One
+ *  `shutter` 0 = off (always false); low = slow/chunky, →1 = fast/fluid. One
  *  fresh frame is let through each step; the rest are held. */
 export function shutterHold(nowMs: number, shutter: number): boolean {
   if (shutter < 0.02) {
@@ -64,7 +64,7 @@ export function shutterHold(nowMs: number, shutter: number): boolean {
     holding = false
     return false
   }
-  const stepsPerSec = 24 - shutter * 22 // 24 fps (fluid) → 2 fps (chunky)
+  const stepsPerSec = 2 + shutter * 22 // slow: 2 fps (chunky) → fast: 24 fps (fluid)
   const step = Math.floor((nowMs / 1000) * stepsPerSec)
   if (step !== lastStep) {
     lastStep = step
