@@ -193,6 +193,18 @@ scenes and the sequencer all travel inside the session file.
 double-click in the bank; recall crossfades over the **MRPH** morph time. Scenes
 carry their sequencer tags and are saved inside the session.
 
+**Session Loader** (toolbar) — a dropdown of every saved session + a **Load**
+button, so you can jump between saved sessions without the file dialog.
+
+**Generate** (toolbar) — a dropdown of **50 visual themes** (grouped by family:
+Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,
+Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage,
+Cinematic/Atmospheric, Retro Screen, Minimal/Structural) + a **Generate** button.
+Each theme is a *recipe* — a tight source/FX pool, a Vibe palette, a matching World
+(coupling + audio routing), and field-macro/temperament biases — so Generate builds
+a whole new, coherent, on-theme session in place (unsaved; Ctrl+S keeps it).
+Pressing it again re-rolls a fresh variation within the same theme.
+
 ---
 
 ## Keyboard shortcuts

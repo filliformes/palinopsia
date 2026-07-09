@@ -534,6 +534,8 @@ export interface ExposedApi {
   sessionSave: (s: Session, path: string) => Promise<boolean>
   sessionSaveToDefault: (s: Session) => Promise<string>
   sessionOpen: () => Promise<{ session: Session; path: string } | null>
+  sessionList: () => Promise<Array<{ name: string; path: string; mtime: number }>>
+  sessionLoad: (path: string) => Promise<Session>
 
   // Autosave / crash recovery
   autosaveCrashCheck: () => Promise<{ crashed: boolean; entries: AutosaveEntry[] }>

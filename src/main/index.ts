@@ -393,6 +393,8 @@ app.whenReady().then(async () => {
   safeHandle('session:saveTo', (_e, s, path) => sessionIO.saveTo(path as string, s as Session))
   safeHandle('session:saveToDefault', (_e, s) => sessionIO.saveToDefault(s as Session))
   safeHandle('session:open', () => sessionIO.open(mainWindow))
+  safeHandle('session:list', () => sessionIO.listSaved())
+  safeHandle('session:load', (_e, path) => sessionIO.loadFromPath(path as string))
   safeHandle('session:setCurrent', (_e, s) => autosave.setCurrentSession(s as Session))
 
   // ---------- IPC: Autosave / crash recovery ----------

@@ -72,7 +72,8 @@ import {
   varyComposition,
   type RandomizeScope
 } from './randomize'
-import { BG_DEFAULT_SPEED } from './bgPresets'
+import { BG_DEFAULT_SPEED, BG_SOURCES } from './bgPresets'
+import { THEME_BY_ID, type Theme } from './themes'
 
 export type { FxScope }
 
@@ -389,6 +390,103 @@ export function normalizeComposition(c: CompositionState): CompositionState {
       const k = c.metaKnobs ?? []
       return makeDefaultMetaKnobs().map((d, i) => ({ ...d, ...(k[i] ?? {}) }))
     })()
+  }
+}
+
+// ── Generate : build a whole composition from a theme recipe (themes.ts) ──
+// Draws WITHIN the theme's pools so the result reads unmistakably as the theme,
+// with variety from which sources/FX land and their curated params. The World +
+// macros + temperament are applied by the generateTheme action on top of this.
+function buildThemeComposition(theme: Theme): CompositionState {
+  const R = Math.random
+  const rr = (lo: number, hi: number): number => lo + R() * (hi - lo)
+  const pickOf = <T>(a: readonly T[]): T => a[Math.floor(R() * a.length)]
+  const themeFx = (id: string): FxInstance => ({
+    id: uid(),
+    shaderId: id,
+    enabled: true,
+    inputs: randomizeInputs(id, {})
+    // node-feedback / node-reponse (the only native nodes themes use) feed on the
+    // layer itself, so they need no sidechain.
+  })
+  const buildRack = (pool: string[], max: number, layerIdx: number): FxInstance[] => {
+    if (!pool.length || max <= 0) return []
+    const n = 1 + Math.floor(R() * max)
+    const avail = [...pool]
+    const out: FxInstance[] = []
+    for (let i = 0; i < n && avail.length; i++) {
+      out.push(themeFx(avail.splice(Math.floor(R() * avail.length), 1)[0]))
+    }
+    return out
+  }
+
+  const nActive = theme.layers[0] + Math.floor(R() * (theme.layers[1] - theme.layers[0] + 1))
+  const layers: LayerState[] = Array.from({ length: 4 }, (_, i) => {
+    const l = makeLayer()
+    if (i >= nActive) {
+      l.sourceA = emptySlot()
+      return l // an inactive (empty) upper layer
+    }
+    const srcId = pickOf(theme.sources)
+    l.sourceA = { kind: 'generator', shaderId: srcId, inputs: randomizeInputs(srcId, {}) }
+    if (R() < theme.useB) {
+      const bId = pickOf(theme.sources)
+      l.sourceB = { kind: 'generator', shaderId: bId, inputs: randomizeInputs(bId, {}) }
+      l.sourceMix = rr(0.3, 0.7)
+      l.sourceBlend = pickOf(['normal', 'screen', 'difference', 'multiply'] as BlendMode[])
+      l.harmony = rr(0, 0.5)
+    }
+    l.sourceAFx = R() < 0.4 ? buildRack(theme.layerFx, 1, i) : []
+    l.fx = buildRack(theme.layerFx, 2, i)
+    if (theme.nativeNodes?.length && R() < 0.4) l.fx.push(themeFx(pickOf(theme.nativeNodes)))
+    l.blend = i === 0 ? 'normal' : pickOf(theme.blends)
+    l.opacity = i === 0 ? 1 : rr(0.65, 1)
+    l.feedback = R() < theme.feedback
+    l.feedbackAmount = rr(0.4, 0.75)
+    l.speed = rr(0.6, 1.6)
+    return l
+  })
+
+  // Background : a legal bg source from the theme's pool (falls back to a drift).
+  const bgPool = (theme.bgSources?.length ? theme.bgSources : theme.sources).filter((id) =>
+    BG_SOURCES.some((g) => g.id === id)
+  )
+  const bgId = bgPool.length ? pickOf(bgPool) : 'drift-field'
+  const background: BackgroundState = {
+    source: { kind: 'generator', shaderId: bgId, inputs: randomizeInputs(bgId, {}) },
+    fx: [],
+    opacity: 1,
+    speed: BG_DEFAULT_SPEED,
+    depth: rr(0, 0.35)
+  }
+
+  // Vibe palette carries the theme's colours (the strongest theme signal).
+  const pkeys = ['colorA', 'colorB', 'colorC', 'colorD', 'colorE']
+  const vibeInputs: Record<string, number | number[]> = {
+    stops: Math.min(5, Math.max(2, theme.palette.length)),
+    blend: 1,
+    dither: rr(0, 0.25),
+    mixSrc: rr(0.12, 0.4),
+    saturation: rr(0.85, 1.15),
+    contrast: rr(0.95, 1.2),
+    gamma: rr(0.9, 1.1)
+  }
+  theme.palette.slice(0, 5).forEach((c, i) => (vibeInputs[pkeys[i]] = c))
+  if (theme.vibe) Object.assign(vibeInputs, theme.vibe)
+  const vibe = makeVibePalette()
+  vibe.inputs = { ...vibe.inputs, ...vibeInputs }
+  const context = makeContext()
+  const finalizer = makeFinalizer()
+  if (theme.finalizer) finalizer.inputs = { ...finalizer.inputs, ...theme.finalizer }
+
+  return {
+    layers,
+    background,
+    master: [vibe, context, finalizer],
+    bpm: 120,
+    modulators: makeDefaultModulators(),
+    modMatrix: [],
+    metaKnobs: makeDefaultMetaKnobs()
   }
 }
 
@@ -727,6 +825,8 @@ interface StoreState {
 
   // Session round-tripping
   newSession: () => void
+  /** Generate : replace the live session with a fresh one built from a theme. */
+  generateTheme: (themeId: string) => void
   loadSession: (s: Session) => void
   exportSession: () => Session
   // Path of the file this session is saved to (from Save As / Open) : enables a
@@ -2014,6 +2114,57 @@ export const useStore = create<StoreState>((set, get) => ({
         sequence: makeDefaultSequence(), // empty bank → stop the auto-pilot
         sessionPath: null, // New = no file yet; next Save prompts for one.
         collapsed
+      }
+    }),
+  generateTheme: (themeId) =>
+    // Generate : a fresh, unsaved session built to a theme recipe (themes.ts).
+    // Full diegetic scene : visuals + the theme's World (coupling + Context mood +
+    // audio routing) + field-macro / temperament biases. Undoable (morph write path).
+    set((s) => {
+      const theme = THEME_BY_ID[themeId]
+      if (!theme) return s
+      beginMorph(s.composition, s.morphMs, performance.now()) // crossfade the reveal
+      resetCouplingState()
+      let comp = buildThemeComposition(theme)
+      const world = s.worlds.find((w) => w.id === theme.world) ?? null
+      const worlds = ensureWorld(s.worlds, world)
+      if (world) comp = applyWorldToComposition(comp, world)
+      // The theme's Context overrides win over the World's mood nudge.
+      if (theme.context) {
+        comp = {
+          ...comp,
+          master: comp.master.map((f) =>
+            f.shaderId === 'fx-context' ? { ...f, inputs: { ...f.inputs, ...theme.context } } : f
+          )
+        }
+      }
+      // Field macros + persisted temperament (shutter/superFlicker stay state-only :
+      // strobes never persist across a reload).
+      localStorage.setItem('opsia.density', String(theme.density))
+      localStorage.setItem('opsia.gestureTexture', String(theme.gestureTexture))
+      localStorage.setItem('opsia.coalesce', String(theme.coalesce))
+      localStorage.setItem('opsia.tonicity', String(theme.tonicity))
+      localStorage.setItem('opsia.drift', String(theme.drift))
+      if (world) localStorage.setItem('opsia.world', theme.world)
+      return {
+        name: theme.name,
+        composition: comp,
+        world: world ? theme.world : s.world,
+        worlds,
+        selection: { type: 'source', layer: 0, slot: 'A' },
+        scenes: [],
+        activeSceneId: null,
+        vibePresetName: null,
+        variationBaseline: null,
+        sequence: makeDefaultSequence(),
+        sessionPath: null, // Generate = unsaved; Ctrl+S keeps it.
+        density: theme.density,
+        gestureTexture: theme.gestureTexture,
+        coalesce: theme.coalesce,
+        tonicity: theme.tonicity,
+        shutter: theme.shutter,
+        drift: theme.drift,
+        superFlicker: theme.superFlicker
       }
     }),
   loadSession: (s) => {

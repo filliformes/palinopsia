@@ -76,6 +76,56 @@ export async function saveToDefault(session: Session): Promise<string> {
   return candidate
 }
 
+/** List every saved session across the Sessions folder(s) : the primary folder
+ *  next to the app plus the userData fallback (saveToDefault may land in either).
+ *  Returns each file's real session name (falling back to the filename) + mtime,
+ *  newest first. Bad/unparseable files are skipped, not fatal. */
+export async function listSaved(): Promise<Array<{ name: string; path: string; mtime: number }>> {
+  const dirs = [sessionsFolderPath(), join(app.getPath('userData'), 'Sessions')]
+  const seen = new Set<string>()
+  const out: Array<{ name: string; path: string; mtime: number }> = []
+  for (const dir of dirs) {
+    let files: string[]
+    try {
+      files = (await fs.readdir(dir)).filter((f) => f.endsWith('.opsia.json'))
+    } catch {
+      continue // folder doesn't exist yet
+    }
+    for (const f of files) {
+      const path = join(dir, f)
+      if (seen.has(path)) continue
+      seen.add(path)
+      let name = f.replace(/\.opsia\.json$/i, '')
+      let mtime = 0
+      try {
+        const st = await fs.stat(path)
+        mtime = st.mtimeMs
+        const parsed = JSON.parse(await fs.readFile(path, 'utf8')) as Session
+        if (parsed && typeof parsed.name === 'string' && parsed.name.trim()) name = parsed.name
+      } catch {
+        /* keep the filename-derived name / mtime 0 */
+      }
+      out.push({ name, path, mtime })
+    }
+  }
+  return out.sort((a, b) => b.mtime - a.mtime)
+}
+
+/** Load + validate a session from an explicit path (the Session Loader). */
+export async function loadFromPath(path: string): Promise<Session> {
+  const text = await fs.readFile(path, 'utf8')
+  let session: Session
+  try {
+    session = JSON.parse(text) as Session
+  } catch (e) {
+    throw new Error(`Session file could not be parsed: ${(e as Error).message}`)
+  }
+  if (!session || typeof session !== 'object') throw new Error('Session file is not a JSON object')
+  if (session.version !== 1)
+    throw new Error(`Unsupported session version: ${session.version}. Expected 1.`)
+  return session
+}
+
 export async function open(
   parent: BrowserWindow | null
 ): Promise<{ session: Session; path: string } | null> {

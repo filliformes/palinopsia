@@ -14,6 +14,8 @@ const api: ExposedApi = {
   sessionSave: (s: Session, path: string) => ipcRenderer.invoke('session:saveTo', s, path),
   sessionSaveToDefault: (s) => ipcRenderer.invoke('session:saveToDefault', s),
   sessionOpen: () => ipcRenderer.invoke('session:open'),
+  sessionList: () => ipcRenderer.invoke('session:list'),
+  sessionLoad: (path: string) => ipcRenderer.invoke('session:load', path),
 
   // ── Autosave / crash recovery ────────────────────────────────────
   autosaveCrashCheck: () => ipcRenderer.invoke('autosave:crashCheck'),

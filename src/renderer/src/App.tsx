@@ -36,6 +36,7 @@ import { initOscInput, applyOscListen, applyOscOutput, initOscQueryStream } from
 import { morphedComposition, consumeCrossfade } from './morph'
 import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
+import { SessionLoader, GenerateMenu } from './components/TopBarMenus'
 import { initMidi } from './midi'
 import { GENERATORS, shaderSourceById } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
@@ -603,11 +604,13 @@ export default function App(): JSX.Element {
           Palinopsia
         </h1>
         <input
-          className="input w-56 text-[12px]"
+          className="input w-40 text-[12px]"
           value={name}
           onChange={(e) => setName(e.target.value)}
           title="Session name"
         />
+        <SessionLoader />
+        <GenerateMenu />
         <div className="flex-1" />
         {(() => {
           const sinks = [
