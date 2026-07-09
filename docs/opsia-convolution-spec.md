@@ -25,6 +25,11 @@ a **sidechain layer picker** (any of the 4 layers, or an imported still/clip).
 
 ---
 
+> **Status (2026-07-09):** all three nodes BUILT in `engine/convNodes.ts` — `Convolution`
+> (Module 1, direct kernel path), `Transfert` (Module 2), `Réponse` (Module 3, frame-echo with
+> a parametric envelope). Module 1's FFT large-kernel path and Module 3's full capture/library/
+> editor workflow remain future upgrades; the shipped versions cover the core effect.
+
 ## Module 1 — `ConvolveSpatial` (FFT image ⊛ kernel-image convolution)
 
 The Unreal "convolution bloom" model generalized: the sidechain frame is the kernel

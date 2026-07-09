@@ -20,10 +20,11 @@ import type {
   ModTarget,
   ModulatorConfig,
   ModulatorType,
+  SidechainRef,
   SourceSlot
 } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS, WORLD_AUTOMOD_SLOT } from '@shared/types'
-import { curatedRange, FX_SHADERS, GENERATORS } from './shaders/isf'
+import { curatedRange, FX_SHADERS, GENERATORS, NATIVE_NODES } from './shaders/isf'
 import { inputsForShader, type IsfInputDesc } from './shaders/isf/inputs'
 import { BG_SOURCES, BG_DEFAULT_SPEED } from './bgPresets'
 
@@ -178,19 +179,34 @@ function drawCount(weights: number[]): number {
   return weights.length - 1
 }
 
-/** Build a rack of n DISTINCT random FX, each with randomized params. */
+// The convolution nodes are LAYER-FX only (they need a sidechain layer) and
+// heavy, so they join the random pool only for the per-layer FX rack, capped to
+// one per rack, each handed a random sidechain layer so they actually do work.
+const CONV_NODE_IDS = ['node-convolve', 'node-transfert', 'node-reponse']
+const CONV_NODES = NATIVE_NODES.filter((n) => CONV_NODE_IDS.includes(n.id))
+const randSidechain = (): SidechainRef => ({ kind: 'layer', layer: Math.floor(rnd() * 4) })
+
+/** Build a rack of n DISTINCT random FX, each with randomized params.
+ *  `includeConv` (layer FX only) also draws the convolution nodes. */
 function randomRack(
   countWeights: number[],
   endWithColor = false,
-  exclude: string[] = []
+  exclude: string[] = [],
+  includeConv = false
 ): FxInstance[] {
   const n = drawCount(countWeights)
-  const pool = FX_SHADERS.filter((f) => !exclude.includes(f.id))
+  const pool = [...FX_SHADERS, ...(includeConv ? CONV_NODES : [])].filter((f) => !exclude.includes(f.id))
   const picked: typeof FX_SHADERS = []
+  let convUsed = 0
   for (let i = 0; i < n && pool.length > 0; i++) {
     const idx = Math.floor(rnd() * pool.length)
-    picked.push(pool[idx])
+    const s = pool[idx]
     pool.splice(idx, 1)
+    if (s.native) {
+      if (convUsed >= 1) continue // heavy — at most one convolution node per rack
+      convUsed++
+    }
+    picked.push(s)
   }
   // Master-rack habit: often close the chain with a unifying color pass.
   // Guarded so the rack never exceeds the requested maximum length.
@@ -207,7 +223,9 @@ function randomRack(
     id: uid(),
     shaderId: s.id,
     enabled: true,
-    inputs: randomizeInputs(s.id, {})
+    inputs: randomizeInputs(s.id, {}),
+    // A random sidechain layer when a convolution node lands, so it isn't inert.
+    ...(s.native ? { sidechain: randSidechain() } : {})
   }))
 }
 
@@ -343,7 +361,7 @@ export function randomizeSingleLayer(l: LayerState): LayerState {
     sourceB: withB ? randomSlot() : null,
     sourceAFx: randomRack([0.45, 0.4, 0.15]),
     sourceBFx: withB ? randomRack([0.55, 0.35, 0.1]) : [],
-    fx: randomRack([0.35, 0.4, 0.2, 0.05]),
+    fx: randomRack([0.35, 0.4, 0.2, 0.05], false, [], true),
     sourceMix: withB ? range(0.25, 0.75) : l.sourceMix,
     sourceBlend: withB ? pick(BLENDS) : l.sourceBlend,
     blend: pick(BLENDS),
@@ -440,7 +458,7 @@ function randomizeStructural(
       ...c,
       layers: c.layers.map((l) => ({
         ...l,
-        fx: slotActive(l.sourceA) || slotActive(l.sourceB) ? randomRack([0.35, 0.4, 0.2, 0.05]) : l.fx
+        fx: slotActive(l.sourceA) || slotActive(l.sourceB) ? randomRack([0.35, 0.4, 0.2, 0.05], false, [], true) : l.fx
       }))
     }
   }
@@ -503,7 +521,7 @@ function randomizeStructural(
         const hasSource = !!layer.sourceA.shaderId || !!layer.sourceB?.shaderId
         layer = {
           ...layer,
-          fx: hasSource ? randomRack([0.35, 0.4, 0.2, 0.05]) : [],
+          fx: hasSource ? randomRack([0.35, 0.4, 0.2, 0.05], false, [], true) : [],
           blend: pick(BLENDS),
           opacity: range(0.55, 1),
           feedback: hasSource ? chance(0.3) : false,

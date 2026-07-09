@@ -12,6 +12,82 @@ export interface ShaderPreset {
 }
 
 export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
+  // ── Convolution nodes (need a sidechain layer; Réponse uses host history) ──
+  'node-transfert': [
+    { name: 'Drift', values: { mode: 0, amount: 0.3, inertie: 0.6, flowScale: 1.0, flowBlur: 8, magnitudeGamma: 1.0, channelSpread: 0, flowRes: 1 } },
+    { name: 'Heavy pull', values: { mode: 0, amount: 0.5, inertie: 0.85, flowScale: 1.4, flowBlur: 12, magnitudeGamma: 1.3, channelSpread: 0.1 } },
+    { name: 'Snap', values: { mode: 0, amount: 0.45, inertie: 0.2, flowScale: 1.0, flowBlur: 5, magnitudeGamma: 0.8 } },
+    { name: 'Chroma pull', values: { mode: 0, amount: 0.4, inertie: 0.6, flowBlur: 8, channelSpread: 0.35 } },
+    { name: 'Whiplash', values: { mode: 0, amount: 0.6, inertie: 0.4, flowScale: 1.8, magnitudeGamma: 1.6 } },
+    { name: 'Trail soft', values: { mode: 1, amount: 0.35, inertie: 0.6, flowBlur: 8, taps: 12, falloff: 0.6, bidirectional: 0 } },
+    { name: 'Trail long', values: { mode: 1, amount: 0.55, inertie: 0.75, taps: 18, falloff: 0.3, bidirectional: 0 } },
+    { name: 'Smear both', values: { mode: 1, amount: 0.4, inertie: 0.5, taps: 14, falloff: 0.5, bidirectional: 1 } },
+    { name: 'Gesture blur', values: { mode: 1, amount: 0.3, inertie: 0.85, taps: 16, falloff: 0.4, magnitudeGamma: 1.2, bidirectional: 0 } },
+    { name: 'Fine trace', values: { mode: 1, amount: 0.25, inertie: 0.5, taps: 10, falloff: 0.7, flowRes: 2 } }
+  ],
+  'node-convolve': [
+    { name: 'Soft bloom', values: { scale: 0.6, taps: 7, threshold: 0.1, kernelGamma: 1.0, boost: 0, gain: 1.0, mix: 0.6, additive: 0 } },
+    { name: 'Glare stamp', values: { scale: 1.0, taps: 9, threshold: 0.15, kernelGamma: 1.4, boost: 0.4, gain: 1.4, mix: 0.7, additive: 1 } },
+    { name: 'Wide halo', values: { scale: 1.6, taps: 10, threshold: 0.2, kernelGamma: 1.2, boost: 0.5, gain: 1.2, mix: 0.6, additive: 1 } },
+    { name: 'Texture imprint', values: { scale: 0.4, taps: 8, threshold: 0.05, kernelGamma: 0.8, boost: 0, gain: 1.0, mix: 0.8, additive: 0 } },
+    { name: 'Tight highlight', values: { scale: 0.5, taps: 6, threshold: 0.3, kernelGamma: 1.6, boost: 0.6, gain: 1.6, mix: 0.6, additive: 1 } },
+    { name: 'Energy wash', values: { scale: 1.2, taps: 9, threshold: 0.1, kernelGamma: 1.0, boost: 0.2, gain: 1.0, mix: 0.75, additive: 0 } },
+    { name: 'Sparse stars', values: { scale: 1.0, taps: 7, threshold: 0.5, kernelGamma: 2.0, boost: 0.5, gain: 1.8, mix: 0.6, additive: 1 } },
+    { name: 'Diffuse', values: { scale: 0.9, taps: 10, threshold: 0.05, kernelGamma: 0.9, boost: 0, gain: 0.9, mix: 0.7, additive: 0 } },
+    { name: 'Hard bloom', values: { scale: 0.8, taps: 8, threshold: 0.25, kernelGamma: 1.4, boost: 0.6, gain: 1.5, mix: 0.65, additive: 1 } },
+    { name: 'Ghost print', values: { scale: 1.1, taps: 9, threshold: 0.15, kernelGamma: 1.1, boost: 0.1, gain: 1.0, mix: 0.5, additive: 0 } }
+  ],
+  'node-reponse': [
+    { name: 'Short echo', values: { length: 6, decay: 0.3, attack: 0, gain: 1.0, reverse: 0, mix: 0.5 } },
+    { name: 'Room', values: { length: 10, decay: 0.5, attack: 0.1, gain: 1.0, reverse: 0, mix: 0.6 } },
+    { name: 'Long tail', values: { length: 16, decay: 0.85, attack: 0.05, gain: 1.1, reverse: 0, mix: 0.65 } },
+    { name: 'Pulse', values: { length: 8, decay: 0.25, attack: 0.15, gain: 1.2, reverse: 0, mix: 0.6 } },
+    { name: 'Swell', values: { length: 14, decay: 0.7, attack: 0.1, gain: 1.0, reverse: 1, mix: 0.6 } },
+    { name: 'Stutter trail', values: { length: 6, decay: 0.4, attack: 0, gain: 1.3, reverse: 0, mix: 0.55 } },
+    { name: 'Ghost trail', values: { length: 12, decay: 0.9, attack: 0.2, gain: 0.9, reverse: 0, mix: 0.5 } },
+    { name: 'Rhythmic', values: { length: 10, decay: 0.4, attack: 0.3, gain: 1.1, reverse: 0, mix: 0.6 } },
+    { name: 'Deep reverb', values: { length: 16, decay: 0.95, attack: 0.15, gain: 1.0, reverse: 0, mix: 0.7 } },
+    { name: 'Reverse bloom', values: { length: 10, decay: 0.6, attack: 0, gain: 1.2, reverse: 1, mix: 0.6 } }
+  ],
+  // ── Motif (spatial counterpoint / transpose echoes) ──
+  'fx-motif': [
+    { name: 'Single echo', values: { copies: 1, offX: 0.16, offY: 0.1, rotate: 0.3, scale: 0.88, fade: 0.62, invert: 0, mode: 0 } },
+    { name: 'Twin', values: { copies: 2, offX: 0.2, offY: 0, rotate: 0, scale: 0.9, fade: 0.6, mode: 0 } },
+    { name: 'Cascade', values: { copies: 3, offX: 0.14, offY: 0.1, rotate: 0.35, scale: 0.85, fade: 0.6, mode: 0 } },
+    { name: 'Spiral', values: { copies: 3, offX: 0.08, offY: 0.06, rotate: 0.8, scale: 0.82, fade: 0.6, mode: 0 } },
+    { name: 'Mirror', values: { copies: 1, offX: 0.3, offY: 0, rotate: 0, scale: 1.0, fade: 0.7, invert: 1, mode: 0 } },
+    { name: 'Ghost add', values: { copies: 2, offX: 0.18, offY: 0.12, rotate: 0.2, scale: 0.92, fade: 0.55, mode: 1 } },
+    { name: 'Screen bloom', values: { copies: 2, offX: 0.12, offY: 0.1, rotate: 0.25, scale: 0.95, fade: 0.6, mode: 2 } },
+    { name: 'Max stack', values: { copies: 3, offX: 0.1, offY: 0.08, rotate: 0.4, scale: 0.88, fade: 0.65, mode: 3 } },
+    { name: 'Tight repeat', values: { copies: 3, offX: 0.06, offY: 0, rotate: 0, scale: 0.95, fade: 0.7, mode: 0 } },
+    { name: 'Diagonal drift', values: { copies: 2, offX: 0.22, offY: 0.18, rotate: 0.5, scale: 0.85, fade: 0.55, mode: 0 } }
+  ],
+  // ── Parametric (audio → raster / waveform / bars / spectrogram) ──
+  'gen-parametric': [
+    { name: 'Raster mono', values: { mode: 0, gain: 1.2, scale: 0.4, scan: 0.3, mono: 1, color: [0.6, 0.85, 1, 1] } },
+    { name: 'Raster cyan', values: { mode: 0, gain: 1.4, scale: 0.6, scan: 0.5, mono: 0, color: [0.2, 0.9, 1, 1] } },
+    { name: 'Waveform', values: { mode: 1, gain: 1.2, scale: 0.4, scan: 0.3, mono: 1 } },
+    { name: 'Waveform amber', values: { mode: 1, gain: 1.6, scale: 0.6, scan: 0.3, mono: 0, color: [1, 0.7, 0.2, 1] } },
+    { name: 'Bars', values: { mode: 2, gain: 1.2, scale: 0.4, scan: 0.3, mono: 1 } },
+    { name: 'Bars magenta', values: { mode: 2, gain: 1.4, scale: 0.5, scan: 0.3, mono: 0, color: [0.9, 0.2, 0.6, 1] } },
+    { name: 'Spectrogram', values: { mode: 3, gain: 1.2, scale: 0.4, scan: 0.3, mono: 0, color: [0.5, 0.8, 1, 1] } },
+    { name: 'Spectrogram slow', values: { mode: 3, gain: 1.4, scale: 0.4, scan: 0.1, mono: 0, color: [0.7, 0.5, 1, 1] } },
+    { name: 'Spectrogram fast', values: { mode: 3, gain: 1.2, scale: 0.4, scan: 0.7, mono: 1 } },
+    { name: 'Test pattern', values: { mode: 0, gain: 1.6, scale: 0.8, scan: 0.6, mono: 1, color: [1, 1, 1, 1] } }
+  ],
+  // ── Text (styling presets — your typed string is left untouched) ──
+  'gen-text': [
+    { name: 'Bold centre', values: { font: 1, size: 0.3, weight: 800, spacing: 0, stretch: 1, angle: 0, posX: 0, posY: 0, color: [1, 1, 1, 1] } },
+    { name: 'Tall condensed', values: { font: 1, size: 0.4, weight: 700, spacing: -0.05, stretch: 2.2, angle: 0 } },
+    { name: 'Wide light', values: { font: 1, size: 0.22, weight: 300, spacing: 0.2, stretch: 1, angle: 0 } },
+    { name: 'Slanted', values: { font: 1, size: 0.28, weight: 700, spacing: 0.05, stretch: 1, angle: 0.35 } },
+    { name: 'Small footer', values: { font: 1, size: 0.12, weight: 500, spacing: 0.1, stretch: 1, posY: -0.8 } },
+    { name: 'Big top', values: { font: 1, size: 0.45, weight: 900, spacing: 0, stretch: 1, posY: 0.6 } },
+    { name: 'Spaced caps', values: { font: 1, size: 0.2, weight: 600, spacing: 0.4, stretch: 1.2 } },
+    { name: 'Stacked tall', values: { font: 1, size: 0.35, weight: 800, spacing: 0, stretch: 3 } },
+    { name: 'Tilt left', values: { font: 1, size: 0.3, weight: 700, stretch: 1, angle: -0.4 } },
+    { name: 'Accent tint', values: { font: 1, size: 0.3, weight: 700, stretch: 1, color: [0.95, 0.35, 0.25, 1] } }
+  ],
   organic: [
     { name: 'Hearth', values: { mode: 0, rate: 0.45, scale: 2.2, detail: 0.6, flow: 0.5, vary: 0, contrast: 1.0 } },
     { name: 'Wildfire', values: { mode: 0, rate: 1.1, scale: 3.5, detail: 0.85, flow: 0.8, vary: 0, contrast: 1.3 } },
