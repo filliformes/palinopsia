@@ -561,6 +561,13 @@ interface StoreState {
   setShutter: (v: number) => void
   drift: number
   setDrift: (v: number) => void
+  // Superimposition flicker (Cameraless §5.2 — 0 = off) + animated-sound loop
+  // (§4.4 — samples a scanline of the output and sends it to Pandore over OSC).
+  superFlicker: number
+  setSuperFlicker: (v: number) => void
+  markSignalEnabled: boolean
+  markSignalY: number
+  setMarkSignal: (partial: Partial<{ enabled: boolean; y: number }>) => void
   // World / diegesis — a bank of editable presets (built-ins + user worlds).
   // Selecting one biases the composition; the World page (W) edits/creates them.
   worlds: World[]
@@ -1598,6 +1605,16 @@ export const useStore = create<StoreState>((set, get) => ({
   setShutter: (v) => { localStorage.setItem('opsia.shutter', String(v)); set({ shutter: v }) },
   drift: (() => { const v = Number(localStorage.getItem('opsia.drift')); return Number.isFinite(v) ? v : 0 })(),
   setDrift: (v) => { localStorage.setItem('opsia.drift', String(v)); set({ drift: v }) },
+  superFlicker: (() => { const v = Number(localStorage.getItem('opsia.superFlicker')); return Number.isFinite(v) ? v : 0 })(),
+  setSuperFlicker: (v) => { localStorage.setItem('opsia.superFlicker', String(v)); set({ superFlicker: v }) },
+  markSignalEnabled: localStorage.getItem('opsia.markSignalEnabled') === '1',
+  markSignalY: (() => { const v = Number(localStorage.getItem('opsia.markSignalY')); return Number.isFinite(v) ? v : 0.5 })(),
+  setMarkSignal: (partial) =>
+    set((s) => {
+      if (partial.enabled !== undefined) localStorage.setItem('opsia.markSignalEnabled', partial.enabled ? '1' : '0')
+      if (partial.y !== undefined) localStorage.setItem('opsia.markSignalY', String(partial.y))
+      return { markSignalEnabled: partial.enabled ?? s.markSignalEnabled, markSignalY: partial.y ?? s.markSignalY }
+    }),
   worlds: startWorlds,
   world: startWorld.id,
   setWorld: (id) =>

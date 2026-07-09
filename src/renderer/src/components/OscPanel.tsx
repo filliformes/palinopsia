@@ -16,6 +16,8 @@ export function OscPanel(): JSX.Element {
   const oscOutHost = useStore((s) => s.oscOutHost)
   const oscOutPort = useStore((s) => s.oscOutPort)
   const setOscOutConfig = useStore((s) => s.setOscOutConfig)
+  const markSignalEnabled = useStore((s) => s.markSignalEnabled)
+  const setMarkSignal = useStore((s) => s.setMarkSignal)
   const [portStr, setPortStr] = useState(String(oscPort))
   const [outHostStr, setOutHostStr] = useState(oscOutHost)
   const [outPortStr, setOutPortStr] = useState(String(oscOutPort))
@@ -197,6 +199,31 @@ export function OscPanel(): JSX.Element {
           className={`font-mono text-[9px] ${oscOutEnabled ? 'text-accent' : 'text-muted'}`}
         >
           {oscOutEnabled ? 'mirroring' : 'off'}
+        </span>
+      </div>
+
+      {/* Animated sound (§4.4) — send a scanline of the output to Pandore as a
+          control signal, so a drawn mark is simultaneously image AND sound. */}
+      <div className="flex min-w-0 items-center gap-2">
+        <button
+          onClick={() => setMarkSignal({ enabled: !markSignalEnabled })}
+          className={`shrink-0 rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
+            markSignalEnabled
+              ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2'
+              : 'bg-panel2 text-muted hover:text-text'
+          }`}
+          title={
+            markSignalEnabled
+              ? 'Stop sending the drawn optical soundtrack to Pandore'
+              : 'Send a scanline of the output to Pandore as sound (McLaren animated-sound loop). Uses the feedback host/port above.'
+          }
+        >
+          {markSignalEnabled ? 'MARK → SND' : 'MARK SND OFF'}
+        </button>
+        <span className="font-mono text-[9px] text-muted">/opsia/av/mark-*</span>
+        <div className="flex-1" />
+        <span className={`font-mono text-[9px] ${markSignalEnabled ? 'text-accent2' : 'text-muted'}`}>
+          {markSignalEnabled ? 'scanning' : 'off'}
         </span>
       </div>
     </div>

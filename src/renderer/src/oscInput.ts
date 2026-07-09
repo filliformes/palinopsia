@@ -30,7 +30,9 @@
 //   /opsia/density|proximity                            f 0..1 (field macros)
 //   /opsia/gesture                                      f 0..1 (Gesture ⇄ Texture)
 //   /opsia/coalesce                                     f 0..1 (Dispersal ⇄ Coalescence)
-//   /opsia/tonicity|shutter|drift                       f 0..1 (temperament, 0 = off)
+//   /opsia/tonicity|shutter|drift|superflicker          f 0..1 (temperament, 0 = off)
+//   (outbound only) /opsia/av/mark-signal f×32 · mark-level|centroid|flux f  — the
+//   animated-sound loop: a scanline of the output sent to Pandore (§4.4).
 //   /opsia/world                                        s id | name | i (1-based index)
 //   /opsia/seq/run                                      >= 0.5 toggles the sequencer
 //   /opsia/seq/skip                                     trigger (advance to next scene)
@@ -313,6 +315,7 @@ function route(address: string, args: Args): void {
     case 'tonicity': st.setTonicity(clamp01(n)); return
     case 'shutter': st.setShutter(clamp01(n)); return
     case 'drift': st.setDrift(clamp01(n)); return
+    case 'superflicker': st.setSuperFlicker(clamp01(n)); return
 
     case 'world': {
       const str = firstStr(args)
@@ -540,6 +543,7 @@ function enumerateLeaves(): Leaf[] {
   add('/opsia/tonicity', 0, 1, st.tonicity ?? 0, 'Tonicity — tonal audio → colour, noise → mono (0 = off)')
   add('/opsia/shutter', 0, 1, st.shutter ?? 0, 'Shutter — stop-motion frame stepping (0 = off)')
   add('/opsia/drift', 0, 1, st.drift ?? 0, 'Drift — analog-instability temperament (0 = off)')
+  add('/opsia/superflicker', 0, 1, st.superFlicker ?? 0, 'Superimposition flicker — layer cross-cut strobe (0 = off)')
   // World selection (accepts a string id/name, or a 1-based index) + transport.
   const worldIdx = Math.max(1, st.worlds.findIndex((w) => w.id === st.world) + 1)
   add('/opsia/world', 1, Math.max(1, st.worlds.length), worldIdx, 'Active World (send an id/name string, or a 1-based index)')

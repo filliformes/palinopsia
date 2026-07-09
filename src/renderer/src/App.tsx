@@ -12,6 +12,8 @@ import { audioBus } from './engine/audioIn'
 import { applyCoupling } from './engine/coupling'
 import { applyProximity, applyFieldMacros } from './engine/field'
 import { applyTonicity, applyDrift, shutterHold, shutterClear } from './engine/temperament'
+import { applyFlicker } from './engine/flicker'
+import { pushMarkSignal } from './engine/markSignal'
 import { applyModulation, modEngine } from './engine/modulation'
 import { currentFps, tickFrame } from './perf'
 import { tickSequencer } from './engine/sequencer'
@@ -450,8 +452,19 @@ export default function App(): JSX.Element {
         applyDrift(comp!, c, st.drift, now)
         if (st.shutter > 0.02) comp!.setFreeze(shutterHold(now, st.shutter))
         else if (shutterClear()) comp!.setFreeze(false)
+        // 2g. Superimposition flicker (§5.2): cross-cut which layer shows on the
+        //     drawn cadence — rate follows the Cameraless film rate when it's on.
+        if (st.superFlicker > 0.02) {
+          const fin = c.master.find((f) => f.shaderId === 'fx-finalizer')?.inputs
+          const filmOn = fin && Math.round(Number(fin.filmHold) || 0) > 0
+          const rateFps = filmOn ? Number(fin!.filmRate) || 8 : 8
+          applyFlicker(comp!, st.superFlicker, rateFps, now)
+        }
         // 3. Render the frame.
         comp!.render(now - start)
+        // 3b. Animated sound (§4.4): sample a scanline of the presented frame and
+        //     send it to Pandore over OSC (McLaren's drawn optical track).
+        if (st.markSignalEnabled) pushMarkSignal(comp!, now)
         // 4. Native output window: push the exact render state so it renders
         //    the same composition itself (pixel-perfect, no transcode).
         if (st.outputActive) {

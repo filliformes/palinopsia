@@ -85,6 +85,8 @@ export function Transport(): JSX.Element {
   const setShutter = useStore((s) => s.setShutter)
   const drift = useStore((s) => s.drift)
   const setDrift = useStore((s) => s.setDrift)
+  const superFlicker = useStore((s) => s.superFlicker)
+  const setSuperFlicker = useStore((s) => s.setSuperFlicker)
   const activeWorld = worlds.find((w) => w.id === world)
   const setComposition = useStore.setState
   const applyVariation = useStore((s) => s.applyVariation)
@@ -254,6 +256,8 @@ export function Transport(): JSX.Element {
           title="Shutter — GLOBAL full-freeze stop-motion: dead-holds the whole present, then jumps (24fps → 2fps). 0 = off. For a filmic hold with gate-weave + materiality (feedback keeps running underneath), use Finishing → film hold (Cameraless) instead. §1.7" />
         <MacroKnob label="DRIFT" value={drift} onChange={setDrift} neutral={0}
           title="Drift — slow analog-instability wander over the grade + rare 'accidents'. 0 = off. Homage to Corbeil-Perron §1.8" />
+        <MacroKnob label="SUPER" value={superFlicker} onChange={setSuperFlicker} neutral={0}
+          title="Superimposition flicker — Brakhage's hypnagogic strobe: cross-cuts which layer shows on the drawn cadence (rate follows Cameraless film hold). 0 = off. §5.2" />
       </div>
 
       <div className="flex-1" />

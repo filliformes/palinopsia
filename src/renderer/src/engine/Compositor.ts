@@ -1146,6 +1146,28 @@ export class Compositor {
     this.outputCapture = cb;
   }
 
+  // ── Animated sound (spec §4.4): read one horizontal scanline of the PRESENTED
+  //    frame and downsample it to `n` luma samples in 0..1 — the "optical
+  //    soundtrack" a drawn gesture writes. Cheap (one row, sub-rect readback).
+  //    Call AFTER render() (the default framebuffer then holds the presented frame).
+  private markStripBuf: Uint8Array | null = null;
+  readMarkStrip(n: number, y01: number): Float32Array | null {
+    const gl = this.gl, w = this.canvas.width, h = this.canvas.height;
+    if (w < 2 || h < 2 || n < 1) return null;
+    // GL is bottom-up; y01 is top-down (0 = top of image).
+    const y = Math.max(0, Math.min(h - 1, Math.round((1 - y01) * (h - 1))));
+    const need = w * 4;
+    if (!this.markStripBuf || this.markStripBuf.length !== need) this.markStripBuf = new Uint8Array(need);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.readPixels(0, y, w, 1, gl.RGBA, gl.UNSIGNED_BYTE, this.markStripBuf);
+    const out = new Float32Array(n), b = this.markStripBuf;
+    for (let i = 0; i < n; i++) {
+      const p = Math.min(w - 1, Math.floor((i / n) * w)) * 4;
+      out[i] = (b[p] * 0.299 + b[p + 1] * 0.587 + b[p + 2] * 0.114) / 255;
+    }
+    return out;
+  }
+
   /** Set the projection warp for the present pass. `corners` = 8 normalized
    *  numbers (TL,TR,BR,BL x,y; top-left origin) or null to disable. */
   setWarp(corners: number[] | null, grid: boolean): void {
