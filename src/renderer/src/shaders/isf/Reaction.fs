@@ -10,6 +10,10 @@
     { "NAME": "scale", "TYPE": "float", "MIN": 0.0,   "MAX": 1.0,  "DEFAULT": 0.4,   "LABEL": "scale" },
     { "NAME": "seed",  "TYPE": "float", "MIN": 0.0,   "MAX": 1.0,  "DEFAULT": 0.3,   "LABEL": "seeding" },
     { "NAME": "sharp", "TYPE": "float", "MIN": 0.0,   "MAX": 1.0,  "DEFAULT": 0.5,   "LABEL": "sharpness" },
+    { "NAME": "zoom",  "TYPE": "float", "MIN": 0.25,  "MAX": 4.0,  "DEFAULT": 1.0,   "LABEL": "zoom" },
+    { "NAME": "panX",  "TYPE": "float", "MIN": -1.0,  "MAX": 1.0,  "DEFAULT": 0.0,   "LABEL": "pan x" },
+    { "NAME": "panY",  "TYPE": "float", "MIN": -1.0,  "MAX": 1.0,  "DEFAULT": 0.0,   "LABEL": "pan y" },
+    { "NAME": "rotate","TYPE": "float", "MIN": -1.0,  "MAX": 1.0,  "DEFAULT": 0.0,   "LABEL": "rotate" },
     { "NAME": "tint",  "TYPE": "color", "DEFAULT": [0.75, 0.78, 0.72, 1.0] }
   ],
   "PASSES": [
@@ -48,8 +52,15 @@ void main() {
     V = min(1.0, V + s * 0.5);
     gl_FragColor = vec4(U, V, 0.0, 1.0);
   } else {
-    // ── Present : V drives a matte pattern over near-black. ──
-    float V = IMG_NORM_PIXEL(buf, uv).g;
+    // ── Present : V drives a matte pattern over near-black. A zoom/pan/rotate
+    //    transform (about centre) lets the field fill the frame at any framing;
+    //    the sample wraps (fract) so it always covers the whole screen. ──
+    vec2 p = uv - 0.5;
+    float a = rotate * 3.14159265;
+    p = mat2(cos(a), -sin(a), sin(a), cos(a)) * p;
+    p = p / max(0.05, zoom) + vec2(panX, panY) * 0.5 + 0.5;
+    p = fract(p);
+    float V = IMG_NORM_PIXEL(buf, p).g;
     float v = smoothstep(0.08, 0.35, pow(clamp(V, 0.0, 1.0), mix(1.0, 3.0, sharp)));
     vec3 base = vec3(0.02, 0.02, 0.025);
     gl_FragColor = vec4(mix(base, tint.rgb, v), 1.0);

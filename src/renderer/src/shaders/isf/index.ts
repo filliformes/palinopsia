@@ -461,7 +461,7 @@ export const GENERATORS: IsfShader[] = [
     name: 'Reaction',
     category: 'Generator',
     source: reaction,
-    curated: { feed: [0.02, 0.06], kill: [0.045, 0.065], rate: [0.6, 1.2], scale: [0.2, 0.8], seed: [0.15, 0.6], sharp: [0.2, 0.8] }
+    curated: { feed: [0.02, 0.06], kill: [0.045, 0.065], rate: [0.6, 1.2], scale: [0.2, 0.8], seed: [0.15, 0.6], sharp: [0.2, 0.8], zoom: [0.6, 2.2], panX: [-0.5, 0.5], panY: [-0.5, 0.5], rotate: [-0.5, 0.5] }
   },
   {
     id: 'sync-osc',

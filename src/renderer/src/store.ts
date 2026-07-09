@@ -259,12 +259,29 @@ export function makeDefaultMetaKnobs(): MetaKnobState[] {
   }))
 }
 
-// The Background slab's default : a solid white ground (a clean canvas to build
-// on / key against). New sessions get this; old sessions with no background
-// normalize to the BLANK (off) one so loading them isn't suddenly washed white.
+// A random NON-WHITE solid ground : varied hue, moderate saturation/value so a
+// fresh session always opens on a different tinted backdrop (never pure white).
+function randomBgColor(): [number, number, number, number] {
+  const h = Math.random()
+  const s = 0.35 + Math.random() * 0.5 // 0.35..0.85
+  const v = 0.28 + Math.random() * 0.44 // 0.28..0.72 : never washes to white
+  const i = Math.floor(h * 6), f = h * 6 - i
+  const p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s)
+  const rgb =
+    i % 6 === 0 ? [v, t, p] :
+    i % 6 === 1 ? [q, v, p] :
+    i % 6 === 2 ? [p, v, t] :
+    i % 6 === 3 ? [p, q, v] :
+    i % 6 === 4 ? [t, p, v] : [v, p, q]
+  return [rgb[0], rgb[1], rgb[2], 1]
+}
+
+// The Background slab's default : a solid ground (a canvas to build on / key
+// against), a RANDOM non-white colour each new session. Old sessions with no
+// background normalize to the BLANK (off) one so loading them isn't washed out.
 export function makeDefaultBackground(): BackgroundState {
   return {
-    source: { kind: 'generator', shaderId: 'solid-color', inputs: { gradient: 0, color: [1, 1, 1, 1] } },
+    source: { kind: 'generator', shaderId: 'solid-color', inputs: { gradient: 0, color: randomBgColor() } },
     fx: [],
     opacity: 1,
     speed: BG_DEFAULT_SPEED,
@@ -1601,12 +1618,14 @@ export const useStore = create<StoreState>((set, get) => ({
   // Temperament controls rest at 0 (off), not the 0.5 deadzone of the field macros.
   tonicity: (() => { const v = Number(localStorage.getItem('opsia.tonicity')); return Number.isFinite(v) ? v : 0 })(),
   setTonicity: (v) => { localStorage.setItem('opsia.tonicity', String(v)); set({ tonicity: v }) },
-  shutter: (() => { const v = Number(localStorage.getItem('opsia.shutter')); return Number.isFinite(v) ? v : 0 })(),
-  setShutter: (v) => { localStorage.setItem('opsia.shutter', String(v)); set({ shutter: v }) },
+  // Shutter + Superimposition are strobe-like performance effects : always start
+  // at 0 on load (they never persist a lingering strobe across sessions/reloads).
+  shutter: 0,
+  setShutter: (v) => set({ shutter: v }),
   drift: (() => { const v = Number(localStorage.getItem('opsia.drift')); return Number.isFinite(v) ? v : 0 })(),
   setDrift: (v) => { localStorage.setItem('opsia.drift', String(v)); set({ drift: v }) },
-  superFlicker: (() => { const v = Number(localStorage.getItem('opsia.superFlicker')); return Number.isFinite(v) ? v : 0 })(),
-  setSuperFlicker: (v) => { localStorage.setItem('opsia.superFlicker', String(v)); set({ superFlicker: v }) },
+  superFlicker: 0,
+  setSuperFlicker: (v) => set({ superFlicker: v }),
   markSignalEnabled: localStorage.getItem('opsia.markSignalEnabled') === '1',
   markSignalY: (() => { const v = Number(localStorage.getItem('opsia.markSignalY')); return Number.isFinite(v) ? v : 0.5 })(),
   setMarkSignal: (partial) =>

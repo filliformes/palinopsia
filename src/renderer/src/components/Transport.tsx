@@ -208,10 +208,10 @@ export function Transport(): JSX.Element {
       <div className="ml-1 flex items-center gap-1.5">
         <button
           onClick={() => setSequencePageOpen(true)}
-          className={`rounded border px-1.5 py-1 font-mono text-[11px] transition-colors ${
+          className={`shrink-0 rounded border px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide transition-colors ${
             seqRunning
-              ? 'border-accent bg-accent/15 text-accent'
-              : 'border-border text-muted hover:text-accent'
+              ? 'border-accent bg-accent/20 text-accent'
+              : 'border-border bg-panel2 text-muted hover:border-accent/50 hover:text-accent'
           }`}
           title="Open the Sequence / macro-form auto-pilot (Q)"
         >
@@ -242,9 +242,9 @@ export function Transport(): JSX.Element {
             ◑
           </button>
         </div>
-        {/* Field macros + temperament : spatial-material + film globals. Wrapped
-            in a tight-gap group so the seven knobs don't push the bar off-screen. */}
-        <div className="flex items-center gap-0.5">
+        {/* Field macros + temperament : spatial-material + film globals. Grouped
+            with breathing room; the bar wraps (flex-wrap) if the window is narrow. */}
+        <div className="flex items-center gap-2">
           <MacroKnob label="DENS" value={density} onChange={setDensity}
             title="Density : sparse ↔ dense (fades upper layers / fills them in). 0.5 neutral · double-click resets" />
           <MacroKnob label="G↔T" value={gestureTexture} onChange={setGestureTexture}
@@ -363,7 +363,7 @@ function MacroKnob({
 }): JSX.Element {
   const active = Math.abs(value - neutral) > 0.02
   return (
-    <div className="flex items-center gap-0.5" title={title}>
+    <div className="flex items-center gap-1" title={title}>
       <span className={`font-mono text-[9px] ${active ? 'text-accent2' : 'text-muted'}`}>{label}</span>
       <input
         type="range"
