@@ -414,6 +414,29 @@ export const GENERATORS: IsfShader[] = [
       posX: [-0.4, 0.4],
       posY: [-0.4, 0.4]
     }
+  },
+  {
+    // Parametric — the audio-buffer→texture generator (Boucher/Piché Parametric
+    // diegesis; Ikeda Test Pattern). NATIVE (engine/ParametricSource.ts). Reads
+    // the LOCAL audio bus's spectrum/waveform; a procedural signal when silent.
+    id: 'gen-parametric',
+    name: 'Parametric',
+    category: 'Generator',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Parametric — a literal audio→image reading (Ikeda test-pattern). Renders the LOCAL audio bus as a hard raster, a waveform trace, spectrum bars, or a scrolling spectrogram. Needs Audio ingest ON (local) to read real sound; otherwise a procedural test signal. Abstract by design — a raster/waveform/spectrogram, never an oscilloscope.',
+      CATEGORIES: ['Generator'],
+      INPUTS: [
+        { NAME: 'mode', TYPE: 'long', VALUES: [0, 1, 2, 3], LABELS: ['raster', 'waveform', 'bars', 'spectrogram'], DEFAULT: 0, LABEL: 'mode' },
+        { NAME: 'gain', TYPE: 'float', MIN: 0.0, MAX: 4.0, DEFAULT: 1.2, LABEL: 'gain' },
+        { NAME: 'scale', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.4, LABEL: 'scale' },
+        { NAME: 'scan', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.3, LABEL: 'scan' },
+        { NAME: 'mono', TYPE: 'bool', DEFAULT: true, LABEL: 'mono' },
+        { NAME: 'color', TYPE: 'color', DEFAULT: [0.6, 0.85, 1.0, 1.0] }
+      ]
+    })}*/`,
+    curated: { gain: [0.6, 2.0], scale: [0.1, 0.8], scan: [0.1, 0.7] }
   }
 ]
 

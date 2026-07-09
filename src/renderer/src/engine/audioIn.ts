@@ -291,6 +291,17 @@ class AudioBus {
     if (name === 'band') return c.bands[Math.max(0, Math.min(BANDS - 1, band))] ?? 0
     return c[name] as number
   }
+
+  /** Live spectrum magnitudes (0..255) — null unless LOCAL audio is running
+   *  (OSC mode carries only reduced features, not the buffer). For the
+   *  Parametric generator's audio-buffer→texture read. */
+  spectrumBytes(): Uint8Array | null {
+    return this.localOn ? this.freq : null
+  }
+  /** Live time-domain waveform (0..255, centred at 128) — local only. */
+  waveformBytes(): Uint8Array | null {
+    return this.localOn ? this.time : null
+  }
 }
 
 // One bus per renderer. The App loop ticks it; audio modulators + the Audio

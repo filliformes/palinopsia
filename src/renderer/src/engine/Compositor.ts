@@ -30,6 +30,7 @@ import { Renderer as ISFRenderer } from 'interactive-shader-format';
 import { handle, installTextureBridge } from './isfTextureBridge';
 import { makeConvNode, isNativeNode, type ConvNode } from './convNodes';
 import { TextSource } from './TextSource';
+import { ParametricSource } from './ParametricSource';
 import { DepthShadow } from './depthShadow';
 import { OutputShape } from './outputShape';
 import { PbrLib } from './pbrTextures';
@@ -615,6 +616,9 @@ export class ISFLayer {
   // sidechain layer).
   private textA: TextSource | null = null;
   private textB: TextSource | null = null;
+  // Native Parametric slots (generator 'gen-parametric' — audio→texture).
+  private paramA: ParametricSource | null = null;
+  private paramB: ParametricSource | null = null;
   // Per-slot framing (zoom/pan/crop) for video + capture sources.
   private framingA: Framing = { ...IDENTITY_FRAMING };
   private framingB: Framing = { ...IDENTITY_FRAMING };
@@ -699,6 +703,24 @@ export class ISFLayer {
     src.update(cfg.text, cfg.inputs, cfg.sidechain);
   }
 
+  /** Activate/refresh/clear a native PARAMETRIC source (audio→texture). */
+  setParam(slot: 'A' | 'B', cfg: { inputs: Record<string, number | number[]> } | null): void {
+    const cur = slot === 'A' ? this.paramA : this.paramB;
+    if (!cfg) {
+      if (cur) {
+        cur.dispose();
+        if (slot === 'A') this.paramA = null; else this.paramB = null;
+      }
+      return;
+    }
+    let src = cur;
+    if (!src) {
+      src = new ParametricSource(this.shared.gl, this.w, this.h);
+      if (slot === 'A') this.paramA = src; else this.paramB = src;
+    }
+    src.update(cfg.inputs);
+  }
+
   /** Load/swap/clear a live CAPTURE source ('webcam' | 'screen' | 'desktop:id'). */
   setCapture(slot: 'A' | 'B', spec: string | null): void {
     const curId = slot === 'A' ? this.captureIdA : this.captureIdB;
@@ -778,9 +800,10 @@ export class ISFLayer {
   setInput(slot: 'A' | 'B', name: string, value: number | number[]) {
     (slot === 'A' ? this.isfA : this.isfB)?.setValue(name, value);
     (slot === 'A' ? this.textA : this.textB)?.setInput(name, value); // modulation on text params
+    (slot === 'A' ? this.paramA : this.paramB)?.setInput(name, value); // modulation on parametric params
   }
 
-  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null || this.textB !== null; }
+  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null || this.textB !== null || this.paramB !== null; }
 
   /** Advance the layer clock and stamp it onto every renderer it owns. */
   advanceClock(dtSec: number): void {
@@ -804,10 +827,17 @@ export class ISFLayer {
     const capture = slot === 'A' ? this.captureA : this.captureB;
     const hive = slot === 'A' ? this.hiveA : this.hiveB;
     const text = slot === 'A' ? this.textA : this.textB;
+    const param = slot === 'A' ? this.paramA : this.paramB;
 
     // Native text: rasterized glyphs × (sidechain material | solid colour).
     if (text) {
       text.render(scratch.fbo, sidechainTex ? sidechainTex(text.sidechain) : null);
+      return;
+    }
+
+    // Native parametric: the audio buffer rendered as raster/waveform/spectrogram.
+    if (param) {
+      param.render(scratch.fbo);
       return;
     }
 
@@ -854,6 +884,8 @@ export class ISFLayer {
     this.hiveB?.dispose();
     this.textA?.dispose();
     this.textB?.dispose();
+    this.paramA?.dispose();
+    this.paramB?.dispose();
     this.rackA.dispose();
     this.rackB.dispose();
     this.rackLayer.dispose();
@@ -1143,8 +1175,10 @@ export class Compositor {
       // Each slot is a generator, a video, or empty — reconcile both engines so
       // switching kinds swaps cleanly (video↔generator never overlap). The Text
       // generator is NATIVE (a TS class, no ISF compile) — route it to setText.
+      const nativeA = l.sourceA.kind === 'generator' && (l.sourceA.shaderId === 'gen-text' || l.sourceA.shaderId === 'gen-parametric');
       const isTextA = l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-text';
-      const wantA = l.sourceA.kind === 'generator' && !isTextA ? l.sourceA.shaderId : null;
+      const isParamA = l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-parametric';
+      const wantA = l.sourceA.kind === 'generator' && !nativeA ? l.sourceA.shaderId : null;
       const wantVidA = l.sourceA.kind === 'video' ? (l.sourceA.mediaId ?? null) : null;
       const wantCapA = l.sourceA.kind === 'capture' ? (l.sourceA.mediaId ?? null) : null;
       const wantHiveA = l.sourceA.kind === 'hive' ? (l.sourceA.mediaId ?? null) : null;
@@ -1155,8 +1189,11 @@ export class Compositor {
       L.setText('A', isTextA
         ? { text: l.sourceA.text ?? 'OPSIA', inputs: l.sourceA.inputs, sidechain: l.sourceA.sidechain ?? null }
         : null);
+      L.setParam('A', isParamA ? { inputs: l.sourceA.inputs } : null);
+      const nativeB = !!l.sourceB && l.sourceB.kind === 'generator' && (l.sourceB.shaderId === 'gen-text' || l.sourceB.shaderId === 'gen-parametric');
       const isTextB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-text';
-      const wantB = l.sourceB && l.sourceB.kind === 'generator' && !isTextB ? l.sourceB.shaderId : null;
+      const isParamB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-parametric';
+      const wantB = l.sourceB && l.sourceB.kind === 'generator' && !nativeB ? l.sourceB.shaderId : null;
       const wantVidB = l.sourceB && l.sourceB.kind === 'video' ? (l.sourceB.mediaId ?? null) : null;
       const wantCapB = l.sourceB && l.sourceB.kind === 'capture' ? (l.sourceB.mediaId ?? null) : null;
       const wantHiveB = l.sourceB && l.sourceB.kind === 'hive' ? (l.sourceB.mediaId ?? null) : null;
@@ -1167,6 +1204,7 @@ export class Compositor {
       L.setText('B', isTextB && l.sourceB
         ? { text: l.sourceB.text ?? 'OPSIA', inputs: l.sourceB.inputs, sidechain: l.sourceB.sidechain ?? null }
         : null);
+      L.setParam('B', isParamB && l.sourceB ? { inputs: l.sourceB.inputs } : null);
       L.setVideoPlayback('A', l.sourceA);
       L.setVideoPlayback('B', l.sourceB);
       L.setFraming('A', l.sourceA);
