@@ -132,6 +132,57 @@ export const NATIVE_NODES: IsfShader[] = [
       taps: [8, 18],
       falloff: [0.2, 0.8]
     }
+  },
+  {
+    // Module 1 — Convolution (ConvolveSpatial). The sidechain frame is the
+    // KERNEL (point-spread function): every host pixel stamps a scaled copy of
+    // it — transfers glare shape / texture / energy. Native (engine/convNodes).
+    id: 'node-convolve',
+    name: 'Convolution',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Convolution — treat another layer as a convolution kernel (impulse response). Every bright pixel of this layer stamps a scaled copy of the sidechain's shape, transferring its glare / texture / energy signature (UE convolution-bloom, run forward). Pick the kernel layer in the Inspector. Direct kernel path; a live sidechain = an animated impulse response.",
+      "CATEGORIES": ["FX", "Convolution"],
+      "INPUTS": [
+        { "NAME": "scale", "TYPE": "float", "MIN": 0.05, "MAX": 2.0, "DEFAULT": 0.8, "LABEL": "spread" },
+        { "NAME": "taps", "TYPE": "float", "MIN": 3.0, "MAX": 12.0, "DEFAULT": 7.0, "LABEL": "kernel res" },
+        { "NAME": "threshold", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.1, "LABEL": "kernel thresh" },
+        { "NAME": "kernelGamma", "TYPE": "float", "MIN": 0.25, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "kernel gamma" },
+        { "NAME": "boost", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "highlight gate" },
+        { "NAME": "gain", "TYPE": "float", "MIN": 0.0, "MAX": 3.0, "DEFAULT": 1.0, "LABEL": "wet gain" },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "mix" },
+        { "NAME": "additive", "TYPE": "bool", "DEFAULT": false, "LABEL": "additive", "COMPACT": true }
+      ]
+    }*/`,
+    curated: {
+      scale: [0.3, 1.2], taps: [5, 10], threshold: [0.05, 0.4], kernelGamma: [0.6, 2.0],
+      boost: [0, 0.6], gain: [0.6, 1.8], mix: [0.4, 0.9]
+    }
+  },
+  {
+    // Module 3 — Réponse (temporal frame-echo convolution). Convolves the host
+    // layer's OWN recent time-history against a shaped envelope — rhythmic
+    // pulsing trails / temporal smear. Native (engine/convNodes). No sidechain.
+    id: 'node-reponse',
+    name: 'Réponse',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Réponse — temporal convolution: this layer's last 16 frames summed through a shaped envelope (attack onset × decay tail, reversible). Trails that pulse with a captured rhythm — a convolution-reverb for image. Uses the layer's own history (no sidechain).",
+      "CATEGORIES": ["FX", "Feedback", "Convolution"],
+      "INPUTS": [
+        { "NAME": "length", "TYPE": "float", "MIN": 2.0, "MAX": 16.0, "DEFAULT": 10.0, "LABEL": "length" },
+        { "NAME": "decay", "TYPE": "float", "MIN": 0.05, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "decay" },
+        { "NAME": "attack", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.1, "LABEL": "attack" },
+        { "NAME": "gain", "TYPE": "float", "MIN": 0.0, "MAX": 2.0, "DEFAULT": 1.0, "LABEL": "gain" },
+        { "NAME": "reverse", "TYPE": "bool", "DEFAULT": false, "LABEL": "reverse", "COMPACT": true },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "mix" }
+      ]
+    }*/`,
+    curated: {
+      length: [6, 16], decay: [0.2, 0.9], attack: [0, 0.4], gain: [0.6, 1.4], mix: [0.4, 0.9]
+    }
   }
 ]
 

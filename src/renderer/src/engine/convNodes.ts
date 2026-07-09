@@ -116,6 +116,88 @@ void main(){
   o = vec4(acc / max(wsum, 1e-4), 1.0);
 }`
 
+// ── Module 1 — Convolution (ConvolveSpatial), direct kernel path ─────────
+// The sidechain frame is the kernel (point-spread function): every host pixel
+// stamps a scaled copy of it. Direct brute-force gather (the spec's `quality:
+// "direct"` path, done well) at reduced res — reliable + verifiable now; FFT
+// large-kernel is a future `quality` upgrade. Kernel is read LIVE from the
+// sidechain each frame (threshold/gamma inline), normalized per-output by the
+// accumulated weight (energy-conserving, no reduction pass).
+const F_CONVOLVE = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uKernel;
+uniform float uExtent, uAspect, uThreshold, uGamma, uBoost;
+uniform int uR;
+const int MAXR = 12;
+float luma(vec3 c){ return dot(c, vec3(0.299,0.587,0.114)); }
+void main(){
+  // Kernel spread as a fraction of the frame, aspect-corrected so it stays round.
+  float step = uExtent / float(2 * uR + 1);
+  vec3 acc = vec3(0.0); float wsum = 0.0;
+  for (int j = -MAXR; j <= MAXR; j++){
+    if (j < -uR || j > uR) continue;
+    for (int i = -MAXR; i <= MAXR; i++){
+      if (i < -uR || i > uR) continue;
+      // kernel weight from the sidechain (centred), thresholded + gamma'd.
+      vec2 kuv = 0.5 + vec2(float(i), float(j)) / float(2 * uR + 1);
+      float kw = luma(texture(uKernel, kuv).rgb);
+      kw = max(0.0, kw - uThreshold);
+      kw = pow(kw, uGamma);
+      if (kw <= 0.0) continue;
+      // host sample, highlight-boosted so only hot pixels bloom (uBoost gate).
+      vec2 off = vec2(float(i) * step / uAspect, float(j) * step);
+      vec3 h = texture(uHost, vUV - off).rgb;
+      float b = uBoost <= 0.0 ? 1.0 : smoothstep(uBoost, 1.0, luma(h));
+      acc += h * b * kw; wsum += kw;
+    }
+  }
+  o = vec4(wsum > 1e-5 ? acc / wsum : vec3(0.0), 1.0);
+}`
+
+// Composite the (reduced-res) convolved 'wet' back over the full-res dry host.
+const F_CONV_MIX = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uDry, uWet; uniform float uGain, uMix, uAdditive;
+void main(){
+  vec3 dry = texture(uDry, vUV).rgb;
+  vec3 wet = texture(uWet, vUV).rgb * uGain;
+  vec3 outc = uAdditive > 0.5 ? dry + wet * uMix : mix(dry, wet, uMix);
+  o = vec4(outc, 1.0);
+}`
+
+// ── Module 3 — Réponse (temporal frame-echo convolution) ─────────────────
+// A ring of N past host frames (half-res, tiled into one atlas). Output =
+// Σ history[i]·envelope[i], normalized — trails that pulse with a shaped
+// temporal IR (attack/decay/reverse). Convolves the host's OWN time-history
+// (no sidechain needed). Copy a downsampled host frame into the write tile:
+const F_COPY = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uTex;
+void main(){ o = vec4(texture(uTex, vUV).rgb, 1.0); }`
+
+// Echo: sum the ring tiles weighted by the envelope, normalize, mix with dry.
+const F_ECHO = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uRing;
+uniform int uCols, uRows, uLast, uLen;
+uniform float uEnv[16]; uniform float uMix;
+void main(){
+  vec3 acc = vec3(0.0); float wsum = 0.0;
+  vec2 tile = 1.0 / vec2(float(uCols), float(uRows));
+  vec2 ins = tile * 0.001; // half-texel-ish inset to avoid tile bleed
+  int N = uCols * uRows;
+  for (int i = 0; i < 16; i++){
+    if (i >= uLen) break;
+    int slot = uLast - i; slot = slot - N * int(floor(float(slot) / float(N)));
+    int col = slot % uCols; int row = slot / uCols;
+    vec2 base = vec2(float(col), float(row)) * tile;
+    vec3 s = texture(uRing, base + ins + clamp(vUV, 0.0, 1.0) * (tile - ins * 2.0)).rgb;
+    acc += s * uEnv[i]; wsum += uEnv[i];
+  }
+  vec3 echo = wsum > 1e-5 ? acc / wsum : vec3(0.0);
+  o = vec4(mix(texture(uHost, vUV).rgb, echo, uMix), 1.0);
+}`
+
 interface Prog {
   prog: WebGLProgram
   u: (n: string) => WebGLUniformLocation | null
@@ -129,6 +211,10 @@ class NodeGL {
   condition: Prog
   displace: Prog
   trainee: Prog
+  convolve: Prog
+  convMix: Prog
+  copy: Prog
+  echo: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -140,6 +226,10 @@ class NodeGL {
     this.condition = this.build(F_CONDITION)
     this.displace = this.build(F_DISPLACE)
     this.trainee = this.build(F_TRAINEE)
+    this.convolve = this.build(F_CONVOLVE)
+    this.convMix = this.build(F_CONV_MIX)
+    this.copy = this.build(F_COPY)
+    this.echo = this.build(F_ECHO)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -352,12 +442,170 @@ export class TransfertNode implements ConvNode {
   }
 }
 
+// ── RGBA target helper (16F for the convolution wet, 8 for the echo ring) ──
+interface RGBA {
+  fbo: WebGLFramebuffer
+  tex: WebGLTexture
+}
+function makeRGBA(gl: WebGL2RenderingContext, w: number, h: number, float: boolean): RGBA {
+  const tex = gl.createTexture()!
+  gl.bindTexture(gl.TEXTURE_2D, tex)
+  if (float) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null)
+  else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+  const fbo = gl.createFramebuffer()!
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0)
+  return { fbo, tex }
+}
+const clampf = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v)
+
+// ── Module 1 — Convolution (ConvolveSpatial, direct kernel path) ──────────
+export class ConvolveNode implements ConvNode {
+  private wet: RGBA | null = null
+  private ww = 0
+  private wh = 0
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed || !ctx.sidechain) return ctx.host // needs a kernel (sidechain)
+    const gl = ctx.gl
+    const g = nodeGL(gl)
+    const inp = ctx.inputs
+    const fullW = ctx.chain.w
+    const fullH = ctx.chain.h
+    const ww = Math.max(2, fullW >> 1)
+    const wh = Math.max(2, fullH >> 1)
+    if (!this.wet || this.ww !== ww || this.wh !== wh) {
+      if (this.wet) { gl.deleteTexture(this.wet.tex); gl.deleteFramebuffer(this.wet.fbo) }
+      this.wet = makeRGBA(gl, ww, wh, true)
+      this.ww = ww; this.wh = wh
+    }
+    const draw = (fbo: WebGLFramebuffer, w: number, h: number): void => {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, w, h); gl.drawArrays(gl.TRIANGLES, 0, 3)
+    }
+    const bind = (unit: number, tex: WebGLTexture): void => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex) }
+    const R = Math.max(1, Math.min(12, Math.round(num(inp.taps, 7))))
+
+    // Convolve host ⊛ kernel(sidechain) → reduced-res wet.
+    let p = g.use(g.convolve)
+    bind(0, ctx.host); bind(1, ctx.sidechain)
+    gl.uniform1i(p.u('uHost'), 0); gl.uniform1i(p.u('uKernel'), 1)
+    gl.uniform1f(p.u('uExtent'), clampf(num(inp.scale, 1), 0, 2) * 0.35)
+    gl.uniform1f(p.u('uAspect'), fullW / Math.max(1, fullH))
+    gl.uniform1f(p.u('uThreshold'), clampf(num(inp.threshold, 0.1), 0, 1))
+    gl.uniform1f(p.u('uGamma'), Math.max(0.25, num(inp.kernelGamma, 1)))
+    gl.uniform1f(p.u('uBoost'), clampf(num(inp.boost, 0), 0, 1))
+    gl.uniform1i(p.u('uR'), R)
+    draw(this.wet.fbo, ww, wh)
+
+    // Composite wet over the full-res dry host.
+    const out = ctx.chain.next()
+    p = g.use(g.convMix)
+    bind(0, ctx.host); bind(1, this.wet.tex)
+    gl.uniform1i(p.u('uDry'), 0); gl.uniform1i(p.u('uWet'), 1)
+    gl.uniform1f(p.u('uGain'), num(inp.gain, 1))
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 0.6), 0, 1))
+    gl.uniform1f(p.u('uAdditive'), num(inp.additive, 0) >= 0.5 ? 1 : 0)
+    draw(out.fbo, fullW, fullH)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return out.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    if (this.wet) { this.gl.deleteTexture(this.wet.tex); this.gl.deleteFramebuffer(this.wet.fbo); this.wet = null }
+  }
+}
+
+// ── Module 3 — Réponse (temporal frame-echo convolution) ──────────────────
+const ECHO_COLS = 4
+const ECHO_ROWS = 4
+const ECHO_N = ECHO_COLS * ECHO_ROWS // 16 history frames
+
+export class ReponseNode implements ConvNode {
+  private ring: RGBA | null = null
+  private tileW = 0
+  private tileH = 0
+  private writeIdx = 0
+  private filled = 0
+  private disposed = false
+  private env = new Float32Array(16)
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl
+    const g = nodeGL(gl)
+    const inp = ctx.inputs
+    const fullW = ctx.chain.w
+    const fullH = ctx.chain.h
+    const tw = Math.max(2, fullW >> 1)
+    const th = Math.max(2, fullH >> 1)
+    if (!this.ring || this.tileW !== tw || this.tileH !== th) {
+      if (this.ring) { gl.deleteTexture(this.ring.tex); gl.deleteFramebuffer(this.ring.fbo) }
+      this.ring = makeRGBA(gl, tw * ECHO_COLS, th * ECHO_ROWS, false)
+      this.tileW = tw; this.tileH = th; this.writeIdx = 0; this.filled = 0
+    }
+    const bind = (unit: number, tex: WebGLTexture): void => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex) }
+
+    // 1) Write the current host frame into the ring's write tile (downsampled).
+    const col = this.writeIdx % ECHO_COLS
+    const row = Math.floor(this.writeIdx / ECHO_COLS)
+    let p = g.use(g.copy)
+    bind(0, ctx.host); gl.uniform1i(p.u('uTex'), 0)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.ring.fbo)
+    gl.viewport(col * tw, row * th, tw, th)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+    const lastWritten = this.writeIdx
+    this.writeIdx = (this.writeIdx + 1) % ECHO_N
+    this.filled = Math.min(ECHO_N, this.filled + 1)
+
+    // 2) Build the temporal envelope (attack onset × exponential decay tail).
+    const len = Math.max(1, Math.min(ECHO_N, Math.min(this.filled, Math.round(num(inp.length, 8)))))
+    const decayTaps = Math.max(0.5, clampf(num(inp.decay, 0.5), 0.02, 1) * ECHO_N)
+    const attackTaps = Math.max(0.02, clampf(num(inp.attack, 0.1), 0, 1) * ECHO_N)
+    const gain = Math.max(0, num(inp.gain, 1))
+    this.env.fill(0)
+    for (let i = 0; i < len; i++) {
+      this.env[i] = gain * (1 - Math.exp(-(i + 1) / attackTaps)) * Math.exp(-i / decayTaps)
+    }
+    if (num(inp.reverse, 0) >= 0.5) {
+      for (let i = 0; i < len >> 1; i++) { const t = this.env[i]; this.env[i] = this.env[len - 1 - i]; this.env[len - 1 - i] = t }
+    }
+
+    // 3) Echo: Σ ring[age i] · env[i], normalized, mixed with the dry host.
+    const out = ctx.chain.next()
+    p = g.use(g.echo)
+    bind(0, ctx.host); bind(1, this.ring.tex)
+    gl.uniform1i(p.u('uHost'), 0); gl.uniform1i(p.u('uRing'), 1)
+    gl.uniform1i(p.u('uCols'), ECHO_COLS); gl.uniform1i(p.u('uRows'), ECHO_ROWS)
+    gl.uniform1i(p.u('uLast'), lastWritten); gl.uniform1i(p.u('uLen'), len)
+    gl.uniform1fv(p.u('uEnv'), this.env)
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 0.6), 0, 1))
+    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.viewport(0, 0, fullW, fullH); gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return out.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    if (this.ring) { this.gl.deleteTexture(this.ring.tex); this.gl.deleteFramebuffer(this.ring.fbo); this.ring = null }
+  }
+}
+
 /** Instantiate the native node for a reserved `node-*` shaderId (null if none). */
 export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): ConvNode | null {
   if (shaderId === 'node-transfert') return new TransfertNode(gl)
+  if (shaderId === 'node-convolve') return new ConvolveNode(gl)
+  if (shaderId === 'node-reponse') return new ReponseNode(gl)
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)
