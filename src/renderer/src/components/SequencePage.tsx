@@ -4,7 +4,7 @@
 // (Breathe, Climate arc) with a live arc/countdown meter. See
 // docs/opsia-sequencer-spec.md.
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import type { CouplingMode, SceneClimate } from '@shared/types'
 import { SCENE_CLIMATES } from '@shared/types'
@@ -25,7 +25,11 @@ const CLIMATE_COLOR: Record<SceneClimate, string> = {
   resolution: '#6bd08a'
 }
 
-export function SequencePage(): JSX.Element {
+export function SequencePage({
+  canvasRef
+}: {
+  canvasRef: RefObject<HTMLCanvasElement | null>
+}): JSX.Element {
   const setOpen = useStore((s) => s.setSequencePageOpen)
   const scenes = useStore(useShallow((s) => s.scenes))
   const activeSceneId = useStore((s) => s.activeSceneId)
@@ -98,8 +102,9 @@ export function SequencePage(): JSX.Element {
       </header>
 
       <div className="flex min-h-0 flex-1">
-        {/* Scene rail */}
-        <div className="flex min-w-0 flex-1 flex-col gap-2 overflow-y-auto p-4">
+        {/* Scene column: scrolling rail + a live preview pinned at the bottom. */}
+        <div className="flex min-w-0 flex-1 flex-col">
+         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-4">
           <span className="font-mono text-[9px] uppercase tracking-wide text-muted">
             scenes · {scenes.length} — click to tag
           </span>
@@ -229,6 +234,9 @@ export function SequencePage(): JSX.Element {
               </Field>
             </div>
           )}
+         </div>
+         {/* Live composition mirror — pinned at the bottom so you SEE the run. */}
+         <SeqPreview canvasRef={canvasRef} />
         </div>
 
         {/* Transport + macro-form */}
@@ -371,6 +379,42 @@ export function SequencePage(): JSX.Element {
           </Section>
         </aside>
       </div>
+    </div>
+  )
+}
+
+// Live mirror of the main composite canvas (via captureStream), compact + fixed
+// height so the scene rail above keeps room for ≥16 cards.
+function SeqPreview({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null> }): JSX.Element {
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const video = videoRef.current
+    if (!canvas || !video) return
+    let stream: MediaStream | null = null
+    try {
+      stream = canvas.captureStream(30)
+      video.srcObject = stream
+      void video.play().catch(() => {})
+    } catch {
+      /* captureStream unsupported — the page still works without the mirror */
+    }
+    return () => {
+      stream?.getTracks().forEach((t) => t.stop())
+      if (video) video.srcObject = null
+    }
+  }, [canvasRef])
+  return (
+    <div className="flex shrink-0 items-center gap-2 border-t border-border bg-black/40 p-2">
+      <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">live</span>
+      <video
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        className="h-[132px] rounded border border-border bg-black object-contain"
+        style={{ aspectRatio: '16 / 9' }}
+      />
     </div>
   )
 }

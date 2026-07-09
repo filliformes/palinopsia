@@ -741,7 +741,7 @@ export default function App(): JSX.Element {
              rendering underneath so the live mirror + engine never stop) ── */}
       {outputPageOpen && <OutputPage canvasRef={canvasRef} />}
       {worldPageOpen && <WorldPage />}
-      {sequencePageOpen && <SequencePage />}
+      {sequencePageOpen && <SequencePage canvasRef={canvasRef} />}
     </div>
   )
 }
