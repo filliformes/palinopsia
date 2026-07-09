@@ -89,7 +89,7 @@ export type ThemeName =
   | 'pastel'
   | 'reaper'
   | 'smooth'
-  | 'circuit'
+  | 'hydra'
   | 'darkside'
   | 'solaris'
   | 'flame'
@@ -103,7 +103,7 @@ export const THEME_ORDER: ThemeName[] = [
   'cream',
   'paper-light',
   'dark',
-  'circuit',
+  'hydra',
   'darkside',
   'solaris',
   'flame',

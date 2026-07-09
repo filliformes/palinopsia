@@ -1,6 +1,6 @@
 // blend.glsl : the six pairwise blend modes, kept here as the single source
 // of truth. The string is currently inlined in Compositor.ts's BLEND_FS; when
-// the FX-fusion pass lands (Phase 2/3, the livecoding lesson : fuse blend + simple
+// the FX-fusion pass lands (Phase 2/3, the Hydra lesson : fuse blend + simple
 // FX into one fragment pass) this file becomes the shared include so blend
 // math is defined once. Keep the `mode` integer mapping in sync with the
 // BlendMode order in @shared/types and Compositor's modeIndex.

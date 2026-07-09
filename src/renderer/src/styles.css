@@ -319,8 +319,8 @@
   --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-/* Circuit : desaturated blue-greys with a bright cyan accent. */
-[data-theme='circuit'] {
+/* Hydra : desaturated blue-greys with a bright cyan accent. */
+[data-theme='hydra'] {
   --c-bg: 26 37 48;
   --c-panel: 37 51 64;
   --c-panel2: 51 67 80;

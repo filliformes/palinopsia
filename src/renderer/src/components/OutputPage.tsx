@@ -377,7 +377,7 @@ export function OutputPage({
                   onClick={() => openOutput(true)}
                   disabled={displayId == null}
                   className="flex-1 rounded border border-accent bg-accent/15 px-2 py-1 font-mono text-[11px] text-accent hover:bg-accent/25 disabled:opacity-40"
-                  title="A normal 1280×720 window : easy to Window-Capture in a streaming/VJ app"
+                  title="A normal 1280×720 window : easy to Window-Capture in OBS"
                 >
                   window ▶
                 </button>
@@ -471,7 +471,7 @@ export function OutputPage({
             </div>
             <p className="text-[11px] leading-tight text-muted">
               HEVC over TCP, advertised on the LAN via mDNS : the open NDI
-              alternative. Receive with the HIVE plugin or any HIVE client.
+              alternative. Receive in OBS (HIVE plugin) or any HIVE client.
               Experimental: needs a hardware HEVC encoder.
             </p>
           </Section>

@@ -4,8 +4,8 @@
 // 4070) and sends the RGBA8 buffer here over IPC; this module forwards it to a
 // native sender. Native senders can't be bundled/tested headless, so both are
 // LAZY-LOADED optional dependencies (drop-ins, not in package.json):
-//   • NDI   → `grandiose` (libNDI bindings)      → cross-platform, any NDI/Spout receiver
-//   • Spout → a Spout sender addon (leadedge SDK) → Windows, any NDI/Spout receiver
+//   • NDI   → `grandiose` (libNDI bindings)      → cross-platform, OBS or any receiver
+//   • Spout → a Spout sender addon (leadedge SDK) → Windows, OBS or any receiver
 // Install the module (+ any runtime) and the matching toggle activates; else we
 // log once and no-op. The RGBA8 buffer is GL bottom-up (senders can flip).
 

@@ -1,7 +1,7 @@
 // HIVE sender (output) : the open NDI-alternative. The renderer encodes the
 // composite to HEVC (WebCodecs) and streams Annex-B chunks here; we run a plain
 // TCP server that fans the raw HEVC Annex-B out to every connected HIVE receiver
-// (a HIVE plugin, hive-recv, hive-web …), and advertise over mDNS. New clients
+// (OBS HIVE plugin, hive-recv, hive-web …), and advertise over mDNS. New clients
 // are gated to the next keyframe so they can start decoding immediately.
 //
 // Protocol (HIVE SDD): raw HEVC Annex-B, no framing/handshake; VPS/SPS/PPS on
