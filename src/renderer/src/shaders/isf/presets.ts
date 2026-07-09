@@ -565,7 +565,44 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Soft bokeh', values: { grid: 0.35, size: 0.9, lumaSize: 0.6, soft: 0.2, shape: 1, gapMix: 0.2 } },
     { name: 'Ghost grid', values: { grid: 0.5, size: 0.7, lumaSize: 0.5, soft: 0.1, shape: 1, gapMix: 0.4 } }
   ],
+  // ── Corbeil-Perron homage: stereoscopic texture + afterimage ──────────
+  'fx-optical-rain': [
+    { name: 'Optical rain', values: { amount: 0.6, rain: 0.4, streak: 0.5, columns: 220, disparity: 0.5, edges: 0.5 } },
+    { name: 'Fine drizzle', values: { amount: 0.45, rain: 0.55, streak: 0.35, columns: 380, disparity: 0.4, edges: 0.7 } },
+    { name: 'Downpour', values: { amount: 0.85, rain: 0.7, streak: 0.8, columns: 150, disparity: 0.7, edges: 0.35 } },
+    { name: 'Edge shatter', values: { amount: 0.75, rain: 0.3, streak: 0.4, columns: 260, disparity: 0.6, edges: 0.9 } },
+    { name: 'Floating dust', values: { amount: 0.4, rain: 0.2, streak: 0.25, columns: 300, disparity: 0.85, edges: 0.6 } },
+    { name: 'Slow membrane', values: { amount: 0.55, rain: 0.15, streak: 0.6, columns: 180, disparity: 0.9, edges: 0.4 } },
+    { name: 'Wide streaks', values: { amount: 0.7, rain: 0.5, streak: 0.9, columns: 90, disparity: 0.5, edges: 0.3 } },
+    { name: 'Whole frame', values: { amount: 0.6, rain: 0.45, streak: 0.5, columns: 220, disparity: 0.55, edges: 0.05 } },
+    { name: 'Sharp relief', values: { amount: 0.65, rain: 0.35, streak: 0.45, columns: 240, disparity: 1.0, edges: 0.8 } },
+    { name: 'Trace only', values: { amount: 0.35, rain: 0.4, streak: 0.3, columns: 320, disparity: 0.35, edges: 0.95 } }
+  ],
+  'fx-phosphene': [
+    { name: 'Afterimage', values: { sensitivity: 0.5, persistence: 0.6, strength: 0.6, complement: 1.0, threshold: 0.55 } },
+    { name: 'Faint ghost', values: { sensitivity: 0.35, persistence: 0.5, strength: 0.4, complement: 1.0, threshold: 0.6 } },
+    { name: 'Long burn', values: { sensitivity: 0.6, persistence: 0.85, strength: 0.7, complement: 1.0, threshold: 0.5 } },
+    { name: 'Flash trail', values: { sensitivity: 0.8, persistence: 0.4, strength: 0.75, complement: 0.9, threshold: 0.65 } },
+    { name: 'Negative haze', values: { sensitivity: 0.55, persistence: 0.7, strength: 0.55, complement: 0.4, threshold: 0.45 } },
+    { name: 'Retinal', values: { sensitivity: 0.5, persistence: 0.75, strength: 0.65, complement: 1.0, threshold: 0.5 } },
+    { name: 'Slow decay', values: { sensitivity: 0.4, persistence: 0.9, strength: 0.5, complement: 0.85, threshold: 0.55 } },
+    { name: 'Bright only', values: { sensitivity: 0.45, persistence: 0.6, strength: 0.6, complement: 1.0, threshold: 0.75 } },
+    { name: 'Mono ghost', values: { sensitivity: 0.5, persistence: 0.65, strength: 0.6, complement: 0.0, threshold: 0.5 } },
+    { name: 'Everywhere', values: { sensitivity: 0.7, persistence: 0.6, strength: 0.5, complement: 1.0, threshold: 0.25 } }
+  ],
   // ── Generators ──────────────────────────────────────────────────────
+  'op-art': [
+    { name: 'Riley fall', values: { mode: 0, scale: 24, warp: 0.4, rate: 0.3, angle: 0, contrast: 0.9, tint: [0.9, 0.9, 0.88, 1] } },
+    { name: 'Riley steep', values: { mode: 0, scale: 40, warp: 0.7, rate: 0.5, angle: 0.2, contrast: 1.0, tint: [0.92, 0.9, 0.85, 1] } },
+    { name: 'Vasarely grid', values: { mode: 1, scale: 20, warp: 0.5, rate: 0.3, angle: 0, contrast: 0.85, tint: [0.88, 0.9, 0.9, 1] } },
+    { name: 'Vasarely bulge', values: { mode: 1, scale: 30, warp: 0.85, rate: 0.45, angle: 0, contrast: 0.95, tint: [0.9, 0.88, 0.86, 1] } },
+    { name: 'Soto moiré', values: { mode: 2, scale: 36, warp: 0.3, rate: 0.35, angle: 0, contrast: 0.8, tint: [0.85, 0.88, 0.9, 1] } },
+    { name: 'Soto beat', values: { mode: 2, scale: 52, warp: 0.6, rate: 0.6, angle: 0.4, contrast: 0.9, tint: [0.9, 0.9, 0.88, 1] } },
+    { name: 'Herringbone', values: { mode: 3, scale: 22, warp: 0.5, rate: 0.3, angle: 0, contrast: 0.9, tint: [0.9, 0.89, 0.85, 1] } },
+    { name: 'Diagonal weave', values: { mode: 3, scale: 34, warp: 0.75, rate: 0.4, angle: 0.8, contrast: 1.0, tint: [0.88, 0.9, 0.9, 1] } },
+    { name: 'Slow waves', values: { mode: 0, scale: 14, warp: 0.25, rate: 0.1, angle: -0.3, contrast: 0.7, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Tight grid', values: { mode: 1, scale: 48, warp: 0.3, rate: 0.2, angle: 0, contrast: 1.0, tint: [0.92, 0.92, 0.9, 1] } }
+  ],
   differential: [
     { name: 'Octaves', values: { count: 4, ratio: 2, rate: 0.4, freq: 3, thickness: 0.12, lines: 6, skew: 0.35, angle: 0.4 } },
     { name: 'Triads', values: { count: 3, ratio: 1.5, rate: 0.3, freq: 4, thickness: 0.1, lines: 5, skew: 0.5, angle: 0.8 } },

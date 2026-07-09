@@ -18,6 +18,10 @@
     { "NAME": "grainSize", "TYPE": "float", "MIN": 1.0, "MAX": 6.0, "DEFAULT": 1.5 },
     { "NAME": "chroma",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "chroma grain" },
     { "NAME": "parasites", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.1, "LABEL": "parasites" },
+    { "NAME": "stereo",      "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["off", "anaglyph R/C", "gray anaglyph"], "DEFAULT": 0, "LABEL": "3D stereo" },
+    { "NAME": "stereoDepth", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "3D relief" },
+    { "NAME": "stereoConv",  "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "3D convergence" },
+    { "NAME": "stereoInvert","TYPE": "bool",  "DEFAULT": false, "LABEL": "3D invert depth" },
     { "NAME": "outShape", "TYPE": "long", "VALUES": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
       "LABELS": ["none","circle","square","rectangle","triangle","pentagon","hexagon","heptagon","octagon","diamond","star 5","star 6","ellipse","rounded","cross","ring","half-circle","heart","crescent","trapezoid","capsule"],
       "DEFAULT": 0, "LABEL": "out shape" },
@@ -57,15 +61,22 @@ float gauss(float u1, float u2) {
   return sqrt(-2.0 * log(max(u1, 1e-6))) * cos(6.2831853 * u2);
 }
 
-void main() {
-  vec2 uv = isf_FragNormCoord;
-  vec4 src = IMG_NORM_PIXEL(inputImage, uv);
-  vec3 c = src.rgb;
-
-  // ── LEVELS: input black/white → gamma → per-channel gain ──
+// LEVELS grade at a UV (input black/white → gamma → per-channel gain). Pulled
+// out so the anaglyph stage can grade a horizontally-displaced second "eye".
+vec3 gradePix(vec2 uv) {
+  vec3 c = IMG_NORM_PIXEL(inputImage, uv).rgb;
   c = clamp((c - black) / max(white - black, 0.01), 0.0, 1.0);
   c = pow(c, vec3(1.0 / gamma));
   c *= vec3(rGain, gGain, bGain);
+  return c;
+}
+
+void main() {
+  vec2 uv = isf_FragNormCoord;
+  vec4 src = IMG_NORM_PIXEL(inputImage, uv);
+
+  // ── LEVELS: input black/white → gamma → per-channel gain ──
+  vec3 c = gradePix(uv);
 
   // ── SHARPEN (luma unsharp mask on the source detail) ──
   if (sharpen > 0.001) {
@@ -79,6 +90,31 @@ void main() {
     float blur = (dot(IMG_NORM_PIXEL(inputImage, cl).rgb, lw) + dot(IMG_NORM_PIXEL(inputImage, cr).rgb, lw) +
                   dot(IMG_NORM_PIXEL(inputImage, cu).rgb, lw) + dot(IMG_NORM_PIXEL(inputImage, cd).rgb, lw)) * 0.25;
     c += (lc - blur) * sharpen;
+  }
+
+  // ── ANAGLYPH 3D (red/cyan stereoscopy) ──────────────────────────────
+  //    Homage to Maxime Corbeil-Perron's archaeomedia stereoscopy (Imaginary
+  //    Optics, Phosphènes): a >century-old 3D medium, generated digitally.
+  //    Depth is read from luminance (bright = near, invertible); the RED eye is
+  //    horizontally displaced from the CYAN eye by a disparity ∝ depth, so under
+  //    red/cyan glasses the flat frame gains relief. Convergence sets the plane
+  //    that sits ON the screen — push it negative and forms pop OUT toward you.
+  if (stereo > 0) {
+    float depth = clamp(dot(c, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
+    if (stereoInvert) depth = 1.0 - depth;
+    // Separation in normalized x. Half each way so the image stays centred.
+    float sep = (depth - 0.5 - stereoConv * 0.5) * stereoDepth * 0.06;
+    vec3 leftEye = gradePix(uv - vec2(sep, 0.0));   // red channel
+    vec3 rightEye = gradePix(uv + vec2(sep, 0.0));  // cyan channels
+    if (stereo == 2) {
+      // Gray/half-colour anaglyph — feed luma to each eye (less retinal rivalry,
+      // classic for abstract relief where hue would fight the filters).
+      float lL = dot(leftEye, vec3(0.299, 0.587, 0.114));
+      float lR = dot(rightEye, vec3(0.299, 0.587, 0.114));
+      c = vec3(lL, lR, lR);
+    } else {
+      c = vec3(leftEye.r, rightEye.g, rightEye.b);
+    }
   }
 
   // ── GRAIN over the graded image (one shared grain structure) ──

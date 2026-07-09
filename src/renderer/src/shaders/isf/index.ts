@@ -30,6 +30,7 @@ import ramps from './Ramps.fs?raw'
 import rgbOsc from './RgbOsc.fs?raw'
 import recurse from './Recurse.fs?raw'
 import shapes from './Shapes.fs?raw'
+import opArt from './OpArt.fs?raw'
 import syncOsc from './SyncOsc.fs?raw'
 import differential from './Differential.fs?raw'
 import solidColor from './SolidColor.fs?raw'
@@ -74,6 +75,8 @@ import ringing from './fx/Ringing.fs?raw'
 import tracking from './fx/Tracking.fs?raw'
 import motif from './fx/Motif.fs?raw'
 import decay from './fx/Decay.fs?raw'
+import opticalRain from './fx/OpticalRain.fs?raw'
+import phosphene from './fx/Phosphene.fs?raw'
 import abstraction from './fx/Abstraction.fs?raw'
 import feedbackZoom from './fx/FeedbackZoom.fs?raw'
 import distort from './fx/Distort.fs?raw'
@@ -387,6 +390,13 @@ export const GENERATORS: IsfShader[] = [
     curated: { count: [1, 12], size: [0.2, 0.85], soft: [0.02, 0.3], rate: [0.05, 1.2] }
   },
   {
+    id: 'op-art',
+    name: 'Op-Art',
+    category: 'Generator',
+    source: opArt,
+    curated: { scale: [8, 48], warp: [0.15, 0.8], rate: [0.05, 1.2], angle: [-1.6, 1.6], contrast: [0.5, 1] }
+  },
+  {
     id: 'sync-osc',
     name: 'Sync Osc',
     category: 'Generator',
@@ -682,6 +692,14 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-mosaic', name: 'Mosaic', category: 'FX', source: mosaic,
     curated: { grid: [0.2, 0.7], size: [0.5, 1], lumaSize: [0.2, 0.9], soft: [0.02, 0.2], shape: [0, 3], gapMix: [0, 0.4] }
+  },
+  {
+    id: 'fx-optical-rain', name: 'Optical Rain', category: 'FX', source: opticalRain,
+    curated: { amount: [0.3, 0.9], rain: [0.15, 0.7], streak: [0.2, 0.8], columns: [90, 400], disparity: [0.3, 0.9], edges: [0.3, 0.9] }
+  },
+  {
+    id: 'fx-phosphene', name: 'Phosphene', category: 'FX', source: phosphene,
+    curated: { sensitivity: [0.3, 0.8], persistence: [0.4, 0.85], strength: [0.35, 0.8], complement: [0.6, 1], threshold: [0.4, 0.7] }
   }
   // PHASE 9 (post-MVP experiment): Cross-FM — a source that takes ANOTHER
   // layer's frame as a video-rate FM input (Lumen A→B→C→A cross-oscillator
