@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Scanlines — line darkening as controlled texture (obs-shaderfilter register), with optional slow roll. Signature element, kept matte: darkening only, no glow.",
-  "CREDIT": "Palinopsia (after exeldro/obs-shaderfilter scanline examples)",
+  "DESCRIPTION": "Scanlines : line darkening as controlled texture (obs-shaderfilter register), with optional slow roll. Signature element, kept matte: darkening only, no glow.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],
   "INPUTS": [

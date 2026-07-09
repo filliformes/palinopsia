@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Erosion — sediment washing down a slope: strongly anisotropic ridged noise advected downward, carving streaks that gather and split. The geological register: slow, directional, matte.",
+  "DESCRIPTION": "Erosion : sediment washing down a slope: strongly anisotropic ridged noise advected downward, carving streaks that gather and split. The geological register: slow, directional, matte.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Noise", "Organic"],

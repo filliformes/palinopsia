@@ -1,9 +1,9 @@
-// Audio panel (Slab 1) — the ingest surface for the audiovisual-reactivity
+// Audio panel (Slab 1) : the ingest surface for the audiovisual-reactivity
 // chapter. Enable, choose the source (Pandore-over-OSC / local Web Audio /
 // both), pick a local device, and watch the live features. Assign audio to
 // parameters via the `audio` modulator type in the Modulation panel.
 //
-// Meters read the audio bus directly each rAF (never through React) — same
+// Meters read the audio bus directly each rAF (never through React) : same
 // discipline as the modulator meters.
 
 import { useEffect, useRef, useState } from 'react'
@@ -119,7 +119,7 @@ export function AudioPanel(): JSX.Element {
   )
 }
 
-// ── Live meters — one rAF, direct style writes off the audio bus ────────
+// ── Live meters : one rAF, direct style writes off the audio bus ────────
 function Meters(): JSX.Element {
   const levelRef = useRef<HTMLDivElement | null>(null)
   const fluxRef = useRef<HTMLDivElement | null>(null)

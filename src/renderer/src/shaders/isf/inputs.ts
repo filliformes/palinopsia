@@ -1,7 +1,7 @@
-// ISF INPUTS introspection — the auto-UI's data source (brief §10.3).
+// ISF INPUTS introspection : the auto-UI's data source (brief §10.3).
 //
 // Each ISF header declares its controls: name, type, range, default. That
-// declaration IS the simplexité mechanism — the UI below is generated from
+// declaration IS the simplexité mechanism : the UI below is generated from
 // it, so authoring a shader is authoring its control surface. Parsed straight
 // from the JSON header (no GL context needed) and cached per shader id.
 
@@ -18,7 +18,7 @@ export interface IsfInputDesc {
   // For 'long' (enum) inputs.
   values?: number[]
   labels?: string[]
-  // Plain-English hover-help (from inputHints.ts) — shown in the control's title.
+  // Plain-English hover-help (from inputHints.ts) : shown in the control's title.
   hint?: string
   // Opsia extension ("COMPACT": true): small toggles/enums that the Inspector's
   // two-row grid stacks together into ONE cluster cell instead of a cell each.

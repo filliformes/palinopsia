@@ -1,4 +1,4 @@
-// HivePicker — enter a HIVE sender's host and port for a live stream source.
+// HivePicker : enter a HIVE sender's host and port for a live stream source.
 // (HIVE auto-discovers via mDNS on its own tooling; here we connect directly,
 // which its `hive-recv listen --host --port` mode also supports.)
 
@@ -65,7 +65,7 @@ export function HivePicker({
           </button>
         </div>
         <p className="text-[10px] leading-tight text-muted">
-          Experimental — needs the host&apos;s HEVC hardware decoder. Capture / Live
+          Experimental : needs the host&apos;s HEVC hardware decoder. Capture / Live
           Input are the reliable live-in paths.
         </p>
       </div>

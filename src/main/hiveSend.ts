@@ -1,4 +1,4 @@
-// HIVE sender (output) — the open NDI-alternative. The renderer encodes the
+// HIVE sender (output) : the open NDI-alternative. The renderer encodes the
 // composite to HEVC (WebCodecs) and streams Annex-B chunks here; we run a plain
 // TCP server that fans the raw HEVC Annex-B out to every connected HIVE receiver
 // (OBS HIVE plugin, hive-recv, hive-web …), and advertise over mDNS. New clients
@@ -73,7 +73,7 @@ export function hiveSendChunk(key: boolean, data: Uint8Array): void {
     try {
       c.sock.write(buf)
     } catch {
-      /* slow/broken client — dropped on its 'error'/'close' */
+      /* slow/broken client : dropped on its 'error'/'close' */
     }
   }
 }

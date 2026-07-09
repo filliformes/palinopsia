@@ -1,4 +1,4 @@
-// SequencePage — the macro-form "auto-pilot" over the scene bank (S1 + S2).
+// SequencePage : the macro-form "auto-pilot" over the scene bank (S1 + S2).
 // A full page (peer of World / Output). Left: the scene rail as tagged cards +
 // a tag editor. Right: the sequencer transport + the macro-form overlays
 // (Breathe, Climate arc) with a live arc/countdown meter. See
@@ -19,17 +19,17 @@ import {
 
 const SYNCHRESIS: CouplingMode[] = ['lean', 'hocket', 'cut', 'gate', 'drift']
 const SYNCHRESIS_INFO: Record<string, string> = {
-  lean: 'lean — audio gently pushes the A/B balance toward B (continuous)',
-  hocket: 'hocket — audio flips the balance A↔B (percussive, alternating)',
-  cut: 'cut — a transient flashes to B, then releases (on-beat, punchy)',
-  gate: 'gate — B while loud, A while quiet (a threshold)',
-  drift: 'drift — slow momentum follow, sharing direction not shape'
+  lean: 'lean : audio gently pushes the A/B balance toward B (continuous)',
+  hocket: 'hocket : audio flips the balance A↔B (percussive, alternating)',
+  cut: 'cut : a transient flashes to B, then releases (on-beat, punchy)',
+  gate: 'gate : B while loud, A while quiet (a threshold)',
+  drift: 'drift : slow momentum follow, sharing direction not shape'
 }
 const CLIMATE_INFO: Record<SceneClimate, string> = {
-  tension: 'tension — unresolved, building',
-  expectation: 'expectation — anticipating a change',
-  release: 'release — easing off / neutral',
-  resolution: 'resolution — arrival, settled'
+  tension: 'tension : unresolved, building',
+  expectation: 'expectation : anticipating a change',
+  release: 'release : easing off / neutral',
+  resolution: 'resolution : arrival, settled'
 }
 const CLIMATE_COLOR: Record<SceneClimate, string> = {
   tension: '#e0564a',
@@ -119,7 +119,7 @@ export function SequencePage({
         <div className="flex min-w-0 flex-1 flex-col">
          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-4">
           <span className="font-mono text-[9px] uppercase tracking-wide text-muted">
-            scenes · {scenes.length} — click to tag
+            scenes · {scenes.length} : click to tag
           </span>
           {scenes.length === 0 && (
             <p className="text-[12px] text-muted">
@@ -179,7 +179,7 @@ export function SequencePage({
                 tags · {selScene.name}
               </span>
               <Field label="Diégèse (world)"
-                title="Which 'world' this scene belongs to — its overall coupling character + Context mood. The sequencer prefers to stay within a world and treats world changes as bigger moments.">
+                title="Which 'world' this scene belongs to : its overall coupling character + Context mood. The sequencer prefers to stay within a world and treats world changes as bigger moments.">
 
                 <select
                   className="input select-compact w-full text-[11px]"
@@ -194,7 +194,7 @@ export function SequencePage({
                 </select>
               </Field>
               <Field label="Synchrèse (coupling)"
-                title="How this scene's two voices (A/B) relate in time — tap the coupling characters that describe it. 'auto' transitions cut instead of morphing when the destination is percussive (cut/hocket).">
+                title="How this scene's two voices (A/B) relate in time : tap the coupling characters that describe it. 'auto' transitions cut instead of morphing when the destination is percussive (cut/hocket).">
 
                 <div className="flex flex-wrap gap-1">
                   {SYNCHRESIS.map((m) => {
@@ -258,11 +258,11 @@ export function SequencePage({
             </div>
           )}
          </div>
-         {/* Live composition mirror — pinned at the bottom so you SEE the run. */}
+         {/* Live composition mirror : pinned at the bottom so you SEE the run. */}
          <SeqPreview canvasRef={canvasRef} />
         </div>
 
-        {/* Transport + macro-form — crammed to fit without scrolling. */}
+        {/* Transport + macro-form : crammed to fit without scrolling. */}
         <aside className="flex w-80 shrink-0 flex-col gap-2 overflow-y-auto border-l border-border bg-panel px-3 py-2">
           <Section title="Transport">
             <Row label={`dwell · ${seq.dwell.toFixed(0)}s`}
@@ -317,7 +317,7 @@ export function SequencePage({
               </select>
             </Row>
             <Row label={`no-repeat · last ${seq.noRepeat}`}
-              title="Won't return to any of the last N scenes it played — keeps the set from cycling on a few favourites.">
+              title="Won't return to any of the last N scenes it played : keeps the set from cycling on a few favourites.">
               <input type="range" min={0} max={8} step={1} value={seq.noRepeat}
                 onChange={(e) => setSequence({ noRepeat: Number(e.target.value) })}
                 className="w-full accent-accent" />
@@ -368,7 +368,7 @@ export function SequencePage({
               <input type="range" min={0} max={8} step={1} value={seq.cadenceEvery}
                 onChange={(e) => setSequence({ cadenceEvery: Number(e.target.value) })}
                 className="w-full accent-accent2"
-                title="Resolve to isomorphy (A/B fuse) every N transitions — a felt arrival" />
+                title="Resolve to isomorphy (A/B fuse) every N transitions : a felt arrival" />
             </Row>
             <Row label={`rupture · ${Math.round(seq.ruptureChance * 100)}%`}>
               <input type="range" min={0} max={1} step={0.01} value={seq.ruptureChance}
@@ -430,7 +430,7 @@ function SeqPreview({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | nu
       video.srcObject = stream
       void video.play().catch(() => {})
     } catch {
-      /* captureStream unsupported — the page still works without the mirror */
+      /* captureStream unsupported : the page still works without the mirror */
     }
     return () => {
       stream?.getTracks().forEach((t) => t.stop())
@@ -519,7 +519,7 @@ function NowMeter({ running }: { running: boolean }): JSX.Element {
     return () => window.clearInterval(id)
   }, [])
   if (!running) return <span className="font-mono text-[10px] text-muted">idle</span>
-  if (armed) return <span className="font-mono text-[10px] text-accent2">◉ armed — waiting for trigger</span>
+  if (armed) return <span className="font-mono text-[10px] text-accent2">◉ armed : waiting for trigger</span>
   return <span className="font-mono text-[10px] text-muted">next in {(ms / 1000).toFixed(1)}s</span>
 }
 

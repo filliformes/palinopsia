@@ -1,4 +1,4 @@
-// VideoTransport — play/pause, direction, loop, speed, and a scrub timeline
+// VideoTransport : play/pause, direction, loop, speed, and a scrub timeline
 // with draggable in/out points + a live playhead, for a selected video source.
 // The playhead is painted straight from the engine's videoPlayheads map in a
 // rAF loop (no React re-renders), like the modulated sliders.
@@ -114,7 +114,7 @@ export function VideoTransport({
             })
           }
           className={btn(direction !== 'forward')}
-          title={`Play mode: ${direction} — click to cycle forward → reverse → pendulum`}
+          title={`Play mode: ${direction} : click to cycle forward → reverse → pendulum`}
         >
           {direction === 'forward' ? 'fwd ▶' : direction === 'reverse' ? '◀ rev' : '⇄ pend'}
         </button>
@@ -131,7 +131,7 @@ export function VideoTransport({
         </span>
       </div>
 
-      {/* Timeline — inset with the same flanking widths as the Speed row so it
+      {/* Timeline : inset with the same flanking widths as the Speed row so it
           lines up to the exact width of the Speed slider. */}
       <div className="flex items-center gap-2">
         <span className="w-10 shrink-0" />
@@ -151,7 +151,7 @@ export function VideoTransport({
           onPointerDown={startDrag('in')}
           onPointerMove={onMove}
           onPointerUp={endDrag}
-          title={`In point — ${(inN * 100).toFixed(0)}%`}
+          title={`In point : ${(inN * 100).toFixed(0)}%`}
         />
         <div
           className="absolute inset-y-0 -ml-1 w-2 cursor-ew-resize rounded-r bg-accent/80 hover:bg-accent"
@@ -159,7 +159,7 @@ export function VideoTransport({
           onPointerDown={startDrag('out')}
           onPointerMove={onMove}
           onPointerUp={endDrag}
-          title={`Out point — ${(outN * 100).toFixed(0)}%`}
+          title={`Out point : ${(outN * 100).toFixed(0)}%`}
         />
         <div
           ref={playheadRef}
@@ -182,7 +182,7 @@ export function VideoTransport({
           onChange={(e) => set({ videoSpeed: speedFromT(Number(e.target.value)) })}
           onDoubleClick={() => set({ videoSpeed: 1 })}
           className="min-w-0 flex-1 accent-accent"
-          title={`Clip speed ${fmtSpeed(speed)} — double-click to reset (×layer ×global)`}
+          title={`Clip speed ${fmtSpeed(speed)} : double-click to reset (×layer ×global)`}
         />
         <span className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">
           {fmtSpeed(speed)}

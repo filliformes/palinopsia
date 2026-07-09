@@ -3,7 +3,7 @@
 // PHASE 5. This is where dataFLOU's 8-modulator engine is PORTED (LFO, Ramp,
 // ADSR, Arp, Random, Sample & Hold, Slew, Chaos) with the shared clock +
 // BPM sync, the 14 output curves, the Meta Controller (32 knobs / 4 banks),
-// and the capped modulation matrix. Do not rewrite it — lift it from
+// and the capped modulation matrix. Do not rewrite it : lift it from
 // dataFLOU's engine.ts modulation section via `/dataflou`.
 //
 // The engine runs on a fixed tick in the main process (decoupled from the

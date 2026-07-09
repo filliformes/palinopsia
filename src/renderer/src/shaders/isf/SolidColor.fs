@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Solid Color — a flat colour fill, or a smooth linear gradient across three stops at any angle. The quietest source: a wash to key against, tint under, or grade with. Gradient off = one solid colour; on = colA → colB (at the midpoint) → colC along the angle. A faint dither kills banding. Matte by design.",
+  "DESCRIPTION": "Solid Color : a flat colour fill, or a smooth linear gradient across three stops at any angle. The quietest source: a wash to key against, tint under, or grade with. Gradient off = one solid colour; on = colA → colB (at the midpoint) → colC along the angle. A faint dither kills banding. Matte by design.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Color"],

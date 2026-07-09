@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Edge — Sobel luminance contours, mixable over the source. Matte line-work for the digital-arts register; gain stays disciplined (no neon bloom).",
+  "DESCRIPTION": "Edge : Sobel luminance contours, mixable over the source. Matte line-work for the digital-arts register; gain stays disciplined (no neon bloom).",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Stylize"],

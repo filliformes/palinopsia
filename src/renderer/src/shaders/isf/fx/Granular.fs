@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Granular — video granular synthesis (after Forbes & Villegas): the frame is shattered into a grid of Hann-windowed grains, each rotated, scattered and scaled on its own, then resynthesised. A persistent buffer lets grains bleed from the previous frame (temporal smear / echo). Density thins the grain field so the smear shows through the gaps. Matte, glitch-native — the granular texture is the point.",
-  "CREDIT": "Palinopsia (after Forbes & Villegas, Video Granular Synthesis)",
+  "DESCRIPTION": "Granular : video granular synthesis (after Forbes & Villegas): the frame is shattered into a grid of Hann-windowed grains, each rotated, scattered and scaled on its own, then resynthesised. A persistent buffer lets grains bleed from the previous frame (temporal smear / echo). Density thins the grain field so the smear shows through the gaps. Matte, glitch-native : the granular texture is the point.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch", "Texture"],
   "INPUTS": [
@@ -29,7 +29,7 @@ void main() {
 
   if (PASSINDEX == 0) {
     float aspect = RENDERSIZE.x / RENDERSIZE.y;
-    // Grain cell size in normalized units — big grains → fine grains.
+    // Grain cell size in normalized units : big grains → fine grains.
     float cell = mix(0.22, 0.03, grain);
     // Stepped grain clock: the grain field re-rolls its jitter in cuts.
     float tk = floor(TIME * (0.5 + rate * 3.0));

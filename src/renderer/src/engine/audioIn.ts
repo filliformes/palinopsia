@@ -1,18 +1,18 @@
-// Audio ingest bus (Slab 1) — the first "voice" of the audiovisual-reactivity
+// Audio ingest bus (Slab 1) : the first "voice" of the audiovisual-reactivity
 // chapter. Two sources feed one merged AudioFeatures frame:
 //
-//   • Pandore over OSC  — /opsia/audio/* messages land here (setOscFeature),
+//   • Pandore over OSC  : /opsia/audio/* messages land here (setOscFeature),
 //     the primary path (Pandore is the audio brain).
-//   • Local Web Audio   — a mic / line / loopback input analysed in-renderer,
+//   • Local Web Audio   : a mic / line / loopback input analysed in-renderer,
 //     the standalone fallback.
 //
 // The modulation engine reads a single feature per `audio` modulator each frame
-// (via `feature()`), so nothing here touches the React store — same discipline
+// (via `feature()`), so nothing here touches the React store : same discipline
 // as the mod meters. Merge policy: OSC primary, local fills in when OSC is stale
 // (mode 'both'); or force one source.
 //
 // Design rule for the chapter: prefer DISCONTINUITY (transient/flux) over gain —
-// the salient signal dominates cross-modal perception (Basanta / Shimojo-Shams).
+// the salient signal dominates cross-modal perception.
 
 const BANDS = 6
 export const AUDIO_BANDS = BANDS
@@ -44,7 +44,7 @@ function zero(): Features {
 
 const OSC_STALE_MS = 500 // in 'both', OSC older than this yields to local
 
-// Pitch mapping span — A1 (55 Hz) to A6 (1760 Hz), log-scaled to 0..1.
+// Pitch mapping span : A1 (55 Hz) to A6 (1760 Hz), log-scaled to 0..1.
 const LOG_FMIN = Math.log2(55)
 const LOG_FMAX = Math.log2(1760)
 
@@ -57,7 +57,7 @@ function autoCorrelate(buf: Float32Array, sampleRate: number): number {
   let rms = 0
   for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i]
   rms = Math.sqrt(rms / SIZE)
-  if (rms < 0.01) return -1 // too quiet — unreliable
+  if (rms < 0.01) return -1 // too quiet : unreliable
 
   // Trim leading/trailing near-silence so the correlation locks on the tone.
   let r1 = 0
@@ -109,9 +109,9 @@ function autoCorrelate(buf: Float32Array, sampleRate: number): number {
 }
 
 class AudioBus {
-  /** Ingest mode — set by the App effect from the store. */
+  /** Ingest mode : set by the App effect from the store. */
   mode: AudioMode = 'off'
-  /** The merged, current frame — read by the mod engine + panel meters. */
+  /** The merged, current frame : read by the mod engine + panel meters. */
   readonly current: Features = zero()
 
   private osc: Features = zero()
@@ -148,7 +148,7 @@ class AudioBus {
       const ctx = new AudioContext()
       const src = ctx.createMediaStreamSource(stream)
       const analyser = ctx.createAnalyser()
-      analyser.fftSize = 2048 // 2048 samples ≈ 46ms — enough window for pitch
+      analyser.fftSize = 2048 // 2048 samples ≈ 46ms : enough window for pitch
       analyser.smoothingTimeConstant = 0.5
       src.connect(analyser)
       this.stream = stream
@@ -192,7 +192,7 @@ class AudioBus {
     an.getByteFrequencyData(freq)
     const L = this.local
 
-    // level — RMS of the centred time-domain waveform, lightly gained.
+    // level : RMS of the centred time-domain waveform, lightly gained.
     let sum = 0
     for (let i = 0; i < time.length; i++) {
       const x = (time[i] - 128) / 128
@@ -201,7 +201,7 @@ class AudioBus {
     L.level = Math.min(1, Math.sqrt(sum / time.length) * 2.5)
 
     const N = freq.length
-    // bands — log-spaced groups across the spectrum.
+    // bands : log-spaced groups across the spectrum.
     for (let b = 0; b < BANDS; b++) {
       const lo = Math.floor(Math.pow(N, b / BANDS))
       const hi = Math.max(lo + 1, Math.floor(Math.pow(N, (b + 1) / BANDS)))
@@ -209,7 +209,7 @@ class AudioBus {
       for (let i = lo; i < hi && i < N; i++) s += freq[i]
       L.bands[b] = Math.min(1, (s / ((hi - lo) * 255)) * 1.5)
     }
-    // centroid — energy-weighted mean bin, normalized.
+    // centroid : energy-weighted mean bin, normalized.
     let num = 0
     let den = 0
     for (let i = 0; i < N; i++) {
@@ -218,7 +218,7 @@ class AudioBus {
       den += m
     }
     L.centroid = den > 0 ? Math.min(1, (num / den / N) * 2) : 0
-    // flux — sum of positive magnitude increases vs the previous frame.
+    // flux : sum of positive magnitude increases vs the previous frame.
     let flux = 0
     for (let i = 0; i < N; i++) {
       const m = freq[i] / 255
@@ -227,11 +227,11 @@ class AudioBus {
       prev[i] = m
     }
     L.flux = Math.min(1, flux / (N * 0.15))
-    // transient — pulse on an onset (flux over threshold), else decay. The
+    // transient : pulse on an onset (flux over threshold), else decay. The
     // decay is normalized to 60fps (^(dt·60)) so it falls at the same wall-clock
     // rate regardless of the actual frame rate.
     L.transient = L.flux > 0.32 ? 1 : L.transient * Math.pow(0.82, dt * 60)
-    // pitch — autocorrelation on the float waveform, throttled (pitch moves
+    // pitch : autocorrelation on the float waveform, throttled (pitch moves
     // slowly, and the ACF is the heaviest step). Held across unvoiced frames.
     if (this.timeF && ++this.pitchCounter % 3 === 0) {
       this.analyser!.getFloatTimeDomainData(this.timeF)
@@ -271,7 +271,7 @@ class AudioBus {
             ? this.local
             : oscFresh
               ? this.osc
-              : this.local // 'both' — OSC primary, local fallback
+              : this.local // 'both' : OSC primary, local fallback
     if (!src) {
       c.level = c.flux = c.transient = c.centroid = c.pitch = 0
       c.bands.fill(0)
@@ -285,20 +285,20 @@ class AudioBus {
     for (let i = 0; i < BANDS; i++) c.bands[i] = src.bands[i]
   }
 
-  /** Read one feature (0..1) — the mod engine calls this per audio modulator. */
+  /** Read one feature (0..1) : the mod engine calls this per audio modulator. */
   feature(name: AudioFeatureName, band = 0): number {
     const c = this.current
     if (name === 'band') return c.bands[Math.max(0, Math.min(BANDS - 1, band))] ?? 0
     return c[name] as number
   }
 
-  /** Live spectrum magnitudes (0..255) — null unless LOCAL audio is running
+  /** Live spectrum magnitudes (0..255) : null unless LOCAL audio is running
    *  (OSC mode carries only reduced features, not the buffer). For the
    *  Parametric generator's audio-buffer→texture read. */
   spectrumBytes(): Uint8Array | null {
     return this.localOn ? this.freq : null
   }
-  /** Live time-domain waveform (0..255, centred at 128) — local only. */
+  /** Live time-domain waveform (0..255, centred at 128) : local only. */
   waveformBytes(): Uint8Array | null {
     return this.localOn ? this.time : null
   }

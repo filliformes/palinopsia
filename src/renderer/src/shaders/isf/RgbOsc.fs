@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "RGB Oscillators — Cathodemer-style video-synth colour: each channel is its own 2D oscillator (waveform × spatial frequency × phase), the three detuned against each other so colour separates into drifting interference. The analog-video register (brief §5, opt-in): kept matte (mid-tone scaled, no neon floor).",
-  "CREDIT": "Palinopsia (after Cathodemer RGB oscillators)",
+  "DESCRIPTION": "RGB Oscillators : Cathodemer-style video-synth colour: each channel is its own 2D oscillator (waveform × spatial frequency × phase), the three detuned against each other so colour separates into drifting interference. The analog-video register (brief §5, opt-in): kept matte (mid-tone scaled, no neon floor).",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Scan"],
   "INPUTS": [
@@ -39,7 +39,7 @@ void main() {
   vec2 p = vec2(c.x * cs - c.y * sn, c.x * sn + c.y * cs) + 0.5;
   float t = TIME * rate;
 
-  // Three detuned frequencies so R/G/B never lock — the colour crawls.
+  // Three detuned frequencies so R/G/B never lock : the colour crawls.
   float r = chan(p, freq, 0.0, t);
   float g = chan(p, freq * (1.0 + spread * 0.35), 2.1, t * 1.07);
   float b = chan(p, freq * (1.0 + spread * 0.7), 4.2, t * 0.93);

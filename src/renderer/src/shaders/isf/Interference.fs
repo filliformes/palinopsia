@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Interference — two near-frequency line fields beating against each other. Moiré handled as MATTE TEXTURE, not op-art: asymmetric angles, posterized product, mid-tone greys with one accent. The beat pattern crawls at the detune rate.",
+  "DESCRIPTION": "Interference : two near-frequency line fields beating against each other. Moiré handled as MATTE TEXTURE, not op-art: asymmetric angles, posterized product, mid-tone greys with one accent. The beat pattern crawls at the detune rate.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Geometry"],
@@ -26,7 +26,7 @@ void main() {
   float t = TIME * rate;
 
   // Field 1: lines at `angle`. Field 2: slightly detuned frequency AND a
-  // slightly skewed angle — both misalignments feed the beat.
+  // slightly skewed angle : both misalignments feed the beat.
   vec2 p1 = rot(p, angle);
   vec2 p2 = rot(p, angle + skew * 0.5);
   float s1 = sin(p1.y * freq * 6.2832 + t * 2.0);

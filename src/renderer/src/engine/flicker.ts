@@ -1,7 +1,7 @@
-// Superimposition flicker (Cameraless spec §5.2) — Brakhage's hypnagogic strobe:
+// Superimposition flicker (Cameraless spec §5.2) : a hypnagogic strobe:
 // on a drawn-frame cadence, cross-cut WHICH layer(s) show. Applied post-modulation
 // in the App loop, it multiplies the non-hot layers' opacity toward black each
-// frame (self-releasing — syncFromState re-applies the base opacity next frame, so
+// frame (self-releasing : syncFromState re-applies the base opacity next frame, so
 // amount → 0 restores everything). The rate follows the Cameraless film draw rate
 // when it's on, so the strobe lands on the drawn frames; otherwise a default.
 //

@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Decay — analogue generation loss. The picture wears like a tape dub or a worn print: VHS chroma bleed, block/quantization crush, horizontal head-switch jitter, a BOUNDED feedback ghost (capped so it can never run away into feedback fractals), tape noise and flickering dropout lines. It only ever DEGRADES the incoming image — it never invents its own pattern. No psychedelia.",
+  "DESCRIPTION": "Decay : analogue generation loss. The picture wears like a tape dub or a worn print: VHS chroma bleed, block/quantization crush, horizontal head-switch jitter, a BOUNDED feedback ghost (capped so it can never run away into feedback fractals), tape noise and flickering dropout lines. It only ever DEGRADES the incoming image : it never invents its own pattern. No psychedelia.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],
@@ -33,7 +33,7 @@ void main() {
     float aspect = RENDERSIZE.x / RENDERSIZE.y;
 
     // ── Head-switch jitter: a per-scanline horizontal offset that flickers,
-    //    plus a slow whole-frame drift. Bounded — this DISPLACES the source
+    //    plus a slow whole-frame drift. Bounded : this DISPLACES the source
     //    lookup, it does not synthesize anything.
     float line = floor(uv.y * RENDERSIZE.y);
     float lj = (dhash(vec2(line, floor(TIME * 24.0))) - 0.5) * jitter * 0.018;
@@ -68,7 +68,7 @@ void main() {
     }
 
     // ── Bounded feedback ghost: mix in the previous degraded frame, HARD
-    //    capped (max ~0.49 weight) so loop gain stays < 1 — trails/smear, never
+    //    capped (max ~0.49 weight) so loop gain stays < 1 : trails/smear, never
     //    a self-generating feedback pattern.
     vec2 buv = uv;
     vec3 prev = IMG_NORM_PIXEL(buf, buv).rgb;

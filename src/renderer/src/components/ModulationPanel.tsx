@@ -42,7 +42,7 @@ export function ModulationPanel(): JSX.Element {
         <MatrixSummary />
       </div>
       {!collapsed && (
-        // Eight equal columns across the full width — every card the same
+        // Eight equal columns across the full width : every card the same
         // size, so the section's shape never changes as types are swapped.
         <div className="grid min-w-0 grid-cols-8 gap-2 pb-1">
           {modulators.map((_, i) => (
@@ -61,7 +61,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
 
   return (
     // Fixed height + min-w-0 so all eight cards are identical regardless of
-    // type — the section keeps one silhouette as types are swapped.
+    // type : the section keeps one silhouette as types are swapped.
     <div
       className={`flex h-36 min-w-0 flex-col gap-1 rounded border p-1.5 transition-colors ${
         m.enabled ? 'border-accent/60 bg-panel2' : 'border-border bg-panel2/40'
@@ -73,13 +73,13 @@ function ModCard({ index }: { index: number }): JSX.Element {
           className={`h-2.5 w-2.5 shrink-0 rounded-full transition-colors ${
             m.enabled ? 'bg-accent' : 'bg-panel3'
           }`}
-          title={m.enabled ? 'On — click to disable' : 'Off — click to enable'}
+          title={m.enabled ? 'On : click to disable' : 'Off : click to enable'}
         />
         <span className="font-mono text-[10px] text-muted">M{index + 1}</span>
         {index === WORLD_AUTOMOD_SLOT && (
           <span
             className="shrink-0 font-mono text-[9px] text-accent2"
-            title="Reserved for the active World's audio routing — set it in the World editor. Skipped by Randomize."
+            title="Reserved for the active World's audio routing : set it in the World editor. Skipped by Randomize."
           >
             ⊛
           </span>
@@ -88,7 +88,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
           className="input select-compact min-w-0 flex-1 text-[10px]"
           value={m.type}
           onChange={(e) => update(index, { type: e.target.value as ModulatorType })}
-          title="The modulator's shape — what kind of moving signal this slot produces (LFO waves, ramp, ADSR envelope, arpeggio, random, sample&hold, slew, chaos, audio-follower, organic, physics, motion). Bind it to parameters with their M button."
+          title="The modulator's shape : what kind of moving signal this slot produces (LFO waves, ramp, ADSR envelope, arpeggio, random, sample&hold, slew, chaos, audio-follower, organic, physics, motion). Bind it to parameters with their M button."
         >
           {MOD_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -99,7 +99,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
         <button
           onClick={() => modEngine.retrigger(index)}
           className="shrink-0 rounded bg-panel3/60 px-1 font-mono text-[9px] text-muted hover:text-accent"
-          title="Retrigger — restart ramp/ADSR/arp from zero"
+          title="Retrigger : restart ramp/ADSR/arp from zero"
         >
           ⟳
         </button>
@@ -108,7 +108,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
       {/* live meter */}
       <Meter index={index} />
 
-      {/* clock — everything except ramp/adsr/audio is clock-driven
+      {/* clock : everything except ramp/adsr/audio is clock-driven
           (audio is driven by the signal itself) */}
       {m.type !== 'ramp' && m.type !== 'adsr' && m.type !== 'audio' && (
         <div className="flex min-w-0 items-center gap-1">
@@ -126,7 +126,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
               className="input select-compact min-w-0 flex-1 text-[10px]"
               value={m.divisionIdx}
               onChange={(e) => update(index, { divisionIdx: Number(e.target.value) })}
-              title="Note division — the modulator's rate as a fraction of the beat (locked to BPM)."
+              title="Note division : the modulator's rate as a fraction of the beat (locked to BPM)."
             >
               {DIVISIONS.map((d, i) => (
                 <option key={d.label} value={i}>
@@ -164,7 +164,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
                   ? 'bg-accent/20 text-accent ring-1 ring-accent'
                   : 'bg-panel3/60 text-muted'
               }`}
-              title="Random target — slew toward a fresh random value each step (vs. alternating)"
+              title="Random target : slew toward a fresh random value each step (vs. alternating)"
             >
               RND
             </button>
@@ -178,7 +178,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
                   ? 'bg-accent/20 text-accent ring-1 ring-accent'
                   : 'bg-panel3/60 text-muted'
               }`}
-              title="Smooth — glide between held samples instead of stepping"
+              title="Smooth : glide between held samples instead of stepping"
             >
               SMTH
             </button>
@@ -187,7 +187,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
       )}
 
       {/* type-specific params (output shaping lives on the Meta knobs, not
-          here — modulators emit their raw signal) */}
+          here : modulators emit their raw signal) */}
       <TypeParams index={index} />
     </div>
   )
@@ -204,7 +204,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
           <select
             className="input select-compact min-w-0 flex-1 text-[10px]"
             value={m.shape}
-              title="LFO waveform — the shape of the repeating wave."
+              title="LFO waveform : the shape of the repeating wave."
             onChange={(e) => update(index, { shape: e.target.value as LfoShape })}
           >
             {LFO_SHAPES.map((s) => (
@@ -226,7 +226,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             <select
               className="input select-compact min-w-0 flex-1 text-[10px]"
               value={m.ramp.mode}
-              title="Ramp direction — normal (rise once), inverted (fall once), or loop (repeat)."
+              title="Ramp direction : normal (rise once), inverted (fall once), or loop (repeat)."
               onChange={(e) =>
                 update(index, { ramp: { ...m.ramp, mode: e.target.value as 'normal' | 'inverted' | 'loop' } })
               }
@@ -287,7 +287,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             <select
               className="input select-compact min-w-0 flex-1 text-[10px]"
               value={m.arp.mode}
-              title="Step order — how the arpeggiator walks its steps (up / down / up-down / random / drunk)."
+              title="Step order : how the arpeggiator walks its steps (up / down / up-down / random / drunk)."
               onChange={(e) => update(index, { arp: { ...m.arp, mode: e.target.value as ArpMode } })}
             >
               {ARP_MODES.map((a) => (
@@ -302,23 +302,23 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
     case 'random':
       return (
         <SliderRow label="DIST" value={m.random.distribution} min={0} max={1}
-          title="Distribution — 0.5 uniform · >0.5 centre-hug · <0.5 edge-weight"
+          title="Distribution : 0.5 uniform · >0.5 centre-hug · <0.5 edge-weight"
           onChange={(v) => update(index, { random: { distribution: v } })} />
       )
     case 'sh':
-      // SMTH lives on the rate line (see the clock row) — only PROB/DIST here.
+      // SMTH lives on the rate line (see the clock row) : only PROB/DIST here.
       return (
         <>
           <SliderRow label="PROB" value={m.sh.probability} min={0} max={1}
-            title="Chance a clock draws a fresh sample — below 1 locks patterns"
+            title="Chance a clock draws a fresh sample : below 1 locks patterns"
             onChange={(v) => update(index, { sh: { ...m.sh, probability: v } })} />
           <SliderRow label="DIST" value={m.sh.distribution} min={0} max={1}
-            title="Distribution — 0.5 = uniform random · <0.5 favours the extremes · >0.5 hugs the centre"
+            title="Distribution : 0.5 = uniform random · <0.5 favours the extremes · >0.5 hugs the centre"
             onChange={(v) => update(index, { sh: { ...m.sh, distribution: v } })} />
         </>
       )
     case 'slew':
-      // RND lives on the rate line (see the clock row) — only RISE/FALL here.
+      // RND lives on the rate line (see the clock row) : only RISE/FALL here.
       return (
         <>
           <NumRow label="RISE" value={m.slew.riseMs} min={1} max={10000}
@@ -330,7 +330,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
     case 'chaos':
       return (
         <SliderRow label="R" value={m.chaos.r} min={3.4} max={4} step={0.005}
-          title="Logistic-map r — toward 4 = wilder"
+          title="Logistic-map r : toward 4 = wilder"
           onChange={(v) => update(index, { chaos: { r: v } })} />
       )
     case 'audio': {
@@ -356,7 +356,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
               onChange={(v) => update(index, { audio: { ...a, band: Math.round(v) - 1 } })} />
           )}
           <SliderRow label="SMOOTH" value={a.smooth} min={0} max={0.99}
-            title="One-pole smoothing — 0 snaps to the signal, →1 glides"
+            title="One-pole smoothing : 0 snaps to the signal, →1 glides"
             onChange={(v) => update(index, { audio: { ...a, smooth: v } })} />
         </>
       )
@@ -365,7 +365,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
       const o = m.organic ?? { variation: 0.5 }
       return (
         <SliderRow label="VARY" value={o.variation} min={0} max={1}
-          title="Irregularity — 0 near-periodic · →1 wanders (never repeats)"
+          title="Irregularity : 0 near-periodic · →1 wanders (never repeats)"
           onChange={(v) => update(index, { organic: { variation: v } })} />
       )
     }
@@ -377,7 +377,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             <select
               className="input select-compact min-w-0 flex-1 text-[10px]"
               value={p.motion}
-              title="Physics model — bounce (a ball), spring (damped oscillation), or riser (accelerating ramp)."
+              title="Physics model : bounce (a ball), spring (damped oscillation), or riser (accelerating ramp)."
               onChange={(e) => update(index, { physics: { ...p, motion: e.target.value as PhysicsMotion } })}
             >
               {PHYSICS_MOTIONS.map((mo) => (
@@ -388,7 +388,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             </select>
           </Row>
           <SliderRow label="DAMP" value={p.damping} min={0} max={1}
-            title="Damping — bounce restitution / spring settle"
+            title="Damping : bounce restitution / spring settle"
             onChange={(v) => update(index, { physics: { ...p, damping: v } })} />
         </>
       )
@@ -401,7 +401,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             className="input select-compact min-w-0 flex-1 text-[10px]"
             value={mt.shape}
             onChange={(e) => update(index, { motion: { shape: e.target.value as MotionShape } })}
-            title="Named motion archetype (Smalley) / force behaviour (Boucher) — a characteristic trajectory"
+            title="Named motion archetype / force behaviour : a characteristic trajectory"
           >
             {MOTION_SHAPES.map((sh) => (
               <option key={sh} value={sh}>
@@ -447,7 +447,7 @@ function NumRow({
   )
 }
 
-// A hair-thin label + a small slider — for the ADSR a/d/s/r segment durations,
+// A hair-thin label + a small slider : for the ADSR a/d/s/r segment durations,
 // where four have to sit two-up in one card. Value lives in the tooltip.
 function MiniSlider({
   label, value, min, max, onChange
@@ -503,7 +503,7 @@ function SliderRow({
 }
 
 
-// ── Live meter — one rAF per meter, direct style writes ───────────────
+// ── Live meter : one rAF per meter, direct style writes ───────────────
 function Meter({ index }: { index: number }): JSX.Element {
   const barRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
@@ -523,7 +523,7 @@ function Meter({ index }: { index: number }): JSX.Element {
   )
 }
 
-// ── Matrix summary — every assignment, with depth + remove ────────────
+// ── Matrix summary : every assignment, with depth + remove ────────────
 function MatrixSummary(): JSX.Element {
   const matrix = useStore((s) => s.composition.modMatrix)
   const composition = useStore((s) => s.composition)

@@ -1,8 +1,8 @@
-// BackgroundPanel — the Background slab's strip, pinned at the BOTTOM of the
+// BackgroundPanel : the Background slab's strip, pinned at the BOTTOM of the
 // Layers column (matching the stack: it renders under everything). Compact by
 // design: one source (curated ground set), a full FX rack, opacity + its own
 // slow clock (default 0.25×), its own dice, and the preset bank (25 built-ins +
-// user saves via right-click). The global Randomize never touches it — the
+// user saves via right-click). The global Randomize never touches it : the
 // ground stays put while the layers churn.
 
 import { useState, type MouseEvent, type ReactNode } from 'react'
@@ -77,7 +77,7 @@ export function BackgroundPanel(): JSX.Element {
           className={`w-[34px] shrink-0 font-mono text-[11px] font-bold ${
             selected ? 'text-accent' : shaderId ? 'text-text' : 'text-muted'
           }`}
-          title="Background — the ground under the four layers (its own slow clock; the global Randomize never touches it)"
+          title="Background : the ground under the four layers (its own slow clock; the global Randomize never touches it)"
         >
           BG
         </span>
@@ -86,7 +86,7 @@ export function BackgroundPanel(): JSX.Element {
           value={shaderId ?? ''}
           onChange={(e) => setBackgroundSource(e.target.value || null)}
           onClick={(e) => e.stopPropagation()}
-          title="Background source — curated ground set"
+          title="Background source : curated ground set"
         >
           <option value="">— none —</option>
           {BG_SOURCES_ALPHA.map((g) => (
@@ -96,7 +96,7 @@ export function BackgroundPanel(): JSX.Element {
           ))}
         </select>
         <span onClick={(e) => e.stopPropagation()}>
-          {/* snug fixed width — fits "+ fx" + arrow without clipping, but not as
+          {/* snug fixed width : fits "+ fx" + arrow without clipping, but not as
               wide as the widest option ("Difference Bloom"). Popup still expands. */}
           <FxAddSelect scope={{ kind: 'background' }} className="w-16 shrink-0" />
         </span>
@@ -128,7 +128,7 @@ export function BackgroundPanel(): JSX.Element {
             }
           }}
           onClick={(e) => e.stopPropagation()}
-          title="Background presets — 25 built-ins + yours (right-click the strip to save/delete)"
+          title="Background presets : 25 built-ins + yours (right-click the strip to save/delete)"
         >
           <option value="">presets</option>
           <optgroup label="Built-in">
@@ -169,7 +169,7 @@ export function BackgroundPanel(): JSX.Element {
           onChange={(e) => setBackgroundOpacity(Number(e.target.value))}
           onClick={(e) => e.stopPropagation()}
           className="min-w-0 flex-1 accent-accent"
-          title={`Background opacity ${opacity.toFixed(2)} — 0 = off`}
+          title={`Background opacity ${opacity.toFixed(2)} : 0 = off`}
         />
         <div className="w-11 shrink-0" onClick={(e) => e.stopPropagation()}>
           <BoundedNumberInput
@@ -191,7 +191,7 @@ export function BackgroundPanel(): JSX.Element {
           onDoubleClick={() => setBackgroundSpeed(0.25)}
           onClick={(e) => e.stopPropagation()}
           className="min-w-0 flex-1 accent-accent"
-          title={`Background clock ${speed.toFixed(2)}× — grounds move slowly (double-click: 0.25×)`}
+          title={`Background clock ${speed.toFixed(2)}× : grounds move slowly (double-click: 0.25×)`}
         />
         <div className="w-11 shrink-0" onClick={(e) => e.stopPropagation()}>
           <BoundedNumberInput
@@ -204,7 +204,7 @@ export function BackgroundPanel(): JSX.Element {
         </div>
       </div>
 
-      {/* DEPTH — the foreground casts a soft contact shadow onto the background
+      {/* DEPTH : the foreground casts a soft contact shadow onto the background
           (separation). Only meaningful with a background + content above it. */}
       <div className="flex min-w-0 items-center gap-1.5">
         <Label>DEPTH</Label>
@@ -217,7 +217,7 @@ export function BackgroundPanel(): JSX.Element {
           onChange={(e) => setBackgroundDepth(Number(e.target.value))}
           onClick={(e) => e.stopPropagation()}
           className="min-w-0 flex-1 accent-accent2"
-          title={`Depth ${depth.toFixed(2)} — foreground casts a soft shadow onto the background (0 = flat)`}
+          title={`Depth ${depth.toFixed(2)} : foreground casts a soft shadow onto the background (0 = flat)`}
         />
         <div className="w-11 shrink-0" onClick={(e) => e.stopPropagation()}>
           <BoundedNumberInput
@@ -237,7 +237,7 @@ export function BackgroundPanel(): JSX.Element {
           value={mode}
           onChange={(e) => setBackgroundBlendMode(e.target.value as 'blend' | 'isolate')}
           onClick={(e) => e.stopPropagation()}
-          title="Blend — layer 1 blends onto the background (backdrop glows through). Isolate — the 4 layers composite as their own group over the background."
+          title="Blend : layer 1 blends onto the background (backdrop glows through). Isolate : the 4 layers composite as their own group over the background."
         >
           <option value="blend">blend</option>
           <option value="isolate">isolate</option>

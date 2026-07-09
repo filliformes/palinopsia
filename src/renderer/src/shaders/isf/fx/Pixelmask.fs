@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Pixelmask — stencil the image through a pattern (aperture grille / shadow mask / dot / line / bayer / noise): the picture only shows where the mask is lit, everything else darkens. The RGB-triad shadow-mask option splits the pattern into red/green/blue stripes for a real tube-phosphor read (Cathodemer pixelmask register).",
-  "CREDIT": "Palinopsia (after Cathodemer pixelmask)",
+  "DESCRIPTION": "Pixelmask : stencil the image through a pattern (aperture grille / shadow mask / dot / line / bayer / noise): the picture only shows where the mask is lit, everything else darkens. The RGB-triad shadow-mask option splits the pattern into red/green/blue stripes for a real tube-phosphor read (Cathodemer pixelmask register).",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Texture", "Scan"],
   "INPUTS": [
@@ -28,7 +28,7 @@ void main() {
     // Vertical aperture grille.
     mask = vec3(0.35 + 0.65 * abs(sin(px.x * 3.14159)));
   } else if (pattern == 1) {
-    // RGB shadow mask — three phosphor stripes.
+    // RGB shadow mask : three phosphor stripes.
     float col3 = mod(floor(px.x), 3.0);
     mask = vec3(step(col3, 0.5), step(abs(col3 - 1.0), 0.5), step(2.5, col3 + 0.5));
     mask = mix(vec3(0.3), mask, 1.0);

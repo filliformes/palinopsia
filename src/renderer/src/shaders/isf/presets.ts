@@ -1,4 +1,4 @@
-// Per-shader presets — 10 named settings per shader, hand-curated in the
+// Per-shader presets : 10 named settings per shader, hand-curated in the
 // same register as the curated Randomize ranges (brief §7): these are the
 // instrument's starting points, not random draws. Values are partial input
 // maps applied through the store's normal write path, so presets are
@@ -75,7 +75,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Spectrogram fast', values: { mode: 3, gain: 1.2, scale: 0.4, scan: 0.7, mono: 1 } },
     { name: 'Test pattern', values: { mode: 0, gain: 1.6, scale: 0.8, scan: 0.6, mono: 1, color: [1, 1, 1, 1] } }
   ],
-  // ── Text (styling presets — your typed string is left untouched) ──
+  // ── Text (styling presets : your typed string is left untouched) ──
   'gen-text': [
     { name: 'Bold centre', values: { font: 1, size: 0.3, weight: 800, spacing: 0, stretch: 1, angle: 0, posX: 0, posY: 0, color: [1, 1, 1, 1] } },
     { name: 'Tall condensed', values: { font: 1, size: 0.4, weight: 700, spacing: -0.05, stretch: 2.2, angle: 0 } },
@@ -565,7 +565,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Soft bokeh', values: { grid: 0.35, size: 0.9, lumaSize: 0.6, soft: 0.2, shape: 1, gapMix: 0.2 } },
     { name: 'Ghost grid', values: { grid: 0.5, size: 0.7, lumaSize: 0.5, soft: 0.1, shape: 1, gapMix: 0.4 } }
   ],
-  // ── Corbeil-Perron homage: stereoscopic texture + afterimage ──────────
+  // ── stereoscopic texture + afterimage ──────────
   'fx-optical-rain': [
     { name: 'Optical rain', values: { amount: 0.6, rain: 0.4, streak: 0.5, columns: 220, disparity: 0.5, edges: 0.5 } },
     { name: 'Fine drizzle', values: { amount: 0.45, rain: 0.55, streak: 0.35, columns: 380, disparity: 0.4, edges: 0.7 } },
@@ -592,22 +592,22 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
   ],
   // ── Generators ──────────────────────────────────────────────────────
   'op-art': [
-    { name: 'Riley fall', values: { mode: 0, scale: 24, warp: 0.4, rate: 0.3, angle: 0, contrast: 0.9, tint: [0.9, 0.9, 0.88, 1] } },
-    { name: 'Riley steep', values: { mode: 0, scale: 40, warp: 0.7, rate: 0.5, angle: 0.2, contrast: 1.0, tint: [0.92, 0.9, 0.85, 1] } },
-    { name: 'Vasarely grid', values: { mode: 1, scale: 20, warp: 0.5, rate: 0.3, angle: 0, contrast: 0.85, tint: [0.88, 0.9, 0.9, 1] } },
-    { name: 'Vasarely bulge', values: { mode: 1, scale: 30, warp: 0.85, rate: 0.45, angle: 0, contrast: 0.95, tint: [0.9, 0.88, 0.86, 1] } },
-    { name: 'Soto moiré', values: { mode: 2, scale: 36, warp: 0.3, rate: 0.35, angle: 0, contrast: 0.8, tint: [0.85, 0.88, 0.9, 1] } },
-    { name: 'Soto beat', values: { mode: 2, scale: 52, warp: 0.6, rate: 0.6, angle: 0.4, contrast: 0.9, tint: [0.9, 0.9, 0.88, 1] } },
+    { name: 'Fall', values: { mode: 0, scale: 24, warp: 0.4, rate: 0.3, angle: 0, contrast: 0.9, tint: [0.9, 0.9, 0.88, 1] } },
+    { name: 'Steep waves', values: { mode: 0, scale: 40, warp: 0.7, rate: 0.5, angle: 0.2, contrast: 1.0, tint: [0.92, 0.9, 0.85, 1] } },
+    { name: 'Grid', values: { mode: 1, scale: 20, warp: 0.5, rate: 0.3, angle: 0, contrast: 0.85, tint: [0.88, 0.9, 0.9, 1] } },
+    { name: 'Bulge grid', values: { mode: 1, scale: 30, warp: 0.85, rate: 0.45, angle: 0, contrast: 0.95, tint: [0.9, 0.88, 0.86, 1] } },
+    { name: 'Moiré', values: { mode: 2, scale: 36, warp: 0.3, rate: 0.35, angle: 0, contrast: 0.8, tint: [0.85, 0.88, 0.9, 1] } },
+    { name: 'Moiré beat', values: { mode: 2, scale: 52, warp: 0.6, rate: 0.6, angle: 0.4, contrast: 0.9, tint: [0.9, 0.9, 0.88, 1] } },
     { name: 'Herringbone', values: { mode: 3, scale: 22, warp: 0.5, rate: 0.3, angle: 0, contrast: 0.9, tint: [0.9, 0.89, 0.85, 1] } },
     { name: 'Diagonal weave', values: { mode: 3, scale: 34, warp: 0.75, rate: 0.4, angle: 0.8, contrast: 1.0, tint: [0.88, 0.9, 0.9, 1] } },
     { name: 'Slow waves', values: { mode: 0, scale: 14, warp: 0.25, rate: 0.1, angle: -0.3, contrast: 0.7, tint: [0.86, 0.86, 0.84, 1] } },
     { name: 'Tight grid', values: { mode: 1, scale: 48, warp: 0.3, rate: 0.2, angle: 0, contrast: 1.0, tint: [0.92, 0.92, 0.9, 1] } }
   ],
-  // ── Cameraless / direct-film sources (McLaren marks · Brakhage dye) ──
+  // ── Cameraless / direct-film sources (film marks and dye) ──
   'direct-marks': [
     { name: 'Ruled lines', values: { markType: 0, density: 20, weight: 0.28, gate: 1, jitter: 0.25, rate: 1.2, angle: 0 } },
     { name: 'Fine rules', values: { markType: 0, density: 48, weight: 0.12, gate: 1, jitter: 0.15, rate: 0.8, angle: 0.1 } },
-    { name: 'Blinkity lines', values: { markType: 0, density: 16, weight: 0.3, gate: 0.5, jitter: 0.4, rate: 3.2, angle: 0 } },
+    { name: 'Flicker lines', values: { markType: 0, density: 16, weight: 0.3, gate: 0.5, jitter: 0.4, rate: 3.2, angle: 0 } },
     { name: 'Diagonal hatch', values: { markType: 0, density: 30, weight: 0.18, gate: 0.9, jitter: 0.3, rate: 1.5, angle: 0.9 } },
     { name: 'Dot grid', values: { markType: 1, density: 14, weight: 0.3, gate: 1, jitter: 0.2, rate: 0.6, angle: 0 } },
     { name: 'Dots on beat', values: { markType: 1, density: 10, weight: 0.35, gate: 0.45, jitter: 0.3, rate: 3.4, angle: 0 } },
@@ -618,7 +618,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
   ],
   'dye-field': [
     { name: 'Oxblood pool', values: { rate: 0.4, scale: 4, warp: 0.5, pool: 0.4, density: 0.5, grain: 0.3, pigment: [0.44, 0.1, 0.11, 1] } },
-    { name: 'Black ice', values: { rate: 0.25, scale: 3, warp: 0.6, pool: 0.8, density: 0.6, grain: 0.35, pigment: [0.16, 0.3, 0.42, 1] } },
+    { name: 'Deep freeze', values: { rate: 0.25, scale: 3, warp: 0.6, pool: 0.8, density: 0.6, grain: 0.35, pigment: [0.16, 0.3, 0.42, 1] } },
     { name: 'Prussian bleed', values: { rate: 0.5, scale: 5, warp: 0.7, pool: 0.5, density: 0.45, grain: 0.4, pigment: [0.12, 0.26, 0.4, 1] } },
     { name: 'Ochre wash', values: { rate: 0.6, scale: 4.5, warp: 0.4, pool: 0.3, density: 0.55, grain: 0.3, pigment: [0.5, 0.34, 0.12, 1] } },
     { name: 'Viridian', values: { rate: 0.35, scale: 5.5, warp: 0.6, pool: 0.55, density: 0.5, grain: 0.35, pigment: [0.1, 0.36, 0.26, 1] } },

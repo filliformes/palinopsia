@@ -1,6 +1,6 @@
 // Host resource sampler for the Output HUD. Reports Palinopsia's OWN CPU + RAM
 // share (from Electron's per-process metrics) and the GPU's VRAM + utilisation
-// (whole-GPU, via nvidia-smi — per-process VRAM isn't reliably attributable for
+// (whole-GPU, via nvidia-smi : per-process VRAM isn't reliably attributable for
 // a graphics context). Everything degrades gracefully: no nvidia-smi → the GPU
 // fields come back null and the HUD shows "—".
 

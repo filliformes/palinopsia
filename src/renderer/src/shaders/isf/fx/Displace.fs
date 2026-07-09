@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Displace — drifting value-noise domain warp of the sampling coordinates. Asymmetric displacement (brief §1's preferred feedback discipline), never radial.",
+  "DESCRIPTION": "Displace : drifting value-noise domain warp of the sampling coordinates. Asymmetric displacement (brief §1's preferred feedback discipline), never radial.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Distortion"],

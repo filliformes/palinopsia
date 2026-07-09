@@ -1,4 +1,4 @@
-// HiveEncoder — encodes the composite canvas to HEVC (WebCodecs) and ships the
+// HiveEncoder : encodes the composite canvas to HEVC (WebCodecs) and ships the
 // Annex-B chunks to the main-process HIVE sender. Real-time, hardware-preferred,
 // ~80 Mbps to match HIVE. GOP + on-demand keyframes let new receivers join fast.
 //
@@ -87,5 +87,5 @@ export class HiveEncoder {
   }
 }
 
-// One shared encoder — the App render loop feeds it, OutputPage toggles it.
+// One shared encoder : the App render loop feeds it, OutputPage toggles it.
 export const hiveEncoder = new HiveEncoder()

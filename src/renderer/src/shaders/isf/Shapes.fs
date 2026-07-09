@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Shapes — hard-edged primitive fields (circle / ring / bar / cross / triangle), tiled and animatable. A Lumen-style shape generator: use it as a matte source, or on layer B keyed through A (the mixer's lumakey) as a mask/stencil. Single accent over near-black.",
-  "CREDIT": "Palinopsia (after Lumen shape generators)",
+  "DESCRIPTION": "Shapes : hard-edged primitive fields (circle / ring / bar / cross / triangle), tiled and animatable. A Lumen-style shape generator: use it as a matte source, or on layer B keyed through A (the mixer's lumakey) as a mask/stencil. Single accent over near-black.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Geometry"],
   "INPUTS": [

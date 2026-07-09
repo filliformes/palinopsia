@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Column Scan — horizontal scan lines vertically displaced by a drifting internal signal, brightness following the displacement slope. A taste of the Rutt/Etra scan-processor register hosted as a plain generator — matte line-work, no phosphor glow.",
+  "DESCRIPTION": "Column Scan : horizontal scan lines vertically displaced by a drifting internal signal, brightness following the displacement slope. A taste of the analog scan-processor register hosted as a plain generator : matte line-work, no phosphor glow.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Geometry", "Scan"],
@@ -60,7 +60,7 @@ void main() {
     float y = baseY + disp(uv.x, k, t);
     float d = abs(uv.y - y);
     float line = 1.0 - smoothstep(0.0, width * px, d);
-    // Brightness follows the local slope — the scan-processor read: lines
+    // Brightness follows the local slope : the scan-processor read: lines
     // light up where the signal moves them hardest.
     float slope = abs(disp(uv.x + 0.004, k, t) - disp(uv.x - 0.004, k, t)) * 60.0;
     lum = max(lum, line * (0.45 + min(slope, 0.55)));

@@ -1,4 +1,4 @@
-// ContextMenu — shared right-click menu. Fixed-positioned at the cursor,
+// ContextMenu : shared right-click menu. Fixed-positioned at the cursor,
 // closes on outside mousedown / Escape. Items can be actions, dividers, or
 // rows with a trailing delete affordance (used by preset lists).
 
@@ -11,7 +11,7 @@ export interface MenuItem {
   divider?: boolean
   /** Greyed and non-interactive (e.g. Paste with an empty clipboard). */
   disabled?: boolean
-  /** Optional trailing × — e.g. delete a preset without applying it. */
+  /** Optional trailing × : e.g. delete a preset without applying it. */
   onDelete?: () => void
   deleteTitle?: string
 }

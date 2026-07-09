@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Direct Marks — hand-drawn film marks after Norman McLaren (Begone Dull Care / Blinkity Blank / Lines / Dots): ruled lines, dots, or scratches, flat ink on paper, appearing intermittently on a GATE you can drive from audio / coupling for marks-on-the-beat. Hard-edged and linear, never radial. Matte ink over near-black paper (brief §1).",
-  "CREDIT": "Palinopsia (after Norman McLaren)",
+  "DESCRIPTION": "Direct Marks : hand-drawn direct-film marks. Ruled lines, dots, or scratches, flat ink on paper, appearing intermittently on a GATE you can drive from audio or coupling for marks-on-the-beat. Hard-edged and linear, never radial. Matte ink over near-black paper (brief §1).",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Geometry"],
   "INPUTS": [
@@ -31,21 +31,21 @@ void main() {
   float seed = 0.0; // per-mark id for the gate flicker
 
   if (mt == 0) {
-    // ruled lines — a band around each line centre, hand-wobbled spacing.
+    // ruled lines : a band around each line centre, hand-wobbled spacing.
     float idx = floor(r.x * density);
     float jx = (h11(idx) - 0.5) * jitter * 0.4 / density;
     float band = abs(fract((r.x + jx) * density) * 2.0 - 1.0);
     m = 1.0 - step(weight, band);
     seed = idx * 2.3;
   } else if (mt == 1) {
-    // dots — a disc per grid cell, hand-nudged off centre.
+    // dots : a disc per grid cell, hand-nudged off centre.
     vec2 cell = floor(r * density);
     vec2 g = fract(r * density) - 0.5;
     g += (vec2(h21(cell), h21(cell + 7.0)) - 0.5) * jitter * 0.5;
     m = 1.0 - step(weight * 0.9, length(g));
     seed = dot(cell, vec2(1.3, 2.1));
   } else {
-    // scratches — only some columns present, wobbling and broken vertically.
+    // scratches : only some columns present, wobbling and broken vertically.
     float idx = floor(r.x * density);
     float present = step(0.62, h11(idx * 3.1));
     float wob = (h21(vec2(floor(r.y * 8.0), idx)) - 0.5) * jitter * 0.03;
@@ -55,8 +55,8 @@ void main() {
     seed = idx * 1.9;
   }
 
-  // GATE — each mark blinks on a per-mark oscillator; `gate` sets how many are on
-  // (1 = all). Drive it from audio/coupling for the McLaren marks-on-the-beat.
+  // GATE : each mark blinks on a per-mark oscillator; `gate` sets how many are on
+  // (1 = all). Drive it from audio/coupling for the marks-on-the-beat.
   float flick = 0.5 + 0.5 * sin(TIME * rate + seed);
   float on = step(1.0 - gate, flick);
 

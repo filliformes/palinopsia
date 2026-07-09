@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Streak — uniform directional blur (16 taps along an angle). The utility motion-smear: unlike Smear it is not luma-gated, so it reads as camera drag rather than pixel-sort.",
+  "DESCRIPTION": "Streak : uniform directional blur (16 taps along an angle). The utility motion-smear: unlike Smear it is not luma-gated, so it reads as camera drag rather than pixel-sort.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Blur"],

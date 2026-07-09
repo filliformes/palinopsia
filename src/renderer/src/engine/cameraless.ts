@@ -1,37 +1,37 @@
-// Cameraless — the "direct-on-film" draw-hold stage (spec: docs/opsia-cameraless-spec.md,
+// Cameraless : the "direct-on-film" draw-hold stage (spec: docs/opsia-cameraless-spec.md,
 // §2–3, stage 1: draw clock + hold + boil). Runs after the Finalizer output-shape stage,
 // just before xfade/present. A DRAW CLOCK ticks at a hand-drawn frame rate (2–12 fps):
 // on a tick it copies the live graded composite into a persistent HELD frame; every
 // render frame it presents that held frame through a BOIL pass (gate weave + flutter +
 // blank leader). This manufactures the discreteness + registration jitter the smooth
-// 60 fps engine actively smooths away — the thing that makes a field read as film.
+// 60 fps engine actively smooths away : the thing that makes a field read as film.
 //
 // Two hold modes (the §2.2 fork, both offered):
-//   film-hold — re-read the LIVE composite each tick, so upstream feedback / motion keep
+//   film-hold : re-read the LIVE composite each tick, so upstream feedback / motion keep
 //               integrating underneath and you see them STEPPED (sampling a live process
 //               at a low rate). Trails should look stepped, not frozen.
-//   freeze    — capture ONCE, then only the boil animates the held cell (content frozen
+//   freeze    : capture ONCE, then only the boil animates the held cell (content frozen
 //               in the gate, still weaving). Distinct from Compositor.setFreeze (which
 //               dead-holds the WHOLE present, incl. warp/xfade) and from the Transport
 //               Shutter (a global full-freeze stop-motion).
 //
 // Self-contained GL: own program + two persistent targets. The Compositor feeds it the
 // live composite + params each frame and swaps in the returned texture. Off (hold===0)
-// is handled by the Compositor skipping the stage entirely — genuine null passthrough.
+// is handled by the Compositor skipping the stage entirely : genuine null passthrough.
 
 export interface CameralessParams {
   hold: number // 0 off · 1 film-hold · 2 freeze
   rate: number // draw fps, 1..60
-  jitter: number // 0..1 — tick-interval irregularity (hand timing)
-  boil: number // 0..1 — registration jitter (XY + micro rot/scale)
-  flutter: number // 0..1 — per-tick density/luminance pump
-  blank: number // 0..1 — probability a tick shows leader instead of the frame
+  jitter: number // 0..1 : tick-interval irregularity (hand timing)
+  boil: number // 0..1 : registration jitter (XY + micro rot/scale)
+  flutter: number // 0..1 : per-tick density/luminance pump
+  blank: number // 0..1 : probability a tick shows leader instead of the frame
   blankMode: number // 0 black · 1 white · 2 both
-  // Émulsion — the direct-on-film artifact family (print/handling layer).
-  dust: number // 0..1 — dirt/hair specks (fast reseed = the "sparkle" of dirt)
-  scratch: number // 0..1 — tramline scratches (slow reseed = they persist)
-  granule: number // 0..1 — dye granulation / pooling (coarse coloured mottle)
-  splice: number // 0..1 — rare whole-frame flash + horizontal bar
+  // Émulsion : the direct-on-film artifact family (print/handling layer).
+  dust: number // 0..1 : dirt/hair specks (fast reseed = the "sparkle" of dirt)
+  scratch: number // 0..1 : tramline scratches (slow reseed = they persist)
+  granule: number // 0..1 : dye granulation / pooling (coarse coloured mottle)
+  splice: number // 0..1 : rare whole-frame flash + horizontal bar
 }
 
 const VS = `#version 300 es
@@ -71,7 +71,7 @@ void main(){
 
   // ── Émulsion (print / handling layer), at screen space ──
   vec2 uv = vUV;
-  // dust & hair — sparse dark specks (+ rare bright emulsion pit), reseed fast.
+  // dust & hair : sparse dark specks (+ rare bright emulsion pit), reseed fast.
   if (uDust > 0.0) {
     float d = h1(floor(uv * 220.0) + uSeedFast);
     float speck = step(1.0 - uDust * 0.012, d);
@@ -79,7 +79,7 @@ void main(){
     float pit = step(1.0 - uDust * 0.004, h1(floor(uv * 180.0) + uSeedFast * 1.7));
     col.rgb = mix(col.rgb, vec3(0.95), pit);
   }
-  // tramline scratches — near-vertical, PERSISTENT across ticks (slow seed).
+  // tramline scratches : near-vertical, PERSISTENT across ticks (slow seed).
   if (uScratch > 0.0) {
     float lane = h1(vec2(floor(uv.x * 60.0), uSeedSlow));
     float on = step(1.0 - uScratch * 0.08, lane);
@@ -87,7 +87,7 @@ void main(){
     float line = smoothstep(0.0015, 0.0, abs(fract(uv.x * 60.0) - 0.5 - wob * 60.0) / 60.0);
     col.rgb = mix(col.rgb, vec3(1.0), on * line * 0.7);
   }
-  // dye granulation / pooling — clumped coloured value noise, subtractive density.
+  // dye granulation / pooling : clumped coloured value noise, subtractive density.
   if (uGranule > 0.0) {
     float clump = vnoise(uv * 23.0);
     vec3 gv = vec3(vnoise(uv * 90.0 + uSeedFast),
@@ -95,7 +95,7 @@ void main(){
                    vnoise(uv * 92.0 + uSeedFast + 7.7)) * clump;
     col.rgb *= 1.0 - uGranule * 0.35 * (gv - 0.5);
   }
-  // splice — rare whole-frame flash + a bright horizontal bar.
+  // splice : rare whole-frame flash + a bright horizontal bar.
   if (uSplice > 0.0) {
     col.rgb = mix(col.rgb, vec3(1.0), uSplice * 0.6);
     float barY = fract(uSeedFast * 0.37);
@@ -119,7 +119,7 @@ export class Cameraless {
   private acc = 0
   private next = 0
   private frozen = false
-  // Held boil uniforms — re-rolled on a tick, held between ticks.
+  // Held boil uniforms : re-rolled on a tick, held between ticks.
   private bx = 0
   private by = 0
   private brot = 0
@@ -289,14 +289,14 @@ export class Cameraless {
     this.granuleAmt = p.granule
     const isTick = this.tick(dt, p)
     if (p.hold === 2) {
-      // freeze — capture once; only the boil animates the held cell thereafter.
+      // freeze : capture once; only the boil animates the held cell thereafter.
       if (!this.frozen) {
         this.blit(srcTex, this.held!.fbo, false)
         this.frozen = true
       }
       if (isTick) this.reroll(p)
     } else {
-      // film-hold — re-read the live composite on each tick (stepped live process).
+      // film-hold : re-read the live composite on each tick (stepped live process).
       this.frozen = false
       if (isTick) {
         this.blit(srcTex, this.held!.fbo, false)

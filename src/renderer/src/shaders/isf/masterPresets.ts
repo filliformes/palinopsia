@@ -1,4 +1,4 @@
-// Master-chain presets — 20 whole-rack chains for the master bus. Applying
+// Master-chain presets : 20 whole-rack chains for the master bus. Applying
 // one replaces the chain AND states its Vibe (the pinned mastering stage):
 // the chain and the vibe are designed together; the vibe's settings merge
 // onto the locked unit without replacing it.

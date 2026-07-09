@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Wavefold — analog wavefolder on the video signal: drive the value up and repeatedly reflect it back inside [0,1], carving hard contour bands out of smooth gradients (West-coast/LZX signal folding). Luma-fold recolours by the source hue; per-channel folds tear the colour apart. Matte contour, not neon.",
-  "CREDIT": "Palinopsia (after analog wavefolders / LZX)",
+  "DESCRIPTION": "Wavefold : analog wavefolder on the video signal: drive the value up and repeatedly reflect it back inside [0,1], carving hard contour bands out of smooth gradients (West-coast/LZX signal folding). Luma-fold recolours by the source hue; per-channel folds tear the colour apart. Matte contour, not neon.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color", "Scan"],
   "INPUTS": [

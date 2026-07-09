@@ -1,6 +1,6 @@
-// External GPU output (brief §9) — Spout (Windows) / NDI (cross-platform).
+// External GPU output (brief §9) : Spout (Windows) / NDI (cross-platform).
 //
-// The renderer reads back the final composite (gl.readPixels — negligible on a
+// The renderer reads back the final composite (gl.readPixels : negligible on a
 // 4070) and sends the RGBA8 buffer here over IPC; this module forwards it to a
 // native sender. Native senders can't be bundled/tested headless, so both are
 // LAZY-LOADED optional dependencies (drop-ins, not in package.json):
@@ -16,7 +16,7 @@ type NdiSender = {
   video: (frame: { data: Buffer; xres: number; yres: number; frameRateN?: number; frameRateD?: number }) => void
   destroy?: () => void
 }
-// Our vendored Spout (DX11) N-API addon — native/spout/build/Release/spout.node.
+// Our vendored Spout (DX11) N-API addon : native/spout/build/Release/spout.node.
 type SpoutAddon = {
   open: (name: string) => boolean
   send: (pixels: Buffer, width: number, height: number) => void
@@ -44,7 +44,7 @@ async function ensureNdi(): Promise<NdiSender | null> {
     ndi = await grandiose.send({ name: 'Palinopsia' })
     return ndi
   } catch {
-    warnOnce('ndi', '[output] NDI unavailable — `npm i grandiose` (+ NDI runtime) to enable NDI output.')
+    warnOnce('ndi', '[output] NDI unavailable : `npm i grandiose` (+ NDI runtime) to enable NDI output.')
     return null
   }
 }
@@ -62,7 +62,7 @@ function ensureSpout(): SpoutAddon | null {
     spout = m.exports
     return spout
   } catch (e) {
-    warnOnce('spout', `[output] Spout unavailable — ${(e as Error).message}. Rebuild native/spout for your Electron.`)
+    warnOnce('spout', `[output] Spout unavailable : ${(e as Error).message}. Rebuild native/spout for your Electron.`)
     return null
   }
 }

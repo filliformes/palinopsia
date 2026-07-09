@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Contour — slow marching contour lines over a drifting, domain-warped noise basin. The topographic register (the disciplined nannou-sketch look): matte line-work over near-black, optional faint band fill. Asymmetric by construction.",
+  "DESCRIPTION": "Contour : slow marching contour lines over a drifting, domain-warped noise basin. The topographic register (the disciplined nannou-sketch look): matte line-work over near-black, optional faint band fill. Asymmetric by construction.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Noise", "Geometry"],

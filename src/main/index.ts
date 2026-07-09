@@ -1,7 +1,7 @@
 // Electron main entry. Creates the window and wires IPC for OSC, sessions,
 // and autosave. Forked from dataFLOU's main/index.ts, trimmed to Palinopsia's
 // surface: the heavy engine lives in the RENDERER (WebGL2 + ISF), so main is
-// pure logic + IO — OSC in/out, file I/O, and the output/OSCQuery seams that
+// pure logic + IO : OSC in/out, file I/O, and the output/OSCQuery seams that
 // later phases fill in.
 
 import {
@@ -28,13 +28,13 @@ import { OutputSender } from './output'
 import { samplePerf } from './perf'
 import * as recording from './recording'
 
-// Must run before app ready — makes opsia-media:// a privileged streaming scheme.
+// Must run before app ready : makes opsia-media:// a privileged streaming scheme.
 registerMediaScheme()
 // Ask Chromium to enable the platform HEVC decoder + encoder (HIVE live-in and
 // HIVE output both use WebCodecs HEVC).
 app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport,PlatformHEVCEncoderSupport')
 // Keep the fullscreen output window rendering when it's on a 2nd display and
-// unfocused — Windows native occlusion detection otherwise pauses it (black).
+// unfocused : Windows native occlusion detection otherwise pauses it (black).
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
 
@@ -44,12 +44,12 @@ let mainWindow: BrowserWindow | null = null
 const oscSender = new OscSender()
 // External video output (NDI, via optional native sender).
 const outputSender = new OutputSender()
-// OSC in — the instrument is PLAYED through this: Pandore/TouchOSC send here
+// OSC in : the instrument is PLAYED through this: Pandore/TouchOSC send here
 // and the renderer maps addresses onto the store (see renderer/oscInput.ts).
 const oscReceiver = new OscReceiver()
-// Modulation brain (Phase 5 port) — started idle so its tick seam exists.
+// Modulation brain (Phase 5 port) : started idle so its tick seam exists.
 const modulation = new ModulationEngine()
-// OSCQuery publisher — serves the self-describing address tree over HTTP so
+// OSCQuery publisher : serves the self-describing address tree over HTTP so
 // Pandore/dataFLOU can auto-discover every control.
 const oscquery = new OscQueryServer()
 
@@ -77,7 +77,7 @@ function createWindow(): void {
     minWidth: 1024,
     minHeight: 640,
     show: false,
-    backgroundColor: '#0a0a0a', // near-black — the instrument's canvas (brief §1)
+    backgroundColor: '#0a0a0a', // near-black : the instrument's canvas (brief §1)
     autoHideMenuBar: true,
     title: 'Palinopsia',
     webPreferences: {
@@ -90,7 +90,7 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => mainWindow?.show())
 
-  // Close intercept — ask the renderer to run its Save-before-quit modal
+  // Close intercept : ask the renderer to run its Save-before-quit modal
   // first; it replies via `app:close-proceed` which flips appQuitting and
   // re-issues close(). The second pass falls through to the OS close.
   mainWindow.on('close', (e) => {
@@ -154,13 +154,13 @@ function openOutputWindow(displayId: number, windowed = false): void {
           frame: true,
           resizable: true,
           backgroundColor: '#000000',
-          title: 'Palinopsia — Output',
+          title: 'Palinopsia : Output',
           webPreferences: {
             preload: join(__dirname, '../preload/index.js'),
             sandbox: false,
             contextIsolation: true,
             nodeIntegration: false,
-            // Never throttle — it's a background window (control has focus).
+            // Never throttle : it's a background window (control has focus).
             backgroundThrottling: false
           }
         }
@@ -172,7 +172,7 @@ function openOutputWindow(displayId: number, windowed = false): void {
           frame: false,
           fullscreen: true,
           backgroundColor: '#000000',
-          title: 'Palinopsia — Output',
+          title: 'Palinopsia : Output',
           webPreferences: {
             preload: join(__dirname, '../preload/index.js'),
             sandbox: false,
@@ -222,7 +222,7 @@ app.whenReady().then(async () => {
 
   prevRunCrashed = autosave.startAutosave().crashed
 
-  // OSC monitor — batch incoming/outgoing events and flush to the renderer
+  // OSC monitor : batch incoming/outgoing events and flush to the renderer
   // every 50ms so a control flood can't drown IPC (dataFLOU's pattern).
   let oscBuffer: OscEvent[] = []
   let oscErrBuffer: OscErrorEvent[] = []
@@ -247,7 +247,7 @@ app.whenReady().then(async () => {
   }, 50)
   app.on('before-quit', () => clearInterval(oscFlushTimer))
 
-  // Inbound OSC — buffer messages and flush to the renderer once per frame
+  // Inbound OSC : buffer messages and flush to the renderer once per frame
   // (~16ms) so a control flood can't drown IPC, but latency stays playable.
   let oscInBuffer: OscInMessage[] = []
   oscReceiver.setOnMessage((m) => {
@@ -344,7 +344,7 @@ app.whenReady().then(async () => {
     return screen.getAllDisplays().map((d, i) => ({
       id: d.id,
       label: d.label || `Display ${i + 1}`,
-      // Report NATIVE pixels (bounds are DIP — a 4K panel at 250% is 1536-wide DIP).
+      // Report NATIVE pixels (bounds are DIP : a 4K panel at 250% is 1536-wide DIP).
       width: Math.round(d.bounds.width * d.scaleFactor),
       height: Math.round(d.bounds.height * d.scaleFactor),
       isPrimary: d.id === primary

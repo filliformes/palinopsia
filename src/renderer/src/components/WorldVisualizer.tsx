@@ -1,4 +1,4 @@
-// World Visualizer — shows what a World *does*, on REAL Opsia material. It runs
+// World Visualizer : shows what a World *does*, on REAL Opsia material. It runs
 // two actual ISF generators (slot A + slot B) into textures, crossfades them by
 // a mix that a SIMULATED audio signal drives through the World's coupling (so you
 // see cut flash / gate / drift behave), then lays the Context mood (bloom · haze ·
@@ -6,7 +6,7 @@
 // on different material; drive it with a synthetic audio shape.
 //
 // The generators render through the same redirect-proxy the compositor uses, on
-// this widget's own WebGL2 context — a self-contained preview needing no audio
+// this widget's own WebGL2 context : a self-contained preview needing no audio
 // input and no live layers.
 
 import { useEffect, useRef } from 'react'
@@ -50,7 +50,7 @@ export function simAudio(
   else if (cfg.shape === 'noise') {
     const i = Math.floor(t * cfg.freqHz)
     env = hashN(i) * (1 - ph) + hashN(i + 1) * ph
-  } else env = Math.exp(-ph * 7) // pulse — percussive decay
+  } else env = Math.exp(-ph * 7) // pulse : percussive decay
   const g = cfg.gain
   const level = cfg.rhythmic ? env * g : (0.35 + 0.5 * env) * g
   const transient = cfg.rhythmic ? Math.exp(-ph * 12) * g : Math.max(0, env - 0.6) * g
@@ -64,7 +64,7 @@ export function simAudio(
 }
 
 // Replicated coupling maths (mirror of engine/coupling.ts) against a supplied
-// feature value + local state — so the preview behaves like the real engine.
+// feature value + local state : so the preview behaves like the real engine.
 function couplingMix(cp: LayerCoupling, raw: number, base: number, st: { held: number }): number {
   if (cp.mode === 'off') return base
   const tight = Math.max(0, Math.min(1, cp.tightness))
@@ -316,7 +316,7 @@ export function WorldVisualizer({
       ref={canvasRef}
       className="w-full rounded border border-border bg-black"
       style={{ aspectRatio: '16 / 9', imageRendering: 'auto' }}
-      title="World preview — simulated audio driving A/B coupling + Context mood, on real generators"
+      title="World preview : simulated audio driving A/B coupling + Context mood, on real generators"
     />
   )
 }

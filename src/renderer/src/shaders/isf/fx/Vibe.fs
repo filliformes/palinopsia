@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Vibe — the always-on end-of-chain color-mastering stage: AUTO-LEVELS (temporally smoothed frame min/max, remaps luminance to full range), gamma tone placement, pre-map luma sharpen, dither, 2–5 stop palette map, source mix-back, contrast, saturation, and SPLIT-TONE (independent shadow/highlight tints). One unit that decides the whole output's look.",
+  "DESCRIPTION": "Vibe : the always-on end-of-chain color-mastering stage: AUTO-LEVELS (temporally smoothed frame min/max, remaps luminance to full range), gamma tone placement, pre-map luma sharpen, dither, 2–5 stop palette map, source mix-back, contrast, saturation, and SPLIT-TONE (independent shadow/highlight tints). One unit that decides the whole output's look.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color", "Master"],
@@ -87,7 +87,7 @@ void main() {
   vec2 uv = isf_FragNormCoord;
 
   if (PASSINDEX == 0) {
-    // Downsampled luma with temporal smoothing — feeds auto-levels. The
+    // Downsampled luma with temporal smoothing : feeds auto-levels. The
     // 0.92 lerp keeps level estimates from pumping with flicker content.
     float l = lumaAt(uv);
     float prev = IMG_NORM_PIXEL(lumBuf, uv).r;
@@ -98,7 +98,7 @@ void main() {
   vec4 src = IMG_NORM_PIXEL(inputImage, uv);
   float l = clamp(dot(src.rgb, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
 
-  // Luma sharpen BEFORE the map — detail survives even hard 2-stop palettes.
+  // Luma sharpen BEFORE the map : detail survives even hard 2-stop palettes.
   if (sharpen > 0.001) {
     vec2 px = 1.0 / RENDERSIZE;
     vec2 cl = uv + vec2(-px.x, 0.0);

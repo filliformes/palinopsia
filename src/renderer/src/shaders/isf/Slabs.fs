@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Slabs — sparse horizontal slabs on a stepped clock, with slice-displacement jitter on a minority of bands and a single accent tint on rare cells. The slice/shuffle glitch register: stepped time (not flow), asymmetric, matte greys over near-black. Contrasts with Drift Field's continuous drift; built to be blended (difference / screen / multiply). Palinopsia seed generator.",
+  "DESCRIPTION": "Slabs : sparse horizontal slabs on a stepped clock, with slice-displacement jitter on a minority of bands and a single accent tint on rare cells. The slice/shuffle glitch register: stepped time (not flow), asymmetric, matte greys over near-black. Contrasts with Drift Field's continuous drift; built to be blended (difference / screen / multiply). Palinopsia seed generator.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Glitch", "Geometry"],
@@ -24,7 +24,7 @@ float hash(vec2 p) {
 void main() {
   vec2 uv = isf_FragNormCoord;
 
-  // Stepped clock — the glitch register moves in cuts, not flow.
+  // Stepped clock : the glitch register moves in cuts, not flow.
   float t = floor(TIME * (0.5 + rate * 5.5));
 
   float band = floor(uv.y * bands);
@@ -45,7 +45,7 @@ void main() {
   float x = fract(uv.x + disp + drift * TIME * 0.03 * (hash(vec2(band, 3.0)) - 0.5) * 2.0);
 
   // Coarse cells along the band; sparse subset lit. Chaotic bands get cell
-  // counts far outside the family — hair-thin shards or one giant slab.
+  // counts far outside the family : hair-thin shards or one giant slab.
   float cells = 5.0 + floor(hash(vec2(band, 27.0)) * 6.0);
   float cellsChaos = mix(1.0, 40.0, pow(hash(vec2(band, 61.0)), 2.0));
   cells = mix(cells, cellsChaos, isChaos);
@@ -53,7 +53,7 @@ void main() {
   float v = hash(vec2(cell * 17.0 + band * 131.0, tC));
   float lit = step(1.0 - density * mix(1.0, 1.6, isChaos), v);
 
-  // Matte grey slab values — mid-tones, never neon.
+  // Matte grey slab values : mid-tones, never neon.
   float shade = lit * (0.18 + 0.55 * hash(vec2(cell + 7.0, band)));
 
   // Chaotic bands: thin broken sub-stripes carve the slab vertically, and
@@ -68,7 +68,7 @@ void main() {
   float acc = step(1.0 - accent * 0.35, hash(vec2(band * 3.1, cell + t)));
   col = mix(col, tint.rgb * (0.25 + shade), acc * lit);
 
-  // Faint scanline signature — controlled texture, never spectacle.
+  // Faint scanline signature : controlled texture, never spectacle.
   col *= 0.94 + 0.06 * sin(uv.y * RENDERSIZE.y * 3.14159);
 
   gl_FragColor = vec4(col, 1.0);

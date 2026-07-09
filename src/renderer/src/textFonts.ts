@@ -1,10 +1,10 @@
-// Text-source font registry — the single source of truth for the Text
+// Text-source font registry : the single source of truth for the Text
 // generator's font list. Families must match the @font-face declarations in
 // styles.css exactly (all bundled OFL/Apache, no CDN). ORDER MATTERS: a slot's
 // `font` input stores an INDEX, so the original six stay first (saved sessions
 // keep their face) and new families append after.
 export const TEXT_FONTS = [
-  // Original six — indices 0-5 are persisted in sessions/scenes.
+  // Original six : indices 0-5 are persisted in sessions/scenes.
   'Inter',
   'Space Grotesk',
   'JetBrains Mono',

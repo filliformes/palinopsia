@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Byte Corrupt — bit-depth quantization with channel entanglement: values crushed to few levels, then per-block arithmetic scrambling folds channels into each other on a stepped clock. Data damage, not noise. `warp byte` bends the block grid and gives every block its own rotation / zoom / offset so the mosaic stops reading as clean squares — irregular warped fragments instead.",
+  "DESCRIPTION": "Byte Corrupt : bit-depth quantization with channel entanglement: values crushed to few levels, then per-block arithmetic scrambling folds channels into each other on a stepped clock. Data damage, not noise. `warp byte` bends the block grid and gives every block its own rotation / zoom / offset so the mosaic stops reading as clean squares : irregular warped fragments instead.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],
@@ -25,7 +25,7 @@ void main() {
   float t = floor(TIME * (0.5 + rate * 7.5));
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
 
-  // CHAOS: a minority of regions abandon the square grid entirely — their
+  // CHAOS: a minority of regions abandon the square grid entirely : their
   // cells stretch into slivers/bars (random aspect), and their CONTENT is
   // deformed: sheared, smeared, or melted sampling instead of clean squares.
   vec2 gridN = vec2(blocks * aspect, blocks);
@@ -62,7 +62,7 @@ void main() {
   }
 
   // WARP BYTE per-block interior: each block rotates + zooms + offsets its own
-  // content around its centre, so no two blocks warp the same way — the interiors
+  // content around its centre, so no two blocks warp the same way : the interiors
   // read as scattered warped fragments rather than clean square crops.
   if (warpByte > 0.001) {
     vec2 lc = fract(domUV * grid) - 0.5;                        // -0.5..0.5 in block

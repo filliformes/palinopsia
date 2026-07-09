@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Light Trails — Lumen's max()-blend Trails: keeps max(current, previous·decay) per channel, so the BRIGHTEST pixels persist and streak — long-exposure light-painting, distinct from the decay-mix feedback (which converges back to the fresh frame). decay 1 = permanent trails; below 1 they fade. Optional drift smears the trail as it fades.",
-  "CREDIT": "Palinopsia (after Lumen Trails)",
+  "DESCRIPTION": "Light Trails : Lumen's max()-blend Trails: keeps max(current, previous·decay) per channel, so the BRIGHTEST pixels persist and streak : long-exposure light-painting, distinct from the decay-mix feedback (which converges back to the fresh frame). decay 1 = permanent trails; below 1 they fade. Optional drift smears the trail as it fades.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Feedback"],
   "INPUTS": [

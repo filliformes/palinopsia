@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Finalizer — the last always-on master stage after Context: a final 'EQ/compressor' for the whole output. LEVELS (input black/white + gamma + per-channel R/G/B gain + alpha, Premiere-style) for the finishing grade, a round of SHARPEN, and the physically-modelled GRAIN (film / digital sensor / CRT / VHS) laid over everything so the whole image shares one grain structure. All neutral at defaults.",
+  "DESCRIPTION": "Finalizer : the last always-on master stage after Context: a final 'EQ/compressor' for the whole output. LEVELS (input black/white + gamma + per-channel R/G/B gain + alpha, Premiere-style) for the finishing grade, a round of SHARPEN, and the physically-modelled GRAIN (film / digital sensor / CRT / VHS) laid over everything so the whole image shares one grain structure. All neutral at defaults.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color", "Master"],
@@ -48,7 +48,7 @@
   ]
 }*/
 // NOTE: outShape / outBg* AND film* are applied NATIVELY as compositor output
-// stages (engine/outputShape.ts, engine/cameraless.ts) — outShape needs the
+// stages (engine/outputShape.ts, engine/cameraless.ts) : outShape needs the
 // Background-slab texture as the outside fill, and film* needs frame-hold state +
 // a fixed pipeline slot, neither reachable from ISF. Declared here only so the
 // auto-UI shows them in the Finalizer; this shader ignores them.
@@ -105,12 +105,11 @@ void main() {
   }
 
   // ── ANAGLYPH 3D (red/cyan stereoscopy) ──────────────────────────────
-  //    Homage to Maxime Corbeil-Perron's archaeomedia stereoscopy (Imaginary
-  //    Optics, Phosphènes): a >century-old 3D medium, generated digitally.
+  //    A >century-old 3D medium, generated digitally.
   //    Depth is read from luminance (bright = near, invertible); the RED eye is
   //    horizontally displaced from the CYAN eye by a disparity ∝ depth, so under
   //    red/cyan glasses the flat frame gains relief. Convergence sets the plane
-  //    that sits ON the screen — push it negative and forms pop OUT toward you.
+  //    that sits ON the screen : push it negative and forms pop OUT toward you.
   if (stereo > 0) {
     float depth = clamp(dot(c, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
     if (stereoInvert) depth = 1.0 - depth;
@@ -119,7 +118,7 @@ void main() {
     vec3 leftEye = gradePix(uv - vec2(sep, 0.0));   // red channel
     vec3 rightEye = gradePix(uv + vec2(sep, 0.0));  // cyan channels
     if (stereo == 2) {
-      // Gray/half-colour anaglyph — feed luma to each eye (less retinal rivalry,
+      // Gray/half-colour anaglyph : feed luma to each eye (less retinal rivalry,
       // classic for abstract relief where hue would fight the filters).
       float lL = dot(leftEye, vec3(0.299, 0.587, 0.114));
       float lR = dot(rightEye, vec3(0.299, 0.587, 0.114));

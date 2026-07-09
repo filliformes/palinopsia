@@ -1,4 +1,4 @@
-// PromptModal — tiny centred modal for the two flows the preset system
+// PromptModal : tiny centred modal for the two flows the preset system
 // needs: a text prompt ("Preset name?") and a yes/no confirm ("Are you sure
 // you want to delete X?"). Enter confirms, Escape cancels.
 

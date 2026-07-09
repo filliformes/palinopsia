@@ -1,4 +1,4 @@
-// World page (W) — the diegesis editor. A full-page takeover: pick a World from
+// World page (W) : the diegesis editor. A full-page takeover: pick a World from
 // the bank (built-ins + your saved ones), edit its relations (A/B coupling ·
 // Context mood · audio routing), and apply it to the live composition. Editing
 // the ACTIVE world updates the composite in real time.
@@ -17,19 +17,19 @@ const SIM_SHAPES: SimAudio['shape'][] = ['pulse', 'sine', 'ramp', 'noise']
 
 const COUPLING_MODES: CouplingMode[] = ['off', 'lean', 'hocket', 'cut', 'gate', 'drift']
 const CONTEXT_KEYS: Array<{ k: string; label: string; hint: string }> = [
-  { k: 'trails', label: 'trails', hint: 'Temporal colour bleed — past frames linger and drift into the distance.' },
-  { k: 'blur', label: 'blur', hint: 'Soft spatial blur — takes the edge off, pushes things back in space.' },
-  { k: 'bloom', label: 'bloom', hint: 'Highlights glow / bleed light — dreamier, more luminous.' },
+  { k: 'trails', label: 'trails', hint: 'Temporal colour bleed : past frames linger and drift into the distance.' },
+  { k: 'blur', label: 'blur', hint: 'Soft spatial blur : takes the edge off, pushes things back in space.' },
+  { k: 'bloom', label: 'bloom', hint: 'Highlights glow / bleed light : dreamier, more luminous.' },
   { k: 'depth', label: 'depth', hint: 'Vignette + aerial recession that seats the image in a volume.' },
-  { k: 'haze', label: 'haze', hint: 'Atmospheric veil toward the atmosphere colour — distance, air.' }
+  { k: 'haze', label: 'haze', hint: 'Atmospheric veil toward the atmosphere colour : distance, air.' }
 ]
 const COUPLING_INFO: Record<string, string> = {
-  off: 'off — the two voices are independent (no audio binding)',
-  lean: 'lean — audio gently pushes the A/B balance toward B (continuous)',
-  hocket: 'hocket — audio flips the balance A↔B (percussive, alternating)',
-  cut: 'cut — a transient flashes to B, then releases (on-beat, punchy)',
-  gate: 'gate — B while loud, A while quiet (a threshold)',
-  drift: 'drift — slow momentum follow, sharing direction not shape'
+  off: 'off : the two voices are independent (no audio binding)',
+  lean: 'lean : audio gently pushes the A/B balance toward B (continuous)',
+  hocket: 'hocket : audio flips the balance A↔B (percussive, alternating)',
+  cut: 'cut : a transient flashes to B, then releases (on-beat, punchy)',
+  gate: 'gate : B while loud, A while quiet (a threshold)',
+  drift: 'drift : slow momentum follow, sharing direction not shape'
 }
 
 export function WorldPage(): JSX.Element {
@@ -68,7 +68,7 @@ export function WorldPage(): JSX.Element {
           ◵ World
         </span>
         <span className="font-mono text-[10px] text-muted">
-          diegesis — the proposed world biasing coupling · Context · audio routing
+          diegesis : the proposed world biasing coupling · Context · audio routing
         </span>
         <div className="flex-1" />
         <button className="btn text-[12px]" onClick={() => close(false)} title="Close (W / Esc)">
@@ -146,7 +146,7 @@ export function WorldPage(): JSX.Element {
             </button>
             {w.builtin && (
               <span className="font-mono text-[10px] text-muted">
-                built-in — edits are session-only; “+ New” to keep your own
+                built-in : edits are session-only; “+ New” to keep your own
               </span>
             )}
           </div>
@@ -160,7 +160,7 @@ export function WorldPage(): JSX.Element {
           <div className="grid min-h-0 max-w-6xl flex-1 grid-cols-[340px_minmax(0,1fr)] gap-6">
            <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
             {/* Coupling */}
-            <Section title="A/B Coupling — how the two voices bond">
+            <Section title="A/B Coupling : how the two voices bond">
               <SelRow label="mode" value={w.coupling.mode} options={COUPLING_MODES}
                 title={COUPLING_INFO[w.coupling.mode] ?? 'How audio binds the layer’s A and B voices in time.'}
                 onChange={(v) => setCoupling({ mode: v as CouplingMode })} />
@@ -168,15 +168,15 @@ export function WorldPage(): JSX.Element {
                 title="Which audio feature drives the coupling (level, flux, transient, centroid, band, pitch)."
                 onChange={(v) => setCoupling({ feature: v as AudioFeature })} />
               <SlideRow label="amount" value={w.coupling.amount}
-                title="Coupling depth — how far the audio can swing the A/B balance (0 = none)."
+                title="Coupling depth : how far the audio can swing the A/B balance (0 = none)."
                 onChange={(v) => setCoupling({ amount: v })} />
               <SlideRow label="tightness" value={w.coupling.tightness}
-                title="Response sharpness — vestigial/loose (0) ↔ obvious/snappy (1). Shapes cut release, gate edge, drift speed."
+                title="Response sharpness : vestigial/loose (0) ↔ obvious/snappy (1). Shapes cut release, gate edge, drift speed."
                 onChange={(v) => setCoupling({ tightness: v })} />
             </Section>
 
             {/* Context mood */}
-            <Section title="Context mood — depth finalizer (safe bands)">
+            <Section title="Context mood : depth finalizer (safe bands)">
               {CONTEXT_KEYS.map(({ k, label, hint }) => (
                 <SlideRow key={k} label={label} value={w.context[k] ?? 0} title={hint}
                   onChange={(v) => setContext(k, v)} />
@@ -184,7 +184,7 @@ export function WorldPage(): JSX.Element {
             </Section>
 
             {/* Audio routing */}
-            <Section title="Audio routing — a default audio modulator (slot M8)">
+            <Section title="Audio routing : a default audio modulator (slot M8)">
               <SelRow
                 label="target"
                 value={w.autoMod?.target ?? 'none'}
@@ -214,9 +214,9 @@ export function WorldPage(): JSX.Element {
 
            </div>
 
-           {/* right column — compact Visualizer + audio driver + full-size live-code */}
+           {/* right column : compact Visualizer + audio driver + full-size live-code */}
            <div className="flex min-h-0 flex-col gap-3 overflow-hidden">
-              <Section title="World Visualizer — real generators · simulated audio · A/B">
+              <Section title="World Visualizer : real generators · simulated audio · A/B">
                 {/* Capped width so the whole page fits without scrolling; the
                     live-code editor below keeps its full height. */}
                 <div className="mx-auto w-full max-w-[380px]">
@@ -310,7 +310,7 @@ export function WorldPage(): JSX.Element {
                   </div>
                 </div>
               </Section>
-              <Section title="Live code (JSON) — edit, then Apply">
+              <Section title="Live code (JSON) : edit, then Apply">
                 <JsonEditor world={w} onApply={(patch) => updateWorld(w.id, patch)} />
               </Section>
             </div>
@@ -397,7 +397,7 @@ function JsonEditor({
   )
 }
 
-// ── VU meter — mirrors the simulated-audio level the visualizer sees ─────
+// ── VU meter : mirrors the simulated-audio level the visualizer sees ─────
 function VuMeter({ audio }: { audio: SimAudio }): JSX.Element {
   const barRef = useRef<HTMLDivElement | null>(null)
   const flashRef = useRef<HTMLDivElement | null>(null)

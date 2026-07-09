@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Congeal — a self-referential feedback field (Signal Culture Maelstrom/Frame-Buffer lineage): sparse bright seeds are injected, then the persistent buffer resamples a domain-warped, decayed copy of itself each frame, so material congeals into slow drifting masses and dissolves. Matte, near-black, disciplined decay (brief §1).",
-  "CREDIT": "Palinopsia (after Signal Culture feedback apps)",
+  "DESCRIPTION": "Congeal : a self-referential feedback field (Signal Culture Maelstrom/Frame-Buffer lineage): sparse bright seeds are injected, then the persistent buffer resamples a domain-warped, decayed copy of itself each frame, so material congeals into slow drifting masses and dissolves. Matte, near-black, disciplined decay (brief §1).",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Feedback"],
   "INPUTS": [
@@ -34,7 +34,7 @@ void main() {
 
   if (PASSINDEX == 0) {
     float t = TIME * rate;
-    // Domain-warp the lookup into the previous frame — this is what makes it
+    // Domain-warp the lookup into the previous frame : this is what makes it
     // congeal and drift rather than just fade.
     vec2 flow = vec2(
       vnoise(uv * scale + vec2(t * 0.3, 0.0)),

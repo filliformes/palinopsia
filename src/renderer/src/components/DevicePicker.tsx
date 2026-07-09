@@ -1,4 +1,4 @@
-// DevicePicker — a modal list of the machine's video input devices (built-in
+// DevicePicker : a modal list of the machine's video input devices (built-in
 // camera, USB cameras, capture cards, a DJI Osmo in webcam mode, …) for the
 // "Live Input" source. Labels only show once camera permission is granted, so
 // we prime it with a throwaway getUserMedia before enumerating.

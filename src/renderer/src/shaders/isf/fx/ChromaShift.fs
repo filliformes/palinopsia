@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Chroma Shift — RGB split along a chosen axis. The restrained chromatic-aberration signature (brief §1): subtle at default, never spectacle.",
+  "DESCRIPTION": "Chroma Shift : RGB split along a chosen axis. The restrained chromatic-aberration signature (brief §1): subtle at default, never spectacle.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],

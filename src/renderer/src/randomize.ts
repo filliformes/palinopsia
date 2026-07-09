@@ -1,4 +1,4 @@
-// Randomize — the Rhodopsin button, done right (brief §7). STRUCTURAL:
+// Randomize : the Rhodopsin button, done right (brief §7). STRUCTURAL:
 // each scope doesn't just re-roll parameters, it (re)builds its targets —
 // picks generators per layer, builds FX racks of random length, enables a
 // random number of modulators and rolls a fresh mod-matrix. One press =
@@ -50,8 +50,8 @@ const range = (lo: number, hi: number): number => lo + rnd() * (hi - lo)
 // dither, sharpen, blur, trails, atmosphere hue) still randomizes freely.
 const FINISHING_SAFE: Record<string, Record<string, [number, number]>> = {
   'fx-finalizer': {
-    black: [0.0, 0.04], // small shadow lift only — never a hard crush
-    white: [0.95, 1.0], // stay near full white — never dim the highlights
+    black: [0.0, 0.04], // small shadow lift only : never a hard crush
+    white: [0.95, 1.0], // stay near full white : never dim the highlights
     gamma: [0.9, 1.15], // gentle either way
     rGain: [0.92, 1.1], // near-unity per-channel gain (mild tint, stable luma)
     gGain: [0.92, 1.1],
@@ -61,13 +61,13 @@ const FINISHING_SAFE: Record<string, Record<string, [number, number]>> = {
   'fx-vibe': {
     gamma: [0.9, 1.15],
     contrast: [0.9, 1.25],
-    autoLevel: [0.0, 0.5] // auto-levels normalizes — safe, but keep it moderate
+    autoLevel: [0.0, 0.5] // auto-levels normalizes : safe, but keep it moderate
   },
   'fx-context': {
     bloom: [0.0, 0.35], // capped so highlights don't bloom to white
     lightGlow: [0.0, 0.2],
-    haze: [0.0, 0.28], // haze washes toward its colour — keep it light
-    depth: [0.0, 0.5] // depth vignette darkens edges — cap it
+    haze: [0.0, 0.28], // haze washes toward its colour : keep it light
+    depth: [0.0, 0.5] // depth vignette darkens edges : cap it
   }
 }
 const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(rnd() * arr.length)]
@@ -77,7 +77,7 @@ const uid = (): string =>
     ? crypto.randomUUID()
     : Math.random().toString(36).slice(2)
 
-// Restrained color register: any hue, bounded saturation/value — matte.
+// Restrained color register: any hue, bounded saturation/value : matte.
 function randomColor(alpha: number): number[] {
   const h = rnd() * 360
   const s = range(0.35, 0.85)
@@ -136,7 +136,7 @@ function randomizeOneInput(
   }
 }
 
-/** Randomize every input of one shader within curated ranges — used by
+/** Randomize every input of one shader within curated ranges : used by
  *  Randomize scopes and by the Inspector's ⚄ button. */
 // Params Randomize must never touch (like the Text source): the Context PBR
 // surface is a deliberate staging decision, not a texture to dice-roll.
@@ -156,7 +156,7 @@ export function randomizeInputs(
 }
 
 // ── Structural builders ───────────────────────────────────────────────
-// Native generators (Text) stay out of the random pool — they need user intent
+// Native generators (Text) stay out of the random pool : they need user intent
 // (a string, a sidechain), so a random draw would just say "OPSIA" at strangers.
 const RANDOM_GENERATORS = GENERATORS.filter((g) => !g.native)
 function randomSlot(): SourceSlot {
@@ -203,7 +203,7 @@ function randomRack(
     const s = pool[idx]
     pool.splice(idx, 1)
     if (s.native) {
-      if (convUsed >= 1) continue // heavy — at most one convolution node per rack
+      if (convUsed >= 1) continue // heavy : at most one convolution node per rack
       convUsed++
     }
     picked.push(s)
@@ -302,7 +302,7 @@ export function collectFloatTargets(c: CompositionState): ModTarget[] {
     addFxTargets(l.sourceBFx, { kind: 'sourceB', layer: li })
     addFxTargets(l.fx, { kind: 'layer', layer: li })
   })
-  // Context is deliberately excluded from random modulation targets — it's the
+  // Context is deliberately excluded from random modulation targets : it's the
   // depth finalizer and too powerful to be re-rolled by the Randomizer.
   addFxTargets(c.master.filter((f) => f.shaderId !== 'fx-context'), { kind: 'master' })
   return out
@@ -347,11 +347,11 @@ const BLENDS = [
   'normal', 'add', 'subtract', 'multiply', 'screen', 'overlay', 'softlight',
   'hardlight', 'darken', 'lighten', 'difference', 'exclusion', 'wrap'
 ] as const
-// Activation odds by layer index — a full stack is possible, a duo is common.
+// Activation odds by layer index : a full stack is possible, a duo is common.
 const LAYER_ACTIVE_P = [0.95, 0.7, 0.45, 0.25]
 
 /** Structural randomize of ONE layer (the layer dice / context-menu action):
- *  fresh source(s), fresh racks, blend/feedback — always active. OPACITY is the
+ *  fresh source(s), fresh racks, blend/feedback : always active. OPACITY is the
  *  player's mix decision and survives the dice untouched. */
 export function randomizeSingleLayer(l: LayerState): LayerState {
   const withB = chance(0.25)
@@ -371,7 +371,7 @@ export function randomizeSingleLayer(l: LayerState): LayerState {
   }
 }
 
-/** Re-roll the Background slab (its own dice — the GLOBAL Randomize never
+/** Re-roll the Background slab (its own dice : the GLOBAL Randomize never
  *  touches the background: the ground stays put while the layers churn).
  *  Draws from the curated background source set; keeps opacity + speed. */
 export function randomizeBackground(cur: BackgroundState | undefined): BackgroundState {
@@ -389,7 +389,7 @@ export function randomizeBackground(cur: BackgroundState | undefined): Backgroun
  *  button lands on a different living one-layer scene each time. */
 export function seedRandomStart(base: CompositionState): CompositionState {
   let l0 = randomizeSingleLayer(base.layers[0])
-  // Guarantee some treatment — never open on a bare, unprocessed source.
+  // Guarantee some treatment : never open on a bare, unprocessed source.
   if (l0.sourceAFx.length + l0.sourceBFx.length + l0.fx.length === 0) {
     l0 = { ...l0, sourceAFx: randomRack([0, 1]) } // exactly one
   }
@@ -417,10 +417,10 @@ function randomizeStructural(
 ): CompositionState {
   let next = c
 
-  // Source PARAMETERS only — keep the chosen generators, re-roll their ISF
+  // Source PARAMETERS only : keep the chosen generators, re-roll their ISF
   // inputs within curated ranges (unlike 'sources', which picks new ones).
   // Text is never touched by a global Randomize (its string / font / layout are
-  // user intent) — only its own Inspector ⚄ re-rolls it.
+  // user intent) : only its own Inspector ⚄ re-rolls it.
   const paramSlot = (s: SourceSlot | null): SourceSlot | null =>
     s && s.shaderId && s.shaderId !== 'gen-text'
       ? { ...s, inputs: randomizeInputs(s.shaderId, s.inputs) }
@@ -436,11 +436,11 @@ function randomizeStructural(
     }
   }
 
-  // A slot carries a real source (generator OR video/capture) — used to gate FX.
+  // A slot carries a real source (generator OR video/capture) : used to gate FX.
   const slotActive = (s: SourceSlot | null | undefined): boolean =>
     !!s && s.kind !== 'none' && (s.kind !== 'generator' || !!s.shaderId)
 
-  // Source FX racks only — new random chains over whatever sources exist.
+  // Source FX racks only : new random chains over whatever sources exist.
   if (scope === 'sourcefxonly') {
     return {
       ...c,
@@ -463,10 +463,10 @@ function randomizeStructural(
     }
   }
 
-  // Finishing — re-roll the three pinned finalizers' params (Vibe · Context ·
+  // Finishing : re-roll the three pinned finalizers' params (Vibe · Context ·
   // Finalizer). CONTROLLED: the brightness-critical params (levels, gamma,
   // gains, bloom, haze) are held in tight neutral bands so the result can never
-  // come out crushed-black or blown-out — only the "look" params roam freely.
+  // come out crushed-black or blown-out : only the "look" params roam freely.
   if (scope === 'finishing') {
     return {
       ...c,
@@ -527,7 +527,7 @@ function randomizeStructural(
           feedback: hasSource ? chance(0.3) : false,
           feedbackAmount: range(0.3, 0.8),
           sourceMix: layer.sourceB?.shaderId ? range(0.2, 0.8) : layer.sourceMix,
-          speed: range(0.5, 1.5) // gentle — extreme speeds are a manual move
+          speed: range(0.5, 1.5) // gentle : extreme speeds are a manual move
         }
       }
       return layer
@@ -540,7 +540,7 @@ function randomizeStructural(
   }
 
   if (doMaster) {
-    // Both pinned finalizers survive every randomize untouched — the Vibe
+    // Both pinned finalizers survive every randomize untouched : the Vibe
     // Palette is the user's look, and Context (depth) is too intense to re-roll.
     // Threshold is excluded from the MASTER pool: on a whole near-black
     // composition it can gate the entire output to black (the black-window
@@ -563,7 +563,7 @@ function randomizeStructural(
     // sources/FX exist at this point.
     const enabledCount = 2 + drawCount([0.25, 0.35, 0.3, 0.1]) // 2..5
     // Slot 8 (WORLD_AUTOMOD_SLOT) is reserved for the active World's audio
-    // routing — leave it out of the randomizer so a World's bond survives.
+    // routing : leave it out of the randomizer so a World's bond survives.
     const slots = [0, 1, 2, 3, 4, 5, 6, 7].filter((s) => s !== WORLD_AUTOMOD_SLOT)
     for (let i = slots.length - 1; i > 0; i--) {
       const j = Math.floor(rnd() * (i + 1))
@@ -656,7 +656,7 @@ function jitterSlot(slot: SourceSlot | null, amount: number): SourceSlot | null 
 function jitterFxArray(fx: FxInstance[], amount: number): FxInstance[] {
   return fx.map((f) => {
     if (!f.shaderId) return f
-    // Locked finalizers (Vibe/Context) are brightness-critical — nudge gently.
+    // Locked finalizers (Vibe/Context) are brightness-critical : nudge gently.
     const amt = f.locked ? amount * 0.4 : amount
     return {
       ...f,
@@ -689,7 +689,7 @@ function jitterMods(mods: ModulatorConfig[], amount: number): ModulatorConfig[] 
   }))
 }
 
-// Which broad areas a scope disturbs — so the intensity walk only nudges the
+// Which broad areas a scope disturbs : so the intensity walk only nudges the
 // same parts the full randomize would have touched.
 function scopeAreas(scope: RandomizeScope): { layers: boolean; master: boolean; mods: boolean } {
   return {
@@ -708,8 +708,8 @@ function scopeAreas(scope: RandomizeScope): { layers: boolean; master: boolean; 
 
 /**
  * Randomize the composition for a scope at a given INTENSITY (0..1).
- *  - 1 (100%): the full structural randomize — new sources / FX / mods.
- *  - <1: a "random walk" — each unit keeps its structure with probability
+ *  - 1 (100%): the full structural randomize : new sources / FX / mods.
+ *  - <1: a "random walk" : each unit keeps its structure with probability
  *    (1 − intensity) and is merely nudged (params jittered by `intensity`);
  *    otherwise it takes the fresh structural draw. Low % = a gentle drift from
  *    the current scene; high % approaches a full re-roll.
@@ -739,7 +739,7 @@ export function randomizeComposition(
 }
 
 /**
- * VARIATION — a fresh variant of `base` at distance `amount` (0.001..1). Keeps
+ * VARIATION : a fresh variant of `base` at distance `amount` (0.001..1). Keeps
  * the entire structure fixed (same sources, FX, blends, mod assignments) and
  * nudges every continuous value around the baseline. Re-running with the same
  * baseline yields siblings at the same spread; larger amount = bolder variants.

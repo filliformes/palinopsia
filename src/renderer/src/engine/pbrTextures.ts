@@ -1,7 +1,7 @@
-// PBR material library for the Context finalizer's surface mapping — the
+// PBR material library for the Context finalizer's surface mapping : the
 // whole composition "projected" onto a physical material (crumpled paper,
 // bark, sand…). 30 CC0 material sets from ambientcg.com, shipped as 1K JPGs
-// in the renderer's public dir (pbr/<AssetID>/{normal,height,ao}.jpg — AO is
+// in the renderer's public dir (pbr/<AssetID>/{normal,height,ao}.jpg : AO is
 // optional, some sets don't publish one).
 //
 // Maps load LAZILY: nothing is fetched until a material is first selected;
@@ -17,7 +17,7 @@ export interface PbrMaterial {
 }
 
 // ORDER IS THE ENUM: Context.fs `pbrTexture` VALUES 1..30 index into this
-// list (0 = off). Append only — saved sessions store the index.
+// list (0 = off). Append only : saved sessions store the index.
 export const PBR_MATERIALS: PbrMaterial[] = [
   { id: 'Paper001', name: 'paper crumpled' },
   { id: 'Paper005', name: 'paper rough' },
@@ -67,7 +67,7 @@ export class PbrLib {
   private owned: WebGLTexture[] = []
 
   constructor(private gl: WebGL2RenderingContext) {
-    // Neutral 1×1 maps: flat normal (128,128,255), mid height, full AO — the
+    // Neutral 1×1 maps: flat normal (128,128,255), mid height, full AO : the
     // shader normalizes against the flat normal, so these are a passthrough.
     this.neutral = {
       normal: this.solid([128, 128, 255, 255]),
@@ -98,7 +98,7 @@ export class PbrLib {
     const [normal, height, ao] = await Promise.all([
       this.fetchTex(`${base}normal.jpg`, this.neutral.normal),
       this.fetchTex(`${base}height.jpg`, this.neutral.height),
-      this.fetchTex(`${base}ao.jpg`, this.neutral.ao) // optional — neutral if absent
+      this.fetchTex(`${base}ao.jpg`, this.neutral.ao) // optional : neutral if absent
     ])
     entry.maps = { normal, height, ao }
   }

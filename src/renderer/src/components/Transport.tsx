@@ -1,8 +1,8 @@
-// Transport bar (brief §10.6): clock/BPM (synced to Pandore over OSC later)
+// Transport bar (brief): clock/BPM (synced to Pandore over OSC later)
 // and the Randomize control. The chevron SELECTS a mode (shown in full on
-// the button); pressing the button FIRES the selected mode — so you always
+// the button); pressing the button FIRES the selected mode : so you always
 // know which randomize you're about to play. Every draw comes from curated
-// aesthetic ranges (brief §7) — the taste layer, not raw min/max.
+// aesthetic ranges (brief) : the taste layer, not raw min/max.
 
 import { useEffect, useRef, useState } from 'react'
 import { randomizeMetaKnobs } from '../metaSmooth'
@@ -26,7 +26,7 @@ const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
 
 // Meta is a UI-layer action (drives the knob smoother); everything else is a
 // pure composition transform through the store. `intensity` 1 = full re-roll,
-// <1 = a walk from the current scene (Meta ignores it — it always re-rolls).
+// <1 = a walk from the current scene (Meta ignores it : it always re-rolls).
 function fireRandomize(scope: RandomizeScope, intensity: number): void {
   if (scope === 'meta') randomizeMetaKnobs()
   else useStore.getState().randomize(scope, intensity)
@@ -144,7 +144,7 @@ export function Transport(): JSX.Element {
         </div>
       </div>
 
-      {/* Global speed — scales every visual clock, 1/64×…64× (log). */}
+      {/* Global speed : scales every visual clock, 1/64×…64× (log). */}
       <div className="flex items-center gap-2">
         <span className="font-mono text-[10px] text-muted">SPEED</span>
         <input
@@ -156,12 +156,12 @@ export function Transport(): JSX.Element {
           onChange={(e) => setGlobalSpeed(Math.pow(2, Number(e.target.value)))}
           onDoubleClick={() => setGlobalSpeed(1)}
           className="w-28 accent-accent"
-          title={`Global speed ${fmtSpeed(globalSpeed)} — double-click to reset to 1×`}
+          title={`Global speed ${fmtSpeed(globalSpeed)} : double-click to reset to 1×`}
         />
         <span className="w-9 shrink-0 font-mono text-[10px] text-muted">{fmtSpeed(globalSpeed)}</span>
       </div>
 
-      {/* Morph — scene recalls & Randomize crossfade over this time. */}
+      {/* Morph : scene recalls & Randomize crossfade over this time. */}
       <div className="flex items-center gap-2">
         <span className="font-mono text-[10px] text-muted">MORPH</span>
         <input
@@ -173,12 +173,12 @@ export function Transport(): JSX.Element {
           onChange={(e) => setMorphMs(tToMs(Number(e.target.value)))}
           onDoubleClick={() => setMorphMs(1000)}
           className="w-24 accent-accent"
-          title={`Scene / Randomize morph ${fmtMorph(morphMs)} — double-click for 1s`}
+          title={`Scene / Randomize morph ${fmtMorph(morphMs)} : double-click for 1s`}
         />
         <span className="w-11 shrink-0 font-mono text-[10px] text-muted">{fmtMorph(morphMs)}</span>
       </div>
 
-      {/* World / diegesis — the active "proposed world" biases coupling + Context
+      {/* World / diegesis : the active "proposed world" biases coupling + Context
           mood + audio routing. The ⧉ button opens the World editor (also W). */}
       <div className="flex items-center gap-1.5">
         <span className="font-mono text-[10px] text-muted">WORLD</span>
@@ -203,7 +203,7 @@ export function Transport(): JSX.Element {
         </button>
       </div>
 
-      {/* Seq + Proximity — nudged right of the World block so they read as their
+      {/* Seq + Proximity : nudged right of the World block so they read as their
           own macro group, detached from the World section. */}
       <div className="ml-5 flex items-center gap-3">
         <button
@@ -217,7 +217,7 @@ export function Transport(): JSX.Element {
         >
           {seqRunning ? '▶ Seq' : 'Seq'}
         </button>
-        {/* Proximity (Field macro) — one knob places the image in a depth zone,
+        {/* Proximity (Field macro) : one knob places the image in a depth zone,
             far/vista ↔ close/personal, by pushing the Context mood. */}
         <div className="flex items-center gap-1.5">
           <span className="font-mono text-[10px] text-muted">PROX</span>
@@ -230,7 +230,7 @@ export function Transport(): JSX.Element {
             onChange={(e) => setProximity(Number(e.target.value))}
             onDoubleClick={() => setProximity(0.5)}
             className="w-20 accent-accent"
-            title={`Proximity ${proximity < 0.48 ? 'far' : proximity > 0.52 ? 'close' : 'neutral'} — vista ↔ personal (double-click: neutral)`}
+            title={`Proximity ${proximity < 0.48 ? 'far' : proximity > 0.52 ? 'close' : 'neutral'} : vista ↔ personal (double-click: neutral)`}
           />
           <button
             onClick={() => setProximityAudio(!proximityAudio)}
@@ -242,33 +242,33 @@ export function Transport(): JSX.Element {
             ◑
           </button>
         </div>
-        {/* Field macros — spatial-material globals (0.5 = neutral). */}
+        {/* Field macros : spatial-material globals (0.5 = neutral). */}
         <MacroKnob label="DENS" value={density} onChange={setDensity}
-          title="Density — sparse ↔ dense (fades upper layers / fills them in). 0.5 neutral · double-click resets" />
+          title="Density : sparse ↔ dense (fades upper layers / fills them in). 0.5 neutral · double-click resets" />
         <MacroKnob label="G↔T" value={gestureTexture} onChange={setGestureTexture}
-          title="Gesture ↔ Texture — clean directional (sharpen) ↔ internalised churn (trails). 0.5 neutral" />
+          title="Gesture ↔ Texture : clean directional (sharpen) ↔ internalised churn (trails). 0.5 neutral" />
         <MacroKnob label="COAL" value={coalesce} onChange={setCoalesce}
-          title="Coalesce — grain (dither) ↔ mass (blur/smooth). 0.5 neutral" />
-        {/* Corbeil-Perron temperament controls — 0 = off (double-click resets). */}
+          title="Coalesce : grain (dither) ↔ mass (blur/smooth). 0.5 neutral" />
+        {/* Temperament controls : 0 = off (double-click resets). */}
         <MacroKnob label="TONE" value={tonicity} onChange={setTonicity} neutral={0}
-          title="Tonicity — tonal/harmonic audio pulls colour in, noise pulls toward black-and-white (needs Audio on). 0 = off · double-click resets. Homage to Corbeil-Perron §3.10" />
+          title="Tonicity : tonal/harmonic audio pulls colour in, noise pulls toward black-and-white (needs Audio on). 0 = off · double-click resets." />
         <MacroKnob label="SHUT" value={shutter} onChange={setShutter} neutral={0}
-          title="Shutter — GLOBAL full-freeze stop-motion: dead-holds the whole present, then jumps (24fps → 2fps). 0 = off. For a filmic hold with gate-weave + materiality (feedback keeps running underneath), use Finishing → film hold (Cameraless) instead. §1.7" />
+          title="Shutter : GLOBAL full-freeze stop-motion: dead-holds the whole present, then jumps (24fps → 2fps). 0 = off. For a filmic hold with gate-weave + materiality (feedback keeps running underneath), use Finishing → film hold (Cameraless) instead." />
         <MacroKnob label="DRIFT" value={drift} onChange={setDrift} neutral={0}
-          title="Drift — slow analog-instability wander over the grade + rare 'accidents'. 0 = off. Homage to Corbeil-Perron §1.8" />
+          title="Drift : slow analog-instability wander over the grade + rare 'accidents'. 0 = off." />
         <MacroKnob label="SUPER" value={superFlicker} onChange={setSuperFlicker} neutral={0}
-          title="Superimposition flicker — Brakhage's hypnagogic strobe: cross-cuts which layer shows on the drawn cadence (rate follows Cameraless film hold). 0 = off. §5.2" />
+          title="Superimposition flicker : a hypnagogic strobe: cross-cuts which layer shows on the drawn cadence (rate follows Cameraless film hold). 0 = off." />
       </div>
 
       <div className="flex-1" />
 
-      {/* Variation — a baseline-anchored variant of the whole scene at `varAmt`
+      {/* Variation : a baseline-anchored variant of the whole scene at `varAmt`
           (structure fixed, continuous values nudged). */}
       <div className="flex items-center gap-1.5">
         <button
           onClick={() => applyVariation(varAmt)}
           className="rounded border border-accent2/60 bg-accent2/10 px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent2 transition-colors hover:bg-accent2/20"
-          title={`Variation ${pct(varAmt)} — a fresh variant of the current scene (same structure, values nudged). First press sets the baseline; each press is a new sibling at this spread.`}
+          title={`Variation ${pct(varAmt)} : a fresh variant of the current scene (same structure, values nudged). First press sets the baseline; each press is a new sibling at this spread.`}
         >
           Vary
         </button>
@@ -290,7 +290,7 @@ export function Transport(): JSX.Element {
       <div className="flex items-center gap-1.5">
         <span
           className="font-mono text-[9px] uppercase text-muted"
-          title="Randomize intensity — low = a gentle walk from the current scene, 100% = a full structural re-roll"
+          title="Randomize intensity : low = a gentle walk from the current scene, 100% = a full structural re-roll"
         >
           amt
         </span>
@@ -311,7 +311,7 @@ export function Transport(): JSX.Element {
         <button
           onClick={() => fireRandomize(scope, intensity)}
           className="rounded-l border border-accent/60 bg-accent/10 px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent transition-colors hover:bg-accent/20"
-          title={`Fire ${current.label} — every draw from curated aesthetic ranges`}
+          title={`Fire ${current.label} : every draw from curated aesthetic ranges`}
         >
           {current.label}
         </button>

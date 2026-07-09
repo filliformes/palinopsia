@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Slit Scan — a slit-scan of an internal oscillator: each column of the frame is the signal frozen at an earlier moment (time = position), so the image is a scrolling time-history — a seismograph of a moving interference profile. Matte bands over near-black, no buffer needed (time IS the x axis).",
-  "CREDIT": "Palinopsia (after Signal Culture SSSScan)",
+  "DESCRIPTION": "Slit Scan : a slit-scan of an internal oscillator: each column of the frame is the signal frozen at an earlier moment (time = position), so the image is a scrolling time-history : a seismograph of a moving interference profile. Matte bands over near-black, no buffer needed (time IS the x axis).",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Scan"],
   "INPUTS": [
@@ -20,7 +20,7 @@ void main() {
   float prof = vertical ? uv.x : uv.y;
   float tc = TIME * rate - axis * span;
 
-  // A small sum of incommensurate sines evolving in time — read across the
+  // A small sum of incommensurate sines evolving in time : read across the
   // scan axis this becomes a flowing history.
   float v = sin(prof * freq * 6.2832 + tc * 1.7);
   v += 0.6 * sin(prof * freq * 2.3 * 6.2832 - tc * 1.1 + 3.0);

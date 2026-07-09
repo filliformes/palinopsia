@@ -1,4 +1,4 @@
-// CapturePicker — a modal grid of the machine's screens and windows (with live
+// CapturePicker : a modal grid of the machine's screens and windows (with live
 // thumbnails from the main process) for choosing a screen-capture source.
 
 import { useEffect, useState } from 'react'

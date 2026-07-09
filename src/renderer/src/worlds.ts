@@ -1,4 +1,4 @@
-// Worlds (diegesis) — editable, saveable presets. A World biases the whole
+// Worlds (diegesis) : editable, saveable presets. A World biases the whole
 // composition when selected: every layer's A/B coupling character, a Context
 // mood nudge, and an optional audio-routing default (an audio modulator on the
 // reserved slot 8 → a Context input). Vibe (the user's palette) is left alone.
@@ -50,7 +50,7 @@ export const BUILTIN_WORLDS: World[] = [
     id: 'synthetic',
     name: 'Synthetic',
     builtin: true,
-    blurb: 'Abstract concordance — audio leans the A/B texture (default).',
+    blurb: 'Abstract concordance : audio leans the A/B texture (default).',
     coupling: { mode: 'lean', amount: 0.5, tightness: 0.7, feature: 'flux' },
     context: { trails: 0.22, blur: 0.08, bloom: 0.18, depth: 0.28, haze: 0.16 },
     autoMod: { feature: 'flux', target: 'haze', depth: 0.4 }
@@ -59,7 +59,7 @@ export const BUILTIN_WORLDS: World[] = [
     id: 'parametric',
     name: 'Parametric',
     builtin: true,
-    blurb: 'Data-mapped — transient cut, crisp and digital.',
+    blurb: 'Data-mapped : transient cut, crisp and digital.',
     coupling: { mode: 'cut', amount: 0.8, tightness: 0.9, feature: 'transient' },
     context: { trails: 0.05, blur: 0.0, bloom: 0.05, depth: 0.15, haze: 0.03 },
     autoMod: { feature: 'transient', target: 'bloom', depth: 0.5 }
@@ -68,7 +68,7 @@ export const BUILTIN_WORLDS: World[] = [
     id: 'musical',
     name: 'Musical',
     builtin: true,
-    blurb: 'Visual reading of the music — pitch drifts the balance.',
+    blurb: 'Visual reading of the music : pitch drifts the balance.',
     coupling: { mode: 'drift', amount: 0.6, tightness: 0.6, feature: 'pitch' },
     context: { trails: 0.2, blur: 0.06, bloom: 0.22, depth: 0.25, haze: 0.1 },
     autoMod: { feature: 'centroid', target: 'bloom', depth: 0.35 }
@@ -77,7 +77,7 @@ export const BUILTIN_WORLDS: World[] = [
     id: 'incongruent',
     name: 'Incongruent',
     builtin: true,
-    blurb: 'Independent voices — coupling off, detached.',
+    blurb: 'Independent voices : coupling off, detached.',
     coupling: { mode: 'off', amount: 0.5, tightness: 0.7, feature: 'level' },
     context: { trails: 0.15, blur: 0.1, bloom: 0.1, depth: 0.3, haze: 0.06 },
     autoMod: null
@@ -86,7 +86,7 @@ export const BUILTIN_WORLDS: World[] = [
     id: 'sublimated',
     name: 'Sublimated',
     builtin: true,
-    blurb: 'Mood over sync — warm, dreamy, gently level-led.',
+    blurb: 'Mood over sync : warm, dreamy, gently level-led.',
     coupling: { mode: 'lean', amount: 0.3, tightness: 0.4, feature: 'level' },
     context: { trails: 0.35, blur: 0.14, bloom: 0.28, depth: 0.4, haze: 0.28 },
     autoMod: { feature: 'level', target: 'trails', depth: 0.45 }
@@ -95,7 +95,7 @@ export const BUILTIN_WORLDS: World[] = [
     id: 'monomedia',
     name: 'Monomedia',
     builtin: true,
-    blurb: 'Absence as tension — stark, near-black, uncoupled.',
+    blurb: 'Absence as tension : stark, near-black, uncoupled.',
     coupling: { mode: 'off', amount: 0.5, tightness: 0.7, feature: 'level' },
     context: { trails: 0.1, blur: 0.04, bloom: 0.0, depth: 0.5, haze: 0.0 },
     autoMod: null
@@ -107,7 +107,7 @@ export const BUILTIN_WORLDS: World[] = [
     id: 'griffe',
     name: 'Griffé',
     builtin: true,
-    blurb: 'McLaren — graphic, rhythmic, tightly synced. Marks on the beat.',
+    blurb: 'Graphic, rhythmic, tightly synced. Marks on the beat.',
     coupling: { mode: 'cut', amount: 0.85, tightness: 0.9, feature: 'transient' },
     context: { trails: 0.04, blur: 0.0, bloom: 0.06, depth: 0.12, haze: 0.02 },
     finalizer: {
@@ -120,20 +120,20 @@ export const BUILTIN_WORLDS: World[] = [
     id: 'peint',
     name: 'Peint',
     builtin: true,
-    blurb: 'Brakhage — dense, gestural, silent. Dye, boil, granulation.',
+    blurb: 'Dense, gestural, silent. Dye, boil, granulation.',
     coupling: { mode: 'drift', amount: 0.6, tightness: 0.35, feature: 'level' },
     context: { trails: 0.2, blur: 0.06, bloom: 0.18, depth: 0.28, haze: 0.1 },
     finalizer: {
       filmHold: 1, filmRate: 6, filmJitter: 0.4, filmBoil: 0.6, filmFlutter: 0.4,
       filmBlank: 0.05, filmBlankMode: 2, filmDust: 0.3, filmScratch: 0.1, filmGranule: 0.6, filmSplice: 0.03
     },
-    autoMod: null // "silent by conviction" — audio decoupled
+    autoMod: null // "silent by conviction" : audio decoupled
   },
   {
     id: 'presse',
     name: 'Pressé',
     builtin: true,
-    blurb: 'Mothlight — pressed material. Heavy handling, scratch, dust.',
+    blurb: 'Pressed material. Heavy handling, scratch, dust.',
     coupling: { mode: 'drift', amount: 0.5, tightness: 0.5, feature: 'level' },
     context: { trails: 0.12, blur: 0.05, bloom: 0.1, depth: 0.35, haze: 0.08 },
     finalizer: {
@@ -176,7 +176,7 @@ export function applyWorldToComposition(c: CompositionState, world: World): Comp
     })
   }
 
-  // Audio routing default — the World manages modulator slot WORLD_AUTOMOD_SLOT
+  // Audio routing default : the World manages modulator slot WORLD_AUTOMOD_SLOT
   // and its single matrix assignment. Clear it first, then install if wanted.
   const slot = WORLD_AUTOMOD_SLOT
   const matrix = next.modMatrix.filter((a) => a.mod !== slot)
@@ -196,7 +196,7 @@ export function applyWorldToComposition(c: CompositionState, world: World): Comp
       depth: am.depth
     })
   } else {
-    // No routing — leave the slot disabled so it stops driving anything.
+    // No routing : leave the slot disabled so it stops driving anything.
     modulators[slot] = { ...modulators[slot], enabled: false }
   }
   next = { ...next, modulators, modMatrix: matrix }

@@ -1,12 +1,12 @@
-// isfTextureBridge — feed raw WebGL textures into ISF image inputs.
+// isfTextureBridge : feed raw WebGL textures into ISF image inputs.
 //
 // The stock `interactive-shader-format` runtime only accepts DOM elements
 // (img / video / canvas) as image-input values: `pushTexture` texImage2D's
 // `uniform.value` into its own texture. Palinopsia's FX chains need to feed
-// GL textures we already own (layer buffers, chain buffers) — re-uploading
+// GL textures we already own (layer buffers, chain buffers) : re-uploading
 // through a canvas would burn the "lightweight" mandate.
 //
-// This module monkeypatches `pushTexture` (the single choke point — verified:
+// This module monkeypatches `pushTexture` (the single choke point : verified:
 // setValue → pushUniform → pushTexture for every 't' uniform) to accept a
 // TextureHandle marker object: it binds the raw texture on a fresh unit from
 // the runtime's own unit allocator and sets the sampler + the _imgSize /
@@ -68,7 +68,7 @@ export function installTextureBridge(): void {
   // The stock cleanup() destroys renderBuffers but NEVER deletes the two
   // ISFGLProgram objects (`program` + `paintProgram`), each of which owns a
   // WebGLProgram, two shaders and a vertex buffer. ISFGLProgram HAS a cleanup()
-  // that frees them — the runtime just never calls it. Palinopsia hot-swaps
+  // that frees them : the runtime just never calls it. Palinopsia hot-swaps
   // shaders constantly (source/FX changes, Randomize up to 4/frame), so this
   // leaks GPU memory without bound → driver pressure → context loss. Wrap
   // cleanup() to also release the programs.

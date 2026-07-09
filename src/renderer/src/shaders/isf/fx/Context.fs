@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Context — the always-on DEPTH finalizer, pinned last in the master chain after Vibe. It gives an image the dimensionality that makes it feel lifelike: temporal TRAILS (colours bleeding into one another over time, drifting gently into the distance), a soft key LIGHT with volumetric BLOOM on the highlights, atmospheric HAZE for aerial perspective, spatial BLUR, and a DEPTH vignette that seats the picture in space. Every parameter at zero is a clean passthrough — turn them up to add air, glow and magic.",
+  "DESCRIPTION": "Context : the always-on DEPTH finalizer, pinned last in the master chain after Vibe. It gives an image the dimensionality that makes it feel lifelike: temporal TRAILS (colours bleeding into one another over time, drifting gently into the distance), a soft key LIGHT with volumetric BLOOM on the highlights, atmospheric HAZE for aerial perspective, spatial BLUR, and a DEPTH vignette that seats the picture in space. Every parameter at zero is a clean passthrough : turn them up to add air, glow and magic.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color", "Master"],
@@ -38,7 +38,7 @@ void main() {
     // TRAILS: blend the live frame with a slightly zoomed copy of the previous
     // trailed frame, so colours bleed together and drift gently into the
     // distance (the zoom scales with depth). Capped below 1 so it always
-    // decays — a leaky integrator, never an infinite hold or a runaway.
+    // decays : a leaky integrator, never an infinite hold or a runaway.
     vec4 cur = IMG_NORM_PIXEL(inputImage, uv);
     vec2 tuv = (uv - 0.5) * (1.0 - depth * 0.012) + 0.5;
     vec4 prev = IMG_NORM_PIXEL(buf, tuv);
@@ -51,8 +51,8 @@ void main() {
   // ── PBR SURFACE (maps fed natively by the compositor; pbrTexture picks the
   //    material, this shader only sees its normal/height/AO). The composition
   //    is "projected" onto a physical relief: parallax-displaced by the height
-  //    map along the surface normal, then — after blur/bloom, BEFORE the key
-  //    light — shaded by the normals and occluded in the crevices, so the
+  //    map along the surface normal, then : after blur/bloom, BEFORE the key
+  //    light : shaded by the normals and occluded in the crevices, so the
   //    light plays over the material. pbrAmount 0 (or texture "off", which
   //    feeds flat neutral maps) is a clean passthrough. ──
   vec3 pnrm = vec3(0.0, 0.0, 1.0);
@@ -63,11 +63,11 @@ void main() {
     float ph = IMG_NORM_PIXEL(pbrHeight, tuv).r;
     pao = IMG_NORM_PIXEL(pbrAO, tuv).r;
     // Parallax: the image slides along the surface slope, most where the
-    // relief is far from mid-height — the projector-on-crumpled-paper warp.
+    // relief is far from mid-height : the projector-on-crumpled-paper warp.
     uv += pnrm.xy * (ph - 0.5) * pbrAmount * 0.06;
   }
 
-  // ── BLUR — 9-tap ring; at blur==0 every tap coincides, so it's identity. ──
+  // ── BLUR : 9-tap ring; at blur==0 every tap coincides, so it's identity. ──
   float rb = blur * 0.03;
   vec2 c0 = uv;
   vec2 c1 = uv + vec2( rb, 0.0);
@@ -89,7 +89,7 @@ void main() {
   vec3 s8 = IMG_NORM_PIXEL(buf, c8).rgb;
   vec3 col = s0 * 0.28 + (s1 + s2 + s3 + s4) * 0.12 + (s5 + s6 + s7 + s8) * 0.06;
 
-  // ── BLOOM — wide ring, keep only the bright part, add it back as glow. ──
+  // ── BLOOM : wide ring, keep only the bright part, add it back as glow. ──
   float rg = 0.012 + bloom * 0.05;
   vec2 g1 = uv + vec2( rg, 0.0);
   vec2 g2 = uv + vec2(-rg, 0.0);
@@ -112,7 +112,7 @@ void main() {
   vec3 bright = bsum * smoothstep(0.5, 0.95, bl);
   col += bright * bloom * 1.4;
 
-  // ── PBR shading — the relief responds to the key light's direction: facets
+  // ── PBR shading : the relief responds to the key light's direction: facets
   //    toward the light lift, facets away fall into shadow, crevices occlude,
   //    and a restrained specular sheen rides the slopes. Normalized against
   //    the flat normal so a neutral map changes nothing. ──
@@ -127,7 +127,7 @@ void main() {
     col += lightColor.rgb * spec * pbrAmount * (0.15 + lightGlow * 0.5);
   }
 
-  // ── KEY LIGHT — a soft, round radial glow from the light position in its
+  // ── KEY LIGHT : a soft, round radial glow from the light position in its
   //    own colour. lightSize sweeps it from a tight spot to a broad ambient
   //    wash across the whole frame. ──
   float falloff = mix(11.0, 0.35, lightSize);
@@ -135,14 +135,14 @@ void main() {
   float lg = exp(-dot(dl, dl) * falloff);
   col += lightColor.rgb * lg * lightGlow * 1.3;
 
-  // ── HAZE — the whole frame settles toward the atmosphere colour, strongest
+  // ── HAZE : the whole frame settles toward the atmosphere colour, strongest
   //    in the shadows/distance (aerial perspective), with a lighter global veil
   //    over the midtones and highlights so the tint always reads. ──
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
   float atmoAmt = haze * (0.18 + 0.82 * (1.0 - smoothstep(0.0, 0.6, lum)));
   col = mix(col, atmosphere.rgb, atmoAmt);
 
-  // ── DEPTH vignette — a lifted, luminous centre falling to a darker,
+  // ── DEPTH vignette : a lifted, luminous centre falling to a darker,
   //    receding rim, seating the frame in a volume. ──
   vec2 dv = (uv - 0.5) * vec2(aspect, 1.0);
   float vig = 1.0 - smoothstep(0.35, 0.95, length(dv));

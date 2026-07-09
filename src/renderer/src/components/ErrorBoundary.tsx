@@ -2,7 +2,7 @@
 // catches the exception and shows the error message + stack instead of
 // unmounting the whole tree (the "blank app" failure mode).
 //
-// React doesn't ship a function-component API for error boundaries — it
+// React doesn't ship a function-component API for error boundaries : it
 // has to be a class component. Kept minimal on purpose.
 
 import { Component, type ErrorInfo, type ReactNode } from 'react'

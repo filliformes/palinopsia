@@ -1,4 +1,4 @@
-// Finishing Touches — the three always-on master finalizers (Vibe Palette →
+// Finishing Touches : the three always-on master finalizers (Vibe Palette →
 // Context → Finalizer) live here in their OWN collapsible sub-sections instead
 // of the shared Inspector. Each: a bypass dot, name, dice, preset picker, and
 // its parameters stacked vertically. Default collapsed.
@@ -15,7 +15,7 @@ import { AssignContext, AssignRow, AutoControls, XYControl } from './AutoControl
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 
-// Duplicated from the Inspector — the Vibe Palette's most characterful stop,
+// Duplicated from the Inspector : the Vibe Palette's most characterful stop,
 // brightened, for Context's "Vibe Color" button.
 function vibeMainColor(inputs: Record<string, number | number[]>): number[] {
   const stops = ['colorA', 'colorB', 'colorC', 'colorD', 'colorE']
@@ -54,7 +54,7 @@ export function FinishingTouches(): JSX.Element {
   const units = order.map((id) => master.find((f) => f.shaderId === id)).filter((u): u is FxInstance => !!u)
   const on = units.length > 0 && units.every((u) => u.enabled)
   // M buttons open the DEDICATED Modulate section pinned at the bottom of this
-  // column (mirrors the main Inspector's side panel) — never the old popover.
+  // column (mirrors the main Inspector's side panel) : never the old popover.
   const [assign, setAssign] = useState<{ target: ModTarget; label: string } | null>(null)
   return (
     <AssignContext.Provider
@@ -86,7 +86,7 @@ export function FinishingTouches(): JSX.Element {
   )
 }
 
-// The Finishing column's Modulate section — pinned to the very bottom (sticky
+// The Finishing column's Modulate section : pinned to the very bottom (sticky
 // inside the column's scrollport), full column width, min-w-0 throughout so
 // nothing escapes the margins however narrow the column is resized.
 function FinishingAssign({
@@ -124,7 +124,7 @@ function FinishingAssign({
   )
 }
 
-// The global finishing on/off pill — reused (mirrored) in the Master FX strip.
+// The global finishing on/off pill : reused (mirrored) in the Master FX strip.
 export function FinishingToggle({ on, onClick }: { on: boolean; onClick: () => void }): JSX.Element {
   return (
     <button
@@ -134,8 +134,8 @@ export function FinishingToggle({ on, onClick }: { on: boolean; onClick: () => v
       }`}
       title={
         on
-          ? 'Finishing ON — click to bypass Vibe · Context · Finalizer'
-          : 'Finishing bypassed — click to enable Vibe · Context · Finalizer'
+          ? 'Finishing ON : click to bypass Vibe · Context · Finalizer'
+          : 'Finishing bypassed : click to enable Vibe · Context · Finalizer'
       }
     >
       finishing {on ? 'on' : 'off'}
@@ -185,7 +185,7 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
         <button
           onClick={() => toggleFx({ kind: 'master' }, inst.id)}
           className={`h-2.5 w-2.5 shrink-0 rounded-full transition-colors ${inst.enabled ? dotCls : 'bg-panel3'}`}
-          title={inst.enabled ? `${name} on — click to bypass` : `${name} bypassed — click to enable`}
+          title={inst.enabled ? `${name} on : click to bypass` : `${name} bypassed : click to enable`}
         />
         <span className={`text-[12px] font-semibold ${inst.enabled ? nameCls : 'text-muted line-through'}`}>
           {name}

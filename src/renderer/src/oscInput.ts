@@ -31,7 +31,7 @@
 //   /opsia/gesture                                      f 0..1 (Gesture ⇄ Texture)
 //   /opsia/coalesce                                     f 0..1 (Dispersal ⇄ Coalescence)
 //   /opsia/tonicity|shutter|drift|superflicker          f 0..1 (temperament, 0 = off)
-//   (outbound only) /opsia/av/mark-signal f×32 · mark-level|centroid|flux f  — the
+//   (outbound only) /opsia/av/mark-signal f×32 · mark-level|centroid|flux f  : the
 //   animated-sound loop: a scanline of the output sent to Pandore (§4.4).
 //   /opsia/world                                        s id | name | i (1-based index)
 //   /opsia/seq/run                                      >= 0.5 toggles the sequencer
@@ -109,7 +109,7 @@ function sourceShaderId(li: number, slot: 'A' | 'B'): string | null {
   return s?.shaderId ?? null
 }
 
-/** The FX unit at `i` (0-based) in a scope's rack — master excludes the locked
+/** The FX unit at `i` (0-based) in a scope's rack : master excludes the locked
  *  finalizers (address those via /master/vibe · /master/context). */
 function fxAt(scope: FxScope, i: number): { id: string; shaderId: string } | null {
   const c = useStore.getState().composition
@@ -307,7 +307,7 @@ function route(address: string, args: Args): void {
       return
     }
 
-    // Global field macros (0.5 = deadzone) and Proximity — each a single 0..1.
+    // Global field macros (0.5 = deadzone) and Proximity : each a single 0..1.
     case 'density': st.setDensity(clamp01(n)); return
     case 'gesture': st.setGestureTexture(clamp01(n)); return
     case 'coalesce': st.setCoalesce(clamp01(n)); return
@@ -383,7 +383,7 @@ function route(address: string, args: Args): void {
       if (idx < 0) return
       const sc = st.scenes[idx]
       if (!sc) return // validate BEFORE rising() so unknown addresses can't grow the edge map
-      // A dedicated /scene/{n} address is a trigger — fire on the rising edge.
+      // A dedicated /scene/{n} address is a trigger : fire on the rising edge.
       if (segs[2] !== undefined && !rising(address, n)) return
       st.recallScene(sc.id)
       return
@@ -441,7 +441,7 @@ export async function applyOscListen(): Promise<void> {
 }
 
 /** Normalize a shader input's stored raw value back to the 0..1 the OSC layer
- *  speaks (inverse of resolveInputValue) — for advertisement + outbound feedback. */
+ *  speaks (inverse of resolveInputValue) : for advertisement + outbound feedback. */
 function inputNorm(shaderId: string, name: string, raw: number | number[] | undefined): number {
   const d = inputsForShader(shaderId).find((x) => x.name === name)
   if (!d) return 0
@@ -509,7 +509,7 @@ function enumerateLeaves(): Leaf[] {
     add(`/opsia/meta/${k}`, 0, 1, knob?.value ?? 0, knob?.name ?? `Meta knob ${k}`)
   }
   add('/opsia/bpm', 20, 800, st.composition.bpm, 'Tempo (raw BPM)')
-  // Audio features Pandore PUSHES (consumed by `audio` modulators) — never echoed.
+  // Audio features Pandore PUSHES (consumed by `audio` modulators) : never echoed.
   for (const feat of ['level', 'flux', 'transient', 'centroid', 'pitch'] as const) {
     add(`/opsia/audio/${feat}`, 0, 1, 0, `Audio ${feat} (0..1)`, false)
   }
@@ -540,10 +540,10 @@ function enumerateLeaves(): Leaf[] {
   add('/opsia/gesture', 0, 1, st.gestureTexture ?? 0.5, 'Gesture ⇄ Texture macro')
   add('/opsia/coalesce', 0, 1, st.coalesce ?? 0.5, 'Dispersal ⇄ Coalescence macro')
   add('/opsia/proximity', 0, 1, st.proximity ?? 0.5, 'Proximity (near ⇄ far)')
-  add('/opsia/tonicity', 0, 1, st.tonicity ?? 0, 'Tonicity — tonal audio → colour, noise → mono (0 = off)')
-  add('/opsia/shutter', 0, 1, st.shutter ?? 0, 'Shutter — stop-motion frame stepping (0 = off)')
-  add('/opsia/drift', 0, 1, st.drift ?? 0, 'Drift — analog-instability temperament (0 = off)')
-  add('/opsia/superflicker', 0, 1, st.superFlicker ?? 0, 'Superimposition flicker — layer cross-cut strobe (0 = off)')
+  add('/opsia/tonicity', 0, 1, st.tonicity ?? 0, 'Tonicity : tonal audio → colour, noise → mono (0 = off)')
+  add('/opsia/shutter', 0, 1, st.shutter ?? 0, 'Shutter : stop-motion frame stepping (0 = off)')
+  add('/opsia/drift', 0, 1, st.drift ?? 0, 'Drift : analog-instability temperament (0 = off)')
+  add('/opsia/superflicker', 0, 1, st.superFlicker ?? 0, 'Superimposition flicker : layer cross-cut strobe (0 = off)')
   // World selection (accepts a string id/name, or a 1-based index) + transport.
   const worldIdx = Math.max(1, st.worlds.findIndex((w) => w.id === st.world) + 1)
   add('/opsia/world', 1, Math.max(1, st.worlds.length), worldIdx, 'Active World (send an id/name string, or a 1-based index)')
@@ -566,13 +566,13 @@ export function publishOscQuery(): void {
 
 // ── Outbound feedback ────────────────────────────────────────────────
 // When enabled, we periodically diff the streamable leaves against what we last
-// sent and push only the CHANGED ones to Pandore — so its UI mirrors ours (a
+// sent and push only the CHANGED ones to Pandore : so its UI mirrors ours (a
 // modulator sweeping opacity, a scene recall, a hand on a slider). Symmetric
 // with the inbound map: same `/opsia/...` addresses, same 0..1 convention.
 
 const lastSent = new Map<string, number>()
 let feedbackTimer: ReturnType<typeof setInterval> | null = null
-const EPS = 0.0015 // ~1/650 — below the noise floor of a modulator at rest
+const EPS = 0.0015 // ~1/650 : below the noise floor of a modulator at rest
 
 function pushFeedback(): void {
   const st = useStore.getState()
@@ -608,7 +608,7 @@ export function applyOscOutput(): void {
 // ── OSCQuery WebSocket value-stream ──────────────────────────────────
 // Same diff-and-send idea as outbound feedback, but the transport is the
 // OSCQuery WS (for web / no-UDP clients) and it runs ONLY while a client is
-// attached — the main process flips wsActive via onOscQueryWsActive.
+// attached : the main process flips wsActive via onOscQueryWsActive.
 
 const wsLastSent = new Map<string, number>()
 let wsTimer: ReturnType<typeof setInterval> | null = null

@@ -1,4 +1,4 @@
-// OSC receiver — a UDP socket LISTENING on a local port; every inbound OSC
+// OSC receiver : a UDP socket LISTENING on a local port; every inbound OSC
 // message is handed to a callback. This is how the instrument is *played*:
 // Pandore / TouchOSC / any OSC source sends here. Separate from OscSender
 // (which owns an ephemeral outgoing socket) so send and receive can't stall
@@ -91,7 +91,7 @@ export class OscReceiver {
   }
 }
 
-/** Non-internal IPv4 addresses — shown in the UI so the user knows where to
+/** Non-internal IPv4 addresses : shown in the UI so the user knows where to
  *  point Pandore (`send to <ip>:<port>`). */
 export function localIPv4s(): string[] {
   const out: string[] = []

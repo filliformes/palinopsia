@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Mycelium — a thin branching network revealed by a growth front expanding from an off-centre seed, then dissolving and regrowing elsewhere. Ridged-noise hyphae, hair-thin and matte; the cycle is the organism's life.",
+  "DESCRIPTION": "Mycelium : a thin branching network revealed by a growth front expanding from an off-centre seed, then dissolving and regrowing elsewhere. Ridged-noise hyphae, hair-thin and matte; the cycle is the organism's life.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic"],
@@ -41,7 +41,7 @@ void main() {
   vec2 seed = vec2(0.2 + hash(vec2(cycle, 1.0)) * 0.6 * aspect,
                    0.2 + hash(vec2(cycle, 7.0)) * 0.6);
 
-  // Hyphae: two ridged-noise webs at different scales — thin where the ridge
+  // Hyphae: two ridged-noise webs at different scales : thin where the ridge
   // peaks. The web itself crawls very slowly (growth is the visible motion).
   vec2 q = p * scale + cycle * 13.7;
   float r1 = 1.0 - abs(2.0 * vnoise(q + t * 0.05) - 1.0);

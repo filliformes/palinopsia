@@ -1,5 +1,5 @@
 // Session file I/O. Plain JSON, .opsia.json extension.
-// Forked from dataFLOU's session.ts — same atomic-write discipline.
+// Forked from dataFLOU's session.ts : same atomic-write discipline.
 
 import { app, dialog, BrowserWindow } from 'electron'
 import { promises as fs, existsSync } from 'fs'
@@ -11,7 +11,7 @@ const FILTERS = [{ name: 'Palinopsia Session', extensions: ['opsia.json', 'json'
 /**
  * Atomic save: write to `<path>.tmp` then rename onto the final path.
  * `fs.rename` is atomic on the same filesystem, so a crash mid-write can
- * only leave the .tmp around — the original session file stays intact.
+ * only leave the .tmp around : the original session file stays intact.
  */
 async function atomicWriteJson(path: string, session: Session): Promise<void> {
   const tmpPath = `${path}.tmp`
@@ -40,7 +40,7 @@ export async function saveTo(path: string, session: Session): Promise<boolean> {
 }
 
 /**
- * Resolve the project's "Sessions" folder — sessions land next to the app
+ * Resolve the project's "Sessions" folder : sessions land next to the app
  * (project root in dev, install dir when packaged), falling back to
  * `<userData>/Sessions` if the install location is read-only.
  */
@@ -68,7 +68,7 @@ export async function saveToDefault(session: Session): Promise<string> {
       .replace(/[\\/:*?"<>|]+/g, '_')
       .replace(/\s+/g, ' ')
       .trim() || 'session'
-  // Overwrite in place — this is the "keep the latest state of <name>" path
+  // Overwrite in place : this is the "keep the latest state of <name>" path
   // (quit-save / switch-save). Suffixing "(N)" here used to mint a new file on
   // every app close, flooding Sessions/ with Untitled (N) duplicates.
   const candidate = join(dir, `${safe}.opsia.json`)

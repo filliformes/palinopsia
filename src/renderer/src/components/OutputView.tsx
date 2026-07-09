@@ -1,4 +1,4 @@
-// OutputView — the fullscreen output window's entire content. It runs its OWN
+// OutputView : the fullscreen output window's entire content. It runs its OWN
 // WebGL Compositor and renders the exact composition the control window pushes
 // each frame (composition + modulation values + warp + clock). No WebRTC, no
 // transcode → pixel-perfect, full-resolution output. Loaded on the #output hash.

@@ -1,10 +1,10 @@
-// VideoSource — imported video as a layer source (brief §4, §7).
+// VideoSource : imported video as a layer source (brief §4, §7).
 //
 // Wraps an HTML <video> (hardware-decoded H.264/HEVC/AV1 via Quick Sync / the
 // 4070), auto-loops it, and uploads each frame to a GL texture the Compositor
 // samples. The "synthify" macro sub-chain (posterize → ordered dither →
 // luma/edge key → chroma shift → optional feedback) runs as ISF FX on top of
-// this texture — it lives in the FX rack, not here. No Hap dependency.
+// this texture : it lives in the FX rack, not here. No Hap dependency.
 
 /** Upload the current frame of a <video> into a GL texture (creating it on
  *  first use), matching the engine's bottom-left orientation. Returns the
@@ -53,7 +53,7 @@ export class VideoSource {
   private stallSince = 0
   // Frame presentation (requestVideoFrameCallback): only upload when a genuinely
   // NEW frame is presented. Uploading every render frame while seeking grabs the
-  // pre-seek (frozen) frame — the "playhead moves, image doesn't" bug.
+  // pre-seek (frozen) frame : the "playhead moves, image doesn't" bug.
   private pendingFrame = true
   private rvfcId = 0
   private rvfcOn = false
@@ -72,7 +72,7 @@ export class VideoSource {
 
   constructor(private gl: WebGL2RenderingContext) {
     this.video = document.createElement('video')
-    // Native looping off — we own the loop/trim/direction.
+    // Native looping off : we own the loop/trim/direction.
     this.video.loop = false
     this.video.muted = true
     this.video.playsInline = true
@@ -135,7 +135,7 @@ export class VideoSource {
 
   /** Drive the clip each frame. `rawDt` is the real frame delta (seconds); `mul`
    *  is the layer×global speed multiplier over realtime; total rate = mul × clip
-   *  speed. The element is kept PLAYING in every mode — a PAUSED <video> stops
+   *  speed. The element is kept PLAYING in every mode : a PAUSED <video> stops
    *  presenting frames to texImage2D, so a pause+seek approach reads as a frozen
    *  clip (the reverse / >16× bug). Forward within the browser's native rate cap
    *  runs on the element's own clock (smoothest); reverse, pendulum-reverse, and
@@ -148,7 +148,7 @@ export class VideoSource {
     const hi = Math.max(0, Math.min(1, Math.max(this.pb.inN, this.pb.outN))) * d
     // Native playback is smooth only while the decoder can sustain the rate. Near
     // its 16× cap it stalls (can't decode 16× realtime; a short clip re-seeking
-    // its loop point every few ms makes it worse) — which reads as a frozen image
+    // its loop point every few ms makes it worse) : which reads as a frozen image
     // even though the playhead moves. Above this we fast-forward with the same
     // keyframe-seek pump reverse uses (choppier, but it never freezes).
     const NATIVE_MAX = 8
@@ -173,7 +173,7 @@ export class VideoSource {
     if (pureNative) {
       const pr = Math.max(0.0625, rate)
       if (v.playbackRate !== pr) v.playbackRate = pr
-      // Stall watchdog — if it claims to be playing but currentTime stops moving,
+      // Stall watchdog : if it claims to be playing but currentTime stops moving,
       // re-kick play() so a decoder/GL hiccup can't freeze the clip.
       const t = v.currentTime
       if (Math.abs(t - this.lastCT) < 1e-4) {
@@ -189,7 +189,7 @@ export class VideoSource {
       // Reverse / pendulum-reverse / above the native cap: keep the pipeline hot
       // at a minimal forward rate, drive the intended playhead ourselves at the
       // TRUE rate, and seek toward it ONE completed seek at a time (below). We do
-      // NOT seek every frame — that keeps the decoder perpetually seeking and the
+      // NOT seek every frame : that keeps the decoder perpetually seeking and the
       // presented frame never updates (playhead moves, image freezes).
       if (v.playbackRate !== 0.1) v.playbackRate = 0.1
       this.pos += rawDt * rate * dir
@@ -208,7 +208,7 @@ export class VideoSource {
 
     // Correct the element toward the intended playhead. In pure-native forward we
     // only intervene at the trim boundaries (else it runs free, smooth). When
-    // overriding, issue ONE seek at a time toward `pos` — wait for the previous to
+    // overriding, issue ONE seek at a time toward `pos` : wait for the previous to
     // finish ('seeked' clears the gate) so each frame settles and reaches the
     // texture; a generous safety timeout recovers from a dropped 'seeked'.
     if (pureNative) {
@@ -217,7 +217,7 @@ export class VideoSource {
       }
     } else {
       // A large backward / fast-forward seek can take a while to decode. The
-      // safety must sit ABOVE any real seek time — otherwise it fires mid-seek,
+      // safety must sit ABOVE any real seek time : otherwise it fires mid-seek,
       // issues a new seek that CANCELS the in-flight one, and the frame never
       // settles (the >1× reverse / >16× forward freeze). 'seeked' is the primary
       // release; this only rescues a genuinely hung seek.
@@ -228,7 +228,7 @@ export class VideoSource {
           this.seeking = true
           this.seekAt = performance.now()
         } catch {
-          /* a seek can race a src reload — retry next frame */
+          /* a seek can race a src reload : retry next frame */
         }
       }
     }
@@ -236,7 +236,7 @@ export class VideoSource {
 
   /** Upload the current frame to a GL texture and return it (null until the
    *  first frame is decodable). Called once per frame for a video slot. Only
-   *  re-uploads when a new frame was actually presented (rVFC) — so a seek's
+   *  re-uploads when a new frame was actually presented (rVFC) : so a seek's
    *  frame reaches the texture and steady playback isn't re-uploaded needlessly.
    *  Without rVFC support it uploads every frame (previous behaviour). */
   upload(): WebGLTexture | null {

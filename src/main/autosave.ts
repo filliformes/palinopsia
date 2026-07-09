@@ -6,7 +6,7 @@
 // - Every ~60s (and on clean shutdown) the current session snapshot is
 //   written to a rotating set of autosave files in `<userData>/autosave/`.
 // - `stopAutosave()` clears the timer, writes a final snapshot, and removes
-//   the sentinel — the marker of a clean exit.
+//   the sentinel : the marker of a clean exit.
 
 import { app } from 'electron'
 import { promises as fs, existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs'
@@ -57,7 +57,7 @@ async function prune(dir: string): Promise<void> {
   }
 }
 
-/** Returns `{ crashed }` — true when the previous run left a sentinel behind. */
+/** Returns `{ crashed }` : true when the previous run left a sentinel behind. */
 export function startAutosave(): { crashed: boolean } {
   const sentinel = sentinelPath()
   const crashed = existsSync(sentinel)

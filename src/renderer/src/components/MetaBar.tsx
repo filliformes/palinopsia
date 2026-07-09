@@ -1,8 +1,8 @@
-// Meta Controller (brief §6) — 16 macro knobs, one flat bank. Each tile
+// Meta Controller (brief §6) : 16 macro knobs, one flat bank. Each tile
 // matches the modulator-card chrome: bordered, aligned rows, everything
 // legible at a glance. A knob shows: dial (destination count under it),
 // name (double-click renames), CC learn, curve, and an M button binding
-// MODULATORS to the knob — modulated knobs' dials move live (accent2 arc).
+// MODULATORS to the knob : modulated knobs' dials move live (accent2 arc).
 
 import {
   useEffect,
@@ -111,7 +111,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
   const isModulated = bound.length > 0
 
   // Dial position: the smoother's display value; while modulated, the live
-  // modulated position (painted at rAF rate through local state — only
+  // modulated position (painted at rAF rate through local state : only
   // modulated knobs pay this cost).
   useSyncExternalStore(subscribeKnobDisplay, knobDisplayVersion)
   const [liveTick, setLiveTick] = useState(0)
@@ -144,7 +144,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
     const dy = d.startY - e.clientY
     const sensitivity = e.shiftKey ? 4 : 1
     const next = Math.max(0, Math.min(1, d.startValue + dy / (DRAG_PIXELS_FOR_FULL_RANGE * sensitivity)))
-    // Direct 1:1 tracking — no tween lag (the pointer is the smoothing).
+    // Direct 1:1 tracking : no tween lag (the pointer is the smoothing).
     setKnobImmediate(index, next)
   }
   function onPointerUp(e: ReactPointerEvent<HTMLDivElement>): void {
@@ -160,7 +160,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
     document.body.style.cursor = ''
   }
 
-  // Dial geometry — min at 7:30, max at 4:30 (LaunchControl orientation).
+  // Dial geometry : min at 7:30, max at 4:30 (LaunchControl orientation).
   const cx = KNOB_PX / 2
   const cy = KNOB_PX / 2
   const radius = KNOB_PX / 2 - 5
@@ -191,7 +191,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         onDoubleClick={() => setKnobTarget(index, 0, knob.smoothMs)}
-        title={`${knob.name} — drag vertically · Shift = fine · double-click resets`}
+        title={`${knob.name} : drag vertically · Shift = fine · double-click resets`}
       >
         <svg width={KNOB_PX} height={KNOB_PX} className="absolute inset-0">
           <path
@@ -225,7 +225,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
         </svg>
       </div>
 
-      {/* destinations count — what this knob drives */}
+      {/* destinations count : what this knob drives */}
       <span className="font-mono text-[8px] leading-none text-muted">
         {knob.destinations.length > 0 ? `${knob.destinations.length} dest` : '—'}
       </span>
@@ -248,7 +248,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
         <button
           onDoubleClick={() => setRenaming(true)}
           className="w-full truncate text-center font-mono text-[9px] text-muted hover:text-text"
-          title={`${knob.name} — double-click to rename`}
+          title={`${knob.name} : double-click to rename`}
         >
           {knob.name}
         </button>
@@ -287,7 +287,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
             learning
               ? 'Waiting for a CC… click to cancel'
               : knob.midiCc
-                ? `CC${knob.midiCc.number} ch${knob.midiCc.channel + 1} — click to clear`
+                ? `CC${knob.midiCc.number} ch${knob.midiCc.channel + 1} : click to clear`
                 : 'MIDI learn'
           }
         >
@@ -313,7 +313,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
 
 // Compact single-modulator assignment for a Meta knob: two rows of four
 // modulator buttons (only ONE can drive a knob at a time) plus a full-width
-// depth slider. No "mod"/"meta" text labels — the tiles are narrow.
+// depth slider. No "mod"/"meta" text labels : the tiles are narrow.
 function KnobModAssign({
   index,
   bound
@@ -325,7 +325,7 @@ function KnobModAssign({
   const removeAssignment = useStore((s) => s.removeAssignment)
   const setAssignmentDepth = useStore((s) => s.setAssignmentDepth)
   const target = { kind: 'meta', knob: index } as const
-  // One modulator per knob — bound[0] is the current driver, if any.
+  // One modulator per knob : bound[0] is the current driver, if any.
   const current = bound[0]
 
   return (
@@ -364,7 +364,7 @@ function KnobModAssign({
           value={current.depth}
           onChange={(e) => setAssignmentDepth(current.id, Number(e.target.value))}
           className="w-full accent-accent2"
-          title={`M${current.mod + 1} depth ${current.depth.toFixed(2)} — bipolar swing around the base`}
+          title={`M${current.mod + 1} depth ${current.depth.toFixed(2)} : bipolar swing around the base`}
         />
       )}
     </div>

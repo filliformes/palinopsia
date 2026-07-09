@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Grade — brightness / contrast / saturation / lift. The master-rack workhorse: bias toward mid-tone grades and desaturation (the disciplined feedback treatment, brief §1).",
+  "DESCRIPTION": "Grade : brightness / contrast / saturation / lift. The master-rack workhorse: bias toward mid-tone grades and desaturation (the disciplined feedback treatment, brief §1).",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color"],
@@ -19,6 +19,6 @@ void main() {
   col = (col - 0.5) * contrast + 0.5 + brightness;
   float l = dot(col, vec3(0.299, 0.587, 0.114));
   col = mix(vec3(l), col, saturation);
-  col = col * (1.0 - lift) + lift; // gentle black lift — matte floor
+  col = col * (1.0 - lift) + lift; // gentle black lift : matte floor
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), c.a);
 }

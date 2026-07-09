@@ -1,7 +1,7 @@
-// Palinopsia — the shell. Mounts the WebGL2 Compositor onto the output-preview
+// Palinopsia : the shell. Mounts the WebGL2 Compositor onto the output-preview
 // canvas and runs the frame loop; hosts the four layer strips, the transport,
 // and the theme picker. The heavy engine lives here in the renderer (brief §3);
-// main is pure IO. Panels/regions follow brief §10 — this is the Phase-0
+// main is pure IO. Panels/regions follow brief §10 : this is the Phase-0
 // skeleton: preview + layers + transport, ready for the ISF runtime (Phase 1),
 // the FX racks (Phase 3), the auto-UI (Phase 4), and modulation (Phase 5).
 
@@ -98,7 +98,7 @@ import { randomizeMetaKnobs } from './metaSmooth'
 import type { RandomizeScope } from './randomize'
 
 // Fire the Randomize mode the Transport's chevron currently points at (persisted
-// in localStorage) — the R shortcut mirrors clicking the Randomize button.
+// in localStorage) : the R shortcut mirrors clicking the Randomize button.
 function fireSelectedRandomize(): void {
   const raw = localStorage.getItem('opsia.randScope') as RandomizeScope | null
   const scope: RandomizeScope = raw ?? 'all'
@@ -121,7 +121,7 @@ export default function App(): JSX.Element {
   const uiZoom = useStore((s) => s.uiZoom)
   const setUiZoom = useStore((s) => s.setUiZoom)
   const rightView = useStore((s) => s.rightView)
-  // Layers-column width — draggable via the handle between preview and strips.
+  // Layers-column width : draggable via the handle between preview and strips.
   const [layersWidth, setLayersWidth] = useState<number>(() => {
     const saved = Number(localStorage.getItem('opsia.layersWidth'))
     return Number.isFinite(saved) && saved >= 240 ? saved : 320
@@ -150,13 +150,13 @@ export default function App(): JSX.Element {
     }
   }, [])
 
-  // ── Output window — reset our flag if the user closes it directly ──────
+  // ── Output window : reset our flag if the user closes it directly ──────
   const outputActive = useStore((s) => s.outputActive)
   useEffect(() => {
     return window.api.onOutputClosed(() => useStore.getState().setOutputActive(false))
   }, [])
 
-  // ── External output (NDI / Spout) — attach the readback while active ──
+  // ── External output (NDI / Spout) : attach the readback while active ──
   const ndiActive = useStore((s) => s.ndiActive)
   const spoutActive = useStore((s) => s.spoutActive)
   const outputPageOpen = useStore((s) => s.outputPageOpen)
@@ -171,7 +171,7 @@ export default function App(): JSX.Element {
     return () => comp.setOutputCapture(null)
   }, [ndiActive, spoutActive])
 
-  // ── HIVE output (sender) — start the HEVC encoder + TCP fan-out ───────
+  // ── HIVE output (sender) : start the HEVC encoder + TCP fan-out ───────
   const hiveOutActive = useStore((s) => s.hiveOutActive)
   const hiveOutPort = useStore((s) => s.hiveOutPort)
   useEffect(() => {
@@ -185,7 +185,7 @@ export default function App(): JSX.Element {
         return
       }
       if (!ok) {
-        // No WebCodecs HEVC encoder on this host — bail out and flip the toggle.
+        // No WebCodecs HEVC encoder on this host : bail out and flip the toggle.
         alert('HIVE output needs a hardware HEVC encoder, which this machine reports as unavailable.')
         useStore.getState().setHiveOutActive(false)
         return
@@ -202,7 +202,7 @@ export default function App(): JSX.Element {
     }
   }, [hiveOutActive, hiveOutPort])
 
-  // ── Audio ingest (Slab 1) — drive the audio bus from OSC + local input ─
+  // ── Audio ingest (Slab 1) : drive the audio bus from OSC + local input ─
   const audioEnabled = useStore((s) => s.audioEnabled)
   const audioSource = useStore((s) => s.audioSource)
   const audioDeviceId = useStore((s) => s.audioDeviceId)
@@ -348,7 +348,7 @@ export default function App(): JSX.Element {
         e.preventDefault()
         redo()
       } else if (e.key === 's' || e.key === 'S') {
-        // Save the session in place (Save As the first time). Global — Ctrl/Cmd+S
+        // Save the session in place (Save As the first time). Global : Ctrl/Cmd+S
         // is universally "save", so it fires even while an input is focused.
         e.preventDefault()
         void saveSession()
@@ -394,7 +394,7 @@ export default function App(): JSX.Element {
       comp = new Compositor(canvas, canvas.width, canvas.height)
       compositorRef.current = comp
     } catch (e) {
-      // WebGL2 unavailable — surface it rather than a blank canvas.
+      // WebGL2 unavailable : surface it rather than a blank canvas.
       console.error('[Compositor]', (e as Error).message)
       return
     }
@@ -414,7 +414,7 @@ export default function App(): JSX.Element {
     const loop = (): void => {
       // The whole body is guarded: a shader that throws at load or draw time
       // must never kill the loop (that's a permanent freeze). Lose one frame,
-      // keep scheduling — the offending layer simply doesn't render.
+      // keep scheduling : the offending layer simply doesn't render.
       try {
         const now = performance.now()
         const st = useStore.getState()
@@ -425,14 +425,14 @@ export default function App(): JSX.Element {
         // an interpolated composition (the store still holds the target).
         const c = morphedComposition(now, st.composition)
         // 1. Store → engine reconciliation (base values). One write path for
-        //    everything: UI edits, session loads, OSC — the engine follows.
+        //    everything: UI edits, session loads, OSC : the engine follows.
         //    Shader hot-swaps preserve feedback buffers (brief §1).
         comp!.setGlobalSpeed(st.globalSpeed)
         comp!.setWarp(st.warpEnabled ? st.warpCorners : null, st.warpGrid)
         comp!.syncFromState(c, shaderSourceById)
         // 2. Modulation: refresh the audio bus (OSC/local features), then tick
         //    the 8-slot engine and overlay the mod-matrix on top of the base
-        //    values — straight into the Compositor, never through React.
+        //    values : straight into the Compositor, never through React.
         audioBus.tick(now)
         const modValues = modEngine.tick(now, c.modulators, c.bpm)
         applyModulation(comp!, c, modValues, inputsForShader)
@@ -445,7 +445,7 @@ export default function App(): JSX.Element {
         if (st.sequence.enabled) tickSequencer(now, comp!, c)
         // 2e. Field macros: Density / Gesture⇄Texture / Coalesce (post-mod, 0.5 deadzone).
         applyFieldMacros(comp!, c, st.density, st.gestureTexture, st.coalesce)
-        // 2f. Corbeil-Perron temperament: Tonicity (tonal audio → colour) + Drift
+        // 2f. Temperament: Tonicity (tonal audio → colour) + Drift
         //     (analog-instability wander). Shutter (stop-motion stepping) freezes
         //     the output on held frames.
         applyTonicity(comp!, c, st.tonicity)
@@ -453,7 +453,7 @@ export default function App(): JSX.Element {
         if (st.shutter > 0.02) comp!.setFreeze(shutterHold(now, st.shutter))
         else if (shutterClear()) comp!.setFreeze(false)
         // 2g. Superimposition flicker (§5.2): cross-cut which layer shows on the
-        //     drawn cadence — rate follows the Cameraless film rate when it's on.
+        //     drawn cadence : rate follows the Cameraless film rate when it's on.
         if (st.superFlicker > 0.02) {
           const fin = c.master.find((f) => f.shaderId === 'fx-finalizer')?.inputs
           const filmOn = fin && Math.round(Number(fin.filmHold) || 0) > 0
@@ -463,7 +463,7 @@ export default function App(): JSX.Element {
         // 3. Render the frame.
         comp!.render(now - start)
         // 3b. Animated sound (§4.4): sample a scanline of the presented frame and
-        //     send it to Pandore over OSC (McLaren's drawn optical track).
+        //     send it to Pandore over OSC (the drawn optical track).
         if (st.markSignalEnabled) pushMarkSignal(comp!, now)
         // 4. Native output window: push the exact render state so it renders
         //    the same composition itself (pixel-perfect, no transcode).
@@ -537,7 +537,7 @@ export default function App(): JSX.Element {
         if (st.sessionPath) await window.api.sessionSave(st.exportSession(), st.sessionPath)
         else await window.api.sessionSaveToDefault(st.exportSession())
       } catch {
-        /* best-effort — never block the open */
+        /* best-effort : never block the open */
       }
       useStore.getState().loadSession(res.session)
       useStore.getState().setSessionPath(res.path) // Save now overwrites this file
@@ -555,14 +555,14 @@ export default function App(): JSX.Element {
     el.classList.add('flash-blue')
   }
 
-  // Save As — always prompts; remembers the chosen path for later plain Saves.
+  // Save As : always prompts; remembers the chosen path for later plain Saves.
   async function saveSessionAs(): Promise<boolean> {
     const path = await window.api.sessionSaveAs(useStore.getState().exportSession())
     if (path) useStore.getState().setSessionPath(path)
     return path != null
   }
 
-  // Save — overwrites the current file in place (no dialog). Falls back to Save
+  // Save : overwrites the current file in place (no dialog). Falls back to Save
   // As the first time (nothing saved/opened yet).
   async function saveSession(): Promise<void> {
     const st = useStore.getState()
@@ -586,7 +586,7 @@ export default function App(): JSX.Element {
       <header className="flex items-center gap-4 border-b border-border bg-panel px-4 py-2">
         <h1
           className="select-none font-mono text-[15px] font-semibold uppercase tracking-[0.2em]"
-          // Restrained glitch signature on the title — a faint chromatic
+          // Restrained glitch signature on the title : a faint chromatic
           // aberration, never spectacle (brief §10).
           style={{ textShadow: '0.5px 0 rgb(var(--c-accent) / 0.5), -0.5px 0 rgb(var(--c-accent2) / 0.5)' }}
         >
@@ -617,12 +617,12 @@ export default function App(): JSX.Element {
         <button
           className={`btn text-[12px] ${outputActive || ndiActive || spoutActive || hiveOutActive ? 'text-accent' : ''}`}
           onClick={() => useStore.getState().setOutputPageOpen(true)}
-          title="Output & projection mapping — fullscreen output, keystone, NDI/Spout/HIVE"
+          title="Output & projection mapping : fullscreen output, keystone, NDI/Spout/HIVE"
         >
           ⛶ Output
         </button>
         <UndoButtons />
-        <div className="flex items-center gap-0.5" title="UI zoom — Ctrl+= / Ctrl+- / Ctrl+0">
+        <div className="flex items-center gap-0.5" title="UI zoom : Ctrl+= / Ctrl+- / Ctrl+0">
           <button className="btn px-1.5 text-[12px]" onClick={() => setUiZoom(uiZoom - 0.05)}>
             −
           </button>
@@ -636,7 +636,7 @@ export default function App(): JSX.Element {
         <button
           className="btn text-[12px]"
           onClick={async () => {
-            // Same silent save-before-leaving as Open — New must not lose the
+            // Same silent save-before-leaving as Open : New must not lose the
             // current session's scenes.
             try {
               const st = useStore.getState()
@@ -658,14 +658,14 @@ export default function App(): JSX.Element {
           ref={saveBtnRef}
           className="btn text-[12px]"
           onClick={saveSession}
-          title="Save (Ctrl+S) — overwrites the current file (Save As the first time)"
+          title="Save (Ctrl+S) : overwrites the current file (Save As the first time)"
         >
           Save
         </button>
         <button
           className="btn text-[12px]"
           onClick={() => void saveSessionAs()}
-          title="Save As — choose a new file"
+          title="Save As : choose a new file"
         >
           Save As
         </button>
@@ -685,7 +685,7 @@ export default function App(): JSX.Element {
 
       {/* ── Body: preview + layer strips ────────────────────────── */}
       <main className="flex min-h-0 flex-1 gap-2 overflow-hidden p-3">
-        {/* Output preview — the live composite, front and centre (brief §10.1) */}
+        {/* Output preview : the live composite, front and centre (brief §10.1) */}
         <section className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="relative flex-1 overflow-hidden rounded-md border border-border bg-black">
             <canvas
@@ -708,18 +708,18 @@ export default function App(): JSX.Element {
             </div>
           </div>
 
-          {/* Scene bank — recallable full-instrument states (brief §10.7) */}
+          {/* Scene bank : recallable full-instrument states (brief §10.7) */}
           <Collapsible sectionKey="scenes" title="scenes">
             <SceneBank />
           </Collapsible>
 
-          {/* Auto-generated control panel — the selection's ISF INPUTS
+          {/* Auto-generated control panel : the selection's ISF INPUTS
               rendered as themed controls (brief §10.3). */}
           <Collapsible sectionKey="inspector" title="inspector">
             <Inspector />
           </Collapsible>
 
-          {/* Master FX rack — chips layout, zero blank space (brief §10.5);
+          {/* Master FX rack : chips layout, zero blank space (brief §10.5);
               the warp/mapping stage joins it in Phase 8. */}
           <Collapsible sectionKey="master" title="master fx">
             <MasterRackStrip />
@@ -727,10 +727,10 @@ export default function App(): JSX.Element {
 
         </section>
 
-        {/* Drag handle — the layers column is resizable */}
+        {/* Drag handle : the layers column is resizable */}
         <LayerColumnHandle onResize={setLayersWidth} width={layersWidth} />
 
-        {/* Right column — three switchable views: Layers strips, the compact
+        {/* Right column : three switchable views: Layers strips, the compact
             Mixer (M key), or the Finishing Touches finalizers stack. */}
         <aside
           className="flex shrink-0 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-0.5"
@@ -746,7 +746,7 @@ export default function App(): JSX.Element {
               {[0, 1, 2, 3].map((i) => (
                 <LayerPanel key={i} index={i} />
               ))}
-              {/* Background slab — pinned last, matching the stack (renders
+              {/* Background slab : pinned last, matching the stack (renders
                   under everything). */}
               <BackgroundPanel />
             </>
@@ -760,17 +760,17 @@ export default function App(): JSX.Element {
       {/* ── Meta Controller: 32 macro knobs / 4 banks (brief §6) ── */}
       <MetaBar />
 
-      {/* ── Audio ingest — OSC (Pandore) + local Web Audio → audio bus ── */}
+      {/* ── Audio ingest : OSC (Pandore) + local Web Audio → audio bus ── */}
       <AudioPanel />
 
-      {/* ── OSC input — just above the transport bar; the ON/OFF button IS
+      {/* ── OSC input : just above the transport bar; the ON/OFF button IS
              the collapse (info shows only while listening) ── */}
       <OscPanel />
 
       {/* ── Transport (BPM + Randomize) ───────────────────────────── */}
       <Transport />
 
-      {/* ── Output / Mapping page — full-screen takeover (canvas keeps
+      {/* ── Output / Mapping page : full-screen takeover (canvas keeps
              rendering underneath so the live mirror + engine never stop) ── */}
       {outputPageOpen && <OutputPage canvasRef={canvasRef} />}
       {worldPageOpen && <WorldPage />}
@@ -779,7 +779,7 @@ export default function App(): JSX.Element {
   )
 }
 
-// Live FPS over the preview's bottom-right corner — mirrors the resolution tag
+// Live FPS over the preview's bottom-right corner : mirrors the resolution tag
 // on the left, same font. Samples the render-loop meter on a light interval.
 function FpsTag(): JSX.Element {
   const [fps, setFps] = useState(0)
@@ -801,7 +801,7 @@ function RightViewTabs(): JSX.Element {
   const tabs: Array<{ id: 'layers' | 'mixer' | 'finishing'; label: string; title: string }> = [
     { id: 'layers', label: 'layers', title: 'The 4 layer strips' },
     { id: 'mixer', label: 'mixer', title: 'Compact opacity/speed/blend for all 4 layers (M)' },
-    { id: 'finishing', label: 'finishing', title: 'Finishing Touches — Vibe Palette · Context · Finalizer' }
+    { id: 'finishing', label: 'finishing', title: 'Finishing Touches : Vibe Palette · Context · Finalizer' }
   ]
   return (
     <div className="flex shrink-0 gap-1">
@@ -832,11 +832,11 @@ function MasterRackStrip(): JSX.Element {
   const [applied, setApplied] = useState('')
   const [flashing, flash] = useFlash()
   // Regular (user-added) FX wrap on the left; the three pinned finalizers
-  // (Vibe / Context / Finalizer) stay clustered at the rightmost — clicking one
+  // (Vibe / Context / Finalizer) stay clustered at the rightmost : clicking one
   // opens the Finishing view, not the shared Inspector.
   const rackFx = master.filter((f) => !f.locked)
   const lockedFx = master.filter((f) => f.locked)
-  // The "chain" On/Off state — on when every user FX is enabled.
+  // The "chain" On/Off state : on when every user FX is enabled.
   const chainOn = rackFx.length > 0 && rackFx.every((f) => f.enabled)
   return (
     // Line 1: chain label · dice · preset box · + fx; the regular FX chips wrap.
@@ -857,8 +857,8 @@ function MasterRackStrip(): JSX.Element {
           rackFx.length === 0
             ? 'No master FX to toggle'
             : chainOn
-              ? 'Master FX chain ON — click to bypass all (keeps Finishing Touches)'
-              : 'Master FX chain OFF — click to enable all'
+              ? 'Master FX chain ON : click to bypass all (keeps Finishing Touches)'
+              : 'Master FX chain OFF : click to enable all'
         }
       >
         chain {chainOn ? 'on' : 'off'}
@@ -887,7 +887,7 @@ function MasterRackStrip(): JSX.Element {
             setApplied(p.name)
           }
         }}
-        title="Master chain presets — replaces the chain and sets the Vibe accordingly"
+        title="Master chain presets : replaces the chain and sets the Vibe accordingly"
       >
         <option value="">chain presets…</option>
         {MASTER_PRESETS.map((p) => (
@@ -896,11 +896,11 @@ function MasterRackStrip(): JSX.Element {
           </option>
         ))}
       </select>
-      {/* Regular FX rack — wraps to more rows if the chain is deep */}
+      {/* Regular FX rack : wraps to more rows if the chain is deep */}
       <div className="ml-3 flex min-w-0 flex-1 items-center">
         <FxRackPanel scope={{ kind: 'master' }} fx={rackFx} label="" />
       </div>
-      {/* Pinned finalizers — clustered at the rightmost, never wrapping apart.
+      {/* Pinned finalizers : clustered at the rightmost, never wrapping apart.
           A global finishing on/off pill mirrors the one in the Finishing view. */}
       {lockedFx.length > 0 && (
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
@@ -918,7 +918,7 @@ function MasterRackStrip(): JSX.Element {
 function UndoButtons(): JSX.Element {
   const state = useUndoState()
   return (
-    <div className="flex items-center gap-0.5" title="Undo / Redo — Ctrl+Z / Ctrl+Shift+Z">
+    <div className="flex items-center gap-0.5" title="Undo / Redo : Ctrl+Z / Ctrl+Shift+Z">
       <button className="btn px-1.5 text-[12px]" onClick={undo} disabled={!state.undo}>
         ↩
       </button>

@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Ordered Dither — 4×4 Bayer-matrix dithering at a chosen dot scale, quantizing into few levels. The libretro/common-shaders dithering register: matte texture, not noise spectacle.",
-  "CREDIT": "Palinopsia (Bayer technique after libretro/common-shaders)",
+  "DESCRIPTION": "Ordered Dither : 4×4 Bayer-matrix dithering at a chosen dot scale, quantizing into few levels. The libretro/common-shaders dithering register: matte texture, not noise spectacle.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],
   "INPUTS": [

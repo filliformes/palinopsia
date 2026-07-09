@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Transform — zoom / pan / rotate the sampling frame, wrap or clamp at the edges. The compositional utility: place and scale a source inside the layer before FX and blending. With Shape set, the layer is instead clipped into a chosen geometric silhouette (circle, polygon, star, heart…) that you move with Pos, size with Zoom, and spin with Rotate.",
+  "DESCRIPTION": "Transform : zoom / pan / rotate the sampling frame, wrap or clamp at the edges. The compositional utility: place and scale a source inside the layer before FX and blending. With Shape set, the layer is instead clipped into a chosen geometric silhouette (circle, polygon, star, heart…) that you move with Pos, size with Zoom, and spin with Rotate.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Utility"],
@@ -59,7 +59,7 @@ float shapeDist(int s, vec2 p, float r) {
     vec2 hp = p / (r * 1.15); hp.y = -hp.y + 0.35;
     float hx = abs(hp.x);
     // b can be negative; pow(neg, 3.0) is undefined in GLSL (NaN on strict
-    // drivers) — cube it directly instead.
+    // drivers) : cube it directly instead.
     float b = hx * hx + hp.y * hp.y - 1.0;
     return b * b * b - hx * hx * hp.y * hp.y * hp.y;
   }

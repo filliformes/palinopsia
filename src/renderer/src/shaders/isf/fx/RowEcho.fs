@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Row Echo — a chance-selected set of row bands freeze onto their top line and repeat it downward (the Rutt-freeze / line-hold read). Held rows refresh on a stepped clock; fade softens the hold into a vertical smear.",
+  "DESCRIPTION": "Row Echo : a chance-selected set of row bands freeze onto their top line and repeat it downward (the line-freeze / line-hold read). Held rows refresh on a stepped clock; fade softens the hold into a vertical smear.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],

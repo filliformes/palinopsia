@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Feedback Zoom — the deepest palinopsia move: the image feeds back into itself through a zoom and twist, echoes marching inward or outward. Persistent-buffer recursion; mix()-based decay so trails converge instead of blooming (brief §1).",
+  "DESCRIPTION": "Feedback Zoom : the deepest palinopsia move: the image feeds back into itself through a zoom and twist, echoes marching inward or outward. Persistent-buffer recursion; mix()-based decay so trails converge instead of blooming (brief §1).",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch", "Feedback"],
@@ -30,7 +30,7 @@ void main() {
     vec2 c = clamp(p + 0.5, 0.0, 1.0);
     vec4 prev = IMG_NORM_PIXEL(fbz, c);
     vec4 live = IMG_NORM_PIXEL(inputImage, uv);
-    // Decay register: mix toward the live frame — echoes always converge.
+    // Decay register: mix toward the live frame : echoes always converge.
     gl_FragColor = mix(live, prev, amount);
   } else {
     gl_FragColor = IMG_NORM_PIXEL(fbz, uv);

@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Motif — spatial counterpoint (Basanta #8): re-instantiates the image's gesture ELSEWHERE in the frame, transposed — translated, rotated, scaled, optionally mirrored — so the same motif recurs at a new position with the same internal relations. Directional echoes (NOT radial/kaleidoscope symmetry): 1–3 copies stacking away from the source, each fainter.",
+  "DESCRIPTION": "Motif : spatial counterpoint: re-instantiates the image's gesture ELSEWHERE in the frame, transposed : translated, rotated, scaled, optionally mirrored : so the same motif recurs at a new position with the same internal relations. Directional echoes (NOT radial/kaleidoscope symmetry): 1–3 copies stacking away from the source, each fainter.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Stylize"],
@@ -46,7 +46,7 @@ void main() {
   vec4 base = IMG_NORM_PIXEL(inputImage, uv);
   vec3 col = base.rgb;
 
-  // Echo 1 — always (copies >= 1). Coord hoisted to a bare vec2 (runtime rule).
+  // Echo 1 : always (copies >= 1). Coord hoisted to a bare vec2 (runtime rule).
   vec2 c1 = xform(uv, 1.0);
   vec4 e1 = IMG_NORM_PIXEL(inputImage, c1);
   col = combine(col, e1.rgb, pow(fade, 1.0), mode);

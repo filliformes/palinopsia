@@ -1,4 +1,4 @@
-// Web MIDI — CC input for the Meta Controller (brief §6/§8: every control
+// Web MIDI : CC input for the Meta Controller (brief §6/§8: every control
 // MIDI-learnable via the Meta layer). Main grants the 'midi' permission;
 // this module listens on every input (hot-plug included) and routes CCs:
 //

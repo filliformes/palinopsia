@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Ash — sparse particulate falling at per-column rates with lateral wander and flicker; rare flecks carry the accent. Near-black particulate weather — settling, not snowing: matte, slow, asymmetric. Physics sets the mass: low = heavy flecks dropping fast and straight, high = light ash drifting down softly with more sway and float.",
+  "DESCRIPTION": "Ash : sparse particulate falling at per-column rates with lateral wander and flicker; rare flecks carry the accent. Near-black particulate weather : settling, not snowing: matte, slow, asymmetric. Physics sets the mass: low = heavy flecks dropping fast and straight, high = light ash drifting down softly with more sway and float.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Particles"],
@@ -53,7 +53,7 @@ void main() {
   for (int j = -1; j <= 1; j++) {
     for (int i = -2; i <= 2; i++) {
       vec2 cell = cell0 + vec2(float(i), float(j));
-      // Not every cell holds a fleck — sparseness is the register.
+      // Not every cell holds a fleck : sparseness is the register.
       if (hash(cell * 1.13) < 0.45) continue;
       // Per-fleck RANDOM horizontal scatter (breaks the columnar lines the old
       // smooth-only wander produced), plus a gentle sway and a physics-scaled

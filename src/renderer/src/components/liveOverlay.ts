@@ -1,5 +1,5 @@
 // One shared rAF that mirrors live modulation values onto registered DOM inputs
-// — slider thumbs and number readouts alike. The Inspector can show many
+// : slider thumbs and number readouts alike. The Inspector can show many
 // modulated controls at once; rather than each spinning its own requestAnimation
 // Frame loop, they all register here and a single loop paints them. The overlay
 // writes straight to the DOM (never through React), and skips any input the user

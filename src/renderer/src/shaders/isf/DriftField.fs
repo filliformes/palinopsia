@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Drift Field — a slow directional value-noise flow, posterized into matte bands over near-black, carrying a single accent tint and a restrained chroma-split at band edges. Asymmetric and matte by design: the disciplined generative/procedural register (brief §1), NOT kaleidoscope, plasma, or neon-on-void. Palinopsia seed generator.",
+  "DESCRIPTION": "Drift Field : a slow directional value-noise flow, posterized into matte bands over near-black, carrying a single accent tint and a restrained chroma-split at band edges. Asymmetric and matte by design: the disciplined generative/procedural register (brief §1), NOT kaleidoscope, plasma, or neon-on-void. Palinopsia seed generator.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Noise", "Glitch"],
@@ -65,7 +65,7 @@ void main() {
   vec3 base = vec3(0.03, 0.03, 0.035);
   vec3 col = base + tint.rgb * vec3(r, g, b) * 0.9;
 
-  // Faint scanline signature — controlled texture, never spectacle.
+  // Faint scanline signature : controlled texture, never spectacle.
   col *= 0.94 + 0.06 * sin(uv.y * RENDERSIZE.y * 3.14159);
 
   gl_FragColor = vec4(col, 1.0);

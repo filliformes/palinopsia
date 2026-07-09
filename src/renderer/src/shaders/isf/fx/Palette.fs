@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Palette — re-color by mapping luminance through a 2–5 stop gradient, with band/blend morph and ordered-dither breakup. The complex-coloring tool: build duotones, tritones, and full matte palettes; MIX returns some of the source color.",
+  "DESCRIPTION": "Palette : re-color by mapping luminance through a 2–5 stop gradient, with band/blend morph and ordered-dither breakup. The complex-coloring tool: build duotones, tritones, and full matte palettes; MIX returns some of the source color.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color"],

@@ -1,8 +1,8 @@
-// Background bank — the curated source set + 25 built-in background presets.
+// Background bank : the curated source set + 25 built-in background presets.
 //
 // The Background is the GROUND under the four layers: its picker offers every
 // generator except the ones that read as figures or need user intent
-// (Recurse, Text, Filaments, Congeal, Swell, Mycelium — per Vincent).
+// (Recurse, Text, Filaments, Congeal, Swell, Mycelium : per Vincent).
 // A preset = source + params + FX chain + opacity/speed. Values are PARTIAL
 // inputs (unset params keep their defaults). Default background speed 0.25 —
 // grounds move slowly.

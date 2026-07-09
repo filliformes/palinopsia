@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "RGB Shift — Lumen's RGB-splitter register: the three channels are pulled apart GEOMETRICALLY — each offset along the axis and independently scaled about the centre — so red/green/blue drift and breathe out of registration. Beyond a flat chroma shift; the channel-separation look, with an animated wobble option.",
-  "CREDIT": "Palinopsia (after Lumen RGB splitter)",
+  "DESCRIPTION": "RGB Shift : Lumen's RGB-splitter register: the three channels are pulled apart GEOMETRICALLY : each offset along the axis and independently scaled about the centre : so red/green/blue drift and breathe out of registration. Beyond a flat chroma shift; the channel-separation look, with an animated wobble option.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch", "Color"],
   "INPUTS": [

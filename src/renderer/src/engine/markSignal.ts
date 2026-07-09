@@ -1,7 +1,7 @@
-// Animated / graphical sound (Cameraless spec §4.4) — McLaren *drew the optical
-// soundtrack*. This closes the loop over OSC: each frame it samples one scanline
+// Animated / graphical sound (Cameraless spec §4.4) : the drawn optical
+// soundtrack. This closes the loop over OSC: each frame it samples one scanline
 // of the presented image and sends it to Pandore as a control signal, so a single
-// drawn gesture is simultaneously image AND sound — synchrèse at the level of the
+// drawn gesture is simultaneously image AND sound : synchrèse at the level of the
 // mark itself. Reuses the outbound OSC path (window.api.oscSend) + the outbound
 // host/port already configured for state feedback.
 //

@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Slice Shuffle — horizontal band displacement on a stepped clock; a minority of slices jump each step. The datamosh/slice register (GODPUS/glitch lineage): cuts, not flow.",
+  "DESCRIPTION": "Slice Shuffle : horizontal band displacement on a stepped clock; a minority of slices jump each step. The datamosh/slice register (GODPUS/glitch lineage): cuts, not flow.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],

@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Phosphene — the retinal afterimage that gives the instrument its name (palinopsia), and a homage to Maxime Corbeil-Perron's 'Phosphènes'. A bright stimulus burns a lingering COMPLEMENTARY-colour negative ghost into a persistent buffer that slowly decays — the afterimage itself, distinct from motion-trail feedback. Bounded (loop gain < 1) so it can never run away. No psychedelia.",
-  "CREDIT": "Palinopsia (after Maxime Corbeil-Perron)",
+  "DESCRIPTION": "Phosphene : the retinal afterimage that gives the instrument its name (palinopsia). A bright stimulus burns a lingering COMPLEMENTARY-colour negative ghost into a persistent buffer that slowly decays : the afterimage itself, distinct from motion-trail feedback. Bounded (loop gain < 1) so it can never run away. No psychedelia.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Optical"],
   "INPUTS": [
@@ -36,7 +36,7 @@ void main() {
     vec3 imprint = comp * bright * (0.3 + sensitivity);
 
     // Persistence → slower fade. max() lets a fresh flash re-arm the ghost while
-    // it otherwise bleeds down by decay — a lingering trail, never runaway.
+    // it otherwise bleeds down by decay : a lingering trail, never runaway.
     float decay = mix(0.90, 0.996, persistence);
     vec3 acc = max(prev * decay, imprint);
     gl_FragColor = vec4(clamp(acc, 0.0, 1.0), 1.0);

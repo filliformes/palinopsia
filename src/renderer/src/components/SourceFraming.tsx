@@ -1,4 +1,4 @@
-// SourceFraming — zoom / pan / crop controls for a video or capture source,
+// SourceFraming : zoom / pan / crop controls for a video or capture source,
 // shown in its Inspector panel. Applied by the engine as a transform on upload.
 
 import type { ReactNode } from 'react'
@@ -34,7 +34,7 @@ function Slider({
         onChange={(e) => onChange(Number(e.target.value))}
         onDoubleClick={() => onChange(def)}
         className="min-w-0 flex-1 accent-accent"
-        title={`${label} — double-click to reset (${def})`}
+        title={`${label} : double-click to reset (${def})`}
       />
       <span className="w-9 shrink-0 text-right font-mono text-[10px] text-muted">
         {(fmt ?? ((v) => v.toFixed(2)))(value)}
@@ -71,7 +71,7 @@ function MiniSlider({
         onChange={(e) => onChange(Number(e.target.value))}
         onDoubleClick={() => onChange(def)}
         className="min-w-0 flex-1 accent-accent"
-        title={`${label} — double-click to reset (${def})`}
+        title={`${label} : double-click to reset (${def})`}
       />
       <span className="w-8 shrink-0 text-right font-mono text-[9px] text-muted">{value.toFixed(2)}</span>
     </div>

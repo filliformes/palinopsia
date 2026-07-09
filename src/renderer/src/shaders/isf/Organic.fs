@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Organic — living elemental textures, always in motion. FIRE: turbulent flames advecting upward through an ember→orange→pale ramp, swaying and licking. WATER: domain-warped depth with drifting thin caustic ridges, deep and cold. NATURE: slowly growing canopy — leaf masses, fine cell texture and brown vein/branch networks, breathing on a very slow clock. `vary` blends each element toward its alternate season (gas-blue flame · lagoon green · autumn). Matte by design — no plasma, no glow blowouts.",
+  "DESCRIPTION": "Organic : living elemental textures, always in motion. FIRE: turbulent flames advecting upward through an ember→orange→pale ramp, swaying and licking. WATER: domain-warped depth with drifting thin caustic ridges, deep and cold. NATURE: slowly growing canopy : leaf masses, fine cell texture and brown vein/branch networks, breathing on a very slow clock. `vary` blends each element toward its alternate season (gas-blue flame · lagoon green · autumn). Matte by design : no plasma, no glow blowouts.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic"],
@@ -54,7 +54,7 @@ vec3 fire(vec2 uv, vec2 p, float t) {
   // Flame body: strongest near the bottom, noise carves the licking tops.
   float body = n * (1.45 - uv.y * 1.25);
   body = clamp(pow(max(body, 0.0) * 1.5, 0.8 + contrast), 0.0, 1.0);
-  // Matte ember ramp — near-black floor, never additive white.
+  // Matte ember ramp : near-black floor, never additive white.
   vec3 c = vec3(0.02, 0.012, 0.01);
   c = mix(c, vec3(0.42, 0.06, 0.02), smoothstep(0.06, 0.34, body));
   c = mix(c, vec3(0.85, 0.36, 0.07), smoothstep(0.34, 0.66, body));
@@ -99,7 +99,7 @@ vec3 nature(vec2 p, float t) {
   vec3 moss = mix(vec3(0.045, 0.085, 0.038), vec3(0.16, 0.32, 0.11), g);
   vec3 c = mix(moss, vec3(0.40, 0.50, 0.19), smoothstep(0.62, 0.95, g) * 0.65);
   c = mix(c, vec3(0.23, 0.155, 0.075), veins * 0.6);
-  // Season: patchy autumn — the swap arrives in drifting patches, not globally.
+  // Season: patchy autumn : the swap arrives in drifting patches, not globally.
   float patch = fbm(p * 0.6 + t * 0.02);
   vec3 autumn = mix(vec3(0.16, 0.07, 0.02), vec3(0.62, 0.32, 0.09), g);
   autumn = mix(autumn, vec3(0.23, 0.14, 0.06), veins * 0.6);

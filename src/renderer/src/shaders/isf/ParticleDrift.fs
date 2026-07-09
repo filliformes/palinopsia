@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Particle Drift — sparse points carried through a flow direction with capsule trails, wandering inside their cells. The generative point-field register (nannou-sketch), matte over near-black; trails elongate along motion, never bloom.",
+  "DESCRIPTION": "Particle Drift : sparse points carried through a flow direction with capsule trails, wandering inside their cells. The generative point-field register (nannou-sketch), matte over near-black; trails elongate along motion, never bloom.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Particles"],
@@ -32,7 +32,7 @@ float vnoise(vec2 p) {
 }
 
 // One particle per grid cell, wandering around its anchor. Each particle
-// wobbles at its OWN rate and phase (desynced — the organic read: a crowd
+// wobbles at its OWN rate and phase (desynced : the organic read: a crowd
 // of individuals, not a lockstep grid).
 vec2 particle(vec2 cell, float t) {
   vec2 anchor = cell + 0.5 + (vec2(hash(cell), hash(cell + 13.1)) - 0.5) * 0.7;
@@ -58,7 +58,7 @@ void main() {
   float t = TIME;
   float lum = 0.0;
   // Per-particle character: individual size, brightness, and trail length
-  // (all scaled by `vary`) — evaluated per neighbour, brightest wins. The
+  // (all scaled by `vary`) : evaluated per neighbour, brightest wins. The
   // capsule metric along dir gives the trail (delta collapsed toward the
   // motion axis behind the dot).
   for (int j = -1; j <= 1; j++) {
@@ -71,7 +71,7 @@ void main() {
       vec2 delta = q - pp;
       float along = clamp(dot(delta, dir), 0.0, trail * tlf);
       float dc = length(delta - dir * along);
-      // Matte dot falloff — solid core, short soft edge, no glow tail.
+      // Matte dot falloff : solid core, short soft edge, no glow tail.
       float dot_ = (1.0 - smoothstep(size * szf * 0.6, size * szf, dc)) * bf;
       lum = max(lum, dot_);
     }

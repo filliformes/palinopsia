@@ -1,4 +1,4 @@
-// PresetPicker — the Inspector's preset control. Custom dropdown (not a
+// PresetPicker : the Inspector's preset control. Custom dropdown (not a
 // native select) so it can: keep the applied preset's name on the button,
 // list factory + user presets (user ones deletable with a confirm), and
 // offer "+ add preset…" which prompts for a name and saves the shader's

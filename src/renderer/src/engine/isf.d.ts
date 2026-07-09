@@ -1,7 +1,7 @@
 // Minimal ambient types for the `interactive-shader-format` runtime (the npm
 // package ships no declarations). Only the surface Palinopsia uses. The runtime
 // is WebGL1-style GLSL (gl_FragColor / texture2D), which a WebGL2 context still
-// accepts for ES 1.00 shaders — so it shares the Compositor's WebGL2 context.
+// accepts for ES 1.00 shaders : so it shares the Compositor's WebGL2 context.
 declare module 'interactive-shader-format' {
   export class Renderer {
     constructor(gl: WebGLRenderingContext | WebGL2RenderingContext)

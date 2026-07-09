@@ -1,4 +1,4 @@
-// HiveSource — live HIVE stream as a layer source. The main process connects
+// HiveSource : live HIVE stream as a layer source. The main process connects
 // over TCP and forwards HEVC access units; here we decode them with WebCodecs
 // (VideoDecoder) and upload each frame to a GL texture. Waits for a keyframe
 // before decoding, and only holds the latest frame (live, never buffered).
@@ -9,7 +9,7 @@
 import type { HiveAU, HiveStatus } from '@shared/types'
 
 // WebCodecs is ambient in Chromium 94+/Electron 33 but not in the TS DOM lib
-// used here — declare the minimum we touch.
+// used here : declare the minimum we touch.
 declare const VideoDecoder: {
   new (init: { output: (frame: VideoFrameLike) => void; error: (e: Error) => void }): VideoDecoderLike
 }

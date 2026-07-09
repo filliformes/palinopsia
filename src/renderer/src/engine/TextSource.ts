@@ -1,12 +1,12 @@
-// TextSource — typography as a SOURCE, with the visual-convolution move applied:
+// TextSource : typography as a SOURCE, with the visual-convolution move applied:
 // the glyphs are a matte, and another layer (the sidechain) can be the material
-// that fills them — the letters become a window cut into the other source's
+// that fills them : the letters become a window cut into the other source's
 // texture/energy. No sidechain ⇒ solid colour fill.
 //
 // Two stages:
 //  1. Rasterize: white glyphs on transparent, drawn on an offscreen 2D canvas at
 //     engine resolution (bundled OFL display faces). Only re-drawn when a raster
-//     param (text · font · size · weight · spacing) changes — or when the font
+//     param (text · font · size · weight · spacing) changes : or when the font
 //     file finishes loading.
 //  2. GL pass into the layer's scratch target: angle/position UV transform on
 //     the MASK, fill sampled in screen space (the sidechain shows through the
@@ -39,7 +39,7 @@ void main(){
   vec2 uv = p + 0.5;
   float m = 0.0;
   if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) m = texture(uMask, uv).a;
-  // Fill in SCREEN space — the sidechain material shows through the letters.
+  // Fill in SCREEN space : the sidechain material shows through the letters.
   vec3 fill = mix(uColor.rgb, texture(uFill, vUV).rgb * uColor.rgb, uUseFill);
   o = vec4(fill * m, 1.0);
 }`
@@ -136,7 +136,7 @@ export class TextSource {
     ctx.fillStyle = '#fff'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    // Canvas letterSpacing (Chromium 99+) — in px, derived from em spacing.
+    // Canvas letterSpacing (Chromium 99+) : in px, derived from em spacing.
     ;(ctx as unknown as { letterSpacing: string }).letterSpacing = `${(spacing * px).toFixed(1)}px`
     // Multi-line: literal "\n" typed in the field, or pasted newlines.
     const lines = this.text.split(/\r?\n|\\n/)
@@ -144,7 +144,7 @@ export class TextSource {
     const y0 = c.height / 2 - ((lines.length - 1) * lineH) / 2
     lines.forEach((line, i) => ctx.fillText(line, c.width / 2, y0 + i * lineH))
 
-    // Upload (flipped — engine space is bottom-left).
+    // Upload (flipped : engine space is bottom-left).
     const gl = this.gl
     if (!this.mask) {
       this.mask = gl.createTexture()

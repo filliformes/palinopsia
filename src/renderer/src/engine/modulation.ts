@@ -1,4 +1,4 @@
-// Modulation engine (brief §6) — PORTED from dataFLOU's engine.ts, not
+// Modulation engine (brief §6) : PORTED from dataFLOU's engine.ts, not
 // rewritten: the LFO shapes, S&H probability/distribution/smoothing, slew
 // one-pole IIR, logistic-map chaos, ramp/ADSR gain math, BPM-sync divisions,
 // and the 14 output curves are dataFLOU's, lifted with their fixes intact
@@ -7,7 +7,7 @@
 //
 // It lives in the RENDERER, not main: Palinopsia's output is GL frames, so
 // modulation must be frame-locked with rendering (dataFLOU runs its engine in
-// main because its output is OSC/MIDI from main — same brain, different
+// main because its output is OSC/MIDI from main : same brain, different
 // mouth). Values are applied straight to the Compositor each frame and never
 // touch the React store, so nothing re-renders at 60 Hz.
 
@@ -252,7 +252,7 @@ function makeSlot(now: number): SlotState {
 }
 
 export class ModEngine {
-  /** Latest post-curve values, 0..1 per slot — read by the panel's meters. */
+  /** Latest post-curve values, 0..1 per slot : read by the panel's meters. */
   readonly values: number[] = new Array(8).fill(0)
   private slots: SlotState[] = []
   private lastNow = 0
@@ -311,7 +311,7 @@ export class ModEngine {
           v01 = adsrGain(cfg.adsr, now - s.startedAt)
           break
         case 'arp': {
-          // Stepped level sequence at clock rate — the arp register reduced
+          // Stepped level sequence at clock rate : the arp register reduced
           // to its visual essence: N evenly spaced levels walked by mode.
           if (hz > 0) {
             const period = 1000 / hz
@@ -431,7 +431,7 @@ export class ModEngine {
           break
         }
         case 'audio': {
-          // Follow one feature off the audio bus (OSC/local). Unclocked — the
+          // Follow one feature off the audio bus (OSC/local). Unclocked : the
           // signal IS the clock. One-pole smoothing tames it toward the value.
           const a = cfg.audio
           if (a) {
@@ -443,9 +443,9 @@ export class ModEngine {
           break
         }
         case 'organic': {
-          // Irregular periodicity + perpetual variation (Boucher's "water"): a
+          // Irregular periodicity + perpetual variation: a
           // base undulation plus INCOMMENSURATE partials whose phases slowly
-          // DRIFT against each other — so the waveform is non-sinusoidal and
+          // DRIFT against each other : so the waveform is non-sinusoidal and
           // never repeats. `variation` grows the partials + a period wobble.
           // At variation 0 it degenerates to a clean sine.
           const varn = Math.max(0, Math.min(1, cfg.organic?.variation ?? 0.5))
@@ -517,7 +517,7 @@ export class ModEngine {
           break
         }
         case 'motion': {
-          // Named motion archetypes (Smalley) + force behaviours (Boucher) —
+          // Named motion archetypes + force behaviours —
           // each a characteristic scalar trajectory over one clocked cycle.
           s.phase += hz * dt
           const p = s.phase - Math.floor(s.phase) // [0,1) cycle position
@@ -538,7 +538,7 @@ export class ModEngine {
               break
             }
             case 'wind': {
-              // Gusty drift — summed incommensurate sines, never quite repeating.
+              // Gusty drift : summed incommensurate sines, never quite repeating.
               const td = now * 0.001
               v01 = 0.5 + 0.28 * Math.sin(TWO_PI * p) + 0.14 * Math.sin(td * 1.7 + 1.0) + 0.08 * Math.sin(td * 0.53)
               break
@@ -556,7 +556,7 @@ export class ModEngine {
   }
 }
 
-// One engine per renderer — App's frame loop ticks it; the modulation panel
+// One engine per renderer : App's frame loop ticks it; the modulation panel
 // reads `.values` for its meters.
 export const modEngine = new ModEngine()
 
@@ -597,11 +597,11 @@ export function makeDefaultModulators(): ModulatorConfig[] {
   return Array.from({ length: 8 }, () => makeDefaultModulator())
 }
 
-// Live modulated value per target key — the UI's sliders read this each rAF
+// Live modulated value per target key : the UI's sliders read this each rAF
 // to move with the modulation (the dataFLOU behaviour). Key format matches
 // the store's modTargetKey exactly.
 export const liveModValues = new Map<string, number>()
-// Live modulated Meta-knob positions (0..1) — the dials read these each rAF.
+// Live modulated Meta-knob positions (0..1) : the dials read these each rAF.
 export const metaLiveValues = new Map<number, number>()
 
 function liveKey(t: import('@shared/types').ModTarget): string {
@@ -648,7 +648,7 @@ export function inputValueFrom01(d: ModDesc, v01: number): number | null {
   return null
 }
 
-/** Bipolar swing around the stored base — the 'replace' direct-modulator model.
+/** Bipolar swing around the stored base : the 'replace' direct-modulator model.
  *  Enums snap to the nearest declared value; bools threshold. null = not modulatable. */
 function inputValueFromSwing(
   d: ModDesc,
@@ -786,7 +786,7 @@ export function applyModulation(
     const v = values[a.mod]
     if (v === undefined) continue
     if (a.target.kind === 'meta') {
-      // Meta target: the knob's curve is its SCALING FUNCTION — the raw
+      // Meta target: the knob's curve is its SCALING FUNCTION : the raw
       // modulator signal is shaped by the curve first (modulator × scaling
       // function), then swung around the knob's base position by depth. The
       // same shaped value is what the dial animates to AND what fans out to

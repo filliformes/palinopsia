@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "CRT Screen — a whole-tube finish (Cathodemer CRT surface): barrel curvature, edge-increasing chromatic aberration, scanline grille, corner vignette, and a rounded bezel that blacks out beyond the glass. The 'projected on a tube' master stage — pairs with Grain/Scanlines under it.",
-  "CREDIT": "Palinopsia (after Cathodemer CRT surface)",
+  "DESCRIPTION": "CRT Screen : a whole-tube finish (Cathodemer CRT surface): barrel curvature, edge-increasing chromatic aberration, scanline grille, corner vignette, and a rounded bezel that blacks out beyond the glass. The 'projected on a tube' master stage : pairs with Grain/Scanlines under it.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Stylize", "Master"],
   "INPUTS": [
@@ -30,14 +30,14 @@ void main() {
   float bb = IMG_NORM_PIXEL(inputImage, cb).b;
   vec3 col = vec3(rr, gg, bb);
 
-  // Scanline grille (darkening only — no glow).
+  // Scanline grille (darkening only : no glow).
   float line = 0.5 + 0.5 * sin(warped.y * RENDERSIZE.y * 3.14159);
   col *= 1.0 - scanline * line * 0.5;
 
   // Corner vignette.
   col *= 1.0 - vignette * smoothstep(0.15, 0.5, r2);
 
-  // Rounded bezel — black outside the glass (on the warped coords).
+  // Rounded bezel : black outside the glass (on the warped coords).
   vec2 q = abs(warped - 0.5) - (0.5 - corner);
   float bezel = length(max(q, 0.0)) - corner;
   col *= 1.0 - smoothstep(0.0, 0.004, bezel);

@@ -1,4 +1,4 @@
-// Mixer — a compact 4-column surface: just each layer's Opacity, Speed and
+// Mixer : a compact 4-column surface: just each layer's Opacity, Speed and
 // Blend, with no source/FX detail. Toggled in place of the layer strips with
 // the M key (or the header button). Fills the full column height, with tall
 // vertical faders. Carries its own app-persistent presets.
@@ -59,7 +59,7 @@ export function MixerPanel(): JSX.Element {
         </div>
       </div>
 
-      {/* Four columns — one per layer — filling the section height */}
+      {/* Four columns : one per layer : filling the section height */}
       <div className="grid min-h-0 flex-1 grid-cols-4 gap-2">
         {layers.map((l, i) => (
           <div
@@ -68,7 +68,7 @@ export function MixerPanel(): JSX.Element {
           >
             <span className="shrink-0 font-mono text-[10px] text-muted">L{i + 1}</span>
 
-            {/* Opacity then Speed stacked — one clean vertical column, each
+            {/* Opacity then Speed stacked : one clean vertical column, each
                 fader with its readout directly beneath it. */}
             <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2">
               <VFader
@@ -89,7 +89,7 @@ export function MixerPanel(): JSX.Element {
               />
             </div>
 
-            {/* Blend — full width, no native arrow / chevron, tiny padding so
+            {/* Blend : full width, no native arrow / chevron, tiny padding so
                 even the longest mode name ("difference") shows without cropping. */}
             <select
               className="input w-full shrink-0 appearance-none !px-1 !py-0.5 text-center !text-[9px]"

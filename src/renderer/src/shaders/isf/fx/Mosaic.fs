@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Mosaic — an analysis/resynthesis grid (after Villegas & Forbes): the frame is read as an N×M field of cells, each replaced by its own average colour and redrawn as a tile whose SIZE follows the cell's luminance (bright cells swell, dark cells shrink to nothing). Shape, gap and softness are yours. A matte, dithered-mosaic resynthesis — the image survives as a field of marks, not pixels.",
-  "CREDIT": "Palinopsia (after Villegas & Forbes, Analysis/Synthesis)",
+  "DESCRIPTION": "Mosaic : an analysis/resynthesis grid (after Villegas & Forbes): the frame is read as an N×M field of cells, each replaced by its own average colour and redrawn as a tile whose SIZE follows the cell's luminance (bright cells swell, dark cells shrink to nothing). Shape, gap and softness are yours. A matte, dithered-mosaic resynthesis : the image survives as a field of marks, not pixels.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Stylize", "Texture"],
   "INPUTS": [

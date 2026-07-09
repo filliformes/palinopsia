@@ -1,4 +1,4 @@
-// OutputShape — the Finalizer's output shaper + background fill. Clips the whole
+// OutputShape : the Finalizer's output shaper + background fill. Clips the whole
 // finished frame into a chosen silhouette (the same 21 shapes as Transform),
 // moved/sized/spun, and fills OUTSIDE the shape with a solid colour OR a supplied
 // texture (the Background slab, "moved" here from behind the layers). Runs as the
@@ -65,17 +65,17 @@ void main(){
   float m = smoothstep(0.004, -0.004, d);           // 1 inside the shape
   vec3 src = texture(uSrc, uv).rgb;
   vec3 fill = mix(uFillColor, texture(uFill, uv).rgb, uUseFill);
-  // Depth: the shaped composition FLOATS over the fill — a soft drop shadow
+  // Depth: the shaped composition FLOATS over the fill : a soft drop shadow
   // cast from the shape's SDF darkens the fill. uShadowAngle sets the light
   // direction (which way the shadow falls, so the depth can read from another
   // perspective). uPersp PROJECTS that shadow onto a receding ground plane:
   // it rakes and stretches away from the shape in the fall direction, its
-  // penumbra widening and its density fading with distance — a low-sun cast
+  // penumbra widening and its density fading with distance : a low-sun cast
   // shadow rather than a flat sticker offset.
   if (uDepth > 0.001) {
     vec2 dir = vec2(cos(uShadowAngle), sin(uShadowAngle));
     vec2 prp = vec2(-dir.y, dir.x);
-    // Contact offset (grows a little with perspective — the object lifts).
+    // Contact offset (grows a little with perspective : the object lifts).
     vec2 off = dir * r * (0.06 + 0.20 * uPersp) * uDepth;
     vec2 sp2 = q - off;
     // Foreshorten along the fall direction so the silhouette elongates into the

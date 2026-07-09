@@ -1,6 +1,6 @@
-// Inspector — the auto-generated control panel (brief §10.3). Points at the
+// Inspector : the auto-generated control panel (brief §10.3). Points at the
 // current selection (a source slot or an FX unit), renders its ISF INPUTS as
-// themed controls, and writes edits back through the store — the same path
+// themed controls, and writes edits back through the store : the same path
 // OSC and the modulators (Phase 5) use, so the engine follows automatically.
 
 import type { FxInstance, ModTarget, SidechainRef, SourceSlot } from '@shared/types'
@@ -95,7 +95,7 @@ export function Inspector(): JSX.Element {
   let modTargetFor: ((inputName: string) => ModTarget) | undefined
   // For FX selections: the dry/wet control shown above the shader's own params.
   let fxOpacity: { value: number; set: (v: number) => void } | null = null
-  // For a video source (no ISF controls) — the clip name shown in a small panel.
+  // For a video source (no ISF controls) : the clip name shown in a small panel.
   let videoName: string | null = null
   // For a native convolution node (layer FX): the sidechain picker.
   let nodeSidechain: { ref: SidechainRef | null; hostLayer: number; set: (r: SidechainRef | null) => void } | null =
@@ -277,9 +277,9 @@ export function Inspector(): JSX.Element {
         <span className="text-[12px] font-semibold">{title}</span>
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{context}</span>
         <div className="flex-1" />
-        {/* Per-FX dry/wet opacity — centered, sized like a normal control. */}
+        {/* Per-FX dry/wet opacity : centered, sized like a normal control. */}
         {fxOpacity && (
-          <div className="flex shrink-0 items-center gap-1.5" title={`FX dry/wet — ${fxOpacity.value.toFixed(2)}`}>
+          <div className="flex shrink-0 items-center gap-1.5" title={`FX dry/wet : ${fxOpacity.value.toFixed(2)}`}>
             <span className="font-mono text-[9px] uppercase text-muted">opacity</span>
             <input
               type="range"
@@ -305,7 +305,7 @@ export function Inspector(): JSX.Element {
               if (vibe) onChange('lightColor', vibeMainColor(vibe.inputs))
             }}
             className="shrink-0 rounded border border-accent2/50 bg-accent2/10 px-1.5 py-0.5 font-mono text-[10px] text-accent2 transition-colors hover:bg-accent2/20"
-            title="Set the light colour from the Vibe Palette's main colour (brightened) — an instant unified look"
+            title="Set the light colour from the Vibe Palette's main colour (brightened) : an instant unified look"
           >
             Vibe Color
           </button>
@@ -345,7 +345,7 @@ export function Inspector(): JSX.Element {
             className="input min-w-0 flex-1 px-2 py-0.5 text-[12px]"
             value={textCfg.text}
             onChange={(e) => textCfg!.setText(e.target.value)}
-            placeholder={'Your text — \\n for a new line'}
+            placeholder={'Your text : \\n for a new line'}
             spellCheck={false}
           />
           <span
@@ -397,7 +397,7 @@ export function Inspector(): JSX.Element {
           <span className="font-mono text-[9px] text-muted">its motion → this layer</span>
         </div>
       )}
-      {/* Sources (≤8 params) fit their content — wrap onto as few rows as
+      {/* Sources (≤8 params) fit their content : wrap onto as few rows as
           needed (usually one), no fixed height, no horizontal scroll. FX can be
           deep, so they keep the fixed two-row grid that flows into columns. */}
       {/* Controls on the left; the mod-assign panel slides in on the right,
@@ -476,7 +476,7 @@ export function Inspector(): JSX.Element {
   )
 }
 
-// The mod-assign side panel — replaces the old floating popover. Sits at the
+// The mod-assign side panel : replaces the old floating popover. Sits at the
 // right of the controls band (under the header's dice/presets), names the
 // parameter it modulates, and hosts the M1–8 / Meta binding row.
 function AssignPanel({

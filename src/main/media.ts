@@ -1,4 +1,4 @@
-// opsia-media:// — a range-capable local-file protocol for video sources.
+// opsia-media:// : a range-capable local-file protocol for video sources.
 //
 // Object URLs die on reload, so a saved session can't restore its clips. Instead
 // we address clips by absolute path through this custom scheme:
@@ -27,7 +27,7 @@ const mimeFor = (path: string): string => MIME[path.split('.').pop()?.toLowerCas
 /** Build the protocol URL for an absolute file path (used by the renderer). */
 export const mediaUrl = (absPath: string): string => `${MEDIA_SCHEME}://local/${encodeURIComponent(absPath)}`
 
-/** Must run BEFORE app ready — registers the scheme as a privileged, streaming,
+/** Must run BEFORE app ready : registers the scheme as a privileged, streaming,
  *  standard scheme so <video> can seek it via range requests. */
 export function registerMediaScheme(): void {
   protocol.registerSchemesAsPrivileged([
@@ -35,7 +35,7 @@ export function registerMediaScheme(): void {
   ])
 }
 
-/** Must run AFTER app ready — serves files with 200 / 206 (range) responses. */
+/** Must run AFTER app ready : serves files with 200 / 206 (range) responses. */
 export function handleMediaProtocol(): void {
   protocol.handle(MEDIA_SCHEME, async (request) => {
     let filePath: string

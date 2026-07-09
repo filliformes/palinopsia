@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Membrane — one large soft mass slowly deforming in the dark: a domain-warped low-frequency field thresholded into a breathing silhouette, interior shaded by depth, edge softness adjustable. The organism register: near-black, one body, no symmetry.",
+  "DESCRIPTION": "Membrane : one large soft mass slowly deforming in the dark: a domain-warped low-frequency field thresholded into a breathing silhouette, interior shaded by depth, edge softness adjustable. The organism register: near-black, one body, no symmetry.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic"],
@@ -45,7 +45,7 @@ void main() {
   vec2 p = (uv - vec2(0.45, 0.52)) * vec2(aspect, 1.0); // off-centre body
   float t = TIME * rate;
 
-  // The body field: low-frequency fbm, warped by itself — a breathing blob
+  // The body field: low-frequency fbm, warped by itself : a breathing blob
   // that never resolves into a circle.
   vec2 flow = vec2(fbm(p * 1.2 + t * 0.3), fbm(p.yx * 1.2 - t * 0.25));
   float field = fbm(p * 1.4 + warp * flow + vec2(t * 0.2, -t * 0.15));

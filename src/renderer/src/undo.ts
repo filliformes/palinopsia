@@ -1,4 +1,4 @@
-// Undo/redo — 100 levels over the composition.
+// Undo/redo : 100 levels over the composition.
 //
 // History lives OUTSIDE React (module state): a debounced subscriber watches
 // the store's composition and, after 300 ms of quiet, commits the previous
@@ -17,7 +17,7 @@ const QUIET_MS = 300
 
 let past: CompositionState[] = []
 let future: CompositionState[] = []
-// The last state committed to history — the baseline the next edit diffs from.
+// The last state committed to history : the baseline the next edit diffs from.
 let committed: CompositionState | null = null
 let quietTimer: ReturnType<typeof setTimeout> | null = null
 // True while undo()/redo() applies a snapshot, so the subscriber ignores it.
@@ -53,7 +53,7 @@ export function initUndo(): () => void {
   return unsub
 }
 
-/** Run a store mutation WITHOUT recording an undo step — for the auto-sequencer,
+/** Run a store mutation WITHOUT recording an undo step : for the auto-sequencer,
  *  which changes the composition every few seconds and would otherwise evict all
  *  real history. The new composition becomes the baseline the next edit diffs from. */
 export function runSilently(fn: () => void): void {
@@ -87,7 +87,7 @@ export function undo(): void {
   const cur = useStore.getState().composition
   future.push(cur)
   if (future.length > CAPACITY) future.shift()
-  cancelMorph() // the composition is being swapped — don't ease toward a stale target
+  cancelMorph() // the composition is being swapped : don't ease toward a stale target
   applying = true
   useStore.setState({ composition: prev })
   committed = prev
@@ -102,7 +102,7 @@ export function redo(): void {
   const cur = useStore.getState().composition
   past.push(cur)
   if (past.length > CAPACITY) past.shift()
-  cancelMorph() // the composition is being swapped — don't ease toward a stale target
+  cancelMorph() // the composition is being swapped : don't ease toward a stale target
   applying = true
   useStore.setState({ composition: next })
   committed = next
@@ -117,7 +117,7 @@ export function canRedo(): boolean {
   return future.length > 0
 }
 
-/** React hook for the header buttons — re-renders on history changes. */
+/** React hook for the header buttons : re-renders on history changes. */
 export function useUndoState(): { undo: boolean; redo: boolean } {
   useSyncExternalStore(
     (cb) => {

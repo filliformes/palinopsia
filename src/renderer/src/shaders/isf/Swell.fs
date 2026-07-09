@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Swell — an open water surface seen as pure luminance: several directional wave trains beating plus fbm chop, no horizon, no sky. Chop sharpens crests toward foam; matte greys with a single tint.",
+  "DESCRIPTION": "Swell : an open water surface seen as pure luminance: several directional wave trains beating plus fbm chop, no horizon, no sky. Chop sharpens crests toward foam; matte greys with a single tint.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic", "Noise"],

@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Sharpen — 3×3 unsharp mask. The utility detail lift: makes dithers bite and posterized bands snap after soft passes.",
+  "DESCRIPTION": "Sharpen : 3×3 unsharp mask. The utility detail lift: makes dithers bite and posterized bands snap after soft passes.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Utility"],

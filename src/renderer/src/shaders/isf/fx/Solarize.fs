@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Solarize — invert everything whose LUMINANCE clears the level, with a soft knee (Sabattier register). Luma-keyed rather than per-channel so it reads clearly even on dark, matte compositions.",
+  "DESCRIPTION": "Solarize : invert everything whose LUMINANCE clears the level, with a soft knee (Sabattier register). Luma-keyed rather than per-channel so it reads clearly even on dark, matte compositions.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color"],

@@ -1,4 +1,4 @@
-// Collapsible — shared section chrome: a slim header with a chevron; the
+// Collapsible : shared section chrome: a slim header with a chevron; the
 // body unmounts when collapsed (cheap) and the state persists per key.
 
 import type { ReactNode } from 'react'

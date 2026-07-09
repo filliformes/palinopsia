@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Pixelate — mosaic quantization of the sampling grid, aspect-correct. Digital texture, not retro-game nostalgia: pair with Posterize/Dither for the synthify register.",
+  "DESCRIPTION": "Pixelate : mosaic quantization of the sampling grid, aspect-correct. Digital texture, not retro-game nostalgia: pair with Posterize/Dither for the synthify register.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],

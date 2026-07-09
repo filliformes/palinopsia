@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Wide Time — a temporal average across the last N frames (after Jean Piché's use of AE's CC Wide Time). The image continuously crossfades with its own recent past, so motion smears into clean, evolving visual-music scapes. WIDTH is how many frames wide the window is; MIX is dry/wet; MODE is how each new frame accumulates (mean / brightest / add / screen / difference / darkest); SOFTEN blurs the trails; DRIFT slowly zooms the memory for breathing scapes; HUE evolves the colour of the fading past. MOTION BLUR simulates a shutter (blurs moving areas); FRAME BLEND runs a second weighted temporal pass for a smoother, more symmetric blend — both on for best results, like AE. Real-time, so the window reaches into the PAST only.",
-  "CREDIT": "Palinopsia (after Jean Piché / CC Wide Time)",
+  "DESCRIPTION": "Wide Time : a temporal average across the last N frames. The image continuously crossfades with its own recent past, so motion smears into clean, evolving visual-music scapes. WIDTH is how many frames wide the window is; MIX is dry/wet; MODE is how each new frame accumulates (mean / brightest / add / screen / difference / darkest); SOFTEN blurs the trails; DRIFT slowly zooms the memory for breathing scapes; HUE evolves the colour of the fading past. MOTION BLUR simulates a shutter (blurs moving areas); FRAME BLEND runs a second weighted temporal pass for a smoother, more symmetric blend : both on for best results. Real-time, so the window reaches into the PAST only.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Time", "Feedback", "Blur"],
   "INPUTS": [

@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Ramps — LZX-style voltage ramps: a single clean gradient signal (horizontal / vertical / diagonal / radial / diamond), optionally stepped into bands and slowly drifting. The raw material of analog video synthesis — feed it into Colorizer or key against it. Matte.",
-  "CREDIT": "Palinopsia (after LZX Industries ramp generators)",
+  "DESCRIPTION": "Ramps : LZX-style voltage ramps: a single clean gradient signal (horizontal / vertical / diagonal / radial / diamond), optionally stepped into bands and slowly drifting. The raw material of analog video synthesis : feed it into Colorizer or key against it. Matte.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Scan"],
   "INPUTS": [

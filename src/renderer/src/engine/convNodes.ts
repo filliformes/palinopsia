@@ -1,12 +1,12 @@
-// Native convolution nodes (visual-convolution spec) — multi-pass render effects
+// Native convolution nodes (visual-convolution spec) : multi-pass render effects
 // that can't be ISF shaders (dynamic pass counts, persistent inter-frame FBO
 // state). They live in a layer's FX rack like any FX (same param/UI/modulation
 // surface) but the rack runs THIS class instead of the ISF runtime, and hands it
 // a sidechain texture (another layer / an imported asset) as the "impulse" source.
 //
-// Module 2 — Transfert (MotionTransfer): estimate the movement of the sidechain
+// Module 2 : Transfert (MotionTransfer): estimate the movement of the sidechain
 // (poor-man's Lucas–Kanade optical flow), condition it (blur + inertia), then
-// imprint it on the host — as a displacement field (« Déplacement ») or a
+// imprint it on the host : as a displacement field (« Déplacement ») or a
 // per-pixel flow-steered line blur (« Traînée », poor-man's SepConv). This is the
 // M factor of Filter Flow's T = MK, run forward (synthesis).
 
@@ -43,7 +43,7 @@ precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uTex;
 void main(){ vec3 c = texture(uTex, vUV).rgb; o = vec4(dot(c, vec3(0.299,0.587,0.114)), 0.0, 0.0, 1.0); }`
 
-// Gradient (poor-man's Lucas–Kanade) flow — RG = flow vector.
+// Gradient (poor-man's Lucas–Kanade) flow : RG = flow vector.
 const F_FLOW = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uCur, uPrev; uniform vec2 uRes; uniform float uLambda, uClamp;
@@ -60,7 +60,7 @@ void main(){
   o = vec4(clamp(flow, -uClamp, uClamp), 0.0, 1.0);
 }`
 
-// Separable blur on the flow field (dynamic radius — WebGL2 allows it).
+// Separable blur on the flow field (dynamic radius : WebGL2 allows it).
 const F_BLUR = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uTex; uniform vec2 uStep; uniform float uRadius;
@@ -82,7 +82,7 @@ void main(){
   o = vec4(mix(pr, f, uResponse), 0.0, 1.0);
 }`
 
-// « Déplacement » — warp host by the flow field (+ per-channel chromatic spread).
+// « Déplacement » : warp host by the flow field (+ per-channel chromatic spread).
 const F_DISPLACE = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uHost, uFlow; uniform float uAmount, uMagGamma, uSpread, uSign;
@@ -97,7 +97,7 @@ void main(){
   o = vec4(r, g, b, 1.0);
 }`
 
-// « Traînée » — flow-steered 1D line blur (poor-man's SepConv).
+// « Traînée » : flow-steered 1D line blur (poor-man's SepConv).
 const F_TRAINEE = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uHost, uFlow;
@@ -116,10 +116,10 @@ void main(){
   o = vec4(acc / max(wsum, 1e-4), 1.0);
 }`
 
-// ── Module 1 — Convolution (ConvolveSpatial), direct kernel path ─────────
+// ── Module 1 : Convolution (ConvolveSpatial), direct kernel path ─────────
 // The sidechain frame is the kernel (point-spread function): every host pixel
 // stamps a scaled copy of it. Direct brute-force gather (the spec's `quality:
-// "direct"` path, done well) at reduced res — reliable + verifiable now; FFT
+// "direct"` path, done well) at reduced res : reliable + verifiable now; FFT
 // large-kernel is a future `quality` upgrade. Kernel is read LIVE from the
 // sidechain each frame (threshold/gamma inline), normalized per-output by the
 // accumulated weight (energy-conserving, no reduction pass).
@@ -165,9 +165,9 @@ void main(){
   o = vec4(outc, 1.0);
 }`
 
-// ── Module 3 — Réponse (temporal frame-echo convolution) ─────────────────
+// ── Module 3 : Réponse (temporal frame-echo convolution) ─────────────────
 // A ring of N past host frames (half-res, tiled into one atlas). Output =
-// Σ history[i]·envelope[i], normalized — trails that pulse with a shaped
+// Σ history[i]·envelope[i], normalized : trails that pulse with a shaped
 // temporal IR (attack/decay/reverse). Convolves the host's OWN time-history
 // (no sidechain needed). Copy a downsampled host frame into the write tile:
 const F_COPY = `#version 300 es
@@ -463,7 +463,7 @@ function makeRGBA(gl: WebGL2RenderingContext, w: number, h: number, float: boole
 }
 const clampf = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v)
 
-// ── Module 1 — Convolution (ConvolveSpatial, direct kernel path) ──────────
+// ── Module 1 : Convolution (ConvolveSpatial, direct kernel path) ──────────
 export class ConvolveNode implements ConvNode {
   private wet: RGBA | null = null
   private ww = 0
@@ -522,7 +522,7 @@ export class ConvolveNode implements ConvNode {
   }
 }
 
-// ── Module 3 — Réponse (temporal frame-echo convolution) ──────────────────
+// ── Module 3 : Réponse (temporal frame-echo convolution) ──────────────────
 const ECHO_COLS = 4
 const ECHO_ROWS = 4
 const ECHO_N = ECHO_COLS * ECHO_ROWS // 16 history frames

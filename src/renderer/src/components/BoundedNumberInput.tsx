@@ -4,7 +4,7 @@
 //  - clamps to [min, max] and reverts to the previous value on blur if invalid
 //  - hides spinner arrows (handled globally in styles.css)
 //  - in rich themes (Nature, Cream-as-Peaks), gets a "console readout"
-//    look — accent-tinted mono on a dark embedded card — until focused,
+//    look : accent-tinted mono on a dark embedded card : until focused,
 //    then reverts to the standard input chrome for editing
 //
 // Use this anywhere a typical <input type="number"> would otherwise hijack
@@ -28,11 +28,11 @@ interface Props {
   // builtin / read-only Templates without forking the component.
   disabled?: boolean
   // Bumping this number focuses the input and selects all its text on
-  // the next render — used by the Sequence view to "land" on the
+  // the next render : used by the Sequence view to "land" on the
   // Duration field after the user drops a scene into a Scene Step.
   autoFocusToken?: number
   // When set, the box shows the LIVE modulated value (liveModValues[liveKey])
-  // while idle — written straight to the DOM per rAF, no re-render — so the
+  // while idle : written straight to the DOM per rAF, no re-render : so the
   // readout tracks modulation just like the slider thumb. Typing still edits
   // the base value.
   liveKey?: string
@@ -61,7 +61,7 @@ export function BoundedNumberInput({
   // on focus + blur. Read inside the value-sync useEffect to know
   // whether to bail.
   const dirty = useRef(false)
-  // Latest str — read inside onBlur to avoid stale-closure issues
+  // Latest str : read inside onBlur to avoid stale-closure issues
   // (the previous version closed over the str captured at handler-
   // creation time, which intermittently caused onBlur to "restore"
   // an old value after a fast type-then-blur sequence).
@@ -69,7 +69,7 @@ export function BoundedNumberInput({
   strRef.current = str
   // DOM ref for autoFocusToken handling.
   const inputRef = useRef<HTMLInputElement | null>(null)
-  // Capture the initial token so we skip the on-mount fire — only
+  // Capture the initial token so we skip the on-mount fire : only
   // INCREMENTS of the token from the parent should pull focus, not
   // the first paint after the panel mounts.
   const initialTokenRef = useRef(autoFocusToken)
@@ -86,7 +86,7 @@ export function BoundedNumberInput({
       if (!el) return
       el.focus()
       el.select()
-      // Mark the input as "edit-ready" — focused.current is what
+      // Mark the input as "edit-ready" : focused.current is what
       // the on-blur and value-sync paths gate on. Without this, a
       // value re-sync arriving on the same tick would clobber str.
       focused.current = true
@@ -153,10 +153,10 @@ export function BoundedNumberInput({
   // the caller passed. The CSS rule for .rich-readout:focus reverts
   // to the standard input look while editing, so the user gets the
   // familiar typing chrome on focus and the console-display look at
-  // rest. Re-renders when the theme changes — instant flip.
+  // rest. Re-renders when the theme changes : instant flip.
   const rich = useStore((s) => isRichTheme(s.theme))
   // Compact height: every number readout matches its slider's text label
-  // (~a 9–10px label line box), even if that shrinks the digits — the box should
+  // (~a 9–10px label line box), even if that shrinks the digits : the box should
   // never tower over the label it sits beside. Forced (!) so per-call padding /
   // font classes can't reinflate it.
   const cls =

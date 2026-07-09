@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Rutt — Rutt/Etra scan processor: the input is redrawn as horizontal scan lines each displaced vertically by the image's own luminance, so bright areas push the lines into relief (a wireframe topography of the picture). Brightness follows the local slope. The canonical analog scan-processor effect. Matte line-work.",
-  "CREDIT": "Palinopsia (after Rutt/Etra scan processor)",
+  "DESCRIPTION": "Scan Relief : an analog scan-processor topography. The input is redrawn as horizontal scan lines each displaced vertically by the image's own luminance, so bright areas push the lines into relief (a wireframe topography of the picture). Brightness follows the local slope. Matte line-work.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Scan", "Stylize"],
   "INPUTS": [

@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Smear — pseudo pixel-sort: bright pixels streak along a direction with decaying taps (haxademic/ciphrd approximation; true compute pixel-sort arrives with WebGPU, brief §15.1). Threshold gates the effect to highlights so the smear reads as structure, not blur.",
-  "CREDIT": "Palinopsia (after cacheflowe/haxademic pseudo pixel-sort)",
+  "DESCRIPTION": "Smear : pseudo pixel-sort: bright pixels streak along a direction with decaying taps (haxademic/ciphrd approximation; true compute pixel-sort arrives with WebGPU, brief §15.1). Threshold gates the effect to highlights so the smear reads as structure, not blur.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],
   "INPUTS": [
@@ -19,7 +19,7 @@ void main() {
   const int TAPS = 24;
 
   // Walk backwards along the smear direction, accumulating samples whose
-  // luminance clears the threshold — bright material streaks, dark holds.
+  // luminance clears the threshold : bright material streaks, dark holds.
   vec3 acc = src.rgb;
   float wsum = 1.0;
   for (int i = 1; i <= TAPS; i++) {

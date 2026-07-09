@@ -1,13 +1,13 @@
-// DepthShadow — a contact/drop shadow the FOREGROUND casts onto the Background,
+// DepthShadow : a contact/drop shadow the FOREGROUND casts onto the Background,
 // for separation and depth. Bright foreground content (text, particles, shapes,
 // figures on a ground) is blurred + offset and used to DARKEN the background in a
-// soft halo around it — so the layers read as lifted above the background plane.
+// soft halo around it : so the layers read as lifted above the background plane.
 //
 // Applied once, right after the background composites and BEFORE the layers do,
 // so the shadow sits in the background and the foreground lands on top of it.
 // A no-op at depth 0. Presence is luma-based (weighted by each layer's opacity),
 // so a full-frame generator barely shadows while a figure-on-black casts a clear
-// halo — exactly where depth reads.
+// halo : exactly where depth reads.
 
 const VS = `#version 300 es
 in vec2 p; out vec2 vUV;
@@ -185,7 +185,7 @@ export class DepthShadow {
     gl.uniform4f(this.mask.u('uW'), weights[0] ?? 0, weights[1] ?? 0, weights[2] ?? 0, weights[3] ?? 0)
     draw(a.fbo, hw, hh)
 
-    // 2) separable blur — bigger + softer with depth.
+    // 2) separable blur : bigger + softer with depth.
     const radius = 2 + depth * 8
     this.use(this.blur)
     bind(0, a.tex)

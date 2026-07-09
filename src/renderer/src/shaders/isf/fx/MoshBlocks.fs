@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Mosh Blocks — macroblock corruption on a stepped clock: a minority of blocks grab displaced content, some with channel-swapped color. The datamosh/JPEG-corruption register (GODPUS lineage): cuts and holds, not flow.",
+  "DESCRIPTION": "Mosh Blocks : macroblock corruption on a stepped clock: a minority of blocks grab displaced content, some with channel-swapped color. The datamosh/JPEG-corruption register (GODPUS lineage): cuts and holds, not flow.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],
@@ -31,7 +31,7 @@ void main() {
   vec2 disp = on *
     (vec2(hash(cell + vec2(t, 3.7)), hash(cell + vec2(9.1, t))) - 0.5) * 2.0 * amount;
 
-  // FREAK blocks — a freak-sized minority breaks the family entirely: content
+  // FREAK blocks : a freak-sized minority breaks the family entirely: content
   // grabbed from ANYWHERE in the frame, zoomed or mirrored inside the block,
   // sometimes inverted, sometimes frozen on a slower clock.
   float fPick = hash(cell + vec2(77.7, t * 0.5));
@@ -49,7 +49,7 @@ void main() {
   c = mix(c, freakCoord, isFreak);
   vec4 s = IMG_NORM_PIXEL(inputImage, c);
 
-  // A minority of corrupted blocks also swap channels — the color tear.
+  // A minority of corrupted blocks also swap channels : the color tear.
   float swap = on * step(0.75, hash(cell + vec2(t * 3.0, 27.0)));
   vec3 col = mix(s.rgb, s.gbr, swap);
   // Some freaks invert outright.

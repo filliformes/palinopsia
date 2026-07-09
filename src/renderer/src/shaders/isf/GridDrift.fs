@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Grid Drift — a flat grid whose rows and columns breathe out of alignment, with a stepped clock occasionally slipping whole lanes and a sparse set of filled cells. Structure degrading with dignity: matte line-work, never op-art.",
+  "DESCRIPTION": "Grid Drift : a flat grid whose rows and columns breathe out of alignment, with a stepped clock occasionally slipping whole lanes and a sparse set of filled cells. Structure degrading with dignity: matte line-work, never op-art.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Geometry", "Glitch"],
@@ -34,7 +34,7 @@ void main() {
   vec2 uv = isf_FragNormCoord;
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
   float t = TIME * rate;
-  float tStep = floor(TIME * (0.5 + rate * 4.0)); // the slip clock — cuts
+  float tStep = floor(TIME * (0.5 + rate * 4.0)); // the slip clock : cuts
 
   vec2 g = vec2(uv.x * cells * aspect, uv.y * cells);
   float col0 = floor(g.x);

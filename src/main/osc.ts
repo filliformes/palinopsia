@@ -1,4 +1,4 @@
-// OSC sender — one UDP socket bound locally, messages sent per-destination.
+// OSC sender : one UDP socket bound locally, messages sent per-destination.
 
 import * as osc from 'osc'
 
@@ -15,7 +15,7 @@ export type OscSendEvent = {
 // Fired when a send fails (synchronous throw in dgram.send, async 'error'
 // on the UDP socket from ICMP unreachable on Windows, etc.). Socket-level
 // errors that can't be attributed to a specific destination use ip='*',
-// port=0, address='' — the UI treats them as system-wide warnings.
+// port=0, address='' : the UI treats them as system-wide warnings.
 export type OscErrorEvent = {
   timestamp: number
   ip: string
@@ -69,12 +69,12 @@ export class OscSender {
   private udp: osc.UDPPort | null = null
   private ready = false
   private queue: Array<() => void> = []
-  // Optional observer invoked on every successful send — used by the OSC
+  // Optional observer invoked on every successful send : used by the OSC
   // monitor panel. Called AFTER the UDP write is handed off (i.e. on the
   // hot path), so it must be cheap: just push to an array.
   private onSent: ((e: OscSendEvent) => void) | null = null
   private onError: ((e: OscErrorEvent) => void) | null = null
-  // Last (ip, port, address) handed to dgram.send — used to attribute
+  // Last (ip, port, address) handed to dgram.send : used to attribute
   // ASYNC port 'error' events back to a specific destination. UDP errors
   // come through the socket's error event some ms after the failing send,
   // so we don't have a perfect mapping, but for the "dot on failure" UX
@@ -102,7 +102,7 @@ export class OscSender {
         resolve()
       })
       port.on('error', (err: Error) => {
-        // Log but don't crash — send errors are non-fatal. Rate-limited
+        // Log but don't crash : send errors are non-fatal. Rate-limited
         // so a persistently-bad destination can't flood stderr. Also
         // drain the pre-ready queue on hard errors so a port that never
         // opens doesn't grow the queue unboundedly (tick-rate sends
@@ -145,7 +145,7 @@ export class OscSender {
       this.udp = null
       this.ready = false
     }
-    // Always drain the pre-ready queue — stopping before 'ready' fires
+    // Always drain the pre-ready queue : stopping before 'ready' fires
     // would otherwise leak the deferred doSend closures forever
     // (next `start()` opens a NEW UDPPort with its own 'ready' that
     // never sees them). Cheap to clear regardless.

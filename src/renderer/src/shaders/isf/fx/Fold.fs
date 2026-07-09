@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Fold — a SINGLE-axis mirror at a movable seam, with a slide offset on the reflected half. One deliberate fold is composition; radial/kaleidoscope symmetry is exactly what the seed library refuses (brief §1) — this stays asymmetric by keeping the seam off-centre and the offset non-zero.",
+  "DESCRIPTION": "Fold : a SINGLE-axis mirror at a movable seam, with a slide offset on the reflected half. One deliberate fold is composition; radial/kaleidoscope symmetry is exactly what the seed library refuses (brief §1) : this stays asymmetric by keeping the seam off-centre and the offset non-zero.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Distortion"],

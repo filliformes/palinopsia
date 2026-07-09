@@ -1,4 +1,4 @@
-// Zustand store — the renderer's single source of truth.
+// Zustand store : the renderer's single source of truth.
 // Holds the theme (design system lifted from dataFLOU) and the live
 // CompositionState (four layers + master rack + transport). The Compositor
 // engine reads this on each frame; OSC / modulators mutate it through the
@@ -37,7 +37,7 @@ function saveUserWorlds(worlds: World[]): void {
   try {
     localStorage.setItem('opsia.userWorlds', JSON.stringify(worlds.filter((w) => !w.builtin)))
   } catch {
-    /* quota / serialization — non-fatal */
+    /* quota / serialization : non-fatal */
   }
 }
 function loadWorlds(): World[] {
@@ -121,7 +121,7 @@ export function isRichTheme(t: ThemeName): boolean {
   return RICH_THEMES.has(t)
 }
 
-// Palinopsia's default: near-black canvas, one accent — restraint as
+// Palinopsia's default: near-black canvas, one accent : restraint as
 // identity (brief §1). Studio-dark is the neutral matte surface the
 // instrument ships on out of the box.
 const DEFAULT_THEME: ThemeName = 'studio-dark'
@@ -170,7 +170,7 @@ function makeLayer(sourceShaderId: string | null = null): LayerState {
 }
 
 // The always-on master Vibe Palette (pinned last in the master rack): the
-// color-MASTERING stage — palette map + built-in saturation / contrast /
+// color-MASTERING stage : palette map + built-in saturation / contrast /
 // gamma / sharpen. Default: black background, white recoloring, neutral tone.
 export function makeVibePalette(): FxInstance {
   return {
@@ -195,7 +195,7 @@ export function makeVibePalette(): FxInstance {
   }
 }
 
-// The always-on Context depth finalizer — pinned AFTER the Vibe Palette at the
+// The always-on Context depth finalizer : pinned AFTER the Vibe Palette at the
 // very end of the master rack. Adds trails, bloom, a key light, haze and a
 // depth vignette. Defaults are a gentle, lifelike amount (not a passthrough).
 export function makeContext(): FxInstance {
@@ -204,7 +204,7 @@ export function makeContext(): FxInstance {
     shaderId: 'fx-context',
     enabled: true,
     locked: true,
-    // Loads on the "Clean" preset — a near-passthrough whisper of depth, not
+    // Loads on the "Clean" preset : a near-passthrough whisper of depth, not
     // an intense default (turn it up or pick a preset via C / Shift+C).
     inputs: {
       trails: 0,
@@ -221,7 +221,7 @@ export function makeContext(): FxInstance {
   }
 }
 
-// The always-on Finalizer — the last master stage after Context. A final
+// The always-on Finalizer : the last master stage after Context. A final
 // grade (levels) + sharpen + physically-modelled grain over the whole output.
 // Neutral at defaults (a whisper of film grain, everything else identity).
 export function makeFinalizer(): FxInstance {
@@ -259,7 +259,7 @@ export function makeDefaultMetaKnobs(): MetaKnobState[] {
   }))
 }
 
-// The Background slab's default — a solid white ground (a clean canvas to build
+// The Background slab's default : a solid white ground (a clean canvas to build
 // on / key against). New sessions get this; old sessions with no background
 // normalize to the BLANK (off) one so loading them isn't suddenly washed white.
 export function makeDefaultBackground(): BackgroundState {
@@ -306,7 +306,7 @@ export function makeDefaultSequence(): SequenceState {
 
 export function makeDefaultComposition(): CompositionState {
   return {
-    // Blank baseline — a fresh open is randomized on top via seedRandomStart().
+    // Blank baseline : a fresh open is randomized on top via seedRandomStart().
     layers: [makeLayer(), makeLayer(), makeLayer(), makeLayer()],
     background: makeDefaultBackground(),
     master: [makeVibePalette(), makeContext(), makeFinalizer()],
@@ -318,14 +318,14 @@ export function makeDefaultComposition(): CompositionState {
 }
 
 // What the Inspector's auto-UI is pointed at: a source slot or an FX unit
-// (brief §10.3 — "selecting any source or FX renders its ISF INPUTS").
+// (brief §10.3 : "selecting any source or FX renders its ISF INPUTS").
 export type Selection =
   | { type: 'source'; layer: number; slot: 'A' | 'B' }
   | { type: 'fx'; scope: FxScope; instId: string }
   | { type: 'background' } // the Background slab's source params
   | null
 
-/** Stable identity for a mod target — used to find existing assignments. */
+/** Stable identity for a mod target : used to find existing assignments. */
 export function modTargetKey(t: ModTarget): string {
   if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
   if (t.kind === 'bgSource') return `bgsrc:${t.input}`
@@ -345,7 +345,7 @@ interface StoreState {
   setName: (n: string) => void
 
   composition: CompositionState
-  // Layer parameter actions — the Compositor reads composition each frame,
+  // Layer parameter actions : the Compositor reads composition each frame,
   // so these double as the OSC / modulator write path.
   setBlend: (layer: number, mode: BlendMode) => void
   setOpacity: (layer: number, v: number) => void
@@ -370,7 +370,7 @@ interface StoreState {
   setSourceText: (layer: number, slot: 'A' | 'B', text: string) => void
   setSourceSidechain: (layer: number, slot: 'A' | 'B', ref: SidechainRef | null) => void
 
-  // ── Background slab — the ground under the four layers ───────────────
+  // ── Background slab : the ground under the four layers ───────────────
   setBackgroundSource: (shaderId: string | null) => void
   setBackgroundInput: (name: string, value: number | number[]) => void
   setBackgroundOpacity: (v: number) => void
@@ -381,7 +381,7 @@ interface StoreState {
   // Apply a materialized background (built-in preset via bgPresetToState, or a
   // user preset's saved state). FX get fresh instance ids.
   applyBgPreset: (bg: BackgroundState) => void
-  // User background presets — app-persistent, like layer presets.
+  // User background presets : app-persistent, like layer presets.
   bgPresets: Array<{ id: string; name: string; bg: BackgroundState }>
   saveBgPreset: (name: string) => void
   deleteBgPreset: (id: string) => void
@@ -414,16 +414,16 @@ interface StoreState {
   // Layer lifecycle (context menu): reset to factory / structural randomize.
   initLayer: (layer: number) => void
   randomizeLayer: (layer: number) => void
-  // Layer presets — whole-layer states (sources + all racks), app-persistent.
+  // Layer presets : whole-layer states (sources + all racks), app-persistent.
   layerPresets: Array<{ id: string; name: string; layer: LayerState }>
   saveLayerPreset: (layer: number, name: string) => void
   applyLayerPreset: (layer: number, presetId: string) => void
   deleteLayerPreset: (presetId: string) => void
-  // Volatile layer clipboard — copy one layer's whole state, paste onto another.
+  // Volatile layer clipboard : copy one layer's whole state, paste onto another.
   copiedLayer: LayerState | null
   copyLayer: (layer: number) => void
   pasteLayer: (layer: number) => void
-  // Right-side panel view — Layers strips, the compact Mixer (M key), or the
+  // Right-side panel view : Layers strips, the compact Mixer (M key), or the
   // Finishing Touches (Vibe/Context/Finalizer) stack. All three occupy the same
   // column; a small tab row switches between them.
   rightView: 'layers' | 'mixer' | 'finishing'
@@ -448,11 +448,11 @@ interface StoreState {
   patchLayer: (layer: number, partial: Partial<LayerState>) => void
   setMasterFx: (fx: FxInstance[]) => void
 
-  // FX racks (Phase 3) — one action surface for all four rack scopes.
+  // FX racks (Phase 3) : one action surface for all four rack scopes.
   addFx: (scope: FxScope, shaderId: string) => void
   removeFx: (scope: FxScope, instId: string) => void
   toggleFx: (scope: FxScope, instId: string) => void
-  // On/Off for the whole master chain — all non-locked master FX at once.
+  // On/Off for the whole master chain : all non-locked master FX at once.
   toggleMasterChain: () => void
   setFxOpacity: (scope: FxScope, instId: string, v: number) => void
   moveFx: (scope: FxScope, instId: string, dir: -1 | 1) => void
@@ -462,18 +462,18 @@ interface StoreState {
   // Native convolution nodes: choose the sidechain (impulse) source.
   setFxSidechain: (scope: FxScope, instId: string, ref: SidechainRef | null) => void
 
-  // Randomize (brief §7) — scoped draws from curated aesthetic ranges.
+  // Randomize (brief §7) : scoped draws from curated aesthetic ranges.
   // `intensity` 1 = full structural re-roll; <1 = a walk from the current scene.
   randomize: (scope: RandomizeScope, intensity?: number) => void
-  // Variation — a baseline-anchored variant of the whole scene (structure fixed,
+  // Variation : a baseline-anchored variant of the whole scene (structure fixed,
   // continuous values nudged by `amount` 0..1). Baseline captured on first press.
   variationBaseline: CompositionState | null
   applyVariation: (amount: number) => void
-  // Re-roll each Meta knob's destinations (up to 8) + value — a fresh macro
+  // Re-roll each Meta knob's destinations (up to 8) + value : a fresh macro
   // surface (fired by 'Randomize Meta Knobs'; the smoother applies it).
   randomizeMetaBank: () => void
   // Randomize the master chain's FX PARAMETERS in place (keep the chain,
-  // keep the Vibe) — the ⚄ next to the Master title.
+  // keep the Vibe) : the ⚄ next to the Master title.
   randomizeMasterParams: () => void
 
   // Name of the Vibe palette currently applied (P/Shift+P + the picker share
@@ -481,7 +481,7 @@ interface StoreState {
   vibePresetName: string | null
   setVibePresetName: (n: string | null) => void
 
-  // Meta Controller (Phase 5) — 16 macro knobs.
+  // Meta Controller (Phase 5) : 16 macro knobs.
   midiLearn: number | null // knob index armed for CC learn
   setMidiLearn: (i: number | null) => void
   updateMetaKnob: (i: number, partial: Partial<MetaKnobState>) => void
@@ -489,7 +489,7 @@ interface StoreState {
   // Toggle a destination on a knob (capped at META_MAX_DESTS).
   toggleMetaDest: (i: number, target: ModTarget) => void
 
-  // Modulation (Phase 5) — the 8-slot bank + the capped matrix.
+  // Modulation (Phase 5) : the 8-slot bank + the capped matrix.
   updateModulator: (i: number, partial: Partial<ModulatorConfig>) => void
   // Upserts by (mod, target): re-assigning the same pair updates its depth.
   // Returns false when the cap would be exceeded (legibility = simplexité).
@@ -505,7 +505,7 @@ interface StoreState {
   // UI chrome (persisted to localStorage, not to sessions).
   uiZoom: number
   setUiZoom: (z: number) => void
-  // Projection warp (keystone / corner-pin) — per-machine output alignment,
+  // Projection warp (keystone / corner-pin) : per-machine output alignment,
   // persisted to localStorage (not part of a scene). Corners are 8 normalized
   // numbers: TL, TR, BR, BL (x,y each), 0..1 in output space.
   warpEnabled: boolean
@@ -528,31 +528,31 @@ interface StoreState {
   setHiveOutActive: (on: boolean) => void
   hiveOutPort: number
   setHiveOutPort: (p: number) => void
-  // Audio ingest (Slab 1) — enable is transient; source/device persist.
+  // Audio ingest (Slab 1) : enable is transient; source/device persist.
   audioEnabled: boolean
   setAudioEnabled: (on: boolean) => void
   audioSource: 'both' | 'osc' | 'local'
   setAudioSource: (s: 'both' | 'osc' | 'local') => void
   audioDeviceId: string | null
   setAudioDeviceId: (id: string | null) => void
-  // Show the per-layer A/B coupling (CPL) row. Off by default — a visuals-only
+  // Show the per-layer A/B coupling (CPL) row. Off by default : a visuals-only
   // user never sees the audio-relations control. Persisted.
   showCoupling: boolean
   setShowCoupling: (on: boolean) => void
-  // Proximity (Field macro) — 0 far/vista · 0.5 neutral · 1 close/personal.
+  // Proximity (Field macro) : 0 far/vista · 0.5 neutral · 1 close/personal.
   // Pushes the Context mood; optional audio (brightness) drive. Persisted.
   proximity: number
   setProximity: (v: number) => void
   proximityAudio: boolean
   setProximityAudio: (on: boolean) => void
-  // Field macros — global spatial-material controls (0.5 = neutral deadzone).
+  // Field macros : global spatial-material controls (0.5 = neutral deadzone).
   density: number
   setDensity: (v: number) => void
   gestureTexture: number
   setGestureTexture: (v: number) => void
   coalesce: number
   setCoalesce: (v: number) => void
-  // Corbeil-Perron temperament controls (0 = off). Tonicity: tonal audio → colour,
+  // Temperament controls (0 = off). Tonicity: tonal audio → colour,
   // noise → mono (§3.10). Shutter: stop-motion frame-stepping (§1.7). Drift: slow
   // analog-instability wander + rare accidents over the grade (§1.8).
   tonicity: number
@@ -561,14 +561,14 @@ interface StoreState {
   setShutter: (v: number) => void
   drift: number
   setDrift: (v: number) => void
-  // Superimposition flicker (Cameraless §5.2 — 0 = off) + animated-sound loop
-  // (§4.4 — samples a scanline of the output and sends it to Pandore over OSC).
+  // Superimposition flicker (Cameraless §5.2 : 0 = off) + animated-sound loop
+  // (§4.4 : samples a scanline of the output and sends it to Pandore over OSC).
   superFlicker: number
   setSuperFlicker: (v: number) => void
   markSignalEnabled: boolean
   markSignalY: number
   setMarkSignal: (partial: Partial<{ enabled: boolean; y: number }>) => void
-  // World / diegesis — a bank of editable presets (built-ins + user worlds).
+  // World / diegesis : a bank of editable presets (built-ins + user worlds).
   // Selecting one biases the composition; the World page (W) edits/creates them.
   worlds: World[]
   world: string // active world id
@@ -587,15 +587,15 @@ interface StoreState {
   collapsed: Record<string, boolean>
   toggleSection: (key: string) => void
   // Finishing view: exclusively open one finalizer sub-section (Vibe / Context /
-  // Finalizer), collapsing the other two — or collapse it if already open.
+  // Finalizer), collapsing the other two : or collapse it if already open.
   showFinishingSub: (shaderId: string) => void
 
-  // Global tempo — drives BPM-synced modulator clocks; OSC-controllable.
+  // Global tempo : drives BPM-synced modulator clocks; OSC-controllable.
   setBpm: (bpm: number) => void
-  // Global time multiplier (1/64×…64×, 1 = realtime) — scales every visual clock.
+  // Global time multiplier (1/64×…64×, 1 = realtime) : scales every visual clock.
   globalSpeed: number
   setGlobalSpeed: (x: number) => void
-  // Scene/Randomize morph time in ms (0…30000, 100 = quick) — crossfade, not snap.
+  // Scene/Randomize morph time in ms (0…30000, 100 = quick) : crossfade, not snap.
   morphMs: number
   setMorphMs: (ms: number) => void
 
@@ -615,12 +615,12 @@ interface StoreState {
   oscOutIntervalMs: number
   setOscOutConfig: (partial: Partial<{ enabled: boolean; host: string; port: number; intervalMs: number }>) => void
 
-  // User shader presets — app-persistent (localStorage), per shader id.
+  // User shader presets : app-persistent (localStorage), per shader id.
   userShaderPresets: Record<string, Array<{ name: string; values: Record<string, number | number[]> }>>
   addUserShaderPreset: (shaderId: string, name: string, values: Record<string, number | number[]>) => void
   deleteUserShaderPreset: (shaderId: string, name: string) => void
 
-  // Scenes (Phase 6) — recallable full-instrument states, drag-arranged.
+  // Scenes (Phase 6) : recallable full-instrument states, drag-arranged.
   scenes: SceneEntry[]
   activeSceneId: string | null
   saveScene: () => void
@@ -654,12 +654,12 @@ interface StoreState {
   newSession: () => void
   loadSession: (s: Session) => void
   exportSession: () => Session
-  // Path of the file this session is saved to (from Save As / Open) — enables a
+  // Path of the file this session is saved to (from Save As / Open) : enables a
   // plain Save that overwrites in place. Null after New (never saved yet).
   sessionPath: string | null
   setSessionPath: (p: string | null) => void
 
-  // Finishing Touches — the three pinned finalizers (Vibe · Context · Finalizer)
+  // Finishing Touches : the three pinned finalizers (Vibe · Context · Finalizer)
   // as one bank: toggle bypasses/enables all three at once.
   toggleFinishing: () => void
 }
@@ -779,7 +779,7 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => ({
       composition: {
         ...s.composition,
-        // Fresh factory layer — keeps its identity (id) so mod-matrix
+        // Fresh factory layer : keeps its identity (id) so mod-matrix
         // source targets pointing at this layer index stay coherent.
         layers: updateLayer(s.composition.layers, layer, (l) => ({
           ...makeLayer(),
@@ -933,7 +933,7 @@ export const useStore = create<StoreState>((set, get) => ({
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => {
           // null shader ⇒ the slot goes back to 'none' (empty layer). A clean
-          // slot — no stale mediaId/mediaName carried over from a prior video.
+          // slot : no stale mediaId/mediaName carried over from a prior video.
           const kind = shaderId ? ('generator' as const) : ('none' as const)
           const next = { kind, shaderId, inputs: {} }
           if (slot === 'A') return { ...l, sourceA: next }
@@ -961,7 +961,7 @@ export const useStore = create<StoreState>((set, get) => ({
             videoIn: 0,
             videoOut: 1
           }
-          // Clear the slot's inherited source FX — a freshly imported clip must
+          // Clear the slot's inherited source FX : a freshly imported clip must
           // not land under a random-scene's hold/freeze/key rack (which would
           // read as "the video won't play"). The user adds FX deliberately after.
           if (slot === 'A') return { ...l, sourceA: vid, sourceAFx: [] }
@@ -1168,7 +1168,7 @@ export const useStore = create<StoreState>((set, get) => ({
         enabled: true,
         inputs: { ...f.inputs }
       }))
-      // A chain preset sets its own vibe — no longer a named palette.
+      // A chain preset sets its own vibe : no longer a named palette.
       return { composition: { ...s.composition, master: [...units, ...locked] }, vibePresetName: vibe ? null : s.vibePresetName }
     }),
   setSourceInput: (layer, slot, name, value) =>
@@ -1237,7 +1237,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const instId = uid()
       return {
         composition: updateFxArray(s.composition, scope, (fx) => {
-          // Locked units (the Vibe Palette) stay last — insert before them.
+          // Locked units (the Vibe Palette) stay last : insert before them.
           const lockedAt = fx.findIndex((f) => f.locked)
           const unit = { id: instId, shaderId, enabled: true, inputs: {} }
           if (lockedAt < 0) return [...fx, unit]
@@ -1245,7 +1245,7 @@ export const useStore = create<StoreState>((set, get) => ({
           next.splice(lockedAt, 0, unit)
           return next
         }),
-        // Land the Inspector on the fresh unit — its controls are the next
+        // Land the Inspector on the fresh unit : its controls are the next
         // thing the player reaches for.
         selection: { type: 'fx', scope, instId }
       }
@@ -1266,7 +1266,7 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
   toggleMasterChain: () =>
     set((s) => {
-      // The "chain" On/Off — flips ALL user-added master FX (never the pinned
+      // The "chain" On/Off : flips ALL user-added master FX (never the pinned
       // Finishing Touches finalizers). On if every non-locked unit is enabled;
       // one click turns them all off, another turns them all back on.
       const regular = s.composition.master.filter((f) => !f.locked)
@@ -1344,7 +1344,7 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const composition = randomizeComposition(s.composition, scope, intensity)
       beginMorph(s.composition, s.morphMs, performance.now()) // crossfade to the new draw
-      // A structural randomize is a fresh starting point — drop the Variation
+      // A structural randomize is a fresh starting point : drop the Variation
       // baseline so the next Variation press anchors on this new scene.
       return { composition, variationBaseline: null }
     }),
@@ -1453,7 +1453,7 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
   assignMod: (mod, target, depth, mode = 'multiply') => {
     const key = modTargetKey(target)
-    // Check existence + cap AND append inside ONE set() updater — otherwise two
+    // Check existence + cap AND append inside ONE set() updater : otherwise two
     // assignMod calls in the same tick (an OSC burst) both pass a stale cap
     // check and exceed MAX_MOD_ASSIGNMENTS.
     let result = true
@@ -1734,7 +1734,7 @@ export const useStore = create<StoreState>((set, get) => ({
   collapsed: (() => {
     // Fresh-load layout: Meta and Modulation start collapsed (deep controls,
     // opened on demand); Master FX and Inspector stay open (always in play).
-    // The three Finishing-Touches sub-sections start collapsed too — seeded so
+    // The three Finishing-Touches sub-sections start collapsed too : seeded so
     // toggleSection works from a defined value (and existing sessions inherit it).
     const FT: Record<string, boolean> = { 'ft-vibe': true, 'ft-context': true, 'ft-finalizer': true }
     const DEFAULT_COLLAPSED: Record<string, boolean> = {
@@ -1826,7 +1826,7 @@ export const useStore = create<StoreState>((set, get) => ({
         {
           id: uid(),
           name: `Scene ${s.scenes.length + 1}`,
-          // Compositions are immutable — the snapshot is a reference.
+          // Compositions are immutable : the snapshot is a reference.
           composition: s.composition,
           world: s.worlds.find((w) => w.id === s.world) ?? null
         }
@@ -1903,7 +1903,7 @@ export const useStore = create<StoreState>((set, get) => ({
       if (!scene) return s
       beginMorph(s.composition, Math.max(0, crossfadeMs), performance.now())
       resetCouplingState()
-      // Subtle per-recall variation → long sets never loop verbatim (Basanta).
+      // Subtle per-recall variation → long sets never loop verbatim.
       const composition =
         variation > 0 ? varyComposition(scene.composition, variation) : scene.composition
       const worlds = ensureWorld(s.worlds, scene.world)
@@ -1916,9 +1916,9 @@ export const useStore = create<StoreState>((set, get) => ({
 
   newSession: () =>
     // A blank slate. Goes through the normal composition write path, so it
-    // lands in undo history — an accidental New is one Ctrl+Z away.
+    // lands in undo history : an accidental New is one Ctrl+Z away.
     set((s) => {
-      cancelMorph() // the composition is being replaced — stop any in-flight ease
+      cancelMorph() // the composition is being replaced : stop any in-flight ease
       resetCouplingState()
       // New session resets the section layout too: Meta/Modulation collapsed,
       // Master FX/Inspector open. Persist so it survives the next reload.
@@ -1939,7 +1939,7 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     }),
   loadSession: (s) => {
-    cancelMorph() // replacing the whole composition — abort any in-flight morph
+    cancelMorph() // replacing the whole composition : abort any in-flight morph
     resetCouplingState()
     // Restore the session's World (self-contained → add to bank if missing).
     const cur = get()
@@ -1957,10 +1957,10 @@ export const useStore = create<StoreState>((set, get) => ({
       sequence: { ...makeDefaultSequence(), ...(s.sequence ?? {}) },
       composition: {
         ...s.composition,
-        // Older sessions have no Background slab — normalize to the blank (off)
+        // Older sessions have no Background slab : normalize to the blank (off)
         // one so loading them isn't suddenly washed by the new white default.
         background: s.composition.background ?? makeBlankBackground(),
-        // Normalize layers from older session files — new fields get defaults.
+        // Normalize layers from older session files : new fields get defaults.
         layers: s.composition.layers.map((l) => ({
           ...l,
           feedbackAmount: l.feedbackAmount ?? 0.6,
@@ -1985,7 +1985,7 @@ export const useStore = create<StoreState>((set, get) => ({
           )
           // Canonicalize the finalizer tail: strip the three locked stages out
           // (wherever/however they were ordered) and re-append them in the one
-          // correct order — Vibe → Context → Finalizer, always last. Reuse the
+          // correct order : Vibe → Context → Finalizer, always last. Reuse the
           // existing instance so its ids/inputs carry over; synthesize if absent.
           const find = (id: string): FxInstance | undefined => m.find((f) => f.shaderId === id)
           const vibe = find('fx-vibe') ?? makeVibePalette()
@@ -2003,7 +2003,7 @@ export const useStore = create<StoreState>((set, get) => ({
           ...m
         })),
         modMatrix: s.composition.modMatrix ?? [],
-        // 16 knobs now — older 32-knob sessions truncate; short arrays pad.
+        // 16 knobs now : older 32-knob sessions truncate; short arrays pad.
         metaKnobs: (() => {
           const k = s.composition.metaKnobs ?? []
           const defaults = makeDefaultMetaKnobs()

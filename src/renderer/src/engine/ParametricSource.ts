@@ -1,11 +1,11 @@
-// ParametricSource — the "Parametric" diegesis generator (Boucher/Piché): a
-// literal audio-buffer → texture reading (Ikeda *Test Pattern*). Reads the local
+// ParametricSource : the "Parametric" diegesis generator: a
+// literal audio-buffer → texture reading. Reads the local
 // audio bus's spectrum / waveform each frame, uploads it to a 1-D texture, and
 // renders it as a hard raster, a waveform trace, spectrum bars, or a scrolling
-// spectrogram. Native node (no ISF compile) — a TS class the layer owns like
+// spectrogram. Native node (no ISF compile) : a TS class the layer owns like
 // TextSource. With no local audio it synthesises a procedural signal so it's
 // never blank. Raster/spectrogram stay abstract + monochrome-friendly (on-brand,
-// NOT oscilloscope/Lissajous — a raster/waveform/spectrogram, per the shelf).
+// NOT oscilloscope/Lissajous : a raster/waveform/spectrogram, per the shelf).
 
 import { audioBus } from './audioIn'
 
@@ -30,7 +30,7 @@ void main(){
     frag = vec4(texture(uHist, uv).rgb, 1.0); return; // spectrogram: show history
   } else if (uMode == 0) {
     // Raster / test-pattern: hard vertical bars gated by the spectrum, plus a
-    // scanning horizontal seam — pure black/white cells (Ikeda).
+    // scanning horizontal seam : pure black/white cells.
     float m = aud(uv.x) * uGain;
     float cell = step(0.5, fract(uv.x * mix(24.0, 96.0, uScale)));
     float bar = step(1.0 - m, cell);

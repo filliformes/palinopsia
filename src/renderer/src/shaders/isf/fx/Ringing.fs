@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Ringing — compression ghost edges: alternating-sign high-pass echoes repeat at a fixed distance along a direction (DCT ringing / over-sharpened broadcast). Structure haunted by its own edges.",
+  "DESCRIPTION": "Ringing : compression ghost edges: alternating-sign high-pass echoes repeat at a fixed distance along a direction (DCT ringing / over-sharpened broadcast). Structure haunted by its own edges.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],

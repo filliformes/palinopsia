@@ -1,9 +1,9 @@
 // ISF shader registry. Sources are imported as raw strings (Vite `?raw`) so
 // the ISF runtime can parse each one's JSON header + GLSL at load time. This
 // curated seed set IS the instrument's voice (brief §1, §5): glitch /
-// generative / digital-arts — never kaleidoscope, plasma, or audio-bloom.
+// generative / digital-arts : never kaleidoscope, plasma, or audio-bloom.
 //
-// `curated` is each shader's AESTHETIC sub-range per input — what Randomize
+// `curated` is each shader's AESTHETIC sub-range per input : what Randomize
 // draws from (brief §7). Declared MIN/MAX is the legal range; curated is the
 // tasteful one. This table is where the instrument's taste lives: it keeps
 // randomization in the glitch register and out of kaleidoscope soup.
@@ -61,7 +61,7 @@ import differenceBloom from './fx/DifferenceBloom.fs?raw'
 import triangleFlicker from './fx/TriangleFlicker.fs?raw'
 import colorizer from './fx/Colorizer.fs?raw'
 import wavefold from './fx/Wavefold.fs?raw'
-import rutt from './fx/Rutt.fs?raw'
+import scanRelief from './fx/ScanRelief.fs?raw'
 import crtScreen from './fx/CrtScreen.fs?raw'
 import pixelmask from './fx/Pixelmask.fs?raw'
 import lightTrails from './fx/LightTrails.fs?raw'
@@ -102,7 +102,7 @@ export interface IsfShader {
 // ── Native convolution nodes (visual-convolution spec) ──────────────────
 // Registered like shaders (header-only source ⇒ auto-UI + modulation + presets +
 // randomize) but the engine runs a TS class and hands it a sidechain texture.
-// Kept OUT of FX_SHADERS (the Randomize pool) — added to the picker + lookups.
+// Kept OUT of FX_SHADERS (the Randomize pool) : added to the picker + lookups.
 export const NATIVE_NODES: IsfShader[] = [
   {
     id: 'node-transfert',
@@ -110,7 +110,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Transfert — imprint another layer's MOVEMENT onto this one (optical-flow transfer). Déplacement warps by the sidechain's flow; Traînée is a flow-steered line blur (motion blur painted by another layer's gesture). Pick the sidechain in the Inspector.",
+      "DESCRIPTION": "Transfert : imprint another layer's MOVEMENT onto this one (optical-flow transfer). Déplacement warps by the sidechain's flow; Traînée is a flow-steered line blur (motion blur painted by another layer's gesture). Pick the sidechain in the Inspector.",
       "CATEGORIES": ["FX", "Convolution"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0,1], "LABELS": ["deplacement","trainee"], "DEFAULT": 0, "LABEL": "mode" },
@@ -139,15 +139,15 @@ export const NATIVE_NODES: IsfShader[] = [
     }
   },
   {
-    // Module 1 — Convolution (ConvolveSpatial). The sidechain frame is the
+    // Module 1 : Convolution (ConvolveSpatial). The sidechain frame is the
     // KERNEL (point-spread function): every host pixel stamps a scaled copy of
-    // it — transfers glare shape / texture / energy. Native (engine/convNodes).
+    // it : transfers glare shape / texture / energy. Native (engine/convNodes).
     id: 'node-convolve',
     name: 'Convolution',
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Convolution — treat another layer as a convolution kernel (impulse response). Every bright pixel of this layer stamps a scaled copy of the sidechain's shape, transferring its glare / texture / energy signature (UE convolution-bloom, run forward). Pick the kernel layer in the Inspector. Direct kernel path; a live sidechain = an animated impulse response.",
+      "DESCRIPTION": "Convolution : treat another layer as a convolution kernel (impulse response). Every bright pixel of this layer stamps a scaled copy of the sidechain's shape, transferring its glare / texture / energy signature (UE convolution-bloom, run forward). Pick the kernel layer in the Inspector. Direct kernel path; a live sidechain = an animated impulse response.",
       "CATEGORIES": ["FX", "Convolution"],
       "INPUTS": [
         { "NAME": "scale", "TYPE": "float", "MIN": 0.05, "MAX": 2.0, "DEFAULT": 0.8, "LABEL": "spread" },
@@ -166,15 +166,15 @@ export const NATIVE_NODES: IsfShader[] = [
     }
   },
   {
-    // Module 3 — Réponse (temporal frame-echo convolution). Convolves the host
-    // layer's OWN recent time-history against a shaped envelope — rhythmic
+    // Module 3 : Réponse (temporal frame-echo convolution). Convolves the host
+    // layer's OWN recent time-history against a shaped envelope : rhythmic
     // pulsing trails / temporal smear. Native (engine/convNodes). No sidechain.
     id: 'node-reponse',
     name: 'Réponse',
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Réponse — temporal convolution: this layer's last 16 frames summed through a shaped envelope (attack onset × decay tail, reversible). Trails that pulse with a captured rhythm — a convolution-reverb for image. Uses the layer's own history (no sidechain).",
+      "DESCRIPTION": "Réponse : temporal convolution: this layer's last 16 frames summed through a shaped envelope (attack onset × decay tail, reversible). Trails that pulse with a captured rhythm : a convolution-reverb for image. Uses the layer's own history (no sidechain).",
       "CATEGORIES": ["FX", "Feedback", "Convolution"],
       "INPUTS": [
         { "NAME": "length", "TYPE": "float", "MIN": 2.0, "MAX": 16.0, "DEFAULT": 10.0, "LABEL": "length" },
@@ -269,7 +269,7 @@ export const GENERATORS: IsfShader[] = [
     name: 'Interference',
     category: 'Generator',
     source: interference,
-    // detune + skew stay small — big values tip into op-art vibration.
+    // detune + skew stay small : big values tip into op-art vibration.
     curated: {
       freq: [15, 80],
       detune: [0.005, 0.08],
@@ -457,7 +457,7 @@ export const GENERATORS: IsfShader[] = [
     }
   },
   {
-    // Native Text generator (TextSource.ts) — typography as a source, glyphs
+    // Native Text generator (TextSource.ts) : typography as a source, glyphs
     // fillable by a sidechain layer (the convolution move). Header-only source:
     // the auto-UI/presets parse INPUTS; the engine runs the TS class. Font
     // VALUES/LABELS order must match TEXT_FONTS in engine/TextSource.ts.
@@ -466,10 +466,10 @@ export const GENERATORS: IsfShader[] = [
     category: 'Generator',
     native: true,
     // Header generated from TEXT_FONTS so the picker always matches the
-    // registry (and the bundled @font-face set) — one source of truth.
+    // registry (and the bundled @font-face set) : one source of truth.
     source: `/*${JSON.stringify({
       DESCRIPTION:
-        "Text — typography as a source. Type in the Inspector; pick a font, size, weight and letter-spacing; place it with angle/position. A sidechain layer can FILL the glyphs (the letters become a matte over that layer's texture) — no sidechain = solid colour.",
+        "Text : typography as a source. Type in the Inspector; pick a font, size, weight and letter-spacing; place it with angle/position. A sidechain layer can FILL the glyphs (the letters become a matte over that layer's texture) : no sidechain = solid colour.",
       CATEGORIES: ['Generator'],
       INPUTS: [
         { NAME: 'font', TYPE: 'long', VALUES: TEXT_FONTS.map((_, i) => i), LABELS: TEXT_FONTS, DEFAULT: 1, LABEL: 'font' },
@@ -494,8 +494,8 @@ export const GENERATORS: IsfShader[] = [
     }
   },
   {
-    // Parametric — the audio-buffer→texture generator (Boucher/Piché Parametric
-    // diegesis; Ikeda Test Pattern). NATIVE (engine/ParametricSource.ts). Reads
+    // Parametric : the audio-buffer→texture generator (the parametric
+    // diegesis; a test-pattern raster). NATIVE (engine/ParametricSource.ts). Reads
     // the LOCAL audio bus's spectrum/waveform; a procedural signal when silent.
     id: 'gen-parametric',
     name: 'Parametric',
@@ -503,7 +503,7 @@ export const GENERATORS: IsfShader[] = [
     native: true,
     source: `/*${JSON.stringify({
       DESCRIPTION:
-        'Parametric — a literal audio→image reading (Ikeda test-pattern). Renders the LOCAL audio bus as a hard raster, a waveform trace, spectrum bars, or a scrolling spectrogram. Needs Audio ingest ON (local) to read real sound; otherwise a procedural test signal. Abstract by design — a raster/waveform/spectrogram, never an oscilloscope.',
+        'Parametric : a literal audio→image reading (a test-pattern raster). Renders the LOCAL audio bus as a hard raster, a waveform trace, spectrum bars, or a scrolling spectrogram. Needs Audio ingest ON (local) to read real sound; otherwise a procedural test signal. Abstract by design : a raster/waveform/spectrogram, never an oscilloscope.',
       CATEGORIES: ['Generator'],
       INPUTS: [
         { NAME: 'mode', TYPE: 'long', VALUES: [0, 1, 2, 3], LABELS: ['raster', 'waveform', 'bars', 'spectrogram'], DEFAULT: 0, LABEL: 'mode' },
@@ -592,7 +592,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-fold', name: 'Fold', category: 'FX', source: fold,
-    // Seam kept off-centre — a centred fold is the symmetry the brief refuses.
+    // Seam kept off-centre : a centred fold is the symmetry the brief refuses.
     curated: { seam: [0.55, 0.8], offset: [-0.3, 0.3] }
   },
   {
@@ -663,7 +663,7 @@ export const FX_SHADERS: IsfShader[] = [
     curated: { fold: [0.1, 0.8], bias: [-0.3, 0.3], symmetry: [0, 1], wet: [0.4, 1] }
   },
   {
-    id: 'fx-rutt', name: 'Rutt', category: 'FX', source: rutt,
+    id: 'fx-rutt', name: 'Scan Relief', category: 'FX', source: scanRelief,
     curated: { lines: [40, 160], amp: [0.03, 0.2], width: [0.08, 0.4], color: [0, 1] }
   },
   {
@@ -717,13 +717,13 @@ export const FX_SHADERS: IsfShader[] = [
     id: 'fx-phosphene', name: 'Phosphene', category: 'FX', source: phosphene,
     curated: { sensitivity: [0.3, 0.8], persistence: [0.4, 0.85], strength: [0.35, 0.8], complement: [0.6, 1], threshold: [0.4, 0.7] }
   }
-  // PHASE 9 (post-MVP experiment): Cross-FM — a source that takes ANOTHER
+  // PHASE 9 (post-MVP experiment): Cross-FM : a source that takes ANOTHER
   // layer's frame as a video-rate FM input (Lumen A→B→C→A cross-oscillator
   // feedback). Needs engine plumbing (a second image input bound to a layer
   // buffer), so it waits with WebGPU (brief §15.1). Not built here.
 ]
 
-// The Vibe mastering stage — pinned to the master rack's end (store-locked),
+// The Vibe mastering stage : pinned to the master rack's end (store-locked),
 // deliberately NOT in FX_SHADERS so racks and Randomize can't add a second.
 export const VIBE_SHADER: IsfShader = {
   id: 'fx-vibe',
@@ -732,7 +732,7 @@ export const VIBE_SHADER: IsfShader = {
   source: vibe
 }
 
-// The Context depth finalizer — pinned AFTER Vibe, also store-locked and kept
+// The Context depth finalizer : pinned AFTER Vibe, also store-locked and kept
 // out of FX_SHADERS. Curated ranges keep the Inspector dice tasteful.
 export const CONTEXT_SHADER: IsfShader = {
   id: 'fx-context',
@@ -750,7 +750,7 @@ export const CONTEXT_SHADER: IsfShader = {
   }
 }
 
-// The Finalizer — the last always-on master stage after Context (grade + grain
+// The Finalizer : the last always-on master stage after Context (grade + grain
 // + sharpen). Store-locked, kept out of FX_SHADERS.
 export const FINALIZER_SHADER: IsfShader = {
   id: 'fx-finalizer',
@@ -769,7 +769,7 @@ export const FINALIZER_SHADER: IsfShader = {
     grainSize: [1, 2.5],
     chroma: [0, 0.4],
     parasites: [0, 0.3],
-    // The output shaper is a deliberate compositional move — never randomized.
+    // The output shaper is a deliberate compositional move : never randomized.
     outShape: [0, 0],
     outBgSource: [0, 0]
   }
@@ -790,7 +790,7 @@ export const SHADER_BY_ID: Record<string, IsfShader> = Object.fromEntries(
 
 // ── Menu ordering ─────────────────────────────────────────────────────
 // Sources list alphabetically; FX group by their sub-category (from the ISF
-// header CATEGORIES), colour first. These drive the pickers only — the raw
+// header CATEGORIES), colour first. These drive the pickers only : the raw
 // arrays keep their authoring order for Randomize's pools.
 
 export const GENERATORS_ALPHA: IsfShader[] = [...GENERATORS].sort((a, b) =>
@@ -806,7 +806,7 @@ function fxGroup(sh: IsfShader): string {
   return cats.find((c) => c && c !== 'FX') ?? 'Other'
 }
 
-/** FX bucketed by sub-category — groups AND shaders alphabetical (matching the
+/** FX bucketed by sub-category : groups AND shaders alphabetical (matching the
  *  alphabetical sources list), so any new group (e.g. Convolution) slots in. */
 export const FX_GROUPS: Array<{ group: string; shaders: IsfShader[] }> = (() => {
   const buckets = new Map<string, IsfShader[]>()

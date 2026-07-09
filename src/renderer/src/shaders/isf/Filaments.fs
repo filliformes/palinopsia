@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Filaments — vertical strands swaying like kelp: each filament is a curve whose lateral sway deepens toward the free end, with its own rate and phase. Matte line-work over near-black; drift makes the whole bed lean.",
+  "DESCRIPTION": "Filaments : vertical strands swaying like kelp: each filament is a curve whose lateral sway deepens toward the free end, with its own rate and phase. Matte line-work over near-black; drift makes the whole bed lean.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic"],
@@ -33,7 +33,7 @@ float vnoise(vec2 p) {
 float strandX(float k, float y, float t) {
   float own = 0.6 + hash(vec2(k, 3.3)) * 0.8; // per-strand rate
   float phase = hash(vec2(k, 7.7)) * 6.2832;
-  // Sway grows toward the free end (y²) — anchored at the root.
+  // Sway grows toward the free end (y²) : anchored at the root.
   float s = sin(t * own + phase + y * (2.0 + hash(vec2(k, 11.0)) * 3.0));
   float n = vnoise(vec2(k * 3.1, y * 2.0 + t * 0.3)) - 0.5;
   return (s * 0.6 + n * 0.8) * sway * y * y * 0.35 + lean * y * y * 0.25;
@@ -55,7 +55,7 @@ void main() {
     // Strands taper toward the free end.
     float w = width * px * (1.0 - uv.y * 0.6);
     float line = 1.0 - smoothstep(w * 0.4, w, d);
-    // Root darker, tip brighter — the light is above.
+    // Root darker, tip brighter : the light is above.
     lum = max(lum, line * (0.35 + 0.65 * uv.y) * (0.6 + 0.4 * hash(vec2(k, 5.0))));
   }
 

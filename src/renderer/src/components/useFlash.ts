@@ -1,4 +1,4 @@
-// useFlash — brief visual acknowledgement for a fired action (the ⚄ dice).
+// useFlash : brief visual acknowledgement for a fired action (the ⚄ dice).
 // Returns [flashing, flash]; flash() turns flashing on for `ms`, so the dice
 // and its section can pulse red to confirm "this section was randomized".
 

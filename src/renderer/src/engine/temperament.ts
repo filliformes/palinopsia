@@ -1,14 +1,14 @@
-// Corbeil-Perron homage — three global "temperament" controls that sit beside
+// Film homage : three global "temperament" controls that sit beside
 // the field macros (engine/field.ts) and, like them, apply AFTER modulation each
 // frame and rest at a neutral deadzone (0 = off) so they never fight manual /
 // World / modulation when parked:
 //
-//  - TONICITY (thèse §3.10, "Mémoire : couleur, hauteur et timbre") — his
+//  - TONICITY (thèse §3.10, "Mémoire : couleur, hauteur et timbre") : his
 //    colour/pitch/timbre language: tonal, harmonic audio pulls COLOUR in, noisy /
 //    percussive audio pulls the image toward black-and-white.
-//  - SHUTTER (§1.7, Displacement) — his frame-by-frame montage at 12/24/48 fps:
+//  - SHUTTER (§1.7, Displacement) : his frame-by-frame montage at 12/24/48 fps:
 //    holds the output for a few frames then jumps (stop-motion stepping).
-//  - DRIFT (§1.8, "[Perte de] Contrôle") — his virtuosity-vs-accident: a slow
+//  - DRIFT (§1.8, "[Perte de] Contrôle") : his virtuosity-vs-accident: a slow
 //    analog-style wander over the finishing grade, plus rare parameter "accidents".
 
 import type { CompositionState } from '@shared/types'
@@ -48,7 +48,7 @@ export function applyTonicity(comp: MacroComp, c: CompositionState, amount: numb
   comp.setFxInput(MASTER, vibe.id, 'chroma', clamp01(baseChroma * (1 - eff) + baseChroma * satFactor * eff))
 }
 
-// ── Shutter — GLOBAL full-freeze stop-motion ─────────────────────────
+// ── Shutter : GLOBAL full-freeze stop-motion ─────────────────────────
 // This drives Compositor.setFreeze, which dead-holds the WHOLE presented frame
 // (incl. warp/xfade). It is deliberately DISTINCT from the Cameraless film-hold
 // (engine/cameraless.ts): that one is output-resample-only so upstream feedback
@@ -86,7 +86,7 @@ export function shutterClear(): boolean {
   return false
 }
 
-// ── Drift — analog-instability temperament ───────────────────────────
+// ── Drift : analog-instability temperament ───────────────────────────
 // Rare "accident" state: a brief excursion re-rolled at intervals.
 let accUntil = 0
 let accSeed = 0
@@ -108,7 +108,7 @@ export function applyDrift(comp: MacroComp, c: CompositionState, drift: number, 
   const w2 = Math.sin(t * 0.37 + 1.7)
   const w3 = Math.sin(t * 0.53 + 4.1)
 
-  // Occasional accident — a short, larger excursion (a "torrent of control data"
+  // Occasional accident : a short, larger excursion (a "torrent of control data"
   // moment). Probability scales with drift; each lasts ~0.15–0.35 s.
   if (nowMs > accUntil && Math.random() < drift * 0.02) {
     accUntil = nowMs + 150 + Math.random() * 200

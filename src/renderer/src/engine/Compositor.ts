@@ -1,5 +1,5 @@
 /**
- * Compositor.ts — WebGL2 4-layer ISF compositor
+ * Compositor.ts : WebGL2 4-layer ISF compositor
  * ----------------------------------------------------------------------------
  * The heart of the visual instrument. Per-frame signal chain (brief §4):
  *
@@ -16,9 +16,9 @@
  *   frame lands in its OWN ping-pong pair (so the shared buffers are free for
  *   the next layer), which doubles as the feedback source.
  * - PERSIST = mix(fresh, previous, amount): decay-register trails (never
- *   additive bloom — brief §1), capped below infinite persistence.
+ *   additive bloom : brief §1), capped below infinite persistence.
  * - Hot-swap principle (brief §1): loading/swapping shaders preserves the
- *   ping-pong buffers — trails survive the swap, never a reset to black.
+ *   ping-pong buffers : trails survive the swap, never a reset to black.
  * - VAO discipline: the ISF runtime owns the default VAO (WebGL1-style
  *   attribute state); our mix/persist/blend/copy passes bind a private
  *   fullscreen-triangle VAO and release it.
@@ -52,7 +52,7 @@ const QUAD_VS = `#version 300 es
 in vec2 p; out vec2 uv;
 void main(){ uv = p*0.5+0.5; gl_Position = vec4(p,0.,1.); }`;
 
-// The 15 blend modes (indices match modeIndex below) — shared by the layer
+// The 15 blend modes (indices match modeIndex below) : shared by the layer
 // stack pass and the A/B source-mix pass. 'wrap' is the digital-native one.
 const BLEND_GLSL = `
 vec3 blendMode(int mode, vec3 b, vec3 t){
@@ -91,7 +91,7 @@ void main(){
 }`;
 
 // Feedback persist: fresh frame smeared with the layer's previous frame.
-// mix() (not add) keeps trails in the decay register — they always converge
+// mix() (not add) keeps trails in the decay register : they always converge
 // back to the fresh image instead of blooming toward white (brief §1).
 const PERSIST_FS = `#version 300 es
 precision highp float;
@@ -107,7 +107,7 @@ void main(){
   o = all(equal(p, p)) ? p : texture(src, uv);
 }`;
 
-// A/B source mix: out = mix(A, blendMode(A,B), x) — 'normal' degenerates to
+// A/B source mix: out = mix(A, blendMode(A,B), x) : 'normal' degenerates to
 // the plain crossfade; every other mode makes the mixer a two-source
 // combinator with x as its depth.
 const MIX_FS = `#version 300 es
@@ -117,7 +117,7 @@ uniform sampler2D a;
 uniform sampler2D b;
 uniform int mode;
 uniform float x;          // 0 = A only, 1 = full blend result
-uniform float bHue;       // B hue rotation (radians) — A/B harmony: 0 consonant, π dissonant
+uniform float bHue;       // B hue rotation (radians) : A/B harmony: 0 consonant, π dissonant
 ${BLEND_GLSL}
 vec3 hueRot(vec3 c, float a){
   vec3 k = vec3(0.57735);
@@ -130,7 +130,7 @@ void main(){
   B.rgb = clamp(hueRot(B.rgb, bHue), 0.0, 1.0);
   if(mode==15){
     // WEAVE (Signal Culture Weaver): each source's luminance displaces the
-    // OTHER's sampling, then they interleave — a woven two-source warp.
+    // OTHER's sampling, then they interleave : a woven two-source warp.
     // x scales the displacement depth.
     vec3 lw = vec3(0.299,0.587,0.114);
     float la = dot(A.rgb, lw);
@@ -309,7 +309,7 @@ function computeWarpVerts(c: number[]): Float32Array {
  * The ISF runtime hardcodes `bindFramebuffer(FRAMEBUFFER, null)` for its final
  * (screen) pass. This proxy hands the runtime a GL context whose null-FBO binds
  * are redirected to a target of our choosing. One shared instance serves every
- * ISF renderer — draws are strictly sequential within a frame.
+ * ISF renderer : draws are strictly sequential within a frame.
  */
 export function makeRedirectableGL(gl: WebGL2RenderingContext): {
   gl: WebGL2RenderingContext;
@@ -325,7 +325,7 @@ export function makeRedirectableGL(gl: WebGL2RenderingContext): {
       }
       if (prop === 'bindTexture') {
         // The runtime defensively unbinds the ACTIVE texture unit between
-        // passes (bindTexture(target, null)) — which strips a multi-pass
+        // passes (bindTexture(target, null)) : which strips a multi-pass
         // shader's persistent-buffer texture off its unit before the final
         // pass samples it (Stutter rendered black). Ignoring null binds
         // keeps every unit intact; the runtime always binds what it needs
@@ -351,7 +351,7 @@ export function makeRedirectableGL(gl: WebGL2RenderingContext): {
 
 /** Load an ISF source into a fresh renderer; null on compile failure.
  *  Wrapped in try/catch because the ISF parser can THROW (not just set
- *  valid=false) on some sources — an uncaught throw here would propagate out
+ *  valid=false) on some sources : an uncaught throw here would propagate out
  *  of the render loop and freeze the whole app. Never let that happen. */
 function loadIsf(rgl: WebGL2RenderingContext, id: string, source: string): ISFRenderer | null {
   try {
@@ -377,14 +377,14 @@ interface SharedGL {
   // freeze), so we cap loads per frame and let the rest come in over the next
   // few frames. Reset at the top of syncFromState.
   budget: { n: number };
-  // Dry/wet blend for per-FX opacity — writes into a dedicated ping-pong so it
+  // Dry/wet blend for per-FX opacity : writes into a dedicated ping-pong so it
   // can't collide with the chain buffers. Set by the Compositor once its blend
   // program is ready. Returns the texture holding mix(dry, wet, opacity).
   blendDryWet?: (dry: WebGLTexture, wet: WebGLTexture, opacity: number) => WebGLTexture;
   // Copy a texture straight into a framebuffer (used to draw a video frame into
   // a layer's scratch target). Set by the Compositor once copyProg exists.
   blit?: (src: WebGLTexture, dstFbo: WebGLFramebuffer) => void;
-  // Framed blit — zoom / pan / crop a source frame into a target (video/capture).
+  // Framed blit : zoom / pan / crop a source frame into a target (video/capture).
   blitXform?: (src: WebGLTexture, dstFbo: WebGLFramebuffer, f: Framing) => void;
 }
 
@@ -402,7 +402,7 @@ const IDENTITY_FRAMING: Framing = { zoom: 1, panX: 0, panY: 0, cropL: 0, cropR: 
 const LOADS_PER_FRAME = 4;
 
 /** One live FX unit inside a rack. `isf` is null when the shader failed to
- *  compile — the unit still exists (so it isn't reloaded every frame) and
+ *  compile : the unit still exists (so it isn't reloaded every frame) and
  *  simply passes the image through. */
 interface FxUnit {
   instId: string;
@@ -500,12 +500,12 @@ class FxRack {
   }
 
   /** Feed a raw GL texture into one ISF unit's image input (via the texture
-   *  bridge) — the Context PBR maps ride this every frame. */
+   *  bridge) : the Context PBR maps ride this every frame. */
   setUnitImage(instId: string, name: string, tex: import('./isfTextureBridge').TextureHandle): void {
     this.units.find((x) => x.instId === instId)?.isf?.setValue(name, tex);
   }
 
-  /** Assign this rack's clock (per-layer Speed — see isfTextureBridge). */
+  /** Assign this rack's clock (per-layer Speed : see isfTextureBridge). */
   setTime(tSec: number): void {
     for (const u of this.units) {
       if (u.isf) (u.isf as unknown as { __opsiaTimeSec?: number }).__opsiaTimeSec = tSec;
@@ -521,7 +521,7 @@ class FxRack {
       const dry = cur;
       let wet: WebGLTexture;
       if (u.node) {
-        // Native convolution node — runs its own multi-pass render.
+        // Native convolution node : runs its own multi-pass render.
         if (!nodeCtx) continue; // rack not given a node context this frame
         wet = u.node.render({
           gl: this.shared.gl,
@@ -531,7 +531,7 @@ class FxRack {
           inputs: u.inputs ?? {},
           dt: nodeCtx.dt
         });
-        if (wet === cur) continue; // node was inert (no sidechain) — passthrough
+        if (wet === cur) continue; // node was inert (no sidechain) : passthrough
       } else if (u.isf) {
         const target = chain.next();
         u.isf.setValue('inputImage', handle(cur, chain.w, chain.h) as unknown as number);
@@ -582,15 +582,15 @@ export class ISFLayer {
   solo = false;
   /** 0 = no feedback (plain copy) · →1 = long decay trails. */
   feedbackAmount = 0;
-  /** A/B mix depth — 0 = A only. Ignored while B is empty. */
+  /** A/B mix depth : 0 = A only. Ignored while B is empty. */
   sourceMix = 0;
   /** How B combines with A before the crossfade. */
   sourceBlend: BlendMode = 'normal';
-  /** A/B harmony — 0 consonant (matched) · 1 dissonant (B hue clashes with A). */
+  /** A/B harmony : 0 consonant (matched) · 1 dissonant (B hue clashes with A). */
   harmony = 0;
   /** Global time multiplier for this layer's sources + racks. */
   speed = 1;
-  /** The layer's own clock (seconds) — advances by dt·speed each frame. */
+  /** The layer's own clock (seconds) : advances by dt·speed each frame. */
   clockSec = 0;
   shaderIdA: string | null = null;
   shaderIdB: string | null = null;
@@ -613,11 +613,11 @@ export class ISFLayer {
   private hiveB: HiveSource | null = null;
   private hiveIdA: string | null = null;
   private hiveIdB: string | null = null;
-  // Native Text slots (generator 'gen-text' — typography, glyphs fillable by a
+  // Native Text slots (generator 'gen-text' : typography, glyphs fillable by a
   // sidechain layer).
   private textA: TextSource | null = null;
   private textB: TextSource | null = null;
-  // Native Parametric slots (generator 'gen-parametric' — audio→texture).
+  // Native Parametric slots (generator 'gen-parametric' : audio→texture).
   private paramA: ParametricSource | null = null;
   private paramB: ParametricSource | null = null;
   // Per-slot framing (zoom/pan/crop) for video + capture sources.
@@ -639,7 +639,7 @@ export class ISFLayer {
   }
 
   /** Load/swap/clear a source shader. Feedback buffers survive (brief §1).
-   *  Records the requested id even when the compile FAILS — otherwise
+   *  Records the requested id even when the compile FAILS : otherwise
    *  syncFromState would see the id still unmatched and re-attempt the load
    *  every frame (a 60 Hz shader-compile storm that stalls the driver). A
    *  failed shader just renders transparent until a different one is chosen. */
@@ -681,7 +681,7 @@ export class ISFLayer {
   }
 
   /** Activate/refresh/clear a native TEXT source. Called every frame by
-   *  syncFromState (cheap when unchanged) — cfg carries the base state. */
+   *  syncFromState (cheap when unchanged) : cfg carries the base state. */
   setText(
     slot: 'A' | 'B',
     cfg: { text: string; inputs: Record<string, number | number[]>; sidechain: SidechainRef | null } | null
@@ -784,7 +784,7 @@ export class ISFLayer {
 
   /** Drive video playheads and publish them for the Inspector timeline.
    *  `rawDt` is the real frame delta; `mul` is this layer's speed × global speed
-   *  (the rate over realtime) — so both scale the clip on top of its own speed. */
+   *  (the rate over realtime) : so both scale the clip on top of its own speed. */
   tickVideos(layerIndex: number, rawDt: number, mul: number): void {
     for (const slot of ['A', 'B'] as const) {
       const v = slot === 'A' ? this.videoA : this.videoB;
@@ -869,7 +869,7 @@ export class ISFLayer {
     this.shared.redirect.redirect = null;
   }
 
-  /** The persisted (post-feedback) frame — what the blend stack composites. */
+  /** The persisted (post-feedback) frame : what the blend stack composites. */
   texture(): WebGLTexture { return this.pp.out(); }
 
   /** Release every GL resource this layer owns (renderers, racks, buffers). */
@@ -900,7 +900,7 @@ export class Compositor {
   gl: WebGL2RenderingContext;
   layers: ISFLayer[] = [];
   masterRack: FxRack;
-  // Background slab — the ground under the stack: one generator + its own FX
+  // Background slab : the ground under the stack: one generator + its own FX
   // rack + its own slow clock, composited first (blend 'normal').
   private bgIsf: ISFRenderer | null = null;
   private bgShaderId: string | null = null;
@@ -963,7 +963,7 @@ export class Compositor {
   private xfadeActive = false;
   private xfadeStartMs = -1;
   private xfadeMs = 0;
-  // The texture presented last frame — snapshotted into `snapshot` the moment a
+  // The texture presented last frame : snapshotted into `snapshot` the moment a
   // crossfade begins (so no per-frame blit in the steady state).
   private lastPresent: WebGLTexture | null = null;
   // Monomedia "freeze" drop: hold the last presented frame on screen (the
@@ -971,11 +971,11 @@ export class Compositor {
   // frozen frame; safe because monomedia recalls are hard cuts (no xfade).
   private freezeActive = false;
   private freezeCaptured = false;
-  // Output readback (Spout/NDI seam) — set to a callback to grab the final RGBA8
+  // Output readback (Spout/NDI seam) : set to a callback to grab the final RGBA8
   // frame each frame; null (default) → zero cost.
   private outputCapture: ((w: number, h: number, px: Uint8Array) => void) | null = null;
   private readbackBuf: Uint8Array | null = null;
-  // Global time multiplier (1/64×…64×) — scales every visual clock.
+  // Global time multiplier (1/64×…64×) : scales every visual clock.
   private globalSpeed = 1;
   private blendProg: WebGLProgram;
   private persistProg: WebGLProgram;
@@ -1014,10 +1014,10 @@ export class Compositor {
     // reliably reads the frame instead of capturing black after the buffer swap.
     const gl = canvas.getContext('webgl2', { premultipliedAlpha: false, preserveDrawingBuffer: true })!;
     if (!gl) throw new Error('WebGL2 unavailable');
-    // RGBA16F render targets need this — without it every FBO is incomplete and
+    // RGBA16F render targets need this : without it every FBO is incomplete and
     // the whole engine renders black. Surface it rather than fail silently.
     if (!gl.getExtension('EXT_color_buffer_float')) {
-      console.error('[Compositor] EXT_color_buffer_float unavailable — float render targets will fail (black output)');
+      console.error('[Compositor] EXT_color_buffer_float unavailable : float render targets will fail (black output)');
     }
     this.gl = gl;
     const wrapped = makeRedirectableGL(gl);
@@ -1029,7 +1029,7 @@ export class Compositor {
     this.quadBuf = buf;
     gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    // Leave the default VAO for the ISF runtime — it sets up its own attribute
+    // Leave the default VAO for the ISF runtime : it sets up its own attribute
     // state there (WebGL1-style). Our passes bind this.vao explicitly.
     gl.bindVertexArray(null);
 
@@ -1060,7 +1060,7 @@ export class Compositor {
     this.uXPan = gl.getUniformLocation(this.xformProg, 'pan')!;
     this.uXCrop = gl.getUniformLocation(this.xformProg, 'crop')!;
 
-    // Warp present pass — its own VAO with a 6-vertex (2-triangle) quad, each
+    // Warp present pass : its own VAO with a 6-vertex (2-triangle) quad, each
     // vertex (x,y, u*q,v*q,q) = 5 floats, re-uploaded when the corners move.
     this.warpProg = compile(gl, WARP_VS, WARP_FS);
     this.uWTex = gl.getUniformLocation(this.warpProg, 'tex')!;
@@ -1113,7 +1113,7 @@ export class Compositor {
     for (let i = 0; i < 4; i++) this.layers.push(new ISFLayer(this.shared, w, h));
   }
 
-  /** Global time multiplier (1/64×…64×) — scales the master + layer clocks. */
+  /** Global time multiplier (1/64×…64×) : scales the master + layer clocks. */
   setGlobalSpeed(x: number): void {
     this.globalSpeed = Math.max(1 / 64, Math.min(64, x));
   }
@@ -1121,7 +1121,7 @@ export class Compositor {
   /** Begin dissolving the frozen last frame into the new scene over `ms`.
    *  Driven by the render loop from a morph (Randomize / scene recall). Called
    *  BEFORE this frame's render(), while `lastPresent` still holds the previous
-   *  (old-scene) frame — snapshot it here rather than blitting every frame. */
+   *  (old-scene) frame : snapshot it here rather than blitting every frame. */
   beginCrossfade(ms: number): void {
     if (ms <= 20) return;
     if (this.lastPresent) this.copyInto(this.snapshot.fbo, this.lastPresent);
@@ -1147,7 +1147,7 @@ export class Compositor {
   }
 
   // ── Animated sound (spec §4.4): read one horizontal scanline of the PRESENTED
-  //    frame and downsample it to `n` luma samples in 0..1 — the "optical
+  //    frame and downsample it to `n` luma samples in 0..1 : the "optical
   //    soundtrack" a drawn gesture writes. Cheap (one row, sub-rect readback).
   //    Call AFTER render() (the default framebuffer then holds the presented frame).
   private markStripBuf: Uint8Array | null = null;
@@ -1202,7 +1202,7 @@ export class Compositor {
 
   /**
    * Reconcile the engine against the store's CompositionState. Called once per
-   * frame before render() — the single write path shared by UI, session loads,
+   * frame before render() : the single write path shared by UI, session loads,
    * OSC, and modulators. Shader hot-swaps preserve feedback buffers (brief §1).
    */
   syncFromState(c: CompositionState, sourceById: (id: string) => string | null) {
@@ -1210,9 +1210,9 @@ export class Compositor {
     for (let i = 0; i < this.layers.length && i < c.layers.length; i++) {
       const l = c.layers[i];
       const L = this.layers[i];
-      // Each slot is a generator, a video, or empty — reconcile both engines so
+      // Each slot is a generator, a video, or empty : reconcile both engines so
       // switching kinds swaps cleanly (video↔generator never overlap). The Text
-      // generator is NATIVE (a TS class, no ISF compile) — route it to setText.
+      // generator is NATIVE (a TS class, no ISF compile) : route it to setText.
       const nativeA = l.sourceA.kind === 'generator' && (l.sourceA.shaderId === 'gen-text' || l.sourceA.shaderId === 'gen-parametric');
       const isTextA = l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-text';
       const isParamA = l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-parametric';
@@ -1274,7 +1274,7 @@ export class Compositor {
         this.bgIsf?.cleanup();
         this.bgIsf = wantBg && src ? loadIsf(this.shared.rgl, wantBg, src) : null;
         this.bgShaderId = wantBg;
-      } // else: budget spent — retry next frame (id left unrecorded)
+      } // else: budget spent : retry next frame (id left unrecorded)
     }
     if (this.bgIsf && bg) {
       for (const [k, v] of Object.entries(bg.source.inputs)) this.bgIsf.setValue(k, v);
@@ -1315,7 +1315,7 @@ export class Compositor {
     this.cfSplice = numf(fi.filmSplice, 0);
 
     // Context PBR surface: feed the selected material's maps (or the neutral
-    // flat set) into the Context unit's image inputs every frame. Lazy — no
+    // flat set) into the Context unit's image inputs every frame. Lazy : no
     // texture leaves disk until a material is first selected.
     const ctx = c.master.find((f) => f.shaderId === 'fx-context');
     if (ctx) {
@@ -1336,7 +1336,7 @@ export class Compositor {
     if (scope.kind === 'master') {
       this.masterRack.setUnitInput(instId, name, value);
       // The Finalizer's out* params are applied NATIVELY (the shader ignores
-      // them) — mirror modulated writes onto the fz fields, else modulation
+      // them) : mirror modulated writes onto the fz fields, else modulation
       // moves the sliders but never the picture. syncFromState sets the base
       // each frame; applyModulation runs after it, so this wins the frame.
       if (instId === this.fzInstId && typeof value === 'number') {
@@ -1378,7 +1378,7 @@ export class Compositor {
 
   /** Direct write to the Background slab's source ISF input (modulation path).
    *  syncFromState re-applies the store base each frame first, so a modulated
-   *  write here wins the frame it lands in — same contract as setFxInput. */
+   *  write here wins the frame it lands in : same contract as setFxInput. */
   setBgSourceInput(name: string, value: number | number[]): void {
     this.bgIsf?.setValue(name, value);
   }
@@ -1426,7 +1426,7 @@ export class Compositor {
     gl.useProgram(this.persistProg);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src); gl.uniform1i(this.uPSrc, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, L.pp.read()); gl.uniform1i(this.uPPrev, 1);
-    // Cap just below 1 so trails always decay — infinite persistence is the
+    // Cap just below 1 so trails always decay : infinite persistence is the
     // blooming failure mode the brief warns about.
     gl.uniform1f(this.uPAmt, Math.min(L.feedbackAmount, 0.97));
     gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -1456,13 +1456,13 @@ export class Compositor {
 
     // Native convolution nodes (layer FX) resolve their sidechain to a live
     // texture: another layer's persisted output (previous frame for layers not
-    // yet rendered — fine, the node keeps its own history). Assets land later.
+    // yet rendered : fine, the node keeps its own history). Assets land later.
     const nodeCtx: NodeApplyCtx = {
       dt: rawDt,
       sidechainTex: (ref) => {
         if (!ref) return null;
         if (ref.kind === 'layer') return this.layers[ref.layer]?.texture() ?? null;
-        return null; // imported assets — Commit C
+        return null; // imported assets : Commit C
       }
     };
 
@@ -1472,7 +1472,7 @@ export class Compositor {
     for (let li = 0; li < this.layers.length; li++) {
       const L = this.layers[li];
       // Fault-isolate each layer: a throw inside one layer's rack (e.g. an ISF
-      // unit in a bad state after an edit) must not abort the whole frame — that
+      // unit in a bad state after an edit) must not abort the whole frame : that
       // would freeze EVERY layer, including a video, until the state changed.
       // Skip the offending layer this frame, keep the rest live, and always
       // clear the ISF redirect so a throw mid-draw can't leak a stale target.
@@ -1514,7 +1514,7 @@ export class Compositor {
     let first = true;
 
     // Background slab. Rendered whenever it's needed either behind the layers OR
-    // as the finalizer's outside fill (fzBgLayer "moves" it there — so it must
+    // as the finalizer's outside fill (fzBgLayer "moves" it there : so it must
     // NOT also sit behind the layers). Copied into a STABLE bgFill buffer since
     // the chain buffer the rack returns is reused by the layer loop below.
     const wantBg = this.bgIsf && (this.bgOpacity > 0.001 || this.fzBgLayer);
@@ -1559,7 +1559,7 @@ export class Compositor {
     for (const L of this.layers) {
       const audible = anySolo ? L.solo : !L.mute;
       if (!audible) continue;
-      // The first visible layer has nothing real below it — the accumulator
+      // The first visible layer has nothing real below it : the accumulator
       // is cleared black, so multiply/overlay/burn would eat it. Standard
       // compositor semantics: the bottom of the stack composites 'normal';
       // blend modes act BETWEEN layers.
@@ -1595,7 +1595,7 @@ export class Compositor {
 
     // Cameraless / direct-film stage: draw-clock hold + boil (§2.1 pipeline slot).
     // Null when off (hold===0) or effectively smooth (draw ≥ present fps with no
-    // artifacts) — skipped entirely so it costs nothing and passes through clean.
+    // artifacts) : skipped entirely so it costs nothing and passes through clean.
     if (this.cfHold > 0) {
       const active =
         this.cfRate < 58 || this.cfBoil > 0.001 || this.cfFlutter > 0.001 || this.cfBlank > 0.001 ||
@@ -1614,7 +1614,7 @@ export class Compositor {
 
     // Scene crossfade: dissolve the frozen old frame into the new composite.
     // The only way a STRUCTURAL morph (Randomize All swaps shaders) can read as
-    // a transition — parameter easing can't cross a shader change.
+    // a transition : parameter easing can't cross a shader change.
     let present = composite;
     if (this.xfadeActive) {
       if (this.xfadeStartMs < 0) this.xfadeStartMs = timeMs;
@@ -1635,7 +1635,7 @@ export class Compositor {
       }
       if (this.freezeCaptured) present = this.snapshot.tex;
     }
-    // Present to canvas — warped (keystone quad) or straight full-screen.
+    // Present to canvas : warped (keystone quad) or straight full-screen.
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     if (this.warpActive) {
@@ -1653,7 +1653,7 @@ export class Compositor {
     }
     gl.bindVertexArray(null);
 
-    // Remember what we just showed — beginCrossfade() snapshots this next time a
+    // Remember what we just showed : beginCrossfade() snapshots this next time a
     // morph starts, so the dissolve begins from the exact frame on screen.
     this.lastPresent = present;
 

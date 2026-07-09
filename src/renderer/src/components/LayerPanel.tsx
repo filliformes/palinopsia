@@ -1,8 +1,8 @@
 // One layer strip (brief §10.2), compact form: opacity rides the header row;
 // SRC A and SRC B sit side by side (their FX racks live BELOW as chips, so
-// the columns stay narrow); every rack uses the chips layout — no blank
+// the columns stay narrow); every rack uses the chips layout : no blank
 // space. Right-click anywhere on the strip: Init, Randomize layer, layer
-// presets (save/apply/delete — app-persistent).
+// presets (save/apply/delete : app-persistent).
 
 import { useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { AudioFeature, BlendMode, CouplingMode, SourceKind } from '@shared/types'
@@ -122,7 +122,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             label="FB"
             active={layer.feedback}
             onClick={() => toggleFeedback(index)}
-            title="Feedback — this layer samples its own previous frame (trails)"
+            title="Feedback : this layer samples its own previous frame (trails)"
           />
           <button
             onClick={() => {
@@ -141,7 +141,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
 
       {!collapsed && (
         <>
-          {/* SOURCE A: label · picker · +fx — its FX chips underneath */}
+          {/* SOURCE A: label · picker · +fx : its FX chips underneath */}
           <SourceRow
             label="A"
             shaderId={layer.sourceA.shaderId}
@@ -158,14 +158,14 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             onPickHive={(host, port) => setSourceHive(index, 'A', host, port)}
           />
 
-          {/* MIX: combinator mode + depth — ALWAYS visible (fixed layout);
+          {/* MIX: combinator mode + depth : ALWAYS visible (fixed layout);
               inert until B has a source. */}
           <Row label="MIX">
             <select
               className="input select-compact w-20 shrink-0 text-[10px]"
               value={layer.sourceBlend}
               onChange={(e) => setSourceBlend(index, e.target.value as BlendMode)}
-              title="How B combines with A — the slider is the depth"
+              title="How B combines with A : the slider is the depth"
             >
               {BLEND_MODES.map((m) => (
                 <option key={m} value={m}>
@@ -181,7 +181,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               value={layer.sourceMix}
               onChange={(e) => setSourceMix(index, Number(e.target.value))}
               className="min-w-0 flex-1 accent-accent"
-              title="Mix depth — 0 = A only, 1 = full blend result"
+              title="Mix depth : 0 = A only, 1 = full blend result"
             />
             <span className="shrink-0 font-mono text-[9px] text-muted" title="A/B harmony">⚖</span>
             <input
@@ -192,19 +192,19 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               value={layer.harmony}
               onChange={(e) => setHarmony(index, Number(e.target.value))}
               className="min-w-0 flex-1 accent-accent2"
-              title={`Harmony ${layer.harmony.toFixed(2)} — 0 consonant (B matched) ↔ 1 dissonant (B hue clashes with A)`}
+              title={`Harmony ${layer.harmony.toFixed(2)} : 0 consonant (B matched) ↔ 1 dissonant (B hue clashes with A)`}
             />
           </Row>
 
           {/* CPL: audio couples the A/B balance. Hidden unless the user turns on
-              coupling (Audio panel) — a visuals-only user never sees it. */}
+              coupling (Audio panel) : a visuals-only user never sees it. */}
           {showCoupling && (
           <Row label="CPL">
             <select
               className="input select-compact w-[4.25rem] shrink-0 text-[10px]"
               value={layer.coupling.mode}
               onChange={(e) => setCoupling(index, { mode: e.target.value as CouplingMode })}
-              title="A/B coupling by audio — lean · hocket (pump) · cut (transient flash) · gate (B while loud) · drift (slow momentum)"
+              title="A/B coupling by audio : lean · hocket (pump) · cut (transient flash) · gate (B while loud) · drift (slow momentum)"
             >
               <option value="off">off</option>
               <option value="lean">lean</option>
@@ -243,7 +243,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               value={layer.coupling.tightness}
               onChange={(e) => setCoupling(index, { tightness: Number(e.target.value) })}
               className="min-w-0 flex-1 accent-accent"
-              title={`Tightness ${layer.coupling.tightness.toFixed(2)} — vestigial (peaks only) ↔ obvious (linear)`}
+              title={`Tightness ${layer.coupling.tightness.toFixed(2)} : vestigial (peaks only) ↔ obvious (linear)`}
             />
           </Row>
           )}
@@ -288,7 +288,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             </select>
           </Row>
 
-          {/* TRAIL persistence — only while FB is on */}
+          {/* TRAIL persistence : only while FB is on */}
           {layer.feedback && (
             <Row label="TRAIL">
               <input
@@ -299,7 +299,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                 value={layer.feedbackAmount}
                 onChange={(e) => setFeedbackAmount(index, Number(e.target.value))}
                 className="min-w-0 flex-1 accent-accent"
-                title="Feedback persistence — decay trails (capped below infinite bloom)"
+                title="Feedback persistence : decay trails (capped below infinite bloom)"
               />
               <div className="w-11 shrink-0">
                 <BoundedNumberInput
@@ -313,7 +313,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             </Row>
           )}
 
-          {/* SPEED — the layer's global clock multiplier; always the last row */}
+          {/* SPEED : the layer's global clock multiplier; always the last row */}
           <Row label="SPEED">
             <input
               type="range"
@@ -323,7 +323,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               value={layer.speed}
               onChange={(e) => setLayerSpeed(index, Number(e.target.value))}
               className="min-w-0 flex-1 accent-accent"
-              title="Layer time — scales every source and FX clock on this layer (1 = realtime)"
+              title="Layer time : scales every source and FX clock on this layer (1 = realtime)"
             />
             <div className="w-11 shrink-0">
               <BoundedNumberInput
@@ -399,7 +399,7 @@ function ToggleChip({
   )
 }
 
-// Fixed 34px label gutter — every row in the strip aligns to it.
+// Fixed 34px label gutter : every row in the strip aligns to it.
 function Row({ label, children }: { label: string; children: ReactNode }): JSX.Element {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
@@ -419,7 +419,7 @@ function mediaUrlForFile(file: File): string {
     const path = window.api.getMediaPath(file)
     if (path) return `opsia-media://local/${encodeURIComponent(path)}`
   } catch {
-    /* getMediaPath unavailable — fall back */
+    /* getMediaPath unavailable : fall back */
   }
   return URL.createObjectURL(file)
 }
@@ -530,7 +530,7 @@ function SourceRow({
             </option>
           ))}
         </select>
-        {/* +fx always present — the layout never shifts when sources load.
+        {/* +fx always present : the layout never shifts when sources load.
             w-auto so the box hugs its "+ fx" label instead of a fixed gutter. */}
         <span onClick={(e) => e.stopPropagation()}>
           <FxAddSelect scope={scope} className="w-auto shrink-0" />

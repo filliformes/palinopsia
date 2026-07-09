@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Posterize — quantize tones into matte bands (gamma-aware). Core of the synthify chain (brief §4).",
+  "DESCRIPTION": "Posterize : quantize tones into matte bands (gamma-aware). Core of the synthify chain (brief §4).",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color"],

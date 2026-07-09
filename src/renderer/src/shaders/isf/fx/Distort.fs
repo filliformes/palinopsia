@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Distort — ten warp modes on one control set (amount · scale · center · angle · rate): WAVE (sine ripple), RIPPLE (concentric, from center), BULGE / PINCH (spherize out/in), SWIRL (twist around center), SHEAR (position-dependent skew), GLASS (cell-refracted textured glass), CORRUGATE (accordion ribs along angle), PULL (directional drag from center), TURBULENT (curl-noise domain warp). The compositional bend/warp tool.",
+  "DESCRIPTION": "Distort : ten warp modes on one control set (amount · scale · center · angle · rate): WAVE (sine ripple), RIPPLE (concentric, from center), BULGE / PINCH (spherize out/in), SWIRL (twist around center), SHEAR (position-dependent skew), GLASS (cell-refracted textured glass), CORRUGATE (accordion ribs along angle), PULL (directional drag from center), TURBULENT (curl-noise domain warp). The compositional bend/warp tool.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Distortion"],
@@ -56,7 +56,7 @@ void main() {
   vec2 perp = vec2(-dir.y, dir.x);
 
   if (mode == 0) {
-    // WAVE — a 2D sine wave oriented along `angle`, its phase measured from
+    // WAVE : a 2D sine wave oriented along `angle`, its phase measured from
     // `center` (moving the pad shifts the nodes; angle turns the grain).
     vec2 rel = uv - center;
     float along = dot(rel, dir);
@@ -65,13 +65,13 @@ void main() {
     float d2 = sin(along * scale * 6.2832 + t * 1.3);
     c = uv + (dir * d1 + perp * d2) * 0.06 * amt;
   } else if (mode == 1) {
-    // RIPPLE — concentric rings travelling out from the center.
+    // RIPPLE : concentric rings travelling out from the center.
     float ring = sin(r * scale * 6.2832 - t * 3.0);
     vec2 dir = p / max(r, 1e-4);
     dir.x /= aspect;
     c = uv + dir * ring * 0.05 * amt;
   } else if (mode == 2) {
-    // BULGE — spherize outward (magnify the centre) inside a radius.
+    // BULGE : spherize outward (magnify the centre) inside a radius.
     float rad = 0.9;
     float rn = clamp(r / rad, 0.0, 1.0);
     float rr = pow(rn, mix(1.0, 0.25, amt)) * rad;
@@ -79,7 +79,7 @@ void main() {
     pr.x /= aspect;
     c = center + pr;
   } else if (mode == 3) {
-    // PINCH — spherize inward (squeeze toward the centre).
+    // PINCH : spherize inward (squeeze toward the centre).
     float rad = 0.9;
     float rn = clamp(r / rad, 0.0, 1.0);
     float rr = pow(rn, mix(1.0, 3.5, amt)) * rad;
@@ -87,19 +87,19 @@ void main() {
     pr.x /= aspect;
     c = center + pr;
   } else if (mode == 4) {
-    // SWIRL — twist around the centre, falloff tightened by scale.
+    // SWIRL : twist around the centre, falloff tightened by scale.
     float ang = amt * 6.2832 * exp(-r * r * scale);
     float cs = cos(ang), sn = sin(ang);
     vec2 pr = vec2(p.x * cs - p.y * sn, p.x * sn + p.y * cs);
     pr.x /= aspect;
     c = center + pr;
   } else if (mode == 5) {
-    // SHEAR — skew ⟂ `angle`, proportional to distance from `center` along it
-    // (center is the shear pivot — the line that stays put).
+    // SHEAR : skew ⟂ `angle`, proportional to distance from `center` along it
+    // (center is the shear pivot : the line that stays put).
     float along = dot(uv - center, dir);
     c = uv + perp * along * amt * 2.0;
   } else if (mode == 6) {
-    // GLASS — cell-refracted textured glass. The tile grid is rotated by
+    // GLASS : cell-refracted textured glass. The tile grid is rotated by
     // `angle` and originates at `center`, so the panes turn and shift.
     vec2 rel = uv - center;
     rel.x *= aspect;
@@ -114,17 +114,17 @@ void main() {
     offW.x /= aspect;
     c = uv + offW;
   } else if (mode == 7) {
-    // CORRUGATE — accordion ribs along `angle`, phase measured from `center`.
+    // CORRUGATE : accordion ribs along `angle`, phase measured from `center`.
     float along = dot(uv - center, dir) * scale;
     float tri = abs(fract(along) * 2.0 - 1.0);
     c = uv + perp * (tri - 0.5) * 0.1 * amt;
   } else if (mode == 8) {
-    // PULL — directional drag from `center` along `angle`, strong near the
+    // PULL : directional drag from `center` along `angle`, strong near the
     // point and fading out (a smear-warp handle).
     float pull = amt * 0.35 / (r * scale + 1.0);
     c = uv - dir * pull;
   } else {
-    // TURBULENT — curl-noise domain warp. The field is rotated by `angle`
+    // TURBULENT : curl-noise domain warp. The field is rotated by `angle`
     // and sampled about `center`, with a soft radial emphasis so the pad
     // point is the eye of the turbulence.
     vec2 rel = uv - center;

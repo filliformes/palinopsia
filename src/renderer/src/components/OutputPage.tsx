@@ -1,4 +1,4 @@
-// OutputPage — a full-screen "Output / Mapping" page that takes over the UI
+// OutputPage : a full-screen "Output / Mapping" page that takes over the UI
 // (opened from the toolbar). It carries a LIVE keystone editor (a mirror of the
 // composite with draggable corner handles, so you warp and watch it move), the
 // alignment grid, projector/2nd-display output, and NDI / Spout senders.
@@ -127,7 +127,7 @@ export function OutputPage({
       video.srcObject = stream
       void video.play().catch(() => {})
     } catch {
-      /* captureStream unsupported — the editor still works without the preview */
+      /* captureStream unsupported : the editor still works without the preview */
     }
     return () => {
       stream?.getTracks().forEach((t) => t.stop())
@@ -224,7 +224,7 @@ export function OutputPage({
             }}
           >
             <video ref={videoRef} autoPlay muted playsInline className="h-full w-full bg-black object-contain" />
-            {/* Recording indicator — top-right, pulsing red dot + elapsed. */}
+            {/* Recording indicator : top-right, pulsing red dot + elapsed. */}
             {recording && (
               <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1.5 rounded bg-black/55 px-2 py-1 font-mono text-[11px] text-danger">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-danger" />
@@ -266,12 +266,12 @@ export function OutputPage({
                 }}
                 className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border-2 border-bg bg-accent"
                 style={{ left: `${corners[i * 2] * 100}%`, top: `${corners[i * 2 + 1] * 100}%` }}
-                title={`${CORNER_LABELS[i]} — drag to keystone · double-click to reset`}
+                title={`${CORNER_LABELS[i]} : drag to keystone · double-click to reset`}
               />
             ))}
           </div>
          </div>
-         {/* Resource HUD — one line, spaced across, just under the output. */}
+         {/* Resource HUD : one line, spaced across, just under the output. */}
          <ResourceHud />
         </div>
 
@@ -310,7 +310,7 @@ export function OutputPage({
                 onChange={(e) => setRenderScale(Number(e.target.value))}
                 onDoubleClick={() => setRenderScale(1)}
                 className="min-w-0 flex-1 accent-accent"
-                title={`Render resolution ${resW}×${resH} — the whole engine renders here, then scales to the display`}
+                title={`Render resolution ${resW}×${resH} : the whole engine renders here, then scales to the display`}
               />
               <span className="w-24 shrink-0 text-right font-mono text-[11px] text-muted">
                 {resW}×{resH}
@@ -335,9 +335,9 @@ export function OutputPage({
             <p className="text-[11px] leading-tight text-muted">
               The whole engine renders at this resolution (every effect, not just a
               filter). Below <span className="text-text">1080p</span> it upscales
-              with crisp pixels — a genuine lo-fi look; push to{' '}
+              with crisp pixels : a genuine lo-fi look; push to{' '}
               <span className="text-text">4K</span> for hi-fi (heavier on the GPU).
-              Changing it rebuilds the engine — a brief flicker is normal.
+              Changing it rebuilds the engine : a brief flicker is normal.
             </p>
           </Section>
 
@@ -377,7 +377,7 @@ export function OutputPage({
                   onClick={() => openOutput(true)}
                   disabled={displayId == null}
                   className="flex-1 rounded border border-accent bg-accent/15 px-2 py-1 font-mono text-[11px] text-accent hover:bg-accent/25 disabled:opacity-40"
-                  title="A normal 1280×720 window — easy to Window-Capture in OBS/Resolume"
+                  title="A normal 1280×720 window : easy to Window-Capture in OBS/Resolume"
                 >
                   window ▶
                 </button>
@@ -470,7 +470,7 @@ export function OutputPage({
               </label>
             </div>
             <p className="text-[11px] leading-tight text-muted">
-              HEVC over TCP, advertised on the LAN via mDNS — the open NDI
+              HEVC over TCP, advertised on the LAN via mDNS : the open NDI
               alternative. Receive in OBS (HIVE plugin) or any HIVE client.
               Experimental: needs a hardware HEVC encoder.
             </p>

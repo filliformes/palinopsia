@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Stutter — probabilistic frame holds, now chaotic: BANDS split the screen into horizontal regions that freeze independently, JITTER gives each band its own irregular clock, and BLACKOUT makes segments blank the region entirely (the chaotic on/off of the screen).",
+  "DESCRIPTION": "Stutter : probabilistic frame holds, now chaotic: BANDS split the screen into horizontal regions that freeze independently, JITTER gives each band its own irregular clock, and BLACKOUT makes segments blank the region entirely (the chaotic on/off of the screen).",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],
@@ -23,7 +23,7 @@ float hash(vec2 p) {
   return fract(p.x * p.y);
 }
 
-// Per-band segment id: each band runs its own clock — jitter detunes the
+// Per-band segment id: each band runs its own clock : jitter detunes the
 // band clocks from each other so freezes stop lining up.
 float segFor(float band) {
   float ownRate = rate * (1.0 + (hash(vec2(band, 4.2)) - 0.5) * jitter * 1.6);

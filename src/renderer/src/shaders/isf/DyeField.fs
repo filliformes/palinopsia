@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Dye Field — painted-on-film dye after Stan Brakhage (Dante Quartet / Black Ice): domain-warped SUBTRACTIVE pigment pooling over a near-black emulsion, disciplined toward decay and crystallisation — never additive glow-on-black (brief §1, §5.3). An internal feedback pass pools and crystallises the dye (the Black Ice look). Matte, near-black, no symmetry, no bloom.",
-  "CREDIT": "Palinopsia (after Stan Brakhage)",
+  "DESCRIPTION": "Dye Field : painted-on-film dye. Domain-warped SUBTRACTIVE pigment pooling over a near-black emulsion, disciplined toward decay and crystallisation, never additive glow-on-black (brief §1, §5.3). An internal feedback pass pools and crystallises the dye. Matte, near-black, no symmetry, no bloom.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic"],
   "INPUTS": [
@@ -31,20 +31,20 @@ void main() {
 
   if (PASSINDEX == 0) {
     float t = TIME * rate;
-    // Two-tap domain warp — the field folds into itself (pooling, not tiling).
+    // Two-tap domain warp : the field folds into itself (pooling, not tiling).
     vec2 q = uv + 0.15 * warp * vec2(vnoise(uv * scale + t), vnoise(uv * scale + 7.0));
     vec2 w = uv + 0.35 * warp * vec2(vnoise(q * scale * 1.4 + 1.7), vnoise(q * scale * 1.4 + 9.2));
     float d = pow(vnoise(w * scale * 1.6 + t * 0.1), mix(1.1, 2.4, density)); // pooling curve
 
     // Crystallise: leak the dye into a warped, decayed copy of itself. Loop gain
-    // < 1 (0.96) so it pools and holds like ice, then slowly releases — bounded.
+    // < 1 (0.96) so it pools and holds like ice, then slowly releases : bounded.
     vec2 sc = uv + (vec2(vnoise(uv * scale - t), vnoise(uv * scale + 3.0)) - 0.5) * warp * 0.02;
     float prev = IMG_NORM_PIXEL(buf, sc).r;
     d = mix(d, prev * 0.96 + d * 0.2, pool);
     gl_FragColor = vec4(vec3(clamp(d, 0.0, 1.0)), 1.0);
   } else {
     float d = IMG_NORM_PIXEL(buf, uv).r;
-    // SUBTRACTIVE dye over near-black emulsion — pigment density, never glow.
+    // SUBTRACTIVE dye over near-black emulsion : pigment density, never glow.
     vec3 col = mix(base.rgb, pigment.rgb, d);
     // Dye granulation: clumped coloured mottle, subtractive density.
     float clump = vnoise(uv * 23.0);

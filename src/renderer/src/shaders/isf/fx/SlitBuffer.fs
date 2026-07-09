@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Slit Buffer — time-smear of the input: a write head sweeps across the frame, freezing the live image into the persistent buffer as it passes, so columns behind the head hold older moments. A real slit-scan of whatever feeds the layer (Signal Culture SSSScan / PXLMSH register). Direction sets the sweep (normal / inverted / pendulum ping-pong); Jitter breaks the seam into a ragged edge; Jumps teleports the whole playhead to random spots before/after its swept position.",
-  "CREDIT": "Palinopsia (after Signal Culture SSSScan)",
+  "DESCRIPTION": "Slit Buffer : time-smear of the input: a write head sweeps across the frame, freezing the live image into the persistent buffer as it passes, so columns behind the head hold older moments. A real slit-scan of whatever feeds the layer (Signal Culture SSSScan / PXLMSH register). Direction sets the sweep (normal / inverted / pendulum ping-pong); Jitter breaks the seam into a ragged edge; Jumps teleports the whole playhead to random spots before/after its swept position.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch", "Scan"],
   "INPUTS": [
@@ -35,7 +35,7 @@ void main() {
     else if (direction == 2) head = abs(fract(t * 0.5) * 2.0 - 1.0);
 
     // Jumps: on a stepped clock the WHOLE playhead teleports to a random spot
-    // before or after its swept position (uniform across the frame — a real
+    // before or after its swept position (uniform across the frame : a real
     // head jump, distinct from jitter's per-band raggedness).
     float jt = floor(t * 3.0);                     // jump clock (~3 per unit t)
     float fire = step(1.0 - jumps, hash21(vec2(jt, 7.7)));  // more jumps → fires more

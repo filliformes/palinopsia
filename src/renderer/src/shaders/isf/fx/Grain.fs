@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Grain — physically-modelled noise per medium. FILM: clumped photochemical grain (value-noise, NOT white), 24fps reseed, amplitude peaking in the MIDTONES; optional colour-stock chroma grain. DIGITAL: honest sensor noise — signal-dependent SHOT noise (highlights), a constant READ-noise floor (shadows), and faint static fixed-pattern (PRNU). CRT: row-correlated snow + dropout bands. VHS: luma smear + chroma phase error + streaks. Parasites (dropout/streaks) apply to CRT/VHS only.",
-  "CREDIT": "Palinopsia (grain models after the analog/sensor artifact reference)",
+  "DESCRIPTION": "Grain : physically-modelled noise per medium. FILM: clumped photochemical grain (value-noise, NOT white), 24fps reseed, amplitude peaking in the MIDTONES; optional colour-stock chroma grain. DIGITAL: honest sensor noise : signal-dependent SHOT noise (highlights), a constant READ-noise floor (shadows), and faint static fixed-pattern (PRNU). CRT: row-correlated snow + dropout bands. VHS: luma smear + chroma phase error + streaks. Parasites (dropout/streaks) apply to CRT/VHS only.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Texture"],
   "INPUTS": [
@@ -13,7 +13,7 @@
   ]
 }*/
 
-// Dave Hoskins hashes — strong, low-pattern distribution.
+// Dave Hoskins hashes : strong, low-pattern distribution.
 float hash21(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
@@ -47,7 +47,7 @@ void main() {
   vec3 add = vec3(0.0); // total additive contribution
 
   if (character == 1) {
-    // FILM — clumped grain (value noise), midtone-weighted, 24fps reseed.
+    // FILM : clumped grain (value noise), midtone-weighted, 24fps reseed.
     float seed = floor(TIME * 24.0);
     vec2 jit = hash22(vec2(seed, 1.0)) * 64.0;
     vec2 p = gl_FragCoord.xy / (max(size, 1.0) * 1.9) + jit;
@@ -62,7 +62,7 @@ void main() {
     }
     add = gn * amount * 1.15 * mid;
   } else if (character == 0) {
-    // DIGITAL — sensor noise: shot (∝√signal, highlights) + read floor
+    // DIGITAL : sensor noise: shot (∝√signal, highlights) + read floor
     // (shadows) + static fixed-pattern gain. Fine, per-pixel. No debris.
     float fs = floor(TIME * 30.0);
     vec2 px = gl_FragCoord.xy / max(size, 1.0);
@@ -77,7 +77,7 @@ void main() {
     }
     add = gn * amount * 0.55;
   } else if (character == 2) {
-    // CRT — row-correlated snow at field rate + dropout bands (parasites).
+    // CRT : row-correlated snow at field rate + dropout bands (parasites).
     float row = floor(gl_FragCoord.y / max(size, 1.0));
     float seed = floor(TIME * 50.0);
     float rowSeed = hash21(vec2(row, seed));
@@ -88,7 +88,7 @@ void main() {
       noise += vec3((hash21(cell + 301.0) - 0.5), 0.0, (hash21(cell + 502.0) - 0.5)) * chroma * 0.5;
     }
     float w = 0.35 + 0.65 * smoothstep(0.0, 0.4, l);
-    // Dropout bands — placed by centre + half-width, ragged edges.
+    // Dropout bands : placed by centre + half-width, ragged edges.
     float bandH = 1.0 + floor(hash21(vec2(row, seed + 3.0)) * 3.0);
     float bandQ = floor(row / bandH);
     float on = step(1.0 - parasites * 0.04, hash21(vec2(bandQ, seed)));
@@ -98,7 +98,7 @@ void main() {
     float inSeg = 1.0 - smoothstep(halfW - 0.02, halfW + 0.02, abs(uv.x - center) + edge);
     add = noise * amount * w + vec3(on * inSeg * (hash21(cell + 77.0) - 0.3) * (0.9 + hash21(vec2(bandQ, 91.0)) * 1.5));
   } else {
-    // VHS — luma smear (horizontally correlated) + chroma phase error + streaks.
+    // VHS : luma smear (horizontally correlated) + chroma phase error + streaks.
     float row = floor(gl_FragCoord.y / max(size, 1.0));
     float seed = floor(TIME * 30.0);
     float smear = vnoise(vec2(gl_FragCoord.x / (max(size, 1.0) * 14.0), row * 0.7 + seed * 3.0)) - 0.5;

@@ -1,5 +1,5 @@
 // Meta Controller smoothing + destination fan-out (dataFLOU's metaSmooth
-// pattern). The knob UI never applies values directly — it calls
+// pattern). The knob UI never applies values directly : it calls
 // setKnobTarget(i, v, smoothMs) and this module tweens the DISPLAY value
 // toward the target each rAF, applying every destination along the way, so
 // what you see on the dial is exactly what the destinations receive. The
@@ -99,7 +99,7 @@ function tick(): void {
     applyKnob(i, knobDisplay[i])
     if (k >= 1) {
       tweens[i] = null
-      // Commit the settled position — one store write per gesture end.
+      // Commit the settled position : one store write per gesture end.
       useStore.getState().setMetaValue(i, knobDisplay[i])
     } else {
       active = true
@@ -110,7 +110,7 @@ function tick(): void {
 }
 
 /** Move knob i toward v (0..1) over smoothMs, applying destinations en route.
- *  For MIDI CC (glide across 1/127 steps) and randomize — NOT mouse drag. */
+ *  For MIDI CC (glide across 1/127 steps) and randomize : NOT mouse drag. */
 export function setKnobTarget(i: number, v: number, smoothMs: number): void {
   const from = knobDisplayValue(i)
   const to = Math.max(0, Math.min(1, v))
@@ -118,10 +118,10 @@ export function setKnobTarget(i: number, v: number, smoothMs: number): void {
   if (!raf) raf = requestAnimationFrame(tick)
 }
 
-/** Direct, UNSMOOTHED set — for live mouse drag (the pointer is its own
+/** Direct, UNSMOOTHED set : for live mouse drag (the pointer is its own
  *  smoothing; a tween on top only adds lag and the steppy burst-update feel).
  *  Cancels any glide, moves the dial + fans out to destinations immediately,
- *  and re-renders now. Does not commit to the store — call commitKnob on
+ *  and re-renders now. Does not commit to the store : call commitKnob on
  *  release so the gesture is a single undo step. */
 export function setKnobImmediate(i: number, v: number): void {
   const val = v < 0 ? 0 : v > 1 ? 1 : v
@@ -141,7 +141,7 @@ export function reapplyKnob(i: number): void {
   applyKnob(i, knobDisplayValue(i))
 }
 
-/** Glide every knob to a new random POSITION, keeping its bindings — the ⚄
+/** Glide every knob to a new random POSITION, keeping its bindings : the ⚄
  *  next to the Meta title (shuffle the macro positions). */
 export function shuffleMetaValues(): void {
   const knobs = useStore.getState().composition.metaKnobs
@@ -149,7 +149,7 @@ export function shuffleMetaValues(): void {
 }
 
 /** Full 'Randomize Meta Knobs': re-roll each knob's destinations (up to 8)
- *  AND its position — a fresh macro surface. The store sets bindings+values;
+ *  AND its position : a fresh macro surface. The store sets bindings+values;
  *  the smoother then glides each knob to its new value, applying the new
  *  destinations along the way. */
 export function randomizeMetaKnobs(): void {

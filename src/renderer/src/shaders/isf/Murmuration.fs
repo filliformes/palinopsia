@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Murmuration — a flock of points steered by one shared, slowly turning wind field: coherent waves of motion pass through the crowd (density waves), individuals still wander. Matte dots over near-black, organic by construction.",
+  "DESCRIPTION": "Murmuration : a flock of points steered by one shared, slowly turning wind field: coherent waves of motion pass through the crowd (density waves), individuals still wander. Matte dots over near-black, organic by construction.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Particles", "Organic"],
@@ -55,12 +55,12 @@ void main() {
       float phase = hash(cell + 9.1) * 37.0;
       vec2 travel = w * (t * speed * 0.8 + phase);
       // Wrap travel inside the cell neighbourhood so birds never leave home
-      // — the WIND translates the pattern, the flock breathes in place.
+      // : the WIND translates the pattern, the flock breathes in place.
       vec2 pos = cell + 0.5 +
         vec2(fract(travel.x * 0.13) - 0.5, fract(travel.y * 0.13) - 0.5) * 1.6 +
         (vec2(vnoise(cell + t * 0.5), vnoise(cell.yx - t * 0.45)) - 0.5) * 0.4;
       vec2 delta = q - pos;
-      // Stretch each dot along its wind — reads as heading, not smear.
+      // Stretch each dot along its wind : reads as heading, not smear.
       float along = clamp(dot(delta, w), 0.0, size * (1.0 + stretch * 4.0));
       float d = length(delta - w * along);
       float dot_ = 1.0 - smoothstep(size * 0.5, size, d);

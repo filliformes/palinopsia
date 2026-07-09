@@ -25,7 +25,7 @@
 @font-face { font-family: 'Playfair Display'; font-weight: 400 900; font-style: normal; font-display: swap; src: url('./fonts/PlayfairDisplay.ttf') format('truetype'); }
 @font-face { font-family: 'Bebas Neue'; font-weight: 400; font-style: normal; font-display: swap; src: url('./fonts/BebasNeue.ttf') format('truetype'); }
 @font-face { font-family: 'VT323'; font-weight: 400; font-style: normal; font-display: swap; src: url('./fonts/VT323.ttf') format('truetype'); }
-/* Text-source expansion — 44 more OFL/Apache faces (declared 100 900: variable
+/* Text-source expansion : 44 more OFL/Apache faces (declared 100 900: variable
    files map real weights; static files serve all weights without faux-bold). */
 @font-face { font-family: 'Abril Fatface'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/AbrilFatface.ttf') format('truetype'); }
 @font-face { font-family: 'Alfa Slab One'; font-weight: 100 900; font-style: normal; font-display: swap; src: url('./fonts/AlfaSlabOne.ttf') format('truetype'); }
@@ -81,9 +81,9 @@
 
 /* -------- NEW THEMES (first in the picker). ----------
    Shared DNA: panel > bg contrast, inputs DARKER than their containing panel
-   with a 1px inner rim shadow — they read as a CRT cutout. */
+   with a 1px inner rim shadow : they read as a CRT cutout. */
 
-/* Studio Dark — canonical DAW stock dark (Inter, warm orange).
+/* Studio Dark : canonical DAW stock dark (Inter, warm orange).
    :root prefix bumps specificity so these rules beat the `:root, [data-theme='dark']`
    default further down the file regardless of source order. */
 :root[data-theme='studio-dark'] {
@@ -104,7 +104,7 @@
   --input-inset: inset 0 1px 0 rgb(10 10 10 / 0.95), inset 1px 0 0 rgb(10 10 10 / 0.5);
 }
 
-/* Warm Charcoal — warm take on the studio-dark DNA (Inter). */
+/* Warm Charcoal : warm take on the studio-dark DNA (Inter). */
 :root[data-theme='warm-charcoal'] {
   --c-bg: 29 29 29;
   --c-panel: 42 42 42;
@@ -123,7 +123,7 @@
   --input-inset: inset 0 1px 0 rgb(8 8 8 / 0.8);
 }
 
-/* Graphite — cool flat dark (Roboto). */
+/* Graphite : cool flat dark (Roboto). */
 :root[data-theme='graphite'] {
   --c-bg: 28 28 28;
   --c-panel: 38 38 38;
@@ -142,9 +142,9 @@
   --input-inset: inset 0 1px 0 rgb(6 6 6 / 0.9);
 }
 
-/* Cream — repainted to match Rainbow Circuit's "Peaks" plugin: warm
+/* Cream : repainted to match Rainbow Circuit's "Peaks" plugin: warm
    cream paper with mustard-ochre accents and a desaturated warm-grey
-   inverted card for readouts. Rich theme — opts into bespoke arc
+   inverted card for readouts. Rich theme : opts into bespoke arc
    sliders, icon-row mode pickers, card-wrap sections, and console
    readouts (see RICH_THEMES in store.ts). */
 :root[data-theme='cream'] {
@@ -163,19 +163,19 @@
   --c-input-bg: 234 228 214;
   --font-app: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
   --input-inset: inset 0 1px 2px rgb(0 0 0 / 0.05);
-  /* Rich-theme tonal-spectrum endpoints — drive the gradient on
+  /* Rich-theme tonal-spectrum endpoints : drive the gradient on
      bespoke arc sliders + step bars. Peaks-style: a single ochre
      family from light cream-yellow to deeper amber. */
   --c-rich-warm: 232 196 110;
   --c-rich-cool: 184 132 52;
-  /* Inverted readout panel — the dark-grey card Peaks tucks beneath
+  /* Inverted readout panel : the dark-grey card Peaks tucks beneath
      its main panel for metric readouts. */
   --c-rich-card-bg: 84 80 76;
   --c-rich-card-text: 232 226 212;
   --c-rich-card-muted: 156 150 138;
 }
 
-/* Nature — repainted to match Rainbow Circuit's "Hopscotch" plugin:
+/* Nature : repainted to match Rainbow Circuit's "Hopscotch" plugin:
    dark warm grey background with a tonal yellow-olive → teal-green
    gradient for active values and warm orange for accents/locks. Rich
    theme. */
@@ -195,19 +195,19 @@
   --c-input-bg: 22 22 22;
   --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --input-inset: inset 0 1px 0 rgb(8 8 8 / 0.95);
-  /* Rich-theme tonal spectrum — Hopscotch's signature warm yellow-
+  /* Rich-theme tonal spectrum : Hopscotch's signature warm yellow-
      olive → mossy → teal-green ramp. The arc sliders and step bars
      interpolate between these endpoints across their length. */
   --c-rich-warm: 197 196 93;
   --c-rich-cool: 93 212 176;
-  /* Inverted readout card — slightly darker than the main panel so
+  /* Inverted readout card : slightly darker than the main panel so
      metric tiles read as embedded displays. */
   --c-rich-card-bg: 18 18 18;
   --c-rich-card-text: 220 218 198;
   --c-rich-card-muted: 138 138 132;
 }
 
-/* Paper Light — cool paper light (Work Sans, blue). */
+/* Paper Light : cool paper light (Work Sans, blue). */
 :root[data-theme='paper-light'] {
   --c-bg: 235 236 240;
   --c-panel: 255 255 255;
@@ -246,7 +246,7 @@
   --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-/* Light — bright but with enough contrast to actually read; darker accent
+/* Light : bright but with enough contrast to actually read; darker accent
    + visible borders so panels read as distinct surfaces. */
 [data-theme='light'] {
   --c-bg: 214 214 214;
@@ -265,7 +265,7 @@
   --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-/* Pastel — dusty rose + lavender, muted not garish, sans-serif only. */
+/* Pastel : dusty rose + lavender, muted not garish, sans-serif only. */
 [data-theme='pastel'] {
   --c-bg: 232 218 232;
   --c-panel: 244 230 242;
@@ -283,7 +283,7 @@
   --font-app: 'Quicksand', 'Nunito', 'Trebuchet MS', sans-serif;
 }
 
-/* Classic — blue-grey, cool, medium-high contrast. */
+/* Classic : blue-grey, cool, medium-high contrast. */
 [data-theme='reaper'] {
   --c-bg: 30 30 30;
   --c-panel: 43 43 43;
@@ -301,7 +301,7 @@
   --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-/* Smooth — low contrast, warm greys, "easy on the eyes". */
+/* Smooth : low contrast, warm greys, "easy on the eyes". */
 [data-theme='smooth'] {
   --c-bg: 44 42 40;
   --c-panel: 54 52 50;
@@ -319,7 +319,7 @@
   --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-/* Hydra — desaturated blue-greys with a bright cyan accent. */
+/* Hydra : desaturated blue-greys with a bright cyan accent. */
 [data-theme='hydra'] {
   --c-bg: 26 37 48;
   --c-panel: 37 51 64;
@@ -337,7 +337,7 @@
   --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-/* DarkSide — near-black with a hot red-orange accent. */
+/* DarkSide : near-black with a hot red-orange accent. */
 [data-theme='darkside'] {
   --c-bg: 10 10 10;
   --c-panel: 20 20 20;
@@ -355,7 +355,7 @@
   --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-/* Solaris — cool blue-dominated. */
+/* Solaris : cool blue-dominated. */
 [data-theme='solaris'] {
   --c-bg: 26 40 56;
   --c-panel: 34 51 72;
@@ -373,7 +373,7 @@
   --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-/* Flame — dark grey with a hot orange. */
+/* Flame : dark grey with a hot orange. */
 [data-theme='flame'] {
   --c-bg: 28 28 28;
   --c-panel: 40 40 40;
@@ -391,7 +391,7 @@
   --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-/* Analog — warm wood/cream. */
+/* Analog : warm wood/cream. */
 [data-theme='analog'] {
   --c-bg: 58 46 34;
   --c-panel: 74 59 44;
@@ -428,7 +428,7 @@ body {
   user-select: none;
   /* Enable Inter's single-storey 'a' (ss01) and cv11 alt glyphs for a more
      Ableton-Sans-ish feel. Other fonts silently ignore features they don't
-     ship. We deliberately do NOT set letter-spacing here — Inter's intrinsic
+     ship. We deliberately do NOT set letter-spacing here : Inter's intrinsic
      metrics plus any extra tracking push the top-bar wide enough that the
      rightmost buttons (Stop All / Panic) clipped off-screen. */
   font-feature-settings: 'ss01', 'cv11';
@@ -509,7 +509,7 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
   50%      { opacity: 1.0; }
 }
 
-/* Armed-scene marker — applied to palette pills, sequence slots, and
+/* Armed-scene marker : applied to palette pills, sequence slots, and
    scene column headers when a scene is primed to fire on the next GO.
    accent2 (blue) ring + soft glow so it never reads as "currently
    playing" (which uses accent / orange). */
@@ -600,10 +600,10 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
   animation: seq-pulse 400ms ease-out;
 }
 
-/* Muted variant of the step pulse — same shape, but in the muted/
+/* Muted variant of the step pulse : same shape, but in the muted/
    border colour instead of accent. Tells the user "the playhead is
    here but this step is gated off in the current cycle (Euclidean
-   miss, Cellular dead bit, etc) — receiver will hold." */
+   miss, Cellular dead bit, etc) : receiver will hold." */
 @keyframes seq-pulse-muted {
   0% {
     box-shadow: 0 0 0 2px rgb(var(--c-muted) / 0.7) inset;
@@ -622,14 +622,14 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
    Rainbow-Circuit-flavoured visualisers for the sequencer previews.
 
    Three building blocks the previews share:
-   - .rc-cell — one slot in a row. Soft rounded square or circle
+   - .rc-cell : one slot in a row. Soft rounded square or circle
      (variants below), uses the cell's `--rc-hue` custom property to
      paint itself; smooth transitions on every state change so the
      row feels alive when params drag.
-   - .rc-cell.is-hit — the cell is part of the active pattern; tints
+   - .rc-cell.is-hit : the cell is part of the active pattern; tints
      itself in its hue at low opacity, gets a coloured outline, and
      casts a soft halo glow that blends across neighbours.
-   - .rc-cell.is-now — the live playhead is over this cell; bumps
+   - .rc-cell.is-now : the live playhead is over this cell; bumps
      scale, pumps the glow, and triggers a one-shot pulse animation.
 
    Each preview sets `style={{ '--rc-hue': '...' }}` per cell so the
@@ -679,7 +679,7 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
 }
 
 /* When a step is BOTH a hit and the live playhead, the .is-now rules
-   above already win — no extra rule needed. The pulse on each new
+   above already win : no extra rule needed. The pulse on each new
    "now" frame triggers because React re-mounts the class via the
    playhead key changing, restarting the animation. */
 
@@ -704,7 +704,7 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
   }
 }
 
-/* Round variant — used by Drift's clock ring + Polyrhythm's rings,
+/* Round variant : used by Drift's clock ring + Polyrhythm's rings,
    where circles read more naturally than rounded squares. */
 .rc-cell.is-round {
   border-radius: 50%;
@@ -717,7 +717,7 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
   border-color: rgb(var(--c-border) / 0.4);
 }
 
-/* Bar-fill cell used by the Density preview — the cell itself is
+/* Bar-fill cell used by the Density preview : the cell itself is
    transparent; an inner div fills from the bottom up, tinted by the
    cell's hue. The :before sliver gives the bar a subtle highlight
    along the top so it reads as a glass tube rather than a flat fill. */
@@ -751,7 +751,7 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
   right: 0;
   bottom: 0;
   border-radius: 0 0 3px 3px;
-  /* Rainbow-Circuit gradient — the bar's own hue at the top fades
+  /* Rainbow-Circuit gradient : the bar's own hue at the top fades
      down into a deeper, slightly desaturated foot. Reads as glassy. */
   background: linear-gradient(
     180deg,
@@ -765,7 +765,7 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
   background: rgb(var(--c-border) / 0.35);
 }
 
-/* Ratchet's per-step burst meter — concentric inner dots that scale
+/* Ratchet's per-step burst meter : concentric inner dots that scale
    with the step's burst probability so high-prob steps look denser. */
 .rc-ratchet-cell {
   width: 22px;
@@ -860,7 +860,7 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
   cursor: not-allowed;
 }
 
-/* Compact native-select style — used where we need the dropdown to fit in
+/* Compact native-select style : used where we need the dropdown to fit in
    a narrow column (e.g. SceneColumn's "Next" follow-action). Strips the
    platform's native dropdown arrow (which eats ~20 px on Windows and
    ~24 px on macOS) and replaces it with a small chevron drawn as a
@@ -1037,15 +1037,15 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
 }
 
 /* ─────────────────────────────────────────────────────────────────
-   Routing matrix — Pure Data `vradio`-style square toggles.
+   Routing matrix : Pure Data `vradio`-style square toggles.
    Two button styles sharing the same square footprint so a column
    of them reads as a tight vertical strip:
-     .routing-tick      — the per-slot Mod / Seq toggle. Hollow
+     .routing-tick      : the per-slot Mod / Seq toggle. Hollow
                           square when "routed off"; accent-filled
                           when routed on. Borderless to avoid the
                           double-border look that two stacked .btn
                           gave us.
-     .routing-bulk      — the header-row ⇆ buttons. Same footprint
+     .routing-bulk      : the header-row ⇆ buttons. Same footprint
                           but rendered with a glyph instead of a
                           fill state so the user can tell apart
                           "toggle one slot" vs "toggle all slots".
@@ -1079,7 +1079,7 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
   background: rgb(var(--c-panel3));
 }
 .routing-tick.routing-tick-on {
-  /* Filled square = "routed on" — same accent colour the rest of
+  /* Filled square = "routed on" : same accent colour the rest of
      the app uses for active states. The inset shadow gives a tiny
      bevel that reads as "lit lamp" on darker themes. */
   background: rgb(var(--c-accent));
@@ -1093,13 +1093,13 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
 .routing-bulk {
   font-size: 11px;
   line-height: 1;
-  /* The glyph itself — use the accent colour so it pops without
+  /* The glyph itself : use the accent colour so it pops without
      competing with the routing-tick fills. */
   color: rgb(var(--c-accent));
 }
 
 /* ─────────────────────────────────────────────────────────────────
-   Live modulation overlay — applied to Modulation 1 controls
+   Live modulation overlay : applied to Modulation 1 controls
    (sliders, number inputs, dropdowns) when Modulation 2 is actively
    driving their value. The control's displayed value tracks the
    live engine-effective number while the user's typed / dragged
@@ -1114,7 +1114,7 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
   outline-offset: -1px;
   color: rgb(var(--c-accent));
 }
-/* Range sliders need a different cue — Chromium / Electron's range
+/* Range sliders need a different cue : Chromium / Electron's range
    thumb ignores `outline`, so we tint the thumb + track via accent. */
 input[type='range'].live-overlay {
   accent-color: rgb(var(--c-accent));
@@ -1130,7 +1130,7 @@ input[type='range'].live-overlay {
    or applying these classes. Other themes are unaffected.
    ──────────────────────────────────────────────────────────────── */
 
-/* Section card — softly rounded panel with a subtle border and inner
+/* Section card : softly rounded panel with a subtle border and inner
    padding. Wraps each CollapsibleSection in rich themes so they feel
    modular instead of merging into one continuous form. */
 .rich-card {
@@ -1139,7 +1139,7 @@ input[type='range'].live-overlay {
   border-radius: 8px;
   padding: 8px 10px;
   margin-top: 6px;
-  /* Replace the default top-border divider — the card IS the
+  /* Replace the default top-border divider : the card IS the
      visual separator now. */
   border-top: 1px solid rgb(var(--c-border) / 0.65);
   box-shadow:
@@ -1151,7 +1151,7 @@ input[type='range'].live-overlay {
   border-color: rgb(var(--c-border) / 0.95);
 }
 
-/* Console readout — replaces the BoundedNumberInput's default look
+/* Console readout : replaces the BoundedNumberInput's default look
    when not focused. The number sits softly tinted in the accent hue
    on a dark embedded card, like a vintage instrument display. On
    focus the input border returns so editing feels familiar. */
@@ -1179,7 +1179,7 @@ input[type='range'].live-overlay {
   outline: none;
 }
 
-/* Mode-icon button — used by RcModeIcons in place of the Pattern
+/* Mode-icon button : used by RcModeIcons in place of the Pattern
    <select>. Each mode is a 26×26 square with a tiny SVG pictogram.
    Rests muted; the active mode lights up in the accent hue with a
    soft halo. */
@@ -1218,7 +1218,7 @@ input[type='range'].live-overlay {
   filter: drop-shadow(0 0 3px rgb(var(--c-accent) / 0.6));
 }
 
-/* Arc slider — half-circle arc of N vertical bars, tonal warm→cool
+/* Arc slider : half-circle arc of N vertical bars, tonal warm→cool
    gradient via --c-rich-warm / --c-rich-cool. Bars left of the
    active position fill in their hue; bars to the right are dim
    placeholders. The active position pumps slightly. Click + drag

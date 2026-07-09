@@ -1,4 +1,4 @@
-// Global Morph — scene recalls and Randomize crossfade instead of snapping.
+// Global Morph : scene recalls and Randomize crossfade instead of snapping.
 //
 // The store holds the TARGET composition (so the UI shows the destination
 // immediately). During a morph, the App render loop feeds the ENGINE an
@@ -13,7 +13,7 @@ let state: { from: CompositionState; startMs: number; ms: number } | null = null
 
 // A pending framebuffer crossfade the render loop should pick up. Set whenever
 // a morph begins; the loop reads it once and tells the Compositor to dissolve
-// the frozen old frame into the new scene — the only way a STRUCTURAL change
+// the frozen old frame into the new scene : the only way a STRUCTURAL change
 // (Randomize All swaps shaders) can visibly morph, since params snap.
 let pendingCrossfadeMs: number | null = null
 
@@ -28,7 +28,7 @@ export function consumeCrossfade(): number | null {
 /** Start easing FROM `from` toward whatever the store holds, over `ms`. */
 export function beginMorph(from: CompositionState, ms: number, now: number): void {
   if (ms <= 20) {
-    state = null // effectively instant — don't bother interpolating
+    state = null // effectively instant : don't bother interpolating
     return
   }
   state = { from: structuredClone(from), startMs: now, ms }
@@ -40,8 +40,8 @@ export function morphActive(): boolean {
 }
 
 /** Abort any in-flight morph (and drop a not-yet-consumed crossfade). Call when
- *  the composition is REPLACED out from under the morph — New, Load, Undo, Redo
- *  — so the engine stops easing toward a target that no longer exists. */
+ *  the composition is REPLACED out from under the morph : New, Load, Undo, Redo
+ *  : so the engine stops easing toward a target that no longer exists. */
 export function cancelMorph(): void {
   state = null
   pendingCrossfadeMs = null
@@ -78,7 +78,7 @@ function lerpSlot(a: SourceSlot | null, b: SourceSlot | null, k: number): Source
   return { ...b, inputs: lerpInputs(a.inputs, b.inputs, k) }
 }
 
-// Match FX by position + shader id — same shader ⇒ ease its inputs + opacity.
+// Match FX by position + shader id : same shader ⇒ ease its inputs + opacity.
 function lerpFx(a: FxInstance[], b: FxInstance[], k: number): FxInstance[] {
   return b.map((bf, i) => {
     const af = a[i]

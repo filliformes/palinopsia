@@ -4,7 +4,7 @@
 // Pipeline: the renderer records the output canvas with MediaRecorder at a HIGH
 // bitrate using a hardware-accelerated codec (H.264 where available) into a
 // temporary intermediate file, streamed here chunk-by-chunk. On stop we hand it
-// to ffmpeg (ffmpeg-static) to produce the chosen delivery format — a fast
+// to ffmpeg (ffmpeg-static) to produce the chosen delivery format : a fast
 // stream-copy remux when the codecs already match (no re-encode, no quality
 // loss), or a real transcode for ProRes / FFV1 / uncompressed / H.265 / VP9.
 // No ffmpeg on PATH → we just keep the intermediate as-is.

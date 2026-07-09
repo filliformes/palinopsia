@@ -1,4 +1,4 @@
-// HIVE receiver (main process) — HIVE streams raw HEVC (H.265) Annex-B over a
+// HIVE receiver (main process) : HIVE streams raw HEVC (H.265) Annex-B over a
 // plain TCP socket (mDNS-discovered; we take host:port directly, which HIVE's
 // `hive-recv listen --host --port` also supports). We connect, split the byte
 // stream into HEVC access units, tag each key/delta, and forward them to the
@@ -6,7 +6,7 @@
 //
 // EXPERIMENTAL: hinges on Chromium's platform HEVC decoder being available
 // (we request the feature flag in index.ts). If HEVC WebCodecs isn't supported
-// on the host, the source stays black and logs — capture / Live Input remain
+// on the host, the source stays black and logs : capture / Live Input remain
 // the reliable live-in paths.
 
 import net from 'net'

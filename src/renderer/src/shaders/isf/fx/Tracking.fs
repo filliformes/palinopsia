@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Tracking — VHS tracking error, rebuilt on the VIDVOX 'VHS Glitch' model (Staffan Widegarn Åhlvik). The classic noisy band (head-switch tear, per-line wobble, dropout dashes) placed by POSITION and crept by ROLL — plus an auto-wandering FREEZE line that smears one row across the frame, per-pixel analog x-distortion, and the tape's tinted chroma BLEED (red channel dragged sideways through magenta↔cyan, warbling with the scan).",
+  "DESCRIPTION": "Tracking : VHS tracking error, rebuilt on the VIDVOX 'VHS Glitch' model (Staffan Widegarn Åhlvik). The classic noisy band (head-switch tear, per-line wobble, dropout dashes) placed by POSITION and crept by ROLL : plus an auto-wandering FREEZE line that smears one row across the frame, per-pixel analog x-distortion, and the tape's tinted chroma BLEED (red channel dragged sideways through magenta↔cyan, warbling with the scan).",
   "CREDIT": "Palinopsia, after David Lublin / Staffan Widegarn Åhlvik",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],
@@ -49,7 +49,7 @@ void main() {
 
   // ── Auto-wandering FREEZE line (VHS Glitch's actualXLine): a narrow row
   // that drifts on stacked incommensurate sines; inside its width the sampled
-  // row snaps to the line — one row smeared across a stripe of the frame. ──
+  // row snaps to the line : one row smeared across a stripe of the frame. ──
   float fLine = mod(0.5 + ((1.0 + sin(0.34 * TIME)) / 2.0 + (1.0 + sin(TIME)) / 3.0 +
     (1.0 + cos(2.1 * TIME)) / 3.0 + (1.0 + cos(0.027 * TIME)) / 2.0) / 3.5, 1.0);
   float fWidth = freeze * 0.06 * ((1.0 + sin(1.2 * TIME)) / 2.0 +

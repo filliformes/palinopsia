@@ -1,6 +1,6 @@
-// Output recorder — captures the live output canvas with MediaRecorder into a
+// Output recorder : captures the live output canvas with MediaRecorder into a
 // HIGH-bitrate, hardware-accelerated intermediate (H.264 where the platform
-// offers it — smooth, low CPU), streams the chunks to main, and lets ffmpeg
+// offers it : smooth, low CPU), streams the chunks to main, and lets ffmpeg
 // turn that into the chosen delivery format on stop (fast stream-copy remux when
 // codecs match; a real transcode for ProRes / FFV1 / uncompressed / H.265 / VP9).
 //
@@ -30,7 +30,7 @@ function pickIntermediate(): { mime: string; ext: string; codec: string } | null
   )
 }
 
-/** Delivery formats offered to the UI — comes from main (ffmpeg-gated). */
+/** Delivery formats offered to the UI : comes from main (ffmpeg-gated). */
 export async function recordingFormats(): Promise<Array<{ id: string; label: string }>> {
   try {
     return await window.api.recordingFormats()

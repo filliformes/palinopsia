@@ -1,5 +1,5 @@
-// Scene bank (brief §7, §10.7) — recallable full-instrument states.
-// Chips: click = recall (undoable, hot-swap safe — feedback buffers survive),
+// Scene bank (brief §7, §10.7) : recallable full-instrument states.
+// Chips: click = recall (undoable, hot-swap safe : feedback buffers survive),
 // double-click = rename, × = delete, drag = rearrange. ⚄ saves a fresh
 // Randomize-All AS a scene without touching the live state (the brief's
 // randomize-into-scene). Keys 1–9 recall the first nine scenes.
@@ -43,7 +43,7 @@ export function SceneBank(): JSX.Element {
       <button
         className="btn px-2 py-0.5 text-[11px]"
         onClick={randomSceneIntoBank}
-        title="Randomize-into-scene — a fresh Randomize All saved to the bank without touching the live state"
+        title="Randomize-into-scene : a fresh Randomize All saved to the bank without touching the live state"
       >
         ⚄ Random
       </button>
@@ -91,7 +91,7 @@ export function SceneBank(): JSX.Element {
               onClick={() => recallScene(scene.id)}
               onDoubleClick={() => setRenamingId(scene.id)}
               className="max-w-[140px] truncate text-[11px]"
-              title={`Recall "${scene.name}" — double-click to rename`}
+              title={`Recall "${scene.name}" : double-click to rename`}
             >
               {scene.name}
             </button>
@@ -106,7 +106,7 @@ export function SceneBank(): JSX.Element {
         </span>
       ))}
 
-      {/* Tail drop zone — drag a chip past the end to move it last. */}
+      {/* Tail drop zone : drag a chip past the end to move it last. */}
       {scenes.length > 1 && (
         <span
           className="h-5 w-6 rounded border border-dashed border-border/50"

@@ -1,8 +1,8 @@
-// CaptureSource — live webcam or screen as a layer source (brief §7).
+// CaptureSource : live webcam or screen as a layer source (brief §7).
 //
 // A MediaStream (getUserMedia for the camera, getDisplayMedia for the screen)
 // feeds an off-DOM <video>; each frame uploads to a GL texture through the same
-// path as imported clips. No transport — it's live. Screen capture relies on
+// path as imported clips. No transport : it's live. Screen capture relies on
 // the main process's setDisplayMediaRequestHandler to pick a source.
 
 import { uploadVideoFrame } from './VideoSource'
@@ -24,7 +24,7 @@ export class CaptureSource {
 
   /** Open the capture stream. `spec` is the slot's mediaId:
    *    'webcam'          → default camera (getUserMedia)
-   *    'device:<id>'     → a specific video input device (Live Input — e.g. a
+   *    'device:<id>'     → a specific video input device (Live Input : e.g. a
    *                        USB camera / capture card / DJI Osmo in webcam mode)
    *    'desktop:<id>'    → a specific screen/window (chromeMediaSourceId)
    *    'screen'          → the primary display (getDisplayMedia fallback)
@@ -36,7 +36,7 @@ export class CaptureSource {
       const md = navigator.mediaDevices
       if (spec.startsWith('desktop:')) {
         const id = spec.slice('desktop:'.length)
-        // Legacy desktop-source constraint — still the way to grab a SPECIFIC
+        // Legacy desktop-source constraint : still the way to grab a SPECIFIC
         // window/screen without the display-media picker.
         this.stream = await md.getUserMedia({
           audio: false,
@@ -57,7 +57,7 @@ export class CaptureSource {
       this.video.srcObject = this.stream
       await this.video.play().catch(() => {})
     } catch (e) {
-      // Permission denied / no device / user cancelled the screen picker — the
+      // Permission denied / no device / user cancelled the screen picker : the
       // slot just renders transparent until re-selected.
       console.error('[capture] start failed:', (e as Error).message)
     } finally {

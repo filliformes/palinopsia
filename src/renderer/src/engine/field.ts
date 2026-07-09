@@ -1,11 +1,11 @@
-// Field macros (Slab 2c) — global "spatial-material" controls that co-articulate
+// Field macros (Slab 2c) : global "spatial-material" controls that co-articulate
 // several parameters at once. v1 ships PROXIMITY: one knob places the image in a
-// depth zone (vista ↔ personal, after Cutting & Vishton via Knight-Hill) by
+// depth zone (vista ↔ personal) by
 // pushing the Context finalizer's mood. Far = hazy, soft, vignetted, distant;
 // close = sharp, present, glowing.
 //
 // Applied each frame AFTER modulation (so it owns the Context mood params while
-// engaged). Neutral (0.5) is a deadzone — it writes nothing, leaving manual /
+// engaged). Neutral (0.5) is a deadzone : it writes nothing, leaving manual /
 // World / modulation in charge. Optional audio drive: brightness = closeness.
 
 import type { CompositionState } from '@shared/types'
@@ -29,14 +29,14 @@ type MacroComp = {
 const MASTER = { kind: 'master' as const }
 
 /**
- * Apply the three named field macros — each 0.5 = neutral deadzone, applied
+ * Apply the three named field macros : each 0.5 = neutral deadzone, applied
  * after modulation/proximity so they own their params while engaged:
- *  - **Density** (Basanta #6) — sparse↔dense: fades the upper layers out toward
+ *  - **Density** : sparse↔dense: fades the upper layers out toward
  *    a single voice (sparse), or pushes every layer's opacity up (dense).
- *  - **Gesture⇄Texture** (Knight-Hill C#3) — motion character: texture adds
+ *  - **Gesture⇄Texture** : motion character: texture adds
  *    Context trails (internalised churn/flux), gesture sharpens (externalised,
  *    clean trajectory).
- *  - **Coalesce** (Knight-Hill C#1) — grain↔mass: mass blurs/smooths, grain adds
+ *  - **Coalesce** : grain↔mass: mass blurs/smooths, grain adds
  *    Vibe dither (discrete particles).
  */
 export function applyFieldMacros(
@@ -97,7 +97,7 @@ export function applyProximity(
   if (audioAmt > 0 && audioBus.mode !== 'off') {
     p = clamp01(p + (audioBus.feature('centroid') - 0.5) * audioAmt)
   }
-  // Deadzone around neutral — don't clobber the mood params when parked.
+  // Deadzone around neutral : don't clobber the mood params when parked.
   if (Math.abs(p - 0.5) < 0.02) return null
   const ctx = c.master.find((f) => f.shaderId === 'fx-context')
   if (!ctx) return null

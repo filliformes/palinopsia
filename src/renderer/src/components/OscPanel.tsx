@@ -1,4 +1,4 @@
-// OSC input panel — enable/disable the listener, set the port, and see where
+// OSC input panel : enable/disable the listener, set the port, and see where
 // to point Pandore (this machine's addresses) + a live activity blink and the
 // last received address. The heavy lifting is in oscInput.ts.
 
@@ -29,7 +29,7 @@ export function OscPanel(): JSX.Element {
   useEffect(() => setOutPortStr(String(oscOutPort)), [oscOutPort])
 
   // Activity blink + last-address readout, straight from the IPC stream (no
-  // store writes — this must not cause re-renders per message).
+  // store writes : this must not cause re-renders per message).
   useEffect(() => {
     return window.api.onOscReceived((batch) => {
       if (!batch.length) return
@@ -159,7 +159,7 @@ export function OscPanel(): JSX.Element {
         </>
       )}
 
-      {/* Outbound feedback — mirror our live state back to Pandore so its UI
+      {/* Outbound feedback : mirror our live state back to Pandore so its UI
           tracks ours (modulators, scene recalls, a hand on a slider). */}
       <div className="flex min-w-0 items-center gap-2 border-t border-border/60 pt-1">
         <button
@@ -181,7 +181,7 @@ export function OscPanel(): JSX.Element {
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
           }}
           className="input w-24 px-1 py-0.5 text-[11px]"
-          title="Destination host (Pandore's IP — 127.0.0.1 if same machine)"
+          title="Destination host (Pandore's IP : 127.0.0.1 if same machine)"
         />
         <span className="font-mono text-[9px] uppercase text-muted">:</span>
         <input
@@ -202,7 +202,7 @@ export function OscPanel(): JSX.Element {
         </span>
       </div>
 
-      {/* Animated sound (§4.4) — send a scanline of the output to Pandore as a
+      {/* Animated sound (§4.4) : send a scanline of the output to Pandore as a
           control signal, so a drawn mark is simultaneously image AND sound. */}
       <div className="flex min-w-0 items-center gap-2">
         <button
@@ -215,7 +215,7 @@ export function OscPanel(): JSX.Element {
           title={
             markSignalEnabled
               ? 'Stop sending the drawn optical soundtrack to Pandore'
-              : 'Send a scanline of the output to Pandore as sound (McLaren animated-sound loop). Uses the feedback host/port above.'
+              : 'Send a scanline of the output to Pandore as sound (the animated-sound loop). Uses the feedback host/port above.'
           }
         >
           {markSignalEnabled ? 'MARK → SND' : 'MARK SND OFF'}

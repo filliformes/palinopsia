@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Colorizer — LZX-style CV colorizer: luminance is run through gain + bias (the analog 'contrast/brightness' of the mapping), optionally soft-clipped, then mapped across a smooth 3-colour gradient. Leaner and more voltage-like than the Palette map — the classic scan-processor colouring stage.",
-  "CREDIT": "Palinopsia (after LZX Industries colorizers)",
+  "DESCRIPTION": "Colorizer : LZX-style CV colorizer: luminance is run through gain + bias (the analog 'contrast/brightness' of the mapping), optionally soft-clipped, then mapped across a smooth 3-colour gradient. Leaner and more voltage-like than the Palette map : the classic scan-processor colouring stage.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color", "Scan"],
   "INPUTS": [

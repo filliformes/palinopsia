@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Recurse — recursive geometry (Cathodemer Arabesque register): a shape is drawn, then the space is shrunk, rotated a little and shifted OFF-CENTRE, and it's drawn again, cascading inward. The off-centre drift + small rotation keep it a spiral/cascade — deliberately NOT the radial kaleidoscope the seed library refuses (brief §1). Matte line-work.",
-  "CREDIT": "Palinopsia (after Cathodemer Arabesque)",
+  "DESCRIPTION": "Recurse : recursive geometry (Cathodemer Arabesque register): a shape is drawn, then the space is shrunk, rotated a little and shifted OFF-CENTRE, and it's drawn again, cascading inward. The off-centre drift + small rotation keep it a spiral/cascade : deliberately NOT the radial kaleidoscope the seed library refuses (brief §1). Matte line-work.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Geometry"],
   "INPUTS": [

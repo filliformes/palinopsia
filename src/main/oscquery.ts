@@ -1,4 +1,4 @@
-// OSCQuery — self-describing OSC address space (brief §8).
+// OSCQuery : self-describing OSC address space (brief §8).
 //
 // Serves Palinopsia's parameter tree as OSCQuery JSON over HTTP so Pandore /
 // dataFLOU / TouchDesigner can auto-discover and bind every control instead of
@@ -118,7 +118,7 @@ export class OscQueryServer {
     return new Promise((resolve, reject) => {
       const server = createServer((req, res) => {
         // No wildcard CORS: OSCQuery clients are native, and the server is
-        // localhost-bound below — we don't want arbitrary web origins reading
+        // localhost-bound below : we don't want arbitrary web origins reading
         // the live parameter tree.
         res.setHeader('Content-Type', 'application/json')
         const url = req.url ?? '/'
@@ -177,7 +177,7 @@ export class OscQueryServer {
         this.server = null
         reject(e)
       })
-      // Bind to loopback only — the OSCQuery tree (which advertises the OSC
+      // Bind to loopback only : the OSCQuery tree (which advertises the OSC
       // port and serves live parameter values) should not be a LAN-visible
       // service. OSC control itself still arrives over the UDP receiver.
       server.listen(httpPort, '127.0.0.1', () => {

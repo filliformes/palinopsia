@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Optical Rain — stereoscopic texture (homage to Maxime Corbeil-Perron, thèse §3.12/§3.7). Shatters the image's edges into vertical streaks that drift downward — his 'pluie optique' — each fragment carrying a horizontal red/cyan disparity, so under the Finalizer's anaglyph 3D a floating tactile texture emerges off the stereoscopic membrane, 'beyond form'. Only ever fragments the incoming image; it invents no pattern of its own. No psychedelia.",
-  "CREDIT": "Palinopsia (after Maxime Corbeil-Perron)",
+  "DESCRIPTION": "Optical Rain : stereoscopic texture. Shatters the image's edges into vertical streaks that drift downward (an 'optical rain'), each fragment carrying a horizontal red/cyan disparity, so under the Finalizer's anaglyph 3D a floating tactile texture emerges off the stereoscopic membrane, 'beyond form'. Only ever fragments the incoming image; it invents no pattern of its own. No psychedelia.",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Stereo"],
   "INPUTS": [
@@ -17,7 +17,7 @@
 float h11(float x) { return fract(sin(x * 127.1) * 43758.5453); }
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 
-// Cheap Sobel-ish edge magnitude on luma — the "form" whose fragments will rain.
+// Cheap Sobel-ish edge magnitude on luma : the "form" whose fragments will rain.
 float edgeMag(vec2 uv, vec2 px) {
   float l = dot(IMG_NORM_PIXEL(inputImage, uv).rgb, LUMA);
   float r = dot(IMG_NORM_PIXEL(inputImage, uv + vec2(px.x, 0.0)).rgb, LUMA);

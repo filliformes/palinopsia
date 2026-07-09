@@ -1,4 +1,4 @@
-// AutoControls — themed controls generated from ISF INPUTS (brief §10.3).
+// AutoControls : themed controls generated from ISF INPUTS (brief §10.3).
 // The dataFLOU Pool→auto-UI pattern applied to ISF: float→slider+number,
 // bool→toggle, long→dropdown, color→swatch+alpha, point2D→XY pad, honouring
 // each input's declared range and default. This is the simplexité payoff:
@@ -88,7 +88,7 @@ function ModButton({
                 ? 'bg-panel3 text-text'
                 : 'bg-panel3/60 text-muted hover:text-text'
         }`}
-        title={`Modulate ${label} — right-click clears all its modulation`}
+        title={`Modulate ${label} : right-click clears all its modulation`}
       >
         M{isBound ? bound.map((b) => b.mod + 1).join('') : ''}
       </button>
@@ -116,8 +116,8 @@ export function AutoControls({
   modTargetFor?: (inputName: string) => ModTarget
   // 'wrap' (default): flex-wrap, height follows param count.
   // 'twoRow': a fixed two-row grid that fills top→bottom then flows into new
-  //   columns, overflowing horizontally — the Inspector's shape never changes.
-  // 'vertical': one full-width control per row, stacked — for narrow tall panels
+  //   columns, overflowing horizontally : the Inspector's shape never changes.
+  // 'vertical': one full-width control per row, stacked : for narrow tall panels
   //   (the Finishing Touches finalizers).
   layout?: 'wrap' | 'twoRow' | 'vertical'
 }): JSX.Element {
@@ -144,7 +144,7 @@ export function AutoControls({
     )
   if (layout === 'vertical') {
     // Full-width controls stacked, one dense single-line row each (label · slider
-    // · M · number) — `[&>*]:w-full` overrides each control's fixed w-44.
+    // · M · number) : `[&>*]:w-full` overrides each control's fixed w-44.
     return (
       <div className="flex flex-col gap-0.5 px-2 py-1 [&>*]:w-full">
         {visible(inputs).map((inp) => renderControl(inp, true))}
@@ -152,12 +152,12 @@ export function AutoControls({
     )
   }
   if (layout === 'twoRow') {
-    // XY pads (point2D) are tall — flowing them through the two-row grid
+    // XY pads (point2D) are tall : flowing them through the two-row grid
     // leaves a ragged column and dead space. Pull them out and stand them to
     // the RIGHT of the scalar controls, vertically centred.
     const pads = inputs.filter((i) => i.type === 'point2D')
     // COMPACT-flagged inputs (small toggles / tiny enums) stack together into
-    // ONE cluster cell instead of a full cell each — tighter panels, no scroll.
+    // ONE cluster cell instead of a full cell each : tighter panels, no scroll.
     const compact = inputs.filter((i) => i.type !== 'point2D' && i.compact)
     const rest = inputs.filter((i) => i.type !== 'point2D' && !i.compact)
     const compactCell =
@@ -199,7 +199,7 @@ export function AutoControls({
       </div>
     )
   }
-  // 'wrap' — items-start so every control's label sits on the same top line
+  // 'wrap' : items-start so every control's label sits on the same top line
   // (colours, sliders and enums have different heights; aligning tops keeps the
   // label row straight).
   return (
@@ -251,7 +251,7 @@ function PosPairControl({
         onChange={(e) => onChange(name, Number(e.target.value))}
         onDoubleClick={() => onChange(name, def)}
         className="min-w-0 flex-1 accent-accent"
-        title={`${name} ${v.toFixed(2)} — double-click to reset`}
+        title={`${name} ${v.toFixed(2)} : double-click to reset`}
       />
       <div className="w-12 shrink-0">
         <BoundedNumberInput
@@ -336,7 +336,7 @@ function FloatControl({
   const isModulated = bound.length > 0
 
   // Modulated sliders MOVE with the live value (dataFLOU behaviour): one rAF
-  // writes the thumb position straight to the DOM — React keeps rendering the
+  // writes the thumb position straight to the DOM : React keeps rendering the
   // BASE value; the live overlay never causes re-renders. Paused while the
   // user is dragging this slider.
   const sliderRef = useRef<HTMLInputElement | null>(null)
@@ -371,8 +371,8 @@ function FloatControl({
             title={
               (inp.hint ? inp.hint + ' · ' : '') +
               (isModulated
-                ? `${inp.label} — modulated (drag sets the base)`
-                : `${inp.label} — double-click to reset (${def})`)
+                ? `${inp.label} : modulated (drag sets the base)`
+                : `${inp.label} : double-click to reset (${def})`)
             }
           />
           {target && <ModButton target={target} bound={bound} label={inp.label} />}
@@ -422,15 +422,15 @@ function FloatControl({
         title={
           (inp.hint ? inp.hint + ' · ' : '') +
           (isModulated
-            ? `${inp.label} — modulated (moving with the live value; drag sets the base)`
-            : `${inp.label} — double-click to reset (${def})`)
+            ? `${inp.label} : modulated (moving with the live value; drag sets the base)`
+            : `${inp.label} : double-click to reset (${def})`)
         }
       />
     </div>
   )
 }
 
-// The binding row as a FIXED-position popover anchored to the M button — the
+// The binding row as a FIXED-position popover anchored to the M button : the
 // Inspector band is `overflow-y-hidden` with a fixed height, so an inline panel
 // would be clipped and would shove its sibling controls. Fixed positioning
 // escapes the clip and leaves the row untouched.
@@ -480,7 +480,7 @@ function AssignPopover({
 }
 
 // Inline binding row: modulators M1–8 (with depth) and Meta knobs K1–K16.
-// Exported — MetaBar reuses it for binding modulators TO knobs (hideMeta).
+// Exported : MetaBar reuses it for binding modulators TO knobs (hideMeta).
 export function AssignRow({
   target,
   bound,
@@ -520,7 +520,7 @@ export function AssignRow({
                 onClick={() => {
                   if (existing) removeAssignment(existing.id)
                   else if (!assignMod(i, target, 0.5)) {
-                    // Cap reached — the matrix stays legible by design.
+                    // Cap reached : the matrix stays legible by design.
                   }
                 }}
                 className={`min-w-0 flex-1 rounded px-0.5 py-0.5 font-mono text-[9px] transition-colors ${
@@ -542,7 +542,7 @@ export function AssignRow({
         return (
           <div key={b.id} className="flex items-center gap-1">
             <span className="w-8 shrink-0 font-mono text-[9px] text-accent">M{b.mod + 1}</span>
-            {/* Mode: Multiply (scale the base — default) ↔ Replace (swing over it). */}
+            {/* Mode: Multiply (scale the base : default) ↔ Replace (swing over it). */}
             <button
               onClick={() => setAssignmentMode(b.id, mult ? 'replace' : 'multiply')}
               className={`shrink-0 rounded px-1 py-0.5 font-mono text-[8px] uppercase transition-colors ${
@@ -552,8 +552,8 @@ export function AssignRow({
               }`}
               title={
                 mult
-                  ? 'Multiply — the modulator scales the base value (|depth| = amount). Click for Replace.'
-                  : 'Replace — the modulator swings the value around the base. Click for Multiply.'
+                  ? 'Multiply : the modulator scales the base value (|depth| = amount). Click for Replace.'
+                  : 'Replace : the modulator swings the value around the base. Click for Multiply.'
               }
             >
               {mult ? 'mul' : 'rep'}
@@ -568,14 +568,14 @@ export function AssignRow({
               className={`min-w-0 flex-1 ${mult ? 'accent-accent' : 'accent-accent2'}`}
               title={
                 mult
-                  ? `Amount ${b.depth.toFixed(2)} — how deeply the modulator scales the base (− inverts)`
-                  : `Depth ${b.depth.toFixed(2)} — bipolar swing around the base value`
+                  ? `Amount ${b.depth.toFixed(2)} : how deeply the modulator scales the base (− inverts)`
+                  : `Depth ${b.depth.toFixed(2)} : bipolar swing around the base value`
               }
             />
           </div>
         )
       })}
-      {/* Meta knobs — K1..K16; a knob drives this input absolutely through
+      {/* Meta knobs : K1..K16; a knob drives this input absolutely through
           its curve over the input's declared range (up to 8 dests/knob).
           EXACTLY two rows, row-major: K1–K9 then K10–K16 (with the MOD line
           above, the whole panel is the fixed three-row shape). */}
@@ -611,7 +611,7 @@ export function AssignRow({
   )
 }
 
-// ── COMPACT cluster — small toggles / tiny enums stacked in one cell ──
+// ── COMPACT cluster : small toggles / tiny enums stacked in one cell ──
 // Inputs flagged "COMPACT": true land here: label left, a tiny control right,
 // one line each. Keeps utility switches (invert · bidir · flow res) from
 // spending a full grid cell apiece.
@@ -756,7 +756,7 @@ function EnumControl({
         onChange={(e) => onChange(inp.name, Number(e.target.value))}
         title={
           isModulated
-            ? `${inp.label} — modulated (showing the live selection; picking sets the base)`
+            ? `${inp.label} : modulated (showing the live selection; picking sets the base)`
             : (inp.hint ?? inp.label)
         }
       >
@@ -807,7 +807,7 @@ function ColorControl({
           value={toHex(v)}
           onChange={(e) => onChange(inp.name, fromHex(e.target.value, alpha))}
           className="h-6 w-9 shrink-0 cursor-pointer rounded border border-border bg-panel2"
-          title={`${inp.label} — RGB`}
+          title={`${inp.label} : RGB`}
         />
         <input
           type="range"
@@ -872,7 +872,7 @@ export function XYControl({
           dragging.current = false
         }}
         onDoubleClick={() => onChange(inp.name, def)}
-        title={`${inp.label} — drag · double-click to reset`}
+        title={`${inp.label} : drag · double-click to reset`}
       >
         <div
           className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 translate-y-1/2 rounded-full bg-accent"

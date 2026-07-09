@@ -1,9 +1,9 @@
 // FX rack UI, decomposed so layouts can place the pieces freely:
-//   FxAddSelect — the "+ fx" picker for a scope
-//   FxChips     — the rack's units as wrapping chips
-//   FxRackPanel — label + add + chips on one wrapping row (master & co.)
+//   FxAddSelect : the "+ fx" picker for a scope
+//   FxChips     : the rack's units as wrapping chips
+//   FxRackPanel : label + add + chips on one wrapping row (master & co.)
 // Locked units (the master Vibe Palette) render pinned: no bypass dot, no
-// remove, no reorder — just the name (click to edit) and a pin glyph.
+// remove, no reorder : just the name (click to edit) and a pin glyph.
 
 import { useRef, type DragEvent } from 'react'
 import type { FxInstance } from '@shared/types'
@@ -13,7 +13,7 @@ import { useStore, type FxScope } from '../store'
 export function FxAddSelect({ scope, className = '' }: { scope: FxScope; className?: string }): JSX.Element {
   const addFx = useStore((s) => s.addFx)
   // Native convolution nodes (sidechained, multi-pass) only run in a LAYER's FX
-  // rack — hide their group from the master + source pickers, where they'd sit
+  // rack : hide their group from the master + source pickers, where they'd sit
   // inert as confusing passthroughs.
   const groups =
     scope.kind === 'layer'
@@ -137,7 +137,7 @@ function FxUnit({
   const showFinishingSub = useStore((s) => s.showFinishingSub)
 
   if (f.locked) {
-    // Pinned finalizers (Vibe → Context → Finalizer) — always last, unremovable,
+    // Pinned finalizers (Vibe → Context → Finalizer) : always last, unremovable,
     // bypassable. Each wears a different accent so they're easy to tell apart:
     // Vibe = accent2, Context = accent, Finalizer = active.
     const lockedName = SHADER_BY_ID[f.shaderId ?? '']?.name ?? f.shaderId
@@ -155,12 +155,12 @@ function FxUnit({
     return (
       <span
         className={`flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 ${borderCls} bg-panel`}
-        title={`${lockedName} — a pinned finalizer stage. Dot bypasses; click the name to edit.`}
+        title={`${lockedName} : a pinned finalizer stage. Dot bypasses; click the name to edit.`}
       >
         <button
           onClick={() => toggleFx(scope, f.id)}
           className={`h-2.5 w-2.5 shrink-0 rounded-full transition-colors ${dotCls}`}
-          title={f.enabled ? `${lockedName} on — click to bypass` : `${lockedName} bypassed — click to enable`}
+          title={f.enabled ? `${lockedName} on : click to bypass` : `${lockedName} bypassed : click to enable`}
         />
         <span className={`font-mono text-[9px] ${glyphCls}`}>◆</span>
         <button
@@ -192,7 +192,7 @@ function FxUnit({
         className={`h-2.5 w-2.5 shrink-0 rounded-full transition-colors ${
           f.enabled ? 'bg-accent' : 'bg-panel3'
         }`}
-        title={f.enabled ? 'Enabled — click to bypass' : 'Bypassed — click to enable'}
+        title={f.enabled ? 'Enabled : click to bypass' : 'Bypassed : click to enable'}
       />
       <button
         onClick={() => setSelection({ type: 'fx', scope, instId: f.id })}

@@ -2,7 +2,7 @@
 // Kept framework-free so it imports cleanly on both the Node and web sides.
 
 // ── Engine / signal model ────────────────────────────────────────────
-// The 15 blend modes implemented in the Compositor's BLEND_GLSL — shared by
+// The 15 blend modes implemented in the Compositor's BLEND_GLSL : shared by
 // the layer stack AND each layer's A/B source mix. Extend here AND in the
 // Compositor's modeIndex together. 'wrap' (fract(b+t)) is the digital-native
 // one: hard value wrap-around.
@@ -59,13 +59,13 @@ export interface ShaderInstance {
 
 export interface SourceSlot extends ShaderInstance {
   kind: SourceKind
-  // For kind:'feedback' — index of the layer whose previous frame we sample.
+  // For kind:'feedback' : index of the layer whose previous frame we sample.
   feedbackLayer?: number
-  // For kind:'video' — the clip's object URL (or path) the engine loads.
+  // For kind:'video' : the clip's object URL (or path) the engine loads.
   mediaId?: string
-  // For kind:'video' — the file's display name, shown in the source picker.
+  // For kind:'video' : the file's display name, shown in the source picker.
   mediaName?: string
-  // For kind:'video' — transport (all optional; engine applies defaults).
+  // For kind:'video' : transport (all optional; engine applies defaults).
   videoPlaying?: boolean // default true
   videoSpeed?: number // 1/28..128, default 1 (× layer speed × global speed)
   videoReverse?: boolean // legacy; superseded by videoDirection
@@ -95,11 +95,11 @@ export type SidechainRef =
 
 // One FX in a rack. Usually an ISF shader (brief §5); a `node-*` shaderId marks a
 // native multi-pass convolution node (visual-convolution spec) run by a TS class
-// instead of the ISF runtime — it carries an extra sidechain source.
+// instead of the ISF runtime : it carries an extra sidechain source.
 export interface FxInstance extends ShaderInstance {
   id: string
   enabled: boolean
-  // Dry/wet — the engine blends the FX output back over its input by this
+  // Dry/wet : the engine blends the FX output back over its input by this
   // amount (1 = fully wet). Undefined ⇒ 1 for older sessions.
   opacity?: number
   // Pinned rack units (the master Vibe Palette): always on, not removable,
@@ -110,15 +110,15 @@ export interface FxInstance extends ShaderInstance {
 }
 
 // One of the four layers.
-// A/B coupling (Slab 1 — the coupling-engine spine). A layer's two "voices"
+// A/B coupling (Slab 1 : the coupling-engine spine). A layer's two "voices"
 // (source A and B) are bound by an audio feature: the A↔B balance leans or
 // pumps with the sound. `tightness` runs obvious↔vestigial (linear response ↔
 // only strong peaks). Slab 2 adds the full synchresis mode catalogue.
 export type CouplingMode = 'off' | 'lean' | 'hocket' | 'cut' | 'gate' | 'drift'
 
-// World / diegesis (Slab 1) — a single, global "proposed world" that biases the
+// World / diegesis (Slab 1) : a single, global "proposed world" that biases the
 // whole composition: it sets every layer's A/B coupling character and nudges
-// the Context depth-finalizer's mood. A bias, not a lock — manual edits after
+// the Context depth-finalizer's mood. A bias, not a lock : manual edits after
 // still win. Later slabs deepen each world's audio routing + source choices.
 export type WorldMode =
   | 'synthetic'
@@ -147,7 +147,7 @@ export interface World {
   blurb: string
   coupling: LayerCoupling // A/B bond character applied to every layer
   context: Record<string, number> // Context finalizer mood nudges (safe bands)
-  // Optional Finalizer input overrides — the curated home for the Cameraless /
+  // Optional Finalizer input overrides : the curated home for the Cameraless /
   // direct-film character (film* params). Absent ⇒ the World forces film off, so
   // switching to a non-film World clears any drawn-film hold. Vibe stays untouched.
   finalizer?: Record<string, number>
@@ -164,8 +164,8 @@ export const WORLD_AUDIO_TARGETS: WorldAudioTarget[] = ['none', 'haze', 'bloom',
 export const WORLD_AUTOMOD_SLOT = 7
 export interface LayerCoupling {
   mode: CouplingMode
-  amount: number // 0..1 — depth
-  tightness: number // 0..1 — vestigial (0) ↔ obvious (1)
+  amount: number // 0..1 : depth
+  tightness: number // 0..1 : vestigial (0) ↔ obvious (1)
   feature: AudioFeature // which audio feature drives the bond
 }
 
@@ -185,11 +185,11 @@ export interface LayerState {
   feedback: boolean // does this layer sample its own previous frame
   // Trail persistence when feedback is on: 0 = none, →1 = long decay trails.
   feedbackAmount: number
-  // A/B source crossfade — 0 = A only, 1 = B only. Ignored while B is empty.
+  // A/B source crossfade : 0 = A only, 1 = B only. Ignored while B is empty.
   sourceMix: number
   // How B combines with A before the crossfade: out = mix(A, blend(A,B), mix).
   sourceBlend: BlendMode
-  // A/B harmony (Basanta's consonant↔dissonant axis) — 0 = consonant (B matched
+  // A/B harmony (consonant↔dissonant axis) : 0 = consonant (B matched
   // to A), 1 = dissonant (B hue rotated toward complementary; clashes yet stays
   // time-locked). A colour-relationship macro on the A/B pair.
   harmony: number
@@ -199,7 +199,7 @@ export interface LayerState {
   coupling: LayerCoupling
 }
 
-// ── Modulation (brief §6 — ported from dataFLOU) ─────────────────────
+// ── Modulation (brief §6 : ported from dataFLOU) ─────────────────────
 export type ModulatorType =
   | 'lfo'
   | 'ramp'
@@ -220,8 +220,8 @@ export type AudioFeature = 'level' | 'flux' | 'transient' | 'centroid' | 'band' 
 // Force-driven motion for the `physics` modulator.
 export type PhysicsMotion = 'bounce' | 'spring' | 'riser'
 
-// Named motion archetypes (Smalley via Pedersen Ch7) + force behaviours
-// (Boucher D#1) for the `motion` modulator — each a characteristic scalar
+// Named motion archetypes + force behaviours
+// for the `motion` modulator : each a characteristic scalar
 // trajectory, clocked like an LFO.
 export type MotionShape =
   | 'ascent'
@@ -273,7 +273,7 @@ export type ArpMode = 'up' | 'down' | 'upDown' | 'random' | 'drunk'
 export interface ModulatorConfig {
   type: ModulatorType
   enabled: boolean
-  // Clock — shared vocabulary with dataFLOU: free Hz or BPM-synced division.
+  // Clock : shared vocabulary with dataFLOU: free Hz or BPM-synced division.
   sync: 'free' | 'bpm'
   rateHz: number
   divisionIdx: number
@@ -304,7 +304,7 @@ export interface ModulatorConfig {
 }
 
 // What an assignment modulates: float ISF inputs, or a Meta knob (the
-// modulator then drives every destination the knob carries — macro motion).
+// modulator then drives every destination the knob carries : macro motion).
 // 'bgSource' addresses the Background slab's single source (no layer/slot).
 export type ModTarget =
   | { kind: 'source'; layer: number; slot: 'A' | 'B'; input: string }
@@ -319,7 +319,7 @@ export type FxScope =
   | { kind: 'layer' | 'sourceA' | 'sourceB'; layer: number }
 
 // How a modulator combines with the parameter's base value:
-//  - 'multiply' (default for new bindings): VCA-style — the base is scaled by
+//  - 'multiply' (default for new bindings): VCA-style : the base is scaled by
 //    the modulator, `|depth|` sets how deep (base·1 → base·mod), negative depth
 //    inverts the signal. A param resting at 0 stays 0 (multiply of nothing).
 //  - 'replace': the modulator swings the value bipolarly around the base over
@@ -330,7 +330,7 @@ export interface ModAssignment {
   id: string
   mod: number // modulator slot 0..7
   target: ModTarget
-  depth: number // -1..+1 — swing/scale amount
+  depth: number // -1..+1 : swing/scale amount
   mode?: ModMode // undefined = 'replace' (back-compat with pre-mode sessions)
 }
 
@@ -338,7 +338,7 @@ export interface ModAssignment {
 export const MAX_MOD_ASSIGNMENTS = 12
 export const MODULATOR_COUNT = 8
 
-// ── Meta Controller (brief §6 — dataFLOU's macro surface) ─────────────
+// ── Meta Controller (brief §6 : dataFLOU's macro surface) ─────────────
 // 16 knobs, one flat bank. Each knob maps its 0..1 position through a curve
 // onto up to 8 destinations (ISF float inputs), with per-knob smoothing and
 // MIDI-CC learn. Modulators can drive knobs (ModTarget kind 'meta').
@@ -354,7 +354,7 @@ export interface MetaKnobState {
   destinations: ModTarget[] // max META_MAX_DESTS
 }
 
-// The Background slab — the stable ground UNDER the four layers. One source
+// The Background slab : the stable ground UNDER the four layers. One source
 // (curated generator set), a full FX rack, opacity and its own slow clock.
 // Deliberately untouched by the global Randomize: the ground stays put while
 // the layers churn. Optional on older sessions (normalized on load).
@@ -362,14 +362,14 @@ export interface BackgroundState {
   source: SourceSlot
   fx: FxInstance[]
   opacity: number // 0..1 (0 = off)
-  speed: number // background clock multiplier — default 0.25 (slow ground)
+  speed: number // background clock multiplier : default 0.25 (slow ground)
   // Contact shadow the foreground casts onto the background (separation/depth).
   // 0 = off (optional). Undefined on older sessions ⇒ 0.
   depth?: number
   // How the four layers sit over the background:
-  //  'blend'   — layer 1 blends onto the background with its own blend mode
+  //  'blend'   : layer 1 blends onto the background with its own blend mode
   //              (Photoshop-standard; additive/screen layers glow it through).
-  //  'isolate' — the four layers composite as their own group (layer 1 forced
+  //  'isolate' : the four layers composite as their own group (layer 1 forced
   //              'normal'), then sit over the background; the background is a
   //              pure backdrop that never alters the inter-layer blends.
   blendMode?: 'blend' | 'isolate'
@@ -386,7 +386,7 @@ export interface CompositionState {
   metaKnobs: MetaKnobState[]
 }
 
-// ── Scenes (brief §7, §10.7) — recallable full-instrument states ──────
+// ── Scenes (brief §7, §10.7) : recallable full-instrument states ──────
 export interface SceneEntry {
   id: string
   name: string
@@ -398,20 +398,20 @@ export interface SceneEntry {
   tags?: SceneTags
 }
 
-// The Boucher/Piché × Boucher scene-relation schema — the sequencer's data model.
+// The scene-relation schema : the sequencer's data model.
 // Diégèse (which world) · Synchrèse (coupling character) · Espace-temps
 // (compressed/dense ↔ decompressed/void) · Climat (affective charge).
 export type SceneClimate = 'tension' | 'expectation' | 'release' | 'resolution'
 export const SCENE_CLIMATES: SceneClimate[] = ['tension', 'expectation', 'release', 'resolution']
 export interface SceneTags {
-  world: string // Diégèse — a World id (built-in WorldMode or a user world's uuid)
-  synchresis: CouplingMode[] // Synchrèse — the coupling character(s) this scene reads as
-  spaceTime: number // Espace-temps — 0 dense/full · 0.5 neutral · 1 void
+  world: string // Diégèse : a World id (built-in WorldMode or a user world's uuid)
+  synchresis: CouplingMode[] // Synchrèse : the coupling character(s) this scene reads as
+  spaceTime: number // Espace-temps : 0 dense/full · 0.5 neutral · 1 void
   climate: SceneClimate // Climat
 }
 
 // The generative scene / relation sequencer (macro-form engine). Session-scoped,
-// sits BESIDE `scenes` (never inside a composition — that would recurse). See
+// sits BESIDE `scenes` (never inside a composition : that would recurse). See
 // docs/opsia-sequencer-spec.md. S3 fields (cadence/rupture/monomedia) ship inert.
 export type SequenceMode = 'weighted' | 'arc' | 'shuffle'
 export type SequenceTransition = 'morph' | 'cut' | 'auto'
@@ -432,14 +432,14 @@ export interface SequenceState {
   // Macro-form overlays (S2).
   breathe: { amount: number; periodSec: number } // Espace-temps oscillator
   arc: { enabled: boolean; lengthSec: number } // Repose–Disturbance–Repose
-  // Punctuation (S3 — inert for now).
+  // Punctuation (S3 : inert for now).
   cadenceEvery: number
   ruptureChance: number
   monomediaChance: number
   monomediaStyle: MonomediaStyle
   // Deferred synchresis (S4): dwell becomes a MINIMUM, then the advance fires on
   // the next audio transient/onset, or a chaos modulator crossing a threshold
-  // (Knight-Hill C#7). 'off' = plain timer.
+  //. 'off' = plain timer.
   audioAdvance: 'off' | 'transient' | 'onset' | 'chaos'
 }
 
@@ -459,7 +459,7 @@ export interface Session {
   // was running). Optional for back-compat with pre-sequencer sessions.
   sequence?: SequenceState
   // Opaque renderer UI snapshot (theme, panel sizes, selection). The main
-  // process never inspects it — it just round-trips it to disk.
+  // process never inspects it : it just round-trips it to disk.
   ui?: unknown
 }
 
@@ -520,7 +520,7 @@ export interface CaptureSourceInfo {
 }
 
 // Per-frame render state pushed to the native output window (it drives its own
-// Compositor from this — no WebRTC transcode).
+// Compositor from this : no WebRTC transcode).
 export interface OutputFrame {
   c: CompositionState
   modValues: number[]
@@ -585,7 +585,7 @@ export interface ExposedApi {
   onOscIn: (cb: (batch: OscEvent[]) => void) => () => void
   onOscErrors: (cb: (batch: OscErrorEvent[]) => void) => () => void
 
-  // OSC input — start/stop the listener + OSCQuery, and subscribe to messages
+  // OSC input : start/stop the listener + OSCQuery, and subscribe to messages
   oscListen: (port: number, enabled: boolean) => Promise<OscListenResult>
   onOscReceived: (cb: (batch: OscInEvent[]) => void) => () => void
   oscQueryPublish: (nodes: OscQueryLeaf[]) => Promise<void>
@@ -594,14 +594,14 @@ export interface ExposedApi {
   oscQueryValues: (updates: Array<{ path: string; value: number | number[] }>) => void
   onOscQueryWsActive: (cb: (active: boolean) => void) => () => void
 
-  // App lifecycle — save-before-quit handshake
+  // App lifecycle : save-before-quit handshake
   appCloseProceed: () => Promise<void>
   onAppBeforeClose: (cb: () => void) => () => void
   // Absolute path for a picked File (Electron 33 removed File.path).
   getMediaPath: (file: File) => string
   // Screens + windows for the capture source picker.
   captureListSources: () => Promise<CaptureSourceInfo[]>
-  // Output window (2nd display / projector) — mirror via WebRTC loopback.
+  // Output window (2nd display / projector) : mirror via WebRTC loopback.
   outputDisplays: () => Promise<DisplayInfo[]>
   outputOpen: (displayId: number, windowed?: boolean) => Promise<boolean>
   outputClose: () => Promise<boolean>

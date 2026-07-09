@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Differential — visual polyrhythm (after Whitney's differential dynamics, via Collopy): several wave trains layered at INTEGER speed ratios (ratio^k), so their phases drift against each other and beat like nested rhythms. Rendered as the contour lines of the summed field — matte topographic bands that pulse in and out of alignment. Per-layer angle skew keeps it asymmetric (never radial/kaleidoscopic).",
-  "CREDIT": "Palinopsia (after J. Whitney / D. Collopy)",
+  "DESCRIPTION": "Differential : visual polyrhythm (after Whitney's differential dynamics, via Collopy): several wave trains layered at INTEGER speed ratios (ratio^k), so their phases drift against each other and beat like nested rhythms. Rendered as the contour lines of the summed field : matte topographic bands that pulse in and out of alignment. Per-layer angle skew keeps it asymmetric (never radial/kaleidoscopic).",
+  "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Geometry"],
   "INPUTS": [
@@ -28,7 +28,7 @@ void main() {
   for (int k = 0; k < 8; k++) {
     if (k >= cn) break;
     float fk = float(k);
-    // Each layer runs at rate·ratio^k — the differential that makes the
+    // Each layer runs at rate·ratio^k : the differential that makes the
     // phases drift against one another (the polyrhythm).
     float sp = rate * pow(ratio, fk);
     float a = angle + fk * skew * 1.15; // per-layer skew → asymmetric, non-radial
@@ -39,7 +39,7 @@ void main() {
   }
   field /= max(norm, 0.001); // -1..1
 
-  // Contour lines of the summed field — a topographic read of the rhythm.
+  // Contour lines of the summed field : a topographic read of the rhythm.
   float t = abs(fract(field * lines * 0.5 + 0.5) - 0.5) * 2.0; // 0 on a contour
   float m = 1.0 - smoothstep(thickness, thickness + 0.05, t);
 

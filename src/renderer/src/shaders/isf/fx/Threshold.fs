@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Threshold — luma key to hard two-tone with a soft knee and optional invert. The matte high-contrast reduction; chain Palette after it for colored keys, or use on a source before blending to carve shapes.",
+  "DESCRIPTION": "Threshold : luma key to hard two-tone with a soft knee and optional invert. The matte high-contrast reduction; chain Palette after it for colored keys, or use on a source before blending to carve shapes.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Stylize"],
