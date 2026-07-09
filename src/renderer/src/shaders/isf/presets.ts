@@ -603,6 +603,31 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Slow waves', values: { mode: 0, scale: 14, warp: 0.25, rate: 0.1, angle: -0.3, contrast: 0.7, tint: [0.86, 0.86, 0.84, 1] } },
     { name: 'Tight grid', values: { mode: 1, scale: 48, warp: 0.3, rate: 0.2, angle: 0, contrast: 1.0, tint: [0.92, 0.92, 0.9, 1] } }
   ],
+  // ── Cameraless / direct-film sources (McLaren marks · Brakhage dye) ──
+  'direct-marks': [
+    { name: 'Ruled lines', values: { markType: 0, density: 20, weight: 0.28, gate: 1, jitter: 0.25, rate: 1.2, angle: 0 } },
+    { name: 'Fine rules', values: { markType: 0, density: 48, weight: 0.12, gate: 1, jitter: 0.15, rate: 0.8, angle: 0.1 } },
+    { name: 'Blinkity lines', values: { markType: 0, density: 16, weight: 0.3, gate: 0.5, jitter: 0.4, rate: 3.2, angle: 0 } },
+    { name: 'Diagonal hatch', values: { markType: 0, density: 30, weight: 0.18, gate: 0.9, jitter: 0.3, rate: 1.5, angle: 0.9 } },
+    { name: 'Dot grid', values: { markType: 1, density: 14, weight: 0.3, gate: 1, jitter: 0.2, rate: 0.6, angle: 0 } },
+    { name: 'Dots on beat', values: { markType: 1, density: 10, weight: 0.35, gate: 0.45, jitter: 0.3, rate: 3.4, angle: 0 } },
+    { name: 'Fine stipple', values: { markType: 1, density: 40, weight: 0.22, gate: 0.8, jitter: 0.4, rate: 1.0, angle: 0 } },
+    { name: 'Scratch', values: { markType: 2, density: 30, weight: 0.3, gate: 0.9, jitter: 0.4, rate: 1.2, angle: 0 } },
+    { name: 'Sparse scratch', values: { markType: 2, density: 18, weight: 0.35, gate: 0.6, jitter: 0.6, rate: 2.0, angle: 0 } },
+    { name: 'Dense scratch', values: { markType: 2, density: 60, weight: 0.2, gate: 1, jitter: 0.5, rate: 0.8, angle: 0.05 } }
+  ],
+  'dye-field': [
+    { name: 'Oxblood pool', values: { rate: 0.4, scale: 4, warp: 0.5, pool: 0.4, density: 0.5, grain: 0.3, pigment: [0.44, 0.1, 0.11, 1] } },
+    { name: 'Black ice', values: { rate: 0.25, scale: 3, warp: 0.6, pool: 0.8, density: 0.6, grain: 0.35, pigment: [0.16, 0.3, 0.42, 1] } },
+    { name: 'Prussian bleed', values: { rate: 0.5, scale: 5, warp: 0.7, pool: 0.5, density: 0.45, grain: 0.4, pigment: [0.12, 0.26, 0.4, 1] } },
+    { name: 'Ochre wash', values: { rate: 0.6, scale: 4.5, warp: 0.4, pool: 0.3, density: 0.55, grain: 0.3, pigment: [0.5, 0.34, 0.12, 1] } },
+    { name: 'Viridian', values: { rate: 0.35, scale: 5.5, warp: 0.6, pool: 0.55, density: 0.5, grain: 0.35, pigment: [0.1, 0.36, 0.26, 1] } },
+    { name: 'Crimson crystallize', values: { rate: 0.3, scale: 3.5, warp: 0.8, pool: 0.85, density: 0.65, grain: 0.4, pigment: [0.5, 0.08, 0.14, 1] } },
+    { name: 'Umber decay', values: { rate: 0.45, scale: 4, warp: 0.5, pool: 0.6, density: 0.5, grain: 0.45, pigment: [0.32, 0.2, 0.12, 1] } },
+    { name: 'Violet ink', values: { rate: 0.4, scale: 5, warp: 0.65, pool: 0.5, density: 0.5, grain: 0.3, pigment: [0.3, 0.14, 0.42, 1] } },
+    { name: 'Sparse dye', values: { rate: 0.5, scale: 6.5, warp: 0.4, pool: 0.25, density: 0.35, grain: 0.5, pigment: [0.4, 0.12, 0.1, 1] } },
+    { name: 'Dense pool', values: { rate: 0.2, scale: 3, warp: 0.7, pool: 0.9, density: 0.8, grain: 0.3, pigment: [0.2, 0.28, 0.36, 1] } }
+  ],
   differential: [
     { name: 'Octaves', values: { count: 4, ratio: 2, rate: 0.4, freq: 3, thickness: 0.12, lines: 6, skew: 0.35, angle: 0.4 } },
     { name: 'Triads', values: { count: 3, ratio: 1.5, rate: 0.3, freq: 4, thickness: 0.1, lines: 5, skew: 0.5, angle: 0.8 } },

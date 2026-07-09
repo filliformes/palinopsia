@@ -31,6 +31,8 @@ import rgbOsc from './RgbOsc.fs?raw'
 import recurse from './Recurse.fs?raw'
 import shapes from './Shapes.fs?raw'
 import opArt from './OpArt.fs?raw'
+import directMarks from './DirectMarks.fs?raw'
+import dyeField from './DyeField.fs?raw'
 import syncOsc from './SyncOsc.fs?raw'
 import differential from './Differential.fs?raw'
 import solidColor from './SolidColor.fs?raw'
@@ -395,6 +397,20 @@ export const GENERATORS: IsfShader[] = [
     category: 'Generator',
     source: opArt,
     curated: { scale: [8, 48], warp: [0.15, 0.8], rate: [0.05, 1.2], angle: [-1.6, 1.6], contrast: [0.5, 1] }
+  },
+  {
+    id: 'direct-marks',
+    name: 'Direct Marks',
+    category: 'Generator',
+    source: directMarks,
+    curated: { density: [8, 60], weight: [0.1, 0.42], gate: [0.35, 1], jitter: [0.1, 0.6], rate: [0.3, 4], angle: [0, 3.14] }
+  },
+  {
+    id: 'dye-field',
+    name: 'Dye Field',
+    category: 'Generator',
+    source: dyeField,
+    curated: { rate: [0.15, 1.5], scale: [2.5, 7], warp: [0.3, 0.9], pool: [0.2, 0.8], density: [0.35, 0.8], grain: [0.15, 0.6] }
   },
   {
     id: 'sync-osc',
