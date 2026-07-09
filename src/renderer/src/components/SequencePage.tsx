@@ -239,8 +239,8 @@ export function SequencePage({
          <SeqPreview canvasRef={canvasRef} />
         </div>
 
-        {/* Transport + macro-form */}
-        <aside className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-l border-border bg-panel p-4">
+        {/* Transport + macro-form — crammed to fit without scrolling. */}
+        <aside className="flex w-80 shrink-0 flex-col gap-2 overflow-y-auto border-l border-border bg-panel px-3 py-2">
           <Section title="Transport">
             <Row label={`dwell · ${seq.dwell.toFixed(0)}s`}>
               <input type="range" min={2} max={60} step={1} value={seq.dwell}
@@ -312,10 +312,6 @@ export function SequencePage({
                 onChange={(e) => setSequence({ breathe: { ...seq.breathe, periodSec: Number(e.target.value) } })}
                 className="w-full accent-accent2" />
             </Row>
-            <p className="text-[10px] leading-tight text-muted">
-              Oscillates the composition toward dense↔void around each scene's Espace-temps tag
-              (Context haze / depth / blur).
-            </p>
           </Section>
 
           <Section title="Climate arc">
@@ -372,10 +368,6 @@ export function SequencePage({
                 </div>
               </Row>
             )}
-            <p className="text-[10px] leading-tight text-muted">
-              Cadence resolves to isomorphy; rupture is a bounded chaos burst; monomedia drops
-              the picture (black or freeze) while audio continues.
-            </p>
           </Section>
         </aside>
       </div>
@@ -454,16 +446,16 @@ function SeqPreview({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | nu
 
 function Section({ title, children }: { title: string; children: ReactNode }): JSX.Element {
   return (
-    <div className="flex flex-col gap-2">
-      <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{title}</span>
+    <div className="flex flex-col gap-1">
+      <span className="font-mono text-[9px] uppercase tracking-wide text-accent2/70">{title}</span>
       {children}
     </div>
   )
 }
 function Row({ label, children }: { label: string; children: ReactNode }): JSX.Element {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="font-mono text-[10px] text-muted">{label}</span>
+    <div className="flex flex-col">
+      <span className="font-mono text-[10px] leading-tight text-muted">{label}</span>
       {children}
     </div>
   )
