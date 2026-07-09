@@ -429,8 +429,10 @@ function SeqPreview({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | nu
         }}
         title="Drag to resize the live monitor"
       />
-      <div className="flex min-h-0 items-center gap-2 p-2" style={{ height }}>
-        <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">live</span>
+      <div className="relative flex min-h-0 items-center justify-center p-2" style={{ height }}>
+        <span className="pointer-events-none absolute left-2 top-2 z-10 font-mono text-[9px] uppercase tracking-wide text-muted">
+          live
+        </span>
         <video
           ref={videoRef}
           autoPlay
