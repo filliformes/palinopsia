@@ -129,8 +129,8 @@ export function Transport(): JSX.Element {
   const current = SCOPES.find((s) => s.scope === scope) ?? SCOPES[0]
 
   return (
-    <div className="flex items-center gap-4 border-t border-border bg-panel px-4 py-1.5">
-      <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border bg-panel px-2 py-1.5">
+      <div className="flex items-center gap-1.5">
         <span className="font-mono text-[10px] text-muted">BPM</span>
         <div className="w-10">
           <BoundedNumberInput
@@ -145,8 +145,8 @@ export function Transport(): JSX.Element {
       </div>
 
       {/* Global speed : scales every visual clock, 1/64×…64× (log). */}
-      <div className="flex items-center gap-2">
-        <span className="font-mono text-[10px] text-muted">SPEED</span>
+      <div className="flex items-center gap-1">
+        <span className="font-mono text-[10px] text-muted">SPD</span>
         <input
           type="range"
           min={-6}
@@ -155,15 +155,15 @@ export function Transport(): JSX.Element {
           value={Math.log2(globalSpeed)}
           onChange={(e) => setGlobalSpeed(Math.pow(2, Number(e.target.value)))}
           onDoubleClick={() => setGlobalSpeed(1)}
-          className="w-28 accent-accent"
+          className="w-14 accent-accent"
           title={`Global speed ${fmtSpeed(globalSpeed)} : double-click to reset to 1×`}
         />
-        <span className="w-9 shrink-0 font-mono text-[10px] text-muted">{fmtSpeed(globalSpeed)}</span>
+        <span className="w-7 shrink-0 font-mono text-[9px] text-muted">{fmtSpeed(globalSpeed)}</span>
       </div>
 
       {/* Morph : scene recalls & Randomize crossfade over this time. */}
-      <div className="flex items-center gap-2">
-        <span className="font-mono text-[10px] text-muted">MORPH</span>
+      <div className="flex items-center gap-1">
+        <span className="font-mono text-[10px] text-muted">MRPH</span>
         <input
           type="range"
           min={0}
@@ -172,16 +172,16 @@ export function Transport(): JSX.Element {
           value={msToT(morphMs)}
           onChange={(e) => setMorphMs(tToMs(Number(e.target.value)))}
           onDoubleClick={() => setMorphMs(1000)}
-          className="w-24 accent-accent"
+          className="w-12 accent-accent"
           title={`Scene / Randomize morph ${fmtMorph(morphMs)} : double-click for 1s`}
         />
-        <span className="w-11 shrink-0 font-mono text-[10px] text-muted">{fmtMorph(morphMs)}</span>
+        <span className="w-8 shrink-0 font-mono text-[9px] text-muted">{fmtMorph(morphMs)}</span>
       </div>
 
       {/* World / diegesis : the active "proposed world" biases coupling + Context
           mood + audio routing. The ⧉ button opens the World editor (also W). */}
-      <div className="flex items-center gap-1.5">
-        <span className="font-mono text-[10px] text-muted">WORLD</span>
+      <div className="flex items-center gap-1">
+        <span className="font-mono text-[10px] text-muted">WRLD</span>
         <select
           className="input select-compact text-[11px]"
           value={world}
@@ -205,10 +205,10 @@ export function Transport(): JSX.Element {
 
       {/* Seq + Proximity : nudged right of the World block so they read as their
           own macro group, detached from the World section. */}
-      <div className="ml-5 flex items-center gap-3">
+      <div className="ml-1 flex items-center gap-1.5">
         <button
           onClick={() => setSequencePageOpen(true)}
-          className={`rounded border px-2 py-1 font-mono text-[11px] transition-colors ${
+          className={`rounded border px-1.5 py-1 font-mono text-[11px] transition-colors ${
             seqRunning
               ? 'border-accent bg-accent/15 text-accent'
               : 'border-border text-muted hover:text-accent'
@@ -219,8 +219,8 @@ export function Transport(): JSX.Element {
         </button>
         {/* Proximity (Field macro) : one knob places the image in a depth zone,
             far/vista ↔ close/personal, by pushing the Context mood. */}
-        <div className="flex items-center gap-1.5">
-          <span className="font-mono text-[10px] text-muted">PROX</span>
+        <div className="flex items-center gap-1">
+          <span className="font-mono text-[9px] text-muted">PROX</span>
           <input
             type="range"
             min={0}
@@ -229,7 +229,7 @@ export function Transport(): JSX.Element {
             value={proximity}
             onChange={(e) => setProximity(Number(e.target.value))}
             onDoubleClick={() => setProximity(0.5)}
-            className="w-20 accent-accent"
+            className="w-12 accent-accent"
             title={`Proximity ${proximity < 0.48 ? 'far' : proximity > 0.52 ? 'close' : 'neutral'} : vista ↔ personal (double-click: neutral)`}
           />
           <button
@@ -242,32 +242,34 @@ export function Transport(): JSX.Element {
             ◑
           </button>
         </div>
-        {/* Field macros : spatial-material globals (0.5 = neutral). */}
-        <MacroKnob label="DENS" value={density} onChange={setDensity}
-          title="Density : sparse ↔ dense (fades upper layers / fills them in). 0.5 neutral · double-click resets" />
-        <MacroKnob label="G↔T" value={gestureTexture} onChange={setGestureTexture}
-          title="Gesture ↔ Texture : clean directional (sharpen) ↔ internalised churn (trails). 0.5 neutral" />
-        <MacroKnob label="COAL" value={coalesce} onChange={setCoalesce}
-          title="Coalesce : grain (dither) ↔ mass (blur/smooth). 0.5 neutral" />
-        {/* Temperament controls : 0 = off (double-click resets). */}
-        <MacroKnob label="TONE" value={tonicity} onChange={setTonicity} neutral={0}
-          title="Tonicity : tonal/harmonic audio pulls colour in, noise pulls toward black-and-white (needs Audio on). 0 = off · double-click resets." />
-        <MacroKnob label="SHUT" value={shutter} onChange={setShutter} neutral={0}
-          title="Shutter : GLOBAL full-freeze stop-motion: dead-holds the whole present, then jumps (24fps → 2fps). 0 = off. For a filmic hold with gate-weave + materiality (feedback keeps running underneath), use Finishing → film hold (Cameraless) instead." />
-        <MacroKnob label="DRIFT" value={drift} onChange={setDrift} neutral={0}
-          title="Drift : slow analog-instability wander over the grade + rare 'accidents'. 0 = off." />
-        <MacroKnob label="SUPER" value={superFlicker} onChange={setSuperFlicker} neutral={0}
-          title="Superimposition flicker : a hypnagogic strobe: cross-cuts which layer shows on the drawn cadence (rate follows Cameraless film hold). 0 = off." />
+        {/* Field macros + temperament : spatial-material + film globals. Wrapped
+            in a tight-gap group so the seven knobs don't push the bar off-screen. */}
+        <div className="flex items-center gap-0.5">
+          <MacroKnob label="DENS" value={density} onChange={setDensity}
+            title="Density : sparse ↔ dense (fades upper layers / fills them in). 0.5 neutral · double-click resets" />
+          <MacroKnob label="G↔T" value={gestureTexture} onChange={setGestureTexture}
+            title="Gesture ↔ Texture : clean directional (sharpen) ↔ internalised churn (trails). 0.5 neutral" />
+          <MacroKnob label="COAL" value={coalesce} onChange={setCoalesce}
+            title="Coalesce : grain (dither) ↔ mass (blur/smooth). 0.5 neutral" />
+          <MacroKnob label="TONE" value={tonicity} onChange={setTonicity} neutral={0}
+            title="Tonicity : tonal/harmonic audio pulls colour in, noise pulls toward black-and-white (needs Audio on). 0 = off · double-click resets." />
+          <MacroKnob label="SHUT" value={shutter} onChange={setShutter} neutral={0}
+            title="Shutter : GLOBAL full-freeze stop-motion: dead-holds the whole present, then jumps (24fps → 2fps). 0 = off. For a filmic hold with gate-weave + materiality (feedback keeps running underneath), use Finishing → film hold (Cameraless) instead." />
+          <MacroKnob label="DRIFT" value={drift} onChange={setDrift} neutral={0}
+            title="Drift : slow analog-instability wander over the grade + rare 'accidents'. 0 = off." />
+          <MacroKnob label="SUPER" value={superFlicker} onChange={setSuperFlicker} neutral={0}
+            title="Superimposition flicker : a hypnagogic strobe: cross-cuts which layer shows on the drawn cadence (rate follows Cameraless film hold). 0 = off." />
+        </div>
       </div>
 
-      <div className="flex-1" />
-
       {/* Variation : a baseline-anchored variant of the whole scene at `varAmt`
-          (structure fixed, continuous values nudged). */}
-      <div className="flex items-center gap-1.5">
+          (structure fixed, continuous values nudged). `ml-auto` pushes this +
+          amt + Randomize to the right edge when there's room, and keeps them
+          together (never off-screen) when the bar wraps on a narrow window. */}
+      <div className="ml-auto flex items-center gap-1">
         <button
           onClick={() => applyVariation(varAmt)}
-          className="rounded border border-accent2/60 bg-accent2/10 px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent2 transition-colors hover:bg-accent2/20"
+          className="rounded border border-accent2/60 bg-accent2/10 px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent2 transition-colors hover:bg-accent2/20"
           title={`Variation ${pct(varAmt)} : a fresh variant of the current scene (same structure, values nudged). First press sets the baseline; each press is a new sibling at this spread.`}
         >
           Vary
@@ -279,15 +281,15 @@ export function Transport(): JSX.Element {
           step={0.01}
           value={varAmt}
           onChange={(e) => changeVarAmt(Number(e.target.value))}
-          className="w-16 accent-accent2"
+          className="w-11 accent-accent2"
           title={`Variation amount ${pct(varAmt)}`}
         />
-        <span className="w-8 shrink-0 font-mono text-[10px] text-muted">{pct(varAmt)}</span>
+        <span className="w-7 shrink-0 font-mono text-[9px] text-muted">{pct(varAmt)}</span>
       </div>
 
       {/* Randomize: chevron selects the mode, button fires it; the amount slider
           scales it from a gentle walk (low %) to a full re-roll (100%). */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1">
         <span
           className="font-mono text-[9px] uppercase text-muted"
           title="Randomize intensity : low = a gentle walk from the current scene, 100% = a full structural re-roll"
@@ -301,16 +303,16 @@ export function Transport(): JSX.Element {
           step={0.01}
           value={intensity}
           onChange={(e) => changeIntensity(Number(e.target.value))}
-          className="w-16 accent-accent"
+          className="w-11 accent-accent"
           title={`Randomize intensity ${pct(intensity)}`}
         />
-        <span className="w-8 shrink-0 font-mono text-[10px] text-muted">{pct(intensity)}</span>
+        <span className="w-7 shrink-0 font-mono text-[9px] text-muted">{pct(intensity)}</span>
       </div>
 
-      <div ref={menuRef} className="relative flex">
+      <div ref={menuRef} className="relative flex shrink-0">
         <button
           onClick={() => fireRandomize(scope, intensity)}
-          className="rounded-l border border-accent/60 bg-accent/10 px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent transition-colors hover:bg-accent/20"
+          className="rounded-l border border-accent/60 bg-accent/10 px-2 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent transition-colors hover:bg-accent/20"
           title={`Fire ${current.label} : every draw from curated aesthetic ranges`}
         >
           {current.label}
@@ -361,7 +363,7 @@ function MacroKnob({
 }): JSX.Element {
   const active = Math.abs(value - neutral) > 0.02
   return (
-    <div className="flex items-center gap-1" title={title}>
+    <div className="flex items-center gap-0.5" title={title}>
       <span className={`font-mono text-[9px] ${active ? 'text-accent2' : 'text-muted'}`}>{label}</span>
       <input
         type="range"
@@ -371,7 +373,7 @@ function MacroKnob({
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         onDoubleClick={() => onChange(neutral)}
-        className="w-14 accent-accent2"
+        className="w-9 accent-accent2"
       />
     </div>
   )

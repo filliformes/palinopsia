@@ -159,9 +159,10 @@ export function OscPanel(): JSX.Element {
         </>
       )}
 
-      {/* Outbound feedback : mirror our live state back to Pandore so its UI
-          tracks ours (modulators, scene recalls, a hand on a slider). */}
-      <div className="flex min-w-0 items-center gap-2 border-t border-border/60 pt-1">
+      {/* Outbound to Pandore (one line) : FEEDBACK mirrors our live state back so
+          its UI tracks ours; MARK sends a scanline of the output as sound (the
+          animated-sound loop). Both share the destination host:port on the right. */}
+      <div className="flex min-w-0 items-center gap-1.5 border-t border-border/60 pt-1">
         <button
           onClick={toggleOut}
           className={`shrink-0 rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
@@ -169,42 +170,10 @@ export function OscPanel(): JSX.Element {
               ? 'bg-accent/20 text-accent ring-1 ring-accent'
               : 'bg-panel2 text-muted hover:text-text'
           }`}
-          title={oscOutEnabled ? 'Stop mirroring state to Pandore' : 'Mirror live state to Pandore over OSC'}
+          title={oscOutEnabled ? 'FEEDBACK on : stop mirroring live state to Pandore' : 'FEEDBACK : mirror live state to Pandore over OSC'}
         >
-          {oscOutEnabled ? 'FEEDBACK →' : 'FEEDBACK OFF'}
+          {oscOutEnabled ? 'FDBK →' : 'FDBK'}
         </button>
-        <input
-          value={outHostStr}
-          onChange={(e) => setOutHostStr(e.target.value)}
-          onBlur={commitOutHost}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-          }}
-          className="input w-24 px-1 py-0.5 text-[11px]"
-          title="Destination host (Pandore's IP : 127.0.0.1 if same machine)"
-        />
-        <span className="font-mono text-[9px] uppercase text-muted">:</span>
-        <input
-          value={outPortStr}
-          onChange={(e) => setOutPortStr(e.target.value.replace(/[^0-9]/g, ''))}
-          onBlur={commitOutPort}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-          }}
-          className="input w-14 px-1 py-0.5 text-right text-[11px]"
-          title="Destination UDP port Pandore receives on"
-        />
-        <div className="flex-1" />
-        <span
-          className={`font-mono text-[9px] ${oscOutEnabled ? 'text-accent' : 'text-muted'}`}
-        >
-          {oscOutEnabled ? 'mirroring' : 'off'}
-        </span>
-      </div>
-
-      {/* Animated sound (§4.4) : send a scanline of the output to Pandore as a
-          control signal, so a drawn mark is simultaneously image AND sound. */}
-      <div className="flex min-w-0 items-center gap-2">
         <button
           onClick={() => setMarkSignal({ enabled: !markSignalEnabled })}
           className={`shrink-0 rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
@@ -214,17 +183,34 @@ export function OscPanel(): JSX.Element {
           }`}
           title={
             markSignalEnabled
-              ? 'Stop sending the drawn optical soundtrack to Pandore'
-              : 'Send a scanline of the output to Pandore as sound (the animated-sound loop). Uses the feedback host/port above.'
+              ? 'MARK→SND on : stop sending the drawn optical soundtrack to Pandore (/opsia/av/mark-*)'
+              : 'MARK→SND : send a scanline of the output to Pandore as sound (/opsia/av/mark-*), the animated-sound loop. Uses the host/port here.'
           }
         >
-          {markSignalEnabled ? 'MARK → SND' : 'MARK SND OFF'}
+          {markSignalEnabled ? 'MARK →' : 'MARK'}
         </button>
-        <span className="font-mono text-[9px] text-muted">/opsia/av/mark-*</span>
         <div className="flex-1" />
-        <span className={`font-mono text-[9px] ${markSignalEnabled ? 'text-accent2' : 'text-muted'}`}>
-          {markSignalEnabled ? 'scanning' : 'off'}
-        </span>
+        <input
+          value={outHostStr}
+          onChange={(e) => setOutHostStr(e.target.value)}
+          onBlur={commitOutHost}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+          }}
+          className="input w-20 px-1 py-0.5 text-[11px]"
+          title="Destination host (Pandore's IP : 127.0.0.1 if same machine). Shared by FEEDBACK + MARK."
+        />
+        <span className="font-mono text-[9px] uppercase text-muted">:</span>
+        <input
+          value={outPortStr}
+          onChange={(e) => setOutPortStr(e.target.value.replace(/[^0-9]/g, ''))}
+          onBlur={commitOutPort}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+          }}
+          className="input w-12 px-1 py-0.5 text-right text-[11px]"
+          title="Destination UDP port Pandore receives on"
+        />
       </div>
     </div>
   )
