@@ -155,7 +155,7 @@ export function Transport(): JSX.Element {
           value={Math.log2(globalSpeed)}
           onChange={(e) => setGlobalSpeed(Math.pow(2, Number(e.target.value)))}
           onDoubleClick={() => setGlobalSpeed(1)}
-          className="w-14 accent-accent"
+          className="w-20 accent-accent"
           title={`Global speed ${fmtSpeed(globalSpeed)} : double-click to reset to 1×`}
         />
         <span className="w-7 shrink-0 font-mono text-[9px] text-muted">{fmtSpeed(globalSpeed)}</span>
@@ -172,7 +172,7 @@ export function Transport(): JSX.Element {
           value={msToT(morphMs)}
           onChange={(e) => setMorphMs(tToMs(Number(e.target.value)))}
           onDoubleClick={() => setMorphMs(1000)}
-          className="w-12 accent-accent"
+          className="w-16 accent-accent"
           title={`Scene / Randomize morph ${fmtMorph(morphMs)} : double-click for 1s`}
         />
         <span className="w-8 shrink-0 font-mono text-[9px] text-muted">{fmtMorph(morphMs)}</span>
@@ -229,7 +229,7 @@ export function Transport(): JSX.Element {
             value={proximity}
             onChange={(e) => setProximity(Number(e.target.value))}
             onDoubleClick={() => setProximity(0.5)}
-            className="w-12 accent-accent"
+            className="w-16 accent-accent"
             title={`Proximity ${proximity < 0.48 ? 'far' : proximity > 0.52 ? 'close' : 'neutral'} : vista ↔ personal (double-click: neutral)`}
           />
           <button
@@ -281,7 +281,7 @@ export function Transport(): JSX.Element {
           step={0.01}
           value={varAmt}
           onChange={(e) => changeVarAmt(Number(e.target.value))}
-          className="w-11 accent-accent2"
+          className="w-14 accent-accent2"
           title={`Variation amount ${pct(varAmt)}`}
         />
         <span className="w-7 shrink-0 font-mono text-[9px] text-muted">{pct(varAmt)}</span>
@@ -303,7 +303,7 @@ export function Transport(): JSX.Element {
           step={0.01}
           value={intensity}
           onChange={(e) => changeIntensity(Number(e.target.value))}
-          className="w-11 accent-accent"
+          className="w-14 accent-accent"
           title={`Randomize intensity ${pct(intensity)}`}
         />
         <span className="w-7 shrink-0 font-mono text-[9px] text-muted">{pct(intensity)}</span>
@@ -373,7 +373,7 @@ function MacroKnob({
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         onDoubleClick={() => onChange(neutral)}
-        className="w-9 accent-accent2"
+        className="w-11 accent-accent2"
       />
     </div>
   )

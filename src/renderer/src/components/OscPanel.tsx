@@ -156,13 +156,12 @@ export function OscPanel(): JSX.Element {
               ↙ {last}
             </div>
           )}
-        </>
-      )}
 
-      {/* Outbound to Pandore (one line) : FEEDBACK mirrors our live state back so
-          its UI tracks ours; MARK sends a scanline of the output as sound (the
-          animated-sound loop). Both share the destination host:port on the right. */}
-      <div className="flex min-w-0 items-center gap-1.5 border-t border-border/60 pt-1">
+          {/* Outbound to Pandore (one line) : FEEDBACK mirrors our live state back
+              so its UI tracks ours; MARK sends a scanline of the output as sound
+              (the animated-sound loop). Both share the host:port on the right.
+              Lives inside the OSC toggle : hidden until OSC is enabled. */}
+          <div className="flex min-w-0 items-center gap-1.5 border-t border-border/60 pt-1">
         <button
           onClick={toggleOut}
           className={`shrink-0 rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
@@ -208,10 +207,12 @@ export function OscPanel(): JSX.Element {
           onKeyDown={(e) => {
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
           }}
-          className="input w-12 px-1 py-0.5 text-right text-[11px]"
-          title="Destination UDP port Pandore receives on"
-        />
-      </div>
+            className="input w-12 px-1 py-0.5 text-right text-[11px]"
+            title="Destination UDP port Pandore receives on"
+          />
+          </div>
+        </>
+      )}
     </div>
   )
 }
