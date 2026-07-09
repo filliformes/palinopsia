@@ -6,6 +6,7 @@
 // from the JSON header (no GL context needed) and cached per shader id.
 
 import { SHADER_BY_ID } from './index'
+import { INPUT_HINTS } from './inputHints'
 
 export interface IsfInputDesc {
   name: string
@@ -17,6 +18,8 @@ export interface IsfInputDesc {
   // For 'long' (enum) inputs.
   values?: number[]
   labels?: string[]
+  // Plain-English hover-help (from inputHints.ts) — shown in the control's title.
+  hint?: string
   // Opsia extension ("COMPACT": true): small toggles/enums that the Inspector's
   // two-row grid stacks together into ONE cluster cell instead of a cell each.
   compact?: boolean
@@ -56,6 +59,7 @@ export function inputsForShader(shaderId: string): IsfInputDesc[] {
   const shader = SHADER_BY_ID[shaderId]
   if (!shader) return []
   const out: IsfInputDesc[] = []
+  const hints = INPUT_HINTS[shaderId]
   for (const raw of parseHeader(shader.source)) {
     if (!raw.NAME || !raw.TYPE) continue
     const type = raw.TYPE as IsfInputDesc['type']
@@ -71,7 +75,8 @@ export function inputsForShader(shaderId: string): IsfInputDesc[] {
       def,
       values: raw.VALUES,
       labels: raw.LABELS,
-      compact: raw.COMPACT
+      compact: raw.COMPACT,
+      hint: hints?.[raw.NAME]
     })
   }
   cache.set(shaderId, out)

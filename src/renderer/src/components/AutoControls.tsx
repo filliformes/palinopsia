@@ -305,7 +305,7 @@ function Control({
 
 function labelEl(inp: IsfInputDesc): JSX.Element {
   return (
-    <span className="font-mono text-[9px] uppercase tracking-wide text-muted" title={inp.name}>
+    <span className="font-mono text-[9px] uppercase tracking-wide text-muted" title={inp.hint ?? inp.name}>
       {inp.label}
     </span>
   )
@@ -354,7 +354,7 @@ function FloatControl({
         <div className="flex min-w-0 items-center gap-1.5">
           <span
             className="w-20 shrink-0 truncate font-mono text-[9px] uppercase tracking-wide text-muted"
-            title={inp.label}
+            title={inp.hint ?? inp.label}
           >
             {inp.label}
           </span>
@@ -369,9 +369,10 @@ function FloatControl({
             onDoubleClick={() => onChange(inp.name, def)}
             className={`min-w-0 flex-1 ${isModulated ? 'accent-accent2' : 'accent-accent'}`}
             title={
-              isModulated
+              (inp.hint ? inp.hint + ' · ' : '') +
+              (isModulated
                 ? `${inp.label} — modulated (drag sets the base)`
-                : `${inp.label} — double-click to reset (${def})`
+                : `${inp.label} — double-click to reset (${def})`)
             }
           />
           {target && <ModButton target={target} bound={bound} label={inp.label} />}
@@ -419,9 +420,10 @@ function FloatControl({
         onDoubleClick={() => onChange(inp.name, def)}
         className={`min-w-0 ${isModulated ? 'accent-accent2' : 'accent-accent'}`}
         title={
-          isModulated
+          (inp.hint ? inp.hint + ' · ' : '') +
+          (isModulated
             ? `${inp.label} — modulated (moving with the live value; drag sets the base)`
-            : `${inp.label} — double-click to reset (${def})`
+            : `${inp.label} — double-click to reset (${def})`)
         }
       />
     </div>
@@ -755,7 +757,7 @@ function EnumControl({
         title={
           isModulated
             ? `${inp.label} — modulated (showing the live selection; picking sets the base)`
-            : inp.label
+            : (inp.hint ?? inp.label)
         }
       >
         {values.map((val, i) => (

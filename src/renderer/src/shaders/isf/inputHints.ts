@@ -1,0 +1,73 @@
+// Plain-English hover-help for shader inputs, keyed by shaderId → inputName.
+// Surfaced by AutoControls in each control's title (appended to the label).
+// Focused on the always-on finalizers (Vibe · Context · Finalizer) — the params
+// a first-timer meets in Finishing and can't guess from the label alone.
+
+export const INPUT_HINTS: Record<string, Record<string, string>> = {
+  'fx-vibe': {
+    stops: 'How many palette stops (2–5) the image is re-coloured toward — the size of the colour map.',
+    blend: 'Blend of the palette re-colour against the original colours.',
+    dither: 'Ordered dithering — breaks up banding, adds fine texture.',
+    mixSrc: 'Mix the original source colours back in over the palette map.',
+    autoLevel: 'Auto-levels — stretches contrast to use the full range.',
+    gamma: 'Midtone brightness (below 1 darkens mids, above 1 lifts them).',
+    contrast: 'Overall contrast.',
+    saturation: 'Colour intensity (0 = greyscale).',
+    sharpen: 'Edge sharpening.',
+    splitTone: 'Split-tone amount — tints shadows and highlights toward two hues.',
+    shadowTint: 'Colour pushed into the shadows (split-tone).',
+    highTint: 'Colour pushed into the highlights (split-tone).',
+    harmony: 'Nudges the palette hues toward a harmonic relationship.',
+    baseHue: 'Base hue the generated palette is built around.',
+    chroma: 'Palette colourfulness / saturation.',
+    spread: 'Hue spread across the palette stops.',
+    colorA: 'Palette stop A — a colour the image is mapped toward (darkest).',
+    colorB: 'Palette stop B — a colour the image is mapped toward.',
+    colorC: 'Palette stop C — a colour the image is mapped toward.',
+    colorD: 'Palette stop D — a colour the image is mapped toward.',
+    colorE: 'Palette stop E — a colour the image is mapped toward (lightest).'
+  },
+  'fx-context': {
+    trails: 'Temporal colour bleed — past frames linger and drift into the distance.',
+    blur: 'Soft spatial blur — takes the edge off, pushes things back in space.',
+    bloom: 'Highlights glow / bleed light — dreamier, more luminous.',
+    depth: 'Vignette + aerial recession that seats the image in a volume.',
+    haze: 'Atmospheric veil toward the atmosphere colour — distance, air.',
+    atmosphere: 'The colour the haze / aerial perspective tints toward.',
+    lightGlow: "A soft key light's glow strength.",
+    lightSize: 'Light spread — a tight spot (0) → a broad ambient wash (1).',
+    lightColor: 'Colour of the key light.',
+    light: 'Position of the key light (drag the XY pad).',
+    pbrTexture: 'PBR material the whole composition is mapped onto (projector-on-surface look).',
+    pbrAmount: 'How strongly the PBR material relights / displaces the image.',
+    pbrScale: 'Tiling scale of the PBR material.',
+    pbrNormal: 'PBR normal-map (relighting) strength.',
+    pbrHeight: 'PBR displacement / height strength.',
+    pbrAO: 'PBR ambient-occlusion (contact shadow) strength.'
+  },
+  'fx-finalizer': {
+    black: 'Input black point — lifts or crushes the shadows (Levels).',
+    white: 'Input white point — where the highlights clip (Levels).',
+    gamma: 'Midtone brightness (Levels).',
+    rGain: 'Red gain — tints the whole output.',
+    gGain: 'Green gain — tints the whole output.',
+    bGain: 'Blue gain — tints the whole output.',
+    alpha: 'Output opacity.',
+    sharpen: 'Final edge sharpening over the whole frame.',
+    character: 'Grain character — digital sensor / film / CRT / VHS.',
+    grain: 'Grain amount over the whole output.',
+    grainSize: 'Grain particle size.',
+    chroma: 'Colour noise in the grain.',
+    parasites: 'CRT/VHS interference (head-switch tear, dropouts) — only with the crt/vhs character.',
+    outShape: 'Clip the finished frame into a silhouette (none = full frame).',
+    outSize: 'Size of the output shape.',
+    outAngle: 'Rotation of the output shape.',
+    outPosX: 'Horizontal position of the output shape.',
+    outPosY: 'Vertical position of the output shape.',
+    outBgSource: "What fills OUTSIDE the shape — a solid colour or the Background layer (moved here).",
+    outBgColor: "Fill colour outside the shape (when 'color' is chosen).",
+    outDepth: 'Soft drop shadow — makes the shape float over the fill.',
+    outShadowAngle: "Direction the shape's shadow falls (light angle).",
+    outPerspective: 'Rakes the shadow onto a receding ground plane — adds depth realism.'
+  }
+}

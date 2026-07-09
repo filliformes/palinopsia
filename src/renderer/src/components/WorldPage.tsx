@@ -16,13 +16,21 @@ import { WorldVisualizer, WORLD_SOURCE_PAIRS, simAudio, type SimAudio } from './
 const SIM_SHAPES: SimAudio['shape'][] = ['pulse', 'sine', 'ramp', 'noise']
 
 const COUPLING_MODES: CouplingMode[] = ['off', 'lean', 'hocket', 'cut', 'gate', 'drift']
-const CONTEXT_KEYS: Array<{ k: string; label: string }> = [
-  { k: 'trails', label: 'trails' },
-  { k: 'blur', label: 'blur' },
-  { k: 'bloom', label: 'bloom' },
-  { k: 'depth', label: 'depth' },
-  { k: 'haze', label: 'haze' }
+const CONTEXT_KEYS: Array<{ k: string; label: string; hint: string }> = [
+  { k: 'trails', label: 'trails', hint: 'Temporal colour bleed — past frames linger and drift into the distance.' },
+  { k: 'blur', label: 'blur', hint: 'Soft spatial blur — takes the edge off, pushes things back in space.' },
+  { k: 'bloom', label: 'bloom', hint: 'Highlights glow / bleed light — dreamier, more luminous.' },
+  { k: 'depth', label: 'depth', hint: 'Vignette + aerial recession that seats the image in a volume.' },
+  { k: 'haze', label: 'haze', hint: 'Atmospheric veil toward the atmosphere colour — distance, air.' }
 ]
+const COUPLING_INFO: Record<string, string> = {
+  off: 'off — the two voices are independent (no audio binding)',
+  lean: 'lean — audio gently pushes the A/B balance toward B (continuous)',
+  hocket: 'hocket — audio flips the balance A↔B (percussive, alternating)',
+  cut: 'cut — a transient flashes to B, then releases (on-beat, punchy)',
+  gate: 'gate — B while loud, A while quiet (a threshold)',
+  drift: 'drift — slow momentum follow, sharing direction not shape'
+}
 
 export function WorldPage(): JSX.Element {
   const worlds = useStore((s) => s.worlds)
@@ -154,19 +162,23 @@ export function WorldPage(): JSX.Element {
             {/* Coupling */}
             <Section title="A/B Coupling — how the two voices bond">
               <SelRow label="mode" value={w.coupling.mode} options={COUPLING_MODES}
+                title={COUPLING_INFO[w.coupling.mode] ?? 'How audio binds the layer’s A and B voices in time.'}
                 onChange={(v) => setCoupling({ mode: v as CouplingMode })} />
               <SelRow label="feature" value={w.coupling.feature} options={AUDIO_FEATURES}
+                title="Which audio feature drives the coupling (level, flux, transient, centroid, band, pitch)."
                 onChange={(v) => setCoupling({ feature: v as AudioFeature })} />
               <SlideRow label="amount" value={w.coupling.amount}
+                title="Coupling depth — how far the audio can swing the A/B balance (0 = none)."
                 onChange={(v) => setCoupling({ amount: v })} />
               <SlideRow label="tightness" value={w.coupling.tightness}
+                title="Response sharpness — vestigial/loose (0) ↔ obvious/snappy (1). Shapes cut release, gate edge, drift speed."
                 onChange={(v) => setCoupling({ tightness: v })} />
             </Section>
 
             {/* Context mood */}
             <Section title="Context mood — depth finalizer (safe bands)">
-              {CONTEXT_KEYS.map(({ k, label }) => (
-                <SlideRow key={k} label={label} value={w.context[k] ?? 0}
+              {CONTEXT_KEYS.map(({ k, label, hint }) => (
+                <SlideRow key={k} label={label} value={w.context[k] ?? 0} title={hint}
                   onChange={(v) => setContext(k, v)} />
               ))}
             </Section>
@@ -177,18 +189,21 @@ export function WorldPage(): JSX.Element {
                 label="target"
                 value={w.autoMod?.target ?? 'none'}
                 options={WORLD_AUDIO_TARGETS}
+                title="Which Context param this World's audio modulator drives when applied (on modulator slot M8). 'none' clears it."
                 onChange={(v) => setAutoMod({ target: v as WorldAudioTarget })}
               />
               <SelRow
                 label="feature"
                 value={w.autoMod?.feature ?? 'transient'}
                 options={AUDIO_FEATURES}
+                title="Which audio feature the auto-modulator follows."
                 onChange={(v) => setAutoMod({ feature: v as AudioFeature })}
               />
               <SlideRow
                 label="depth"
                 value={w.autoMod?.depth ?? 0.4}
                 min={-1}
+                title="How strongly the audio moves the target (negative inverts)."
                 onChange={(v) => setAutoMod({ depth: v })}
               />
               <p className="mt-1 font-mono text-[9px] leading-tight text-muted">
@@ -422,15 +437,17 @@ function SelRow({
   label,
   value,
   options,
-  onChange
+  onChange,
+  title
 }: {
   label: string
   value: string
   options: readonly string[]
   onChange: (v: string) => void
+  title?: string
 }): JSX.Element {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2" title={title}>
       <span className="w-16 shrink-0 font-mono text-[10px] text-muted">{label}</span>
       <select
         className="input select-compact min-w-0 flex-1 text-[11px]"
@@ -451,15 +468,17 @@ function SlideRow({
   label,
   value,
   min = 0,
-  onChange
+  onChange,
+  title
 }: {
   label: string
   value: number
   min?: number
   onChange: (v: number) => void
+  title?: string
 }): JSX.Element {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2" title={title}>
       <span className="w-16 shrink-0 font-mono text-[10px] text-muted">{label}</span>
       <input
         type="range"
