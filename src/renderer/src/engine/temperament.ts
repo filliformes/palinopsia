@@ -48,7 +48,11 @@ export function applyTonicity(comp: MacroComp, c: CompositionState, amount: numb
   comp.setFxInput(MASTER, vibe.id, 'chroma', clamp01(baseChroma * (1 - eff) + baseChroma * satFactor * eff))
 }
 
-// ── Shutter — stop-motion frame stepping ─────────────────────────────
+// ── Shutter — GLOBAL full-freeze stop-motion ─────────────────────────
+// This drives Compositor.setFreeze, which dead-holds the WHOLE presented frame
+// (incl. warp/xfade). It is deliberately DISTINCT from the Cameraless film-hold
+// (engine/cameraless.ts): that one is output-resample-only so upstream feedback
+// keeps integrating and you see it stepped, plus gate-weave/blank/materiality.
 let lastStep = -1
 let holding = false
 /** Returns whether THIS frame should hold (freeze) the last rendered frame.

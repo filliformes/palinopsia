@@ -33,6 +33,7 @@ import { TextSource } from './TextSource';
 import { ParametricSource } from './ParametricSource';
 import { DepthShadow } from './depthShadow';
 import { OutputShape } from './outputShape';
+import { Cameraless } from './cameraless';
 import { PbrLib } from './pbrTextures';
 import type { SidechainRef } from '@shared/types';
 import { VideoSource } from './VideoSource';
@@ -925,6 +926,17 @@ export class Compositor {
   private fzShadowAngle = -0.98; // direction the shape's shadow falls
   private fzPersp = 0; // perspective projection of the cast shadow
   private fzInstId: string | null = null; // the pinned finalizer's instance id
+
+  // Cameraless / direct-film stage (after outputShape, before xfade). Params live
+  // on the Finalizer (cf* ← film* inputs), applied natively like the fz* shaper.
+  private cameraless: Cameraless | null = null;
+  private cfHold = 0; // 0 off · 1 film-hold · 2 freeze
+  private cfRate = 8;
+  private cfJitter = 0.3;
+  private cfBoil = 0.35;
+  private cfFlutter = 0.2;
+  private cfBlank = 0;
+  private cfBlankMode = 0;
   private pbrLib: PbrLib | null = null; // Context PBR material maps (lazy)
   // Outside fill = the Background slab, only meaningful with a shape active.
   private get fzBgLayer(): boolean {
@@ -1263,6 +1275,14 @@ export class Compositor {
     this.fzDepth = numf(fi.outDepth, 0);
     this.fzShadowAngle = numf(fi.outShadowAngle, -0.98);
     this.fzPersp = numf(fi.outPerspective, 0);
+    // Cameraless / direct-film draw-hold (native, applied after the shaper).
+    this.cfHold = fin ? Math.round(numf(fi.filmHold, 0)) : 0;
+    this.cfRate = numf(fi.filmRate, 8);
+    this.cfJitter = numf(fi.filmJitter, 0.3);
+    this.cfBoil = numf(fi.filmBoil, 0.35);
+    this.cfFlutter = numf(fi.filmFlutter, 0.2);
+    this.cfBlank = numf(fi.filmBlank, 0);
+    this.cfBlankMode = Math.round(numf(fi.filmBlankMode, 0));
 
     // Context PBR surface: feed the selected material's maps (or the neutral
     // flat set) into the Context unit's image inputs every frame. Lazy — no
@@ -1300,6 +1320,13 @@ export class Compositor {
           case 'outDepth': this.fzDepth = value; break;
           case 'outShadowAngle': this.fzShadowAngle = value; break;
           case 'outPerspective': this.fzPersp = value; break;
+          case 'filmHold': this.cfHold = Math.round(value); break;
+          case 'filmRate': this.cfRate = value; break;
+          case 'filmJitter': this.cfJitter = value; break;
+          case 'filmBoil': this.cfBoil = value; break;
+          case 'filmFlutter': this.cfFlutter = value; break;
+          case 'filmBlank': this.cfBlank = value; break;
+          case 'filmBlankMode': this.cfBlankMode = Math.round(value); break;
         }
       }
       return;
@@ -1532,6 +1559,23 @@ export class Compositor {
       composite = this.mixTarget.tex;
     }
 
+    // Cameraless / direct-film stage: draw-clock hold + boil (§2.1 pipeline slot).
+    // Null when off (hold===0) or effectively smooth (draw ≥ present fps with no
+    // artifacts) — skipped entirely so it costs nothing and passes through clean.
+    if (this.cfHold > 0) {
+      const active =
+        this.cfRate < 58 || this.cfBoil > 0.001 || this.cfFlutter > 0.001 || this.cfBlank > 0.001;
+      if (active) {
+        if (!this.cameraless) this.cameraless = new Cameraless(gl);
+        composite = this.cameraless.apply(
+          composite, rawDt,
+          { hold: this.cfHold, rate: this.cfRate, jitter: this.cfJitter, boil: this.cfBoil,
+            flutter: this.cfFlutter, blank: this.cfBlank, blankMode: this.cfBlankMode },
+          this.w, this.h
+        );
+      }
+    }
+
     // Scene crossfade: dissolve the frozen old frame into the new composite.
     // The only way a STRUCTURAL morph (Randomize All swaps shaders) can read as
     // a transition — parameter easing can't cross a shader change.
@@ -1603,6 +1647,7 @@ export class Compositor {
     this.bgRack.dispose();
     this.depthShadow?.dispose();
     this.outputShape?.dispose();
+    this.cameraless?.dispose();
     this.pbrLib?.dispose();
     disposeTarget(gl, this.bgScratch);
     disposeTarget(gl, this.bgFill);

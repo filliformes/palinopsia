@@ -22,6 +22,13 @@
     { "NAME": "stereoDepth", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "3D relief" },
     { "NAME": "stereoConv",  "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "3D convergence" },
     { "NAME": "stereoInvert","TYPE": "bool",  "DEFAULT": false, "LABEL": "3D invert depth" },
+    { "NAME": "filmHold",   "TYPE": "long",  "VALUES": [0, 1, 2], "LABELS": ["off", "film-hold", "freeze"], "DEFAULT": 0, "LABEL": "film hold" },
+    { "NAME": "filmRate",   "TYPE": "float", "MIN": 1.0, "MAX": 60.0, "DEFAULT": 8.0, "LABEL": "film draw fps" },
+    { "NAME": "filmJitter", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "film timing" },
+    { "NAME": "filmBoil",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "film boil" },
+    { "NAME": "filmFlutter","TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2, "LABEL": "film flutter" },
+    { "NAME": "filmBlank",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "film blanks" },
+    { "NAME": "filmBlankMode","TYPE": "long","VALUES": [0, 1, 2], "LABELS": ["black", "white", "both"], "DEFAULT": 0, "LABEL": "blank leader" },
     { "NAME": "outShape", "TYPE": "long", "VALUES": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
       "LABELS": ["none","circle","square","rectangle","triangle","pentagon","hexagon","heptagon","octagon","diamond","star 5","star 6","ellipse","rounded","cross","ring","half-circle","heart","crescent","trapezoid","capsule"],
       "DEFAULT": 0, "LABEL": "out shape" },
@@ -36,10 +43,11 @@
     { "NAME": "outPerspective", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "perspective" }
   ]
 }*/
-// NOTE: outShape / outBg* are applied NATIVELY as the compositor's final output
-// stage (engine/outputShape.ts) — they need the Background-slab texture as the
-// outside fill, which ISF can't reach. Declared here only so the auto-UI shows
-// them in the Finalizer; this shader ignores them.
+// NOTE: outShape / outBg* AND film* are applied NATIVELY as compositor output
+// stages (engine/outputShape.ts, engine/cameraless.ts) — outShape needs the
+// Background-slab texture as the outside fill, and film* needs frame-hold state +
+// a fixed pipeline slot, neither reachable from ISF. Declared here only so the
+// auto-UI shows them in the Finalizer; this shader ignores them.
 
 float hash21(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
