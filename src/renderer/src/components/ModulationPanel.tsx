@@ -88,6 +88,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
           className="input select-compact min-w-0 flex-1 text-[10px]"
           value={m.type}
           onChange={(e) => update(index, { type: e.target.value as ModulatorType })}
+          title="The modulator's shape — what kind of moving signal this slot produces (LFO waves, ramp, ADSR envelope, arpeggio, random, sample&hold, slew, chaos, audio-follower, organic, physics, motion). Bind it to parameters with their M button."
         >
           {MOD_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -125,6 +126,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
               className="input select-compact min-w-0 flex-1 text-[10px]"
               value={m.divisionIdx}
               onChange={(e) => update(index, { divisionIdx: Number(e.target.value) })}
+              title="Note division — the modulator's rate as a fraction of the beat (locked to BPM)."
             >
               {DIVISIONS.map((d, i) => (
                 <option key={d.label} value={i}>
@@ -202,6 +204,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
           <select
             className="input select-compact min-w-0 flex-1 text-[10px]"
             value={m.shape}
+              title="LFO waveform — the shape of the repeating wave."
             onChange={(e) => update(index, { shape: e.target.value as LfoShape })}
           >
             {LFO_SHAPES.map((s) => (
@@ -223,6 +226,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             <select
               className="input select-compact min-w-0 flex-1 text-[10px]"
               value={m.ramp.mode}
+              title="Ramp direction — normal (rise once), inverted (fall once), or loop (repeat)."
               onChange={(e) =>
                 update(index, { ramp: { ...m.ramp, mode: e.target.value as 'normal' | 'inverted' | 'loop' } })
               }
@@ -283,6 +287,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             <select
               className="input select-compact min-w-0 flex-1 text-[10px]"
               value={m.arp.mode}
+              title="Step order — how the arpeggiator walks its steps (up / down / up-down / random / drunk)."
               onChange={(e) => update(index, { arp: { ...m.arp, mode: e.target.value as ArpMode } })}
             >
               {ARP_MODES.map((a) => (
@@ -308,6 +313,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             title="Chance a clock draws a fresh sample — below 1 locks patterns"
             onChange={(v) => update(index, { sh: { ...m.sh, probability: v } })} />
           <SliderRow label="DIST" value={m.sh.distribution} min={0} max={1}
+            title="Distribution — 0.5 = uniform random · <0.5 favours the extremes · >0.5 hugs the centre"
             onChange={(v) => update(index, { sh: { ...m.sh, distribution: v } })} />
         </>
       )
@@ -335,6 +341,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             <select
               className="input select-compact min-w-0 flex-1 text-[10px]"
               value={a.feature}
+              title="Which audio feature this modulator follows (level, flux, transient, centroid, band, pitch)."
               onChange={(e) => update(index, { audio: { ...a, feature: e.target.value as AudioFeature } })}
             >
               {AUDIO_FEATURES.map((f) => (
@@ -370,6 +377,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             <select
               className="input select-compact min-w-0 flex-1 text-[10px]"
               value={p.motion}
+              title="Physics model — bounce (a ball), spring (damped oscillation), or riser (accelerating ramp)."
               onChange={(e) => update(index, { physics: { ...p, motion: e.target.value as PhysicsMotion } })}
             >
               {PHYSICS_MOTIONS.map((mo) => (

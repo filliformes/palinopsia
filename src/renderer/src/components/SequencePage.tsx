@@ -18,6 +18,19 @@ import {
 } from '../engine/sequencer'
 
 const SYNCHRESIS: CouplingMode[] = ['lean', 'hocket', 'cut', 'gate', 'drift']
+const SYNCHRESIS_INFO: Record<string, string> = {
+  lean: 'lean — audio gently pushes the A/B balance toward B (continuous)',
+  hocket: 'hocket — audio flips the balance A↔B (percussive, alternating)',
+  cut: 'cut — a transient flashes to B, then releases (on-beat, punchy)',
+  gate: 'gate — B while loud, A while quiet (a threshold)',
+  drift: 'drift — slow momentum follow, sharing direction not shape'
+}
+const CLIMATE_INFO: Record<SceneClimate, string> = {
+  tension: 'tension — unresolved, building',
+  expectation: 'expectation — anticipating a change',
+  release: 'release — easing off / neutral',
+  resolution: 'resolution — arrival, settled'
+}
 const CLIMATE_COLOR: Record<SceneClimate, string> = {
   tension: '#e0564a',
   expectation: '#e0a24a',
@@ -165,7 +178,9 @@ export function SequencePage({
               <span className="font-mono text-[9px] uppercase tracking-wide text-muted">
                 tags · {selScene.name}
               </span>
-              <Field label="Diégèse (world)">
+              <Field label="Diégèse (world)"
+                title="Which 'world' this scene belongs to — its overall coupling character + Context mood. The sequencer prefers to stay within a world and treats world changes as bigger moments.">
+
                 <select
                   className="input select-compact w-full text-[11px]"
                   value={selScene.tags.world}
@@ -178,7 +193,9 @@ export function SequencePage({
                   ))}
                 </select>
               </Field>
-              <Field label="Synchrèse (coupling)">
+              <Field label="Synchrèse (coupling)"
+                title="How this scene's two voices (A/B) relate in time — tap the coupling characters that describe it. 'auto' transitions cut instead of morphing when the destination is percussive (cut/hocket).">
+
                 <div className="flex flex-wrap gap-1">
                   {SYNCHRESIS.map((m) => {
                     const on = selScene.tags!.synchresis.includes(m)
@@ -191,6 +208,7 @@ export function SequencePage({
                             synchresis: on ? cur.filter((x) => x !== m) : [...cur, m]
                           })
                         }}
+                        title={SYNCHRESIS_INFO[m] ?? m}
                         className={`rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
                           on ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted hover:text-text'
                         }`}
@@ -201,7 +219,9 @@ export function SequencePage({
                   })}
                 </div>
               </Field>
-              <Field label={`Espace-temps · ${selScene.tags.spaceTime < 0.4 ? 'full' : selScene.tags.spaceTime > 0.6 ? 'void' : 'neutral'}`}>
+              <Field label={`Espace-temps · ${selScene.tags.spaceTime < 0.4 ? 'full' : selScene.tags.spaceTime > 0.6 ? 'void' : 'neutral'}`}
+                title="How full or empty the scene feels: 0 = dense / full frame · 1 = sparse / void. The Breathe macro oscillates around this, and Selection prefers small steps between neighbouring scenes.">
+
                 <input
                   type="range"
                   min={0}
@@ -213,7 +233,9 @@ export function SequencePage({
                   title="0 = dense / full · 1 = sparse / void"
                 />
               </Field>
-              <Field label="Climat">
+              <Field label="Climat"
+                title="The emotional charge of the scene (tension / expectation / release / resolution). The Climate arc uses these to shape which scenes it reaches for as it builds and releases.">
+
                 <div className="flex flex-wrap gap-1">
                   {SCENE_CLIMATES.map((c) => {
                     const on = selScene.tags!.climate === c
@@ -221,6 +243,7 @@ export function SequencePage({
                       <button
                         key={c}
                         onClick={() => setSceneTags(selScene.id, { climate: c })}
+                        title={CLIMATE_INFO[c]}
                         className={`rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
                           on ? 'text-black' : 'bg-panel2 text-muted hover:text-text'
                         }`}
@@ -242,17 +265,20 @@ export function SequencePage({
         {/* Transport + macro-form — crammed to fit without scrolling. */}
         <aside className="flex w-80 shrink-0 flex-col gap-2 overflow-y-auto border-l border-border bg-panel px-3 py-2">
           <Section title="Transport">
-            <Row label={`dwell · ${seq.dwell.toFixed(0)}s`}>
+            <Row label={`dwell · ${seq.dwell.toFixed(0)}s`}
+              title="How long each scene is held before the sequencer moves on (seconds).">
               <input type="range" min={2} max={60} step={1} value={seq.dwell}
                 onChange={(e) => setSequence({ dwell: Number(e.target.value) })}
                 className="w-full accent-accent" />
             </Row>
-            <Row label={`humanise · ${Math.round(seq.dwellJitter * 100)}%`}>
+            <Row label={`humanise · ${Math.round(seq.dwellJitter * 100)}%`}
+              title="Randomly varies each dwell time by up to this much, so the pacing never feels metronomic.">
               <input type="range" min={0} max={1} step={0.01} value={seq.dwellJitter}
                 onChange={(e) => setSequence({ dwellJitter: Number(e.target.value) })}
                 className="w-full accent-accent" />
             </Row>
-            <Row label="transition">
+            <Row label="transition"
+              title="How one scene becomes the next: morph = crossfade · cut = instant · auto = cut when the destination's Synchrèse is percussive, else morph.">
               <select className="input select-compact w-full text-[11px]" value={seq.transition}
                 onChange={(e) => setSequence({ transition: e.target.value as typeof seq.transition })}>
                 <option value="morph">morph (crossfade)</option>
@@ -261,7 +287,8 @@ export function SequencePage({
               </select>
             </Row>
             {seq.transition !== 'cut' && (
-              <Row label={`crossfade · ${(seq.crossfadeMs / 1000).toFixed(1)}s`}>
+              <Row label={`crossfade · ${(seq.crossfadeMs / 1000).toFixed(1)}s`}
+                title="Duration of the morph dissolve between scenes.">
                 <input type="range" min={0} max={8000} step={100} value={seq.crossfadeMs}
                   onChange={(e) => setSequence({ crossfadeMs: Number(e.target.value) })}
                   className="w-full accent-accent" />
@@ -280,7 +307,8 @@ export function SequencePage({
           </Section>
 
           <Section title="Selection">
-            <Row label="mode">
+            <Row label="mode"
+              title="How the next scene is chosen: weighted = wander guided by the scene tags (world continuity + a gentle Espace-temps step) · arc = also shaped by the Climate arc · shuffle = flat random.">
               <select className="input select-compact w-full text-[11px]" value={seq.mode}
                 onChange={(e) => setSequence({ mode: e.target.value as typeof seq.mode })}>
                 <option value="weighted">weighted (tag-guided wander)</option>
@@ -288,26 +316,29 @@ export function SequencePage({
                 <option value="shuffle">shuffle (flat random)</option>
               </select>
             </Row>
-            <Row label={`no-repeat · last ${seq.noRepeat}`}>
+            <Row label={`no-repeat · last ${seq.noRepeat}`}
+              title="Won't return to any of the last N scenes it played — keeps the set from cycling on a few favourites.">
               <input type="range" min={0} max={8} step={1} value={seq.noRepeat}
                 onChange={(e) => setSequence({ noRepeat: Number(e.target.value) })}
                 className="w-full accent-accent" />
             </Row>
-            <Row label={`variation · ${Math.round(seq.variation * 100)}%`}>
+            <Row label={`variation · ${Math.round(seq.variation * 100)}%`}
+              title="A small random tweak applied to each scene as it's recalled, so a long run never loops verbatim (0 = play scenes exactly).">
               <input type="range" min={0} max={0.6} step={0.01} value={seq.variation}
                 onChange={(e) => setSequence({ variation: Number(e.target.value) })}
-                className="w-full accent-accent"
-                title="Per-recall jitter so a long set never loops verbatim" />
+                className="w-full accent-accent" />
             </Row>
           </Section>
 
           <Section title="Breathe (Espace-temps)">
-            <Row label={`amount · ${Math.round(seq.breathe.amount * 100)}%`}>
+            <Row label={`amount · ${Math.round(seq.breathe.amount * 100)}%`}
+              title="A slow swing of the whole composition toward dense↔void (Context haze / depth / blur), centred on each scene's Espace-temps tag. 0 = off.">
               <input type="range" min={0} max={1} step={0.01} value={seq.breathe.amount}
                 onChange={(e) => setSequence({ breathe: { ...seq.breathe, amount: Number(e.target.value) } })}
                 className="w-full accent-accent2" />
             </Row>
-            <Row label={`period · ${seq.breathe.periodSec.toFixed(0)}s`}>
+            <Row label={`period · ${seq.breathe.periodSec.toFixed(0)}s`}
+              title="How long one full breathe cycle (full → void → full) takes.">
               <input type="range" min={4} max={120} step={1} value={seq.breathe.periodSec}
                 onChange={(e) => setSequence({ breathe: { ...seq.breathe, periodSec: Number(e.target.value) } })}
                 className="w-full accent-accent2" />
@@ -315,13 +346,15 @@ export function SequencePage({
           </Section>
 
           <Section title="Climate arc">
-            <label className="flex items-center gap-2 text-[11px] text-muted">
+            <label className="flex items-center gap-2 text-[11px] text-muted"
+              title="A slow build-and-release shape (calm → intense → calm) that biases which scenes are chosen and lifts the visuals at its peak.">
               <input type="checkbox" checked={seq.arc.enabled}
                 onChange={(e) => setSequence({ arc: { ...seq.arc, enabled: e.target.checked } })} />
               enable Repose–Disturbance–Repose
             </label>
             {seq.arc.enabled && (
-              <Row label={`length · ${seq.arc.lengthSec.toFixed(0)}s`}>
+              <Row label={`length · ${seq.arc.lengthSec.toFixed(0)}s`}
+                title="Duration of one full climate arc (calm → intense → calm).">
                 <input type="range" min={20} max={600} step={5} value={seq.arc.lengthSec}
                   onChange={(e) => setSequence({ arc: { ...seq.arc, lengthSec: Number(e.target.value) } })}
                   className="w-full accent-accent2" />
@@ -350,12 +383,14 @@ export function SequencePage({
                 title="Chance a transition drops one medium as a tension marker" />
             </Row>
             {seq.monomediaChance > 0 && (
-              <Row label="monomedia style">
+              <Row label="monomedia style"
+                title="What the drop looks like: fade to black dims the picture out and back; freeze frame holds the last frame still. Either way the audio keeps playing underneath.">
                 <div className="flex gap-1">
                   {(['black', 'freeze'] as const).map((st) => (
                     <button
                       key={st}
                       onClick={() => setSequence({ monomediaStyle: st })}
+                      title={st === 'black' ? 'Dim the picture to black at the transition, then back' : 'Hold the last frame frozen at the transition, then resume'}
                       className={`flex-1 rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
                         seq.monomediaStyle === st
                           ? 'bg-accent/20 text-accent ring-1 ring-accent'
@@ -454,17 +489,17 @@ function Section({ title, children }: { title: string; children: ReactNode }): J
     </div>
   )
 }
-function Row({ label, children }: { label: string; children: ReactNode }): JSX.Element {
+function Row({ label, title, children }: { label: string; title?: string; children: ReactNode }): JSX.Element {
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col" title={title}>
       <span className="font-mono text-[10px] leading-tight text-muted">{label}</span>
       {children}
     </div>
   )
 }
-function Field({ label, children }: { label: string; children: ReactNode }): JSX.Element {
+function Field({ label, title, children }: { label: string; title?: string; children: ReactNode }): JSX.Element {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1" title={title}>
       <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{label}</span>
       {children}
     </div>
