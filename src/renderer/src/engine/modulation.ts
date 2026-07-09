@@ -516,6 +516,38 @@ export class ModEngine {
           }
           break
         }
+        case 'motion': {
+          // Named motion archetypes (Smalley) + force behaviours (Boucher) —
+          // each a characteristic scalar trajectory over one clocked cycle.
+          s.phase += hz * dt
+          const p = s.phase - Math.floor(s.phase) // [0,1) cycle position
+          const shape = cfg.motion?.shape ?? 'oscillation'
+          switch (shape) {
+            case 'ascent': v01 = p * p; break // accelerating rise
+            case 'descent': v01 = (1 - p) * (1 - p); break // decelerating fall
+            case 'oscillation': v01 = 0.5 - 0.5 * Math.cos(TWO_PI * p); break
+            case 'rotation': v01 = p; break // continuous wrap (angle)
+            case 'dilation': v01 = 1 - (1 - p) * (1 - p); break // ease-out expand
+            case 'contraction': v01 = 1 - Math.sqrt(p); break // quick pull-in
+            case 'convergence': v01 = 0.5 + 0.5 * Math.cos(TWO_PI * 3 * p) * (1 - p); break // damped → centre
+            case 'divergence': v01 = 0.5 + 0.5 * Math.sin(TWO_PI * 3 * p) * p; break // grows from centre
+            case 'gravity': {
+              // Bouncing fall: a parabola per cycle, energy bleeding across it.
+              const b = Math.abs(Math.sin(Math.PI * p * 2.0))
+              v01 = 1 - b * (0.4 + 0.6 * (1 - p))
+              break
+            }
+            case 'wind': {
+              // Gusty drift — summed incommensurate sines, never quite repeating.
+              const td = now * 0.001
+              v01 = 0.5 + 0.28 * Math.sin(TWO_PI * p) + 0.14 * Math.sin(td * 1.7 + 1.0) + 0.08 * Math.sin(td * 0.53)
+              break
+            }
+            case 'attract': v01 = 1 - Math.pow(1 - p, 3); break // ease toward a pole, hold
+            case 'drag': v01 = Math.exp(-3.2 * p); break // launch then decay to rest
+          }
+          break
+        }
       }
 
       this.values[i] = shapeCurve(Math.max(0, Math.min(1, v01)), cfg.curve)
@@ -556,7 +588,8 @@ export function makeDefaultModulator(): ModulatorConfig {
     chaos: { r: 3.8 },
     audio: { feature: 'level', band: 0, smooth: 0.2 },
     organic: { variation: 0.5 },
-    physics: { motion: 'bounce', damping: 0.5 }
+    physics: { motion: 'bounce', damping: 0.5 },
+    motion: { shape: 'oscillation' }
   }
 }
 

@@ -208,12 +208,34 @@ export type ModulatorType =
   | 'audio'
   | 'organic'
   | 'physics'
+  | 'motion'
 
 // Which audio feature an `audio` modulator follows (bus in engine/audioIn.ts).
 export type AudioFeature = 'level' | 'flux' | 'transient' | 'centroid' | 'band' | 'pitch'
 
 // Force-driven motion for the `physics` modulator.
 export type PhysicsMotion = 'bounce' | 'spring' | 'riser'
+
+// Named motion archetypes (Smalley via Pedersen Ch7) + force behaviours
+// (Boucher D#1) for the `motion` modulator — each a characteristic scalar
+// trajectory, clocked like an LFO.
+export type MotionShape =
+  | 'ascent'
+  | 'descent'
+  | 'oscillation'
+  | 'rotation'
+  | 'dilation'
+  | 'contraction'
+  | 'convergence'
+  | 'divergence'
+  | 'gravity'
+  | 'wind'
+  | 'attract'
+  | 'drag'
+export const MOTION_SHAPES: MotionShape[] = [
+  'ascent', 'descent', 'oscillation', 'rotation', 'dilation', 'contraction',
+  'convergence', 'divergence', 'gravity', 'wind', 'attract', 'drag'
+]
 
 export type LfoShape =
   | 'sine'
@@ -274,6 +296,7 @@ export interface ModulatorConfig {
   audio: { feature: AudioFeature; band: number; smooth: number } // follows the audio bus
   organic: { variation: number } // 0 = near-LFO, 1 = very irregular (never repeats)
   physics: { motion: PhysicsMotion; damping: number } // force-driven motion
+  motion: { shape: MotionShape } // named motion archetype / force behaviour
 }
 
 // What an assignment modulates: float ISF inputs, or a Meta knob (the

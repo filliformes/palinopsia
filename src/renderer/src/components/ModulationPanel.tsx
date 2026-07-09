@@ -5,15 +5,15 @@
 // modulation never re-renders React at 60 Hz.
 
 import { useEffect, useRef, type ReactNode } from 'react'
-import type { ArpMode, AudioFeature, LfoShape, ModulatorType, PhysicsMotion } from '@shared/types'
-import { MAX_MOD_ASSIGNMENTS, WORLD_AUTOMOD_SLOT } from '@shared/types'
+import type { ArpMode, AudioFeature, LfoShape, ModulatorType, MotionShape, PhysicsMotion } from '@shared/types'
+import { MAX_MOD_ASSIGNMENTS, MOTION_SHAPES, WORLD_AUTOMOD_SLOT } from '@shared/types'
 import { DIVISIONS, modEngine } from '../engine/modulation'
 import { AUDIO_BANDS, AUDIO_FEATURES } from '../engine/audioIn'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { modTargetKey, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 
-const MOD_TYPES: ModulatorType[] = ['lfo', 'ramp', 'adsr', 'arp', 'random', 'sh', 'slew', 'chaos', 'audio', 'organic', 'physics']
+const MOD_TYPES: ModulatorType[] = ['lfo', 'ramp', 'adsr', 'arp', 'random', 'sh', 'slew', 'chaos', 'audio', 'organic', 'physics', 'motion']
 const LFO_SHAPES: LfoShape[] = ['sine', 'triangle', 'square', 'sawtooth', 'rndStep', 'rndSmooth', 'spastic']
 const ARP_MODES: ArpMode[] = ['up', 'down', 'upDown', 'random', 'drunk']
 const PHYSICS_MOTIONS: PhysicsMotion[] = ['bounce', 'spring', 'riser']
@@ -383,6 +383,25 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             title="Damping — bounce restitution / spring settle"
             onChange={(v) => update(index, { physics: { ...p, damping: v } })} />
         </>
+      )
+    }
+    case 'motion': {
+      const mt = m.motion ?? { shape: 'oscillation' as MotionShape }
+      return (
+        <Row label="SHAPE">
+          <select
+            className="input select-compact min-w-0 flex-1 text-[10px]"
+            value={mt.shape}
+            onChange={(e) => update(index, { motion: { shape: e.target.value as MotionShape } })}
+            title="Named motion archetype (Smalley) / force behaviour (Boucher) — a characteristic trajectory"
+          >
+            {MOTION_SHAPES.map((sh) => (
+              <option key={sh} value={sh}>
+                {sh}
+              </option>
+            ))}
+          </select>
+        </Row>
       )
     }
     default:
