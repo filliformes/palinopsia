@@ -643,6 +643,18 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Sparse dye', values: { rate: 0.5, scale: 6.5, warp: 0.4, pool: 0.25, density: 0.35, grain: 0.5, pigment: [0.4, 0.12, 0.1, 1] } },
     { name: 'Dense pool', values: { rate: 0.2, scale: 3, warp: 0.7, pool: 0.9, density: 0.8, grain: 0.3, pigment: [0.2, 0.28, 0.36, 1] } }
   ],
+  reaction: [
+    { name: 'Mitosis', values: { feed: 0.0367, kill: 0.0649, rate: 1.0, scale: 0.4, seed: 0.3, sharp: 0.5, tint: [0.78, 0.8, 0.74, 1] } },
+    { name: 'Coral', values: { feed: 0.0545, kill: 0.062, rate: 1.0, scale: 0.35, seed: 0.25, sharp: 0.6, tint: [0.82, 0.7, 0.55, 1] } },
+    { name: 'Labyrinth', values: { feed: 0.029, kill: 0.057, rate: 1.0, scale: 0.5, seed: 0.2, sharp: 0.5, tint: [0.7, 0.75, 0.8, 1] } },
+    { name: 'Spots', values: { feed: 0.03, kill: 0.062, rate: 0.9, scale: 0.45, seed: 0.3, sharp: 0.75, tint: [0.8, 0.8, 0.78, 1] } },
+    { name: 'Fingerprints', values: { feed: 0.037, kill: 0.06, rate: 1.0, scale: 0.4, seed: 0.25, sharp: 0.55, tint: [0.76, 0.78, 0.72, 1] } },
+    { name: 'Holes', values: { feed: 0.039, kill: 0.058, rate: 1.0, scale: 0.5, seed: 0.3, sharp: 0.5, tint: [0.72, 0.76, 0.78, 1] } },
+    { name: 'Worms', values: { feed: 0.054, kill: 0.063, rate: 1.1, scale: 0.3, seed: 0.2, sharp: 0.6, tint: [0.8, 0.74, 0.6, 1] } },
+    { name: 'Chaos', values: { feed: 0.026, kill: 0.051, rate: 1.1, scale: 0.55, seed: 0.4, sharp: 0.4, tint: [0.66, 0.72, 0.82, 1] } },
+    { name: 'Fine cells', values: { feed: 0.034, kill: 0.063, rate: 1.0, scale: 0.15, seed: 0.3, sharp: 0.75, tint: [0.8, 0.8, 0.76, 1] } },
+    { name: 'Slow drift', values: { feed: 0.03, kill: 0.06, rate: 0.6, scale: 0.7, seed: 0.25, sharp: 0.45, tint: [0.74, 0.77, 0.73, 1] } }
+  ],
   differential: [
     { name: 'Octaves', values: { count: 4, ratio: 2, rate: 0.4, freq: 3, thickness: 0.12, lines: 6, skew: 0.35, angle: 0.4 } },
     { name: 'Triads', values: { count: 3, ratio: 1.5, rate: 0.3, freq: 4, thickness: 0.1, lines: 5, skew: 0.5, angle: 0.8 } },

@@ -33,6 +33,7 @@ import shapes from './Shapes.fs?raw'
 import opArt from './OpArt.fs?raw'
 import directMarks from './DirectMarks.fs?raw'
 import dyeField from './DyeField.fs?raw'
+import reaction from './Reaction.fs?raw'
 import syncOsc from './SyncOsc.fs?raw'
 import differential from './Differential.fs?raw'
 import solidColor from './SolidColor.fs?raw'
@@ -454,6 +455,13 @@ export const GENERATORS: IsfShader[] = [
     category: 'Generator',
     source: dyeField,
     curated: { rate: [0.15, 1.5], scale: [2.5, 7], warp: [0.3, 0.9], pool: [0.2, 0.8], density: [0.35, 0.8], grain: [0.15, 0.6] }
+  },
+  {
+    id: 'reaction',
+    name: 'Reaction',
+    category: 'Generator',
+    source: reaction,
+    curated: { feed: [0.02, 0.06], kill: [0.045, 0.065], rate: [0.6, 1.2], scale: [0.2, 0.8], seed: [0.15, 0.6], sharp: [0.2, 0.8] }
   },
   {
     id: 'sync-osc',
