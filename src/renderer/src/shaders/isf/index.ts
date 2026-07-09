@@ -72,6 +72,7 @@ import rowEcho from './fx/RowEcho.fs?raw'
 import byteCorrupt from './fx/ByteCorrupt.fs?raw'
 import ringing from './fx/Ringing.fs?raw'
 import tracking from './fx/Tracking.fs?raw'
+import motif from './fx/Motif.fs?raw'
 import decay from './fx/Decay.fs?raw'
 import abstraction from './fx/Abstraction.fs?raw'
 import feedbackZoom from './fx/FeedbackZoom.fs?raw'
@@ -547,6 +548,13 @@ export const FX_SHADERS: IsfShader[] = [
       band: [0.05, 0.25], position: [0, 1], roll: [0, 0.6], wobble: [0.01, 0.1],
       noise: [0.2, 0.8], rate: [0.2, 0.8], freeze: [0, 0.6], distort: [0, 0.4],
       bleed: [0, 0.5], bleedRange: [0.4, 1.4]
+    }
+  },
+  {
+    id: 'fx-motif', name: 'Motif', category: 'FX', source: motif,
+    curated: {
+      offX: [-0.3, 0.3], offY: [-0.25, 0.25], rotate: [-1.2, 1.2],
+      scale: [0.75, 1.15], fade: [0.4, 0.8]
     }
   },
   {
