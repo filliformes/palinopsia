@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Difference Bloom : frame-difference motion key (Signal Culture Maelstrom lineage): only what MOVED between frames survives, spread softly outward. Still areas fall to near-black; motion reads as matte contour light. `keep` fades the source back in behind the motion.",
+  "DESCRIPTION": "Difference Bloom : frame-difference motion key (a video-feedback lineage): only what MOVED between frames survives, spread softly outward. Still areas fall to near-black; motion reads as matte contour light. `keep` fades the source back in behind the motion.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],

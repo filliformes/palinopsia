@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Sync Osc : Lumen's signature oscillator: one waveform that MORPHS continuously (saw→triangle→sine on the shape knob), and a SYNC control that morphs the lines from freely scrolling → frozen-horizontal → frozen-vertical. Colorized between two tints by level. The most playable video-synth source : matte.",
+  "DESCRIPTION": "Sync Osc : a morphing video-synth oscillator: one waveform that MORPHS continuously (saw→triangle→sine on the shape knob), and a SYNC control that morphs the lines from freely scrolling → frozen-horizontal → frozen-vertical. Colorized between two tints by level. The most playable video-synth source : matte.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Scan"],
@@ -31,7 +31,7 @@ void main() {
   vec2 p = vec2(c.x * cs - c.y * sn, c.x * sn + c.y * cs) + 0.5;
   float t = TIME * rate;
 
-  // Sync (Lumen): as it rises the orientation rotates horizontal→vertical
+  // Sync: as it rises the orientation rotates horizontal→vertical
   // AND the motion slows to a freeze : unsynced moves, fully synced is still.
   float axis = mix(p.y, p.x, sync);
   float motion = t * (1.0 - sync) * 3.0; // rate clearly drives the scroll

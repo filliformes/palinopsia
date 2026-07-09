@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Slit Buffer : time-smear of the input: a write head sweeps across the frame, freezing the live image into the persistent buffer as it passes, so columns behind the head hold older moments. A real slit-scan of whatever feeds the layer (Signal Culture SSSScan / PXLMSH register). Direction sets the sweep (normal / inverted / pendulum ping-pong); Jitter breaks the seam into a ragged edge; Jumps teleports the whole playhead to random spots before/after its swept position.",
+  "DESCRIPTION": "Slit Buffer : time-smear of the input: a write head sweeps across the frame, freezing the live image into the persistent buffer as it passes, so columns behind the head hold older moments. A real slit-scan of whatever feeds the layer (the slit-scan register). Direction sets the sweep (normal / inverted / pendulum ping-pong); Jitter breaks the seam into a ragged edge; Jumps teleports the whole playhead to random spots before/after its swept position.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch", "Scan"],

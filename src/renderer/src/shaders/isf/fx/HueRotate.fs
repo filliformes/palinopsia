@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Hue Rotate : Lumen's Hue Mod as a primitive: rotate the image's hue by an amount, optionally weighted by luminance (shift more in the lights, or the darks). The missing colour primitive : beautiful under a slow LFO (the whole picture cycling colour). Preserves saturation and value.",
+  "DESCRIPTION": "Hue Rotate : a hue-rotation primitive: rotate the image's hue by an amount, optionally weighted by luminance (shift more in the lights, or the darks). The missing colour primitive : beautiful under a slow LFO (the whole picture cycling colour). Preserves saturation and value.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color"],

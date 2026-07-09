@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Finalizer : the last always-on master stage after Context: a final 'EQ/compressor' for the whole output. LEVELS (input black/white + gamma + per-channel R/G/B gain + alpha, Premiere-style) for the finishing grade, a round of SHARPEN, and the physically-modelled GRAIN (film / digital sensor / CRT / VHS) laid over everything so the whole image shares one grain structure. All neutral at defaults.",
+  "DESCRIPTION": "Finalizer : the last always-on master stage after Context: a final 'EQ/compressor' for the whole output. LEVELS (input black/white + gamma + per-channel R/G/B gain + alpha, video-editor-style) for the finishing grade, a round of SHARPEN, and the physically-modelled GRAIN (film / digital sensor / CRT / VHS) laid over everything so the whole image shares one grain structure. All neutral at defaults.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color", "Master"],

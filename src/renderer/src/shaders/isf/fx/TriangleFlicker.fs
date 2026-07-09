@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Triangle Flicker : triangle-wave rhythmic flicker (Signal Culture Re:Struktr): brightness pulses on a triangle LFO, with an optional hard on/off strobe and a channel-shuffle on the beat. Clock it against the tempo for a rhythmic strobe/transition. Multiplicative : matte, never additive.",
+  "DESCRIPTION": "Triangle Flicker : triangle-wave rhythmic flicker: brightness pulses on a triangle LFO, with an optional hard on/off strobe and a channel-shuffle on the beat. Clock it against the tempo for a rhythmic strobe/transition. Multiplicative : matte, never additive.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],

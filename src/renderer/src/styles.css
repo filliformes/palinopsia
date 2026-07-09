@@ -142,7 +142,7 @@
   --input-inset: inset 0 1px 0 rgb(6 6 6 / 0.9);
 }
 
-/* Cream : repainted to match Rainbow Circuit's "Peaks" plugin: warm
+/* Cream : repainted to match a warm ochre plugin palette: warm
    cream paper with mustard-ochre accents and a desaturated warm-grey
    inverted card for readouts. Rich theme : opts into bespoke arc
    sliders, icon-row mode pickers, card-wrap sections, and console
@@ -164,18 +164,18 @@
   --font-app: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
   --input-inset: inset 0 1px 2px rgb(0 0 0 / 0.05);
   /* Rich-theme tonal-spectrum endpoints : drive the gradient on
-     bespoke arc sliders + step bars. Peaks-style: a single ochre
+     bespoke arc sliders + step bars. arc-slider style: a single ochre
      family from light cream-yellow to deeper amber. */
   --c-rich-warm: 232 196 110;
   --c-rich-cool: 184 132 52;
-  /* Inverted readout panel : the dark-grey card Peaks tucks beneath
+  /* Inverted readout panel : the dark-grey card the card tucks beneath
      its main panel for metric readouts. */
   --c-rich-card-bg: 84 80 76;
   --c-rich-card-text: 232 226 212;
   --c-rich-card-muted: 156 150 138;
 }
 
-/* Nature : repainted to match Rainbow Circuit's "Hopscotch" plugin:
+/* Nature : repainted to match a nature-toned plugin palette:
    dark warm grey background with a tonal yellow-olive → teal-green
    gradient for active values and warm orange for accents/locks. Rich
    theme. */
@@ -319,8 +319,8 @@
   --font-app: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-/* Hydra : desaturated blue-greys with a bright cyan accent. */
-[data-theme='hydra'] {
+/* Circuit : desaturated blue-greys with a bright cyan accent. */
+[data-theme='circuit'] {
   --c-bg: 26 37 48;
   --c-panel: 37 51 64;
   --c-panel2: 51 67 80;
@@ -427,7 +427,7 @@ body {
   -webkit-user-select: none;
   user-select: none;
   /* Enable Inter's single-storey 'a' (ss01) and cv11 alt glyphs for a more
-     Ableton-Sans-ish feel. Other fonts silently ignore features they don't
+     a clean geometric-sans feel. Other fonts silently ignore features they don't
      ship. We deliberately do NOT set letter-spacing here : Inter's intrinsic
      metrics plus any extra tracking push the top-bar wide enough that the
      rightmost buttons (Stop All / Panic) clipped off-screen. */
@@ -1125,7 +1125,7 @@ input[type='range'].live-overlay {
 
 /* ─────────────────────────────────────────────────────────────────
    Rich-theme styling. Activated by ThemeName ∈ RICH_THEMES (Nature,
-   Cream-as-Peaks). Components opt in by reading `isRichTheme()` from
+   the rich themes). Components opt in by reading `isRichTheme()` from
    the store and either rendering bespoke variants of their controls
    or applying these classes. Other themes are unaffected.
    ──────────────────────────────────────────────────────────────── */

@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Congeal : a self-referential feedback field (Signal Culture Maelstrom/Frame-Buffer lineage): sparse bright seeds are injected, then the persistent buffer resamples a domain-warped, decayed copy of itself each frame, so material congeals into slow drifting masses and dissolves. Matte, near-black, disciplined decay (brief §1).",
+  "DESCRIPTION": "Congeal : a self-referential feedback field (a video-feedback / frame-buffer lineage): sparse bright seeds are injected, then the persistent buffer resamples a domain-warped, decayed copy of itself each frame, so material congeals into slow drifting masses and dissolves. Matte, near-black, disciplined decay (brief §1).",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Feedback"],

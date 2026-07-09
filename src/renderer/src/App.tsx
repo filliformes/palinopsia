@@ -481,7 +481,7 @@ export default function App(): JSX.Element {
           })
         }
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to
-        //    HIVE receivers (OBS plugin, Resolume …). Frame-drops if backed up.
+        //    HIVE receivers (compatible receivers …). Frame-drops if backed up.
         if (st.hiveOutActive) hiveEncoder.encode(canvas, now * 1000)
         tickFrame(now) // feed the Output HUD's FPS meter
       } catch (e) {

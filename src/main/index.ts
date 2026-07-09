@@ -132,7 +132,7 @@ function createWindow(): void {
 // control canvas over a WebRTC loopback (hardware-encoded, no second render
 // pipeline, no double camera access). Main just relays signals. Two modes:
 //   fullscreen → borderless, fills the chosen display (projector)
-//   windowed   → a normal 16:9 window (easy to Window-Capture in OBS/Resolume)
+//   windowed   → a normal 16:9 window (easy to Window-Capture in a streaming/VJ app)
 let outputWindow: BrowserWindow | null = null
 
 function openOutputWindow(displayId: number, windowed = false): void {

@@ -129,7 +129,7 @@ void main(){
   vec4 B = texture(b, uv);
   B.rgb = clamp(hueRot(B.rgb, bHue), 0.0, 1.0);
   if(mode==15){
-    // WEAVE (Signal Culture Weaver): each source's luminance displaces the
+    // WEAVE (a luminance-displacement weave): each source's luminance displaces the
     // OTHER's sampling, then they interleave : a woven two-source warp.
     // x scales the displacement depth.
     vec3 lw = vec3(0.299,0.587,0.114);
@@ -142,7 +142,7 @@ void main(){
     return;
   }
   if(mode==16){
-    // LUMAKEY (Lumen-style keyer): A shows where it's bright, B fills A's
+    // LUMAKEY (a luma keyer): A shows where it's bright, B fills A's
     // dark areas (composite A over B, keying out A's near-black background).
     // x is the key threshold, with a soft knee.
     float la = dot(A.rgb, vec3(0.299,0.587,0.114));

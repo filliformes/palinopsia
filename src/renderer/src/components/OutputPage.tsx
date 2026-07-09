@@ -377,7 +377,7 @@ export function OutputPage({
                   onClick={() => openOutput(true)}
                   disabled={displayId == null}
                   className="flex-1 rounded border border-accent bg-accent/15 px-2 py-1 font-mono text-[11px] text-accent hover:bg-accent/25 disabled:opacity-40"
-                  title="A normal 1280×720 window : easy to Window-Capture in OBS/Resolume"
+                  title="A normal 1280×720 window : easy to Window-Capture in a streaming/VJ app"
                 >
                   window ▶
                 </button>
@@ -429,7 +429,7 @@ export function OutputPage({
             </p>
           </Section>
 
-          <Section title="Send (Resolume / OBS)">
+          <Section title="Send (NDI / Spout)">
             <div className="flex gap-1.5">
               <button
                 onClick={() => toggleSink('ndi', ndiActive, setNdiActive)}
@@ -471,7 +471,7 @@ export function OutputPage({
             </div>
             <p className="text-[11px] leading-tight text-muted">
               HEVC over TCP, advertised on the LAN via mDNS : the open NDI
-              alternative. Receive in OBS (HIVE plugin) or any HIVE client.
+              alternative. Receive with the HIVE plugin or any HIVE client.
               Experimental: needs a hardware HEVC encoder.
             </p>
           </Section>

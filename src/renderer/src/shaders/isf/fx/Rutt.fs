@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Scan Relief : an analog scan-processor topography. The input is redrawn as horizontal scan lines each displaced vertically by the image's own luminance, so bright areas push the lines into relief (a wireframe topography of the picture). Brightness follows the local slope. Matte line-work.",
+  "DESCRIPTION": "Rutt : the classic Rutt/Etra-style scan processor. The input is redrawn as horizontal scan lines each displaced vertically by the image's own luminance, so bright areas push the lines into relief (a wireframe topography of the picture). Brightness follows the local slope. Matte line-work.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Scan", "Stylize"],

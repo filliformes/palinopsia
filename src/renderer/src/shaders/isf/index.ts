@@ -61,7 +61,7 @@ import differenceBloom from './fx/DifferenceBloom.fs?raw'
 import triangleFlicker from './fx/TriangleFlicker.fs?raw'
 import colorizer from './fx/Colorizer.fs?raw'
 import wavefold from './fx/Wavefold.fs?raw'
-import scanRelief from './fx/ScanRelief.fs?raw'
+import rutt from './fx/Rutt.fs?raw'
 import crtScreen from './fx/CrtScreen.fs?raw'
 import pixelmask from './fx/Pixelmask.fs?raw'
 import lightTrails from './fx/LightTrails.fs?raw'
@@ -663,7 +663,7 @@ export const FX_SHADERS: IsfShader[] = [
     curated: { fold: [0.1, 0.8], bias: [-0.3, 0.3], symmetry: [0, 1], wet: [0.4, 1] }
   },
   {
-    id: 'fx-rutt', name: 'Scan Relief', category: 'FX', source: scanRelief,
+    id: 'fx-rutt', name: 'Rutt', category: 'FX', source: rutt,
     curated: { lines: [40, 160], amp: [0.03, 0.2], width: [0.08, 0.4], color: [0, 1] }
   },
   {
@@ -718,7 +718,7 @@ export const FX_SHADERS: IsfShader[] = [
     curated: { sensitivity: [0.3, 0.8], persistence: [0.4, 0.85], strength: [0.35, 0.8], complement: [0.6, 1], threshold: [0.4, 0.7] }
   }
   // PHASE 9 (post-MVP experiment): Cross-FM : a source that takes ANOTHER
-  // layer's frame as a video-rate FM input (Lumen A→B→C→A cross-oscillator
+  // layer's frame as a video-rate FM input (an A→B→C→A cross-oscillator
   // feedback). Needs engine plumbing (a second image input bound to a layer
   // buffer), so it waits with WebGPU (brief §15.1). Not built here.
 ]

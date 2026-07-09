@@ -1,7 +1,7 @@
 // OSCQuery : self-describing OSC address space (brief §8).
 //
 // Serves Palinopsia's parameter tree as OSCQuery JSON over HTTP so Pandore /
-// dataFLOU / TouchDesigner can auto-discover and bind every control instead of
+// dataFLOU or any OSCQuery client can auto-discover and bind every control instead of
 // a hand-maintained OSC map. The renderer enumerates the address space (fixed
 // controls + live shader inputs) and pushes it via `publishTree()`; this server
 // nests the flat list into the OSCQuery CONTENTS tree and answers GETs.

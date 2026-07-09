@@ -3,7 +3,7 @@
 //  - allows the field to be EMPTY during editing (instead of snapping to 0)
 //  - clamps to [min, max] and reverts to the previous value on blur if invalid
 //  - hides spinner arrows (handled globally in styles.css)
-//  - in rich themes (Nature, Cream-as-Peaks), gets a "console readout"
+//  - in rich themes (Nature), gets a "console readout"
 //    look : accent-tinted mono on a dark embedded card : until focused,
 //    then reverts to the standard input chrome for editing
 //
