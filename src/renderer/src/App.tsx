@@ -29,7 +29,7 @@ import { OutputPage } from './components/OutputPage'
 import { WorldPage } from './components/WorldPage'
 import { SequencePage } from './components/SequencePage'
 import { SceneBank } from './components/SceneBank'
-import { initOscInput, applyOscListen } from './oscInput'
+import { initOscInput, applyOscListen, applyOscOutput } from './oscInput'
 import { morphedComposition, consumeCrossfade } from './morph'
 import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
@@ -137,6 +137,8 @@ export default function App(): JSX.Element {
     const unsub = initOscInput()
     // Restore the saved listen state (starts the listener if it was on).
     void applyOscListen()
+    // Restore outbound feedback (starts the diff-and-send loop if it was on).
+    applyOscOutput()
     return unsub
   }, [])
 

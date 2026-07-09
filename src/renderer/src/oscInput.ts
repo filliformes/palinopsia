@@ -433,74 +433,163 @@ export async function applyOscListen(): Promise<void> {
   }
 }
 
-/** Enumerate the address space and hand it to the OSCQuery server. */
-export function publishOscQuery(): void {
+/** Normalize a shader input's stored raw value back to the 0..1 the OSC layer
+ *  speaks (inverse of resolveInputValue) — for advertisement + outbound feedback. */
+function inputNorm(shaderId: string, name: string, raw: number | number[] | undefined): number {
+  const d = inputsForShader(shaderId).find((x) => x.name === name)
+  if (!d) return 0
+  const v = typeof raw === 'number' ? raw : Array.isArray(raw) ? Number(raw[0]) : 0
+  if (d.type === 'float') {
+    const min = typeof d.min === 'number' ? d.min : 0
+    const max = typeof d.max === 'number' ? d.max : 1
+    return max > min ? clamp01((v - min) / (max - min)) : 0
+  }
+  if (d.type === 'long') {
+    const vals = d.values ?? []
+    const i = vals.indexOf(v)
+    return vals.length > 1 ? Math.max(0, i) / (vals.length - 1) : 0
+  }
+  if (d.type === 'bool' || d.type === 'event') return v >= 0.5 ? 1 : 0
+  return clamp01(v)
+}
+
+// One advertised / streamable control. `stream:false` marks inbound-only sensors
+// (audio) and pure triggers (seq/skip) that outbound feedback must NOT echo.
+interface Leaf {
+  path: string
+  min: number
+  max: number
+  value: number
+  desc: string
+  stream: boolean
+}
+
+/** Enumerate every OSC-addressable control with its CURRENT value. Shared by
+ *  OSCQuery advertisement (structure) and outbound feedback (diff-and-send), so
+ *  the two can never drift apart. */
+function enumerateLeaves(): Leaf[] {
   const st = useStore.getState()
-  const nodes: OscQueryLeaf[] = []
-  const f = (full_path: string, min: number, max: number, value: number, description: string): void => {
-    nodes.push({ full_path, type: 'f', range: { min, max }, value, description })
+  const out: Leaf[] = []
+  const add = (path: string, min: number, max: number, value: number, desc: string, stream = true): void => {
+    out.push({ path, min, max, value, desc, stream })
+  }
+  const fxVal = (sid: string, name: string): number => {
+    const inst = st.composition.master.find((f) => f.shaderId === sid)
+    return inputNorm(sid, name, inst?.inputs?.[name])
   }
   for (let n = 1; n <= 4; n++) {
     const l = st.composition.layers[n - 1]
-    f(`/opsia/layer/${n}/opacity`, 0, 1, l?.opacity ?? 1, 'Layer opacity')
-    f(`/opsia/layer/${n}/speed`, 0, 1, (l?.speed ?? 1) / 20, 'Layer speed (0..1 → 0..20×)')
-    f(`/opsia/layer/${n}/mix`, 0, 1, l?.sourceMix ?? 0.5, 'A/B source mix')
-    f(`/opsia/layer/${n}/trail`, 0, 1, l?.feedbackAmount ?? 0, 'Feedback trail amount')
-    f(`/opsia/layer/${n}/blend`, 0, 1, 0, 'Layer blend mode (index)')
-    f(`/opsia/layer/${n}/sourceblend`, 0, 1, 0, 'A/B blend mode (index)')
-    f(`/opsia/layer/${n}/mute`, 0, 1, l?.mute ? 1 : 0, 'Mute (>= 0.5)')
-    f(`/opsia/layer/${n}/solo`, 0, 1, l?.solo ? 1 : 0, 'Solo (>= 0.5)')
-    f(`/opsia/layer/${n}/feedback`, 0, 1, l?.feedback ? 1 : 0, 'Feedback on (>= 0.5)')
-    f(`/opsia/layer/${n}/coupling/mode`, 0, 1, 0, 'A/B coupling mode (index: off·lean·hocket·cut·gate·drift)')
-    f(`/opsia/layer/${n}/coupling/amount`, 0, 1, l?.coupling?.amount ?? 0.5, 'A/B coupling depth')
-    f(`/opsia/layer/${n}/coupling/tightness`, 0, 1, l?.coupling?.tightness ?? 0.7, 'A/B coupling tightness')
-    f(`/opsia/layer/${n}/coupling/feature`, 0, 1, 0, 'A/B coupling audio feature (index)')
+    add(`/opsia/layer/${n}/opacity`, 0, 1, l?.opacity ?? 1, 'Layer opacity')
+    add(`/opsia/layer/${n}/speed`, 0, 1, (l?.speed ?? 1) / 20, 'Layer speed (0..1 → 0..20×)')
+    add(`/opsia/layer/${n}/mix`, 0, 1, l?.sourceMix ?? 0.5, 'A/B source mix')
+    add(`/opsia/layer/${n}/trail`, 0, 1, l?.feedbackAmount ?? 0, 'Feedback trail amount')
+    const bi = Math.max(0, BLEND_MODES.indexOf(l?.blend ?? 'normal'))
+    add(`/opsia/layer/${n}/blend`, 0, 1, bi / (BLEND_MODES.length - 1), 'Layer blend mode (index)')
+    const si = Math.max(0, BLEND_MODES.indexOf(l?.sourceBlend ?? 'normal'))
+    add(`/opsia/layer/${n}/sourceblend`, 0, 1, si / (BLEND_MODES.length - 1), 'A/B blend mode (index)')
+    add(`/opsia/layer/${n}/mute`, 0, 1, l?.mute ? 1 : 0, 'Mute (>= 0.5)')
+    add(`/opsia/layer/${n}/solo`, 0, 1, l?.solo ? 1 : 0, 'Solo (>= 0.5)')
+    add(`/opsia/layer/${n}/feedback`, 0, 1, l?.feedback ? 1 : 0, 'Feedback on (>= 0.5)')
+    const cm = Math.max(0, COUPLING_MODES.indexOf(l?.coupling?.mode ?? 'off'))
+    add(`/opsia/layer/${n}/coupling/mode`, 0, 1, cm / (COUPLING_MODES.length - 1), 'A/B coupling mode (index: off·lean·hocket·cut·gate·drift)')
+    add(`/opsia/layer/${n}/coupling/amount`, 0, 1, l?.coupling?.amount ?? 0.5, 'A/B coupling depth')
+    add(`/opsia/layer/${n}/coupling/tightness`, 0, 1, l?.coupling?.tightness ?? 0.7, 'A/B coupling tightness')
+    const cf = Math.max(0, COUPLING_FEATURES.indexOf(l?.coupling?.feature ?? 'transient'))
+    add(`/opsia/layer/${n}/coupling/feature`, 0, 1, cf / (COUPLING_FEATURES.length - 1), 'A/B coupling audio feature (index)')
   }
   for (let k = 1; k <= st.composition.metaKnobs.length; k++) {
     const knob = st.composition.metaKnobs[k - 1]
-    f(`/opsia/meta/${k}`, 0, 1, knob?.value ?? 0, knob?.name ?? `Meta knob ${k}`)
+    add(`/opsia/meta/${k}`, 0, 1, knob?.value ?? 0, knob?.name ?? `Meta knob ${k}`)
   }
-  nodes.push({ full_path: '/opsia/bpm', type: 'f', range: { min: 20, max: 800 }, value: st.composition.bpm, description: 'Tempo (raw BPM)' })
-  // Audio features Pandore can push (consumed by `audio` modulators).
+  add('/opsia/bpm', 20, 800, st.composition.bpm, 'Tempo (raw BPM)')
+  // Audio features Pandore PUSHES (consumed by `audio` modulators) — never echoed.
   for (const feat of ['level', 'flux', 'transient', 'centroid', 'pitch'] as const) {
-    f(`/opsia/audio/${feat}`, 0, 1, 0, `Audio ${feat} (0..1)`)
+    add(`/opsia/audio/${feat}`, 0, 1, 0, `Audio ${feat} (0..1)`, false)
   }
-  for (let b = 1; b <= 6; b++) f(`/opsia/audio/band/${b}`, 0, 1, 0, `Audio band ${b} energy (0..1)`)
+  for (let b = 1; b <= 6; b++) add(`/opsia/audio/band/${b}`, 0, 1, 0, `Audio band ${b} energy (0..1)`, false)
   for (const [key, sid] of [['vibe', 'fx-vibe'], ['context', 'fx-context'], ['finalizer', 'fx-finalizer']] as const) {
     for (const d of inputsForShader(sid)) {
       if (d.type !== 'float') continue
       const min = typeof d.min === 'number' ? d.min : 0
       const max = typeof d.max === 'number' ? d.max : 1
-      f(`/opsia/master/${key}/${d.name}`, 0, 1, 0, `${key} · ${d.label} (0..1 → ${min}..${max})`)
+      add(`/opsia/master/${key}/${d.name}`, 0, 1, fxVal(sid, d.name), `${key} · ${d.label} (0..1 → ${min}..${max})`)
     }
   }
   // Background layer.
   const bg = st.composition.background
-  f('/opsia/bg/opacity', 0, 1, bg?.opacity ?? 0, 'Background opacity')
-  f('/opsia/bg/speed', 0, 1, bg?.speed ?? 0.5, 'Background speed')
-  f('/opsia/bg/depth', 0, 1, bg?.depth ?? 0, 'Background depth push')
-  f('/opsia/bg/blend', 0, 1, bg?.blendMode === 'isolate' ? 1 : 0, 'Background blend (0=blend · 1=isolate)')
+  add('/opsia/bg/opacity', 0, 1, bg?.opacity ?? 0, 'Background opacity')
+  add('/opsia/bg/speed', 0, 1, bg?.speed ?? 0.5, 'Background speed')
+  add('/opsia/bg/depth', 0, 1, bg?.depth ?? 0, 'Background depth push')
+  add('/opsia/bg/blend', 0, 1, bg?.blendMode === 'isolate' ? 1 : 0, 'Background blend (0=blend · 1=isolate)')
   if (bg?.source?.shaderId) {
-    for (const d of inputsForShader(bg.source.shaderId)) {
+    const sid = bg.source.shaderId
+    for (const d of inputsForShader(sid)) {
       if (d.type !== 'float') continue
-      f(`/opsia/bg/source/${d.name}`, 0, 1, 0, `Background · ${d.label}`)
+      add(`/opsia/bg/source/${d.name}`, 0, 1, inputNorm(sid, d.name, bg.source.inputs?.[d.name]), `Background · ${d.label}`)
     }
   }
   // Global field macros + Proximity (0.5 = deadzone).
-  f('/opsia/density', 0, 1, st.density ?? 0.5, 'Density macro (sparse ⇄ dense)')
-  f('/opsia/gesture', 0, 1, st.gestureTexture ?? 0.5, 'Gesture ⇄ Texture macro')
-  f('/opsia/coalesce', 0, 1, st.coalesce ?? 0.5, 'Dispersal ⇄ Coalescence macro')
-  f('/opsia/proximity', 0, 1, st.proximity ?? 0.5, 'Proximity (near ⇄ far)')
+  add('/opsia/density', 0, 1, st.density ?? 0.5, 'Density macro (sparse ⇄ dense)')
+  add('/opsia/gesture', 0, 1, st.gestureTexture ?? 0.5, 'Gesture ⇄ Texture macro')
+  add('/opsia/coalesce', 0, 1, st.coalesce ?? 0.5, 'Dispersal ⇄ Coalescence macro')
+  add('/opsia/proximity', 0, 1, st.proximity ?? 0.5, 'Proximity (near ⇄ far)')
   // World selection (accepts a string id/name, or a 1-based index) + transport.
   const worldIdx = Math.max(1, st.worlds.findIndex((w) => w.id === st.world) + 1)
-  nodes.push({
-    full_path: '/opsia/world',
+  add('/opsia/world', 1, Math.max(1, st.worlds.length), worldIdx, 'Active World (send an id/name string, or a 1-based index)')
+  add('/opsia/seq/run', 0, 1, st.sequence.running ? 1 : 0, 'Sequencer running (>= 0.5)')
+  add('/opsia/seq/skip', 0, 1, 0, 'Advance to the next scene (trigger)', false)
+  return out
+}
+
+/** Enumerate the address space and hand it to the OSCQuery server. */
+export function publishOscQuery(): void {
+  const nodes: OscQueryLeaf[] = enumerateLeaves().map((n) => ({
+    full_path: n.path,
     type: 'f',
-    range: { min: 1, max: Math.max(1, st.worlds.length) },
-    value: worldIdx,
-    description: 'Active World (send an id/name string, or a 1-based index)'
-  })
-  f('/opsia/seq/run', 0, 1, st.sequence.running ? 1 : 0, 'Sequencer running (>= 0.5)')
-  f('/opsia/seq/skip', 0, 1, 0, 'Advance to the next scene (trigger)')
+    range: { min: n.min, max: n.max },
+    value: n.value,
+    description: n.desc
+  }))
   window.api.oscQueryPublish(nodes)
+}
+
+// ── Outbound feedback ────────────────────────────────────────────────
+// When enabled, we periodically diff the streamable leaves against what we last
+// sent and push only the CHANGED ones to Pandore — so its UI mirrors ours (a
+// modulator sweeping opacity, a scene recall, a hand on a slider). Symmetric
+// with the inbound map: same `/opsia/...` addresses, same 0..1 convention.
+
+const lastSent = new Map<string, number>()
+let feedbackTimer: ReturnType<typeof setInterval> | null = null
+const EPS = 0.0015 // ~1/650 — below the noise floor of a modulator at rest
+
+function pushFeedback(): void {
+  const st = useStore.getState()
+  if (!st.oscOutEnabled || !st.oscOutHost) return
+  const host = st.oscOutHost
+  const port = st.oscOutPort
+  let sent = 0
+  for (const leaf of enumerateLeaves()) {
+    if (!leaf.stream) continue
+    const prev = lastSent.get(leaf.path)
+    if (prev !== undefined && Math.abs(prev - leaf.value) < EPS) continue
+    lastSent.set(leaf.path, leaf.value)
+    // Cap the burst on the very first pass (nothing cached) so we don't flood.
+    if (prev === undefined && sent > 96) continue
+    window.api.oscSend(host, port, leaf.path, [{ type: 'f', value: leaf.value }])
+    sent++
+  }
+}
+
+/** Start/stop the outbound feedback loop to match the store's oscOut config. */
+export function applyOscOutput(): void {
+  const st = useStore.getState()
+  if (feedbackTimer) {
+    clearInterval(feedbackTimer)
+    feedbackTimer = null
+  }
+  lastSent.clear() // force a full resend on (re)start so Pandore syncs from scratch
+  if (st.oscOutEnabled && st.oscOutHost) {
+    feedbackTimer = setInterval(pushFeedback, Math.max(40, st.oscOutIntervalMs || 100))
+  }
 }

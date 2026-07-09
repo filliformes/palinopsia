@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
-import { applyOscListen } from '../oscInput'
+import { applyOscListen, applyOscOutput } from '../oscInput'
 
 export function OscPanel(): JSX.Element {
   const oscEnabled = useStore((s) => s.oscEnabled)
@@ -12,11 +12,19 @@ export function OscPanel(): JSX.Element {
   const oscListening = useStore((s) => s.oscListening)
   const oscAddresses = useStore((s) => s.oscAddresses)
   const setOscConfig = useStore((s) => s.setOscConfig)
+  const oscOutEnabled = useStore((s) => s.oscOutEnabled)
+  const oscOutHost = useStore((s) => s.oscOutHost)
+  const oscOutPort = useStore((s) => s.oscOutPort)
+  const setOscOutConfig = useStore((s) => s.setOscOutConfig)
   const [portStr, setPortStr] = useState(String(oscPort))
+  const [outHostStr, setOutHostStr] = useState(oscOutHost)
+  const [outPortStr, setOutPortStr] = useState(String(oscOutPort))
   const [last, setLast] = useState('')
   const dotRef = useRef<HTMLSpanElement | null>(null)
 
   useEffect(() => setPortStr(String(oscPort)), [oscPort])
+  useEffect(() => setOutHostStr(oscOutHost), [oscOutHost])
+  useEffect(() => setOutPortStr(String(oscOutPort)), [oscOutPort])
 
   // Activity blink + last-address readout, straight from the IPC stream (no
   // store writes — this must not cause re-renders per message).
@@ -45,6 +53,28 @@ export function OscPanel(): JSX.Element {
       if (oscEnabled) void applyOscListen()
     } else {
       setPortStr(String(oscPort))
+    }
+  }
+  function toggleOut(): void {
+    setOscOutConfig({ enabled: !oscOutEnabled })
+    applyOscOutput()
+  }
+  function commitOutHost(): void {
+    const h = outHostStr.trim()
+    if (h) {
+      setOscOutConfig({ host: h })
+      if (oscOutEnabled) applyOscOutput()
+    } else {
+      setOutHostStr(oscOutHost)
+    }
+  }
+  function commitOutPort(): void {
+    const p = parseInt(outPortStr, 10)
+    if (Number.isInteger(p) && p >= 1 && p <= 65535) {
+      setOscOutConfig({ port: p })
+      if (oscOutEnabled) applyOscOutput()
+    } else {
+      setOutPortStr(String(oscOutPort))
     }
   }
 
@@ -126,6 +156,49 @@ export function OscPanel(): JSX.Element {
           )}
         </>
       )}
+
+      {/* Outbound feedback — mirror our live state back to Pandore so its UI
+          tracks ours (modulators, scene recalls, a hand on a slider). */}
+      <div className="flex min-w-0 items-center gap-2 border-t border-border/60 pt-1">
+        <button
+          onClick={toggleOut}
+          className={`shrink-0 rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
+            oscOutEnabled
+              ? 'bg-accent/20 text-accent ring-1 ring-accent'
+              : 'bg-panel2 text-muted hover:text-text'
+          }`}
+          title={oscOutEnabled ? 'Stop mirroring state to Pandore' : 'Mirror live state to Pandore over OSC'}
+        >
+          {oscOutEnabled ? 'FEEDBACK →' : 'FEEDBACK OFF'}
+        </button>
+        <input
+          value={outHostStr}
+          onChange={(e) => setOutHostStr(e.target.value)}
+          onBlur={commitOutHost}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+          }}
+          className="input w-24 px-1 py-0.5 text-[11px]"
+          title="Destination host (Pandore's IP — 127.0.0.1 if same machine)"
+        />
+        <span className="font-mono text-[9px] uppercase text-muted">:</span>
+        <input
+          value={outPortStr}
+          onChange={(e) => setOutPortStr(e.target.value.replace(/[^0-9]/g, ''))}
+          onBlur={commitOutPort}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+          }}
+          className="input w-14 px-1 py-0.5 text-right text-[11px]"
+          title="Destination UDP port Pandore receives on"
+        />
+        <div className="flex-1" />
+        <span
+          className={`font-mono text-[9px] ${oscOutEnabled ? 'text-accent' : 'text-muted'}`}
+        >
+          {oscOutEnabled ? 'mirroring' : 'off'}
+        </span>
+      </div>
     </div>
   )
 }

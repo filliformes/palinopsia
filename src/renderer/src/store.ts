@@ -591,6 +591,14 @@ interface StoreState {
   oscAddresses: string[]
   setOscConfig: (partial: Partial<{ enabled: boolean; port: number; listening: boolean; addresses: string[] }>) => void
 
+  // Outbound OSC feedback (state mirror → Pandore). `enabled`/`host`/`port` are
+  // the user's intent; the loop lives in oscInput.ts (applyOscOutput).
+  oscOutEnabled: boolean
+  oscOutHost: string
+  oscOutPort: number
+  oscOutIntervalMs: number
+  setOscOutConfig: (partial: Partial<{ enabled: boolean; host: string; port: number; intervalMs: number }>) => void
+
   // User shader presets — app-persistent (localStorage), per shader id.
   userShaderPresets: Record<string, Array<{ name: string; values: Record<string, number | number[]> }>>
   addUserShaderPreset: (shaderId: string, name: string, values: Record<string, number | number[]>) => void
@@ -1662,6 +1670,32 @@ export const useStore = create<StoreState>((set, get) => ({
         oscPort: partial.port ?? s.oscPort,
         oscListening: partial.listening ?? s.oscListening,
         oscAddresses: partial.addresses ?? s.oscAddresses
+      }
+    }),
+
+  oscOutEnabled: localStorage.getItem('opsia.oscOutEnabled') === '1',
+  oscOutHost: localStorage.getItem('opsia.oscOutHost') || '127.0.0.1',
+  oscOutPort: (() => {
+    const p = Number(localStorage.getItem('opsia.oscOutPort'))
+    return Number.isInteger(p) && p >= 1 && p <= 65535 ? p : 9001
+  })(),
+  oscOutIntervalMs: (() => {
+    const m = Number(localStorage.getItem('opsia.oscOutIntervalMs'))
+    return Number.isFinite(m) && m >= 40 && m <= 1000 ? m : 100
+  })(),
+  setOscOutConfig: (partial) =>
+    set((s) => {
+      if (partial.enabled !== undefined)
+        localStorage.setItem('opsia.oscOutEnabled', partial.enabled ? '1' : '0')
+      if (partial.host !== undefined) localStorage.setItem('opsia.oscOutHost', partial.host)
+      if (partial.port !== undefined) localStorage.setItem('opsia.oscOutPort', String(partial.port))
+      if (partial.intervalMs !== undefined)
+        localStorage.setItem('opsia.oscOutIntervalMs', String(partial.intervalMs))
+      return {
+        oscOutEnabled: partial.enabled ?? s.oscOutEnabled,
+        oscOutHost: partial.host ?? s.oscOutHost,
+        oscOutPort: partial.port ?? s.oscOutPort,
+        oscOutIntervalMs: partial.intervalMs ?? s.oscOutIntervalMs
       }
     }),
   collapsed: (() => {
