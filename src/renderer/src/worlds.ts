@@ -99,6 +99,48 @@ export const BUILTIN_WORLDS: World[] = [
     coupling: { mode: 'off', amount: 0.5, tightness: 0.7, feature: 'level' },
     context: { trails: 0.1, blur: 0.04, bloom: 0.0, depth: 0.5, haze: 0.0 },
     autoMod: null
+  },
+  // ── Cameraless / direct-film modes (spec §6). These bias the whole comp toward
+  //    a hand-made-film reading; pick the sources to match (Op-Art marks for
+  //    Griffé, an organic/feedback source for Peint, a scanned clip for Pressé).
+  {
+    id: 'griffe',
+    name: 'Griffé',
+    builtin: true,
+    blurb: 'McLaren — graphic, rhythmic, tightly synced. Marks on the beat.',
+    coupling: { mode: 'cut', amount: 0.85, tightness: 0.9, feature: 'transient' },
+    context: { trails: 0.04, blur: 0.0, bloom: 0.06, depth: 0.12, haze: 0.02 },
+    finalizer: {
+      filmHold: 1, filmRate: 10, filmJitter: 0.2, filmBoil: 0.15, filmFlutter: 0.12,
+      filmBlank: 0.35, filmBlankMode: 0, filmDust: 0.12, filmScratch: 0.3, filmGranule: 0, filmSplice: 0.05
+    },
+    autoMod: { feature: 'transient', target: 'bloom', depth: 0.4 }
+  },
+  {
+    id: 'peint',
+    name: 'Peint',
+    builtin: true,
+    blurb: 'Brakhage — dense, gestural, silent. Dye, boil, granulation.',
+    coupling: { mode: 'drift', amount: 0.6, tightness: 0.35, feature: 'level' },
+    context: { trails: 0.2, blur: 0.06, bloom: 0.18, depth: 0.28, haze: 0.1 },
+    finalizer: {
+      filmHold: 1, filmRate: 6, filmJitter: 0.4, filmBoil: 0.6, filmFlutter: 0.4,
+      filmBlank: 0.05, filmBlankMode: 2, filmDust: 0.3, filmScratch: 0.1, filmGranule: 0.6, filmSplice: 0.03
+    },
+    autoMod: null // "silent by conviction" — audio decoupled
+  },
+  {
+    id: 'presse',
+    name: 'Pressé',
+    builtin: true,
+    blurb: 'Mothlight — pressed material. Heavy handling, scratch, dust.',
+    coupling: { mode: 'drift', amount: 0.5, tightness: 0.5, feature: 'level' },
+    context: { trails: 0.12, blur: 0.05, bloom: 0.1, depth: 0.35, haze: 0.08 },
+    finalizer: {
+      filmHold: 1, filmRate: 8, filmJitter: 0.35, filmBoil: 0.4, filmFlutter: 0.25,
+      filmBlank: 0.08, filmBlankMode: 0, filmDust: 0.5, filmScratch: 0.5, filmGranule: 0.35, filmSplice: 0.08
+    },
+    autoMod: { feature: 'level', target: 'haze', depth: 0.3 }
   }
 ]
 
@@ -111,6 +153,7 @@ export function cloneWorld(src: World, name: string): World {
     blurb: src.blurb,
     coupling: { ...src.coupling },
     context: { ...src.context },
+    finalizer: src.finalizer ? { ...src.finalizer } : undefined,
     autoMod: src.autoMod ? { ...src.autoMod } : null
   }
 }
@@ -123,9 +166,14 @@ export function applyWorldToComposition(c: CompositionState, world: World): Comp
   let next: CompositionState = {
     ...c,
     layers: c.layers.map((l) => ({ ...l, coupling: { ...world.coupling } })),
-    master: c.master.map((f) =>
-      f.shaderId === 'fx-context' ? { ...f, inputs: { ...f.inputs, ...world.context } } : f
-    )
+    master: c.master.map((f) => {
+      if (f.shaderId === 'fx-context') return { ...f, inputs: { ...f.inputs, ...world.context } }
+      // Finalizer: reset the Cameraless hold OFF as a baseline (so a non-film
+      // World clears drawn-film), then apply this World's film character if any.
+      if (f.shaderId === 'fx-finalizer')
+        return { ...f, inputs: { ...f.inputs, filmHold: 0, ...(world.finalizer ?? {}) } }
+      return f
+    })
   }
 
   // Audio routing default — the World manages modulator slot WORLD_AUTOMOD_SLOT

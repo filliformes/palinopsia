@@ -147,6 +147,10 @@ export interface World {
   blurb: string
   coupling: LayerCoupling // A/B bond character applied to every layer
   context: Record<string, number> // Context finalizer mood nudges (safe bands)
+  // Optional Finalizer input overrides — the curated home for the Cameraless /
+  // direct-film character (film* params). Absent ⇒ the World forces film off, so
+  // switching to a non-film World clears any drawn-film hold. Vibe stays untouched.
+  finalizer?: Record<string, number>
   // Audio routing default: an audio modulator the World can install on apply,
   // driving one common target. null = none.
   autoMod: { feature: AudioFeature; target: WorldAudioTarget; depth: number } | null

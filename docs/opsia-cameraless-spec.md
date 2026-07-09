@@ -2,6 +2,18 @@
 
 > **`docs/opsia-cameraless-spec.md`** · v0.1 (draft — design intent)
 > Date: 2026-07-08 · Author: Vincent Fillion · Co-designed with Claude Opus 4.8
+>
+> **Status (2026-07-09): substrate BUILT** — the native Cameraless stage (§2–3)
+> ships as `engine/cameraless.ts`, params on the Finalizer (`film*`, applied
+> natively like `out*`): draw clock + hold (both **film-hold** and **freeze**
+> modes) + boil + flutter + blank (§3.1–3.2) and the full **émulsion** family —
+> dust · scratch · granulation · splice (§3.3). The three **World presets** (§6,
+> Griffé/Peint/Pressé) carry the film character via a new optional `World.finalizer`.
+> The **Shutter** (Transport) is reconciled as the distinct *global full-freeze*
+> stop-motion. Still open: Direct-Marks + Dye-Field sources (§4.1/§5.1) and
+> superimposition flicker (§5.2) — **deferred pending play-test** of the substrate
+> over existing generators (Op-Art etc.); `drawSync` BPM division (§3.1); the
+> animated-sound outbound loop (§4.4, with S4).
 > Companion to `opsia-convolution-spec.md` (T = M·K). This spec covers the
 > **cameraless / direct-on-film** family: making the continuous procedural engine
 > read as hand-made, frame-by-frame film after Brakhage, McLaren, and Len Lye.
