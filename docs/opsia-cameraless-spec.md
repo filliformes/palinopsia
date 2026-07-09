@@ -10,10 +10,11 @@
 > dust · scratch · granulation · splice (§3.3). The three **World presets** (§6,
 > Griffé/Peint/Pressé) carry the film character via a new optional `World.finalizer`.
 > The **Shutter** (Transport) is reconciled as the distinct *global full-freeze*
-> stop-motion. Still open: Direct-Marks + Dye-Field sources (§4.1/§5.1) and
-> superimposition flicker (§5.2) — **deferred pending play-test** of the substrate
-> over existing generators (Op-Art etc.); `drawSync` BPM division (§3.1); the
-> animated-sound outbound loop (§4.4, with S4).
+> stop-motion. The **Direct Marks** (§4.1, `direct-marks`) and **Dye Field** (§5.1,
+> `dye-field`, subtractive + internal crystallise feedback) sources are now BUILT
+> too (a mockup comparison confirmed Op-Art can't do the dot/scratch marks and
+> Congeal is additive where Dye needs subtractive). Still open: superimposition
+> flicker (§5.2); `drawSync` BPM division (§3.1); the animated-sound loop (§4.4, with S4).
 > Companion to `opsia-convolution-spec.md` (T = M·K). This spec covers the
 > **cameraless / direct-on-film** family: making the continuous procedural engine
 > read as hand-made, frame-by-frame film after Brakhage, McLaren, and Len Lye.
