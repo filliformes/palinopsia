@@ -169,7 +169,10 @@ export default function App(): JSX.Element {
     const on = ndiActive || spoutActive
     comp.setOutputCapture(on ? (w, h, px) => window.api.ndiFrame(w, h, px) : null)
     return () => comp.setOutputCapture(null)
-  }, [ndiActive, spoutActive])
+    // `renderScale` is a dep because changing it disposes + rebuilds the whole
+    // Compositor : without re-running here the fresh engine has no capture
+    // callback and NDI/Spout output goes black until the sink is toggled.
+  }, [ndiActive, spoutActive, renderScale])
 
   // ── HIVE output (sender) : start the HEVC encoder + TCP fan-out ───────
   const hiveOutActive = useStore((s) => s.hiveOutActive)
@@ -234,7 +237,14 @@ export default function App(): JSX.Element {
     const unsub = initUndo()
     const onKey = (e: KeyboardEvent): void => {
       // Don't hijack typing in inputs for zoom keys; undo is safe globally.
-      const inField = (e.target as HTMLElement)?.tagName === 'INPUT'
+      // Covers <input>, <textarea>, <select>, and any contentEditable region so
+      // bare-letter shortcuts (p/c/m/o/… and 1–9) never eat a typed character.
+      const el = e.target as HTMLElement | null
+      const inField =
+        el?.tagName === 'INPUT' ||
+        el?.tagName === 'TEXTAREA' ||
+        el?.tagName === 'SELECT' ||
+        el?.isContentEditable === true
       // Bare 1–9: recall scenes (the playing-surface shortcut).
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && /^[1-9]$/.test(e.key)) {
         const st = useStore.getState()

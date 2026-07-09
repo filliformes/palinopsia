@@ -136,11 +136,6 @@ export function commitKnob(i: number): void {
   useStore.getState().setMetaValue(i, knobDisplayValue(i))
 }
 
-/** Re-apply a knob's destinations at its current position (after re-binding). */
-export function reapplyKnob(i: number): void {
-  applyKnob(i, knobDisplayValue(i))
-}
-
 /** Glide every knob to a new random POSITION, keeping its bindings : the ⚄
  *  next to the Meta title (shuffle the macro positions). */
 export function shuffleMetaValues(): void {

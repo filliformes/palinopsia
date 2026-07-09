@@ -37,7 +37,7 @@
 //   /opsia/seq/run                                      >= 0.5 toggles the sequencer
 //   /opsia/seq/skip                                     trigger (advance to next scene)
 //   /opsia/meta/{1..16}                                f 0..1 (drives the knob)
-//   /opsia/bpm                                          f 20..300 (raw)
+//   /opsia/bpm                                          f 20..800 (raw)
 //   /opsia/scene/{n}                                    trigger
 //   /opsia/randomize[/{scope}]                          trigger
 
@@ -584,10 +584,13 @@ function pushFeedback(): void {
     if (!leaf.stream) continue
     const prev = lastSent.get(leaf.path)
     if (prev !== undefined && Math.abs(prev - leaf.value) < EPS) continue
-    lastSent.set(leaf.path, leaf.value)
     // Cap the burst on the very first pass (nothing cached) so we don't flood.
+    // Record as "sent" only AFTER we actually transmit : otherwise capped leaves
+    // get cached here and then skipped forever (prev matches value on every later
+    // tick), so anything past the cap would never reach Pandore.
     if (prev === undefined && sent > 96) continue
     window.api.oscSend(host, port, leaf.path, [{ type: 'f', value: leaf.value }])
+    lastSent.set(leaf.path, leaf.value)
     sent++
   }
 }

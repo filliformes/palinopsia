@@ -120,23 +120,8 @@ export type CouplingMode = 'off' | 'lean' | 'hocket' | 'cut' | 'gate' | 'drift'
 // whole composition: it sets every layer's A/B coupling character and nudges
 // the Context depth-finalizer's mood. A bias, not a lock : manual edits after
 // still win. Later slabs deepen each world's audio routing + source choices.
-export type WorldMode =
-  | 'synthetic'
-  | 'parametric'
-  | 'musical'
-  | 'incongruent'
-  | 'sublimated'
-  | 'monomedia'
-export const WORLD_MODES: WorldMode[] = [
-  'synthetic',
-  'parametric',
-  'musical',
-  'incongruent',
-  'sublimated',
-  'monomedia'
-]
-
-// An editable World preset. Built-ins ship with the app (id = a WorldMode);
+//
+// An editable World preset. Built-ins ship with the app (id = a built-in world);
 // user worlds are saved to localStorage. A World biases the composition when
 // selected: A/B coupling character + Context mood + an optional audio-routing
 // default. Vibe (the user's palette) is deliberately NOT touched.
@@ -336,7 +321,6 @@ export interface ModAssignment {
 
 // The cap is deliberate (simplexité): bounded modulation stays followable.
 export const MAX_MOD_ASSIGNMENTS = 12
-export const MODULATOR_COUNT = 8
 
 // ── Meta Controller (brief §6 : dataFLOU's macro surface) ─────────────
 // 16 knobs, one flat bank. Each knob maps its 0..1 position through a curve
@@ -463,22 +447,6 @@ export interface Session {
   ui?: unknown
 }
 
-// ── OSC (mirrors main/osc.ts) ────────────────────────────────────────
-export interface OscEvent {
-  timestamp: number
-  ip: string
-  port: number
-  address: string
-  args: Array<{ type: string; value: number | string | boolean }>
-}
-
-export interface OscErrorEvent {
-  timestamp: number
-  ip: string
-  port: number
-  address: string
-  message: string
-}
 
 // ── Inbound OSC (Pandore → instrument) ───────────────────────────────
 export interface OscInEvent {
@@ -582,8 +550,6 @@ export interface ExposedApi {
     address: string,
     args: Array<{ type: string; value: number | string | boolean }>
   ) => Promise<void>
-  onOscIn: (cb: (batch: OscEvent[]) => void) => () => void
-  onOscErrors: (cb: (batch: OscErrorEvent[]) => void) => () => void
 
   // OSC input : start/stop the listener + OSCQuery, and subscribe to messages
   oscListen: (port: number, enabled: boolean) => Promise<OscListenResult>

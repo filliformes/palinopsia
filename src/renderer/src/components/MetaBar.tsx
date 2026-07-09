@@ -132,6 +132,10 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
 
   const dragRef = useRef<{ startY: number; startValue: number; pointerId: number } | null>(null)
 
+  // Restore the app-wide cursor if this tile unmounts mid-drag (it hides the
+  // cursor on pointer-down and only restores on pointer-up/cancel otherwise).
+  useEffect(() => () => { if (dragRef.current) document.body.style.cursor = '' }, [])
+
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>): void {
     if (e.button !== 0) return
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)

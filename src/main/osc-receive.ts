@@ -16,17 +16,9 @@ export type OscInMessage = {
 export class OscReceiver {
   private udp: osc.UDPPort | null = null
   private onMessage: ((m: OscInMessage) => void) | null = null
-  private boundPort = 0
 
   setOnMessage(cb: (m: OscInMessage) => void): void {
     this.onMessage = cb
-  }
-
-  isListening(): boolean {
-    return this.udp !== null
-  }
-  port(): number {
-    return this.boundPort
   }
 
   /**
@@ -40,7 +32,6 @@ export class OscReceiver {
       const udp = new osc.UDPPort({ localAddress: '0.0.0.0', localPort: port, metadata: true })
       let settled = false
       udp.on('ready', () => {
-        this.boundPort = port
         this.udp = udp
         settled = true
         resolve()
@@ -87,7 +78,6 @@ export class OscReceiver {
       }
       this.udp = null
     }
-    this.boundPort = 0
   }
 }
 

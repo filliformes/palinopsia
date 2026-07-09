@@ -50,11 +50,6 @@ export class OscQueryServer {
     this.onActive = cb
   }
 
-  /** How many value-stream clients are attached (renderer gates its push loop). */
-  activeClients(): number {
-    return this.clients.size
-  }
-
   /** Renderer pushes the flattened parameter tree; served on request. */
   publishTree(nodes: OscQueryNode[]): void {
     this.tree = nodes
@@ -72,10 +67,6 @@ export class OscQueryServer {
         )
       }
     }
-  }
-
-  getTree(): OscQueryNode[] {
-    return this.tree
   }
 
   private buildRoot(): Record<string, unknown> {

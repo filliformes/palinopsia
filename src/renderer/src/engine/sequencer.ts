@@ -364,6 +364,7 @@ export function sequencerSkip(): void {
   while (recent.length > Math.max(0, seq.noRepeat)) recent.shift()
   dwellStart = performance.now()
   nextDwellMs = dwellMs(seq)
+  armed = false // clear any pending audio/chaos arm so the fresh dwell is honoured
 }
 
 /** ms remaining until the next auto-advance (for the UI countdown). */

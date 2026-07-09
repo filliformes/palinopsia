@@ -4,8 +4,6 @@ import type {
   HiveAU,
   HiveStatus,
   OutputFrame,
-  OscEvent,
-  OscErrorEvent,
   OscInEvent,
   Session
 } from '@shared/types'
@@ -26,16 +24,6 @@ const api: ExposedApi = {
   // ── OSC control plane ────────────────────────────────────────────
   oscSend: (ip, port, address, args) =>
     ipcRenderer.invoke('osc:send', ip, port, address, args),
-  onOscIn: (cb) => {
-    const h = (_e: Electron.IpcRendererEvent, batch: OscEvent[]): void => cb(batch)
-    ipcRenderer.on('osc:in', h)
-    return () => ipcRenderer.off('osc:in', h)
-  },
-  onOscErrors: (cb) => {
-    const h = (_e: Electron.IpcRendererEvent, batch: OscErrorEvent[]): void => cb(batch)
-    ipcRenderer.on('osc:errors', h)
-    return () => ipcRenderer.off('osc:errors', h)
-  },
 
   // ── OSC input (Pandore → instrument) ─────────────────────────────
   oscListen: (port, enabled) => ipcRenderer.invoke('osc:listen', port, enabled),

@@ -373,10 +373,12 @@ export function randomizeSingleLayer(l: LayerState): LayerState {
 
 /** Re-roll the Background slab (its own dice : the GLOBAL Randomize never
  *  touches the background: the ground stays put while the layers churn).
- *  Draws from the curated background source set; keeps opacity + speed. */
+ *  Draws from the curated background source set; keeps opacity + speed +
+ *  depth + blendMode (the user's framing of the ground survives the dice). */
 export function randomizeBackground(cur: BackgroundState | undefined): BackgroundState {
   const gen = pick(BG_SOURCES)
   return {
+    ...cur,
     source: { kind: 'generator', shaderId: gen.id, inputs: randomizeInputs(gen.id, {}) },
     fx: randomRack([0.45, 0.35, 0.2]),
     opacity: cur?.opacity ?? 1,
@@ -637,7 +639,7 @@ function jitterOneInput(
 }
 
 /** Nudge every input of one shader around its current value by `amount`. */
-export function jitterInputs(
+function jitterInputs(
   shaderId: string,
   base: Record<string, number | number[]>,
   amount: number

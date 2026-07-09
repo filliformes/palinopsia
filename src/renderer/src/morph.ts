@@ -35,10 +35,6 @@ export function beginMorph(from: CompositionState, ms: number, now: number): voi
   pendingCrossfadeMs = ms
 }
 
-export function morphActive(): boolean {
-  return state !== null
-}
-
 /** Abort any in-flight morph (and drop a not-yet-consumed crossfade). Call when
  *  the composition is REPLACED out from under the morph : New, Load, Undo, Redo
  *  : so the engine stops easing toward a target that no longer exists. */

@@ -24,9 +24,6 @@ const MIME: Record<string, string> = {
 }
 const mimeFor = (path: string): string => MIME[path.split('.').pop()?.toLowerCase() ?? ''] ?? 'video/mp4'
 
-/** Build the protocol URL for an absolute file path (used by the renderer). */
-export const mediaUrl = (absPath: string): string => `${MEDIA_SCHEME}://local/${encodeURIComponent(absPath)}`
-
 /** Must run BEFORE app ready : registers the scheme as a privileged, streaming,
  *  standard scheme so <video> can seek it via range requests. */
 export function registerMediaScheme(): void {

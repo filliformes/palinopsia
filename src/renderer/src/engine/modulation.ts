@@ -316,6 +316,10 @@ export class ModEngine {
           if (hz > 0) {
             const period = 1000 / hz
             const steps = Math.max(2, Math.min(16, Math.round(cfg.arp.steps)))
+            // Guard the catch-up loop against a huge idle gap (slot re-enabled or
+            // type switched after minutes): snap forward so one fresh step fires
+            // instead of burning idle/period iterations in a single frame.
+            if (now - s.arpLastAdvanceAt > period * 4) s.arpLastAdvanceAt = now - period
             while (now - s.arpLastAdvanceAt >= period) {
               s.arpLastAdvanceAt += period
               switch (cfg.arp.mode) {
@@ -355,6 +359,7 @@ export class ModEngine {
           // Clocked uniform random with distribution warp.
           if (hz > 0) {
             const period = 1000 / hz
+            if (now - s.randomLastAdvanceAt > period * 4) s.randomLastAdvanceAt = now - period
             while (now - s.randomLastAdvanceAt >= period) {
               s.randomLastAdvanceAt += period
               s.randomValue = warpDistribution(Math.random(), cfg.random.distribution)
@@ -373,6 +378,7 @@ export class ModEngine {
               if (dist === 0.5) return Math.random() * 2 - 1
               return warpDistribution(Math.random(), dist) * 2 - 1
             }
+            if (now - s.shLastAdvanceAt > period * 4) s.shLastAdvanceAt = now - period
             while (now - s.shLastAdvanceAt >= period) {
               s.shLastAdvanceAt += period
               if (Math.random() < Math.max(0, Math.min(1, cfg.sh.probability))) {
@@ -397,6 +403,7 @@ export class ModEngine {
           // rise/fall half-lives. Target flips in place (dataFLOU's fix).
           if (hz > 0) {
             const period = 1000 / hz
+            if (now - s.slewLastAdvanceAt > period * 4) s.slewLastAdvanceAt = now - period
             while (now - s.slewLastAdvanceAt >= period) {
               s.slewLastAdvanceAt += period
               s.slewTarget = cfg.slew.randomTarget
@@ -419,6 +426,7 @@ export class ModEngine {
           if (hz > 0) {
             const period = 1000 / hz
             const r = Math.max(3.4, Math.min(4.0, cfg.chaos.r))
+            if (now - s.chaosLastAdvanceAt > period * 4) s.chaosLastAdvanceAt = now - period
             while (now - s.chaosLastAdvanceAt >= period) {
               s.chaosLastAdvanceAt += period
               let x = s.chaosX
@@ -744,6 +752,10 @@ export function applyModulation(
   descFor: (shaderId: string) => Array<{ name: string } & ModDesc>
 ): void {
   metaLiveValues.clear()
+  // Clear the live map each frame too (symmetric with metaLiveValues): otherwise
+  // a removed mod-matrix assignment leaves a stale entry that liveOverlay keeps
+  // writing into the slider forever, so the control never reverts to its base.
+  liveModValues.clear()
   // Resolve one ISF-input target's shader + write the given value everywhere
   // it needs to land (engine + live map). Shared by direct and meta paths.
   const writeTarget = (

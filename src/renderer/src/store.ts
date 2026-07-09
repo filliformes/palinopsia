@@ -334,6 +334,64 @@ export function makeDefaultComposition(): CompositionState {
   }
 }
 
+// Migrate a composition loaded from disk (or a recalled scene) up to the current
+// schema : backfill new layer/background/master/modulator/metaKnob fields so an
+// older session — or a scene inside one — can never hand the engine an undefined
+// slab or a locked-tail that's missing the Vibe → Context → Finalizer stages.
+// Idempotent : safe to run on an already-current composition.
+export function normalizeComposition(c: CompositionState): CompositionState {
+  return {
+    ...c,
+    // Older sessions have no Background slab : normalize to the blank (off) one.
+    background: c.background ?? makeBlankBackground(),
+    // Normalize layers from older session files : new fields get defaults.
+    layers: c.layers.map((l) => ({
+      ...l,
+      feedbackAmount: l.feedbackAmount ?? 0.6,
+      sourceMix: l.sourceMix ?? 0.5,
+      sourceBlend: l.sourceBlend ?? 'normal',
+      harmony: l.harmony ?? 0,
+      speed: l.speed ?? 1,
+      sourceAFx: l.sourceAFx ?? [],
+      sourceBFx: l.sourceBFx ?? [],
+      fx: l.fx ?? [],
+      coupling: l.coupling ?? { mode: 'off', amount: 0.5, tightness: 0.7, feature: 'transient' }
+    })),
+    // The Vibe Palette then the Context finalizer must exist and sit last, in
+    // that order. Older sessions get them appended; a session whose locked unit
+    // was the plain Palette migrates to fx-vibe (colors carry, mastering neutral).
+    master: (() => {
+      const m = (c.master ?? []).map((f) =>
+        f.locked && f.shaderId === 'fx-palette'
+          ? { ...makeVibePalette(), id: f.id, inputs: { ...makeVibePalette().inputs, ...f.inputs } }
+          : f
+      )
+      const find = (id: string): FxInstance | undefined => m.find((f) => f.shaderId === id)
+      const vibe = find('fx-vibe') ?? makeVibePalette()
+      const context = find('fx-context') ?? makeContext()
+      const finalizer = find('fx-finalizer') ?? makeFinalizer()
+      const rest = m.filter(
+        (f) => f.shaderId !== 'fx-vibe' && f.shaderId !== 'fx-context' && f.shaderId !== 'fx-finalizer'
+      )
+      return [...rest, vibe, context, finalizer]
+    })(),
+    // Backfill new modulator blocks (e.g. `audio`) so switching a slot to a new
+    // type can't read undefined.
+    modulators: (c.modulators ?? makeDefaultModulators()).map((m) => ({
+      ...makeDefaultModulator(),
+      ...m
+    })),
+    modMatrix: c.modMatrix ?? [],
+    // 16 knobs now : older 32-knob sessions truncate; short arrays pad. Field-
+    // MERGE each stored knob onto the default so a knob predating a field (e.g.
+    // `destinations`) can't leave it undefined.
+    metaKnobs: (() => {
+      const k = c.metaKnobs ?? []
+      return makeDefaultMetaKnobs().map((d, i) => ({ ...d, ...(k[i] ?? {}) }))
+    })()
+  }
+}
+
 // What the Inspector's auto-UI is pointed at: a source slot or an FX unit
 // (brief §10.3 : "selecting any source or FX renders its ISF INPUTS").
 export type Selection =
@@ -1876,7 +1934,8 @@ export const useStore = create<StoreState>((set, get) => ({
       const worlds = ensureWorld(s.worlds, scene.world)
       const world = scene.world ? scene.world.id : s.world
       if (scene.world) localStorage.setItem('opsia.world', world)
-      return { composition: scene.composition, activeSceneId: id, worlds, world, variationBaseline: null }
+      // Normalize defensively (idempotent) : a scene may predate a schema field.
+      return { composition: normalizeComposition(scene.composition), activeSceneId: id, worlds, world, variationBaseline: null }
     }),
   renameScene: (id, name) =>
     set((s) => ({
@@ -1965,70 +2024,26 @@ export const useStore = create<StoreState>((set, get) => ({
     const worlds = ensureWorld(cur.worlds, s.world)
     const world = s.world ? s.world.id : cur.world
     if (s.world) localStorage.setItem('opsia.world', world)
+    // Theme travels with the self-contained session (like world + sequencer).
+    // Older files without a saved theme keep the current one.
+    const savedTheme = (s.ui as { theme?: ThemeName } | undefined)?.theme
+    if (savedTheme) {
+      applyTheme(savedTheme)
+      localStorage.setItem('opsia.theme', savedTheme)
+    }
     return set({
       name: s.name,
+      theme: savedTheme ?? cur.theme,
       worlds,
       world,
-      scenes: s.scenes ?? [],
+      // Scenes migrate too : recalling one must never push an un-normalized
+      // composition (missing Background slab / finalizer tail) live.
+      scenes: (s.scenes ?? []).map((sc) => ({ ...sc, composition: normalizeComposition(sc.composition) })),
       activeSceneId: null,
       variationBaseline: null,
       // Sequencer travels with the session; auto-resumes if it was running.
       sequence: { ...makeDefaultSequence(), ...(s.sequence ?? {}) },
-      composition: {
-        ...s.composition,
-        // Older sessions have no Background slab : normalize to the blank (off)
-        // one so loading them isn't suddenly washed by the new white default.
-        background: s.composition.background ?? makeBlankBackground(),
-        // Normalize layers from older session files : new fields get defaults.
-        layers: s.composition.layers.map((l) => ({
-          ...l,
-          feedbackAmount: l.feedbackAmount ?? 0.6,
-          sourceMix: l.sourceMix ?? 0.5,
-          sourceBlend: l.sourceBlend ?? 'normal',
-          harmony: l.harmony ?? 0,
-          speed: l.speed ?? 1,
-          sourceAFx: l.sourceAFx ?? [],
-          sourceBFx: l.sourceBFx ?? [],
-          fx: l.fx ?? [],
-          coupling: l.coupling ?? { mode: 'off', amount: 0.5, tightness: 0.7, feature: 'transient' }
-        })),
-        // The Vibe Palette then the Context finalizer must exist and sit last,
-        // in that order. Older sessions get them appended; sessions whose locked
-        // unit was the plain Palette migrate to fx-vibe (color inputs carry
-        // over; mastering params get neutral defaults).
-        master: (() => {
-          const m = (s.composition.master ?? []).map((f) =>
-            f.locked && f.shaderId === 'fx-palette'
-              ? { ...makeVibePalette(), id: f.id, inputs: { ...makeVibePalette().inputs, ...f.inputs } }
-              : f
-          )
-          // Canonicalize the finalizer tail: strip the three locked stages out
-          // (wherever/however they were ordered) and re-append them in the one
-          // correct order : Vibe → Context → Finalizer, always last. Reuse the
-          // existing instance so its ids/inputs carry over; synthesize if absent.
-          const find = (id: string): FxInstance | undefined => m.find((f) => f.shaderId === id)
-          const vibe = find('fx-vibe') ?? makeVibePalette()
-          const context = find('fx-context') ?? makeContext()
-          const finalizer = find('fx-finalizer') ?? makeFinalizer()
-          const rest = m.filter(
-            (f) => f.shaderId !== 'fx-vibe' && f.shaderId !== 'fx-context' && f.shaderId !== 'fx-finalizer'
-          )
-          return [...rest, vibe, context, finalizer]
-        })(),
-        // Backfill new modulator blocks (e.g. `audio`) onto older sessions so
-        // switching a slot to a new type can't read undefined.
-        modulators: (s.composition.modulators ?? makeDefaultModulators()).map((m) => ({
-          ...makeDefaultModulator(),
-          ...m
-        })),
-        modMatrix: s.composition.modMatrix ?? [],
-        // 16 knobs now : older 32-knob sessions truncate; short arrays pad.
-        metaKnobs: (() => {
-          const k = s.composition.metaKnobs ?? []
-          const defaults = makeDefaultMetaKnobs()
-          return defaults.map((d, i) => k[i] ?? d)
-        })()
-      }
+      composition: normalizeComposition(s.composition)
     })
   },
   exportSession: () => {

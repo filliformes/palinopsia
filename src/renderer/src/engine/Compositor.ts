@@ -486,10 +486,6 @@ class FxRack {
     this.units = next;
   }
 
-  hasWork(): boolean {
-    return this.units.some((u) => u.enabled);
-  }
-
   /** Direct write to one unit's input (the modulation path). ISF units push to
    *  the renderer; native nodes overlay their live param map (read at render). */
   setUnitInput(instId: string, name: string, value: number | number[]): void {

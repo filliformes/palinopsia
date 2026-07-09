@@ -7,8 +7,6 @@
 
 import { uploadVideoFrame } from './VideoSource'
 
-export type CaptureKind = 'webcam' | 'screen'
-
 export class CaptureSource {
   private video: HTMLVideoElement
   private tex: WebGLTexture | null = null

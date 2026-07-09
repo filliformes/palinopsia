@@ -14,7 +14,7 @@ import {
   screen
 } from 'electron'
 import { join } from 'path'
-import type { OscEvent, OscErrorEvent, Session } from '@shared/types'
+import type { Session } from '@shared/types'
 import { OscSender } from './osc'
 import { OscReceiver, localIPv4s, type OscInMessage } from './osc-receive'
 import * as sessionIO from './session'
@@ -56,6 +56,7 @@ const oscquery = new OscQueryServer()
 let appQuitting = false
 let prevRunCrashed = false
 let shutdownComplete = false
+let closeFallback: ReturnType<typeof setTimeout> | null = null
 
 function shutdown(): void {
   if (shutdownComplete) return
@@ -97,6 +98,15 @@ function createWindow(): void {
     if (appQuitting) return
     e.preventDefault()
     mainWindow?.webContents.send('app:before-close')
+    // Fallback : if the renderer is hung/crashed and never replies with
+    // `app:close-proceed`, force the close after a grace period so the window
+    // can't get stuck open (only arm once).
+    if (!closeFallback) {
+      closeFallback = setTimeout(() => {
+        appQuitting = true
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close()
+      }, 4000)
+    }
   })
 
   // Closing the control window closes the projector output with it.
@@ -222,33 +232,9 @@ app.whenReady().then(async () => {
 
   prevRunCrashed = autosave.startAutosave().crashed
 
-  // OSC monitor : batch incoming/outgoing events and flush to the renderer
-  // every 50ms so a control flood can't drown IPC (dataFLOU's pattern).
-  let oscBuffer: OscEvent[] = []
-  let oscErrBuffer: OscErrorEvent[] = []
-  const OSC_BUFFER_MAX = 2000
-  oscSender.setOnSent((e) => {
-    if (oscBuffer.length < OSC_BUFFER_MAX) oscBuffer.push(e as OscEvent)
-  })
-  oscSender.setOnError((e) => {
-    if (oscErrBuffer.length < 256) oscErrBuffer.push(e)
-  })
-  const oscFlushTimer = setInterval(() => {
-    if (oscBuffer.length > 0) {
-      const batch = oscBuffer
-      oscBuffer = []
-      mainWindow?.webContents.send('osc:in', batch)
-    }
-    if (oscErrBuffer.length > 0) {
-      const errBatch = oscErrBuffer
-      oscErrBuffer = []
-      mainWindow?.webContents.send('osc:errors', errBatch)
-    }
-  }, 50)
-  app.on('before-quit', () => clearInterval(oscFlushTimer))
-
   // Inbound OSC : buffer messages and flush to the renderer once per frame
   // (~16ms) so a control flood can't drown IPC, but latency stays playable.
+  const OSC_BUFFER_MAX = 2000
   let oscInBuffer: OscInMessage[] = []
   oscReceiver.setOnMessage((m) => {
     if (oscInBuffer.length < OSC_BUFFER_MAX) oscInBuffer.push(m)
@@ -297,9 +283,13 @@ app.whenReady().then(async () => {
       return { ok: true, listening: false, port: 0, addresses }
     }
     try {
-      await oscReceiver.start(port as number)
-      await oscquery.start((port as number) + 1, port as number) // HTTP on port+1
-      return { ok: true, listening: true, port: port as number, addresses }
+      const p = port as number
+      // OSCQuery's HTTP server sits on port+1; if the OSC port is the last valid
+      // one, host it on port-1 instead so it can't overflow to an invalid 65536.
+      const httpPort = p >= 65535 ? p - 1 : p + 1
+      await oscReceiver.start(p)
+      await oscquery.start(httpPort, p)
+      return { ok: true, listening: true, port: p, addresses }
     } catch (e) {
       oscReceiver.stop()
       oscquery.stop()
@@ -415,6 +405,10 @@ app.whenReady().then(async () => {
 
   // ---------- IPC: App lifecycle ----------
   safeHandle('app:close-proceed', () => {
+    if (closeFallback) {
+      clearTimeout(closeFallback)
+      closeFallback = null
+    }
     appQuitting = true
     mainWindow?.close()
   })
@@ -427,8 +421,14 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
-  shutdown()
-  if (process.platform !== 'darwin') app.quit()
+  // Only tear the subsystems down when we're actually quitting. On macOS the app
+  // stays alive in the dock and can be re-activated : shutting down here would
+  // stop OSC/modulation with no restart path AND latch `shutdownComplete`, so a
+  // reopened window would be dead and the real before-quit shutdown a no-op.
+  if (process.platform !== 'darwin') {
+    shutdown()
+    app.quit()
+  }
 })
 
 app.on('before-quit', shutdown)

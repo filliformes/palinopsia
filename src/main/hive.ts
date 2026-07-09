@@ -29,7 +29,15 @@ class AnnexBParser {
         i += 3
       } else i++
     }
-    if (starts.length < 2) return // need the next start code to close a NAL
+    if (starts.length < 2) {
+      // Guard against a malformed / handshake-less peer that never emits a second
+      // start code : without this, `buf` concatenates every received byte for the
+      // life of the connection and slowly leaks the main process. Drop all but a
+      // trailing few bytes (a start code could straddle the cap boundary).
+      const MAX_BUF = 8 * 1024 * 1024
+      if (this.buf.length > MAX_BUF) this.buf = Buffer.from(this.buf.subarray(this.buf.length - 3))
+      return // need the next start code to close a NAL
+    }
     for (let s = 0; s < starts.length - 1; s++) {
       const nalStart = starts[s] + 3
       let end = starts[s + 1]

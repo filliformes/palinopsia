@@ -66,10 +66,14 @@ export function OutputPage({
       setFormatId((cur) => cur || fs.find((f) => f.id === 'mp4-h264')?.id || fs[0]?.id || '')
     })
   }, [])
-  const recorderRef = useRef<OutputRecorder>(new OutputRecorder())
+  // Lazy-init : the useRef initializer runs every render, so `new OutputRecorder()`
+  // as a bare argument would construct (and discard) a throwaway each time.
+  const recorderRef = useRef<OutputRecorder | null>(null)
+  if (!recorderRef.current) recorderRef.current = new OutputRecorder()
   const [recording, setRecording] = useState(false)
   const [recElapsed, setRecElapsed] = useState(0) // seconds
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
+  const savedTimer = useRef<number | null>(null)
 
   // Tick the recording timer while active.
   useEffect(() => {
@@ -80,15 +84,19 @@ export function OutputPage({
     return () => window.clearInterval(id)
   }, [recording])
 
+  // Clear a pending "saved" flash on unmount so it can't fire on a dead component.
+  useEffect(() => () => { if (savedTimer.current) window.clearTimeout(savedTimer.current) }, [])
+
   const flashSaved = (path: string | null, kind: string): void => {
     if (!path) return
     const name = path.split(/[\\/]/).pop() ?? path
     setSavedMsg(`${kind}: ${name}`)
-    window.setTimeout(() => setSavedMsg((m) => (m?.endsWith(name) ? null : m)), 4000)
+    if (savedTimer.current) window.clearTimeout(savedTimer.current)
+    savedTimer.current = window.setTimeout(() => setSavedMsg((m) => (m?.endsWith(name) ? null : m)), 4000)
   }
 
   const toggleRecord = async (): Promise<void> => {
-    const rec = recorderRef.current
+    const rec = recorderRef.current!
     if (rec.active) {
       const path = await rec.stop()
       setRecording(false)
@@ -110,7 +118,7 @@ export function OutputPage({
 
   // Stop a recording cleanly if the page unmounts mid-take.
   useEffect(() => {
-    const rec = recorderRef.current
+    const rec = recorderRef.current!
     return () => {
       if (rec.active) void rec.stop()
     }
@@ -464,7 +472,12 @@ export function OutputPage({
                   type="number"
                   value={hiveOutPort}
                   disabled={hiveOutActive}
-                  onChange={(e) => setHiveOutPort(Number(e.target.value) || 51842)}
+                  onChange={(e) => {
+                    // Let the field go empty / mid-edit without snapping to the
+                    // default : only commit a real, in-range port number.
+                    const n = Number(e.target.value)
+                    if (Number.isFinite(n) && n >= 1 && n <= 65535) setHiveOutPort(n)
+                  }}
                   className="w-16 rounded bg-panel px-1 py-0.5 text-right font-mono text-[11px] text-fg disabled:opacity-50"
                 />
               </label>
