@@ -209,11 +209,11 @@ interface Prog {
 //    blowing out. Ping-pong RGBA16F, owned by FeedbackNode.
 const F_FEEDBACK = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
-uniform sampler2D uHost, uPrev;
+uniform sampler2D uHost, uPrev, uRing;
 uniform vec2 uRes, uOff, uPivot;
 uniform float uFeedback, uGain, uZoom, uRot, uWarp, uHue, uBlur, uAgc, uNoise, uSeed;
-uniform float uKeyThresh, uKeySoft, uBorder, uBorderHue, uHueCurve;
-uniform int uBlend, uKeyMode;
+uniform float uKeyThresh, uKeySoft, uBorder, uBorderHue, uHueCurve, uDelayMix;
+uniform int uBlend, uKeyMode, uRingCols, uRingRows, uDelayTile;
 
 float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 vec3 rgb2hsv(vec3 c){
@@ -252,6 +252,15 @@ void main(){
         + texture(uPrev, ruv + vec2(t.x, 0.0)).rgb + texture(uPrev, ruv - vec2(t.x, 0.0)).rgb
         + texture(uPrev, ruv + vec2(0.0, t.y)).rgb + texture(uPrev, ruv - vec2(0.0, t.y)).rgb) / 6.0;
   } else pv = texture(uPrev, ruv).rgb;
+
+  // DELAY TAP : blend in a frame from uDelay frames ago (a ring atlas of recent
+  // outputs), sampled with the SAME transform → echo / ghosting / time-shear.
+  if (uDelayMix > 0.001){
+    int col = uDelayTile - (uDelayTile / uRingCols) * uRingCols;
+    int row = uDelayTile / uRingCols;
+    vec2 rtUV = (vec2(float(col), float(row)) + clamp(ruv, 0.0, 1.0)) / vec2(float(uRingCols), float(uRingRows));
+    pv = mix(pv, texture(uRing, rtUV).rgb, uDelayMix);
+  }
 
   // AGC : normalise toward a target mean luma (from a coarse read of the buffer,
   // 1-frame delayed) so gain can sit at G≈1 without runaway / collapse.
@@ -707,8 +716,17 @@ export class ReponseNode implements ConvNode {
 // signal (host), and writes the new frame. Ignores the sidechain : it feeds on
 // the host. Returns its own write buffer (valid through this frame's downstream
 // use; only re-touched two frames later, so no read/write aliasing).
+const FB_COLS = 4
+const FB_ROWS = 4
+const FB_N = FB_COLS * FB_ROWS // 16-frame delay ring
+
 export class FeedbackNode implements ConvNode {
   private bufs: [RGBA, RGBA] | null = null
+  private ring: RGBA | null = null // atlas of recent OUTPUTS (half-res, RGBA8) for the delay tap
+  private ringTW = 0
+  private ringTH = 0
+  private ringWrite = 0
+  private ringFilled = 0
   private w = 0
   private h = 0
   private cur = 0
@@ -721,7 +739,11 @@ export class FeedbackNode implements ConvNode {
     if (this.bufs && this.w === w && this.h === h) return
     const gl = this.gl
     if (this.bufs) for (const b of this.bufs) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
+    if (this.ring) { gl.deleteTexture(this.ring.tex); gl.deleteFramebuffer(this.ring.fbo) }
     this.bufs = [makeRGBA(gl, w, h, true), makeRGBA(gl, w, h, true)]
+    this.ringTW = Math.max(2, w >> 1); this.ringTH = Math.max(2, h >> 1)
+    this.ring = makeRGBA(gl, this.ringTW * FB_COLS, this.ringTH * FB_ROWS, false)
+    this.ringWrite = 0; this.ringFilled = 0
     this.w = w; this.h = h; this.cur = 0
   }
 
@@ -741,9 +763,20 @@ export class FeedbackNode implements ConvNode {
     const pvx = 0.5 + Math.sin(this.t * 0.13) * drift * 0.3
     const pvy = 0.5 + Math.cos(this.t * 0.11) * drift * 0.3
 
+    // Delay tap : most-recent past tile = (ringWrite-1); go `delay` frames back,
+    // clamped to what's actually been filled so we never read a black tile.
+    const delayMixIn = clampf(num(inp.delayMix, 0), 0, 1)
+    const delayReq = Math.round(clampf(num(inp.delay, 0), 0, FB_N - 1))
+    const delayFrames = Math.min(delayReq, Math.max(0, this.ringFilled - 1))
+    const delayTile = ((this.ringWrite - 1 - delayFrames) % FB_N + FB_N) % FB_N
+
     const p = g.use(g.feedback)
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, read.tex); gl.uniform1i(p.u('uPrev'), 1)
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.ring!.tex); gl.uniform1i(p.u('uRing'), 2)
+    gl.uniform1i(p.u('uRingCols'), FB_COLS); gl.uniform1i(p.u('uRingRows'), FB_ROWS)
+    gl.uniform1i(p.u('uDelayTile'), delayTile)
+    gl.uniform1f(p.u('uDelayMix'), this.ringFilled > 1 ? delayMixIn : 0)
     gl.uniform2f(p.u('uRes'), W, H)
     gl.uniform1f(p.u('uFeedback'), clampf(num(inp.feedback, 0.85), 0, 1))
     gl.uniform1f(p.u('uGain'), clampf(num(inp.gain, 1.0), 0.2, 2.0))
@@ -767,6 +800,17 @@ export class FeedbackNode implements ConvNode {
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo)
     gl.viewport(0, 0, W, H)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    // Store this frame's output into the delay ring (downsampled to the tile).
+    const cp = g.use(g.copy)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, write.tex); gl.uniform1i(cp.u('uTex'), 0)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.ring!.fbo)
+    const col = this.ringWrite % FB_COLS, row = Math.floor(this.ringWrite / FB_COLS)
+    gl.viewport(col * this.ringTW, row * this.ringTH, this.ringTW, this.ringTH)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+    this.ringWrite = (this.ringWrite + 1) % FB_N
+    this.ringFilled = Math.min(FB_N, this.ringFilled + 1)
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     this.cur = 1 - this.cur // next frame reads what we just wrote
     return write.tex
@@ -774,7 +818,9 @@ export class FeedbackNode implements ConvNode {
 
   dispose(): void {
     this.disposed = true
-    if (this.bufs) { for (const b of this.bufs) { this.gl.deleteTexture(b.tex); this.gl.deleteFramebuffer(b.fbo) } this.bufs = null }
+    const gl = this.gl
+    if (this.bufs) { for (const b of this.bufs) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.bufs = null }
+    if (this.ring) { gl.deleteTexture(this.ring.tex); gl.deleteFramebuffer(this.ring.fbo); this.ring = null }
   }
 }
 

@@ -213,6 +213,8 @@ export const NATIVE_NODES: IsfShader[] = [
         { "NAME": "hue", "TYPE": "float", "MIN": -0.2, "MAX": 0.2, "DEFAULT": 0.0, "LABEL": "hue cycle" },
         { "NAME": "hueCurve", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "hue nonlinearity" },
         { "NAME": "blur", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2, "LABEL": "softness" },
+        { "NAME": "delay", "TYPE": "float", "MIN": 0.0, "MAX": 15.0, "DEFAULT": 0.0, "LABEL": "delay frames" },
+        { "NAME": "delayMix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "delay echo" },
         { "NAME": "blend", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4], "LABELS": ["mix", "add", "screen", "difference", "lighten"], "DEFAULT": 0, "LABEL": "source blend" },
         { "NAME": "keyMode", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["off", "key black", "key white"], "DEFAULT": 0, "LABEL": "keyer" },
         { "NAME": "keyThresh", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "key threshold" },
@@ -226,8 +228,8 @@ export const NATIVE_NODES: IsfShader[] = [
     curated: {
       feedback: [0.6, 0.95], gain: [0.9, 1.08], zoom: [-0.05, 0.05], rotate: [-0.08, 0.08],
       driftX: [-0.02, 0.02], driftY: [-0.02, 0.02], pivot: [0.2, 0.8], warp: [0.2, 0.8],
-      hue: [-0.08, 0.08], hueCurve: [0, 0.6], blur: [0.05, 0.5], keyThresh: [0.3, 0.6],
-      keySoft: [0.02, 0.2], border: [0, 0.5], agc: [0.3, 0.8], noise: [0.05, 0.4]
+      hue: [-0.08, 0.08], hueCurve: [0, 0.6], blur: [0.05, 0.5], delay: [2, 12], delayMix: [0.2, 0.6],
+      keyThresh: [0.3, 0.6], keySoft: [0.02, 0.2], border: [0, 0.5], agc: [0.3, 0.8], noise: [0.05, 0.4]
     }
   }
 ]
