@@ -79,6 +79,12 @@ export function Transport(): JSX.Element {
   const setGestureTexture = useStore((s) => s.setGestureTexture)
   const coalesce = useStore((s) => s.coalesce)
   const setCoalesce = useStore((s) => s.setCoalesce)
+  const tonicity = useStore((s) => s.tonicity)
+  const setTonicity = useStore((s) => s.setTonicity)
+  const shutter = useStore((s) => s.shutter)
+  const setShutter = useStore((s) => s.setShutter)
+  const drift = useStore((s) => s.drift)
+  const setDrift = useStore((s) => s.setDrift)
   const activeWorld = worlds.find((w) => w.id === world)
   const setComposition = useStore.setState
   const applyVariation = useStore((s) => s.applyVariation)
@@ -241,6 +247,13 @@ export function Transport(): JSX.Element {
           title="Gesture ↔ Texture — clean directional (sharpen) ↔ internalised churn (trails). 0.5 neutral" />
         <MacroKnob label="COAL" value={coalesce} onChange={setCoalesce}
           title="Coalesce — grain (dither) ↔ mass (blur/smooth). 0.5 neutral" />
+        {/* Corbeil-Perron temperament controls — 0 = off (double-click resets). */}
+        <MacroKnob label="TONE" value={tonicity} onChange={setTonicity} neutral={0}
+          title="Tonicity — tonal/harmonic audio pulls colour in, noise pulls toward black-and-white (needs Audio on). 0 = off · double-click resets. Homage to Corbeil-Perron §3.10" />
+        <MacroKnob label="SHUT" value={shutter} onChange={setShutter} neutral={0}
+          title="Shutter — stop-motion frame stepping, holds the output then jumps (24fps → 2fps). 0 = off. Homage to Corbeil-Perron §1.7" />
+        <MacroKnob label="DRIFT" value={drift} onChange={setDrift} neutral={0}
+          title="Drift — slow analog-instability wander over the grade + rare 'accidents'. 0 = off. Homage to Corbeil-Perron §1.8" />
       </div>
 
       <div className="flex-1" />
@@ -327,18 +340,22 @@ export function Transport(): JSX.Element {
 }
 
 // A compact field-macro slider (label + narrow range, double-click → neutral).
+// `neutral` is the parked value (0.5 for the bipolar field macros, 0 for the
+// unipolar temperament controls).
 function MacroKnob({
   label,
   value,
   onChange,
-  title
+  title,
+  neutral = 0.5
 }: {
   label: string
   value: number
   onChange: (v: number) => void
   title: string
+  neutral?: number
 }): JSX.Element {
-  const active = Math.abs(value - 0.5) > 0.02
+  const active = Math.abs(value - neutral) > 0.02
   return (
     <div className="flex items-center gap-1" title={title}>
       <span className={`font-mono text-[9px] ${active ? 'text-accent2' : 'text-muted'}`}>{label}</span>
@@ -349,7 +366,7 @@ function MacroKnob({
         step={0.01}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        onDoubleClick={() => onChange(0.5)}
+        onDoubleClick={() => onChange(neutral)}
         className="w-14 accent-accent2"
       />
     </div>

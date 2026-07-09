@@ -11,6 +11,7 @@ import { hiveEncoder } from './hiveEncoder'
 import { audioBus } from './engine/audioIn'
 import { applyCoupling } from './engine/coupling'
 import { applyProximity, applyFieldMacros } from './engine/field'
+import { applyTonicity, applyDrift, shutterHold, shutterClear } from './engine/temperament'
 import { applyModulation, modEngine } from './engine/modulation'
 import { currentFps, tickFrame } from './perf'
 import { tickSequencer } from './engine/sequencer'
@@ -437,6 +438,13 @@ export default function App(): JSX.Element {
         if (st.sequence.enabled) tickSequencer(now, comp!, c)
         // 2e. Field macros: Density / Gesture⇄Texture / Coalesce (post-mod, 0.5 deadzone).
         applyFieldMacros(comp!, c, st.density, st.gestureTexture, st.coalesce)
+        // 2f. Corbeil-Perron temperament: Tonicity (tonal audio → colour) + Drift
+        //     (analog-instability wander). Shutter (stop-motion stepping) freezes
+        //     the output on held frames.
+        applyTonicity(comp!, c, st.tonicity)
+        applyDrift(comp!, c, st.drift, now)
+        if (st.shutter > 0.02) comp!.setFreeze(shutterHold(now, st.shutter))
+        else if (shutterClear()) comp!.setFreeze(false)
         // 3. Render the frame.
         comp!.render(now - start)
         // 4. Native output window: push the exact render state so it renders

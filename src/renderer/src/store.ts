@@ -552,6 +552,15 @@ interface StoreState {
   setGestureTexture: (v: number) => void
   coalesce: number
   setCoalesce: (v: number) => void
+  // Corbeil-Perron temperament controls (0 = off). Tonicity: tonal audio → colour,
+  // noise → mono (§3.10). Shutter: stop-motion frame-stepping (§1.7). Drift: slow
+  // analog-instability wander + rare accidents over the grade (§1.8).
+  tonicity: number
+  setTonicity: (v: number) => void
+  shutter: number
+  setShutter: (v: number) => void
+  drift: number
+  setDrift: (v: number) => void
   // World / diegesis — a bank of editable presets (built-ins + user worlds).
   // Selecting one biases the composition; the World page (W) edits/creates them.
   worlds: World[]
@@ -1582,6 +1591,13 @@ export const useStore = create<StoreState>((set, get) => ({
   setGestureTexture: (v) => { localStorage.setItem('opsia.gestureTexture', String(v)); set({ gestureTexture: v }) },
   coalesce: readMacro('opsia.coalesce'),
   setCoalesce: (v) => { localStorage.setItem('opsia.coalesce', String(v)); set({ coalesce: v }) },
+  // Temperament controls rest at 0 (off), not the 0.5 deadzone of the field macros.
+  tonicity: (() => { const v = Number(localStorage.getItem('opsia.tonicity')); return Number.isFinite(v) ? v : 0 })(),
+  setTonicity: (v) => { localStorage.setItem('opsia.tonicity', String(v)); set({ tonicity: v }) },
+  shutter: (() => { const v = Number(localStorage.getItem('opsia.shutter')); return Number.isFinite(v) ? v : 0 })(),
+  setShutter: (v) => { localStorage.setItem('opsia.shutter', String(v)); set({ shutter: v }) },
+  drift: (() => { const v = Number(localStorage.getItem('opsia.drift')); return Number.isFinite(v) ? v : 0 })(),
+  setDrift: (v) => { localStorage.setItem('opsia.drift', String(v)); set({ drift: v }) },
   worlds: startWorlds,
   world: startWorld.id,
   setWorld: (id) =>
