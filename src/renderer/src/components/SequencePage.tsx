@@ -9,7 +9,13 @@ import { useShallow } from 'zustand/react/shallow'
 import type { CouplingMode, SceneClimate } from '@shared/types'
 import { SCENE_CLIMATES } from '@shared/types'
 import { useStore } from '../store'
-import { sequencerArcIntensity, sequencerCountdownMs, sequencerSkip } from '../engine/sequencer'
+import {
+  sequencerArcIntensity,
+  sequencerArmed,
+  sequencerCountdownMs,
+  sequencerScoreMarkdown,
+  sequencerSkip
+} from '../engine/sequencer'
 
 const SYNCHRESIS: CouplingMode[] = ['lean', 'hocket', 'cut', 'gate', 'drift']
 const CLIMATE_COLOR: Record<SceneClimate, string> = {
@@ -64,6 +70,22 @@ export function SequencePage(): JSX.Element {
           title="Advance to the next scene now"
         >
           skip →
+        </button>
+        <button
+          onClick={() => {
+            const md = sequencerScoreMarkdown()
+            if (!md) return
+            const url = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }))
+            const a = document.createElement('a')
+            a.href = url
+            a.download = 'opsia-relation-score.md'
+            a.click()
+            URL.revokeObjectURL(url)
+          }}
+          className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
+          title="Export the run as a relation-score (ordered AVUs, Markdown)"
+        >
+          ⤓ score
         </button>
         <NowMeter running={seq.running} />
         <div className="flex-1" />
@@ -237,6 +259,16 @@ export function SequencePage(): JSX.Element {
                   className="w-full accent-accent" />
               </Row>
             )}
+            <Row label="advance on">
+              <select className="input select-compact w-full text-[11px]" value={seq.audioAdvance}
+                onChange={(e) => setSequence({ audioAdvance: e.target.value as typeof seq.audioAdvance })}
+                title="Timer, or hold until an audio/chaos event fires the step (deferred synchresis)">
+                <option value="off">timer (dwell)</option>
+                <option value="transient">dwell, then audio transient</option>
+                <option value="onset">dwell, then audio onset</option>
+                <option value="chaos">dwell, then chaos peak</option>
+              </select>
+            </Row>
           </Section>
 
           <Section title="Selection">
@@ -368,14 +400,20 @@ function Field({ label, children }: { label: string; children: ReactNode }): JSX
   )
 }
 
-// Countdown to the next auto-advance (header).
+// Countdown to the next auto-advance (header). Shows "armed" while waiting for
+// an audio/chaos trigger (S4 deferred advance).
 function NowMeter({ running }: { running: boolean }): JSX.Element {
   const [ms, setMs] = useState(0)
+  const [armed, setArmed] = useState(false)
   useEffect(() => {
-    const id = window.setInterval(() => setMs(sequencerCountdownMs()), 200)
+    const id = window.setInterval(() => {
+      setMs(sequencerCountdownMs())
+      setArmed(sequencerArmed())
+    }, 200)
     return () => window.clearInterval(id)
   }, [])
   if (!running) return <span className="font-mono text-[10px] text-muted">idle</span>
+  if (armed) return <span className="font-mono text-[10px] text-accent2">◉ armed — waiting for trigger</span>
   return <span className="font-mono text-[10px] text-muted">next in {(ms / 1000).toFixed(1)}s</span>
 }
 

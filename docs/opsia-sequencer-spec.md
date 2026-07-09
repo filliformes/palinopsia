@@ -203,10 +203,12 @@ All OSC-addressable (`/opsia/seq/{run|dwell|advance|rupture|…}`) so Pandore ca
 |---|---|---|
 | **S1 · Skeleton** | tags + tag editor · weighted/shuffle selection · morph/cut · dwell clock · auto-variation · Sequence page | Basanta #9 · Boucher #2, #4 · no-exact-repeat (Basanta #8 in spirit) |
 | **S2 · Macro-form** | Breathe (Espace-temps) · Climate arc + arc-guided selection | Boucher D#3 · Knight-Hill C#6 · Basanta #6 (Density) |
-| **S3 · Punctuation** | Cadence/Anchoring · Rupture · Monomedia drop | Basanta #2 · Boucher/Piché Anchoring + Monomedia · Knight-Hill C#9 |
-| **S4 · Deferred + score** | audio-armed advance · export/notate the run as an ordered AVU relation-score (Boucher/Piché "future work") | deferred synchresis (Anchoring/Delayed/Expected) · representational score |
+| **S3 · Punctuation** ✅ | Cadence/Anchoring · Rupture · Monomedia drop (black + freeze) | Basanta #2 · Boucher/Piché Anchoring + Monomedia · Knight-Hill C#9 |
+| **S4 · Deferred + score** ⬜ | audio-armed advance · export/notate the run as an ordered AVU relation-score (Boucher/Piché "future work") | deferred synchresis (Anchoring/Delayed/Expected) · representational score |
 
-Ship S1 first — it's a usable long-form auto-pilot on its own; S2–S4 deepen it.
+**S1 + S2 + S3 built.** Only S4 (audio-armed deferred advance + AVU relation-score export)
+remains. `engine/sequencer.ts` holds all runtime timers; punctuation overlays write
+post-sync each frame so they self-release; `Compositor.setFreeze` backs the freeze drop.
 
 ---
 

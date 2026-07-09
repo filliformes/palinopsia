@@ -410,8 +410,10 @@ export interface SequenceState {
   ruptureChance: number
   monomediaChance: number
   monomediaStyle: MonomediaStyle
-  // Deferred synchresis (S4 — inert for now).
-  audioAdvance: 'off' | 'transient' | 'onset'
+  // Deferred synchresis (S4): dwell becomes a MINIMUM, then the advance fires on
+  // the next audio transient/onset, or a chaos modulator crossing a threshold
+  // (Knight-Hill C#7). 'off' = plain timer.
+  audioAdvance: 'off' | 'transient' | 'onset' | 'chaos'
 }
 
 // ── Session persistence (brief §7) ───────────────────────────────────

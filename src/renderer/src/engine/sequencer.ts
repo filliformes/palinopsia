@@ -9,7 +9,8 @@
 import type { CompositionState, SceneEntry, SequenceState } from '@shared/types'
 import { useStore } from '../store'
 import { runSilently } from '../undo'
-import { liveModValues } from './modulation'
+import { liveModValues, modEngine } from './modulation'
+import { audioBus } from './audioIn'
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
 const num = (v: unknown, d: number): number => (typeof v === 'number' ? v : d)
@@ -36,6 +37,13 @@ let freezeHeld = false
 // A recall deferred to a punctuation's midpoint/trough.
 let pending: { id: string; variation: number; cross: number; at: number } | null = null
 
+// ── S4 deferred advance (audio/chaos-armed) + play history ────────────────
+let armed = false // dwell elapsed; waiting for a trigger event
+let trigPrev = false // edge-detect the trigger signal
+interface ScoreEntry { sceneId: string; name: string; atMs: number; world?: string; climate?: string; punct?: string }
+const history: ScoreEntry[] = []
+let historyStart = 0
+
 /** (Re)seed timers — on start, and whenever the scene set is replaced. */
 function reset(now: number, seq: SequenceState): void {
   dwellStart = now
@@ -45,7 +53,33 @@ function reset(now: number, seq: SequenceState): void {
   stepCount = 0
   cadenceUntil = ruptureUntil = monoUntil = 0
   pending = null
+  armed = false
+  trigPrev = false
+  history.length = 0
+  historyStart = now
   recent.length = 0
+}
+
+/** Edge-detected advance trigger for S4 (rising edge only). `mode` off = timer. */
+function triggerFired(mode: SequenceState['audioAdvance']): boolean {
+  if (mode === 'off') return false
+  let sig = false
+  if (mode === 'chaos') {
+    // Any enabled chaos modulator crossing high.
+    const cfgs = useStore.getState().composition.modulators
+    for (let i = 0; i < cfgs.length; i++) {
+      if (cfgs[i]?.enabled && cfgs[i].type === 'chaos' && (modEngine.values[i] ?? 0) > 0.82) {
+        sig = true
+        break
+      }
+    }
+  } else if (audioBus.mode !== 'off') {
+    const v = audioBus.feature(mode === 'onset' ? 'flux' : 'transient')
+    sig = v > 0.45
+  }
+  const fired = sig && !trigPrev
+  trigPrev = sig
+  return fired
 }
 
 function dwellMs(seq: SequenceState): number {
@@ -236,32 +270,62 @@ export function tickSequencer(now: number, comp: SeqComp, c: CompositionState): 
     pending = null
   }
 
-  // Advance when the dwell elapses (unless a punctuation is mid-flight).
-  const busy = now < ruptureUntil || now < monoUntil || pending !== null
-  if (!busy && now - dwellStart >= nextDwellMs && scenes.length > 1) {
+  // Pick + fire the next scene (normal / rupture / monomedia + cadence), and log
+  // the AVU to the play history for the relation-score export.
+  const advance = (): void => {
     const next = pickNext(scenes, seq, st.activeSceneId, arcInt)
     if (next) {
       stepCount++
       const doRupture = seq.ruptureChance > 0 && Math.random() < seq.ruptureChance
       const doMono = !doRupture && seq.monomediaChance > 0 && Math.random() < seq.monomediaChance
+      let punct = ''
       if (doRupture) {
         ruptureUntil = now + RUPTURE_MS
         pending = { id: next.id, variation: seq.variation, cross: 0, at: now + RUPTURE_MS / 2 }
+        punct = 'rupture'
       } else if (doMono) {
         monoUntil = now + MONO_MS
         monoStyle = seq.monomediaStyle
         if (monoStyle === 'freeze') { comp.setFreeze(true); freezeHeld = true }
         pending = { id: next.id, variation: seq.variation, cross: 0, at: now + MONO_MS / 2 }
+        punct = `monomedia:${monoStyle}`
       } else {
         doRecall(next.id, seq.variation, transitionMs(seq, next))
-        // Cadence: every N steps, resolve to isomorphy on the transition.
-        if (seq.cadenceEvery > 0 && stepCount % seq.cadenceEvery === 0) cadenceUntil = now + CADENCE_MS
+        if (seq.cadenceEvery > 0 && stepCount % seq.cadenceEvery === 0) {
+          cadenceUntil = now + CADENCE_MS
+          punct = 'cadence'
+        }
       }
       recent.push(next.id)
       while (recent.length > Math.max(0, seq.noRepeat)) recent.shift()
+      history.push({
+        sceneId: next.id,
+        name: next.name,
+        atMs: now - historyStart,
+        world: next.tags?.world,
+        climate: next.tags?.climate,
+        punct: punct || undefined
+      })
+      if (history.length > 500) history.shift()
     }
     dwellStart = now
     nextDwellMs = dwellMs(seq)
+    armed = false
+  }
+
+  // Advance when the dwell elapses (unless a punctuation is mid-flight). With
+  // audio/chaos arming (S4) the dwell is a MINIMUM — the step fires on the next
+  // transient/onset/chaos edge (Anchoring/Delayed synchresis · C#7).
+  const busy = now < ruptureUntil || now < monoUntil || pending !== null
+  const fired = triggerFired(seq.audioAdvance)
+  if (!busy && scenes.length > 1) {
+    const dwellElapsed = now - dwellStart >= nextDwellMs
+    if (seq.audioAdvance === 'off') {
+      if (dwellElapsed) advance()
+    } else {
+      if (dwellElapsed) armed = true
+      if (armed && fired) advance()
+    }
   }
 
   // Continuous overlay (Breathe + Arc).
@@ -305,4 +369,37 @@ export function sequencerSkip(): void {
 /** ms remaining until the next auto-advance (for the UI countdown). */
 export function sequencerCountdownMs(): number {
   return running ? Math.max(0, nextDwellMs - (performance.now() - dwellStart)) : 0
+}
+
+/** True while the dwell has elapsed and the sequencer is waiting for an audio/
+ *  chaos trigger to fire the next step (S4). */
+export function sequencerArmed(): boolean {
+  return running && armed
+}
+
+// ── Relation-score export (Boucher/Piché "future work": a representational
+// score of ordered AVUs) ────────────────────────────────────────────────────
+const fmtT = (ms: number): string => {
+  const s = Math.round(ms / 1000)
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+}
+
+/** The play history as a Markdown relation-score (ordered AVUs: time · scene ·
+ *  Diégèse · Climat · punctuation). Empty string when nothing has played. */
+export function sequencerScoreMarkdown(): string {
+  if (history.length === 0) return ''
+  const name = useStore.getState().name || 'Untitled'
+  const lines = [
+    `# Opsia relation-score — ${name}`,
+    '',
+    'Ordered AVUs as the macro-form sequencer played them.',
+    '',
+    '| time | scene | diégèse | climat | punctuation |',
+    '|---|---|---|---|---|'
+  ]
+  for (const h of history) {
+    lines.push(`| ${fmtT(h.atMs)} | ${h.name} | ${h.world ?? '—'} | ${h.climate ?? '—'} | ${h.punct ?? '·'} |`)
+  }
+  lines.push('', `_${history.length} AVUs · exported from Palinopsia._`)
+  return lines.join('\n')
 }
