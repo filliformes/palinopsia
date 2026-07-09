@@ -45,6 +45,12 @@ const api: ExposedApi = {
     return () => ipcRenderer.off('osc:received', h)
   },
   oscQueryPublish: (nodes) => ipcRenderer.invoke('oscquery:publish', nodes),
+  oscQueryValues: (updates) => ipcRenderer.send('oscquery:values', updates),
+  onOscQueryWsActive: (cb) => {
+    const h = (_e: Electron.IpcRendererEvent, active: boolean): void => cb(active)
+    ipcRenderer.on('oscquery:ws-active', h)
+    return () => ipcRenderer.off('oscquery:ws-active', h)
+  },
 
   // ── Media ────────────────────────────────────────────────────────
   // Resolve a picked <input type=file> File to its absolute path (Electron 33

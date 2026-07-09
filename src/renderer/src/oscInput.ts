@@ -593,3 +593,35 @@ export function applyOscOutput(): void {
     feedbackTimer = setInterval(pushFeedback, Math.max(40, st.oscOutIntervalMs || 100))
   }
 }
+
+// ── OSCQuery WebSocket value-stream ──────────────────────────────────
+// Same diff-and-send idea as outbound feedback, but the transport is the
+// OSCQuery WS (for web / no-UDP clients) and it runs ONLY while a client is
+// attached — the main process flips wsActive via onOscQueryWsActive.
+
+const wsLastSent = new Map<string, number>()
+let wsTimer: ReturnType<typeof setInterval> | null = null
+
+function pushWsValues(): void {
+  const updates: Array<{ path: string; value: number }> = []
+  for (const leaf of enumerateLeaves()) {
+    if (!leaf.stream) continue
+    const prev = wsLastSent.get(leaf.path)
+    if (prev !== undefined && Math.abs(prev - leaf.value) < EPS) continue
+    wsLastSent.set(leaf.path, leaf.value)
+    updates.push({ path: leaf.path, value: leaf.value })
+  }
+  if (updates.length) window.api.oscQueryValues(updates)
+}
+
+/** Subscribe to WS-client presence and run the value-stream only when attached. */
+export function initOscQueryStream(): () => void {
+  return window.api.onOscQueryWsActive((active) => {
+    if (wsTimer) {
+      clearInterval(wsTimer)
+      wsTimer = null
+    }
+    wsLastSent.clear() // a fresh client gets a full snapshot on its first tick
+    if (active) wsTimer = setInterval(pushWsValues, 100)
+  })
+}

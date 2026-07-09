@@ -585,6 +585,10 @@ export interface ExposedApi {
   oscListen: (port: number, enabled: boolean) => Promise<OscListenResult>
   onOscReceived: (cb: (batch: OscInEvent[]) => void) => () => void
   oscQueryPublish: (nodes: OscQueryLeaf[]) => Promise<void>
+  // OSCQuery WebSocket value-stream: push live value diffs; be told when a
+  // client is (dis)connected so the renderer only computes diffs when needed.
+  oscQueryValues: (updates: Array<{ path: string; value: number | number[] }>) => void
+  onOscQueryWsActive: (cb: (active: boolean) => void) => () => void
 
   // App lifecycle — save-before-quit handshake
   appCloseProceed: () => Promise<void>

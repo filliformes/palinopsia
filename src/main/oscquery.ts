@@ -6,11 +6,15 @@
 // controls + live shader inputs) and pushes it via `publishTree()`; this server
 // nests the flat list into the OSCQuery CONTENTS tree and answers GETs.
 //
-// MVP scope: a read of any path returns the full root tree (clients traverse
-// CONTENTS); `?HOST_INFO` advertises the OSC UDP port. Per-path queries and the
-// WebSocket value-stream are a later refinement.
+// A read of any path returns the full root tree (clients traverse CONTENTS);
+// `?HOST_INFO` advertises the OSC UDP port. The WebSocket value-stream (below)
+// upgrades on the SAME http port: a client sends `{COMMAND:'LISTEN',DATA:path}`
+// to subscribe (no LISTEN = all paths), and we push `{FULL_PATH,VALUE:[v]}`
+// frames as the renderer's controls move. Per-path HTTP queries stay a refinement.
 
-import { createServer, type Server } from 'http'
+import { createServer, type Server, type IncomingMessage } from 'http'
+import type { Socket } from 'net'
+import { WebSocketServer, WebSocket } from 'ws'
 
 export interface OscQueryNode {
   full_path: string
@@ -26,14 +30,48 @@ interface Container {
   leaf?: OscQueryNode
 }
 
+// A connected value-stream client + the paths it asked to LISTEN on (empty = all).
+interface WsClient {
+  ws: WebSocket
+  listen: Set<string>
+}
+
 export class OscQueryServer {
   private tree: OscQueryNode[] = []
   private server: Server | null = null
   private oscPort = 0
+  private wss: WebSocketServer | null = null
+  private clients = new Set<WsClient>()
+  // Fired when the connected-client count crosses 0↔1, so the renderer can start
+  // or stop computing value diffs only while someone is actually listening.
+  private onActive: ((active: boolean) => void) | null = null
+
+  setOnActive(cb: (active: boolean) => void): void {
+    this.onActive = cb
+  }
+
+  /** How many value-stream clients are attached (renderer gates its push loop). */
+  activeClients(): number {
+    return this.clients.size
+  }
 
   /** Renderer pushes the flattened parameter tree; served on request. */
   publishTree(nodes: OscQueryNode[]): void {
     this.tree = nodes
+  }
+
+  /** Broadcast changed values to every subscribed WS client (JSON frames). */
+  pushValues(updates: Array<{ path: string; value: number | number[] }>): void {
+    if (!this.clients.size || !updates.length) return
+    for (const c of this.clients) {
+      if (c.ws.readyState !== WebSocket.OPEN) continue
+      for (const u of updates) {
+        if (c.listen.size && !c.listen.has(u.path)) continue
+        c.ws.send(
+          JSON.stringify({ FULL_PATH: u.path, VALUE: Array.isArray(u.value) ? u.value : [u.value] })
+        )
+      }
+    }
   }
 
   getTree(): OscQueryNode[] {
@@ -90,13 +128,51 @@ export class OscQueryServer {
               NAME: 'Palinopsia',
               OSC_PORT: this.oscPort,
               OSC_TRANSPORT: 'UDP',
-              EXTENSIONS: { ACCESS: true, VALUE: true, RANGE: true, TYPE: true, DESCRIPTION: true }
+              // The value-stream WebSocket upgrades on this same HTTP host:port.
+              WS_IP: '127.0.0.1',
+              WS_PORT: httpPort,
+              EXTENSIONS: {
+                ACCESS: true,
+                VALUE: true,
+                RANGE: true,
+                TYPE: true,
+                DESCRIPTION: true,
+                LISTEN: true
+              }
             })
           )
           return
         }
         res.end(JSON.stringify(this.buildRoot()))
       })
+
+      // Value-stream: upgrade WS on the same server (loopback-bound like the HTTP
+      // side). Clients LISTEN/IGNORE per path; we push value frames via pushValues.
+      const wss = new WebSocketServer({ noServer: true })
+      server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
+        wss.handleUpgrade(req, socket, head, (ws) => {
+          const client: WsClient = { ws, listen: new Set() }
+          this.clients.add(client)
+          if (this.clients.size === 1) this.onActive?.(true)
+          ws.on('message', (data) => {
+            try {
+              const msg = JSON.parse(data.toString()) as { COMMAND?: string; DATA?: string }
+              const cmd = msg.COMMAND?.toUpperCase()
+              if (cmd === 'LISTEN' && msg.DATA) client.listen.add(msg.DATA)
+              else if (cmd === 'IGNORE' && msg.DATA) client.listen.delete(msg.DATA)
+            } catch {
+              /* ignore malformed control frames */
+            }
+          })
+          const drop = (): void => {
+            if (this.clients.delete(client) && this.clients.size === 0) this.onActive?.(false)
+          }
+          ws.on('close', drop)
+          ws.on('error', drop)
+        })
+      })
+      this.wss = wss
+
       server.on('error', (e) => {
         this.server = null
         reject(e)
@@ -112,6 +188,24 @@ export class OscQueryServer {
   }
 
   stop(): void {
+    for (const c of this.clients) {
+      try {
+        c.ws.close()
+      } catch {
+        /* ignore */
+      }
+    }
+    const hadClients = this.clients.size > 0
+    this.clients.clear()
+    if (this.wss) {
+      try {
+        this.wss.close()
+      } catch {
+        /* ignore */
+      }
+      this.wss = null
+    }
+    if (hadClients) this.onActive?.(false)
     if (this.server) {
       try {
         this.server.close()

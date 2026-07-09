@@ -312,6 +312,16 @@ app.whenReady().then(async () => {
     oscquery.publishTree(nodes as OscQueryNode[])
   })
 
+  // Renderer streams live value diffs (only while a WS client is attached);
+  // OSCQuery broadcasts them to subscribers. Fire-and-forget (ipcRenderer.send).
+  ipcMain.on('oscquery:values', (_e, updates) => {
+    oscquery.pushValues(updates as Array<{ path: string; value: number | number[] }>)
+  })
+  // Tell the renderer to start/stop its value-push loop as clients come and go.
+  oscquery.setOnActive((active) => {
+    mainWindow?.webContents.send('oscquery:ws-active', active)
+  })
+
   // ---------- IPC: Capture ----------
   // Enumerate screens + windows (with thumbnails) so the renderer can offer a
   // source picker for screen capture.

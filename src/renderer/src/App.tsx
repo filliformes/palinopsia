@@ -29,7 +29,7 @@ import { OutputPage } from './components/OutputPage'
 import { WorldPage } from './components/WorldPage'
 import { SequencePage } from './components/SequencePage'
 import { SceneBank } from './components/SceneBank'
-import { initOscInput, applyOscListen, applyOscOutput } from './oscInput'
+import { initOscInput, applyOscListen, applyOscOutput, initOscQueryStream } from './oscInput'
 import { morphedComposition, consumeCrossfade } from './morph'
 import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
@@ -139,7 +139,12 @@ export default function App(): JSX.Element {
     void applyOscListen()
     // Restore outbound feedback (starts the diff-and-send loop if it was on).
     applyOscOutput()
-    return unsub
+    // Stream values to OSCQuery WS clients while any are attached.
+    const unsubWs = initOscQueryStream()
+    return () => {
+      unsub()
+      unsubWs()
+    }
   }, [])
 
   // ── Output window — reset our flag if the user closes it directly ──────
