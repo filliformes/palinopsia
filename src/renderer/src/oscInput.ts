@@ -17,14 +17,28 @@
 //   /opsia/layer/{n}/source/{A|B}/{input}              f 0..1 → range
 //   /opsia/layer/{n}/source/{A|B}/fx/{i}/{input}       f 0..1 → range
 //   /opsia/layer/{n}/fx/{i}/{input}                    f 0..1 → range
+//   /opsia/layer/{n}/coupling/mode                     i index | f 0..1 | s name
+//   /opsia/layer/{n}/coupling/amount|tightness         f 0..1
+//   /opsia/layer/{n}/coupling/feature                  i index | f 0..1 | s name
 //   /opsia/master/fx/{i}/{input}                       f 0..1 → range
-//   /opsia/master/vibe|context/{input}                 f 0..1 → range
+//   /opsia/master/vibe|context|finalizer/{input}       f 0..1 → range (color/point2D: N args)
+//   /opsia/bg/opacity|speed|depth                      f 0..1
+//   /opsia/bg/blend                                     0=blend · 1=isolate (>= 0.5)
+//   /opsia/bg/source                                    s shaderId | name | "none"
+//   /opsia/bg/source/{input}                           f 0..1 → range (color/point2D: N args)
+//   /opsia/bg/fx/{i}/{input}                           f 0..1 → range
+//   /opsia/density|proximity                            f 0..1 (field macros)
+//   /opsia/gesture                                      f 0..1 (Gesture ⇄ Texture)
+//   /opsia/coalesce                                     f 0..1 (Dispersal ⇄ Coalescence)
+//   /opsia/world                                        s id | name | i (1-based index)
+//   /opsia/seq/run                                      >= 0.5 toggles the sequencer
+//   /opsia/seq/skip                                     trigger (advance to next scene)
 //   /opsia/meta/{1..16}                                f 0..1 (drives the knob)
 //   /opsia/bpm                                          f 20..300 (raw)
 //   /opsia/scene/{n}                                    trigger
 //   /opsia/randomize[/{scope}]                          trigger
 
-import type { BlendMode, FxScope, OscInEvent, OscQueryLeaf } from '@shared/types'
+import type { BlendMode, CouplingMode, AudioFeature, FxScope, OscInEvent, OscQueryLeaf } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
 import { useStore } from './store'
 import type { RandomizeScope } from './randomize'
@@ -32,6 +46,7 @@ import { setKnobTarget } from './metaSmooth'
 import { GENERATORS, SHADER_BY_ID } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
 import { audioBus, type AudioFeatureName } from './engine/audioIn'
+import { sequencerSkip } from './engine/sequencer'
 
 type Args = OscInEvent['args']
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v))
@@ -50,10 +65,18 @@ function firstStr(args: Args): string | null {
   return a && typeof a.value === 'string' ? a.value : null
 }
 
-/** Scale a normalized 0..1 OSC value onto a shader input's declared range/type. */
-function scaleInput(shaderId: string, name: string, norm: number): number | null {
+/** Resolve OSC args onto a shader input's declared range/type. float/long/bool
+ *  take a single normalized 0..1 value; color takes 3–4 raw 0..1 args (or one =
+ *  grayscale); point2D takes 2 normalized args scaled to each axis. null = skip. */
+function resolveInputValue(shaderId: string, name: string, args: Args): number | number[] | null {
   const d = inputsForShader(shaderId).find((x) => x.name === name)
   if (!d) return null
+  const norm = firstNum(args)
+  if (d.type === 'float') {
+    const min = typeof d.min === 'number' ? d.min : 0
+    const max = typeof d.max === 'number' ? d.max : 1
+    return min + clamp01(norm) * (max - min)
+  }
   if (d.type === 'long') {
     const vals = d.values ?? []
     if (!vals.length) return null
@@ -61,10 +84,19 @@ function scaleInput(shaderId: string, name: string, norm: number): number | null
     return vals[Math.max(0, Math.min(vals.length - 1, i))]
   }
   if (d.type === 'bool' || d.type === 'event') return norm >= 0.5 ? 1 : 0
-  if (d.type !== 'float') return null // color / point2D need multi-arg — skip
-  const min = typeof d.min === 'number' ? d.min : 0
-  const max = typeof d.max === 'number' ? d.max : 1
-  return min + clamp01(norm) * (max - min)
+  if (d.type === 'color') {
+    const nums = args.map((a) => Number(a.value)).filter((x) => Number.isFinite(x))
+    if (nums.length >= 3) return [nums[0], nums[1], nums[2], nums[3] ?? 1]
+    return [norm, norm, norm, 1] // single value → grayscale
+  }
+  if (d.type === 'point2D') {
+    const min = Array.isArray(d.min) ? d.min : [0, 0]
+    const max = Array.isArray(d.max) ? d.max : [1, 1]
+    const a0 = clamp01(Number(args[0]?.value) || 0)
+    const a1 = clamp01(Number(args[1]?.value) || 0)
+    return [min[0] + a0 * (max[0] - min[0]), min[1] + a1 * (max[1] - min[1])]
+  }
+  return null
 }
 
 function sourceShaderId(li: number, slot: 'A' | 'B'): string | null {
@@ -109,6 +141,24 @@ function blendFrom(args: Args): BlendMode | null {
   return BLEND_MODES[Math.max(0, Math.min(BLEND_MODES.length - 1, idx))] ?? null
 }
 
+const COUPLING_MODES: readonly CouplingMode[] = ['off', 'lean', 'hocket', 'cut', 'gate', 'drift']
+const COUPLING_FEATURES: readonly AudioFeature[] = ['level', 'flux', 'transient', 'centroid', 'band', 'pitch']
+
+/** Resolve an enum arg: a string name, an int index, or a 0..1 float mapped
+ *  across the members. Returns null if nothing valid is present. */
+function enumFrom<T extends string>(args: Args, members: readonly T[]): T | null {
+  const a = args[0]
+  if (!a) return null
+  if (typeof a.value === 'string') {
+    const lc = a.value.trim().toLowerCase()
+    return (members as readonly string[]).includes(lc) ? (lc as T) : null
+  }
+  const v = Number(a.value)
+  if (!Number.isFinite(v)) return null
+  const idx = a.type === 'i' ? Math.round(v) : Math.round(clamp01(v) * (members.length - 1))
+  return members[Math.max(0, Math.min(members.length - 1, idx))] ?? null
+}
+
 // Rising-edge tracking for trigger addresses (scene / randomize).
 const edge = new Map<string, boolean>()
 function rising(address: string, v: number): boolean {
@@ -144,14 +194,14 @@ function route(address: string, args: Args): void {
           const scope: FxScope = { kind: slot === 'A' ? 'sourceA' : 'sourceB', layer: li }
           const u = fxAt(scope, fi)
           if (!u) return
-          const v = scaleInput(u.shaderId, input, n)
+          const v = resolveInputValue(u.shaderId, input, args)
           if (v !== null) st.setFxInput(scope, u.id, input, v)
           return
         }
         const input = segs[5]
         const sid = sourceShaderId(li, slot)
         if (!sid) return
-        const v = scaleInput(sid, input, n)
+        const v = resolveInputValue(sid, input, args)
         if (v !== null) st.setSourceInput(li, slot, input, v)
         return
       }
@@ -163,8 +213,22 @@ function route(address: string, args: Args): void {
         const scope: FxScope = { kind: 'layer', layer: li }
         const u = fxAt(scope, fi)
         if (!u) return
-        const v = scaleInput(u.shaderId, input, n)
+        const v = resolveInputValue(u.shaderId, input, args)
         if (v !== null) st.setFxInput(scope, u.id, input, v)
+        return
+      }
+
+      if (ctl === 'coupling') {
+        const which = segs[4]
+        if (which === 'mode') {
+          const m = enumFrom(args, COUPLING_MODES)
+          if (m) st.patchLayer(li, { coupling: { ...st.composition.layers[li].coupling, mode: m } })
+        } else if (which === 'feature') {
+          const feat = enumFrom(args, COUPLING_FEATURES)
+          if (feat) st.patchLayer(li, { coupling: { ...st.composition.layers[li].coupling, feature: feat } })
+        } else if (which === 'amount' || which === 'tightness') {
+          st.patchLayer(li, { coupling: { ...st.composition.layers[li].coupling, [which]: clamp01(n) } })
+        }
         return
       }
 
@@ -190,18 +254,84 @@ function route(address: string, args: Args): void {
         const scope: FxScope = { kind: 'master' }
         const u = fxAt(scope, fi)
         if (!u) return
-        const v = scaleInput(u.shaderId, input, n)
+        const v = resolveInputValue(u.shaderId, input, args)
         if (v !== null) st.setFxInput(scope, u.id, input, v)
         return
       }
-      if (segs[2] === 'vibe' || segs[2] === 'context') {
-        const shaderId = segs[2] === 'vibe' ? 'fx-vibe' : 'fx-context'
+      if (segs[2] === 'vibe' || segs[2] === 'context' || segs[2] === 'finalizer') {
+        const shaderId =
+          segs[2] === 'vibe' ? 'fx-vibe' : segs[2] === 'context' ? 'fx-context' : 'fx-finalizer'
         const input = segs[3]
         if (!input) return
         const u = st.composition.master.find((f) => f.shaderId === shaderId)
         if (!u) return
-        const v = scaleInput(shaderId, input, n)
+        const v = resolveInputValue(shaderId, input, args)
         if (v !== null) st.setFxInput({ kind: 'master' }, u.id, input, v)
+        return
+      }
+      return
+    }
+
+    case 'bg': {
+      const ctl = segs[2]
+      if (ctl === 'opacity') { st.setBackgroundOpacity(clamp01(n)); return }
+      if (ctl === 'speed') { st.setBackgroundSpeed(clamp01(n)); return }
+      if (ctl === 'depth') { st.setBackgroundDepth(clamp01(n)); return }
+      if (ctl === 'blend') { st.setBackgroundBlendMode(n >= 0.5 ? 'isolate' : 'blend'); return }
+      if (ctl === 'source') {
+        if (segs[3] === undefined) {
+          const str = firstStr(args)
+          if (str !== null) st.setBackgroundSource(resolveGenerator(str))
+          return
+        }
+        const sid = st.composition.background?.source?.shaderId
+        if (!sid) return
+        const v = resolveInputValue(sid, segs[3], args)
+        if (v !== null) st.setBackgroundInput(segs[3], v)
+        return
+      }
+      if (ctl === 'fx') {
+        const fi = parseInt(segs[3], 10) - 1
+        const input = segs[4]
+        if (!input || fi < 0) return
+        const scope: FxScope = { kind: 'background' }
+        const u = fxAt(scope, fi)
+        if (!u) return
+        const v = resolveInputValue(u.shaderId, input, args)
+        if (v !== null) st.setFxInput(scope, u.id, input, v)
+        return
+      }
+      return
+    }
+
+    // Global field macros (0.5 = deadzone) and Proximity — each a single 0..1.
+    case 'density': st.setDensity(clamp01(n)); return
+    case 'gesture': st.setGestureTexture(clamp01(n)); return
+    case 'coalesce': st.setCoalesce(clamp01(n)); return
+    case 'proximity': st.setProximity(clamp01(n)); return
+
+    case 'world': {
+      const str = firstStr(args)
+      if (str !== null) {
+        const w = st.worlds.find((x) => x.id === str || x.name.toLowerCase() === str.trim().toLowerCase())
+        if (w) st.setWorld(w.id)
+        return
+      }
+      const idx = Math.round(n) - 1 // 1-based index into the worlds bank
+      const w = st.worlds[idx]
+      if (w) st.setWorld(w.id)
+      return
+    }
+
+    case 'seq': {
+      if (segs[2] === 'run') {
+        // Level control: >= 0.5 runs, < 0.5 stops (toggle only when it differs).
+        if ((n >= 0.5) !== st.sequence.running) st.toggleSequenceRunning()
+        return
+      }
+      if (segs[2] === 'skip') {
+        if (!rising(address, n)) return
+        sequencerSkip() // advance now (respects transition + variation)
         return
       }
       return
@@ -321,6 +451,10 @@ export function publishOscQuery(): void {
     f(`/opsia/layer/${n}/mute`, 0, 1, l?.mute ? 1 : 0, 'Mute (>= 0.5)')
     f(`/opsia/layer/${n}/solo`, 0, 1, l?.solo ? 1 : 0, 'Solo (>= 0.5)')
     f(`/opsia/layer/${n}/feedback`, 0, 1, l?.feedback ? 1 : 0, 'Feedback on (>= 0.5)')
+    f(`/opsia/layer/${n}/coupling/mode`, 0, 1, 0, 'A/B coupling mode (index: off·lean·hocket·cut·gate·drift)')
+    f(`/opsia/layer/${n}/coupling/amount`, 0, 1, l?.coupling?.amount ?? 0.5, 'A/B coupling depth')
+    f(`/opsia/layer/${n}/coupling/tightness`, 0, 1, l?.coupling?.tightness ?? 0.7, 'A/B coupling tightness')
+    f(`/opsia/layer/${n}/coupling/feature`, 0, 1, 0, 'A/B coupling audio feature (index)')
   }
   for (let k = 1; k <= st.composition.metaKnobs.length; k++) {
     const knob = st.composition.metaKnobs[k - 1]
@@ -332,7 +466,7 @@ export function publishOscQuery(): void {
     f(`/opsia/audio/${feat}`, 0, 1, 0, `Audio ${feat} (0..1)`)
   }
   for (let b = 1; b <= 6; b++) f(`/opsia/audio/band/${b}`, 0, 1, 0, `Audio band ${b} energy (0..1)`)
-  for (const [key, sid] of [['vibe', 'fx-vibe'], ['context', 'fx-context']] as const) {
+  for (const [key, sid] of [['vibe', 'fx-vibe'], ['context', 'fx-context'], ['finalizer', 'fx-finalizer']] as const) {
     for (const d of inputsForShader(sid)) {
       if (d.type !== 'float') continue
       const min = typeof d.min === 'number' ? d.min : 0
@@ -340,5 +474,33 @@ export function publishOscQuery(): void {
       f(`/opsia/master/${key}/${d.name}`, 0, 1, 0, `${key} · ${d.label} (0..1 → ${min}..${max})`)
     }
   }
+  // Background layer.
+  const bg = st.composition.background
+  f('/opsia/bg/opacity', 0, 1, bg?.opacity ?? 0, 'Background opacity')
+  f('/opsia/bg/speed', 0, 1, bg?.speed ?? 0.5, 'Background speed')
+  f('/opsia/bg/depth', 0, 1, bg?.depth ?? 0, 'Background depth push')
+  f('/opsia/bg/blend', 0, 1, bg?.blendMode === 'isolate' ? 1 : 0, 'Background blend (0=blend · 1=isolate)')
+  if (bg?.source?.shaderId) {
+    for (const d of inputsForShader(bg.source.shaderId)) {
+      if (d.type !== 'float') continue
+      f(`/opsia/bg/source/${d.name}`, 0, 1, 0, `Background · ${d.label}`)
+    }
+  }
+  // Global field macros + Proximity (0.5 = deadzone).
+  f('/opsia/density', 0, 1, st.density ?? 0.5, 'Density macro (sparse ⇄ dense)')
+  f('/opsia/gesture', 0, 1, st.gestureTexture ?? 0.5, 'Gesture ⇄ Texture macro')
+  f('/opsia/coalesce', 0, 1, st.coalesce ?? 0.5, 'Dispersal ⇄ Coalescence macro')
+  f('/opsia/proximity', 0, 1, st.proximity ?? 0.5, 'Proximity (near ⇄ far)')
+  // World selection (accepts a string id/name, or a 1-based index) + transport.
+  const worldIdx = Math.max(1, st.worlds.findIndex((w) => w.id === st.world) + 1)
+  nodes.push({
+    full_path: '/opsia/world',
+    type: 'f',
+    range: { min: 1, max: Math.max(1, st.worlds.length) },
+    value: worldIdx,
+    description: 'Active World (send an id/name string, or a 1-based index)'
+  })
+  f('/opsia/seq/run', 0, 1, st.sequence.running ? 1 : 0, 'Sequencer running (>= 0.5)')
+  f('/opsia/seq/skip', 0, 1, 0, 'Advance to the next scene (trigger)')
   window.api.oscQueryPublish(nodes)
 }
