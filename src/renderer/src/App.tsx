@@ -701,7 +701,7 @@ export default function App(): JSX.Element {
           Save As
         </button>
         <select
-          className="input text-[12px]"
+          className="input w-24 shrink-0 text-[12px]"
           value={theme}
           onChange={(e) => setTheme(e.target.value as ThemeName)}
           title="Theme"
