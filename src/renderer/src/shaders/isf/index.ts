@@ -258,6 +258,8 @@ export const NATIVE_NODES: IsfShader[] = [
         { "NAME": "reseed", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.1, "LABEL": "reseed" },
         { "NAME": "thresh", "TYPE": "float", "MIN": 0.0, "MAX": 0.5, "DEFAULT": 0.06, "LABEL": "motion gate" },
         { "NAME": "bleed", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2, "LABEL": "chroma bleed" },
+        { "NAME": "autoBloom", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.7, "LABEL": "auto-bloom (cuts)" },
+        { "NAME": "cutSense", "TYPE": "float", "MIN": 0.02, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "cut sensitivity" },
         { "NAME": "sidechainFlow", "TYPE": "bool", "DEFAULT": false, "LABEL": "motion transfer", "COMPACT": true },
         { "NAME": "flowRes", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["128", "256", "512"], "DEFAULT": 1, "LABEL": "flow res", "COMPACT": true }
       ]
@@ -270,7 +272,9 @@ export const NATIVE_NODES: IsfShader[] = [
       residual: [0.05, 0.35],
       reseed: [0.0, 0.35],
       thresh: [0.02, 0.12],
-      bleed: [0, 0.5]
+      bleed: [0, 0.5],
+      autoBloom: [0.4, 1.0],
+      cutSense: [0.2, 0.5]
     }
   }
 ]

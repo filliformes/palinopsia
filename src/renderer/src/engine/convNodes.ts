@@ -326,12 +326,16 @@ void main(){
 // bleed. Block-constant vectors tear at block edges : the macroblock signature.
 const F_DATAMOSH = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
-uniform sampler2D uHost, uPrev, uFlow;
+uniform sampler2D uHost, uPrev, uFlow, uEnergy;
 uniform vec2 uRes;
-uniform float uBlock, uMotion, uRefresh, uResidual, uReseed, uDecay, uBleed, uThresh, uSeed;
+uniform float uBlock, uMotion, uRefresh, uResidual, uReseed, uDecay, uBleed, uThresh, uSeed, uAutoBloom;
 uniform int uMode;
 float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 void main(){
+  // AUTO-BLOOM : a detected cut (global-motion spike, held in the 1×1 energy
+  // state) momentarily drives the I-frame refresh toward 0, so a scene change
+  // blooms : the new shot's motion drags the previous shot's texture around.
+  float refresh = uRefresh * (1.0 - uAutoBloom * texture(uEnergy, vec2(0.5)).r);
   vec2 texel = 1.0 / uRes;
   vec2 blk = max(uBlock, 1.0) * texel;                 // macroblock size in UV
   vec2 blockOrigin = floor(vUV / blk) * blk;
@@ -366,7 +370,7 @@ void main(){
   vec3 outc = mix(host, mosh, gate);
 
   // I-frame reset : lerp the buffer back to the clean live frame.
-  outc = mix(outc, host, uRefresh);
+  outc = mix(outc, host, refresh);
 
   // Stochastic block reseed : whole blocks snap back to host, re-introducing
   // detail so the smear never fully mushes (transflow's random-reset idea).
@@ -374,6 +378,27 @@ void main(){
   outc = mix(outc, host, rs);
 
   o = vec4(clamp(outc, 0.0, 1.0), 1.0);
+}`
+
+// Cut detector → decaying bloom state (rendered to a 1×1 buffer). Averages the
+// flow field's magnitude (a scene cut spikes it everywhere); the state holds a
+// level that jumps to 1 on a cut and decays over frames, so the bloom is
+// SUSTAINED (a cut lasts many frames), all on the GPU (no readback stall).
+const F_ENERGY = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uFlow, uPrevE;
+uniform float uCutSense, uEDecay;
+void main(){
+  float m = 0.0;
+  for (int j = 0; j < 8; j++){
+    for (int i = 0; i < 8; i++){
+      m += length(texture(uFlow, (vec2(float(i), float(j)) + 0.5) / 8.0).rg);
+    }
+  }
+  m /= 64.0;
+  float spike = smoothstep(uCutSense, uCutSense * 2.0, m * 4.0);
+  float prev = texture(uPrevE, vec2(0.5)).r;
+  o = vec4(max(prev * uEDecay, spike), 0.0, 0.0, 1.0);
 }`
 
 class NodeGL {
@@ -390,6 +415,7 @@ class NodeGL {
   echo: Prog
   feedback: Prog
   datamosh: Prog
+  energy: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -407,6 +433,7 @@ class NodeGL {
     this.echo = this.build(F_ECHO)
     this.feedback = this.build(F_FEEDBACK)
     this.datamosh = this.build(F_DATAMOSH)
+    this.energy = this.build(F_ENERGY)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -901,6 +928,8 @@ export class DatamoshNode implements ConvNode {
   private lumaCurIsA = true
   private flowT!: RG
   private accum: [RGBA, RGBA] | null = null
+  private energyBuf: [RGBA, RGBA] | null = null // 1×1 decaying cut-bloom state
+  private energyCur = 0
   private w = 0
   private h = 0
   private cur = 0
@@ -966,11 +995,22 @@ export class DatamoshNode implements ConvNode {
     gl.uniform1f(p.u('uClamp'), 0.03)
     draw(this.flowT.fbo, n, n)
 
+    // 2b) cut detector → 1×1 decaying bloom state (scene-cut auto-mosh).
+    if (!this.energyBuf) { this.energyBuf = [makeRGBA(gl, 1, 1, false), makeRGBA(gl, 1, 1, false)]; this.energyCur = 0 }
+    const eRead = this.energyBuf[this.energyCur], eWrite = this.energyBuf[1 - this.energyCur]
+    p = g.use(g.energy)
+    bind(0, this.flowT.tex); bind(1, eRead.tex)
+    gl.uniform1i(p.u('uFlow'), 0); gl.uniform1i(p.u('uPrevE'), 1)
+    gl.uniform1f(p.u('uCutSense'), clampf(num(inp.cutSense, 0.35), 0.02, 1))
+    gl.uniform1f(p.u('uEDecay'), 0.92) // bloom sustains ~25–30 frames after a cut
+    draw(eWrite.fbo, 1, 1)
+
     // 3) datamosh advection → accumulator write
     const read = this.accum![this.cur], write = this.accum![1 - this.cur]
     p = g.use(g.datamosh)
-    bind(0, ctx.host); bind(1, read.tex); bind(2, this.flowT.tex)
-    gl.uniform1i(p.u('uHost'), 0); gl.uniform1i(p.u('uPrev'), 1); gl.uniform1i(p.u('uFlow'), 2)
+    bind(0, ctx.host); bind(1, read.tex); bind(2, this.flowT.tex); bind(3, eWrite.tex)
+    gl.uniform1i(p.u('uHost'), 0); gl.uniform1i(p.u('uPrev'), 1); gl.uniform1i(p.u('uFlow'), 2); gl.uniform1i(p.u('uEnergy'), 3)
+    gl.uniform1f(p.u('uAutoBloom'), clampf(num(inp.autoBloom, 0.7), 0, 1))
     gl.uniform2f(p.u('uRes'), W, H)
     gl.uniform1f(p.u('uBlock'), clampf(num(inp.block, 16), 2, 64))
     gl.uniform1f(p.u('uMotion'), clampf(num(inp.motion, 1), 0, 4))
@@ -987,6 +1027,7 @@ export class DatamoshNode implements ConvNode {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     this.lumaCurIsA = !this.lumaCurIsA
     this.cur = 1 - this.cur
+    this.energyCur = 1 - this.energyCur
     return write.tex
   }
 
@@ -995,6 +1036,7 @@ export class DatamoshNode implements ConvNode {
     this.freeFlow()
     const gl = this.gl
     if (this.accum) { for (const b of this.accum) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.accum = null }
+    if (this.energyBuf) { for (const b of this.energyBuf) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.energyBuf = null }
   }
 }
 
