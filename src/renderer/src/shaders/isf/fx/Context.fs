@@ -22,6 +22,7 @@
       "DEFAULT": 0, "LABEL": "texture" },
     { "NAME": "pbrAmount", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "relief" },
     { "NAME": "pbrScale",  "TYPE": "float", "MIN": 0.25, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "tex scale" },
+    { "NAME": "pbrDepth",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "field depth" },
     { "NAME": "pbrNormal", "TYPE": "image" },
     { "NAME": "pbrHeight", "TYPE": "image" },
     { "NAME": "pbrAO",     "TYPE": "image" }
@@ -65,29 +66,34 @@ void main() {
     // rides over bumps) : the "projected onto a complex 3D surface" warp, not a
     // flat nudge. A gentle perspective throw from centre makes features near the
     // edges parallax more, as a real projector throw would.
-    vec2 vdir = (uv - 0.5) * vec2(aspect, 1.0);
-    float amp = pbrAmount * 0.1;                       // max displacement
+    // FIELD DEPTH (pbrDepth) = viewing distance. Stepping BACK : you see MORE of
+    // the surface (it tiles denser), the relief flattens, and the perspective
+    // throw becomes less extreme (more orthographic) : the material reads from
+    // afar rather than pressed against your eye.
+    float pscl = pbrScale * (1.0 + pbrDepth * 2.5);
+    vec2 vdir = (uv - 0.5) * vec2(aspect, 1.0) * (1.0 - pbrDepth * 0.6);
+    float amp = pbrAmount * 0.1 * (1.0 - pbrDepth * 0.55); // relief subtends less from afar
     vec2 stepUV = vdir * amp / 16.0;
     float layer = 1.0 / 16.0;
     vec2 pp = uv;
     float curD = 0.0;
-    float hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, fract(vec2(pp.x * aspect, pp.y) * pbrScale)).r;
+    float hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, fract(vec2(pp.x * aspect, pp.y) * pscl)).r;
     for (int i = 0; i < 16; i++) {
       if (curD >= hd) break;
       pp += stepUV;
-      hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, fract(vec2(pp.x * aspect, pp.y) * pbrScale)).r;
+      hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, fract(vec2(pp.x * aspect, pp.y) * pscl)).r;
       curD += layer;
     }
     // Refine : interpolate the exact crossing so the surface reads smooth.
     vec2 prev = pp - stepUV;
     float aft = hd - curD;
-    float bef = (1.0 - IMG_NORM_PIXEL(pbrHeight, fract(vec2(prev.x * aspect, prev.y) * pbrScale)).r) - (curD - layer);
+    float bef = (1.0 - IMG_NORM_PIXEL(pbrHeight, fract(vec2(prev.x * aspect, prev.y) * pscl)).r) - (curD - layer);
     pp = mix(pp, prev, clamp(aft / (aft - bef + 1e-4), 0.0, 1.0));
     // Reference to the mid-plane (height 0.5) so a FLAT/neutral map (texture off)
     // gives ZERO displacement; raised vs recessed features then shift oppositely.
     uv = pp - vdir * amp * 0.5;                        // parallax-corrected sample point
 
-    vec2 tuv = fract(vec2(uv.x * aspect, uv.y) * pbrScale);
+    vec2 tuv = fract(vec2(uv.x * aspect, uv.y) * pscl);
     pnrm = normalize(IMG_NORM_PIXEL(pbrNormal, tuv).rgb * 2.0 - 1.0);
     pao = IMG_NORM_PIXEL(pbrAO, tuv).r;
 
@@ -100,7 +106,7 @@ void main() {
       float occ = 0.0;
       for (int j = 1; j <= 6; j++) {
         vec2 sp = uv + Ls.xy * amp * (float(j) / 6.0);
-        float hs = IMG_NORM_PIXEL(pbrHeight, fract(vec2(sp.x * aspect, sp.y) * pbrScale)).r;
+        float hs = IMG_NORM_PIXEL(pbrHeight, fract(vec2(sp.x * aspect, sp.y) * pscl)).r;
         occ = max(occ, hs - surfH - float(j) / 6.0 * 0.12);
       }
       pshadow = clamp(1.0 - occ * 4.0, 0.25, 1.0);
@@ -160,19 +166,24 @@ void main() {
     vec3 L = normalize(vec3((light - uv) * vec2(aspect, 1.0), 0.55));
     float ndl = clamp(dot(pnrm, L), 0.0, 1.0);
     float flatNdl = clamp(L.z, 0.0, 1.0);
-    // Diffuse relief lighting (steeper than before for more modelling) × the cast
-    // self-shadow × ambient occlusion in the crevices.
-    float diff = (0.18 + 0.82 * ndl) / (0.18 + 0.82 * flatNdl);
-    float shade = diff * pshadow * mix(1.0, pao, 0.9);
+    // Diffuse relief lighting × the cast self-shadow × ambient occlusion. FIELD
+    // DEPTH raises the ambient floor : stepped back, the light reads softer / more
+    // ambient (less raking contrast), as a distant surface does.
+    float amb = mix(0.18, 0.5, pbrDepth);
+    float diff = (amb + (1.0 - amb) * ndl) / (amb + (1.0 - amb) * flatNdl);
+    float shade = diff * mix(pshadow, 1.0, pbrDepth * 0.6) * mix(1.0, pao, 0.9);
     col *= mix(1.0, shade, pbrAmount);
     // Rim / fresnel : slopes turned away from the screen catch a thin edge light,
-    // popping each bump off the surface (the projector grazing the relief).
+    // popping each bump off the surface (softens with distance).
     float fres = pow(1.0 - clamp(pnrm.z, 0.0, 1.0), 3.0);
-    col += lightColor.rgb * fres * pbrAmount * 0.14;
-    // Specular sheen riding the slopes.
+    col += lightColor.rgb * fres * pbrAmount * 0.14 * (1.0 - pbrDepth * 0.5);
+    // Specular sheen riding the slopes (broader + gentler from afar).
     vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));
-    float spec = pow(clamp(dot(pnrm, H), 0.0, 1.0), 32.0);
-    col += lightColor.rgb * spec * pbrAmount * (0.2 + lightGlow * 0.6);
+    float spec = pow(clamp(dot(pnrm, H), 0.0, 1.0), mix(32.0, 12.0, pbrDepth));
+    col += lightColor.rgb * spec * pbrAmount * (0.2 + lightGlow * 0.6) * (1.0 - pbrDepth * 0.4);
+    // Atmospheric recession : the stepped-back surface settles a touch toward the
+    // atmosphere colour (the "context" shifts as you pull away).
+    col = mix(col, atmosphere.rgb, pbrDepth * 0.14 * pbrAmount);
   }
 
   // ── KEY LIGHT : a soft radial glow from the light position in its own colour;
