@@ -612,7 +612,7 @@ export default function App(): JSX.Element {
       style={{ zoom: uiZoom, height: `calc(100vh / ${uiZoom})` }}
     >
       {/* ── Top bar ─────────────────────────────────────────────── */}
-      <header className="flex items-center gap-4 border-b border-border bg-panel px-4 py-2">
+      <header className="flex items-center gap-4 border-b border-border bg-panel px-4 py-2 pr-8">
         <h1
           className="select-none font-mono text-[15px] font-semibold uppercase tracking-[0.2em]"
           // Restrained glitch signature on the title : a faint chromatic
@@ -701,7 +701,7 @@ export default function App(): JSX.Element {
           Save As
         </button>
         <select
-          className="input w-24 shrink-0 text-[12px]"
+          className="input w-28 shrink-0 text-[12px]"
           value={theme}
           onChange={(e) => setTheme(e.target.value as ThemeName)}
           title="Theme"
