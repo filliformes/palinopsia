@@ -127,14 +127,6 @@ void main() {
     col += lightColor.rgb * spec * pbrAmount * (0.15 + lightGlow * 0.5);
   }
 
-  // ── KEY LIGHT : a soft, round radial glow from the light position in its
-  //    own colour. lightSize sweeps it from a tight spot to a broad ambient
-  //    wash across the whole frame. ──
-  float falloff = mix(11.0, 0.35, lightSize);
-  vec2 dl = (uv - light) * vec2(aspect, 1.0);
-  float lg = exp(-dot(dl, dl) * falloff);
-  col += lightColor.rgb * lg * lightGlow * 1.3;
-
   // ── HAZE : the whole frame settles toward the atmosphere colour, strongest
   //    in the shadows/distance (aerial perspective), with a lighter global veil
   //    over the midtones and highlights so the tint always reads. ──
@@ -147,6 +139,16 @@ void main() {
   vec2 dv = (uv - 0.5) * vec2(aspect, 1.0);
   float vig = 1.0 - smoothstep(0.35, 0.95, length(dv));
   col *= mix(1.0, 0.35 + 0.65 * vig, depth);
+
+  // ── KEY LIGHT : applied LAST so it always reads. A soft radial glow from the
+  //    light position in its own colour, added ON TOP of haze, the depth vignette
+  //    and everything below in the master chain (a hard CRT / Posterize, etc.), so
+  //    the light never gets washed out, darkened at the rim, or quantised away.
+  //    lightSize sweeps it from a tight spot to a broad ambient wash. ──
+  float falloff = mix(11.0, 0.35, lightSize);
+  vec2 dl = (uv - light) * vec2(aspect, 1.0);
+  float lg = exp(-dot(dl, dl) * falloff);
+  col += lightColor.rgb * lg * lightGlow * 1.3;
 
   gl_FragColor = vec4(col, 1.0);
 }
