@@ -262,7 +262,8 @@ export const GENERATORS: IsfShader[] = [
       jitter: [0.1, 0.7],
       drift: [0, 0.6],
       accent: [0, 0.5],
-      chaos: [0, 0.6]
+      chaos: [0, 0.6],
+      nonlinear: [0, 0.7]
     }
   },
   {

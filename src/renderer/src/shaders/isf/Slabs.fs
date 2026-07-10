@@ -1,17 +1,18 @@
 /*{
-  "DESCRIPTION": "Slabs : sparse horizontal slabs on a stepped clock, with slice-displacement jitter on a minority of bands and a single accent tint on rare cells. The slice/shuffle glitch register: stepped time (not flow), asymmetric, matte greys over near-black. Contrasts with Drift Field's continuous drift; built to be blended (difference / screen / multiply). Palinopsia seed generator.",
+  "DESCRIPTION": "Slabs : sparse horizontal slabs on a stepped clock, with slice-displacement jitter on a minority of bands and a single accent tint on rare cells. The slice/shuffle glitch register: stepped time (not flow), asymmetric, matte greys over near-black. CHAOS bends and distorts every cell on its own non-linear curve (each rectangle warps differently, not a global shear). NONLINEAR randomly thins the width and height of every cell so the slabs break into a field of many different lines. Built to be blended (difference / screen / multiply). Palinopsia seed generator.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Glitch", "Geometry"],
   "INPUTS": [
-    { "NAME": "rate",    "TYPE": "float", "MIN": 0.0, "MAX": 20.0,  "DEFAULT": 0.3 },
-    { "NAME": "bands",   "TYPE": "float", "MIN": 4.0, "MAX": 80.0, "DEFAULT": 24.0 },
-    { "NAME": "density", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.35 },
-    { "NAME": "jitter",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.35 },
-    { "NAME": "drift",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.2 },
-    { "NAME": "accent",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.2 },
-    { "NAME": "chaos",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0 },
-    { "NAME": "tint",    "TYPE": "color", "DEFAULT": [0.9, 0.5, 0.18, 1.0] }
+    { "NAME": "rate",      "TYPE": "float", "MIN": 0.0, "MAX": 20.0, "DEFAULT": 0.3 },
+    { "NAME": "bands",     "TYPE": "float", "MIN": 4.0, "MAX": 80.0, "DEFAULT": 24.0 },
+    { "NAME": "density",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.35 },
+    { "NAME": "jitter",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.35 },
+    { "NAME": "drift",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.2 },
+    { "NAME": "accent",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.2 },
+    { "NAME": "chaos",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0, "LABEL": "chaos (bend)" },
+    { "NAME": "nonlinear", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0, "LABEL": "nonlinear (thin)" },
+    { "NAME": "tint",      "TYPE": "color", "DEFAULT": [0.9, 0.5, 0.18, 1.0] }
   ]
 }*/
 
@@ -36,16 +37,18 @@ void main() {
   // Stepped clock : the glitch register moves in cuts, not flow.
   float t = floor(TIME * (0.5 + rate * 5.5));
 
-  // CHAOS also BENDS the whole grid : a smooth low-frequency domain warp (plus a
-  // faster ripple) so the square cells stop reading as clean rectangles : wavy,
-  // sheared ribbons at high chaos. Warps x more than y so the bands stay roughly
-  // horizontal (still "slabs") but lose their hard geometry. Zero at chaos 0.
+  // CHAOS bends the grid NON-LINEARLY at CELL SCALE : the warp is sampled near
+  // the band/cell frequency so each region (each rectangle) bends on its own
+  // curve instead of the whole grid shearing together. The sin-of-noise and the
+  // squared ripple are the non-linearities. Zero at chaos 0.
   if (chaos > 0.001) {
     float w = chaos;
-    uv.x += ((vn(vec2(uv.y * 5.0, TIME * 0.35)) - 0.5) * 0.28
-           + sin(uv.y * 11.0 + TIME * 0.6) * 0.05) * w;
-    uv.y += ((vn(vec2(uv.x * 4.0, TIME * 0.3 + 9.0)) - 0.5) * 0.10
-           + sin(uv.x * 8.0 - TIME * 0.45) * 0.02) * w;
+    vec2 cq = vec2(uv.x * bands * 0.9, uv.y * bands);
+    float a = vn(cq * 0.6 + TIME * 0.25);
+    float b = vn(cq * 1.7 - TIME * 0.18);
+    uv.x += (sin((a - 0.5) * 6.28318) * 0.5 + (b - 0.5)) * 0.13 * w;
+    uv.y += (sin((b - 0.5) * 6.28318) * 0.4 + (a - 0.5)) * 0.08 * w;
+    uv.x += pow(abs(sin(uv.y * bands * 3.14159 + a * 6.0)), 2.5) * 0.05 * w * sign(b - 0.5);
   }
 
   float band = floor(uv.y * bands);
@@ -71,8 +74,30 @@ void main() {
   float cellsChaos = mix(1.0, 40.0, pow(hash(vec2(band, 61.0)), 2.0));
   cells = mix(cells, cellsChaos, isChaos);
   float cell = floor(x * cells);
+
+  // Local coords inside this cell (0..1 across the cell, 0..1 up the band).
+  float lx = fract(x * cells);
+  float ly = fract(uv.y * bands);
+  float cseed = hash(vec2(cell * 7.0 + band * 131.0, 21.0));
+
+  // CHAOS bends each rectangle's INTERIOR on its own non-linear curve, seeded per
+  // cell, so every little cell warps a different way (creative, not a uniform shear).
+  if (chaos > 0.001) {
+    float bnd = chaos;
+    lx += (sin(ly * 6.28318 + cseed * 6.28318) * 0.3
+         + (vn(vec2(ly * 3.0 + cseed * 11.0, cseed * 7.0)) - 0.5)) * bnd * 0.6;
+    ly += sin(lx * 6.28318 * 1.3 + cseed * 4.0) * bnd * 0.28;
+  }
+
+  // NONLINEAR : randomise each cell's WIDTH and HEIGHT independently (only ever
+  // THINNER, never fatter) so the slabs break into a field of many different
+  // lines / thin rectangles. `inCell` carves the cell down to that sub-rectangle.
+  float wf = mix(1.0, 0.12 + 0.88 * hash(vec2(cell * 7.0 + band * 131.0, 3.0)), nonlinear);
+  float hf = mix(1.0, 0.12 + 0.88 * hash(vec2(cell * 7.0 + band * 131.0, 8.0)), nonlinear);
+  float inCell = step(abs(lx - 0.5), wf * 0.5) * step(abs(ly - 0.5), hf * 0.5);
+
   float v = hash(vec2(cell * 17.0 + band * 131.0, tC));
-  float lit = step(1.0 - density * mix(1.0, 1.6, isChaos), v);
+  float lit = step(1.0 - density * mix(1.0, 1.6, isChaos), v) * inCell;
 
   // Matte grey slab values : mid-tones, never neon.
   float shade = lit * (0.18 + 0.55 * hash(vec2(cell + 7.0, band)));
