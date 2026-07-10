@@ -784,6 +784,9 @@ interface StoreState {
   // The full-page Output / Mapping view is showing. Transient.
   outputPageOpen: boolean
   setOutputPageOpen: (on: boolean) => void
+  // Global modulation mute (transient) : freezes every modulator output.
+  modBypass: boolean
+  toggleModBypass: () => void
   renderScale: number
   setRenderScale: (v: number) => void
   collapsed: Record<string, boolean>
@@ -1878,6 +1881,12 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   outputPageOpen: false,
   setOutputPageOpen: (on) => set({ outputPageOpen: on }),
+
+  // Global modulation mute (transient) : one click freezes every modulator's
+  // output so all sliders revert to their base values. Not persisted — a live
+  // "hold everything still" that the render loop honours (and mirrors to output).
+  modBypass: false,
+  toggleModBypass: () => set((s) => ({ modBypass: !s.modBypass })),
 
   // Internal render scale: multiplies the 1920×1080 base. <1 = lo-fi (coarser
   // everything, upscaled to the display); 1 = 1080p; 2 = 4K (3840×2160). The App

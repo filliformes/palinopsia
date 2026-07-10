@@ -22,9 +22,11 @@ export function ModulationPanel(): JSX.Element {
   const modulators = useStore((s) => s.composition.modulators)
   const collapsed = useStore((s) => !!s.collapsed['modulation'])
   const toggleSection = useStore((s) => s.toggleSection)
+  const modBypass = useStore((s) => s.modBypass)
+  const toggleModBypass = useStore((s) => s.toggleModBypass)
   return (
     <div className="flex min-w-0 flex-col gap-2 border-t border-border bg-panel px-3 py-1.5">
-      <div className="flex items-baseline gap-3">
+      <div className="flex items-center gap-3">
         <button
           onClick={() => toggleSection('modulation')}
           className="flex shrink-0 items-center gap-1.5"
@@ -40,6 +42,23 @@ export function ModulationPanel(): JSX.Element {
           </span>
         </button>
         <MatrixSummary />
+        {/* Far right of the title row : one click freezes every modulator so all
+            sliders revert to their base. A live "hold everything still". */}
+        <button
+          onClick={toggleModBypass}
+          className={`ml-auto shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide transition-colors ${
+            modBypass
+              ? 'bg-danger/20 text-danger ring-1 ring-danger'
+              : 'bg-panel3/60 text-muted hover:text-accent'
+          }`}
+          title={
+            modBypass
+              ? 'Modulation muted : every modulator output is frozen and all controls sit at their base values. Click to resume modulation.'
+              : 'Mute all modulation : freeze every modulator in one click (controls revert to their base values).'
+          }
+        >
+          {modBypass ? '⊘ muted' : 'active'}
+        </button>
       </div>
       {!collapsed && (
         // Eight equal columns across the full width : every card the same

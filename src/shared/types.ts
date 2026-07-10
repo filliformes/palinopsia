@@ -492,6 +492,7 @@ export interface CaptureSourceInfo {
 export interface OutputFrame {
   c: CompositionState
   modValues: number[]
+  modBypass?: boolean
   globalSpeed: number
   warpEnabled: boolean
   warpCorners: number[]

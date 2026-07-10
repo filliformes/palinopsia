@@ -749,13 +749,18 @@ export function applyModulation(
   },
   c: CompositionState,
   values: number[],
-  descFor: (shaderId: string) => Array<{ name: string } & ModDesc>
+  descFor: (shaderId: string) => Array<{ name: string } & ModDesc>,
+  bypass = false
 ): void {
   metaLiveValues.clear()
   // Clear the live map each frame too (symmetric with metaLiveValues): otherwise
   // a removed mod-matrix assignment leaves a stale entry that liveOverlay keeps
   // writing into the slider forever, so the control never reverts to its base.
   liveModValues.clear()
+  // Global modulation mute: with the maps cleared and no writes issued, the
+  // Compositor keeps this frame's base values (syncFromState already ran) and
+  // every slider reverts to its stored position. One flag, whole rig held still.
+  if (bypass) return
   // Resolve one ISF-input target's shader + write the given value everywhere
   // it needs to land (engine + live map). Shared by direct and meta paths.
   const writeTarget = (

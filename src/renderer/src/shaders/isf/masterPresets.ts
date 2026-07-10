@@ -1,4 +1,4 @@
-// Master-chain presets : 20 whole-rack chains for the master bus. Applying
+// Master-chain presets : a library of whole-rack chains for the master bus. Applying
 // one replaces the chain AND states its Vibe (the pinned mastering stage):
 // the chain and the vibe are designed together; the vibe's settings merge
 // onto the locked unit without replacing it.
@@ -434,5 +434,179 @@ export const MASTER_PRESETS: MasterPreset[] = [
       { shaderId: 'fx-palette', inputs: { stops: 4, blend: 1, dither: 0.1, mixSrc: 0.15, colorA: [0.02, 0.02, 0.08, 1], colorB: [0.2, 0.1, 0.6, 1], colorC: [0.7, 0.2, 0.6, 1], colorD: [0.95, 0.9, 0.95, 1] } }
     ],
     vibe: { mixSrc: 1, contrast: 1.1, saturation: 1.15, autoLevel: 0.2 }
+  },
+
+  // ── Compression & signal-decay chains (the datamosh research family) ──
+  {
+    name: 'Transcode Artifact',
+    fx: [
+      { shaderId: 'fx-compress', inputs: { block: 16, quality: 0.16, ring: 0.7, chroma: 0.8, grid: 0.12 } },
+      { shaderId: 'fx-databend', inputs: { bands: 64, shift: 0.06, chance: 0.3, hold: 0.5, channel: 0.4, rate: 0.35 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 1.05, lift: 0.01 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.08, saturation: 1, gamma: 1, autoLevel: 0.2, splitTone: 0.15, shadowTint: [0.45, 0.48, 0.55, 1], highTint: [0.55, 0.53, 0.48, 1] }
+  },
+  {
+    name: 'Macroblock Bloom',
+    fx: [
+      { shaderId: 'fx-compress', inputs: { block: 24, quality: 0.28, ring: 0.5, chroma: 0.35, grid: 0.2 } },
+      { shaderId: 'fx-difference-bloom', inputs: { gain: 3.5, spread: 0.02, keep: 0.25, tint: [0.5, 0.56, 0.72, 1] } },
+      { shaderId: 'fx-grade', inputs: { brightness: -0.03, contrast: 1.1, saturation: 0.95 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 0.95, gamma: 1.05, autoLevel: 0.15, splitTone: 0.2, shadowTint: [0.44, 0.48, 0.56, 1], highTint: [0.53, 0.52, 0.5, 1] }
+  },
+  {
+    name: 'Dropped Frames',
+    fx: [
+      { shaderId: 'fx-decay', inputs: { amount: 0.55, smear: 0.4, chroma: 0.5, blocks: 0.5, dropout: 0.4, jitter: 0.4 } },
+      { shaderId: 'fx-mosh-blocks', inputs: { blocks: 20, amount: 0.2, chance: 0.35, rate: 0.5, freak: 0.3 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 0.9 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 0.9, gamma: 1, autoLevel: 0.15 }
+  },
+  {
+    name: 'Vertical Hold',
+    fx: [
+      { shaderId: 'fx-sync-loss', inputs: { roll: 0.4, tear: 0.15, bands: 5, rate: 0.4 } },
+      { shaderId: 'fx-tracking', inputs: { band: 0.15, position: 0.1, roll: 0.1, wobble: 0.08, noise: 0.5, rate: 0.4, freeze: 0.2, distort: 0.2, bleed: 0.3, bleedRange: 1.2 } },
+      { shaderId: 'fx-scanlines', inputs: { count: 480, darkness: 0.25, roll: 0.05 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 0.85, gamma: 1.05, autoLevel: 0.15, splitTone: 0.3, shadowTint: [0.44, 0.48, 0.56, 1], highTint: [0.55, 0.52, 0.46, 1] }
+  },
+  {
+    name: 'Tape Chewed',
+    fx: [
+      { shaderId: 'fx-tracking', inputs: { band: 0.25, position: 0.15, wobble: 0.12, noise: 0.7, rate: 0.5, freeze: 0.4, distort: 0.3, bleed: 0.4, bleedRange: 1.4 } },
+      { shaderId: 'fx-grain', inputs: { character: 2, amount: 0.18, size: 2, chroma: 0.5 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1, saturation: 0.8, gamma: 1.05, autoLevel: 0.12, splitTone: 0.3, shadowTint: [0.45, 0.5, 0.53, 1], highTint: [0.56, 0.52, 0.45, 1] }
+  },
+  {
+    name: 'Pixel Sorter',
+    fx: [
+      { shaderId: 'fx-pixelsort', inputs: { low: 0.2, high: 0.78, length: 0.35, vertical: 0, reverse: 0 } },
+      { shaderId: 'fx-posterize', inputs: { levels: 5, gamma: 1 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 1.05 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 1.05, autoLevel: 0.2 }
+  },
+  {
+    name: 'Sort & Bleed',
+    fx: [
+      { shaderId: 'fx-pixelsort', inputs: { low: 0.25, high: 0.8, length: 0.4, vertical: 1, reverse: 0 } },
+      { shaderId: 'fx-rgb-shift', inputs: { offset: 0.02, scale: 0.03, angle: 1.5708, wobble: 0.2 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 1.1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 1.1, autoLevel: 0.2 }
+  },
+  {
+    name: 'Ghost Rows',
+    fx: [
+      { shaderId: 'fx-row-echo', inputs: { rows: 80, chance: 0.35, fade: 0.4, rate: 0.3 } },
+      { shaderId: 'fx-light-trails', inputs: { decay: 0.94, drift: 0.005, angle: 1.5708 } },
+      { shaderId: 'fx-grade', inputs: { brightness: -0.04, contrast: 1.15, saturation: 0.8 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 0.8, gamma: 1.05, autoLevel: 0.12, splitTone: 0.25, shadowTint: [0.45, 0.49, 0.55, 1], highTint: [0.54, 0.52, 0.48, 1] }
+  },
+  {
+    name: 'Long Exposure',
+    fx: [
+      { shaderId: 'fx-light-trails', inputs: { decay: 0.98, drift: 0.002, angle: 1.5708 } },
+      { shaderId: 'fx-grade', inputs: { lift: 0.05, contrast: 1.1, saturation: 0.9 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 0.9, gamma: 1.05, autoLevel: 0.1, splitTone: 0.2, shadowTint: [0.44, 0.48, 0.56, 1], highTint: [0.55, 0.53, 0.47, 1] }
+  },
+  {
+    name: 'Rain of Data',
+    fx: [
+      { shaderId: 'fx-optical-rain', inputs: { amount: 0.6, rain: 0.5, streak: 0.6, columns: 260, disparity: 0.5, edges: 0.6 } },
+      { shaderId: 'fx-grade', inputs: { brightness: -0.06, contrast: 1.2, saturation: 0.7 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 0.7, gamma: 1.1, autoLevel: 0.1, splitTone: 0.35, shadowTint: [0.43, 0.49, 0.56, 1], highTint: [0.52, 0.53, 0.5, 1] }
+  },
+  {
+    name: 'Bad Antenna',
+    fx: [
+      { shaderId: 'fx-ringing', inputs: { gap: 0.012, intensity: 1, angle: 0 } },
+      { shaderId: 'fx-tracking', inputs: { band: 0.1, position: 0.06, noise: 0.6, rate: 0.4, freeze: 0.25, distort: 0.15, bleed: 0.3, bleedRange: 1 } },
+      { shaderId: 'fx-scanlines', inputs: { count: 520, darkness: 0.2, roll: 0.02 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 0.9, autoLevel: 0.15 }
+  },
+  {
+    name: 'Time Smear',
+    fx: [
+      { shaderId: 'fx-wide-time', inputs: { width: 60, amount: 0.8, mode: 0, soften: 0.3, drift: 0.005, hue: 0 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 0.9, lift: 0.03 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1, saturation: 0.9, gamma: 1.05, autoLevel: 0.12 }
+  },
+  {
+    name: 'Ceramic Tile',
+    fx: [
+      { shaderId: 'fx-mosaic', inputs: { grid: 0.5, size: 0.85, lumaSize: 0.5, soft: 0.1, shape: 1, gapMix: 0.3 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 1, lift: 0.02 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.08, saturation: 1, autoLevel: 0.2 }
+  },
+  {
+    name: 'Grain Storm',
+    fx: [
+      { shaderId: 'fx-granular', inputs: { grain: 0.5, density: 0.85, scatter: 0.3, rotate: 0.2, smear: 0.3, rate: 0.6 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 0.75, lift: 0.02 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 0.75, gamma: 1, autoLevel: 0.15, splitTone: 0.25, shadowTint: [0.46, 0.48, 0.52, 1], highTint: [0.55, 0.52, 0.47, 1] }
+  },
+  {
+    name: 'Cold Solder',
+    fx: [
+      { shaderId: 'fx-wavefold', inputs: { fold: 0.45, bias: 0.1, symmetry: 0.5, perChannel: 0, wet: 0.7 } },
+      { shaderId: 'fx-edge', inputs: { gain: 1.4, blend: 0.3 } },
+      { shaderId: 'fx-grade', inputs: { saturation: 0.35, contrast: 1.2, brightness: -0.03 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.15, saturation: 0.4, gamma: 1, autoLevel: 0.25, splitTone: 0.2, shadowTint: [0.45, 0.48, 0.53, 1], highTint: [0.54, 0.53, 0.49, 1] }
+  },
+  {
+    name: 'Oscilloscope',
+    fx: [
+      { shaderId: 'fx-rutt', inputs: { lines: 90, amp: 0.1, width: 0.2, color: 0.4 } },
+      { shaderId: 'fx-palette', inputs: { stops: 3, blend: 1, dither: 0.15, mixSrc: 0, colorA: [0.01, 0.03, 0.02, 1], colorB: [0.15, 0.65, 0.35, 1], colorC: [0.75, 0.98, 0.8, 1] } },
+      { shaderId: 'fx-scanlines', inputs: { count: 500, darkness: 0.2, roll: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 1, autoLevel: 0.35 }
+  },
+  {
+    name: 'Afterimage',
+    fx: [
+      { shaderId: 'fx-phosphene', inputs: { sensitivity: 0.5, persistence: 0.7, strength: 0.6, complement: 1, threshold: 0.55 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 0.85, brightness: -0.02 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 0.85, gamma: 1.05, autoLevel: 0.12 }
+  },
+  {
+    name: 'Slit Time',
+    fx: [
+      { shaderId: 'fx-slit-buffer', inputs: { rate: 0.3, width: 0.03, jitter: 0.2, jumps: 0.2, vertical: 0, direction: 0 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 0.95, lift: 0.02 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 0.95, autoLevel: 0.15 }
+  },
+  {
+    name: 'Recursion',
+    fx: [
+      { shaderId: 'fx-transform', inputs: { zoom: 1.08, posX: 0, posY: 0, rotate: 0.04, wrap: 1, shape: 0 } },
+      { shaderId: 'fx-feedback-zoom', inputs: { zoom: 1.03, twist: 0.02, amount: 0.5 } },
+      { shaderId: 'fx-chroma-shift', inputs: { amount: 0.01, angle: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.08, saturation: 1, gamma: 1, autoLevel: 0.15 }
+  },
+  {
+    name: 'Reduction',
+    fx: [
+      { shaderId: 'fx-abstraction', inputs: { amount: 0.5, disperse: 0.55, posterize: 0.5, desat: 0.45 } },
+      { shaderId: 'fx-hue-rotate', inputs: { shift: 0.08, byLuma: 0.2 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 0.9, lift: 0.02 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 0.9, autoLevel: 0.18, splitTone: 0.2, shadowTint: [0.46, 0.48, 0.53, 1], highTint: [0.55, 0.52, 0.47, 1] }
   }
 ]

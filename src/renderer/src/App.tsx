@@ -446,7 +446,7 @@ export default function App(): JSX.Element {
         //    values : straight into the Compositor, never through React.
         audioBus.tick(now)
         const modValues = modEngine.tick(now, c.modulators, c.bpm)
-        applyModulation(comp!, c, modValues, inputsForShader)
+        applyModulation(comp!, c, modValues, inputsForShader, st.modBypass)
         // 2b. Coupling: audio binds each layer's A/B balance (post-sync so it
         //     overrides the base mix); returns the coupled mixes for the output.
         const coupledMix = applyCoupling(comp!, c, now)
@@ -492,6 +492,7 @@ export default function App(): JSX.Element {
           window.api.outputFrame({
             c,
             modValues,
+            modBypass: st.modBypass,
             globalSpeed: st.globalSpeed,
             warpEnabled: st.warpEnabled,
             warpCorners: st.warpCorners,
