@@ -78,27 +78,39 @@ void main() {
     // and it grows with the RAKING control so a hard-lit material also parallaxes
     // harder. 24 march steps keep the deeper throw artefact-free.
     float amp = pbrAmount * (0.24 + pbrLight * 0.14) * (1.0 - pbrDepth * 0.55);
+    // ORGANIC TILING : the maps are REPEAT-wrapped in hardware, so we sample the
+    // raw scaled coords WITHOUT fract(). fract() jumps 1→0 at every tile edge,
+    // which spikes the screen-space derivative → the GPU drops to the coarsest
+    // mip and draws a dark seam line along each boundary (the "lines" at high tex
+    // scale). Hardware REPEAT tiles seamlessly with continuous derivatives, so
+    // the seams vanish. On top of that we domain-warp the coords with a smooth,
+    // incommensurate field so the repeat reads organic rather than as a rigid grid.
+    vec2 wq = vec2(uv.x * aspect, uv.y);
+    vec2 warp = vec2(
+      sin(wq.x * 5.3 + wq.y * 2.1) + 0.5 * sin(wq.y * 9.7 - wq.x * 3.3),
+      cos(wq.y * 4.7 - wq.x * 2.7) + 0.5 * cos(wq.x * 8.9 + wq.y * 3.1)
+    ) * 0.04;
     vec2 stepUV = vdir * amp / 24.0;
     float layer = 1.0 / 24.0;
     vec2 pp = uv;
     float curD = 0.0;
-    float hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, fract(vec2(pp.x * aspect, pp.y) * pscl)).r;
+    float hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, (vec2(pp.x * aspect, pp.y) + warp) * pscl).r;
     for (int i = 0; i < 24; i++) {
       if (curD >= hd) break;
       pp += stepUV;
-      hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, fract(vec2(pp.x * aspect, pp.y) * pscl)).r;
+      hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, (vec2(pp.x * aspect, pp.y) + warp) * pscl).r;
       curD += layer;
     }
     // Refine : interpolate the exact crossing so the surface reads smooth.
     vec2 prev = pp - stepUV;
     float aft = hd - curD;
-    float bef = (1.0 - IMG_NORM_PIXEL(pbrHeight, fract(vec2(prev.x * aspect, prev.y) * pscl)).r) - (curD - layer);
+    float bef = (1.0 - IMG_NORM_PIXEL(pbrHeight, (vec2(prev.x * aspect, prev.y) + warp) * pscl).r) - (curD - layer);
     pp = mix(pp, prev, clamp(aft / (aft - bef + 1e-4), 0.0, 1.0));
     // Reference to the mid-plane (height 0.5) so a FLAT/neutral map (texture off)
     // gives ZERO displacement; raised vs recessed features then shift oppositely.
     uv = pp - vdir * amp * 0.5;                        // parallax-corrected sample point
 
-    vec2 tuv = fract(vec2(uv.x * aspect, uv.y) * pscl);
+    vec2 tuv = (vec2(uv.x * aspect, uv.y) + warp) * pscl;
     pnrm = normalize(IMG_NORM_PIXEL(pbrNormal, tuv).rgb * 2.0 - 1.0);
     pao = IMG_NORM_PIXEL(pbrAO, tuv).r;
 
@@ -114,7 +126,7 @@ void main() {
       float occ = 0.0;
       for (int j = 1; j <= 10; j++) {
         vec2 sp = uv + Ls.xy * amp * 1.6 * (float(j) / 10.0);
-        float hs = IMG_NORM_PIXEL(pbrHeight, fract(vec2(sp.x * aspect, sp.y) * pscl)).r;
+        float hs = IMG_NORM_PIXEL(pbrHeight, (vec2(sp.x * aspect, sp.y) + warp) * pscl).r;
         occ = max(occ, hs - surfH - float(j) / 10.0 * 0.10);
       }
       pshadow = clamp(1.0 - occ * (5.0 + pbrLight * 11.0), 0.02, 1.0);

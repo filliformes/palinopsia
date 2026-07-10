@@ -453,7 +453,36 @@ export default function App(): JSX.Element {
         // 2c. Proximity (Field macro): push the Context mood into a depth zone.
         const contextProx = applyProximity(comp!, c, st.proximity, st.proximityAudio ? 0.6 : 0)
         // 2d. Macro-form sequencer: auto-advance scenes + Breathe/Arc overlay.
-        if (st.sequence.enabled) tickSequencer(now, comp!, c)
+        //     The overlay writes master-FX values, layer mixes and freeze straight
+        //     onto the compositor — none of which is otherwise in the payload, so
+        //     the output window desyncs whenever a sequence is running. Capture the
+        //     master-FX writes through a recording proxy (merged into
+        //     masterOverrides below) and the freeze; the final layer mixes are read
+        //     back afterwards so cadence's mix pull travels too.
+        const seqOverrides: Record<string, Record<string, number>> = {}
+        let seqFreeze: boolean | null = null
+        let seqTouchedMix = false
+        if (st.sequence.enabled) {
+          const beforeMix = comp!.layers.map((L) => (L ? L.sourceMix : 0))
+          const rec = {
+            setFxInput: (
+              scope: { kind: 'master' },
+              id: string,
+              name: string,
+              v: number
+            ): void => {
+              comp!.setFxInput(scope, id, name, v)
+              ;(seqOverrides[id] ||= {})[name] = v
+            },
+            layers: comp!.layers,
+            setFreeze: (on: boolean): void => {
+              comp!.setFreeze(on)
+              seqFreeze = on
+            }
+          }
+          tickSequencer(now, rec, c)
+          seqTouchedMix = comp!.layers.some((L, i) => L && L.sourceMix !== beforeMix[i])
+        }
         // 2e. Field macros: Density / Gesture⇄Texture / Coalesce (post-mod, 0.5 deadzone).
         applyFieldMacros(comp!, c, st.density, st.gestureTexture, st.coalesce)
         // 2f. Temperament: Tonicity (tonal audio → colour) + Drift
@@ -463,6 +492,7 @@ export default function App(): JSX.Element {
         const driftOv = applyDrift(comp!, c, st.drift, now)
         let freeze = false
         if (st.shutter > 0.02) { freeze = shutterHold(now, st.shutter); comp!.setFreeze(freeze) }
+        else if (seqFreeze !== null) { freeze = seqFreeze; comp!.setFreeze(freeze) } // sequencer mono-freeze
         else if (shutterClear()) comp!.setFreeze(false)
         // 2g. Superimposition flicker (§5.2): cross-cut which layer shows on the
         //     drawn cadence : rate follows the Cameraless film rate when it's on.
@@ -476,11 +506,16 @@ export default function App(): JSX.Element {
         // Merge the temperament results (Tonicity + Drift) into one override map so
         // the output window can mirror them exactly (they can't re-derive audio/
         // random/time). Field macros + freeze + flicker travel alongside.
+        // Sequencer overlay first, then temperament on top : the same order the
+        // monitor applied them, so shared inputs resolve identically.
         const masterOverrides: Record<string, Record<string, number>> = {}
-        for (const ov of [tonOv, driftOv]) {
+        for (const ov of [seqOverrides, tonOv, driftOv]) {
           if (!ov) continue
           for (const id in ov) masterOverrides[id] = { ...masterOverrides[id], ...ov[id] }
         }
+        // Cadence pulls the layer mixes toward fused; send the post-sequencer mixes
+        // so the output mirrors that too (else only the pre-sequencer coupling shows).
+        const outMix = seqTouchedMix ? comp!.layers.map((L) => (L ? L.sourceMix : 0.5)) : coupledMix
         // 3. Render the frame.
         comp!.render(now - start)
         // 3b. Animated sound (§4.4): sample a scanline of the presented frame and
@@ -498,7 +533,7 @@ export default function App(): JSX.Element {
             warpCorners: st.warpCorners,
             warpGrid: st.warpGrid,
             time: now - start,
-            coupledMix,
+            coupledMix: outMix,
             contextProx,
             // Bottom-bar state → exact replica in the output window.
             density: st.density,
