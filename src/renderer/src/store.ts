@@ -438,7 +438,7 @@ function buildThemeComposition(theme: Theme): CompositionState {
     }
     l.sourceAFx = R() < 0.4 ? buildRack(theme.layerFx, 1, i) : []
     l.fx = buildRack(theme.layerFx, 2, i)
-    if (theme.nativeNodes?.length && R() < 0.4) l.fx.push(themeFx(pickOf(theme.nativeNodes)))
+    if (theme.nativeNodes?.length && R() < (theme.nativeChance ?? 0.4)) l.fx.push(themeFx(pickOf(theme.nativeNodes)))
     l.blend = i === 0 ? 'normal' : pickOf(theme.blends)
     l.opacity = i === 0 ? 1 : rr(0.65, 1)
     l.feedback = R() < theme.feedback

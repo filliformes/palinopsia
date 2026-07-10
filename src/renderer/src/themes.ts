@@ -35,6 +35,8 @@ export interface Theme {
   layerFx: string[]
   /** Native node ids occasionally added to a layer (node-feedback / node-reponse…). */
   nativeNodes?: string[]
+  /** Per-layer probability the signature native node is added (default 0.4). */
+  nativeChance?: number
   /** Preferred layer blend modes (the bottom layer is always `normal`). */
   blends: BlendMode[]
   /** Active layer count range [min, max]. */
@@ -573,6 +575,94 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-grain', 'fx-grade'],
     blends: ['screen', 'lighten'], useB: 0.1, layers: [1, 2], density: 0.25, drift: 0.2,
     context: { depth: 0.4, haze: 0.14, trails: 0.16 }
+  }),
+
+  // ── Datamosh & Compression (from the glitch research) ─────────────────
+  mk({
+    id: 'melt', name: 'Melt', family: 'Datamosh & Compression',
+    blurb: 'The datamosh bloom : new motion drags the old texture, figures melt into a soup of colour.',
+    world: 'sublimated',
+    palette: [K, [0.4, 0.08, 0.35, 1], [0.1, 0.5, 0.55, 1], [0.95, 0.8, 0.5, 1]],
+    sources: ['organic', 'dye-field', 'swell', 'membrane'],
+    layerFx: ['fx-grade', 'fx-chroma-shift'],
+    nativeNodes: ['node-datamosh'], nativeChance: 0.9,
+    blends: ['screen', 'lighten'], layers: [1, 2], feedback: 0.2, drift: 0.3, density: 0.4
+  }),
+  mk({
+    id: 'monster-movie', name: 'Monster Movie', family: 'Datamosh & Compression',
+    blurb: 'Monsters emerging from and dissolving into pixellated colour : the moshed swirl.',
+    world: 'musical',
+    palette: [K, [0.5, 0.12, 0.1, 1], [0.1, 0.3, 0.6, 1], [0.9, 0.85, 0.4, 1]],
+    sources: ['organic', 'shapes', 'murmuration', 'dye-field'],
+    layerFx: ['fx-hue-rotate', 'fx-grade'],
+    nativeNodes: ['node-datamosh'], nativeChance: 0.7,
+    blends: ['screen', 'difference'], layers: [2, 2], feedback: 0.3, drift: 0.3, gestureTexture: 0.6
+  }),
+  mk({
+    id: 'pure-motion', name: 'Pure Motion', family: 'Datamosh & Compression',
+    blurb: 'Movement divorced from what-is-moving : flows, streaks and cascades with no fixed image.',
+    world: 'incongruent',
+    palette: [INK, [0.15, 0.16, 0.2, 1], [0.7, 0.75, 0.82, 1]],
+    sources: ['murmuration', 'particle-drift', 'filaments', 'swell'],
+    layerFx: ['fx-streak', 'fx-grade'],
+    nativeNodes: ['node-datamosh'], nativeChance: 0.9,
+    blends: ['screen', 'lighten'], layers: [1, 2], feedback: 0.3, drift: 0.35, density: 0.4
+  }),
+  mk({
+    id: 'macroblock', name: 'Macroblock', family: 'Datamosh & Compression',
+    blurb: 'The quantisation aesthetic : the image crushed into blocks of averaged colour, banded and ringing.',
+    world: 'parametric',
+    palette: [K, [0.2, 0.06, 0.28, 1], [0.85, 0.35, 0.4, 1], [0.9, 0.9, 0.82, 1]],
+    sources: ['drift-field', 'slabs', 'shapes', 'organic'],
+    layerFx: ['fx-compress', 'fx-pixelate', 'fx-posterize'],
+    blends: ['screen', 'difference'], gestureTexture: 0.55, coalesce: 0.3, density: 0.55
+  }),
+  mk({
+    id: 'transcode', name: 'Transcode', family: 'Datamosh & Compression',
+    blurb: 'Recompressed to death : block crush over byte-bent bands, colour out of registration.',
+    world: 'parametric',
+    palette: [K, [0.14, 0.15, 0.2, 1], [0.8, 0.4, 0.35, 1], [0.85, 0.85, 0.78, 1]],
+    sources: ['organic', 'drift-field', 'swell'],
+    layerFx: ['fx-compress', 'fx-databend', 'fx-chroma-shift'],
+    blends: ['screen', 'lighten'], coalesce: 0.35, drift: 0.25
+  }),
+  mk({
+    id: 'databent', name: 'Databent', family: 'Datamosh & Compression',
+    blurb: 'Editing the stream, not the picture : bands tear and hold, channels drift, the signal breaks.',
+    world: 'incongruent',
+    palette: [K, [0.16, 0.16, 0.18, 1], [0.78, 0.78, 0.72, 1]],
+    sources: ['slabs', 'column-scan', 'organic', 'drift-field'],
+    layerFx: ['fx-databend', 'fx-sync-loss', 'fx-row-echo'],
+    blends: ['screen', 'lighten'], coalesce: 0.35, drift: 0.3
+  }),
+  mk({
+    id: 'pixel-sort', name: 'Pixel Sort', family: 'Datamosh & Compression',
+    blurb: 'Brightness pulled into clean monotone streaks : the sorted-pixel light-leak.',
+    world: 'sublimated',
+    palette: [K, [0.3, 0.12, 0.28, 1], [1.0, 0.75, 0.55, 1]],
+    sources: ['organic', 'dye-field', 'drift-field', 'swell'],
+    layerFx: ['fx-pixelsort', 'fx-grade', 'fx-hue-rotate'],
+    blends: ['screen', 'lighten'], feedback: 0.2, drift: 0.25, density: 0.4
+  }),
+  mk({
+    id: 'bitrate-starve', name: 'Bitrate Starve', family: 'Datamosh & Compression',
+    blurb: 'Running out of bitrate : the picture collapses into moshed, block-crushed matter.',
+    world: 'presse',
+    palette: [INK, [0.24, 0.14, 0.08, 1], [0.82, 0.7, 0.5, 1]],
+    sources: ['organic', 'swell', 'dye-field'],
+    layerFx: ['fx-compress', 'fx-grade'],
+    nativeNodes: ['node-datamosh'], nativeChance: 0.9,
+    blends: ['screen', 'lighten'], layers: [1, 2], feedback: 0.3, drift: 0.35, coalesce: 0.4, density: 0.4
+  }),
+  mk({
+    id: 'discorrelated', name: 'Discorrelated', family: 'Datamosh & Compression',
+    blurb: 'Two images decorrelate and smear into each other : moshed layers bleeding together.',
+    world: 'incongruent',
+    palette: [K, [0.4, 0.1, 0.3, 1], [0.1, 0.45, 0.55, 1], [0.9, 0.82, 0.5, 1]],
+    sources: ['organic', 'shapes', 'dye-field', 'murmuration'],
+    layerFx: ['fx-grade', 'fx-chroma-shift'],
+    nativeNodes: ['node-datamosh'], nativeChance: 0.7,
+    blends: ['screen', 'difference'], layers: [2, 2], useB: 0.4, feedback: 0.25, drift: 0.3
   })
 ]
 
