@@ -13,17 +13,19 @@ let lastMs = 0
 let hot = -1
 
 /** Strobe the layer stack. `amount` 0 = off (deadzone); 1 = only the hot layer
- *  shows. `rateFps` = strobe rate (drawn frames/sec). Mutates comp layer opacity. */
+ *  shows. `rateFps` = strobe rate (drawn frames/sec). Mutates comp layer opacity.
+ *  Returns the current hot layer index (or -1) so the output window can mirror the
+ *  same choice without re-rolling its own random pick. */
 export function applyFlicker(
   comp: { layers: Array<{ opacity: number } | null | undefined> },
   amount: number,
   rateFps: number,
   nowMs: number
-): void {
+): number {
   if (amount < 0.02) {
     lastMs = nowMs
     hot = -1
-    return
+    return -1
   }
   const dt = lastMs > 0 ? Math.min(0.2, (nowMs - lastMs) / 1000) : 0
   lastMs = nowMs
@@ -50,4 +52,5 @@ export function applyFlicker(
   comp.layers.forEach((L, i) => {
     if (L && i !== hot) L.opacity *= 1 - amount
   })
+  return hot
 }

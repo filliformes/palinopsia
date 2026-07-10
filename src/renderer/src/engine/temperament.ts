@@ -24,28 +24,40 @@ type MacroComp = {
   setFxInput: (scope: { kind: 'master' }, instId: string, name: string, v: number) => void
 }
 
+/** The exact master-FX input values a temperament pass applied this frame
+ *  ({ instId: { input: value } }). Returned so the output window can mirror the
+ *  result WITHOUT re-running the audio/random/time-dependent computation. */
+export type MasterOverrides = Record<string, Record<string, number>>
+
 /** Tonal audio → colour, noisy audio → monochrome (§3.10). `amount` 0 = off.
  *  Colour-ness is read from spectral flux (steady = tonal, churning = noisy);
- *  loudness gates the effect so silence stays neutral rather than forcing grey. */
-export function applyTonicity(comp: MacroComp, c: CompositionState, amount: number): void {
-  if (amount < 0.02 || audioBus.mode === 'off') return
+ *  loudness gates the effect so silence stays neutral rather than forcing grey.
+ *  Returns the applied overrides (or null) so the output mirror is exact. */
+export function applyTonicity(comp: MacroComp, c: CompositionState, amount: number): MasterOverrides | null {
+  if (amount < 0.02 || audioBus.mode === 'off') return null
   const vibe = c.master.find((f) => f.shaderId === 'fx-vibe')
-  if (!vibe) return
+  if (!vibe) return null
   const level = audioBus.feature('level')
   const flux = audioBus.feature('flux')
   const presence = clamp01((level - 0.02) / 0.18) // fade in over a low-level window
   const eff = amount * presence
-  if (eff < 0.02) return
+  if (eff < 0.02) return null
 
   const colourness = clamp01(1 - flux * 1.2) // noisy (high flux) → 0 → grey
   const satFactor = 0.15 + colourness * 1.2 // noisy ≈ ×0.15, tonal ≈ ×1.35
   const liveVal = (name: string, d: number): number =>
     (liveModValues.get(`fx:master:${vibe.id}:${name}`) as number | undefined) ?? num(vibe.inputs[name], d)
 
+  const ov: MasterOverrides = {}
+  const set = (id: string, name: string, v: number): void => {
+    comp.setFxInput(MASTER, id, name, v)
+    ;(ov[id] ??= {})[name] = v
+  }
   const baseSat = liveVal('saturation', 1) // Vibe saturation range 0..2
-  comp.setFxInput(MASTER, vibe.id, 'saturation', clamp(baseSat * (1 - eff) + baseSat * satFactor * eff, 0, 2))
+  set(vibe.id, 'saturation', clamp(baseSat * (1 - eff) + baseSat * satFactor * eff, 0, 2))
   const baseChroma = liveVal('chroma', 0.55) // range 0..1
-  comp.setFxInput(MASTER, vibe.id, 'chroma', clamp01(baseChroma * (1 - eff) + baseChroma * satFactor * eff))
+  set(vibe.id, 'chroma', clamp01(baseChroma * (1 - eff) + baseChroma * satFactor * eff))
+  return ov
 }
 
 // ── Shutter : GLOBAL full-freeze stop-motion ─────────────────────────
@@ -93,8 +105,13 @@ let accSeed = 0
 /** Slow wander over the finishing grade + rare accidents (§1.8). `drift` 0 = off.
  *  Bounded and additive on the live values, so it colours the temperament without
  *  ever running away or erasing a modulator on the same param. */
-export function applyDrift(comp: MacroComp, c: CompositionState, drift: number, nowMs: number): void {
-  if (drift < 0.02) return
+export function applyDrift(comp: MacroComp, c: CompositionState, drift: number, nowMs: number): MasterOverrides | null {
+  if (drift < 0.02) return null
+  const ov: MasterOverrides = {}
+  const set = (id: string, name: string, v: number): void => {
+    comp.setFxInput(MASTER, id, name, v)
+    ;(ov[id] ??= {})[name] = v
+  }
   const fin = c.master.find((f) => f.shaderId === 'fx-finalizer')
   const vibe = c.master.find((f) => f.shaderId === 'fx-vibe')
   const t = nowMs / 1000
@@ -117,13 +134,14 @@ export function applyDrift(comp: MacroComp, c: CompositionState, drift: number, 
   const acc = nowMs < accUntil ? (accSeed - 0.5) : 0
 
   if (fin) {
-    comp.setFxInput(MASTER, fin.id, 'gamma', Math.max(0.4, finLive('gamma', 1) + w1 * 0.06 * drift + acc * 0.5 * drift))
-    comp.setFxInput(MASTER, fin.id, 'rGain', Math.max(0, finLive('rGain', 1) + w2 * 0.05 * drift))
-    comp.setFxInput(MASTER, fin.id, 'bGain', Math.max(0, finLive('bGain', 1) - w2 * 0.05 * drift))
+    set(fin.id, 'gamma', Math.max(0.4, finLive('gamma', 1) + w1 * 0.06 * drift + acc * 0.5 * drift))
+    set(fin.id, 'rGain', Math.max(0, finLive('rGain', 1) + w2 * 0.05 * drift))
+    set(fin.id, 'bGain', Math.max(0, finLive('bGain', 1) - w2 * 0.05 * drift))
     // Accidents briefly kick the grain/parasites (analog breakup on the excursion).
-    if (acc !== 0) comp.setFxInput(MASTER, fin.id, 'parasites', clamp01(finLive('parasites', 0.1) + Math.abs(acc) * drift))
+    if (acc !== 0) set(fin.id, 'parasites', clamp01(finLive('parasites', 0.1) + Math.abs(acc) * drift))
   }
   if (vibe) {
-    comp.setFxInput(MASTER, vibe.id, 'contrast', clamp01(vibeLive('contrast', 0.5) + w3 * 0.05 * drift))
+    set(vibe.id, 'contrast', clamp01(vibeLive('contrast', 0.5) + w3 * 0.05 * drift))
   }
+  return ov
 }

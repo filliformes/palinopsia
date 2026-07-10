@@ -459,17 +459,27 @@ export default function App(): JSX.Element {
         // 2f. Temperament: Tonicity (tonal audio → colour) + Drift
         //     (analog-instability wander). Shutter (stop-motion stepping) freezes
         //     the output on held frames.
-        applyTonicity(comp!, c, st.tonicity)
-        applyDrift(comp!, c, st.drift, now)
-        if (st.shutter > 0.02) comp!.setFreeze(shutterHold(now, st.shutter))
+        const tonOv = applyTonicity(comp!, c, st.tonicity)
+        const driftOv = applyDrift(comp!, c, st.drift, now)
+        let freeze = false
+        if (st.shutter > 0.02) { freeze = shutterHold(now, st.shutter); comp!.setFreeze(freeze) }
         else if (shutterClear()) comp!.setFreeze(false)
         // 2g. Superimposition flicker (§5.2): cross-cut which layer shows on the
         //     drawn cadence : rate follows the Cameraless film rate when it's on.
+        let flickerHot = -1
         if (st.superFlicker > 0.02) {
           const fin = c.master.find((f) => f.shaderId === 'fx-finalizer')?.inputs
           const filmOn = fin && Math.round(Number(fin.filmHold) || 0) > 0
           const rateFps = filmOn ? Number(fin!.filmRate) || 8 : 8
-          applyFlicker(comp!, st.superFlicker, rateFps, now)
+          flickerHot = applyFlicker(comp!, st.superFlicker, rateFps, now)
+        }
+        // Merge the temperament results (Tonicity + Drift) into one override map so
+        // the output window can mirror them exactly (they can't re-derive audio/
+        // random/time). Field macros + freeze + flicker travel alongside.
+        const masterOverrides: Record<string, Record<string, number>> = {}
+        for (const ov of [tonOv, driftOv]) {
+          if (!ov) continue
+          for (const id in ov) masterOverrides[id] = { ...masterOverrides[id], ...ov[id] }
         }
         // 3. Render the frame.
         comp!.render(now - start)
@@ -488,7 +498,15 @@ export default function App(): JSX.Element {
             warpGrid: st.warpGrid,
             time: now - start,
             coupledMix,
-            contextProx
+            contextProx,
+            // Bottom-bar state → exact replica in the output window.
+            density: st.density,
+            gestureTexture: st.gestureTexture,
+            coalesce: st.coalesce,
+            masterOverrides,
+            freeze,
+            superFlicker: st.superFlicker,
+            flickerHot
           })
         }
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to

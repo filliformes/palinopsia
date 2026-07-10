@@ -503,6 +503,19 @@ export interface OutputFrame {
   // Proximity's Context mood override (haze/blur/bloom/depth), so the output
   // window mirrors it; absent when Proximity is neutral.
   contextProx?: { haze: number; blur: number; bloom: number; depth: number } | null
+  // ── Bottom-bar state, so the output window is an EXACT replica ──
+  // Field macros (deterministic : the output re-applies them from these scalars).
+  density?: number
+  gestureTexture?: number
+  coalesce?: number
+  // Temperament results the output can't re-derive (audio / random / time based):
+  // the exact master-FX input values Tonicity + Drift applied ({instId:{input:v}}).
+  masterOverrides?: Record<string, Record<string, number>>
+  // Shutter's whole-frame freeze decision (computed in the control window).
+  freeze?: boolean
+  // Superimposition flicker : amount + which layer was chosen "hot" this frame.
+  superFlicker?: number
+  flickerHot?: number
 }
 
 export interface DisplayInfo {

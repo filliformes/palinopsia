@@ -11,6 +11,7 @@ import { useEffect, useRef } from 'react'
 import type { OutputFrame } from '@shared/types'
 import { Compositor } from '../engine/Compositor'
 import { applyModulation } from '../engine/modulation'
+import { applyFieldMacros } from '../engine/field'
 import { shaderSourceById } from '../shaders/isf'
 import { inputsForShader } from '../shaders/isf/inputs'
 
@@ -51,6 +52,29 @@ export function OutputView(): JSX.Element {
             comp!.setFxInput(sc, ctx.id, 'depth', f.contextProx.depth)
             comp!.setFxInput(sc, ctx.id, 'bloom', f.contextProx.bloom)
           }
+        }
+        // ── Bottom-bar state, mirrored for an EXACT replica ──
+        // Field macros : deterministic, re-applied from the passed scalars (same
+        // order as the control loop : after modulation, before temperament).
+        if (f.density !== undefined || f.gestureTexture !== undefined || f.coalesce !== undefined) {
+          applyFieldMacros(comp!, f.c, f.density ?? 0.5, f.gestureTexture ?? 0.5, f.coalesce ?? 0.5)
+        }
+        // Temperament (Tonicity + Drift) : the exact master-FX values the control
+        // window applied (can't re-derive audio / random / time here).
+        if (f.masterOverrides) {
+          const sc = { kind: 'master' as const }
+          for (const id in f.masterOverrides) {
+            const inputs = f.masterOverrides[id]
+            for (const name in inputs) comp!.setFxInput(sc, id, name, inputs[name])
+          }
+        }
+        // Shutter freeze (whole-frame hold).
+        comp!.setFreeze(!!f.freeze)
+        // Superimposition flicker : dim the same non-hot layers by the same amount.
+        const sf = f.superFlicker ?? 0
+        const hotL = f.flickerHot ?? -1
+        if (sf > 0.02 && hotL >= 0) {
+          comp!.layers.forEach((L, i) => { if (L && i !== hotL) L.opacity *= 1 - sf })
         }
         comp!.render(f.time)
       } catch (err) {
