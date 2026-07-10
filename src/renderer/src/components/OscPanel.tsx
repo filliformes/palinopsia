@@ -18,6 +18,8 @@ export function OscPanel(): JSX.Element {
   const setOscOutConfig = useStore((s) => s.setOscOutConfig)
   const markSignalEnabled = useStore((s) => s.markSignalEnabled)
   const setMarkSignal = useStore((s) => s.setMarkSignal)
+  const collapsed = useStore((s) => !!s.collapsed['osc'])
+  const toggleSection = useStore((s) => s.toggleSection)
   const [portStr, setPortStr] = useState(String(oscPort))
   const [outHostStr, setOutHostStr] = useState(oscOutHost)
   const [outPortStr, setOutPortStr] = useState(String(oscOutPort))
@@ -81,8 +83,23 @@ export function OscPanel(): JSX.Element {
   }
 
   return (
-    <div className="flex flex-col gap-1 rounded-md border border-border bg-panel px-2 py-1 text-[11px]">
+    <div className="flex min-w-0 flex-col gap-1 border-t border-border bg-panel px-3 py-1.5 text-[11px]">
+      {/* Section header : matches Modulation / Meta (chevron + title collapse),
+          with the enable button + live status + activity dot riding the header so
+          the OSC state stays visible even when the section is collapsed. */}
       <div className="flex min-w-0 items-center gap-2">
+        <button
+          onClick={() => toggleSection('osc')}
+          className="flex shrink-0 items-center gap-1.5"
+          title={collapsed ? 'Expand OSC' : 'Collapse OSC'}
+        >
+          <span
+            className={`font-mono text-[9px] text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}
+          >
+            ▶
+          </span>
+          <span className="font-mono text-[10px] uppercase tracking-wide text-muted">OSC</span>
+        </button>
         <button
           onClick={toggle}
           className={`shrink-0 rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
@@ -96,18 +113,6 @@ export function OscPanel(): JSX.Element {
         >
           {oscEnabled && oscListening ? 'LISTENING' : oscEnabled ? 'BIND FAILED' : 'OSC OFF'}
         </button>
-        <span className="font-mono text-[9px] uppercase text-muted">port</span>
-        <input
-          value={portStr}
-          onChange={(e) => setPortStr(e.target.value.replace(/[^0-9]/g, ''))}
-          onBlur={commitPort}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-          }}
-          className="input w-16 px-1 py-0.5 text-right text-[11px]"
-          title="Local UDP port to listen on (Pandore sends here)"
-        />
-        {/* Live status rides the same line as the port. */}
         <span
           className={`font-mono text-[9px] ${
             oscEnabled && oscListening
@@ -128,9 +133,26 @@ export function OscPanel(): JSX.Element {
         />
       </div>
 
-      {/* Enabling OSC de-collapses this info block; disabling collapses it. */}
-      {oscEnabled && (
+      {!collapsed && (
         <>
+          {/* Port row. */}
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="font-mono text-[9px] uppercase text-muted">port</span>
+            <input
+              value={portStr}
+              onChange={(e) => setPortStr(e.target.value.replace(/[^0-9]/g, ''))}
+              onBlur={commitPort}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+              }}
+              className="input w-16 px-1 py-0.5 text-right text-[11px]"
+              title="Local UDP port to listen on (Pandore sends here)"
+            />
+          </div>
+
+          {/* The send-target + outbound controls only matter once OSC is on. */}
+          {oscEnabled && (
+            <>
           <div
             className={`flex flex-col gap-0.5 rounded border border-border bg-panel2/40 p-1.5 font-mono text-[9px] leading-relaxed ${
               oscListening ? 'text-muted' : 'text-muted/60'
@@ -211,6 +233,8 @@ export function OscPanel(): JSX.Element {
             title="Destination UDP port Pandore receives on"
           />
           </div>
+            </>
+          )}
         </>
       )}
     </div>

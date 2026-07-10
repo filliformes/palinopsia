@@ -129,7 +129,7 @@ export function Transport(): JSX.Element {
   const current = SCOPES.find((s) => s.scope === scope) ?? SCOPES[0]
 
   return (
-    <div className="flex flex-nowrap items-center gap-x-2 overflow-hidden border-t border-border bg-panel px-2 py-1.5">
+    <div className="flex flex-nowrap items-center gap-x-2 overflow-x-clip overflow-y-visible border-t border-border bg-panel px-2 py-1.5">
       <div className="flex shrink-0 items-center gap-1.5">
         <span className="font-mono text-[10px] text-muted">BPM</span>
         <div className="w-10">
@@ -326,7 +326,7 @@ export function Transport(): JSX.Element {
           ▾
         </button>
         {menuOpen && (
-          <div className="absolute bottom-full right-0 z-20 mb-1 flex min-w-[210px] flex-col rounded border border-border bg-panel2 py-1 shadow-lg">
+          <div className="absolute bottom-full right-0 z-50 mb-1 flex min-w-[210px] flex-col rounded border border-border bg-panel2 py-1 shadow-lg">
             {SCOPES.map((s) => (
               <button
                 key={s.scope}
