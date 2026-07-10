@@ -81,6 +81,9 @@ import decay from './fx/Decay.fs?raw'
 import opticalRain from './fx/OpticalRain.fs?raw'
 import phosphene from './fx/Phosphene.fs?raw'
 import abstraction from './fx/Abstraction.fs?raw'
+import compress from './fx/Compress.fs?raw'
+import databend from './fx/Databend.fs?raw'
+import pixelSort from './fx/PixelSort.fs?raw'
 import feedbackZoom from './fx/FeedbackZoom.fs?raw'
 import distort from './fx/Distort.fs?raw'
 import vibe from './fx/Vibe.fs?raw'
@@ -805,6 +808,18 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-phosphene', name: 'Phosphene', category: 'FX', source: phosphene,
     curated: { sensitivity: [0.3, 0.8], persistence: [0.4, 0.85], strength: [0.35, 0.8], complement: [0.6, 1], threshold: [0.4, 0.7] }
+  },
+  {
+    id: 'fx-compress', name: 'Compress', category: 'FX', source: compress,
+    curated: { block: [6, 16], quality: [0.1, 0.5], ring: [0.2, 0.7], chroma: [0.3, 0.9], grid: [0, 0.3] }
+  },
+  {
+    id: 'fx-databend', name: 'Databend', category: 'FX', source: databend,
+    curated: { bands: [16, 90], shift: [0.03, 0.25], chance: [0.15, 0.5], hold: [0.2, 0.6], channel: [0.2, 0.7], rate: [0.2, 0.7] }
+  },
+  {
+    id: 'fx-pixelsort', name: 'Pixel Sort', category: 'FX', source: pixelSort,
+    curated: { low: [0.1, 0.4], high: [0.6, 0.9], length: [0.1, 0.4] }
   }
   // PHASE 9 (post-MVP experiment): Cross-FM : a source that takes ANOTHER
   // layer's frame as a video-rate FM input (an A→B→C→A cross-oscillator

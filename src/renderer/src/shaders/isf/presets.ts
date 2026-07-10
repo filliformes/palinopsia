@@ -618,6 +618,45 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Mono ghost', values: { sensitivity: 0.5, persistence: 0.65, strength: 0.6, complement: 0.0, threshold: 0.5 } },
     { name: 'Everywhere', values: { sensitivity: 0.7, persistence: 0.6, strength: 0.5, complement: 1.0, threshold: 0.25 } }
   ],
+  // ── Compress (JPEG / DCT intra artefacts) ──
+  'fx-compress': [
+    { name: 'JPEG low', values: { block: 8, quality: 0.25, ring: 0.5, chroma: 0.7, grid: 0 } },
+    { name: 'Heavy crush', values: { block: 12, quality: 0.1, ring: 0.7, chroma: 0.9, grid: 0.2 } },
+    { name: 'Chroma bleed', values: { block: 8, quality: 0.4, ring: 0.3, chroma: 1.0, grid: 0 } },
+    { name: 'Blocky', values: { block: 16, quality: 0.2, ring: 0.4, chroma: 0.6, grid: 0.4 } },
+    { name: 'Ringing edges', values: { block: 8, quality: 0.45, ring: 0.9, chroma: 0.5, grid: 0 } },
+    { name: 'Fine tiles', values: { block: 4, quality: 0.3, ring: 0.5, chroma: 0.6, grid: 0.15 } },
+    { name: 'Banded', values: { block: 10, quality: 0.15, ring: 0.3, chroma: 0.7, grid: 0 } },
+    { name: 'Broadcast', values: { block: 8, quality: 0.5, ring: 0.5, chroma: 0.8, grid: 0 } },
+    { name: 'Grid mesh', values: { block: 14, quality: 0.35, ring: 0.4, chroma: 0.6, grid: 0.8 } },
+    { name: 'Near clean', values: { block: 8, quality: 0.7, ring: 0.25, chroma: 0.4, grid: 0 } }
+  ],
+  // ── Databend (byte-editing bands) ──
+  'fx-databend': [
+    { name: 'Signal tear', values: { bands: 40, shift: 0.12, chance: 0.35, hold: 0.4, channel: 0.4, rate: 0.5 } },
+    { name: 'Heavy corrupt', values: { bands: 60, shift: 0.3, chance: 0.55, hold: 0.6, channel: 0.7, rate: 0.6 } },
+    { name: 'Row hold', values: { bands: 50, shift: 0.05, chance: 0.4, hold: 0.9, channel: 0.2, rate: 0.4 } },
+    { name: 'Channel drift', values: { bands: 30, shift: 0.08, chance: 0.4, hold: 0.2, channel: 0.9, rate: 0.5 } },
+    { name: 'Fine bands', values: { bands: 110, shift: 0.1, chance: 0.3, hold: 0.4, channel: 0.4, rate: 0.6 } },
+    { name: 'Strobe', values: { bands: 24, shift: 0.15, chance: 0.5, hold: 0.3, channel: 0.5, rate: 0.8 } },
+    { name: 'Broken monitor', values: { bands: 45, shift: 0.22, chance: 0.45, hold: 0.5, channel: 0.6, rate: 0.5 } },
+    { name: 'Subtle', values: { bands: 60, shift: 0.05, chance: 0.2, hold: 0.3, channel: 0.25, rate: 0.4 } },
+    { name: 'Slow drift', values: { bands: 36, shift: 0.14, chance: 0.35, hold: 0.5, channel: 0.4, rate: 0.2 } },
+    { name: 'Chaos', values: { bands: 80, shift: 0.35, chance: 0.6, hold: 0.6, channel: 0.8, rate: 0.7 } }
+  ],
+  // ── Pixel Sort (threshold-interval luma sort) ──
+  'fx-pixelsort': [
+    { name: 'Bright streaks', values: { low: 0.25, high: 0.85, length: 0.2, vertical: 0, reverse: 0 } },
+    { name: 'Vertical rain', values: { low: 0.2, high: 0.8, length: 0.3, vertical: 1, reverse: 0 } },
+    { name: 'Up streaks', values: { low: 0.2, high: 0.8, length: 0.3, vertical: 1, reverse: 1 } },
+    { name: 'Long sort', values: { low: 0.15, high: 0.9, length: 0.5, vertical: 0, reverse: 0 } },
+    { name: 'Highlights only', values: { low: 0.6, high: 1.0, length: 0.25, vertical: 0, reverse: 0 } },
+    { name: 'Shadows', values: { low: 0.0, high: 0.4, length: 0.25, vertical: 1, reverse: 0 } },
+    { name: 'Midtone runs', values: { low: 0.35, high: 0.65, length: 0.3, vertical: 0, reverse: 0 } },
+    { name: 'Short chop', values: { low: 0.25, high: 0.8, length: 0.08, vertical: 0, reverse: 0 } },
+    { name: 'Wide band', values: { low: 0.1, high: 0.95, length: 0.35, vertical: 1, reverse: 0 } },
+    { name: 'Reverse horiz', values: { low: 0.25, high: 0.85, length: 0.25, vertical: 0, reverse: 1 } }
+  ],
   // ── Generators ──────────────────────────────────────────────────────
   'op-art': [
     { name: 'Fall', values: { mode: 0, scale: 24, warp: 0.4, rate: 0.3, angle: 0, contrast: 0.9, tint: [0.9, 0.9, 0.88, 1] } },
