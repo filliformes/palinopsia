@@ -21,6 +21,7 @@
       "LABELS": ["off","paper crumpled","paper rough","paper fibers","cardboard","bark fine","bark deep","bark plates","dry ground","sand dunes","sand ripples","rock face","rock rough","fabric weave","fabric knit","carpet","plaster","painted plaster","concrete","concrete rough","bricks","wood planks","wood grain","metal worn","corrugated steel","crushed foil","foil wrinkles","snow","lava","leather","gravel"],
       "DEFAULT": 0, "LABEL": "texture" },
     { "NAME": "pbrAmount", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "relief" },
+    { "NAME": "pbrLight",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.55, "LABEL": "raking" },
     { "NAME": "pbrScale",  "TYPE": "float", "MIN": 0.25, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "tex scale" },
     { "NAME": "pbrDepth",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "field depth" },
     { "NAME": "pbrNormal", "TYPE": "image" },
@@ -72,13 +73,17 @@ void main() {
     // afar rather than pressed against your eye.
     float pscl = pbrScale * (1.0 + pbrDepth * 2.5);
     vec2 vdir = (uv - 0.5) * vec2(aspect, 1.0) * (1.0 - pbrDepth * 0.6);
-    float amp = pbrAmount * 0.1 * (1.0 - pbrDepth * 0.55); // relief subtends less from afar
-    vec2 stepUV = vdir * amp / 16.0;
-    float layer = 1.0 / 16.0;
+    // Displacement amplitude : the geometric throw of the projected image into
+    // the relief. Much deeper than a flat nudge (features really sink / ride),
+    // and it grows with the RAKING control so a hard-lit material also parallaxes
+    // harder. 24 march steps keep the deeper throw artefact-free.
+    float amp = pbrAmount * (0.24 + pbrLight * 0.14) * (1.0 - pbrDepth * 0.55);
+    vec2 stepUV = vdir * amp / 24.0;
+    float layer = 1.0 / 24.0;
     vec2 pp = uv;
     float curD = 0.0;
     float hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, fract(vec2(pp.x * aspect, pp.y) * pscl)).r;
-    for (int i = 0; i < 16; i++) {
+    for (int i = 0; i < 24; i++) {
       if (curD >= hd) break;
       pp += stepUV;
       hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, fract(vec2(pp.x * aspect, pp.y) * pscl)).r;
@@ -100,16 +105,19 @@ void main() {
     // Soft self-shadow : march toward the light; where the relief rises above the
     // ray the point sits in shadow → cast shadows in the crevices (the strongest
     // depth cue, the thing that sells "lit 3D surface").
-    vec3 Ls = normalize(vec3((light - uv) * vec2(aspect, 1.0), 0.55));
-    if (Ls.z > 0.05) {
+    // Graze the light lower across the surface as raking rises (Ls.z shrinks →
+    // longer, deeper cast shadows), then march farther and darker. The shadow
+    // floor drops toward near-black at full raking : real crevice darkness.
+    vec3 Ls = normalize(vec3((light - uv) * vec2(aspect, 1.0), mix(0.6, 0.22, pbrLight)));
+    if (Ls.z > 0.03) {
       float surfH = IMG_NORM_PIXEL(pbrHeight, tuv).r;
       float occ = 0.0;
-      for (int j = 1; j <= 6; j++) {
-        vec2 sp = uv + Ls.xy * amp * (float(j) / 6.0);
+      for (int j = 1; j <= 10; j++) {
+        vec2 sp = uv + Ls.xy * amp * 1.6 * (float(j) / 10.0);
         float hs = IMG_NORM_PIXEL(pbrHeight, fract(vec2(sp.x * aspect, sp.y) * pscl)).r;
-        occ = max(occ, hs - surfH - float(j) / 6.0 * 0.12);
+        occ = max(occ, hs - surfH - float(j) / 10.0 * 0.10);
       }
-      pshadow = clamp(1.0 - occ * 4.0, 0.25, 1.0);
+      pshadow = clamp(1.0 - occ * (5.0 + pbrLight * 11.0), 0.02, 1.0);
     }
   }
 
@@ -163,24 +171,31 @@ void main() {
   //    and a restrained specular sheen rides the slopes. Normalized against
   //    the flat normal so a neutral map changes nothing. ──
   if (pbrAmount > 0.001) {
-    vec3 L = normalize(vec3((light - uv) * vec2(aspect, 1.0), 0.55));
+    float rk = pbrLight; // RAKING : how hard the light grazes the material.
+    vec3 L = normalize(vec3((light - uv) * vec2(aspect, 1.0), mix(0.6, 0.28, rk)));
     float ndl = clamp(dot(pnrm, L), 0.0, 1.0);
     float flatNdl = clamp(L.z, 0.0, 1.0);
-    // Diffuse relief lighting × the cast self-shadow × ambient occlusion. FIELD
-    // DEPTH raises the ambient floor : stepped back, the light reads softer / more
-    // ambient (less raking contrast), as a distant surface does.
-    float amb = mix(0.18, 0.5, pbrDepth);
+    // Diffuse relief lighting × the cast self-shadow × ambient occlusion. The
+    // ambient floor DROPS as raking rises → deeper shadows, more chiaroscuro in
+    // the material. FIELD DEPTH lifts it back up (a distant surface reads softer,
+    // more ambient, less raking contrast).
+    float amb = mix(mix(0.30, 0.03, rk), 0.5, pbrDepth);
     float diff = (amb + (1.0 - amb) * ndl) / (amb + (1.0 - amb) * flatNdl);
-    float shade = diff * mix(pshadow, 1.0, pbrDepth * 0.6) * mix(1.0, pao, 0.9);
-    col *= mix(1.0, shade, pbrAmount);
+    // Expand the diffuse swing around the flat reference (1.0) so lit facets punch
+    // brighter and shadowed facets fall darker : the extra material CONTRAST the
+    // relief needs. A neutral map (diff==1) is untouched.
+    diff = 1.0 + (diff - 1.0) * (1.0 + rk * 2.4);
+    float shade = diff * mix(pshadow, 1.0, pbrDepth * 0.6) * mix(1.0, pao, 0.7 + rk * 0.3);
+    col *= mix(1.0, max(shade, 0.0), pbrAmount);
     // Rim / fresnel : slopes turned away from the screen catch a thin edge light,
-    // popping each bump off the surface (softens with distance).
+    // popping each bump off the surface (stronger with raking, softens with distance).
     float fres = pow(1.0 - clamp(pnrm.z, 0.0, 1.0), 3.0);
-    col += lightColor.rgb * fres * pbrAmount * 0.14 * (1.0 - pbrDepth * 0.5);
-    // Specular sheen riding the slopes (broader + gentler from afar).
+    col += lightColor.rgb * fres * pbrAmount * (0.12 + rk * 0.24) * (1.0 - pbrDepth * 0.5);
+    // Specular sheen riding the slopes : tighter + hotter as raking rises, broader
+    // and gentler from afar.
     vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));
-    float spec = pow(clamp(dot(pnrm, H), 0.0, 1.0), mix(32.0, 12.0, pbrDepth));
-    col += lightColor.rgb * spec * pbrAmount * (0.2 + lightGlow * 0.6) * (1.0 - pbrDepth * 0.4);
+    float spec = pow(clamp(dot(pnrm, H), 0.0, 1.0), mix(mix(18.0, 48.0, rk), 12.0, pbrDepth));
+    col += lightColor.rgb * spec * pbrAmount * (0.18 + lightGlow * 0.6 + rk * 0.5) * (1.0 - pbrDepth * 0.4);
     // Atmospheric recession : the stepped-back surface settles a touch toward the
     // atmosphere colour (the "context" shifts as you pull away).
     col = mix(col, atmosphere.rgb, pbrDepth * 0.14 * pbrAmount);
