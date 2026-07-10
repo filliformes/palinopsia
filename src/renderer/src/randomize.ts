@@ -140,7 +140,7 @@ function randomizeOneInput(
  *  Randomize scopes and by the Inspector's ⚄ button. */
 // Params Randomize must never touch (like the Text source): the Context PBR
 // surface is a deliberate staging decision, not a texture to dice-roll.
-const RANDOMIZE_SKIP: Record<string, RegExp> = { 'fx-context': /^pbr/ }
+const RANDOMIZE_SKIP: Record<string, RegExp> = { 'fx-context': /^(pbr|lightOrder$)/ }
 
 export function randomizeInputs(
   shaderId: string,

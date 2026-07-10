@@ -15,6 +15,7 @@
     { "NAME": "lightSize",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5,  "LABEL": "light size" },
     { "NAME": "lightColor", "TYPE": "color", "DEFAULT": [1.0, 0.92, 0.8, 1.0], "LABEL": "light color" },
     { "NAME": "light",      "TYPE": "point2D", "DEFAULT": [0.5, 0.55] },
+    { "NAME": "lightOrder", "TYPE": "bool", "DEFAULT": true, "LABEL": "light order" },
     { "NAME": "pbrTexture", "TYPE": "long",
       "VALUES": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30],
       "LABELS": ["off","paper crumpled","paper rough","paper fibers","cardboard","bark fine","bark deep","bark plates","dry ground","sand dunes","sand ripples","rock face","rock rough","fabric weave","fabric knit","carpet","plaster","painted plaster","concrete","concrete rough","bricks","wood planks","wood grain","metal worn","corrugated steel","crushed foil","foil wrinkles","snow","lava","leather","gravel"],
@@ -127,6 +128,18 @@ void main() {
     col += lightColor.rgb * spec * pbrAmount * (0.15 + lightGlow * 0.5);
   }
 
+  // ── KEY LIGHT : a soft radial glow from the light position in its own colour;
+  //    lightSize sweeps it from a tight spot to a broad ambient wash. Computed
+  //    once, then added either PRE (before haze + vignette, which wash / darken
+  //    it : the old behaviour) or POST (after them, so it punches through haze,
+  //    the vignette and any hard master FX below : always reads). The Light
+  //    PRE/POST toggle in the Inspector picks which. ──
+  float falloff = mix(11.0, 0.35, lightSize);
+  vec2 dl = (uv - light) * vec2(aspect, 1.0);
+  float lg = exp(-dot(dl, dl) * falloff);
+  vec3 keyLight = lightColor.rgb * lg * lightGlow * 1.3;
+  if (!lightOrder) col += keyLight; // PRE
+
   // ── HAZE : the whole frame settles toward the atmosphere colour, strongest
   //    in the shadows/distance (aerial perspective), with a lighter global veil
   //    over the midtones and highlights so the tint always reads. ──
@@ -140,15 +153,7 @@ void main() {
   float vig = 1.0 - smoothstep(0.35, 0.95, length(dv));
   col *= mix(1.0, 0.35 + 0.65 * vig, depth);
 
-  // ── KEY LIGHT : applied LAST so it always reads. A soft radial glow from the
-  //    light position in its own colour, added ON TOP of haze, the depth vignette
-  //    and everything below in the master chain (a hard CRT / Posterize, etc.), so
-  //    the light never gets washed out, darkened at the rim, or quantised away.
-  //    lightSize sweeps it from a tight spot to a broad ambient wash. ──
-  float falloff = mix(11.0, 0.35, lightSize);
-  vec2 dl = (uv - light) * vec2(aspect, 1.0);
-  float lg = exp(-dot(dl, dl) * falloff);
-  col += lightColor.rgb * lg * lightGlow * 1.3;
+  if (lightOrder) col += keyLight; // POST (default)
 
   gl_FragColor = vec4(col, 1.0);
 }

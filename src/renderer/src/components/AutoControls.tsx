@@ -127,8 +127,12 @@ export function AutoControls({
   // posX + posY collapse into one "POS" cell with the two sliders side by side.
   const hasPosPair =
     inputs.some((i) => i.name === 'posX') && inputs.some((i) => i.name === 'posY')
+  // Context's `lightOrder` bool renders as a small PRE/POST toggle beside the
+  // "light" label instead of its own control row.
+  const hasLightOrder =
+    inputs.some((i) => i.name === 'lightOrder') && inputs.some((i) => i.name === 'lightGlow')
   const visible = (arr: IsfInputDesc[]): IsfInputDesc[] =>
-    hasPosPair ? arr.filter((i) => i.name !== 'posY') : arr
+    arr.filter((i) => !(hasPosPair && i.name === 'posY') && !(hasLightOrder && i.name === 'lightOrder'))
   const renderControl = (inp: IsfInputDesc, dense = false): JSX.Element =>
     hasPosPair && inp.name === 'posX' ? (
       <PosPairControl key="pos" inputs={inputs} values={values} onChange={onChange} />
@@ -140,6 +144,11 @@ export function AutoControls({
         onChange={onChange}
         modTargetFor={modTargetFor}
         dense={dense}
+        labelExtra={
+          hasLightOrder && inp.name === 'lightGlow' ? (
+            <LightOrderToggle values={values} onChange={onChange} />
+          ) : undefined
+        }
       />
     )
   if (layout === 'vertical') {
@@ -278,17 +287,19 @@ function Control({
   value,
   onChange,
   modTargetFor,
-  dense = false
+  dense = false,
+  labelExtra
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
   modTargetFor?: (inputName: string) => ModTarget
   dense?: boolean
+  labelExtra?: JSX.Element
 }): JSX.Element | null {
   switch (inp.type) {
     case 'float':
-      return <FloatControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} dense={dense} />
+      return <FloatControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} dense={dense} labelExtra={labelExtra} />
     case 'bool':
     case 'event':
       return <BoolControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} />
@@ -317,13 +328,15 @@ function FloatControl({
   value,
   onChange,
   modTargetFor,
-  dense = false
+  dense = false,
+  labelExtra
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
   modTargetFor?: (inputName: string) => ModTarget
   dense?: boolean
+  labelExtra?: JSX.Element
 }): JSX.Element {
   const min = typeof inp.min === 'number' ? inp.min : 0
   const max = typeof inp.max === 'number' ? inp.max : 1
@@ -358,6 +371,7 @@ function FloatControl({
           >
             {inp.label}
           </span>
+          {labelExtra}
           <input
             ref={sliderRef}
             type="range"
@@ -394,7 +408,10 @@ function FloatControl({
   return (
     <div className="flex w-44 min-w-0 flex-col gap-0.5">
       <div className="flex min-w-0 items-center justify-between gap-2">
-        {labelEl(inp)}
+        <div className="flex min-w-0 items-center gap-1">
+          {labelEl(inp)}
+          {labelExtra}
+        </div>
         <div className="flex shrink-0 items-center gap-1">
           {target && <ModButton target={target} bound={bound} label={inp.label} />}
           <div className="w-14">
@@ -666,6 +683,37 @@ function CompactCluster({
         )
       })}
     </div>
+  )
+}
+
+// Context's Light PRE/POST toggle : a tiny chip beside the "light" label that
+// flips the `lightOrder` bool. POST (default) adds the key light after haze +
+// vignette (+ any hard master FX below) so it always reads; PRE is the old order
+// (before them, so they can wash / darken it).
+function LightOrderToggle({
+  values,
+  onChange
+}: {
+  values: Record<string, Value>
+  onChange: (name: string, value: Value) => void
+}): JSX.Element {
+  const post = (typeof values.lightOrder === 'number' ? values.lightOrder : 1) >= 0.5
+  return (
+    <button
+      onClick={() => onChange('lightOrder', post ? 0 : 1)}
+      className={`shrink-0 rounded px-1 font-mono text-[8px] leading-4 uppercase transition-colors ${
+        post
+          ? 'bg-accent/20 text-accent ring-1 ring-accent'
+          : 'bg-accent2/20 text-accent2 ring-1 ring-accent2'
+      }`}
+      title={
+        post
+          ? 'Light POST : light added after haze + vignette (and any hard master FX below), so it always reads. Click for PRE.'
+          : 'Light PRE : light added before haze + vignette, which can wash / darken it (the old order). Click for POST.'
+      }
+    >
+      {post ? 'POST' : 'PRE'}
+    </button>
   )
 }
 
