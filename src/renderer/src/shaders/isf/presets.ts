@@ -66,16 +66,16 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
   ],
   // ── Datamosh (real-time faux-codec mosh) ──
   'node-datamosh': [
-    { name: 'Classic mosh', values: { mode: 1, motion: 1.0, block: 16, decay: 0.92, refresh: 0.06, residual: 0.15, reseed: 0.1, thresh: 0.06, bleed: 0.2 } },
-    { name: 'Deep bloom', values: { mode: 1, motion: 1.4, block: 24, decay: 0.96, refresh: 0.0, residual: 0.05, reseed: 0.05, thresh: 0.04, bleed: 0.3 } },
-    { name: 'Sticky slide', values: { mode: 1, motion: 0.8, block: 16, decay: 0.94, refresh: 0.04, residual: 0.1, reseed: 0.06, thresh: 0.06, bleed: 0.15 } },
-    { name: 'Melt soup', values: { mode: 0, motion: 1.2, block: 20, decay: 0.95, refresh: 0.02, residual: 0.1, reseed: 0.08, thresh: 0.05, bleed: 0.35 } },
-    { name: 'Chunky blocks', values: { mode: 1, motion: 1.0, block: 40, decay: 0.9, refresh: 0.08, residual: 0.2, reseed: 0.15, thresh: 0.08, bleed: 0.2 } },
-    { name: 'Fine mosh', values: { mode: 1, motion: 0.7, block: 8, decay: 0.9, refresh: 0.1, residual: 0.2, reseed: 0.12, thresh: 0.05, bleed: 0.1 } },
-    { name: 'Bleeding pixels', values: { mode: 0, motion: 1.5, block: 16, decay: 0.93, refresh: 0.03, residual: 0.08, reseed: 0.05, thresh: 0.04, bleed: 0.6 } },
-    { name: 'Boiling reseed', values: { mode: 1, motion: 0.9, block: 16, decay: 0.92, refresh: 0.05, residual: 0.15, reseed: 0.4, thresh: 0.05, bleed: 0.2 } },
-    { name: 'Subtle drag', values: { mode: 1, motion: 0.5, block: 16, decay: 0.88, refresh: 0.15, residual: 0.3, reseed: 0.1, thresh: 0.08, bleed: 0.1 } },
-    { name: 'Motion transfer', values: { mode: 1, motion: 1.2, block: 20, decay: 0.95, refresh: 0.02, residual: 0.06, reseed: 0.05, thresh: 0.04, bleed: 0.25, sidechainFlow: 1 } }
+    { name: 'Classic mosh', values: { mode: 1, motion: 1.0, block: 16, decay: 0.92, refresh: 0.06, residual: 0.15, reseed: 0.1, thresh: 0.012, bleed: 0.2, autoBloom: 0.7 } },
+    { name: 'Deep bloom', values: { mode: 1, motion: 1.4, block: 24, decay: 0.96, refresh: 0.0, residual: 0.05, reseed: 0.05, thresh: 0.008, bleed: 0.3, autoBloom: 1.0 } },
+    { name: 'Sticky slide', values: { mode: 1, motion: 0.9, block: 16, decay: 0.94, refresh: 0.04, residual: 0.1, reseed: 0.06, thresh: 0.012, bleed: 0.15, autoBloom: 0.7 } },
+    { name: 'Melt soup', values: { mode: 0, motion: 1.2, block: 20, decay: 0.95, refresh: 0.02, residual: 0.1, reseed: 0.08, thresh: 0.01, bleed: 0.35, autoBloom: 0.8 } },
+    { name: 'Chunky blocks', values: { mode: 1, motion: 1.0, block: 40, decay: 0.9, refresh: 0.08, residual: 0.2, reseed: 0.15, thresh: 0.015, bleed: 0.2, autoBloom: 0.6 } },
+    { name: 'Fine mosh', values: { mode: 1, motion: 0.8, block: 8, decay: 0.9, refresh: 0.1, residual: 0.2, reseed: 0.12, thresh: 0.01, bleed: 0.1, autoBloom: 0.6 } },
+    { name: 'Bleeding pixels', values: { mode: 0, motion: 1.5, block: 16, decay: 0.93, refresh: 0.03, residual: 0.08, reseed: 0.05, thresh: 0.008, bleed: 0.6, autoBloom: 0.8 } },
+    { name: 'Boiling reseed', values: { mode: 1, motion: 0.9, block: 16, decay: 0.92, refresh: 0.05, residual: 0.15, reseed: 0.5, thresh: 0.012, bleed: 0.2, autoBloom: 0.6 } },
+    { name: 'Subtle drag', values: { mode: 1, motion: 0.6, block: 16, decay: 0.88, refresh: 0.15, residual: 0.3, reseed: 0.1, thresh: 0.018, bleed: 0.1, autoBloom: 0.5 } },
+    { name: 'Motion transfer', values: { mode: 1, motion: 1.2, block: 20, decay: 0.95, refresh: 0.02, residual: 0.06, reseed: 0.05, thresh: 0.008, bleed: 0.25, autoBloom: 0.9, sidechainFlow: 1 } }
   ],
   // ── Motif (spatial counterpoint / transpose echoes) ──
   'fx-motif': [

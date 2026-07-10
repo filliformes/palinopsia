@@ -338,43 +338,36 @@ void main(){
   float refresh = uRefresh * (1.0 - uAutoBloom * texture(uEnergy, vec2(0.5)).r);
   vec2 texel = 1.0 / uRes;
   vec2 blk = max(uBlock, 1.0) * texel;                 // macroblock size in UV
-  vec2 blockOrigin = floor(vUV / blk) * blk;
-  vec2 blockCenter = blockOrigin + blk * 0.5;
-  vec2 mv = texture(uFlow, blockCenter).rg * uMotion;  // one vector per block
-  float fmag = length(mv);
-  float gate = smoothstep(uThresh, uThresh + 0.03, fmag); // mosh only where it moves
+  vec2 blockCenter = (floor(vUV / blk) + 0.5) * blk;
+  // STICKY = one vector per macroblock (block-constant → the whole block slides as
+  // a rigid tile, tearing at block edges : the real datamosh look). MELT = the
+  // per-pixel (smoothly interpolated) flow → a softer warp/smear.
+  vec2 rawmv = (uMode == 1 ? texture(uFlow, blockCenter).rg : texture(uFlow, vUV).rg) * uMotion;
+  float fmag = length(rawmv);
+  // Suppress sub-threshold flow noise so still areas don't creep; above it, the
+  // block advects. NOT an output gate : the accumulator always shows through, so
+  // the smear PERSISTS after motion stops (real datamosh) and only fades via decay.
+  vec2 mv = rawmv * smoothstep(uThresh, uThresh * 2.0 + 0.001, fmag);
 
-  // Displaced read : STICKY slides the whole block as a rigid tile (crisp,
-  // tearing at 16px edges); MELT displaces per-pixel (softer smear).
-  vec2 dispUV;
-  if (uMode == 1) {
-    vec2 local = vUV - blockOrigin;
-    dispUV = (blockOrigin - mv) + local;
-  } else {
-    dispUV = vUV - mv;
-  }
-
-  // Chroma bleed keyed to motion (codec colour bleed).
-  vec2 cb = mv * uBleed * 3.0;
-  vec3 prev = vec3(
+  vec2 dispUV = vUV - mv;                               // advect along motion
+  vec2 cb = mv * uBleed * 3.0;                          // chroma bleed keyed to motion
+  vec3 advected = vec3(
     texture(uPrev, dispUV + cb).r,
     texture(uPrev, dispUV).g,
     texture(uPrev, dispUV - cb).b);
 
   vec3 host = texture(uHost, vUV).rgb;
 
-  // The mosh : the advected accumulator, retained by decay; residual re-injects
-  // live texture. Gated to moving regions (still areas stay clean : "skip" blocks).
-  vec3 mosh = mix(host, prev, uDecay);
-  mosh = mix(mosh, host, uResidual);
-  vec3 outc = mix(host, mosh, gate);
-
-  // I-frame reset : lerp the buffer back to the clean live frame.
-  outc = mix(outc, host, refresh);
+  // Accumulator persists by DECAY. Still areas (mv≈0) sample themselves and
+  // converge back to host over ~1/(1-decay) frames : the smear LINGERS where the
+  // motion was, then cleans up. Moving areas keep sliding (the P-frame smear).
+  vec3 outc = mix(host, advected, uDecay);
+  outc = mix(outc, host, uResidual * 0.5);             // extra live-texture re-inject (mush control)
+  outc = mix(outc, host, refresh);                     // I-frame reset
 
   // Stochastic block reseed : whole blocks snap back to host, re-introducing
   // detail so the smear never fully mushes (transflow's random-reset idea).
-  float rs = step(1.0 - uReseed * 0.06, hash(floor(vUV * uRes / max(uBlock, 1.0)) + uSeed));
+  float rs = step(1.0 - uReseed * 0.3, hash(floor(vUV * uRes / max(uBlock, 1.0)) + uSeed));
   outc = mix(outc, host, rs);
 
   o = vec4(clamp(outc, 0.0, 1.0), 1.0);
@@ -933,6 +926,7 @@ export class DatamoshNode implements ConvNode {
   private w = 0
   private h = 0
   private cur = 0
+  private seeded = false
   private frame = 0
   private disposed = false
   constructor(private gl: WebGL2RenderingContext) {}
@@ -958,7 +952,7 @@ export class DatamoshNode implements ConvNode {
     const gl = this.gl
     if (this.accum) for (const b of this.accum) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
     this.accum = [makeRGBA(gl, w, h, true), makeRGBA(gl, w, h, true)]
-    this.w = w; this.h = h; this.cur = 0
+    this.w = w; this.h = h; this.cur = 0; this.seeded = false
   }
 
   render(ctx: NodeContext): WebGLTexture {
@@ -976,6 +970,15 @@ export class DatamoshNode implements ConvNode {
     }
     const bind = (unit: number, tex: WebGLTexture): void => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex) }
 
+    // Seed the accumulator with the live frame so the mosh never starts from a
+    // black buffer (which, with high persistence, would take ~12 frames to fill).
+    if (!this.seeded) {
+      const cp = g.use(g.copy)
+      bind(0, ctx.host); gl.uniform1i(cp.u('uTex'), 0)
+      for (const b of this.accum!) draw(b.fbo, W, H)
+      this.seeded = true
+    }
+
     const lumaCur = this.lumaCurIsA ? this.lumaA : this.lumaB
     const lumaPrev = this.lumaCurIsA ? this.lumaB : this.lumaA
     // Flow source : a sidechain layer (motion transfer / "diegetic datamosh") if
@@ -992,7 +995,7 @@ export class DatamoshNode implements ConvNode {
     gl.uniform1i(p.u('uCur'), 0); gl.uniform1i(p.u('uPrev'), 1)
     gl.uniform2f(p.u('uRes'), n, n)
     gl.uniform1f(p.u('uLambda'), 0.002)
-    gl.uniform1f(p.u('uClamp'), 0.03)
+    gl.uniform1f(p.u('uClamp'), 0.06) // max per-frame flow (must exceed the motion gate)
     draw(this.flowT.fbo, n, n)
 
     // 2b) cut detector → 1×1 decaying bloom state (scene-cut auto-mosh).
