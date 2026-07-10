@@ -232,6 +232,43 @@ export const NATIVE_NODES: IsfShader[] = [
       hue: [-0.08, 0.08], hueCurve: [0, 0.6], blur: [0.05, 0.5], delay: [2, 12], delayMix: [0.2, 0.6],
       keyThresh: [0.3, 0.6], keySoft: [0.02, 0.2], border: [0, 0.5], agc: [0.3, 0.8], noise: [0.05, 0.4]
     }
+  },
+  {
+    // Datamosh engine : the real codec-mosh look faked in real time (engine/
+    // convNodes DatamoshNode). Optical flow → per-macroblock vectors → advected
+    // accumulator. No sidechain needed (feeds on the layer); with one + "motion
+    // transfer" on, another layer's MOTION moshes this layer's texture.
+    id: 'node-datamosh',
+    name: 'Datamosh',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Datamosh : the codec 'moshing' look, real-time and codec-free. The layer's own motion (optical flow, quantised to macroblocks) advects a feedback buffer every frame, so the picture keeps SLIDING along movement : the P-frame smear. Turn REFRESH (the I-frame) down and a new scene's motion drags the PREVIOUS scene's texture around : figures melt into and emerge from the image (the bloom). RESIDUAL re-injects live texture (the mosh↔mush line); RESEED snaps whole blocks back so it never fully mushes. STICKY slides each block as a crisp tile (real datamosh tearing); MELT is a softer smear. With a sidechain layer + 'motion transfer' on, that layer's MOVEMENT moshes THIS layer's texture (two images melting into each other).",
+      "CATEGORIES": ["FX", "Glitch", "Feedback"],
+      "INPUTS": [
+        { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["melt", "sticky"], "DEFAULT": 1, "LABEL": "mode" },
+        { "NAME": "motion", "TYPE": "float", "MIN": 0.0, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "motion" },
+        { "NAME": "block", "TYPE": "float", "MIN": 2.0, "MAX": 64.0, "DEFAULT": 16.0, "LABEL": "block size" },
+        { "NAME": "decay", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.92, "LABEL": "persistence" },
+        { "NAME": "refresh", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.06, "LABEL": "refresh (I-frame)" },
+        { "NAME": "residual", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "residual" },
+        { "NAME": "reseed", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.1, "LABEL": "reseed" },
+        { "NAME": "thresh", "TYPE": "float", "MIN": 0.0, "MAX": 0.5, "DEFAULT": 0.06, "LABEL": "motion gate" },
+        { "NAME": "bleed", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2, "LABEL": "chroma bleed" },
+        { "NAME": "sidechainFlow", "TYPE": "bool", "DEFAULT": false, "LABEL": "motion transfer", "COMPACT": true },
+        { "NAME": "flowRes", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["128", "256", "512"], "DEFAULT": 1, "LABEL": "flow res", "COMPACT": true }
+      ]
+    }*/`,
+    curated: {
+      motion: [0.5, 2.0],
+      block: [8, 32],
+      decay: [0.85, 0.97],
+      refresh: [0.0, 0.15],
+      residual: [0.05, 0.35],
+      reseed: [0.0, 0.35],
+      thresh: [0.02, 0.12],
+      bleed: [0, 0.5]
+    }
   }
 ]
 

@@ -313,6 +313,69 @@ void main(){
   o = vec4(clamp(outc, 0.0, 1.0), 1.0);
 }`
 
+// ── Datamosh engine ──────────────────────────────────────────────────────
+// The real datamosh look, faked in real time (no codec): a per-MACROBLOCK motion
+// field (optical flow of the live signal — or a sidechain layer — quantised to a
+// block grid) advects an accumulator buffer each frame, so the picture keeps
+// sliding along motion (the P-frame smear). A `refresh` term lerps the buffer back
+// to the live frame (the I-frame); dropping it low lets a new scene's motion drag
+// the PREVIOUS scene's texture around (the bloom). `residual` re-injects live
+// texture (the mosh↔mush line); a block-granular stochastic `reseed` keeps it from
+// mushing. STICKY mode slides each block as a rigid tile (crisp, real-datamosh
+// tearing); MELT mode is a softer per-pixel smear. Chroma `bleed` = codec colour
+// bleed. Block-constant vectors tear at block edges : the macroblock signature.
+const F_DATAMOSH = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uPrev, uFlow;
+uniform vec2 uRes;
+uniform float uBlock, uMotion, uRefresh, uResidual, uReseed, uDecay, uBleed, uThresh, uSeed;
+uniform int uMode;
+float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+void main(){
+  vec2 texel = 1.0 / uRes;
+  vec2 blk = max(uBlock, 1.0) * texel;                 // macroblock size in UV
+  vec2 blockOrigin = floor(vUV / blk) * blk;
+  vec2 blockCenter = blockOrigin + blk * 0.5;
+  vec2 mv = texture(uFlow, blockCenter).rg * uMotion;  // one vector per block
+  float fmag = length(mv);
+  float gate = smoothstep(uThresh, uThresh + 0.03, fmag); // mosh only where it moves
+
+  // Displaced read : STICKY slides the whole block as a rigid tile (crisp,
+  // tearing at 16px edges); MELT displaces per-pixel (softer smear).
+  vec2 dispUV;
+  if (uMode == 1) {
+    vec2 local = vUV - blockOrigin;
+    dispUV = (blockOrigin - mv) + local;
+  } else {
+    dispUV = vUV - mv;
+  }
+
+  // Chroma bleed keyed to motion (codec colour bleed).
+  vec2 cb = mv * uBleed * 3.0;
+  vec3 prev = vec3(
+    texture(uPrev, dispUV + cb).r,
+    texture(uPrev, dispUV).g,
+    texture(uPrev, dispUV - cb).b);
+
+  vec3 host = texture(uHost, vUV).rgb;
+
+  // The mosh : the advected accumulator, retained by decay; residual re-injects
+  // live texture. Gated to moving regions (still areas stay clean : "skip" blocks).
+  vec3 mosh = mix(host, prev, uDecay);
+  mosh = mix(mosh, host, uResidual);
+  vec3 outc = mix(host, mosh, gate);
+
+  // I-frame reset : lerp the buffer back to the clean live frame.
+  outc = mix(outc, host, uRefresh);
+
+  // Stochastic block reseed : whole blocks snap back to host, re-introducing
+  // detail so the smear never fully mushes (transflow's random-reset idea).
+  float rs = step(1.0 - uReseed * 0.06, hash(floor(vUV * uRes / max(uBlock, 1.0)) + uSeed));
+  outc = mix(outc, host, rs);
+
+  o = vec4(clamp(outc, 0.0, 1.0), 1.0);
+}`
+
 class NodeGL {
   quad: WebGLBuffer
   downsample: Prog
@@ -326,6 +389,7 @@ class NodeGL {
   copy: Prog
   echo: Prog
   feedback: Prog
+  datamosh: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -342,6 +406,7 @@ class NodeGL {
     this.copy = this.build(F_COPY)
     this.echo = this.build(F_ECHO)
     this.feedback = this.build(F_FEEDBACK)
+    this.datamosh = this.build(F_DATAMOSH)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -824,15 +889,125 @@ export class FeedbackNode implements ConvNode {
   }
 }
 
+// ── Datamosh engine (real-time faux-codec mosh) ──────────────────────────
+// Optical flow of the live signal (or a sidechain layer, for cross-layer motion
+// transfer) → block-quantised macroblock vectors → advect an RGBA16F accumulator
+// (F_DATAMOSH). Reuses the flow pipeline (downsample + F_FLOW) like Transfert and
+// the ping-pong accumulator like Feedback. Layer-FX only.
+export class DatamoshNode implements ConvNode {
+  private res = 0
+  private lumaA!: RG
+  private lumaB!: RG
+  private lumaCurIsA = true
+  private flowT!: RG
+  private accum: [RGBA, RGBA] | null = null
+  private w = 0
+  private h = 0
+  private cur = 0
+  private frame = 0
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  private ensureFlow(n: number): void {
+    if (this.res === n) return
+    this.freeFlow()
+    const gl = this.gl
+    this.lumaA = makeRG(gl, n)
+    this.lumaB = makeRG(gl, n)
+    this.flowT = makeRG(gl, n)
+    this.res = n
+  }
+  private freeFlow(): void {
+    const gl = this.gl
+    for (const t of [this.lumaA, this.lumaB, this.flowT]) {
+      if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo) }
+    }
+    this.res = 0
+  }
+  private ensureAccum(w: number, h: number): void {
+    if (this.accum && this.w === w && this.h === h) return
+    const gl = this.gl
+    if (this.accum) for (const b of this.accum) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
+    this.accum = [makeRGBA(gl, w, h, true), makeRGBA(gl, w, h, true)]
+    this.w = w; this.h = h; this.cur = 0
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl)
+    const inp = ctx.inputs
+    const W = ctx.chain.w, H = ctx.chain.h
+    const n = FLOW_RES[Math.max(0, Math.min(2, Math.round(num(inp.flowRes, 1))))]
+    this.ensureFlow(n)
+    this.ensureAccum(W, H)
+    this.frame++
+
+    const draw = (fbo: WebGLFramebuffer, w: number, h: number): void => {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, w, h); gl.drawArrays(gl.TRIANGLES, 0, 3)
+    }
+    const bind = (unit: number, tex: WebGLTexture): void => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex) }
+
+    const lumaCur = this.lumaCurIsA ? this.lumaA : this.lumaB
+    const lumaPrev = this.lumaCurIsA ? this.lumaB : this.lumaA
+    // Flow source : a sidechain layer (motion transfer / "diegetic datamosh") if
+    // present + enabled, else the host's own motion.
+    const flowSrc = ctx.sidechain && num(inp.sidechainFlow, 0) >= 0.5 ? ctx.sidechain : ctx.host
+
+    // 1) downsample flow source → luma
+    let p = g.use(g.downsample)
+    bind(0, flowSrc); gl.uniform1i(p.u('uTex'), 0)
+    draw(lumaCur.fbo, n, n)
+    // 2) flow(cur, prev)
+    p = g.use(g.flow)
+    bind(0, lumaCur.tex); bind(1, lumaPrev.tex)
+    gl.uniform1i(p.u('uCur'), 0); gl.uniform1i(p.u('uPrev'), 1)
+    gl.uniform2f(p.u('uRes'), n, n)
+    gl.uniform1f(p.u('uLambda'), 0.002)
+    gl.uniform1f(p.u('uClamp'), 0.03)
+    draw(this.flowT.fbo, n, n)
+
+    // 3) datamosh advection → accumulator write
+    const read = this.accum![this.cur], write = this.accum![1 - this.cur]
+    p = g.use(g.datamosh)
+    bind(0, ctx.host); bind(1, read.tex); bind(2, this.flowT.tex)
+    gl.uniform1i(p.u('uHost'), 0); gl.uniform1i(p.u('uPrev'), 1); gl.uniform1i(p.u('uFlow'), 2)
+    gl.uniform2f(p.u('uRes'), W, H)
+    gl.uniform1f(p.u('uBlock'), clampf(num(inp.block, 16), 2, 64))
+    gl.uniform1f(p.u('uMotion'), clampf(num(inp.motion, 1), 0, 4))
+    gl.uniform1f(p.u('uRefresh'), clampf(num(inp.refresh, 0.06), 0, 1))
+    gl.uniform1f(p.u('uResidual'), clampf(num(inp.residual, 0.15), 0, 1))
+    gl.uniform1f(p.u('uReseed'), clampf(num(inp.reseed, 0.1), 0, 1))
+    gl.uniform1f(p.u('uDecay'), clampf(num(inp.decay, 0.92), 0, 1))
+    gl.uniform1f(p.u('uBleed'), clampf(num(inp.bleed, 0.2), 0, 1))
+    gl.uniform1f(p.u('uThresh'), clampf(num(inp.thresh, 0.06), 0, 1))
+    gl.uniform1i(p.u('uMode'), Math.round(num(inp.mode, 1)))
+    gl.uniform1f(p.u('uSeed'), this.frame % 2048)
+    draw(write.fbo, W, H)
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    this.lumaCurIsA = !this.lumaCurIsA
+    this.cur = 1 - this.cur
+    return write.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    this.freeFlow()
+    const gl = this.gl
+    if (this.accum) { for (const b of this.accum) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.accum = null }
+  }
+}
+
 /** Instantiate the native node for a reserved `node-*` shaderId (null if none). */
 export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): ConvNode | null {
   if (shaderId === 'node-transfert') return new TransfertNode(gl)
   if (shaderId === 'node-convolve') return new ConvolveNode(gl)
   if (shaderId === 'node-reponse') return new ReponseNode(gl)
   if (shaderId === 'node-feedback') return new FeedbackNode(gl)
+  if (shaderId === 'node-datamosh') return new DatamoshNode(gl)
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)
