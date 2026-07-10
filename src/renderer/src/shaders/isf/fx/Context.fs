@@ -58,14 +58,53 @@ void main() {
   //    feeds flat neutral maps) is a clean passthrough. ──
   vec3 pnrm = vec3(0.0, 0.0, 1.0);
   float pao = 1.0;
+  float pshadow = 1.0;
   if (pbrAmount > 0.001) {
+    // PARALLAX OCCLUSION MAPPING : ray-march the height field so the projected
+    // image is displaced by the true DEPTH of each feature (sinks into crevices,
+    // rides over bumps) : the "projected onto a complex 3D surface" warp, not a
+    // flat nudge. A gentle perspective throw from centre makes features near the
+    // edges parallax more, as a real projector throw would.
+    vec2 vdir = (uv - 0.5) * vec2(aspect, 1.0);
+    float amp = pbrAmount * 0.1;                       // max displacement
+    vec2 stepUV = vdir * amp / 16.0;
+    float layer = 1.0 / 16.0;
+    vec2 pp = uv;
+    float curD = 0.0;
+    float hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, fract(vec2(pp.x * aspect, pp.y) * pbrScale)).r;
+    for (int i = 0; i < 16; i++) {
+      if (curD >= hd) break;
+      pp += stepUV;
+      hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, fract(vec2(pp.x * aspect, pp.y) * pbrScale)).r;
+      curD += layer;
+    }
+    // Refine : interpolate the exact crossing so the surface reads smooth.
+    vec2 prev = pp - stepUV;
+    float aft = hd - curD;
+    float bef = (1.0 - IMG_NORM_PIXEL(pbrHeight, fract(vec2(prev.x * aspect, prev.y) * pbrScale)).r) - (curD - layer);
+    pp = mix(pp, prev, clamp(aft / (aft - bef + 1e-4), 0.0, 1.0));
+    // Reference to the mid-plane (height 0.5) so a FLAT/neutral map (texture off)
+    // gives ZERO displacement; raised vs recessed features then shift oppositely.
+    uv = pp - vdir * amp * 0.5;                        // parallax-corrected sample point
+
     vec2 tuv = fract(vec2(uv.x * aspect, uv.y) * pbrScale);
     pnrm = normalize(IMG_NORM_PIXEL(pbrNormal, tuv).rgb * 2.0 - 1.0);
-    float ph = IMG_NORM_PIXEL(pbrHeight, tuv).r;
     pao = IMG_NORM_PIXEL(pbrAO, tuv).r;
-    // Parallax: the image slides along the surface slope, most where the
-    // relief is far from mid-height : the projector-on-crumpled-paper warp.
-    uv += pnrm.xy * (ph - 0.5) * pbrAmount * 0.06;
+
+    // Soft self-shadow : march toward the light; where the relief rises above the
+    // ray the point sits in shadow → cast shadows in the crevices (the strongest
+    // depth cue, the thing that sells "lit 3D surface").
+    vec3 Ls = normalize(vec3((light - uv) * vec2(aspect, 1.0), 0.55));
+    if (Ls.z > 0.05) {
+      float surfH = IMG_NORM_PIXEL(pbrHeight, tuv).r;
+      float occ = 0.0;
+      for (int j = 1; j <= 6; j++) {
+        vec2 sp = uv + Ls.xy * amp * (float(j) / 6.0);
+        float hs = IMG_NORM_PIXEL(pbrHeight, fract(vec2(sp.x * aspect, sp.y) * pbrScale)).r;
+        occ = max(occ, hs - surfH - float(j) / 6.0 * 0.12);
+      }
+      pshadow = clamp(1.0 - occ * 4.0, 0.25, 1.0);
+    }
   }
 
   // ── BLUR : 9-tap ring; at blur==0 every tap coincides, so it's identity. ──
@@ -121,11 +160,19 @@ void main() {
     vec3 L = normalize(vec3((light - uv) * vec2(aspect, 1.0), 0.55));
     float ndl = clamp(dot(pnrm, L), 0.0, 1.0);
     float flatNdl = clamp(L.z, 0.0, 1.0);
-    float shade = (0.25 + 0.75 * ndl) / (0.25 + 0.75 * flatNdl);
-    col *= mix(1.0, shade * mix(1.0, pao, 0.85), pbrAmount);
+    // Diffuse relief lighting (steeper than before for more modelling) × the cast
+    // self-shadow × ambient occlusion in the crevices.
+    float diff = (0.18 + 0.82 * ndl) / (0.18 + 0.82 * flatNdl);
+    float shade = diff * pshadow * mix(1.0, pao, 0.9);
+    col *= mix(1.0, shade, pbrAmount);
+    // Rim / fresnel : slopes turned away from the screen catch a thin edge light,
+    // popping each bump off the surface (the projector grazing the relief).
+    float fres = pow(1.0 - clamp(pnrm.z, 0.0, 1.0), 3.0);
+    col += lightColor.rgb * fres * pbrAmount * 0.14;
+    // Specular sheen riding the slopes.
     vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));
-    float spec = pow(clamp(dot(pnrm, H), 0.0, 1.0), 24.0);
-    col += lightColor.rgb * spec * pbrAmount * (0.15 + lightGlow * 0.5);
+    float spec = pow(clamp(dot(pnrm, H), 0.0, 1.0), 32.0);
+    col += lightColor.rgb * spec * pbrAmount * (0.2 + lightGlow * 0.6);
   }
 
   // ── KEY LIGHT : a soft radial glow from the light position in its own colour;
