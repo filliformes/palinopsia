@@ -10,7 +10,7 @@
     { "NAME": "jitter",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.35 },
     { "NAME": "drift",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.2 },
     { "NAME": "accent",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.2 },
-    { "NAME": "chaos",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0, "LABEL": "chaos (bend)" },
+    { "NAME": "chaos",     "TYPE": "float", "MIN": 0.0, "MAX": 0.2,  "DEFAULT": 0.0, "LABEL": "chaos (bend)" },
     { "NAME": "nonlinear", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0, "LABEL": "nonlinear (thin)" },
     { "NAME": "tint",      "TYPE": "color", "DEFAULT": [0.9, 0.5, 0.18, 1.0] }
   ]
