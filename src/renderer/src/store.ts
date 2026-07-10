@@ -461,17 +461,46 @@ function buildThemeComposition(theme: Theme): CompositionState {
   }
 
   // Vibe palette carries the theme's colours (the strongest theme signal).
+  // BRIGHTNESS SAFETY : force a near-black darkest stop AND a legible brightest
+  // stop so the palette always spans a full tonal range : no generated session
+  // can crush to black or wash out, while the theme's hue + sparseness (its mood)
+  // are untouched. A mild auto-levels stretch is the net for dark/flat sources.
+  const lum = (c: number[]): number => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
+  const pcols = theme.palette.slice(0, 5).map((c) => c.slice())
+  if (pcols.length) {
+    let di = 0, bi = 0
+    for (let i = 1; i < pcols.length; i++) {
+      if (lum(pcols[i]) < lum(pcols[di])) di = i
+      if (lum(pcols[i]) > lum(pcols[bi])) bi = i
+    }
+    const dL = lum(pcols[di])
+    if (dL > 0.14) {
+      const s = 0.06 / Math.max(dL, 0.05)
+      pcols[di] = [pcols[di][0] * s, pcols[di][1] * s, pcols[di][2] * s, pcols[di][3] ?? 1]
+    }
+    const bL = lum(pcols[bi])
+    if (bL < 0.6) {
+      const s = 0.6 / Math.max(bL, 0.05)
+      pcols[bi] = [
+        Math.min(1, pcols[bi][0] * s),
+        Math.min(1, pcols[bi][1] * s),
+        Math.min(1, pcols[bi][2] * s),
+        pcols[bi][3] ?? 1
+      ]
+    }
+  }
   const pkeys = ['colorA', 'colorB', 'colorC', 'colorD', 'colorE']
   const vibeInputs: Record<string, number | number[]> = {
-    stops: Math.min(5, Math.max(2, theme.palette.length)),
+    stops: Math.min(5, Math.max(2, pcols.length)),
     blend: 1,
     dither: rr(0, 0.25),
     mixSrc: rr(0.12, 0.4),
+    autoLevel: 0.4, // mild dynamic-range normalise : never a dead-black frame
     saturation: rr(0.85, 1.15),
     contrast: rr(0.95, 1.2),
     gamma: rr(0.9, 1.1)
   }
-  theme.palette.slice(0, 5).forEach((c, i) => (vibeInputs[pkeys[i]] = c))
+  pcols.forEach((c, i) => (vibeInputs[pkeys[i]] = c))
   if (theme.vibe) Object.assign(vibeInputs, theme.vibe)
   const vibe = makeVibePalette()
   vibe.inputs = { ...vibe.inputs, ...vibeInputs }

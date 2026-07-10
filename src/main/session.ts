@@ -78,11 +78,12 @@ export async function saveToDefault(session: Session): Promise<string> {
 
 /** List every saved session across the Sessions folder(s) : the primary folder
  *  next to the app plus the userData fallback (saveToDefault may land in either).
- *  Returns each file's real session name (falling back to the filename) + mtime,
- *  newest first. Bad/unparseable files are skipped, not fatal. */
+ *  The display name is the FILENAME (what the user chose in Save As), not the
+ *  in-JSON `name` : those are often a stale "Untitled" even when the file is
+ *  named meaningfully. Deduped by basename, newest first. */
 export async function listSaved(): Promise<Array<{ name: string; path: string; mtime: number }>> {
   const dirs = [sessionsFolderPath(), join(app.getPath('userData'), 'Sessions')]
-  const seen = new Set<string>()
+  const seenName = new Set<string>()
   const out: Array<{ name: string; path: string; mtime: number }> = []
   for (const dir of dirs) {
     let files: string[]
@@ -92,18 +93,15 @@ export async function listSaved(): Promise<Array<{ name: string; path: string; m
       continue // folder doesn't exist yet
     }
     for (const f of files) {
+      const name = f.replace(/\.opsia\.json$/i, '')
+      if (seenName.has(name)) continue // primary folder wins over the fallback
+      seenName.add(name)
       const path = join(dir, f)
-      if (seen.has(path)) continue
-      seen.add(path)
-      let name = f.replace(/\.opsia\.json$/i, '')
       let mtime = 0
       try {
-        const st = await fs.stat(path)
-        mtime = st.mtimeMs
-        const parsed = JSON.parse(await fs.readFile(path, 'utf8')) as Session
-        if (parsed && typeof parsed.name === 'string' && parsed.name.trim()) name = parsed.name
+        mtime = (await fs.stat(path)).mtimeMs
       } catch {
-        /* keep the filename-derived name / mtime 0 */
+        /* keep mtime 0 */
       }
       out.push({ name, path, mtime })
     }

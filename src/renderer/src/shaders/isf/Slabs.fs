@@ -21,11 +21,32 @@ float hash(vec2 p) {
   return fract(p.x * p.y);
 }
 
+// Smooth 2D value noise (for the chaos domain warp : bends, not per-pixel snow).
+float vn(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = hash(i), b = hash(i + vec2(1.0, 0.0));
+  float c = hash(i + vec2(0.0, 1.0)), d = hash(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
 void main() {
   vec2 uv = isf_FragNormCoord;
 
   // Stepped clock : the glitch register moves in cuts, not flow.
   float t = floor(TIME * (0.5 + rate * 5.5));
+
+  // CHAOS also BENDS the whole grid : a smooth low-frequency domain warp (plus a
+  // faster ripple) so the square cells stop reading as clean rectangles : wavy,
+  // sheared ribbons at high chaos. Warps x more than y so the bands stay roughly
+  // horizontal (still "slabs") but lose their hard geometry. Zero at chaos 0.
+  if (chaos > 0.001) {
+    float w = chaos;
+    uv.x += ((vn(vec2(uv.y * 5.0, TIME * 0.35)) - 0.5) * 0.28
+           + sin(uv.y * 11.0 + TIME * 0.6) * 0.05) * w;
+    uv.y += ((vn(vec2(uv.x * 4.0, TIME * 0.3 + 9.0)) - 0.5) * 0.10
+           + sin(uv.x * 8.0 - TIME * 0.45) * 0.02) * w;
+  }
 
   float band = floor(uv.y * bands);
 

@@ -483,12 +483,14 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'broadcast', name: 'Broadcast', family: 'Retro Screen',
-    blurb: 'A tuned-in TV signal : tracking wobble, tear bands, scanlines.',
+    blurb: 'A tuned-in TV signal : tracking wobble, tear bands, scanlines over a soft image.',
     world: 'incongruent',
     palette: [K, [0.16, 0.16, 0.18, 1], [0.78, 0.78, 0.74, 1]],
-    sources: ['organic', 'drift-field', 'slabs'],
+    // Softer, image-like sources : VHS treatment flatters photographic content,
+    // not hard geometry (the old slabs/drift read as ugly under tracking noise).
+    sources: ['organic', 'swell', 'dye-field', 'membrane'],
     layerFx: ['fx-tracking', 'fx-sync-loss', 'fx-scanlines', 'fx-chroma-shift'],
-    blends: ['screen', 'lighten'], coalesce: 0.4, drift: 0.3
+    blends: ['screen', 'lighten'], coalesce: 0.45, drift: 0.3, feedback: 0.25
   }),
   mk({
     id: 'terminal', name: 'Terminal', family: 'Retro Screen',
@@ -523,12 +525,14 @@ export const THEMES: Theme[] = [
   // ── Minimal / Structural ──────────────────────────────────────────────
   mk({
     id: 'constructivist', name: 'Constructivist', family: 'Minimal / Structural',
-    blurb: 'Red, black and white slabs and shapes : hard graphic composition.',
+    blurb: 'Bold geometric abstraction : diagonal bars and shapes in red, blue, black and cream.',
     world: 'monomedia',
-    palette: [INK, [0.85, 0.12, 0.1, 1], [0.92, 0.9, 0.85, 1]],
-    sources: ['slabs', 'shapes', 'op-art'],
-    layerFx: ['fx-posterize', 'fx-transform', 'fx-sharpen'],
-    blends: ['normal', 'difference'], useB: 0.2, density: 0.4, coalesce: 0.3
+    palette: [INK, [0.82, 0.12, 0.09, 1], [0.13, 0.28, 0.52, 1], [0.93, 0.9, 0.83, 1]],
+    sources: ['shapes', 'slabs', 'differential'],
+    layerFx: ['fx-transform', 'fx-posterize', 'fx-sharpen'],
+    blends: ['normal', 'multiply', 'screen'], useB: 0.3, layers: [2, 3],
+    density: 0.4, coalesce: 0.35, gestureTexture: 0.4, drift: 0.12,
+    vibe: { saturation: 1.2, contrast: 1.15, mixSrc: 0.15 }
   }),
   mk({
     id: 'grid', name: 'Grid', family: 'Minimal / Structural',
@@ -550,13 +554,15 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'monolith', name: 'Monolith', family: 'Minimal / Structural',
-    blurb: 'A single dark form standing in space : one silhouette, graded.',
+    blurb: 'A single form standing in graded space : one lit silhouette against the dark.',
+    // Textured sources (never a flat solid) so the form always reads : a lit mass
+    // clipped into a silhouette, seated by the depth vignette.
     world: 'monomedia',
-    palette: [INK, [0.1, 0.1, 0.12, 1], [0.6, 0.6, 0.64, 1]],
-    sources: ['solid-color', 'membrane', 'shapes'],
+    palette: [INK, [0.16, 0.16, 0.19, 1], [0.72, 0.72, 0.78, 1]],
+    sources: ['membrane', 'organic', 'shapes'],
     layerFx: ['fx-transform', 'fx-grade'],
-    blends: ['normal', 'multiply'], useB: 0.15, layers: [1, 2], density: 0.3,
-    context: { depth: 0.5 }
+    blends: ['normal', 'lighten'], useB: 0.15, layers: [1, 2], density: 0.35,
+    context: { depth: 0.45, bloom: 0.14 }
   }),
   mk({
     id: 'silence', name: 'Silence', family: 'Minimal / Structural',
