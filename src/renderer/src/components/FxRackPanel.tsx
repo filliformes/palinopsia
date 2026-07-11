@@ -13,14 +13,19 @@ import { useStore, type FxScope } from '../store'
 export function FxAddSelect({ scope, className = '' }: { scope: FxScope; className?: string }): JSX.Element {
   const addFx = useStore((s) => s.addFx)
   // Native convolution nodes (sidechained, multi-pass) only run in a LAYER's FX
-  // rack : hide their group from the master + source pickers, where they'd sit
-  // inert as confusing passthroughs.
+  // rack : hide them from the source pickers, where they'd sit inert. The MASTER
+  // rack now gets a node context, so the depth-driven Parallax (whole-picture 2.5D,
+  // best on master) is allowed there — but the other sidechain nodes stay layer-only.
+  const MASTER_NATIVE_OK = new Set(['node-parallax'])
   const groups =
     scope.kind === 'layer'
       ? FX_GROUPS
-      : FX_GROUPS.map((g) => ({ ...g, shaders: g.shaders.filter((f) => !f.native) })).filter(
-          (g) => g.shaders.length > 0
-        )
+      : FX_GROUPS.map((g) => ({
+          ...g,
+          shaders: g.shaders.filter(
+            (f) => !f.native || (scope.kind === 'master' && MASTER_NATIVE_OK.has(f.id))
+          )
+        })).filter((g) => g.shaders.length > 0)
   return (
     <select
       className={`input select-compact text-[10px] ${className || 'w-20 shrink-0'}`}
