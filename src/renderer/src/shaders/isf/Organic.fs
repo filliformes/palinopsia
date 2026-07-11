@@ -63,25 +63,33 @@ vec2 curl(vec2 p) {
   return vec2(x1 - x2, -(y1 - y2)) / (2.0 * e);
 }
 
-// Drifting soft-dot particle field : two depth sub-layers, per-cell jittered, the
-// whole field translated by `vel` (so dots drift smoothly) and locally perturbed
-// by the curl flow, with a twinkle. Cheap stand-in for embers / sediment / pollen.
-float particles(vec2 uv, float t, vec2 vel, float grid, float dens, float sz) {
-  if (dens < 0.001) return 0.0;
+// Aspect-correct drifting particle field. A persistent lattice of soft ROUND dots
+// scrolls coherently along `dir` (the bulk drift : rise / settle / float) so
+// particles enter and leave only at the screen edges (no mid-screen popping),
+// while each one wanders independently and breathes in brightness so the field
+// never reads as a moving grid. A 3×3 neighbourhood is accumulated so a dot near a
+// cell edge still lights adjacent fragments (no clipping into squares/half-dots).
+float particles(vec2 uv, float t, vec2 dir, float density, float baseSize) {
+  if (density < 0.001) return 0.0;
+  float aspect = RENDERSIZE.x / RENDERSIZE.y;
+  float grid = mix(7.0, 20.0, density);
+  vec2 sp = vec2(uv.x * aspect, uv.y) * grid - dir * t * grid; // square cells, drifting
+  vec2 cell = floor(sp);
+  float emit = mix(0.18, 0.55, density);                       // fraction of cells that spawn
   float acc = 0.0;
-  for (int L = 0; L < 2; L++) {
-    float fl = float(L);
-    float sc = grid * (1.0 + fl * 1.6);
-    float spd = 1.0 + fl * 0.7;
-    vec2 g = uv * sc + vel * t * spd * sc + curl(uv * 3.0 + t * 0.1) * 0.4;
-    vec2 id = floor(g);
-    vec2 f = fract(g) - 0.5;
-    vec2 j = (hash2(id) - 0.5) * 0.7;
-    float on = step(hash(id + 3.7), dens * (1.0 - 0.3 * fl));
-    float d = length(f - j);
-    float spark = smoothstep(sz * (1.0 + 0.6 * fl), 0.0, d);
-    spark *= 0.55 + 0.45 * sin(t * 5.0 + hash(id) * 30.0);
-    acc += on * spark * (1.0 - 0.4 * fl);
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      vec2 cid = cell + vec2(float(x), float(y));
+      if (hash(cid + 0.5) > emit) continue;
+      vec2 r = hash2(cid);
+      vec2 wob = vec2(sin(t * (0.6 + r.x) + r.y * 6.28),
+                      cos(t * (0.5 + r.y) + r.x * 6.28)) * 0.16; // independent wander
+      vec2 pos = cid + 0.15 + r * 0.7 + wob;                    // rest spot in the cell
+      float d = length(sp - pos);
+      float sz = baseSize * (0.55 + r.x * 0.9);                 // varied radii
+      float br = 0.35 + 0.65 * (0.5 + 0.5 * sin(t * (1.1 + r.y * 2.0) + r.x * 6.28));
+      acc += smoothstep(sz, 0.0, d) * br;
+    }
   }
   return clamp(acc, 0.0, 1.0);
 }
@@ -106,8 +114,8 @@ vec3 fire(vec2 uv, vec2 p, float t) {
   c = mix(c, vec3(0.85, 0.36, 0.07), smoothstep(0.34, 0.66, body));
   c = mix(c, vec3(0.97, 0.78, 0.38), smoothstep(0.70, 0.97, body));
   // Rising sparks : brightest near the base, drifting up + a little sideways.
-  float sp = particles(uv, t, vec2(0.03, -0.55), 24.0, embers * 0.55, 0.5);
-  c += sp * vec3(0.95, 0.5, 0.16) * (1.2 - uv.y) * embers;
+  float sp = particles(uv, t, vec2(0.04, 0.55), embers, 0.14);
+  c += sp * vec3(0.95, 0.5, 0.16) * (1.25 - uv.y) * embers;
   vec3 gas = vec3(0.10, 0.30, 0.62) * (0.25 + body * 1.1);
   return mix(c, gas, vary * 0.85);
 }
@@ -126,7 +134,7 @@ vec3 water(vec2 uv, vec2 p, float t) {
   vec3 c = mix(vec3(0.010, 0.045, 0.070), vec3(0.05, 0.17, 0.21), deep);
   c *= mix(1.0, 0.65, depth * (1.0 - deep));
   c += caust * vec3(0.22, 0.40, 0.42) * (0.35 + detail * 0.65);
-  float mote = particles(uv, t, vec2(0.05, 0.12), 34.0, embers * 0.35, 0.42);
+  float mote = particles(uv, t, vec2(0.05, -0.10), embers * 0.8, 0.09);
   c += mote * vec3(0.30, 0.42, 0.44) * embers * 0.55;
   vec3 lagoon = mix(vec3(0.02, 0.09, 0.05), vec3(0.10, 0.34, 0.22), deep)
     + caust * vec3(0.30, 0.44, 0.28) * (0.35 + detail * 0.65);
@@ -148,7 +156,7 @@ vec3 nature(vec2 uv, vec2 p, float t) {
   float far = fbm(p * (1.0 + depth * 0.6) * 1.2 + 5.0);
   c = mix(c, c * 0.45, depth * smoothstep(0.5, 0.0, g) * far);
   // Drifting pollen / slow-falling leaves.
-  float mote = particles(uv, t, vec2(0.03, 0.10), 30.0, embers * 0.30, 0.44);
+  float mote = particles(uv, t, vec2(0.03, -0.06), embers * 0.7, 0.10);
   c += mote * vec3(0.50, 0.45, 0.20) * embers * 0.5;
   float patch = fbm(p * 0.6 + t * 0.02);
   vec3 autumn = mix(vec3(0.16, 0.07, 0.02), vec3(0.62, 0.32, 0.09), g);
