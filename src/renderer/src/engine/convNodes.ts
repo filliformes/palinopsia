@@ -499,6 +499,95 @@ void main(){
   o = vec4(clamp(mix(orig, col, uMix), 0.0, 1.0), 1.0);
 }`
 
+// ── Chronoscan (per-pixel time displacement / slit-scan) ─────────────────
+// A ring-atlas of the last N frames; a CONTROL field sets a per-pixel age, so each
+// region of the picture reads from a different past frame — every region living in
+// a different present. Control = the host's own luminance, a sidechain layer's
+// luminance, or a moving gradient (the classic slit-scan sweep). The temporal twin
+// of the convolution trio : it convolves TIME the way they convolve space.
+const F_CHRONO = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uCtrl, uRing;
+uniform vec2 uAtlasTexel;
+uniform float uCols, uRows, uN, uWrite, uFilled;
+uniform int uSrcMode, uInvert, uSmooth;
+uniform float uReach, uAngle, uSweep, uCurve, uMix;
+float luma(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
+vec3 tile(float idx, vec2 uv){
+  float col = mod(idx, uCols);
+  float row = floor(idx / uCols);
+  vec2 base = vec2(col, row) / vec2(uCols, uRows);
+  vec2 span = 1.0 / vec2(uCols, uRows);
+  vec2 tuv = clamp(base + clamp(uv, 0.0, 1.0) * span, base + 0.5 * uAtlasTexel, base + span - 0.5 * uAtlasTexel);
+  return texture(uRing, tuv).rgb;
+}
+void main(){
+  vec3 host = texture(uHost, vUV).rgb;
+  if (uFilled < 2.0) { o = vec4(host, 1.0); return; }
+  float ctrl;
+  if (uSrcMode == 0) ctrl = luma(host);
+  else if (uSrcMode == 1) ctrl = luma(texture(uCtrl, vUV).rgb);
+  else { vec2 d = vec2(cos(uAngle), sin(uAngle)); ctrl = fract(dot(vUV - 0.5, d) + 0.5 + uSweep); }
+  ctrl = pow(clamp(ctrl, 0.0, 1.0), uCurve);
+  if (uInvert == 1) ctrl = 1.0 - ctrl;
+  float back = ctrl * uReach * max(uFilled - 2.0, 0.0);   // frames into the past
+  float recent = mod(uWrite - 1.0 + uN, uN);              // newest stored frame
+  float idxF = mod(recent - back + uN * 4.0, uN);
+  vec3 col;
+  if (uSmooth == 1) {
+    float lo = floor(idxF);
+    col = mix(tile(mod(lo, uN), vUV), tile(mod(lo + 1.0, uN), vUV), fract(idxF));
+  } else {
+    col = tile(mod(floor(idxF + 0.5), uN), vUV);
+  }
+  o = vec4(mix(host, col, uMix), 1.0);
+}`
+
+// ── Sediment : long-term image memory ────────────────────────────────────
+// The instrument is named for image persistence but only remembered ~16 frames.
+// This keeps a decaying long-exposure ACCUMULATOR (peaks that slowly sink over
+// seconds→minutes) plus a sparse KEYFRAME ring (a snapshot every few seconds, so
+// minutes of the past are recallable). `age` sweeps from the recent accumulator to
+// the oldest keyframe; `resurface` bleeds that memory back under the live image,
+// `stir` drifts it so it sediments rather than sitting as a frozen loop.
+const F_SED_ACC = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uPrev; uniform float uDecay, uDeposit;
+void main(){
+  vec3 host = texture(uHost, vUV).rgb;
+  vec3 prev = texture(uPrev, vUV).rgb;
+  o = vec4(max(prev * uDecay, host * uDeposit), 1.0);   // decaying peak memory
+}`
+
+const F_SED_OUT = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uAcc, uRing;
+uniform vec2 uAtlasTexel;
+uniform float uCols, uRows, uN, uWrite, uFilled;
+uniform float uAge, uResurface, uStir, uMix, uTime;
+uniform int uBlend;
+vec3 tile(float idx, vec2 uv){
+  float col = mod(idx, uCols); float row = floor(idx / uCols);
+  vec2 base = vec2(col, row) / vec2(uCols, uRows); vec2 span = 1.0 / vec2(uCols, uRows);
+  vec2 tuv = clamp(base + clamp(uv, 0.0, 1.0) * span, base + 0.5 * uAtlasTexel, base + span - 0.5 * uAtlasTexel);
+  return texture(uRing, tuv).rgb;
+}
+void main(){
+  vec3 host = texture(uHost, vUV).rgb;
+  vec2 st = vUV + vec2(sin(vUV.y * 6.28 + uTime * 0.11), cos(vUV.x * 6.28 - uTime * 0.09)) * uStir * 0.03;
+  vec3 acc = texture(uAcc, st).rgb;
+  float kf = mod(uWrite - 1.0 - uAge * max(uFilled - 1.0, 0.0) + uN * 4.0, uN);
+  vec3 key = uFilled > 1.0 ? tile(kf, st) : acc;
+  vec3 mem = mix(acc, key, smoothstep(0.0, 1.0, uAge));
+  vec3 m = mem * uResurface;
+  vec3 res;
+  if (uBlend == 0) res = 1.0 - (1.0 - host) * (1.0 - m);          // screen
+  else if (uBlend == 1) res = max(host, m);                        // lighten
+  else if (uBlend == 2) res = host + m * (1.0 - host);             // under
+  else res = mix(host, abs(host - mem), uResurface);               // difference
+  o = vec4(clamp(mix(host, res, uMix), 0.0, 1.0), 1.0);
+}`
+
 class NodeGL {
   quad: WebGLBuffer
   downsample: Prog
@@ -517,6 +606,9 @@ class NodeGL {
   scan: Prog
   scanout: Prog
   autocut: Prog
+  chrono: Prog
+  sedAcc: Prog
+  sedOut: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -538,6 +630,9 @@ class NodeGL {
     this.scan = this.build(F_SCAN)
     this.scanout = this.build(F_SCANOUT)
     this.autocut = this.build(F_AUTOCUT)
+    this.chrono = this.build(F_CHRONO)
+    this.sedAcc = this.build(F_SED_ACC)
+    this.sedOut = this.build(F_SED_OUT)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -1347,6 +1442,189 @@ export class AutocutterNode implements ConvNode {
   dispose(): void { this.disposed = true }
 }
 
+// ── Chronoscan : per-pixel time displacement / slit-scan ─────────────────
+// A ring-atlas of the last CH_N frames (quarter-res tiles). A control field sets a
+// per-pixel age into that history, so each region shows a different past frame :
+// slit-scan (gradient control), luminance-driven time-warp (self/sidechain), or a
+// moving-slit sweep. Reuses the ring-atlas machinery of Réponse/Feedback. Layer-FX.
+const CH_COLS = 8, CH_ROWS = 4, CH_N = CH_COLS * CH_ROWS
+export class ChronoscanNode implements ConvNode {
+  private ring: RGBA | null = null
+  private w = 0
+  private h = 0
+  private tw = 0
+  private th = 0
+  private writeHead = 0
+  private filled = 0
+  private sweep = 0
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  private ensure(w: number, h: number): void {
+    const tw = Math.max(2, w >> 2), th = Math.max(2, h >> 2)
+    if (this.ring && this.tw === tw && this.th === th) return
+    const gl = this.gl
+    if (this.ring) { gl.deleteTexture(this.ring.tex); gl.deleteFramebuffer(this.ring.fbo) }
+    this.ring = makeRGBA(gl, tw * CH_COLS, th * CH_ROWS, false)
+    this.tw = tw; this.th = th; this.w = w; this.h = h
+    this.writeHead = 0; this.filled = 0
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl)
+    const W = ctx.chain.w, H = ctx.chain.h
+    this.ensure(W, H)
+    const inp = ctx.inputs
+    const ring = this.ring as RGBA
+    this.sweep = (this.sweep + ctx.dt * clampf(num(inp.sweep, 0.15), 0, 1) * 0.5) % 1
+
+    // 1) Present : read the history atlas at each pixel's computed age.
+    const out = ctx.chain.next()
+    const p = g.use(g.chrono)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, ctx.sidechain ?? ctx.host); gl.uniform1i(p.u('uCtrl'), 1)
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, ring.tex); gl.uniform1i(p.u('uRing'), 2)
+    gl.uniform2f(p.u('uAtlasTexel'), 1 / (this.tw * CH_COLS), 1 / (this.th * CH_ROWS))
+    gl.uniform1f(p.u('uCols'), CH_COLS); gl.uniform1f(p.u('uRows'), CH_ROWS); gl.uniform1f(p.u('uN'), CH_N)
+    gl.uniform1f(p.u('uWrite'), this.writeHead); gl.uniform1f(p.u('uFilled'), this.filled)
+    gl.uniform1i(p.u('uSrcMode'), Math.round(num(inp.source, 2)))
+    gl.uniform1i(p.u('uInvert'), num(inp.invert, 0) >= 0.5 ? 1 : 0)
+    gl.uniform1i(p.u('uSmooth'), num(inp.smooth, 1) >= 0.5 ? 1 : 0)
+    gl.uniform1f(p.u('uReach'), clampf(num(inp.reach, 0.6), 0, 1))
+    gl.uniform1f(p.u('uAngle'), num(inp.angle, 0))
+    gl.uniform1f(p.u('uSweep'), this.sweep)
+    gl.uniform1f(p.u('uCurve'), clampf(num(inp.curve, 1), 0.2, 3))
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
+    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    // 2) Store the current frame into the ring (quarter-res tile).
+    const cp = g.use(g.copy)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(cp.u('uTex'), 0)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, ring.fbo)
+    const col = this.writeHead % CH_COLS, row = Math.floor(this.writeHead / CH_COLS)
+    gl.viewport(col * this.tw, row * this.th, this.tw, this.th)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+    this.writeHead = (this.writeHead + 1) % CH_N
+    this.filled = Math.min(CH_N, this.filled + 1)
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return out.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    const gl = this.gl
+    if (this.ring) { gl.deleteTexture(this.ring.tex); gl.deleteFramebuffer(this.ring.fbo); this.ring = null }
+  }
+}
+
+// ── Sediment : long-term image memory ────────────────────────────────────
+// A decaying long-exposure accumulator (peaks that sink over seconds→minutes) +
+// a sparse keyframe ring (a snapshot every `interval` seconds → minutes recallable).
+// `age` sweeps recent→old; `resurface` bleeds the memory back under the live image;
+// `stir` drifts it so it sediments rather than loops. Earns the app's name. Layer-FX.
+const SED_COLS = 4, SED_ROWS = 4, SED_N = SED_COLS * SED_ROWS
+export class SedimentNode implements ConvNode {
+  private acc: [RGBA, RGBA] | null = null
+  private ring: RGBA | null = null
+  private w = 0
+  private h = 0
+  private tw = 0
+  private th = 0
+  private accCur = 0
+  private writeHead = 0
+  private filled = 0
+  private kfTimer = 0
+  private time = 0
+  private seeded = false
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  private ensure(w: number, h: number): void {
+    if (this.acc && this.w === w && this.h === h) return
+    const gl = this.gl
+    if (this.acc) for (const b of this.acc) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
+    if (this.ring) { gl.deleteTexture(this.ring.tex); gl.deleteFramebuffer(this.ring.fbo) }
+    this.acc = [makeRGBA(gl, w, h, true), makeRGBA(gl, w, h, true)]
+    this.tw = Math.max(2, w >> 2); this.th = Math.max(2, h >> 2)
+    this.ring = makeRGBA(gl, this.tw * SED_COLS, this.th * SED_ROWS, false)
+    this.w = w; this.h = h; this.accCur = 0; this.writeHead = 0; this.filled = 0; this.kfTimer = 0; this.seeded = false
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl)
+    const W = ctx.chain.w, H = ctx.chain.h
+    this.ensure(W, H)
+    const inp = ctx.inputs
+    const acc = this.acc as [RGBA, RGBA], ring = this.ring as RGBA
+    this.time += ctx.dt
+
+    // Seed the accumulator with the live frame so memory doesn't start black.
+    if (!this.seeded) {
+      const cp = g.use(g.copy)
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(cp.u('uTex'), 0)
+      for (const b of acc) { gl.bindFramebuffer(gl.FRAMEBUFFER, b.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3) }
+      this.seeded = true
+    }
+
+    const read = acc[this.accCur], write = acc[1 - this.accCur]
+    // 1) Accumulator : decaying peak memory (framerate-independent decay).
+    const decayP = clampf(num(inp.decay, 0.6), 0, 1)
+    const tau = 0.5 + decayP * decayP * 299.5 // half-life 0.5s → 300s
+    let p = g.use(g.sedAcc)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, read.tex); gl.uniform1i(p.u('uPrev'), 1)
+    gl.uniform1f(p.u('uDecay'), Math.exp(-ctx.dt / tau))
+    gl.uniform1f(p.u('uDeposit'), clampf(num(inp.deposit, 0.5), 0, 1))
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    // 2) Keyframe capture every `interval` seconds → the sparse long ring.
+    this.kfTimer += ctx.dt
+    const interval = clampf(num(inp.interval, 4), 0.5, 30)
+    if (this.kfTimer >= interval) {
+      this.kfTimer = 0
+      const cp = g.use(g.copy)
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(cp.u('uTex'), 0)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, ring.fbo)
+      const col = this.writeHead % SED_COLS, row = Math.floor(this.writeHead / SED_COLS)
+      gl.viewport(col * this.tw, row * this.th, this.tw, this.th)
+      gl.drawArrays(gl.TRIANGLES, 0, 3)
+      this.writeHead = (this.writeHead + 1) % SED_N
+      this.filled = Math.min(SED_N, this.filled + 1)
+    }
+
+    // 3) Output : live image with the resurfaced memory blended under it.
+    const out = ctx.chain.next()
+    p = g.use(g.sedOut)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, write.tex); gl.uniform1i(p.u('uAcc'), 1)
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, ring.tex); gl.uniform1i(p.u('uRing'), 2)
+    gl.uniform2f(p.u('uAtlasTexel'), 1 / (this.tw * SED_COLS), 1 / (this.th * SED_ROWS))
+    gl.uniform1f(p.u('uCols'), SED_COLS); gl.uniform1f(p.u('uRows'), SED_ROWS); gl.uniform1f(p.u('uN'), SED_N)
+    gl.uniform1f(p.u('uWrite'), this.writeHead); gl.uniform1f(p.u('uFilled'), this.filled)
+    gl.uniform1f(p.u('uAge'), clampf(num(inp.age, 0.3), 0, 1))
+    gl.uniform1f(p.u('uResurface'), clampf(num(inp.resurface, 0.5), 0, 1))
+    gl.uniform1f(p.u('uStir'), clampf(num(inp.stir, 0.2), 0, 1))
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
+    gl.uniform1f(p.u('uTime'), this.time)
+    gl.uniform1i(p.u('uBlend'), Math.round(num(inp.blend, 0)))
+    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    this.accCur = 1 - this.accCur
+    return out.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    const gl = this.gl
+    if (this.acc) { for (const b of this.acc) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.acc = null }
+    if (this.ring) { gl.deleteTexture(this.ring.tex); gl.deleteFramebuffer(this.ring.fbo); this.ring = null }
+  }
+}
+
 /** Instantiate the native node for a reserved `node-*` shaderId (null if none). */
 export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): ConvNode | null {
   if (shaderId === 'node-transfert') return new TransfertNode(gl)
@@ -1356,9 +1634,11 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   if (shaderId === 'node-datamosh') return new DatamoshNode(gl)
   if (shaderId === 'node-scanner') return new ScannerNode(gl)
   if (shaderId === 'node-autocutter') return new AutocutterNode(gl)
+  if (shaderId === 'node-chronoscan') return new ChronoscanNode(gl)
+  if (shaderId === 'node-sediment') return new SedimentNode(gl)
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

@@ -334,6 +334,62 @@ export const NATIVE_NODES: IsfShader[] = [
       mix: [0.7, 1.0],
       rate: [0, 2]
     }
+  },
+  {
+    id: 'node-chronoscan',
+    name: 'Chronoscan',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Chronoscan : per-pixel time displacement. The node keeps a ring of the last ~32 frames; a CONTROL field then sets, for every pixel, how far into that history it reads — so each region of the picture lives in a DIFFERENT PRESENT. SOURCE picks the control: SLIT-SCAN sweeps a moving gradient (the classic scanner smear — an angle you set, drifting at SWEEP), LUMA lets the image's own brightness choose each region's age (bright = further back), or SIDECHAIN uses another layer's brightness as the clock. REACH sets how far back the oldest regions go, CURVE bends the time distribution, INVERT flips it, SMOOTH cross-fades between frames. The temporal twin of the convolution nodes : it convolves TIME. Layer-FX only.",
+      "CATEGORIES": ["FX", "Time", "Scan"],
+      "INPUTS": [
+        { "NAME": "source", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["luma (self)", "luma (sidechain)", "slit-scan"], "DEFAULT": 2, "LABEL": "control" },
+        { "NAME": "reach", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "time reach" },
+        { "NAME": "angle", "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 0.0, "LABEL": "scan angle" },
+        { "NAME": "sweep", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "sweep" },
+        { "NAME": "curve", "TYPE": "float", "MIN": 0.2, "MAX": 3.0, "DEFAULT": 1.0, "LABEL": "curve" },
+        { "NAME": "invert", "TYPE": "bool", "DEFAULT": false, "LABEL": "invert", "COMPACT": true },
+        { "NAME": "smooth", "TYPE": "bool", "DEFAULT": true, "LABEL": "smooth", "COMPACT": true },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
+      ]
+    }*/`,
+    curated: {
+      reach: [0.3, 1.0],
+      angle: [0, 6.2832],
+      sweep: [0, 0.4],
+      curve: [0.5, 2.0],
+      mix: [0.6, 1.0]
+    }
+  },
+  {
+    id: 'node-sediment',
+    name: 'Sediment',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Sediment : long-term image memory (the app's namesake made literal). It keeps a decaying long-exposure ACCUMULATOR — the brightest traces of the past sink slowly back to black over seconds to MINUTES (DECAY) — plus a sparse KEYFRAME store that snapshots the picture every few seconds (INTERVAL), so minutes of the past stay recallable. AGE sweeps from the recent accumulator to the oldest keyframe; RESURFACE bleeds that memory back under the live image (via BLEND: screen · lighten · under · difference); STIR drifts the memory so it SEDIMENTS rather than sitting as a frozen loop; DEPOSIT sets how strongly the present is laid down. The piece can resurface what it looked like ten minutes ago. Layer-FX only.",
+      "CATEGORIES": ["FX", "Time", "Feedback"],
+      "INPUTS": [
+        { "NAME": "deposit", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "deposit" },
+        { "NAME": "decay", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "persistence" },
+        { "NAME": "resurface", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "resurface" },
+        { "NAME": "age", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "age" },
+        { "NAME": "interval", "TYPE": "float", "MIN": 0.5, "MAX": 30.0, "DEFAULT": 4.0, "LABEL": "keyframe (s)" },
+        { "NAME": "stir", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2, "LABEL": "stir" },
+        { "NAME": "blend", "TYPE": "long", "VALUES": [0, 1, 2, 3], "LABELS": ["screen", "lighten", "under", "difference"], "DEFAULT": 0, "LABEL": "blend" },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
+      ]
+    }*/`,
+    curated: {
+      deposit: [0.3, 0.8],
+      decay: [0.4, 0.85],
+      resurface: [0.2, 0.7],
+      age: [0, 0.6],
+      interval: [2, 12],
+      stir: [0, 0.5],
+      mix: [0.6, 1.0]
+    }
   }
 ]
 

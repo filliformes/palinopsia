@@ -16,6 +16,26 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     vary: 'Season blend toward each element’s alternate : gas-blue flame · lagoon green · patchy autumn.',
     contrast: 'Tonal contrast of the element (harder vs. softer masses).'
   },
+  'node-chronoscan': {
+    source: 'What sets each pixel’s age into the frame history : SLIT-SCAN (a moving gradient — the scanner smear) · LUMA self (the image’s own brightness) · LUMA sidechain (another layer’s brightness as the clock).',
+    reach: 'How far back the oldest regions read (up to ~32 frames of history).',
+    angle: 'Direction of the slit-scan gradient (slit-scan control only).',
+    sweep: 'Speed the slit-scan gradient drifts (a moving slit). 0 = static.',
+    curve: 'Bends the time distribution : <1 crowds regions near the present, >1 near the past.',
+    invert: 'Flip the age mapping (present ↔ past).',
+    smooth: 'Cross-fade between the two nearest frames (smooth) vs. snap to one (stepped).',
+    mix: 'Dry/wet against the live image.'
+  },
+  'node-sediment': {
+    deposit: 'How strongly the present is laid down into the long memory.',
+    decay: 'How slowly the memory fades : low = seconds, high = many minutes (the peaks sink back to black over this time).',
+    resurface: 'How much of the old memory bleeds back under the live image.',
+    age: 'Which past to resurface : 0 = the recent long-exposure accumulator, → 1 = the oldest kept keyframe (minutes ago).',
+    interval: 'Seconds between keyframe snapshots. 16 slots × this = how far back the recallable past reaches.',
+    stir: 'Slowly drifts the resurfaced memory so it sediments and wanders, rather than sitting as a frozen loop.',
+    blend: 'How the memory combines with the live image : screen · lighten · under · difference.',
+    mix: 'Dry/wet against the live image.'
+  },
   'node-scanner': {
     mode: 'LOOP scans forever (continuous live slit-scan) · ONE-SHOT does a single pass on a trigger, then holds the frozen document.',
     axis: 'Which way the scan head sweeps : down / up / right / left.',
