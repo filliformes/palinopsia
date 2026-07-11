@@ -394,6 +394,111 @@ void main(){
   o = vec4(max(prev * uEDecay, spike), 0.0, 0.0, 1.0);
 }`
 
+// ── Scanner (flatbed slit-scan) ──────────────────────────────────────────
+// A scan head sweeps the frame over one pass; as it crosses each line, that line
+// is CAPTURED from the live signal at that instant into a persistent buffer, and
+// held until the head passes again. Because different lines are grabbed at
+// different times, any motion during the sweep smears/tears across scanlines —
+// the flatbed-scanner-with-a-moving-object glitch. `drag` shears the capture (the
+// paper sliding under the head), `wobble` adds a hand-wave, `jitter`/`tear` add
+// per-line rips, `rgb` splits the CCD channels. Content only (no scan bar) — the
+// bar is added in the present pass so it never bakes into the frozen document.
+const F_SCAN = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uPrev; uniform vec2 uRes; uniform int uAxis;
+uniform float uPrevP, uCurP; uniform int uWrapped;
+uniform float uDrag, uWobble, uJitter, uTear, uRgb, uSeed;
+float hash(float x){ return fract(sin(x * 127.1 + uSeed * 13.0) * 43758.5453); }
+vec2 axisUV(int a, float s, float c){
+  if (a == 0) return vec2(c, s);
+  if (a == 1) return vec2(c, 1.0 - s);
+  if (a == 2) return vec2(s, c);
+  return vec2(1.0 - s, c);
+}
+void main(){
+  // s = progress along the scan axis (0 where the head starts); c = cross-axis.
+  float s = (uAxis == 0) ? vUV.y : (uAxis == 1) ? 1.0 - vUV.y : (uAxis == 2) ? vUV.x : 1.0 - vUV.x;
+  float c = (uAxis <= 1) ? vUV.x : vUV.y;
+  // Captured this frame = the band the head crossed since last frame (wrap-aware).
+  bool captured = (uWrapped == 0) ? (s > uPrevP && s <= uCurP) : (s > uPrevP || s <= uCurP);
+  vec3 col;
+  if (captured){
+    float span = (uAxis <= 1) ? uRes.y : uRes.x;
+    float tearQ = mix(1.0, 6.0 + floor(uTear * 40.0), step(0.001, uTear));
+    float tline = floor(s * (span / tearQ));
+    float jit = (hash(tline) - 0.5) * uJitter * 0.12;                 // per-slab rip
+    float drag = (s - 0.5) * uDrag * 0.35;                            // steady shear
+    float wob = sin(s * 20.0 + uSeed * 6.283) * uWobble * 0.06;       // hand wobble
+    float off = jit + drag + wob;
+    float k = uRgb * 0.02;                                            // CCD channel split
+    col = vec3(
+      texture(uHost, axisUV(uAxis, s, c + off + k)).r,
+      texture(uHost, axisUV(uAxis, s, c + off)).g,
+      texture(uHost, axisUV(uAxis, s, c + off - k)).b);
+  } else {
+    col = texture(uPrev, vUV).rgb;                                    // hold the document
+  }
+  o = vec4(col, 1.0);
+}`
+
+// Scanner present : copy the frozen buffer + add the soft bright scan bar at the
+// head. Kept out of the persistent buffer so the bar never leaves a permanent streak.
+const F_SCANOUT = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uBuf; uniform int uAxis; uniform float uCurP, uBar; uniform int uWrapped;
+void main(){
+  float s = (uAxis == 0) ? vUV.y : (uAxis == 1) ? 1.0 - vUV.y : (uAxis == 2) ? vUV.x : 1.0 - vUV.x;
+  float d = abs(s - uCurP);
+  if (uWrapped == 1) d = min(d, min(abs(s - uCurP + 1.0), abs(s - uCurP - 1.0)));
+  float bar = exp(-d * d * 1400.0) * uBar;
+  o = vec4(clamp(texture(uBuf, vUV).rgb + bar, 0.0, 1.0), 1.0);
+}`
+
+// ── Autocutter (BSP cut-up rearrange) ────────────────────────────────────
+// The frame is recursively split (binary space partition) into ragged rectangles,
+// then the pieces are SHUFFLED among their own slots (a seeded permutation) and
+// optionally rotated 90°/180°/270°. Each output cell samples the LIVE host from a
+// different cell's region, so the scramble layout holds while the video keeps
+// moving inside each piece — a live cut-up collage. Cells/permutation/rotation are
+// computed on the CPU (see AutocutterNode) and passed as uniform arrays; the
+// fragment just finds its dest cell and remaps.
+const F_AUTOCUT = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost;
+uniform int uCount;
+uniform vec4 uCell[64];   // dest rect (x,y,w,h)
+uniform vec4 uMap[64];    // source rect (x,y,w,h)
+uniform float uRot[64];   // 0..3 (×90°)
+uniform float uGap, uSlip, uMix, uSeed;
+float hash(float x){ return fract(sin(x * 91.7 + uSeed * 57.0) * 43758.5453); }
+vec2 rot90(vec2 p, float r){
+  p -= 0.5; int ri = int(r + 0.5);
+  if (ri == 1) p = vec2(-p.y, p.x);
+  else if (ri == 2) p = -p;
+  else if (ri == 3) p = vec2(p.y, -p.x);
+  return p + 0.5;
+}
+void main(){
+  vec3 orig = texture(uHost, vUV).rgb;
+  vec3 col = orig;
+  for (int i = 0; i < 64; i++){
+    if (i >= uCount) break;
+    vec4 d = uCell[i];
+    if (vUV.x >= d.x && vUV.x < d.x + d.z && vUV.y >= d.y && vUV.y < d.y + d.w){
+      vec2 luv = rot90((vUV - d.xy) / d.zw, uRot[i]);
+      vec4 sr = uMap[i];
+      vec2 slip = (vec2(hash(float(i) + 1.3), hash(float(i) + 7.7)) - 0.5) * uSlip;
+      col = texture(uHost, sr.xy + (luv + slip) * sr.zw).rgb;
+      if (uGap > 0.001){                                             // dark seams
+        vec2 e = min(vUV - d.xy, d.xy + d.zw - vUV);
+        col *= smoothstep(0.0, uGap * 0.02, min(e.x, e.y));
+      }
+      break;
+    }
+  }
+  o = vec4(clamp(mix(orig, col, uMix), 0.0, 1.0), 1.0);
+}`
+
 class NodeGL {
   quad: WebGLBuffer
   downsample: Prog
@@ -409,6 +514,9 @@ class NodeGL {
   feedback: Prog
   datamosh: Prog
   energy: Prog
+  scan: Prog
+  scanout: Prog
+  autocut: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -427,6 +535,9 @@ class NodeGL {
     this.feedback = this.build(F_FEEDBACK)
     this.datamosh = this.build(F_DATAMOSH)
     this.energy = this.build(F_ENERGY)
+    this.scan = this.build(F_SCAN)
+    this.scanout = this.build(F_SCANOUT)
+    this.autocut = this.build(F_AUTOCUT)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -1043,6 +1154,199 @@ export class DatamoshNode implements ConvNode {
   }
 }
 
+// ── Scanner (flatbed slit-scan) ──────────────────────────────────────────
+// A scan head sweeps the frame; the band it crosses each frame is captured live
+// into a persistent buffer and held until the head passes again, so motion during
+// the sweep smears across scanlines. Loop mode scans continuously (live); one-shot
+// does a single pass on TRIGGER then holds the frozen document. `trig` fires a fresh
+// pass on the rising edge (manual toggle / OSC / a modulator's square/S&H/audio edge).
+export class ScannerNode implements ConvNode {
+  private bufs: [RGBA, RGBA] | null = null
+  private w = 0
+  private h = 0
+  private cur = 0
+  private seeded = false
+  private pos = 0 // scan-head position 0..1 along the axis
+  private prevTrig = 0
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  private ensure(w: number, h: number): void {
+    if (this.bufs && this.w === w && this.h === h) return
+    const gl = this.gl
+    if (this.bufs) for (const b of this.bufs) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
+    this.bufs = [makeRGBA(gl, w, h, true), makeRGBA(gl, w, h, true)]
+    this.w = w; this.h = h; this.cur = 0; this.seeded = false
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl)
+    const W = ctx.chain.w, H = ctx.chain.h
+    this.ensure(W, H)
+    const inp = ctx.inputs
+    const read = this.bufs![this.cur], write = this.bufs![1 - this.cur]
+
+    // Seed both buffers with the live frame so the document never starts black.
+    if (!this.seeded) {
+      const cp = g.use(g.copy)
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(cp.u('uTex'), 0)
+      for (const b of this.bufs!) { gl.bindFramebuffer(gl.FRAMEBUFFER, b.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3) }
+      this.seeded = true
+    }
+
+    // Advance the scan head (rising-edge trigger restarts the pass).
+    const rate = clampf(num(inp.scanRate, 0.4), 0.02, 4)
+    const oneShot = Math.round(num(inp.mode, 0)) === 1
+    const trig = num(inp.trig, 0)
+    const restart = trig >= 0.5 && this.prevTrig < 0.5
+    this.prevTrig = trig
+    let prevP: number, curP: number, wrapped = 0
+    if (restart) { prevP = 0; curP = ctx.dt * rate }
+    else if (oneShot && this.pos >= 1.0) { prevP = 1.0; curP = 1.0 } // finished → hold
+    else {
+      prevP = this.pos; curP = this.pos + ctx.dt * rate
+      if (curP >= 1.0) { if (oneShot) curP = 1.0; else { curP -= 1.0; wrapped = 1 } }
+    }
+    this.pos = curP
+    const axis = Math.round(num(inp.axis, 0))
+
+    // Pass 1 : capture the band / hold the rest → write buffer (no scan bar).
+    let p = g.use(g.scan)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, read.tex); gl.uniform1i(p.u('uPrev'), 1)
+    gl.uniform2f(p.u('uRes'), W, H)
+    gl.uniform1i(p.u('uAxis'), axis)
+    gl.uniform1f(p.u('uPrevP'), prevP); gl.uniform1f(p.u('uCurP'), curP); gl.uniform1i(p.u('uWrapped'), wrapped)
+    gl.uniform1f(p.u('uDrag'), clampf(num(inp.drag, 0.3), 0, 1))
+    gl.uniform1f(p.u('uWobble'), clampf(num(inp.wobble, 0.2), 0, 1))
+    gl.uniform1f(p.u('uJitter'), clampf(num(inp.jitter, 0.15), 0, 1))
+    gl.uniform1f(p.u('uTear'), clampf(num(inp.tear, 0.3), 0, 1))
+    gl.uniform1f(p.u('uRgb'), clampf(num(inp.rgb, 0.2), 0, 1))
+    gl.uniform1f(p.u('uSeed'), Math.floor(this.pos * 997) % 1024)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    // Pass 2 : present the frozen buffer + the scan bar → chain output.
+    const out = ctx.chain.next()
+    p = g.use(g.scanout)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, write.tex); gl.uniform1i(p.u('uBuf'), 0)
+    gl.uniform1i(p.u('uAxis'), axis)
+    gl.uniform1f(p.u('uCurP'), curP); gl.uniform1i(p.u('uWrapped'), wrapped)
+    gl.uniform1f(p.u('uBar'), clampf(num(inp.bar, 0.25), 0, 1))
+    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    this.cur = 1 - this.cur
+    return out.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    const gl = this.gl
+    if (this.bufs) { for (const b of this.bufs) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.bufs = null }
+  }
+}
+
+// ── Autocutter (BSP cut-up rearrange) ────────────────────────────────────
+// Recursive binary-space-partition of the frame into ragged rectangles, then the
+// pieces are shuffled among their slots (seeded permutation) + optionally rotated.
+// The layout is computed on the CPU here and passed as uniform arrays; the shader
+// remaps each output cell to a different cell's live content, so the scramble holds
+// while the video animates inside it. `trig` re-cuts on the rising edge; `rate` (Hz)
+// auto-re-cuts for hands-free live rhythm.
+const AC_MAX = 64
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0
+    let t = a
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+interface Rect { x: number; y: number; w: number; h: number }
+export class AutocutterNode implements ConvNode {
+  private cellArr = new Float32Array(AC_MAX * 4)
+  private mapArr = new Float32Array(AC_MAX * 4)
+  private rotArr = new Float32Array(AC_MAX)
+  private count = 0
+  private seed = 0x1a2b3c4d
+  private prevTrig = 0
+  private timer = 0
+  private lastCuts = -1
+  private lastRotate = -1
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  private rebuild(cuts: number, rotateFrac: number): void {
+    const rnd = mulberry32(this.seed)
+    const minW = 0.06, minH = 0.06
+    let cells: Rect[] = [{ x: 0, y: 0, w: 1, h: 1 }]
+    while (cells.length < cuts) {
+      let idx = -1, area = -1
+      for (let i = 0; i < cells.length; i++) {
+        const c = cells[i]
+        if (c.w >= minW * 2 || c.h >= minH * 2) { const a = c.w * c.h; if (a > area) { area = a; idx = i } }
+      }
+      if (idx < 0) break
+      const c = cells[idx]
+      const canV = c.w >= minW * 2, canH = c.h >= minH * 2
+      const vertical = canV && canH ? rnd() < c.w / (c.w + c.h) : canV
+      const t = 0.35 + rnd() * 0.3
+      if (vertical) { const sw = c.w * t; cells.splice(idx, 1, { x: c.x, y: c.y, w: sw, h: c.h }, { x: c.x + sw, y: c.y, w: c.w - sw, h: c.h }) }
+      else { const sh = c.h * t; cells.splice(idx, 1, { x: c.x, y: c.y, w: c.w, h: sh }, { x: c.x, y: c.y + sh, w: c.w, h: c.h - sh }) }
+    }
+    if (cells.length > AC_MAX) cells = cells.slice(0, AC_MAX)
+    const n = cells.length
+    const perm = cells.map((_, i) => i)
+    for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp }
+    for (let i = 0; i < n; i++) {
+      const d = cells[i], sIdx = perm[i], s = cells[sIdx]
+      this.cellArr[i * 4] = d.x; this.cellArr[i * 4 + 1] = d.y; this.cellArr[i * 4 + 2] = d.w; this.cellArr[i * 4 + 3] = d.h
+      this.mapArr[i * 4] = s.x; this.mapArr[i * 4 + 1] = s.y; this.mapArr[i * 4 + 2] = s.w; this.mapArr[i * 4 + 3] = s.h
+      this.rotArr[i] = rotateFrac > 0 && rnd() < rotateFrac ? 1 + Math.floor(rnd() * 3) : 0
+    }
+    this.count = n
+    this.lastCuts = cuts; this.lastRotate = rotateFrac
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl)
+    const W = ctx.chain.w, H = ctx.chain.h
+    const inp = ctx.inputs
+
+    const cuts = Math.round(clampf(num(inp.cuts, 20), 2, AC_MAX))
+    const rotate = clampf(num(inp.rotate, 0.3), 0, 1)
+    const trig = num(inp.trig, 0)
+    const recut = trig >= 0.5 && this.prevTrig < 0.5
+    this.prevTrig = trig
+    const autoRate = clampf(num(inp.rate, 0), 0, 8)
+    if (autoRate > 0) { this.timer += ctx.dt; if (this.timer >= 1 / autoRate) { this.timer = 0; this.reseed(); this.rebuild(cuts, rotate) } }
+    if (recut) { this.reseed(); this.rebuild(cuts, rotate) }
+    else if (this.count === 0 || cuts !== this.lastCuts || rotate !== this.lastRotate) this.rebuild(cuts, rotate)
+
+    const out = ctx.chain.next()
+    const p = g.use(g.autocut)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    gl.uniform1i(p.u('uCount'), this.count)
+    gl.uniform4fv(p.u('uCell'), this.cellArr.subarray(0, this.count * 4))
+    gl.uniform4fv(p.u('uMap'), this.mapArr.subarray(0, this.count * 4))
+    gl.uniform1fv(p.u('uRot'), this.rotArr.subarray(0, this.count))
+    gl.uniform1f(p.u('uGap'), clampf(num(inp.gap, 0.15), 0, 1))
+    gl.uniform1f(p.u('uSlip'), clampf(num(inp.slip, 0), 0, 1))
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
+    gl.uniform1f(p.u('uSeed'), this.seed % 1024)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return out.tex
+  }
+
+  private reseed(): void { this.seed = (Math.imul(this.seed, 1664525) + 1013904223) >>> 0 }
+  dispose(): void { this.disposed = true }
+}
+
 /** Instantiate the native node for a reserved `node-*` shaderId (null if none). */
 export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): ConvNode | null {
   if (shaderId === 'node-transfert') return new TransfertNode(gl)
@@ -1050,9 +1354,11 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   if (shaderId === 'node-reponse') return new ReponseNode(gl)
   if (shaderId === 'node-feedback') return new FeedbackNode(gl)
   if (shaderId === 'node-datamosh') return new DatamoshNode(gl)
+  if (shaderId === 'node-scanner') return new ScannerNode(gl)
+  if (shaderId === 'node-autocutter') return new AutocutterNode(gl)
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

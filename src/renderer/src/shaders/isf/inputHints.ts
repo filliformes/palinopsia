@@ -4,6 +4,27 @@
 // a first-timer meets in Finishing and can't guess from the label alone.
 
 export const INPUT_HINTS: Record<string, Record<string, string>> = {
+  'node-scanner': {
+    mode: 'LOOP scans forever (continuous live slit-scan) · ONE-SHOT does a single pass on a trigger, then holds the frozen document.',
+    axis: 'Which way the scan head sweeps : down / up / right / left.',
+    scanRate: 'How fast the head sweeps (passes per second). Slow = long time-smear; fast = a quick refresh.',
+    drag: 'Steady shear of the capture — the paper sliding under the head as it scans (diagonal smear).',
+    wobble: 'A slow hand-wave across the sweep : wavy, organic distortion.',
+    jitter: 'Random per-line horizontal rips (the digital tear).',
+    tear: 'Chunkiness of the rips : low = per-line, high = torn in fat slabs.',
+    rgb: 'CCD channel misregistration : splits R/G/B sideways (colour-fringe scanner artifact).',
+    bar: 'Brightness of the moving scan bar (the bright line at the head). 0 hides it.',
+    trig: 'FIRE a fresh scan pass on the rising edge. Press the button, send it over OSC, or bind a modulator (M) — a square LFO / sample&hold / audio edge — for rhythmic live re-scans.'
+  },
+  'node-autocutter': {
+    cuts: 'How many pieces the frame is chopped into (recursive splits).',
+    rotate: 'What fraction of the pieces get turned 90°/180°/270°.',
+    slip: 'Nudges each piece’s source region — extra displacement / tearing.',
+    gap: 'Dark seams drawn between the pieces (the collage cut lines).',
+    mix: 'Blend of the rearranged cut-up against the untouched original.',
+    rate: 'Auto re-cut rate (Hz) : >0 re-cuts on its own for hands-free live rhythm. 0 = only on trigger.',
+    trig: 'Make a fresh cut on the rising edge. Press FIRE, send OSC, or bind a modulator (M) for rhythmic cutting.'
+  },
   'fx-vibe': {
     stops: 'How many palette stops (2–5) the image is re-coloured toward : the size of the colour map.',
     blend: 'Blend of the palette re-colour against the original colours.',

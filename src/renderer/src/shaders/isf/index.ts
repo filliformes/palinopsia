@@ -276,6 +276,64 @@ export const NATIVE_NODES: IsfShader[] = [
       autoBloom: [0.4, 1.0],
       cutSense: [0.2, 0.5]
     }
+  },
+  {
+    id: 'node-scanner',
+    name: 'Scanner',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Scanner : a flatbed-scanner slit-scan. A scan head sweeps the frame; the line it crosses is CAPTURED from the live signal at that instant and held until the head passes again. Because each line is grabbed at a different moment, anything MOVING during the sweep smears and tears across the scanlines — the classic 'moved the photo mid-scan' glitch, live. LOOP scans continuously; ONE-SHOT does a single pass on a trigger then holds the frozen document. DRAG shears the capture (the paper sliding under the head), WOBBLE adds a hand-wave, JITTER/TEAR rip lines, CHANNEL SPLIT misregisters the CCD's RGB. TRIGGER (scan ▸) starts a fresh pass on its rising edge — fire it from the button, over OSC, or by binding a modulator (a square LFO / sample&hold / audio edge) with M for rhythmic live re-scans. Layer-FX only.",
+      "CATEGORIES": ["FX", "Scan", "Glitch"],
+      "INPUTS": [
+        { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["loop", "one-shot"], "DEFAULT": 0, "LABEL": "mode" },
+        { "NAME": "axis", "TYPE": "long", "VALUES": [0, 1, 2, 3], "LABELS": ["down", "up", "right", "left"], "DEFAULT": 0, "LABEL": "direction" },
+        { "NAME": "scanRate", "TYPE": "float", "MIN": 0.02, "MAX": 4.0, "DEFAULT": 0.4, "LABEL": "scan rate" },
+        { "NAME": "drag", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "drag" },
+        { "NAME": "wobble", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2, "LABEL": "wobble" },
+        { "NAME": "jitter", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "line jitter" },
+        { "NAME": "tear", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "tear" },
+        { "NAME": "rgb", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2, "LABEL": "channel split" },
+        { "NAME": "bar", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.25, "LABEL": "scan bar" },
+        { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "scan ▸" }
+      ]
+    }*/`,
+    curated: {
+      scanRate: [0.1, 1.5],
+      drag: [0.1, 0.7],
+      wobble: [0, 0.5],
+      jitter: [0, 0.5],
+      tear: [0, 0.6],
+      rgb: [0, 0.5],
+      bar: [0.1, 0.4]
+    }
+  },
+  {
+    id: 'node-autocutter',
+    name: 'Autocutter',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Autocutter : a cut-up collage. The frame is recursively split (binary space partition) into ragged rectangles, then the pieces are SHUFFLED among their slots and optionally rotated — so the picture is chopped and rearranged. The scramble LAYOUT holds still while the live video keeps playing inside every piece, so it stays kinetic. CUTS sets how many pieces, ROTATE how many are turned, SLIP nudges each piece's source, SEAMS draws dark cuts between pieces, MIX blends back toward the original. TRIGGER (cut ▸) makes a fresh cut on its rising edge (button / OSC / a modulator via M); AUTO RATE (Hz) re-cuts on its own for hands-free live rhythm. Layer-FX only.",
+      "CATEGORIES": ["FX", "Glitch"],
+      "INPUTS": [
+        { "NAME": "cuts", "TYPE": "float", "MIN": 2.0, "MAX": 64.0, "DEFAULT": 20.0, "LABEL": "cuts" },
+        { "NAME": "rotate", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "rotate" },
+        { "NAME": "slip", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "slip" },
+        { "NAME": "gap", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "seams" },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" },
+        { "NAME": "rate", "TYPE": "float", "MIN": 0.0, "MAX": 8.0, "DEFAULT": 0.0, "LABEL": "auto rate" },
+        { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "cut ▸" }
+      ]
+    }*/`,
+    curated: {
+      cuts: [6, 40],
+      rotate: [0, 0.6],
+      slip: [0, 0.3],
+      gap: [0, 0.4],
+      mix: [0.7, 1.0],
+      rate: [0, 2]
+    }
   }
 ]
 

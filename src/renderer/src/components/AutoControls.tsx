@@ -748,6 +748,26 @@ function BoolControl({
   modTargetFor?: (inputName: string) => ModTarget
 }): JSX.Element {
   const def = typeof inp.def === 'number' ? inp.def : 0
+  // An `event` input is a MOMENTARY trigger : press pulses it 1 → 0 so the engine
+  // sees a rising edge (fire) then re-arms. Bind M to drive it from a modulator
+  // (a square LFO / sample&hold / audio edge) or fire it over OSC for live use.
+  if (inp.type === 'event') {
+    return (
+      <div className="flex w-24 min-w-0 flex-col items-start gap-0.5">
+        <LabelRow inp={inp} modTargetFor={modTargetFor} />
+        <button
+          onPointerDown={() => {
+            onChange(inp.name, 1)
+            window.setTimeout(() => onChange(inp.name, 0), 140)
+          }}
+          className="w-full rounded bg-panel2 px-2 py-0.5 font-mono text-[10px] text-accent ring-1 ring-accent/40 transition-colors hover:bg-accent/20 active:bg-accent/50"
+          title={inp.hint ?? `${inp.label} : fire (momentary trigger; bind M for rhythmic auto-fire)`}
+        >
+          FIRE ▸
+        </button>
+      </div>
+    )
+  }
   const on = (typeof value === 'number' ? value : def) >= 0.5
   return (
     <div className="flex w-24 min-w-0 flex-col items-start gap-0.5">
