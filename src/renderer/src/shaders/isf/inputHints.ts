@@ -4,6 +4,18 @@
 // a first-timer meets in Finishing and can't guess from the label alone.
 
 export const INPUT_HINTS: Record<string, Record<string, string>> = {
+  organic: {
+    mode: 'Which element : fire (buoyant flames + sparks) · water (flowing caustics + deep) · nature (growing canopy + pollen).',
+    rate: 'Overall speed of life : how fast the element moves / grows.',
+    scale: 'Feature size : small = fine detail, large = broad masses.',
+    detail: 'High-frequency texture on top of the base masses.',
+    flow: 'Directional drift : the base current (flame rise · water flow · growth push).',
+    swirl: 'Curl-noise turbulence : how much the flow eddies and billows (vs. smooth drift). The engine that makes it feel alive.',
+    depth: 'Parallax depth : stacks a farther, dimmer layer behind (deep water · back-glow · far foliage) for volume.',
+    embers: 'Drifting particle layer : rising sparks (fire) · sediment/bubbles (water) · pollen/leaves (nature). 0 = none.',
+    vary: 'Season blend toward each element’s alternate : gas-blue flame · lagoon green · patchy autumn.',
+    contrast: 'Tonal contrast of the element (harder vs. softer masses).'
+  },
   'node-scanner': {
     mode: 'LOOP scans forever (continuous live slit-scan) · ONE-SHOT does a single pass on a trigger, then holds the frozen document.',
     axis: 'Which way the scan head sweeps : down / up / right / left.',

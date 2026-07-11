@@ -606,6 +606,9 @@ export const GENERATORS: IsfShader[] = [
       scale: [1.2, 5],
       detail: [0.3, 0.9],
       flow: [0.25, 0.85],
+      swirl: [0.2, 0.8],
+      depth: [0.2, 0.8],
+      embers: [0.2, 0.7],
       vary: [0, 0.7],
       contrast: [0.8, 1.5]
     }
