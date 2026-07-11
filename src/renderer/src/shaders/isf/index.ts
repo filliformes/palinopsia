@@ -86,6 +86,7 @@ import databend from './fx/Databend.fs?raw'
 import pixelSort from './fx/PixelSort.fs?raw'
 import feedbackZoom from './fx/FeedbackZoom.fs?raw'
 import distort from './fx/Distort.fs?raw'
+import parallax from './fx/Parallax.fs?raw'
 import vibe from './fx/Vibe.fs?raw'
 import context from './fx/Context.fs?raw'
 import finalizer from './fx/Finalizer.fs?raw'
@@ -854,6 +855,10 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-distort', name: 'Distort', category: 'FX', source: distort,
     curated: { amount: [0.1, 0.6], scale: [1, 12], angle: [0, 6.2832], rate: [0.1, 2] }
+  },
+  {
+    id: 'fx-parallax', name: 'Parallax', category: 'FX', source: parallax,
+    curated: { amount: [0.1, 0.6], angle: [0, 6.2832], sway: [0, 0.6], dof: [0, 0.5], focus: [0.3, 0.7], fog: [0, 0.5], wet: [0.6, 1] }
   },
   {
     id: 'fx-slit-buffer', name: 'Slit Buffer', category: 'FX', source: slitBuffer,

@@ -16,6 +16,7 @@ import { applyFlicker } from './engine/flicker'
 import { pushMarkSignal } from './engine/markSignal'
 import { applyModulation, modEngine } from './engine/modulation'
 import { visionBus } from './engine/visionIn'
+import { depthEngine } from './engine/depthEstimate'
 import { currentFps, tickFrame } from './perf'
 import { tickSequencer } from './engine/sequencer'
 import { Collapsible } from './components/Collapsible'
@@ -49,6 +50,10 @@ import { PRESETS_BY_ID } from './shaders/isf/presets'
 // survive re-renders and advance across Shift presses.
 let vibePresetIndex = -1
 let contextPresetIndex = -1
+// Tracks the last-applied depth mode so the render loop only re-fills the depth
+// map on a change (synth bowl / clear), rather than every frame.
+let depthModePrev = ''
+let lastDepthSample = 0 // throttles the depth-estimator frame readback (~11 Hz)
 
 // Reveal a Finishing Touches sub-section: switch the right column to the
 // Finishing view and expand the relevant sub-row.
@@ -118,6 +123,8 @@ export default function App(): JSX.Element {
   const compositorRef = useRef<Compositor | null>(null)
   const theme = useStore((s) => s.theme)
   const setTheme = useStore((s) => s.setTheme)
+  const depthMode = useStore((s) => s.depthMode)
+  const setDepthMode = useStore((s) => s.setDepthMode)
   const name = useStore((s) => s.name)
   const setName = useStore((s) => s.setName)
   const uiZoom = useStore((s) => s.uiZoom)
@@ -530,6 +537,25 @@ export default function App(): JSX.Element {
           const vs = comp!.visionSample(32)
           if (vs) visionBus.ingest(vs.grid, vs.size)
         }
+        // 3d. Depth (2.5D) : keep the shared depth map current. Off = flat (Parallax
+        //     passthrough); synth = a test bowl; estimate = the monocular model,
+        //     fed a low-res frame, run async, its result EMA-smoothed into the map.
+        if (st.depthMode !== depthModePrev) {
+          depthModePrev = st.depthMode
+          if (st.depthMode === 'synth') comp!.setSyntheticDepth()
+          else if (st.depthMode === 'off') comp!.clearDepth()
+        }
+        if (st.depthMode === 'estimate') {
+          // Throttle the frame readback to the estimator's cadence (~11 Hz) so we
+          // don't stall the pipeline with a 256² readback every frame.
+          if (now - lastDepthSample > 85) {
+            lastDepthSample = now
+            const df = comp!.depthFrame(256)
+            if (df) depthEngine.update(df.data, df.w, df.h, now)
+          }
+          const dr = depthEngine.take()
+          if (dr) comp!.setDepth(dr.data, dr.w, dr.h, 0.35)
+        }
         // 4. Native output window: push the exact render state so it renders
         //    the same composition itself (pixel-perfect, no transcode).
         if (st.outputActive) {
@@ -745,6 +771,16 @@ export default function App(): JSX.Element {
         >
           Save As
         </button>
+        <select
+          className="input w-24 shrink-0 text-[11px]"
+          value={depthMode}
+          onChange={(e) => setDepthMode(e.target.value as 'off' | 'synth' | 'estimate')}
+          title="Depth engine (2.5D) : fills the depth map the Parallax FX reads. off = flat (passthrough) · synth = a test depth bowl · AI = monocular depth estimation (downloads a small model on first use; needs network + WebGPU)."
+        >
+          <option value="off">depth: off</option>
+          <option value="synth">depth: synth</option>
+          <option value="estimate">depth: AI</option>
+        </select>
         <select
           className="input w-28 shrink-0 text-[12px]"
           value={theme}

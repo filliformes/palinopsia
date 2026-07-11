@@ -789,6 +789,9 @@ interface StoreState {
   toggleModBypass: () => void
   renderScale: number
   setRenderScale: (v: number) => void
+  // Depth engine mode (2.5D) : off · synthetic test bowl · AI monocular estimate.
+  depthMode: 'off' | 'synth' | 'estimate'
+  setDepthMode: (m: 'off' | 'synth' | 'estimate') => void
   collapsed: Record<string, boolean>
   toggleSection: (key: string) => void
   // Finishing view: exclusively open one finalizer sub-section (Vibe / Context /
@@ -1899,6 +1902,15 @@ export const useStore = create<StoreState>((set, get) => ({
     const s = Math.max(0.1, Math.min(2, v))
     localStorage.setItem('opsia.renderScale', String(s))
     set({ renderScale: s })
+  },
+
+  depthMode: ((): 'off' | 'synth' | 'estimate' => {
+    const m = localStorage.getItem('opsia.depthMode')
+    return m === 'synth' || m === 'estimate' ? m : 'off'
+  })(),
+  setDepthMode: (m) => {
+    localStorage.setItem('opsia.depthMode', m)
+    set({ depthMode: m })
   },
 
   oscEnabled: localStorage.getItem('opsia.oscEnabled') === '1',

@@ -16,6 +16,16 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     vary: 'Season blend toward each element’s alternate : gas-blue flame · lagoon green · patchy autumn.',
     contrast: 'Tonal contrast of the element (harder vs. softer masses).'
   },
+  'fx-parallax': {
+    amount: 'Parallax strength : how far near features shift relative to far ones. Needs the Depth engine on (header).',
+    angle: 'Direction the parallax pushes.',
+    sway: 'Animated camera drift — gives constant parallax motion even on a still image.',
+    dof: 'Depth-of-field : blur that grows with distance from the focus plane.',
+    focus: 'The depth that stays sharp (the focal plane).',
+    fog: 'Aerial recession : the far distance sinks toward black.',
+    invert: 'Flip near ↔ far.',
+    wet: 'Dry/wet against the untouched image.'
+  },
   'node-chronoscan': {
     source: 'What sets each pixel’s age into the frame history : SLIT-SCAN (a moving gradient — the scanner smear) · LUMA self (the image’s own brightness) · LUMA sidechain (another layer’s brightness as the clock).',
     reach: 'How far back the oldest regions read (up to ~32 frames of history).',

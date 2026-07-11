@@ -501,6 +501,12 @@ class FxRack {
     this.units.find((x) => x.instId === instId)?.isf?.setValue(name, tex);
   }
 
+  /** Bind an image to `name` on every enabled ISF unit whose shader is in `ids`
+   *  (used to feed the shared depth map to Parallax / any depth-aware FX). */
+  bindImageByShader(ids: string[], name: string, tex: import('./isfTextureBridge').TextureHandle): void {
+    for (const u of this.units) if (u.isf && ids.includes(u.shaderId)) u.isf.setValue(name, tex);
+  }
+
   /** Assign this rack's clock (per-layer Speed : see isfTextureBridge). */
   setTime(tSec: number): void {
     for (const u of this.units) {
@@ -1187,6 +1193,112 @@ export class Compositor {
     return { grid: this.visionBuf as Uint8Array, size };
   }
 
+  // ── Depth map (2.5D) : the shared grayscale depth the Parallax FX reads (and
+  //    later Context / anaglyph). Filled synthetically or by the depth estimator. ──
+  private depthTex: WebGLTexture | null = null;
+  private depthAcc: Float32Array | null = null;
+  private depthRGBA: Uint8Array | null = null;
+  private depthW = 0;
+  private depthH = 0;
+  private depthFbo: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
+  private depthReadBuf: Uint8Array | null = null;
+  private depthReadSize = 0;
+
+  private ensureDepth(w: number, h: number): void {
+    if (this.depthTex && this.depthW === w && this.depthH === h) return;
+    const gl = this.gl;
+    if (this.depthTex) gl.deleteTexture(this.depthTex);
+    this.depthTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.depthTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    this.depthAcc = new Float32Array(w * h);
+    this.depthRGBA = new Uint8Array(w * h * 4);
+    this.depthW = w; this.depthH = h;
+  }
+
+  /** Push a grayscale depth map (0..1) with temporal EMA; upload to depthTex. */
+  setDepth(data: Float32Array, w: number, h: number, ema: number): void {
+    const first = !this.depthTex || this.depthW !== w || this.depthH !== h;
+    this.ensureDepth(w, h);
+    const acc = this.depthAcc as Float32Array, rgba = this.depthRGBA as Uint8Array;
+    const k = first ? 1 : Math.max(0, Math.min(1, ema));
+    const n = w * h;
+    for (let i = 0; i < n; i++) {
+      acc[i] += (data[i] - acc[i]) * k;
+      let v = acc[i] * 255; v = v < 0 ? 0 : v > 255 ? 255 : v;
+      const b = v | 0;
+      rgba[i * 4] = b; rgba[i * 4 + 1] = b; rgba[i * 4 + 2] = b; rgba[i * 4 + 3] = 255;
+    }
+    const gl = this.gl;
+    gl.bindTexture(gl.TEXTURE_2D, this.depthTex);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+  }
+
+  /** Flat 0.5 depth → the Parallax FX becomes a passthrough (Depth off). */
+  clearDepth(): void {
+    const d = new Float32Array(4); d.fill(0.5);
+    this.setDepth(d, 2, 2, 1);
+  }
+
+  /** A synthetic depth bowl (centre near → edges far) : a test map, no model. */
+  setSyntheticDepth(): void {
+    const S = 64, d = new Float32Array(S * S);
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const dx = x / (S - 1) - 0.5, dy = y / (S - 1) - 0.5;
+      const r = Math.sqrt(dx * dx + dy * dy) * 1.7;
+      d[y * S + x] = Math.max(0, Math.min(1, 1 - r));
+    }
+    this.setDepth(d, S, S, 1);
+  }
+
+  /** Read the presented frame down to size×size RGBA (the depth estimator input). */
+  depthFrame(size: number): { data: Uint8Array; w: number; h: number } | null {
+    const gl = this.gl;
+    if (!this.lastPresent) return null;
+    if (!this.depthFbo || this.depthReadSize !== size) {
+      if (this.depthFbo) { gl.deleteFramebuffer(this.depthFbo.fbo); gl.deleteTexture(this.depthFbo.tex); }
+      const tex = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      const fbo = gl.createFramebuffer()!;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      this.depthFbo = { fbo, tex }; this.depthReadSize = size;
+      this.depthReadBuf = new Uint8Array(size * size * 4);
+    }
+    gl.bindVertexArray(this.vao);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.depthFbo.fbo);
+    gl.viewport(0, 0, size, size);
+    gl.useProgram(this.copyProg);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.lastPresent); gl.uniform1i(this.uCTex, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.readPixels(0, 0, size, size, gl.RGBA, gl.UNSIGNED_BYTE, this.depthReadBuf as Uint8Array);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindVertexArray(null);
+    return { data: this.depthReadBuf as Uint8Array, w: size, h: size };
+  }
+
+  /** Feed the shared depth map to every Parallax unit (across master + layers). */
+  private bindDepth(): void {
+    if (!this.depthTex) this.clearDepth();
+    const dh = handle(this.depthTex as WebGLTexture, this.depthW, this.depthH);
+    const C = ['fx-parallax'];
+    this.masterRack.bindImageByShader(C, 'depthMap', dh);
+    for (const L of this.layers) {
+      L.rackA.bindImageByShader(C, 'depthMap', dh);
+      L.rackB.bindImageByShader(C, 'depthMap', dh);
+      L.rackLayer.bindImageByShader(C, 'depthMap', dh);
+    }
+  }
+
   readMarkStrip(n: number, y01: number): Float32Array | null {
     const gl = this.gl, w = this.canvas.width, h = this.canvas.height;
     if (w < 2 || h < 2 || n < 1) return null;
@@ -1489,6 +1601,9 @@ export class Compositor {
     this.bgClockSec += dtSec * this.bgSpeed;
     if (this.bgIsf) (this.bgIsf as unknown as { __opsiaTimeSec?: number }).__opsiaTimeSec = this.bgClockSec;
     this.bgRack.setTime(this.bgClockSec);
+    // Feed the shared depth map to any Parallax units before they draw (uses last
+    // frame's depth : the estimator runs post-render, so it's always 1 frame behind).
+    this.bindDepth();
 
     // Native convolution nodes (layer FX) resolve their sidechain to a live
     // texture: another layer's persisted output (previous frame for layers not
@@ -1731,6 +1846,8 @@ export class Compositor {
     disposeTarget(gl, this.xfadeTarget);
     if (this.fxOpac) { disposeTarget(gl, this.fxOpac[0]); disposeTarget(gl, this.fxOpac[1]); }
     if (this.visionFbo) { gl.deleteFramebuffer(this.visionFbo.fbo); gl.deleteTexture(this.visionFbo.tex); this.visionFbo = null; }
+    if (this.depthTex) { gl.deleteTexture(this.depthTex); this.depthTex = null; }
+    if (this.depthFbo) { gl.deleteFramebuffer(this.depthFbo.fbo); gl.deleteTexture(this.depthFbo.tex); this.depthFbo = null; }
     gl.deleteProgram(this.blendProg);
     gl.deleteProgram(this.persistProg);
     gl.deleteProgram(this.mixProg);
