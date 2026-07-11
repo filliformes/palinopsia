@@ -5,7 +5,7 @@
   "CATEGORIES": ["FX", "Utility"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
-    { "NAME": "amount", "TYPE": "float", "MIN": 0.0, "MAX": 3.0, "DEFAULT": 0.8 }
+    { "NAME": "amount", "TYPE": "float", "MIN": 0.0, "MAX": 20.0, "DEFAULT": 0.8 }
   ]
 }*/
 
