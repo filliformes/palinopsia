@@ -49,6 +49,7 @@ import { setKnobTarget } from './metaSmooth'
 import { GENERATORS, SHADER_BY_ID } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
 import { audioBus, type AudioFeatureName } from './engine/audioIn'
+import { visionBus, VISION_FEATURES } from './engine/visionIn'
 import { sequencerSkip } from './engine/sequencer'
 
 type Args = OscInEvent['args']
@@ -514,6 +515,11 @@ function enumerateLeaves(): Leaf[] {
     add(`/opsia/audio/${feat}`, 0, 1, 0, `Audio ${feat} (0..1)`, false)
   }
   for (let b = 1; b <= 6; b++) add(`/opsia/audio/band/${b}`, 0, 1, 0, `Audio band ${b} energy (0..1)`, false)
+  // Vision features the PICTURE emits (the return path) : streamed OUT to Pandore
+  // so the composited image plays the synths (echoed by the outbound diff loop).
+  for (const vf of VISION_FEATURES) {
+    add(`/opsia/vision/${vf}`, 0, 1, visionBus.feature(vf), `Vision ${vf} (0..1) : the composited picture as control`)
+  }
   for (const [key, sid] of [['vibe', 'fx-vibe'], ['context', 'fx-context'], ['finalizer', 'fx-finalizer']] as const) {
     for (const d of inputsForShader(sid)) {
       if (d.type !== 'float') continue

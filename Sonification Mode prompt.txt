@@ -1,0 +1,70 @@
+SONIFICATION
+
+We will now implement a new sonification mode in Palinopsia. The app thus becomes a real audiovisual instrument. I need different real-time video sonification methods; I want different and adaptative sound sources; I want sonified data quantized to real notes or not; I want experimental stuff that will be super tied to the visuals. 
+
+I found some resources, read them, but also fetch 10 to 20 other pertinent resources for this on the internet. Read them thoroughly to create this new mode. 
+
+https://jmpelletier.com/sonification-demos/
+https://forum.ircam.fr/topics/detail/703-Sonification/
+https://nime.org/papers/
+
+
+ECOLOGICAL TEXTS 
+
+The striking thing: three independent texts — a French essay on bricolage vs engineering, a 2025 book on ecologies of experimental cinema, and one on expanded animation — all circle the same idea, which happens to be the app's literal name: persistence of vision, the afterimage, the interval between frames as the real material. They also independently validate your guardrails (matte, restraint, decay-over-bloom, the détourned/curated apparatus). So the headline isn't "add features" — it's that the concept is being confirmed from three directions, and there's a signature family sitting unbuilt.
+
+Here are the 10, strongest first. Tags: [NEW build], [reinforces concept], [extends X].
+
+1. The afterimage family — earn the name «Palinopsia». [NEW build] All three texts. Jacobs' "Eternalism" — "unfrozen slices of time… going nowhere, without discernable start and stop" (thouvenel p66); Sherwin/McClure's phase-drift twins — two identical loops of 200 vs 199 frames that "shift in and out of sync… chaotic periods before shifting into sync" (expanim p170); Goethe's complement — a removed bright form leaves its space "much darker" (expanim p63). These are one shared primitive: a frame-history ring buffer read with a per-pixel/per-region temporal offset. Build it once → you get Eternalism (two frames N apart oscillating across a black interval), Phase-Drift Twin (A & B from the same source at rates R and R±ε, beating in and out of lock), and Afterimage (a slow-decaying negative of recent frames blooming back on a cut). This is the most on-brand thing in 750 pages.
+
+2. Pulfrich depth — monochrome 3D, no anaglyph. [NEW build / extends Context] Thouvenel p67. "Dark stimuli are perceived a little later than light stimuli… providing two distinct images… merged to create a third dimension." A luminance-keyed per-pixel frame-delay (read from the same ring buffer as #1) gives real depth on any lateral motion with zero colour fringing — a near-black-safe companion to your anaglyph stage.
+
+3. Homeostat modulator — the instrument self-stabilizes. [NEW build] Expnature p166–170, Welsby. Wind drove his camera speed; the system held "homeostatic" equilibrium. Build a negative-feedback modulator that watches an output property (frame energy, edge density, motion) and nudges parameters back toward a setpoint — your feedback-engine AGC promoted to a first-class modulator that parks the whole rig at edge-of-chaos instead of drifting to black or blow-out.
+
+4. Buried / Weathered — slow entropy across a whole set. [NEW build / extends Cameraless] Expnature p91 (Lefrant), thouvenel p14 (reticulation). Film buried in soil so "biochemical breakdown… animates the figurative image." A time-integrated corrosion mask (reaction-diffusion) that monotonically worsens over performance time — eating luminance, blooming mineral colour along its fronts — with an "exhume/harvest" reset. Deliberately not a per-frame flicker; a decay that accumulates like real burial. Plus a reticulation émulsion texture (thermal crackle).
+
+5. Compression-as-material: actant triggers on Datamosh. [extends Datamosh] Expnature p267–281, Perconte. An insect near the lens "leaves strokes of white pixels that winds… slowly fill again"; a leaf "creates blocks of grey pixels that persist and follow the wind." Add a sparse event-trigger input to your Datamosh node that injects localized persistent pixel-blocks which then advect along the existing optical-flow field and bleed colour into neighbours. Plus his "manifestation" mode: a new source doesn't cut, it completes itself out of the retained previous frame.
+
+6. Flow ↔ Interruption — one temperament axis. [NEW build, unifies existing] Expanim p45, Sharits. Film is both vector (the continuous thread) and modular (the shutter chopping it). One macro knob, sibling to Tonicity/Shutter/Drift, that crossfades the entire instrument: toward Flow → motion-smoothing, echo, feedback continuity; toward Interruption → frame-hold, decimate, splice, strobe, blank frames. It gives a single expressive spine to half your finalizer tools.
+
+7. Consume / Reagent — a blend mode where A and B etch each other. [NEW build] Expnature p120, Doing. A plant as chemical "second developer" so "both renditions consume each other," motion "between fight and embrace." Not a mix or wipe — a coupled reaction-diffusion where bright A eats into B and vice-versa and the boundary migrates over time. A genuinely new A/B relation.
+
+8. Frame-Weave — a Sequencer that works at the single frame. [NEW build / reframes Sequencer] Thouvenel p39, Rose Lowder. She composed in-camera frame by frame, tracked on "a visual score… columns, each 24 images = one second," placing "spots of colour anywhere on the surface." A Sequencer mode that interleaves sources on a per-frame lattice (not blends), with a paintable 24-cells-per-second score grid. Temporal interlace is a cinematic register nothing in the app currently does.
+
+9. Time-Lapse / Decimate — reveal motion invisible at 1:1. [NEW build] Expanim p95–99, Woodman. A two-screen piece: real-time left vs 1-frame-per-10-seconds right, where weeds "static in the left… agitate vigorously" in the right. A sample-and-hold-every-N temporal FX; preset it as same source, two rates across A/B to reproduce the control-vs-lapse revelation.
+
+10. Burial→Exhumation macro-arc + the Long-Take/Veil discipline. [NEW build / reinforces concept] Expnature p53 (Fog Line: 11-min single shot, fog imperceptibly clearing), p233 (Los Ingrávidos). Two Sequencer long-forms: a dramatic Burial→Exhumation curve (slowly degrade the composite to near-illegibility, then recover), and its opposite — a "Veil" / slowness governor that forbids cuts and drives one imperceptibly-slow parameter over minutes. The antidote to your restless macro-forms.
+
+Honourable mentions I left off the 10: a "lines-of-force" incrustation FX that cuts along the image's own gradients (thouvenel p23, distinct from Autocutter's rectangles); a "Metamorph" birth-from-within shape generator (expanim p120, Blu's Muto); complementary aperture-gate masks with a defocus↔flicker coupling (expanim p172); a "Void / edge-dissolve" Context control that makes emptiness the subject.
+
+Questions for you:
+
+Which family first? My instinct says the afterimage/persistence family (#1–2) — it's the most-converged, most-signature, cheapest per-effect once the ring buffer exists, and it literally earns the app's name. But the process/entropy family (#3–5) is the more radical extension of the instrument-as-living-system. Which pulls you more?
+Eternalism/Phase-Drift — node or temperament? Should the persistence behaviour be a layer-FX node you drop where you want it, or a global temperament (a "hold/nervous" character over the whole composite)? Or both?
+The slow stuff (#4, #10). These only pay off over minutes to a whole set — burial that worsens, veils that clear imperceptibly. Does that fit how you actually perform (long durational sets), or do you want faster, more gestural versions?
+Homeostat (#3) — do you want the instrument to be able to self-drive toward stability (which slightly cedes control), or is edge-of-chaos something you'd rather keep steering by hand?
+Want me to save this as a research memory (like the datamosh one) so it's a standing shelf we build from across sessions?
+
+
+
+
+
+
+DATAMOSHING
+Ok ! Now we need to improve the glitch aesthetics capabilities of the app. 
+
+Here is a lot of resources on datamoshing. I want you to carefully and thoroughly read them and report here to build the best new datamoshing effect(s) and/or source for Opsia. And maybe while you're there fetch a few new cool ideas to improve the glitch effects and sources that we already have, or create new ones we don't have ! I want complex, creative, out-of-the-box ideas.
+
+http://datamoshing.com/
+https://formatc.hr/datamosh101/
+https://ressources.labomedia.org/le_datamoshing
+
+and GitHub repos : 
+https://github.com/Akascape/Datamosher-Pro
+https://github.com/Datamosh-js/datamosh
+https://github.com/tobloef/glitch-tool
+https://github.com/maelswarm/Datamosh
+https://github.com/supermosh/supermosh.github.io
+https://github.com/topics/datamoshing
+
+

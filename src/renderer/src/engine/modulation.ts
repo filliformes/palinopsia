@@ -13,6 +13,7 @@
 
 import type { CompositionState, LfoShape, ModCurve, ModulatorConfig } from '@shared/types'
 import { audioBus } from './audioIn'
+import { visionBus } from './visionIn'
 
 const TWO_PI = Math.PI * 2
 
@@ -216,6 +217,7 @@ interface SlotState {
   arpDir: 1 | -1
   arpLastAdvanceAt: number
   audioValue: number // one-pole smoothed audio feature (audio type)
+  visionValue: number // one-pole smoothed picture feature (vision type)
   physPos: number // physics integrator position 0..1
   physVel: number // physics integrator velocity
   physTarget: number // physics spring target (flips on clock)
@@ -243,6 +245,7 @@ function makeSlot(now: number): SlotState {
     arpDir: 1,
     arpLastAdvanceAt: now,
     audioValue: 0,
+    visionValue: 0,
     physPos: 0,
     physVel: 0,
     physTarget: 1,
@@ -450,6 +453,18 @@ export class ModEngine {
           }
           break
         }
+        case 'vision': {
+          // Follow one feature off the vision bus (the composited PICTURE, one
+          // frame behind). Unclocked : the image is the clock. One-pole smoothed.
+          const vc = cfg.vision
+          if (vc) {
+            const raw = visionBus.feature(vc.feature)
+            const sm = Math.max(0, Math.min(0.99, vc.smooth ?? 0))
+            s.visionValue += (raw - s.visionValue) * (1 - sm)
+            v01 = s.visionValue
+          }
+          break
+        }
         case 'organic': {
           // Irregular periodicity + perpetual variation: a
           // base undulation plus INCOMMENSURATE partials whose phases slowly
@@ -595,6 +610,7 @@ export function makeDefaultModulator(): ModulatorConfig {
     slew: { riseMs: 200, fallMs: 400, randomTarget: true },
     chaos: { r: 3.8 },
     audio: { feature: 'level', band: 0, smooth: 0.2 },
+    vision: { feature: 'brightness', smooth: 0.3 },
     organic: { variation: 0.5 },
     physics: { motion: 'bounce', damping: 0.5 },
     motion: { shape: 'oscillation' }

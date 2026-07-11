@@ -5,15 +5,16 @@
 // modulation never re-renders React at 60 Hz.
 
 import { useEffect, useRef, type ReactNode } from 'react'
-import type { ArpMode, AudioFeature, LfoShape, ModulatorType, MotionShape, PhysicsMotion } from '@shared/types'
+import type { ArpMode, AudioFeature, LfoShape, ModulatorType, MotionShape, PhysicsMotion, VisionFeature } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS, MOTION_SHAPES, WORLD_AUTOMOD_SLOT } from '@shared/types'
 import { DIVISIONS, modEngine } from '../engine/modulation'
 import { AUDIO_BANDS, AUDIO_FEATURES } from '../engine/audioIn'
+import { VISION_FEATURES } from '../engine/visionIn'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { modTargetKey, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 
-const MOD_TYPES: ModulatorType[] = ['lfo', 'ramp', 'adsr', 'arp', 'random', 'sh', 'slew', 'chaos', 'audio', 'organic', 'physics', 'motion']
+const MOD_TYPES: ModulatorType[] = ['lfo', 'ramp', 'adsr', 'arp', 'random', 'sh', 'slew', 'chaos', 'audio', 'vision', 'organic', 'physics', 'motion']
 const LFO_SHAPES: LfoShape[] = ['sine', 'triangle', 'square', 'sawtooth', 'rndStep', 'rndSmooth', 'spastic']
 const ARP_MODES: ArpMode[] = ['up', 'down', 'upDown', 'random', 'drunk']
 const PHYSICS_MOTIONS: PhysicsMotion[] = ['bounce', 'spring', 'riser']
@@ -129,7 +130,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
 
       {/* clock : everything except ramp/adsr/audio is clock-driven
           (audio is driven by the signal itself) */}
-      {m.type !== 'ramp' && m.type !== 'adsr' && m.type !== 'audio' && (
+      {m.type !== 'ramp' && m.type !== 'adsr' && m.type !== 'audio' && m.type !== 'vision' && (
         <div className="flex min-w-0 items-center gap-1">
           <button
             onClick={() => update(index, { sync: m.sync === 'bpm' ? 'free' : 'bpm' })}
@@ -377,6 +378,30 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
           <SliderRow label="SMOOTH" value={a.smooth} min={0} max={0.99}
             title="One-pole smoothing : 0 snaps to the signal, →1 glides"
             onChange={(v) => update(index, { audio: { ...a, smooth: v } })} />
+        </>
+      )
+    }
+    case 'vision': {
+      const vc = m.vision ?? { feature: 'brightness' as VisionFeature, smooth: 0.3 }
+      return (
+        <>
+          <Row label="READ">
+            <select
+              className="input select-compact min-w-0 flex-1 text-[10px]"
+              value={vc.feature}
+              title="Which picture feature this modulator follows : the composited image played back as control (brightness, contrast, motion, edge-density, entropy, bright-mass X/Y, warmth). The return path : the picture drives parameters, and streams to Pandore over /opsia/vision/*."
+              onChange={(e) => update(index, { vision: { ...vc, feature: e.target.value as VisionFeature } })}
+            >
+              {VISION_FEATURES.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          </Row>
+          <SliderRow label="SMOOTH" value={vc.smooth} min={0} max={0.99}
+            title="One-pole smoothing of the picture feature : 0 snaps, →1 glides"
+            onChange={(v) => update(index, { vision: { ...vc, smooth: v } })} />
         </>
       )
     }

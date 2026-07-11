@@ -15,6 +15,7 @@ import { applyTonicity, applyDrift, shutterHold, shutterClear } from './engine/t
 import { applyFlicker } from './engine/flicker'
 import { pushMarkSignal } from './engine/markSignal'
 import { applyModulation, modEngine } from './engine/modulation'
+import { visionBus } from './engine/visionIn'
 import { currentFps, tickFrame } from './perf'
 import { tickSequencer } from './engine/sequencer'
 import { Collapsible } from './components/Collapsible'
@@ -521,6 +522,14 @@ export default function App(): JSX.Element {
         // 3b. Animated sound (§4.4): sample a scanline of the presented frame and
         //     send it to Pandore over OSC (the drawn optical track).
         if (st.markSignalEnabled) pushMarkSignal(comp!, now)
+        // 3c. Return path (image → control): reduce the presented frame to vision
+        //     features that drive `vision` modulators next frame + stream out over
+        //     OSC. Gated to when something actually reads them (a vision modulator
+        //     or outbound feedback), so the tiny readback is skipped otherwise.
+        if (st.oscOutEnabled || c.modulators.some((m) => m.enabled && m.type === 'vision')) {
+          const vs = comp!.visionSample(32)
+          if (vs) visionBus.ingest(vs.grid, vs.size)
+        }
         // 4. Native output window: push the exact render state so it renders
         //    the same composition itself (pixel-perfect, no transcode).
         if (st.outputActive) {

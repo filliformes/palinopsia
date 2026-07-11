@@ -198,9 +198,22 @@ export type ModulatorType =
   | 'organic'
   | 'physics'
   | 'motion'
+  | 'vision'
 
 // Which audio feature an `audio` modulator follows (bus in engine/audioIn.ts).
 export type AudioFeature = 'level' | 'flux' | 'transient' | 'centroid' | 'band' | 'pitch'
+
+// Which picture feature a `vision` modulator follows (bus in engine/visionIn.ts) :
+// the RETURN PATH — the composited image drives control.
+export type VisionFeature =
+  | 'brightness'
+  | 'contrast'
+  | 'motion'
+  | 'edges'
+  | 'entropy'
+  | 'centroidX'
+  | 'centroidY'
+  | 'warmth'
 
 // Force-driven motion for the `physics` modulator.
 export type PhysicsMotion = 'bounce' | 'spring' | 'riser'
@@ -286,6 +299,7 @@ export interface ModulatorConfig {
   organic: { variation: number } // 0 = near-LFO, 1 = very irregular (never repeats)
   physics: { motion: PhysicsMotion; damping: number } // force-driven motion
   motion: { shape: MotionShape } // named motion archetype / force behaviour
+  vision: { feature: VisionFeature; smooth: number } // follows the picture (return path)
 }
 
 // What an assignment modulates: float ISF inputs, or a Meta knob (the
