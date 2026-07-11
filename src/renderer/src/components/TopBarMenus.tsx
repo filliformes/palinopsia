@@ -50,7 +50,7 @@ export function SessionLoader(): JSX.Element {
     <div className="flex items-center gap-1" title="Load a saved session">
       <span className="font-mono text-[9px] uppercase text-muted">Session</span>
       <select
-        className="input max-w-[150px] text-[12px]"
+        className="input w-[104px] text-[12px]"
         value={sel}
         onFocus={() => void refresh()}
         onChange={(e) => setSel(e.target.value)}
@@ -87,7 +87,12 @@ export function GenerateMenu(): JSX.Element {
     >
       <span className="font-mono text-[9px] uppercase text-muted">Generate</span>
       <select
-        className="input max-w-[160px] text-[12px]"
+        // Fixed width : a native <select> otherwise grows to fit the WIDEST
+        // content, which includes the long <optgroup> family labels ("Datamosh &
+        // Compression"…). Pinning it keeps the closed control only theme-name wide
+        // (the selected name truncates with ellipsis; the open list still shows
+        // full names + families).
+        className="input w-[120px] text-[12px]"
         value={sel}
         onChange={(e) => setSel(e.target.value)}
         title={current?.blurb}

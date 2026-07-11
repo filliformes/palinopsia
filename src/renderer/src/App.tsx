@@ -693,7 +693,7 @@ export default function App(): JSX.Element {
       style={{ zoom: uiZoom, height: `calc(100vh / ${uiZoom})` }}
     >
       {/* ── Top bar ─────────────────────────────────────────────── */}
-      <header className="flex items-center gap-4 border-b border-border bg-panel px-4 py-2 pr-8">
+      <header className="flex items-center gap-3 border-b border-border bg-panel px-4 py-2 pr-6">
         <h1
           className="select-none font-mono text-[15px] font-semibold uppercase tracking-[0.2em]"
           // Restrained glitch signature on the title : a faint chromatic
@@ -703,7 +703,7 @@ export default function App(): JSX.Element {
           Palinopsia
         </h1>
         <input
-          className="input w-40 text-[12px]"
+          className="input w-28 text-[12px]"
           value={name}
           onChange={(e) => setName(e.target.value)}
           title="Session name"
