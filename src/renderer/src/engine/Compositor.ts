@@ -422,6 +422,7 @@ interface FxUnit {
 export interface NodeApplyCtx {
   sidechainTex: (ref: SidechainRef | null | undefined) => WebGLTexture | null;
   dt: number;
+  depth?: WebGLTexture | null; // shared scene-depth map for depth-aware nodes (Parallax)
 }
 
 /**
@@ -531,7 +532,8 @@ class FxRack {
           host: cur,
           sidechain: nodeCtx.sidechainTex(u.sidechain),
           inputs: u.inputs ?? {},
-          dt: nodeCtx.dt
+          dt: nodeCtx.dt,
+          depth: nodeCtx.depth ?? null
         });
         if (wet === cur) continue; // node was inert (no sidechain) : passthrough
       } else if (u.isf) {
@@ -1610,6 +1612,7 @@ export class Compositor {
     // yet rendered : fine, the node keeps its own history). Assets land later.
     const nodeCtx: NodeApplyCtx = {
       dt: rawDt,
+      depth: this.depthTex, // shared scene depth (Parallax node reads it, layer + master)
       sidechainTex: (ref) => {
         if (!ref) return null;
         if (ref.kind === 'layer') return this.layers[ref.layer]?.texture() ?? null;
@@ -1728,7 +1731,7 @@ export class Compositor {
 
     // Master rack (glitch / dither / chroma / grade; warp joins in Phase 8).
     gl.bindVertexArray(null);
-    composite = this.masterRack.apply(composite, this.chain);
+    composite = this.masterRack.apply(composite, this.chain, nodeCtx); // nodeCtx → native nodes (Parallax) work on master too
 
     // Finalizer output stage: clip the finished frame into a shape, filling
     // OUTSIDE with a solid colour or the (moved) Background slab. No-op unless a

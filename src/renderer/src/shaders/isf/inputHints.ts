@@ -16,7 +16,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     vary: 'Season blend toward each element’s alternate : gas-blue flame · lagoon green · patchy autumn.',
     contrast: 'Tonal contrast of the element (harder vs. softer masses).'
   },
-  'fx-parallax': {
+  'node-parallax': {
     amount: 'Parallax strength : how far near features shift relative to far ones. Needs the Depth engine on (header).',
     angle: 'Direction the parallax pushes.',
     sway: 'Animated camera drift — gives constant parallax motion even on a still image.',

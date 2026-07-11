@@ -23,6 +23,7 @@ export interface NodeContext {
   sidechain: WebGLTexture | null // the impulse source (null ⇒ node is inert)
   inputs: Record<string, number | number[]> // param values (from the FxInstance)
   dt: number
+  depth?: WebGLTexture | null // shared scene-depth map (Depth engine), if any
 }
 
 export interface ConvNode {
@@ -559,6 +560,31 @@ void main(){
   o = vec4(max(prev * uDecay, host * uDeposit), 1.0);   // decaying peak memory
 }`
 
+// ── Parallax : real 2.5D from the shared depth map (native, so the passthrough
+// and the two image inputs are exact — an ISF FX with a 2nd image input tangled
+// with the rack's inputImage binding). host + depth are bound explicitly here. ──
+const F_PARALLAX = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uDepth;
+uniform float uAmount, uAngle, uSway, uDof, uFocus, uFog, uWet, uTime;
+uniform int uInvert, uHasDepth;
+void main(){
+  vec3 src = texture(uHost, vUV).rgb;
+  if (uHasDepth == 0 || uWet < 0.001) { o = vec4(src, 1.0); return; } // exact passthrough
+  float d = texture(uDepth, vUV).r;
+  if (uInvert == 1) d = 1.0 - d;
+  float dc = d - 0.5;
+  vec2 dir = vec2(cos(uAngle), sin(uAngle));
+  vec2 swayv = vec2(sin(uTime * 0.5), cos(uTime * 0.37)) * uSway;
+  vec2 suv = vUV + (dir * uAmount + swayv) * dc * 0.15;
+  float r = uDof * 0.03 * abs(d - uFocus);
+  vec3 col = texture(uHost, suv).rgb * 0.4
+    + (texture(uHost, suv + vec2(r, 0.0)).rgb + texture(uHost, suv - vec2(r, 0.0)).rgb
+     + texture(uHost, suv + vec2(0.0, r)).rgb + texture(uHost, suv - vec2(0.0, r)).rgb) * 0.15;
+  col = mix(col, vec3(0.0), uFog * smoothstep(uFocus, 1.0, d));
+  o = vec4(mix(src, col, uWet), 1.0);
+}`
+
 const F_SED_OUT = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uHost, uAcc, uRing;
@@ -609,6 +635,7 @@ class NodeGL {
   chrono: Prog
   sedAcc: Prog
   sedOut: Prog
+  parallax: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -633,6 +660,7 @@ class NodeGL {
     this.chrono = this.build(F_CHRONO)
     this.sedAcc = this.build(F_SED_ACC)
     this.sedOut = this.build(F_SED_OUT)
+    this.parallax = this.build(F_PARALLAX)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -1625,8 +1653,47 @@ export class SedimentNode implements ConvNode {
   }
 }
 
+// ── Parallax node : real 2.5D from the shared depth map ──────────────────
+// Native (not ISF) so host + depth are bound explicitly and the passthrough is
+// exact — an ISF FX with a second image input fought the rack's inputImage bind
+// (dry-wet + colours broke). Works on layer AND master racks (both are given a
+// node context carrying `depth`). Flat / absent depth = clean passthrough.
+export class ParallaxNode implements ConvNode {
+  private time = 0
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl)
+    const W = ctx.chain.w, H = ctx.chain.h
+    const inp = ctx.inputs
+    this.time += ctx.dt
+    const out = ctx.chain.next()
+    const p = g.use(g.parallax)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, ctx.depth ?? ctx.host); gl.uniform1i(p.u('uDepth'), 1)
+    gl.uniform1i(p.u('uHasDepth'), ctx.depth ? 1 : 0)
+    gl.uniform1f(p.u('uAmount'), clampf(num(inp.amount, 0.4), 0, 1))
+    gl.uniform1f(p.u('uAngle'), num(inp.angle, 0))
+    gl.uniform1f(p.u('uSway'), clampf(num(inp.sway, 0.3), 0, 1))
+    gl.uniform1f(p.u('uDof'), clampf(num(inp.dof, 0), 0, 1))
+    gl.uniform1f(p.u('uFocus'), clampf(num(inp.focus, 0.5), 0, 1))
+    gl.uniform1f(p.u('uFog'), clampf(num(inp.fog, 0), 0, 1))
+    gl.uniform1f(p.u('uWet'), clampf(num(inp.wet, 1), 0, 1))
+    gl.uniform1i(p.u('uInvert'), num(inp.invert, 0) >= 0.5 ? 1 : 0)
+    gl.uniform1f(p.u('uTime'), this.time)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return out.tex
+  }
+
+  dispose(): void { this.disposed = true }
+}
+
 /** Instantiate the native node for a reserved `node-*` shaderId (null if none). */
 export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): ConvNode | null {
+  if (shaderId === 'node-parallax') return new ParallaxNode(gl)
   if (shaderId === 'node-transfert') return new TransfertNode(gl)
   if (shaderId === 'node-convolve') return new ConvolveNode(gl)
   if (shaderId === 'node-reponse') return new ReponseNode(gl)
@@ -1639,6 +1706,6 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

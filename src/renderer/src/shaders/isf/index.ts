@@ -86,7 +86,6 @@ import databend from './fx/Databend.fs?raw'
 import pixelSort from './fx/PixelSort.fs?raw'
 import feedbackZoom from './fx/FeedbackZoom.fs?raw'
 import distort from './fx/Distort.fs?raw'
-import parallax from './fx/Parallax.fs?raw'
 import vibe from './fx/Vibe.fs?raw'
 import context from './fx/Context.fs?raw'
 import finalizer from './fx/Finalizer.fs?raw'
@@ -391,6 +390,27 @@ export const NATIVE_NODES: IsfShader[] = [
       stir: [0, 0.5],
       mix: [0.6, 1.0]
     }
+  },
+  {
+    id: 'node-parallax',
+    name: 'Parallax',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Parallax : real 2.5D from the shared depth map. Near features shift more than far ones as an animated camera SWAY drifts the view, with depth-of-field blur around a FOCUS plane and a FOG that sinks the far distance toward black (aerial recession). It reads the depth the Depth engine fills — set Depth in the header (SYNTH for a test bowl, AI for estimated depth on video/capture). With Depth off (or MIX 0) it is an exact passthrough. Works on any rack; best on the MASTER chain (depth of the whole picture).",
+      "CATEGORIES": ["FX", "Distortion", "Depth"],
+      "INPUTS": [
+        { "NAME": "amount", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "parallax" },
+        { "NAME": "angle",  "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 0.0, "LABEL": "angle" },
+        { "NAME": "sway",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "sway" },
+        { "NAME": "dof",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "depth blur" },
+        { "NAME": "focus",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "focus" },
+        { "NAME": "fog",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "depth fog" },
+        { "NAME": "invert", "TYPE": "bool", "DEFAULT": false, "LABEL": "invert", "COMPACT": true },
+        { "NAME": "wet",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
+      ]
+    }*/`,
+    curated: { amount: [0.1, 0.6], angle: [0, 6.2832], sway: [0, 0.6], dof: [0, 0.5], focus: [0.3, 0.7], fog: [0, 0.5], wet: [0.6, 1] }
   }
 ]
 
@@ -855,10 +875,6 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-distort', name: 'Distort', category: 'FX', source: distort,
     curated: { amount: [0.1, 0.6], scale: [1, 12], angle: [0, 6.2832], rate: [0.1, 2] }
-  },
-  {
-    id: 'fx-parallax', name: 'Parallax', category: 'FX', source: parallax,
-    curated: { amount: [0.1, 0.6], angle: [0, 6.2832], sway: [0, 0.6], dof: [0, 0.5], focus: [0.3, 0.7], fog: [0, 0.5], wet: [0.6, 1] }
   },
   {
     id: 'fx-slit-buffer', name: 'Slit Buffer', category: 'FX', source: slitBuffer,
