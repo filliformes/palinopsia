@@ -214,6 +214,8 @@ export type VisionFeature =
   | 'centroidX'
   | 'centroidY'
   | 'warmth'
+  | 'depth'
+  | 'depthSpread'
 
 // Force-driven motion for the `physics` modulator.
 export type PhysicsMotion = 'bounce' | 'spring' | 'riser'

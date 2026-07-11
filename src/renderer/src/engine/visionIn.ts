@@ -20,6 +20,8 @@ export type VisionFeatureName =
   | 'centroidX' // horizontal centre of the bright mass 0..1
   | 'centroidY' // vertical centre of the bright mass 0..1 (0 = top)
   | 'warmth' // red↔blue balance : 0 cool, 1 warm
+  | 'depth' // mean scene depth (Depth engine) : 0 far, 1 near
+  | 'depthSpread' // near↔far range in frame (depth relief / flatness) 0..1
 
 export const VISION_FEATURES: VisionFeatureName[] = [
   'brightness',
@@ -29,7 +31,9 @@ export const VISION_FEATURES: VisionFeatureName[] = [
   'entropy',
   'centroidX',
   'centroidY',
-  'warmth'
+  'warmth',
+  'depth',
+  'depthSpread'
 ]
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
@@ -43,7 +47,9 @@ class VisionBus {
     entropy: 0,
     centroidX: 0.5,
     centroidY: 0.5,
-    warmth: 0.5
+    warmth: 0.5,
+    depth: 0.5,
+    depthSpread: 0
   }
   private gray: Float32Array | null = null
   private prev: Float32Array | null = null
@@ -116,6 +122,12 @@ class VisionBus {
     // Ping-pong : this frame becomes the previous one.
     this.gray = prev
     this.prev = gray
+  }
+
+  /** Depth stats from the Depth engine (fed separately : depth isn't in the grid). */
+  setDepth(mean: number, spread: number): void {
+    this.f.depth = clamp01(mean)
+    this.f.depthSpread = clamp01(spread)
   }
 
   feature(name: VisionFeatureName): number {

@@ -554,7 +554,17 @@ export default function App(): JSX.Element {
             if (df) depthEngine.update(df.data, df.w, df.h, now)
           }
           const dr = depthEngine.take()
-          if (dr) comp!.setDepth(dr.data, dr.w, dr.h, 0.35)
+          if (dr) {
+            comp!.setDepth(dr.data, dr.w, dr.h, 0.35)
+            // Depth → Vision bus : the image's SPACE as control (mean depth + the
+            // near↔far spread), drivable into modulators + streamed over OSC.
+            let s = 0
+            for (let i = 0; i < dr.data.length; i++) s += dr.data[i]
+            const mean = s / dr.data.length
+            let v = 0
+            for (let i = 0; i < dr.data.length; i++) { const e = dr.data[i] - mean; v += e * e }
+            visionBus.setDepth(mean, Math.min(1, Math.sqrt(v / dr.data.length) * 3))
+          }
         }
         // 4. Native output window: push the exact render state so it renders
         //    the same composition itself (pixel-perfect, no transcode).
