@@ -107,15 +107,18 @@ vec3 fire(vec2 uv, vec2 p, float t) {
   n += (fbm(q * 2.4) - 0.5) * detail * 0.8;
   float col = 1.5 - uv.y * 1.25;               // hot at the base, sparse up top
   float body = clamp(pow(max(n * col, 0.0) * 1.5, 0.75 + contrast), 0.0, 1.0);
+  // Rising sparks are hot bits of the SAME fire : raise the local HEAT before the
+  // ramp colours it, so a spark is an ember-coloured hot spot IN-FAMILY (not a
+  // separate brighter dot a palette/finish would tint differently — which is why
+  // they were reading green). Capped into the orange band so they stay warm.
+  float sp = particles(uv, t, vec2(0.04, 0.55), embers, 0.14);
+  body = max(body, sp * (1.2 - uv.y) * embers * 0.72);
   // A dim wide back-glow layer for depth (kept matte, never additive white).
   float back = fbm(p * 0.6 + rise * 0.5) * (1.3 - uv.y) * depth * 0.4;
   vec3 c = vec3(0.02, 0.012, 0.01) + vec3(0.10, 0.03, 0.012) * back;
   c = mix(c, vec3(0.42, 0.06, 0.02), smoothstep(0.06, 0.34, body));
   c = mix(c, vec3(0.85, 0.36, 0.07), smoothstep(0.34, 0.66, body));
   c = mix(c, vec3(0.97, 0.78, 0.38), smoothstep(0.70, 0.97, body));
-  // Rising sparks : brightest near the base, drifting up + a little sideways.
-  float sp = particles(uv, t, vec2(0.04, 0.55), embers, 0.14);
-  c += sp * vec3(0.95, 0.5, 0.16) * (1.25 - uv.y) * embers;
   vec3 gas = vec3(0.10, 0.30, 0.62) * (0.25 + body * 1.1);
   return mix(c, gas, vary * 0.85);
 }
@@ -128,14 +131,16 @@ vec3 water(vec2 uv, vec2 p, float t) {
   float n1 = fbm(q);
   float n2 = fbm(q * 1.7 + 3.1);
   float caust = pow(clamp(1.0 - abs(n1 - n2) * 2.6, 0.0, 1.0), 8.0 / max(contrast, 0.5));
+  // Drifting sediment / bubbles : fold into the caustic brightness so they glow in
+  // the water's own tint (in-family), never as separate foreign-coloured dots.
+  float mote = particles(uv, t, vec2(0.05, -0.10), embers * 0.8, 0.09);
+  caust = max(caust, mote * embers * 0.7);
   // Deep parallax layer : slower, offset, tinted down for recession.
   vec2 dp = p * (1.0 - depth * 0.4) + dir * t * 0.4 + 5.0;
   float deep = fbm(dp * 0.5);
   vec3 c = mix(vec3(0.010, 0.045, 0.070), vec3(0.05, 0.17, 0.21), deep);
   c *= mix(1.0, 0.65, depth * (1.0 - deep));
   c += caust * vec3(0.22, 0.40, 0.42) * (0.35 + detail * 0.65);
-  float mote = particles(uv, t, vec2(0.05, -0.10), embers * 0.8, 0.09);
-  c += mote * vec3(0.30, 0.42, 0.44) * embers * 0.55;
   vec3 lagoon = mix(vec3(0.02, 0.09, 0.05), vec3(0.10, 0.34, 0.22), deep)
     + caust * vec3(0.30, 0.44, 0.28) * (0.35 + detail * 0.65);
   return mix(c, lagoon, vary);
@@ -149,15 +154,16 @@ vec3 nature(vec2 uv, vec2 p, float t) {
   float canopy = fbm(q + vec2(t * 0.05, t * 0.02));
   float cells = (fbm(q * 3.2) - 0.5) * detail;
   float g = pow(clamp(canopy * 0.85 + cells * 0.8 + 0.08, 0.0, 1.0), contrast);
+  // Drifting pollen / slow-falling leaves : raise the canopy highlight so they read
+  // as bright leaf specks in the foliage's OWN colour (in-family), not foreign dots.
+  float mote = particles(uv, t, vec2(0.03, -0.06), embers * 0.7, 0.10);
+  g = max(g, mote * embers * 0.85);
   vec3 moss = mix(vec3(0.045, 0.085, 0.038), vec3(0.16, 0.32, 0.11), g);
   vec3 c = mix(moss, vec3(0.40, 0.50, 0.19), smoothstep(0.62, 0.95, g) * 0.65);
   c = mix(c, vec3(0.23, 0.155, 0.075), veins * 0.6);
   // Far foliage : darkens the canopy gaps so the mass reads in depth.
   float far = fbm(p * (1.0 + depth * 0.6) * 1.2 + 5.0);
   c = mix(c, c * 0.45, depth * smoothstep(0.5, 0.0, g) * far);
-  // Drifting pollen / slow-falling leaves.
-  float mote = particles(uv, t, vec2(0.03, -0.06), embers * 0.7, 0.10);
-  c += mote * vec3(0.50, 0.45, 0.20) * embers * 0.5;
   float patch = fbm(p * 0.6 + t * 0.02);
   vec3 autumn = mix(vec3(0.16, 0.07, 0.02), vec3(0.62, 0.32, 0.09), g);
   autumn = mix(autumn, vec3(0.23, 0.14, 0.06), veins * 0.6);
