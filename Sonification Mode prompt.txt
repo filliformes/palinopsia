@@ -46,7 +46,30 @@ Homeostat (#3) — do you want the instrument to be able to self-drive toward st
 Want me to save this as a research memory (like the datamosh one) so it's a standing shelf we build from across sessions?
 
 
+What Nuvotion is
+A free, web-based, beginner-first VJ app (app.nuvotion.live) for audio-reactive live visuals. Big numbers up front: 82 effects, 43 transitions, 465 Milkdrop presets, 59 blend modes, every parameter syncable to BPM/bass/mid/treble, plus X/Y pad, motion tracking, strobe, layer keying/masking, A/B crossfader, playlists, MIDI/keyboard mapping, recording. Their charter is open-source, anti-blockchain/scraping, accessibility-over-profit, "craft not move-fast." Their GitHub also has real glitch tooling — ffmosh (an ffglitch fork), JPEGGED (true JPEG databending), a Formation cross-platform UI kit, and Harmony, an in-app AI assistant.
 
+The core differences
+Nuvotion	Palinopsia
+Platform	Web browser (WebGL, butterchurn/Milkdrop)	Electron desktop (ISF, Spout/NDI, 2nd-display, projection warp)
+Audience	Mass, beginner, "you can't mess this up"	A personal, opinionated instrument tied to your research + the Pandore/dataFLOU ecosystem
+Aesthetic	Anything-goes VJ, incl. Milkdrop psychedelia	Disciplined doctrine — matte, near-black, one accent, glitch-as-controlled-texture, anti-kaleidoscope/plasma
+Control	Self-contained (MIDI, keyboard, X/Y, audio)	OSC-first, played by an external brain, and now bidirectional (vision bus → OSC)
+Model	Layers + FX + scenes + huge preset libraries	A deep instrument: modulators + Meta macros, coupling engine, Worlds/diegesis, temperament, generative macro-form sequencer, native nodes, monocular depth
+The short version: Nuvotion is broad and accessible; Palinopsia is deep and opinionated. They chase reach and a low floor; you chase a high ceiling and a specific artistic voice. Notably, their headline 465 Milkdrop presets are exactly the register your guardrails forbid — so their biggest number is the least borrowable thing.
+
+Features genuinely worth borrowing (that fit your doctrine)
+X/Y performance pad(s) — the strongest fit. You have 16 Meta knobs but no 2-D touch surface. One or more X/Y pads, each mapping two Meta knobs/params to a draggable square, is a superb live gesture and pure UX (guardrail-neutral).
+Setlist / Playlist — an ordered, manual scene list you step through on stage (next/prev, optional auto-advance), distinct from your generative macro-form sequencer. You have the scene bank (1–9) and the auto-pilot; a linear setlist is the missing performance middle-ground.
+Per-layer masking — luma / gradient / shape masks (not just blend modes + keyer). This is real compositing depth you don't fully have, and it stays on-brand (a matte can be as restrained as you like).
+One-click "react to bass/mid/treble" — your modulation is more powerful but takes setup. A quick affordance on any slider ("bind to bass," "bind to BPM") would give the instant audio-reactivity their beginners love, without diluting the modulator system.
+Saveable UI workspaces — they emphasize custom resizable layouts. You have resizable panels; saving named layouts (perform / edit / minimal) is a nice touch.
+(Against-doctrine, optional) butterchurn/Milkdrop as a tamed source — you could host Milkdrop as one optional generator and force it through Vibe/Context so it reads matte, but it fights the whole aesthetic. I'd skip it, or only allow it heavily graded.
+(Speculative) An AI copilot like their Harmony — natural-language "make it darker / slower / more mineral," or scene suggestions. Big feature, but interesting given you already have the Generate/theme system.
+What you already do that they don't
+OSC/OSCQuery two-way control, the audiovisual-relations theory layer (coupling, Worlds, temperament, Basanta/Chion lineage), the vision-bus return path, real-time GLSL datamosh + the native-node engine, monocular depth/2.5D, the Cameraless and Corbeil-Perron homages, and desktop-native output. Their datamosh is offline codec (ffmosh/JPEGGED); yours is real-time. You're a much deeper instrument — they're a wider, friendlier canvas.
+
+My pick of the four most worth building, in order: X/Y pad → Setlist → per-layer masking → quick audio-bind. Want me to build any of them? The X/Y pad is the highest value-to-effort and slots straight into your Meta layer.
 
 
 

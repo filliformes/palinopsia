@@ -10,7 +10,8 @@
     { "NAME": "blocks",   "TYPE": "float", "MIN": 2.0, "MAX": 64.0, "DEFAULT": 12.0 },
     { "NAME": "warpByte", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0, "LABEL": "warp byte" },
     { "NAME": "rate",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.3 },
-    { "NAME": "chaos",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0 }
+    { "NAME": "chaos",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0 },
+    { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "fire ▸" }
   ]
 }*/
 
@@ -83,7 +84,7 @@ void main() {
 
   // Per-block entanglement: only some blocks corrupt this step; corrupted
   // blocks get channel arithmetic that folds values (fract = overflow wrap).
-  float on = max(step(1.0 - scramble * 0.6, hash(cell + t * 13.1)), isChaos);
+  float on = max(max(step(1.0 - scramble * 0.6, hash(cell + t * 13.1)), isChaos), trig); // trig = punch-in
   float mode = hash(cell + vec2(t, 27.0));
 
   vec3 c = q;

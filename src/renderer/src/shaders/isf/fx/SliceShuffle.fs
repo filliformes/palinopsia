@@ -8,7 +8,8 @@
     { "NAME": "slices",  "TYPE": "float", "MIN": 4.0, "MAX": 96.0, "DEFAULT": 24.0 },
     { "NAME": "amount",  "TYPE": "float", "MIN": 0.0, "MAX": 0.5,  "DEFAULT": 0.08 },
     { "NAME": "chance",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.25 },
-    { "NAME": "rate",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.35 }
+    { "NAME": "rate",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.35 },
+    { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "fire ▸" }
   ]
 }*/
 
@@ -23,7 +24,7 @@ void main() {
   float t = floor(TIME * (0.5 + rate * 7.5));
   float slice = floor(uv.y * slices);
   float pick = hash(vec2(slice, t));
-  float on = step(1.0 - chance, pick);
+  float on = max(step(1.0 - chance, pick), trig); // trig = punch-in (all slices)
   float offset = on * (hash(vec2(slice, t + 41.7)) - 0.5) * 2.0 * amount;
   vec2 c = vec2(fract(uv.x + offset), uv.y);
   gl_FragColor = IMG_NORM_PIXEL(inputImage, c);

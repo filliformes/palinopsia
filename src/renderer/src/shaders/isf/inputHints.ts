@@ -4,6 +4,25 @@
 // a first-timer meets in Finishing and can't guess from the label alone.
 
 export const INPUT_HINTS: Record<string, Record<string, string>> = {
+  'node-datamosh': {
+    mode: 'MELT (soft per-pixel smear) · STICKY (rigid block tiles that tear at edges — the real datamosh look) · FLUID (a temporally-averaged flow → smooth liquid melt).',
+    swirl: 'Rotate every motion vector → a vortex mosh (0 = none, ± = spin direction).',
+    flowInvert: 'Reverse the motion direction → the smear pushes backward.',
+    pulse: 'Auto-fire the bloom on a clock (Hz) — hands-free rhythmic moshing. 0 = off.',
+    trig: 'Fire a BLOOM burst on the rising edge : momentarily holds the I-frame + boosts persistence so the motion drags the frozen texture (the classic datamosh hit). Press it, send OSC, or bind a modulator (square LFO / audio onset) with M to mosh on the beat.'
+  },
+  'fx-stutter': {
+    trig: 'PUNCH-IN : while fired, every band freezes (full stutter). Press, OSC, or bind a modulator (M) to glitch on the beat. 0 = the base `chance` applies.'
+  },
+  'fx-mosh-blocks': {
+    trig: 'PUNCH-IN : while fired, every block moshes (full). Press, OSC, or bind a modulator (M) for beat-locked bursts. 0 = the base `chance` applies.'
+  },
+  'fx-slice-shuffle': {
+    trig: 'PUNCH-IN : while fired, every slice shuffles (full). Press, OSC, or bind a modulator (M). 0 = the base `chance` applies.'
+  },
+  'fx-byte-corrupt': {
+    trig: 'PUNCH-IN : while fired, every block corrupts (full). Press, OSC, or bind a modulator (M) to fire on the beat. 0 = the base `scramble` applies.'
+  },
   organic: {
     mode: 'Which element : fire (buoyant flames + sparks) · water (flowing caustics + deep) · nature (growing canopy + pollen).',
     rate: 'Overall speed of life : how fast the element moves / grows.',

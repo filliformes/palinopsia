@@ -329,21 +329,27 @@ const F_DATAMOSH = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uHost, uPrev, uFlow, uEnergy;
 uniform vec2 uRes;
-uniform float uBlock, uMotion, uRefresh, uResidual, uReseed, uDecay, uBleed, uThresh, uSeed, uAutoBloom;
-uniform int uMode;
+uniform float uBlock, uMotion, uRefresh, uResidual, uReseed, uDecay, uBleed, uThresh, uSeed, uAutoBloom, uBloom, uSwirl;
+uniform int uMode, uFlowInvert;
 float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 void main(){
-  // AUTO-BLOOM : a detected cut (global-motion spike, held in the 1×1 energy
-  // state) momentarily drives the I-frame refresh toward 0, so a scene change
-  // blooms : the new shot's motion drags the previous shot's texture around.
-  float refresh = uRefresh * (1.0 - uAutoBloom * texture(uEnergy, vec2(0.5)).r);
+  // BLOOM : a detected cut (auto, held in the 1×1 energy state) OR a manual/beat
+  // BLOOM TRIGGER (uBloom, a decaying envelope) momentarily drives the I-frame
+  // refresh toward 0 and boosts persistence, so the picture blooms : the current
+  // motion keeps dragging the held texture around (the classic datamosh burst).
+  float bloom = max(uAutoBloom * texture(uEnergy, vec2(0.5)).r, uBloom);
+  float refresh = uRefresh * (1.0 - bloom);
   vec2 texel = 1.0 / uRes;
   vec2 blk = max(uBlock, 1.0) * texel;                 // macroblock size in UV
   vec2 blockCenter = (floor(vUV / blk) + 0.5) * blk;
   // STICKY = one vector per macroblock (block-constant → the whole block slides as
-  // a rigid tile, tearing at block edges : the real datamosh look). MELT = the
-  // per-pixel (smoothly interpolated) flow → a softer warp/smear.
+  // a rigid tile, tearing at block edges : the real datamosh look). MELT/FLUID = the
+  // per-pixel flow → a softer warp/smear (FLUID feeds a temporally-averaged flow).
   vec2 rawmv = (uMode == 1 ? texture(uFlow, blockCenter).rg : texture(uFlow, vUV).rg) * uMotion;
+  // Motion-vector manipulation (ffglitch-style, on our flow field) : invert the
+  // direction (reverse-smear) and/or rotate every vector (vortex mosh).
+  if (uFlowInvert == 1) rawmv = -rawmv;
+  if (abs(uSwirl) > 0.001) { float cs = cos(uSwirl), sn = sin(uSwirl); rawmv = mat2(cs, -sn, sn, cs) * rawmv; }
   float fmag = length(rawmv);
   // Suppress sub-threshold flow noise so still areas don't creep; above it, the
   // block advects. NOT an output gate : the accumulator always shows through, so
@@ -362,7 +368,8 @@ void main(){
   // Accumulator persists by DECAY. Still areas (mv≈0) sample themselves and
   // converge back to host over ~1/(1-decay) frames : the smear LINGERS where the
   // motion was, then cleans up. Moving areas keep sliding (the P-frame smear).
-  vec3 outc = mix(host, advected, uDecay);
+  float dec = mix(uDecay, 0.985, bloom * 0.6);         // bloom boosts persistence
+  vec3 outc = mix(host, advected, dec);
   outc = mix(outc, host, uResidual * 0.5);             // extra live-texture re-inject (mush control)
   outc = mix(outc, host, refresh);                     // I-frame reset
 
@@ -1154,6 +1161,9 @@ export class DatamoshNode implements ConvNode {
   private lumaB!: RG
   private lumaCurIsA = true
   private flowT!: RG
+  private flowStateA!: RG // temporally-averaged flow (FLUID mode)
+  private flowStateB!: RG
+  private flowStateCur = true
   private accum: [RGBA, RGBA] | null = null
   private energyBuf: [RGBA, RGBA] | null = null // 1×1 decaying cut-bloom state
   private energyCur = 0
@@ -1162,6 +1172,9 @@ export class DatamoshNode implements ConvNode {
   private cur = 0
   private seeded = false
   private frame = 0
+  private bloomEnv = 0 // decaying bloom-trigger envelope
+  private prevTrig = 0
+  private pulseT = 0
   private disposed = false
   constructor(private gl: WebGL2RenderingContext) {}
 
@@ -1172,11 +1185,13 @@ export class DatamoshNode implements ConvNode {
     this.lumaA = makeRG(gl, n)
     this.lumaB = makeRG(gl, n)
     this.flowT = makeRG(gl, n)
+    this.flowStateA = makeRG(gl, n)
+    this.flowStateB = makeRG(gl, n)
     this.res = n
   }
   private freeFlow(): void {
     const gl = this.gl
-    for (const t of [this.lumaA, this.lumaB, this.flowT]) {
+    for (const t of [this.lumaA, this.lumaB, this.flowT, this.flowStateA, this.flowStateB]) {
       if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo) }
     }
     this.res = 0
@@ -1198,6 +1213,16 @@ export class DatamoshNode implements ConvNode {
     this.ensureFlow(n)
     this.ensureAccum(W, H)
     this.frame++
+
+    // Bloom trigger : a rising edge on `trig` (or the `pulse` auto-clock) sets a
+    // decaying bloom envelope that the shader turns into an I-frame hold + a
+    // persistence boost — the classic datamosh burst, fireable on the beat.
+    const trig = num(inp.trig, 0)
+    if (trig >= 0.5 && this.prevTrig < 0.5) this.bloomEnv = 1
+    this.prevTrig = trig
+    const pulse = clampf(num(inp.pulse, 0), 0, 8)
+    if (pulse > 0) { this.pulseT += ctx.dt; if (this.pulseT >= 1 / pulse) { this.pulseT = 0; this.bloomEnv = 1 } }
+    this.bloomEnv *= Math.exp(-ctx.dt / 0.4) // ~0.4s bloom tail
 
     const draw = (fbo: WebGLFramebuffer, w: number, h: number): void => {
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, w, h); gl.drawArrays(gl.TRIANGLES, 0, 3)
@@ -1232,6 +1257,17 @@ export class DatamoshNode implements ConvNode {
     gl.uniform1f(p.u('uClamp'), 0.06) // max per-frame flow (must exceed the motion gate)
     draw(this.flowT.fbo, n, n)
 
+    // 2a) FLUID mode : temporally average the flow (ffglitch's "average motion") →
+    //     a smooth liquid melt. melt/sticky feed the RAW flow (response 1 = no avg).
+    const mode = Math.round(num(inp.mode, 1))
+    const fsRead = this.flowStateCur ? this.flowStateA : this.flowStateB
+    const fsWrite = this.flowStateCur ? this.flowStateB : this.flowStateA
+    p = g.use(g.condition)
+    bind(0, this.flowT.tex); bind(1, fsRead.tex)
+    gl.uniform1i(p.u('uFlow'), 0); gl.uniform1i(p.u('uPrev'), 1)
+    gl.uniform1f(p.u('uResponse'), mode === 2 ? 0.12 : 1.0)
+    draw(fsWrite.fbo, n, n)
+
     // 2b) cut detector → 1×1 decaying bloom state (scene-cut auto-mosh).
     if (!this.energyBuf) { this.energyBuf = [makeRGBA(gl, 1, 1, false), makeRGBA(gl, 1, 1, false)]; this.energyCur = 0 }
     const eRead = this.energyBuf[this.energyCur], eWrite = this.energyBuf[1 - this.energyCur]
@@ -1245,9 +1281,12 @@ export class DatamoshNode implements ConvNode {
     // 3) datamosh advection → accumulator write
     const read = this.accum![this.cur], write = this.accum![1 - this.cur]
     p = g.use(g.datamosh)
-    bind(0, ctx.host); bind(1, read.tex); bind(2, this.flowT.tex); bind(3, eWrite.tex)
+    bind(0, ctx.host); bind(1, read.tex); bind(2, fsWrite.tex); bind(3, eWrite.tex) // conditioned flow
     gl.uniform1i(p.u('uHost'), 0); gl.uniform1i(p.u('uPrev'), 1); gl.uniform1i(p.u('uFlow'), 2); gl.uniform1i(p.u('uEnergy'), 3)
     gl.uniform1f(p.u('uAutoBloom'), clampf(num(inp.autoBloom, 0.7), 0, 1))
+    gl.uniform1f(p.u('uBloom'), Math.min(1, this.bloomEnv))
+    gl.uniform1i(p.u('uFlowInvert'), num(inp.flowInvert, 0) >= 0.5 ? 1 : 0)
+    gl.uniform1f(p.u('uSwirl'), clampf(num(inp.swirl, 0), -1, 1) * 1.5708)
     gl.uniform2f(p.u('uRes'), W, H)
     gl.uniform1f(p.u('uBlock'), clampf(num(inp.block, 16), 2, 64))
     gl.uniform1f(p.u('uMotion'), clampf(num(inp.motion, 1), 0, 4))
@@ -1265,6 +1304,7 @@ export class DatamoshNode implements ConvNode {
     this.lumaCurIsA = !this.lumaCurIsA
     this.cur = 1 - this.cur
     this.energyCur = 1 - this.energyCur
+    this.flowStateCur = !this.flowStateCur
     return write.tex
   }
 

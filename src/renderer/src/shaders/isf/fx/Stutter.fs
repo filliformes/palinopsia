@@ -9,7 +9,8 @@
     { "NAME": "chance",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.4 },
     { "NAME": "bands",    "TYPE": "float", "MIN": 1.0, "MAX": 24.0, "DEFAULT": 1.0 },
     { "NAME": "jitter",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0 },
-    { "NAME": "blackout", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0 }
+    { "NAME": "blackout", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0 },
+    { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "fire ▸" }
   ],
   "PASSES": [
     { "TARGET": "held", "PERSISTENT": true },
@@ -37,7 +38,7 @@ void main() {
   float seg = segFor(band);
 
   if (PASSINDEX == 0) {
-    float freeze = step(1.0 - chance, hash(vec2(seg, band * 31.7 + 7.0)));
+    float freeze = max(step(1.0 - chance, hash(vec2(seg, band * 31.7 + 7.0))), trig); // trig = punch-in
     vec4 live = IMG_NORM_PIXEL(inputImage, uv);
     vec4 prev = IMG_NORM_PIXEL(held, uv);
     gl_FragColor = mix(live, prev, freeze);

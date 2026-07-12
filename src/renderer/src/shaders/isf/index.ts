@@ -249,8 +249,10 @@ export const NATIVE_NODES: IsfShader[] = [
       "DESCRIPTION": "Datamosh : the codec 'moshing' look, real-time and codec-free. The layer's own motion (optical flow, quantised to macroblocks) advects a feedback buffer every frame, so the picture keeps SLIDING along movement : the P-frame smear. Turn REFRESH (the I-frame) down and a new scene's motion drags the PREVIOUS scene's texture around : figures melt into and emerge from the image (the bloom). RESIDUAL re-injects live texture (the mosh↔mush line); RESEED snaps whole blocks back so it never fully mushes. STICKY slides each block as a crisp tile (real datamosh tearing); MELT is a softer smear. With a sidechain layer + 'motion transfer' on, that layer's MOVEMENT moshes THIS layer's texture (two images melting into each other).",
       "CATEGORIES": ["FX", "Glitch", "Feedback"],
       "INPUTS": [
-        { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["melt", "sticky"], "DEFAULT": 1, "LABEL": "mode" },
+        { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["melt", "sticky", "fluid"], "DEFAULT": 1, "LABEL": "mode" },
         { "NAME": "motion", "TYPE": "float", "MIN": 0.0, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "motion" },
+        { "NAME": "swirl", "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "flow swirl" },
+        { "NAME": "flowInvert", "TYPE": "bool", "DEFAULT": false, "LABEL": "flow invert", "COMPACT": true },
         { "NAME": "block", "TYPE": "float", "MIN": 2.0, "MAX": 64.0, "DEFAULT": 16.0, "LABEL": "block size" },
         { "NAME": "decay", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.92, "LABEL": "persistence" },
         { "NAME": "refresh", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.06, "LABEL": "refresh (I-frame)" },
@@ -260,12 +262,15 @@ export const NATIVE_NODES: IsfShader[] = [
         { "NAME": "bleed", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2, "LABEL": "chroma bleed" },
         { "NAME": "autoBloom", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.7, "LABEL": "auto-bloom (cuts)" },
         { "NAME": "cutSense", "TYPE": "float", "MIN": 0.02, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "cut sensitivity" },
+        { "NAME": "pulse", "TYPE": "float", "MIN": 0.0, "MAX": 8.0, "DEFAULT": 0.0, "LABEL": "pulse (Hz)" },
+        { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "bloom ▸" },
         { "NAME": "sidechainFlow", "TYPE": "bool", "DEFAULT": false, "LABEL": "motion transfer", "COMPACT": true },
         { "NAME": "flowRes", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["128", "256", "512"], "DEFAULT": 1, "LABEL": "flow res", "COMPACT": true }
       ]
     }*/`,
     curated: {
       motion: [0.5, 2.0],
+      swirl: [-0.4, 0.4],
       block: [8, 32],
       decay: [0.85, 0.97],
       refresh: [0.0, 0.15],
@@ -274,7 +279,8 @@ export const NATIVE_NODES: IsfShader[] = [
       thresh: [0.005, 0.03],
       bleed: [0, 0.5],
       autoBloom: [0.4, 1.0],
-      cutSense: [0.2, 0.5]
+      cutSense: [0.2, 0.5],
+      pulse: [0, 2]
     }
   },
   {

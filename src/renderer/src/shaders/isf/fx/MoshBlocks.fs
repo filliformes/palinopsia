@@ -9,7 +9,8 @@
     { "NAME": "amount", "TYPE": "float", "MIN": 0.0, "MAX": 0.5,  "DEFAULT": 0.12 },
     { "NAME": "chance", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.25 },
     { "NAME": "rate",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.4 },
-    { "NAME": "freak",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0 }
+    { "NAME": "freak",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0 },
+    { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "fire ▸" }
   ]
 }*/
 
@@ -27,7 +28,7 @@ void main() {
   vec2 cell = floor(uv * grid);
 
   float pick = hash(cell + t * 17.31);
-  float on = step(1.0 - chance, pick);
+  float on = max(step(1.0 - chance, pick), trig); // trig = punch-in (all blocks)
   vec2 disp = on *
     (vec2(hash(cell + vec2(t, 3.7)), hash(cell + vec2(9.1, t))) - 0.5) * 2.0 * amount;
 

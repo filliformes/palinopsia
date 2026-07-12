@@ -110,8 +110,10 @@ function randomizeOneInput(
       const [lo, hi] = curatedRange(shaderId, d.name, declared)
       return range(lo, hi)
     }
-    case 'bool':
-    case 'event': {
+    case 'event':
+      // Momentary triggers : never randomized (a dice must not leave one stuck ON).
+      return typeof current === 'number' ? current : typeof d.def === 'number' ? d.def : 0
+    case 'bool': {
       const cur = typeof current === 'number' ? current : typeof d.def === 'number' ? d.def : 0
       return chance(0.3) ? (cur >= 0.5 ? 0 : 1) : cur
     }
@@ -604,8 +606,10 @@ function jitterOneInput(
       const b = typeof base === 'number' ? base : typeof d.def === 'number' ? d.def : lo
       return jn(b, amount, hi - lo, declaredLo, declaredHi)
     }
-    case 'bool':
-    case 'event': {
+    case 'event':
+      // Momentary triggers are never jittered (never leave one stuck ON).
+      return typeof base === 'number' ? base : typeof d.def === 'number' ? d.def : 0
+    case 'bool': {
       const cur = typeof base === 'number' ? base : typeof d.def === 'number' ? d.def : 0
       return chance(amount * 0.5) ? (cur >= 0.5 ? 0 : 1) : cur
     }
