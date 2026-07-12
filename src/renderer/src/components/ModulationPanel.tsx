@@ -159,7 +159,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
               <input
                 type="range"
                 min={-2}
-                max={1.3}
+                max={1.699}
                 step={0.01}
                 value={Math.log10(Math.max(0.01, m.rateHz))}
                 onChange={(e) => update(index, { rateHz: Math.pow(10, Number(e.target.value)) })}
@@ -169,7 +169,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
               <BoundedNumberInput
                 value={m.rateHz}
                 min={0.01}
-                max={20}
+                max={50}
                 onChange={(v) => update(index, { rateHz: v })}
                 className="input w-12 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
               />
