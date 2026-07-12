@@ -58,19 +58,24 @@ export function FxAddSelect({ scope, className = '' }: { scope: FxScope; classNa
 export function FxChips({
   scope,
   fx,
-  nowrap = false
+  nowrap = false,
+  leading
 }: {
   scope: FxScope
   fx: FxInstance[]
   nowrap?: boolean
+  // Rendered as the FIRST item inside the same wrap flow (the "+ fx" picker), so
+  // it stays put at the front and the chips flow after it and wrap underneath —
+  // rather than the picker being stranded alone on its own line.
+  leading?: JSX.Element
 }): JSX.Element | null {
   const selection = useStore((s) => s.selection)
   const reorderFx = useStore((s) => s.reorderFx)
   const dragId = useRef<string | null>(null)
-  if (fx.length === 0) return null
+  if (fx.length === 0 && !leading) return null
   return (
     <div
-      className={`flex min-w-0 items-center gap-1 ${nowrap ? 'flex-nowrap' : 'flex-wrap'}`}
+      className={`flex min-w-0 items-center gap-1 ${nowrap ? 'flex-nowrap' : 'grow flex-wrap'}`}
       // Tail drop: releasing on the row (not on a chip) moves to the end.
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e: DragEvent) => {
@@ -79,6 +84,7 @@ export function FxChips({
         dragId.current = null
       }}
     >
+      {leading}
       {fx.map((f, i) => (
         <FxUnit
           key={f.id}
@@ -118,8 +124,9 @@ export function FxRackPanel({
           {label}
         </span>
       )}
-      <FxAddSelect scope={scope} />
-      <FxChips scope={scope} fx={fx} nowrap={nowrap} />
+      {/* "+ fx" rides in the SAME wrap flow as the chips (as the first item), so it
+          stays at the front and the chips flow after it and wrap underneath. */}
+      <FxChips scope={scope} fx={fx} nowrap={nowrap} leading={<FxAddSelect scope={scope} />} />
     </div>
   )
 }
