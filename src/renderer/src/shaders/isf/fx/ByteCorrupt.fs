@@ -84,7 +84,7 @@ void main() {
 
   // Per-block entanglement: only some blocks corrupt this step; corrupted
   // blocks get channel arithmetic that folds values (fract = overflow wrap).
-  float on = max(max(step(1.0 - scramble * 0.6, hash(cell + t * 13.1)), isChaos), trig); // trig = punch-in
+  float on = max(max(step(1.0 - scramble * 0.6, hash(cell + t * 13.1)), isChaos), float(trig)); // trig = punch-in
   float mode = hash(cell + vec2(t, 27.0));
 
   vec3 c = q;

@@ -24,7 +24,7 @@ void main() {
   float t = floor(TIME * (0.5 + rate * 7.5));
   float slice = floor(uv.y * slices);
   float pick = hash(vec2(slice, t));
-  float on = max(step(1.0 - chance, pick), trig); // trig = punch-in (all slices)
+  float on = max(step(1.0 - chance, pick), float(trig)); // trig = punch-in (all slices)
   float offset = on * (hash(vec2(slice, t + 41.7)) - 0.5) * 2.0 * amount;
   vec2 c = vec2(fract(uv.x + offset), uv.y);
   gl_FragColor = IMG_NORM_PIXEL(inputImage, c);

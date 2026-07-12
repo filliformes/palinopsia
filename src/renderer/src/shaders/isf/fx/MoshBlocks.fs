@@ -28,7 +28,7 @@ void main() {
   vec2 cell = floor(uv * grid);
 
   float pick = hash(cell + t * 17.31);
-  float on = max(step(1.0 - chance, pick), trig); // trig = punch-in (all blocks)
+  float on = max(step(1.0 - chance, pick), float(trig)); // trig = punch-in (all blocks)
   vec2 disp = on *
     (vec2(hash(cell + vec2(t, 3.7)), hash(cell + vec2(9.1, t))) - 0.5) * 2.0 * amount;
 

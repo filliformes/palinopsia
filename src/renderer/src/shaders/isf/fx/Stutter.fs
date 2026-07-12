@@ -38,7 +38,7 @@ void main() {
   float seg = segFor(band);
 
   if (PASSINDEX == 0) {
-    float freeze = max(step(1.0 - chance, hash(vec2(seg, band * 31.7 + 7.0))), trig); // trig = punch-in
+    float freeze = max(step(1.0 - chance, hash(vec2(seg, band * 31.7 + 7.0))), float(trig)); // trig = punch-in
     vec4 live = IMG_NORM_PIXEL(inputImage, uv);
     vec4 prev = IMG_NORM_PIXEL(held, uv);
     gl_FragColor = mix(live, prev, freeze);
