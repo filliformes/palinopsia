@@ -12,19 +12,25 @@ import { useStore, type FxScope } from '../store'
 
 export function FxAddSelect({ scope, className = '' }: { scope: FxScope; className?: string }): JSX.Element {
   const addFx = useStore((s) => s.addFx)
-  // Native convolution nodes (sidechained, multi-pass) only run in a LAYER's FX
-  // rack : hide them from the source pickers, where they'd sit inert. The MASTER
-  // rack now gets a node context, so the depth-driven Parallax (whole-picture 2.5D,
-  // best on master) is allowed there — but the other sidechain nodes stay layer-only.
-  const MASTER_NATIVE_OK = new Set(['node-parallax'])
+  // Native-node availability by rack. A LAYER takes every node. The 7 SELF-CONTAINED
+  // nodes (no external input needed — they work on whatever signal enters) run in
+  // any rack now that master/source/background all get a node context, so they're
+  // opened up there too. Parallax (whole-picture depth) is master-only among the
+  // non-layer racks. The two SIDECHAIN nodes (Transfert / Convolution) need another
+  // layer as input, so they stay LAYER-ONLY.
+  const SELF_CONTAINED = [
+    'node-datamosh', 'node-feedback', 'node-reponse',
+    'node-chronoscan', 'node-sediment', 'node-scanner', 'node-autocutter'
+  ]
+  const allowedNative = new Set(
+    scope.kind === 'master' ? [...SELF_CONTAINED, 'node-parallax'] : SELF_CONTAINED
+  )
   const groups =
     scope.kind === 'layer'
       ? FX_GROUPS
       : FX_GROUPS.map((g) => ({
           ...g,
-          shaders: g.shaders.filter(
-            (f) => !f.native || (scope.kind === 'master' && MASTER_NATIVE_OK.has(f.id))
-          )
+          shaders: g.shaders.filter((f) => !f.native || allowedNative.has(f.id))
         })).filter((g) => g.shaders.length > 0)
   return (
     <select

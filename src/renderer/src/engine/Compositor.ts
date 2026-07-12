@@ -1637,7 +1637,7 @@ export class Compositor {
         L.tickVideos(li, rawDt, this.globalSpeed * L.speed);
         gl.bindVertexArray(null); // ISF draws own the default VAO
         L.renderSource('A', nodeCtx.sidechainTex);
-        let sig = L.rackA.apply(L.scratchA.tex, this.chain);
+        let sig = L.rackA.apply(L.scratchA.tex, this.chain, nodeCtx); // nodeCtx → native nodes on source A
         if (L.hasB()) {
           // rackA + rackB ping-pong through the SAME ChainBuffers, so rackB can
           // land a write back on the buffer holding A's result (parity-dependent,
@@ -1645,7 +1645,7 @@ export class Compositor {
           this.copyInto(this.abHold.fbo, sig);
           sig = this.abHold.tex;
           L.renderSource('B', nodeCtx.sidechainTex);
-          const sigB = L.rackB.apply(L.scratchB.tex, this.chain);
+          const sigB = L.rackB.apply(L.scratchB.tex, this.chain, nodeCtx); // nodeCtx → native nodes on source B
           sig = this.mixSources(sig, sigB, L.sourceMix, L.sourceBlend, L.harmony);
         }
         gl.bindVertexArray(null);
@@ -1680,7 +1680,7 @@ export class Compositor {
         this.bgIsf!.draw({ width: this.w, height: this.h });
         this.shared.redirect.redirect = null;
         gl.bindVertexArray(null);
-        const bgTex = this.bgRack.apply(this.bgScratch.tex, this.chain);
+        const bgTex = this.bgRack.apply(this.bgScratch.tex, this.chain, nodeCtx); // nodeCtx → native nodes on the background
         this.copyInto(this.bgFill.fbo, bgTex);
         haveBgFill = true;
 
