@@ -621,6 +621,79 @@ void main(){
   o = vec4(clamp(mix(host, res, uMix), 0.0, 1.0), 1.0);
 }`
 
+// ── Eternalism / Phase-Drift (the afterimage family : persistence of vision) ──
+// A frame-history ring, read as two temporal taps. HOLD = Ken Jacobs' Eternalism:
+// two frames a `gap` apart, alternated across a BLACK shutter interval at `rate` →
+// an unfrozen slice of time, a held micro-motion going nowhere. DRIFT = Sherwin/
+// McClure's phase-drift twins: two delayed copies whose delay difference slowly
+// beats in and out of lock (coherent → double-exposed → coherent), the second copy
+// a touch larger with an amber cast. The app's name, made a signal path.
+const F_ETERNAL = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uRing;
+uniform vec2 uAtlasTexel;
+uniform float uCols, uRows, uN, uWrite, uFilled;
+uniform int uMode;
+uniform float uGap, uOffB, uPhase, uInterval, uTint, uMix;
+vec3 tile(float idx, vec2 uv){
+  float col = mod(idx, uCols); float row = floor(idx / uCols);
+  vec2 base = vec2(col, row) / vec2(uCols, uRows); vec2 span = 1.0 / vec2(uCols, uRows);
+  vec2 tuv = clamp(base + clamp(uv, 0.0, 1.0) * span, base + 0.5 * uAtlasTexel, base + span - 0.5 * uAtlasTexel);
+  return texture(uRing, tuv).rgb;
+}
+void main(){
+  vec3 host = texture(uHost, vUV).rgb;
+  if (uFilled < 3.0) { o = vec4(host, 1.0); return; }
+  float recent = mod(uWrite - 1.0 + uN, uN);
+  vec3 col;
+  if (uMode == 0) {
+    // HOLD : two taps gap apart, alternated across a black shutter (uPhase 0..1).
+    vec3 A = tile(mod(recent - uGap + uN * 4.0, uN), vUV);
+    vec3 B = tile(mod(recent - uGap - 1.0 + uN * 4.0, uN), vUV);
+    float g = uInterval * 0.5;
+    float winA = smoothstep(0.0, 0.06, uPhase) * (1.0 - smoothstep(0.5 - g, 0.5, uPhase));
+    float winB = smoothstep(0.5, 0.56, uPhase) * (1.0 - smoothstep(1.0 - g, 1.0, uPhase));
+    col = A * winA + B * winB;
+  } else {
+    // DRIFT : two delayed copies (offsets uGap / uOffB from JS); the second is
+    // slightly larger with an amber cast. When the offsets coincide → locked.
+    vec3 A = tile(mod(recent - uGap + uN * 4.0, uN), vUV);
+    vec2 buv = (vUV - 0.5) * 0.985 + 0.5;
+    vec3 B = tile(mod(recent - uOffB + uN * 4.0, uN), buv);
+    B = mix(B, B * vec3(1.0, 0.82, 0.5), uTint);
+    col = (A + B) * 0.5;
+  }
+  o = vec4(mix(host, col, uMix), 1.0);
+}`
+
+// ── Afterimage (Goethe's complement : a removed bright form leaves a dark/negative
+// ghost). A decaying per-channel brightness high-water of recent frames; where a
+// bright form has DEPARTED a spot, the ghost blooms — as a dark subtraction, and/or
+// its complementary colour (a red form leaves a cyan trace). Two passes : acc, out. ──
+const F_AFTER_ACC = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uPrev; uniform float uDecay;
+void main(){
+  vec3 host = texture(uHost, vUV).rgb;
+  vec3 prev = texture(uPrev, vUV).rgb;
+  o = vec4(max(prev * uDecay, host), 1.0);   // decaying brightness high-water
+}`
+
+const F_AFTER_OUT = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uAcc; uniform float uAmount, uChroma, uMix;
+float luma(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
+void main(){
+  vec3 host = texture(uHost, vUV).rgb;
+  vec3 acc = texture(uAcc, vUV).rgb;
+  float leave = max(0.0, luma(acc) - luma(host));   // brightness that has left this spot
+  vec3 comp = 1.0 - acc;                            // complementary colour of what was here
+  vec3 dark = host - vec3(leave) * uAmount;                     // Goethe dark afterimage
+  vec3 chroma = host + (comp - 0.5) * 2.0 * leave * uAmount;    // complementary-colour ghost
+  vec3 col = mix(dark, chroma, uChroma);
+  o = vec4(clamp(mix(host, col, uMix), 0.0, 1.0), 1.0);
+}`
+
 class NodeGL {
   quad: WebGLBuffer
   downsample: Prog
@@ -643,6 +716,9 @@ class NodeGL {
   sedAcc: Prog
   sedOut: Prog
   parallax: Prog
+  eternal: Prog
+  afterAcc: Prog
+  afterOut: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -668,6 +744,9 @@ class NodeGL {
     this.sedAcc = this.build(F_SED_ACC)
     this.sedOut = this.build(F_SED_OUT)
     this.parallax = this.build(F_PARALLAX)
+    this.eternal = this.build(F_ETERNAL)
+    this.afterAcc = this.build(F_AFTER_ACC)
+    this.afterOut = this.build(F_AFTER_OUT)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -1731,9 +1810,154 @@ export class ParallaxNode implements ConvNode {
   dispose(): void { this.disposed = true }
 }
 
+// ── Eternalism / Phase-Drift node : the persistence-of-vision family ─────
+const ET_COLS = 4, ET_ROWS = 4, ET_N = ET_COLS * ET_ROWS // 16-frame ring (half-res)
+export class EternalismNode implements ConvNode {
+  private ring: RGBA | null = null
+  private tw = 0
+  private th = 0
+  private writeHead = 0
+  private filled = 0
+  private time = 0
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  private ensure(w: number, h: number): void {
+    const tw = Math.max(2, w >> 1), th = Math.max(2, h >> 1)
+    if (this.ring && this.tw === tw && this.th === th) return
+    const gl = this.gl
+    if (this.ring) { gl.deleteTexture(this.ring.tex); gl.deleteFramebuffer(this.ring.fbo) }
+    this.ring = makeRGBA(gl, tw * ET_COLS, th * ET_ROWS, false)
+    this.tw = tw; this.th = th; this.writeHead = 0; this.filled = 0
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl)
+    const W = ctx.chain.w, H = ctx.chain.h
+    this.ensure(W, H)
+    const inp = ctx.inputs
+    const ring = this.ring as RGBA
+    this.time += ctx.dt
+
+    const mode = Math.round(num(inp.mode, 0))
+    const gap = clampf(Math.round(num(inp.gap, 4)), 1, ET_N - 2)
+    let uGap = gap, uOffB = gap, uPhase = 0
+    if (mode === 0) {
+      uPhase = ((this.time * clampf(num(inp.rate, 6), 0.5, 20)) % 1 + 1) % 1
+    } else {
+      const det = clampf(num(inp.detune, 0.1), 0, 1)
+      const beat = 0.5 + 0.5 * Math.sin(this.time * (0.2 + det * 1.5))
+      uOffB = Math.min(ET_N - 2, gap + beat * det * (ET_N - 2))
+    }
+
+    // Present : read the ring's two taps.
+    const out = ctx.chain.next()
+    const p = g.use(g.eternal)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, ring.tex); gl.uniform1i(p.u('uRing'), 1)
+    gl.uniform2f(p.u('uAtlasTexel'), 1 / (this.tw * ET_COLS), 1 / (this.th * ET_ROWS))
+    gl.uniform1f(p.u('uCols'), ET_COLS); gl.uniform1f(p.u('uRows'), ET_ROWS); gl.uniform1f(p.u('uN'), ET_N)
+    gl.uniform1f(p.u('uWrite'), this.writeHead); gl.uniform1f(p.u('uFilled'), this.filled)
+    gl.uniform1i(p.u('uMode'), mode)
+    gl.uniform1f(p.u('uGap'), uGap); gl.uniform1f(p.u('uOffB'), uOffB); gl.uniform1f(p.u('uPhase'), uPhase)
+    gl.uniform1f(p.u('uInterval'), clampf(num(inp.interval, 0.3), 0, 1))
+    gl.uniform1f(p.u('uTint'), clampf(num(inp.tint, 0.3), 0, 1))
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
+    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    // Store the current frame into the ring (half-res tile).
+    const cp = g.use(g.copy)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(cp.u('uTex'), 0)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, ring.fbo)
+    const col = this.writeHead % ET_COLS, row = Math.floor(this.writeHead / ET_COLS)
+    gl.viewport(col * this.tw, row * this.th, this.tw, this.th)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+    this.writeHead = (this.writeHead + 1) % ET_N
+    this.filled = Math.min(ET_N, this.filled + 1)
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return out.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    const gl = this.gl
+    if (this.ring) { gl.deleteTexture(this.ring.tex); gl.deleteFramebuffer(this.ring.fbo); this.ring = null }
+  }
+}
+
+// ── Afterimage node : Goethe's complementary-negative persistence ────────
+export class AfterimageNode implements ConvNode {
+  private acc: [RGBA, RGBA] | null = null
+  private w = 0
+  private h = 0
+  private accCur = 0
+  private seeded = false
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  private ensure(w: number, h: number): void {
+    if (this.acc && this.w === w && this.h === h) return
+    const gl = this.gl
+    if (this.acc) for (const b of this.acc) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
+    this.acc = [makeRGBA(gl, w, h, true), makeRGBA(gl, w, h, true)]
+    this.w = w; this.h = h; this.accCur = 0; this.seeded = false
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl)
+    const W = ctx.chain.w, H = ctx.chain.h
+    this.ensure(W, H)
+    const inp = ctx.inputs
+    const acc = this.acc as [RGBA, RGBA]
+
+    // Seed the high-water with the live frame so it doesn't start black (leave=0).
+    if (!this.seeded) {
+      const cp = g.use(g.copy)
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(cp.u('uTex'), 0)
+      for (const b of acc) { gl.bindFramebuffer(gl.FRAMEBUFFER, b.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3) }
+      this.seeded = true
+    }
+
+    const read = acc[this.accCur], write = acc[1 - this.accCur]
+    // 1) decaying brightness high-water (persistence of the departed light).
+    const decayP = clampf(num(inp.decay, 0.6), 0, 1)
+    const tau = 0.3 + decayP * decayP * 8 // 0.3s → ~8s afterimage
+    let p = g.use(g.afterAcc)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, read.tex); gl.uniform1i(p.u('uPrev'), 1)
+    gl.uniform1f(p.u('uDecay'), Math.exp(-ctx.dt / tau))
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    // 2) present : bloom the complementary ghost where a bright form has left.
+    const out = ctx.chain.next()
+    p = g.use(g.afterOut)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, write.tex); gl.uniform1i(p.u('uAcc'), 1)
+    gl.uniform1f(p.u('uAmount'), clampf(num(inp.amount, 0.5), 0, 1))
+    gl.uniform1f(p.u('uChroma'), clampf(num(inp.chroma, 0.6), 0, 1))
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
+    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    this.accCur = 1 - this.accCur
+    return out.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    const gl = this.gl
+    if (this.acc) { for (const b of this.acc) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.acc = null }
+  }
+}
+
 /** Instantiate the native node for a reserved `node-*` shaderId (null if none). */
 export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): ConvNode | null {
   if (shaderId === 'node-parallax') return new ParallaxNode(gl)
+  if (shaderId === 'node-eternalism') return new EternalismNode(gl)
+  if (shaderId === 'node-afterimage') return new AfterimageNode(gl)
   if (shaderId === 'node-transfert') return new TransfertNode(gl)
   if (shaderId === 'node-convolve') return new ConvolveNode(gl)
   if (shaderId === 'node-reponse') return new ReponseNode(gl)
@@ -1746,6 +1970,6 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

@@ -20,7 +20,8 @@ export function FxAddSelect({ scope, className = '' }: { scope: FxScope; classNa
   // layer as input, so they stay LAYER-ONLY.
   const SELF_CONTAINED = [
     'node-datamosh', 'node-feedback', 'node-reponse',
-    'node-chronoscan', 'node-sediment', 'node-scanner', 'node-autocutter'
+    'node-chronoscan', 'node-sediment', 'node-scanner', 'node-autocutter',
+    'node-eternalism', 'node-afterimage'
   ]
   const allowedNative = new Set(
     scope.kind === 'master' ? [...SELF_CONTAINED, 'node-parallax'] : SELF_CONTAINED

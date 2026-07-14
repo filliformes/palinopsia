@@ -417,6 +417,43 @@ export const NATIVE_NODES: IsfShader[] = [
       ]
     }*/`,
     curated: { amount: [0.1, 0.6], angle: [0, 6.2832], sway: [0, 0.6], dof: [0, 0.5], focus: [0.3, 0.7], fog: [0, 0.5], wet: [0.6, 1] }
+  },
+  {
+    id: 'node-eternalism',
+    name: 'Eternalism',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Eternalism : persistence of vision made a signal path (the app's namesake). Keeps a short ring of recent frames and reads two temporal taps. HOLD (Ken Jacobs' Eternalism) alternates two frames a GAP apart across a BLACK shutter interval at RATE — an unfrozen slice of time, a held micro-motion going nowhere (sub-fusion rates shimmer; higher rates fuse). DRIFT (Sherwin/McClure phase-drift twins) superimposes two delayed copies whose delay slowly BEATS in and out of lock — coherent → double-exposed → coherent — the second copy a touch larger with an amber TINT. Matte, near-black, no bloom. Layer / source / master.",
+      "CATEGORIES": ["FX", "Time", "Feedback"],
+      "INPUTS": [
+        { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["hold", "drift"], "DEFAULT": 0, "LABEL": "mode" },
+        { "NAME": "gap", "TYPE": "float", "MIN": 1.0, "MAX": 14.0, "DEFAULT": 4.0, "LABEL": "gap (frames)" },
+        { "NAME": "rate", "TYPE": "float", "MIN": 0.5, "MAX": 20.0, "DEFAULT": 6.0, "LABEL": "flicker (Hz)" },
+        { "NAME": "interval", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "black interval" },
+        { "NAME": "detune", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.12, "LABEL": "detune" },
+        { "NAME": "tint", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "twin tint" },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
+      ]
+    }*/`,
+    curated: { gap: [2, 10], rate: [3, 12], interval: [0.1, 0.5], detune: [0.05, 0.4], tint: [0.1, 0.5], mix: [0.6, 1] }
+  },
+  {
+    id: 'node-afterimage',
+    name: 'Afterimage',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Afterimage : Goethe's complement — a bright form, once removed, leaves a ghost in its place (the eye emits the negative/complementary colour). Keeps a slowly-decaying brightness high-water of recent frames; where a bright form has DEPARTED a spot, the ghost blooms back over DECAY seconds. CHROMA sweeps the ghost from a dark subtraction (0, the pure Goethe darkening) to its complementary COLOUR (1, a red form leaves a cyan trace). AMOUNT sets its strength. The literal meaning of Palinopsia. Matte, near-black. Layer / source / master.",
+      "CATEGORIES": ["FX", "Time", "Color"],
+      "INPUTS": [
+        { "NAME": "decay", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "persistence" },
+        { "NAME": "amount", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "ghost" },
+        { "NAME": "chroma", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "dark ↔ colour" },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
+      ]
+    }*/`,
+    curated: { decay: [0.3, 0.8], amount: [0.3, 0.8], chroma: [0, 1], mix: [0.6, 1] }
   }
 ]
 

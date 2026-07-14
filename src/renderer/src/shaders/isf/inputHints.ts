@@ -4,6 +4,21 @@
 // a first-timer meets in Finishing and can't guess from the label alone.
 
 export const INPUT_HINTS: Record<string, Record<string, string>> = {
+  'node-eternalism': {
+    mode: 'HOLD = two frames a gap apart alternated across a black shutter (Jacobs’ Eternalism — a held micro-motion). DRIFT = two delayed copies beating in and out of lock (phase-drift twins).',
+    gap: 'How many frames apart the two temporal taps are (the size of the time-slice).',
+    rate: 'HOLD only : the shutter flicker rate. ~3–12 Hz shimmers (sub-fusion); higher fuses.',
+    interval: 'HOLD only : size of the BLACK shutter gap between the two frames (the interval that becomes an image).',
+    detune: 'DRIFT only : how fast/far the two copies’ delay drifts apart → the beat in and out of sync.',
+    tint: 'DRIFT only : amber cast on the second (slightly larger) twin.',
+    mix: 'Dry/wet against the live image.'
+  },
+  'node-afterimage': {
+    decay: 'How long the ghost lingers : low = a fraction of a second, high = many seconds.',
+    amount: 'Strength of the afterimage ghost.',
+    chroma: '0 = a dark subtraction where the bright form was (pure Goethe). 1 = its complementary colour (a red form leaves a cyan ghost).',
+    mix: 'Dry/wet against the live image.'
+  },
   'node-datamosh': {
     mode: 'MELT (soft per-pixel smear) · STICKY (rigid block tiles that tear at edges — the real datamosh look) · FLUID (a temporally-averaged flow → smooth liquid melt).',
     swirl: 'Rotate every motion vector → a vortex mosh (0 = none, ± = spin direction).',
