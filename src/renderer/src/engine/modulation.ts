@@ -219,7 +219,9 @@ interface SlotState {
   audioValue: number // one-pole smoothed audio feature (audio type)
   visionValue: number // one-pole smoothed picture feature (vision type)
   homeoFeat: number // one-pole smoothed feature (homeostat type)
+  homeoBase: number // slow-adapting baseline the controller regulates around
   homeoInt: number // homeostat integrator (accumulated correction, ±0.5)
+  homeoSeeded: boolean // false until the baseline is seeded to the first reading
   physPos: number // physics integrator position 0..1
   physVel: number // physics integrator velocity
   physTarget: number // physics spring target (flips on clock)
@@ -249,7 +251,9 @@ function makeSlot(now: number): SlotState {
     audioValue: 0,
     visionValue: 0,
     homeoFeat: 0.5,
+    homeoBase: 0.5,
     homeoInt: 0,
+    homeoSeeded: false,
     physPos: 0,
     physVel: 0,
     physTarget: 1,
@@ -471,19 +475,35 @@ export class ModEngine {
         }
         case 'homeostat': {
           // Negative-feedback controller (AGC-as-modulator). Watch a picture
-          // feature, integrate the error toward `setpoint` into a corrective
-          // output centred on 0.5, so a `replace`-mode binding nudges the bound
-          // param to HOLD the feature at the setpoint — parking the rig at the
-          // chosen edge-of-chaos level. The binding depth's SIGN sets the plant
-          // polarity; the integrator is clamped (anti-windup) so a mis-signed or
-          // dead loop saturates rather than running away.
+          // feature and regulate it around a SELF-ADAPTING baseline, so a feature
+          // that naturally sits high or low (edges, motion…) still gives full
+          // control range instead of pinning a rail. The signed deviation from
+          // baseline, scaled by `range`, is compared to `setpoint` (0.5 = hold at
+          // baseline; higher/lower biases above/below it). The error is integrated
+          // into a corrective output centred on 0.5, so a `replace`-mode binding
+          // nudges the bound param to hold the feature — parking the rig at the
+          // chosen edge-of-chaos level. `adapt` sets how fast the baseline
+          // re-centres (low = hold a level, high = only fight quick swings). The
+          // binding depth's SIGN sets plant polarity; the integrator is clamped
+          // (anti-windup) so a mis-signed or dead loop saturates, never runs away.
           const hc = cfg.homeostat
           if (hc) {
             const raw = visionBus.feature(hc.feature)
             const sm = Math.max(0, Math.min(0.99, hc.smooth ?? 0.3))
+            if (!s.homeoSeeded) {
+              s.homeoFeat = raw
+              s.homeoBase = raw
+              s.homeoSeeded = true
+            }
             s.homeoFeat += (raw - s.homeoFeat) * (1 - sm)
+            // Slow baseline the loop regulates around (0.02 → ~2 Hz re-centre).
+            const adapt = Math.max(0, Math.min(1, hc.adapt ?? 0.3))
+            const baseRate = Math.min(1, (0.02 + adapt * 2) * dt)
+            s.homeoBase += (s.homeoFeat - s.homeoBase) * baseRate
+            const sens = 1 + Math.max(0, Math.min(1, hc.range ?? 0.5)) * 8 // 1…9×
+            const norm = Math.max(0, Math.min(1, 0.5 + (s.homeoFeat - s.homeoBase) * sens))
             const set = Math.max(0, Math.min(1, hc.setpoint ?? 0.5))
-            const error = set - s.homeoFeat
+            const error = set - norm
             const g = Math.max(0, Math.min(1, hc.gain ?? 0.3))
             const ki = 0.05 + g * 1.2 // integral rate (per unit-error · second)
             s.homeoInt = Math.max(-0.5, Math.min(0.5, s.homeoInt + error * ki * dt))
@@ -640,7 +660,7 @@ export function makeDefaultModulator(): ModulatorConfig {
     organic: { variation: 0.5 },
     physics: { motion: 'bounce', damping: 0.5 },
     motion: { shape: 'oscillation' },
-    homeostat: { feature: 'edges', setpoint: 0.5, gain: 0.3, smooth: 0.3 }
+    homeostat: { feature: 'edges', setpoint: 0.5, gain: 0.3, smooth: 0.3, adapt: 0.3, range: 0.5 }
   }
 }
 

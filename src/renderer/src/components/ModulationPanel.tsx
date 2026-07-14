@@ -406,14 +406,14 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
       )
     }
     case 'homeostat': {
-      const h = m.homeostat ?? { feature: 'edges' as VisionFeature, setpoint: 0.5, gain: 0.3, smooth: 0.3 }
+      const h = m.homeostat ?? { feature: 'edges' as VisionFeature, setpoint: 0.5, gain: 0.3, smooth: 0.3, adapt: 0.3, range: 0.5 }
       return (
         <>
           <Row label="WATCH">
             <select
               className="input select-compact min-w-0 flex-1 text-[10px]"
               value={h.feature}
-              title="Which picture feature the controller holds steady : it watches this and pushes the bound param so the feature settles at SET. edges/motion/contrast ≈ energy. A negative-feedback loop → parks the rig at edge-of-chaos."
+              title="Which picture feature the controller regulates : it watches this and pushes the bound param to hold it steady. edges/motion/contrast ≈ energy. A negative-feedback loop → parks the rig at edge-of-chaos. It regulates around a self-adapting baseline, so features that sit high or low still give full range."
               onChange={(e) => update(index, { homeostat: { ...h, feature: e.target.value as VisionFeature } })}
             >
               {VISION_FEATURES.map((f) => (
@@ -424,10 +424,16 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             </select>
           </Row>
           <SliderRow label="SET" value={h.setpoint} min={0} max={1}
-            title="Setpoint : the feature level the controller holds. Bind in REPLACE mode; the depth's sign sets which way it pushes (flip it if the loop runs to a rail)."
+            title="Setpoint, relative to the baseline : 0.5 = hold the feature where it's been; above/below biases it higher/lower. Bind in REPLACE mode; the depth's sign sets which way it pushes (flip it if the loop runs to a rail)."
             onChange={(v) => update(index, { homeostat: { ...h, setpoint: v } })} />
+          <SliderRow label="RANGE" value={h.range} min={0} max={1}
+            title="Sensitivity : how much a small feature deviation fills the control range. Turn UP when the feature barely moves (e.g. edges stays near the top); down if it over-reacts."
+            onChange={(v) => update(index, { homeostat: { ...h, range: v } })} />
+          <SliderRow label="ADAPT" value={h.adapt} min={0} max={1}
+            title="How fast the baseline re-centres : LOW holds a fixed level (absolute-ish); HIGH only fights quick swings and lets slow drift through. Raise it if the loop keeps pinning a rail."
+            onChange={(v) => update(index, { homeostat: { ...h, adapt: v } })} />
           <SliderRow label="GAIN" value={h.gain} min={0} max={1}
-            title="Correction strength : how hard/fast it drives the param back to the setpoint. Too high hunts/oscillates; too low drifts."
+            title="Correction strength : how hard/fast it drives the param back toward the setpoint. Too high hunts/oscillates; too low drifts."
             onChange={(v) => update(index, { homeostat: { ...h, gain: v } })} />
           <SliderRow label="SMOOTH" value={h.smooth} min={0} max={0.99}
             title="One-pole smoothing of the watched feature before the error : tames per-frame noise (→1 glides)."
