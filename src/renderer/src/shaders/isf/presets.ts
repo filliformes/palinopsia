@@ -77,6 +77,32 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Subtle drag', values: { mode: 1, motion: 0.6, block: 16, decay: 0.88, refresh: 0.15, residual: 0.3, reseed: 0.1, thresh: 0.018, bleed: 0.1, autoBloom: 0.5 } },
     { name: 'Motion transfer', values: { mode: 1, motion: 1.2, block: 20, decay: 0.95, refresh: 0.02, residual: 0.06, reseed: 0.05, thresh: 0.008, bleed: 0.25, autoBloom: 0.9, sidechainFlow: 1 } }
   ],
+  // ── Eternalism (persistence-of-vision : held micro-motion / phase-drift twins) ──
+  'node-eternalism': [
+    { name: 'Held frame', values: { mode: 0, gap: 4, rate: 6, interval: 0.3, detune: 0.12, tint: 0.3, mix: 1.0 } },
+    { name: 'Shimmer', values: { mode: 0, gap: 3, rate: 2.5, interval: 0.15, detune: 0.08, tint: 0.2, mix: 1.0 } },
+    { name: 'Fused strobe', values: { mode: 0, gap: 5, rate: 18, interval: 0.4, detune: 0.1, tint: 0.25, mix: 1.0 } },
+    { name: 'Wide micro-motion', values: { mode: 0, gap: 12, rate: 7, interval: 0.35, detune: 0.15, tint: 0.3, mix: 1.0 } },
+    { name: 'Tight tremor', values: { mode: 0, gap: 2, rate: 12, interval: 0.25, detune: 0.06, tint: 0.15, mix: 1.0 } },
+    { name: 'Black shutter', values: { mode: 0, gap: 4, rate: 5, interval: 0.7, detune: 0.1, tint: 0.3, mix: 0.9 } },
+    { name: 'Phase-drift twins', values: { mode: 1, gap: 6, rate: 6, interval: 0.3, detune: 0.35, tint: 0.4, mix: 0.85 } },
+    { name: 'Double exposure', values: { mode: 1, gap: 8, rate: 6, interval: 0.3, detune: 0.6, tint: 0.5, mix: 0.9 } },
+    { name: 'Locking beat', values: { mode: 1, gap: 5, rate: 6, interval: 0.3, detune: 0.25, tint: 0.3, mix: 0.8 } },
+    { name: 'Amber twin', values: { mode: 1, gap: 7, rate: 6, interval: 0.3, detune: 0.45, tint: 0.8, mix: 0.85 } }
+  ],
+  // ── Afterimage (Goethe complement : departed forms leave a ghost) ──
+  'node-afterimage': [
+    { name: 'Goethe dark', values: { decay: 0.6, amount: 0.5, chroma: 0.0, mix: 1.0 } },
+    { name: 'Complement bloom', values: { decay: 0.6, amount: 0.6, chroma: 1.0, mix: 1.0 } },
+    { name: 'Cyan trace', values: { decay: 0.7, amount: 0.75, chroma: 1.0, mix: 1.0 } },
+    { name: 'Faint ghost', values: { decay: 0.55, amount: 0.3, chroma: 0.5, mix: 0.8 } },
+    { name: 'Long persistence', values: { decay: 0.85, amount: 0.55, chroma: 0.4, mix: 1.0 } },
+    { name: 'Quick fade', values: { decay: 0.35, amount: 0.5, chroma: 0.6, mix: 0.9 } },
+    { name: 'Half tint', values: { decay: 0.6, amount: 0.6, chroma: 0.5, mix: 1.0 } },
+    { name: 'Burned form', values: { decay: 0.8, amount: 0.8, chroma: 0.7, mix: 1.0 } },
+    { name: 'Subtle dark', values: { decay: 0.5, amount: 0.35, chroma: 0.0, mix: 0.75 } },
+    { name: 'Full palinopsia', values: { decay: 0.7, amount: 0.6, chroma: 0.6, mix: 1.0 } }
+  ],
   // ── Motif (spatial counterpoint / transpose echoes) ──
   'fx-motif': [
     { name: 'Single echo', values: { copies: 1, offX: 0.16, offY: 0.1, rotate: 0.3, scale: 0.88, fade: 0.62, invert: 0, mode: 0 } },

@@ -180,6 +180,46 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-decay', 'fx-tracking', 'fx-grain'],
     blends: ['screen', 'lighten'], coalesce: 0.45, drift: 0.3
   }),
+  mk({
+    id: 'p-frame', name: 'P-Frame', family: 'Glitch / Datamosh',
+    blurb: 'The real codec mosh : motion smears forward, I-frames bloom and reset.',
+    world: 'parametric',
+    palette: [K, [0.18, 0.06, 0.26, 1], [0.85, 0.35, 0.5, 1], [0.9, 0.9, 0.85, 1]],
+    sources: ['drift-field', 'slabs', 'grid-drift'],
+    layerFx: ['fx-pixelate'],
+    nativeNodes: ['node-datamosh'], nativeChance: 0.9,
+    blends: ['screen', 'difference'], gestureTexture: 0.6, coalesce: 0.3, density: 0.6
+  }),
+  mk({
+    id: 'slit-scan', name: 'Slit-Scan', family: 'Glitch / Datamosh',
+    blurb: 'A moving read-head smears time along one axis : the scanner’s streak.',
+    world: 'synthetic',
+    palette: [K, [0.1, 0.14, 0.2, 1], [0.68, 0.78, 0.82, 1]],
+    sources: ['column-scan', 'contour', 'drift-field'],
+    layerFx: ['fx-scanlines'],
+    nativeNodes: ['node-scanner'], nativeChance: 0.9,
+    blends: ['screen', 'lighten'], drift: 0.35, coalesce: 0.3
+  }),
+  mk({
+    id: 'cut-up', name: 'Cut-Up', family: 'Glitch / Datamosh',
+    blurb: 'The frame diced into cells that jump and re-shuffle on the beat : a live collage.',
+    world: 'incongruent',
+    palette: [INK, [0.14, 0.16, 0.2, 1], [0.9, 0.9, 0.88, 1]],
+    sources: ['slabs', 'shapes', 'op-art'],
+    layerFx: ['fx-slice-shuffle', 'fx-threshold'],
+    nativeNodes: ['node-autocutter'], nativeChance: 0.9,
+    blends: ['difference', 'exclusion'], shutter: 0.35, gestureTexture: 0.6, coalesce: 0.25
+  }),
+  mk({
+    id: 'chronoscan', name: 'Chronoscan', family: 'Glitch / Datamosh',
+    blurb: 'Every pixel reads from its own moment : the picture drips through a time-map.',
+    world: 'synthetic',
+    palette: [K, [0.12, 0.1, 0.2, 1], [0.7, 0.72, 0.85, 1]],
+    sources: ['interference', 'contour', 'organic'],
+    layerFx: ['fx-wide-time'],
+    nativeNodes: ['node-chronoscan'], nativeChance: 0.9,
+    blends: ['screen', 'add'], drift: 0.4, coalesce: 0.3
+  }),
 
   // ── Cameraless / Direct Film ──────────────────────────────────────────
   mk({
@@ -419,6 +459,46 @@ export const THEMES: Theme[] = [
     sources: ['recurse', 'shapes', 'op-art'],
     layerFx: ['fx-feedback-zoom', 'fx-hue-rotate', 'fx-sharpen'],
     blends: ['screen', 'add'], feedback: 0.4, drift: 0.35
+  }),
+  mk({
+    id: 'eternalism', name: 'Eternalism', family: 'Feedback / Afterimage',
+    blurb: 'An unfrozen slice of time : two frames a gap apart, held across a black shutter.',
+    world: 'sublimated',
+    palette: [K, [0.1, 0.12, 0.16, 1], [0.8, 0.82, 0.85, 1]],
+    sources: ['organic', 'shapes', 'op-art'],
+    layerFx: ['fx-wide-time'],
+    nativeNodes: ['node-eternalism'], nativeChance: 0.85,
+    blends: ['screen', 'lighten'], superFlicker: 0.4, drift: 0.2, density: 0.4
+  }),
+  mk({
+    id: 'phase-drift', name: 'Phase Drift', family: 'Feedback / Afterimage',
+    blurb: 'Two delayed twins beating in and out of lock : coherent, doubled, coherent.',
+    world: 'musical',
+    palette: [K, [0.22, 0.14, 0.06, 1], [0.9, 0.78, 0.55, 1]],
+    sources: ['particle-drift', 'organic', 'murmuration'],
+    layerFx: ['fx-wide-time', 'fx-light-trails'],
+    nativeNodes: ['node-eternalism'], nativeChance: 0.85,
+    blends: ['screen', 'add'], drift: 0.4, density: 0.4
+  }),
+  mk({
+    id: 'complement', name: 'Complement', family: 'Feedback / Afterimage',
+    blurb: 'A bright form, once removed, leaves its complementary ghost : Goethe’s afterimage.',
+    world: 'sublimated',
+    palette: [K, [0.24, 0.05, 0.14, 1], [0.4, 0.85, 0.82, 1]],
+    sources: ['shapes', 'op-art', 'dye-field'],
+    layerFx: ['fx-phosphene', 'fx-decay'],
+    nativeNodes: ['node-afterimage'], nativeChance: 0.85,
+    blends: ['screen', 'lighten'], drift: 0.25, density: 0.35
+  }),
+  mk({
+    id: 'sediment', name: 'Sediment', family: 'Feedback / Afterimage',
+    blurb: 'Long mineral memory : the image settles in layers that never quite wash out.',
+    world: 'mineral',
+    palette: [K, [0.16, 0.14, 0.1, 1], [0.72, 0.66, 0.52, 1]],
+    sources: ['contour', 'drift-field', 'organic'],
+    layerFx: ['fx-decay', 'fx-grain'],
+    nativeNodes: ['node-sediment'], nativeChance: 0.85,
+    blends: ['screen', 'darken'], feedback: 0.4, drift: 0.2, gestureTexture: 0.55
   }),
 
   // ── Cinematic / Atmospheric ───────────────────────────────────────────

@@ -22,3 +22,6 @@ dist-tsc/
 
 # Imported video / media used while testing — not part of the repo.
 /media/
+
+# Output recordings + screenshots — local artifacts, not part of the repo.
+/Recorded/
