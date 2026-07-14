@@ -307,16 +307,9 @@ export interface ModulatorConfig {
   // corrective output that (bound in `replace` mode) nudges the param to hold the
   // feature at `setpoint` — AGC-as-modulator, parks the rig at edge-of-chaos.
   // Regulates around a self-adapting baseline (so features that sit high/low still
-  // give full control range); `adapt` = baseline re-centre rate, `range` = how much
-  // feature deviation fills the control span.
-  homeostat: {
-    feature: VisionFeature
-    setpoint: number
-    gain: number
-    smooth: number
-    adapt: number
-    range: number
-  }
+  // give full control range); `gain` = grip (sensitivity + drive), `adapt` =
+  // baseline re-centre rate.
+  homeostat: { feature: VisionFeature; setpoint: number; gain: number; adapt: number }
 }
 
 // What an assignment modulates: float ISF inputs, or a Meta knob (the

@@ -489,22 +489,22 @@ export class ModEngine {
           const hc = cfg.homeostat
           if (hc) {
             const raw = visionBus.feature(hc.feature)
-            const sm = Math.max(0, Math.min(0.99, hc.smooth ?? 0.3))
             if (!s.homeoSeeded) {
               s.homeoFeat = raw
               s.homeoBase = raw
               s.homeoSeeded = true
             }
-            s.homeoFeat += (raw - s.homeoFeat) * (1 - sm)
+            s.homeoFeat += (raw - s.homeoFeat) * 0.3 // fixed light de-noise
             // Slow baseline the loop regulates around (0.02 → ~2 Hz re-centre).
             const adapt = Math.max(0, Math.min(1, hc.adapt ?? 0.3))
             const baseRate = Math.min(1, (0.02 + adapt * 2) * dt)
             s.homeoBase += (s.homeoFeat - s.homeoBase) * baseRate
-            const sens = 1 + Math.max(0, Math.min(1, hc.range ?? 0.5)) * 8 // 1…9×
+            // GAIN = grip : one knob for both deviation sensitivity and drive.
+            const g = Math.max(0, Math.min(1, hc.gain ?? 0.4))
+            const sens = 1 + g * 8 // 1…9× — fills the control span from small swings
             const norm = Math.max(0, Math.min(1, 0.5 + (s.homeoFeat - s.homeoBase) * sens))
             const set = Math.max(0, Math.min(1, hc.setpoint ?? 0.5))
             const error = set - norm
-            const g = Math.max(0, Math.min(1, hc.gain ?? 0.3))
             const ki = 0.05 + g * 1.2 // integral rate (per unit-error · second)
             s.homeoInt = Math.max(-0.5, Math.min(0.5, s.homeoInt + error * ki * dt))
             v01 = 0.5 + s.homeoInt + error * (g * 0.3) // + a light proportional snap
@@ -660,7 +660,7 @@ export function makeDefaultModulator(): ModulatorConfig {
     organic: { variation: 0.5 },
     physics: { motion: 'bounce', damping: 0.5 },
     motion: { shape: 'oscillation' },
-    homeostat: { feature: 'edges', setpoint: 0.5, gain: 0.3, smooth: 0.3, adapt: 0.3, range: 0.5 }
+    homeostat: { feature: 'edges', setpoint: 0.5, gain: 0.4, adapt: 0.3 }
   }
 }
 
