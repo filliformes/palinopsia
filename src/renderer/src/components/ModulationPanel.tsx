@@ -14,7 +14,7 @@ import { SHADER_BY_ID } from '../shaders/isf'
 import { modTargetKey, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 
-const MOD_TYPES: ModulatorType[] = ['lfo', 'ramp', 'adsr', 'arp', 'random', 'sh', 'slew', 'chaos', 'audio', 'vision', 'organic', 'physics', 'motion']
+const MOD_TYPES: ModulatorType[] = ['lfo', 'ramp', 'adsr', 'arp', 'random', 'sh', 'slew', 'chaos', 'audio', 'vision', 'homeostat', 'organic', 'physics', 'motion']
 const LFO_SHAPES: LfoShape[] = ['sine', 'triangle', 'square', 'sawtooth', 'rndStep', 'rndSmooth', 'spastic']
 const ARP_MODES: ArpMode[] = ['up', 'down', 'upDown', 'random', 'drunk']
 const PHYSICS_MOTIONS: PhysicsMotion[] = ['bounce', 'spring', 'riser']
@@ -108,7 +108,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
           className="input select-compact min-w-0 flex-1 text-[10px]"
           value={m.type}
           onChange={(e) => update(index, { type: e.target.value as ModulatorType })}
-          title="The modulator's shape : what kind of moving signal this slot produces (LFO waves, ramp, ADSR envelope, arpeggio, random, sample&hold, slew, chaos, audio-follower, organic, physics, motion). Bind it to parameters with their M button."
+          title="The modulator's shape : what kind of moving signal this slot produces (LFO waves, ramp, ADSR envelope, arpeggio, random, sample&hold, slew, chaos, audio-follower, vision-follower, homeostat controller, organic, physics, motion). Bind it to parameters with their M button."
         >
           {MOD_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -130,7 +130,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
 
       {/* clock : everything except ramp/adsr/audio is clock-driven
           (audio is driven by the signal itself) */}
-      {m.type !== 'ramp' && m.type !== 'adsr' && m.type !== 'audio' && m.type !== 'vision' && (
+      {m.type !== 'ramp' && m.type !== 'adsr' && m.type !== 'audio' && m.type !== 'vision' && m.type !== 'homeostat' && (
         <div className="flex min-w-0 items-center gap-1">
           <button
             onClick={() => update(index, { sync: m.sync === 'bpm' ? 'free' : 'bpm' })}
@@ -402,6 +402,36 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
           <SliderRow label="SMOOTH" value={vc.smooth} min={0} max={0.99}
             title="One-pole smoothing of the picture feature : 0 snaps, →1 glides"
             onChange={(v) => update(index, { vision: { ...vc, smooth: v } })} />
+        </>
+      )
+    }
+    case 'homeostat': {
+      const h = m.homeostat ?? { feature: 'edges' as VisionFeature, setpoint: 0.5, gain: 0.3, smooth: 0.3 }
+      return (
+        <>
+          <Row label="WATCH">
+            <select
+              className="input select-compact min-w-0 flex-1 text-[10px]"
+              value={h.feature}
+              title="Which picture feature the controller holds steady : it watches this and pushes the bound param so the feature settles at SET. edges/motion/contrast ≈ energy. A negative-feedback loop → parks the rig at edge-of-chaos."
+              onChange={(e) => update(index, { homeostat: { ...h, feature: e.target.value as VisionFeature } })}
+            >
+              {VISION_FEATURES.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          </Row>
+          <SliderRow label="SET" value={h.setpoint} min={0} max={1}
+            title="Setpoint : the feature level the controller holds. Bind in REPLACE mode; the depth's sign sets which way it pushes (flip it if the loop runs to a rail)."
+            onChange={(v) => update(index, { homeostat: { ...h, setpoint: v } })} />
+          <SliderRow label="GAIN" value={h.gain} min={0} max={1}
+            title="Correction strength : how hard/fast it drives the param back to the setpoint. Too high hunts/oscillates; too low drifts."
+            onChange={(v) => update(index, { homeostat: { ...h, gain: v } })} />
+          <SliderRow label="SMOOTH" value={h.smooth} min={0} max={0.99}
+            title="One-pole smoothing of the watched feature before the error : tames per-frame noise (→1 glides)."
+            onChange={(v) => update(index, { homeostat: { ...h, smooth: v } })} />
         </>
       )
     }

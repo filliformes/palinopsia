@@ -218,6 +218,8 @@ interface SlotState {
   arpLastAdvanceAt: number
   audioValue: number // one-pole smoothed audio feature (audio type)
   visionValue: number // one-pole smoothed picture feature (vision type)
+  homeoFeat: number // one-pole smoothed feature (homeostat type)
+  homeoInt: number // homeostat integrator (accumulated correction, ±0.5)
   physPos: number // physics integrator position 0..1
   physVel: number // physics integrator velocity
   physTarget: number // physics spring target (flips on clock)
@@ -246,6 +248,8 @@ function makeSlot(now: number): SlotState {
     arpLastAdvanceAt: now,
     audioValue: 0,
     visionValue: 0,
+    homeoFeat: 0.5,
+    homeoInt: 0,
     physPos: 0,
     physVel: 0,
     physTarget: 1,
@@ -465,6 +469,28 @@ export class ModEngine {
           }
           break
         }
+        case 'homeostat': {
+          // Negative-feedback controller (AGC-as-modulator). Watch a picture
+          // feature, integrate the error toward `setpoint` into a corrective
+          // output centred on 0.5, so a `replace`-mode binding nudges the bound
+          // param to HOLD the feature at the setpoint — parking the rig at the
+          // chosen edge-of-chaos level. The binding depth's SIGN sets the plant
+          // polarity; the integrator is clamped (anti-windup) so a mis-signed or
+          // dead loop saturates rather than running away.
+          const hc = cfg.homeostat
+          if (hc) {
+            const raw = visionBus.feature(hc.feature)
+            const sm = Math.max(0, Math.min(0.99, hc.smooth ?? 0.3))
+            s.homeoFeat += (raw - s.homeoFeat) * (1 - sm)
+            const set = Math.max(0, Math.min(1, hc.setpoint ?? 0.5))
+            const error = set - s.homeoFeat
+            const g = Math.max(0, Math.min(1, hc.gain ?? 0.3))
+            const ki = 0.05 + g * 1.2 // integral rate (per unit-error · second)
+            s.homeoInt = Math.max(-0.5, Math.min(0.5, s.homeoInt + error * ki * dt))
+            v01 = 0.5 + s.homeoInt + error * (g * 0.3) // + a light proportional snap
+          }
+          break
+        }
         case 'organic': {
           // Irregular periodicity + perpetual variation: a
           // base undulation plus INCOMMENSURATE partials whose phases slowly
@@ -613,7 +639,8 @@ export function makeDefaultModulator(): ModulatorConfig {
     vision: { feature: 'brightness', smooth: 0.3 },
     organic: { variation: 0.5 },
     physics: { motion: 'bounce', damping: 0.5 },
-    motion: { shape: 'oscillation' }
+    motion: { shape: 'oscillation' },
+    homeostat: { feature: 'edges', setpoint: 0.5, gain: 0.3, smooth: 0.3 }
   }
 }
 

@@ -199,6 +199,7 @@ export type ModulatorType =
   | 'physics'
   | 'motion'
   | 'vision'
+  | 'homeostat'
 
 // Which audio feature an `audio` modulator follows (bus in engine/audioIn.ts).
 export type AudioFeature = 'level' | 'flux' | 'transient' | 'centroid' | 'band' | 'pitch'
@@ -302,6 +303,10 @@ export interface ModulatorConfig {
   physics: { motion: PhysicsMotion; damping: number } // force-driven motion
   motion: { shape: MotionShape } // named motion archetype / force behaviour
   vision: { feature: VisionFeature; smooth: number } // follows the picture (return path)
+  // Negative-feedback controller : watches a picture feature and integrates a
+  // corrective output that (bound in `replace` mode) nudges the param to hold the
+  // feature at `setpoint` — AGC-as-modulator, parks the rig at edge-of-chaos.
+  homeostat: { feature: VisionFeature; setpoint: number; gain: number; smooth: number }
 }
 
 // What an assignment modulates: float ISF inputs, or a Meta knob (the
