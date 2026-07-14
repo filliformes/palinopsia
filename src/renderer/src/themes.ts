@@ -500,6 +500,16 @@ export const THEMES: Theme[] = [
     nativeNodes: ['node-sediment'], nativeChance: 0.85,
     blends: ['screen', 'darken'], feedback: 0.4, drift: 0.2, gestureTexture: 0.55
   }),
+  mk({
+    id: 'pulfrich', name: 'Pulfrich', family: 'Feedback / Afterimage',
+    blurb: 'Lateral motion tips into depth : a red/cyan stereo pair born from a temporal eye-delay.',
+    world: 'sublimated',
+    palette: [K, [0.24, 0.06, 0.1, 1], [0.3, 0.72, 0.78, 1]],
+    sources: ['murmuration', 'particle-drift', 'drift-field'],
+    layerFx: ['fx-wide-time'],
+    nativeNodes: ['node-pulfrich'], nativeChance: 0.85,
+    blends: ['screen', 'add'], drift: 0.45, density: 0.4
+  }),
 
   // ── Cinematic / Atmospheric ───────────────────────────────────────────
   mk({

@@ -694,6 +694,60 @@ void main(){
   o = vec4(clamp(mix(host, col, uMix), 0.0, 1.0), 1.0);
 }`
 
+// ── Pulfrich : real monocular 3D from a temporal eye-delay ────────────────
+// The Pulfrich effect : one eye seeing a slightly DELAYED image (a dark filter
+// slows its neural response) turns lateral motion into stereo depth. Here the
+// delay is read per-pixel from a frame-history ring, keyed by the shared DEPTH
+// map (or luminance) so far/dark planes lag more — a matte companion to the
+// anaglyph stage. Crucially the disparity is TEMPORAL, not spatial : on a still
+// frame both eyes read the same stored frame, so the picture is byte-exact and
+// shows NO colour fringing — depth only blooms on lateral motion. Reuses the
+// Chronoscan/Eternalism ring-atlas. Layer / source / master.
+const F_PULFRICH = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uRing, uDepth;
+uniform vec2 uAtlasTexel;
+uniform float uCols, uRows, uN, uWrite, uFilled;
+uniform int uMode, uSrc, uSwap, uHasDepth;
+uniform float uDelay, uCurve, uSep, uDesat, uMix;
+float luma(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
+vec3 tile(float idx, vec2 uv){
+  float col = mod(idx, uCols); float row = floor(idx / uCols);
+  vec2 base = vec2(col, row) / vec2(uCols, uRows); vec2 span = 1.0 / vec2(uCols, uRows);
+  vec2 tuv = clamp(base + clamp(uv, 0.0, 1.0) * span, base + 0.5 * uAtlasTexel, base + span - 0.5 * uAtlasTexel);
+  return texture(uRing, tuv).rgb;
+}
+void main(){
+  vec3 host = texture(uHost, vUV).rgb;
+  if (uFilled < 2.0) { o = vec4(host, 1.0); return; }
+  float key = (uSrc == 1 && uHasDepth == 1) ? texture(uDepth, vUV).r : luma(host);
+  key = pow(clamp(key, 0.0, 1.0), uCurve);
+  if (uSwap == 1) key = 1.0 - key;
+  float back = key * uDelay * max(uFilled - 2.0, 0.0);   // frames of eye-delay
+  float recent = mod(uWrite - 1.0 + uN, uN);
+  float idxF = mod(recent - back + uN * 4.0, uN);
+  float lo = floor(idxF);
+  vec3 delayed = mix(tile(mod(lo, uN), vUV), tile(mod(lo + 1.0, uN), vUV), fract(idxF));
+  // Assign eyes : swap chooses which eye carries the lag (i.e. its motion direction).
+  vec3 L = (uSwap == 1) ? delayed : host;
+  vec3 R = (uSwap == 1) ? host : delayed;
+  vec3 res;
+  if (uMode == 0) {
+    // Anaglyph red/cyan. Identical eyes (a still) → exactly host : no fringe.
+    vec3 diff = R - L;
+    vec3 Ra = L + diff * (1.0 + uSep * 2.0);   // uSep amplifies the disparity
+    vec3 Ld = mix(L,  vec3(luma(L)),  uDesat);  // desat curbs retinal rivalry
+    vec3 Rd = mix(Ra, vec3(luma(Ra)), uDesat);
+    res = vec3(Ld.r, Rd.g, Rd.b);
+  } else {
+    // Glasses-free : a horizontal parallax slide gated by motion, so stills stay clean.
+    float mo = clamp(length(host - delayed) * 6.0, 0.0, 1.0);
+    vec2 suv = vUV + vec2((key - 0.5) * uSep * 0.12 * mo, 0.0);
+    res = texture(uHost, suv).rgb;
+  }
+  o = vec4(clamp(mix(host, res, uMix), 0.0, 1.0), 1.0);
+}`
+
 class NodeGL {
   quad: WebGLBuffer
   downsample: Prog
@@ -719,6 +773,7 @@ class NodeGL {
   eternal: Prog
   afterAcc: Prog
   afterOut: Prog
+  pulfrich: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -747,6 +802,7 @@ class NodeGL {
     this.eternal = this.build(F_ETERNAL)
     this.afterAcc = this.build(F_AFTER_ACC)
     this.afterOut = this.build(F_AFTER_OUT)
+    this.pulfrich = this.build(F_PULFRICH)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -1953,9 +2009,84 @@ export class AfterimageNode implements ConvNode {
   }
 }
 
+// ── Pulfrich node : monocular 3D from a temporal eye-delay ───────────────
+// A frame-history ring read as a per-pixel delay, keyed by the shared depth map
+// (or luminance), presented as an anaglyph pair or a motion-gated parallax slide.
+// The disparity is temporal, so a still frame is byte-exact (no colour fringing)
+// and depth blooms only on lateral motion. Works on any rack (both layer and
+// master carry the depth context); flat/absent depth falls back to luminance.
+const PU_COLS = 4, PU_ROWS = 4, PU_N = PU_COLS * PU_ROWS // 16-frame ring (half-res)
+export class PulfrichNode implements ConvNode {
+  private ring: RGBA | null = null
+  private tw = 0
+  private th = 0
+  private writeHead = 0
+  private filled = 0
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  private ensure(w: number, h: number): void {
+    const tw = Math.max(2, w >> 1), th = Math.max(2, h >> 1)
+    if (this.ring && this.tw === tw && this.th === th) return
+    const gl = this.gl
+    if (this.ring) { gl.deleteTexture(this.ring.tex); gl.deleteFramebuffer(this.ring.fbo) }
+    this.ring = makeRGBA(gl, tw * PU_COLS, th * PU_ROWS, false)
+    this.tw = tw; this.th = th; this.writeHead = 0; this.filled = 0
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl)
+    const W = ctx.chain.w, H = ctx.chain.h
+    this.ensure(W, H)
+    const inp = ctx.inputs
+    const ring = this.ring as RGBA
+
+    // Present : read the delayed eye from the ring and combine with the live eye.
+    const out = ctx.chain.next()
+    const p = g.use(g.pulfrich)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, ring.tex); gl.uniform1i(p.u('uRing'), 1)
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, ctx.depth ?? ctx.host); gl.uniform1i(p.u('uDepth'), 2)
+    gl.uniform2f(p.u('uAtlasTexel'), 1 / (this.tw * PU_COLS), 1 / (this.th * PU_ROWS))
+    gl.uniform1f(p.u('uCols'), PU_COLS); gl.uniform1f(p.u('uRows'), PU_ROWS); gl.uniform1f(p.u('uN'), PU_N)
+    gl.uniform1f(p.u('uWrite'), this.writeHead); gl.uniform1f(p.u('uFilled'), this.filled)
+    gl.uniform1i(p.u('uHasDepth'), ctx.depth ? 1 : 0)
+    gl.uniform1i(p.u('uMode'), Math.round(num(inp.mode, 0)))
+    gl.uniform1i(p.u('uSrc'), Math.round(num(inp.source, 1)))
+    gl.uniform1i(p.u('uSwap'), num(inp.swap, 0) >= 0.5 ? 1 : 0)
+    gl.uniform1f(p.u('uDelay'), clampf(num(inp.delay, 5), 1, PU_N - 2))
+    gl.uniform1f(p.u('uCurve'), clampf(num(inp.curve, 1), 0.2, 3))
+    gl.uniform1f(p.u('uSep'), clampf(num(inp.separation, 0.4), 0, 1))
+    gl.uniform1f(p.u('uDesat'), clampf(num(inp.desat, 0.4), 0, 1))
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
+    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    // Store the current frame into the ring (half-res tile).
+    const cp = g.use(g.copy)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(cp.u('uTex'), 0)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, ring.fbo)
+    const col = this.writeHead % PU_COLS, row = Math.floor(this.writeHead / PU_COLS)
+    gl.viewport(col * this.tw, row * this.th, this.tw, this.th)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+    this.writeHead = (this.writeHead + 1) % PU_N
+    this.filled = Math.min(PU_N, this.filled + 1)
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return out.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    const gl = this.gl
+    if (this.ring) { gl.deleteTexture(this.ring.tex); gl.deleteFramebuffer(this.ring.fbo); this.ring = null }
+  }
+}
+
 /** Instantiate the native node for a reserved `node-*` shaderId (null if none). */
 export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): ConvNode | null {
   if (shaderId === 'node-parallax') return new ParallaxNode(gl)
+  if (shaderId === 'node-pulfrich') return new PulfrichNode(gl)
   if (shaderId === 'node-eternalism') return new EternalismNode(gl)
   if (shaderId === 'node-afterimage') return new AfterimageNode(gl)
   if (shaderId === 'node-transfert') return new TransfertNode(gl)
@@ -1970,6 +2101,6 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

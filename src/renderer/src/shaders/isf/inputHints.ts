@@ -19,6 +19,16 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     chroma: '0 = a dark subtraction where the bright form was (pure Goethe). 1 = its complementary colour (a red form leaves a cyan ghost).',
     mix: 'Dry/wet against the live image.'
   },
+  'node-pulfrich': {
+    mode: 'ANAGLYPH = a red/cyan stereo pair (needs glasses) — real depth on lateral motion. FREE = a glasses-free horizontal parallax slide, gated by motion.',
+    source: 'What keys the per-pixel eye-delay : the Depth map (real 2.5D, needs the Depth engine on) or the image’s own LUMINANCE (a stylised fallback).',
+    delay: 'Maximum eye-delay in frames for the most-delayed plane. Bigger = deeper 3D but more doubling on fast motion.',
+    curve: 'Bends how depth maps to delay : <1 crowds the delay onto the far plane, >1 spreads it forward.',
+    separation: 'ANAGLYPH : amplifies the red/cyan disparity. FREE : the horizontal slide distance.',
+    desat: 'ANAGLYPH only : desaturate the eyes toward grey to curb retinal rivalry (ghosting/eye-strain) in the glasses.',
+    swap: 'Flip which eye carries the lag (near ↔ far, left ↔ right). Fixes inverted or reversed depth.',
+    mix: 'Dry/wet against the live image. The disparity is temporal, so a still frame is byte-exact — no colour fringing.'
+  },
   'node-datamosh': {
     mode: 'MELT (soft per-pixel smear) · STICKY (rigid block tiles that tear at edges — the real datamosh look) · FLUID (a temporally-averaged flow → smooth liquid melt).',
     swirl: 'Rotate every motion vector → a vortex mosh (0 = none, ± = spin direction).',

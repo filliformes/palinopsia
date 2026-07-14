@@ -454,6 +454,27 @@ export const NATIVE_NODES: IsfShader[] = [
       ]
     }*/`,
     curated: { decay: [0.3, 0.8], amount: [0.3, 0.8], chroma: [0, 1], mix: [0.6, 1] }
+  },
+  {
+    id: 'node-pulfrich',
+    name: 'Pulfrich',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Pulfrich : monocular 3D from a temporal eye-delay. One eye reads a slightly DELAYED image (a dark filter slows its neural response) so lateral motion becomes stereo depth. The delay is read per-pixel from a frame ring, keyed by the shared DEPTH map (or luminance) so far/dark planes lag more. The disparity is TEMPORAL, not spatial — a still frame is byte-exact with NO colour fringing; depth blooms only on lateral motion. ANAGLYPH gives a red/cyan pair for glasses (DESAT curbs retinal rivalry, SEPARATION widens the split); FREE is a glasses-free parallax slide, gated by motion. A matte companion to the Anaglyph stage. Layer / source / master; falls back to luminance when no depth map is live.",
+      "CATEGORIES": ["FX", "Depth", "Time"],
+      "INPUTS": [
+        { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["anaglyph", "free"], "DEFAULT": 0, "LABEL": "mode" },
+        { "NAME": "source", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["luminance", "depth map"], "DEFAULT": 1, "LABEL": "key" },
+        { "NAME": "delay", "TYPE": "float", "MIN": 1.0, "MAX": 14.0, "DEFAULT": 5.0, "LABEL": "eye delay (frames)" },
+        { "NAME": "curve", "TYPE": "float", "MIN": 0.2, "MAX": 3.0, "DEFAULT": 1.0, "LABEL": "depth curve" },
+        { "NAME": "separation", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "disparity" },
+        { "NAME": "desat", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "desaturate" },
+        { "NAME": "swap", "TYPE": "bool", "DEFAULT": false, "LABEL": "swap eyes", "COMPACT": true },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
+      ]
+    }*/`,
+    curated: { delay: [3, 10], curve: [0.6, 1.8], separation: [0.2, 0.7], desat: [0.2, 0.7], mix: [0.6, 1] }
   }
 ]
 

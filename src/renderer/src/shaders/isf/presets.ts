@@ -103,6 +103,19 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Subtle dark', values: { decay: 0.5, amount: 0.35, chroma: 0.0, mix: 0.75 } },
     { name: 'Full palinopsia', values: { decay: 0.7, amount: 0.6, chroma: 0.6, mix: 1.0 } }
   ],
+  // ── Pulfrich (monocular 3D from a temporal eye-delay) ──
+  'node-pulfrich': [
+    { name: 'Anaglyph depth', values: { mode: 0, source: 1, delay: 5, curve: 1.0, separation: 0.4, desat: 0.4, swap: 0, mix: 1.0 } },
+    { name: 'Deep anaglyph', values: { mode: 0, source: 1, delay: 10, curve: 1.2, separation: 0.7, desat: 0.5, swap: 0, mix: 1.0 } },
+    { name: 'Subtle 3D', values: { mode: 0, source: 1, delay: 3, curve: 1.0, separation: 0.2, desat: 0.3, swap: 0, mix: 0.9 } },
+    { name: 'Luma pop', values: { mode: 0, source: 0, delay: 5, curve: 0.8, separation: 0.45, desat: 0.4, swap: 0, mix: 1.0 } },
+    { name: 'Far lag', values: { mode: 0, source: 1, delay: 8, curve: 1.6, separation: 0.5, desat: 0.4, swap: 0, mix: 1.0 } },
+    { name: 'Near lag', values: { mode: 0, source: 1, delay: 6, curve: 1.0, separation: 0.5, desat: 0.4, swap: 1, mix: 1.0 } },
+    { name: 'Grey stereo', values: { mode: 0, source: 1, delay: 6, curve: 1.0, separation: 0.6, desat: 0.85, swap: 0, mix: 1.0 } },
+    { name: 'Free slide', values: { mode: 1, source: 1, delay: 6, curve: 1.0, separation: 0.5, desat: 0.4, swap: 0, mix: 0.9 } },
+    { name: 'Free luma', values: { mode: 1, source: 0, delay: 5, curve: 0.9, separation: 0.4, desat: 0.4, swap: 0, mix: 0.85 } },
+    { name: 'Full parallax', values: { mode: 0, source: 1, delay: 12, curve: 1.2, separation: 0.65, desat: 0.5, swap: 0, mix: 1.0 } }
+  ],
   // ── Motif (spatial counterpoint / transpose echoes) ──
   'fx-motif': [
     { name: 'Single echo', values: { copies: 1, offX: 0.16, offY: 0.1, rotate: 0.3, scale: 0.88, fade: 0.62, invert: 0, mode: 0 } },
