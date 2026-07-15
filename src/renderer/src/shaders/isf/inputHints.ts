@@ -19,6 +19,13 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     chroma: '0 = a dark subtraction where the bright form was (pure Goethe). 1 = its complementary colour (a red form leaves a cyan ghost).',
     mix: 'Dry/wet against the live image.'
   },
+  'node-decimate': {
+    mode: 'CLOCK samples a fresh frame every 1/rate seconds (the time-lapse clock). HOLD freezes the picture and only re-samples when you fire the trigger.',
+    rate: 'CLOCK mode : how often it grabs a fresh frame (Hz). Low = chunky time-lapse steps, high = near-passthrough.',
+    smooth: 'Tween between the last two grabs : 0 = a hard snap on each sample, 1 = a continuous morph across the whole interval (slow-motion).',
+    trig: 'SAMPLE ▸ : grab a fresh frame now (rising edge). In HOLD mode this is the only way to refresh; in CLOCK mode it forces an extra sample. Bind a modulator (square/S&H/audio) to sample on the beat.',
+    mix: 'Dry/wet against the live image.'
+  },
   'node-corrode': {
     bury: 'How fast corrosion accumulates over time. The mask ONLY ever grows — it eats the picture slowly over minutes and never recovers until you EXHUME. On the Master rack it weathers the whole set.',
     spread: 'How fast corroded zones creep outward into clean areas (the migrating front).',

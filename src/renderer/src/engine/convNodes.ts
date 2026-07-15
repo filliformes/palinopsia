@@ -846,6 +846,22 @@ void main(){
   o = vec4(clamp(mix(host, eaten, uMix), 0.0, 1.0), 1.0);
 }`
 
+// ── Decimate / Time-Lapse : sample-and-hold at a chosen rate ──────────────
+// Holds a captured frame and only refreshes it on a clock (or a trigger), so the
+// picture STEPS through time — the time-lapse / stutter register the smooth engine
+// smooths away. Between samples it crossfades the last two grabs by `smooth` (0 =
+// hard snap, 1 = a continuous tween across the whole interval → slow-motion). The
+// signature use is two rates of the SAME source across A/B (control vs lapse).
+const F_DECIMATE = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uPrev, uCur;
+uniform float uF, uMix;
+void main(){
+  vec3 held = mix(texture(uPrev, vUV).rgb, texture(uCur, vUV).rgb, uF);
+  vec3 host = texture(uHost, vUV).rgb;
+  o = vec4(mix(host, held, uMix), 1.0);
+}`
+
 class NodeGL {
   quad: WebGLBuffer
   downsample: Prog
@@ -875,6 +891,7 @@ class NodeGL {
   pulfrich: Prog
   corrodeGrow: Prog
   corrodeOut: Prog
+  decimate: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -907,6 +924,7 @@ class NodeGL {
     this.pulfrich = this.build(F_PULFRICH)
     this.corrodeGrow = this.build(F_CORRODE_GROW)
     this.corrodeOut = this.build(F_CORRODE_OUT)
+    this.decimate = this.build(F_DECIMATE)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -2330,11 +2348,96 @@ export class CorrodeNode implements ConvNode {
   }
 }
 
+// ── Decimate / Time-Lapse node : sample-and-hold at a chosen rate ────────
+// Grabs a fresh frame only on a clock (CLOCK mode, `rate` Hz) or on the TRIGGER
+// (HOLD mode : freeze until re-sampled), and crossfades the last two grabs by
+// `smooth` between samples. Two persistent targets ping-pong the samples.
+export class DecimateNode implements ConvNode {
+  private buf: [RGBA, RGBA] | null = null
+  private w = 0
+  private h = 0
+  private cur = 0
+  private timer = 0
+  private prevTrig = 0
+  private seeded = false
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  private ensure(w: number, h: number): void {
+    if (this.buf && this.w === w && this.h === h) return
+    const gl = this.gl
+    if (this.buf) for (const b of this.buf) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
+    this.buf = [makeRGBA(gl, w, h, false), makeRGBA(gl, w, h, false)]
+    this.w = w; this.h = h; this.cur = 0; this.seeded = false; this.timer = 0
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl)
+    const W = ctx.chain.w, H = ctx.chain.h
+    this.ensure(W, H)
+    const inp = ctx.inputs
+    const buf = this.buf as [RGBA, RGBA]
+
+    const grab = (fbo: WebGLFramebuffer): void => {
+      const cp = g.use(g.copy)
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(cp.u('uTex'), 0)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+    }
+
+    // Seed both slots with the live frame so it never starts black.
+    if (!this.seeded) { grab(buf[0].fbo); grab(buf[1].fbo); this.seeded = true }
+
+    const mode = Math.round(num(inp.mode, 0)) // 0 clock · 1 hold (trig-only)
+    const rate = clampf(num(inp.rate, 6), 0.2, 20)
+    const interval = 1 / rate
+    const smooth = clampf(num(inp.smooth, 0), 0, 1)
+
+    const trig = num(inp.trig, 0)
+    const fired = trig >= 0.5 && this.prevTrig < 0.5
+    this.prevTrig = trig
+
+    this.timer += ctx.dt
+    let tick = fired
+    if (mode === 0 && this.timer >= interval) tick = true
+    if (tick) {
+      // Write the fresh frame into the PREV slot, then make it current : the old
+      // current becomes prev (the crossfade source).
+      grab(buf[1 - this.cur].fbo)
+      this.cur = 1 - this.cur
+      this.timer = 0
+    }
+
+    // Crossfade the previous sample → current over `smooth`·interval seconds.
+    const fadeDur = smooth * interval
+    const f = fadeDur < 0.001 ? 1 : clampf(this.timer / fadeDur, 0, 1)
+
+    const out = ctx.chain.next()
+    const p = g.use(g.decimate)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, buf[1 - this.cur].tex); gl.uniform1i(p.u('uPrev'), 1)
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, buf[this.cur].tex); gl.uniform1i(p.u('uCur'), 2)
+    gl.uniform1f(p.u('uF'), f)
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
+    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return out.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    const gl = this.gl
+    if (this.buf) { for (const b of this.buf) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.buf = null }
+  }
+}
+
 /** Instantiate the native node for a reserved `node-*` shaderId (null if none). */
 export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): ConvNode | null {
   if (shaderId === 'node-parallax') return new ParallaxNode(gl)
   if (shaderId === 'node-pulfrich') return new PulfrichNode(gl)
   if (shaderId === 'node-corrode') return new CorrodeNode(gl)
+  if (shaderId === 'node-decimate') return new DecimateNode(gl)
   if (shaderId === 'node-eternalism') return new EternalismNode(gl)
   if (shaderId === 'node-afterimage') return new AfterimageNode(gl)
   if (shaderId === 'node-transfert') return new TransfertNode(gl)
@@ -2349,6 +2452,6 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

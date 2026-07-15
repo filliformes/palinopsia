@@ -504,6 +504,24 @@ export const NATIVE_NODES: IsfShader[] = [
       ]
     }*/`,
     curated: { bury: [0.2, 0.7], spread: [0.2, 0.7], eat: [0.4, 0.9], tone: [0.1, 0.6], crackle: [0.2, 0.7], mix: [0.6, 1] }
+  },
+  {
+    id: 'node-decimate',
+    name: 'Decimate',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Decimate / Time-Lapse : sample-and-hold at a chosen rate. It grabs a fresh frame only every so often and HOLDS it between grabs, so the picture steps through time — the time-lapse / stutter register the smooth 60fps engine erases. SMOOTH crossfades the last two grabs (0 = a hard snap, 1 = a continuous tween across the whole interval → slow-motion). CLOCK mode samples at RATE; HOLD mode freezes and only re-samples on the trigger. The signature move : two rates of the SAME source across A and B (control vs lapse). Matte, no bloom. Layer / source / master.",
+      "CATEGORIES": ["FX", "Time"],
+      "INPUTS": [
+        { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["clock", "hold"], "DEFAULT": 0, "LABEL": "mode" },
+        { "NAME": "rate", "TYPE": "float", "MIN": 0.2, "MAX": 20.0, "DEFAULT": 6.0, "LABEL": "rate (Hz)" },
+        { "NAME": "smooth", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "tween" },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" },
+        { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "sample ▸" }
+      ]
+    }*/`,
+    curated: { rate: [1, 12], smooth: [0, 0.6], mix: [0.7, 1] }
   }
 ]
 

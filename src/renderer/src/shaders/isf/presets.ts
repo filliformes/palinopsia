@@ -129,6 +129,19 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Faint decay', values: { bury: 0.25, spread: 0.3, eat: 0.4, tone: 0.3, crackle: 0.25, mix: 0.7 } },
     { name: 'Total ruin', values: { bury: 1.0, spread: 0.7, eat: 1.0, tone: 0.15, crackle: 0.6, mix: 1.0 } }
   ],
+  // ── Decimate / Time-Lapse (sample-and-hold at a rate) ──
+  'node-decimate': [
+    { name: 'Chunky 3fps', values: { mode: 0, rate: 3, smooth: 0.0, mix: 1.0 } },
+    { name: 'Stop-motion 8fps', values: { mode: 0, rate: 8, smooth: 0.0, mix: 1.0 } },
+    { name: 'Slow lapse', values: { mode: 0, rate: 1.5, smooth: 0.0, mix: 1.0 } },
+    { name: 'Tweened lapse', values: { mode: 0, rate: 2, smooth: 0.6, mix: 1.0 } },
+    { name: 'Slow-mo morph', values: { mode: 0, rate: 4, smooth: 1.0, mix: 1.0 } },
+    { name: 'Filmic 12fps', values: { mode: 0, rate: 12, smooth: 0.0, mix: 1.0 } },
+    { name: 'Half-blend', values: { mode: 0, rate: 6, smooth: 0.4, mix: 0.6 } },
+    { name: 'Strobe grab', values: { mode: 0, rate: 5, smooth: 0.0, mix: 1.0 } },
+    { name: 'Freeze (trig)', values: { mode: 1, rate: 6, smooth: 0.0, mix: 1.0 } },
+    { name: 'Held tween (trig)', values: { mode: 1, rate: 6, smooth: 0.8, mix: 1.0 } }
+  ],
   // ── Motif (spatial counterpoint / transpose echoes) ──
   'fx-motif': [
     { name: 'Single echo', values: { copies: 1, offX: 0.16, offY: 0.1, rotate: 0.3, scale: 0.88, fade: 0.62, invert: 0, mode: 0 } },
