@@ -756,6 +756,81 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-grade', 'fx-chroma-shift'],
     nativeNodes: ['node-datamosh'], nativeChance: 0.7,
     blends: ['screen', 'difference'], layers: [2, 2], useB: 0.4, feedback: 0.25, drift: 0.3
+  }),
+
+  // ── Test : one theme per macro (open Feel · G, then sweep the named macro).
+  // Each isolates ONE macro — clean content, every OTHER macro left neutral.
+  mk({
+    id: 'test-density', name: 'Density', family: 'Test',
+    blurb: 'TEST · Four stacked layers. Sweep DENSITY in Feel (G) : left fades the upper layers out (sparse), right fills them in (dense).',
+    world: 'synthetic',
+    palette: [K, [0.5, 0.3, 0.6, 1], [0.3, 0.6, 0.55, 1], [0.85, 0.8, 0.4, 1]],
+    sources: ['shapes', 'op-art', 'grid-drift', 'contour', 'murmuration'],
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [4, 4], useB: 0
+  }),
+  mk({
+    id: 'test-gesture', name: 'Gesture ⇄ Texture', family: 'Test',
+    blurb: 'TEST · A moving, textured field. Sweep G↔T : left = gesture (crisp, sharpened motion), right = texture (internalised churn / trails).',
+    world: 'musical',
+    palette: [K, [0.14, 0.16, 0.2, 1], [0.75, 0.8, 0.85, 1]],
+    sources: ['murmuration', 'particle-drift'],
+    layerFx: ['fx-grade'],
+    blends: ['screen'], layers: [2, 2], useB: 0
+  }),
+  mk({
+    id: 'test-coalesce', name: 'Coalesce', family: 'Test',
+    blurb: 'TEST · A detailed field. Sweep COALESCE : left breaks it into grain / dither, right pulls it into smooth mass (blur).',
+    world: 'synthetic',
+    palette: [K, [0.2, 0.22, 0.26, 1], [0.85, 0.85, 0.8, 1]],
+    sources: ['op-art', 'interference', 'contour'],
+    layerFx: ['fx-grade'],
+    blends: ['screen'], layers: [1, 2], useB: 0
+  }),
+  mk({
+    id: 'test-tonicity', name: 'Tonicity', family: 'Test',
+    blurb: 'TEST · NEEDS Audio on. A colourful field. Sweep TONICITY : tonal/harmonic audio pulls colour in, noise pulls toward black-and-white.',
+    world: 'peint',
+    palette: [K, [0.7, 0.15, 0.4, 1], [0.15, 0.55, 0.7, 1], [0.9, 0.8, 0.3, 1]],
+    sources: ['dye-field', 'organic'],
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [2, 2], useB: 0, tonicity: 0.7
+  }),
+  mk({
+    id: 'test-shutter', name: 'Shutter', family: 'Test',
+    blurb: 'TEST · Fast motion. Sweep SHUTTER : the whole frame stop-motion-steps — low = chunky (~2fps), high = fluid.',
+    world: 'synthetic',
+    palette: [K, [0.16, 0.18, 0.22, 1], [0.8, 0.82, 0.86, 1]],
+    sources: ['murmuration', 'particle-drift', 'swell'],
+    layerFx: ['fx-grade'],
+    blends: ['screen'], layers: [2, 2], useB: 0, shutter: 0.4
+  }),
+  mk({
+    id: 'test-drift', name: 'Drift', family: 'Test',
+    blurb: 'TEST · A calm graded image. Sweep DRIFT : the grade slowly wanders (gamma / RGB) with rare analog accidents — watch over ~10s.',
+    world: 'sublimated',
+    palette: [K, [0.3, 0.16, 0.12, 1], [0.85, 0.75, 0.6, 1]],
+    sources: ['organic', 'membrane'],
+    layerFx: ['fx-grade'],
+    blends: ['screen'], layers: [1, 1], useB: 0, drift: 0.6
+  }),
+  mk({
+    id: 'test-flow', name: 'Flow ⇄ Interruption', family: 'Test',
+    blurb: 'TEST · Moving content. Sweep FLOW : left (interruption) stutters — frame-holds, breakup, blank stabs; right (flow) softens to a liquid image.',
+    world: 'incongruent',
+    palette: [K, [0.18, 0.14, 0.24, 1], [0.75, 0.78, 0.85, 1]],
+    sources: ['particle-drift', 'murmuration'],
+    layerFx: ['fx-grade'],
+    blends: ['screen'], layers: [2, 2], useB: 0
+  }),
+  mk({
+    id: 'test-super', name: 'Superimposition', family: 'Test',
+    blurb: 'TEST · Three distinct layers. Sweep SUPERIMPOSITION : a hypnagogic strobe cross-cuts which single layer shows each drawn frame.',
+    world: 'synthetic',
+    palette: [K, [0.5, 0.3, 0.2, 1], [0.2, 0.5, 0.6, 1], [0.85, 0.85, 0.5, 1]],
+    sources: ['shapes', 'op-art', 'contour', 'grid-drift'],
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [3, 3], useB: 0, superFlicker: 0.4
   })
 ]
 
