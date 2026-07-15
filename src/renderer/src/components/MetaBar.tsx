@@ -38,6 +38,8 @@ const CURVES: ModCurve[] = [
 export function MetaBar(): JSX.Element {
   const collapsed = useStore((s) => !!s.collapsed['meta'])
   const toggleSection = useStore((s) => s.toggleSection)
+  const metaXYPads = useStore((s) => s.metaXYPads)
+  const toggleMetaXYPads = useStore((s) => s.toggleMetaXYPads)
   const [flashing, flash] = useFlash()
 
   return (
@@ -46,7 +48,7 @@ export function MetaBar(): JSX.Element {
         flashing ? 'animate-pulse border-danger ring-1 ring-inset ring-danger' : 'border-border'
       }`}
     >
-      <div className="flex shrink-0 items-center gap-2 self-start">
+      <div className="flex w-full shrink-0 items-center gap-2">
         <button
           onClick={() => toggleSection('meta')}
           className="flex items-center gap-1.5"
@@ -73,6 +75,21 @@ export function MetaBar(): JSX.Element {
         >
           ⚄
         </button>
+        <button
+          onClick={toggleMetaXYPads}
+          className={`ml-auto rounded border px-1.5 font-mono text-[9px] leading-4 transition-colors ${
+            metaXYPads
+              ? 'border-accent/50 bg-accent/10 text-accent hover:bg-accent/20'
+              : 'border-border text-muted hover:text-text'
+          }`}
+          title={
+            metaXYPads
+              ? 'Knobs 13–16 are two XY performance pads : click to show them as knobs'
+              : 'Knobs 13–16 are knobs : click to show them as two XY performance pads'
+          }
+        >
+          {metaXYPads ? '⊞ XY' : '◎ 16'}
+        </button>
       </div>
       {!collapsed && (
         // 16 tiles spread to fill the full width; columns never shrink below
@@ -81,11 +98,125 @@ export function MetaBar(): JSX.Element {
           className="grid gap-1.5 overflow-x-auto pb-1"
           style={{ gridTemplateColumns: `repeat(${META_KNOB_COUNT}, minmax(52px, 1fr))` }}
         >
-          {Array.from({ length: META_KNOB_COUNT }, (_, i) => (
-            <MetaKnobTile key={i} index={i} />
-          ))}
+          {metaXYPads ? (
+            <>
+              {Array.from({ length: 12 }, (_, i) => (
+                <MetaKnobTile key={i} index={i} />
+              ))}
+              {/* Knobs 13–14 and 15–16 become two XY performance pads (each spans
+                  the two knob columns it replaces). Configure their destinations /
+                  names / bindings in knob mode (toggle top-right). */}
+              <MetaXYPad key="xy1" xIndex={12} yIndex={13} />
+              <MetaXYPad key="xy2" xIndex={14} yIndex={15} />
+            </>
+          ) : (
+            Array.from({ length: META_KNOB_COUNT }, (_, i) => (
+              <MetaKnobTile key={i} index={i} />
+            ))
+          )}
         </div>
       )}
+    </div>
+  )
+}
+
+// An XY performance pad over two Meta knobs (X = xIndex, Y = yIndex). Pure
+// view/controller : it writes the same knob values a knob tile does, so the two
+// knobs keep their destinations / bindings / CC / persistence. The handle reflects
+// the LIVE (modulated) value. Configure the underlying knobs in knob mode.
+function MetaXYPad({ xIndex, yIndex }: { xIndex: number; yIndex: number }): JSX.Element {
+  const xName = useStore((s) => s.composition.metaKnobs[xIndex].name)
+  const yName = useStore((s) => s.composition.metaKnobs[yIndex].name)
+  const xSmooth = useStore((s) => s.composition.metaKnobs[xIndex].smoothMs)
+  const ySmooth = useStore((s) => s.composition.metaKnobs[yIndex].smoothMs)
+  const xDest = useStore((s) => s.composition.metaKnobs[xIndex].destinations.length)
+  const yDest = useStore((s) => s.composition.metaKnobs[yIndex].destinations.length)
+
+  const xKey = modTargetKey({ kind: 'meta', knob: xIndex } as const)
+  const yKey = modTargetKey({ kind: 'meta', knob: yIndex } as const)
+  const xMod = useStore(useShallow((s) => s.composition.modMatrix.some((a) => modTargetKey(a.target) === xKey)))
+  const yMod = useStore(useShallow((s) => s.composition.modMatrix.some((a) => modTargetKey(a.target) === yKey)))
+  const anyMod = xMod || yMod
+
+  // Live position: the smoother's display value, painted at rAF while modulated.
+  useSyncExternalStore(subscribeKnobDisplay, knobDisplayVersion)
+  const [, setLiveTick] = useState(0)
+  useEffect(() => {
+    if (!anyMod) return
+    let raf = 0
+    const paint = (): void => { setLiveTick((n) => n + 1); raf = requestAnimationFrame(paint) }
+    raf = requestAnimationFrame(paint)
+    return () => cancelAnimationFrame(raf)
+  }, [anyMod])
+  const xVal = xMod ? (metaLiveValues.get(xIndex) ?? knobDisplayValue(xIndex)) : knobDisplayValue(xIndex)
+  const yVal = yMod ? (metaLiveValues.get(yIndex) ?? knobDisplayValue(yIndex)) : knobDisplayValue(yIndex)
+
+  const surfRef = useRef<HTMLDivElement | null>(null)
+  const dragRef = useRef<number | null>(null)
+  useEffect(() => () => { if (dragRef.current !== null) document.body.style.cursor = '' }, [])
+
+  function setFromPointer(e: ReactPointerEvent<HTMLDivElement>): void {
+    const el = surfRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const x = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width))
+    const y = Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)) // up = 1
+    setKnobImmediate(xIndex, x)
+    setKnobImmediate(yIndex, y)
+  }
+  function onPointerDown(e: ReactPointerEvent<HTMLDivElement>): void {
+    if (e.button !== 0) return
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    dragRef.current = e.pointerId
+    document.body.style.cursor = 'none'
+    setFromPointer(e) // absolute : the dot jumps to the press point (pad idiom)
+  }
+  function onPointerMove(e: ReactPointerEvent<HTMLDivElement>): void {
+    if (dragRef.current !== e.pointerId) return
+    setFromPointer(e)
+  }
+  function onPointerUp(e: ReactPointerEvent<HTMLDivElement>): void {
+    if (dragRef.current !== e.pointerId) return
+    try { (e.target as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* ignore */ }
+    commitKnob(xIndex); commitKnob(yIndex) // one undo checkpoint per gesture
+    dragRef.current = null
+    document.body.style.cursor = ''
+  }
+
+  const dotColor = anyMod ? 'rgb(var(--c-accent2))' : 'rgb(var(--c-accent))'
+  const highlight = xDest > 0 || yDest > 0 || anyMod
+
+  return (
+    <div
+      className={`flex min-w-0 flex-col items-center gap-1 rounded border p-1.5 transition-colors ${
+        highlight ? 'border-accent/40 bg-panel2' : 'border-border bg-panel2/40'
+      }`}
+      style={{ gridColumn: 'span 2' }}
+    >
+      <div
+        ref={surfRef}
+        className="relative mx-auto w-full cursor-crosshair rounded border border-border bg-panel"
+        style={{ maxWidth: 96, aspectRatio: '1 / 1', touchAction: 'none' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onDoubleClick={() => { setKnobTarget(xIndex, 0.5, xSmooth); setKnobTarget(yIndex, 0.5, ySmooth) }}
+        title={`XY pad · X = ${xName} · Y = ${yName} · click/drag to move · double-click recenters`}
+      >
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-border/50" />
+          <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-border/50" />
+        </div>
+        <div
+          className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-panel"
+          style={{ left: `${xVal * 100}%`, top: `${(1 - yVal) * 100}%`, backgroundColor: dotColor }}
+        />
+      </div>
+      <div className="flex w-full items-center justify-between gap-1 font-mono text-[8px] leading-none text-muted">
+        <span className="min-w-0 truncate" title={`X : ${xName}`}>X·{xName}</span>
+        <span className="min-w-0 truncate text-right" title={`Y : ${yName}`}>{yName}·Y</span>
+      </div>
     </div>
   )
 }

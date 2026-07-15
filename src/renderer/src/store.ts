@@ -791,6 +791,9 @@ interface StoreState {
   // Global modulation mute (transient) : freezes every modulator output.
   modBypass: boolean
   toggleModBypass: () => void
+  // Meta: show the last four knobs (13–16) as two XY performance pads (default on).
+  metaXYPads: boolean
+  toggleMetaXYPads: () => void
   renderScale: number
   setRenderScale: (v: number) => void
   // Depth engine mode (2.5D) : off · synthetic test bowl · AI monocular estimate.
@@ -1897,6 +1900,13 @@ export const useStore = create<StoreState>((set, get) => ({
   // "hold everything still" that the render loop honours (and mirrors to output).
   modBypass: false,
   toggleModBypass: () => set((s) => ({ modBypass: !s.modBypass })),
+  metaXYPads: localStorage.getItem('opsia.metaXYPads') !== '0', // default on
+  toggleMetaXYPads: () =>
+    set((s) => {
+      const v = !s.metaXYPads
+      localStorage.setItem('opsia.metaXYPads', v ? '1' : '0')
+      return { metaXYPads: v }
+    }),
 
   // Internal render scale: multiplies the 1920×1080 base. <1 = lo-fi (coarser
   // everything, upscaled to the display); 1 = 1080p; 2 = 4K (3840×2160). The App
