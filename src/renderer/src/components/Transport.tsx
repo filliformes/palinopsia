@@ -96,6 +96,23 @@ export function Transport(): JSX.Element {
     setComposition((s) => ({ composition: { ...s.composition, bpm: v } }))
   }
 
+  // Tap tempo : each click on BPM records a beat; the average of the last few
+  // intervals sets the tempo (shown in the box beside it). A >2s gap starts fresh.
+  const tapTimes = useRef<number[]>([])
+  function tapTempo(): void {
+    const now = performance.now()
+    const t = tapTimes.current
+    if (t.length && now - t[t.length - 1] > 2000) t.length = 0
+    t.push(now)
+    if (t.length > 6) t.shift()
+    if (t.length >= 2) {
+      let sum = 0
+      for (let i = 1; i < t.length; i++) sum += t[i] - t[i - 1]
+      const next = Math.round(60000 / (sum / (t.length - 1)))
+      setBpm(Math.max(20, Math.min(800, next)))
+    }
+  }
+
   function selectScope(s: RandomizeScope): void {
     setScope(s)
     localStorage.setItem('opsia.randScope', s)
@@ -117,7 +134,13 @@ export function Transport(): JSX.Element {
   return (
     <div className="flex flex-nowrap items-center gap-x-2 overflow-x-clip overflow-y-visible border-t border-border bg-panel px-2 py-1.5">
       <div className="flex shrink-0 items-center gap-1.5">
-        <span className="font-mono text-[10px] text-muted">BPM</span>
+        <button
+          onClick={tapTempo}
+          className="rounded border border-border px-1 py-0.5 font-mono text-[10px] text-muted transition-colors hover:border-accent/50 hover:text-accent active:bg-accent/20"
+          title="Tap tempo : click on the beat (2+ taps) to set the BPM. A pause of 2s starts a fresh count."
+        >
+          BPM
+        </button>
         <div className="w-10">
           <BoundedNumberInput
             value={bpm}
