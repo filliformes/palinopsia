@@ -13,6 +13,7 @@ import { applyCoupling } from './engine/coupling'
 import { applyProximity, applyFieldMacros } from './engine/field'
 import { applyTonicity, applyDrift, applyFlowInterrupt, shutterHold, shutterClear } from './engine/temperament'
 import { applyFlicker } from './engine/flicker'
+import { applyFrameWeave } from './engine/frameWeave'
 import { pushMarkSignal } from './engine/markSignal'
 import { applyModulation, modEngine } from './engine/modulation'
 import { visionBus } from './engine/visionIn'
@@ -524,6 +525,11 @@ export default function App(): JSX.Element {
           const rateFps = filmOn ? Number(fin!.filmRate) || 8 : 8
           flickerHot = applyFlicker(comp!, st.superFlicker, rateFps, now)
         }
+        // 2h. Frame-Weave (Lowder) : temporal interlace — show ONE layer per frame
+        //     stepping through the lattice. Runs whenever enabled (independent of
+        //     the scene sequencer). Hard-mutes the non-chosen layers this frame.
+        let weaveHot: number | undefined
+        if (st.sequence.frameWeave?.enabled) weaveHot = applyFrameWeave(comp!, st.sequence.frameWeave, now)
         // Merge the temperament results (Tonicity + Drift) into one override map so
         // the output window can mirror them exactly (they can't re-derive audio/
         // random/time). Field macros + freeze + flicker travel alongside.
@@ -600,7 +606,8 @@ export default function App(): JSX.Element {
             masterOverrides,
             freeze,
             superFlicker: st.superFlicker,
-            flickerHot
+            flickerHot,
+            weaveHot
           })
         }
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to

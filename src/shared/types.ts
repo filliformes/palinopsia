@@ -448,6 +448,10 @@ export interface SequenceState {
   // that FORBIDS auto-cuts and drives one slow veil (Context haze) over minutes.
   burial: { enabled: boolean; lengthSec: number; depth: number }
   longTake: { enabled: boolean; lengthSec: number; depth: number }
+  // Frame-Weave (Rose Lowder) : temporal interlace. Instead of blending, show ONE
+  // layer per frame, stepping through a paintable lattice at `rate` cells/sec so
+  // persistence-of-vision fuses them. A cell = a layer index (0..3) or -1 (blank).
+  frameWeave: { enabled: boolean; rate: number; cells: number[] }
   // Punctuation (S3 : inert for now).
   cadenceEvery: number
   ruptureChance: number
@@ -549,6 +553,9 @@ export interface OutputFrame {
   // Superimposition flicker : amount + which layer was chosen "hot" this frame.
   superFlicker?: number
   flickerHot?: number
+  // Frame-Weave : the lattice cell shown this frame (0..3 = layer, -1 = blank).
+  // Absent = Frame-Weave off.
+  weaveHot?: number
 }
 
 export interface DisplayInfo {

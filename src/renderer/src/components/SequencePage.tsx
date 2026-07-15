@@ -18,6 +18,7 @@ import {
   sequencerScoreMarkdown,
   sequencerSkip
 } from '../engine/sequencer'
+import { frameWeaveActiveCell } from '../engine/frameWeave'
 
 const SYNCHRESIS: CouplingMode[] = ['lean', 'hocket', 'cut', 'gate', 'drift']
 const SYNCHRESIS_INFO: Record<string, string> = {
@@ -417,6 +418,45 @@ export function SequencePage({
             <LevelMeter label="veil" enabled={seq.longTake.enabled && seq.running} get={sequencerLongTakeLevel} />
           </Section>
 
+          <Section title="Frame-Weave (interlace)">
+            <label className="flex items-center gap-2 text-[11px] text-muted"
+              title="Rose Lowder's temporal interlace : instead of blending, show ONE layer per frame, stepping through the lattice below so persistence-of-vision fuses them into a shimmer. Runs live (independent of scene stepping). Blank cells (·) show black.">
+              <input type="checkbox" checked={seq.frameWeave.enabled}
+                onChange={(e) => setSequence({ frameWeave: { ...seq.frameWeave, enabled: e.target.checked } })} />
+              interleave layers per frame
+            </label>
+            {seq.frameWeave.enabled && (
+              <>
+                <Row label={`rate · ${seq.frameWeave.rate}/s`}
+                  title="Cells per second (24 ≈ one lattice cell per film frame). Lower = a visible stutter, higher = a smoother fuse.">
+                  <input type="range" min={1} max={48} step={1} value={seq.frameWeave.rate}
+                    onChange={(e) => setSequence({ frameWeave: { ...seq.frameWeave, rate: Number(e.target.value) } })}
+                    className="w-full accent-accent2" />
+                </Row>
+                <Row label={`length · ${seq.frameWeave.cells.length} cells`}
+                  title="How many frames the lattice runs before it repeats. Growing tiles the current pattern.">
+                  <input type="range" min={2} max={24} step={1} value={seq.frameWeave.cells.length}
+                    onChange={(e) => {
+                      const n = Number(e.target.value)
+                      const cur = seq.frameWeave.cells
+                      const cells = Array.from({ length: n }, (_, i) => cur[i % cur.length] ?? 0)
+                      setSequence({ frameWeave: { ...seq.frameWeave, cells } })
+                    }}
+                    className="w-full accent-accent2" />
+                </Row>
+                <WeaveGrid
+                  cells={seq.frameWeave.cells}
+                  onPaint={(i) => {
+                    const cells = seq.frameWeave.cells.slice()
+                    cells[i] = cells[i] >= 3 ? -1 : cells[i] + 1 // cycle blank → L1 → L2 → L3 → L4 → blank
+                    setSequence({ frameWeave: { ...seq.frameWeave, cells } })
+                  }}
+                />
+                <p className="text-[9px] leading-tight text-muted">Click a cell to cycle its layer (1–4) or blank (·).</p>
+              </>
+            )}
+          </Section>
+
           <Section title="Punctuation">
             <Row label={`cadence · ${seq.cadenceEvery === 0 ? 'off' : `every ${seq.cadenceEvery}`}`}>
               <input type="range" min={0} max={8} step={1} value={seq.cadenceEvery}
@@ -580,6 +620,38 @@ function NowMeter({ running }: { running: boolean }): JSX.Element {
 // Live arc-intensity bar (repose ↔ disturbance).
 function ArcMeter({ enabled }: { enabled: boolean }): JSX.Element {
   return <LevelMeter label="arc" enabled={enabled} get={sequencerArcIntensity} />
+}
+
+// The paintable Frame-Weave lattice : one square per frame-cell, colour-coded by
+// layer (1–4) or blank (·). The cell currently playing is ringed (polled live).
+const WEAVE_HUE = [205, 32, 135, 292] // four distinct layer hues
+function WeaveGrid({ cells, onPaint }: { cells: number[]; onPaint: (i: number) => void }): JSX.Element {
+  const [active, setActive] = useState(-1)
+  useEffect(() => {
+    const id = window.setInterval(() => setActive(frameWeaveActiveCell()), 80)
+    return () => window.clearInterval(id)
+  }, [])
+  return (
+    <div className="flex flex-wrap gap-1">
+      {cells.map((v, i) => {
+        const isActive = i === active
+        const bg = v < 0 ? 'transparent' : `hsl(${WEAVE_HUE[v] ?? 0} 55% 34%)`
+        return (
+          <button
+            key={i}
+            onClick={() => onPaint(i)}
+            className={`flex h-6 w-6 items-center justify-center rounded border font-mono text-[10px] transition-transform ${
+              isActive ? 'scale-110 border-accent ring-1 ring-accent' : 'border-border'
+            }`}
+            style={{ background: bg, color: v < 0 ? 'rgb(var(--c-muted))' : 'white' }}
+            title={`frame ${i + 1} : ${v < 0 ? 'blank' : `layer ${v + 1}`} — click to cycle`}
+          >
+            {v < 0 ? '·' : v + 1}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 // A generic live 0..1 progress bar, polled from a getter (arc / burial / veil).

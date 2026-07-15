@@ -76,6 +76,11 @@ export function OutputView(): JSX.Element {
         if (sf > 0.02 && hotL >= 0) {
           comp!.layers.forEach((L, i) => { if (L && i !== hotL) L.opacity *= 1 - sf })
         }
+        // Frame-Weave : hard-mute the same non-chosen layers (or all, if blank).
+        const wh = f.weaveHot
+        if (wh !== undefined && wh !== null) {
+          comp!.layers.forEach((L, i) => { if (L && (wh < 0 || i !== wh)) L.opacity = 0 })
+        }
         comp!.render(f.time)
       } catch (err) {
         console.error('[output render]', err)

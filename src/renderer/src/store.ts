@@ -316,6 +316,7 @@ export function makeDefaultSequence(): SequenceState {
     arc: { enabled: false, lengthSec: 120 },
     burial: { enabled: false, lengthSec: 180, depth: 0.7 },
     longTake: { enabled: false, lengthSec: 240, depth: 0.5 },
+    frameWeave: { enabled: false, rate: 24, cells: [0, 1, 2, 3] },
     cadenceEvery: 0,
     ruptureChance: 0,
     monomediaChance: 0,
