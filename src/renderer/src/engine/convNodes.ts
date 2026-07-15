@@ -787,6 +787,65 @@ void main(){
   o = vec4(clamp(mix(host, res, uMix), 0.0, 1.0), 1.0);
 }`
 
+// ── Corrode / Weathered : durational corrosion over a whole set ───────────
+// A time-integrated corrosion mask that only ever GROWS (buried/weathered, the
+// process/entropy family). A static blotch field seeds new corrosion as the
+// integrated `bury` LEVEL rises, and each frame the mask creeps outward (a max-of-
+// neighbours diffusion) — so the picture is eaten away slowly over minutes, never
+// recovering until you EXHUME (reset). The present pass stains/darkens the corroded
+// zones and cracks them with reticulation (émulsion crackle). Layer / source / master.
+const F_CORRODE_GROW = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uPrev;
+uniform vec2 uTexel;
+uniform float uLevel, uSpread, uSeed;
+float h(vec2 p){ p = fract(p * vec2(127.1, 311.7)); p += dot(p, p + 34.5); return fract(p.x * p.y); }
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  float a = h(i), b = h(i + vec2(1, 0)), c = h(i + vec2(0, 1)), d = h(i + vec2(1, 1));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+float fbm(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++){ s += a * vnoise(p); p *= 2.03; a *= 0.5; } return s; }
+void main(){
+  float prev = texture(uPrev, vUV).r;
+  // Creep : take the max of a small neighbourhood so corroded zones spread outward.
+  vec2 r = uTexel * (0.5 + uSpread * 3.5);
+  float nb = prev;
+  nb = max(nb, texture(uPrev, vUV + vec2(r.x, 0.0)).r);
+  nb = max(nb, texture(uPrev, vUV - vec2(r.x, 0.0)).r);
+  nb = max(nb, texture(uPrev, vUV + vec2(0.0, r.y)).r);
+  nb = max(nb, texture(uPrev, vUV - vec2(0.0, r.y)).r);
+  // New corrosion : a static blotch field whose threshold falls as LEVEL rises.
+  float field = fbm(vUV * 6.0 + uSeed) * 0.6 + fbm(vUV * 17.0 + uSeed * 1.7) * 0.4;
+  float seed = smoothstep(1.0 - uLevel - 0.06, 1.0 - uLevel + 0.02, field);
+  o = vec4(clamp(max(nb, seed), 0.0, 1.0), 0.0, 0.0, 1.0); // monotonic : only grows
+}`
+
+const F_CORRODE_OUT = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uCorr;
+uniform float uEat, uCrackle, uTone, uMix, uSeed;
+float h(vec2 p){ p = fract(p * vec2(127.1, 311.7)); p += dot(p, p + 34.5); return fract(p.x * p.y); }
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  float a = h(i), b = h(i + vec2(1, 0)), c = h(i + vec2(0, 1)), d = h(i + vec2(1, 1));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+void main(){
+  vec3 host = texture(uHost, vUV).rgb;
+  float c = texture(uCorr, vUV).r;
+  // Reticulation : thin dark cracks (a difference-of-noise ridge), only in corroded zones.
+  float cr = 0.0;
+  if (uCrackle > 0.0) {
+    float n = vnoise(vUV * 68.0 + uSeed) - vnoise(vUV * 68.0 + uSeed + 3.7);
+    cr = smoothstep(0.16, 0.0, abs(n)) * smoothstep(0.15, 0.6, c) * uCrackle;
+  }
+  vec3 stain = mix(vec3(0.02, 0.02, 0.025), vec3(0.20, 0.13, 0.07), uTone); // leader-dark ↔ sepia
+  vec3 eaten = mix(host, stain, clamp(c * uEat, 0.0, 1.0));
+  eaten *= 1.0 - cr * 0.85;
+  o = vec4(clamp(mix(host, eaten, uMix), 0.0, 1.0), 1.0);
+}`
+
 class NodeGL {
   quad: WebGLBuffer
   downsample: Prog
@@ -814,6 +873,8 @@ class NodeGL {
   afterAcc: Prog
   afterOut: Prog
   pulfrich: Prog
+  corrodeGrow: Prog
+  corrodeOut: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -844,6 +905,8 @@ class NodeGL {
     this.afterAcc = this.build(F_AFTER_ACC)
     this.afterOut = this.build(F_AFTER_OUT)
     this.pulfrich = this.build(F_PULFRICH)
+    this.corrodeGrow = this.build(F_CORRODE_GROW)
+    this.corrodeOut = this.build(F_CORRODE_OUT)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -2182,10 +2245,96 @@ export class PulfrichNode implements ConvNode {
   }
 }
 
+// ── Corrode node : durational corrosion that only grows over a set ───────
+// A persistent single-channel corrosion mask, half-res, that monotonically grows
+// (blotch-seeded by a rising integrated LEVEL + a max-of-neighbours creep) and eats
+// the picture with reticulation cracks. EXHUME (reset ▸) zeros it + re-rolls the
+// blotch pattern. On the master rack it weathers the whole set over minutes.
+export class CorrodeNode implements ConvNode {
+  private corr: [RGBA, RGBA] | null = null
+  private tw = 0
+  private th = 0
+  private cur = 0
+  private buryAge = 0
+  private seed = Math.random() * 100
+  private prevReset = 0
+  private seeded = false
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  private ensure(w: number, h: number): void {
+    const tw = Math.max(2, w >> 1), th = Math.max(2, h >> 1)
+    if (this.corr && this.tw === tw && this.th === th) return
+    const gl = this.gl
+    if (this.corr) for (const b of this.corr) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
+    this.corr = [makeRGBA(gl, tw, th, false), makeRGBA(gl, tw, th, false)]
+    this.tw = tw; this.th = th; this.cur = 0; this.seeded = false
+  }
+
+  private clearBuffers(): void {
+    const gl = this.gl
+    gl.clearColor(0, 0, 0, 1)
+    for (const b of this.corr!) { gl.bindFramebuffer(gl.FRAMEBUFFER, b.fbo); gl.viewport(0, 0, this.tw, this.th); gl.clear(gl.COLOR_BUFFER_BIT) }
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl)
+    const W = ctx.chain.w, H = ctx.chain.h
+    this.ensure(W, H)
+    const inp = ctx.inputs
+    const corr = this.corr as [RGBA, RGBA]
+
+    if (!this.seeded) { this.clearBuffers(); this.seeded = true }
+
+    // EXHUME : a rising edge on reset zeros the corrosion + re-rolls the blotch field.
+    const reset = num(inp.reset, 0)
+    if (reset >= 0.5 && this.prevReset < 0.5) { this.clearBuffers(); this.buryAge = 0; this.seed = (this.seed + 37.13) % 100 }
+    this.prevReset = reset
+
+    // Integrated corrosion LEVEL : rises with `bury` · time, only forward.
+    this.buryAge += clampf(num(inp.bury, 0.5), 0, 1) * ctx.dt
+    const level = clampf(this.buryAge * 0.025, 0, 1) // ~40s to full at bury 1
+
+    // 1) grow the mask (creep + new blotches), ping-pong.
+    const read = corr[this.cur], write = corr[1 - this.cur]
+    let p = g.use(g.corrodeGrow)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, read.tex); gl.uniform1i(p.u('uPrev'), 0)
+    gl.uniform2f(p.u('uTexel'), 1 / this.tw, 1 / this.th)
+    gl.uniform1f(p.u('uLevel'), level)
+    gl.uniform1f(p.u('uSpread'), clampf(num(inp.spread, 0.4), 0, 1))
+    gl.uniform1f(p.u('uSeed'), this.seed)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo); gl.viewport(0, 0, this.tw, this.th); gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    // 2) present : stain + eat + reticulation cracks.
+    const out = ctx.chain.next()
+    p = g.use(g.corrodeOut)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, write.tex); gl.uniform1i(p.u('uCorr'), 1)
+    gl.uniform1f(p.u('uEat'), clampf(num(inp.eat, 0.7), 0, 1))
+    gl.uniform1f(p.u('uCrackle'), clampf(num(inp.crackle, 0.4), 0, 1))
+    gl.uniform1f(p.u('uTone'), clampf(num(inp.tone, 0.3), 0, 1))
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
+    gl.uniform1f(p.u('uSeed'), this.seed)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    this.cur = 1 - this.cur
+    return out.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    const gl = this.gl
+    if (this.corr) { for (const b of this.corr) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.corr = null }
+  }
+}
+
 /** Instantiate the native node for a reserved `node-*` shaderId (null if none). */
 export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): ConvNode | null {
   if (shaderId === 'node-parallax') return new ParallaxNode(gl)
   if (shaderId === 'node-pulfrich') return new PulfrichNode(gl)
+  if (shaderId === 'node-corrode') return new CorrodeNode(gl)
   if (shaderId === 'node-eternalism') return new EternalismNode(gl)
   if (shaderId === 'node-afterimage') return new AfterimageNode(gl)
   if (shaderId === 'node-transfert') return new TransfertNode(gl)
@@ -2200,6 +2349,6 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

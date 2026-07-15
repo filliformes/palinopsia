@@ -116,6 +116,19 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Free luma', values: { mode: 1, source: 0, delay: 5, curve: 0.9, separation: 0.4, desat: 0.4, swap: 0, mix: 0.85 } },
     { name: 'Full parallax', values: { mode: 0, source: 1, delay: 12, curve: 1.2, separation: 0.65, desat: 0.5, swap: 0, mix: 1.0 } }
   ],
+  // ── Corrode (durational corrosion / buried-weathered) ──
+  'node-corrode': [
+    { name: 'Slow weather', values: { bury: 0.3, spread: 0.3, eat: 0.6, tone: 0.3, crackle: 0.4, mix: 1.0 } },
+    { name: 'Fast rot', values: { bury: 0.8, spread: 0.6, eat: 0.85, tone: 0.35, crackle: 0.5, mix: 1.0 } },
+    { name: 'Rust creep', values: { bury: 0.5, spread: 0.8, eat: 0.7, tone: 0.55, crackle: 0.3, mix: 1.0 } },
+    { name: 'Leader black', values: { bury: 0.6, spread: 0.4, eat: 0.9, tone: 0.0, crackle: 0.2, mix: 1.0 } },
+    { name: 'Sepia stain', values: { bury: 0.4, spread: 0.35, eat: 0.65, tone: 0.7, crackle: 0.3, mix: 0.9 } },
+    { name: 'Cracked varnish', values: { bury: 0.35, spread: 0.3, eat: 0.5, tone: 0.4, crackle: 0.9, mix: 1.0 } },
+    { name: 'Buried', values: { bury: 0.9, spread: 0.5, eat: 1.0, tone: 0.2, crackle: 0.4, mix: 1.0 } },
+    { name: 'Patina', values: { bury: 0.3, spread: 0.55, eat: 0.55, tone: 0.6, crackle: 0.45, mix: 0.85 } },
+    { name: 'Faint decay', values: { bury: 0.25, spread: 0.3, eat: 0.4, tone: 0.3, crackle: 0.25, mix: 0.7 } },
+    { name: 'Total ruin', values: { bury: 1.0, spread: 0.7, eat: 1.0, tone: 0.15, crackle: 0.6, mix: 1.0 } }
+  ],
   // ── Motif (spatial counterpoint / transpose echoes) ──
   'fx-motif': [
     { name: 'Single echo', values: { copies: 1, offX: 0.16, offY: 0.1, rotate: 0.3, scale: 0.88, fade: 0.62, invert: 0, mode: 0 } },

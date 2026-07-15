@@ -484,6 +484,26 @@ export const NATIVE_NODES: IsfShader[] = [
       ]
     }*/`,
     curated: { delay: [3, 10], curve: [0.6, 1.8], separation: [0.2, 0.7], desat: [0.2, 0.7], mix: [0.6, 1] }
+  },
+  {
+    id: 'node-corrode',
+    name: 'Corrode',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Corrode : durational corrosion that only ever GROWS (buried / weathered — the entropy family). A blotch field seeds new corrosion as the integrated BURY level rises, and each frame it creeps outward, so the picture is eaten away slowly over minutes and never recovers until you EXHUME (reset ▸). EAT sets how deeply corroded zones are removed; TONE stains them from leader-dark to sepia; CRACKLE adds reticulation (cracked-émulsion) lines. On the Master rack it weathers the whole set. Matte, near-black. Layer / source / master.",
+      "CATEGORIES": ["FX", "Time", "Cameraless"],
+      "INPUTS": [
+        { "NAME": "bury", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "bury rate" },
+        { "NAME": "spread", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "creep" },
+        { "NAME": "eat", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.7, "LABEL": "eat" },
+        { "NAME": "tone", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "dark ↔ sepia" },
+        { "NAME": "crackle", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "reticulation" },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" },
+        { "NAME": "reset", "TYPE": "event", "DEFAULT": false, "LABEL": "exhume ▸" }
+      ]
+    }*/`,
+    curated: { bury: [0.2, 0.7], spread: [0.2, 0.7], eat: [0.4, 0.9], tone: [0.1, 0.6], crackle: [0.2, 0.7], mix: [0.6, 1] }
   }
 ]
 

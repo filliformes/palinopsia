@@ -19,6 +19,15 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     chroma: '0 = a dark subtraction where the bright form was (pure Goethe). 1 = its complementary colour (a red form leaves a cyan ghost).',
     mix: 'Dry/wet against the live image.'
   },
+  'node-corrode': {
+    bury: 'How fast corrosion accumulates over time. The mask ONLY ever grows — it eats the picture slowly over minutes and never recovers until you EXHUME. On the Master rack it weathers the whole set.',
+    spread: 'How fast corroded zones creep outward into clean areas (the migrating front).',
+    eat: 'How deeply corroded zones are removed — from a faint stain to fully eaten to the leader colour.',
+    tone: 'The corroded colour : 0 = leader-dark (near-black), 1 = a sepia / rust stain.',
+    crackle: 'Reticulation : thin cracked-émulsion lines through the corroded zones.',
+    reset: 'EXHUME ▸ : clears all accumulated corrosion and re-rolls the blotch pattern, starting the weathering fresh. Press it, send OSC, or bind a modulator.',
+    mix: 'Dry/wet against the untouched image.'
+  },
   'node-pulfrich': {
     mode: 'ANAGLYPH = a red/cyan stereo pair (needs glasses) — real depth on lateral motion. FREE = a glasses-free horizontal parallax slide, gated by motion.',
     source: 'What keys the per-pixel eye-delay : the Depth map (real 2.5D, needs the Depth engine on) or the image’s own LUMINANCE (a stylised fallback).',
