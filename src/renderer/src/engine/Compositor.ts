@@ -115,6 +115,7 @@ precision highp float;
 in vec2 uv; out vec4 o;
 uniform sampler2D a;
 uniform sampler2D b;
+uniform sampler2D uState; // Consume/Reagent competition field (mode 17; unused otherwise)
 uniform int mode;
 uniform float x;          // 0 = A only, 1 = full blend result
 uniform float bHue;       // B hue rotation (radians) : A/B harmony: 0 consonant, π dissonant
@@ -150,8 +151,46 @@ void main(){
     o = vec4(mix(B.rgb, A.rgb, k), max(A.a, B.a));
     return;
   }
+  if(mode==17){
+    // CONSUME / REAGENT : a competition field phi (updated in a prior pass) migrates
+    // between A and B — bright A eats toward A, bright B toward B, the boundary
+    // diffusing. Near the contested front the two EMBRACE (average). Stateful.
+    float phi = texture(uState, uv).r;
+    float k = smoothstep(0.35, 0.65, phi);
+    vec3 front = mix(B.rgb, A.rgb, k);
+    float edge = 1.0 - abs(phi - 0.5) * 2.0;         // 1 at the migrating boundary
+    vec3 embrace = (A.rgb + B.rgb) * 0.5;
+    o = vec4(mix(front, embrace, edge * 0.4), max(A.a, B.a));
+    return;
+  }
   vec3 c = blendMode(mode, A.rgb, B.rgb);
   o = vec4(mix(A.rgb, c, x), max(A.a, B.a * x));
+}`;
+
+// Consume/Reagent state update : evolve the competition field phi one step. Bright A
+// pushes phi → 1, bright B → 0 (each source EATS toward itself, brightness-weighted);
+// a Laplacian diffuses the boundary so the front migrates and stays organic; a weak
+// pull to neutral keeps it alive. NaN-guarded (the field ping-pongs across frames).
+const REAGENT_FS = `#version 300 es
+precision highp float;
+in vec2 uv; out vec4 o;
+uniform sampler2D a, b, uState;
+uniform vec2 uTexel;
+uniform float uRate;    // = sourceMix : how hard the sources eat
+const vec3 LUM = vec3(0.299, 0.587, 0.114);
+void main(){
+  float phi = texture(uState, uv).r;
+  if(!(phi == phi)) phi = 0.5;                       // NaN guard
+  float lap = (texture(uState, uv + vec2(uTexel.x, 0.0)).r
+             + texture(uState, uv - vec2(uTexel.x, 0.0)).r
+             + texture(uState, uv + vec2(0.0, uTexel.y)).r
+             + texture(uState, uv - vec2(0.0, uTexel.y)).r) * 0.25 - phi;
+  phi += lap * 0.28;                                 // diffusion : boundary migrates
+  float la = dot(texture(a, uv).rgb, LUM);
+  float lb = dot(texture(b, uv).rgb, LUM);
+  phi += (la * la - lb * lb) * (0.05 + uRate * 0.25); // reaction : brighter side eats
+  phi += (0.5 - phi) * 0.012;                        // weak restoring : front stays alive
+  o = vec4(clamp(phi, 0.0, 1.0), 0.0, 0.0, 1.0);
 }`;
 
 // Present / copy pass.
@@ -632,6 +671,8 @@ export class ISFLayer {
   rackLayer: FxRack;
   scratchA: { fbo: WebGLFramebuffer; tex: WebGLTexture };
   scratchB: { fbo: WebGLFramebuffer; tex: WebGLTexture };
+  // Consume/Reagent competition field (lazy : only when the A/B mix uses 'consume').
+  reagent: PingPong | null = null;
 
   constructor(private shared: SharedGL, public w: number, public h: number) {
     this.pp = new PingPong(shared.gl, w, h);
@@ -897,6 +938,7 @@ export class ISFLayer {
     this.pp.dispose(gl);
     disposeTarget(gl, this.scratchA);
     disposeTarget(gl, this.scratchB);
+    this.reagent?.dispose(gl);
   }
 }
 
@@ -994,7 +1036,12 @@ export class Compositor {
   private uPAmt: WebGLUniformLocation;
   private uMA: WebGLUniformLocation; private uMB: WebGLUniformLocation;
   private uMX: WebGLUniformLocation; private uMMode: WebGLUniformLocation;
-  private uMBHue!: WebGLUniformLocation;
+  private uMBHue!: WebGLUniformLocation; private uMState!: WebGLUniformLocation;
+  // Consume/Reagent competition-field update program.
+  private reagentProg!: WebGLProgram;
+  private uRA!: WebGLUniformLocation; private uRB!: WebGLUniformLocation;
+  private uRState!: WebGLUniformLocation; private uRTexel!: WebGLUniformLocation;
+  private uRRate!: WebGLUniformLocation;
   private uCTex: WebGLUniformLocation;
   private xformProg!: WebGLProgram;
   private uXTex!: WebGLUniformLocation; private uXZoom!: WebGLUniformLocation;
@@ -1010,7 +1057,7 @@ export class Compositor {
   private modeIndex: Record<BlendMode, number> = {
     normal: 0, add: 1, subtract: 2, multiply: 3, screen: 4, overlay: 5,
     softlight: 6, hardlight: 7, darken: 8, lighten: 9, difference: 10,
-    exclusion: 11, dodge: 12, burn: 13, wrap: 14, weave: 15, lumakey: 16
+    exclusion: 11, dodge: 12, burn: 13, wrap: 14, weave: 15, lumakey: 16, consume: 17
   };
 
   constructor(public canvas: HTMLCanvasElement, public w = 1920, public h = 1080) {
@@ -1054,6 +1101,14 @@ export class Compositor {
     this.uMX = gl.getUniformLocation(this.mixProg, 'x')!;
     this.uMMode = gl.getUniformLocation(this.mixProg, 'mode')!;
     this.uMBHue = gl.getUniformLocation(this.mixProg, 'bHue')!;
+    this.uMState = gl.getUniformLocation(this.mixProg, 'uState')!;
+
+    this.reagentProg = compile(gl, QUAD_VS, REAGENT_FS);
+    this.uRA = gl.getUniformLocation(this.reagentProg, 'a')!;
+    this.uRB = gl.getUniformLocation(this.reagentProg, 'b')!;
+    this.uRState = gl.getUniformLocation(this.reagentProg, 'uState')!;
+    this.uRTexel = gl.getUniformLocation(this.reagentProg, 'uTexel')!;
+    this.uRRate = gl.getUniformLocation(this.reagentProg, 'uRate')!;
 
     this.copyProg = compile(gl, QUAD_VS, COPY_FS);
     this.uCTex = gl.getUniformLocation(this.copyProg, 'tex')!;
@@ -1548,17 +1603,41 @@ export class Compositor {
     gl.bindVertexArray(null);
   }
 
-  /** A/B mix into the shared mix target: mix(A, blendMode(A,B), x). */
+  /** A/B mix into the shared mix target: mix(A, blendMode(A,B), x). The `consume`
+   *  mode is stateful : it first evolves the layer's competition field one step. */
   private mixSources(
-    a: WebGLTexture, b: WebGLTexture, x: number, mode: BlendMode, harmony = 0
+    a: WebGLTexture, b: WebGLTexture, x: number, mode: BlendMode, harmony = 0, layer?: ISFLayer
   ): WebGLTexture {
     const gl = this.gl;
     gl.bindVertexArray(this.vao);
+
+    // Consume/Reagent : advance the persistent competition field first.
+    let stateTex = a; // dummy bind for non-consume modes (branch not taken)
+    if (mode === 'consume' && layer) {
+      if (!layer.reagent || layer.reagent.w !== this.w || layer.reagent.h !== this.h) {
+        layer.reagent?.dispose(gl);
+        layer.reagent = new PingPong(gl, this.w, this.h);
+      }
+      const st = layer.reagent;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, st.write());
+      gl.viewport(0, 0, this.w, this.h);
+      gl.useProgram(this.reagentProg);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, a); gl.uniform1i(this.uRA, 0);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, b); gl.uniform1i(this.uRB, 1);
+      gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, st.read()); gl.uniform1i(this.uRState, 2);
+      gl.uniform2f(this.uRTexel, 1 / this.w, 1 / this.h);
+      gl.uniform1f(this.uRRate, x);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      stateTex = st.out(); // the field we just wrote
+      st.swap();
+    }
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.mixTarget.fbo);
     gl.viewport(0, 0, this.w, this.h);
     gl.useProgram(this.mixProg);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, a); gl.uniform1i(this.uMA, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, b); gl.uniform1i(this.uMB, 1);
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, stateTex); gl.uniform1i(this.uMState, 2);
     gl.uniform1i(this.uMMode, this.modeIndex[mode] ?? 0);
     gl.uniform1f(this.uMX, x);
     gl.uniform1f(this.uMBHue, harmony * Math.PI); // 1 = complementary (π rad)
@@ -1646,7 +1725,7 @@ export class Compositor {
           sig = this.abHold.tex;
           L.renderSource('B', nodeCtx.sidechainTex);
           const sigB = L.rackB.apply(L.scratchB.tex, this.chain, nodeCtx); // nodeCtx → native nodes on source B
-          sig = this.mixSources(sig, sigB, L.sourceMix, L.sourceBlend, L.harmony);
+          sig = this.mixSources(sig, sigB, L.sourceMix, L.sourceBlend, L.harmony, L);
         }
         gl.bindVertexArray(null);
         sig = L.rackLayer.apply(sig, this.chain, nodeCtx);
