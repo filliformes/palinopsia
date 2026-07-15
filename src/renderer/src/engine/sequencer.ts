@@ -21,7 +21,11 @@ let dwellStart = 0
 let nextDwellMs = 8000
 let arcStart = 0
 let breatheStart = 0
+let burialStart = 0
+let longTakeStart = 0
 let lastArc = 0 // most recent arc intensity (for the UI meter)
+let lastBurial = 0
+let lastLongTake = 0
 let stepCount = 0
 const recent: string[] = [] // recently-visited scene ids (no-repeat window)
 
@@ -49,6 +53,8 @@ function reset(now: number, seq: SequenceState): void {
   dwellStart = now
   arcStart = now
   breatheStart = now
+  burialStart = now
+  longTakeStart = now
   nextDwellMs = dwellMs(seq)
   stepCount = 0
   cadenceUntil = ruptureUntil = monoUntil = 0
@@ -239,6 +245,44 @@ function writeMonoBlack(comp: SeqComp, c: CompositionState, now: number): void {
   }
 }
 
+// Slow raised-cosine 0→1→0 over `lengthSec` from `start` : the durational
+// envelope both long-forms ride (minutes long ; imperceptible per-frame).
+function coswave(now: number, start: number, lengthSec: number): number {
+  if (lengthSec <= 0) return 0
+  const phase = ((now - start) / 1000 / lengthSec) % 1
+  return 0.5 - 0.5 * Math.cos(phase * Math.PI * 2)
+}
+
+// Burial → Exhumation : drive the Finalizer's breakup/grade toward illegibility
+// at the envelope peak, then recover. Additive on the live/base grade, bounded.
+function writeBurial(comp: SeqComp, c: CompositionState, level: number, depth: number): void {
+  const fin = c.master.find((f) => f.shaderId === 'fx-finalizer')
+  if (!fin) return
+  const cur = (name: string, d: number): number =>
+    (liveModValues.get(`fx:master:${fin.id}:${name}`) as number | undefined) ?? num(fin.inputs[name], d)
+  const set = (name: string, v: number): void => comp.setFxInput(MASTER, fin.id, name, v)
+  const e = clamp01(level) * clamp01(depth)
+  set('parasites', Math.min(1, cur('parasites', 0.1) + e * 0.5)) // analog breakup
+  set('grain', Math.min(1, cur('grain', 0) + e * 0.4))
+  set('black', Math.min(0.6, cur('black', 0) + e * 0.45)) // crush the shadows
+  set('white', Math.max(0.35, cur('white', 1) - e * 0.4)) // pull the highlights down
+  set('sharpen', Math.max(0, cur('sharpen', 0) * (1 - e * 0.9))) // soften toward illegible
+  set('gamma', Math.max(0.4, cur('gamma', 1) + e * 0.4)) // darken the midtones
+}
+
+// Long-Take / Veil : a single slow veil (Context haze + a touch of depth) that
+// creeps over minutes. The no-cut governance is enforced in the advance gate.
+function writeLongTake(comp: SeqComp, c: CompositionState, level: number, depth: number): void {
+  const ctx = c.master.find((f) => f.shaderId === 'fx-context')
+  if (!ctx) return
+  const cur = (name: string, d: number): number =>
+    (liveModValues.get(`fx:master:${ctx.id}:${name}`) as number | undefined) ?? num(ctx.inputs[name], d)
+  const set = (name: string, v: number): void => comp.setFxInput(MASTER, ctx.id, name, clamp01(v))
+  const e = clamp01(level) * clamp01(depth)
+  set('haze', cur('haze', 0.02) + e * 0.5) // the veil thickens
+  set('depth', cur('depth', 0.15) + e * 0.25) // slight atmospheric recession
+}
+
 /**
  * Tick the sequencer. Called every frame by the App loop (after proximity).
  * Reads its own state from the store; advances + writes overlays. Returns the
@@ -316,9 +360,11 @@ export function tickSequencer(now: number, comp: SeqComp, c: CompositionState): 
   // Advance when the dwell elapses (unless a punctuation is mid-flight). With
   // audio/chaos arming (S4) the dwell is a MINIMUM : the step fires on the next
   // transient/onset/chaos edge (Anchoring/Delayed synchresis · C#7).
+  // Long-Take / Veil forbids auto-cuts : the current shot is held (a single take)
+  // while the veil creeps. Manual skip still works.
   const busy = now < ruptureUntil || now < monoUntil || pending !== null
   const fired = triggerFired(seq.audioAdvance)
-  if (!busy && scenes.length > 1) {
+  if (!busy && scenes.length > 1 && !seq.longTake.enabled) {
     const dwellElapsed = now - dwellStart >= nextDwellMs
     if (seq.audioAdvance === 'off') {
       if (dwellElapsed) advance()
@@ -331,6 +377,13 @@ export function tickSequencer(now: number, comp: SeqComp, c: CompositionState): 
   // Continuous overlay (Breathe + Arc).
   const curTags = scenes.find((s) => s.id === useStore.getState().activeSceneId)?.tags
   writeContextOverlay(comp, c, seq, now, curTags, arcInt)
+
+  // Durational long-forms : Burial → Exhumation (grade) + Long-Take / Veil (Context
+  // haze). Run after the Context overlay so the Veil governs the haze when active.
+  lastBurial = seq.burial.enabled ? coswave(now, burialStart, seq.burial.lengthSec) : 0
+  if (seq.burial.enabled) writeBurial(comp, c, lastBurial, seq.burial.depth)
+  lastLongTake = seq.longTake.enabled ? coswave(now, longTakeStart, seq.longTake.lengthSec) : 0
+  if (seq.longTake.enabled) writeLongTake(comp, c, lastLongTake, seq.longTake.depth)
 
   // ── S3 punctuation overlays ──
   if (now < cadenceUntil) writeCadence(comp, (cadenceUntil - now) / CADENCE_MS)
@@ -349,6 +402,16 @@ export function tickSequencer(now: number, comp: SeqComp, c: CompositionState): 
 /** Latest arc intensity 0..1 (for the UI meter). */
 export function sequencerArcIntensity(): number {
   return running ? lastArc : 0
+}
+
+/** Latest Burial level 0 (exhumed) → 1 (buried) for the UI meter. */
+export function sequencerBurialLevel(): number {
+  return running ? lastBurial : 0
+}
+
+/** Latest Long-Take / Veil level 0→1 for the UI meter. */
+export function sequencerLongTakeLevel(): number {
+  return running ? lastLongTake : 0
 }
 
 /** Manual "skip →" from the UI : advance now (respects transition + variation). */

@@ -442,6 +442,12 @@ export interface SequenceState {
   // Macro-form overlays (S2).
   breathe: { amount: number; periodSec: number } // Espace-temps oscillator
   arc: { enabled: boolean; lengthSec: number } // Repose–Disturbance–Repose
+  // Durational long-forms (ecological texts, process/entropy family).
+  // Burial → Exhumation : degrade the grade toward illegibility over minutes,
+  // then recover (a slow cosine 0→1→0). Long-Take / Veil : a slowness governor
+  // that FORBIDS auto-cuts and drives one slow veil (Context haze) over minutes.
+  burial: { enabled: boolean; lengthSec: number; depth: number }
+  longTake: { enabled: boolean; lengthSec: number; depth: number }
   // Punctuation (S3 : inert for now).
   cadenceEvery: number
   ruptureChance: number

@@ -12,7 +12,9 @@ import { useStore } from '../store'
 import {
   sequencerArcIntensity,
   sequencerArmed,
+  sequencerBurialLevel,
   sequencerCountdownMs,
+  sequencerLongTakeLevel,
   sequencerScoreMarkdown,
   sequencerSkip
 } from '../engine/sequencer'
@@ -363,6 +365,58 @@ export function SequencePage({
             <ArcMeter enabled={seq.arc.enabled && seq.running} />
           </Section>
 
+          <Section title="Burial → Exhumation">
+            <label className="flex items-center gap-2 text-[11px] text-muted"
+              title="A durational arc that slowly buries the picture — analog breakup, crushed shadows, softening, darkening the grade toward illegibility — then exhumes it (recovers). A slow cosine over the length below.">
+              <input type="checkbox" checked={seq.burial.enabled}
+                onChange={(e) => setSequence({ burial: { ...seq.burial, enabled: e.target.checked } })} />
+              enable degrade → recover
+            </label>
+            {seq.burial.enabled && (
+              <>
+                <Row label={`length · ${(seq.burial.lengthSec / 60).toFixed(1)}min`}
+                  title="Duration of one full burial cycle (legible → buried → exhumed).">
+                  <input type="range" min={30} max={900} step={5} value={seq.burial.lengthSec}
+                    onChange={(e) => setSequence({ burial: { ...seq.burial, lengthSec: Number(e.target.value) } })}
+                    className="w-full accent-accent2" />
+                </Row>
+                <Row label={`depth · ${Math.round(seq.burial.depth * 100)}%`}
+                  title="How far it degrades at the peak : from a light patina to near-illegible.">
+                  <input type="range" min={0} max={1} step={0.01} value={seq.burial.depth}
+                    onChange={(e) => setSequence({ burial: { ...seq.burial, depth: Number(e.target.value) } })}
+                    className="w-full accent-accent2" />
+                </Row>
+              </>
+            )}
+            <LevelMeter label="buried" enabled={seq.burial.enabled && seq.running} get={sequencerBurialLevel} />
+          </Section>
+
+          <Section title="Long-Take / Veil">
+            <label className="flex items-center gap-2 text-[11px] text-muted"
+              title="A slowness discipline : FORBIDS auto-cuts (holds a single take) and drives one imperceptibly-slow veil — Context haze thickening and thinning over minutes. An antidote to restless macro-forms (a Fog Line). Manual skip still works.">
+              <input type="checkbox" checked={seq.longTake.enabled}
+                onChange={(e) => setSequence({ longTake: { ...seq.longTake, enabled: e.target.checked } })} />
+              hold the shot · slow veil
+            </label>
+            {seq.longTake.enabled && (
+              <>
+                <Row label={`length · ${(seq.longTake.lengthSec / 60).toFixed(1)}min`}
+                  title="How long one full veil cycle (clear → veiled → clear) takes.">
+                  <input type="range" min={30} max={900} step={5} value={seq.longTake.lengthSec}
+                    onChange={(e) => setSequence({ longTake: { ...seq.longTake, lengthSec: Number(e.target.value) } })}
+                    className="w-full accent-accent2" />
+                </Row>
+                <Row label={`depth · ${Math.round(seq.longTake.depth * 100)}%`}
+                  title="How thick the veil gets at its peak.">
+                  <input type="range" min={0} max={1} step={0.01} value={seq.longTake.depth}
+                    onChange={(e) => setSequence({ longTake: { ...seq.longTake, depth: Number(e.target.value) } })}
+                    className="w-full accent-accent2" />
+                </Row>
+              </>
+            )}
+            <LevelMeter label="veil" enabled={seq.longTake.enabled && seq.running} get={sequencerLongTakeLevel} />
+          </Section>
+
           <Section title="Punctuation">
             <Row label={`cadence · ${seq.cadenceEvery === 0 ? 'off' : `every ${seq.cadenceEvery}`}`}>
               <input type="range" min={0} max={8} step={1} value={seq.cadenceEvery}
@@ -525,14 +579,27 @@ function NowMeter({ running }: { running: boolean }): JSX.Element {
 
 // Live arc-intensity bar (repose ↔ disturbance).
 function ArcMeter({ enabled }: { enabled: boolean }): JSX.Element {
+  return <LevelMeter label="arc" enabled={enabled} get={sequencerArcIntensity} />
+}
+
+// A generic live 0..1 progress bar, polled from a getter (arc / burial / veil).
+function LevelMeter({
+  label,
+  enabled,
+  get
+}: {
+  label: string
+  enabled: boolean
+  get: () => number
+}): JSX.Element {
   const [v, setV] = useState(0)
   useEffect(() => {
-    const id = window.setInterval(() => setV(sequencerArcIntensity()), 150)
+    const id = window.setInterval(() => setV(get()), 150)
     return () => window.clearInterval(id)
-  }, [])
+  }, [get])
   return (
     <div className="flex items-center gap-2">
-      <span className="font-mono text-[9px] text-muted">arc</span>
+      <span className="font-mono text-[9px] text-muted">{label}</span>
       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-panel2">
         <div
           className="h-full transition-[width] duration-150"

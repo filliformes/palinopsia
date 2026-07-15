@@ -314,6 +314,8 @@ export function makeDefaultSequence(): SequenceState {
     variation: 0.15,
     breathe: { amount: 0, periodSec: 30 },
     arc: { enabled: false, lengthSec: 120 },
+    burial: { enabled: false, lengthSec: 180, depth: 0.7 },
+    longTake: { enabled: false, lengthSec: 240, depth: 0.5 },
     cadenceEvery: 0,
     ruptureChance: 0,
     monomediaChance: 0,
