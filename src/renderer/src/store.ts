@@ -799,6 +799,9 @@ interface StoreState {
   toggleMetaXYPads: () => void
   renderScale: number
   setRenderScale: (v: number) => void
+  // Strobe-safety limiter (photosensitive) : 0 = off, higher = tighter flash cap.
+  strobeSafe: number
+  setStrobeSafe: (v: number) => void
   // Depth engine mode (2.5D) : off · synthetic test bowl · AI monocular estimate.
   depthMode: 'off' | 'synth' | 'estimate'
   setDepthMode: (m: 'off' | 'synth' | 'estimate') => void
@@ -1922,6 +1925,17 @@ export const useStore = create<StoreState>((set, get) => ({
     const s = Math.max(0.1, Math.min(2, v))
     localStorage.setItem('opsia.renderScale', String(s))
     set({ renderScale: s })
+  },
+  // Flash safety : mild ON by default (0.35) — it barely touches normal content
+  // (only >~17% full-field mean-luminance jumps get damped) but nets real strobes.
+  strobeSafe: (() => {
+    const n = Number(localStorage.getItem('opsia.strobeSafe'))
+    return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0.35
+  })(),
+  setStrobeSafe: (v) => {
+    const s = Math.max(0, Math.min(1, v))
+    localStorage.setItem('opsia.strobeSafe', String(s))
+    set({ strobeSafe: s })
   },
 
   depthMode: ((): 'off' | 'synth' | 'estimate' => {

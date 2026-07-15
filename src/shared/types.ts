@@ -556,6 +556,8 @@ export interface OutputFrame {
   // Frame-Weave : the lattice cell shown this frame (0..3 = layer, -1 = blank).
   // Absent = Frame-Weave off.
   weaveHot?: number
+  // Strobe-safety limiter amount (0 = off) : the output window applies the same cap.
+  strobeSafe?: number
 }
 
 export interface DisplayInfo {

@@ -456,6 +456,7 @@ export default function App(): JSX.Element {
         //    Shader hot-swaps preserve feedback buffers (brief §1).
         comp!.setGlobalSpeed(st.globalSpeed)
         comp!.setWarp(st.warpEnabled ? st.warpCorners : null, st.warpGrid)
+        comp!.setStrobeSafe(st.strobeSafe)
         comp!.syncFromState(c, shaderSourceById)
         // 2. Modulation: refresh the audio bus (OSC/local features), then tick
         //    the 8-slot engine and overlay the mod-matrix on top of the base
@@ -607,7 +608,8 @@ export default function App(): JSX.Element {
             freeze,
             superFlicker: st.superFlicker,
             flickerHot,
-            weaveHot
+            weaveHot,
+            strobeSafe: st.strobeSafe
           })
         }
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to

@@ -32,6 +32,7 @@ export function OutputView(): JSX.Element {
       try {
         comp!.setGlobalSpeed(f.globalSpeed)
         comp!.setWarp(f.warpEnabled ? f.warpCorners : null, f.warpGrid)
+        comp!.setStrobeSafe(f.strobeSafe ?? 0)
         comp!.syncFromState(f.c, shaderSourceById)
         applyModulation(comp!, f.c, f.modValues, inputsForShader, f.modBypass)
         // Mirror audio-coupled A/B mixes (computed with the audio bus in the

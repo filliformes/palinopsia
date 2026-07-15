@@ -46,6 +46,8 @@ export function OutputPage({
   const setHiveOutPort = useStore((s) => s.setHiveOutPort)
   const renderScale = useStore((s) => s.renderScale)
   const setRenderScale = useStore((s) => s.setRenderScale)
+  const strobeSafe = useStore((s) => s.strobeSafe)
+  const setStrobeSafe = useStore((s) => s.setStrobeSafe)
   const resW = Math.round(1920 * renderScale)
   const resH = Math.round(1080 * renderScale)
 
@@ -346,6 +348,49 @@ export function OutputPage({
               with crisp pixels : a genuine lo-fi look; push to{' '}
               <span className="text-text">4K</span> for hi-fi (heavier on the GPU).
               Changing it rebuilds the engine : a brief flicker is normal.
+            </p>
+          </Section>
+
+          <Section title="Flash safety">
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={strobeSafe}
+                onChange={(e) => setStrobeSafe(Number(e.target.value))}
+                onDoubleClick={() => setStrobeSafe(0.35)}
+                className="min-w-0 flex-1 accent-accent"
+                title="Photosensitive-safety limiter : caps how fast the whole picture can flash. Applies to the preview AND the projection."
+              />
+              <span className="w-24 shrink-0 text-right font-mono text-[11px] text-muted">
+                {strobeSafe < 0.02 ? 'off' : `${Math.round(strobeSafe * 100)}%`}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                ['off', 0],
+                ['mild', 0.35],
+                ['strong', 0.7],
+                ['max', 1]
+              ].map(([lbl, v]) => (
+                <button
+                  key={lbl as string}
+                  onClick={() => setStrobeSafe(v as number)}
+                  className={btn(Math.abs(strobeSafe - (v as number)) < 0.02)}
+                >
+                  {lbl}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] leading-tight text-muted">
+              A safety net on the final image : it measures the whole-frame brightness
+              each frame and damps big full-field <span className="text-text">flashes</span>{' '}
+              (from Shutter, Superimposition, Frame-Weave, datamosh, hard cuts…) so no
+              seizure-inducing strobe reaches the screen. Normal motion is untouched.
+              <span className="text-text"> Mild</span> is on by default and barely
+              affects ordinary content.
             </p>
           </Section>
 

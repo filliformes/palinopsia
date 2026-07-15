@@ -34,6 +34,7 @@ import { ParametricSource } from './ParametricSource';
 import { DepthShadow } from './depthShadow';
 import { OutputShape } from './outputShape';
 import { Cameraless } from './cameraless';
+import { StrobeLimiter } from './strobeLimit';
 import { PbrLib } from './pbrTextures';
 import type { SidechainRef } from '@shared/types';
 import { VideoSource } from './VideoSource';
@@ -973,6 +974,12 @@ export class Compositor {
   private fzPersp = 0; // perspective projection of the cast shadow
   private fzInstId: string | null = null; // the pinned finalizer's instance id
 
+  // Strobe-safety limiter : slew-limits full-field luminance jumps on the FINAL
+  // presented frame (photosensitive safety). 0 = off. Applied last, before present.
+  private strobeLimiter: StrobeLimiter | null = null;
+  private strobeSafe = 0;
+  /** Flash-safety amount 0..1 (0 = off). Higher = tighter mean-luminance cap. */
+  setStrobeSafe(v: number): void { this.strobeSafe = v; }
   // Cameraless / direct-film stage (after outputShape, before xfade). Params live
   // on the Finalizer (cf* ← film* inputs), applied natively like the fz* shaper.
   private cameraless: Cameraless | null = null;
@@ -1868,6 +1875,14 @@ export class Compositor {
       }
       if (this.freezeCaptured) present = this.snapshot.tex;
     }
+    // Strobe-safety limiter : the very last stage on the presented frame, so it nets
+    // ALL upstream flash sources (Shutter, Superimposition, Frame-Weave, Cameraless
+    // blank, datamosh bloom, hard cuts…). cap = max mean-luminance step per frame.
+    if (this.strobeSafe > 0.02) {
+      if (!this.strobeLimiter) this.strobeLimiter = new StrobeLimiter(gl);
+      const cap = 0.25 - this.strobeSafe * 0.235; // 0.02 → ~0.245 (loose) · 1 → 0.015 (tight)
+      present = this.strobeLimiter.apply(present, cap, this.w, this.h);
+    }
     // Present to canvas : warped (keystone quad) or straight full-screen.
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -1917,6 +1932,7 @@ export class Compositor {
     this.depthShadow?.dispose();
     this.outputShape?.dispose();
     this.cameraless?.dispose();
+    this.strobeLimiter?.dispose();
     this.pbrLib?.dispose();
     disposeTarget(gl, this.bgScratch);
     disposeTarget(gl, this.bgFill);
