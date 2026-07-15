@@ -34,7 +34,12 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     swirl: 'Rotate every motion vector → a vortex mosh (0 = none, ± = spin direction).',
     flowInvert: 'Reverse the motion direction → the smear pushes backward.',
     pulse: 'Auto-fire the bloom on a clock (Hz) — hands-free rhythmic moshing. 0 = off.',
-    trig: 'Fire a BLOOM burst on the rising edge : momentarily holds the I-frame + boosts persistence so the motion drags the frozen texture (the classic datamosh hit). Press it, send OSC, or bind a modulator (square LFO / audio onset) with M to mosh on the beat.'
+    trig: 'Fire a BLOOM burst on the rising edge : momentarily holds the I-frame + boosts persistence so the motion drags the frozen texture (the classic datamosh hit). Press it, send OSC, or bind a modulator (square LFO / audio onset) with M to mosh on the beat.',
+    manifest: 'Manifestation : instead of a clean I-frame cut, the live frame re-enters ONLY where there is motion — a new source completes itself out of the retained frame, growing in along movement. Still areas stay frozen.',
+    actant: 'Actant layer strength : sparse sticky patches that FREEZE their texture and drift along the flow as autonomous frozen blocks. 0 = off. Drop them with the actant ▸ trigger or the rate clock.',
+    actantLife: 'How long each actant patch persists before it fades : low ≈ a fraction of a second, high ≈ several seconds.',
+    actantRate: 'Auto-spawn actant bursts on a clock (Hz) — hands-free. 0 = only the manual/OSC trigger fires them.',
+    actantTrig: 'Drop a burst of actant patches on the rising edge : localized frozen blocks that stick and drift along the motion. Press it, send OSC, or bind a modulator (square LFO / audio onset) with M. Needs actants > 0.'
   },
   'fx-stutter': {
     trig: 'PUNCH-IN : while fired, every band freezes (full stutter). Press, OSC, or bind a modulator (M) to glitch on the beat. 0 = the base `chance` applies.'

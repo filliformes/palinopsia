@@ -327,9 +327,9 @@ void main(){
 // bleed. Block-constant vectors tear at block edges : the macroblock signature.
 const F_DATAMOSH = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
-uniform sampler2D uHost, uPrev, uFlow, uEnergy;
+uniform sampler2D uHost, uPrev, uFlow, uEnergy, uActantMask;
 uniform vec2 uRes;
-uniform float uBlock, uMotion, uRefresh, uResidual, uReseed, uDecay, uBleed, uThresh, uSeed, uAutoBloom, uBloom, uSwirl;
+uniform float uBlock, uMotion, uRefresh, uResidual, uReseed, uDecay, uBleed, uThresh, uSeed, uAutoBloom, uBloom, uSwirl, uActant, uManifest;
 uniform int uMode, uFlowInvert;
 float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 void main(){
@@ -365,20 +365,59 @@ void main(){
 
   vec3 host = texture(uHost, vUV).rgb;
 
+  // ACTANTS : sparse localized patches (seeded by a trigger, advecting along the
+  // flow in their own mask) that FREEZE and drag their texture — autonomous
+  // persistent blocks (Perconte). Where the mask is high, force near-total
+  // persistence and immunity to reset/reseed, so the patch sticks and smears.
+  float act = uActant * texture(uActantMask, vUV).r;
+
   // Accumulator persists by DECAY. Still areas (mv≈0) sample themselves and
   // converge back to host over ~1/(1-decay) frames : the smear LINGERS where the
   // motion was, then cleans up. Moving areas keep sliding (the P-frame smear).
   float dec = mix(uDecay, 0.985, bloom * 0.6);         // bloom boosts persistence
+  dec = mix(dec, 0.99, act);                           // actants : near-total hold
   vec3 outc = mix(host, advected, dec);
-  outc = mix(outc, host, uResidual * 0.5);             // extra live-texture re-inject (mush control)
-  outc = mix(outc, host, refresh);                     // I-frame reset
+  outc = mix(outc, host, uResidual * 0.5 * (1.0 - act)); // extra live-texture re-inject
+
+  // MANIFESTATION : instead of a clean I-frame cut, the live frame re-enters only
+  // where there's MOTION — the new source completes itself out of the retained
+  // frame along the flow. Still regions stay frozen; moving edges reveal the live.
+  float mo = smoothstep(uThresh, uThresh * 4.0 + 0.001, fmag);
+  float reset = clamp(refresh + uManifest * mo, 0.0, 1.0) * (1.0 - act);
+  outc = mix(outc, host, reset);                       // I-frame reset / manifestation
 
   // Stochastic block reseed : whole blocks snap back to host, re-introducing
   // detail so the smear never fully mushes (transflow's random-reset idea).
-  float rs = step(1.0 - uReseed * 0.3, hash(floor(vUV * uRes / max(uBlock, 1.0)) + uSeed));
+  float rs = step(1.0 - uReseed * 0.3, hash(floor(vUV * uRes / max(uBlock, 1.0)) + uSeed)) * (1.0 - act);
   outc = mix(outc, host, rs);
 
   o = vec4(clamp(outc, 0.0, 1.0), 1.0);
+}`
+
+// Actant mask : a single-channel field of localized "sticky" patches. Each frame
+// it ADVECTS along the same motion field as the mosh (so the patches drift with
+// the picture) and DECAYS; on a trigger frame it STAMPS a burst of soft blobs at
+// random centres. The datamosh pass reads this mask to freeze + hold those spots.
+const F_ACTANT = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uPrev, uFlow;
+uniform vec2 uRes, uCenters[6];
+uniform float uDecay, uMotion, uStamp, uRad, uNStamp;
+uniform int uFlowInvert;
+void main(){
+  vec2 mv = texture(uFlow, vUV).rg * uMotion;
+  if (uFlowInvert == 1) mv = -mv;
+  float m = texture(uPrev, vUV - mv).r * uDecay;       // advect + decay the mask
+  if (uStamp > 0.5) {
+    float aspect = uRes.x / uRes.y;
+    for (int i = 0; i < 6; i++) {
+      if (float(i) < uNStamp) {
+        vec2 d = vUV - uCenters[i]; d.x *= aspect;      // aspect-correct blobs
+        m = max(m, smoothstep(uRad, uRad * 0.25, length(d)));
+      }
+    }
+  }
+  o = vec4(clamp(m, 0.0, 1.0), 0.0, 0.0, 1.0);
 }`
 
 // Cut detector → decaying bloom state (rendered to a 1×1 buffer). Averages the
@@ -762,6 +801,7 @@ class NodeGL {
   echo: Prog
   feedback: Prog
   datamosh: Prog
+  actant: Prog
   energy: Prog
   scan: Prog
   scanout: Prog
@@ -791,6 +831,7 @@ class NodeGL {
     this.echo = this.build(F_ECHO)
     this.feedback = this.build(F_FEEDBACK)
     this.datamosh = this.build(F_DATAMOSH)
+    this.actant = this.build(F_ACTANT)
     this.energy = this.build(F_ENERGY)
     this.scan = this.build(F_SCAN)
     this.scanout = this.build(F_SCANOUT)
@@ -1310,6 +1351,13 @@ export class DatamoshNode implements ConvNode {
   private bloomEnv = 0 // decaying bloom-trigger envelope
   private prevTrig = 0
   private pulseT = 0
+  private actBuf: [RGBA, RGBA] | null = null // actant mask ping-pong (localized sticky patches)
+  private actW = 0
+  private actH = 0
+  private actCur = 0
+  private prevActTrig = 0
+  private actPulseT = 0
+  private actCenters = new Float32Array(12) // up to 6 stamp centres (vec2 each)
   private disposed = false
   constructor(private gl: WebGL2RenderingContext) {}
 
@@ -1358,6 +1406,25 @@ export class DatamoshNode implements ConvNode {
     const pulse = clampf(num(inp.pulse, 0), 0, 8)
     if (pulse > 0) { this.pulseT += ctx.dt; if (this.pulseT >= 1 / pulse) { this.pulseT = 0; this.bloomEnv = 1 } }
     this.bloomEnv *= Math.exp(-ctx.dt / 0.4) // ~0.4s bloom tail
+
+    // Actant spawn : a rising edge on `actantTrig` (or the `actantRate` clock) seeds
+    // a burst of localized sticky patches at random centres. Fill the centre array
+    // and flag how many to stamp this frame (0 = advect+decay only).
+    const actStrength = clampf(num(inp.actant, 0), 0, 1)
+    const actTrig = num(inp.actantTrig, 0)
+    const actRate = clampf(num(inp.actantRate, 0), 0, 8)
+    let spawn = 0
+    if (actStrength > 0.001) {
+      if (actTrig >= 0.5 && this.prevActTrig < 0.5) spawn = 3
+      if (actRate > 0) { this.actPulseT += ctx.dt; if (this.actPulseT >= 1 / actRate) { this.actPulseT = 0; spawn = 3 } }
+    }
+    this.prevActTrig = actTrig
+    if (spawn > 0) {
+      for (let i = 0; i < spawn; i++) {
+        this.actCenters[i * 2] = 0.12 + Math.random() * 0.76
+        this.actCenters[i * 2 + 1] = 0.12 + Math.random() * 0.76
+      }
+    }
 
     const draw = (fbo: WebGLFramebuffer, w: number, h: number): void => {
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, w, h); gl.drawArrays(gl.TRIANGLES, 0, 3)
@@ -1413,11 +1480,42 @@ export class DatamoshNode implements ConvNode {
     gl.uniform1f(p.u('uEDecay'), 0.92) // bloom sustains ~25–30 frames after a cut
     draw(eWrite.fbo, 1, 1)
 
+    // 2c) actant mask : advect the sticky-patch field along the conditioned flow,
+    //     decay it, and stamp any spawn burst. Only when actants are enabled.
+    let actMask: WebGLTexture = ctx.host // fallback tex (unused when uActant = 0)
+    if (actStrength > 0.001) {
+      if (!this.actBuf || this.actW !== W || this.actH !== H) {
+        if (this.actBuf) for (const b of this.actBuf) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
+        this.actBuf = [makeRGBA(gl, W, H, false), makeRGBA(gl, W, H, false)]
+        this.actW = W; this.actH = H; this.actCur = 0
+      }
+      const aRead = this.actBuf[this.actCur], aWrite = this.actBuf[1 - this.actCur]
+      p = g.use(g.actant)
+      bind(0, aRead.tex); bind(1, fsWrite.tex)
+      gl.uniform1i(p.u('uPrev'), 0); gl.uniform1i(p.u('uFlow'), 1)
+      gl.uniform2f(p.u('uRes'), W, H)
+      const life = clampf(num(inp.actantLife, 0.6), 0, 1)
+      gl.uniform1f(p.u('uDecay'), Math.exp(-ctx.dt / (0.15 + life * life * 6))) // ~0.15–6s life
+      gl.uniform1f(p.u('uMotion'), clampf(num(inp.motion, 1), 0, 4))
+      gl.uniform1i(p.u('uFlowInvert'), num(inp.flowInvert, 0) >= 0.5 ? 1 : 0)
+      gl.uniform1f(p.u('uStamp'), spawn > 0 ? 1 : 0)
+      gl.uniform1f(p.u('uNStamp'), spawn)
+      gl.uniform1f(p.u('uRad'), clampf(num(inp.block, 16) / Math.min(W, H) * 4, 0.03, 0.4))
+      gl.uniform2fv(p.u('uCenters'), this.actCenters)
+      draw(aWrite.fbo, W, H)
+      actMask = aWrite.tex
+      this.actCur = 1 - this.actCur
+    }
+
     // 3) datamosh advection → accumulator write
     const read = this.accum![this.cur], write = this.accum![1 - this.cur]
     p = g.use(g.datamosh)
     bind(0, ctx.host); bind(1, read.tex); bind(2, fsWrite.tex); bind(3, eWrite.tex) // conditioned flow
+    bind(4, actMask)
     gl.uniform1i(p.u('uHost'), 0); gl.uniform1i(p.u('uPrev'), 1); gl.uniform1i(p.u('uFlow'), 2); gl.uniform1i(p.u('uEnergy'), 3)
+    gl.uniform1i(p.u('uActantMask'), 4)
+    gl.uniform1f(p.u('uActant'), actStrength)
+    gl.uniform1f(p.u('uManifest'), clampf(num(inp.manifest, 0), 0, 1))
     gl.uniform1f(p.u('uAutoBloom'), clampf(num(inp.autoBloom, 0.7), 0, 1))
     gl.uniform1f(p.u('uBloom'), Math.min(1, this.bloomEnv))
     gl.uniform1i(p.u('uFlowInvert'), num(inp.flowInvert, 0) >= 0.5 ? 1 : 0)
@@ -1449,6 +1547,7 @@ export class DatamoshNode implements ConvNode {
     const gl = this.gl
     if (this.accum) { for (const b of this.accum) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.accum = null }
     if (this.energyBuf) { for (const b of this.energyBuf) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.energyBuf = null }
+    if (this.actBuf) { for (const b of this.actBuf) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.actBuf = null }
   }
 }
 

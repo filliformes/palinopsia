@@ -246,7 +246,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Datamosh : the codec 'moshing' look, real-time and codec-free. The layer's own motion (optical flow, quantised to macroblocks) advects a feedback buffer every frame, so the picture keeps SLIDING along movement : the P-frame smear. Turn REFRESH (the I-frame) down and a new scene's motion drags the PREVIOUS scene's texture around : figures melt into and emerge from the image (the bloom). RESIDUAL re-injects live texture (the mosh↔mush line); RESEED snaps whole blocks back so it never fully mushes. STICKY slides each block as a crisp tile (real datamosh tearing); MELT is a softer smear. With a sidechain layer + 'motion transfer' on, that layer's MOVEMENT moshes THIS layer's texture (two images melting into each other).",
+      "DESCRIPTION": "Datamosh : the codec 'moshing' look, real-time and codec-free. The layer's own motion (optical flow, quantised to macroblocks) advects a feedback buffer every frame, so the picture keeps SLIDING along movement : the P-frame smear. Turn REFRESH (the I-frame) down and a new scene's motion drags the PREVIOUS scene's texture around : figures melt into and emerge from the image (the bloom). RESIDUAL re-injects live texture (the mosh↔mush line); RESEED snaps whole blocks back so it never fully mushes. STICKY slides each block as a crisp tile (real datamosh tearing); MELT is a softer smear. ACTANTS are sparse sticky patches that a trigger drops into the picture, drifting along the flow as autonomous frozen blocks (Perconte). MANIFEST reveals the live frame only where there's motion, so a new source completes itself out of the retained frame instead of cutting. With a sidechain layer + 'motion transfer' on, that layer's MOVEMENT moshes THIS layer's texture.",
       "CATEGORIES": ["FX", "Glitch", "Feedback"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["melt", "sticky", "fluid"], "DEFAULT": 1, "LABEL": "mode" },
@@ -258,12 +258,17 @@ export const NATIVE_NODES: IsfShader[] = [
         { "NAME": "refresh", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.06, "LABEL": "refresh (I-frame)" },
         { "NAME": "residual", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "residual" },
         { "NAME": "reseed", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.1, "LABEL": "reseed" },
+        { "NAME": "manifest", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "manifest (motion reveal)" },
         { "NAME": "thresh", "TYPE": "float", "MIN": 0.0, "MAX": 0.1, "DEFAULT": 0.012, "LABEL": "motion gate" },
         { "NAME": "bleed", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2, "LABEL": "chroma bleed" },
         { "NAME": "autoBloom", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.7, "LABEL": "auto-bloom (cuts)" },
         { "NAME": "cutSense", "TYPE": "float", "MIN": 0.02, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "cut sensitivity" },
         { "NAME": "pulse", "TYPE": "float", "MIN": 0.0, "MAX": 8.0, "DEFAULT": 0.0, "LABEL": "pulse (Hz)" },
         { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "bloom ▸" },
+        { "NAME": "actant", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "actants" },
+        { "NAME": "actantLife", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "actant life" },
+        { "NAME": "actantRate", "TYPE": "float", "MIN": 0.0, "MAX": 8.0, "DEFAULT": 0.0, "LABEL": "actant rate (Hz)" },
+        { "NAME": "actantTrig", "TYPE": "event", "DEFAULT": false, "LABEL": "actant ▸" },
         { "NAME": "sidechainFlow", "TYPE": "bool", "DEFAULT": false, "LABEL": "motion transfer", "COMPACT": true },
         { "NAME": "flowRes", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["128", "256", "512"], "DEFAULT": 1, "LABEL": "flow res", "COMPACT": true }
       ]
@@ -276,6 +281,10 @@ export const NATIVE_NODES: IsfShader[] = [
       refresh: [0.0, 0.15],
       residual: [0.05, 0.35],
       reseed: [0.0, 0.35],
+      manifest: [0.0, 0.6],
+      actant: [0.0, 0.8],
+      actantLife: [0.3, 0.8],
+      actantRate: [0.0, 2.0],
       thresh: [0.005, 0.03],
       bleed: [0, 0.5],
       autoBloom: [0.4, 1.0],
