@@ -73,22 +73,6 @@ export function Transport(): JSX.Element {
   const setProximity = useStore((s) => s.setProximity)
   const proximityAudio = useStore((s) => s.proximityAudio)
   const setProximityAudio = useStore((s) => s.setProximityAudio)
-  const density = useStore((s) => s.density)
-  const setDensity = useStore((s) => s.setDensity)
-  const gestureTexture = useStore((s) => s.gestureTexture)
-  const setGestureTexture = useStore((s) => s.setGestureTexture)
-  const coalesce = useStore((s) => s.coalesce)
-  const setCoalesce = useStore((s) => s.setCoalesce)
-  const tonicity = useStore((s) => s.tonicity)
-  const setTonicity = useStore((s) => s.setTonicity)
-  const shutter = useStore((s) => s.shutter)
-  const setShutter = useStore((s) => s.setShutter)
-  const drift = useStore((s) => s.drift)
-  const setDrift = useStore((s) => s.setDrift)
-  const flow = useStore((s) => s.flow)
-  const setFlow = useStore((s) => s.setFlow)
-  const superFlicker = useStore((s) => s.superFlicker)
-  const setSuperFlicker = useStore((s) => s.setSuperFlicker)
   const activeWorld = worlds.find((w) => w.id === world)
   const setComposition = useStore.setState
   const applyVariation = useStore((s) => s.applyVariation)
@@ -244,27 +228,7 @@ export function Transport(): JSX.Element {
             ◑
           </button>
         </div>
-        {/* Field macros + temperament : spatial-material + film globals. Grouped
-            with breathing room; sliders cram (shrink) rather than ever wrap to a
-          second row on a narrow window. */}
-        <div className="flex min-w-0 items-center gap-2">
-          <MacroKnob label="DENS" value={density} onChange={setDensity}
-            title="Density : sparse ↔ dense (fades upper layers / fills them in). 0.5 neutral · double-click resets" />
-          <MacroKnob label="G↔T" value={gestureTexture} onChange={setGestureTexture}
-            title="Gesture ↔ Texture : clean directional (sharpen) ↔ internalised churn (trails). 0.5 neutral" />
-          <MacroKnob label="COAL" value={coalesce} onChange={setCoalesce}
-            title="Coalesce : grain (dither) ↔ mass (blur/smooth). 0.5 neutral" />
-          <MacroKnob label="TONE" value={tonicity} onChange={setTonicity} neutral={0}
-            title="Tonicity : tonal/harmonic audio pulls colour in, noise pulls toward black-and-white (needs Audio on). 0 = off · double-click resets." />
-          <MacroKnob label="SHUT" value={shutter} onChange={setShutter} neutral={0}
-            title="Shutter : GLOBAL full-freeze stop-motion: dead-holds the whole present, then jumps. 0 = off, low = slow/chunky (~2fps) → high = fast/fluid (~24fps). For a filmic hold with gate-weave + materiality (feedback keeps running underneath), use Finishing → film hold (Cameraless) instead." />
-          <MacroKnob label="DRIFT" value={drift} onChange={setDrift} neutral={0}
-            title="Drift : slow analog-instability wander over the grade + rare 'accidents'. 0 = off." />
-          <MacroKnob label="FLOW" value={flow} onChange={setFlow}
-            title="Flow ↔ Interruption : one bipolar axis. LEFT (interruption) stutters — stochastic frame-holds, breakup and brief blank stabs; RIGHT (flow) softens toward a liquid, continuous image. 0.5 neutral · double-click resets." />
-          <MacroKnob label="SUPER" value={superFlicker} onChange={setSuperFlicker} neutral={0}
-            title="Superimposition flicker : a hypnagogic strobe: cross-cuts which layer shows on the drawn cadence (rate follows Cameraless film hold). 0 = off." />
-        </div>
+        {/* The Field + Temperament macros moved to the Feel tab (right column, G). */}
       </div>
 
       {/* Variation : a baseline-anchored variant of the whole scene at `varAmt`
@@ -346,40 +310,6 @@ export function Transport(): JSX.Element {
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-// A compact field-macro slider (label + narrow range, double-click → neutral).
-// `neutral` is the parked value (0.5 for the bipolar field macros, 0 for the
-// unipolar temperament controls).
-function MacroKnob({
-  label,
-  value,
-  onChange,
-  title,
-  neutral = 0.5
-}: {
-  label: string
-  value: number
-  onChange: (v: number) => void
-  title: string
-  neutral?: number
-}): JSX.Element {
-  const active = Math.abs(value - neutral) > 0.02
-  return (
-    <div className="flex min-w-0 items-center gap-1" title={title}>
-      <span className={`shrink-0 font-mono text-[9px] ${active ? 'text-accent2' : 'text-muted'}`}>{label}</span>
-      <input
-        type="range"
-        min={0}
-        max={1}
-        step={0.01}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        onDoubleClick={() => onChange(neutral)}
-        className="w-11 min-w-0 accent-accent2"
-      />
     </div>
   )
 }

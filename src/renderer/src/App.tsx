@@ -25,6 +25,7 @@ import { FinishingTouches, FinishingToggle } from './components/FinishingTouches
 import { Inspector } from './components/Inspector'
 import { LayerPanel } from './components/LayerPanel'
 import { MixerPanel } from './components/MixerPanel'
+import { FeelPanel } from './components/FeelPanel'
 import { MetaBar } from './components/MetaBar'
 import { ModulationPanel } from './components/ModulationPanel'
 import { OscPanel } from './components/OscPanel'
@@ -317,6 +318,12 @@ export default function App(): JSX.Element {
         if (k === 'f') {
           e.preventDefault()
           useStore.getState().setRightView('finishing')
+          return
+        }
+        // G: switch the right column to Feel (the global macros).
+        if (k === 'g') {
+          e.preventDefault()
+          useStore.getState().setRightView('feel')
           return
         }
         // D / X / I: collapse-toggle the Modulation / Master-FX / Inspector panels.
@@ -869,6 +876,8 @@ export default function App(): JSX.Element {
             <MixerPanel />
           ) : rightView === 'finishing' ? (
             <FinishingTouches />
+          ) : rightView === 'feel' ? (
+            <FeelPanel />
           ) : (
             <>
               {[0, 1, 2, 3].map((i) => (
@@ -926,10 +935,11 @@ function FpsTag(): JSX.Element {
 function RightViewTabs(): JSX.Element {
   const rightView = useStore((s) => s.rightView)
   const setRightView = useStore((s) => s.setRightView)
-  const tabs: Array<{ id: 'layers' | 'mixer' | 'finishing'; label: string; title: string }> = [
+  const tabs: Array<{ id: 'layers' | 'mixer' | 'finishing' | 'feel'; label: string; title: string }> = [
     { id: 'layers', label: 'layers', title: 'The 4 layer strips' },
     { id: 'mixer', label: 'mixer', title: 'Compact opacity/speed/blend for all 4 layers (M)' },
-    { id: 'finishing', label: 'finishing', title: 'Finishing Touches : Vibe Palette · Context · Finalizer' }
+    { id: 'finishing', label: 'finishing', title: 'Finishing Touches : Vibe Palette · Context · Finalizer' },
+    { id: 'feel', label: 'feel', title: 'Feel : the global macros — Field + Temperament (G)' }
   ]
   return (
     <div className="flex shrink-0 gap-1">
