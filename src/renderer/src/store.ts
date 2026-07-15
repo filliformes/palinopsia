@@ -763,6 +763,10 @@ interface StoreState {
   setShutter: (v: number) => void
   drift: number
   setDrift: (v: number) => void
+  // Flow ↔ Interruption (bipolar, 0.5 = neutral) : Flow softens toward a liquid,
+  // continuous image; Interruption stutters (frame-holds / breakup / blank stabs).
+  flow: number
+  setFlow: (v: number) => void
   // Superimposition flicker (Cameraless §5.2 : 0 = off) + animated-sound loop
   // (§4.4 : samples a scanline of the output and sends it to Pandore over OSC).
   superFlicker: number
@@ -1817,6 +1821,9 @@ export const useStore = create<StoreState>((set, get) => ({
   setShutter: (v) => set({ shutter: v }),
   drift: (() => { const v = Number(localStorage.getItem('opsia.drift')); return Number.isFinite(v) ? v : 0 })(),
   setDrift: (v) => { localStorage.setItem('opsia.drift', String(v)); set({ drift: v }) },
+  // Flow ↔ Interruption is bipolar : rests at 0.5 (neutral) and persists like drift.
+  flow: (() => { const v = Number(localStorage.getItem('opsia.flow')); return Number.isFinite(v) ? v : 0.5 })(),
+  setFlow: (v) => { localStorage.setItem('opsia.flow', String(v)); set({ flow: v }) },
   superFlicker: 0,
   setSuperFlicker: (v) => set({ superFlicker: v }),
   markSignalEnabled: localStorage.getItem('opsia.markSignalEnabled') === '1',
@@ -2195,6 +2202,7 @@ export const useStore = create<StoreState>((set, get) => ({
       localStorage.setItem('opsia.coalesce', String(theme.coalesce))
       localStorage.setItem('opsia.tonicity', String(theme.tonicity))
       localStorage.setItem('opsia.drift', String(theme.drift))
+      localStorage.setItem('opsia.flow', String(theme.flow))
       if (world) localStorage.setItem('opsia.world', theme.world)
       return {
         name: theme.name,
@@ -2214,6 +2222,7 @@ export const useStore = create<StoreState>((set, get) => ({
         tonicity: theme.tonicity,
         shutter: theme.shutter,
         drift: theme.drift,
+        flow: theme.flow,
         superFlicker: theme.superFlicker
       }
     }),

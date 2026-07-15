@@ -11,7 +11,7 @@ import { hiveEncoder } from './hiveEncoder'
 import { audioBus } from './engine/audioIn'
 import { applyCoupling } from './engine/coupling'
 import { applyProximity, applyFieldMacros } from './engine/field'
-import { applyTonicity, applyDrift, shutterHold, shutterClear } from './engine/temperament'
+import { applyTonicity, applyDrift, applyFlowInterrupt, shutterHold, shutterClear } from './engine/temperament'
 import { applyFlicker } from './engine/flicker'
 import { pushMarkSignal } from './engine/markSignal'
 import { applyModulation, modEngine } from './engine/modulation'
@@ -498,10 +498,16 @@ export default function App(): JSX.Element {
         //     the output on held frames.
         const tonOv = applyTonicity(comp!, c, st.tonicity)
         const driftOv = applyDrift(comp!, c, st.drift, now)
+        // Flow ↔ Interruption : smooth/liquid ↔ stutter/decimate/blank. Its freeze
+        // ORs into the shutter path; its finishing overrides merge below.
+        const flowRes = applyFlowInterrupt(comp!, c, st.flow, now)
+        const flowActive = Math.abs(st.flow - 0.5) > 0.02
         let freeze = false
-        if (st.shutter > 0.02) { freeze = shutterHold(now, st.shutter); comp!.setFreeze(freeze) }
-        else if (seqFreeze !== null) { freeze = seqFreeze; comp!.setFreeze(freeze) } // sequencer mono-freeze
-        else if (shutterClear()) comp!.setFreeze(false)
+        if (st.shutter > 0.02) freeze = shutterHold(now, st.shutter)
+        else if (seqFreeze !== null) freeze = seqFreeze // sequencer mono-freeze
+        else shutterClear()
+        freeze = freeze || (flowActive && flowRes.freeze)
+        comp!.setFreeze(freeze)
         // 2g. Superimposition flicker (§5.2): cross-cut which layer shows on the
         //     drawn cadence : rate follows the Cameraless film rate when it's on.
         let flickerHot = -1
@@ -517,7 +523,7 @@ export default function App(): JSX.Element {
         // Sequencer overlay first, then temperament on top : the same order the
         // monitor applied them, so shared inputs resolve identically.
         const masterOverrides: Record<string, Record<string, number>> = {}
-        for (const ov of [seqOverrides, tonOv, driftOv]) {
+        for (const ov of [seqOverrides, tonOv, driftOv, flowRes.overrides]) {
           if (!ov) continue
           for (const id in ov) masterOverrides[id] = { ...masterOverrides[id], ...ov[id] }
         }

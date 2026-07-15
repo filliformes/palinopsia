@@ -316,6 +316,7 @@ function route(address: string, args: Args): void {
     case 'tonicity': st.setTonicity(clamp01(n)); return
     case 'shutter': st.setShutter(clamp01(n)); return
     case 'drift': st.setDrift(clamp01(n)); return
+    case 'flow': st.setFlow(clamp01(n)); return
     case 'superflicker': st.setSuperFlicker(clamp01(n)); return
 
     case 'world': {
@@ -549,6 +550,7 @@ function enumerateLeaves(): Leaf[] {
   add('/opsia/tonicity', 0, 1, st.tonicity ?? 0, 'Tonicity : tonal audio → colour, noise → mono (0 = off)')
   add('/opsia/shutter', 0, 1, st.shutter ?? 0, 'Shutter : stop-motion frame stepping (0 = off)')
   add('/opsia/drift', 0, 1, st.drift ?? 0, 'Drift : analog-instability temperament (0 = off)')
+  add('/opsia/flow', 0, 1, st.flow ?? 0.5, 'Flow ⇄ Interruption : liquid ↔ stutter/decimate/blank (0.5 = neutral)')
   add('/opsia/superflicker', 0, 1, st.superFlicker ?? 0, 'Superimposition flicker : layer cross-cut strobe (0 = off)')
   // World selection (accepts a string id/name, or a 1-based index) + transport.
   const worldIdx = Math.max(1, st.worlds.findIndex((w) => w.id === st.world) + 1)

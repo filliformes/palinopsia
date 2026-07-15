@@ -145,3 +145,53 @@ export function applyDrift(comp: MacroComp, c: CompositionState, drift: number, 
   }
   return ov
 }
+
+// ── Flow ↔ Interruption : one bipolar temperament axis (0.5 = neutral) ───
+// Sweeps the whole rig between two ways of moving through time (ecological texts,
+// process/entropy family). Toward FLOW the image runs smooth and liquid : softened,
+// un-stepped, continuous. Toward INTERRUPTION it stutters : stochastic frame-holds
+// (decimate), analog breakup, and occasional blank stabs (splice). One knob folds
+// half the finishing tools into a single gesture. Returns the master overrides AND
+// whether to hold (freeze) this frame, so the caller ORs it into the shutter path.
+let flowBlankUntil = 0
+export interface FlowResult {
+  overrides: MasterOverrides | null
+  freeze: boolean
+}
+export function applyFlowInterrupt(comp: MacroComp, c: CompositionState, flow: number, nowMs: number): FlowResult {
+  if (Math.abs(flow - 0.5) < 0.02) return { overrides: null, freeze: false }
+  const fin = c.master.find((f) => f.shaderId === 'fx-finalizer')
+  const finLive = (name: string, d: number): number =>
+    (fin && (liveModValues.get(`fx:master:${fin.id}:${name}`) as number | undefined)) ?? (fin ? num(fin.inputs[name], d) : d)
+  const ov: MasterOverrides = {}
+  const set = (id: string, name: string, v: number): void => {
+    comp.setFxInput(MASTER, id, name, v)
+    ;(ov[id] ??= {})[name] = v
+  }
+  let freeze = false
+
+  if (flow > 0.5) {
+    // FLOW : soften toward a liquid, continuous image (pull the breakup tools down).
+    const a = (flow - 0.5) * 2
+    if (fin) {
+      set(fin.id, 'sharpen', Math.max(0, finLive('sharpen', 0) * (1 - a)))
+      set(fin.id, 'grain', Math.max(0, finLive('grain', 0) * (1 - a * 0.7)))
+      set(fin.id, 'parasites', Math.max(0, finLive('parasites', 0.1) * (1 - a * 0.8)))
+    }
+  } else {
+    // INTERRUPTION : stutter — stochastic frame-holds + breakup + brief blank stabs.
+    const a = (0.5 - flow) * 2
+    if (Math.random() < a * 0.6) freeze = true // decimate : hold this frame
+    if (nowMs > flowBlankUntil && Math.random() < a * 0.03) flowBlankUntil = nowMs + 40 + Math.random() * 80
+    const blanking = nowMs < flowBlankUntil
+    if (fin) {
+      set(fin.id, 'grain', clamp01(finLive('grain', 0) + a * 0.25))
+      set(fin.id, 'parasites', clamp01(finLive('parasites', 0.1) + a * 0.3))
+      if (blanking) {
+        set(fin.id, 'black', clamp01(finLive('black', 0) + 0.8)) // a dark splice/blank
+        set(fin.id, 'white', Math.max(0.05, finLive('white', 1) - 0.7))
+      }
+    }
+  }
+  return { overrides: Object.keys(ov).length ? ov : null, freeze }
+}

@@ -52,6 +52,8 @@ export interface Theme {
   tonicity: number
   shutter: number
   drift: number
+  /** Flow ↔ Interruption (bipolar, 0.5 = neutral) : liquid ↔ stutter. */
+  flow: number
   superFlicker: number
   /** Context finalizer overrides applied AFTER the World (theme wins). */
   context?: Record<string, number | number[]>
@@ -79,6 +81,7 @@ const DEF = {
   tonicity: 0,
   shutter: 0,
   drift: 0,
+  flow: 0.5,
   superFlicker: 0
 }
 const mk = (t: ThemeIn): Theme => ({ ...DEF, ...t })
@@ -169,7 +172,7 @@ export const THEMES: Theme[] = [
     sources: ['shapes', 'slabs', 'op-art'],
     layerFx: ['fx-byte-corrupt', 'fx-mosh-blocks', 'fx-stutter', 'fx-threshold'],
     blends: ['difference', 'exclusion'], gestureTexture: 0.7, coalesce: 0.25,
-    shutter: 0.35, density: 0.5
+    shutter: 0.35, flow: 0.3, density: 0.5
   }),
   mk({
     id: 'dropout', name: 'Dropout', family: 'Glitch / Datamosh',
@@ -449,7 +452,7 @@ export const THEMES: Theme[] = [
     palette: [K, [0.3, 0.16, 0.04, 1], [1.0, 0.85, 0.5, 1]],
     sources: ['particle-drift', 'ash', 'filaments'],
     layerFx: ['fx-light-trails', 'fx-decay', 'fx-phosphene'],
-    blends: ['screen', 'lighten'], feedback: 0.5, drift: 0.3, density: 0.4
+    blends: ['screen', 'lighten'], feedback: 0.5, drift: 0.3, flow: 0.66, density: 0.4
   }),
   mk({
     id: 'recursion', name: 'Recursion', family: 'Feedback / Afterimage',
