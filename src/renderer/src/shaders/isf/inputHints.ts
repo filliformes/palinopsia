@@ -45,6 +45,12 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     swap: 'Flip which eye carries the lag (near ↔ far, left ↔ right). Fixes inverted or reversed depth.',
     mix: 'Dry/wet against the live image. The disparity is temporal, so a still frame is byte-exact — no colour fringing.'
   },
+  'node-feedback': {
+    couple: 'Runs a SECOND feedback buffer (fb1) under a diverged transform and cross-mixes it into the main loop. 0 = single buffer. Up = emergent structure neither loop makes alone.',
+    couple2: 'How differently the 2nd buffer evolves : scales its zoom/rotate vs the main loop. 1 = same, <1 gentler, >1 wilder. The divergence is what makes the coupling interesting.',
+    rgbDelay: 'Time-shear : the R/G/B channels read the delay echo from slightly different past frames → chromatic trails. Needs delay echo > 0.',
+    route: 'Where the delay echo goes : FEEDBACK re-enters the loop (compounds/accumulates) · FEEDFORWARD rides on top of the output only (a clean, non-accumulating echo).'
+  },
   'node-datamosh': {
     mode: 'MELT (soft per-pixel smear) · STICKY (rigid block tiles that tear at edges — the real datamosh look) · FLUID (a temporally-averaged flow → smooth liquid melt).',
     swirl: 'Rotate every motion vector → a vortex mosh (0 = none, ± = spin direction).',

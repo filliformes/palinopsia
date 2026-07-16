@@ -62,7 +62,12 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Ghost smear', values: { feedback: 0.82, gain: 0.96, zoom: 0.002, rotate: 0, driftX: 0.015, driftY: 0, pivot: 0.4, warp: 0.25, hue: 0, blur: 0.5, blend: 0, agc: 0.45, noise: 0.12 } },
     { name: 'Crystalline', values: { feedback: 0.88, gain: 1.03, zoom: 0.015, rotate: 0.015, driftX: 0, driftY: 0, pivot: 0.55, warp: 0.35, hue: 0, blur: 0.02, blend: 3, agc: 0.5, noise: 0.1 } },
     { name: 'Keyed shapes', values: { feedback: 0.9, gain: 1.02, zoom: 0.02, rotate: 0.02, driftX: 0.005, driftY: 0, pivot: 0.6, warp: 0.25, hue: 0.01, blur: 0.1, blend: 0, keyMode: 1, keyThresh: 0.45, keySoft: 0.06, border: 0.5, borderHue: 0.55, agc: 0.5, noise: 0.1 } },
-    { name: 'Time echo', values: { feedback: 0.82, gain: 1.0, zoom: 0.006, rotate: 0.008, driftX: 0.004, driftY: 0, pivot: 0.5, warp: 0.3, hue: 0, blur: 0.2, delay: 8, delayMix: 0.45, blend: 0, agc: 0.5, noise: 0.12 } }
+    { name: 'Time echo', values: { feedback: 0.82, gain: 1.0, zoom: 0.006, rotate: 0.008, driftX: 0.004, driftY: 0, pivot: 0.5, warp: 0.3, hue: 0, blur: 0.2, delay: 8, delayMix: 0.45, blend: 0, agc: 0.5, noise: 0.12 } },
+    { name: 'Coupled twins', values: { feedback: 0.9, gain: 1.02, zoom: 0.02, rotate: 0.02, driftX: 0.004, driftY: -0.003, pivot: 0.65, warp: 0.5, hue: 0.01, blur: 0.2, blend: 0, agc: 0.55, noise: 0.12, couple: 0.4, couple2: 1.4 } },
+    { name: 'Emergent weave', values: { feedback: 0.92, gain: 1.04, zoom: 0.015, rotate: 0.03, driftX: 0, driftY: 0, pivot: 0.7, warp: 0.6, hue: 0.02, hueCurve: 0.4, blur: 0.15, blend: 0, agc: 0.5, noise: 0.1, couple: 0.6, couple2: 0.7 } },
+    { name: 'RGB time-shear', values: { feedback: 0.86, gain: 1.0, zoom: 0.008, rotate: 0.01, driftX: 0.006, driftY: 0, pivot: 0.5, warp: 0.3, hue: 0, blur: 0.15, delay: 9, delayMix: 0.5, rgbDelay: 4, route: 0, blend: 0, agc: 0.5, noise: 0.1 } },
+    { name: 'Feedforward echo', values: { feedback: 0.8, gain: 0.98, zoom: 0.004, rotate: 0, driftX: 0.015, driftY: 0.005, pivot: 0.4, warp: 0.25, hue: 0, blur: 0.2, delay: 10, delayMix: 0.55, rgbDelay: 2, route: 1, blend: 0, agc: 0.45, noise: 0.1 } },
+    { name: 'Coupled chaos', values: { feedback: 0.94, gain: 1.07, zoom: 0.03, rotate: 0.04, driftX: 0.01, driftY: 0.006, pivot: 0.72, warp: 0.7, hue: 0.03, hueCurve: 0.5, blur: 0.12, blend: 0, agc: 0.35, noise: 0.1, couple: 0.5, couple2: 1.6, delay: 6, delayMix: 0.4, rgbDelay: 3 } }
   ],
   // ── Datamosh (real-time faux-codec mosh) ──
   'node-datamosh': [

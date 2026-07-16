@@ -210,13 +210,20 @@ interface Prog {
 //    blowing out. Ping-pong RGBA16F, owned by FeedbackNode.
 const F_FEEDBACK = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
-uniform sampler2D uHost, uPrev, uRing;
+uniform sampler2D uHost, uPrev, uRing, uCross;
 uniform vec2 uRes, uOff, uPivot;
 uniform float uFeedback, uGain, uZoom, uRot, uWarp, uHue, uBlur, uAgc, uNoise, uSeed;
-uniform float uKeyThresh, uKeySoft, uBorder, uBorderHue, uHueCurve, uDelayMix;
-uniform int uBlend, uKeyMode, uRingCols, uRingRows, uDelayTile;
+uniform float uKeyThresh, uKeySoft, uBorder, uBorderHue, uHueCurve, uDelayMix, uCouple;
+uniform int uBlend, uKeyMode, uRingCols, uRingRows, uDelayTileR, uDelayTileG, uDelayTileB, uRoute;
 
 float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+// Sample one tile of the delay ring atlas at uv.
+vec3 ringTap(int tile, vec2 uv){
+  int col = tile - (tile / uRingCols) * uRingCols;
+  int row = tile / uRingCols;
+  vec2 rtUV = (vec2(float(col), float(row)) + clamp(uv, 0.0, 1.0)) / vec2(float(uRingCols), float(uRingRows));
+  return texture(uRing, rtUV).rgb;
+}
 vec3 rgb2hsv(vec3 c){
   vec4 K = vec4(0., -1./3., 2./3., -1.);
   vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
@@ -254,13 +261,18 @@ void main(){
         + texture(uPrev, ruv + vec2(0.0, t.y)).rgb + texture(uPrev, ruv - vec2(0.0, t.y)).rgb) / 6.0;
   } else pv = texture(uPrev, ruv).rgb;
 
-  // DELAY TAP : blend in a frame from uDelay frames ago (a ring atlas of recent
-  // outputs), sampled with the SAME transform → echo / ghosting / time-shear.
-  if (uDelayMix > 0.001){
-    int col = uDelayTile - (uDelayTile / uRingCols) * uRingCols;
-    int row = uDelayTile / uRingCols;
-    vec2 rtUV = (vec2(float(col), float(row)) + clamp(ruv, 0.0, 1.0)) / vec2(float(uRingCols), float(uRingRows));
-    pv = mix(pv, texture(uRing, rtUV).rgb, uDelayMix);
+  // COUPLE : cross-inject the companion buffer (fb1) which evolves under a DIFFERENT
+  // transform → emergent behaviour no single loop shows (dual coupled buffers).
+  if (uCouple > 0.001) pv = mix(pv, texture(uCross, ruv).rgb, uCouple);
+
+  // DELAY TAP with PER-CHANNEL RGB delay (time-shear : each channel from a slightly
+  // different past frame). ROUTE : fed BACK into the loop (accumulates) or FED
+  // FORWARD onto the output only (a non-accumulating echo, screen-blended at the end).
+  vec3 dtap = vec3(0.0);
+  bool hasDelay = uDelayMix > 0.001;
+  if (hasDelay){
+    dtap = vec3(ringTap(uDelayTileR, ruv).r, ringTap(uDelayTileG, ruv).g, ringTap(uDelayTileB, ruv).b);
+    if (uRoute == 0) pv = mix(pv, dtap, uDelayMix); // feedback : re-enters the loop
   }
 
   // AGC : normalise toward a target mean luma (from a coarse read of the buffer,
@@ -309,6 +321,10 @@ void main(){
     float edge = clamp(length(vec2(dFdx(keyed), dFdy(keyed))) * 40.0, 0.0, 1.0);
     outc = mix(outc, hsv2rgb(vec3(uBorderHue, 0.9, 1.0)), edge * uBorder);
   }
+
+  // Feedforward routing : the delay echo rides on top of the output only (screen),
+  // so it never compounds in the accumulator.
+  if (hasDelay && uRoute == 1) outc = 1.0 - (1.0 - outc) * (1.0 - clamp(dtap, 0.0, 1.0) * uDelayMix);
 
   outc += (hash(vUV * uRes + uSeed) - 0.5) * uNoise * 0.04; // noise floor : never dies flat
   o = vec4(clamp(outc, 0.0, 1.0), 1.0);
@@ -1305,6 +1321,8 @@ const FB_N = FB_COLS * FB_ROWS // 16-frame delay ring
 
 export class FeedbackNode implements ConvNode {
   private bufs: [RGBA, RGBA] | null = null
+  private bufsB: [RGBA, RGBA] | null = null // 2nd coupled buffer (fb1), lazy when couple > 0
+  private curB = 0
   private ring: RGBA | null = null // atlas of recent OUTPUTS (half-res, RGBA8) for the delay tap
   private ringTW = 0
   private ringTH = 0
@@ -1322,6 +1340,7 @@ export class FeedbackNode implements ConvNode {
     if (this.bufs && this.w === w && this.h === h) return
     const gl = this.gl
     if (this.bufs) for (const b of this.bufs) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
+    if (this.bufsB) { for (const b of this.bufsB) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.bufsB = null }
     if (this.ring) { gl.deleteTexture(this.ring.tex); gl.deleteFramebuffer(this.ring.fbo) }
     this.bufs = [makeRGBA(gl, w, h, true), makeRGBA(gl, w, h, true)]
     this.ringTW = Math.max(2, w >> 1); this.ringTH = Math.max(2, h >> 1)
@@ -1347,42 +1366,75 @@ export class FeedbackNode implements ConvNode {
     const pvy = 0.5 + Math.cos(this.t * 0.11) * drift * 0.3
 
     // Delay tap : most-recent past tile = (ringWrite-1); go `delay` frames back,
-    // clamped to what's actually been filled so we never read a black tile.
-    const delayMixIn = clampf(num(inp.delayMix, 0), 0, 1)
+    // clamped to what's actually been filled so we never read a black tile. RGB
+    // delay shears the channels by ±spread frames (time-shear).
+    const delayMixIn = this.ringFilled > 1 ? clampf(num(inp.delayMix, 0), 0, 1) : 0
     const delayReq = Math.round(clampf(num(inp.delay, 0), 0, FB_N - 1))
-    const delayFrames = Math.min(delayReq, Math.max(0, this.ringFilled - 1))
-    const delayTile = ((this.ringWrite - 1 - delayFrames) % FB_N + FB_N) % FB_N
+    const spread = Math.round(clampf(num(inp.rgbDelay, 0), 0, 8))
+    const maxBack = Math.max(0, this.ringFilled - 1)
+    const tile = (back: number): number => ((this.ringWrite - 1 - Math.min(maxBack, Math.max(0, back))) % FB_N + FB_N) % FB_N
+    const dg = Math.min(delayReq, maxBack)
+    const tileR = tile(dg + spread), tileG = tile(dg), tileB = tile(dg - spread)
+    const route = Math.round(num(inp.route, 0))
 
-    const p = g.use(g.feedback)
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
-    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, read.tex); gl.uniform1i(p.u('uPrev'), 1)
-    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.ring!.tex); gl.uniform1i(p.u('uRing'), 2)
-    gl.uniform1i(p.u('uRingCols'), FB_COLS); gl.uniform1i(p.u('uRingRows'), FB_ROWS)
-    gl.uniform1i(p.u('uDelayTile'), delayTile)
-    gl.uniform1f(p.u('uDelayMix'), this.ringFilled > 1 ? delayMixIn : 0)
-    gl.uniform2f(p.u('uRes'), W, H)
-    gl.uniform1f(p.u('uFeedback'), clampf(num(inp.feedback, 0.85), 0, 1))
-    gl.uniform1f(p.u('uGain'), clampf(num(inp.gain, 1.0), 0.2, 2.0))
-    gl.uniform1f(p.u('uZoom'), clampf(num(inp.zoom, 0.01), -0.2, 0.2))
-    gl.uniform1f(p.u('uRot'), clampf(num(inp.rotate, 0), -0.3, 0.3))
-    gl.uniform2f(p.u('uOff'), clampf(num(inp.driftX, 0), -0.1, 0.1), clampf(num(inp.driftY, 0), -0.1, 0.1))
-    gl.uniform2f(p.u('uPivot'), pvx, pvy)
-    gl.uniform1f(p.u('uWarp'), clampf(num(inp.warp, 0.4), 0, 1))
-    gl.uniform1f(p.u('uHue'), clampf(num(inp.hue, 0), -0.5, 0.5))
-    gl.uniform1f(p.u('uHueCurve'), clampf(num(inp.hueCurve, 0), 0, 1))
-    gl.uniform1f(p.u('uBlur'), clampf(num(inp.blur, 0.2), 0, 1))
-    gl.uniform1i(p.u('uBlend'), Math.round(num(inp.blend, 0)))
-    gl.uniform1i(p.u('uKeyMode'), Math.round(num(inp.keyMode, 0)))
-    gl.uniform1f(p.u('uKeyThresh'), clampf(num(inp.keyThresh, 0.4), 0, 1))
-    gl.uniform1f(p.u('uKeySoft'), clampf(num(inp.keySoft, 0.1), 0.001, 0.5))
-    gl.uniform1f(p.u('uBorder'), clampf(num(inp.border, 0), 0, 1))
-    gl.uniform1f(p.u('uBorderHue'), clampf(num(inp.borderHue, 0.6), 0, 1))
-    gl.uniform1f(p.u('uAgc'), clampf(num(inp.agc, 0.5), 0, 1))
-    gl.uniform1f(p.u('uNoise'), clampf(num(inp.noise, 0.15), 0, 1))
-    gl.uniform1f(p.u('uSeed'), this.frame % 1024)
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo)
-    gl.viewport(0, 0, W, H)
-    gl.drawArrays(gl.TRIANGLES, 0, 3)
+    const couple = clampf(num(inp.couple, 0), 0, 1)
+    const couple2 = clampf(num(inp.couple2, 1.3), 0, 2)
+    const dual = couple > 0.001
+
+    // Set every (shared) uniform + draw one feedback pass. `prev`/`cross` are the
+    // buffers this pass reads; `tmul` scales this buffer's transform (fb1 diverges).
+    const drawFB = (writeFbo: WebGLFramebuffer, prev: WebGLTexture, cross: WebGLTexture, tmul: number, coupleAmt: number): void => {
+      const p = g.use(g.feedback)
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, prev); gl.uniform1i(p.u('uPrev'), 1)
+      gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.ring!.tex); gl.uniform1i(p.u('uRing'), 2)
+      gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, cross); gl.uniform1i(p.u('uCross'), 3)
+      gl.uniform1i(p.u('uRingCols'), FB_COLS); gl.uniform1i(p.u('uRingRows'), FB_ROWS)
+      gl.uniform1i(p.u('uDelayTileR'), tileR); gl.uniform1i(p.u('uDelayTileG'), tileG); gl.uniform1i(p.u('uDelayTileB'), tileB)
+      gl.uniform1f(p.u('uDelayMix'), delayMixIn); gl.uniform1i(p.u('uRoute'), route)
+      gl.uniform1f(p.u('uCouple'), coupleAmt)
+      gl.uniform2f(p.u('uRes'), W, H)
+      gl.uniform1f(p.u('uFeedback'), clampf(num(inp.feedback, 0.85), 0, 1))
+      gl.uniform1f(p.u('uGain'), clampf(num(inp.gain, 1.0), 0.2, 2.0))
+      gl.uniform1f(p.u('uZoom'), clampf(num(inp.zoom, 0.01), -0.2, 0.2) * tmul)
+      gl.uniform1f(p.u('uRot'), clampf(num(inp.rotate, 0), -0.3, 0.3) * tmul)
+      gl.uniform2f(p.u('uOff'), clampf(num(inp.driftX, 0), -0.1, 0.1), clampf(num(inp.driftY, 0), -0.1, 0.1))
+      gl.uniform2f(p.u('uPivot'), pvx, pvy)
+      gl.uniform1f(p.u('uWarp'), clampf(num(inp.warp, 0.4), 0, 1))
+      gl.uniform1f(p.u('uHue'), clampf(num(inp.hue, 0), -0.5, 0.5))
+      gl.uniform1f(p.u('uHueCurve'), clampf(num(inp.hueCurve, 0), 0, 1))
+      gl.uniform1f(p.u('uBlur'), clampf(num(inp.blur, 0.2), 0, 1))
+      gl.uniform1i(p.u('uBlend'), Math.round(num(inp.blend, 0)))
+      gl.uniform1i(p.u('uKeyMode'), Math.round(num(inp.keyMode, 0)))
+      gl.uniform1f(p.u('uKeyThresh'), clampf(num(inp.keyThresh, 0.4), 0, 1))
+      gl.uniform1f(p.u('uKeySoft'), clampf(num(inp.keySoft, 0.1), 0.001, 0.5))
+      gl.uniform1f(p.u('uBorder'), clampf(num(inp.border, 0), 0, 1))
+      gl.uniform1f(p.u('uBorderHue'), clampf(num(inp.borderHue, 0.6), 0, 1))
+      gl.uniform1f(p.u('uAgc'), clampf(num(inp.agc, 0.5), 0, 1))
+      gl.uniform1f(p.u('uNoise'), clampf(num(inp.noise, 0.15), 0, 1))
+      gl.uniform1f(p.u('uSeed'), this.frame % 1024)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, writeFbo)
+      gl.viewport(0, 0, W, H)
+      gl.drawArrays(gl.TRIANGLES, 0, 3)
+    }
+
+    if (dual) {
+      // Lazily allocate fb1, seeded from fb0 so it doesn't start black.
+      if (!this.bufsB) {
+        this.bufsB = [makeRGBA(gl, W, H, true), makeRGBA(gl, W, H, true)]
+        this.curB = 0
+        const cp0 = g.use(g.copy)
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, read.tex); gl.uniform1i(cp0.u('uTex'), 0)
+        for (const b of this.bufsB) { gl.bindFramebuffer(gl.FRAMEBUFFER, b.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3) }
+      }
+      const readB = this.bufsB[this.curB], writeB = this.bufsB[1 - this.curB]
+      // Both passes read the OLD (read) buffers so the coupling is symmetric.
+      drawFB(write.fbo, read.tex, readB.tex, 1.0, couple) // fb0 ← fb0 × fb1
+      drawFB(writeB.fbo, readB.tex, read.tex, couple2, couple) // fb1 : diverged transform
+      this.curB = 1 - this.curB
+    } else {
+      drawFB(write.fbo, read.tex, read.tex, 1.0, 0)
+    }
 
     // Store this frame's output into the delay ring (downsampled to the tile).
     const cp = g.use(g.copy)
@@ -1403,6 +1455,7 @@ export class FeedbackNode implements ConvNode {
     this.disposed = true
     const gl = this.gl
     if (this.bufs) { for (const b of this.bufs) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.bufs = null }
+    if (this.bufsB) { for (const b of this.bufsB) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.bufsB = null }
     if (this.ring) { gl.deleteTexture(this.ring.tex); gl.deleteFramebuffer(this.ring.fbo); this.ring = null }
   }
 }
