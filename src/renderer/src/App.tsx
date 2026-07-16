@@ -21,6 +21,7 @@ import { visionBus } from './engine/visionIn'
 import { depthEngine } from './engine/depthEstimate'
 import { currentFps, tickFrame } from './perf'
 import { videoSeekRequests } from './engine/videoState'
+import { sonifyEngine } from './audio/sonify'
 import { tickSequencer } from './engine/sequencer'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel, FxChips } from './components/FxRackPanel'
@@ -35,6 +36,7 @@ import { OscPanel } from './components/OscPanel'
 import { AudioPanel } from './components/AudioPanel'
 import { BackgroundPanel } from './components/BackgroundPanel'
 import { OutputPage } from './components/OutputPage'
+import { SonifyPage } from './components/SonifyPage'
 import { WorldPage } from './components/WorldPage'
 import { SequencePage } from './components/SequencePage'
 import { SceneBank } from './components/SceneBank'
@@ -174,6 +176,7 @@ export default function App(): JSX.Element {
   const ndiActive = useStore((s) => s.ndiActive)
   const spoutActive = useStore((s) => s.spoutActive)
   const outputPageOpen = useStore((s) => s.outputPageOpen)
+  const sonifyPageOpen = useStore((s) => s.sonifyPageOpen)
   const renderScale = useStore((s) => s.renderScale)
   const worldPageOpen = useStore((s) => s.worldPageOpen)
   const sequencePageOpen = useStore((s) => s.sequencePageOpen)
@@ -310,6 +313,13 @@ export default function App(): JSX.Element {
         st.setSequencePageOpen(!st.sequencePageOpen)
         return
       }
+      // S : the Sonify page (image-to-sound engine).
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        const st = useStore.getState()
+        st.setSonifyPageOpen(!st.sonifyPageOpen)
+        return
+      }
       // Bare letters: view / panel shortcuts (guarded against typing in fields).
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField) {
         const k = e.key.toLowerCase()
@@ -357,6 +367,11 @@ export default function App(): JSX.Element {
       if (e.key === 'Escape' && useStore.getState().worldPageOpen) {
         e.preventDefault()
         useStore.getState().setWorldPageOpen(false)
+        return
+      }
+      if (e.key === 'Escape' && useStore.getState().sonifyPageOpen) {
+        e.preventDefault()
+        useStore.getState().setSonifyPageOpen(false)
         return
       }
       if (e.key === 'Escape' && useStore.getState().outputPageOpen) {
@@ -670,6 +685,9 @@ export default function App(): JSX.Element {
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to
         //    HIVE receivers (an OBS plugin, …). Frame-drops if backed up.
         if (st.hiveOutActive) hiveEncoder.encode(canvas, now * 1000)
+        // 5b. Sonify : ship the image taps to the audio engine (~30Hz; no-op
+        //     while the sound engine is off).
+        sonifyEngine.tick(comp!, now, c.bpm)
         // 6. Shader warm-up : one registry compile per frame, in the background,
         //    after launch settles. First-ever run pays the compiles here (a few
         //    seconds of background work); afterwards the GPU disk cache makes
@@ -985,6 +1003,7 @@ export default function App(): JSX.Element {
       {/* ── Output / Mapping page : full-screen takeover (canvas keeps
              rendering underneath so the live mirror + engine never stop) ── */}
       {outputPageOpen && <OutputPage canvasRef={canvasRef} />}
+      {sonifyPageOpen && <SonifyPage canvasRef={canvasRef} />}
       {worldPageOpen && <WorldPage />}
       {sequencePageOpen && <SequencePage canvasRef={canvasRef} />}
     </div>

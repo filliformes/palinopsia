@@ -30,6 +30,7 @@ import type { MetaKnobState } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
 import { beginMorph, cancelMorph } from './morph'
+import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify'
 import { resetCouplingState } from './engine/coupling'
 import { applyWorldToComposition, BUILTIN_WORLDS, cloneWorld, deriveSceneTags } from './worlds'
 
@@ -311,6 +312,15 @@ export function makeBlankBackground(): BackgroundState {
 // renderer thread. The live value hits the store immediately; the disk write
 // trails by 250ms of quiet.
 const persistTimers = new Map<string, ReturnType<typeof setTimeout>>()
+let sonifyPersistTimer: ReturnType<typeof setTimeout> | null = null
+function persistSonify(cfg: SoniConfig): void {
+  if (sonifyPersistTimer) clearTimeout(sonifyPersistTimer)
+  sonifyPersistTimer = setTimeout(() => {
+    sonifyPersistTimer = null
+    localStorage.setItem('opsia.sonify', JSON.stringify({ ...cfg, on: false }))
+  }, 250)
+}
+
 function persistMacro(key: string, v: number): void {
   const t = persistTimers.get(key)
   if (t) clearTimeout(t)
@@ -828,6 +838,13 @@ interface StoreState {
   // Strobe-safety limiter (photosensitive) : 0 = off, higher = tighter flash cap.
   strobeSafe: number
   setStrobeSafe: (v: number) => void
+  // Sonify (the S page) : the image-to-sound engine's whole config. Persisted
+  // to localStorage (per-machine, like OSC config), pushed to the engine on
+  // every write : one write path, same as everything else.
+  sonifyPageOpen: boolean
+  setSonifyPageOpen: (on: boolean) => void
+  sonify: SoniConfig
+  setSonify: (next: SoniConfig) => void
   // Depth engine mode (2.5D) : off · synthetic test bowl · AI monocular estimate.
   depthMode: 'off' | 'synth' | 'estimate'
   setDepthMode: (m: 'off' | 'synth' | 'estimate') => void
@@ -1972,6 +1989,22 @@ export const useStore = create<StoreState>((set, get) => ({
     const s = Math.max(0, Math.min(1, v))
     localStorage.setItem('opsia.strobeSafe', String(s))
     set({ strobeSafe: s })
+  },
+  sonifyPageOpen: false,
+  setSonifyPageOpen: (on) => set({ sonifyPageOpen: on }),
+  sonify: (() => {
+    try {
+      const raw = localStorage.getItem('opsia.sonify')
+      if (raw) return { ...defaultSoniConfig(), ...JSON.parse(raw), on: false } as SoniConfig
+    } catch { /* fall through to defaults */ }
+    return defaultSoniConfig()
+  })(),
+  setSonify: (next) => {
+    persistSonify(next)
+    if (next.on && !sonifyEngine.isRunning()) void sonifyEngine.start().then(() => sonifyEngine.pushConfig(useStore.getState().sonify))
+    else if (!next.on && sonifyEngine.isRunning()) sonifyEngine.stop()
+    else sonifyEngine.pushConfig(next)
+    set({ sonify: next })
   },
 
   depthMode: ((): 'off' | 'synth' | 'estimate' => {

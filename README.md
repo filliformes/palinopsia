@@ -35,6 +35,7 @@ work: **never cheap psychedelia, never a 3D game engine.**
 - [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix)
 - [Sequencer](#sequencer-key-q) — auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) · [Output & mapping](#output--mapping-key-o) — incl. Flash safety
+- [Sonify — image to sound](#sonify--image-to-sound-key-s) — Spectra · Orbit · Flow voices · quantizer · audio in recordings
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
@@ -119,6 +120,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `O` | Output / Mapping page |
 | `W` | World editor |
 | `Q` | Sequence page |
+| `S` | **Sonify** page (image-to-sound engine) |
 | `D` / `X` / `I` | Collapse Modulation / Master-FX / Inspector |
 | `R` | Fire the Transport's selected Randomize |
 | `Esc` | Close World / Output / Sequence page |
@@ -351,6 +353,31 @@ A full-page takeover (the engine keeps rendering underneath):
   accidents) without touching a steady image. One slider from loose to tight;
   it ships **on** at a moderate setting and mirrors to the output window.
 - A resource **HUD** (FPS · CPU · RAM · VRAM · GPU).
+
+## Sonify — image to sound (key `S`)
+
+The instrument's sound half : the image itself synthesizes audio, in real time,
+inside the app (an AudioWorklet engine — no external software). A full-page
+takeover: the live composite mirrored large with the **probes drawn on it** —
+because the probe is the instrument — plus three voice strips and a master bus.
+
+**The three voices** (each one lineage of the sonification literature):
+
+| Voice | Mapping | Register |
+|---|---|---|
+| **Spectra** | The frame as a spectrogram : a column of 96 partials reads the image under a scan line — vertical position → pitch, brightness → loudness. The line **sweeps** (tempo-syncable, one sweep per bar) or **holds** (drag it). | ANS · Metasynth · vOICe — shimmering masses; the musical one |
+| **Orbit** | The frame as a **waveform** : an orbit (circle or Lissajous) reads pixels at audio rate — the image *is* the oscillator, so the visuals mutate the timbre live. Drag the centre and radius on the mirror; pitch is a note or free Hz. | wave terrain · Oramics — alive, analog-adjacent |
+| **Flow** | Whatever **moves** sings : each moving region fires a grain — position → pan, motion energy → loudness, height → pitch. Onsets are dithered across the frame interval so 30 Hz control never quantizes audibly. | Pelletier's flow fields — Gestalt grain clouds |
+
+**Adaptive sources** : each voice listens to one of two **taps** — the
+composited master output or any single layer's post-FX image — so different
+voices can sonify different layers (a real ensemble). **Quantizer** : a global
+key (root + scale : chromatic, major, minor, pentatonic, whole-tone, modes)
+with a per-voice **♪ snap** — sonified data lands on real notes, or runs free.
+**Master** : gain + an always-on peak limiter (the audio Flash-safety) + live
+meter, and an **output-device picker**. While the engine runs, **recordings mix
+the sound in** — exports become true audiovisual pieces. Config persists
+per-machine.
 
 ## Sessions, scenes & themes
 
@@ -766,7 +793,7 @@ config persists to `localStorage`.
 | Engine | WebGL2 + [`interactive-shader-format`](https://github.com/msfeldstein/interactive-shader-format-js) runtime; WebGPU compute is post-MVP |
 | Control | `osc` (main) in/out + OSCQuery HTTP tree; Web MIDI in the renderer |
 | Video | `ffmpeg-static` ingest (DXV/HAP/ProRes… → all-intra cache) + `<video>` hardware decode; WebCodecs (HEVC) for HIVE; ffmpeg for recording delivery |
-| Audio | Web Audio (local) + OSC audio bus |
+| Audio | Web Audio (local analyser + the Sonify AudioWorklet engine) + OSC audio bus |
 | Output | Fullscreen HDMI · Spout (native DX11) · NDI (optional) · HIVE (HEVC/TCP + mDNS) — async PBO readback |
 
 ## Architecture

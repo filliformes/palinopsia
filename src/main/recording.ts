@@ -56,36 +56,36 @@ const FORMATS: Fmt[] = [
     // Codecs already match → stream-copy remux (instant, lossless). Else x264.
     args: (src, out, c) =>
       c === 'h264'
-        ? ['-i', src, '-c', 'copy', '-movflags', '+faststart', out]
-        : ['-i', src, '-c:v', 'libx264', '-preset', 'medium', '-crf', '16', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out]
+        ? ['-i', src, '-c:v', 'copy', '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', out]
+        : ['-i', src, '-c:v', 'libx264', '-preset', 'medium', '-crf', '16', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', out]
   },
   {
     id: 'mp4-h265',
     label: 'MP4 · H.265 / HEVC',
     ext: 'mp4',
     needsFfmpeg: true,
-    args: (src, out) => ['-i', src, '-c:v', 'libx265', '-preset', 'medium', '-crf', '20', '-pix_fmt', 'yuv420p', '-tag:v', 'hvc1', out]
+    args: (src, out) => ['-i', src, '-c:v', 'libx265', '-preset', 'medium', '-crf', '20', '-pix_fmt', 'yuv420p', '-tag:v', 'hvc1', '-c:a', 'aac', '-b:a', '256k', out]
   },
   {
     id: 'mov-prores',
     label: 'MOV · ProRes 422 HQ',
     ext: 'mov',
     needsFfmpeg: true,
-    args: (src, out) => ['-i', src, '-c:v', 'prores_ks', '-profile:v', '3', '-pix_fmt', 'yuv422p10le', out]
+    args: (src, out) => ['-i', src, '-c:v', 'prores_ks', '-profile:v', '3', '-pix_fmt', 'yuv422p10le', '-c:a', 'pcm_s16le', out]
   },
   {
     id: 'mkv-ffv1',
     label: 'MKV · FFV1 (lossless)',
     ext: 'mkv',
     needsFfmpeg: true,
-    args: (src, out) => ['-i', src, '-c:v', 'ffv1', '-level', '3', '-g', '1', out]
+    args: (src, out) => ['-i', src, '-c:v', 'ffv1', '-level', '3', '-g', '1', '-c:a', 'copy', out]
   },
   {
     id: 'avi-raw',
     label: 'AVI · uncompressed (raw)',
     ext: 'avi',
     needsFfmpeg: true,
-    args: (src, out) => ['-i', src, '-c:v', 'rawvideo', '-pix_fmt', 'bgr24', out]
+    args: (src, out) => ['-i', src, '-c:v', 'rawvideo', '-pix_fmt', 'bgr24', '-c:a', 'pcm_s16le', out]
   },
   {
     id: 'webm-vp9',
@@ -95,7 +95,7 @@ const FORMATS: Fmt[] = [
     args: (src, out, c) =>
       c === 'vp9'
         ? ['-i', src, '-c', 'copy', out]
-        : ['-i', src, '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '20', '-row-mt', '1', out]
+        : ['-i', src, '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '20', '-row-mt', '1', '-c:a', 'copy', out]
   }
 ]
 

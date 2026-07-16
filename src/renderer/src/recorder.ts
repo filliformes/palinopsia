@@ -8,6 +8,8 @@
 // so recording doesn't stall the live show. The lo-fi/glitchy look before was
 // MediaRecorder's ~2.5 Mbps default; we now set a resolution-scaled bitrate.
 
+import { sonifyEngine } from './audio/sonify'
+
 // Intermediate codec preference: H.264 first (hardware-encoded on Windows/macOS
 // Chromium → smooth + cheap), then VP9, then VP8. Each maps to what we tell main.
 const INTERMEDIATES: Array<{ mime: string; ext: string; codec: string }> = [
@@ -17,12 +19,15 @@ const INTERMEDIATES: Array<{ mime: string; ext: string; codec: string }> = [
   { mime: 'video/webm;codecs=vp8', ext: 'webm', codec: 'vp8' }
 ]
 
-function pickIntermediate(): { mime: string; ext: string; codec: string } | null {
+function pickIntermediate(withAudio: boolean): { mime: string; ext: string; codec: string } | null {
   if (typeof MediaRecorder === 'undefined') return null
   return (
     INTERMEDIATES.find((i) => {
       try {
-        return MediaRecorder.isTypeSupported(i.mime)
+        // With sonification running the intermediate must mux an Opus track :
+        // test the combined mime (Chromium's mp4 muxer may refuse audio, in
+        // which case we fall through to webm, which always takes vp9+opus).
+        return MediaRecorder.isTypeSupported(withAudio ? `${i.mime},opus` : i.mime)
       } catch {
         return false
       }
@@ -60,20 +65,29 @@ export class OutputRecorder {
 
   async start(canvas: HTMLCanvasElement, formatId: string): Promise<boolean> {
     if (this.rec) return false
-    const inter = pickIntermediate()
+    // Sonification running → mix its audio into the capture (a true
+    // audiovisual take). The audio track belongs to the sound engine's
+    // MediaStreamDestination : it is merged, never stopped by us.
+    const soniStream = sonifyEngine.recordStream()
+    const audioTracks = soniStream && sonifyEngine.isRunning() ? soniStream.getAudioTracks() : []
+    const inter = pickIntermediate(audioTracks.length > 0)
     if (!inter) return false
     this.formatId = formatId
     const ok = await window.api.recordingStart(inter.ext, inter.codec)
     if (!ok) return false
     try {
       const fps = 60
-      this.stream = canvas.captureStream(fps)
+      const canvasStream = canvas.captureStream(fps)
+      this.stream = audioTracks.length
+        ? new MediaStream([...canvasStream.getVideoTracks(), ...audioTracks])
+        : canvasStream
       this.rec = new MediaRecorder(this.stream, {
-        mimeType: inter.mime,
-        videoBitsPerSecond: captureBitrate(canvas.width, canvas.height, fps)
+        mimeType: audioTracks.length ? `${inter.mime},opus` : inter.mime,
+        videoBitsPerSecond: captureBitrate(canvas.width, canvas.height, fps),
+        ...(audioTracks.length ? { audioBitsPerSecond: 256_000 } : {})
       })
     } catch {
-      this.stream?.getTracks().forEach((t) => t.stop())
+      this.stream?.getVideoTracks().forEach((t) => t.stop())
       this.stream = null
       await window.api.recordingStop(formatId)
       return false
@@ -98,7 +112,9 @@ export class OutputRecorder {
       rec.onstop = (): void => res()
       rec.stop()
     })
-    this.stream?.getTracks().forEach((t) => t.stop())
+    // Stop only the canvas video tracks : the audio track is the LIVE sound
+    // engine's output and must keep running for the performance.
+    this.stream?.getVideoTracks().forEach((t) => t.stop())
     this.rec = null
     this.stream = null
     await this.queue // every chunk reached main before we finalize

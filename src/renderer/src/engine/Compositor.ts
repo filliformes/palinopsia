@@ -1394,6 +1394,42 @@ export class Compositor {
     return { grid: this.visionBuf as Uint8Array, size };
   }
 
+  // ── Sonify tap readback : a 96×96 downsample of the presented frame OR one
+  //    layer's post-FX image, read by the sonification engine at ~30Hz. Same
+  //    pattern as visionSample (tiny sync read after a downsample draw). ──
+  private soniFbo: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
+
+  readSonifyGrid(kind: 'master' | 'layer', layer: number, out: Uint8Array): boolean {
+    const gl = this.gl;
+    const size = 96;
+    if (out.length < size * size * 4) return false;
+    const src = kind === 'master' ? this.lastPresent : this.layers[layer]?.texture() ?? null;
+    if (!src) return false;
+    if (!this.soniFbo) {
+      const tex = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      const fbo = gl.createFramebuffer()!;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      this.soniFbo = { fbo, tex };
+    }
+    gl.bindVertexArray(this.vao);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.soniFbo.fbo);
+    gl.viewport(0, 0, size, size);
+    gl.useProgram(this.copyProg);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src); gl.uniform1i(this.uCTex, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.readPixels(0, 0, size, size, gl.RGBA, gl.UNSIGNED_BYTE, out);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindVertexArray(null);
+    return true;
+  }
+
   // ── Depth map (2.5D) : the shared grayscale depth the Parallax FX reads (and
   //    later Context / anaglyph). Filled synthetically or by the depth estimator. ──
   private depthTex: WebGLTexture | null = null;
@@ -2175,6 +2211,7 @@ export class Compositor {
     if (this.fxOpac) { disposeTarget(gl, this.fxOpac[0]); disposeTarget(gl, this.fxOpac[1]); }
     this.freeCapturePbos();
     if (this.audioTexGL) { gl.deleteTexture(this.audioTexGL); this.audioTexGL = null; }
+    if (this.soniFbo) { gl.deleteFramebuffer(this.soniFbo.fbo); gl.deleteTexture(this.soniFbo.tex); this.soniFbo = null; }
     if (this.visionFbo) { gl.deleteFramebuffer(this.visionFbo.fbo); gl.deleteTexture(this.visionFbo.tex); this.visionFbo = null; }
     if (this.depthTex) { gl.deleteTexture(this.depthTex); this.depthTex = null; }
     if (this.depthFbo) { gl.deleteFramebuffer(this.depthFbo.fbo); gl.deleteTexture(this.depthFbo.tex); this.depthFbo = null; }
