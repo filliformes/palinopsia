@@ -799,9 +799,20 @@ function inputValueForMode(
  * final = clamp(base + (v−0.5)·2·depth·span, min, max). Enums/bools are driven
  * too (snap / threshold).
  */
+// Video slots aren't ISF shaders, so their modulatable inputs carry synthetic
+// descriptors : `position` = the normalized playhead within the in/out trim (the
+// modulatable playhead), `speed` = a rate multiplier over the transport speed.
+const VIDEO_MOD_DESCS: Record<string, ModDesc> = {
+  position: { type: 'float', min: 0, max: 1, def: 0.5 },
+  speed: { type: 'float', min: 0, max: 4, def: 1 }
+}
+
 export function applyModulation(
   comp: {
-    layers: Array<{ setInput: (slot: 'A' | 'B', name: string, value: number) => void }>
+    layers: Array<{
+      setInput: (slot: 'A' | 'B', name: string, value: number) => void
+      setVideoInput?: (slot: 'A' | 'B', name: string, value: number) => void
+    }>
     setFxInput: (
       scope: import('@shared/types').FxScope,
       instId: string,
@@ -834,6 +845,14 @@ export function applyModulation(
     if (t.kind === 'source') {
       const layer = c.layers[t.layer]
       const slot = t.slot === 'A' ? layer?.sourceA : layer?.sourceB
+      // Video slot : route position/speed through the video seam (no shader).
+      if (slot?.kind === 'video' && VIDEO_MOD_DESCS[t.input]) {
+        const value = inputValueFrom01(VIDEO_MOD_DESCS[t.input], shaped01)
+        if (value === null || typeof value !== 'number') return
+        liveModValues.set(liveKey(t), value)
+        comp.layers[t.layer]?.setVideoInput?.(t.slot, t.input, value)
+        return
+      }
       shaderId = slot?.shaderId ?? null
     } else if (t.kind === 'bgSource') {
       shaderId = c.background?.source.shaderId ?? null
@@ -896,6 +915,15 @@ export function applyModulation(
       const layer = c.layers[a.target.layer]
       if (!layer) continue
       const slot = a.target.slot === 'A' ? layer.sourceA : layer.sourceB
+      // Video slot : position/speed modulate through the video seam.
+      if (slot?.kind === 'video' && VIDEO_MOD_DESCS[a.target.input]) {
+        const d = VIDEO_MOD_DESCS[a.target.input]
+        const final = inputValueForMode(d, undefined, v, a.depth, a.mode)
+        if (final === null || typeof final !== 'number') continue
+        liveModValues.set(liveKey(a.target), final)
+        comp.layers[a.target.layer]?.setVideoInput?.(a.target.slot, a.target.input, final)
+        continue
+      }
       if (!slot?.shaderId) continue
       const input = a.target.input
       const d = descFor(slot.shaderId).find((x) => x.name === input)

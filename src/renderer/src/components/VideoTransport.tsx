@@ -3,10 +3,12 @@
 // The playhead is painted straight from the engine's videoPlayheads map in a
 // rAF loop (no React re-renders), like the modulated sliders.
 
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react'
-import type { SourceSlot } from '@shared/types'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import type { ModTarget, SourceSlot } from '@shared/types'
+import { useShallow } from 'zustand/react/shallow'
 import { videoKey, videoPlayheads } from '../engine/videoState'
-import { useStore } from '../store'
+import { modTargetKey, useStore } from '../store'
+import { AssignRow } from './AutoControls'
 
 const SMIN = 1 / 28
 const SMAX = 128
@@ -188,6 +190,51 @@ export function VideoTransport({
           {fmtSpeed(speed)}
         </span>
       </div>
+
+      {/* Modulation : the playhead (position) + clip speed as mod targets. */}
+      <VideoModRow layer={layer} slot={slot} />
+    </div>
+  )
+}
+
+// Bind a modulator to the video PLAYHEAD (position 0..1 within the trim : a saw
+// LFO = a loop, S&H = jump-cuts, audio = a sound-driven scrub) or to the clip
+// SPEED (rate multiplier). On imported/converted all-intra clips the seeks are
+// frame-accurate, so a modulated playhead reads smooth.
+function VideoModRow({ layer, slot }: { layer: number; slot: 'A' | 'B' }): JSX.Element {
+  const [open, setOpen] = useState<'position' | 'speed' | null>(null)
+  const posTarget: ModTarget = { kind: 'source', layer, slot, input: 'position' }
+  const spdTarget: ModTarget = { kind: 'source', layer, slot, input: 'speed' }
+  const posKey = modTargetKey(posTarget)
+  const spdKey = modTargetKey(spdTarget)
+  const posBound = useStore(
+    useShallow((s) => s.composition.modMatrix.filter((a) => modTargetKey(a.target) === posKey))
+  )
+  const spdBound = useStore(
+    useShallow((s) => s.composition.modMatrix.filter((a) => modTargetKey(a.target) === spdKey))
+  )
+  const mBtn = (label: string, which: 'position' | 'speed', bound: { length: number }): JSX.Element => (
+    <button
+      onClick={() => setOpen((o) => (o === which ? null : which))}
+      className={`rounded px-1.5 py-0.5 font-mono text-[9px] transition-colors ${
+        bound.length > 0
+          ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2'
+          : 'bg-panel3/60 text-muted hover:text-text'
+      }`}
+      title={`Bind a modulator to the ${which === 'position' ? 'playhead (a saw LFO loops, S&H jump-cuts, audio scrubs)' : 'clip speed'}`}
+    >
+      M·{label}
+    </button>
+  )
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <span className="w-10 shrink-0 font-mono text-[9px] uppercase text-muted">mod</span>
+        {mBtn('playhead', 'position', posBound)}
+        {mBtn('speed', 'speed', spdBound)}
+      </div>
+      {open === 'position' && <AssignRow target={posTarget} bound={posBound} />}
+      {open === 'speed' && <AssignRow target={spdTarget} bound={spdBound} />}
     </div>
   )
 }

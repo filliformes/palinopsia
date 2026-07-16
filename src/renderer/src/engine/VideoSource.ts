@@ -69,6 +69,19 @@ export class VideoSource {
     inN: 0,
     outN: 1
   }
+  // Modulation overrides, written post-modulation each frame and CONSUMED by the
+  // next tick (one-frame values : unbinding the modulator releases them).
+  // posMod : normalized playhead 0..1 within the in/out trim — the modulatable
+  // playhead. On all-intra clips (the ffmpeg import cache) every frame is a
+  // keyframe, so the override-seek lands frame-accurately at speed.
+  private posMod: number | null = null
+  private speedMod: number | null = null
+  setPosMod(v: number): void {
+    this.posMod = Math.max(0, Math.min(1, v))
+  }
+  setSpeedMod(v: number): void {
+    this.speedMod = Math.max(0, v)
+  }
 
   constructor(private gl: WebGL2RenderingContext) {
     this.video = document.createElement('video')
@@ -160,12 +173,28 @@ export class VideoSource {
     // Always keep the media pipeline hot so frames flow to the texture.
     if (v.paused) void v.play().catch(() => {})
 
+    // Modulated playhead : a bound modulator wrote a normalized position this
+    // frame. It OWNS the playhead — place it inside the trim and drive the
+    // element through the override-seek path (below). Consumed per-frame, so
+    // unbinding the modulator hands the transport back seamlessly.
+    const posN = this.posMod
+    this.posMod = null
+    const spMod = this.speedMod ?? 1
+    this.speedMod = null
+    if (posN !== null) {
+      if (v.playbackRate !== 0.1) v.playbackRate = 0.1
+      this.pos = lo + posN * Math.max(0, hi - lo - 0.02)
+      if (!Number.isFinite(this.pos)) this.pos = lo
+      this.seekTowardPos(v)
+      return
+    }
+
     // Instantaneous direction: pendulum bounces between +1 and -1 at the trims.
     let dir = 1
     if (this.pb.direction === 'reverse') dir = -1
     else if (this.pb.direction === 'pendulum') dir = this.pendDir
 
-    const rate = Math.max(0, mul * this.pb.speed) // over realtime
+    const rate = Math.max(0, mul * this.pb.speed * spMod) // over realtime
     if (this.pos < 0) this.pos = v.currentTime
 
     // Pure-native forward: follow the element's own clock (no per-frame seeking).
@@ -216,20 +245,25 @@ export class VideoSource {
         try { v.currentTime = this.pos } catch { /* seek can race a reload */ }
       }
     } else {
-      // A large backward / fast-forward seek can take a while to decode. The
-      // safety must sit ABOVE any real seek time : otherwise it fires mid-seek,
-      // issues a new seek that CANCELS the in-flight one, and the frame never
-      // settles (the >1× reverse / >16× forward freeze). 'seeked' is the primary
-      // release; this only rescues a genuinely hung seek.
-      if (this.seeking && performance.now() - this.seekAt > 4000) this.seeking = false
-      if (!this.seeking && Math.abs(this.pos - v.currentTime) > 0.02) {
-        try {
-          v.currentTime = this.pos
-          this.seeking = true
-          this.seekAt = performance.now()
-        } catch {
-          /* a seek can race a src reload : retry next frame */
-        }
+      this.seekTowardPos(v)
+    }
+  }
+
+  /** Override-seek : one completed seek at a time toward the intended playhead.
+   *  A large backward / fast-forward seek can take a while to decode. The
+   *  safety must sit ABOVE any real seek time : otherwise it fires mid-seek,
+   *  issues a new seek that CANCELS the in-flight one, and the frame never
+   *  settles (the >1× reverse / >16× forward freeze). 'seeked' is the primary
+   *  release; this only rescues a genuinely hung seek. */
+  private seekTowardPos(v: HTMLVideoElement): void {
+    if (this.seeking && performance.now() - this.seekAt > 4000) this.seeking = false
+    if (!this.seeking && Math.abs(this.pos - v.currentTime) > 0.02) {
+      try {
+        v.currentTime = this.pos
+        this.seeking = true
+        this.seekAt = performance.now()
+      } catch {
+        /* a seek can race a src reload : retry next frame */
       }
     }
   }

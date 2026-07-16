@@ -670,6 +670,14 @@ export class ISFLayer {
   private videoB: VideoSource | null = null;
   private mediaIdA: string | null = null;
   private mediaIdB: string | null = null;
+  /** Modulation seam for video slots : `position` (normalized playhead) and
+   *  `speed` (rate multiplier) overrides, consumed by the source's next tick. */
+  setVideoInput(slot: 'A' | 'B', name: string, v: number): void {
+    const vs = slot === 'A' ? this.videoA : this.videoB;
+    if (!vs) return;
+    if (name === 'position') vs.setPosMod(v);
+    else if (name === 'speed') vs.setSpeedMod(v);
+  }
   // Live capture slots (kind:'capture'). Like video: a slot is one kind at once.
   private captureA: CaptureSource | null = null;
   private captureB: CaptureSource | null = null;
