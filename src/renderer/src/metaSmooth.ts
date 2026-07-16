@@ -14,7 +14,8 @@
 // morph and stay OSC-visible like any base value.
 
 import type { ModTarget } from '@shared/types'
-import { shapeCurve, inputValueFrom01 } from './engine/modulation'
+import { withSonifyParam } from './audio/sonify'
+import { shapeCurve, inputValueFrom01, SONIFY_MOD_DESCS } from './engine/modulation'
 import { inputsForShader } from './shaders/isf/inputs'
 import { useStore } from './store'
 
@@ -52,6 +53,14 @@ export function knobDisplayVersion(): number {
 function applyDest(target: ModTarget, shaped: number): void {
   if (target.kind === 'meta') return // knobs never chain into knobs
   const st = useStore.getState()
+  // Sonify probe destination : commit into the sonify config (real units).
+  if (target.kind === 'sonify') {
+    const d = SONIFY_MOD_DESCS[target.param]
+    if (!d) return
+    const v = d.min + Math.max(0, Math.min(1, shaped)) * (d.max - d.min)
+    st.setSonify(withSonifyParam(st.sonify, target.param, v))
+    return
+  }
   const c = st.composition
   let shaderId: string | null = null
   if (target.kind === 'source') {

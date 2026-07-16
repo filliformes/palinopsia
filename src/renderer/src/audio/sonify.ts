@@ -11,6 +11,7 @@
 //   dither across the frame interval (Pelletier), pitch quantized via the
 //   active scale table, then posted to the worklet.
 
+import { registerSonifyModBase, sonifyModValues } from '../engine/modulation'
 import { SONI_WORKLET_URL } from './soniWorklet'
 
 export const GRID = 96
@@ -44,7 +45,7 @@ export interface SoniConfig {
   spectra: {
     on: boolean; tap: number; gain: number; pan: number
     sweepOn: boolean; sweepHz: number; sync: boolean; x: number
-    gamma: number; loOct: number; hiOct: number; quantize: boolean
+    gamma: number; breath: number; loOct: number; hiOct: number; quantize: boolean
   }
   orbit: {
     on: boolean; tap: number; gain: number; pan: number
@@ -84,7 +85,7 @@ export function defaultSoniConfig(): SoniConfig {
     sinkId: '',
     root: 0,
     scale: 'minor',
-    spectra: { on: true, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, sync: false, x: 0.5, gamma: 1.8, loOct: 2, hiOct: 7, quantize: true },
+    spectra: { on: true, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, sync: false, x: 0.5, gamma: 1.8, breath: 0, loOct: 2, hiOct: 7, quantize: true },
     orbit: { on: false, tap: 0, gain: 0.5, pan: 0, note: 45, freq: 110, quantize: true, ratio: 1, cx: 0.5, cy: 0.5, rx: 0.25, ry: 0.25, drive: 1, smooth: 0.5 },
     flow: { on: false, tap: 0, gain: 0.6, pan: 0, sense: 0.4, density: 0.5, dur: 0.09, noise: 0.15, loOct: 3, hiOct: 6, quantize: true },
     raster: { on: false, tap: 0, gain: 0.4, pan: 0, note: 45, freq: 110, quantize: true, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
@@ -95,6 +96,7 @@ export function defaultSoniConfig(): SoniConfig {
 }
 
 const noteFreq = (n: number): number => 440 * Math.pow(2, (n - 69) / 12)
+const freqNote = (f: number): number => 69 + 12 * Math.log2(Math.max(1, f) / 440)
 
 /** All scale frequencies from octave lo..hi (root-relative), ascending. */
 function scaleTable(root: number, scale: SoniScale, loOct: number, hiOct: number): Float32Array {
@@ -135,6 +137,31 @@ function filterFreqs(cfg: SoniConfig): Float32Array {
   return out
 }
 
+/** Apply one sonify mod-param (REAL units, see SONIFY_MOD_DESCS) onto a config
+ *  immutably — shared by the Meta-knob settle path and the OSC endpoints. */
+export function withSonifyParam(c: SoniConfig, param: string, v: number): SoniConfig {
+  switch (param) {
+    case 'spectraX': return { ...c, spectra: { ...c.spectra, x: v } }
+    case 'filterX': return { ...c, filter: { ...c.filter, x: v } }
+    case 'orbitX': return { ...c, orbit: { ...c.orbit, cx: v } }
+    case 'orbitY': return { ...c, orbit: { ...c.orbit, cy: v } }
+    case 'orbitR': return { ...c, orbit: { ...c.orbit, rx: v, ry: v } }
+    case 'orbitPitch':
+      return c.orbit.quantize
+        ? { ...c, orbit: { ...c.orbit, note: Math.round(v) } }
+        : { ...c, orbit: { ...c.orbit, freq: noteFreq(v) } }
+    case 'rasterX': return { ...c, raster: { ...c.raster, rx: v } }
+    case 'rasterY': return { ...c, raster: { ...c.raster, ry: v } }
+    case 'rasterW': return { ...c, raster: { ...c.raster, rw: v } }
+    case 'rasterH': return { ...c, raster: { ...c.raster, rh: v } }
+    case 'rasterPitch':
+      return c.raster.quantize
+        ? { ...c, raster: { ...c.raster, note: Math.round(v) } }
+        : { ...c, raster: { ...c.raster, freq: noteFreq(v) } }
+    default: return c
+  }
+}
+
 interface GridReader {
   readSonifyGrid: (kind: 'master' | 'layer', layer: number, out: Uint8Array) => boolean
 }
@@ -160,6 +187,29 @@ class SonifyEngine {
   meterLim = 1
   // live flow vectors for the overlay ([x01,y01,mag] × n)
   flowDots: Float32Array = new Float32Array(0)
+  // effective probe values (base + modulation), for the page overlay
+  liveProbes: Record<string, number> = {}
+
+  constructor() {
+    // The mod-matrix swings around each param's BASE : the current config.
+    registerSonifyModBase((param) => {
+      const c = this.cfg
+      switch (param) {
+        case 'spectraX': return c.spectra.x
+        case 'filterX': return c.filter.x
+        case 'orbitX': return c.orbit.cx
+        case 'orbitY': return c.orbit.cy
+        case 'orbitR': return c.orbit.rx
+        case 'orbitPitch': return c.orbit.quantize ? c.orbit.note : freqNote(c.orbit.freq)
+        case 'rasterX': return c.raster.rx
+        case 'rasterY': return c.raster.ry
+        case 'rasterW': return c.raster.rw
+        case 'rasterH': return c.raster.rh
+        case 'rasterPitch': return c.raster.quantize ? c.raster.note : freqNote(c.raster.freq)
+        default: return undefined
+      }
+    })
+  }
 
   isRunning(): boolean { return !!this.node }
 
@@ -227,7 +277,8 @@ class SonifyEngine {
         master: cfg.master,
         spectra: {
           on: cfg.spectra.on, tap: cfg.spectra.tap, gain: cfg.spectra.gain, pan: cfg.spectra.pan,
-          sweepOn: cfg.spectra.sweepOn, sweepHz: cfg.spectra.sweepHz, x: cfg.spectra.x, gamma: cfg.spectra.gamma
+          sweepOn: cfg.spectra.sweepOn, sweepHz: cfg.spectra.sweepHz, x: cfg.spectra.x, gamma: cfg.spectra.gamma,
+          breath: cfg.spectra.breath ?? 0
         },
         orbit: {
           on: cfg.orbit.on, tap: cfg.orbit.tap, gain: cfg.orbit.gain, pan: cfg.orbit.pan,
@@ -322,6 +373,41 @@ class SonifyEngine {
       if (Math.abs(hz - this.cfg.sstv.lineHz) > 1e-3) {
         this.cfg.sstv.lineHz = hz
         this.pushConfig(this.cfg)
+      }
+    }
+
+    // Probe modulation overlay : ship the EFFECTIVE probe values (base +
+    // whatever the mod-matrix / Meta knobs wrote this frame) every tick.
+    // Always sent, so releasing a modulator reverts to the base cleanly.
+    {
+      const mv = sonifyModValues
+      const g = (k: string, base: number): number => mv.get(k) ?? base
+      const c = this.cfg
+      const oPitch = mv.get('orbitPitch')
+      const rPitch = mv.get('rasterPitch')
+      const m = {
+        spectra: { x: g('spectraX', c.spectra.x) },
+        filter: { x: g('filterX', c.filter.x) },
+        orbit: {
+          cx: g('orbitX', c.orbit.cx), cy: g('orbitY', c.orbit.cy),
+          rx: g('orbitR', c.orbit.rx), ry: g('orbitR', c.orbit.ry),
+          freq: oPitch !== undefined
+            ? (c.orbit.quantize ? this.snapNote(Math.round(oPitch)) : noteFreq(oPitch))
+            : (c.orbit.quantize ? this.snapNote(c.orbit.note) : c.orbit.freq)
+        },
+        raster: {
+          rx: g('rasterX', c.raster.rx), ry: g('rasterY', c.raster.ry),
+          rw: g('rasterW', c.raster.rw), rh: g('rasterH', c.raster.rh),
+          freq: rPitch !== undefined
+            ? (c.raster.quantize ? this.snapNote(Math.round(rPitch)) : noteFreq(rPitch))
+            : (c.raster.quantize ? this.snapNote(c.raster.note) : c.raster.freq)
+        }
+      }
+      node.port.postMessage({ t: 'mod', m })
+      this.liveProbes = {
+        spectraX: m.spectra.x, filterX: m.filter.x,
+        orbitX: m.orbit.cx, orbitY: m.orbit.cy, orbitR: m.orbit.rx,
+        rasterX: m.raster.rx, rasterY: m.raster.ry, rasterW: m.raster.rw, rasterH: m.raster.rh
       }
     }
 

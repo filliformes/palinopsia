@@ -348,11 +348,22 @@ export interface ModulatorConfig {
 // What an assignment modulates: float ISF inputs, or a Meta knob (the
 // modulator then drives every destination the knob carries : macro motion).
 // 'bgSource' addresses the Background slab's single source (no layer/slot).
+// Sonify probe/pitch parameters reachable by the mod-matrix + Meta knobs.
+export type SonifyModParam =
+  | 'spectraX' | 'filterX'
+  | 'orbitX' | 'orbitY' | 'orbitR' | 'orbitPitch'
+  | 'rasterX' | 'rasterY' | 'rasterW' | 'rasterH' | 'rasterPitch'
+export const SONIFY_MOD_PARAMS: SonifyModParam[] = [
+  'spectraX', 'filterX', 'orbitX', 'orbitY', 'orbitR', 'orbitPitch',
+  'rasterX', 'rasterY', 'rasterW', 'rasterH', 'rasterPitch'
+]
+
 export type ModTarget =
   | { kind: 'source'; layer: number; slot: 'A' | 'B'; input: string }
   | { kind: 'bgSource'; input: string }
   | { kind: 'fx'; scope: FxScope; instId: string; input: string }
   | { kind: 'meta'; knob: number }
+  | { kind: 'sonify'; param: SonifyModParam }
 
 // Addresses one of the FX racks (per-source, per-layer, master, or background).
 export type FxScope =
@@ -437,6 +448,9 @@ export interface SceneEntry {
   world?: World | null
   // Relation tags (macro-form sequencer). Auto-derived on first tag, editable.
   tags?: SceneTags
+  // Sonify patch active when the scene was saved (recall switches the sound
+  // half too). Opaque here : the renderer owns the SoniConfig shape.
+  sonify?: unknown
 }
 
 // The scene-relation schema : the sequencer's data model.
@@ -509,6 +523,8 @@ export interface Session {
   // The macro-form sequencer config (session-scoped; auto-starts on load if it
   // was running). Optional for back-compat with pre-sequencer sessions.
   sequence?: SequenceState
+  // Sonify config (the S page) : travels with the session. Opaque to main.
+  sonify?: unknown
   // Opaque renderer UI snapshot (theme, panel sizes, selection). The main
   // process never inspects it : it just round-trips it to disk.
   ui?: unknown

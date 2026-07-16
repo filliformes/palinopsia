@@ -569,6 +569,7 @@ export function modTargetKey(t: ModTarget): string {
   if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
   if (t.kind === 'bgSource') return `bgsrc:${t.input}`
   if (t.kind === 'meta') return `meta:${t.knob}`
+  if (t.kind === 'sonify') return `soni:${t.param}`
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
@@ -2158,7 +2159,9 @@ export const useStore = create<StoreState>((set, get) => ({
           name: `Scene ${s.scenes.length + 1}`,
           // Compositions are immutable : the snapshot is a reference.
           composition: s.composition,
-          world: s.worlds.find((w) => w.id === s.world) ?? null
+          world: s.worlds.find((w) => w.id === s.world) ?? null,
+          // The sound patch travels with the scene (on/sink stay machine-local).
+          sonify: { ...s.sonify, on: false, sinkId: '' }
         }
       ]
     })),
@@ -2188,6 +2191,12 @@ export const useStore = create<StoreState>((set, get) => ({
       const world = scene.world ? scene.world.id : s.world
       if (scene.world) localStorage.setItem('opsia.world', world)
       // Normalize defensively (idempotent) : a scene may predate a schema field.
+      // Recall the scene's sound patch too (keep the local on-state + device).
+      if (scene.sonify) {
+        const cur = s.sonify
+        const next = { ...defaultSoniConfig(), ...(scene.sonify as Partial<SoniConfig>), on: cur.on, sinkId: cur.sinkId } as SoniConfig
+        queueMicrotask(() => useStore.getState().setSonify(next))
+      }
       return { composition: normalizeComposition(scene.composition), activeSceneId: id, worlds, world, variationBaseline: null }
     }),
   renameScene: (id, name) =>
@@ -2353,6 +2362,16 @@ export const useStore = create<StoreState>((set, get) => ({
       sequence: { ...makeDefaultSequence(), ...(s.sequence ?? {}) },
       composition: normalizeComposition(s.composition)
     })
+    // The session's sound patch (post-set so setSonify's engine push sees it).
+    if (s.sonify) {
+      const curSoni = get().sonify
+      get().setSonify({
+        ...defaultSoniConfig(),
+        ...(s.sonify as Partial<SoniConfig>),
+        on: curSoni.on,
+        sinkId: curSoni.sinkId
+      } as SoniConfig)
+    }
   },
   exportSession: () => {
     const s = get()
@@ -2363,6 +2382,7 @@ export const useStore = create<StoreState>((set, get) => ({
       scenes: s.scenes,
       world: s.worlds.find((w) => w.id === s.world) ?? null,
       sequence: s.sequence,
+      sonify: { ...s.sonify, on: false, sinkId: '' },
       ui: { theme: s.theme }
     }
   }

@@ -675,10 +675,36 @@ export const liveModValues = new Map<string, number>()
 // Live modulated Meta-knob positions (0..1) : the dials read these each rAF.
 export const metaLiveValues = new Map<number, number>()
 
+// ── Sonify probe modulation ───────────────────────────────────────────
+// The Sonify page's probes (scan lines, orbit, raster rect) + pitches as
+// mod-matrix / Meta targets. Values land in `sonifyModValues` (REAL units);
+// the sonify engine reads them each tick and overlays them onto its config.
+// Pitch params live in NOTE space (24..72) : the engine snaps/convert them.
+export const SONIFY_MOD_DESCS: Record<string, { min: number; max: number; def: number }> = {
+  spectraX: { min: 0, max: 1, def: 0.5 },
+  filterX: { min: 0, max: 1, def: 0.5 },
+  orbitX: { min: 0, max: 1, def: 0.5 },
+  orbitY: { min: 0, max: 1, def: 0.5 },
+  orbitR: { min: 0.02, max: 0.5, def: 0.25 },
+  orbitPitch: { min: 24, max: 72, def: 45 },
+  rasterX: { min: 0, max: 0.9, def: 0.35 },
+  rasterY: { min: 0, max: 0.9, def: 0.35 },
+  rasterW: { min: 0.04, max: 0.9, def: 0.3 },
+  rasterH: { min: 0.03, max: 0.9, def: 0.3 },
+  rasterPitch: { min: 24, max: 72, def: 45 }
+}
+export const sonifyModValues = new Map<string, number>()
+// The engine registers a getter for each param's BASE value (swing centre).
+export let sonifyModBase: ((param: string) => number | undefined) | null = null
+export function registerSonifyModBase(fn: (param: string) => number | undefined): void {
+  sonifyModBase = fn
+}
+
 function liveKey(t: import('@shared/types').ModTarget): string {
   if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
   if (t.kind === 'bgSource') return `bgsrc:${t.input}`
   if (t.kind === 'meta') return `meta:${t.knob}`
+  if (t.kind === 'sonify') return `soni:${t.param}`
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
@@ -837,6 +863,15 @@ export function writeModTarget(
   t: Exclude<import('@shared/types').ModTarget, { kind: 'meta' }>,
   shaped01: number
 ): void {
+  // Sonify probe : absolute 0..1 mapped over the param's declared span.
+  if (t.kind === 'sonify') {
+    const d = SONIFY_MOD_DESCS[t.param]
+    if (!d) return
+    const v = d.min + Math.max(0, Math.min(1, shaped01)) * (d.max - d.min)
+    sonifyModValues.set(t.param, v)
+    liveModValues.set(liveKey(t), v)
+    return
+  }
   let shaderId: string | null = null
   if (t.kind === 'source') {
     const layer = c.layers[t.layer]
@@ -910,6 +945,7 @@ export function applyModulation(
   bypass = false
 ): void {
   metaLiveValues.clear()
+  sonifyModValues.clear()
   // Clear the live map each frame too (symmetric with metaLiveValues): otherwise
   // a removed mod-matrix assignment leaves a stale entry that liveOverlay keeps
   // writing into the slider forever, so the control never reverts to its base.
@@ -953,6 +989,19 @@ export function applyModulation(
         if (dest.kind === 'meta') continue // knobs never chain into knobs
         writeTarget(dest, v01)
       }
+      continue
+    }
+    if (a.target.kind === 'sonify') {
+      const d = SONIFY_MOD_DESCS[a.target.param]
+      if (!d) continue
+      const stored = sonifyModBase?.(a.target.param)
+      const final = inputValueForMode(
+        { type: 'float', min: d.min, max: d.max, def: d.def },
+        stored, v, a.depth, a.mode
+      )
+      if (final === null || typeof final !== 'number') continue
+      sonifyModValues.set(a.target.param, final)
+      liveModValues.set(liveKey(a.target), final)
       continue
     }
     if (a.target.kind === 'source') {

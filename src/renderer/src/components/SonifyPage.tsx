@@ -7,8 +7,9 @@
 // picker. The sound engine lives in audio/sonify.ts (AudioWorklet).
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
+import type { ModTarget, SonifyModParam } from '@shared/types'
 import { SONI_SCALES, sonifyEngine, type SoniConfig } from '../audio/sonify'
-import { useStore } from '../store'
+import { modTargetKey, useStore } from '../store'
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
@@ -65,6 +66,86 @@ function TapSelect({ cfg, voice, onChange }: {
   )
 }
 
+/** M-binding chip for a sonify probe/pitch param : shows the bound modulator
+ *  (M1..M8) or a hollow M; click opens the mini assign panel below. */
+function ModChip({ param, open, onOpen }: {
+  param: SonifyModParam; open: boolean; onOpen: (p: SonifyModParam) => void
+}): JSX.Element {
+  const matrix = useStore((st) => st.composition.modMatrix)
+  const key = modTargetKey({ kind: 'sonify', param })
+  const a = matrix.find((x) => modTargetKey(x.target) === key)
+  return (
+    <button
+      onClick={() => onOpen(param)}
+      className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] transition-colors ${
+        a ? 'bg-accent/25 text-accent ring-1 ring-accent' : open ? 'bg-panel3 text-text ring-1 ring-border' : 'bg-panel3/60 text-muted hover:text-text'
+      }`}
+      title={a ? `Modulated by M${a.mod + 1} (depth ${a.depth.toFixed(2)}) : click to edit` : 'Bind a modulator to this parameter'}
+    >
+      {a ? `M${a.mod + 1}` : 'M'}
+    </button>
+  )
+}
+
+const PARAM_LABELS: Record<SonifyModParam, string> = {
+  spectraX: 'Spectra scan column', filterX: 'Filter scan column',
+  orbitX: 'Orbit centre x', orbitY: 'Orbit centre y', orbitR: 'Orbit radius', orbitPitch: 'Orbit pitch',
+  rasterX: 'Raster rect x', rasterY: 'Raster rect y', rasterW: 'Raster rect width', rasterH: 'Raster rect height',
+  rasterPitch: 'Raster pitch'
+}
+
+/** Mini assign panel : modulator select + depth + mode + clear, writing the
+ *  same mod-matrix the Inspector's M buttons use. */
+function AssignMini({ param, onClose }: { param: SonifyModParam; onClose: () => void }): JSX.Element {
+  const matrix = useStore((st) => st.composition.modMatrix)
+  const assignMod = useStore((st) => st.assignMod)
+  const removeAssignment = useStore((st) => st.removeAssignment)
+  const setAssignmentDepth = useStore((st) => st.setAssignmentDepth)
+  const setAssignmentMode = useStore((st) => st.setAssignmentMode)
+  const target: ModTarget = { kind: 'sonify', param }
+  const key = modTargetKey(target)
+  const a = matrix.find((x) => modTargetKey(x.target) === key)
+  return (
+    <section className="rounded border border-accent/40 bg-panel2 px-2 py-1.5">
+      <div className="mb-1 flex items-center gap-2">
+        <span className="text-[10px] font-semibold">modulate</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted">{PARAM_LABELS[param]}</span>
+        <button onClick={onClose} className="text-[11px] text-muted hover:text-text" title="Close">x</button>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <select
+          className="input select-compact text-[10px]"
+          value={a ? a.mod : -1}
+          onChange={(e) => {
+            const mi = Number(e.target.value)
+            if (a) removeAssignment(a.id)
+            if (mi >= 0 && !assignMod(mi, target, a?.depth ?? 0.5, a?.mode ?? 'replace')) {
+              // matrix cap reached : nothing to do, the select snaps back
+            }
+          }}
+          title="Which modulator drives this parameter"
+        >
+          <option value={-1}>off</option>
+          {[0, 1, 2, 3, 4, 5, 6, 7].map((m) => <option key={m} value={m}>M{m + 1}</option>)}
+        </select>
+        <input
+          type="range" min={-1} max={1} step={0.01} value={a?.depth ?? 0.5}
+          disabled={!a}
+          onChange={(e) => a && setAssignmentDepth(a.id, Number(e.target.value))}
+          className="min-w-0 flex-1 accent-accent"
+          title={`Depth ${(a?.depth ?? 0.5).toFixed(2)} (negative inverts)`}
+        />
+        <button
+          disabled={!a}
+          onClick={() => a && setAssignmentMode(a.id, a.mode === 'multiply' ? 'replace' : 'multiply')}
+          className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${a?.mode === 'multiply' ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
+          title="Replace = swing around the base value; Multiply = VCA-scale it"
+        >{a?.mode === 'multiply' ? 'mult' : 'swing'}</button>
+      </div>
+    </section>
+  )
+}
+
 function VoiceShell({ title, on, hint, onToggle, children }: {
   title: string; on: boolean; hint: string; onToggle: () => void; children: ReactNode
 }): JSX.Element {
@@ -100,6 +181,10 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   const meterRef = useRef<HTMLDivElement | null>(null)
   const dragging = useRef<'line' | 'orbit' | 'radius' | 'rect' | 'rectsize' | 'fline' | null>(null)
   const [devices, setDevices] = useState<Array<{ id: string; label: string }>>([])
+  const [assign, setAssign] = useState<SonifyModParam | null>(null)
+  const chip = (p: SonifyModParam): JSX.Element => (
+    <ModChip param={p} open={assign === p} onOpen={(x) => setAssign(assign === x ? null : x)} />
+  )
 
   const set = (next: SoniConfig): void => setSonify(next)
   const patch = (p: Partial<SoniConfig>): void => set({ ...cfg, ...p })
@@ -147,6 +232,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
       last = now
       const c = overlayRef.current
       const st = useStore.getState().sonify
+      const lp = sonifyEngine.isRunning() ? sonifyEngine.liveProbes : ({} as Record<string, number>)
       if (c) {
         const w = c.width, h = c.height
         const g = c.getContext('2d')!
@@ -165,7 +251,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
         // Spectra sweep line (mirror of the worklet's sweep : same rate)
         if (st.on && st.spectra.on) {
           if (st.spectra.sweepOn) sweepPhase = (sweepPhase + st.spectra.sweepHz * dt) % 1
-          else sweepPhase = st.spectra.x
+          else sweepPhase = lp.spectraX ?? st.spectra.x
           g.strokeStyle = 'rgba(255,255,255,0.85)'
           g.lineWidth = 1.5
           g.beginPath()
@@ -176,7 +262,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
         // Filter column (its own hue, mirrors the filter sweep)
         if (st.on && st.filter.on) {
           if (st.filter.sweepOn) fSweep = (fSweep + st.filter.sweepHz * dt) % 1
-          else fSweep = st.filter.x
+          else fSweep = lp.filterX ?? st.filter.x
           g.strokeStyle = 'rgba(120,200,255,0.8)'
           g.lineWidth = 1.5
           g.beginPath()
@@ -188,9 +274,11 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
         if (st.on && st.raster.on) {
           g.strokeStyle = 'rgba(120,255,160,0.85)'
           g.lineWidth = 1.5
-          g.strokeRect(st.raster.rx * w, st.raster.ry * h, st.raster.rw * w, st.raster.rh * h)
+          const rx = lp.rasterX ?? st.raster.rx, ry = lp.rasterY ?? st.raster.ry
+          const rw = lp.rasterW ?? st.raster.rw, rh = lp.rasterH ?? st.raster.rh
+          g.strokeRect(rx * w, ry * h, rw * w, rh * h)
           g.fillStyle = 'rgba(120,255,160,0.85)'
-          g.fillRect((st.raster.rx + st.raster.rw) * w - 4, (st.raster.ry + st.raster.rh) * h - 4, 8, 8)
+          g.fillRect((rx + rw) * w - 4, (ry + rh) * h - 4, 8, 8)
         }
         // Transmission scan row (animates downward at the line rate)
         if (st.on && st.sstv.on) {
@@ -207,11 +295,12 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           g.strokeStyle = 'rgba(255,180,80,0.9)'
           g.lineWidth = 1.5
           g.beginPath()
-          g.ellipse(st.orbit.cx * w, st.orbit.cy * h, Math.max(2, st.orbit.rx * w), Math.max(2, st.orbit.ry * h), 0, 0, 6.2832)
+          const ocx = lp.orbitX ?? st.orbit.cx, ocy = lp.orbitY ?? st.orbit.cy, orr = lp.orbitR ?? st.orbit.rx
+          g.ellipse(ocx * w, ocy * h, Math.max(2, orr * w), Math.max(2, orr * h), 0, 0, 6.2832)
           g.stroke()
           g.fillStyle = 'rgba(255,180,80,0.9)'
           g.beginPath()
-          g.arc(st.orbit.cx * w, st.orbit.cy * h, 3, 0, 6.2832)
+          g.arc(ocx * w, ocy * h, 3, 0, 6.2832)
           g.fill()
         }
       }
@@ -385,6 +474,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 
         {/* Voice strips */}
         <aside className="flex w-[320px] shrink-0 flex-col gap-2 overflow-y-auto border-l border-border bg-panel px-3 py-2">
+          {assign && <AssignMini param={assign} onClose={() => setAssign(null)} />}
           <VoiceShell
             title="Spectra" on={cfg.spectra.on}
             hint="the frame as a spectrogram : a column of partials sweeps or sits"
@@ -402,11 +492,14 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.spectra.sync ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
                 title={`Sync the sweep to the tempo (one sweep per bar @ ${bpm} BPM)`}
               >sync</button>
+              <span className="ml-auto" />
+              {chip('spectraX')}
             </Row>
             {!cfg.spectra.sync && cfg.spectra.sweepOn && (
               <Slider label="rate" value={cfg.spectra.sweepHz} min={0.02} max={4} neutral={0.25} fmt={(v) => v.toFixed(2) + 'Hz'} onChange={(v) => pv('spectra', { sweepHz: v })} />
             )}
             <Slider label="contrast" value={cfg.spectra.gamma} min={0.5} max={4} neutral={1.8} onChange={(v) => pv('spectra', { gamma: v })} />
+            <Slider label="breath" value={cfg.spectra.breath ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('spectra', { breath: v })} />
             <Row label="range">
               <select className="input select-compact text-[10px]" value={cfg.spectra.loOct} onChange={(e) => pv('spectra', { loOct: Math.min(Number(e.target.value), cfg.spectra.hiOct - 1) })} title="Lowest octave">
                 {[0, 1, 2, 3, 4].map((o) => <option key={o} value={o}>oct {o}</option>)}
@@ -536,6 +629,13 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.raster.quantize ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
                 title="Snap the scan pitch to the key/scale, or run free Hz"
               >&#9834;</button>
+              {chip('rasterPitch')}
+            </Row>
+            <Row label="rect">
+              <span className="font-mono text-[9px] text-muted">x</span>{chip('rasterX')}
+              <span className="font-mono text-[9px] text-muted">y</span>{chip('rasterY')}
+              <span className="font-mono text-[9px] text-muted">w</span>{chip('rasterW')}
+              <span className="font-mono text-[9px] text-muted">h</span>{chip('rasterH')}
             </Row>
             <Slider label="smooth" value={cfg.raster.smooth} min={0} max={1} neutral={0} onChange={(v) => pv('raster', { smooth: v })} />
             <Slider
@@ -602,6 +702,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.filter.sweepOn ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
                 title="Sweep the reading column, or hold it (drag the blue line)"
               >{cfg.filter.sweepOn ? 'sweeping' : 'held'}</button>
+              {chip('filterX')}
               {cfg.filter.sweepOn && (
                 <input
                   type="range" min={0.02} max={4} step={0.01} value={cfg.filter.sweepHz}

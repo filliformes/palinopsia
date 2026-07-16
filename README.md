@@ -379,8 +379,19 @@ key (root + scale : chromatic, major, minor, pentatonic, whole-tone, modes)
 with a per-voice **♪ snap** — sonified data lands on real notes, or runs free.
 **Master** : gain + an always-on peak limiter (the audio Flash-safety) + live
 meter, and an **output-device picker**. While the engine runs, **recordings mix
-the sound in** — exports become true audiovisual pieces. Config persists
-per-machine.
+the sound in** — exports become true audiovisual pieces.
+
+**Fully integrated** : every probe and pitch (scan columns, orbit centre/radius/
+pitch, the raster rect and its pitch) is a **modulation target** — bind M1–M8 or
+a Meta knob via the M chips on the Sonify strips, and the mod-matrix stirs the
+listening the same way it stirs the image (overlays show the modulated probes
+live). The sound patch **travels with sessions and scenes** — recalling a scene
+switches the sonification with it (the on-switch and output device stay
+machine-local). And the whole page speaks **OSC** under `/opsia/sonify/…`
+(on/master/root/scale + per-voice on·gain·pan·probes·pitches, all 0..1) —
+advertised over OSCQuery and streamed outbound like everything else. Spectra
+also gained **breath** : a per-partial sine↔noise morph (the Coagula blue) from
+glassy additive to breathy bands.
 
 ## Sessions, scenes & themes
 

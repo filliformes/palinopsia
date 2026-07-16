@@ -43,6 +43,9 @@
 //   /opsia/world                                        s id | name | i (1-based index)
 //   /opsia/seq/run                                      >= 0.5 toggles the sequencer
 //   /opsia/seq/skip                                     trigger (advance to next scene)
+//   /opsia/sonify/on|master                             >= 0.5 | f 0..1
+//   /opsia/sonify/root|scale                            i index | s name
+//   /opsia/sonify/{voice}/on|gain|pan + voice params    f 0..1 (see case below)
 //   /opsia/meta/{1..16}                                f 0..1 (drives the knob)
 //   /opsia/bpm                                          f 20..800 (raw)
 //   /opsia/scene/{n}                                    trigger
@@ -51,6 +54,8 @@
 import type { BlendMode, CouplingMode, AudioFeature, FxScope, OscInEvent, OscQueryLeaf } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
 import { videoKey, videoSeekRequests } from './engine/videoState'
+import { SONI_SCALES, withSonifyParam, type SoniConfig } from './audio/sonify'
+import { SONIFY_MOD_DESCS } from './engine/modulation'
 import { useStore } from './store'
 import type { RandomizeScope } from './randomize'
 import { setKnobTarget } from './metaSmooth'
@@ -454,6 +459,107 @@ function route(address: string, args: Args): void {
       return
     }
 
+    case 'sonify': {
+      // The sound half over OSC. All continuous params take 0..1 (the usual
+      // convention); probe/pitch params map over the same spans the mod-matrix
+      // uses (SONIFY_MOD_DESCS), so OSC and modulation agree.
+      const c = st.sonify
+      const apply = (next: SoniConfig): void => st.setSonify(next)
+      const probe = (param: string): void => {
+        const d = SONIFY_MOD_DESCS[param]
+        if (d) apply(withSonifyParam(c, param, d.min + clamp01(n) * (d.max - d.min)))
+      }
+      const g = segs[2]
+      if (g === 'on') { apply({ ...c, on: n >= 0.5 }); return }
+      if (g === 'master') { apply({ ...c, master: clamp01(n) }); return }
+      if (g === 'root') {
+        const names = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'] as const
+        const r = enumFrom(args, names)
+        if (r) apply({ ...c, root: names.indexOf(r) })
+        return
+      }
+      if (g === 'scale') {
+        const sc = enumFrom(args, SONI_SCALES)
+        if (sc) apply({ ...c, scale: sc })
+        return
+      }
+      const ctl = segs[3]
+      if (!ctl) return
+      const V = <K extends 'spectra' | 'orbit' | 'flow' | 'raster' | 'sstv' | 'filter'>(
+        k: K, patch: Partial<SoniConfig[K]>
+      ): void => apply({ ...c, [k]: { ...c[k], ...patch } })
+      switch (g) {
+        case 'spectra':
+          if (ctl === 'on') V('spectra', { on: n >= 0.5 })
+          else if (ctl === 'gain') V('spectra', { gain: clamp01(n) })
+          else if (ctl === 'pan') V('spectra', { pan: clamp01(n) * 2 - 1 })
+          else if (ctl === 'sweep') V('spectra', { sweepOn: n >= 0.5 })
+          else if (ctl === 'rate') V('spectra', { sweepHz: 0.02 * Math.pow(4 / 0.02, clamp01(n)), sync: false })
+          else if (ctl === 'x') probe('spectraX')
+          else if (ctl === 'contrast') V('spectra', { gamma: 0.5 + clamp01(n) * 3.5 })
+          else if (ctl === 'breath') V('spectra', { breath: clamp01(n) })
+          else if (ctl === 'quantize') V('spectra', { quantize: n >= 0.5 })
+          return
+        case 'orbit':
+          if (ctl === 'on') V('orbit', { on: n >= 0.5 })
+          else if (ctl === 'gain') V('orbit', { gain: clamp01(n) })
+          else if (ctl === 'pan') V('orbit', { pan: clamp01(n) * 2 - 1 })
+          else if (ctl === 'pitch') probe('orbitPitch')
+          else if (ctl === 'x') probe('orbitX')
+          else if (ctl === 'y') probe('orbitY')
+          else if (ctl === 'r') probe('orbitR')
+          else if (ctl === 'drive') V('orbit', { drive: 0.2 + clamp01(n) * 3.8 })
+          else if (ctl === 'smooth') V('orbit', { smooth: clamp01(n) })
+          else if (ctl === 'quantize') V('orbit', { quantize: n >= 0.5 })
+          return
+        case 'flow':
+          if (ctl === 'on') V('flow', { on: n >= 0.5 })
+          else if (ctl === 'gain') V('flow', { gain: clamp01(n) })
+          else if (ctl === 'pan') V('flow', { pan: clamp01(n) * 2 - 1 })
+          else if (ctl === 'sense') V('flow', { sense: clamp01(n) })
+          else if (ctl === 'density') V('flow', { density: clamp01(n) })
+          else if (ctl === 'grain') V('flow', { dur: 0.02 + clamp01(n) * 0.38 })
+          else if (ctl === 'breath') V('flow', { noise: clamp01(n) })
+          else if (ctl === 'quantize') V('flow', { quantize: n >= 0.5 })
+          return
+        case 'raster':
+          if (ctl === 'on') V('raster', { on: n >= 0.5 })
+          else if (ctl === 'gain') V('raster', { gain: clamp01(n) })
+          else if (ctl === 'pan') V('raster', { pan: clamp01(n) * 2 - 1 })
+          else if (ctl === 'pitch') probe('rasterPitch')
+          else if (ctl === 'x') probe('rasterX')
+          else if (ctl === 'y') probe('rasterY')
+          else if (ctl === 'w') probe('rasterW')
+          else if (ctl === 'h') probe('rasterH')
+          else if (ctl === 'smooth') V('raster', { smooth: clamp01(n) })
+          else if (ctl === 'tone') V('raster', { tone: clamp01(n) })
+          else if (ctl === 'quantize') V('raster', { quantize: n >= 0.5 })
+          return
+        case 'sstv':
+          if (ctl === 'on') V('sstv', { on: n >= 0.5 })
+          else if (ctl === 'gain') V('sstv', { gain: clamp01(n) })
+          else if (ctl === 'pan') V('sstv', { pan: clamp01(n) * 2 - 1 })
+          else if (ctl === 'lines') V('sstv', { lineHz: 1 + clamp01(n) * 59, sync: false })
+          else if (ctl === 'sync') V('sstv', { sync: n >= 0.5 })
+          else if (ctl === 'transpose') V('sstv', { dev: 0.25 + clamp01(n) * 1.75 })
+          else if (ctl === 'tick') V('sstv', { syncLev: clamp01(n) })
+          return
+        case 'filter':
+          if (ctl === 'on') V('filter', { on: n >= 0.5 })
+          else if (ctl === 'gain') V('filter', { gain: clamp01(n) })
+          else if (ctl === 'pan') V('filter', { pan: clamp01(n) * 2 - 1 })
+          else if (ctl === 'sweep') V('filter', { sweepOn: n >= 0.5 })
+          else if (ctl === 'rate') V('filter', { sweepHz: 0.02 * Math.pow(4 / 0.02, clamp01(n)) })
+          else if (ctl === 'x') probe('filterX')
+          else if (ctl === 'resonance') V('filter', { q: clamp01(n) })
+          else if (ctl === 'noise') V('filter', { noise: clamp01(n) })
+          else if (ctl === 'contrast') V('filter', { gamma: 0.5 + clamp01(n) * 3.5 })
+          else if (ctl === 'linein') V('filter', { lineIn: n >= 0.5 })
+          else if (ctl === 'quantize') V('filter', { quantize: n >= 0.5 })
+          return
+      }
+      return
+    }
     case 'scene': {
       const idx = segs[2] !== undefined ? parseInt(segs[2], 10) - 1 : Math.round(n) - 1
       if (idx < 0) return
@@ -607,6 +713,42 @@ function enumerateLeaves(): Leaf[] {
   for (let k = 1; k <= st.composition.metaKnobs.length; k++) {
     const knob = st.composition.metaKnobs[k - 1]
     add(`/opsia/meta/${k}`, 0, 1, knob?.value ?? 0, knob?.name ?? `Meta knob ${k}`)
+  }
+  // Sonify (the S page) : the core streamable set. Probe params normalize over
+  // the same spans the mod-matrix uses.
+  {
+    const so = st.sonify
+    add('/opsia/sonify/on', 0, 1, so.on ? 1 : 0, 'Sonify engine on (>= 0.5)')
+    add('/opsia/sonify/master', 0, 1, so.master, 'Sonify master gain')
+    add('/opsia/sonify/root', 0, 1, so.root / 11, 'Quantizer root (index over C..B)')
+    const si = Math.max(0, SONI_SCALES.indexOf(so.scale))
+    add('/opsia/sonify/scale', 0, 1, si / (SONI_SCALES.length - 1), 'Quantizer scale (index)')
+    const norm = (param: string, v: number): number => {
+      const d = SONIFY_MOD_DESCS[param]
+      return d ? Math.max(0, Math.min(1, (v - d.min) / (d.max - d.min))) : 0
+    }
+    add('/opsia/sonify/spectra/on', 0, 1, so.spectra.on ? 1 : 0, 'Spectra voice on')
+    add('/opsia/sonify/spectra/gain', 0, 1, so.spectra.gain, 'Spectra gain')
+    add('/opsia/sonify/spectra/x', 0, 1, norm('spectraX', so.spectra.x), 'Spectra scan column')
+    add('/opsia/sonify/spectra/breath', 0, 1, so.spectra.breath ?? 0, 'Spectra sine-noise morph')
+    add('/opsia/sonify/orbit/on', 0, 1, so.orbit.on ? 1 : 0, 'Orbit voice on')
+    add('/opsia/sonify/orbit/gain', 0, 1, so.orbit.gain, 'Orbit gain')
+    add('/opsia/sonify/orbit/pitch', 0, 1, norm('orbitPitch', so.orbit.quantize ? so.orbit.note : 45), 'Orbit pitch (note span)')
+    add('/opsia/sonify/orbit/x', 0, 1, norm('orbitX', so.orbit.cx), 'Orbit centre x')
+    add('/opsia/sonify/orbit/y', 0, 1, norm('orbitY', so.orbit.cy), 'Orbit centre y')
+    add('/opsia/sonify/orbit/r', 0, 1, norm('orbitR', so.orbit.rx), 'Orbit radius')
+    add('/opsia/sonify/flow/on', 0, 1, so.flow.on ? 1 : 0, 'Flow voice on')
+    add('/opsia/sonify/flow/gain', 0, 1, so.flow.gain, 'Flow gain')
+    add('/opsia/sonify/raster/on', 0, 1, so.raster.on ? 1 : 0, 'Raster voice on')
+    add('/opsia/sonify/raster/gain', 0, 1, so.raster.gain, 'Raster gain')
+    add('/opsia/sonify/raster/x', 0, 1, norm('rasterX', so.raster.rx), 'Raster rect x')
+    add('/opsia/sonify/raster/y', 0, 1, norm('rasterY', so.raster.ry), 'Raster rect y')
+    add('/opsia/sonify/raster/tone', 0, 1, so.raster.tone ?? 0.6, 'Raster tone lowpass')
+    add('/opsia/sonify/sstv/on', 0, 1, so.sstv.on ? 1 : 0, 'Transmission voice on')
+    add('/opsia/sonify/sstv/gain', 0, 1, so.sstv.gain, 'Transmission gain')
+    add('/opsia/sonify/filter/on', 0, 1, so.filter.on ? 1 : 0, 'Filter voice on')
+    add('/opsia/sonify/filter/gain', 0, 1, so.filter.gain, 'Filter gain')
+    add('/opsia/sonify/filter/x', 0, 1, norm('filterX', so.filter.x), 'Filter scan column')
   }
   add('/opsia/bpm', 20, 800, st.composition.bpm, 'Tempo (raw BPM)')
   // Audio features Pandore PUSHES (consumed by `audio` modulators) : never echoed.

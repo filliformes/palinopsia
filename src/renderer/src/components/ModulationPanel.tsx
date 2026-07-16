@@ -612,6 +612,7 @@ function MatrixSummary(): JSX.Element {
       const name = composition.metaKnobs[t.knob]?.name ?? `Knob ${t.knob + 1}`
       return `META K${t.knob + 1} (${name})`
     }
+    if (t.kind === 'sonify') return `SONIFY ${t.param}`
     const inst =
       t.scope.kind === 'master'
         ? composition.master.find((f) => f.id === t.instId)

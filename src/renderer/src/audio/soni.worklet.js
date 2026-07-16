@@ -30,7 +30,7 @@ class SoniProcessor extends AudioWorkletProcessor {
     // ── voice configs (overwritten by 'cfg' messages) ──
     this.cfg = {
       master: 0.8,
-      spectra: { on: false, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, x: 0.5, gamma: 1.6, noise: 0 },
+      spectra: { on: false, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, x: 0.5, gamma: 1.6, breath: 0 },
       orbit:   { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, ratio: 1, cx: 0.5, cy: 0.5, rx: 0.25, ry: 0.25, drive: 1.2, smooth: 0.6 },
       flow:    { on: false, tap: 0, gain: 0.5, pan: 0, dur: 0.09, noise: 0.15 },
       raster:  { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
@@ -43,6 +43,7 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.sPhase = new Float32Array(NPART);
     this.sAmp = new Float32Array(NPART);
     this.sTarget = new Float32Array(NPART);
+    this.sNz = new Float32Array(NPART); // per-partial lowpassed noise (breath)
     this.sweepPos = 0;
     this.noiseState = 1;
     // ── Orbit state ──
@@ -99,6 +100,16 @@ class SoniProcessor extends AudioWorkletProcessor {
       this.cfg = m.cfg;
       if (m.spectraFreqs) this.spectraFreqs.set(m.spectraFreqs);
       if (m.filterFreqs) { this.fFreqs.set(m.filterFreqs); this.rebuildFilterCoefs(); }
+      return;
+    }
+    if (m.t === 'mod') {
+      // Per-tick probe overlay : shallow-merge effective values into the live
+      // voice configs (sent every tick, so releases revert cleanly).
+      const mm = m.m;
+      for (const k in mm) {
+        const dst = this.cfg[k];
+        if (dst) Object.assign(dst, mm[k]);
+      }
       return;
     }
     if (m.t === 'flow') {
@@ -190,10 +201,27 @@ class SoniProcessor extends AudioWorkletProcessor {
         }
         let ph = this.sPhase[i];
         const inc = this.spectraFreqs[i] * dt;
-        for (let s = 0; s < n; s++) {
-          const v = Math.sin(ph * 6.283185307179586) * a0;
-          L[s] += v * gL; R[s] += v * gR;
-          ph += inc;
+        const br = sp.breath || 0;
+        if (br > 0.005) {
+          // BREATH (the Coagula blue) : lowpassed noise jitters each partial's
+          // instantaneous frequency (widens the line into a narrow band) and
+          // flutters its amplitude — sine → breathy band per partial.
+          let nz = this.sNz[i];
+          for (let s = 0; s < n; s++) {
+            this.noiseState = (this.noiseState * 1103515245 + 12345) & 0x7fffffff;
+            const w = this.noiseState / 0x40000000 - 1;
+            nz = nz * 0.985 + w * 0.015;
+            const v = Math.sin(ph * 6.283185307179586) * a0 * (1 + br * nz * 6);
+            L[s] += v * gL; R[s] += v * gR;
+            ph += inc * (1 + br * nz * 3);
+          }
+          this.sNz[i] = nz;
+        } else {
+          for (let s = 0; s < n; s++) {
+            const v = Math.sin(ph * 6.283185307179586) * a0;
+            L[s] += v * gL; R[s] += v * gR;
+            ph += inc;
+          }
         }
         this.sPhase[i] = ph % 1;
       }
