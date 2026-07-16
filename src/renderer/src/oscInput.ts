@@ -10,16 +10,16 @@
 // Scene 1) to match the UI and the number-key scene shortcuts.
 //
 // Address map:
-//   /opsia/layer/{1..4}/opacity|speed|mix|trail        f 0..1
-//   /opsia/layer/{n}/blend|sourceblend                 i index | f 0..1
-//   /opsia/layer/{n}/mute|solo|feedback                >= 0.5
-//   /opsia/layer/{n}/source/{A|B}                       s shaderId | name | "none"
-//   /opsia/layer/{n}/source/{A|B}/{input}              f 0..1 → range
-//   /opsia/layer/{n}/source/{A|B}/fx/{i}/{input}       f 0..1 → range
-//   /opsia/layer/{n}/fx/{i}/{input}                    f 0..1 → range
-//   /opsia/layer/{n}/coupling/mode                     i index | f 0..1 | s name
-//   /opsia/layer/{n}/coupling/amount|tightness         f 0..1
-//   /opsia/layer/{n}/coupling/feature                  i index | f 0..1 | s name
+//   /opsia/layer{1..4}/opacity|speed|mix|trail        f 0..1
+//   /opsia/layer{n}/blend|sourceblend                 i index | f 0..1
+//   /opsia/layer{n}/mute|solo|feedback                >= 0.5
+//   /opsia/layer{n}/source/{A|B}                       s shaderId | name | "none"
+//   /opsia/layer{n}/source/{A|B}/{input}              f 0..1 → range
+//   /opsia/layer{n}/source/{A|B}/fx/{i}/{input}       f 0..1 → range
+//   /opsia/layer{n}/fx/{i}/{input}                    f 0..1 → range
+//   /opsia/layer{n}/coupling/mode                     i index | f 0..1 | s name
+//   /opsia/layer{n}/coupling/amount|tightness         f 0..1
+//   /opsia/layer{n}/coupling/feature                  i index | f 0..1 | s name
 //   /opsia/master/fx/{i}/{input}                       f 0..1 → range
 //   /opsia/master/vibe|context|finalizer/{input}       f 0..1 → range (color/point2D: N args)
 //   /opsia/bg/opacity|speed|depth                      f 0..1
@@ -173,10 +173,15 @@ function rising(address: string, v: number): boolean {
 }
 
 function route(address: string, args: Args): void {
-  const segs = address.split('/').filter(Boolean)
+  let segs = address.split('/').filter(Boolean)
   if (segs[0] !== 'opsia') return
   const st = useStore.getState()
   const n = firstNum(args)
+
+  // Layer addressing : /opsia/layer1/… (the number inside the segment). The old
+  // /opsia/layer/1/… form is normalized to the same shape for back-compat.
+  const lm = segs[1]?.match(/^layer([1-9])$/)
+  if (lm) segs = [segs[0], 'layer', lm[1], ...segs.slice(2)]
 
   switch (segs[1]) {
     case 'layer': {
@@ -488,23 +493,23 @@ function enumerateLeaves(): Leaf[] {
   }
   for (let n = 1; n <= 4; n++) {
     const l = st.composition.layers[n - 1]
-    add(`/opsia/layer/${n}/opacity`, 0, 1, l?.opacity ?? 1, 'Layer opacity')
-    add(`/opsia/layer/${n}/speed`, 0, 1, (l?.speed ?? 1) / 20, 'Layer speed (0..1 → 0..20×)')
-    add(`/opsia/layer/${n}/mix`, 0, 1, l?.sourceMix ?? 0.5, 'A/B source mix')
-    add(`/opsia/layer/${n}/trail`, 0, 1, l?.feedbackAmount ?? 0, 'Feedback trail amount')
+    add(`/opsia/layer${n}/opacity`, 0, 1, l?.opacity ?? 1, 'Layer opacity')
+    add(`/opsia/layer${n}/speed`, 0, 1, (l?.speed ?? 1) / 20, 'Layer speed (0..1 → 0..20×)')
+    add(`/opsia/layer${n}/mix`, 0, 1, l?.sourceMix ?? 0.5, 'A/B source mix')
+    add(`/opsia/layer${n}/trail`, 0, 1, l?.feedbackAmount ?? 0, 'Feedback trail amount')
     const bi = Math.max(0, BLEND_MODES.indexOf(l?.blend ?? 'normal'))
-    add(`/opsia/layer/${n}/blend`, 0, 1, bi / (BLEND_MODES.length - 1), 'Layer blend mode (index)')
+    add(`/opsia/layer${n}/blend`, 0, 1, bi / (BLEND_MODES.length - 1), 'Layer blend mode (index)')
     const si = Math.max(0, BLEND_MODES.indexOf(l?.sourceBlend ?? 'normal'))
-    add(`/opsia/layer/${n}/sourceblend`, 0, 1, si / (BLEND_MODES.length - 1), 'A/B blend mode (index)')
-    add(`/opsia/layer/${n}/mute`, 0, 1, l?.mute ? 1 : 0, 'Mute (>= 0.5)')
-    add(`/opsia/layer/${n}/solo`, 0, 1, l?.solo ? 1 : 0, 'Solo (>= 0.5)')
-    add(`/opsia/layer/${n}/feedback`, 0, 1, l?.feedback ? 1 : 0, 'Feedback on (>= 0.5)')
+    add(`/opsia/layer${n}/sourceblend`, 0, 1, si / (BLEND_MODES.length - 1), 'A/B blend mode (index)')
+    add(`/opsia/layer${n}/mute`, 0, 1, l?.mute ? 1 : 0, 'Mute (>= 0.5)')
+    add(`/opsia/layer${n}/solo`, 0, 1, l?.solo ? 1 : 0, 'Solo (>= 0.5)')
+    add(`/opsia/layer${n}/feedback`, 0, 1, l?.feedback ? 1 : 0, 'Feedback on (>= 0.5)')
     const cm = Math.max(0, COUPLING_MODES.indexOf(l?.coupling?.mode ?? 'off'))
-    add(`/opsia/layer/${n}/coupling/mode`, 0, 1, cm / (COUPLING_MODES.length - 1), 'A/B coupling mode (index: off·lean·hocket·cut·gate·drift)')
-    add(`/opsia/layer/${n}/coupling/amount`, 0, 1, l?.coupling?.amount ?? 0.5, 'A/B coupling depth')
-    add(`/opsia/layer/${n}/coupling/tightness`, 0, 1, l?.coupling?.tightness ?? 0.7, 'A/B coupling tightness')
+    add(`/opsia/layer${n}/coupling/mode`, 0, 1, cm / (COUPLING_MODES.length - 1), 'A/B coupling mode (index: off·lean·hocket·cut·gate·drift)')
+    add(`/opsia/layer${n}/coupling/amount`, 0, 1, l?.coupling?.amount ?? 0.5, 'A/B coupling depth')
+    add(`/opsia/layer${n}/coupling/tightness`, 0, 1, l?.coupling?.tightness ?? 0.7, 'A/B coupling tightness')
     const cf = Math.max(0, COUPLING_FEATURES.indexOf(l?.coupling?.feature ?? 'transient'))
-    add(`/opsia/layer/${n}/coupling/feature`, 0, 1, cf / (COUPLING_FEATURES.length - 1), 'A/B coupling audio feature (index)')
+    add(`/opsia/layer${n}/coupling/feature`, 0, 1, cf / (COUPLING_FEATURES.length - 1), 'A/B coupling audio feature (index)')
   }
   for (let k = 1; k <= st.composition.metaKnobs.length; k++) {
     const knob = st.composition.metaKnobs[k - 1]

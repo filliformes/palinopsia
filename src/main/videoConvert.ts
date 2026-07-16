@@ -108,6 +108,47 @@ function cachePathFor(src: string): string {
   return join(dir, `${key}.mp4`)
 }
 
+// Warm every video file sitting next to a loaded session : probe each one and
+// pre-convert the exotic codecs (DXV/HAP/ProRes…) into the all-intra cache in the
+// BACKGROUND, sequentially (one ffmpeg at a time : no CPU spike), so by the time
+// the performer reaches for a clip it imports instantly. Fire-and-forget.
+const VIDEO_EXTS = /\.(mp4|m4v|mov|dxv|webm|mkv|avi|mpg|mpeg|mxf|m2v)$/i
+let warming = false
+export async function warmVideoFolder(dir: string): Promise<void> {
+  if (warming) return // one warm sweep at a time
+  warming = true
+  try {
+    const { readdirSync } = await import('fs')
+    const files = readdirSync(dir)
+      .filter((f) => VIDEO_EXTS.test(f))
+      .map((f) => join(dir, f))
+    for (const f of files) {
+      try {
+        const p = await probe(f)
+        if (!p.ffmpegAvailable) return // no ffmpeg : nothing to warm
+        if (!p.needsConvert) continue
+        const out = cachePathFor(f)
+        if (existsSync(out) && statSync(out).size > 0) continue // already cached
+        const dur = Math.max(p.durationSec, 0.001)
+        void dur
+        await runFfmpeg([
+          '-hide_banner', '-y', '-i', f, '-an',
+          '-c:v', 'libx264', '-g', '1', '-bf', '0',
+          '-crf', '16', '-preset', 'fast', '-pix_fmt', 'yuv420p',
+          '-movflags', '+faststart', out
+        ])
+        console.log(`[video] warmed ${f}`)
+      } catch {
+        /* one bad file must not stop the sweep */
+      }
+    }
+  } catch {
+    /* unreadable dir : ignore */
+  } finally {
+    warming = false
+  }
+}
+
 export function registerVideoConvert(): void {
   ipcMain.handle('video:probe', async (_e, path: string) => {
     try {

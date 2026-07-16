@@ -22,7 +22,7 @@ import * as autosave from './autosave'
 import { ModulationEngine } from './modulators'
 import { OscQueryServer, type OscQueryNode } from './oscquery'
 import { registerMediaScheme, handleMediaProtocol } from './media'
-import { registerVideoConvert } from './videoConvert'
+import { registerVideoConvert, warmVideoFolder } from './videoConvert'
 import { hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
 import { hiveSendStart, hiveSendChunk, hiveSendStop } from './hiveSend'
 import { OutputSender } from './output'
@@ -396,7 +396,13 @@ app.whenReady().then(async () => {
   safeHandle('session:saveToDefault', (_e, s) => sessionIO.saveToDefault(s as Session))
   safeHandle('session:open', () => sessionIO.open(mainWindow))
   safeHandle('session:list', () => sessionIO.listSaved())
-  safeHandle('session:load', (_e, path) => sessionIO.loadFromPath(path as string))
+  safeHandle('session:load', (_e, path) => {
+    // Warm the session folder's clips in the background (pre-convert DXV/HAP/
+    // ProRes into the all-intra cache) so every clip beside the session is
+    // instant to load. Fire-and-forget : never delays the session itself.
+    void import('path').then(({ dirname }) => warmVideoFolder(dirname(path as string))).catch(() => {})
+    return sessionIO.loadFromPath(path as string)
+  })
   safeHandle('session:setCurrent', (_e, s) => autosave.setCurrentSession(s as Session))
 
   // ---------- IPC: Autosave / crash recovery ----------
