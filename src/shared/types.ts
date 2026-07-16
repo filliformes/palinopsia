@@ -397,6 +397,14 @@ export const MAX_MOD_ASSIGNMENTS = 12
 export const META_KNOB_COUNT = 16
 export const META_MAX_DESTS = 8
 
+// A learned MIDI control : a CC (knob/slider/button) or a Note (pad/key) on
+// one channel. dataFLOU's shape, verbatim — the two apps share controllers.
+export interface MidiBinding {
+  kind: 'cc' | 'note'
+  channel: number // 0..15
+  number: number // CC# or note#
+}
+
 export interface MetaKnobState {
   name: string
   value: number // committed 0..1 position

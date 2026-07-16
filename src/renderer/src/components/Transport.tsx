@@ -14,6 +14,7 @@ import { randomizeMetaKnobs } from '../metaSmooth'
 import type { RandomizeScope } from '../randomize'
 import { useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
 
 const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
   { scope: 'all', label: 'Randomize All' },
@@ -87,6 +88,8 @@ export function Transport(): JSX.Element {
   const setProximity = useStore((s) => s.setProximity)
   const proximityAudio = useStore((s) => s.proximityAudio)
   const setProximityAudio = useStore((s) => s.setProximityAudio)
+  const midiLearnMode = useStore((s) => s.midiLearnMode)
+  const setMidiLearnMode = useStore((s) => s.setMidiLearnMode)
   const setComposition = useStore.setState
   const applyVariation = useStore((s) => s.applyVariation)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -146,7 +149,8 @@ export function Transport(): JSX.Element {
 
   return (
     <div className="flex flex-nowrap items-center gap-x-2 overflow-x-clip overflow-y-visible border-t border-border bg-panel px-2 py-1.5">
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="relative flex shrink-0 items-center gap-1.5">
+        <MidiLearnOverlay id="transport:bpm" />
         <button
           onClick={tapTempo}
           className={`${TBTN} ${TBTN_IDLE} active:bg-accent/20`}
@@ -167,7 +171,8 @@ export function Transport(): JSX.Element {
       </div>
 
       {/* Global speed : scales every visual clock, 1/64×…64× (log). */}
-      <div className="flex min-w-0 items-center gap-1">
+      <div className="relative flex min-w-0 items-center gap-1">
+        <MidiLearnOverlay id="transport:speed" />
         <span className="font-mono text-[10px] text-muted">SPD</span>
         <input
           type="range"
@@ -184,7 +189,8 @@ export function Transport(): JSX.Element {
       </div>
 
       {/* Morph : scene recalls & Randomize crossfade over this time. */}
-      <div className="flex min-w-0 items-center gap-1">
+      <div className="relative flex min-w-0 items-center gap-1">
+        <MidiLearnOverlay id="transport:morph" />
         <span className="font-mono text-[10px] text-muted">MORPH</span>
         <input
           type="range"
@@ -202,7 +208,8 @@ export function Transport(): JSX.Element {
 
       {/* Proximity (Field macro) : one knob places the image in a depth zone,
           far/vista ↔ close/personal, by pushing the Context mood. */}
-      <div className="flex min-w-0 items-center gap-1">
+      <div className="relative flex min-w-0 items-center gap-1">
+        <MidiLearnOverlay id="transport:prox" />
         <span className="font-mono text-[10px] text-muted">PROX</span>
         <input
           type="range"
@@ -235,6 +242,30 @@ export function Transport(): JSX.Element {
         ⛶ Output
       </button>
 
+      {/* Global MIDI Learn (dataFLOU's, colour and all) : pressed = learn
+          mode on, blue overlays appear on every learnable control — click
+          one, move a MIDI control to bind (green = bound). Press to exit. */}
+      <button
+        onClick={() => setMidiLearnMode(!midiLearnMode)}
+        className={`${TBTN} ${midiLearnMode ? '' : TBTN_IDLE}`}
+        style={
+          midiLearnMode
+            ? {
+                background: 'rgba(90, 150, 255, 0.6)',
+                color: '#fff',
+                borderColor: 'rgba(90, 150, 255, 1)'
+              }
+            : undefined
+        }
+        title={
+          midiLearnMode
+            ? 'MIDI Learn ON — click a highlighted control, then move a knob / hit a pad to bind it. Right-click a green one to clear. Click here (or Esc) to exit.'
+            : 'Enter MIDI Learn mode : map hardware knobs and pads to Meta knobs, transport controls, Vary / Randomize / Sonify and scenes.'
+        }
+      >
+        MIDI Learn
+      </button>
+
       {/* Command group, pushed right : Seq · Sonify · Vary · Randomize. */}
       <div className="ml-auto flex min-w-0 items-center gap-1.5">
         <button
@@ -244,23 +275,29 @@ export function Transport(): JSX.Element {
         >
           {seqRunning ? '▶ Seq' : 'Seq'}
         </button>
-        <button
-          onClick={() => setSonifyPageOpen(!sonifyPageOpen)}
-          className={`${TBTN} ${sonifyOn ? TBTN_LIT : TBTN_IDLE}`}
-          title="Open Sonify, the image-to-sound engine (S) : lights while the sound is running"
-        >
-          {sonifyOn ? '◉ Sonify' : 'Sonify'}
-        </button>
+        <span className="relative flex shrink-0">
+          <MidiLearnOverlay id="fire:sonify" />
+          <button
+            onClick={() => setSonifyPageOpen(!sonifyPageOpen)}
+            className={`${TBTN} ${sonifyOn ? TBTN_LIT : TBTN_IDLE}`}
+            title="Open Sonify, the image-to-sound engine (S) : lights while the sound is running"
+          >
+            {sonifyOn ? '◉ Sonify' : 'Sonify'}
+          </button>
+        </span>
 
         {/* Variation : a baseline-anchored variant of the whole scene at `varAmt`
             (structure fixed, continuous values nudged). */}
-        <button
-          onClick={() => applyVariation(varAmt)}
-          className={`${TBTN} border-accent2/60 bg-accent2/10 text-accent2 hover:bg-accent2/20`}
-          title={`Variation ${pct(varAmt)} : a fresh variant of the current scene (same structure, values nudged). First press sets the baseline; each press is a new sibling at this spread.`}
-        >
-          Vary
-        </button>
+        <span className="relative flex shrink-0">
+          <MidiLearnOverlay id="fire:vary" />
+          <button
+            onClick={() => applyVariation(varAmt)}
+            className={`${TBTN} border-accent2/60 bg-accent2/10 text-accent2 hover:bg-accent2/20`}
+            title={`Variation ${pct(varAmt)} : a fresh variant of the current scene (same structure, values nudged). First press sets the baseline; each press is a new sibling at this spread.`}
+          >
+            Vary
+          </button>
+        </span>
         <input
           type="range"
           min={0.01}
@@ -294,13 +331,16 @@ export function Transport(): JSX.Element {
         <span className="w-7 shrink-0 font-mono text-[9px] text-muted">{pct(intensity)}</span>
 
         <div ref={menuRef} className="relative flex shrink-0">
-          <button
-            onClick={() => fireRandomize(scope, intensity)}
-            className={`${TBTN} rounded-r-none border-accent/60 bg-accent/10 text-accent hover:bg-accent/20`}
-            title={`Fire ${current.label} : every draw from curated aesthetic ranges`}
-          >
-            {current.label}
-          </button>
+          <span className="relative flex shrink-0">
+            <MidiLearnOverlay id="fire:randomize" />
+            <button
+              onClick={() => fireRandomize(scope, intensity)}
+              className={`${TBTN} rounded-r-none border-accent/60 bg-accent/10 text-accent hover:bg-accent/20`}
+              title={`Fire ${current.label} : every draw from curated aesthetic ranges`}
+            >
+              {current.label}
+            </button>
+          </span>
           <button
             onClick={() => setMenuOpen((o) => !o)}
             className="rounded-r border border-l-0 border-accent/60 bg-accent/10 px-1.5 text-[10px] text-accent transition-colors hover:bg-accent/20"

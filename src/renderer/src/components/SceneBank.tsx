@@ -7,6 +7,7 @@
 import { useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import { useStore } from '../store'
 import { ContextMenu } from './ContextMenu'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
 
 export function SceneBank(): JSX.Element {
   const scenes = useStore((s) => s.scenes)
@@ -61,12 +62,15 @@ export function SceneBank(): JSX.Element {
             e.preventDefault()
             setMenu({ x: e.clientX, y: e.clientY, sceneId: scene.id, name: scene.name })
           }}
-          className={`flex shrink-0 cursor-grab items-center gap-1 rounded border px-1.5 py-0.5 transition-colors ${
+          className={`relative flex shrink-0 cursor-grab items-center gap-1 rounded border px-1.5 py-0.5 transition-colors ${
             activeSceneId === scene.id
               ? 'border-accent bg-accent/15 text-accent'
               : 'border-border bg-panel2 hover:border-accent/50'
           }`}
         >
+          {/* MIDI Learn : bindings are per SLOT (like the 1–9 keys), so a
+              pad keeps recalling "slot 3" even after scenes are re-saved. */}
+          <MidiLearnOverlay id={`scene:${i}`} />
           {i < 9 && (
             <span className="font-mono text-[9px] text-muted" title={`Key ${i + 1} recalls`}>
               {i + 1}

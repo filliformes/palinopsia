@@ -22,8 +22,8 @@ import { depthEngine } from './engine/depthEstimate'
 import { currentFps, tickFrame } from './perf'
 import { videoSeekRequests } from './engine/videoState'
 import { outputRecorder } from './recorder'
-import { randomSonify } from './audio/autoSonify'
 import { sonifyEngine } from './audio/sonify'
+import { fireSelectedRandomize } from './commands'
 import { tickSequencer } from './engine/sequencer'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel, FxChips } from './components/FxRackPanel'
@@ -36,6 +36,7 @@ import { MetaBar } from './components/MetaBar'
 import { ModulationPanel } from './components/ModulationPanel'
 import { OscPanel } from './components/OscPanel'
 import { AudioPanel } from './components/AudioPanel'
+import { MidiPanel } from './components/MidiPanel'
 import { BackgroundPanel } from './components/BackgroundPanel'
 import { OutputPage } from './components/OutputPage'
 import { SonifyPage } from './components/SonifyPage'
@@ -110,8 +111,7 @@ function cycleContextPreset(): void {
 }
 import { initUndo, redo, undo, useUndoState } from './undo'
 import { THEME_ORDER, useStore, type ThemeName } from './store'
-import { metaGlides, randomizeMetaKnobs } from './metaSmooth'
-import type { RandomizeScope } from './randomize'
+import { metaGlides } from './metaSmooth'
 
 // The global REC pill : visible in the top bar while a take is rolling, so you
 // can leave the Output page and tweak live. Click ■ to stop + save the take.
@@ -162,24 +162,8 @@ function WorldSelect(): JSX.Element {
   )
 }
 
-// Fire the Randomize mode the Transport's chevron currently points at (persisted
-// in localStorage) : the R shortcut mirrors clicking the Randomize button.
-function fireSelectedRandomize(): void {
-  const raw = localStorage.getItem('opsia.randScope') as RandomizeScope | null
-  const scope: RandomizeScope = raw ?? 'all'
-  if (scope === 'meta') {
-    randomizeMetaKnobs()
-    return
-  }
-  if (scope === 'sonify') {
-    const st = useStore.getState()
-    st.setSonify(randomSonify(st.sonify))
-    return
-  }
-  const i = Number(localStorage.getItem('opsia.randIntensity'))
-  const intensity = Number.isFinite(i) && i > 0 ? i : 1
-  useStore.getState().randomize(scope, intensity)
-}
+// fireSelectedRandomize lives in commands.ts now : the R shortcut, the
+// Transport button and a learned MIDI pad all fire the same implementation.
 
 export default function App(): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -396,6 +380,13 @@ export default function App(): JSX.Element {
           useStore.getState().setRightView('feel')
           return
         }
+        // A: show/hide the osc/audio/midi setup tab.
+        if (k === 'a') {
+          e.preventDefault()
+          const st = useStore.getState()
+          st.setRightView(st.rightView === 'io' ? 'layers' : 'io')
+          return
+        }
         // D / X / I: collapse-toggle the Modulation / Master-FX / Inspector panels.
         if (k === 'd') {
           e.preventDefault()
@@ -418,6 +409,12 @@ export default function App(): JSX.Element {
           fireSelectedRandomize()
           return
         }
+      }
+      // Esc: leave MIDI Learn mode first — it sits over every other surface.
+      if (e.key === 'Escape' && useStore.getState().midiLearnMode) {
+        e.preventDefault()
+        useStore.getState().setMidiLearnMode(false)
+        return
       }
       // Esc: close the World editor if it's open.
       if (e.key === 'Escape' && useStore.getState().worldPageOpen) {
@@ -1035,10 +1032,12 @@ export default function App(): JSX.Element {
           ) : rightView === 'feel' ? (
             <FeelPanel />
           ) : rightView === 'io' ? (
-            // Setup lives out of the way : OSC + Audio as collapsible sections.
+            // Setup lives out of the way : OSC + Audio + MIDI as collapsible
+            // sections (A toggles this tab).
             <>
               <OscPanel />
               <AudioPanel />
+              <MidiPanel />
             </>
           ) : (
             <>
@@ -1059,8 +1058,8 @@ export default function App(): JSX.Element {
       {/* ── Meta Controller: 32 macro knobs / 4 banks (brief §6) ── */}
       <MetaBar />
 
-      {/* Audio + OSC setup moved to the right column's `osc/audio` tab :
-          performance space stays for creation, setup lives out of the way. */}
+      {/* Audio + OSC + MIDI setup lives in the right column's `osc/audio/midi`
+          tab (A) : performance space stays for creation, setup out of the way. */}
 
       {/* ── Transport (BPM + Randomize) ───────────────────────────── */}
       <Transport />
@@ -1099,7 +1098,7 @@ function RightViewTabs(): JSX.Element {
     { id: 'mixer', label: 'mixer', title: 'Compact opacity/speed/blend for all 4 layers (M)' },
     { id: 'finishing', label: 'finishing', title: 'Finishing Touches : Vibe Palette · Context · Finalizer' },
     { id: 'feel', label: 'feel', title: 'Feel : the global macros — Field + Temperament (G)' },
-    { id: 'io', label: 'osc/audio', title: 'Setup : OSC input/OSCQuery + the audio bus, each a collapsible section' }
+    { id: 'io', label: 'osc/audio/midi', title: 'Setup (A) : OSC input/OSCQuery, the audio bus, and MIDI (controller input + learned bindings), each a collapsible section' }
   ]
   return (
     <div className="flex shrink-0 gap-1">

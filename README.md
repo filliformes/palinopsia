@@ -34,7 +34,7 @@ work: **never cheap psychedelia, never a 3D game engine.**
 - [The Transport bar](#the-transport-bar-bottom) · [Feel — the global macros](#feel--the-global-macros-key-g)
 - [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix)
 - [Sequencer](#sequencer-key-q) — auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
-- [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) · [Output & mapping](#output--mapping-key-o) — incl. Flash safety
+- [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) · [MIDI](#midi) · [Output & mapping](#output--mapping-key-o) — incl. Flash safety
 - [Sonify — image to sound](#sonify--image-to-sound-key-s) — six voices (Spectra · Orbit · Flow · Raster · Transmission · Filter) · quantizer · audio in recordings
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
@@ -121,6 +121,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `W` | World editor |
 | `Q` | Sequence page |
 | `S` | **Sonify** page (image-to-sound engine) |
+| `A` | Right column → **osc/audio/midi** setup tab |
 | `D` / `X` / `I` | Collapse Modulation / Master-FX / Inspector |
 | `R` | Fire the Transport's selected Randomize |
 | `Esc` | Close World / Output / Sequence page |
@@ -128,8 +129,8 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `Ctrl/Cmd+S` | Save session |
 | `Ctrl/Cmd` `+` / `-` / `0` · `Ctrl`+wheel | UI zoom in / out / reset |
 
-The **osc/audio** tab (the fifth right-column tab) has no key — click it.
-**MIDI:** per-knob CC learn on the Meta Controller (Web MIDI).
+**MIDI:** the **MIDI Learn** toolbar button maps any controller — see
+[MIDI](#midi).
 **Everywhere:** double-click a slider/knob to reset it to its neutral value.
 
 ---
@@ -214,6 +215,7 @@ Left → right:
   lights when running) · **Sfy** (opens Sonify; lights while the sound engine
   runs) · **PROX** proximity (far ↔ close depth zone) + `◑` audio-brightness
   follow.
+- **MIDI Learn** — arms the controller-mapping mode (see [MIDI](#midi)).
 - **Vary** (a baseline-anchored variant — structure fixed, values nudged) + amount.
 - **amt** Randomize intensity (gentle walk ↔ full re-roll) · **Randomize**
   split-button (main fires the selected scope; `▾` picks the scope — see
@@ -319,7 +321,7 @@ composite live.
 
 ## Audio in
 
-The **osc/audio** right-column tab holds both control panels:
+The **osc/audio/midi** right-column tab (key `A`) holds the control panels:
 
 - **Audio** — enable the local analyser (input device picker), or receive
   features over OSC from an audio brain (`/opsia/audio/*`). The **coupling**
@@ -327,10 +329,38 @@ The **osc/audio** right-column tab holds both control panels:
   level / flux / transient / centroid / bands.
 - **OSC** — inbound listener (port, on/off, this machine's IPs), outbound
   feedback (host/port/interval), and the OSCQuery status.
+- **MIDI** — controller input picker + the learned-bindings ledger
+  (see [MIDI](#midi)).
 
 Everything that "listens" to sound reads one shared **audio bus**: coupling,
 Tonicity, the `audio` modulator, World routings, Proximity's `◑` follow, and the
 Parametric generator.
+
+## MIDI
+
+Hardware control, Ableton-style. Press **MIDI Learn** in the bottom toolbar
+(it turns blue) : every learnable control grows a **blue overlay**. Click one
+(it pulses), then move a knob / hit a pad on your controller — bound (the
+overlay turns **green**). The mode stays armed so you can map the next control
+immediately; right-click a green overlay to clear its binding, press the
+button again or `Esc` to exit. While learning, incoming MIDI never fires
+anything — browse your controller safely.
+
+Learnable targets:
+
+- **Meta knobs** (all 16, CC only) — hardware drives them through the same
+  per-knob smoothing as a mouse drag. These bindings live **in the session**
+  (the per-knob **CC** button still works as a direct shortcut).
+- **Transport** — BPM (CC → 40–240), SPD, MORPH, PROX (each mirrors its
+  slider's curve).
+- **Fires** (pad/note or button-CC, press edge only) — **Vary**, **Randomize**
+  (the selected scope), **Sonify** on/off.
+- **Scene chips** — a pad recalls that scene *slot* (like the `1`–`9` keys).
+
+Everything except the Meta-knob CCs is machine-local (survives restarts,
+doesn't travel with sessions). The **MIDI** section of the osc/audio/midi tab
+(key `A`) has the **input dropdown** (all controllers, or just one — hot-plug
+is handled) and the full bindings ledger with per-row clear.
 
 ## Output & mapping (key `O`)
 

@@ -26,7 +26,7 @@ import type {
   SourceSlot,
   World
 } from '@shared/types'
-import type { MetaKnobState } from '@shared/types'
+import type { MetaKnobState, MidiBinding } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
 import { beginMorph, cancelMorph } from './morph'
@@ -319,6 +319,31 @@ function persistSonify(cfg: SoniConfig): void {
     sonifyPersistTimer = null
     localStorage.setItem('opsia.sonify', JSON.stringify({ ...cfg, on: false }))
   }, 250)
+}
+
+// Machine-local MIDI Learn bindings (everything except the Meta knobs' CCs,
+// which travel with the session). Malformed entries are dropped, not fatal.
+function loadMidiMap(): Record<string, MidiBinding> {
+  try {
+    const raw = JSON.parse(localStorage.getItem('opsia.midiMap') || '{}') as Record<
+      string,
+      MidiBinding
+    >
+    const out: Record<string, MidiBinding> = {}
+    for (const [id, b] of Object.entries(raw)) {
+      if (
+        b &&
+        (b.kind === 'cc' || b.kind === 'note') &&
+        Number.isInteger(b.channel) &&
+        Number.isInteger(b.number)
+      ) {
+        out[id] = { kind: b.kind, channel: b.channel, number: b.number }
+      }
+    }
+    return out
+  } catch {
+    return {}
+  }
 }
 
 function persistMacro(key: string, v: number): void {
@@ -726,6 +751,22 @@ interface StoreState {
   // Meta Controller (Phase 5) : 16 macro knobs.
   midiLearn: number | null // knob index armed for CC learn
   setMidiLearn: (i: number | null) => void
+
+  // Global MIDI Learn (dataFLOU's Ableton-style mode) : the toolbar button
+  // arms it, blue overlays appear on every learnable control, click one and
+  // move a MIDI control to bind (green = already bound). Bindings other than
+  // the Meta knobs' CCs (those live in the session's metaKnobs) are machine-
+  // local : they persist in localStorage, keyed by a stable target id
+  // ('scene:0', 'transport:morph', 'fire:vary', …).
+  midiLearnMode: boolean
+  midiLearnTarget: string | null
+  setMidiLearnMode: (on: boolean) => void
+  setMidiLearnTarget: (t: string | null) => void
+  midiMap: Record<string, MidiBinding>
+  setMidiBinding: (id: string, b: MidiBinding | null) => void
+  // Which MIDI input feeds the app ('' = all inputs). Machine-local.
+  midiInputName: string
+  setMidiInputName: (name: string) => void
   updateMetaKnob: (i: number, partial: Partial<MetaKnobState>) => void
   setMetaValue: (i: number, v: number) => void
   // Toggle a destination on a knob (capped at META_MAX_DESTS).
@@ -1683,6 +1724,32 @@ export const useStore = create<StoreState>((set, get) => ({
 
   midiLearn: null,
   setMidiLearn: (i) => set({ midiLearn: i }),
+
+  midiLearnMode: false,
+  midiLearnTarget: null,
+  // Turning OFF also drops the pending target (cancelling); turning ON never
+  // clears bindings — it's a browse/bind mode, not a reset.
+  setMidiLearnMode: (on) =>
+    set(on ? { midiLearnMode: true } : { midiLearnMode: false, midiLearnTarget: null }),
+  setMidiLearnTarget: (t) => set({ midiLearnTarget: t }),
+  midiMap: loadMidiMap(),
+  setMidiBinding: (id, b) =>
+    set((s) => {
+      const midiMap = { ...s.midiMap }
+      if (b) midiMap[id] = b
+      else delete midiMap[id]
+      try {
+        localStorage.setItem('opsia.midiMap', JSON.stringify(midiMap))
+      } catch {
+        /* quota — bindings just won't survive the restart */
+      }
+      return { midiMap }
+    }),
+  midiInputName: localStorage.getItem('opsia.midiInput') ?? '',
+  setMidiInputName: (name) => {
+    localStorage.setItem('opsia.midiInput', name)
+    set({ midiInputName: name })
+  },
   updateMetaKnob: (i, partial) =>
     set((s) => ({
       composition: {

@@ -1261,3 +1261,37 @@ input[type='range'].live-overlay {
   text-anchor: middle;
   font-weight: 600;
 }
+
+/* ======== MIDI Learn overlays (dataFLOU's, verbatim) ======== */
+/* Rendered on top of every learnable control while learn mode is armed.
+   Blue = unbound, bright pulsing blue = selected as the learn target,
+   green = already bound. */
+.midi-learn-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 2px;
+  transition: background 120ms, box-shadow 120ms;
+  z-index: 40;
+}
+.midi-learn-blue {
+  background: rgba(90, 150, 255, 0.28);
+  box-shadow: 0 0 0 1px rgba(90, 150, 255, 0.7) inset;
+}
+.midi-learn-selected {
+  background: rgba(90, 150, 255, 0.5);
+  box-shadow: 0 0 0 2px rgba(90, 150, 255, 1) inset;
+  animation: midi-learn-pulse 700ms ease-in-out infinite alternate;
+}
+.midi-learn-green {
+  background: rgba(80, 210, 130, 0.3);
+  box-shadow: 0 0 0 1px rgba(80, 210, 130, 0.7) inset;
+}
+@keyframes midi-learn-pulse {
+  from {
+    box-shadow: 0 0 0 1px rgba(90, 150, 255, 0.5) inset;
+  }
+  to {
+    box-shadow: 0 0 0 3px rgba(90, 150, 255, 1) inset;
+  }
+}

@@ -25,6 +25,7 @@ import {
 } from '../metaSmooth'
 import { useShallow } from 'zustand/react/shallow'
 import { modTargetKey, useStore } from '../store'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { useFlash } from './useFlash'
 
 const KNOB_PX = 44
@@ -328,6 +329,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
         onDoubleClick={() => setKnobTarget(index, 0, knob.smoothMs)}
         title={`${knob.name} : drag vertically · Shift = fine · double-click resets`}
       >
+        <MidiLearnOverlay id={`meta:${index}`} />
         <svg width={KNOB_PX} height={KNOB_PX} className="absolute inset-0">
           <path
             d={`M ${cx + radius * Math.cos(arcStart)} ${cy + radius * Math.sin(arcStart)}
