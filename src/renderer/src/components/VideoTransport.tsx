@@ -191,8 +191,42 @@ export function VideoTransport({
         </span>
       </div>
 
-      {/* Modulation : the playhead (position) + clip speed as mod targets. */}
-      <VideoModRow layer={layer} slot={slot} />
+      {/* Granular : 3 seek-head voices scattering grains around the playhead. */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => set({ grainOn: !(state.grainOn ?? false) })}
+          className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] transition-colors ${
+            state.grainOn ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'
+          }`}
+          title="Video granulation : three grain voices scatter short windows around the playhead (which keeps moving — modulate it to steer the cloud). Best on imported/converted all-intra clips."
+        >
+          ⌗ grain
+        </button>
+        {state.grainOn && (
+          <>
+            {([
+              ['size', 'grainSize', 0.05, 1, state.grainSize ?? 0.25, 'Grain length (seconds)'],
+              ['spray', 'grainSpray', 0, 1, state.grainSpray ?? 0.15, 'Scatter around the playhead'],
+              ['rev', 'grainReverse', 0, 1, state.grainReverse ?? 0.25, 'Probability a grain plays backward'],
+              ['jit', 'grainJitter', 0, 1, state.grainJitter ?? 0.2, 'Per-grain speed jitter']
+            ] as Array<[string, 'grainSize' | 'grainSpray' | 'grainReverse' | 'grainJitter', number, number, number, string]>).map(
+              ([lbl, key, lo, hi, val, tip]) => (
+                <span key={key} className="flex min-w-0 flex-1 items-center gap-1" title={tip}>
+                  <span className="shrink-0 font-mono text-[8px] uppercase text-muted">{lbl}</span>
+                  <input
+                    type="range" min={lo} max={hi} step={0.01} value={val}
+                    onChange={(e) => set({ [key]: Number(e.target.value) })}
+                    className="min-w-0 flex-1 accent-accent2"
+                  />
+                </span>
+              )
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Modulation : playhead / speed / grain params as mod targets. */}
+      <VideoModRow layer={layer} slot={slot} grainOn={state.grainOn ?? false} />
     </div>
   )
 }
@@ -201,40 +235,44 @@ export function VideoTransport({
 // LFO = a loop, S&H = jump-cuts, audio = a sound-driven scrub) or to the clip
 // SPEED (rate multiplier). On imported/converted all-intra clips the seeks are
 // frame-accurate, so a modulated playhead reads smooth.
-function VideoModRow({ layer, slot }: { layer: number; slot: 'A' | 'B' }): JSX.Element {
-  const [open, setOpen] = useState<'position' | 'speed' | null>(null)
-  const posTarget: ModTarget = { kind: 'source', layer, slot, input: 'position' }
-  const spdTarget: ModTarget = { kind: 'source', layer, slot, input: 'speed' }
-  const posKey = modTargetKey(posTarget)
-  const spdKey = modTargetKey(spdTarget)
-  const posBound = useStore(
-    useShallow((s) => s.composition.modMatrix.filter((a) => modTargetKey(a.target) === posKey))
-  )
-  const spdBound = useStore(
-    useShallow((s) => s.composition.modMatrix.filter((a) => modTargetKey(a.target) === spdKey))
-  )
-  const mBtn = (label: string, which: 'position' | 'speed', bound: { length: number }): JSX.Element => (
-    <button
-      onClick={() => setOpen((o) => (o === which ? null : which))}
-      className={`rounded px-1.5 py-0.5 font-mono text-[9px] transition-colors ${
-        bound.length > 0
-          ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2'
-          : 'bg-panel3/60 text-muted hover:text-text'
-      }`}
-      title={`Bind a modulator to the ${which === 'position' ? 'playhead (a saw LFO loops, S&H jump-cuts, audio scrubs)' : 'clip speed'}`}
-    >
-      M·{label}
-    </button>
-  )
+function VideoModRow({ layer, slot, grainOn }: { layer: number; slot: 'A' | 'B'; grainOn: boolean }): JSX.Element {
+  const [open, setOpen] = useState<string | null>(null)
+  const inputs: Array<[string, string]> = [
+    ['playhead', 'position'],
+    ['speed', 'speed'],
+    ...(grainOn ? ([['gr·size', 'grainSize'], ['gr·spray', 'grainSpray']] as Array<[string, string]>) : [])
+  ]
+  const targets: Record<string, ModTarget> = {}
+  for (const [, input] of inputs) targets[input] = { kind: 'source', layer, slot, input }
+  const matrix = useStore(useShallow((s) => s.composition.modMatrix))
+  const boundFor = (input: string): typeof matrix => {
+    const key = modTargetKey(targets[input])
+    return matrix.filter((a) => modTargetKey(a.target) === key)
+  }
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         <span className="w-10 shrink-0 font-mono text-[9px] uppercase text-muted">mod</span>
-        {mBtn('playhead', 'position', posBound)}
-        {mBtn('speed', 'speed', spdBound)}
+        {inputs.map(([label, input]) => (
+          <button
+            key={input}
+            onClick={() => setOpen((o) => (o === input ? null : input))}
+            className={`rounded px-1.5 py-0.5 font-mono text-[9px] transition-colors ${
+              boundFor(input).length > 0
+                ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2'
+                : 'bg-panel3/60 text-muted hover:text-text'
+            }`}
+            title={
+              input === 'position'
+                ? 'Bind a modulator to the playhead : a saw LFO loops, S&H jump-cuts, audio scrubs. With grain on, this steers the cloud.'
+                : `Bind a modulator to ${label}`
+            }
+          >
+            M·{label}
+          </button>
+        ))}
       </div>
-      {open === 'position' && <AssignRow target={posTarget} bound={posBound} />}
-      {open === 'speed' && <AssignRow target={spdTarget} bound={spdBound} />}
+      {open && targets[open] && <AssignRow target={targets[open]} bound={boundFor(open)} />}
     </div>
   )
 }

@@ -804,7 +804,9 @@ function inputValueForMode(
 // modulatable playhead), `speed` = a rate multiplier over the transport speed.
 const VIDEO_MOD_DESCS: Record<string, ModDesc> = {
   position: { type: 'float', min: 0, max: 1, def: 0.5 },
-  speed: { type: 'float', min: 0, max: 4, def: 1 }
+  speed: { type: 'float', min: 0, max: 4, def: 1 },
+  grainSize: { type: 'float', min: 0.05, max: 1, def: 0.25 },
+  grainSpray: { type: 'float', min: 0, max: 1, def: 0.15 }
 }
 
 export function applyModulation(

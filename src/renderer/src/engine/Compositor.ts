@@ -677,6 +677,7 @@ export class ISFLayer {
     if (!vs) return;
     if (name === 'position') vs.setPosMod(v);
     else if (name === 'speed') vs.setSpeedMod(v);
+    else vs.setGrainMod(name, v);
   }
   // Live capture slots (kind:'capture'). Like video: a slot is one kind at once.
   private captureA: CaptureSource | null = null;
@@ -858,6 +859,13 @@ export class ISFLayer {
       loop: s.videoLoop ?? true,
       inN: s.videoIn ?? 0,
       outN: s.videoOut ?? 1
+    });
+    v.setGrain({
+      on: s.grainOn ?? false,
+      size: s.grainSize ?? 0.25,
+      spray: s.grainSpray ?? 0.15,
+      reverseP: s.grainReverse ?? 0.25,
+      jitter: s.grainJitter ?? 0.2
     });
   }
 

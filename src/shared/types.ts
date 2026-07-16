@@ -75,6 +75,13 @@ export interface SourceSlot extends ShaderInstance {
   videoLoop?: boolean // default true
   videoIn?: number // normalized start point 0..1, default 0
   videoOut?: number // normalized stop point 0..1, default 1
+  // Video granulation (multi-voice) : 3 seek-head voices scattering grains
+  // around the (modulatable) playhead, crossfaded with raised-cosine envelopes.
+  grainOn?: boolean // default false
+  grainSize?: number // grain length seconds 0.05..1, default 0.25
+  grainSpray?: number // scatter around the playhead, 0..1 of the trim, default 0.15
+  grainReverse?: number // probability a grain plays backward 0..1, default 0.25
+  grainJitter?: number // per-grain speed jitter 0..1, default 0.2
   // Source framing (video + capture): sample transform applied on upload.
   zoom?: number // scale about centre, default 1
   panX?: number // -1..1, default 0

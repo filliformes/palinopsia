@@ -611,7 +611,8 @@ interface StoreState {
     patch: Partial<
       Pick<
         SourceSlot,
-        'videoPlaying' | 'videoSpeed' | 'videoDirection' | 'videoLoop' | 'videoIn' | 'videoOut'
+        | 'videoPlaying' | 'videoSpeed' | 'videoDirection' | 'videoLoop' | 'videoIn' | 'videoOut'
+        | 'grainOn' | 'grainSize' | 'grainSpray' | 'grainReverse' | 'grainJitter'
       >
     >
   ) => void
