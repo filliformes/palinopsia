@@ -13,10 +13,24 @@
 // `ffmpeg-static` package (if installed), then `ffmpeg` on PATH.
 
 import { app, ipcMain } from 'electron'
-import { spawn } from 'child_process'
+import { spawn, type ChildProcess } from 'child_process'
 import { createHash } from 'crypto'
-import { existsSync, mkdirSync, statSync } from 'fs'
+import { existsSync, mkdirSync, renameSync, statSync, unlinkSync } from 'fs'
 import { join } from 'path'
+
+// In-flight converts keyed by CACHE path : a second request for the same clip
+// (source A+B on one file, warm sweep vs foreground import, multi-layer session
+// load) awaits the same promise instead of spawning a second ffmpeg writing the
+// same file (which corrupts the cache).
+const inflight = new Map<string, Promise<{ ok: boolean; path?: string; cached?: boolean; error?: string }>>()
+// Live ffmpeg children, killed on app quit so a long transcode never orphans.
+const children = new Set<ChildProcess>()
+export function killAllConverts(): void {
+  for (const c of children) {
+    try { c.kill() } catch { /* already gone */ }
+  }
+  children.clear()
+}
 
 let ffmpegPath: string | null | undefined // undefined = not probed yet
 
@@ -50,6 +64,7 @@ function runFfmpeg(args: string[], onStderr?: (chunk: string) => void): Promise<
     const bin = resolveFfmpeg()
     if (!bin) return reject(new Error('ffmpeg not found'))
     const child = spawn(bin, args, { windowsHide: true })
+    children.add(child)
     let err = ''
     child.stderr.on('data', (d: Buffer) => {
       const s = d.toString()
@@ -57,8 +72,8 @@ function runFfmpeg(args: string[], onStderr?: (chunk: string) => void): Promise<
       if (err.length > 65536) err = err.slice(-32768)
       onStderr?.(s)
     })
-    child.on('error', (e) => reject(e))
-    child.on('close', (code) => resolve({ code: code ?? -1, err }))
+    child.on('error', (e) => { children.delete(child); reject(e) })
+    child.on('close', (code) => { children.delete(child); resolve({ code: code ?? -1, err }) })
   })
 }
 
@@ -108,6 +123,62 @@ function cachePathFor(src: string): string {
   return join(dir, `${key}.mp4`)
 }
 
+/** Convert one clip into the all-intra cache. ATOMIC (writes to .tmp, renames on
+ *  success, unlinks on failure — a truncated cache file is never trusted) and
+ *  DEDUPED (concurrent requests for the same clip share one ffmpeg). */
+function convertToCache(
+  path: string,
+  onProgress?: (pct: number) => void
+): Promise<{ ok: boolean; path?: string; cached?: boolean; error?: string }> {
+  let out: string
+  try {
+    out = cachePathFor(path)
+  } catch (e) {
+    return Promise.resolve({ ok: false, error: (e as Error).message })
+  }
+  if (existsSync(out) && statSync(out).size > 0) return Promise.resolve({ ok: true, path: out, cached: true })
+  const running = inflight.get(out)
+  if (running) return running
+  const job = (async (): Promise<{ ok: boolean; path?: string; cached?: boolean; error?: string }> => {
+    const tmp = `${out}.tmp`
+    try {
+      const p = await probe(path)
+      if (!p.ffmpegAvailable) {
+        return { ok: false, error: 'ffmpeg not found : set OPSIA_FFMPEG, install ffmpeg-static, or add ffmpeg to PATH' }
+      }
+      const dur = Math.max(p.durationSec, 0.001)
+      const { code } = await runFfmpeg(
+        [
+          '-hide_banner', '-y', '-i', path,
+          '-an', // clips are visual sources : no audio track in the cache
+          '-c:v', 'libx264', '-g', '1', '-bf', '0', // ALL-INTRA : every frame a keyframe
+          '-crf', '16', '-preset', 'fast', '-pix_fmt', 'yuv420p',
+          '-movflags', '+faststart',
+          '-f', 'mp4', tmp
+        ],
+        (chunk) => {
+          const t = chunk.match(/time=([\d:.]+)/)?.[1]
+          if (t) onProgress?.(Math.min(0.99, parseClock(t) / dur))
+        }
+      )
+      if (code !== 0 || !existsSync(tmp) || statSync(tmp).size === 0) {
+        try { if (existsSync(tmp)) unlinkSync(tmp) } catch { /* best effort */ }
+        return { ok: false, error: `ffmpeg exited ${code}` }
+      }
+      renameSync(tmp, out) // atomic on the same volume : cache is whole or absent
+      onProgress?.(1)
+      return { ok: true, path: out, cached: false }
+    } catch (e) {
+      try { if (existsSync(tmp)) unlinkSync(tmp) } catch { /* best effort */ }
+      return { ok: false, error: (e as Error).message }
+    } finally {
+      inflight.delete(out)
+    }
+  })()
+  inflight.set(out, job)
+  return job
+}
+
 // Warm every video file sitting next to a loaded session : probe each one and
 // pre-convert the exotic codecs (DXV/HAP/ProRes…) into the all-intra cache in the
 // BACKGROUND, sequentially (one ffmpeg at a time : no CPU spike), so by the time
@@ -127,17 +198,8 @@ export async function warmVideoFolder(dir: string): Promise<void> {
         const p = await probe(f)
         if (!p.ffmpegAvailable) return // no ffmpeg : nothing to warm
         if (!p.needsConvert) continue
-        const out = cachePathFor(f)
-        if (existsSync(out) && statSync(out).size > 0) continue // already cached
-        const dur = Math.max(p.durationSec, 0.001)
-        void dur
-        await runFfmpeg([
-          '-hide_banner', '-y', '-i', f, '-an',
-          '-c:v', 'libx264', '-g', '1', '-bf', '0',
-          '-crf', '16', '-preset', 'fast', '-pix_fmt', 'yuv420p',
-          '-movflags', '+faststart', out
-        ])
-        console.log(`[video] warmed ${f}`)
+        const res = await convertToCache(f) // deduped + atomic (shared with imports)
+        if (res.ok && !res.cached) console.log(`[video] warmed ${f}`)
       } catch {
         /* one bad file must not stop the sweep */
       }
@@ -160,33 +222,10 @@ export function registerVideoConvert(): void {
 
   ipcMain.handle('video:convert', async (e, path: string) => {
     try {
-      const out = cachePathFor(path)
-      if (existsSync(out) && statSync(out).size > 0) return { ok: true, path: out, cached: true }
-      const p = await probe(path)
-      if (!p.ffmpegAvailable) return { ok: false, error: 'ffmpeg not found : set OPSIA_FFMPEG, install ffmpeg-static, or add ffmpeg to PATH' }
-      const dur = Math.max(p.durationSec, 0.001)
       const sender = e.sender
-      const { code, err } = await runFfmpeg(
-        [
-          '-hide_banner', '-y', '-i', path,
-          '-an', // clips are visual sources : no audio track in the cache
-          '-c:v', 'libx264', '-g', '1', '-bf', '0', // ALL-INTRA : every frame a keyframe
-          '-crf', '16', '-preset', 'fast', '-pix_fmt', 'yuv420p',
-          '-movflags', '+faststart',
-          out
-        ],
-        (chunk) => {
-          const t = chunk.match(/time=([\d:.]+)/)?.[1]
-          if (t && !sender.isDestroyed()) {
-            sender.send('video:convertProgress', { path, pct: Math.min(0.99, parseClock(t) / dur) })
-          }
-        }
-      )
-      if (code !== 0 || !existsSync(out)) {
-        return { ok: false, error: `ffmpeg exited ${code}: ${err.slice(-400)}` }
-      }
-      if (!e.sender.isDestroyed()) e.sender.send('video:convertProgress', { path, pct: 1 })
-      return { ok: true, path: out, cached: false }
+      return await convertToCache(path, (pct) => {
+        if (!sender.isDestroyed()) sender.send('video:convertProgress', { path, pct })
+      })
     } catch (err2) {
       return { ok: false, error: (err2 as Error).message }
     }

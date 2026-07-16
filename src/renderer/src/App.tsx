@@ -57,6 +57,7 @@ let contextPresetIndex = -1
 // map on a change (synth bowl / clear), rather than every frame.
 let depthModePrev = ''
 let lastDepthSample = 0 // throttles the depth-estimator frame readback (~11 Hz)
+let lastVisionSample = 0 // throttles the vision-bus readback (~30 Hz)
 
 // Reveal a Finishing Touches sub-section: switch the right column to the
 // Finishing view and expand the relevant sub-row.
@@ -557,7 +558,13 @@ export default function App(): JSX.Element {
         //     features that drive `vision` modulators next frame + stream out over
         //     OSC. Gated to when something actually reads them (a vision modulator
         //     or outbound feedback), so the tiny readback is skipped otherwise.
-        if (st.oscOutEnabled || c.modulators.some((m) => m.enabled && m.type === 'vision')) {
+        //     Throttled to ~30Hz : a sync readPixels (even 4KB) flushes the GPU
+        //     pipeline, and the vision features don't need frame-rate freshness.
+        if (
+          now - lastVisionSample > 33 &&
+          (st.oscOutEnabled || c.modulators.some((m) => m.enabled && (m.type === 'vision' || m.type === 'homeostat')))
+        ) {
+          lastVisionSample = now
           const vs = comp!.visionSample(32)
           if (vs) visionBus.ingest(vs.grid, vs.size)
         }

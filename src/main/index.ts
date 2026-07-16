@@ -22,7 +22,7 @@ import * as autosave from './autosave'
 import { ModulationEngine } from './modulators'
 import { OscQueryServer, type OscQueryNode } from './oscquery'
 import { registerMediaScheme, handleMediaProtocol } from './media'
-import { registerVideoConvert, warmVideoFolder } from './videoConvert'
+import { killAllConverts, registerVideoConvert, warmVideoFolder } from './videoConvert'
 import { hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
 import { hiveSendStart, hiveSendChunk, hiveSendStop } from './hiveSend'
 import { OutputSender } from './output'
@@ -248,7 +248,10 @@ app.whenReady().then(async () => {
       mainWindow?.webContents.send('osc:received', batch)
     }
   }, 16)
-  app.on('before-quit', () => clearInterval(oscInFlush))
+  app.on('before-quit', () => {
+    clearInterval(oscInFlush)
+    killAllConverts() // never orphan an in-flight ffmpeg transcode
+  })
 
   function safeHandle(
     channel: string,

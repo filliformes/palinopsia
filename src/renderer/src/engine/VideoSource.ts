@@ -109,6 +109,8 @@ export class VideoSource {
     seekAt: number
   }> | null = null
   private blendProg: WebGLProgram | null = null
+  private uT: Array<WebGLUniformLocation | null> = [null, null, null]
+  private uW: WebGLUniformLocation | null = null
   private blendFbo: WebGLFramebuffer | null = null
   private blendTex: WebGLTexture | null = null
   private blendW = 0
@@ -218,6 +220,14 @@ void main(){
       gl.linkProgram(p)
       if (!gl.getProgramParameter(p, gl.LINK_STATUS)) console.error('[grain] link:', gl.getProgramInfoLog(p))
       this.blendProg = p
+      // Cache the uniform locations ONCE : getUniformLocation per frame is a
+      // driver round-trip (plus a template-string alloc) on the 60fps path.
+      this.uT = [
+        gl.getUniformLocation(p, 't0'),
+        gl.getUniformLocation(p, 't1'),
+        gl.getUniformLocation(p, 't2')
+      ]
+      this.uW = gl.getUniformLocation(p, 'uW')
       this.quad = gl.createBuffer()!
       gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
@@ -253,10 +263,12 @@ void main(){
     gl.viewport(0, 0, w, h)
     for (let i = 0; i < 3; i++) {
       gl.activeTexture(gl.TEXTURE0 + i)
-      gl.bindTexture(gl.TEXTURE_2D, this.voices![i].tex)
-      gl.uniform1i(gl.getUniformLocation(this.blendProg, `t${i}`), i)
+      // A not-yet-decodable voice has no texture (weight 0) : bind the blend
+      // output as a harmless placeholder instead of null (GL warnings).
+      gl.bindTexture(gl.TEXTURE_2D, this.voices![i].tex ?? this.blendTex)
+      gl.uniform1i(this.uT[i], i)
     }
-    gl.uniform3f(gl.getUniformLocation(this.blendProg, 'uW'), weights[0], weights[1], weights[2])
+    gl.uniform3f(this.uW, weights[0], weights[1], weights[2])
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     return this.blendTex

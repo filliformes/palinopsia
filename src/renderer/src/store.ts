@@ -306,6 +306,17 @@ export function makeBlankBackground(): BackgroundState {
 }
 
 // A persisted field-macro value (0.5 neutral default).
+// Debounced macro persistence : OSC streams the field/temperament macros at
+// message rate, and a synchronous localStorage write per message blocks the
+// renderer thread. The live value hits the store immediately; the disk write
+// trails by 250ms of quiet.
+const persistTimers = new Map<string, ReturnType<typeof setTimeout>>()
+function persistMacro(key: string, v: number): void {
+  const t = persistTimers.get(key)
+  if (t) clearTimeout(t)
+  persistTimers.set(key, setTimeout(() => localStorage.setItem(key, String(v)), 250))
+}
+
 function readMacro(key: string): number {
   const v = localStorage.getItem(key)
   return v !== null && Number.isFinite(Number(v)) ? Number(v) : 0.5
@@ -1830,7 +1841,7 @@ export const useStore = create<StoreState>((set, get) => ({
     return p !== null && Number.isFinite(Number(p)) ? Number(p) : 0.5
   })(),
   setProximity: (v) => {
-    localStorage.setItem('opsia.proximity', String(v))
+    persistMacro('opsia.proximity', v)
     set({ proximity: v })
   },
   proximityAudio: localStorage.getItem('opsia.proximityAudio') === '1',
@@ -1841,23 +1852,23 @@ export const useStore = create<StoreState>((set, get) => ({
   // Field macros (Slab 2c): each 0.5 = neutral deadzone. density (sparse↔dense),
   // gestureTexture (gesture↔texture motion character), coalesce (grain↔mass).
   density: readMacro('opsia.density'),
-  setDensity: (v) => { localStorage.setItem('opsia.density', String(v)); set({ density: v }) },
+  setDensity: (v) => { persistMacro('opsia.density', v); set({ density: v }) },
   gestureTexture: readMacro('opsia.gestureTexture'),
-  setGestureTexture: (v) => { localStorage.setItem('opsia.gestureTexture', String(v)); set({ gestureTexture: v }) },
+  setGestureTexture: (v) => { persistMacro('opsia.gestureTexture', v); set({ gestureTexture: v }) },
   coalesce: readMacro('opsia.coalesce'),
-  setCoalesce: (v) => { localStorage.setItem('opsia.coalesce', String(v)); set({ coalesce: v }) },
+  setCoalesce: (v) => { persistMacro('opsia.coalesce', v); set({ coalesce: v }) },
   // Temperament controls rest at 0 (off), not the 0.5 deadzone of the field macros.
   tonicity: (() => { const v = Number(localStorage.getItem('opsia.tonicity')); return Number.isFinite(v) ? v : 0 })(),
-  setTonicity: (v) => { localStorage.setItem('opsia.tonicity', String(v)); set({ tonicity: v }) },
+  setTonicity: (v) => { persistMacro('opsia.tonicity', v); set({ tonicity: v }) },
   // Shutter + Superimposition are strobe-like performance effects : always start
   // at 0 on load (they never persist a lingering strobe across sessions/reloads).
   shutter: 0,
   setShutter: (v) => set({ shutter: v }),
   drift: (() => { const v = Number(localStorage.getItem('opsia.drift')); return Number.isFinite(v) ? v : 0 })(),
-  setDrift: (v) => { localStorage.setItem('opsia.drift', String(v)); set({ drift: v }) },
+  setDrift: (v) => { persistMacro('opsia.drift', v); set({ drift: v }) },
   // Flow ↔ Interruption is bipolar : rests at 0.5 (neutral) and persists like drift.
   flow: (() => { const v = Number(localStorage.getItem('opsia.flow')); return Number.isFinite(v) ? v : 0.5 })(),
-  setFlow: (v) => { localStorage.setItem('opsia.flow', String(v)); set({ flow: v }) },
+  setFlow: (v) => { persistMacro('opsia.flow', v); set({ flow: v }) },
   superFlicker: 0,
   setSuperFlicker: (v) => set({ superFlicker: v }),
   markSignalEnabled: localStorage.getItem('opsia.markSignalEnabled') === '1',
@@ -2190,9 +2201,11 @@ export const useStore = create<StoreState>((set, get) => ({
       if (!scene) return s
       beginMorph(s.composition, Math.max(0, crossfadeMs), performance.now())
       resetCouplingState()
-      // Subtle per-recall variation → long sets never loop verbatim.
-      const composition =
+      // Subtle per-recall variation → long sets never loop verbatim. Normalized
+      // like recallScene (idempotent) so an old-shape scene can't skip migration.
+      const composition = normalizeComposition(
         variation > 0 ? varyComposition(scene.composition, variation) : scene.composition
+      )
       const worlds = ensureWorld(s.worlds, scene.world)
       const world = scene.world ? scene.world.id : s.world
       if (scene.world) localStorage.setItem('opsia.world', world)

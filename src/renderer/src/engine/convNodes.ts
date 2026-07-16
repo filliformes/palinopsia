@@ -429,7 +429,7 @@ void main(){
     for (int i = 0; i < 6; i++) {
       if (float(i) < uNStamp) {
         vec2 d = vUV - uCenters[i]; d.x *= aspect;      // aspect-correct blobs
-        m = max(m, smoothstep(uRad, uRad * 0.25, length(d)));
+        m = max(m, 1.0 - smoothstep(uRad * 0.25, uRad, length(d)));
       }
     }
   }
@@ -705,7 +705,7 @@ void main(){
     // HOLD : two taps gap apart, alternated across a black shutter (uPhase 0..1).
     vec3 A = tile(mod(recent - uGap + uN * 4.0, uN), vUV);
     vec3 B = tile(mod(recent - uGap - 1.0 + uN * 4.0, uN), vUV);
-    float g = uInterval * 0.5;
+    float g = max(uInterval * 0.5, 1e-3); // interval 0 would make smoothstep edges equal (UB)
     float winA = smoothstep(0.0, 0.06, uPhase) * (1.0 - smoothstep(0.5 - g, 0.5, uPhase));
     float winB = smoothstep(0.5, 0.56, uPhase) * (1.0 - smoothstep(1.0 - g, 1.0, uPhase));
     col = A * winA + B * winB;
@@ -854,7 +854,7 @@ void main(){
   float cr = 0.0;
   if (uCrackle > 0.0) {
     float n = vnoise(vUV * 68.0 + uSeed) - vnoise(vUV * 68.0 + uSeed + 3.7);
-    cr = smoothstep(0.16, 0.0, abs(n)) * smoothstep(0.15, 0.6, c) * uCrackle;
+    cr = (1.0 - smoothstep(0.0, 0.16, abs(n))) * smoothstep(0.15, 0.6, c) * uCrackle;
   }
   vec3 stain = mix(vec3(0.02, 0.02, 0.025), vec3(0.20, 0.13, 0.07), uTone); // leader-dark ↔ sepia
   vec3 eaten = mix(host, stain, clamp(c * uEat, 0.0, 1.0));
@@ -1115,7 +1115,7 @@ export class TransfertNode implements ConvNode {
 
     // 5) application at full res → a chain buffer.
     const out = ctx.chain.next()
-    const amount = num(inp.amount, 0.3) * num(inp.flowScale, 1)
+    const amount = num(inp.amount, 0.35) * num(inp.flowScale, 1)
     const sign = num(inp.invert, 0) >= 0.5 ? -1 : 1
     const magGamma = Math.max(0.1, num(inp.magnitudeGamma, 1))
     const mode = Math.round(num(inp.mode, 0)) // 0 déplacement, 1 traînée
@@ -1184,9 +1184,12 @@ export class ConvolveNode implements ConvNode {
 
   render(ctx: NodeContext): WebGLTexture {
     if (this.disposed || !ctx.sidechain) return ctx.host // needs a kernel (sidechain)
+    const inp = ctx.inputs
+    // The O(R²) gather (up to 625 taps/pixel) is the most expensive avoidable
+    // pass in the file : skip it entirely while the node is mixed out.
+    if (clampf(num(inp.mix, 0.6), 0, 1) <= 0.001) return ctx.host
     const gl = ctx.gl
     const g = nodeGL(gl)
-    const inp = ctx.inputs
     const fullW = ctx.chain.w
     const fullH = ctx.chain.h
     const ww = Math.max(2, fullW >> 1)
@@ -1206,7 +1209,7 @@ export class ConvolveNode implements ConvNode {
     let p = g.use(g.convolve)
     bind(0, ctx.host); bind(1, ctx.sidechain)
     gl.uniform1i(p.u('uHost'), 0); gl.uniform1i(p.u('uKernel'), 1)
-    gl.uniform1f(p.u('uExtent'), clampf(num(inp.scale, 1), 0, 2) * 0.35)
+    gl.uniform1f(p.u('uExtent'), clampf(num(inp.scale, 0.8), 0, 2) * 0.35)
     gl.uniform1f(p.u('uAspect'), fullW / Math.max(1, fullH))
     gl.uniform1f(p.u('uThreshold'), clampf(num(inp.threshold, 0.1), 0, 1))
     gl.uniform1f(p.u('uGamma'), Math.max(0.25, num(inp.kernelGamma, 1)))
@@ -1277,7 +1280,7 @@ export class ReponseNode implements ConvNode {
     this.filled = Math.min(ECHO_N, this.filled + 1)
 
     // 2) Build the temporal envelope (attack onset × exponential decay tail).
-    const len = Math.max(1, Math.min(ECHO_N, Math.min(this.filled, Math.round(num(inp.length, 8)))))
+    const len = Math.max(1, Math.min(ECHO_N, Math.min(this.filled, Math.round(num(inp.length, 10)))))
     const decayTaps = Math.max(0.5, clampf(num(inp.decay, 0.5), 0.02, 1) * ECHO_N)
     const attackTaps = Math.max(0.02, clampf(num(inp.attack, 0.1), 0, 1) * ECHO_N)
     const gain = Math.max(0, num(inp.gain, 1))
@@ -1433,6 +1436,13 @@ export class FeedbackNode implements ConvNode {
       drawFB(writeB.fbo, readB.tex, read.tex, couple2, couple) // fb1 : diverged transform
       this.curB = 1 - this.curB
     } else {
+      // Couple off : free fb1 (2× full-res RGBA16F ≈ 33MB at 1080p would
+      // otherwise sit in VRAM) — the lazy path re-seeds it fresh from fb0 when
+      // coupling returns, instead of resuming from stale frames (a visible pop).
+      if (this.bufsB) {
+        for (const b of this.bufsB) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
+        this.bufsB = null
+      }
       drawFB(write.fbo, read.tex, read.tex, 1.0, 0)
     }
 
@@ -1605,7 +1615,8 @@ export class DatamoshNode implements ConvNode {
     draw(fsWrite.fbo, n, n)
 
     // 2b) cut detector → 1×1 decaying bloom state (scene-cut auto-mosh).
-    if (!this.energyBuf) { this.energyBuf = [makeRGBA(gl, 1, 1, false), makeRGBA(gl, 1, 1, false)]; this.energyCur = 0 }
+    // 16F : an 8-bit exponential decay quantize-sticks at a faint non-zero level.
+    if (!this.energyBuf) { this.energyBuf = [makeRGBA(gl, 1, 1, true), makeRGBA(gl, 1, 1, true)]; this.energyCur = 0 }
     const eRead = this.energyBuf[this.energyCur], eWrite = this.energyBuf[1 - this.energyCur]
     p = g.use(g.energy)
     bind(0, this.flowT.tex); bind(1, eRead.tex)
@@ -1662,7 +1673,7 @@ export class DatamoshNode implements ConvNode {
     gl.uniform1f(p.u('uReseed'), clampf(num(inp.reseed, 0.1), 0, 1))
     gl.uniform1f(p.u('uDecay'), clampf(num(inp.decay, 0.92), 0, 1))
     gl.uniform1f(p.u('uBleed'), clampf(num(inp.bleed, 0.2), 0, 1))
-    gl.uniform1f(p.u('uThresh'), clampf(num(inp.thresh, 0.06), 0, 1))
+    gl.uniform1f(p.u('uThresh'), clampf(num(inp.thresh, 0.012), 0, 0.1))
     gl.uniform1i(p.u('uMode'), Math.round(num(inp.mode, 1)))
     gl.uniform1f(p.u('uSeed'), this.frame % 2048)
     draw(write.fbo, W, H)
@@ -2073,9 +2084,11 @@ export class ParallaxNode implements ConvNode {
 
   render(ctx: NodeContext): WebGLTexture {
     if (this.disposed) return ctx.host
+    const inp = ctx.inputs
+    // Exact passthrough without even a draw : no depth map, or fully dry.
+    if (!ctx.depth || clampf(num(inp.wet, 1), 0, 1) < 0.001) return ctx.host
     const gl = ctx.gl, g = nodeGL(gl)
     const W = ctx.chain.w, H = ctx.chain.h
-    const inp = ctx.inputs
     this.time += ctx.dt
     const out = ctx.chain.next()
     const p = g.use(g.parallax)
@@ -2135,7 +2148,7 @@ export class EternalismNode implements ConvNode {
     if (mode === 0) {
       uPhase = ((this.time * clampf(num(inp.rate, 6), 0.5, 20)) % 1 + 1) % 1
     } else {
-      const det = clampf(num(inp.detune, 0.1), 0, 1)
+      const det = clampf(num(inp.detune, 0.12), 0, 1)
       const beat = 0.5 + 0.5 * Math.sin(this.time * (0.2 + det * 1.5))
       uOffB = Math.min(ET_N - 2, gap + beat * det * (ET_N - 2))
     }

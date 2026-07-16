@@ -496,12 +496,19 @@ export interface NodeApplyCtx {
  */
 class FxRack {
   private units: FxUnit[] = [];
+  // Persistent id→unit index : O(1) modulation writes (setUnitInput runs once per
+  // modulated input per frame) AND doubles as the reconcile map in sync(), so the
+  // 60fps sync path allocates nothing (the old code built a fresh Map + arrays
+  // per rack per frame — 14 racks of steady GC churn).
+  private index = new Map<string, FxUnit>();
+  private scratch: FxUnit[] = []; // swapped with `units` each sync : no array alloc
 
   constructor(private shared: SharedGL) {}
 
   sync(instances: FxInstance[], sourceById: (id: string) => string | null) {
-    const byInst = new Map(this.units.map((u) => [u.instId, u]));
-    const next: FxUnit[] = [];
+    const byInst = this.index; // holds last frame's units : exactly the reconcile set
+    const next = this.scratch;
+    next.length = 0;
     for (const inst of instances) {
       if (!inst.shaderId) continue;
       let unit = byInst.get(inst.id);
@@ -540,20 +547,25 @@ class FxRack {
         unit.sidechain = inst.sidechain ?? null;
       } else if (unit.isf) {
         // Push declared param values (auto-UI / OSC write these to the store).
-        for (const [k, v] of Object.entries(inst.inputs)) unit.isf.setValue(k, v);
+        // for-in : Object.entries allocates an array of pairs per unit per frame.
+        for (const k in inst.inputs) unit.isf.setValue(k, inst.inputs[k]);
       }
       byInst.delete(inst.id);
       next.push(unit);
     }
     // Anything left in the map was removed from the rack.
     for (const gone of byInst.values()) { gone.isf?.cleanup(); gone.node?.dispose(); }
+    // Swap the arrays and rebuild the index from the fresh list.
+    this.scratch = this.units;
     this.units = next;
+    byInst.clear();
+    for (const u of next) byInst.set(u.instId, u);
   }
 
   /** Direct write to one unit's input (the modulation path). ISF units push to
    *  the renderer; native nodes overlay their live param map (read at render). */
   setUnitInput(instId: string, name: string, value: number | number[]): void {
-    const u = this.units.find((x) => x.instId === instId);
+    const u = this.index.get(instId);
     if (!u) return;
     if (u.node) { if (u.inputs) u.inputs[name] = value; }
     else u.isf?.setValue(name, value);
@@ -562,7 +574,7 @@ class FxRack {
   /** Feed a raw GL texture into one ISF unit's image input (via the texture
    *  bridge) : the Context PBR maps ride this every frame. */
   setUnitImage(instId: string, name: string, tex: import('./isfTextureBridge').TextureHandle): void {
-    this.units.find((x) => x.instId === instId)?.isf?.setValue(name, tex);
+    this.index.get(instId)?.isf?.setValue(name, tex);
   }
 
   /** Bind an image to `name` on every enabled ISF unit whose shader is in `ids`
@@ -1105,7 +1117,7 @@ export class Compositor {
   private uWTex!: WebGLUniformLocation; private uWGrid!: WebGLUniformLocation;
   private warpActive = false;
   private warpGridOn = false;
-  private warpKey = '';
+  private warpCorners: number[] = [];
   private modeIndex: Record<BlendMode, number> = {
     normal: 0, add: 1, subtract: 2, multiply: 3, screen: 4, overlay: 5,
     softlight: 6, hardlight: 7, darken: 8, lighten: 9, difference: 10,
@@ -1437,9 +1449,11 @@ export class Compositor {
     }
     this.warpActive = true;
     this.warpGridOn = grid;
-    const key = corners.join(',');
-    if (key !== this.warpKey) {
-      this.warpKey = key;
+    // Numeric diff (a join() would allocate a string every frame while warping).
+    let changed = this.warpCorners.length !== corners.length;
+    if (!changed) for (let i = 0; i < corners.length; i++) if (this.warpCorners[i] !== corners[i]) { changed = true; break; }
+    if (changed) {
+      this.warpCorners = corners.slice();
       const gl = this.gl;
       gl.bindVertexArray(this.warpVao);
       gl.bindBuffer(gl.ARRAY_BUFFER, this.warpBuf);
@@ -1521,8 +1535,9 @@ export class Compositor {
       L.harmony = l.harmony ?? 0;
       L.speed = l.speed ?? 1;
       L.mask = l.mask ?? null;
-      for (const [k, v] of Object.entries(l.sourceA.inputs)) L.setInput('A', k, v);
-      if (l.sourceB) for (const [k, v] of Object.entries(l.sourceB.inputs)) L.setInput('B', k, v);
+      // for-in : entries() would allocate a pair-array per slot per frame.
+      for (const k in l.sourceA.inputs) L.setInput('A', k, l.sourceA.inputs[k]);
+      if (l.sourceB) for (const k in l.sourceB.inputs) L.setInput('B', k, l.sourceB.inputs[k]);
       L.rackA.sync(l.sourceAFx, sourceById);
       L.rackB.sync(l.sourceBFx, sourceById);
       L.rackLayer.sync(l.fx, sourceById);
@@ -1542,7 +1557,7 @@ export class Compositor {
       } // else: budget spent : retry next frame (id left unrecorded)
     }
     if (this.bgIsf && bg) {
-      for (const [k, v] of Object.entries(bg.source.inputs)) this.bgIsf.setValue(k, v);
+      for (const k in bg.source.inputs) this.bgIsf.setValue(k, bg.source.inputs[k]);
     }
     this.bgRack.sync(bg?.fx ?? [], sourceById);
     this.bgOpacity = bg && bg.source.shaderId ? bg.opacity : 0;
@@ -1846,9 +1861,8 @@ export class Compositor {
           // acc). No-op at depth 0.
           if (this.bgDepth > 0.001) {
             if (!this.depthShadow) this.depthShadow = new DepthShadow(this.gl);
-            const anySoloD = this.layers.some((l) => l.solo);
             const tex = this.layers.map((l) => l.texture());
-            const wts = this.layers.map((l) => ((anySoloD ? l.solo : !l.mute) ? l.opacity : 0));
+            const wts = this.layers.map((l) => ((anySolo ? l.solo : !l.mute) ? l.opacity : 0));
             this.depthShadow.apply(this.acc.read(), tex, wts, this.bgDepth, this.acc.write(), this.w, this.h);
             this.acc.swap();
             gl.bindVertexArray(null);
