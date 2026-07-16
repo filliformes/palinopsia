@@ -38,7 +38,7 @@ work: **never cheap psychedelia, never a 3D game engine.**
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
-- [Sources](#sources-31-generators) (31 generators) · [Effects](#effects) (51 FX) ·
+- [Sources](#sources-32-generators) (32 generators) · [Effects](#effects) (51 FX) ·
   [Native nodes](#native-nodes--layer-fx-only) (15) · [Master finalizers](#master-finalizers--pinned-always-last)
 - [Blend modes](#blend-modes) (18)
 
@@ -416,9 +416,9 @@ don't flood your history.
 
 ---
 
-## Sources (31 generators)
+## Sources (32 generators)
 
-31 sources produce an image from nothing. Any generator can fill **Source A or B**
+32 sources produce an image from nothing. Any generator can fill **Source A or B**
 of any layer (and all but a few can be the Background source). Each ships curated
 Randomize sub-ranges and its own preset bank.
 
@@ -431,6 +431,7 @@ Randomize sub-ranges and its own preset bank.
 | **Slabs** | Sparse horizontal slabs on a stepped clock with slice-jitter and a rare accent cell — the slice/shuffle glitch register, built to be blended. |
 | **Contour** | Slow marching contour lines over a drifting, domain-warped noise basin — topographic matte line-work. |
 | **Grid Drift** | A flat grid whose rows and columns breathe out of alignment, occasionally slipping whole lanes, with sparse filled cells. |
+| **Ten Print** | The Commodore one-liner maze — every cell one diagonal, / or \, dealt by a seeded coin-flip. **Reseed ▸** re-deals the lattice on a trigger; audio scatter shivers the maze apart segment by segment. |
 | **Particle Drift** | Sparse points carried through a flow direction with capsule trails, wandering inside their cells. |
 | **Interference** | Two near-frequency line fields beating into moiré, handled as matte texture (never op-art); the beat crawls at the detune rate. |
 | **Column Scan** | Horizontal scan lines vertically displaced by a drifting internal signal; brightness follows the slope. |
@@ -460,6 +461,19 @@ Randomize sub-ranges and its own preset bank.
 | **Parametric** *(native)* | A literal audio → image reading — the audio bus as a hard raster, waveform trace, spectrum bars, or scrolling spectrogram (needs Audio ingest for real sound). |
 
 </details>
+
+Two gestures mined from the EYESY lineage run through the field generators:
+
+- **Reseed ▸** (Ten Print · Slabs · Grid Drift · Shapes) — an event input that
+  re-deals the generator's whole stochastic layout in one cut. Fire it from the
+  Inspector, over OSC, or bind **M** to an audio modulator for the
+  re-deal-on-the-beat gesture. A shader-side latch fires exactly once per
+  rising edge, whatever drives it.
+- **Audio scatter** (Ten Print · Slabs · Grid Drift · Shapes · Filaments · Ash)
+  — each element (band, lane, cell, strand, column) rides its **own** live
+  audio sample from a shared 128-sample waveform texture, so fields ripple
+  element-by-element instead of pulsing globally. Silent input = perfectly
+  still. Mirrors to the output window.
 
 > Beyond generators, a source slot can also hold an **imported video** (see
 > [Video sources](#video-sources)), a **live capture** (webcam / screen / device),

@@ -6,7 +6,7 @@
 // the FX racks (Phase 3), the auto-UI (Phase 4), and modulation (Phase 5).
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { Compositor } from './engine/Compositor'
+import { AUDIO_TEX_GENS, Compositor } from './engine/Compositor'
 import { hiveEncoder } from './hiveEncoder'
 import { audioBus } from './engine/audioIn'
 import { applyCoupling } from './engine/coupling'
@@ -653,7 +653,18 @@ export default function App(): JSX.Element {
             // engine-side fan-out (the store only updates on settle).
             metaGlides: metaGlides.size ? Array.from(metaGlides) : undefined,
             // One-shot video seeks : the mirror's own decoders seek too.
-            videoSeeks
+            videoSeeks,
+            // Per-element audio rows, only when some layer's generator reads them.
+            audioRows: c.layers.some(
+              (l) =>
+                (l.sourceA.shaderId && AUDIO_TEX_GENS.has(l.sourceA.shaderId)) ||
+                (l.sourceB?.shaderId && AUDIO_TEX_GENS.has(l.sourceB.shaderId))
+            )
+              ? {
+                  wave: Array.from(audioBus.waveformBytes() ?? []),
+                  spec: Array.from(audioBus.spectrumBytes() ?? [])
+                }
+              : undefined
           })
         }
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to

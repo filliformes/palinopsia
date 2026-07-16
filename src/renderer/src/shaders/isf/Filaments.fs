@@ -9,9 +9,16 @@
     { "NAME": "sway",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.45 },
     { "NAME": "width",   "TYPE": "float", "MIN": 0.05, "MAX": 0.6,  "DEFAULT": 0.18 },
     { "NAME": "lean",    "TYPE": "float", "MIN": -1.0, "MAX": 1.0,  "DEFAULT": 0.15 },
-    { "NAME": "tint",    "TYPE": "color", "DEFAULT": [0.5, 0.68, 0.55, 1.0] }
+    { "NAME": "audioScatter", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "audio scatter" },
+    { "NAME": "tint",    "TYPE": "color", "DEFAULT": [0.5, 0.68, 0.55, 1.0] },
+    { "NAME": "audioTex","TYPE": "image" }
   ]
 }*/
+
+// Per-element audio : the shared waveform texture (row 0), ±1 around silence.
+float aud(float idx01) {
+  return (IMG_NORM_PIXEL(audioTex, vec2(fract(idx01), 0.25)).r - 0.5) * 2.0;
+}
 
 float hash(vec2 p) {
   p = fract(p * vec2(123.34, 345.45));
@@ -50,7 +57,10 @@ void main() {
     float k = k0 + float(i);
     if (k < 0.0 || k >= strands) continue;
     float rootX = (k + 0.5) * px + (hash(vec2(k, 1.0)) - 0.5) * px * 0.8;
-    float x = rootX + strandX(k, uv.y, t);
+    // Audio scatter : each strand leans on its OWN live sample, anchored at the
+    // root (y²) like the sway — the bed ripples with the waveform.
+    float x = rootX + strandX(k, uv.y, t)
+      + aud(k / strands) * audioScatter * uv.y * uv.y * 0.18;
     float d = abs(uv.x - x);
     // Strands taper toward the free end.
     float w = width * px * (1.0 - uv.y * 0.6);

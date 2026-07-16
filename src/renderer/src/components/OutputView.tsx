@@ -34,6 +34,7 @@ export function OutputView(): JSX.Element {
         comp!.setGlobalSpeed(f.globalSpeed)
         comp!.setWarp(f.warpEnabled ? f.warpCorners : null, f.warpGrid)
         comp!.setStrobeSafe(f.strobeSafe ?? 0)
+        comp!.setAudioOverride(f.audioRows ?? null)
         comp!.syncFromState(f.c, shaderSourceById)
         applyModulation(comp!, f.c, f.modValues, inputsForShader, f.modBypass)
         // In-flight Meta-knob gestures : same engine-side fan-out as the

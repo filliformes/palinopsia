@@ -12,7 +12,14 @@
     { "NAME": "accent",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.2 },
     { "NAME": "chaos",     "TYPE": "float", "MIN": 0.0, "MAX": 0.2,  "DEFAULT": 0.0, "LABEL": "chaos (bend)" },
     { "NAME": "nonlinear", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0, "LABEL": "nonlinear (thin)" },
-    { "NAME": "tint",      "TYPE": "color", "DEFAULT": [0.9, 0.5, 0.18, 1.0] }
+    { "NAME": "audioScatter", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "audio scatter" },
+    { "NAME": "tint",      "TYPE": "color", "DEFAULT": [0.9, 0.5, 0.18, 1.0] },
+    { "NAME": "reseed",    "TYPE": "event", "LABEL": "reseed ▸" },
+    { "NAME": "audioTex",  "TYPE": "image" }
+  ],
+  "PASSES": [
+    { "TARGET": "seedState", "PERSISTENT": true, "WIDTH": "1", "HEIGHT": "1" },
+    { }
   ]
 }*/
 
@@ -31,7 +38,22 @@ float vn(vec2 p) {
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
+// Per-element audio : the shared waveform texture (row 0), ±1 around silence.
+float aud(float idx01) {
+  return (IMG_NORM_PIXEL(audioTex, vec2(fract(idx01), 0.25)).r - 0.5) * 2.0;
+}
+
 void main() {
+  // Pass 0 : the 1×1 reseed latch (rising-edge → golden-ratio seed step).
+  if (PASSINDEX == 0) {
+    vec4 prev = IMG_NORM_PIXEL(seedState, vec2(0.5));
+    float fire = (reseed && prev.y < 0.5) ? 1.0 : 0.0;
+    float s = fract(prev.x + fire * (0.61803399 + fract(TIME * 0.7317)));
+    gl_FragColor = vec4(s, reseed ? 1.0 : 0.0, 0.0, 1.0);
+    return;
+  }
+  float seedShift = IMG_NORM_PIXEL(seedState, vec2(0.5)).x * 89.0;
+
   vec2 uv = isf_FragNormCoord;
 
   // Stepped clock : the glitch register moves in cuts, not flow.
@@ -52,6 +74,14 @@ void main() {
   }
 
   float band = floor(uv.y * bands);
+
+  // Per-band audio displacement : each slab band slides on its OWN live sample
+  // (adjacent bands read adjacent samples → the waveform ripples the stack).
+  if (audioScatter > 0.001) uv.x += aud(band / bands) * audioScatter * 0.22;
+
+  // The reseed latch : band only ever feeds the hashes below, so salting it
+  // re-deals every band-keyed decision (widths, picks, accents) in one move.
+  band += floor(seedShift);
 
   // CHAOTIC bands: a chaos-sized minority of bands break the grid's rules —
   // wildly different cell widths, oversized displacement, thin sub-stripes

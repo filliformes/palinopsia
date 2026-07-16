@@ -28,6 +28,7 @@
 
 import { Renderer as ISFRenderer } from 'interactive-shader-format';
 import { handle, installTextureBridge } from './isfTextureBridge';
+import { audioBus } from './audioIn';
 import { makeConvNode, isNativeNode, type ConvNode } from './convNodes';
 import { TextSource } from './TextSource';
 import { ParametricSource } from './ParametricSource';
@@ -452,7 +453,17 @@ interface SharedGL {
   blit?: (src: WebGLTexture, dstFbo: WebGLFramebuffer) => void;
   // Framed blit : zoom / pan / crop a source frame into a target (video/capture).
   blitXform?: (src: WebGLTexture, dstFbo: WebGLFramebuffer, f: Framing) => void;
+  // The shared per-frame audio texture (128×2 : row 0 waveform, row 1 spectrum),
+  // pushed into any generator that declares an `audioTex` image input so each
+  // element can ride its own live sample (the EYESY per-element gesture).
+  audioTex?: import('./isfTextureBridge').TextureHandle;
 }
+
+// Generators that declare the `audioTex` image input : renderSource pushes the
+// shared audio texture into these every frame (the bridge requires a re-push).
+export const AUDIO_TEX_GENS = new Set([
+  'ten-print', 'slabs', 'grid-drift', 'shapes', 'filaments', 'ash'
+]);
 
 export interface Framing {
   zoom: number;
@@ -986,6 +997,12 @@ export class ISFLayer {
       gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
       return;
     }
+    // Per-element audio : generators that declare `audioTex` get the shared
+    // 128×2 waveform/spectrum texture, re-pushed each frame (bridge contract).
+    const sid = slot === 'A' ? this.shaderIdA : this.shaderIdB;
+    if (sid && this.shared.audioTex && AUDIO_TEX_GENS.has(sid)) {
+      isf.setValue('audioTex', this.shared.audioTex);
+    }
     this.shared.redirect.redirect = scratch.fbo;
     isf.draw({ width: this.w, height: this.h });
     this.shared.redirect.redirect = null;
@@ -1483,6 +1500,44 @@ export class Compositor {
     }
   }
 
+  // ── Shared audio texture (per-element audio, the EYESY gesture) ──────────
+  // 128×2 R8 : row 0 = time-domain waveform (0..255 centred at 128), row 1 =
+  // spectrum. Uploaded once per frame (256 bytes); generators with an
+  // `audioTex` image input sample it per element. The output window can't run
+  // the audio bus, so it mirrors via setAudioOverride (OutputFrame.audioRows).
+  private audioTexGL: WebGLTexture | null = null;
+  private audioRowBuf = new Uint8Array(128 * 2);
+  private audioOverride: { wave: number[]; spec: number[] } | null = null;
+
+  setAudioOverride(rows: { wave: number[]; spec: number[] } | null): void {
+    this.audioOverride = rows;
+  }
+
+  private updateAudioTex(): void {
+    const gl = this.gl;
+    if (!this.audioTexGL) {
+      this.audioTexGL = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, this.audioTexGL);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 128, 2, 0, gl.RED, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      this.shared.audioTex = handle(this.audioTexGL, 128, 2);
+    }
+    const buf = this.audioRowBuf;
+    const ov = this.audioOverride;
+    const wave = ov ? ov.wave : audioBus.waveformBytes();
+    const spec = ov ? ov.spec : audioBus.spectrumBytes();
+    for (let i = 0; i < 128; i++) {
+      // 128 = silence for the waveform row so aud() reads ~0 without audio.
+      buf[i] = wave && wave.length ? (wave[Math.floor((i / 128) * wave.length)] ?? 128) : 128;
+      buf[128 + i] = spec && spec.length ? (spec[Math.floor((i / 128) * spec.length)] ?? 0) : 0;
+    }
+    gl.bindTexture(gl.TEXTURE_2D, this.audioTexGL);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 128, 2, gl.RED, gl.UNSIGNED_BYTE, buf);
+  }
+
   readMarkStrip(n: number, y01: number): Float32Array | null {
     const gl = this.gl, w = this.canvas.width, h = this.canvas.height;
     if (w < 2 || h < 2 || n < 1) return null;
@@ -1831,6 +1886,9 @@ export class Compositor {
     // Feed the shared depth map to any Parallax units before they draw (uses last
     // frame's depth : the estimator runs post-render, so it's always 1 frame behind).
     this.bindDepth();
+    // Refresh the shared audio texture (waveform + spectrum rows) : generators
+    // with an `audioTex` input ride it element-by-element this frame.
+    this.updateAudioTex();
 
     // Native convolution nodes (layer FX) resolve their sidechain to a live
     // texture: another layer's persisted output (previous frame for layers not
@@ -2116,6 +2174,7 @@ export class Compositor {
     disposeTarget(gl, this.xfadeTarget);
     if (this.fxOpac) { disposeTarget(gl, this.fxOpac[0]); disposeTarget(gl, this.fxOpac[1]); }
     this.freeCapturePbos();
+    if (this.audioTexGL) { gl.deleteTexture(this.audioTexGL); this.audioTexGL = null; }
     if (this.visionFbo) { gl.deleteFramebuffer(this.visionFbo.fbo); gl.deleteTexture(this.visionFbo.tex); this.visionFbo = null; }
     if (this.depthTex) { gl.deleteTexture(this.depthTex); this.depthTex = null; }
     if (this.depthFbo) { gl.deleteFramebuffer(this.depthFbo.fbo); gl.deleteTexture(this.depthFbo.tex); this.depthFbo = null; }

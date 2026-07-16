@@ -14,6 +14,7 @@ import { TEXT_FONTS } from '../../textFonts'
 import slabs from './Slabs.fs?raw'
 import contour from './Contour.fs?raw'
 import gridDrift from './GridDrift.fs?raw'
+import tenPrint from './TenPrint.fs?raw'
 import particleDrift from './ParticleDrift.fs?raw'
 import interference from './Interference.fs?raw'
 import columnScan from './ColumnScan.fs?raw'
@@ -584,12 +585,31 @@ export const GENERATORS: IsfShader[] = [
     category: 'Generator',
     source: gridDrift,
     curated: {
+      audioScatter: [0, 0.5],
       cells: [5, 24],
       rate: [0.05, 0.4],
       breathe: [0.1, 0.7],
       slip: [0.05, 0.6],
       lineW: [0.02, 0.12],
       density: [0, 0.35]
+    }
+  },
+  {
+    // Ten Print : the Commodore maze one-liner as a generator (EYESY lineage).
+    // Reseed is an EVENT (bind M to fire it from an audio modulator : the
+    // re-deal-on-transient gesture); audioScatter rides the shared audio
+    // texture per cell.
+    id: 'ten-print',
+    name: 'Ten Print',
+    category: 'Generator',
+    source: tenPrint,
+    curated: {
+      cells: [10, 44],
+      thickness: [0.05, 0.28],
+      bias: [0.3, 0.7],
+      flip: [0, 2.5],
+      audioScatter: [0, 0.6],
+      accent: [0, 0.4]
     }
   },
   {

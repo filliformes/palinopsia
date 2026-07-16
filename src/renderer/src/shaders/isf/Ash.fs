@@ -11,9 +11,16 @@
     { "NAME": "wander",  "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.4 },
     { "NAME": "flicker", "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.3 },
     { "NAME": "accent",  "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.25 },
-    { "NAME": "tint",    "TYPE": "color", "DEFAULT": [0.9, 0.55, 0.25, 1.0] }
+    { "NAME": "audioScatter", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "audio scatter" },
+    { "NAME": "tint",    "TYPE": "color", "DEFAULT": [0.9, 0.55, 0.25, 1.0] },
+    { "NAME": "audioTex","TYPE": "image" }
   ]
 }*/
+
+// Per-element audio : the shared waveform texture (row 0), ±1 around silence.
+float aud(float idx01) {
+  return (IMG_NORM_PIXEL(audioTex, vec2(fract(idx01), 0.25)).r - 0.5) * 2.0;
+}
 
 float hash(vec2 p) {
   p = fract(p * vec2(123.34, 345.45));
@@ -44,6 +51,9 @@ void main() {
   // no uniform sheet of motion).
   float colIdx = floor(uv.x * count * aspect);
   float colRate = 0.35 + hash(vec2(colIdx, 1.7)) * 0.65;
+  // Audio scatter : each column gusts sideways on its OWN live sample — the
+  // ash bed is blown around by the waveform, column by column.
+  uv.x += aud(colIdx / (count * aspect)) * audioScatter * 0.06;
   vec2 q = vec2(uv.x * count * aspect, uv.y * count + TIME * speed * count * 0.2 * colRate * fall);
   vec2 cell0 = floor(q);
 

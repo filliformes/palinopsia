@@ -857,6 +857,16 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Slow melt', values: { rate: 0.02, scale: 1.8, levels: 16, width: 0.09, warp: 1.4, fill: 0.1 } },
     { name: 'Shoreline', values: { rate: 0.15, scale: 1.5, levels: 5, width: 0.2, warp: 0.9, fill: 0.35, tint: [0.5, 0.75, 0.7, 1] } }
   ],
+  'ten-print': [
+    { name: 'Commodore', values: { cells: 22, thickness: 0.12, bias: 0.5, flip: 0.6, audioScatter: 0.25, accent: 0.12 } },
+    { name: 'Fine weave', values: { cells: 44, thickness: 0.07, bias: 0.5, flip: 0.3, audioScatter: 0.15, accent: 0.05 } },
+    { name: 'Big bones', values: { cells: 9, thickness: 0.3, bias: 0.5, flip: 0.2, audioScatter: 0.2, accent: 0.2 } },
+    { name: 'Leaning right', values: { cells: 26, thickness: 0.1, bias: 0.78, flip: 0.8, audioScatter: 0.2, accent: 0.1 } },
+    { name: 'Restless', values: { cells: 30, thickness: 0.09, bias: 0.5, flip: 4.5, audioScatter: 0.3, accent: 0.15 } },
+    { name: 'Frozen deal', values: { cells: 24, thickness: 0.14, bias: 0.45, flip: 0.0, audioScatter: 0.0, accent: 0.1 } },
+    { name: 'Shiver field', values: { cells: 36, thickness: 0.08, bias: 0.5, flip: 0.4, audioScatter: 0.85, accent: 0.08 } },
+    { name: 'Sparse strokes', values: { cells: 14, thickness: 0.06, bias: 0.62, flip: 0.15, audioScatter: 0.25, accent: 0.3 } }
+  ],
   'grid-drift': [
     { name: 'Quiet lattice', values: { cells: 12, rate: 0.08, breathe: 0.2, slip: 0.1, lineW: 0.04, density: 0.08 } },
     { name: 'Loose weave', values: { cells: 8, rate: 0.15, breathe: 0.6, slip: 0.2, lineW: 0.06, density: 0.12 } },

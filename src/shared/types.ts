@@ -595,6 +595,9 @@ export interface OutputFrame {
   // One-shot video seeks ("layer:slot" → 0..1 within trim) : the mirror's own
   // video decoders seek to the same spot (OSC /video/position).
   videoSeeks?: Array<[string, number]>
+  // Shared audio texture rows (128 bytes each) : the mirror can't run the
+  // audio bus, so per-element audio generators ride the same live data.
+  audioRows?: { wave: number[]; spec: number[] }
 }
 
 export interface DisplayInfo {
