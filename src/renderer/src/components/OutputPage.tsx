@@ -232,6 +232,9 @@ export function OutputPage({
             onPointerUp={() => {
               dragging.current = null
             }}
+            onPointerCancel={() => {
+              dragging.current = null
+            }}
           >
             <video ref={videoRef} autoPlay muted playsInline className="h-full w-full bg-black object-contain" />
             {/* Recording indicator : top-right, pulsing red dot + elapsed. */}

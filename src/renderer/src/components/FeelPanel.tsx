@@ -54,7 +54,7 @@ function FeelRow({
           title={`${label} : drag · double-click resets to ${neutral === 0 ? 'off' : neutral.toFixed(2)}`}
         />
       </div>
-      <div className="flex justify-between font-mono text-[8px] uppercase tracking-wide text-muted">
+      <div className="flex justify-between font-mono text-[9px] uppercase tracking-wide text-muted">
         <span>{left}</span>
         <span>{right}</span>
       </div>

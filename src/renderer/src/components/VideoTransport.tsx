@@ -142,6 +142,7 @@ export function VideoTransport({
           className="relative h-6 min-w-0 flex-1 select-none rounded bg-panel2"
           onPointerMove={onMove}
           onPointerUp={endDrag}
+          onPointerCancel={endDrag}
         >
         <div
           className="absolute inset-y-0 bg-accent/15"
@@ -153,6 +154,7 @@ export function VideoTransport({
           onPointerDown={startDrag('in')}
           onPointerMove={onMove}
           onPointerUp={endDrag}
+          onPointerCancel={endDrag}
           title={`In point : ${(inN * 100).toFixed(0)}%`}
         />
         <div
@@ -161,6 +163,7 @@ export function VideoTransport({
           onPointerDown={startDrag('out')}
           onPointerMove={onMove}
           onPointerUp={endDrag}
+          onPointerCancel={endDrag}
           title={`Out point : ${(outN * 100).toFixed(0)}%`}
         />
         <div
@@ -191,31 +194,40 @@ export function VideoTransport({
         </span>
       </div>
 
-      {/* Granular : 3 seek-head voices scattering grains around the playhead. */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => set({ grainOn: !(state.grainOn ?? false) })}
-          className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] transition-colors ${
-            state.grainOn ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'
-          }`}
-          title="Video granulation : three grain voices scatter short windows around the playhead (which keeps moving — modulate it to steer the cloud). Best on imported/converted all-intra clips."
-        >
-          ⌗ grain
-        </button>
+      {/* Granular : 3 seek-head voices scattering grains around the playhead.
+          Toggle + BPM sync on one line, the 4 grain sliders in a 2×2 grid
+          below so each gets a readable width. */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => set({ grainOn: !(state.grainOn ?? false) })}
+            className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] transition-colors ${
+              state.grainOn ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'
+            }`}
+            title="Video granulation : three grain voices scatter short windows around the playhead (which keeps moving — modulate it to steer the cloud). Best on imported/converted all-intra clips."
+          >
+            ⌗ grain
+          </button>
+          {state.grainOn && (
+            <>
+              <span className="shrink-0 font-mono text-[9px] uppercase text-muted">sync</span>
+              <select
+                className="input select-compact shrink-0 text-[9px]"
+                value={state.grainSync ?? 0}
+                onChange={(e) => set({ grainSync: Number(e.target.value) })}
+                title="BPM sync : grains retrigger on the beat grid (grain length = this division). free = grain size in seconds."
+              >
+                <option value={0}>free</option>
+                <option value={0.25}>1/16</option>
+                <option value={0.5}>1/8</option>
+                <option value={1}>1/4</option>
+                <option value={2}>1/2</option>
+              </select>
+            </>
+          )}
+        </div>
         {state.grainOn && (
-          <>
-            <select
-              className="input select-compact shrink-0 text-[9px]"
-              value={state.grainSync ?? 0}
-              onChange={(e) => set({ grainSync: Number(e.target.value) })}
-              title="BPM sync : grains retrigger on the beat grid (grain length = this division). free = grain size in seconds."
-            >
-              <option value={0}>free</option>
-              <option value={0.25}>1/16</option>
-              <option value={0.5}>1/8</option>
-              <option value={1}>1/4</option>
-              <option value={2}>1/2</option>
-            </select>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1">
             {([
               ['size', 'grainSize', 0.05, 1, state.grainSize ?? 0.25, 'Grain length (seconds)'],
               ['spray', 'grainSpray', 0, 1, state.grainSpray ?? 0.15, 'Scatter around the playhead'],
@@ -223,8 +235,8 @@ export function VideoTransport({
               ['jit', 'grainJitter', 0, 1, state.grainJitter ?? 0.2, 'Per-grain speed jitter']
             ] as Array<[string, 'grainSize' | 'grainSpray' | 'grainReverse' | 'grainJitter', number, number, number, string]>).map(
               ([lbl, key, lo, hi, val, tip]) => (
-                <span key={key} className="flex min-w-0 flex-1 items-center gap-1" title={tip}>
-                  <span className="shrink-0 font-mono text-[8px] uppercase text-muted">{lbl}</span>
+                <span key={key} className="flex min-w-0 items-center gap-1" title={tip}>
+                  <span className="w-9 shrink-0 font-mono text-[9px] uppercase text-muted">{lbl}</span>
                   <input
                     type="range" min={lo} max={hi} step={0.01} value={val}
                     onChange={(e) => set({ [key]: Number(e.target.value) })}
@@ -233,7 +245,7 @@ export function VideoTransport({
                 </span>
               )
             )}
-          </>
+          </div>
         )}
       </div>
 

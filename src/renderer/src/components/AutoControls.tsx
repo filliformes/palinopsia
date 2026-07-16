@@ -525,7 +525,7 @@ export function AssignRow({
   return (
     <div className="flex flex-col gap-1 rounded border border-border bg-panel2/60 p-1">
       <div className="flex min-w-0 items-center gap-1">
-        <span className="w-8 shrink-0 font-mono text-[8px] uppercase text-muted">mod</span>
+        <span className="w-8 shrink-0 font-mono text-[9px] uppercase text-muted">mod</span>
         {/* Buttons share the row's width evenly so the panel stays inside its
             margins at ANY width (main side panel, popover, Finishing column). */}
         <div className="flex min-w-0 flex-1 gap-0.5">
@@ -562,7 +562,7 @@ export function AssignRow({
             {/* Mode: Multiply (scale the base : default) ↔ Replace (swing over it). */}
             <button
               onClick={() => setAssignmentMode(b.id, mult ? 'replace' : 'multiply')}
-              className={`shrink-0 rounded px-1 py-0.5 font-mono text-[8px] uppercase transition-colors ${
+              className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] uppercase transition-colors ${
                 mult
                   ? 'bg-accent/20 text-accent ring-1 ring-accent'
                   : 'bg-accent2/20 text-accent2 ring-1 ring-accent2'
@@ -598,7 +598,7 @@ export function AssignRow({
           above, the whole panel is the fixed three-row shape). */}
       {!hideMeta && (
         <div className="flex min-w-0 items-start gap-1">
-          <span className="w-8 shrink-0 pt-0.5 font-mono text-[8px] uppercase text-muted">meta</span>
+          <span className="w-8 shrink-0 pt-0.5 font-mono text-[9px] uppercase text-muted">meta</span>
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             {[metaBound.slice(0, 9), metaBound.slice(9)].map((row, r) => (
               <div key={r} className="flex min-w-0 gap-0.5">
@@ -608,7 +608,7 @@ export function AssignRow({
                     <button
                       key={i}
                       onClick={() => toggleMetaDest(i, target)}
-                      className={`min-w-0 flex-1 rounded px-0.5 py-0.5 font-mono text-[8px] transition-colors ${
+                      className={`min-w-0 flex-1 rounded px-0.5 py-0.5 font-mono text-[9px] transition-colors ${
                         on
                           ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
                           : 'bg-panel3/60 text-muted hover:text-text'
@@ -701,7 +701,7 @@ function LightOrderToggle({
   return (
     <button
       onClick={() => onChange('lightOrder', post ? 0 : 1)}
-      className={`shrink-0 rounded px-1 font-mono text-[8px] leading-4 uppercase transition-colors ${
+      className={`shrink-0 rounded px-1 font-mono text-[9px] leading-4 uppercase transition-colors ${
         post
           ? 'bg-accent/20 text-accent ring-1 ring-accent'
           : 'bg-accent2/20 text-accent2 ring-1 ring-accent2'
@@ -937,6 +937,9 @@ export function XYControl({
           if (dragging.current) setFromPointer(e)
         }}
         onPointerUp={() => {
+          dragging.current = false
+        }}
+        onPointerCancel={() => {
           dragging.current = false
         }}
         onDoubleClick={() => onChange(inp.name, def)}

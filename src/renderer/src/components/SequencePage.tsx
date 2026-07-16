@@ -161,11 +161,11 @@ export function SequencePage({
                     <span className={`min-w-0 flex-1 truncate text-[12px] ${isCur ? 'text-accent' : 'text-text'}`}>
                       {s.name}
                     </span>
-                    {isCur && <span className="shrink-0 font-mono text-[8px] text-accent">▶ now</span>}
+                    {isCur && <span className="shrink-0 font-mono text-[9px] text-accent">▶ now</span>}
                   </div>
                   {t && (
                     <>
-                      <div className="flex items-center gap-1 font-mono text-[8px] text-muted">
+                      <div className="flex items-center gap-1 font-mono text-[9px] text-muted">
                         <span className="rounded bg-panel2 px-1 py-0.5 text-accent2">{worldName(t.world)}</span>
                         <span className="truncate">{t.synchresis.join('·') || '—'}</span>
                       </div>
@@ -288,9 +288,11 @@ export function SequencePage({
             const up = (): void => {
               el.removeEventListener('pointermove', move)
               el.removeEventListener('pointerup', up)
+              el.removeEventListener('pointercancel', up)
             }
             el.addEventListener('pointermove', move)
             el.addEventListener('pointerup', up)
+            el.addEventListener('pointercancel', up)
           }}
           title="Drag to resize the inspector"
         />
@@ -581,6 +583,13 @@ function SeqPreview({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | nu
           setHeight(h)
         }}
         onPointerUp={(e) => {
+          if (drag.current) {
+            localStorage.setItem('opsia.seqPreviewH', String(drag.current.last))
+            drag.current = null
+            ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
+          }
+        }}
+        onPointerCancel={(e) => {
           if (drag.current) {
             localStorage.setItem('opsia.seqPreviewH', String(drag.current.last))
             drag.current = null

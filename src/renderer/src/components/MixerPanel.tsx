@@ -132,6 +132,7 @@ function VFader({
   min,
   max,
   step,
+  neutral = 1,
   onChange
 }: {
   label: string
@@ -139,11 +140,12 @@ function VFader({
   min: number
   max: number
   step: number
+  neutral?: number
   onChange: (v: number) => void
 }): JSX.Element {
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1">
-      <span className="shrink-0 font-mono text-[8px] uppercase text-muted">{label}</span>
+      <span className="shrink-0 font-mono text-[9px] uppercase text-muted">{label}</span>
       <input
         type="range"
         min={min}
@@ -151,11 +153,12 @@ function VFader({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
+        onDoubleClick={() => onChange(neutral)}
         // Modern vertical range: writing-mode makes it vertical, rtl puts the
         // minimum at the bottom (up = more).
         style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
         className="min-h-[40px] flex-1 accent-accent"
-        title={`${label} ${value.toFixed(2)}`}
+        title={`${label} ${value.toFixed(2)} : double-click resets to ${neutral}`}
       />
       <BoundedNumberInput
         value={value}

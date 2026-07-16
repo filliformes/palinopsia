@@ -293,6 +293,7 @@ export function Inspector(): JSX.Element {
               step={0.01}
               value={fxOpacity.value}
               onChange={(e) => fxOpacity!.set(Number(e.target.value))}
+              onDoubleClick={() => fxOpacity!.set(1)}
               className="w-24 accent-accent"
             />
             <span className="w-7 text-right font-mono text-[10px] text-muted">
@@ -456,9 +457,11 @@ export function Inspector(): JSX.Element {
                   const up = (): void => {
                     el.removeEventListener('pointermove', move)
                     el.removeEventListener('pointerup', up)
+                    el.removeEventListener('pointercancel', up)
                   }
                   el.addEventListener('pointermove', move)
                   el.addEventListener('pointerup', up)
+                  el.addEventListener('pointercancel', up)
                 }}
                 title="Drag to resize the Inspector"
               />
@@ -484,6 +487,13 @@ export function Inspector(): JSX.Element {
                   setAssignW(w)
                 }}
                 onPointerUp={(e) => {
+                  if (resize.current) {
+                    localStorage.setItem('opsia.assignPanelW', String(resize.current.last))
+                    resize.current = null
+                    ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
+                  }
+                }}
+                onPointerCancel={(e) => {
                   if (resize.current) {
                     localStorage.setItem('opsia.assignPanelW', String(resize.current.last))
                     resize.current = null

@@ -168,7 +168,7 @@ export function OscPanel(): JSX.Element {
             </div>
             <div>
               e.g. <span className="text-text">/opsia/meta/1</span> ·{' '}
-              <span className="text-text">/opsia/layer/1/opacity</span> · OSCQuery{' '}
+              <span className="text-text">/opsia/layer1/opacity</span> · OSCQuery{' '}
               <span className="text-text">:{oscPort + 1}</span>
             </div>
           </div>

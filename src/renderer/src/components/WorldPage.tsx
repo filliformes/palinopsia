@@ -105,7 +105,7 @@ export function WorldPage(): JSX.Element {
                   {x.id === activeId ? '● ' : ''}
                   {x.name}
                 </span>
-                {x.builtin && <span className="ml-1 font-mono text-[8px] text-muted">built-in</span>}
+                {x.builtin && <span className="ml-1 font-mono text-[9px] text-muted">built-in</span>}
               </button>
               {!x.builtin && (
                 <button

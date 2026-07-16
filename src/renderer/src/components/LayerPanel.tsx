@@ -112,8 +112,9 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           step={0.01}
           value={layer.opacity}
           onChange={(e) => setOpacity(index, Number(e.target.value))}
+          onDoubleClick={() => setOpacity(index, 1)}
           className="min-w-0 flex-1 accent-accent"
-          title={`Opacity ${layer.opacity.toFixed(2)}`}
+          title={`Opacity ${layer.opacity.toFixed(2)} : double-click resets to 1`}
         />
         <div className="flex shrink-0 gap-1">
           <ToggleChip label="S" active={layer.solo} onClick={() => toggleSolo(index)} title="Solo" />
@@ -200,51 +201,61 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               coupling (Audio panel) : a visuals-only user never sees it. */}
           {showCoupling && (
           <Row label="CPL">
-            <select
-              className="input select-compact w-[4.25rem] shrink-0 text-[10px]"
-              value={layer.coupling.mode}
-              onChange={(e) => setCoupling(index, { mode: e.target.value as CouplingMode })}
-              title="A/B coupling by audio : lean · hocket (pump) · cut (transient flash) · gate (B while loud) · drift (slow momentum)"
-            >
-              <option value="off">off</option>
-              <option value="lean">lean</option>
-              <option value="hocket">hocket</option>
-              <option value="cut">cut</option>
-              <option value="gate">gate</option>
-              <option value="drift">drift</option>
-            </select>
-            <select
-              className="input select-compact w-[5.25rem] shrink-0 text-[10px]"
-              value={layer.coupling.feature}
-              onChange={(e) => setCoupling(index, { feature: e.target.value as AudioFeature })}
-              title="Audio feature driving the bond (transient/flux read best)"
-            >
-              {AUDIO_FEATURES.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))}
-            </select>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={layer.coupling.amount}
-              onChange={(e) => setCoupling(index, { amount: Number(e.target.value) })}
-              className="min-w-0 flex-1 accent-accent"
-              title={`Coupling amount ${layer.coupling.amount.toFixed(2)}`}
-            />
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={layer.coupling.tightness}
-              onChange={(e) => setCoupling(index, { tightness: Number(e.target.value) })}
-              className="min-w-0 flex-1 accent-accent"
-              title={`Tightness ${layer.coupling.tightness.toFixed(2)} : vestigial (peaks only) ↔ obvious (linear)`}
-            />
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              {/* Line 1 : mode + feature pickers, each wide enough to read. */}
+              <div className="flex min-w-0 items-center gap-1.5">
+                <select
+                  className="input select-compact min-w-0 flex-1 text-[10px]"
+                  value={layer.coupling.mode}
+                  onChange={(e) => setCoupling(index, { mode: e.target.value as CouplingMode })}
+                  title="A/B coupling by audio : lean · hocket (pump) · cut (transient flash) · gate (B while loud) · drift (slow momentum)"
+                >
+                  <option value="off">off</option>
+                  <option value="lean">lean</option>
+                  <option value="hocket">hocket</option>
+                  <option value="cut">cut</option>
+                  <option value="gate">gate</option>
+                  <option value="drift">drift</option>
+                </select>
+                <select
+                  className="input select-compact min-w-0 flex-1 text-[10px]"
+                  value={layer.coupling.feature}
+                  onChange={(e) => setCoupling(index, { feature: e.target.value as AudioFeature })}
+                  title="Audio feature driving the bond (transient/flux read best)"
+                >
+                  {AUDIO_FEATURES.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {/* Line 2 : amount + tightness sliders, labelled. */}
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className="shrink-0 font-mono text-[9px] uppercase text-muted">amt</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={layer.coupling.amount}
+                  onChange={(e) => setCoupling(index, { amount: Number(e.target.value) })}
+                  className="min-w-0 flex-1 accent-accent"
+                  title={`Coupling amount ${layer.coupling.amount.toFixed(2)}`}
+                />
+                <span className="shrink-0 font-mono text-[9px] uppercase text-muted">tight</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={layer.coupling.tightness}
+                  onChange={(e) => setCoupling(index, { tightness: Number(e.target.value) })}
+                  className="min-w-0 flex-1 accent-accent"
+                  title={`Tightness ${layer.coupling.tightness.toFixed(2)} : vestigial (peaks only) ↔ obvious (linear)`}
+                />
+              </div>
+            </div>
           </Row>
           )}
 
@@ -325,8 +336,9 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               step={0.05}
               value={layer.speed}
               onChange={(e) => setLayerSpeed(index, Number(e.target.value))}
+              onDoubleClick={() => setLayerSpeed(index, 1)}
               className="min-w-0 flex-1 accent-accent"
-              title="Layer time : scales every source and FX clock on this layer (1 = realtime)"
+              title="Layer time : scales every source and FX clock on this layer (1 = realtime) : double-click resets"
             />
             <div className="w-11 shrink-0">
               <BoundedNumberInput

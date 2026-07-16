@@ -68,7 +68,7 @@ export function SceneBank(): JSX.Element {
           }`}
         >
           {i < 9 && (
-            <span className="font-mono text-[8px] text-muted" title={`Key ${i + 1} recalls`}>
+            <span className="font-mono text-[9px] text-muted" title={`Key ${i + 1} recalls`}>
               {i + 1}
             </span>
           )}

@@ -213,7 +213,7 @@ function MetaXYPad({ xIndex, yIndex }: { xIndex: number; yIndex: number }): JSX.
           style={{ left: `${xVal * 100}%`, top: `${(1 - yVal) * 100}%`, backgroundColor: dotColor }}
         />
       </div>
-      <div className="flex w-full items-center justify-between gap-1 font-mono text-[8px] leading-none text-muted">
+      <div className="flex w-full items-center justify-between gap-1 font-mono text-[9px] leading-none text-muted">
         <span className="min-w-0 truncate" title={`X : ${xName}`}>X·{xName}</span>
         <span className="min-w-0 truncate text-right" title={`Y : ${yName}`}>{yName}·Y</span>
       </div>
@@ -361,7 +361,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
       </div>
 
       {/* destinations count : what this knob drives */}
-      <span className="font-mono text-[8px] leading-none text-muted">
+      <span className="font-mono text-[9px] leading-none text-muted">
         {knob.destinations.length > 0 ? `${knob.destinations.length} dest` : '—'}
       </span>
 
@@ -411,7 +411,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
             else if (knob.midiCc) updateMetaKnob(index, { midiCc: null })
             else setMidiLearn(index)
           }}
-          className={`flex-1 rounded border px-1 py-px font-mono text-[8px] leading-none transition-colors ${
+          className={`flex-1 rounded border px-1 py-px font-mono text-[9px] leading-none transition-colors ${
             learning
               ? 'animate-pulse border-accent bg-accent/25 text-accent'
               : knob.midiCc
@@ -430,7 +430,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
         </button>
         <button
           onClick={() => setAssignOpen((o) => !o)}
-          className={`flex-1 rounded px-1 py-px font-mono text-[8px] leading-none transition-colors ${
+          className={`flex-1 rounded px-1 py-px font-mono text-[9px] leading-none transition-colors ${
             isModulated
               ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2'
               : 'bg-panel3/60 text-muted hover:text-text'
