@@ -641,6 +641,21 @@ the only raw value.** All indices in addresses are **1-based**.
 | `…/coupling/amount` · `…/tightness` | f | Coupling depth / tightness |
 | `…/coupling/feature` | i / f / s | `level·flux·transient·centroid·band·pitch` |
 
+**Video transport** — `/opsia/layer{n}/video[/{A|B}]/…`. Without an explicit
+slot, the message lands on the layer's first video slot (A, then B). Ignored
+unless the slot actually holds a video.
+
+| Address | Type | Meaning |
+|---|---|---|
+| `…/video/play` · `…/loop` · `…/grain` | bool | Play/pause · loop · granulation on (≥ 0.5) |
+| `…/video/direction` | i / f / s | `forward·reverse·pendulum` |
+| `…/video/speed` | f | Clip speed, 0..1 log across 1/28×..128× |
+| `…/video/position` | f | **One-shot seek** to 0..1 within the in/out trim |
+| `…/video/in` · `…/video/out` | f | Trim points (0..1; kept ordered) |
+| `…/video/grainsize` | f | Grain length (0..1 → 0.05..1 s) |
+| `…/video/grainspray` · `…/grainrev` · `…/grainjit` | f | Scatter · reverse probability · speed jitter |
+| `…/video/grainsync` | i / f / s | `free·1/16·1/8·1/4·1/2` (BPM grain clock) |
+
 **Master** — `/opsia/master/…`
 
 | Address | Meaning |
@@ -681,9 +696,10 @@ Type resolution: `float` → `min + v·(max−min)`; enum → nearest member;
 `bool`/`event` → `v ≥ 0.5`; `color` → 3–4 raw `0..1` args (or one → grayscale);
 `point2D` → 2 per-axis args.
 
-> Video transport (playhead, speed, loop, grain) is not directly OSC-addressed —
-> drive it through the modulators (bind an `audio` follower or LFO to the `M`
-> targets in the video transport), or a Meta knob over OSC.
+> For continuous playhead motion, prefer binding a modulator to the transport's
+> `M` targets (an LFO loops, S&H jump-cuts, audio scrubs); `…/video/position`
+> over OSC is a **one-shot seek** per message. A seek also mirrors to the
+> output window's own decoders.
 
 ### Outbound (instrument → control, "feedback")
 
@@ -693,7 +709,10 @@ ones to a peer (e.g. Pandore's UI mirrors yours). Same `/opsia/…` addresses
 outbound value is a single float `f`** (enums/bools normalized). Streamed: every
 layer control, meta knobs, BPM (raw), the three master finalizers' float inputs,
 background controls + source inputs, all macros/temperament, world (1-based
-index), and `seq/run`. **Not** streamed: `/opsia/audio/*` and `/opsia/seq/skip`.
+index), and `seq/run` — plus, while a slot holds a video, its transport
+(`video/{A|B}/play·direction·loop·speed·in·out·grain·grain*`). **Not** streamed:
+`/opsia/audio/*`, `/opsia/seq/skip`, and `video/…/position` (the playhead flies
+at frame rate; it's advertised for discovery but never echoed).
 
 Behaviour: a diff loop on a `max(40, interval)` ms timer; a leaf is sent only when it
 moves by ≥ `0.0015`; a first-pass burst cap (~97 leaves/tick) spreads the initial

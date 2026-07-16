@@ -20,6 +20,7 @@ import { applyMetaGlides, applyModulation, modEngine } from './engine/modulation
 import { visionBus } from './engine/visionIn'
 import { depthEngine } from './engine/depthEstimate'
 import { currentFps, tickFrame } from './perf'
+import { videoSeekRequests } from './engine/videoState'
 import { tickSequencer } from './engine/sequencer'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel, FxChips } from './components/FxRackPanel'
@@ -480,6 +481,19 @@ export default function App(): JSX.Element {
         //      destinations engine-side (zero store writes per frame; the
         //      final value commits to the store on settle).
         if (metaGlides.size) applyMetaGlides(comp!, c, inputsForShader, metaGlides)
+        // 2a¾. One-shot video seeks (OSC /video/position) : drained into the
+        //      same consumed-per-frame seam the playhead modulators use, and
+        //      kept for the output-window payload so the mirror seeks too.
+        let videoSeeks: Array<[string, number]> | undefined
+        if (videoSeekRequests.size) {
+          videoSeeks = Array.from(videoSeekRequests)
+          videoSeekRequests.clear()
+          for (const [k, v] of videoSeeks) {
+            const ci = k.indexOf(':')
+            const li = Number(k.slice(0, ci))
+            comp!.layers[li]?.setVideoInput(k.slice(ci + 1) === 'B' ? 'B' : 'A', 'position', v)
+          }
+        }
         // 2b. Coupling: audio binds each layer's A/B balance (post-sync so it
         //     overrides the base mix); returns the coupled mixes for the output.
         const coupledMix = applyCoupling(comp!, c, now)
@@ -637,7 +651,9 @@ export default function App(): JSX.Element {
             strobeSafe: st.strobeSafe,
             // In-flight Meta-knob gestures : the mirror re-applies the same
             // engine-side fan-out (the store only updates on settle).
-            metaGlides: metaGlides.size ? Array.from(metaGlides) : undefined
+            metaGlides: metaGlides.size ? Array.from(metaGlides) : undefined,
+            // One-shot video seeks : the mirror's own decoders seek too.
+            videoSeeks
           })
         }
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to

@@ -9,4 +9,9 @@ export interface VideoPlayhead {
 
 export const videoPlayheads = new Map<string, VideoPlayhead>()
 
+// One-shot seek requests (0..1 within the in/out trim), written by OSC
+// (/opsia/layerN/video/position) and drained by the render loop, which routes
+// each through the same consumed-per-frame seam the playhead modulators use.
+export const videoSeekRequests = new Map<string, number>()
+
 export const videoKey = (layer: number, slot: 'A' | 'B'): string => `${layer}:${slot}`

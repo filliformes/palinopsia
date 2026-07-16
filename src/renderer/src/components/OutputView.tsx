@@ -39,6 +39,16 @@ export function OutputView(): JSX.Element {
         // In-flight Meta-knob gestures : same engine-side fan-out as the
         // control window (the store/composition only carries settled values).
         if (f.metaGlides) applyMetaGlides(comp!, f.c, inputsForShader, f.metaGlides)
+        // One-shot video seeks (OSC /video/position) : this window decodes its
+        // own copies of the clips, so it seeks them to the same spot.
+        if (f.videoSeeks) {
+          for (const [k, v] of f.videoSeeks) {
+            const ci = k.indexOf(':')
+            comp!.layers[Number(k.slice(0, ci))]?.setVideoInput(
+              k.slice(ci + 1) === 'B' ? 'B' : 'A', 'position', v
+            )
+          }
+        }
         // Fresh per-frame write bus (else applyFieldMacros below would stack on
         // its OWN last-frame writes and run away).
         clearFrameVals()

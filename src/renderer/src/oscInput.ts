@@ -17,6 +17,13 @@
 //   /opsia/layer{n}/source/{A|B}/{input}              f 0..1 → range
 //   /opsia/layer{n}/source/{A|B}/fx/{i}/{input}       f 0..1 → range
 //   /opsia/layer{n}/fx/{i}/{input}                    f 0..1 → range
+//   /opsia/layer{n}/video[/{A|B}]/play|loop|grain     >= 0.5 (slotless form: first video slot)
+//   /opsia/layer{n}/video[/{A|B}]/direction            i index | f 0..1 | s forward|reverse|pendulum
+//   /opsia/layer{n}/video[/{A|B}]/speed                f 0..1 (log across 1/28x..128x)
+//   /opsia/layer{n}/video[/{A|B}]/position             f 0..1 (one-shot seek within trim)
+//   /opsia/layer{n}/video[/{A|B}]/in|out               f 0..1 (trim points)
+//   /opsia/layer{n}/video[/{A|B}]/grainsize|grainspray|grainrev|grainjit  f 0..1
+//   /opsia/layer{n}/video[/{A|B}]/grainsync            i index | f 0..1 | s free|1/16|1/8|1/4|1/2
 //   /opsia/layer{n}/coupling/mode                     i index | f 0..1 | s name
 //   /opsia/layer{n}/coupling/amount|tightness         f 0..1
 //   /opsia/layer{n}/coupling/feature                  i index | f 0..1 | s name
@@ -43,6 +50,7 @@
 
 import type { BlendMode, CouplingMode, AudioFeature, FxScope, OscInEvent, OscQueryLeaf } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
+import { videoKey, videoSeekRequests } from './engine/videoState'
 import { useStore } from './store'
 import type { RandomizeScope } from './randomize'
 import { setKnobTarget } from './metaSmooth'
@@ -148,6 +156,14 @@ function blendFrom(args: Args): BlendMode | null {
 const COUPLING_MODES: readonly CouplingMode[] = ['off', 'lean', 'hocket', 'cut', 'gate', 'drift']
 const COUPLING_FEATURES: readonly AudioFeature[] = ['level', 'flux', 'transient', 'centroid', 'band', 'pitch']
 
+// Video transport enums + the transport's log speed range (mirrors the UI
+// slider in VideoTransport.tsx : 1/28× .. 128×).
+const VIDEO_DIRECTIONS = ['forward', 'reverse', 'pendulum'] as const
+const VSMIN = 1 / 28
+const VSMAX = 128
+const GRAIN_SYNCS = ['free', '1/16', '1/8', '1/4', '1/2'] as const
+const GRAIN_SYNC_VALUES = [0, 0.25, 0.5, 1, 2] as const
+
 /** Resolve an enum arg: a string name, an int index, or a 0..1 float mapped
  *  across the members. Returns null if nothing valid is present. */
 function enumFrom<T extends string>(args: Args, members: readonly T[]): T | null {
@@ -224,6 +240,59 @@ function route(address: string, args: Args): void {
         if (!u) return
         const v = resolveInputValue(u.shaderId, input, args)
         if (v !== null) st.setFxInput(scope, u.id, input, v)
+        return
+      }
+
+      // Video transport : /opsia/layerN/video[/{A|B}]/{ctl}. Without an explicit
+      // slot the message lands on the layer's first video slot (A, then B).
+      if (ctl === 'video') {
+        const layer = st.composition.layers[li]
+        if (!layer) return
+        let slot: 'A' | 'B' | null
+        let which = segs[4]
+        if (which === 'A' || which === 'B') {
+          slot = which
+          which = segs[5]
+        } else {
+          slot = layer.sourceA?.kind === 'video' ? 'A' : layer.sourceB?.kind === 'video' ? 'B' : null
+        }
+        if (!slot || !which) return
+        const s = slot === 'A' ? layer.sourceA : layer.sourceB
+        if (s?.kind !== 'video') return
+        switch (which) {
+          case 'play': st.setVideoPlayback(li, slot, { videoPlaying: n >= 0.5 }); return
+          case 'loop': st.setVideoPlayback(li, slot, { videoLoop: n >= 0.5 }); return
+          case 'direction': {
+            const d = enumFrom(args, VIDEO_DIRECTIONS)
+            if (d) st.setVideoPlayback(li, slot, { videoDirection: d })
+            return
+          }
+          case 'speed':
+            // 0..1 across the transport's log range (1/28× .. 128×).
+            st.setVideoPlayback(li, slot, { videoSpeed: VSMIN * Math.pow(VSMAX / VSMIN, clamp01(n)) })
+            return
+          case 'position':
+            // One-shot seek within the trim : drained by the render loop into
+            // the same consumed-per-frame seam the playhead modulators use.
+            videoSeekRequests.set(videoKey(li, slot), clamp01(n))
+            return
+          case 'in':
+            st.setVideoPlayback(li, slot, { videoIn: Math.min(clamp01(n), (s.videoOut ?? 1) - 0.01) })
+            return
+          case 'out':
+            st.setVideoPlayback(li, slot, { videoOut: Math.max(clamp01(n), (s.videoIn ?? 0) + 0.01) })
+            return
+          case 'grain': st.setVideoPlayback(li, slot, { grainOn: n >= 0.5 }); return
+          case 'grainsize': st.setVideoPlayback(li, slot, { grainSize: 0.05 + clamp01(n) * 0.95 }); return
+          case 'grainspray': st.setVideoPlayback(li, slot, { grainSpray: clamp01(n) }); return
+          case 'grainrev': st.setVideoPlayback(li, slot, { grainReverse: clamp01(n) }); return
+          case 'grainjit': st.setVideoPlayback(li, slot, { grainJitter: clamp01(n) }); return
+          case 'grainsync': {
+            const g = enumFrom(args, GRAIN_SYNCS)
+            if (g) st.setVideoPlayback(li, slot, { grainSync: GRAIN_SYNC_VALUES[GRAIN_SYNCS.indexOf(g)] })
+            return
+          }
+        }
         return
       }
 
@@ -510,6 +579,30 @@ function enumerateLeaves(): Leaf[] {
     add(`/opsia/layer${n}/coupling/tightness`, 0, 1, l?.coupling?.tightness ?? 0.7, 'A/B coupling tightness')
     const cf = Math.max(0, COUPLING_FEATURES.indexOf(l?.coupling?.feature ?? 'transient'))
     add(`/opsia/layer${n}/coupling/feature`, 0, 1, cf / (COUPLING_FEATURES.length - 1), 'A/B coupling audio feature (index)')
+    // Video transport : advertised (slot-explicit) only while the slot actually
+    // holds a video. `position` is a one-shot seek — advertised for discovery
+    // but never echoed outbound (the playhead flies at frame rate).
+    for (const sl of ['A', 'B'] as const) {
+      const s = sl === 'A' ? l?.sourceA : l?.sourceB
+      if (s?.kind !== 'video') continue
+      const p = `/opsia/layer${n}/video/${sl}`
+      add(`${p}/play`, 0, 1, (s.videoPlaying ?? true) ? 1 : 0, 'Video play (>= 0.5) / pause')
+      const di = Math.max(0, VIDEO_DIRECTIONS.indexOf((s.videoDirection ?? 'forward') as (typeof VIDEO_DIRECTIONS)[number]))
+      add(`${p}/direction`, 0, 1, di / (VIDEO_DIRECTIONS.length - 1), 'Play mode (index: forward·reverse·pendulum)')
+      add(`${p}/loop`, 0, 1, (s.videoLoop ?? true) ? 1 : 0, 'Loop between in/out (>= 0.5)')
+      const sp = Math.max(VSMIN, Math.min(VSMAX, s.videoSpeed ?? 1))
+      add(`${p}/speed`, 0, 1, Math.log(sp / VSMIN) / Math.log(VSMAX / VSMIN), 'Clip speed (0..1 log across 1/28×..128×)')
+      add(`${p}/position`, 0, 1, 0, 'One-shot seek (0..1 within the in/out trim)', false)
+      add(`${p}/in`, 0, 1, s.videoIn ?? 0, 'Trim in point')
+      add(`${p}/out`, 0, 1, s.videoOut ?? 1, 'Trim out point')
+      add(`${p}/grain`, 0, 1, (s.grainOn ?? false) ? 1 : 0, 'Granulation on (>= 0.5)')
+      add(`${p}/grainsize`, 0, 1, ((s.grainSize ?? 0.25) - 0.05) / 0.95, 'Grain length')
+      add(`${p}/grainspray`, 0, 1, s.grainSpray ?? 0.15, 'Grain scatter around the playhead')
+      add(`${p}/grainrev`, 0, 1, s.grainReverse ?? 0.25, 'Grain reverse probability')
+      add(`${p}/grainjit`, 0, 1, s.grainJitter ?? 0.2, 'Per-grain speed jitter')
+      const gi = Math.max(0, (GRAIN_SYNC_VALUES as readonly number[]).indexOf(s.grainSync ?? 0))
+      add(`${p}/grainsync`, 0, 1, gi / (GRAIN_SYNC_VALUES.length - 1), 'Grain BPM sync (index: free·1/16·1/8·1/4·1/2)')
+    }
   }
   for (let k = 1; k <= st.composition.metaKnobs.length; k++) {
     const knob = st.composition.metaKnobs[k - 1]

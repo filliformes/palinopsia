@@ -592,6 +592,9 @@ export interface OutputFrame {
   // In-flight Meta-knob gestures : [knob index, display 0..1] pairs the mirror
   // re-applies engine-side (the store only carries the settled value).
   metaGlides?: Array<[number, number]>
+  // One-shot video seeks ("layer:slot" → 0..1 within trim) : the mirror's own
+  // video decoders seek to the same spot (OSC /video/position).
+  videoSeeks?: Array<[string, number]>
 }
 
 export interface DisplayInfo {
