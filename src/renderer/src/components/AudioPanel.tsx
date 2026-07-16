@@ -76,10 +76,21 @@ export function AudioPanel(): JSX.Element {
               ))}
             </div>
 
+            {/* Coupling toggle rides line 1, pinned right. */}
+            <div className="flex-1" />
+            <button
+              onClick={() => setShowCoupling(!showCoupling)}
+              title="Show the A/B coupling row on each layer (audio binds the two sources)"
+              className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] ${
+                showCoupling ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted'
+              }`}
+            >
+              coupling
+            </button>
           </>
         )}
       </div>
-      {/* Second line : device + coupling + meters (the tab column is narrow). */}
+      {/* Second line : the device dropdown at full width + the meters. */}
       {enabled && (
         <div className="flex min-w-0 items-center gap-2">
           {showDevice && (
@@ -97,19 +108,7 @@ export function AudioPanel(): JSX.Element {
               ))}
             </select>
           )}
-
-          {/* Reveal the per-layer A/B coupling (CPL) rows. */}
-          <button
-            onClick={() => setShowCoupling(!showCoupling)}
-            title="Show the A/B coupling row on each layer (audio binds the two sources)"
-            className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] ${
-              showCoupling ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted'
-            }`}
-          >
-            coupling
-          </button>
-
-          <div className="flex-1" />
+          {!showDevice && <div className="flex-1" />}
           <Meters />
         </div>
       )}
