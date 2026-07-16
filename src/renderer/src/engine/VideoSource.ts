@@ -296,6 +296,21 @@ void main(){
 
   load(src: string): void {
     this.disposeVoices() // grain voices re-create lazily on the new src
+    // Reset every per-clip transient : a stale playhead (beyond the new clip's
+    // duration), a stuck seek gate, or a pending rVFC chain from a previous load
+    // can strand the new clip on a frozen frame.
+    this.pos = -1
+    this.seeking = false
+    this.pendingFrame = true
+    this.lastCT = -1
+    this.stallSince = 0
+    this.pendDir = 1
+    this.posMod = null
+    this.speedMod = null
+    if (this.rvfcOn && typeof this.video.cancelVideoFrameCallback === 'function' && this.rvfcId) {
+      this.video.cancelVideoFrameCallback(this.rvfcId)
+      this.rvfcId = 0
+    }
     this.video.src = src
     // Start native playback (import is a user gesture, so autoplay is allowed);
     // tick() takes over rate/direction/loop from here. Re-assert play once the

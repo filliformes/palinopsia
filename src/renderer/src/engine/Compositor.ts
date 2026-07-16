@@ -750,7 +750,9 @@ export class ISFLayer {
     const curId = slot === 'A' ? this.mediaIdA : this.mediaIdB;
     if (mediaId === curId) return; // no change
     const cur = slot === 'A' ? this.videoA : this.videoB;
-    cur?.dispose();
+    // A dispose error must never strand the slot on the OLD frozen source :
+    // always fall through to loading the new clip.
+    try { cur?.dispose(); } catch (e) { console.warn('[video] dispose failed:', e); }
     let next: VideoSource | null = null;
     if (mediaId) {
       next = new VideoSource(this.shared.gl);
