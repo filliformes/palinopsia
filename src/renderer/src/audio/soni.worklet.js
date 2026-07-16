@@ -33,7 +33,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       spectra: { on: false, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, x: 0.5, gamma: 1.6, noise: 0 },
       orbit:   { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, ratio: 1, cx: 0.5, cy: 0.5, rx: 0.25, ry: 0.25, drive: 1.2, smooth: 0.6 },
       flow:    { on: false, tap: 0, gain: 0.5, pan: 0, dur: 0.09, noise: 0.15 },
-      raster:  { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0 },
+      raster:  { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
       sstv:    { on: false, tap: 0, gain: 0.5, pan: 0, lineHz: 12, dev: 1, syncLev: 0.5 },
       filter:  { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6 }
     };
@@ -58,7 +58,7 @@ class SoniProcessor extends AudioWorkletProcessor {
     // ── Raster state ──
     this.rPtr = 0; // read pointer in probe pixels (row-major, wraps)
     this.rDcX = 0; this.rDcY = 0;
-    this.rLast = 0;
+    this.rLow = 0; this.rBand = 0; // tone : 12dB/oct SVF lowpass state
     // ── Transmission (SSTV) state ──
     this.tPhase = 0; // FM oscillator phase
     this.tLine = 0; // current scan row 0..GRID-1
@@ -282,6 +282,12 @@ class SoniProcessor extends AudioWorkletProcessor {
       const step = ra.freq * nPix * dt;
       const gL = ra.gain * (1 - Math.max(0, ra.pan)) * 0.7;
       const gR = ra.gain * (1 + Math.min(0, ra.pan)) * 0.7;
+      // TONE : a 12dB/oct lowpass tames the read's aliased edges. Log sweep
+      // 300Hz → 8kHz (the Chamberlin SVF is only stable below ~sr/6);
+      // at the top of the dial the filter is BYPASSED (truly open).
+      const toneOpen = ra.tone >= 0.99;
+      const fc = 300 * Math.pow(8000 / 300, Math.max(0, Math.min(1, ra.tone)));
+      const rc = 2 * Math.sin(Math.PI * Math.min(fc, sampleRate / 6.5) / sampleRate);
       let ptr = this.rPtr;
       for (let s = 0; s < n; s++) {
         ptr += step;
@@ -302,7 +308,11 @@ class SoniProcessor extends AudioWorkletProcessor {
         // DC-block (the rect's mean brightness is pure DC)
         const hp = v - this.rDcX + 0.995 * this.rDcY;
         this.rDcX = v; this.rDcY = hp;
-        const shaped = Math.max(-1, Math.min(1, hp * 1.4));
+        // tone lowpass (SVF, ~Butterworth damping) then clip
+        this.rLow += rc * this.rBand;
+        const rHigh = hp - this.rLow - this.rBand;
+        this.rBand += rc * rHigh;
+        const shaped = Math.max(-1, Math.min(1, (toneOpen ? hp : this.rLow) * 1.4));
         L[s] += shaped * gL; R[s] += shaped * gR;
       }
       this.rPtr = ptr;

@@ -62,7 +62,7 @@ export interface SoniConfig {
   raster: {
     on: boolean; tap: number; gain: number; pan: number
     note: number; freq: number; quantize: boolean
-    rx: number; ry: number; rw: number; rh: number; smooth: number
+    rx: number; ry: number; rw: number; rh: number; smooth: number; tone: number
   }
   sstv: {
     on: boolean; tap: number; gain: number; pan: number
@@ -87,7 +87,7 @@ export function defaultSoniConfig(): SoniConfig {
     spectra: { on: true, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, sync: false, x: 0.5, gamma: 1.8, loOct: 2, hiOct: 7, quantize: true },
     orbit: { on: false, tap: 0, gain: 0.5, pan: 0, note: 45, freq: 110, quantize: true, ratio: 1, cx: 0.5, cy: 0.5, rx: 0.25, ry: 0.25, drive: 1, smooth: 0.5 },
     flow: { on: false, tap: 0, gain: 0.6, pan: 0, sense: 0.4, density: 0.5, dur: 0.09, noise: 0.15, loOct: 3, hiOct: 6, quantize: true },
-    raster: { on: false, tap: 0, gain: 0.4, pan: 0, note: 45, freq: 110, quantize: true, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0 },
+    raster: { on: false, tap: 0, gain: 0.4, pan: 0, note: 45, freq: 110, quantize: true, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
     sstv: { on: false, tap: 0, gain: 0.4, pan: 0, lineHz: 12, sync: false, dev: 1, syncLev: 0.5 },
     filter: { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, lineIn: false, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, loOct: 1, hiOct: 8, quantize: false },
     taps: [{ kind: 'master', layer: 0 }, { kind: 'layer', layer: 0 }]
@@ -245,7 +245,7 @@ class SonifyEngine {
           on: cfg.raster.on, tap: cfg.raster.tap, gain: cfg.raster.gain, pan: cfg.raster.pan,
           freq: cfg.raster.quantize ? this.snapNote(cfg.raster.note) : cfg.raster.freq,
           rx: cfg.raster.rx, ry: cfg.raster.ry, rw: cfg.raster.rw, rh: cfg.raster.rh,
-          smooth: cfg.raster.smooth
+          smooth: cfg.raster.smooth, tone: cfg.raster.tone ?? 0.6
         },
         sstv: {
           on: cfg.sstv.on, tap: cfg.sstv.tap, gain: cfg.sstv.gain, pan: cfg.sstv.pan,
