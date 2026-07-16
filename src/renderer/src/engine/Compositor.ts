@@ -465,7 +465,11 @@ export interface Framing {
 }
 const IDENTITY_FRAMING: Framing = { zoom: 1, panX: 0, panY: 0, cropL: 0, cropR: 0, cropT: 0, cropB: 0 };
 
-const LOADS_PER_FRAME = 4;
+// Generous COUNT cap (the time gate below is the real guard) : with a warm
+// program cache a whole Randomize-All burst (~20 loads at <1ms each) lands
+// inside one or two frames, so the crossfade covers the swap in one piece
+// instead of layers popping in one by one.
+const LOADS_PER_FRAME = 12;
 // ms of compile time allowed per frame : one heavy (cache-miss) compile may
 // overshoot it, after which the rest of the queue defers to later frames.
 const LOAD_MS_PER_FRAME = 8;

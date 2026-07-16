@@ -330,16 +330,29 @@ function targetKey(t: ModTarget): string {
   return `fx:${s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`}:${t.instId}:${t.input}`
 }
 
-/** Roll a fresh matrix: 1–2 assignments per enabled mod, capped, deduped. */
+/** Does this target land on layer `li` (its sources or any of its racks)? */
+function targetOnLayer(t: ModTarget, li: number): boolean {
+  if (t.kind === 'source') return t.layer === li
+  if (t.kind !== 'fx') return false
+  const s = t.scope
+  return s.kind !== 'master' && s.kind !== 'background' && s.layer === li
+}
+
+/** Roll a fresh matrix: 1–2 assignments per enabled mod, capped, deduped.
+ *  Then GUARANTEE MOTION : every layer with an active source gets at least one
+ *  assignment — a random draw that leaves a layer untargeted reads as a static,
+ *  lifeless scene (the "Randomize feels dead" report). */
 function randomMatrix(c: CompositionState): ModAssignment[] {
   const targets = collectFloatTargets(c)
   if (targets.length === 0) return []
   const out: ModAssignment[] = []
   const used = new Set<string>()
+  const enabledMods: number[] = []
   c.modulators.forEach((m, mi) => {
     if (!m.enabled) return
     if (mi === WORLD_AUTOMOD_SLOT) return // reserved for the World's audio routing
-    const n = drawCount([0.15, 0.5, 0.35]) // 0..2 assignments per mod
+    enabledMods.push(mi)
+    const n = drawCount([0.1, 0.5, 0.4]) // 0..2 assignments per mod
     for (let i = 0; i < n; i++) {
       if (out.length >= MAX_MOD_ASSIGNMENTS) return
       const t = pick(targets)
@@ -351,6 +364,27 @@ function randomMatrix(c: CompositionState): ModAssignment[] {
       out.push({ id: uid(), mod: mi, target: t, depth: sign * range(0.2, 0.75), mode: 'replace' })
     }
   })
+  // Coverage pass : hand every untargeted active layer one solid assignment.
+  if (enabledMods.length > 0) {
+    c.layers.forEach((l, li) => {
+      if (out.length >= MAX_MOD_ASSIGNMENTS) return
+      if (!l.sourceA.shaderId && !l.sourceB?.shaderId) return
+      if (out.some((a) => targetOnLayer(a.target, li))) return
+      const local = targets.filter((t) => targetOnLayer(t, li))
+      if (local.length === 0) return
+      for (let tries = 0; tries < 4; tries++) {
+        const t = pick(local)
+        const mi = pick(enabledMods)
+        const key = `${mi}|${targetKey(t)}`
+        if (used.has(key)) continue
+        used.add(key)
+        // A guaranteed-motion bond should be FELT : solid depth, mostly positive.
+        const sign = chance(0.15) ? -1 : 1
+        out.push({ id: uid(), mod: mi, target: t, depth: sign * range(0.35, 0.75), mode: 'replace' })
+        break
+      }
+    })
+  }
   return out
 }
 
@@ -579,9 +613,41 @@ function randomizeStructural(
       }
       return layer
     })
-    // Never randomize into a black stage.
-    if (doSources && !anyActive) {
-      layers = layers.map((l, li) => (li === 0 ? { ...l, sourceA: randomSlot(), mute: false } : l))
+    // Never randomize into a black or near-empty stage : guarantee at least
+    // TWO active layers. A solo layer over the untouched background reads as
+    // empty far too often (the "Randomize comes out black" report).
+    if (doSources) {
+      void anyActive
+      const isOn = (l: LayerState): boolean => !!l.sourceA.shaderId || !!l.sourceB?.shaderId
+      let need = 2 - layers.filter(isOn).length
+      if (need > 0) {
+        layers = layers.map((l) => {
+          if (need > 0 && !isOn(l)) {
+            need--
+            return { ...l, sourceA: randomSlot(), sourceAFx: randomRack([0.45, 0.4, 0.15]), mute: false }
+          }
+          return l
+        })
+      }
+    }
+    // The stack's FIRST visible layer sits directly on the background : a dark
+    // blend there (multiply / darken / subtract...) is the classic black-window
+    // draw. When the dice rolled the blends, force the bottom voice to a
+    // stack-safe mode and a solid opacity so the scene always reads.
+    if (doLayer) {
+      const SAFE_BOTTOM = ['normal', 'add', 'screen', 'lighten']
+      const fi = layers.findIndex((l) => (!!l.sourceA.shaderId || !!l.sourceB?.shaderId) && !l.mute)
+      if (fi >= 0) {
+        layers = layers.map((l, i) =>
+          i === fi
+            ? {
+                ...l,
+                blend: SAFE_BOTTOM.includes(l.blend) ? l.blend : (pick(SAFE_BOTTOM) as LayerState['blend']),
+                opacity: Math.max(l.opacity, 0.75)
+              }
+            : l
+        )
+      }
     }
     next = { ...next, layers }
   }
