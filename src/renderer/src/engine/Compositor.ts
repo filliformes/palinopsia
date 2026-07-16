@@ -438,8 +438,11 @@ interface SharedGL {
   // Per-frame shader-compile budget. Randomize can request ~20 new shaders at
   // once; compiling them all in one frame stalls the driver (looks like a
   // freeze), so we cap loads per frame and let the rest come in over the next
-  // few frames. Reset at the top of syncFromState.
-  budget: { n: number };
+  // few frames. Reset at the top of syncFromState. TIME-gated too : on
+  // ANGLE/D3D one compile+link can cost 100ms+, so once `until` passes no
+  // further compiles start this frame (the first one always goes through, so
+  // progress is guaranteed).
+  budget: { n: number; until: number };
   // Dry/wet blend for per-FX opacity : writes into a dedicated ping-pong so it
   // can't collide with the chain buffers. Set by the Compositor once its blend
   // program is ready. Returns the texture holding mix(dry, wet, opacity).
@@ -463,6 +466,13 @@ export interface Framing {
 const IDENTITY_FRAMING: Framing = { zoom: 1, panX: 0, panY: 0, cropL: 0, cropR: 0, cropT: 0, cropB: 0 };
 
 const LOADS_PER_FRAME = 4;
+// ms of compile time allowed per frame : one heavy (cache-miss) compile may
+// overshoot it, after which the rest of the queue defers to later frames.
+const LOAD_MS_PER_FRAME = 8;
+/** True when this frame's compile budget (count OR time) is exhausted. */
+function budgetSpent(b: { n: number; until: number }): boolean {
+  return b.n <= 0 || performance.now() >= b.until;
+}
 
 /** One live FX unit inside a rack. `isf` is null when the shader failed to
  *  compile : the unit still exists (so it isn't reloaded every frame) and
@@ -520,6 +530,12 @@ class FxRack {
       const native = isNativeNode(inst.shaderId);
       if (!unit) {
         if (native) {
+          // A native node compiles ALL its pass programs in its constructor —
+          // as heavy as an ISF load, so it pays from the same per-frame budget
+          // (a Randomize that lands nodes in several racks used to stall a
+          // single frame for seconds).
+          if (budgetSpent(this.shared.budget)) continue;
+          this.shared.budget.n--;
           unit = {
             instId: inst.id, shaderId: inst.shaderId, isf: null, enabled: inst.enabled, opacity: 1,
             node: makeConvNode(this.shared.gl, inst.shaderId)
@@ -529,7 +545,7 @@ class FxRack {
           // A compile costs from the per-frame budget; if spent, defer this
           // unit to a later frame (it just isn't in the chain this frame).
           if (src) {
-            if (this.shared.budget.n <= 0) continue;
+            if (budgetSpent(this.shared.budget)) continue;
             this.shared.budget.n--;
           }
           // Create the unit even if the source is missing or the compile fails
@@ -739,7 +755,7 @@ export class ISFLayer {
     // A real compile costs from the per-frame budget; if it's spent, defer —
     // leave the id unrecorded so syncFromState retries next frame.
     if (id && source) {
-      if (this.shared.budget.n <= 0) return;
+      if (budgetSpent(this.shared.budget)) return;
       this.shared.budget.n--;
     }
     const cur = slot === 'A' ? this.isfA : this.isfB;
@@ -1159,7 +1175,7 @@ export class Compositor {
     }
     this.gl = gl;
     const wrapped = makeRedirectableGL(gl);
-    this.shared = { gl, rgl: wrapped.gl, redirect: wrapped.state, budget: { n: 0 } };
+    this.shared = { gl, rgl: wrapped.gl, redirect: wrapped.state, budget: { n: 0, until: 0 } };
 
     const quad = new Float32Array([-1,-1, 3,-1, -1,3]); // fullscreen triangle
     this.vao = gl.createVertexArray()!; gl.bindVertexArray(this.vao);
@@ -1293,6 +1309,23 @@ export class Compositor {
    *  callback gets the presented RGBA8 frame each frame (GL bottom-up). */
   setOutputCapture(cb: ((w: number, h: number, px: Uint8Array) => void) | null): void {
     this.outputCapture = cb;
+  }
+
+  /** Compile ONE shader (or native node) and immediately discard it : startup
+   *  warm-up. The compiled program lands in Chromium's GPU program cache
+   *  (memory + disk), so every later load of the same source — Randomize's
+   *  bursts above all — is a cache hit instead of a 100ms+ driver compile.
+   *  Call one per frame from the render loop until the registry is warm. */
+  prewarmShader(id: string, source: string | null): void {
+    try {
+      if (isNativeNode(id)) {
+        makeConvNode(this.gl, id)?.dispose();
+      } else if (source) {
+        loadIsf(this.shared.rgl, id, source)?.cleanup();
+      }
+    } catch (e) {
+      console.warn('[prewarm]', id, e);
+    }
   }
 
   // ── Animated sound (spec §4.4): read one horizontal scanline of the PRESENTED
@@ -1508,6 +1541,7 @@ export class Compositor {
   syncFromState(c: CompositionState, sourceById: (id: string) => string | null) {
     this.bpm = c.bpm || 120;
     this.shared.budget.n = LOADS_PER_FRAME; // cap new shader compiles this frame
+    this.shared.budget.until = performance.now() + LOAD_MS_PER_FRAME; // ...and cap the time they take
     for (let i = 0; i < this.layers.length && i < c.layers.length; i++) {
       const l = c.layers[i];
       const L = this.layers[i];
@@ -1572,7 +1606,7 @@ export class Compositor {
     const wantBg = bg && bg.source.kind === 'generator' ? bg.source.shaderId : null;
     if (wantBg !== this.bgShaderId) {
       const src = wantBg ? sourceById(wantBg) : null;
-      if (!wantBg || !src || this.shared.budget.n > 0) {
+      if (!wantBg || !src || !budgetSpent(this.shared.budget)) {
         if (wantBg && src) this.shared.budget.n--;
         this.bgIsf?.cleanup();
         this.bgIsf = wantBg && src ? loadIsf(this.shared.rgl, wantBg, src) : null;

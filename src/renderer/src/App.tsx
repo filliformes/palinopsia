@@ -43,7 +43,7 @@ import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
 import { SessionLoader, GenerateMenu } from './components/TopBarMenus'
 import { initMidi } from './midi'
-import { GENERATORS, shaderSourceById } from './shaders/isf'
+import { FX_SHADERS, GENERATORS, NATIVE_NODES, shaderSourceById } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
 import { MASTER_PRESETS } from './shaders/isf/masterPresets'
 import { PRESETS_BY_ID } from './shaders/isf/presets'
@@ -440,6 +440,16 @@ export default function App(): JSX.Element {
     }
 
     const start = performance.now()
+    // Shader warm-up queue : every registry shader + native node, compiled ONE
+    // per frame in the background (starting a beat after launch) and discarded.
+    // Chromium's GPU program cache (memory + disk) keeps the results, so a
+    // Randomize-All burst of ~20 loads hits the cache instead of stalling the
+    // driver for seconds. Dedup because BG sources overlap the generators.
+    const prewarmQueue = [
+      ...new Set(
+        [...GENERATORS, ...FX_SHADERS, ...NATIVE_NODES].map((s) => s.id)
+      )
+    ]
     const loop = (): void => {
       // The whole body is guarded: a shader that throws at load or draw time
       // must never kill the loop (that's a permanent freeze). Lose one frame,
@@ -633,6 +643,15 @@ export default function App(): JSX.Element {
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to
         //    HIVE receivers (an OBS plugin, …). Frame-drops if backed up.
         if (st.hiveOutActive) hiveEncoder.encode(canvas, now * 1000)
+        // 6. Shader warm-up : one registry compile per frame, in the background,
+        //    after launch settles. First-ever run pays the compiles here (a few
+        //    seconds of background work); afterwards the GPU disk cache makes
+        //    both this warm-up AND every Randomize burst near-instant.
+        if (prewarmQueue.length && now - start > 1200) {
+          const id = prewarmQueue.pop()!
+          comp!.prewarmShader(id, shaderSourceById(id))
+          if (!prewarmQueue.length) console.info('[prewarm] shader registry warm')
+        }
         tickFrame(now) // feed the Output HUD's FPS meter
       } catch (e) {
         console.error('[render loop]', e)

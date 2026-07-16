@@ -38,6 +38,12 @@ app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport,Plat
 // unfocused : Windows native occlusion detection otherwise pauses it (black).
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
+// Grow the GPU program caches (in-memory + on-disk). The renderer pre-warms the
+// whole shader registry at launch so Randomize's compile bursts become cache
+// hits : ~70 warmed programs need more than Chromium's small default before
+// they start evicting each other.
+app.commandLine.appendSwitch('gpu-program-cache-size-kb', '16384')
+app.commandLine.appendSwitch('gpu-disk-cache-size-kb', '65536')
 
 let mainWindow: BrowserWindow | null = null
 
