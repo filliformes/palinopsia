@@ -41,6 +41,7 @@ export type RandomizeScope =
   | 'finishing' // re-roll the three finalizers' params (Vibe/Context/Finalizer)
   | 'modulators'
   | 'meta' // handled in the UI layer (needs the knob smoother), not here
+  | 'sonify' // handled in the UI layer (drives the sound engine), not here
 
 const rnd = (): number => Math.random()
 const range = (lo: number, hi: number): number => lo + rnd() * (hi - lo)

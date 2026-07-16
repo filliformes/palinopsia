@@ -22,6 +22,7 @@ import { depthEngine } from './engine/depthEstimate'
 import { currentFps, tickFrame } from './perf'
 import { videoSeekRequests } from './engine/videoState'
 import { outputRecorder } from './recorder'
+import { randomSonify } from './audio/autoSonify'
 import { sonifyEngine } from './audio/sonify'
 import { tickSequencer } from './engine/sequencer'
 import { Collapsible } from './components/Collapsible'
@@ -139,6 +140,28 @@ function RecPill(): JSX.Element | null {
   )
 }
 
+// The active-World selector for the top bar (the Transport handed it up here).
+function WorldSelect(): JSX.Element {
+  const worlds = useStore((s) => s.worlds)
+  const world = useStore((s) => s.world)
+  const setWorld = useStore((s) => s.setWorld)
+  const active = worlds.find((w) => w.id === world)
+  return (
+    <select
+      className="input select-compact max-w-[130px] text-[11px]"
+      value={world}
+      onChange={(e) => setWorld(e.target.value)}
+      title={active?.blurb}
+    >
+      {worlds.map((w) => (
+        <option key={w.id} value={w.id}>
+          {w.name}
+        </option>
+      ))}
+    </select>
+  )
+}
+
 // Fire the Randomize mode the Transport's chevron currently points at (persisted
 // in localStorage) : the R shortcut mirrors clicking the Randomize button.
 function fireSelectedRandomize(): void {
@@ -146,6 +169,11 @@ function fireSelectedRandomize(): void {
   const scope: RandomizeScope = raw ?? 'all'
   if (scope === 'meta') {
     randomizeMetaKnobs()
+    return
+  }
+  if (scope === 'sonify') {
+    const st = useStore.getState()
+    st.setSonify(randomSonify(st.sonify))
     return
   }
   const i = Number(localStorage.getItem('opsia.randIntensity'))
@@ -861,13 +889,18 @@ export default function App(): JSX.Element {
             </span>
           ) : null
         })()}
-        <button
-          className={`btn text-[12px] ${outputActive || ndiActive || spoutActive || hiveOutActive ? 'text-accent' : ''}`}
-          onClick={() => useStore.getState().setOutputPageOpen(true)}
-          title="Output & projection mapping : fullscreen output, keystone, NDI/Spout/HIVE"
-        >
-          ⛶ Output
-        </button>
+        {/* World / diegesis : moved up from the Transport. The label IS the
+            button (toggles the World editor, also W); the select swaps worlds. */}
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            onClick={() => useStore.getState().setWorldPageOpen(!useStore.getState().worldPageOpen)}
+            className="btn px-2 text-[12px]"
+            title="Open the World editor (W) : coupling character + Context mood + audio routing"
+          >
+            World
+          </button>
+          <WorldSelect />
+        </div>
         <RecPill />
         <UndoButtons />
         <div className="flex items-center gap-0.5" title="UI zoom : Ctrl+= / Ctrl+- / Ctrl+0">

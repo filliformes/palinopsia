@@ -123,3 +123,58 @@ export function suggestSonify(c: CompositionState, cur: SoniConfig): SoniConfig 
     filter: { ...cur.filter, on: chosen.has('filter'), tap: tapFor('filter') }
   }
 }
+
+// ── Randomize Sonification (the Randomizer's 'sonify' scope) ─────────────
+const rnd = (): number => Math.random()
+const rr = (lo: number, hi: number): number => lo + rnd() * (hi - lo)
+const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(rnd() * arr.length)]
+
+/** A fresh random sound patch : 2–3 voices, a new key/scale, tasteful probe +
+ *  character draws. The on-state, output device and master gain are kept —
+ *  the dice re-voices the instrument, it never blasts or silences it. */
+export function randomSonify(cur: SoniConfig): SoniConfig {
+  const voices: Voice[] = ['spectra', 'orbit', 'flow', 'raster', 'sstv', 'filter']
+  for (let i = voices.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1))
+    ;[voices[i], voices[j]] = [voices[j], voices[i]]
+  }
+  const chosen = new Set(voices.slice(0, rnd() < 0.4 ? 3 : 2))
+  const scales = ['minor', 'major', 'pentatonic', 'dorian', 'phrygian', 'lydian', 'wholetone'] as const
+  const q = rnd() < 0.8 // quantize mostly on : musical by default
+  return {
+    ...cur,
+    root: Math.floor(rnd() * 12),
+    scale: pick(scales),
+    taps: [{ kind: 'master', layer: 0 }, cur.taps[1]],
+    spectra: {
+      ...cur.spectra, on: chosen.has('spectra'), tap: 0, quantize: q,
+      sweepOn: rnd() < 0.75, sync: rnd() < 0.3, sweepHz: rr(0.06, 0.8), x: rr(0.2, 0.8),
+      gamma: rr(1.2, 2.6), breath: rnd() < 0.4 ? rr(0.2, 0.7) : 0
+    },
+    orbit: {
+      ...cur.orbit, on: chosen.has('orbit'), tap: 0, quantize: q,
+      note: 33 + Math.floor(rnd() * 28), cx: rr(0.3, 0.7), cy: rr(0.3, 0.7),
+      rx: rr(0.08, 0.35), ry: rr(0.08, 0.35), ratio: pick([1, 2, 1.5, 3]),
+      drive: rr(0.6, 2), smooth: rr(0.2, 0.8)
+    },
+    flow: {
+      ...cur.flow, on: chosen.has('flow'), tap: 0, quantize: q,
+      sense: rr(0.3, 0.7), density: rr(0.3, 0.8), dur: rr(0.05, 0.2), noise: rr(0, 0.4)
+    },
+    raster: {
+      ...cur.raster, on: chosen.has('raster'), tap: 0, quantize: q,
+      note: 33 + Math.floor(rnd() * 24), rx: rr(0.1, 0.5), ry: rr(0.1, 0.5),
+      rw: rr(0.15, 0.45), rh: rr(0.1, 0.35), smooth: rnd() < 0.5 ? 0 : rr(0.3, 1),
+      tone: rr(0.35, 1)
+    },
+    sstv: {
+      ...cur.sstv, on: chosen.has('sstv'), tap: 0,
+      lineHz: rr(4, 28), sync: rnd() < 0.35, dev: rr(0.5, 1.5), syncLev: rr(0.2, 0.8)
+    },
+    filter: {
+      ...cur.filter, on: chosen.has('filter'), tap: 0, quantize: q && rnd() < 0.5,
+      sweepOn: rnd() < 0.6, sweepHz: rr(0.05, 0.6), x: rr(0.2, 0.8),
+      q: rr(0.3, 0.85), noise: rr(0.3, 0.8), gamma: rr(1.2, 2.4)
+    }
+  }
+}

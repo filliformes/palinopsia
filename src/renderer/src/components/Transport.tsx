@@ -3,8 +3,13 @@
 // the button); pressing the button FIRES the selected mode : so you always
 // know which randomize you're about to play. Every draw comes from curated
 // aesthetic ranges (brief) : the taste layer, not raw min/max.
+//
+// Layout : BPM · SPD · MORPH · PROX · Output ── Seq · Sonify · Vary+amt ·
+// Randomize. All command buttons share ONE look (sans, semibold) : no more
+// mono-caps zoo. The World section lives in the TOP bar now.
 
 import { useEffect, useRef, useState } from 'react'
+import { randomSonify } from '../audio/autoSonify'
 import { randomizeMetaKnobs } from '../metaSmooth'
 import type { RandomizeScope } from '../randomize'
 import { useStore } from '../store'
@@ -21,15 +26,19 @@ const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
   { scope: 'master', label: 'Randomize Master FX' },
   { scope: 'finishing', label: 'Randomize Finishing' },
   { scope: 'modulators', label: 'Randomize Modulators' },
-  { scope: 'meta', label: 'Randomize Meta Knobs' }
+  { scope: 'meta', label: 'Randomize Meta Knobs' },
+  { scope: 'sonify', label: 'Randomize Sonification' }
 ]
 
-// Meta is a UI-layer action (drives the knob smoother); everything else is a
-// pure composition transform through the store. `intensity` 1 = full re-roll,
-// <1 = a walk from the current scene (Meta ignores it : it always re-rolls).
+// Meta + Sonify are UI-layer actions (knob smoother / sound engine); everything
+// else is a pure composition transform through the store. `intensity` 1 = full
+// re-roll, <1 = a walk from the current scene (Meta/Sonify always re-roll).
 function fireRandomize(scope: RandomizeScope, intensity: number): void {
   if (scope === 'meta') randomizeMetaKnobs()
-  else useStore.getState().randomize(scope, intensity)
+  else if (scope === 'sonify') {
+    const st = useStore.getState()
+    st.setSonify(randomSonify(st.sonify))
+  } else useStore.getState().randomize(scope, intensity)
 }
 
 function loadScope(): RandomizeScope {
@@ -42,6 +51,11 @@ const loadNum = (key: string, dflt: number): number => {
   return Number.isFinite(v) && v > 0 ? v : dflt
 }
 const pct = (v: number): string => Math.round(v * 100) + '%'
+
+// The ONE command-button look for this bar (sans, semibold : no mono-caps).
+const TBTN = 'shrink-0 rounded border px-2.5 py-1 text-[11.5px] font-semibold transition-colors'
+const TBTN_IDLE = 'border-border bg-panel2 text-muted hover:border-accent/50 hover:text-accent'
+const TBTN_LIT = 'border-accent bg-accent/20 text-accent'
 
 // 1/64×…64× shown as a compact fraction/multiple.
 function fmtSpeed(s: number): string {
@@ -63,20 +77,16 @@ export function Transport(): JSX.Element {
   const setGlobalSpeed = useStore((s) => s.setGlobalSpeed)
   const morphMs = useStore((s) => s.morphMs)
   const setMorphMs = useStore((s) => s.setMorphMs)
-  const worlds = useStore((s) => s.worlds)
-  const world = useStore((s) => s.world)
-  const setWorld = useStore((s) => s.setWorld)
-  const setWorldPageOpen = useStore((s) => s.setWorldPageOpen)
   const setSequencePageOpen = useStore((s) => s.setSequencePageOpen)
   const seqRunning = useStore((s) => s.sequence.running)
   const sonifyOn = useStore((s) => s.sonify.on)
   const sonifyPageOpen = useStore((s) => s.sonifyPageOpen)
   const setSonifyPageOpen = useStore((s) => s.setSonifyPageOpen)
+  const setOutputPageOpen = useStore((s) => s.setOutputPageOpen)
   const proximity = useStore((s) => s.proximity)
   const setProximity = useStore((s) => s.setProximity)
   const proximityAudio = useStore((s) => s.proximityAudio)
   const setProximityAudio = useStore((s) => s.setProximityAudio)
-  const activeWorld = worlds.find((w) => w.id === world)
   const setComposition = useStore.setState
   const applyVariation = useStore((s) => s.applyVariation)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -139,7 +149,7 @@ export function Transport(): JSX.Element {
       <div className="flex shrink-0 items-center gap-1.5">
         <button
           onClick={tapTempo}
-          className="rounded border border-border px-1 py-0.5 font-mono text-[10px] text-muted transition-colors hover:border-accent/50 hover:text-accent active:bg-accent/20"
+          className={`${TBTN} ${TBTN_IDLE} active:bg-accent/20`}
           title="Tap tempo : click on the beat (2+ taps) to set the BPM. A pause of 2s starts a fresh count."
         >
           BPM
@@ -175,7 +185,7 @@ export function Transport(): JSX.Element {
 
       {/* Morph : scene recalls & Randomize crossfade over this time. */}
       <div className="flex min-w-0 items-center gap-1">
-        <span className="font-mono text-[10px] text-muted">MRPH</span>
+        <span className="font-mono text-[10px] text-muted">MORPH</span>
         <input
           type="range"
           min={0}
@@ -190,92 +200,63 @@ export function Transport(): JSX.Element {
         <span className="w-8 shrink-0 font-mono text-[9px] text-muted">{fmtMorph(morphMs)}</span>
       </div>
 
-      {/* World / diegesis : the active "proposed world" biases coupling + Context
-          mood + audio routing. The ⧉ button opens the World editor (also W). */}
-      <div className="flex shrink-0 items-center gap-1">
-        <span className="font-mono text-[10px] text-muted">WRLD</span>
-        <select
-          className="input select-compact text-[11px]"
-          value={world}
-          onChange={(e) => setWorld(e.target.value)}
-          title={activeWorld?.blurb}
-        >
-          {worlds.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.name}
-            </option>
-          ))}
-        </select>
+      {/* Proximity (Field macro) : one knob places the image in a depth zone,
+          far/vista ↔ close/personal, by pushing the Context mood. */}
+      <div className="flex min-w-0 items-center gap-1">
+        <span className="font-mono text-[10px] text-muted">PROX</span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={proximity}
+          onChange={(e) => setProximity(Number(e.target.value))}
+          onDoubleClick={() => setProximity(0.5)}
+          className="w-16 min-w-0 accent-accent"
+          title={`Proximity ${proximity < 0.48 ? 'far' : proximity > 0.52 ? 'close' : 'neutral'} : vista ↔ personal (double-click: neutral)`}
+        />
         <button
-          onClick={() => setWorldPageOpen(true)}
-          className="btn px-1.5 text-[12px]"
-          title="Open the World editor (W)"
+          onClick={() => setProximityAudio(!proximityAudio)}
+          className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
+            proximityAudio ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'
+          }`}
+          title="Audio brightness (centroid) drives proximity"
         >
-          ⧉
+          ◑
         </button>
       </div>
 
-      {/* Seq + Proximity : nudged right of the World block so they read as their
-          own macro group, detached from the World section. */}
-      <div className="ml-1 flex min-w-0 items-center gap-1.5">
+      {/* Output : fullscreen / mapping / record / senders (also O). */}
+      <button
+        onClick={() => setOutputPageOpen(true)}
+        className={`${TBTN} ${TBTN_IDLE}`}
+        title="Output & projection mapping : fullscreen output, keystone, record, NDI/Spout/HIVE (O)"
+      >
+        ⛶ Output
+      </button>
+
+      {/* Command group, pushed right : Seq · Sonify · Vary · Randomize. */}
+      <div className="ml-auto flex min-w-0 items-center gap-1.5">
         <button
           onClick={() => setSequencePageOpen(true)}
-          className={`shrink-0 rounded border px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide transition-colors ${
-            seqRunning
-              ? 'border-accent bg-accent/20 text-accent'
-              : 'border-border bg-panel2 text-muted hover:border-accent/50 hover:text-accent'
-          }`}
+          className={`${TBTN} ${seqRunning ? TBTN_LIT : TBTN_IDLE}`}
           title="Open the Sequence / macro-form auto-pilot (Q)"
         >
           {seqRunning ? '▶ Seq' : 'Seq'}
         </button>
         <button
           onClick={() => setSonifyPageOpen(!sonifyPageOpen)}
-          className={`shrink-0 rounded border px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide transition-colors ${
-            sonifyOn
-              ? 'border-accent bg-accent/20 text-accent'
-              : 'border-border bg-panel2 text-muted hover:border-accent/50 hover:text-accent'
-          }`}
+          className={`${TBTN} ${sonifyOn ? TBTN_LIT : TBTN_IDLE}`}
           title="Open Sonify, the image-to-sound engine (S) : lights while the sound is running"
         >
-          {sonifyOn ? '◉ Sfy' : 'Sfy'}
+          {sonifyOn ? '◉ Sonify' : 'Sonify'}
         </button>
-        {/* Proximity (Field macro) : one knob places the image in a depth zone,
-            far/vista ↔ close/personal, by pushing the Context mood. */}
-        <div className="flex min-w-0 items-center gap-1">
-          <span className="font-mono text-[9px] text-muted">PROX</span>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={proximity}
-            onChange={(e) => setProximity(Number(e.target.value))}
-            onDoubleClick={() => setProximity(0.5)}
-            className="w-16 min-w-0 accent-accent"
-            title={`Proximity ${proximity < 0.48 ? 'far' : proximity > 0.52 ? 'close' : 'neutral'} : vista ↔ personal (double-click: neutral)`}
-          />
-          <button
-            onClick={() => setProximityAudio(!proximityAudio)}
-            className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
-              proximityAudio ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'
-            }`}
-            title="Audio brightness (centroid) drives proximity"
-          >
-            ◑
-          </button>
-        </div>
-        {/* The Field + Temperament macros moved to the Feel tab (right column, G). */}
-      </div>
 
-      {/* Variation : a baseline-anchored variant of the whole scene at `varAmt`
-          (structure fixed, continuous values nudged). `ml-auto` pushes this +
-          amt + Randomize to the right edge when there's room, and keeps them
-          together (never off-screen) when the bar wraps on a narrow window. */}
-      <div className="ml-auto flex min-w-0 items-center gap-1">
+        {/* Variation : a baseline-anchored variant of the whole scene at `varAmt`
+            (structure fixed, continuous values nudged). */}
         <button
           onClick={() => applyVariation(varAmt)}
-          className="rounded border border-accent2/60 bg-accent2/10 px-2 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent2 transition-colors hover:bg-accent2/20"
+          className={`${TBTN} border-accent2/60 bg-accent2/10 text-accent2 hover:bg-accent2/20`}
           title={`Variation ${pct(varAmt)} : a fresh variant of the current scene (same structure, values nudged). First press sets the baseline; each press is a new sibling at this spread.`}
         >
           Vary
@@ -291,11 +272,9 @@ export function Transport(): JSX.Element {
           title={`Variation amount ${pct(varAmt)}`}
         />
         <span className="w-7 shrink-0 font-mono text-[9px] text-muted">{pct(varAmt)}</span>
-      </div>
 
-      {/* Randomize: chevron selects the mode, button fires it; the amount slider
-          scales it from a gentle walk (low %) to a full re-roll (100%). */}
-      <div className="flex min-w-0 items-center gap-1">
+        {/* Randomize: chevron selects the mode, button fires it; the amount
+            slider scales it from a gentle walk (low %) to a full re-roll. */}
         <span
           className="shrink-0 font-mono text-[9px] uppercase text-muted"
           title="Randomize intensity : low = a gentle walk from the current scene, 100% = a full structural re-roll"
@@ -313,39 +292,39 @@ export function Transport(): JSX.Element {
           title={`Randomize intensity ${pct(intensity)}`}
         />
         <span className="w-7 shrink-0 font-mono text-[9px] text-muted">{pct(intensity)}</span>
-      </div>
 
-      <div ref={menuRef} className="relative flex shrink-0">
-        <button
-          onClick={() => fireRandomize(scope, intensity)}
-          className="rounded-l border border-accent/60 bg-accent/10 px-2 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide text-accent transition-colors hover:bg-accent/20"
-          title={`Fire ${current.label} : every draw from curated aesthetic ranges`}
-        >
-          {current.label}
-        </button>
-        <button
-          onClick={() => setMenuOpen((o) => !o)}
-          className="rounded-r border border-l-0 border-accent/60 bg-accent/10 px-1.5 font-mono text-[10px] text-accent transition-colors hover:bg-accent/20"
-          title="Choose which randomize the button fires"
-        >
-          ▾
-        </button>
-        {menuOpen && (
-          <div className="absolute bottom-full right-0 z-50 mb-1 flex min-w-[210px] flex-col rounded border border-border bg-panel2 py-1 shadow-lg">
-            {SCOPES.map((s) => (
-              <button
-                key={s.scope}
-                onClick={() => selectScope(s.scope)}
-                className={`flex items-center gap-2 px-3 py-1 text-left text-[11px] transition-colors hover:bg-accent/15 hover:text-accent ${
-                  s.scope === scope ? 'text-accent' : ''
-                }`}
-              >
-                <span className="w-3 font-mono text-[10px]">{s.scope === scope ? '✓' : ''}</span>
-                {s.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div ref={menuRef} className="relative flex shrink-0">
+          <button
+            onClick={() => fireRandomize(scope, intensity)}
+            className={`${TBTN} rounded-r-none border-accent/60 bg-accent/10 text-accent hover:bg-accent/20`}
+            title={`Fire ${current.label} : every draw from curated aesthetic ranges`}
+          >
+            {current.label}
+          </button>
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            className="rounded-r border border-l-0 border-accent/60 bg-accent/10 px-1.5 text-[10px] text-accent transition-colors hover:bg-accent/20"
+            title="Choose which randomize the button fires"
+          >
+            ▾
+          </button>
+          {menuOpen && (
+            <div className="absolute bottom-full right-0 z-50 mb-1 flex min-w-[210px] flex-col rounded border border-border bg-panel2 py-1 shadow-lg">
+              {SCOPES.map((s) => (
+                <button
+                  key={s.scope}
+                  onClick={() => selectScope(s.scope)}
+                  className={`flex items-center gap-2 px-3 py-1 text-left text-[11px] transition-colors hover:bg-accent/15 hover:text-accent ${
+                    s.scope === scope ? 'text-accent' : ''
+                  }`}
+                >
+                  <span className="w-3 font-mono text-[10px]">{s.scope === scope ? '✓' : ''}</span>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
