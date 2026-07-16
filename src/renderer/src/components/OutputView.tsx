@@ -12,6 +12,7 @@ import type { OutputFrame } from '@shared/types'
 import { Compositor } from '../engine/Compositor'
 import { applyModulation } from '../engine/modulation'
 import { applyFieldMacros } from '../engine/field'
+import { clearFrameVals } from '../engine/frameVals'
 import { shaderSourceById } from '../shaders/isf'
 import { inputsForShader } from '../shaders/isf/inputs'
 
@@ -35,6 +36,9 @@ export function OutputView(): JSX.Element {
         comp!.setStrobeSafe(f.strobeSafe ?? 0)
         comp!.syncFromState(f.c, shaderSourceById)
         applyModulation(comp!, f.c, f.modValues, inputsForShader, f.modBypass)
+        // Fresh per-frame write bus (else applyFieldMacros below would stack on
+        // its OWN last-frame writes and run away).
+        clearFrameVals()
         // Mirror audio-coupled A/B mixes (computed with the audio bus in the
         // control window, which the output window doesn't run).
         if (f.coupledMix) {

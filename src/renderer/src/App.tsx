@@ -11,6 +11,7 @@ import { hiveEncoder } from './hiveEncoder'
 import { audioBus } from './engine/audioIn'
 import { applyCoupling } from './engine/coupling'
 import { applyProximity, applyFieldMacros } from './engine/field'
+import { clearFrameVals } from './engine/frameVals'
 import { applyTonicity, applyDrift, applyFlowInterrupt, shutterHold, shutterClear } from './engine/temperament'
 import { applyFlicker } from './engine/flicker'
 import { applyFrameWeave } from './engine/frameWeave'
@@ -468,6 +469,9 @@ export default function App(): JSX.Element {
         //     overrides the base mix); returns the coupled mixes for the output.
         const coupledMix = applyCoupling(comp!, c, now)
         // 2c. Proximity (Field macro): push the Context mood into a depth zone.
+        //     From here on the passes share the per-frame write bus (frameVals) so
+        //     co-engaged macros stack on the same param instead of clobbering.
+        clearFrameVals()
         const contextProx = applyProximity(comp!, c, st.proximity, st.proximityAudio ? 0.6 : 0)
         // 2d. Macro-form sequencer: auto-advance scenes + Breathe/Arc overlay.
         //     The overlay writes master-FX values, layer mixes and freeze straight

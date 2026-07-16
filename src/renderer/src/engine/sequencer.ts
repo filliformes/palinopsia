@@ -9,6 +9,7 @@
 import type { CompositionState, SceneEntry, SequenceState } from '@shared/types'
 import { useStore } from '../store'
 import { runSilently } from '../undo'
+import { frameVals } from './frameVals'
 import { liveModValues, modEngine } from './modulation'
 import { audioBus } from './audioIn'
 
@@ -175,9 +176,14 @@ function writeContextOverlay(
   }
   // s: 0 full/present → 1 void/distant. Map to Context mood (safe bands).
   const scope = { kind: 'master' as const }
-  const set = (name: string, v: number): void => comp.setFxInput(scope, ctx.id, name, clamp01(v))
-  // Blend from the live/base value so we don't hard-stomp a modulated Context.
+  const set = (name: string, v: number): void => {
+    const cv = clamp01(v)
+    comp.setFxInput(scope, ctx.id, name, cv)
+    frameVals.set(`fx:master:${ctx.id}:${name}`, cv) // later passes stack, not clobber
+  }
+  // Blend from this frame's earlier writes / the live value so we don't hard-stomp.
   const cur = (name: string, d: number): number =>
+    frameVals.get(`fx:master:${ctx.id}:${name}`) ??
     liveModValues.get(`fx:master:${ctx.id}:${name}`) ?? num(ctx.inputs[name], d)
   if (breatheOn) {
     set('haze', 0.02 + s * 0.3) // void → hazier
@@ -259,8 +265,12 @@ function writeBurial(comp: SeqComp, c: CompositionState, level: number, depth: n
   const fin = c.master.find((f) => f.shaderId === 'fx-finalizer')
   if (!fin) return
   const cur = (name: string, d: number): number =>
+    frameVals.get(`fx:master:${fin.id}:${name}`) ??
     (liveModValues.get(`fx:master:${fin.id}:${name}`) as number | undefined) ?? num(fin.inputs[name], d)
-  const set = (name: string, v: number): void => comp.setFxInput(MASTER, fin.id, name, v)
+  const set = (name: string, v: number): void => {
+    comp.setFxInput(MASTER, fin.id, name, v)
+    frameVals.set(`fx:master:${fin.id}:${name}`, v)
+  }
   const e = clamp01(level) * clamp01(depth)
   set('parasites', Math.min(1, cur('parasites', 0.1) + e * 0.5)) // analog breakup
   set('grain', Math.min(1, cur('grain', 0) + e * 0.4))
@@ -276,8 +286,13 @@ function writeLongTake(comp: SeqComp, c: CompositionState, level: number, depth:
   const ctx = c.master.find((f) => f.shaderId === 'fx-context')
   if (!ctx) return
   const cur = (name: string, d: number): number =>
+    frameVals.get(`fx:master:${ctx.id}:${name}`) ??
     (liveModValues.get(`fx:master:${ctx.id}:${name}`) as number | undefined) ?? num(ctx.inputs[name], d)
-  const set = (name: string, v: number): void => comp.setFxInput(MASTER, ctx.id, name, clamp01(v))
+  const set = (name: string, v: number): void => {
+    const cv = clamp01(v)
+    comp.setFxInput(MASTER, ctx.id, name, cv)
+    frameVals.set(`fx:master:${ctx.id}:${name}`, cv)
+  }
   const e = clamp01(level) * clamp01(depth)
   set('haze', cur('haze', 0.02) + e * 0.5) // the veil thickens
   set('depth', cur('depth', 0.15) + e * 0.25) // slight atmospheric recession

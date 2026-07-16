@@ -10,9 +10,11 @@
 
 import type { CompositionState } from '@shared/types'
 import { audioBus } from './audioIn'
+import { frameVals } from './frameVals'
 import { liveModValues } from './modulation'
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
+const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v)
 const num = (v: unknown, d: number): number => (typeof v === 'number' ? v : d)
 
 export interface ContextProx {
@@ -49,8 +51,16 @@ export function applyFieldMacros(
   const ctx = c.master.find((f) => f.shaderId === 'fx-context')
   const vibe = c.master.find((f) => f.shaderId === 'fx-vibe')
   const fin = c.master.find((f) => f.shaderId === 'fx-finalizer')
+  // Read the per-frame bus first (an earlier pass's write), then the modulated
+  // value, then the composition base — so co-engaged macros STACK, not clobber.
   const liveVal = (inst: { id: string; inputs: Record<string, unknown> }, name: string, d: number): number =>
-    (liveModValues.get(`fx:master:${inst.id}:${name}`) as number | undefined) ?? num(inst.inputs[name], d)
+    frameVals.get(`fx:master:${inst.id}:${name}`) ??
+    (liveModValues.get(`fx:master:${inst.id}:${name}`) as number | undefined) ??
+    num(inst.inputs[name], d)
+  const setF = (inst: { id: string }, name: string, v: number): void => {
+    comp.setFxInput(MASTER, inst.id, name, v)
+    frameVals.set(`fx:master:${inst.id}:${name}`, v)
+  }
 
   // ── Density → layer-opacity spread (unique lever; nothing else drives it). ──
   if (Math.abs(density - 0.5) > 0.02) {
@@ -69,15 +79,17 @@ export function applyFieldMacros(
   // ── Gesture⇄Texture → Context trails (texture) vs Finalizer sharpen (gesture). ──
   if (Math.abs(gestureTexture - 0.5) > 0.02) {
     const t = (gestureTexture - 0.5) * 2 // -1 gesture .. +1 texture
-    if (ctx) comp.setFxInput(MASTER, ctx.id, 'trails', clamp01(liveVal(ctx, 'trails', 0.2) + t * 0.4))
-    if (fin) comp.setFxInput(MASTER, fin.id, 'sharpen', clamp01(liveVal(fin, 'sharpen', 0) - t * 0.8))
+    if (ctx) setF(ctx, 'trails', clamp01(liveVal(ctx, 'trails', 0.2) + t * 0.4))
+    // Finalizer sharpen spans 0..2 : clamp to the DECLARED range (clamp01 used to
+    // crush any base above 1 down to 1 the moment the macro engaged).
+    if (fin) setF(fin, 'sharpen', clamp(liveVal(fin, 'sharpen', 0) - t * 0.8, 0, 2))
   }
 
   // ── Coalesce → Context blur (mass) vs Vibe dither (grain). ──
   if (Math.abs(coalesce - 0.5) > 0.02) {
     const t = (coalesce - 0.5) * 2 // -1 grain .. +1 mass
-    if (ctx) comp.setFxInput(MASTER, ctx.id, 'blur', clamp01(liveVal(ctx, 'blur', 0.08) + t * 0.18))
-    if (vibe) comp.setFxInput(MASTER, vibe.id, 'dither', clamp01(liveVal(vibe, 'dither', 0) - t * 0.5))
+    if (ctx) setF(ctx, 'blur', clamp01(liveVal(ctx, 'blur', 0.08) + t * 0.18))
+    if (vibe) setF(vibe, 'dither', clamp01(liveVal(vibe, 'dither', 0) - t * 0.5))
   }
 }
 
@@ -107,7 +119,9 @@ export function applyProximity(
   // (liveModValues, written by applyModulation) so Proximity coexists with a
   // modulator/World-autoMod on the same Context param; else the composition base.
   const cur = (name: string, dflt: number): number =>
-    liveModValues.get(`fx:master:${ctx.id}:${name}`) ?? num(ctx.inputs[name], dflt)
+    frameVals.get(`fx:master:${ctx.id}:${name}`) ??
+    liveModValues.get(`fx:master:${ctx.id}:${name}`) ??
+    num(ctx.inputs[name], dflt)
   const out: ContextProx = {
     haze: clamp01(cur('haze', 0.15) - t * 0.22), // far → more haze
     blur: clamp01(cur('blur', 0.08) - t * 0.12), // far → softer
@@ -115,9 +129,9 @@ export function applyProximity(
     bloom: clamp01(cur('bloom', 0.3) + t * 0.2) // close → more bloom/light
   }
   const scope = { kind: 'master' as const }
-  comp.setFxInput(scope, ctx.id, 'haze', out.haze)
-  comp.setFxInput(scope, ctx.id, 'blur', out.blur)
-  comp.setFxInput(scope, ctx.id, 'depth', out.depth)
-  comp.setFxInput(scope, ctx.id, 'bloom', out.bloom)
+  for (const [name, v] of Object.entries(out)) {
+    comp.setFxInput(scope, ctx.id, name, v)
+    frameVals.set(`fx:master:${ctx.id}:${name}`, v)
+  }
   return out
 }

@@ -13,6 +13,7 @@
 
 import type { CompositionState } from '@shared/types'
 import { audioBus } from './audioIn'
+import { frameVals } from './frameVals'
 import { liveModValues } from './modulation'
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
@@ -46,11 +47,14 @@ export function applyTonicity(comp: MacroComp, c: CompositionState, amount: numb
   const colourness = clamp01(1 - flux * 1.2) // noisy (high flux) → 0 → grey
   const satFactor = 0.15 + colourness * 1.2 // noisy ≈ ×0.15, tonal ≈ ×1.35
   const liveVal = (name: string, d: number): number =>
-    (liveModValues.get(`fx:master:${vibe.id}:${name}`) as number | undefined) ?? num(vibe.inputs[name], d)
+    frameVals.get(`fx:master:${vibe.id}:${name}`) ??
+    (liveModValues.get(`fx:master:${vibe.id}:${name}`) as number | undefined) ??
+    num(vibe.inputs[name], d)
 
   const ov: MasterOverrides = {}
   const set = (id: string, name: string, v: number): void => {
     comp.setFxInput(MASTER, id, name, v)
+    frameVals.set(`fx:master:${id}:${name}`, v)
     ;(ov[id] ??= {})[name] = v
   }
   const baseSat = liveVal('saturation', 1) // Vibe saturation range 0..2
@@ -110,14 +114,17 @@ export function applyDrift(comp: MacroComp, c: CompositionState, drift: number, 
   const ov: MasterOverrides = {}
   const set = (id: string, name: string, v: number): void => {
     comp.setFxInput(MASTER, id, name, v)
+    frameVals.set(`fx:master:${id}:${name}`, v)
     ;(ov[id] ??= {})[name] = v
   }
   const fin = c.master.find((f) => f.shaderId === 'fx-finalizer')
   const vibe = c.master.find((f) => f.shaderId === 'fx-vibe')
   const t = nowMs / 1000
   const finLive = (name: string, d: number): number =>
+    (fin ? frameVals.get(`fx:master:${fin.id}:${name}`) : undefined) ??
     (fin && (liveModValues.get(`fx:master:${fin.id}:${name}`) as number | undefined)) ?? (fin ? num(fin.inputs[name], d) : d)
   const vibeLive = (name: string, d: number): number =>
+    (vibe ? frameVals.get(`fx:master:${vibe.id}:${name}`) : undefined) ??
     (vibe && (liveModValues.get(`fx:master:${vibe.id}:${name}`) as number | undefined)) ?? (vibe ? num(vibe.inputs[name], d) : d)
 
   // Slow incommensurate wander (three primes so it never obviously repeats).
@@ -141,7 +148,9 @@ export function applyDrift(comp: MacroComp, c: CompositionState, drift: number, 
     if (acc !== 0) set(fin.id, 'parasites', clamp01(finLive('parasites', 0.1) + Math.abs(acc) * drift))
   }
   if (vibe) {
-    set(vibe.id, 'contrast', clamp01(vibeLive('contrast', 0.5) + w3 * 0.05 * drift))
+    // Vibe contrast spans 0.25..2.5 (neutral 1) : clamp01 used to CLIP the upward
+    // wander at 1.0 — exactly the neutral — so Drift's contrast only ever dipped.
+    set(vibe.id, 'contrast', clamp(vibeLive('contrast', 1) + w3 * 0.05 * drift, 0.25, 2.5))
   }
   return ov
 }
@@ -162,10 +171,12 @@ export function applyFlowInterrupt(comp: MacroComp, c: CompositionState, flow: n
   if (Math.abs(flow - 0.5) < 0.02) return { overrides: null, freeze: false }
   const fin = c.master.find((f) => f.shaderId === 'fx-finalizer')
   const finLive = (name: string, d: number): number =>
+    (fin ? frameVals.get(`fx:master:${fin.id}:${name}`) : undefined) ??
     (fin && (liveModValues.get(`fx:master:${fin.id}:${name}`) as number | undefined)) ?? (fin ? num(fin.inputs[name], d) : d)
   const ov: MasterOverrides = {}
   const set = (id: string, name: string, v: number): void => {
     comp.setFxInput(MASTER, id, name, v)
+    frameVals.set(`fx:master:${id}:${name}`, v)
     ;(ov[id] ??= {})[name] = v
   }
   let freeze = false
@@ -184,6 +195,7 @@ export function applyFlowInterrupt(comp: MacroComp, c: CompositionState, flow: n
     const ctx = c.master.find((f) => f.shaderId === 'fx-context')
     if (ctx) {
       const ctxLive = (name: string, d: number): number =>
+        frameVals.get(`fx:master:${ctx.id}:${name}`) ??
         (liveModValues.get(`fx:master:${ctx.id}:${name}`) as number | undefined) ?? num(ctx.inputs[name], d)
       set(ctx.id, 'trails', clamp01(ctxLive('trails', 0) + a * 0.5))
       set(ctx.id, 'blur', clamp01(ctxLive('blur', 0) + a * 0.12))
