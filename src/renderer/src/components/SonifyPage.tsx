@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
 import type { ModTarget, SonifyModParam } from '@shared/types'
+import { suggestSonify } from '../audio/autoSonify'
 import { SONI_SCALES, sonifyEngine, type SoniConfig } from '../audio/sonify'
 import { modTargetKey, useStore } from '../store'
 
@@ -375,6 +376,16 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-border px-3 py-2">
         <span className="text-[13px] font-semibold">Sonify</span>
+        <button
+          onClick={() => {
+            const comp = useStore.getState().composition
+            setSonify(suggestSonify(comp, cfg))
+          }}
+          className="rounded px-2 py-0.5 font-mono text-[11px] text-muted ring-1 ring-border transition-colors hover:text-accent hover:ring-accent/60"
+          title="Auto-voice : read the session's registers and pick the fitting voices — glitch → Raster, motion → Flow, feedback → Orbit, line-work → Spectra, scan → Transmission, atmosphere → Filter. The strongest voice taps the layer that earned it. Your key, gains and probes are kept."
+        >
+          ✨ auto
+        </button>
         <button
           onClick={() => patch({ on: !cfg.on })}
           className={`rounded px-2 py-0.5 font-mono text-[11px] transition-colors ${

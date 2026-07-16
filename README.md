@@ -211,8 +211,9 @@ Left → right:
   **SPD** global speed (1/64×–64×, log; double-click → 1×) · **MRPH** morph time
   (0–30 s — scene recalls and Randomize crossfade over this).
 - **WRLD** World selector + `⧉` World editor · **Seq** (opens the sequencer;
-  lights when running) · **PROX** proximity (far ↔ close depth zone) + `◑`
-  audio-brightness follow.
+  lights when running) · **Sfy** (opens Sonify; lights while the sound engine
+  runs) · **PROX** proximity (far ↔ close depth zone) + `◑` audio-brightness
+  follow.
 - **Vary** (a baseline-anchored variant — structure fixed, values nudged) + amount.
 - **amt** Randomize intensity (gentle walk ↔ full re-roll) · **Randomize**
   split-button (main fires the selected scope; `▾` picks the scope — see
@@ -343,7 +344,9 @@ A full-page takeover (the engine keeps rendering underneath):
   output window runs its own compositor fed per-frame state — pixel-perfect, no
   transcode.
 - **Record** — format select (MP4/H.264 default; ProRes / FFV1 / uncompressed via
-  ffmpeg) + record / stop + screenshot → `Recorded/`.
+  ffmpeg) + record / stop + screenshot → `Recorded/`. **The take keeps rolling
+  when you leave the page** — a pulsing REC pill in the top bar shows the
+  elapsed time and stops/saves it, so you can tweak parameters live mid-take.
 - **Send** — NDI / Spout toggles (optional native senders; the frame readback is
   asynchronous — attaching a sink costs ~nothing); **HIVE** HEVC-over-TCP network
   output + port.
@@ -380,6 +383,13 @@ with a per-voice **♪ snap** — sonified data lands on real notes, or runs fre
 **Master** : gain + an always-on peak limiter (the audio Flash-safety) + live
 meter, and an **output-device picker**. While the engine runs, **recordings mix
 the sound in** — exports become true audiovisual pieces.
+
+**✨ Auto-voice** : one button reads the session's actual vocabulary — which
+generators, nodes and FX are live on which layers — and picks the fitting
+voices by register : glitch/datamosh → Raster, motion/video → Flow, feedback →
+Orbit, line-work → Spectra, scan registers → Transmission, atmosphere → Filter.
+The strongest voice taps the layer that earned it; your key, gains and probes
+are kept. Deterministic — the same session always suggests the same setup.
 
 **Fully integrated** : every probe and pitch (scan columns, orbit centre/radius/
 pitch, the raster rect and its pitch) is a **modulation target** — bind M1–M8 or

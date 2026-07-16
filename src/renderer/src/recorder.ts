@@ -9,6 +9,7 @@
 // MediaRecorder's ~2.5 Mbps default; we now set a resolution-scaled bitrate.
 
 import { sonifyEngine } from './audio/sonify'
+import { useStore } from './store'
 
 // Intermediate codec preference: H.264 first (hardware-encoded on Windows/macOS
 // Chromium → smooth + cheap), then VP9, then VP8. Each maps to what we tell main.
@@ -101,6 +102,7 @@ export class OutputRecorder {
     }
     // Small timeslice → frequent flushes → lower memory + tighter stop latency.
     this.rec.start(500)
+    useStore.getState().setRecording(true)
     return true
   }
 
@@ -118,9 +120,15 @@ export class OutputRecorder {
     this.rec = null
     this.stream = null
     await this.queue // every chunk reached main before we finalize
+    useStore.getState().setRecording(false)
     return window.api.recordingStop(this.formatId)
   }
 }
+
+// The ONE recorder : recording is a global take, not an Output-page visit.
+// Starting happens from the Output page; the take keeps rolling when you
+// return to the main view (a REC pill in the top bar shows it + stops it).
+export const outputRecorder = new OutputRecorder()
 
 /** One-shot PNG of the current output frame at its native resolution. */
 export async function captureScreenshot(canvas: HTMLCanvasElement): Promise<string | null> {

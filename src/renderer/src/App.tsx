@@ -21,6 +21,7 @@ import { visionBus } from './engine/visionIn'
 import { depthEngine } from './engine/depthEstimate'
 import { currentFps, tickFrame } from './perf'
 import { videoSeekRequests } from './engine/videoState'
+import { outputRecorder } from './recorder'
 import { sonifyEngine } from './audio/sonify'
 import { tickSequencer } from './engine/sequencer'
 import { Collapsible } from './components/Collapsible'
@@ -110,6 +111,33 @@ import { initUndo, redo, undo, useUndoState } from './undo'
 import { THEME_ORDER, useStore, type ThemeName } from './store'
 import { metaGlides, randomizeMetaKnobs } from './metaSmooth'
 import type { RandomizeScope } from './randomize'
+
+// The global REC pill : visible in the top bar while a take is rolling, so you
+// can leave the Output page and tweak live. Click ■ to stop + save the take.
+function RecPill(): JSX.Element | null {
+  const recording = useStore((s) => s.recording)
+  const since = useStore((s) => s.recordingSince)
+  const [, tick] = useState(0)
+  useEffect(() => {
+    if (!recording) return
+    const id = window.setInterval(() => tick((t) => t + 1), 500)
+    return () => window.clearInterval(id)
+  }, [recording])
+  if (!recording) return null
+  const sec = Math.max(0, (performance.now() - since) / 1000)
+  const mm = Math.floor(sec / 60)
+  const ss = String(Math.floor(sec % 60)).padStart(2, '0')
+  return (
+    <button
+      onClick={() => void outputRecorder.stop()}
+      className="flex shrink-0 items-center gap-1.5 rounded border border-red-500/60 bg-red-500/15 px-2 py-1 font-mono text-[11px] text-red-400 transition-colors hover:bg-red-500/30"
+      title="Recording the output (keeps rolling while you tweak) : click to stop + save"
+    >
+      <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+      REC {mm}:{ss} ■
+    </button>
+  )
+}
 
 // Fire the Randomize mode the Transport's chevron currently points at (persisted
 // in localStorage) : the R shortcut mirrors clicking the Randomize button.
@@ -840,6 +868,7 @@ export default function App(): JSX.Element {
         >
           ⛶ Output
         </button>
+        <RecPill />
         <UndoButtons />
         <div className="flex items-center gap-0.5" title="UI zoom : Ctrl+= / Ctrl+- / Ctrl+0">
           <button className="btn px-1.5 text-[12px]" onClick={() => setUiZoom(uiZoom - 0.05)}>

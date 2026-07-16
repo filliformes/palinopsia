@@ -15,7 +15,7 @@ import { useShallow } from 'zustand/react/shallow'
 import type { DisplayInfo, PerfStats } from '@shared/types'
 import { useStore } from '../store'
 import { currentFps } from '../perf'
-import { captureScreenshot, OutputRecorder, recordingFormats } from '../recorder'
+import { captureScreenshot, outputRecorder, recordingFormats } from '../recorder'
 
 const CORNER_LABELS = ['TL', 'TR', 'BR', 'BL']
 
@@ -68,23 +68,21 @@ export function OutputPage({
       setFormatId((cur) => cur || fs.find((f) => f.id === 'mp4-h264')?.id || fs[0]?.id || '')
     })
   }, [])
-  // Lazy-init : the useRef initializer runs every render, so `new OutputRecorder()`
-  // as a bare argument would construct (and discard) a throwaway each time.
-  const recorderRef = useRef<OutputRecorder | null>(null)
-  if (!recorderRef.current) recorderRef.current = new OutputRecorder()
-  const [recording, setRecording] = useState(false)
+  // The GLOBAL recorder : the take survives leaving this page (tweak live in
+  // the main view; the top-bar REC pill shows and stops it).
+  const recording = useStore((s) => s.recording)
+  const recordingSince = useStore((s) => s.recordingSince)
   const [recElapsed, setRecElapsed] = useState(0) // seconds
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
   const savedTimer = useRef<number | null>(null)
 
-  // Tick the recording timer while active.
+  // Tick the recording timer while active (elapsed from the global start).
   useEffect(() => {
     if (!recording) return
-    const start = performance.now()
-    setRecElapsed(0)
-    const id = window.setInterval(() => setRecElapsed((performance.now() - start) / 1000), 250)
+    setRecElapsed((performance.now() - recordingSince) / 1000)
+    const id = window.setInterval(() => setRecElapsed((performance.now() - recordingSince) / 1000), 250)
     return () => window.clearInterval(id)
-  }, [recording])
+  }, [recording, recordingSince])
 
   // Clear a pending "saved" flash on unmount so it can't fire on a dead component.
   useEffect(() => () => { if (savedTimer.current) window.clearTimeout(savedTimer.current) }, [])
@@ -98,17 +96,14 @@ export function OutputPage({
   }
 
   const toggleRecord = async (): Promise<void> => {
-    const rec = recorderRef.current!
-    if (rec.active) {
-      const path = await rec.stop()
-      setRecording(false)
+    if (outputRecorder.active) {
+      const path = await outputRecorder.stop()
       flashSaved(path, 'saved')
     } else {
       const canvas = canvasRef.current
       if (!canvas || !formatId) return
-      const ok = await rec.start(canvas, formatId)
-      if (ok) setRecording(true)
-      else flashSaved('failed', 'recording could not start')
+      const ok = await outputRecorder.start(canvas, formatId)
+      if (!ok) flashSaved('failed', 'recording could not start')
     }
   }
 
@@ -117,14 +112,6 @@ export function OutputPage({
     if (!canvas) return
     flashSaved(await captureScreenshot(canvas), 'screenshot')
   }
-
-  // Stop a recording cleanly if the page unmounts mid-take.
-  useEffect(() => {
-    const rec = recorderRef.current!
-    return () => {
-      if (rec.active) void rec.stop()
-    }
-  }, [])
 
   // Live mirror of the composite into the editor via canvas.captureStream.
   useEffect(() => {

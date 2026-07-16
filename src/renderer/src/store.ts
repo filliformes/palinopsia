@@ -844,6 +844,10 @@ interface StoreState {
   // every write : one write path, same as everything else.
   sonifyPageOpen: boolean
   setSonifyPageOpen: (on: boolean) => void
+  // Live recording state (set by the global recorder) : drives the REC pill.
+  recording: boolean
+  recordingSince: number
+  setRecording: (on: boolean) => void
   sonify: SoniConfig
   setSonify: (next: SoniConfig) => void
   // Depth engine mode (2.5D) : off · synthetic test bowl · AI monocular estimate.
@@ -1993,6 +1997,9 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   sonifyPageOpen: false,
   setSonifyPageOpen: (on) => set({ sonifyPageOpen: on }),
+  recording: false,
+  recordingSince: 0,
+  setRecording: (on) => set({ recording: on, recordingSince: on ? performance.now() : 0 }),
   sonify: (() => {
     try {
       const raw = localStorage.getItem('opsia.sonify')

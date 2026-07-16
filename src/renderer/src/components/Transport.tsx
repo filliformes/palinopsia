@@ -69,6 +69,9 @@ export function Transport(): JSX.Element {
   const setWorldPageOpen = useStore((s) => s.setWorldPageOpen)
   const setSequencePageOpen = useStore((s) => s.setSequencePageOpen)
   const seqRunning = useStore((s) => s.sequence.running)
+  const sonifyOn = useStore((s) => s.sonify.on)
+  const sonifyPageOpen = useStore((s) => s.sonifyPageOpen)
+  const setSonifyPageOpen = useStore((s) => s.setSonifyPageOpen)
   const proximity = useStore((s) => s.proximity)
   const setProximity = useStore((s) => s.setProximity)
   const proximityAudio = useStore((s) => s.proximityAudio)
@@ -225,6 +228,17 @@ export function Transport(): JSX.Element {
           title="Open the Sequence / macro-form auto-pilot (Q)"
         >
           {seqRunning ? '▶ Seq' : 'Seq'}
+        </button>
+        <button
+          onClick={() => setSonifyPageOpen(!sonifyPageOpen)}
+          className={`shrink-0 rounded border px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+            sonifyOn
+              ? 'border-accent bg-accent/20 text-accent'
+              : 'border-border bg-panel2 text-muted hover:border-accent/50 hover:text-accent'
+          }`}
+          title="Open Sonify, the image-to-sound engine (S) : lights while the sound is running"
+        >
+          {sonifyOn ? '◉ Sfy' : 'Sfy'}
         </button>
         {/* Proximity (Field macro) : one knob places the image in a depth zone,
             far/vista ↔ close/personal, by pushing the Context mood. */}
