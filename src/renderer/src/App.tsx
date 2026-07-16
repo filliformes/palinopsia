@@ -461,9 +461,12 @@ export default function App(): JSX.Element {
     // Chromium's GPU program cache (memory + disk) keeps the results, so a
     // Randomize-All burst of ~20 loads hits the cache instead of stalling the
     // driver for seconds. Dedup because BG sources overlap the generators.
+    // Native GENERATORS (Text / Parametric) are header-only ISF — no GLSL body
+    // to compile — so warming them just spams GL errors. Native NODES compile
+    // via their own constructors and stay in.
     const prewarmQueue = [
       ...new Set(
-        [...GENERATORS, ...FX_SHADERS, ...NATIVE_NODES].map((s) => s.id)
+        [...GENERATORS.filter((g) => !g.native), ...FX_SHADERS, ...NATIVE_NODES].map((s) => s.id)
       )
     ]
     const loop = (): void => {

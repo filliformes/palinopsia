@@ -64,7 +64,7 @@ export function installTextureBridge(): void {
     }
   }
 
-  // ── Program leak fix ───────────────────────────────────────────────
+  // ── Program leak fix + shared-attribute quarantine ──────────────────
   // The stock cleanup() destroys renderBuffers but NEVER deletes the two
   // ISFGLProgram objects (`program` + `paintProgram`), each of which owns a
   // WebGLProgram, two shaders and a vertex buffer. ISFGLProgram HAS a cleanup()
@@ -72,19 +72,45 @@ export function installTextureBridge(): void {
   // shaders constantly (source/FX changes, Randomize up to 4/frame), so this
   // leaks GPU memory without bound → driver pressure → context loss. Wrap
   // cleanup() to also release the programs.
+  //
+  // CRITICAL : the runtime is WebGL1-style — every ISFGLProgram wires its quad
+  // buffer into the DEFAULT VAO's attribute 0, shared by EVERY renderer on the
+  // context (they all draw off whoever wired it last). Deleting a buffer while
+  // the default VAO is current RESETS that shared binding to zero → every ISF
+  // drawArrays in the app becomes INVALID_OPERATION → the whole image freezes
+  // on the last presented frame until some new renderer re-wires it. (This is
+  // exactly what the startup shader pre-warm did : ~70 create→cleanup cycles
+  // with no successor = frozen first frame on every launch.) Quarantine ALL
+  // deletions inside a sacrificial VAO so the default VAO's binding survives.
+  const cleanupVaos = new WeakMap<object, WebGLVertexArrayObject>()
   const origCleanup = proto.cleanup as (this: {
     program?: { cleanup?: () => void }
     paintProgram?: { cleanup?: () => void }
   }) => void
   proto.cleanup = function (this: {
+    gl?: WebGL2RenderingContext
     program?: { cleanup?: () => void }
     paintProgram?: { cleanup?: () => void }
   }): void {
-    origCleanup.call(this)
-    this.program?.cleanup?.()
-    this.paintProgram?.cleanup?.()
-    this.program = undefined
-    this.paintProgram = undefined
+    const gl = this.gl
+    let vao: WebGLVertexArrayObject | null = null
+    if (gl && typeof gl.createVertexArray === 'function') {
+      vao = cleanupVaos.get(gl) ?? null
+      if (!vao) {
+        vao = gl.createVertexArray()
+        if (vao) cleanupVaos.set(gl, vao)
+      }
+      if (vao) gl.bindVertexArray(vao)
+    }
+    try {
+      origCleanup.call(this)
+      this.program?.cleanup?.()
+      this.paintProgram?.cleanup?.()
+      this.program = undefined
+      this.paintProgram = undefined
+    } finally {
+      if (gl && vao) gl.bindVertexArray(null)
+    }
   }
 
   const orig = proto.pushTexture as (this: IsfRendererInternals, u: IsfUniform) => void

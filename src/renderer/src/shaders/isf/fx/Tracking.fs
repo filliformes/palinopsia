@@ -43,9 +43,9 @@ void main() {
 
   // ── The tracking band: `position` places it, `roll` creeps it upward. ──
   float center = fract(position + roll * TIME * 0.06);
-  float half = band * 0.5 * (0.8 + 0.2 * hash(vec2(t, 1.0)));
+  float bandHalf = band * 0.5 * (0.8 + 0.2 * hash(vec2(t, 1.0)));
   float d = wd(uv.y, center);
-  float inBand = smoothstep(half, half * 0.4, d);
+  float inBand = smoothstep(bandHalf, bandHalf * 0.4, d);
 
   // ── Auto-wandering FREEZE line (VHS Glitch's actualXLine): a narrow row
   // that drifts on stacked incommensurate sines; inside its width the sampled
@@ -96,7 +96,7 @@ void main() {
   }
 
   // Head-switch flash rides the band's lower edge (wraps with the roll).
-  float headSwitch = smoothstep(0.012, 0.0, wd(uv.y, fract(center - half))) * 0.5;
+  float headSwitch = smoothstep(0.012, 0.0, wd(uv.y, fract(center - bandHalf))) * 0.5;
   col += vec3(headSwitch);
 
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), s.a);

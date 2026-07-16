@@ -466,14 +466,34 @@ export function randomizeBackground(cur: BackgroundState | undefined): Backgroun
 
 /** A fresh "blank open" state: layer 1 gets random source(s) + FX (guaranteed
  *  at least one FX unit), the other three stay empty. A cold launch or the New
- *  button lands on a different living one-layer scene each time. */
+ *  button lands on a different living one-layer scene each time.
+ *
+ *  This path MUST carry the same guarantees as Randomize All (it used to skip
+ *  them, which is why cold launches could land on a dead or black "first
+ *  frame" : a static source, a dark blend over the near-black background, and
+ *  no modulation = a frozen-looking boot):
+ *   - the seed source is never a static-by-design generator (Solid Color);
+ *   - the layer sits directly on the background, so its blend is stack-safe
+ *     and its opacity solid;
+ *   - 2 modulators + a small matrix guarantee visible motion. */
+const SEED_STATIC_GENS = new Set(['solid-color'])
 export function seedRandomStart(base: CompositionState): CompositionState {
   let l0 = randomizeSingleLayer(base.layers[0])
+  // Never seed on a static source : re-draw A until it's a living generator.
+  for (let tries = 0; tries < 8 && SEED_STATIC_GENS.has(l0.sourceA.shaderId ?? ''); tries++) {
+    l0 = { ...l0, sourceA: randomSlot() }
+  }
   // Guarantee some treatment : never open on a bare, unprocessed source.
   if (l0.sourceAFx.length + l0.sourceBFx.length + l0.fx.length === 0) {
     l0 = { ...l0, sourceAFx: randomRack([0, 1]) } // exactly one
   }
-  return {
+  // The seed layer composites straight onto the near-black background : a dark
+  // blend there is the classic black-window draw. Stack-safe blend + solid
+  // opacity, same rule as Randomize All's bottom layer.
+  const SAFE_BOTTOM = ['normal', 'add', 'screen', 'lighten']
+  if (!SAFE_BOTTOM.includes(l0.blend)) l0 = { ...l0, blend: pick(SAFE_BOTTOM) as LayerState['blend'] }
+  l0 = { ...l0, opacity: Math.max(l0.opacity, 0.85) }
+  let next: CompositionState = {
     ...base,
     layers: base.layers.map((l, i) =>
       i === 0
@@ -489,6 +509,16 @@ export function seedRandomStart(base: CompositionState): CompositionState {
           }
     )
   }
+  // Guaranteed motion : two fresh modulators + a small matrix over the seeded
+  // layer, so the boot scene breathes even when the generator itself is slow.
+  const slots = [0, 1, 2, 3, 4, 5, 6, 7].filter((s) => s !== WORLD_AUTOMOD_SLOT)
+  const chosen = new Set([pick(slots), pick(slots)])
+  next = {
+    ...next,
+    modulators: next.modulators.map((m, i) => (chosen.has(i) ? freshModulator(m, true) : m))
+  }
+  next = { ...next, modMatrix: randomMatrix(next) }
+  return next
 }
 
 function randomizeStructural(
