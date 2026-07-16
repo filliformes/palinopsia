@@ -59,6 +59,21 @@ export interface SoniConfig {
     sense: number; density: number; dur: number; noise: number
     loOct: number; hiOct: number; quantize: boolean
   }
+  raster: {
+    on: boolean; tap: number; gain: number; pan: number
+    note: number; freq: number; quantize: boolean
+    rx: number; ry: number; rw: number; rh: number; smooth: number
+  }
+  sstv: {
+    on: boolean; tap: number; gain: number; pan: number
+    lineHz: number; sync: boolean; dev: number; syncLev: number
+  }
+  filter: {
+    on: boolean; tap: number; gain: number; pan: number
+    q: number; noise: number; lineIn: boolean
+    sweepOn: boolean; sweepHz: number; x: number; gamma: number
+    loOct: number; hiOct: number; quantize: boolean
+  }
   taps: [SoniTap, SoniTap]
 }
 
@@ -72,6 +87,9 @@ export function defaultSoniConfig(): SoniConfig {
     spectra: { on: true, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, sync: false, x: 0.5, gamma: 1.8, loOct: 2, hiOct: 7, quantize: true },
     orbit: { on: false, tap: 0, gain: 0.5, pan: 0, note: 45, freq: 110, quantize: true, ratio: 1, cx: 0.5, cy: 0.5, rx: 0.25, ry: 0.25, drive: 1, smooth: 0.5 },
     flow: { on: false, tap: 0, gain: 0.6, pan: 0, sense: 0.4, density: 0.5, dur: 0.09, noise: 0.15, loOct: 3, hiOct: 6, quantize: true },
+    raster: { on: false, tap: 0, gain: 0.4, pan: 0, note: 45, freq: 110, quantize: true, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0 },
+    sstv: { on: false, tap: 0, gain: 0.4, pan: 0, lineHz: 12, sync: false, dev: 1, syncLev: 0.5 },
+    filter: { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, lineIn: false, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, loOct: 1, hiOct: 8, quantize: false },
     taps: [{ kind: 'master', layer: 0 }, { kind: 'layer', layer: 0 }]
   }
 }
@@ -104,6 +122,19 @@ function spectraFreqs(cfg: SoniConfig): Float32Array {
   return out
 }
 
+/** The Filter voice's 48 band-centre frequencies : quantized to the scale
+ *  (a resonant harmonic wash) or a plain log spread 80Hz..8kHz. */
+function filterFreqs(cfg: SoniConfig): Float32Array {
+  const out = new Float32Array(48)
+  if (cfg.filter.quantize) {
+    const tab = scaleTable(cfg.root, cfg.scale, cfg.filter.loOct, cfg.filter.hiOct)
+    for (let i = 0; i < 48; i++) out[i] = tab[Math.min(tab.length - 1, Math.floor((i / 48) * tab.length))]
+  } else {
+    for (let i = 0; i < 48; i++) out[i] = 80 * Math.pow(100, i / 47)
+  }
+  return out
+}
+
 interface GridReader {
   readSonifyGrid: (kind: 'master' | 'layer', layer: number, out: Uint8Array) => boolean
 }
@@ -114,6 +145,9 @@ class SonifyEngine {
   private recDest: MediaStreamAudioDestinationNode | null = null
   private cfg: SoniConfig = defaultSoniConfig()
   private starting = false
+  private lineSrc: MediaStreamAudioSourceNode | null = null
+  private lineStream: MediaStream | null = null
+  private lineWanted = false
   private lastTick = 0
   private lastFrameAt = [0, 0]
   // luma grids per tap : cur + prev (for flow), plus the RGBA readback scratch
@@ -138,7 +172,7 @@ class SonifyEngine {
     try {
       const ctx = new AudioContext({ latencyHint: 'interactive' })
       await ctx.audioWorklet.addModule(SONI_WORKLET_URL)
-      const node = new AudioWorkletNode(ctx, 'soni', { numberOfInputs: 0, outputChannelCount: [2] })
+      const node = new AudioWorkletNode(ctx, 'soni', { numberOfInputs: 1, outputChannelCount: [2] })
       node.port.onmessage = (e): void => {
         const m = e.data
         if (m?.t === 'meter') { this.meterPeak = m.peak; this.meterLim = m.lim }
@@ -160,6 +194,10 @@ class SonifyEngine {
   }
 
   stop(): void {
+    this.lineSrc?.disconnect()
+    this.lineSrc = null
+    this.lineStream?.getTracks().forEach((t) => t.stop())
+    this.lineStream = null
     this.node?.disconnect()
     this.node = null
     this.recDest = null
@@ -202,10 +240,51 @@ class SonifyEngine {
         flow: {
           on: cfg.flow.on, tap: cfg.flow.tap, gain: cfg.flow.gain, pan: cfg.flow.pan,
           dur: cfg.flow.dur, noise: cfg.flow.noise
+        },
+        raster: {
+          on: cfg.raster.on, tap: cfg.raster.tap, gain: cfg.raster.gain, pan: cfg.raster.pan,
+          freq: cfg.raster.quantize ? this.snapNote(cfg.raster.note) : cfg.raster.freq,
+          rx: cfg.raster.rx, ry: cfg.raster.ry, rw: cfg.raster.rw, rh: cfg.raster.rh,
+          smooth: cfg.raster.smooth
+        },
+        sstv: {
+          on: cfg.sstv.on, tap: cfg.sstv.tap, gain: cfg.sstv.gain, pan: cfg.sstv.pan,
+          lineHz: cfg.sstv.lineHz, dev: cfg.sstv.dev, syncLev: cfg.sstv.syncLev
+        },
+        filter: {
+          on: cfg.filter.on, tap: cfg.filter.tap, gain: cfg.filter.gain, pan: cfg.filter.pan,
+          q: cfg.filter.q, noise: cfg.filter.lineIn ? cfg.filter.noise * 0.25 : cfg.filter.noise,
+          sweepOn: cfg.filter.sweepOn, sweepHz: cfg.filter.sweepHz, x: cfg.filter.x, gamma: cfg.filter.gamma
         }
       },
-      spectraFreqs: spectraFreqs(cfg)
+      spectraFreqs: spectraFreqs(cfg),
+      filterFreqs: filterFreqs(cfg)
     })
+    this.syncLineIn(cfg.filter.on && cfg.filter.lineIn)
+  }
+
+  /** Open/close the line-in tap for the Filter voice (mic/line via WebRTC). */
+  private syncLineIn(want: boolean): void {
+    if (want === this.lineWanted) return
+    this.lineWanted = want
+    if (!want) {
+      this.lineSrc?.disconnect()
+      this.lineSrc = null
+      this.lineStream?.getTracks().forEach((t) => t.stop())
+      this.lineStream = null
+      return
+    }
+    const ctx = this.ctx
+    if (!ctx || !this.node) return
+    navigator.mediaDevices
+      .getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
+      .then((stream) => {
+        if (!this.lineWanted || !this.ctx || !this.node) { stream.getTracks().forEach((t) => t.stop()); return }
+        this.lineStream = stream
+        this.lineSrc = this.ctx.createMediaStreamSource(stream)
+        this.lineSrc.connect(this.node)
+      })
+      .catch((e) => console.warn('[sonify] line-in unavailable, noise only', e))
   }
 
   /** Snap the orbit's note number onto the active scale, return Hz. */
@@ -237,10 +316,22 @@ class SonifyEngine {
       }
     }
 
+    // SSTV sync : one scan line per 16th note, following tap-tempo live.
+    if (this.cfg.sstv.sync && this.cfg.sstv.on) {
+      const hz = (bpm / 60) * 4
+      if (Math.abs(hz - this.cfg.sstv.lineHz) > 1e-3) {
+        this.cfg.sstv.lineHz = hz
+        this.pushConfig(this.cfg)
+      }
+    }
+
     const need = [false, false]
     if (this.cfg.spectra.on) need[this.cfg.spectra.tap] = true
     if (this.cfg.orbit.on) need[this.cfg.orbit.tap] = true
     if (this.cfg.flow.on) need[this.cfg.flow.tap] = true
+    if (this.cfg.raster.on) need[this.cfg.raster.tap] = true
+    if (this.cfg.sstv.on) need[this.cfg.sstv.tap] = true
+    if (this.cfg.filter.on) need[this.cfg.filter.tap] = true
 
     for (let t = 0; t < 2; t++) {
       if (!need[t]) continue

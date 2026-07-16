@@ -98,12 +98,12 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   const mirrorRef = useRef<HTMLDivElement | null>(null)
   const overlayRef = useRef<HTMLCanvasElement | null>(null)
   const meterRef = useRef<HTMLDivElement | null>(null)
-  const dragging = useRef<'line' | 'orbit' | 'radius' | null>(null)
+  const dragging = useRef<'line' | 'orbit' | 'radius' | 'rect' | 'rectsize' | 'fline' | null>(null)
   const [devices, setDevices] = useState<Array<{ id: string; label: string }>>([])
 
   const set = (next: SoniConfig): void => setSonify(next)
   const patch = (p: Partial<SoniConfig>): void => set({ ...cfg, ...p })
-  const pv = <K extends 'spectra' | 'orbit' | 'flow'>(k: K, p: Partial<SoniConfig[K]>): void =>
+  const pv = <K extends 'spectra' | 'orbit' | 'flow' | 'raster' | 'sstv' | 'filter'>(k: K, p: Partial<SoniConfig[K]>): void =>
     set({ ...cfg, [k]: { ...cfg[k], ...p } })
 
   // Live mirror of the composite (same pattern as the Output page).
@@ -138,6 +138,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   useEffect(() => {
     let raf = 0
     let sweepPhase = cfg.spectra.x
+    let fSweep = cfg.filter.x
+    let tvRow = 0
     let last = performance.now()
     const paint = (): void => {
       const now = performance.now()
@@ -169,6 +171,35 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           g.beginPath()
           g.moveTo(sweepPhase * w, 0)
           g.lineTo(sweepPhase * w, h)
+          g.stroke()
+        }
+        // Filter column (its own hue, mirrors the filter sweep)
+        if (st.on && st.filter.on) {
+          if (st.filter.sweepOn) fSweep = (fSweep + st.filter.sweepHz * dt) % 1
+          else fSweep = st.filter.x
+          g.strokeStyle = 'rgba(120,200,255,0.8)'
+          g.lineWidth = 1.5
+          g.beginPath()
+          g.moveTo(fSweep * w, 0)
+          g.lineTo(fSweep * w, h)
+          g.stroke()
+        }
+        // Raster probe rect
+        if (st.on && st.raster.on) {
+          g.strokeStyle = 'rgba(120,255,160,0.85)'
+          g.lineWidth = 1.5
+          g.strokeRect(st.raster.rx * w, st.raster.ry * h, st.raster.rw * w, st.raster.rh * h)
+          g.fillStyle = 'rgba(120,255,160,0.85)'
+          g.fillRect((st.raster.rx + st.raster.rw) * w - 4, (st.raster.ry + st.raster.rh) * h - 4, 8, 8)
+        }
+        // Transmission scan row (animates downward at the line rate)
+        if (st.on && st.sstv.on) {
+          tvRow = (tvRow + st.sstv.lineHz * dt / 96) % 1
+          g.strokeStyle = 'rgba(255,120,200,0.8)'
+          g.lineWidth = 1.5
+          g.beginPath()
+          g.moveTo(0, tvRow * h)
+          g.lineTo(w, tvRow * h)
           g.stroke()
         }
         // Orbit ellipse
@@ -206,12 +237,19 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   }
   const onPointerDown = (e: ReactPointerEvent): void => {
     const [x, y] = posFrom(e)
-    // nearest grab : orbit centre, orbit edge (radius), else the scan line
-    if (cfg.orbit.on) {
+    // grab priority : raster corner → raster rect → orbit centre → orbit edge
+    // → held scan lines. The probes are the instrument.
+    if (cfg.raster.on) {
+      const cx2 = cfg.raster.rx + cfg.raster.rw, cy2 = cfg.raster.ry + cfg.raster.rh
+      if (Math.abs(x - cx2) < 0.02 && Math.abs(y - cy2) < 0.03) dragging.current = 'rectsize'
+      else if (x > cfg.raster.rx && x < cx2 && y > cfg.raster.ry && y < cy2) dragging.current = 'rect'
+    }
+    if (!dragging.current && cfg.orbit.on) {
       const dc = Math.hypot(x - cfg.orbit.cx, y - cfg.orbit.cy)
       if (dc < 0.03) { dragging.current = 'orbit' }
       else if (Math.abs(dc - Math.max(cfg.orbit.rx, cfg.orbit.ry)) < 0.04) { dragging.current = 'radius' }
     }
+    if (!dragging.current && cfg.filter.on && !cfg.filter.sweepOn && Math.abs(x - cfg.filter.x) < 0.02) dragging.current = 'fline'
     if (!dragging.current && cfg.spectra.on && !cfg.spectra.sweepOn) dragging.current = 'line'
     if (!dragging.current && cfg.orbit.on) dragging.current = 'orbit'
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
@@ -221,10 +259,21 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
     if (!dragging.current) return
     const [x, y] = posFrom(e)
     if (dragging.current === 'line') pv('spectra', { x })
+    else if (dragging.current === 'fline') pv('filter', { x })
     else if (dragging.current === 'orbit') pv('orbit', { cx: x, cy: y })
     else if (dragging.current === 'radius') {
       const r = Math.max(0.02, Math.hypot(x - cfg.orbit.cx, y - cfg.orbit.cy))
       pv('orbit', { rx: r, ry: r })
+    } else if (dragging.current === 'rect') {
+      pv('raster', {
+        rx: Math.max(0, Math.min(1 - cfg.raster.rw, x - cfg.raster.rw / 2)),
+        ry: Math.max(0, Math.min(1 - cfg.raster.rh, y - cfg.raster.rh / 2))
+      })
+    } else if (dragging.current === 'rectsize') {
+      pv('raster', {
+        rw: Math.max(0.04, Math.min(1 - cfg.raster.rx, x - cfg.raster.rx)),
+        rh: Math.max(0.03, Math.min(1 - cfg.raster.ry, y - cfg.raster.ry))
+      })
     }
   }
   const endDrag = (): void => { dragging.current = null }
@@ -456,10 +505,127 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             <Slider label="gain" value={cfg.flow.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('flow', { gain: v })} />
           </VoiceShell>
 
+          <VoiceShell
+            title="Raster" on={cfg.raster.on}
+            hint="audification : the probe rect read raw as samples (Ikeda)"
+            onToggle={() => pv('raster', { on: !cfg.raster.on })}
+          >
+            <TapSelect cfg={cfg} voice={cfg.raster} onChange={(tap) => pv('raster', { tap })} />
+            <Row label="pitch">
+              {cfg.raster.quantize ? (
+                <input
+                  type="range" min={24} max={72} step={1} value={cfg.raster.note}
+                  onChange={(e) => pv('raster', { note: Number(e.target.value) })}
+                  className="min-w-0 flex-1 accent-accent"
+                  title={`Note ${fmtNote(cfg.raster.note)} : one full scan of the rect = the period`}
+                />
+              ) : (
+                <input
+                  type="range" min={0} max={1} step={0.001}
+                  value={Math.log(cfg.raster.freq / 20) / Math.log(1000 / 20)}
+                  onChange={(e) => pv('raster', { freq: 20 * Math.pow(1000 / 20, Number(e.target.value)) })}
+                  className="min-w-0 flex-1 accent-accent"
+                  title={`Free frequency ${fmtHz(cfg.raster.freq)}`}
+                />
+              )}
+              <span className="w-10 shrink-0 text-right font-mono text-[9px] text-muted">
+                {cfg.raster.quantize ? fmtNote(cfg.raster.note) : fmtHz(cfg.raster.freq)}
+              </span>
+              <button
+                onClick={() => pv('raster', { quantize: !cfg.raster.quantize })}
+                className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.raster.quantize ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
+                title="Snap the scan pitch to the key/scale, or run free Hz"
+              >&#9834;</button>
+            </Row>
+            <Slider label="smooth" value={cfg.raster.smooth} min={0} max={1} neutral={0} onChange={(v) => pv('raster', { smooth: v })} />
+            <Slider label="gain" value={cfg.raster.gain} min={0} max={1} neutral={0.4} onChange={(v) => pv('raster', { gain: v })} />
+            <Slider label="pan" value={cfg.raster.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('raster', { pan: v })} />
+            <p className="text-[9px] leading-tight text-muted">Drag the green rect (corner resizes). The rect IS the waveform : edges buzz, gradients hum, datamosh blocks tick. Smooth 0 = the hard aliased register.</p>
+          </VoiceShell>
+
+          <VoiceShell
+            title="Transmission" on={cfg.sstv.on}
+            hint="the SSTV register : line-sequential FM + a sync-pulse metronome"
+            onToggle={() => pv('sstv', { on: !cfg.sstv.on })}
+          >
+            <TapSelect cfg={cfg} voice={cfg.sstv} onChange={(tap) => pv('sstv', { tap })} />
+            <Row label="lines">
+              {!cfg.sstv.sync && (
+                <input
+                  type="range" min={1} max={60} step={0.5} value={cfg.sstv.lineHz}
+                  onChange={(e) => pv('sstv', { lineHz: Number(e.target.value) })}
+                  className="min-w-0 flex-1 accent-accent"
+                  title={`Scan rate ${cfg.sstv.lineHz.toFixed(1)} lines/s : the melody is the image rows`}
+                />
+              )}
+              {!cfg.sstv.sync && (
+                <span className="w-10 shrink-0 text-right font-mono text-[9px] text-muted">{cfg.sstv.lineHz.toFixed(1)}/s</span>
+              )}
+              <button
+                onClick={() => pv('sstv', { sync: !cfg.sstv.sync })}
+                className={`${cfg.sstv.sync ? 'flex-1 ' : ''}rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.sstv.sync ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
+                title={`Sync : one scan line per 16th note @ ${bpm} BPM (the sync tick becomes the clock)`}
+              >{cfg.sstv.sync ? `sync 1/16 @ ${bpm}` : 'sync'}</button>
+            </Row>
+            <Slider label="transpose" value={cfg.sstv.dev} min={0.25} max={2} neutral={1} fmt={(v) => v.toFixed(2) + 'x'} onChange={(v) => pv('sstv', { dev: v })} />
+            <Slider label="tick" value={cfg.sstv.syncLev} min={0} max={1} neutral={0.5} onChange={(v) => pv('sstv', { syncLev: v })} />
+            <Slider label="gain" value={cfg.sstv.gain} min={0} max={1} neutral={0.4} onChange={(v) => pv('sstv', { gain: v })} />
+            <Slider label="pan" value={cfg.sstv.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('sstv', { pan: v })} />
+          </VoiceShell>
+
+          <VoiceShell
+            title="Filter" on={cfg.filter.on}
+            hint="the image as a filter bank : noise or line-in played THROUGH the frame"
+            onToggle={() => pv('filter', { on: !cfg.filter.on })}
+          >
+            <TapSelect cfg={cfg} voice={cfg.filter} onChange={(tap) => pv('filter', { tap })} />
+            <Row label="source">
+              <button
+                onClick={() => pv('filter', { lineIn: false })}
+                className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${!cfg.filter.lineIn ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
+                title="Internal noise through the image's bands (wide resonance = wind, narrow = flute)"
+              >noise</button>
+              <button
+                onClick={() => pv('filter', { lineIn: true })}
+                className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.filter.lineIn ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
+                title="Live line/mic input filtered by the frame (the Metasynth filter room)"
+              >line-in</button>
+            </Row>
+            <Row label="sweep">
+              <button
+                onClick={() => pv('filter', { sweepOn: !cfg.filter.sweepOn })}
+                className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.filter.sweepOn ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
+                title="Sweep the reading column, or hold it (drag the blue line)"
+              >{cfg.filter.sweepOn ? 'sweeping' : 'held'}</button>
+              {cfg.filter.sweepOn && (
+                <input
+                  type="range" min={0.02} max={4} step={0.01} value={cfg.filter.sweepHz}
+                  onChange={(e) => pv('filter', { sweepHz: Number(e.target.value) })}
+                  className="min-w-0 flex-1 accent-accent"
+                  title={`Sweep rate ${cfg.filter.sweepHz.toFixed(2)}Hz`}
+                />
+              )}
+            </Row>
+            <Slider label="resonance" value={cfg.filter.q} min={0} max={1} neutral={0.5} onChange={(v) => pv('filter', { q: v })} />
+            <Slider label="noise" value={cfg.filter.noise} min={0} max={1} neutral={0.5} onChange={(v) => pv('filter', { noise: v })} />
+            <Slider label="contrast" value={cfg.filter.gamma} min={0.5} max={4} neutral={1.6} onChange={(v) => pv('filter', { gamma: v })} />
+            <Row label="bands">
+              <button
+                onClick={() => pv('filter', { quantize: !cfg.filter.quantize })}
+                className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.filter.quantize ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
+                title="Tune the 48 band centres to the key/scale (a resonant harmonic wash) or spread them freely"
+              >&#9834; scale</button>
+            </Row>
+            <Slider label="gain" value={cfg.filter.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('filter', { gain: v })} />
+            <Slider label="pan" value={cfg.filter.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('filter', { pan: v })} />
+          </VoiceShell>
+
           <p className="text-[9px] leading-tight text-muted">
             Spectra : vertical position is pitch, brightness is loudness — the sweep plays the frame like a score (ANS · Metasynth · vOICe).
             Orbit : the image itself is the oscillator — move the orbit to change timbre; the visuals mutate the waveform live (wave terrain · Oramics).
-            Flow : whatever MOVES sings — each moving region fires a grain, panned where it is (Pelletier). Recording captures the sound too.
+            Flow : whatever MOVES sings — each moving region fires a grain, panned where it is (Pelletier).
+            Raster : the probe rect IS the waveform, read raw (Ikeda). Transmission : the image as an FM broadcast, sync tick as metronome (SSTV).
+            Filter : sound played THROUGH the frame (Metasynth). Recording captures everything.
           </p>
         </aside>
       </div>

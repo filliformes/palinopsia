@@ -1,8 +1,8 @@
 // The Sonify AudioWorklet processor (plain JS : loaded via Vite ?url as a
 // module asset, added with audioContext.audioWorklet.addModule).
 //
-// One processor runs all three v1 voices (Spectra · Orbit · Flow) plus the
-// master bus with an always-on peak limiter. Rules: zero allocation inside
+// One processor runs all six voices (Spectra · Orbit · Flow · Raster ·
+// Transmission · Filter) plus the master bus with an always-on peak limiter. Rules: zero allocation inside
 // process(); no AudioParams (control flows through port messages); image
 // frames arrive as transferred Uint8Array luma grids, double-buffered and
 // crossfaded so 30Hz video never steps audibly; grain onsets are pre-dithered
@@ -11,6 +11,7 @@
 const GRID = 96; // luma grid is GRID×GRID
 const NPART = 96; // Spectra partial count
 const NGRAIN = 64; // Flow grain pool
+const NBAND = 48; // Image-Filter band count
 
 class SoniProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -31,7 +32,10 @@ class SoniProcessor extends AudioWorkletProcessor {
       master: 0.8,
       spectra: { on: false, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, x: 0.5, gamma: 1.6, noise: 0 },
       orbit:   { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, ratio: 1, cx: 0.5, cy: 0.5, rx: 0.25, ry: 0.25, drive: 1.2, smooth: 0.6 },
-      flow:    { on: false, tap: 0, gain: 0.5, pan: 0, dur: 0.09, noise: 0.15 }
+      flow:    { on: false, tap: 0, gain: 0.5, pan: 0, dur: 0.09, noise: 0.15 },
+      raster:  { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0 },
+      sstv:    { on: false, tap: 0, gain: 0.5, pan: 0, lineHz: 12, dev: 1, syncLev: 0.5 },
+      filter:  { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6 }
     };
     this.spectraFreqs = new Float32Array(NPART); // filled by cfg
     for (let i = 0; i < NPART; i++) this.spectraFreqs[i] = 55 * Math.pow(2, i * 6 / NPART);
@@ -51,6 +55,24 @@ class SoniProcessor extends AudioWorkletProcessor {
       this.grains.push({ on: false, t0: 0, phase: 0, inc: 0, amp: 0, pan: 0.5, age: 0, dur: 0.1, noise: 0 });
     }
     this.pending = []; // scheduled grain events (small, replaced per flow msg)
+    // ── Raster state ──
+    this.rPtr = 0; // read pointer in probe pixels (row-major, wraps)
+    this.rDcX = 0; this.rDcY = 0;
+    this.rLast = 0;
+    // ── Transmission (SSTV) state ──
+    this.tPhase = 0; // FM oscillator phase
+    this.tLine = 0; // current scan row 0..GRID-1
+    this.tX = 0; // position within the line 0..1
+    // ── Filter (image-shaped bandpass bank over noise / line-in) ──
+    this.fFreqs = new Float32Array(NBAND);
+    for (let i = 0; i < NBAND; i++) this.fFreqs[i] = 80 * Math.pow(100, i / (NBAND - 1)); // 80Hz..8kHz
+    this.fCoef = new Float32Array(NBAND); // 2·sin(π·fc/sr), rebuilt on cfg
+    this.fLow = new Float32Array(NBAND);
+    this.fBand = new Float32Array(NBAND);
+    this.fGain = new Float32Array(NBAND); // slewed image gains
+    this.fTarget = new Float32Array(NBAND);
+    this.fSweep = 0;
+    this.rebuildFilterCoefs();
     // ── limiter ──
     this.limEnv = 1;
     // ── metering (sent back ~10Hz) ──
@@ -76,6 +98,7 @@ class SoniProcessor extends AudioWorkletProcessor {
     if (m.t === 'cfg') {
       this.cfg = m.cfg;
       if (m.spectraFreqs) this.spectraFreqs.set(m.spectraFreqs);
+      if (m.filterFreqs) { this.fFreqs.set(m.filterFreqs); this.rebuildFilterCoefs(); }
       return;
     }
     if (m.t === 'flow') {
@@ -105,6 +128,21 @@ class SoniProcessor extends AudioWorkletProcessor {
     const sc = (c[i00] * (1 - ax) + c[i10] * ax) * (1 - ay) + (c[i01] * (1 - ax) + c[i11] * ax) * ay;
     const sp = (pv[i00] * (1 - ax) + pv[i10] * ax) * (1 - ay) + (pv[i01] * (1 - ax) + pv[i11] * ax) * ay;
     return sp + (sc - sp) * m;
+  }
+
+  rebuildFilterCoefs() {
+    for (let i = 0; i < NBAND; i++) {
+      this.fCoef[i] = 2 * Math.sin(Math.PI * Math.min(this.fFreqs[i], sampleRate * 0.45) / sampleRate);
+    }
+  }
+
+  // Nearest-pixel read of a tap's CURRENT grid (the Raster voice wants the
+  // hard, aliased read — no interframe smoothing, that's the register).
+  rawPixel(tap, ix, iy) {
+    if (!tap.has) return 0;
+    ix = ix < 0 ? 0 : ix >= GRID ? GRID - 1 : ix;
+    iy = iy < 0 ? 0 : iy >= GRID ? GRID - 1 : iy;
+    return tap.cur[iy * GRID + ix];
   }
 
   process(_inputs, outputs) {
@@ -227,6 +265,113 @@ class SoniProcessor extends AudioWorkletProcessor {
           gr.phase += gr.inc;
           L[s] += v * gL; R[s] += v * gR;
         }
+      }
+    }
+
+    // ── RASTER : audification — the probe rect read row-major as samples ──
+    const ra = cfg.raster;
+    if (ra.on) {
+      const tap = this.taps[ra.tap] || this.taps[0];
+      const px0 = Math.max(0, Math.min(GRID - 2, Math.round(ra.rx * GRID)));
+      const py0 = Math.max(0, Math.min(GRID - 2, Math.round(ra.ry * GRID)));
+      const pw = Math.max(2, Math.min(GRID - px0, Math.round(ra.rw * GRID)));
+      const ph = Math.max(1, Math.min(GRID - py0, Math.round(ra.rh * GRID)));
+      const nPix = pw * ph;
+      // scan rate in pixels/sec so one full pass of the rect = the period :
+      // pitch = freq, timbre = the rect's contents (Yeo/Berger geometry).
+      const step = ra.freq * nPix * dt;
+      const gL = ra.gain * (1 - Math.max(0, ra.pan)) * 0.7;
+      const gR = ra.gain * (1 + Math.min(0, ra.pan)) * 0.7;
+      let ptr = this.rPtr;
+      for (let s = 0; s < n; s++) {
+        ptr += step;
+        if (ptr >= nPix) ptr -= Math.floor(ptr / nPix) * nPix;
+        const i0 = ptr | 0;
+        let v;
+        if (ra.smooth > 0.01) {
+          const i1 = (i0 + 1) % nPix;
+          const fr = ptr - i0;
+          const a = this.rawPixel(tap, px0 + (i0 % pw), py0 + ((i0 / pw) | 0));
+          const b = this.rawPixel(tap, px0 + (i1 % pw), py0 + ((i1 / pw) | 0));
+          const lin = a + (b - a) * fr;
+          v = a + (lin - a) * ra.smooth;
+        } else {
+          v = this.rawPixel(tap, px0 + (i0 % pw), py0 + ((i0 / pw) | 0)); // hard/aliased
+        }
+        v = v * 2 - 1;
+        // DC-block (the rect's mean brightness is pure DC)
+        const hp = v - this.rDcX + 0.995 * this.rDcY;
+        this.rDcX = v; this.rDcY = hp;
+        const shaped = Math.max(-1, Math.min(1, hp * 1.4));
+        L[s] += shaped * gL; R[s] += shaped * gR;
+      }
+      this.rPtr = ptr;
+    }
+
+    // ── TRANSMISSION : the SSTV register — line-sequential FM + sync tick ──
+    const tv = cfg.sstv;
+    if (tv.on) {
+      const tap = this.taps[tv.tap] || this.taps[0];
+      const lineDur = 1 / Math.max(0.5, tv.lineHz); // seconds per line
+      const syncFrac = Math.min(0.25, 0.005 / lineDur); // ~5ms sync pulse
+      const gL = tv.gain * (1 - Math.max(0, tv.pan)) * 0.5;
+      const gR = tv.gain * (1 + Math.min(0, tv.pan)) * 0.5;
+      for (let s = 0; s < n; s++) {
+        this.tX += dt / lineDur;
+        if (this.tX >= 1) {
+          this.tX -= 1;
+          this.tLine = (this.tLine + 1) % GRID;
+        }
+        let f, amp;
+        if (this.tX < syncFrac) {
+          f = 1200 * tv.dev; // the horizontal-sync tick : the metronome
+          amp = 0.7 + tv.syncLev * 0.3;
+        } else {
+          const u = (this.tX - syncFrac) / (1 - syncFrac);
+          const luma = this.rawPixel(tap, (u * (GRID - 1)) | 0, this.tLine);
+          f = (1500 + luma * 800) * tv.dev; // black 1500Hz → white 2300Hz
+          amp = 0.55 + luma * 0.45;
+        }
+        this.tPhase += f * dt;
+        const v = Math.sin(this.tPhase * 6.283185307179586) * amp;
+        L[s] += v * gL; R[s] += v * gR;
+      }
+      if (this.tPhase > 1e6) this.tPhase %= 1;
+    }
+
+    // ── FILTER : the image as a band-gain matrix over noise / line-in ──
+    const fi = cfg.filter;
+    if (fi.on) {
+      const tap = this.taps[fi.tap] || this.taps[0];
+      const input = _inputs[0] && _inputs[0][0] ? _inputs[0][0] : null;
+      if (fi.sweepOn) this.fSweep = (this.fSweep + fi.sweepHz * n * dt) % 1;
+      else this.fSweep = fi.x;
+      // band gains from the image column : row → band (top = high), slewed
+      const cx = this.fSweep;
+      for (let i = 0; i < NBAND; i++) {
+        const y = 1 - (i + 0.5) / NBAND;
+        this.fTarget[i] = Math.pow(this.terrain(tap, cx, y), fi.gamma);
+      }
+      const slew = 1 - Math.exp(-n * dt / 0.03);
+      const q1 = 1.5 - fi.q * 1.35; // damping : wide/windy → narrow/flute
+      const gL = fi.gain * (1 - Math.max(0, fi.pan)) * 0.9;
+      const gR = fi.gain * (1 + Math.min(0, fi.pan)) * 0.9;
+      for (let i = 0; i < NBAND; i++) this.fGain[i] += (this.fTarget[i] - this.fGain[i]) * slew;
+      for (let s = 0; s < n; s++) {
+        // source : line-in when connected, plus an internal noise floor
+        this.noiseState = (this.noiseState * 1103515245 + 12345) & 0x7fffffff;
+        const nz = (this.noiseState / 0x40000000 - 1) * fi.noise * 0.5;
+        const x = (input ? input[s] : 0) + nz;
+        let acc = 0;
+        for (let i = 0; i < NBAND; i++) {
+          const f = this.fCoef[i];
+          this.fLow[i] += f * this.fBand[i];
+          const high = x - this.fLow[i] - q1 * this.fBand[i];
+          this.fBand[i] += f * high;
+          acc += this.fBand[i] * this.fGain[i];
+        }
+        const v = Math.tanh(acc * 0.7);
+        L[s] += v * gL; R[s] += v * gR;
       }
     }
 
