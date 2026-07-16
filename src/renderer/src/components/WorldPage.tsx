@@ -214,8 +214,10 @@ export function WorldPage(): JSX.Element {
 
            </div>
 
-           {/* right column : compact Visualizer + audio driver + full-size live-code */}
-           <div className="flex min-h-0 flex-col gap-3 overflow-hidden">
+           {/* right column : compact Visualizer + audio driver + live-code that
+               FLEXES into whatever height remains (fully visible at 100% zoom;
+               the textarea scrolls internally instead of clipping the page). */}
+           <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
               <Section title="World Visualizer : real generators · simulated audio · A/B">
                 {/* Capped width so the whole page fits without scrolling; the
                     live-code editor below keeps its full height. */}
@@ -310,7 +312,7 @@ export function WorldPage(): JSX.Element {
                   </div>
                 </div>
               </Section>
-              <Section title="Live code (JSON) : edit, then Apply">
+              <Section title="Live code (JSON) : edit, then Apply" className="min-h-[180px] flex-1">
                 <JsonEditor world={w} onApply={(patch) => updateWorld(w.id, patch)} />
               </Section>
             </div>
@@ -366,9 +368,9 @@ function JsonEditor({
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex min-h-0 flex-1 flex-col gap-1.5">
       <textarea
-        className="input h-72 w-full resize-y whitespace-pre font-mono text-[10px] leading-tight"
+        className="input min-h-[120px] w-full flex-1 resize-none whitespace-pre font-mono text-[10px] leading-tight"
         spellCheck={false}
         value={text}
         onChange={(e) => {
@@ -424,9 +426,9 @@ function VuMeter({ audio }: { audio: SimAudio }): JSX.Element {
 }
 
 // ── small form helpers ──────────────────────────────────────────────────
-function Section({ title, children }: { title: string; children: React.ReactNode }): JSX.Element {
+function Section({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }): JSX.Element {
   return (
-    <div className="flex flex-col gap-2 rounded border border-border bg-panel2/30 p-3">
+    <div className={`flex flex-col gap-2 rounded border border-border bg-panel2/30 p-3 ${className}`}>
       <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{title}</span>
       {children}
     </div>
