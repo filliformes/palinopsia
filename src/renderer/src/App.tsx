@@ -16,7 +16,7 @@ import { applyTonicity, applyDrift, applyFlowInterrupt, shutterHold, shutterClea
 import { applyFlicker } from './engine/flicker'
 import { applyFrameWeave } from './engine/frameWeave'
 import { pushMarkSignal } from './engine/markSignal'
-import { applyModulation, modEngine } from './engine/modulation'
+import { applyMetaGlides, applyModulation, modEngine } from './engine/modulation'
 import { visionBus } from './engine/visionIn'
 import { depthEngine } from './engine/depthEstimate'
 import { currentFps, tickFrame } from './perf'
@@ -105,7 +105,7 @@ function cycleContextPreset(): void {
 }
 import { initUndo, redo, undo, useUndoState } from './undo'
 import { THEME_ORDER, useStore, type ThemeName } from './store'
-import { randomizeMetaKnobs } from './metaSmooth'
+import { metaGlides, randomizeMetaKnobs } from './metaSmooth'
 import type { RandomizeScope } from './randomize'
 
 // Fire the Randomize mode the Transport's chevron currently points at (persisted
@@ -466,6 +466,10 @@ export default function App(): JSX.Element {
         audioBus.tick(now)
         const modValues = modEngine.tick(now, c.modulators, c.bpm)
         applyModulation(comp!, c, modValues, inputsForShader, st.modBypass)
+        // 2a½. Meta-knob glides/drags : in-flight positions fan out to their
+        //      destinations engine-side (zero store writes per frame; the
+        //      final value commits to the store on settle).
+        if (metaGlides.size) applyMetaGlides(comp!, c, inputsForShader, metaGlides)
         // 2b. Coupling: audio binds each layer's A/B balance (post-sync so it
         //     overrides the base mix); returns the coupled mixes for the output.
         const coupledMix = applyCoupling(comp!, c, now)
@@ -620,7 +624,10 @@ export default function App(): JSX.Element {
             superFlicker: st.superFlicker,
             flickerHot,
             weaveHot,
-            strobeSafe: st.strobeSafe
+            strobeSafe: st.strobeSafe,
+            // In-flight Meta-knob gestures : the mirror re-applies the same
+            // engine-side fan-out (the store only updates on settle).
+            metaGlides: metaGlides.size ? Array.from(metaGlides) : undefined
           })
         }
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to

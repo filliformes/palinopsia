@@ -10,7 +10,7 @@
 import { useEffect, useRef } from 'react'
 import type { OutputFrame } from '@shared/types'
 import { Compositor } from '../engine/Compositor'
-import { applyModulation } from '../engine/modulation'
+import { applyMetaGlides, applyModulation } from '../engine/modulation'
 import { applyFieldMacros } from '../engine/field'
 import { clearFrameVals } from '../engine/frameVals'
 import { shaderSourceById } from '../shaders/isf'
@@ -36,6 +36,9 @@ export function OutputView(): JSX.Element {
         comp!.setStrobeSafe(f.strobeSafe ?? 0)
         comp!.syncFromState(f.c, shaderSourceById)
         applyModulation(comp!, f.c, f.modValues, inputsForShader, f.modBypass)
+        // In-flight Meta-knob gestures : same engine-side fan-out as the
+        // control window (the store/composition only carries settled values).
+        if (f.metaGlides) applyMetaGlides(comp!, f.c, inputsForShader, f.metaGlides)
         // Fresh per-frame write bus (else applyFieldMacros below would stack on
         // its OWN last-frame writes and run away).
         clearFrameVals()

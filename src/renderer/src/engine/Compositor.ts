@@ -1084,6 +1084,29 @@ export class Compositor {
   // frame each frame; null (default) → zero cost.
   private outputCapture: ((w: number, h: number, px: Uint8Array) => void) | null = null;
   private readbackBuf: Uint8Array | null = null;
+  // Async readback (Spout/NDI) : two PIXEL_PACK PBOs ping-pong so readPixels
+  // never stalls the pipeline. Frame N reads into one PBO (async) while frame
+  // N-1's pixels are harvested from the other once its fence signals : one
+  // frame of sink latency instead of a full GPU flush every frame.
+  private capPbos: [WebGLBuffer, WebGLBuffer] | null = null;
+  private capSyncs: [WebGLSync | null, WebGLSync | null] = [null, null];
+  private capW = 0;
+  private capH = 0;
+  private capPhase = 0;
+
+  private freeCapturePbos(): void {
+    const gl = this.gl;
+    if (this.capPbos) {
+      gl.deleteBuffer(this.capPbos[0]);
+      gl.deleteBuffer(this.capPbos[1]);
+      this.capPbos = null;
+    }
+    for (let i = 0; i < 2; i++) {
+      if (this.capSyncs[i]) { gl.deleteSync(this.capSyncs[i]!); this.capSyncs[i] = null; }
+    }
+    this.capW = this.capH = 0;
+    this.capPhase = 0;
+  }
   // Global time multiplier (1/64×…64×) : scales every visual clock.
   private globalSpeed = 1;
   private blendProg: WebGLProgram;
@@ -1985,16 +2008,49 @@ export class Compositor {
 
     // External output seam (Spout/NDI): read the presented RGBA8 frame from the
     // default framebuffer and hand it off. Only runs when a sink is attached.
+    // ASYNC : readPixels goes into a PBO (no stall); the previous frame's PBO is
+    // harvested once its fence signals. One frame of sink latency, zero flushes.
     if (this.outputCapture) {
       const w = this.canvas.width, h = this.canvas.height;
       const need = w * h * 4;
-      if (!this.readbackBuf || this.readbackBuf.length !== need) this.readbackBuf = new Uint8Array(need);
+      if (!this.capPbos || this.capW !== w || this.capH !== h) {
+        this.freeCapturePbos();
+        const a = gl.createBuffer()!, b = gl.createBuffer()!;
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, a);
+        gl.bufferData(gl.PIXEL_PACK_BUFFER, need, gl.STREAM_READ);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, b);
+        gl.bufferData(gl.PIXEL_PACK_BUFFER, need, gl.STREAM_READ);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+        this.capPbos = [a, b];
+        this.capW = w; this.capH = h;
+      }
+      const wi = this.capPhase, ri = 1 - this.capPhase;
+      // If the write-side PBO still has a pending fence (sink slower than us),
+      // drop that frame : delete the fence and overwrite.
+      if (this.capSyncs[wi]) { gl.deleteSync(this.capSyncs[wi]!); this.capSyncs[wi] = null; }
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, this.readbackBuf);
-      this.outputCapture(w, h, this.readbackBuf);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.capPbos[wi]);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, 0); // → PBO, async
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      this.capSyncs[wi] = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+      // Harvest the OTHER PBO (last frame's pixels) if its copy completed.
+      const sync = this.capSyncs[ri];
+      if (sync) {
+        const st = gl.clientWaitSync(sync, 0, 0);
+        if (st === gl.ALREADY_SIGNALED || st === gl.CONDITION_SATISFIED) {
+          gl.deleteSync(sync); this.capSyncs[ri] = null;
+          if (!this.readbackBuf || this.readbackBuf.length !== need) this.readbackBuf = new Uint8Array(need);
+          gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.capPbos[ri]);
+          gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.readbackBuf);
+          gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+          this.outputCapture(w, h, this.readbackBuf);
+        }
+        // Not signalled yet → leave it; next frame either harvests or drops it.
+      }
+      this.capPhase = ri;
+    } else if (this.capPbos) {
+      this.freeCapturePbos(); // sink detached : release the PBOs
     }
-
-    // SEAM (Phase 8): gl.readPixels(composite) → IPC → Spout/Syphon/NDI.
   }
 
   /** Release EVERY GL resource this compositor owns. Call on unmount so a
@@ -2021,6 +2077,7 @@ export class Compositor {
     disposeTarget(gl, this.snapshot);
     disposeTarget(gl, this.xfadeTarget);
     if (this.fxOpac) { disposeTarget(gl, this.fxOpac[0]); disposeTarget(gl, this.fxOpac[1]); }
+    this.freeCapturePbos();
     if (this.visionFbo) { gl.deleteFramebuffer(this.visionFbo.fbo); gl.deleteTexture(this.visionFbo.tex); this.visionFbo = null; }
     if (this.depthTex) { gl.deleteTexture(this.depthTex); this.depthTex = null; }
     if (this.depthFbo) { gl.deleteFramebuffer(this.depthFbo.fbo); gl.deleteTexture(this.depthFbo.tex); this.depthFbo = null; }

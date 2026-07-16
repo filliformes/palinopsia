@@ -589,6 +589,9 @@ export interface OutputFrame {
   weaveHot?: number
   // Strobe-safety limiter amount (0 = off) : the output window applies the same cap.
   strobeSafe?: number
+  // In-flight Meta-knob gestures : [knob index, display 0..1] pairs the mirror
+  // re-applies engine-side (the store only carries the settled value).
+  metaGlides?: Array<[number, number]>
 }
 
 export interface DisplayInfo {

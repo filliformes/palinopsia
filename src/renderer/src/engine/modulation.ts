@@ -811,20 +811,99 @@ const VIDEO_MOD_DESCS: Record<string, ModDesc> = {
   loopOut: { type: 'float', min: 0, max: 1, def: 1 }
 }
 
+// The engine surface the overlay passes write into (the Compositor, or the
+// output window's recording proxy). Shared by applyModulation + applyMetaGlides.
+export interface ModComp {
+  layers: Array<{
+    setInput: (slot: 'A' | 'B', name: string, value: number) => void
+    setVideoInput?: (slot: 'A' | 'B', name: string, value: number) => void
+  } | null>
+  setFxInput: (
+    scope: import('@shared/types').FxScope,
+    instId: string,
+    name: string,
+    value: number
+  ) => void
+  setBgSourceInput: (name: string, value: number) => void
+}
+
+/** Resolve one ISF-input target's shader + write the given ABSOLUTE 0..1
+ *  position everywhere it needs to land (engine + live map). Shared by the
+ *  mod-matrix meta path and the Meta-knob glide overlay. */
+export function writeModTarget(
+  comp: ModComp,
+  c: CompositionState,
+  descFor: (shaderId: string) => Array<{ name: string } & ModDesc>,
+  t: Exclude<import('@shared/types').ModTarget, { kind: 'meta' }>,
+  shaped01: number
+): void {
+  let shaderId: string | null = null
+  if (t.kind === 'source') {
+    const layer = c.layers[t.layer]
+    const slot = t.slot === 'A' ? layer?.sourceA : layer?.sourceB
+    // Video slot : route position/speed through the video seam (no shader).
+    if (slot?.kind === 'video' && VIDEO_MOD_DESCS[t.input]) {
+      const value = inputValueFrom01(VIDEO_MOD_DESCS[t.input], shaped01)
+      if (value === null || typeof value !== 'number') return
+      liveModValues.set(liveKey(t), value)
+      comp.layers[t.layer]?.setVideoInput?.(t.slot, t.input, value)
+      return
+    }
+    shaderId = slot?.shaderId ?? null
+  } else if (t.kind === 'bgSource') {
+    shaderId = c.background?.source.shaderId ?? null
+  } else {
+    const s = t.scope
+    const arr =
+      s.kind === 'master'
+        ? c.master
+        : s.kind === 'background'
+          ? c.background?.fx
+          : s.kind === 'layer'
+            ? c.layers[s.layer]?.fx
+            : s.kind === 'sourceA'
+              ? c.layers[s.layer]?.sourceAFx
+              : c.layers[s.layer]?.sourceBFx
+    shaderId = arr?.find((f) => f.id === t.instId)?.shaderId ?? null
+  }
+  if (!shaderId) return
+  const d = descFor(shaderId).find((x) => x.name === t.input)
+  if (!d) return
+  const value = inputValueFrom01(d, shaped01)
+  if (value === null) return
+  liveModValues.set(liveKey(t), value)
+  if (t.kind === 'source') comp.layers[t.layer]?.setInput(t.slot, t.input, value)
+  else if (t.kind === 'bgSource') comp.setBgSourceInput(t.input, value)
+  else comp.setFxInput(t.scope, t.instId, t.input, value)
+}
+
+/** Meta-knob glide overlay : while a knob glides (MIDI CC / randomize) or is
+ *  dragged, its display position fans out to destinations HERE, straight into
+ *  the engine — zero store writes per frame. The gesture's final value is
+ *  committed to the store once, on settle (metaSmooth.ts). Runs after
+ *  applyModulation so a live gesture wins the frame. */
+export function applyMetaGlides(
+  comp: ModComp,
+  c: CompositionState,
+  descFor: (shaderId: string) => Array<{ name: string } & ModDesc>,
+  glides: Iterable<[number, number]>
+): void {
+  for (const [i, v01] of glides) {
+    const knob = c.metaKnobs[i]
+    if (!knob) continue
+    // Same mapping as the settle-time store fan-out (metaSmooth.applyKnob) :
+    // position shaped by the knob's curve, then mapped per destination.
+    const shaped = shapeCurve(Math.max(0, Math.min(1, v01)), knob.curve)
+    metaLiveValues.set(i, Math.max(0, Math.min(1, v01)))
+    for (const dest of knob.destinations) {
+      if (dest.kind === 'meta') continue // knobs never chain into knobs
+      writeModTarget(comp, c, descFor, dest, shaped)
+    }
+  }
+}
+
 export function applyModulation(
-  comp: {
-    layers: Array<{
-      setInput: (slot: 'A' | 'B', name: string, value: number) => void
-      setVideoInput?: (slot: 'A' | 'B', name: string, value: number) => void
-    }>
-    setFxInput: (
-      scope: import('@shared/types').FxScope,
-      instId: string,
-      name: string,
-      value: number
-    ) => void
-    setBgSourceInput: (name: string, value: number) => void
-  },
+  comp: ModComp,
   c: CompositionState,
   values: number[],
   descFor: (shaderId: string) => Array<{ name: string } & ModDesc>,
@@ -844,46 +923,7 @@ export function applyModulation(
   const writeTarget = (
     t: Exclude<import('@shared/types').ModTarget, { kind: 'meta' }>,
     shaped01: number
-  ): void => {
-    let shaderId: string | null = null
-    if (t.kind === 'source') {
-      const layer = c.layers[t.layer]
-      const slot = t.slot === 'A' ? layer?.sourceA : layer?.sourceB
-      // Video slot : route position/speed through the video seam (no shader).
-      if (slot?.kind === 'video' && VIDEO_MOD_DESCS[t.input]) {
-        const value = inputValueFrom01(VIDEO_MOD_DESCS[t.input], shaped01)
-        if (value === null || typeof value !== 'number') return
-        liveModValues.set(liveKey(t), value)
-        comp.layers[t.layer]?.setVideoInput?.(t.slot, t.input, value)
-        return
-      }
-      shaderId = slot?.shaderId ?? null
-    } else if (t.kind === 'bgSource') {
-      shaderId = c.background?.source.shaderId ?? null
-    } else {
-      const s = t.scope
-      const arr =
-        s.kind === 'master'
-          ? c.master
-          : s.kind === 'background'
-            ? c.background?.fx
-            : s.kind === 'layer'
-              ? c.layers[s.layer]?.fx
-              : s.kind === 'sourceA'
-                ? c.layers[s.layer]?.sourceAFx
-                : c.layers[s.layer]?.sourceBFx
-      shaderId = arr?.find((f) => f.id === t.instId)?.shaderId ?? null
-    }
-    if (!shaderId) return
-    const d = descFor(shaderId).find((x) => x.name === t.input)
-    if (!d) return
-    const value = inputValueFrom01(d, shaped01)
-    if (value === null) return
-    liveModValues.set(liveKey(t), value)
-    if (t.kind === 'source') comp.layers[t.layer]?.setInput(t.slot, t.input, value)
-    else if (t.kind === 'bgSource') comp.setBgSourceInput(t.input, value)
-    else comp.setFxInput(t.scope, t.instId, t.input, value)
-  }
+  ): void => writeModTarget(comp, c, descFor, t, shaped01)
 
   for (const a of c.modMatrix) {
     const v = values[a.mod]
