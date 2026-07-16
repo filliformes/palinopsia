@@ -643,6 +643,17 @@ export interface ExposedApi {
   onAppBeforeClose: (cb: () => void) => () => void
   // Absolute path for a picked File (Electron 33 removed File.path).
   getMediaPath: (file: File) => string
+  // Codec probe + ffmpeg conversion (DXV3 / HAP / ProRes… → all-intra H.264 cache).
+  videoProbe: (path: string) => Promise<{
+    ok: boolean
+    codec: string | null
+    durationSec: number
+    needsConvert: boolean
+    ffmpegAvailable: boolean
+    error?: string
+  }>
+  videoConvert: (path: string) => Promise<{ ok: boolean; path?: string; cached?: boolean; error?: string }>
+  onVideoConvertProgress: (cb: (p: { path: string; pct: number }) => void) => () => void
   // Screens + windows for the capture source picker.
   captureListSources: () => Promise<CaptureSourceInfo[]>
   // Output window (2nd display / projector) : mirror via WebRTC loopback.

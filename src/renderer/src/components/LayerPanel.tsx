@@ -519,6 +519,47 @@ function SourceRow({
   const [showCapture, setShowCapture] = useState(false)
   const [showDevices, setShowDevices] = useState(false)
   const [showHive, setShowHive] = useState(false)
+  // ffmpeg import conversion (DXV3 / HAP / ProRes → all-intra cache) : 0..1, null = idle.
+  const [converting, setConverting] = useState<number | null>(null)
+
+  async function importVideo(file: File): Promise<void> {
+    let path = ''
+    try {
+      path = window.api.getMediaPath(file)
+    } catch {
+      /* getMediaPath unavailable */
+    }
+    if (path) {
+      try {
+        const probe = await window.api.videoProbe(path)
+        if (probe.needsConvert) {
+          if (!probe.ffmpegAvailable) {
+            alert(
+              `"${file.name}" is ${probe.codec ?? 'a codec'} the built-in player can't read.\n` +
+                'Install ffmpeg to import it : add ffmpeg to PATH, `npm i ffmpeg-static`, or set OPSIA_FFMPEG.'
+            )
+            return
+          }
+          setConverting(0)
+          const off = window.api.onVideoConvertProgress((p) => {
+            if (p.path === path) setConverting(p.pct)
+          })
+          const res = await window.api.videoConvert(path)
+          off()
+          setConverting(null)
+          if (!res.ok || !res.path) {
+            alert(`Conversion failed : ${res.error ?? 'unknown error'}`)
+            return
+          }
+          onPickVideo(`opsia-media://local/${encodeURIComponent(res.path)}`, file.name)
+          return
+        }
+      } catch {
+        /* probe failed (no ffmpeg) : just try playing it directly */
+      }
+    }
+    onPickVideo(mediaUrlForFile(file), file.name)
+  }
   const isVideo = sourceKind === 'video'
   const isCapture = sourceKind === 'capture'
   const isHive = sourceKind === 'hive'
@@ -549,14 +590,22 @@ function SourceRow({
         <input
           ref={fileRef}
           type="file"
-          accept="video/*"
+          accept="video/*,.dxv,.mov,.avi,.mkv,.mpg,.mpeg,.mxf,.m2v"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]
-            if (file) onPickVideo(mediaUrlForFile(file), file.name)
+            if (file) void importVideo(file)
             e.target.value = '' // allow re-picking the same file
           }}
         />
+        {converting !== null && (
+          <span
+            className="shrink-0 animate-pulse font-mono text-[9px] text-accent"
+            title="Converting to the all-intra cache (once per clip : later imports are instant)"
+          >
+            ⚙ {Math.round(converting * 100)}%
+          </span>
+        )}
         <select
           className={`input select-compact min-w-0 flex-1 text-[11px] ${
             selected ? 'border-accent' : ''

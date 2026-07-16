@@ -20,7 +20,8 @@ const MIME: Record<string, string> = {
   mov: 'video/quicktime',
   mkv: 'video/x-matroska',
   avi: 'video/x-msvideo',
-  ogv: 'video/ogg'
+  ogv: 'video/ogg',
+  dxv: 'video/quicktime' // DXV3 clips are MOV containers (converted on import)
 }
 const mimeFor = (path: string): string => MIME[path.split('.').pop()?.toLowerCase() ?? ''] ?? 'video/mp4'
 
