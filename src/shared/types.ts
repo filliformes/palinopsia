@@ -184,6 +184,27 @@ export interface LayerState {
   speed: number
   // A/B audio coupling (Slab 1). Off by default.
   coupling: LayerCoupling
+  // Per-layer spatial mask : multiplies the layer's contribution to the stack,
+  // beyond blend + opacity (luma / gradient / shape). Applied in the blend pass.
+  mask: LayerMask
+}
+
+// A spatial mask on a layer's stack contribution. mode : 0 none · 1 luma (the
+// layer's own luminance window) · 2 gradient (a linear fade) · 3 shape (box↔ellipse
+// window). `soft` feathers every edge; `invert` flips the mask.
+export interface LayerMask {
+  mode: number
+  invert: boolean
+  soft: number
+  lumaLo: number // luma : keep where the layer's luminance is within [lo, hi]
+  lumaHi: number
+  angle: number // gradient : direction (radians)
+  pos: number // gradient : edge position along the axis (0..1)
+  cx: number // shape : centre
+  cy: number
+  size: number // shape : radius
+  aspect: number // shape : x/y stretch
+  round: number // shape : 0 = box, 1 = ellipse
 }
 
 // ── Modulation (brief §6 : ported from dataFLOU) ─────────────────────

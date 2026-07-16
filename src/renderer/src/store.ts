@@ -12,6 +12,7 @@ import type {
   FxInstance,
   FxScope,
   LayerCoupling,
+  LayerMask,
   LayerState,
   ModAssignment,
   ModMode,
@@ -166,7 +167,18 @@ function makeLayer(sourceShaderId: string | null = null): LayerState {
     sourceBlend: 'normal',
     harmony: 0,
     speed: 1,
-    coupling: { mode: 'off', amount: 0.5, tightness: 0.7, feature: 'transient' }
+    coupling: { mode: 'off', amount: 0.5, tightness: 0.7, feature: 'transient' },
+    mask: makeDefaultMask()
+  }
+}
+
+/** Default per-layer mask : off (mode 0). */
+export function makeDefaultMask(): LayerMask {
+  return {
+    mode: 0, invert: false, soft: 0.1,
+    lumaLo: 0.2, lumaHi: 1.0,
+    angle: 0, pos: 0.5,
+    cx: 0.5, cy: 0.5, size: 0.4, aspect: 1, round: 1
   }
 }
 
@@ -359,7 +371,8 @@ export function normalizeComposition(c: CompositionState): CompositionState {
       sourceAFx: l.sourceAFx ?? [],
       sourceBFx: l.sourceBFx ?? [],
       fx: l.fx ?? [],
-      coupling: l.coupling ?? { mode: 'off', amount: 0.5, tightness: 0.7, feature: 'transient' }
+      coupling: l.coupling ?? { mode: 'off', amount: 0.5, tightness: 0.7, feature: 'transient' },
+      mask: { ...makeDefaultMask(), ...(l.mask ?? {}) }
     })),
     // The Vibe Palette then the Context finalizer must exist and sit last, in
     // that order. Older sessions get them appended; a session whose locked unit
@@ -562,6 +575,7 @@ interface StoreState {
   setHarmony: (layer: number, v: number) => void
   setCoupling: (layer: number, partial: Partial<LayerCoupling>) => void
   setSourceBlend: (layer: number, mode: BlendMode) => void
+  setLayerMask: (layer: number, partial: Partial<LayerMask>) => void
   setSourceShader: (layer: number, slot: 'A' | 'B', shaderId: string | null) => void
   // Point a slot at an imported video clip (kind:'video'). mediaId is the clip's
   // object URL; mediaName is shown in the picker.
@@ -994,6 +1008,16 @@ export const useStore = create<StoreState>((set, get) => ({
         layers: updateLayer(s.composition.layers, layer, (l) => ({
           ...l,
           sourceBlend: mode
+        }))
+      }
+    })),
+  setLayerMask: (layer, partial) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({
+          ...l,
+          mask: { ...(l.mask ?? makeDefaultMask()), ...partial }
         }))
       }
     })),

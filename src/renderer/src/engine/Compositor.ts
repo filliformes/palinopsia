@@ -46,7 +46,7 @@ import type { CompositionState, FxInstance, FxScope } from '@shared/types';
 
 installTextureBridge();
 
-import type { BlendMode } from '@shared/types';
+import type { BlendMode, LayerMask } from '@shared/types';
 export type { BlendMode };
 
 const QUAD_VS = `#version 300 es
@@ -83,12 +83,35 @@ uniform sampler2D base;   // accumulator below
 uniform sampler2D top;    // layer above
 uniform int mode;
 uniform float opacity;
+// Per-layer spatial mask (0 none · 1 luma · 2 gradient · 3 shape).
+uniform int mMode, mInvert;
+uniform float mSoft, mLumaLo, mLumaHi, mAngle, mPos, mCx, mCy, mSize, mAspect, mRound;
 ${BLEND_GLSL}
+float maskValue(vec2 p, vec3 topRgb){
+  if (mMode == 0) return 1.0;
+  float s = max(mSoft, 0.001);
+  float m = 1.0;
+  if (mMode == 1) {
+    float l = dot(topRgb, vec3(0.299, 0.587, 0.114));
+    m = smoothstep(mLumaLo - s, mLumaLo + s, l) * (1.0 - smoothstep(mLumaHi - s, mLumaHi + s, l));
+  } else if (mMode == 2) {
+    vec2 d = vec2(cos(mAngle), sin(mAngle));
+    float t = dot(p - 0.5, d) + 0.5;              // 0..1 across the axis
+    m = smoothstep(mPos - s, mPos + s, t);
+  } else if (mMode == 3) {
+    vec2 q = (p - vec2(mCx, mCy)) / vec2(max(mSize * mAspect, 1e-3), max(mSize, 1e-3));
+    float dist = mix(max(abs(q.x), abs(q.y)), length(q), mRound); // box ↔ ellipse
+    m = 1.0 - smoothstep(1.0 - s, 1.0 + s, dist);
+  }
+  if (mInvert == 1) m = 1.0 - m;
+  return clamp(m, 0.0, 1.0);
+}
 void main(){
   vec4 B = texture(base, uv);
   vec4 T = texture(top, uv);
   vec3 c = blendMode(mode, B.rgb, T.rgb);
-  o = vec4(mix(B.rgb, c, T.a*opacity), max(B.a, T.a*opacity));
+  float a = T.a * opacity * maskValue(uv, T.rgb);
+  o = vec4(mix(B.rgb, c, a), max(B.a, a));
 }`;
 
 // Feedback persist: fresh frame smeared with the layer's previous frame.
@@ -674,6 +697,8 @@ export class ISFLayer {
   scratchB: { fbo: WebGLFramebuffer; tex: WebGLTexture };
   // Consume/Reagent competition field (lazy : only when the A/B mix uses 'consume').
   reagent: PingPong | null = null;
+  // Spatial mask on this layer's stack contribution (null = none).
+  mask: LayerMask | null = null;
 
   constructor(private shared: SharedGL, public w: number, public h: number) {
     this.pp = new PingPong(shared.gl, w, h);
@@ -1039,6 +1064,7 @@ export class Compositor {
   private acc: PingPong;            // accumulator for the layer stack
   private uBase: WebGLUniformLocation; private uTop: WebGLUniformLocation;
   private uMode: WebGLUniformLocation; private uOpac: WebGLUniformLocation;
+  private uMask: Record<string, WebGLUniformLocation | null> = {};
   private uPSrc: WebGLUniformLocation; private uPPrev: WebGLUniformLocation;
   private uPAmt: WebGLUniformLocation;
   private uMA: WebGLUniformLocation; private uMB: WebGLUniformLocation;
@@ -1096,6 +1122,9 @@ export class Compositor {
     this.uTop  = gl.getUniformLocation(this.blendProg, 'top')!;
     this.uMode = gl.getUniformLocation(this.blendProg, 'mode')!;
     this.uOpac = gl.getUniformLocation(this.blendProg, 'opacity')!;
+    for (const n of ['mMode', 'mInvert', 'mSoft', 'mLumaLo', 'mLumaHi', 'mAngle', 'mPos', 'mCx', 'mCy', 'mSize', 'mAspect', 'mRound']) {
+      this.uMask[n] = gl.getUniformLocation(this.blendProg, n);
+    }
 
     this.persistProg = compile(gl, QUAD_VS, PERSIST_FS);
     this.uPSrc  = gl.getUniformLocation(this.persistProg, 'src')!;
@@ -1468,6 +1497,7 @@ export class Compositor {
       L.sourceBlend = l.sourceBlend ?? 'normal';
       L.harmony = l.harmony ?? 0;
       L.speed = l.speed ?? 1;
+      L.mask = l.mask ?? null;
       for (const [k, v] of Object.entries(l.sourceA.inputs)) L.setInput('A', k, v);
       if (l.sourceB) for (const [k, v] of Object.entries(l.sourceB.inputs)) L.setInput('B', k, v);
       L.rackA.sync(l.sourceAFx, sourceById);
@@ -1596,7 +1626,7 @@ export class Compositor {
   }
 
   /** Composite top texture over base into target using the given blend mode. */
-  private blendInto(target: WebGLFramebuffer, base: WebGLTexture, top: WebGLTexture, mode: BlendMode, opacity: number) {
+  private blendInto(target: WebGLFramebuffer, base: WebGLTexture, top: WebGLTexture, mode: BlendMode, opacity: number, mask?: LayerMask | null) {
     const gl = this.gl;
     gl.bindVertexArray(this.vao);
     gl.bindFramebuffer(gl.FRAMEBUFFER, target);
@@ -1606,6 +1636,16 @@ export class Compositor {
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, top);  gl.uniform1i(this.uTop, 1);
     gl.uniform1i(this.uMode, this.modeIndex[mode]);
     gl.uniform1f(this.uOpac, opacity);
+    const m = this.uMask;
+    if (mask && mask.mode > 0) {
+      gl.uniform1i(m.mMode, Math.round(mask.mode)); gl.uniform1i(m.mInvert, mask.invert ? 1 : 0);
+      gl.uniform1f(m.mSoft, mask.soft); gl.uniform1f(m.mLumaLo, mask.lumaLo); gl.uniform1f(m.mLumaHi, mask.lumaHi);
+      gl.uniform1f(m.mAngle, mask.angle); gl.uniform1f(m.mPos, mask.pos);
+      gl.uniform1f(m.mCx, mask.cx); gl.uniform1f(m.mCy, mask.cy);
+      gl.uniform1f(m.mSize, mask.size); gl.uniform1f(m.mAspect, mask.aspect); gl.uniform1f(m.mRound, mask.round);
+    } else {
+      gl.uniform1i(m.mMode, 0);
+    }
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindVertexArray(null);
   }
@@ -1808,7 +1848,8 @@ export class Compositor {
         this.acc.read(),
         L.texture(),
         first ? 'normal' : L.blend,
-        L.opacity
+        L.opacity,
+        L.mask
       );
       first = false;
       this.acc.swap();

@@ -5,7 +5,7 @@
 // presets (save/apply/delete : app-persistent).
 
 import { useRef, useState, type MouseEvent, type ReactNode } from 'react'
-import type { AudioFeature, BlendMode, CouplingMode, SourceKind } from '@shared/types'
+import type { AudioFeature, BlendMode, CouplingMode, LayerMask, SourceKind } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
 import { AUDIO_FEATURES } from '../engine/audioIn'
 import { GENERATORS_ALPHA } from '../shaders/isf'
@@ -288,6 +288,9 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             </select>
           </Row>
 
+          {/* MASK : a spatial mask on this layer's stack contribution. */}
+          <MaskControls index={index} mask={layer.mask} />
+
           {/* TRAIL persistence : only while FB is on */}
           {layer.feedback && (
             <Row label="TRAIL">
@@ -396,6 +399,59 @@ function ToggleChip({
     >
       {label}
     </button>
+  )
+}
+
+// Per-layer spatial mask : mode + invert, then the mode's own params. Multiplies
+// the layer's contribution to the stack (beyond blend + opacity).
+const MASK_MODES = ['none', 'luma', 'gradient', 'shape']
+function MaskControls({ index, mask }: { index: number; mask: LayerMask }): JSX.Element {
+  const setLayerMask = useStore((s) => s.setLayerMask)
+  const set = (p: Partial<LayerMask>): void => setLayerMask(index, p)
+  const sl = (label: string, key: keyof LayerMask, min = 0, max = 1, step = 0.01): JSX.Element => (
+    <Row label={label}>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={mask[key] as number}
+        onChange={(e) => set({ [key]: Number(e.target.value) } as Partial<LayerMask>)}
+        className="min-w-0 flex-1 accent-accent"
+      />
+    </Row>
+  )
+  return (
+    <>
+      <Row label="MASK">
+        <select
+          className="input select-compact min-w-0 flex-1 text-[11px]"
+          value={mask.mode}
+          onChange={(e) => set({ mode: Number(e.target.value) })}
+          title="Spatial mask on this layer : luma (its own brightness), gradient (a linear fade), or shape (a box↔ellipse window)."
+        >
+          {MASK_MODES.map((m, i) => (
+            <option key={m} value={i}>
+              {m}
+            </option>
+          ))}
+        </select>
+        {mask.mode > 0 && (
+          <button
+            onClick={() => set({ invert: !mask.invert })}
+            className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
+              mask.invert ? 'border-accent bg-accent/15 text-accent' : 'border-border text-muted hover:text-text'
+            }`}
+            title="Invert the mask"
+          >
+            inv
+          </button>
+        )}
+      </Row>
+      {mask.mode === 1 && (<>{sl('LO', 'lumaLo')}{sl('HI', 'lumaHi')}{sl('SOFT', 'soft')}</>)}
+      {mask.mode === 2 && (<>{sl('ANGLE', 'angle', 0, 6.283)}{sl('POS', 'pos')}{sl('SOFT', 'soft')}</>)}
+      {mask.mode === 3 && (<>{sl('X', 'cx')}{sl('Y', 'cy')}{sl('SIZE', 'size')}{sl('ASPECT', 'aspect', 0.2, 3)}{sl('ROUND', 'round')}{sl('SOFT', 'soft')}</>)}
+    </>
   )
 }
 
