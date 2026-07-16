@@ -29,7 +29,10 @@ function resolveFfmpeg(): string | null {
   try {
     // Optional dependency : present when `npm i ffmpeg-static` has been run.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const p = require('ffmpeg-static') as string | null
+    let p = require('ffmpeg-static') as string | null
+    // Packaged app : the binary lives in the asarUnpack'd copy (an exe can't be
+    // spawned from inside app.asar) — electron-builder.yml unpacks ffmpeg-static.
+    if (p) p = p.replace('app.asar', 'app.asar.unpacked')
     if (p && existsSync(p)) {
       ffmpegPath = p
       return ffmpegPath
