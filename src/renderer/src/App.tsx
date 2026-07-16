@@ -891,6 +891,12 @@ export default function App(): JSX.Element {
             <FinishingTouches />
           ) : rightView === 'feel' ? (
             <FeelPanel />
+          ) : rightView === 'io' ? (
+            // Setup lives out of the way : OSC + Audio as collapsible sections.
+            <>
+              <OscPanel />
+              <AudioPanel />
+            </>
           ) : (
             <>
               {[0, 1, 2, 3].map((i) => (
@@ -910,12 +916,8 @@ export default function App(): JSX.Element {
       {/* ── Meta Controller: 32 macro knobs / 4 banks (brief §6) ── */}
       <MetaBar />
 
-      {/* ── Audio ingest : OSC (Pandore) + local Web Audio → audio bus ── */}
-      <AudioPanel />
-
-      {/* ── OSC input : just above the transport bar; the ON/OFF button IS
-             the collapse (info shows only while listening) ── */}
-      <OscPanel />
+      {/* Audio + OSC setup moved to the right column's `osc/audio` tab :
+          performance space stays for creation, setup lives out of the way. */}
 
       {/* ── Transport (BPM + Randomize) ───────────────────────────── */}
       <Transport />
@@ -948,11 +950,12 @@ function FpsTag(): JSX.Element {
 function RightViewTabs(): JSX.Element {
   const rightView = useStore((s) => s.rightView)
   const setRightView = useStore((s) => s.setRightView)
-  const tabs: Array<{ id: 'layers' | 'mixer' | 'finishing' | 'feel'; label: string; title: string }> = [
+  const tabs: Array<{ id: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io'; label: string; title: string }> = [
     { id: 'layers', label: 'layers', title: 'The 4 layer strips' },
     { id: 'mixer', label: 'mixer', title: 'Compact opacity/speed/blend for all 4 layers (M)' },
     { id: 'finishing', label: 'finishing', title: 'Finishing Touches : Vibe Palette · Context · Finalizer' },
-    { id: 'feel', label: 'feel', title: 'Feel : the global macros — Field + Temperament (G)' }
+    { id: 'feel', label: 'feel', title: 'Feel : the global macros — Field + Temperament (G)' },
+    { id: 'io', label: 'osc/audio', title: 'Setup : OSC input/OSCQuery + the audio bus, each a collapsible section' }
   ]
   return (
     <div className="flex shrink-0 gap-1">

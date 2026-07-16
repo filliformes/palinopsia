@@ -51,6 +51,11 @@ export function SequencePage({
   const activeSceneId = useStore((s) => s.activeSceneId)
   const worlds = useStore(useShallow((s) => s.worlds))
   const seq = useStore((s) => s.sequence)
+  // Resizable inspector column (drag its left edge; persisted).
+  const [seqAsideW, setSeqAsideW] = useState(() => {
+    const n = Number(localStorage.getItem('opsia.seqAsideW'))
+    return Number.isFinite(n) && n >= 240 ? n : 320
+  })
   const setSequence = useStore((s) => s.setSequence)
   const toggleRunning = useStore((s) => s.toggleSequenceRunning)
   const ensureSceneTags = useStore((s) => s.ensureSceneTags)
@@ -266,7 +271,33 @@ export function SequencePage({
         </div>
 
         {/* Transport + macro-form : crammed to fit without scrolling. */}
-        <aside className="flex w-80 shrink-0 flex-col gap-2 overflow-y-auto border-l border-border bg-panel px-3 py-2">
+        {/* Drag the left edge to resize the inspector column (persisted). */}
+        <div
+          className="w-1 shrink-0 cursor-col-resize bg-border/60 transition-colors hover:bg-accent/60"
+          style={{ touchAction: 'none' }}
+          onPointerDown={(e) => {
+            const startX = e.clientX
+            const startW = seqAsideW
+            const el = e.target as HTMLElement
+            el.setPointerCapture(e.pointerId)
+            const move = (ev: PointerEvent): void => {
+              const w = Math.max(240, Math.min(640, startW + (startX - ev.clientX)))
+              setSeqAsideW(w)
+              localStorage.setItem('opsia.seqAsideW', String(w))
+            }
+            const up = (): void => {
+              el.removeEventListener('pointermove', move)
+              el.removeEventListener('pointerup', up)
+            }
+            el.addEventListener('pointermove', move)
+            el.addEventListener('pointerup', up)
+          }}
+          title="Drag to resize the inspector"
+        />
+        <aside
+          className="flex shrink-0 flex-col gap-2 overflow-y-auto border-l border-border bg-panel px-3 py-2"
+          style={{ width: seqAsideW }}
+        >
           <Section title="Transport">
             <Row label={`dwell · ${seq.dwell.toFixed(0)}s`}
               title="How long each scene is held before the sequencer moves on (seconds).">

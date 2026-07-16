@@ -867,19 +867,20 @@ export class ISFLayer {
       size: s.grainSize ?? 0.25,
       spray: s.grainSpray ?? 0.15,
       reverseP: s.grainReverse ?? 0.25,
-      jitter: s.grainJitter ?? 0.2
+      jitter: s.grainJitter ?? 0.2,
+      sync: s.grainSync ?? 0
     });
   }
 
   /** Drive video playheads and publish them for the Inspector timeline.
    *  `rawDt` is the real frame delta; `mul` is this layer's speed × global speed
    *  (the rate over realtime) : so both scale the clip on top of its own speed. */
-  tickVideos(layerIndex: number, rawDt: number, mul: number): void {
+  tickVideos(layerIndex: number, rawDt: number, mul: number, bpm = 120): void {
     for (const slot of ['A', 'B'] as const) {
       const v = slot === 'A' ? this.videoA : this.videoB;
       const key = videoKey(layerIndex, slot);
       if (v) {
-        v.tick(rawDt, mul);
+        v.tick(rawDt, mul, bpm);
         videoPlayheads.set(key, { time: v.time(), duration: v.duration() });
       } else {
         videoPlayheads.delete(key);
@@ -1464,7 +1465,11 @@ export class Compositor {
    * frame before render() : the single write path shared by UI, session loads,
    * OSC, and modulators. Shader hot-swaps preserve feedback buffers (brief §1).
    */
+  /** Transport BPM, synced from the composition each frame (grain-clock sync). */
+  bpm = 120;
+
   syncFromState(c: CompositionState, sourceById: (id: string) => string | null) {
+    this.bpm = c.bpm || 120;
     this.shared.budget.n = LOADS_PER_FRAME; // cap new shader compiles this frame
     for (let i = 0; i < this.layers.length && i < c.layers.length; i++) {
       const l = c.layers[i];
@@ -1778,7 +1783,7 @@ export class Compositor {
         L.advanceClock(dtSec);
         // Video: pass the REAL delta + the layer×global rate multiplier so the
         // clip plays natively (smooth) at speed·layer·global over realtime.
-        L.tickVideos(li, rawDt, this.globalSpeed * L.speed);
+        L.tickVideos(li, rawDt, this.globalSpeed * L.speed, this.bpm);
         gl.bindVertexArray(null); // ISF draws own the default VAO
         L.renderSource('A', nodeCtx.sidechainTex);
         let sig = L.rackA.apply(L.scratchA.tex, this.chain, nodeCtx); // nodeCtx → native nodes on source A

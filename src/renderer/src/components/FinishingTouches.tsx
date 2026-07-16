@@ -143,6 +143,30 @@ export function FinishingToggle({ on, onClick }: { on: boolean; onClick: () => v
   )
 }
 
+// The Vibe Palette's dry/wet, surfaced as the FIRST control of its section : how
+// much the palette re-colours the picture (1 = full grade, 0 = untouched).
+function VibeOpacityRow({ inst }: { inst: FxInstance }): JSX.Element {
+  const setFxOpacity = useStore((s) => s.setFxOpacity)
+  const v = inst.opacity ?? 1
+  return (
+    <div className="flex items-center gap-2 border-b border-border bg-panel2/40 px-2 py-1">
+      <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-accent2">opacity</span>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.01}
+        value={v}
+        onChange={(e) => setFxOpacity({ kind: 'master' }, inst.id, Number(e.target.value))}
+        onDoubleClick={() => setFxOpacity({ kind: 'master' }, inst.id, 1)}
+        className="min-w-0 flex-1 accent-accent2"
+        title={`Vibe dry/wet ${v.toFixed(2)} : how much the palette re-colours the picture. Double-click = full.`}
+      />
+      <span className="w-8 shrink-0 text-right font-mono text-[10px] text-muted">{v.toFixed(2)}</span>
+    </div>
+  )
+}
+
 function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
   const shaderId = inst.shaderId as string
   const sectionKey = `ft-${shaderId.replace('fx-', '')}`
@@ -217,6 +241,8 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
       </div>
       {!collapsed && (
         <div className="border-t border-border">
+          {/* Vibe : global dry/wet FIRST — how much the palette re-colours the picture. */}
+          {isVibe && <VibeOpacityRow inst={inst} />}
           {isContext ? (
             <ContextBody inst={inst} onChange={onChange} modTargetFor={modTargetFor} />
           ) : (

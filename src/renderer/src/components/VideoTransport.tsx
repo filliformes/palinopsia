@@ -204,6 +204,18 @@ export function VideoTransport({
         </button>
         {state.grainOn && (
           <>
+            <select
+              className="input select-compact shrink-0 text-[9px]"
+              value={state.grainSync ?? 0}
+              onChange={(e) => set({ grainSync: Number(e.target.value) })}
+              title="BPM sync : grains retrigger on the beat grid (grain length = this division). free = grain size in seconds."
+            >
+              <option value={0}>free</option>
+              <option value={0.25}>1/16</option>
+              <option value={0.5}>1/8</option>
+              <option value={1}>1/4</option>
+              <option value={2}>1/2</option>
+            </select>
             {([
               ['size', 'grainSize', 0.05, 1, state.grainSize ?? 0.25, 'Grain length (seconds)'],
               ['spray', 'grainSpray', 0, 1, state.grainSpray ?? 0.15, 'Scatter around the playhead'],
@@ -240,6 +252,8 @@ function VideoModRow({ layer, slot, grainOn }: { layer: number; slot: 'A' | 'B';
   const inputs: Array<[string, string]> = [
     ['playhead', 'position'],
     ['speed', 'speed'],
+    ['in', 'loopIn'],
+    ['out', 'loopOut'],
     ...(grainOn ? ([['gr·size', 'grainSize'], ['gr·spray', 'grainSpray']] as Array<[string, string]>) : [])
   ]
   const targets: Record<string, ModTarget> = {}

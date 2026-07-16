@@ -75,6 +75,11 @@ export function Inspector(): JSX.Element {
     const n = Number(localStorage.getItem('opsia.assignPanelW'))
     return Number.isFinite(n) && n >= 150 ? n : 224
   })
+  // Resizable FX-controls band (drag the handle under it; persisted).
+  const [fxH, setFxH] = useState(() => {
+    const n = Number(localStorage.getItem('opsia.inspectorH'))
+    return Number.isFinite(n) && n >= 96 ? n : 136
+  })
   const resize = useRef<{ startX: number; startW: number; last: number } | null>(null)
   // Close the panel whenever the selection moves to a different shader/unit.
   const selKey =
@@ -424,7 +429,8 @@ export function Inspector(): JSX.Element {
                 />
               </div>
             ) : (
-              <div className="h-[8.5rem] overflow-x-auto overflow-y-hidden">
+              <>
+              <div style={{ height: fxH }} className="overflow-x-auto overflow-y-hidden">
                 <AutoControls
                   inputs={inputsForShader(shaderId)}
                   values={values}
@@ -433,6 +439,30 @@ export function Inspector(): JSX.Element {
                   layout="twoRow"
                 />
               </div>
+              {/* Drag to resize the controls band (persisted). */}
+              <div
+                className="h-1 cursor-row-resize bg-border/50 transition-colors hover:bg-accent/60"
+                style={{ touchAction: 'none' }}
+                onPointerDown={(e) => {
+                  const startY = e.clientY
+                  const startH = fxH
+                  const el = e.target as HTMLElement
+                  el.setPointerCapture(e.pointerId)
+                  const move = (ev: PointerEvent): void => {
+                    const h = Math.max(96, Math.min(420, startH + (ev.clientY - startY)))
+                    setFxH(h)
+                    localStorage.setItem('opsia.inspectorH', String(h))
+                  }
+                  const up = (): void => {
+                    el.removeEventListener('pointermove', move)
+                    el.removeEventListener('pointerup', up)
+                  }
+                  el.addEventListener('pointermove', move)
+                  el.addEventListener('pointerup', up)
+                }}
+                title="Drag to resize the Inspector"
+              />
+              </>
             )}
           </div>
           {assign && (

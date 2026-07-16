@@ -82,6 +82,9 @@ export interface SourceSlot extends ShaderInstance {
   grainSpray?: number // scatter around the playhead, 0..1 of the trim, default 0.15
   grainReverse?: number // probability a grain plays backward 0..1, default 0.25
   grainJitter?: number // per-grain speed jitter 0..1, default 0.2
+  // BPM-synced grain clock : grains retrigger on the beat grid. 0 = free-run
+  // (grainSize seconds); else beats-per-grain (0.25 = 16th … 2 = half note).
+  grainSync?: number
   // Source framing (video + capture): sample transform applied on upload.
   zoom?: number // scale about centre, default 1
   panX?: number // -1..1, default 0

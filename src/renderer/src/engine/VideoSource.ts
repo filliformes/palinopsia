@@ -91,9 +91,12 @@ export class VideoSource {
   // raised-cosine envelope; voices are staggered a third of a grain apart and
   // blended by envelope weight in a small GL pass. The transport (or the
   // MODULATED playhead) keeps moving underneath : it is the cloud's centre.
-  private grain = { on: false, size: 0.25, spray: 0.15, reverseP: 0.25, jitter: 0.2 }
+  private grain = { on: false, size: 0.25, spray: 0.15, reverseP: 0.25, jitter: 0.2, sync: 0 }
   private grainSizeMod: number | null = null
   private grainSprayMod: number | null = null
+  // Modulatable loop in/out : a moving loop window (consumed per frame).
+  private loopInMod: number | null = null
+  private loopOutMod: number | null = null
   private voices: Array<{
     v: HTMLVideoElement
     tex: WebGLTexture | null
@@ -112,12 +115,14 @@ export class VideoSource {
   private blendH = 0
   private quad: WebGLBuffer | null = null
 
-  setGrain(g: { on: boolean; size: number; spray: number; reverseP: number; jitter: number }): void {
+  setGrain(g: { on: boolean; size: number; spray: number; reverseP: number; jitter: number; sync: number }): void {
     this.grain = g
   }
   setGrainMod(name: string, v: number): void {
     if (name === 'grainSize') this.grainSizeMod = v
     else if (name === 'grainSpray') this.grainSprayMod = v
+    else if (name === 'loopIn') this.loopInMod = Math.max(0, Math.min(1, v))
+    else if (name === 'loopOut') this.loopOutMod = Math.max(0, Math.min(1, v))
   }
 
   private ensureVoices(): void {
@@ -137,24 +142,34 @@ export class VideoSource {
 
   /** Drive the 3 grain voices : retrigger ended grains around the playhead,
    *  step each voice's clip-time along its grain, one seek at a time. */
-  private tickGrains(nowS: number, lo: number, hi: number): void {
+  private tickGrains(nowS: number, lo: number, hi: number, bpm: number): void {
     this.ensureVoices()
-    const size = Math.max(0.05, Math.min(1, this.grainSizeMod ?? this.grain.size))
+    // BPM sync : grain length = `sync` beats, and retriggers snap to the beat
+    // grid (voices staggered a third of a grain across it) — rhythmic granulation.
+    const beat = 60 / Math.max(20, Math.min(800, bpm))
+    const synced = this.grain.sync > 0
+    const size = synced
+      ? Math.max(0.05, Math.min(2, this.grain.sync * beat))
+      : Math.max(0.05, Math.min(1, this.grainSizeMod ?? this.grain.size))
     const spray = Math.max(0, Math.min(1, this.grainSprayMod ?? this.grain.spray))
     this.grainSizeMod = null
     this.grainSprayMod = null
     const span = Math.max(0.05, hi - lo)
     for (let i = 0; i < this.voices!.length; i++) {
       const g = this.voices![i]
-      const age = g.born < 0 ? Infinity : nowS - g.born
-      if (age >= g.dur) {
+      const stagger = (i / 3) * size
+      // Synced : each voice's grain boundary is quantized to the global beat grid.
+      const bornSync = Math.floor((nowS - stagger) / size) * size + stagger
+      const retrig = synced ? g.born !== bornSync : (g.born < 0 ? Infinity : nowS - g.born) >= g.dur
+      if (retrig) {
         // Retrigger : scatter around the current (possibly modulated) playhead.
         g.dur = size
-        g.born = nowS - (g.born < 0 ? (i / 3) * size : 0) // stagger the first round
+        g.born = synced ? bornSync : nowS - (g.born < 0 ? stagger : 0)
         g.start = Math.max(lo, Math.min(hi - 0.05, this.pos + (Math.random() * 2 - 1) * spray * span))
         g.dir = Math.random() < this.grain.reverseP ? -1 : 1
         g.rate = Math.max(0.1, 1 + (Math.random() * 2 - 1) * this.grain.jitter)
       }
+      const age = nowS - g.born
       if (g.v.paused) void g.v.play().catch(() => {})
       // Target clip-time for this voice = grain start + progress along the grain.
       const t = Math.max(lo, Math.min(hi - 0.02, g.start + Math.min(age, g.dur) * g.rate * g.dir))
@@ -344,12 +359,18 @@ void main(){
    *  clip (the reverse / >16× bug). Forward within the browser's native rate cap
    *  runs on the element's own clock (smoothest); reverse, pendulum-reverse, and
    *  above-cap speed keep playing but OVERRIDE currentTime each frame. */
-  tick(rawDt: number, mul: number): void {
+  tick(rawDt: number, mul: number, bpm = 120): void {
     const v = this.video
     const d = this.duration()
     if (d <= 0) return
-    const lo = Math.max(0, Math.min(1, Math.min(this.pb.inN, this.pb.outN))) * d
-    const hi = Math.max(0, Math.min(1, Math.max(this.pb.inN, this.pb.outN))) * d
+    // Modulatable loop window : a bound modulator overrides the in/out points
+    // this frame (a moving loop). Consumed per frame, like the other mods.
+    const inN = this.loopInMod ?? this.pb.inN
+    const outN = this.loopOutMod ?? this.pb.outN
+    this.loopInMod = null
+    this.loopOutMod = null
+    const lo = Math.max(0, Math.min(1, Math.min(inN, outN))) * d
+    const hi = Math.max(lo + 0.04, Math.max(0, Math.min(1, Math.max(inN, outN))) * d)
     // Native playback is smooth only while the decoder can sustain the rate. Near
     // its 16× cap it stalls (can't decode 16× realtime; a short clip re-seeking
     // its loop point every few ms makes it worse) : which reads as a frozen image
@@ -376,7 +397,7 @@ void main(){
       if (v.playbackRate !== 0.1) v.playbackRate = 0.1
       this.pos = lo + posN * Math.max(0, hi - lo - 0.02)
       if (!Number.isFinite(this.pos)) this.pos = lo
-      if (this.grain.on) this.tickGrains(performance.now() / 1000, lo, hi)
+      if (this.grain.on) this.tickGrains(performance.now() / 1000, lo, hi, bpm)
       else this.seekTowardPos(v)
       return
     }
@@ -435,7 +456,7 @@ void main(){
     // Granular : the transport above still advances `pos` (the cloud's centre);
     // the picture comes from the grain voices, so skip correcting the element.
     if (this.grain.on) {
-      this.tickGrains(performance.now() / 1000, lo, hi)
+      this.tickGrains(performance.now() / 1000, lo, hi, bpm)
       return
     }
 

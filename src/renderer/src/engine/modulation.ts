@@ -806,7 +806,9 @@ const VIDEO_MOD_DESCS: Record<string, ModDesc> = {
   position: { type: 'float', min: 0, max: 1, def: 0.5 },
   speed: { type: 'float', min: 0, max: 4, def: 1 },
   grainSize: { type: 'float', min: 0.05, max: 1, def: 0.25 },
-  grainSpray: { type: 'float', min: 0, max: 1, def: 0.15 }
+  grainSpray: { type: 'float', min: 0, max: 1, def: 0.15 },
+  loopIn: { type: 'float', min: 0, max: 1, def: 0 },
+  loopOut: { type: 'float', min: 0, max: 1, def: 1 }
 }
 
 export function applyModulation(

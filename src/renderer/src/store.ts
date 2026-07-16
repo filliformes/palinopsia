@@ -612,7 +612,7 @@ interface StoreState {
       Pick<
         SourceSlot,
         | 'videoPlaying' | 'videoSpeed' | 'videoDirection' | 'videoLoop' | 'videoIn' | 'videoOut'
-        | 'grainOn' | 'grainSize' | 'grainSpray' | 'grainReverse' | 'grainJitter'
+        | 'grainOn' | 'grainSize' | 'grainSpray' | 'grainReverse' | 'grainJitter' | 'grainSync'
       >
     >
   ) => void
@@ -646,8 +646,8 @@ interface StoreState {
   // Right-side panel view : Layers strips, the compact Mixer (M key), or the
   // Finishing Touches (Vibe/Context/Finalizer) stack. All three occupy the same
   // column; a small tab row switches between them.
-  rightView: 'layers' | 'mixer' | 'finishing' | 'feel'
-  setRightView: (v: 'layers' | 'mixer' | 'finishing' | 'feel') => void
+  rightView: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io'
+  setRightView: (v: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io') => void
   // Back-compat: the M key still toggles the Mixer on/off against Layers.
   mixerView: boolean
   toggleMixerView: () => void
