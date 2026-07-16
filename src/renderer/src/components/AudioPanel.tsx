@@ -76,39 +76,43 @@ export function AudioPanel(): JSX.Element {
               ))}
             </div>
 
-            {/* local device */}
-            {showDevice && (
-              <select
-                className="input select-compact min-w-0 max-w-[180px] flex-1 text-[10px]"
-                value={deviceId ?? ''}
-                onChange={(e) => setDeviceId(e.target.value || null)}
-                title="Local audio input device"
-              >
-                <option value="">Default input</option>
-                {devices.map((d) => (
-                  <option key={d.deviceId} value={d.deviceId}>
-                    {d.label || `Input ${d.deviceId.slice(0, 6)}`}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {/* Reveal the per-layer A/B coupling (CPL) rows. */}
-            <button
-              onClick={() => setShowCoupling(!showCoupling)}
-              title="Show the A/B coupling row on each layer (audio binds the two sources)"
-              className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] ${
-                showCoupling ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted'
-              }`}
-            >
-              coupling
-            </button>
-
-            <div className="flex-1" />
-            <Meters />
           </>
         )}
       </div>
+      {/* Second line : device + coupling + meters (the tab column is narrow). */}
+      {enabled && (
+        <div className="flex min-w-0 items-center gap-2">
+          {showDevice && (
+            <select
+              className="input select-compact min-w-0 flex-1 text-[10px]"
+              value={deviceId ?? ''}
+              onChange={(e) => setDeviceId(e.target.value || null)}
+              title="Local audio input device"
+            >
+              <option value="">Default input</option>
+              {devices.map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>
+                  {d.label || `Input ${d.deviceId.slice(0, 6)}`}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Reveal the per-layer A/B coupling (CPL) rows. */}
+          <button
+            onClick={() => setShowCoupling(!showCoupling)}
+            title="Show the A/B coupling row on each layer (audio binds the two sources)"
+            className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] ${
+              showCoupling ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted'
+            }`}
+          >
+            coupling
+          </button>
+
+          <div className="flex-1" />
+          <Meters />
+        </div>
+      )}
       {enabled && (
         <p className="font-mono text-[9px] leading-tight text-muted">
           Assign to parameters via the <span className="text-accent">audio</span> modulator type
