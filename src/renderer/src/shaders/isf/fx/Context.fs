@@ -26,13 +26,28 @@
     { "NAME": "pbrDepth",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "field depth" },
     { "NAME": "pbrNormal", "TYPE": "image" },
     { "NAME": "pbrHeight", "TYPE": "image" },
-    { "NAME": "pbrAO",     "TYPE": "image" }
+    { "NAME": "pbrAO",     "TYPE": "image" },
+    { "NAME": "voidEdge",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "void" }
   ],
   "PASSES": [
     { "TARGET": "buf", "PERSISTENT": true },
     { }
   ]
 }*/
+
+// Void / edge-dissolve noise (a ragged erosion boundary, not a clean vignette).
+float vHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float vNoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(vHash(i), vHash(i + vec2(1.0, 0.0)), f.x),
+             mix(vHash(i + vec2(0.0, 1.0)), vHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float vFbm(vec2 p) {
+  float s = 0.0, a = 0.5;
+  for (int i = 0; i < 3; i++) { s += a * vNoise(p); p *= 2.03; a *= 0.5; }
+  return s;
+}
 
 void main() {
   vec2 uv = isf_FragNormCoord;
@@ -239,6 +254,17 @@ void main() {
   col *= mix(1.0, 0.35 + 0.65 * vig, depth);
 
   if (lightOrder) col += keyLight; // POST (default)
+
+  // ── VOID : the frame's edges dissolve into the dark with a RAGGED, slowly
+  //    breathing boundary (an erosion eating inward, not a clean vignette).
+  //    0 = exact passthrough; up = the void reaches deeper into the frame. ──
+  if (voidEdge > 0.001) {
+    float vd = length(dv);
+    float n = vFbm(vec2(uv.x * aspect, uv.y) * 6.0 + TIME * 0.03);
+    float reach = mix(0.95, 0.2, voidEdge); // where the erosion begins
+    float diss = smoothstep(reach, reach + 0.4, vd + (n - 0.5) * 0.45);
+    col *= 1.0 - diss;
+  }
 
   gl_FragColor = vec4(col, 1.0);
 }

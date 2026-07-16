@@ -45,6 +45,30 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     swap: 'Flip which eye carries the lag (near ↔ far, left ↔ right). Fixes inverted or reversed depth.',
     mix: 'Dry/wet against the live image. The disparity is temporal, so a still frame is byte-exact — no colour fringing.'
   },
+  'fx-force-lines': {
+    lines: 'How many luminance-contour bands the picture is cut into : the lines of force.',
+    shift: 'How far each ribbon slides along its contour (adjacent bands shear opposite ways).',
+    edge: 'Engrave the band boundaries as dark incrust lines.',
+    gate: 'Confine the cutting to where there is real structure (gradient energy) : flat areas stay untouched.',
+    amount: 'Dry/wet against the untouched image.'
+  },
+  'fx-aperture': {
+    shape: 'The gate : IRIS (circle) · vertical / horizontal SLIT · film GATE (rectangle).',
+    size: 'How open the gate rests. Outside is leader-black.',
+    soft: 'Feather on the gate edge.',
+    flicker: 'The opening re-rolls every drawn frame (a breathing shutter). 0 = steady.',
+    rate: 'The flicker cadence (drawn frames per second).',
+    couple: 'Defocus ↔ gate coupling : as the aperture closes, the lens softens (the focus pull a contracting iris forces).',
+    amount: 'Dry/wet against the untouched image.'
+  },
+  metamorph: {
+    rate: 'How often a new form is born from inside the old one.',
+    size: 'The organism’s resting size.',
+    wobble: 'Boil on the outline : the silhouette’s rim churns.',
+    complexity: 'Body warp : from a soft blob toward a carved, asymmetric figure.',
+    drift: 'How far the lineage wanders around the frame between generations.',
+    inner: 'Faint interior shading so the form reads as a body, not a flat sticker.'
+  },
   'node-feedback': {
     couple: 'Runs a SECOND feedback buffer (fb1) under a diverged transform and cross-mixes it into the main loop. 0 = single buffer. Up = emergent structure neither loop makes alone.',
     couple2: 'How differently the 2nd buffer evolves : scales its zoom/rotate vs the main loop. 1 = same, <1 gentler, >1 wilder. The divergence is what makes the coupling interesting.',
@@ -162,6 +186,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     colorE: 'Palette stop E : a colour the image is mapped toward (lightest).'
   },
   'fx-context': {
+    voidEdge: 'VOID : the frame’s edges dissolve into the dark with a ragged, slowly breathing boundary (an erosion eating inward, not a clean vignette). 0 = off.',
     trails: 'Temporal colour bleed : past frames linger and drift into the distance.',
     blur: 'Soft spatial blur : takes the edge off, pushes things back in space.',
     bloom: 'Highlights glow / bleed light : dreamier, more luminous.',

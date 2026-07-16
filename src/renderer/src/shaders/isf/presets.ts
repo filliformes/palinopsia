@@ -147,6 +147,39 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Freeze (trig)', values: { mode: 1, rate: 6, smooth: 0.0, mix: 1.0 } },
     { name: 'Held tween (trig)', values: { mode: 1, rate: 6, smooth: 0.8, mix: 1.0 } }
   ],
+  // ── Force Lines (incrustation along the image's gradients) ──
+  'fx-force-lines': [
+    { name: 'Engraved', values: { lines: 8, shift: 0.015, edge: 0.7, gate: 0.6, amount: 1.0 } },
+    { name: 'Ribbons', values: { lines: 6, shift: 0.04, edge: 0.3, gate: 0.5, amount: 1.0 } },
+    { name: 'Fine etch', values: { lines: 18, shift: 0.008, edge: 0.8, gate: 0.7, amount: 1.0 } },
+    { name: 'Sliding forms', values: { lines: 4, shift: 0.06, edge: 0.2, gate: 0.4, amount: 1.0 } },
+    { name: 'Contour map', values: { lines: 14, shift: 0.0, edge: 0.9, gate: 0.5, amount: 1.0 } },
+    { name: 'Loose shear', values: { lines: 5, shift: 0.03, edge: 0.4, gate: 0.2, amount: 0.85 } },
+    { name: 'Hard cuts', values: { lines: 10, shift: 0.05, edge: 0.6, gate: 0.8, amount: 1.0 } },
+    { name: 'Subtle inlay', values: { lines: 8, shift: 0.012, edge: 0.35, gate: 0.6, amount: 0.6 } }
+  ],
+  // ── Aperture (gate mask + defocus↔flicker coupling) ──
+  'fx-aperture': [
+    { name: 'Open iris', values: { shape: 0, size: 0.8, soft: 0.15, flicker: 0, rate: 8, couple: 0.4, amount: 1.0 } },
+    { name: 'Closing iris', values: { shape: 0, size: 0.35, soft: 0.12, flicker: 0, rate: 8, couple: 0.8, amount: 1.0 } },
+    { name: 'Breathing gate', values: { shape: 0, size: 0.6, soft: 0.18, flicker: 0.4, rate: 8, couple: 0.6, amount: 1.0 } },
+    { name: 'Projector gate', values: { shape: 3, size: 0.7, soft: 0.06, flicker: 0.15, rate: 12, couple: 0.3, amount: 1.0 } },
+    { name: 'Vertical slit', values: { shape: 1, size: 0.25, soft: 0.1, flicker: 0.2, rate: 6, couple: 0.5, amount: 1.0 } },
+    { name: 'Horizontal band', values: { shape: 2, size: 0.3, soft: 0.14, flicker: 0.2, rate: 6, couple: 0.5, amount: 1.0 } },
+    { name: 'Hard flicker', values: { shape: 0, size: 0.55, soft: 0.05, flicker: 0.8, rate: 14, couple: 0.7, amount: 1.0 } },
+    { name: 'Soft window', values: { shape: 3, size: 0.85, soft: 0.35, flicker: 0, rate: 8, couple: 0.2, amount: 0.8 } }
+  ],
+  // ── Metamorph (birth-from-within silhouettes) ──
+  metamorph: [
+    { name: 'Slow lineage', values: { rate: 0.08, size: 0.3, wobble: 0.4, complexity: 0.5, drift: 0.4, inner: 0.3 } },
+    { name: 'Restless births', values: { rate: 0.3, size: 0.25, wobble: 0.6, complexity: 0.6, drift: 0.6, inner: 0.3 } },
+    { name: 'Great beast', values: { rate: 0.05, size: 0.5, wobble: 0.5, complexity: 0.7, drift: 0.2, inner: 0.5 } },
+    { name: 'Amoeba', values: { rate: 0.12, size: 0.22, wobble: 0.85, complexity: 0.3, drift: 0.5, inner: 0.2 } },
+    { name: 'Carved figure', values: { rate: 0.1, size: 0.35, wobble: 0.25, complexity: 0.85, drift: 0.3, inner: 0.6 } },
+    { name: 'Wanderer', values: { rate: 0.15, size: 0.28, wobble: 0.45, complexity: 0.5, drift: 0.9, inner: 0.3 } },
+    { name: 'Still cell', values: { rate: 0.03, size: 0.32, wobble: 0.3, complexity: 0.4, drift: 0.1, inner: 0.4 } },
+    { name: 'Boiling mass', values: { rate: 0.2, size: 0.4, wobble: 1.0, complexity: 0.6, drift: 0.4, inner: 0.35 } }
+  ],
   // ── Motif (spatial counterpoint / transpose echoes) ──
   'fx-motif': [
     { name: 'Single echo', values: { copies: 1, offX: 0.16, offY: 0.1, rotate: 0.3, scale: 0.88, fade: 0.62, invert: 0, mode: 0 } },

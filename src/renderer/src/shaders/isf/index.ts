@@ -34,6 +34,7 @@ import opArt from './OpArt.fs?raw'
 import directMarks from './DirectMarks.fs?raw'
 import dyeField from './DyeField.fs?raw'
 import reaction from './Reaction.fs?raw'
+import metamorph from './Metamorph.fs?raw'
 import syncOsc from './SyncOsc.fs?raw'
 import differential from './Differential.fs?raw'
 import solidColor from './SolidColor.fs?raw'
@@ -85,6 +86,8 @@ import compress from './fx/Compress.fs?raw'
 import databend from './fx/Databend.fs?raw'
 import pixelSort from './fx/PixelSort.fs?raw'
 import feedbackZoom from './fx/FeedbackZoom.fs?raw'
+import forceLines from './fx/ForceLines.fs?raw'
+import aperture from './fx/Aperture.fs?raw'
 import distort from './fx/Distort.fs?raw'
 import vibe from './fx/Vibe.fs?raw'
 import context from './fx/Context.fs?raw'
@@ -760,6 +763,13 @@ export const GENERATORS: IsfShader[] = [
     curated: { feed: [0.02, 0.06], kill: [0.045, 0.065], rate: [0.6, 1.2], scale: [0.2, 0.8], seed: [0.15, 0.6], sharp: [0.2, 0.8], zoom: [0.6, 2.2], panX: [-0.5, 0.5], panY: [-0.5, 0.5], rotate: [-0.5, 0.5] }
   },
   {
+    id: 'metamorph',
+    name: 'Metamorph',
+    category: 'Generator',
+    source: metamorph,
+    curated: { rate: [0.05, 0.35], size: [0.15, 0.45], wobble: [0.2, 0.8], complexity: [0.2, 0.8], drift: [0.2, 0.7], inner: [0.1, 0.6] }
+  },
+  {
     id: 'sync-osc',
     name: 'Sync Osc',
     category: 'Generator',
@@ -987,6 +997,14 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-feedback-zoom', name: 'Feedback Zoom', category: 'FX', source: feedbackZoom,
     curated: { zoom: [0.95, 1.08], twist: [-0.08, 0.08], amount: [0.35, 0.85] }
+  },
+  {
+    id: 'fx-force-lines', name: 'Force Lines', category: 'FX', source: forceLines,
+    curated: { lines: [4, 16], shift: [0.005, 0.04], edge: [0.2, 0.8], gate: [0.3, 0.8], amount: [0.6, 1] }
+  },
+  {
+    id: 'fx-aperture', name: 'Aperture', category: 'FX', source: aperture,
+    curated: { size: [0.3, 0.9], soft: [0.05, 0.3], flicker: [0, 0.5], rate: [4, 16], couple: [0.2, 0.8], amount: [0.7, 1] }
   },
   {
     id: 'fx-distort', name: 'Distort', category: 'FX', source: distort,

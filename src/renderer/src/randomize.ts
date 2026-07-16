@@ -68,7 +68,8 @@ const FINISHING_SAFE: Record<string, Record<string, [number, number]>> = {
     bloom: [0.0, 0.35], // capped so highlights don't bloom to white
     lightGlow: [0.0, 0.2],
     haze: [0.0, 0.28], // haze washes toward its colour : keep it light
-    depth: [0.0, 0.5] // depth vignette darkens edges : cap it
+    depth: [0.0, 0.5], // depth vignette darkens edges : cap it
+    voidEdge: [0.0, 0.35] // the void eats the frame : keep a dice-roll shallow
   }
 }
 const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(rnd() * arr.length)]
