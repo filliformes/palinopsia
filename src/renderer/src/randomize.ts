@@ -13,6 +13,7 @@ import type {
   CompositionState,
   FxInstance,
   FxScope,
+  LayerMask,
   LayerState,
   LfoShape,
   ModAssignment,
@@ -184,8 +185,18 @@ function drawCount(weights: number[]): number {
 // The convolution nodes are LAYER-FX only (they need a sidechain layer) and
 // heavy, so they join the random pool only for the per-layer FX rack, capped to
 // one per rack, each handed a random sidechain layer so they actually do work.
-const CONV_NODE_IDS = ['node-convolve', 'node-transfert', 'node-reponse']
+const CONV_NODE_IDS = ['node-convolve', 'node-transfert']
 const CONV_NODES = NATIVE_NODES.filter((n) => CONV_NODE_IDS.includes(n.id))
+// The self-contained native nodes need no sidechain, so they join the random pool
+// for EVERY rack (not just layer FX). They're `native`, so they share the "≤1
+// native node per rack" cap below. (node-parallax is excluded : inert without the
+// Depth engine.)
+const SELF_NODE_IDS = [
+  'node-reponse', 'node-datamosh', 'node-feedback', 'node-chronoscan', 'node-sediment',
+  'node-scanner', 'node-autocutter', 'node-eternalism', 'node-afterimage',
+  'node-pulfrich', 'node-corrode', 'node-decimate'
+]
+const SELF_NODES = NATIVE_NODES.filter((n) => SELF_NODE_IDS.includes(n.id))
 const randSidechain = (): SidechainRef => ({ kind: 'layer', layer: Math.floor(rnd() * 4) })
 
 /** Build a rack of n DISTINCT random FX, each with randomized params.
@@ -197,7 +208,7 @@ function randomRack(
   includeConv = false
 ): FxInstance[] {
   const n = drawCount(countWeights)
-  const pool = [...FX_SHADERS, ...(includeConv ? CONV_NODES : [])].filter((f) => !exclude.includes(f.id))
+  const pool = [...FX_SHADERS, ...SELF_NODES, ...(includeConv ? CONV_NODES : [])].filter((f) => !exclude.includes(f.id))
   const picked: typeof FX_SHADERS = []
   let convUsed = 0
   for (let i = 0; i < n && pool.length > 0; i++) {
@@ -349,6 +360,35 @@ const BLENDS = [
   'normal', 'add', 'subtract', 'multiply', 'screen', 'overlay', 'softlight',
   'hardlight', 'darken', 'lighten', 'difference', 'exclusion', 'wrap'
 ] as const
+// The A/B source mix can also use the relation modes (Weave / Lumakey / the
+// stateful Consume). Only used for sourceBlend : as a layer-stack blend they'd
+// fall through to normal.
+const MIX_BLENDS = [...BLENDS, 'weave', 'lumakey', 'consume'] as const
+
+// Occasionally give a layer a spatial mask (mostly none). Keeps the register
+// matte : gentle softness, generous shape size, so it windows rather than hides.
+function randomMask(): LayerMask {
+  const base: LayerMask = {
+    mode: 0, invert: false, soft: 0.1, lumaLo: 0.2, lumaHi: 1,
+    angle: 0, pos: 0.5, cx: 0.5, cy: 0.5, size: 0.4, aspect: 1, round: 1
+  }
+  if (!chance(0.15)) return base
+  return {
+    ...base,
+    mode: pick([1, 2, 3]),
+    invert: chance(0.3),
+    soft: range(0.06, 0.3),
+    lumaLo: range(0.1, 0.4),
+    lumaHi: range(0.7, 1),
+    angle: range(0, 6.283),
+    pos: range(0.3, 0.7),
+    cx: range(0.35, 0.65),
+    cy: range(0.35, 0.65),
+    size: range(0.3, 0.55),
+    aspect: range(0.7, 1.5),
+    round: pick([0, 1])
+  }
+}
 // Activation odds by layer index : a full stack is possible, a duo is common.
 const LAYER_ACTIVE_P = [0.95, 0.7, 0.45, 0.25]
 
@@ -365,11 +405,12 @@ export function randomizeSingleLayer(l: LayerState): LayerState {
     sourceBFx: withB ? randomRack([0.55, 0.35, 0.1]) : [],
     fx: randomRack([0.35, 0.4, 0.2, 0.05], false, [], true),
     sourceMix: withB ? range(0.25, 0.75) : l.sourceMix,
-    sourceBlend: withB ? pick(BLENDS) : l.sourceBlend,
+    sourceBlend: withB ? pick(MIX_BLENDS) : l.sourceBlend,
     blend: pick(BLENDS),
     feedback: chance(0.3),
     feedbackAmount: range(0.3, 0.8),
-    mute: false
+    mute: false,
+    mask: randomMask()
   }
 }
 
@@ -507,7 +548,7 @@ function randomizeStructural(
             sourceB: withB ? randomSlot() : null,
             sourceBFx: withB ? layer.sourceBFx : [],
             sourceMix: withB ? range(0.25, 0.75) : layer.sourceMix,
-            sourceBlend: withB ? pick(BLENDS) : layer.sourceBlend,
+            sourceBlend: withB ? pick(MIX_BLENDS) : layer.sourceBlend,
             mute: false
           }
         } else {
@@ -531,7 +572,8 @@ function randomizeStructural(
           feedback: hasSource ? chance(0.3) : false,
           feedbackAmount: range(0.3, 0.8),
           sourceMix: layer.sourceB?.shaderId ? range(0.2, 0.8) : layer.sourceMix,
-          speed: range(0.5, 1.5) // gentle : extreme speeds are a manual move
+          speed: range(0.5, 1.5), // gentle : extreme speeds are a manual move
+          mask: hasSource ? randomMask() : layer.mask
         }
       }
       return layer
