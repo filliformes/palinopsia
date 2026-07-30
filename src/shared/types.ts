@@ -50,7 +50,14 @@ export const BLEND_MODES: BlendMode[] = [
 // What feeds a layer slot. ISF generator is the MVP path; the rest land
 // in later phases (video + synthify → Phase 7, capture/HIVE → Phase 7,
 // feedback samples another layer's previous frame → Phase 2).
-export type SourceKind = 'none' | 'generator' | 'video' | 'capture' | 'hive' | 'feedback'
+export type SourceKind =
+  | 'none'
+  | 'generator'
+  | 'video'
+  | 'capture'
+  | 'hive'
+  | 'feedback'
+  | 'assemble'
 
 // A live shader instance: which ISF shader, and the current value of each
 // of its declared INPUTS (float → number, color/point2D → number[]).
@@ -64,9 +71,15 @@ export interface SourceSlot extends ShaderInstance {
   // For kind:'feedback' : index of the layer whose previous frame we sample.
   feedbackLayer?: number
   // For kind:'video' : the clip's object URL (or path) the engine loads.
+  // For kind:'assemble' : the assemblage's id (changes on every generate /
+  // Variation, which is what tells the engine to reload the edit).
   mediaId?: string
   // For kind:'video' : the file's display name, shown in the source picker.
   mediaName?: string
+  // For kind:'assemble' : the generated edit decision list, carried ON the slot
+  // so an assemblage travels with sessions and scenes and can be played back
+  // from the source files alone — no corpus re-analysis needed.
+  edl?: import('./assemble').AssembleClip[]
   // For kind:'video' : transport (all optional; engine applies defaults).
   videoPlaying?: boolean // default true
   videoSpeed?: number // 1/28..128, default 1 (× layer speed × global speed)
@@ -697,6 +710,21 @@ export interface ExposedApi {
   }>
   videoConvert: (path: string) => Promise<{ ok: boolean; path?: string; cached?: boolean; error?: string }>
   onVideoConvertProgress: (cb: (p: { path: string; pct: number }) => void) => () => void
+  // Assemble : pick a corpus folder, then sweep it into a descriptor point cloud.
+  assemblePickFolder: () => Promise<string | null>
+  assembleAnalyze: (
+    folder: string,
+    opts?: { minUnit?: number; maxUnit?: number; sensitivity?: number }
+  ) => Promise<{ ok: boolean; corpus?: import('./assemble').AssembleCorpus; error?: string }>
+  onAssembleProgress: (
+    cb: (p: import('./assemble').AnalyzeProgress) => void
+  ) => () => void
+  // Render an assemblage to a real video file (Recorded/).
+  assembleExport: (
+    clips: import('./assemble').AssembleClip[],
+    name: string
+  ) => Promise<{ ok: boolean; path?: string; error?: string }>
+  onAssembleExportProgress: (cb: (p: { pct: number }) => void) => () => void
   // Screens + windows for the capture source picker.
   captureListSources: () => Promise<CaptureSourceInfo[]>
   // Output window (2nd display / projector) : mirror via WebRTC loopback.

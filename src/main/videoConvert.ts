@@ -24,7 +24,8 @@ import { join } from 'path'
 // same file (which corrupts the cache).
 const inflight = new Map<string, Promise<{ ok: boolean; path?: string; cached?: boolean; error?: string }>>()
 // Live ffmpeg children, killed on app quit so a long transcode never orphans.
-const children = new Set<ChildProcess>()
+// Exported so the Assemble analyser's streaming ffmpeg joins the same reaping.
+export const children = new Set<ChildProcess>()
 export function killAllConverts(): void {
   for (const c of children) {
     try { c.kill() } catch { /* already gone */ }
@@ -34,7 +35,7 @@ export function killAllConverts(): void {
 
 let ffmpegPath: string | null | undefined // undefined = not probed yet
 
-function resolveFfmpeg(): string | null {
+export function resolveFfmpeg(): string | null {
   if (ffmpegPath !== undefined) return ffmpegPath
   if (process.env.OPSIA_FFMPEG && existsSync(process.env.OPSIA_FFMPEG)) {
     ffmpegPath = process.env.OPSIA_FFMPEG

@@ -23,6 +23,7 @@ import { ModulationEngine } from './modulators'
 import { OscQueryServer, type OscQueryNode } from './oscquery'
 import { registerMediaScheme, handleMediaProtocol } from './media'
 import { killAllConverts, registerVideoConvert, warmVideoFolder } from './videoConvert'
+import { registerAssemble } from './assemble'
 import { hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
 import { hiveSendStart, hiveSendChunk, hiveSendStop } from './hiveSend'
 import { OutputSender } from './output'
@@ -214,6 +215,7 @@ app.whenReady().then(async () => {
   // Serve local video clips over opsia-media:// (range-capable, persistent).
   handleMediaProtocol()
   registerVideoConvert()
+  registerAssemble()
 
   // Allow Web MIDI + camera/mic/screen capture in the renderer (all local,
   // user-initiated: MIDI-CC learn and video-capture sources).

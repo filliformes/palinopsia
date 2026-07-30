@@ -17,6 +17,7 @@ import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 import { SourceFraming } from './SourceFraming'
 import { VideoTransport } from './VideoTransport'
+import { AssembleTransport } from './AssembleTransport'
 
 // The Vibe Palette's "main" colour = its most characterful stop (highest
 // chroma, luma as a tiebreak), brightened a touch so it reads as a light
@@ -135,7 +136,12 @@ export function Inspector(): JSX.Element {
           hostLayer: li
         }
       }
-    } else if (slot?.kind === 'video' || slot?.kind === 'capture' || slot?.kind === 'hive') {
+    } else if (
+      slot?.kind === 'video' ||
+      slot?.kind === 'capture' ||
+      slot?.kind === 'hive' ||
+      slot?.kind === 'assemble'
+    ) {
       videoName = slot.mediaName ?? slot.kind
       context = `layer ${selection.layer + 1} · src ${selection.slot}`
     }
@@ -200,7 +206,18 @@ export function Inspector(): JSX.Element {
       const capId = vslot?.mediaId ?? ''
       const isDevice = capId.startsWith('device:')
       const isScreen = isCap && !isDevice && capId !== 'webcam'
-      const icon = isHive ? '📡' : !isCap ? '🎞' : isDevice ? '🎥' : capId === 'webcam' ? '📷' : '🖥'
+      const isAsm = vslot?.kind === 'assemble'
+      const icon = isAsm
+        ? '🎬'
+        : isHive
+          ? '📡'
+          : !isCap
+            ? '🎞'
+            : isDevice
+              ? '🎥'
+              : capId === 'webcam'
+                ? '📷'
+                : '🖥'
       return (
         <div className="rounded-md border border-border bg-panel">
           <div className="flex items-start gap-2 px-3 py-2">

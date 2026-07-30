@@ -575,9 +575,12 @@ function SourceRow({
   const isVideo = sourceKind === 'video'
   const isCapture = sourceKind === 'capture'
   const isHive = sourceKind === 'hive'
+  const isAsm = sourceKind === 'assemble'
   // The select's value: a generator id, or a sentinel for the active video /
-  // capture source, or '' for none.
-  const value = isVideo
+  // capture / assemble source, or '' for none.
+  const value = isAsm
+    ? '__assemble__'
+    : isVideo
     ? '__video__'
     : isHive
       ? '__cap_hive__'
@@ -588,7 +591,7 @@ function SourceRow({
             ? '__cap_live__'
             : '__cap_screen__'
         : (shaderId ?? '')
-  const active = isVideo || isCapture || isHive || !!shaderId
+  const active = isVideo || isCapture || isHive || isAsm || !!shaderId
   return (
     <>
       <div className="flex min-w-0 items-center gap-1.5" onClick={onSelect}>
@@ -630,13 +633,19 @@ function SourceRow({
             else if (v === '__cap_screen__') setShowCapture(true)
             else if (v === '__cap_live__') setShowDevices(true)
             else if (v === '__cap_hive__') setShowHive(true)
-            else if (v !== '__video__') onPick(v || null)
+            // The assemble entries are informational : an assemblage is placed
+            // from the assemble tab (it needs the corpus), so selecting either
+            // one just opens that tab rather than silently doing nothing.
+            else if (v === '__assemble_pick__') useStore.getState().setRightView('assemble')
+            else if (v !== '__video__' && v !== '__assemble__') onPick(v || null)
           }}
           onClick={(e) => e.stopPropagation()}
         >
           <option value="">— none —</option>
           {isVideo && <option value="__video__">🎞 {mediaName ?? 'video'}</option>}
+          {isAsm && <option value="__assemble__">🎬 {mediaName ?? 'assemblage'}</option>}
           <option value="__video_pick__">🎞 Import video…</option>
+          <option value="__assemble_pick__">🎬 Assemblage…</option>
           <option value="__cap_webcam__">📷 Webcam</option>
           <option value="__cap_live__">🎥 Live Input…</option>
           <option value="__cap_screen__">🖥 Screen…</option>

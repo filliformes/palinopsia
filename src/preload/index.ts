@@ -56,6 +56,23 @@ const api: ExposedApi = {
     return () => ipcRenderer.off('video:convertProgress', h)
   },
 
+  // ── Assemble (corpus analysis + edit export) ─────────────────────
+  assemblePickFolder: () => ipcRenderer.invoke('assemble:pickFolder'),
+  assembleAnalyze: (folder: string, opts?: { minUnit?: number; maxUnit?: number; sensitivity?: number }) =>
+    ipcRenderer.invoke('assemble:analyze', folder, opts),
+  onAssembleProgress: (cb: (p: import('@shared/assemble').AnalyzeProgress) => void) => {
+    const h = (_e: Electron.IpcRendererEvent, p: import('@shared/assemble').AnalyzeProgress): void => cb(p)
+    ipcRenderer.on('assemble:progress', h)
+    return () => ipcRenderer.off('assemble:progress', h)
+  },
+  assembleExport: (clips: import('@shared/assemble').AssembleClip[], name: string) =>
+    ipcRenderer.invoke('assemble:export', clips, name),
+  onAssembleExportProgress: (cb: (p: { pct: number }) => void) => {
+    const h = (_e: Electron.IpcRendererEvent, p: { pct: number }): void => cb(p)
+    ipcRenderer.on('assemble:exportProgress', h)
+    return () => ipcRenderer.off('assemble:exportProgress', h)
+  },
+
   // ── Output window (2nd display) ──────────────────────────────────
   outputDisplays: () => ipcRenderer.invoke('output:displays'),
   outputOpen: (displayId: number, windowed = false) =>

@@ -27,6 +27,9 @@ import type {
   World
 } from '@shared/types'
 import type { MetaKnobState, MidiBinding } from '@shared/types'
+import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
+import { defaultAssembleParams } from '@shared/assemble'
+import { corpusMap } from './assemble/match'
 import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
 import { beginMorph, cancelMorph } from './morph'
@@ -343,6 +346,16 @@ function loadMidiMap(): Record<string, MidiBinding> {
     return out
   } catch {
     return {}
+  }
+}
+
+function persistAssemblages(list: Assemblage[]): void {
+  try {
+    localStorage.setItem('opsia.assemblages', JSON.stringify(list))
+  } catch {
+    // Quota : an edit list is small, but a long bank of them isn't. The
+    // assemblage still works this session, it just won't survive a restart.
+    console.warn('[assemble] could not persist the assemblage bank (quota)')
   }
 }
 
@@ -693,8 +706,8 @@ interface StoreState {
   // Right-side panel view : Layers strips, the compact Mixer (M key), or the
   // Finishing Touches (Vibe/Context/Finalizer) stack. All three occupy the same
   // column; a small tab row switches between them.
-  rightView: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io'
-  setRightView: (v: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io') => void
+  rightView: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io' | 'assemble'
+  setRightView: (v: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io' | 'assemble') => void
   // Back-compat: the M key still toggles the Mixer on/off against Layers.
   mixerView: boolean
   toggleMixerView: () => void
@@ -891,6 +904,27 @@ interface StoreState {
   setRecording: (on: boolean) => void
   sonify: SoniConfig
   setSonify: (next: SoniConfig) => void
+
+  // ── Assemble : the corpus-based automatic editor ──────────────────────
+  // The corpus is machine-local and derived (re-analysing is near-instant from
+  // the on-disk cache), so only the FOLDER, the recipe and the saved
+  // assemblages persist. `map` holds the PCA layout, recomputed with the corpus.
+  assembleFolder: string
+  assembleCorpus: AssembleCorpus | null
+  assembleMap: Array<[number, number]>
+  assembleParams: AssembleParams
+  assemblages: Assemblage[]
+  /** Non-null while a sweep or an export is running (drives the progress bar). */
+  assembleBusy: { label: string; pct: number } | null
+  setAssembleCorpus: (folder: string, c: AssembleCorpus | null) => void
+  setAssembleParams: (p: Partial<AssembleParams>) => void
+  setAssembleBusy: (b: { label: string; pct: number } | null) => void
+  saveAssemblage: (a: Assemblage) => void
+  deleteAssemblage: (id: string) => void
+  renameAssemblage: (id: string, name: string) => void
+  /** Put an assemblage on a layer as a source (the edit rides on the slot). */
+  setSourceAssemble: (layer: number, slot: 'A' | 'B', a: Assemblage) => void
+
   // Depth engine mode (2.5D) : off · synthetic test bowl · AI monocular estimate.
   depthMode: 'off' | 'synth' | 'estimate'
   setDepthMode: (m: 'off' | 'synth' | 'estimate') => void
@@ -1441,7 +1475,8 @@ export const useStore = create<StoreState>((set, get) => ({
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => {
           const cur = slot === 'A' ? l.sourceA : l.sourceB
-          if (!cur || cur.kind !== 'video') return l
+          // Assemble slots share the play/loop/speed fields with video.
+          if (!cur || (cur.kind !== 'video' && cur.kind !== 'assemble')) return l
           const next = { ...cur, ...patch }
           return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
         })
@@ -2081,6 +2116,90 @@ export const useStore = create<StoreState>((set, get) => ({
     else sonifyEngine.pushConfig(next)
     set({ sonify: next })
   },
+
+  // ── Assemble ──────────────────────────────────────────────────────────
+  assembleFolder: localStorage.getItem('opsia.assembleFolder') ?? '',
+  assembleCorpus: null,
+  assembleMap: [],
+  assembleParams: (() => {
+    try {
+      const raw = localStorage.getItem('opsia.assembleParams')
+      if (raw) return { ...defaultAssembleParams(), ...JSON.parse(raw) } as AssembleParams
+    } catch {
+      /* fall through to defaults */
+    }
+    return defaultAssembleParams()
+  })(),
+  assemblages: (() => {
+    try {
+      return JSON.parse(localStorage.getItem('opsia.assemblages') || '[]') as Assemblage[]
+    } catch {
+      return []
+    }
+  })(),
+  assembleBusy: null,
+  setAssembleCorpus: (folder, c) => {
+    localStorage.setItem('opsia.assembleFolder', folder)
+    // The map is derived from the corpus : compute it once here rather than in
+    // every render of the scatter plot.
+    const map = c && c.units.length ? corpusMap(c.units, c.mean, c.std).pos : []
+    set({ assembleFolder: folder, assembleCorpus: c, assembleMap: map })
+  },
+  setAssembleParams: (p) =>
+    set((s) => {
+      const assembleParams = { ...s.assembleParams, ...p }
+      try {
+        localStorage.setItem('opsia.assembleParams', JSON.stringify(assembleParams))
+      } catch {
+        /* quota : the recipe just won't survive a restart */
+      }
+      return { assembleParams }
+    }),
+  setAssembleBusy: (b) => set({ assembleBusy: b }),
+  saveAssemblage: (a) =>
+    set((s) => {
+      const assemblages = [a, ...s.assemblages.filter((x) => x.id !== a.id)].slice(0, 60)
+      persistAssemblages(assemblages)
+      return { assemblages }
+    }),
+  deleteAssemblage: (id) =>
+    set((s) => {
+      const assemblages = s.assemblages.filter((x) => x.id !== id)
+      persistAssemblages(assemblages)
+      return { assemblages }
+    }),
+  renameAssemblage: (id, name) =>
+    set((s) => {
+      const assemblages = s.assemblages.map((x) => (x.id === id ? { ...x, name } : x))
+      persistAssemblages(assemblages)
+      return { assemblages }
+    }),
+  setSourceAssemble: (layer, slot, a) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: s.composition.layers.map((l, i) =>
+          i !== layer
+            ? l
+            : {
+                ...l,
+                [slot === 'A' ? 'sourceA' : 'sourceB']: {
+                  kind: 'assemble' as const,
+                  shaderId: null,
+                  inputs: {},
+                  mediaId: a.id,
+                  mediaName: a.name,
+                  edl: a.clips,
+                  videoPlaying: true,
+                  videoLoop: a.params.loop
+                },
+                // A source swap clears that slot's FX rack, matching video/capture.
+                [slot === 'A' ? 'sourceAFx' : 'sourceBFx']: []
+              }
+        )
+      },
+      selection: { type: 'source', layer, slot }
+    })),
 
   depthMode: ((): 'off' | 'synth' | 'estimate' => {
     const m = localStorage.getItem('opsia.depthMode')

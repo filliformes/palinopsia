@@ -39,10 +39,12 @@ import { StrobeLimiter } from './strobeLimit';
 import { PbrLib } from './pbrTextures';
 import type { SidechainRef } from '@shared/types';
 import { VideoSource } from './VideoSource';
+import { AssembleSource } from './AssembleSource';
 import { CaptureSource } from './CaptureSource';
 import { HiveSource } from './HiveSource';
 import { videoPlayheads, videoKey } from './videoState';
 import type { SourceSlot } from '@shared/types';
+import type { AssembleClip } from '@shared/assemble';
 import type { CompositionState, FxInstance, FxScope } from '@shared/types';
 
 installTextureBridge();
@@ -716,12 +718,25 @@ export class ISFLayer {
   /** Modulation seam for video slots : `position` (normalized playhead) and
    *  `speed` (rate multiplier) overrides, consumed by the source's next tick. */
   setVideoInput(slot: 'A' | 'B', name: string, v: number): void {
+    // An Assemble slot answers to the same two names : `position` scrubs the
+    // whole edit, `speed` scales it. (No grain — the cuts are the grain.)
+    const as = slot === 'A' ? this.assembleA : this.assembleB;
+    if (as) {
+      if (name === 'position') as.setPosMod(v);
+      else if (name === 'speed') as.setSpeedMod(v);
+      return;
+    }
     const vs = slot === 'A' ? this.videoA : this.videoB;
     if (!vs) return;
     if (name === 'position') vs.setPosMod(v);
     else if (name === 'speed') vs.setSpeedMod(v);
     else vs.setGrainMod(name, v);
   }
+  // Assemble slots (kind:'assemble') : an edit decision list played live.
+  private assembleA: AssembleSource | null = null;
+  private assembleB: AssembleSource | null = null;
+  private assembleIdA: string | null = null;
+  private assembleIdB: string | null = null;
   // Live capture slots (kind:'capture'). Like video: a slot is one kind at once.
   private captureA: CaptureSource | null = null;
   private captureB: CaptureSource | null = null;
@@ -803,6 +818,46 @@ export class ISFLayer {
     }
     if (slot === 'A') { this.videoA = next; this.mediaIdA = mediaId; }
     else { this.videoB = next; this.mediaIdB = mediaId; }
+  }
+
+  /** Activate/refresh/clear an ASSEMBLE slot. Keyed by the assemblage id, which
+   *  changes on every generate and Variation — so a re-roll swaps the edit and
+   *  an untouched one is a cheap no-op every frame. */
+  setAssemble(slot: 'A' | 'B', id: string | null, edl: AssembleClip[] | undefined, loop: boolean): void {
+    const curId = slot === 'A' ? this.assembleIdA : this.assembleIdB;
+    const cur = slot === 'A' ? this.assembleA : this.assembleB;
+    if (id === curId) {
+      // Same edit : `loop` is the only thing that can change without a re-id.
+      cur?.setLoop(loop);
+      return;
+    }
+    try { cur?.dispose(); } catch (e) { console.warn('[assemble] dispose failed:', e); }
+    let next: AssembleSource | null = null;
+    if (id && edl && edl.length) {
+      next = new AssembleSource(this.shared.gl);
+      next.setPlaylist(edl, loop);
+    }
+    if (slot === 'A') { this.assembleA = next; this.assembleIdA = id; }
+    else { this.assembleB = next; this.assembleIdB = id; }
+  }
+
+  /** The live AssembleSource on a slot, if any. The renderer uses this to hand
+   *  target-driven edits their matcher (which needs the corpus from the store,
+   *  so it cannot be built down here). */
+  assemble(slot: 'A' | 'B'): AssembleSource | null {
+    return slot === 'A' ? this.assembleA : this.assembleB;
+  }
+
+  /** Per-frame clock for assemble slots, mirroring tickVideos. Only touches a
+   *  playhead entry when this slot IS an assemblage — tickVideos owns the same
+   *  key for video slots and must not be clobbered. */
+  tickAssemble(layerIndex: number, rawDt: number, mul: number): void {
+    for (const slot of ['A', 'B'] as const) {
+      const a = slot === 'A' ? this.assembleA : this.assembleB;
+      if (!a) continue;
+      try { a.tick(rawDt, mul); } catch { /* a bad clip must not stall the frame */ }
+      videoPlayheads.set(videoKey(layerIndex, slot), { time: a.position(), duration: a.totalDuration() });
+    }
   }
 
   /** Activate/refresh/clear a native TEXT source. Called every frame by
@@ -895,6 +950,13 @@ export class ISFLayer {
 
   /** Push transport params (play/speed/reverse/loop/in/out) to a video slot. */
   setVideoPlayback(slot: 'A' | 'B', s: SourceSlot | null | undefined): void {
+    // Assemble slots share the transport's play/pause flag but have none of the
+    // trim / direction / granulation machinery.
+    const a = slot === 'A' ? this.assembleA : this.assembleB;
+    if (a && s) {
+      a.setPlaying(s.videoPlaying ?? true);
+      return;
+    }
     const v = slot === 'A' ? this.videoA : this.videoB;
     if (!v || !s) return;
     v.setPlayback({
@@ -937,7 +999,7 @@ export class ISFLayer {
     (slot === 'A' ? this.paramA : this.paramB)?.setInput(name, value); // modulation on parametric params
   }
 
-  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null || this.textB !== null || this.paramB !== null; }
+  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null || this.textB !== null || this.paramB !== null || this.assembleB !== null; }
 
   /** Advance the layer clock and stamp it onto every renderer it owns. */
   advanceClock(dtSec: number): void {
@@ -977,7 +1039,7 @@ export class ISFLayer {
 
     // Video / live-capture / HIVE slot: upload the current frame and blit (with
     // the slot's zoom/pan/crop framing) into scratch.
-    const feed = video ?? capture ?? hive;
+    const feed = video ?? capture ?? hive ?? (slot === 'A' ? this.assembleA : this.assembleB);
     if (feed) {
       const tex = feed.upload();
       const framing = slot === 'A' ? this.framingA : this.framingB;
@@ -1018,6 +1080,8 @@ export class ISFLayer {
     this.isfB?.cleanup();
     this.videoA?.dispose();
     this.videoB?.dispose();
+    this.assembleA?.dispose();
+    this.assembleB?.dispose();
     this.captureA?.dispose();
     this.captureB?.dispose();
     this.hiveA?.dispose();
@@ -1650,10 +1714,12 @@ export class Compositor {
       const wantVidA = l.sourceA.kind === 'video' ? (l.sourceA.mediaId ?? null) : null;
       const wantCapA = l.sourceA.kind === 'capture' ? (l.sourceA.mediaId ?? null) : null;
       const wantHiveA = l.sourceA.kind === 'hive' ? (l.sourceA.mediaId ?? null) : null;
+      const wantAsmA = l.sourceA.kind === 'assemble' ? (l.sourceA.mediaId ?? null) : null;
       if (wantA !== L.shaderIdA) L.setShader('A', wantA, wantA ? sourceById(wantA) : null);
       L.setVideo('A', wantVidA);
       L.setCapture('A', wantCapA);
       L.setHive('A', wantHiveA);
+      L.setAssemble('A', wantAsmA, l.sourceA.edl, l.sourceA.videoLoop ?? true);
       L.setText('A', isTextA
         ? { text: l.sourceA.text ?? 'OPSIA', inputs: l.sourceA.inputs, sidechain: l.sourceA.sidechain ?? null }
         : null);
@@ -1665,10 +1731,12 @@ export class Compositor {
       const wantVidB = l.sourceB && l.sourceB.kind === 'video' ? (l.sourceB.mediaId ?? null) : null;
       const wantCapB = l.sourceB && l.sourceB.kind === 'capture' ? (l.sourceB.mediaId ?? null) : null;
       const wantHiveB = l.sourceB && l.sourceB.kind === 'hive' ? (l.sourceB.mediaId ?? null) : null;
+      const wantAsmB = l.sourceB && l.sourceB.kind === 'assemble' ? (l.sourceB.mediaId ?? null) : null;
       if (wantB !== L.shaderIdB) L.setShader('B', wantB, wantB ? sourceById(wantB) : null);
       L.setVideo('B', wantVidB);
       L.setCapture('B', wantCapB);
       L.setHive('B', wantHiveB);
+      L.setAssemble('B', wantAsmB, l.sourceB?.edl, l.sourceB?.videoLoop ?? true);
       L.setText('B', isTextB && l.sourceB
         ? { text: l.sourceB.text ?? 'OPSIA', inputs: l.sourceB.inputs, sidechain: l.sourceB.sidechain ?? null }
         : null);
@@ -1954,6 +2022,7 @@ export class Compositor {
         // Video: pass the REAL delta + the layer×global rate multiplier so the
         // clip plays natively (smooth) at speed·layer·global over realtime.
         L.tickVideos(li, rawDt, this.globalSpeed * L.speed, this.bpm);
+        L.tickAssemble(li, rawDt, this.globalSpeed * L.speed);
         gl.bindVertexArray(null); // ISF draws own the default VAO
         L.renderSource('A', nodeCtx.sidechainTex);
         let sig = L.rackA.apply(L.scratchA.tex, this.chain, nodeCtx); // nodeCtx → native nodes on source A

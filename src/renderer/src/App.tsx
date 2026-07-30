@@ -24,6 +24,7 @@ import { videoSeekRequests } from './engine/videoState'
 import { outputRecorder } from './recorder'
 import { sonifyEngine } from './audio/sonify'
 import { fireSelectedRandomize } from './commands'
+import { syncLiveMatchers } from './assemble/liveMatch'
 import { tickSequencer } from './engine/sequencer'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel, FxChips } from './components/FxRackPanel'
@@ -37,6 +38,7 @@ import { ModulationPanel } from './components/ModulationPanel'
 import { OscPanel } from './components/OscPanel'
 import { AudioPanel } from './components/AudioPanel'
 import { MidiPanel } from './components/MidiPanel'
+import { AssemblePanel } from './components/AssemblePanel'
 import { BackgroundPanel } from './components/BackgroundPanel'
 import { OutputPage } from './components/OutputPage'
 import { SonifyPage } from './components/SonifyPage'
@@ -380,6 +382,13 @@ export default function App(): JSX.Element {
           useStore.getState().setRightView('feel')
           return
         }
+        // E: show/hide the assemble (automatic editor) tab.
+        if (k === 'e') {
+          e.preventDefault()
+          const st = useStore.getState()
+          st.setRightView(st.rightView === 'assemble' ? 'layers' : 'assemble')
+          return
+        }
         // A: show/hide the osc/audio/midi setup tab.
         if (k === 'a') {
           e.preventDefault()
@@ -542,6 +551,10 @@ export default function App(): JSX.Element {
         comp!.setWarp(st.warpEnabled ? st.warpCorners : null, st.warpGrid)
         comp!.setStrobeSafe(st.strobeSafe)
         comp!.syncFromState(c, shaderSourceById)
+        // 1b. Assemble : hand any target-driven edit its matcher, so its next
+        //     cut is chosen from the corpus by what the output looks like now.
+        //     Cheap : a no-op unless the assemblage on a slot actually changed.
+        syncLiveMatchers(comp!)
         // 2. Modulation: refresh the audio bus (OSC/local features), then tick
         //    the 8-slot engine and overlay the mod-matrix on top of the base
         //    values : straight into the Compositor, never through React.
@@ -1031,6 +1044,8 @@ export default function App(): JSX.Element {
             <FinishingTouches />
           ) : rightView === 'feel' ? (
             <FeelPanel />
+          ) : rightView === 'assemble' ? (
+            <AssemblePanel />
           ) : rightView === 'io' ? (
             // Setup lives out of the way : OSC + Audio + MIDI as collapsible
             // sections (A toggles this tab).
@@ -1093,11 +1108,21 @@ function FpsTag(): JSX.Element {
 function RightViewTabs(): JSX.Element {
   const rightView = useStore((s) => s.rightView)
   const setRightView = useStore((s) => s.setRightView)
-  const tabs: Array<{ id: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io'; label: string; title: string }> = [
+  const tabs: Array<{
+    id: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io' | 'assemble'
+    label: string
+    title: string
+  }> = [
     { id: 'layers', label: 'layers', title: 'The 4 layer strips' },
     { id: 'mixer', label: 'mixer', title: 'Compact opacity/speed/blend for all 4 layers (M)' },
     { id: 'finishing', label: 'finishing', title: 'Finishing Touches : Vibe Palette · Context · Finalizer' },
     { id: 'feel', label: 'feel', title: 'Feel : the global macros — Field + Temperament (G)' },
+    {
+      id: 'assemble',
+      label: 'assemble',
+      title:
+        'Assemble (E) : the automatic editor — analyse a folder of video into a descriptor point cloud, then generate an edit from it'
+    },
     { id: 'io', label: 'osc/audio/midi', title: 'Setup (A) : OSC input/OSCQuery, the audio bus, and MIDI (controller input + learned bindings), each a collapsible section' }
   ]
   return (
