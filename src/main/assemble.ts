@@ -32,7 +32,7 @@ import {
   type AssembleUnit,
   type FrameStats
 } from '@shared/assemble'
-import { children, resolveFfmpeg } from './videoConvert'
+import { children, convertToCache, probe, resolveFfmpeg } from './videoConvert'
 
 // Bump when the descriptor set or segmentation changes : old caches are then
 // ignored rather than silently mixing incompatible vectors into one corpus.
@@ -302,17 +302,47 @@ export async function analyzeFolder(
     const path = join(folder, name)
     onProgress({ file: name, index: i, total: names.length, units: units.length, done: false })
     try {
+      // Playback runs through Chromium <video>, which cannot decode DXV / HAP /
+      // ProRes / DNxHD / MPEG-2… — exactly the codecs a VJ folder is full of.
+      // ffmpeg would ANALYSE them happily and the assemblage would then play
+      // black. So: probe first, and route needs-convert files through the same
+      // all-intra H.264 cache the single-clip import uses. The units then carry
+      // the CACHE path, so analysis, live playback and export all read one file
+      // that every pipeline can decode. Cached per source file : the transcode
+      // happens once, ever.
+      let playPath = path
+      const pr = await probe(path)
+      if (pr.needsConvert && pr.ffmpegAvailable) {
+        const conv = await convertToCache(path, (pct) => {
+          // convertToCache reports a 0..1 fraction.
+          onProgress({
+            file: `${name} — converting ${Math.round(pct * 100)}%`,
+            index: i,
+            total: names.length,
+            units: units.length,
+            done: false
+          })
+        })
+        if (!conv.ok || !conv.path) throw new Error(conv.error ?? 'conversion failed')
+        playPath = conv.path
+      }
+      // The analysis cache is keyed by the ORIGINAL file's identity (the
+      // conversion is deterministic, so the derived units are too).
       const cf = join(cacheDir(), `${cacheKey(path, opts)}.json`)
       let mine: AssembleUnit[] | null = null
       if (existsSync(cf)) {
         try {
           mine = JSON.parse(readFileSync(cf, 'utf8')) as AssembleUnit[]
+          // An old cache row may predate the conversion : re-point it.
+          if (mine && mine.some((u) => u.file !== playPath)) {
+            mine = mine.map((u) => ({ ...u, file: playPath }))
+          }
         } catch {
           mine = null // corrupt cache : just re-analyse
         }
       }
       if (!mine) {
-        mine = await analyzeFile(path, name, opts)
+        mine = await analyzeFile(playPath, name, opts)
         try {
           writeFileSync(cf, JSON.stringify(mine))
         } catch {

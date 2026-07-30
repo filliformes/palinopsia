@@ -96,7 +96,7 @@ export interface VideoProbeResult {
   error?: string
 }
 
-async function probe(path: string): Promise<VideoProbeResult> {
+export async function probe(path: string): Promise<VideoProbeResult> {
   try {
     // `ffmpeg -i <file>` exits non-zero (no output requested) but prints the
     // stream info we need on stderr : codec name + duration.
@@ -127,7 +127,7 @@ function cachePathFor(src: string): string {
 /** Convert one clip into the all-intra cache. ATOMIC (writes to .tmp, renames on
  *  success, unlinks on failure — a truncated cache file is never trusted) and
  *  DEDUPED (concurrent requests for the same clip share one ffmpeg). */
-function convertToCache(
+export function convertToCache(
   path: string,
   onProgress?: (pct: number) => void
 ): Promise<{ ok: boolean; path?: string; cached?: boolean; error?: string }> {
