@@ -272,6 +272,9 @@ export function Inspector(): JSX.Element {
           {vslot?.kind === 'video' && (
             <VideoTransport layer={selection.layer} slot={selection.slot} state={vslot} />
           )}
+          {vslot?.kind === 'assemble' && (
+            <AssembleTransport layer={selection.layer} slot={selection.slot} state={vslot} />
+          )}
           {vslot && (
             <SourceFraming layer={selection.layer} slot={selection.slot} state={vslot} />
           )}

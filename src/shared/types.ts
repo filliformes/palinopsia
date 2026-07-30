@@ -635,6 +635,18 @@ export interface OutputFrame {
   // Shared audio texture rows (128 bytes each) : the mirror can't run the
   // audio bus, so per-element audio generators ride the same live data.
   audioRows?: { wave: number[]; spec: number[] }
+  // Assemble mirroring ("layer:slot" → where the control window is in the
+  // edit, plus any clip its live matcher just chose). The mirror runs its own
+  // decks and has no vision bus, so without this it drifts on every load stall
+  // and, in target-driven mode, plays an entirely different edit.
+  assemble?: Array<{
+    key: string
+    idx: number
+    elapsed: number
+    // The full clip list, sent only when live matching changed it — so an
+    // output window opened mid-performance catches up on the next cut.
+    clips?: import('./assemble').AssembleClip[]
+  }>
 }
 
 export interface DisplayInfo {

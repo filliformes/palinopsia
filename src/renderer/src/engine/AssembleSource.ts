@@ -22,7 +22,9 @@ interface Deck {
   src: string // the file currently loaded ('' = nothing)
   pending: boolean // a fresh decoded frame is waiting to be uploaded
   rvfc: number
-  ready: boolean // seeked and holding the right frame
+  seeking: boolean // a seek is in flight (gate : never queue a second)
+  seekAt: number // when it started, for the stuck-seek safety net
+  pendingSeek: (() => void) | null // deferred seek awaiting 'loadedmetadata'
 }
 
 export class AssembleSource {
@@ -37,6 +39,7 @@ export class AssembleSource {
   private primedFor = -1 // clip index the off-screen deck is prepared for
   private speedMod: number | null = null
   private posMod: number | null = null
+  private rate = 1
   private finished = false
   // Live (target-driven) mode : instead of walking a fixed list, ask for the
   // next clip one clip ahead of the cut. The lag is deliberate — the match then
@@ -55,15 +58,17 @@ export class AssembleSource {
     el.playsInline = true
     el.preload = 'auto'
     el.crossOrigin = 'anonymous'
-    const deck: Deck = { el, src: '', pending: false, rvfc: 0, ready: false }
+    const deck: Deck = {
+      el, src: '', pending: false, rvfc: 0, seeking: false, seekAt: 0, pendingSeek: null
+    }
     el.addEventListener('seeked', () => {
-      deck.ready = true
+      deck.seeking = false
       deck.pending = true
     })
     el.addEventListener('error', () => {
-      // A bad file must not wedge the edit — mark it ready so the scheduler
-      // advances past it on the next cut instead of waiting forever.
-      deck.ready = true
+      // A bad file must not wedge the edit : clear the gate so the next seek
+      // can be issued, and let the clip run out its screen time normally.
+      deck.seeking = false
     })
     const step = (): void => {
       deck.pending = true
@@ -81,17 +86,26 @@ export class AssembleSource {
 
   /** Install a new edit. Restarts from the top; a null/empty list goes black. */
   setPlaylist(clips: AssembleClip[], loop: boolean): void {
-    this.clips = clips ?? []
+    // COPY. The caller hands us `SourceSlot.edl`, which is the very same array
+    // object the store holds and the saved assemblage in the bank references.
+    // Live mode pushes onto this list and trimHistory splices its front — doing
+    // that to the store's array silently rewrites the saved edit (and whatever
+    // Export would then render).
+    this.clips = clips ? clips.slice() : []
     this.loop = loop
     this.idx = 0
     this.elapsed = 0
     this.primedFor = -1
     this.finished = false
-    if (this.clips.length) this.cue(this.decks[this.live], this.clips[0], true)
+    this.listDirty = false
+    if (this.clips.length) this.cue(this.decks[this.live], this.clips[0], this.playing)
   }
 
-  /** Same edit, keep playing — used when only `loop` changes. */
+  /** Same edit, keep playing — used when only `loop` changes. Turning loop ON
+   *  after the edit ran out has to un-stick it, or the picture stays frozen on
+   *  the last frame with no way back short of regenerating. */
   setLoop(loop: boolean): void {
+    if (loop && !this.loop) this.finished = false
     this.loop = loop
   }
 
@@ -104,15 +118,71 @@ export class AssembleSource {
     this.liveNext = fn
   }
 
-  /** In live mode the list grows as clips are chosen; keep it bounded so a
-   *  performance running for hours doesn't accumulate forever. */
+  /** In LIVE mode the list grows as clips are chosen; keep it bounded so a
+   *  performance running for hours doesn't accumulate forever.
+   *
+   *  Only ever in live mode : a fixed edit must never be mutated — trimming one
+   *  would permanently delete its opening clips and shorten the loop. */
   private trimHistory(): void {
+    if (!this.liveNext) return
     const KEEP = 64
     if (this.clips.length > KEEP * 2 && this.idx > KEEP) {
       const drop = this.idx - KEEP
       this.clips.splice(0, drop)
       this.idx -= drop
+      this.listDirty = true
     }
+  }
+
+  // ── Output-window mirroring ────────────────────────────────────────────
+  // The projector window runs its OWN Compositor, so it has its own decks and
+  // its own clock — and no vision bus, so it cannot re-match in live mode. Left
+  // alone it drifts on every load stall and, in live mode, plays a completely
+  // different edit. The control window therefore ships its authoritative
+  // position every frame, plus the clip list whenever live matching changed it.
+
+  /** Set whenever live matching changes the list. */
+  private listDirty = false
+
+  /**
+   * Control side : the whole clip list, but only once after it changes.
+   *
+   * Sending the FULL list (not just the new clip) is what lets an output window
+   * opened mid-performance catch up — it re-syncs on the very next cut instead
+   * of being permanently behind by everything it missed. trimHistory keeps the
+   * list bounded, so this is a few KB about once per cut.
+   */
+  takeChangedList(): AssembleClip[] | null {
+    if (!this.listDirty) return null
+    this.listDirty = false
+    return this.clips.slice()
+  }
+
+  /** Output side : adopt the control window's list. `idx`/`elapsed` are left
+   *  alone — syncPosition immediately after is what places the playhead. */
+  replaceClips(clips: AssembleClip[]): void {
+    this.clips = clips
+  }
+
+  /** Output side : snap to the control window's position when we've drifted.
+   *  A small tolerance avoids re-seeking every frame over rounding. */
+  syncPosition(idx: number, elapsed: number): void {
+    if (idx < 0 || idx >= this.clips.length) return
+    if (idx === this.idx && Math.abs(elapsed - this.elapsed) < 0.2) return
+    const deck = this.decks[this.live]
+    if (idx !== this.idx) {
+      this.idx = idx
+      this.primedFor = -1
+      this.finished = false
+      this.cue(deck, this.clips[idx], this.playing)
+    }
+    this.elapsed = elapsed
+    seekGated(deck, this.clips[idx].inSec + elapsed * this.clips[idx].speed)
+  }
+
+  /** Control side : where we are, for the frame payload. */
+  syncState(): { idx: number; elapsed: number } {
+    return { idx: this.idx, elapsed: this.elapsed }
   }
 
   setPlaying(p: boolean): void {
@@ -130,6 +200,12 @@ export class AssembleSource {
     this.speedMod = v
   }
 
+  /** Persistent slot speed (the Inspector slider), distinct from `speedMod`
+   *  which is a modulator's one-frame override. */
+  setRate(r: number): void {
+    this.rate = Number.isFinite(r) && r > 0 ? r : 1
+  }
+
   /** Absolute scrub over the whole assemblage, 0..1 (the `position` mod). */
   setPosMod(v: number): void {
     this.posMod = v
@@ -138,7 +214,7 @@ export class AssembleSource {
   /** Point a deck at a clip and hold its first frame. */
   private cue(deck: Deck, clip: AssembleClip, playNow: boolean): void {
     const url = `opsia-media://local/${encodeURIComponent(clip.file)}`
-    deck.ready = false
+    deck.seeking = false
     if (deck.src !== url) {
       deck.src = url
       deck.el.src = url
@@ -148,15 +224,22 @@ export class AssembleSource {
         /* ignore */
       }
     }
+    // Drop any pending seek from an earlier cue on this deck first. `{once}`
+    // only unregisters AFTER firing, so re-cueing before metadata arrives would
+    // otherwise leave the old handler queued — and it fires first, snapping to
+    // the PREVIOUS clip's in-point before the correct one lands.
+    if (deck.pendingSeek) deck.el.removeEventListener('loadedmetadata', deck.pendingSeek)
     const seek = (): void => {
-      try {
-        deck.el.currentTime = clip.inSec
-      } catch {
-        /* not seekable yet : the loadeddata handler below retries */
-      }
+      deck.pendingSeek = null
+      seekGated(deck, clip.inSec, true)
     }
-    if (deck.el.readyState >= 1) seek()
-    else deck.el.addEventListener('loadedmetadata', seek, { once: true })
+    if (deck.el.readyState >= 1) {
+      deck.pendingSeek = null
+      seek()
+    } else {
+      deck.pendingSeek = seek
+      deck.el.addEventListener('loadedmetadata', seek, { once: true })
+    }
     if (playNow) {
       deck.el.playbackRate = clampRate(clip.speed)
       void deck.el.play().catch(() => {
@@ -198,11 +281,7 @@ export class AssembleSource {
             this.cue(deck, this.clips[i], this.playing)
           }
           this.elapsed = Math.max(0, target - acc)
-          try {
-            deck.el.currentTime = this.clips[i].inSec + this.elapsed * this.clips[i].speed
-          } catch {
-            /* ignore */
-          }
+          seekGated(deck, this.clips[i].inSec + this.elapsed * this.clips[i].speed)
           break
         }
         acc += d
@@ -212,7 +291,7 @@ export class AssembleSource {
 
     if (!this.playing || this.finished) return
 
-    const spd = this.speedMod ?? 1
+    const spd = (this.speedMod ?? 1) * this.rate
     this.speedMod = null
     const rate = clip.speed * mul * spd
     if (Math.abs(deck.el.playbackRate - clampRate(rate)) > 0.01) {
@@ -240,6 +319,14 @@ export class AssembleSource {
 
     if (this.elapsed >= clip.durSec) {
       if (nextIdx < 0) {
+        // A LIVE matcher declining is transient (the vision bus needs a frame
+        // or two after launch), so hold on this clip and ask again next tick.
+        // Only a genuinely exhausted fixed list is terminal — latching
+        // `finished` on a transient decline used to kill playback for good.
+        if (this.liveNext) {
+          this.elapsed = clip.durSec
+          return
+        }
         this.finished = true
         return
       }
@@ -255,7 +342,7 @@ export class AssembleSource {
       this.elapsed = Math.min(carry, this.clips[nextIdx].durSec * 0.5)
       this.primedFor = -1
       const nd = this.decks[this.live]
-      nd.el.playbackRate = clampRate(this.clips[nextIdx].speed * mul)
+      nd.el.playbackRate = clampRate(this.clips[nextIdx].speed * mul * spd)
       void nd.el.play().catch(() => {
         /* ignore */
       })
@@ -270,6 +357,7 @@ export class AssembleSource {
       const picked = this.liveNext(this.clips[this.idx]?.unitId ?? null)
       if (picked) {
         this.clips.push(picked)
+        this.listDirty = true // → the whole list is mirrored to the output window
         return this.idx + 1
       }
     }
@@ -339,6 +427,29 @@ export class AssembleSource {
       this.tex = null
     }
     this.clips = []
+  }
+}
+
+/**
+ * Seek a deck, at most one in flight at a time.
+ *
+ * A bound `position` modulator writes every frame, and assigning currentTime
+ * every frame means the decoder never settles — the playhead moves and the
+ * picture freezes. This is the same gate VideoSource.seekTowardPos uses, for
+ * the same reason: a dead-band to ignore sub-frame noise, one outstanding seek,
+ * and a safety timeout so a seek that never reports back can't wedge the deck.
+ */
+function seekGated(deck: Deck, t: number, force = false): void {
+  if (!Number.isFinite(t)) return
+  if (deck.seeking && performance.now() - deck.seekAt > 4000) deck.seeking = false
+  if (deck.seeking && !force) return
+  if (!force && Math.abs(deck.el.currentTime - t) < 0.04) return
+  try {
+    deck.el.currentTime = Math.max(0, t)
+    deck.seeking = true
+    deck.seekAt = performance.now()
+  } catch {
+    /* not seekable yet : a later frame retries */
   }
 }
 

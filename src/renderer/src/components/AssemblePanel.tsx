@@ -16,7 +16,7 @@ import {
   type CurveShape,
   type MatchMode
 } from '@shared/assemble'
-import { corpusMap, curveAt, edlDuration, generate } from '../assemble/match'
+import { curveAt, edlDuration, generate } from '../assemble/match'
 import { liveDescriptor } from '../assemble/liveMatch'
 import { useStore } from '../store'
 
@@ -58,12 +58,12 @@ export function AssemblePanel(): JSX.Element {
   async function analyze(f: string): Promise<void> {
     setErr('')
     setBusy({ label: 'scanning…', pct: 0 })
-    const off = window.api.onAssembleProgress((p) => {
+    const off = (offRef.current = window.api.onAssembleProgress((p) => {
       setBusy({
         label: p.done ? 'finishing…' : `${p.file} (${p.index + 1}/${p.total}) · ${p.units} units`,
         pct: p.total ? Math.round((p.index / p.total) * 100) : 0
       })
-    })
+    }))
     try {
       const r = await window.api.assembleAnalyze(f)
       if (r.ok && r.corpus) {
@@ -76,6 +76,7 @@ export function AssemblePanel(): JSX.Element {
       setErr((e as Error).message)
     } finally {
       off()
+      offRef.current = null
       setBusy(null)
     }
   }
@@ -88,6 +89,9 @@ export function AssemblePanel(): JSX.Element {
     tried.current = true
     void analyze(folder)
   }, [folder, corpus, busy])
+  // Leaving the tab mid-sweep must not leave the IPC listener attached.
+  const offRef = useRef<null | (() => void)>(null)
+  useEffect(() => () => offRef.current?.(), [])
 
   // ── Generate / vary ───────────────────────────────────────────────────
   function build(seed: number, label?: string): Assemblage | null {
@@ -540,14 +544,25 @@ function CorpusMap(): JSX.Element {
   const setParams = useStore((s) => s.setAssembleParams)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [hover, setHover] = useState<number>(-1)
+  const [w, setW] = useState(240)
   const drag = useRef<'from' | 'to' | null>(null)
 
   const H = 132
 
+  // The right column is user-resizable, and the backing store is sized from
+  // clientWidth — without this the old bitmap just stretches (oval dots, blur).
+  useEffect(() => {
+    const cv = canvasRef.current
+    if (!cv || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => setW(cv.clientWidth || 240))
+    ro.observe(cv)
+    setW(cv.clientWidth || 240)
+    return () => ro.disconnect()
+  }, [])
+
   useEffect(() => {
     const cv = canvasRef.current
     if (!cv || !corpus) return
-    const w = cv.clientWidth || 240
     const dpr = Math.min(2, window.devicePixelRatio || 1)
     cv.width = w * dpr
     cv.height = H * dpr
@@ -596,7 +611,7 @@ function CorpusMap(): JSX.Element {
         g.fillText(label, p[0] * w, p[1] * H)
       }
     }
-  }, [corpus, map, hover, params.mode, params.trajFrom, params.trajTo])
+  }, [corpus, map, hover, w, params.mode, params.trajFrom, params.trajTo])
 
   const at = (e: React.PointerEvent): [number, number] => {
     const r = (e.target as HTMLCanvasElement).getBoundingClientRect()

@@ -12,7 +12,6 @@
 // any assemble slot whose recipe asks for live mode and removes it otherwise.
 
 import {
-  DESCRIPTORS,
   LIVE_DESC_N,
   DESC_N,
   distance,
@@ -22,13 +21,17 @@ import {
   type AssembleParams
 } from '@shared/assemble'
 import type { Compositor } from '../engine/Compositor'
-import { visionBus, type VisionFeatureName } from '../engine/visionIn'
+import type { OutputFrame } from '@shared/types'
+import { visionBus } from '../engine/visionIn'
 import { boltzmannPick, curveMul, joinScale, mulberry32 } from './match'
 import { useStore } from '../store'
 
-/** Read the live image as a descriptor point (the first LIVE_DESC_N axes). */
+/** Read the live image as a descriptor point (the first LIVE_DESC_N axes).
+ *  The bus computes these with the analyser's own `frameStats`, so corpus and
+ *  image really are on one ruler; the legacy `feature()` values are NOT
+ *  interchangeable with them (different definitions of contrast and warmth). */
 export function liveDescriptor(): number[] {
-  return DESCRIPTORS.slice(0, LIVE_DESC_N).map((n) => visionBus.feature(n as VisionFeatureName))
+  return visionBus.descriptor() ?? new Array<number>(LIVE_DESC_N).fill(0.5)
 }
 
 /** Build the per-cut chooser for one assemblage. */
@@ -94,10 +97,22 @@ function makeMatcher(
   }
 }
 
-// One matcher per (layer, slot), rebuilt only when the assemblage on that slot
-// changes — rebuilding every frame would reset the no-repeat history at each cut.
+// One matcher per (layer, slot). Rebuilt only when something it CAPTURED
+// changes — rebuilding every frame would reset the no-repeat history at each
+// cut, but keying on the assemblage id alone meant the closure went on scoring
+// against the recipe and corpus it was born with: dragging similar↔contrast, or
+// re-analysing the folder, changed nothing until you regenerated.
 const installed = new Map<string, string>()
-const matchers = new Map<string, (prev: string | null) => AssembleClip | null>()
+
+/** Everything `makeMatcher` closes over, as a cheap comparable string. */
+function recipeKey(corpus: AssembleCorpus | null, p: AssembleParams): string {
+  return [
+    corpus ? `${corpus.folder}|${corpus.units.length}|${corpus.analyzedAt}` : '-',
+    p.contrast, p.variety, p.noRepeat,
+    p.lenShape, p.lenAmount, p.spdShape, p.spdAmount,
+    p.weights.join(',')
+  ].join('~')
+}
 
 /** Called once per frame by the App loop, after syncFromState. */
 export function syncLiveMatchers(comp: Compositor): void {
@@ -114,24 +129,51 @@ export function syncLiveMatchers(comp: Compositor): void {
       const key = `${li}:${slot}`
       if (!src) {
         installed.delete(key)
-        matchers.delete(key)
         continue
       }
       const layer = st.composition.layers[li]
       const s = slot === 'A' ? layer.sourceA : layer.sourceB
       const id = s?.mediaId ?? ''
-      const want = live ? id : ''
+      const want = live ? `${id}~${recipeKey(corpus, params)}` : ''
       if (installed.get(key) === want) continue
       installed.set(key, want)
-      if (!live || !corpus) {
-        matchers.delete(key)
-        src.setLiveMatcher(null)
-      } else {
-        const fn = makeMatcher(corpus, params, hashSeed(id))
-        matchers.set(key, fn)
-        src.setLiveMatcher(fn)
-      }
+      if (!live || !corpus) src.setLiveMatcher(null)
+      else src.setLiveMatcher(makeMatcher(corpus, params, hashSeed(id)))
     }
+  }
+}
+
+/**
+ * Gather every assemble slot's position for the output-window payload, and
+ * drain any clip a live matcher chose this frame. Returns undefined when no
+ * assemblage is on air, so the common case adds nothing to the frame.
+ */
+export function collectAssembleSync(comp: Compositor): OutputFrame['assemble'] {
+  let out: NonNullable<OutputFrame['assemble']> | undefined
+  for (let li = 0; li < comp.layers.length; li++) {
+    const L = comp.layers[li]
+    if (!L) continue
+    for (const slot of ['A', 'B'] as const) {
+      const src = L.assemble(slot)
+      if (!src) continue
+      const { idx, elapsed } = src.syncState()
+      const clips = src.takeChangedList()
+      ;(out ??= []).push({ key: `${li}:${slot}`, idx, elapsed, ...(clips ? { clips } : {}) })
+    }
+  }
+  return out
+}
+
+/** Output-window side : append newly-matched clips, then follow the position. */
+export function applyAssembleSync(comp: Compositor, rows: OutputFrame['assemble']): void {
+  if (!rows) return
+  for (const r of rows) {
+    const ci = r.key.indexOf(':')
+    const L = comp.layers[Number(r.key.slice(0, ci))]
+    const src = L?.assemble(r.key.slice(ci + 1) === 'B' ? 'B' : 'A')
+    if (!src) continue
+    if (r.clips) src.replaceClips(r.clips)
+    src.syncPosition(r.idx, r.elapsed)
   }
 }
 

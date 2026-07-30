@@ -270,7 +270,15 @@ function pixelWarmth(r: number, g: number, b: number, mx: number, mn: number): n
  * `gray` is written into the caller's scratch buffer so consecutive frames can
  * be differenced without allocating — this runs a few thousand times per file.
  */
-export function frameStats(rgb: Uint8Array, gray: Float32Array, size = GRID): FrameStats {
+export function frameStats(
+  rgb: Uint8Array,
+  gray: Float32Array,
+  size = GRID,
+  // 3 for the analyser's packed RGB strip, 4 for an RGBA readback (the live
+  // vision grid). Both sides MUST go through this one function or the "same
+  // ruler" promise is a lie — see visionIn.descriptor().
+  stride = 3
+): FrameStats {
   const n = size * size
   let sum = 0
   let sumSq = 0
@@ -293,7 +301,7 @@ export function frameStats(rgb: Uint8Array, gray: Float32Array, size = GRID): Fr
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = y * size + x
-      const p = i * 3
+      const p = i * stride
       const r = rgb[p] / 255
       const g = rgb[p + 1] / 255
       const b = rgb[p + 2] / 255
@@ -457,8 +465,12 @@ export function aggregate(frames: FrameStats[], diffs: number[]): number[] {
   v[13] = avg((f) => f.grain)
   v[14] = clamp01(motionVar * 12)
   v[15] = clamp01(flicker * 14)
-  v[16] = clamp01(0.5 + (dx / nd) * 12)
-  v[17] = clamp01(0.5 + (dy / nd) * 12)
+  // Gain 6, not 12 : dx/nd is the centroid shift PER ANALYSIS FRAME (8 fps), so
+  // at 12 anything faster than about two-thirds of a frame-width per second
+  // pinned the axis at 0 or 1 — i.e. most real pans saturated and stopped
+  // discriminating, on exactly the footage the axis was added for.
+  v[16] = clamp01(0.5 + (dx / nd) * 6)
+  v[17] = clamp01(0.5 + (dy / nd) * 6)
   return v
 }
 
@@ -468,8 +480,13 @@ export function aggregate(frames: FrameStats[], diffs: number[]): number[] {
  *  z-scores so a wide-ranging axis can't drown a narrow one. */
 export function corpusStats(units: AssembleUnit[]): { mean: number[]; std: number[] } {
   const mean = new Array<number>(DESC_N).fill(0)
-  const std = new Array<number>(DESC_N).fill(1)
-  if (!units.length) return { mean, std }
+  // NOTE: this MUST start at 0 — it is the sum-of-squares accumulator. Seeding
+  // it with the degenerate-axis sentinel (1) inflates every variance by 1/N,
+  // which is negligible on a big corpus but wrecks a small one: on 10 units an
+  // axis with σ=0.03 came out at 0.32, ten times too wide, so its z-scores
+  // collapsed and its weight slider went inert.
+  const std = new Array<number>(DESC_N).fill(0)
+  if (!units.length) return { mean, std: std.map(() => 1) }
   for (const u of units) for (let d = 0; d < DESC_N; d++) mean[d] += u.desc[d] ?? 0;
   for (let d = 0; d < DESC_N; d++) mean[d] /= units.length;
   for (const u of units) {

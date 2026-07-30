@@ -11,6 +11,7 @@ import { useEffect, useRef } from 'react'
 import type { OutputFrame } from '@shared/types'
 import { Compositor } from '../engine/Compositor'
 import { applyMetaGlides, applyModulation } from '../engine/modulation'
+import { applyAssembleSync } from '../assemble/liveMatch'
 import { applyFieldMacros } from '../engine/field'
 import { clearFrameVals } from '../engine/frameVals'
 import { shaderSourceById } from '../shaders/isf'
@@ -36,6 +37,10 @@ export function OutputView(): JSX.Element {
         comp!.setStrobeSafe(f.strobeSafe ?? 0)
         comp!.setAudioOverride(f.audioRows ?? null)
         comp!.syncFromState(f.c, shaderSourceById)
+        // Assemble : this window walks its own copy of the edit with its own
+        // decks and has no vision bus, so it takes the control window's
+        // position (and any live-matched clip) rather than drifting apart.
+        applyAssembleSync(comp!, f.assemble)
         applyModulation(comp!, f.c, f.modValues, inputsForShader, f.modBypass)
         // In-flight Meta-knob gestures : same engine-side fan-out as the
         // control window (the store/composition only carries settled values).

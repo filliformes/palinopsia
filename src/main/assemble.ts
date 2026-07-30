@@ -15,7 +15,9 @@
 import { app, dialog, ipcMain } from 'electron'
 import { spawn } from 'child_process'
 import { createHash } from 'crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'fs'
+import {
+  existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync
+} from 'fs'
 import { dirname, join } from 'path'
 import {
   aggregate,
@@ -40,6 +42,11 @@ const CACHE_VERSION = 2
 
 const VIDEO_EXTS = /\.(mp4|m4v|mov|dxv|webm|mkv|avi|mpg|mpeg|mxf|m2v)$/i
 const FRAME_BYTES = GRID * GRID * 3
+// Keep roughly one thumbnail per second of footage.
+const THUMB_STRIDE = ANALYSIS_FPS
+// Per-file ceiling for the analysis pass : a stalled ffmpeg is killed, that
+// file is skipped, and the sweep carries on.
+const ANALYZE_TIMEOUT_MS = 5 * 60_000
 
 export interface AnalyzeOptions {
   minUnit: number // shortest kept segment, seconds
@@ -98,6 +105,10 @@ function stripStats(path: string): Promise<{ frames: FrameStats[]; diffs: number
 
     const frames: FrameStats[] = []
     const diffs: number[] = []
+    // One thumb per THUMB_STRIDE frames, not per frame. Only ONE thumb per unit
+    // is ever read, but unit boundaries aren't known until the stream ends —
+    // keeping every frame's chip cost ~44 MB on a 30-minute file and ~180 MB on
+    // a two-hour one, which flatly contradicted this module's memory claim.
     const thumbs: Uint8Array[] = []
     let grayA = new Float32Array(GRID * GRID)
     let grayB = new Float32Array(GRID * GRID)
@@ -124,18 +135,34 @@ function stripStats(path: string): Promise<{ frames: FrameStats[]; diffs: number
         grayA = grayB
         grayB = t
         frames.push(st)
-        thumbs.push(downsampleThumb(rgb))
+        if (frames.length % THUMB_STRIDE === 1) thumbs.push(downsampleThumb(rgb))
       }
     })
     child.stderr.on('data', (d: Buffer) => {
       err += d.toString()
       if (err.length > 32768) err = err.slice(-16384)
     })
+    // An EPIPE on either pipe (most likely when killAllConverts reaps this child
+    // on quit) arrives as an unhandled 'error' event, which THROWS in main.
+    child.stdout.on('error', () => {})
+    child.stderr.on('error', () => {})
+    // Without this, one ffmpeg stalling on a corrupt or network-mounted file
+    // hangs analyzeFolder's sequential await forever — no progress, no way out
+    // but quitting the app.
+    const guard = setTimeout(() => {
+      try {
+        child.kill()
+      } catch {
+        /* already gone */
+      }
+    }, ANALYZE_TIMEOUT_MS)
     child.on('error', (e) => {
+      clearTimeout(guard)
       children.delete(child)
       reject(e)
     })
     child.on('close', () => {
+      clearTimeout(guard)
       children.delete(child)
       if (frames.length === 0) return reject(new Error(err.split('\n').slice(-4).join(' ').trim() || 'no frames'))
       resolve({ frames, diffs, thumbs })
@@ -222,8 +249,9 @@ function analyzeFile(path: string, fileName: string, opts: AnalyzeOptions): Prom
         const fb = Math.round(a + (p + 1) * len)
         if (fb - fa < minF) continue
         const slice = frames.slice(fa, fb)
-        // diffs[i] is the change INTO frame i, so a segment's motion is the
-        // diffs strictly inside it (the first one belongs to the cut itself).
+        // diffs[i] is the change FROM frame i TO frame i+1, so the transitions
+        // strictly inside segment [fa,fb) are diffs[fa .. fb-2], and the cut
+        // spike itself is correctly excluded from both neighbours.
         const dslice = diffs.slice(Math.max(0, fa), Math.max(0, fb - 1))
         const mid = (fa + fb) >> 1
         // Head / tail thirds for the join cost (Schödl's successor rule).
@@ -241,7 +269,10 @@ function analyzeFile(path: string, fileName: string, opts: AnalyzeOptions): Prom
           desc: aggregate(slice, dslice),
           head: aggregate(frames.slice(fa, hEnd), diffs.slice(fa, Math.max(fa, hEnd - 1))),
           tail: aggregate(frames.slice(tStart, fb), diffs.slice(tStart, Math.max(tStart, fb - 1))),
-          thumb: Buffer.from(thumbs[Math.min(mid, thumbs.length - 1)]).toString('base64')
+          thumb: Buffer.from(
+            thumbs[Math.max(0, Math.min((mid / THUMB_STRIDE) | 0, thumbs.length - 1))] ??
+              new Uint8Array(THUMB * THUMB * 3)
+          ).toString('base64')
         })
       }
     }
@@ -303,14 +334,93 @@ export async function analyzeFolder(
 
 // ── Export : render an edit to a real file ───────────────────────────────
 
+// Clips per ffmpeg invocation. Every clip is a separate INPUT (that's what
+// makes the `-ss` input seek cheap), but ffmpeg OPENS AND PROBES every input
+// before emitting a frame — so a 400-clip edit as one command means 400
+// simultaneous demuxers and decoder contexts, minutes pinned at 0%, and
+// gigabytes of RSS. Batching caps that at a constant cost.
+const EXPORT_BATCH = 40
+
+/** Run one ffmpeg, reporting `time=` progress through `onSec`. */
+function runExport(
+  bin: string,
+  args: string[],
+  onSec: (secs: number) => void
+): Promise<{ code: number; err: string }> {
+  return new Promise((resolve) => {
+    const child = spawn(bin, args, { windowsHide: true })
+    children.add(child)
+    let err = ''
+    child.stdout?.on('error', () => {})
+    child.stderr.on('error', () => {})
+    child.stderr.on('data', (d: Buffer) => {
+      const t = d.toString()
+      err += t
+      if (err.length > 32768) err = err.slice(-16384)
+      const m = t.match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/)
+      if (m) onSec(Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]))
+    })
+    child.on('error', (e) => {
+      children.delete(child)
+      resolve({ code: -1, err: (e as Error).message })
+    })
+    child.on('close', (code) => {
+      children.delete(child)
+      resolve({ code: code ?? -1, err })
+    })
+  })
+}
+
+/** Encode one batch of clips into a single intermediate segment. */
+async function exportBatch(
+  bin: string,
+  clips: AssembleClip[],
+  out: string,
+  onSec: (secs: number) => void
+): Promise<string | null> {
+  const args: string[] = ['-hide_banner', '-y']
+  const parts: string[] = []
+  const labels: string[] = []
+  clips.forEach((c, i) => {
+    // Clamp : these clips can come back from localStorage, and a speed of 0
+    // would format to 0.0000 and divide by zero inside setpts.
+    const speed = Math.min(8, Math.max(0.1, Number.isFinite(c.speed) ? c.speed : 1))
+    const inSec = Math.max(0, Number.isFinite(c.inSec) ? c.inSec : 0)
+    const consumed = Math.max(0.02, Math.max(0.02, c.durSec || 0.02) * speed)
+    args.push('-ss', inSec.toFixed(3), '-t', consumed.toFixed(3), '-i', c.file)
+    // setpts divides by speed : `consumed` source seconds play in `durSec` of
+    // output. scale/pad/setsar/fps make every piece concat-compatible.
+    parts.push(
+      `[${i}:v]setpts=(PTS-STARTPTS)/${speed.toFixed(4)},` +
+        `scale=1920:1080:force_original_aspect_ratio=decrease,` +
+        `pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v${i}]`
+    )
+    labels.push(`[v${i}]`)
+  })
+  const graph = `${parts.join(';')};${labels.join('')}concat=n=${clips.length}:v=1:a=0[out]`
+  // A long filtergraph blows past the Windows command-line limit, so it goes
+  // to a script file.
+  const scriptPath = `${out}.graph.txt`
+  writeFileSync(scriptPath, graph)
+  args.push('-filter_complex_script', scriptPath, '-map', '[out]')
+  args.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p')
+  args.push(out)
+  const { code, err } = await runExport(bin, args, onSec)
+  try {
+    unlinkSync(scriptPath)
+  } catch {
+    /* best effort */
+  }
+  if (code === 0 && existsSync(out)) return null
+  return err.split('\n').filter(Boolean).slice(-3).join(' ').trim() || `ffmpeg exited ${code}`
+}
+
 /**
- * Flatten an assemblage into one video with ffmpeg.
+ * Flatten an assemblage into one video.
  *
- * Each clip becomes its own INPUT with `-ss`/`-t` (an input seek, so ffmpeg
- * jumps straight to the in-point instead of decoding from zero), then a
- * filtergraph applies the speed change and normalises geometry/rate so concat
- * will accept the streams. The graph is written to a script file — a 600-clip
- * edit produces a filtergraph far past the Windows command-line limit.
+ * Batches of EXPORT_BATCH clips are encoded to intermediate segments, then the
+ * segments are joined with the concat DEMUXER and `-c copy` — so the footage is
+ * encoded exactly once and the join costs nothing.
  */
 async function exportEdl(
   clips: AssembleClip[],
@@ -324,68 +434,76 @@ async function exportEdl(
   const dir = recordedFolder()
   mkdirSync(dir, { recursive: true })
   const safe = (name || 'assemblage').replace(/[^\w\-. ]+/g, '_').slice(0, 60).trim() || 'assemblage'
-  const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15)
+  // 14 digits = yyyymmddhhmmss; slice(0,15) kept the '.' before the fractional
+  // seconds and produced 'name-20260730041508..mp4'.
+  const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
   const out = join(dir, `${safe}-${stamp}.mp4`)
 
-  const args: string[] = ['-hide_banner', '-y']
-  const parts: string[] = []
-  const labels: string[] = []
-  clips.forEach((c, i) => {
-    const consumed = Math.max(0.02, c.durSec * c.speed)
-    args.push('-ss', c.inSec.toFixed(3), '-t', consumed.toFixed(3), '-i', c.file)
-    // setpts divides by speed : consuming `consumed` source seconds in `durSec`
-    // of output. scale/pad/setsar/fps make every segment concat-compatible.
-    parts.push(
-      `[${i}:v]setpts=(PTS-STARTPTS)/${c.speed.toFixed(4)},` +
-        `scale=1920:1080:force_original_aspect_ratio=decrease,` +
-        `pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v${i}]`
-    )
-    labels.push(`[v${i}]`)
-  })
-  const graph = `${parts.join(';')};${labels.join('')}concat=n=${clips.length}:v=1:a=0[out]`
-  const scriptPath = join(cacheDir(), `graph-${Date.now()}.txt`)
-  writeFileSync(scriptPath, graph)
-  args.push('-filter_complex_script', scriptPath, '-map', '[out]')
-  args.push('-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p')
-  args.push('-movflags', '+faststart', out)
-
-  const total = clips.reduce((s, c) => s + c.durSec, 0)
-  return new Promise((resolve) => {
-    const child = spawn(bin, args, { windowsHide: true })
-    children.add(child)
-    let err = ''
-    child.stderr.on('data', (d: Buffer) => {
-      const s = d.toString()
-      err += s
-      if (err.length > 32768) err = err.slice(-16384)
-      const m = s.match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/)
-      if (m && total > 0) {
-        const secs = Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3])
-        onPct(Math.min(99, Math.round((secs / total) * 100)))
-      }
-    })
-    const cleanup = (): void => {
-      children.delete(child)
+  const total = clips.reduce((s, c) => s + Math.max(0.02, c.durSec || 0.02), 0)
+  const tmp: string[] = []
+  const scrub = (): void => {
+    for (const f of tmp) {
       try {
-        unlinkSync(scriptPath)
+        unlinkSync(f)
       } catch {
         /* best effort */
       }
     }
-    child.on('error', (e) => {
-      cleanup()
-      resolve({ ok: false, error: (e as Error).message })
-    })
-    child.on('close', (code) => {
-      cleanup()
-      if (code === 0 && existsSync(out)) {
-        onPct(100)
-        resolve({ ok: true, path: out })
-      } else {
-        resolve({ ok: false, error: err.split('\n').filter(Boolean).slice(-3).join(' ').trim() || `ffmpeg exited ${code}` })
+  }
+
+  try {
+    let done = 0 // output seconds finished in previous batches
+    for (let i = 0; i < clips.length; i += EXPORT_BATCH) {
+      const batch = clips.slice(i, i + EXPORT_BATCH)
+      const seg = join(cacheDir(), `seg-${stamp}-${(i / EXPORT_BATCH) | 0}.mp4`)
+      tmp.push(seg)
+      const base = done
+      const fail = await exportBatch(bin, batch, seg, (secs) => {
+        if (total > 0) onPct(Math.min(99, Math.round(((base + secs) / total) * 100)))
+      })
+      if (fail) {
+        scrub()
+        return { ok: false, error: fail }
       }
-    })
-  })
+      done += batch.reduce((s, c) => s + Math.max(0.02, c.durSec || 0.02), 0)
+    }
+
+    // One segment : it IS the export, no concat pass needed.
+    if (tmp.length === 1) {
+      renameSync(tmp[0], out)
+      onPct(100)
+      return { ok: true, path: out }
+    }
+
+    // concat demuxer + stream copy : no re-encode, so no generation loss.
+    const listPath = join(cacheDir(), `concat-${stamp}.txt`)
+    // concat-demuxer quoting : a literal ' inside a '…' path is written '\''.
+    const esc = (f: string): string => f.split("'").join("'\\''")
+    writeFileSync(listPath, tmp.map((f) => `file '${esc(f)}'`).join('\n'))
+    const { code, err } = await runExport(
+      bin,
+      ['-hide_banner', '-y', '-f', 'concat', '-safe', '0', '-i', listPath,
+       '-c', 'copy', '-movflags', '+faststart', out],
+      () => {}
+    )
+    try {
+      unlinkSync(listPath)
+    } catch {
+      /* best effort */
+    }
+    scrub()
+    if (code === 0 && existsSync(out)) {
+      onPct(100)
+      return { ok: true, path: out }
+    }
+    return {
+      ok: false,
+      error: err.split('\n').filter(Boolean).slice(-3).join(' ').trim() || `concat exited ${code}`
+    }
+  } catch (e) {
+    scrub()
+    return { ok: false, error: (e as Error).message }
+  }
 }
 
 /** Same destination the output recorder writes to : next to the app in a
@@ -400,6 +518,9 @@ function recordedFolder(): string {
     return join(app.getPath('userData'), 'Recorded')
   }
 }
+
+/** Test seam : the export path is otherwise reachable only over IPC. */
+export const __exportEdlForTest = exportEdl
 
 export function registerAssemble(): void {
   ipcMain.handle('assemble:pickFolder', async () => {

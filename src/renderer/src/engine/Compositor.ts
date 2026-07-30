@@ -955,6 +955,10 @@ export class ISFLayer {
     const a = slot === 'A' ? this.assembleA : this.assembleB;
     if (a && s) {
       a.setPlaying(s.videoPlaying ?? true);
+      // The slot's own speed multiplies the whole edit on top of each clip's
+      // rate. Without this the Inspector's speed slider wrote a value nothing
+      // ever read.
+      a.setRate(s.videoSpeed ?? 1);
       return;
     }
     const v = slot === 'A' ? this.videoA : this.videoB;

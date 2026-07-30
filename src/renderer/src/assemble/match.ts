@@ -14,6 +14,7 @@
 
 import {
   DESC_N,
+  LIVE_DESC_N,
   distance,
   zscore,
   type AssembleClip,
@@ -153,18 +154,39 @@ export function corpusMap(
   }
   const norm = (v: number[]): number => Math.sqrt(v.reduce((s, x) => s + x * x, 0))
 
-  const power = (m: number[][], iters = 80): { vec: number[]; val: number } => {
+  // Project `v` off `against` and renormalise (Gram-Schmidt).
+  const orthonormal = (v: number[], against: number[] | null): number[] => {
+    let out = v
+    if (against) {
+      const d = out.reduce((s, x, i) => s + x * against[i], 0)
+      out = out.map((x, i) => x - d * against[i])
+    }
+    const n2 = norm(out)
+    return n2 > 1e-9 ? out.map((x) => x / n2) : out
+  }
+
+  const power = (
+    m: number[][],
+    against: number[] | null = null,
+    iters = 80
+  ): { vec: number[]; val: number } => {
     // A fixed non-degenerate start beats Math.random() here : the map must be
     // identical every time the same corpus is opened.
-    let v = Array.from({ length: DESC_N }, (_, i) => Math.sin(i * 1.7 + 0.3))
-    let nv = norm(v)
-    v = v.map((x) => x / nv)
+    let v = orthonormal(
+      Array.from({ length: DESC_N }, (_, i) => Math.sin(i * 1.7 + 0.3)),
+      against
+    )
     let val = 0
     for (let k = 0; k < iters; k++) {
-      const w = mulv(m, v)
-      nv = norm(w)
+      // Re-orthogonalising each step keeps the 2nd component from drifting back
+      // onto the 1st when λ1 ≈ λ2, and — critically — means the early-out below
+      // returns a vector that is still perpendicular to it. Returning the raw
+      // start vector instead (as this did) collapsed a rank-1 corpus's map onto
+      // a diagonal line rather than spreading it along one axis.
+      const w = orthonormal(mulv(m, v), against)
+      const nv = norm(mulv(m, v))
       if (nv < 1e-9) return { vec: v, val: 0 }
-      v = w.map((x) => x / nv)
+      v = w
       val = nv
     }
     return { vec: v, val }
@@ -173,7 +195,7 @@ export function corpusMap(
   const p1 = power(cov)
   // Deflate the dominant component so the second iteration finds the next axis.
   const cov2 = cov.map((row, i) => row.map((x, j) => x - p1.val * p1.vec[i] * p1.vec[j]))
-  const p2 = power(cov2)
+  const p2 = power(cov2, p1.vec)
 
   const raw = zs.map(
     (z) =>
@@ -184,8 +206,14 @@ export function corpusMap(
   )
   // Normalize to 0..1 with a small margin so points don't sit on the frame.
   const fit = (vals: number[]): ((v: number) => number) => {
-    const lo = Math.min(...vals)
-    const hi = Math.max(...vals)
+    // reduce, not Math.min(...vals) : spreading one argument per unit blows the
+    // call stack somewhere north of ~100k units.
+    let lo = Infinity
+    let hi = -Infinity
+    for (const v of vals) {
+      if (v < lo) lo = v
+      if (v > hi) hi = v
+    }
     const span = hi - lo
     return span > 1e-6 ? (v) => 0.04 + ((v - lo) / span) * 0.92 : () => 0.5
   }
@@ -289,15 +317,19 @@ export function generate({ corpus, params, seed, map, liveTarget }: GenerateInpu
 
     // Where in descriptor space do we want to be at this moment?
     let target: number[] | null = null
+    // Weights for the TARGET term only. In live mode the vision bus supplies
+    // just the first LIVE_DESC_N axes, and leaving the rest at z=0 is NOT "no
+    // pull" — z=0 is the corpus mean, so a distinctively grainy or bursty shot
+    // gets penalised on axes the live target knows nothing about (and turning
+    // its weight UP made it worse). Zero those weights instead.
+    let tw = w
     if (params.mode === 'trajectory' && trajA && trajB) {
       target = trajA.map((a, i) => a + (trajB[i] - a) * progress)
     } else if (params.mode === 'live' && liveTarget && liveTarget.length) {
-      // The vision bus only supplies the first LIVE_DESC_N axes; the rest are
-      // left at the corpus centre (z = 0) so they exert no pull.
       target = new Array<number>(DESC_N).fill(0)
-      for (let i = 0; i < Math.min(liveTarget.length, DESC_N); i++) {
-        target[i] = (liveTarget[i] - mean[i]) / std[i]
-      }
+      const n = Math.min(liveTarget.length, LIVE_DESC_N)
+      for (let i = 0; i < n; i++) target[i] = (liveTarget[i] - mean[i]) / std[i];
+      tw = w.map((x, i) => (i < n ? x : 0))
     }
 
     const wantJoin = params.contrast * dRef
@@ -305,7 +337,7 @@ export function generate({ corpus, params, seed, map, liveTarget }: GenerateInpu
     for (let i = 0; i < units.length; i++) {
       if (recent.includes(i)) continue
       // Target cost : does this unit sit where we want to be in the space?
-      const tc = target ? distance(z[i], target, w) : 0
+      const tc = target ? distance(z[i], target, tw) : 0
       // Concatenation cost : how does the cut itself read? Compares how the
       // previous clip ENDS to how this one BEGINS (Schödl's successor rule),
       // then measures that against the distance the contrast dial asked for.
@@ -340,6 +372,22 @@ export function generate({ corpus, params, seed, map, liveTarget }: GenerateInpu
     prev = zTail[bestIdx] // the next join is measured from how THIS clip ends
     recent.push(bestIdx)
     while (recent.length > Math.min(params.noRepeat, Math.max(0, units.length - 2))) recent.shift();
+  }
+  // No silent caps : if the clip ceiling stopped us short of the requested
+  // length, say so rather than quietly returning a shorter edit.
+  if (clips.length >= MAX_CLIPS && t < total * 0.95) {
+    console.warn(
+      `[assemble] hit the ${MAX_CLIPS}-clip ceiling at ${t.toFixed(1)}s of a ` +
+        `${total}s target — the corpus's units are very short. Raise the cut-length ` +
+        `curve or the segmentation's minimum unit for a longer edit.`
+    )
+  }
+  // Trim the last clip so the edit lands ON the requested duration instead of
+  // overshooting it by up to a whole clip (which could be 20s).
+  const last = clips[clips.length - 1]
+  if (last && t > total) {
+    const over = t - total
+    if (last.durSec - over >= 0.08) last.durSec = last.durSec - over
   }
   return clips
 }

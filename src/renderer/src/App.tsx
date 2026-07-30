@@ -24,7 +24,8 @@ import { videoSeekRequests } from './engine/videoState'
 import { outputRecorder } from './recorder'
 import { sonifyEngine } from './audio/sonify'
 import { fireSelectedRandomize } from './commands'
-import { syncLiveMatchers } from './assemble/liveMatch'
+import { collectAssembleSync, syncLiveMatchers } from './assemble/liveMatch'
+import { GRID } from '@shared/assemble'
 import { tickSequencer } from './engine/sequencer'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel, FxChips } from './components/FxRackPanel'
@@ -672,12 +673,24 @@ export default function App(): JSX.Element {
         //     or outbound feedback), so the tiny readback is skipped otherwise.
         //     Throttled to ~30Hz : a sync readPixels (even 4KB) flushes the GPU
         //     pipeline, and the vision features don't need frame-rate freshness.
+        //     Assemble's target-driven mode reads the SAME bus, so it has to be
+        //     in this gate too : without it the matcher saw an all-defaults bus
+        //     forever and "follow the live output" silently did nothing unless
+        //     some unrelated vision modulator happened to be switched on.
+        const assembleLive =
+          st.assembleParams.mode === 'live' &&
+          c.layers.some((l) => l.sourceA.kind === 'assemble' || l.sourceB?.kind === 'assemble')
         if (
           now - lastVisionSample > 33 &&
-          (st.oscOutEnabled || c.modulators.some((m) => m.enabled && (m.type === 'vision' || m.type === 'homeostat')))
+          (st.oscOutEnabled ||
+            assembleLive ||
+            c.modulators.some((m) => m.enabled && (m.type === 'vision' || m.type === 'homeostat')))
         ) {
           lastVisionSample = now
-          const vs = comp!.visionSample(32)
+          // Assemble measures its corpus on a GRID² raster, so when it's driving
+          // we sample at the same resolution — the scale-dependent axes (edges,
+          // texture, grain) only compare meaningfully at a matched raster.
+          const vs = comp!.visionSample(assembleLive ? GRID : 32)
           if (vs) visionBus.ingest(vs.grid, vs.size)
         }
         // 3d. Depth (2.5D) : keep the shared depth map current. Off = flat (Parallax
@@ -738,6 +751,10 @@ export default function App(): JSX.Element {
             metaGlides: metaGlides.size ? Array.from(metaGlides) : undefined,
             // One-shot video seeks : the mirror's own decoders seek too.
             videoSeeks,
+            // Assemble : the mirror walks its own copy of the edit, so hand it
+            // our position (it snaps only when it has actually drifted) and any
+            // clip a live matcher just chose (it has no vision bus of its own).
+            assemble: collectAssembleSync(comp!),
             // Per-element audio rows, only when some layer's generator reads them.
             audioRows: c.layers.some(
               (l) =>

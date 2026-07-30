@@ -45,6 +45,11 @@ export function AssembleTransport({
   const clipRef = useRef<HTMLSpanElement | null>(null)
 
   // Live playhead : read the engine's map every frame and poke the DOM.
+  // `clips` is derived (`state.edl ?? []`), so it must NOT be a dependency —
+  // a fresh [] each render would tear down and rebuild this loop every render.
+  // VideoTransport's pattern: key on the slot, read everything else live.
+  const clipsRef = useRef(clips)
+  clipsRef.current = clips
   useEffect(() => {
     let raf = 0
     const key = videoKey(layer, slot)
@@ -56,24 +61,25 @@ export function AssembleTransport({
         if (timeRef.current) timeRef.current.textContent = fmtT(ph.time)
         if (clipRef.current) {
           // Which block are we inside? Cheap linear walk — a few dozen clips.
+          const cs = clipsRef.current
           let acc = 0
           let idx = 0
-          for (let i = 0; i < clips.length; i++) {
-            if (acc + clips[i].durSec > ph.time) {
+          for (let i = 0; i < cs.length; i++) {
+            if (acc + cs[i].durSec > ph.time) {
               idx = i
               break
             }
-            acc += clips[i].durSec
+            acc += cs[i].durSec
             idx = i
           }
-          clipRef.current.textContent = clips.length ? `${idx + 1}/${clips.length}` : '—'
+          clipRef.current.textContent = cs.length ? `${idx + 1}/${cs.length}` : '—'
         }
       }
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [layer, slot, clips])
+  }, [layer, slot])
 
   const set = (patch: Partial<SourceSlot>): void => setSourceVideoPlayback(layer, slot, patch)
 

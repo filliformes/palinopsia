@@ -11,6 +11,8 @@
 // features are 1 frame behind the picture (you can't drive this frame's params
 // from this frame's output) — the same benign latency as audio-reactivity.
 
+import { frameStats } from '@shared/assemble'
+
 export type VisionFeatureName =
   | 'brightness' // mean luminance 0..1
   | 'contrast' // luminance spread (max−min) 0..1
@@ -54,6 +56,15 @@ class VisionBus {
   private gray: Float32Array | null = null
   private prev: Float32Array | null = null
   private ready = false
+  // The live image expressed on the ASSEMBLE corpus's axes (the first
+  // LIVE_DESC_N of DESCRIPTORS). Computed with the very same `frameStats` the
+  // analyser runs, because several of these axes are NOT the same quantity as
+  // the legacy feature above them — corpus `contrast` is RMS where the legacy
+  // one is max−min, and corpus `warmth` is Dimopoulos–Winkler where the legacy
+  // one is a raw R−B. Matching against the legacy numbers aimed the target at
+  // systematically wrong coordinates.
+  private desc: number[] | null = null
+  private descGray: Float32Array | null = null
 
   /** Reduce a size×size RGBA8 grid (from Compositor.visionSample) to features. */
   ingest(grid: Uint8Array, size: number): void {
@@ -119,6 +130,24 @@ class VisionBus {
     this.f.warmth = clamp01(0.5 + (rSum - bSum) / n)
     this.ready = true
 
+    // Corpus-compatible reading of the same grid, on the same code path the
+    // analyser uses. `motion` has no per-frame equivalent in frameStats, so it
+    // reuses the value computed above with the identical ×5 gain `aggregate`
+    // applies. centroidY is flipped because the GL grid arrives bottom-up while
+    // the analyser's ffmpeg frames are top-down.
+    if (!this.descGray || this.descGray.length !== n) this.descGray = new Float32Array(n)
+    const fs = frameStats(grid, this.descGray, size, 4)
+    this.desc = [
+      fs.brightness,
+      fs.contrast,
+      clamp01(motion * 5),
+      fs.edges,
+      fs.entropy,
+      fs.centroidX,
+      1 - fs.centroidY,
+      fs.warmth
+    ]
+
     // Ping-pong : this frame becomes the previous one.
     this.gray = prev
     this.prev = gray
@@ -135,6 +164,12 @@ class VisionBus {
   }
   hasData(): boolean {
     return this.ready
+  }
+
+  /** The live image on the Assemble corpus's axes, or null before the first
+   *  ingest. Assemble's target-driven mode reads this, never `feature()`. */
+  descriptor(): number[] | null {
+    return this.desc
   }
 }
 

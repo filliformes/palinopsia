@@ -36,12 +36,12 @@
     "react-dom": "^18.3.1",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.6.3",
-    "vite": "^8.1.5"
+    "vite": "^7.3.6"
   },
   "allowScripts": {
-    "@serialport/bindings-cpp@12.0.1": true,
-    "electron@33.4.11": true,
-    "esbuild@0.21.5": true,
+    "electron@43.2.0": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.1": true,
     "ffmpeg-static@5.3.0": true
   }
 }

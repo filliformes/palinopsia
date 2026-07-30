@@ -60,12 +60,26 @@ export function suggestSonify(c: CompositionState, cur: SoniConfig): SoniConfig 
 
   c.layers.forEach((l) => {
     const mine = new Map<Voice, number>()
-    const active = (!!l.sourceA.shaderId || l.sourceA.kind === 'video' || !!l.sourceB?.shaderId) && !l.mute
+    // A slot with no shaderId still counts when it carries live footage —
+    // video, capture, HIVE or an assemblage. (Assemble was missing here, so a
+    // layer whose only source was an edit read as an empty layer.)
+    const footage = (k: string): boolean =>
+      k === 'video' || k === 'capture' || k === 'hive' || k === 'assemble'
+    const active =
+      (!!l.sourceA.shaderId ||
+        footage(l.sourceA.kind) ||
+        !!l.sourceB?.shaderId ||
+        (!!l.sourceB && footage(l.sourceB.kind))) &&
+      !l.mute
     if (active) {
       scoreId(l.sourceA.shaderId, mine)
-      // Video/capture sources are motion by nature.
-      if (l.sourceA.kind === 'video' || l.sourceA.kind === 'capture' || l.sourceA.kind === 'hive') {
-        mine.set('flow', (mine.get('flow') ?? 0) + 3)
+      // Footage is motion by nature — and an assemblage is footage that CUTS,
+      // so it earns a little extra (hard cuts are the loudest motion there is).
+      if (footage(l.sourceA.kind)) {
+        mine.set('flow', (mine.get('flow') ?? 0) + (l.sourceA.kind === 'assemble' ? 4 : 3))
+      }
+      if (l.sourceB && footage(l.sourceB.kind)) {
+        mine.set('flow', (mine.get('flow') ?? 0) + 2)
       }
       if (l.sourceB?.shaderId) scoreId(l.sourceB.shaderId, mine, 0.7)
       rack(l.sourceAFx, mine, 0.8)
