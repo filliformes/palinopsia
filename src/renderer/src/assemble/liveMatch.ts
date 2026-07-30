@@ -91,8 +91,12 @@ function makeMatcher(
     const u = units[pick]
     const progress = (step++ % 32) / 32
     const speed = Math.min(8, Math.max(0.1, curveMul(params.spdShape, progress, params.spdAmount, rng())))
-    const durSec = Math.min(20, Math.max(0.05, u.dur * curveMul(params.lenShape, progress, params.lenAmount, rng())))
-    const inSec = Math.max(0, Math.min(u.start, Math.max(0, u.fileDur - durSec * speed)))
+    // Same CUT-dial law as offline generation, same in-shot offset.
+    const base = params.baseCut > 0 ? params.baseCut : u.dur
+    const durSec = Math.min(20, Math.max(0.05, base * curveMul(params.lenShape, progress, params.lenAmount, rng())))
+    const consumed = durSec * speed
+    const slack = Math.max(0, u.dur - consumed)
+    const inSec = Math.max(0, Math.min(u.start + rng() * slack, Math.max(0, u.fileDur - consumed)))
     return { unitId: u.id, file: u.file, fileName: u.fileName, inSec, durSec, speed }
   }
 }
@@ -108,7 +112,7 @@ const installed = new Map<string, string>()
 function recipeKey(corpus: AssembleCorpus | null, p: AssembleParams): string {
   return [
     corpus ? `${corpus.folder}|${corpus.units.length}|${corpus.analyzedAt}` : '-',
-    p.contrast, p.variety, p.noRepeat,
+    p.contrast, p.variety, p.noRepeat, p.baseCut,
     p.lenShape, p.lenAmount, p.spdShape, p.spdAmount,
     p.weights.join(',')
   ].join('~')

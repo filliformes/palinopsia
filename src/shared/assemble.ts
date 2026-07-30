@@ -144,6 +144,11 @@ export interface AssembleParams {
   weights: number[] // DESC_N per-axis matching weights
   duration: number // target output length, seconds
   loop: boolean
+  // Base cut length in SECONDS; 0 = natural (each shot's own analysed length).
+  // This is the pace control : the length curve then breathes AROUND it. At
+  // 0.33s a 10-second loop is ~30 cuts — impossible before this existed,
+  // because no curve shape means "short everywhere".
+  baseCut: number
   lenShape: CurveShape // cut-length curve over the sequence
   lenAmount: number // 0 = even cuts, 1 = ±3 octaves
   spdShape: CurveShape // playback-speed curve over the sequence
@@ -182,6 +187,7 @@ export function defaultAssembleParams(): AssembleParams {
     ),
     duration: 60,
     loop: true,
+    baseCut: 0,
     lenShape: 'flat',
     lenAmount: 0.5,
     spdShape: 'flat',

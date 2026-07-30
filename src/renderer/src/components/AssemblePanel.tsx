@@ -23,6 +23,17 @@ import { useStore } from '../store'
 const fmt = (s: number): string =>
   s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${s.toFixed(1)}s`
 
+// The CUT dial's slider mapping. Position 0 = natural (baseCut 0, shots keep
+// their own lengths); the rest of the travel maps LOG from a leisurely 3s down
+// to a strobing 80ms, so pushing right = faster cutting = more clips.
+const CUT_MAX = 3
+const CUT_MIN = 0.08
+const tToCut = (t: number): number =>
+  t <= 0.001 ? 0 : CUT_MAX * Math.pow(CUT_MIN / CUT_MAX, (t - 0.001) / 0.999)
+const cutToT = (c: number): number =>
+  c <= 0 ? 0 : 0.001 + (Math.log(c / CUT_MAX) / Math.log(CUT_MIN / CUT_MAX)) * 0.999
+const fmtCut = (s: number): string => (s < 1 ? `${Math.round(s * 1000)}ms` : `${s.toFixed(2)}s`)
+
 export function AssemblePanel(): JSX.Element {
   const folder = useStore((s) => s.assembleFolder)
   const corpus = useStore((s) => s.assembleCorpus)
@@ -285,13 +296,38 @@ export function AssemblePanel(): JSX.Element {
           </button>
         </div>
 
+        {/* CUT : the pace dial. Natural = each shot's own analysed length;
+            pushing right shortens EVERY cut toward a fixed base, which is how
+            you get thirty clips into a ten-second loop (≈0.33s). The curve
+            below then breathes around this base. */}
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="w-[86px] shrink-0 font-mono text-[9px] text-muted">cut</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={cutToT(params.baseCut)}
+            onChange={(e) => setParams({ baseCut: tToCut(Number(e.target.value)) })}
+            onDoubleClick={() => setParams({ baseCut: 0 })}
+            className="min-w-0 flex-1 accent-accent"
+            title={
+              params.baseCut > 0
+                ? `Base cut ${fmtCut(params.baseCut)} — ~${Math.max(1, Math.round(params.duration / params.baseCut))} clips at ${fmt(params.duration)}. Double-click for natural.`
+                : 'Natural : each clip keeps its shot’s own length. Push right for a fixed, faster cutting pace (more clips per second).'
+            }
+          />
+          <span className="w-11 shrink-0 text-right font-mono text-[9px] text-muted">
+            {params.baseCut > 0 ? fmtCut(params.baseCut) : 'natural'}
+          </span>
+        </div>
         <Curve
           label="cut length"
           shape={params.lenShape}
           amount={params.lenAmount}
           onShape={(lenShape) => setParams({ lenShape })}
           onAmount={(lenAmount) => setParams({ lenAmount })}
-          hint="How long each clip stays on screen, across the sequence. Rise = cuts get slower; accel = a late rush."
+          hint="How the cut length evolves across the sequence, relative to the CUT base above. Rise = cuts get slower; accel = a late rush."
         />
         <Curve
           label="speed"

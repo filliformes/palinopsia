@@ -361,11 +361,21 @@ export function generate({ corpus, params, seed, map, liveTarget }: GenerateInpu
     const u = units[bestIdx]
     const lenMul = curveMul(params.lenShape, progress, params.lenAmount, rng())
     const spdMul = curveMul(params.spdShape, progress, params.spdAmount, rng())
+    // Drawn unconditionally so a given seed replays identically whatever the
+    // parameters (conditional draws would shift every later draw).
+    const offsetDraw = rng()
     const speed = Math.min(8, Math.max(0.1, spdMul))
-    const durSec = Math.min(20, Math.max(0.05, u.dur * lenMul))
-    // Keep the in-point inside the file even when speed eats source fast.
+    // The CUT dial : 0 = the shot's own analysed length, else an absolute base
+    // in seconds. The length curve breathes around whichever base is chosen.
+    const base = params.baseCut > 0 ? params.baseCut : u.dur
+    const durSec = Math.min(20, Math.max(0.05, base * lenMul))
+    // When the cut is shorter than the shot, start it at a seeded random
+    // moment INSIDE the shot — thirty 0.3s cuts of the same few opening
+    // frames would read as a stutter, not an edit. Then keep the in-point
+    // inside the file even when speed eats source fast.
     const consumed = durSec * speed
-    const inSec = Math.max(0, Math.min(u.start, Math.max(0, u.fileDur - consumed)))
+    const slack = Math.max(0, u.dur - consumed)
+    const inSec = Math.max(0, Math.min(u.start + offsetDraw * slack, Math.max(0, u.fileDur - consumed)))
 
     clips.push({ unitId: u.id, file: u.file, fileName: u.fileName, inSec, durSec, speed })
     t += durSec

@@ -36,6 +36,7 @@ work: **never cheap psychedelia, never a 3D game engine.**
 - [Sequencer](#sequencer-key-q) — auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) · [MIDI](#midi) · [Output & mapping](#output--mapping-key-o) — incl. Flash safety
 - [Sonify — image to sound](#sonify--image-to-sound-key-s) — six voices (Spectra · Orbit · Flow · Raster · Transmission · Filter) · quantizer · audio in recordings
+- [Assemble — the automatic editor](#assemble--the-automatic-editor-key-e) — corpus point cloud · matching modes · cut pace + time curves · export
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
@@ -121,6 +122,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `W` | World editor |
 | `Q` | Sequence page |
 | `S` | **Sonify** page (image-to-sound engine) |
+| `E` | Right column → **assemble** (the automatic editor) |
 | `A` | Right column → **osc/audio/midi** setup tab |
 | `D` / `X` / `I` | Collapse Modulation / Master-FX / Inspector |
 | `R` | Fire the Transport's selected Randomize |
@@ -432,6 +434,39 @@ machine-local). And the whole page speaks **OSC** under `/opsia/sonify/…`
 advertised over OSCQuery and streamed outbound like everything else. Spectra
 also gained **breath** : a per-partial sine↔noise morph (the Coagula blue) from
 glassy additive to breathy bands.
+
+## Assemble — the automatic editor (key `E`)
+
+Concatenative synthesis for video : point the **assemble** tab at a folder of
+films, and every file is segmented into shots and reduced to 18 visual
+descriptors (brightness, motion, warmth, texture, drift…). The corpus becomes a
+**point cloud where neighbours look alike**; an edit is a walk through it,
+played live as a layer source — so it takes FX, blends and modulation like any
+other picture.
+
+- **Corpus** — `folder…` scans the folder's top level (`mp4 m4v mov webm mkv avi
+  mpg mpeg mxf m2v dxv`). Codecs Chromium can't play (DXV, HAP, ProRes, DNxHD,
+  MPEG-2) are converted **once** into the same cache your video imports use —
+  first sweep of a heavy folder takes time, every later one is seconds.
+- **Map** — the cloud, tinted by each shot's own colour. In *trajectory* mode,
+  drag **A → B** and the edit travels that path.
+- **Matching** — *free walk* (each clip chosen against the last), *trajectory*,
+  or *follow the live output* (the edit chases what Opsia is showing, re-matching
+  at every cut). The **similar ↔ contrast** dial asks for morphing joins or
+  whiplash ones; **variety** loosens the choice; the weight sliders decide what
+  "similar" means (set motion to full and colour to zero and it matches purely
+  on movement).
+- **Time** — output **length** + **loop**, then the pace machinery :
+  **cut** sets the base cut length — `natural` keeps each shot's own duration;
+  push right for a fixed pace (at **0.33s, a 10-second loop is ~30 cuts**; each
+  cut then starts at a fresh moment inside its shot). The two **curves** (cut
+  length · speed) shape how that pace and the playback rate evolve across the
+  sequence — cross them for slow-motion stutter into accelerating cuts.
+- **Generate** builds the edit onto the selected layer slot instantly; **Vary**
+  re-rolls the same recipe; name + **save** keeps it in the bank; **export…**
+  renders it to `Recorded/` via ffmpeg. Assemblages travel with sessions and
+  scenes, and the Inspector shows a cut-timeline transport with `position` /
+  `speed` as mod targets.
 
 ## Sessions, scenes & themes
 
