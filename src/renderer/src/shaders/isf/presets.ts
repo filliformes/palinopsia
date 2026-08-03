@@ -348,6 +348,14 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Motion edges', values: { width: 20, amount: 0.9, mode: 4, soften: 0.15, drift: 0, hue: 0, preserve: 0.4 } },
     { name: 'Frozen deep', values: { width: 400, amount: 1, mode: 0, soften: 0.4, drift: 0, hue: 0.01 } }
   ],
+  'node-autocutter': [
+    { name: 'Clean cut-up', values: { cuts: 20, rotate: 0.3, slip: 0, gap: 0.15, contour: 0, torn: 0, mix: 1, rate: 0 } },
+    { name: 'Magazine tear', values: { cuts: 14, rotate: 0.2, slip: 0.05, gap: 0, contour: 0.55, torn: 0.55, mix: 1, rate: 0 } },
+    { name: 'Ripped poster', values: { cuts: 8, rotate: 0.1, slip: 0.1, gap: 0, contour: 0.75, torn: 0.8, mix: 1, rate: 0 } },
+    { name: 'Paper storm', values: { cuts: 36, rotate: 0.5, slip: 0.2, gap: 0, contour: 0.6, torn: 0.45, mix: 1, rate: 1.2 } },
+    { name: 'Wavy cut', values: { cuts: 24, rotate: 0.35, slip: 0, gap: 0.2, contour: 0.45, torn: 0, mix: 1, rate: 0 } },
+    { name: 'Collage subtle', values: { cuts: 10, rotate: 0.15, slip: 0, gap: 0, contour: 0.4, torn: 0.35, mix: 0.85, rate: 0 } }
+  ],
   'fx-hue-rotate': [
     { name: 'Quarter turn', values: { shift: 0.25, byLuma: 0 } },
     { name: 'Complement', values: { shift: 0.5, byLuma: 0 } },

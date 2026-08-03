@@ -532,8 +532,26 @@ uniform int uCount;
 uniform vec4 uCell[64];   // dest rect (x,y,w,h)
 uniform vec4 uMap[64];    // source rect (x,y,w,h)
 uniform float uRot[64];   // 0..3 (×90°)
-uniform float uGap, uSlip, uMix, uSeed;
+uniform float uGap, uSlip, uMix, uSeed, uContour, uTorn;
 float hash(float x){ return fract(sin(x * 91.7 + uSeed * 57.0) * 43758.5453); }
+// 2D value noise for the tear lines : re-seeded per cut, so every re-cut tears
+// along fresh contours.
+float vhash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)) + uSeed * 0.031) * 43758.5453); }
+float vnoise(vec2 p){
+  vec2 i = floor(p); vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(vhash(i), vhash(i + vec2(1.0, 0.0)), f.x),
+             mix(vhash(i + vec2(0.0, 1.0)), vhash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+// CONTOUR : a continuous domain warp of the cell lookup. Because every pixel
+// still resolves to exactly ONE (warped) cell, the pieces stay a perfect
+// tessellation — no gaps, no overlaps — while their boundaries wander (coarse
+// octave) and fray (fine octave) like torn paper instead of ruled cuts.
+vec2 tearWarp(vec2 p){
+  vec2 w = (vec2(vnoise(p * 9.0), vnoise(p * 9.0 + 31.7)) - 0.5) * 0.75
+         + (vec2(vnoise(p * 47.0 + 11.3), vnoise(p * 47.0 + 71.9)) - 0.5) * 0.25;
+  return p + w * uContour * 0.045;
+}
 vec2 rot90(vec2 p, float r){
   p -= 0.5; int ri = int(r + 0.5);
   if (ri == 1) p = vec2(-p.y, p.x);
@@ -544,17 +562,33 @@ vec2 rot90(vec2 p, float r){
 void main(){
   vec3 orig = texture(uHost, vUV).rgb;
   vec3 col = orig;
+  vec2 wUV = uContour > 0.001 ? clamp(tearWarp(vUV), 0.0001, 0.9999) : vUV;
   for (int i = 0; i < 64; i++){
     if (i >= uCount) break;
     vec4 d = uCell[i];
-    if (vUV.x >= d.x && vUV.x < d.x + d.z && vUV.y >= d.y && vUV.y < d.y + d.w){
-      vec2 luv = rot90((vUV - d.xy) / d.zw, uRot[i]);
+    if (wUV.x >= d.x && wUV.x < d.x + d.z && wUV.y >= d.y && wUV.y < d.y + d.w){
+      vec2 luv = rot90((wUV - d.xy) / d.zw, uRot[i]);
       vec4 sr = uMap[i];
       vec2 slip = (vec2(hash(float(i) + 1.3), hash(float(i) + 7.7)) - 0.5) * uSlip;
       col = texture(uHost, sr.xy + (luv + slip) * sr.zw).rgb;
+      // Distance to the piece's edge, measured in the WARPED domain so seams,
+      // shadow and fringe all follow the torn contour, not the hidden rectangle.
+      vec2 e = min(wUV - d.xy, d.xy + d.zw - wUV);
+      float ed = min(e.x, e.y);
       if (uGap > 0.001){                                             // dark seams
-        vec2 e = min(vUV - d.xy, d.xy + d.zw - vUV);
-        col *= smoothstep(0.0, uGap * 0.02, min(e.x, e.y));
+        col *= smoothstep(0.0, uGap * 0.02, ed);
+      }
+      if (uTorn > 0.001){
+        // TORN PAPER : a ragged-width off-white fringe along the tear (the
+        // magazine page's substrate showing at the rip), over a soft collage
+        // shadow just inside the piece. Fibre noise keeps both irregular.
+        float rag = 0.5 + 0.5 * vnoise(wUV * 90.0);
+        float fw = uTorn * 0.010 * (0.35 + 0.65 * rag);
+        float sh = smoothstep(fw * 0.8, fw + 0.022 * uTorn, ed);
+        col *= 1.0 - (1.0 - sh) * 0.3 * uTorn;
+        float paper = 1.0 - smoothstep(0.0, fw, ed);
+        vec3 paperCol = vec3(0.93, 0.91, 0.87) * (0.80 + 0.20 * vnoise(wUV * 160.0));
+        col = mix(col, paperCol, paper * min(uTorn * 2.0, 1.0));
       }
       break;
     }
@@ -1879,6 +1913,8 @@ export class AutocutterNode implements ConvNode {
     gl.uniform1f(p.u('uGap'), clampf(num(inp.gap, 0.15), 0, 1))
     gl.uniform1f(p.u('uSlip'), clampf(num(inp.slip, 0), 0, 1))
     gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
+    gl.uniform1f(p.u('uContour'), clampf(num(inp.contour, 0), 0, 1))
+    gl.uniform1f(p.u('uTorn'), clampf(num(inp.torn, 0), 0, 1))
     gl.uniform1f(p.u('uSeed'), this.seed % 1024)
     gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)

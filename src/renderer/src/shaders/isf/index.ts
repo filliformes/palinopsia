@@ -338,13 +338,15 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Autocutter : a cut-up collage. The frame is recursively split (binary space partition) into ragged rectangles, then the pieces are SHUFFLED among their slots and optionally rotated — so the picture is chopped and rearranged. The scramble LAYOUT holds still while the live video keeps playing inside every piece, so it stays kinetic. CUTS sets how many pieces, ROTATE how many are turned, SLIP nudges each piece's source, SEAMS draws dark cuts between pieces, MIX blends back toward the original. TRIGGER (cut ▸) makes a fresh cut on its rising edge (button / OSC / a modulator via M); AUTO RATE (Hz) re-cuts on its own for hands-free live rhythm. Layer-FX only.",
+      "DESCRIPTION": "Autocutter : a cut-up collage. The frame is recursively split (binary space partition) into ragged rectangles, then the pieces are SHUFFLED among their slots and optionally rotated — so the picture is chopped and rearranged. The scramble LAYOUT holds still while the live video keeps playing inside every piece, so it stays kinetic. CUTS sets how many pieces, ROTATE how many are turned, SLIP nudges each piece's source, SEAMS draws dark cuts between pieces, MIX blends back toward the original. CONTOUR bends the cuts into uneven, curved tear-lines (the pieces still tessellate perfectly — no gaps, ever); TORN PAPER adds the ripped-magazine edge : a ragged off-white paper fringe along each tear over a soft collage shadow. Both re-tear on every cut. TRIGGER (cut ▸) makes a fresh cut on its rising edge (button / OSC / a modulator via M); AUTO RATE (Hz) re-cuts on its own for hands-free live rhythm. Layer-FX only.",
       "CATEGORIES": ["FX", "Glitch"],
       "INPUTS": [
         { "NAME": "cuts", "TYPE": "float", "MIN": 2.0, "MAX": 64.0, "DEFAULT": 20.0, "LABEL": "cuts" },
         { "NAME": "rotate", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "rotate" },
         { "NAME": "slip", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "slip" },
         { "NAME": "gap", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "seams" },
+        { "NAME": "contour", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "contour" },
+        { "NAME": "torn", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "torn paper" },
         { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" },
         { "NAME": "rate", "TYPE": "float", "MIN": 0.0, "MAX": 8.0, "DEFAULT": 0.0, "LABEL": "auto rate" },
         { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "cut ▸" }
@@ -355,6 +357,8 @@ export const NATIVE_NODES: IsfShader[] = [
       rotate: [0, 0.6],
       slip: [0, 0.3],
       gap: [0, 0.4],
+      contour: [0.2, 0.8],
+      torn: [0, 0.7],
       mix: [0.7, 1.0],
       rate: [0, 2]
     }
