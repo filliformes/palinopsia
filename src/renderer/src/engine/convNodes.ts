@@ -598,9 +598,11 @@ void main(){
         // of hairline tear broken by broad white bites — the way a real rip
         // crosses the paper grain unevenly — with mid-frequency fibre raggedness
         // on top. Runs to 2.0 for fat, chewed-up edges.
-        float patch = pow(vnoise(wUV * 6.0 + 13.7), 3.0);
+        // ('patch' is a RESERVED WORD in GLSL ES 3.00 — naming this variable
+        // that killed the whole program compile and every Autocutter with it.)
+        float bite = pow(vnoise(wUV * 6.0 + 13.7), 3.0);
         float rag = 0.5 + 0.5 * vnoise(wUV * 90.0);
-        float fw = uTorn * 0.012 * (0.06 + 2.4 * patch + 0.45 * rag);
+        float fw = uTorn * 0.012 * (0.06 + 2.4 * bite + 0.45 * rag);
         float sh = smoothstep(fw * 0.8, fw + 0.020 * uTorn, ed);
         col *= 1.0 - (1.0 - sh) * 0.3 * min(uTorn, 1.0);
         float paper = 1.0 - smoothstep(0.0, fw, ed);
