@@ -487,10 +487,46 @@ export default function App(): JSX.Element {
     }
   }, [setUiZoom])
 
+  // Bumped when the GPU comes back after a driver reset : re-keys the engine
+  // effect below, which rebuilds the Compositor on the restored context.
+  const [glEpoch, setGlEpoch] = useState(0)
+
   // ── Engine: mount the Compositor + run the frame loop ───────────────
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
+
+    // GPU-loss recovery. A driver reset (Windows TDR — heavy sessions on two
+    // displays can provoke it) kills EVERY WebGL context in the process : the
+    // preview turns into Chromium's white failure surface and, without these
+    // handlers, stays dead until the app restarts — loading another session
+    // can't help because the dead context is the Compositor's, not the store's.
+    // preventDefault() on `lost` is what tells the browser we want `restored`;
+    // on `restored` we bump the epoch and this whole effect re-runs on a live
+    // context. Engine-side buffers (feedback trails, Context) reset — after a
+    // GPU crash that is the acceptable cost of coming back at all.
+    let restoreFallback: number | null = null
+    const onLost = (e: Event): void => {
+      e.preventDefault()
+      console.warn('[gl] context LOST (GPU reset) — awaiting restore')
+      // If `restored` never fires (repeated crashes can blocklist the GPU),
+      // force one rebuild attempt anyway : either the context is quietly back,
+      // or the Compositor constructor throws and the existing catch surfaces
+      // the WebGL-unavailable message instead of a silent white canvas.
+      restoreFallback = window.setTimeout(() => setGlEpoch((n) => n + 1), 6000)
+    }
+    const onRestored = (): void => {
+      console.warn('[gl] context restored — rebuilding the engine')
+      if (restoreFallback) window.clearTimeout(restoreFallback)
+      setGlEpoch((n) => n + 1)
+    }
+    canvas.addEventListener('webglcontextlost', onLost)
+    canvas.addEventListener('webglcontextrestored', onRestored)
+    const offGl = (): void => {
+      if (restoreFallback) window.clearTimeout(restoreFallback)
+      canvas.removeEventListener('webglcontextlost', onLost)
+      canvas.removeEventListener('webglcontextrestored', onRestored)
+    }
     // Internal render resolution = 1920×1080 × renderScale (lo-fi ↔ 4K). The
     // canvas backing store IS the render res; CSS object-contain scales it to the
     // preview (pixelated upscale below 1× for the lo-fi look).
@@ -791,12 +827,20 @@ export default function App(): JSX.Element {
     }
     raf = requestAnimationFrame(loop)
     return () => {
+      offGl()
       cancelAnimationFrame(raf)
-      comp?.dispose() // free all GL resources so a remount can't orphan them
+      // After a GPU reset the old context is dead : dispose would only spray
+      // INVALID_OPERATION noise into the console on its way out.
+      try {
+        comp?.dispose() // free all GL resources so a remount can't orphan them
+      } catch {
+        /* context already gone */
+      }
       compositorRef.current = null
     }
-    // Recreate the whole engine when the render resolution changes.
-  }, [renderScale])
+    // Recreate the whole engine when the render resolution changes — or when
+    // the GPU comes back from a driver reset (glEpoch).
+  }, [renderScale, glEpoch])
 
   // ── Save-before-quit handshake (main asks; we ack) ──────────────────
   useEffect(() => {

@@ -48,6 +48,19 @@ app.commandLine.appendSwitch('gpu-disk-cache-size-kb', '65536')
 
 let mainWindow: BrowserWindow | null = null
 
+// A dying GPU process is EXACTLY what a white preview with a failure glyph
+// looks like from the renderer's side. Name it in the log with its exit code
+// so the next occurrence is a diagnosis, not a mystery. (The renderers handle
+// the recovery themselves via webglcontextlost/restored.)
+app.on('child-process-gone', (_e, details) => {
+  if (details.type === 'GPU') {
+    console.error(
+      `[gpu] GPU process gone : reason=${details.reason} exitCode=${details.exitCode} — ` +
+        'renderers will rebuild their GL contexts on restore'
+    )
+  }
+})
+
 // OSC out (renderer → instrument fan-out).
 const oscSender = new OscSender()
 // External video output (NDI, via optional native sender).

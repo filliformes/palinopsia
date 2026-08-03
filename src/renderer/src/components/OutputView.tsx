@@ -7,7 +7,7 @@
 // its own (generators + shaders are identical); those live sources may drift a
 // touch between the two windows, which is fine for a mirror.
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { OutputFrame } from '@shared/types'
 import { Compositor } from '../engine/Compositor'
 import { applyMetaGlides, applyModulation } from '../engine/modulation'
@@ -19,14 +19,36 @@ import { inputsForShader } from '../shaders/isf/inputs'
 
 export function OutputView(): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  // Re-keys the whole effect after a GPU driver reset (same recovery as the
+  // control window : preventDefault on `lost`, rebuild on `restored`).
+  const [glEpoch, setGlEpoch] = useState(0)
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
+    let restoreFallback: number | null = null
+    const onLost = (e: Event): void => {
+      e.preventDefault()
+      console.warn('[output gl] context LOST — awaiting restore')
+      restoreFallback = window.setTimeout(() => setGlEpoch((n) => n + 1), 6000)
+    }
+    const onRestored = (): void => {
+      console.warn('[output gl] context restored — rebuilding')
+      if (restoreFallback) window.clearTimeout(restoreFallback)
+      setGlEpoch((n) => n + 1)
+    }
+    canvas.addEventListener('webglcontextlost', onLost)
+    canvas.addEventListener('webglcontextrestored', onRestored)
+    const offGl = (): void => {
+      if (restoreFallback) window.clearTimeout(restoreFallback)
+      canvas.removeEventListener('webglcontextlost', onLost)
+      canvas.removeEventListener('webglcontextrestored', onRestored)
+    }
     let comp: Compositor | null = null
     try {
       comp = new Compositor(canvas, canvas.width, canvas.height)
     } catch (e) {
       console.error('[output Compositor]', (e as Error).message)
+      offGl()
       return
     }
     const off = window.api.onOutputFrame((f: OutputFrame) => {
@@ -111,10 +133,15 @@ export function OutputView(): JSX.Element {
       }
     })
     return () => {
+      offGl()
       off()
-      comp?.dispose()
+      try {
+        comp?.dispose()
+      } catch {
+        /* context already gone after a GPU reset */
+      }
     }
-  }, [])
+  }, [glEpoch])
 
   return (
     <div className="fixed inset-0 bg-black">
