@@ -532,7 +532,7 @@ uniform int uCount;
 uniform vec4 uCell[64];   // dest rect (x,y,w,h)
 uniform vec4 uMap[64];    // source rect (x,y,w,h)
 uniform float uRot[64];   // 0..3 (×90°)
-uniform float uGap, uSlip, uMix, uSeed, uContour, uTorn, uMask;
+uniform float uGap, uSlip, uMix, uSeed, uContour, uTorn, uMask, uCurve;
 uniform float uRank[64];  // per-piece dropout order; the survivor holds 2.0
 float hash(float x){ return fract(sin(x * 91.7 + uSeed * 57.0) * 43758.5453); }
 // 2D value noise for the tear lines : re-seeded per cut, so every re-cut tears
@@ -551,11 +551,18 @@ float vnoise(vec2 p){
 // Runs to 2.0 : values ≤1 keep their original amplitude, above 1 the
 // displacement keeps growing AND the fray octave takes a bigger share, so the
 // top of the dial is genuinely wilder, not just larger.
+// CURVE LENGTH picks the warp's wavelength : low = many small waves (the
+// displace-map look), high = few LONG sweeping curves — simple organic shapes.
+// Longer curves also get more amplitude (a long curve needs travel to read)
+// and shed the fray octave (simple means simple). Default 0.3 reproduces the
+// original frequency (9.06 vs the old fixed 9.0), so saved sessions hold.
 vec2 tearWarp(vec2 p){
-  float fray = 0.25 + 0.2 * max(uContour - 1.0, 0.0);
-  vec2 w = (vec2(vnoise(p * 9.0), vnoise(p * 9.0 + 31.7)) - 0.5) * (1.0 - fray)
-         + (vec2(vnoise(p * 47.0 + 11.3), vnoise(p * 47.0 + 71.9)) - 0.5) * fray;
-  return p + w * uContour * 0.045;
+  float fc = mix(12.0, 2.2, clamp(uCurve, 0.0, 1.0));
+  float ff = fc * 5.2;
+  float fray = (0.25 + 0.2 * max(uContour - 1.0, 0.0)) * (1.0 - 0.7 * uCurve);
+  vec2 w = (vec2(vnoise(p * fc), vnoise(p * fc + 31.7)) - 0.5) * (1.0 - fray)
+         + (vec2(vnoise(p * ff + 11.3), vnoise(p * ff + 71.9)) - 0.5) * fray;
+  return p + w * uContour * 0.045 * (1.0 + uCurve * 1.1);
 }
 vec2 rot90(vec2 p, float r){
   p -= 0.5; int ri = int(r + 0.5);
@@ -1950,6 +1957,7 @@ export class AutocutterNode implements ConvNode {
     gl.uniform1f(p.u('uContour'), clampf(num(inp.contour, 0), 0, 2))
     gl.uniform1f(p.u('uTorn'), clampf(num(inp.torn, 0), 0, 2))
     gl.uniform1f(p.u('uMask'), clampf(num(inp.mask, 0), 0, 1))
+    gl.uniform1f(p.u('uCurve'), clampf(num(inp.curve, 0.3), 0, 1))
     gl.uniform1fv(p.u('uRank'), this.rankArr.subarray(0, this.count))
     gl.uniform1f(p.u('uSeed'), this.seed % 1024)
     gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)

@@ -28,6 +28,7 @@ import type {
 } from '@shared/types'
 import type { MetaKnobState, MidiBinding } from '@shared/types'
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
+import { inputsForShader } from './shaders/isf/inputs'
 import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
 import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
@@ -346,6 +347,57 @@ function loadMidiMap(): Record<string, MidiBinding> {
     return out
   } catch {
     return {}
+  }
+}
+
+/** Normalized (0..1) CURRENT base of a mod target, for assignMod's automatic
+ *  mode choice. 0.5 (→ multiply) wherever the base can't be resolved. */
+function baseNormForTarget(st: { composition: CompositionState }, t: ModTarget): number {
+  try {
+    if (t.kind === 'meta') return st.composition.metaKnobs[t.knob]?.value ?? 0.5
+    let shaderId: string | null = null
+    let inputs: Record<string, number | number[]> | undefined
+    let input = ''
+    if (t.kind === 'source') {
+      const l = st.composition.layers[t.layer]
+      const slot = t.slot === 'A' ? l?.sourceA : l?.sourceB
+      if (!slot?.shaderId) return 0.5 // video slots : neutral, keep multiply
+      shaderId = slot.shaderId
+      inputs = slot.inputs
+      input = t.input
+    } else if (t.kind === 'bgSource') {
+      shaderId = st.composition.background?.source.shaderId ?? null
+      inputs = st.composition.background?.source.inputs
+      input = t.input
+    } else if (t.kind === 'fx') {
+      const s = t.scope
+      const arr =
+        s.kind === 'master'
+          ? st.composition.master
+          : s.kind === 'background'
+            ? st.composition.background?.fx
+            : s.kind === 'layer'
+              ? st.composition.layers[s.layer]?.fx
+              : s.kind === 'sourceA'
+                ? st.composition.layers[s.layer]?.sourceAFx
+                : st.composition.layers[s.layer]?.sourceBFx
+      const inst = arr?.find((f) => f.id === t.instId)
+      if (!inst?.shaderId) return 0.5
+      shaderId = inst.shaderId
+      inputs = inst.inputs
+      input = t.input
+    } else {
+      return 0.5 // sonify etc : defaults are non-zero, multiply is fine
+    }
+    if (!shaderId) return 0.5
+    const d = inputsForShader(shaderId).find((x) => x.name === input)
+    if (!d || d.type !== 'float' || typeof d.min !== 'number' || typeof d.max !== 'number' || d.max === d.min)
+      return 0.5
+    const raw = inputs?.[input]
+    const v = typeof raw === 'number' ? raw : typeof d.def === 'number' ? d.def : d.min
+    return (v - d.min) / (d.max - d.min)
+  } catch {
+    return 0.5
   }
 }
 
@@ -1834,7 +1886,15 @@ export const useStore = create<StoreState>((set, get) => ({
         )
       }
     })),
-  assignMod: (mod, target, depth, mode = 'multiply') => {
+  assignMod: (mod, target, depth, mode) => {
+    // No explicit mode → choose from the target's CURRENT base. Multiply is the
+    // right default for riding a set level (VCA), but its law base·(1−a+a·mod)
+    // is a guaranteed NO-OP on a zero base — bind an LFO to a param sitting at
+    // 0 (a fresh FX's torn/contour/mask, any zeroed slider) and nothing can
+    // ever happen, which reads as "modulation is broken". Near-zero bases get
+    // Replace (bipolar swing around base : immediately audible); the chip can
+    // still flip it after.
+    mode = mode ?? (baseNormForTarget(get(), target) < 0.05 ? 'replace' : 'multiply')
     const key = modTargetKey(target)
     // Check existence + cap AND append inside ONE set() updater : otherwise two
     // assignMod calls in the same tick (an OSC burst) both pass a stale cap
