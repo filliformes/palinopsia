@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Wide Time : a temporal average across the last N frames. The image continuously crossfades with its own recent past, so motion smears into clean, evolving visual-music scapes. WIDTH is how many frames wide the window is; MIX is dry/wet; MODE is how each new frame accumulates (mean / brightest / add / screen / difference / darkest); SOFTEN blurs the trails; DRIFT slowly zooms the memory for breathing scapes; HUE evolves the colour of the fading past. MOTION BLUR simulates a shutter (blurs moving areas); FRAME BLEND runs a second weighted temporal pass for a smoother, more symmetric blend : both on for best results. Real-time, so the window reaches into the PAST only.",
+  "DESCRIPTION": "Wide Time : a temporal average across the last N frames. The image continuously crossfades with its own recent past, so motion smears into clean, evolving visual-music scapes. WIDTH is how many frames wide the window is; MIX is dry/wet; MODE is how each new frame accumulates (mean / brightest / add / screen / difference / darkest); SOFTEN blurs the trails; DRIFT slowly zooms the memory for breathing scapes; HUE evolves the colour of the fading past. MOTION BLUR simulates a shutter (blurs moving areas); FRAME BLEND runs a second weighted temporal pass for a smoother, more symmetric blend : both on for best results. PRESERVE anchors the output's exposure to the live image (the brightening/darkening modes otherwise push it away) : 0 = the raw accumulated look, 1 = fully re-anchored, so the base image's colours stay readable under the trails. Real-time, so the window reaches into the PAST only.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Time", "Feedback", "Blur"],
@@ -13,11 +13,13 @@
     { "NAME": "drift",  "TYPE": "float", "MIN": -0.02, "MAX": 0.02, "DEFAULT": 0.0, "LABEL": "drift" },
     { "NAME": "hue",    "TYPE": "float", "MIN": -0.1, "MAX": 0.1,  "DEFAULT": 0.0,  "LABEL": "hue" },
     { "NAME": "motionBlur", "TYPE": "bool", "DEFAULT": true, "LABEL": "motion blur" },
-    { "NAME": "frameBlend", "TYPE": "bool", "DEFAULT": true, "LABEL": "frame blend" }
+    { "NAME": "frameBlend", "TYPE": "bool", "DEFAULT": true, "LABEL": "frame blend" },
+    { "NAME": "preserve", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "preserve" }
   ],
   "PASSES": [
-    { "TARGET": "buf",  "PERSISTENT": true },
-    { "TARGET": "buf2", "PERSISTENT": true },
+    { "TARGET": "buf",   "PERSISTENT": true },
+    { "TARGET": "buf2",  "PERSISTENT": true },
+    { "TARGET": "stats", "PERSISTENT": true, "WIDTH": 1, "HEIGHT": 1 },
     { }
   ]
 }*/
@@ -89,10 +91,43 @@ void main() {
     return;
   }
 
+  if (PASSINDEX == 2) {
+    // PRESERVE statistics : running mean luminance of the LIVE image vs the
+    // WIDE buffer, from a sparse 3x3 probe, EMA-smoothed so the compensation
+    // rides like a slow fader instead of flickering with the content. 1x1
+    // persistent target; the present pass turns the ratio into a gain.
+    vec2 h = vec2(0.5);
+    float mIn = 0.0;
+    float mWide = 0.0;
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++) {
+        vec2 p = vec2(0.17 + 0.33 * float(i), 0.17 + 0.33 * float(j));
+        vec3 ci = IMG_NORM_PIXEL(inputImage, p).rgb;
+        // Sample the same buffer the present pass shows (frameBlend picks buf2).
+        vec3 cw = frameBlend ? IMG_NORM_PIXEL(buf2, p).rgb : IMG_NORM_PIXEL(buf, p).rgb;
+        mIn   += dot(ci, vec3(0.299, 0.587, 0.114));
+        mWide += dot(cw, vec3(0.299, 0.587, 0.114));
+      }
+    }
+    vec2 mean = vec2(mIn, mWide) / 9.0;
+    vec2 prev = IMG_NORM_PIXEL(stats, h).xy;
+    gl_FragColor = vec4(mix(mean, prev, 0.9), 0.0, 1.0);
+    return;
+  }
+
   // Present: pick the (optionally frame-blended) memory, dry/wet against live.
   vec3 a = IMG_NORM_PIXEL(buf, uv).rgb;
   vec3 b = IMG_NORM_PIXEL(buf2, uv).rgb;
   vec3 wide = frameBlend ? b : a;
+  // PRESERVE : re-anchor the wide buffer's exposure to the live image. The
+  // accumulating modes drift structurally (brightest/add/screen only ever
+  // brighten, darkest only darkens); this scales them back by the ratio of the
+  // two running means, so the trails keep their shape but the base image's
+  // colours stay readable. Gain clamped so a black scene can't explode it.
+  vec2 statC = vec2(0.5);
+  vec2 m = IMG_NORM_PIXEL(stats, statC).xy;
+  float gain = clamp((m.x + 0.02) / (m.y + 0.02), 0.25, 4.0);
+  wide *= mix(1.0, gain, preserve);
   vec4 cur = IMG_NORM_PIXEL(inputImage, uv);
-  gl_FragColor = mix(cur, vec4(wide, 1.0), amount);
+  gl_FragColor = mix(cur, vec4(clamp(wide, 0.0, 1.0), 1.0), amount);
 }
