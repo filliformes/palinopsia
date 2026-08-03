@@ -532,7 +532,8 @@ uniform int uCount;
 uniform vec4 uCell[64];   // dest rect (x,y,w,h)
 uniform vec4 uMap[64];    // source rect (x,y,w,h)
 uniform float uRot[64];   // 0..3 (×90°)
-uniform float uGap, uSlip, uMix, uSeed, uContour, uTorn;
+uniform float uGap, uSlip, uMix, uSeed, uContour, uTorn, uMask;
+uniform float uRank[64];  // per-piece dropout order; the survivor holds 2.0
 float hash(float x){ return fract(sin(x * 91.7 + uSeed * 57.0) * 43758.5453); }
 // 2D value noise for the tear lines : re-seeded per cut, so every re-cut tears
 // along fresh contours.
@@ -547,9 +548,13 @@ float vnoise(vec2 p){
 // still resolves to exactly ONE (warped) cell, the pieces stay a perfect
 // tessellation — no gaps, no overlaps — while their boundaries wander (coarse
 // octave) and fray (fine octave) like torn paper instead of ruled cuts.
+// Runs to 2.0 : values ≤1 keep their original amplitude, above 1 the
+// displacement keeps growing AND the fray octave takes a bigger share, so the
+// top of the dial is genuinely wilder, not just larger.
 vec2 tearWarp(vec2 p){
-  vec2 w = (vec2(vnoise(p * 9.0), vnoise(p * 9.0 + 31.7)) - 0.5) * 0.75
-         + (vec2(vnoise(p * 47.0 + 11.3), vnoise(p * 47.0 + 71.9)) - 0.5) * 0.25;
+  float fray = 0.25 + 0.2 * max(uContour - 1.0, 0.0);
+  vec2 w = (vec2(vnoise(p * 9.0), vnoise(p * 9.0 + 31.7)) - 0.5) * (1.0 - fray)
+         + (vec2(vnoise(p * 47.0 + 11.3), vnoise(p * 47.0 + 71.9)) - 0.5) * fray;
   return p + w * uContour * 0.045;
 }
 vec2 rot90(vec2 p, float r){
@@ -562,11 +567,18 @@ vec2 rot90(vec2 p, float r){
 void main(){
   vec3 orig = texture(uHost, vUV).rgb;
   vec3 col = orig;
+  float keep = 1.0;
   vec2 wUV = uContour > 0.001 ? clamp(tearWarp(vUV), 0.0001, 0.9999) : vUV;
   for (int i = 0; i < 64; i++){
     if (i >= uCount) break;
     vec4 d = uCell[i];
     if (wUV.x >= d.x && wUV.x < d.x + d.z && wUV.y >= d.y && wUV.y < d.y + d.w){
+      // MASK : pieces drop out in their seeded order as the dial rises; a
+      // quick per-piece fade instead of a hard pop so modulation sweeps read
+      // as pieces peeling away. The survivor's rank of 2 can never be reached,
+      // so at full mask exactly one shape remains — and each cut ▸ re-rolls
+      // which one, so the last piece keeps changing.
+      keep = smoothstep(uMask - 0.06, uMask, uRank[i]);
       vec2 luv = rot90((wUV - d.xy) / d.zw, uRot[i]);
       vec4 sr = uMap[i];
       vec2 slip = (vec2(hash(float(i) + 1.3), hash(float(i) + 7.7)) - 0.5) * uSlip;
@@ -579,13 +591,18 @@ void main(){
         col *= smoothstep(0.0, uGap * 0.02, ed);
       }
       if (uTorn > 0.001){
-        // TORN PAPER : a ragged-width off-white fringe along the tear (the
-        // magazine page's substrate showing at the rip), over a soft collage
-        // shadow just inside the piece. Fibre noise keeps both irregular.
+        // TORN PAPER : a ragged off-white fringe along the tear (the magazine
+        // page's substrate showing at the rip), over a soft collage shadow just
+        // inside the piece. The fringe width is a HEAVY-TAILED patch field, not
+        // a gentle wobble : a low-frequency selector cubed gives long stretches
+        // of hairline tear broken by broad white bites — the way a real rip
+        // crosses the paper grain unevenly — with mid-frequency fibre raggedness
+        // on top. Runs to 2.0 for fat, chewed-up edges.
+        float patch = pow(vnoise(wUV * 6.0 + 13.7), 3.0);
         float rag = 0.5 + 0.5 * vnoise(wUV * 90.0);
-        float fw = uTorn * 0.010 * (0.35 + 0.65 * rag);
-        float sh = smoothstep(fw * 0.8, fw + 0.022 * uTorn, ed);
-        col *= 1.0 - (1.0 - sh) * 0.3 * uTorn;
+        float fw = uTorn * 0.012 * (0.06 + 2.4 * patch + 0.45 * rag);
+        float sh = smoothstep(fw * 0.8, fw + 0.020 * uTorn, ed);
+        col *= 1.0 - (1.0 - sh) * 0.3 * min(uTorn, 1.0);
         float paper = 1.0 - smoothstep(0.0, fw, ed);
         vec3 paperCol = vec3(0.93, 0.91, 0.87) * (0.80 + 0.20 * vnoise(wUV * 160.0));
         col = mix(col, paperCol, paper * min(uTorn * 2.0, 1.0));
@@ -593,7 +610,9 @@ void main(){
       break;
     }
   }
-  o = vec4(clamp(mix(orig, col, uMix), 0.0, 1.0), 1.0);
+  // Masked pieces leave TRANSPARENT holes (the collage's table shows through :
+  // lower layers / background), whatever the dry/wet mix says.
+  o = vec4(clamp(mix(orig, col, uMix), 0.0, 1.0) * keep, keep);
 }`
 
 // ── Chronoscan (per-pixel time displacement / slit-scan) ─────────────────
@@ -1846,6 +1865,7 @@ export class AutocutterNode implements ConvNode {
   private cellArr = new Float32Array(AC_MAX * 4)
   private mapArr = new Float32Array(AC_MAX * 4)
   private rotArr = new Float32Array(AC_MAX)
+  private rankArr = new Float32Array(AC_MAX)
   private count = 0
   private seed = 0x1a2b3c4d
   private prevTrig = 0
@@ -1883,6 +1903,18 @@ export class AutocutterNode implements ConvNode {
       this.mapArr[i * 4] = s.x; this.mapArr[i * 4 + 1] = s.y; this.mapArr[i * 4 + 2] = s.w; this.mapArr[i * 4 + 3] = s.h
       this.rotArr[i] = rotateFrac > 0 && rnd() < rotateFrac ? 1 + Math.floor(rnd() * 3) : 0
     }
+    // MASK dropout order : a shuffled EVEN spacing over (0,0.90], so the dial
+    // removes pieces at a steady rate instead of in random clumps. The ceiling
+    // sits BELOW the shader's 0.06 fade band under mask=1 — at 0.97 the last
+    // ranked pieces were still half-faded at full mask and "only one remains"
+    // was two. One seeded SURVIVOR gets rank 2 — unreachable by a 0..1 mask —
+    // so full mask always leaves exactly one piece, and every re-cut elects a
+    // new one.
+    const order = cells.map((_, i) => i)
+    for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const tmp = order[i]; order[i] = order[j]; order[j] = tmp }
+    const survivor = Math.floor(rnd() * n)
+    for (let i = 0; i < n; i++) this.rankArr[order[i]] = ((i + 1) / n) * 0.90
+    this.rankArr[survivor] = 2.0
     this.count = n
     this.lastCuts = cuts; this.lastRotate = rotateFrac
   }
@@ -1913,8 +1945,10 @@ export class AutocutterNode implements ConvNode {
     gl.uniform1f(p.u('uGap'), clampf(num(inp.gap, 0.15), 0, 1))
     gl.uniform1f(p.u('uSlip'), clampf(num(inp.slip, 0), 0, 1))
     gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
-    gl.uniform1f(p.u('uContour'), clampf(num(inp.contour, 0), 0, 1))
-    gl.uniform1f(p.u('uTorn'), clampf(num(inp.torn, 0), 0, 1))
+    gl.uniform1f(p.u('uContour'), clampf(num(inp.contour, 0), 0, 2))
+    gl.uniform1f(p.u('uTorn'), clampf(num(inp.torn, 0), 0, 2))
+    gl.uniform1f(p.u('uMask'), clampf(num(inp.mask, 0), 0, 1))
+    gl.uniform1fv(p.u('uRank'), this.rankArr.subarray(0, this.count))
     gl.uniform1f(p.u('uSeed'), this.seed % 1024)
     gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)

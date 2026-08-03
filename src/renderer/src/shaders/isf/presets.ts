@@ -350,11 +350,14 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
   ],
   'node-autocutter': [
     { name: 'Clean cut-up', values: { cuts: 20, rotate: 0.3, slip: 0, gap: 0.15, contour: 0, torn: 0, mix: 1, rate: 0 } },
-    { name: 'Magazine tear', values: { cuts: 14, rotate: 0.2, slip: 0.05, gap: 0, contour: 0.55, torn: 0.55, mix: 1, rate: 0 } },
-    { name: 'Ripped poster', values: { cuts: 8, rotate: 0.1, slip: 0.1, gap: 0, contour: 0.75, torn: 0.8, mix: 1, rate: 0 } },
+    { name: 'Magazine tear', values: { cuts: 14, rotate: 0.2, slip: 0.05, gap: 0, contour: 0.7, torn: 0.8, mix: 1, rate: 0 } },
+    { name: 'Ripped poster', values: { cuts: 8, rotate: 0.1, slip: 0.1, gap: 0, contour: 1.1, torn: 1.2, mix: 1, rate: 0 } },
     { name: 'Paper storm', values: { cuts: 36, rotate: 0.5, slip: 0.2, gap: 0, contour: 0.6, torn: 0.45, mix: 1, rate: 1.2 } },
     { name: 'Wavy cut', values: { cuts: 24, rotate: 0.35, slip: 0, gap: 0.2, contour: 0.45, torn: 0, mix: 1, rate: 0 } },
-    { name: 'Collage subtle', values: { cuts: 10, rotate: 0.15, slip: 0, gap: 0, contour: 0.4, torn: 0.35, mix: 0.85, rate: 0 } }
+    { name: 'Collage subtle', values: { cuts: 10, rotate: 0.15, slip: 0, gap: 0, contour: 0.4, torn: 0.35, mix: 0.85, rate: 0 } },
+    { name: 'Shredded', values: { cuts: 28, rotate: 0.4, slip: 0.15, gap: 0, contour: 1.8, torn: 1.7, mask: 0, mix: 1, rate: 0 } },
+    { name: 'Scraps', values: { cuts: 24, rotate: 0.3, slip: 0.1, gap: 0, contour: 0.9, torn: 1.0, mask: 0.75, mix: 1, rate: 0 } },
+    { name: 'Last piece', values: { cuts: 16, rotate: 0.2, slip: 0, gap: 0, contour: 0.8, torn: 0.9, mask: 1, mix: 1, rate: 0.5 } }
   ],
   'fx-hue-rotate': [
     { name: 'Quarter turn', values: { shift: 0.25, byLuma: 0 } },
