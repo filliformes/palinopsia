@@ -5,33 +5,23 @@
 // Locked units (the master Vibe Palette) render pinned: no bypass dot, no
 // remove, no reorder : just the name (click to edit) and a pin glyph.
 
-import { useRef, type DragEvent } from 'react'
+import { useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import type { FxInstance } from '@shared/types'
 import { FX_GROUPS, SHADER_BY_ID } from '../shaders/isf'
 import { useStore, type FxScope } from '../store'
+import { canHostFx } from '../fxScopes'
+import { ContextMenu } from './ContextMenu'
+import { useFxMenuItems } from './fxMenu'
 
 export function FxAddSelect({ scope, className = '' }: { scope: FxScope; className?: string }): JSX.Element {
   const addFx = useStore((s) => s.addFx)
-  // Native-node availability by rack. A LAYER takes every node. The 7 SELF-CONTAINED
-  // nodes (no external input needed — they work on whatever signal enters) run in
-  // any rack now that master/source/background all get a node context, so they're
-  // opened up there too. Parallax (whole-picture depth) is master-only among the
-  // non-layer racks. The two SIDECHAIN nodes (Transfert / Convolution) need another
-  // layer as input, so they stay LAYER-ONLY.
-  const SELF_CONTAINED = [
-    'node-datamosh', 'node-feedback', 'node-reponse',
-    'node-chronoscan', 'node-sediment', 'node-scanner', 'node-autocutter',
-    'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate'
-  ]
-  const allowedNative = new Set(
-    scope.kind === 'master' ? [...SELF_CONTAINED, 'node-parallax'] : SELF_CONTAINED
-  )
+  // Which nodes a rack can host is `canHostFx` — one rule, shared with paste.
   const groups =
     scope.kind === 'layer'
       ? FX_GROUPS
       : FX_GROUPS.map((g) => ({
           ...g,
-          shaders: g.shaders.filter((f) => !f.native || allowedNative.has(f.id))
+          shaders: g.shaders.filter((f) => canHostFx(scope, f.id))
         })).filter((g) => g.shaders.length > 0)
   return (
     <select
@@ -149,6 +139,22 @@ function FxUnit({
   onDragStart?: () => void
   onDropOn?: () => void
 }): JSX.Element {
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const menuItems = useFxMenuItems(scope, f.id, f.shaderId, () => setMenu(null))
+  const onContextMenu = (e: MouseEvent): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenu({ x: e.clientX, y: e.clientY })
+  }
+  const fxMenu = menu ? (
+    <ContextMenu
+      x={menu.x}
+      y={menu.y}
+      header={SHADER_BY_ID[f.shaderId ?? '']?.name ?? f.shaderId}
+      items={menuItems}
+      onClose={() => setMenu(null)}
+    />
+  ) : null
   const removeFx = useStore((s) => s.removeFx)
   const toggleFx = useStore((s) => s.toggleFx)
   const moveFx = useStore((s) => s.moveFx)
@@ -175,7 +181,9 @@ function FxUnit({
       <span
         className={`flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 ${borderCls} bg-panel`}
         title={`${lockedName} : a pinned finalizer stage. Dot bypasses; click the name to edit.`}
+        onContextMenu={onContextMenu}
       >
+        {fxMenu}
         <button
           onClick={() => toggleFx(scope, f.id)}
           className={`h-2.5 w-2.5 shrink-0 rounded-full transition-colors ${dotCls}`}
@@ -195,6 +203,7 @@ function FxUnit({
   return (
     <span
       draggable
+      onContextMenu={onContextMenu}
       onDragStart={onDragStart}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
@@ -245,6 +254,7 @@ function FxUnit({
       >
         ×
       </button>
+      {fxMenu}
     </span>
   )
 }

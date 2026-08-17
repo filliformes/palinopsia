@@ -10,7 +10,9 @@ import { inputsForShader } from '../shaders/isf/inputs'
 import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { CollageStrip } from './CollageStrip'
-import { modTargetKey, useStore, type FxScope } from '../store'
+import { ContextMenu } from './ContextMenu'
+import { useFxMenuItems } from './fxMenu'
+import { fxArrayFor, modTargetKey, useStore, type FxScope } from '../store'
 import { AutoControls, AssignContext, AssignRow } from './AutoControls'
 import { CapturePicker } from './CapturePicker'
 import { DevicePicker } from './DevicePicker'
@@ -122,6 +124,19 @@ export function Inspector(): JSX.Element {
     pool: import('@shared/collage').CollageClip[]
     edls: import('@shared/collage').CollageEdl[]
   } | null = null
+  // The FX the header is showing, if any : right-clicking its title offers the
+  // same copy/paste menu as right-clicking its chip in the rack.
+  const fxHere: { scope: FxScope; instId: string } | null =
+    selection?.type === 'fx' ? { scope: selection.scope, instId: selection.instId } : null
+  const [headerMenu, setHeaderMenu] = useState<{ x: number; y: number } | null>(null)
+  // Hooks run unconditionally : the fallback scope is never used, because the
+  // menu only renders when fxHere is set.
+  const headerMenuItems = useFxMenuItems(
+    fxHere?.scope ?? { kind: 'master' },
+    fxHere?.instId ?? null,
+    fxHere ? fxArrayFor(composition, fxHere.scope).find((f) => f.id === fxHere.instId)?.shaderId : null,
+    () => setHeaderMenu(null)
+  )
 
   if (selection?.type === 'source') {
     const layer = composition.layers[selection.layer]
@@ -315,7 +330,23 @@ export function Inspector(): JSX.Element {
         flashing ? 'animate-pulse border-danger ring-1 ring-danger' : 'border-border'
       }`}
     >
-      <div className="flex items-center gap-2 border-b border-border px-2 py-1">
+      <div
+        className="flex items-center gap-2 border-b border-border px-2 py-1"
+        onContextMenu={(e) => {
+          if (!fxHere) return
+          e.preventDefault()
+          setHeaderMenu({ x: e.clientX, y: e.clientY })
+        }}
+      >
+        {headerMenu && fxHere && (
+          <ContextMenu
+            x={headerMenu.x}
+            y={headerMenu.y}
+            header={title}
+            items={headerMenuItems}
+            onClose={() => setHeaderMenu(null)}
+          />
+        )}
         <span className="text-[12px] font-semibold">{title}</span>
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{context}</span>
         <div className="flex-1" />

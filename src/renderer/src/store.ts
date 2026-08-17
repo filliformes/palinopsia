@@ -29,6 +29,8 @@ import type {
 import type { MetaKnobState, MidiBinding } from '@shared/types'
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
 import { inputsForShader } from './shaders/isf/inputs'
+import { SHADER_BY_ID } from './shaders/isf'
+import { canHostFx } from './fxScopes'
 import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
 import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
@@ -805,6 +807,15 @@ interface StoreState {
   // Drag-and-drop reorder: place instId before beforeId (null = end of chain).
   reorderFx: (scope: FxScope, instId: string, beforeId: string | null) => void
   setFxInput: (scope: FxScope, instId: string, name: string, value: number | number[]) => void
+  // FX clipboard : copy a unit, then either overwrite another unit of the SAME
+  // shader with its settings, or drop a fresh copy into any rack that can host
+  // it. Transient — like `rightView`, it is not part of a Session.
+  fxClipboard: { shaderId: string; name: string; inputs: Record<string, number | number[]>; opacity: number; sidechain: SidechainRef | null } | null
+  copyFx: (scope: FxScope, instId: string) => void
+  /** Overwrite one unit's settings from the clipboard. Same shader only. */
+  pasteFxSettings: (scope: FxScope, instId: string) => void
+  /** Add a fresh copy to a rack, after `afterId` (null = end of chain). */
+  pasteFxAsNew: (scope: FxScope, afterId: string | null) => void
   // Native convolution nodes: choose the sidechain (impulse) source.
   setFxSidechain: (scope: FxScope, instId: string, ref: SidechainRef | null) => void
 
@@ -1135,6 +1146,17 @@ function dropTargets(
 /** The slot a swap is about to overwrite. */
 function slotOf(c: CompositionState, layer: number, slot: 'A' | 'B'): SourceSlot | null {
   return (slot === 'A' ? c.layers[layer]?.sourceA : c.layers[layer]?.sourceB) ?? null
+}
+
+/** Read the FX array a scope addresses. The Inspector, the copy/paste actions
+ *  and anything else that needs "which rack is this" share one resolver. */
+export function fxArrayFor(c: CompositionState, scope: FxScope): FxInstance[] {
+  if (scope.kind === 'master') return c.master
+  if (scope.kind === 'background') return c.background?.fx ?? []
+  const l = c.layers[scope.layer]
+  if (!l) return []
+  if (scope.kind === 'layer') return l.fx
+  return scope.kind === 'sourceA' ? l.sourceAFx : l.sourceBFx
 }
 
 // Rewrite the FX array addressed by `scope` through `fn`, immutably.
@@ -1770,6 +1792,80 @@ export const useStore = create<StoreState>((set, get) => ({
         }),
         // Land the Inspector on the fresh unit : its controls are the next
         // thing the player reaches for.
+        selection: { type: 'fx', scope, instId }
+      }
+    }),
+  fxClipboard: null,
+  copyFx: (scope, instId) => {
+    const inst = fxArrayFor(get().composition, scope).find((f) => f.id === instId)
+    if (!inst?.shaderId) return
+    set({
+      fxClipboard: {
+        shaderId: inst.shaderId,
+        name: SHADER_BY_ID[inst.shaderId]?.name ?? inst.shaderId,
+        // A deep-enough copy : point2D/colour inputs are arrays, and sharing
+        // them would make the clipboard alias the live unit.
+        inputs: Object.fromEntries(
+          Object.entries(inst.inputs).map(([k, v]) => [k, Array.isArray(v) ? [...v] : v])
+        ),
+        opacity: inst.opacity ?? 1,
+        sidechain: inst.sidechain ?? null
+      }
+    })
+  },
+  pasteFxSettings: (scope, instId) =>
+    set((s) => {
+      const clip = s.fxClipboard
+      if (!clip) return s
+      const target = fxArrayFor(s.composition, scope).find((f) => f.id === instId)
+      // Settings are per-shader : a Blur's inputs mean nothing to a Datamosh.
+      if (!target || target.shaderId !== clip.shaderId) return s
+      return {
+        composition: updateFxArray(s.composition, scope, (fx) =>
+          fx.map((f) =>
+            f.id === instId
+              ? {
+                  ...f,
+                  inputs: Object.fromEntries(
+                    Object.entries(clip.inputs).map(([k, v]) => [k, Array.isArray(v) ? [...v] : v])
+                  ),
+                  opacity: clip.opacity,
+                  // A sidechain names a LAYER, which only a layer rack resolves.
+                  sidechain: scope.kind === 'layer' ? clip.sidechain : null
+                }
+              : f
+          )
+        )
+      }
+    }),
+  pasteFxAsNew: (scope, afterId) =>
+    set((s) => {
+      const clip = s.fxClipboard
+      if (!clip || !canHostFx(scope, clip.shaderId)) return s
+      const instId = uid()
+      return {
+        composition: updateFxArray(s.composition, scope, (fx) => {
+          const unit: FxInstance = {
+            id: instId,
+            shaderId: clip.shaderId,
+            enabled: true,
+            inputs: Object.fromEntries(
+              Object.entries(clip.inputs).map(([k, v]) => [k, Array.isArray(v) ? [...v] : v])
+            ),
+            opacity: clip.opacity,
+            sidechain: scope.kind === 'layer' ? clip.sidechain : null
+          }
+          const next = [...fx]
+          // Drop it right after the unit that was right-clicked, so a paste
+          // lands where the player is looking — but never past the pinned
+          // finalizers, which must stay last.
+          const lockedAt = next.findIndex((f) => f.locked)
+          const anchor = afterId ? next.findIndex((f) => f.id === afterId) : -1
+          let at = anchor >= 0 ? anchor + 1 : lockedAt >= 0 ? lockedAt : next.length
+          if (lockedAt >= 0 && at > lockedAt) at = lockedAt
+          next.splice(at, 0, unit)
+          return next
+        }),
         selection: { type: 'fx', scope, instId }
       }
     }),
