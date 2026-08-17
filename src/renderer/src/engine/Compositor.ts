@@ -32,6 +32,7 @@ import { audioBus } from './audioIn';
 import { makeConvNode, isNativeNode, type ConvNode } from './convNodes';
 import { TextSource } from './TextSource';
 import { ParametricSource } from './ParametricSource';
+import { CollageSource } from './CollageSource';
 import { DepthShadow } from './depthShadow';
 import { OutputShape } from './outputShape';
 import { Cameraless } from './cameraless';
@@ -482,6 +483,11 @@ const IDENTITY_FRAMING: Framing = { zoom: 1, panX: 0, panY: 0, cropL: 0, cropR: 
 // program cache a whole Randomize-All burst (~20 loads at <1ms each) lands
 // inside one or two frames, so the crossfade covers the swap in one piece
 // instead of layers popping in one by one.
+// Generators whose picture is drawn by a TS class instead of the ISF runtime :
+// their header-only ISF exists purely to give the Inspector / M / modulation /
+// curated-Randomize surface. syncFromState must keep them OUT of setShader.
+const NATIVE_SOURCE_IDS = new Set(['gen-text', 'gen-parametric', 'gen-collage']);
+
 const LOADS_PER_FRAME = 12;
 // ms of compile time allowed per frame : one heavy (cache-miss) compile may
 // overshoot it, after which the rest of the queue defers to later frames.
@@ -754,6 +760,10 @@ export class ISFLayer {
   // Native Parametric slots (generator 'gen-parametric' : audio→texture).
   private paramA: ParametricSource | null = null;
   private paramB: ParametricSource | null = null;
+  // Native Collage slots (generator 'gen-collage' : a wall of films cut up by
+  // the Autocutter's partition — owns its own pool of video decks).
+  private collageA: CollageSource | null = null;
+  private collageB: CollageSource | null = null;
   // Per-slot framing (zoom/pan/crop) for video + capture sources.
   private framingA: Framing = { ...IDENTITY_FRAMING };
   private framingB: Framing = { ...IDENTITY_FRAMING };
@@ -902,6 +912,27 @@ export class ISFLayer {
     src.update(cfg.inputs);
   }
 
+  /** Activate/refresh/clear a native COLLAGE source (a wall of film pieces). */
+  setCollage(
+    slot: 'A' | 'B',
+    cfg: { pool: import('@shared/collage').CollageClip[]; inputs: Record<string, number | number[]> } | null
+  ): void {
+    const cur = slot === 'A' ? this.collageA : this.collageB;
+    if (!cfg) {
+      if (cur) {
+        cur.dispose();
+        if (slot === 'A') this.collageA = null; else this.collageB = null;
+      }
+      return;
+    }
+    let src = cur;
+    if (!src) {
+      src = new CollageSource(this.shared.gl, this.w, this.h);
+      if (slot === 'A') this.collageA = src; else this.collageB = src;
+    }
+    src.update(cfg.pool, cfg.inputs);
+  }
+
   /** Load/swap/clear a live CAPTURE source ('webcam' | 'screen' | 'desktop:id'). */
   setCapture(slot: 'A' | 'B', spec: string | null): void {
     const curId = slot === 'A' ? this.captureIdA : this.captureIdB;
@@ -1001,9 +1032,10 @@ export class ISFLayer {
     (slot === 'A' ? this.isfA : this.isfB)?.setValue(name, value);
     (slot === 'A' ? this.textA : this.textB)?.setInput(name, value); // modulation on text params
     (slot === 'A' ? this.paramA : this.paramB)?.setInput(name, value); // modulation on parametric params
+    (slot === 'A' ? this.collageA : this.collageB)?.setInput(name, value); // modulation on collage params
   }
 
-  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null || this.textB !== null || this.paramB !== null || this.assembleB !== null; }
+  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null || this.textB !== null || this.paramB !== null || this.collageB !== null || this.assembleB !== null; }
 
   /** Advance the layer clock and stamp it onto every renderer it owns. */
   advanceClock(dtSec: number): void {
@@ -1038,6 +1070,13 @@ export class ISFLayer {
     // Native parametric: the audio buffer rendered as raster/waveform/spectrogram.
     if (param) {
       param.render(scratch.fbo);
+      return;
+    }
+
+    // Native collage: a wall of simultaneous films through the cut-up partition.
+    const collage = slot === 'A' ? this.collageA : this.collageB;
+    if (collage) {
+      collage.render(scratch.fbo);
       return;
     }
 
@@ -1086,6 +1125,8 @@ export class ISFLayer {
     this.videoB?.dispose();
     this.assembleA?.dispose();
     this.assembleB?.dispose();
+    this.collageA?.dispose();
+    this.collageB?.dispose();
     this.captureA?.dispose();
     this.captureB?.dispose();
     this.hiveA?.dispose();
@@ -1711,9 +1752,10 @@ export class Compositor {
       // Each slot is a generator, a video, or empty : reconcile both engines so
       // switching kinds swaps cleanly (video↔generator never overlap). The Text
       // generator is NATIVE (a TS class, no ISF compile) : route it to setText.
-      const nativeA = l.sourceA.kind === 'generator' && (l.sourceA.shaderId === 'gen-text' || l.sourceA.shaderId === 'gen-parametric');
+      const nativeA = l.sourceA.kind === 'generator' && NATIVE_SOURCE_IDS.has(l.sourceA.shaderId ?? '');
       const isTextA = l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-text';
       const isParamA = l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-parametric';
+      const isCollA = l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-collage';
       const wantA = l.sourceA.kind === 'generator' && !nativeA ? l.sourceA.shaderId : null;
       const wantVidA = l.sourceA.kind === 'video' ? (l.sourceA.mediaId ?? null) : null;
       const wantCapA = l.sourceA.kind === 'capture' ? (l.sourceA.mediaId ?? null) : null;
@@ -1728,9 +1770,11 @@ export class Compositor {
         ? { text: l.sourceA.text ?? 'OPSIA', inputs: l.sourceA.inputs, sidechain: l.sourceA.sidechain ?? null }
         : null);
       L.setParam('A', isParamA ? { inputs: l.sourceA.inputs } : null);
-      const nativeB = !!l.sourceB && l.sourceB.kind === 'generator' && (l.sourceB.shaderId === 'gen-text' || l.sourceB.shaderId === 'gen-parametric');
+      L.setCollage('A', isCollA ? { pool: l.sourceA.collagePool ?? [], inputs: l.sourceA.inputs } : null);
+      const nativeB = !!l.sourceB && l.sourceB.kind === 'generator' && NATIVE_SOURCE_IDS.has(l.sourceB.shaderId ?? '');
       const isTextB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-text';
       const isParamB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-parametric';
+      const isCollB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-collage';
       const wantB = l.sourceB && l.sourceB.kind === 'generator' && !nativeB ? l.sourceB.shaderId : null;
       const wantVidB = l.sourceB && l.sourceB.kind === 'video' ? (l.sourceB.mediaId ?? null) : null;
       const wantCapB = l.sourceB && l.sourceB.kind === 'capture' ? (l.sourceB.mediaId ?? null) : null;
@@ -1745,6 +1789,7 @@ export class Compositor {
         ? { text: l.sourceB.text ?? 'OPSIA', inputs: l.sourceB.inputs, sidechain: l.sourceB.sidechain ?? null }
         : null);
       L.setParam('B', isParamB && l.sourceB ? { inputs: l.sourceB.inputs } : null);
+      L.setCollage('B', isCollB && l.sourceB ? { pool: l.sourceB.collagePool ?? [], inputs: l.sourceB.inputs } : null);
       L.setVideoPlayback('A', l.sourceA);
       L.setVideoPlayback('B', l.sourceB);
       L.setFraming('A', l.sourceA);

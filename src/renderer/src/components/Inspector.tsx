@@ -9,6 +9,7 @@ import { SHADER_BY_ID } from '../shaders/isf'
 import { inputsForShader } from '../shaders/isf/inputs'
 import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import { CollageStrip } from './CollageStrip'
 import { modTargetKey, useStore, type FxScope } from '../store'
 import { AutoControls, AssignContext, AssignRow } from './AutoControls'
 import { CapturePicker } from './CapturePicker'
@@ -114,6 +115,12 @@ export function Inspector(): JSX.Element {
     setRef: (r: SidechainRef | null) => void
     hostLayer: number
   } | null = null
+  let collageCfg: {
+    layer: number
+    slot: 'A' | 'B'
+    folder: string
+    pool: import('@shared/collage').CollageClip[]
+  } | null = null
 
   if (selection?.type === 'source') {
     const layer = composition.layers[selection.layer]
@@ -127,6 +134,14 @@ export function Inspector(): JSX.Element {
       const { layer: li, slot: sl } = selection
       onChange = (n, v) => setSourceInput(li, sl, n, v)
       modTargetFor = (input) => ({ kind: 'source', layer: li, slot: sl, input })
+      if (slot.shaderId === 'gen-collage') {
+        collageCfg = {
+          layer: li,
+          slot: sl,
+          folder: slot.collageFolder ?? '',
+          pool: slot.collagePool ?? []
+        }
+      }
       if (slot.shaderId === 'gen-text') {
         textCfg = {
           text: slot.text ?? 'OPSIA',
@@ -364,6 +379,14 @@ export function Inspector(): JSX.Element {
         />
       </div>
       {/* Native Text source: the string + the glyph-fill sidechain. */}
+      {collageCfg && (
+        <CollageStrip
+          layer={collageCfg.layer}
+          slot={collageCfg.slot}
+          folder={collageCfg.folder}
+          pool={collageCfg.pool}
+        />
+      )}
       {textCfg && (
         <div className="flex items-center gap-2 border-b border-border bg-panel2/40 px-2 py-1">
           <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">text</span>

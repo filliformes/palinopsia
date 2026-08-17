@@ -110,6 +110,12 @@ export interface SourceSlot extends ShaderInstance {
   // optional sidechain whose texture FILLS the glyphs (letters as a matte).
   text?: string
   sidechain?: SidechainRef | null
+  // For the native Collage generator (shaderId 'gen-collage'): the scanned
+  // folder and the playable clip pool it produced. The POOL travels with the
+  // session (like an assemblage's edl) so a saved collage replays from the
+  // source files alone, with no re-scan and no re-conversion.
+  collageFolder?: string
+  collagePool?: import('./collage').CollageClip[]
 }
 
 // Where a native convolution node reads its "impulse"/energy source from: another
@@ -722,6 +728,14 @@ export interface ExposedApi {
   }>
   videoConvert: (path: string) => Promise<{ ok: boolean; path?: string; cached?: boolean; error?: string }>
   onVideoConvertProgress: (cb: (p: { path: string; pct: number }) => void) => () => void
+  // Collage : pick a folder, then reduce it to a pool of playable clips (one
+  // entry per file, non-Chromium codecs converted through the same cache the
+  // single-clip import uses).
+  collagePickFolder: () => Promise<string | null>
+  collageScan: (folder: string) => Promise<import('./collage').CollageScanResult>
+  onCollageProgress: (
+    cb: (p: { done: number; total: number; file: string }) => void
+  ) => () => void
   // Assemble : pick a corpus folder, then sweep it into a descriptor point cloud.
   assemblePickFolder: () => Promise<string | null>
   assembleAnalyze: (

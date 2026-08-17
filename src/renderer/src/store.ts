@@ -700,6 +700,13 @@ interface StoreState {
   // Native Text source (gen-text): the string + the glyph-fill sidechain.
   setSourceText: (layer: number, slot: 'A' | 'B', text: string) => void
   setSourceSidechain: (layer: number, slot: 'A' | 'B', ref: SidechainRef | null) => void
+  // Native Collage source (gen-collage): the scanned folder + its clip pool.
+  setCollagePool: (
+    layer: number,
+    slot: 'A' | 'B',
+    folder: string,
+    pool: import('@shared/collage').CollageClip[]
+  ) => void
 
   // ── Background slab : the ground under the four layers ───────────────
   setBackgroundSource: (shaderId: string | null) => void
@@ -1422,6 +1429,18 @@ export const useStore = create<StoreState>((set, get) => ({
           const cur = slot === 'A' ? l.sourceA : l.sourceB
           if (!cur || cur.shaderId !== 'gen-text') return l
           const next = { ...cur, text }
+          return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
+        })
+      }
+    })),
+  setCollagePool: (layer, slot, folder, pool) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => {
+          const cur = slot === 'A' ? l.sourceA : l.sourceB
+          if (!cur || cur.shaderId !== 'gen-collage') return l
+          const next = { ...cur, collageFolder: folder, collagePool: pool }
           return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
         })
       }

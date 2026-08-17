@@ -67,6 +67,11 @@ function runFfmpeg(args: string[], onStderr?: (chunk: string) => void): Promise<
     const child = spawn(bin, args, { windowsHide: true })
     children.add(child)
     let err = ''
+    // An EPIPE on either pipe (most likely when killAllConverts reaps this
+    // child on quit, mid-scan) arrives as an unhandled 'error' event, which
+    // THROWS in main and takes the app with it.
+    child.stdout?.on('error', () => {})
+    child.stderr.on('error', () => {})
     child.stderr.on('data', (d: Buffer) => {
       const s = d.toString()
       err += s
@@ -91,6 +96,8 @@ export interface VideoProbeResult {
   ok: boolean
   codec: string | null
   durationSec: number
+  width: number
+  height: number
   needsConvert: boolean
   ffmpegAvailable: boolean
   error?: string
@@ -99,20 +106,27 @@ export interface VideoProbeResult {
 export async function probe(path: string): Promise<VideoProbeResult> {
   try {
     // `ffmpeg -i <file>` exits non-zero (no output requested) but prints the
-    // stream info we need on stderr : codec name + duration.
+    // stream info we need on stderr : codec name + duration + frame size.
     const { err } = await runFfmpeg(['-hide_banner', '-i', path])
     const codec = err.match(/Video:\s*([a-z0-9_]+)/i)?.[1]?.toLowerCase() ?? null
     const durationSec = parseClock(err.match(/Duration:\s*([\d:.]+)/)?.[1] ?? '')
+    // Frame size, from the Video: line only : the first `<W>x<H>` field after
+    // the pixel format. Anchoring on `Video:` keeps an audio or data stream out
+    // of it, and the `[SAR 1:1 DAR 16:9]` that follows on the same line is a
+    // pair of RATIOS, not a size — the lazy match stops before it.
+    const dim = err.match(/Video:.*?,\s*(\d+)x(\d+)/)
     return {
       ok: codec !== null,
       codec,
       durationSec,
+      width: dim ? Number(dim[1]) : 0,
+      height: dim ? Number(dim[2]) : 0,
       needsConvert: codec !== null && CONVERT_CODECS.test(codec),
       ffmpegAvailable: true
     }
   } catch (e) {
     // ffmpeg missing entirely : the renderer falls back to trying <video> as-is.
-    return { ok: false, codec: null, durationSec: 0, needsConvert: false, ffmpegAvailable: false, error: (e as Error).message }
+    return { ok: false, codec: null, durationSec: 0, width: 0, height: 0, needsConvert: false, ffmpegAvailable: false, error: (e as Error).message }
   }
 }
 
@@ -217,7 +231,7 @@ export function registerVideoConvert(): void {
     try {
       return await probe(path)
     } catch (e) {
-      return { ok: false, codec: null, durationSec: 0, needsConvert: false, ffmpegAvailable: false, error: (e as Error).message }
+      return { ok: false, codec: null, durationSec: 0, width: 0, height: 0, needsConvert: false, ffmpegAvailable: false, error: (e as Error).message }
     }
   })
 

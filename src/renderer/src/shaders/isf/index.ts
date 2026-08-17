@@ -882,6 +882,53 @@ export const GENERATORS: IsfShader[] = [
     }
   },
   {
+    // Collage : the Autocutter's cut-up with a different FILM in every piece.
+    // NATIVE (engine/CollageSource.ts) : it owns a pool of video decks and
+    // composites them through the Autocutter's own partition, so the whole wall
+    // is ONE layer and the usual rack / blend / finishing stack rides on top.
+    // The folder lives on the slot (collageFolder / collagePool), not here.
+    id: 'gen-collage',
+    name: 'Collage',
+    category: 'Generator',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        "Collage : a wall of films cut up like torn paper. Point it at a folder in the Inspector and every piece of the cut-up plays a different clip, cover-cropped to its own shape so portrait, landscape and 4K mix freely. `films` is how many play at once (more cuts than films is fine — the extra pieces show the same film at another crop); `hold` is the window each one loops; `churn` decides how many pieces re-cut on their own fast clock, from all holding to every piece its own little montage. `deal` re-deals the wall, `rate` does it on a clock. contour / curve length / torn paper / mask are the Autocutter's dials, and behave identically.",
+      CATEGORIES: ['Generator'],
+      INPUTS: [
+        { NAME: 'cuts', TYPE: 'float', MIN: 2.0, MAX: 64.0, DEFAULT: 12.0, LABEL: 'cuts' },
+        { NAME: 'films', TYPE: 'float', MIN: 1.0, MAX: 16.0, DEFAULT: 12.0, LABEL: 'films' },
+        { NAME: 'hold', TYPE: 'float', MIN: 0.0, MAX: 30.0, DEFAULT: 6.0, LABEL: 'hold (s)' },
+        { NAME: 'churn', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'churn' },
+        { NAME: 'speed', TYPE: 'float', MIN: 0.1, MAX: 4.0, DEFAULT: 1.0, LABEL: 'speed' },
+        { NAME: 'zoom', TYPE: 'float', MIN: 1.0, MAX: 3.0, DEFAULT: 1.05, LABEL: 'zoom' },
+        { NAME: 'rotate', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'rotate' },
+        { NAME: 'gap', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'seams' },
+        { NAME: 'contour', TYPE: 'float', MIN: 0.0, MAX: 2.0, DEFAULT: 0.0, LABEL: 'contour' },
+        { NAME: 'curve', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.3, LABEL: 'curve length' },
+        { NAME: 'torn', TYPE: 'float', MIN: 0.0, MAX: 2.0, DEFAULT: 0.0, LABEL: 'torn paper' },
+        { NAME: 'mask', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'mask' },
+        { NAME: 'rate', TYPE: 'float', MIN: 0.0, MAX: 60.0, DEFAULT: 0.0, LABEL: 'auto deal (s)' },
+        { NAME: 'deal', TYPE: 'event', LABEL: 'deal' }
+      ]
+    })}*/`,
+    curated: {
+      cuts: [4, 24],
+      films: [4, 12],
+      hold: [1.5, 12],
+      churn: [0, 0.6],
+      speed: [0.5, 1.6],
+      zoom: [1, 1.4],
+      rotate: [0, 0.35],
+      gap: [0, 0.4],
+      contour: [0.3, 1.5],
+      curve: [0.1, 0.9],
+      torn: [0.2, 1.4],
+      mask: [0, 0.5],
+      rate: [0, 20]
+    }
+  },
+  {
     // Parametric : the audio-buffer→texture generator (the parametric
     // diegesis; a test-pattern raster). NATIVE (engine/ParametricSource.ts). Reads
     // the LOCAL audio bus's spectrum/waveform; a procedural signal when silent.

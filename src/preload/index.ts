@@ -7,6 +7,7 @@ import type {
   OscInEvent,
   Session
 } from '@shared/types'
+import type { CollageScanResult } from '@shared/collage'
 
 const api: ExposedApi = {
   // ── Session I/O ──────────────────────────────────────────────────
@@ -71,6 +72,15 @@ const api: ExposedApi = {
     const h = (_e: Electron.IpcRendererEvent, p: { pct: number }): void => cb(p)
     ipcRenderer.on('assemble:exportProgress', h)
     return () => ipcRenderer.off('assemble:exportProgress', h)
+  },
+
+  // ── Collage (folder → playable clip pool) ────────────────────────
+  collagePickFolder: () => ipcRenderer.invoke('collage:pickFolder'),
+  collageScan: (folder: string) => ipcRenderer.invoke('collage:scan', folder),
+  onCollageProgress: (cb: (p: { done: number; total: number; file: string }) => void) => {
+    const h = (_e: Electron.IpcRendererEvent, p: { done: number; total: number; file: string }): void => cb(p)
+    ipcRenderer.on('collage:progress', h)
+    return () => ipcRenderer.off('collage:progress', h)
   },
 
   // ── Output window (2nd display) ──────────────────────────────────
