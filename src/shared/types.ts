@@ -116,6 +116,9 @@ export interface SourceSlot extends ShaderInstance {
   // source files alone, with no re-scan and no re-conversion.
   collageFolder?: string
   collagePool?: import('./collage').CollageClip[]
+  // Collage `feed: assemblages` : one small edit per piece, copied out of the
+  // Assemble bank so the session does not depend on machine-local storage.
+  collageEdls?: import('./collage').CollageEdl[]
 }
 
 // Where a native convolution node reads its "impulse"/energy source from: another

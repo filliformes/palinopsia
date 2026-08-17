@@ -915,7 +915,11 @@ export class ISFLayer {
   /** Activate/refresh/clear a native COLLAGE source (a wall of film pieces). */
   setCollage(
     slot: 'A' | 'B',
-    cfg: { pool: import('@shared/collage').CollageClip[]; inputs: Record<string, number | number[]> } | null
+    cfg: {
+      pool: import('@shared/collage').CollageClip[];
+      edls: import('@shared/collage').CollageEdl[];
+      inputs: Record<string, number | number[]>;
+    } | null
   ): void {
     const cur = slot === 'A' ? this.collageA : this.collageB;
     if (!cfg) {
@@ -930,7 +934,7 @@ export class ISFLayer {
       src = new CollageSource(this.shared.gl, this.w, this.h);
       if (slot === 'A') this.collageA = src; else this.collageB = src;
     }
-    src.update(cfg.pool, cfg.inputs);
+    src.update(cfg.pool, cfg.edls, cfg.inputs);
   }
 
   /** Load/swap/clear a live CAPTURE source ('webcam' | 'screen' | 'desktop:id'). */
@@ -1770,7 +1774,7 @@ export class Compositor {
         ? { text: l.sourceA.text ?? 'OPSIA', inputs: l.sourceA.inputs, sidechain: l.sourceA.sidechain ?? null }
         : null);
       L.setParam('A', isParamA ? { inputs: l.sourceA.inputs } : null);
-      L.setCollage('A', isCollA ? { pool: l.sourceA.collagePool ?? [], inputs: l.sourceA.inputs } : null);
+      L.setCollage('A', isCollA ? { pool: l.sourceA.collagePool ?? [], edls: l.sourceA.collageEdls ?? [], inputs: l.sourceA.inputs } : null);
       const nativeB = !!l.sourceB && l.sourceB.kind === 'generator' && NATIVE_SOURCE_IDS.has(l.sourceB.shaderId ?? '');
       const isTextB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-text';
       const isParamB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-parametric';
@@ -1789,7 +1793,7 @@ export class Compositor {
         ? { text: l.sourceB.text ?? 'OPSIA', inputs: l.sourceB.inputs, sidechain: l.sourceB.sidechain ?? null }
         : null);
       L.setParam('B', isParamB && l.sourceB ? { inputs: l.sourceB.inputs } : null);
-      L.setCollage('B', isCollB && l.sourceB ? { pool: l.sourceB.collagePool ?? [], inputs: l.sourceB.inputs } : null);
+      L.setCollage('B', isCollB && l.sourceB ? { pool: l.sourceB.collagePool ?? [], edls: l.sourceB.collageEdls ?? [], inputs: l.sourceB.inputs } : null);
       L.setVideoPlayback('A', l.sourceA);
       L.setVideoPlayback('B', l.sourceB);
       L.setFraming('A', l.sourceA);

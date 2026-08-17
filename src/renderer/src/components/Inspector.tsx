@@ -120,6 +120,7 @@ export function Inspector(): JSX.Element {
     slot: 'A' | 'B'
     folder: string
     pool: import('@shared/collage').CollageClip[]
+    edls: import('@shared/collage').CollageEdl[]
   } | null = null
 
   if (selection?.type === 'source') {
@@ -139,7 +140,8 @@ export function Inspector(): JSX.Element {
           layer: li,
           slot: sl,
           folder: slot.collageFolder ?? '',
-          pool: slot.collagePool ?? []
+          pool: slot.collagePool ?? [],
+          edls: slot.collageEdls ?? []
         }
       }
       if (slot.shaderId === 'gen-text') {
@@ -385,6 +387,7 @@ export function Inspector(): JSX.Element {
           slot={collageCfg.slot}
           folder={collageCfg.folder}
           pool={collageCfg.pool}
+          edls={collageCfg.edls}
         />
       )}
       {textCfg && (

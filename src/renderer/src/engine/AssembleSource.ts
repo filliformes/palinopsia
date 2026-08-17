@@ -390,6 +390,14 @@ export class AssembleSource {
 
   // ── GL ─────────────────────────────────────────────────────────────────
 
+  /** The live deck's decoded frame size (0×0 before the first frame lands).
+   *  Collage needs it per frame : an edit cuts between clips of different
+   *  aspects, so the fit of the piece has to follow the cut. */
+  frameSize(): [number, number] {
+    const el = this.decks[this.live].el
+    return [el.videoWidth, el.videoHeight]
+  }
+
   upload(): WebGLTexture | null {
     const deck = this.decks[this.live]
     if (!this.clips.length) return this.tex

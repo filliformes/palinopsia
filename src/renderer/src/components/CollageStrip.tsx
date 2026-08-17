@@ -4,21 +4,26 @@
 // transport, because there is no single clip to scrub.
 
 import { useEffect, useRef, useState } from 'react'
-import type { CollageClip } from '@shared/collage'
+import type { CollageClip, CollageEdl } from '@shared/collage'
 import { useStore } from '../store'
 
 export function CollageStrip({
   layer,
   slot,
   folder,
-  pool
+  pool,
+  edls
 }: {
   layer: number
   slot: 'A' | 'B'
   folder: string
   pool: CollageClip[]
+  edls: CollageEdl[]
 }): JSX.Element {
   const setCollagePool = useStore((s) => s.setCollagePool)
+  const setCollageEdls = useStore((s) => s.setCollageEdls)
+  const bank = useStore((s) => s.assemblages)
+  const [picking, setPicking] = useState(false)
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState('')
   const [note, setNote] = useState('')
@@ -70,8 +75,23 @@ export function CollageStrip({
   }
 
   const name = folder ? folder.split(/[\\/]/).filter(Boolean).pop() : ''
+  const chosen = new Set(edls.map((e) => e.id))
+  const toggle = (id: string): void => {
+    const hit = bank.find((a) => a.id === id)
+    if (!hit) return
+    // Copy the CLIPS in : the bank is machine-local localStorage, and a session
+    // carrying a collage has to replay without it.
+    setCollageEdls(
+      layer,
+      slot,
+      chosen.has(id)
+        ? edls.filter((e) => e.id !== id)
+        : [...edls, { id: hit.id, name: hit.name, clips: hit.clips }]
+    )
+  }
 
   return (
+    <>
     <div className="flex items-center gap-2 border-b border-border bg-panel2/40 px-2 py-1">
       <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">films</span>
       <button
@@ -98,6 +118,34 @@ export function CollageStrip({
         </button>
       )}
       {note && <span className="shrink-0 text-[10px] text-muted">{note}</span>}
+      <button
+        className={`btn shrink-0 text-[11px] ${edls.length ? 'text-accent2' : ''}`}
+        onClick={() => setPicking((v) => !v)}
+        title="Use saved assemblages as the pieces instead of single files : each one plays its own little edit. Set feed to 'assemblages' to hear them."
+      >
+        {edls.length ? `${edls.length} edits` : 'edits…'}
+      </button>
     </div>
+    {picking && (
+      <div className="max-h-32 overflow-y-auto border-b border-border bg-panel2/20 px-2 py-1">
+        {bank.length === 0 ? (
+          <div className="py-1 text-[11px] text-muted">
+            No saved assemblages yet — generate and save some in the assemble tab (<kbd>E</kbd>).
+          </div>
+        ) : (
+          bank.map((a) => (
+            <label
+              key={a.id}
+              className="flex cursor-pointer items-center gap-2 py-0.5 text-[11px] hover:text-accent2"
+            >
+              <input type="checkbox" checked={chosen.has(a.id)} onChange={() => toggle(a.id)} />
+              <span className="min-w-0 flex-1 truncate">{a.name}</span>
+              <span className="shrink-0 font-mono text-[10px] text-muted">{a.clips.length} cuts</span>
+            </label>
+          ))
+        )}
+      </div>
+    )}
+    </>
   )
 }

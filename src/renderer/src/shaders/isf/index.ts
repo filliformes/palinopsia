@@ -893,11 +893,12 @@ export const GENERATORS: IsfShader[] = [
     native: true,
     source: `/*${JSON.stringify({
       DESCRIPTION:
-        "Collage : a wall of films cut up like torn paper. Point it at a folder in the Inspector and every piece of the cut-up plays a different clip, cover-cropped to its own shape so portrait, landscape and 4K mix freely. `films` is how many play at once (more cuts than films is fine — the extra pieces show the same film at another crop); `hold` is the window each one loops; `churn` decides how many pieces re-cut on their own fast clock, from all holding to every piece its own little montage. `deal` re-deals the wall, `rate` does it on a clock. contour / curve length / torn paper / mask are the Autocutter's dials, and behave identically.",
+        "Collage : a wall of films cut up like torn paper. Point it at a folder in the Inspector and every piece of the cut-up plays a different clip, cover-cropped to its own shape so portrait, landscape and 4K mix freely. `feed` switches between that folder and a selection from the Assemble bank — with `assemblages` every piece plays one of your saved little edits instead, cutting on its own. `films` is how many play at once, up to 50 (more cuts than films is fine — the extra pieces show the same film at another crop); `hold` is the window each one loops; `churn` decides how many pieces re-cut on their own fast clock, from all holding to every piece its own little montage. `deal` re-deals the wall, `rate` does it on a clock. contour / curve length / torn paper / mask are the Autocutter's dials, and behave identically.",
       CATEGORIES: ['Generator'],
       INPUTS: [
         { NAME: 'cuts', TYPE: 'float', MIN: 2.0, MAX: 64.0, DEFAULT: 12.0, LABEL: 'cuts' },
-        { NAME: 'films', TYPE: 'float', MIN: 1.0, MAX: 16.0, DEFAULT: 12.0, LABEL: 'films' },
+        { NAME: 'feed', TYPE: 'long', VALUES: [0, 1], LABELS: ['folder', 'assemblages'], DEFAULT: 0, LABEL: 'feed' },
+        { NAME: 'films', TYPE: 'float', MIN: 1.0, MAX: 50.0, DEFAULT: 12.0, LABEL: 'films' },
         { NAME: 'hold', TYPE: 'float', MIN: 0.0, MAX: 30.0, DEFAULT: 6.0, LABEL: 'hold (s)' },
         { NAME: 'churn', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'churn' },
         { NAME: 'speed', TYPE: 'float', MIN: 0.1, MAX: 4.0, DEFAULT: 1.0, LABEL: 'speed' },
@@ -914,7 +915,7 @@ export const GENERATORS: IsfShader[] = [
     })}*/`,
     curated: {
       cuts: [4, 24],
-      films: [4, 12],
+      films: [4, 20],
       hold: [1.5, 12],
       churn: [0, 0.6],
       speed: [0.5, 1.6],

@@ -35,16 +35,21 @@
 // every frame cost ~3.5 ms. Uploads here are gated on a fresh decoded frame
 // (requestVideoFrameCallback), so the steady-state cost is well under that.
 
-import type { CollageClip } from '@shared/collage'
+import type { CollageClip, CollageEdl } from '@shared/collage'
 import { uploadVideoFrame } from './VideoSource'
+import { AssembleSource } from './AssembleSource'
 
 /** Same piece cap as the Autocutter : the shader's uniform arrays are sized 64. */
 const MAX_CELLS = 64
 /** Hard ceiling on simultaneous decoders. */
-export const MAX_DECKS = 16
-/** Edge of one square array layer. 16 layers ≈ 26 MB — comfortable, and enough
- *  resolution for a cell occupying a good half of a 1080p frame. */
-const TILE = 640
+export const MAX_DECKS = 50
+/** Edge of one square array layer, traded against how many there are : a wall
+ *  of 50 gives each piece a fiftieth of the frame, so it needs far less
+ *  resolution than a wall of 8. Keeps the array under ~30 MB at every size
+ *  (16×640² ≈ 26 MB, 50×384² ≈ 29 MB) instead of 50×640² ≈ 82 MB. */
+function tileFor(layers: number): number {
+  return layers <= 16 ? 640 : layers <= 32 ? 448 : 384
+}
 /** Chromium refuses playback rates outside roughly this band. */
 const RATE_MIN = 0.0625
 const RATE_MAX = 16
@@ -209,6 +214,10 @@ function mulberry32(a: number): () => number {
 }
 
 interface Deck {
+  // Exactly one of these drives the deck. `asm` decks play a saved assemblage
+  // (its own edit, its own cuts, its own ping-pong pair for cross-file cuts);
+  // `el` decks loop a window of a single file.
+  asm: AssembleSource | null
   el: HTMLVideoElement
   tex: WebGLTexture | null
   src: string // file currently loaded ('' = nothing)
@@ -240,10 +249,15 @@ export class CollageSource {
   private cells: Cell[] = []
   private arr: WebGLTexture | null = null
   private arrLayers = 0
+  private tile = 640
   private fbo: WebGLFramebuffer | null = null
   private pool: CollageClip[] = []
   private poolKey = ''
   private poolDirty = false
+  private edls: CollageEdl[] = []
+  private edlKey = ''
+  private edlDirty = false
+  private lastFeed = -1
   /** Base inputs from the store, overlaid by modulation's per-frame writes. */
   private live: Record<string, number | number[]> = {}
   private seed = 0x5eed1234
@@ -278,6 +292,7 @@ export class CollageSource {
     el.preload = 'auto'
     el.crossOrigin = 'anonymous'
     const deck: Deck = {
+      asm: null,
       el, tex: null, src: '', clip: null, inSec: 0, lenSec: 0,
       content: [0, 0, 1, 1], pending: false, rvfc: 0, seeking: false, seekAt: 0,
       churning: false, nextRoll: 0, pan: [0.5, 0.5]
@@ -296,7 +311,29 @@ export class CollageSource {
     return deck
   }
 
+  /** An assemblage-fed deck : AssembleSource already owns playlist walking,
+   *  gated seeks and the ping-pong pair that makes cross-FILE cuts free, so
+   *  there is no second implementation of any of it here. */
+  private makeAsmDeck(edl: CollageEdl): Deck {
+    const asm = new AssembleSource(this.gl)
+    asm.setPlaylist(edl.clips, true)
+    asm.setPlaying(true)
+    return {
+      asm, el: document.createElement('video'), tex: null, src: edl.id, clip: null,
+      inSec: 0, lenSec: 0, content: [0, 0, 1, 1], pending: false, rvfc: 0,
+      seeking: false, seekAt: 0, churning: false, nextRoll: 0, pan: [0.5, 0.5]
+    }
+  }
+
   private killDeck(d: Deck): void {
+    if (d.asm) {
+      // The texture belongs to the AssembleSource : disposing that frees it, and
+      // deleting it here as well would double-free.
+      d.asm.dispose()
+      d.asm = null
+      d.tex = null
+      return
+    }
     try {
       if (d.rvfc && typeof d.el.cancelVideoFrameCallback === 'function')
         d.el.cancelVideoFrameCallback(d.rvfc)
@@ -317,12 +354,23 @@ export class CollageSource {
     if (this.arrLayers !== n) this.allocArray(n)
   }
 
+  /** One deck per selected assemblage. Rebuilt whenever the selection changes;
+   *  identity is the edl id list, so re-picking the same set is a no-op. */
+  private setAsmDecks(edls: CollageEdl[]): void {
+    const want = edls.slice(0, MAX_DECKS)
+    for (const d of this.decks) this.killDeck(d)
+    this.decks = want.map((e) => this.makeAsmDeck(e))
+    if (!this.decks.length) this.decks = [this.makeDeck()]
+    this.allocArray(this.decks.length)
+  }
+
   private allocArray(layers: number): void {
     const gl = this.gl
     if (this.arr) gl.deleteTexture(this.arr)
     this.arr = gl.createTexture()
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.arr)
-    gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, TILE, TILE, layers, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+    this.tile = tileFor(layers)
+    gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, this.tile, this.tile, layers, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
@@ -504,7 +552,11 @@ export class CollageSource {
    *  itself runs at render time, because applyModulation lands its overrides
    *  through setInput in between — reading them here would miss a frame and,
    *  worse, make modulated `cuts` / `films` / `mask` inert. */
-  update(pool: CollageClip[], inputs: Record<string, number | number[]>): void {
+  update(
+    pool: CollageClip[],
+    edls: CollageEdl[],
+    inputs: Record<string, number | number[]>
+  ): void {
     if (this.disposed) return
     // A changed pool (new folder, new selection) re-deals from scratch.
     const key = pool.map((c) => c.id).join('|')
@@ -512,6 +564,12 @@ export class CollageSource {
       this.pool = pool.slice()
       this.poolKey = key
       this.poolDirty = true
+    }
+    const ek = edls.map((e) => e.id).join('|')
+    if (ek !== this.edlKey) {
+      this.edls = edls.slice()
+      this.edlKey = ek
+      this.edlDirty = true
     }
     this.live = { ...inputs }
   }
@@ -536,13 +594,29 @@ export class CollageSource {
     const speed = clampf(num(inputs.speed, 1), 0.1, 4)
     const rate = clampf(num(inputs.rate, 0), 0, 60)
 
+    // feed 0 = the folder pool (one film per piece) · 1 = the Assemble bank
+    // (one saved edit per piece). An empty selection falls back to the folder,
+    // so switching the dial before picking anything can't blank the wall.
+    const feed = this.edls.length && Math.round(num(inputs.feed, 0)) === 1 ? 1 : 0
     const poolChanged = this.poolDirty
     this.poolDirty = false
+    const edlChanged = this.edlDirty
+    this.edlDirty = false
 
-    const deckChanged = Math.round(films) !== this.lastFilms
-    if (deckChanged) {
-      this.setDeckCount(films)
-      this.lastFilms = Math.round(films)
+    let deckChanged = feed !== this.lastFeed
+    this.lastFeed = feed
+    if (feed === 1) {
+      if (deckChanged || edlChanged) {
+        this.setAsmDecks(this.edls)
+        deckChanged = true
+      }
+      this.lastFilms = -1 // force a rebuild when the dial goes back to folder
+    } else {
+      if (Math.round(films) !== this.lastFilms || deckChanged) {
+        this.setDeckCount(films)
+        this.lastFilms = Math.round(films)
+        deckChanged = true
+      }
     }
     if (cuts !== this.lastCuts || rotate !== this.lastRotate || deckChanged) {
       this.rebuildCells(cuts, rotate)
@@ -562,7 +636,9 @@ export class CollageSource {
     }
     if (redeal) {
       if (!poolChanged && !deckChanged) this.seed = (this.seed * 1664525 + 1013904223) >>> 0
-      this.deal(hold, churn)
+      // Assemblage decks carry their own edit and their own pace : a deal only
+      // re-cuts the partition and re-shuffles which piece shows which edit.
+      if (feed === 0) this.deal(hold, churn)
       this.rebuildCells(cuts, rotate)
       this.rebuildCrops(zoom)
     }
@@ -570,7 +646,25 @@ export class CollageSource {
 
     // Per-deck housekeeping : rate, window looping, and the churn re-roll.
     const rnd = mulberry32((this.seed ^ 0x2545f491) >>> 0)
+    let aspectMoved = false
     for (const d of this.decks) {
+      if (d.asm) {
+        // AssembleSource owns the walk; `speed` scales it like a layer clock.
+        d.asm.tick(dt, speed)
+        const [vw, vh] = d.asm.frameSize()
+        if (vw > 0 && vh > 0) {
+          // An edit cuts between clips of DIFFERENT aspects, so the piece has to
+          // re-fit at every cut, not once when the deck was made.
+          const av = vw / vh
+          const cw = av >= 1 ? 1 : av
+          const ch = av >= 1 ? 1 / av : 1
+          if (Math.abs(cw - d.content[2]) > 1e-4 || Math.abs(ch - d.content[3]) > 1e-4) {
+            d.content = [(1 - cw) / 2, (1 - ch) / 2, cw, ch]
+            aspectMoved = true
+          }
+        }
+        continue
+      }
       if (!d.clip) continue
       const want = clampf(speed, RATE_MIN, RATE_MAX)
       if (Math.abs(d.el.playbackRate - want) > 1e-3) {
@@ -596,6 +690,7 @@ export class CollageSource {
         if (t >= d.inSec + d.lenSec || t < d.inSec - 0.25) this.seekTo(d, d.inSec)
       }
     }
+    if (aspectMoved) this.rebuildCrops(zoom)
   }
 
   /** Draw the wall into the layer's scratch target. */
@@ -609,13 +704,19 @@ export class CollageSource {
     if (this.arr && this.fbo) {
       for (let i = 0; i < this.decks.length; i++) {
         const d = this.decks[i]
-        if (!d.pending || d.el.readyState < 2 || !d.el.videoWidth) continue
-        d.pending = false
-        d.tex = uploadVideoFrame(gl, d.el, d.tex)
+        if (d.asm) {
+          const t = d.asm.upload()
+          if (!t) continue
+          d.tex = t
+        } else {
+          if (!d.pending || d.el.readyState < 2 || !d.el.videoWidth) continue
+          d.pending = false
+          d.tex = uploadVideoFrame(gl, d.el, d.tex)
+        }
         if (!d.tex) continue
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo)
         gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, this.arr, 0, i)
-        gl.viewport(0, 0, TILE, TILE)
+        gl.viewport(0, 0, this.tile, this.tile)
         gl.useProgram(g.tile)
         gl.bindBuffer(gl.ARRAY_BUFFER, g.quad)
         gl.enableVertexAttribArray(0)
@@ -635,7 +736,7 @@ export class CollageSource {
     gl.clearColor(0, 0, 0, 0)
     gl.clear(gl.COLOR_BUFFER_BIT)
     const n = Math.min(this.cells.length, MAX_CELLS)
-    if (!n || !this.arr || !this.pool.length) return
+    if (!n || !this.arr || !(this.pool.length || this.edls.length)) return
     for (let i = 0; i < n; i++) {
       const c = this.cells[i]
       this.cellArr[i * 4] = c.x; this.cellArr[i * 4 + 1] = c.y

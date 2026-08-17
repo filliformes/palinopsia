@@ -26,3 +26,13 @@ export interface CollageScanResult {
   skipped: string[] // file names that could not be used, with no detail
   error?: string
 }
+
+/** One saved assemblage used as a Collage piece : the piece plays this little
+ *  edit on a loop instead of looping a window of a single file. The CLIPS are
+ *  copied in from the bank (which is machine-local localStorage), so a session
+ *  carrying a collage replays without the bank. */
+export interface CollageEdl {
+  id: string
+  name: string
+  clips: import('./assemble').AssembleClip[]
+}

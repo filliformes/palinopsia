@@ -707,6 +707,13 @@ interface StoreState {
     folder: string,
     pool: import('@shared/collage').CollageClip[]
   ) => void
+  // Collage `feed: assemblages` : the saved edits used as pieces (copied out of
+  // the bank, so the session no longer depends on it).
+  setCollageEdls: (
+    layer: number,
+    slot: 'A' | 'B',
+    edls: import('@shared/collage').CollageEdl[]
+  ) => void
 
   // ── Background slab : the ground under the four layers ───────────────
   setBackgroundSource: (shaderId: string | null) => void
@@ -1077,6 +1084,59 @@ function updateLayer(
   return layers.map((l, idx) => (idx === i ? fn(l) : l))
 }
 
+/** Drop every modulation + Meta destination pointing at one source slot.
+ *
+ *  Targets address a slot by LAYER + SLOT + INPUT NAME, never by the shader that
+ *  happens to occupy it. So without this, swapping a source leaves the old
+ *  bindings driving whatever the NEW source declares under the same name — an
+ *  LFO patched to one generator's `rate` silently seizes the next source's
+ *  `rate`, and a Meta knob left on `mask` blanks a freshly-placed Collage.
+ *  Invisible, and impossible to reason about. Replacing what is in a slot
+ *  replaces the instrument, so its patching goes with it.
+ *
+ *  Only for INTERACTIVE swaps : session loads, scene recalls and Randomize write
+ *  a whole composition whose matrix already matches its sources. */
+function dropSlotTargets(
+  c: CompositionState,
+  layer: number,
+  slot: 'A' | 'B',
+  prev: SourceSlot | null
+): CompositionState {
+  const next = (slot === 'A' ? c.layers[layer]?.sourceA : c.layers[layer]?.sourceB) ?? null
+  if (sameSource(prev, next)) return c // re-picking what is already there
+  return dropTargets(c, (t) => t.kind === 'source' && t.layer === layer && t.slot === slot)
+}
+
+/** The same, for the Background slab's source (addressed by input name alone). */
+function dropBgTargets(c: CompositionState, prev: SourceSlot | null): CompositionState {
+  if (sameSource(prev, c.background?.source ?? null)) return c
+  return dropTargets(c, (t) => t.kind === 'bgSource')
+}
+
+/** Same instrument in the slot? Identity is kind + shader + media, not inputs. */
+function sameSource(a: SourceSlot | null, b: SourceSlot | null): boolean {
+  if (!a || !b) return a === b
+  return a.kind === b.kind && a.shaderId === b.shaderId && (a.mediaId ?? null) === (b.mediaId ?? null)
+}
+
+function dropTargets(
+  c: CompositionState,
+  hits: (t: ModTarget) => boolean
+): CompositionState {
+  const modMatrix = c.modMatrix.filter((a) => !hits(a.target))
+  const metaKnobs = c.metaKnobs.map((k) =>
+    k.destinations.some(hits) ? { ...k, destinations: k.destinations.filter((t) => !hits(t)) } : k
+  )
+  const knobsChanged = metaKnobs.some((k, i) => k !== c.metaKnobs[i])
+  if (modMatrix.length === c.modMatrix.length && !knobsChanged) return c
+  return { ...c, modMatrix, metaKnobs }
+}
+
+/** The slot a swap is about to overwrite. */
+function slotOf(c: CompositionState, layer: number, slot: 'A' | 'B'): SourceSlot | null {
+  return (slot === 'A' ? c.layers[layer]?.sourceA : c.layers[layer]?.sourceB) ?? null
+}
+
 // Rewrite the FX array addressed by `scope` through `fn`, immutably.
 function updateFxArray(
   c: CompositionState,
@@ -1344,81 +1404,101 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
   setSourceShader: (layer, slot, shaderId) =>
     set((s) => ({
-      composition: {
-        ...s.composition,
-        layers: updateLayer(s.composition.layers, layer, (l) => {
-          // null shader ⇒ the slot goes back to 'none' (empty layer). A clean
-          // slot : no stale mediaId/mediaName carried over from a prior video.
-          const kind = shaderId ? ('generator' as const) : ('none' as const)
-          const next = { kind, shaderId, inputs: {} }
-          if (slot === 'A') return { ...l, sourceA: next }
-          return { ...l, sourceB: next }
-        })
-      },
+      composition: dropSlotTargets(
+        {
+          ...s.composition,
+          layers: updateLayer(s.composition.layers, layer, (l) => {
+            // null shader ⇒ the slot goes back to 'none' (empty layer). A clean
+            // slot : no stale mediaId/mediaName carried over from a prior video.
+            const kind = shaderId ? ('generator' as const) : ('none' as const)
+            const next = { kind, shaderId, inputs: {} }
+            if (slot === 'A') return { ...l, sourceA: next }
+            return { ...l, sourceB: next }
+          })
+        },
+        layer,
+        slot,
+        slotOf(s.composition, layer, slot)
+      ),
       // Picking a source lands its controls in the Inspector immediately.
       selection: shaderId ? { type: 'source', layer, slot } : s.selection
     })),
   setSourceVideo: (layer, slot, mediaId, mediaName) =>
     set((s) => ({
-      composition: {
-        ...s.composition,
-        layers: updateLayer(s.composition.layers, layer, (l) => {
-          const vid = {
-            kind: 'video' as const,
-            shaderId: null,
-            inputs: {},
-            mediaId,
-            mediaName,
-            videoPlaying: true,
-            videoSpeed: 1,
-            videoDirection: 'forward' as const,
-            videoLoop: true,
-            videoIn: 0,
-            videoOut: 1
-          }
-          // Clear the slot's inherited source FX : a freshly imported clip must
-          // not land under a random-scene's hold/freeze/key rack (which would
-          // read as "the video won't play"). The user adds FX deliberately after.
-          if (slot === 'A') return { ...l, sourceA: vid, sourceAFx: [] }
-          return { ...l, sourceB: vid, sourceBFx: [] }
-        })
-      },
+      composition: dropSlotTargets(
+        {
+          ...s.composition,
+          layers: updateLayer(s.composition.layers, layer, (l) => {
+            const vid = {
+              kind: 'video' as const,
+              shaderId: null,
+              inputs: {},
+              mediaId,
+              mediaName,
+              videoPlaying: true,
+              videoSpeed: 1,
+              videoDirection: 'forward' as const,
+              videoLoop: true,
+              videoIn: 0,
+              videoOut: 1
+            }
+            // Clear the slot's inherited source FX : a freshly imported clip must
+            // not land under a random-scene's hold/freeze/key rack (which would
+            // read as "the video won't play"). The user adds FX deliberately after.
+            if (slot === 'A') return { ...l, sourceA: vid, sourceAFx: [] }
+            return { ...l, sourceB: vid, sourceBFx: [] }
+          })
+        },
+        layer,
+        slot,
+        slotOf(s.composition, layer, slot)
+      ),
       selection: { type: 'source', layer, slot }
     })),
   setSourceCapture: (layer, slot, spec, name) =>
     set((s) => ({
-      composition: {
-        ...s.composition,
-        layers: updateLayer(s.composition.layers, layer, (l) => {
-          const cap = {
-            kind: 'capture' as const,
-            shaderId: null,
-            inputs: {},
-            mediaId: spec,
-            mediaName: name
-          }
-          if (slot === 'A') return { ...l, sourceA: cap, sourceAFx: [] }
-          return { ...l, sourceB: cap, sourceBFx: [] }
-        })
-      },
+      composition: dropSlotTargets(
+        {
+          ...s.composition,
+          layers: updateLayer(s.composition.layers, layer, (l) => {
+            const cap = {
+              kind: 'capture' as const,
+              shaderId: null,
+              inputs: {},
+              mediaId: spec,
+              mediaName: name
+            }
+            if (slot === 'A') return { ...l, sourceA: cap, sourceAFx: [] }
+            return { ...l, sourceB: cap, sourceBFx: [] }
+          })
+        },
+        layer,
+        slot,
+        slotOf(s.composition, layer, slot)
+      ),
       selection: { type: 'source', layer, slot }
     })),
   setSourceHive: (layer, slot, host, port) =>
     set((s) => ({
-      composition: {
-        ...s.composition,
-        layers: updateLayer(s.composition.layers, layer, (l) => {
-          const hv = {
-            kind: 'hive' as const,
-            shaderId: null,
-            inputs: {},
-            mediaId: `${host}:${port}`,
-            mediaName: `HIVE ${host}:${port}`
-          }
-          if (slot === 'A') return { ...l, sourceA: hv, sourceAFx: [] }
-          return { ...l, sourceB: hv, sourceBFx: [] }
-        })
-      },
+      composition: dropSlotTargets(
+        {
+          ...s.composition,
+          layers: updateLayer(s.composition.layers, layer, (l) => {
+            const hv = {
+              kind: 'hive' as const,
+              shaderId: null,
+              inputs: {},
+              mediaId: `${host}:${port}`,
+              mediaName: `HIVE ${host}:${port}`
+            }
+            if (slot === 'A') return { ...l, sourceA: hv, sourceAFx: [] }
+            return { ...l, sourceB: hv, sourceBFx: [] }
+          })
+        },
+        layer,
+        slot,
+        slotOf(s.composition, layer, slot)
+      ),
       selection: { type: 'source', layer, slot }
     })),
   setSourceText: (layer, slot, text) =>
@@ -1445,6 +1525,18 @@ export const useStore = create<StoreState>((set, get) => ({
         })
       }
     })),
+  setCollageEdls: (layer, slot, edls) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => {
+          const cur = slot === 'A' ? l.sourceA : l.sourceB
+          if (!cur || cur.shaderId !== 'gen-collage') return l
+          const next = { ...cur, collageEdls: edls }
+          return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
+        })
+      }
+    })),
   setSourceSidechain: (layer, slot, ref) =>
     set((s) => ({
       composition: {
@@ -1465,7 +1557,10 @@ export const useStore = create<StoreState>((set, get) => ({
         ? { kind: 'generator', shaderId, inputs: {} }
         : emptySlot()
       return {
-        composition: { ...s.composition, background: { ...bg, source } },
+        composition: dropBgTargets(
+          { ...s.composition, background: { ...bg, source } },
+          bg.source ?? null
+        ),
         selection: shaderId ? { type: 'background' } : s.selection
       }
     }),
@@ -2255,28 +2350,33 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
   setSourceAssemble: (layer, slot, a) =>
     set((s) => ({
-      composition: {
-        ...s.composition,
-        layers: s.composition.layers.map((l, i) =>
-          i !== layer
-            ? l
-            : {
-                ...l,
-                [slot === 'A' ? 'sourceA' : 'sourceB']: {
-                  kind: 'assemble' as const,
-                  shaderId: null,
-                  inputs: {},
-                  mediaId: a.id,
-                  mediaName: a.name,
-                  edl: a.clips,
-                  videoPlaying: true,
-                  videoLoop: a.params.loop
-                },
-                // A source swap clears that slot's FX rack, matching video/capture.
-                [slot === 'A' ? 'sourceAFx' : 'sourceBFx']: []
-              }
-        )
-      },
+      composition: dropSlotTargets(
+        {
+          ...s.composition,
+          layers: s.composition.layers.map((l, i) =>
+            i !== layer
+              ? l
+              : {
+                  ...l,
+                  [slot === 'A' ? 'sourceA' : 'sourceB']: {
+                    kind: 'assemble' as const,
+                    shaderId: null,
+                    inputs: {},
+                    mediaId: a.id,
+                    mediaName: a.name,
+                    edl: a.clips,
+                    videoPlaying: true,
+                    videoLoop: a.params.loop
+                  },
+                  // A source swap clears that slot's FX rack, matching video/capture.
+                  [slot === 'A' ? 'sourceAFx' : 'sourceBFx']: []
+                }
+          )
+        },
+        layer,
+        slot,
+        slotOf(s.composition, layer, slot)
+      ),
       selection: { type: 'source', layer, slot }
     })),
 
