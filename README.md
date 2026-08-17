@@ -20,12 +20,30 @@ work: **never cheap psychedelia, never a 3D game engine.**
 - **Played, not patched** — every parameter reachable over OSC, MIDI, or the UI,
   through a single write path.
 
+![The Palinopsia compositor](docs/images/interface-compositor.jpg)
+
+*The instrument: live preview and scene bank at the top left, the Inspector for
+whatever is selected below it, the pinned master finalizers under that, and the
+layer stack down the right column — here two layers of Shapes cut up by Slice
+Shuffle and **Autocutter**, differenced together.*
+
+### What it looks like
+
+Every frame below was made by the app alone, no external footage: pick a recipe
+from the **Generate** menu and it builds an entire coherent session — sources,
+racks, palette, World and macro biases — in one click.
+
+| | | |
+|---|---|---|
+| ![Cut-Up](docs/images/visual-cut-up.jpg)<br>**Cut-Up** — Autocutter's torn, curved, still-tessellating collage | ![Constructivist](docs/images/visual-constructivist.jpg)<br>**Constructivist** — hard slabs, one accent | ![Mycelial](docs/images/visual-mycelial.jpg)<br>**Mycelial** — reaction-diffusion filaments |
+| ![Op Field](docs/images/visual-op-field.jpg)<br>**Op Field** — Riley/Vasarely optical grids | ![Cathode Ray](docs/images/visual-cathode-ray.jpg)<br>**Cathode Ray** — analog video-synthesis lineage | ![Pixel Sort](docs/images/visual-pixel-sort.jpg)<br>**Pixel Sort** — the datamosh / compression family |
+
 ---
 
 ## Contents
 
 **Play it**
-- [Concept](#concept) · [Getting started](#getting-started) · [Your first five minutes](#your-first-five-minutes)
+- [What it looks like](#what-it-looks-like) · [Concept](#concept) · [Getting started](#getting-started) · [Your first five minutes](#your-first-five-minutes)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 
 **The instrument**
@@ -103,7 +121,7 @@ first-ever launch pays this once; it persists on disk afterwards.
 4. **Save a scene**: get something you like, click `+` in the Scene bank, then
    press `1`–`9` to recall it live (recalls morph over MRPH).
 5. **Go fullscreen**: press **`O`**, pick a display, hit fullscreen. Or try
-   **Generate** in the toolbar — 50 themed recipes that build a coherent
+   **Generate** in the toolbar — 76 themed recipes that build a coherent
    session (visuals + World + palette + macro biases) in one click.
 
 ---
@@ -126,7 +144,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `A` | Right column → **osc/audio/midi** setup tab |
 | `D` / `X` / `I` | Collapse Modulation / Master-FX / Inspector |
 | `R` | Fire the Transport's selected Randomize |
-| `Esc` | Close World / Output / Sequence page |
+| `Esc` | Exit MIDI Learn first; otherwise close World / Sonify / Output / Sequence |
 | `Ctrl/Cmd+Z` · `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` | Undo · Redo (100 levels) |
 | `Ctrl/Cmd+S` | Save session |
 | `Ctrl/Cmd` `+` / `-` / `0` · `Ctrl`+wheel | UI zoom in / out / reset |
@@ -167,10 +185,11 @@ soft contact shadow onto it), and a **blend / isolate** mode against the stack. 
 has its own preset bank and its own dice, and is never touched by the global
 Randomize.
 
-The right column switches between **five views** (tabs, or keys `L` / `M` / `F` /
-`G`): **Layers** (the strips + background), **Mixer** (tall opacity/speed faders +
-blend for all four), **Finishing** (the Vibe · Context · Finalizer stack),
-**Feel** (the global macros), and **osc/audio** (the OSC + Audio panels).
+The right column switches between **six views** (tabs, or keys `L` / `M` / `F` /
+`G` / `E` / `A`): **Layers** (the strips + background), **Mixer** (tall
+opacity/speed faders + blend for all four), **Finishing** (the Vibe · Context ·
+Finalizer stack), **Feel** (the global macros), **assemble** (the automatic
+editor), and **osc/audio/midi** (the OSC, Audio and MIDI panels).
 Both the main Inspector's FX band and the Modulate side panel are **resizable**
 (drag their handles; widths/heights persist).
 
@@ -285,12 +304,34 @@ Two of the types close the loop **from the image back to control**:
   and *steers its target* to hold a setpoint (gain + adaptation), an
   Ashby-style homeostat that keeps a quality of the image in balance.
 
-The **mod-matrix** is a capped list of assignments (M# → target param, with a
-bipolar depth and a **Multiply** [VCA-scale the base] or **Replace** [swing] mode).
-Bindings are made from each parameter's **M** button in the Inspector or Meta tile.
-Modulation reaches **float, enum, and bool** inputs — plus the **video** targets
-(playhead / speed / loop / grain) — and is written straight to the compositor at
-frame rate, never through React re-renders.
+The **mod-matrix** holds up to **12** assignments (M# → target param, with a
+bipolar depth and a **Multiply** or **Replace** mode). Bindings are made from each
+parameter's **M** button in the Inspector or Meta tile. Modulation reaches
+**float, enum, and bool** inputs — plus the **video** targets (playhead / speed /
+loop / grain) — and is written straight to the compositor at frame rate, never
+through React re-renders.
+
+The two modes differ in what the parameter's own slider means once bound:
+
+- **Multiply** treats the slider as a ceiling and the modulator as a VCA
+  (`base · (1 − amount + amount · mod)`); a negative depth inverts. The base
+  value still sets the character, which is what you want on a param you have
+  already dialled in.
+- **Replace** swings bipolarly *around* the base, so the parameter moves even
+  from a standstill.
+
+Binding from the **M** button picks the mode for you: a target sitting at (or
+near) zero gets **Replace**, anything else gets **Multiply**. This matters because
+Multiply's law is a guaranteed no-op on a zero base — before the auto-pick,
+binding an LFO to a freshly-added effect's `torn`, `contour` or any zeroed slider
+looked like broken modulation. You can still flip the mode per assignment from
+the `mul`/`rep` chip in the Modulate panel.
+
+![The modulation brain and the Meta knobs](docs/images/interface-modulation.jpg)
+
+*The eight modulators (`D` toggles the row) over the sixteen Meta knobs and the
+two XY pads. Each modulator card carries its type, clock, shape and live meter;
+each knob its curve, MIDI CC and destination count.*
 
 ## Sequencer (key `Q`)
 
@@ -312,6 +353,12 @@ Three **durational long-forms** run underneath the scene clock (minutes-scale):
 
 The Sequence page has its own live monitor (resizable) and a resizable
 inspector column.
+
+![The macro-form sequencer](docs/images/interface-sequencer.jpg)
+
+*Tagged scenes across the top, the live monitor at the bottom, and the transport
+column on the right: dwell clock, transition style, selection strategy, the
+Repose–Disturbance–Repose climate arc, and the punctuation toggles.*
 
 ## Worlds / diegesis (key `W`)
 
@@ -389,6 +436,19 @@ A full-page takeover (the engine keeps rendering underneath):
   it ships **on** at a moderate setting and mirrors to the output window.
 - A resource **HUD** (FPS · CPU · RAM · VRAM · GPU).
 
+![Output and mapping](docs/images/interface-output.jpg)
+
+*The keystone editor with its four corner handles over a live mirror of the
+output, and the right column holding resolution, flash safety, display + record
+controls. The HUD runs along the bottom.*
+
+**If the GPU driver resets** (a Windows TDR — heavy sessions across two displays
+can provoke one), the picture no longer dies for good: both the main window and
+the output window listen for WebGL context loss and rebuild their compositor when
+the context comes back, with a forced rebuild after 6 s as a fallback. You lose
+what was in the feedback and Context history buffers; you do not lose the session
+or need to restart.
+
 ## Sonify — image to sound (key `S`)
 
 The instrument's sound half : the image itself synthesizes audio, in real time,
@@ -434,6 +494,12 @@ machine-local). And the whole page speaks **OSC** under `/opsia/sonify/…`
 advertised over OSCQuery and streamed outbound like everything else. Spectra
 also gained **breath** : a per-partial sine↔noise morph (the Coagula blue) from
 glassy additive to breathy bands.
+
+![The Sonify page](docs/images/interface-sonify.jpg)
+
+*The composite mirrored large with the probes drawn on it — the probe is the
+instrument — and the voice strips on the right, each with its own tap, gain,
+pitch and ♪ snap.*
 
 ## Assemble — the automatic editor (key `E`)
 
@@ -483,11 +549,12 @@ carry their sequencer tags and are saved inside the session.
 **Session Loader** (toolbar) — a dropdown of every saved session + a **Load**
 button, so you can jump between saved sessions without the file dialog.
 
-**Generate** (toolbar) — a dropdown of **50 visual themes** (grouped by family:
+**Generate** (toolbar) — a dropdown of **76 visual themes** (grouped by family:
 Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,
 Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage,
-Cinematic/Atmospheric, Retro Screen, Minimal/Structural — plus a **Test** family
-with one diagnostic theme per Feel macro) + a **Generate** button. Each theme is
+Cinematic/Atmospheric, Retro Screen, Minimal/Structural, Datamosh & Compression —
+plus a **Test** family with one diagnostic theme per Feel macro) + a **Generate**
+button. Each theme is
 a *recipe* — a tight source/FX pool, a Vibe palette, a matching World (coupling +
 audio routing), and Feel biases — so Generate builds a whole new, coherent,
 on-theme session in place (unsaved; Ctrl+S keeps it). Pressing it again re-rolls
@@ -500,9 +567,10 @@ targets — picks generators per layer, builds FX racks of random length, enable
 2–5 modulators and rolls a fresh mod-matrix. Every float draw comes from the
 shader's **curated aesthetic sub-range**; colors stay matte.
 
-Scopes (the `▾` next to the button, all also OSC-fireable): **All · Sources ·
-Source Parameters · Source+FX · Source FX · Layers · Layer FX · Master FX ·
-Finishing · Modulators · Meta Knobs.**
+Scopes (the `▾` next to the button): **All · Sources · Source Parameters ·
+Source+FX · Source FX · Layers · Layer FX · Master FX · Finishing · Modulators ·
+Meta Knobs · Sonification.** All except *Meta Knobs* and *Sonification* are also
+OSC-fireable (see the [table below](#inbound-control--instrument)).
 
 Built-in guarantees so a roll always *plays*:
 
@@ -668,7 +736,7 @@ FX treat the whole composite before the finalizers.
 | **Light Trails** | max()-blend trails — the brightest pixels persist and streak (long-exposure light-painting); optional drift. |
 | **Decay** | Analogue generation loss — chroma bleed, block crush, head-switch jitter, a bounded feedback ghost, tape noise and dropout lines; only ever degrades. |
 | **Abstraction** | One knob from representation to abstraction — luma-driven displacement + posterize + desaturation; a source dissolving into moving matter. |
-| **Wide Time** | A temporal average across the last N frames — the image crossfades with its own recent past into evolving scapes (mean / brightest / add / screen / difference / darkest). |
+| **Wide Time** | A temporal average across the last N frames — the image crossfades with its own recent past into evolving scapes (mean / brightest / add / screen / difference / darkest). Because those modes brighten or darken by construction, a **preserve** dial re-anchors the output's exposure to the live image (0 = the raw accumulated look, 1 = fully re-anchored) so you can keep the base colours readable without pre-compensating with contrast. |
 | **Hue Rotate** | Rotate the image's hue, optionally weighted by luminance — the missing colour primitive, beautiful under a slow LFO. |
 | **RGB Shift** | The three channels pulled apart geometrically (offset + independently scaled about centre) with an animated wobble — the channel-separation look. |
 | **Granular** | Video granular synthesis — the frame shattered into a grid of windowed grains, each rotated / scattered / scaled, with a persistent buffer for temporal smear. |
@@ -699,7 +767,7 @@ that take a **sidechain** get a layer picker in the Inspector.
 | **Feedback** | A full video-feedback engine — the last frame re-sampled through a drifting off-centre transform + self-displacement, held at the edge of chaos by AGC + a noise floor. **Couple** runs a second buffer under a diverged transform and cross-mixes it (emergent behaviour no single loop shows); a delay-tap ring with **RGB delay** (channels sheared in time) and an echo **route** (back into the loop, or feedforward onto the output only); keyer-into-the-loop; blend modes. |
 | **Datamosh** | The codec-mosh look, real-time and codec-free: optical flow quantised to macroblocks advects a feedback buffer (the P-frame smear). Refresh (the I-frame) down + a scene cut = the bloom; **sticky/melt/fluid** modes; **actants** — sparse autonomous frozen patches that drift along the flow; **manifest** reveals a new source only where there's motion; auto-bloom on detected cuts; motion-transfer from a sidechain. |
 | **Scanner** | A flatbed-scanner slit-scan — a head sweeps the frame, capturing each line at a different instant; anything moving mid-sweep smears and tears across the scanlines. |
-| **Autocutter** | A cut-up collage — the frame recursively split into ragged rectangles, shuffled among their slots (and optionally rotated); the layout holds while live video keeps playing inside every piece. |
+| **Autocutter** | A cut-up collage — the frame recursively split into pieces, shuffled among their slots (and optionally rotated); the layout holds while live video keeps playing inside every piece, and re-cuts on `cut ▸` or an auto **rate**. Four dials shape the cut itself: **contour** bends the straight seams into uneven curves that still tessellate perfectly (past 1 it shreds), **curve length** trades many small wiggles for a few long, simple curves, **torn paper** grows a ragged off-white fringe and collage shadow along each edge for the ripped-magazine look, and **mask** peels pieces away into transparent holes — at full mask a single piece survives, and each new cut elects a different one. Ships 9 presets from *Clean cut-up* to *Last piece*. |
 | **Chronoscan** | Per-pixel time displacement over a ~32-frame ring — a control field (slit-scan gradient, luminance, noise…) sets how far into the past each pixel reads, so each region lives in a different present. |
 | **Sediment** | Long-term image memory — a decaying long-exposure accumulator (seconds to **minutes**) plus a sparse keyframe store, so the deep past stays recallable and resurfaces through the present. |
 | **Parallax** | Real 2.5D from the shared depth map — near features sway more than far ones, with depth-of-field around a focus plane and aerial fog (needs the Depth engine set in the header). |
@@ -715,9 +783,9 @@ that take a **sidechain** get a layer picker in the Inspector.
 
 | Stage | Description |
 |---|---|
-| **Vibe Palette** | The always-on colour-**mastering** stage: an **opacity** dry/wet on top, auto-levels (temporally smoothed min/max), gamma tone placement, palette map, source mix-back, contrast, saturation, and split-tone. Decides the whole output's look; survives every global Randomize. Ships 50 palettes. |
+| **Vibe Palette** | The always-on colour-**mastering** stage: an **opacity** dry/wet on top, auto-levels (temporally smoothed min/max), gamma tone placement, palette map, source mix-back, contrast, saturation, and split-tone. Decides the whole output's look; survives every global Randomize. Ships 56 palettes. |
 | **Context** | The always-on **depth** finalizer: temporal trails, a soft key light with volumetric bloom, atmospheric haze, spatial blur, a depth vignette, a **void / edge-dissolve** (the frame's edges eaten toward black), and PBR texture mapping (project the composition onto a material). Every parameter at zero is a clean passthrough. |
-| **Finalizer** | The last always-on stage: a final grade (input black/white + gamma + per-channel R/G/B gain), sharpen, and physically-modelled grain over everything, plus an **output shaper** (clip the frame to any of ~21 silhouettes with a drop-shadow, filled by a colour or the Background) and the **Cameraless film hold**. Neutral at defaults. |
+| **Finalizer** | The last always-on stage: a final grade (input black/white + gamma + per-channel R/G/B gain), sharpen, and physically-modelled grain over everything, plus an **output shaper** (clip the frame to any of ~21 silhouettes with a drop-shadow, filled by a colour or the Background), the **anaglyph 3D stage** (`stereo`: off / red-cyan / grayscale, with depth, convergence and invert — this is where the shaders described as "at home under anaglyph" get their glasses), and the **Cameraless film hold**. Neutral at defaults. |
 
 `toggleFinishing` bypasses/enables the three as one bank; they are excluded from
 Randomize (only their own dice re-rolls their params, holding brightness-critical
@@ -890,16 +958,22 @@ config persists to `localStorage`.
 ```
 src/
   main/       Electron main — OSC in/out, OSCQuery, output window, HIVE in/out,
-              video ingest (ffmpeg → all-intra cache), Spout/NDI senders
+              video ingest (ffmpeg → all-intra cache), Assemble corpus analysis
+              + edit export, Spout/NDI senders
   preload/    contextBridge API surface (window.api)
   renderer/   React UI + the WebGL2 engine
     engine/   Compositor (per-layer ISF → blend → stack), modulation engine,
               audio bus, coupling, Feel macros + Proximity, macro-form sequencer,
-              Video/Capture/Hive/Text/Parametric sources, native nodes
+              Video/Capture/Hive/Text/Parametric/Assemble sources, native nodes
               (convNodes), strobe limiter, output shaper, PBR
     shaders/  ISF .fs files + registry (curated ranges) + presets
-  shared/     types shared across processes
+    audio/    the Sonify engine — AudioWorklet + voice managers + auto-voice
+    assemble/ the corpus matcher — descriptor costs, live matching, PCA map
+  shared/     types shared across processes (incl. the descriptor definitions,
+              so corpus and live image are measured with one ruler)
 native/spout/ N-API DX11 Spout sender addon (vendored Spout2 SDK)
+docs/         specs (convolution · cameraless · sequencer), research notes, and
+              the screenshots used by this README
 ```
 
 The store holds one **single write path** — UI edits, session loads, OSC and MIDI all
