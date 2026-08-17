@@ -736,6 +736,11 @@ export interface ExposedApi {
   // single-clip import uses).
   collagePickFolder: () => Promise<string | null>
   collageScan: (folder: string) => Promise<import('./collage').CollageScanResult>
+  // The same scan, except EVERY clip is force-transcoded to 720p all-intra : the
+  // wall seeks on every loop and every cut, and long-GOP files stutter it. One-
+  // time cost per file, then cached; same result shape, so the pool is swapped
+  // with it directly.
+  collageOptimise: (folder: string) => Promise<import('./collage').CollageScanResult>
   onCollageProgress: (
     cb: (p: { done: number; total: number; file: string }) => void
   ) => () => void

@@ -130,12 +130,21 @@ export async function probe(path: string): Promise<VideoProbeResult> {
   }
 }
 
-function cachePathFor(src: string): string {
+/** Cache path for one source, under one ENCODE PROFILE. The profile joins both
+ *  the identity hash and the file name, because the same source can be cached
+ *  under more than one encode : without it, a clip already bridged by
+ *  convertToCache (full-res, crf 16) would be found on disk by the Collage
+ *  optimiser and handed back as if it were the lean 720p file it asked for.
+ *  No profile = the original naming, whose files already exist on disk. */
+function cachePathFor(src: string, profile?: { tag: string; suffix: string }): string {
   const st = statSync(src)
-  const key = createHash('sha1').update(`${src}|${st.size}|${st.mtimeMs}`).digest('hex').slice(0, 20)
+  const key = createHash('sha1')
+    .update(`${src}|${st.size}|${st.mtimeMs}${profile ? `|${profile.tag}` : ''}`)
+    .digest('hex')
+    .slice(0, 20)
   const dir = join(app.getPath('userData'), 'video-cache')
   mkdirSync(dir, { recursive: true })
-  return join(dir, `${key}.mp4`)
+  return join(dir, `${key}${profile?.suffix ?? ''}.mp4`)
 }
 
 /** Convert one clip into the all-intra cache. ATOMIC (writes to .tmp, renames on
@@ -168,6 +177,95 @@ export function convertToCache(
           '-an', // clips are visual sources : no audio track in the cache
           '-c:v', 'libx264', '-g', '1', '-bf', '0', // ALL-INTRA : every frame a keyframe
           '-crf', '16', '-preset', 'fast', '-pix_fmt', 'yuv420p',
+          '-movflags', '+faststart',
+          '-f', 'mp4', tmp
+        ],
+        (chunk) => {
+          const t = chunk.match(/time=([\d:.]+)/)?.[1]
+          if (t) onProgress?.(Math.min(0.99, parseClock(t) / dur))
+        }
+      )
+      if (code !== 0 || !existsSync(tmp) || statSync(tmp).size === 0) {
+        try { if (existsSync(tmp)) unlinkSync(tmp) } catch { /* best effort */ }
+        return { ok: false, error: `ffmpeg exited ${code}` }
+      }
+      renameSync(tmp, out) // atomic on the same volume : cache is whole or absent
+      onProgress?.(1)
+      return { ok: true, path: out, cached: false }
+    } catch (e) {
+      try { if (existsSync(tmp)) unlinkSync(tmp) } catch { /* best effort */ }
+      return { ok: false, error: (e as Error).message }
+    } finally {
+      inflight.delete(out)
+    }
+  })()
+  inflight.set(out, job)
+  return job
+}
+
+// The Collage optimise profile. The wall SEEKS constantly — every window loop,
+// every churn re-roll, every cut of an assemblage-fed piece — and on a long-GOP
+// file each seek has to decode forward from the previous keyframe, which stutters
+// a wall of 50 pieces. convertToCache above only bridges the codecs Chromium
+// cannot decode AT ALL, so ordinary long-GOP H.264 / HEVC — exactly the case that
+// stutters — passes through untouched. This profile converts EVERYTHING, and
+// downscales while it is at it : a piece in a 50-cut wall is drawn into a
+// 384–640 px square of an array layer, so every pixel above 720p is decoded and
+// then thrown away. crf 20 rather than 16 : all-intra at 30 fps is already fat,
+// and the pieces are seen postage-stamp sized.
+const COLLAGE_PROFILE = { tag: 'collage720', suffix: '.c720' }
+
+/** Force-convert one clip into the lean, seek-friendly Collage cache (720p max,
+ *  30 fps, all-intra H.264, no audio) whatever its source codec. Same atomic +
+ *  deduped contract as convertToCache, and a separate cache name (see
+ *  cachePathFor) so the two encodes never stand in for each other. */
+/** The optimised cache file for `src`, if one has already been made. Lets a
+ *  plain re-scan KEEP an earlier optimise pass instead of silently reverting the
+ *  pool to the original long-GOP files — the user would have no way to tell that
+ *  their smooth wall had just been undone by a ↻. */
+export function collageCacheFor(src: string): string | null {
+  try {
+    const out = cachePathFor(src, COLLAGE_PROFILE)
+    return existsSync(out) && statSync(out).size > 0 ? out : null
+  } catch {
+    return null // unreadable source : the caller's probe will report it
+  }
+}
+
+export function convertForCollage(
+  path: string,
+  onProgress?: (pct: number) => void
+): Promise<{ ok: boolean; path?: string; cached?: boolean; error?: string }> {
+  let out: string
+  try {
+    out = cachePathFor(path, COLLAGE_PROFILE)
+  } catch (e) {
+    return Promise.resolve({ ok: false, error: (e as Error).message })
+  }
+  if (existsSync(out) && statSync(out).size > 0) return Promise.resolve({ ok: true, path: out, cached: true })
+  const running = inflight.get(out)
+  if (running) return running
+  const job = (async (): Promise<{ ok: boolean; path?: string; cached?: boolean; error?: string }> => {
+    const tmp = `${out}.tmp`
+    try {
+      const p = await probe(path)
+      if (!p.ffmpegAvailable) {
+        return { ok: false, error: 'ffmpeg not found : set OPSIA_FFMPEG, install ffmpeg-static, or add ffmpeg to PATH' }
+      }
+      const dur = Math.max(p.durationSec, 0.001)
+      const { code } = await runFfmpeg(
+        [
+          '-hide_banner', '-y', '-i', path,
+          '-an', // clips are visual sources : no audio track in the cache
+          // min(720,ih) so a 480p clip stays 480p instead of being blown up into
+          // pixels it never had (an upscale would only make the decode dearer),
+          // and trunc(…/2)*2 keeps the height EVEN, which yuv420p demands and an
+          // odd-height source would otherwise break on. The single quotes are
+          // ffmpeg's own : they keep the comma inside min() out of the filter
+          // separator.
+          '-vf', "scale=-2:'trunc(min(720,ih)/2)*2',fps=30",
+          '-c:v', 'libx264', '-g', '1', '-bf', '0', // ALL-INTRA : every seek lands on a keyframe
+          '-crf', '20', '-preset', 'fast', '-pix_fmt', 'yuv420p',
           '-movflags', '+faststart',
           '-f', 'mp4', tmp
         ],

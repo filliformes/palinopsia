@@ -77,6 +77,7 @@ const api: ExposedApi = {
   // ── Collage (folder → playable clip pool) ────────────────────────
   collagePickFolder: () => ipcRenderer.invoke('collage:pickFolder'),
   collageScan: (folder: string) => ipcRenderer.invoke('collage:scan', folder),
+  collageOptimise: (folder: string) => ipcRenderer.invoke('collage:optimise', folder),
   onCollageProgress: (cb: (p: { done: number; total: number; file: string }) => void) => {
     const h = (_e: Electron.IpcRendererEvent, p: { done: number; total: number; file: string }): void => cb(p)
     ipcRenderer.on('collage:progress', h)

@@ -208,18 +208,18 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
   ],
   // ── Text (styling presets : your typed string is left untouched) ──
   'gen-collage': [
-    { name: 'Contact sheet', values: { cuts: 12, films: 12, hold: 8, churn: 0, zoom: 1.05, rotate: 0, gap: 0, contour: 0, torn: 0, mask: 0, rate: 0, speed: 1 } },
-    { name: 'Torn magazine', values: { cuts: 14, films: 12, hold: 6, churn: 0, zoom: 1.1, rotate: 0.2, gap: 0.12, contour: 1.2, curve: 0.6, torn: 1, mask: 0, rate: 0 } },
-    { name: 'Paper wall', values: { cuts: 24, films: 16, hold: 10, churn: 0, zoom: 1.15, rotate: 0.1, gap: 0.2, contour: 0.6, curve: 0.4, torn: 0.7, rate: 0 } },
-    { name: 'Long curves', values: { cuts: 8, films: 8, hold: 12, churn: 0, zoom: 1.2, contour: 1.4, curve: 0.9, torn: 0.4, gap: 0, rate: 0 } },
+    { name: 'Contact sheet', values: { cuts: 12, films: 12, hold: 0, churn: 0, zoom: 1.05, rotate: 0, gap: 0, contour: 0, torn: 0, mask: 0, rate: 0, speed: 1 } },
+    { name: 'Torn magazine', values: { cuts: 14, films: 12, hold: 0, churn: 0, zoom: 1.1, rotate: 0.2, gap: 0.12, contour: 1.2, curve: 0.6, torn: 1, mask: 0, rate: 0 } },
+    { name: 'Paper wall', values: { cuts: 24, films: 16, hold: 0, churn: 0, zoom: 1.15, rotate: 0.1, gap: 0.2, contour: 0.6, curve: 0.4, torn: 0.7, rate: 0 } },
+    { name: 'Long curves', values: { cuts: 8, films: 8, hold: 0, churn: 0, zoom: 1.2, contour: 1.4, curve: 0.9, torn: 0.4, gap: 0, rate: 0 } },
     { name: 'Restless', values: { cuts: 14, films: 12, hold: 2.5, churn: 1, zoom: 1.1, contour: 0.4, curve: 0.85, torn: 0.3, rate: 0 } },
     { name: 'Half restless', values: { cuts: 16, films: 12, hold: 3, churn: 0.45, zoom: 1.1, contour: 0.5, torn: 0.4, rate: 0 } },
-    { name: 'Slow deal', values: { cuts: 10, films: 10, hold: 14, churn: 0, zoom: 1.05, contour: 0.3, torn: 0.2, rate: 12, speed: 0.6 } },
+    { name: 'Slow deal', values: { cuts: 10, films: 10, hold: 0, churn: 0, zoom: 1.05, contour: 0.3, torn: 0.2, rate: 12, speed: 0.6 } },
     { name: 'Strobe deal', values: { cuts: 20, films: 16, hold: 1.2, churn: 0.8, zoom: 1.1, contour: 0.8, torn: 0.6, rate: 2 } },
-    { name: 'Scraps', values: { cuts: 22, films: 14, hold: 5, churn: 0.3, zoom: 1.2, rotate: 0.4, gap: 0.1, contour: 1.1, curve: 0.5, torn: 1.2, mask: 0.6, rate: 0 } },
-    { name: 'Last film standing', values: { cuts: 18, films: 12, hold: 6, churn: 0, zoom: 1.1, contour: 0.9, curve: 0.7, torn: 0.8, mask: 1, rate: 6 } },
-    { name: 'Two up', values: { cuts: 2, films: 2, hold: 20, churn: 0, zoom: 1, gap: 0.05, contour: 0.2, curve: 0.9, rate: 0 } },
-    { name: 'Slow motion wall', values: { cuts: 12, films: 12, hold: 16, churn: 0, zoom: 1.25, speed: 0.25, contour: 0.5, curve: 0.8, torn: 0.5 } }
+    { name: 'Scraps', values: { cuts: 22, films: 14, hold: 0, churn: 0.3, zoom: 1.2, rotate: 0.4, gap: 0.1, contour: 1.1, curve: 0.5, torn: 1.2, mask: 0.6, rate: 0 } },
+    { name: 'Last film standing', values: { cuts: 18, films: 12, hold: 0, churn: 0, zoom: 1.1, contour: 0.9, curve: 0.7, torn: 0.8, mask: 1, rate: 6 } },
+    { name: 'Two up', values: { cuts: 2, films: 2, hold: 0, churn: 0, zoom: 1, gap: 0.05, contour: 0.2, curve: 0.9, rate: 0 } },
+    { name: 'Slow motion wall', values: { cuts: 12, films: 12, hold: 0, churn: 0, zoom: 1.25, speed: 0.25, contour: 0.5, curve: 0.8, torn: 0.5 } }
   ],
   'gen-text': [
     { name: 'Bold centre', values: { font: 1, size: 0.3, weight: 800, spacing: 0, stretch: 1, angle: 0, posX: 0, posY: 0, color: [1, 1, 1, 1] } },

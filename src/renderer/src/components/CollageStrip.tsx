@@ -24,7 +24,9 @@ export function CollageStrip({
   const setCollageEdls = useStore((s) => s.setCollageEdls)
   const bank = useStore((s) => s.assemblages)
   const [picking, setPicking] = useState(false)
-  const [busy, setBusy] = useState(false)
+  // The running VERB doubles as the busy flag : an optimise pass is minutes where
+  // a scan is seconds, and the folder button is the only place that says so.
+  const [busy, setBusy] = useState<'' | 'scanning' | 'optimising'>('')
   const [progress, setProgress] = useState('')
   const [note, setNote] = useState('')
   // A scan can outlive the selection that started it; don't setState after unmount.
@@ -36,15 +38,15 @@ export function CollageStrip({
     }
   }, [])
 
-  const scan = async (dir: string): Promise<void> => {
-    setBusy(true)
+  const scan = async (dir: string, optimise = false): Promise<void> => {
+    setBusy(optimise ? 'optimising' : 'scanning')
     setProgress('')
     setNote('')
     const off = window.api.onCollageProgress((p) => {
       if (alive.current) setProgress(`${p.done}/${p.total}`)
     })
     try {
-      const res = await window.api.collageScan(dir)
+      const res = optimise ? await window.api.collageOptimise(dir) : await window.api.collageScan(dir)
       if (!alive.current) return
       if (!res.ok) {
         setNote(res.error ? 'scan failed' : 'no readable video in that folder')
@@ -63,7 +65,7 @@ export function CollageStrip({
     } finally {
       off()
       if (alive.current) {
-        setBusy(false)
+        setBusy('')
         setProgress('')
       }
     }
@@ -96,11 +98,11 @@ export function CollageStrip({
       <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">films</span>
       <button
         className="btn shrink-0 text-[11px]"
-        disabled={busy}
+        disabled={!!busy}
         onClick={() => void pick()}
         title="Pick a folder of videos. Every clip in it joins the pool the pieces are dealt from — any format, portrait or landscape; codecs Chromium can't play are converted once."
       >
-        {busy ? `scanning ${progress}` : 'folder…'}
+        {busy ? `${busy} ${progress}` : 'folder…'}
       </button>
       <span className="min-w-0 flex-1 truncate text-[11px] text-fg" title={folder || undefined}>
         {name || <span className="text-muted">no folder yet</span>}
@@ -115,6 +117,15 @@ export function CollageStrip({
           title="Re-scan the folder (picks up files added since)"
         >
           ↻
+        </button>
+      )}
+      {folder && !busy && (
+        <button
+          className="btn shrink-0 text-[11px]"
+          onClick={() => void scan(folder, true)}
+          title="Re-encode every clip in the folder to 720p all-intra H.264 — the shape the wall's constant seeking wants (every window loop, every re-roll, every cut lands on a keyframe instead of decoding forward from one). Much slower than a scan: minutes for a big folder. One-time cost per file, though — the result is cached and found instantly ever after."
+        >
+          optimise
         </button>
       )}
       {note && <span className="shrink-0 text-[10px] text-muted">{note}</span>}

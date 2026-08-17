@@ -22,12 +22,15 @@
 //     and rotations, which reads as collage rather than repetition. The pool
 //     size is what costs decoder bandwidth, not the number of cuts.
 //
-//  3. **Windows, not whole files.** A deck loops a WINDOW of its clip rather
-//     than the file, so a 30-minute take doesn't reduce a cell to one slow
-//     moment. `hold` sets the window, `churn` decides how many decks re-roll
-//     their window on a fast clock instead of waiting for the next deal — which
-//     is the whole span from "every piece holds" to "every piece is its own
-//     little montage".
+//  3. **Whole films by default, windows on request.** `window` (0 by default)
+//     loops the WHOLE file : the element's native loop, no seeking at all, which
+//     is both the smoothest path and the least surprising — a piece just plays
+//     its film. Setting it non-zero loops a short window instead, which is how
+//     you stop a 30-minute take from reducing a cell to one slow moment; the
+//     cost is a hard cut backwards every `window` seconds, so it is opt-in.
+//     `churn` then decides how many decks re-roll on a fast clock instead of
+//     waiting for the next deal — the span from "every piece holds" to "every
+//     piece is its own little montage".
 //
 // Measured on the target machine (RTX 4070) before designing this : 11 clips —
 // including a 3840×2160 and a portrait 1200×1920 — decoded simultaneously at
@@ -588,7 +591,7 @@ export class CollageSource {
     const films = clampf(num(inputs.films, 12), 1, MAX_DECKS)
     const cuts = Math.round(clampf(num(inputs.cuts, 12), 2, MAX_CELLS))
     const rotate = clampf(num(inputs.rotate, 0), 0, 1)
-    const hold = clampf(num(inputs.hold, 6), 0, 30)
+    const hold = clampf(num(inputs.hold, 0), 0, 30)
     const churn = clampf(num(inputs.churn, 0), 0, 1)
     const zoom = clampf(num(inputs.zoom, 1.05), 1, 3)
     const speed = clampf(num(inputs.speed, 1), 0.1, 4)
