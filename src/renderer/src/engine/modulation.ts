@@ -297,6 +297,16 @@ export class ModEngine {
       const hz = effectiveHz(cfg, bpm)
       let v01 = 0
 
+      // SLIP : the clock still ticks, some ticks just don't fire. Keeping the
+      // GRID while dropping the EVENT is what reads as cross-rhythm instead of
+      // sloppiness — and it survives BPM sync, which a jittered period would
+      // not. Capped below 1 so the top of the dial is sparse, never frozen.
+      // Each modulator draws its own coin : the slots slip independently.
+      const slipSkip = (): boolean => {
+        const p = Math.max(0, Math.min(1, cfg.slip ?? 0)) * 0.85
+        return p > 0 && Math.random() < p
+      }
+
       switch (cfg.type) {
         case 'lfo': {
           const prevPhase = s.phase
@@ -323,6 +333,15 @@ export class ModEngine {
             for (let w = 0; w < wraps; w++) {
               s.rndSmoothPrev = s.rndSmoothNext
               s.rndSmoothNext = Math.random() * 2 - 1
+              // The two stepped shapes hold their sample when the tick is
+              // skipped. Spastic is left out : its own coin flip already IS
+              // this, and stacking the two would just halve its rate.
+              if (
+                (cfg.shape === 'rndStep' || cfg.shape === 'rndSmooth') &&
+                slipSkip()
+              ) {
+                continue
+              }
               if (spasticBinary) {
                 s.rndStepValue = Math.random() < 0.5 ? -1 : 1
               } else if (spasticShape) {
@@ -359,15 +378,11 @@ export class ModEngine {
             // type switched after minutes): snap forward so one fresh step fires
             // instead of burning idle/period iterations in a single frame.
             if (now - s.arpLastAdvanceAt > period * 4) s.arpLastAdvanceAt = now - period
-            // Cap below 1 : at a true 1.0 the register would never advance
-            // again, turning the top of the dial into a dead zone rather than
-            // "very sparse". 0.85 leaves a mean hold of ~7 ticks.
-            const skipP = Math.max(0, Math.min(1, cfg.slip ?? 0)) * 0.85
             while (now - s.arpLastAdvanceAt >= period) {
               // The clock advances whether or not the step does : dropping the
               // EVENT while keeping the GRID is the whole point.
               s.arpLastAdvanceAt += period
-              if (skipP > 0 && Math.random() < skipP) continue
+              if (slipSkip()) continue
               switch (cfg.arp.mode) {
                 case 'up':
                   s.arpStep = (s.arpStep + 1) % steps
@@ -408,6 +423,7 @@ export class ModEngine {
             if (now - s.randomLastAdvanceAt > period * 4) s.randomLastAdvanceAt = now - period
             while (now - s.randomLastAdvanceAt >= period) {
               s.randomLastAdvanceAt += period
+              if (slipSkip()) continue
               s.randomValue = warpDistribution(Math.random(), cfg.random.distribution)
             }
           }
@@ -475,6 +491,7 @@ export class ModEngine {
             if (now - s.chaosLastAdvanceAt > period * 4) s.chaosLastAdvanceAt = now - period
             while (now - s.chaosLastAdvanceAt >= period) {
               s.chaosLastAdvanceAt += period
+              if (slipSkip()) continue
               let x = s.chaosX
               x = r * x * (1 - x)
               if (!Number.isFinite(x) || x <= 0 || x >= 1) x = 0.1 + Math.random() * 0.8

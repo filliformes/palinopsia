@@ -19,6 +19,14 @@ const LFO_SHAPES: LfoShape[] = ['sine', 'triangle', 'square', 'sawtooth', 'rndSt
 const ARP_MODES: ArpMode[] = ['up', 'down', 'upDown', 'random', 'drunk']
 const PHYSICS_MOTIONS: PhysicsMotion[] = ['bounce', 'spring', 'riser']
 
+// One explanation, shown wherever SLIP appears.
+const SLIP_HELP =
+  "SLIP : how far this modulator strays from its own pulse. The clock keeps ticking — some " +
+  "ticks simply do not fire, so events stay ON the beat while becoming impossible to " +
+  "anticipate. That is what makes it read as a cross-rhythm rather than as sloppiness, and " +
+  "why it still works when the clock is BPM-synced. 0 = dead regular; 0.5 is roughly the " +
+  "feel of Spastic; high = long, uneven holds. Every modulator slips on its own clock."
+
 export function ModulationPanel(): JSX.Element {
   const modulators = useStore((s) => s.composition.modulators)
   const collapsed = useStore((s) => !!s.collapsed['modulation'])
@@ -235,6 +243,11 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
               ))}
             </select>
           </Row>
+          {(m.shape === 'rndStep' || m.shape === 'rndSmooth') && (
+            <SliderRow label="SLIP" value={m.slip ?? 0} min={0} max={1}
+              title={SLIP_HELP}
+              onChange={(v) => update(index, { slip: v })} />
+          )}
           {m.shape === 'spastic' && (
             <Row label="THROW">
               <select
@@ -301,6 +314,13 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
               className="min-w-0 flex-1 accent-accent"
               title={`Sustain level ${m.adsr.sustainLevel.toFixed(2)}`}
             />
+            <BoundedNumberInput
+              value={Math.round(m.adsr.sustainLevel * 100) / 100}
+              min={0}
+              max={1}
+              onChange={(v) => update(index, { adsr: { ...m.adsr, sustainLevel: v } })}
+              className="input w-10 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+            />
             <button
               onClick={() => update(index, { adsr: { ...m.adsr, loop: !m.adsr.loop } })}
               className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
@@ -318,8 +338,9 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
     case 'arp':
       return (
         <>
-          <NumRow label="STEPS" value={m.arp.steps} min={2} max={16} integer
-            onChange={(v) => update(index, { arp: { ...m.arp, steps: v } })} />
+          <SliderRow label="STEPS" value={m.arp.steps} min={2} max={16} step={1} integer
+            title="How many evenly spaced levels the register walks."
+            onChange={(v) => update(index, { arp: { ...m.arp, steps: Math.round(v) } })} />
           <Row label="MODE">
             <select
               className="input select-compact min-w-0 flex-1 text-[10px]"
@@ -334,20 +355,21 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
               ))}
             </select>
           </Row>
-          <NumRow
-            label="SLIP"
-            value={m.slip ?? 0}
-            min={0}
-            max={1}
-            onChange={(v) => update(index, { slip: v })}
-          />
+          <SliderRow label="SLIP" value={m.slip ?? 0} min={0} max={1}
+            title={SLIP_HELP}
+            onChange={(v) => update(index, { slip: v })} />
         </>
       )
     case 'random':
       return (
-        <SliderRow label="DIST" value={m.random.distribution} min={0} max={1}
-          title="Distribution : 0.5 uniform · >0.5 centre-hug · <0.5 edge-weight"
-          onChange={(v) => update(index, { random: { distribution: v } })} />
+        <>
+          <SliderRow label="SLIP" value={m.slip ?? 0} min={0} max={1}
+            title={SLIP_HELP}
+            onChange={(v) => update(index, { slip: v })} />
+          <SliderRow label="DIST" value={m.random.distribution} min={0} max={1}
+            title="Distribution : 0.5 uniform · >0.5 centre-hug · <0.5 edge-weight"
+            onChange={(v) => update(index, { random: { distribution: v } })} />
+        </>
       )
     case 'sh':
       // SMTH lives on the rate line (see the clock row) : only PROB/DIST here.
@@ -373,9 +395,14 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
       )
     case 'chaos':
       return (
-        <SliderRow label="R" value={m.chaos.r} min={3.4} max={4} step={0.005}
-          title="Logistic-map r : toward 4 = wilder"
-          onChange={(v) => update(index, { chaos: { r: v } })} />
+        <>
+          <SliderRow label="SLIP" value={m.slip ?? 0} min={0} max={1}
+            title={SLIP_HELP}
+            onChange={(v) => update(index, { slip: v })} />
+          <SliderRow label="R" value={m.chaos.r} min={3.4} max={4} step={0.005}
+            title="Logistic-map r : toward 4 = wilder"
+            onChange={(v) => update(index, { chaos: { r: v } })} />
+        </>
       )
     case 'audio': {
       const a = m.audio ?? { feature: 'level' as AudioFeature, band: 0, smooth: 0.2 }
@@ -516,10 +543,25 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
 }
 
 // ── Small row helpers ─────────────────────────────────────────────────
-function Row({ label, children }: { label: string; children: ReactNode }): JSX.Element {
+function Row({
+  label,
+  title,
+  children
+}: {
+  label: string
+  title?: string
+  children: ReactNode
+}): JSX.Element {
   return (
-    <div className="flex min-w-0 items-center gap-1">
-      <span className="w-10 shrink-0 font-mono text-[9px] text-muted">{label}</span>
+    <div className="flex min-w-0 items-center gap-1" title={title}>
+      <span
+        className={`w-10 shrink-0 font-mono text-[9px] text-muted ${
+          title ? 'cursor-help underline decoration-dotted underline-offset-2' : ''
+        }`}
+        title={title}
+      >
+        {label}
+      </span>
       {children}
     </div>
   )
@@ -545,8 +587,11 @@ function NumRow({
   )
 }
 
-// A hair-thin label + a small slider : for the ADSR a/d/s/r segment durations,
-// where four have to sit two-up in one card. Value lives in the tooltip.
+// A hair-thin label + a small slider + an editable readout : for the ADSR
+// a/d/s/r durations, where four have to sit two-up in one card. The value is
+// STORED in ms but shown in SECONDS — five digits of milliseconds cannot fit
+// beside a slider in a two-up cell, and seconds is the readable unit for an
+// envelope anyway.
 function MiniSlider({
   label, value, min, max, onChange
 }: {
@@ -554,7 +599,7 @@ function MiniSlider({
   onChange: (v: number) => void
 }): JSX.Element {
   return (
-    <div className="flex min-w-0 items-center gap-1">
+    <div className="flex min-w-0 items-center gap-1" title={`${label} : ${(value / 1000).toFixed(2)} s`}>
       <span className="w-2.5 shrink-0 font-mono text-[9px] text-muted">{label}</span>
       <input
         type="range"
@@ -564,20 +609,30 @@ function MiniSlider({
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         className="min-w-0 flex-1 accent-accent"
-        title={`${label} ${Math.round(value)} ms`}
+      />
+      {/* One decimal : the box renders String(value), so a raw ms/1000 would
+          read "1.073" and clip in a cell this narrow. The row's tooltip keeps
+          the exact figure. */}
+      <BoundedNumberInput
+        value={Math.round(value / 100) / 10}
+        min={min / 1000}
+        max={max / 1000}
+        onChange={(v) => onChange(Math.round(v * 1000))}
+        className="input w-9 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
       />
     </div>
   )
 }
 
 function SliderRow({
-  label, value, min, max, step = 0.01, title, onChange
+  label, value, min, max, step = 0.01, title, integer, onChange
 }: {
   label: string; value: number; min: number; max: number; step?: number; title?: string
+  integer?: boolean
   onChange: (v: number) => void
 }): JSX.Element {
   return (
-    <Row label={label}>
+    <Row label={label} title={title}>
       <input
         type="range"
         min={min}
@@ -593,6 +648,7 @@ function SliderRow({
         value={value}
         min={min}
         max={max}
+        integer={integer}
         onChange={onChange}
         className="input w-12 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
       />
