@@ -335,6 +335,15 @@ export interface ModulatorConfig {
   divisionIdx: number
   dotted: boolean
   triplet: boolean
+  // SLIP : how much this modulator's events depart from its own metric grid,
+  // 0 = dead regular. The mechanism is a Bernoulli SKIP — the clock still ticks,
+  // some ticks just don't fire — which is what makes it read as polyrhythm
+  // rather than as sloppiness: events never land off-grid, there are simply
+  // fewer of them. (Same law that gives Spastic its un-feelable clock, and the
+  // same one S&H spells 'probability'.) Currently read by `arp` only; the field
+  // lives at clock level so extending it to the other grid-locked types is
+  // purely additive. Optional — absent is 0, so old sessions are unchanged.
+  slip?: number
   // Output shaping.
   curve: ModCurve
   // Type-specific parameter blocks (only the active type's block is read).

@@ -359,8 +359,15 @@ export class ModEngine {
             // type switched after minutes): snap forward so one fresh step fires
             // instead of burning idle/period iterations in a single frame.
             if (now - s.arpLastAdvanceAt > period * 4) s.arpLastAdvanceAt = now - period
+            // Cap below 1 : at a true 1.0 the register would never advance
+            // again, turning the top of the dial into a dead zone rather than
+            // "very sparse". 0.85 leaves a mean hold of ~7 ticks.
+            const skipP = Math.max(0, Math.min(1, cfg.slip ?? 0)) * 0.85
             while (now - s.arpLastAdvanceAt >= period) {
+              // The clock advances whether or not the step does : dropping the
+              // EVENT while keeping the GRID is the whole point.
               s.arpLastAdvanceAt += period
+              if (skipP > 0 && Math.random() < skipP) continue
               switch (cfg.arp.mode) {
                 case 'up':
                   s.arpStep = (s.arpStep + 1) % steps

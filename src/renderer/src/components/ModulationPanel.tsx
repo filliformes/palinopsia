@@ -334,6 +334,13 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
               ))}
             </select>
           </Row>
+          <NumRow
+            label="SLIP"
+            value={m.slip ?? 0}
+            min={0}
+            max={1}
+            onChange={(v) => update(index, { slip: v })}
+          />
         </>
       )
     case 'random':
