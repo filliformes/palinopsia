@@ -529,10 +529,11 @@ const F_AUTOCUT = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uHost;
 uniform int uCount;
-uniform vec4 uCell[64];   // dest rect (x,y,w,h)
-uniform vec4 uMap[64];    // source rect (x,y,w,h)
-uniform float uRot[64];   // 0..3 (×90°)
-uniform float uGap, uSlip, uMix, uSeed, uContour, uTorn, uMask, uCurve;
+uniform int uShape;       // 0 = cut-up rectangles (BSP), 1 = mosaic (Voronoi)
+uniform vec4 uCell[64];   // rect: dest (x,y,w,h) - mosaic: seed .xy (dest cell)
+uniform vec4 uMap[64];    // rect: source rect  - mosaic: source seed .xy
+uniform float uRot[64];   // 0..3 (x90 deg)
+uniform float uGap, uSlip, uMix, uSeed, uContour, uTorn, uMask, uCurve, uFade;
 uniform float uRank[64];  // per-piece dropout order; the survivor holds 2.0
 float hash(float x){ return fract(sin(x * 91.7 + uSeed * 57.0) * 43758.5453); }
 // 2D value noise for the tear lines : re-seeded per cut, so every re-cut tears
@@ -546,16 +547,11 @@ float vnoise(vec2 p){
 }
 // CONTOUR : a continuous domain warp of the cell lookup. Because every pixel
 // still resolves to exactly ONE (warped) cell, the pieces stay a perfect
-// tessellation — no gaps, no overlaps — while their boundaries wander (coarse
-// octave) and fray (fine octave) like torn paper instead of ruled cuts.
-// Runs to 2.0 : values ≤1 keep their original amplitude, above 1 the
-// displacement keeps growing AND the fray octave takes a bigger share, so the
-// top of the dial is genuinely wilder, not just larger.
-// CURVE LENGTH picks the warp's wavelength : low = many small waves (the
-// displace-map look), high = few LONG sweeping curves — simple organic shapes.
-// Longer curves also get more amplitude (a long curve needs travel to read)
-// and shed the fray octave (simple means simple). Default 0.3 reproduces the
-// original frequency (9.06 vs the old fixed 9.0), so saved sessions hold.
+// tessellation - no gaps, no overlaps - while their boundaries wander (coarse
+// octave) and fray (fine octave) like torn paper instead of ruled cuts. In
+// mosaic mode the same warp bends the Voronoi borders the same way.
+// CURVE LENGTH picks the warp's wavelength : low = many small waves, high = few
+// LONG sweeping curves. Default 0.3 reproduces the original fixed frequency.
 vec2 tearWarp(vec2 p){
   float fc = mix(12.0, 2.2, clamp(uCurve, 0.0, 1.0));
   float ff = fc * 5.2;
@@ -571,11 +567,52 @@ vec2 rot90(vec2 p, float r){
   else if (ri == 3) p = vec2(p.y, -p.x);
   return p + 0.5;
 }
+// Quarter-turn about the origin (mosaic content rotation, no 0.5 recentre).
+vec2 rotL(vec2 v, float r){
+  int ri = int(r + 0.5);
+  if (ri == 1) return vec2(-v.y, v.x);
+  if (ri == 2) return -v;
+  if (ri == 3) return vec2(v.y, -v.x);
+  return v;
+}
 void main(){
   vec3 orig = texture(uHost, vUV).rgb;
   vec3 col = orig;
   float keep = 1.0;
   vec2 wUV = uContour > 0.001 ? clamp(tearWarp(vUV), 0.0001, 0.9999) : vUV;
+
+  if (uShape == 1) {
+    // ── MOSAIC : Voronoi cells. Each pixel belongs to its nearest seed, so the
+    // pieces are irregular convex polygons instead of rectangles. The border
+    // distance (2nd-nearest minus nearest) drives the same seams / torn fringe
+    // the rectangles use, so contour, torn and mask all behave identically.
+    int mi = 0; float d1 = 1e9, d2 = 1e9;
+    for (int i = 0; i < 64; i++){
+      if (i >= uCount) break;
+      float dd = distance(wUV, uCell[i].xy);
+      if (dd < d1) { d2 = d1; d1 = dd; mi = i; }
+      else if (dd < d2) { d2 = dd; }
+    }
+    keep = smoothstep(uMask - 0.06, uMask, uRank[mi]);
+    vec2 slip = (vec2(hash(float(mi) + 1.3), hash(float(mi) + 7.7)) - 0.5) * uSlip * 0.3;
+    vec2 local = rotL(wUV - uCell[mi].xy, uRot[mi]);
+    col = texture(uHost, clamp(uMap[mi].xy + local + slip, 0.0, 1.0)).rgb;
+    float ed = 0.5 * (d2 - d1);           // small near a Voronoi boundary
+    if (uGap > 0.001) col *= smoothstep(0.0, uGap * 0.02, ed);
+    if (uTorn > 0.001){
+      float bite = pow(vnoise(wUV * 6.0 + 13.7), 3.0);
+      float rag = 0.5 + 0.5 * vnoise(wUV * 90.0);
+      float fw = uTorn * 0.012 * (0.06 + 2.4 * bite + 0.45 * rag);
+      float sh = smoothstep(fw * 0.8, fw + 0.020 * uTorn, ed);
+      col *= 1.0 - (1.0 - sh) * 0.3 * min(uTorn, 1.0);
+      float paper = 1.0 - smoothstep(0.0, fw, ed);
+      vec3 paperCol = vec3(0.93, 0.91, 0.87) * (0.80 + 0.20 * vnoise(wUV * 160.0));
+      col = mix(col, paperCol, paper * min(uTorn * 2.0, 1.0));
+    }
+    o = vec4(clamp(mix(orig, col, uMix), 0.0, 1.0) * keep, keep) * uFade;
+    return;
+  }
+
   for (int i = 0; i < 64; i++){
     if (i >= uCount) break;
     vec4 d = uCell[i];
@@ -583,7 +620,7 @@ void main(){
       // MASK : pieces drop out in their seeded order as the dial rises; a
       // quick per-piece fade instead of a hard pop so modulation sweeps read
       // as pieces peeling away. The survivor's rank of 2 can never be reached,
-      // so at full mask exactly one shape remains — and each cut ▸ re-rolls
+      // so at full mask exactly one shape remains - and each cut re-rolls
       // which one, so the last piece keeps changing.
       keep = smoothstep(uMask - 0.06, uMask, uRank[i]);
       vec2 luv = rot90((wUV - d.xy) / d.zw, uRot[i]);
@@ -602,10 +639,10 @@ void main(){
         // page's substrate showing at the rip), over a soft collage shadow just
         // inside the piece. The fringe width is a HEAVY-TAILED patch field, not
         // a gentle wobble : a low-frequency selector cubed gives long stretches
-        // of hairline tear broken by broad white bites — the way a real rip
-        // crosses the paper grain unevenly — with mid-frequency fibre raggedness
+        // of hairline tear broken by broad white bites - the way a real rip
+        // crosses the paper grain unevenly - with mid-frequency fibre raggedness
         // on top. Runs to 2.0 for fat, chewed-up edges.
-        // ('patch' is a RESERVED WORD in GLSL ES 3.00 — naming this variable
+        // ('patch' is a RESERVED WORD in GLSL ES 3.00 - naming this variable
         // that killed the whole program compile and every Autocutter with it.)
         float bite = pow(vnoise(wUV * 6.0 + 13.7), 3.0);
         float rag = 0.5 + 0.5 * vnoise(wUV * 90.0);
@@ -620,8 +657,9 @@ void main(){
     }
   }
   // Masked pieces leave TRANSPARENT holes (the collage's table shows through :
-  // lower layers / background), whatever the dry/wet mix says.
-  o = vec4(clamp(mix(orig, col, uMix), 0.0, 1.0) * keep, keep);
+  // lower layers / background), whatever the dry/wet mix says. uFade scales the
+  // whole output (incl. alpha) so the auto-recut crossfade can add two layouts.
+  o = vec4(clamp(mix(orig, col, uMix), 0.0, 1.0) * keep, keep) * uFade;
 }`
 
 // ── Chronoscan (per-pixel time displacement / slit-scan) ─────────────────
@@ -1871,21 +1909,43 @@ function mulberry32(seed: number): () => number {
 }
 interface Rect { x: number; y: number; w: number; h: number }
 export class AutocutterNode implements ConvNode {
+  // The live (incoming) layout.
   private cellArr = new Float32Array(AC_MAX * 4)
   private mapArr = new Float32Array(AC_MAX * 4)
   private rotArr = new Float32Array(AC_MAX)
   private rankArr = new Float32Array(AC_MAX)
   private count = 0
   private seed = 0x1a2b3c4d
+  // The outgoing layout, kept only while an auto/trig recut is crossfading.
+  private oldCell = new Float32Array(AC_MAX * 4)
+  private oldMap = new Float32Array(AC_MAX * 4)
+  private oldRot = new Float32Array(AC_MAX)
+  private oldRank = new Float32Array(AC_MAX)
+  private oldCount = 0
+  private oldSeed = 0
+  // Crossfade progress 0..1 (1 = done, single-pass). Advanced by dt/xfadeDur.
+  private xfade = 1
   private prevTrig = 0
   private timer = 0
   private lastCuts = -1
   private lastRotate = -1
+  private lastShape = -1
   private disposed = false
   constructor(private gl: WebGL2RenderingContext) {}
 
-  private rebuild(cuts: number, rotateFrac: number): void {
+  private rebuild(cuts: number, rotateFrac: number, shape: number): void {
     const rnd = mulberry32(this.seed)
+    if (shape === 1) {
+      this.rebuildMosaic(cuts, rotateFrac, rnd)
+    } else {
+      this.rebuildRects(cuts, rotateFrac, rnd)
+    }
+    this.assignMaskAndSurvivor(this.count, rnd)
+    this.lastCuts = cuts; this.lastRotate = rotateFrac; this.lastShape = shape
+  }
+
+  // Cut-up : recursive binary space partition into rectangles (the original).
+  private rebuildRects(cuts: number, rotateFrac: number, rnd: () => number): void {
     const minW = 0.06, minH = 0.06
     let cells: Rect[] = [{ x: 0, y: 0, w: 1, h: 1 }]
     while (cells.length < cuts) {
@@ -1907,50 +1967,81 @@ export class AutocutterNode implements ConvNode {
     const perm = cells.map((_, i) => i)
     for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp }
     for (let i = 0; i < n; i++) {
-      const d = cells[i], sIdx = perm[i], s = cells[sIdx]
+      const d = cells[i], sIdx = perm[i], src = cells[sIdx]
       this.cellArr[i * 4] = d.x; this.cellArr[i * 4 + 1] = d.y; this.cellArr[i * 4 + 2] = d.w; this.cellArr[i * 4 + 3] = d.h
-      this.mapArr[i * 4] = s.x; this.mapArr[i * 4 + 1] = s.y; this.mapArr[i * 4 + 2] = s.w; this.mapArr[i * 4 + 3] = s.h
+      this.mapArr[i * 4] = src.x; this.mapArr[i * 4 + 1] = src.y; this.mapArr[i * 4 + 2] = src.w; this.mapArr[i * 4 + 3] = src.h
       this.rotArr[i] = rotateFrac > 0 && rnd() < rotateFrac ? 1 + Math.floor(rnd() * 3) : 0
     }
-    // MASK dropout order : a shuffled EVEN spacing over (0,0.90], so the dial
-    // removes pieces at a steady rate instead of in random clumps. The ceiling
-    // sits BELOW the shader's 0.06 fade band under mask=1 — at 0.97 the last
-    // ranked pieces were still half-faded at full mask and "only one remains"
-    // was two. One seeded SURVIVOR gets rank 2 — unreachable by a 0..1 mask —
-    // so full mask always leaves exactly one piece, and every re-cut elects a
-    // new one.
-    const order = cells.map((_, i) => i)
-    for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const tmp = order[i]; order[i] = order[j]; order[j] = tmp }
-    const survivor = Math.floor(rnd() * n)
-    for (let i = 0; i < n; i++) this.rankArr[order[i]] = ((i + 1) / n) * 0.90
-    this.rankArr[survivor] = 2.0
     this.count = n
-    this.lastCuts = cuts; this.lastRotate = rotateFrac
   }
 
-  render(ctx: NodeContext): WebGLTexture {
-    if (this.disposed) return ctx.host
-    const gl = ctx.gl, g = nodeGL(gl)
+  // Mosaic : a jittered grid of Voronoi seeds. Each pixel belongs to its nearest
+  // seed, so the pieces are irregular convex polygons (a real mosaic). Every
+  // cell samples the neighbourhood of a SHUFFLED seed, so the picture is
+  // scrambled the way the rectangles are. The unconditional rng draws keep a
+  // seed replaying identically whichever branch runs.
+  private rebuildMosaic(cuts: number, rotateFrac: number, rnd: () => number): void {
+    const n = Math.min(cuts, AC_MAX)
+    const cols = Math.max(1, Math.round(Math.sqrt(n)))
+    const rows = Math.max(1, Math.ceil(n / cols))
+    const seeds: Array<[number, number]> = []
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (seeds.length >= n) { rnd(); rnd(); continue }
+        const jx = (c + 0.15 + rnd() * 0.7) / cols
+        const jy = (r + 0.15 + rnd() * 0.7) / rows
+        seeds.push([jx, jy])
+      }
+    }
+    const m = seeds.length
+    const perm = seeds.map((_, i) => i)
+    for (let i = m - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp }
+    for (let i = 0; i < m; i++) {
+      const s0 = seeds[i], src = seeds[perm[i]]
+      this.cellArr[i * 4] = s0[0]; this.cellArr[i * 4 + 1] = s0[1]; this.cellArr[i * 4 + 2] = 0; this.cellArr[i * 4 + 3] = 0
+      this.mapArr[i * 4] = src[0]; this.mapArr[i * 4 + 1] = src[1]; this.mapArr[i * 4 + 2] = 0; this.mapArr[i * 4 + 3] = 0
+      this.rotArr[i] = rotateFrac > 0 && rnd() < rotateFrac ? 1 + Math.floor(rnd() * 3) : 0
+    }
+    this.count = m
+  }
+
+  // MASK dropout order : a shuffled EVEN spacing over (0,0.90], so the dial
+  // removes pieces at a steady rate instead of in random clumps. The ceiling
+  // sits BELOW the shader's 0.06 fade band under mask=1. One seeded SURVIVOR
+  // gets rank 2 (unreachable by a 0..1 mask), so full mask always leaves exactly
+  // one piece and every re-cut elects a new one.
+  private assignMaskAndSurvivor(n: number, rnd: () => number): void {
+    const order: number[] = []
+    for (let i = 0; i < n; i++) order.push(i)
+    for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const tmp = order[i]; order[i] = order[j]; order[j] = tmp }
+    const survivor = Math.floor(rnd() * Math.max(1, n))
+    for (let i = 0; i < n; i++) this.rankArr[order[i]] = ((i + 1) / n) * 0.90
+    this.rankArr[survivor] = 2.0
+  }
+
+  // Snapshot the live layout as the outgoing one and start a crossfade.
+  private beginCrossfade(): void {
+    this.oldCell.set(this.cellArr); this.oldMap.set(this.mapArr)
+    this.oldRot.set(this.rotArr); this.oldRank.set(this.rankArr)
+    this.oldCount = this.count; this.oldSeed = this.seed
+    this.xfade = 0
+  }
+
+  // Upload one layout + the shared scalar params, and draw a fade-scaled pass.
+  private drawLayout(
+    ctx: NodeContext, p: Prog, fbo: WebGLFramebuffer,
+    cell: Float32Array, map: Float32Array, rot: Float32Array, rank: Float32Array,
+    count: number, seed: number, shape: number, fade: number
+  ): void {
+    const gl = ctx.gl, inp = ctx.inputs
     const W = ctx.chain.w, H = ctx.chain.h
-    const inp = ctx.inputs
-
-    const cuts = Math.round(clampf(num(inp.cuts, 20), 2, AC_MAX))
-    const rotate = clampf(num(inp.rotate, 0.3), 0, 1)
-    const trig = num(inp.trig, 0)
-    const recut = trig >= 0.5 && this.prevTrig < 0.5
-    this.prevTrig = trig
-    const autoRate = clampf(num(inp.rate, 0), 0, 8)
-    if (autoRate > 0) { this.timer += ctx.dt; if (this.timer >= 1 / autoRate) { this.timer = 0; this.reseed(); this.rebuild(cuts, rotate) } }
-    if (recut) { this.reseed(); this.rebuild(cuts, rotate) }
-    else if (this.count === 0 || cuts !== this.lastCuts || rotate !== this.lastRotate) this.rebuild(cuts, rotate)
-
-    const out = ctx.chain.next()
-    const p = g.use(g.autocut)
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
-    gl.uniform1i(p.u('uCount'), this.count)
-    gl.uniform4fv(p.u('uCell'), this.cellArr.subarray(0, this.count * 4))
-    gl.uniform4fv(p.u('uMap'), this.mapArr.subarray(0, this.count * 4))
-    gl.uniform1fv(p.u('uRot'), this.rotArr.subarray(0, this.count))
+    gl.uniform1i(p.u('uCount'), count)
+    gl.uniform1i(p.u('uShape'), shape)
+    gl.uniform4fv(p.u('uCell'), cell.subarray(0, count * 4))
+    gl.uniform4fv(p.u('uMap'), map.subarray(0, count * 4))
+    gl.uniform1fv(p.u('uRot'), rot.subarray(0, count))
+    gl.uniform1fv(p.u('uRank'), rank.subarray(0, count))
     gl.uniform1f(p.u('uGap'), clampf(num(inp.gap, 0.15), 0, 1))
     gl.uniform1f(p.u('uSlip'), clampf(num(inp.slip, 0), 0, 1))
     gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
@@ -1958,9 +2049,59 @@ export class AutocutterNode implements ConvNode {
     gl.uniform1f(p.u('uTorn'), clampf(num(inp.torn, 0), 0, 2))
     gl.uniform1f(p.u('uMask'), clampf(num(inp.mask, 0), 0, 1))
     gl.uniform1f(p.u('uCurve'), clampf(num(inp.curve, 0.3), 0, 1))
-    gl.uniform1fv(p.u('uRank'), this.rankArr.subarray(0, this.count))
-    gl.uniform1f(p.u('uSeed'), this.seed % 1024)
-    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.uniform1f(p.u('uFade'), fade)
+    gl.uniform1f(p.u('uSeed'), seed % 1024)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl)
+    const inp = ctx.inputs
+
+    const cuts = Math.round(clampf(num(inp.cuts, 20), 2, AC_MAX))
+    const rotate = clampf(num(inp.rotate, 0.3), 0, 1)
+    const shape = Math.round(clampf(num(inp.shape, 0), 0, 1))
+    const trig = num(inp.trig, 0)
+    const recut = trig >= 0.5 && this.prevTrig < 0.5
+    this.prevTrig = trig
+    const autoRate = clampf(num(inp.rate, 0), 0, 8)
+    const xfadeDur = clampf(num(inp.xfade, 0), 0, 4)
+
+    // A reseed recut (auto clock or the trigger) starts a crossfade from the
+    // outgoing layout when xfade time is set; a structural param edit
+    // (cuts / rotate / shape) rebuilds in place and snaps.
+    let didReseedRecut = false
+    if (autoRate > 0) { this.timer += ctx.dt; if (this.timer >= 1 / autoRate) { this.timer = 0; didReseedRecut = true } }
+    if (recut) didReseedRecut = true
+
+    if (didReseedRecut) {
+      if (xfadeDur > 0 && this.count > 0) this.beginCrossfade()
+      else this.xfade = 1
+      this.reseed(); this.rebuild(cuts, rotate, shape)
+    } else if (this.count === 0 || cuts !== this.lastCuts || rotate !== this.lastRotate || shape !== this.lastShape) {
+      this.xfade = 1
+      this.rebuild(cuts, rotate, shape)
+    }
+
+    if (this.xfade < 1 && xfadeDur > 0) this.xfade = Math.min(1, this.xfade + ctx.dt / xfadeDur)
+
+    const p = g.use(g.autocut)
+    const out = ctx.chain.next()
+    if (this.xfade >= 1 || xfadeDur <= 0 || this.oldCount === 0) {
+      // Single pass : identical cost + result to before the crossfade existed.
+      gl.disable(gl.BLEND)
+      this.drawLayout(ctx, p, out.fbo, this.cellArr, this.mapArr, this.rotArr, this.rankArr, this.count, this.seed, shape, 1)
+    } else {
+      // Crossfade : old * (1-t) written flat, new * t added on top. Both outputs
+      // are premultiplied (rgb * keep), so additive blend gives a correct mix
+      // of two transparent-holed layouts in one buffer, no third pass.
+      gl.disable(gl.BLEND)
+      this.drawLayout(ctx, p, out.fbo, this.oldCell, this.oldMap, this.oldRot, this.oldRank, this.oldCount, this.oldSeed, shape, 1 - this.xfade)
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE)
+      this.drawLayout(ctx, p, out.fbo, this.cellArr, this.mapArr, this.rotArr, this.rankArr, this.count, this.seed, shape, this.xfade)
+      gl.disable(gl.BLEND)
+    }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     return out.tex
   }

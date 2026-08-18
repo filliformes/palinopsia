@@ -141,7 +141,7 @@ export const SHADER_BLURBS: Record<string, string> = {
   'node-scanner':
     'Works like a flatbed scanner: a head sweeps the frame and captures only the line it is crossing, holding it until the head comes round again. Anything that moves while the head travels is stretched or repeated along the sweep. Fire the trigger to start a pass, or let it run in a loop.',
   'node-autocutter':
-    'Chops the frame into pieces and shuffles them among each other, like a cut-up collage, while live video keeps playing inside every piece. The cuts can bend into torn curves with ragged paper edges instead of clean rectangles. Turn the mask up and pieces fall away until a single one is left.',
+    'Chops the frame into pieces and shuffles them among each other, like a cut-up collage, while live video keeps playing inside every piece. The Shape control switches between rectangular cuts and an irregular Voronoi mosaic, and the cuts can bend into torn curves with ragged paper edges. Set an auto re-cut rate and a Crossfade to dissolve one layout into the next instead of snapping. Turn the mask up and pieces fall away until a single one is left.',
   'node-chronoscan':
     'Lets every part of the picture live at a different moment. It keeps a short history and then decides, pixel by pixel, how far back to look — driven by a sweep, by the image’s own brightness, or by another layer. One frame ends up containing many different presents.',
   'node-sediment':
