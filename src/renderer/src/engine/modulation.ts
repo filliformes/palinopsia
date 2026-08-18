@@ -305,13 +305,39 @@ export class ModEngine {
           // multiple wraps so a rate jump can't freeze the held value.
           const wraps = Math.floor(s.phase) - Math.floor(prevPhase)
           if (wraps > 0) {
-            // Spastic throws a fresh value each cycle : hard ±1 in 'binary'
-            // mode, anywhere in the span in 'float'.
-            const spastic = cfg.shape === 'spastic' && (cfg.spasticMode ?? 'binary') === 'binary'
+            // SPASTIC's whole point is that you can't feel its clock — the
+            // speed reads as random, near-polyrhythmic against everything else.
+            // In 'binary' that falls straight out of the coin flip: half the
+            // ticks land on the value it already holds, so the holds run 1, 2,
+            // 3… ticks and the pulse disappears.
+            //
+            // 'float' therefore CANNOT just draw a new number every tick — that
+            // puts the grid right back, and a steady pulse is the one thing
+            // Spastic must not have. It takes the same coin flip, so its holds
+            // land on the identical distribution; and when it does move it has
+            // to move FAR enough to read as a jump, since a tiny step is
+            // indistinguishable from a hold and would quietly reintroduce the
+            // metronome at half rate.
+            const spasticShape = cfg.shape === 'spastic'
+            const spasticBinary = spasticShape && (cfg.spasticMode ?? 'binary') === 'binary'
             for (let w = 0; w < wraps; w++) {
               s.rndSmoothPrev = s.rndSmoothNext
               s.rndSmoothNext = Math.random() * 2 - 1
-              s.rndStepValue = spastic ? (Math.random() < 0.5 ? -1 : 1) : Math.random() * 2 - 1
+              if (spasticBinary) {
+                s.rndStepValue = Math.random() < 0.5 ? -1 : 1
+              } else if (spasticShape) {
+                if (Math.random() < 0.5) {
+                  let next = Math.random() * 2 - 1
+                  // Span is -1..1, so 0.7 is a third of the range : big enough
+                  // to register as a throw rather than a wobble.
+                  for (let g = 0; g < 8 && Math.abs(next - s.rndStepValue) < 0.7; g++) {
+                    next = Math.random() * 2 - 1
+                  }
+                  s.rndStepValue = next
+                }
+              } else {
+                s.rndStepValue = Math.random() * 2 - 1 // rndStep : steady grid
+              }
             }
           }
           v01 = (lfoValue(cfg.shape, s.phase, s) + 1) / 2
