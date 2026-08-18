@@ -597,7 +597,7 @@ export function AssignRow({
               min={-1}
               max={1}
               onChange={(v) => setAssignmentDepth(b.id, v)}
-              className="input w-10 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+              className="input w-12 shrink-0 px-1 py-0.5 text-right text-[9px]"
             />
           </div>
         )
