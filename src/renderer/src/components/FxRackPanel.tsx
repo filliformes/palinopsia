@@ -12,6 +12,7 @@ import { useStore, type FxScope } from '../store'
 import { canHostFx } from '../fxScopes'
 import { ContextMenu } from './ContextMenu'
 import { useFxMenuItems } from './fxMenu'
+import { SearchSelect, type SearchOption } from './SearchSelect'
 
 export function FxAddSelect({ scope, className = '' }: { scope: FxScope; className?: string }): JSX.Element {
   const addFx = useStore((s) => s.addFx)
@@ -23,26 +24,21 @@ export function FxAddSelect({ scope, className = '' }: { scope: FxScope; classNa
           ...g,
           shaders: g.shaders.filter((f) => canHostFx(scope, f.id))
         })).filter((g) => g.shaders.length > 0)
+  const options: SearchOption[] = groups.flatMap((grp) =>
+    grp.shaders.map((f) => ({ value: f.id, label: f.name, group: grp.group }))
+  )
   return (
-    <select
-      className={`input select-compact text-[10px] ${className || 'w-20 shrink-0'}`}
+    <SearchSelect
+      className={`text-[10px] ${className || 'w-20 shrink-0'}`}
       value=""
-      onChange={(e) => {
-        if (e.target.value) addFx(scope, e.target.value)
+      options={options}
+      placeholder="+ fx"
+      resetAfterPick
+      onChange={(v) => {
+        if (v) addFx(scope, v)
       }}
-      title="Add an FX to this rack"
-    >
-      <option value="">+ fx</option>
-      {groups.map((grp) => (
-        <optgroup key={grp.group} label={grp.group}>
-          {grp.shaders.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
-        </optgroup>
-      ))}
-    </select>
+      title="Add an FX to this rack — type to search by name or family"
+    />
   )
 }
 

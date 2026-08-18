@@ -11,6 +11,7 @@ import { BG_PRESETS, BG_SOURCES, bgPresetToState } from '../bgPresets'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxAddSelect, FxChips } from './FxRackPanel'
+import { SearchSelect, type SearchOption } from './SearchSelect'
 import { ConfirmModal, PromptModal } from './PromptModal'
 import { useFlash } from './useFlash'
 
@@ -81,20 +82,16 @@ export function BackgroundPanel(): JSX.Element {
         >
           BG
         </span>
-        <select
-          className={`input select-compact min-w-[5rem] flex-1 text-[11px] ${selected ? 'border-accent' : ''}`}
+        <SearchSelect
+          className={`min-w-[5rem] flex-1 text-[11px] ${selected ? 'border-accent' : ''}`}
           value={shaderId ?? ''}
-          onChange={(e) => setBackgroundSource(e.target.value || null)}
-          onClick={(e) => e.stopPropagation()}
-          title="Background source : curated ground set"
-        >
-          <option value="">— none —</option>
-          {BG_SOURCES_ALPHA.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: '', label: '— none —' },
+            ...BG_SOURCES_ALPHA.map((g): SearchOption => ({ value: g.id, label: g.name }))
+          ]}
+          onChange={(v) => setBackgroundSource(v || null)}
+          title="Background source : curated ground set — type to search"
+        />
         <span onClick={(e) => e.stopPropagation()}>
           {/* snug fixed width : fits "+ fx" + arrow without clipping, but not as
               wide as the widest option ("Difference Bloom"). Popup still expands. */}
@@ -113,11 +110,16 @@ export function BackgroundPanel(): JSX.Element {
         >
           ⚄
         </button>
-        <select
-          className="input select-compact w-[4.75rem] shrink-0 text-[10px]"
+        <SearchSelect
+          className="w-[4.75rem] shrink-0 text-[10px]"
           value=""
-          onChange={(e) => {
-            const v = e.target.value
+          placeholder="presets"
+          resetAfterPick
+          options={[
+            ...BG_PRESETS.map((p): SearchOption => ({ value: p.id, label: p.name, group: 'Built-in' })),
+            ...bgPresets.map((p): SearchOption => ({ value: `u:${p.id}`, label: p.name, group: 'Yours' }))
+          ]}
+          onChange={(v) => {
             if (!v) return
             if (v.startsWith('u:')) {
               const p = bgPresets.find((x) => x.id === v.slice(2))
@@ -127,27 +129,8 @@ export function BackgroundPanel(): JSX.Element {
               if (p) applyBgPreset(bgPresetToState(p))
             }
           }}
-          onClick={(e) => e.stopPropagation()}
           title="Background presets : 25 built-ins + yours (right-click the strip to save/delete)"
-        >
-          <option value="">presets</option>
-          <optgroup label="Built-in">
-            {BG_PRESETS.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </optgroup>
-          {bgPresets.length > 0 && (
-            <optgroup label="Yours">
-              {bgPresets.map((p) => (
-                <option key={p.id} value={`u:${p.id}`}>
-                  {p.name}
-                </option>
-              ))}
-            </optgroup>
-          )}
-        </select>
+        />
       </div>
 
       {/* FX chips under the header, inside the gutter (like a layer strip). */}

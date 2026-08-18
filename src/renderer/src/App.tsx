@@ -29,6 +29,7 @@ import { GRID } from '@shared/assemble'
 import { tickSequencer } from './engine/sequencer'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel, FxChips } from './components/FxRackPanel'
+import { SearchSelect } from './components/SearchSelect'
 import { FinishingTouches, FinishingToggle } from './components/FinishingTouches'
 import { Inspector } from './components/Inspector'
 import { LayerPanel } from './components/LayerPanel'
@@ -1260,25 +1261,20 @@ function MasterRackStrip(): JSX.Element {
       >
         ⚄
       </button>
-      <select
-        className="input select-compact w-32 shrink-0 text-[10px]"
+      <SearchSelect
+        className="w-32 shrink-0 text-[10px]"
         value={applied}
-        onChange={(e) => {
-          const p = MASTER_PRESETS.find((x) => x.name === e.target.value)
+        placeholder="chain presets…"
+        options={MASTER_PRESETS.map((p) => ({ value: p.name, label: p.name }))}
+        onChange={(v) => {
+          const p = MASTER_PRESETS.find((x) => x.name === v)
           if (p) {
             applyMasterPreset(p.fx, p.vibe)
             setApplied(p.name)
           }
         }}
         title="Master chain presets : replaces the chain and sets the Vibe accordingly"
-      >
-        <option value="">chain presets…</option>
-        {MASTER_PRESETS.map((p) => (
-          <option key={p.name} value={p.name}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+      />
       {/* Regular FX rack : wraps to more rows if the chain is deep */}
       <div className="ml-3 flex min-w-0 flex-1 items-center">
         <FxRackPanel scope={{ kind: 'master' }} fx={rackFx} label="" />

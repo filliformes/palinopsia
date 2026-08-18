@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { THEME_FAMILIES, THEMES } from '../themes'
+import { SearchSelect } from './SearchSelect'
 
 type SessionEntry = { name: string; path: string; mtime: number }
 
@@ -86,27 +87,18 @@ export function GenerateMenu(): JSX.Element {
       title="Generate a whole new session tethered to a visual theme"
     >
       <span className="font-mono text-[9px] uppercase text-muted">Generate</span>
-      <select
-        // Fixed width : a native <select> otherwise grows to fit the WIDEST
-        // content, which includes the long <optgroup> family labels ("Datamosh &
-        // Compression"…). Pinning it keeps the closed control only theme-name wide
-        // (the selected name truncates with ellipsis; the open list still shows
-        // full names + families).
-        className="input w-[120px] text-[12px]"
+      <SearchSelect
+        // Fixed width : the closed control stays theme-name wide, while the
+        // popup is free to be as wide as it needs.
+        className="w-[120px] text-[12px]"
         value={sel}
-        onChange={(e) => setSel(e.target.value)}
-        title={current?.blurb}
-      >
-        {THEME_FAMILIES.map((f) => (
-          <optgroup key={f.family} label={f.family}>
-            {f.themes.map((t) => (
-              <option key={t.id} value={t.id} title={t.blurb}>
-                {t.name}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
+        menuWidth={248}
+        options={THEME_FAMILIES.flatMap((f) =>
+          f.themes.map((t) => ({ value: t.id, label: t.name, group: f.family, title: t.blurb }))
+        )}
+        onChange={(v) => setSel(v)}
+        title={current?.blurb ?? 'Pick a visual theme — type to search by name or family'}
+      />
       <button
         className="btn text-[12px] text-accent2"
         onClick={() => generateTheme(sel)}

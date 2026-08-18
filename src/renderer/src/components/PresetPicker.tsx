@@ -34,8 +34,11 @@ export function PresetPicker({
   const addUserShaderPreset = useStore((s) => s.addUserShaderPreset)
   const deleteUserShaderPreset = useStore((s) => s.deleteUserShaderPreset)
 
-  const factory = PRESETS_BY_ID[shaderId] ?? []
+  const all = PRESETS_BY_ID[shaderId] ?? []
   const [open, setOpen] = useState(false)
+  // A shader can carry 56 presets (the Vibe does), which is a long scroll for a
+  // name you already know. Same filter as the other pickers.
+  const [q, setQ] = useState('')
   const [localApplied, setLocalApplied] = useState<string | null>(null)
   const controlled = appliedName !== undefined
   const applied = controlled ? appliedName : localApplied
@@ -53,7 +56,19 @@ export function PresetPicker({
     return () => window.removeEventListener('mousedown', down)
   }, [open])
 
-  if (factory.length === 0 && userPresets.length === 0 && !shaderId) return null
+  const match = (n: string): boolean => {
+    const s2 = q.trim().toLowerCase()
+    if (!s2) return true
+    const l = n.toLowerCase()
+    if (l.includes(s2)) return true
+    let i = 0
+    for (const ch of l) if (ch === s2[i]) i++
+    return i === s2.length
+  }
+  const factory = all.filter((p) => match(p.name))
+  const users = userPresets.filter((p) => match(p.name))
+
+  if (all.length === 0 && userPresets.length === 0 && !shaderId) return null
 
   function apply(p: ShaderPreset): void {
     for (const [k, v] of Object.entries(p.values)) onChange(k, v)
@@ -76,7 +91,10 @@ export function PresetPicker({
   return (
     <div ref={ref} className="relative min-w-0 max-w-full">
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          setQ('')
+          setOpen((o) => !o)
+        }}
         className={`input select-compact max-w-full truncate text-left text-[10px] ${widthCh ? '' : 'w-36'}`}
         style={widthCh ? { width: `${widthCh}ch` } : undefined}
         title="Presets"
@@ -88,6 +106,27 @@ export function PresetPicker({
           className="absolute right-0 top-full z-30 mt-1 flex max-h-64 max-w-[14rem] flex-col overflow-y-auto rounded border border-border bg-panel2 py-1 shadow-lg"
           style={{ width: widthCh ? `${widthCh}ch` : '11rem' }}
         >
+          <input
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && factory.length + users.length > 0) {
+                e.preventDefault()
+                apply(factory[0] ?? users[0])
+              } else if (e.key === 'Escape') {
+                e.preventDefault()
+                e.stopPropagation()
+                setOpen(false)
+              }
+            }}
+            placeholder="search…"
+            spellCheck={false}
+            className="input mx-1 mb-1 shrink-0 px-2 py-0.5 text-[11px]"
+          />
+          {factory.length + users.length === 0 && (
+            <div className="px-3 py-1 text-[11px] text-muted">no match</div>
+          )}
           {factory.map((p) => (
             <button
               key={p.name}
@@ -99,8 +138,8 @@ export function PresetPicker({
               {p.name}
             </button>
           ))}
-          {userPresets.length > 0 && <div className="my-1 border-t border-border" />}
-          {userPresets.map((p) => (
+          {users.length > 0 && <div className="my-1 border-t border-border" />}
+          {users.map((p) => (
             <div key={p.name} className="flex items-center">
               <button
                 onClick={() => apply(p)}

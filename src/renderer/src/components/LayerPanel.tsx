@@ -16,6 +16,7 @@ import { DevicePicker } from './DevicePicker'
 import { HivePicker } from './HivePicker'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxAddSelect, FxChips } from './FxRackPanel'
+import { SearchSelect, type SearchOption } from './SearchSelect'
 import { ConfirmModal, PromptModal } from './PromptModal'
 import { useFlash } from './useFlash'
 
@@ -621,13 +622,30 @@ function SourceRow({
             ⚙ {Math.round(converting * 100)}%
           </span>
         )}
-        <select
-          className={`input select-compact min-w-0 flex-1 text-[11px] ${
-            selected ? 'border-accent' : ''
-          }`}
+        <SearchSelect
+          className={`min-w-0 flex-1 text-[11px] ${selected ? 'border-accent' : ''}`}
           value={value}
-          onChange={(e) => {
-            const v = e.target.value
+          menuWidth={248}
+          title="Source for this slot — type to search the generators"
+          options={[
+            { value: '', label: '— none —' },
+            ...(isVideo
+              ? [{ value: '__video__', label: mediaName ?? 'video', prefix: '🎞 ', group: 'live' }]
+              : []),
+            ...(isAsm
+              ? [{ value: '__assemble__', label: mediaName ?? 'assemblage', prefix: '🎬 ', group: 'live' }]
+              : []),
+            { value: '__video_pick__', label: 'Import video…', prefix: '🎞 ', group: 'live' },
+            { value: '__assemble_pick__', label: 'Assemblage…', prefix: '🎬 ', group: 'live' },
+            { value: '__cap_webcam__', label: 'Webcam', prefix: '📷 ', group: 'live' },
+            { value: '__cap_live__', label: 'Live Input…', prefix: '🎥 ', group: 'live' },
+            { value: '__cap_screen__', label: 'Screen…', prefix: '🖥 ', group: 'live' },
+            { value: '__cap_hive__', label: 'HIVE stream…', prefix: '📡 ', group: 'live' },
+            ...GENERATORS_ALPHA.map(
+              (g): SearchOption => ({ value: g.id, label: g.name, group: 'generators' })
+            )
+          ]}
+          onChange={(v) => {
             if (v === '__video_pick__') fileRef.current?.click()
             else if (v === '__cap_webcam__') onPickCapture('webcam', 'Webcam')
             else if (v === '__cap_screen__') setShowCapture(true)
@@ -639,23 +657,7 @@ function SourceRow({
             else if (v === '__assemble_pick__') useStore.getState().setRightView('assemble')
             else if (v !== '__video__' && v !== '__assemble__') onPick(v || null)
           }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <option value="">— none —</option>
-          {isVideo && <option value="__video__">🎞 {mediaName ?? 'video'}</option>}
-          {isAsm && <option value="__assemble__">🎬 {mediaName ?? 'assemblage'}</option>}
-          <option value="__video_pick__">🎞 Import video…</option>
-          <option value="__assemble_pick__">🎬 Assemblage…</option>
-          <option value="__cap_webcam__">📷 Webcam</option>
-          <option value="__cap_live__">🎥 Live Input…</option>
-          <option value="__cap_screen__">🖥 Screen…</option>
-          <option value="__cap_hive__">📡 HIVE stream…</option>
-          {GENERATORS_ALPHA.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </select>
+        />
         {/* +fx always present : the layout never shifts when sources load.
             w-auto so the box hugs its "+ fx" label instead of a fixed gutter. */}
         <span onClick={(e) => e.stopPropagation()}>
