@@ -268,9 +268,13 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
     case 'ramp':
       return (
         <>
-          <NumRow label="MS" value={m.ramp.rampMs} min={50} max={120000}
+          <SliderRow label="MS" value={m.ramp.rampMs} min={50} max={120000} log integer
+            title="Ramp time : how long the sweep takes, in milliseconds (log track)."
+
             onChange={(v) => update(index, { ramp: { ...m.ramp, rampMs: v } })} />
-          <NumRow label="CURVE%" value={m.ramp.curvePct} min={-100} max={100}
+          <SliderRow label="CURVE%" value={m.ramp.curvePct} min={-100} max={100} step={1} integer
+            title="Ramp shape : negative eases in, positive eases out, 0 is linear."
+
             onChange={(v) => update(index, { ramp: { ...m.ramp, curvePct: v } })} />
           <Row label="MODE">
             <select
@@ -292,18 +296,25 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
       // a/d/s/r are little duration sliders (2×2); SUS level + LOOP share a row.
       return (
         <>
-          <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-            <MiniSlider label="A" value={m.adsr.attackMs} min={0} max={30000}
+          {/* Tighter than the card's own gap-1 : four rows plus SUS have to
+              live inside the fixed h-36 silhouette. */}
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <MiniSlider label="A" name="Attack time" value={m.adsr.attackMs} min={0} max={30000}
               onChange={(v) => update(index, { adsr: { ...m.adsr, attackMs: v } })} />
-            <MiniSlider label="D" value={m.adsr.decayMs} min={0} max={30000}
+            <MiniSlider label="D" name="Decay time" value={m.adsr.decayMs} min={0} max={30000}
               onChange={(v) => update(index, { adsr: { ...m.adsr, decayMs: v } })} />
-            <MiniSlider label="S" value={m.adsr.sustainMs} min={0} max={60000}
+            <MiniSlider label="S" name="Sustain time" value={m.adsr.sustainMs} min={0} max={60000}
               onChange={(v) => update(index, { adsr: { ...m.adsr, sustainMs: v } })} />
-            <MiniSlider label="R" value={m.adsr.releaseMs} min={0} max={30000}
+            <MiniSlider label="R" name="Release time" value={m.adsr.releaseMs} min={0} max={30000}
               onChange={(v) => update(index, { adsr: { ...m.adsr, releaseMs: v } })} />
           </div>
-          <div className="flex min-w-0 items-center gap-1">
-            <span className="w-10 shrink-0 font-mono text-[9px] text-muted">SUS</span>
+          <div className="flex min-w-0 items-center gap-1" title="Sustain level : the height the envelope holds at, not a duration.">
+            <span
+              className="w-10 shrink-0 cursor-help font-mono text-[9px] text-muted underline decoration-dotted underline-offset-2"
+              title="Sustain level : the height the envelope holds at, not a duration."
+            >
+              SUS
+            </span>
             <input
               type="range"
               min={0}
@@ -312,7 +323,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
               value={m.adsr.sustainLevel}
               onChange={(e) => update(index, { adsr: { ...m.adsr, sustainLevel: Number(e.target.value) } })}
               className="min-w-0 flex-1 accent-accent"
-              title={`Sustain level ${m.adsr.sustainLevel.toFixed(2)}`}
+              title={'Sustain level : the height the envelope holds at, not a duration.'}
             />
             <BoundedNumberInput
               value={Math.round(m.adsr.sustainLevel * 100) / 100}
@@ -387,9 +398,13 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
       // RND lives on the rate line (see the clock row) : only RISE/FALL here.
       return (
         <>
-          <NumRow label="RISE" value={m.slew.riseMs} min={1} max={10000}
+          <SliderRow label="RISE" value={m.slew.riseMs} min={1} max={10000} log integer
+            title="Rise time : how long it takes to climb to a new target (log track)."
+
             onChange={(v) => update(index, { slew: { ...m.slew, riseMs: v } })} />
-          <NumRow label="FALL" value={m.slew.fallMs} min={1} max={10000}
+          <SliderRow label="FALL" value={m.slew.fallMs} min={1} max={10000} log integer
+            title="Fall time : how long it takes to drop to a new target (log track)."
+
             onChange={(v) => update(index, { slew: { ...m.slew, fallMs: v } })} />
         </>
       )
@@ -587,20 +602,24 @@ function NumRow({
   )
 }
 
-// A hair-thin label + a small slider + an editable readout : for the ADSR
-// a/d/s/r durations, where four have to sit two-up in one card. The value is
-// STORED in ms but shown in SECONDS — five digits of milliseconds cannot fit
-// beside a slider in a two-up cell, and seconds is the readable unit for an
-// envelope anyway.
+// One ADSR segment : hair-thin label, slider, editable readout. These used to
+// sit TWO-UP, which left the slider narrower than its own thumb and effectively
+// undraggable. One per row gives it real travel, and four rows fit because an
+// envelope card carries no clock row. The value is STORED in ms and shown in
+// SECONDS: five digits of milliseconds will not fit beside a slider, and
+// seconds is the readable unit for an envelope anyway.
 function MiniSlider({
-  label, value, min, max, onChange
+  label, name, value, min, max, onChange
 }: {
-  label: string; value: number; min: number; max: number
+  label: string; name: string; value: number; min: number; max: number
   onChange: (v: number) => void
 }): JSX.Element {
+  const help = name + ' : ' + (value / 1000).toFixed(2) + ' s'
   return (
-    <div className="flex min-w-0 items-center gap-1" title={`${label} : ${(value / 1000).toFixed(2)} s`}>
-      <span className="w-2.5 shrink-0 font-mono text-[9px] text-muted">{label}</span>
+    <div className="flex min-w-0 items-center gap-1" title={help}>
+      <span className="w-2.5 shrink-0 cursor-help font-mono text-[9px] text-muted" title={help}>
+        {label}
+      </span>
       <input
         type="range"
         min={min}
@@ -609,6 +628,7 @@ function MiniSlider({
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         className="min-w-0 flex-1 accent-accent"
+        title={help}
       />
       {/* One decimal : the box renders String(value), so a raw ms/1000 would
           read "1.073" and clip in a cell this narrow. The row's tooltip keeps
@@ -625,21 +645,30 @@ function MiniSlider({
 }
 
 function SliderRow({
-  label, value, min, max, step = 0.01, title, integer, onChange
+  label, value, min, max, step = 0.01, title, integer, log, onChange
 }: {
   label: string; value: number; min: number; max: number; step?: number; title?: string
   integer?: boolean
+  // Log track : a linear slider over 50…120000 ms puts everything usable in the
+  // first 2% of its travel. The readout box stays linear either way.
+  log?: boolean
   onChange: (v: number) => void
 }): JSX.Element {
+  const useLog = !!log && min > 0
+  const toPos = (v: number): number => (useLog ? Math.log10(Math.max(min, v)) : v)
+  const emit = (p: number): void => {
+    const v = useLog ? Math.pow(10, p) : p
+    onChange(integer ? Math.round(v) : v)
+  }
   return (
     <Row label={label} title={title}>
       <input
         type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
+        min={toPos(min)}
+        max={toPos(max)}
+        step={useLog ? 0.001 : step}
+        value={toPos(value)}
+        onChange={(e) => emit(Number(e.target.value))}
         className="min-w-0 flex-1 accent-accent"
         title={title}
       />
