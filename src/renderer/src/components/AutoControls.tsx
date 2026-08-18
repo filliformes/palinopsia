@@ -589,6 +589,16 @@ export function AssignRow({
                   : `Depth ${b.depth.toFixed(2)} : bipolar swing around the base value`
               }
             />
+            {/* The slider gave no readout of the depth : a bipolar ±1 box, so
+                you can see and set it exactly. The box's fixed width shrinks the
+                flex-1 slider to fit, keeping the row its current size. */}
+            <BoundedNumberInput
+              value={b.depth}
+              min={-1}
+              max={1}
+              onChange={(v) => setAssignmentDepth(b.id, v)}
+              className="input w-10 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+            />
           </div>
         )
       })}
