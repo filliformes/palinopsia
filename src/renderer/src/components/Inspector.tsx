@@ -7,6 +7,7 @@ import type { FxInstance, ModTarget, SidechainRef, SourceSlot } from '@shared/ty
 import { randomizeInputs } from '../randomize'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { blurbFor } from '../shaders/isf/shaderBlurbs'
+import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { inputsForShader } from '../shaders/isf/inputs'
 import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
@@ -234,8 +235,13 @@ export function Inspector(): JSX.Element {
     }
   }
 
-  // Plain-English hover-help for the whole effect, on its name.
-  const blurb = blurbFor(shaderId)
+  // Plain-English hover-help on the title : an FX blurb, or — when a
+  // generator source is selected — a source blurb.
+  const blurb =
+    blurbFor(shaderId) ??
+    (selection?.type === 'source' || selection?.type === 'background'
+      ? generatorBlurb(shaderId)
+      : undefined)
 
   if (!shaderId) {
     if (videoName && selection?.type === 'source') {

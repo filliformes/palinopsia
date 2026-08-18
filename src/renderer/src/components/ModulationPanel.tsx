@@ -13,6 +13,7 @@ import { VISION_FEATURES } from '../engine/visionIn'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { modTargetKey, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
+import { modulatorBlurb } from '../shaders/isf/sourceBlurbs'
 
 const MOD_TYPES: ModulatorType[] = ['lfo', 'ramp', 'adsr', 'arp', 'random', 'sh', 'slew', 'chaos', 'audio', 'vision', 'homeostat', 'organic', 'physics', 'motion']
 const LFO_SHAPES: LfoShape[] = ['sine', 'triangle', 'square', 'sawtooth', 'rndStep', 'rndSmooth', 'spastic']
@@ -116,10 +117,13 @@ function ModCard({ index }: { index: number }): JSX.Element {
           className="input select-compact min-w-0 flex-1 text-[10px]"
           value={m.type}
           onChange={(e) => update(index, { type: e.target.value as ModulatorType })}
-          title="The modulator's shape : what kind of moving signal this slot produces (LFO waves, ramp, ADSR envelope, arpeggio, random, sample&hold, slew, chaos, audio-follower, vision-follower, homeostat controller, organic, physics, motion). Bind it to parameters with their M button."
+          title={
+            modulatorBlurb(m.type) ??
+            'The modulator type : what kind of moving signal this slot produces. Bind it to parameters with their M button.'
+          }
         >
           {MOD_TYPES.map((t) => (
-            <option key={t} value={t}>
+            <option key={t} value={t} title={modulatorBlurb(t)}>
               {t}
             </option>
           ))}
