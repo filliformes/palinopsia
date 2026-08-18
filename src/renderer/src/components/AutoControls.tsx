@@ -596,6 +596,7 @@ export function AssignRow({
               value={b.depth}
               min={-1}
               max={1}
+              maxFrac={2}
               onChange={(v) => setAssignmentDepth(b.id, v)}
               className="input w-12 shrink-0 px-1 py-0.5 text-right text-[9px]"
             />

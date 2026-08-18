@@ -182,6 +182,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
                 value={m.rateHz}
                 min={0.01}
                 max={50}
+                maxFrac={2}
                 onChange={(v) => update(index, { rateHz: v })}
                 className="input w-12 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
               />
@@ -676,12 +677,14 @@ function SliderRow({
         className="min-w-0 flex-1 accent-accent"
         title={title}
       />
-      {/* Every slider carries an editable numeric readout. */}
+      {/* Every slider carries an editable numeric readout, shown to at most
+          three decimals so a slider landing on 0.079577… doesn't clip. */}
       <BoundedNumberInput
         value={value}
         min={min}
         max={max}
         integer={integer}
+        maxFrac={3}
         onChange={onChange}
         className="input w-12 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
       />

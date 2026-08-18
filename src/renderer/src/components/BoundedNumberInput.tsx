@@ -20,6 +20,11 @@ interface Props {
   min?: number
   max?: number
   integer?: boolean
+  // Cap the number of DECIMAL places SHOWN (display only : the stored value
+  // and what the user can type are untouched). Without it the box renders
+  // String(v), so a slider that lands on 0.079577… clips in a narrow box.
+  // Trailing zeros are trimmed, so 0.5 stays "0.5", not "0.500".
+  maxFrac?: number
   step?: number
   placeholder?: string
   className?: string
@@ -44,6 +49,7 @@ export function BoundedNumberInput({
   min = -Infinity,
   max = Infinity,
   integer = false,
+  maxFrac,
   placeholder,
   className,
   title,
@@ -51,7 +57,7 @@ export function BoundedNumberInput({
   autoFocusToken,
   liveKey
 }: Props): JSX.Element {
-  const [str, setStr] = useState(formatValue(value, integer))
+  const [str, setStr] = useState(formatValue(value, integer, maxFrac))
   const focused = useRef(false)
   // "dirty" = the user has actually typed something since gaining
   // focus. Without this we can't tell "focused but idle" (where
@@ -119,7 +125,7 @@ export function BoundedNumberInput({
       const clamped = Math.max(min, Math.min(max, parsed))
       if (clamped === value) return
     }
-    setStr(formatValue(value, integer))
+    setStr(formatValue(value, integer, maxFrac))
   }, [value, integer, min, max])
 
   // Live modulation readout: while idle, mirror the modulated value straight to
@@ -129,24 +135,24 @@ export function BoundedNumberInput({
   useEffect(() => {
     const el = inputRef.current
     if (!liveKey || !el) return
-    return registerLiveOverlay({ el, key: liveKey, format: (v) => formatValue(v, integer) })
+    return registerLiveOverlay({ el, key: liveKey, format: (v) => formatValue(v, integer, maxFrac) })
   }, [liveKey, integer])
 
   const re = integer ? /^-?\d*$/ : /^-?\d*\.?\d*([eE][-+]?\d*)?$/
 
   function commit(raw: string): void {
     if (raw === '' || raw === '-' || raw === '.' || raw === '-.') {
-      setStr(formatValue(value, integer))
+      setStr(formatValue(value, integer, maxFrac))
       return
     }
     const n = integer ? parseInt(raw, 10) : parseFloat(raw)
     if (!Number.isFinite(n)) {
-      setStr(formatValue(value, integer))
+      setStr(formatValue(value, integer, maxFrac))
       return
     }
     const clamped = Math.max(min, Math.min(max, n))
     if (clamped !== value) onChange(clamped)
-    setStr(formatValue(clamped, integer))
+    setStr(formatValue(clamped, integer, maxFrac))
   }
 
   // Rich theme overlays the .rich-readout class onto whatever class
@@ -210,7 +216,7 @@ export function BoundedNumberInput({
         // snapshot they had on focus. Reset str to the current
         // value so the displayed text matches the source of truth.
         if (!dirty.current) {
-          setStr(formatValue(value, integer))
+          setStr(formatValue(value, integer, maxFrac))
           return
         }
         dirty.current = false
@@ -223,7 +229,7 @@ export function BoundedNumberInput({
         if (e.key === 'Enter') {
           ;(e.currentTarget as HTMLInputElement).blur()
         } else if (e.key === 'Escape') {
-          setStr(formatValue(value, integer))
+          setStr(formatValue(value, integer, maxFrac))
           ;(e.currentTarget as HTMLInputElement).blur()
         }
       }}
@@ -231,7 +237,11 @@ export function BoundedNumberInput({
   )
 }
 
-function formatValue(v: number, integer: boolean): string {
+function formatValue(v: number, integer: boolean, maxFrac?: number): string {
   if (!Number.isFinite(v)) return ''
-  return integer ? String(Math.round(v)) : String(v)
+  if (integer) return String(Math.round(v))
+  if (maxFrac === undefined) return String(v)
+  // Round to maxFrac places, then drop trailing zeros (parseFloat) so a clean
+  // value doesn't gain padding : 0.5 → '0.5', 0.079577 → '0.08' at maxFrac 2.
+  return String(parseFloat(v.toFixed(maxFrac)))
 }
