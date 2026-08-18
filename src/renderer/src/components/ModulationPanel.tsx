@@ -220,20 +220,37 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
   switch (m.type) {
     case 'lfo':
       return (
-        <Row label="SHAPE">
-          <select
-            className="input select-compact min-w-0 flex-1 text-[10px]"
-            value={m.shape}
+        <>
+          <Row label="SHAPE">
+            <select
+              className="input select-compact min-w-0 flex-1 text-[10px]"
+              value={m.shape}
               title="LFO waveform : the shape of the repeating wave."
-            onChange={(e) => update(index, { shape: e.target.value as LfoShape })}
-          >
-            {LFO_SHAPES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </Row>
+              onChange={(e) => update(index, { shape: e.target.value as LfoShape })}
+            >
+              {LFO_SHAPES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </Row>
+          {m.shape === 'spastic' && (
+            <Row label="THROW">
+              <select
+                className="input select-compact min-w-0 flex-1 text-[10px]"
+                value={m.spasticMode ?? 'binary'}
+                title="What Spastic throws each cycle : binary snaps between the two extremes; float lands anywhere in between."
+                onChange={(e) =>
+                  update(index, { spasticMode: e.target.value as 'binary' | 'float' })
+                }
+              >
+                <option value="binary">binary</option>
+                <option value="float">float</option>
+              </select>
+            </Row>
+          )}
+        </>
       )
     case 'ramp':
       return (

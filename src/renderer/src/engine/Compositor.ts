@@ -1156,6 +1156,12 @@ export class Compositor {
   // Background slab : the ground under the stack: one generator + its own FX
   // rack + its own slow clock, composited first (blend 'normal').
   private bgIsf: ISFRenderer | null = null;
+  // The background slab can host the NATIVE generators too (Collage's wall of
+  // films, Parametric's audio raster). They are TS classes, not ISF, so they
+  // bypass bgIsf entirely and draw straight into bgScratch. Without this they
+  // appeared in the background picker and rendered nothing at all.
+  private bgCollage: CollageSource | null = null;
+  private bgParam: ParametricSource | null = null;
   private bgShaderId: string | null = null;
   private bgRack: FxRack;
   private bgScratch!: { fbo: WebGLFramebuffer; tex: WebGLTexture };
@@ -1163,7 +1169,8 @@ export class Compositor {
   private bgOpacity = 0;
   private bgSpeed = 0.25;
   private bgDepth = 0;
-  private bgIsolate = false; // true → the 4 layers composite as their own group
+  private bgIsolate = false;
+  private bgNativeSource: { render(fbo: WebGLFramebuffer): void } | null = null; // true → the 4 layers composite as their own group
   private depthShadow: DepthShadow | null = null;
   // Finalizer output stage (shape + outside fill), applied last.
   private outputShape: OutputShape | null = null;
@@ -1819,7 +1826,28 @@ export class Compositor {
 
     // ── Background slab reconcile (generator-only source + rack + mix). ──
     const bg = c.background;
-    const wantBg = bg && bg.source.kind === 'generator' ? bg.source.shaderId : null;
+    const bgId = bg && bg.source.kind === 'generator' ? bg.source.shaderId : null;
+    const bgNative = NATIVE_SOURCE_IDS.has(bgId ?? '');
+    // Native ids never reach loadIsf : their "shader" is a header-only stub.
+    const wantBg = bgNative ? null : bgId;
+    if (bgId === 'gen-collage' && bg) {
+      if (!this.bgCollage) this.bgCollage = new CollageSource(this.shared.gl, this.w, this.h);
+      this.bgCollage.update(
+        bg.source.collagePool ?? [],
+        bg.source.collageEdls ?? [],
+        bg.source.inputs
+      );
+    } else if (this.bgCollage) {
+      this.bgCollage.dispose();
+      this.bgCollage = null;
+    }
+    if (bgId === 'gen-parametric' && bg) {
+      if (!this.bgParam) this.bgParam = new ParametricSource(this.shared.gl, this.w, this.h);
+      this.bgParam.update(bg.source.inputs);
+    } else if (this.bgParam) {
+      this.bgParam.dispose();
+      this.bgParam = null;
+    }
     if (wantBg !== this.bgShaderId) {
       const src = wantBg ? sourceById(wantBg) : null;
       if (!wantBg || !src || !budgetSpent(this.shared.budget)) {
@@ -1834,6 +1862,7 @@ export class Compositor {
     }
     this.bgRack.sync(bg?.fx ?? [], sourceById);
     this.bgOpacity = bg && bg.source.shaderId ? bg.opacity : 0;
+    this.bgNativeSource = this.bgCollage ?? this.bgParam;
     this.bgSpeed = bg?.speed ?? 0.25;
     this.bgDepth = bg?.depth ?? 0;
     this.bgIsolate = bg?.blendMode === 'isolate';
@@ -1934,6 +1963,8 @@ export class Compositor {
    *  write here wins the frame it lands in : same contract as setFxInput. */
   setBgSourceInput(name: string, value: number | number[]): void {
     this.bgIsf?.setValue(name, value);
+    this.bgCollage?.setInput(name, value);
+    this.bgParam?.setInput(name, value);
   }
 
   /** Composite top texture over base into target using the given blend mode. */
@@ -2112,14 +2143,19 @@ export class Compositor {
     // as the finalizer's outside fill (fzBgLayer "moves" it there : so it must
     // NOT also sit behind the layers). Copied into a STABLE bgFill buffer since
     // the chain buffer the rack returns is reused by the layer loop below.
-    const wantBg = this.bgIsf && (this.bgOpacity > 0.001 || this.fzBgLayer);
+    const bgSource = this.bgIsf ?? this.bgNativeSource;
+    const wantBg = bgSource && (this.bgOpacity > 0.001 || this.fzBgLayer);
     let haveBgFill = false;
     if (wantBg) {
       try {
         gl.bindVertexArray(null);
-        this.shared.redirect.redirect = this.bgScratch.fbo;
-        this.bgIsf!.draw({ width: this.w, height: this.h });
-        this.shared.redirect.redirect = null;
+        if (this.bgNativeSource) {
+          this.bgNativeSource.render(this.bgScratch.fbo);
+        } else {
+          this.shared.redirect.redirect = this.bgScratch.fbo;
+          this.bgIsf!.draw({ width: this.w, height: this.h });
+          this.shared.redirect.redirect = null;
+        }
         gl.bindVertexArray(null);
         const bgTex = this.bgRack.apply(this.bgScratch.tex, this.chain, nodeCtx); // nodeCtx → native nodes on the background
         this.copyInto(this.bgFill.fbo, bgTex);
@@ -2316,6 +2352,8 @@ export class Compositor {
     this.layers = [];
     this.masterRack.dispose();
     this.bgIsf?.cleanup();
+    this.bgCollage?.dispose();
+    this.bgParam?.dispose();
     this.bgRack.dispose();
     this.depthShadow?.dispose();
     this.outputShape?.dispose();

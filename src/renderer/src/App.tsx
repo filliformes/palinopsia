@@ -1033,7 +1033,7 @@ export default function App(): JSX.Element {
           <option value="estimate">depth: AI</option>
         </select>
         <select
-          className="input w-28 shrink-0 text-[12px]"
+          className="input w-24 shrink-0 text-[12px]"
           value={theme}
           onChange={(e) => setTheme(e.target.value as ThemeName)}
           title="Theme"

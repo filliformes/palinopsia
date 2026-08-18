@@ -8,20 +8,35 @@ import type { CollageClip, CollageEdl } from '@shared/collage'
 import { useStore } from '../store'
 
 export function CollageStrip({
-  layer,
-  slot,
+  target,
   folder,
   pool,
   edls
 }: {
-  layer: number
-  slot: 'A' | 'B'
+  // A Collage can sit in a layer slot or on the Background slab; the strip is
+  // the same, only the store action it writes through differs.
+  target: { kind: 'layer'; layer: number; slot: 'A' | 'B' } | { kind: 'background' }
   folder: string
   pool: CollageClip[]
   edls: CollageEdl[]
 }): JSX.Element {
-  const setCollagePool = useStore((s) => s.setCollagePool)
-  const setCollageEdls = useStore((s) => s.setCollageEdls)
+  const setLayerPool = useStore((s) => s.setCollagePool)
+  const setLayerEdls = useStore((s) => s.setCollageEdls)
+  const setBgPool = useStore((s) => s.setBgCollagePool)
+  const setBgEdls = useStore((s) => s.setBgCollageEdls)
+  const setCollagePool = (
+    _l: number,
+    _s: 'A' | 'B',
+    dir: string,
+    clips: CollageClip[]
+  ): void =>
+    target.kind === 'background'
+      ? setBgPool(dir, clips)
+      : setLayerPool(target.layer, target.slot, dir, clips)
+  const setCollageEdls = (_l: number, _s: 'A' | 'B', next: CollageEdl[]): void =>
+    target.kind === 'background' ? setBgEdls(next) : setLayerEdls(target.layer, target.slot, next)
+  const layer = target.kind === 'background' ? 0 : target.layer
+  const slot: 'A' | 'B' = target.kind === 'background' ? 'A' : target.slot
   const bank = useStore((s) => s.assemblages)
   const [picking, setPicking] = useState(false)
   // The running VERB doubles as the busy flag : an optimise pass is minutes where

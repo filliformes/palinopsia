@@ -339,6 +339,11 @@ export interface ModulatorConfig {
   curve: ModCurve
   // Type-specific parameter blocks (only the active type's block is read).
   shape: LfoShape // lfo
+  // Spastic only : what it throws on each cycle. 'binary' is the original
+  // hard flip between the two extremes; 'float' lands anywhere in between,
+  // which is the same stepped-noise family with the quantisation removed.
+  // Optional so older sessions keep the binary behaviour they were made with.
+  spasticMode?: 'binary' | 'float'
   ramp: { rampMs: number; curvePct: number; mode: 'normal' | 'inverted' | 'loop' }
   adsr: {
     attackMs: number

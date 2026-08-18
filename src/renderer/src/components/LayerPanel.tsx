@@ -661,7 +661,7 @@ function SourceRow({
         {/* +fx always present : the layout never shifts when sources load.
             w-auto so the box hugs its "+ fx" label instead of a fixed gutter. */}
         <span onClick={(e) => e.stopPropagation()}>
-          <FxAddSelect scope={scope} className="w-auto shrink-0" />
+          <FxAddSelect scope={scope} className="w-[8.5rem] shrink-0" />
         </span>
       </div>
       {/* Only the FX the user adds appear below the row */}

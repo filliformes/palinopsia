@@ -105,7 +105,7 @@
 }
 
 /* Warm Charcoal : warm take on the studio-dark DNA (Inter). */
-:root[data-theme='warm-charcoal'] {
+:root[data-theme='warm'] {
   --c-bg: 29 29 29;
   --c-panel: 42 42 42;
   --c-panel2: 52 52 52;
@@ -948,7 +948,7 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
 }
 
 [data-theme='studio-dark']   .clip-top-bar { height: 3px; }
-[data-theme='warm-charcoal'] .clip-top-bar { height: 2px; opacity: 0.85; }
+[data-theme='warm'] .clip-top-bar { height: 2px; opacity: 0.85; }
 [data-theme='graphite']      .clip-top-bar { height: 2px; }
 [data-theme='cream']         .clip-top-bar { height: 3px; }
 [data-theme='paper-light']   .clip-top-bar { height: 3px; }

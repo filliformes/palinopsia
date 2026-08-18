@@ -89,7 +89,7 @@ export type { FxScope }
 export type ThemeName =
   | 'nature'
   | 'studio-dark'
-  | 'warm-charcoal'
+  | 'warm'
   | 'graphite'
   | 'cream'
   | 'paper-light'
@@ -106,7 +106,7 @@ export type ThemeName =
 
 export const THEME_ORDER: ThemeName[] = [
   'studio-dark',
-  'warm-charcoal',
+  'warm',
   'graphite',
   'nature',
   'cream',
@@ -136,7 +136,10 @@ export function isRichTheme(t: ThemeName): boolean {
 const DEFAULT_THEME: ThemeName = 'studio-dark'
 
 function loadTheme(): ThemeName {
-  const saved = localStorage.getItem('opsia.theme') as ThemeName | null
+  const raw = localStorage.getItem('opsia.theme')
+  // 'warm-charcoal' was renamed to 'warm' : migrate rather than silently
+  // dropping whoever had it selected back to the default.
+  const saved = (raw === 'warm-charcoal' ? 'warm' : raw) as ThemeName | null
   return saved && THEME_ORDER.includes(saved) ? saved : DEFAULT_THEME
 }
 
@@ -716,6 +719,9 @@ interface StoreState {
     slot: 'A' | 'B',
     edls: import('@shared/collage').CollageEdl[]
   ) => void
+  // The same two, for a Collage sitting on the Background slab.
+  setBgCollagePool: (folder: string, pool: import('@shared/collage').CollageClip[]) => void
+  setBgCollageEdls: (edls: import('@shared/collage').CollageEdl[]) => void
 
   // ── Background slab : the ground under the four layers ───────────────
   setBackgroundSource: (shaderId: string | null) => void
@@ -1559,6 +1565,28 @@ export const useStore = create<StoreState>((set, get) => ({
         })
       }
     })),
+  setBgCollagePool: (folder, pool) =>
+    set((s) => {
+      const bg = s.composition.background ?? makeDefaultBackground()
+      if (bg.source.shaderId !== 'gen-collage') return s
+      return {
+        composition: {
+          ...s.composition,
+          background: { ...bg, source: { ...bg.source, collageFolder: folder, collagePool: pool } }
+        }
+      }
+    }),
+  setBgCollageEdls: (edls) =>
+    set((s) => {
+      const bg = s.composition.background ?? makeDefaultBackground()
+      if (bg.source.shaderId !== 'gen-collage') return s
+      return {
+        composition: {
+          ...s.composition,
+          background: { ...bg, source: { ...bg.source, collageEdls: edls } }
+        }
+      }
+    }),
   setSourceSidechain: (layer, slot, ref) =>
     set((s) => ({
       composition: {

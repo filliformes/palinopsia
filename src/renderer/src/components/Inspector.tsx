@@ -118,8 +118,7 @@ export function Inspector(): JSX.Element {
     hostLayer: number
   } | null = null
   let collageCfg: {
-    layer: number
-    slot: 'A' | 'B'
+    target: { kind: 'layer'; layer: number; slot: 'A' | 'B' } | { kind: 'background' }
     folder: string
     pool: import('@shared/collage').CollageClip[]
     edls: import('@shared/collage').CollageEdl[]
@@ -152,8 +151,7 @@ export function Inspector(): JSX.Element {
       modTargetFor = (input) => ({ kind: 'source', layer: li, slot: sl, input })
       if (slot.shaderId === 'gen-collage') {
         collageCfg = {
-          layer: li,
-          slot: sl,
+          target: { kind: 'layer', layer: li, slot: sl },
           folder: slot.collageFolder ?? '',
           pool: slot.collagePool ?? [],
           edls: slot.collageEdls ?? []
@@ -187,6 +185,14 @@ export function Inspector(): JSX.Element {
       context = 'background'
       onChange = (n, v) => setBackgroundInput(n, v)
       modTargetFor = (input) => ({ kind: 'bgSource', input })
+      if (bg.source.shaderId === 'gen-collage') {
+        collageCfg = {
+          target: { kind: 'background' },
+          folder: bg.source.collageFolder ?? '',
+          pool: bg.source.collagePool ?? [],
+          edls: bg.source.collageEdls ?? []
+        }
+      }
     }
   } else if (selection?.type === 'fx') {
     const { scope, instId } = selection
@@ -414,8 +420,7 @@ export function Inspector(): JSX.Element {
       {/* Native Text source: the string + the glyph-fill sidechain. */}
       {collageCfg && (
         <CollageStrip
-          layer={collageCfg.layer}
-          slot={collageCfg.slot}
+          target={collageCfg.target}
           folder={collageCfg.folder}
           pool={collageCfg.pool}
           edls={collageCfg.edls}

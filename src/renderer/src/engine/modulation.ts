@@ -305,7 +305,9 @@ export class ModEngine {
           // multiple wraps so a rate jump can't freeze the held value.
           const wraps = Math.floor(s.phase) - Math.floor(prevPhase)
           if (wraps > 0) {
-            const spastic = cfg.shape === 'spastic'
+            // Spastic throws a fresh value each cycle : hard ±1 in 'binary'
+            // mode, anywhere in the span in 'float'.
+            const spastic = cfg.shape === 'spastic' && (cfg.spasticMode ?? 'binary') === 'binary'
             for (let w = 0; w < wraps; w++) {
               s.rndSmoothPrev = s.rndSmoothNext
               s.rndSmoothNext = Math.random() * 2 - 1
