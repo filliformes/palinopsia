@@ -6,6 +6,7 @@
 import type { FxInstance, ModTarget, SidechainRef, SourceSlot } from '@shared/types'
 import { randomizeInputs } from '../randomize'
 import { SHADER_BY_ID } from '../shaders/isf'
+import { blurbFor } from '../shaders/isf/shaderBlurbs'
 import { inputsForShader } from '../shaders/isf/inputs'
 import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
@@ -233,6 +234,9 @@ export function Inspector(): JSX.Element {
     }
   }
 
+  // Plain-English hover-help for the whole effect, on its name.
+  const blurb = blurbFor(shaderId)
+
   if (!shaderId) {
     if (videoName && selection?.type === 'source') {
       const vslot =
@@ -353,7 +357,14 @@ export function Inspector(): JSX.Element {
             onClose={() => setHeaderMenu(null)}
           />
         )}
-        <span className="text-[12px] font-semibold">{title}</span>
+        <span
+          className={`text-[12px] font-semibold ${
+            blurb ? 'cursor-help underline decoration-dotted decoration-muted underline-offset-4' : ''
+          }`}
+          title={blurb}
+        >
+          {title}
+        </span>
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{context}</span>
         <div className="flex-1" />
         {/* Per-FX dry/wet opacity : centered, sized like a normal control. */}
