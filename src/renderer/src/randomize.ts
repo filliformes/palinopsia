@@ -289,7 +289,7 @@ function freshModulator(base: ModulatorConfig, enabled: boolean): ModulatorConfi
       fallMs: Math.pow(10, range(Math.log10(50), Math.log10(2000)))
     },
     chaos: { r: range(3.5, 4) },
-    euclid: { steps: Math.floor(range(8, 17)), pulses: Math.floor(range(2, 9)) },
+    euclid: { steps: Math.floor(range(8, 17)), pulses: Math.floor(range(2, 9)), decay: range(0.1, 0.6) },
     turing: { length: Math.floor(range(4, 13)), mutate: range(0.05, 0.4) },
     cellular: { rule: pick([30, 90, 110, 150]), cells: Math.floor(range(16, 33)) }
   }

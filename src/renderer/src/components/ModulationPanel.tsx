@@ -434,6 +434,9 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
           <SliderRow label="PULSES" value={m.euclid.pulses} min={0} max={m.euclid.steps} step={1} integer
             title="How many onsets, spread as evenly as possible across the steps (a gate on each)."
             onChange={(v) => update(index, { euclid: { ...m.euclid, pulses: Math.round(v) } })} />
+          <SliderRow label="DECAY" value={m.euclid.decay ?? 0.35} min={0} max={1}
+            title="Release each pulse fades over : 0 = a hard on/off gate · up = a soft pluck/swell that rides between beats."
+            onChange={(v) => update(index, { euclid: { ...m.euclid, decay: v } })} />
           <SliderRow label="SLIP" value={m.slip ?? 0} min={0} max={1}
             title={SLIP_HELP}
             onChange={(v) => update(index, { slip: v })} />

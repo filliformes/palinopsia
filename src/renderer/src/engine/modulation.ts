@@ -227,6 +227,7 @@ interface SlotState {
   physTarget: number // physics spring target (flips on clock)
   physLastAdvanceAt: number // physics clock (re-kick / period base)
   euclidStep: number // euclid : current step index
+  euclidEnv: number // euclid : the gate's release envelope (0..1)
   euclidLastAdvanceAt: number
   turingReg: number // turing : the shift register (bitmask, read as a value)
   turingLastAdvanceAt: number
@@ -265,6 +266,7 @@ function makeSlot(now: number): SlotState {
     physTarget: 1,
     physLastAdvanceAt: now,
     euclidStep: 0,
+    euclidEnv: 0,
     euclidLastAdvanceAt: now,
     turingReg: 0,
     turingLastAdvanceAt: now,
@@ -555,7 +557,15 @@ export class ModEngine {
               if (slipSkip()) continue // a skipped tick holds the gate an extra step
               s.euclidStep = (s.euclidStep + 1) % steps
             }
-            v01 = euclidHit(s.euclidStep, steps, pulses) ? 1 : 0
+            // The raw gate rises instantly on a pulse step; `decay` gives it a
+            // release once the pulse ends, so the output rides continuously
+            // between beats instead of snapping 1→0 (decay 0 = a hard gate).
+            const gate = euclidHit(s.euclidStep, steps, pulses) ? 1 : 0
+            const decay = Math.max(0, Math.min(1, cfg.euclid.decay ?? 0.35))
+            if (gate >= s.euclidEnv) s.euclidEnv = gate
+            else if (decay < 0.005) s.euclidEnv = 0
+            else s.euclidEnv *= Math.exp(-dtMs / (20 * Math.pow(300, decay))) // ~20ms → ~6s
+            v01 = s.euclidEnv
           }
           break
         }
@@ -816,7 +826,7 @@ export function makeDefaultModulator(): ModulatorConfig {
     physics: { motion: 'bounce', damping: 0.5 },
     motion: { shape: 'oscillation' },
     homeostat: { feature: 'edges', setpoint: 0.5, gain: 0.4, adapt: 0.3 },
-    euclid: { steps: 16, pulses: 5 },
+    euclid: { steps: 16, pulses: 5, decay: 0.35 },
     turing: { length: 8, mutate: 0.15 },
     cellular: { rule: 90, cells: 24 }
   }

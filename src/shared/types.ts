@@ -383,9 +383,11 @@ export interface ModulatorConfig {
   // baseline re-centre rate.
   homeostat: { feature: VisionFeature; setpoint: number; gain: number; adapt: number }
   // ── Generative clocked sequencers (LZX Videomancer borrows) ──
-  // Euclidean rhythm : `pulses` onsets spread evenly (Bjorklund) over `steps`;
-  // outputs a binary GATE that advances one step per clock. Grid-locked → SLIP.
-  euclid: { steps: number; pulses: number }
+  // Euclidean rhythm : `pulses` onsets spread evenly (Bjorklund) over `steps`,
+  // advancing one step per clock. `decay` is the release each pulse fades over
+  // once it ends — 0 = a hard on/off GATE, up = a soft pluck / swell so the
+  // output rides continuously between beats instead of just 0/1. Grid-locked → SLIP.
+  euclid: { steps: number; pulses: number; decay: number }
   // Turing machine : a `length`-bit shift register read as a value; each clock
   // shifts, feeding the falling bit back UNLESS `mutate` flips it — a looping
   // sequence that occasionally rewrites itself (0 = locked loop, 1 = free). SLIP.
