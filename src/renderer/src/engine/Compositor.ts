@@ -1452,6 +1452,67 @@ export class Compositor {
     this.outputCapture = cb;
   }
 
+  /** SYNCHRONOUS readback of the just-composited frame, for the output-window
+   *  stream. Called from the render loop right after render(), so the composite
+   *  is already drawn : the readPixels stall is only the tail of GPU work that
+   *  was about to finish anyway. Unlike the async PBO path (built for NDI,
+   *  1-frame latency, fence-gated), this delivers EVERY frame in lockstep with
+   *  the render — which is what an identical mirror needs.
+   *
+   *  Two things this does NOT read from : the default framebuffer. First, that
+   *  is the PRE-projection-warp seam — the present pass keystones the composite
+   *  into the default framebuffer, and the output window applies the SAME warp
+   *  again, so streaming the warped default buffer would double-warp. We read
+   *  `lastPresent` (the clean pre-warp composite) instead. Second, a 4K default
+   *  buffer is 32MB/frame; readback + transfer + re-upload is memory-bandwidth
+   *  bound to ~23fps regardless of scene. So we downscale to a `capLong` long
+   *  edge (1920 → 8MB) first, through the copy shader into a single-sample RGBA8
+   *  target. The control preview stays full-res; only the projector copy is
+   *  capped, and at projection scale the two are indistinguishable. The copy
+   *  shader + bottom-up readback match the full-res path byte-for-byte in
+   *  orientation, so the output presenter's warp UVs need no change.
+   *  Returns a reused buffer; copy it before the next call. */
+  captureFrameSync(capLong = 1920): { w: number; h: number; px: Uint8Array } | null {
+    const gl = this.gl;
+    if (!this.lastPresent) return null;
+    const fw = this.w, fh = this.h;
+    if (fw <= 0 || fh <= 0) return null;
+    const long = Math.max(fw, fh);
+    const scale = long > capLong ? capLong / long : 1;
+    const w = scale < 1 ? Math.max(1, Math.round(fw * scale)) : fw;
+    const h = scale < 1 ? Math.max(1, Math.round(fh * scale)) : fh;
+    const need = w * h * 4;
+    if (!this.streamBuf || this.streamBuf.length !== need) this.streamBuf = new Uint8Array(need);
+    // (Re)build the capped RGBA8 stream target when the size changes.
+    if (!this.streamTarget || this.streamTW !== w || this.streamTH !== h) {
+      if (this.streamTarget) { gl.deleteFramebuffer(this.streamTarget.fbo); gl.deleteTexture(this.streamTarget.tex); }
+      const tex = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      const fbo = gl.createFramebuffer()!; gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      this.streamTarget = { fbo, tex }; this.streamTW = w; this.streamTH = h;
+    }
+    // Downscale the clean composite into the capped target (bilinear), read it.
+    gl.bindVertexArray(this.vao);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.streamTarget.fbo);
+    gl.viewport(0, 0, w, h);
+    gl.useProgram(this.copyProg);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.lastPresent); gl.uniform1i(this.uCTex, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindVertexArray(null);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, this.streamBuf);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return { w, h, px: this.streamBuf };
+  }
+  private streamBuf: Uint8Array | null = null;
+  private streamTarget: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
+  private streamTW = 0;
+  private streamTH = 0;
+
   /** Compile ONE shader (or native node) and immediately discard it : startup
    *  warm-up. The compiled program lands in Chromium's GPU program cache
    *  (memory + disk), so every later load of the same source — Randomize's
@@ -2326,7 +2387,11 @@ export class Compositor {
       // Harvest the OTHER PBO (last frame's pixels) if its copy completed.
       const sync = this.capSyncs[ri];
       if (sync) {
-        const st = gl.clientWaitSync(sync, 0, 0);
+        // SYNC_FLUSH_COMMANDS_BIT : flush the fence to the GPU so it can
+        // actually signal on the next poll. Without it the fence sits unflushed
+        // and only clears on some later natural flush, throttling the harvest
+        // (and the output stream) to a small fraction of the render rate.
+        const st = gl.clientWaitSync(sync, gl.SYNC_FLUSH_COMMANDS_BIT, 0);
         if (st === gl.ALREADY_SIGNALED || st === gl.CONDITION_SATISFIED) {
           gl.deleteSync(sync); this.capSyncs[ri] = null;
           if (!this.readbackBuf || this.readbackBuf.length !== need) this.readbackBuf = new Uint8Array(need);
@@ -2369,6 +2434,7 @@ export class Compositor {
     disposeTarget(gl, this.snapshot);
     disposeTarget(gl, this.xfadeTarget);
     if (this.fxOpac) { disposeTarget(gl, this.fxOpac[0]); disposeTarget(gl, this.fxOpac[1]); }
+    if (this.streamTarget) { gl.deleteFramebuffer(this.streamTarget.fbo); gl.deleteTexture(this.streamTarget.tex); this.streamTarget = null; }
     this.freeCapturePbos();
     if (this.audioTexGL) { gl.deleteTexture(this.audioTexGL); this.audioTexGL = null; }
     if (this.soniFbo) { gl.deleteFramebuffer(this.soniFbo.fbo); gl.deleteTexture(this.soniFbo.tex); this.soniFbo = null; }

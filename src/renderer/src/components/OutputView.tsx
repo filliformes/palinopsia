@@ -1,30 +1,28 @@
-// OutputView : the fullscreen output window's entire content. It runs its OWN
-// WebGL Compositor and renders the exact composition the control window pushes
-// each frame (composition + modulation values + warp + clock). No WebRTC, no
-// transcode → pixel-perfect, full-resolution output. Loaded on the #output hash.
+// OutputView : the fullscreen output window's entire content. It no longer
+// re-renders the composition (which diverged on every stochastic source —
+// Collage, video, feedback — because it ran its own Compositor with its own
+// decoders and seeds). Instead the control window STREAMS its finished RGBA8
+// frame each tick over a zero-copy MessagePort, and this blits it through the
+// projection warp. The projector now shows the control window's EXACT pixels.
 //
-// Note: for video / capture / HIVE source slots this opens a second decode of
-// its own (generators + shaders are identical); those live sources may drift a
-// touch between the two windows, which is fine for a mirror.
+// The small `output:frame` push is still received — but only for the warp
+// corners + alignment grid, which are applied on this side to the streamed
+// texture (warp is post-composite, so it belongs here).
 
 import { useEffect, useRef, useState } from 'react'
 import type { OutputFrame } from '@shared/types'
-import { Compositor } from '../engine/Compositor'
-import { applyMetaGlides, applyModulation } from '../engine/modulation'
-import { applyAssembleSync } from '../assemble/liveMatch'
-import { applyFieldMacros } from '../engine/field'
-import { clearFrameVals } from '../engine/frameVals'
-import { shaderSourceById } from '../shaders/isf'
-import { inputsForShader } from '../shaders/isf/inputs'
+import { OutputPresenter } from '../engine/OutputPresenter'
 
 export function OutputView(): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   // Re-keys the whole effect after a GPU driver reset (same recovery as the
   // control window : preventDefault on `lost`, rebuild on `restored`).
   const [glEpoch, setGlEpoch] = useState(0)
+
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
+
     let restoreFallback: number | null = null
     const onLost = (e: Event): void => {
       e.preventDefault()
@@ -43,100 +41,53 @@ export function OutputView(): JSX.Element {
       canvas.removeEventListener('webglcontextlost', onLost)
       canvas.removeEventListener('webglcontextrestored', onRestored)
     }
-    let comp: Compositor | null = null
+
+    let presenter: OutputPresenter | null = null
     try {
-      comp = new Compositor(canvas, canvas.width, canvas.height)
+      presenter = new OutputPresenter(canvas)
     } catch (e) {
-      console.error('[output Compositor]', (e as Error).message)
+      console.error('[output presenter]', (e as Error).message)
       offGl()
       return
     }
-    const off = window.api.onOutputFrame((f: OutputFrame) => {
-      // The whole drive is guarded, mirroring the control render loop.
-      try {
-        comp!.setGlobalSpeed(f.globalSpeed)
-        comp!.setWarp(f.warpEnabled ? f.warpCorners : null, f.warpGrid)
-        comp!.setStrobeSafe(f.strobeSafe ?? 0)
-        comp!.setAudioOverride(f.audioRows ?? null)
-        comp!.syncFromState(f.c, shaderSourceById)
-        // Assemble : this window walks its own copy of the edit with its own
-        // decks and has no vision bus, so it takes the control window's
-        // position (and any live-matched clip) rather than drifting apart.
-        applyAssembleSync(comp!, f.assemble)
-        applyModulation(comp!, f.c, f.modValues, inputsForShader, f.modBypass)
-        // In-flight Meta-knob gestures : same engine-side fan-out as the
-        // control window (the store/composition only carries settled values).
-        if (f.metaGlides) applyMetaGlides(comp!, f.c, inputsForShader, f.metaGlides)
-        // One-shot video seeks (OSC /video/position) : this window decodes its
-        // own copies of the clips, so it seeks them to the same spot.
-        if (f.videoSeeks) {
-          for (const [k, v] of f.videoSeeks) {
-            const ci = k.indexOf(':')
-            comp!.layers[Number(k.slice(0, ci))]?.setVideoInput(
-              k.slice(ci + 1) === 'B' ? 'B' : 'A', 'position', v
-            )
-          }
+
+    // The streamed frame arrives over the MessagePort the preload relays here.
+    // The port is two-way : we report our native drawing-buffer size back so the
+    // control streams at exactly our resolution (no 4K over-read, no soft upscale).
+    let port: MessagePort | null = null
+    let reportedW = 0
+    let reportedH = 0
+    const onPort = (e: MessageEvent): void => {
+      if (e.data !== 'opsia:pixelport' || !e.ports[0]) return
+      port = e.ports[0]
+      port.onmessage = (m: MessageEvent): void => {
+        const d = m.data as { w: number; h: number; buf: ArrayBuffer }
+        if (!d || !d.buf) return
+        presenter?.present(d.w, d.h, new Uint8Array(d.buf))
+        // present() sized the canvas to the physical output; report it upstream.
+        if (canvas.width !== reportedW || canvas.height !== reportedH) {
+          reportedW = canvas.width
+          reportedH = canvas.height
+          port?.postMessage({ type: 'outsize', w: reportedW, h: reportedH })
         }
-        // Fresh per-frame write bus (else applyFieldMacros below would stack on
-        // its OWN last-frame writes and run away).
-        clearFrameVals()
-        // Mirror audio-coupled A/B mixes (computed with the audio bus in the
-        // control window, which the output window doesn't run).
-        if (f.coupledMix) {
-          for (let i = 0; i < f.coupledMix.length; i++) {
-            const layer = comp!.layers[i]
-            if (layer) layer.sourceMix = f.coupledMix[i]
-          }
-        }
-        // Mirror Proximity's Context mood push.
-        if (f.contextProx) {
-          const ctx = f.c.master.find((x) => x.shaderId === 'fx-context')
-          if (ctx) {
-            const sc = { kind: 'master' as const }
-            comp!.setFxInput(sc, ctx.id, 'haze', f.contextProx.haze)
-            comp!.setFxInput(sc, ctx.id, 'blur', f.contextProx.blur)
-            comp!.setFxInput(sc, ctx.id, 'depth', f.contextProx.depth)
-            comp!.setFxInput(sc, ctx.id, 'bloom', f.contextProx.bloom)
-          }
-        }
-        // ── Bottom-bar state, mirrored for an EXACT replica ──
-        // Field macros : deterministic, re-applied from the passed scalars (same
-        // order as the control loop : after modulation, before temperament).
-        if (f.density !== undefined || f.gestureTexture !== undefined || f.coalesce !== undefined) {
-          applyFieldMacros(comp!, f.c, f.density ?? 0.5, f.gestureTexture ?? 0.5, f.coalesce ?? 0.5)
-        }
-        // Temperament (Tonicity + Drift) : the exact master-FX values the control
-        // window applied (can't re-derive audio / random / time here).
-        if (f.masterOverrides) {
-          const sc = { kind: 'master' as const }
-          for (const id in f.masterOverrides) {
-            const inputs = f.masterOverrides[id]
-            for (const name in inputs) comp!.setFxInput(sc, id, name, inputs[name])
-          }
-        }
-        // Shutter freeze (whole-frame hold).
-        comp!.setFreeze(!!f.freeze)
-        // Superimposition flicker : dim the same non-hot layers by the same amount.
-        const sf = f.superFlicker ?? 0
-        const hotL = f.flickerHot ?? -1
-        if (sf > 0.02 && hotL >= 0) {
-          comp!.layers.forEach((L, i) => { if (L && i !== hotL) L.opacity *= 1 - sf })
-        }
-        // Frame-Weave : hard-mute the same non-chosen layers (or all, if blank).
-        const wh = f.weaveHot
-        if (wh !== undefined && wh !== null) {
-          comp!.layers.forEach((L, i) => { if (L && (wh < 0 || i !== wh)) L.opacity = 0 })
-        }
-        comp!.render(f.time)
-      } catch (err) {
-        console.error('[output render]', err)
       }
+      port.start()
+    }
+    window.addEventListener('message', onPort)
+    window.postMessage('opsia:want-pixelport', '*')
+
+    // Warp corners + grid ride the small composition push (cheap metadata).
+    const off = window.api.onOutputFrame((f: OutputFrame) => {
+      presenter?.setWarp(f.warpEnabled ? f.warpCorners : null, !!f.warpGrid)
     })
+
     return () => {
       offGl()
       off()
+      window.removeEventListener('message', onPort)
+      if (port) port.onmessage = null
       try {
-        comp?.dispose()
+        presenter?.dispose()
       } catch {
         /* context already gone after a GPU reset */
       }
@@ -145,7 +96,7 @@ export function OutputView(): JSX.Element {
 
   return (
     <div className="fixed inset-0 bg-black">
-      <canvas ref={canvasRef} width={1920} height={1080} className="h-full w-full bg-black object-contain" />
+      <canvas ref={canvasRef} className="h-full w-full bg-black" />
     </div>
   )
 }

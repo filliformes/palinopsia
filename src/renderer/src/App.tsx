@@ -216,6 +216,32 @@ export default function App(): JSX.Element {
     return window.api.onOutputClosed(() => useStore.getState().setOutputActive(false))
   }, [])
 
+  // The zero-copy pixel port to the output window (see main's MessageChannelMain).
+  const pixelPortRef = useRef<MessagePort | null>(null)
+  // The long-edge cap for the streamed frame : the output window reports its
+  // native drawing-buffer size back over the port, and we stream at exactly that
+  // — never larger (a 4K readback is 32MB/frame and memory-bound; the projector
+  // can't show more than its own pixels anyway) nor upscaled-soft (a 1080p stream
+  // on a 1440p panel). 1920 is a safe default for the first frames before the
+  // output has reported in.
+  const outCapRef = useRef(1920)
+  useEffect(() => {
+    const onMsg = (e: MessageEvent): void => {
+      if (e.data === 'opsia:pixelport' && e.ports[0]) {
+        pixelPortRef.current = e.ports[0]
+        pixelPortRef.current.onmessage = (m: MessageEvent): void => {
+          const d = m.data as { type?: string; w?: number; h?: number }
+          if (d && d.type === 'outsize' && d.w && d.h) outCapRef.current = Math.max(d.w, d.h)
+        }
+        pixelPortRef.current.start()
+      }
+    }
+    window.addEventListener('message', onMsg)
+    // Ask the preload to hand over the port (handshake — order-independent).
+    window.postMessage('opsia:want-pixelport', '*')
+    return () => window.removeEventListener('message', onMsg)
+  }, [])
+
   // ── External output (NDI / Spout) : attach the readback while active ──
   const ndiActive = useStore((s) => s.ndiActive)
   const spoutActive = useStore((s) => s.spoutActive)
@@ -233,6 +259,7 @@ export default function App(): JSX.Element {
     // `renderScale` is a dep because changing it disposes + rebuilds the whole
     // Compositor : without re-running here the fresh engine has no capture
     // callback and NDI/Spout output goes black until the sink is toggled.
+    // (The output-window STREAM is driven from the render loop, not here.)
   }, [ndiActive, spoutActive, renderScale])
 
   // ── HIVE output (sender) : start the HEVC encoder + TCP fan-out ───────
@@ -701,6 +728,16 @@ export default function App(): JSX.Element {
         const outMix = seqTouchedMix ? comp!.layers.map((L) => (L ? L.sourceMix : 0.5)) : coupledMix
         // 3. Render the frame.
         comp!.render(now - start)
+        // 3a. Output window : stream the just-rendered frame to it (identical
+        //     mirror). Synchronous readback in lockstep with render — every
+        //     frame reaches the projector, unlike the async NDI path.
+        if (st.outputActive && pixelPortRef.current) {
+          const fr = comp!.captureFrameSync(outCapRef.current)
+          if (fr) {
+            const buf = fr.px.slice(0, fr.w * fr.h * 4).buffer
+            pixelPortRef.current.postMessage({ w: fr.w, h: fr.h, buf }, [buf])
+          }
+        }
         // 3b. Animated sound (§4.4): sample a scanline of the presented frame and
         //     send it to Pandore over OSC (the drawn optical track).
         if (st.markSignalEnabled) pushMarkSignal(comp!, now)

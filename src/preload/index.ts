@@ -149,6 +149,32 @@ const api: ExposedApi = {
   }
 }
 
+// The composited-frame stream uses a direct renderer↔renderer MessagePort
+// (zero-copy transfer). Ports can't cross the contextBridge, so relay the one
+// main hands us into the page's main world via window.postMessage — the
+// standard Electron pattern under contextIsolation. A HANDSHAKE avoids the
+// delivery race : the port can arrive from main before OR after React mounts
+// its listener, so we hold it until the page asks (a port is neutered once
+// transferred, so it must be posted exactly once, to a ready listener).
+let pendingPorts: readonly MessagePort[] | null = null
+let pageWantsPort = false
+const deliverPort = (): void => {
+  if (pageWantsPort && pendingPorts) {
+    window.postMessage('opsia:pixelport', '*', pendingPorts as unknown as Transferable[])
+    pendingPorts = null
+  }
+}
+ipcRenderer.on('output:pixelport', (e) => {
+  pendingPorts = e.ports
+  deliverPort()
+})
+window.addEventListener('message', (ev) => {
+  if (ev.data === 'opsia:want-pixelport') {
+    pageWantsPort = true
+    deliverPort()
+  }
+})
+
 contextBridge.exposeInMainWorld('api', api)
 
 declare global {

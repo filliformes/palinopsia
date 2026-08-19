@@ -8,6 +8,7 @@ import {
   app,
   BrowserWindow,
   ipcMain,
+  MessageChannelMain,
   shell,
   session as electronSession,
   desktopCapturer,
@@ -223,6 +224,17 @@ function openOutputWindow(displayId: number, windowed = false): void {
   } else {
     outputWindow.loadFile(join(__dirname, '../renderer/index.html'), { hash: 'output' })
   }
+  // A DIRECT renderer↔renderer MessagePort for streaming the composited frame :
+  // the control window transfers each finished RGBA8 frame (zero-copy) and the
+  // output window blits it, so the projector shows the control's EXACT pixels
+  // instead of an independent re-render that diverges on live sources. Hand a
+  // port to each side once the output window's content is ready.
+  outputWindow.webContents.once('did-finish-load', () => {
+    if (!outputWindow || !mainWindow) return
+    const { port1, port2 } = new MessageChannelMain()
+    mainWindow.webContents.postMessage('output:pixelport', null, [port1])
+    outputWindow.webContents.postMessage('output:pixelport', null, [port2])
+  })
 }
 
 app.whenReady().then(async () => {
