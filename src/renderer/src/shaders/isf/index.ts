@@ -1036,11 +1036,12 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-transform', name: 'Transform', category: 'FX', source: transform,
-    // crop pinned to 0 : Randomize should reframe (zoom/pan/rotate), never chop
-    // the frame to black bars — same reason shape stays at 0.
+    // crop rolls a SHALLOW bite (≤0.2 per edge) : Randomize / Vary reframe with
+    // it, but four edges at their max still leave a generous 0.6×0.6 centre, so
+    // a dice never chops the frame to slivers. shape stays pinned at 0.
     curated: {
       zoom: [0.7, 1.6], posX: [-0.3, 0.3], posY: [-0.3, 0.3], rotate: [-0.6, 0.6], shape: [0, 0],
-      cropUp: [0, 0], cropDown: [0, 0], cropLeft: [0, 0], cropRight: [0, 0]
+      cropUp: [0, 0.2], cropDown: [0, 0.2], cropLeft: [0, 0.2], cropRight: [0, 0.2]
     }
   },
   {

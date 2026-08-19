@@ -8,7 +8,7 @@ import { randomizeInputs } from '../randomize'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { blurbFor } from '../shaders/isf/shaderBlurbs'
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
-import { inputsForShader } from '../shaders/isf/inputs'
+import { inputsForShader, defaultInputs } from '../shaders/isf/inputs'
 import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { CollageStrip } from './CollageStrip'
@@ -426,6 +426,19 @@ export function Inspector(): JSX.Element {
             Vibe Color
           </button>
         )}
+        <button
+          onClick={() => {
+            // Back to the factory state : every parameter to its DEFAULT, the
+            // same values a freshly-added unit shows.
+            const def = defaultInputs(shaderId)
+            for (const [k, v] of Object.entries(def)) onChange(k, v)
+            if (isVibe) setVibePresetName(null)
+          }}
+          className="shrink-0 rounded border border-border bg-panel2/60 px-1.5 py-0.5 font-mono text-[10px] text-muted transition-colors hover:border-fg/40 hover:text-fg"
+          title="Reset this effect to its default state (every parameter to its default value)"
+        >
+          ↺
+        </button>
         <button
           onClick={() => {
             // Curated-range randomize of THIS shader's params only.

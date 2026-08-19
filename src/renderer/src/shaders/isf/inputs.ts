@@ -82,3 +82,19 @@ export function inputsForShader(shaderId: string): IsfInputDesc[] {
   cache.set(shaderId, out)
   return out
 }
+
+/** Every control input's DEFAULT value (image inputs excluded), resolved the
+ *  same way a control resolves a missing value : an explicit DEFAULT, else a
+ *  type-appropriate fallback. This is the state a freshly-added unit shows.
+ *  Used by the Inspector's "reset" button. */
+export function defaultInputs(shaderId: string): Record<string, number | number[]> {
+  const out: Record<string, number | number[]> = {}
+  for (const d of inputsForShader(shaderId)) {
+    if (Array.isArray(d.def)) out[d.name] = [...d.def]
+    else if (typeof d.def === 'number') out[d.name] = d.def
+    else if (d.type === 'color') out[d.name] = [1, 1, 1, 1]
+    else if (d.type === 'point2D') out[d.name] = Array.isArray(d.min) ? [...d.min] : [0.5, 0.5]
+    else out[d.name] = typeof d.min === 'number' ? d.min : 0
+  }
+  return out
+}
