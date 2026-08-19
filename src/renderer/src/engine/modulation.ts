@@ -331,17 +331,19 @@ export class ModEngine {
             const spasticShape = cfg.shape === 'spastic'
             const spasticBinary = spasticShape && (cfg.spasticMode ?? 'binary') === 'binary'
             for (let w = 0; w < wraps; w++) {
+              // SLIP holds the two stepped shapes on a skipped tick. The two
+              // shapes hold DIFFERENTLY : rndStep holds a sampled value, so it
+              // just skips the resample; rndSmooth is a phase-driven ramp from
+              // prev→next, so `prev` must ALWAYS advance to the value it just
+              // arrived at (else the next cycle re-ramps from the old prev, a
+              // jump backwards) while only the new TARGET is held — that makes
+              // the held cycle interpolate flat. Spastic is excluded : its own
+              // coin flip already IS this, and stacking would halve its rate.
+              const stepped = cfg.shape === 'rndStep' || cfg.shape === 'rndSmooth'
+              const slipHold = stepped && slipSkip()
               s.rndSmoothPrev = s.rndSmoothNext
-              s.rndSmoothNext = Math.random() * 2 - 1
-              // The two stepped shapes hold their sample when the tick is
-              // skipped. Spastic is left out : its own coin flip already IS
-              // this, and stacking the two would just halve its rate.
-              if (
-                (cfg.shape === 'rndStep' || cfg.shape === 'rndSmooth') &&
-                slipSkip()
-              ) {
-                continue
-              }
+              if (!slipHold) s.rndSmoothNext = Math.random() * 2 - 1
+              if (slipHold) continue
               if (spasticBinary) {
                 s.rndStepValue = Math.random() < 0.5 ? -1 : 1
               } else if (spasticShape) {

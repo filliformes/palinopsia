@@ -46,10 +46,15 @@ export function canHostFx(scope: FxScope, shaderId: string | null | undefined): 
   return scope.kind === 'master' && shaderId === 'node-parallax'
 }
 
-/** Human-readable reason a paste is refused, for a disabled menu row. */
+/** Human-readable reason a paste is refused, for a disabled menu row : it names
+ *  WHERE the shader can go, computed from the same rule, so the message is never
+ *  wrong (Parallax is layer-or-master, the sidechain nodes are layer-only). */
 export function hostRefusal(scope: FxScope, shaderId: string | null | undefined): string {
   if (!shaderId) return 'nothing copied'
   const name = SHADER_BY_ID[shaderId]?.name ?? shaderId
-  if (scope.kind === 'layer') return `${name} can't go here`
-  return `${name} is layer-only`
+  const inLayer = canHostFx({ kind: 'layer', layer: 0 }, shaderId)
+  const inMaster = canHostFx({ kind: 'master' }, shaderId)
+  if (inLayer && inMaster) return `${name} needs a layer or the master rack`
+  if (inLayer) return `${name} is layer-only`
+  return `${name} can't go here` // finalizers etc : in no rack's catalogue
 }

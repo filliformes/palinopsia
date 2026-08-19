@@ -48,6 +48,7 @@ async function scanFolder(
 
   for (const name of names) {
     const path = join(folder, name)
+    let cacheHit: string | null = null
     try {
       const pr = await probe(path)
       if (!pr.ok || pr.durationSec <= 0) throw new Error(pr.error ?? 'no readable video stream')
@@ -61,14 +62,24 @@ async function scanFolder(
         // starting it so the counter isn't frozen on the one being worked on.
         onProgress({ done: clips.length + skipped.length, total: names.length, file: name })
         const conv = await convertForCollage(path)
-        if (!conv.ok || !conv.path) throw new Error(conv.error ?? 'optimise failed')
-        file = conv.path
+        if (conv.ok && conv.path) {
+          file = conv.path
+        } else if (pr.needsConvert) {
+          // The lean transcode failed, but the codec still needs bridging to play
+          // at all : fall back to the plain all-intra cache rather than dropping
+          // the clip (which `↻` would have kept).
+          const bridge = await convertToCache(path)
+          if (!bridge.ok || !bridge.path) throw new Error(bridge.error ?? 'optimise failed')
+          file = bridge.path
+        }
+        // else: optimise failed but the ORIGINAL is Chromium-playable — keep it
+        // (file stays = path), so the pool is never smaller than a plain scan's.
         // The optimise profile DOWNSCALES, and the renderer cover-crops each
         // piece from these numbers : a stale 4K size would mis-frame every piece
-        // on the wall. Re-probe the output; if that comes back empty, fall back
-        // to the source aspect at the profile's height (kept even, as the
+        // on the wall. Re-probe the chosen file; if that comes back empty, fall
+        // back to the source aspect at the profile's height (kept even, as the
         // encoder's yuv420p demands).
-        const op = await probe(conv.path)
+        const op = await probe(file)
         if (op.ok && op.width > 0 && op.height > 0) {
           width = op.width
           height = op.height
@@ -76,12 +87,12 @@ async function scanFolder(
           height = Math.min(720, pr.height) & ~1
           width = Math.max(2, Math.round(((pr.width / pr.height) * height) / 2) * 2)
         }
-      } else if (collageCacheFor(path)) {
-        // Already optimised on an earlier pass : prefer it. A re-scan must not
-        // quietly hand playback back to the long-GOP original.
-        const hit = collageCacheFor(path)!
-        file = hit
-        const op = await probe(hit)
+      } else if ((cacheHit = collageCacheFor(path))) {
+        // Already optimised on an earlier pass : prefer it (computed ONCE — each
+        // call does statSync + sha1 + existsSync). A re-scan must not quietly
+        // hand playback back to the long-GOP original.
+        file = cacheHit
+        const op = await probe(cacheHit)
         if (op.ok && op.width > 0 && op.height > 0) {
           width = op.width
           height = op.height

@@ -132,11 +132,13 @@ export function Inspector(): JSX.Element {
   const [headerMenu, setHeaderMenu] = useState<{ x: number; y: number } | null>(null)
   // Hooks run unconditionally : the fallback scope is never used, because the
   // menu only renders when fxHere is set.
+  const headerUnit = fxHere ? fxArrayFor(composition, fxHere.scope).find((f) => f.id === fxHere.instId) : undefined
   const headerMenuItems = useFxMenuItems(
     fxHere?.scope ?? { kind: 'master' },
     fxHere?.instId ?? null,
-    fxHere ? fxArrayFor(composition, fxHere.scope).find((f) => f.id === fxHere.instId)?.shaderId : null,
-    () => setHeaderMenu(null)
+    headerUnit?.shaderId,
+    () => setHeaderMenu(null),
+    !!headerUnit?.locked
   )
 
   if (selection?.type === 'source') {

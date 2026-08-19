@@ -18,7 +18,11 @@ export function useFxMenuItems(
   scope: FxScope,
   instId: string | null,
   shaderId: string | null | undefined,
-  close: () => void
+  close: () => void,
+  // Locked finalizers (Vibe/Context/Finalizer) are singletons in no rack's
+  // catalogue : copying one can only ever poison the clipboard (nowhere accepts
+  // it, and the refusal message would be wrong), so they offer no Copy.
+  locked = false
 ): MenuItem[] {
   const clip = useStore((s) => s.fxClipboard)
   const copyFx = useStore((s) => s.copyFx)
@@ -31,7 +35,7 @@ export function useFxMenuItems(
   }
   const items: MenuItem[] = []
 
-  if (instId) {
+  if (instId && !locked) {
     items.push({ label: 'Copy effect', onClick: run(() => copyFx(scope, instId)) })
   }
 

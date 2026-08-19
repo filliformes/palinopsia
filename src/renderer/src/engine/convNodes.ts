@@ -1923,6 +1923,7 @@ export class AutocutterNode implements ConvNode {
   private oldRank = new Float32Array(AC_MAX)
   private oldCount = 0
   private oldSeed = 0
+  private oldShape = 0
   // Crossfade progress 0..1 (1 = done, single-pass). Advanced by dt/xfadeDur.
   private xfade = 1
   private prevTrig = 0
@@ -2020,10 +2021,10 @@ export class AutocutterNode implements ConvNode {
   }
 
   // Snapshot the live layout as the outgoing one and start a crossfade.
-  private beginCrossfade(): void {
+  private beginCrossfade(shape: number): void {
     this.oldCell.set(this.cellArr); this.oldMap.set(this.mapArr)
     this.oldRot.set(this.rotArr); this.oldRank.set(this.rankArr)
-    this.oldCount = this.count; this.oldSeed = this.seed
+    this.oldCount = this.count; this.oldSeed = this.seed; this.oldShape = shape
     this.xfade = 0
   }
 
@@ -2076,28 +2077,39 @@ export class AutocutterNode implements ConvNode {
     if (recut) didReseedRecut = true
 
     if (didReseedRecut) {
-      if (xfadeDur > 0 && this.count > 0) this.beginCrossfade()
-      else this.xfade = 1
+      // Snapshot BEFORE the rebuild, with the shape those arrays were built
+      // under, so a shape change on the same frame can't draw the outgoing
+      // layout with the wrong geometry.
+      if (xfadeDur > 0 && this.count > 0) this.beginCrossfade(this.lastShape < 0 ? shape : this.lastShape)
+      else { this.xfade = 1; this.oldCount = 0 }
       this.reseed(); this.rebuild(cuts, rotate, shape)
     } else if (this.count === 0 || cuts !== this.lastCuts || rotate !== this.lastRotate || shape !== this.lastShape) {
-      this.xfade = 1
+      this.xfade = 1; this.oldCount = 0
       this.rebuild(cuts, rotate, shape)
     }
 
-    if (this.xfade < 1 && xfadeDur > 0) this.xfade = Math.min(1, this.xfade + ctx.dt / xfadeDur)
+    if (this.xfade < 1) {
+      // A live crossfade always runs to completion : if the time is pulled to 0
+      // mid-fade, snap to done and drop the outgoing layout rather than freezing
+      // it (else raising the time later would resurrect a layout retired ago).
+      if (xfadeDur > 0) this.xfade = Math.min(1, this.xfade + ctx.dt / xfadeDur)
+      else this.xfade = 1
+      if (this.xfade >= 1) this.oldCount = 0
+    }
 
     const p = g.use(g.autocut)
     const out = ctx.chain.next()
-    if (this.xfade >= 1 || xfadeDur <= 0 || this.oldCount === 0) {
+    if (this.xfade >= 1 || this.oldCount === 0) {
       // Single pass : identical cost + result to before the crossfade existed.
       gl.disable(gl.BLEND)
       this.drawLayout(ctx, p, out.fbo, this.cellArr, this.mapArr, this.rotArr, this.rankArr, this.count, this.seed, shape, 1)
     } else {
       // Crossfade : old * (1-t) written flat, new * t added on top. Both outputs
       // are premultiplied (rgb * keep), so additive blend gives a correct mix
-      // of two transparent-holed layouts in one buffer, no third pass.
+      // of two transparent-holed layouts in one buffer, no third pass. The old
+      // layout draws with ITS OWN shape (finding: a mid-frame shape flip).
       gl.disable(gl.BLEND)
-      this.drawLayout(ctx, p, out.fbo, this.oldCell, this.oldMap, this.oldRot, this.oldRank, this.oldCount, this.oldSeed, shape, 1 - this.xfade)
+      this.drawLayout(ctx, p, out.fbo, this.oldCell, this.oldMap, this.oldRot, this.oldRank, this.oldCount, this.oldSeed, this.oldShape, 1 - this.xfade)
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE)
       this.drawLayout(ctx, p, out.fbo, this.cellArr, this.mapArr, this.rotArr, this.rankArr, this.count, this.seed, shape, this.xfade)
       gl.disable(gl.BLEND)

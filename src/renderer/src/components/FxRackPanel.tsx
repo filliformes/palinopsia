@@ -136,7 +136,7 @@ function FxUnit({
   onDropOn?: () => void
 }): JSX.Element {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const menuItems = useFxMenuItems(scope, f.id, f.shaderId, () => setMenu(null))
+  const menuItems = useFxMenuItems(scope, f.id, f.shaderId, () => setMenu(null), !!f.locked)
   const onContextMenu = (e: MouseEvent): void => {
     e.preventDefault()
     e.stopPropagation()
@@ -198,7 +198,7 @@ function FxUnit({
 
   return (
     <span
-      draggable
+      draggable={!menu}
       onContextMenu={onContextMenu}
       onDragStart={onDragStart}
       onDragOver={(e) => e.preventDefault()}

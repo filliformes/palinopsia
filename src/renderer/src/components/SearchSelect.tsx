@@ -68,6 +68,7 @@ export function SearchSelect({
   const btnRef = useRef<HTMLButtonElement | null>(null)
   const popRef = useRef<HTMLDivElement | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
 
   const query = q.trim().toLowerCase()
   const groups = useMemo(() => {
@@ -171,8 +172,17 @@ export function SearchSelect({
           }}
           className="fixed z-50 flex max-h-[17rem] flex-col overflow-hidden rounded border border-border bg-panel2 shadow-lg"
           onClick={(e) => e.stopPropagation()}
+          // Keep the search input focused when clicking the popup's chrome (group
+          // headings, padding). Otherwise focus falls to <body> and the app's
+          // bare-key shortcuts (R, S, 1-9, Esc) fire while you type — its guard
+          // is `target.tagName === 'INPUT'`. Options handle their own click, so
+          // this only preventDefaults the non-interactive regions.
+          onMouseDown={(e) => {
+            if (e.target !== inputRef.current) e.preventDefault()
+          }}
         >
           <input
+            ref={inputRef}
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}

@@ -62,12 +62,16 @@ export function CollageStrip({
     })
     try {
       const res = optimise ? await window.api.collageOptimise(dir) : await window.api.collageScan(dir)
+      // The store write belongs to the composition, not this component, so it
+      // must land even if the strip unmounted mid-scan (selecting another layer
+      // during a minutes-long optimise) — else the finished result is thrown
+      // away and the pool stays empty with no sign anything happened.
+      if (res.ok) setCollagePool(layer, slot, dir, res.clips)
       if (!alive.current) return
       if (!res.ok) {
         setNote(res.error ? 'scan failed' : 'no readable video in that folder')
         return
       }
-      setCollagePool(layer, slot, dir, res.clips)
       // Conversions are silent but slow; say what was dropped rather than
       // leaving a short pool unexplained.
       setNote(

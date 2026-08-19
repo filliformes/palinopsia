@@ -232,6 +232,7 @@ interface Deck {
   rvfc: number
   seeking: boolean // gate : never queue a second seek
   seekAt: number
+  pendingSeek: (() => void) | null // a deferred 'loadedmetadata' seek, replaceable
   churning: boolean // re-rolls its window on the fast clock
   nextRoll: number // seconds until this deck re-rolls (churn only)
   pan: [number, number] // where this deck's cells frame the picture
@@ -298,7 +299,7 @@ export class CollageSource {
       asm: null,
       el, tex: null, src: '', clip: null, inSec: 0, lenSec: 0,
       content: [0, 0, 1, 1], pending: false, rvfc: 0, seeking: false, seekAt: 0,
-      churning: false, nextRoll: 0, pan: [0.5, 0.5]
+      pendingSeek: null, churning: false, nextRoll: 0, pan: [0.5, 0.5]
     }
     el.addEventListener('seeked', () => { deck.seeking = false; deck.pending = true })
     // A bad file must never wedge the wall : clear the gate and let the deck
@@ -324,7 +325,7 @@ export class CollageSource {
     return {
       asm, el: document.createElement('video'), tex: null, src: edl.id, clip: null,
       inSec: 0, lenSec: 0, content: [0, 0, 1, 1], pending: false, rvfc: 0,
-      seeking: false, seekAt: 0, churning: false, nextRoll: 0, pan: [0.5, 0.5]
+      seeking: false, seekAt: 0, pendingSeek: null, churning: false, nextRoll: 0, pan: [0.5, 0.5]
     }
   }
 
@@ -338,6 +339,8 @@ export class CollageSource {
       return
     }
     try {
+      if (d.pendingSeek) d.el.removeEventListener('loadedmetadata', d.pendingSeek)
+      d.pendingSeek = null
       if (d.rvfc && typeof d.el.cancelVideoFrameCallback === 'function')
         d.el.cancelVideoFrameCallback(d.rvfc)
       d.el.pause()
@@ -418,7 +421,10 @@ export class CollageSource {
   private cue(d: Deck, clip: CollageClip, hold: number, rnd: () => number): void {
     const url = `opsia-media://local/${encodeURIComponent(clip.file)}`
     const dur = Math.max(0.1, clip.durSec)
-    const len = hold > 0.01 ? Math.min(hold, dur) : dur
+    // Floor the window : a sub-second window seeks back so often the decoder
+    // never settles (the "per-frame currentTime write" law). Below ~0.4s just
+    // play the whole file.
+    const len = hold > 0.4 ? Math.min(hold, dur) : dur
     const inSec = len >= dur - 0.05 ? 0 : rnd() * (dur - len)
     d.clip = clip
     d.inSec = inSec
@@ -451,8 +457,14 @@ export class CollageSource {
     const now = performance.now()
     if (d.seeking && now - d.seekAt < 4000) return
     if (d.el.readyState < 1) {
-      // Metadata not in yet : defer to the one-shot below rather than dropping it.
-      d.el.addEventListener('loadedmetadata', () => this.seekTo(d, t), { once: true })
+      // Metadata not in yet : defer, REPLACING any earlier deferred seek. A
+      // stacked `{once}` handler fires the OLDEST first and parks the deck at a
+      // window belonging to a clip it no longer plays (same bug AssembleSource
+      // fixes with pendingSeek).
+      if (d.pendingSeek) d.el.removeEventListener('loadedmetadata', d.pendingSeek)
+      const fn = (): void => { d.pendingSeek = null; this.seekTo(d, t) }
+      d.pendingSeek = fn
+      d.el.addEventListener('loadedmetadata', fn, { once: true })
       return
     }
     if (Math.abs(d.el.currentTime - t) < 0.05) return
@@ -615,6 +627,13 @@ export class CollageSource {
       }
       this.lastFilms = -1 // force a rebuild when the dial goes back to folder
     } else {
+      // Leaving assemblage mode : setDeckCount only trims the tail, so kill every
+      // asm deck first, else front decks keep playing (and decoding) an edit.
+      if (this.decks.some((d) => d.asm)) {
+        for (const d of this.decks) this.killDeck(d)
+        this.decks = []
+        this.lastFilms = -1
+      }
       if (Math.round(films) !== this.lastFilms || deckChanged) {
         this.setDeckCount(films)
         this.lastFilms = Math.round(films)
@@ -632,8 +651,10 @@ export class CollageSource {
     if (dealNow && this.prevDeal < 0.5) redeal = true
     this.prevDeal = dealNow ? 1 : 0
     if (rate > 0.01) {
+      // At least ~0.15s between deals : a deal reloads clips, and dealing every
+      // frame is a reload storm no wall can survive.
       this.dealTimer += dt
-      if (this.dealTimer >= rate) { this.dealTimer = 0; redeal = true }
+      if (this.dealTimer >= Math.max(rate, 0.15)) { this.dealTimer = 0; redeal = true }
     } else {
       this.dealTimer = 0
     }
@@ -669,6 +690,15 @@ export class CollageSource {
         continue
       }
       if (!d.clip) continue
+      if (d.el.videoWidth > 0 && d.el.videoHeight > 0) {
+        const av = d.el.videoWidth / d.el.videoHeight
+        const cw = av >= 1 ? 1 : av
+        const ch = av >= 1 ? 1 / av : 1
+        if (Math.abs(cw - d.content[2]) > 1e-4 || Math.abs(ch - d.content[3]) > 1e-4) {
+          d.content = [(1 - cw) / 2, (1 - ch) / 2, cw, ch]
+          aspectMoved = true
+        }
+      }
       const want = clampf(speed, RATE_MIN, RATE_MAX)
       if (Math.abs(d.el.playbackRate - want) > 1e-3) {
         try { d.el.playbackRate = want } catch { /* out-of-band rate */ }

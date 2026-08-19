@@ -103,7 +103,7 @@ export function PresetPicker({
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full z-30 mt-1 flex max-h-64 max-w-[14rem] flex-col overflow-y-auto rounded border border-border bg-panel2 py-1 shadow-lg"
+          className="absolute right-0 top-full z-30 mt-1 flex max-h-64 max-w-[14rem] flex-col overflow-hidden rounded border border-border bg-panel2 py-1 shadow-lg"
           style={{ width: widthCh ? `${widthCh}ch` : '11rem' }}
         >
           <input
@@ -124,7 +124,8 @@ export function PresetPicker({
             spellCheck={false}
             className="input mx-1 mb-1 shrink-0 px-2 py-0.5 text-[11px]"
           />
-          {factory.length + users.length === 0 && (
+          <div className="min-h-0 flex-1 overflow-y-auto">
+          {factory.length + users.length === 0 && q.trim() !== '' && (
             <div className="px-3 py-1 text-[11px] text-muted">no match</div>
           )}
           {factory.map((p) => (
@@ -169,6 +170,7 @@ export function PresetPicker({
           >
             ＋ add preset…
           </button>
+          </div>
         </div>
       )}
 

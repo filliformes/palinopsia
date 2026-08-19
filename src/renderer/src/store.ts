@@ -1117,11 +1117,25 @@ function dropSlotTargets(
   c: CompositionState,
   layer: number,
   slot: 'A' | 'B',
-  prev: SourceSlot | null
+  prev: SourceSlot | null,
+  alsoDropSourceFx = false
 ): CompositionState {
   const next = (slot === 'A' ? c.layers[layer]?.sourceA : c.layers[layer]?.sourceB) ?? null
   if (sameSource(prev, next)) return c // re-picking what is already there
-  return dropTargets(c, (t) => t.kind === 'source' && t.layer === layer && t.slot === slot)
+  // `alsoDropSourceFx` : the video/capture/hive/assemble swaps EMPTY the slot's
+  // source-FX rack, so a modulator/Meta target pointing into that rack would be
+  // left dangling (counts against MAX_MOD_ASSIGNMENTS, clutters the panel). The
+  // generator swap keeps its rack, so it does not pass the flag.
+  const fxKind = slot === 'A' ? 'sourceA' : 'sourceB'
+  return dropTargets(
+    c,
+    (t) =>
+      (t.kind === 'source' && t.layer === layer && t.slot === slot) ||
+      (alsoDropSourceFx &&
+        t.kind === 'fx' &&
+        t.scope.kind === fxKind &&
+        (t.scope as { layer: number }).layer === layer)
+  )
 }
 
 /** The same, for the Background slab's source (addressed by input name alone). */
@@ -1163,6 +1177,15 @@ export function fxArrayFor(c: CompositionState, scope: FxScope): FxInstance[] {
   if (!l) return []
   if (scope.kind === 'layer') return l.fx
   return scope.kind === 'sourceA' ? l.sourceAFx : l.sourceBFx
+}
+
+/** updateLayer, but returns a whole CompositionState (one layer rewritten). */
+function updateLayer2(
+  c: CompositionState,
+  i: number,
+  fn: (l: LayerState) => LayerState
+): CompositionState {
+  return { ...c, layers: updateLayer(c.layers, i, fn) }
 }
 
 // Rewrite the FX array addressed by `scope` through `fn`, immutably.
@@ -1431,7 +1454,15 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     })),
   setSourceShader: (layer, slot, shaderId) =>
-    set((s) => ({
+    set((s) => {
+      // Re-picking the SAME generator that is already in the slot is a no-op :
+      // rebuilding it with inputs:{} would wipe a dialled-in patch and (over
+      // OSC, which re-sends /source every tick) make the slot un-editable.
+      const cur = slotOf(s.composition, layer, slot)
+      if (shaderId && cur && cur.kind === 'generator' && cur.shaderId === shaderId) {
+        return { selection: { type: 'source' as const, layer, slot } }
+      }
+      return {
       composition: dropSlotTargets(
         {
           ...s.composition,
@@ -1450,7 +1481,8 @@ export const useStore = create<StoreState>((set, get) => ({
       ),
       // Picking a source lands its controls in the Inspector immediately.
       selection: shaderId ? { type: 'source', layer, slot } : s.selection
-    })),
+      }
+    }),
   setSourceVideo: (layer, slot, mediaId, mediaName) =>
     set((s) => ({
       composition: dropSlotTargets(
@@ -1479,7 +1511,8 @@ export const useStore = create<StoreState>((set, get) => ({
         },
         layer,
         slot,
-        slotOf(s.composition, layer, slot)
+        slotOf(s.composition, layer, slot),
+        true
       ),
       selection: { type: 'source', layer, slot }
     })),
@@ -1502,7 +1535,8 @@ export const useStore = create<StoreState>((set, get) => ({
         },
         layer,
         slot,
-        slotOf(s.composition, layer, slot)
+        slotOf(s.composition, layer, slot),
+        true
       ),
       selection: { type: 'source', layer, slot }
     })),
@@ -1525,7 +1559,8 @@ export const useStore = create<StoreState>((set, get) => ({
         },
         layer,
         slot,
-        slotOf(s.composition, layer, slot)
+        slotOf(s.composition, layer, slot),
+        true
       ),
       selection: { type: 'source', layer, slot }
     })),
@@ -1542,29 +1577,29 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     })),
   setCollagePool: (layer, slot, folder, pool) =>
-    set((s) => ({
-      composition: {
-        ...s.composition,
-        layers: updateLayer(s.composition.layers, layer, (l) => {
-          const cur = slot === 'A' ? l.sourceA : l.sourceB
-          if (!cur || cur.shaderId !== 'gen-collage') return l
-          const next = { ...cur, collageFolder: folder, collagePool: pool }
+    set((s) => {
+      const cur = slot === 'A' ? s.composition.layers[layer]?.sourceA : s.composition.layers[layer]?.sourceB
+      if (!cur || cur.shaderId !== 'gen-collage') return s
+      return {
+        composition: updateLayer2(s.composition, layer, (l) => {
+          const c2 = slot === 'A' ? l.sourceA : l.sourceB
+          const next = { ...c2!, collageFolder: folder, collagePool: pool }
           return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
         })
       }
-    })),
+    }),
   setCollageEdls: (layer, slot, edls) =>
-    set((s) => ({
-      composition: {
-        ...s.composition,
-        layers: updateLayer(s.composition.layers, layer, (l) => {
-          const cur = slot === 'A' ? l.sourceA : l.sourceB
-          if (!cur || cur.shaderId !== 'gen-collage') return l
-          const next = { ...cur, collageEdls: edls }
+    set((s) => {
+      const cur = slot === 'A' ? s.composition.layers[layer]?.sourceA : s.composition.layers[layer]?.sourceB
+      if (!cur || cur.shaderId !== 'gen-collage') return s
+      return {
+        composition: updateLayer2(s.composition, layer, (l) => {
+          const c2 = slot === 'A' ? l.sourceA : l.sourceB
+          const next = { ...c2!, collageEdls: edls }
           return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
         })
       }
-    })),
+    }),
   setBgCollagePool: (folder, pool) =>
     set((s) => {
       const bg = s.composition.background ?? makeDefaultBackground()
@@ -2499,7 +2534,8 @@ export const useStore = create<StoreState>((set, get) => ({
         },
         layer,
         slot,
-        slotOf(s.composition, layer, slot)
+        slotOf(s.composition, layer, slot),
+        true
       ),
       selection: { type: 'source', layer, slot }
     })),
