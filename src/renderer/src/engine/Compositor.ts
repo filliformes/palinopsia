@@ -669,6 +669,20 @@ class FxRack {
     return cur;
   }
 
+  /** PANIC : dispose every native node and rebuild it fresh so its self-feeding
+   *  buffers (accumulators, echo/scan rings, feedback stores) start empty and
+   *  re-seed from the live frame next render. NodeGL programs are cached, so this
+   *  is cheap (no recompile); the FxUnit keeps its inputs (read from ctx each
+   *  frame), so parameters and modulation are untouched. */
+  flushNodes(): void {
+    for (const u of this.units) {
+      if (u.node) {
+        u.node.dispose();
+        u.node = makeConvNode(this.shared.gl, u.shaderId);
+      }
+    }
+  }
+
   dispose() {
     for (const u of this.units) { u.isf?.cleanup(); u.node?.dispose(); }
     this.units = [];
@@ -1120,6 +1134,17 @@ export class ISFLayer {
   /** The persisted (post-feedback) frame : what the blend stack composites. */
   texture(): WebGLTexture { return this.pp.out(); }
 
+  /** PANIC : flush this layer's self-feeding buffers — the three FX racks' native
+   *  nodes and the reaction-diffusion feedback ping-pong (dropped, recreated black
+   *  next frame). The per-layer `pp` (post-feedback persist) is rewritten every
+   *  frame from the fresh source, so it needs no clearing. */
+  flush(): void {
+    this.rackA.flushNodes();
+    this.rackB.flushNodes();
+    this.rackLayer.flushNodes();
+    if (this.reagent) { this.reagent.dispose(this.shared.gl); this.reagent = null; }
+  }
+
   /** Release every GL resource this layer owns (renderers, racks, buffers). */
   dispose(): void {
     const gl = this.shared.gl;
@@ -1512,6 +1537,22 @@ export class Compositor {
   private streamTarget: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
   private streamTW = 0;
   private streamTH = 0;
+
+  /** PANIC FLUSH (bound to the `0` key) : empty every self-feeding buffer WITHOUT
+   *  a rebuild, so a runaway feedback or a stuck accumulator recovers live — no
+   *  reload, no black. Each layer's feedback ping-pong + all three of its FX racks'
+   *  native nodes, plus the master and background racks, restart from the current
+   *  frame; parameters, modulator phases, the clock and the source decoders are
+   *  untouched. The buffers that can hold a BAD frame indefinitely — Sediment /
+   *  Corrode accumulators, Datamosh persistence, the Réponse/Chronoscan/Eternalism/
+   *  Pulfrich rings, Scanner capture, reaction-diffusion feedback — are exactly the
+   *  ones cleared. The ISF trail/bloom passes (Context) DECAY on their own within a
+   *  second, so they are deliberately left running. */
+  panic(): void {
+    for (const layer of this.layers) layer.flush();
+    this.masterRack.flushNodes();
+    this.bgRack.flushNodes();
+  }
 
   /** Compile ONE shader (or native node) and immediately discard it : startup
    *  warm-up. The compiled program lands in Chromium's GPU program cache

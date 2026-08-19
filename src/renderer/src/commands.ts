@@ -32,3 +32,14 @@ export function fireVariation(): void {
   const amt = Number.isFinite(v) && v > 0 ? v : 0.3
   useStore.getState().applyVariation(amt)
 }
+
+// Panic flush needs the live Compositor (which isn't in the store), so App
+// registers a thunk here and the `0` key + the Transport button both fire it.
+let panicFn: (() => void) | null = null
+export function registerPanic(fn: (() => void) | null): void {
+  panicFn = fn
+}
+/** Empty every self-feeding buffer (`Compositor.panic`) : the safety net. */
+export function firePanic(): void {
+  panicFn?.()
+}

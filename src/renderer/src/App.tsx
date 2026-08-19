@@ -23,7 +23,7 @@ import { currentFps, tickFrame } from './perf'
 import { videoSeekRequests } from './engine/videoState'
 import { outputRecorder } from './recorder'
 import { sonifyEngine } from './audio/sonify'
-import { fireSelectedRandomize } from './commands'
+import { fireSelectedRandomize, registerPanic, firePanic } from './commands'
 import { collectAssembleSync, syncLiveMatchers } from './assemble/liveMatch'
 import { GRID } from '@shared/assemble'
 import { tickSequencer } from './engine/sequencer'
@@ -343,6 +343,14 @@ export default function App(): JSX.Element {
         }
         return
       }
+      // Bare 0: PANIC FLUSH — empty every self-feeding buffer (feedback + stateful
+      // native nodes) so a runaway feedback / stuck mosh recovers without a reload.
+      // (Ctrl+0 is the separate UI-zoom reset, handled in the modifier block.)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key === '0') {
+        e.preventDefault()
+        firePanic()
+        return
+      }
       // P: open the Vibe Palette in the Inspector · Shift+P: cycle its presets.
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'p') {
         e.preventDefault()
@@ -565,6 +573,8 @@ export default function App(): JSX.Element {
     try {
       comp = new Compositor(canvas, canvas.width, canvas.height)
       compositorRef.current = comp
+      // The `0` key + the Transport's flush button both fire panic through here.
+      registerPanic(() => compositorRef.current?.panic())
     } catch (e) {
       // WebGL2 unavailable : surface it rather than a blank canvas.
       console.error('[Compositor]', (e as Error).message)

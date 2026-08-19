@@ -15,6 +15,8 @@ import type { RandomizeScope } from '../randomize'
 import { useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { firePanic } from '../commands'
+import { useFlash } from './useFlash'
 
 const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
   { scope: 'all', label: 'Randomize All' },
@@ -84,6 +86,7 @@ export function Transport(): JSX.Element {
   const sonifyPageOpen = useStore((s) => s.sonifyPageOpen)
   const setSonifyPageOpen = useStore((s) => s.setSonifyPageOpen)
   const setOutputPageOpen = useStore((s) => s.setOutputPageOpen)
+  const [flushFlashing, flushFlash] = useFlash()
   const proximity = useStore((s) => s.proximity)
   const setProximity = useStore((s) => s.setProximity)
   const proximityAudio = useStore((s) => s.proximityAudio)
@@ -240,6 +243,18 @@ export function Transport(): JSX.Element {
         title="Output & projection mapping : fullscreen output, keystone, record, NDI/Spout/HIVE (O)"
       >
         ⛶ Output
+      </button>
+
+      {/* Panic flush (0) : empty every self-feeding buffer — the live safety net. */}
+      <button
+        onClick={() => {
+          firePanic()
+          flushFlash()
+        }}
+        className={`${TBTN} ${flushFlashing ? 'border-danger bg-danger/25 text-danger' : TBTN_IDLE}`}
+        title="Panic flush (0) : empty every self-feeding buffer — feedback, and the datamosh / sediment / corrode / scanner / echo accumulators — so a runaway image recovers WITHOUT a reload. Parameters, modulators and the clock stay put."
+      >
+        ⚡ Flush
       </button>
 
       {/* Global MIDI Learn (dataFLOU's, colour and all) : pressed = learn
