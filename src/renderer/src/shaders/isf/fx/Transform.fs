@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Transform : zoom / pan / rotate the sampling frame, wrap or clamp at the edges. The compositional utility: place and scale a source inside the layer before FX and blending. With Shape set, the layer is instead clipped into a chosen geometric silhouette (circle, polygon, star, heart…) that you move with Pos, size with Zoom, and spin with Rotate.",
+  "DESCRIPTION": "Transform : zoom / pan / rotate the sampling frame, wrap or clamp at the edges, and crop the four edges (up/down/left/right) to black. The compositional utility: place, scale and frame a source inside the layer before FX and blending. With Shape set, the layer is instead clipped into a chosen geometric silhouette (circle, polygon, star, heart…) that you move with Pos, size with Zoom, and spin with Rotate; the crop still applies on top.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Utility"],
@@ -10,6 +10,10 @@
     { "NAME": "posY",   "TYPE": "float", "MIN": -1.0, "MAX": 1.0,   "DEFAULT": 0.0 },
     { "NAME": "rotate", "TYPE": "float", "MIN": -3.1416, "MAX": 3.1416, "DEFAULT": 0.0 },
     { "NAME": "wrap",   "TYPE": "bool",  "DEFAULT": true },
+    { "NAME": "cropUp",    "LABEL": "crop ↑", "TYPE": "float", "MIN": 0.0, "MAX": 0.5, "DEFAULT": 0.0 },
+    { "NAME": "cropDown",  "LABEL": "crop ↓", "TYPE": "float", "MIN": 0.0, "MAX": 0.5, "DEFAULT": 0.0 },
+    { "NAME": "cropLeft",  "LABEL": "crop ←", "TYPE": "float", "MIN": 0.0, "MAX": 0.5, "DEFAULT": 0.0 },
+    { "NAME": "cropRight", "LABEL": "crop →", "TYPE": "float", "MIN": 0.0, "MAX": 0.5, "DEFAULT": 0.0 },
     { "NAME": "shape",  "TYPE": "long",  "VALUES": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
       "LABELS": ["none","circle","square","rectangle","triangle","pentagon","hexagon","heptagon","octagon","diamond","star 5","star 6","ellipse","rounded","cross","ring","half-circle","heart","crescent","trapezoid","capsule"],
       "DEFAULT": 0 }
@@ -73,9 +77,19 @@ float shapeDist(int s, vec2 p, float r) {
   return length(cp) - r * 0.5;
 }
 
+// Screen-space edge crop : 1 inside the kept window, 0 in the cropped margins.
+// A fixed garbage matte — it does NOT move with zoom/pan, it frames the layer's
+// final rectangle. uv.y = 0 is the BOTTOM of the displayed frame, so cropUp
+// bites the HIGH-y (top) edge and cropDown the low-y (bottom) edge.
+float cropMask(vec2 uv) {
+  return step(cropLeft, uv.x) * step(uv.x, 1.0 - cropRight)
+       * step(cropDown, uv.y) * step(uv.y, 1.0 - cropUp);
+}
+
 void main() {
   vec2 uv = isf_FragNormCoord;
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
+  vec4 outCol;
 
   if (shape == 0) {
     // Inverse transform: centre, un-rotate, un-zoom, un-pan.
@@ -89,27 +103,28 @@ void main() {
     vec2 c = p + 0.5 - vec2(posX, posY) * 0.5;
 
     if (wrap) {
-      c = fract(c);
+      outCol = IMG_NORM_PIXEL(inputImage, fract(c));
+    } else if (c.x < 0.0 || c.x > 1.0 || c.y < 0.0 || c.y > 1.0) {
+      outCol = vec4(0.0, 0.0, 0.0, 1.0);
     } else {
-      if (c.x < 0.0 || c.x > 1.0 || c.y < 0.0 || c.y > 1.0) {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-        return;
-      }
+      outCol = IMG_NORM_PIXEL(inputImage, c);
     }
-    gl_FragColor = IMG_NORM_PIXEL(inputImage, c);
-    return;
+  } else {
+    // Shape mode: clip the layer into the chosen silhouette, moved by Pos, sized
+    // by Zoom, spun by Rotate. Outside the shape is black.
+    vec2 sp = (uv - 0.5) * vec2(aspect, 1.0);
+    vec2 ctr = vec2(posX * aspect, posY) * 0.5;
+    vec2 q = sp - ctr;
+    float cs = cos(rotate), sn = sin(rotate);
+    q = vec2(q.x * cs - q.y * sn, q.x * sn + q.y * cs);
+    float r = clamp(zoom * 0.35, 0.05, 1.6);
+    float d = shapeDist(shape, q, r);
+    float m = smoothstep(0.004, -0.004, d); // 1 inside
+    vec4 src = IMG_NORM_PIXEL(inputImage, uv);
+    outCol = vec4(src.rgb * m, src.a);
   }
 
-  // Shape mode: clip the layer into the chosen silhouette, moved by Pos, sized
-  // by Zoom, spun by Rotate. Outside the shape is black.
-  vec2 sp = (uv - 0.5) * vec2(aspect, 1.0);
-  vec2 ctr = vec2(posX * aspect, posY) * 0.5;
-  vec2 q = sp - ctr;
-  float cs = cos(rotate), sn = sin(rotate);
-  q = vec2(q.x * cs - q.y * sn, q.x * sn + q.y * cs);
-  float r = clamp(zoom * 0.35, 0.05, 1.6);
-  float d = shapeDist(shape, q, r);
-  float m = smoothstep(0.004, -0.004, d); // 1 inside
-  vec4 src = IMG_NORM_PIXEL(inputImage, uv);
-  gl_FragColor = vec4(src.rgb * m, src.a);
+  // Crop the four edges to black (screen space, after any transform/shape).
+  outCol.rgb *= cropMask(uv);
+  gl_FragColor = outCol;
 }

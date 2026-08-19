@@ -49,7 +49,7 @@ export const SHADER_BLURBS: Record<string, string> = {
   'fx-fold':
     'Mirrors the image once across a line you can move, with the reflected half slidable. One deliberate fold makes a composition; this is why it will not do radial or kaleidoscope symmetry. Use it to build a diptych or to answer a shape with itself.',
   'fx-transform':
-    'Zooms, moves and rotates the picture inside its layer, either wrapping at the edges or holding the border pixels. It is the plain compositional tool: place and scale a source without touching the layer itself. Wrapping turns a slow pan into an endless tile.',
+    'Zooms, moves and rotates the picture inside its layer, either wrapping at the edges or holding the border pixels. It is the plain compositional tool: place and scale a source without touching the layer itself. The four crop sliders black out the top, bottom, left and right edges to reframe the layer. Wrapping turns a slow pan into an endless tile.',
   'fx-abstraction':
     'One dial that carries the image away from being a picture of something toward being pure texture. As you raise it the picture is dragged along its own lines of brightness until subjects dissolve into movement. Very useful when you want a recognisable source to stop being recognisable.',
   'fx-motif':

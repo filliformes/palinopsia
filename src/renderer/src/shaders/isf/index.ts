@@ -1036,7 +1036,12 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-transform', name: 'Transform', category: 'FX', source: transform,
-    curated: { zoom: [0.7, 1.6], posX: [-0.3, 0.3], posY: [-0.3, 0.3], rotate: [-0.6, 0.6], shape: [0, 0] }
+    // crop pinned to 0 : Randomize should reframe (zoom/pan/rotate), never chop
+    // the frame to black bars — same reason shape stays at 0.
+    curated: {
+      zoom: [0.7, 1.6], posX: [-0.3, 0.3], posY: [-0.3, 0.3], rotate: [-0.6, 0.6], shape: [0, 0],
+      cropUp: [0, 0], cropDown: [0, 0], cropLeft: [0, 0], cropRight: [0, 0]
+    }
   },
   {
     id: 'fx-stutter', name: 'Stutter', category: 'FX', source: stutter,
