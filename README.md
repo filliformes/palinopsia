@@ -49,6 +49,7 @@ racks, palette, World and macro biases — in one click.
 **The instrument**
 - [The layer stack](#the-layer-stack) — sources · A/B mix · racks · blends · masks · coupling
 - [Video sources](#video-sources) — import (DXV/HAP/ProRes…) · transport · modulatable playhead · granulation
+- [Collage](#collage--a-wall-of-films-key-source-gen-collage) — a wall of films cut up by the Autocutter partition · folder or Assemble-bank feed
 - [The Transport bar](#the-transport-bar-bottom) · [Feel — the global macros](#feel--the-global-macros-key-g)
 - [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix)
 - [Sequencer](#sequencer-key-q) — auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
@@ -58,7 +59,7 @@ racks, palette, World and macro biases — in one click.
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
-- [Sources](#sources-32-generators) (32 generators) · [Effects](#effects) (51 FX) ·
+- [Sources](#sources-33-generators) (33 generators) · [Effects](#effects) (51 FX) ·
   [Native nodes](#native-nodes--layer-fx-only) (15) · [Master finalizers](#master-finalizers--pinned-always-last)
 - [Blend modes](#blend-modes) (18)
 
@@ -304,6 +305,15 @@ Two of the types close the loop **from the image back to control**:
   and *steers its target* to hold a setpoint (gain + adaptation), an
   Ashby-style homeostat that keeps a quality of the image in balance.
 
+**SLIP** (on `arp`, `random`, `chaos`, and the LFO's stepped shapes) makes a
+stepped modulator's rhythm impossible to feel. The clock keeps ticking, but some
+ticks simply don't fire — so events stay *on* the beat while becoming
+unpredictable, which reads as a cross-rhythm rather than as sloppiness (and it
+survives BPM sync, where jittered timing wouldn't). It generalises the
+un-feelable clock that the **Spastic** LFO shape has always had; Spastic itself
+now offers a **binary** throw (hard flip between the extremes) or **float**
+(anywhere in between, with the same irregular timing).
+
 The **mod-matrix** holds up to **12** assignments (M# → target param, with a
 bipolar depth and a **Multiply** or **Replace** mode). Bindings are made from each
 parameter's **M** button in the Inspector or Meta tile. Modulation reaches
@@ -534,6 +544,37 @@ other picture.
   scenes, and the Inspector shows a cut-timeline transport with `position` /
   `speed` as mod targets.
 
+## Collage — a wall of films (key source `gen-collage`)
+
+![Collage](docs/images/visual-collage.jpg)
+
+*Twelve different films at once, each cover-cropped into its own piece of the
+Autocutter's partition — folder feed, no post work.*
+
+Point the **Collage** source at a folder of videos and it plays every clip at
+once, each inside its own piece of the **Autocutter's** cut-up partition — a
+living mosaic where every fragment is a different film. Pick it as a layer source
+(or the Background source), then open the folder from the Inspector.
+
+- **Any format, any shape.** The folder scan takes the same codecs as Assemble
+  and converts anything Chromium can't decode; portrait, landscape and 4K all
+  **cover-crop** to their piece's shape, so nothing letterboxes or distorts.
+- **Two feeds.** `folder` plays one film per piece; **`assemblages`** plays one
+  of your saved Assemble edits per piece, each cutting on its own — selected from
+  the Assemble bank in the same strip. The chosen edits copy onto the layer, so a
+  session replays without the bank.
+- **`films`** is how many decode at once (up to **50**); **more cuts than films**
+  is fine — extra pieces show the same film at another crop and rotation.
+  **`window`** loops a slice of each clip (0 = play the whole film, the smoothest
+  setting); **`churn`** is how many pieces re-cut on their own fast clock, from
+  all-holding to every-piece-its-own-montage.
+- **`deal`** re-deals the wall by hand, **`rate`** on a clock. contour · curve
+  length · torn paper · mask · rotate are the **Autocutter's own dials**, working
+  identically here.
+- **Optimise** (a button in the strip) re-encodes the whole folder to 720p
+  all-intra H.264 — the shape the wall's constant seeking wants. Slow (minutes for
+  a big folder) but one-time and cached; measured to hold 60 fps with 50 films.
+
 ## Sessions, scenes & themes
 
 Sessions are `.opsia.json` files: **New / Open / Save / Save As** in the toolbar,
@@ -600,9 +641,9 @@ don't flood your history.
 
 ---
 
-## Sources (32 generators)
+## Sources (33 generators)
 
-32 sources produce an image from nothing. Any generator can fill **Source A or B**
+33 sources produce an image from nothing. Any generator can fill **Source A or B**
 of any layer (and all but a few can be the Background source). Each ships curated
 Randomize sub-ranges and its own preset bank.
 
@@ -643,6 +684,7 @@ Randomize sub-ranges and its own preset bank.
 | **Organic** | Living elemental textures in motion — fire (upward flames), water (caustic depth), or nature (growing canopy); `vary` shifts each toward an alternate season. |
 | **Text** *(native)* | Typography as a source — type in the Inspector; choose font / size / weight / spacing / position; a sidechain layer can fill the glyphs. |
 | **Parametric** *(native)* | A literal audio → image reading — the audio bus as a hard raster, waveform trace, spectrum bars, or scrolling spectrogram (needs Audio ingest for real sound). |
+| **Collage** *(native)* | A wall of films cut up by the Autocutter partition — a folder of clips, or your saved Assemble edits, one per piece (see [Collage](#collage--a-wall-of-films-key-source-gen-collage)). |
 
 </details>
 
@@ -677,9 +719,19 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   placement is not restricted by effect. The picker (grouped by sub-category) is the
   same everywhere. Each unit has enable, dry/wet **opacity** (double-click → 1),
   drag-reorder, presets, and a dice.
-- **Native nodes** appear **only in the Layer-FX rack** — they need full-resolution
-  ping-pong buffers, the host/sidechain textures, and inter-frame state that only
-  the layer rack provides.
+- **Right-click any effect** (its chip, or its name in the Inspector) to **copy**
+  it — then **paste its settings** onto another unit of the same shader, or **paste
+  it as a new effect** into any rack that can host it. The menu says where a shader
+  can and can't go.
+- **Every picker is searchable.** Click the `+ fx` box, a source picker, a preset
+  list or the Generate menu and type — the list filters by name *and* family, so
+  "glitch" surfaces the whole Glitch group and "atct" still finds Autocutter.
+- **Every effect, source and modulator names itself on hover** — a plain-English
+  sentence or two on the item's name in the Inspector, saying what it does.
+- **Native nodes**: the two **sidechain** nodes (Transfert, Convolution) are
+  **Layer-FX only** — they read another layer as their input. The self-contained
+  nodes run in any rack; Parallax runs in a layer or the Master rack (it needs the
+  whole-picture depth map).
 - **The three master finalizers** (Vibe · Context · Finalizer) are **pinned, locked,
   and always last in the Master rack, in that order.** They can't be added, removed,
   reordered, or duplicated — only bypassed.
@@ -767,7 +819,7 @@ that take a **sidechain** get a layer picker in the Inspector.
 | **Feedback** | A full video-feedback engine — the last frame re-sampled through a drifting off-centre transform + self-displacement, held at the edge of chaos by AGC + a noise floor. **Couple** runs a second buffer under a diverged transform and cross-mixes it (emergent behaviour no single loop shows); a delay-tap ring with **RGB delay** (channels sheared in time) and an echo **route** (back into the loop, or feedforward onto the output only); keyer-into-the-loop; blend modes. |
 | **Datamosh** | The codec-mosh look, real-time and codec-free: optical flow quantised to macroblocks advects a feedback buffer (the P-frame smear). Refresh (the I-frame) down + a scene cut = the bloom; **sticky/melt/fluid** modes; **actants** — sparse autonomous frozen patches that drift along the flow; **manifest** reveals a new source only where there's motion; auto-bloom on detected cuts; motion-transfer from a sidechain. |
 | **Scanner** | A flatbed-scanner slit-scan — a head sweeps the frame, capturing each line at a different instant; anything moving mid-sweep smears and tears across the scanlines. |
-| **Autocutter** | A cut-up collage — the frame recursively split into pieces, shuffled among their slots (and optionally rotated); the layout holds while live video keeps playing inside every piece, and re-cuts on `cut ▸` or an auto **rate**. Four dials shape the cut itself: **contour** bends the straight seams into uneven curves that still tessellate perfectly (past 1 it shreds), **curve length** trades many small wiggles for a few long, simple curves, **torn paper** grows a ragged off-white fringe and collage shadow along each edge for the ripped-magazine look, and **mask** peels pieces away into transparent holes — at full mask a single piece survives, and each new cut elects a different one. Ships 9 presets from *Clean cut-up* to *Last piece*. |
+| **Autocutter** | A cut-up collage — the frame recursively split into pieces, shuffled among their slots (and optionally rotated); the layout holds while live video keeps playing inside every piece, and re-cuts on `cut ▸` or an auto **rate**. Four dials shape the cut itself: **contour** bends the straight seams into uneven curves that still tessellate perfectly (past 1 it shreds), **curve length** trades many small wiggles for a few long, simple curves, **torn paper** grows a ragged off-white fringe and collage shadow along each edge for the ripped-magazine look, and **mask** peels pieces away into transparent holes — at full mask a single piece survives, and each new cut elects a different one. **Shape** switches between the rectangles and an irregular **Voronoi mosaic** (denser, more organic — every dial behaves the same in both). Set an **auto rate** and a **crossfade** to dissolve one cut layout into the next instead of snapping. Ships 9 presets from *Clean cut-up* to *Last piece*. |
 | **Chronoscan** | Per-pixel time displacement over a ~32-frame ring — a control field (slit-scan gradient, luminance, noise…) sets how far into the past each pixel reads, so each region lives in a different present. |
 | **Sediment** | Long-term image memory — a decaying long-exposure accumulator (seconds to **minutes**) plus a sparse keyframe store, so the deep past stays recallable and resurfaces through the present. |
 | **Parallax** | Real 2.5D from the shared depth map — near features sway more than far ones, with depth-of-field around a focus plane and aerial fog (needs the Depth engine set in the header). |
