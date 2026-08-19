@@ -15,7 +15,8 @@ import { modTargetKey, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { modulatorBlurb } from '../shaders/isf/sourceBlurbs'
 
-const MOD_TYPES: ModulatorType[] = ['lfo', 'ramp', 'adsr', 'arp', 'random', 'sh', 'slew', 'chaos', 'audio', 'vision', 'homeostat', 'organic', 'physics', 'motion']
+const MOD_TYPES: ModulatorType[] = ['lfo', 'ramp', 'adsr', 'arp', 'euclid', 'turing', 'cellular', 'random', 'sh', 'slew', 'chaos', 'audio', 'vision', 'homeostat', 'organic', 'physics', 'motion']
+const CELL_RULES = [30, 90, 110, 150]
 const LFO_SHAPES: LfoShape[] = ['sine', 'triangle', 'square', 'sawtooth', 'rndStep', 'rndSmooth', 'spastic']
 const ARP_MODES: ArpMode[] = ['up', 'down', 'upDown', 'random', 'drunk']
 const PHYSICS_MOTIONS: PhysicsMotion[] = ['bounce', 'spring', 'riser']
@@ -422,6 +423,59 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
           <SliderRow label="R" value={m.chaos.r} min={3.4} max={4} step={0.005}
             title="Logistic-map r : toward 4 = wilder"
             onChange={(v) => update(index, { chaos: { r: v } })} />
+        </>
+      )
+    case 'euclid':
+      return (
+        <>
+          <SliderRow label="STEPS" value={m.euclid.steps} min={2} max={32} step={1} integer
+            title="Euclidean : total steps the pattern spans."
+            onChange={(v) => update(index, { euclid: { ...m.euclid, steps: Math.round(v), pulses: Math.min(m.euclid.pulses, Math.round(v)) } })} />
+          <SliderRow label="PULSES" value={m.euclid.pulses} min={0} max={m.euclid.steps} step={1} integer
+            title="How many onsets, spread as evenly as possible across the steps (a gate on each)."
+            onChange={(v) => update(index, { euclid: { ...m.euclid, pulses: Math.round(v) } })} />
+          <SliderRow label="SLIP" value={m.slip ?? 0} min={0} max={1}
+            title={SLIP_HELP}
+            onChange={(v) => update(index, { slip: v })} />
+        </>
+      )
+    case 'turing':
+      return (
+        <>
+          <SliderRow label="LENGTH" value={m.turing.length} min={2} max={16} step={1} integer
+            title="Shift-register length : how many steps before the sequence loops."
+            onChange={(v) => update(index, { turing: { ...m.turing, length: Math.round(v) } })} />
+          <SliderRow label="MUTATE" value={m.turing.mutate} min={0} max={1}
+            title="Chance a step rewrites the loop : 0 = locked forever · 1 = never repeats."
+            onChange={(v) => update(index, { turing: { ...m.turing, mutate: v } })} />
+          <SliderRow label="SLIP" value={m.slip ?? 0} min={0} max={1}
+            title={SLIP_HELP}
+            onChange={(v) => update(index, { slip: v })} />
+        </>
+      )
+    case 'cellular':
+      return (
+        <>
+          <Row label="RULE">
+            <select
+              className="input select-compact min-w-0 flex-1 text-[10px]"
+              value={m.cellular.rule}
+              title="Wolfram rule : 30 chaotic · 90 fractal (Sierpiński) · 110 complex · 150 additive."
+              onChange={(e) => update(index, { cellular: { ...m.cellular, rule: Number(e.target.value) } })}
+            >
+              {CELL_RULES.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </Row>
+          <SliderRow label="CELLS" value={m.cellular.cells} min={8} max={48} step={1} integer
+            title="Automaton width : the output is the fraction of live cells."
+            onChange={(v) => update(index, { cellular: { ...m.cellular, cells: Math.round(v) } })} />
+          <SliderRow label="SLIP" value={m.slip ?? 0} min={0} max={1}
+            title={SLIP_HELP}
+            onChange={(v) => update(index, { slip: v })} />
         </>
       )
     case 'audio': {

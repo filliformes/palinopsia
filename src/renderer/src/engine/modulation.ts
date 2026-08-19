@@ -226,6 +226,12 @@ interface SlotState {
   physVel: number // physics integrator velocity
   physTarget: number // physics spring target (flips on clock)
   physLastAdvanceAt: number // physics clock (re-kick / period base)
+  euclidStep: number // euclid : current step index
+  euclidLastAdvanceAt: number
+  turingReg: number // turing : the shift register (bitmask, read as a value)
+  turingLastAdvanceAt: number
+  cellRow: number[] // cellular : the current 1-D generation
+  cellLastAdvanceAt: number
   startedAt: number // ramp/adsr time base (reset by retrigger)
 }
 
@@ -258,8 +264,42 @@ function makeSlot(now: number): SlotState {
     physVel: 0,
     physTarget: 1,
     physLastAdvanceAt: now,
+    euclidStep: 0,
+    euclidLastAdvanceAt: now,
+    turingReg: 0,
+    turingLastAdvanceAt: now,
+    cellRow: [],
+    cellLastAdvanceAt: now,
     startedAt: now
   }
+}
+
+// Euclidean : does step i carry one of `pulses` onsets spread evenly over `steps`?
+// (the Bresenham form of Bjorklund : same even distribution, deterministic.)
+function euclidHit(i: number, steps: number, pulses: number): boolean {
+  if (pulses <= 0) return false
+  if (pulses >= steps) return true
+  const j = ((i % steps) + steps) % steps
+  return Math.floor(((j + 1) * pulses) / steps) !== Math.floor((j * pulses) / steps)
+}
+
+// True when every cell is dead (a plain loop : `.every(x=>x===0)` narrows the
+// array's element type to the literal `0` and then blocks the reseed write).
+function allDead(row: number[]): boolean {
+  for (const x of row) if (x !== 0) return false
+  return true
+}
+
+// One generation of a 1-D elementary cellular automaton under Wolfram `rule`,
+// wrapping at the edges. Neighbourhood (left,centre,right) → 3-bit index → bit.
+function cellNext(row: number[], rule: number): number[] {
+  const n = row.length
+  const out = new Array<number>(n)
+  for (let i = 0; i < n; i++) {
+    const idx = (row[(i - 1 + n) % n] << 2) | (row[i] << 1) | row[(i + 1) % n]
+    out[i] = (rule >> idx) & 1
+  }
+  return out
 }
 
 export class ModEngine {
@@ -503,6 +543,67 @@ export class ModEngine {
           v01 = s.chaosX
           break
         }
+        case 'euclid': {
+          // Bjorklund gate : advance one step per clock, output 1 on an onset.
+          if (hz > 0) {
+            const period = 1000 / hz
+            const steps = Math.max(2, Math.min(32, Math.round(cfg.euclid.steps)))
+            const pulses = Math.max(0, Math.min(steps, Math.round(cfg.euclid.pulses)))
+            if (now - s.euclidLastAdvanceAt > period * 4) s.euclidLastAdvanceAt = now - period
+            while (now - s.euclidLastAdvanceAt >= period) {
+              s.euclidLastAdvanceAt += period
+              if (slipSkip()) continue // a skipped tick holds the gate an extra step
+              s.euclidStep = (s.euclidStep + 1) % steps
+            }
+            v01 = euclidHit(s.euclidStep, steps, pulses) ? 1 : 0
+          }
+          break
+        }
+        case 'turing': {
+          // Shift-register sequence : the falling bit feeds back (loop) unless
+          // `mutate` flips it (rewrite). Read the whole register as a value.
+          if (hz > 0) {
+            const period = 1000 / hz
+            const len = Math.max(2, Math.min(16, Math.round(cfg.turing.length)))
+            const mask = (1 << len) - 1
+            const mutate = Math.max(0, Math.min(1, cfg.turing.mutate))
+            if ((s.turingReg & mask) === 0) s.turingReg = (Math.floor(Math.random() * mask) | 1) & mask // seed / revive
+            if (now - s.turingLastAdvanceAt > period * 4) s.turingLastAdvanceAt = now - period
+            while (now - s.turingLastAdvanceAt >= period) {
+              s.turingLastAdvanceAt += period
+              if (slipSkip()) continue // hold the register a step
+              const outBit = (s.turingReg >> (len - 1)) & 1
+              const newBit = Math.random() < mutate ? 1 - outBit : outBit
+              s.turingReg = ((s.turingReg << 1) | newBit) & mask
+            }
+            v01 = (s.turingReg & mask) / mask
+          }
+          break
+        }
+        case 'cellular': {
+          // 1-D elementary CA advanced one generation per clock; output = density.
+          if (hz > 0) {
+            const period = 1000 / hz
+            const cells = Math.max(8, Math.min(48, Math.round(cfg.cellular.cells)))
+            const rule = Math.round(cfg.cellular.rule)
+            // (Re)seed with a single centre cell if the row is the wrong size or died.
+            if (s.cellRow.length !== cells || allDead(s.cellRow)) {
+              s.cellRow = new Array<number>(cells).fill(0)
+              s.cellRow[cells >> 1] = 1
+            }
+            if (now - s.cellLastAdvanceAt > period * 4) s.cellLastAdvanceAt = now - period
+            while (now - s.cellLastAdvanceAt >= period) {
+              s.cellLastAdvanceAt += period
+              if (slipSkip()) continue // hold the generation a step
+              s.cellRow = cellNext(s.cellRow, rule)
+              if (allDead(s.cellRow)) s.cellRow[cells >> 1] = 1 // revive if it dies out
+            }
+            let live = 0
+            for (const x of s.cellRow) live += x
+            v01 = live / cells
+          }
+          break
+        }
         case 'audio': {
           // Follow one feature off the audio bus (OSC/local). Unclocked : the
           // signal IS the clock. One-pole smoothing tames it toward the value.
@@ -714,7 +815,10 @@ export function makeDefaultModulator(): ModulatorConfig {
     organic: { variation: 0.5 },
     physics: { motion: 'bounce', damping: 0.5 },
     motion: { shape: 'oscillation' },
-    homeostat: { feature: 'edges', setpoint: 0.5, gain: 0.4, adapt: 0.3 }
+    homeostat: { feature: 'edges', setpoint: 0.5, gain: 0.4, adapt: 0.3 },
+    euclid: { steps: 16, pulses: 5 },
+    turing: { length: 8, mutate: 0.15 },
+    cellular: { rule: 90, cells: 24 }
   }
 }
 

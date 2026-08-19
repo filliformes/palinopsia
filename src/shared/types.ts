@@ -255,6 +255,9 @@ export type ModulatorType =
   | 'motion'
   | 'vision'
   | 'homeostat'
+  | 'euclid'
+  | 'turing'
+  | 'cellular'
 
 // Which audio feature an `audio` modulator follows (bus in engine/audioIn.ts).
 export type AudioFeature = 'level' | 'flux' | 'transient' | 'centroid' | 'band' | 'pitch'
@@ -379,6 +382,18 @@ export interface ModulatorConfig {
   // give full control range); `gain` = grip (sensitivity + drive), `adapt` =
   // baseline re-centre rate.
   homeostat: { feature: VisionFeature; setpoint: number; gain: number; adapt: number }
+  // ── Generative clocked sequencers (LZX Videomancer borrows) ──
+  // Euclidean rhythm : `pulses` onsets spread evenly (Bjorklund) over `steps`;
+  // outputs a binary GATE that advances one step per clock. Grid-locked → SLIP.
+  euclid: { steps: number; pulses: number }
+  // Turing machine : a `length`-bit shift register read as a value; each clock
+  // shifts, feeding the falling bit back UNLESS `mutate` flips it — a looping
+  // sequence that occasionally rewrites itself (0 = locked loop, 1 = free). SLIP.
+  turing: { length: number; mutate: number }
+  // Cellular automaton : a `cells`-wide 1-D elementary CA under Wolfram `rule`
+  // (30/90/110/150), advanced one generation per clock; output = live-cell
+  // density. Chaotic (30), fractal (90/150) or complex (110). Grid-locked → SLIP.
+  cellular: { rule: number; cells: number }
 }
 
 // What an assignment modulates: float ISF inputs, or a Meta knob (the
