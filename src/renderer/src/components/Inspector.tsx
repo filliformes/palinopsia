@@ -564,7 +564,7 @@ export function Inspector(): JSX.Element {
               </div>
             ) : (
               <>
-              <div style={{ height: fxH }} className="overflow-x-auto overflow-y-hidden">
+              <div style={{ height: fxH }} className="overflow-x-hidden overflow-y-auto">
                 <AutoControls
                   inputs={inputsForShader(shaderId)}
                   values={values}

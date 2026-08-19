@@ -831,6 +831,38 @@ export const THEMES: Theme[] = [
     sources: ['shapes', 'op-art', 'contour', 'grid-drift'],
     layerFx: ['fx-grade'],
     blends: ['screen', 'lighten'], layers: [3, 3], useB: 0, superFlicker: 0.4
+  }),
+
+  // ── New effect showcases (BENDR borrows) ──────────────────────────────
+  mk({
+    id: 'composite-signal', name: 'Composite Signal', family: 'Retro Screen',
+    blurb: 'One crowded composite line : colour crawls off the edges and the two scan fields shiver apart.',
+    world: 'incongruent',
+    palette: [K, [0.1, 0.14, 0.18, 1], [0.7, 0.55, 0.4, 1], [0.85, 0.88, 0.82, 1]],
+    sources: ['slabs', 'column-scan', 'rgb-osc'],
+    layerFx: ['fx-ntsc', 'fx-scanlines', 'fx-tracking'],
+    blends: ['screen', 'add'], layers: [2, 3], coalesce: 0.4, drift: 0.2,
+    finalizer: { grain: 0.14, character: 2 }
+  }),
+  mk({
+    id: 'meltwater', name: 'Meltwater', family: 'Feedback / Afterimage',
+    blurb: 'The picture softens only at its own edges and the seams slowly walk : contours dissolving in place.',
+    world: 'sublimated',
+    palette: [K, [0.08, 0.14, 0.16, 1], [0.5, 0.68, 0.66, 1]],
+    sources: ['organic', 'dye-field', 'membrane'],
+    layerFx: ['fx-grade'],
+    nativeNodes: ['node-melt'], nativeChance: 0.7,
+    blends: ['screen', 'lighten'], layers: [1, 2], feedback: 0.3, density: 0.4, coalesce: 0.55, drift: 0.2
+  }),
+  mk({
+    id: 'liquid-mosh', name: 'Liquid Mosh', family: 'Datamosh & Compression',
+    blurb: 'Motion advects the frame like a fluid : the gate holds the movers, edges repel the smear into swirls.',
+    world: 'parametric',
+    palette: [K, [0.16, 0.06, 0.24, 1], [0.7, 0.35, 0.5, 1], [0.9, 0.88, 0.85, 1]],
+    sources: ['slabs', 'grid-drift', 'drift-field'],
+    layerFx: ['fx-grade'],
+    nativeNodes: ['node-datamosh'], nativeChance: 0.7,
+    blends: ['screen', 'difference'], layers: [2, 3], gestureTexture: 0.6, coalesce: 0.35, density: 0.55
   })
 ]
 

@@ -115,8 +115,10 @@ export function AutoControls({
   // to this input (the capped mod-matrix, brief §6).
   modTargetFor?: (inputName: string) => ModTarget
   // 'wrap' (default): flex-wrap, height follows param count.
-  // 'twoRow': a fixed two-row grid that fills top→bottom then flows into new
-  //   columns, overflowing horizontally : the Inspector's shape never changes.
+  // 'twoRow': a WIDTH-wrapping grid of fixed 11rem columns — few params sit on one
+  //   row, many wrap DOWN into as many rows as the band's width needs (no
+  //   horizontal scroll; the band scrolls vertically / is drag-resized to show
+  //   the extra rows). Named twoRow for history; it's really auto-rows now.
   // 'vertical': one full-width control per row, stacked : for narrow tall panels
   //   (the Finishing Touches finalizers).
   layout?: 'wrap' | 'twoRow' | 'vertical'
@@ -173,20 +175,25 @@ export function AutoControls({
       compact.length > 0 ? (
         <CompactCluster key="compact" inputs={compact} values={values} onChange={onChange} />
       ) : null
-    // Too few controls to justify two rows → lay them in a single row and
-    // centre the whole group (both axes) instead of a sparse, top-left grid.
+    // Too few controls to justify a wrapping grid → lay them in a single row and
+    // centre the whole group instead of a sparse, top-left grid.
     const singleRow = rest.length + (compactCell ? 1 : 0) <= 4
     return (
-      <div className={`flex h-full items-center gap-5 p-2 ${singleRow ? 'justify-center' : ''}`}>
+      <div className={`flex h-full gap-5 p-2 ${singleRow ? 'items-center justify-center' : 'items-start'}`}>
         {singleRow ? (
           <div className="flex items-center gap-5">
             {visible(rest).map((inp) => renderControl(inp))}
             {compactCell}
           </div>
         ) : (
+          // Flexible columns (≥9.5rem, stretched to fill) that auto-fill the band's
+          // WIDTH and wrap into new ROWS as needed : as many controls as fit sit on
+          // one row (a 6-param effect stays one row at a normal width), the rest wrap
+          // DOWN — never a horizontal overflow. `[&>*]:w-full` lets each control fill
+          // its (now variable) cell, same trick the vertical layout uses.
           <div
-            className="grid grid-flow-col content-start gap-x-5 gap-y-2"
-            style={{ gridTemplateRows: 'repeat(2, min-content)', gridAutoColumns: '11rem' }}
+            className="grid min-w-0 flex-1 content-start gap-x-4 gap-y-2 [&>*]:w-full"
+            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(9.5rem, 1fr))' }}
           >
             {visible(rest).map((inp) => renderControl(inp))}
             {compactCell}

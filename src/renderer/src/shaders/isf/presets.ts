@@ -80,7 +80,23 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Bleeding pixels', values: { mode: 0, motion: 1.5, block: 16, decay: 0.93, refresh: 0.03, residual: 0.08, reseed: 0.05, thresh: 0.008, bleed: 0.6, autoBloom: 0.8 } },
     { name: 'Boiling reseed', values: { mode: 1, motion: 0.9, block: 16, decay: 0.92, refresh: 0.05, residual: 0.15, reseed: 0.5, thresh: 0.012, bleed: 0.2, autoBloom: 0.6 } },
     { name: 'Subtle drag', values: { mode: 1, motion: 0.6, block: 16, decay: 0.88, refresh: 0.15, residual: 0.3, reseed: 0.1, thresh: 0.018, bleed: 0.1, autoBloom: 0.5 } },
-    { name: 'Motion transfer', values: { mode: 1, motion: 1.2, block: 20, decay: 0.95, refresh: 0.02, residual: 0.06, reseed: 0.05, thresh: 0.008, bleed: 0.25, autoBloom: 0.9, sidechainFlow: 1 } }
+    { name: 'Motion transfer', values: { mode: 1, motion: 1.2, block: 20, decay: 0.95, refresh: 0.02, residual: 0.06, reseed: 0.05, thresh: 0.008, bleed: 0.25, autoBloom: 0.9, sidechainFlow: 1 } },
+    { name: 'Hold the movers', values: { mode: 1, motion: 1.1, block: 18, decay: 0.94, refresh: 0.03, residual: 0.12, reseed: 0.08, thresh: 0.01, bleed: 0.2, autoBloom: 0.7, moshGate: 0.7, edgeRepel: 0.2, resharp: 0.35 } },
+    { name: 'Freeze the still', values: { mode: 1, motion: 1.0, block: 16, decay: 0.95, refresh: 0.02, residual: 0.1, reseed: 0.06, thresh: 0.012, bleed: 0.15, autoBloom: 0.7, moshGate: -0.7, edgeRepel: 0, resharp: 0.2 } },
+    { name: 'Liquid edges', values: { mode: 0, motion: 1.2, block: 20, decay: 0.95, refresh: 0.02, residual: 0.1, reseed: 0.06, thresh: 0.009, bleed: 0.3, autoBloom: 0.8, moshGate: 0.3, edgeRepel: 0.5, resharp: 0.5 } }
+  ],
+  // ── Melt (BENDR borrow : seam-local edge dissolve that creeps) ──
+  'node-melt': [
+    { name: 'Contour bleed', values: { amount: 0.6, width: 0.35, dir: 0.3, gate: 0.15 } },
+    { name: 'Edge ghost', values: { amount: 0.7, width: 0.25, dir: 0, gate: 0.2 } },
+    { name: 'Slow crawl', values: { amount: 0.5, width: 0.5, dir: 0.5, gate: 0.1 } },
+    { name: 'Wax', values: { amount: 0.9, width: 0.7, dir: 0.8, gate: 0.05 } },
+    { name: 'Whisper', values: { amount: 0.35, width: 0.3, dir: 0.2, gate: 0.25 } },
+    { name: 'Dissolve out', values: { amount: 0.65, width: 0.45, dir: 0.7, gate: 0.12 } },
+    { name: 'Thaw inward', values: { amount: 0.55, width: 0.5, dir: -0.4, gate: 0.15 } },
+    { name: 'Fine seams', values: { amount: 0.5, width: 0.15, dir: 0.4, gate: 0.3 } },
+    { name: 'Run down', values: { amount: 0.8, width: 0.6, dir: -0.6, gate: 0.08 } },
+    { name: 'Total melt', values: { amount: 1, width: 0.85, dir: 1, gate: 0.02 } }
   ],
   // ── Eternalism (persistence-of-vision : held micro-motion / phase-drift twins) ──
   'node-eternalism': [
@@ -371,7 +387,11 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Collage subtle', values: { cuts: 10, rotate: 0.15, slip: 0, gap: 0, contour: 0.4, torn: 0.35, mix: 0.85, rate: 0 } },
     { name: 'Shredded', values: { cuts: 28, rotate: 0.4, slip: 0.15, gap: 0, contour: 1.8, torn: 1.7, mask: 0, mix: 1, rate: 0 } },
     { name: 'Scraps', values: { cuts: 24, rotate: 0.3, slip: 0.1, gap: 0, contour: 0.9, torn: 1.0, mask: 0.75, mix: 1, rate: 0 } },
-    { name: 'Last piece', values: { cuts: 16, rotate: 0.2, slip: 0, gap: 0, contour: 0.8, torn: 0.9, mask: 1, mix: 1, rate: 0.5 } }
+    { name: 'Last piece', values: { cuts: 16, rotate: 0.2, slip: 0, gap: 0, contour: 0.8, torn: 0.9, mask: 1, mix: 1, rate: 0.5 } },
+    { name: 'Voronoi mosaic', values: { shape: 1, cuts: 28, rotate: 0.3, slip: 0.1, contour: 0.6, torn: 0.4, mix: 1, rate: 0 } },
+    { name: 'Stained glass', values: { shape: 1, cuts: 16, rotate: 0.2, contour: 0.4, torn: 0.25, gap: 0.12, mix: 1, rate: 0 } },
+    { name: 'Morphing cells', values: { shape: 1, cuts: 22, rotate: 0.35, contour: 0.5, torn: 0.3, mix: 1, rate: 0.8, xfade: 1.2 } },
+    { name: 'Dissolving cut-up', values: { shape: 0, cuts: 20, rotate: 0.3, contour: 0.5, torn: 0.6, mix: 1, rate: 0.6, xfade: 1.5 } }
   ],
   'fx-hue-rotate': [
     { name: 'Quarter turn', values: { shift: 0.25, byLuma: 0 } },
@@ -1121,7 +1141,11 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Dim room', values: { brightness: -0.15, contrast: 1.15, saturation: 0.8, lift: 0 } },
     { name: 'Overexposed', values: { brightness: 0.2, contrast: 0.9, saturation: 0.75, lift: 0.05 } },
     { name: 'Night bus', values: { brightness: -0.1, contrast: 1.3, saturation: 0.55, lift: 0.08 } },
-    { name: 'Neutral+', values: { brightness: 0.01, contrast: 1.1, saturation: 1.05, lift: 0.01 } }
+    { name: 'Neutral+', values: { brightness: 0.01, contrast: 1.1, saturation: 1.05, lift: 0.01 } },
+    { name: 'Hard crush', values: { brightness: -0.15, contrast: 3.2, saturation: 0.9, lift: 0 } },
+    { name: 'Bleach', values: { brightness: 0.55, contrast: 1.2, saturation: 0.65, lift: 0 } },
+    { name: 'Flat grey', values: { brightness: 0, contrast: 0.18, saturation: 0.5, lift: 0.06 } },
+    { name: 'High key mono', values: { brightness: 0.35, contrast: 2.4, saturation: 0, lift: 0 } }
   ],
   'fx-slice-shuffle': [
     { name: 'Rare jump', values: { slices: 24, amount: 0.08, chance: 0.12, rate: 0.25 } },
@@ -1276,7 +1300,12 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Tile field', values: { zoom: 0.45, posX: 0, posY: 0, rotate: 0.08, wrap: 1 } },
     { name: 'Macro', values: { zoom: 2.4, posX: 0.1, posY: 0.1, rotate: 0, wrap: 0 } },
     { name: 'Corner peek', values: { zoom: 1.6, posX: 0.4, posY: 0.35, rotate: 0, wrap: 0 } },
-    { name: 'Upside down', values: { zoom: 1, posX: 0, posY: 0, rotate: 3.1416, wrap: 1 } }
+    { name: 'Upside down', values: { zoom: 1, posX: 0, posY: 0, rotate: 3.1416, wrap: 1 } },
+    { name: 'Letterbox', values: { zoom: 1, posX: 0, posY: 0, rotate: 0, wrap: 1, cropUp: 0.13, cropDown: 0.13 } },
+    { name: 'Pillarbox', values: { zoom: 1, posX: 0, posY: 0, rotate: 0, wrap: 1, cropLeft: 0.16, cropRight: 0.16 } },
+    { name: 'Punched frame', values: { zoom: 1.2, posX: 0, posY: 0, rotate: 0, wrap: 0, cropUp: 0.08, cropDown: 0.08, cropLeft: 0.08, cropRight: 0.08 } },
+    { name: 'Slot', values: { zoom: 1.1, posX: 0, posY: 0, rotate: 0, wrap: 1, cropUp: 0.32, cropDown: 0.32 } },
+    { name: 'Circle mask', values: { zoom: 1.1, posX: 0, posY: 0, rotate: 0, shape: 1 } }
   ],
   'fx-sync-loss': [
     { name: 'Slow climb', values: { roll: 0.1, tear: 0.05, bands: 3, rate: 0.2 } },
@@ -1289,6 +1318,19 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Dying set', values: { roll: 0.8, tear: 0.25, bands: 8, rate: 0.7 } },
     { name: 'Almost stable', values: { roll: 0.05, tear: 0.03, bands: 2, rate: 0.25 } },
     { name: 'Full collapse', values: { roll: 1.8, tear: 0.4, bands: 12, rate: 1 } }
+  ],
+  // ── NTSC (BENDR borrow : composite luma/chroma crosstalk) ──
+  'fx-ntsc': [
+    { name: 'Composite bleed', values: { artifact: 0.4, carrier: 0.5, fringe: 0.35, interlace: 0.2, fieldHue: 0.1, fieldCrawl: 0.1 } },
+    { name: 'Dot crawl', values: { artifact: 0.7, carrier: 0.7, fringe: 0.15, interlace: 0.1, fieldHue: 0, fieldCrawl: 0.2 } },
+    { name: 'VHS tracking', values: { artifact: 0.3, carrier: 0.4, fringe: 0.5, interlace: 0.5, fieldHue: 0.2, fieldCrawl: 0.4 } },
+    { name: 'Rainbow edges', values: { artifact: 0.9, carrier: 0.8, fringe: 0.2, interlace: 0, fieldHue: 0.3, fieldCrawl: 0.15 } },
+    { name: 'Interlace shiver', values: { artifact: 0.2, carrier: 0.5, fringe: 0.1, interlace: 0.8, fieldHue: 0.5, fieldCrawl: 0.5 } },
+    { name: 'Chroma smear', values: { artifact: 0.25, carrier: 0.4, fringe: 0.7, interlace: 0.15, fieldHue: 0, fieldCrawl: 0.05 } },
+    { name: 'Broken field', values: { artifact: 0.35, carrier: 0.6, fringe: 0.3, interlace: 0.9, fieldHue: -0.4, fieldCrawl: 0.6 } },
+    { name: 'Faint signal', values: { artifact: 0.15, carrier: 0.5, fringe: 0.15, interlace: 0.1, fieldHue: 0.05, fieldCrawl: 0.05 } },
+    { name: 'Colour-bar ghost', values: { artifact: 0.5, carrier: 0.75, fringe: 0.4, interlace: 0.3, fieldHue: 0.25, fieldCrawl: 0.2 } },
+    { name: 'Full crosstalk', values: { artifact: 0.8, carrier: 0.65, fringe: 0.55, interlace: 0.5, fieldHue: 0.35, fieldCrawl: 0.35 } }
   ],
   'fx-row-echo': [
     { name: 'Light freeze', values: { rows: 60, chance: 0.2, fade: 0.4, rate: 0.3 } },

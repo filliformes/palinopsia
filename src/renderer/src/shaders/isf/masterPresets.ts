@@ -608,5 +608,48 @@ export const MASTER_PRESETS: MasterPreset[] = [
       { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 0.9, lift: 0.02 } }
     ],
     vibe: { mixSrc: 1, contrast: 1.05, saturation: 0.9, autoLevel: 0.18, splitTone: 0.2, shadowTint: [0.46, 0.48, 0.53, 1], highTint: [0.55, 0.52, 0.47, 1] }
+  },
+  {
+    name: 'Composite Deck',
+    fx: [
+      { shaderId: 'fx-ntsc', inputs: { artifact: 0.4, carrier: 0.55, fringe: 0.45, interlace: 0.4, fieldHue: 0.15, fieldCrawl: 0.25 } },
+      { shaderId: 'fx-grain', inputs: { character: 2, amount: 0.16, size: 2, chroma: 0.4 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 1.05, lift: 0.04 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 1.05, gamma: 1, autoLevel: 0.18, splitTone: 0.25, shadowTint: [0.45, 0.48, 0.55, 1], highTint: [0.57, 0.52, 0.44, 1] }
+  },
+  {
+    name: 'Contour Melt',
+    fx: [
+      { shaderId: 'node-melt', inputs: { amount: 0.6, width: 0.4, dir: 0.4, gate: 0.12 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.15, saturation: 0.85, lift: 0.05 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1, saturation: 0.85, gamma: 1, autoLevel: 0.2, splitTone: 0.2, shadowTint: [0.47, 0.49, 0.53, 1], highTint: [0.54, 0.52, 0.48, 1] }
+  },
+  {
+    name: 'Liquid Mosh',
+    fx: [
+      { shaderId: 'node-datamosh', inputs: { mode: 0, motion: 1.2, block: 20, decay: 0.95, refresh: 0.02, moshGate: 0.4, edgeRepel: 0.5, resharp: 0.45, bleed: 0.3, autoBloom: 0.8 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 0.95, lift: 0.03 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 0.95, gamma: 1, autoLevel: 0.15, splitTone: 0.15, shadowTint: [0.46, 0.49, 0.54, 1], highTint: [0.55, 0.52, 0.46, 1] }
+  },
+  {
+    name: 'Broken Broadcast',
+    fx: [
+      { shaderId: 'fx-ntsc', inputs: { artifact: 0.55, carrier: 0.7, fringe: 0.35, interlace: 0.7, fieldHue: -0.3, fieldCrawl: 0.5 } },
+      { shaderId: 'fx-sync-loss', inputs: { roll: 0.2, tear: 0.08, bands: 4, rate: 0.35 } },
+      { shaderId: 'fx-scanlines', inputs: { count: 420, darkness: 0.28, roll: 0.12 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.08, saturation: 1, gamma: 1, autoLevel: 0.2, splitTone: 0.2, shadowTint: [0.45, 0.47, 0.55, 1], highTint: [0.56, 0.53, 0.45, 1] }
+  },
+  {
+    name: 'Melted Print',
+    fx: [
+      { shaderId: 'node-melt', inputs: { amount: 0.7, width: 0.5, dir: -0.4, gate: 0.1 } },
+      { shaderId: 'fx-palette', inputs: { stops: 4, blend: 0.85, dither: 0.12, mixSrc: 0.2, colorA: [0.02, 0.02, 0.03, 1], colorB: [0.22, 0.14, 0.12, 1], colorC: [0.6, 0.42, 0.3, 1], colorD: [0.9, 0.86, 0.78, 1] } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.12, size: 1.6, chroma: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1, saturation: 0.9, gamma: 1, autoLevel: 0.2, splitTone: 0.3, shadowTint: [0.48, 0.47, 0.5, 1], highTint: [0.56, 0.52, 0.45, 1] }
   }
 ]
