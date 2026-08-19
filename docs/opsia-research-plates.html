@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Opsia — 20 plates</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0A0A0C; --slab:#131317; --slab2:#17171C; --edge:#26262E;
+  --amber:#E4A24A; --cyan:#6FB3B8; --bone:#E7E3DA; --mute:#8A8792;
+  --disp:"Barlow Condensed",Oswald,"Arial Narrow",sans-serif;
+  --body:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--ink); color:var(--bone); font-family:var(--body);
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:760px;margin:0 auto;padding:0 16px 96px 44px;position:relative}
+
+/* ── signature: the perforated rail ───────────────────── */
+.rail{position:absolute;left:0;top:0;bottom:0;width:34px;pointer-events:none}
+.rail:before{content:"";position:absolute;left:26px;top:0;bottom:0;width:1px;background:var(--edge)}
+.perf{position:absolute;left:4px;width:18px;height:26px;border:1px solid var(--edge);
+  border-radius:3px;background:var(--slab);display:flex;align-items:center;justify-content:center}
+.perf span{font-family:var(--mono);font-size:9px;color:var(--mute);letter-spacing:.02em}
+.perf.on{border-color:var(--amber)}
+.perf.on span{color:var(--amber)}
+
+/* ── header ───────────────────────────────────────────── */
+header{padding:56px 0 34px}
+.eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--mute)}
+h1{font-family:var(--disp);font-weight:600;font-size:clamp(38px,11vw,62px);line-height:.92;
+  letter-spacing:-.005em;margin:14px 0 0;text-transform:uppercase}
+h1 em{font-style:normal;color:var(--amber)}
+.lede{margin:18px 0 0;max-width:44ch;color:#BDB9B1}
+.meta{margin-top:22px;font-family:var(--mono);font-size:11px;color:var(--mute);
+  border-top:1px solid var(--edge);padding-top:12px;display:flex;gap:18px;flex-wrap:wrap}
+
+/* ── group divider ────────────────────────────────────── */
+.group{margin:52px 0 22px;border-top:1px solid var(--edge);padding-top:14px}
+.group h2{font-family:var(--disp);font-weight:600;text-transform:uppercase;
+  font-size:23px;letter-spacing:.03em;margin:0}
+.group p{margin:4px 0 0;font-family:var(--mono);font-size:11px;color:var(--mute);letter-spacing:.04em}
+
+/* ── plate ────────────────────────────────────────────── */
+.plate{margin:0 0 30px;background:var(--slab);border:1px solid var(--edge);border-radius:6px;overflow:hidden}
+.stage{position:relative;background:#08080A;border-bottom:1px solid var(--edge);cursor:pointer}
+canvas{display:block;width:100%;height:auto}
+.stage .tag{position:absolute;left:10px;top:9px;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--mute);pointer-events:none}
+.stage .hint{position:absolute;right:10px;top:9px;font-family:var(--mono);font-size:9.5px;
+  color:var(--edge);pointer-events:none}
+.stage.paused .hint{color:var(--amber)}
+.body{padding:16px 16px 18px}
+.body h3{font-family:var(--disp);font-weight:600;font-size:25px;line-height:1.05;margin:0;
+  letter-spacing:.005em;text-transform:uppercase}
+.src{font-family:var(--mono);font-size:10.5px;color:var(--amber);margin:6px 0 12px;letter-spacing:.02em}
+.lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--mute);margin:0 0 3px}
+.body p{margin:0 0 13px;color:#CFCBC3;font-size:14.5px}
+.body p:last-child{margin-bottom:0}
+.opsia{border-left:2px solid var(--cyan);padding-left:12px}
+.opsia p{color:var(--bone)}
+
+/* ── closing ──────────────────────────────────────────── */
+.end{margin-top:46px;border-top:1px solid var(--edge);padding-top:20px}
+.end h2{font-family:var(--disp);text-transform:uppercase;font-size:23px;margin:0 0 10px;font-weight:600}
+.end ol{margin:0;padding-left:20px;color:#CFCBC3}
+.end li{margin-bottom:8px}
+.end b{color:var(--amber);font-weight:500}
+
+@media (prefers-reduced-motion:reduce){ .stage .hint{display:none} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="rail" id="rail"></div>
+
+  <header>
+    <div class="eyebrow">Palinopsia · carnet de recherche · août 2026</div>
+    <h1>Vingt<br>plaques<br><em>d'essai</em></h1>
+    <p class="lede">Twenty concepts from the second research pass, each one running rather than described. Sonify gave the instrument an ear; Assemble gave it scissors. These are the ideas that follow from that.</p>
+    <div class="meta"><span>20 plates</span><span>tap a frame to hold it</span><span>all demos procedural</span></div>
+  </header>
+
+  <div id="plates"></div>
+
+  <div class="end">
+    <h2>If you build three</h2>
+    <ol>
+      <li><b>Plate 07 — idioms as a model.</b> Assemble stops being heuristics and becomes a small curated vocabulary, exactly like the Context and Vibe param sets.</li>
+      <li><b>Plate 18 — motion history.</b> Sedimentation, the return path, and the instrument's own namesake, in one buffer.</li>
+      <li><b>Plate 14 — shared clock.</b> Peer tempo instead of master/slave is the right topology for a room with three instruments in it.</li>
+    </ol>
+    <p style="margin-top:14px;color:#8A8792;font-family:var(--mono);font-size:11px">And plate 04 is the one-paragraph idea: the mark is not the sound, the mark is the control.</p>
+  </div>
+</div>
+
+<script>
+const C={ink:'#0A0A0C',slab:'#131317',edge:'#26262E',amber:'#E4A24A',cyan:'#6FB3B8',
+         bone:'#E7E3DA',mute:'#8A8792',dim:'#3A3A44'};
+
+/* ── small helpers ─────────────────────────────────────── */
+function ln(x,a,b,c,d,col,w){x.strokeStyle=col;x.lineWidth=w||1;x.beginPath();x.moveTo(a,b);x.lineTo(c,d);x.stroke();}
+function rect(x,a,b,w,h,col){x.fillStyle=col;x.fillRect(a,b,w,h);}
+function txt(x,s,a,b,col,size,align){x.fillStyle=col;x.font=(size||9)+'px "IBM Plex Mono",monospace';
+  x.textAlign=align||'left';x.textBaseline='middle';x.fillText(s,a,b);x.textAlign='left';}
+function dot(x,a,b,r,col){x.fillStyle=col;x.beginPath();x.arc(a,b,r,0,7);x.fill();}
+function clamp(v,a,b){return v<a?a:v>b?b:v}
+function hash(n){return (Math.sin(n*127.1)*43758.5453)%1<0?-(Math.sin(n*127.1)*43758.5453)%1:(Math.sin(n*127.1)*43758.5453)%1}
+function rnd(n){let v=Math.sin(n*12.9898)*43758.5453;return v-Math.floor(v);}
+
+/* procedural source frame: sky, sun, ridge — reused across plates */
+function sceneLum(u,v,t){
+  const sx=.74+.015*Math.sin(t*.4), sy=.27;
+  const sun=Math.exp(-Math.pow(Math.hypot(u-sx,(v-sy)*1.02)/.085,2));
+  const sky=.10+.30*(1-v)+.13*Math.exp(-Math.pow((v-.30)/.42,2));
+  const ridge=.60+.055*Math.sin(u*6.2+1.1)+.03*Math.sin(u*13.+t*.15);
+  let g=sky+sun*1.05;
+  if(v>ridge) g=.055+.05*Math.sin(u*20.+v*8.);
+  return clamp(g,0,1);
+}
+function sceneDepth(u,v){ // true depth: sun is FAR though bright
+  const ridge=.60+.055*Math.sin(u*6.2+1.1);
+  if(v>ridge) return clamp(.15+(v-ridge)*.9,0,1)*.5;      // ground: near
+  return clamp(.55+(1-v)*.45,0,1);                        // sky+sun: far
+}
+/* draw a low-res buffer scaled up = instrument look */
+const buf=document.createElement('canvas'), bx=buf.getContext('2d');
+function drawField(x,X,Y,W,H,t,fn,cols){
+  const w=88,h=Math.max(8,Math.round(w*H/W)); buf.width=w; buf.height=h;
+  const im=bx.createImageData(w,h);
+  for(let j=0;j<h;j++)for(let i=0;i<w;i++){
+    const c=fn((i+.5)/w,(j+.5)/h,t), k=(j*w+i)*4, rgb=cols(c);
+    im.data[k]=rgb[0];im.data[k+1]=rgb[1];im.data[k+2]=rgb[2];im.data[k+3]=255;}
+  bx.putImageData(im,0,0);
+  x.imageSmoothingEnabled=false; x.drawImage(buf,X,Y,W,H); x.imageSmoothingEnabled=true;
+}
+const warm=c=>[Math.round(18+c*222),Math.round(17+c*200),Math.round(21+c*168)];
+const cold=c=>[Math.round(14+c*90),Math.round(20+c*150),Math.round(26+c*160)];
+
+/* ── the twenty plates ─────────────────────────────────── */
+const DATA=[
+{g:'Sonify',gt:'l\'image devient signal',n:'01',
+ title:'The vOICe',src:'Meijer, IEEE Trans. Biomed. Eng., 1992',tag:'scan · pitch · pan',
+ what:'A vertical line sweeps the image left to right. Each column becomes a chord: a pixel\'s height sets its pitch, its brightness sets its loudness, and its horizontal position places it in the stereo field. About 4000 pixels get read per second of sound.',
+ opsia:'The rigorous default mode for Sonify, with thirty years of perceptual research and an IEEE citation behind it. Everything else you map can be argued as a departure from this.'},
+{g:null,n:'02',title:'The mapping is learned',src:'npj Science of Learning, 2026',tag:'standard vs reversed',
+ what:'Researchers tested the standard mapping (pitch = height, time = across) against a deliberately reversed one, and against arbitrary pitch–time pairs. The standard version was chosen for technical reasons, not because it is intuitive.',
+ opsia:'This is your licence to offer several mappings and let a performer inhabit one. It answers the obvious thesis objection — "why that correspondence?" — with evidence rather than taste.'},
+{g:null,n:'03',title:'ANS',src:'Murzin, 1937–57 · Glinka Museum, Moscow',tag:'720 tones · scratched score',
+ what:'Five rotating glass discs carry 144 hand-drawn waveforms each — 720 pure tones. The score is a glass plate coated in black mastic; the composer scratches the coating away and light passes through to photocells.',
+ opsia:'Griffé already produces scratched marks on black. Read them as a spectral score and the Cameraless stage stops following sound and starts making it.'},
+{g:null,n:'04',title:'Oramics',src:'Daphne Oram, 1957 · after Avraamov, Sholpo, Voinov',tag:'ten strips · drawn control',
+ what:'Ten synchronised strips of clear 35mm film. Shapes drawn on them form a mask that modulates light onto photocells. The output is monophonic — the drawings are not the waveform, they are the control curves.',
+ opsia:'The distinction Sonify most needs. Opsia sends control, Pandore makes sound. This is §4.4 of the Cameraless spec, already solved in 1957.'},
+{g:null,n:'05',title:'Three ways to sonify',src:'Kramer et al. · audification / mapping / model',tag:'taxonomy',
+ what:'Audification runs the data straight into the audible range. Parameter mapping lets extracted features drive synthesis parameters. Model-based sonification uses the data to excite a virtual resonator that then rings on its own.',
+ opsia:'Name Sonify\'s modes along this axis instead of ad hoc. It tells you which modes need analysis and which only need scanning — and gives the mémoire a vocabulary that already exists.'},
+{g:null,n:'06',title:'The histogram bank',src:'documented negative result',tag:'255 voices · beating',
+ what:'One published approach drove a 255-voice bank from the pixel count at each luminance level. It ran in real time, but neighbouring partials beat against each other, and all spatial information was lost.',
+ opsia:'Cheapest possible Sonify mode, with both failure modes handed to you. Detune the bank to kill the beating, and run per-region histograms on a coarse grid to keep the layout.'},
+
+{g:'Assemble',gt:'le montage comme système',n:'07',
+ title:'Idioms, not heuristics',src:'Leake, Davis, Truong, Agrawala · SIGGRAPH 2017',tag:'labelled clips · hmm path',
+ what:'RoughCut labels every clip, then lets you switch on editing idioms — avoid cutting between two shots of the same speaker, change scale slowly, go close on the intense line. The idioms compile into a Markov model that picks the path.',
+ opsia:'This is your architecture already: a small curated vocabulary compiled into weights, exactly like S1–S4\'s tag-derived selection. Swap speaker for layer, scale for proximity, intensity for audio energy.'},
+{g:null,n:'08',title:'Cut to the beat, then roll again',src:'audeosynth · music-driven video montage',tag:'beat lock · mcmc',
+ what:'Two rules: cuts land on the beat, and the cut must produce synchresis — the sense that image and sound are one event. The search runs as stochastic sampling, so a second pass gives a different edit that is equally valid.',
+ opsia:'It cites synchresis by name, which puts Assemble directly on your Chion→Basanta shelf. And the sampler is the right selector shape: never the same edit twice, like Variation.'},
+{g:null,n:'09',title:'Shot lengths are a curve',src:'Tsivian & Civjans, Cinemetrics · Salt 1974 · Redfern',tag:'asl · cutting rate',
+ what:'Salt proposed average shot length as a measure of style; Cinemetrics holds nearly ten thousand of them. Redfern\'s objection is that an average is not a rate and hides the film\'s temporal shape entirely.',
+ opsia:'So do not give Assemble an ASL knob. Give it a cutting-rate curve plus a spread. A Style preset becomes a distribution with a shape over time — and you get real numbers to cite.'},
+{g:null,n:'10',title:'Elastic rhythm',src:'BEAT · energy-adaptive alignment, 2026',tag:'energy → density',
+ what:'Professional cutting is elastic, not gridded: rapid cuts crowd the loud passages, single sustained shots span the quiet bars. The alignment is solved per bar against musical energy rather than one shot per beat.',
+ opsia:'If Assemble cuts on a fixed division, this is the upgrade. Dwell derived from bar energy — the same gesture as your Density macro, turned onto the time axis.'},
+{g:null,n:'11',title:'Retime, don\'t cut',src:'MVAA · music-driven video editing, 2025',tag:'reindex frames',
+ what:'Instead of choosing shots, treat it as placing existing frames at new time indices and filling smoothly between them. The content is preserved; only its timing moves.',
+ opsia:'A live instrument cannot cut footage that has not happened yet — but it can retime what it has. This reframing fits Assemble\'s real-time constraint far better than a cut list does.'},
+{g:null,n:'12',title:'Find a seam, not a fade',src:'Kwatra, Schödl, Essa, Turk, Bobick · SIGGRAPH 2003',tag:'graphcut',
+ what:'Rather than blending two clips and accepting the blur, search for a seam through the space-time volume where the two already agree. The transition disappears instead of being softened.',
+ opsia:'Assemble\'s cut quality, and non-repeating loops for the Background slab. A crossfade announces the join; a seam hides it.'},
+{g:null,n:'13',title:'What reads as edited',src:'user study, automatic music video generation',tag:'shuffled vs coherent',
+ what:'In a study of generated music videos, 55.6% were judged human-made, and viewers named two reasons: rhythmic sync, and whether consecutive shots belonged together. Effects were not on the list.',
+ opsia:'Spend Assemble\'s effort on rhythm and inter-shot coherence. And borrow the EDL export from the commercial tools, so a good pass can be finished in Resolve.'},
+
+{g:'Réseau',gt:'l\'horloge partagée',n:'14',
+ title:'Ableton Link',src:'beat · tempo · phase over UDP multicast',tag:'peers, no master',
+ what:'Applications on a local network find each other, share beat, tempo and phase, and anyone can change the tempo, start, stop, join or leave without breaking the session. No device is the master.',
+ opsia:'Opsia takes BPM from Pandore over OSC today, which is master and slave. Link makes it peer — the right topology for three instruments in one room, and for Espaces connectés.'},
+{g:null,n:'15',title:'Tempo follower',src:'audio-derived clock',tag:'onsets → bpm',
+ what:'Analyse the incoming audio in real time and infer its tempo, then follow it. The clock comes from the sound in the room rather than from a machine sending it.',
+ opsia:'Your audio bus already has flux and transients. This is the installation case where nothing is the master — Opsia following a musician, or following Phasma following the room.'},
+
+{g:'Lacunes',gt:'ce qui manque encore',n:'16',
+ title:'Real depth',src:'Depth Anything V2 Small · Apache-2.0, ~50 MB',tag:'luma proxy vs estimate',
+ what:'Monocular depth estimation now runs in a browser tab: 24.8M parameters, real time with WebGPU, one line through Transformers.js. Luminance-as-depth calls a bright sun near; an estimate knows it is far.',
+ opsia:'Closes the depth gap you flagged. Feeds Context\'s haze, the Finalizer\'s anaglyph convergence and the contact shadow with geometry instead of a proxy. Check the licence tier — only Small is Apache.'},
+{g:null,n:'17',title:'Depth that holds still',src:'Video Depth Anything, 2025',tag:'per-frame vs consistent',
+ what:'Estimated per frame, depth crawls — the map re-guesses every frame and the error moves. The video variant produces consistent depth across sequences minutes long.',
+ opsia:'A crawling depth map driving haze and shadow will read as noise on a projection. For a fixed installation this is not an optimisation, it is the difference between usable and not.'},
+{g:null,n:'18',title:'Motion history',src:'Bobick & Davis, PAMI 2001',tag:'mei where · mhi when',
+ what:'Two accumulations of the same movement. The energy image marks where motion happened; the history image encodes when, with brightness standing for recency. Shape moments extracted from it are compact and stable.',
+ opsia:'The cleanest formulation of sedimentation — intensity as recency is literally what the word palinopsia describes. It pays twice: visible as a layer, and its moments feed Sonify and outbound OSC.'},
+{g:null,n:'19',title:'Steerable video',src:'Schödl & Essa · controlled video sprites, 2002',tag:'similarity graph',
+ what:'Build a graph of which frames can follow which, then steer the walk toward a target instead of letting it run free. The clip stops being a timeline and becomes a space you move through.',
+ opsia:'Pandore\'s gesture sets the target, the selector finds the nearest admissible frame. Video becomes playable — and nothing ever scrubs, so the reverse-seek problem simply stops existing.'},
+{g:null,n:'20',title:'Metric phrases',src:'Kubelka, Arnulf Rainer, 1960',tag:'24 · 16 · 12 · 8 · 6 · 4 · 2 · 1',
+ what:'Sixteen sections of exactly 576 frames, built from phrases of 2, 4, 6, 8, 9, 12, 16, 18, 24, 36, 48, 72, 96, 144, 192 or 288 frames. Almost every section runs from the long phrases toward the short ones.',
+ opsia:'Last pass I put this in the Cameraless draw clock. With Assemble built it belongs there instead — phrase lengths as the cutting-rate curve, contracting when the energy says so.'}
+];
+
+/* ── demos ─────────────────────────────────────────────── */
+const D={};
+
+D['01']=(x,t,W,H)=>{
+  const iw=W*.60, ih=H-30, X=12, Y=15;
+  drawField(x,X,Y,iw,ih,t,sceneLum,warm);
+  const ph=(t*.22)%1, sx=X+ph*iw;
+  ln(x,sx,Y,sx,Y+ih,C.amber,1.5);
+  rect(x,sx-1,Y,2,ih,'rgba(228,162,74,.25)');
+  const px=X+iw+18, pw=W-px-14, N=26;
+  txt(x,'HIGH',px,Y+5,C.mute,8); txt(x,'LOW',px,Y+ih-5,C.mute,8);
+  for(let i=0;i<N;i++){
+    const v=(i+.5)/N, c=sceneLum(ph,v,t), y=Y+v*ih;
+    rect(x,px+22,y-2.4,Math.max(1,c*(pw-30)),4.8, i%2?'rgba(228,162,74,.85)':'rgba(228,162,74,.6)');
+  }
+  ln(x,px+21,Y,px+21,Y+ih,C.edge,1);
+  const pan=ph*2-1;
+  txt(x,'L',X,H-6,C.mute,8); txt(x,'R',X+iw,H-6,C.mute,8,'right');
+  ln(x,X,H-6,X+iw,H-6,C.edge,1); dot(x,X+ph*iw,H-6,3,C.cyan);
+};
+
+D['02']=(x,t,W,H)=>{
+  const pw=(W-42)/2, ph=H-40;
+  [0,1].forEach(k=>{
+    const X=14+k*(pw+14), Y=22;
+    x.strokeStyle=C.edge;x.strokeRect(X,Y,pw,ph);
+    txt(x,k?'REVERSED':'STANDARD',X,12,k?C.cyan:C.amber,9);
+    const u=(t*.3+k*.5)%1;
+    for(let i=0;i<9;i++){const v=(i+.5)/9;
+      dot(x,X+((k?v:u)*pw),Y+((k?u:v)*ph),1.6,'rgba(231,227,218,.25)');}
+    const col=k?C.cyan:C.amber;
+    if(!k){ln(x,X+u*pw,Y,X+u*pw,Y+ph,col,1.4);
+      txt(x,'time →',X+4,Y+ph-8,C.mute,8);
+      x.save();x.translate(X+9,Y+ph/2);x.rotate(-Math.PI/2);txt(x,'pitch →',0,0,C.mute,8);x.restore();}
+    else{ln(x,X,Y+u*ph,X+pw,Y+u*ph,col,1.4);
+      txt(x,'pitch →',X+4,Y+ph-8,C.mute,8);
+      x.save();x.translate(X+9,Y+ph/2);x.rotate(-Math.PI/2);txt(x,'time →',0,0,C.mute,8);x.restore();}
+  });
+  txt(x,'both are learnable — neither is innate',W/2,H-10,C.mute,9,'center');
+};
+
+D['03']=(x,t,W,H)=>{
+  const X=12,Y=14,iw=W*.62,ih=H-28;
+  rect(x,X,Y,iw,ih,'#0C0C0E');
+  x.save();x.beginPath();x.rect(X,Y,iw,ih);x.clip();
+  x.lineCap='round';
+  for(let s=0;s<7;s++){
+    x.strokeStyle='rgba(231,227,218,'+(.5+.35*rnd(s))+')';
+    x.lineWidth=1+2.2*rnd(s+9);x.beginPath();
+    const y0=Y+ih*(.10+.12*s), a=.5+1.6*rnd(s+3);
+    for(let i=0;i<=40;i++){const u=i/40;
+      const yy=y0+Math.sin(u*a*6.2+s)*ih*.045*(1+rnd(s+i*.01)*.5);
+      i?x.lineTo(X+u*iw,yy):x.moveTo(X+u*iw,yy);}
+    x.stroke();
+  }
+  const ph=(t*.18)%1, sx=X+ph*iw;
+  rect(x,sx-6,Y,12,ih,'rgba(228,162,74,.10)'); ln(x,sx,Y,sx,Y+ih,C.amber,1.2);
+  x.restore(); x.strokeStyle=C.edge; x.strokeRect(X,Y,iw,ih);
+  txt(x,'MASTIC PLATE — SCRATCHED',X+3,Y-6,C.mute,8);
+  const px=X+iw+16;
+  txt(x,'720 TONES',px,Y+2,C.mute,8);
+  for(let s=0;s<7;s++){
+    const y0=Y+ih*(.10+.12*s), a=.5+1.6*rnd(s), yy=y0+Math.sin(ph*a*6.2+s)*ih*.045;
+    const lit=.35+.65*Math.abs(Math.sin(ph*8+s));
+    rect(x,px,yy-2,(W-px-14)*lit,4,'rgba(228,162,74,'+(.25+.6*lit)+')');
+  }
+};
+
+D['04']=(x,t,W,H)=>{
+  const N=8, X=14, Y=14, sw=W*.60, sh=(H-28)/N, ph=(t*.16)%1;
+  for(let i=0;i<N;i++){
+    const y=Y+i*sh;
+    rect(x,X,y+1,sw,sh-2,'#0E0E11');
+    for(let k=0;k<Math.floor(sw/13);k++) rect(x,X+4+k*13,y+sh/2-1.2,3,2.4,C.edge);
+    x.strokeStyle='rgba(231,227,218,.75)';x.lineWidth=1.1;x.beginPath();
+    for(let j=0;j<=30;j++){const u=j/30;
+      const yy=y+sh/2+Math.sin(u*(1.4+i*.9)*6.2+i*1.7)*(sh*.28);
+      j?x.lineTo(X+u*sw,yy):x.moveTo(X+u*sw,yy);}
+    x.stroke();
+  }
+  ln(x,X+ph*sw,Y,X+ph*sw,Y+N*sh,C.amber,1.4);
+  const px=X+sw+18;
+  txt(x,'CONTROL OUT',px,8,C.cyan,8);
+  for(let i=0;i<N;i++){
+    const y=Y+i*sh+sh/2;
+    const v=(Math.sin(ph*(1.4+i*.9)*6.2+i*1.7)+1)/2;
+    rect(x,px,y-2,Math.max(1.5,v*(W-px-14)),4,'rgba(111,179,184,.8)');
+  }
+};
+
+D['05']=(x,t,W,H)=>{
+  const lh=(H-16)/3;
+  const names=['AUDIFICATION','PARAMETER MAPPING','MODEL-BASED'];
+  for(let k=0;k<3;k++){
+    const Y=8+k*lh+lh/2;
+    ln(x,14,8+k*lh+lh-1,W-14,8+k*lh+lh-1,k<2?C.edge:'transparent',1);
+    txt(x,names[k],14,8+k*lh+11,C.mute,8.5);
+    const X=W*.30, w=W-X-16;
+    if(k===0){ // a row of pixels straight to a waveform
+      x.strokeStyle=C.amber;x.lineWidth=1.2;x.beginPath();
+      for(let i=0;i<=90;i++){const u=i/90;
+        const c=sceneLum(u,.35,t)-.4;
+        const yy=Y+8+c*22;
+        i?x.lineTo(X+u*w,yy):x.moveTo(X+u*w,yy);}
+      x.stroke();
+      txt(x,'the pixels are the waveform',X,Y-12,C.dim,8.5);
+    } else if(k===1){ // features to knobs
+      const f=['level','flux','centroid'];
+      for(let i=0;i<3;i++){
+        const cx=X+22+i*(w/3), cy=Y+6, v=(Math.sin(t*(.7+i*.4)+i)+1)/2;
+        x.strokeStyle=C.edge;x.lineWidth=2;x.beginPath();x.arc(cx,cy,11,.8,Math.PI*2+.4);x.stroke();
+        x.strokeStyle=C.amber;x.lineWidth=2;x.beginPath();x.arc(cx,cy,11,.8,.8+v*5.3);x.stroke();
+        txt(x,f[i],cx,cy+21,C.dim,8,'center');
+      }
+    } else { // impulse exciting a resonator
+      const p=(t*.9)%2.2, imp=Math.exp(-p*7);
+      x.strokeStyle=C.cyan;x.lineWidth=1.2;x.beginPath();
+      for(let i=0;i<=110;i++){const u=i/110;
+        const env=Math.exp(-Math.max(0,u*2.2-p+2.2)*0);
+        const a=Math.exp(-Math.max(0,(u*2.2-(2.2-p)))*3.2);
+        const yy=Y+6+Math.sin(u*70)*16*a*(u*2.2>2.2-p?1:0);
+        i?x.lineTo(X+u*w,yy):x.moveTo(X+u*w,yy);}
+      x.stroke();
+      dot(x,X+((2.2-p)/2.2)*w,Y+6,2.5+imp*3,C.amber);
+      txt(x,'the image strikes, the model rings',X,Y-12,C.dim,8.5);
+    }
+  }
+};
+
+D['06']=(x,t,W,H)=>{
+  const X=12,Y=14,iw=W*.34,ih=H*.5;
+  drawField(x,X,Y,iw,ih,t,sceneLum,warm);
+  const hx=X, hy=Y+ih+14, hw=iw, hh=H-hy-12, B=22, bins=new Array(B).fill(0);
+  for(let j=0;j<20;j++)for(let i=0;i<20;i++) bins[Math.min(B-1,Math.floor(sceneLum((i+.5)/20,(j+.5)/20,t)*B))]++;
+  const mx=Math.max(...bins);
+  for(let i=0;i<B;i++) rect(x,hx+i*(hw/B),hy+hh-(bins[i]/mx)*hh,hw/B-1,(bins[i]/mx)*hh,'rgba(228,162,74,.55)');
+  txt(x,'LUMINANCE HISTOGRAM',hx,hy-6,C.mute,8);
+  const px=X+iw+20, pw=W-px-14;
+  const phase=(t%8)<4;
+  txt(x,phase?'NEIGHBOURING PARTIALS — BEATING':'DETUNED & SPREAD — STABLE',px,10,phase?C.amber:C.cyan,8.5);
+  x.strokeStyle=phase?C.amber:C.cyan;x.lineWidth=1.2;x.beginPath();
+  for(let i=0;i<=160;i++){const u=i/160; let s=0;
+    for(let k=0;k<5;k++){const f=40+k*(phase?.35:5.5); s+=Math.sin(u*f*6.2+t*(phase?1.5:.4)+k);}
+    const yy=H*.55+s*7;
+    i?x.lineTo(px+u*pw,yy):x.moveTo(px+u*pw,yy);}
+  x.stroke();
+  txt(x,'spatial layout is lost — fix with a coarse grid',px,H-10,C.dim,8.5);
+};
+
+D['07']=(x,t,W,H)=>{
+  const rows=3, cols=7, X=34, Y=26, cw=(W-X-16)/cols, ch=(H-Y-24)/rows;
+  const names=['WIDE','MID','CLOSE'];
+  const path=[0,1,0,2,1,2,0];
+  for(let r=0;r<rows;r++){
+    txt(x,names[r],6,Y+r*ch+ch/2,C.mute,8);
+    for(let c=0;c<cols;c++){
+      const on=path[c]===r;
+      rect(x,X+c*cw+2,Y+r*ch+3,cw-6,ch-8,on?'rgba(228,162,74,.16)':'#101014');
+      x.strokeStyle=on?C.amber:C.edge;x.lineWidth=1;
+      x.strokeRect(X+c*cw+2,Y+r*ch+3,cw-6,ch-8);
+    }
+  }
+  const prog=(t*.5)%(cols+1.4);
+  x.strokeStyle=C.amber;x.lineWidth=1.6;x.beginPath();
+  for(let c=0;c<cols;c++){
+    if(c>prog) break;
+    const cx=X+c*cw+cw/2, cy=Y+path[c]*ch+ch/2;
+    c?x.lineTo(cx,cy):x.moveTo(cx,cy);
+  }
+  x.stroke();
+  const ci=clamp(Math.floor(prog),0,cols-1);
+  dot(x,X+ci*cw+cw/2,Y+path[ci]*ch+ch/2,3.5,C.amber);
+  txt(x,'IDIOM: never cut to the same framing  ·  IDIOM: go closer as energy rises',6,12,C.cyan,8.5);
+  txt(x,'lines of the score →',X,H-8,C.dim,8.5);
+};
+
+D['08']=(x,t,W,H)=>{
+  const X=14,Y=H*.30,w=W-28, beats=16, seed=Math.floor(t/3.2);
+  txt(x,'BEAT GRID',X,14,C.mute,8.5);
+  for(let i=0;i<=beats;i++){
+    const bx=X+i*(w/beats), on=i%4===0;
+    ln(x,bx,Y-14,bx,Y+34,on?C.edge:'#1A1A20',1);
+    if(on) dot(x,bx,Y-20,1.8,C.mute);
+  }
+  let i=0, k=0;
+  while(i<beats){
+    const step=[1,1,2,2,4][Math.floor(rnd(seed*7+k)*5)];
+    const len=Math.min(step,beats-i);
+    rect(x,X+i*(w/beats)+1.5,Y-8,len*(w/beats)-3,26,k%2?'rgba(228,162,74,.5)':'rgba(111,179,184,.5)');
+    i+=len;k++;
+  }
+  const ph=(t%3.2)/3.2;
+  ln(x,X+ph*w,Y-22,X+ph*w,Y+42,C.bone,1.2);
+  txt(x,'every cut lands on a beat — the arrangement re-rolls, and stays valid',X,H-14,C.dim,8.5);
+  txt(x,'PASS '+(seed%99),W-14,14,C.amber,8.5,'right');
+};
+
+D['09']=(x,t,W,H)=>{
+  const X=14,Y=26,w=W-28,h=H-Y-26, n=54;
+  ln(x,X,Y,X+w,Y,C.edge,1);
+  txt(x,'SHOT LENGTHS HANG BELOW THE CUT LINE',X,14,C.mute,8.5);
+  const spread=.35+.3*Math.sin(t*.35);
+  const vals=[];
+  for(let i=0;i<n;i++){
+    const base=.34+.42*Math.exp(-Math.pow((i/n-.62)/.20,2))*-1+.42*Math.exp(-Math.pow((i/n-.2)/.30,2));
+    const v=clamp(base+(rnd(i*3.1)-.5)*spread*1.4,.06,1);
+    vals.push(v);
+    rect(x,X+i*(w/n)+.6,Y,(w/n)-1.6,v*h,'rgba(228,162,74,.42)');
+  }
+  x.strokeStyle=C.cyan;x.lineWidth=1.6;x.beginPath();
+  for(let i=0;i<n;i++){
+    let s=0,c=0;for(let k=-4;k<=4;k++){const j=i+k;if(j>=0&&j<n){s+=vals[j];c++;}}
+    const yy=Y+(s/c)*h;
+    i?x.lineTo(X+i*(w/n),yy):x.moveTo(X+i*(w/n),yy);
+  }
+  x.stroke();
+  txt(x,'the average tells you almost nothing — the curve is the style',X,H-10,C.dim,8.5);
+  txt(x,'SPREAD '+spread.toFixed(2),W-14,14,C.cyan,8.5,'right');
+};
+
+D['10']=(x,t,W,H)=>{
+  const X=14,w=W-28,Y=H*.62;
+  x.strokeStyle='rgba(111,179,184,.8)';x.lineWidth=1.4;x.beginPath();
+  const E=u=>.12+.88*Math.pow(Math.max(0,Math.sin(u*6.2*1.5-1.2)),2)*.85+.25*Math.max(0,Math.sin(u*6.2*.6));
+  for(let i=0;i<=140;i++){const u=i/140,e=E(u),yy=Y-e*(H*.42);
+    i?x.lineTo(X+u*w,yy):x.moveTo(X+u*w,yy);}
+  x.stroke();
+  txt(x,'BAR ENERGY',X,12,C.cyan,8.5);
+  let u=0,k=0;
+  while(u<1){
+    const e=E(u), len=clamp(.16-e*.13,.018,.17);
+    rect(x,X+u*w+1,Y+10,Math.min(len,1-u)*w-2,20,k%2?'rgba(228,162,74,.62)':'rgba(228,162,74,.34)');
+    u+=len;k++;
+  }
+  const ph=(t*.16)%1; ln(x,X+ph*w,Y-H*.44,X+ph*w,Y+34,C.bone,1.1);
+  txt(x,'loud bars get crowded with cuts · quiet bars get one long shot',X,H-10,C.dim,8.5);
+};
+
+D['11']=(x,t,W,H)=>{
+  const X=14,w=W-28,n=9, top=30, bot=H-34;
+  txt(x,'CAPTURED',X,16,C.mute,8.5); txt(x,'PLACED ON MUSICAL TIME',X,H-14,C.amber,8.5);
+  const dest=[0,.07,.15,.30,.36,.42,.62,.80,.92];
+  for(let i=0;i<n;i++){
+    const a=X+(i/(n-1))*(w-26)+13, b=X+dest[i]*(w-26)+13;
+    rect(x,a-9,top,18,16,'rgba(231,227,218,.16)');
+    rect(x,b-9,bot-16,18,16,'rgba(228,162,74,.5)');
+    x.strokeStyle='rgba(228,162,74,.28)';x.lineWidth=1;
+    x.beginPath();x.moveTo(a,top+16);x.bezierCurveTo(a,top+42,b,bot-42,b,bot-16);x.stroke();
+  }
+  for(let i=0;i<=8;i++){const bx=X+13+(i/8)*(w-26);ln(x,bx,bot+2,bx,bot+8,C.edge,1);}
+  const ph=(t*.2)%1;dot(x,X+13+ph*(w-26),bot+5,2,C.cyan);
+};
+
+D['12']=(x,t,W,H)=>{
+  const pw=(W-42)/2,ph=H-40,Y=24;
+  [0,1].forEach(k=>{
+    const X=14+k*(pw+14);
+    drawField(x,X,Y,pw,ph,t+k*3.4,(u,v,tt)=>{
+      const n=(Math.sin(u*22+tt*.4)+Math.sin(v*17-tt*.3)+Math.sin((u+v)*13))/3;
+      return clamp(.42+n*.3,0,1);},k?cold:warm);
+    txt(x,k?'SEAM':'CROSSFADE',X,14,k?C.cyan:C.amber,8.5);
+  });
+  const X0=14,X1=14+pw+14;
+  rect(x,X0+pw/2-13,Y,26,ph,'rgba(10,10,12,.55)');
+  txt(x,'blur',X0+pw/2,Y+ph/2,C.mute,8,'center');
+  x.strokeStyle=C.cyan;x.lineWidth=1.6;x.beginPath();
+  for(let j=0;j<=24;j++){const v=j/24;
+    const xx=X1+pw/2+Math.sin(v*9+t*.7)*pw*.16+Math.sin(v*23+t)*pw*.05;
+    j?x.lineTo(xx,Y+v*ph):x.moveTo(xx,Y+v*ph);}
+  x.stroke();
+  txt(x,'join where they already agree',W/2,H-10,C.dim,8.5,'center');
+};
+
+D['13']=(x,t,W,H)=>{
+  const X=14,w=W-28,seg=12;
+  [0,1].forEach(k=>{
+    const Y=26+k*(H*.40);
+    txt(x,k?'ON THE BEAT · NEIGHBOURS AGREE':'RANDOM OFFSETS · NEIGHBOURS CLASH',X,Y-8,k?C.cyan:C.mute,8.5);
+    for(let i=0;i<seg;i++){
+      const off=k?0:(rnd(i*5.3)-.5)*.5;
+      const a=X+((i+off*.4)/seg)*w, ww=w/seg-2;
+      const hue=k? .34+.10*Math.sin(i*.7) : rnd(i*9.1);
+      rect(x,a,Y,Math.max(3,ww),H*.20,'rgba('+Math.round(120+hue*140)+','+Math.round(90+hue*90)+','+Math.round(60+hue*60)+',.8)');
+    }
+    for(let i=0;i<=seg;i++){const bx=X+(i/seg)*w;ln(x,bx,Y+H*.20+2,bx,Y+H*.20+7,k?C.cyan:C.edge,1);}
+  });
+  txt(x,'viewers name rhythm and shot coherence — never the effects',X,H-8,C.dim,8.5);
+};
+
+D['14']=(x,t,W,H)=>{
+  const bpm=104+34*Math.sin(t*.22), beat=(t*bpm/60);
+  const names=['OPSIA','PANDORE','PHASMA','LOOPER'], n=4;
+  const cw=(W-28)/n;
+  for(let i=0;i<n;i++){
+    const cx=14+i*cw+cw/2, cy=H*.44;
+    const here=(i<3)||((t%14)<8);
+    x.globalAlpha=here?1:.18;
+    x.strokeStyle=here?C.edge:C.dim;x.lineWidth=1;
+    x.beginPath();x.arc(cx,cy,Math.min(24,cw*.32),0,7);x.stroke();
+    const r=Math.min(24,cw*.32), ph=(beat%1)*6.283-1.571;
+    x.strokeStyle=C.amber;x.lineWidth=2;x.beginPath();
+    x.arc(cx,cy,r,-1.571,ph);x.stroke();
+    dot(x,cx+Math.cos(ph)*r,cy+Math.sin(ph)*r,3,C.amber);
+    txt(x,names[i],cx,cy+r+14,here?C.mute:C.dim,8.5,'center');
+    if(Math.floor(beat)%4===0) dot(x,cx,cy,3.5,'rgba(228,162,74,.5)');
+    x.globalAlpha=1;
+    if(i<n-1) ln(x,cx+r+4,cy,14+(i+1)*cw+cw/2-r-4,cy,'rgba(111,179,184,.35)',1);
+  }
+  txt(x,'UDP MULTICAST · SHARED BEAT, TEMPO, PHASE',14,14,C.cyan,8.5);
+  txt(x,bpm.toFixed(1)+' BPM',W-14,14,C.amber,9,'right');
+  txt(x,'anyone can change tempo · anyone can leave · nothing is the master',14,H-10,C.dim,8.5);
+};
+
+D['15']=(x,t,W,H)=>{
+  const X=14,w=W-28,Y=H*.36,target=128;
+  const settle=1-Math.exp(-((t%12))*.55);
+  x.strokeStyle='rgba(231,227,218,.45)';x.lineWidth=1;x.beginPath();
+  for(let i=0;i<=220;i++){const u=i/220;
+    const env=Math.pow(Math.max(0,Math.sin(u*6.283*8-1.4)),6)*.9+.06;
+    const yy=Y+Math.sin(u*900)*env*(H*.20);
+    i?x.lineTo(X+u*w,yy):x.moveTo(X+u*w,yy);}
+  x.stroke();
+  for(let k=0;k<8;k++){
+    const u=(k+.28)/8, bx=X+u*w;
+    dot(x,bx,Y-H*.24,2,C.amber);
+    ln(x,bx,Y-H*.22,bx,Y+H*.22,'rgba(228,162,74,.18)',1);
+  }
+  for(let k=0;k<=8;k++){
+    const drift=(1-settle)*(rnd(k+Math.floor(t*3))-.5)*.06;
+    const bx=X+((k+.28)/8+drift)*w;
+    ln(x,bx,Y+H*.26,bx,Y+H*.36,C.cyan,1.4);
+  }
+  txt(x,'ROOM AUDIO',X,14,C.mute,8.5);
+  txt(x,'INFERRED GRID',X,Y+H*.46,C.cyan,8.5);
+  txt(x,(target*settle+ (1-settle)*(70+40*rnd(Math.floor(t*4)))).toFixed(1)+' BPM',
+      W-14,14,C.amber,10,'right');
+  txt(x,'the clock comes from the room, not from a cable',X,H-10,C.dim,8.5);
+};
+
+D['16']=(x,t,W,H)=>{
+  const pw=(W-42)/2,Y=26,ph=H-46;
+  drawField(x,14,Y,pw,ph,t,(u,v,tt)=>{
+    const l=sceneLum(u,v,tt), a=(1-l)*.8;          // bright = assumed near = no haze
+    return clamp(l*(1-a)+.42*a,0,1);},warm);
+  drawField(x,14+pw+14,Y,pw,ph,t,(u,v,tt)=>{
+    const l=sceneLum(u,v,tt), a=sceneDepth(u,v)*.85; // far = hazed, whatever its brightness
+    return clamp(l*(1-a)+.40*a,0,1);},warm);
+  txt(x,'LUMINANCE AS DEPTH',14,14,C.mute,8.5);
+  txt(x,'ESTIMATED DEPTH',14+pw+14,14,C.cyan,8.5);
+  txt(x,'sun reads NEAR — wrong',14,H-10,C.amber,8.5);
+  txt(x,'sun reads FAR — hazed',14+pw+14,H-10,C.cyan,8.5);
+  x.strokeStyle=C.edge;x.strokeRect(14,Y,pw,ph);x.strokeRect(14+pw+14,Y,pw,ph);
+};
+
+D['17']=(x,t,W,H)=>{
+  const pw=(W-42)/2,Y=26,ph=H-46, fr=Math.floor(t*12);
+  drawField(x,14,Y,pw,ph,t,(u,v)=>{
+    const d=sceneDepth(u,v);
+    const j=(rnd(Math.floor(u*10)+Math.floor(v*10)*17+fr*3.7)-.5)*.42;
+    return clamp(d+j,0,1);},cold);
+  drawField(x,14+pw+14,Y,pw,ph,t,(u,v)=>{
+    const d=sceneDepth(u,v);
+    const j=(rnd(Math.floor(u*10)+Math.floor(v*10)*17)-.5)*.05;
+    return clamp(d+j,0,1);},cold);
+  txt(x,'PER-FRAME ESTIMATE',14,14,C.amber,8.5);
+  txt(x,'TEMPORALLY CONSISTENT',14+pw+14,14,C.cyan,8.5);
+  txt(x,'the error moves every frame',14,H-10,C.dim,8.5);
+  txt(x,'usable on a projection',14+pw+14,H-10,C.dim,8.5);
+  x.strokeStyle=C.edge;x.strokeRect(14,Y,pw,ph);x.strokeRect(14+pw+14,Y,pw,ph);
+};
+
+D['18']=(x,t,W,H)=>{
+  const pw=(W-42)/2,Y=26,ph=H-46,N=46;
+  const P=k=>{const u=(t*.30-k*.028)%2;
+    const s=u<1?u:2-u;
+    return [ .18+s*.64, .52+Math.sin(s*6.6)*.26 ];};
+  [0,1].forEach(kk=>{
+    const X=14+kk*(pw+14);
+    rect(x,X,Y,pw,ph,'#0A0A0D');
+    for(let k=N-1;k>=0;k--){
+      const p=P(k), rec=1-k/N;
+      const col=kk? 'rgba(228,162,74,'+(0.10+0.90*rec*rec)+')'
+                  : 'rgba(111,179,184,.42)';
+      dot(x,X+p[0]*pw,Y+p[1]*ph,kk?(5+rec*3):6,col);
+    }
+    x.strokeStyle=C.edge;x.strokeRect(X,Y,pw,ph);
+  });
+  txt(x,'MEI — WHERE',14,14,C.cyan,8.5);
+  txt(x,'MHI — WHEN (BRIGHT = RECENT)',14+pw+14,14,C.amber,8.5);
+  txt(x,'a single image that remembers the movement · this is the namesake',14,H-10,C.dim,8.5);
+};
+
+D['19']=(x,t,W,H)=>{
+  const N=26, cx=W*.40, cy=H*.5, R=Math.min(W,H)*.34;
+  const pos=i=>{const a=i/N*6.283+.4;
+    return [cx+Math.cos(a)*R*(.62+.38*rnd(i)), cy+Math.sin(a)*R*(.62+.38*rnd(i+5))];};
+  for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){
+    if(rnd(i*31+j)>.86){const a=pos(i),b=pos(j);ln(x,a[0],a[1],b[0],b[1],'rgba(38,38,46,.9)',1);}
+  }
+  const tx=cx+Math.cos(t*.5)*R*.75, ty=cy+Math.sin(t*.83)*R*.6;
+  let best=0,bd=1e9;
+  for(let i=0;i<N;i++){const p=pos(i),d=Math.hypot(p[0]-tx,p[1]-ty);if(d<bd){bd=d;best=i;}}
+  for(let i=0;i<N;i++){const p=pos(i);dot(x,p[0],p[1],i===best?5:2.6,i===best?C.amber:'rgba(231,227,218,.35)');}
+  const b=pos(best);
+  x.strokeStyle='rgba(228,162,74,.5)';x.setLineDash([3,3]);
+  x.beginPath();x.moveTo(tx,ty);x.lineTo(b[0],b[1]);x.stroke();x.setLineDash([]);
+  dot(x,tx,ty,4,C.cyan);
+  txt(x,'FRAMES, LINKED BY WHAT CAN FOLLOW WHAT',14,14,C.mute,8.5);
+  const px=W*.74;
+  txt(x,'GESTURE',px,H*.36,C.cyan,8.5);
+  txt(x,'target',px,H*.36+14,C.dim,8.5);
+  txt(x,'SELECTED',px,H*.58,C.amber,8.5);
+  txt(x,'frame '+String(best).padStart(2,'0'),px,H*.58+14,C.dim,8.5);
+  txt(x,'nothing ever scrubs',14,H-10,C.dim,8.5);
+};
+
+D['20']=(x,t,W,H)=>{
+  const ph=[24,24,16,16,12,12,8,8,6,6,4,4,2,2,1,1,1,1], tot=ph.reduce((a,b)=>a+b,0);
+  const X=14,w=W-28,Y=30,bh=H*.34;
+  let acc=0;
+  const head=(t*.18)%1;
+  ph.forEach((f,i)=>{
+    const a=X+(acc/tot)*w, ww=(f/tot)*w;
+    const white=i%2===0;
+    rect(x,a,Y,Math.max(1,ww-1),bh,white?'rgba(231,227,218,.86)':'#0D0D10');
+    if(!white){x.strokeStyle=C.edge;x.strokeRect(a,Y,Math.max(1,ww-1),bh);}
+    if(f>=6) txt(x,f,a+ww/2,Y+bh+10,C.mute,8,'center');
+    acc+=f;
+  });
+  ln(x,X+head*w,Y-8,X+head*w,Y+bh+16,C.amber,1.3);
+  x.strokeStyle=C.cyan;x.lineWidth=1.5;x.beginPath();
+  acc=0;
+  ph.forEach((f,i)=>{
+    const u=(acc+f/2)/tot, r=1-(f/24);
+    const yy=H-16-r*(H*.20);
+    i?x.lineTo(X+u*w,yy):x.moveTo(X+u*w,yy);
+    acc+=f;
+  });
+  x.stroke();
+  txt(x,'PHRASES IN FRAMES — LONG TOWARD SHORT',X,16,C.mute,8.5);
+  txt(x,'CUTTING RATE',X,H-6,C.cyan,8.5);
+};
+
+/* ── page build ────────────────────────────────────────── */
+const host=document.getElementById('plates'), rail=document.getElementById('rail');
+const live=[];
+DATA.forEach(d=>{
+  if(d.g){
+    const g=document.createElement('div');g.className='group';
+    g.innerHTML='<h2>'+d.g+'</h2><p>'+d.gt+'</p>';host.appendChild(g);
+  }
+  const p=document.createElement('div');p.className='plate';
+  p.innerHTML=
+   '<div class="stage"><canvas></canvas><div class="tag">'+d.tag+'</div><div class="hint">HOLD</div></div>'+
+   '<div class="body"><h3>'+d.title+'</h3><div class="src">'+d.src+'</div>'+
+   '<div class="lab">What it shows</div><p>'+d.what+'</p>'+
+   '<div class="opsia"><div class="lab">In Opsia</div><p>'+d.opsia+'</p></div></div>';
+  host.appendChild(p);
+  const cv=p.querySelector('canvas'), stage=p.querySelector('.stage');
+  const rec={cv:cv,ctx:cv.getContext('2d'),id:d.n,el:p,vis:false,paused:false,t:Math.random()*10};
+  stage.addEventListener('click',()=>{rec.paused=!rec.paused;stage.classList.toggle('paused',rec.paused);
+    stage.querySelector('.hint').textContent=rec.paused?'HELD':'HOLD';});
+  live.push(rec);
+  const perf=document.createElement('div');perf.className='perf';
+  perf.innerHTML='<span>'+d.n+'</span>';rail.appendChild(perf);rec.perf=perf;
+});
+
+function size(){
+  live.forEach(r=>{
+    const w=r.cv.parentElement.clientWidth, h=Math.round(w*0.52);
+    const dpr=Math.min(2,window.devicePixelRatio||1);
+    r.cv.width=w*dpr;r.cv.height=h*dpr;r.cv.style.height=h+'px';
+    r.ctx.setTransform(dpr,0,0,dpr,0,0);r.W=w;r.H=h;
+  });
+  live.forEach(r=>{const b=r.el.getBoundingClientRect();
+    r.perf.style.top=(r.el.offsetTop+10)+'px';});
+}
+window.addEventListener('resize',size);
+
+const io=new IntersectionObserver(es=>es.forEach(e=>{
+  const r=live.find(l=>l.el===e.target); if(r){r.vis=e.isIntersecting;
+    r.perf.classList.toggle('on',e.isIntersecting&&e.intersectionRatio>.35);}
+}),{threshold:[0,.35,.8]});
+live.forEach(r=>io.observe(r.el));
+
+const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let last=performance.now();
+function frame(now){
+  const dt=Math.min(.05,(now-last)/1000);last=now;
+  live.forEach(r=>{
+    if(!r.vis||!r.W) return;
+    if(!r.paused&&!reduce) r.t+=dt;
+    const f=D[r.id]; if(!f) return;
+    r.ctx.clearRect(0,0,r.W,r.H);
+    r.ctx.fillStyle='#08080A';r.ctx.fillRect(0,0,r.W,r.H);
+    try{f(r.ctx,r.t,r.W,r.H);}catch(err){}
+  });
+  requestAnimationFrame(frame);
+}
+size();setTimeout(size,300);setTimeout(size,1200);
+window.addEventListener('load',size);
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(size);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
