@@ -175,30 +175,16 @@ export function AutoControls({
       compact.length > 0 ? (
         <CompactCluster key="compact" inputs={compact} values={values} onChange={onChange} />
       ) : null
-    // Too few controls to justify a wrapping grid → lay them in a single row and
-    // centre the whole group instead of a sparse, top-left grid.
-    const singleRow = rest.length + (compactCell ? 1 : 0) <= 4
+    // Fixed-width controls (each its own 11rem) that WRAP by width, LEFT-justified so
+    // the parameters stay compact and read left-to-right. They flow DOWN into rows as
+    // the width narrows (never a sideways overflow). Vertical centring inside the band
+    // — and the scroll when the rows overflow it — is the band wrapper's `m-auto`.
     return (
-      <div className={`flex h-full gap-5 p-2 ${singleRow ? 'items-center justify-center' : 'items-start'}`}>
-        {singleRow ? (
-          <div className="flex items-center gap-5">
-            {visible(rest).map((inp) => renderControl(inp))}
-            {compactCell}
-          </div>
-        ) : (
-          // Flexible columns (≥9.5rem, stretched to fill) that auto-fill the band's
-          // WIDTH and wrap into new ROWS as needed : as many controls as fit sit on
-          // one row (a 6-param effect stays one row at a normal width), the rest wrap
-          // DOWN — never a horizontal overflow. `[&>*]:w-full` lets each control fill
-          // its (now variable) cell, same trick the vertical layout uses.
-          <div
-            className="grid min-w-0 flex-1 content-start gap-x-4 gap-y-2 [&>*]:w-full"
-            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(9.5rem, 1fr))' }}
-          >
-            {visible(rest).map((inp) => renderControl(inp))}
-            {compactCell}
-          </div>
-        )}
+      <div className="flex items-center gap-5 p-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-5 gap-y-2.5">
+          {visible(rest).map((inp) => renderControl(inp))}
+          {compactCell}
+        </div>
         {pads.length > 0 && (
           <div className="flex shrink-0 items-center gap-5">
             {pads.map((inp) => (
@@ -219,7 +205,7 @@ export function AutoControls({
   // (colours, sliders and enums have different heights; aligning tops keeps the
   // label row straight).
   return (
-    <div className="flex flex-wrap items-start gap-x-5 gap-y-2 p-2">
+    <div className="flex flex-wrap items-start gap-x-5 gap-y-2.5 p-2">
       {visible(inputs).map((inp) => renderControl(inp))}
     </div>
   )
@@ -322,8 +308,14 @@ function Control({
 }
 
 function labelEl(inp: IsfInputDesc): JSX.Element {
+  // Clamp to ONE line (ellipsis + full text in the tooltip) so a long label like
+  // "manifest (motion reveal)" can't wrap to two lines and shove its slider down
+  // out of alignment with the rest of the row : every control keeps one label line.
   return (
-    <span className="font-mono text-[9px] uppercase tracking-wide text-muted" title={inp.hint ?? inp.name}>
+    <span
+      className="line-clamp-1 min-w-0 font-mono text-[9px] uppercase tracking-wide text-muted"
+      title={inp.hint ?? inp.label}
+    >
       {inp.label}
     </span>
   )

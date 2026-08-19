@@ -564,14 +564,19 @@ export function Inspector(): JSX.Element {
               </div>
             ) : (
               <>
-              <div style={{ height: fxH }} className="overflow-x-hidden overflow-y-auto">
-                <AutoControls
-                  inputs={inputsForShader(shaderId)}
-                  values={values}
-                  onChange={onChange}
-                  modTargetFor={modTargetFor}
-                  layout="twoRow"
-                />
+              <div style={{ height: fxH }} className="flex overflow-x-hidden overflow-y-auto">
+                {/* m-auto centres the controls vertically when they fit the band and
+                    collapses to a normal top-anchored scroll when they overflow (unlike
+                    align/justify-center, which would clip the top out of reach). */}
+                <div className="m-auto w-full">
+                  <AutoControls
+                    inputs={inputsForShader(shaderId)}
+                    values={values}
+                    onChange={onChange}
+                    modTargetFor={modTargetFor}
+                    layout="twoRow"
+                  />
+                </div>
               </div>
               {/* Drag to resize the controls band (persisted). */}
               <div
