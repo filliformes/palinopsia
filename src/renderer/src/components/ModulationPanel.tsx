@@ -15,7 +15,9 @@ import { modTargetKey, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { modulatorBlurb } from '../shaders/isf/sourceBlurbs'
 
-const MOD_TYPES: ModulatorType[] = ['lfo', 'ramp', 'adsr', 'arp', 'euclid', 'turing', 'cellular', 'random', 'sh', 'slew', 'chaos', 'audio', 'vision', 'homeostat', 'organic', 'physics', 'motion']
+// Alphabetical : the dropdown shows the raw type id, so keep this sorted so the
+// list reads in order (add new types in their alphabetical slot).
+const MOD_TYPES: ModulatorType[] = ['adsr', 'arp', 'audio', 'cellular', 'chaos', 'euclid', 'homeostat', 'lfo', 'motion', 'organic', 'physics', 'ramp', 'random', 'sh', 'slew', 'turing', 'vision']
 const CELL_RULES = [30, 90, 110, 150]
 const LFO_SHAPES: LfoShape[] = ['sine', 'triangle', 'square', 'sawtooth', 'rndStep', 'rndSmooth', 'spastic']
 const ARP_MODES: ArpMode[] = ['up', 'down', 'upDown', 'random', 'drunk']
