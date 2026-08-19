@@ -33,6 +33,5 @@ export interface CollageScanResult {
  *  carrying a collage replays without the bank. */
 export interface CollageEdl {
   id: string
-  name: string
   clips: import('./assemble').AssembleClip[]
 }

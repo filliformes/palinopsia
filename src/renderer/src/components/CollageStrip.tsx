@@ -24,19 +24,12 @@ export function CollageStrip({
   const setLayerEdls = useStore((s) => s.setCollageEdls)
   const setBgPool = useStore((s) => s.setBgCollagePool)
   const setBgEdls = useStore((s) => s.setBgCollageEdls)
-  const setCollagePool = (
-    _l: number,
-    _s: 'A' | 'B',
-    dir: string,
-    clips: CollageClip[]
-  ): void =>
+  const writePool = (dir: string, clips: CollageClip[]): void =>
     target.kind === 'background'
       ? setBgPool(dir, clips)
       : setLayerPool(target.layer, target.slot, dir, clips)
-  const setCollageEdls = (_l: number, _s: 'A' | 'B', next: CollageEdl[]): void =>
+  const writeEdls = (next: CollageEdl[]): void =>
     target.kind === 'background' ? setBgEdls(next) : setLayerEdls(target.layer, target.slot, next)
-  const layer = target.kind === 'background' ? 0 : target.layer
-  const slot: 'A' | 'B' = target.kind === 'background' ? 'A' : target.slot
   const bank = useStore((s) => s.assemblages)
   const [picking, setPicking] = useState(false)
   // The running VERB doubles as the busy flag : an optimise pass is minutes where
@@ -66,7 +59,7 @@ export function CollageStrip({
       // must land even if the strip unmounted mid-scan (selecting another layer
       // during a minutes-long optimise) — else the finished result is thrown
       // away and the pool stays empty with no sign anything happened.
-      if (res.ok) setCollagePool(layer, slot, dir, res.clips)
+      if (res.ok) writePool(dir, res.clips)
       if (!alive.current) return
       if (!res.ok) {
         setNote(res.error ? 'scan failed' : 'no readable video in that folder')
@@ -102,12 +95,10 @@ export function CollageStrip({
     if (!hit) return
     // Copy the CLIPS in : the bank is machine-local localStorage, and a session
     // carrying a collage has to replay without it.
-    setCollageEdls(
-      layer,
-      slot,
+    writeEdls(
       chosen.has(id)
         ? edls.filter((e) => e.id !== id)
-        : [...edls, { id: hit.id, name: hit.name, clips: hit.clips }]
+        : [...edls, { id: hit.id, clips: hit.clips }]
     )
   }
 

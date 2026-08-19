@@ -1933,11 +1933,15 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     }),
   removeFx: (scope, instId) =>
-    set((s) => ({
-      composition: updateFxArray(s.composition, scope, (fx) =>
+    set((s) => {
+      const composition = updateFxArray(s.composition, scope, (fx) =>
         fx.filter((f) => f.id !== instId || f.locked)
       )
-    })),
+      // Drop any modulation / Meta target that pointed at the removed unit, else
+      // it lingers as a dead matrix row (counting against the 12-assignment cap)
+      // that renders nothing and can't be found to delete.
+      return { composition: dropTargets(composition, (t) => t.kind === 'fx' && t.instId === instId) }
+    }),
   toggleFx: (scope, instId) =>
     set((s) => ({
       // Locked units stay pinned and unremovable, but CAN be bypassed —

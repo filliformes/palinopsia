@@ -25,17 +25,12 @@ interface Props {
   // String(v), so a slider that lands on 0.079577… clips in a narrow box.
   // Trailing zeros are trimmed, so 0.5 stays "0.5", not "0.500".
   maxFrac?: number
-  step?: number
   placeholder?: string
   className?: string
   title?: string
   // Pass-through to the native input. Lets the Inspector pane render
   // builtin / read-only Templates without forking the component.
   disabled?: boolean
-  // Bumping this number focuses the input and selects all its text on
-  // the next render : used by the Sequence view to "land" on the
-  // Duration field after the user drops a scene into a Scene Step.
-  autoFocusToken?: number
   // When set, the box shows the LIVE modulated value (liveModValues[liveKey])
   // while idle : written straight to the DOM per rAF, no re-render : so the
   // readout tracks modulation just like the slider thumb. Typing still edits
@@ -54,7 +49,6 @@ export function BoundedNumberInput({
   className,
   title,
   disabled,
-  autoFocusToken,
   liveKey
 }: Props): JSX.Element {
   const [str, setStr] = useState(formatValue(value, integer, maxFrac))
@@ -73,32 +67,8 @@ export function BoundedNumberInput({
   // an old value after a fast type-then-blur sequence).
   const strRef = useRef(str)
   strRef.current = str
-  // DOM ref for autoFocusToken handling.
+  // DOM ref for focus/blur handling.
   const inputRef = useRef<HTMLInputElement | null>(null)
-  // Capture the initial token so we skip the on-mount fire : only
-  // INCREMENTS of the token from the parent should pull focus, not
-  // the first paint after the panel mounts.
-  const initialTokenRef = useRef(autoFocusToken)
-  useEffect(() => {
-    if (autoFocusToken === undefined) return
-    if (autoFocusToken === initialTokenRef.current) return
-    // Defer to a microtask so any in-flight focus events from the
-    // upstream gesture (drop's mouseup, dnd-kit drag-end cleanup,
-    // React's commit phase) finish before we claim focus. Without
-    // this the input ends up visually selected but the browser
-    // keeps focus elsewhere, so keystrokes don't actually edit it.
-    const id = setTimeout(() => {
-      const el = inputRef.current
-      if (!el) return
-      el.focus()
-      el.select()
-      // Mark the input as "edit-ready" : focused.current is what
-      // the on-blur and value-sync paths gate on. Without this, a
-      // value re-sync arriving on the same tick would clobber str.
-      focused.current = true
-    }, 0)
-    return () => clearTimeout(id)
-  }, [autoFocusToken])
 
   // Sync external value into local string. Runs on every `value`
   // change. Hard rule: if the user is currently focused AND has

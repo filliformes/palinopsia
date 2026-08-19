@@ -257,9 +257,11 @@ export class CollageSource {
   private fbo: WebGLFramebuffer | null = null
   private pool: CollageClip[] = []
   private poolKey = ''
+  private poolRef: CollageClip[] | null = null
   private poolDirty = false
   private edls: CollageEdl[] = []
   private edlKey = ''
+  private edlRef: CollageEdl[] | null = null
   private edlDirty = false
   private lastFeed = -1
   /** Base inputs from the store, overlaid by modulation's per-frame writes. */
@@ -573,18 +575,26 @@ export class CollageSource {
     inputs: Record<string, number | number[]>
   ): void {
     if (this.disposed) return
-    // A changed pool (new folder, new selection) re-deals from scratch.
-    const key = pool.map((c) => c.id).join('|')
-    if (key !== this.poolKey) {
-      this.pool = pool.slice()
-      this.poolKey = key
-      this.poolDirty = true
+    // A changed pool (new folder, new selection) re-deals from scratch. The
+    // store passes a STABLE array reference until it actually changes, so a
+    // cheap reference check gates the per-frame id-join (~300 ids × 60 fps).
+    if (pool !== this.poolRef) {
+      this.poolRef = pool
+      const key = pool.map((c) => c.id).join('|')
+      if (key !== this.poolKey) {
+        this.pool = pool.slice()
+        this.poolKey = key
+        this.poolDirty = true
+      }
     }
-    const ek = edls.map((e) => e.id).join('|')
-    if (ek !== this.edlKey) {
-      this.edls = edls.slice()
-      this.edlKey = ek
-      this.edlDirty = true
+    if (edls !== this.edlRef) {
+      this.edlRef = edls
+      const ek = edls.map((e) => e.id).join('|')
+      if (ek !== this.edlKey) {
+        this.edls = edls.slice()
+        this.edlKey = ek
+        this.edlDirty = true
+      }
     }
     this.live = { ...inputs }
   }

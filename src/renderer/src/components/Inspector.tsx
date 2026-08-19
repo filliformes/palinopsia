@@ -226,7 +226,12 @@ export function Inspector(): JSX.Element {
           : `layer ${scope.layer + 1} · ${SCOPE_LABEL[scope.kind]}`
       onChange = (n, v) => setFxInput(scope, instId, n, v)
       modTargetFor = (input) => ({ kind: 'fx', scope, instId, input })
-      if (SHADER_BY_ID[inst.shaderId]?.native && scope.kind === 'layer') {
+      // Only the two SIDECHAIN nodes read a sidechain; the self-contained
+      // nodes ignore it, so showing the picker for them is misleading.
+      if (
+        (inst.shaderId === 'node-transfert' || inst.shaderId === 'node-convolve') &&
+        scope.kind === 'layer'
+      ) {
         const sc = scope
         nodeSidechain = {
           ref: inst.sidechain ?? null,
@@ -236,6 +241,18 @@ export function Inspector(): JSX.Element {
       }
     }
   }
+
+  // A stable identity for the preset picker : distinct per selected FX unit /
+  // source slot / background, so it never bleeds an applied name between two
+  // same-shader units.
+  const presetKey =
+    selection?.type === 'fx'
+      ? `fx:${JSON.stringify(selection.scope)}:${selection.instId}`
+      : selection?.type === 'source'
+        ? `src:${selection.layer}:${selection.slot}`
+        : selection?.type === 'background'
+          ? 'bg'
+          : String(shaderId)
 
   // Plain-English hover-help on the title : an FX blurb, or — when a
   // generator source is selected — a source blurb.
@@ -426,9 +443,11 @@ export function Inspector(): JSX.Element {
         >
           ⚄
         </button>
-        {/* key resets the picker's applied-name when the selection moves */}
+        {/* key resets the picker's applied-name when the selection moves. Keyed
+            on the selection's IDENTITY (an FX instId, or the source/bg slot) so
+            two units of the same shader in one rack don't share a picker. */}
         <PresetPicker
-          key={`${shaderId}:${context}`}
+          key={presetKey}
           shaderId={shaderId}
           values={values}
           onChange={onChange}
@@ -436,7 +455,7 @@ export function Inspector(): JSX.Element {
           onApplied={isVibe ? setVibePresetName : undefined}
         />
       </div>
-      {/* Native Text source: the string + the glyph-fill sidechain. */}
+      {/* Native Collage source : the folder / assemblage picker strip. */}
       {collageCfg && (
         <CollageStrip
           target={collageCfg.target}
