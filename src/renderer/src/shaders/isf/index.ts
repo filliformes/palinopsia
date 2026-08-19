@@ -58,6 +58,7 @@ import streak from './fx/Streak.fs?raw'
 import sharpen from './fx/Sharpen.fs?raw'
 import fold from './fx/Fold.fs?raw'
 import transform from './fx/Transform.fs?raw'
+import ntsc from './fx/NTSC.fs?raw'
 import stutter from './fx/Stutter.fs?raw'
 import slitBuffer from './fx/SlitBuffer.fs?raw'
 import differenceBloom from './fx/DifferenceBloom.fs?raw'
@@ -255,7 +256,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Datamosh : the codec 'moshing' look, real-time and codec-free. The layer's own motion (optical flow, quantised to macroblocks) advects a feedback buffer every frame, so the picture keeps SLIDING along movement : the P-frame smear. Turn REFRESH (the I-frame) down and a new scene's motion drags the PREVIOUS scene's texture around : figures melt into and emerge from the image (the bloom). RESIDUAL re-injects live texture (the mosh↔mush line); RESEED snaps whole blocks back so it never fully mushes. STICKY slides each block as a crisp tile (real datamosh tearing); MELT is a softer smear. ACTANTS are sparse sticky patches that a trigger drops into the picture, drifting along the flow as autonomous frozen blocks (Perconte). MANIFEST reveals the live frame only where there's motion, so a new source completes itself out of the retained frame instead of cutting. With a sidechain layer + 'motion transfer' on, that layer's MOVEMENT moshes THIS layer's texture.",
+      "DESCRIPTION": "Datamosh : the codec 'moshing' look, real-time and codec-free. The layer's own motion (optical flow, quantised to macroblocks) advects a feedback buffer every frame, so the picture keeps SLIDING along movement : the P-frame smear. Turn REFRESH (the I-frame) down and a new scene's motion drags the PREVIOUS scene's texture around : figures melt into and emerge from the image (the bloom). RESIDUAL re-injects live texture (the mosh↔mush line); RESEED snaps whole blocks back so it never fully mushes. STICKY slides each block as a crisp tile (real datamosh tearing); MELT is a softer smear. ACTANTS are sparse sticky patches that a trigger drops into the picture, drifting along the flow as autonomous frozen blocks (Perconte). MANIFEST reveals the live frame only where there's motion, so a new source completes itself out of the retained frame instead of cutting. MOSH GATE holds only the moving parts (+) or only the still ones (−); EDGE REPEL steers the smear along content edges; RE-SHARP crisps the softened result back up. With a sidechain layer + 'motion transfer' on, that layer's MOVEMENT moshes THIS layer's texture.",
       "CATEGORIES": ["FX", "Glitch", "Feedback"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["melt", "sticky", "fluid"], "DEFAULT": 1, "LABEL": "mode" },
@@ -269,6 +270,9 @@ export const NATIVE_NODES: IsfShader[] = [
         { "NAME": "reseed", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.1, "LABEL": "reseed" },
         { "NAME": "manifest", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "manifest (motion reveal)" },
         { "NAME": "thresh", "TYPE": "float", "MIN": 0.0, "MAX": 0.1, "DEFAULT": 0.012, "LABEL": "motion gate" },
+        { "NAME": "moshGate", "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "mosh gate (still↔move)" },
+        { "NAME": "edgeRepel", "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "edge repel" },
+        { "NAME": "resharp", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "re-sharpen" },
         { "NAME": "bleed", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2, "LABEL": "chroma bleed" },
         { "NAME": "autoBloom", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.7, "LABEL": "auto-bloom (cuts)" },
         { "NAME": "cutSense", "TYPE": "float", "MIN": 0.02, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "cut sensitivity" },
@@ -291,6 +295,9 @@ export const NATIVE_NODES: IsfShader[] = [
       residual: [0.05, 0.35],
       reseed: [0.0, 0.35],
       manifest: [0.0, 0.6],
+      moshGate: [-0.8, 0.8],
+      edgeRepel: [-0.5, 0.5],
+      resharp: [0.0, 0.5],
       actant: [0.0, 0.8],
       actantLife: [0.3, 0.8],
       actantRate: [0.0, 2.0],
@@ -483,6 +490,23 @@ export const NATIVE_NODES: IsfShader[] = [
       ]
     }*/`,
     curated: { decay: [0.3, 0.8], amount: [0.3, 0.8], chroma: [0, 1], mix: [0.6, 1] }
+  },
+  {
+    id: 'node-melt',
+    name: 'Melt',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Melt : a seam-local dissolve that CREEPS. It reads the picture's own light/dark edges, and inside a narrow band along each edge it dissolves the node's OWN previous frame back in, pushed one-sided along the edge normal — so the boundaries between forms soften and slowly walk outward, the image melting at its contours. Unlike Datamosh (motion-driven, whole-frame) this is edge-driven and self-feeding, a structural melt that keeps going on a still picture. WIDTH sets how far from an edge it reaches, GATE which edges qualify, DIR the creep direction and speed (0 = a static edge-ghost, ± = it walks). Layer / source / master.",
+      "CATEGORIES": ["FX", "Feedback", "Distortion"],
+      "INPUTS": [
+        { "NAME": "amount", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "melt" },
+        { "NAME": "width", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "band width" },
+        { "NAME": "dir", "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "creep" },
+        { "NAME": "gate", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "edge gate" }
+      ]
+    }*/`,
+    curated: { amount: [0.3, 0.8], width: [0.1, 0.5], dir: [-0.6, 0.6], gate: [0.05, 0.35] }
   },
   {
     id: 'node-pulfrich',
@@ -1051,6 +1075,10 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-sync-loss', name: 'Sync Loss', category: 'FX', source: syncLoss,
     curated: { roll: [0.05, 0.8], tear: [0.02, 0.25], bands: [2, 8], rate: [0.1, 0.7] }
+  },
+  {
+    id: 'fx-ntsc', name: 'NTSC', category: 'FX', source: ntsc,
+    curated: { artifact: [0.1, 0.6], carrier: [0.2, 0.8], fringe: [0.05, 0.4], interlace: [0.1, 0.6], fieldHue: [-0.5, 0.5], fieldCrawl: [0, 0.4] }
   },
   {
     id: 'fx-row-echo', name: 'Row Echo', category: 'FX', source: rowEcho,

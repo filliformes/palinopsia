@@ -346,8 +346,10 @@ precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uHost, uPrev, uFlow, uEnergy, uActantMask;
 uniform vec2 uRes;
 uniform float uBlock, uMotion, uRefresh, uResidual, uReseed, uDecay, uBleed, uThresh, uSeed, uAutoBloom, uBloom, uSwirl, uActant, uManifest;
+uniform float uMoshGate, uRepel, uResharp;
 uniform int uMode, uFlowInvert;
 float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float lumD(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
 void main(){
   // BLOOM : a detected cut (auto, held in the 1×1 energy state) OR a manual/beat
   // BLOOM TRIGGER (uBloom, a decaying envelope) momentarily drives the I-frame
@@ -362,6 +364,14 @@ void main(){
   // a rigid tile, tearing at block edges : the real datamosh look). MELT/FLUID = the
   // per-pixel flow → a softer warp/smear (FLUID feeds a temporally-averaged flow).
   vec2 rawmv = (uMode == 1 ? texture(uFlow, blockCenter).rg : texture(uFlow, vUV).rg) * uMotion;
+  // EDGE REPEL : push the motion by the host's own luma gradient, so the smear
+  // slides along / away from content edges instead of purely along motion (a more
+  // liquid, contour-hugging melt). Signed : +away from bright, −toward.
+  if (abs(uRepel) > 0.001) {
+    float rx = lumD(texture(uHost, vUV + vec2(texel.x, 0.0)).rgb) - lumD(texture(uHost, vUV - vec2(texel.x, 0.0)).rgb);
+    float ry = lumD(texture(uHost, vUV + vec2(0.0, texel.y)).rgb) - lumD(texture(uHost, vUV - vec2(0.0, texel.y)).rgb);
+    rawmv += vec2(rx, ry) * uRepel * 0.06;
+  }
   // Motion-vector manipulation (ffglitch-style, on our flow field) : invert the
   // direction (reverse-smear) and/or rotate every vector (vortex mosh).
   if (uFlowInvert == 1) rawmv = -rawmv;
@@ -392,6 +402,13 @@ void main(){
   // motion was, then cleans up. Moving areas keep sliding (the P-frame smear).
   float dec = mix(uDecay, 0.985, bloom * 0.6);         // bloom boosts persistence
   dec = mix(dec, 0.99, act);                           // actants : near-total hold
+  // MOSH GATE : bias the hold toward MOVING parts (+) or STILL parts (−). Positive
+  // freezes the smear only where there's motion (the rest stays live); negative
+  // holds the still background and lets the moving figures read through clean.
+  if (abs(uMoshGate) > 0.001) {
+    float mg = smoothstep(uThresh, uThresh * 8.0 + 0.01, fmag);
+    dec *= mix(1.0, (uMoshGate > 0.0) ? mg : (1.0 - mg), abs(uMoshGate)) * (1.0 - act) + act;
+  }
   vec3 outc = mix(host, advected, dec);
   outc = mix(outc, host, uResidual * 0.5 * (1.0 - act)); // extra live-texture re-inject
 
@@ -406,6 +423,15 @@ void main(){
   // detail so the smear never fully mushes (transflow's random-reset idea).
   float rs = step(1.0 - uReseed * 0.3, hash(floor(vUV * uRes / max(uBlock, 1.0)) + uSeed)) * (1.0 - act);
   outc = mix(outc, host, rs);
+
+  // RE-SHARP : the smear softens the picture; add the host's own high-frequency
+  // detail back so edges crisp up again without breaking the mosh (unsharp mask
+  // against a 4-tap box of the live frame).
+  if (uResharp > 0.001) {
+    vec3 hb = (texture(uHost, vUV + vec2(texel.x, 0.0)).rgb + texture(uHost, vUV - vec2(texel.x, 0.0)).rgb
+             + texture(uHost, vUV + vec2(0.0, texel.y)).rgb + texture(uHost, vUV - vec2(0.0, texel.y)).rgb) * 0.25;
+    outc += (host - hb) * uResharp * 2.0;
+  }
 
   o = vec4(clamp(outc, 0.0, 1.0), 1.0);
 }`
@@ -849,6 +875,37 @@ void main(){
   o = vec4(clamp(mix(host, col, uMix), 0.0, 1.0), 1.0);
 }`
 
+// ── Melt (BENDR borrow) : seam-local dissolve that CREEPS. The host's own luma
+// edges give an edge band + a normal; inside the band the node's OWN previous
+// output is fetched pushed one-sided along that normal and dissolved back in, so
+// the boundary between light and dark forms softens and walks outward every frame.
+// Unlike Datamosh (motion-driven, full-frame) this is EDGE-driven and self-feeding
+// — a slow structural melt of contours. One ping-pong buffer holds last output. ──
+const F_MELT = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uPrev; uniform vec2 uRes;
+uniform float uAmount, uWidth, uDir, uGate;
+float lum(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
+void main(){
+  vec2 texel = 1.0 / uRes;
+  vec3 host = texture(uHost, vUV).rgb;
+  float mL = lum(texture(uHost, vUV - vec2(texel.x, 0.0)).rgb);
+  float mR = lum(texture(uHost, vUV + vec2(texel.x, 0.0)).rgb);
+  float mD = lum(texture(uHost, vUV - vec2(0.0, texel.y)).rgb);
+  float mU = lum(texture(uHost, vUV + vec2(0.0, texel.y)).rgb);
+  vec2 grad = vec2(mR - mL, mU - mD);
+  float glen = length(grad);
+  vec2 en = (glen > 1e-5) ? grad / glen : vec2(0.0);
+  float lo = 0.01 + uGate * 0.30;                       // GATE : only the strong edges
+  float band = smoothstep(lo, lo + 0.02 + uWidth * 0.50, glen);
+  // creep : fetch the previous output pushed one-sided along the edge normal, so
+  // the dissolved seam walks a little further each frame (self-feeding melt).
+  float speed = (0.004 + uWidth * 0.06) * abs(uDir);
+  vec2 bd = en * sign(uDir + 1e-4) * band * speed;
+  vec3 pv = texture(uPrev, clamp(vUV + bd, 0.0, 1.0)).rgb;
+  o = vec4(clamp(mix(host, pv, clamp(band * uAmount, 0.0, 0.92)), 0.0, 1.0), 1.0);
+}`
+
 // ── Pulfrich : real monocular 3D from a temporal eye-delay ────────────────
 // The Pulfrich effect : one eye seeing a slightly DELAYED image (a dark filter
 // slows its neural response) turns lateral motion into stereo depth. Here the
@@ -1008,6 +1065,7 @@ class NodeGL {
   corrodeGrow: Prog
   corrodeOut: Prog
   decimate: Prog
+  melt: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -1041,6 +1099,7 @@ class NodeGL {
     this.corrodeGrow = this.build(F_CORRODE_GROW)
     this.corrodeOut = this.build(F_CORRODE_OUT)
     this.decimate = this.build(F_DECIMATE)
+    this.melt = this.build(F_MELT)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -1775,6 +1834,9 @@ export class DatamoshNode implements ConvNode {
     gl.uniform1f(p.u('uBleed'), clampf(num(inp.bleed, 0.2), 0, 1))
     gl.uniform1f(p.u('uThresh'), clampf(num(inp.thresh, 0.012), 0, 0.1))
     gl.uniform1i(p.u('uMode'), Math.round(num(inp.mode, 1)))
+    gl.uniform1f(p.u('uMoshGate'), clampf(num(inp.moshGate, 0), -1, 1))
+    gl.uniform1f(p.u('uRepel'), clampf(num(inp.edgeRepel, 0), -1, 1))
+    gl.uniform1f(p.u('uResharp'), clampf(num(inp.resharp, 0), 0, 1))
     gl.uniform1f(p.u('uSeed'), this.frame % 2048)
     draw(write.fbo, W, H)
 
@@ -2488,6 +2550,68 @@ export class AfterimageNode implements ConvNode {
   }
 }
 
+// ── Melt node : seam-local edge dissolve that creeps (BENDR borrow) ──────
+// One ping-pong RGBA16F buffer holds the previous output; the melt pass reads it
+// + the live host, and writes the melted frame back — which IS next frame's prev,
+// so the seam self-feeds and walks. Returns the written buffer directly (same
+// safe pattern as Datamosh : it's only re-read next frame, after the flip).
+export class MeltNode implements ConvNode {
+  private acc: [RGBA, RGBA] | null = null
+  private w = 0
+  private h = 0
+  private cur = 0
+  private seeded = false
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  private ensure(w: number, h: number): void {
+    if (this.acc && this.w === w && this.h === h) return
+    const gl = this.gl
+    if (this.acc) for (const b of this.acc) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
+    this.acc = [makeRGBA(gl, w, h, true), makeRGBA(gl, w, h, true)]
+    this.w = w; this.h = h; this.cur = 0; this.seeded = false
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl)
+    const W = ctx.chain.w, H = ctx.chain.h
+    this.ensure(W, H)
+    const inp = ctx.inputs
+    const acc = this.acc as [RGBA, RGBA]
+
+    // Seed both buffers with the live frame so the seam starts from the picture,
+    // not black (which would dissolve the edges into a void on the first frames).
+    if (!this.seeded) {
+      const cp = g.use(g.copy)
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(cp.u('uTex'), 0)
+      for (const b of acc) { gl.bindFramebuffer(gl.FRAMEBUFFER, b.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3) }
+      this.seeded = true
+    }
+
+    const read = acc[this.cur], write = acc[1 - this.cur]
+    const p = g.use(g.melt)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, read.tex); gl.uniform1i(p.u('uPrev'), 1)
+    gl.uniform2f(p.u('uRes'), W, H)
+    gl.uniform1f(p.u('uAmount'), clampf(num(inp.amount, 0.5), 0, 1))
+    gl.uniform1f(p.u('uWidth'), clampf(num(inp.width, 0.3), 0, 1))
+    gl.uniform1f(p.u('uDir'), clampf(num(inp.dir, 0.3), -1, 1))
+    gl.uniform1f(p.u('uGate'), clampf(num(inp.gate, 0.15), 0, 1))
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    this.cur = 1 - this.cur
+    return write.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    const gl = this.gl
+    if (this.acc) { for (const b of this.acc) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.acc = null }
+  }
+}
+
 // ── Pulfrich node : monocular 3D from a temporal eye-delay ───────────────
 // A frame-history ring read as a per-pixel delay, keyed by the shared depth map
 // (or luminance), presented as an anaglyph pair or a motion-gated parallax slide.
@@ -2739,6 +2863,7 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   if (shaderId === 'node-decimate') return new DecimateNode(gl)
   if (shaderId === 'node-eternalism') return new EternalismNode(gl)
   if (shaderId === 'node-afterimage') return new AfterimageNode(gl)
+  if (shaderId === 'node-melt') return new MeltNode(gl)
   if (shaderId === 'node-transfert') return new TransfertNode(gl)
   if (shaderId === 'node-convolve') return new ConvolveNode(gl)
   if (shaderId === 'node-reponse') return new ReponseNode(gl)
@@ -2751,6 +2876,6 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

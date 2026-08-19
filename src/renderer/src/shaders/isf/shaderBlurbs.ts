@@ -50,6 +50,8 @@ export const SHADER_BLURBS: Record<string, string> = {
     'Mirrors the image once across a line you can move, with the reflected half slidable. One deliberate fold makes a composition; this is why it will not do radial or kaleidoscope symmetry. Use it to build a diptych or to answer a shape with itself.',
   'fx-transform':
     'Zooms, moves and rotates the picture inside its layer, either wrapping at the edges or holding the border pixels. It is the plain compositional tool: place and scale a source without touching the layer itself. The four crop sliders black out the top, bottom, left and right edges to reframe the layer. Wrapping turns a slow pan into an endless tile.',
+  'fx-ntsc':
+    'Recreates the colour smearing and rainbow shimmer of old composite video, where the picture and its colour share one crowded signal. Sharp edges crawl with dot-rainbows, colours bleed sideways, and the two interlaced scan fields can be pulled slightly apart so the image shivers. A cheap approximation of the look, not a real broadcast encoder.',
   'fx-abstraction':
     'One dial that carries the image away from being a picture of something toward being pure texture. As you raise it the picture is dragged along its own lines of brightness until subjects dissolve into movement. Very useful when you want a recognisable source to stop being recognisable.',
   'fx-motif':
@@ -152,6 +154,8 @@ export const SHADER_BLURBS: Record<string, string> = {
     'Holds two frames a moment apart and alternates them across a black shutter, so a slice of time hangs there moving without ever going anywhere. It is persistence of vision turned into a signal path. Slower rates shimmer; faster ones fuse into a single strange image.',
   'node-afterimage':
     'Where a bright shape has been and then left, its ghost blooms back in the opposite colour. This is what your eye does on its own after staring at something, described by Goethe two centuries ago. The ghost can be a plain dark subtraction or a full complementary colour.',
+  'node-melt':
+    'Softens the picture only along its own light-and-dark edges, dissolving the last frame back in a narrow band so the boundaries between forms bleed. Turn the creep up and the seam slowly walks outward, the image melting at its contours. Unlike a datamosh it is driven by edges, not motion, so it keeps going even on a still picture.',
   'node-pulfrich':
     'Creates real depth out of sideways movement by delaying one eye slightly behind the other. It is the illusion that appears when you watch a moving picture with one eye darkened. Needs the anaglyph stage in the Finalizer, and a source that moves laterally.',
   'node-corrode':
