@@ -49,11 +49,17 @@ The browser flagged these as gaps because the skill it read predated them. They'
    Pandore's Trill Square via `/opsia/surface x y`. **Biggest instrument-feel upgrade available.**
    → a Surface view over the existing scene bank; the interpolation is `varyComposition`-adjacent
    (numeric params blend, structure snaps to the nearest snapshot).
-2. **LZX Memory Palace** feedback (Eurorack). The per-layer feedback (`REAGENT_FS` + TRAIL) has no
-   keyer and no placement switch. Add (a) a **soft luma/chroma key** (threshold + softness) gating
-   what re-enters the loop, (b) a **Painting ↔ Feedback** toggle (spatial process before vs after
-   the key), (c) a **per-repeat hue/sat increment** (gradients across time). ~6 curated params on
-   the path that already exists — highest expressive-gain-to-new-UI ratio in either pass.
+2. **LZX Memory Palace** feedback (Eurorack). ✅ **BUILT** (f68d82f, 2026-08-20). *Triage correction:*
+   this item first eyed the per-layer TRAIL (`persist`/`PERSIST_FS`), but the **`node-feedback` FX
+   node was already a full Memory-Palace engine** — soft luma keyer (`keyMode`/`keyThresh`/`keySoft`
+   + edge border), per-repeat hue drift (`hue`/`hueCurve`), a drifting off-centre zoom/rotate/self-warp
+   transform, an RGB delay ring, dual-buffer COUPLE, and AGC. So the three genuinely-missing LZX moves
+   went onto that node (not a duplicate engine on the trail): (a) **chroma key** — `keyMode` gains
+   `key desat` / `key chroma` (saturation) beside luma black/white; (b) **process placement** — a
+   `placement` long puts the spatial process on the recirculating buffer (feedback : wandering tunnel)
+   or on the incoming live image (painting : source smeared into a still accumulator); (c) **sat
+   drift/repeat** — a `sat` uniform nudges the buffer's saturation each pass (bleach→grey / intensify→
+   neon). Verified live in an isolated GL2 FBO (compile+link + branch readbacks).
 3. **Ableton Link** (peer tempo). BPM currently arrives over OSC master/slave; Link makes tempo/
    phase/start-stop **peer** across Opsia + Pandore + Phasma on the LAN (UDP multicast). Correct
    topology for the three-instrument ecology + *Espaces connectés*. Electron-main integration is
