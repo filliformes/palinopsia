@@ -208,7 +208,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Feedback : a video-feedback engine. The layer's own last frame is re-sampled through a drifting off-centre transform (zoom/rotate/drift) plus a self-displacement that boils the image organically, then mixed with the live layer : trails, tunnels-that-wander, reaction-diffusion textures. A built-in AGC + noise floor hold it at the edge of chaos so it never fades to black or blows to white. COUPLE runs a SECOND buffer under a diverged transform and cross-mixes it in → emergent behaviour no single loop shows. RGB DELAY shears the delay-echo channels in time; ROUTE feeds that echo back into the loop or forward onto the output only. Off-centre + small transforms keep it matte, not a radial mandala.",
+      "DESCRIPTION": "Feedback : a video-feedback engine. The layer's own last frame is re-sampled through a drifting off-centre transform (zoom/rotate/drift) plus a self-displacement that boils the image organically, then mixed with the live layer : trails, tunnels-that-wander, reaction-diffusion textures. A built-in AGC + noise floor hold it at the edge of chaos so it never fades to black or blows to white. COUPLE runs a SECOND buffer under a diverged transform and cross-mixes it in → emergent behaviour no single loop shows. RGB DELAY shears the delay-echo channels in time; ROUTE feeds that echo back into the loop or forward onto the output only. PLACEMENT (Memory Palace) sits the spatial process on the recirculating buffer (feedback : a wandering tunnel) or on the incoming live image (painting : the source is smeared into a still accumulator). The KEYER gates on luma (key black/white) or chroma (key desat/chroma : saturation), so only the keyed region re-enters the loop; SAT DRIFT bleaches trails toward grey or intensifies them toward neon a little more each repeat. Off-centre + small transforms keep it matte, not a radial mandala.",
       "CATEGORIES": ["FX", "Feedback"],
       "INPUTS": [
         { "NAME": "feedback", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.85, "LABEL": "feedback" },
@@ -223,13 +223,15 @@ export const NATIVE_NODES: IsfShader[] = [
         { "NAME": "warp", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "self-warp" },
         { "NAME": "hue", "TYPE": "float", "MIN": -0.2, "MAX": 0.2, "DEFAULT": 0.0, "LABEL": "hue cycle" },
         { "NAME": "hueCurve", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "hue nonlinearity" },
+        { "NAME": "sat", "TYPE": "float", "MIN": -0.15, "MAX": 0.15, "DEFAULT": 0.0, "LABEL": "sat drift/repeat" },
         { "NAME": "blur", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2, "LABEL": "softness" },
         { "NAME": "delay", "TYPE": "float", "MIN": 0.0, "MAX": 15.0, "DEFAULT": 0.0, "LABEL": "delay frames" },
         { "NAME": "delayMix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "delay echo" },
         { "NAME": "rgbDelay", "TYPE": "float", "MIN": 0.0, "MAX": 8.0, "DEFAULT": 0.0, "LABEL": "rgb delay (shear)" },
         { "NAME": "route", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["feedback", "feedforward"], "DEFAULT": 0, "LABEL": "echo route" },
+        { "NAME": "placement", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["feedback", "painting"], "DEFAULT": 0, "LABEL": "process placement" },
         { "NAME": "blend", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4], "LABELS": ["mix", "add", "screen", "difference", "lighten"], "DEFAULT": 0, "LABEL": "source blend" },
-        { "NAME": "keyMode", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["off", "key black", "key white"], "DEFAULT": 0, "LABEL": "keyer" },
+        { "NAME": "keyMode", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4], "LABELS": ["off", "key black", "key white", "key desat", "key chroma"], "DEFAULT": 0, "LABEL": "keyer" },
         { "NAME": "keyThresh", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "key threshold" },
         { "NAME": "keySoft", "TYPE": "float", "MIN": 0.001, "MAX": 0.5, "DEFAULT": 0.1, "LABEL": "key softness" },
         { "NAME": "border", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "key border" },
@@ -241,7 +243,7 @@ export const NATIVE_NODES: IsfShader[] = [
     curated: {
       feedback: [0.6, 0.95], gain: [0.9, 1.08], zoom: [-0.05, 0.05], rotate: [-0.08, 0.08],
       driftX: [-0.02, 0.02], driftY: [-0.02, 0.02], pivot: [0.2, 0.8], warp: [0.2, 0.8],
-      hue: [-0.08, 0.08], hueCurve: [0, 0.6], blur: [0.05, 0.5], delay: [2, 12], delayMix: [0.2, 0.6],
+      hue: [-0.08, 0.08], hueCurve: [0, 0.6], sat: [-0.1, 0.1], blur: [0.05, 0.5], delay: [2, 12], delayMix: [0.2, 0.6],
       couple: [0, 0.6], couple2: [0.6, 1.6], rgbDelay: [0, 4],
       keyThresh: [0.3, 0.6], keySoft: [0.02, 0.2], border: [0, 0.5], agc: [0.3, 0.8], noise: [0.05, 0.4]
     }

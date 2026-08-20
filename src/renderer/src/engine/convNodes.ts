@@ -213,8 +213,8 @@ precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uHost, uPrev, uRing, uCross;
 uniform vec2 uRes, uOff, uPivot;
 uniform float uFeedback, uGain, uZoom, uRot, uWarp, uHue, uBlur, uAgc, uNoise, uSeed;
-uniform float uKeyThresh, uKeySoft, uBorder, uBorderHue, uHueCurve, uDelayMix, uCouple;
-uniform int uBlend, uKeyMode, uRingCols, uRingRows, uDelayTileR, uDelayTileG, uDelayTileB, uRoute;
+uniform float uKeyThresh, uKeySoft, uBorder, uBorderHue, uHueCurve, uDelayMix, uCouple, uSat;
+uniform int uBlend, uKeyMode, uRingCols, uRingRows, uDelayTileR, uDelayTileG, uDelayTileB, uRoute, uPlacement;
 
 float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 // Sample one tile of the delay ring atlas at uv.
@@ -248,22 +248,29 @@ void main(){
 
   // Self-displacement by the buffer's own hue/value (the "alive" term : organic
   // boiling / reaction-diffusion motion instead of a rigid spiral).
-  vec3 p0 = texture(uPrev, ruv).rgb;
+  vec3 p0 = texture(uPrev, uPlacement == 1 ? vUV : ruv).rgb;
   vec3 hsv0 = rgb2hsv(p0);
   vec2 disp = uWarp * 0.03 * (hsv0.z * hsv0.y) * vec2(cos(hsv0.x * 6.2831853), sin(hsv0.x * 6.2831853));
   ruv += disp;
 
+  // PLACEMENT (Memory Palace) : the spatial process (zoom/rotate/drift/self-warp)
+  // sits EITHER on the recirculating buffer (feedback : the classic wandering
+  // tunnel) OR on the incoming live image (painting : the source is smeared into a
+  // still accumulator that holds its shape). One transform, two very different looks.
+  vec2 bufUV = (uPlacement == 1) ? vUV : ruv;
+  vec2 srcUV = (uPlacement == 1) ? ruv : vUV;
+
   vec3 pv;
   if (uBlur > 0.001){
     vec2 t = (0.5 + uBlur * 2.0) / uRes;
-    pv = (texture(uPrev, ruv).rgb * 2.0
-        + texture(uPrev, ruv + vec2(t.x, 0.0)).rgb + texture(uPrev, ruv - vec2(t.x, 0.0)).rgb
-        + texture(uPrev, ruv + vec2(0.0, t.y)).rgb + texture(uPrev, ruv - vec2(0.0, t.y)).rgb) / 6.0;
-  } else pv = texture(uPrev, ruv).rgb;
+    pv = (texture(uPrev, bufUV).rgb * 2.0
+        + texture(uPrev, bufUV + vec2(t.x, 0.0)).rgb + texture(uPrev, bufUV - vec2(t.x, 0.0)).rgb
+        + texture(uPrev, bufUV + vec2(0.0, t.y)).rgb + texture(uPrev, bufUV - vec2(0.0, t.y)).rgb) / 6.0;
+  } else pv = texture(uPrev, bufUV).rgb;
 
   // COUPLE : cross-inject the companion buffer (fb1) which evolves under a DIFFERENT
   // transform → emergent behaviour no single loop shows (dual coupled buffers).
-  if (uCouple > 0.001) pv = mix(pv, texture(uCross, ruv).rgb, uCouple);
+  if (uCouple > 0.001) pv = mix(pv, texture(uCross, bufUV).rgb, uCouple);
 
   // DELAY TAP with PER-CHANNEL RGB delay (time-shear : each channel from a slightly
   // different past frame). ROUTE : fed BACK into the loop (accumulates) or FED
@@ -271,7 +278,7 @@ void main(){
   vec3 dtap = vec3(0.0);
   bool hasDelay = uDelayMix > 0.001;
   if (hasDelay){
-    dtap = vec3(ringTap(uDelayTileR, ruv).r, ringTap(uDelayTileG, ruv).g, ringTap(uDelayTileB, ruv).b);
+    dtap = vec3(ringTap(uDelayTileR, bufUV).r, ringTap(uDelayTileG, bufUV).g, ringTap(uDelayTileB, bufUV).b);
     if (uRoute == 0) pv = mix(pv, dtap, uDelayMix); // feedback : re-enters the loop
   }
 
@@ -291,22 +298,28 @@ void main(){
 
   // Hue cycle : linear rate uHue, made NONLINEAR by uHueCurve (Andrei Jay's
   // sin(x)+c idea) so the palette churns chaotically instead of drifting evenly.
-  if (abs(uHue) > 0.001 || uHueCurve > 0.001){
+  // SAT DRIFT (Memory Palace) : nudge saturation a little every repeat so the trail
+  // bleaches toward grey (uSat<0) or intensifies toward neon (uSat>0) as it ages.
+  if (abs(uHue) > 0.001 || uHueCurve > 0.001 || abs(uSat) > 0.001){
     vec3 h = rgb2hsv(pv);
     h.x = fract(h.x + uHue * (1.0 + uHueCurve * 3.0 * sin(h.x * 12.566371)));
+    h.y = clamp(h.y * (1.0 + uSat), 0.0, 1.0);
     pv = hsv2rgb(h);
   }
 
   // KEYER : where the source is keyed out (dark for key-black, bright for
   // key-white) the feedback fills in; elsewhere the source shows. A bright border
   // around the key edge re-enters the loop → regenerating hard-edged shapes.
-  vec3 src = texture(uHost, vUV).rgb;
+  vec3 src = texture(uHost, srcUV).rgb;
   float fbAmt = uFeedback;
   float keyed = 0.0;
   if (uKeyMode > 0){
-    float sl = dot(src, vec3(0.299, 0.587, 0.114));
-    float k = smoothstep(uKeyThresh - uKeySoft - 0.001, uKeyThresh + uKeySoft + 0.001, sl);
-    keyed = (uKeyMode == 1) ? (1.0 - k) : k;
+    // Modes 1/2 key on LUMA (black / white); modes 3/4 key on CHROMA = saturation
+    // (desat / colourful). Low-side modes (1,3) invert. The keyed region is where
+    // the feedback fills in; elsewhere the live source shows through.
+    float kv = (uKeyMode <= 2) ? dot(src, vec3(0.299, 0.587, 0.114)) : rgb2hsv(src).y;
+    float k = smoothstep(uKeyThresh - uKeySoft - 0.001, uKeyThresh + uKeySoft + 0.001, kv);
+    keyed = (uKeyMode == 1 || uKeyMode == 3) ? (1.0 - k) : k;
     fbAmt = uFeedback * keyed;
   }
 
@@ -1554,6 +1567,7 @@ export class FeedbackNode implements ConvNode {
       gl.uniform1i(p.u('uRingCols'), FB_COLS); gl.uniform1i(p.u('uRingRows'), FB_ROWS)
       gl.uniform1i(p.u('uDelayTileR'), tileR); gl.uniform1i(p.u('uDelayTileG'), tileG); gl.uniform1i(p.u('uDelayTileB'), tileB)
       gl.uniform1f(p.u('uDelayMix'), delayMixIn); gl.uniform1i(p.u('uRoute'), route)
+      gl.uniform1i(p.u('uPlacement'), Math.round(num(inp.placement, 0)))
       gl.uniform1f(p.u('uCouple'), coupleAmt)
       gl.uniform2f(p.u('uRes'), W, H)
       gl.uniform1f(p.u('uFeedback'), clampf(num(inp.feedback, 0.85), 0, 1))
@@ -1565,6 +1579,7 @@ export class FeedbackNode implements ConvNode {
       gl.uniform1f(p.u('uWarp'), clampf(num(inp.warp, 0.4), 0, 1))
       gl.uniform1f(p.u('uHue'), clampf(num(inp.hue, 0), -0.5, 0.5))
       gl.uniform1f(p.u('uHueCurve'), clampf(num(inp.hueCurve, 0), 0, 1))
+      gl.uniform1f(p.u('uSat'), clampf(num(inp.sat, 0), -0.15, 0.15))
       gl.uniform1f(p.u('uBlur'), clampf(num(inp.blur, 0.2), 0, 1))
       gl.uniform1i(p.u('uBlend'), Math.round(num(inp.blend, 0)))
       gl.uniform1i(p.u('uKeyMode'), Math.round(num(inp.keyMode, 0)))
