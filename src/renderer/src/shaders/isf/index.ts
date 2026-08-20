@@ -511,6 +511,25 @@ export const NATIVE_NODES: IsfShader[] = [
     curated: { amount: [0.3, 0.8], width: [0.1, 0.5], dir: [-0.6, 0.6], gate: [0.05, 0.35] }
   },
   {
+    id: 'node-faultline',
+    name: 'Faultline',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Faultline : a dirty vision-mixer. A clock (RATE) and a probability (DIRT) fire momentary STRUCTURAL faults at the output, and the picture is COMPLETELY CLEAN between them — the same skip-law as SLIP, moved from a single parameter to the whole blend. Each fire is one discrete fault of the chosen TYPE : DROPOUT (the signal loses lock and collapses toward black under a rolling sync bar), CUT (the mixer holds the frame grabbed at the fire instant — a hard cut to a still the live picture snaps back from), TIMEBASE (a head-switch knock : blocks of scanlines shear sideways, the field rolls, a torn band along the switch line), or NOISE (a band of switching static sweeps the cut point) — or ROULETTE, a fresh pick each fire. DEPTH is severity, HOLD the length of each fault, TRIG fires one by hand / OSC / a modulator. Best on the master rack (the whole programme glitches like circuit-bent kit), but works on any rack.",
+      "CATEGORIES": ["FX", "Glitch"],
+      "INPUTS": [
+        { "NAME": "type", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4], "LABELS": ["dropout", "cut", "timebase", "noise", "roulette"], "DEFAULT": 4, "LABEL": "fault" },
+        { "NAME": "rate", "TYPE": "float", "MIN": 0.0, "MAX": 12.0, "DEFAULT": 2.0, "LABEL": "rate (Hz)" },
+        { "NAME": "dirt", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "dirt" },
+        { "NAME": "depth", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "depth" },
+        { "NAME": "hold", "TYPE": "float", "MIN": 0.02, "MAX": 0.5, "DEFAULT": 0.08, "LABEL": "hold (s)" },
+        { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "fire ▸" }
+      ]
+    }*/`,
+    curated: { rate: [0, 6], dirt: [0.2, 0.9], depth: [0.3, 0.9], hold: [0.03, 0.2] }
+  },
+  {
     id: 'node-pulfrich',
     name: 'Pulfrich',
     category: 'FX',

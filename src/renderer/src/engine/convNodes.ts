@@ -1079,6 +1079,7 @@ class NodeGL {
   corrodeOut: Prog
   decimate: Prog
   melt: Prog
+  faultline: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -1113,6 +1114,7 @@ class NodeGL {
     this.corrodeOut = this.build(F_CORRODE_OUT)
     this.decimate = this.build(F_DECIMATE)
     this.melt = this.build(F_MELT)
+    this.faultline = this.build(F_FAULTLINE)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -2627,6 +2629,147 @@ export class MeltNode implements ConvNode {
   }
 }
 
+// ── Faultline node : the dirty vision-mixer (structural fault generator) ──
+// A clock (RATE) and a probability (DIRT) fire momentary STRUCTURAL faults at the
+// output — a dropout, a hard cut to a frozen frame, a timebase knock, or a band of
+// switching noise — and the picture is COMPLETELY CLEAN between firings (the SLIP
+// law, moved from per-parameter to the blend stage). One discrete fault per fire.
+const F_FAULTLINE = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uFreeze;
+uniform vec2 uRes;
+uniform int uType;        // 0 dropout · 1 cut (freeze) · 2 timebase knock · 3 switching noise
+uniform float uDepth;     // fault severity 0..1
+uniform float uProgress;  // 0..1 through the fault's life
+uniform float uSeed;      // per-fire random, so every fault lands differently
+float hash(vec2 p){ p = fract(p * vec2(123.34, 345.45)); p += dot(p, p + 34.345); return fract(p.x * p.y); }
+float h1(float x){ return fract(sin(x * 91.7 + uSeed * 57.3) * 43758.5453); }
+void main(){
+  vec4 host = texture(uHost, vUV);
+  vec3 col = host.rgb; float a = host.a;
+  if (uType == 0){
+    // DROPOUT : the signal loses lock and collapses toward black, torn by a sync
+    // bar sweeping down the frame (an outage, not a fade).
+    float bar = smoothstep(0.06, 0.0, abs(fract(vUV.y + uProgress * 1.3 + uSeed) - 0.5));
+    col = host.rgb * (1.0 - uDepth * (0.75 + 0.25 * bar)) + bar * uDepth * 0.12;
+  } else if (uType == 1){
+    // CUT : the mixer holds the frame captured at the fire instant — a hard cut to
+    // a still that the live picture snaps back from when the fault clears.
+    vec4 f = texture(uFreeze, vUV);
+    col = mix(host.rgb, f.rgb, uDepth); a = mix(host.a, f.a, uDepth);
+  } else if (uType == 2){
+    // TIMEBASE KNOCK : a head-switch jolt — blocks of scanlines shear sideways and
+    // the field rolls, with a torn noise band along the switch line (frame bottom).
+    float band = floor(vUV.y * uRes.y / 6.0);
+    float shear = (h1(band) - 0.5) * uDepth * 0.25 * (0.4 + 0.6 * uProgress);
+    float roll = uDepth * 0.12 * uProgress;
+    vec4 s = texture(uHost, vec2(vUV.x + shear, fract(vUV.y + roll)));
+    float sw = smoothstep(0.10, 0.0, vUV.y);
+    float st = hash(vec2(vUV.x * uRes.x, band) + uProgress * 53.0);
+    col = mix(s.rgb, vec3(st), sw * uDepth); a = s.a;
+  } else {
+    // SWITCHING NOISE : a band of static sweeps the frame at the cut point.
+    float c = fract(uSeed + uProgress * 0.7);
+    float band = smoothstep(0.18, 0.0, abs(vUV.y - c));
+    float st = hash(vUV * uRes * 0.5 + uProgress * 97.0);
+    col = mix(host.rgb, vec3(st), band * uDepth);
+  }
+  o = vec4(col, a);
+}`
+
+export class FaultlineNode implements ConvNode {
+  private freeze: RGBA | null = null
+  private w = 0
+  private h = 0
+  private timer = 0
+  private prevTrig = 0
+  private faultRemaining = 0
+  private faultDur = 0
+  private faultType = 0
+  private faultSeed = 0
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  private ensure(w: number, h: number): void {
+    if (this.freeze && this.w === w && this.h === h) return
+    const gl = this.gl
+    if (this.freeze) { gl.deleteTexture(this.freeze.tex); gl.deleteFramebuffer(this.freeze.fbo) }
+    this.freeze = makeRGBA(gl, w, h, true)
+    this.w = w; this.h = h
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const inp = ctx.inputs
+    const rate = clampf(num(inp.rate, 2), 0, 12)
+    const dirt = clampf(num(inp.dirt, 0.6), 0, 1)
+    const type = Math.round(clampf(num(inp.type, 4), 0, 4))
+    const depth = clampf(num(inp.depth, 0.6), 0, 1)
+    const hold = clampf(num(inp.hold, 0.08), 0.02, 0.5)
+    const trig = num(inp.trig, 0)
+
+    // FIRING (the SLIP law) : the trigger's rising edge, plus a clock whose every
+    // tick is a fire OPPORTUNITY that `dirt` accepts with probability — so it skips,
+    // never metronomic. A fire (re)starts one discrete fault; catch-up is capped so
+    // a stalled frame can't unload a burst.
+    let fire = trig >= 0.5 && this.prevTrig < 0.5
+    this.prevTrig = trig
+    if (rate > 0.001) {
+      const period = 1 / rate
+      this.timer += ctx.dt
+      let guard = 0
+      while (this.timer >= period && guard++ < 8) {
+        this.timer -= period
+        if (Math.random() < dirt) fire = true
+      }
+    } else {
+      this.timer = 0
+    }
+    if (fire) {
+      this.faultRemaining = hold
+      this.faultDur = hold
+      this.faultType = type === 4 ? Math.floor(Math.random() * 4) : type
+      this.faultSeed = Math.random()
+    }
+
+    // CLEAN between firings : no active fault ⇒ byte-identical passthrough (zero cost).
+    if (this.faultRemaining <= 0) return ctx.host
+
+    const gl = ctx.gl, g = nodeGL(gl)
+    const W = ctx.chain.w, H = ctx.chain.h
+    this.ensure(W, H)
+
+    // A CUT holds the frame grabbed at the fire instant.
+    if (fire && this.faultType === 1) {
+      const cp = g.use(g.copy)
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(cp.u('uTex'), 0)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.freeze!.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+    }
+
+    const progress = this.faultDur > 0 ? 1 - this.faultRemaining / this.faultDur : 0
+    this.faultRemaining -= ctx.dt
+
+    const out = ctx.chain.next()
+    const p = g.use(g.faultline)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, (this.freeze as RGBA).tex); gl.uniform1i(p.u('uFreeze'), 1)
+    gl.uniform2f(p.u('uRes'), W, H)
+    gl.uniform1i(p.u('uType'), this.faultType)
+    gl.uniform1f(p.u('uDepth'), depth)
+    gl.uniform1f(p.u('uProgress'), progress)
+    gl.uniform1f(p.u('uSeed'), this.faultSeed)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return out.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    const gl = this.gl
+    if (this.freeze) { gl.deleteTexture(this.freeze.tex); gl.deleteFramebuffer(this.freeze.fbo); this.freeze = null }
+  }
+}
+
 // ── Pulfrich node : monocular 3D from a temporal eye-delay ───────────────
 // A frame-history ring read as a per-pixel delay, keyed by the shared depth map
 // (or luminance), presented as an anaglyph pair or a motion-gated parallax slide.
@@ -2879,6 +3022,7 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   if (shaderId === 'node-eternalism') return new EternalismNode(gl)
   if (shaderId === 'node-afterimage') return new AfterimageNode(gl)
   if (shaderId === 'node-melt') return new MeltNode(gl)
+  if (shaderId === 'node-faultline') return new FaultlineNode(gl)
   if (shaderId === 'node-transfert') return new TransfertNode(gl)
   if (shaderId === 'node-convolve') return new ConvolveNode(gl)
   if (shaderId === 'node-reponse') return new ReponseNode(gl)
@@ -2891,6 +3035,6 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)
