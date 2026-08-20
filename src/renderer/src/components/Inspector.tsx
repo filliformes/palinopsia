@@ -9,7 +9,7 @@ import { SHADER_BY_ID } from '../shaders/isf'
 import { blurbFor } from '../shaders/isf/shaderBlurbs'
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { inputsForShader, defaultInputs } from '../shaders/isf/inputs'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { CollageStrip } from './CollageStrip'
 import { ContextMenu } from './ContextMenu'
@@ -87,6 +87,9 @@ export function Inspector(): JSX.Element {
     return Number.isFinite(n) && n >= 96 ? n : 136
   })
   const resize = useRef<{ startX: number; startW: number; last: number } | null>(null)
+  // The FX-controls band measures its own content so it can auto-fit (see the
+  // auto-fit RULE below).
+  const fxContentRef = useRef<HTMLDivElement>(null)
   // Close the panel whenever the selection moves to a different shader/unit.
   const selKey =
     selection?.type === 'source'
@@ -97,6 +100,27 @@ export function Inspector(): JSX.Element {
           ? 'bg'
           : 'none'
   useEffect(() => setAssign(null), [selKey])
+
+  // RULE — the FX-controls band ALWAYS auto-fits its parameters : never blank space
+  // over a few, never a hidden/scrolled row when there are many. On every selection
+  // change (and on any reflow — a width change re-flows the wrapped controls) we
+  // measure the natural content height and size the band to it, clamped to a
+  // screen-sensible range (below the cap it fits exactly; above it, it scrolls). The
+  // drag handle still lets you override the height until the next selection.
+  useLayoutEffect(() => {
+    const el = fxContentRef.current
+    if (!el) return
+    const fit = (): void => {
+      const min = 44
+      const max = Math.max(240, Math.min(560, Math.round(window.innerHeight * 0.55)))
+      const h = el.scrollHeight
+      if (h > 0) setFxH(Math.max(min, Math.min(max, h + 6)))
+    }
+    fit()
+    const ro = new ResizeObserver(fit)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [selKey])
 
   let title = ''
   let context = ''
@@ -565,17 +589,22 @@ export function Inspector(): JSX.Element {
             ) : (
               <>
               <div style={{ height: fxH }} className="flex overflow-x-hidden overflow-y-auto">
-                {/* m-auto centres the controls vertically when they fit the band and
-                    collapses to a normal top-anchored scroll when they overflow (unlike
-                    align/justify-center, which would clip the top out of reach). */}
+                {/* The band auto-fits this content (see the auto-fit RULE); m-auto
+                    still centres the controls in the rare case the band is capped
+                    below the content and has to scroll. */}
                 <div className="m-auto w-full">
-                  <AutoControls
-                    inputs={inputsForShader(shaderId)}
-                    values={values}
-                    onChange={onChange}
-                    modTargetFor={modTargetFor}
-                    layout="twoRow"
-                  />
+                  {/* A plain block that tightly wraps the controls : its height is
+                      exactly the content, so measuring it (auto-fit RULE) is immune
+                      to the parent's flex stretch. */}
+                  <div ref={fxContentRef}>
+                    <AutoControls
+                      inputs={inputsForShader(shaderId)}
+                      values={values}
+                      onChange={onChange}
+                      modTargetFor={modTargetFor}
+                      layout="twoRow"
+                    />
+                  </div>
                 </div>
               </div>
               {/* Drag to resize the controls band (persisted). */}
@@ -588,7 +617,7 @@ export function Inspector(): JSX.Element {
                   const el = e.target as HTMLElement
                   el.setPointerCapture(e.pointerId)
                   const move = (ev: PointerEvent): void => {
-                    const h = Math.max(96, Math.min(420, startH + (ev.clientY - startY)))
+                    const h = Math.max(44, Math.min(560, startH + (ev.clientY - startY)))
                     setFxH(h)
                     localStorage.setItem('opsia.inspectorH', String(h))
                   }
