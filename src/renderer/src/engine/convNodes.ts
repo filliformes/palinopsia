@@ -2648,15 +2648,20 @@ void main(){
   vec4 host = texture(uHost, vUV);
   vec3 col = host.rgb; float a = host.a;
   if (uType == 0){
-    // DROPOUT : the signal loses lock and collapses toward black, torn by a sync
-    // bar sweeping down the frame (an outage, not a fade).
-    float bar = smoothstep(0.06, 0.0, abs(fract(vUV.y + uProgress * 1.3 + uSeed) - 0.5));
-    col = host.rgb * (1.0 - uDepth * (0.75 + 0.25 * bar)) + bar * uDepth * 0.12;
+    // DROPOUT : the signal cuts out in horizontal STREAKS that sweep the frame — a
+    // lost-lock outage, not a global dim. A few bands collapse toward black (with a
+    // little snow); the rest of the picture stays live, so it never just darkens.
+    float y = vUV.y * 12.0 - uProgress * 7.0 + uSeed * 23.0;
+    float band = smoothstep(0.62, 0.9, hash(vec2(floor(y), floor(uSeed * 17.0))));
+    float st = hash(vUV * uRes * 0.4 + uProgress * 61.0);
+    col = mix(host.rgb, vec3(st * 0.12), band * uDepth);
   } else if (uType == 1){
-    // CUT : the mixer holds the frame captured at the fire instant — a hard cut to
-    // a still that the live picture snaps back from when the fault clears.
+    // CUT : the mixer holds the frame captured at the fire instant — a clean hard
+    // cut to a still that the live picture snaps back from. Depth eases in a partial
+    // hold at very low settings; by mid-depth it is a full freeze.
     vec4 f = texture(uFreeze, vUV);
-    col = mix(host.rgb, f.rgb, uDepth); a = mix(host.a, f.a, uDepth);
+    float hold = clamp(uDepth * 2.0, 0.0, 1.0);
+    col = mix(host.rgb, f.rgb, hold); a = mix(host.a, f.a, hold);
   } else if (uType == 2){
     // TIMEBASE KNOCK : a head-switch jolt — blocks of scanlines shear sideways and
     // the field rolls, with a torn noise band along the switch line (frame bottom).
