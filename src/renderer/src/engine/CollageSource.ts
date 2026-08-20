@@ -90,6 +90,7 @@ uniform vec4 uCrop[64];   // source rect inside the deck's layer (cover crop)
 uniform float uDeck[64];  // which array layer this piece plays
 uniform float uRot[64];   // 0..3 (×90°)
 uniform float uRank[64];  // mask dropout order; the survivor holds 2.0
+uniform vec4 uContent[64]; // each cell's deck picture rect inside the square layer
 uniform float uGap, uSeed, uContour, uTorn, uMask, uCurve;
 uniform int uShape;       // 0 = cut-up rectangles (BSP), 1 = mosaic (Voronoi)
 uniform int uContourMode; // 0 = normal (warp edges only), 1 = warped (warp content too)
@@ -147,9 +148,13 @@ void main(){
     keep = smoothstep(uMask - 0.06, uMask, uRank[mi]);
     vec4 d = uCell[mi];
     vec2 topleft = d.xy - d.zw * 0.5;
-    vec2 luv = rot90(clamp((sUV - topleft) / d.zw, 0.0, 1.0), uRot[mi]);
-    vec4 cr = uCrop[mi];
-    col = texture(uDecks, vec3(cr.xy + luv * cr.zw, uDeck[mi])).rgb;
+    // luv is NOT clamped : where the shard runs past its nominal box the film
+    // keeps going (real pixels fill the shape) instead of smearing an edge; the
+    // final read is clamped to the deck's picture rect so it never hits the
+    // letterbox padding. That is "the video adapts to the shape".
+    vec2 luv = rot90((sUV - topleft) / d.zw, uRot[mi]);
+    vec4 cr = uCrop[mi], ct = uContent[mi];
+    col = texture(uDecks, vec3(clamp(cr.xy + luv * cr.zw, ct.xy, ct.xy + ct.zw), uDeck[mi])).rgb;
     float ed = 0.5 * (d2 - d1);           // small near a Voronoi boundary
     if (uGap > 0.001) col *= smoothstep(0.0, uGap * 0.02, ed);
     if (uTorn > 0.001){
@@ -171,9 +176,13 @@ void main(){
     vec4 d = uCell[i];
     if (wUV.x >= d.x && wUV.x < d.x + d.z && wUV.y >= d.y && wUV.y < d.y + d.w){
       keep = smoothstep(uMask - 0.06, uMask, uRank[i]);
-      vec2 luv = rot90(clamp((sUV - d.xy) / d.zw, 0.0, 1.0), uRot[i]);
-      vec4 cr = uCrop[i];
-      col = texture(uDecks, vec3(cr.xy + luv * cr.zw, uDeck[i])).rgb;
+      // NORMAL mode : the frayed boundary means vUV runs past the cell rect; leave
+      // luv unclamped so the straight film fills the fray with its own pixels, and
+      // clamp the read to the deck's picture rect so padding never shows. (In
+      // WARPED mode membership keeps luv in [0,1], so this is a no-op there.)
+      vec2 luv = rot90((sUV - d.xy) / d.zw, uRot[i]);
+      vec4 cr = uCrop[i], ct = uContent[i];
+      col = texture(uDecks, vec3(clamp(cr.xy + luv * cr.zw, ct.xy, ct.xy + ct.zw), uDeck[i])).rgb;
       vec2 e = min(wUV - d.xy, d.xy + d.zw - wUV);
       float ed = min(e.x, e.y);
       if (uGap > 0.001) col *= smoothstep(0.0, uGap * 0.02, ed);
@@ -346,6 +355,7 @@ export class CollageSource {
   // Uniform staging, allocated once.
   private cellArr = new Float32Array(MAX_CELLS * 4)
   private cropArr = new Float32Array(MAX_CELLS * 4)
+  private contentArr = new Float32Array(MAX_CELLS * 4)
   private deckArr = new Float32Array(MAX_CELLS)
   private rotArr = new Float32Array(MAX_CELLS)
   private rankArr = new Float32Array(MAX_CELLS)
@@ -930,6 +940,11 @@ export class CollageSource {
       this.cellArr[i * 4 + 2] = c.w; this.cellArr[i * 4 + 3] = c.h
       this.cropArr[i * 4] = c.crop[0]; this.cropArr[i * 4 + 1] = c.crop[1]
       this.cropArr[i * 4 + 2] = c.crop[2]; this.cropArr[i * 4 + 3] = c.crop[3]
+      // The deck's picture rect (content) : the shader clamps its film read to it
+      // so an over-running / frayed shape samples real film, never the padding.
+      const ct = this.decks[c.deck] ? this.decks[c.deck].content : [0, 0, 1, 1]
+      this.contentArr[i * 4] = ct[0]; this.contentArr[i * 4 + 1] = ct[1]
+      this.contentArr[i * 4 + 2] = ct[2]; this.contentArr[i * 4 + 3] = ct[3]
       this.deckArr[i] = c.deck
       this.rotArr[i] = c.rot
     }
@@ -947,6 +962,7 @@ export class CollageSource {
     gl.uniform1i(g.uColl('uCount'), n)
     gl.uniform4fv(g.uColl('uCell'), this.cellArr)
     gl.uniform4fv(g.uColl('uCrop'), this.cropArr)
+    gl.uniform4fv(g.uColl('uContent'), this.contentArr)
     gl.uniform1fv(g.uColl('uDeck'), this.deckArr)
     gl.uniform1fv(g.uColl('uRot'), this.rotArr)
     gl.uniform1fv(g.uColl('uRank'), this.rankArr)
