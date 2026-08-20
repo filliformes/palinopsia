@@ -12,8 +12,8 @@ import { inputsForShader, defaultInputs } from '../shaders/isf/inputs'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { CollageStrip } from './CollageStrip'
-import { ContextMenu } from './ContextMenu'
-import { useFxMenuItems } from './fxMenu'
+import { ContextMenu, type MenuItem } from './ContextMenu'
+import { floatModTargets, hasModulationOn, useFxMenuItems } from './fxMenu'
 import { fxArrayFor, modTargetKey, useStore, type FxScope } from '../store'
 import { AutoControls, AssignContext, AssignRow } from './AutoControls'
 import { CapturePicker } from './CapturePicker'
@@ -71,6 +71,7 @@ export function Inspector(): JSX.Element {
   const vibePresetName = useStore((s) => s.vibePresetName)
   const setVibePresetName = useStore((s) => s.setVibePresetName)
   const setSourceCapture = useStore((s) => s.setSourceCapture)
+  const randomizeModulation = useStore((s) => s.randomizeModulation)
   const [flashing, flash] = useFlash()
   const [switchCapture, setSwitchCapture] = useState(false)
   const [switchDevice, setSwitchDevice] = useState(false)
@@ -383,6 +384,26 @@ export function Inspector(): JSX.Element {
   const isVibe = shaderId === 'fx-vibe'
   const isContext = shaderId === 'fx-context'
 
+  // Header right-click menu : an FX gets copy/paste + modulation (useFxMenuItems);
+  // a source/background gets "Randomize modulation" only when it already carries
+  // modulation. No items ⇒ no menu (right-click does nothing).
+  const isSourceSel = selection?.type === 'source' || selection?.type === 'background'
+  const srcModCands =
+    isSourceSel && modTargetFor ? floatModTargets(shaderId, modTargetFor) : []
+  const srcMenuItems: MenuItem[] = hasModulationOn(composition.modMatrix, srcModCands)
+    ? [
+        {
+          label: 'Randomize modulation',
+          onClick: () => {
+            randomizeModulation(srcModCands, false)
+            setHeaderMenu(null)
+          }
+        }
+      ]
+    : []
+  const menuItems = fxHere ? headerMenuItems : srcMenuItems
+  const menuOpenable = fxHere ? true : srcMenuItems.length > 0
+
   return (
     <div
       className={`rounded-md border bg-panel transition-colors ${
@@ -392,17 +413,17 @@ export function Inspector(): JSX.Element {
       <div
         className="flex items-center gap-2 border-b border-border px-2 py-1"
         onContextMenu={(e) => {
-          if (!fxHere) return
+          if (!menuOpenable) return
           e.preventDefault()
           setHeaderMenu({ x: e.clientX, y: e.clientY })
         }}
       >
-        {headerMenu && fxHere && (
+        {headerMenu && menuOpenable && (
           <ContextMenu
             x={headerMenu.x}
             y={headerMenu.y}
             header={title}
-            items={headerMenuItems}
+            items={menuItems}
             onClose={() => setHeaderMenu(null)}
           />
         )}

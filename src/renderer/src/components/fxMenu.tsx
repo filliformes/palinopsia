@@ -8,10 +8,29 @@
 // host the shader (`canHostFx`) : the sidechain nodes need a layer to read from,
 // and Parallax needs the whole-picture depth map.
 
-import type { FxScope } from '@shared/types'
-import { useStore } from '../store'
+import type { FxScope, ModAssignment, ModTarget } from '@shared/types'
+import { modTargetKey, useStore } from '../store'
 import { canHostFx, hostRefusal } from '../fxScopes'
+import { inputsForShader } from '../shaders/isf/inputs'
 import type { MenuItem } from './ContextMenu'
+
+/** The float (i.e. modulatable) inputs of a shader, as ModTargets built by `build`. */
+export function floatModTargets(
+  shaderId: string | null | undefined,
+  build: (input: string) => ModTarget
+): ModTarget[] {
+  if (!shaderId) return []
+  return inputsForShader(shaderId)
+    .filter((i) => i.type === 'float')
+    .map((i) => build(i.name))
+}
+
+/** Does the matrix carry any modulation on one of these candidate targets? */
+export function hasModulationOn(matrix: ModAssignment[], candidates: ModTarget[]): boolean {
+  if (!candidates.length) return false
+  const keys = new Set(candidates.map(modTargetKey))
+  return matrix.some((a) => keys.has(modTargetKey(a.target)))
+}
 
 /** Menu rows for one FX unit. `instId` null = the rack itself (paste-only). */
 export function useFxMenuItems(
@@ -28,12 +47,34 @@ export function useFxMenuItems(
   const copyFx = useStore((s) => s.copyFx)
   const pasteFxSettings = useStore((s) => s.pasteFxSettings)
   const pasteFxAsNew = useStore((s) => s.pasteFxAsNew)
+  const modMatrix = useStore((s) => s.composition.modMatrix)
+  const randomizeModulation = useStore((s) => s.randomizeModulation)
 
   const run = (fn: () => void) => (): void => {
     fn()
     close()
   }
   const items: MenuItem[] = []
+
+  // Modulation actions : "Assign and randomize" seeds+re-rolls random mod (source +
+  // Mul) onto this FX's parameters ; "Randomize modulation" re-rolls only what's
+  // already there, and shows only when this FX carries modulation.
+  if (instId && shaderId) {
+    const cands = floatModTargets(shaderId, (input) => ({ kind: 'fx', scope, instId, input }))
+    if (cands.length) {
+      items.push({
+        label: 'Assign and randomize modulation',
+        onClick: run(() => randomizeModulation(cands, true))
+      })
+      if (hasModulationOn(modMatrix, cands)) {
+        items.push({
+          label: 'Randomize modulation',
+          onClick: run(() => randomizeModulation(cands, false))
+        })
+      }
+      items.push({ label: '', divider: true })
+    }
+  }
 
   if (instId && !locked) {
     items.push({ label: 'Copy effect', onClick: run(() => copyFx(scope, instId)) })

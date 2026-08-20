@@ -873,6 +873,12 @@ interface StoreState {
   // Upserts by (mod, target): re-assigning the same pair updates its depth.
   // Returns false when the cap would be exceeded (legibility = simplexité).
   assignMod: (mod: number, target: ModTarget, depth: number, mode?: ModMode) => boolean
+  // Random modulation over a set of candidate parameter targets. Always re-rolls
+  // (source + depth) any EXISTING assignment on those targets; when `addNew`, also
+  // seeds random assignments onto a subset of the still-unassigned ones (respecting
+  // the cap). The Inspector/rack right-click menus drive this : "Assign and
+  // randomize modulation" passes addNew=true, "Randomize modulation" passes false.
+  randomizeModulation: (candidates: ModTarget[], addNew: boolean) => void
   removeAssignment: (id: string) => void
   setAssignmentDepth: (id: string, depth: number) => void
   setAssignmentMode: (id: string, mode: ModMode) => void
@@ -2202,6 +2208,50 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     })
     return result
+  },
+  randomizeModulation: (candidates, addNew) => {
+    if (!candidates.length) return
+    set((st) => {
+      const c = st.composition
+      // Eligible SOURCES : the ENABLED modulators (what's actually running); fall
+      // back to all 8 slots when none are enabled, so the action is never a no-op.
+      const on = c.modulators.map((m, i) => (m.enabled ? i : -1)).filter((i) => i >= 0)
+      const mods = on.length ? on : c.modulators.map((_, i) => i)
+      if (!mods.length) return {}
+      const pickMod = (): number => mods[Math.floor(Math.random() * mods.length)]
+      // Depth : a musical magnitude with an occasional inversion (both modes read
+      // |depth| as the amount; a negative depth inverts the signal).
+      const pickDepth = (): number => (0.4 + Math.random() * 0.6) * (Math.random() < 0.28 ? -1 : 1)
+      const candKeys = new Set(candidates.map(modTargetKey))
+
+      let changed = false
+      // (a) re-roll every existing assignment sitting on one of these targets.
+      let matrix = c.modMatrix.map((a) => {
+        if (!candKeys.has(modTargetKey(a.target))) return a
+        changed = true
+        return { ...a, mod: pickMod(), depth: pickDepth() }
+      })
+
+      // (b) optionally seed a random subset of the still-unassigned candidates.
+      if (addNew) {
+        const assigned = new Set(matrix.map((a) => modTargetKey(a.target)))
+        const open = candidates.filter((t) => !assigned.has(modTargetKey(t)))
+        for (let i = open.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1))
+          const tmp = open[i]; open[i] = open[j]; open[j] = tmp
+        }
+        const budget = MAX_MOD_ASSIGNMENTS - matrix.length
+        const want = Math.max(1, Math.round(open.length * 0.6))
+        const k = Math.min(open.length, Math.max(0, budget), 6, want)
+        for (let i = 0; i < k; i++) {
+          const target = open[i]
+          const mode: ModMode = baseNormForTarget(st, target) < 0.05 ? 'replace' : 'multiply'
+          matrix = [...matrix, { id: uid(), mod: pickMod(), depth: pickDepth(), target, mode }]
+          changed = true
+        }
+      }
+      return changed ? { composition: { ...c, modMatrix: matrix } } : {}
+    })
   },
   removeAssignment: (id) =>
     set((s) => ({
