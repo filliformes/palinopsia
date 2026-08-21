@@ -47,7 +47,7 @@ import { SonifyPage } from './components/SonifyPage'
 import { WorldPage } from './components/WorldPage'
 import { SequencePage } from './components/SequencePage'
 import { SceneBank } from './components/SceneBank'
-import { SurfacePad } from './components/SurfacePad'
+import { SurfacePad, SurfaceOnToggle } from './components/SurfacePad'
 import { initOscInput, applyOscListen, applyOscOutput, initOscQueryStream } from './oscInput'
 import { morphedComposition, consumeCrossfade } from './morph'
 import { surfaceComposition, nearestSurfaceScene, samplePath } from './surface'
@@ -1245,7 +1245,7 @@ export default function App(): JSX.Element {
               <BackgroundPanel />
               {/* Metasurface : the scene bank as a continuous 2D plane you play
                   by dragging (Bencina 2005). Collapsed by default. */}
-              <Collapsible sectionKey="surface" title="surface">
+              <Collapsible sectionKey="surface" title="surface" extra={<SurfaceOnToggle />}>
                 <SurfacePad />
               </Collapsible>
             </>

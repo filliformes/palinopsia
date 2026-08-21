@@ -853,7 +853,7 @@ function enumerateLeaves(): Leaf[] {
   add('/opsia/surface', 0, 1, st.surface.x, 'Metasurface cursor X (send x y together; turns it on)')
   add('/opsia/surface/active', 0, 1, st.surface.active ? 1 : 0, 'Enable the Metasurface (>= 0.5)')
   add('/opsia/surface/play', 0, 1, st.surface.play ? 1 : 0, 'Auto-trace the drawn path (>= 0.5)')
-  add('/opsia/surface/time', 0, 20, st.surface.timeMs / 1000, 'Draw-path loop time (seconds, or ms if > 120)')
+  add('/opsia/surface/time', 0, 60, st.surface.timeMs / 1000, 'Draw-path loop time (seconds, or ms if > 120)')
   add('/opsia/surface/jump', 0, 1, st.surface.jump / 100, 'Draw-path jump jitter (0..1 → 0..100 %)')
   add('/opsia/surface/way', 0, 2, st.surface.way === 'pingpong' ? 2 : st.surface.way === 'backward' ? 1 : 0, 'Draw-path direction : 0 fwd · 1 back · 2 ping-pong')
   return out

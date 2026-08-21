@@ -14,6 +14,37 @@ import { nearestSurfaceScene } from '../surface'
 
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v))
 
+/** The surface on/off toggle, lifted into the section header (merged with the
+ *  "surface" title). Rendered inside the Collapsible's header button, so it stops
+ *  propagation to avoid also toggling the collapse. */
+export function SurfaceOnToggle(): JSX.Element {
+  const active = useStore((s) => s.surface.active)
+  const setSurfaceActive = useStore((s) => s.setSurfaceActive)
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      onClick={(e) => {
+        e.stopPropagation()
+        setSurfaceActive(!active)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          e.stopPropagation()
+          setSurfaceActive(!active)
+        }
+      }}
+      className={`ml-1.5 rounded border px-1.5 py-0 font-mono text-[9px] normal-case transition-colors ${
+        active ? 'border-accent bg-accent/15 text-accent' : 'border-border text-muted hover:text-text'
+      }`}
+      title="When on, the output is a live blend of the scenes at the cursor, instead of the live composition"
+    >
+      {active ? '● on' : '○ off'}
+    </span>
+  )
+}
+
 export function SurfacePad(): JSX.Element {
   const scenes = useStore((s) => s.scenes)
   const surface = useStore((s) => s.surface)
@@ -117,17 +148,6 @@ export function SurfacePad(): JSX.Element {
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-1.5">
         <button
-          onClick={() => setSurfaceActive(!surface.active)}
-          className={`rounded border px-2 py-0.5 font-mono text-[10px] transition-colors ${
-            surface.active
-              ? 'border-accent bg-accent/15 text-accent'
-              : 'border-border text-muted hover:text-text'
-          }`}
-          title="When on, the output is a live blend of the scenes at the cursor, instead of the live composition"
-        >
-          {surface.active ? '● surface on' : '○ surface off'}
-        </button>
-        <button
           onClick={() => autoPlaceScenes(true)}
           className="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-muted transition-colors hover:text-text"
           title="Re-spread every scene evenly over the plane (a sunflower layout)"
@@ -172,10 +192,11 @@ export function SurfacePad(): JSX.Element {
               d={pathD}
               fill="none"
               stroke="rgb(var(--c-accent2))"
-              strokeWidth={0.007}
+              strokeWidth={2.5}
               strokeLinejoin="round"
               strokeLinecap="round"
-              opacity={drawingRef.current ? 0.9 : 0.55}
+              strokeDasharray="0.5 6"
+              opacity={drawingRef.current ? 0.95 : 0.75}
               vectorEffect="non-scaling-stroke"
             />
             {visPath.length > 1 && (
@@ -275,7 +296,7 @@ export function SurfacePad(): JSX.Element {
             <input
               type="range"
               min={200}
-              max={20000}
+              max={60000}
               step={100}
               value={surface.timeMs}
               onChange={(e) => setSurfaceTimeMs(Number(e.target.value))}
