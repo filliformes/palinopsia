@@ -496,6 +496,7 @@
           <tr><td class="addr"><span class="lit">/opsia/scene/</span><span class="v">{n}</span></td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">Recall <b>scene</b> <code>n</code> (1-based) — full-instrument state.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>randomize</td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">Re-roll <b>everything</b> within curated ranges.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>randomize/<span class="v">{scope}</span></td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">Re-roll one scope — <code>sources · sourceparams · sourcefx · sourcefxonly · layerfxonly · layer · master · finishing · modulators</code>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>panic</td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc"><b>Panic flush</b> — drop every self-feeding buffer (feedback · trails · frame rings · accumulators) at once. Same as key <code>0</code> / the ⚡ Flush button; advertised over OSCQuery.</td></tr>
         </tbody>
       </table>
     </div>

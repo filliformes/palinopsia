@@ -974,6 +974,7 @@ unless the slot actually holds a video.
 | `/opsia/seq/skip` | trigger | Advance to next scene |
 | `/opsia/scene/{n}` | trigger | Recall scene *n* (1-based) |
 | `/opsia/randomize[/{scope}]` | trigger | Fire Randomize (scope defaults to `all`; `sources`, `sourceparams`, `sourcefx`, `sourcefxonly`, `layer`, `layerfxonly`, `master`, `finishing`, `modulators`) |
+| `/opsia/panic` | trigger | **Panic flush** — drop every self-feeding buffer (same as key `0` / the ⚡ Flush button); advertised over OSCQuery |
 
 **Audio sensors** (pushed by the "audio brain"; bypass the store, feed the audio bus
 directly): `/opsia/audio/{level|flux|transient|centroid|pitch}` and

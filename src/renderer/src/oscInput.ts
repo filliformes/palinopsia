@@ -50,6 +50,7 @@
 //   /opsia/bpm                                          f 20..800 (raw)
 //   /opsia/scene/{n}                                    trigger
 //   /opsia/randomize[/{scope}]                          trigger
+//   /opsia/panic                                        trigger (flush self-feeding buffers)
 
 import type { BlendMode, CouplingMode, AudioFeature, FxScope, OscInEvent, OscQueryLeaf } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
@@ -59,6 +60,7 @@ import { SONIFY_MOD_DESCS } from './engine/modulation'
 import { useStore } from './store'
 import type { RandomizeScope } from './randomize'
 import { setKnobTarget } from './metaSmooth'
+import { firePanic } from './commands'
 import { GENERATORS, SHADER_BY_ID } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
 import { audioBus, type AudioFeatureName } from './engine/audioIn'
@@ -591,6 +593,14 @@ function route(address: string, args: Args): void {
       return
     }
 
+    case 'panic': {
+      // The remote panic flush : drop every self-feeding buffer (same as key 0 /
+      // the ⚡ Flush button). A rising-edge trigger, so a held value fires once.
+      if (!rising(address, n)) return
+      firePanic()
+      return
+    }
+
     default:
       return
   }
@@ -797,6 +807,7 @@ function enumerateLeaves(): Leaf[] {
   add('/opsia/world', 1, Math.max(1, st.worlds.length), worldIdx, 'Active World (send an id/name string, or a 1-based index)')
   add('/opsia/seq/run', 0, 1, st.sequence.running ? 1 : 0, 'Sequencer running (>= 0.5)')
   add('/opsia/seq/skip', 0, 1, 0, 'Advance to the next scene (trigger)', false)
+  add('/opsia/panic', 0, 1, 0, 'Panic flush — drop every self-feeding buffer (trigger)', false)
   return out
 }
 
