@@ -1142,11 +1142,6 @@ export default function App(): JSX.Element {
             <SceneBank />
           </Collapsible>
 
-          {/* Metasurface : the scene bank as a continuous 2D plane (Bencina 2005) */}
-          <Collapsible sectionKey="surface" title="surface">
-            <SurfacePad />
-          </Collapsible>
-
           {/* Auto-generated control panel : the selection's ISF INPUTS
               rendered as themed controls (brief §10.3). */}
           <Collapsible sectionKey="inspector" title="inspector">
@@ -1195,6 +1190,11 @@ export default function App(): JSX.Element {
               {/* Background slab : pinned last, matching the stack (renders
                   under everything). */}
               <BackgroundPanel />
+              {/* Metasurface : the scene bank as a continuous 2D plane you play
+                  by dragging (Bencina 2005). Collapsed by default. */}
+              <Collapsible sectionKey="surface" title="surface">
+                <SurfacePad />
+              </Collapsible>
             </>
           )}
         </aside>

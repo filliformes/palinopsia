@@ -629,8 +629,9 @@ a fresh variation within the same theme.
 
 ## Metasurface — the continuous scene-space
 
-The **surface** section (under the scene bank) turns the discrete bank into a
-**continuous 2D plane** (Bencina, NIME 2005): every scene is a point, and a cursor
+The **surface** section (in the right column's Layers view, under the Background)
+turns the discrete bank into a **continuous 2D plane** (Bencina, NIME 2005): every
+scene is a point, and a cursor
 **blends** between them, so you *navigate* the bank by dragging rather than stepping
 scene-to-scene. Drag anywhere to move the cursor (it turns the surface on); drag a **dot**
 to arrange which scenes sit near which; **arrange** re-spreads them evenly.
