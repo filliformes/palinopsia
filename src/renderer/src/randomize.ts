@@ -196,7 +196,7 @@ const CONV_NODES = NATIVE_NODES.filter((n) => CONV_NODE_IDS.includes(n.id))
 const SELF_NODE_IDS = [
   'node-reponse', 'node-datamosh', 'node-feedback', 'node-chronoscan', 'node-sediment',
   'node-scanner', 'node-autocutter', 'node-eternalism', 'node-afterimage',
-  'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv'
+  'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile'
 ]
 const SELF_NODES = NATIVE_NODES.filter((n) => SELF_NODE_IDS.includes(n.id))
 const randSidechain = (): SidechainRef => ({ kind: 'layer', layer: Math.floor(rnd() * 4) })

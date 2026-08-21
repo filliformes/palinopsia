@@ -160,6 +160,8 @@ export const SHADER_BLURBS: Record<string, string> = {
     'A dirty vision-mixer that throws momentary faults into the picture and stays completely clean between them. A rate and a dirt dial decide how often it fires — or hit the trigger by hand — and each fire drops the signal out, hard-cuts to a frozen frame, knocks the timebase sideways, or sweeps a band of switching noise across the cut. Best on the master chain, where the whole programme glitches like circuit-bent kit.',
   'node-ibfv':
     'Drags a cloud of dye along a flowing field and keeps topping it up with fresh noise, so the noise smears into long flow-aligned filaments — a wake of material trailing the motion. The field is a slow curl-noise swirl that is always moving (so even a still picture streams) plus the image’s own movement, and the dye can be tinted by the picture so it reads as its own substance flowing. Decays into structure rather than glowing, so it stays matte.',
+  'node-toile':
+    'Reworks the picture as a painting that follows its own structure — it finds the direction of each contour and smooths the image into strokes running along it, so forms flatten into coherent paint rather than a uniform blur, and it stays steady from frame to frame instead of speckling. Turn up the line to ink the contours with clean, flow-following outlines. The real painterly / scratch pass, as a rack effect.',
   'node-pulfrich':
     'Creates real depth out of sideways movement by delaying one eye slightly behind the other. It is the illusion that appears when you watch a moving picture with one eye darkened. Needs the anaglyph stage in the Finalizer, and a source that moves laterally.',
   'node-corrode':

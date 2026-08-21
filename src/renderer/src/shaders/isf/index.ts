@@ -558,6 +558,28 @@ export const NATIVE_NODES: IsfShader[] = [
     }
   },
   {
+    id: 'node-toile',
+    name: 'Toile',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Toile : a painterly reworking that follows the image's own structure (anisotropic Kuwahara, Kyprianidis) with optional coherent line-work (flow-XDoG). A structure tensor finds the local orientation, and the picture is smoothed into strokes that run ALONG its contours — forms flatten into paint that stays temporally coherent (not per-frame speckle) instead of a uniform blur. RADIUS is the brush size, SHARP how hard it flattens (edge-preserving ↔ painterly), PAINT how far toward the painting. LINE inks the contours : a difference-of-gaussians measured across each edge and smoothed along it draws clean outlines that follow the structure (THRESHOLD picks how strong an edge must be). MIX blends over the live frame. The real « Peint » + « Griffé » as a rack FX; a spatial filter (no feedback). Any rack.",
+      "CATEGORIES": ["FX", "Stylize"],
+      "INPUTS": [
+        { "NAME": "radius", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "brush" },
+        { "NAME": "sharp", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "flatten" },
+        { "NAME": "paint", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "paint" },
+        { "NAME": "line", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "line (ink)" },
+        { "NAME": "threshold", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "line edge" },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
+      ]
+    }*/`,
+    curated: {
+      radius: [0.3, 0.9], sharp: [0.3, 0.9], paint: [0.6, 1.0],
+      line: [0.0, 0.7], threshold: [0.3, 0.7], mix: [0.6, 1.0]
+    }
+  },
+  {
     id: 'node-pulfrich',
     name: 'Pulfrich',
     category: 'FX',

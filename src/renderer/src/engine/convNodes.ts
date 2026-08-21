@@ -1082,6 +1082,9 @@ class NodeGL {
   faultline: Prog
   ibfv: Prog
   ibfvOut: Prog
+  toileTensor: Prog
+  toileTBlur: Prog
+  toile: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -1119,6 +1122,9 @@ class NodeGL {
     this.faultline = this.build(F_FAULTLINE)
     this.ibfv = this.build(F_IBFV)
     this.ibfvOut = this.build(F_IBFV_OUT)
+    this.toileTensor = this.build(F_TOILE_TENSOR)
+    this.toileTBlur = this.build(F_TOILE_TBLUR)
+    this.toile = this.build(F_TOILE)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -2948,6 +2954,167 @@ export class IBFVNode implements ConvNode {
   }
 }
 
+// ── Toile node : anisotropic Kuwahara + flow-XDoG (painterly + coherent lines) ──
+// A structure-tensor-aligned PAINTERLY flatten (Kyprianidis-style anisotropic
+// Kuwahara : the image is smoothed into strokes that follow its own structure, so
+// forms flatten into paint that stays temporally coherent, not per-frame speckle) with
+// optional flow-XDoG LINE-work (a difference-of-gaussians edge measured across the
+// contour and smoothed along it → clean outlines that follow the image's structure).
+// The real implementation of the Cameraless « Peint » (paint) + « Griffé » (scratch)
+// stages, as a rack FX. Stateless spatial filter : three passes (tensor → smooth →
+// paint+line), no feedback buffers.
+const F_TOILE_TENSOR = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost; uniform vec2 uTexel;
+float L(vec2 uv){ return dot(texture(uHost, uv).rgb, vec3(0.299, 0.587, 0.114)); }
+void main(){
+  vec2 t = uTexel;
+  // Sobel gradient of luma → the structure tensor (E,F,G) = (gx², gx·gy, gy²).
+  float gx = (L(vUV + vec2(t.x,-t.y)) + 2.0*L(vUV + vec2(t.x,0.0)) + L(vUV + t))
+           - (L(vUV + vec2(-t.x,-t.y)) + 2.0*L(vUV + vec2(-t.x,0.0)) + L(vUV + vec2(-t.x,t.y)));
+  float gy = (L(vUV + vec2(-t.x,t.y)) + 2.0*L(vUV + vec2(0.0,t.y)) + L(vUV + t))
+           - (L(vUV + vec2(-t.x,-t.y)) + 2.0*L(vUV + vec2(0.0,-t.y)) + L(vUV + vec2(t.x,-t.y)));
+  o = vec4(gx*gx, gx*gy, gy*gy, 1.0);
+}`
+const F_TOILE_TBLUR = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uTex; uniform vec2 uStep; uniform float uRadius;
+void main(){
+  vec3 acc = vec3(0.0); float wsum = 0.0; int R = int(uRadius);
+  float s = uRadius * 0.5 + 0.5;
+  for (int i = -12; i <= 12; i++){
+    if (i < -R || i > R) continue;
+    float w = exp(-float(i*i) / (2.0 * s * s));
+    acc += texture(uTex, vUV + uStep * float(i)).rgb * w; wsum += w;
+  }
+  o = vec4(acc / max(wsum, 1e-4), 1.0);
+}`
+const F_TOILE = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uTensor; uniform vec2 uTexel;
+uniform float uRadius, uSharp, uPaint, uLine, uThresh, uMix;
+float L(vec2 uv){ return dot(texture(uHost, uv).rgb, vec3(0.299, 0.587, 0.114)); }
+void main(){
+  vec3 host = texture(uHost, vUV).rgb;
+  // ── orientation from the smoothed structure tensor ──
+  vec3 tn = texture(uTensor, vUV).rgb; float E = tn.x, F = tn.y, G = tn.z;
+  float disc = sqrt(max(0.0, (E - G) * (E - G) + 4.0 * F * F));
+  float l1 = 0.5 * (E + G + disc), l2 = 0.5 * (E + G - disc);
+  float aniso = (l1 + l2 > 1e-6) ? (l1 - l2) / (l1 + l2) : 0.0;
+  float phi = 0.5 * atan(2.0 * F, E - G);          // gradient orientation
+  vec2 grad = vec2(cos(phi), sin(phi));
+  vec2 tang = vec2(-grad.y, grad.x);               // along the contour
+
+  // ── anisotropic Kuwahara : 8 sectors over an ellipse elongated along the
+  //    tangent (so strokes run along the image's structure). ──
+  int R = int(uRadius);
+  vec3 m[8]; vec3 s2[8]; float w[8];
+  for (int k = 0; k < 8; k++){ m[k] = vec3(0.0); s2[k] = vec3(0.0); w[k] = 0.0; }
+  for (int j = -5; j <= 5; j++){
+    for (int i = -5; i <= 5; i++){
+      if (abs(i) > R || abs(j) > R) continue;
+      vec2 v = vec2(float(i), float(j));
+      // rotate into the tangent frame, compress along the tangent → ellipse
+      vec2 rv = vec2(dot(v, tang), dot(v, grad));
+      rv.x *= (1.0 - 0.55 * aniso);
+      if (dot(rv, rv) > float(R * R) + 0.5) continue;
+      vec3 col = texture(uHost, vUV + v * uTexel).rgb;
+      int k = int(floor((atan(rv.y, rv.x) + 3.14159265) / 6.28318531 * 8.0)) & 7;
+      m[k] += col; s2[k] += col * col; w[k] += 1.0;
+    }
+  }
+  vec3 paint = vec3(0.0); float aw = 0.0;
+  for (int k = 0; k < 8; k++){
+    if (w[k] < 0.5) continue;
+    vec3 mk = m[k] / w[k];
+    vec3 vk = abs(s2[k] / w[k] - mk * mk);
+    float var = vk.x + vk.y + vk.z;
+    float a = 1.0 / (1.0 + pow(var * 12.0, 1.0 + uSharp * 6.0));  // low-variance sectors win
+    paint += mk * a; aw += a;
+  }
+  paint = aw > 1e-4 ? paint / aw : host;
+  vec3 col = mix(host, paint, uPaint);
+
+  // ── flow-XDoG line : a high-pass ACROSS the contour, smoothed ALONG it. ──
+  if (uLine > 0.001){
+    float e = 0.0;
+    for (int s = -3; s <= 3; s++){
+      vec2 b = vUV + tang * (float(s) * 2.0) * uTexel;         // walk along the contour
+      float c = L(b);
+      float n = 0.5 * (L(b + grad * 2.0 * uTexel) + L(b - grad * 2.0 * uTexel));
+      e += (c - n);                                            // across-contour high pass
+    }
+    e = abs(e) / 7.0;
+    float line = smoothstep(uThresh * 0.03, uThresh * 0.03 + 0.06, e) * aniso;
+    col *= 1.0 - line * uLine;                                 // ink the contours dark
+  }
+  o = vec4(clamp(mix(host, col, uMix), 0.0, 1.0), 1.0);
+}`
+
+export class ToileNode implements ConvNode {
+  private t0: RGBA | null = null
+  private t1: RGBA | null = null
+  private w = 0
+  private h = 0
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  private ensure(w: number, h: number): void {
+    if (this.t0 && this.w === w && this.h === h) return
+    const gl = this.gl
+    if (this.t0) { gl.deleteTexture(this.t0.tex); gl.deleteFramebuffer(this.t0.fbo) }
+    if (this.t1) { gl.deleteTexture(this.t1.tex); gl.deleteFramebuffer(this.t1.fbo) }
+    this.t0 = makeRGBA(gl, w, h, true); this.t1 = makeRGBA(gl, w, h, true)
+    this.w = w; this.h = h
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl)
+    const W = ctx.chain.w, H = ctx.chain.h
+    this.ensure(W, H)
+    const inp = ctx.inputs
+    const t0 = this.t0 as RGBA, t1 = this.t1 as RGBA
+    const draw = (fbo: WebGLFramebuffer): void => { gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, W, H); gl.drawArrays(gl.TRIANGLES, 0, 3) }
+    const bind = (u: number, tex: WebGLTexture): void => { gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D, tex) }
+    const radius = Math.round(clampf(num(inp.radius, 0.5), 0, 1) * 4) + 1
+
+    // 1) structure tensor.
+    let p = g.use(g.toileTensor)
+    bind(0, ctx.host); gl.uniform1i(p.u('uHost'), 0); gl.uniform2f(p.u('uTexel'), 1 / W, 1 / H)
+    draw(t0.fbo)
+    // 2) smooth the tensor (separable) for coherent orientation : t0 →H→ t1 →V→ t0.
+    const coh = Math.max(2, radius + 2)
+    p = g.use(g.toileTBlur)
+    bind(0, t0.tex); gl.uniform1i(p.u('uTex'), 0); gl.uniform1f(p.u('uRadius'), coh)
+    gl.uniform2f(p.u('uStep'), 1 / W, 0); draw(t1.fbo)
+    bind(0, t1.tex); gl.uniform2f(p.u('uStep'), 0, 1 / H); draw(t0.fbo)
+    // 3) paint + line.
+    const out = ctx.chain.next()
+    p = g.use(g.toile)
+    bind(0, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    bind(1, t0.tex); gl.uniform1i(p.u('uTensor'), 1)
+    gl.uniform2f(p.u('uTexel'), 1 / W, 1 / H)
+    gl.uniform1f(p.u('uRadius'), radius)
+    gl.uniform1f(p.u('uSharp'), clampf(num(inp.sharp, 0.5), 0, 1))
+    gl.uniform1f(p.u('uPaint'), clampf(num(inp.paint, 1), 0, 1))
+    gl.uniform1f(p.u('uLine'), clampf(num(inp.line, 0.4), 0, 1))
+    gl.uniform1f(p.u('uThresh'), clampf(num(inp.threshold, 0.5), 0, 1))
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
+    draw(out.fbo)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return out.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    const gl = this.gl
+    if (this.t0) { gl.deleteTexture(this.t0.tex); gl.deleteFramebuffer(this.t0.fbo) }
+    if (this.t1) { gl.deleteTexture(this.t1.tex); gl.deleteFramebuffer(this.t1.fbo) }
+    this.t0 = this.t1 = null
+  }
+}
+
 // ── Pulfrich node : monocular 3D from a temporal eye-delay ───────────────
 // A frame-history ring read as a per-pixel delay, keyed by the shared depth map
 // (or luminance), presented as an anaglyph pair or a motion-gated parallax slide.
@@ -3202,6 +3369,7 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   if (shaderId === 'node-melt') return new MeltNode(gl)
   if (shaderId === 'node-faultline') return new FaultlineNode(gl)
   if (shaderId === 'node-ibfv') return new IBFVNode(gl)
+  if (shaderId === 'node-toile') return new ToileNode(gl)
   if (shaderId === 'node-transfert') return new TransfertNode(gl)
   if (shaderId === 'node-convolve') return new ConvolveNode(gl)
   if (shaderId === 'node-reponse') return new ReponseNode(gl)
@@ -3214,6 +3382,6 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)
