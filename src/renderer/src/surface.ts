@@ -29,6 +29,24 @@ export function surfaceWeights(scenes: SceneEntry[], x: number, y: number): numb
   return sum > 1e-9 ? raw.map((w) => w / sum) : raw.map(() => 1 / Math.max(1, scenes.length))
 }
 
+/** Sample a drawn path at a normalized playhead in [0,1], linear-interpolating
+ *  between adjacent points by index-fraction. (0.5,0.5) for an empty path —
+ *  the plane centre, so a cleared sequencer sits quiet.) */
+export function samplePath(
+  path: { x: number; y: number }[],
+  ph01: number
+): { x: number; y: number } {
+  const n = path.length
+  if (n === 0) return { x: 0.5, y: 0.5 }
+  if (n === 1) return { x: path[0].x, y: path[0].y }
+  const p = Math.max(0, Math.min(1, ph01)) * (n - 1)
+  const i = Math.floor(p)
+  const f = p - i
+  const a = path[i]
+  const b = path[Math.min(n - 1, i + 1)]
+  return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f }
+}
+
 /** Index of the scene nearest the cursor (its structure becomes the base). */
 export function nearestSurfaceScene(scenes: SceneEntry[], x: number, y: number): number {
   let best = 0

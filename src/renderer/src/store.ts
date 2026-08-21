@@ -1086,9 +1086,26 @@ interface StoreState {
   // Metasurface : a continuous 2D scene-space. When active, the render loop feeds
   // the engine a Gaussian blend of the placed scenes at the cursor (surface.ts),
   // instead of the live composition. `x`/`y` are 0..1 on the plane.
-  surface: { active: boolean; x: number; y: number }
+  // The draw sequencer (path/timeMs/way/jump) persists with the session; the
+  // live cursor (x/y), active + play toggles stay runtime. The render loop
+  // advances the playhead and drives x/y along `path` when `play` is on.
+  surface: {
+    active: boolean
+    x: number
+    y: number
+    path: { x: number; y: number }[]
+    play: boolean
+    timeMs: number
+    way: 'forward' | 'backward' | 'pingpong'
+    jump: number
+  }
   setSurfaceActive: (active: boolean) => void
   setSurfaceXY: (x: number, y: number) => void
+  setSurfacePath: (path: { x: number; y: number }[]) => void
+  setSurfacePlay: (play: boolean) => void
+  setSurfaceTimeMs: (ms: number) => void
+  setSurfaceWay: (way: 'forward' | 'backward' | 'pingpong') => void
+  setSurfaceJump: (pct: number) => void
   setScenePos: (id: string, x: number, y: number) => void
   // Auto-place any scenes without a surface position (a sunflower spread).
   autoPlaceScenes: (force?: boolean) => void
@@ -2816,7 +2833,7 @@ export const useStore = create<StoreState>((set, get) => ({
       scenes: s.scenes.filter((x) => x.id !== id),
       activeSceneId: s.activeSceneId === id ? null : s.activeSceneId
     })),
-  surface: { active: false, x: 0.5, y: 0.5 },
+  surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0 },
   setSurfaceActive: (active) =>
     set((s) => {
       // On first activation, give every not-yet-placed scene a plane position.
@@ -2828,6 +2845,23 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
   setSurfaceXY: (x, y) =>
     set((s) => ({ surface: { ...s.surface, x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) } })),
+  setSurfacePath: (path) =>
+    set((s) => ({ surface: { ...s.surface, path } })),
+  setSurfacePlay: (play) =>
+    // Playing the drawn path only makes sense with the surface live : turning
+    // play on turns the surface on too (and places any un-placed scenes).
+    set((s) => {
+      if (play && !s.surface.active && s.scenes.some((x) => !x.surface)) {
+        const scenes = s.scenes.map((x, i) => (x.surface ? x : { ...x, surface: autoSurfacePos(i, s.scenes.length) }))
+        return { surface: { ...s.surface, play, active: true }, scenes }
+      }
+      return { surface: { ...s.surface, play, active: play ? true : s.surface.active } }
+    }),
+  setSurfaceTimeMs: (ms) =>
+    set((s) => ({ surface: { ...s.surface, timeMs: Math.max(100, Math.min(120000, ms)) } })),
+  setSurfaceWay: (way) => set((s) => ({ surface: { ...s.surface, way } })),
+  setSurfaceJump: (pct) =>
+    set((s) => ({ surface: { ...s.surface, jump: Math.max(0, Math.min(100, pct)) } })),
   setScenePos: (id, x, y) =>
     set((s) => ({
       scenes: s.scenes.map((sc) =>
@@ -2990,6 +3024,18 @@ export const useStore = create<StoreState>((set, get) => ({
       variationBaseline: null,
       // Sequencer travels with the session; auto-resumes if it was running.
       sequence: { ...makeDefaultSequence(), ...(s.sequence ?? {}) },
+      // The drawn surface gesture + timing travel too; the live cursor / active
+      // / play toggles reset (a session opens paused at the plane centre).
+      surface: {
+        active: false,
+        x: 0.5,
+        y: 0.5,
+        play: false,
+        path: Array.isArray(s.surface?.path) ? s.surface!.path : [],
+        timeMs: typeof s.surface?.timeMs === 'number' ? s.surface!.timeMs : 8000,
+        way: s.surface?.way ?? 'forward',
+        jump: typeof s.surface?.jump === 'number' ? s.surface!.jump : 0
+      },
       composition: normalizeComposition(s.composition)
     })
     // The session's sound patch (post-set so setSonify's engine push sees it).
@@ -3013,6 +3059,9 @@ export const useStore = create<StoreState>((set, get) => ({
       world: s.worlds.find((w) => w.id === s.world) ?? null,
       sequence: s.sequence,
       sonify: { ...s.sonify, on: false, sinkId: '' },
+      // The drawn gesture + its timing travel with the session; the live cursor,
+      // active + play toggles are runtime and reset on load.
+      surface: { path: s.surface.path, timeMs: s.surface.timeMs, way: s.surface.way, jump: s.surface.jump },
       ui: { theme: s.theme }
     }
   }

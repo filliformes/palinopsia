@@ -573,6 +573,24 @@ export interface SequenceState {
 }
 
 // ── Session persistence (brief §7) ───────────────────────────────────
+// ── Metasurface draw sequencer ───────────────────────────────────────
+// A drawn gesture over the 2D scene-space plane, auto-played by the render
+// loop : the cursor traces the path over `timeMs`, in `way` direction, with
+// `jump`% of random teleports to other spots (a jitter). Modeled on dataFLOU's
+// Gesture playback (phase→playhead mapping), retargeted from a modulator to
+// the surface cursor.
+export interface SurfaceSequencer {
+  // Recorded path, each point normalized to [0,1]² on the plane. Sampled by
+  // index-fraction (drawn at ~display rate, so index ≈ even time).
+  path: { x: number; y: number }[]
+  // Milliseconds for the cursor to traverse the whole drawing once.
+  timeMs: number
+  // Play direction : forward, reversed, or a 0→1→0 triangle each loop.
+  way: 'forward' | 'backward' | 'pingpong'
+  // 0..100 % : chance/frequency the playhead jumps to a random spot (jitter).
+  jump: number
+}
+
 export interface Session {
   version: 1
   name: string
@@ -589,6 +607,9 @@ export interface Session {
   sequence?: SequenceState
   // Sonify config (the S page) : travels with the session. Opaque to main.
   sonify?: unknown
+  // Metasurface draw sequencer : the recorded path + its playback timing.
+  // The live cursor / active toggle stay runtime; only the gesture persists.
+  surface?: SurfaceSequencer
   // Opaque renderer UI snapshot (theme, panel sizes, selection). The main
   // process never inspects it : it just round-trips it to disk.
   ui?: unknown

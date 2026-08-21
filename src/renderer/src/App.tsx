@@ -50,7 +50,7 @@ import { SceneBank } from './components/SceneBank'
 import { SurfacePad } from './components/SurfacePad'
 import { initOscInput, applyOscListen, applyOscOutput, initOscQueryStream } from './oscInput'
 import { morphedComposition, consumeCrossfade } from './morph'
-import { surfaceComposition, nearestSurfaceScene } from './surface'
+import { surfaceComposition, nearestSurfaceScene, samplePath } from './surface'
 import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
 import { SessionLoader, GenerateMenu } from './components/TopBarMenus'
@@ -177,6 +177,17 @@ export default function App(): JSX.Element {
   // Metasurface : last-nearest scene index, so a structure jump (a new nearest)
   // crossfades instead of snapping. -1 = surface inactive / nothing placed.
   const surfaceNearest = useRef(-1)
+  // Draw sequencer playback state (loop-local, off the store to avoid per-frame
+  // React churn). phase wraps in [0,∞); jump* hold a random-teleport target
+  // between refreshes; lastStoreT throttles the pad-cursor visual write.
+  const surfaceSeq = useRef({
+    phase: 0,
+    lastT: 0,
+    jumpActive: false,
+    jumpTarget: 0.5,
+    lastJumpT: 0,
+    lastStoreT: 0
+  })
   const theme = useStore((s) => s.theme)
   const setTheme = useStore((s) => s.setTheme)
   const depthMode = useStore((s) => s.depthMode)
@@ -627,10 +638,52 @@ export default function App(): JSX.Element {
         // dissolve it. Otherwise the Morph path (scene recall / Randomize easing).
         let c
         const surf = st.surface
-        const surfComp = surf.active ? surfaceComposition(st.scenes, surf.x, surf.y) : null
+        // Draw sequencer : when playing a recorded path, advance a phase in real
+        // time and drive the cursor along the drawing (dataFLOU's Gesture model,
+        // retargeted to the surface). way maps phase→playhead; jump% overlays
+        // random teleports (a held sample-and-hold jitter). The blend still reads
+        // sx/sy below, so playback and hand-dragging share one code path.
+        let sx = surf.x
+        let sy = surf.y
+        if (surf.active && surf.play && surf.path.length >= 2) {
+          const seq = surfaceSeq.current
+          const dt = seq.lastT ? Math.min(200, now - seq.lastT) : 0
+          seq.lastT = now
+          seq.phase += dt / Math.max(100, surf.timeMs)
+          const pf = seq.phase - Math.floor(seq.phase)
+          let base = pf
+          if (surf.way === 'backward') base = 1 - pf
+          else if (surf.way === 'pingpong') base = 1 - Math.abs(2 * pf - 1)
+          // jump : refresh a held random target on an interval that tightens as
+          // jump grows; each refresh has `jumpAmt` odds of teleporting (else it
+          // rejoins the smooth path). 0 % = clean traversal, 100 % = near-chaos.
+          const jumpAmt = Math.max(0, Math.min(1, surf.jump / 100))
+          let ph = base
+          if (jumpAmt > 0) {
+            const holdMs = 60 + (1 - jumpAmt) * 340
+            if (now - seq.lastJumpT >= holdMs) {
+              seq.lastJumpT = now
+              seq.jumpActive = Math.random() < jumpAmt
+              if (seq.jumpActive) seq.jumpTarget = Math.random()
+            }
+            if (seq.jumpActive) ph = seq.jumpTarget
+          }
+          const s = samplePath(surf.path, ph)
+          sx = s.x
+          sy = s.y
+          // Throttle the store write (pad-cursor visual) to ~25 Hz — the blend
+          // itself runs off sx/sy every frame regardless.
+          if (now - seq.lastStoreT >= 40) {
+            seq.lastStoreT = now
+            st.setSurfaceXY(sx, sy)
+          }
+        } else {
+          surfaceSeq.current.lastT = 0
+        }
+        const surfComp = surf.active ? surfaceComposition(st.scenes, sx, sy) : null
         if (surfComp) {
           const placed = st.scenes.filter((s) => s.surface)
-          const ni = nearestSurfaceScene(placed, surf.x, surf.y)
+          const ni = nearestSurfaceScene(placed, sx, sy)
           if (surfaceNearest.current !== -1 && surfaceNearest.current !== ni) comp!.beginCrossfade(250)
           surfaceNearest.current = ni
           c = surfComp
