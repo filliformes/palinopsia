@@ -645,6 +645,14 @@ with a short crossfade, so crossing between scenes is smooth, not a hard cut. Sc
 positions travel in the session; the whole plane is playable over OSC — **`/opsia/surface
 x y`** is Pandore's Trill Square.
 
+**Draw sequencer.** Flip to **draw** and sketch a path across the plane, then **play** —
+the cursor auto-traces the drawing so the output morphs through scene-space hands-free.
+**time** sets how long one traversal takes; **way** picks the direction (forward · backward ·
+⇄ ping-pong); **jump %** randomly teleports the playhead to other spots on the path (a
+jitter — 0 % is a clean trace, higher values fracture it). The drawn gesture and its timing
+travel in the session. Drivable over OSC too: **`/opsia/surface/play`**, **`/time`**,
+**`/jump`**, **`/way`**.
+
 ## Randomize & Vary
 
 **Randomize** is structural: it doesn't just re-roll parameters, it rebuilds its
@@ -997,6 +1005,10 @@ unless the slot actually holds a video.
 | `/opsia/panic` | trigger | **Panic flush** — drop every self-feeding buffer (same as key `0` / the ⚡ Flush button); advertised over OSCQuery |
 | `/opsia/surface` | f f | **Metasurface** cursor — two `0..1` floats (x, y) on the scene plane; sending it turns the surface on (Pandore's Trill Square) |
 | `/opsia/surface/active` | bool | Enable / disable the Metasurface |
+| `/opsia/surface/play` | bool | **Draw sequencer** — auto-trace the drawn path |
+| `/opsia/surface/time` | f | Draw-path loop time (seconds, or ms if > 120) |
+| `/opsia/surface/jump` | f | Draw-path jump jitter (`0..1` → 0–100 %) |
+| `/opsia/surface/way` | f | Draw-path direction: `0` fwd · `1` back · `2` ping-pong |
 
 **Audio sensors** (pushed by the "audio brain"; bypass the store, feed the audio bus
 directly): `/opsia/audio/{level|flux|transient|centroid|pitch}` and

@@ -53,6 +53,10 @@
 //   /opsia/panic                                        trigger (flush self-feeding buffers)
 //   /opsia/surface x y                                  two 0..1 floats : the Metasurface cursor
 //   /opsia/surface/active {0|1}                         bool : enable the Metasurface
+//   /opsia/surface/play {0|1}                           bool : auto-trace the drawn path
+//   /opsia/surface/time {s}                             float : draw-path loop time (s, or ms if > 120)
+//   /opsia/surface/jump {0..1}                          float : draw-path jump jitter (→ 0..100 %)
+//   /opsia/surface/way {0|1|2}                          fwd · back · ping-pong
 
 import type { BlendMode, CouplingMode, AudioFeature, FxScope, OscInEvent, OscQueryLeaf } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
@@ -611,6 +615,25 @@ function route(address: string, args: Args): void {
         st.setSurfaceActive(n >= 0.5)
         return
       }
+      // Draw sequencer transport (auto-trace the drawn path).
+      if (segs[2] === 'play') {
+        st.setSurfacePlay(n >= 0.5)
+        return
+      }
+      if (segs[2] === 'time') {
+        // Seconds if it looks like a small number, else milliseconds.
+        st.setSurfaceTimeMs(n <= 120 ? n * 1000 : n)
+        return
+      }
+      if (segs[2] === 'jump') {
+        // 0..1 fraction (OSC norm) → percent.
+        st.setSurfaceJump(n <= 1 ? n * 100 : n)
+        return
+      }
+      if (segs[2] === 'way') {
+        st.setSurfaceWay(n >= 1.5 ? 'pingpong' : n >= 0.5 ? 'backward' : 'forward')
+        return
+      }
       const xa = args[0]
       const ya = args[1]
       const gx = xa && typeof xa.value === 'number' ? xa.value : n
@@ -829,6 +852,10 @@ function enumerateLeaves(): Leaf[] {
   add('/opsia/panic', 0, 1, 0, 'Panic flush — drop every self-feeding buffer (trigger)', false)
   add('/opsia/surface', 0, 1, st.surface.x, 'Metasurface cursor X (send x y together; turns it on)')
   add('/opsia/surface/active', 0, 1, st.surface.active ? 1 : 0, 'Enable the Metasurface (>= 0.5)')
+  add('/opsia/surface/play', 0, 1, st.surface.play ? 1 : 0, 'Auto-trace the drawn path (>= 0.5)')
+  add('/opsia/surface/time', 0, 20, st.surface.timeMs / 1000, 'Draw-path loop time (seconds, or ms if > 120)')
+  add('/opsia/surface/jump', 0, 1, st.surface.jump / 100, 'Draw-path jump jitter (0..1 → 0..100 %)')
+  add('/opsia/surface/way', 0, 2, st.surface.way === 'pingpong' ? 2 : st.surface.way === 'backward' ? 1 : 0, 'Draw-path direction : 0 fwd · 1 back · 2 ping-pong')
   return out
 }
 
