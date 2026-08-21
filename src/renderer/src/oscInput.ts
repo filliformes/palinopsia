@@ -51,6 +51,8 @@
 //   /opsia/scene/{n}                                    trigger
 //   /opsia/randomize[/{scope}]                          trigger
 //   /opsia/panic                                        trigger (flush self-feeding buffers)
+//   /opsia/surface x y                                  two 0..1 floats : the Metasurface cursor
+//   /opsia/surface/active {0|1}                         bool : enable the Metasurface
 
 import type { BlendMode, CouplingMode, AudioFeature, FxScope, OscInEvent, OscQueryLeaf } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
@@ -601,6 +603,23 @@ function route(address: string, args: Args): void {
       return
     }
 
+    case 'surface': {
+      // The Metasurface cursor (Pandore's Trill Square plays it). `/opsia/surface x y`
+      // are two 0..1 floats on the plane, and sending them turns the surface ON;
+      // `/opsia/surface/active {0|1}` toggles it explicitly.
+      if (segs[2] === 'active') {
+        st.setSurfaceActive(n >= 0.5)
+        return
+      }
+      const xa = args[0]
+      const ya = args[1]
+      const gx = xa && typeof xa.value === 'number' ? xa.value : n
+      const gy = ya && typeof ya.value === 'number' ? ya.value : gx
+      st.setSurfaceXY(clamp01(gx), clamp01(gy))
+      if (!st.surface.active) st.setSurfaceActive(true)
+      return
+    }
+
     default:
       return
   }
@@ -808,6 +827,8 @@ function enumerateLeaves(): Leaf[] {
   add('/opsia/seq/run', 0, 1, st.sequence.running ? 1 : 0, 'Sequencer running (>= 0.5)')
   add('/opsia/seq/skip', 0, 1, 0, 'Advance to the next scene (trigger)', false)
   add('/opsia/panic', 0, 1, 0, 'Panic flush — drop every self-feeding buffer (trigger)', false)
+  add('/opsia/surface', 0, 1, st.surface.x, 'Metasurface cursor X (send x y together; turns it on)')
+  add('/opsia/surface/active', 0, 1, st.surface.active ? 1 : 0, 'Enable the Metasurface (>= 0.5)')
   return out
 }
 

@@ -47,8 +47,10 @@ import { SonifyPage } from './components/SonifyPage'
 import { WorldPage } from './components/WorldPage'
 import { SequencePage } from './components/SequencePage'
 import { SceneBank } from './components/SceneBank'
+import { SurfacePad } from './components/SurfacePad'
 import { initOscInput, applyOscListen, applyOscOutput, initOscQueryStream } from './oscInput'
 import { morphedComposition, consumeCrossfade } from './morph'
+import { surfaceComposition, nearestSurfaceScene } from './surface'
 import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
 import { SessionLoader, GenerateMenu } from './components/TopBarMenus'
@@ -172,6 +174,9 @@ function WorldSelect(): JSX.Element {
 export default function App(): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const compositorRef = useRef<Compositor | null>(null)
+  // Metasurface : last-nearest scene index, so a structure jump (a new nearest)
+  // crossfades instead of snapping. -1 = surface inactive / nothing placed.
+  const surfaceNearest = useRef(-1)
   const theme = useStore((s) => s.theme)
   const setTheme = useStore((s) => s.setTheme)
   const depthMode = useStore((s) => s.depthMode)
@@ -616,9 +621,23 @@ export default function App(): JSX.Element {
         // A morph just began → dissolve the frozen old frame into the new scene.
         const xfadeMs = consumeCrossfade()
         if (xfadeMs) comp!.beginCrossfade(xfadeMs)
-        // Morph: while a scene recall / randomize is easing, the engine renders
-        // an interpolated composition (the store still holds the target).
-        const c = morphedComposition(now, st.composition)
+        // Metasurface : when active, the engine renders a live Gaussian blend of the
+        // placed scenes at the cursor (structure snaps to the nearest, numeric params
+        // ease across the scenes that share it). A new nearest = a structure jump, so
+        // dissolve it. Otherwise the Morph path (scene recall / Randomize easing).
+        let c
+        const surf = st.surface
+        const surfComp = surf.active ? surfaceComposition(st.scenes, surf.x, surf.y) : null
+        if (surfComp) {
+          const placed = st.scenes.filter((s) => s.surface)
+          const ni = nearestSurfaceScene(placed, surf.x, surf.y)
+          if (surfaceNearest.current !== -1 && surfaceNearest.current !== ni) comp!.beginCrossfade(250)
+          surfaceNearest.current = ni
+          c = surfComp
+        } else {
+          surfaceNearest.current = -1
+          c = morphedComposition(now, st.composition)
+        }
         // 1. Store → engine reconciliation (base values). One write path for
         //    everything: UI edits, session loads, OSC : the engine follows.
         //    Shader hot-swaps preserve feedback buffers (brief §1).
@@ -1121,6 +1140,11 @@ export default function App(): JSX.Element {
           {/* Scene bank : recallable full-instrument states (brief §10.7) */}
           <Collapsible sectionKey="scenes" title="scenes">
             <SceneBank />
+          </Collapsible>
+
+          {/* Metasurface : the scene bank as a continuous 2D plane (Bencina 2005) */}
+          <Collapsible sectionKey="surface" title="surface">
+            <SurfacePad />
           </Collapsible>
 
           {/* Auto-generated control panel : the selection's ISF INPUTS

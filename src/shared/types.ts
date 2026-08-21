@@ -512,6 +512,9 @@ export interface SceneEntry {
   // Sonify patch active when the scene was saved (recall switches the sound
   // half too). Opaque here : the renderer owns the SoniConfig shape.
   sonify?: unknown
+  // Metasurface : this scene's point on the continuous 0..1 scene-space plane.
+  // Absent = not placed yet (auto-placed on first use of the Surface).
+  surface?: { x: number; y: number }
 }
 
 // The scene-relation schema : the sequencer's data model.

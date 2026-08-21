@@ -36,6 +36,7 @@ import { corpusMap } from './assemble/match'
 import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
 import { beginMorph, cancelMorph } from './morph'
+import { autoSurfacePos } from './surface'
 import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify'
 import { resetCouplingState } from './engine/coupling'
 import { applyWorldToComposition, BUILTIN_WORLDS, cloneWorld, deriveSceneTags } from './worlds'
@@ -1071,6 +1072,16 @@ interface StoreState {
   // defaults if a scene has none; setSceneTags edits them.
   ensureSceneTags: (id: string) => void
   setSceneTags: (id: string, patch: Partial<SceneTags>) => void
+
+  // Metasurface : a continuous 2D scene-space. When active, the render loop feeds
+  // the engine a Gaussian blend of the placed scenes at the cursor (surface.ts),
+  // instead of the live composition. `x`/`y` are 0..1 on the plane.
+  surface: { active: boolean; x: number; y: number }
+  setSurfaceActive: (active: boolean) => void
+  setSurfaceXY: (x: number, y: number) => void
+  setScenePos: (id: string, x: number, y: number) => void
+  // Auto-place any scenes without a surface position (a sunflower spread).
+  autoPlaceScenes: (force?: boolean) => void
 
   // Generative scene / relation sequencer (macro-form). Session-scoped.
   sequence: SequenceState
@@ -2658,6 +2669,7 @@ export const useStore = create<StoreState>((set, get) => ({
       meta: true,
       modulation: true,
       output: true,
+      surface: true,
       ...FT
     }
     try {
@@ -2793,6 +2805,28 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => ({
       scenes: s.scenes.filter((x) => x.id !== id),
       activeSceneId: s.activeSceneId === id ? null : s.activeSceneId
+    })),
+  surface: { active: false, x: 0.5, y: 0.5 },
+  setSurfaceActive: (active) =>
+    set((s) => {
+      // On first activation, give every not-yet-placed scene a plane position.
+      if (active && s.scenes.some((x) => !x.surface)) {
+        const scenes = s.scenes.map((x, i) => (x.surface ? x : { ...x, surface: autoSurfacePos(i, s.scenes.length) }))
+        return { surface: { ...s.surface, active }, scenes }
+      }
+      return { surface: { ...s.surface, active } }
+    }),
+  setSurfaceXY: (x, y) =>
+    set((s) => ({ surface: { ...s.surface, x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) } })),
+  setScenePos: (id, x, y) =>
+    set((s) => ({
+      scenes: s.scenes.map((sc) =>
+        sc.id === id ? { ...sc, surface: { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) } } : sc
+      )
+    })),
+  autoPlaceScenes: (force) =>
+    set((s) => ({
+      scenes: s.scenes.map((x, i) => (!force && x.surface ? x : { ...x, surface: autoSurfacePos(i, s.scenes.length) }))
     })),
   reorderScene: (id, beforeId) =>
     set((s) => {
