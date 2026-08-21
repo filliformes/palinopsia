@@ -2799,6 +2799,9 @@ uniform float uScale;     // injected-noise spatial frequency
 uniform float uField;     // synthetic curl-flow strength
 uniform float uMotion;    // host optical-flow strength
 uniform float uDye;       // 0 = grey noise, 1 = tinted by the image
+uniform float uAngle;     // 0..1 → 0..2π : direction of the wind
+uniform float uPush;      // steerable directional wind strength
+uniform float uSwirl;     // 0..1 (0.5 = none) : spiral rotation about the centre
 uniform float uTime, uSeed;
 float hash(vec2 p){ p = fract(p * vec2(123.34, 345.45)); p += dot(p, p + 34.345); return fract(p.x * p.y); }
 float vnoise(vec2 p){
@@ -2813,10 +2816,16 @@ vec2 curl(vec2 p){
   return vec2(y1 - y0, x0 - x1) / e * 0.5;
 }
 void main(){
-  // combined flow (px) : the animated curl base + the image's optical flow
-  vec2 syn = curl(vUV * 2.5 + uTime * 0.05) * uField;
-  vec2 opt = texture(uFlow, vUV).rg * uMotion * 4.0;
-  vec2 flow = (syn + opt) * uFlowAmt;
+  // combined flow (px). The curl base BREATHES (an orbiting sample) instead of
+  // scrolling, so it has no built-in direction; a steerable WIND (angle+push) and a
+  // SPIRAL (rotation about the centre) then let the wake go anywhere.
+  vec2 syn = curl(vUV * 2.5 + vec2(sin(uTime * 0.11), cos(uTime * 0.13)) * 0.6) * uField;
+  vec2 opt = texture(uFlow, vUV).rg * uMotion * 4.0;         // the image's own motion
+  float ang = uAngle * 6.2831853;
+  vec2 wind = vec2(cos(ang), sin(ang)) * uPush;
+  vec2 rc = vUV - 0.5;
+  vec2 spin = vec2(-rc.y, rc.x) * (uSwirl - 0.5) * 4.0;
+  vec2 flow = (syn + opt + wind + spin) * uFlowAmt;
   // advect : sample the accumulator UPSTREAM along the flow
   vec3 adv = texture(uPrev, vUV - flow / uRes).rgb;
   // fresh filtered noise, temporally phased so injected material scintillates and
@@ -2909,6 +2918,9 @@ export class IBFVNode implements ConvNode {
     gl.uniform1f(p.u('uField'), clampf(num(inp.field, 0.5), 0, 1))
     gl.uniform1f(p.u('uMotion'), clampf(num(inp.motion, 0.6), 0, 1))
     gl.uniform1f(p.u('uDye'), clampf(num(inp.dye, 0.6), 0, 1))
+    gl.uniform1f(p.u('uAngle'), clampf(num(inp.angle, 0), 0, 1))
+    gl.uniform1f(p.u('uPush'), clampf(num(inp.push, 0), 0, 1))
+    gl.uniform1f(p.u('uSwirl'), clampf(num(inp.swirl, 0.5), 0, 1))
     gl.uniform1f(p.u('uTime'), this.t * (0.5 + clampf(num(inp.speed, 0.5), 0, 1) * 2))
     gl.uniform1f(p.u('uSeed'), this.frame % 1024)
     draw(write.fbo, W, H)
