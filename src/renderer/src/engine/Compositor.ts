@@ -29,7 +29,7 @@
 import { Renderer as ISFRenderer } from 'interactive-shader-format';
 import { handle, installTextureBridge } from './isfTextureBridge';
 import { audioBus } from './audioIn';
-import { makeConvNode, isNativeNode, type ConvNode } from './convNodes';
+import { makeConvNode, isNativeNode, type ConvNode, type NodeContext } from './convNodes';
 import { TextSource } from './TextSource';
 import { ParametricSource } from './ParametricSource';
 import { CollageSource } from './CollageSource';
@@ -1559,12 +1559,58 @@ export class Compositor {
    *  (memory + disk), so every later load of the same source — Randomize's
    *  bursts above all — is a cache hit instead of a 100ms+ driver compile.
    *  Call one per frame from the render loop until the registry is warm. */
+  private warmFbo: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
+  private warmInputTex: WebGLTexture | null = null;
+  // A minimal NodeContext to force a native node's program(s) to actually compile
+  // during warm-up (same ANGLE deferral as ISF : the compile waits for a real
+  // draw). Built once, tiny (8×8), and reused.
+  private warmNode: { ctx: NodeContext; a: WebGLTexture; b: WebGLTexture } | null = null;
+  private warmNodeCtx(): NodeContext {
+    if (!this.warmNode) {
+      const host = makeTarget(this.gl, 8, 8);
+      const side = makeTarget(this.gl, 8, 8); // non-null sidechain so gated nodes still draw
+      const a = makeTarget(this.gl, 8, 8), b = makeTarget(this.gl, 8, 8);
+      let cur = 0;
+      const chain = { w: 8, h: 8, next: () => (cur++ % 2 ? b : a) };
+      this.warmNode = {
+        a: a.tex, b: b.tex,
+        ctx: {
+          gl: this.gl, chain, host: host.tex, sidechain: side.tex,
+          inputs: {}, dt: 0.016, depth: null
+        }
+      };
+    }
+    return this.warmNode.ctx;
+  }
   prewarmShader(id: string, source: string | null): void {
     try {
       if (isNativeNode(id)) {
-        makeConvNode(this.gl, id)?.dispose();
+        const node = makeConvNode(this.gl, id);
+        if (node) {
+          // Force NodeGL + this node's program(s) to compile now (see warmNodeCtx).
+          try { node.render(this.warmNodeCtx()); } catch { /* warm render best-effort */ }
+          node.dispose();
+        }
       } else if (source) {
-        loadIsf(this.shared.rgl, id, source)?.cleanup();
+        const isf = loadIsf(this.shared.rgl, id, source);
+        if (isf) {
+          // Force the driver to actually COMPILE now. ANGLE (Win→D3D) defers the
+          // real fragment compile until the first DRAW with full pipeline state;
+          // link-status alone doesn't trigger it, so compiling-then-disposing
+          // never populated the GPU program cache and every Randomize still paid
+          // the full compile. One tiny draw makes the warm-up real.
+          if (!this.warmFbo) this.warmFbo = makeTarget(this.gl, 8, 8);
+          if (!this.warmInputTex) this.warmInputTex = makeTarget(this.gl, 8, 8).tex;
+          this.shared.redirect.redirect = this.warmFbo.fbo;
+          // Bind a dummy inputImage so an FX shader warms the SAME variant the real
+          // render uses (ANGLE keys a variant on whether the sampler is bound;
+          // warming without it just recompiles on first real use). Harmless on
+          // generators (they don't declare inputImage).
+          isf.setValue('inputImage', handle(this.warmInputTex, 8, 8) as unknown as number);
+          try { isf.draw({ width: 8, height: 8 }); } catch { /* warm draw is best-effort */ }
+          this.shared.redirect.redirect = null;
+          isf.cleanup();
+        }
       }
     } catch (e) {
       console.warn('[prewarm]', id, e);
