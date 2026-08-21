@@ -60,7 +60,7 @@ racks, palette, World and macro biases — in one click.
 
 **The vocabulary**
 - [Sources](#sources-33-generators) (33 generators) · [Effects](#effects) (52 FX) ·
-  [Native nodes](#native-nodes) (18) · [Master finalizers](#master-finalizers--pinned-always-last)
+  [Native nodes](#native-nodes) (19) · [Master finalizers](#master-finalizers--pinned-always-last)
 - [Blend modes](#blend-modes) (18)
 
 **Control & internals**
@@ -844,7 +844,7 @@ so they are **Layer-FX only** and get a layer picker in the Inspector; the
 the whole programme glitches at once).
 
 <details>
-<summary><b>The full node catalogue (18)</b> (click to expand)</summary>
+<summary><b>The full node catalogue (19)</b> (click to expand)</summary>
 
 | Node | Description |
 |---|---|
@@ -866,6 +866,7 @@ the whole programme glitches at once).
 | **Melt** | A seam-local dissolve that **creeps** — reads the picture's own light/dark edges and, inside a band along each, dissolves the node's **own previous frame** back one-sided along the edge normal, so the boundaries between forms soften and slowly walk outward. Edge-driven, not motion-driven, so it keeps melting a still picture; **creep** direction/speed, band **width**, and an edge **gate**. |
 | **Faultline** | A dirty vision-mixer — a **rate** clock and a **dirt** probability fire momentary **structural faults** at the output and the picture is completely clean between them (the SLIP skip-law moved to the blend stage). Each fire is one discrete fault : **dropout** (the signal loses lock and cuts out in sweeping streaks), **cut** (a hard cut to the frame frozen at the fire instant), **timebase** (a head-switch knock — scanline-block shear + field roll + a torn switch band), **noise** (a sweeping switching-static band), or **roulette** (a fresh pick each fire). **Depth** severity, **hold** length, **fire ▸** by hand / OSC / a modulator. Best on the Master rack. |
 | **Sillage** | Advected-noise feedback (IBFV, van Wijk 2002) — a dye buffer is dragged each frame along a **flow field** and topped up with fresh filtered noise, so the noise smears into flow-aligned filaments (a line-integral / LIC look) and **decays into structure** instead of glowing : a wake of dye trailing the motion, reading as material, not neon. The field is a divergence-free **curl-noise** base (**field** — always flowing, so even a still image streams) plus the image's own **optical flow** (**motion** — its movement advects the dye); steer the wake anywhere with **wind** (a drift of strength *push* in any *angle*) and **swirl** (a spiral about the centre). **dye** tints the wake by the picture so it reads as its own substance, **flow** the streak length, **injection** the decay rate, **grain** the noise frequency. |
+| **Toile** | Reworks the picture as a **painting that follows its own structure** — a structure tensor finds each contour's orientation, and the image is smoothed into strokes running **along** it (anisotropic Kuwahara), so forms flatten into coherent paint (steady frame-to-frame, not speckling) while the **edges are preserved**, not washed out. **line** adds flow-XDoG ink : clean outlines measured across each contour and smoothed along it, following the image's own structure. **brush** size, **flatten** hardness, **paint** amount, **line edge** threshold. The real *Peint* + *Griffé* as a rack effect. |
 
 </details>
 
