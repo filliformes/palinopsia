@@ -59,8 +59,8 @@ racks, palette, World and macro biases — in one click.
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
-- [Sources](#sources-33-generators) (33 generators) · [Effects](#effects) (51 FX) ·
-  [Native nodes](#native-nodes--layer-fx-only) (15) · [Master finalizers](#master-finalizers--pinned-always-last)
+- [Sources](#sources-33-generators) (33 generators) · [Effects](#effects) (52 FX) ·
+  [Native nodes](#native-nodes) (17) · [Master finalizers](#master-finalizers--pinned-always-last)
 - [Blend modes](#blend-modes) (18)
 
 **Control & internals**
@@ -145,6 +145,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `A` | Right column → **osc/audio/midi** setup tab |
 | `D` / `X` / `I` | Collapse Modulation / Master-FX / Inspector |
 | `R` | Fire the Transport's selected Randomize |
+| `0` | **Panic flush** — clear every self-feeding buffer (feedback / trails / rings / accumulators) at once |
 | `Esc` | Exit MIDI Learn first; otherwise close World / Sonify / Output / Sequence |
 | `Ctrl/Cmd+Z` · `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` | Undo · Redo (100 levels) |
 | `Ctrl/Cmd+S` | Save session |
@@ -168,7 +169,7 @@ Each of the **4 layers** carries:
 | **Source A / B** | Two source slots. Each holds a generator, an imported video (`🎞`), a capture (webcam `📷` / screen `🖥` / device `🎥`), a HIVE network stream (`📡`), or nothing. |
 | **A/B mix** (`MIX`) | `sourceBlend` (how B combines with A, incl. the relation modes Weave / Lumakey / Consume) · `sourceMix` (0 = A only … 1 = full B) · `harmony` (⚖ consonant → dissonant B hue). Inert until B has a source. |
 | **Source FX** | A separate effect rack under **each** source slot (`sourceAFx`, `sourceBFx`). |
-| **Layer FX** (`FX`) | The layer's own effect rack — the **only** rack that accepts [native nodes](#native-nodes--layer-fx-only). |
+| **Layer FX** (`FX`) | The layer's own effect rack — the only rack that accepts the **sidechain** [native nodes](#native-nodes) (Transfert, Convolution); the self-contained nodes run in any rack. |
 | **Blend** (`BLEND`) | How the layer composites onto the stack below ([18 blend modes](#blend-modes)). |
 | **Mask** | A per-layer spatial mask beyond blend modes: **luma** (keyed off the layer's own brightness, lo/hi + soft knee), **gradient** (a directional wipe at any angle/position), or **shape** (a soft rect/ellipse window — centre, size, aspect, roundness), each invertible. Multiplies into the layer's alpha before the blend. |
 | **Opacity** | Header slider (0–1; double-click → 1). |
@@ -191,8 +192,11 @@ The right column switches between **six views** (tabs, or keys `L` / `M` / `F` /
 opacity/speed faders + blend for all four), **Finishing** (the Vibe · Context ·
 Finalizer stack), **Feel** (the global macros), **assemble** (the automatic
 editor), and **osc/audio/midi** (the OSC, Audio and MIDI panels).
-Both the main Inspector's FX band and the Modulate side panel are **resizable**
-(drag their handles; widths/heights persist).
+The main Inspector's FX-controls band **auto-fits its parameters** — selecting any
+effect or source sizes the band to exactly its controls, so there's never blank space
+over a few params nor a hidden row behind a scroll (you can still drag its handle to
+override until the next selection). The Modulate side panel is resizable too (widths /
+heights persist).
 
 ## Video sources
 
@@ -238,6 +242,10 @@ Left → right:
   runs) · **PROX** proximity (far ↔ close depth zone) + `◑` audio-brightness
   follow.
 - **MIDI Learn** — arms the controller-mapping mode (see [MIDI](#midi)).
+- **⚡ Flush** — the panic button (also key `0`): drops every self-feeding buffer at
+  once — per-layer trails, the Feedback / Réponse / Chronoscan frame rings, the
+  Sediment / Scanner accumulators, the reaction-diffusion field — so a runaway
+  feedback build-up clears instantly without reloading anything.
 - **Vary** (a baseline-anchored variant — structure fixed, values nudged) + amount.
 - **amt** Randomize intensity (gentle walk ↔ full re-roll) · **Randomize**
   split-button (main fires the selected scope; `▾` picks the scope — see
@@ -293,9 +301,22 @@ gesture, so gliding a knob costs nothing.
 
 Eight modulator slots, each of a chosen **type** — `lfo` (7 shapes) · `ramp` ·
 `adsr` · `arp` · `random` · `s&h` · `slew` · `chaos` · `audio` (follower) ·
-`organic` · `physics` · `motion` · `vision` · `homeostat` — with a clock (free Hz
-or BPM division), type-specific params, a live meter, and retrigger. Slot 8 (`⊛`)
-is reserved for the active World's audio routing and is skipped by Randomize.
+`organic` · `physics` · `motion` · `vision` · `homeostat` · `euclid` · `turing` ·
+`cellular` (the modulator types are dropdown-listed alphabetically) — with a clock
+(free Hz or BPM division), type-specific params, a live meter, and retrigger. Slot 8
+(`⊛`) is reserved for the active World's audio routing and is skipped by Randomize.
+
+Three **generative** types (borrowed from the LZX Videomancer vocabulary) join the
+stepped family and take **SLIP** like the rest:
+
+- **`euclid`** — a Euclidean/Bjorklund rhythm : `pulses` spread evenly over `steps`,
+  read as a gate that a `decay` release rides continuously (a pluck/swell; decay 0 =
+  a hard 0/1 gate).
+- **`turing`** — a Turing-machine shift register : a `length`-bit loop read as a
+  value, its falling bit fed back unless a `mutate` probability flips it — an
+  evolving-but-locked pattern that slowly rewrites itself.
+- **`cellular`** — a 1-D elementary cellular automaton (rule 30 / 90 / 110 / 150) read
+  as live-cell density : generative, on-brand, never quite repeating.
 
 Two of the types close the loop **from the image back to control**:
 
@@ -568,9 +589,14 @@ living mosaic where every fragment is a different film. Pick it as a layer sourc
   **`window`** loops a slice of each clip (0 = play the whole film, the smoothest
   setting); **`churn`** is how many pieces re-cut on their own fast clock, from
   all-holding to every-piece-its-own-montage.
-- **`deal`** re-deals the wall by hand, **`rate`** on a clock. contour · curve
-  length · torn paper · mask · rotate are the **Autocutter's own dials**, working
-  identically here.
+- **`deal`** re-deals the wall by hand, **`rate`** on a clock, and a **`crossfade`**
+  dissolves one deal into the next instead of snapping. contour · curve length · torn
+  paper · mask · rotate are the **Autocutter's own dials**, working identically here;
+  **`shape`** switches the pieces between the cut-up rectangles and a **Voronoi
+  mosaic**, and a **contour mode** (normal / warped) chooses whether Contour frays
+  **only the cut edges** (the film inside stays straight) or ripples the whole clip.
+  Either way the film **adapts to its piece** — normal, warped and mosaic shapes all
+  fill edge-to-edge with real video, no black in the cuts.
 - **Optimise** (a button in the strip) re-encodes the whole folder to 720p
   all-intra H.264 — the shape the wall's constant seeking wants. Slow (minutes for
   a big folder) but one-time and cached; measured to hold 60 fps with 50 films.
@@ -718,11 +744,17 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
 - **Any standard ISF effect below can be placed in any of the five racks** —
   placement is not restricted by effect. The picker (grouped by sub-category) is the
   same everywhere. Each unit has enable, dry/wet **opacity** (double-click → 1),
-  drag-reorder, presets, and a dice.
+  drag-reorder, presets, a dice `⚄`, and a **reset `↺`** (the whole effect back to
+  its defaults).
 - **Right-click any effect** (its chip, or its name in the Inspector) to **copy**
   it — then **paste its settings** onto another unit of the same shader, or **paste
-  it as a new effect** into any rack that can host it. The menu says where a shader
-  can and can't go.
+  it as a new effect** into any rack that can host it (the menu says where a shader
+  can and can't go) — plus **Assign and randomize modulation**, which seeds random
+  modulation (a modulator source + a **Mul** depth) across a spread of the effect's
+  parameters, and **Randomize modulation** (shown once the effect carries modulation)
+  which re-rolls the source + depth of what's already bound. Sources are drawn from
+  the modulators you have **enabled**. Right-clicking a **source's** name in the
+  Inspector header offers the same **Randomize modulation** when it carries any.
 - **Every picker is searchable.** Click the `+ fx` box, a source picker, a preset
   list or the Generate menu and type — the list filters by name *and* family, so
   "glitch" surfaces the whole Glitch group and "atct" still finds Autocutter.
@@ -740,7 +772,7 @@ An effect's position in a rack matters: effects apply top-to-bottom. Source FX t
 one slot before the A/B mix; Layer FX treat the mixed layer before its blend; Master
 FX treat the whole composite before the finalizers.
 
-### The catalogue (51 effects)
+### The catalogue (52 effects)
 
 <details>
 <summary><b>The full effect catalogue</b> (click to expand)</summary>
@@ -765,7 +797,7 @@ FX treat the whole composite before the finalizers.
 | **Streak** | Uniform 16-tap directional blur — camera-drag motion smear (not luma-gated). |
 | **Sharpen** | 3×3 unsharp mask — makes dithers bite and posterized bands snap. |
 | **Fold** | A single-axis mirror at a movable seam with a slide offset — one deliberate fold, kept asymmetric. |
-| **Transform** | Zoom / pan / rotate the sampling frame (wrap or clamp); with Shape set, clips the layer into a geometric silhouette. |
+| **Transform** | Zoom / pan / rotate the sampling frame (wrap or clamp), with **edge crop** (independent up / down / left / right insets); with Shape set, clips the layer into a geometric silhouette. |
 | **Stutter** | Probabilistic frame holds — horizontal bands freeze independently on their own irregular clocks, with optional blackout. |
 | **Sync Loss** | Vertical hold rolling away plus horizontal tear bands on a stepped clock — the broken-monitor register. |
 | **Row Echo** | Chance-selected row bands freeze onto their top line and repeat downward — a line-hold smear. |
@@ -784,6 +816,7 @@ FX treat the whole composite before the finalizers.
 | **Wavefold** | Analog wavefolder on the video signal — drive the value and repeatedly reflect it inside [0,1], carving hard contour bands. |
 | **Rutt** | Rutt/Etra-style scan processor — horizontal scan lines displaced vertically by the image's own luminance (a wireframe topography). |
 | **CRT Screen** | A whole-tube finish — barrel curvature, edge chromatic aberration, scanline grille, corner vignette, rounded bezel. |
+| **NTSC** | Composite-video crosstalk — YIQ encode/decode with **dot-crawl** artifacts, a **carrier** beat, chroma **fringing**, and **interlace field modulation** (even/odd fields pulled apart in hue and warp); the analog-broadcast register, cheap enough to run per-pixel at 60 fps. |
 | **Pixelmask** | Stencil the image through a pattern (aperture grille / shadow mask / dot / line / bayer / noise); an RGB-triad option gives real phosphor stripes. |
 | **Light Trails** | max()-blend trails — the brightest pixels persist and streak (long-exposure light-painting); optional drift. |
 | **Decay** | Analogue generation loss — chroma bleed, block crush, head-switch jitter, a bounded feedback ghost, tape noise and dropout lines; only ever degrades. |
@@ -801,23 +834,25 @@ FX treat the whole composite before the finalizers.
 
 </details>
 
-### Native nodes — Layer FX only
+### Native nodes
 
 These run a TypeScript class behind a header-only ISF (so the auto-UI, presets and
-modulation still work). They keep **inter-frame state** — flow fields, frame
-rings, accumulators — which is why they live only in the Layer-FX rack. Nodes
-that take a **sidechain** get a layer picker in the Inspector.
+modulation still work). They keep **inter-frame state** — flow fields, frame rings,
+accumulators. The two **sidechain** nodes (Transfert, Convolution) read another layer,
+so they are **Layer-FX only** and get a layer picker in the Inspector; the
+**self-contained** nodes run in any rack (Faultline is happiest on the Master, where
+the whole programme glitches at once).
 
 <details>
-<summary><b>The full node catalogue (15)</b> (click to expand)</summary>
+<summary><b>The full node catalogue (17)</b> (click to expand)</summary>
 
 | Node | Description |
 |---|---|
 | **Transfert** | Imprint another layer's **motion** onto this one (optical-flow transfer) — *Déplacement* warps by the sidechain's flow, *Traînée* is a flow-steered line blur. |
 | **Convolution** | Treat another layer as a convolution **kernel** — every bright pixel of this layer stamps a scaled copy of the sidechain's shape, transferring its glare / texture / energy. |
 | **Réponse** | Temporal convolution — the layer's last 16 frames summed through a shaped attack/decay envelope (reversible): a convolution-reverb for image. |
-| **Feedback** | A full video-feedback engine — the last frame re-sampled through a drifting off-centre transform + self-displacement, held at the edge of chaos by AGC + a noise floor. **Couple** runs a second buffer under a diverged transform and cross-mixes it (emergent behaviour no single loop shows); a delay-tap ring with **RGB delay** (channels sheared in time) and an echo **route** (back into the loop, or feedforward onto the output only); keyer-into-the-loop; blend modes. |
-| **Datamosh** | The codec-mosh look, real-time and codec-free: optical flow quantised to macroblocks advects a feedback buffer (the P-frame smear). Refresh (the I-frame) down + a scene cut = the bloom; **sticky/melt/fluid** modes; **actants** — sparse autonomous frozen patches that drift along the flow; **manifest** reveals a new source only where there's motion; auto-bloom on detected cuts; motion-transfer from a sidechain. |
+| **Feedback** | A full video-feedback engine (LZX-Memory-Palace-class) — the last frame re-sampled through a drifting off-centre transform + self-displacement, held at the edge of chaos by AGC + a noise floor. **Couple** runs a second buffer under a diverged transform and cross-mixes it (emergent behaviour no single loop shows); a delay-tap ring with **RGB delay** (channels sheared in time) and an echo **route** (back into the loop, or feedforward onto the output only); blend modes. A **keyer** gates what re-enters — on **luma** (key black / white) or **chroma** (key desaturated / colourful) — so only the keyed region trails; a **placement** switch puts the spatial process on the recirculating buffer (*feedback* : a wandering tunnel) or on the incoming live image (*painting* : the source smeared into a still accumulator that holds its shape); and a per-repeat **hue cycle** and **sat drift** bleach the trails toward grey or intensify them toward neon as they age. |
+| **Datamosh** | The codec-mosh look, real-time and codec-free: optical flow quantised to macroblocks advects a feedback buffer (the P-frame smear). Refresh (the I-frame) down + a scene cut = the bloom; **sticky/melt/fluid** modes; **actants** — sparse autonomous frozen patches that drift along the flow; **manifest** reveals a new source only where there's motion; auto-bloom on detected cuts; motion-transfer from a sidechain; **flow-shaping** — a **mosh gate** restricts the smear to moving or to still regions, **edge-repel** pushes the flow off the image's own contours, and **re-sharpen** claws back the mush. |
 | **Scanner** | A flatbed-scanner slit-scan — a head sweeps the frame, capturing each line at a different instant; anything moving mid-sweep smears and tears across the scanlines. |
 | **Autocutter** | A cut-up collage — the frame recursively split into pieces, shuffled among their slots (and optionally rotated); the layout holds while live video keeps playing inside every piece, and re-cuts on `cut ▸` or an auto **rate**. Four dials shape the cut itself: **contour** bends the straight seams into uneven curves that still tessellate perfectly (past 1 it shreds), **curve length** trades many small wiggles for a few long, simple curves, **torn paper** grows a ragged off-white fringe and collage shadow along each edge for the ripped-magazine look, and **mask** peels pieces away into transparent holes — at full mask a single piece survives, and each new cut elects a different one. **Shape** switches between the rectangles and an irregular **Voronoi mosaic** (denser, more organic — every dial behaves the same in both). Set an **auto rate** and a **crossfade** to dissolve one cut layout into the next instead of snapping. Ships 9 presets from *Clean cut-up* to *Last piece*. |
 | **Chronoscan** | Per-pixel time displacement over a ~32-frame ring — a control field (slit-scan gradient, luminance, noise…) sets how far into the past each pixel reads, so each region lives in a different present. |
@@ -828,6 +863,8 @@ that take a **sidechain** get a layer picker in the Inspector.
 | **Pulfrich** | Monocular 3D from a temporal eye-delay — one eye reads a delayed image (per-pixel, keyed by depth or luminance) so lateral motion becomes stereo depth; the disparity is temporal, not spatial. |
 | **Corrode** | Durational corrosion that only ever grows — a blotch field seeds and creeps as the integrated bury level rises, eating the picture over minutes; it never recovers until you **exhume** (reset). |
 | **Decimate** | Time-lapse / sample-and-hold — grabs a frame only every so often and holds between grabs; smooth crossfades the last two grabs from hard snap to continuous slow-tween. |
+| **Melt** | A seam-local dissolve that **creeps** — reads the picture's own light/dark edges and, inside a band along each, dissolves the node's **own previous frame** back one-sided along the edge normal, so the boundaries between forms soften and slowly walk outward. Edge-driven, not motion-driven, so it keeps melting a still picture; **creep** direction/speed, band **width**, and an edge **gate**. |
+| **Faultline** | A dirty vision-mixer — a **rate** clock and a **dirt** probability fire momentary **structural faults** at the output and the picture is completely clean between them (the SLIP skip-law moved to the blend stage). Each fire is one discrete fault : **dropout** (the signal loses lock and cuts out in sweeping streaks), **cut** (a hard cut to the frame frozen at the fire instant), **timebase** (a head-switch knock — scanline-block shear + field roll + a torn switch band), **noise** (a sweeping switching-static band), or **roulette** (a fresh pick each fire). **Depth** severity, **hold** length, **fire ▸** by hand / OSC / a modulator. Best on the Master rack. |
 
 </details>
 
