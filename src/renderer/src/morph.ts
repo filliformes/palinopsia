@@ -17,6 +17,14 @@ let state: { from: CompositionState; startMs: number; ms: number } | null = null
 // (Randomize All swaps shaders) can visibly morph, since params snap.
 let pendingCrossfadeMs: number | null = null
 
+// The framebuffer crossfade FREEZES the outgoing frame as a snapshot, so it must
+// stay SHORT : it only needs to cover the instant the new structure appears (~1
+// frame), not the whole morph. Capping it here (numeric params still ease over the
+// full `morphMs`) is what stops a scene recall / Randomize from looking like the old
+// scene freezes for a beat before it changes — the structure quick-dissolves, then
+// the params morph live. (Matches the Metasurface's short jump-crossfade.)
+const STRUCT_XFADE_MS = 320
+
 /** The render loop calls this once per frame; returns the ms for a crossfade
  *  that just began (and clears it), else null. */
 export function consumeCrossfade(): number | null {
@@ -32,7 +40,7 @@ export function beginMorph(from: CompositionState, ms: number, now: number): voi
     return
   }
   state = { from: structuredClone(from), startMs: now, ms }
-  pendingCrossfadeMs = ms
+  pendingCrossfadeMs = Math.min(ms, STRUCT_XFADE_MS)
 }
 
 /** Abort any in-flight morph (and drop a not-yet-consumed crossfade). Call when
