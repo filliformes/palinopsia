@@ -530,6 +530,30 @@ export const NATIVE_NODES: IsfShader[] = [
     curated: { rate: [0, 6], dirt: [0.2, 0.9], depth: [0.3, 0.9], hold: [0.03, 0.2] }
   },
   {
+    id: 'node-ibfv',
+    name: 'Sillage',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Sillage : advected-noise feedback (IBFV, van Wijk 2002). A dye buffer is dragged each frame along a FLOW field and blended with fresh filtered noise, so the noise stretches into flow-aligned filaments (a line-integral / LIC look) and DECAYS INTO STRUCTURE instead of blowing to neon — a wake of dye trailing the motion, reading as material, not glow. The field is a divergence-free CURL-noise base (FIELD : always flowing, so even a still image streams) plus the image's own OPTICAL FLOW (MOTION : its movement advects the dye). FLOW is how far the dye travels each frame (streak length), INJECTION how fast fresh noise replaces it (short trails ↔ long smears), GRAIN the noise frequency, DYE tints the wake by the image so it reads as the picture's own material, SPEED the churn rate, MIX the blend over the live frame. Self-contained : any rack.",
+      "CATEGORIES": ["FX", "Feedback", "Flow"],
+      "INPUTS": [
+        { "NAME": "flow", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "flow (streak)" },
+        { "NAME": "inject", "TYPE": "float", "MIN": 0.02, "MAX": 0.6, "DEFAULT": 0.12, "LABEL": "injection" },
+        { "NAME": "scale", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "grain" },
+        { "NAME": "field", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "field (curl)" },
+        { "NAME": "motion", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "motion (optical)" },
+        { "NAME": "dye", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "dye (tint)" },
+        { "NAME": "speed", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "speed" },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.8, "LABEL": "mix" }
+      ]
+    }*/`,
+    curated: {
+      flow: [0.2, 0.8], inject: [0.05, 0.3], scale: [0.2, 0.8], field: [0.2, 0.9],
+      motion: [0.2, 0.9], dye: [0.3, 0.9], speed: [0.2, 0.8], mix: [0.5, 1.0]
+    }
+  },
+  {
     id: 'node-pulfrich',
     name: 'Pulfrich',
     category: 'FX',

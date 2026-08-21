@@ -24,7 +24,8 @@ const SELF_CONTAINED = new Set([
   'node-corrode',
   'node-decimate',
   'node-melt',
-  'node-faultline'
+  'node-faultline',
+  'node-ibfv'
 ])
 
 /** Can `shaderId` be placed in this rack?

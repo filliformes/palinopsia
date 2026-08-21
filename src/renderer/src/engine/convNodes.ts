@@ -1080,6 +1080,8 @@ class NodeGL {
   decimate: Prog
   melt: Prog
   faultline: Prog
+  ibfv: Prog
+  ibfvOut: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -1115,6 +1117,8 @@ class NodeGL {
     this.decimate = this.build(F_DECIMATE)
     this.melt = this.build(F_MELT)
     this.faultline = this.build(F_FAULTLINE)
+    this.ibfv = this.build(F_IBFV)
+    this.ibfvOut = this.build(F_IBFV_OUT)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -2775,6 +2779,163 @@ export class FaultlineNode implements ConvNode {
   }
 }
 
+// ── Sillage node : IBFV advected-noise feedback (van Wijk, SIG 2002) ──────
+// Image-Based Flow Visualization : a dye accumulator is advected each frame by a
+// FLOW field, then blended with a fresh filtered-noise pattern. The advection
+// stretches the noise into flow-aligned filaments (an LIC-like line-integral look),
+// and the blend makes it DECAY INTO STRUCTURE instead of blowing to neon — a wake of
+// dye trailing the motion. The field is a divergence-free CURL-noise base (always
+// flowing, so even a still image streams) plus the host's own OPTICAL FLOW (its
+// motion advects the dye). DYE tints the noise by the image so it reads as the
+// picture's own material in the wake. Self-contained : runs on any rack.
+const IBFV_RES = 256
+const F_IBFV = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uPrev, uFlow;
+uniform vec2 uRes;
+uniform float uFlowAmt;   // advection distance (px)
+uniform float uInject;    // noise injection / decay rate
+uniform float uScale;     // injected-noise spatial frequency
+uniform float uField;     // synthetic curl-flow strength
+uniform float uMotion;    // host optical-flow strength
+uniform float uDye;       // 0 = grey noise, 1 = tinted by the image
+uniform float uTime, uSeed;
+float hash(vec2 p){ p = fract(p * vec2(123.34, 345.45)); p += dot(p, p + 34.345); return fract(p.x * p.y); }
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+}
+// Curl of a scalar noise potential → a smooth, divergence-free (swirling) flow.
+vec2 curl(vec2 p){
+  float e = 0.05;
+  float x1 = vnoise(p + vec2(e, 0.0)), x0 = vnoise(p - vec2(e, 0.0));
+  float y1 = vnoise(p + vec2(0.0, e)), y0 = vnoise(p - vec2(0.0, e));
+  return vec2(y1 - y0, x0 - x1) / e * 0.5;
+}
+void main(){
+  // combined flow (px) : the animated curl base + the image's optical flow
+  vec2 syn = curl(vUV * 2.5 + uTime * 0.05) * uField;
+  vec2 opt = texture(uFlow, vUV).rg * uMotion * 4.0;
+  vec2 flow = (syn + opt) * uFlowAmt;
+  // advect : sample the accumulator UPSTREAM along the flow
+  vec3 adv = texture(uPrev, vUV - flow / uRes).rgb;
+  // fresh filtered noise, temporally phased so injected material scintillates and
+  // the filaments keep moving; sparsened so it reads as strands, not flat grey
+  float n = vnoise(vUV * uScale + vec2(uSeed, uTime * 0.3));
+  n = smoothstep(0.35, 0.66, n);
+  vec3 injected = mix(vec3(n), texture(uHost, vUV).rgb * (0.4 + 0.6 * n), uDye);
+  o = vec4(clamp(mix(adv, injected, uInject), 0.0, 1.0), 1.0);
+}`
+const F_IBFV_OUT = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uDye; uniform float uMix;
+void main(){ o = vec4(mix(texture(uHost, vUV).rgb, texture(uDye, vUV).rgb, uMix), 1.0); }`
+
+export class IBFVNode implements ConvNode {
+  private lumaA: RG | null = null
+  private lumaB: RG | null = null
+  private scratch1: RG | null = null
+  private scratch2: RG | null = null
+  private lumaCurIsA = true
+  private acc: [RGBA, RGBA] | null = null
+  private cur = 0
+  private w = 0
+  private h = 0
+  private seeded = false
+  private t = 0
+  private frame = 0
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  private ensure(w: number, h: number): void {
+    const gl = this.gl
+    if (!this.lumaA) {
+      this.lumaA = makeRG(gl, IBFV_RES); this.lumaB = makeRG(gl, IBFV_RES)
+      this.scratch1 = makeRG(gl, IBFV_RES); this.scratch2 = makeRG(gl, IBFV_RES)
+    }
+    if (this.acc && this.w === w && this.h === h) return
+    if (this.acc) for (const b of this.acc) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
+    this.acc = [makeRGBA(gl, w, h, true), makeRGBA(gl, w, h, true)]
+    this.w = w; this.h = h; this.cur = 0; this.seeded = false
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl)
+    const W = ctx.chain.w, H = ctx.chain.h
+    this.ensure(W, H)
+    const inp = ctx.inputs
+    this.t += ctx.dt; this.frame++
+    const acc = this.acc as [RGBA, RGBA]
+    const read = acc[this.cur], write = acc[1 - this.cur]
+    const n = IBFV_RES
+    const draw = (fbo: WebGLFramebuffer, w: number, h: number): void => {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, w, h); gl.drawArrays(gl.TRIANGLES, 0, 3)
+    }
+    const bind = (u: number, tex: WebGLTexture): void => { gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D, tex) }
+
+    // Seed the accumulator from the live frame so it never dissolves out of black.
+    if (!this.seeded) {
+      const cp = g.use(g.copy)
+      bind(0, ctx.host); gl.uniform1i(cp.u('uTex'), 0)
+      for (const b of acc) draw(b.fbo, W, H)
+      this.seeded = true
+    }
+
+    const lumaCur = (this.lumaCurIsA ? this.lumaA : this.lumaB) as RG
+    const lumaPrev = (this.lumaCurIsA ? this.lumaB : this.lumaA) as RG
+    const s1 = this.scratch1 as RG, s2 = this.scratch2 as RG
+
+    // 1) host → luma (low res) · 2) optical flow(cur, prev) · 3) blur it smooth.
+    let p = g.use(g.downsample); bind(0, ctx.host); gl.uniform1i(p.u('uTex'), 0); draw(lumaCur.fbo, n, n)
+    p = g.use(g.flow)
+    bind(0, lumaCur.tex); bind(1, lumaPrev.tex); gl.uniform1i(p.u('uCur'), 0); gl.uniform1i(p.u('uPrev'), 1)
+    gl.uniform2f(p.u('uRes'), n, n); gl.uniform1f(p.u('uLambda'), 0.001); gl.uniform1f(p.u('uClamp'), 0.25)
+    draw(s1.fbo, n, n)
+    p = g.use(g.blur)
+    bind(0, s1.tex); gl.uniform1i(p.u('uTex'), 0); gl.uniform1f(p.u('uRadius'), 6)
+    gl.uniform2f(p.u('uStep'), 1 / n, 0); draw(s2.fbo, n, n)
+    bind(0, s2.tex); gl.uniform2f(p.u('uStep'), 0, 1 / n); draw(s1.fbo, n, n)
+
+    // 4) advect + inject into the dye accumulator.
+    p = g.use(g.ibfv)
+    bind(0, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    bind(1, read.tex); gl.uniform1i(p.u('uPrev'), 1)
+    bind(2, s1.tex); gl.uniform1i(p.u('uFlow'), 2)
+    gl.uniform2f(p.u('uRes'), W, H)
+    gl.uniform1f(p.u('uFlowAmt'), clampf(num(inp.flow, 0.5), 0, 1) * 30 + 2)
+    gl.uniform1f(p.u('uInject'), clampf(num(inp.inject, 0.12), 0.02, 0.6))
+    gl.uniform1f(p.u('uScale'), clampf(num(inp.scale, 0.4), 0, 1) * 100 + 12)
+    gl.uniform1f(p.u('uField'), clampf(num(inp.field, 0.5), 0, 1))
+    gl.uniform1f(p.u('uMotion'), clampf(num(inp.motion, 0.6), 0, 1))
+    gl.uniform1f(p.u('uDye'), clampf(num(inp.dye, 0.6), 0, 1))
+    gl.uniform1f(p.u('uTime'), this.t * (0.5 + clampf(num(inp.speed, 0.5), 0, 1) * 2))
+    gl.uniform1f(p.u('uSeed'), this.frame % 1024)
+    draw(write.fbo, W, H)
+
+    // 5) composite the dye over the live image.
+    const out = ctx.chain.next()
+    p = g.use(g.ibfvOut)
+    bind(0, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    bind(1, write.tex); gl.uniform1i(p.u('uDye'), 1)
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 0.8), 0, 1))
+    draw(out.fbo, W, H)
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    this.cur = 1 - this.cur
+    this.lumaCurIsA = !this.lumaCurIsA
+    return out.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    const gl = this.gl
+    for (const t of [this.lumaA, this.lumaB, this.scratch1, this.scratch2]) if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo) }
+    if (this.acc) for (const b of this.acc) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
+    this.lumaA = this.lumaB = this.scratch1 = this.scratch2 = null; this.acc = null
+  }
+}
+
 // ── Pulfrich node : monocular 3D from a temporal eye-delay ───────────────
 // A frame-history ring read as a per-pixel delay, keyed by the shared depth map
 // (or luminance), presented as an anaglyph pair or a motion-gated parallax slide.
@@ -3028,6 +3189,7 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   if (shaderId === 'node-afterimage') return new AfterimageNode(gl)
   if (shaderId === 'node-melt') return new MeltNode(gl)
   if (shaderId === 'node-faultline') return new FaultlineNode(gl)
+  if (shaderId === 'node-ibfv') return new IBFVNode(gl)
   if (shaderId === 'node-transfert') return new TransfertNode(gl)
   if (shaderId === 'node-convolve') return new ConvolveNode(gl)
   if (shaderId === 'node-reponse') return new ReponseNode(gl)
@@ -3040,6 +3202,6 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

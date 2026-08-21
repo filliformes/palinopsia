@@ -158,6 +158,8 @@ export const SHADER_BLURBS: Record<string, string> = {
     'Softens the picture only along its own light-and-dark edges, dissolving the last frame back in a narrow band so the boundaries between forms bleed. Turn the creep up and the seam slowly walks outward, the image melting at its contours. Unlike a datamosh it is driven by edges, not motion, so it keeps going even on a still picture.',
   'node-faultline':
     'A dirty vision-mixer that throws momentary faults into the picture and stays completely clean between them. A rate and a dirt dial decide how often it fires — or hit the trigger by hand — and each fire drops the signal out, hard-cuts to a frozen frame, knocks the timebase sideways, or sweeps a band of switching noise across the cut. Best on the master chain, where the whole programme glitches like circuit-bent kit.',
+  'node-ibfv':
+    'Drags a cloud of dye along a flowing field and keeps topping it up with fresh noise, so the noise smears into long flow-aligned filaments — a wake of material trailing the motion. The field is a slow curl-noise swirl that is always moving (so even a still picture streams) plus the image’s own movement, and the dye can be tinted by the picture so it reads as its own substance flowing. Decays into structure rather than glowing, so it stays matte.',
   'node-pulfrich':
     'Creates real depth out of sideways movement by delaying one eye slightly behind the other. It is the illusion that appears when you watch a moving picture with one eye darkened. Needs the anaglyph stage in the Finalizer, and a source that moves laterally.',
   'node-corrode':
