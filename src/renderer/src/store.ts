@@ -2286,7 +2286,7 @@ export const useStore = create<StoreState>((set, get) => ({
       composition: {
         ...s.composition,
         modMatrix: s.composition.modMatrix.map((a) =>
-          a.id === id ? { ...a, depth: Math.max(-1, Math.min(1, depth)) } : a
+          a.id === id ? { ...a, depth: Math.max(-10, Math.min(10, depth)) } : a
         )
       }
     })),

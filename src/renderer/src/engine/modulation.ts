@@ -944,14 +944,16 @@ function inputValueFromSwing(
 
 /** VCA-style 'multiply': scale the base by the modulator. `factor` = 1 at
  *  |depth| 0 (no effect) → `m` at |depth| 1 (full multiply); negative depth
- *  inverts the signal. Clamped/snapped per type. null = not modulatable. */
+ *  inverts the signal. Past |depth| 1 the factor over-drives (the trough goes
+ *  below 0 → clamped to min, a harder downward scale). Clamped/snapped per type.
+ *  null = not modulatable. */
 function inputValueFromMultiply(
   d: ModDesc,
   stored: number | number[] | undefined,
   v: number,
   depth: number
 ): number | null {
-  const amt = Math.min(1, Math.abs(depth))
+  const amt = Math.abs(depth)
   const m = depth < 0 ? 1 - v : v
   const factor = 1 - amt + amt * m
   if (d.type === 'float') {

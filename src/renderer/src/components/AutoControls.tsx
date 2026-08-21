@@ -576,9 +576,9 @@ export function AssignRow({
             </button>
             <input
               type="range"
-              min={-1}
-              max={1}
-              step={0.01}
+              min={-10}
+              max={10}
+              step={0.05}
               value={b.depth}
               onChange={(e) => setAssignmentDepth(b.id, Number(e.target.value))}
               className={`min-w-0 flex-1 ${mult ? 'accent-accent' : 'accent-accent2'}`}
@@ -593,8 +593,8 @@ export function AssignRow({
                 flex-1 slider to fit, keeping the row its current size. */}
             <BoundedNumberInput
               value={b.depth}
-              min={-1}
-              max={1}
+              min={-10}
+              max={10}
               maxFrac={2}
               onChange={(v) => setAssignmentDepth(b.id, v)}
               className="input w-12 shrink-0 px-1 py-0.5 text-right text-[9px]"
