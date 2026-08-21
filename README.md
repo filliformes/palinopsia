@@ -342,6 +342,12 @@ parameter's **M** button in the Inspector or Meta tile. Modulation reaches
 loop / grain) — and is written straight to the compositor at frame rate, never
 through React re-renders.
 
+The **Mul** (depth) control spans **−10 … +10**. Between −1 and +1 it behaves as
+before; past ±1 it **over-drives** — in Multiply mode the modulator's trough is
+pushed below zero (clamped to the param's minimum), a harder downward scale, and in
+Replace mode the swing saturates hard against the param's range. The number box next
+to the slider takes exact values.
+
 The two modes differ in what the parameter's own slider means once bound:
 
 - **Multiply** treats the slider as a ceiling and the modulator as a VCA
