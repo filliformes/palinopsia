@@ -89,11 +89,11 @@ export type { FxScope }
 // ── Themes (lifted from dataFLOU; palettes live in styles.css) ────────
 export type ThemeName =
   | 'nature'
-  | 'studio-dark'
+  | 'studio'
   | 'warm'
   | 'graphite'
   | 'cream'
-  | 'paper-light'
+  | 'paper'
   | 'dark'
   | 'light'
   | 'pastel'
@@ -106,12 +106,12 @@ export type ThemeName =
   | 'analog'
 
 export const THEME_ORDER: ThemeName[] = [
-  'studio-dark',
+  'studio',
   'warm',
   'graphite',
   'nature',
   'cream',
-  'paper-light',
+  'paper',
   'dark',
   'hydra',
   'darkside',
@@ -132,15 +132,25 @@ export function isRichTheme(t: ThemeName): boolean {
 }
 
 // Palinopsia's default: near-black canvas, one accent : restraint as
-// identity (brief §1). Studio-dark is the neutral matte surface the
+// identity (brief §1). Studio is the neutral matte surface the
 // instrument ships on out of the box.
-const DEFAULT_THEME: ThemeName = 'studio-dark'
+const DEFAULT_THEME: ThemeName = 'studio'
+
+// Old theme ids renamed over time : migrate rather than silently dropping whoever
+// had one selected back to the default. ('studio-dark'→'studio', 'paper-light'→'paper',
+// 'warm-charcoal'→'warm'.)
+export function migrateThemeName(raw: string | null | undefined): ThemeName | null {
+  if (!raw) return null
+  const map: Record<string, ThemeName> = {
+    'warm-charcoal': 'warm',
+    'studio-dark': 'studio',
+    'paper-light': 'paper'
+  }
+  return (map[raw] ?? raw) as ThemeName
+}
 
 function loadTheme(): ThemeName {
-  const raw = localStorage.getItem('opsia.theme')
-  // 'warm-charcoal' was renamed to 'warm' : migrate rather than silently
-  // dropping whoever had it selected back to the default.
-  const saved = (raw === 'warm-charcoal' ? 'warm' : raw) as ThemeName | null
+  const saved = migrateThemeName(localStorage.getItem('opsia.theme'))
   return saved && THEME_ORDER.includes(saved) ? saved : DEFAULT_THEME
 }
 
@@ -2963,7 +2973,7 @@ export const useStore = create<StoreState>((set, get) => ({
     if (s.world) localStorage.setItem('opsia.world', world)
     // Theme travels with the self-contained session (like world + sequencer).
     // Older files without a saved theme keep the current one.
-    const savedTheme = (s.ui as { theme?: ThemeName } | undefined)?.theme
+    const savedTheme = migrateThemeName((s.ui as { theme?: ThemeName } | undefined)?.theme)
     if (savedTheme) {
       applyTheme(savedTheme)
       localStorage.setItem('opsia.theme', savedTheme)
