@@ -637,21 +637,27 @@ scene-to-scene. Drag anywhere to move the cursor (it turns the surface on); drag
 to arrange which scenes sit near which; **arrange** re-spreads them evenly.
 
 The blend passes **through** each scene (at a scene's own point the output *is* that
-scene) and interpolates smoothly in between. **Structure** — shader ids, counts, enums,
-modulator types — can't interpolate, so it **snaps to the nearest scene**; only numeric
-params ease, and only across the scenes that share that structure at each slot (a
-Datamosh's `refresh` means nothing to a Blur). A structure jump (a new nearest) dissolves
-with a short crossfade, so crossing between scenes is smooth, not a hard cut. Scene
-positions travel in the session; the whole plane is playable over OSC — **`/opsia/surface
-x y`** is Pandore's Trill Square.
+scene) and interpolates smoothly in between — a **local, natural-neighbour-style** weighting,
+so only the handful of scenes around the cursor contribute (far scenes don't muddy the mix as
+the bank grows). **Structure** — shader ids, counts, enums, modulator types — can't interpolate,
+so it **snaps to the nearest scene**; only numeric params ease, and only across the scenes that
+share that structure at each slot (a Datamosh's `refresh` means nothing to a Blur). A structure
+change dissolves with a **speed-aware crossfade** (slow drag = long dissolve, fast = short), and
+a **dead-band** around each boundary keeps the shaders from flip-flopping when you sit on a seam.
+A faint **territory map** on the pad shows each scene's region (tinted by scene, soft at the
+seams), and a readout names the two scenes you're between and by how much. Scene positions travel
+in the session; the whole plane is playable over OSC — **`/opsia/surface x y`** is Pandore's
+Trill Square.
 
 **Draw sequencer.** Flip to **draw** and sketch a path across the plane, then **play** —
 the cursor auto-traces the drawing so the output morphs through scene-space hands-free.
-**time** sets how long one traversal takes; **way** picks the direction (forward · backward ·
-⇄ ping-pong); **jump %** randomly teleports the playhead to other spots on the path (a
-jitter — 0 % is a clean trace, higher values fracture it). The drawn gesture and its timing
-travel in the session. Drivable over OSC too: **`/opsia/surface/play`**, **`/time`**,
-**`/jump`**, **`/way`**.
+**time** sets how long one traversal takes (up to 60 s); **way** picks the direction (forward ·
+backward · ⇄ ping-pong); **⟳ loop** closes the path end→start so forward play flows around
+instead of teleporting; **jump %** randomly teleports the playhead to other spots on the path
+(a stutter — 0 % is a clean trace, higher values fracture it); **wiggle %** adds a smooth
+sinusoidal wobble around the traced position (a vibrato, distinct from jump). The drawn gesture
+and its timing travel in the session. Drivable over OSC too: **`/opsia/surface/play`**,
+**`/time`**, **`/jump`**, **`/way`**, **`/wiggle`**, **`/loop`**.
 
 ## Randomize & Vary
 
@@ -1009,6 +1015,8 @@ unless the slot actually holds a video.
 | `/opsia/surface/time` | f | Draw-path loop time (seconds, or ms if > 120) |
 | `/opsia/surface/jump` | f | Draw-path jump jitter (`0..1` → 0–100 %) |
 | `/opsia/surface/way` | f | Draw-path direction: `0` fwd · `1` back · `2` ping-pong |
+| `/opsia/surface/wiggle` | f | Draw-path smooth wobble (`0..1` → 0–100 %) |
+| `/opsia/surface/loop` | bool | Close the draw path into a loop |
 
 **Audio sensors** (pushed by the "audio brain"; bypass the store, feed the audio bus
 directly): `/opsia/audio/{level|flux|transient|centroid|pitch}` and

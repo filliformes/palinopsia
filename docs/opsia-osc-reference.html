@@ -503,6 +503,8 @@
           <tr><td class="addr"><span class="lit">/opsia/</span>surface/time</td><td class="arg">f</td><td class="desc">Draw-path loop time — seconds (or milliseconds if <code>&gt; 120</code>).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>surface/jump</td><td class="arg">f</td><td class="desc">Draw-path jump jitter — <code>0..1</code> maps to 0–100 %. Random teleports of the playhead to other spots on the path.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>surface/way</td><td class="arg">f</td><td class="desc">Draw-path direction : <code>0</code> forward · <code>1</code> backward · <code>2</code> ping-pong.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>surface/wiggle</td><td class="arg">f</td><td class="desc">Draw-path smooth wobble — <code>0..1</code> maps to 0–100 %. A sinusoidal vibrato around the traced position (distinct from jump's teleports).</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>surface/loop</td><td class="arg">bool</td><td class="desc">Close the draw path into a loop (end→start), so forward play flows around instead of teleporting.</td></tr>
         </tbody>
       </table>
     </div>
