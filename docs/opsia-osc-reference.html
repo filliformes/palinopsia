@@ -497,6 +497,8 @@
           <tr><td class="addr"><span class="lit">/opsia/</span>randomize</td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">Re-roll <b>everything</b> within curated ranges.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>randomize/<span class="v">{scope}</span></td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">Re-roll one scope — <code>sources · sourceparams · sourcefx · sourcefxonly · layerfxonly · layer · master · finishing · modulators</code>.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>panic</td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc"><b>Panic flush</b> — drop every self-feeding buffer (feedback · trails · frame rings · accumulators) at once. Same as key <code>0</code> / the ⚡ Flush button; advertised over OSCQuery.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>surface <span class="v">x y</span></td><td class="arg">f f</td><td class="desc"><b>Metasurface</b> cursor — two <code>0..1</code> floats on the scene plane; the output becomes a live blend of the nearest scenes. Sending it turns the surface ON (Pandore's Trill Square plays it).</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>surface/active</td><td class="arg">bool</td><td class="desc">Enable / disable the Metasurface (<code>&ge; 0.5</code>).</td></tr>
         </tbody>
       </table>
     </div>

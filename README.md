@@ -56,7 +56,7 @@ racks, palette, World and macro biases — in one click.
 - [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) · [MIDI](#midi) · [Output & mapping](#output--mapping-key-o) — incl. Flash safety
 - [Sonify — image to sound](#sonify--image-to-sound-key-s) — six voices (Spectra · Orbit · Flow · Raster · Transmission · Filter) · quantizer · audio in recordings
 - [Assemble — the automatic editor](#assemble--the-automatic-editor-key-e) — corpus point cloud · matching modes · cut pace + time curves · export
-- [Sessions, scenes & themes](#sessions-scenes--themes) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
+- [Sessions, scenes & themes](#sessions-scenes--themes) · [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
 - [Sources](#sources-33-generators) (33 generators) · [Effects](#effects) (52 FX) ·
@@ -627,6 +627,23 @@ audio routing), and Feel biases — so Generate builds a whole new, coherent,
 on-theme session in place (unsaved; Ctrl+S keeps it). Pressing it again re-rolls
 a fresh variation within the same theme.
 
+## Metasurface — the continuous scene-space
+
+The **surface** section (under the scene bank) turns the discrete bank into a
+**continuous 2D plane** (Bencina, NIME 2005): every scene is a point, and a cursor
+**blends** between them, so you *navigate* the bank by dragging rather than stepping
+scene-to-scene. Drag anywhere to move the cursor (it turns the surface on); drag a **dot**
+to arrange which scenes sit near which; **arrange** re-spreads them evenly.
+
+The blend passes **through** each scene (at a scene's own point the output *is* that
+scene) and interpolates smoothly in between. **Structure** — shader ids, counts, enums,
+modulator types — can't interpolate, so it **snaps to the nearest scene**; only numeric
+params ease, and only across the scenes that share that structure at each slot (a
+Datamosh's `refresh` means nothing to a Blur). A structure jump (a new nearest) dissolves
+with a short crossfade, so crossing between scenes is smooth, not a hard cut. Scene
+positions travel in the session; the whole plane is playable over OSC — **`/opsia/surface
+x y`** is Pandore's Trill Square.
+
 ## Randomize & Vary
 
 **Randomize** is structural: it doesn't just re-roll parameters, it rebuilds its
@@ -977,6 +994,8 @@ unless the slot actually holds a video.
 | `/opsia/scene/{n}` | trigger | Recall scene *n* (1-based) |
 | `/opsia/randomize[/{scope}]` | trigger | Fire Randomize (scope defaults to `all`; `sources`, `sourceparams`, `sourcefx`, `sourcefxonly`, `layer`, `layerfxonly`, `master`, `finishing`, `modulators`) |
 | `/opsia/panic` | trigger | **Panic flush** — drop every self-feeding buffer (same as key `0` / the ⚡ Flush button); advertised over OSCQuery |
+| `/opsia/surface` | f f | **Metasurface** cursor — two `0..1` floats (x, y) on the scene plane; sending it turns the surface on (Pandore's Trill Square) |
+| `/opsia/surface/active` | bool | Enable / disable the Metasurface |
 
 **Audio sensors** (pushed by the "audio brain"; bypass the store, feed the audio bus
 directly): `/opsia/audio/{level|flux|transient|centroid|pitch}` and
