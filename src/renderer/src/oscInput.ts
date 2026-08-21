@@ -57,6 +57,8 @@
 //   /opsia/surface/time {s}                             float : draw-path loop time (s, or ms if > 120)
 //   /opsia/surface/jump {0..1}                          float : draw-path jump jitter (→ 0..100 %)
 //   /opsia/surface/way {0|1|2}                          fwd · back · ping-pong
+//   /opsia/surface/wiggle {0..1}                         float : smooth wobble (→ 0..100 %)
+//   /opsia/surface/loop {0|1}                            bool : close the path into a loop
 
 import type { BlendMode, CouplingMode, AudioFeature, FxScope, OscInEvent, OscQueryLeaf } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
@@ -630,6 +632,14 @@ function route(address: string, args: Args): void {
         st.setSurfaceJump(n <= 1 ? n * 100 : n)
         return
       }
+      if (segs[2] === 'wiggle') {
+        st.setSurfaceWiggle(n <= 1 ? n * 100 : n)
+        return
+      }
+      if (segs[2] === 'loop') {
+        st.setSurfaceClosed(n >= 0.5)
+        return
+      }
       if (segs[2] === 'way') {
         st.setSurfaceWay(n >= 1.5 ? 'pingpong' : n >= 0.5 ? 'backward' : 'forward')
         return
@@ -856,6 +866,8 @@ function enumerateLeaves(): Leaf[] {
   add('/opsia/surface/time', 0, 60, st.surface.timeMs / 1000, 'Draw-path loop time (seconds, or ms if > 120)')
   add('/opsia/surface/jump', 0, 1, st.surface.jump / 100, 'Draw-path jump jitter (0..1 → 0..100 %)')
   add('/opsia/surface/way', 0, 2, st.surface.way === 'pingpong' ? 2 : st.surface.way === 'backward' ? 1 : 0, 'Draw-path direction : 0 fwd · 1 back · 2 ping-pong')
+  add('/opsia/surface/wiggle', 0, 1, st.surface.wiggle / 100, 'Draw-path smooth wobble (0..1 → 0..100 %)')
+  add('/opsia/surface/loop', 0, 1, st.surface.closed ? 1 : 0, 'Close the draw path into a loop (>= 0.5)')
   return out
 }
 

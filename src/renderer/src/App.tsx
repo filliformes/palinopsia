@@ -188,6 +188,11 @@ export default function App(): JSX.Element {
     lastJumpT: 0,
     lastStoreT: 0
   })
+  // Cursor-motion tracking for the structure crossfade : previous position + time
+  // (to derive speed) and the last fade's start (to rate-limit re-fires). Hysteresis
+  // + speed-aware duration keep boundary crossings smooth and stop jump from
+  // machine-gunning 250 ms fades.
+  const surfaceMove = useRef({ x: 0.5, y: 0.5, t: 0, lastFadeT: 0 })
   const theme = useStore((s) => s.theme)
   const setTheme = useStore((s) => s.setTheme)
   const depthMode = useStore((s) => s.depthMode)
@@ -666,9 +671,18 @@ export default function App(): JSX.Element {
               seq.jumpActive = Math.random() < jumpAmt
               if (seq.jumpActive) seq.jumpTarget = Math.random()
             }
-            if (seq.jumpActive) ph = seq.jumpTarget
           }
-          const s = samplePath(surf.path, ph)
+          if (jumpAmt > 0 && seq.jumpActive) {
+            // A discrete teleport overrides the smooth position for this hold window.
+            ph = seq.jumpTarget
+          } else if (surf.wiggle > 0) {
+            // Smooth sinusoidal wobble around the traced position (a vibrato). ~0.8 Hz
+            // so it reads as a shimmer regardless of loop length; amplitude by %.
+            const span = (surf.wiggle / 100) * 0.12
+            ph = base + Math.sin((now / 1000) * 0.8 * Math.PI * 2) * span
+            ph = ((ph % 1) + 1) % 1
+          }
+          const s = samplePath(surf.path, ph, surf.closed)
           sx = s.x
           sy = s.y
           // Throttle the store write (pad-cursor visual) to ~25 Hz — the blend
@@ -680,15 +694,45 @@ export default function App(): JSX.Element {
         } else {
           surfaceSeq.current.lastT = 0
         }
-        const surfComp = surf.active ? surfaceComposition(st.scenes, sx, sy) : null
-        if (surfComp) {
-          const placed = st.scenes.filter((s) => s.surface)
+        const placed = surf.active ? st.scenes.filter((s) => s.surface) : []
+        if (surf.active && placed.length >= 2) {
           const ni = nearestSurfaceScene(placed, sx, sy)
-          if (surfaceNearest.current !== -1 && surfaceNearest.current !== ni) comp!.beginCrossfade(250)
-          surfaceNearest.current = ni
-          c = surfComp
+          const mv = surfaceMove.current
+          let cur = surfaceNearest.current
+          // Hysteresis : hold the current structure until a NEW nearest is clearly
+          // closer (a dead-band around the Voronoi seam), so tiny wobbles / sitting on
+          // an edge / a jump landing barely across don't flip-flop the shaders. The
+          // held index drives BOTH the base structure (below) and the crossfade, so
+          // they always agree — the structure never pops without its dissolve.
+          let commit = cur === -1 || cur >= placed.length
+          if (!commit && ni !== cur) {
+            const pn = placed[ni].surface ?? { x: 0.5, y: 0.5 }
+            const pc = placed[cur].surface ?? { x: 0.5, y: 0.5 }
+            const dn = Math.hypot(pn.x - sx, pn.y - sy)
+            const dc = Math.hypot(pc.x - sx, pc.y - sy)
+            if (dn < dc - 0.04) commit = true // 4 % dead-band
+          }
+          if (commit && ni !== cur) {
+            // Speed-aware fade : a slow drag across a seam wants a long dissolve to hide
+            // the shader swap; a fast sweep wants a short one. And never restart a fade
+            // that's still running (rate-limit) — that's what made jump smear.
+            const dtm = mv.t ? Math.max(1, now - mv.t) : 16
+            const speed = Math.hypot(sx - mv.x, sy - mv.y) / dtm // units/ms
+            const fadeMs = Math.round(Math.max(90, Math.min(420, 420 - speed * 12000)))
+            if (cur !== -1 && now - mv.lastFadeT >= fadeMs * 0.6) {
+              comp!.beginCrossfade(fadeMs)
+              mv.lastFadeT = now
+            }
+            cur = ni
+            surfaceNearest.current = ni
+          }
+          mv.x = sx
+          mv.y = sy
+          mv.t = now
+          c = surfaceComposition(st.scenes, sx, sy, cur)!
         } else {
           surfaceNearest.current = -1
+          surfaceMove.current.t = 0
           c = morphedComposition(now, st.composition)
         }
         // 1. Store → engine reconciliation (base values). One write path for

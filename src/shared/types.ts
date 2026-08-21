@@ -589,6 +589,12 @@ export interface SurfaceSequencer {
   way: 'forward' | 'backward' | 'pingpong'
   // 0..100 % : chance/frequency the playhead jumps to a random spot (jitter).
   jump: number
+  // 0..100 % : amplitude of a smooth sinusoidal wobble on the playhead — a
+  // continuous vibrato around the traced position (vs jump's discrete teleports).
+  wiggle: number
+  // Closed path : connect the last point back to the first, so forward looping
+  // flows around the cycle instead of teleporting end→start.
+  closed: boolean
 }
 
 export interface Session {

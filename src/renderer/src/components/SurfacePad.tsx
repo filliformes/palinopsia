@@ -8,11 +8,22 @@
 // with a JUMP % that randomly teleports the playhead to other spots (a jitter). Modeled
 // on dataFLOU's Gesture playback; the actual advance lives in App's render loop.
 
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
-import { nearestSurfaceScene } from '../surface'
+import { nearestSurfaceScene, surfaceWeights } from '../surface'
 
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v))
+
+/** A distinct, calm hue per scene index (golden-angle spread). Returns 0..255 rgb. */
+function sceneRGB(i: number): [number, number, number] {
+  const h = ((i * 137.508) % 360) / 360
+  const s = 0.5
+  const l = 0.55
+  const k = (nn: number): number => (nn + h * 12) % 12
+  const a = s * Math.min(l, 1 - l)
+  const f = (nn: number): number => l - a * Math.max(-1, Math.min(Math.min(k(nn) - 3, 9 - k(nn)), 1))
+  return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)]
+}
 
 /** The surface on/off toggle, lifted into the section header (merged with the
  *  "surface" title). Rendered inside the Collapsible's header button, so it stops
@@ -57,7 +68,10 @@ export function SurfacePad(): JSX.Element {
   const setSurfaceTimeMs = useStore((s) => s.setSurfaceTimeMs)
   const setSurfaceWay = useStore((s) => s.setSurfaceWay)
   const setSurfaceJump = useStore((s) => s.setSurfaceJump)
+  const setSurfaceWiggle = useStore((s) => s.setSurfaceWiggle)
+  const setSurfaceClosed = useStore((s) => s.setSurfaceClosed)
   const padRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const drag = useRef<{ mode: 'cursor' | 'dot'; id?: string } | null>(null)
 
   // Draw mode : when on, pointer gestures RECORD a path instead of navigating.
@@ -69,6 +83,62 @@ export function SurfacePad(): JSX.Element {
 
   const placed = scenes.filter((s) => s.surface)
   const nearest = placed.length && surface.active ? nearestSurfaceScene(placed, surface.x, surface.y) : -1
+
+  // ── Territory map (#3) : paint the Voronoi regions of the placed scenes into a
+  // low-res canvas (each pixel tinted by its nearest scene, faded toward the seams
+  // where the nearest two are close). Recomputed only when a dot moves, not per frame.
+  const posKey = placed.map((s) => `${s.id}:${s.surface!.x.toFixed(3)},${s.surface!.y.toFixed(3)}`).join('|')
+  useEffect(() => {
+    const cv = canvasRef.current
+    if (!cv) return
+    const N = 56
+    cv.width = N
+    cv.height = N
+    const ctx = cv.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, N, N)
+    if (placed.length < 2) return
+    const pts = placed.map((s) => s.surface!)
+    const cols = placed.map((_, i) => sceneRGB(i))
+    const img = ctx.createImageData(N, N)
+    for (let yy = 0; yy < N; yy++) {
+      for (let xx = 0; xx < N; xx++) {
+        const x = (xx + 0.5) / N
+        const y = (yy + 0.5) / N
+        let b0 = Infinity
+        let b1 = Infinity
+        let bi = 0
+        for (let i = 0; i < pts.length; i++) {
+          const d = (pts[i].x - x) ** 2 + (pts[i].y - y) ** 2
+          if (d < b0) {
+            b1 = b0
+            b0 = d
+            bi = i
+          } else if (d < b1) b1 = d
+        }
+        // Margin between nearest and second-nearest → bright at cell centres,
+        // transparent at the seams (so boundaries read as soft edges).
+        const margin = Math.sqrt(b1) - Math.sqrt(b0)
+        const dom = Math.max(0, Math.min(1, margin * 5))
+        const o = (yy * N + xx) * 4
+        img.data[o] = cols[bi][0]
+        img.data[o + 1] = cols[bi][1]
+        img.data[o + 2] = cols[bi][2]
+        img.data[o + 3] = Math.round(28 + dom * 74)
+      }
+    }
+    ctx.putImageData(img, 0, 0)
+  }, [posKey, placed.length])
+
+  // Blend readout (#3) : the top-two scenes by weight under the cursor, so you can
+  // see which scenes you're between (and by how much) before you hear it.
+  const blend = useMemo(() => {
+    if (placed.length < 2 || !surface.active) return null
+    const w = surfaceWeights(placed, surface.x, surface.y)
+    const idx = w.map((v, i) => ({ i, v })).sort((a, b) => b.v - a.v)
+    const top = idx.slice(0, 2).filter((e) => e.v > 0.005)
+    return top.map((e) => ({ n: scenes.findIndex((z) => z.id === placed[e.i].id) + 1, pct: Math.round(e.v * 100) }))
+  }, [placed, surface.x, surface.y, surface.active, scenes])
 
   const toXY = (e: React.PointerEvent): { x: number; y: number } => {
     const r = padRef.current!.getBoundingClientRect()
@@ -141,7 +211,12 @@ export function SurfacePad(): JSX.Element {
   void drawTick
   const visPath = drawingRef.current ?? surface.path
   const pathD =
-    visPath.length > 0 ? visPath.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') : ''
+    visPath.length > 0
+      ? visPath.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') +
+        // Close the outline when the sequencer treats the path as a loop (and it's
+        // the committed path, not the in-progress recording).
+        (surface.closed && !drawingRef.current ? ' Z' : '')
+      : ''
   const hasPath = surface.path.length >= 2
 
   return (
@@ -181,6 +256,12 @@ export function SurfacePad(): JSX.Element {
         onPointerUp={onUp}
         onPointerCancel={onUp}
       >
+        {/* Territory map — the Voronoi regions of the placed scenes (soft seams). */}
+        <canvas
+          ref={canvasRef}
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          style={{ imageRendering: 'auto' }}
+        />
         {/* Drawn path overlay (0..1 user space). */}
         {pathD && (
           <svg
@@ -238,13 +319,25 @@ export function SurfacePad(): JSX.Element {
           />
         )}
       </div>
-      <span className="font-mono text-[9px] text-muted/70">
-        {placed.length < 2
-          ? 'save ≥ 2 scenes to play the surface'
-          : drawMode
-            ? 'drag on the plane to draw a path · Play traces it'
-            : 'drag = navigate · drag a dot = move a scene'}
-      </span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-[9px] text-muted/70">
+          {placed.length < 2
+            ? 'save ≥ 2 scenes to play the surface'
+            : drawMode
+              ? 'drag on the plane to draw a path · Play traces it'
+              : 'drag = navigate · drag a dot = move a scene'}
+        </span>
+        {blend && blend.length > 0 && (
+          <span className="shrink-0 font-mono text-[9px] text-muted tabular-nums" title="Scenes you're between, by weight">
+            {blend.map((b, i) => (
+              <span key={b.n}>
+                {i > 0 && ' · '}
+                <span className="text-accent">{b.n}</span> {b.pct}%
+              </span>
+            ))}
+          </span>
+        )}
+      </div>
 
       {/* Draw-sequencer transport — shown once there's a path to play. */}
       {hasPath && (
@@ -280,6 +373,15 @@ export function SurfacePad(): JSX.Element {
                 </button>
               ))}
             </div>
+            <button
+              onClick={() => setSurfaceClosed(!surface.closed)}
+              className={`rounded border px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
+                surface.closed ? 'border-accent2 bg-accent2/20 text-accent2' : 'border-border text-muted hover:text-text'
+              }`}
+              title="Loop the path : connect the end back to the start so forward play flows around instead of teleporting"
+            >
+              ⟳ loop
+            </button>
             <button
               onClick={() => {
                 setSurfacePath([])
@@ -319,6 +421,20 @@ export function SurfacePad(): JSX.Element {
               title="Chance the playhead randomly teleports to another spot on the path (jitter)"
             />
             <span className="w-16 text-right tabular-nums text-text">{surface.jump} %</span>
+          </label>
+          <label className="flex items-center gap-1.5 font-mono text-[10px] text-muted">
+            <span className="w-8">wiggle</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={surface.wiggle}
+              onChange={(e) => setSurfaceWiggle(Number(e.target.value))}
+              className="flex-1 accent-accent2"
+              title="Smooth sinusoidal wobble around the traced position (a vibrato — unlike jump's teleports)"
+            />
+            <span className="w-16 text-right tabular-nums text-text">{surface.wiggle} %</span>
           </label>
         </div>
       )}

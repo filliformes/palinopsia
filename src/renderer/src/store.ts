@@ -1098,6 +1098,8 @@ interface StoreState {
     timeMs: number
     way: 'forward' | 'backward' | 'pingpong'
     jump: number
+    wiggle: number
+    closed: boolean
   }
   setSurfaceActive: (active: boolean) => void
   setSurfaceXY: (x: number, y: number) => void
@@ -1106,6 +1108,8 @@ interface StoreState {
   setSurfaceTimeMs: (ms: number) => void
   setSurfaceWay: (way: 'forward' | 'backward' | 'pingpong') => void
   setSurfaceJump: (pct: number) => void
+  setSurfaceWiggle: (pct: number) => void
+  setSurfaceClosed: (closed: boolean) => void
   setScenePos: (id: string, x: number, y: number) => void
   // Auto-place any scenes without a surface position (a sunflower spread).
   autoPlaceScenes: (force?: boolean) => void
@@ -2833,7 +2837,7 @@ export const useStore = create<StoreState>((set, get) => ({
       scenes: s.scenes.filter((x) => x.id !== id),
       activeSceneId: s.activeSceneId === id ? null : s.activeSceneId
     })),
-  surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0 },
+  surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0, wiggle: 0, closed: false },
   setSurfaceActive: (active) =>
     set((s) => {
       // On first activation, give every not-yet-placed scene a plane position.
@@ -2862,6 +2866,9 @@ export const useStore = create<StoreState>((set, get) => ({
   setSurfaceWay: (way) => set((s) => ({ surface: { ...s.surface, way } })),
   setSurfaceJump: (pct) =>
     set((s) => ({ surface: { ...s.surface, jump: Math.max(0, Math.min(100, pct)) } })),
+  setSurfaceWiggle: (pct) =>
+    set((s) => ({ surface: { ...s.surface, wiggle: Math.max(0, Math.min(100, pct)) } })),
+  setSurfaceClosed: (closed) => set((s) => ({ surface: { ...s.surface, closed } })),
   setScenePos: (id, x, y) =>
     set((s) => ({
       scenes: s.scenes.map((sc) =>
@@ -3034,7 +3041,9 @@ export const useStore = create<StoreState>((set, get) => ({
         path: Array.isArray(s.surface?.path) ? s.surface!.path : [],
         timeMs: typeof s.surface?.timeMs === 'number' ? s.surface!.timeMs : 8000,
         way: s.surface?.way ?? 'forward',
-        jump: typeof s.surface?.jump === 'number' ? s.surface!.jump : 0
+        jump: typeof s.surface?.jump === 'number' ? s.surface!.jump : 0,
+        wiggle: typeof s.surface?.wiggle === 'number' ? s.surface!.wiggle : 0,
+        closed: !!s.surface?.closed
       },
       composition: normalizeComposition(s.composition)
     })
@@ -3061,7 +3070,14 @@ export const useStore = create<StoreState>((set, get) => ({
       sonify: { ...s.sonify, on: false, sinkId: '' },
       // The drawn gesture + its timing travel with the session; the live cursor,
       // active + play toggles are runtime and reset on load.
-      surface: { path: s.surface.path, timeMs: s.surface.timeMs, way: s.surface.way, jump: s.surface.jump },
+      surface: {
+        path: s.surface.path,
+        timeMs: s.surface.timeMs,
+        way: s.surface.way,
+        jump: s.surface.jump,
+        wiggle: s.surface.wiggle,
+        closed: s.surface.closed
+      },
       ui: { theme: s.theme }
     }
   }
