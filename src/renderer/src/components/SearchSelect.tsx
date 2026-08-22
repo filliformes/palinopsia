@@ -23,10 +23,14 @@ export interface SearchOption {
   title?: string
   /** Rendered before the label (the source picker's glyphs). */
   prefix?: string
+  /** Concept tags searched alongside the name — the musician's vocabulary, so
+   *  "reverb" / "bitcrush" / "delay" / "paint" surface the matching effects. */
+  keywords?: string[]
 }
 
 /** Match `q` against one option. Lower is better; null = no match.
- *  0 prefix - 1 word-start - 2 substring - 3 group hit - 4 subsequence. */
+ *  0 prefix · 1 word-start · 2 substring · 2 keyword-exact · 2.5 keyword-word ·
+ *  3 group hit · 3.5 keyword-substring · 4 subsequence. */
 function score(opt: SearchOption, q: string): number | null {
   if (!q) return 0
   const label = opt.label.toLowerCase()
@@ -34,7 +38,24 @@ function score(opt: SearchOption, q: string): number | null {
   if (label.startsWith(q)) return 0
   if (label.split(/[\s\-/()]+/).some((w) => w.startsWith(q))) return 1
   if (label.includes(q)) return 2
-  if (group.includes(q)) return 3
+  // Keyword tags : an exact tag ("reverb") ranks with a label substring; a tag
+  // whose own words start with the query ranks just under; a mid-tag substring
+  // ranks below the group hit but still surfaces the effect.
+  if (opt.keywords) {
+    let best: number | null = null
+    for (const k of opt.keywords) {
+      const kw = k.toLowerCase()
+      if (kw === q) return 2
+      // A tag word starts with the query ("rev" → "reverb"), OR the query is a
+      // longer form of the tag ("bitcrusher" ⊃ "bitcrush", "equalizer" ⊃ "eq").
+      if (kw.split(/[\s\-/()]+/).some((w) => w.startsWith(q)) || (kw.length >= 2 && q.startsWith(kw)))
+        best = Math.min(best ?? 9, 2.5)
+      else if (kw.includes(q)) best = Math.min(best ?? 9, 3.5)
+    }
+    if (best !== null && best <= 2.5) return best
+    if (group.includes(q)) return 3
+    if (best !== null) return best
+  } else if (group.includes(q)) return 3
   // Subsequence : the query's letters appear in order.
   let i = 0
   for (const ch of label) if (ch === q[i]) i++

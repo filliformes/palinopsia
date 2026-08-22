@@ -9,6 +9,7 @@ import type { AudioFeature, BlendMode, CouplingMode, LayerMask, SourceKind } fro
 import { BLEND_MODES } from '@shared/types'
 import { AUDIO_FEATURES } from '../engine/audioIn'
 import { GENERATORS_ALPHA } from '../shaders/isf'
+import { keywordsFor } from '../shaders/isf/keywords'
 import { useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { CapturePicker } from './CapturePicker'
@@ -642,7 +643,7 @@ function SourceRow({
             { value: '__cap_screen__', label: 'Screen…', prefix: '🖥 ', group: 'live' },
             { value: '__cap_hive__', label: 'HIVE stream…', prefix: '📡 ', group: 'live' },
             ...GENERATORS_ALPHA.map(
-              (g): SearchOption => ({ value: g.id, label: g.name, group: 'generators' })
+              (g): SearchOption => ({ value: g.id, label: g.name, group: 'generators', keywords: keywordsFor(g.id) })
             )
           ]}
           onChange={(v) => {

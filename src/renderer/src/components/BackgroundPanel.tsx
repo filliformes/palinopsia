@@ -8,6 +8,7 @@
 import { useState, type MouseEvent, type ReactNode } from 'react'
 import { useStore } from '../store'
 import { BG_PRESETS, BG_SOURCES, bgPresetToState } from '../bgPresets'
+import { keywordsFor } from '../shaders/isf/keywords'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxAddSelect, FxChips } from './FxRackPanel'
@@ -87,7 +88,7 @@ export function BackgroundPanel(): JSX.Element {
           value={shaderId ?? ''}
           options={[
             { value: '', label: '— none —' },
-            ...BG_SOURCES_ALPHA.map((g): SearchOption => ({ value: g.id, label: g.name }))
+            ...BG_SOURCES_ALPHA.map((g): SearchOption => ({ value: g.id, label: g.name, keywords: keywordsFor(g.id) }))
           ]}
           onChange={(v) => setBackgroundSource(v || null)}
           title="Background source : curated ground set — type to search"

@@ -8,6 +8,7 @@
 import { useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import type { FxInstance } from '@shared/types'
 import { FX_GROUPS, SHADER_BY_ID } from '../shaders/isf'
+import { keywordsFor } from '../shaders/isf/keywords'
 import { useStore, type FxScope } from '../store'
 import { canHostFx } from '../fxScopes'
 import { ContextMenu } from './ContextMenu'
@@ -25,7 +26,7 @@ export function FxAddSelect({ scope, className = '' }: { scope: FxScope; classNa
           shaders: g.shaders.filter((f) => canHostFx(scope, f.id))
         })).filter((g) => g.shaders.length > 0)
   const options: SearchOption[] = groups.flatMap((grp) =>
-    grp.shaders.map((f) => ({ value: f.id, label: f.name, group: grp.group }))
+    grp.shaders.map((f) => ({ value: f.id, label: f.name, group: grp.group, keywords: keywordsFor(f.id) }))
   )
   return (
     <SearchSelect
