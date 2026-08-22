@@ -214,6 +214,11 @@ The selected video slot shows a full **transport** in the Inspector:
 
 - **Play/pause** · play mode **forward → reverse → pendulum** · **loop** (or
   play-once-and-hold) · **speed** 1/28×–128× (log slider).
+- **◇ smooth scrub.** A **native** H.264/VP9/AV1 clip only seeks to keyframes, so
+  reverse / pendulum / high-speed jump keyframe-to-keyframe. One press transcodes the
+  clip once to the all-intra cache (with a progress badge) and swaps the slot to it —
+  transport, FX and modulation are preserved — after which every direction and speed
+  scrubs smoothly. A clip that's already all-intra shows a **◆ smooth** badge instead.
 - A **scrub timeline** with a live playhead and draggable **in/out trim points**.
 - **`M` targets** — the playhead position, speed, and loop in/out are modulation
   targets like any shader param: a saw LFO loops, S&H jump-cuts, an audio
@@ -793,9 +798,16 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   which re-rolls the source + depth of what's already bound. Sources are drawn from
   the modulators you have **enabled**. Right-clicking a **source's** name in the
   Inspector header offers the same **Randomize modulation** when it carries any.
-- **Every picker is searchable.** Click the `+ fx` box, a source picker, a preset
-  list or the Generate menu and type — the list filters by name *and* family, so
-  "glitch" surfaces the whole Glitch group and "atct" still finds Autocutter.
+- **Every picker is searchable — by concept, not just name.** Click the `+ fx` box, a
+  source picker, a preset list or the Generate menu and type — the list filters by name,
+  family, *and* a set of **keyword tags** written in a musician's vocabulary. So a **visual
+  delay** → **`delay`** surfaces Réponse / Chronoscan / Light Trails / Motif; **`reverb`** →
+  Réponse / Feedback / Sediment / Wide Time; **`bitcrush`** → Byte Corrupt / Compress /
+  Dither / Posterize / Pixelate; **`compressor`** / **`eq`** → Grade; **`wavefolder`** →
+  Wavefold; **`paint`** → Toile / Dye Field; **`particles`** → Ash / Murmuration; and
+  **`glitch`** / **`vhs`** / **`detune`** / **`strobe`** / **`filter`** / **`video synth`**
+  each surface their family. (Family names still work — "glitch" — and "atct" still finds
+  Autocutter by subsequence.)
 - **Every effect, source and modulator names itself on hover** — a plain-English
   sentence or two on the item's name in the Inspector, saying what it does.
 - **Native nodes**: the two **sidechain** nodes (Transfert, Convolution) are
