@@ -708,6 +708,9 @@ interface StoreState {
   // Point a slot at an imported video clip (kind:'video'). mediaId is the clip's
   // object URL; mediaName is shown in the picker.
   setSourceVideo: (layer: number, slot: 'A' | 'B', mediaId: string, mediaName: string) => void
+  /** Swap ONLY the clip path/name on a video slot (the smooth-scrub transcode),
+   *  preserving transport (play/dir/speed/loop/in-out/grain), FX, and modulation. */
+  swapVideoSource: (layer: number, slot: 'A' | 'B', mediaId: string, mediaName: string) => void
   // Point a slot at a live capture source. `spec` is 'webcam', 'screen', or
   // 'desktop:<sourceId>' for a specific window/screen; `name` labels it.
   setSourceCapture: (layer: number, slot: 'A' | 'B', spec: string, name: string) => void
@@ -1563,6 +1566,18 @@ export const useStore = create<StoreState>((set, get) => ({
         true
       ),
       selection: { type: 'source', layer, slot }
+    })),
+  swapVideoSource: (layer, slot, mediaId, mediaName) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => {
+          const cur = slot === 'A' ? l.sourceA : l.sourceB
+          if (!cur || cur.kind !== 'video') return l
+          const vid = { ...cur, mediaId, mediaName }
+          return slot === 'A' ? { ...l, sourceA: vid } : { ...l, sourceB: vid }
+        })
+      }
     })),
   setSourceCapture: (layer, slot, spec, name) =>
     set((s) => ({

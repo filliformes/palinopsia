@@ -27,6 +27,24 @@ function fmtSpeed(s: number): string {
   return `1/${(1 / s).toFixed(s > 0.1 ? 1 : 0)}×`
 }
 
+// The all-intra cache dir, fetched once and memoised across all transports.
+let cacheDirCache: string | null = null
+let cacheDirPromise: Promise<string> | null = null
+function loadCacheDir(): Promise<string> {
+  return (cacheDirPromise ??= window.api.videoCacheDir().then((d) => (cacheDirCache = d)))
+}
+
+/** Recover the on-disk path from a slot's opsia-media URL (null for blob / remote). */
+function pathFromMediaUrl(url: string | undefined): string | null {
+  const pfx = 'opsia-media://local/'
+  if (!url || !url.startsWith(pfx)) return null
+  try {
+    return decodeURIComponent(url.slice(pfx.length))
+  } catch {
+    return null
+  }
+}
+
 export function VideoTransport({
   layer,
   slot,
@@ -37,8 +55,40 @@ export function VideoTransport({
   state: SourceSlot
 }): JSX.Element {
   const setVideoPlayback = useStore((s) => s.setVideoPlayback)
+  const swapVideoSource = useStore((s) => s.swapVideoSource)
   const set = (patch: Parameters<typeof setVideoPlayback>[2]): void =>
     setVideoPlayback(layer, slot, patch)
+
+  // Smooth-scrub : native H.264/VP9/AV1 seek only to keyframes, so reverse /
+  // pendulum / high-speed jump keyframe-to-keyframe. Transcoding the clip once to
+  // the all-intra cache (every frame a keyframe) makes those scrub smoothly. We
+  // detect whether the loaded clip already lives in that cache and, if not, offer
+  // a one-press convert-and-swap (reusing the exact import pipeline).
+  const [cacheDir, setCacheDir] = useState<string | null>(cacheDirCache)
+  const [smoothPct, setSmoothPct] = useState<number | null>(null)
+  useEffect(() => {
+    if (cacheDir === null) loadCacheDir().then(setCacheDir)
+  }, [cacheDir])
+  const vidPath = pathFromMediaUrl(state.mediaId)
+  const isSmooth = !!(vidPath && cacheDir && vidPath.startsWith(cacheDir))
+  async function makeSmooth(): Promise<void> {
+    if (!vidPath) return
+    setSmoothPct(0)
+    const off = window.api.onVideoConvertProgress((p) => {
+      if (p.path === vidPath) setSmoothPct(p.pct)
+    })
+    try {
+      const res = await window.api.videoConvert(vidPath)
+      if (res.ok && res.path) {
+        swapVideoSource(layer, slot, `opsia-media://local/${encodeURIComponent(res.path)}`, state.mediaName ?? 'video')
+      } else if (res.error) {
+        alert(`Couldn't make a smooth-scrub copy : ${res.error}`)
+      }
+    } finally {
+      off()
+      setSmoothPct(null)
+    }
+  }
 
   const playing = state.videoPlaying ?? true
   const direction = state.videoDirection ?? (state.videoReverse ? 'reverse' : 'forward')
@@ -127,6 +177,32 @@ export function VideoTransport({
         >
           ⟲ loop
         </button>
+        {/* Smooth scrub : convert a native clip to all-intra so reverse / high-speed
+            are smooth. Only meaningful for on-disk clips. */}
+        {vidPath &&
+          (smoothPct !== null ? (
+            <span
+              className="rounded border border-accent2 px-1.5 py-0.5 font-mono text-[10px] text-accent2"
+              title="Transcoding to an all-intra copy…"
+            >
+              ⚙ {Math.round(smoothPct * 100)}%
+            </span>
+          ) : isSmooth ? (
+            <span
+              className="rounded border border-border/60 px-1.5 py-0.5 font-mono text-[10px] text-muted/70"
+              title="This clip is all-intra — reverse, pendulum and high-speed scrub smoothly"
+            >
+              ◆ smooth
+            </span>
+          ) : (
+            <button
+              onClick={makeSmooth}
+              className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted transition-colors hover:border-accent2 hover:text-accent2"
+              title="Make a smooth-scrub copy : transcode once to an all-intra cache so reverse / pendulum / high-speed play smoothly (native clips only seek to keyframes)"
+            >
+              ◇ smooth
+            </button>
+          ))}
         <div className="flex-1" />
         <span className="font-mono text-[10px] text-muted">
           <span ref={timeRef}>0:00</span> / <span ref={durRef}>0:00</span>

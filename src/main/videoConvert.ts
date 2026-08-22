@@ -136,13 +136,29 @@ export async function probe(path: string): Promise<VideoProbeResult> {
  *  convertToCache (full-res, crf 16) would be found on disk by the Collage
  *  optimiser and handed back as if it were the lean 720p file it asked for.
  *  No profile = the original naming, whose files already exist on disk. */
+/** The all-intra cache directory (userData/video-cache). Clips that live here are
+ *  already every-frame-keyframe H.264, so they scrub / reverse smoothly. */
+export function videoCacheDir(): string {
+  return join(app.getPath('userData'), 'video-cache')
+}
+
+/** Is this file already an all-intra cache clip (⇒ smooth reverse already)? */
+export function isCachedVideo(path: string): boolean {
+  try {
+    const dir = videoCacheDir()
+    return path.startsWith(dir) || decodeURIComponent(path).startsWith(dir)
+  } catch {
+    return false
+  }
+}
+
 function cachePathFor(src: string, profile?: { tag: string; suffix: string }): string {
   const st = statSync(src)
   const key = createHash('sha1')
     .update(`${src}|${st.size}|${st.mtimeMs}${profile ? `|${profile.tag}` : ''}`)
     .digest('hex')
     .slice(0, 20)
-  const dir = join(app.getPath('userData'), 'video-cache')
+  const dir = videoCacheDir()
   mkdirSync(dir, { recursive: true })
   return join(dir, `${key}${profile?.suffix ?? ''}.mp4`)
 }
@@ -335,6 +351,9 @@ export function registerVideoConvert(): void {
 
   ipcMain.handle('video:convert', async (e, path: string) => {
     try {
+      // Already an all-intra cache clip → idempotent, no re-encode. Makes the
+      // "smooth scrub" button safe to press on any clip.
+      if (isCachedVideo(path)) return { ok: true, path, cached: true }
       const sender = e.sender
       return await convertToCache(path, (pct) => {
         if (!sender.isDestroyed()) sender.send('video:convertProgress', { path, pct })
@@ -343,4 +362,6 @@ export function registerVideoConvert(): void {
       return { ok: false, error: (err2 as Error).message }
     }
   })
+
+  ipcMain.handle('video:cacheDir', () => videoCacheDir())
 }

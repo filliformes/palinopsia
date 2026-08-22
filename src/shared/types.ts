@@ -792,6 +792,8 @@ export interface ExposedApi {
   }>
   videoConvert: (path: string) => Promise<{ ok: boolean; path?: string; cached?: boolean; error?: string }>
   onVideoConvertProgress: (cb: (p: { path: string; pct: number }) => void) => () => void
+  /** The all-intra cache directory — a clip whose path is under it already scrubs smoothly. */
+  videoCacheDir: () => Promise<string>
   // Collage : pick a folder, then reduce it to a pool of playable clips (one
   // entry per file, non-Chromium codecs converted through the same cache the
   // single-clip import uses).
