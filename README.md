@@ -511,6 +511,17 @@ because the probe is the instrument — plus three voice strips and a master bus
 | **Filter** | Sonify **without synthesizing** : 48 band-pass filters whose gains come from the image under the (sweepable) line — **noise** or **live line-in** played *through* the frame. Same **reading path** + **breathe** as Spectra. Wide resonance = wind, narrow = flute; band centres can snap to the scale (a resonant harmonic wash). | Metasynth's Filter room · Pelletier's wind |
 | **Chord** | A **scale-tuned chord bank** : a few oscillators (2–16 notes spread over the range), one per horizontal **band** of the frame, each note's loudness following that band's brightness — slewed with a **swell** / **fade** so it sustains into a chord that breathes with the image. Unlike Flow it **sings on a still frame**. Low notes = bottom of frame, high = top; **tone** brightens, **spread** fans the bank in stereo. | after Remo DeVico's *Aural Mirror* — sustained harmony from light |
 
+**Shared FX tail — Reverb / Delay** : one **send** feeds the whole mix into an
+analog **BBD delay** → a high-quality **reverb**, returned to the master (the tail
+rings out when you pull the send back). Both are ported from the Essaim / Res
+instruments. The delay is bucket-brigade: tape-glided **time**, **feedback**,
+BBD **tone** (dark analog repeats ↔ bright) with wow/flutter, mono / stereo /
+ping-pong. The reverb is a modulated 8-line FDN with two colourings — **Quartz**
+(a dual-band-damped pad-verb) and **Prism** (per-band frequency-dependent decay) —
+with full control : **size · decay · damp · predelay · shimmer · width · low-cut ·
+freeze**, plus Quartz's **diffusion / low-damp** or Prism's **crossover / low× /
+high×**. A `❄ freeze` holds the tail forever.
+
 **Adaptive sources** : each voice listens to one of two **taps** — the
 composited master output or any single layer's post-FX image — so different
 voices can sonify different layers (a real ensemble). **Quantizer** : a global
