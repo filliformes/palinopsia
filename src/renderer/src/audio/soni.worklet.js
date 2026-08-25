@@ -1,8 +1,8 @@
 // The Sonify AudioWorklet processor (plain JS : loaded via Vite ?url as a
 // module asset, added with audioContext.audioWorklet.addModule).
 //
-// One processor runs all seven voices (Spectra · Orbit · Flow · Events ·
-// Raster · Transmission · Filter) plus the master bus with an always-on peak limiter. Rules: zero allocation inside
+// One processor runs all eight voices (Spectra · Orbit · Flow · Events ·
+// Raster · Transmission · Filter · Chord) plus the master bus with an always-on peak limiter. Rules: zero allocation inside
 // process(); no AudioParams (control flows through port messages); image
 // frames arrive as transferred Uint8Array luma grids, double-buffered and
 // crossfaded so 30Hz video never steps audibly; grain onsets are pre-dithered
