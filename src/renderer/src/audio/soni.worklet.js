@@ -13,6 +13,7 @@ const NPART = 96; // Spectra partial count
 const NGRAIN = 64; // Flow grain pool
 const NEVENT = 24; // Events polyphony (plucked notes)
 const NBAND = 48; // Image-Filter band count
+const NCHORD = 16; // Chord bank max voices
 const TAU = 6.283185307179586;
 
 class SoniProcessor extends AudioWorkletProcessor {
@@ -38,7 +39,8 @@ class SoniProcessor extends AudioWorkletProcessor {
       events:  { on: false, gain: 0.6, pan: 0, wave: 1, decay: 0.35, highs: 0.6 },
       raster:  { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
       sstv:    { on: false, tap: 0, gain: 0.5, pan: 0, lineHz: 12, dev: 1, syncLev: 0.5 },
-      filter:  { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0 }
+      filter:  { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0 },
+      chord:   { on: false, tap: 0, gain: 0.6, pan: 0, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3 }
     };
     this.spectraFreqs = new Float32Array(NPART); // filled by cfg
     for (let i = 0; i < NPART; i++) this.spectraFreqs[i] = 55 * Math.pow(2, i * 6 / NPART);
@@ -83,6 +85,12 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.fTarget = new Float32Array(NBAND);
     this.fSweep = 0;
     this.rebuildFilterCoefs();
+    // ── Chord bank (scale-tuned oscillators following brightness bands) ──
+    this.chordFreqs = new Float32Array(NCHORD);
+    this.chordN = 0;
+    this.cPhase = new Float32Array(NCHORD);
+    this.cAmp = new Float32Array(NCHORD);
+    this.cTarget = new Float32Array(NCHORD);
     // scratch (x,y) for the scan-path read (zero-alloc : written per partial)
     this.sxy = new Float32Array(2);
     // ── limiter ──
@@ -111,6 +119,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       this.cfg = m.cfg;
       if (m.spectraFreqs) this.spectraFreqs.set(m.spectraFreqs);
       if (m.filterFreqs) { this.fFreqs.set(m.filterFreqs); this.rebuildFilterCoefs(); }
+      if (m.chordFreqs) { this.chordN = Math.min(NCHORD, m.chordFreqs.length); this.chordFreqs.set(m.chordFreqs.subarray(0, this.chordN)); }
       return;
     }
     if (m.t === 'mod') {
@@ -525,6 +534,48 @@ class SoniProcessor extends AudioWorkletProcessor {
         }
         const v = Math.tanh(acc * 0.7);
         L[s] += v * gL; R[s] += v * gR;
+      }
+    }
+
+    // ── CHORD : scale-tuned bank following the frame's brightness bands ──
+    const ch = cfg.chord;
+    if (ch.on && this.chordN > 0) {
+      const tap = this.taps[ch.tap] || this.taps[0];
+      const N = this.chordN;
+      // control-rate targets : voice i = avg brightness of its horizontal band
+      // (voice 0 = low pitch = image bottom … N-1 = high = top), gamma-shaped.
+      for (let i = 0; i < N; i++) {
+        const y0 = 1 - (i + 1) / N, y1 = 1 - i / N;
+        let sum = 0, cnt = 0;
+        for (let yy = 0; yy < 3; yy++) {
+          const y = y0 + (y1 - y0) * ((yy + 0.5) / 3);
+          for (let xx = 0; xx < 5; xx++) { sum += this.terrain(tap, (xx + 0.5) / 5, y); cnt++; }
+        }
+        this.cTarget[i] = Math.pow(cnt ? sum / cnt : 0, ch.gamma);
+      }
+      // asymmetric slew : swell in over `attack`, fade over `release`
+      const up = 1 - Math.exp(-n * dt / Math.max(0.01, ch.attack || 0.4));
+      const dn = 1 - Math.exp(-n * dt / Math.max(0.01, ch.release || 0.8));
+      const gBase = (ch.gain * 0.5) / Math.sqrt(N);
+      const tone = ch.tone || 0, spread = ch.spread || 0, panBase = 0.5 + ch.pan * 0.5;
+      for (let i = 0; i < N; i++) {
+        const tgt = this.cTarget[i], cur = this.cAmp[i];
+        const a0 = cur + (tgt - cur) * (tgt > cur ? up : dn);
+        this.cAmp[i] = a0;
+        if (a0 < 0.003) { this.cPhase[i] = (this.cPhase[i] + this.chordFreqs[i] * n * dt) % 1; continue; }
+        let pan = N > 1 ? panBase + spread * 0.5 * (2 * i / (N - 1) - 1) : panBase;
+        pan = pan < 0 ? 0 : pan > 1 ? 1 : pan;
+        const gL = gBase * (1 - pan), gR = gBase * pan;
+        let ph = this.cPhase[i];
+        const inc = this.chordFreqs[i] * dt;
+        for (let s = 0; s < n; s++) {
+          let v = Math.sin(ph * TAU);
+          if (tone > 0.001) v = v * (1 - tone) + Math.tanh(3 * v) * tone * 0.9;
+          v *= a0;
+          L[s] += v * gL; R[s] += v * gR;
+          ph += inc;
+        }
+        this.cPhase[i] = ph % 1;
       }
     }
 

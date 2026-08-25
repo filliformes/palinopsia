@@ -94,6 +94,18 @@ export interface SoniConfig {
     path: number; pace: number // reading path + breathing pace (see spectra)
     loOct: number; hiOct: number; quantize: boolean
   }
+  // Chord bank (Aural Mirror's additive layer) : a few scale-tuned oscillators,
+  // each following the brightness of a horizontal band → a sustained chord that
+  // swells and fades with the image (sings even on a STILL frame).
+  chord: {
+    on: boolean; tap: number; gain: number; pan: number
+    voices: number // 3..16 notes, spread across the octave range
+    loOct: number; hiOct: number
+    gamma: number // brightness contrast
+    spread: number // stereo fan across the bank
+    attack: number; release: number // swell / fade seconds
+    tone: number // 0 sine … 1 brighter (soft-clip harmonics)
+  }
   taps: [SoniTap, SoniTap]
 }
 
@@ -111,6 +123,7 @@ export function defaultSoniConfig(): SoniConfig {
     raster: { on: false, tap: 0, gain: 0.4, pan: 0, note: 45, freq: 110, quantize: true, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
     sstv: { on: false, tap: 0, gain: 0.4, pan: 0, lineHz: 12, sync: false, dev: 1, syncLev: 0.5 },
     filter: { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, lineIn: false, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0, loOct: 1, hiOct: 8, quantize: false },
+    chord: { on: false, tap: 0, gain: 0.6, pan: 0, voices: 7, loOct: 2, hiOct: 6, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3 },
     taps: [{ kind: 'master', layer: 0 }, { kind: 'layer', layer: 0 }]
   }
 }
@@ -140,6 +153,18 @@ function spectraFreqs(cfg: SoniConfig): Float32Array {
     const lo = noteFreq(12 * (loOct + 1) + cfg.root)
     const hi = noteFreq(12 * (hiOct + 1) + cfg.root)
     for (let i = 0; i < 96; i++) out[i] = lo * Math.pow(hi / lo, i / 95)
+  }
+  return out
+}
+
+/** The Chord bank's note frequencies : `voices` scale notes spread evenly from
+ *  the lowest to the highest of the octave range (always scale-tuned). */
+function chordFreqs(cfg: SoniConfig): Float32Array {
+  const tab = scaleTable(cfg.root, cfg.scale, cfg.chord.loOct, cfg.chord.hiOct)
+  const N = Math.max(1, Math.min(16, cfg.chord.voices | 0))
+  const out = new Float32Array(N)
+  for (let i = 0; i < N; i++) {
+    out[i] = tab[Math.min(tab.length - 1, Math.round((i * (tab.length - 1)) / Math.max(1, N - 1)))]
   }
   return out
 }
@@ -339,10 +364,16 @@ class SonifyEngine {
           q: cfg.filter.q, noise: cfg.filter.lineIn ? cfg.filter.noise * 0.25 : cfg.filter.noise,
           sweepOn: cfg.filter.sweepOn, sweepHz: cfg.filter.sweepHz, x: cfg.filter.x, gamma: cfg.filter.gamma,
           path: cfg.filter.path ?? 0, pace: cfg.filter.pace ?? 0
+        },
+        chord: {
+          on: cfg.chord.on, tap: cfg.chord.tap, gain: cfg.chord.gain, pan: cfg.chord.pan,
+          gamma: cfg.chord.gamma, spread: cfg.chord.spread, attack: cfg.chord.attack,
+          release: cfg.chord.release, tone: cfg.chord.tone
         }
       },
       spectraFreqs: spectraFreqs(cfg),
-      filterFreqs: filterFreqs(cfg)
+      filterFreqs: filterFreqs(cfg),
+      chordFreqs: chordFreqs(cfg)
     })
     this.syncLineIn(cfg.filter.on && cfg.filter.lineIn)
   }
@@ -452,6 +483,7 @@ class SonifyEngine {
     if (this.cfg.raster.on) need[this.cfg.raster.tap] = true
     if (this.cfg.sstv.on) need[this.cfg.sstv.tap] = true
     if (this.cfg.filter.on) need[this.cfg.filter.tap] = true
+    if (this.cfg.chord.on) need[this.cfg.chord.tap] = true
 
     for (let t = 0; t < 2; t++) {
       if (!need[t]) continue

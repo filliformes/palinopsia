@@ -212,7 +212,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 
   const set = (next: SoniConfig): void => setSonify(next)
   const patch = (p: Partial<SoniConfig>): void => set({ ...cfg, ...p })
-  const pv = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter'>(k: K, p: Partial<SoniConfig[K]>): void =>
+  const pv = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord'>(k: K, p: Partial<SoniConfig[K]>): void =>
     set({ ...cfg, [k]: { ...cfg[k], ...p } })
 
   // Live mirror of the composite (same pattern as the Output page).
@@ -860,13 +860,48 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             <Slider label="pan" value={cfg.filter.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('filter', { pan: v })} />
           </VoiceShell>
 
+          <VoiceShell
+            title="Chord" on={cfg.chord.on}
+            hint="a scale-tuned chord that follows the frame's brightness bands — sings on stills"
+            onToggle={() => pv('chord', { on: !cfg.chord.on })}
+          >
+            <TapSelect cfg={cfg} voice={cfg.chord} onChange={(tap) => pv('chord', { tap })} />
+            <Row label="voices">
+              <input
+                type="range" min={2} max={16} step={1} value={cfg.chord.voices}
+                onChange={(e) => pv('chord', { voices: Number(e.target.value) })}
+                className="min-w-0 flex-1 accent-accent"
+                title="How many scale notes in the chord (spread over the range)"
+              />
+              <span className="w-12 shrink-0 text-right font-mono text-[9px] text-muted">{cfg.chord.voices}</span>
+            </Row>
+            <Row label="range">
+              <select className="input select-compact text-[10px]" value={cfg.chord.loOct} onChange={(e) => pv('chord', { loOct: Math.min(Number(e.target.value), cfg.chord.hiOct - 1) })} title="Lowest octave">
+                {[0, 1, 2, 3, 4].map((o) => <option key={o} value={o}>oct {o}</option>)}
+              </select>
+              <span className="text-[9px] text-muted">→</span>
+              <select className="input select-compact text-[10px]" value={cfg.chord.hiOct} onChange={(e) => pv('chord', { hiOct: Math.max(Number(e.target.value), cfg.chord.loOct + 1) })} title="Highest octave">
+                {[3, 4, 5, 6, 7, 8].map((o) => <option key={o} value={o}>oct {o}</option>)}
+              </select>
+            </Row>
+            <Slider label="swell" value={cfg.chord.attack} min={0.02} max={3} neutral={0.4} fmt={(v) => v.toFixed(2) + 's'} onChange={(v) => pv('chord', { attack: v })} title="Attack : how slowly each note fades IN as its band brightens" />
+            <Slider label="fade" value={cfg.chord.release} min={0.05} max={6} neutral={0.8} fmt={(v) => v.toFixed(2) + 's'} onChange={(v) => pv('chord', { release: v })} title="Release : how slowly each note fades OUT as its band darkens" />
+            <Slider label="contrast" value={cfg.chord.gamma} min={0.5} max={4} neutral={1.6} onChange={(v) => pv('chord', { gamma: v })} />
+            <Slider label="tone" value={cfg.chord.tone} min={0} max={1} neutral={0.3} onChange={(v) => pv('chord', { tone: v })} title="Sine → brighter (soft-clip harmonics)" />
+            <Slider label="spread" value={cfg.chord.spread} min={0} max={1} neutral={0.6} onChange={(v) => pv('chord', { spread: v })} title="Stereo fan across the bank (low notes ↔ high notes)" />
+            <Slider label="gain" value={cfg.chord.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('chord', { gain: v })} />
+            <Slider label="pan" value={cfg.chord.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('chord', { pan: v })} />
+          </VoiceShell>
+
           <p className="text-[9px] leading-tight text-muted">
             Spectra : vertical position is pitch, brightness is loudness — the sweep plays the frame like a score (ANS · Metasynth · vOICe).
             Orbit : the image itself is the oscillator — move the orbit to change timbre; the visuals mutate the waveform live (wave terrain · Oramics).
             Flow : whatever MOVES sings — each moving region fires a grain, panned where it is (Pelletier).
             Events : edges and motion are struck as discrete notes — pitch from height, panned where they are, highs decaying sooner (after Aural Mirror).
             Raster : the probe rect IS the waveform, read raw (Ikeda). Transmission : the image as an FM broadcast, sync tick as metronome (SSTV).
-            Filter : sound played THROUGH the frame (Metasynth). Recording captures everything.
+            Filter : sound played THROUGH the frame (Metasynth).
+            Chord : a scale-tuned bank whose notes follow the brightness of horizontal bands — a sustained chord that swells and fades, so a still image still sings (after Aural Mirror's additive layer).
+            Recording captures everything.
           </p>
         </aside>
       </div>

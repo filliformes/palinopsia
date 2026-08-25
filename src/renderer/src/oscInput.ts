@@ -495,7 +495,7 @@ function route(address: string, args: Args): void {
       }
       const ctl = segs[3]
       if (!ctl) return
-      const V = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter'>(
+      const V = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord'>(
         k: K, patch: Partial<SoniConfig[K]>
       ): void => apply({ ...c, [k]: { ...c[k], ...patch } })
       switch (g) {
@@ -583,6 +583,17 @@ function route(address: string, args: Args): void {
           else if (ctl === 'path') V('filter', { path: Math.max(0, Math.min(3, Math.round(n <= 1 ? n * 3 : n))) })
           else if (ctl === 'breathe' || ctl === 'pace') V('filter', { pace: clamp01(n) * 0.95 })
           else if (ctl === 'quantize') V('filter', { quantize: n >= 0.5 })
+          return
+        case 'chord':
+          if (ctl === 'on') V('chord', { on: n >= 0.5 })
+          else if (ctl === 'gain') V('chord', { gain: clamp01(n) })
+          else if (ctl === 'pan') V('chord', { pan: clamp01(n) * 2 - 1 })
+          else if (ctl === 'voices') V('chord', { voices: Math.max(2, Math.min(16, Math.round(n <= 1 ? 2 + n * 14 : n))) })
+          else if (ctl === 'swell' || ctl === 'attack') V('chord', { attack: 0.02 + clamp01(n) * 2.98 })
+          else if (ctl === 'fade' || ctl === 'release') V('chord', { release: 0.05 + clamp01(n) * 5.95 })
+          else if (ctl === 'contrast') V('chord', { gamma: 0.5 + clamp01(n) * 3.5 })
+          else if (ctl === 'tone') V('chord', { tone: clamp01(n) })
+          else if (ctl === 'spread') V('chord', { spread: clamp01(n) })
           return
       }
       return
@@ -821,6 +832,13 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/flow/on', 0, 1, so.flow.on ? 1 : 0, 'Flow voice on')
     add('/opsia/sonify/flow/gain', 0, 1, so.flow.gain, 'Flow gain')
     add('/opsia/sonify/flow/colour', 0, 1, so.flow.colour ?? 0, 'Flow colour → grain timbre')
+    add('/opsia/sonify/chord/on', 0, 1, so.chord.on ? 1 : 0, 'Chord bank on')
+    add('/opsia/sonify/chord/gain', 0, 1, so.chord.gain, 'Chord gain')
+    add('/opsia/sonify/chord/voices', 2, 16, so.chord.voices, 'Chord note count')
+    add('/opsia/sonify/chord/swell', 0, 1, (so.chord.attack - 0.02) / 2.98, 'Chord attack (swell)')
+    add('/opsia/sonify/chord/fade', 0, 1, (so.chord.release - 0.05) / 5.95, 'Chord release (fade)')
+    add('/opsia/sonify/chord/tone', 0, 1, so.chord.tone, 'Chord tone (sine → bright)')
+    add('/opsia/sonify/chord/spread', 0, 1, so.chord.spread, 'Chord stereo spread')
     add('/opsia/sonify/events/on', 0, 1, so.events.on ? 1 : 0, 'Events voice on')
     add('/opsia/sonify/events/gain', 0, 1, so.events.gain, 'Events gain')
     add('/opsia/sonify/events/mode', 0, 2, so.events.mode === 'blend' ? 2 : so.events.mode === 'motion' ? 1 : 0, 'Events trigger : 0 spatial · 1 motion · 2 blend')
