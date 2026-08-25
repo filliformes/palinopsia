@@ -54,7 +54,7 @@ racks, palette, World and macro biases — in one click.
 - [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix)
 - [Sequencer](#sequencer-key-q) — auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) · [MIDI](#midi) · [Output & mapping](#output--mapping-key-o) — incl. Flash safety
-- [Sonify — image to sound](#sonify--image-to-sound-key-s) — six voices (Spectra · Orbit · Flow · Raster · Transmission · Filter) · quantizer · audio in recordings
+- [Sonify — image to sound](#sonify--image-to-sound-key-s) — seven voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter) · quantizer · audio in recordings
 - [Assemble — the automatic editor](#assemble--the-automatic-editor-key-e) — corpus point cloud · matching modes · cut pace + time curves · export
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
@@ -498,13 +498,14 @@ inside the app (an AudioWorklet engine — no external software). A full-page
 takeover: the live composite mirrored large with the **probes drawn on it** —
 because the probe is the instrument — plus three voice strips and a master bus.
 
-**The six voices** (each one lineage of the sonification literature):
+**The seven voices** (each one lineage of the sonification literature):
 
 | Voice | Mapping | Register |
 |---|---|---|
 | **Spectra** | The frame as a spectrogram : a column of 96 partials reads the image under a scan line — vertical position → pitch, brightness → loudness. The line **sweeps** (tempo-syncable, one sweep per bar) or **holds** (drag it). | ANS · Metasynth · vOICe — shimmering masses; the musical one |
 | **Orbit** | The frame as a **waveform** : an orbit (circle or Lissajous) reads pixels at audio rate — the image *is* the oscillator, so the visuals mutate the timbre live. Drag the centre and radius on the mirror; pitch is a note or free Hz. | wave terrain · Oramics — alive, analog-adjacent |
 | **Flow** | Whatever **moves** sings : each moving region fires a grain — position → pan, motion energy → loudness, height → pitch. Onsets are dithered across the frame interval so 30 Hz control never quantizes audibly. | Pelletier's flow fields — Gestalt grain clouds |
+| **Events** | Edges and motion are **struck as discrete notes** : a salience field (**spatial** Sobel edges — fires on a still · **motion** frame-difference · **blend** — a moving edge dominates) picks one peak per region and plucks the strongest as scale-quantized notes — pitch from height, velocity from strength, pan from position, and **highs decaying sooner** (a struck-string touch). sine / triangle / saw / square. | after Remo DeVico's *Aural Mirror* — articulation, rhythm |
 | **Raster** | Audification : a draggable **probe rect** read row-major as raw samples — the rect's contents *are* the waveform (edges buzz, gradients hum, datamosh blocks tick). One full scan = the period, so pitch is a note or free Hz; **smooth** 0 is the hard aliased register. | Ikeda · Yeo/Berger raster scanning — harsh, digital |
 | **Transmission** | The SSTV register : the image scanned line-by-line as a **monophonic FM voice** (black 1500 Hz → white 2300 Hz) with the 1200 Hz **sync tick** as a metronome. Line rate free or synced (one line per 16th). The melody *is* the image rows. | slow-scan TV — narrative, decodable |
 | **Filter** | Sonify **without synthesizing** : 48 band-pass filters whose gains come from the image column under the (sweepable) line — **noise** or **live line-in** played *through* the frame. Wide resonance = wind, narrow = flute; band centres can snap to the scale (a resonant harmonic wash). | Metasynth's Filter room · Pelletier's wind |
