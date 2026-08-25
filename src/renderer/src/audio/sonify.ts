@@ -18,6 +18,7 @@ export const GRID = 96
 const FLOW_BLOCK = 8 // grid px per flow block → 12×12 blocks
 const FLOW_BLOCKS = GRID / FLOW_BLOCK
 
+export type SoniEventMode = 'spatial' | 'motion' | 'blend'
 export type SoniScale = 'chromatic' | 'major' | 'minor' | 'pentatonic' | 'wholetone' | 'dorian' | 'phrygian' | 'lydian'
 export const SONI_SCALES: SoniScale[] = ['chromatic', 'major', 'minor', 'pentatonic', 'wholetone', 'dorian', 'phrygian', 'lydian']
 const SCALE_STEPS: Record<SoniScale, number[]> = {
@@ -60,6 +61,17 @@ export interface SoniConfig {
     sense: number; density: number; dur: number; noise: number
     loOct: number; hiOct: number; quantize: boolean
   }
+  // Events (Aural-Mirror register) : edges / motion → discrete plucked notes.
+  events: {
+    on: boolean; tap: number; gain: number; pan: number
+    mode: SoniEventMode // what fires a note : spatial edges, motion, or both
+    sense: number // detection threshold (higher = more events)
+    density: number // max events per instant
+    decay: number // base note decay 0..1
+    highs: number // 'highs decay sooner' amount 0..1
+    wave: number // 0 sine · 1 triangle · 2 saw · 3 square
+    loOct: number; hiOct: number; quantize: boolean
+  }
   raster: {
     on: boolean; tap: number; gain: number; pan: number
     note: number; freq: number; quantize: boolean
@@ -88,6 +100,7 @@ export function defaultSoniConfig(): SoniConfig {
     spectra: { on: true, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, sync: false, x: 0.5, gamma: 1.8, breath: 0, loOct: 2, hiOct: 7, quantize: true },
     orbit: { on: false, tap: 0, gain: 0.5, pan: 0, note: 45, freq: 110, quantize: true, ratio: 1, cx: 0.5, cy: 0.5, rx: 0.25, ry: 0.25, drive: 1, smooth: 0.5 },
     flow: { on: false, tap: 0, gain: 0.6, pan: 0, sense: 0.4, density: 0.5, dur: 0.09, noise: 0.15, loOct: 3, hiOct: 6, quantize: true },
+    events: { on: false, tap: 0, gain: 0.6, pan: 0, mode: 'blend', sense: 0.5, density: 0.4, decay: 0.35, highs: 0.6, wave: 1, loOct: 3, hiOct: 6, quantize: true },
     raster: { on: false, tap: 0, gain: 0.4, pan: 0, note: 45, freq: 110, quantize: true, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
     sstv: { on: false, tap: 0, gain: 0.4, pan: 0, lineHz: 12, sync: false, dev: 1, syncLev: 0.5 },
     filter: { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, lineIn: false, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, loOct: 1, hiOct: 8, quantize: false },
@@ -182,11 +195,15 @@ class SonifyEngine {
   private luma: Uint8Array[] = [new Uint8Array(GRID * GRID), new Uint8Array(GRID * GRID)]
   private lumaPrev: Uint8Array[] = [new Uint8Array(GRID * GRID), new Uint8Array(GRID * GRID)]
   private grainFreqs: Float32Array = new Float32Array(0)
+  private eventFreqs: Float32Array = new Float32Array(0)
+  private salience = new Float32Array(GRID * GRID) // Events detection scratch
   // live meter (UI reads these; written from the worklet's meter messages)
   meterPeak = 0
   meterLim = 1
   // live flow vectors for the overlay ([x01,y01,mag] × n)
   flowDots: Float32Array = new Float32Array(0)
+  // live event onsets for the overlay ([x01,y01,mag] × n), fade painted by the UI
+  eventDots: Float32Array = new Float32Array(0)
   // effective probe values (base + modulation), for the page overlay
   liveProbes: Record<string, number> = {}
 
@@ -271,6 +288,10 @@ class SonifyEngine {
     this.grainFreqs = cfg.flow.quantize
       ? scaleTable(cfg.root, cfg.scale, cfg.flow.loOct, cfg.flow.hiOct)
       : new Float32Array(0)
+    // note pitch table for the events voice
+    this.eventFreqs = cfg.events.quantize
+      ? scaleTable(cfg.root, cfg.scale, cfg.events.loOct, cfg.events.hiOct)
+      : new Float32Array(0)
     this.node.port.postMessage({
       t: 'cfg',
       cfg: {
@@ -291,6 +312,10 @@ class SonifyEngine {
         flow: {
           on: cfg.flow.on, tap: cfg.flow.tap, gain: cfg.flow.gain, pan: cfg.flow.pan,
           dur: cfg.flow.dur, noise: cfg.flow.noise
+        },
+        events: {
+          on: cfg.events.on, gain: cfg.events.gain, pan: cfg.events.pan,
+          wave: cfg.events.wave, decay: cfg.events.decay, highs: cfg.events.highs
         },
         raster: {
           on: cfg.raster.on, tap: cfg.raster.tap, gain: cfg.raster.gain, pan: cfg.raster.pan,
@@ -415,6 +440,7 @@ class SonifyEngine {
     if (this.cfg.spectra.on) need[this.cfg.spectra.tap] = true
     if (this.cfg.orbit.on) need[this.cfg.orbit.tap] = true
     if (this.cfg.flow.on) need[this.cfg.flow.tap] = true
+    if (this.cfg.events.on) need[this.cfg.events.tap] = true
     if (this.cfg.raster.on) need[this.cfg.raster.tap] = true
     if (this.cfg.sstv.on) need[this.cfg.sstv.tap] = true
     if (this.cfg.filter.on) need[this.cfg.filter.tap] = true
@@ -443,7 +469,86 @@ class SonifyEngine {
       node.port.postMessage({ t: 'grid', tap: t, dt: frameDt, data: copy }, [copy.buffer])
 
       if (this.cfg.flow.on && this.cfg.flow.tap === t) this.analyzeFlow(t, dt)
+      if (this.cfg.events.on && this.cfg.events.tap === t) this.analyzeEvents(t, frameDt)
     }
+  }
+
+  /** Detect edge / motion peaks on the 96×96 luma grid → discrete note events.
+   *  Mode picks the salience field: SPATIAL = a Sobel edge magnitude (strokes /
+   *  contours, fires even on a still), MOTION = frame-difference (only what moves),
+   *  BLEND = both summed (a MOVING edge is the strongest, so it dominates). One
+   *  peak per coarse block spreads the notes; the strongest N (density) fire, pitch
+   *  from height (top = high), velocity from salience, pan from x. Onset-dithered. */
+  private analyzeEvents(t: number, frameDt: number): void {
+    const cur = this.luma[t], prev = this.lumaPrev[t]
+    const ev = this.cfg.events
+    const sal = this.salience
+    const spatial = ev.mode !== 'motion'
+    const motion = ev.mode !== 'spatial'
+    // Salience per cell. Interior only for the Sobel; borders stay 0.
+    sal.fill(0)
+    for (let y = 1; y < GRID - 1; y++) {
+      const r0 = (y - 1) * GRID, r1 = y * GRID, r2 = (y + 1) * GRID
+      for (let x = 1; x < GRID - 1; x++) {
+        let s = 0
+        if (spatial) {
+          const gx =
+            cur[r0 + x + 1] + 2 * cur[r1 + x + 1] + cur[r2 + x + 1] -
+            (cur[r0 + x - 1] + 2 * cur[r1 + x - 1] + cur[r2 + x - 1])
+          const gy =
+            cur[r2 + x - 1] + 2 * cur[r2 + x] + cur[r2 + x + 1] -
+            (cur[r0 + x - 1] + 2 * cur[r0 + x] + cur[r0 + x + 1])
+          s += (Math.abs(gx) + Math.abs(gy)) * 0.25 // 0..~255
+        }
+        if (motion) s += Math.abs(cur[r1 + x] - prev[r1 + x])
+        sal[r1 + x] = s
+      }
+    }
+    // One peak per FLOW_BLOCK cell → spread events across the frame; threshold by
+    // sense (high sense = low bar = a busier rain), keep the strongest `density`.
+    const thresh = 10 + (1 - ev.sense) * 70
+    const maxEv = Math.max(1, Math.round(2 + ev.density * 16))
+    type C = { x: number; y: number; mag: number }
+    const cands: C[] = []
+    for (let by = 0; by < FLOW_BLOCKS; by++) {
+      for (let bx = 0; bx < FLOW_BLOCKS; bx++) {
+        let best = 0, bxi = 0, byi = 0
+        const ox = bx * FLOW_BLOCK, oy = by * FLOW_BLOCK
+        for (let y = 0; y < FLOW_BLOCK; y++) {
+          const row = (oy + y) * GRID + ox
+          for (let x = 0; x < FLOW_BLOCK; x++) {
+            const v = sal[row + x]
+            if (v > best) { best = v; bxi = ox + x; byi = oy + y }
+          }
+        }
+        if (best > thresh) cands.push({ x: (bxi + 0.5) / GRID, y: (byi + 0.5) / GRID, mag: Math.min(1, best / 200) })
+      }
+    }
+    cands.sort((a, b) => b.mag - a.mag)
+    const chosen = cands.slice(0, maxEv)
+    const dots = new Float32Array(chosen.length * 3)
+    chosen.forEach((c, i) => { dots[i * 3] = c.x; dots[i * 3 + 1] = c.y; dots[i * 3 + 2] = c.mag })
+    this.eventDots = dots
+    if (!chosen.length || !this.node) return
+    // events : [tOffset, freq, amp, pan] — onset dithered across the frame gap
+    const out = new Float32Array(chosen.length * 4)
+    const lo = ev.loOct, hi = ev.hiOct
+    for (let i = 0; i < chosen.length; i++) {
+      const c = chosen[i]
+      let freq: number
+      if (ev.quantize && this.eventFreqs.length) {
+        const idx = Math.min(this.eventFreqs.length - 1, Math.floor((1 - c.y) * this.eventFreqs.length))
+        freq = this.eventFreqs[idx]
+      } else {
+        const f0 = noteFreq(12 * (lo + 1)), f1 = noteFreq(12 * (hi + 1))
+        freq = f0 * Math.pow(f1 / f0, 1 - c.y)
+      }
+      out[i * 4] = Math.random() * frameDt
+      out[i * 4 + 1] = freq
+      out[i * 4 + 2] = 0.3 + c.mag * 0.7
+      out[i * 4 + 3] = c.x
+    }
+    this.node.port.postMessage({ t: 'events', events: out }, [out.buffer])
   }
 
   /** Block-matching motion field on the 96×96 luma grids → grain events. */

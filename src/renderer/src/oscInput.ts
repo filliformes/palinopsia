@@ -495,7 +495,7 @@ function route(address: string, args: Args): void {
       }
       const ctl = segs[3]
       if (!ctl) return
-      const V = <K extends 'spectra' | 'orbit' | 'flow' | 'raster' | 'sstv' | 'filter'>(
+      const V = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter'>(
         k: K, patch: Partial<SoniConfig[K]>
       ): void => apply({ ...c, [k]: { ...c[k], ...patch } })
       switch (g) {
@@ -531,6 +531,18 @@ function route(address: string, args: Args): void {
           else if (ctl === 'grain') V('flow', { dur: 0.02 + clamp01(n) * 0.38 })
           else if (ctl === 'breath') V('flow', { noise: clamp01(n) })
           else if (ctl === 'quantize') V('flow', { quantize: n >= 0.5 })
+          return
+        case 'events':
+          if (ctl === 'on') V('events', { on: n >= 0.5 })
+          else if (ctl === 'gain') V('events', { gain: clamp01(n) })
+          else if (ctl === 'pan') V('events', { pan: clamp01(n) * 2 - 1 })
+          else if (ctl === 'mode') V('events', { mode: n >= 1.5 ? 'blend' : n >= 0.5 ? 'motion' : 'spatial' })
+          else if (ctl === 'sense') V('events', { sense: clamp01(n) })
+          else if (ctl === 'density') V('events', { density: clamp01(n) })
+          else if (ctl === 'decay') V('events', { decay: clamp01(n) })
+          else if (ctl === 'highs') V('events', { highs: clamp01(n) })
+          else if (ctl === 'wave') V('events', { wave: Math.round(clamp01(n) * 3) })
+          else if (ctl === 'quantize') V('events', { quantize: n >= 0.5 })
           return
         case 'raster':
           if (ctl === 'on') V('raster', { on: n >= 0.5 })
@@ -801,6 +813,11 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/orbit/r', 0, 1, norm('orbitR', so.orbit.rx), 'Orbit radius')
     add('/opsia/sonify/flow/on', 0, 1, so.flow.on ? 1 : 0, 'Flow voice on')
     add('/opsia/sonify/flow/gain', 0, 1, so.flow.gain, 'Flow gain')
+    add('/opsia/sonify/events/on', 0, 1, so.events.on ? 1 : 0, 'Events voice on')
+    add('/opsia/sonify/events/gain', 0, 1, so.events.gain, 'Events gain')
+    add('/opsia/sonify/events/mode', 0, 2, so.events.mode === 'blend' ? 2 : so.events.mode === 'motion' ? 1 : 0, 'Events trigger : 0 spatial · 1 motion · 2 blend')
+    add('/opsia/sonify/events/density', 0, 1, so.events.density, 'Events per instant')
+    add('/opsia/sonify/events/decay', 0, 1, so.events.decay, 'Event note decay')
     add('/opsia/sonify/raster/on', 0, 1, so.raster.on ? 1 : 0, 'Raster voice on')
     add('/opsia/sonify/raster/gain', 0, 1, so.raster.gain, 'Raster gain')
     add('/opsia/sonify/raster/x', 0, 1, norm('rasterX', so.raster.rx), 'Raster rect x')

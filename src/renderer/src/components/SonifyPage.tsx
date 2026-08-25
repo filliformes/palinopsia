@@ -189,7 +189,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 
   const set = (next: SoniConfig): void => setSonify(next)
   const patch = (p: Partial<SoniConfig>): void => set({ ...cfg, ...p })
-  const pv = <K extends 'spectra' | 'orbit' | 'flow' | 'raster' | 'sstv' | 'filter'>(k: K, p: Partial<SoniConfig[K]>): void =>
+  const pv = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter'>(k: K, p: Partial<SoniConfig[K]>): void =>
     set({ ...cfg, [k]: { ...cfg[k], ...p } })
 
   // Live mirror of the composite (same pattern as the Output page).
@@ -247,6 +247,18 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             g.beginPath()
             g.arc(dots[i] * w, dots[i + 1] * h, r, 0, 6.2832)
             g.fill()
+          }
+        }
+        // Event onsets : a ring at each note the picture just plucked
+        if (st.on && st.events.on) {
+          const dots = sonifyEngine.eventDots
+          g.strokeStyle = 'rgba(255,210,120,0.9)'
+          g.lineWidth = 1.5
+          for (let i = 0; i + 2 < dots.length; i += 3) {
+            const r = 3 + dots[i + 2] * 9
+            g.beginPath()
+            g.arc(dots[i] * w, dots[i + 1] * h, r, 0, 6.2832)
+            g.stroke()
           }
         }
         // Spectra sweep line (mirror of the worklet's sweep : same rate)
@@ -610,6 +622,65 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           </VoiceShell>
 
           <VoiceShell
+            title="Events" on={cfg.events.on}
+            hint="edges & motion → plucked notes, pitched by height, panned by position"
+            onToggle={() => pv('events', { on: !cfg.events.on })}
+          >
+            <TapSelect cfg={cfg} voice={cfg.events} onChange={(tap) => pv('events', { tap })} />
+            <Row label="trigger">
+              {(['spatial', 'motion', 'blend'] as const).map((mo) => (
+                <button
+                  key={mo}
+                  onClick={() => pv('events', { mode: mo })}
+                  className={`flex-1 rounded px-1.5 py-0.5 font-mono text-[9px] transition-colors ${
+                    cfg.events.mode === mo ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'
+                  }`}
+                  title={
+                    mo === 'spatial'
+                      ? 'Edges / strokes (Sobel) — fires on contours, works on a still image'
+                      : mo === 'motion'
+                        ? 'Frame difference — only what MOVES fires a note'
+                        : 'Both — a moving edge is the strongest, so it dominates'
+                  }
+                >{mo}</button>
+              ))}
+            </Row>
+            <Slider label="sense" value={cfg.events.sense} min={0} max={1} neutral={0.5} onChange={(v) => pv('events', { sense: v })} />
+            <Slider label="density" value={cfg.events.density} min={0} max={1} neutral={0.4} onChange={(v) => pv('events', { density: v })} />
+            <Slider label="decay" value={cfg.events.decay} min={0} max={1} neutral={0.35} fmt={(v) => Math.round((0.05 + v * 2.45) * 1000) + 'ms'} onChange={(v) => pv('events', { decay: v })} />
+            <Slider label="highs↓" value={cfg.events.highs} min={0} max={1} neutral={0.6} onChange={(v) => pv('events', { highs: v })} />
+            <Row label="wave">
+              <select
+                className="input select-compact min-w-0 flex-1 text-[10px]"
+                value={cfg.events.wave}
+                onChange={(e) => pv('events', { wave: Number(e.target.value) })}
+                title="Oscillator shape for the notes"
+              >
+                <option value={0}>sine</option>
+                <option value={1}>triangle</option>
+                <option value={2}>saw</option>
+                <option value={3}>square</option>
+              </select>
+            </Row>
+            <Row label="range">
+              <select className="input select-compact text-[10px]" value={cfg.events.loOct} onChange={(e) => pv('events', { loOct: Math.min(Number(e.target.value), cfg.events.hiOct - 1) })} title="Lowest octave">
+                {[1, 2, 3, 4].map((o) => <option key={o} value={o}>oct {o}</option>)}
+              </select>
+              <span className="text-[9px] text-muted">→</span>
+              <select className="input select-compact text-[10px]" value={cfg.events.hiOct} onChange={(e) => pv('events', { hiOct: Math.max(Number(e.target.value), cfg.events.loOct + 1) })} title="Highest octave">
+                {[4, 5, 6, 7].map((o) => <option key={o} value={o}>oct {o}</option>)}
+              </select>
+              <button
+                onClick={() => pv('events', { quantize: !cfg.events.quantize })}
+                className={`ml-auto rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.events.quantize ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
+                title="Notes land on scale degrees or free frequencies"
+              >♪ scale</button>
+            </Row>
+            <Slider label="gain" value={cfg.events.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('events', { gain: v })} />
+            <Slider label="pan" value={cfg.events.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('events', { pan: v })} />
+          </VoiceShell>
+
+          <VoiceShell
             title="Raster" on={cfg.raster.on}
             hint="audification : the probe rect read raw as samples (Ikeda)"
             onToggle={() => pv('raster', { on: !cfg.raster.on })}
@@ -741,6 +812,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             Spectra : vertical position is pitch, brightness is loudness — the sweep plays the frame like a score (ANS · Metasynth · vOICe).
             Orbit : the image itself is the oscillator — move the orbit to change timbre; the visuals mutate the waveform live (wave terrain · Oramics).
             Flow : whatever MOVES sings — each moving region fires a grain, panned where it is (Pelletier).
+            Events : edges and motion are struck as discrete notes — pitch from height, panned where they are, highs decaying sooner (after Aural Mirror).
             Raster : the probe rect IS the waveform, read raw (Ikeda). Transmission : the image as an FM broadcast, sync tick as metronome (SSTV).
             Filter : sound played THROUGH the frame (Metasynth). Recording captures everything.
           </p>

@@ -1,8 +1,8 @@
 // The Sonify AudioWorklet processor (plain JS : loaded via Vite ?url as a
 // module asset, added with audioContext.audioWorklet.addModule).
 //
-// One processor runs all six voices (Spectra · Orbit · Flow · Raster ·
-// Transmission · Filter) plus the master bus with an always-on peak limiter. Rules: zero allocation inside
+// One processor runs all seven voices (Spectra · Orbit · Flow · Events ·
+// Raster · Transmission · Filter) plus the master bus with an always-on peak limiter. Rules: zero allocation inside
 // process(); no AudioParams (control flows through port messages); image
 // frames arrive as transferred Uint8Array luma grids, double-buffered and
 // crossfaded so 30Hz video never steps audibly; grain onsets are pre-dithered
@@ -11,7 +11,9 @@
 const GRID = 96; // luma grid is GRID×GRID
 const NPART = 96; // Spectra partial count
 const NGRAIN = 64; // Flow grain pool
+const NEVENT = 24; // Events polyphony (plucked notes)
 const NBAND = 48; // Image-Filter band count
+const TAU = 6.283185307179586;
 
 class SoniProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -33,6 +35,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       spectra: { on: false, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, x: 0.5, gamma: 1.6, breath: 0 },
       orbit:   { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, ratio: 1, cx: 0.5, cy: 0.5, rx: 0.25, ry: 0.25, drive: 1.2, smooth: 0.6 },
       flow:    { on: false, tap: 0, gain: 0.5, pan: 0, dur: 0.09, noise: 0.15 },
+      events:  { on: false, gain: 0.6, pan: 0, wave: 1, decay: 0.35, highs: 0.6 },
       raster:  { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
       sstv:    { on: false, tap: 0, gain: 0.5, pan: 0, lineHz: 12, dev: 1, syncLev: 0.5 },
       filter:  { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6 }
@@ -56,6 +59,12 @@ class SoniProcessor extends AudioWorkletProcessor {
       this.grains.push({ on: false, t0: 0, phase: 0, inc: 0, amp: 0, pan: 0.5, age: 0, dur: 0.1, noise: 0 });
     }
     this.pending = []; // scheduled grain events (small, replaced per flow msg)
+    // ── Events poly pool (plucked notes from edges / motion) ──
+    this.notes = [];
+    for (let k = 0; k < NEVENT; k++) {
+      this.notes.push({ on: false, phase: 0, inc: 0, amp: 0, pan: 0.5, wave: 0, env: 0, atkInc: 1, decMul: 0.999, attacking: false });
+    }
+    this.evPending = []; // scheduled note onsets [{t0, freq, amp, pan}]
     // ── Raster state ──
     this.rPtr = 0; // read pointer in probe pixels (row-major, wraps)
     this.rDcX = 0; this.rDcY = 0;
@@ -120,6 +129,17 @@ class SoniProcessor extends AudioWorkletProcessor {
       const base = currentTime;
       for (let i = 0; i + 3 < ev.length; i += 4) {
         this.pending.push({ t0: base + ev[i], freq: ev[i + 1], amp: ev[i + 2], pan: ev[i + 3] });
+      }
+      return;
+    }
+    if (m.t === 'events') {
+      // events: flat Float32Array [tOffset, freq, amp, pan] × n (dithered +
+      // quantized by the main thread) → scheduled discrete note onsets.
+      const ev = m.events;
+      this.evPending.length = 0;
+      const base = currentTime;
+      for (let i = 0; i + 3 < ev.length; i += 4) {
+        this.evPending.push({ t0: base + ev[i], freq: ev[i + 1], amp: ev[i + 2], pan: ev[i + 3] });
       }
       return;
     }
@@ -291,6 +311,61 @@ class SoniProcessor extends AudioWorkletProcessor {
           const nz = (this.noiseState / 0x40000000 - 1) * gr.noise;
           const v = (Math.sin(gr.phase * 6.283185307179586) * (1 - gr.noise) + nz) * e * gr.amp;
           gr.phase += gr.inc;
+          L[s] += v * gL; R[s] += v * gR;
+        }
+      }
+    }
+
+    // ── EVENTS : edges / motion → plucked notes (Aural-Mirror register) ──
+    const ev = cfg.events;
+    if (ev.on) {
+      // fire scheduled onsets whose time has come
+      const nowT = currentTime;
+      const wave = ev.wave | 0;
+      for (let i = this.evPending.length - 1; i >= 0; i--) {
+        const e = this.evPending[i];
+        if (e.t0 <= nowT + n * dt) {
+          // grab a free voice, else steal the quietest
+          let slot = -1, quiet = 2;
+          for (let k = 0; k < NEVENT; k++) {
+            const nt2 = this.notes[k];
+            if (!nt2.on) { slot = k; break; }
+            if (nt2.env < quiet) { quiet = nt2.env; slot = k; }
+          }
+          const nt = this.notes[slot < 0 ? 0 : slot];
+          // decay time : base 0.05..2.5s, shortened for high notes when `highs`>0
+          const f = e.freq < 20 ? 20 : e.freq;
+          const baseDecay = 0.05 + ev.decay * 2.45;
+          const factor = ev.highs > 0.001 ? Math.pow(220 / f, ev.highs * 1.5) : 1;
+          const decayTime = Math.max(0.03, Math.min(6, baseDecay * factor));
+          nt.on = true; nt.phase = 0; nt.inc = e.freq * dt;
+          nt.amp = e.amp; nt.pan = e.pan; nt.wave = wave;
+          nt.env = 0; nt.attacking = true;
+          nt.atkInc = 1 / Math.max(1, 0.004 * sampleRate); // ~4ms attack
+          nt.decMul = Math.exp(-6.9077552 / (decayTime * sampleRate)); // ≈ -60dB over decayTime
+          this.evPending.splice(i, 1);
+        }
+      }
+      const g0 = ev.gain * 0.5;
+      const bias = ev.pan * 0.5;
+      // saw / square carry more energy — trim so they don't dominate the mix.
+      const wg = wave === 3 ? 0.5 : wave === 2 ? 0.7 : 1;
+      for (let k = 0; k < NEVENT; k++) {
+        const nt = this.notes[k];
+        if (!nt.on) continue;
+        let p = nt.pan + bias; p = p < 0 ? 0 : p > 1 ? 1 : p;
+        const gL = g0 * (1 - p) * wg, gR = g0 * p * wg;
+        for (let s = 0; s < n; s++) {
+          if (nt.attacking) { nt.env += nt.atkInc; if (nt.env >= 1) { nt.env = 1; nt.attacking = false; } }
+          else { nt.env *= nt.decMul; if (nt.env < 0.0004) { nt.on = false; break; } }
+          const ph = nt.phase;
+          let sig;
+          if (wave === 0) sig = Math.sin(ph * TAU);
+          else if (wave === 1) { const tr = ph < 0.5 ? ph * 2 : 2 - ph * 2; sig = tr * 2 - 1; } // triangle
+          else if (wave === 2) sig = ph * 2 - 1; // saw
+          else sig = ph < 0.5 ? 1 : -1; // square
+          const v = sig * nt.env * nt.amp;
+          nt.phase += nt.inc; if (nt.phase >= 1) nt.phase -= 1;
           L[s] += v * gL; R[s] += v * gR;
         }
       }
