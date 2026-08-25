@@ -46,6 +46,9 @@ export interface SoniConfig {
   spectra: {
     on: boolean; tap: number; gain: number; pan: number
     sweepOn: boolean; sweepHz: number; sync: boolean; x: number
+    // reading PATH (0 horizontal · 1 vertical · 2 radial · 3 spiral) + PACE
+    // (0 = even sweep … breathing rubato : slow at the edges, rushing the middle).
+    path: number; pace: number
     gamma: number; breath: number; loOct: number; hiOct: number; quantize: boolean
   }
   orbit: {
@@ -85,6 +88,7 @@ export interface SoniConfig {
     on: boolean; tap: number; gain: number; pan: number
     q: number; noise: number; lineIn: boolean
     sweepOn: boolean; sweepHz: number; x: number; gamma: number
+    path: number; pace: number // reading path + breathing pace (see spectra)
     loOct: number; hiOct: number; quantize: boolean
   }
   taps: [SoniTap, SoniTap]
@@ -97,13 +101,13 @@ export function defaultSoniConfig(): SoniConfig {
     sinkId: '',
     root: 0,
     scale: 'minor',
-    spectra: { on: true, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, sync: false, x: 0.5, gamma: 1.8, breath: 0, loOct: 2, hiOct: 7, quantize: true },
+    spectra: { on: true, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, sync: false, x: 0.5, path: 0, pace: 0, gamma: 1.8, breath: 0, loOct: 2, hiOct: 7, quantize: true },
     orbit: { on: false, tap: 0, gain: 0.5, pan: 0, note: 45, freq: 110, quantize: true, ratio: 1, cx: 0.5, cy: 0.5, rx: 0.25, ry: 0.25, drive: 1, smooth: 0.5 },
     flow: { on: false, tap: 0, gain: 0.6, pan: 0, sense: 0.4, density: 0.5, dur: 0.09, noise: 0.15, loOct: 3, hiOct: 6, quantize: true },
     events: { on: false, tap: 0, gain: 0.6, pan: 0, mode: 'blend', sense: 0.5, density: 0.4, decay: 0.35, highs: 0.6, wave: 1, loOct: 3, hiOct: 6, quantize: true },
     raster: { on: false, tap: 0, gain: 0.4, pan: 0, note: 45, freq: 110, quantize: true, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
     sstv: { on: false, tap: 0, gain: 0.4, pan: 0, lineHz: 12, sync: false, dev: 1, syncLev: 0.5 },
-    filter: { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, lineIn: false, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, loOct: 1, hiOct: 8, quantize: false },
+    filter: { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, lineIn: false, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0, loOct: 1, hiOct: 8, quantize: false },
     taps: [{ kind: 'master', layer: 0 }, { kind: 'layer', layer: 0 }]
   }
 }
@@ -299,7 +303,7 @@ class SonifyEngine {
         spectra: {
           on: cfg.spectra.on, tap: cfg.spectra.tap, gain: cfg.spectra.gain, pan: cfg.spectra.pan,
           sweepOn: cfg.spectra.sweepOn, sweepHz: cfg.spectra.sweepHz, x: cfg.spectra.x, gamma: cfg.spectra.gamma,
-          breath: cfg.spectra.breath ?? 0
+          breath: cfg.spectra.breath ?? 0, path: cfg.spectra.path ?? 0, pace: cfg.spectra.pace ?? 0
         },
         orbit: {
           on: cfg.orbit.on, tap: cfg.orbit.tap, gain: cfg.orbit.gain, pan: cfg.orbit.pan,
@@ -330,7 +334,8 @@ class SonifyEngine {
         filter: {
           on: cfg.filter.on, tap: cfg.filter.tap, gain: cfg.filter.gain, pan: cfg.filter.pan,
           q: cfg.filter.q, noise: cfg.filter.lineIn ? cfg.filter.noise * 0.25 : cfg.filter.noise,
-          sweepOn: cfg.filter.sweepOn, sweepHz: cfg.filter.sweepHz, x: cfg.filter.x, gamma: cfg.filter.gamma
+          sweepOn: cfg.filter.sweepOn, sweepHz: cfg.filter.sweepHz, x: cfg.filter.x, gamma: cfg.filter.gamma,
+          path: cfg.filter.path ?? 0, pace: cfg.filter.pace ?? 0
         }
       },
       spectraFreqs: spectraFreqs(cfg),

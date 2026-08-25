@@ -32,13 +32,13 @@ class SoniProcessor extends AudioWorkletProcessor {
     // ── voice configs (overwritten by 'cfg' messages) ──
     this.cfg = {
       master: 0.8,
-      spectra: { on: false, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, x: 0.5, gamma: 1.6, breath: 0 },
+      spectra: { on: false, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, x: 0.5, gamma: 1.6, breath: 0, path: 0, pace: 0 },
       orbit:   { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, ratio: 1, cx: 0.5, cy: 0.5, rx: 0.25, ry: 0.25, drive: 1.2, smooth: 0.6 },
       flow:    { on: false, tap: 0, gain: 0.5, pan: 0, dur: 0.09, noise: 0.15 },
       events:  { on: false, gain: 0.6, pan: 0, wave: 1, decay: 0.35, highs: 0.6 },
       raster:  { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
       sstv:    { on: false, tap: 0, gain: 0.5, pan: 0, lineHz: 12, dev: 1, syncLev: 0.5 },
-      filter:  { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6 }
+      filter:  { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0 }
     };
     this.spectraFreqs = new Float32Array(NPART); // filled by cfg
     for (let i = 0; i < NPART; i++) this.spectraFreqs[i] = 55 * Math.pow(2, i * 6 / NPART);
@@ -83,6 +83,8 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.fTarget = new Float32Array(NBAND);
     this.fSweep = 0;
     this.rebuildFilterCoefs();
+    // scratch (x,y) for the scan-path read (zero-alloc : written per partial)
+    this.sxy = new Float32Array(2);
     // ── limiter ──
     this.limEnv = 1;
     // ── metering (sent back ~10Hz) ──
@@ -161,6 +163,27 @@ class SoniProcessor extends AudioWorkletProcessor {
     return sp + (sc - sp) * m;
   }
 
+  // Breathing rubato : warp a linear sweep phase (0..1) so the read slows at the
+  // edges and rushes the middle, WITHOUT changing the cycle period (BPM-sync safe :
+  // warp(0)=0, warp(1)=1). pace 0 = even. Monotonic while pace < 1.
+  warpPace(lin, pace) {
+    if (pace < 0.005) return lin;
+    return lin - pace * Math.sin(lin * TAU) / TAU;
+  }
+
+  // Where a scanning voice's partial samples the frame, by reading PATH. `pos` is
+  // the (paced) sweep phase 0..1; `pp` is the partial fraction 0 (low pitch) → 1
+  // (high). Writes into this.sxy. 0 horizontal (a column swept in x — the classic
+  // vOICe read), 1 vertical (a row swept in y), 2 radial (a ray from centre that
+  // rotates : pitch = radius), 3 spiral (the ray winds outward AND rotates).
+  scanXY(path, pos, pp) {
+    const s = this.sxy;
+    if (path === 1) { s[0] = pp; s[1] = pos; }
+    else if (path === 2) { const a = pos * TAU, r = pp * 0.48; s[0] = 0.5 + r * Math.cos(a); s[1] = 0.5 + r * Math.sin(a); }
+    else if (path === 3) { const a = pos * TAU + pp * TAU * 2.5, r = pp * 0.48; s[0] = 0.5 + r * Math.cos(a); s[1] = 0.5 + r * Math.sin(a); }
+    else { s[0] = pos; s[1] = 1 - pp; }
+  }
+
   rebuildFilterCoefs() {
     for (let i = 0; i < NBAND; i++) {
       this.fCoef[i] = 2 * Math.sin(Math.PI * Math.min(this.fFreqs[i], sampleRate * 0.45) / sampleRate);
@@ -201,11 +224,13 @@ class SoniProcessor extends AudioWorkletProcessor {
       } else {
         this.sweepPos = sp.x;
       }
-      // column read : row i (bottom = low pitch) → target amp
-      const cx = this.sweepPos;
+      // reading path : each partial samples along the chosen trajectory (breathing
+      // pace warps the sweep phase). pp 0 = low pitch … 1 = high (image top).
+      const pos = sp.sweepOn ? this.warpPace(this.sweepPos, sp.pace || 0) : this.sweepPos;
+      const path = sp.path | 0;
       for (let i = 0; i < NPART; i++) {
-        const y = 1 - (i + 0.5) / NPART; // image top = high pitch
-        const v = this.terrain(tap, cx, y);
+        this.scanXY(path, pos, (i + 0.5) / NPART);
+        const v = this.terrain(tap, this.sxy[0], this.sxy[1]);
         this.sTarget[i] = Math.pow(v, sp.gamma);
       }
       // synthesize : slewed additive bank (slew kills zipper + clicks)
@@ -459,11 +484,13 @@ class SoniProcessor extends AudioWorkletProcessor {
       const input = _inputs[0] && _inputs[0][0] ? _inputs[0][0] : null;
       if (fi.sweepOn) this.fSweep = (this.fSweep + fi.sweepHz * n * dt) % 1;
       else this.fSweep = fi.x;
-      // band gains from the image column : row → band (top = high), slewed
-      const cx = this.fSweep;
+      // band gains along the reading path (breathing pace warps the sweep phase),
+      // pp 0 = low band … 1 = high, slewed.
+      const fpos = fi.sweepOn ? this.warpPace(this.fSweep, fi.pace || 0) : this.fSweep;
+      const fpath = fi.path | 0;
       for (let i = 0; i < NBAND; i++) {
-        const y = 1 - (i + 0.5) / NBAND;
-        this.fTarget[i] = Math.pow(this.terrain(tap, cx, y), fi.gamma);
+        this.scanXY(fpath, fpos, (i + 0.5) / NBAND);
+        this.fTarget[i] = Math.pow(this.terrain(tap, this.sxy[0], this.sxy[1]), fi.gamma);
       }
       const slew = 1 - Math.exp(-n * dt / 0.03);
       const q1 = 1.5 - fi.q * 1.35; // damping : wide/windy → narrow/flute

@@ -14,6 +14,29 @@ import { modTargetKey, useStore } from '../store'
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
+const TAU = 6.283185307179586
+/** Breathing rubato warp of a linear sweep phase (mirror of the worklet's warpPace). */
+function warpPace(lin: number, pace: number): number {
+  return pace < 0.005 ? lin : lin - (pace * Math.sin(lin * TAU)) / TAU
+}
+/** Paint the reading path of a scanning voice at (paced) sweep phase `pos`. */
+function drawScanPath(g: CanvasRenderingContext2D, path: number, pos: number, w: number, h: number): void {
+  g.beginPath()
+  if (path === 1) { g.moveTo(0, pos * h); g.lineTo(w, pos * h) } // vertical row
+  else if (path === 2) { // radial ray from centre
+    const a = pos * TAU
+    g.moveTo(0.5 * w, 0.5 * h)
+    g.lineTo((0.5 + 0.48 * Math.cos(a)) * w, (0.5 + 0.48 * Math.sin(a)) * h)
+  } else if (path === 3) { // spiral arm
+    for (let k = 0; k <= 48; k++) {
+      const pp = k / 48, a = pos * TAU + pp * TAU * 2.5, r = pp * 0.48
+      const px = (0.5 + r * Math.cos(a)) * w, py = (0.5 + r * Math.sin(a)) * h
+      if (k === 0) g.moveTo(px, py); else g.lineTo(px, py)
+    }
+  } else { g.moveTo(pos * w, 0); g.lineTo(pos * w, h) } // horizontal column
+  g.stroke()
+}
+
 function Row({ label, children }: { label: string; children: ReactNode }): JSX.Element {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
@@ -261,27 +284,23 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             g.stroke()
           }
         }
-        // Spectra sweep line (mirror of the worklet's sweep : same rate)
+        // Spectra reading path (mirror of the worklet : same rate, pace + path)
         if (st.on && st.spectra.on) {
           if (st.spectra.sweepOn) sweepPhase = (sweepPhase + st.spectra.sweepHz * dt) % 1
           else sweepPhase = lp.spectraX ?? st.spectra.x
+          const pos = st.spectra.sweepOn ? warpPace(sweepPhase, st.spectra.pace ?? 0) : sweepPhase
           g.strokeStyle = 'rgba(255,255,255,0.85)'
           g.lineWidth = 1.5
-          g.beginPath()
-          g.moveTo(sweepPhase * w, 0)
-          g.lineTo(sweepPhase * w, h)
-          g.stroke()
+          drawScanPath(g, st.spectra.path ?? 0, pos, w, h)
         }
-        // Filter column (its own hue, mirrors the filter sweep)
+        // Filter reading path (its own hue, mirrors the filter sweep)
         if (st.on && st.filter.on) {
           if (st.filter.sweepOn) fSweep = (fSweep + st.filter.sweepHz * dt) % 1
           else fSweep = lp.filterX ?? st.filter.x
+          const pos = st.filter.sweepOn ? warpPace(fSweep, st.filter.pace ?? 0) : fSweep
           g.strokeStyle = 'rgba(120,200,255,0.8)'
           g.lineWidth = 1.5
-          g.beginPath()
-          g.moveTo(fSweep * w, 0)
-          g.lineTo(fSweep * w, h)
-          g.stroke()
+          drawScanPath(g, st.filter.path ?? 0, pos, w, h)
         }
         // Raster probe rect
         if (st.on && st.raster.on) {
@@ -520,6 +539,22 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             </Row>
             {!cfg.spectra.sync && cfg.spectra.sweepOn && (
               <Slider label="rate" value={cfg.spectra.sweepHz} min={0.02} max={4} neutral={0.25} fmt={(v) => v.toFixed(2) + 'Hz'} onChange={(v) => pv('spectra', { sweepHz: v })} />
+            )}
+            <Row label="path">
+              <select
+                className="input select-compact min-w-0 flex-1 text-[10px]"
+                value={cfg.spectra.path ?? 0}
+                onChange={(e) => pv('spectra', { path: Number(e.target.value) })}
+                title="Reading path : how the scan traverses the frame (Aural Mirror) — a column swept across, a row swept down, a rotating ray, or a spiral"
+              >
+                <option value={0}>horizontal →</option>
+                <option value={1}>vertical ↓</option>
+                <option value={2}>radial ⟳</option>
+                <option value={3}>spiral</option>
+              </select>
+            </Row>
+            {cfg.spectra.sweepOn && (
+              <Slider label="breathe" value={cfg.spectra.pace ?? 0} min={0} max={0.95} neutral={0} onChange={(v) => pv('spectra', { pace: v })} />
             )}
             <Slider label="contrast" value={cfg.spectra.gamma} min={0.5} max={4} neutral={1.8} onChange={(v) => pv('spectra', { gamma: v })} />
             <Slider label="breath" value={cfg.spectra.breath ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('spectra', { breath: v })} />
@@ -794,6 +829,22 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 />
               )}
             </Row>
+            <Row label="path">
+              <select
+                className="input select-compact min-w-0 flex-1 text-[10px]"
+                value={cfg.filter.path ?? 0}
+                onChange={(e) => pv('filter', { path: Number(e.target.value) })}
+                title="Reading path : how the band-scan traverses the frame (Aural Mirror)"
+              >
+                <option value={0}>horizontal →</option>
+                <option value={1}>vertical ↓</option>
+                <option value={2}>radial ⟳</option>
+                <option value={3}>spiral</option>
+              </select>
+            </Row>
+            {cfg.filter.sweepOn && (
+              <Slider label="breathe" value={cfg.filter.pace ?? 0} min={0} max={0.95} neutral={0} onChange={(v) => pv('filter', { pace: v })} />
+            )}
             <Slider label="resonance" value={cfg.filter.q} min={0} max={1} neutral={0.5} onChange={(v) => pv('filter', { q: v })} />
             <Slider label="noise" value={cfg.filter.noise} min={0} max={1} neutral={0.5} onChange={(v) => pv('filter', { noise: v })} />
             <Slider label="contrast" value={cfg.filter.gamma} min={0.5} max={4} neutral={1.6} onChange={(v) => pv('filter', { gamma: v })} />

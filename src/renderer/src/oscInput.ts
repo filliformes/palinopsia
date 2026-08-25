@@ -508,6 +508,8 @@ function route(address: string, args: Args): void {
           else if (ctl === 'x') probe('spectraX')
           else if (ctl === 'contrast') V('spectra', { gamma: 0.5 + clamp01(n) * 3.5 })
           else if (ctl === 'breath') V('spectra', { breath: clamp01(n) })
+          else if (ctl === 'path') V('spectra', { path: Math.max(0, Math.min(3, Math.round(n <= 1 ? n * 3 : n))) })
+          else if (ctl === 'breathe' || ctl === 'pace') V('spectra', { pace: clamp01(n) * 0.95 })
           else if (ctl === 'quantize') V('spectra', { quantize: n >= 0.5 })
           return
         case 'orbit':
@@ -577,6 +579,8 @@ function route(address: string, args: Args): void {
           else if (ctl === 'noise') V('filter', { noise: clamp01(n) })
           else if (ctl === 'contrast') V('filter', { gamma: 0.5 + clamp01(n) * 3.5 })
           else if (ctl === 'linein') V('filter', { lineIn: n >= 0.5 })
+          else if (ctl === 'path') V('filter', { path: Math.max(0, Math.min(3, Math.round(n <= 1 ? n * 3 : n))) })
+          else if (ctl === 'breathe' || ctl === 'pace') V('filter', { pace: clamp01(n) * 0.95 })
           else if (ctl === 'quantize') V('filter', { quantize: n >= 0.5 })
           return
       }
@@ -805,6 +809,8 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/spectra/gain', 0, 1, so.spectra.gain, 'Spectra gain')
     add('/opsia/sonify/spectra/x', 0, 1, norm('spectraX', so.spectra.x), 'Spectra scan column')
     add('/opsia/sonify/spectra/breath', 0, 1, so.spectra.breath ?? 0, 'Spectra sine-noise morph')
+    add('/opsia/sonify/spectra/path', 0, 3, so.spectra.path ?? 0, 'Spectra reading path : 0 horizontal · 1 vertical · 2 radial · 3 spiral')
+    add('/opsia/sonify/spectra/breathe', 0, 1, (so.spectra.pace ?? 0) / 0.95, 'Spectra breathing sweep pace')
     add('/opsia/sonify/orbit/on', 0, 1, so.orbit.on ? 1 : 0, 'Orbit voice on')
     add('/opsia/sonify/orbit/gain', 0, 1, so.orbit.gain, 'Orbit gain')
     add('/opsia/sonify/orbit/pitch', 0, 1, norm('orbitPitch', so.orbit.quantize ? so.orbit.note : 45), 'Orbit pitch (note span)')
@@ -828,6 +834,8 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/filter/on', 0, 1, so.filter.on ? 1 : 0, 'Filter voice on')
     add('/opsia/sonify/filter/gain', 0, 1, so.filter.gain, 'Filter gain')
     add('/opsia/sonify/filter/x', 0, 1, norm('filterX', so.filter.x), 'Filter scan column')
+    add('/opsia/sonify/filter/path', 0, 3, so.filter.path ?? 0, 'Filter reading path : 0 horizontal · 1 vertical · 2 radial · 3 spiral')
+    add('/opsia/sonify/filter/breathe', 0, 1, (so.filter.pace ?? 0) / 0.95, 'Filter breathing sweep pace')
   }
   add('/opsia/bpm', 20, 800, st.composition.bpm, 'Tempo (raw BPM)')
   // Audio features Pandore PUSHES (consumed by `audio` modulators) : never echoed.
