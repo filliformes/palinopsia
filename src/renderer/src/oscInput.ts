@@ -532,6 +532,7 @@ function route(address: string, args: Args): void {
           else if (ctl === 'density') V('flow', { density: clamp01(n) })
           else if (ctl === 'grain') V('flow', { dur: 0.02 + clamp01(n) * 0.38 })
           else if (ctl === 'breath') V('flow', { noise: clamp01(n) })
+          else if (ctl === 'colour' || ctl === 'color') V('flow', { colour: clamp01(n) })
           else if (ctl === 'quantize') V('flow', { quantize: n >= 0.5 })
           return
         case 'events':
@@ -819,6 +820,7 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/orbit/r', 0, 1, norm('orbitR', so.orbit.rx), 'Orbit radius')
     add('/opsia/sonify/flow/on', 0, 1, so.flow.on ? 1 : 0, 'Flow voice on')
     add('/opsia/sonify/flow/gain', 0, 1, so.flow.gain, 'Flow gain')
+    add('/opsia/sonify/flow/colour', 0, 1, so.flow.colour ?? 0, 'Flow colour → grain timbre')
     add('/opsia/sonify/events/on', 0, 1, so.events.on ? 1 : 0, 'Events voice on')
     add('/opsia/sonify/events/gain', 0, 1, so.events.gain, 'Events gain')
     add('/opsia/sonify/events/mode', 0, 2, so.events.mode === 'blend' ? 2 : so.events.mode === 'motion' ? 1 : 0, 'Events trigger : 0 spatial · 1 motion · 2 blend')

@@ -47,10 +47,10 @@ function Row({ label, children }: { label: string; children: ReactNode }): JSX.E
 }
 
 function Slider({
-  label, value, min, max, step = 0.01, neutral, fmt, onChange
+  label, value, min, max, step = 0.01, neutral, fmt, onChange, title
 }: {
   label: string; value: number; min: number; max: number; step?: number
-  neutral?: number; fmt?: (v: number) => string; onChange: (v: number) => void
+  neutral?: number; fmt?: (v: number) => string; onChange: (v: number) => void; title?: string
 }): JSX.Element {
   return (
     <Row label={label}>
@@ -59,7 +59,7 @@ function Slider({
         onChange={(e) => onChange(Number(e.target.value))}
         onDoubleClick={() => neutral !== undefined && onChange(neutral)}
         className="min-w-0 flex-1 accent-accent"
-        title={`${label} ${fmt ? fmt(value) : value.toFixed(2)}`}
+        title={title ?? `${label} ${fmt ? fmt(value) : value.toFixed(2)}`}
       />
       <span className="w-12 shrink-0 text-right font-mono text-[9px] text-muted">
         {fmt ? fmt(value) : value.toFixed(2)}
@@ -639,6 +639,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             <Slider label="density" value={cfg.flow.density} min={0} max={1} neutral={0.5} onChange={(v) => pv('flow', { density: v })} />
             <Slider label="grain" value={cfg.flow.dur} min={0.02} max={0.4} neutral={0.09} fmt={(v) => Math.round(v * 1000) + 'ms'} onChange={(v) => pv('flow', { dur: v })} />
             <Slider label="breath" value={cfg.flow.noise} min={0} max={1} neutral={0.15} onChange={(v) => pv('flow', { noise: v })} />
+            <Slider label="colour" value={cfg.flow.colour ?? 0} min={0} max={1} neutral={0.6} onChange={(v) => pv('flow', { colour: v })} title="Colour → grain timbre : saturation brightens each grain, hue tints it (warm = rounder body, cool = shimmer)" />
             <Row label="range">
               <select className="input select-compact text-[10px]" value={cfg.flow.loOct} onChange={(e) => pv('flow', { loOct: Math.min(Number(e.target.value), cfg.flow.hiOct - 1) })} title="Lowest octave">
                 {[1, 2, 3, 4].map((o) => <option key={o} value={o}>oct {o}</option>)}

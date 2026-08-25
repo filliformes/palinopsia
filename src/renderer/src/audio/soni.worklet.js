@@ -34,7 +34,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       master: 0.8,
       spectra: { on: false, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, x: 0.5, gamma: 1.6, breath: 0, path: 0, pace: 0 },
       orbit:   { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, ratio: 1, cx: 0.5, cy: 0.5, rx: 0.25, ry: 0.25, drive: 1.2, smooth: 0.6 },
-      flow:    { on: false, tap: 0, gain: 0.5, pan: 0, dur: 0.09, noise: 0.15 },
+      flow:    { on: false, tap: 0, gain: 0.5, pan: 0, dur: 0.09, noise: 0.15, colour: 0 },
       events:  { on: false, gain: 0.6, pan: 0, wave: 1, decay: 0.35, highs: 0.6 },
       raster:  { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
       sstv:    { on: false, tap: 0, gain: 0.5, pan: 0, lineHz: 12, dev: 1, syncLev: 0.5 },
@@ -56,7 +56,7 @@ class SoniProcessor extends AudioWorkletProcessor {
     // ── Flow grain pool ──
     this.grains = [];
     for (let g = 0; g < NGRAIN; g++) {
-      this.grains.push({ on: false, t0: 0, phase: 0, inc: 0, amp: 0, pan: 0.5, age: 0, dur: 0.1, noise: 0 });
+      this.grains.push({ on: false, t0: 0, phase: 0, inc: 0, amp: 0, pan: 0.5, age: 0, dur: 0.1, noise: 0, bright: 0, warm: 0, phase2: 0, inc2: 0 });
     }
     this.pending = []; // scheduled grain events (small, replaced per flow msg)
     // ── Events poly pool (plucked notes from edges / motion) ──
@@ -124,13 +124,13 @@ class SoniProcessor extends AudioWorkletProcessor {
       return;
     }
     if (m.t === 'flow') {
-      // events: flat Float32Array [tOffset, freq, amp, pan] × n (already
-      // dithered + quantized by the main thread)
+      // events: flat Float32Array [tOffset, freq, amp, pan, bright, warm] × n
+      // (already dithered + quantized by the main thread; bright/warm = colour)
       const ev = m.events;
       this.pending.length = 0;
       const base = currentTime;
-      for (let i = 0; i + 3 < ev.length; i += 4) {
-        this.pending.push({ t0: base + ev[i], freq: ev[i + 1], amp: ev[i + 2], pan: ev[i + 3] });
+      for (let i = 0; i + 5 < ev.length; i += 6) {
+        this.pending.push({ t0: base + ev[i], freq: ev[i + 1], amp: ev[i + 2], pan: ev[i + 3], bright: ev[i + 4], warm: ev[i + 5] });
       }
       return;
     }
@@ -314,6 +314,12 @@ class SoniProcessor extends AudioWorkletProcessor {
               gr.amp = ev.amp; gr.pan = ev.pan;
               gr.dur = fl.dur * (0.7 + Math.random() * 0.6);
               gr.noise = fl.noise;
+              // colour → timbre : bright = waveshape drive, warm picks the tint
+              // partial (sub-octave body when warm, octave-up shimmer when cool).
+              gr.bright = ev.bright || 0;
+              gr.warm = ev.warm || 0;
+              gr.phase2 = Math.random();
+              gr.inc2 = gr.inc * (gr.warm >= 0 ? 0.5 : 2);
               break;
             }
           }
@@ -321,20 +327,27 @@ class SoniProcessor extends AudioWorkletProcessor {
         }
       }
       const g0 = fl.gain * 0.5;
+      const colAmt = fl.colour || 0;
       for (let g = 0; g < NGRAIN; g++) {
         const gr = this.grains[g];
         if (!gr.on) continue;
         const gL = g0 * (1 - gr.pan);
         const gR = g0 * gr.pan;
+        // colour → timbre (0 when colour off ⇒ identical to the plain grain).
+        const eb = gr.bright * colAmt; // waveshape drive : vivid colour = edgier
+        const tintAmt = Math.abs(gr.warm) * colAmt * 0.5; // sub-oct / oct-up blend
         for (let s = 0; s < n; s++) {
           gr.age += dt;
           if (gr.age >= gr.dur) { gr.on = false; break; }
           // raised-cosine envelope
           const e = 0.5 - 0.5 * Math.cos(6.283185307179586 * Math.min(1, gr.age / gr.dur));
+          let s0 = Math.sin(gr.phase * 6.283185307179586);
+          if (eb > 0.001) s0 = s0 * (1 - eb) + Math.tanh(3.5 * s0) * eb * 0.85; // brighten
+          if (tintAmt > 0.001) { s0 = s0 * (1 - tintAmt) + Math.sin(gr.phase2 * 6.283185307179586) * tintAmt; gr.phase2 += gr.inc2; }
           // sine + a breath of noise
           this.noiseState = (this.noiseState * 1103515245 + 12345) & 0x7fffffff;
           const nz = (this.noiseState / 0x40000000 - 1) * gr.noise;
-          const v = (Math.sin(gr.phase * 6.283185307179586) * (1 - gr.noise) + nz) * e * gr.amp;
+          const v = (s0 * (1 - gr.noise) + nz) * e * gr.amp;
           gr.phase += gr.inc;
           L[s] += v * gL; R[s] += v * gR;
         }

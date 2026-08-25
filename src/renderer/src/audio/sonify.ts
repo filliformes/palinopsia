@@ -62,6 +62,9 @@ export interface SoniConfig {
   flow: {
     on: boolean; tap: number; gain: number; pan: number
     sense: number; density: number; dur: number; noise: number
+    // colour → grain timbre : saturation brightens, hue tints (warm = sub-octave
+    // body, cool = octave-up shimmer). 0 = the plain sine↔noise grain.
+    colour: number
     loOct: number; hiOct: number; quantize: boolean
   }
   // Events (Aural-Mirror register) : edges / motion → discrete plucked notes.
@@ -103,7 +106,7 @@ export function defaultSoniConfig(): SoniConfig {
     scale: 'minor',
     spectra: { on: true, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, sync: false, x: 0.5, path: 0, pace: 0, gamma: 1.8, breath: 0, loOct: 2, hiOct: 7, quantize: true },
     orbit: { on: false, tap: 0, gain: 0.5, pan: 0, note: 45, freq: 110, quantize: true, ratio: 1, cx: 0.5, cy: 0.5, rx: 0.25, ry: 0.25, drive: 1, smooth: 0.5 },
-    flow: { on: false, tap: 0, gain: 0.6, pan: 0, sense: 0.4, density: 0.5, dur: 0.09, noise: 0.15, loOct: 3, hiOct: 6, quantize: true },
+    flow: { on: false, tap: 0, gain: 0.6, pan: 0, sense: 0.4, density: 0.5, dur: 0.09, noise: 0.15, colour: 0.6, loOct: 3, hiOct: 6, quantize: true },
     events: { on: false, tap: 0, gain: 0.6, pan: 0, mode: 'blend', sense: 0.5, density: 0.4, decay: 0.35, highs: 0.6, wave: 1, loOct: 3, hiOct: 6, quantize: true },
     raster: { on: false, tap: 0, gain: 0.4, pan: 0, note: 45, freq: 110, quantize: true, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
     sstv: { on: false, tap: 0, gain: 0.4, pan: 0, lineHz: 12, sync: false, dev: 1, syncLev: 0.5 },
@@ -315,7 +318,7 @@ class SonifyEngine {
         },
         flow: {
           on: cfg.flow.on, tap: cfg.flow.tap, gain: cfg.flow.gain, pan: cfg.flow.pan,
-          dur: cfg.flow.dur, noise: cfg.flow.noise
+          dur: cfg.flow.dur, noise: cfg.flow.noise, colour: cfg.flow.colour ?? 0
         },
         events: {
           on: cfg.events.on, gain: cfg.events.gain, pan: cfg.events.pan,
@@ -562,7 +565,7 @@ class SonifyEngine {
     const fl = this.cfg.flow
     const thresh = 6 + (1 - fl.sense) * 30 // mean |diff| per block, 0..255
     const maxEv = Math.max(2, Math.round(4 + fl.density * 20))
-    type V = { x: number; y: number; mag: number }
+    type V = { x: number; y: number; mag: number; bx: number; by: number }
     const vecs: V[] = []
     for (let by = 0; by < FLOW_BLOCKS; by++) {
       for (let bx = 0; bx < FLOW_BLOCKS; bx++) {
@@ -576,7 +579,7 @@ class SonifyEngine {
         }
         diff /= (FLOW_BLOCK * FLOW_BLOCK) / 4
         if (diff > thresh) {
-          vecs.push({ x: (bx + 0.5) / FLOW_BLOCKS, y: (by + 0.5) / FLOW_BLOCKS, mag: Math.min(1, diff / 80) })
+          vecs.push({ x: (bx + 0.5) / FLOW_BLOCKS, y: (by + 0.5) / FLOW_BLOCKS, mag: Math.min(1, diff / 80), bx, by })
         }
       }
     }
@@ -589,8 +592,9 @@ class SonifyEngine {
     chosen.forEach((v, i) => { dots[i * 3] = v.x; dots[i * 3 + 1] = v.y; dots[i * 3 + 2] = v.mag })
     this.flowDots = dots
     if (!chosen.length || !this.node) return
-    // events : [tOffset, freq, amp, pan] — onset dithered across the frame gap
-    const ev = new Float32Array(chosen.length * 4)
+    // events : [tOffset, freq, amp, pan, bright, warm] — onset dithered across
+    // the frame gap. bright/warm come from the block's average COLOUR (see below).
+    const ev = new Float32Array(chosen.length * 6)
     const lo = fl.loOct, hi = fl.hiOct
     for (let i = 0; i < chosen.length; i++) {
       const v = chosen[i]
@@ -602,12 +606,45 @@ class SonifyEngine {
         const f0 = noteFreq(12 * (lo + 1)), f1 = noteFreq(12 * (hi + 1))
         freq = f0 * Math.pow(f1 / f0, 1 - v.y)
       }
-      ev[i * 4] = Math.random() * frameDt // Pelletier's onset dither
-      ev[i * 4 + 1] = freq
-      ev[i * 4 + 2] = 0.25 + v.mag * 0.75
-      ev[i * 4 + 3] = v.x // 0 = left … 1 = right
+      const col = this.blockColour(v.bx, v.by) // { bright, warm } from avg RGB
+      ev[i * 6] = Math.random() * frameDt // Pelletier's onset dither
+      ev[i * 6 + 1] = freq
+      ev[i * 6 + 2] = 0.25 + v.mag * 0.75
+      ev[i * 6 + 3] = v.x // 0 = left … 1 = right
+      ev[i * 6 + 4] = col.bright
+      ev[i * 6 + 5] = col.warm
     }
     this.node.port.postMessage({ t: 'flow', events: ev }, [ev.buffer])
+  }
+
+  /** Average colour of one flow block (from the raw RGBA readback, y-flipped to
+   *  match the luma grid) → grain timbre : `bright` (saturation × value, brightens
+   *  the grain) and `warm` (−1 cool … +1 warm, from hue, scaled by saturation). */
+  private blockColour(bx: number, by: number): { bright: number; warm: number } {
+    const ox = bx * FLOW_BLOCK, oy = by * FLOW_BLOCK
+    let R = 0, G = 0, B = 0, cnt = 0
+    for (let yy = 0; yy < FLOW_BLOCK; yy += 2) {
+      const ry = GRID - 1 - (oy + yy) // rgba is bottom-up; luma row 0 = top
+      const base = ry * GRID * 4
+      for (let xx = 0; xx < FLOW_BLOCK; xx += 2) {
+        const i = base + (ox + xx) * 4
+        R += this.rgba[i]; G += this.rgba[i + 1]; B += this.rgba[i + 2]; cnt++
+      }
+    }
+    if (cnt === 0) return { bright: 0, warm: 0 }
+    R /= cnt; G /= cnt; B /= cnt
+    const mx = Math.max(R, G, B), mn = Math.min(R, G, B), d = mx - mn
+    const sat = mx <= 0 ? 0 : d / mx
+    const val = mx / 255
+    let hue = 0
+    if (d > 0) {
+      if (mx === R) hue = ((G - B) / d) % 6
+      else if (mx === G) hue = (B - R) / d + 2
+      else hue = (R - G) / d + 4
+      hue /= 6
+      if (hue < 0) hue += 1
+    }
+    return { bright: sat * (0.4 + 0.6 * val), warm: Math.cos(hue * 6.283185307179586) * sat }
   }
 }
 
