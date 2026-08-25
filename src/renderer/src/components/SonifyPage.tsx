@@ -214,6 +214,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   const patch = (p: Partial<SoniConfig>): void => set({ ...cfg, ...p })
   const pv = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord'>(k: K, p: Partial<SoniConfig[K]>): void =>
     set({ ...cfg, [k]: { ...cfg[k], ...p } })
+  const pfx = (p: Partial<SoniConfig['fx']>): void => set({ ...cfg, fx: { ...cfg.fx, ...p } })
 
   // Live mirror of the composite (same pattern as the Output page).
   useEffect(() => {
@@ -891,6 +892,53 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             <Slider label="spread" value={cfg.chord.spread} min={0} max={1} neutral={0.6} onChange={(v) => pv('chord', { spread: v })} title="Stereo fan across the bank (low notes ↔ high notes)" />
             <Slider label="gain" value={cfg.chord.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('chord', { gain: v })} />
             <Slider label="pan" value={cfg.chord.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('chord', { pan: v })} />
+          </VoiceShell>
+
+          <VoiceShell
+            title="Reverb / Delay" on={cfg.fx.send > 0.0001}
+            hint="a shared FX tail — the whole mix sends into an analog delay → Quartz/Prism reverb"
+            onToggle={() => pfx({ send: cfg.fx.send > 0.0001 ? 0 : 0.35 })}
+          >
+            <Slider label="send" value={cfg.fx.send} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ send: v })} title="How much of the sonify mix feeds the shared reverb / delay tail" />
+            <div className="mt-1 font-mono text-[8px] uppercase tracking-wide text-muted/70">delay (BBD / analog)</div>
+            <Row label="mode">
+              <select className="input select-compact min-w-0 flex-1 text-[10px]" value={cfg.fx.dlyMode} onChange={(e) => pfx({ dlyMode: Number(e.target.value) })} title="Delay routing">
+                <option value={0}>mono</option>
+                <option value={1}>stereo</option>
+                <option value={2}>ping-pong</option>
+              </select>
+            </Row>
+            <Slider label="time" value={cfg.fx.dlyTime} min={0.02} max={2} neutral={0.3} fmt={(v) => Math.round(v * 1000) + 'ms'} onChange={(v) => pfx({ dlyTime: v })} title="Delay time (glides tape-style when moved)" />
+            <Slider label="feedback" value={cfg.fx.dlyFb} min={0} max={0.95} neutral={0.35} onChange={(v) => pfx({ dlyFb: v })} title="Echo regeneration (companded, self-limiting)" />
+            <Slider label="tone" value={cfg.fx.dlyTone} min={0} max={1} neutral={0.5} onChange={(v) => pfx({ dlyTone: v })} title="BBD darkness : low = dark analog repeats, high = bright" />
+            <Slider label="delay mix" value={cfg.fx.dlyMix} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ dlyMix: v })} title="Echo level in the tail" />
+            <div className="mt-1 font-mono text-[8px] uppercase tracking-wide text-muted/70">reverb (Quartz / Prism)</div>
+            <Row label="mode">
+              <button onClick={() => pfx({ rvMode: 0 })} className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.fx.rvMode === 0 ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`} title="Quartz : dual-band damped pad-verb">Quartz</button>
+              <button onClick={() => pfx({ rvMode: 1 })} className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.fx.rvMode === 1 ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`} title="Prism : per-band frequency-dependent decay">Prism</button>
+              <button onClick={() => pfx({ rvFreeze: !cfg.fx.rvFreeze })} className={`ml-auto rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.fx.rvFreeze ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2' : 'bg-panel3/60 text-muted'}`} title="Infinite freeze (hold the tail)">❄ freeze</button>
+            </Row>
+            <Slider label="size" value={cfg.fx.rvSize} min={0} max={1} neutral={0.6} onChange={(v) => pfx({ rvSize: v })} />
+            <Slider label="decay" value={cfg.fx.rvDecay} min={0} max={1} neutral={0.6} fmt={(v) => (0.25 + v * v * 11.75).toFixed(1) + 's'} onChange={(v) => pfx({ rvDecay: v })} title="RT60 (0.25–12 s)" />
+            <Slider label="damp" value={cfg.fx.rvDamp} min={0} max={1} neutral={0.3} onChange={(v) => pfx({ rvDamp: v })} title="HF absorption (darker tail)" />
+            <Slider label="predelay" value={cfg.fx.rvPre} min={0} max={200} neutral={20} fmt={(v) => Math.round(v) + 'ms'} onChange={(v) => pfx({ rvPre: v })} />
+            <Slider label="shimmer" value={cfg.fx.rvMod} min={0} max={40} neutral={6} fmt={(v) => v.toFixed(0)} onChange={(v) => pfx({ rvMod: v })} title="Tail modulation depth (chorusing)" />
+            <Slider label="mod rate" value={cfg.fx.rvModRate} min={0.01} max={8} neutral={0.5} fmt={(v) => v.toFixed(2) + 'Hz'} onChange={(v) => pfx({ rvModRate: v })} />
+            <Slider label="width" value={cfg.fx.rvWidth} min={0} max={1} neutral={1} onChange={(v) => pfx({ rvWidth: v })} title="Stereo width (0 mono … 1 wide)" />
+            <Slider label="low-cut" value={cfg.fx.rvLocut} min={20} max={2000} neutral={220} fmt={(v) => Math.round(v) + 'Hz'} onChange={(v) => pfx({ rvLocut: v })} title="Wet low-cut (keeps the tail airy)" />
+            {cfg.fx.rvMode === 0 ? (
+              <>
+                <Slider label="diffusion" value={cfg.fx.rvDiff} min={0} max={1} neutral={0.85} onChange={(v) => pfx({ rvDiff: v })} title="Quartz : input diffusion (smears transients)" />
+                <Slider label="low damp" value={cfg.fx.rvLowDamp} min={0} max={1} neutral={0.5} onChange={(v) => pfx({ rvLowDamp: v })} title="Quartz : LF damping" />
+              </>
+            ) : (
+              <>
+                <Slider label="crossover" value={cfg.fx.rvCross} min={0} max={1} neutral={0.3} onChange={(v) => pfx({ rvCross: v })} title="Prism : band-split frequency" />
+                <Slider label="low ×" value={cfg.fx.rvLowMult} min={0.05} max={4} neutral={1} fmt={(v) => v.toFixed(2)} onChange={(v) => pfx({ rvLowMult: v })} title="Prism : low-band decay multiplier" />
+                <Slider label="high ×" value={cfg.fx.rvHighMult} min={0.05} max={4} neutral={1} fmt={(v) => v.toFixed(2)} onChange={(v) => pfx({ rvHighMult: v })} title="Prism : high-band decay multiplier" />
+              </>
+            )}
+            <Slider label="reverb mix" value={cfg.fx.rvMix} min={0} max={1} neutral={0.6} onChange={(v) => pfx({ rvMix: v })} title="Reverb level in the tail" />
           </VoiceShell>
 
           <p className="text-[9px] leading-tight text-muted">

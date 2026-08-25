@@ -106,6 +106,18 @@ export interface SoniConfig {
     attack: number; release: number // swell / fade seconds
     tone: number // 0 sine … 1 brighter (soft-clip harmonics)
   }
+  // Shared FX tail (send/return) : the whole mix feeds an analog delay → the
+  // Quartz/Prism FDN reverb, ported from Essaim/Res. `send` scales the input.
+  fx: {
+    send: number
+    // BBD delay
+    dlyMix: number; dlyTime: number; dlyFb: number; dlyTone: number; dlyMode: number
+    // reverb (shared)
+    rvMode: number; rvMix: number; rvSize: number; rvDecay: number; rvDamp: number
+    rvPre: number; rvMod: number; rvModRate: number; rvWidth: number; rvLocut: number; rvFreeze: boolean
+    rvDiff: number; rvLowDamp: number // Quartz
+    rvCross: number; rvLowMult: number; rvHighMult: number // Prism
+  }
   taps: [SoniTap, SoniTap]
 }
 
@@ -124,6 +136,13 @@ export function defaultSoniConfig(): SoniConfig {
     sstv: { on: false, tap: 0, gain: 0.4, pan: 0, lineHz: 12, sync: false, dev: 1, syncLev: 0.5 },
     filter: { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, lineIn: false, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0, loOct: 1, hiOct: 8, quantize: false },
     chord: { on: false, tap: 0, gain: 0.6, pan: 0, voices: 7, loOct: 2, hiOct: 6, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3 },
+    fx: {
+      send: 0,
+      dlyMix: 0.35, dlyTime: 0.3, dlyFb: 0.35, dlyTone: 0.5, dlyMode: 1,
+      rvMode: 0, rvMix: 0.6, rvSize: 0.6, rvDecay: 0.6, rvDamp: 0.3, rvPre: 20, rvMod: 6, rvModRate: 0.5,
+      rvWidth: 1, rvLocut: 220, rvFreeze: false, rvDiff: 0.85, rvLowDamp: 0.5,
+      rvCross: 0.3, rvLowMult: 1, rvHighMult: 1
+    },
     taps: [{ kind: 'master', layer: 0 }, { kind: 'layer', layer: 0 }]
   }
 }
@@ -369,7 +388,8 @@ class SonifyEngine {
           on: cfg.chord.on, tap: cfg.chord.tap, gain: cfg.chord.gain, pan: cfg.chord.pan,
           gamma: cfg.chord.gamma, spread: cfg.chord.spread, attack: cfg.chord.attack,
           release: cfg.chord.release, tone: cfg.chord.tone
-        }
+        },
+        fx: { ...cfg.fx }
       },
       spectraFreqs: spectraFreqs(cfg),
       filterFreqs: filterFreqs(cfg),

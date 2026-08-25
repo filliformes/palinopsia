@@ -495,7 +495,7 @@ function route(address: string, args: Args): void {
       }
       const ctl = segs[3]
       if (!ctl) return
-      const V = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord'>(
+      const V = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'fx'>(
         k: K, patch: Partial<SoniConfig[K]>
       ): void => apply({ ...c, [k]: { ...c[k], ...patch } })
       switch (g) {
@@ -594,6 +594,31 @@ function route(address: string, args: Args): void {
           else if (ctl === 'contrast') V('chord', { gamma: 0.5 + clamp01(n) * 3.5 })
           else if (ctl === 'tone') V('chord', { tone: clamp01(n) })
           else if (ctl === 'spread') V('chord', { spread: clamp01(n) })
+          return
+        case 'fx':
+          // shared reverb / delay tail
+          if (ctl === 'send') V('fx', { send: clamp01(n) })
+          else if (ctl === 'delaytime' || ctl === 'dlytime') V('fx', { dlyTime: 0.02 * Math.pow(2 / 0.02, clamp01(n)) })
+          else if (ctl === 'delayfb' || ctl === 'feedback') V('fx', { dlyFb: clamp01(n) * 0.95 })
+          else if (ctl === 'delaytone') V('fx', { dlyTone: clamp01(n) })
+          else if (ctl === 'delaymix') V('fx', { dlyMix: clamp01(n) })
+          else if (ctl === 'delaymode') V('fx', { dlyMode: Math.max(0, Math.min(2, Math.round(n <= 1 ? n * 2 : n))) })
+          else if (ctl === 'reverbmode' || ctl === 'rvmode') V('fx', { rvMode: n >= 0.5 ? 1 : 0 })
+          else if (ctl === 'reverbmix' || ctl === 'rvmix') V('fx', { rvMix: clamp01(n) })
+          else if (ctl === 'size') V('fx', { rvSize: clamp01(n) })
+          else if (ctl === 'decay') V('fx', { rvDecay: clamp01(n) })
+          else if (ctl === 'damp') V('fx', { rvDamp: clamp01(n) })
+          else if (ctl === 'predelay') V('fx', { rvPre: clamp01(n) * 200 })
+          else if (ctl === 'shimmer' || ctl === 'mod') V('fx', { rvMod: clamp01(n) * 40 })
+          else if (ctl === 'modrate') V('fx', { rvModRate: 0.01 + clamp01(n) * 7.99 })
+          else if (ctl === 'width') V('fx', { rvWidth: clamp01(n) })
+          else if (ctl === 'locut') V('fx', { rvLocut: 20 * Math.pow(100, clamp01(n)) })
+          else if (ctl === 'freeze') V('fx', { rvFreeze: n >= 0.5 })
+          else if (ctl === 'diffusion') V('fx', { rvDiff: clamp01(n) })
+          else if (ctl === 'lowdamp') V('fx', { rvLowDamp: clamp01(n) })
+          else if (ctl === 'crossover') V('fx', { rvCross: clamp01(n) })
+          else if (ctl === 'lowmult') V('fx', { rvLowMult: 0.05 + clamp01(n) * 3.95 })
+          else if (ctl === 'highmult') V('fx', { rvHighMult: 0.05 + clamp01(n) * 3.95 })
           return
       }
       return
@@ -839,6 +864,23 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/chord/fade', 0, 1, (so.chord.release - 0.05) / 5.95, 'Chord release (fade)')
     add('/opsia/sonify/chord/tone', 0, 1, so.chord.tone, 'Chord tone (sine → bright)')
     add('/opsia/sonify/chord/spread', 0, 1, so.chord.spread, 'Chord stereo spread')
+    // shared reverb / delay tail
+    add('/opsia/sonify/fx/send', 0, 1, so.fx.send, 'FX tail send (whole mix → delay/reverb)')
+    add('/opsia/sonify/fx/delaytime', 0, 1, Math.log(so.fx.dlyTime / 0.02) / Math.log(2 / 0.02), 'Delay time')
+    add('/opsia/sonify/fx/feedback', 0, 1, so.fx.dlyFb / 0.95, 'Delay feedback')
+    add('/opsia/sonify/fx/delaytone', 0, 1, so.fx.dlyTone, 'Delay BBD tone')
+    add('/opsia/sonify/fx/delaymix', 0, 1, so.fx.dlyMix, 'Delay level in the tail')
+    add('/opsia/sonify/fx/delaymode', 0, 2, so.fx.dlyMode, 'Delay routing : 0 mono · 1 stereo · 2 ping-pong')
+    add('/opsia/sonify/fx/reverbmode', 0, 1, so.fx.rvMode, 'Reverb : 0 Quartz · 1 Prism')
+    add('/opsia/sonify/fx/size', 0, 1, so.fx.rvSize, 'Reverb size')
+    add('/opsia/sonify/fx/decay', 0, 1, so.fx.rvDecay, 'Reverb decay (RT60)')
+    add('/opsia/sonify/fx/damp', 0, 1, so.fx.rvDamp, 'Reverb HF damping')
+    add('/opsia/sonify/fx/predelay', 0, 1, so.fx.rvPre / 200, 'Reverb predelay')
+    add('/opsia/sonify/fx/shimmer', 0, 1, so.fx.rvMod / 40, 'Reverb tail modulation')
+    add('/opsia/sonify/fx/width', 0, 1, so.fx.rvWidth, 'Reverb stereo width')
+    add('/opsia/sonify/fx/locut', 0, 1, Math.log(so.fx.rvLocut / 20) / Math.log(100), 'Reverb wet low-cut')
+    add('/opsia/sonify/fx/freeze', 0, 1, so.fx.rvFreeze ? 1 : 0, 'Reverb infinite freeze')
+    add('/opsia/sonify/fx/reverbmix', 0, 1, so.fx.rvMix, 'Reverb level in the tail')
     add('/opsia/sonify/events/on', 0, 1, so.events.on ? 1 : 0, 'Events voice on')
     add('/opsia/sonify/events/gain', 0, 1, so.events.gain, 'Events gain')
     add('/opsia/sonify/events/mode', 0, 2, so.events.mode === 'blend' ? 2 : so.events.mode === 'motion' ? 1 : 0, 'Events trigger : 0 spatial · 1 motion · 2 blend')

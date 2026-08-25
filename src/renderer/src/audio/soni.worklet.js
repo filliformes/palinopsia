@@ -16,6 +16,152 @@ const NBAND = 48; // Image-Filter band count
 const NCHORD = 16; // Chord bank max voices
 const TAU = 6.283185307179586;
 
+function clampf(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+// ── Shared FX tail : reverb + analog delay, ported from the Essaim / Res
+// instruments (abl.dsp.quartz~ / abl.dsp.prism~ reverb + a BBD delay). ────────
+
+// Dual-mode modulated 8-line Hadamard FDN reverb (Quartz : dual-band damping ·
+// Prism : per-line frequency-dependent decay). Faithful port of res_reverb.c.
+const RV_NL = 8, RV_LMAX = 6144, RV_NAP = 4, RV_APMAX = 1024, RV_PDMAX = 12288;
+const RV_BASELEN = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617];
+const RV_APLEN = [225, 341, 441, 556];
+const RV_APG = [0.72, 0.70, 0.68, 0.66];
+class FDNReverb {
+  constructor(sr) {
+    this.sr = sr > 0 ? sr : 48000;
+    this.mode = 0;
+    this.size = 0.6; this.decay = 0.6; this.damp = 0.3; this.mix = 0.3;
+    this.predelay_ms = 20; this.mod_depth = 6; this.mod_rate = 0.5; this.width = 1;
+    this.diffusion = 0.85; this.low_damp = 0.5;
+    this.crossover = 0.3; this.lowmult = 1; this.highmult = 1;
+    this.freeze = 0; this.locut_hz = 220;
+    this.line = []; for (let i = 0; i < RV_NL; i++) this.line.push(new Float32Array(RV_LMAX));
+    this.linelen = new Int32Array(RV_NL); this.linelen_s = new Float32Array(RV_NL); this.lw = new Int32Array(RV_NL);
+    this.damp_z = new Float32Array(RV_NL); this.lo_z = new Float32Array(RV_NL);
+    this.ls_z = new Float32Array(RV_NL); this.hs_z = new Float32Array(RV_NL);
+    this.gain = new Float32Array(RV_NL); this.glow = new Float32Array(RV_NL); this.ghigh = new Float32Array(RV_NL);
+    this.modph = new Float64Array(RV_NL);
+    this.ap = []; for (let i = 0; i < RV_NAP; i++) this.ap.push(new Float32Array(RV_APMAX));
+    this.apw = new Int32Array(RV_NAP);
+    this.pd = [new Float32Array(RV_PDMAX), new Float32Array(RV_PDMAX)]; this.pdw = 0;
+    this.hp_x = new Float32Array(2); this.hp_y = new Float32Array(2);
+    this.ls_a = 0; this.hs_a = 0;
+    this.d = new Float32Array(RV_NL); this.a = new Float32Array(RV_NL); this.fb = new Float32Array(RV_NL);
+    this.wL = 0; this.wR = 0;
+    for (let i = 0; i < RV_NL; i++) this.modph[i] = i / RV_NL;
+    this.recompute();
+    for (let i = 0; i < RV_NL; i++) this.linelen_s[i] = this.linelen[i];
+  }
+  recompute() {
+    const scale = (0.35 + 1.65 * this.size) * (this.sr / 44100);
+    const rt60 = 0.25 + this.decay * this.decay * 11.75;
+    const lowsplit = clampf(400 * Math.pow(4, this.crossover - 0.3), 60, 3000);
+    const highsplit = clampf(5500 * Math.pow(4, this.crossover - 0.3), 1500, 14000);
+    this.ls_a = 1 - Math.exp(-TAU * lowsplit / this.sr);
+    this.hs_a = 1 - Math.exp(-TAU * highsplit / this.sr);
+    for (let i = 0; i < RV_NL; i++) {
+      let L = (RV_BASELEN[i] * scale) | 0;
+      if (L < 8) L = 8; if (L > RV_LMAX - 64) L = RV_LMAX - 64;
+      this.linelen[i] = L;
+      const t = L / this.sr;
+      if (this.freeze) { this.gain[i] = this.glow[i] = this.ghigh[i] = 1; }
+      else {
+        const lm = this.lowmult > 0.02 ? this.lowmult : 0.02, hm = this.highmult > 0.02 ? this.highmult : 0.02;
+        this.gain[i] = Math.pow(10, -3 * t / rt60);
+        this.glow[i] = Math.pow(10, -3 * t / (rt60 * lm));
+        this.ghigh[i] = Math.pow(10, -3 * t / (rt60 * hm));
+      }
+    }
+  }
+  lineRead(i, delay) {
+    let rp = this.lw[i] - delay; while (rp < 0) rp += RV_LMAX;
+    let i0 = rp | 0; const frac = rp - i0; if (i0 >= RV_LMAX) i0 -= RV_LMAX;
+    let i1 = i0 + 1; if (i1 >= RV_LMAX) i1 -= RV_LMAX;
+    return this.line[i][i0] * (1 - frac) + this.line[i][i1] * frac;
+  }
+  process(inL, inR) {
+    const moddepth = this.freeze ? 0 : this.mod_depth;
+    const damp_a = clampf(1 - this.damp * 0.85, 0.05, 1);
+    const dscale = 0.15 + 0.85 * this.diffusion;
+    const ingain = this.freeze ? 0 : 1;
+    const lowkeep = clampf(1 - this.low_damp * 0.9, 0.05, 1);
+    let locut_a = TAU * this.locut_hz / this.sr; if (locut_a > 0.5) locut_a = 0.5;
+    let pdlen = (this.predelay_ms * 0.001 * this.sr) | 0; if (pdlen < 1) pdlen = 1; if (pdlen > RV_PDMAX - 1) pdlen = RV_PDMAX - 1;
+    let rp = this.pdw - pdlen; while (rp < 0) rp += RV_PDMAX;
+    const pdL = this.pd[0][rp], pdR = this.pd[1][rp];
+    this.pd[0][this.pdw] = inL; this.pd[1][this.pdw] = inR; this.pdw = (this.pdw + 1) % RV_PDMAX;
+    let x = 0.5 * (pdL + pdR);
+    for (let i = 0; i < RV_NAP; i++) { const r = this.apw[i], g = RV_APG[i] * dscale, buf = this.ap[i][r], y = -g * x + buf; this.ap[i][r] = x + g * y; this.apw[i] = (r + 1) % RV_APLEN[i]; x = y; }
+    const d = this.d;
+    for (let i = 0; i < RV_NL; i++) {
+      const mod = moddepth * Math.sin(TAU * this.modph[i]);
+      this.linelen_s[i] += (this.linelen[i] - this.linelen_s[i]) * 0.0006;
+      d[i] = this.lineRead(i, this.linelen_s[i] - 2 - mod);
+      this.modph[i] += this.mod_rate * (0.7 + 0.09 * i) / this.sr;
+      if (this.modph[i] >= 1) this.modph[i] -= 1;
+    }
+    const a = this.a; for (let i = 0; i < RV_NL; i++) a[i] = d[i];
+    for (let s = 1; s < RV_NL; s <<= 1) for (let j = 0; j < RV_NL; j += s << 1) for (let k = 0; k < s; k++) { const u = a[j + k], v = a[j + k + s]; a[j + k] = u + v; a[j + k + s] = u - v; }
+    const fb = this.fb; for (let i = 0; i < RV_NL; i++) fb[i] = a[i] * 0.35355339;
+    for (let i = 0; i < RV_NL; i++) {
+      let v = x * ingain + fb[i];
+      if (this.mode === 1) {
+        const low = (this.ls_z[i] += this.ls_a * (v - this.ls_z[i])); const rem = v - low;
+        const mid = (this.hs_z[i] += this.hs_a * (rem - this.hs_z[i])); const high = rem - mid;
+        v = low * this.glow[i] + mid * this.gain[i] + high * this.ghigh[i];
+      } else {
+        this.damp_z[i] += damp_a * (v - this.damp_z[i]); v = this.damp_z[i] * this.gain[i];
+        this.lo_z[i] += locut_a * (v - this.lo_z[i]); v = (v - this.lo_z[i]) + this.lo_z[i] * lowkeep;
+      }
+      if (v > 4) v = 4; else if (v < -4) v = -4;
+      this.line[i][this.lw[i]] = v; this.lw[i] = (this.lw[i] + 1) % RV_LMAX;
+    }
+    const Lo = (d[0] - d[1] + d[2] - d[3] + d[6] - d[7]) * 0.4082;
+    const Ro = (d[4] - d[5] + d[6] - d[7] + d[0] - d[2]) * 0.4082;
+    const mid = 0.5 * (Lo + Ro), w = this.width;
+    const oL = mid * (1 - w) + Lo * w, oR = mid * (1 - w) + Ro * w;
+    let ac = 1 - TAU * this.locut_hz / this.sr; if (ac < 0) ac = 0;
+    this.wL = ac * (this.hp_y[0] + oL - this.hp_x[0]); this.hp_x[0] = oL; this.hp_y[0] = this.wL;
+    this.wR = ac * (this.hp_y[1] + oR - this.hp_x[1]); this.hp_x[1] = oR; this.hp_y[1] = this.wR;
+  }
+}
+
+// BBD (bucket-brigade / analog) delay : glided tape-morph time, dual-lowpass
+// tone with wow/flutter jitter, companded soft-saturating feedback, mono /
+// stereo / ping-pong. Faithful port of Essaim fx.c's delay. Returns wet echoes.
+class BBDDelay {
+  constructor(sr) {
+    this.sr = sr > 0 ? sr : 48000; this.sri = 1 / this.sr;
+    this.dlen = Math.floor(this.sr * 4);
+    this.dbl = new Float32Array(this.dlen); this.dbr = new Float32Array(this.dlen); this.dw = 0;
+    this.lp_l = 0; this.lp_r = 0; this.lp2_l = 0; this.lp2_r = 0; this.jit = 0;
+    this.mix = 0.3; this.rate = 0.3; this.rate_s = 0.3; this.fb = 0.35; this.tone = 0.5; this.mode = 1;
+    this.wL = 0; this.wR = 0;
+  }
+  process(inL, inR) {
+    this.rate_s += 0.0004 * (this.rate - this.rate_s);
+    const delf = this.rate_s * this.sr; let rf = this.dw - delf; if (rf < 0) rf += this.dlen;
+    let rp0 = rf | 0; const frac = rf - rp0; let rp1 = rp0 + 1;
+    if (rp0 >= this.dlen) rp0 -= this.dlen; if (rp1 >= this.dlen) rp1 -= this.dlen;
+    const tl = this.dbl[rp0] * (1 - frac) + this.dbl[rp1] * frac;
+    const tr = this.dbr[rp0] * (1 - frac) + this.dbr[rp1] * frac;
+    this.jit += 0.15 * this.sri; if (this.jit >= 1) this.jit -= 1; const jit = Math.sin(this.jit * TAU) * 0.04;
+    const dt = this.tone;
+    const lpc = dt < 0.49 ? clampf(0.08 + (dt / 0.49) * 0.72 + jit, 0.04, 0.92)
+      : dt > 0.51 ? clampf(0.85 + jit, 0.7, 0.95) : clampf(0.88 + jit, 0.75, 0.95);
+    this.lp_l += lpc * (tl - this.lp_l); this.lp_r += lpc * (tr - this.lp_r);
+    this.lp2_l += lpc * (this.lp_l - this.lp2_l); this.lp2_r += lpc * (this.lp_r - this.lp2_r);
+    let fbl = this.lp2_l * this.fb, fbr = this.lp2_r * this.fb;
+    fbl = fbl / (1 + Math.abs(fbl * 0.8)); fbr = fbr / (1 + Math.abs(fbr * 0.8));
+    if (this.mode === 0) { const m = (inL + inR) * 0.5 + fbl; this.dbl[this.dw] = m; this.dbr[this.dw] = m; }
+    else if (this.mode === 2) { this.dbl[this.dw] = inR + fbr; this.dbr[this.dw] = inL + fbl; }
+    else { this.dbl[this.dw] = inL + fbl; this.dbr[this.dw] = inR + fbr; }
+    if (++this.dw >= this.dlen) this.dw = 0;
+    this.wL = Math.tanh(tl * 1.2) * this.mix; this.wR = Math.tanh(tr * 1.2) * this.mix;
+  }
+}
+
 class SoniProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -93,6 +239,10 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.cTarget = new Float32Array(NCHORD);
     // scratch (x,y) for the scan-path read (zero-alloc : written per partial)
     this.sxy = new Float32Array(2);
+    // ── shared FX tail : reverb + analog delay (send/return) ──
+    this.reverb = new FDNReverb(sampleRate);
+    this.delay = new BBDDelay(sampleRate);
+    this.fxSend = 0; this.fxSendS = 0; this.fxRinging = false; // global send + smoothing + tail ring-out
     // ── limiter ──
     this.limEnv = 1;
     // ── metering (sent back ~10Hz) ──
@@ -120,6 +270,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       if (m.spectraFreqs) this.spectraFreqs.set(m.spectraFreqs);
       if (m.filterFreqs) { this.fFreqs.set(m.filterFreqs); this.rebuildFilterCoefs(); }
       if (m.chordFreqs) { this.chordN = Math.min(NCHORD, m.chordFreqs.length); this.chordFreqs.set(m.chordFreqs.subarray(0, this.chordN)); }
+      if (m.cfg.fx) this.applyFx(m.cfg.fx);
       return;
     }
     if (m.t === 'mod') {
@@ -197,6 +348,25 @@ class SoniProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < NBAND; i++) {
       this.fCoef[i] = 2 * Math.sin(Math.PI * Math.min(this.fFreqs[i], sampleRate * 0.45) / sampleRate);
     }
+  }
+
+  // Apply the shared FX-tail params (send + delay + reverb) onto the DSP objects.
+  applyFx(fx) {
+    this.fxSend = clampf(fx.send || 0, 0, 1);
+    const dl = this.delay;
+    dl.mix = clampf(fx.dlyMix, 0, 1); dl.rate = clampf(fx.dlyTime, 0.004, 4);
+    dl.fb = clampf(fx.dlyFb, 0, 0.95); dl.tone = clampf(fx.dlyTone, 0, 1); dl.mode = fx.dlyMode | 0;
+    const rv = this.reverb;
+    rv.mode = fx.rvMode ? 1 : 0;
+    rv.size = clampf(fx.rvSize, 0, 1); rv.decay = clampf(fx.rvDecay, 0, 1); rv.damp = clampf(fx.rvDamp, 0, 1);
+    rv.mix = clampf(fx.rvMix, 0, 1);
+    rv.predelay_ms = clampf(fx.rvPre, 0, 255); rv.mod_depth = clampf(fx.rvMod, 0, 40);
+    rv.mod_rate = clampf(fx.rvModRate, 0.01, 8); rv.width = clampf(fx.rvWidth, 0, 1);
+    rv.locut_hz = clampf(fx.rvLocut, 20, 2000); rv.freeze = fx.rvFreeze ? 1 : 0;
+    rv.diffusion = clampf(fx.rvDiff, 0, 1); rv.low_damp = clampf(fx.rvLowDamp, 0, 1);
+    rv.crossover = clampf(fx.rvCross, 0, 1);
+    rv.lowmult = clampf(fx.rvLowMult, 0.05, 8); rv.highmult = clampf(fx.rvHighMult, 0.05, 8);
+    rv.recompute();
   }
 
   // Nearest-pixel read of a tap's CURRENT grid (the Raster voice wants the
@@ -577,6 +747,25 @@ class SoniProcessor extends AudioWorkletProcessor {
         }
         this.cPhase[i] = ph % 1;
       }
+    }
+
+    // ── shared FX tail : send the (dry) mix into delay → reverb, return the wet ──
+    // Runs while there's send OR the reverb/delay are still ringing (so cutting the
+    // send lets the tail decay naturally instead of snapping off).
+    const wantFx = this.fxSend > 0.0001;
+    if (wantFx || this.fxRinging) {
+      const rv = this.reverb, dl = this.delay;
+      let tail = 0;
+      for (let s = 0; s < n; s++) {
+        const send = (this.fxSendS += (this.fxSend - this.fxSendS) * 0.002);
+        const inL = L[s] * send, inR = R[s] * send;
+        dl.process(inL, inR);
+        rv.process(inL + dl.wL, inR + dl.wR); // reverb hears the send + the echoes
+        const wl = dl.wL + rv.wL, wr = dl.wR + rv.wR;
+        L[s] += wl; R[s] += wr;
+        const amp = Math.abs(wl) + Math.abs(wr); if (amp > tail) tail = amp;
+      }
+      this.fxRinging = wantFx || tail > 1e-4;
     }
 
     // ── master : gain + peak limiter (always on) + meter ──
