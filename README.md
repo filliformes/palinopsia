@@ -525,11 +525,20 @@ high×**. A `❄ freeze` holds the tail forever.
 **Adaptive sources** : each voice listens to one of two **taps** — the
 composited master output or any single layer's post-FX image — so different
 voices can sonify different layers (a real ensemble). **Quantizer** : a global
-key (root + scale : chromatic, major, minor, pentatonic, whole-tone, modes)
-with a per-voice **♪ snap** — sonified data lands on real notes, or runs free.
-**Master** : gain + an always-on peak limiter (the audio Flash-safety) + live
-meter, and an **output-device picker**. While the engine runs, **recordings mix
-the sound in** — exports become true audiovisual pieces.
+key (root + **root octave** + scale : chromatic, major, minor, pentatonic,
+whole-tone, modes) with a per-voice **♪ snap** — sonified data lands on real
+notes, or runs free. **Master** : gain + an always-on peak limiter (the audio
+Flash-safety) + live meter, and an **output-device picker**. While the engine
+runs, **recordings mix the sound in** — exports become true audiovisual pieces.
+
+**Mixer** : a **[voices | mixer]** view. The mixer shows all eight voices as
+channel strips — on/off, **volume**, and a per-voice **HP/LP filter** (a DJ-style
+tilt, ported from the Essaim instrument : one knob sweeps a 3-stage lowpass down or
+a highpass up, centre = bypass) — plus the FX-tail send / delay / reverb mix.
+**Presets** : name + save + a load dropdown keep whole Sonify patches. **🎲 dice** :
+one in the header re-rolls the whole instrument; one at the top-right of each voice
+box re-rolls just that voice. Each voice box carries an **ⓘ** with its full
+description.
 
 **✨ Auto-voice** : one button reads the session's actual vocabulary — which
 generators, nodes and FX are live on which layers — and picks the fitting
@@ -538,9 +547,12 @@ Orbit, line-work → Spectra, scan registers → Transmission, atmosphere → Fi
 The strongest voice taps the layer that earned it; your key, gains and probes
 are kept. Deterministic — the same session always suggests the same setup.
 
-**Fully integrated** : every probe and pitch (scan columns, orbit centre/radius/
-pitch, the raster rect and its pitch) is a **modulation target** — bind M1–M8 or
-a Meta knob via the M chips on the Sonify strips, and the mod-matrix stirs the
+**Fully integrated** : not just every probe and pitch (scan columns, orbit centre/
+radius/pitch, the raster rect and its pitch) but **most timbre & motion params** —
+Spectra gain/contrast/sweep/breath, orbit drive/smooth, flow grain/colour, events
+decay, raster smooth/tone, SSTV line/transpose, filter resonance/sweep, chord tone/
+spread/swell, and the FX send/reverb/delay — are **modulation targets**. Bind M1–M8
+or a Meta knob via the M chips on the Sonify strips, and the mod-matrix stirs the
 listening the same way it stirs the image (overlays show the modulated probes
 live). The sound patch **travels with sessions and scenes** — recalling a scene
 switches the sonification with it (the on-switch and output device stay
