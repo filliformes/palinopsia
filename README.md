@@ -536,9 +536,12 @@ channel strips — on/off, **volume**, and a per-voice **HP/LP filter** (a DJ-st
 tilt, ported from the Essaim instrument : one knob sweeps a 3-stage lowpass down or
 a highpass up, centre = bypass) — plus the FX-tail send / delay / reverb mix.
 **Presets** : name + save + a load dropdown keep whole Sonify patches. **🎲 dice** :
-one in the header re-rolls the whole instrument; one at the top-right of each voice
-box re-rolls just that voice. Each voice box carries an **ⓘ** with its full
-description.
+one in the header re-rolls the whole instrument (always keeping at least one voice
+that sings on a still frame); one at the top-right of each voice box re-rolls just
+that voice. **↺ default** resets every voice / FX / mixer setting to the factory
+patch. Each voice box carries an **ⓘ** with its full description. The whole audio
+path is NaN-safe — a wild random patch can't get the reverb/delay stuck or mute the
+output.
 
 **✨ Auto-voice** : one button reads the session's actual vocabulary — which
 generators, nodes and FX are live on which layers — and picks the fitting
@@ -557,10 +560,11 @@ listening the same way it stirs the image (overlays show the modulated probes
 live). The sound patch **travels with sessions and scenes** — recalling a scene
 switches the sonification with it (the on-switch and output device stay
 machine-local). And the whole page speaks **OSC** under `/opsia/sonify/…`
-(on/master/root/scale + per-voice on·gain·pan·probes·pitches, all 0..1) —
-advertised over OSCQuery and streamed outbound like everything else. Spectra
-also gained **breath** : a per-partial sine↔noise morph (the Coagula blue) from
-glassy additive to breathy bands.
+(on/master/root/**rootoct**/scale + per-voice on·gain·pan·probes·pitches·params,
+the **Chord** bank, and the **FX** tail `/fx/{send,delaytime,feedback,size,decay,
+damp,reverbmode,freeze,…}`) — advertised over OSCQuery and streamed outbound like
+everything else. Spectra also gained **breath** : a per-partial sine↔noise morph
+(the Coagula blue) from glassy additive to breathy bands.
 
 ![The Sonify page](docs/images/interface-sonify.jpg)
 
