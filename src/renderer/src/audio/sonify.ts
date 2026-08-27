@@ -158,6 +158,22 @@ const noteFreq = (n: number): number => 440 * Math.pow(2, (n - 69) / 12)
 /** The quantizer root, shifted by the global root-octave (a whole-instrument
  *  transpose in octaves; rootOct 3 = no shift). Used by every scale-table build. */
 const effRoot = (cfg: SoniConfig): number => cfg.root + 12 * ((cfg.rootOct ?? 3) - 3)
+
+// Simple scalar mod targets : param → [voice sub-config, field]. These map
+// directly onto a config field (unlike the probe positions / pitches, which have
+// custom handling). Drives withSonifyParam, the base getter, and the tick overlay,
+// so adding a modulatable param is one line here (+ a DESC + a chip in the UI).
+const SONI_SIMPLE_MODS: Record<string, [keyof SoniConfig, string]> = {
+  spectraGain: ['spectra', 'gain'], spectraGamma: ['spectra', 'gamma'], spectraSweep: ['spectra', 'sweepHz'], spectraBreath: ['spectra', 'breath'],
+  orbitDrive: ['orbit', 'drive'], orbitSmooth: ['orbit', 'smooth'],
+  flowDur: ['flow', 'dur'], flowColour: ['flow', 'colour'],
+  eventsDecay: ['events', 'decay'],
+  rasterSmooth: ['raster', 'smooth'], rasterTone: ['raster', 'tone'],
+  sstvLine: ['sstv', 'lineHz'], sstvDev: ['sstv', 'dev'],
+  filterQ: ['filter', 'q'], filterSweep: ['filter', 'sweepHz'],
+  chordTone: ['chord', 'tone'], chordSpread: ['chord', 'spread'], chordAttack: ['chord', 'attack'],
+  fxSend: ['fx', 'send'], fxReverb: ['fx', 'rvMix'], fxDelay: ['fx', 'dlyMix']
+}
 const freqNote = (f: number): number => 69 + 12 * Math.log2(Math.max(1, f) / 440)
 
 /** All scale frequencies from octave lo..hi (root-relative), ascending. */
@@ -214,6 +230,11 @@ function filterFreqs(cfg: SoniConfig): Float32Array {
 /** Apply one sonify mod-param (REAL units, see SONIFY_MOD_DESCS) onto a config
  *  immutably — shared by the Meta-knob settle path and the OSC endpoints. */
 export function withSonifyParam(c: SoniConfig, param: string, v: number): SoniConfig {
+  const simple = SONI_SIMPLE_MODS[param]
+  if (simple) {
+    const [voice, field] = simple
+    return { ...c, [voice]: { ...(c[voice] as Record<string, unknown>), [field]: v } } as SoniConfig
+  }
   switch (param) {
     case 'spectraX': return { ...c, spectra: { ...c.spectra, x: v } }
     case 'filterX': return { ...c, filter: { ...c.filter, x: v } }
@@ -272,6 +293,8 @@ class SonifyEngine {
     // The mod-matrix swings around each param's BASE : the current config.
     registerSonifyModBase((param) => {
       const c = this.cfg
+      const simple = SONI_SIMPLE_MODS[param]
+      if (simple) { const [voice, field] = simple; return (c[voice] as unknown as Record<string, number>)[field] }
       switch (param) {
         case 'spectraX': return c.spectra.x
         case 'filterX': return c.filter.x
@@ -497,6 +520,14 @@ class SonifyEngine {
             ? (c.raster.quantize ? this.snapNote(Math.round(rPitch)) : noteFreq(rPitch))
             : (c.raster.quantize ? this.snapNote(c.raster.note) : c.raster.freq)
         }
+      }
+      // Simple scalar mods : always send the EFFECTIVE value (mod or base), so
+      // releasing a modulator reverts cleanly. The worklet merges these onto its
+      // live cfg (voice renders read them per-block; fx re-applies, see applyFx).
+      const mm = m as unknown as Record<string, Record<string, number>>
+      for (const param in SONI_SIMPLE_MODS) {
+        const [voice, field] = SONI_SIMPLE_MODS[param]
+        ;(mm[voice] ??= {})[field] = g(param, (c[voice] as unknown as Record<string, number>)[field])
       }
       node.port.postMessage({ t: 'mod', m })
       this.liveProbes = {

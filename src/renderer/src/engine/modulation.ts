@@ -859,7 +859,29 @@ export const SONIFY_MOD_DESCS: Record<string, { min: number; max: number; def: n
   rasterY: { min: 0, max: 0.9, def: 0.35 },
   rasterW: { min: 0.04, max: 0.9, def: 0.3 },
   rasterH: { min: 0.03, max: 0.9, def: 0.3 },
-  rasterPitch: { min: 24, max: 72, def: 45 }
+  rasterPitch: { min: 24, max: 72, def: 45 },
+  // simple scalar targets (SONI_SIMPLE_MODS)
+  spectraGain: { min: 0, max: 1, def: 0.5 },
+  spectraGamma: { min: 0.5, max: 4, def: 1.8 },
+  spectraSweep: { min: 0.02, max: 4, def: 0.25 },
+  spectraBreath: { min: 0, max: 1, def: 0 },
+  orbitDrive: { min: 0.2, max: 3, def: 1 },
+  orbitSmooth: { min: 0, max: 1, def: 0.5 },
+  flowDur: { min: 0.02, max: 0.4, def: 0.09 },
+  flowColour: { min: 0, max: 1, def: 0.6 },
+  eventsDecay: { min: 0, max: 1, def: 0.35 },
+  rasterSmooth: { min: 0, max: 1, def: 0 },
+  rasterTone: { min: 0, max: 1, def: 0.6 },
+  sstvLine: { min: 1, max: 60, def: 12 },
+  sstvDev: { min: 0.25, max: 2, def: 1 },
+  filterQ: { min: 0, max: 1, def: 0.5 },
+  filterSweep: { min: 0.02, max: 4, def: 0.25 },
+  chordTone: { min: 0, max: 1, def: 0.3 },
+  chordSpread: { min: 0, max: 1, def: 0.6 },
+  chordAttack: { min: 0.02, max: 3, def: 0.4 },
+  fxSend: { min: 0, max: 1, def: 0 },
+  fxReverb: { min: 0, max: 1, def: 0.6 },
+  fxDelay: { min: 0, max: 1, def: 0.35 }
 }
 export const sonifyModValues = new Map<string, number>()
 // The engine registers a getter for each param's BASE value (swing centre).

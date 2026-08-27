@@ -331,6 +331,8 @@ class SoniProcessor extends AudioWorkletProcessor {
         const dst = this.cfg[k];
         if (dst) Object.assign(dst, mm[k]);
       }
+      // fx params drive the reverb/delay objects (not read live) → re-apply.
+      if (mm.fx) this.applyFx(this.cfg.fx);
       return;
     }
     if (m.t === 'flow') {

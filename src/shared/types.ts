@@ -406,9 +406,25 @@ export type SonifyModParam =
   | 'spectraX' | 'filterX'
   | 'orbitX' | 'orbitY' | 'orbitR' | 'orbitPitch'
   | 'rasterX' | 'rasterY' | 'rasterW' | 'rasterH' | 'rasterPitch'
+  // Simple scalar targets (SONI_SIMPLE_MODS in sonify.ts) — breathe life into
+  // the timbre / motion params, not just the probe positions.
+  | 'spectraGain' | 'spectraGamma' | 'spectraSweep' | 'spectraBreath'
+  | 'orbitDrive' | 'orbitSmooth'
+  | 'flowDur' | 'flowColour'
+  | 'eventsDecay'
+  | 'rasterSmooth' | 'rasterTone'
+  | 'sstvLine' | 'sstvDev'
+  | 'filterQ' | 'filterSweep'
+  | 'chordTone' | 'chordSpread' | 'chordAttack'
+  | 'fxSend' | 'fxReverb' | 'fxDelay'
 export const SONIFY_MOD_PARAMS: SonifyModParam[] = [
   'spectraX', 'filterX', 'orbitX', 'orbitY', 'orbitR', 'orbitPitch',
-  'rasterX', 'rasterY', 'rasterW', 'rasterH', 'rasterPitch'
+  'rasterX', 'rasterY', 'rasterW', 'rasterH', 'rasterPitch',
+  'spectraGain', 'spectraGamma', 'spectraSweep', 'spectraBreath',
+  'orbitDrive', 'orbitSmooth', 'flowDur', 'flowColour',
+  'eventsDecay', 'rasterSmooth', 'rasterTone',
+  'sstvLine', 'sstvDev', 'filterQ', 'filterSweep',
+  'chordTone', 'chordSpread', 'chordAttack', 'fxSend', 'fxReverb', 'fxDelay'
 ]
 
 export type ModTarget =
