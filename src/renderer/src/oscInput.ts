@@ -493,6 +493,10 @@ function route(address: string, args: Args): void {
         if (sc) apply({ ...c, scale: sc })
         return
       }
+      if (g === 'rootoct' || g === 'octave') {
+        apply({ ...c, rootOct: Math.max(1, Math.min(6, Math.round(n <= 1 ? 1 + n * 5 : n))) })
+        return
+      }
       const ctl = segs[3]
       if (!ctl) return
       const V = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'fx'>(
@@ -836,6 +840,7 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/on', 0, 1, so.on ? 1 : 0, 'Sonify engine on (>= 0.5)')
     add('/opsia/sonify/master', 0, 1, so.master, 'Sonify master gain')
     add('/opsia/sonify/root', 0, 1, so.root / 11, 'Quantizer root (index over C..B)')
+    add('/opsia/sonify/rootoct', 1, 6, so.rootOct ?? 3, 'Root octave (global transpose)')
     const si = Math.max(0, SONI_SCALES.indexOf(so.scale))
     add('/opsia/sonify/scale', 0, 1, si / (SONI_SCALES.length - 1), 'Quantizer scale (index)')
     const norm = (param: string, v: number): number => {

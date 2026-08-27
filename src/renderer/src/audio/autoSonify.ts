@@ -146,49 +146,52 @@ const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(rnd() * arr.length)]
 /** A fresh random sound patch : 2–3 voices, a new key/scale, tasteful probe +
  *  character draws. The on-state, output device and master gain are kept —
  *  the dice re-voices the instrument, it never blasts or silences it. */
+// Per-voice parameter randomizers (character only — `on`/`tap` set by the caller).
+// Shared by the whole-instrument dice and the per-voice dice.
+export type SoniVoiceKey = 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord'
+const R_PARAMS: Record<SoniVoiceKey, (c: SoniConfig) => Record<string, unknown>> = {
+  spectra: (c) => ({ ...c.spectra, quantize: rnd() < 0.85, sweepOn: rnd() < 0.75, sync: rnd() < 0.3, sweepHz: rr(0.06, 0.8), x: rr(0.2, 0.8), path: pick([0, 0, 0, 1, 2, 3]), pace: rnd() < 0.4 ? rr(0.2, 0.8) : 0, gamma: rr(1.2, 2.6), breath: rnd() < 0.4 ? rr(0.2, 0.7) : 0, loOct: pick([1, 2, 2, 3]), hiOct: pick([6, 7, 7, 8]) }),
+  orbit: (c) => ({ ...c.orbit, quantize: rnd() < 0.85, note: 33 + Math.floor(rnd() * 28), cx: rr(0.3, 0.7), cy: rr(0.3, 0.7), rx: rr(0.08, 0.35), ry: rr(0.08, 0.35), ratio: pick([1, 2, 1.5, 3]), drive: rr(0.6, 2), smooth: rr(0.2, 0.8) }),
+  flow: (c) => ({ ...c.flow, quantize: rnd() < 0.85, sense: rr(0.3, 0.7), density: rr(0.3, 0.8), dur: rr(0.05, 0.2), noise: rr(0, 0.4), colour: rnd() < 0.6 ? rr(0.3, 0.9) : 0 }),
+  events: (c) => ({ ...c.events, quantize: rnd() < 0.85, mode: pick(['spatial', 'motion', 'blend'] as const), sense: rr(0.3, 0.7), density: rr(0.3, 0.7), decay: rr(0.2, 0.6), highs: rr(0.3, 0.9), wave: pick([0, 1, 2, 3]) }),
+  raster: (c) => ({ ...c.raster, quantize: rnd() < 0.85, note: 33 + Math.floor(rnd() * 24), rx: rr(0.1, 0.5), ry: rr(0.1, 0.5), rw: rr(0.15, 0.45), rh: rr(0.1, 0.35), smooth: rnd() < 0.5 ? 0 : rr(0.3, 1), tone: rr(0.35, 1) }),
+  sstv: (c) => ({ ...c.sstv, lineHz: rr(4, 28), sync: rnd() < 0.35, dev: rr(0.5, 1.5), syncLev: rr(0.2, 0.8) }),
+  filter: (c) => ({ ...c.filter, quantize: rnd() < 0.4, sweepOn: rnd() < 0.6, sweepHz: rr(0.05, 0.6), x: rr(0.2, 0.8), path: pick([0, 0, 1, 2, 3]), pace: rnd() < 0.4 ? rr(0.2, 0.8) : 0, q: rr(0.3, 0.85), noise: rr(0.3, 0.8), gamma: rr(1.2, 2.4) }),
+  chord: (c) => ({ ...c.chord, voices: 3 + Math.floor(rnd() * 8), loOct: pick([1, 2, 2, 3]), hiOct: pick([5, 6, 6, 7]), gamma: rr(1.2, 2.4), spread: rr(0.3, 0.9), attack: rr(0.1, 1.2), release: rr(0.3, 2), tone: rr(0, 0.6) })
+}
+
+/** Randomize the whole Sonify instrument : pick 2–3 voices, re-roll their params,
+ *  a key/scale/octave, and maybe an FX tail. `on`/`sinkId` are kept by the caller. */
 export function randomSonify(cur: SoniConfig): SoniConfig {
-  const voices: Voice[] = ['spectra', 'orbit', 'flow', 'raster', 'sstv', 'filter']
-  for (let i = voices.length - 1; i > 0; i--) {
-    const j = Math.floor(rnd() * (i + 1))
-    ;[voices[i], voices[j]] = [voices[j], voices[i]]
-  }
-  const chosen = new Set(voices.slice(0, rnd() < 0.4 ? 3 : 2))
+  const all: SoniVoiceKey[] = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord']
+  const bag = [...all]
+  for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1));[bag[i], bag[j]] = [bag[j], bag[i]] }
+  const chosen = new Set(bag.slice(0, rnd() < 0.4 ? 3 : 2))
   const scales = ['minor', 'major', 'pentatonic', 'dorian', 'phrygian', 'lydian', 'wholetone'] as const
-  const q = rnd() < 0.8 // quantize mostly on : musical by default
+  const V = (k: SoniVoiceKey): Record<string, unknown> => ({ ...R_PARAMS[k](cur), on: chosen.has(k), tap: 0 })
   return {
     ...cur,
     root: Math.floor(rnd() * 12),
+    rootOct: pick([2, 3, 3, 4]),
     scale: pick(scales),
     taps: [{ kind: 'master', layer: 0 }, cur.taps[1]],
-    spectra: {
-      ...cur.spectra, on: chosen.has('spectra'), tap: 0, quantize: q,
-      sweepOn: rnd() < 0.75, sync: rnd() < 0.3, sweepHz: rr(0.06, 0.8), x: rr(0.2, 0.8),
-      gamma: rr(1.2, 2.6), breath: rnd() < 0.4 ? rr(0.2, 0.7) : 0
-    },
-    orbit: {
-      ...cur.orbit, on: chosen.has('orbit'), tap: 0, quantize: q,
-      note: 33 + Math.floor(rnd() * 28), cx: rr(0.3, 0.7), cy: rr(0.3, 0.7),
-      rx: rr(0.08, 0.35), ry: rr(0.08, 0.35), ratio: pick([1, 2, 1.5, 3]),
-      drive: rr(0.6, 2), smooth: rr(0.2, 0.8)
-    },
-    flow: {
-      ...cur.flow, on: chosen.has('flow'), tap: 0, quantize: q,
-      sense: rr(0.3, 0.7), density: rr(0.3, 0.8), dur: rr(0.05, 0.2), noise: rr(0, 0.4)
-    },
-    raster: {
-      ...cur.raster, on: chosen.has('raster'), tap: 0, quantize: q,
-      note: 33 + Math.floor(rnd() * 24), rx: rr(0.1, 0.5), ry: rr(0.1, 0.5),
-      rw: rr(0.15, 0.45), rh: rr(0.1, 0.35), smooth: rnd() < 0.5 ? 0 : rr(0.3, 1),
-      tone: rr(0.35, 1)
-    },
-    sstv: {
-      ...cur.sstv, on: chosen.has('sstv'), tap: 0,
-      lineHz: rr(4, 28), sync: rnd() < 0.35, dev: rr(0.5, 1.5), syncLev: rr(0.2, 0.8)
-    },
-    filter: {
-      ...cur.filter, on: chosen.has('filter'), tap: 0, quantize: q && rnd() < 0.5,
-      sweepOn: rnd() < 0.6, sweepHz: rr(0.05, 0.6), x: rr(0.2, 0.8),
-      q: rr(0.3, 0.85), noise: rr(0.3, 0.8), gamma: rr(1.2, 2.4)
-    }
+    spectra: V('spectra') as SoniConfig['spectra'],
+    orbit: V('orbit') as SoniConfig['orbit'],
+    flow: V('flow') as SoniConfig['flow'],
+    events: V('events') as SoniConfig['events'],
+    raster: V('raster') as SoniConfig['raster'],
+    sstv: V('sstv') as SoniConfig['sstv'],
+    filter: V('filter') as SoniConfig['filter'],
+    chord: V('chord') as SoniConfig['chord'],
+    fx: rnd() < 0.5
+      ? { ...cur.fx, send: rr(0.2, 0.5), rvMode: pick([0, 1]), rvSize: rr(0.4, 0.85), rvDecay: rr(0.4, 0.8), dlyTime: rr(0.1, 0.6), dlyFb: rr(0.2, 0.5), dlyMode: pick([0, 1, 2]) }
+      : { ...cur.fx, send: 0 }
   }
+}
+
+/** Re-roll a single voice's params (leaving the rest of the mix untouched), and
+ *  switch it on — for the per-voice dice. */
+export function randomizeVoice(cur: SoniConfig, voice: SoniVoiceKey): SoniConfig {
+  const params = { ...R_PARAMS[voice](cur), on: true, tap: cur[voice].tap }
+  return { ...cur, [voice]: params } as SoniConfig
 }

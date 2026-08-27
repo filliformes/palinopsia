@@ -42,6 +42,7 @@ export interface SoniConfig {
   sinkId: string
   // quantizer
   root: number // 0..11 (C..B)
+  rootOct: number // 1..6 : the octave the root sits in (a global transpose; 3 = no shift)
   scale: SoniScale
   spectra: {
     on: boolean; tap: number; gain: number; pan: number
@@ -131,6 +132,7 @@ export function defaultSoniConfig(): SoniConfig {
     master: 0.8,
     sinkId: '',
     root: 0,
+    rootOct: 3,
     scale: 'minor',
     spectra: { on: true, tap: 0, gain: 0.5, pan: 0, sweepOn: true, sweepHz: 0.25, sync: false, x: 0.5, path: 0, pace: 0, gamma: 1.8, breath: 0, loOct: 2, hiOct: 7, quantize: true },
     orbit: { on: false, tap: 0, gain: 0.5, pan: 0, note: 45, freq: 110, quantize: true, ratio: 1, cx: 0.5, cy: 0.5, rx: 0.25, ry: 0.25, drive: 1, smooth: 0.5 },
@@ -153,6 +155,9 @@ export function defaultSoniConfig(): SoniConfig {
 }
 
 const noteFreq = (n: number): number => 440 * Math.pow(2, (n - 69) / 12)
+/** The quantizer root, shifted by the global root-octave (a whole-instrument
+ *  transpose in octaves; rootOct 3 = no shift). Used by every scale-table build. */
+const effRoot = (cfg: SoniConfig): number => cfg.root + 12 * ((cfg.rootOct ?? 3) - 3)
 const freqNote = (f: number): number => 69 + 12 * Math.log2(Math.max(1, f) / 440)
 
 /** All scale frequencies from octave lo..hi (root-relative), ascending. */
@@ -171,11 +176,11 @@ function spectraFreqs(cfg: SoniConfig): Float32Array {
   const { loOct, hiOct, quantize } = cfg.spectra
   const out = new Float32Array(96)
   if (quantize) {
-    const tab = scaleTable(cfg.root, cfg.scale, loOct, hiOct)
+    const tab = scaleTable(effRoot(cfg), cfg.scale, loOct, hiOct)
     for (let i = 0; i < 96; i++) out[i] = tab[Math.min(tab.length - 1, Math.floor((i / 96) * tab.length))]
   } else {
-    const lo = noteFreq(12 * (loOct + 1) + cfg.root)
-    const hi = noteFreq(12 * (hiOct + 1) + cfg.root)
+    const lo = noteFreq(12 * (loOct + 1) + effRoot(cfg))
+    const hi = noteFreq(12 * (hiOct + 1) + effRoot(cfg))
     for (let i = 0; i < 96; i++) out[i] = lo * Math.pow(hi / lo, i / 95)
   }
   return out
@@ -184,7 +189,7 @@ function spectraFreqs(cfg: SoniConfig): Float32Array {
 /** The Chord bank's note frequencies : `voices` scale notes spread evenly from
  *  the lowest to the highest of the octave range (always scale-tuned). */
 function chordFreqs(cfg: SoniConfig): Float32Array {
-  const tab = scaleTable(cfg.root, cfg.scale, cfg.chord.loOct, cfg.chord.hiOct)
+  const tab = scaleTable(effRoot(cfg), cfg.scale, cfg.chord.loOct, cfg.chord.hiOct)
   const N = Math.max(1, Math.min(16, cfg.chord.voices | 0))
   const out = new Float32Array(N)
   for (let i = 0; i < N; i++) {
@@ -198,7 +203,7 @@ function chordFreqs(cfg: SoniConfig): Float32Array {
 function filterFreqs(cfg: SoniConfig): Float32Array {
   const out = new Float32Array(48)
   if (cfg.filter.quantize) {
-    const tab = scaleTable(cfg.root, cfg.scale, cfg.filter.loOct, cfg.filter.hiOct)
+    const tab = scaleTable(effRoot(cfg), cfg.scale, cfg.filter.loOct, cfg.filter.hiOct)
     for (let i = 0; i < 48; i++) out[i] = tab[Math.min(tab.length - 1, Math.floor((i / 48) * tab.length))]
   } else {
     for (let i = 0; i < 48; i++) out[i] = 80 * Math.pow(100, i / 47)
@@ -342,11 +347,11 @@ class SonifyEngine {
     if (sinkChanged) this.applySink(cfg.sinkId)
     // grain pitch table for the flow voice
     this.grainFreqs = cfg.flow.quantize
-      ? scaleTable(cfg.root, cfg.scale, cfg.flow.loOct, cfg.flow.hiOct)
+      ? scaleTable(effRoot(cfg), cfg.scale, cfg.flow.loOct, cfg.flow.hiOct)
       : new Float32Array(0)
     // note pitch table for the events voice
     this.eventFreqs = cfg.events.quantize
-      ? scaleTable(cfg.root, cfg.scale, cfg.events.loOct, cfg.events.hiOct)
+      ? scaleTable(effRoot(cfg), cfg.scale, cfg.events.loOct, cfg.events.hiOct)
       : new Float32Array(0)
     this.node.port.postMessage({
       t: 'cfg',
