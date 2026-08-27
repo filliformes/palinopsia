@@ -229,7 +229,8 @@ class SoniProcessor extends AudioWorkletProcessor {
       raster:  { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
       sstv:    { on: false, tap: 0, gain: 0.5, pan: 0, lineHz: 12, dev: 1, syncLev: 0.5 },
       filter:  { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0 },
-      chord:   { on: false, tap: 0, gain: 0.6, pan: 0, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3 }
+      chord:   { on: false, tap: 0, gain: 0.6, pan: 0, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3 },
+      fx:      { send: 0, dlyMix: 0.35, dlyTime: 0.3, dlyFb: 0.35, dlyTone: 0.5, dlyMode: 1, rvMode: 0, rvMix: 0.6, rvSize: 0.6, rvDecay: 0.6, rvDamp: 0.3, rvPre: 20, rvMod: 6, rvModRate: 0.5, rvWidth: 1, rvLocut: 220, rvFreeze: false, rvDiff: 0.85, rvLowDamp: 0.5, rvCross: 0.3, rvLowMult: 1, rvHighMult: 1 }
     };
     this.spectraFreqs = new Float32Array(NPART); // filled by cfg
     for (let i = 0; i < NPART; i++) this.spectraFreqs[i] = 55 * Math.pow(2, i * 6 / NPART);
@@ -332,7 +333,7 @@ class SoniProcessor extends AudioWorkletProcessor {
         if (dst) Object.assign(dst, mm[k]);
       }
       // fx params drive the reverb/delay objects (not read live) → re-apply.
-      if (mm.fx) this.applyFx(this.cfg.fx);
+      if (mm.fx && this.cfg.fx) this.applyFx(this.cfg.fx);
       return;
     }
     if (m.t === 'flow') {

@@ -364,6 +364,24 @@ class SonifyEngine {
   }
 
   pushConfig(cfg: SoniConfig): void {
+    // Deep-fill against the defaults so no voice — or voice FIELD — is ever
+    // missing (old localStorage / sessions / scenes / presets saved before a
+    // voice or param existed). A partial config used to silence the whole engine
+    // (a missing voice threw; a missing field went NaN).
+    const d = defaultSoniConfig()
+    cfg = {
+      ...d, ...cfg,
+      spectra: { ...d.spectra, ...cfg.spectra },
+      orbit: { ...d.orbit, ...cfg.orbit },
+      flow: { ...d.flow, ...cfg.flow },
+      events: { ...d.events, ...cfg.events },
+      raster: { ...d.raster, ...cfg.raster },
+      sstv: { ...d.sstv, ...cfg.sstv },
+      filter: { ...d.filter, ...cfg.filter },
+      chord: { ...d.chord, ...cfg.chord },
+      fx: { ...d.fx, ...cfg.fx },
+      mixFilter: Array.isArray(cfg.mixFilter) && cfg.mixFilter.length === 8 ? cfg.mixFilter : d.mixFilter
+    }
     const sinkChanged = cfg.sinkId !== this.cfg.sinkId
     this.cfg = cfg
     if (!this.node) return
@@ -497,7 +515,9 @@ class SonifyEngine {
     // Probe modulation overlay : ship the EFFECTIVE probe values (base +
     // whatever the mod-matrix / Meta knobs wrote this frame) every tick.
     // Always sent, so releasing a modulator reverts to the base cleanly.
-    {
+    // Wrapped so a modulation hiccup can NEVER stop the grid-send below (which
+    // would silence every voice — the whole engine reads the same taps).
+    try {
       const mv = sonifyModValues
       const g = (k: string, base: number): number => mv.get(k) ?? base
       const c = this.cfg
@@ -527,7 +547,10 @@ class SonifyEngine {
       const mm = m as unknown as Record<string, Record<string, number>>
       for (const param in SONI_SIMPLE_MODS) {
         const [voice, field] = SONI_SIMPLE_MODS[param]
-        ;(mm[voice] ??= {})[field] = g(param, (c[voice] as unknown as Record<string, number>)[field])
+        const vc = c[voice] as unknown as Record<string, number> | undefined
+        const base = vc ? vc[field] : undefined
+        if (typeof base !== 'number') continue // defensive : partial config → skip
+        ;(mm[voice] ??= {})[field] = g(param, base)
       }
       node.port.postMessage({ t: 'mod', m })
       this.liveProbes = {
@@ -535,6 +558,8 @@ class SonifyEngine {
         orbitX: m.orbit.cx, orbitY: m.orbit.cy, orbitR: m.orbit.rx,
         rasterX: m.raster.rx, rasterY: m.raster.ry, rasterW: m.raster.rw, rasterH: m.raster.rh
       }
+    } catch (e) {
+      console.error('[sonify] mod overlay skipped', e)
     }
 
     const need = [false, false]
