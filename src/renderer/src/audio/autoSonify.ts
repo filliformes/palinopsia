@@ -167,6 +167,10 @@ export function randomSonify(cur: SoniConfig): SoniConfig {
   const bag = [...all]
   for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1));[bag[i], bag[j]] = [bag[j], bag[i]] }
   const chosen = new Set(bag.slice(0, rnd() < 0.4 ? 3 : 2))
+  // Guarantee at least one voice that sings on ANY frame — Flow & Events need
+  // MOTION, so a dice that picks only those would be silent on a still image.
+  const alwaysAudible: SoniVoiceKey[] = ['spectra', 'orbit', 'raster', 'sstv', 'filter', 'chord']
+  if (![...chosen].some((v) => alwaysAudible.includes(v))) chosen.add(pick(alwaysAudible))
   const scales = ['minor', 'major', 'pentatonic', 'dorian', 'phrygian', 'lydian', 'wholetone'] as const
   const V = (k: SoniVoiceKey): Record<string, unknown> => ({ ...R_PARAMS[k](cur), on: chosen.has(k), tap: 0 })
   return {

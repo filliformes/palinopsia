@@ -74,6 +74,12 @@ class FDNReverb {
       }
     }
   }
+  reset() { // clear all feedback state (recover from a NaN / blow-up)
+    for (let i = 0; i < RV_NL; i++) { this.line[i].fill(0); this.lw[i] = 0; this.damp_z[i] = this.lo_z[i] = this.ls_z[i] = this.hs_z[i] = 0; }
+    for (let i = 0; i < RV_NAP; i++) { this.ap[i].fill(0); this.apw[i] = 0; }
+    this.pd[0].fill(0); this.pd[1].fill(0); this.pdw = 0;
+    this.hp_x[0] = this.hp_x[1] = this.hp_y[0] = this.hp_y[1] = 0; this.wL = this.wR = 0;
+  }
   lineRead(i, delay) {
     let rp = this.lw[i] - delay; while (rp < 0) rp += RV_LMAX;
     let i0 = rp | 0; const frac = rp - i0; if (i0 >= RV_LMAX) i0 -= RV_LMAX;
@@ -139,6 +145,7 @@ class BBDDelay {
     this.mix = 0.3; this.rate = 0.3; this.rate_s = 0.3; this.fb = 0.35; this.tone = 0.5; this.mode = 1;
     this.wL = 0; this.wR = 0;
   }
+  reset() { this.dbl.fill(0); this.dbr.fill(0); this.dw = 0; this.lp_l = this.lp_r = this.lp2_l = this.lp2_r = 0; this.wL = this.wR = 0; }
   process(inL, inR) {
     this.rate_s += 0.0004 * (this.rate - this.rate_s);
     const delf = this.rate_s * this.sr; let rf = this.dw - delf; if (rf < 0) rf += this.dlen;
@@ -426,10 +433,14 @@ class SoniProcessor extends AudioWorkletProcessor {
   // zero the scratch so the next voice starts clean (no per-voice pre-fill).
   mixVoice(idx, vL, vR, outL, outR, n) {
     const f = this.djf[idx];
-    if (f.mode === 0) {
-      for (let s = 0; s < n; s++) { outL[s] += vL[s]; outR[s] += vR[s]; vL[s] = 0; vR[s] = 0; }
-    } else {
-      for (let s = 0; s < n; s++) { outL[s] += f.procL(vL[s]); outR[s] += f.procR(vR[s]); vL[s] = 0; vR[s] = 0; }
+    // Sanitize : a bad param can make a voice go NaN/Inf; if that reached the
+    // master or the FX-tail feedback it would silence everything permanently.
+    for (let s = 0; s < n; s++) {
+      let l = vL[s], r = vR[s];
+      if (!Number.isFinite(l)) l = 0;
+      if (!Number.isFinite(r)) r = 0;
+      if (f.mode !== 0) { l = f.procL(l); r = f.procR(r); }
+      outL[s] += l; outR[s] += r; vL[s] = 0; vR[s] = 0;
     }
   }
 
@@ -844,7 +855,10 @@ class SoniProcessor extends AudioWorkletProcessor {
         const inL = outL[s] * send, inR = outR[s] * send;
         dl.process(inL, inR);
         rv.process(inL + dl.wL, inR + dl.wR); // reverb hears the send + the echoes
-        const wl = dl.wL + rv.wL, wr = dl.wR + rv.wR;
+        let wl = dl.wL + rv.wL, wr = dl.wR + rv.wR;
+        // A NaN in the tail's feedback would stick forever (permanent silence) —
+        // detect it and clear the buffers so the tail self-heals.
+        if (!(Number.isFinite(wl) && Number.isFinite(wr))) { dl.reset(); rv.reset(); wl = 0; wr = 0; }
         outL[s] += wl; outR[s] += wr;
         const amp = Math.abs(wl) + Math.abs(wr); if (amp > tail) tail = amp;
       }
@@ -856,6 +870,8 @@ class SoniProcessor extends AudioWorkletProcessor {
     let peak = this.peak;
     for (let s = 0; s < n; s++) {
       let l = outL[s] * mg, r = outR[s] * mg;
+      if (!Number.isFinite(l)) l = 0;
+      if (!Number.isFinite(r)) r = 0;
       const p = Math.max(Math.abs(l), Math.abs(r));
       // fast-attack / slow-release peak limiter at -1 dBFS
       const target = p > 0.89 ? 0.89 / p : 1;

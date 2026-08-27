@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
 import type { ModTarget, SonifyModParam } from '@shared/types'
 import { randomSonify, randomizeVoice, suggestSonify, type SoniVoiceKey } from '../audio/autoSonify'
-import { SONI_SCALES, sonifyEngine, type SoniConfig } from '../audio/sonify'
+import { defaultSoniConfig, SONI_SCALES, sonifyEngine, type SoniConfig } from '../audio/sonify'
 import { deleteSoniPreset, listSoniPresets, loadSoniPreset, saveSoniPreset } from '../audio/soniPresets'
 import { modTargetKey, useStore } from '../store'
 
@@ -243,6 +243,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   const [presetList, setPresetList] = useState<string[]>(() => listSoniPresets())
   const [presetName, setPresetName] = useState('')
   const diceWhole = (): void => setSonify({ ...randomSonify(cfg), on: cfg.on, sinkId: cfg.sinkId })
+  const resetDefault = (): void => setSonify({ ...defaultSoniConfig(), on: cfg.on, sinkId: cfg.sinkId })
   const diceVoice = (k: SoniVoiceKey): void => setSonify(randomizeVoice(cfg, k))
   const savePreset = (): void => {
     const n = presetName.trim()
@@ -478,6 +479,13 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           title="Randomize the whole Sonify patch — 2–3 voices, their params, a key/octave, maybe an FX tail (your on/off + output are kept)"
         >
           🎲
+        </button>
+        <button
+          onClick={resetDefault}
+          className="rounded px-2 py-0.5 font-mono text-[11px] text-muted ring-1 ring-border transition-colors hover:text-accent hover:ring-accent/60"
+          title="Reset every Sonify voice / FX / mixer setting back to the defaults (keeps sound on/off + output device)"
+        >
+          default
         </button>
         {/* Presets */}
         <div className="flex items-center gap-1">
