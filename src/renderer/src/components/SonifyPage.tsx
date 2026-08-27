@@ -13,6 +13,10 @@ import { SONI_SCALES, sonifyEngine, type SoniConfig } from '../audio/sonify'
 import { modTargetKey, useStore } from '../store'
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+// Voice order matches the worklet's render/filter order (mixFilter indices).
+const VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord'] as const
+const VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord']
+const filterTag = (x: number): string => (x < 0.49 ? 'LP' : x > 0.51 ? 'HP' : '—')
 
 const TAU = 6.283185307179586
 /** Breathing rubato warp of a linear sweep phase (mirror of the worklet's warpPace). */
@@ -212,6 +216,12 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 
   const set = (next: SoniConfig): void => setSonify(next)
   const patch = (p: Partial<SoniConfig>): void => set({ ...cfg, ...p })
+  const [view, setView] = useState<'voices' | 'mixer'>('voices')
+  const setMixFilter = (i: number, v: number): void => {
+    const mf = [...(cfg.mixFilter ?? [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5])]
+    mf[i] = v
+    patch({ mixFilter: mf })
+  }
   const pv = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord'>(k: K, p: Partial<SoniConfig[K]>): void =>
     set({ ...cfg, [k]: { ...cfg[k], ...p } })
   const pfx = (p: Partial<SoniConfig['fx']>): void => set({ ...cfg, fx: { ...cfg.fx, ...p } })
@@ -427,6 +437,11 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
         >
           {cfg.on ? '◉ sound on' : '○ sound off'}
         </button>
+        {/* Voices ↔ Mixer view */}
+        <div className="flex overflow-hidden rounded ring-1 ring-border font-mono text-[10px]">
+          <button onClick={() => setView('voices')} className={`px-2 py-0.5 transition-colors ${view === 'voices' ? 'bg-accent/20 text-accent' : 'text-muted hover:text-text'}`} title="Per-voice parameter strips">voices</button>
+          <button onClick={() => setView('mixer')} className={`px-2 py-0.5 transition-colors ${view === 'mixer' ? 'bg-accent/20 text-accent' : 'text-muted hover:text-text'}`} title="Mixer : per-voice volume + HP/LP filter, and the FX-tail mix">▤ mixer</button>
+        </div>
         {/* Master + meter */}
         <span className="font-mono text-[9px] uppercase text-muted">master</span>
         <input
@@ -518,6 +533,34 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
         {/* Voice strips */}
         <aside className="flex w-[320px] shrink-0 flex-col gap-2 overflow-y-auto border-l border-border bg-panel px-3 py-2">
           {assign && <AssignMini param={assign} onClose={() => setAssign(null)} />}
+          {view === 'mixer' && (
+            <div className="flex flex-col gap-1">
+              <div className="mb-0.5 font-mono text-[9px] uppercase tracking-wide text-muted">mixer — volume · filter (LP ◄ off ► HP)</div>
+              {VOICE_KEYS.map((k, i) => {
+                const vv = cfg[k]
+                return (
+                  <div key={k} className="flex items-center gap-1.5 rounded border border-border/60 bg-panel2/40 px-1.5 py-1">
+                    <button
+                      onClick={() => pv(k, { on: !vv.on })}
+                      className={`h-4 w-4 shrink-0 rounded-full text-[8px] leading-none ${vv.on ? 'bg-accent text-black' : 'bg-panel3 text-muted'}`}
+                      title={vv.on ? 'on' : 'off'}
+                    >{vv.on ? '●' : '○'}</button>
+                    <span className="w-[52px] shrink-0 truncate font-mono text-[9px]">{VOICE_NAMES[i]}</span>
+                    <input type="range" min={0} max={1} step={0.01} value={vv.gain} onChange={(e) => pv(k, { gain: Number(e.target.value) })} onDoubleClick={() => pv(k, { gain: 0.5 })} className="min-w-0 flex-1 accent-accent" title={`Volume ${vv.gain.toFixed(2)}`} />
+                    <input type="range" min={0} max={1} step={0.01} value={cfg.mixFilter?.[i] ?? 0.5} onChange={(e) => setMixFilter(i, Number(e.target.value))} onDoubleClick={() => setMixFilter(i, 0.5)} className="min-w-0 flex-1 accent-accent2" title={`Filter : ${filterTag(cfg.mixFilter?.[i] ?? 0.5)} (double-click = off)`} />
+                    <span className="w-5 shrink-0 text-right font-mono text-[8px] text-muted">{filterTag(cfg.mixFilter?.[i] ?? 0.5)}</span>
+                  </div>
+                )
+              })}
+              <div className="mt-1 flex flex-col gap-0.5 rounded border border-accent2/40 bg-panel2/40 px-1.5 py-1">
+                <div className="font-mono text-[8px] uppercase tracking-wide text-muted/70">fx tail</div>
+                <Slider label="send" value={cfg.fx.send} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ send: v })} />
+                <Slider label="delay" value={cfg.fx.dlyMix} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ dlyMix: v })} />
+                <Slider label="reverb" value={cfg.fx.rvMix} min={0} max={1} neutral={0.6} onChange={(v) => pfx({ rvMix: v })} />
+              </div>
+            </div>
+          )}
+          {view === 'voices' && (<>
           <VoiceShell
             title="Spectra" on={cfg.spectra.on}
             hint="the frame as a spectrogram : a column of partials sweeps or sits"
@@ -951,6 +994,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             Chord : a scale-tuned bank whose notes follow the brightness of horizontal bands — a sustained chord that swells and fades, so a still image still sings (after Aural Mirror's additive layer).
             Recording captures everything.
           </p>
+          </>)}
         </aside>
       </div>
     </div>

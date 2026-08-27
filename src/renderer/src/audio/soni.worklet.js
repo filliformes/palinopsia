@@ -162,6 +162,49 @@ class BBDDelay {
   }
 }
 
+// Per-voice DJ filter (Essaim fx.c) : one knob — <0.5 sweeps a 3-stage lowpass
+// down (18k→200Hz), >0.5 sweeps a 3-stage highpass up (20→8000Hz), 0.5 = bypass.
+// RBJ biquads at Q=0.707, cascaded ×3, independent L/R state.
+class DJFilter {
+  constructor() {
+    this.mode = 0; // 0 off · 1 LP · 2 HP
+    this.b0 = 1; this.b1 = 0; this.b2 = 0; this.a1 = 0; this.a2 = 0;
+    this.x1L = new Float32Array(3); this.x2L = new Float32Array(3); this.y1L = new Float32Array(3); this.y2L = new Float32Array(3);
+    this.x1R = new Float32Array(3); this.x2R = new Float32Array(3); this.y1R = new Float32Array(3); this.y2R = new Float32Array(3);
+  }
+  coefsLPF(freq, sr) {
+    const w0 = TAU * clampf(freq, 20, sr * 0.49) / sr, alpha = Math.sin(w0) / (2 * 0.707);
+    const cw = Math.cos(w0), a0i = 1 / (1 + alpha);
+    this.b0 = (1 - cw) * 0.5 * a0i; this.b1 = (1 - cw) * a0i; this.b2 = this.b0; this.a1 = -2 * cw * a0i; this.a2 = (1 - alpha) * a0i;
+  }
+  coefsHPF(freq, sr) {
+    const w0 = TAU * clampf(freq, 20, sr * 0.49) / sr, alpha = Math.sin(w0) / (2 * 0.707);
+    const cw = Math.cos(w0), a0i = 1 / (1 + alpha);
+    this.b0 = (1 + cw) * 0.5 * a0i; this.b1 = -(1 + cw) * a0i; this.b2 = this.b0; this.a1 = -2 * cw * a0i; this.a2 = (1 - alpha) * a0i;
+  }
+  setX(x, sr) {
+    if (x < 0.49) { this.mode = 1; this.coefsLPF(18000 * Math.pow(200 / 18000, (0.49 - x) / 0.49), sr); }
+    else if (x > 0.51) { this.mode = 2; this.coefsHPF(20 * Math.pow(400, (x - 0.51) / 0.49), sr); }
+    else this.mode = 0;
+  }
+  procL(inp) {
+    let v = inp;
+    for (let s = 0; s < 3; s++) {
+      const o = this.b0 * v + this.b1 * this.x1L[s] + this.b2 * this.x2L[s] - this.a1 * this.y1L[s] - this.a2 * this.y2L[s];
+      this.x2L[s] = this.x1L[s]; this.x1L[s] = v; this.y2L[s] = this.y1L[s]; this.y1L[s] = o; v = o + 1e-20;
+    }
+    return v;
+  }
+  procR(inp) {
+    let v = inp;
+    for (let s = 0; s < 3; s++) {
+      const o = this.b0 * v + this.b1 * this.x1R[s] + this.b2 * this.x2R[s] - this.a1 * this.y1R[s] - this.a2 * this.y2R[s];
+      this.x2R[s] = this.x1R[s]; this.x1R[s] = v; this.y2R[s] = this.y1R[s]; this.y1R[s] = o; v = o + 1e-20;
+    }
+    return v;
+  }
+}
+
 class SoniProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -243,6 +286,12 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.reverb = new FDNReverb(sampleRate);
     this.delay = new BBDDelay(sampleRate);
     this.fxSend = 0; this.fxSendS = 0; this.fxRinging = false; // global send + smoothing + tail ring-out
+    // ── mixer : per-voice DJ filter (volume = each voice's own gain) ──
+    // Order matches the voice-render order below : spectra·orbit·flow·events·
+    // raster·sstv·filter·chord. Voices render into vL/vR then flush through their
+    // filter into the master (mixVoice).
+    this.djf = []; for (let i = 0; i < 8; i++) this.djf.push(new DJFilter());
+    this.vL = new Float32Array(128); this.vR = new Float32Array(128);
     // ── limiter ──
     this.limEnv = 1;
     // ── metering (sent back ~10Hz) ──
@@ -271,6 +320,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       if (m.filterFreqs) { this.fFreqs.set(m.filterFreqs); this.rebuildFilterCoefs(); }
       if (m.chordFreqs) { this.chordN = Math.min(NCHORD, m.chordFreqs.length); this.chordFreqs.set(m.chordFreqs.subarray(0, this.chordN)); }
       if (m.cfg.fx) this.applyFx(m.cfg.fx);
+      if (m.cfg.mixFilter) for (let i = 0; i < 8; i++) this.djf[i].setX(m.cfg.mixFilter[i] != null ? m.cfg.mixFilter[i] : 0.5, sampleRate);
       return;
     }
     if (m.t === 'mod') {
@@ -369,6 +419,17 @@ class SoniProcessor extends AudioWorkletProcessor {
     rv.recompute();
   }
 
+  // Flush a voice's scratch (vL/vR) through its DJ filter into the master, then
+  // zero the scratch so the next voice starts clean (no per-voice pre-fill).
+  mixVoice(idx, vL, vR, outL, outR, n) {
+    const f = this.djf[idx];
+    if (f.mode === 0) {
+      for (let s = 0; s < n; s++) { outL[s] += vL[s]; outR[s] += vR[s]; vL[s] = 0; vR[s] = 0; }
+    } else {
+      for (let s = 0; s < n; s++) { outL[s] += f.procL(vL[s]); outR[s] += f.procR(vR[s]); vL[s] = 0; vR[s] = 0; }
+    }
+  }
+
   // Nearest-pixel read of a tap's CURRENT grid (the Raster voice wants the
   // hard, aliased read — no interframe smoothing, that's the register).
   rawPixel(tap, ix, iy) {
@@ -380,9 +441,12 @@ class SoniProcessor extends AudioWorkletProcessor {
 
   process(_inputs, outputs) {
     const out = outputs[0];
-    const L = out[0], R = out[1] || out[0];
-    const n = L.length;
-    L.fill(0); if (R !== L) R.fill(0);
+    const outL = out[0], outR = out[1] || out[0];
+    const n = outL.length;
+    outL.fill(0); if (outR !== outL) outR.fill(0);
+    // Voices render into a per-voice scratch (L/R), then flush through their DJ
+    // filter into the master (outL/outR) via mixVoice — see the constructor.
+    const L = this.vL, R = this.vR;
     const cfg = this.cfg;
     const dt = 1 / sampleRate;
 
@@ -451,6 +515,8 @@ class SoniProcessor extends AudioWorkletProcessor {
       }
     }
 
+    if (sp.on) this.mixVoice(0, L, R, outL, outR, n);
+
     // ── ORBIT : wave terrain — the frame IS the waveform ──
     const ob = cfg.orbit;
     if (ob.on) {
@@ -476,6 +542,8 @@ class SoniProcessor extends AudioWorkletProcessor {
       }
       if (this.oPhase > 1e6) this.oPhase %= 1;
     }
+
+    if (ob.on) this.mixVoice(1, L, R, outL, outR, n);
 
     // ── FLOW : grain cloud from the motion field ──
     const fl = cfg.flow;
@@ -533,6 +601,8 @@ class SoniProcessor extends AudioWorkletProcessor {
       }
     }
 
+    if (fl.on) this.mixVoice(2, L, R, outL, outR, n);
+
     // ── EVENTS : edges / motion → plucked notes (Aural-Mirror register) ──
     const ev = cfg.events;
     if (ev.on) {
@@ -588,6 +658,8 @@ class SoniProcessor extends AudioWorkletProcessor {
       }
     }
 
+    if (ev.on) this.mixVoice(3, L, R, outL, outR, n);
+
     // ── RASTER : audification — the probe rect read row-major as samples ──
     const ra = cfg.raster;
     if (ra.on) {
@@ -638,6 +710,8 @@ class SoniProcessor extends AudioWorkletProcessor {
       this.rPtr = ptr;
     }
 
+    if (ra.on) this.mixVoice(4, L, R, outL, outR, n);
+
     // ── TRANSMISSION : the SSTV register — line-sequential FM + sync tick ──
     const tv = cfg.sstv;
     if (tv.on) {
@@ -668,6 +742,8 @@ class SoniProcessor extends AudioWorkletProcessor {
       }
       if (this.tPhase > 1e6) this.tPhase %= 1;
     }
+
+    if (tv.on) this.mixVoice(5, L, R, outL, outR, n);
 
     // ── FILTER : the image as a band-gain matrix over noise / line-in ──
     const fi = cfg.filter;
@@ -706,6 +782,8 @@ class SoniProcessor extends AudioWorkletProcessor {
         L[s] += v * gL; R[s] += v * gR;
       }
     }
+
+    if (fi.on) this.mixVoice(6, L, R, outL, outR, n);
 
     // ── CHORD : scale-tuned bank following the frame's brightness bands ──
     const ch = cfg.chord;
@@ -749,6 +827,8 @@ class SoniProcessor extends AudioWorkletProcessor {
       }
     }
 
+    if (ch.on) this.mixVoice(7, L, R, outL, outR, n);
+
     // ── shared FX tail : send the (dry) mix into delay → reverb, return the wet ──
     // Runs while there's send OR the reverb/delay are still ringing (so cutting the
     // send lets the tail decay naturally instead of snapping off).
@@ -758,11 +838,11 @@ class SoniProcessor extends AudioWorkletProcessor {
       let tail = 0;
       for (let s = 0; s < n; s++) {
         const send = (this.fxSendS += (this.fxSend - this.fxSendS) * 0.002);
-        const inL = L[s] * send, inR = R[s] * send;
+        const inL = outL[s] * send, inR = outR[s] * send;
         dl.process(inL, inR);
         rv.process(inL + dl.wL, inR + dl.wR); // reverb hears the send + the echoes
         const wl = dl.wL + rv.wL, wr = dl.wR + rv.wR;
-        L[s] += wl; R[s] += wr;
+        outL[s] += wl; outR[s] += wr;
         const amp = Math.abs(wl) + Math.abs(wr); if (amp > tail) tail = amp;
       }
       this.fxRinging = wantFx || tail > 1e-4;
@@ -772,13 +852,13 @@ class SoniProcessor extends AudioWorkletProcessor {
     const mg = cfg.master;
     let peak = this.peak;
     for (let s = 0; s < n; s++) {
-      let l = L[s] * mg, r = R[s] * mg;
+      let l = outL[s] * mg, r = outR[s] * mg;
       const p = Math.max(Math.abs(l), Math.abs(r));
       // fast-attack / slow-release peak limiter at -1 dBFS
       const target = p > 0.89 ? 0.89 / p : 1;
       this.limEnv = target < this.limEnv ? target : this.limEnv + (1 - this.limEnv) * 0.0004;
       l *= this.limEnv; r *= this.limEnv;
-      L[s] = l; R[s] = r;
+      outL[s] = l; outR[s] = r;
       const ap = Math.max(Math.abs(l), Math.abs(r));
       if (ap > peak) peak = ap;
     }

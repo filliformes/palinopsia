@@ -118,6 +118,10 @@ export interface SoniConfig {
     rvDiff: number; rvLowDamp: number // Quartz
     rvCross: number; rvLowMult: number; rvHighMult: number // Prism
   }
+  // Per-voice DJ filter for the mixer page (one per voice, in render order :
+  // spectra·orbit·flow·events·raster·sstv·filter·chord). 0.5 = bypass, <0.5
+  // lowpass sweep, >0.5 highpass sweep. Volume is each voice's own `gain`.
+  mixFilter: number[]
   taps: [SoniTap, SoniTap]
 }
 
@@ -143,6 +147,7 @@ export function defaultSoniConfig(): SoniConfig {
       rvWidth: 1, rvLocut: 220, rvFreeze: false, rvDiff: 0.85, rvLowDamp: 0.5,
       rvCross: 0.3, rvLowMult: 1, rvHighMult: 1
     },
+    mixFilter: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
     taps: [{ kind: 'master', layer: 0 }, { kind: 'layer', layer: 0 }]
   }
 }
@@ -389,7 +394,8 @@ class SonifyEngine {
           gamma: cfg.chord.gamma, spread: cfg.chord.spread, attack: cfg.chord.attack,
           release: cfg.chord.release, tone: cfg.chord.tone
         },
-        fx: { ...cfg.fx }
+        fx: { ...cfg.fx },
+        mixFilter: cfg.mixFilter
       },
       spectraFreqs: spectraFreqs(cfg),
       filterFreqs: filterFreqs(cfg),
