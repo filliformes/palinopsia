@@ -41,7 +41,18 @@ nsis:
 mac:
   target:
     - target: dmg
-      arch:
-        - universal
+  # No arch pin: electron-builder defaults to the build host's arch. CI builds
+  # mac twice — macos-latest (Apple Silicon → arm64) and macos-13 (Intel → x64) —
+  # so ffmpeg-static bundles the matching native binary in each dmg (a single
+  # "universal" dmg on the arm64 runner would ship an arm64-only ffmpeg that
+  # fails probe/convert/record on Intel Macs).
   artifactName: ${productName}-${version}-mac-${arch}.${ext}
   category: public.app-category.music
+linux:
+  target:
+    - AppImage
+    - deb
+  category: AudioVideo
+  artifactName: ${productName}-${version}-linux-${arch}.${ext}
+  # deb requires a maintainer contact (also present in package.json "author").
+  maintainer: Vincent Fillion <vfillion.av@gmail.com>

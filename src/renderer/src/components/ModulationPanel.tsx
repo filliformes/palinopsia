@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { ArpMode, AudioFeature, LfoShape, ModulatorType, MotionShape, PhysicsMotion, VisionFeature } from '@shared/types'
-import { MAX_MOD_ASSIGNMENTS, MOTION_SHAPES, WORLD_AUTOMOD_SLOT } from '@shared/types'
+import { FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, MOTION_SHAPES, WORLD_AUTOMOD_SLOT } from '@shared/types'
 import { DIVISIONS, modEngine } from '../engine/modulation'
 import { AUDIO_BANDS, AUDIO_FEATURES } from '../engine/audioIn'
 import { VISION_FEATURES } from '../engine/visionIn'
@@ -93,13 +93,16 @@ function ModCard({ index }: { index: number }): JSX.Element {
 
   return (
     // Fixed height + min-w-0 so all eight cards are identical regardless of
-    // type : the section keeps one silhouette as types are swapped.
+    // type : the section keeps one silhouette as types are swapped. Sized for
+    // the tallest type (euclid : 4 param rows + the BPM division select); the
+    // params region below scrolls as a safety net so nothing ever crosses the
+    // border even at large UI zoom.
     <div
-      className={`flex h-36 min-w-0 flex-col gap-1 rounded border p-1.5 transition-colors ${
+      className={`flex h-40 min-w-0 flex-col gap-1 rounded border p-1.5 transition-colors ${
         m.enabled ? 'border-accent/60 bg-panel2' : 'border-border bg-panel2/40'
       }`}
     >
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <button
           onClick={() => update(index, { enabled: !m.enabled })}
           className={`h-2.5 w-2.5 shrink-0 rounded-full transition-colors ${
@@ -146,7 +149,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
       {/* clock : everything except ramp/adsr/audio is clock-driven
           (audio is driven by the signal itself) */}
       {m.type !== 'ramp' && m.type !== 'adsr' && m.type !== 'audio' && m.type !== 'vision' && m.type !== 'homeostat' && (
-        <div className="flex min-w-0 items-center gap-1">
+        <div className="flex min-w-0 shrink-0 items-center gap-1">
           <button
             onClick={() => update(index, { sync: m.sync === 'bpm' ? 'free' : 'bpm' })}
             className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
@@ -223,8 +226,11 @@ function ModCard({ index }: { index: number }): JSX.Element {
       )}
 
       {/* type-specific params (output shaping lives on the Meta knobs, not
-          here : modulators emit their raw signal) */}
-      <TypeParams index={index} />
+          here : modulators emit their raw signal). Bounded + scrollable so a
+          param-heavy type (euclid) can never spill past the card border. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+        <TypeParams index={index} />
+      </div>
     </div>
   )
 }
@@ -694,13 +700,15 @@ function MiniSlider({
         className="min-w-0 flex-1 accent-accent"
         title={help}
       />
-      {/* One decimal : the box renders String(value), so a raw ms/1000 would
-          read "1.073" and clip in a cell this narrow. The row's tooltip keeps
-          the exact figure. */}
+      {/* Two decimals (display only) : maxFrac shows 0.01 s and drops trailing
+          zeros, so 0.55 s reads "0.55" instead of rounding up to "0.6". A raw
+          ms/1000 would read "1.073" and clip in a cell this narrow; the row's
+          tooltip keeps the exact figure. */}
       <BoundedNumberInput
-        value={Math.round(value / 100) / 10}
+        value={value / 1000}
         min={min / 1000}
         max={max / 1000}
+        maxFrac={2}
         onChange={(v) => onChange(Math.round(v * 1000))}
         className="input w-9 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
       />
@@ -766,7 +774,7 @@ function Meter({ index }: { index: number }): JSX.Element {
     return () => cancelAnimationFrame(raf)
   }, [index])
   return (
-    <div className="h-1 w-full overflow-hidden rounded bg-panel3/50">
+    <div className="h-1 w-full shrink-0 overflow-hidden rounded bg-panel3/50">
       <div ref={barRef} className="h-full bg-accent/80" style={{ width: '0%' }} />
     </div>
   )
@@ -788,6 +796,10 @@ function MatrixSummary(): JSX.Element {
       return `META K${t.knob + 1} (${name})`
     }
     if (t.kind === 'sonify') return `SONIFY ${t.param}`
+    if (t.kind === 'layer') {
+      const f = t.field === 'mix' ? 'A/B mix' : t.field
+      return `L${t.layer + 1} ${f}`
+    }
     const inst =
       t.scope.kind === 'master'
         ? composition.master.find((f) => f.id === t.instId)
@@ -802,7 +814,8 @@ function MatrixSummary(): JSX.Element {
     const fxName = inst?.shaderId ? (SHADER_BY_ID[inst.shaderId]?.name ?? '?') : '?'
     const where =
       t.scope.kind === 'master' ? 'MST' : t.scope.kind === 'background' ? 'BG' : `L${t.scope.layer + 1}`
-    return `${where}·${fxName} ${t.input}`
+    const inputLabel = t.input === FX_OPACITY_INPUT ? 'opacity' : t.input
+    return `${where}·${fxName} ${inputLabel}`
   }
 
   return (
@@ -821,9 +834,9 @@ function MatrixSummary(): JSX.Element {
           </span>
           <input
             type="range"
-            min={-1}
-            max={1}
-            step={0.01}
+            min={-10}
+            max={10}
+            step={0.05}
             value={a.depth}
             onChange={(e) => setAssignmentDepth(a.id, Number(e.target.value))}
             className="w-14 accent-accent"

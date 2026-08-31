@@ -433,6 +433,15 @@ export type ModTarget =
   | { kind: 'fx'; scope: FxScope; instId: string; input: string }
   | { kind: 'meta'; knob: number }
   | { kind: 'sonify'; param: SonifyModParam }
+  // Compositor-level layer controls (not ISF inputs) : the layer's own opacity,
+  // its A/B source mix, and its blend-against-the-stack mode (driven as an enum
+  // index that cycles through BLEND_MODES). Applied as a final per-frame override.
+  | { kind: 'layer'; layer: number; field: 'opacity' | 'mix' | 'blend' }
+
+// Sentinel `input` name that turns an `fx` ModTarget into the FX unit's dry/wet
+// OPACITY (a compositor property, not an ISF uniform), so per-FX opacity rides
+// the exact same fx target plumbing (key, label, removal-pruning, session save).
+export const FX_OPACITY_INPUT = '__opacity'
 
 // Addresses one of the FX racks (per-source, per-layer, master, or background).
 export type FxScope =
@@ -613,6 +622,30 @@ export interface SurfaceSequencer {
   closed: boolean
 }
 
+// ── Sonify sequencer ─────────────────────────────────────────────────
+// A step timeline that evolves the Sonify engine over time (Mixer page). Each
+// step either loads a whole saved preset (structural change) or, with no preset,
+// just sets which of the 8 voices are on (a rhythmic on/off pattern over the
+// current sound). One shared transport advances the steps.
+export interface SoniSeqStep {
+  voices: boolean[] // length 8 : per-voice on/off, applied when `preset` is empty
+  preset: string // '' = apply the voices mask; else the name of a saved Sonify preset to load
+}
+export interface SoniSeq {
+  on: boolean // transport running
+  stepMs: number // dwell per step
+  len: number // active step count (2..16)
+  cur: number // current step (runtime; resets to 0 on load)
+  // Step-advance mode (dataFLOU's): forward = linear loop · bounce = forward but
+  // with an accelerating "bouncing-ball" rhythm each cycle · drift = a biased
+  // random-walk playhead.
+  mode: 'forward' | 'bounce' | 'drift'
+  bounceDecay: number // 0..100 (bounce) : how hard the per-cycle rhythm accelerates
+  bias: number // -100..100 (drift) : random-walk direction bias (back ↔ forward)
+  edge: 'wrap' | 'reflect' // (drift) : behaviour at the ends
+  steps: SoniSeqStep[] // length 16 (only the first `len` are used)
+}
+
 export interface Session {
   version: 1
   name: string
@@ -629,6 +662,13 @@ export interface Session {
   sequence?: SequenceState
   // Sonify config (the S page) : travels with the session. Opaque to main.
   sonify?: unknown
+  // Sonify step sequencer : travels with the session so an evolving sonified
+  // work is self-contained (preset steps reference machine-local preset names).
+  soniSeq?: SoniSeq
+  // Performance dials : the global clock multiplier + the scene-morph duration.
+  // Optional for back-compat with sessions saved before they were persisted.
+  globalSpeed?: number
+  morphMs?: number
   // Metasurface draw sequencer : the recorded path + its playback timing.
   // The live cursor / active toggle stay runtime; only the gesture persists.
   surface?: SurfaceSequencer
@@ -660,6 +700,9 @@ export interface OscQueryLeaf {
   range?: { min?: number; max?: number }
   value?: number | number[]
   description?: string
+  // OSCQuery ACCESS override (1 = read-only, 2 = write-only, 3 = read/write).
+  // Defaults to 3 when omitted; set 1 for outbound-only leaves (e.g. vision).
+  access?: number
 }
 
 // ── Autosave / crash recovery ────────────────────────────────────────

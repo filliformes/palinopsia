@@ -17,7 +17,10 @@
 import type { CompositionState } from '@shared/types'
 import { audioBus } from './audioIn'
 
-const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
+// NaN-safe : a partial/malformed coupling block could feed NaN through here,
+// and `v < 0 ? … : v` would pass NaN straight to layer.sourceMix, blanking the
+// layer's crossfade. Coerce a non-finite input to 0.
+const clamp01 = (v: number): number => (v > 0 ? (v > 1 ? 1 : v) : 0)
 const smoothstep = (a: number, b: number, x: number): number => {
   if (a === b) return x < a ? 0 : 1
   const t = clamp01((x - a) / (b - a))

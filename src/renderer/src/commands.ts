@@ -43,3 +43,33 @@ export function registerPanic(fn: (() => void) | null): void {
 export function firePanic(): void {
   panicFn?.()
 }
+
+// Global freeze / hold : a latch the render loop ORs into its per-frame freeze
+// (App reads isFrozen() each frame and calls comp.setFreeze). No Compositor ref
+// needed here — the render loop already owns the freeze application. The button
+// (and any indicator) subscribe so the UI reflects the latch state live.
+let frozen = false
+const freezeListeners = new Set<() => void>()
+export function fireFreeze(): void {
+  frozen = !frozen
+  for (const l of freezeListeners) l()
+}
+export function isFrozen(): boolean {
+  return frozen
+}
+/** Subscribe to freeze-latch changes (useSyncExternalStore-shaped). */
+export function subscribeFrozen(cb: () => void): () => void {
+  freezeListeners.add(cb)
+  return () => freezeListeners.delete(cb)
+}
+
+// Recording toggle needs the canvas + a delivery format (App-side), so App
+// registers the toggle thunk and the MIDI router / a pad fire it.
+let recordToggleFn: (() => void) | null = null
+export function registerRecordToggle(fn: (() => void) | null): void {
+  recordToggleFn = fn
+}
+/** Start a take (default fast/no-reencode) or stop the running one. */
+export function fireRecordToggle(): void {
+  recordToggleFn?.()
+}

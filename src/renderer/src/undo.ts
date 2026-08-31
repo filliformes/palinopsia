@@ -18,6 +18,8 @@ import { cancelMorph } from './morph'
 const CAPACITY = 100
 const QUIET_MS = 300
 
+type FullState = ReturnType<typeof useStore.getState>
+
 // One undo step : references into the store's immutable slices.
 interface Snapshot {
   composition: CompositionState
@@ -28,6 +30,20 @@ interface Snapshot {
   world: string
   name: string
   vibePresetName: string | null
+  // Also part of "the whole session surface": the sound patch, the field
+  // macros / temperament, and the drawn surface gesture. Without these, Ctrl+Z
+  // after a scene recall / Generate / Open reverted the picture but left the
+  // sound, the theme's density/tonicity/drift/flow, or the gesture behind.
+  sonify: FullState['sonify']
+  surface: FullState['surface']
+  density: number
+  gestureTexture: number
+  coalesce: number
+  tonicity: number
+  shutter: number
+  drift: number
+  flow: number
+  superFlicker: number
 }
 
 function snap(): Snapshot {
@@ -40,7 +56,17 @@ function snap(): Snapshot {
     worlds: s.worlds,
     world: s.world,
     name: s.name,
-    vibePresetName: s.vibePresetName
+    vibePresetName: s.vibePresetName,
+    sonify: s.sonify,
+    surface: s.surface,
+    density: s.density,
+    gestureTexture: s.gestureTexture,
+    coalesce: s.coalesce,
+    tonicity: s.tonicity,
+    shutter: s.shutter,
+    drift: s.drift,
+    flow: s.flow,
+    superFlicker: s.superFlicker
   }
 }
 
@@ -54,7 +80,17 @@ function differs(a: Snapshot, b: Snapshot): boolean {
     a.worlds !== b.worlds ||
     a.world !== b.world ||
     a.name !== b.name ||
-    a.vibePresetName !== b.vibePresetName
+    a.vibePresetName !== b.vibePresetName ||
+    a.sonify !== b.sonify ||
+    a.surface !== b.surface ||
+    a.density !== b.density ||
+    a.gestureTexture !== b.gestureTexture ||
+    a.coalesce !== b.coalesce ||
+    a.tonicity !== b.tonicity ||
+    a.shutter !== b.shutter ||
+    a.drift !== b.drift ||
+    a.flow !== b.flow ||
+    a.superFlicker !== b.superFlicker
   )
 }
 
@@ -69,10 +105,23 @@ function apply(s: Snapshot): void {
     worlds: s.worlds,
     world: s.world,
     name: s.name,
-    vibePresetName: s.vibePresetName
+    vibePresetName: s.vibePresetName,
+    surface: s.surface,
+    density: s.density,
+    gestureTexture: s.gestureTexture,
+    coalesce: s.coalesce,
+    tonicity: s.tonicity,
+    shutter: s.shutter,
+    drift: s.drift,
+    flow: s.flow,
+    superFlicker: s.superFlicker
   })
   // Keep the persisted active-World id in step with what the user now sees.
   localStorage.setItem('opsia.world', s.world)
+  // Sonify goes through setSonify so the sound engine (and its localStorage)
+  // update too — but keep the machine-local on-state + output device as they are.
+  const curSoni = useStore.getState().sonify
+  useStore.getState().setSonify({ ...s.sonify, on: curSoni.on, sinkId: curSoni.sinkId })
   applying = false
 }
 

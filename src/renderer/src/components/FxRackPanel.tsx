@@ -8,6 +8,7 @@
 import { useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import type { FxInstance } from '@shared/types'
 import { FX_GROUPS, SHADER_BY_ID } from '../shaders/isf'
+import { blurbFor } from '../shaders/isf/shaderBlurbs'
 import { keywordsFor } from '../shaders/isf/keywords'
 import { useStore, type FxScope } from '../store'
 import { canHostFx } from '../fxScopes'
@@ -26,7 +27,7 @@ export function FxAddSelect({ scope, className = '' }: { scope: FxScope; classNa
           shaders: g.shaders.filter((f) => canHostFx(scope, f.id))
         })).filter((g) => g.shaders.length > 0)
   const options: SearchOption[] = groups.flatMap((grp) =>
-    grp.shaders.map((f) => ({ value: f.id, label: f.name, group: grp.group, keywords: keywordsFor(f.id) }))
+    grp.shaders.map((f) => ({ value: f.id, label: f.name, group: grp.group, keywords: keywordsFor(f.id), title: blurbFor(f.id) }))
   )
   return (
     <SearchSelect
@@ -66,6 +67,12 @@ export function FxChips({
       className={`flex min-w-0 items-center gap-1 ${nowrap ? 'flex-nowrap' : 'grow flex-wrap'}`}
       // Tail drop: releasing on the row (not on a chip) moves to the end.
       onDragOver={(e) => e.preventDefault()}
+      // A drag dropped OUTSIDE any chip/row still fires dragend on the source
+      // (which bubbles here) : clear the pending id so it can't leak into the
+      // next unrelated drop and silently reorder a stale unit.
+      onDragEnd={() => {
+        dragId.current = null
+      }}
       onDrop={(e: DragEvent) => {
         e.preventDefault()
         if (dragId.current) reorderFx(scope, dragId.current, null)
@@ -224,7 +231,7 @@ function FxUnit({
         className={`min-w-0 truncate text-left text-[11px] transition-colors ${
           f.enabled ? '' : 'text-muted line-through'
         } ${selected ? 'text-accent' : 'hover:text-accent'}`}
-        title="Edit this FX's controls in the Inspector"
+        title={blurbFor(f.shaderId) ?? "Edit this FX's controls in the Inspector"}
       >
         {SHADER_BY_ID[f.shaderId ?? '']?.name ?? f.shaderId}
       </button>

@@ -30,22 +30,27 @@ export class OscReceiver {
     this.stop()
     return new Promise((resolve, reject) => {
       const udp = new osc.UDPPort({ localAddress: '0.0.0.0', localPort: port, metadata: true })
+      // Track the socket from the moment it's created, not only on 'ready', so a
+      // stop() during an in-flight start() (before ready) can still close() it.
+      // Otherwise the port stays bound and leaks until the next start()+stop().
+      this.udp = udp
       let settled = false
       udp.on('ready', () => {
-        this.udp = udp
         settled = true
         resolve()
       })
       udp.on('error', (err: Error) => {
         if (!settled) {
           settled = true
-          this.udp = null
+          if (this.udp === udp) this.udp = null
           reject(err)
         }
         // Post-ready errors are almost always a single malformed packet —
         // swallow them so one bad sender can't take the listener down.
       })
       udp.on('message', (msg) => {
+        // Ignore anything from a socket we've since stopped or replaced.
+        if (this.udp !== udp) return
         const m = msg as osc.OscMessage
         if (!this.onMessage || !m || typeof m.address !== 'string') return
         this.onMessage({

@@ -20,7 +20,6 @@ import { OscSender } from './osc'
 import { OscReceiver, localIPv4s, type OscInMessage } from './osc-receive'
 import * as sessionIO from './session'
 import * as autosave from './autosave'
-import { ModulationEngine } from './modulators'
 import { OscQueryServer, type OscQueryNode } from './oscquery'
 import { registerMediaScheme, handleMediaProtocol } from './media'
 import { killAllConverts, registerVideoConvert, warmVideoFolder } from './videoConvert'
@@ -70,8 +69,6 @@ const outputSender = new OutputSender()
 // OSC in : the instrument is PLAYED through this: Pandore/TouchOSC send here
 // and the renderer maps addresses onto the store (see renderer/oscInput.ts).
 const oscReceiver = new OscReceiver()
-// Modulation brain (Phase 5 port) : started idle so its tick seam exists.
-const modulation = new ModulationEngine()
 // OSCQuery publisher : serves the self-describing address tree over HTTP so
 // Pandore/dataFLOU can auto-discover every control.
 const oscquery = new OscQueryServer()
@@ -84,7 +81,6 @@ let closeFallback: ReturnType<typeof setTimeout> | null = null
 function shutdown(): void {
   if (shutdownComplete) return
   shutdownComplete = true
-  modulation.stop()
   oscSender.stop()
   oscReceiver.stop()
   oscquery.stop()
@@ -95,6 +91,12 @@ function shutdown(): void {
 }
 
 function createWindow(): void {
+  // A fresh window must re-arm the save-before-quit intercept. On macOS the app
+  // survives its last window's close (which latched `appQuitting = true` via
+  // close-proceed); an `activate` then re-creates a window here, so reset the
+  // latch or that new window's `close` would bypass the Save modal. The real
+  // quit path flips it back to true (close-proceed) before closing.
+  appQuitting = false
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -172,9 +174,30 @@ function openOutputWindow(displayId: number, windowed = false): void {
   const displays = screen.getAllDisplays()
   const d = displays.find((x) => x.id === displayId) ?? screen.getPrimaryDisplay()
   if (outputWindow) {
-    if (!windowed) outputWindow.setBounds(d.bounds)
-    outputWindow.focus()
-    return
+    // Same mode as the live window → fast path : re-home it on the requested
+    // display (windowed re-centres; fullscreen fills the display) and focus.
+    if (outputWindow.isFullScreen() !== windowed) {
+      if (windowed) {
+        outputWindow.setBounds({
+          x: d.bounds.x + Math.round((d.bounds.width - 1280) / 2),
+          y: d.bounds.y + Math.round((d.bounds.height - 720) / 2),
+          width: 1280,
+          height: 720
+        })
+      } else {
+        outputWindow.setBounds(d.bounds)
+      }
+      outputWindow.focus()
+      return
+    }
+    // Mode switch (fullscreen↔windowed) : the two configs differ by `frame`,
+    // which can't be toggled after creation, so recreate cleanly. Drop our
+    // 'closed' handler first so its teardown (null + 'output:closed' to the
+    // renderer) doesn't fire for this internal swap, then build afresh below.
+    const old = outputWindow
+    outputWindow = null
+    old.removeAllListeners('closed')
+    old.destroy()
   }
   outputWindow = new BrowserWindow(
     windowed
@@ -265,7 +288,6 @@ app.whenReady().then(async () => {
 
   // Bind the OSC UDP socket on an ephemeral local port for outgoing sends.
   await oscSender.start(0)
-  modulation.start()
 
   prevRunCrashed = autosave.startAutosave().crashed
 
@@ -298,6 +320,23 @@ app.whenReady().then(async () => {
       } catch (e) {
         console.error(`[ipc] ${channel} threw:`, (e as Error).message)
         return undefined
+      }
+    })
+  }
+
+  // Fire-and-forget (ipcRenderer.send) counterpart of safeHandle. These channels
+  // fire at frame rate or from live sockets; a throw — a destroyed output window
+  // mid-close, a bad port, a dead socket — must be logged, never bubble up into
+  // an uncaught main-process exception / crash dialog.
+  function safeOn(
+    channel: string,
+    handler: (event: Electron.IpcMainEvent, ...args: unknown[]) => void
+  ): void {
+    ipcMain.on(channel, (event, ...args) => {
+      try {
+        handler(event, ...args)
+      } catch (e) {
+        console.error(`[ipc] ${channel} threw:`, (e as Error).message)
       }
     })
   }
@@ -344,7 +383,7 @@ app.whenReady().then(async () => {
 
   // Renderer streams live value diffs (only while a WS client is attached);
   // OSCQuery broadcasts them to subscribers. Fire-and-forget (ipcRenderer.send).
-  ipcMain.on('oscquery:values', (_e, updates) => {
+  safeOn('oscquery:values', (_e, updates) => {
     oscquery.pushValues(updates as Array<{ path: string; value: number | number[] }>)
   })
   // Tell the renderer to start/stop its value-push loop as clients come and go.
@@ -388,8 +427,14 @@ app.whenReady().then(async () => {
     outputWindow?.close()
     return true
   })
-  // Per-frame render state: control window → output window.
-  ipcMain.on('output:frame', (_e, frame) => outputWindow?.webContents.send('output:frame', frame))
+  // Per-frame render state: control window → output window. Guard the window +
+  // its webContents : a frame in flight while the output window is closing would
+  // otherwise throw "Object has been destroyed" on every close.
+  safeOn('output:frame', (_e, frame) => {
+    if (outputWindow && !outputWindow.isDestroyed() && !outputWindow.webContents.isDestroyed()) {
+      outputWindow.webContents.send('output:frame', frame)
+    }
+  })
 
   // ---------- IPC: Resource HUD ----------
   safeHandle('perf:stats', () => samplePerf())
@@ -399,15 +444,15 @@ app.whenReady().then(async () => {
   safeHandle('recording:start', (_e, ext, codec) =>
     recording.recordingStart(ext as string, codec as string)
   )
-  ipcMain.on('recording:chunk', (_e, data) => recording.recordingChunk(data as Uint8Array))
+  safeOn('recording:chunk', (_e, data) => recording.recordingChunk(data as Uint8Array))
   safeHandle('recording:stop', (_e, formatId) => recording.recordingStop(formatId as string))
   safeHandle('screenshot:save', (_e, data) => recording.saveScreenshot(data as Uint8Array))
 
   // ---------- IPC: HIVE live-in ----------
-  ipcMain.on('hive:connect', (e, id, host, port) =>
+  safeOn('hive:connect', (e, id, host, port) =>
     hiveConnect(e.sender, id as string, host as string, port as number)
   )
-  ipcMain.on('hive:disconnect', (_e, id) => hiveDisconnect(id as string))
+  safeOn('hive:disconnect', (_e, id) => hiveDisconnect(id as string))
 
   // ---------- IPC: HIVE output (sender) ----------
   safeHandle('hiveout:start', (e, port) =>
@@ -417,12 +462,12 @@ app.whenReady().then(async () => {
     hiveSendStop()
     return true
   })
-  ipcMain.on('hiveout:chunk', (_e, key, data) => hiveSendChunk(key as boolean, data as Uint8Array))
+  safeOn('hiveout:chunk', (_e, key, data) => hiveSendChunk(key as boolean, data as Uint8Array))
 
   // ---------- IPC: External output (NDI / Spout) ----------
   safeHandle('ndi:set', (_e, on) => outputSender.setNdi(on as boolean))
   safeHandle('spout:set', (_e, on) => outputSender.setSpout(on as boolean))
-  ipcMain.on('ndi:frame', (_e, w, h, pixels) =>
+  safeOn('ndi:frame', (_e, w, h, pixels) =>
     outputSender.send(w as number, h as number, pixels as Uint8Array)
   )
 

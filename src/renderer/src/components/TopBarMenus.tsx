@@ -36,6 +36,16 @@ export function SessionLoader(): JSX.Element {
     try {
       const session = await window.api.sessionLoad(sel)
       if (session) {
+        // Silently save the session being left before switching (mirrors
+        // App.openSession) so A→B→A round-trips everything, scenes included.
+        // Unnamed sessions go to the default Sessions/<name> file, not lost.
+        try {
+          const st = useStore.getState()
+          if (st.sessionPath) await window.api.sessionSave(st.exportSession(), st.sessionPath)
+          else await window.api.sessionSaveToDefault(st.exportSession())
+        } catch {
+          /* best-effort : never block the load */
+        }
         loadSession(session)
         // Remember the file so a later plain Save overwrites it in place.
         useStore.setState({ sessionPath: sel })

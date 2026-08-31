@@ -23,10 +23,14 @@ import { currentFps, tickFrame } from './perf'
 import { videoSeekRequests } from './engine/videoState'
 import { outputRecorder } from './recorder'
 import { sonifyEngine } from './audio/sonify'
-import { fireSelectedRandomize, registerPanic, firePanic } from './commands'
+import { fireSelectedRandomize, registerPanic, firePanic, fireFreeze, isFrozen, registerRecordToggle } from './commands'
+import { Toaster, showToast } from './components/Toast'
+import { ShortcutHelp } from './components/ShortcutHelp'
+import { onCaptureError } from './engine/CaptureSource'
 import { collectAssembleSync, syncLiveMatchers } from './assemble/liveMatch'
 import { GRID } from '@shared/assemble'
 import { tickSequencer } from './engine/sequencer'
+import { tickSonifySeq } from './audio/soniSeq'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel, FxChips } from './components/FxRackPanel'
 import { SearchSelect } from './components/SearchSelect'
@@ -36,6 +40,7 @@ import { LayerPanel } from './components/LayerPanel'
 import { MixerPanel } from './components/MixerPanel'
 import { FeelPanel } from './components/FeelPanel'
 import { MetaBar } from './components/MetaBar'
+import { MidiLearnOverlay } from './components/MidiLearnOverlay'
 import { ModulationPanel } from './components/ModulationPanel'
 import { OscPanel } from './components/OscPanel'
 import { AudioPanel } from './components/AudioPanel'
@@ -54,6 +59,8 @@ import { surfaceComposition, nearestSurfaceScene, samplePath } from './surface'
 import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
 import { SessionLoader, GenerateMenu } from './components/TopBarMenus'
+import { ConfirmModal } from './components/PromptModal'
+import type { AutosaveEntry } from '@shared/types'
 import { initMidi } from './midi'
 import { FX_SHADERS, GENERATORS, NATIVE_NODES, shaderSourceById } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
@@ -121,6 +128,16 @@ import { metaGlides } from './metaSmooth'
 
 // The global REC pill : visible in the top bar while a take is rolling, so you
 // can leave the Output page and tweak live. Click ■ to stop + save the take.
+// Stop the running take and confirm WHERE it saved. The Output page shows its
+// own banner, but the common path — start there, return, stop from the REC pill
+// or the keyboard — had no confirmation at all; this toast fills that gap.
+function stopRecordingWithToast(): void {
+  void outputRecorder.stop().then((path) => {
+    if (path) showToast('Recording saved · ' + (path.split(/[\\/]/).pop() ?? path))
+    else showToast('Recording stopped — the file may not have saved', 'warn')
+  })
+}
+
 function RecPill(): JSX.Element | null {
   const recording = useStore((s) => s.recording)
   const since = useStore((s) => s.recordingSince)
@@ -136,7 +153,7 @@ function RecPill(): JSX.Element | null {
   const ss = String(Math.floor(sec % 60)).padStart(2, '0')
   return (
     <button
-      onClick={() => void outputRecorder.stop()}
+      onClick={stopRecordingWithToast}
       className="flex shrink-0 items-center gap-1.5 rounded border border-red-500/60 bg-red-500/15 px-2 py-1 font-mono text-[11px] text-red-400 transition-colors hover:bg-red-500/30"
       title="Recording the output (keeps rolling while you tweak) : click to stop + save"
     >
@@ -146,27 +163,6 @@ function RecPill(): JSX.Element | null {
   )
 }
 
-// The active-World selector for the top bar (the Transport handed it up here).
-function WorldSelect(): JSX.Element {
-  const worlds = useStore((s) => s.worlds)
-  const world = useStore((s) => s.world)
-  const setWorld = useStore((s) => s.setWorld)
-  const active = worlds.find((w) => w.id === world)
-  return (
-    <select
-      className="input select-compact max-w-[130px] text-[11px]"
-      value={world}
-      onChange={(e) => setWorld(e.target.value)}
-      title={active?.blurb}
-    >
-      {worlds.map((w) => (
-        <option key={w.id} value={w.id}>
-          {w.name}
-        </option>
-      ))}
-    </select>
-  )
-}
 
 // fireSelectedRandomize lives in commands.ts now : the R shortcut, the
 // Transport button and a learned MIDI pad all fire the same implementation.
@@ -197,6 +193,17 @@ export default function App(): JSX.Element {
   const setTheme = useStore((s) => s.setTheme)
   const depthMode = useStore((s) => s.depthMode)
   const setDepthMode = useStore((s) => s.setDepthMode)
+  // MIDI Learn + Flush moved up to the top bar (World moved down to the Transport).
+  const midiLearnMode = useStore((s) => s.midiLearnMode)
+  const setMidiLearnMode = useStore((s) => s.setMidiLearnMode)
+  const [flushFlashing, flushFlash] = useFlash()
+  // The keyboard cheat-sheet (`?`). A ref shadows the state so the mount-once
+  // keydown handler can read "is it open?" for the Esc path without a stale closure.
+  const [helpOpen, setHelpOpen] = useState(false)
+  const helpOpenRef = useRef(false)
+  useEffect(() => {
+    helpOpenRef.current = helpOpen
+  }, [helpOpen])
   const name = useStore((s) => s.name)
   const setName = useStore((s) => s.setName)
   const uiZoom = useStore((s) => s.uiZoom)
@@ -210,6 +217,24 @@ export default function App(): JSX.Element {
   useEffect(() => {
     localStorage.setItem('opsia.layersWidth', String(layersWidth))
   }, [layersWidth])
+
+  // Crash recovery : on launch, if the previous run didn't shut down cleanly and
+  // a rotating autosave snapshot exists, offer to restore the most recent one.
+  // (main writes a `.running` sentinel + a 60s snapshot; without this prompt the
+  // recovered work sat unreachable in <userData>/autosave.)
+  const [crashEntry, setCrashEntry] = useState<AutosaveEntry | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void window.api
+      .autosaveCrashCheck()
+      .then((res) => {
+        if (!cancelled && res?.crashed && res.entries.length > 0) setCrashEntry(res.entries[0])
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // ── MIDI (Meta Controller CC learn + routing) ───────────────────────
   useEffect(() => {
@@ -277,10 +302,13 @@ export default function App(): JSX.Element {
     const on = ndiActive || spoutActive
     comp.setOutputCapture(on ? (w, h, px) => window.api.ndiFrame(w, h, px) : null)
     return () => comp.setOutputCapture(null)
-    // `renderScale` is a dep because changing it disposes + rebuilds the whole
-    // Compositor : without re-running here the fresh engine has no capture
-    // callback and NDI/Spout output goes black until the sink is toggled.
-    // (The output-window STREAM is driven from the render loop, not here.)
+    // Handles live NDI/Spout toggles. Re-attachment across an engine REBUILD is
+    // owned by the compositor-build effect instead : this effect is declared
+    // earlier, so on a rebuild it runs first and just reads a null ref (harmless
+    // no-op). `renderScale` stays a dep so this effect's cleanup runs on the LIVE
+    // compositor before it's disposed (glEpoch is declared later, so the build
+    // effect — which does see it — carries the GPU-reset case). (The output-window
+    // STREAM is driven from the render loop, not here.)
   }, [ndiActive, spoutActive, renderScale])
 
   // ── HIVE output (sender) : start the HEVC encoder + TCP fan-out ───────
@@ -354,6 +382,12 @@ export default function App(): JSX.Element {
         el?.tagName === 'TEXTAREA' ||
         el?.tagName === 'SELECT' ||
         el?.isContentEditable === true
+      // ? : the keyboard cheat-sheet (Shift+/ on most layouts). Toggles.
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key === '?') {
+        e.preventDefault()
+        setHelpOpen((o) => !o)
+        return
+      }
       // Bare 1–9: recall scenes (the playing-surface shortcut).
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && /^[1-9]$/.test(e.key)) {
         const st = useStore.getState()
@@ -370,6 +404,8 @@ export default function App(): JSX.Element {
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key === '0') {
         e.preventDefault()
         firePanic()
+        flushFlash() // match the top-bar Flush button's click feedback
+        showToast('Panic flush — buffers emptied', 'warn')
         return
       }
       // P: open the Vibe Palette in the Inspector · Shift+P: cycle its presets.
@@ -423,12 +459,15 @@ export default function App(): JSX.Element {
       // Bare letters: view / panel shortcuts (guarded against typing in fields).
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField) {
         const k = e.key.toLowerCase()
-        // L / F: switch the right column to Layers / Finishing.
+        // L: toggle MIDI Learn from anywhere (any tab / full-page overlay), so
+        // you can arm bindings without hunting for the top-bar button.
         if (k === 'l') {
           e.preventDefault()
-          useStore.getState().setRightView('layers')
+          const st = useStore.getState()
+          st.setMidiLearnMode(!st.midiLearnMode)
           return
         }
+        // F: switch the right column to Finishing.
         if (k === 'f') {
           e.preventDefault()
           useStore.getState().setRightView('finishing')
@@ -476,6 +515,18 @@ export default function App(): JSX.Element {
           fireSelectedRandomize()
           return
         }
+        // H: freeze / hold the output (the same latch as the Transport ❄).
+        if (k === 'h') {
+          e.preventDefault()
+          fireFreeze()
+          return
+        }
+      }
+      // Esc: close the cheat-sheet first if it's up (it sits above everything).
+      if (e.key === 'Escape' && helpOpenRef.current) {
+        e.preventDefault()
+        setHelpOpen(false)
+        return
       }
       // Esc: leave MIDI Learn mode first — it sits over every other surface.
       if (e.key === 'Escape' && useStore.getState().midiLearnMode) {
@@ -483,33 +534,43 @@ export default function App(): JSX.Element {
         useStore.getState().setMidiLearnMode(false)
         return
       }
-      // Esc: close the World editor if it's open.
-      if (e.key === 'Escape' && useStore.getState().worldPageOpen) {
-        e.preventDefault()
-        useStore.getState().setWorldPageOpen(false)
-        return
-      }
-      if (e.key === 'Escape' && useStore.getState().sonifyPageOpen) {
-        e.preventDefault()
-        useStore.getState().setSonifyPageOpen(false)
-        return
-      }
-      if (e.key === 'Escape' && useStore.getState().outputPageOpen) {
-        e.preventDefault()
-        useStore.getState().setOutputPageOpen(false)
-        return
-      }
-      if (e.key === 'Escape' && useStore.getState().sequencePageOpen) {
-        e.preventDefault()
-        useStore.getState().setSequencePageOpen(false)
-        return
+      // Esc: close the VISUALLY topmost full-page overlay first — but NOT while a
+      // text field is focused, so Escape cancels the field edit (World JSON, a
+      // number input) instead of closing the page and discarding it. The overlays
+      // render output → sonify → world → sequence, so sequence paints on top;
+      // close them in that reverse (topmost-first) order.
+      if (e.key === 'Escape' && !inField) {
+        const st = useStore.getState()
+        if (st.sequencePageOpen) {
+          e.preventDefault()
+          st.setSequencePageOpen(false)
+          return
+        }
+        if (st.worldPageOpen) {
+          e.preventDefault()
+          st.setWorldPageOpen(false)
+          return
+        }
+        if (st.sonifyPageOpen) {
+          e.preventDefault()
+          st.setSonifyPageOpen(false)
+          return
+        }
+        if (st.outputPageOpen) {
+          e.preventDefault()
+          st.setOutputPageOpen(false)
+          return
+        }
       }
       if (!(e.ctrlKey || e.metaKey)) return
-      if (e.key === 'z' || e.key === 'Z') {
+      // Undo/redo apply to the app composition — but NOT while a text field is
+      // focused, so Ctrl+Z there undoes the keystroke (native) instead of
+      // reverting the last composition edit while the typo stays.
+      if (!inField && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault()
         if (e.shiftKey) redo()
         else undo()
-      } else if (e.key === 'y') {
+      } else if (!inField && e.key === 'y') {
         e.preventDefault()
         redo()
       } else if (e.key === 's' || e.key === 'S') {
@@ -594,8 +655,53 @@ export default function App(): JSX.Element {
     try {
       comp = new Compositor(canvas, canvas.width, canvas.height)
       compositorRef.current = comp
+      // Re-attach the external-output (NDI/Spout) readback to the freshly built
+      // compositor. The separate toggle effect is declared earlier, so on a
+      // rebuild (renderScale change or glEpoch GPU-reset) it runs BEFORE this and
+      // reads a null ref — leaving the sender black until toggled. Restoring it
+      // here, from the live store state, keeps NDI/Spout output alive across any
+      // engine rebuild.
+      {
+        const st = useStore.getState()
+        comp.setOutputCapture(
+          st.ndiActive || st.spoutActive ? (w, h, px) => window.api.ndiFrame(w, h, px) : null
+        )
+      }
+      // The fresh compositor's depth map is empty : force the depth mode to
+      // re-apply next frame (else module-level depthModePrev still equals the
+      // active mode and synth-depth Parallax silently goes flat after a rebuild).
+      depthModePrev = ''
       // The `0` key + the Transport's flush button both fire panic through here.
       registerPanic(() => compositorRef.current?.panic())
+      // MIDI record toggle : start a fast (no-reencode) take or stop the running
+      // one — the canvas + recorder live here, not in the store.
+      registerRecordToggle(() => {
+        if (useStore.getState().recording) stopRecordingWithToast()
+        else if (canvasRef.current)
+          void outputRecorder.start(canvasRef.current, 'source').then((ok) => {
+            showToast(ok ? 'Recording started' : 'Recording could not start', ok ? 'ok' : 'warn')
+          })
+      })
+      // A live-capture slot that fails to start (denied permission, no device,
+      // cancelled screen picker) used to render a silent black source. Surface why.
+      onCaptureError((spec, errName) => {
+        const src = spec.startsWith('device:')
+          ? 'Live input'
+          : spec === 'screen' || spec.startsWith('desktop:')
+            ? 'Screen capture'
+            : 'Webcam'
+        const reason =
+          errName === 'NotAllowedError'
+            ? 'permission denied'
+            : errName === 'NotFoundError' || errName === 'OverconstrainedError'
+              ? 'no matching device found'
+              : errName === 'NotReadableError'
+                ? 'device busy / already in use'
+                : errName === 'AbortError'
+                  ? 'cancelled'
+                  : errName
+        showToast(`${src} couldn’t start — ${reason}`, 'warn', 5000)
+      })
     } catch (e) {
       // WebGL2 unavailable : surface it rather than a blank canvas.
       console.error('[Compositor]', (e as Error).message)
@@ -808,6 +914,9 @@ export default function App(): JSX.Element {
           tickSequencer(now, rec, c)
           seqTouchedMix = comp!.layers.some((L, i) => L && L.sourceMix !== beforeMix[i])
         }
+        // Sonify step sequencer : evolves the sound over time (independent of the
+        // scene sequencer above). No-op unless the user started it on the S mixer.
+        tickSonifySeq(now)
         // 2e. Field macros: Density / Gesture⇄Texture / Coalesce (post-mod, 0.5 deadzone).
         applyFieldMacros(comp!, c, st.density, st.gestureTexture, st.coalesce)
         // 2f. Temperament: Tonicity (tonal audio → colour) + Drift
@@ -823,7 +932,7 @@ export default function App(): JSX.Element {
         if (st.shutter > 0.02) freeze = shutterHold(now, st.shutter)
         else if (seqFreeze !== null) freeze = seqFreeze // sequencer mono-freeze
         else shutterClear()
-        freeze = freeze || (flowActive && flowRes.freeze)
+        freeze = freeze || (flowActive && flowRes.freeze) || isFrozen() // MIDI hold latch
         comp!.setFreeze(freeze)
         // 2g. Superimposition flicker (§5.2): cross-cut which layer shows on the
         //     drawn cadence : rate follows the Cameraless film rate when it's on.
@@ -898,8 +1007,17 @@ export default function App(): JSX.Element {
         //     fed a low-res frame, run async, its result EMA-smoothed into the map.
         if (st.depthMode !== depthModePrev) {
           depthModePrev = st.depthMode
-          if (st.depthMode === 'synth') comp!.setSyntheticDepth()
-          else if (st.depthMode === 'off') comp!.clearDepth()
+          if (st.depthMode === 'synth') {
+            comp!.setSyntheticDepth()
+            // The synthetic bowl is static, so feed its mean + spread to the
+            // vision bus once (matching the mean / sqrt(var)·3 the estimate path
+            // reports) instead of leaving depth/depthSpread modulators pinned at
+            // the 0.5 / 0 init default.
+            visionBus.setDepth(0.3444, 0.7125)
+          } else if (st.depthMode === 'off') {
+            comp!.clearDepth()
+            visionBus.setDepth(0.5, 0) // flat : no depth signal
+          }
         }
         if (st.depthMode === 'estimate') {
           // Throttle the frame readback to the estimator's cadence (~11 Hz) so we
@@ -992,6 +1110,7 @@ export default function App(): JSX.Element {
     raf = requestAnimationFrame(loop)
     return () => {
       offGl()
+      onCaptureError(null)
       cancelAnimationFrame(raf)
       // After a GPU reset the old context is dead : dispose would only spray
       // INVALID_OPERATION noise into the console on its way out.
@@ -1026,12 +1145,28 @@ export default function App(): JSX.Element {
 
   // ── Push the live session to main for the 60s autosave loop ─────────
   useEffect(() => {
+    // Serializing the whole session (every scene's composition, collage pools,
+    // EDLs) on EVERY store write floods the IPC boundary — 25 Hz during surface
+    // playback, one write per pointermove on a slider drag — though main only
+    // writes the autosave to disk every 60s. Coalesce to a trailing push at most
+    // ~once/second : crash recovery then loses at most the last second of work.
+    let timer: ReturnType<typeof setTimeout> | null = null
     const push = (): void => {
       void window.api.setCurrentSession(useStore.getState().exportSession())
     }
-    push()
-    const unsub = useStore.subscribe(push)
-    return unsub
+    const schedule = (): void => {
+      if (timer) return
+      timer = setTimeout(() => {
+        timer = null
+        push()
+      }, 1000)
+    }
+    push() // seed main with the current session immediately
+    const unsub = useStore.subscribe(schedule)
+    return () => {
+      unsub()
+      if (timer) clearTimeout(timer)
+    }
   }, [])
 
   async function openSession(): Promise<void> {
@@ -1047,8 +1182,15 @@ export default function App(): JSX.Element {
       } catch {
         /* best-effort : never block the open */
       }
-      useStore.getState().loadSession(res.session)
-      useStore.getState().setSessionPath(res.path) // Save now overwrites this file
+      // Guard the load : loadSession is defensive, but a corrupt/foreign file
+      // that slips past validation must not throw here and leave a half-applied
+      // state (the current session is already saved above).
+      try {
+        useStore.getState().loadSession(res.session)
+        useStore.getState().setSessionPath(res.path) // Save now overwrites this file
+      } catch (e) {
+        console.error('[session] load failed:', (e as Error).message)
+      }
     }
   }
 
@@ -1124,18 +1266,24 @@ export default function App(): JSX.Element {
             </span>
           ) : null
         })()}
-        {/* World / diegesis : moved up from the Transport. The label IS the
-            button (toggles the World editor, also W); the select swaps worlds. */}
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            onClick={() => useStore.getState().setWorldPageOpen(!useStore.getState().worldPageOpen)}
-            className="btn px-2 text-[12px]"
-            title="Open the World editor (W) : coupling character + Context mood + audio routing"
-          >
-            World
-          </button>
-          <WorldSelect />
-        </div>
+        {/* MIDI Learn : moved up from the Transport (World moved down there).
+            Blue while active — the app's MIDI-learn colour. */}
+        <button
+          onClick={() => setMidiLearnMode(!midiLearnMode)}
+          className="btn text-[12px]"
+          style={
+            midiLearnMode
+              ? { background: 'rgba(90, 150, 255, 0.6)', color: '#fff', borderColor: 'rgba(90, 150, 255, 1)' }
+              : undefined
+          }
+          title={
+            midiLearnMode
+              ? 'MIDI Learn ON — click a highlighted control, then move a knob / hit a pad to bind it. Right-click a green one to clear. Click here (or press L / Esc) to exit.'
+              : 'Enter MIDI Learn mode (shortcut : L, from any tab) : map hardware knobs and pads to Meta knobs, transport controls, Vary / Randomize / Sonify and scenes.'
+          }
+        >
+          MIDI Learn
+        </button>
         <RecPill />
         <UndoButtons />
         <div className="flex items-center gap-0.5" title="UI zoom : Ctrl+= / Ctrl+- / Ctrl+0">
@@ -1186,7 +1334,8 @@ export default function App(): JSX.Element {
           Save As
         </button>
         <select
-          className="input w-24 shrink-0 text-[11px]"
+          className="input select-compact w-24 shrink-0 text-[11px]"
+          style={{ paddingLeft: 6 }}
           value={depthMode}
           onChange={(e) => setDepthMode(e.target.value as 'off' | 'synth' | 'estimate')}
           title="Depth engine (2.5D) : fills the depth map the Parallax FX reads. off = flat (passthrough) · synth = a test depth bowl · AI = monocular depth estimation (downloads a small model on first use; needs network + WebGPU)."
@@ -1195,8 +1344,9 @@ export default function App(): JSX.Element {
           <option value="synth">depth: synth</option>
           <option value="estimate">depth: AI</option>
         </select>
+        {/* Theme : sizes to its widest entry (no fixed width). */}
         <select
-          className="input w-24 shrink-0 text-[12px]"
+          className="input select-compact shrink-0 text-[12px]"
           value={theme}
           onChange={(e) => setTheme(e.target.value as ThemeName)}
           title="Theme"
@@ -1207,6 +1357,20 @@ export default function App(): JSX.Element {
             </option>
           ))}
         </select>
+        {/* Panic flush : moved up from the Transport, sits at the far right. */}
+        <span className="relative flex shrink-0">
+          <MidiLearnOverlay id="fire:flush" />
+          <button
+            onClick={() => {
+              firePanic()
+              flushFlash()
+            }}
+            className={`btn text-[12px] ${flushFlashing ? '!border-danger !text-danger' : ''}`}
+            title="Panic flush (0) : empty every self-feeding buffer — feedback, and the datamosh / sediment / corrode / scanner / echo accumulators — so a runaway image recovers WITHOUT a reload. Parameters, modulators and the clock stay put."
+          >
+            ⚡ Flush
+          </button>
+        </span>
       </header>
 
       {/* ── Body: preview + layer strips ────────────────────────── */}
@@ -1315,6 +1479,32 @@ export default function App(): JSX.Element {
       {sonifyPageOpen && <SonifyPage canvasRef={canvasRef} />}
       {worldPageOpen && <WorldPage />}
       {sequencePageOpen && <SequencePage canvasRef={canvasRef} />}
+
+      {/* Crash recovery : offer to restore the last autosave after an unclean exit. */}
+      {crashEntry && (
+        <ConfirmModal
+          title={`Palinopsia didn't close cleanly last time. Restore your last autosave${
+            crashEntry.name ? ` — "${crashEntry.name}"` : ''
+          }?`}
+          yesLabel="Restore"
+          noLabel="Discard"
+          onYes={() => {
+            const entry = crashEntry
+            setCrashEntry(null)
+            void (async () => {
+              try {
+                const session = await window.api.autosaveLoad(entry.path)
+                useStore.getState().loadSession(session)
+              } catch {
+                /* best-effort : a corrupt snapshot just leaves the fresh boot in place */
+              }
+            })()
+          }}
+          onNo={() => setCrashEntry(null)}
+        />
+      )}
+      {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
+      <Toaster />
     </div>
   )
 }

@@ -8,7 +8,7 @@
 // user worlds live in the store (persisted to localStorage).
 
 import type { CompositionState, CouplingMode, SceneEntry, SceneTags, World } from '@shared/types'
-import { WORLD_AUTOMOD_SLOT } from '@shared/types'
+import { MAX_MOD_ASSIGNMENTS, WORLD_AUTOMOD_SLOT } from '@shared/types'
 import { makeDefaultModulator } from './engine/modulation'
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
@@ -176,13 +176,16 @@ export function applyWorldToComposition(c: CompositionState, world: World): Comp
     })
   }
 
-  // Audio routing default : the World manages modulator slot WORLD_AUTOMOD_SLOT
-  // and its single matrix assignment. Clear it first, then install if wanted.
+  // Audio routing default : the World manages ONLY the reserved slot
+  // WORLD_AUTOMOD_SLOT and the single matrix row keyed to it. Dropping every row
+  // on that slot first means a World switch REPLACES its own previous auto-mod row
+  // rather than stacking a duplicate, and never touches a user's slots/rows.
   const slot = WORLD_AUTOMOD_SLOT
   const matrix = next.modMatrix.filter((a) => a.mod !== slot)
   const modulators = next.modulators.slice()
   const am = world.autoMod
-  if (am && am.target !== 'none' && contextInst) {
+  // Only install the row if it stays within the matrix cap (never a 13th row).
+  if (am && am.target !== 'none' && contextInst && matrix.length < MAX_MOD_ASSIGNMENTS) {
     modulators[slot] = {
       ...makeDefaultModulator(),
       type: 'audio',
@@ -196,8 +199,9 @@ export function applyWorldToComposition(c: CompositionState, world: World): Comp
       depth: am.depth
     })
   } else {
-    // No routing : leave the slot disabled so it stops driving anything.
-    modulators[slot] = { ...modulators[slot], enabled: false }
+    // No routing (or no room within the cap) : leave the slot a full, disabled
+    // modulator so it drives nothing and can never be a partial object.
+    modulators[slot] = { ...makeDefaultModulator(), ...modulators[slot], enabled: false }
   }
   next = { ...next, modulators, modMatrix: matrix }
   return next

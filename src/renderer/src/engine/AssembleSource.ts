@@ -161,7 +161,10 @@ export class AssembleSource {
   /** Output side : adopt the control window's list. `idx`/`elapsed` are left
    *  alone — syncPosition immediately after is what places the playhead. */
   replaceClips(clips: AssembleClip[]): void {
-    this.clips = clips
+    // Copy (like setPlaylist) so live-mode push / trimHistory can't mutate a
+    // shared array — the caller's list is IPC-cloned today, but this keeps the
+    // same aliasing guard rather than relying on that.
+    this.clips = clips.slice()
   }
 
   /** Output side : snap to the control window's position when we've drifted.

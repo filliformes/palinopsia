@@ -4,19 +4,23 @@
 // space. Right-click anywhere on the strip: Init, Randomize layer, layer
 // presets (save/apply/delete : app-persistent).
 
-import { useRef, useState, type MouseEvent, type ReactNode } from 'react'
-import type { AudioFeature, BlendMode, CouplingMode, LayerMask, SourceKind } from '@shared/types'
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import type { AudioFeature, BlendMode, CouplingMode, LayerMask, ModTarget, SourceKind } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
 import { AUDIO_FEATURES } from '../engine/audioIn'
 import { GENERATORS_ALPHA } from '../shaders/isf'
+import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { keywordsFor } from '../shaders/isf/keywords'
-import { useStore } from '../store'
+import { modTargetKey, useStore } from '../store'
+import { AssignRow } from './AutoControls'
+import { registerLiveOverlay } from './liveOverlay'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { CapturePicker } from './CapturePicker'
 import { DevicePicker } from './DevicePicker'
 import { HivePicker } from './HivePicker'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxAddSelect, FxChips } from './FxRackPanel'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { SearchSelect, type SearchOption } from './SearchSelect'
 import { ConfirmModal, PromptModal } from './PromptModal'
 import { useFlash } from './useFlash'
@@ -58,6 +62,82 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [flashing, flash] = useFlash()
 
+  // ── Modulation of the compositor-level layer controls (opacity / A-B mix /
+  // blend). A small M chip beside each toggles its M1–8 binding row; bound
+  // sliders tint accent2 and MOVE with the live value (the app-wide behaviour).
+  type LayerField = 'opacity' | 'mix' | 'blend'
+  const modMatrix = useStore((s) => s.composition.modMatrix)
+  const [openMod, setOpenMod] = useState<LayerField | null>(null)
+  const layerTarget = (field: LayerField): ModTarget => ({ kind: 'layer', layer: index, field })
+  const boundFor = (field: LayerField): typeof modMatrix => {
+    const key = modTargetKey(layerTarget(field))
+    return modMatrix.filter((a) => modTargetKey(a.target) === key)
+  }
+  const opacityBound = boundFor('opacity').length > 0
+  const mixBound = boundFor('mix').length > 0
+  const blendBound = boundFor('blend').length > 0
+  const opacityRef = useRef<HTMLInputElement | null>(null)
+  const mixRef = useRef<HTMLInputElement | null>(null)
+  const blendRef = useRef<HTMLSelectElement | null>(null)
+  useEffect(() => {
+    const offs: Array<() => void> = []
+    if (opacityBound && opacityRef.current)
+      offs.push(registerLiveOverlay({ el: opacityRef.current, key: modTargetKey(layerTarget('opacity')), format: (x) => String(x) }))
+    if (mixBound && mixRef.current)
+      offs.push(registerLiveOverlay({ el: mixRef.current, key: modTargetKey(layerTarget('mix')), format: (x) => String(x) }))
+    if (blendBound && blendRef.current)
+      offs.push(registerLiveOverlay({
+        el: blendRef.current,
+        key: modTargetKey(layerTarget('blend')),
+        format: (x) => BLEND_MODES[Math.max(0, Math.min(BLEND_MODES.length - 1, Math.round(x)))] ?? BLEND_MODES[0]
+      }))
+    return () => offs.forEach((o) => o())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opacityBound, mixBound, blendBound, collapsed, index])
+
+  // The M chip beside a layer control : accent when bound, accent2 while its
+  // binding row is open. Right-click clears every modulation on that field.
+  const modChip = (field: LayerField, label: string): JSX.Element => {
+    const bound = boundFor(field)
+    const active = openMod === field
+    return (
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          setOpenMod(active ? null : field)
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          const st = useStore.getState()
+          const key = modTargetKey(layerTarget(field))
+          st.composition.modMatrix
+            .filter((a) => modTargetKey(a.target) === key)
+            .forEach((a) => st.removeAssignment(a.id))
+          st.composition.metaKnobs.forEach((k, i) => {
+            if (k.destinations.some((d) => modTargetKey(d) === key)) st.toggleMetaDest(i, layerTarget(field))
+          })
+        }}
+        className={`shrink-0 rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
+          bound.length
+            ? 'bg-accent/20 text-accent ring-1 ring-accent'
+            : active
+              ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
+              : 'bg-panel3/60 text-muted hover:text-text'
+        }`}
+        title={`Modulate ${label} : right-click clears its modulation`}
+      >
+        M{bound.length ? bound.map((b) => b.mod + 1).join('·') : ''}
+      </button>
+    )
+  }
+  const modAssign = (field: LayerField): JSX.Element | null =>
+    openMod === field ? (
+      <div className="px-1 pb-0.5">
+        <AssignRow target={layerTarget(field)} bound={boundFor(field)} />
+      </div>
+    ) : null
+
   const isSelected = (slot: 'A' | 'B'): boolean =>
     selection?.type === 'source' && selection.layer === index && selection.slot === slot
 
@@ -89,7 +169,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   return (
     <div
       className={`flex min-w-0 flex-col gap-1.5 rounded-md border bg-panel p-2 transition-colors ${
-        flashing ? 'animate-pulse border-danger ring-1 ring-danger' : 'border-border'
+        flashing ? 'animate-pulse border-accent ring-1 ring-accent' : 'border-border'
       }`}
       onContextMenu={onContextMenu}
     >
@@ -107,20 +187,25 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           </span>
           <span className="font-mono text-[11px] text-muted">L{index + 1}</span>
         </button>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={layer.opacity}
-          onChange={(e) => setOpacity(index, Number(e.target.value))}
-          onDoubleClick={() => setOpacity(index, 1)}
-          className="min-w-0 flex-1 accent-accent"
-          title={`Opacity ${layer.opacity.toFixed(2)} : double-click resets to 1`}
-        />
+        <span className="relative flex min-w-0 flex-1">
+          <MidiLearnOverlay id={`layer:${index}:opacity`} />
+          <input
+            ref={opacityRef}
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={layer.opacity}
+            onChange={(e) => setOpacity(index, Number(e.target.value))}
+            onDoubleClick={() => setOpacity(index, 1)}
+            className={`w-full ${opacityBound ? 'accent-accent2' : 'accent-accent'}`}
+            title={`Opacity ${layer.opacity.toFixed(2)} : double-click resets to 1`}
+          />
+        </span>
+        {modChip('opacity', 'layer opacity')}
         <div className="flex shrink-0 gap-1">
           <ToggleChip label="S" active={layer.solo} onClick={() => toggleSolo(index)} title="Solo" />
-          <ToggleChip label="M" active={layer.mute} onClick={() => toggleMute(index)} title="Mute" />
+          <ToggleChip label="⊘" active={layer.mute} onClick={() => toggleMute(index)} title="Mute" />
           <ToggleChip
             label="FB"
             active={layer.feedback}
@@ -134,13 +219,14 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             }}
             title="Randomize this whole layer (sources, FX, blend, feedback)"
             className={`rounded px-1.5 py-0.5 font-mono text-[11px] leading-none transition-colors ${
-              flashing ? 'animate-pulse text-danger' : 'text-muted hover:bg-accent/15 hover:text-accent'
+              flashing ? 'animate-pulse text-accent' : 'text-muted hover:bg-accent/15 hover:text-accent'
             }`}
           >
             ⚄
           </button>
         </div>
       </div>
+      {modAssign('opacity')}
 
       {!collapsed && (
         <>
@@ -176,16 +262,22 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                 </option>
               ))}
             </select>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={layer.sourceMix}
-              onChange={(e) => setSourceMix(index, Number(e.target.value))}
-              className="min-w-0 flex-1 accent-accent"
-              title="Mix depth : 0 = A only, 1 = full blend result"
-            />
+            <span className="relative flex min-w-0 flex-1">
+              <MidiLearnOverlay id={`layer:${index}:mix`} />
+              <input
+                ref={mixRef}
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={layer.sourceMix}
+                onChange={(e) => setSourceMix(index, Number(e.target.value))}
+                onDoubleClick={() => setSourceMix(index, 0.5)}
+                className={`w-full min-w-0 ${mixBound ? 'accent-accent2' : 'accent-accent'}`}
+                title="Mix depth : 0 = A only, 1 = full blend result : double-click resets to 0.5"
+              />
+            </span>
+            {modChip('mix', 'A-B mix')}
             <span className="shrink-0 font-mono text-[9px] text-muted" title="A/B harmony">⚖</span>
             <input
               type="range"
@@ -194,10 +286,12 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               step={0.01}
               value={layer.harmony}
               onChange={(e) => setHarmony(index, Number(e.target.value))}
+              onDoubleClick={() => setHarmony(index, 0)}
               className="min-w-0 flex-1 accent-accent2"
-              title={`Harmony ${layer.harmony.toFixed(2)} : 0 consonant (B matched) ↔ 1 dissonant (B hue clashes with A)`}
+              title={`Harmony ${layer.harmony.toFixed(2)} : 0 consonant (B matched) ↔ 1 dissonant (B hue clashes with A) : double-click resets to 0`}
             />
           </Row>
+          {modAssign('mix')}
 
           {/* CPL: audio couples the A/B balance. Hidden unless the user turns on
               coupling (Audio panel) : a visuals-only user never sees it. */}
@@ -242,8 +336,9 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                   step={0.01}
                   value={layer.coupling.amount}
                   onChange={(e) => setCoupling(index, { amount: Number(e.target.value) })}
+                  onDoubleClick={() => setCoupling(index, { amount: 0.5 })}
                   className="min-w-0 flex-1 accent-accent"
-                  title={`Coupling amount ${layer.coupling.amount.toFixed(2)}`}
+                  title={`Coupling amount ${layer.coupling.amount.toFixed(2)} : double-click resets to 0.5`}
                 />
                 <span className="shrink-0 font-mono text-[9px] uppercase text-muted">tight</span>
                 <input
@@ -253,8 +348,9 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                   step={0.01}
                   value={layer.coupling.tightness}
                   onChange={(e) => setCoupling(index, { tightness: Number(e.target.value) })}
+                  onDoubleClick={() => setCoupling(index, { tightness: 0.7 })}
                   className="min-w-0 flex-1 accent-accent"
-                  title={`Tightness ${layer.coupling.tightness.toFixed(2)} : vestigial (peaks only) ↔ obvious (linear)`}
+                  title={`Tightness ${layer.coupling.tightness.toFixed(2)} : vestigial (peaks only) ↔ obvious (linear) : double-click resets to 0.7`}
                 />
               </div>
             </div>
@@ -289,7 +385,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           {/* BLEND against the stack below */}
           <Row label="BLEND">
             <select
-              className="input select-compact min-w-0 flex-1 text-[11px]"
+              ref={blendRef}
+              className={`input select-compact min-w-0 flex-1 text-[11px] ${blendBound ? 'text-accent2 ring-1 ring-accent2' : ''}`}
               value={layer.blend}
               onChange={(e) => setBlend(index, e.target.value as BlendMode)}
             >
@@ -299,7 +396,9 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                 </option>
               ))}
             </select>
+            {modChip('blend', 'blend mode')}
           </Row>
+          {modAssign('blend')}
 
           {/* MASK : a spatial mask on this layer's stack contribution. */}
           <MaskControls index={index} mask={layer.mask} />
@@ -558,14 +657,23 @@ function SourceRow({
           const off = window.api.onVideoConvertProgress((p) => {
             if (p.path === path) setConverting(p.pct)
           })
-          const res = await window.api.videoConvert(path)
-          off()
-          setConverting(null)
-          if (!res.ok || !res.path) {
-            alert(`Conversion failed : ${res.error ?? 'unknown error'}`)
-            return
+          try {
+            const res = await window.api.videoConvert(path)
+            if (!res.ok || !res.path) {
+              alert(`Conversion failed : ${res.error ?? 'unknown error'}`)
+              return
+            }
+            onPickVideo(`opsia-media://local/${encodeURIComponent(res.path)}`, file.name)
+          } catch (err) {
+            // Convert rejected : surface it and STOP here — don't fall through to
+            // direct-play a clip the probe already flagged as needing conversion.
+            alert(`Conversion failed : ${(err as Error)?.message ?? 'unknown error'}`)
+          } finally {
+            // Always unsubscribe the progress listener + clear the badge, whether
+            // the convert resolved, failed, or threw (else both leak).
+            off()
+            setConverting(null)
           }
-          onPickVideo(`opsia-media://local/${encodeURIComponent(res.path)}`, file.name)
           return
         }
       } catch {
@@ -643,7 +751,7 @@ function SourceRow({
             { value: '__cap_screen__', label: 'Screen…', prefix: '🖥 ', group: 'live' },
             { value: '__cap_hive__', label: 'HIVE stream…', prefix: '📡 ', group: 'live' },
             ...GENERATORS_ALPHA.map(
-              (g): SearchOption => ({ value: g.id, label: g.name, group: 'generators', keywords: keywordsFor(g.id) })
+              (g): SearchOption => ({ value: g.id, label: g.name, group: 'generators', keywords: keywordsFor(g.id), title: generatorBlurb(g.id) })
             )
           ]}
           onChange={(v) => {

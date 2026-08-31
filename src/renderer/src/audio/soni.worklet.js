@@ -174,10 +174,13 @@ class BBDDelay {
 // RBJ biquads at Q=0.707, cascaded ×3, independent L/R state.
 class DJFilter {
   constructor() {
-    this.mode = 0; // 0 off · 1 LP · 2 HP
-    this.b0 = 1; this.b1 = 0; this.b2 = 0; this.a1 = 0; this.a2 = 0;
+    this.b0 = 1; this.b1 = 0; this.b2 = 0; this.a1 = 0; this.a2 = 0; // start at unity (bypass)
     this.x1L = new Float32Array(3); this.x2L = new Float32Array(3); this.y1L = new Float32Array(3); this.y2L = new Float32Array(3);
     this.x1R = new Float32Array(3); this.x2R = new Float32Array(3); this.y1R = new Float32Array(3); this.y2R = new Float32Array(3);
+    // Smoothed control : setX() sets a TARGET, update() glides toward it once per
+    // block so a fast slider sweep ramps the cutoff instead of snapping the biquad
+    // coefficients (which made a loud POP). lastApplied skips recompute once settled.
+    this.tx = 0.5; this.cx = 0.5; this.sr = 48000; this.lastApplied = -1;
   }
   coefsLPF(freq, sr) {
     const w0 = TAU * clampf(freq, 20, sr * 0.49) / sr, alpha = Math.sin(w0) / (2 * 0.707);
@@ -189,10 +192,20 @@ class DJFilter {
     const cw = Math.cos(w0), a0i = 1 / (1 + alpha);
     this.b0 = (1 + cw) * 0.5 * a0i; this.b1 = -(1 + cw) * a0i; this.b2 = this.b0; this.a1 = -2 * cw * a0i; this.a2 = (1 - alpha) * a0i;
   }
-  setX(x, sr) {
-    if (x < 0.49) { this.mode = 1; this.coefsLPF(18000 * Math.pow(200 / 18000, (0.49 - x) / 0.49), sr); }
-    else if (x > 0.51) { this.mode = 2; this.coefsHPF(20 * Math.pow(400, (x - 0.51) / 0.49), sr); }
-    else this.mode = 0;
+  setX(x, sr) { this.tx = x; this.sr = sr || this.sr; }
+  update() {
+    // One-pole glide toward the target (~27ms to 90% at 128-sample blocks / 48k).
+    this.cx += (this.tx - this.cx) * 0.2;
+    if (Math.abs(this.cx - this.lastApplied) < 1e-4) return; // settled : keep coefficients
+    this.lastApplied = this.cx;
+    const x = this.cx, sr = this.sr;
+    // Bypass = UNITY coefficients (not a skip). The biquad runs every sample so
+    // its state stays warm : crossing in/out of bypass is then click-free. The
+    // POP was a zero-state engage transient when the filter switched on from a
+    // skipped bypass, NOT the coefficient value — so the glide alone didn't fix it.
+    if (x < 0.49) this.coefsLPF(18000 * Math.pow(200 / 18000, (0.49 - x) / 0.49), sr);
+    else if (x > 0.51) this.coefsHPF(20 * Math.pow(400, (x - 0.51) / 0.49), sr);
+    else { this.b0 = 1; this.b1 = 0; this.b2 = 0; this.a1 = 0; this.a2 = 0; }
   }
   procL(inp) {
     let v = inp;
@@ -292,6 +305,10 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.sxy = new Float32Array(2);
     // ── shared FX tail : reverb + analog delay (send/return) ──
     this.reverb = new FDNReverb(sampleRate);
+    // Cache of the reverb params that force a full (per-line pow()) recompute, so
+    // applyFx can skip it on send/mix-only changes — the mod overlay re-applies fx
+    // ~30Hz. Sentinel -1 ⇒ the first applyFx always recomputes.
+    this.rvRecompute = { size: -1, decay: -1, cross: -1, freeze: -1, low: -1, high: -1 };
     this.delay = new BBDDelay(sampleRate);
     this.fxSend = 0; this.fxSendS = 0; this.fxRinging = false; // global send + smoothing + tail ring-out
     // ── mixer : per-voice DJ filter (volume = each voice's own gain) ──
@@ -405,8 +422,13 @@ class SoniProcessor extends AudioWorkletProcessor {
   }
 
   rebuildFilterCoefs() {
+    // The Chamberlin SVF is only stable while its centre stays below ~sr/6 (the
+    // worst case is minimum resonance). Cap at sr/6.5 — the same guard the Raster
+    // tone filter uses — so raising root octave / hiOct can't push a band past the
+    // stable region and blow fLow/fBand to Inf→NaN. (A far-above cap of sr*0.45
+    // gave no protection and latched the whole voice to silence.)
     for (let i = 0; i < NBAND; i++) {
-      this.fCoef[i] = 2 * Math.sin(Math.PI * Math.min(this.fFreqs[i], sampleRate * 0.45) / sampleRate);
+      this.fCoef[i] = 2 * Math.sin(Math.PI * Math.min(this.fFreqs[i], sampleRate / 6.5) / sampleRate);
     }
   }
 
@@ -426,20 +448,31 @@ class SoniProcessor extends AudioWorkletProcessor {
     rv.diffusion = clampf(fx.rvDiff, 0, 1); rv.low_damp = clampf(fx.rvLowDamp, 0, 1);
     rv.crossover = clampf(fx.rvCross, 0, 1);
     rv.lowmult = clampf(fx.rvLowMult, 0.05, 8); rv.highmult = clampf(fx.rvHighMult, 0.05, 8);
-    rv.recompute();
+    // Only size/decay/crossover/freeze/low-high-mult change the line lengths and
+    // per-line decay gains; everything else applied above is read live in
+    // process(). The ~30Hz mod overlay re-applies fx every tick, so skip the
+    // recompute (per-line pow()) unless one of those params actually moved.
+    const rc = this.rvRecompute;
+    if (rv.size !== rc.size || rv.decay !== rc.decay || rv.crossover !== rc.cross ||
+      rv.freeze !== rc.freeze || rv.lowmult !== rc.low || rv.highmult !== rc.high) {
+      rc.size = rv.size; rc.decay = rv.decay; rc.cross = rv.crossover;
+      rc.freeze = rv.freeze; rc.low = rv.lowmult; rc.high = rv.highmult;
+      rv.recompute();
+    }
   }
 
   // Flush a voice's scratch (vL/vR) through its DJ filter into the master, then
   // zero the scratch so the next voice starts clean (no per-voice pre-fill).
   mixVoice(idx, vL, vR, outL, outR, n) {
     const f = this.djf[idx];
+    f.update(); // glide the DJ-filter cutoff toward its target (anti-pop)
     // Sanitize : a bad param can make a voice go NaN/Inf; if that reached the
     // master or the FX-tail feedback it would silence everything permanently.
     for (let s = 0; s < n; s++) {
       let l = vL[s], r = vR[s];
       if (!Number.isFinite(l)) l = 0;
       if (!Number.isFinite(r)) r = 0;
-      if (f.mode !== 0) { l = f.procL(l); r = f.procR(r); }
+      l = f.procL(l); r = f.procR(r); // always filter (unity in bypass) : keeps state warm, click-free
       outL[s] += l; outR[s] += r; vL[s] = 0; vR[s] = 0;
     }
   }
@@ -562,9 +595,12 @@ class SoniProcessor extends AudioWorkletProcessor {
     // ── FLOW : grain cloud from the motion field ──
     const fl = cfg.flow;
     if (fl.on) {
-      // activate pending events whose time has come
+      // activate pending events whose time has come, retaining the rest by
+      // compacting in place (a write index) — Array.splice would allocate a
+      // throwaway array on every removal inside this render quantum.
       const nowT = currentTime;
-      for (let i = this.pending.length - 1; i >= 0; i--) {
+      let pw = 0;
+      for (let i = 0; i < this.pending.length; i++) {
         const ev = this.pending[i];
         if (ev.t0 <= nowT + n * dt) {
           for (let g = 0; g < NGRAIN; g++) {
@@ -584,9 +620,11 @@ class SoniProcessor extends AudioWorkletProcessor {
               break;
             }
           }
-          this.pending.splice(i, 1);
+        } else {
+          this.pending[pw++] = ev; // not yet due : retain
         }
       }
+      this.pending.length = pw;
       const g0 = fl.gain * 0.5;
       const colAmt = fl.colour || 0;
       for (let g = 0; g < NGRAIN; g++) {
@@ -620,10 +658,13 @@ class SoniProcessor extends AudioWorkletProcessor {
     // ── EVENTS : edges / motion → plucked notes (Aural-Mirror register) ──
     const ev = cfg.events;
     if (ev.on) {
-      // fire scheduled onsets whose time has come
+      // fire scheduled onsets whose time has come, retaining the rest by
+      // compacting in place (a write index) — splice would allocate a throwaway
+      // array on every removal inside this render quantum.
       const nowT = currentTime;
       const wave = ev.wave | 0;
-      for (let i = this.evPending.length - 1; i >= 0; i--) {
+      let ew = 0;
+      for (let i = 0; i < this.evPending.length; i++) {
         const e = this.evPending[i];
         if (e.t0 <= nowT + n * dt) {
           // grab a free voice, else steal the quietest
@@ -644,9 +685,11 @@ class SoniProcessor extends AudioWorkletProcessor {
           nt.env = 0; nt.attacking = true;
           nt.atkInc = 1 / Math.max(1, 0.004 * sampleRate); // ~4ms attack
           nt.decMul = Math.exp(-6.9077552 / (decayTime * sampleRate)); // ≈ -60dB over decayTime
-          this.evPending.splice(i, 1);
+        } else {
+          this.evPending[ew++] = e; // not yet due : retain
         }
       }
+      this.evPending.length = ew;
       const g0 = ev.gain * 0.5;
       const bias = ev.pan * 0.5;
       // saw / square carry more energy — trim so they don't dominate the mix.
@@ -795,6 +838,16 @@ class SoniProcessor extends AudioWorkletProcessor {
         const v = Math.tanh(acc * 0.7);
         L[s] += v * gL; R[s] += v * gR;
       }
+      // Self-heal : if any band state went non-finite (a NaN line-in sample, or a
+      // transient past the stable region), zero the SVF state so the voice recovers
+      // next block. mixVoice sanitizes the OUTPUT but never this internal state —
+      // which is why an unguarded NaN here used to latch the Filter to silence.
+      for (let i = 0; i < NBAND; i++) {
+        if (!Number.isFinite(this.fBand[i]) || !Number.isFinite(this.fLow[i])) {
+          this.fLow.fill(0); this.fBand.fill(0);
+          break;
+        }
+      }
     }
 
     if (fi.on) this.mixVoice(6, L, R, outL, outR, n);
@@ -818,7 +871,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       // asymmetric slew : swell in over `attack`, fade over `release`
       const up = 1 - Math.exp(-n * dt / Math.max(0.01, ch.attack || 0.4));
       const dn = 1 - Math.exp(-n * dt / Math.max(0.01, ch.release || 0.8));
-      const gBase = (ch.gain * 0.5) / Math.sqrt(N);
+      const gBase = (ch.gain * 1.8) / Math.sqrt(N); // lift the pad into the pack (was 0.5 : ~4× too quiet vs the other voices); the master limiter catches rare bright-frame peaks
       const tone = ch.tone || 0, spread = ch.spread || 0, panBase = 0.5 + ch.pan * 0.5;
       for (let i = 0; i < N; i++) {
         const tgt = this.cTarget[i], cur = this.cAmp[i];

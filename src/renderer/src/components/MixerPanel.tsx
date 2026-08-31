@@ -15,6 +15,8 @@ export function MixerPanel(): JSX.Element {
   const setOpacity = useStore((s) => s.setOpacity)
   const setLayerSpeed = useStore((s) => s.setLayerSpeed)
   const setBlend = useStore((s) => s.setBlend)
+  const toggleMute = useStore((s) => s.toggleMute)
+  const toggleSolo = useStore((s) => s.toggleSolo)
   const mixerPresets = useStore((s) => s.mixerPresets)
   const saveMixerPreset = useStore((s) => s.saveMixerPreset)
   const applyMixerPreset = useStore((s) => s.applyMixerPreset)
@@ -66,7 +68,29 @@ export function MixerPanel(): JSX.Element {
             key={l.id}
             className="flex min-h-0 flex-col items-center gap-2 rounded border border-border bg-panel2/50 p-1.5"
           >
-            <span className="shrink-0 font-mono text-[10px] text-muted">L{i + 1}</span>
+            {/* Layer id + solo/mute : the same S/⊘ chips as the layer strips,
+                so a blackout or solo is one click without leaving the Mixer. */}
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="font-mono text-[10px] text-muted">L{i + 1}</span>
+              <button
+                onClick={() => toggleSolo(i)}
+                className={`rounded px-1 py-0.5 font-mono text-[9px] leading-none transition-colors ${
+                  l.solo ? 'bg-accent/25 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'
+                }`}
+                title="Solo this layer"
+              >
+                S
+              </button>
+              <button
+                onClick={() => toggleMute(i)}
+                className={`rounded px-1 py-0.5 font-mono text-[9px] leading-none transition-colors ${
+                  l.mute ? 'bg-accent/25 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'
+                }`}
+                title="Mute this layer"
+              >
+                ⊘
+              </button>
+            </div>
 
             {/* Opacity then Speed stacked : one clean vertical column, each
                 fader with its readout directly beneath it. */}

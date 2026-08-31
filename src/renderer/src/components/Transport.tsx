@@ -10,13 +10,13 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { randomSonify } from '../audio/autoSonify'
+import { fireFreeze, isFrozen, subscribeFrozen } from '../commands'
+import { useSyncExternalStore } from 'react'
 import { randomizeMetaKnobs } from '../metaSmooth'
 import type { RandomizeScope } from '../randomize'
 import { useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
-import { firePanic } from '../commands'
-import { useFlash } from './useFlash'
 
 const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
   { scope: 'all', label: 'Randomize All' },
@@ -75,6 +75,9 @@ function fmtMorph(ms: number): string {
 }
 
 export function Transport(): JSX.Element {
+  // The freeze latch lives outside the store (commands.ts) : subscribe so the
+  // ❄ button lights while the output is held (from the button, H, or a pad).
+  const frozen = useSyncExternalStore(subscribeFrozen, isFrozen)
   const bpm = useStore((s) => s.composition.bpm)
   const globalSpeed = useStore((s) => s.globalSpeed)
   const setGlobalSpeed = useStore((s) => s.setGlobalSpeed)
@@ -86,13 +89,18 @@ export function Transport(): JSX.Element {
   const sonifyPageOpen = useStore((s) => s.sonifyPageOpen)
   const setSonifyPageOpen = useStore((s) => s.setSonifyPageOpen)
   const setOutputPageOpen = useStore((s) => s.setOutputPageOpen)
-  const [flushFlashing, flushFlash] = useFlash()
   const proximity = useStore((s) => s.proximity)
   const setProximity = useStore((s) => s.setProximity)
   const proximityAudio = useStore((s) => s.proximityAudio)
   const setProximityAudio = useStore((s) => s.setProximityAudio)
-  const midiLearnMode = useStore((s) => s.midiLearnMode)
-  const setMidiLearnMode = useStore((s) => s.setMidiLearnMode)
+  // World : moved down from the top bar. The label toggles the editor (also W);
+  // the select swaps the active World.
+  const worlds = useStore((s) => s.worlds)
+  const world = useStore((s) => s.world)
+  const setWorld = useStore((s) => s.setWorld)
+  const worldPageOpen = useStore((s) => s.worldPageOpen)
+  const setWorldPageOpen = useStore((s) => s.setWorldPageOpen)
+  const activeWorld = worlds.find((w) => w.id === world)
   const setComposition = useStore.setState
   const applyVariation = useStore((s) => s.applyVariation)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -152,16 +160,22 @@ export function Transport(): JSX.Element {
 
   return (
     <div className="flex flex-nowrap items-center gap-x-2 overflow-x-clip overflow-y-visible border-t border-border bg-panel px-2 py-1.5">
-      <div className="relative flex shrink-0 items-center gap-1.5">
-        <MidiLearnOverlay id="transport:bpm" />
-        <button
-          onClick={tapTempo}
-          className={`${TBTN} ${TBTN_IDLE} active:bg-accent/20`}
-          title="Tap tempo : click on the beat (2+ taps) to set the BPM. A pause of 2s starts a fresh count."
-        >
-          BPM
-        </button>
-        <div className="w-10">
+      <div className="flex shrink-0 items-center gap-1.5">
+        {/* Tap tempo is a PAD action (fire:tap); the number box is the CC value
+            target (transport:bpm) — each gets its own relative wrapper so the
+            two learn films never overlap. */}
+        <span className="relative flex shrink-0">
+          <MidiLearnOverlay id="fire:tap" />
+          <button
+            onClick={tapTempo}
+            className={`${TBTN} ${TBTN_IDLE} active:bg-accent/20`}
+            title="Tap tempo : click on the beat (2+ taps) to set the BPM. A pause of 2s starts a fresh count."
+          >
+            BPM
+          </button>
+        </span>
+        <div className="relative w-10">
+          <MidiLearnOverlay id="transport:bpm" />
           <BoundedNumberInput
             value={bpm}
             min={20}
@@ -194,7 +208,12 @@ export function Transport(): JSX.Element {
       {/* Morph : scene recalls & Randomize crossfade over this time. */}
       <div className="relative flex min-w-0 items-center gap-1">
         <MidiLearnOverlay id="transport:morph" />
-        <span className="font-mono text-[10px] text-muted">MORPH</span>
+        <span
+          className="font-mono text-[10px] text-muted"
+          title="Morph : how long a scene recall or a Randomize takes to crossfade into the new look (double-click the slider for 1s)."
+        >
+          MORPH
+        </span>
         <input
           type="range"
           min={0}
@@ -213,7 +232,12 @@ export function Transport(): JSX.Element {
           far/vista ↔ close/personal, by pushing the Context mood. */}
       <div className="relative flex min-w-0 items-center gap-1">
         <MidiLearnOverlay id="transport:prox" />
-        <span className="font-mono text-[10px] text-muted">PROX</span>
+        <span
+          className="font-mono text-[10px] text-muted"
+          title="Proximity : one knob places the image in a depth zone — vista/far ↔ personal/close — by pushing the Context mood (double-click the slider for neutral)."
+        >
+          PROX
+        </span>
         <input
           type="range"
           min={0}
@@ -230,66 +254,71 @@ export function Transport(): JSX.Element {
           className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
             proximityAudio ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'
           }`}
-          title="Audio brightness (centroid) drives proximity"
+          title="Auto-proximity : when ON (lit), the image's audio brightness (spectral centroid) drives the Prox depth zone automatically — brighter sound pulls the image closer. Off = Prox stays where you set it."
         >
           ◑
         </button>
       </div>
 
-      {/* Output : fullscreen / mapping / record / senders (also O). */}
+      {/* World : the active-World editor (label toggles it, also W) + the World
+          selector. Moved down from the top bar; ml-3 keeps it off the Prox slider. */}
       <button
-        onClick={() => setOutputPageOpen(true)}
-        className={`${TBTN} ${TBTN_IDLE}`}
-        title="Output & projection mapping : fullscreen output, keystone, record, NDI/Spout/HIVE (O)"
+        onClick={() => setWorldPageOpen(!worldPageOpen)}
+        className={`${TBTN} ml-3 ${worldPageOpen ? TBTN_LIT : TBTN_IDLE}`}
+        title="Open the World editor (W) : coupling character + Context mood + audio routing"
       >
-        ⛶ Output
+        World
       </button>
-
-      {/* Panic flush (0) : empty every self-feeding buffer — the live safety net. */}
-      <button
-        onClick={() => {
-          firePanic()
-          flushFlash()
-        }}
-        className={`${TBTN} ${flushFlashing ? 'border-danger bg-danger/25 text-danger' : TBTN_IDLE}`}
-        title="Panic flush (0) : empty every self-feeding buffer — feedback, and the datamosh / sediment / corrode / scanner / echo accumulators — so a runaway image recovers WITHOUT a reload. Parameters, modulators and the clock stay put."
+      <select
+        className="input select-compact max-w-[130px] shrink-0 text-[11px]"
+        value={world}
+        onChange={(e) => setWorld(e.target.value)}
+        title={activeWorld?.blurb}
       >
-        ⚡ Flush
-      </button>
+        {worlds.map((w) => (
+          <option key={w.id} value={w.id}>
+            {w.name}
+          </option>
+        ))}
+      </select>
 
-      {/* Global MIDI Learn (dataFLOU's, colour and all) : pressed = learn
-          mode on, blue overlays appear on every learnable control — click
-          one, move a MIDI control to bind (green = bound). Press to exit. */}
-      <button
-        onClick={() => setMidiLearnMode(!midiLearnMode)}
-        className={`${TBTN} ${midiLearnMode ? '' : TBTN_IDLE}`}
-        style={
-          midiLearnMode
-            ? {
-                background: 'rgba(90, 150, 255, 0.6)',
-                color: '#fff',
-                borderColor: 'rgba(90, 150, 255, 1)'
-              }
-            : undefined
-        }
-        title={
-          midiLearnMode
-            ? 'MIDI Learn ON — click a highlighted control, then move a knob / hit a pad to bind it. Right-click a green one to clear. Click here (or Esc) to exit.'
-            : 'Enter MIDI Learn mode : map hardware knobs and pads to Meta knobs, transport controls, Vary / Randomize / Sonify and scenes.'
-        }
-      >
-        MIDI Learn
-      </button>
-
-      {/* Command group, pushed right : Seq · Sonify · Vary · Randomize. */}
-      <div className="ml-auto flex min-w-0 items-center gap-1.5">
+      {/* Freeze : latch that holds the output (render loop ORs it in). Also a
+          learn target so a pad can grab-and-hold the frame live. */}
+      <span className="relative flex shrink-0">
+        <MidiLearnOverlay id="fire:freeze" />
         <button
-          onClick={() => setSequencePageOpen(true)}
-          className={`${TBTN} ${seqRunning ? TBTN_LIT : TBTN_IDLE}`}
-          title="Open the Sequence / macro-form auto-pilot (Q)"
+          onClick={() => fireFreeze()}
+          className={`${TBTN} ${frozen ? TBTN_LIT : TBTN_IDLE}`}
+          title={
+            frozen
+              ? 'Output FROZEN / held — click (or H) to release'
+              : 'Freeze / hold the output — shortcut H (also MIDI-learnable)'
+          }
         >
-          {seqRunning ? '▶ Seq' : 'Seq'}
+          ❄
         </button>
+      </span>
+
+      {/* Command group, pushed right : Output · Seq · Sonify · Vary · Randomize. */}
+      <div className="ml-auto flex min-w-0 items-center gap-1.5">
+        {/* Output : fullscreen / mapping / record / senders (also O). */}
+        <button
+          onClick={() => setOutputPageOpen(true)}
+          className={`${TBTN} ${TBTN_IDLE}`}
+          title="Output & projection mapping : fullscreen output, keystone, record, NDI/Spout/HIVE (O)"
+        >
+          ⛶ Output
+        </button>
+        <span className="relative flex shrink-0">
+          <MidiLearnOverlay id="fire:seq" />
+          <button
+            onClick={() => setSequencePageOpen(true)}
+            className={`${TBTN} ${seqRunning ? TBTN_LIT : TBTN_IDLE}`}
+            title="Open the Sequence / macro-form auto-pilot (Q)"
+          >
+            {seqRunning ? '▶ Seq' : 'Seq'}
+          </button>
+        </span>
         <span className="relative flex shrink-0">
           <MidiLearnOverlay id="fire:sonify" />
           <button

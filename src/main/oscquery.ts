@@ -22,6 +22,7 @@ export interface OscQueryNode {
   range?: { min?: number; max?: number }
   value?: number | number[]
   description?: string
+  access?: number // OSCQuery ACCESS override (1=read, 2=write, 3=read/write); default 3
 }
 
 interface Container {
@@ -84,7 +85,7 @@ export class OscQueryServer {
     }
     const toJson = (c: Container): Record<string, unknown> => {
       const l = c.leaf
-      const o: Record<string, unknown> = { FULL_PATH: c.full_path, ACCESS: l ? 3 : 0 }
+      const o: Record<string, unknown> = { FULL_PATH: c.full_path, ACCESS: l ? (l.access ?? 3) : 0 }
       if (l) {
         if (l.type) o.TYPE = l.type
         if (l.range) o.RANGE = [{ MIN: l.range.min, MAX: l.range.max }]
@@ -107,6 +108,7 @@ export class OscQueryServer {
     this.stop()
     this.oscPort = oscPort
     return new Promise((resolve, reject) => {
+      let listening = false
       const server = createServer((req, res) => {
         // No wildcard CORS: OSCQuery clients are native, and the server is
         // localhost-bound below : we don't want arbitrary web origins reading
@@ -165,13 +167,23 @@ export class OscQueryServer {
       this.wss = wss
 
       server.on('error', (e) => {
-        this.server = null
-        reject(e)
+        // Only a bind failure (before we start listening) is fatal : null the
+        // (still-null) server and reject so osc:listen reports the error. A
+        // post-listen 'error' must NOT null a live server — stop() has to keep
+        // being able to close() it, else the socket leaks and the next
+        // osc:listen can't rebind the port. Log and keep it running.
+        if (!listening) {
+          this.server = null
+          reject(e)
+          return
+        }
+        console.error('[oscquery] server error (still listening):', (e as Error).message)
       })
       // Bind to loopback only : the OSCQuery tree (which advertises the OSC
       // port and serves live parameter values) should not be a LAN-visible
       // service. OSC control itself still arrives over the UDP receiver.
       server.listen(httpPort, '127.0.0.1', () => {
+        listening = true
         this.server = server
         resolve()
       })

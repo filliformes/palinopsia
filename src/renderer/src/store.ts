@@ -22,6 +22,8 @@ import type {
   SceneTags,
   SequenceState,
   Session,
+  SoniSeq,
+  SoniSeqStep,
   SidechainRef,
   SourceSlot,
   World
@@ -33,7 +35,7 @@ import { SHADER_BY_ID } from './shaders/isf'
 import { canHostFx } from './fxScopes'
 import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
-import { MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
+import { BLEND_MODES, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
 import { beginMorph, cancelMorph } from './morph'
 import { autoSurfacePos } from './surface'
@@ -49,10 +51,25 @@ function saveUserWorlds(worlds: World[]): void {
     /* quota / serialization : non-fatal */
   }
 }
+// A stored user world is well-formed only if it carries the fields
+// applyWorldToComposition dereferences : id/name + coupling & context OBJECTS
+// (a missing `coupling` spreads to `{}` and silently breaks A/B coupling) and an
+// autoMod that is either an object or null. Malformed entries are dropped.
+function isValidWorld(w: unknown): w is World {
+  if (!w || typeof w !== 'object') return false
+  const o = w as Record<string, unknown>
+  return (
+    typeof o.id === 'string' &&
+    typeof o.name === 'string' &&
+    !!o.coupling && typeof o.coupling === 'object' &&
+    !!o.context && typeof o.context === 'object' &&
+    typeof o.autoMod === 'object' // object or null (typeof null === 'object'); not undefined
+  )
+}
 function loadWorlds(): World[] {
   try {
     const u = JSON.parse(localStorage.getItem('opsia.userWorlds') || '[]')
-    return [...BUILTIN_WORLDS, ...(Array.isArray(u) ? (u as World[]) : [])]
+    return [...BUILTIN_WORLDS, ...(Array.isArray(u) ? u.filter(isValidWorld) : [])]
   } catch {
     return [...BUILTIN_WORLDS]
   }
@@ -337,8 +354,76 @@ function persistSonify(cfg: SoniConfig): void {
   if (sonifyPersistTimer) clearTimeout(sonifyPersistTimer)
   sonifyPersistTimer = setTimeout(() => {
     sonifyPersistTimer = null
-    localStorage.setItem('opsia.sonify', JSON.stringify({ ...cfg, on: false }))
+    try {
+      localStorage.setItem('opsia.sonify', JSON.stringify({ ...cfg, on: false }))
+    } catch {
+      // Quota : the patch still works this session, it just won't survive a restart.
+      console.warn('[sonify] could not persist the config (quota)')
+    }
   }, 250)
+}
+
+function makeDefaultSoniSeq(): SoniSeq {
+  return {
+    on: false,
+    stepMs: 1000,
+    len: 8,
+    cur: 0,
+    mode: 'forward',
+    bounceDecay: 60,
+    bias: 0,
+    edge: 'wrap',
+    steps: Array.from({ length: 16 }, () => ({
+      voices: [false, false, false, false, false, false, false, false],
+      preset: ''
+    }))
+  }
+}
+let soniSeqPersistTimer: ReturnType<typeof setTimeout> | null = null
+function persistSoniSeq(sq: SoniSeq): void {
+  if (soniSeqPersistTimer) clearTimeout(soniSeqPersistTimer)
+  soniSeqPersistTimer = setTimeout(() => {
+    soniSeqPersistTimer = null
+    try {
+      // Runtime toggles (on/cur) never persist : the sequence opens paused at 0.
+      localStorage.setItem('opsia.soniSeq', JSON.stringify({ ...sq, on: false, cur: 0 }))
+    } catch {
+      console.warn('[soniSeq] could not persist (quota)')
+    }
+  }, 250)
+}
+function sanitizeSoniSeq(raw: unknown, fallback: SoniSeq): SoniSeq {
+  if (!raw || typeof raw !== 'object') return fallback
+  const d = makeDefaultSoniSeq()
+  const s = raw as Partial<SoniSeq>
+  const steps = Array.isArray(s.steps)
+    ? d.steps.map((ds, i) => {
+        const st = s.steps![i] as Partial<SoniSeqStep> | undefined
+        return {
+          voices: Array.isArray(st?.voices) && st!.voices.length === 8 ? st!.voices.map(Boolean) : ds.voices,
+          preset: typeof st?.preset === 'string' ? st!.preset : ''
+        }
+      })
+    : fallback.steps
+  return {
+    on: false, // never auto-run on load
+    cur: 0,
+    stepMs: typeof s.stepMs === 'number' ? Math.max(30, Math.min(20000, s.stepMs)) : fallback.stepMs,
+    len: typeof s.len === 'number' ? Math.max(2, Math.min(16, s.len | 0)) : fallback.len,
+    mode: s.mode === 'bounce' || s.mode === 'drift' ? s.mode : 'forward',
+    bounceDecay: typeof s.bounceDecay === 'number' ? Math.max(0, Math.min(100, s.bounceDecay)) : fallback.bounceDecay,
+    bias: typeof s.bias === 'number' ? Math.max(-100, Math.min(100, s.bias)) : fallback.bias,
+    edge: s.edge === 'reflect' ? 'reflect' : 'wrap',
+    steps
+  }
+}
+function loadSoniSeq(): SoniSeq {
+  try {
+    const raw = localStorage.getItem('opsia.soniSeq')
+    return raw ? sanitizeSoniSeq(JSON.parse(raw), makeDefaultSoniSeq()) : makeDefaultSoniSeq()
+  } catch {
+    return makeDefaultSoniSeq()
+  }
 }
 
 // Machine-local MIDI Learn bindings (everything except the Meta knobs' CCs,
@@ -371,6 +456,14 @@ function loadMidiMap(): Record<string, MidiBinding> {
 function baseNormForTarget(st: { composition: CompositionState }, t: ModTarget): number {
   try {
     if (t.kind === 'meta') return st.composition.metaKnobs[t.knob]?.value ?? 0.5
+    if (t.kind === 'layer') {
+      const l = st.composition.layers[t.layer]
+      if (!l) return 0.5
+      if (t.field === 'opacity') return l.opacity
+      if (t.field === 'mix') return l.sourceMix
+      const i = BLEND_MODES.indexOf(l.blend)
+      return BLEND_MODES.length > 1 ? Math.max(0, i) / (BLEND_MODES.length - 1) : 0.5
+    }
     let shaderId: string | null = null
     let inputs: Record<string, number | number[]> | undefined
     let input = ''
@@ -399,6 +492,9 @@ function baseNormForTarget(st: { composition: CompositionState }, t: ModTarget):
                 : st.composition.layers[s.layer]?.sourceBFx
       const inst = arr?.find((f) => f.id === t.instId)
       if (!inst?.shaderId) return 0.5
+      // FX dry/wet opacity is a compositor property, not an ISF input : its base
+      // is the unit's opacity (default 1), so a full-wet FX defaults to Multiply.
+      if (t.input === FX_OPACITY_INPUT) return inst.opacity ?? 1
       shaderId = inst.shaderId
       inputs = inst.inputs
       input = t.input
@@ -430,7 +526,17 @@ function persistAssemblages(list: Assemblage[]): void {
 function persistMacro(key: string, v: number): void {
   const t = persistTimers.get(key)
   if (t) clearTimeout(t)
-  persistTimers.set(key, setTimeout(() => localStorage.setItem(key, String(v)), 250))
+  persistTimers.set(
+    key,
+    setTimeout(() => {
+      try {
+        localStorage.setItem(key, String(v))
+      } catch {
+        // Quota : the live value already hit the store; only its persistence is lost.
+        console.warn(`[macro] could not persist ${key} (quota)`)
+      }
+    }, 250)
+  )
 }
 
 function readMacro(key: string): number {
@@ -519,12 +625,14 @@ export function normalizeComposition(c: CompositionState): CompositionState {
       )
       return [...rest, vibe, context, finalizer]
     })(),
-    // Backfill new modulator blocks (e.g. `audio`) so switching a slot to a new
-    // type can't read undefined.
-    modulators: (c.modulators ?? makeDefaultModulators()).map((m) => ({
-      ...makeDefaultModulator(),
-      ...m
-    })),
+    // Always 8 slots : a short array pads with disabled defaults (worlds.ts writes
+    // modulators[WORLD_AUTOMOD_SLOT] directly, which would else punch holes), a long
+    // one truncates, and each stored slot field-MERGES onto the default so a new
+    // block (e.g. `audio`) can't read undefined.
+    modulators: (() => {
+      const m = c.modulators ?? []
+      return makeDefaultModulators().map((d, i) => ({ ...d, ...(m[i] ?? {}) }))
+    })(),
     modMatrix: c.modMatrix ?? [],
     // 16 knobs now : older 32-knob sessions truncate; short arrays pad. Field-
     // MERGE each stored knob onto the default so a knob predating a field (e.g.
@@ -676,6 +784,7 @@ export function modTargetKey(t: ModTarget): string {
   if (t.kind === 'bgSource') return `bgsrc:${t.input}`
   if (t.kind === 'meta') return `meta:${t.knob}`
   if (t.kind === 'sonify') return `soni:${t.param}`
+  if (t.kind === 'layer') return `lay:${t.layer}:${t.field}`
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
@@ -797,7 +906,6 @@ interface StoreState {
   rightView: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io' | 'assemble'
   setRightView: (v: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io' | 'assemble') => void
   // Back-compat: the M key still toggles the Mixer on/off against Layers.
-  mixerView: boolean
   toggleMixerView: () => void
   mixerPresets: Array<{
     id: string
@@ -814,7 +922,6 @@ interface StoreState {
     value: number | number[]
   ) => void
   patchLayer: (layer: number, partial: Partial<LayerState>) => void
-  setMasterFx: (fx: FxInstance[]) => void
 
   // FX racks (Phase 3) : one action surface for all four rack scopes.
   addFx: (scope: FxScope, shaderId: string) => void
@@ -1007,6 +1114,21 @@ interface StoreState {
   setRecording: (on: boolean) => void
   sonify: SoniConfig
   setSonify: (next: SoniConfig) => void
+  // Sonify step sequencer (Mixer page) : evolves the sound over time.
+  soniSeq: SoniSeq
+  setSoniSeqOn: (on: boolean) => void
+  setSoniSeqStepMs: (ms: number) => void
+  setSoniSeqLen: (n: number) => void
+  toggleSoniSeqVoice: (step: number, voice: number) => void
+  setSoniSeqStepPreset: (step: number, preset: string) => void
+  clearSoniSeqStep: (step: number) => void
+  setSoniSeqCur: (i: number) => void
+  setSoniSeqMode: (mode: SoniSeq['mode']) => void
+  setSoniSeqBounceDecay: (v: number) => void
+  setSoniSeqBias: (v: number) => void
+  setSoniSeqEdge: (edge: SoniSeq['edge']) => void
+  randomizeSoniSeq: () => void
+  resetSoniSeq: () => void
 
   // ── Assemble : the corpus-based automatic editor ──────────────────────
   // The corpus is machine-local and derived (re-analysing is near-instant from
@@ -1024,7 +1146,6 @@ interface StoreState {
   setAssembleBusy: (b: { label: string; pct: number } | null) => void
   saveAssemblage: (a: Assemblage) => void
   deleteAssemblage: (id: string) => void
-  renameAssemblage: (id: string, name: string) => void
   /** Put an assemblage on a layer as a source (the edit rides on the slot). */
   setSourceAssemble: (layer: number, slot: 'A' | 'B', a: Assemblage) => void
 
@@ -1214,6 +1335,22 @@ function dropTargets(
   return { ...c, modMatrix, metaKnobs }
 }
 
+/** Prune mod / Meta targets orphaned when a WHOLE layer is replaced (initLayer /
+ *  randomizeLayer / applyLayerPreset / pasteLayer). Source-kind rows would else
+ *  seize the new source's same-named inputs, and layer-scoped fx rows dangle
+ *  once fresh FX instance ids are minted — dead rows that eat the 12-assignment
+ *  cap. Mirrors dropSlotTargets / removeFx for the whole-layer replace case. */
+function dropLayerTargets(c: CompositionState, layer: number): CompositionState {
+  return dropTargets(
+    c,
+    (t) =>
+      (t.kind === 'source' && t.layer === layer) ||
+      (t.kind === 'fx' &&
+        (t.scope.kind === 'layer' || t.scope.kind === 'sourceA' || t.scope.kind === 'sourceB') &&
+        t.scope.layer === layer)
+  )
+}
+
 /** The slot a swap is about to overwrite. */
 function slotOf(c: CompositionState, layer: number, slot: 'A' | 'B'): SourceSlot | null {
   return (slot === 'A' ? c.layers[layer]?.sourceA : c.layers[layer]?.sourceB) ?? null
@@ -1353,24 +1490,26 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
 
   initLayer: (layer) =>
-    set((s) => ({
-      composition: {
+    set((s) => {
+      // Fresh factory layer : keeps its identity (id), but its source + FX are
+      // replaced, so its mod/Meta patching goes with it (dropLayerTargets).
+      const composition = {
         ...s.composition,
-        // Fresh factory layer : keeps its identity (id) so mod-matrix
-        // source targets pointing at this layer index stay coherent.
         layers: updateLayer(s.composition.layers, layer, (l) => ({
           ...makeLayer(),
           id: l.id
         }))
       }
-    })),
+      return { composition: dropLayerTargets(composition, layer) }
+    }),
   randomizeLayer: (layer) =>
-    set((s) => ({
-      composition: {
+    set((s) => {
+      const composition = {
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => randomizeSingleLayer(l))
       }
-    })),
+      return { composition: dropLayerTargets(composition, layer) }
+    }),
 
   layerPresets: (() => {
     try {
@@ -1394,20 +1533,21 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const p = s.layerPresets.find((x) => x.id === presetId)
       if (!p) return s
-      return {
-        composition: {
-          ...s.composition,
-          layers: updateLayer(s.composition.layers, layer, (l) => ({
-            ...p.layer,
-            // Fresh FX instance ids so mod-matrix entries from another life
-            // of this preset can't alias; keep the target layer's identity.
-            id: l.id,
-            sourceAFx: p.layer.sourceAFx.map((f) => ({ ...f, id: uid() })),
-            sourceBFx: p.layer.sourceBFx.map((f) => ({ ...f, id: uid() })),
-            fx: p.layer.fx.map((f) => ({ ...f, id: uid() }))
-          }))
-        }
+      const composition = {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({
+          ...p.layer,
+          // Fresh FX instance ids so mod-matrix entries from another life
+          // of this preset can't alias; keep the target layer's identity.
+          id: l.id,
+          sourceAFx: p.layer.sourceAFx.map((f) => ({ ...f, id: uid() })),
+          sourceBFx: p.layer.sourceBFx.map((f) => ({ ...f, id: uid() })),
+          fx: p.layer.fx.map((f) => ({ ...f, id: uid() }))
+        }))
       }
+      // The layer's instrument is replaced : drop its now-orphaned patching
+      // (source rows would seize the preset's inputs, fx rows dangle on old ids).
+      return { composition: dropLayerTargets(composition, layer) }
     }),
   deleteLayerPreset: (presetId) =>
     set((s) => {
@@ -1428,29 +1568,28 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const src = s.copiedLayer
       if (!src) return s
-      return {
-        composition: {
-          ...s.composition,
-          layers: updateLayer(s.composition.layers, layer, (l) => ({
-            ...structuredClone(src),
-            // Keep the target's identity; fresh FX ids so the mod-matrix can't
-            // alias between the copied layer and this one (same as presets).
-            id: l.id,
-            sourceAFx: src.sourceAFx.map((f) => ({ ...f, id: uid() })),
-            sourceBFx: src.sourceBFx.map((f) => ({ ...f, id: uid() })),
-            fx: src.fx.map((f) => ({ ...f, id: uid() }))
-          }))
-        }
+      const composition = {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({
+          ...structuredClone(src),
+          // Keep the target's identity; fresh FX ids so the mod-matrix can't
+          // alias between the copied layer and this one (same as presets).
+          id: l.id,
+          sourceAFx: src.sourceAFx.map((f) => ({ ...f, id: uid() })),
+          sourceBFx: src.sourceBFx.map((f) => ({ ...f, id: uid() })),
+          fx: src.fx.map((f) => ({ ...f, id: uid() }))
+        }))
       }
+      // Pasting replaces this layer's instrument : drop its orphaned patching.
+      return { composition: dropLayerTargets(composition, layer) }
     }),
 
   rightView: 'layers',
-  setRightView: (v) => set({ rightView: v, mixerView: v === 'mixer' }),
-  mixerView: false,
+  setRightView: (v) => set({ rightView: v }),
   toggleMixerView: () =>
     set((s) => {
       const next = s.rightView === 'mixer' ? 'layers' : 'mixer'
-      return { rightView: next, mixerView: next === 'mixer' }
+      return { rightView: next }
     }),
   mixerPresets: (() => {
     try {
@@ -1747,17 +1886,26 @@ export const useStore = create<StoreState>((set, get) => ({
       composition: { ...s.composition, background: randomizeBackground(s.composition.background) }
     })),
   applyBgPreset: (bg) =>
-    set((s) => ({
-      composition: {
+    set((s) => {
+      const composition = {
         ...s.composition,
         background: {
           ...bg,
           source: { ...bg.source, inputs: { ...bg.source.inputs } },
           fx: bg.fx.map((f) => ({ ...f, id: uid(), inputs: { ...f.inputs } }))
         }
-      },
-      selection: { type: 'background' }
-    })),
+      }
+      // The background source + FX are replaced (fresh ids) : drop mod/Meta rows
+      // scoped to it — bg-fx rows would dangle on old ids, a bgSource row would
+      // seize the preset's inputs.
+      return {
+        composition: dropTargets(
+          composition,
+          (t) => t.kind === 'bgSource' || (t.kind === 'fx' && t.scope.kind === 'background')
+        ),
+        selection: { type: 'background' }
+      }
+    }),
   bgPresets: (() => {
     try {
       return JSON.parse(localStorage.getItem('opsia.bgPresets') ?? '[]')
@@ -1822,10 +1970,27 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => ({
       composition: { ...s.composition, bpm: Math.max(20, Math.min(800, bpm)) }
     })),
-  globalSpeed: 1,
-  setGlobalSpeed: (x) => set({ globalSpeed: Math.max(1 / 64, Math.min(64, x)) }),
-  morphMs: 1000,
-  setMorphMs: (ms) => set({ morphMs: Math.max(0, Math.min(30000, ms)) }),
+  // Performance dials : persisted to localStorage so a plain restart (which
+  // seeds a fresh session, not the last one) keeps the feel set for a show, and
+  // round-tripped through the session file so saved sessions carry it too.
+  globalSpeed: (() => {
+    const v = Number(localStorage.getItem('opsia.globalSpeed'))
+    return Number.isFinite(v) && v > 0 ? Math.max(1 / 64, Math.min(64, v)) : 1
+  })(),
+  setGlobalSpeed: (x) => {
+    const v = Math.max(1 / 64, Math.min(64, x))
+    localStorage.setItem('opsia.globalSpeed', String(v))
+    set({ globalSpeed: v })
+  },
+  morphMs: (() => {
+    const v = Number(localStorage.getItem('opsia.morphMs'))
+    return Number.isFinite(v) && v >= 0 ? Math.max(0, Math.min(30000, v)) : 1000
+  })(),
+  setMorphMs: (ms) => {
+    const v = Math.max(0, Math.min(30000, ms))
+    localStorage.setItem('opsia.morphMs', String(v))
+    set({ morphMs: v })
+  },
   applyMasterPreset: (fx, vibe) =>
     set((s) => {
       // Locked finalizers (Vibe, then Context) survive a chain preset; the
@@ -1839,8 +2004,17 @@ export const useStore = create<StoreState>((set, get) => ({
         enabled: true,
         inputs: { ...f.inputs }
       }))
+      const master = [...units, ...locked]
+      // The non-locked chain is replaced (fresh ids), so drop master-fx mod/Meta
+      // rows that no longer resolve — but the locked finalizers keep their ids,
+      // so a modulator on the Vibe/Context survives the preset.
+      const liveIds = new Set(master.map((f) => f.id))
+      const composition = dropTargets(
+        { ...s.composition, master },
+        (t) => t.kind === 'fx' && t.scope.kind === 'master' && !liveIds.has(t.instId)
+      )
       // A chain preset sets its own vibe : no longer a named palette.
-      return { composition: { ...s.composition, master: [...units, ...locked] }, vibePresetName: vibe ? null : s.vibePresetName }
+      return { composition, vibePresetName: vibe ? null : s.vibePresetName }
     }),
   setSourceInput: (layer, slot, name, value) =>
     set((s) => ({
@@ -1867,9 +2041,6 @@ export const useStore = create<StoreState>((set, get) => ({
         layers: updateLayer(s.composition.layers, layer, (l) => ({ ...l, ...partial }))
       }
     })),
-  setMasterFx: (fx) =>
-    set((s) => ({ composition: { ...s.composition, master: fx } })),
-
   setSourceMix: (layer, v) =>
     set((s) => ({
       composition: {
@@ -2561,6 +2732,106 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ sonify: next })
   },
 
+  soniSeq: loadSoniSeq(),
+  setSoniSeqOn: (on) =>
+    set((s) => {
+      const soniSeq = { ...s.soniSeq, on, cur: on ? s.soniSeq.cur : 0 }
+      persistSoniSeq(soniSeq)
+      return { soniSeq }
+    }),
+  setSoniSeqStepMs: (ms) =>
+    set((s) => {
+      const soniSeq = { ...s.soniSeq, stepMs: Math.max(30, Math.min(20000, ms)) }
+      persistSoniSeq(soniSeq)
+      return { soniSeq }
+    }),
+  setSoniSeqLen: (n) =>
+    set((s) => {
+      const len = Math.max(2, Math.min(16, n | 0))
+      const soniSeq = { ...s.soniSeq, len, cur: s.soniSeq.cur % len }
+      persistSoniSeq(soniSeq)
+      return { soniSeq }
+    }),
+  toggleSoniSeqVoice: (step, voice) =>
+    set((s) => {
+      const steps = s.soniSeq.steps.map((st, i) =>
+        i === step ? { ...st, voices: st.voices.map((v, vi) => (vi === voice ? !v : v)) } : st
+      )
+      const soniSeq = { ...s.soniSeq, steps }
+      persistSoniSeq(soniSeq)
+      return { soniSeq }
+    }),
+  setSoniSeqStepPreset: (step, preset) =>
+    set((s) => {
+      const steps = s.soniSeq.steps.map((st, i) => (i === step ? { ...st, preset } : st))
+      const soniSeq = { ...s.soniSeq, steps }
+      persistSoniSeq(soniSeq)
+      return { soniSeq }
+    }),
+  clearSoniSeqStep: (step) =>
+    set((s) => {
+      const steps = s.soniSeq.steps.map((st, i) =>
+        i === step ? { voices: [false, false, false, false, false, false, false, false], preset: '' } : st
+      )
+      const soniSeq = { ...s.soniSeq, steps }
+      persistSoniSeq(soniSeq)
+      return { soniSeq }
+    }),
+  resetSoniSeq: () => {
+    const soniSeq = makeDefaultSoniSeq()
+    persistSoniSeq(soniSeq)
+    set({ soniSeq })
+  },
+  // Runtime-only : the sequencer tick writes the current step (never persisted).
+  setSoniSeqCur: (i) => set((s) => ({ soniSeq: { ...s.soniSeq, cur: i } })),
+  setSoniSeqMode: (mode) =>
+    set((s) => {
+      const soniSeq = { ...s.soniSeq, mode }
+      persistSoniSeq(soniSeq)
+      return { soniSeq }
+    }),
+  setSoniSeqBounceDecay: (v) =>
+    set((s) => {
+      const soniSeq = { ...s.soniSeq, bounceDecay: Math.max(0, Math.min(100, v)) }
+      persistSoniSeq(soniSeq)
+      return { soniSeq }
+    }),
+  setSoniSeqBias: (v) =>
+    set((s) => {
+      const soniSeq = { ...s.soniSeq, bias: Math.max(-100, Math.min(100, v)) }
+      persistSoniSeq(soniSeq)
+      return { soniSeq }
+    }),
+  setSoniSeqEdge: (edge) =>
+    set((s) => {
+      const soniSeq = { ...s.soniSeq, edge }
+      persistSoniSeq(soniSeq)
+      return { soniSeq }
+    }),
+  randomizeSoniSeq: () =>
+    set((s) => {
+      // Re-roll each active step to 1–3 voices on (a fresh rhythmic pattern).
+      // Preset steps keep their preset (its voice mask is unused there anyway).
+      const steps = s.soniSeq.steps.map((st, i) => {
+        if (i >= s.soniSeq.len) return st
+        const voices = [false, false, false, false, false, false, false, false]
+        const n = 1 + Math.floor(Math.random() * 3)
+        let placed = 0
+        let guard = 0
+        while (placed < n && guard++ < 40) {
+          const v = Math.floor(Math.random() * 8)
+          if (!voices[v]) {
+            voices[v] = true
+            placed++
+          }
+        }
+        return { ...st, voices }
+      })
+      const soniSeq = { ...s.soniSeq, steps }
+      persistSoniSeq(soniSeq)
+      return { soniSeq }
+    }),
+
   // ── Assemble ──────────────────────────────────────────────────────────
   assembleFolder: localStorage.getItem('opsia.assembleFolder') ?? '',
   assembleCorpus: null,
@@ -2609,12 +2880,6 @@ export const useStore = create<StoreState>((set, get) => ({
   deleteAssemblage: (id) =>
     set((s) => {
       const assemblages = s.assemblages.filter((x) => x.id !== id)
-      persistAssemblages(assemblages)
-      return { assemblages }
-    }),
-  renameAssemblage: (id, name) =>
-    set((s) => {
-      const assemblages = s.assemblages.map((x) => (x.id === id ? { ...x, name } : x))
       persistAssemblages(assemblages)
       return { assemblages }
     }),
@@ -2746,7 +3011,7 @@ export const useStore = create<StoreState>((set, get) => ({
         [sub]: isOpen // open ⇒ collapse; closed ⇒ expand (the others stay collapsed)
       }
       localStorage.setItem('opsia.collapsed', JSON.stringify(collapsed))
-      return { collapsed, rightView: 'finishing', mixerView: false }
+      return { collapsed, rightView: 'finishing' }
     }),
 
   userShaderPresets: (() => {
@@ -2783,7 +3048,19 @@ export const useStore = create<StoreState>((set, get) => ({
   activeSceneId: null,
   updateSceneFromLive: (id) =>
     set((s) => ({
-      scenes: s.scenes.map((x) => (x.id === id ? { ...x, composition: s.composition } : x))
+      // Overwrite the WHOLE live scene — composition + World + sound patch — the
+      // same trio saveScene captures. Refreshing only the composition used to
+      // leave the recalled scene's old World label + Sonify behind.
+      scenes: s.scenes.map((x) =>
+        x.id === id
+          ? {
+              ...x,
+              composition: s.composition,
+              world: s.worlds.find((w) => w.id === s.world) ?? null,
+              sonify: { ...s.sonify, on: false, sinkId: '' }
+            }
+          : x
+      )
     })),
   duplicateScene: (id) =>
     set((s) => {
@@ -2937,6 +3214,13 @@ export const useStore = create<StoreState>((set, get) => ({
       const worlds = ensureWorld(s.worlds, scene.world)
       const world = scene.world ? scene.world.id : s.world
       if (scene.world) localStorage.setItem('opsia.world', world)
+      // Recall the scene's sound patch too (keep the local on-state + device) —
+      // a sequencer-driven set played every scene with the wrong (frozen) sound.
+      if (scene.sonify) {
+        const cur = s.sonify
+        const next = { ...defaultSoniConfig(), ...(scene.sonify as Partial<SoniConfig>), on: cur.on, sinkId: cur.sinkId } as SoniConfig
+        queueMicrotask(() => useStore.getState().setSonify(next))
+      }
       return { composition, activeSceneId: id, worlds, world, variationBaseline: null }
     }),
   sequencePageOpen: false,
@@ -2952,10 +3236,14 @@ export const useStore = create<StoreState>((set, get) => ({
       // Master FX/Inspector open. Persist so it survives the next reload.
       const collapsed = { ...s.collapsed, meta: true, modulation: true, master: false, inspector: false }
       localStorage.setItem('opsia.collapsed', JSON.stringify(collapsed))
+      // New = a fresh random one-layer scene (not a blank canvas), with the
+      // active World applied so the World selector matches the layers' coupling
+      // (else it'd read e.g. "Musical" over factory-uncoupled layers).
+      const activeWorld = s.worlds.find((w) => w.id === s.world) ?? null
+      const fresh = seedRandomStart(makeDefaultComposition())
       return {
         name: 'Untitled',
-        // New = a fresh random one-layer scene (not a blank canvas).
-        composition: seedRandomStart(makeDefaultComposition()),
+        composition: activeWorld ? applyWorldToComposition(fresh, activeWorld) : fresh,
         selection: { type: 'source', layer: 0, slot: 'A' },
         scenes: [],
         activeSceneId: null,
@@ -2963,6 +3251,9 @@ export const useStore = create<StoreState>((set, get) => ({
         variationBaseline: null,
         sequence: makeDefaultSequence(), // empty bank → stop the auto-pilot
         sessionPath: null, // New = no file yet; next Save prompts for one.
+        // Reset the draw-sequencer gesture (else a stale path exports into the
+        // new session and reactivates once two scenes are placed).
+        surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0, wiggle: 0, closed: false },
         collapsed
       }
     }),
@@ -3009,6 +3300,9 @@ export const useStore = create<StoreState>((set, get) => ({
         variationBaseline: null,
         sequence: makeDefaultSequence(),
         sessionPath: null, // Generate = unsaved; Ctrl+S keeps it.
+        // Reset the draw-sequencer gesture (as newSession does) so a stale path
+        // can't export into the generated session and reactivate.
+        surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0, wiggle: 0, closed: false },
         density: theme.density,
         gestureTexture: theme.gestureTexture,
         coalesce: theme.coalesce,
@@ -3020,6 +3314,14 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     }),
   loadSession: (s) => {
+    // session.ts only checks version + objectness, so a malformed-but-v1 file can
+    // still reach here. normalizeComposition dereferences s.composition.layers, and
+    // the savedTheme block below mutates the theme/localStorage BEFORE that throw —
+    // a half-applied load. Guard the shape at the TOP and bail as a clean no-op.
+    if (!s.composition || !Array.isArray(s.composition.layers)) {
+      console.warn('[session] ignored a malformed session (missing composition.layers)')
+      return
+    }
     cancelMorph() // replacing the whole composition : abort any in-flight morph
     resetCouplingState()
     // Restore the session's World (self-contained → add to bank if missing).
@@ -3034,7 +3336,7 @@ export const useStore = create<StoreState>((set, get) => ({
       applyTheme(savedTheme)
       localStorage.setItem('opsia.theme', savedTheme)
     }
-    return set({
+    set({
       name: s.name,
       theme: savedTheme ?? cur.theme,
       worlds,
@@ -3044,8 +3346,18 @@ export const useStore = create<StoreState>((set, get) => ({
       scenes: (s.scenes ?? []).map((sc) => ({ ...sc, composition: normalizeComposition(sc.composition) })),
       activeSceneId: null,
       variationBaseline: null,
+      // The old selection can dangle onto an FX unit the loaded session lacks, and
+      // the old palette name no longer describes it : reset both (as newSession does).
+      selection: { type: 'source', layer: 0, slot: 'A' },
+      vibePresetName: null,
       // Sequencer travels with the session; auto-resumes if it was running.
       sequence: { ...makeDefaultSequence(), ...(s.sequence ?? {}) },
+      // Performance dials travel with the session; an older file without them
+      // keeps the current (localStorage-restored) values rather than resetting.
+      globalSpeed: typeof s.globalSpeed === 'number' ? Math.max(1 / 64, Math.min(64, s.globalSpeed)) : cur.globalSpeed,
+      morphMs: typeof s.morphMs === 'number' ? Math.max(0, Math.min(30000, s.morphMs)) : cur.morphMs,
+      // The Sonify step sequence travels with the session (opens paused at 0).
+      soniSeq: sanitizeSoniSeq(s.soniSeq, cur.soniSeq),
       // The drawn surface gesture + timing travel too; the live cursor / active
       // / play toggles reset (a session opens paused at the plane centre).
       surface: {
@@ -3062,6 +3374,11 @@ export const useStore = create<StoreState>((set, get) => ({
       },
       composition: normalizeComposition(s.composition)
     })
+    // Keep the performance-dial localStorage in sync with the loaded session so a
+    // later restart preserves the loaded feel, not the previously-set one.
+    localStorage.setItem('opsia.globalSpeed', String(get().globalSpeed))
+    localStorage.setItem('opsia.morphMs', String(get().morphMs))
+    persistSoniSeq(get().soniSeq)
     // The session's sound patch (post-set so setSonify's engine push sees it).
     if (s.sonify) {
       const curSoni = get().sonify
@@ -3083,6 +3400,9 @@ export const useStore = create<StoreState>((set, get) => ({
       world: s.worlds.find((w) => w.id === s.world) ?? null,
       sequence: s.sequence,
       sonify: { ...s.sonify, on: false, sinkId: '' },
+      soniSeq: { ...s.soniSeq, on: false, cur: 0 },
+      globalSpeed: s.globalSpeed,
+      morphMs: s.morphMs,
       // The drawn gesture + its timing travel with the session; the live cursor,
       // active + play toggles are runtime and reset on load.
       surface: {

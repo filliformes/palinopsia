@@ -231,7 +231,8 @@ export function VideoTransport({
           onPointerMove={onMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
-          title={`In point : ${(inN * 100).toFixed(0)}%`}
+          onDoubleClick={() => set({ videoIn: 0 })}
+          title={`In point : ${(inN * 100).toFixed(0)}% : double-click resets to start`}
         />
         <div
           className="absolute inset-y-0 -ml-1 w-2 cursor-ew-resize rounded-r bg-accent/80 hover:bg-accent"
@@ -240,7 +241,8 @@ export function VideoTransport({
           onPointerMove={onMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
-          title={`Out point : ${(outN * 100).toFixed(0)}%`}
+          onDoubleClick={() => set({ videoOut: 1 })}
+          title={`Out point : ${(outN * 100).toFixed(0)}% : double-click resets to end`}
         />
         <div
           ref={playheadRef}

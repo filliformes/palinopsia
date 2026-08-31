@@ -90,7 +90,7 @@ const parseClock = (s: string): number => {
 
 // Codecs Chromium's <video> cannot decode : convert these. (h264/hevc/vp8/vp9/
 // av1 in mp4/webm play natively and are left untouched.)
-const CONVERT_CODECS = /\b(dxv|hap|prores|dnxhd|mpeg2video|mjpeg|cfhd|qtrle|rawvideo)\b/i
+const CONVERT_CODECS = /\b(dxv[0-9]*|hap|prores|dnxhd|mpeg2video|mjpeg|cfhd|qtrle|rawvideo)\b/i
 
 export interface VideoProbeResult {
   ok: boolean
@@ -314,9 +314,17 @@ export function convertForCollage(
 // the performer reaches for a clip it imports instantly. Fire-and-forget.
 const VIDEO_EXTS = /\.(mp4|m4v|mov|dxv|webm|mkv|avi|mpg|mpeg|mxf|m2v)$/i
 let warming = false
+let warmingDir: string | null = null
+// Folders requested while a sweep is in flight : queued (deduped) to run after,
+// so loading session A then quickly session B (a different folder) still warms B.
+const pendingWarm = new Set<string>()
 export async function warmVideoFolder(dir: string): Promise<void> {
-  if (warming) return // one warm sweep at a time
+  if (warming) {
+    if (dir !== warmingDir) pendingWarm.add(dir) // queue it, don't drop it
+    return
+  }
   warming = true
+  warmingDir = dir
   try {
     const { readdirSync } = await import('fs')
     const files = readdirSync(dir)
@@ -337,6 +345,10 @@ export async function warmVideoFolder(dir: string): Promise<void> {
     /* unreadable dir : ignore */
   } finally {
     warming = false
+    warmingDir = null
+    // Drain one queued folder (fire-and-forget); it re-enters and drains the next.
+    const next = pendingWarm.values().next().value
+    if (next !== undefined) { pendingWarm.delete(next); void warmVideoFolder(next) }
   }
 }
 

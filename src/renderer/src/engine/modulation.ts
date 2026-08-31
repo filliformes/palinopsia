@@ -12,10 +12,15 @@
 // touch the React store, so nothing re-renders at 60 Hz.
 
 import type { CompositionState, LfoShape, ModCurve, ModulatorConfig } from '@shared/types'
+import { BLEND_MODES, FX_OPACITY_INPUT } from '@shared/types'
 import { audioBus } from './audioIn'
 import { visionBus } from './visionIn'
 
 const TWO_PI = Math.PI * 2
+// The 60fps reference frame time (ms). The picture / audio one-pole followers
+// below tune their smoothing to this, then scale by the real dt, so a given
+// `smooth` feels the same at any frame rate (see the audio/vision/homeostat cases).
+const FR_MS = 1000 / 60
 
 // ── BPM sync (dataFLOU's DIVISIONS + effectiveLfoHz) ──────────────────
 export const DIVISIONS: Array<{ label: string; beats: number }> = [
@@ -621,7 +626,10 @@ export class ModEngine {
           if (a) {
             const raw = audioBus.feature(a.feature, a.band)
             const sm = Math.max(0, Math.min(0.99, a.smooth ?? 0))
-            s.audioValue += (raw - s.audioValue) * (1 - sm)
+            // dt-normalized one-pole : retain `sm` per 60fps frame, then scale by
+            // the real dt so the follower's speed doesn't ride the frame rate
+            // (sm=0 stays instant). Preserves the old fixed-(1−sm) feel at 60fps.
+            s.audioValue += (raw - s.audioValue) * (1 - Math.pow(sm, dtMs / FR_MS))
             v01 = s.audioValue
           }
           break
@@ -633,7 +641,8 @@ export class ModEngine {
           if (vc) {
             const raw = visionBus.feature(vc.feature)
             const sm = Math.max(0, Math.min(0.99, vc.smooth ?? 0))
-            s.visionValue += (raw - s.visionValue) * (1 - sm)
+            // dt-normalized one-pole (see the audio case) : frame-rate-independent.
+            s.visionValue += (raw - s.visionValue) * (1 - Math.pow(sm, dtMs / FR_MS))
             v01 = s.visionValue
           }
           break
@@ -659,7 +668,7 @@ export class ModEngine {
               s.homeoBase = raw
               s.homeoSeeded = true
             }
-            s.homeoFeat += (raw - s.homeoFeat) * 0.3 // fixed light de-noise
+            s.homeoFeat += (raw - s.homeoFeat) * (1 - Math.pow(0.7, dtMs / FR_MS)) // fixed light de-noise (dt-normalized : 0.3/frame @ 60fps)
             // Slow baseline the loop regulates around (0.02 → ~2 Hz re-centre).
             const adapt = Math.max(0, Math.min(1, hc.adapt ?? 0.3))
             const baseRate = Math.min(1, (0.02 + adapt * 2) * dt)
@@ -865,7 +874,7 @@ export const SONIFY_MOD_DESCS: Record<string, { min: number; max: number; def: n
   spectraGamma: { min: 0.5, max: 4, def: 1.8 },
   spectraSweep: { min: 0.02, max: 4, def: 0.25 },
   spectraBreath: { min: 0, max: 1, def: 0 },
-  orbitDrive: { min: 0.2, max: 3, def: 1 },
+  orbitDrive: { min: 0.2, max: 4, def: 1 },
   orbitSmooth: { min: 0, max: 1, def: 0.5 },
   flowDur: { min: 0.02, max: 0.4, def: 0.09 },
   flowColour: { min: 0, max: 1, def: 0.6 },
@@ -895,6 +904,7 @@ function liveKey(t: import('@shared/types').ModTarget): string {
   if (t.kind === 'bgSource') return `bgsrc:${t.input}`
   if (t.kind === 'meta') return `meta:${t.knob}`
   if (t.kind === 'sonify') return `soni:${t.param}`
+  if (t.kind === 'layer') return `lay:${t.layer}:${t.field}`
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
@@ -1043,7 +1053,15 @@ export interface ModComp {
     value: number
   ) => void
   setBgSourceInput: (name: string, value: number) => void
+  // Compositor-level overrides (not ISF inputs) : per-FX dry/wet opacity, and a
+  // layer's own opacity / A-B mix / blend-mode index. Applied post-syncFromState.
+  setFxOpacity: (scope: import('@shared/types').FxScope, instId: string, value: number) => void
+  setLayerParam: (layer: number, field: 'opacity' | 'mix' | 'blend', value: number) => void
 }
+
+// Shared 0..1 → blend-index descriptor : the enum's ordered indices, so both the
+// absolute (Meta) and swing/multiply (direct) paths map onto the same modes.
+const BLEND_INDICES = BLEND_MODES.map((_, i) => i)
 
 /** Resolve one ISF-input target's shader + write the given ABSOLUTE 0..1
  *  position everywhere it needs to land (engine + live map). Shared by the
@@ -1062,6 +1080,24 @@ export function writeModTarget(
     const v = d.min + Math.max(0, Math.min(1, shaped01)) * (d.max - d.min)
     sonifyModValues.set(t.param, v)
     liveModValues.set(liveKey(t), v)
+    return
+  }
+  // Layer opacity / A-B mix / blend-index : compositor overrides, absolute 0..1.
+  if (t.kind === 'layer') {
+    const x = Math.max(0, Math.min(1, shaped01))
+    const value =
+      t.field === 'blend'
+        ? Math.min(BLEND_INDICES.length - 1, Math.floor(x * BLEND_INDICES.length))
+        : x
+    liveModValues.set(liveKey(t), value)
+    comp.setLayerParam(t.layer, t.field, value)
+    return
+  }
+  // Per-FX dry/wet opacity : a compositor property, not an ISF input.
+  if (t.kind === 'fx' && t.input === FX_OPACITY_INPUT) {
+    const value = Math.max(0, Math.min(1, shaped01))
+    liveModValues.set(liveKey(t), value)
+    comp.setFxOpacity(t.scope, t.instId, value)
     return
   }
   let shaderId: string | null = null
@@ -1157,29 +1193,31 @@ export function applyModulation(
     const v = values[a.mod]
     if (v === undefined) continue
     if (a.target.kind === 'meta') {
-      // Meta target: the knob's curve is its SCALING FUNCTION : the raw
-      // modulator signal is shaped by the curve first (modulator × scaling
-      // function), then swung around the knob's base position by depth. The
-      // same shaped value is what the dial animates to AND what fans out to
-      // the destinations, so what you see the knob doing is exactly what it
-      // sends.
+      // Meta target: the modulator drives the knob's POSITION (as a hand on the
+      // dial would), then the knob's curve shapes THAT position on its way to
+      // the destinations — exactly the manual/glide/CC path (applyMetaGlides,
+      // metaSmooth.settle), which shapes the dial position, not the input. So a
+      // dial reaching 0.5 lands its targets identically whether dragged there or
+      // modulated there. metaLiveValues holds the raw position (what the dial
+      // shows), same as the manual path.
       const knob = c.metaKnobs[a.target.knob]
       if (!knob) continue
-      const scaled = shapeCurve(Math.max(0, Math.min(1, v)), knob.curve)
+      const mv = Math.max(0, Math.min(1, v))
       // Multiply scales the knob's base position (VCA on the macro); Replace
       // swings it around the base (default for pre-mode sessions).
       let v01: number
       if (a.mode === 'multiply') {
         const amt = Math.min(1, Math.abs(a.depth))
-        const m = a.depth < 0 ? 1 - scaled : scaled
+        const m = a.depth < 0 ? 1 - mv : mv
         v01 = Math.max(0, Math.min(1, knob.value * (1 - amt + amt * m)))
       } else {
-        v01 = Math.max(0, Math.min(1, knob.value + (scaled - 0.5) * 2 * a.depth))
+        v01 = Math.max(0, Math.min(1, knob.value + (mv - 0.5) * 2 * a.depth))
       }
       metaLiveValues.set(a.target.knob, v01)
+      const shaped = shapeCurve(v01, knob.curve)
       for (const dest of knob.destinations) {
         if (dest.kind === 'meta') continue // knobs never chain into knobs
-        writeTarget(dest, v01)
+        writeTarget(dest, shaped)
       }
       continue
     }
@@ -1194,6 +1232,25 @@ export function applyModulation(
       if (final === null || typeof final !== 'number') continue
       sonifyModValues.set(a.target.param, final)
       liveModValues.set(liveKey(a.target), final)
+      continue
+    }
+    if (a.target.kind === 'layer') {
+      const layer = c.layers[a.target.layer]
+      if (!layer) continue
+      const f = a.target.field
+      let final: number | null
+      if (f === 'blend') {
+        const baseIdx = Math.max(0, BLEND_MODES.indexOf(layer.blend))
+        final = inputValueForMode(
+          { type: 'long', values: BLEND_INDICES, def: baseIdx }, baseIdx, v, a.depth, a.mode
+        )
+      } else {
+        const base = f === 'opacity' ? layer.opacity : layer.sourceMix
+        final = inputValueForMode({ type: 'float', min: 0, max: 1, def: base }, base, v, a.depth, a.mode)
+      }
+      if (final === null || typeof final !== 'number') continue
+      liveModValues.set(liveKey(a.target), final)
+      comp.setLayerParam(a.target.layer, f, final)
       continue
     }
     if (a.target.kind === 'source') {
@@ -1244,6 +1301,15 @@ export function applyModulation(
       }
       const inst = arr.find((f) => f.id === instId)
       if (!inst?.shaderId) continue
+      // Per-FX dry/wet opacity : compositor property, not an ISF input.
+      if (input === FX_OPACITY_INPUT) {
+        const base = inst.opacity ?? 1
+        const final = inputValueForMode({ type: 'float', min: 0, max: 1, def: base }, base, v, a.depth, a.mode)
+        if (final === null || typeof final !== 'number') continue
+        liveModValues.set(liveKey(a.target), final)
+        comp.setFxOpacity(scope, instId, final)
+        continue
+      }
       const d = descFor(inst.shaderId).find((x) => x.name === input)
       if (!d) continue
       const final = inputValueForMode(d, inst.inputs[input], v, a.depth, a.mode)

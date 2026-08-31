@@ -6,14 +6,10 @@
 
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
-  useLayoutEffect,
   useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-  type RefObject
+  type PointerEvent as ReactPointerEvent
 } from 'react'
 import type { ModMode, ModTarget } from '@shared/types'
 import type { IsfInputDesc } from '../shaders/isf/inputs'
@@ -22,10 +18,9 @@ import { useShallow } from 'zustand/react/shallow'
 import { modTargetKey, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 
-// When an ancestor (the Inspector) provides `onAssign`, clicking an M button
-// opens the mod-assign in the Inspector's side panel instead of the little
-// floating popover. `activeKey` highlights the M whose panel is open. Providers
-// that don't set onAssign (Finishing view, dense stacks) keep the popover.
+// Clicking an M button opens the mod-assign in the provider's side panel (the
+// Inspector, or the Finishing column) via `onAssign`. `activeKey` highlights the
+// M whose panel is open.
 type BoundAssignment = { id: string; mod: number; depth: number; mode?: ModMode }
 interface AssignCtx {
   onAssign?: (target: ModTarget, label: string) => void
@@ -35,7 +30,7 @@ export const AssignContext = createContext<AssignCtx>({})
 
 /** Assignments bound to one target (any modulator). useShallow so this
  *  fresh-array selector doesn't re-render every control on every store write. */
-function useBound(targetKey: string | null): BoundAssignment[] {
+export function useBound(targetKey: string | null): BoundAssignment[] {
   return useStore(
     useShallow((s) =>
       targetKey ? s.composition.modMatrix.filter((a) => modTargetKey(a.target) === targetKey) : []
@@ -43,9 +38,9 @@ function useBound(targetKey: string | null): BoundAssignment[] {
   )
 }
 
-// The M pill. In Inspector context it toggles the side panel; elsewhere it opens
-// the legacy anchored popover. Highlights when bound OR when its panel is active.
-function ModButton({
+// The M pill. Toggles the provider's mod-assign side panel. Highlights when
+// bound OR when its panel is active.
+export function ModButton({
   target,
   bound,
   label
@@ -55,10 +50,7 @@ function ModButton({
   label: string
 }): JSX.Element {
   const { onAssign, activeKey } = useContext(AssignContext)
-  const [open, setOpen] = useState(false)
-  const btnRef = useRef<HTMLButtonElement | null>(null)
   const key = modTargetKey(target)
-  useEffect(() => setOpen(false), [key])
   const isBound = bound.length > 0
   const active = activeKey === key
   // Right-click = kill switch: clear EVERY modulation on this parameter —
@@ -71,31 +63,23 @@ function ModButton({
     })
   }
   return (
-    <>
-      <button
-        ref={btnRef}
-        onClick={() => (onAssign ? onAssign(target, label) : setOpen((o) => !o))}
-        onContextMenu={(e) => {
-          e.preventDefault()
-          clearAll()
-        }}
-        className={`shrink-0 rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
-          isBound
-            ? 'bg-accent/20 text-accent ring-1 ring-accent'
-            : active
-              ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
-              : open
-                ? 'bg-panel3 text-text'
-                : 'bg-panel3/60 text-muted hover:text-text'
-        }`}
-        title={`Modulate ${label} : right-click clears all its modulation`}
-      >
-        M{isBound ? bound.map((b) => b.mod + 1).join('') : ''}
-      </button>
-      {!onAssign && open && (
-        <AssignPopover target={target} bound={bound} anchor={btnRef} onClose={() => setOpen(false)} />
-      )}
-    </>
+    <button
+      onClick={() => onAssign?.(target, label)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        clearAll()
+      }}
+      className={`shrink-0 rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
+        isBound
+          ? 'bg-accent/20 text-accent ring-1 ring-accent'
+          : active
+            ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
+            : 'bg-panel3/60 text-muted hover:text-text'
+      }`}
+      title={`Modulate ${label} : right-click clears all its modulation`}
+    >
+      M{isBound ? bound.map((b) => b.mod + 1).join('·') : ''}
+    </button>
   )
 }
 
@@ -446,55 +430,6 @@ function FloatControl({
   )
 }
 
-// The binding row as a FIXED-position popover anchored to the M button : the
-// Inspector band is `overflow-y-hidden` with a fixed height, so an inline panel
-// would be clipped and would shove its sibling controls. Fixed positioning
-// escapes the clip and leaves the row untouched.
-function AssignPopover({
-  target,
-  bound,
-  anchor,
-  onClose
-}: {
-  target: ModTarget
-  bound: Array<{ id: string; mod: number; depth: number }>
-  anchor: RefObject<HTMLElement>
-  onClose: () => void
-}): JSX.Element | null {
-  const ref = useRef<HTMLDivElement | null>(null)
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
-  const W = 236
-  const place = useCallback((): void => {
-    const r = anchor.current?.getBoundingClientRect()
-    if (r) setPos({ top: r.bottom + 4, left: Math.max(6, Math.min(r.left, window.innerWidth - W - 6)) })
-  }, [anchor])
-  useLayoutEffect(() => place(), [place])
-  // Follow the anchor when the Inspector scrolls or the window resizes (the
-  // popover is position:fixed, so it would otherwise detach from the button).
-  useEffect(() => {
-    window.addEventListener('scroll', place, true)
-    window.addEventListener('resize', place)
-    return () => {
-      window.removeEventListener('scroll', place, true)
-      window.removeEventListener('resize', place)
-    }
-  }, [place])
-  useEffect(() => {
-    const h = (e: MouseEvent): void => {
-      if (ref.current?.contains(e.target as Node) || anchor.current?.contains(e.target as Node)) return
-      onClose()
-    }
-    window.addEventListener('mousedown', h)
-    return () => window.removeEventListener('mousedown', h)
-  }, [anchor, onClose])
-  if (!pos) return null
-  return (
-    <div ref={ref} style={{ position: 'fixed', top: pos.top, left: pos.left, width: W, zIndex: 60 }}>
-      <AssignRow target={target} bound={bound} />
-    </div>
-  )
-}
-
 // Inline binding row: modulators M1–8 (with depth) and Meta knobs K1–K16.
 // Exported : MetaBar reuses it for binding modulators TO knobs (hideMeta).
 export function AssignRow({
@@ -761,14 +696,33 @@ function BoolControl({
   // An `event` input is a MOMENTARY trigger : press pulses it 1 → 0 so the engine
   // sees a rising edge (fire) then re-arms. Bind M to drive it from a modulator
   // (a square LFO / sample&hold / audio edge) or fire it over OSC for live use.
+  // Hold the deferred 1 → 0 reset in a ref and cancel it when this control
+  // unmounts or its shader/slot changes — the `inp` descriptor is cached per
+  // shader (inputsForShader), so it only changes on a real swap. Without this a
+  // reset armed on shader A but landing after a swap would plant a stray
+  // `name → 0` on whatever shader now occupies the slot.
+  const fireTimer = useRef<number | null>(null)
+  useEffect(
+    () => () => {
+      if (fireTimer.current !== null) {
+        window.clearTimeout(fireTimer.current)
+        fireTimer.current = null
+      }
+    },
+    [inp]
+  )
   if (inp.type === 'event') {
     return (
       <div className="flex w-24 min-w-0 flex-col items-start gap-0.5">
         <LabelRow inp={inp} modTargetFor={modTargetFor} />
         <button
           onPointerDown={() => {
+            if (fireTimer.current !== null) window.clearTimeout(fireTimer.current)
             onChange(inp.name, 1)
-            window.setTimeout(() => onChange(inp.name, 0), 140)
+            fireTimer.current = window.setTimeout(() => {
+              onChange(inp.name, 0)
+              fireTimer.current = null
+            }, 140)
           }}
           className="w-full rounded bg-panel2 px-2 py-0.5 font-mono text-[10px] text-accent ring-1 ring-accent/40 transition-colors hover:bg-accent/20 active:bg-accent/50"
           title={inp.hint ?? `${inp.label} : fire (momentary trigger; bind M for rhythmic auto-fire)`}

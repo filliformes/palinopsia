@@ -72,6 +72,13 @@ const sockets = new Map<string, net.Socket>()
 /** Connect to a HIVE sender and stream access units to `wc` as `hive:au`. */
 export function hiveConnect(wc: WebContents, id: string, host: string, port: number): void {
   hiveDisconnect(id)
+  // Validate before net.connect : an out-of-range / non-integer port throws
+  // synchronously (ERR_SOCKET_BAD_PORT), which would otherwise crash the main
+  // process from the fire-and-forget IPC handler.
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    if (!wc.isDestroyed()) wc.send('hive:status', { id, ok: false, error: `Invalid port: ${port}` })
+    return
+  }
   let ts = 0
   const parser = new AnnexBParser((data, key) => {
     if (wc.isDestroyed()) return

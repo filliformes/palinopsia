@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { nearestSurfaceScene, surfaceWeights } from '../surface'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
 
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v))
 
@@ -241,6 +242,26 @@ export function SurfacePad(): JSX.Element {
         >
           {drawMode ? '✎ drawing' : '✎ draw'}
         </button>
+        {/* Learn hosts only : bind a hardware fader / joystick axis to the
+            surface X / Y so the cursor can be driven from a controller. */}
+        <span className="relative ml-auto flex shrink-0">
+          <MidiLearnOverlay id="surface:x" />
+          <span
+            className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted"
+            title="Bind MIDI to the Metasurface X axis"
+          >
+            X
+          </span>
+        </span>
+        <span className="relative flex shrink-0">
+          <MidiLearnOverlay id="surface:y" />
+          <span
+            className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted"
+            title="Bind MIDI to the Metasurface Y axis"
+          >
+            Y
+          </span>
+        </span>
       </div>
       <div
         ref={padRef}

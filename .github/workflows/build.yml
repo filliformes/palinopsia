@@ -1,8 +1,13 @@
 name: build
 
-# Builds Windows (NSIS + portable) and macOS (DMG) artifacts together on a
-# tag push. Mirrors dataFLOU's release recipe. No native modules in the MVP,
-# so no rebuild toolchain is needed (electron-builder npmRebuild:false).
+# Builds Windows (NSIS + portable), macOS (DMG, per-arch), and Linux (AppImage +
+# deb) artifacts on a tag push, then drafts a GitHub Release with all of them.
+#
+# macOS is built twice — macos-latest (Apple Silicon → arm64) and macos-13 (Intel
+# → x64) — so ffmpeg-static bundles the matching native binary in each dmg. The
+# Windows Spout addon (native/spout) is a DX11 native module whose prebuilt .node
+# is git-ignored, so it is rebuilt against the packaged Electron ABI before
+# electron-builder runs; mac/linux skip it (Spout is Windows-only and guarded).
 
 on:
   push:
@@ -10,15 +15,27 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
+            platform: win
             script: build:win
           - os: macos-latest
+            platform: mac
             script: build:mac
+          - os: macos-13
+            platform: mac
+            script: build:mac
+          - os: ubuntu-latest
+            platform: linux
+            script: build:linux
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -27,6 +44,16 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Build Spout addon (Windows only)
+        if: matrix.platform == 'win'
+        shell: bash
+        working-directory: native/spout
+        run: |
+          npm install --ignore-scripts
+          npx --yes node-gyp rebuild \
+            --target=$(node -p "require('electron/package.json').version") \
+            --dist-url=https://electronjs.org/headers \
+            --arch=x64
       - run: npm run typecheck
       - run: npm run ${{ matrix.script }}
       - uses: actions/upload-artifact@v4
@@ -35,4 +62,25 @@ jobs:
           path: |
             release/**/*.exe
             release/**/*.dmg
+            release/**/*.AppImage
+            release/**/*.deb
           if-no-files-found: ignore
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      # Drafts (does not auto-publish) a release with every platform artifact.
+      # macOS dmgs are unsigned/un-notarized for v0.1.0 — the release notes should
+      # tell users to right-click → Open (or `xattr -cr`) past Gatekeeper.
+      - name: Draft GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          fail_on_unmatched_files: false
+          draft: true
+          generate_release_notes: true

@@ -923,7 +923,7 @@ export const GENERATORS: IsfShader[] = [
     name: 'Solid Color',
     category: 'Generator',
     source: solidColor,
-    curated: { gradient: [0, 1], angle: [0, 6.2832], midpoint: [0.3, 0.7], dither: [0.3, 0.7] }
+    curated: { angle: [0, 6.2832], midpoint: [0.3, 0.7], dither: [0.3, 0.7] }
   },
   {
     id: 'organic',
@@ -1200,7 +1200,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-slit-buffer', name: 'Slit Buffer', category: 'FX', source: slitBuffer,
-    curated: { rate: [0.05, 1], width: [0.01, 0.1], jitter: [0, 0.7], jumps: [0, 0.6], direction: [0, 2] }
+    curated: { rate: [0.05, 1], width: [0.01, 0.1], jitter: [0, 0.7], jumps: [0, 0.6] }
   },
   {
     id: 'fx-difference-bloom', name: 'Difference Bloom', category: 'FX', source: differenceBloom,
@@ -1264,7 +1264,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-mosaic', name: 'Mosaic', category: 'FX', source: mosaic,
-    curated: { grid: [0.2, 0.7], size: [0.5, 1], lumaSize: [0.2, 0.9], soft: [0.02, 0.2], shape: [0, 3], gapMix: [0, 0.4] }
+    curated: { grid: [0.2, 0.7], size: [0.5, 1], lumaSize: [0.2, 0.9], soft: [0.02, 0.2], gapMix: [0, 0.4] }
   },
   {
     id: 'fx-optical-rain', name: 'Optical Rain', category: 'FX', source: opticalRain,

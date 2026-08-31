@@ -4,6 +4,7 @@
 // OSC and the modulators (Phase 5) use, so the engine follows automatically.
 
 import type { FxInstance, ModTarget, SidechainRef, SourceSlot } from '@shared/types'
+import { FX_OPACITY_INPUT } from '@shared/types'
 import { randomizeInputs } from '../randomize'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { blurbFor } from '../shaders/isf/shaderBlurbs'
@@ -15,7 +16,8 @@ import { CollageStrip } from './CollageStrip'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { floatModTargets, hasModulationOn, useFxMenuItems } from './fxMenu'
 import { fxArrayFor, modTargetKey, useStore, type FxScope } from '../store'
-import { AutoControls, AssignContext, AssignRow } from './AutoControls'
+import { AutoControls, AssignContext, AssignRow, ModButton, useBound } from './AutoControls'
+import { registerLiveOverlay } from './liveOverlay'
 import { CapturePicker } from './CapturePicker'
 import { DevicePicker } from './DevicePicker'
 import { PresetPicker } from './PresetPicker'
@@ -91,6 +93,9 @@ export function Inspector(): JSX.Element {
   // The FX-controls band measures its own content so it can auto-fit (see the
   // auto-fit RULE below).
   const fxContentRef = useRef<HTMLDivElement>(null)
+  // The FX dry/wet opacity slider tracks its live modulated value (like every
+  // other modulated control), so a bound opacity visibly moves in the header.
+  const fxOpaRef = useRef<HTMLInputElement | null>(null)
   // Close the panel whenever the selection moves to a different shader/unit.
   const selKey =
     selection?.type === 'source'
@@ -267,6 +272,29 @@ export function Inspector(): JSX.Element {
     }
   }
 
+  // Per-FX dry/wet opacity as a modulation target : rides the fx plumbing via a
+  // sentinel input name, so its M pill opens the same mod-assign side panel as
+  // any other FX parameter. useBound is a hook, so it must run before any early
+  // return below (it no-ops on a null key when no FX is selected).
+  const fxOpaTarget: ModTarget | null = fxOpacity && modTargetFor ? modTargetFor(FX_OPACITY_INPUT) : null
+  const fxOpaBound = useBound(fxOpaTarget ? modTargetKey(fxOpaTarget) : null)
+  // One shared assign-context value : the header's FX-opacity pill and the body's
+  // parameter pills both toggle the same side panel (`assign`).
+  const assignCtxValue = {
+    activeKey: assign ? modTargetKey(assign.target) : null,
+    onAssign: (target: ModTarget, label: string): void =>
+      setAssign((cur) =>
+        cur && modTargetKey(cur.target) === modTargetKey(target) ? null : { target, label }
+      )
+  }
+  const fxOpaKey = fxOpaTarget ? modTargetKey(fxOpaTarget) : null
+  const fxOpaModulated = fxOpaBound.length > 0
+  useEffect(() => {
+    const el = fxOpaRef.current
+    if (!fxOpaModulated || !fxOpaKey || !el) return
+    return registerLiveOverlay({ el, key: fxOpaKey, format: (x) => String(x) })
+  }, [fxOpaModulated, fxOpaKey])
+
   // A stable identity for the preset picker : distinct per selected FX unit /
   // source slot / background, so it never bleeds an applied name between two
   // same-shader units.
@@ -407,7 +435,7 @@ export function Inspector(): JSX.Element {
   return (
     <div
       className={`rounded-md border bg-panel transition-colors ${
-        flashing ? 'animate-pulse border-danger ring-1 ring-danger' : 'border-border'
+        flashing ? 'animate-pulse border-accent ring-1 ring-accent' : 'border-border'
       }`}
     >
       <div
@@ -442,6 +470,7 @@ export function Inspector(): JSX.Element {
           <div className="flex shrink-0 items-center gap-1.5" title={`FX dry/wet : ${fxOpacity.value.toFixed(2)}`}>
             <span className="font-mono text-[9px] uppercase text-muted">opacity</span>
             <input
+              ref={fxOpaRef}
               type="range"
               min={0}
               max={1}
@@ -449,11 +478,16 @@ export function Inspector(): JSX.Element {
               value={fxOpacity.value}
               onChange={(e) => fxOpacity!.set(Number(e.target.value))}
               onDoubleClick={() => fxOpacity!.set(1)}
-              className="w-24 accent-accent"
+              className={`w-24 ${fxOpaBound.length ? 'accent-accent2' : 'accent-accent'}`}
             />
             <span className="w-7 text-right font-mono text-[10px] text-muted">
               {fxOpacity.value.toFixed(2)}
             </span>
+            {fxOpaTarget && (
+              <AssignContext.Provider value={assignCtxValue}>
+                <ModButton target={fxOpaTarget} bound={fxOpaBound} label="FX opacity" />
+              </AssignContext.Provider>
+            )}
           </div>
         )}
         <div className="flex-1" />
@@ -494,7 +528,7 @@ export function Inspector(): JSX.Element {
           }}
           className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
             flashing
-              ? 'animate-pulse border-danger bg-danger/25 text-danger'
+              ? 'animate-pulse border-accent bg-accent/25 text-accent'
               : 'border-accent/50 bg-accent/10 text-accent hover:bg-accent/20'
           }`}
           title="Randomize this shader's parameters (curated ranges)"
@@ -586,15 +620,7 @@ export function Inspector(): JSX.Element {
           deep, so they keep the fixed two-row grid that flows into columns. */}
       {/* Controls on the left; the mod-assign panel slides in on the right,
           under the header's dice/presets, when an M is clicked. */}
-      <AssignContext.Provider
-        value={{
-          activeKey: assign ? modTargetKey(assign.target) : null,
-          onAssign: (target, label) =>
-            setAssign((cur) =>
-              cur && modTargetKey(cur.target) === modTargetKey(target) ? null : { target, label }
-            )
-        }}
-      >
+      <AssignContext.Provider value={assignCtxValue}>
         <div className="flex min-w-0 items-stretch">
           <div className="min-w-0 flex-1">
             {selection?.type === 'source' || selection?.type === 'background' ? (

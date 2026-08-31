@@ -118,6 +118,11 @@ function randomizeOneInput(
       return typeof current === 'number' ? current : typeof d.def === 'number' ? d.def : 0
     case 'bool': {
       const cur = typeof current === 'number' ? current : typeof d.def === 'number' ? d.def : 0
+      // Respect a curated pin (e.g. [0,0]) : a collapsed span forces the value
+      // and is never gambled. The bool/long branches used to ignore curatedRange
+      // entirely, so "never randomized" pins were silently flipped by the dice.
+      const [blo, bhi] = curatedRange(shaderId, d.name, [0, 1])
+      if (blo === bhi) return blo >= 0.5 ? 1 : 0
       return chance(0.3) ? (cur >= 0.5 ? 0 : 1) : cur
     }
     case 'long': {
@@ -125,7 +130,14 @@ function randomizeOneInput(
       if (values.length === 0)
         return typeof current === 'number' ? current : ((d.def as number) ?? 0)
       const cur = typeof current === 'number' ? current : ((d.def as number) ?? values[0])
-      return chance(0.4) ? pick(values) : cur
+      // Restrict the pickable VALUES to the curated span (e.g. fx-finalizer
+      // outShape [0,0] "never randomized", fx-transform.shape, fx-wide-time.mode).
+      const declared: [number, number] = [Math.min(...values), Math.max(...values)]
+      const [lo, hi] = curatedRange(shaderId, d.name, declared)
+      const allowed = values.filter((v) => v >= lo && v <= hi)
+      const pool = allowed.length ? allowed : values
+      if (pool.length === 1) return pool[0] // pinned : deterministic, never gambled
+      return chance(0.4) ? pick(pool) : cur
     }
     case 'color': {
       const cur = Array.isArray(current) ? current : Array.isArray(d.def) ? d.def : [1, 1, 1, 1]
@@ -332,6 +344,7 @@ function targetKey(t: ModTarget): string {
   if (t.kind === 'bgSource') return `bgsrc:${t.input}`
   if (t.kind === 'meta') return `meta:${t.knob}`
   if (t.kind === 'sonify') return `soni:${t.param}`
+  if (t.kind === 'layer') return `lay:${t.layer}:${t.field}`
   const s = t.scope
   return `fx:${s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`}:${t.instId}:${t.input}`
 }
@@ -874,7 +887,7 @@ export function randomizeComposition(
   if (intensity >= 0.999) return target
   const p = Math.max(0, Math.min(1, intensity))
   const area = scopeAreas(scope)
-  return {
+  const mixed: CompositionState = {
     ...target,
     layers: area.layers
       ? c.layers.map((cl, i) => (chance(p) ? target.layers[i] : jitterLayer(cl, p)))
@@ -887,6 +900,23 @@ export function randomizeComposition(
       : target.modulators,
     modMatrix: area.mods ? (chance(p) ? target.modMatrix : c.modMatrix) : target.modMatrix
   }
+  // The per-layer coin-flip can keep a modMatrix from one structural roll while
+  // the racks came from the other, leaving `fx`-kind rows pointing at instance
+  // ids that aren't in the mixed comp : dead rows that eat the assignment cap
+  // until modulation silently stops. Prune them, mirroring removeFx/dropTargets.
+  const fxIds = new Set<string>()
+  const collect = (arr?: FxInstance[]): void => arr?.forEach((f) => fxIds.add(f.id))
+  collect(mixed.master)
+  collect(mixed.background?.fx)
+  for (const l of mixed.layers) {
+    collect(l.fx)
+    collect(l.sourceAFx)
+    collect(l.sourceBFx)
+  }
+  const modMatrix = mixed.modMatrix.filter(
+    (a) => a.target.kind !== 'fx' || fxIds.has(a.target.instId)
+  )
+  return modMatrix.length === mixed.modMatrix.length ? mixed : { ...mixed, modMatrix }
 }
 
 /**

@@ -18,9 +18,61 @@
 // the target ids below.
 
 import type { MidiBinding } from '@shared/types'
-import { fireSelectedRandomize, fireVariation } from './commands'
+import { fireSelectedRandomize, fireVariation, firePanic, fireFreeze, fireRecordToggle } from './commands'
 import { setKnobTarget } from './metaSmooth'
 import { useStore } from './store'
+import type { SoniConfig } from './audio/sonify'
+
+const SONI_VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord'] as const
+// Field-macro CC targets → their store setters. These "feel" dials aren't
+// mod-matrix destinations, so the Meta knobs can't reach them : MIDI is the
+// only way to bind hardware to them.
+const FIELD_SETTERS: Record<string, (v: number) => void> = {
+  'field:density': (v) => useStore.getState().setDensity(v),
+  'field:gestureTexture': (v) => useStore.getState().setGestureTexture(v),
+  'field:coalesce': (v) => useStore.getState().setCoalesce(v),
+  'field:tonicity': (v) => useStore.getState().setTonicity(v),
+  'field:drift': (v) => useStore.getState().setDrift(v),
+  'field:flow': (v) => useStore.getState().setFlow(v),
+  'field:shutter': (v) => useStore.getState().setShutter(v),
+  'field:superFlicker': (v) => useStore.getState().setSuperFlicker(v)
+}
+const FIELD_LABELS: Record<string, string> = {
+  'field:density': 'DENSITY', 'field:gestureTexture': 'GESTURE↔TEXTURE', 'field:coalesce': 'COALESCE',
+  'field:tonicity': 'TONICITY', 'field:drift': 'DRIFT', 'field:flow': 'FLOW↔INTERRUPT',
+  'field:shutter': 'SHUTTER', 'field:superFlicker': 'SUPERIMPOSE'
+}
+
+// Tap tempo from a pad : a rolling window of hit times → BPM (like the Transport).
+const tapTimes: number[] = []
+function tapTempo(): void {
+  const now = performance.now()
+  if (tapTimes.length && now - tapTimes[tapTimes.length - 1] > 2000) tapTimes.length = 0
+  tapTimes.push(now)
+  if (tapTimes.length > 6) tapTimes.shift()
+  if (tapTimes.length < 2) return
+  let sum = 0
+  for (let i = 1; i < tapTimes.length; i++) sum += tapTimes[i] - tapTimes[i - 1]
+  const bpm = Math.max(20, Math.min(800, Math.round(60000 / (sum / (tapTimes.length - 1)))))
+  useStore.setState((s) => ({ composition: { ...s.composition, bpm } }))
+}
+
+/** Recall the scene `dir` steps from the active one (wraps); no active → scene 0. */
+function recallRelativeScene(dir: number): void {
+  const st = useStore.getState()
+  const scenes = st.scenes
+  if (!scenes.length) return
+  const cur = scenes.findIndex((s) => s.id === st.activeSceneId)
+  const next = cur < 0 ? 0 : ((cur + dir) % scenes.length + scenes.length) % scenes.length
+  st.recallScene(scenes[next].id)
+}
+
+function toggleSoniVoice(i: number): void {
+  const k = SONI_VOICE_KEYS[i]
+  const cur = useStore.getState().sonify
+  const rec = cur as unknown as Record<string, { on: boolean }>
+  useStore.getState().setSonify({ ...cur, [k]: { ...rec[k], on: !rec[k].on } } as SoniConfig)
+}
 
 export interface MidiDevice {
   id: string
@@ -30,18 +82,42 @@ export interface MidiDevice {
 // ── Learnable targets ────────────────────────────────────────────────────
 // meta:<i>          Meta knob i (CC only, stored on the knob itself)
 // scene:<i>         scene slot i (0-based; note or button-CC recalls it)
+// scene:next/prev   note/CC press → step the scene bank (wraps)
 // transport:bpm     CC → 40..240 BPM
 // transport:speed   CC → global speed 1/64×..64× (log, like the slider)
 // transport:morph   CC → morph time (same power curve as the slider)
 // transport:prox    CC → proximity 0..1
+// field:<macro>     CC → a feel dial (density/gestureTexture/coalesce/tonicity/
+//                   drift/flow/shutter/superFlicker) — NOT mod-matrix targets,
+//                   so MIDI is the only hardware route to them
+// layer:<i>:mix     CC → layer i's A↔B source crossfade (0..1)
+// surface:x / :y    CC → the Metasurface cursor axis (drives scene-morphing;
+//                   activates the surface; needs >=2 placed scenes)
+// sonify:master     CC → Sonify master gain
+// sonify:voice:<i>  note/CC press → toggle Sonify voice i on/off (0..7)
 // fire:vary         note/CC press → Variation at the current spread
 // fire:randomize    note/CC press → the selected Randomize
 // fire:sonify       note/CC press → Sonify on/off
+// fire:flush        note/CC press → panic flush (empty self-feeding buffers)
+// fire:freeze       note/CC press → toggle the global freeze / hold latch
+// fire:record       note/CC press → start (fast take) / stop recording
+// fire:tap          note/CC press → tap tempo
+// fire:seq          note/CC press → toggle the scene sequencer
+// fire:soniseq      note/CC press → toggle the Sonify step sequencer
 
 /** Continuous targets take knobs/faders only : notes are ignored while one
  *  of these is the armed learn target (keep twisting until it takes). */
 export function isContinuousTarget(id: string): boolean {
-  return id.startsWith('meta:') || id.startsWith('transport:')
+  return (
+    id.startsWith('meta:') ||
+    id.startsWith('transport:') ||
+    id.startsWith('field:') ||
+    id === 'surface:x' ||
+    id === 'surface:y' ||
+    id === 'sonify:master' ||
+    id === 'bg:opacity' ||
+    /^layer:\d+:(mix|opacity)$/.test(id)
+  )
 }
 
 /** Human name for a target id (bindings list + overlay tooltips). */
@@ -51,7 +127,15 @@ export function midiTargetLabel(id: string): string {
     const name = useStore.getState().composition.metaKnobs[i]?.name
     return `META ${i + 1}${name ? ` · ${name}` : ''}`
   }
+  if (id === 'scene:next') return 'SCENE next'
+  if (id === 'scene:prev') return 'SCENE prev'
   if (id.startsWith('scene:')) return `SCENE ${Number(id.slice(6)) + 1}`
+  if (id in FIELD_LABELS) return FIELD_LABELS[id]
+  if (id === 'bg:opacity') return 'BACKGROUND opacity'
+  const lm = /^layer:(\d+):(mix|opacity)$/.exec(id)
+  if (lm) return `LAYER ${Number(lm[1]) + 1} ${lm[2] === 'mix' ? 'A↔B' : 'opacity'}`
+  const sv = /^sonify:voice:(\d+)$/.exec(id)
+  if (sv) return `SONIFY ${SONI_VOICE_KEYS[Number(sv[1])] ?? sv[1]} on/off`
   switch (id) {
     case 'transport:bpm':
       return 'BPM'
@@ -61,12 +145,30 @@ export function midiTargetLabel(id: string): string {
       return 'MORPH'
     case 'transport:prox':
       return 'PROXIMITY'
+    case 'surface:x':
+      return 'SURFACE X'
+    case 'surface:y':
+      return 'SURFACE Y'
+    case 'sonify:master':
+      return 'SONIFY master'
     case 'fire:vary':
       return 'VARY'
     case 'fire:randomize':
       return 'RANDOMIZE'
     case 'fire:sonify':
       return 'SONIFY on/off'
+    case 'fire:flush':
+      return 'FLUSH'
+    case 'fire:freeze':
+      return 'FREEZE / hold'
+    case 'fire:record':
+      return 'RECORD toggle'
+    case 'fire:tap':
+      return 'TAP tempo'
+    case 'fire:seq':
+      return 'SEQUENCER run'
+    case 'fire:soniseq':
+      return 'SONIFY seq run'
     default:
       return id
   }
@@ -83,6 +185,11 @@ const MORPH_POW = 2.5
 class MidiManager {
   private access: MIDIAccess | null = null
   private listeners = new Set<(devs: MidiDevice[]) => void>()
+  // Diagnostics : the last raw message seen + the count of inputs currently
+  // wired. The MIDI panel shows these so a plugged-in-but-silent controller is
+  // instantly visible (message arriving vs not; input actually attached).
+  lastMsg = ''
+  wiredCount = 0
 
   async init(): Promise<boolean> {
     if (!('requestMIDIAccess' in navigator)) {
@@ -115,10 +222,20 @@ class MidiManager {
   attach(): void {
     if (!this.access) return
     const wanted = useStore.getState().midiInputName
+    // If a named device is selected but NO connected port matches it (a stale /
+    // renamed port), fall back to listening on ALL inputs rather than silently
+    // wiring zero and dropping every message.
+    let matched = false
+    if (wanted) this.access.inputs.forEach((inp) => { if ((inp.name ?? inp.id) === wanted) matched = true })
+    const useAll = !wanted || !matched
+    let wired = 0
     this.access.inputs.forEach((inp) => {
-      const mine = !wanted || (inp.name ?? inp.id) === wanted
+      const mine = useAll || (inp.name ?? inp.id) === wanted
       inp.onmidimessage = mine ? (e): void => this.onMessage(e) : null
+      if (mine) wired++
     })
+    this.wiredCount = wired
+    if (wanted && !matched) console.warn(`[midi] input "${wanted}" not found — listening to all inputs instead`)
   }
 
   subscribe(cb: (devs: MidiDevice[]) => void): () => void {
@@ -133,11 +250,23 @@ class MidiManager {
 
   private onMessage(e: MIDIMessageEvent): void {
     const data = e.data
-    if (!data || data.length < 3) return
+    if (!data || data.length < 2) return
     const status = data[0] & 0xf0
     const channel = data[0] & 0x0f
     const number = data[1]
     const value = data[2] ?? 0
+
+    // Activity readout : record EVERY message (even ones we don't route, like
+    // pitch-bend) so the panel shows a controller is alive. Set before any return.
+    const kind =
+      status === 0x90 ? (value > 0 ? 'NOTE' : 'note-off')
+      : status === 0x80 ? 'note-off'
+      : status === 0xb0 ? 'CC'
+      : status === 0xe0 ? 'pitch-bend'
+      : status === 0xd0 ? 'aftertouch'
+      : status === 0xc0 ? 'prog-change'
+      : '0x' + status.toString(16)
+    this.lastMsg = `${kind} ${number} ch${channel + 1}${status === 0xb0 || status === 0x90 ? ' = ' + value : ''}`
 
     // A binding candidate from any CC or Note-On. CC value 0 still counts
     // (a knob turned fully down must keep driving its target).
@@ -175,63 +304,80 @@ class MidiManager {
     // controller doesn't fire scenes underneath the overlays.
     if (st.midiLearnMode) return
 
-    // ── Normal routing ──────────────────────────────────────────────────
-    // Meta knobs FIRST (continuous; the smoother gives hardware the same
-    // feel as a mouse drag), so a knob CC never also fires a trigger bound
-    // to the same number.
+    // ── Normal routing (ONE-TO-MANY) ────────────────────────────────────
+    // The SAME binding may drive several targets at once, so every match is
+    // applied — no early return per hit. Meta knobs go through the smoother.
     if (binding.kind === 'cc') {
       const t = value / 127
+      let ccHandled = false
       const knobs = st.composition.metaKnobs
       for (let i = 0; i < knobs.length; i++) {
         const cc = knobs[i].midiCc
         if (cc && cc.channel === channel && cc.number === number) {
           setKnobTarget(i, t, knobs[i].smoothMs)
-          return
+          ccHandled = true
         }
       }
       // Transport continuous controls — each mirrors its slider's mapping.
       const map = st.midiMap
       if (matches(map['transport:bpm'], binding)) {
-        useStore.setState((s) => ({
-          composition: { ...s.composition, bpm: Math.round(40 + t * 200) }
-        }))
-        return
+        useStore.setState((s) => ({ composition: { ...s.composition, bpm: Math.round(40 + t * 200) } }))
+        ccHandled = true
       }
-      if (matches(map['transport:speed'], binding)) {
-        st.setGlobalSpeed(Math.pow(2, -6 + t * 12))
-        return
+      if (matches(map['transport:speed'], binding)) { st.setGlobalSpeed(Math.pow(2, -6 + t * 12)); ccHandled = true }
+      if (matches(map['transport:morph'], binding)) { st.setMorphMs(Math.round(Math.pow(t, MORPH_POW) * 30000)); ccHandled = true }
+      if (matches(map['transport:prox'], binding)) { st.setProximity(t); ccHandled = true }
+      // Field macros / temperament (the "feel" dials — not mod-matrix targets).
+      for (const fid in FIELD_SETTERS) {
+        if (matches(map[fid], binding)) { FIELD_SETTERS[fid](t); ccHandled = true }
       }
-      if (matches(map['transport:morph'], binding)) {
-        st.setMorphMs(Math.round(Math.pow(t, MORPH_POW) * 30000))
-        return
+      // Per-layer A↔B crossfade (source mix) + layer opacity.
+      for (let i = 0; i < st.composition.layers.length; i++) {
+        if (matches(map[`layer:${i}:mix`], binding)) { st.setSourceMix(i, t); ccHandled = true }
+        if (matches(map[`layer:${i}:opacity`], binding)) { st.setOpacity(i, t); ccHandled = true }
       }
-      if (matches(map['transport:prox'], binding)) {
-        st.setProximity(t)
-        return
+      if (matches(map['bg:opacity'], binding)) { st.setBackgroundOpacity(t); ccHandled = true }
+      // Metasurface cursor (activates the surface; needs ≥2 placed scenes).
+      if (matches(map['surface:x'], binding)) {
+        st.setSurfaceXY(t, st.surface.y)
+        if (!st.surface.active) st.setSurfaceActive(true)
+        ccHandled = true
       }
+      if (matches(map['surface:y'], binding)) {
+        st.setSurfaceXY(st.surface.x, t)
+        if (!st.surface.active) st.setSurfaceActive(true)
+        ccHandled = true
+      }
+      if (matches(map['sonify:master'], binding)) { st.setSonify({ ...st.sonify, master: t }); ccHandled = true }
+      // A CC used as a continuous control never also fires a trigger bound to
+      // the same number.
+      if (ccHandled) return
     }
 
     // Triggers fire on the press edge only : a CC button's release (value 0)
-    // or a zero-velocity note-off must not double-fire.
+    // or a zero-velocity note-off must not double-fire. Every matching trigger
+    // fires — one pad can drive several actions.
     if (value <= 0) return
     const map = st.midiMap
-    if (matches(map['fire:vary'], binding)) {
-      fireVariation()
-      return
-    }
-    if (matches(map['fire:randomize'], binding)) {
-      fireSelectedRandomize()
-      return
-    }
+    if (matches(map['fire:vary'], binding)) fireVariation()
+    if (matches(map['fire:randomize'], binding)) fireSelectedRandomize()
     if (matches(map['fire:sonify'], binding)) {
-      st.setSonify({ ...st.sonify, on: !st.sonify.on })
-      return
+      const s = useStore.getState().sonify
+      useStore.getState().setSonify({ ...s, on: !s.on })
+    }
+    if (matches(map['fire:flush'], binding)) firePanic()
+    if (matches(map['fire:freeze'], binding)) fireFreeze()
+    if (matches(map['fire:record'], binding)) fireRecordToggle()
+    if (matches(map['fire:tap'], binding)) tapTempo()
+    if (matches(map['fire:seq'], binding)) st.toggleSequenceRunning()
+    if (matches(map['fire:soniseq'], binding)) st.setSoniSeqOn(!useStore.getState().soniSeq.on)
+    if (matches(map['scene:next'], binding)) recallRelativeScene(1)
+    if (matches(map['scene:prev'], binding)) recallRelativeScene(-1)
+    for (let i = 0; i < SONI_VOICE_KEYS.length; i++) {
+      if (matches(map[`sonify:voice:${i}`], binding)) toggleSoniVoice(i)
     }
     for (let i = 0; i < st.scenes.length; i++) {
-      if (matches(map[`scene:${i}`], binding)) {
-        st.recallScene(st.scenes[i].id)
-        return
-      }
+      if (matches(map[`scene:${i}`], binding)) st.recallScene(st.scenes[i].id)
     }
   }
 }

@@ -119,6 +119,10 @@ export class VideoSource {
 
   setGrain(g: { on: boolean; size: number; spray: number; reverseP: number; jitter: number; sync: number }): void {
     this.grain = g
+    // Grain OFF : release the 3 voice decoders now (they'd otherwise keep
+    // decoding in the background while upload() falls back to the single-video
+    // path). Turning ON re-creates them lazily via ensureVoices() in tickGrains().
+    if (!g.on) this.disposeVoices()
   }
   setGrainMod(name: string, v: number): void {
     if (name === 'grainSize') this.grainSizeMod = v

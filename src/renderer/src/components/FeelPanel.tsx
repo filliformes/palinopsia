@@ -5,6 +5,7 @@
 // the two poles + a one-line description. Reach it with the G key.
 
 import { useStore } from '../store'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
 
 function FeelRow({
   label,
@@ -13,6 +14,7 @@ function FeelRow({
   value,
   neutral,
   desc,
+  midiId,
   onChange
 }: {
   label: string
@@ -21,6 +23,7 @@ function FeelRow({
   value: number
   neutral: number
   desc: string
+  midiId: string
   onChange: (v: number) => void
 }): JSX.Element {
   const active = Math.abs(value - neutral) > 0.02
@@ -38,6 +41,7 @@ function FeelRow({
         </span>
       </div>
       <div className="relative">
+        <MidiLearnOverlay id={midiId} />
         {bipolar && (
           // Centre tick for the 0.5-neutral (bipolar) macros.
           <div className="pointer-events-none absolute left-1/2 top-0 z-10 h-full w-px -translate-x-1/2 bg-border" />
@@ -86,38 +90,38 @@ export function FeelPanel(): JSX.Element {
       <section className="flex flex-col gap-1.5">
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted">Field · spatial + material</span>
         <FeelRow
-          label="Density" left="sparse" right="dense" value={density} neutral={0.5} onChange={setDensity}
+          label="Density" left="sparse" right="dense" value={density} neutral={0.5} midiId="field:density" onChange={setDensity}
           desc="Fades the upper layers out (sparse) or fills them in (dense)."
         />
         <FeelRow
-          label="Gesture ⇄ Texture" left="gesture" right="texture" value={gestureTexture} neutral={0.5} onChange={setGestureTexture}
+          label="Gesture ⇄ Texture" left="gesture" right="texture" value={gestureTexture} neutral={0.5} midiId="field:gestureTexture" onChange={setGestureTexture}
           desc="Clean directional movement (sharpen) ↔ internalised churn (trails)."
         />
         <FeelRow
-          label="Coalesce" left="grain" right="mass" value={coalesce} neutral={0.5} onChange={setCoalesce}
+          label="Coalesce" left="grain" right="mass" value={coalesce} neutral={0.5} midiId="field:coalesce" onChange={setCoalesce}
           desc="Broken into grain/dither ↔ pulled into smooth mass (blur)."
         />
       </section>
       <section className="flex flex-col gap-1.5">
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted">Temperament · film character</span>
         <FeelRow
-          label="Flow ⇄ Interruption" left="interruption" right="flow" value={flow} neutral={0.5} onChange={setFlow}
+          label="Flow ⇄ Interruption" left="interruption" right="flow" value={flow} neutral={0.5} midiId="field:flow" onChange={setFlow}
           desc="Stutter — frame-holds, breakup, blank stabs ↔ a liquid, continuous image."
         />
         <FeelRow
-          label="Tonicity" left="off" right="colour" value={tonicity} neutral={0} onChange={setTonicity}
+          label="Tonicity" left="off" right="colour" value={tonicity} neutral={0} midiId="field:tonicity" onChange={setTonicity}
           desc="Tonal/harmonic audio pulls colour in; noise pulls toward black-and-white (needs Audio on)."
         />
         <FeelRow
-          label="Shutter" left="off" right="stepped" value={shutter} neutral={0} onChange={setShutter}
+          label="Shutter" left="off" right="stepped" value={shutter} neutral={0} midiId="field:shutter" onChange={setShutter}
           desc="Global full-freeze stop-motion : low = chunky (~2fps) → high = fluid (~24fps)."
         />
         <FeelRow
-          label="Drift" left="off" right="wander" value={drift} neutral={0} onChange={setDrift}
+          label="Drift" left="off" right="wander" value={drift} neutral={0} midiId="field:drift" onChange={setDrift}
           desc="Slow analog-instability wander over the grade + rare accidents."
         />
         <FeelRow
-          label="Superimposition" left="off" right="strobe" value={superFlicker} neutral={0} onChange={setSuperFlicker}
+          label="Superimposition" left="off" right="strobe" value={superFlicker} neutral={0} midiId="field:superFlicker" onChange={setSuperFlicker}
           desc="Hypnagogic strobe : cross-cuts which layer shows on the drawn cadence."
         />
       </section>

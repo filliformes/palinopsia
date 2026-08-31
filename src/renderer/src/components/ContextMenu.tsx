@@ -36,13 +36,20 @@ export function ContextMenu({
       if (!ref.current?.contains(e.target as Node)) onClose()
     }
     const key = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
+      if (e.key !== 'Escape') return
+      // Escape closes the menu and MUST NOT also fire an App-level Escape (exit
+      // MIDI-learn, close the page underneath). App's handler sits on window in
+      // the bubble phase and is registered first, so listen in the CAPTURE phase
+      // and swallow the event before it can reach those bubble listeners.
+      e.preventDefault()
+      e.stopPropagation()
+      onClose()
     }
     window.addEventListener('mousedown', down)
-    window.addEventListener('keydown', key)
+    window.addEventListener('keydown', key, true)
     return () => {
       window.removeEventListener('mousedown', down)
-      window.removeEventListener('keydown', key)
+      window.removeEventListener('keydown', key, true)
     }
   }, [onClose])
 

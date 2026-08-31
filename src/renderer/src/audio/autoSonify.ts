@@ -17,7 +17,7 @@
 import type { CompositionState, FxInstance } from '@shared/types'
 import type { SoniConfig } from './sonify'
 
-type Voice = 'raster' | 'flow' | 'orbit' | 'spectra' | 'sstv' | 'filter'
+type Voice = 'raster' | 'flow' | 'orbit' | 'spectra' | 'sstv' | 'filter' | 'events' | 'chord'
 
 // Register tables : shader/node id → (voice, weight). Weights are taste.
 const AFFINITY: Array<[RegExp, Voice, number]> = [
@@ -37,7 +37,16 @@ const AFFINITY: Array<[RegExp, Voice, number]> = [
   [/^(slit-scan|column-scan|node-scanner|fx-slit-buffer|fx-tracking|fx-crt-screen)$/, 'sstv', 3],
   // smooth fields / atmosphere → Filter
   [/^(swell|membrane|dye-field|drift-field|erosion)$/, 'filter', 3],
-  [/^(recurse|sync-osc|fx-abstraction|fx-colorizer)$/, 'filter', 2]
+  [/^(recurse|sync-osc|fx-abstraction|fx-colorizer)$/, 'filter', 2],
+  // edges / marks / rhythmic hits → Events (edges & motion → plucked notes, the
+  // percussive register). Weight 2 : a secondary colour to the anchors above,
+  // never demoting them (Events loses ties, see the ranked order below).
+  [/^(direct-marks|fx-stutter|fx-slice-shuffle|node-decimate|fx-sync-loss|fx-row-echo)$/, 'events', 2],
+  [/^(ten-print|op-art|contour|filaments|fx-scanlines)$/, 'events', 2],
+  // sustained harmonic wash / drones / accumulation → Chord (a scale-tuned bank
+  // that swells with the brightness bands — sings even on a still frame).
+  [/^(swell|membrane|dye-field|drift-field|erosion)$/, 'chord', 2],
+  [/^(congeal|node-sediment|node-eternalism|node-afterimage|recurse|sync-osc)$/, 'chord', 2]
 ]
 
 function scoreId(id: string | null | undefined, into: Map<Voice, number>, weightMul = 1): void {
@@ -94,7 +103,7 @@ export function suggestSonify(c: CompositionState, cur: SoniConfig): SoniConfig 
   rack(c.master.filter((f) => !f.locked), total, 0.5)
 
   // Rank; always have something to say (a quiet scene defaults to Spectra+Filter).
-  const ranked = (['spectra', 'orbit', 'flow', 'raster', 'sstv', 'filter'] as Voice[])
+  const ranked = (['spectra', 'orbit', 'flow', 'raster', 'sstv', 'filter', 'events', 'chord'] as Voice[])
     .map((v) => ({ v, w: total.get(v) ?? 0 }))
     .sort((a, b) => b.w - a.w)
   const chosen = new Set<Voice>()
@@ -132,9 +141,11 @@ export function suggestSonify(c: CompositionState, cur: SoniConfig): SoniConfig 
     spectra: { ...cur.spectra, on: chosen.has('spectra'), tap: tapFor('spectra'), sweepOn: true, quantize: cur.spectra.quantize },
     orbit: { ...cur.orbit, on: chosen.has('orbit'), tap: tapFor('orbit') },
     flow: { ...cur.flow, on: chosen.has('flow'), tap: tapFor('flow') },
+    events: { ...cur.events, on: chosen.has('events'), tap: tapFor('events') },
     raster: { ...cur.raster, on: chosen.has('raster'), tap: tapFor('raster') },
     sstv: { ...cur.sstv, on: chosen.has('sstv'), tap: tapFor('sstv') },
-    filter: { ...cur.filter, on: chosen.has('filter'), tap: tapFor('filter') }
+    filter: { ...cur.filter, on: chosen.has('filter'), tap: tapFor('filter') },
+    chord: { ...cur.chord, on: chosen.has('chord'), tap: tapFor('chord') }
   }
 }
 

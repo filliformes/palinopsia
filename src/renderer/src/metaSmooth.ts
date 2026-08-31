@@ -14,6 +14,7 @@
 // morph and stay OSC-visible like any base value.
 
 import type { ModTarget } from '@shared/types'
+import { BLEND_MODES, FX_OPACITY_INPUT } from '@shared/types'
 import { withSonifyParam } from './audio/sonify'
 import { shapeCurve, inputValueFrom01, SONIFY_MOD_DESCS } from './engine/modulation'
 import { inputsForShader } from './shaders/isf/inputs'
@@ -59,6 +60,19 @@ function applyDest(target: ModTarget, shaped: number): void {
     if (!d) return
     const v = d.min + Math.max(0, Math.min(1, shaped)) * (d.max - d.min)
     st.setSonify(withSonifyParam(st.sonify, target.param, v))
+    return
+  }
+  // Layer opacity / A-B mix / blend : commit into the store (compositor reads it).
+  if (target.kind === 'layer') {
+    const x = Math.max(0, Math.min(1, shaped))
+    if (target.field === 'opacity') st.setOpacity(target.layer, x)
+    else if (target.field === 'mix') st.setSourceMix(target.layer, x)
+    else st.setBlend(target.layer, BLEND_MODES[Math.min(BLEND_MODES.length - 1, Math.floor(x * BLEND_MODES.length))])
+    return
+  }
+  // Per-FX dry/wet opacity : a compositor property, committed via its store action.
+  if (target.kind === 'fx' && target.input === FX_OPACITY_INPUT) {
+    st.setFxOpacity(target.scope, target.instId, Math.max(0, Math.min(1, shaped)))
     return
   }
   const c = st.composition

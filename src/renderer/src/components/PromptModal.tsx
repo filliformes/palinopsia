@@ -68,13 +68,16 @@ export function ConfirmModal({
   onNo: () => void
 }): JSX.Element {
   useEffect(() => {
+    // Only bind Escape here. Enter is deliberately NOT bound : a window-level
+    // Enter→onYes would confirm regardless of focus, so pressing Enter on the
+    // autoFocused "No" would still delete. Left unbound, Enter activates whichever
+    // button is actually focused (the autoFocused "No" by default) via its click.
     const key = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onNo()
-      if (e.key === 'Enter') onYes()
     }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
-  }, [onYes, onNo])
+  }, [onNo])
 
   return (
     <ModalShell onCancel={onNo}>

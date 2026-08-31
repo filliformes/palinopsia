@@ -18,7 +18,7 @@ import { createHash } from 'crypto'
 import {
   existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync
 } from 'fs'
-import { dirname, join } from 'path'
+import { join } from 'path'
 import {
   aggregate,
   ANALYSIS_FPS,
@@ -33,6 +33,7 @@ import {
   type FrameStats
 } from '@shared/assemble'
 import { children, convertToCache, probe, resolveFfmpeg } from './videoConvert'
+import { userFilesBase } from './paths'
 
 // Bump when the descriptor set or segmentation changes : old caches are then
 // ignored rather than silently mixing incompatible vectors into one corpus.
@@ -539,8 +540,7 @@ async function exportEdl(
 /** Same destination the output recorder writes to : next to the app in a
  *  packaged build, the project root in dev, userData as the fallback. */
 function recordedFolder(): string {
-  const base = app.isPackaged ? dirname(app.getPath('exe')) : process.cwd()
-  const dir = join(base, 'Recorded')
+  const dir = join(userFilesBase(), 'Recorded')
   try {
     mkdirSync(dir, { recursive: true })
     return dir
@@ -548,9 +548,6 @@ function recordedFolder(): string {
     return join(app.getPath('userData'), 'Recorded')
   }
 }
-
-/** Test seam : the export path is otherwise reachable only over IPC. */
-export const __exportEdlForTest = exportEdl
 
 export function registerAssemble(): void {
   ipcMain.handle('assemble:pickFolder', async () => {

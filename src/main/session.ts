@@ -3,8 +3,9 @@
 
 import { app, dialog, BrowserWindow } from 'electron'
 import { promises as fs, existsSync } from 'fs'
-import { join, dirname } from 'path'
+import { join } from 'path'
 import type { Session } from '@shared/types'
+import { userFilesBase } from './paths'
 
 const FILTERS = [{ name: 'Palinopsia Session', extensions: ['opsia.json', 'json'] }]
 
@@ -40,15 +41,12 @@ export async function saveTo(path: string, session: Session): Promise<boolean> {
 }
 
 /**
- * Resolve the project's "Sessions" folder : sessions land next to the app
- * (project root in dev, install dir when packaged), falling back to
- * `<userData>/Sessions` if the install location is read-only.
+ * Resolve the "Sessions" folder : repo root in dev, ~/Documents/Palinopsia when
+ * packaged (see userFilesBase), falling back to `<userData>/Sessions` if that
+ * location is read-only.
  */
 function sessionsFolderPath(): string {
-  if (app.isPackaged) {
-    return join(dirname(app.getPath('exe')), 'Sessions')
-  }
-  return join(process.cwd(), 'Sessions')
+  return join(userFilesBase(), 'Sessions')
 }
 
 export async function saveToDefault(session: Session): Promise<string> {

@@ -51,6 +51,7 @@ import type { CompositionState, FxInstance, FxScope } from '@shared/types';
 installTextureBridge();
 
 import type { BlendMode, LayerMask } from '@shared/types';
+import { BLEND_MODES } from '@shared/types';
 export type { BlendMode };
 
 const QUAD_VS = `#version 300 es
@@ -608,6 +609,14 @@ class FxRack {
     if (!u) return;
     if (u.node) { if (u.inputs) u.inputs[name] = value; }
     else u.isf?.setValue(name, value);
+  }
+
+  /** Live override of one unit's dry/wet opacity (the modulation path). Mirrors
+   *  setUnitInput's contract : syncFromState re-applies the base each frame first,
+   *  applyModulation runs after, so this write wins the frame it lands in. */
+  setUnitOpacity(instId: string, value: number): void {
+    const u = this.index.get(instId);
+    if (u) u.opacity = value < 0 ? 0 : value > 1 ? 1 : value;
   }
 
   /** Feed a raw GL texture into one ISF unit's image input (via the texture
@@ -1188,6 +1197,7 @@ export class Compositor {
   private bgCollage: CollageSource | null = null;
   private bgParam: ParametricSource | null = null;
   private bgShaderId: string | null = null;
+  private bgTextWarned = false;
   private bgRack: FxRack;
   private bgScratch!: { fbo: WebGLFramebuffer; tex: WebGLTexture };
   private bgClockSec = 0;
@@ -1560,11 +1570,11 @@ export class Compositor {
    *  bursts above all — is a cache hit instead of a 100ms+ driver compile.
    *  Call one per frame from the render loop until the registry is warm. */
   private warmFbo: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
-  private warmInputTex: WebGLTexture | null = null;
+  private warmInput: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
   // A minimal NodeContext to force a native node's program(s) to actually compile
   // during warm-up (same ANGLE deferral as ISF : the compile waits for a real
   // draw). Built once, tiny (8×8), and reused.
-  private warmNode: { ctx: NodeContext; a: WebGLTexture; b: WebGLTexture } | null = null;
+  private warmNode: { ctx: NodeContext; targets: { fbo: WebGLFramebuffer; tex: WebGLTexture }[] } | null = null;
   private warmNodeCtx(): NodeContext {
     if (!this.warmNode) {
       const host = makeTarget(this.gl, 8, 8);
@@ -1573,7 +1583,7 @@ export class Compositor {
       let cur = 0;
       const chain = { w: 8, h: 8, next: () => (cur++ % 2 ? b : a) };
       this.warmNode = {
-        a: a.tex, b: b.tex,
+        targets: [host, side, a, b],
         ctx: {
           gl: this.gl, chain, host: host.tex, sidechain: side.tex,
           inputs: {}, dt: 0.016, depth: null
@@ -1600,13 +1610,13 @@ export class Compositor {
           // never populated the GPU program cache and every Randomize still paid
           // the full compile. One tiny draw makes the warm-up real.
           if (!this.warmFbo) this.warmFbo = makeTarget(this.gl, 8, 8);
-          if (!this.warmInputTex) this.warmInputTex = makeTarget(this.gl, 8, 8).tex;
+          if (!this.warmInput) this.warmInput = makeTarget(this.gl, 8, 8);
           this.shared.redirect.redirect = this.warmFbo.fbo;
           // Bind a dummy inputImage so an FX shader warms the SAME variant the real
           // render uses (ANGLE keys a variant on whether the sampler is bound;
           // warming without it just recompiles on first real use). Harmless on
           // generators (they don't declare inputImage).
-          isf.setValue('inputImage', handle(this.warmInputTex, 8, 8) as unknown as number);
+          isf.setValue('inputImage', handle(this.warmInput.tex, 8, 8) as unknown as number);
           try { isf.draw({ width: 8, height: 8 }); } catch { /* warm draw is best-effort */ }
           this.shared.redirect.redirect = null;
           isf.cleanup();
@@ -1791,17 +1801,10 @@ export class Compositor {
     return { data: this.depthReadBuf as Uint8Array, w: size, h: size };
   }
 
-  /** Feed the shared depth map to every Parallax unit (across master + layers). */
+  /** Ensure a shared depth map exists (cleared to neutral until one is computed).
+   *  The native node-parallax reads depth via nodeCtx.depth, not through here. */
   private bindDepth(): void {
     if (!this.depthTex) this.clearDepth();
-    const dh = handle(this.depthTex as WebGLTexture, this.depthW, this.depthH);
-    const C = ['fx-parallax'];
-    this.masterRack.bindImageByShader(C, 'depthMap', dh);
-    for (const L of this.layers) {
-      L.rackA.bindImageByShader(C, 'depthMap', dh);
-      L.rackB.bindImageByShader(C, 'depthMap', dh);
-      L.rackLayer.bindImageByShader(C, 'depthMap', dh);
-    }
   }
 
   // ── Shared audio texture (per-element audio, the EYESY gesture) ──────────
@@ -1996,6 +1999,15 @@ export class Compositor {
       this.bgParam.dispose();
       this.bgParam = null;
     }
+    // 'gen-text' is native (kept out of loadIsf) but has no background handler :
+    // TextSource.render needs a sidechain texture the background path never wires,
+    // so it can't satisfy the one-arg bgNativeSource contract. The curated picker
+    // (BG_EXCLUDED) hides it, so this is only reachable via OSC / session-load —
+    // warn once so the blank slab is diagnosable instead of a silent mystery.
+    if (bgId === 'gen-text' && !this.bgTextWarned) {
+      this.bgTextWarned = true;
+      console.warn('[background] gen-text is not supported as a background source : the slab renders blank');
+    }
     if (wantBg !== this.bgShaderId) {
       const src = wantBg ? sourceById(wantBg) : null;
       if (!wantBg || !src || !budgetSpent(this.shared.budget)) {
@@ -2113,6 +2125,33 @@ export class Compositor {
     this.bgIsf?.setValue(name, value);
     this.bgCollage?.setInput(name, value);
     this.bgParam?.setInput(name, value);
+  }
+
+  /** Live override of an FX unit's dry/wet opacity in any rack (modulation path).
+   *  Scope dispatch mirrors setFxInput; the write wins the frame (post-sync). */
+  setFxOpacity(scope: FxScope, instId: string, value: number): void {
+    if (scope.kind === 'master') { this.masterRack.setUnitOpacity(instId, value); return; }
+    if (scope.kind === 'background') { this.bgRack.setUnitOpacity(instId, value); return; }
+    const L = this.layers[scope.layer];
+    if (!L) return;
+    const rack = scope.kind === 'layer' ? L.rackLayer : scope.kind === 'sourceA' ? L.rackA : L.rackB;
+    rack.setUnitOpacity(instId, value);
+  }
+
+  /** Live override of a layer's own compositor controls : opacity, A-B source
+   *  mix, or blend-against-the-stack mode (as an index into BLEND_MODES). The
+   *  render reads these fields directly; syncFromState re-seeds the base each
+   *  frame, applyModulation runs after, so the override wins the frame. */
+  setLayerParam(layer: number, field: 'opacity' | 'mix' | 'blend', value: number): void {
+    const L = this.layers[layer];
+    if (!L) return;
+    const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
+    if (field === 'opacity') L.opacity = clamp01(value);
+    else if (field === 'mix') L.sourceMix = clamp01(value);
+    else {
+      const i = Math.round(value);
+      L.blend = BLEND_MODES[i < 0 ? 0 : i >= BLEND_MODES.length ? BLEND_MODES.length - 1 : i];
+    }
   }
 
   /** Composite top texture over base into target using the given blend mode. */
@@ -2528,12 +2567,16 @@ export class Compositor {
     if (this.visionFbo) { gl.deleteFramebuffer(this.visionFbo.fbo); gl.deleteTexture(this.visionFbo.tex); this.visionFbo = null; }
     if (this.depthTex) { gl.deleteTexture(this.depthTex); this.depthTex = null; }
     if (this.depthFbo) { gl.deleteFramebuffer(this.depthFbo.fbo); gl.deleteTexture(this.depthFbo.tex); this.depthFbo = null; }
+    if (this.warmFbo) { disposeTarget(gl, this.warmFbo); this.warmFbo = null; }
+    if (this.warmInput) { disposeTarget(gl, this.warmInput); this.warmInput = null; }
+    if (this.warmNode) { for (const t of this.warmNode.targets) disposeTarget(gl, t); this.warmNode = null; }
     gl.deleteProgram(this.blendProg);
     gl.deleteProgram(this.persistProg);
     gl.deleteProgram(this.mixProg);
     gl.deleteProgram(this.copyProg);
     gl.deleteProgram(this.xformProg);
     gl.deleteProgram(this.warpProg);
+    gl.deleteProgram(this.reagentProg);
     gl.deleteVertexArray(this.vao);
     gl.deleteVertexArray(this.warpVao);
     gl.deleteBuffer(this.quadBuf);

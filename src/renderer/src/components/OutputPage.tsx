@@ -16,6 +16,7 @@ import type { DisplayInfo, PerfStats } from '@shared/types'
 import { useStore } from '../store'
 import { currentFps } from '../perf'
 import { captureScreenshot, outputRecorder, recordingFormats } from '../recorder'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
 
 const CORNER_LABELS = ['TL', 'TR', 'BR', 'BL']
 
@@ -44,6 +45,20 @@ export function OutputPage({
   const setHiveOutActive = useStore((s) => s.setHiveOutActive)
   const hiveOutPort = useStore((s) => s.hiveOutPort)
   const setHiveOutPort = useStore((s) => s.setHiveOutPort)
+  // HIVE port : a controlled text field with a LOCAL draft so unrelated
+  // re-renders (the 250 ms recording tick, a saved-flash) can't snap the field
+  // back to the stored port mid-edit. Commit the parsed, in-range value on blur /
+  // Enter; resync the draft from the store while the field isn't being edited.
+  const [hivePortDraft, setHivePortDraft] = useState(String(hiveOutPort))
+  const hivePortEditing = useRef(false)
+  useEffect(() => {
+    if (!hivePortEditing.current) setHivePortDraft(String(hiveOutPort))
+  }, [hiveOutPort])
+  const commitHivePort = (): void => {
+    const n = Number(hivePortDraft)
+    if (Number.isFinite(n) && n >= 1 && n <= 65535) setHiveOutPort(Math.round(n))
+    else setHivePortDraft(String(hiveOutPort)) // out of range → revert to stored
+  }
   const renderScale = useStore((s) => s.renderScale)
   const setRenderScale = useStore((s) => s.setRenderScale)
   const strobeSafe = useStore((s) => s.strobeSafe)
@@ -444,18 +459,21 @@ export function OutputPage({
               ))}
             </select>
             <div className="flex gap-1.5">
-              <button
-                onClick={() => void toggleRecord()}
-                disabled={formats.length === 0}
-                className={`flex-1 rounded border px-2 py-1 font-mono text-[11px] transition-colors disabled:opacity-40 ${
-                  recording
-                    ? 'border-danger bg-danger/20 text-danger hover:bg-danger/30'
-                    : 'border-accent bg-accent/15 text-accent hover:bg-accent/25'
-                }`}
-                title={recording ? 'Stop recording' : 'Record the output composition to the Recorded folder'}
-              >
-                {recording ? '■ stop' : '● rec'}
-              </button>
+              <span className="relative flex flex-1">
+                <MidiLearnOverlay id="fire:record" />
+                <button
+                  onClick={() => void toggleRecord()}
+                  disabled={formats.length === 0}
+                  className={`flex-1 rounded border px-2 py-1 font-mono text-[11px] transition-colors disabled:opacity-40 ${
+                    recording
+                      ? 'border-danger bg-danger/20 text-danger hover:bg-danger/30'
+                      : 'border-accent bg-accent/15 text-accent hover:bg-accent/25'
+                  }`}
+                  title={recording ? 'Stop recording' : 'Record the output composition to the Recorded folder'}
+                >
+                  {recording ? '■ stop' : '● rec'}
+                </button>
+              </span>
               <button
                 onClick={() => void takeScreenshot()}
                 className="flex-1 rounded border border-border px-2 py-1 font-mono text-[11px] text-muted hover:text-accent"
@@ -505,13 +523,13 @@ export function OutputPage({
                 port
                 <input
                   type="number"
-                  value={hiveOutPort}
+                  value={hivePortDraft}
                   disabled={hiveOutActive}
-                  onChange={(e) => {
-                    // Let the field go empty / mid-edit without snapping to the
-                    // default : only commit a real, in-range port number.
-                    const n = Number(e.target.value)
-                    if (Number.isFinite(n) && n >= 1 && n <= 65535) setHiveOutPort(n)
+                  onFocus={() => { hivePortEditing.current = true }}
+                  onChange={(e) => setHivePortDraft(e.target.value)}
+                  onBlur={() => { hivePortEditing.current = false; commitHivePort() }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur()
                   }}
                   className="w-16 rounded bg-panel px-1 py-0.5 text-right font-mono text-[11px] text-fg disabled:opacity-50"
                 />

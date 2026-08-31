@@ -201,10 +201,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     pbrAmount: 'RELIEF : how deep the material is — how far the image sinks into crevices and rides over bumps, and how much the surface relights it. 0 = flat passthrough.',
     pbrLight: 'RAKING : how hard the light grazes the material — independent of relief depth. Low = soft, even, front-lit. High = a low grazing light that throws long, near-black cast shadows in the crevices and hot specular sheen on the ridges (deep chiaroscuro contrast). Turn this up when the relief looks too flat.',
     pbrScale: 'Tiling scale of the PBR material : how many times it repeats across the frame.',
-    pbrDepth: 'FIELD DEPTH : viewing distance. 0 = pressed against your eye (dense parallax, raking contrast). Up = you step back — the material tiles finer, the relief flattens, the light reads softer and more ambient, and the surface settles toward the atmosphere colour.',
-    pbrNormal: 'PBR normal-map (relighting) strength.',
-    pbrHeight: 'PBR displacement / height strength.',
-    pbrAO: 'PBR ambient-occlusion (contact shadow) strength.'
+    pbrDepth: 'FIELD DEPTH : viewing distance. 0 = pressed against your eye (dense parallax, raking contrast). Up = you step back — the material tiles finer, the relief flattens, the light reads softer and more ambient, and the surface settles toward the atmosphere colour.'
   },
   'fx-finalizer': {
     black: 'Input black point : lifts or crushes the shadows (Levels).',

@@ -13,6 +13,8 @@ import { app } from 'electron'
 import { createWriteStream, existsSync, promises as fs, type WriteStream } from 'fs'
 import { execFile } from 'child_process'
 import { join, dirname } from 'path'
+import { userFilesBase } from './paths'
+import { children } from './videoConvert'
 
 // ffmpeg-static ships a per-platform binary; unpack it from the asar when packaged.
 function ffmpegPath(): string | null {
@@ -106,8 +108,7 @@ export function recordingFormats(): Array<{ id: string; label: string }> {
 }
 
 function recordedFolder(): string {
-  const base = app.isPackaged ? dirname(app.getPath('exe')) : process.cwd()
-  return join(base, 'Recorded')
+  return join(userFilesBase(), 'Recorded')
 }
 
 async function ensureFolder(): Promise<string> {
@@ -136,7 +137,17 @@ let srcCodec = 'h264' // intermediate codec, told to us at start (for remux deci
  *  what the renderer's MediaRecorder is producing. Returns ok. */
 export async function recordingStart(intermediateExt: string, codec: string): Promise<boolean> {
   try {
-    if (stream) stream.end()
+    if (stream) {
+      // Starting a new take while one is still recording. End the old stream
+      // and, once its handle is closed, delete its intermediate — otherwise the
+      // orphaned .opsia-rec-* file lingers in Recorded/ forever. Best-effort:
+      // Windows can't unlink a still-open handle, hence the end() callback.
+      const oldStream = stream
+      const oldPath = tmpPath
+      oldStream.end(() => {
+        if (oldPath) fs.rm(oldPath).catch(() => {})
+      })
+    }
     const dir = await ensureFolder()
     const safeExt = /^[a-z0-9]+$/i.test(intermediateExt) ? intermediateExt : 'mkv'
     srcCodec = /^[a-z0-9]+$/i.test(codec) ? codec : 'h264'
@@ -160,9 +171,18 @@ function runFfmpeg(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
     const bin = ffmpegPath()
     if (!bin) return reject(new Error('ffmpeg unavailable'))
-    execFile(bin, ['-y', '-hide_banner', '-loglevel', 'error', ...args], { windowsHide: true }, (err) =>
-      err ? reject(err) : resolve()
+    const child = execFile(
+      bin,
+      ['-y', '-hide_banner', '-loglevel', 'error', ...args],
+      { windowsHide: true },
+      (err) => {
+        children.delete(child)
+        err ? reject(err) : resolve()
+      }
     )
+    // Track in the shared reap set so quitting mid-transcode (killAllConverts on
+    // before-quit) kills this ffmpeg instead of orphaning it (Windows).
+    children.add(child)
   })
 }
 

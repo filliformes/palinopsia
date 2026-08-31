@@ -23,7 +23,13 @@ const MIME: Record<string, string> = {
   ogv: 'video/ogg',
   dxv: 'video/quicktime' // DXV3 clips are MOV containers (converted on import)
 }
-const mimeFor = (path: string): string => MIME[path.split('.').pop()?.toLowerCase() ?? ''] ?? 'video/mp4'
+const extOf = (path: string): string => path.split('.').pop()?.toLowerCase() ?? ''
+const mimeFor = (path: string): string => MIME[extOf(path)] ?? 'video/mp4'
+// Only these extensions may be streamed. The scheme addresses clips by absolute
+// path, so without this any renderer request could read an arbitrary file
+// (~/.ssh/id_rsa, .env, …); restricting to known video containers keeps the
+// blast radius to video files, which is all this scheme is ever asked to serve.
+const ALLOWED_EXT = new Set(Object.keys(MIME))
 
 /** Must run BEFORE app ready : registers the scheme as a privileged, streaming,
  *  standard scheme so <video> can seek it via range requests. */
@@ -42,9 +48,15 @@ export function handleMediaProtocol(): void {
     } catch {
       return new Response('bad url', { status: 400 })
     }
+    // Refuse anything that isn't a known video container (see ALLOWED_EXT).
+    if (!ALLOWED_EXT.has(extOf(filePath))) {
+      return new Response('forbidden', { status: 403 })
+    }
     let size: number
     try {
-      size = statSync(filePath).size
+      const st = statSync(filePath)
+      if (!st.isFile()) return new Response('not found', { status: 404 })
+      size = st.size
     } catch {
       return new Response('not found', { status: 404 })
     }

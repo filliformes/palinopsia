@@ -4,26 +4,6 @@ import * as osc from 'osc'
 
 type Arg = { type: 'i' | 'f' | 's' | 'T' | 'F'; value: number | string | boolean }
 
-export type OscSendEvent = {
-  timestamp: number // Date.now() ms
-  ip: string
-  port: number
-  address: string
-  args: Arg[]
-}
-
-// Fired when a send fails (synchronous throw in dgram.send, async 'error'
-// on the UDP socket from ICMP unreachable on Windows, etc.). Socket-level
-// errors that can't be attributed to a specific destination use ip='*',
-// port=0, address='' : the UI treats them as system-wide warnings.
-export type OscErrorEvent = {
-  timestamp: number
-  ip: string
-  port: number
-  address: string
-  message: string
-}
-
 // Rate-limit stderr output so the engine can't flood the dev-server /
 // PowerShell pipe with identical "send failed" lines at tick rate. The
 // old unconditional console.error at 120 Hz × N cells was enough to
@@ -50,7 +30,7 @@ function rateLimitedError(...args: unknown[]): void {
 
 // Accept dotted IPv4, "localhost", or simple broadcast/multicast
 // addresses. This is a fast pre-check so typo'd destinations ("127.O.O.1"
-// with capital O instead of zero) fire an instant onError → red dot,
+// with capital O instead of zero) are rejected loudly (logged),
 // rather than silently dropping the packet inside dgram.
 function isPlausibleIpLiteral(ip: string): boolean {
   if (!ip) return false
@@ -69,27 +49,10 @@ export class OscSender {
   private udp: osc.UDPPort | null = null
   private ready = false
   private queue: Array<() => void> = []
-  // Optional observer invoked on every successful send : used by the OSC
-  // monitor panel. Called AFTER the UDP write is handed off (i.e. on the
-  // hot path), so it must be cheap: just push to an array.
-  private onSent: ((e: OscSendEvent) => void) | null = null
-  private onError: ((e: OscErrorEvent) => void) | null = null
-  // Last (ip, port, address) handed to dgram.send : used to attribute
-  // ASYNC port 'error' events back to a specific destination. UDP errors
-  // come through the socket's error event some ms after the failing send,
-  // so we don't have a perfect mapping, but for the "dot on failure" UX
-  // it's good enough: persistently-bad destinations always match.
-  private lastSendDest: { ip: string; port: number; address: string } | null = null
-
-  setOnSent(cb: ((e: OscSendEvent) => void) | null): void {
-    this.onSent = cb
-  }
-  setOnError(cb: ((e: OscErrorEvent) => void) | null): void {
-    this.onError = cb
-  }
 
   async start(localPort = 0): Promise<void> {
     return new Promise((resolve, reject) => {
+      let settled = false
       const port = new osc.UDPPort({
         localAddress: '0.0.0.0',
         localPort,
@@ -97,6 +60,7 @@ export class OscSender {
       })
       port.on('ready', () => {
         this.ready = true
+        settled = true
         this.queue.forEach((fn) => fn())
         this.queue.length = 0
         resolve()
@@ -109,20 +73,13 @@ export class OscSender {
         // would otherwise keep piling up and leak memory).
         rateLimitedError('[OSC] error:', err.message)
         if (!this.ready) this.queue.length = 0
-        // Attribute the async error to the most recently attempted
-        // destination. Not perfect if many sends are in flight at once,
-        // but persistently-bad destinations (unreachable host, port
-        // closed) always fail on the SAME dest, so the dot lights up
-        // correctly in practice.
-        const dest = this.lastSendDest
-        if (this.onError) {
-          this.onError({
-            timestamp: Date.now(),
-            ip: dest?.ip ?? '*',
-            port: dest?.port ?? 0,
-            address: dest?.address ?? '',
-            message: err.message
-          })
+        // A bind failure (e.g. EADDRINUSE) fires 'error' before 'ready' ever
+        // does. Settle the promise so start() can't hang forever — the caller
+        // awaits it before creating the window. Resolve (not reject) : the
+        // caller doesn't .catch, and a failed OSC-out socket is non-fatal.
+        if (!settled) {
+          settled = true
+          resolve()
         }
       })
       try {
@@ -152,10 +109,6 @@ export class OscSender {
     this.queue.length = 0
   }
 
-  send(ip: string, port: number, address: string, arg: Arg): void {
-    this.sendMany(ip, port, address, [arg])
-  }
-
   /** Send an OSC message with multiple typed arguments. */
   sendMany(ip: string, port: number, address: string, args: Arg[]): void {
     // Fast-path validation BEFORE queuing / sending so UI gets a red dot
@@ -165,37 +118,22 @@ export class OscSender {
     if (!isPlausibleIpLiteral(ip)) {
       const message = `Invalid IP address: "${ip}"`
       rateLimitedError('[OSC]', message)
-      if (this.onError) {
-        this.onError({ timestamp: Date.now(), ip, port, address, message })
-      }
       return
     }
     if (!Number.isFinite(port) || port < 1 || port > 65535) {
       const message = `Invalid port: ${port}`
       rateLimitedError('[OSC]', message)
-      if (this.onError) {
-        this.onError({ timestamp: Date.now(), ip, port, address, message })
-      }
       return
     }
 
     const doSend = (): void => {
       if (!this.udp) return
       const osc_args = args.map((a) => ({ type: a.type, value: a.value }))
-      // Stamp the last-send destination BEFORE handing to dgram so any
-      // async 'error' that fires a few ms later can be attributed.
-      this.lastSendDest = { ip, port, address }
       try {
         this.udp.send({ address, args: osc_args }, ip, port)
-        if (this.onSent) {
-          this.onSent({ timestamp: Date.now(), ip, port, address, args })
-        }
       } catch (e) {
         const message = (e as Error).message
         rateLimitedError('[OSC] send failed', ip, port, message)
-        if (this.onError) {
-          this.onError({ timestamp: Date.now(), ip, port, address, message })
-        }
       }
     }
     if (this.ready) doSend()

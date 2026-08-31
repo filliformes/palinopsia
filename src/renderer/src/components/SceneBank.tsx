@@ -9,6 +9,18 @@ import { useStore } from '../store'
 import { ContextMenu } from './ContextMenu'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 
+// Step to the scene one slot before/after the active one (wrapping). A pad
+// bound to scene:prev / scene:next fires this same path; with no active scene
+// it recalls the first, and an empty bank is a no-op.
+function stepScene(dir: 1 | -1): void {
+  const st = useStore.getState()
+  const n = st.scenes.length
+  if (n === 0) return
+  const idx = st.scenes.findIndex((s) => s.id === st.activeSceneId)
+  const next = idx < 0 ? st.scenes[0] : st.scenes[(idx + dir + n) % n]
+  st.recallScene(next.id)
+}
+
 export function SceneBank(): JSX.Element {
   const scenes = useStore((s) => s.scenes)
   const activeSceneId = useStore((s) => s.activeSceneId)
@@ -49,12 +61,40 @@ export function SceneBank(): JSX.Element {
         ⚄ Random
       </button>
 
+      {/* Step chips : recall the previous / next scene (wrapping). Also learn
+          hosts so a pad can page through the bank one slot at a time. */}
+      <span className="relative flex shrink-0">
+        <MidiLearnOverlay id="scene:prev" />
+        <button
+          onClick={() => stepScene(-1)}
+          className="rounded border border-border bg-panel2 px-1.5 py-0.5 font-mono text-[11px] text-muted transition-colors hover:border-accent/50 hover:text-accent"
+          title="Recall previous scene (MIDI-learnable)"
+        >
+          ‹
+        </button>
+      </span>
+      <span className="relative flex shrink-0">
+        <MidiLearnOverlay id="scene:next" />
+        <button
+          onClick={() => stepScene(1)}
+          className="rounded border border-border bg-panel2 px-1.5 py-0.5 font-mono text-[11px] text-muted transition-colors hover:border-accent/50 hover:text-accent"
+          title="Recall next scene (MIDI-learnable)"
+        >
+          ›
+        </button>
+      </span>
+
       {scenes.map((scene, i) => (
         <span
           key={scene.id}
           draggable={renamingId !== scene.id}
           onDragStart={() => {
             dragId.current = scene.id
+          }}
+          // Dropped OUTSIDE any target : clear the pending id so a later
+          // unrelated drop on the row can't reorder this stale scene.
+          onDragEnd={() => {
+            dragId.current = null
           }}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => onDrop(e, scene.id)}

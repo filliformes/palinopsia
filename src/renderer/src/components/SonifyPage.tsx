@@ -6,12 +6,14 @@
 // per-voice snap), two image taps (master or any layer), and an output-device
 // picker. The sound engine lives in audio/sonify.ts (AudioWorklet).
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
+import { isValidElement, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
 import type { ModTarget, SonifyModParam } from '@shared/types'
+import { registerLiveOverlay } from './liveOverlay'
 import { randomSonify, randomizeVoice, suggestSonify, type SoniVoiceKey } from '../audio/autoSonify'
 import { defaultSoniConfig, SONI_SCALES, sonifyEngine, type SoniConfig } from '../audio/sonify'
 import { deleteSoniPreset, listSoniPresets, loadSoniPreset, saveSoniPreset } from '../audio/soniPresets'
 import { modTargetKey, useStore } from '../store'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 // Voice order matches the worklet's render/filter order (mixFilter indices).
@@ -58,16 +60,34 @@ function Slider({
   neutral?: number; fmt?: (v: number) => string; onChange: (v: number) => void; title?: string
   mod?: ReactNode
 }): JSX.Element {
+  // The `mod` node (when present) is a <ModChip param=… inactive=…/>, so read its
+  // param straight off the element : no call-site needs to repeat it. A slider
+  // whose param has a live mod assignment turns accent2 + its thumb tracks the
+  // modulator's live value (via the shared liveOverlay rAF), exactly like the
+  // Inspector's modulated controls.
+  const modProps = isValidElement(mod) ? (mod.props as { param?: SonifyModParam; inactive?: boolean }) : null
+  const modParam = modProps?.param
+  const modInactive = !!modProps?.inactive
+  const modulated = useStore((st) =>
+    modParam ? st.composition.modMatrix.some((a) => a.target.kind === 'sonify' && a.target.param === modParam) : false
+  )
+  const live = modulated && !modInactive
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (!live || !modParam || !ref.current) return
+    return registerLiveOverlay({ el: ref.current, key: modTargetKey({ kind: 'sonify', param: modParam }), format: (x) => String(x) })
+  }, [live, modParam])
   return (
     <Row label={label}>
       <input
+        ref={ref}
         type="range" min={min} max={max} step={step} value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         onDoubleClick={() => neutral !== undefined && onChange(neutral)}
-        className="min-w-0 flex-1 accent-accent"
-        title={title ?? `${label} ${fmt ? fmt(value) : value.toFixed(2)}`}
+        className={`min-w-0 flex-1 ${live ? 'accent-accent2' : 'accent-accent'}`}
+        title={title ?? `${label} ${fmt ? fmt(value) : value.toFixed(2)}${live ? ' : modulated (drag sets the base)' : ''}`}
       />
-      <span className="w-12 shrink-0 text-right font-mono text-[9px] text-muted">
+      <span className={`w-12 shrink-0 text-right font-mono text-[9px] ${live ? 'text-accent2' : 'text-muted'}`}>
         {fmt ? fmt(value) : value.toFixed(2)}
       </span>
       {mod}
@@ -99,19 +119,22 @@ function TapSelect({ cfg, voice, onChange }: {
 
 /** M-binding chip for a sonify probe/pitch param : shows the bound modulator
  *  (M1..M8) or a hollow M; click opens the mini assign panel below. */
-function ModChip({ param, open, onOpen }: {
-  param: SonifyModParam; open: boolean; onOpen: (p: SonifyModParam) => void
+function ModChip({ param, open, onOpen, inactive = false }: {
+  param: SonifyModParam; open: boolean; onOpen: (p: SonifyModParam) => void; inactive?: boolean
 }): JSX.Element {
   const matrix = useStore((st) => st.composition.modMatrix)
   const key = modTargetKey({ kind: 'sonify', param })
   const a = matrix.find((x) => modTargetKey(x.target) === key)
   return (
     <button
-      onClick={() => onOpen(param)}
+      onClick={() => { if (!inactive) onOpen(param) }}
+      disabled={inactive}
       className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] transition-colors ${
-        a ? 'bg-accent/25 text-accent ring-1 ring-accent' : open ? 'bg-panel3 text-text ring-1 ring-border' : 'bg-panel3/60 text-muted hover:text-text'
+        inactive
+          ? 'bg-panel3/30 text-muted/40 cursor-default'
+          : a ? 'bg-accent/25 text-accent ring-1 ring-accent' : open ? 'bg-panel3 text-text ring-1 ring-border' : 'bg-panel3/60 text-muted hover:text-text'
       }`}
-      title={a ? `Modulated by M${a.mod + 1} (depth ${a.depth.toFixed(2)}) : click to edit` : 'Bind a modulator to this parameter'}
+      title={inactive ? 'Inactive while sweeping — the scan column is driven by the sweep, not this bind' : a ? `Modulated by M${a.mod + 1} (depth ${a.depth.toFixed(2)}) : click to edit` : 'Bind a modulator to this parameter'}
     >
       {a ? `M${a.mod + 1}` : 'M'}
     </button>
@@ -220,6 +243,141 @@ function VoiceShell({ title, on, hint, onToggle, onDice, children }: {
   )
 }
 
+/** The Sonify step sequencer (Mixer page). Each step either loads a whole saved
+ *  preset or, with no preset, just sets which voices are on — one transport
+ *  advances them so a fully evolving sonified work can be built. */
+function SonifySequencer(): JSX.Element {
+  const sq = useStore((s) => s.soniSeq)
+  const setOn = useStore((s) => s.setSoniSeqOn)
+  const setStepMs = useStore((s) => s.setSoniSeqStepMs)
+  const setLen = useStore((s) => s.setSoniSeqLen)
+  const toggleVoice = useStore((s) => s.toggleSoniSeqVoice)
+  const setStepPreset = useStore((s) => s.setSoniSeqStepPreset)
+  const clearStep = useStore((s) => s.clearSoniSeqStep)
+  const setMode = useStore((s) => s.setSoniSeqMode)
+  const setBounceDecay = useStore((s) => s.setSoniSeqBounceDecay)
+  const setBias = useStore((s) => s.setSoniSeqBias)
+  const setEdge = useStore((s) => s.setSoniSeqEdge)
+  const randomize = useStore((s) => s.randomizeSoniSeq)
+  const reset = useStore((s) => s.resetSoniSeq)
+  const presets = listSoniPresets()
+  const R = 6000 / 80 // rate slider spans 80ms … 6s, log-mapped for feel
+  const msToT = (ms: number): number => Math.max(0, Math.min(1, Math.log(ms / 80) / Math.log(R)))
+  const fmtMs = (ms: number): string => (ms >= 1000 ? (ms / 1000).toFixed(ms >= 3000 ? 1 : 2) + 's' : Math.round(ms) + 'ms')
+  return (
+    <div className="mt-1 flex flex-col gap-1 rounded border border-accent2/40 bg-panel2/40 px-1.5 py-1">
+      <div className="flex items-center gap-1.5">
+        <span className="font-mono text-[8px] uppercase tracking-wide text-muted/70">sequencer</span>
+        <span className="relative flex shrink-0">
+          <MidiLearnOverlay id="fire:soniseq" />
+          <button
+            onClick={() => setOn(!sq.on)}
+            className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${sq.on ? 'bg-accent/25 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'}`}
+            title="Play / stop the Sonify step sequence"
+          >{sq.on ? '■ stop' : '▶ play'}</button>
+        </span>
+        <button
+          onClick={randomize}
+          className="rounded px-1 py-0.5 text-[11px] leading-none text-muted transition-colors hover:text-accent"
+          title="Randomize the step pattern (1–3 voices per step; keeps presets)"
+        >🎲</button>
+        <button
+          onClick={reset}
+          className="rounded px-1 py-0.5 text-[12px] leading-none text-muted transition-colors hover:text-accent"
+          title="Reset the sequencer to defaults (clears steps, mode + rate)"
+        >↺</button>
+        <span className="ml-auto font-mono text-[8px] text-muted">steps</span>
+        <button onClick={() => setLen(sq.len - 1)} className="rounded bg-panel3/60 px-1 text-[10px] text-muted hover:text-text" title="Fewer steps">−</button>
+        <span className="w-4 text-center font-mono text-[9px]">{sq.len}</span>
+        <button onClick={() => setLen(sq.len + 1)} className="rounded bg-panel3/60 px-1 text-[10px] text-muted hover:text-text" title="More steps">+</button>
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="font-mono text-[8px] text-muted">rate</span>
+        <input
+          type="range" min={0} max={1} step={0.005} value={msToT(sq.stepMs)}
+          onChange={(e) => setStepMs(Math.round(80 * Math.pow(R, Number(e.target.value))))}
+          className="min-w-0 flex-1 accent-accent2" title={`${fmtMs(sq.stepMs)} per step`}
+        />
+        <span className="w-10 shrink-0 text-right font-mono text-[8px] text-muted">{fmtMs(sq.stepMs)}</span>
+      </div>
+      {/* Advance mode (dataFLOU's) : forward · bounce (accelerating rhythm) · drift (random walk). */}
+      <div className="flex flex-wrap items-center gap-1">
+        <span className="font-mono text-[8px] text-muted">mode</span>
+        {(['forward', 'bounce', 'drift'] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className={`rounded px-1.5 py-0.5 font-mono text-[8px] ${sq.mode === m ? 'bg-accent/25 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'}`}
+            title={m === 'forward' ? 'Play the steps in order, looping' : m === 'bounce' ? 'Forward order, but each cycle accelerates like a bouncing ball settling' : 'A biased random walk across the steps (bias + wrap/reflect below)'}
+          >{m}</button>
+        ))}
+        {sq.mode === 'bounce' && (
+          <>
+            <span className="ml-1 font-mono text-[8px] text-muted">decay</span>
+            <input
+              type="range" min={0} max={100} step={1} value={sq.bounceDecay}
+              onChange={(e) => setBounceDecay(Number(e.target.value))}
+              className="min-w-0 flex-1 accent-accent2" title={`Bounce decay ${sq.bounceDecay}% : higher = sharper acceleration (the cycle still lasts the same total time)`}
+            />
+            <span className="w-6 shrink-0 text-right font-mono text-[8px] text-muted">{sq.bounceDecay}</span>
+          </>
+        )}
+        {sq.mode === 'drift' && (
+          <>
+            <span className="ml-1 font-mono text-[8px] text-muted">bias</span>
+            <input
+              type="range" min={-100} max={100} step={1} value={sq.bias}
+              onChange={(e) => setBias(Number(e.target.value))}
+              className="min-w-0 flex-1 accent-accent2" title={`Drift bias ${sq.bias} : − walks backward, + walks forward, 0 = even wander`}
+            />
+            <span className="w-7 shrink-0 text-right font-mono text-[8px] text-muted">{sq.bias > 0 ? '+' + sq.bias : sq.bias}</span>
+            <button
+              onClick={() => setEdge(sq.edge === 'wrap' ? 'reflect' : 'wrap')}
+              className="shrink-0 rounded bg-panel3/60 px-1 py-0.5 font-mono text-[8px] text-muted hover:text-text"
+              title="At the ends : wrap (loop around) or reflect (bounce back inward)"
+            >{sq.edge}</button>
+          </>
+        )}
+      </div>
+      <div className="flex items-center gap-0.5">
+        <span className="w-4 shrink-0" />
+        {VOICE_NAMES.map((n, i) => (
+          <span key={i} className="w-3.5 shrink-0 text-center font-mono text-[7px] text-muted/70" title={n}>{n[0]}</span>
+        ))}
+        <span className="ml-1 flex-1 truncate font-mono text-[7px] text-muted/70">preset (loads the whole sound)</span>
+      </div>
+      <div className="flex flex-col gap-0.5">
+        {Array.from({ length: sq.len }).map((_, s) => {
+          const step = sq.steps[s]
+          const isCur = sq.on && sq.cur === s
+          const hasPreset = !!step.preset
+          return (
+            <div key={s} className={`flex items-center gap-0.5 rounded px-0.5 ${isCur ? 'bg-accent/20 ring-1 ring-accent' : ''}`}>
+              <span className="w-4 shrink-0 text-center font-mono text-[8px] text-muted">{s + 1}</span>
+              {VOICE_NAMES.map((vn, vi) => (
+                <button
+                  key={vi} disabled={hasPreset} onClick={() => toggleVoice(s, vi)}
+                  className={`h-3.5 w-3.5 shrink-0 rounded-sm transition-colors ${hasPreset ? 'cursor-default bg-panel3/25' : step.voices[vi] ? 'bg-accent' : 'bg-panel3/70 hover:bg-panel3'}`}
+                  title={hasPreset ? 'preset step : voices come from the preset' : `${vn} ${step.voices[vi] ? 'on' : 'off'} at step ${s + 1}`}
+                />
+              ))}
+              <select
+                className="input select-compact ml-1 min-w-0 flex-1 text-[9px]" value={step.preset}
+                onChange={(e) => setStepPreset(s, e.target.value)}
+                title="Load a full Sonify preset when this step plays (overrides the voice toggles)"
+              >
+                <option value="">— voices —</option>
+                {presets.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+              <button onClick={() => clearStep(s)} className="shrink-0 px-0.5 text-[10px] leading-none text-muted/50 hover:text-danger" title="Clear this step">×</button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null> }): JSX.Element {
   const setOpen = useStore((s) => s.setSonifyPageOpen)
   const cfg = useStore((s) => s.sonify)
@@ -233,8 +391,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   const dragging = useRef<'line' | 'orbit' | 'radius' | 'rect' | 'rectsize' | 'fline' | null>(null)
   const [devices, setDevices] = useState<Array<{ id: string; label: string }>>([])
   const [assign, setAssign] = useState<SonifyModParam | null>(null)
-  const chip = (p: SonifyModParam): JSX.Element => (
-    <ModChip param={p} open={assign === p} onOpen={(x) => setAssign(assign === x ? null : x)} />
+  const chip = (p: SonifyModParam, inactive = false): JSX.Element => (
+    <ModChip param={p} open={assign === p} onOpen={(x) => setAssign(assign === x ? null : x)} inactive={inactive} />
   )
 
   const set = (next: SoniConfig): void => setSonify(next)
@@ -242,6 +400,25 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   const [view, setView] = useState<'voices' | 'mixer'>('voices')
   const [presetList, setPresetList] = useState<string[]>(() => listSoniPresets())
   const [presetName, setPresetName] = useState('')
+  // While the Sonify page is open, M toggles ITS Voices↔Mixer view. Capture phase
+  // + stopPropagation so it beats (and suppresses) App's window M handler, which
+  // would otherwise toggle the right-panel mixer underneath.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.key.toLowerCase() !== 'm') return
+      const el = e.target as HTMLElement | null
+      if (
+        el &&
+        (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)
+      )
+        return
+      e.preventDefault()
+      e.stopPropagation()
+      setView((v) => (v === 'mixer' ? 'voices' : 'mixer'))
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
   const diceWhole = (): void => setSonify({ ...randomSonify(cfg), on: cfg.on, sinkId: cfg.sinkId })
   const resetDefault = (): void => setSonify({ ...defaultSoniConfig(), on: cfg.on, sinkId: cfg.sinkId })
   const diceVoice = (k: SoniVoiceKey): void => setSonify(randomizeVoice(cfg, k))
@@ -527,13 +704,16 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
         </div>
         {/* Master + meter */}
         <span className="font-mono text-[9px] uppercase text-muted">master</span>
-        <input
-          type="range" min={0} max={1} step={0.01} value={cfg.master}
-          onChange={(e) => patch({ master: Number(e.target.value) })}
-          onDoubleClick={() => patch({ master: 0.8 })}
-          className="w-28 accent-accent"
-          title={`Master gain ${cfg.master.toFixed(2)} (a peak limiter always guards the output)`}
-        />
+        <span className="relative flex shrink-0">
+          <MidiLearnOverlay id="sonify:master" />
+          <input
+            type="range" min={0} max={1} step={0.01} value={cfg.master}
+            onChange={(e) => patch({ master: Number(e.target.value) })}
+            onDoubleClick={() => patch({ master: 0.8 })}
+            className="w-28 accent-accent"
+            title={`Master gain ${cfg.master.toFixed(2)} (a peak limiter always guards the output)`}
+          />
+        </span>
         <div className="h-2 w-24 overflow-hidden rounded bg-panel3" title="Output level (orange = the limiter is working)">
           <div ref={meterRef} className="h-full w-0" />
         </div>
@@ -631,11 +811,14 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 const vv = cfg[k]
                 return (
                   <div key={k} className="flex items-center gap-1.5 rounded border border-border/60 bg-panel2/40 px-1.5 py-1">
-                    <button
-                      onClick={() => pv(k, { on: !vv.on })}
-                      className={`h-4 w-4 shrink-0 rounded-full text-[8px] leading-none ${vv.on ? 'bg-accent text-black' : 'bg-panel3 text-muted'}`}
-                      title={vv.on ? 'on' : 'off'}
-                    >{vv.on ? '●' : '○'}</button>
+                    <span className="relative flex shrink-0">
+                      <MidiLearnOverlay id={`sonify:voice:${i}`} />
+                      <button
+                        onClick={() => pv(k, { on: !vv.on })}
+                        className={`h-4 w-4 shrink-0 rounded-full text-[8px] leading-none ${vv.on ? 'bg-accent text-black' : 'bg-panel3 text-muted'}`}
+                        title={vv.on ? 'on' : 'off'}
+                      >{vv.on ? '●' : '○'}</button>
+                    </span>
                     <span className="w-[52px] shrink-0 truncate font-mono text-[9px]">{VOICE_NAMES[i]}</span>
                     <input type="range" min={0} max={1} step={0.01} value={vv.gain} onChange={(e) => pv(k, { gain: Number(e.target.value) })} onDoubleClick={() => pv(k, { gain: 0.5 })} className="min-w-0 flex-1 accent-accent" title={`Volume ${vv.gain.toFixed(2)}`} />
                     <input type="range" min={0} max={1} step={0.01} value={cfg.mixFilter?.[i] ?? 0.5} onChange={(e) => setMixFilter(i, Number(e.target.value))} onDoubleClick={() => setMixFilter(i, 0.5)} className="min-w-0 flex-1 accent-accent2" title={`Filter : ${filterTag(cfg.mixFilter?.[i] ?? 0.5)} (double-click = off)`} />
@@ -649,6 +832,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 <Slider label="delay" value={cfg.fx.dlyMix} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ dlyMix: v })} />
                 <Slider label="reverb" value={cfg.fx.rvMix} min={0} max={1} neutral={0.6} onChange={(v) => pfx({ rvMix: v })} />
               </div>
+              <SonifySequencer />
             </div>
           )}
           {view === 'voices' && (<>
@@ -671,7 +855,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 title={`Sync the sweep to the tempo (one sweep per bar @ ${bpm} BPM)`}
               >sync</button>
               <span className="ml-auto" />
-              {chip('spectraX')}
+              {chip('spectraX', cfg.spectra.sweepOn)}
             </Row>
             {!cfg.spectra.sync && cfg.spectra.sweepOn && (
               <Slider label="rate" value={cfg.spectra.sweepHz} min={0.02} max={4} neutral={0.25} fmt={(v) => v.toFixed(2) + 'Hz'} onChange={(v) => pv('spectra', { sweepHz: v })} mod={chip('spectraSweep')} />
@@ -963,7 +1147,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.filter.sweepOn ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
                 title="Sweep the reading column, or hold it (drag the blue line)"
               >{cfg.filter.sweepOn ? 'sweeping' : 'held'}</button>
-              {chip('filterX')}
+              {chip('filterX', cfg.filter.sweepOn)}
               {cfg.filter.sweepOn && (
                 <input
                   type="range" min={0.02} max={4} step={0.01} value={cfg.filter.sweepHz}

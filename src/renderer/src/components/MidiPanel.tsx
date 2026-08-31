@@ -23,6 +23,18 @@ export function MidiPanel(): JSX.Element {
   const [devices, setDevices] = useState<MidiDevice[]>(() => midi.listDevices())
   useEffect(() => midi.subscribe(setDevices), [])
 
+  // Live diagnostics : the last raw message + how many inputs are actually
+  // wired. Lets you confirm a controller is talking before hunting bindings.
+  const [activity, setActivity] = useState('')
+  const [wired, setWired] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setActivity(midi.lastMsg)
+      setWired(midi.wiredCount)
+    }, 150)
+    return () => window.clearInterval(id)
+  }, [])
+
   // The selected device may be unplugged right now : keep it listed (greyed
   // by the ⚠ suffix) so the choice survives replugging.
   const missing = inputName && !devices.some((d) => d.name === inputName)
@@ -108,6 +120,18 @@ export function MidiPanel(): JSX.Element {
               ))}
               {missing && <option value={inputName}>{inputName} ⚠ (unplugged)</option>}
             </select>
+          </div>
+
+          {/* Live activity : if this stays "no MIDI received" while you move a
+              control, the input isn't reaching the app (wiring/device); if it
+              updates, the controller is talking (bind via the LEARN overlays). */}
+          <div className="flex items-center gap-2 font-mono text-[9px]">
+            <span className={wired > 0 ? 'text-accent' : 'text-danger'}>
+              {wired > 0 ? `${wired} input${wired > 1 ? 's' : ''} wired` : 'no input wired'}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-muted">
+              in: {activity || '— (no MIDI received yet — move a knob / press a key)'}
+            </span>
           </div>
 
           {/* The bindings ledger. */}

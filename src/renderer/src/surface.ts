@@ -35,8 +35,14 @@ export function surfaceWeights(scenes: SceneEntry[], x: number, y: number): numb
     return (p.x - x) ** 2 + (p.y - y) ** 2
   })
   // Support radius = distance to the K-th nearest scene (adaptive locality).
+  // With only two scenes the K-th neighbour IS the far scene, so a radius AT its
+  // distance zeroes its window (t → 0) : it never contributes and the pair snaps
+  // at the midline instead of crossfading. Push the radius past the far scene for
+  // n ≤ 2 so both keep a nonzero, distance-graded weight (50/50 at the midpoint).
+  // n ≥ 3 is untouched (still exactly the K-th-neighbour distance).
   const sorted = [...d2].sort((a, b) => a - b)
-  const rc = Math.max(sorted[Math.min(SURFACE_K, n - 1)], 1e-4)
+  const kd = sorted[Math.min(SURFACE_K, n - 1)]
+  const rc = Math.max(n <= 2 ? kd * 2 : kd, 1e-4)
   const raw = d2.map((d) => {
     if (d >= rc) return 0
     const t = 1 - d / rc // 1 at the point → 0 at the cutoff (smooth window in d²)

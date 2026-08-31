@@ -2,7 +2,7 @@
 // (HIVE auto-discovers via mDNS on its own tooling; here we connect directly,
 // which its `hive-recv listen --host --port` mode also supports.)
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export function HivePicker({
   onPick,
@@ -18,6 +18,18 @@ export function HivePicker({
     const p = Number(port)
     if (host.trim() && Number.isFinite(p) && p > 0) onPick(host.trim(), p)
   }
+
+  // Esc closes, matching every other modal in the app.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onCancel()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onCancel}>

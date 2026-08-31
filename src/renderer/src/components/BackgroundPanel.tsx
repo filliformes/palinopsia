@@ -9,9 +9,11 @@ import { useState, type MouseEvent, type ReactNode } from 'react'
 import { useStore } from '../store'
 import { BG_PRESETS, BG_SOURCES, bgPresetToState } from '../bgPresets'
 import { keywordsFor } from '../shaders/isf/keywords'
+import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxAddSelect, FxChips } from './FxRackPanel'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { SearchSelect, type SearchOption } from './SearchSelect'
 import { ConfirmModal, PromptModal } from './PromptModal'
 import { useFlash } from './useFlash'
@@ -66,7 +68,7 @@ export function BackgroundPanel(): JSX.Element {
   return (
     <div
       className={`flex min-w-0 flex-col gap-1.5 rounded-md border bg-panel p-2 transition-colors ${
-        flashing ? 'animate-pulse border-danger ring-1 ring-danger' : 'border-border'
+        flashing ? 'animate-pulse border-accent ring-1 ring-accent' : 'border-border'
       }`}
       onContextMenu={onContextMenu}
       onClick={() => shaderId && setSelection({ type: 'background' })}
@@ -88,7 +90,7 @@ export function BackgroundPanel(): JSX.Element {
           value={shaderId ?? ''}
           options={[
             { value: '', label: '— none —' },
-            ...BG_SOURCES_ALPHA.map((g): SearchOption => ({ value: g.id, label: g.name, keywords: keywordsFor(g.id) }))
+            ...BG_SOURCES_ALPHA.map((g): SearchOption => ({ value: g.id, label: g.name, keywords: keywordsFor(g.id), title: generatorBlurb(g.id) }))
           ]}
           onChange={(v) => setBackgroundSource(v || null)}
           title="Background source : curated ground set — type to search"
@@ -106,7 +108,7 @@ export function BackgroundPanel(): JSX.Element {
           }}
           title="Randomize the background only (source + params + FX; keeps opacity/speed)"
           className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[11px] leading-none transition-colors ${
-            flashing ? 'animate-pulse text-danger' : 'text-muted hover:bg-accent/15 hover:text-accent'
+            flashing ? 'animate-pulse text-accent' : 'text-muted hover:bg-accent/15 hover:text-accent'
           }`}
         >
           ⚄
@@ -144,17 +146,21 @@ export function BackgroundPanel(): JSX.Element {
       {/* OPAC + SPEED on one row. */}
       <div className="flex min-w-0 items-center gap-1.5">
         <Label>OPAC</Label>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={opacity}
-          onChange={(e) => setBackgroundOpacity(Number(e.target.value))}
-          onClick={(e) => e.stopPropagation()}
-          className="min-w-0 flex-1 accent-accent"
-          title={`Background opacity ${opacity.toFixed(2)} : 0 = off`}
-        />
+        <span className="relative flex min-w-0 flex-1">
+          <MidiLearnOverlay id="bg:opacity" />
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={opacity}
+            onChange={(e) => setBackgroundOpacity(Number(e.target.value))}
+            onDoubleClick={() => setBackgroundOpacity(1)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full accent-accent"
+            title={`Background opacity ${opacity.toFixed(2)} : 0 = off : double-click resets to 1`}
+          />
+        </span>
         <div className="w-11 shrink-0" onClick={(e) => e.stopPropagation()}>
           <BoundedNumberInput
             value={opacity}
@@ -181,7 +187,7 @@ export function BackgroundPanel(): JSX.Element {
           <BoundedNumberInput
             value={speed}
             min={0}
-            max={4}
+            max={2}
             onChange={setBackgroundSpeed}
             className="input w-full px-1 py-0.5 text-right text-[11px]"
           />
@@ -199,9 +205,10 @@ export function BackgroundPanel(): JSX.Element {
           step={0.01}
           value={depth}
           onChange={(e) => setBackgroundDepth(Number(e.target.value))}
+          onDoubleClick={() => setBackgroundDepth(0)}
           onClick={(e) => e.stopPropagation()}
           className="min-w-0 flex-1 accent-accent2"
-          title={`Depth ${depth.toFixed(2)} : foreground casts a soft shadow onto the background (0 = flat)`}
+          title={`Depth ${depth.toFixed(2)} : foreground casts a soft shadow onto the background (0 = flat) : double-click resets to 0`}
         />
         <div className="w-11 shrink-0" onClick={(e) => e.stopPropagation()}>
           <BoundedNumberInput

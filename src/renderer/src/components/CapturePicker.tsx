@@ -28,6 +28,18 @@ export function CapturePicker({
     }
   }, [])
 
+  // Esc closes, matching every other modal in the app.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onCancel()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel])
+
   const screens = sources?.filter((s) => s.isScreen) ?? []
   const windows = sources?.filter((s) => !s.isScreen) ?? []
 

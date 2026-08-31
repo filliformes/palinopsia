@@ -2199,9 +2199,16 @@ export class AutocutterNode implements ConvNode {
       // layout draws with ITS OWN shape (finding: a mid-frame shape flip).
       gl.disable(gl.BLEND)
       this.drawLayout(ctx, p, out.fbo, this.oldCell, this.oldMap, this.oldRot, this.oldRank, this.oldCount, this.oldSeed, this.oldShape, 1 - this.xfade)
-      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE)
-      this.drawLayout(ctx, p, out.fbo, this.cellArr, this.mapArr, this.rotArr, this.rankArr, this.count, this.seed, shape, this.xfade)
-      gl.disable(gl.BLEND)
+      // finally : this is the only pass that enables blending, and every other
+      // pass assumes it's OFF. If the add-on-top draw threw, the per-layer
+      // try/catch in Compositor.render would swallow it while leaving GL_BLEND
+      // on — blowing out the rest of the frame's blend stack. Always turn it off.
+      try {
+        gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE)
+        this.drawLayout(ctx, p, out.fbo, this.cellArr, this.mapArr, this.rotArr, this.rankArr, this.count, this.seed, shape, this.xfade)
+      } finally {
+        gl.disable(gl.BLEND)
+      }
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     return out.tex

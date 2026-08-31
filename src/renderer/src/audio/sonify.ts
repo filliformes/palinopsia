@@ -188,7 +188,7 @@ function scaleTable(root: number, scale: SoniScale, loOct: number, hiOct: number
 
 /** The Spectra bank's 96 partial frequencies : quantized (rows land on scale
  *  notes, repeated as needed) or a free log spread across the same span. */
-function spectraFreqs(cfg: SoniConfig): Float32Array {
+function spectraFreqs(cfg: SoniConfig, sr: number): Float32Array {
   const { loOct, hiOct, quantize } = cfg.spectra
   const out = new Float32Array(96)
   if (quantize) {
@@ -197,7 +197,11 @@ function spectraFreqs(cfg: SoniConfig): Float32Array {
   } else {
     const lo = noteFreq(12 * (loOct + 1) + effRoot(cfg))
     const hi = noteFreq(12 * (hiOct + 1) + effRoot(cfg))
-    for (let i = 0; i < 96; i++) out[i] = lo * Math.pow(hi / lo, i / 95)
+    // Cap the top partials just below Nyquist : a raised root octave + a high
+    // hiOct can push the free spread past sr/2, where it folds back as inharmonic
+    // aliasing. Only the high end is clamped; in-range partials are untouched.
+    const nyq = sr * 0.49
+    for (let i = 0; i < 96; i++) out[i] = Math.min(lo * Math.pow(hi / lo, i / 95), nyq)
   }
   return out
 }
@@ -380,7 +384,15 @@ class SonifyEngine {
       filter: { ...d.filter, ...cfg.filter },
       chord: { ...d.chord, ...cfg.chord },
       fx: { ...d.fx, ...cfg.fx },
-      mixFilter: Array.isArray(cfg.mixFilter) && cfg.mixFilter.length === 8 ? cfg.mixFilter : d.mixFilter
+      mixFilter:
+        Array.isArray(cfg.mixFilter) && cfg.mixFilter.length === 8
+          ? cfg.mixFilter
+          : // Pre-Chord presets/scenes carried 7 entries : keep their first-7
+            // filter positions and pad the new Chord channel to bypass (0.5)
+            // instead of discarding the whole array. Any other shape → default.
+            Array.isArray(cfg.mixFilter) && cfg.mixFilter.length === 7
+            ? [...cfg.mixFilter, 0.5]
+            : d.mixFilter
     }
     const sinkChanged = cfg.sinkId !== this.cfg.sinkId
     this.cfg = cfg
@@ -443,7 +455,7 @@ class SonifyEngine {
         fx: { ...cfg.fx },
         mixFilter: cfg.mixFilter
       },
-      spectraFreqs: spectraFreqs(cfg),
+      spectraFreqs: spectraFreqs(cfg, this.ctx?.sampleRate ?? 48000),
       filterFreqs: filterFreqs(cfg),
       chordFreqs: chordFreqs(cfg)
     })
@@ -474,13 +486,15 @@ class SonifyEngine {
       .catch((e) => console.warn('[sonify] line-in unavailable, noise only', e))
   }
 
-  /** Snap the orbit's note number onto the active scale, return Hz. */
+  /** Snap the orbit's note number onto the active scale, return Hz. Includes the
+   *  global root-octave transpose (the octave half of effRoot) so Orbit/Raster
+   *  ride the root octave with every other voice (rootOct 3 = no shift). */
   private snapNote(note: number): number {
     const steps = SCALE_STEPS[this.cfg.scale]
     const rel = ((note - this.cfg.root) % 12 + 12) % 12
     let best = steps[0], bd = 99
     for (const s of steps) { const d = Math.abs(s - rel); if (d < bd) { bd = d; best = s } }
-    return noteFreq(note - rel + best)
+    return noteFreq(note - rel + best + 12 * ((this.cfg.rootOct ?? 3) - 3))
   }
 
   /** Per-frame pump : read the active taps from the compositor, ship grids to
@@ -667,7 +681,7 @@ class SonifyEngine {
         const idx = Math.min(this.eventFreqs.length - 1, Math.floor((1 - c.y) * this.eventFreqs.length))
         freq = this.eventFreqs[idx]
       } else {
-        const f0 = noteFreq(12 * (lo + 1)), f1 = noteFreq(12 * (hi + 1))
+        const f0 = noteFreq(12 * (lo + 1) + effRoot(this.cfg)), f1 = noteFreq(12 * (hi + 1) + effRoot(this.cfg))
         freq = f0 * Math.pow(f1 / f0, 1 - c.y)
       }
       out[i * 4] = Math.random() * frameDt
@@ -722,7 +736,7 @@ class SonifyEngine {
         const idx = Math.min(this.grainFreqs.length - 1, Math.floor((1 - v.y) * this.grainFreqs.length))
         freq = this.grainFreqs[idx]
       } else {
-        const f0 = noteFreq(12 * (lo + 1)), f1 = noteFreq(12 * (hi + 1))
+        const f0 = noteFreq(12 * (lo + 1) + effRoot(this.cfg)), f1 = noteFreq(12 * (hi + 1) + effRoot(this.cfg))
         freq = f0 * Math.pow(f1 / f0, 1 - v.y)
       }
       const col = this.blockColour(v.bx, v.by) // { bright, warm } from avg RGB

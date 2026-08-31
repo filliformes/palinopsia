@@ -24,7 +24,10 @@ let bonjour: Bonjour | null = null
 let service: Service | null = null
 let wc: WebContents | null = null
 
-export function hiveSendStart(webContents: WebContents, port: number): { ok: boolean; port: number } {
+export function hiveSendStart(
+  webContents: WebContents,
+  port: number
+): Promise<{ ok: boolean; port: number; error?: string }> {
   hiveSendStop()
   wc = webContents
   server = net.createServer((sock) => {
@@ -36,29 +39,43 @@ export function hiveSendStart(webContents: WebContents, port: number): { ok: boo
     // Ask the encoder for a keyframe so this client can start streaming ASAP.
     if (wc && !wc.isDestroyed()) wc.send('hive:forceKey')
   })
-  server.on('error', (e) => console.error('[hive-send]', (e as Error).message))
-  server.listen(port, '0.0.0.0')
-
-  try {
-    bonjour = new Bonjour()
-    service = bonjour.publish({
-      name: `Palinopsia-${os.hostname()}`,
-      type: 'hive', // HIVE's historical service type is _hive._udp
-      protocol: 'udp',
-      port,
-      txt: {
-        name: 'Palinopsia',
-        transport: 'tcp',
-        codec: 'hevc',
-        profile: 'main',
-        bitrate: '80000000',
-        port: String(port)
-      }
+  // The bind result drives the return : a failed listen (EADDRINUSE …) must
+  // report ok:false, never a phantom success (the UI would show output live
+  // while nothing is bound). Resolve once, on 'listening' or the first 'error'.
+  return new Promise((resolve) => {
+    let settled = false
+    server!.on('error', (e) => {
+      console.error('[hive-send]', (e as Error).message)
+      if (settled) return
+      settled = true
+      hiveSendStop()
+      resolve({ ok: false, port, error: (e as Error).message })
     })
-  } catch (e) {
-    console.warn('[hive-send] mDNS advertise failed:', (e as Error).message)
-  }
-  return { ok: true, port }
+    server!.once('listening', () => {
+      settled = true
+      try {
+        bonjour = new Bonjour()
+        service = bonjour.publish({
+          name: `Palinopsia-${os.hostname()}`,
+          type: 'hive', // HIVE's historical service type is _hive._udp
+          protocol: 'udp',
+          port,
+          txt: {
+            name: 'Palinopsia',
+            transport: 'tcp',
+            codec: 'hevc',
+            profile: 'main',
+            bitrate: '80000000',
+            port: String(port)
+          }
+        })
+      } catch (e) {
+        console.warn('[hive-send] mDNS advertise failed:', (e as Error).message)
+      }
+      resolve({ ok: true, port })
+    })
+    server!.listen(port, '0.0.0.0')
+  })
 }
 
 /** A HEVC Annex-B chunk from the encoder → fan out to live clients. */

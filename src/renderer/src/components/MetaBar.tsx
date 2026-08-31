@@ -495,9 +495,9 @@ function KnobModAssign({
       {current && (
         <input
           type="range"
-          min={-1}
-          max={1}
-          step={0.01}
+          min={-10}
+          max={10}
+          step={0.05}
           value={current.depth}
           onChange={(e) => setAssignmentDepth(current.id, Number(e.target.value))}
           className="w-full accent-accent2"

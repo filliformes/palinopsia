@@ -479,6 +479,14 @@ function route(address: string, args: Args): void {
         const d = SONIFY_MOD_DESCS[param]
         if (d) apply(withSonifyParam(c, param, d.min + clamp01(n) * (d.max - d.min)))
       }
+      // Index params (rootoct·path·voices·delaymode) advertise RAW ranges, so an
+      // integer arg is a raw index and a float is 0..1 normalized across [lo..hi].
+      // Disambiguated by the OSC type tag (like enumFrom) so a raw `1` is never
+      // mistaken for a normalized 1.
+      const idx = (lo: number, hi: number): number => {
+        const v = args[0]?.type === 'i' ? Math.round(n) : Math.round(lo + clamp01(n) * (hi - lo))
+        return Math.max(lo, Math.min(hi, v))
+      }
       const g = segs[2]
       if (g === 'on') { apply({ ...c, on: n >= 0.5 }); return }
       if (g === 'master') { apply({ ...c, master: clamp01(n) }); return }
@@ -494,7 +502,7 @@ function route(address: string, args: Args): void {
         return
       }
       if (g === 'rootoct' || g === 'octave') {
-        apply({ ...c, rootOct: Math.max(1, Math.min(6, Math.round(n <= 1 ? 1 + n * 5 : n))) })
+        apply({ ...c, rootOct: idx(1, 6) })
         return
       }
       const ctl = segs[3]
@@ -512,7 +520,7 @@ function route(address: string, args: Args): void {
           else if (ctl === 'x') probe('spectraX')
           else if (ctl === 'contrast') V('spectra', { gamma: 0.5 + clamp01(n) * 3.5 })
           else if (ctl === 'breath') V('spectra', { breath: clamp01(n) })
-          else if (ctl === 'path') V('spectra', { path: Math.max(0, Math.min(3, Math.round(n <= 1 ? n * 3 : n))) })
+          else if (ctl === 'path') V('spectra', { path: idx(0, 3) })
           else if (ctl === 'breathe' || ctl === 'pace') V('spectra', { pace: clamp01(n) * 0.95 })
           else if (ctl === 'quantize') V('spectra', { quantize: n >= 0.5 })
           return
@@ -584,7 +592,7 @@ function route(address: string, args: Args): void {
           else if (ctl === 'noise') V('filter', { noise: clamp01(n) })
           else if (ctl === 'contrast') V('filter', { gamma: 0.5 + clamp01(n) * 3.5 })
           else if (ctl === 'linein') V('filter', { lineIn: n >= 0.5 })
-          else if (ctl === 'path') V('filter', { path: Math.max(0, Math.min(3, Math.round(n <= 1 ? n * 3 : n))) })
+          else if (ctl === 'path') V('filter', { path: idx(0, 3) })
           else if (ctl === 'breathe' || ctl === 'pace') V('filter', { pace: clamp01(n) * 0.95 })
           else if (ctl === 'quantize') V('filter', { quantize: n >= 0.5 })
           return
@@ -592,7 +600,7 @@ function route(address: string, args: Args): void {
           if (ctl === 'on') V('chord', { on: n >= 0.5 })
           else if (ctl === 'gain') V('chord', { gain: clamp01(n) })
           else if (ctl === 'pan') V('chord', { pan: clamp01(n) * 2 - 1 })
-          else if (ctl === 'voices') V('chord', { voices: Math.max(2, Math.min(16, Math.round(n <= 1 ? 2 + n * 14 : n))) })
+          else if (ctl === 'voices') V('chord', { voices: idx(2, 16) })
           else if (ctl === 'swell' || ctl === 'attack') V('chord', { attack: 0.02 + clamp01(n) * 2.98 })
           else if (ctl === 'fade' || ctl === 'release') V('chord', { release: 0.05 + clamp01(n) * 5.95 })
           else if (ctl === 'contrast') V('chord', { gamma: 0.5 + clamp01(n) * 3.5 })
@@ -606,7 +614,7 @@ function route(address: string, args: Args): void {
           else if (ctl === 'delayfb' || ctl === 'feedback') V('fx', { dlyFb: clamp01(n) * 0.95 })
           else if (ctl === 'delaytone') V('fx', { dlyTone: clamp01(n) })
           else if (ctl === 'delaymix') V('fx', { dlyMix: clamp01(n) })
-          else if (ctl === 'delaymode') V('fx', { dlyMode: Math.max(0, Math.min(2, Math.round(n <= 1 ? n * 2 : n))) })
+          else if (ctl === 'delaymode') V('fx', { dlyMode: idx(0, 2) })
           else if (ctl === 'reverbmode' || ctl === 'rvmode') V('fx', { rvMode: n >= 0.5 ? 1 : 0 })
           else if (ctl === 'reverbmix' || ctl === 'rvmix') V('fx', { rvMix: clamp01(n) })
           else if (ctl === 'size') V('fx', { rvSize: clamp01(n) })
@@ -855,7 +863,9 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/spectra/breathe', 0, 1, (so.spectra.pace ?? 0) / 0.95, 'Spectra breathing sweep pace')
     add('/opsia/sonify/orbit/on', 0, 1, so.orbit.on ? 1 : 0, 'Orbit voice on')
     add('/opsia/sonify/orbit/gain', 0, 1, so.orbit.gain, 'Orbit gain')
-    add('/opsia/sonify/orbit/pitch', 0, 1, norm('orbitPitch', so.orbit.quantize ? so.orbit.note : 45), 'Orbit pitch (note span)')
+    // Free-Hz mode : advertise the ACTUAL pitch by converting the live freq to a
+    // note number (mirrors sonify's freqNote), instead of a constant 45.
+    add('/opsia/sonify/orbit/pitch', 0, 1, norm('orbitPitch', so.orbit.quantize ? so.orbit.note : 69 + 12 * Math.log2(Math.max(1, so.orbit.freq) / 440)), 'Orbit pitch (note span)')
     add('/opsia/sonify/orbit/x', 0, 1, norm('orbitX', so.orbit.cx), 'Orbit centre x')
     add('/opsia/sonify/orbit/y', 0, 1, norm('orbitY', so.orbit.cy), 'Orbit centre y')
     add('/opsia/sonify/orbit/r', 0, 1, norm('orbitR', so.orbit.rx), 'Orbit radius')
@@ -970,7 +980,11 @@ export function publishOscQuery(): void {
     type: 'f',
     range: { min: n.min, max: n.max },
     value: n.value,
-    description: n.desc
+    description: n.desc,
+    // /opsia/vision/* is outbound-only (the picture reports it; there is no
+    // inbound route), so advertise it read-only instead of as a writable float.
+    // Audio leaves stay writable — Pandore PUSHES those in.
+    ...(n.path.startsWith('/opsia/vision/') ? { access: 1 } : {})
   }))
   window.api.oscQueryPublish(nodes)
 }

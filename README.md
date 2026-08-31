@@ -125,6 +125,8 @@ first-ever launch pays this once; it persists on disk afterwards.
    **Generate** in the toolbar — 76 themed recipes that build a coherent
    session (visuals + World + palette + macro biases) in one click.
 
+**Lost?** Press **`?`** anytime for the full keyboard cheat-sheet.
+
 ---
 
 ## Keyboard shortcuts
@@ -136,7 +138,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `1`–`9` | Recall scene 1–9 |
 | `P` / `Shift+P` | Open Vibe Palette / cycle its presets |
 | `C` / `Shift+C` | Open Context / cycle its presets |
-| `L` / `M` / `F` / `G` | Right column → Layers / Mixer / Finishing / **Feel** |
+| `M` / `F` / `G` | Right column → Mixer / Finishing / **Feel** (Layers is the default view — `M` toggles Mixer↔Layers, or click the tab) |
 | `O` | Output / Mapping page |
 | `W` | World editor |
 | `Q` | Sequence page |
@@ -145,15 +147,23 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `A` | Right column → **osc/audio/midi** setup tab |
 | `D` / `X` / `I` | Collapse Modulation / Master-FX / Inspector |
 | `R` | Fire the Transport's selected Randomize |
+| `H` | **Freeze / hold** the output (the ❄ latch — the Transport button lights while held) |
+| `L` | **MIDI Learn** on/off — from any tab or full-page view |
+| `?` | Keyboard **cheat-sheet** — this table, in-app (Esc closes) |
 | `0` | **Panic flush** — clear every self-feeding buffer (feedback / trails / rings / accumulators) at once |
-| `Esc` | Exit MIDI Learn first; otherwise close World / Sonify / Output / Sequence |
+| `Esc` | Close the cheat-sheet, then MIDI Learn; otherwise close World / Sonify / Output / Sequence |
 | `Ctrl/Cmd+Z` · `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` | Undo · Redo (100 levels) |
 | `Ctrl/Cmd+S` | Save session |
 | `Ctrl/Cmd` `+` / `-` / `0` · `Ctrl`+wheel | UI zoom in / out / reset |
 
-**MIDI:** the **MIDI Learn** toolbar button maps any controller — see
-[MIDI](#midi).
-**Everywhere:** double-click a slider/knob to reset it to its neutral value.
+**MIDI:** the **MIDI Learn** toolbar button (top bar) — or the `L` key from
+anywhere — maps any controller; see [MIDI](#midi).
+**Everywhere:** double-click a slider/knob to reset it to its neutral value —
+including the A/B mix, harmony, coupling, background opacity / depth and the
+video **in / out** trim handles.
+**Feedback:** a brief bottom **toast** confirms actions with no natural home on
+screen — a recording saved (with its filename), a panic flush, or a live-capture
+that couldn't start *and why* (permission denied / no device / cancelled).
 
 ---
 
@@ -175,11 +185,19 @@ Each of the **4 layers** carries:
 | **Opacity** | Header slider (0–1; double-click → 1). |
 | **Speed** (`SPEED`) | The layer's own clock multiplier (0–20×) over global speed (double-click → 1). |
 | **Feedback** (`FB` + `TRAIL`) | Samples the layer's own previous frame (ping-pong FBO decay-feedback). |
-| **Solo / Mute** (`S` / `M`) | Per-layer isolation; per-layer dice `⚄`. |
+| **Solo / Mute** (`S` / `⊘`) | Per-layer isolation; per-layer dice `⚄`. (Mute moved off the letter `M` so it never reads as the Modulate **M** chips. The same `S` / `⊘` chips now also ride each column of the **Mixer** view.) |
 | **Coupling** (`CPL`) | Audio drives the A/B balance (hidden until Coupling is enabled in the Audio tab): modes off/lean/hocket/cut/gate/drift + audio feature + amount + tightness. |
 
 Shader hot-swaps preserve feedback buffers — no reset-to-black mid-performance.
 Right-click a layer for Init / Randomize / Copy / Paste / layer presets.
+
+A layer's **opacity, A/B mix and blend mode** are themselves [modulation](#modulation-brain-8-modulators--matrix)
+targets — a small **M** chip beside each opens the same M1–8 binding row as any
+Inspector control. Bound sliders turn the modulated colour and move with the
+signal; the blend dropdown cycles its modes. Per-FX **dry/wet opacity** is
+modulatable too — select a loaded effect and its opacity slider grows the same
+**M** pill. (These are compositor-level, so they apply as a final per-frame
+override with the base value preserved, and they travel with sessions.)
 
 The **Background** slab has one source (from a curated set), its own full FX rack,
 opacity, a slow clock (default 0.25×), a **Depth** control (the foreground casts a
@@ -196,7 +214,9 @@ The main Inspector's FX-controls band **auto-fits its parameters** — selecting
 effect or source sizes the band to exactly its controls, so there's never blank space
 over a few params nor a hidden row behind a scroll (you can still drag its handle to
 override until the next selection). The Modulate side panel is resizable too (widths /
-heights persist).
+heights persist). Every effect, generator and source in a picker — and each FX
+chip already in a rack — shows a **one-line description on hover**, so the whole
+catalogue is learnable without adding-then-reading.
 
 ## Video sources
 
@@ -242,19 +262,25 @@ Left → right:
 - **BPM** (20–800) — the label is a **tap-tempo button** (tap it in time) ·
   **SPD** global speed (1/64×–64×, log; double-click → 1×) · **MRPH** morph time
   (0–30 s — scene recalls and Randomize crossfade over this).
-- **WRLD** World selector + `⧉` World editor · **Seq** (opens the sequencer;
+- **WRLD** World selector + `⧉` World editor · **❄ Freeze** — hold the output on
+  the current frame (the button lights while held; also key `H` or a learned pad) ·
+  **Output** (opens the Output / mapping page) · **Seq** (opens the sequencer;
   lights when running) · **Sfy** (opens Sonify; lights while the sound engine
   runs) · **PROX** proximity (far ↔ close depth zone) + `◑` audio-brightness
   follow.
-- **MIDI Learn** — arms the controller-mapping mode (see [MIDI](#midi)).
-- **⚡ Flush** — the panic button (also key `0`): drops every self-feeding buffer at
-  once — per-layer trails, the Feedback / Réponse / Chronoscan frame rings, the
-  Sediment / Scanner accumulators, the reaction-diffusion field — so a runaway
-  feedback build-up clears instantly without reloading anything.
 - **Vary** (a baseline-anchored variant — structure fixed, values nudged) + amount.
 - **amt** Randomize intensity (gentle walk ↔ full re-roll) · **Randomize**
   split-button (main fires the selected scope; `▾` picks the scope — see
   [Randomize & Vary](#randomize--vary)).
+
+The **top bar** carries the session controls (name · Session · Generate · New /
+Open / Save / Save As · render-depth + theme selectors), the **MIDI Learn**
+button (key `L`), the **REC** pill (stop it here and a toast confirms the saved
+file), undo / redo, UI zoom, and — at the far right — **⚡ Flush**, the panic
+button (also key `0`) that drops every self-feeding buffer at once: per-layer
+trails, the Feedback / Réponse / Chronoscan frame rings, the Sediment / Scanner
+accumulators, the reaction-diffusion field — so a runaway feedback build-up
+clears instantly without reloading anything.
 
 ## Feel — the global macros (key `G`)
 
@@ -344,8 +370,10 @@ The **mod-matrix** holds up to **12** assignments (M# → target param, with a
 bipolar depth and a **Multiply** or **Replace** mode). Bindings are made from each
 parameter's **M** button in the Inspector or Meta tile. Modulation reaches
 **float, enum, and bool** inputs — plus the **video** targets (playhead / speed /
-loop / grain) — and is written straight to the compositor at frame rate, never
-through React re-renders.
+loop / grain), the compositor-level **layer** controls (opacity / A-B mix /
+blend-mode, from the M chips on the layer strip), and per-**FX dry/wet opacity**
+— and is written straight to the compositor at frame rate, never through React
+re-renders.
 
 The **Mul** (depth) control spans **−10 … +10**. Between −1 and +1 it behaves as
 before; past ±1 it **over-drives** — in Multiply mode the modulator's trough is
@@ -429,13 +457,17 @@ Parametric generator.
 
 ## MIDI
 
-Hardware control, Ableton-style. Press **MIDI Learn** in the bottom toolbar
-(it turns blue) : every learnable control grows a **blue overlay**. Click one
-(it pulses), then move a knob / hit a pad on your controller — bound (the
-overlay turns **green**). The mode stays armed so you can map the next control
-immediately; right-click a green overlay to clear its binding, press the
-button again or `Esc` to exit. While learning, incoming MIDI never fires
-anything — browse your controller safely.
+Hardware control, Ableton-style. Press **MIDI Learn** in the top toolbar (or the
+`L` key, from any tab) — it turns blue and every learnable control grows a **blue
+overlay**. Click one (it pulses), then move a knob / hit a pad on your
+controller — bound (the overlay turns **green**). The mode stays armed so you can
+map the next control immediately; right-click a green overlay to clear its
+binding, press the button / `L` again or `Esc` to exit. While learning, incoming
+MIDI never fires anything — browse your controller safely.
+
+**One CC, many targets** — learn the *same* CC onto several controls and one knob
+drives them all at once (every match fires, not just the first). A wide hardware
+gesture can sweep a whole cluster of parameters.
 
 Learnable targets:
 
@@ -444,14 +476,22 @@ Learnable targets:
   (the per-knob **CC** button still works as a direct shortcut).
 - **Transport** — BPM (CC → 40–240), SPD, MORPH, PROX (each mirrors its
   slider's curve).
+- **Continuous (CC)** — each of the **4 layer opacities** and their **A/B mix**,
+  the **background opacity**, the **8 Feel dials**, the **Metasurface XY**, and
+  the **Sonify master** (each mirrors its own curve).
 - **Fires** (pad/note or button-CC, press edge only) — **Vary**, **Randomize**
-  (the selected scope), **Sonify** on/off.
-- **Scene chips** — a pad recalls that scene *slot* (like the `1`–`9` keys).
+  (the selected scope), **Tap tempo**, **Freeze**, **Panic flush**, **Record**
+  start/stop, **Sonify** on/off, and the **Sequence** + **Sonify-sequence**
+  transports.
+- **Scene chips** — a pad recalls that scene *slot* (like the `1`–`9` keys); a
+  pad can also step **scene next / prev**.
 
 Everything except the Meta-knob CCs is machine-local (survives restarts,
 doesn't travel with sessions). The **MIDI** section of the osc/audio/midi tab
 (key `A`) has the **input dropdown** (all controllers, or just one — hot-plug
-is handled) and the full bindings ledger with per-row clear.
+is handled), a **live-activity readout** (last message + how many controls are
+wired, so you can confirm the port is really talking), and the full bindings
+ledger with per-row clear.
 
 ## Output & mapping (key `O`)
 
@@ -542,6 +582,17 @@ that voice. **↺ default** resets every voice / FX / mixer setting to the facto
 patch. Each voice box carries an **ⓘ** with its full description. The whole audio
 path is NaN-safe — a wild random patch can't get the reverb/delay stuck or mute the
 output.
+
+**Sequencer** : inside the mixer, a step sequencer lets the sound *evolve on its
+own* — each step stores either a **voice on/off mask** (a rhythmic pattern over
+the current patch) or a **whole saved preset** (a structural change), so a full
+evolving sonified piece can be built. The rate spans 80 ms – 6 s (log). Three
+advance **modes**, ported from dataFLOU's generative section: **forward**,
+**bounce** (each cycle's steps accelerate like a settling ball, the total cycle
+time preserved) and **drift** (a biased random walk with a **wrap** or **reflect**
+edge). A **🎲** re-rolls the pattern (1–3 voices per active step, presets kept)
+and a **↺** resets it; the section grows to fit its steps (no scrollbar). Its
+play/stop is MIDI-learnable (the Sonify-sequence transport).
 
 **✨ Auto-voice** : one button reads the session's actual vocabulary — which
 generators, nodes and FX are live on which layers — and picks the fitting

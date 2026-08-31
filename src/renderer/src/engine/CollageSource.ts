@@ -446,7 +446,6 @@ export class CollageSource {
     const want = edls.slice(0, MAX_DECKS)
     for (const d of this.decks) this.killDeck(d)
     this.decks = want.map((e) => this.makeAsmDeck(e))
-    if (!this.decks.length) this.decks = [this.makeDeck()]
     this.allocArray(this.decks.length)
   }
 
