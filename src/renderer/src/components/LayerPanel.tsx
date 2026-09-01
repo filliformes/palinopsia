@@ -14,6 +14,7 @@ import { keywordsFor } from '../shaders/isf/keywords'
 import { modTargetKey, useStore } from '../store'
 import { AssignRow } from './AutoControls'
 import { registerLiveOverlay } from './liveOverlay'
+import { showToast } from './Toast'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { CapturePicker } from './CapturePicker'
 import { DevicePicker } from './DevicePicker'
@@ -673,9 +674,10 @@ function SourceRow({
         const probe = await window.api.videoProbe(path)
         if (probe.needsConvert) {
           if (!probe.ffmpegAvailable) {
-            alert(
-              `"${file.name}" is ${probe.codec ?? 'a codec'} the built-in player can't read.\n` +
-                'Install ffmpeg to import it : add ffmpeg to PATH, `npm i ffmpeg-static`, or set OPSIA_FFMPEG.'
+            showToast(
+              `"${file.name}" is ${probe.codec ?? 'a codec'} the player can't read — install ffmpeg to import it (add to PATH, npm i ffmpeg-static, or set OPSIA_FFMPEG)`,
+              'warn',
+              7000
             )
             return
           }
@@ -686,14 +688,14 @@ function SourceRow({
           try {
             const res = await window.api.videoConvert(path)
             if (!res.ok || !res.path) {
-              alert(`Conversion failed : ${res.error ?? 'unknown error'}`)
+              showToast(`Conversion failed : ${res.error ?? 'unknown error'}`, 'warn', 6000)
               return
             }
             onPickVideo(`opsia-media://local/${encodeURIComponent(res.path)}`, file.name)
           } catch (err) {
             // Convert rejected : surface it and STOP here — don't fall through to
             // direct-play a clip the probe already flagged as needing conversion.
-            alert(`Conversion failed : ${(err as Error)?.message ?? 'unknown error'}`)
+            showToast(`Conversion failed : ${(err as Error)?.message ?? 'unknown error'}`, 'warn', 6000)
           } finally {
             // Always unsubscribe the progress listener + clear the badge, whether
             // the convert resolved, failed, or threw (else both leak).

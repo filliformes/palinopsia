@@ -14,6 +14,7 @@ import {
 import { useShallow } from 'zustand/react/shallow'
 import type { DisplayInfo, PerfStats } from '@shared/types'
 import { useStore } from '../store'
+import { showToast } from './Toast'
 import { currentFps } from '../perf'
 import { captureScreenshot, outputRecorder, recordingFormats } from '../recorder'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
@@ -186,11 +187,12 @@ export function OutputPage({
     const ok = kind === 'ndi' ? await window.api.ndiSet(next) : await window.api.spoutSet(next)
     setActive(next && ok)
     if (next && !ok) {
-      // eslint-disable-next-line no-alert
-      alert(
+      showToast(
         kind === 'ndi'
-          ? 'NDI sender not available. Install the optional native module (grandiose) + NDI runtime.'
-          : 'Spout sender not available. Add a Spout sender addon (leadedge SDK) for Windows.'
+          ? 'NDI sender not available — install the optional grandiose module + NDI runtime'
+          : 'Spout sender not available — add a Spout addon (leadedge SDK) for Windows',
+        'warn',
+        7000
       )
     }
   }

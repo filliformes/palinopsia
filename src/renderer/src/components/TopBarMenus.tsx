@@ -7,8 +7,22 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { THEME_FAMILIES, THEMES } from '../themes'
 import { SearchSelect } from './SearchSelect'
+import { showToast } from './Toast'
 
 type SessionEntry = { name: string; path: string; mtime: number }
+
+/** Save the outgoing session before it's replaced (Load / Generate) — named
+ *  sessions overwrite their file, unnamed ones go to the default Sessions/<name>,
+ *  so nothing is ever silently lost. Best-effort : never blocks the replace. */
+async function saveBeforeReplace(): Promise<void> {
+  try {
+    const st = useStore.getState()
+    if (st.sessionPath) await window.api.sessionSave(st.exportSession(), st.sessionPath)
+    else await window.api.sessionSaveToDefault(st.exportSession())
+  } catch {
+    /* best-effort */
+  }
+}
 
 export function SessionLoader(): JSX.Element {
   const [sessions, setSessions] = useState<SessionEntry[]>([])
@@ -36,19 +50,11 @@ export function SessionLoader(): JSX.Element {
     try {
       const session = await window.api.sessionLoad(sel)
       if (session) {
-        // Silently save the session being left before switching (mirrors
-        // App.openSession) so A→B→A round-trips everything, scenes included.
-        // Unnamed sessions go to the default Sessions/<name> file, not lost.
-        try {
-          const st = useStore.getState()
-          if (st.sessionPath) await window.api.sessionSave(st.exportSession(), st.sessionPath)
-          else await window.api.sessionSaveToDefault(st.exportSession())
-        } catch {
-          /* best-effort : never block the load */
-        }
+        await saveBeforeReplace() // A→B→A round-trips everything (scenes included)
         loadSession(session)
         // Remember the file so a later plain Save overwrites it in place.
         useStore.setState({ sessionPath: sel })
+        showToast(`Loaded · ${sessions.find((s) => s.path === sel)?.name ?? 'session'} (previous saved)`)
       }
     } catch (e) {
       console.error('[SessionLoader] load failed', e)
@@ -111,7 +117,11 @@ export function GenerateMenu(): JSX.Element {
       />
       <button
         className="btn text-[12px] text-accent2"
-        onClick={() => generateTheme(sel)}
+        onClick={async () => {
+          await saveBeforeReplace() // Generate wipes the session — save it first, like Load/Open/New
+          generateTheme(sel)
+          showToast(`Generated · ${current?.name ?? 'theme'} (previous saved)`)
+        }}
         title={current ? `Generate a “${current.name}” session : ${current.blurb}` : 'Generate'}
       >
         Generate

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import type { ModTarget, SourceSlot } from '@shared/types'
 import { useShallow } from 'zustand/react/shallow'
 import { videoKey, videoPlayheads } from '../engine/videoState'
+import { showToast } from './Toast'
 import { modTargetKey, useStore } from '../store'
 import { AssignRow } from './AutoControls'
 
@@ -82,7 +83,7 @@ export function VideoTransport({
       if (res.ok && res.path) {
         swapVideoSource(layer, slot, `opsia-media://local/${encodeURIComponent(res.path)}`, state.mediaName ?? 'video')
       } else if (res.error) {
-        alert(`Couldn't make a smooth-scrub copy : ${res.error}`)
+        showToast(`Couldn't make a smooth-scrub copy : ${res.error}`, 'warn', 6000)
       }
     } finally {
       off()

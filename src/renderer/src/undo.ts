@@ -14,6 +14,7 @@ import { useSyncExternalStore } from 'react'
 import type { CompositionState, SceneEntry, SequenceState, World } from '@shared/types'
 import { useStore } from './store'
 import { cancelMorph } from './morph'
+import { showToast } from './components/Toast'
 
 const CAPACITY = 100
 const QUIET_MS = 300
@@ -190,26 +191,57 @@ function flushPending(): void {
   }
 }
 
+// Name what a step touched, so the toast says "Undone · layers" not just "Undone".
+// Leans on the reference-compare : the first slice whose reference differs wins.
+function describeDiff(a: Snapshot, b: Snapshot): string {
+  const c1 = a.composition, c2 = b.composition
+  if (c1 !== c2) {
+    if (c1.layers !== c2.layers) return 'layers'
+    if (c1.modMatrix !== c2.modMatrix || c1.modulators !== c2.modulators) return 'modulation'
+    if (c1.metaKnobs !== c2.metaKnobs) return 'meta knobs'
+    if (c1.master !== c2.master) return 'master FX'
+    if (c1.background !== c2.background) return 'background'
+    return 'composition'
+  }
+  if (a.scenes !== b.scenes || a.activeSceneId !== b.activeSceneId) return 'scenes'
+  if (a.sequence !== b.sequence) return 'sequencer'
+  if (a.worlds !== b.worlds || a.world !== b.world) return 'world'
+  if (a.sonify !== b.sonify) return 'sonify'
+  if (a.surface !== b.surface) return 'surface'
+  if (
+    a.density !== b.density || a.gestureTexture !== b.gestureTexture || a.coalesce !== b.coalesce ||
+    a.tonicity !== b.tonicity || a.shutter !== b.shutter || a.drift !== b.drift ||
+    a.flow !== b.flow || a.superFlicker !== b.superFlicker
+  ) return 'feel'
+  if (a.vibePresetName !== b.vibePresetName) return 'vibe'
+  if (a.name !== b.name) return 'name'
+  return 'change'
+}
+
 export function undo(): void {
   flushPending()
   const prev = past.pop()
   if (!prev) return
-  future.push(snap())
+  const cur = snap()
+  future.push(cur)
   if (future.length > CAPACITY) future.shift()
   apply(prev)
   committed = prev
   bump()
+  showToast(`Undone · ${describeDiff(prev, cur)}`)
 }
 
 export function redo(): void {
   flushPending()
   const next = future.pop()
   if (!next) return
-  past.push(snap())
+  const cur = snap()
+  past.push(cur)
   if (past.length > CAPACITY) past.shift()
   apply(next)
   committed = next
   bump()
+  showToast(`Redone · ${describeDiff(next, cur)}`)
 }
 
 export function canUndo(): boolean {

@@ -326,7 +326,7 @@ export default function App(): JSX.Element {
       }
       if (!ok) {
         // No WebCodecs HEVC encoder on this host : bail out and flip the toggle.
-        alert('HIVE output needs a hardware HEVC encoder, which this machine reports as unavailable.')
+        showToast('HIVE output needs a hardware HEVC encoder — unavailable on this machine', 'warn', 6000)
         useStore.getState().setHiveOutActive(false)
         return
       }
@@ -358,7 +358,7 @@ export default function App(): JSX.Element {
     if (wantLocal && !audioBus.localActive) {
       void audioBus.startLocal(audioDeviceId).then((ok) => {
         if (!ok && audioSource === 'local') {
-          alert('Could not open the audio input. Check the device / OS permissions.')
+          showToast('Could not open the audio input — check the device / OS permissions', 'warn', 6000)
         }
       })
     } else if (!wantLocal) {
@@ -1188,6 +1188,7 @@ export default function App(): JSX.Element {
       try {
         useStore.getState().loadSession(res.session)
         useStore.getState().setSessionPath(res.path) // Save now overwrites this file
+        showToast(`Opened · ${res.path.split(/[\\/]/).pop() ?? 'session'} (previous saved)`)
       } catch (e) {
         console.error('[session] load failed:', (e as Error).message)
       }
@@ -1310,6 +1311,7 @@ export default function App(): JSX.Element {
               /* best-effort */
             }
             useStore.getState().newSession()
+            showToast('New session — previous saved')
           }}
           title="New blank session (undoable; the current session is saved first)"
         >
