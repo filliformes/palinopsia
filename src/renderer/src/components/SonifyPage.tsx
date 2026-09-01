@@ -19,6 +19,19 @@ const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 
 // Voice order matches the worklet's render/filter order (mixFilter indices).
 const VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord'] as const
 const VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord']
+// The hue each voice's probe is drawn in on the mirror (matches the overlay
+// painter below), so a strip's swatch tells you which mark is yours. Chord has
+// no spatial probe (it reads horizontal bands), so it gets a neutral swatch.
+const PROBE_COLOR: Record<string, string> = {
+  Spectra: 'rgb(255,255,255)',
+  Orbit: 'rgb(255,180,80)',
+  Flow: 'rgb(255,255,255)',
+  Events: 'rgb(255,210,120)',
+  Raster: 'rgb(120,255,160)',
+  Transmission: 'rgb(255,120,200)',
+  Filter: 'rgb(120,200,255)',
+  Chord: 'rgb(150,150,160)'
+}
 const filterTag = (x: number): string => (x < 0.49 ? 'LP' : x > 0.51 ? 'HP' : '—')
 
 const TAU = 6.283185307179586
@@ -224,6 +237,17 @@ function VoiceShell({ title, on, hint, onToggle, onDice, children }: {
         >
           {on ? '● on' : '○ off'}
         </button>
+        {PROBE_COLOR[title] && (
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-sm ring-1 ring-black/30"
+            style={{ background: PROBE_COLOR[title] }}
+            title={
+              title === 'Chord'
+                ? 'Chord reads horizontal bands — no spatial probe on the mirror'
+                : `${title}'s probe is drawn in this colour on the mirror`
+            }
+          />
+        )}
         <span className="text-[11px] font-semibold">{title}</span>
         {/* hover-info : the mode's description as a tooltip (was inline text) */}
         <span className="cursor-help rounded-full text-[10px] text-muted/70 hover:text-accent" title={hint}>ⓘ</span>
@@ -801,8 +825,13 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           </div>
         </div>
 
-        {/* Voice strips */}
-        <aside className="flex w-[320px] shrink-0 flex-col gap-2 overflow-y-auto border-l border-border bg-panel px-3 py-2">
+        {/* Voice strips : dimmed while the master engine is OFF, so the green
+            "● on" pills don't read as live sound (still fully editable). */}
+        <aside
+          className={`flex w-[320px] shrink-0 flex-col gap-2 overflow-y-auto border-l border-border bg-panel px-3 py-2 transition-opacity ${
+            cfg.on ? '' : 'opacity-50'
+          }`}
+        >
           {assign && <AssignMini param={assign} onClose={() => setAssign(null)} />}
           {view === 'mixer' && (
             <div className="flex flex-col gap-1">

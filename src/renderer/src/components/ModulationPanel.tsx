@@ -90,6 +90,8 @@ export function ModulationPanel(): JSX.Element {
 function ModCard({ index }: { index: number }): JSX.Element {
   const m = useStore((s) => s.composition.modulators[index])
   const update = useStore((s) => s.updateModulator)
+  // How many matrix targets this modulator drives — a glance at what's wired.
+  const drives = useStore((s) => s.composition.modMatrix.filter((a) => a.mod === index).length)
 
   return (
     // Fixed height + min-w-0 so all eight cards are identical regardless of
@@ -111,6 +113,14 @@ function ModCard({ index }: { index: number }): JSX.Element {
           title={m.enabled ? 'On : click to disable' : 'Off : click to enable'}
         />
         <span className="font-mono text-[10px] text-muted">M{index + 1}</span>
+        {drives > 0 && (
+          <span
+            className="shrink-0 rounded bg-accent/15 px-1 font-mono text-[9px] leading-4 text-accent"
+            title={`Drives ${drives} parameter${drives === 1 ? '' : 's'} in the matrix`}
+          >
+            →{drives}
+          </span>
+        )}
         {index === WORLD_AUTOMOD_SLOT && (
           <span
             className="shrink-0 font-mono text-[9px] text-accent2"

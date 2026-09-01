@@ -5,10 +5,10 @@
 // presets (save/apply/delete : app-persistent).
 
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
-import type { AudioFeature, BlendMode, CouplingMode, LayerMask, ModTarget, SourceKind } from '@shared/types'
+import type { AudioFeature, BlendMode, CouplingMode, LayerMask, ModTarget, SourceKind, SourceSlot } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
 import { AUDIO_FEATURES } from '../engine/audioIn'
-import { GENERATORS_ALPHA } from '../shaders/isf'
+import { GENERATORS_ALPHA, SHADER_BY_ID } from '../shaders/isf'
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { keywordsFor } from '../shaders/isf/keywords'
 import { modTargetKey, useStore } from '../store'
@@ -227,6 +227,32 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
         </div>
       </div>
       {modAssign('opacity')}
+      {collapsed &&
+        (() => {
+          const srcLabel = (slot?: SourceSlot | null): string | null => {
+            if (!slot || slot.kind === 'none') return null
+            if (slot.shaderId) return SHADER_BY_ID[slot.shaderId]?.name ?? slot.shaderId
+            return slot.mediaName ?? slot.kind
+          }
+          const a = srcLabel(layer.sourceA)
+          const b = srcLabel(layer.sourceB)
+          const fxCount = layer.fx.length + layer.sourceAFx.length + layer.sourceBFx.length
+          return (
+            <div
+              className="flex min-w-0 items-center gap-1 px-1 font-mono text-[9px] text-muted"
+              title="What this collapsed layer holds — expand to edit"
+            >
+              <span className="min-w-0 truncate">
+                {a ?? 'empty'}
+                {b ? ` + ${b}` : ''}
+              </span>
+              {fxCount > 0 && <span className="shrink-0 text-muted/70">· {fxCount} fx</span>}
+              {layer.feedback && <span className="shrink-0 text-accent2/80">· FB</span>}
+              {layer.mute && <span className="shrink-0 text-danger/80">· muted</span>}
+              {layer.solo && <span className="shrink-0 text-accent/80">· solo</span>}
+            </div>
+          )
+        })()}
 
       {!collapsed && (
         <>
