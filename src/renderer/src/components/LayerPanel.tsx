@@ -11,7 +11,7 @@ import { AUDIO_FEATURES } from '../engine/audioIn'
 import { GENERATORS_ALPHA, SHADER_BY_ID } from '../shaders/isf'
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { keywordsFor } from '../shaders/isf/keywords'
-import { modTargetKey, useStore } from '../store'
+import { makeDefaultMask, modTargetKey, useStore } from '../store'
 import { AssignRow } from './AutoControls'
 import { registerLiveOverlay } from './liveOverlay'
 import { showToast } from './Toast'
@@ -548,19 +548,27 @@ const MASK_MODES = ['none', 'luma', 'gradient', 'shape']
 function MaskControls({ index, mask }: { index: number; mask: LayerMask }): JSX.Element {
   const setLayerMask = useStore((s) => s.setLayerMask)
   const set = (p: Partial<LayerMask>): void => setLayerMask(index, p)
-  const sl = (label: string, key: keyof LayerMask, min = 0, max = 1, step = 0.01): JSX.Element => (
-    <Row label={label}>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={mask[key] as number}
-        onChange={(e) => set({ [key]: Number(e.target.value) } as Partial<LayerMask>)}
-        className="min-w-0 flex-1 accent-accent"
-      />
-    </Row>
-  )
+  const def = makeDefaultMask()
+  const sl = (label: string, key: keyof LayerMask, min = 0, max = 1, step = 0.01): JSX.Element => {
+    const v = mask[key] as number
+    const d = def[key] as number
+    return (
+      <Row label={label}>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={v}
+          onChange={(e) => set({ [key]: Number(e.target.value) } as Partial<LayerMask>)}
+          onDoubleClick={() => set({ [key]: d } as Partial<LayerMask>)}
+          className="min-w-0 flex-1 accent-accent"
+          title={`${label} ${v.toFixed(2)} : double-click resets to ${d}`}
+        />
+        <span className="w-8 shrink-0 text-right font-mono text-[9px] text-muted">{v.toFixed(2)}</span>
+      </Row>
+    )
+  }
   return (
     <>
       <Row label="MASK">

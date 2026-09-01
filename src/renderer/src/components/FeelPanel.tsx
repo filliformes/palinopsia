@@ -85,8 +85,30 @@ export function FeelPanel(): JSX.Element {
   const superFlicker = useStore((s) => s.superFlicker)
   const setSuperFlicker = useStore((s) => s.setSuperFlicker)
 
+  // Return all eight macros to their rest values in one gesture (double-click
+  // only resets one row) — the Feel counterpart to Modulation's global mute.
+  const resetAll = (): void => {
+    setDensity(0.5); setGestureTexture(0.5); setCoalesce(0.5); setFlow(0.5)
+    setTonicity(0); setShutter(0); setDrift(0); setSuperFlicker(0)
+  }
+  const anyOff =
+    Math.abs(density - 0.5) > 0.02 || Math.abs(gestureTexture - 0.5) > 0.02 ||
+    Math.abs(coalesce - 0.5) > 0.02 || Math.abs(flow - 0.5) > 0.02 ||
+    tonicity > 0.02 || shutter > 0.02 || drift > 0.02 || superFlicker > 0.02
+
   return (
     <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-[9px] uppercase tracking-wide text-muted">Feel · global macros</span>
+        <button
+          onClick={resetAll}
+          disabled={!anyOff}
+          className="rounded px-1 py-0.5 text-[12px] leading-none text-muted transition-colors hover:text-accent disabled:opacity-30"
+          title="Reset all eight Feel macros to neutral"
+        >
+          ↺
+        </button>
+      </div>
       <section className="flex flex-col gap-1.5">
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted">Field · spatial + material</span>
         <FeelRow

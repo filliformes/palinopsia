@@ -45,6 +45,9 @@ export function PresetPicker({
   const [addPrompt, setAddPrompt] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement | null>(null)
+  // Keyboard cursor into the filtered list (factory then user), like SearchSelect.
+  const [cursor, setCursor] = useState(0)
+  const listRef = useRef<HTMLDivElement | null>(null)
 
   // Close on outside click.
   useEffect(() => {
@@ -55,6 +58,11 @@ export function PresetPicker({
     window.addEventListener('mousedown', down)
     return () => window.removeEventListener('mousedown', down)
   }, [open])
+
+  // Keep the highlighted row in view as the cursor moves.
+  useEffect(() => {
+    listRef.current?.querySelector('[data-cursor="true"]')?.scrollIntoView({ block: 'nearest' })
+  }, [cursor, open])
 
   const match = (n: string): boolean => {
     const s2 = q.trim().toLowerCase()
@@ -92,8 +100,14 @@ export function PresetPicker({
     <div ref={ref} className="relative min-w-0 max-w-full">
       <button
         onClick={() => {
+          const opening = !open
           setQ('')
-          setOpen((o) => !o)
+          setOpen(opening)
+          if (opening) {
+            // Open with the cursor on the currently-applied preset.
+            const idx = [...all, ...userPresets].findIndex((p) => p.name === applied)
+            setCursor(idx >= 0 ? idx : 0)
+          }
         }}
         className={`input select-compact max-w-full truncate text-left text-[10px] ${widthCh ? '' : 'w-36'}`}
         style={widthCh ? { width: `${widthCh}ch` } : undefined}
@@ -109,11 +123,21 @@ export function PresetPicker({
           <input
             autoFocus
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => {
+              setQ(e.target.value)
+              setCursor(0)
+            }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && factory.length + users.length > 0) {
+              const flat = [...factory, ...users]
+              if (e.key === 'ArrowDown') {
                 e.preventDefault()
-                apply(factory[0] ?? users[0])
+                setCursor((c) => Math.min(c + 1, flat.length - 1))
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                setCursor((c) => Math.max(c - 1, 0))
+              } else if (e.key === 'Enter' && flat.length > 0) {
+                e.preventDefault()
+                apply(flat[Math.max(0, Math.min(cursor, flat.length - 1))])
               } else if (e.key === 'Escape') {
                 e.preventDefault()
                 e.stopPropagation()
@@ -124,28 +148,30 @@ export function PresetPicker({
             spellCheck={false}
             className="input mx-1 mb-1 shrink-0 px-2 py-0.5 text-[11px]"
           />
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto">
           {factory.length + users.length === 0 && q.trim() !== '' && (
             <div className="px-3 py-1 text-[11px] text-muted">no match</div>
           )}
-          {factory.map((p) => (
+          {factory.map((p, i) => (
             <button
               key={p.name}
+              data-cursor={i === cursor}
               onClick={() => apply(p)}
               className={`px-3 py-1 text-left text-[11px] transition-colors hover:bg-accent/15 hover:text-accent ${
-                applied === p.name ? 'text-accent' : ''
+                i === cursor ? 'bg-accent/15 text-accent' : applied === p.name ? 'text-accent' : ''
               }`}
             >
               {p.name}
             </button>
           ))}
           {users.length > 0 && <div className="my-1 border-t border-border" />}
-          {users.map((p) => (
+          {users.map((p, j) => (
             <div key={p.name} className="flex items-center">
               <button
+                data-cursor={factory.length + j === cursor}
                 onClick={() => apply(p)}
                 className={`flex-1 truncate px-3 py-1 text-left text-[11px] transition-colors hover:bg-accent/15 hover:text-accent ${
-                  applied === p.name ? 'text-accent' : ''
+                  factory.length + j === cursor ? 'bg-accent/15 text-accent' : applied === p.name ? 'text-accent' : ''
                 }`}
                 title={`${p.name} (user preset)`}
               >

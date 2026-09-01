@@ -5,7 +5,7 @@
 // Locked units (the master Vibe Palette) render pinned: no bypass dot, no
 // remove, no reorder : just the name (click to edit) and a pin glyph.
 
-import { useRef, useState, type DragEvent, type MouseEvent } from 'react'
+import { Fragment, useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import type { FxInstance } from '@shared/types'
 import { FX_GROUPS, SHADER_BY_ID } from '../shaders/isf'
 import { blurbFor } from '../shaders/isf/shaderBlurbs'
@@ -61,42 +61,56 @@ export function FxChips({
   const selection = useStore((s) => s.selection)
   const reorderFx = useStore((s) => s.reorderFx)
   const dragId = useRef<string | null>(null)
+  // While dragging, which chip we'd drop BEFORE (an id), or the tail ('__tail__').
+  // Drives the accent insertion bar so you see where the unit will land.
+  const [overId, setOverId] = useState<string | null>(null)
+  const bar = <span className="h-4 w-0.5 shrink-0 self-center rounded bg-accent" />
   if (fx.length === 0 && !leading) return null
   return (
     <div
       className={`flex min-w-0 items-center gap-1 ${nowrap ? 'flex-nowrap' : 'grow flex-wrap'}`}
       // Tail drop: releasing on the row (not on a chip) moves to the end.
-      onDragOver={(e) => e.preventDefault()}
+      onDragOver={(e) => {
+        e.preventDefault()
+        if (dragId.current) setOverId('__tail__')
+      }}
       // A drag dropped OUTSIDE any chip/row still fires dragend on the source
       // (which bubbles here) : clear the pending id so it can't leak into the
       // next unrelated drop and silently reorder a stale unit.
       onDragEnd={() => {
         dragId.current = null
+        setOverId(null)
       }}
       onDrop={(e: DragEvent) => {
         e.preventDefault()
         if (dragId.current) reorderFx(scope, dragId.current, null)
         dragId.current = null
+        setOverId(null)
       }}
     >
       {leading}
       {fx.map((f, i) => (
-        <FxUnit
-          key={f.id}
-          f={f}
-          i={i}
-          count={fx.length}
-          scope={scope}
-          selected={selection?.type === 'fx' && selection.instId === f.id}
-          onDragStart={() => {
-            dragId.current = f.id
-          }}
-          onDropOn={() => {
-            if (dragId.current) reorderFx(scope, dragId.current, f.id)
-            dragId.current = null
-          }}
-        />
+        <Fragment key={f.id}>
+          {overId === f.id && dragId.current && dragId.current !== f.id && bar}
+          <FxUnit
+            f={f}
+            i={i}
+            count={fx.length}
+            scope={scope}
+            selected={selection?.type === 'fx' && selection.instId === f.id}
+            onDragStart={() => {
+              dragId.current = f.id
+            }}
+            onOver={() => setOverId(f.id)}
+            onDropOn={() => {
+              if (dragId.current) reorderFx(scope, dragId.current, f.id)
+              dragId.current = null
+              setOverId(null)
+            }}
+          />
+        </Fragment>
       ))}
+      {overId === '__tail__' && dragId.current && bar}
     </div>
   )
 }
@@ -133,7 +147,8 @@ function FxUnit({
   scope,
   selected,
   onDragStart,
-  onDropOn
+  onDropOn,
+  onOver
 }: {
   f: FxInstance
   i: number
@@ -142,6 +157,7 @@ function FxUnit({
   selected: boolean
   onDragStart?: () => void
   onDropOn?: () => void
+  onOver?: () => void
 }): JSX.Element {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const menuItems = useFxMenuItems(scope, f.id, f.shaderId, () => setMenu(null), !!f.locked)
@@ -209,7 +225,11 @@ function FxUnit({
       draggable={!menu}
       onContextMenu={onContextMenu}
       onDragStart={onDragStart}
-      onDragOver={(e) => e.preventDefault()}
+      onDragOver={(e) => {
+        e.preventDefault()
+        e.stopPropagation() // so the row's tail-drop indicator doesn't override this chip
+        onOver?.()
+      }}
       onDrop={(e) => {
         e.preventDefault()
         e.stopPropagation() // don't fall through to the row's tail drop
