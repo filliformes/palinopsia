@@ -53,17 +53,22 @@ export function ContextMenu({
     }
   }, [onClose])
 
-  // Keep the menu inside the viewport.
+  // Keep the whole menu inside the viewport : estimate its height, clamp the top
+  // so it never runs off the bottom, and cap + scroll when the list is very long
+  // (a layer/background with many saved presets used to spill off-screen).
+  const estH = Math.min(items.length * 28 + 40, window.innerHeight - 16)
+  const top = Math.max(8, Math.min(y, window.innerHeight - 8 - estH))
   const style: React.CSSProperties = {
     left: Math.min(x, window.innerWidth - 220),
-    top: Math.min(y, window.innerHeight - 40 * items.length - 20)
+    top,
+    maxHeight: window.innerHeight - top - 8
   }
 
   return (
     <div
       ref={ref}
       style={style}
-      className="fixed z-50 flex min-w-[180px] flex-col rounded border border-border bg-panel2 py-1 shadow-lg"
+      className="fixed z-50 flex min-w-[180px] flex-col overflow-y-auto rounded border border-border bg-panel2 py-1 shadow-lg"
     >
       {header && (
         <div className="border-b border-border px-3 py-1 font-mono text-[9px] uppercase tracking-wide text-muted">

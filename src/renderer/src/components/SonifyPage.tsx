@@ -422,6 +422,11 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   const set = (next: SoniConfig): void => setSonify(next)
   const patch = (p: Partial<SoniConfig>): void => set({ ...cfg, ...p })
   const [view, setView] = useState<'voices' | 'mixer'>('voices')
+  // The voice/mixer column is drag-resizable (persisted), like the Sequence page.
+  const [voiceW, setVoiceW] = useState(() => {
+    const v = Number(localStorage.getItem('opsia.soniVoiceW'))
+    return v >= 240 && v <= 640 ? v : 320
+  })
   const [presetList, setPresetList] = useState<string[]>(() => listSoniPresets())
   const [presetName, setPresetName] = useState('')
   // While the Sonify page is open, M toggles ITS Voices↔Mixer view. Capture phase
@@ -661,8 +666,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-bg">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b border-border px-3 py-2">
+      {/* Header : wraps gracefully on a narrow window instead of pushing controls off. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border px-3 py-2">
         <span className="text-[13px] font-semibold">Sonify</span>
         <button
           onClick={() => {
@@ -735,9 +740,10 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             onChange={(e) => patch({ master: Number(e.target.value) })}
             onDoubleClick={() => patch({ master: 0.8 })}
             className="w-28 accent-accent"
-            title={`Master gain ${cfg.master.toFixed(2)} (a peak limiter always guards the output)`}
+            title={`Master gain ${cfg.master.toFixed(2)} : double-click resets to 0.80 (a peak limiter always guards the output)`}
           />
         </span>
+        <span className="w-7 shrink-0 text-right font-mono text-[9px] text-muted">{cfg.master.toFixed(2)}</span>
         <div className="h-2 w-24 overflow-hidden rounded bg-panel3" title="Output level (orange = the limiter is working)">
           <div ref={meterRef} className="h-full w-0" />
         </div>
@@ -825,10 +831,37 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           </div>
         </div>
 
+        {/* Drag handle : resize the voice/mixer column (dragging left widens it). */}
+        <div
+          className="w-1 shrink-0 cursor-col-resize bg-border/60 transition-colors hover:bg-accent/60"
+          style={{ touchAction: 'none' }}
+          onPointerDown={(e) => {
+            const startX = e.clientX
+            const startW = voiceW
+            let last = startW
+            const el = e.currentTarget
+            el.setPointerCapture(e.pointerId)
+            const move = (ev: PointerEvent): void => {
+              last = Math.max(240, Math.min(640, startW + (startX - ev.clientX)))
+              setVoiceW(last)
+            }
+            const up = (): void => {
+              el.removeEventListener('pointermove', move)
+              el.removeEventListener('pointerup', up)
+              el.removeEventListener('pointercancel', up)
+              localStorage.setItem('opsia.soniVoiceW', String(Math.round(last)))
+            }
+            el.addEventListener('pointermove', move)
+            el.addEventListener('pointerup', up)
+            el.addEventListener('pointercancel', up)
+          }}
+          title="Drag to resize the voice column"
+        />
         {/* Voice strips : dimmed while the master engine is OFF, so the green
             "● on" pills don't read as live sound (still fully editable). */}
         <aside
-          className={`flex w-[320px] shrink-0 flex-col gap-2 overflow-y-auto border-l border-border bg-panel px-3 py-2 transition-opacity ${
+          style={{ width: voiceW }}
+          className={`flex shrink-0 flex-col gap-2 overflow-y-auto border-l border-border bg-panel px-3 py-2 transition-opacity ${
             cfg.on ? '' : 'opacity-50'
           }`}
         >
