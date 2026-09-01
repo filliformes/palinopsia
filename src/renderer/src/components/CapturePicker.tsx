@@ -1,7 +1,7 @@
 // CapturePicker : a modal grid of the machine's screens and windows (with live
 // thumbnails from the main process) for choosing a screen-capture source.
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { CaptureSourceInfo } from '@shared/types'
 
 export function CapturePicker({
@@ -13,20 +13,13 @@ export function CapturePicker({
 }): JSX.Element {
   const [sources, setSources] = useState<CaptureSourceInfo[] | null>(null)
 
-  useEffect(() => {
-    let alive = true
-    window.api
-      .captureListSources()
-      .then((s) => {
-        if (alive) setSources(s)
-      })
-      .catch(() => {
-        if (alive) setSources([])
-      })
-    return () => {
-      alive = false
-    }
+  // Re-enumerable : plug in a window/projector after opening and hit ⟳ rescan
+  // instead of having to close and reopen the modal.
+  const refresh = useCallback((): void => {
+    setSources(null)
+    window.api.captureListSources().then(setSources).catch(() => setSources([]))
   }, [])
+  useEffect(() => refresh(), [refresh])
 
   // Esc closes, matching every other modal in the app.
   useEffect(() => {
@@ -54,18 +47,35 @@ export function CapturePicker({
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-2">
           <span className="text-[13px] font-semibold">Choose a screen or window</span>
-          <button
-            onClick={onCancel}
-            className="rounded border border-border px-2 py-0.5 font-mono text-[11px] text-muted hover:text-text"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={refresh}
+              className="rounded border border-border px-2 py-0.5 font-mono text-[11px] text-muted hover:text-accent"
+              title="Rescan for screens / windows"
+            >
+              ⟳ rescan
+            </button>
+            <button
+              onClick={onCancel}
+              className="rounded border border-border px-2 py-0.5 font-mono text-[11px] text-muted hover:text-text"
+            >
+              ✕
+            </button>
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {sources === null ? (
             <div className="p-6 text-center text-[12px] text-muted">Enumerating sources…</div>
           ) : sources.length === 0 ? (
-            <div className="p-6 text-center text-[12px] text-muted">No capture sources found.</div>
+            <div className="flex flex-col items-center gap-2 p-6 text-center text-[12px] text-muted">
+              No capture sources found.
+              <button
+                onClick={refresh}
+                className="rounded border border-accent/50 bg-accent/10 px-2 py-0.5 font-mono text-[11px] text-accent hover:bg-accent/20"
+              >
+                ⟳ rescan
+              </button>
+            </div>
           ) : (
             <>
               {screens.length > 0 && <Group title="Screens" items={screens} onPick={onPick} />}

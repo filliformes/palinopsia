@@ -25,6 +25,13 @@ export function OscPanel(): JSX.Element {
   const [outPortStr, setOutPortStr] = useState(String(oscOutPort))
   const [last, setLast] = useState('')
   const dotRef = useRef<HTMLSpanElement | null>(null)
+  // A rejected port/host edit briefly flashes the field red instead of silently
+  // snapping back with no explanation.
+  const [invalid, setInvalid] = useState<'port' | 'outHost' | 'outPort' | null>(null)
+  const flashInvalid = (f: 'port' | 'outHost' | 'outPort'): void => {
+    setInvalid(f)
+    window.setTimeout(() => setInvalid((c) => (c === f ? null : c)), 700)
+  }
 
   useEffect(() => setPortStr(String(oscPort)), [oscPort])
   useEffect(() => setOutHostStr(oscOutHost), [oscOutHost])
@@ -57,6 +64,7 @@ export function OscPanel(): JSX.Element {
       if (oscEnabled) void applyOscListen()
     } else {
       setPortStr(String(oscPort))
+      flashInvalid('port')
     }
   }
   function toggleOut(): void {
@@ -70,6 +78,7 @@ export function OscPanel(): JSX.Element {
       if (oscOutEnabled) applyOscOutput()
     } else {
       setOutHostStr(oscOutHost)
+      flashInvalid('outHost')
     }
   }
   function commitOutPort(): void {
@@ -79,6 +88,7 @@ export function OscPanel(): JSX.Element {
       if (oscOutEnabled) applyOscOutput()
     } else {
       setOutPortStr(String(oscOutPort))
+      flashInvalid('outPort')
     }
   }
 
@@ -145,8 +155,8 @@ export function OscPanel(): JSX.Element {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
               }}
-              className="input w-16 px-1 py-0.5 text-right text-[11px]"
-              title="Local UDP port to listen on (Pandore sends here)"
+              className={`input w-16 px-1 py-0.5 text-right text-[11px] ${invalid === 'port' ? 'ring-1 ring-danger' : ''}`}
+              title="Local UDP port to listen on (Pandore sends here) — 1–65535"
             />
           </div>
 
@@ -218,7 +228,7 @@ export function OscPanel(): JSX.Element {
           onKeyDown={(e) => {
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
           }}
-          className="input w-20 px-1 py-0.5 text-[11px]"
+          className={`input w-20 px-1 py-0.5 text-[11px] ${invalid === 'outHost' ? 'ring-1 ring-danger' : ''}`}
           title="Destination host (Pandore's IP : 127.0.0.1 if same machine). Shared by FEEDBACK + MARK."
         />
         <span className="font-mono text-[9px] uppercase text-muted">:</span>
@@ -229,8 +239,8 @@ export function OscPanel(): JSX.Element {
           onKeyDown={(e) => {
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
           }}
-            className="input w-12 px-1 py-0.5 text-right text-[11px]"
-            title="Destination UDP port Pandore receives on"
+            className={`input w-12 px-1 py-0.5 text-right text-[11px] ${invalid === 'outPort' ? 'ring-1 ring-danger' : ''}`}
+            title="Destination UDP port Pandore receives on — 1–65535"
           />
           </div>
             </>

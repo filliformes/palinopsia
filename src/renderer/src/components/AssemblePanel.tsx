@@ -19,6 +19,7 @@ import {
 import { curveAt, edlDuration, generate } from '../assemble/match'
 import { liveDescriptor } from '../assemble/liveMatch'
 import { useStore } from '../store'
+import { ConfirmModal } from './PromptModal'
 
 const fmt = (s: number): string =>
   s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${s.toFixed(1)}s`
@@ -51,6 +52,7 @@ export function AssemblePanel(): JSX.Element {
 
   // The edit currently on the bench : generated but not necessarily saved.
   const [draft, setDraft] = useState<Assemblage | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [name, setName] = useState('')
   const [err, setErr] = useState('')
   const [showWeights, setShowWeights] = useState(false)
@@ -425,7 +427,7 @@ export function AssemblePanel(): JSX.Element {
                 <span className="shrink-0 font-mono text-[9px] text-muted">{fmt(edlDuration(a.clips))}</span>
                 <button
                   className="shrink-0 font-mono text-[10px] text-muted hover:text-danger"
-                  onClick={() => deleteAssemblage(a.id)}
+                  onClick={() => setDeleteTarget({ id: a.id, name: a.name })}
                   title="Delete"
                 >
                   ×
@@ -433,6 +435,16 @@ export function AssemblePanel(): JSX.Element {
               </div>
             ))}
           </div>
+          {deleteTarget && (
+            <ConfirmModal
+              title={`Delete the assemblage "${deleteTarget.name}"? Regenerating it re-analyses the whole folder.`}
+              onYes={() => {
+                deleteAssemblage(deleteTarget.id)
+                setDeleteTarget(null)
+              }}
+              onNo={() => setDeleteTarget(null)}
+            />
+          )}
         </Box>
       )}
     </div>

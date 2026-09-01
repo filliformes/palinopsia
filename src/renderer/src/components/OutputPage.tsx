@@ -4,6 +4,7 @@
 // alignment grid, projector/2nd-display output, and NDI / Spout senders.
 
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -148,7 +149,8 @@ export function OutputPage({
     }
   }, [canvasRef])
 
-  useEffect(() => {
+  // Re-enumerable : plug in a projector after opening the page and hit ⟳ rescan.
+  const refreshDisplays = useCallback((): void => {
     window.api
       .outputDisplays()
       .then((ds) => {
@@ -158,6 +160,7 @@ export function OutputPage({
       })
       .catch(() => setDisplays([]))
   }, [])
+  useEffect(() => refreshDisplays(), [refreshDisplays])
 
   const posFromEvent = (e: ReactPointerEvent): [number, number] => {
     const el = padRef.current
@@ -402,20 +405,29 @@ export function OutputPage({
           </Section>
 
           <Section title="Fullscreen output">
-            <select
-              className="input select-compact w-full text-[11px]"
-              value={displayId ?? ''}
-              onChange={(e) => setDisplayId(Number(e.target.value))}
-              disabled={outputActive}
-            >
-              {displays.length === 0 && <option value="">no displays</option>}
-              {displays.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.label} · {d.width}×{d.height}
-                  {d.isPrimary ? ' (primary)' : ''}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-1">
+              <select
+                className="input select-compact min-w-0 flex-1 text-[11px]"
+                value={displayId ?? ''}
+                onChange={(e) => setDisplayId(Number(e.target.value))}
+                disabled={outputActive}
+              >
+                {displays.length === 0 && <option value="">no displays</option>}
+                {displays.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.label} · {d.width}×{d.height}
+                    {d.isPrimary ? ' (primary)' : ''}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={refreshDisplays}
+                className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[11px] text-muted hover:text-accent"
+                title="Rescan for connected displays"
+              >
+                ⟳
+              </button>
+            </div>
             {outputActive ? (
               <button
                 onClick={closeOutput}

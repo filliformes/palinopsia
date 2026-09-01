@@ -55,6 +55,7 @@ export function HivePicker({
         <label className="flex items-center gap-2 text-[11px] text-muted">
           <span className="w-10 shrink-0 font-mono text-[9px] uppercase">port</span>
           <input
+            autoFocus
             className="input w-28 px-2 py-1 text-[12px]"
             value={port}
             onChange={(e) => setPort(e.target.value.replace(/[^0-9]/g, ''))}
@@ -71,7 +72,9 @@ export function HivePicker({
           </button>
           <button
             onClick={submit}
-            className="rounded border border-accent bg-accent/15 px-3 py-1 font-mono text-[11px] text-accent hover:bg-accent/25"
+            disabled={!(host.trim() && Number(port) > 0)}
+            className="rounded border border-accent bg-accent/15 px-3 py-1 font-mono text-[11px] text-accent hover:bg-accent/25 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-accent/15"
+            title={host.trim() && Number(port) > 0 ? 'Connect to the HIVE stream' : 'Enter a host and a port first'}
           >
             connect
           </button>
