@@ -147,7 +147,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
         <button
           onClick={() => modEngine.retrigger(index)}
           className="shrink-0 rounded bg-panel3/60 px-1 font-mono text-[9px] text-muted hover:text-accent"
-          title="Retrigger : restart ramp/ADSR/arp from zero"
+          title="Retrigger : re-sync this modulator to NOW — a running LFO / Euclid / Turing / Cellular / arp snaps back to the start of its cycle (line it up on a downbeat), and Ramp / ADSR / Riser restart from zero. Modulators that run on their own clock (Random / S&H / Slew / Chaos) or follow a signal (Audio / Vision) don't move."
         >
           ⟳
         </button>
