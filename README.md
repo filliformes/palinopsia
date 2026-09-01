@@ -60,7 +60,7 @@ racks, palette, World and macro biases — in one click.
 
 **The vocabulary**
 - [Sources](#sources-33-generators) (33 generators) · [Effects](#effects) (52 FX) ·
-  [Native nodes](#native-nodes) (19) · [Master finalizers](#master-finalizers--pinned-always-last)
+  [Native nodes](#native-nodes) (20) · [Master finalizers](#master-finalizers--pinned-always-last)
 - [Blend modes](#blend-modes) (18)
 
 **Control & internals**
@@ -179,7 +179,7 @@ Each of the **4 layers** carries:
 | **Source A / B** | Two source slots. Each holds a generator, an imported video (`🎞`), a capture (webcam `📷` / screen `🖥` / device `🎥`), a HIVE network stream (`📡`), or nothing. |
 | **A/B mix** (`MIX`) | `sourceBlend` (how B combines with A, incl. the relation modes Weave / Lumakey / Consume) · `sourceMix` (0 = A only … 1 = full B) · `harmony` (⚖ consonant → dissonant B hue). Inert until B has a source. |
 | **Source FX** | A separate effect rack under **each** source slot (`sourceAFx`, `sourceBFx`). |
-| **Layer FX** (`FX`) | The layer's own effect rack — the only rack that accepts the **sidechain** [native nodes](#native-nodes) (Transfert, Convolution); the self-contained nodes run in any rack. |
+| **Layer FX** (`FX`) | The layer's own effect rack — the only rack that accepts the **sidechain** [native nodes](#native-nodes) (Transfert, Convolution, Mosaïque); the self-contained nodes run in any rack. |
 | **Blend** (`BLEND`) | How the layer composites onto the stack below ([18 blend modes](#blend-modes)). |
 | **Mask** | A per-layer spatial mask beyond blend modes: **luma** (keyed off the layer's own brightness, lo/hi + soft knee), **gradient** (a directional wipe at any angle/position), or **shape** (a soft rect/ellipse window — centre, size, aspect, roundness), each invertible. Multiplies into the layer's alpha before the blend. |
 | **Opacity** | Header slider (0–1; double-click → 1). |
@@ -890,7 +890,7 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   Autocutter by subsequence.)
 - **Every effect, source and modulator names itself on hover** — a plain-English
   sentence or two on the item's name in the Inspector, saying what it does.
-- **Native nodes**: the two **sidechain** nodes (Transfert, Convolution) are
+- **Native nodes**: the three **sidechain** nodes (Transfert, Convolution, Mosaïque) are
   **Layer-FX only** — they read another layer as their input. The self-contained
   nodes run in any rack; Parallax runs in a layer or the Master rack (it needs the
   whole-picture depth map).
@@ -955,7 +955,7 @@ FX treat the whole composite before the finalizers.
 | **Hue Rotate** | Rotate the image's hue, optionally weighted by luminance — the missing colour primitive, beautiful under a slow LFO. |
 | **RGB Shift** | The three channels pulled apart geometrically (offset + independently scaled about centre) with an animated wobble — the channel-separation look. |
 | **Granular** | Video granular synthesis — the frame shattered into a grid of windowed grains, each rotated / scattered / scaled, with a persistent buffer for temporal smear. |
-| **Mosaic** | An analysis/resynthesis grid — each cell its average colour, redrawn as a tile whose size follows its luminance (bright swells, dark shrinks to nothing). |
+| **Tiles** | An analysis/resynthesis grid — each cell its average colour, redrawn as a tile whose size follows its luminance (bright swells, dark shrinks to nothing). |
 | **Optical Rain** | Shatters the image's edges into downward-drifting vertical streaks, each carrying a red/cyan disparity — a floating tactile texture under anaglyph 3D. |
 | **Phosphene** | The retinal afterimage that names the instrument — a bright stimulus burns a lingering complementary-colour negative ghost that slowly decays. |
 | **Compress** | Real intra-frame compression artefacts (the JPEG/MPEG keyframe look): macroblocks crushed toward DC + coarse low-frequency reconstruction, chroma subsampled so colour bleeds across luma edges. |
@@ -968,18 +968,19 @@ FX treat the whole composite before the finalizers.
 
 These run a TypeScript class behind a header-only ISF (so the auto-UI, presets and
 modulation still work). They keep **inter-frame state** — flow fields, frame rings,
-accumulators. The two **sidechain** nodes (Transfert, Convolution) read another layer,
-so they are **Layer-FX only** and get a layer picker in the Inspector; the
+accumulators. The three **sidechain** nodes (Transfert, Convolution, Mosaïque) read
+another layer, so they are **Layer-FX only** and get a layer picker in the Inspector; the
 **self-contained** nodes run in any rack (Faultline is happiest on the Master, where
 the whole programme glitches at once).
 
 <details>
-<summary><b>The full node catalogue (19)</b> (click to expand)</summary>
+<summary><b>The full node catalogue (20)</b> (click to expand)</summary>
 
 | Node | Description |
 |---|---|
 | **Transfert** | Imprint another layer's **motion** onto this one (optical-flow transfer) — *Déplacement* warps by the sidechain's flow, *Traînée* is a flow-steered line blur. |
 | **Convolution** | Treat another layer as a convolution **kernel** — every bright pixel of this layer stamps a scaled copy of the sidechain's shape, transferring its glare / texture / energy. |
+| **Mosaïque** | **Spatial concatenative synthesis** ([Assemble](#assemble--the-automatic-editor-key-e)'s sibling on the other axis; after CIS + Image-Melding). The frame is cut into patches, and each is replaced by the **corpus tile** (from the sidechain layer) whose colour + structure match best — tiles flip/rotate and **re-tint** to fit, matches **hold** across frames so it doesn't boil. Cell **shape** goes grid → **brick** → **voronoi** (organic polygons of varying size) → **warp** (a noise-bent grid), with an **irregular** amount and a **drift** that slowly evolves the shapes; **melt** softens the seams. |
 | **Réponse** | Temporal convolution — the layer's last 16 frames summed through a shaped attack/decay envelope (reversible): a convolution-reverb for image. |
 | **Feedback** | A full video-feedback engine (LZX-Memory-Palace-class) — the last frame re-sampled through a drifting off-centre transform + self-displacement, held at the edge of chaos by AGC + a noise floor. **Couple** runs a second buffer under a diverged transform and cross-mixes it (emergent behaviour no single loop shows); a delay-tap ring with **RGB delay** (channels sheared in time) and an echo **route** (back into the loop, or feedforward onto the output only); blend modes. A **keyer** gates what re-enters — on **luma** (key black / white) or **chroma** (key desaturated / colourful) — so only the keyed region trails; a **placement** switch puts the spatial process on the recirculating buffer (*feedback* : a wandering tunnel) or on the incoming live image (*painting* : the source smeared into a still accumulator that holds its shape); and a per-repeat **hue cycle** and **sat drift** bleach the trails toward grey or intensify them toward neon as they age. |
 | **Datamosh** | The codec-mosh look, real-time and codec-free: optical flow quantised to macroblocks advects a feedback buffer (the P-frame smear). Refresh (the I-frame) down + a scene cut = the bloom; **sticky/melt/fluid** modes; **actants** — sparse autonomous frozen patches that drift along the flow; **manifest** reveals a new source only where there's motion; auto-bloom on detected cuts; motion-transfer from a sidechain; **flow-shaping** — a **mosh gate** restricts the smear to moving or to still regions, **edge-repel** pushes the flow off the image's own contours, and **re-sharpen** claws back the mush. |

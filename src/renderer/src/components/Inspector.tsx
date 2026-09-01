@@ -256,10 +256,12 @@ export function Inspector(): JSX.Element {
           : `layer ${scope.layer + 1} · ${SCOPE_LABEL[scope.kind]}`
       onChange = (n, v) => setFxInput(scope, instId, n, v)
       modTargetFor = (input) => ({ kind: 'fx', scope, instId, input })
-      // Only the two SIDECHAIN nodes read a sidechain; the self-contained
+      // Only the SIDECHAIN nodes read a sidechain; the self-contained
       // nodes ignore it, so showing the picker for them is misleading.
       if (
-        (inst.shaderId === 'node-transfert' || inst.shaderId === 'node-convolve') &&
+        (inst.shaderId === 'node-transfert' ||
+          inst.shaderId === 'node-convolve' ||
+          inst.shaderId === 'node-mosaique') &&
         scope.kind === 'layer'
       ) {
         const sc = scope

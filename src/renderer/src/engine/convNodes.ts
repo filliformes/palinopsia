@@ -1048,6 +1048,176 @@ void main(){
   o = vec4(mix(host, held, uMix), 1.0);
 }`
 
+// ── Mosaïque : spatial concatenative synthesis (CIS + Image-Melding wins) ──
+// The sidechain frame IS the live corpus (a C×C grid of tiles); the host is the
+// target. Per-patch nearest-tile match on colour mean/variance + a directional
+// gradient, with orientation search, temporal stickiness (its own ping-pong,
+// cleared on Flush by node re-creation), a gain/bias re-tint and a seam melt.
+
+// Reduce one tile to (meanRGB, luma variance). Rendered at grid resolution.
+const F_MOSAIC_FEAT = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uSrc; uniform float uGrid; uniform int uTaps;
+void main(){
+  vec2 base = floor(vUV*uGrid)/uGrid;
+  float inv = 1.0/uGrid; int K = uTaps;
+  vec3 sum = vec3(0.0); float sumL2 = 0.0; float n = 0.0;
+  for(int y=0;y<16;y++){ if(y>=K) break;
+    for(int x=0;x<16;x++){ if(x>=K) break;
+      vec2 uv = base + (vec2(float(x),float(y))+0.5)/float(K)*inv;
+      vec3 c = texture(uSrc, uv).rgb;
+      float l = dot(c, vec3(0.299,0.587,0.114));
+      sum += c; sumL2 += l*l; n += 1.0;
+    }
+  }
+  vec3 mean = sum/max(n,1.0);
+  float meanL = dot(mean, vec3(0.299,0.587,0.114));
+  o = vec4(mean, max(0.0, sumL2/max(n,1.0) - meanL*meanL));
+}`
+
+// Mean SIGNED luma gradient of a tile (a directional signature for orient search).
+const F_MOSAIC_GRAD = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uSrc; uniform float uGrid; uniform int uTaps; uniform vec2 uPix;
+float lum(vec2 uv){ return dot(texture(uSrc,uv).rgb, vec3(0.299,0.587,0.114)); }
+void main(){
+  vec2 base = floor(vUV*uGrid)/uGrid;
+  float inv = 1.0/uGrid; int K = uTaps;
+  vec2 g = vec2(0.0); float n = 0.0;
+  for(int y=0;y<16;y++){ if(y>=K) break;
+    for(int x=0;x<16;x++){ if(x>=K) break;
+      vec2 uv = base + (vec2(float(x),float(y))+0.5)/float(K)*inv;
+      g += vec2(lum(uv+vec2(uPix.x,0.0))-lum(uv-vec2(uPix.x,0.0)),
+                lum(uv+vec2(0.0,uPix.y))-lum(uv-vec2(0.0,uPix.y)));
+      n += 1.0;
+    }
+  }
+  o = vec4(g/max(n,1.0), 0.0, 0.0);
+}`
+
+// Per target patch : nearest corpus tile (colour + structure), best orientation,
+// with stickiness + jitter. Writes (cx, cy, orient, valid) to the index texture.
+const F_MOSAIC_MATCH = `#version 300 es
+precision highp float; precision highp int; in vec2 vUV; out vec4 o;
+uniform sampler2D uTMean, uTGrad, uCMean, uCGrad, uPrev;
+uniform float uG, uC, uStructure, uStick, uJitter, uWVar, uWGrad;
+uniform int uCount, uMode;
+mat2 orientMat(int oi){ int r=oi&3; int f=(oi>>2)&1; float a=float(r)*1.5707963;
+  float c=cos(a),s=sin(a); mat2 R=mat2(c,-s,s,c);
+  mat2 F=(f==1)?mat2(-1.0,0.0,0.0,1.0):mat2(1.0,0.0,0.0,1.0); return R*F; }
+float hash(vec3 p){ return fract(sin(dot(p, vec3(12.9898,78.233,37.719)))*43758.5453); }
+float dist(vec3 tM, float tV, vec2 tG, vec3 cM, float cV, vec2 cG, int oi){
+  vec3 dC = tM - cM;
+  float colorD = dot(dC,dC) + uWVar*(tV-cV)*(tV-cV);
+  vec2 gd = tG - orientMat(oi)*cG;
+  float gradD = dot(gd,gd); if(!(gradD < 1e18)) gradD = 0.0;
+  // Colour ALWAYS carries part of the weight (never fully replaced), so a flat /
+  // degenerate gradient can't collapse the match onto one tile.
+  return mix(colorD, uWGrad*gradD, uStructure*0.85);
+}
+void main(){
+  vec2 patch = floor(vUV*uG); vec2 tuv = (patch+0.5)/uG;
+  vec4 tm = texture(uTMean, tuv); vec3 tMean = tm.rgb; float tVar = tm.a;
+  vec2 tGrad = texture(uTGrad, tuv).rg;
+  int norient = (uMode==0)?1:(uMode==1)?2:8;
+  int Ci = int(uC + 0.5);
+  float best = 1e20; float bcx = 0.0, bcy = 0.0; int bo = 0;
+  for(int i=0;i<1024;i++){
+    if(i>=uCount) break;
+    int cx = i % Ci; int cy = i / Ci;
+    vec2 cuv = (vec2(float(cx),float(cy))+0.5)/uC;
+    vec4 cm = texture(uCMean, cuv); vec3 cMean = cm.rgb; float cVar = cm.a;
+    vec2 cGrad = texture(uCGrad, cuv).rg;
+    float gBest = 1e20; int goBest = 0;
+    for(int k=0;k<8;k++){
+      if(k>=norient) break;
+      int oi = (uMode==1)? k*4 : k;
+      vec2 gd = tGrad - orientMat(oi)*cGrad; float gg = dot(gd,gd);
+      if(gg < gBest){ gBest = gg; goBest = oi; }
+    }
+    if(!(gBest < 1e18)) gBest = 0.0; // NaN / unset gradient must not swamp colour
+    vec3 dC = tMean - cMean;
+    float colorD = dot(dC,dC) + uWVar*(tVar-cVar)*(tVar-cVar);
+    float total = mix(colorD, uWGrad*gBest, uStructure*0.85);
+    total += uJitter*0.25*hash(vec3(patch, float(i)));
+    if(total < best){ best = total; bcx = float(cx); bcy = float(cy); bo = goBest; }
+  }
+  vec4 prev = texture(uPrev, tuv);
+  if(prev.a > 0.5 && uStick > 0.001){
+    int pcx = int(prev.r+0.5), pcy = int(prev.g+0.5), po = int(prev.b+0.5);
+    vec2 cuv = (vec2(float(pcx),float(pcy))+0.5)/uC;
+    vec4 cm = texture(uCMean, cuv); vec2 cGrad = texture(uCGrad, cuv).rg;
+    float heldD = dist(tMean, tVar, tGrad, cm.rgb, cm.a, cGrad, po);
+    if(best > heldD - uStick*0.25){ bcx = prev.r; bcy = prev.g; bo = po; }
+  }
+  o = vec4(bcx, bcy, float(bo), 1.0);
+}`
+
+// Full-res tiling : sample the matched corpus tile (oriented), re-tint toward the
+// target patch mean (gain/bias), and melt seams by blending toward neighbours.
+const F_MOSAIC_RENDER = `#version 300 es
+precision highp float; precision highp int; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uSide, uIndex, uCMean, uTMean;
+uniform float uG, uC, uCorrect, uMelt, uGain, uMix, uIrregular, uTime;
+uniform int uShape; // 0 grid · 1 brick · 2 voronoi · 3 warp
+mat2 orientMat(int oi){ int r=oi&3; int f=(oi>>2)&1; float a=float(r)*1.5707963;
+  float c=cos(a),s=sin(a); mat2 R=mat2(c,-s,s,c);
+  mat2 F=(f==1)?mat2(-1.0,0.0,0.0,1.0):mat2(1.0,0.0,0.0,1.0); return R*F; }
+float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+vec2 h22(vec2 p){ return fract(sin(vec2(dot(p,vec2(127.1,311.7)), dot(p,vec2(269.5,183.3))))*43758.5453); }
+float vnoise(vec2 p){ vec2 i=floor(p), f=fract(p); vec2 u=f*f*(3.0-2.0*f);
+  return mix(mix(h21(i),h21(i+vec2(1,0)),u.x), mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),u.x), u.y); }
+vec3 tileAt(vec2 cell, vec2 local){
+  cell = clamp(cell, vec2(0.0), vec2(uG-1.0));
+  vec2 ic = (cell+0.5)/uG;
+  vec4 idx = texture(uIndex, ic);
+  vec2 cc = idx.rg; int oi = int(idx.b+0.5);
+  vec2 ol = orientMat(oi)*(local-0.5)+0.5; ol = clamp(ol, 0.0, 1.0);
+  vec3 col = texture(uSide, (cc+ol)/uC).rgb;
+  vec3 cM = texture(uCMean, (cc+0.5)/uC).rgb;
+  vec3 tM = texture(uTMean, ic).rgb;
+  return col + (tM - cM)*uCorrect;
+}
+void main(){
+  vec2 pg = vUV*uG;
+  vec3 mosaic;
+  if(uShape==2){
+    // Voronoi : jittered seeds → organic polygons of varying size. Drift wobbles
+    // the seeds over time; melt blends across the nearest edge.
+    vec2 base = floor(pg);
+    float d1=1e9, d2=1e9; vec2 c1=base, c2=base;
+    for(int y=-1;y<=1;y++){ for(int x=-1;x<=1;x++){
+      vec2 nc = base + vec2(float(x),float(y));
+      float a = h21(nc)*6.2831853;
+      vec2 seed = nc + 0.5 + uIrregular*0.5*((h22(nc)-0.5)*2.0 + 0.35*vec2(sin(uTime+a), cos(uTime*1.1+a)));
+      float d = distance(pg, seed);
+      if(d<d1){ d2=d1; c2=c1; d1=d; c1=nc; } else if(d<d2){ d2=d; c2=nc; }
+    }}
+    vec3 t1 = tileAt(c1, clamp(pg-c1, 0.0, 1.0));
+    if(uMelt > 0.001){
+      vec3 t2 = tileAt(c2, clamp(pg-c2, 0.0, 1.0));
+      float bw = clamp((d2-d1)/(uMelt*0.7+0.001), 0.0, 1.0); // 0 at edge → 1 interior
+      mosaic = mix(t2, t1, 0.5+0.5*bw);
+    } else mosaic = t1;
+  } else {
+    // grid / brick / warp : a (possibly transformed) regular grid + seam melt.
+    vec2 pp = pg;
+    if(uShape==1){ float row=floor(pp.y); pp.x += uIrregular*(0.5*mod(row,2.0) + 0.35*(h21(vec2(row,7.0))-0.5)); }
+    else if(uShape==3){ vec2 wv=vec2(vnoise(vUV*3.0+uTime), vnoise(vUV*3.0+5.2-uTime))*2.0-1.0; pp = pg + uIrregular*1.3*wv; }
+    vec2 cell = floor(pp); vec2 local = pp - cell;
+    vec2 edge = abs(local-0.5)*2.0;
+    vec2 w = smoothstep(vec2(1.0-uMelt), vec2(1.0), edge)*0.5;
+    vec2 dir = step(0.5, local)*2.0 - 1.0;
+    vec3 c   = tileAt(cell, local);
+    vec3 cx  = tileAt(cell+vec2(dir.x,0.0), local);
+    vec3 cy  = tileAt(cell+vec2(0.0,dir.y), local);
+    vec3 cxy = tileAt(cell+dir, local);
+    mosaic = c*(1.0-w.x)*(1.0-w.y) + cx*w.x*(1.0-w.y) + cy*(1.0-w.x)*w.y + cxy*w.x*w.y;
+  }
+  vec3 dry = texture(uHost, vUV).rgb;
+  o = vec4(mix(dry, mosaic*uGain, uMix), 1.0);
+}`
+
 class NodeGL {
   quad: WebGLBuffer
   downsample: Prog
@@ -1085,6 +1255,10 @@ class NodeGL {
   toileTensor: Prog
   toileTBlur: Prog
   toile: Prog
+  mosaicFeat: Prog
+  mosaicGrad: Prog
+  mosaicMatch: Prog
+  mosaicRender: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -1125,6 +1299,10 @@ class NodeGL {
     this.toileTensor = this.build(F_TOILE_TENSOR)
     this.toileTBlur = this.build(F_TOILE_TBLUR)
     this.toile = this.build(F_TOILE)
+    this.mosaicFeat = this.build(F_MOSAIC_FEAT)
+    this.mosaicGrad = this.build(F_MOSAIC_GRAD)
+    this.mosaicMatch = this.build(F_MOSAIC_MATCH)
+    this.mosaicRender = this.build(F_MOSAIC_RENDER)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -1417,6 +1595,141 @@ export class ConvolveNode implements ConvNode {
   dispose(): void {
     this.disposed = true
     if (this.wet) { this.gl.deleteTexture(this.wet.tex); this.gl.deleteFramebuffer(this.wet.fbo); this.wet = null }
+  }
+}
+
+// ── Mosaïque : spatial concatenative synthesis (native, sidechain) ────────
+const CORPUS_SIDES = [8, 16, 24, 32]
+function setNearest(gl: WebGL2RenderingContext, tex: WebGLTexture): void {
+  gl.bindTexture(gl.TEXTURE_2D, tex)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+}
+
+export class MosaiqueNode implements ConvNode {
+  private G = 0
+  private C = 0
+  private cMean!: RGBA // corpus tile mean+var (C×C)
+  private cGrad!: RGBA // corpus tile signed gradient in .rg (C×C)
+  private tMean!: RGBA // target patch mean+var (G×G)
+  private tGrad!: RGBA // target patch gradient in .rg (G×G)
+  private idxA!: RGBA // index-map ping-pong (G×G) : (cx, cy, orient, valid)
+  private idxB!: RGBA
+  private readIsA = true
+  private phase = 0 // accumulated time for drift (frozen while drift = 0)
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+
+  private clear(t: RGBA | RG, n: number): void {
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo); gl.viewport(0, 0, n, n)
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT)
+  }
+
+  private ensure(G: number, C: number): void {
+    const gl = this.gl
+    if (this.C !== C) {
+      for (const t of [this.cMean, this.cGrad]) if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo) }
+      this.cMean = makeRGBA(gl, C, C, true); setNearest(gl, this.cMean.tex); this.clear(this.cMean, C)
+      this.cGrad = makeRGBA(gl, C, C, true); setNearest(gl, this.cGrad.tex); this.clear(this.cGrad, C)
+      this.C = C
+    }
+    if (this.G !== G) {
+      for (const t of [this.tMean, this.tGrad, this.idxA, this.idxB]) if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo) }
+      this.tMean = makeRGBA(gl, G, G, true); setNearest(gl, this.tMean.tex); this.clear(this.tMean, G)
+      this.tGrad = makeRGBA(gl, G, G, true); setNearest(gl, this.tGrad.tex); this.clear(this.tGrad, G)
+      // The index map starts empty (valid=0) so stickiness has nothing to hold.
+      this.idxA = makeRGBA(gl, G, G, true); setNearest(gl, this.idxA.tex); this.clear(this.idxA, G)
+      this.idxB = makeRGBA(gl, G, G, true); setNearest(gl, this.idxB.tex); this.clear(this.idxB, G)
+      this.readIsA = true
+      this.G = G
+    }
+  }
+
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed || !ctx.sidechain) return ctx.host // needs a corpus (sidechain)
+    const inp = ctx.inputs
+    if (clampf(num(inp.mix, 0.85), 0, 1) <= 0.001) return ctx.host
+    const gl = ctx.gl
+    const g = nodeGL(gl)
+    const fullW = ctx.chain.w, fullH = ctx.chain.h
+    const G = Math.max(2, Math.min(64, Math.round(num(inp.tile, 24))))
+    const C = CORPUS_SIDES[Math.max(0, Math.min(3, Math.round(num(inp.corpus, 1))))]
+    this.ensure(G, C)
+    const K = 8
+    const draw = (fbo: WebGLFramebuffer, w: number, h: number): void => {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, w, h); gl.drawArrays(gl.TRIANGLES, 0, 3)
+    }
+    const bind = (unit: number, tex: WebGLTexture): void => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex) }
+    const pix: [number, number] = [1 / Math.max(1, fullW), 1 / Math.max(1, fullH)]
+
+    // ── Descriptors : corpus (from the sidechain) + target (from the host) ──
+    let p = g.use(g.mosaicFeat)
+    bind(0, ctx.sidechain); gl.uniform1i(p.u('uSrc'), 0)
+    gl.uniform1f(p.u('uGrid'), C); gl.uniform1i(p.u('uTaps'), K)
+    draw(this.cMean.fbo, C, C)
+    p = g.use(g.mosaicGrad)
+    bind(0, ctx.sidechain); gl.uniform1i(p.u('uSrc'), 0)
+    gl.uniform1f(p.u('uGrid'), C); gl.uniform1i(p.u('uTaps'), K); gl.uniform2f(p.u('uPix'), pix[0], pix[1])
+    draw(this.cGrad.fbo, C, C)
+    p = g.use(g.mosaicFeat)
+    bind(0, ctx.host); gl.uniform1i(p.u('uSrc'), 0)
+    gl.uniform1f(p.u('uGrid'), G); gl.uniform1i(p.u('uTaps'), K)
+    draw(this.tMean.fbo, G, G)
+    p = g.use(g.mosaicGrad)
+    bind(0, ctx.host); gl.uniform1i(p.u('uSrc'), 0)
+    gl.uniform1f(p.u('uGrid'), G); gl.uniform1i(p.u('uTaps'), K); gl.uniform2f(p.u('uPix'), pix[0], pix[1])
+    draw(this.tGrad.fbo, G, G)
+
+    // ── Match → index map (ping-pong for stickiness) ──
+    const idxRead = this.readIsA ? this.idxA : this.idxB
+    const idxWrite = this.readIsA ? this.idxB : this.idxA
+    p = g.use(g.mosaicMatch)
+    bind(0, this.tMean.tex); gl.uniform1i(p.u('uTMean'), 0)
+    bind(1, this.tGrad.tex); gl.uniform1i(p.u('uTGrad'), 1)
+    bind(2, this.cMean.tex); gl.uniform1i(p.u('uCMean'), 2)
+    bind(3, this.cGrad.tex); gl.uniform1i(p.u('uCGrad'), 3)
+    bind(4, idxRead.tex); gl.uniform1i(p.u('uPrev'), 4)
+    gl.uniform1f(p.u('uG'), G); gl.uniform1f(p.u('uC'), C)
+    gl.uniform1i(p.u('uCount'), C * C)
+    gl.uniform1i(p.u('uMode'), Math.max(0, Math.min(2, Math.round(num(inp.orient, 1)))))
+    gl.uniform1f(p.u('uStructure'), clampf(num(inp.structure, 0.4), 0, 1))
+    gl.uniform1f(p.u('uStick'), clampf(num(inp.stick, 0.6), 0, 1))
+    gl.uniform1f(p.u('uJitter'), clampf(num(inp.jitter, 0.1), 0, 1))
+    gl.uniform1f(p.u('uWVar'), 0.5)
+    gl.uniform1f(p.u('uWGrad'), 3.0)
+    draw(idxWrite.fbo, G, G)
+    this.readIsA = !this.readIsA
+
+    // ── Render : tile the frame from the matched corpus ──
+    const out = ctx.chain.next()
+    p = g.use(g.mosaicRender)
+    bind(0, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    bind(1, ctx.sidechain); gl.uniform1i(p.u('uSide'), 1)
+    bind(2, idxWrite.tex); gl.uniform1i(p.u('uIndex'), 2)
+    bind(3, this.cMean.tex); gl.uniform1i(p.u('uCMean'), 3)
+    bind(4, this.tMean.tex); gl.uniform1i(p.u('uTMean'), 4)
+    gl.uniform1f(p.u('uG'), G); gl.uniform1f(p.u('uC'), C)
+    gl.uniform1f(p.u('uCorrect'), clampf(num(inp.correct, 0.5), 0, 1))
+    gl.uniform1f(p.u('uMelt'), clampf(num(inp.melt, 0.3), 0, 1))
+    gl.uniform1f(p.u('uGain'), Math.max(0, num(inp.gain, 1)))
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 0.85), 0, 1))
+    // Cell shape (grid/brick/voronoi/warp), its irregularity, and drift (only
+    // advances the phase clock while > 0, so shapes hold still at drift 0).
+    this.phase += clampf(ctx.dt, 0, 0.1) * clampf(num(inp.drift, 0), 0, 1) * 0.6
+    gl.uniform1i(p.u('uShape'), Math.max(0, Math.min(3, Math.round(num(inp.shape, 2)))))
+    gl.uniform1f(p.u('uIrregular'), clampf(num(inp.irregular, 0.5), 0, 1))
+    gl.uniform1f(p.u('uTime'), this.phase)
+    draw(out.fbo, fullW, fullH)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return out.tex
+  }
+
+  dispose(): void {
+    this.disposed = true
+    const gl = this.gl
+    for (const t of [this.cMean, this.cGrad, this.tMean, this.tGrad, this.idxA, this.idxB])
+      if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo) }
   }
 }
 
@@ -3379,6 +3692,7 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   if (shaderId === 'node-toile') return new ToileNode(gl)
   if (shaderId === 'node-transfert') return new TransfertNode(gl)
   if (shaderId === 'node-convolve') return new ConvolveNode(gl)
+  if (shaderId === 'node-mosaique') return new MosaiqueNode(gl)
   if (shaderId === 'node-reponse') return new ReponseNode(gl)
   if (shaderId === 'node-feedback') return new FeedbackNode(gl)
   if (shaderId === 'node-datamosh') return new DatamoshNode(gl)
@@ -3389,6 +3703,6 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

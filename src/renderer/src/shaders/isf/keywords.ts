@@ -13,6 +13,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   // ── Native FX nodes ──────────────────────────────────────────────────
   'node-transfert': ['warp', 'optical flow', 'displace', 'sidechain', 'motion'],
   'node-convolve': ['convolution', 'kernel', 'bloom', 'stamp', 'impulse'],
+  'node-mosaique': ['mosaic', 'mosaique', 'concatenative', 'tiles', 'photomosaic', 'patch', 'match', 'sidechain'],
   'node-reponse': ['delay', 'echo', 'reverb', 'trails', 'temporal'],
   'node-feedback': ['feedback', 'reverb', 'trails', 'tunnel', 'recursion'],
   'node-datamosh': ['datamosh', 'glitch', 'codec', 'smear', 'motion'],
@@ -56,7 +57,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   'fx-granular': ['granular', 'grains', 'shatter', 'scatter', 'texture'],
   'fx-hue-rotate': ['hue', 'color', 'rotate', 'shift', 'tint', 'filter'],
   'fx-light-trails': ['trails', 'delay', 'echo', 'long exposure', 'feedback'],
-  'fx-mosaic': ['mosaic', 'pixelate', 'tiles', 'blocks', 'downsample'],
+  'fx-mosaic': ['tiles', 'grid', 'mosaic', 'pixelate', 'blocks', 'downsample'],
   'fx-mosh-blocks': ['glitch', 'datamosh', 'blocks', 'bitcrush', 'corrupt'],
   'fx-motif': ['echo', 'counterpoint', 'delay', 'transpose', 'repeat'],
   'fx-ntsc': ['ntsc', 'vhs', 'retro', 'dot crawl', 'composite'],

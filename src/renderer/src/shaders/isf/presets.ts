@@ -37,6 +37,18 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Hard bloom', values: { scale: 0.8, taps: 8, threshold: 0.25, kernelGamma: 1.4, boost: 0.6, gain: 1.5, mix: 0.65, additive: 1 } },
     { name: 'Ghost print', values: { scale: 1.1, taps: 9, threshold: 0.15, kernelGamma: 1.1, boost: 0.1, gain: 1.0, mix: 0.5, additive: 0 } }
   ],
+  'node-mosaique': [
+    { name: 'Fine mosaic', values: { tile: 32, corpus: 2, structure: 0.5, orient: 1, correct: 0.6, melt: 0.3, stick: 0.7, jitter: 0.1, shape: 0, irregular: 0.5, drift: 0, gain: 1.0, mix: 1.0 } },
+    { name: 'Coarse blocks', values: { tile: 10, corpus: 1, structure: 0.3, orient: 0, correct: 0.7, melt: 0.2, stick: 0.6, jitter: 0.05, shape: 0, irregular: 0.5, drift: 0, gain: 1.0, mix: 1.0 } },
+    { name: 'Photomosaic', values: { tile: 44, corpus: 3, structure: 0.6, orient: 2, correct: 0.8, melt: 0.25, stick: 0.8, jitter: 0.05, shape: 0, irregular: 0.5, drift: 0, gain: 1.0, mix: 1.0 } },
+    { name: 'Organic cells', values: { tile: 22, corpus: 2, structure: 0.5, orient: 2, correct: 0.6, melt: 0.4, stick: 0.75, jitter: 0.1, shape: 2, irregular: 0.7, drift: 0.15, gain: 1.0, mix: 1.0 } },
+    { name: 'Living warp', values: { tile: 26, corpus: 2, structure: 0.45, orient: 2, correct: 0.6, melt: 0.35, stick: 0.7, jitter: 0.1, shape: 3, irregular: 0.6, drift: 0.4, gain: 1.0, mix: 1.0 } },
+    { name: 'Brick wall', values: { tile: 18, corpus: 1, structure: 0.35, orient: 1, correct: 0.6, melt: 0.2, stick: 0.7, jitter: 0.08, shape: 1, irregular: 0.8, drift: 0, gain: 1.0, mix: 1.0 } },
+    { name: 'Melted cells', values: { tile: 20, corpus: 2, structure: 0.4, orient: 2, correct: 0.5, melt: 0.75, stick: 0.7, jitter: 0.15, shape: 2, irregular: 0.55, drift: 0.1, gain: 1.0, mix: 0.9 } },
+    { name: 'Raw corpus', values: { tile: 24, corpus: 1, structure: 0.3, orient: 1, correct: 0.0, melt: 0.2, stick: 0.5, jitter: 0.2, shape: 0, irregular: 0.5, drift: 0, gain: 1.0, mix: 1.0 } },
+    { name: 'Boiling swap', values: { tile: 18, corpus: 2, structure: 0.4, orient: 1, correct: 0.5, melt: 0.3, stick: 0.0, jitter: 0.35, shape: 2, irregular: 0.45, drift: 0.5, gain: 1.0, mix: 0.9 } },
+    { name: 'Colour tiles', values: { tile: 16, corpus: 1, structure: 0.15, orient: 0, correct: 0.4, melt: 0.15, stick: 0.65, jitter: 0.1, shape: 0, irregular: 0.5, drift: 0, gain: 1.0, mix: 1.0 } }
+  ],
   'node-reponse': [
     { name: 'Short echo', values: { length: 6, decay: 0.3, attack: 0, gain: 1.0, reverse: 0, mix: 0.5 } },
     { name: 'Room', values: { length: 10, decay: 0.5, attack: 0.1, gain: 1.0, reverse: 0, mix: 0.6 } },

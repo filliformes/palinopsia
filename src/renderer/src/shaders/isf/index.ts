@@ -73,7 +73,7 @@ import wideTime from './fx/WideTime.fs?raw'
 import hueRotate from './fx/HueRotate.fs?raw'
 import rgbShift from './fx/RgbShift.fs?raw'
 import granular from './fx/Granular.fs?raw'
-import mosaic from './fx/Mosaic.fs?raw'
+import tiles from './fx/Tiles.fs?raw'
 import syncLoss from './fx/SyncLoss.fs?raw'
 import rowEcho from './fx/RowEcho.fs?raw'
 import byteCorrupt from './fx/ByteCorrupt.fs?raw'
@@ -172,6 +172,40 @@ export const NATIVE_NODES: IsfShader[] = [
     curated: {
       scale: [0.3, 1.2], taps: [5, 10], threshold: [0.05, 0.4], kernelGamma: [0.6, 2.0],
       boost: [0, 0.6], gain: [0.6, 1.8], mix: [0.4, 0.9]
+    }
+  },
+  {
+    // Mosaïque (MosaiqueNode) : spatial concatenative synthesis. The sidechain
+    // frame is a live corpus of tiles; each host patch is replaced by the tile
+    // whose colour + structure match best (nearest-neighbour, orientation search,
+    // gain/bias re-tint, seam melt, temporal stickiness). Native (engine/convNodes).
+    id: 'node-mosaique',
+    name: 'Mosaïque',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Mosaïque : rebuild this layer as a live mosaic of another. The frame is cut into patches; each is replaced by the corpus tile (from the sidechain layer) whose colour + structure match best — tiles flip/rotate and re-tint to fit, seams melt, and matches hold across frames so it doesn't boil. Spatial concatenation, Assemble's sibling on the other axis. Pick the corpus layer in the Inspector.",
+      "CATEGORIES": ["FX", "Convolution"],
+      "INPUTS": [
+        { "NAME": "tile", "TYPE": "float", "MIN": 4.0, "MAX": 64.0, "DEFAULT": 24.0, "LABEL": "tile" },
+        { "NAME": "corpus", "TYPE": "long", "VALUES": [0,1,2,3], "LABELS": ["64","256","576","1024"], "DEFAULT": 1, "LABEL": "corpus" },
+        { "NAME": "structure", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.40, "LABEL": "structure" },
+        { "NAME": "orient", "TYPE": "long", "VALUES": [0,1,2], "LABELS": ["off","flip","rotate"], "DEFAULT": 1, "LABEL": "orient" },
+        { "NAME": "correct", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.50, "LABEL": "recolor" },
+        { "NAME": "melt", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.30, "LABEL": "melt" },
+        { "NAME": "stick", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.60, "LABEL": "stick" },
+        { "NAME": "jitter", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.10, "LABEL": "jitter" },
+        { "NAME": "shape", "TYPE": "long", "VALUES": [0,1,2,3], "LABELS": ["grid","brick","voronoi","warp"], "DEFAULT": 2, "LABEL": "shape" },
+        { "NAME": "irregular", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "irregular" },
+        { "NAME": "drift", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "drift" },
+        { "NAME": "gain", "TYPE": "float", "MIN": 0.0, "MAX": 3.0, "DEFAULT": 1.0, "LABEL": "gain" },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.85, "LABEL": "mix" }
+      ]
+    }*/`,
+    curated: {
+      tile: [10, 40], structure: [0.2, 0.7], correct: [0.3, 0.8],
+      melt: [0.1, 0.6], stick: [0.4, 0.85], jitter: [0, 0.35],
+      irregular: [0.2, 0.8], drift: [0, 0.5], gain: [0.8, 1.4], mix: [0.5, 1.0]
     }
   },
   {
@@ -1263,7 +1297,9 @@ export const FX_SHADERS: IsfShader[] = [
     curated: { grain: [0.2, 0.8], density: [0.5, 1], scatter: [0, 0.5], rotate: [0, 0.5], smear: [0, 0.6], rate: [0.1, 3] }
   },
   {
-    id: 'fx-mosaic', name: 'Mosaic', category: 'FX', source: mosaic,
+    // Historically id 'fx-mosaic' (kept stable for saved sessions/presets); the
+    // display name is now Tiles, since Mosaïque (node-mosaique) is the concatenative one.
+    id: 'fx-mosaic', name: 'Tiles', category: 'FX', source: tiles,
     curated: { grid: [0.2, 0.7], size: [0.5, 1], lumaSize: [0.2, 0.9], soft: [0.02, 0.2], gapMix: [0, 0.4] }
   },
   {

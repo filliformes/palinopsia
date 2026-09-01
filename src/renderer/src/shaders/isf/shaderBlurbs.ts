@@ -134,6 +134,8 @@ export const SHADER_BLURBS: Record<string, string> = {
     'Takes the MOVEMENT of another layer and imprints it onto this one. The chosen layer never appears; only its motion does, either pushing this picture around or smearing it along the direction that layer is travelling. Pick which layer to read in the Inspector.',
   'node-convolve':
     'Treats another layer as a stamp, and prints a copy of its shape at every bright point of this one. Whatever texture or glare the other layer has is transferred onto this image. Because the stamp can be a live layer, the signature it imprints keeps changing.',
+  'node-mosaique':
+    'Rebuilds this image as a mosaic of another. The frame is cut into patches, and each is swapped for the tile of the other layer that best matches its colour and structure — tiles turn and re-tint to fit, seams melt, and matches hold across frames so it does not flicker. Pick which layer supplies the tiles in the Inspector.',
   'node-reponse':
     'Sums this layer’s last several frames through a shaped envelope, so trails swell and fade with a rhythm instead of decaying evenly. It is the visual equivalent of a reverb tail. Uses only its own history, so it needs no other layer.',
   'node-feedback':
