@@ -1,6 +1,6 @@
 {
   "name": "palinopsia",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Palinopsia (Opsia) — an OSC-controlled ISF visual instrument. A lightweight Electron + WebGL2 four-layer compositor with blend modes, feedback, per-source/per-layer/master ISF FX racks, a modulation brain, and a curated Randomize button — the visual sibling to dataFLOU, played over OSC by Pandore. Glitchy, deep, digital-arts; never cheap psychedelia.",
   "main": "out/main/index.js",
   "author": {
