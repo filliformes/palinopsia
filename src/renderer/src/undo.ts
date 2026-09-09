@@ -218,6 +218,26 @@ function describeDiff(a: Snapshot, b: Snapshot): string {
   return 'change'
 }
 
+// Coalesce a burst of undos/redos (holding Ctrl+Z) into ONE toast so it never
+// nags : it fires ~260 ms after the LAST step, naming that step and, for a
+// burst, how many were rolled together.
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+let toastDir = ''
+let toastLabel = ''
+let toastCount = 0
+function notifyHistory(dir: string, label: string): void {
+  if (dir !== toastDir) toastCount = 0 // a direction flip restarts the tally
+  toastDir = dir
+  toastLabel = label
+  toastCount++
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    showToast(`${toastDir} · ${toastLabel}${toastCount > 1 ? ` ×${toastCount}` : ''}`)
+    toastTimer = null
+    toastCount = 0
+  }, 260)
+}
+
 export function undo(): void {
   flushPending()
   const prev = past.pop()
@@ -228,7 +248,7 @@ export function undo(): void {
   apply(prev)
   committed = prev
   bump()
-  showToast(`Undone · ${describeDiff(prev, cur)}`)
+  notifyHistory('Undone', describeDiff(prev, cur))
 }
 
 export function redo(): void {
@@ -241,7 +261,7 @@ export function redo(): void {
   apply(next)
   committed = next
   bump()
-  showToast(`Redone · ${describeDiff(next, cur)}`)
+  notifyHistory('Redone', describeDiff(next, cur))
 }
 
 export function canUndo(): boolean {

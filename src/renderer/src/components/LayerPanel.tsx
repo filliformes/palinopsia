@@ -685,7 +685,7 @@ function SourceRow({
             showToast(
               `"${file.name}" is ${probe.codec ?? 'a codec'} the player can't read — install ffmpeg to import it (add to PATH, npm i ffmpeg-static, or set OPSIA_FFMPEG)`,
               'warn',
-              7000
+              0 // sticky : an install instruction shouldn't vanish on a timer
             )
             return
           }

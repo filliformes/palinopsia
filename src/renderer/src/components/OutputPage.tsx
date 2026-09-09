@@ -195,7 +195,7 @@ export function OutputPage({
           ? 'NDI sender not available — install the optional grandiose module + NDI runtime'
           : 'Spout sender not available — add a Spout addon (leadedge SDK) for Windows',
         'warn',
-        7000
+        0 // sticky : an install instruction shouldn't vanish on a timer
       )
     }
   }
