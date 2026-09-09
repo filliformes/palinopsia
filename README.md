@@ -35,8 +35,10 @@ racks, palette, World and macro biases — in one click.
 
 | | | |
 |---|---|---|
-| ![Cut-Up](docs/images/visual-cut-up.jpg)<br>**Cut-Up** — Autocutter's torn, curved, still-tessellating collage | ![Constructivist](docs/images/visual-constructivist.jpg)<br>**Constructivist** — hard slabs, one accent | ![Mycelial](docs/images/visual-mycelial.jpg)<br>**Mycelial** — reaction-diffusion filaments |
-| ![Op Field](docs/images/visual-op-field.jpg)<br>**Op Field** — Riley/Vasarely optical grids | ![Cathode Ray](docs/images/visual-cathode-ray.jpg)<br>**Cathode Ray** — analog video-synthesis lineage | ![Pixel Sort](docs/images/visual-pixel-sort.jpg)<br>**Pixel Sort** — the datamosh / compression family |
+| ![Op-Art](docs/images/shot-opart.jpg)<br>**Op-Art** : a grid warped and folded until it breathes | ![Datamosh](docs/images/shot-datamosh.jpg)<br>**Datamosh** : a slit-scan torn into RGB compression noise | ![Mycelial](docs/images/shot-mycelial.jpg)<br>**Mycelial** : reaction-diffusion filaments, grown then eroded |
+| ![Cathode Ray](docs/images/shot-crt.jpg)<br>**Cathode Ray** : phosphor scanlines, one colour on black | ![Analog moiré](docs/images/shot-moire.jpg)<br>**Analog moiré** : a wobbulated interference field | ![Cut-Up](docs/images/visual-cut-up.jpg)<br>**Cut-Up** : a wall of films, each in its own torn piece |
+
+*(These frames are fresh from v1.0.0. The older shots stay in `docs/images/`.)*
 
 ---
 
