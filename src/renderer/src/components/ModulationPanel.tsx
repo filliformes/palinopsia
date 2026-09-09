@@ -115,7 +115,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
         <span className="font-mono text-[10px] text-muted">M{index + 1}</span>
         {drives > 0 && (
           <span
-            className="shrink-0 rounded bg-accent/15 px-1 font-mono text-[9px] leading-4 text-accent"
+            className="shrink-0 font-mono text-[9px] leading-4 text-accent"
             title={`Drives ${drives} parameter${drives === 1 ? '' : 's'} in the matrix`}
           >
             →{drives}

@@ -71,7 +71,7 @@ export function ContextMenu({
       className="fixed z-50 flex min-w-[180px] flex-col overflow-y-auto rounded border border-border bg-panel2 py-1 shadow-lg"
     >
       {header && (
-        <div className="border-b border-border px-3 py-1 font-mono text-[9px] uppercase tracking-wide text-muted">
+        <div className="sticky top-0 z-10 border-b border-border bg-panel2 px-3 py-1 font-mono text-[9px] uppercase tracking-wide text-muted">
           {header}
         </div>
       )}

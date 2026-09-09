@@ -243,10 +243,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               className="flex min-w-0 items-center gap-1 px-1 font-mono text-[9px] text-muted"
               title="What this collapsed layer holds — expand to edit"
             >
-              <span className="min-w-0 truncate">
-                {a ?? 'empty'}
-                {b ? ` + ${b}` : ''}
-              </span>
+              <span className="min-w-0 truncate">{a && b ? `${a} + ${b}` : (a ?? b ?? 'empty')}</span>
               {fxCount > 0 && <span className="shrink-0 text-muted/70">· {fxCount} fx</span>}
               {layer.feedback && <span className="shrink-0 text-accent2/80">· FB</span>}
               {layer.mute && <span className="shrink-0 text-danger/80">· muted</span>}

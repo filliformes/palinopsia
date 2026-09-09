@@ -1251,7 +1251,10 @@ export default function App(): JSX.Element {
         />
         <SessionLoader />
         <GenerateMenu />
-        <div className="flex-1" />
+        {/* Right-side controls as one ml-auto group : they wrap together (still
+            right-aligned) instead of the old flex-1 spacer stranding them on a
+            half-empty second line. */}
+        <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1.5">
         {(() => {
           const sinks = [
             ndiActive && 'NDI',
@@ -1373,6 +1376,7 @@ export default function App(): JSX.Element {
             ⚡ Flush
           </button>
         </span>
+        </div>
       </header>
 
       {/* ── Body: preview + layer strips ────────────────────────── */}
