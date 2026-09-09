@@ -23,6 +23,9 @@ asarUnpack:
   # loaded from inside the asar) — unpack it so recording transcodes work.
   - node_modules/ffmpeg-static/**
 win:
+  # Explicit .ico so the app icon is embedded in the exe. Without it, only a PNG
+  # was present and electron-builder shipped the default Electron icon on Windows.
+  icon: build/icon.ico
   target:
     - target: nsis
       arch:

@@ -261,6 +261,11 @@ function openOutputWindow(displayId: number, windowed = false): void {
 }
 
 app.whenReady().then(async () => {
+  // Windows taskbar identity. Without an explicit AppUserModelID the running
+  // window isn't tied to the installed shortcut (whose AUMID electron-builder
+  // sets to appId), so Windows shows a generic blank taskbar icon instead of
+  // the app icon. Must match electron-builder.yml `appId`.
+  if (process.platform === 'win32') app.setAppUserModelId('com.vincentfillion.palinopsia')
   // Serve local video clips over opsia-media:// (range-capable, persistent).
   handleMediaProtocol()
   registerVideoConvert()
