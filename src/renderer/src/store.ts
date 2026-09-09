@@ -299,6 +299,29 @@ export function makeFinalizer(): FxInstance {
   }
 }
 
+// The Cameraless / direct-film input names on the Finalizer. The film stage is
+// gated on filmHold>0, so removing these keys drops the finalizer back to a
+// clean grade (they fall to their neutral ISF defaults). Used by New to open a
+// blank slate even when the active World is a direct-film mode : Griffé / Peint
+// / Pressé inject filmHold + dust via applyWorldToComposition, which is what
+// used to make a New session open with drawn-film "rectangles" over the picture.
+const FINALIZER_FILM_KEYS = [
+  'filmHold', 'filmRate', 'filmJitter', 'filmBoil', 'filmFlutter',
+  'filmBlank', 'filmBlankMode', 'filmDust', 'filmScratch', 'filmGranule', 'filmSplice'
+] as const
+
+export function clearFinalizerFilm(c: CompositionState): CompositionState {
+  const film = new Set<string>(FINALIZER_FILM_KEYS)
+  return {
+    ...c,
+    master: (c.master ?? []).map((f) =>
+      f.shaderId === 'fx-finalizer'
+        ? { ...f, inputs: Object.fromEntries(Object.entries(f.inputs).filter(([k]) => !film.has(k))) }
+        : f
+    )
+  }
+}
+
 export function makeDefaultMetaKnobs(): MetaKnobState[] {
   return Array.from({ length: META_KNOB_COUNT }, (_, i) => ({
     name: `Knob ${i + 1}`,
@@ -3241,9 +3264,13 @@ export const useStore = create<StoreState>((set, get) => ({
       // (else it'd read e.g. "Musical" over factory-uncoupled layers).
       const activeWorld = s.worlds.find((w) => w.id === s.world) ?? null
       const fresh = seedRandomStart(makeDefaultComposition())
+      // NEW is a clean slate. Even under a direct-film World (Griffé/Peint/Pressé),
+      // strip the Finalizer's film stage back off so a New session never opens with
+      // drawn-film artifacts — film is still one World-pick away from the selector.
+      const built = clearFinalizerFilm(activeWorld ? applyWorldToComposition(fresh, activeWorld) : fresh)
       return {
         name: 'Untitled',
-        composition: activeWorld ? applyWorldToComposition(fresh, activeWorld) : fresh,
+        composition: built,
         selection: { type: 'source', layer: 0, slot: 'A' },
         scenes: [],
         activeSceneId: null,

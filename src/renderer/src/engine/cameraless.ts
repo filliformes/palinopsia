@@ -51,7 +51,15 @@ uniform float uDust, uScratch, uGranule, uSplice; // émulsion amounts
 uniform float uSeedFast;   // reseeds every tick (dust sparkle · granulation)
 uniform float uSeedSlow;   // reseeds every N ticks (scratch persistence)
 
-float h1(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
+// Sine-free hash (Hoskins). The old sin(dot(...)) version aliased badly on
+// large integer grids — the dust/granule seeds pushed sin() into its low-
+// precision range, so specks collapsed into wavy banded ROWS (the "little
+// black rectangles" over the picture). This spreads cleanly at every scale.
+float h1(vec2 p){
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
 float vnoise(vec2 p){
   vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
   float a=h1(i), b=h1(i+vec2(1.0,0.0)), c=h1(i+vec2(0.0,1.0)), d=h1(i+vec2(1.0,1.0));

@@ -197,7 +197,7 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
 
   return (
     <div className={`rounded-md border bg-panel ${flashing ? 'animate-pulse border-danger' : ringCls}`}>
-      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 px-2 py-1">
+      <div className="flex min-w-0 items-center gap-2 px-2 py-1">
         <button
           onClick={() => toggleSection(sectionKey)}
           className="flex shrink-0 items-center gap-1"
@@ -211,7 +211,7 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
           className={`h-2.5 w-2.5 shrink-0 rounded-full transition-colors ${inst.enabled ? dotCls : 'bg-panel3'}`}
           title={inst.enabled ? `${name} on : click to bypass` : `${name} bypassed : click to enable`}
         />
-        <span className={`text-[12px] font-semibold ${inst.enabled ? nameCls : 'text-muted line-through'}`}>
+        <span className={`shrink-0 text-[12px] font-semibold ${inst.enabled ? nameCls : 'text-muted line-through'}`}>
           {name}
         </span>
         <div className="flex-1" />
