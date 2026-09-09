@@ -24,7 +24,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
+          # Pinned to windows-2022 (VS 2022 / v17). `windows-latest` has rolled to
+          # the windows-2025 image, which ships Visual Studio 18 — a version the
+          # node-gyp (9.x) that rebuilds the Spout addon can't map to a toolchain,
+          # so it fails VS detection ("unknown version"). VS 2022 is recognized.
+          # Revisit once node-gyp detects VS 18 and windows-2022 nears retirement.
+          - os: windows-2022
             platform: win
             script: build:win
           - os: macos-latest
