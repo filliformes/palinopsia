@@ -1427,9 +1427,13 @@ const startWorlds = loadWorlds()
 const startWorld =
   startWorlds.find((w) => w.id === (localStorage.getItem('opsia.world') || 'synthetic')) ??
   startWorlds[0]
-const startComposition = applyWorldToComposition(
-  seedRandomStart(makeDefaultComposition()),
-  startWorld
+// Like New (see newSession) : a cold launch is a clean slate, so strip the
+// Finalizer's film stage even when the persisted World is a direct-film mode —
+// else every start under Griffé/Peint/Pressé re-installs drawn-film dust over
+// the picture. A loaded/opened session keeps its own film (that path is
+// user-authored work); only this fresh scaffold is forced clean.
+const startComposition = clearFinalizerFilm(
+  applyWorldToComposition(seedRandomStart(makeDefaultComposition()), startWorld)
 )
 
 export const useStore = create<StoreState>((set, get) => ({
