@@ -55,7 +55,11 @@ jobs:
         working-directory: native/spout
         run: |
           npm install --ignore-scripts
-          npx --yes node-gyp rebuild \
+          # node-gyp@11 (not the transitive 9.x): its bundled gyp-next runs on
+          # Python 3.12, whereas node-gyp 9's gyp does `from distutils.version
+          # import StrictVersion` and 3.12 removed distutils (PEP 632), which
+          # crashed `gyp configure` on the runner even once VS was found.
+          npx --yes node-gyp@11 rebuild \
             --target=$(node -p "require('electron/package.json').version") \
             --dist-url=https://electronjs.org/headers \
             --arch=x64
