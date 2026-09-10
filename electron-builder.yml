@@ -22,6 +22,14 @@ asarUnpack:
   # ffmpeg-static ships a platform binary that must be spawned from disk (not
   # loaded from inside the asar) — unpack it so recording transcodes work.
   - node_modules/ffmpeg-static/**
+# Ship the icon into resources/ so the RUNNING window can set BrowserWindow.icon
+# (windowIcon() in main). The exe icon alone only covers the taskbar shortcut,
+# not a running app's taskbar button.
+extraResources:
+  - from: build/icon.ico
+    to: icon.ico
+  - from: build/icon.png
+    to: icon.png
 win:
   # Explicit .ico so the app icon is embedded in the exe. Without it, only a PNG
   # was present and electron-builder shipped the default Electron icon on Windows.

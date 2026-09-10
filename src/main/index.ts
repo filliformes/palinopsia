@@ -15,6 +15,7 @@ import {
   screen
 } from 'electron'
 import { join } from 'path'
+import { existsSync } from 'fs'
 import type { Session } from '@shared/types'
 import { OscSender } from './osc'
 import { OscReceiver, localIPv4s, type OscInMessage } from './osc-receive'
@@ -90,6 +91,17 @@ function shutdown(): void {
   outputSender.dispose()
 }
 
+// Window/taskbar icon. electron-builder stamps the exe icon (which covers the
+// shortcut), but a RUNNING window's taskbar button uses the WINDOW icon, so it
+// must be set here too. Packaged: bundled via extraResources into resources/;
+// dev: from build/ at the repo root. Undefined if missing (Electron ignores it).
+function windowIcon(): string | undefined {
+  const base = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'build')
+  const file = process.platform === 'win32' ? 'icon.ico' : 'icon.png'
+  const p = join(base, file)
+  return existsSync(p) ? p : undefined
+}
+
 function createWindow(): void {
   // A fresh window must re-arm the save-before-quit intercept. On macOS the app
   // survives its last window's close (which latched `appQuitting = true` via
@@ -106,6 +118,7 @@ function createWindow(): void {
     backgroundColor: '#0a0a0a', // near-black : the instrument's canvas (brief §1)
     autoHideMenuBar: true,
     title: 'Palinopsia',
+    icon: windowIcon(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -211,6 +224,7 @@ function openOutputWindow(displayId: number, windowed = false): void {
           resizable: true,
           backgroundColor: '#000000',
           title: 'Palinopsia : Output',
+          icon: windowIcon(),
           webPreferences: {
             preload: join(__dirname, '../preload/index.js'),
             sandbox: false,
@@ -229,6 +243,7 @@ function openOutputWindow(displayId: number, windowed = false): void {
           fullscreen: true,
           backgroundColor: '#000000',
           title: 'Palinopsia : Output',
+          icon: windowIcon(),
           webPreferences: {
             preload: join(__dirname, '../preload/index.js'),
             sandbox: false,
