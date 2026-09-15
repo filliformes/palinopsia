@@ -924,6 +924,9 @@ export interface ExposedApi {
   // Light output (ArtNet/DMX · WLED) : push config, then zone frames.
   lightConfig: (cfg: LightConfig) => void
   lightFrame: (cols: number, rows: number, pixels: Uint8Array) => void
+  // Kiosk / installation mode : read the launch config; get the operator UI out.
+  kioskConfig: () => Promise<{ kiosk: boolean; sessionPath?: string; display?: number }>
+  minimizeMain: () => void
   // Host resource monitor (Output HUD).
   perfStats: () => Promise<PerfStats>
   // Recording: intermediate MediaRecorder chunks streamed to main → ffmpeg

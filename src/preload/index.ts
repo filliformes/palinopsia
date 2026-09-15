@@ -138,6 +138,10 @@ const api: ExposedApi = {
   lightFrame: (cols: number, rows: number, pixels: Uint8Array) =>
     ipcRenderer.send('light:frame', cols, rows, pixels),
 
+  // ── Kiosk / installation mode ────────────────────────────────────
+  kioskConfig: () => ipcRenderer.invoke('kiosk:config'),
+  minimizeMain: () => ipcRenderer.send('app:minimizeMain'),
+
   // ── Resource HUD + recording ─────────────────────────────────────
   perfStats: () => ipcRenderer.invoke('perf:stats'),
   recordingFormats: () => ipcRenderer.invoke('recording:formats'),

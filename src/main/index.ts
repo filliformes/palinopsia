@@ -69,6 +69,25 @@ const oscSender = new OscSender()
 // External video output (NDI, via optional native sender).
 const outputSender = new OutputSender()
 const lightSender = new LightSender()
+
+// Kiosk / installation mode : `--kiosk [--session=<path>] [--display=<id>]`.
+// Boot straight to a session, fullscreen the output, get the operator UI out of
+// the way (renderer-driven, see the kiosk effect), and self-heal on a renderer
+// crash. Parsed once from argv; the renderer reads it via `kiosk:config`.
+const kioskConfig = (() => {
+  const argv = process.argv
+  const val = (f: string): string | undefined => {
+    const a = argv.find((x) => x.startsWith(f + '='))
+    return a ? a.slice(f.length + 1) : undefined
+  }
+  const displayRaw = val('--display')
+  const display = displayRaw != null ? Number(displayRaw) : undefined
+  return {
+    kiosk: argv.includes('--kiosk'),
+    sessionPath: val('--session'),
+    display: display != null && Number.isFinite(display) ? display : undefined
+  }
+})()
 // OSC in : the instrument is PLAYED through this: Pandore/TouchOSC send here
 // and the renderer maps addresses onto the store (see renderer/oscInput.ts).
 const oscReceiver = new OscReceiver()
@@ -131,6 +150,15 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => mainWindow?.show())
+
+  // Kiosk self-heal : an unattended install must not sit on a dead renderer, so
+  // reload if the render process dies (crash / GPU process gone). Kiosk-only so
+  // normal-mode crashes still surface for debugging.
+  if (kioskConfig.kiosk) {
+    mainWindow.webContents.on('render-process-gone', () => {
+      if (mainWindow && !appQuitting) mainWindow.reload()
+    })
+  }
 
   // Close intercept : ask the renderer to run its Save-before-quit modal
   // first; it replies via `app:close-proceed` which flips appQuitting and
@@ -499,6 +527,10 @@ app.whenReady().then(async () => {
   safeOn('light:frame', (_e, cols, rows, pixels) =>
     lightSender.send(cols as number, rows as number, pixels as Uint8Array)
   )
+
+  // ---------- IPC: Kiosk / installation mode ----------
+  safeHandle('kiosk:config', () => kioskConfig)
+  safeOn('app:minimizeMain', () => mainWindow?.minimize())
 
   // ---------- IPC: Session I/O ----------
   // All wrapped in safeHandle so a filesystem throw (path vanished, read-only

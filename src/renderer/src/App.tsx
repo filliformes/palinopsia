@@ -320,6 +320,37 @@ export default function App(): JSX.Element {
     try { window.api.lightConfig(lights) } catch { /* main not ready yet */ }
   }, [lights])
 
+  // ── Kiosk / installation mode : on launch (`--kiosk [--session=…] [--display=…]`)
+  //    boot the given session, fullscreen the output on the chosen display, and
+  //    minimize the operator window. Renderer-crash self-heal is handled main-side.
+  //    Runs once. ───────
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const k = await window.api.kioskConfig().catch(() => null)
+      if (cancelled || !k?.kiosk) return
+      if (k.sessionPath) {
+        try {
+          const s = await window.api.sessionLoad(k.sessionPath)
+          if (s) useStore.getState().loadSession(s)
+        } catch { /* keep the fresh boot */ }
+      }
+      try {
+        const displays = await window.api.outputDisplays()
+        const target =
+          (k.display != null ? displays.find((d) => d.id === k.display) : undefined) ??
+          displays.find((d) => d.isPrimary) ??
+          displays[0]
+        if (target) {
+          await window.api.outputOpen(target.id, false)
+          useStore.getState().setOutputActive(true)
+        }
+      } catch { /* no display : stay windowed */ }
+      window.api.minimizeMain()
+    })()
+    return () => { cancelled = true }
+  }, [])
+
   // ── HIVE output (sender) : start the HEVC encoder + TCP fan-out ───────
   const hiveOutActive = useStore((s) => s.hiveOutActive)
   const hiveOutPort = useStore((s) => s.hiveOutPort)
