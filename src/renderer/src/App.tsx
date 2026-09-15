@@ -51,6 +51,10 @@ import { OutputPage } from './components/OutputPage'
 import { SonifyPage } from './components/SonifyPage'
 import { WorldPage } from './components/WorldPage'
 import { SequencePage } from './components/SequencePage'
+import { BodyPage } from './components/BodyPage'
+import { bodyTracker } from './engine/bodyTracker'
+import { bodyBus } from './engine/bodyIn'
+import type { GestureAction } from '@shared/types'
 import { SceneBank } from './components/SceneBank'
 import { SurfacePad, SurfaceOnToggle } from './components/SurfacePad'
 import { initOscInput, applyOscListen, applyOscOutput, initOscQueryStream } from './oscInput'
@@ -167,6 +171,56 @@ function RecPill(): JSX.Element | null {
 
 // fireSelectedRandomize lives in commands.ts now : the R shortcut, the
 // Transport button and a learned MIDI pad all fire the same implementation.
+
+// A body gesture fires one of the store's existing performance actions (this is
+// routing, not new engine). Scene next/prev cycle the scene bank through a shared
+// cursor so a hands-free performer can walk the setlist.
+function dispatchGesture(action: GestureAction, cursor: { i: number }): void {
+  const st = useStore.getState()
+  switch (action) {
+    case 'randomize': fireSelectedRandomize(); break
+    case 'panic': firePanic(); break
+    case 'freeze': fireFreeze(); break
+    case 'sceneNext':
+    case 'scenePrev': {
+      const scenes = st.scenes
+      if (scenes.length === 0) break
+      const step = action === 'sceneNext' ? 1 : -1
+      cursor.i = (cursor.i + step + scenes.length) % scenes.length
+      st.recallScene(scenes[cursor.i].id)
+      break
+    }
+    default: break // 'none'
+  }
+}
+
+// Small always-on status pip : when embodied control is live it shows a pulsing
+// red "camera on" dot (a privacy tell) and doubles as a shortcut to the Body page.
+function BodyPip(): JSX.Element | null {
+  const enabled = useStore((s) => s.bodyControl.enabled)
+  const pageOpen = useStore((s) => s.bodyPageOpen)
+  const setPage = useStore((s) => s.setBodyPageOpen)
+  const [live, setLive] = useState(false)
+  useEffect(() => {
+    if (!enabled) return
+    const id = window.setInterval(() => {
+      const b = bodyBus.status()
+      setLive(b.hands || b.pose || b.face)
+    }, 300)
+    return () => window.clearInterval(id)
+  }, [enabled])
+  if (!enabled || pageOpen) return null
+  return (
+    <button
+      onClick={() => setPage(true)}
+      title="Embodied control is live (camera on). Click for the Body page (B)."
+      className="fixed bottom-2 left-2 z-[60] flex items-center gap-1.5 rounded-full border border-border bg-panel/90 px-2.5 py-1 font-mono text-[10px] text-muted shadow-lg backdrop-blur hover:text-text"
+    >
+      <span className={`h-2 w-2 rounded-full ${live ? 'animate-pulse bg-red-500' : 'bg-yellow-500'}`} />
+      BODY
+    </button>
+  )
+}
 
 export default function App(): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -297,6 +351,7 @@ export default function App(): JSX.Element {
   const renderScale = useStore((s) => s.renderScale)
   const worldPageOpen = useStore((s) => s.worldPageOpen)
   const sequencePageOpen = useStore((s) => s.sequencePageOpen)
+  const bodyPageOpen = useStore((s) => s.bodyPageOpen)
   useEffect(() => {
     const comp = compositorRef.current
     if (!comp) return
@@ -320,10 +375,46 @@ export default function App(): JSX.Element {
     try { window.api.lightConfig(lights) } catch { /* main not ready yet */ }
   }, [lights])
 
+  // ── Embodied control : drive the MediaPipe tracker from the (machine-local)
+  //    bodyControl config, and route discrete gestures to actions. The tracker
+  //    opens the camera only when enabled (opt-in) ; a `body` modulator reads the
+  //    bus directly (via the modulation engine), so continuous features need no
+  //    wiring here. ───────
+  const bodyControl = useStore((s) => s.bodyControl)
+  useEffect(() => {
+    void bodyTracker.setConfig(bodyControl)
+  }, [bodyControl])
+  useEffect(() => () => bodyTracker.stop(), []) // release the camera on unmount
+  useEffect(() => {
+    // Drain gesture onsets each frame and fire the bound action. Cheap when the
+    // tracker is off (the queue is empty). Reads config live so re-binding a
+    // gesture takes effect without re-subscribing.
+    const cursor = { i: -1 }
+    let raf = 0
+    const tick = (): void => {
+      raf = requestAnimationFrame(tick)
+      const gs = bodyBus.drainGestures()
+      if (gs.length === 0) return
+      const map = useStore.getState().bodyControl.gestures
+      for (const g of gs) dispatchGesture(map[g], cursor)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
   // ── Kiosk / installation mode : on launch (`--kiosk [--session=…] [--display=…]`)
-  //    boot the given session, fullscreen the output on the chosen display, and
-  //    minimize the operator window. Renderer-crash self-heal is handled main-side.
-  //    Runs once. ───────
+  //    boot the given session and fullscreen the output on the chosen display.
+  //    Renderer-crash self-heal is handled main-side. Runs once.
+  //
+  //    We deliberately do NOT minimize the operator window : it is the render
+  //    SOURCE (it runs the WebGL engine and streams each finished frame to the
+  //    output window over a MessagePort). A minimized window is document.hidden,
+  //    which pauses its requestAnimationFrame — so minimizing it froze the stream
+  //    and the projector went black. Left un-minimized it keeps painting behind
+  //    the fullscreen output (occlusion throttling is already disabled via the
+  //    command-line switches in main), so the output shows live frames. On a
+  //    single display the fullscreen output covers the operator UI anyway. Escape
+  //    with Esc / O (output window) or Ctrl+Shift+O (global). ───────
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -346,9 +437,17 @@ export default function App(): JSX.Element {
           useStore.getState().setOutputActive(true)
         }
       } catch { /* no display : stay windowed */ }
-      window.api.minimizeMain()
     })()
     return () => { cancelled = true }
+  }, [])
+
+  // ── Installation exit : when the operator breaks out of a running install
+  //    (Esc / O in the output, or Ctrl+Shift+O), tell them how to stop it
+  //    launching again next time. ───────
+  useEffect(() => {
+    return window.api.onKioskExited(() => {
+      showToast('Exited installation mode. Turn off "launch on restart" in Output → Installation to stop it.', 'warn', 8000)
+    })
   }, [])
 
   // ── HIVE output (sender) : start the HEVC encoder + TCP fan-out ───────
@@ -496,6 +595,13 @@ export default function App(): JSX.Element {
         st.setSonifyPageOpen(!st.sonifyPageOpen)
         return
       }
+      // B : the Body page (embodied control : MediaPipe Hands + Pose).
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        const st = useStore.getState()
+        st.setBodyPageOpen(!st.bodyPageOpen)
+        return
+      }
       // Bare letters: view / panel shortcuts (guarded against typing in fields).
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField) {
         const k = e.key.toLowerCase()
@@ -581,6 +687,11 @@ export default function App(): JSX.Element {
       // close them in that reverse (topmost-first) order.
       if (e.key === 'Escape' && !inField) {
         const st = useStore.getState()
+        if (st.bodyPageOpen) {
+          e.preventDefault()
+          st.setBodyPageOpen(false)
+          return
+        }
         if (st.sequencePageOpen) {
           e.preventDefault()
           st.setSequencePageOpen(false)
@@ -1537,6 +1648,8 @@ export default function App(): JSX.Element {
       {sonifyPageOpen && <SonifyPage canvasRef={canvasRef} />}
       {worldPageOpen && <WorldPage />}
       {sequencePageOpen && <SequencePage canvasRef={canvasRef} />}
+      {bodyPageOpen && <BodyPage />}
+      <BodyPip />
 
       {/* Crash recovery : offer to restore the last autosave after an unclean exit. */}
       {crashEntry && (

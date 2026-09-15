@@ -254,6 +254,7 @@ export type ModulatorType =
   | 'physics'
   | 'motion'
   | 'vision'
+  | 'body'
   | 'homeostat'
   | 'euclid'
   | 'turing'
@@ -275,6 +276,81 @@ export type VisionFeature =
   | 'warmth'
   | 'depth'
   | 'depthSpread'
+
+// ── Embodied control (MediaPipe : Hands + Pose ; Face is a planned drop-in) ──
+// A `body` modulator follows one of these features off the body bus (the LIVE
+// WEBCAM of the performer → hand/pose landmarks → scalars). This is the FORWARD
+// path : the room plays the instrument, distinct from `vision` (the composited
+// output analysed back into control). Every value is normalised 0..1 and read by
+// engine/modulation.ts exactly like the audio / vision buses. Bus : engine/bodyIn.ts.
+export type BodyFeature =
+  // Hands (per hand + two-hand relations)
+  | 'handLeftHeight' // left wrist height : 0 low, 1 high
+  | 'handRightHeight'
+  | 'handLeftX' // left wrist horizontal : 0 left edge, 1 right edge (mirrored)
+  | 'handRightX'
+  | 'handLeftOpen' // finger spread : 0 fist, 1 open
+  | 'handRightOpen'
+  | 'handsApart' // wrist-to-wrist distance : 0 together, 1 wide (the accordion)
+  | 'handsHeight' // mean of both wrists' height
+  // Pose (whole body)
+  | 'bodyMotion' // overall landmark velocity / energy 0..1
+  | 'bodyLean' // torso lean : 0 left, 0.5 centred, 1 right
+  | 'bodySway' // shoulder-line tilt : 0 down-left, 0.5 level, 1 down-right
+  | 'armSpan' // wrist-to-wrist over shoulder width : 0 closed, 1 spread
+  | 'bodyHeight' // stance : 0 crouched, 1 tall
+  | 'handsUp' // hands above the head : 0 down, 1 fully raised
+  | 'weightLR' // centre-of-mass horizontal : 0 left, 0.5 centred, 1 right
+  // Face (MediaPipe FaceLandmarker : blendshapes 0..1 + head pose from geometry)
+  | 'faceJawOpen' // mouth open : 0 closed, 1 wide
+  | 'faceSmile' // smile : 0 neutral, 1 broad
+  | 'faceBrowUp' // brows raised : 0 rest, 1 high
+  | 'faceBlink' // eyes closed : 0 open, 1 shut (both)
+  | 'faceMouthPucker' // lips pursed : 0 rest, 1 pucker
+  | 'faceHeadYaw' // head turn : 0 left, 0.5 centred, 1 right
+  | 'faceHeadPitch' // head nod : 0 down, 0.5 level, 1 up
+  | 'faceHeadRoll' // head tilt : 0 left, 0.5 level, 1 right
+  // Presence gates (smoothed 0..1)
+  | 'bodyPresent'
+  | 'handsPresent'
+  | 'facePresent'
+export const BODY_FEATURES: BodyFeature[] = [
+  'handLeftHeight', 'handRightHeight', 'handLeftX', 'handRightX',
+  'handLeftOpen', 'handRightOpen', 'handsApart', 'handsHeight',
+  'bodyMotion', 'bodyLean', 'bodySway', 'armSpan', 'bodyHeight', 'handsUp', 'weightLR',
+  'faceJawOpen', 'faceSmile', 'faceBrowUp', 'faceBlink', 'faceMouthPucker',
+  'faceHeadYaw', 'faceHeadPitch', 'faceHeadRoll',
+  'bodyPresent', 'handsPresent', 'facePresent'
+]
+
+// Discrete body gestures : one-shot onsets (threshold + cooldown, like the audio
+// bus's `transient`). An early slice of the ① trigger/event layer : each fires a
+// bound GestureAction. More can be added without touching the routing.
+export type BodyGesture =
+  | 'pinchLeft' | 'pinchRight' | 'clap' | 'cross' | 'handsUp'
+  | 'mouthPop' | 'browRaise' | 'winkLeft' | 'winkRight'
+export const BODY_GESTURES: BodyGesture[] = [
+  'pinchLeft', 'pinchRight', 'clap', 'cross', 'handsUp',
+  'mouthPop', 'browRaise', 'winkLeft', 'winkRight'
+]
+
+// What a gesture fires. All map to actions the store already exposes, so this is
+// routing, not new engine. 'none' unbinds.
+export type GestureAction = 'none' | 'sceneNext' | 'scenePrev' | 'randomize' | 'panic' | 'freeze'
+export const GESTURE_ACTIONS: GestureAction[] = ['none', 'sceneNext', 'scenePrev', 'randomize', 'panic', 'freeze']
+
+// Machine-local embodied-control config (a webcam is machine-bound, like warp).
+// NOT part of a session : it lives in the store's `bodyControl` slice + localStorage.
+export interface BodyControlConfig {
+  enabled: boolean // master : off by default (a camera : explicit opt-in)
+  deviceId: string | null // chosen videoinput, or null = default camera
+  hands: boolean // run the HandLandmarker
+  pose: boolean // run the PoseLandmarker
+  face: boolean // run the FaceLandmarker (blendshapes + head pose)
+  mirror: boolean // flip X so moving right moves the value right (selfie view)
+  sensitivity: number // 0..1 : global gain on gesture thresholds (higher = easier)
+  gestures: Record<BodyGesture, GestureAction> // gesture → action routing
+}
 
 // Force-driven motion for the `physics` modulator.
 export type PhysicsMotion = 'bounce' | 'spring' | 'riser'
@@ -375,6 +451,7 @@ export interface ModulatorConfig {
   physics: { motion: PhysicsMotion; damping: number } // force-driven motion
   motion: { shape: MotionShape } // named motion archetype / force behaviour
   vision: { feature: VisionFeature; smooth: number } // follows the picture (return path)
+  body: { feature: BodyFeature; smooth: number } // follows the body bus (embodied control)
   // Negative-feedback controller : watches a picture feature and integrates a
   // corrective output that (bound in `replace` mode) nudges the param to hold the
   // feature at `setpoint` — AGC-as-modulator, parks the rig at edge-of-chaos.
@@ -930,6 +1007,13 @@ export interface ExposedApi {
   kioskGetLaunch: () => Promise<{ enabled?: boolean; sessionPath?: string; display?: number }>
   kioskSetLaunch: (cfg: { enabled: boolean; sessionPath?: string; display?: number }) => Promise<boolean>
   minimizeMain: () => void
+  // Live exit from a running installation : close the fullscreen output and
+  // bring the operator window back (bound to Esc / O in the output window, plus
+  // a Ctrl+Shift+O global backstop). Does NOT disarm the next-restart launch.
+  kioskExit: () => Promise<boolean>
+  // Operator-side notice that an installation exit just happened, so the UI can
+  // tell the user how to stop it launching again.
+  onKioskExited: (cb: () => void) => () => void
   // Host resource monitor (Output HUD).
   perfStats: () => Promise<PerfStats>
   // Recording: intermediate MediaRecorder chunks streamed to main → ffmpeg

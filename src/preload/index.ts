@@ -143,6 +143,12 @@ const api: ExposedApi = {
   kioskGetLaunch: () => ipcRenderer.invoke('kiosk:getLaunch'),
   kioskSetLaunch: (cfg: unknown) => ipcRenderer.invoke('kiosk:setLaunch', cfg),
   minimizeMain: () => ipcRenderer.send('app:minimizeMain'),
+  kioskExit: () => ipcRenderer.invoke('kiosk:exit'),
+  onKioskExited: (cb: () => void) => {
+    const h = (): void => cb()
+    ipcRenderer.on('kiosk:exited', h)
+    return () => ipcRenderer.off('kiosk:exited', h)
+  },
 
   // ── Resource HUD + recording ─────────────────────────────────────
   perfStats: () => ipcRenderer.invoke('perf:stats'),

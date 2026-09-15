@@ -12,7 +12,8 @@ import {
   shell,
   session as electronSession,
   desktopCapturer,
-  screen
+  screen,
+  globalShortcut
 } from 'electron'
 import { join } from 'path'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
@@ -23,6 +24,7 @@ import * as sessionIO from './session'
 import * as autosave from './autosave'
 import { OscQueryServer, type OscQueryNode } from './oscquery'
 import { registerMediaScheme, handleMediaProtocol } from './media'
+import { registerAssetScheme, handleAssetProtocol } from './assets'
 import { killAllConverts, registerVideoConvert, warmVideoFolder } from './videoConvert'
 import { registerAssemble } from './assemble'
 import { registerCollage } from './collage'
@@ -35,6 +37,8 @@ import * as recording from './recording'
 
 // Must run before app ready : makes opsia-media:// a privileged streaming scheme.
 registerMediaScheme()
+// Same : opsia-asset:// serves the bundled MediaPipe wasm + models (offline).
+registerAssetScheme()
 // Ask Chromium to enable the platform HEVC decoder + encoder (HIVE live-in and
 // HIVE output both use WebCodecs HEVC).
 app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport,PlatformHEVCEncoderSupport')
@@ -104,6 +108,21 @@ function getKioskConfig(): { kiosk: boolean; sessionPath?: string; display?: num
     display: argvKiosk.display ?? (typeof f.display === 'number' ? f.display : undefined)
   }
 }
+// Live escape hatch for an installation : close the fullscreen output and bring
+// the operator window back to the front. Reachable from Esc / O in the output
+// window and from a Ctrl+Shift+O global shortcut, so an install that boots into
+// a black or wrong-looking output is never a trap. This is a RUNTIME exit only :
+// it does not touch kiosk.json, so the next launch still boots the installation
+// unless the operator turns it off in Output → Installation.
+function exitKiosk(): void {
+  outputWindow?.close()
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+    mainWindow.webContents.send('kiosk:exited')
+  }
+}
 // OSC in : the instrument is PLAYED through this: Pandore/TouchOSC send here
 // and the renderer maps addresses onto the store (see renderer/oscInput.ts).
 const oscReceiver = new OscReceiver()
@@ -127,6 +146,7 @@ function shutdown(): void {
   hiveSendStop()
   outputSender.dispose()
   lightSender.dispose()
+  globalShortcut.unregisterAll()
 }
 
 // Window/taskbar icon. electron-builder stamps the exe icon (which covers the
@@ -330,6 +350,8 @@ app.whenReady().then(async () => {
   if (process.platform === 'win32') app.setAppUserModelId('com.vincentfillion.palinopsia')
   // Serve local video clips over opsia-media:// (range-capable, persistent).
   handleMediaProtocol()
+  // Serve bundled MediaPipe wasm + models over opsia-asset:// (offline/kiosk).
+  handleAssetProtocol()
   registerVideoConvert()
   registerAssemble()
   registerCollage()
@@ -550,7 +572,16 @@ app.whenReady().then(async () => {
   safeHandle('kiosk:setLaunch', (_e, cfg) => {
     try { writeFileSync(kioskFilePath(), JSON.stringify((cfg as KioskLaunch) ?? {})); return true } catch { return false }
   })
+  safeHandle('kiosk:exit', () => { exitKiosk(); return true })
   safeOn('app:minimizeMain', () => mainWindow?.minimize())
+
+  // Global escape backstop : whichever window has focus (the borderless
+  // fullscreen output usually does), Ctrl+Shift+O always breaks out of an
+  // installation. The in-output Esc / O keys cover the common case; this covers
+  // the rest. Only armed when we actually launch into kiosk.
+  if (getKioskConfig().kiosk) {
+    try { globalShortcut.register('CommandOrControl+Shift+O', () => exitKiosk()) } catch { /* combo taken */ }
+  }
 
   // ---------- IPC: Session I/O ----------
   // All wrapped in safeHandle so a filesystem throw (path vanished, read-only

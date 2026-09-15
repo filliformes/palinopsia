@@ -30,6 +30,12 @@ extraResources:
     to: icon.ico
   - from: build/icon.png
     to: icon.png
+  # MediaPipe embodied-control assets (Hands + Pose). Self-hosted so tracking
+  # works OFFLINE and in a kiosk install : the renderer loads them over the
+  # opsia-asset:// scheme (main/assets.ts), never Google's CDN. wasm is the SIMD
+  # build only (Electron 33 / Chromium always has wasm SIMD).
+  - from: resources/mediapipe
+    to: mediapipe
 win:
   # Explicit .ico so the app icon is embedded in the exe. Without it, only a PNG
   # was present and electron-builder shipped the default Electron icon on Windows.

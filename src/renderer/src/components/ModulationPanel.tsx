@@ -5,8 +5,8 @@
 // modulation never re-renders React at 60 Hz.
 
 import { useEffect, useRef, type ReactNode } from 'react'
-import type { ArpMode, AudioFeature, LfoShape, ModulatorType, MotionShape, PhysicsMotion, VisionFeature } from '@shared/types'
-import { FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, MOTION_SHAPES, WORLD_AUTOMOD_SLOT } from '@shared/types'
+import type { ArpMode, AudioFeature, BodyFeature, LfoShape, ModulatorType, MotionShape, PhysicsMotion, VisionFeature } from '@shared/types'
+import { BODY_FEATURES, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, MOTION_SHAPES, WORLD_AUTOMOD_SLOT } from '@shared/types'
 import { DIVISIONS, modEngine } from '../engine/modulation'
 import { AUDIO_BANDS, AUDIO_FEATURES } from '../engine/audioIn'
 import { VISION_FEATURES } from '../engine/visionIn'
@@ -17,7 +17,7 @@ import { modulatorBlurb } from '../shaders/isf/sourceBlurbs'
 
 // Alphabetical : the dropdown shows the raw type id, so keep this sorted so the
 // list reads in order (add new types in their alphabetical slot).
-const MOD_TYPES: ModulatorType[] = ['adsr', 'arp', 'audio', 'cellular', 'chaos', 'euclid', 'homeostat', 'lfo', 'motion', 'organic', 'physics', 'ramp', 'random', 'sh', 'slew', 'turing', 'vision']
+const MOD_TYPES: ModulatorType[] = ['adsr', 'arp', 'audio', 'body', 'cellular', 'chaos', 'euclid', 'homeostat', 'lfo', 'motion', 'organic', 'physics', 'ramp', 'random', 'sh', 'slew', 'turing', 'vision']
 const CELL_RULES = [30, 90, 110, 150]
 const LFO_SHAPES: LfoShape[] = ['sine', 'triangle', 'square', 'sawtooth', 'rndStep', 'rndSmooth', 'spastic']
 const ARP_MODES: ArpMode[] = ['up', 'down', 'upDown', 'random', 'drunk']
@@ -158,7 +158,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
 
       {/* clock : everything except ramp/adsr/audio is clock-driven
           (audio is driven by the signal itself) */}
-      {m.type !== 'ramp' && m.type !== 'adsr' && m.type !== 'audio' && m.type !== 'vision' && m.type !== 'homeostat' && (
+      {m.type !== 'ramp' && m.type !== 'adsr' && m.type !== 'audio' && m.type !== 'vision' && m.type !== 'body' && m.type !== 'homeostat' && (
         <div className="flex min-w-0 shrink-0 items-center gap-1">
           <button
             onClick={() => update(index, { sync: m.sync === 'bpm' ? 'free' : 'bpm' })}
@@ -548,6 +548,30 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
           <SliderRow label="SMOOTH" value={vc.smooth} min={0} max={0.99}
             title="One-pole smoothing of the picture feature : 0 snaps, →1 glides"
             onChange={(v) => update(index, { vision: { ...vc, smooth: v } })} />
+        </>
+      )
+    }
+    case 'body': {
+      const bc = m.body ?? { feature: 'handRightHeight' as BodyFeature, smooth: 0.3 }
+      return (
+        <>
+          <div className="flex min-w-0 items-center gap-1">
+            <select
+              className="input select-compact min-w-0 flex-1 text-[10px]"
+              value={bc.feature}
+              title="Which body feature this modulator follows : the live camera of the performer (hand height / side / openness, hands apart, whole-body motion, lean, arm span, stance, hands-up). Turn embodied control on and pick a camera on the Body page (B)."
+              onChange={(e) => update(index, { body: { ...bc, feature: e.target.value as BodyFeature } })}
+            >
+              {BODY_FEATURES.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          </div>
+          <SliderRow label="SMOOTH" value={bc.smooth} min={0} max={0.99}
+            title="One-pole smoothing of the body feature : 0 snaps, →1 glides"
+            onChange={(v) => update(index, { body: { ...bc, smooth: v } })} />
         </>
       )
     }

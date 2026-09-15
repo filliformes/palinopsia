@@ -10,7 +10,8 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['O', 'Output / mapping'],
       ['W', 'World editor'],
       ['Q', 'Sequence (macro-form)'],
-      ['S', 'Sonify (image → sound)']
+      ['S', 'Sonify (image → sound)'],
+      ['B', 'Body (embodied control)']
     ]
   },
   {

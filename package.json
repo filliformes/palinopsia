@@ -18,6 +18,7 @@
     "start": "electron-vite preview"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.22-rc.20250304",
     "bonjour-service": "^1.4.2",
     "ffmpeg-static": "^5.3.0",
     "interactive-shader-format": "^2.7.0",

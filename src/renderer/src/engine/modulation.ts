@@ -15,6 +15,7 @@ import type { CompositionState, LfoShape, ModCurve, ModulatorConfig } from '@sha
 import { BLEND_MODES, FX_OPACITY_INPUT } from '@shared/types'
 import { audioBus } from './audioIn'
 import { visionBus } from './visionIn'
+import { bodyBus } from './bodyIn'
 
 const TWO_PI = Math.PI * 2
 // The 60fps reference frame time (ms). The picture / audio one-pole followers
@@ -223,6 +224,7 @@ interface SlotState {
   arpLastAdvanceAt: number
   audioValue: number // one-pole smoothed audio feature (audio type)
   visionValue: number // one-pole smoothed picture feature (vision type)
+  bodyValue: number // one-pole smoothed body feature (body type)
   homeoFeat: number // one-pole smoothed feature (homeostat type)
   homeoBase: number // slow-adapting baseline the controller regulates around
   homeoInt: number // homeostat integrator (accumulated correction, ±0.5)
@@ -262,6 +264,7 @@ function makeSlot(now: number): SlotState {
     arpLastAdvanceAt: now,
     audioValue: 0,
     visionValue: 0,
+    bodyValue: 0,
     homeoFeat: 0.5,
     homeoBase: 0.5,
     homeoInt: 0,
@@ -647,6 +650,19 @@ export class ModEngine {
           }
           break
         }
+        case 'body': {
+          // Follow one feature off the body bus (the live WEBCAM of the performer :
+          // hand / pose landmarks). Unclocked : the room is the clock. One-pole
+          // smoothed exactly like the audio / vision cases.
+          const bc = cfg.body
+          if (bc) {
+            const raw = bodyBus.feature(bc.feature)
+            const sm = Math.max(0, Math.min(0.99, bc.smooth ?? 0))
+            s.bodyValue += (raw - s.bodyValue) * (1 - Math.pow(sm, dtMs / FR_MS))
+            v01 = s.bodyValue
+          }
+          break
+        }
         case 'homeostat': {
           // Negative-feedback controller (AGC-as-modulator). Watch a picture
           // feature and regulate it around a SELF-ADAPTING baseline, so a feature
@@ -831,6 +847,7 @@ export function makeDefaultModulator(): ModulatorConfig {
     chaos: { r: 3.8 },
     audio: { feature: 'level', band: 0, smooth: 0.2 },
     vision: { feature: 'brightness', smooth: 0.3 },
+    body: { feature: 'handRightHeight', smooth: 0.3 },
     organic: { variation: 0.5 },
     physics: { motion: 'bounce', damping: 0.5 },
     motion: { shape: 'oscillation' },

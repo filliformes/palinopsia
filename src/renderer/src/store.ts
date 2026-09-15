@@ -28,7 +28,7 @@ import type {
   SourceSlot,
   World
 } from '@shared/types'
-import type { MetaKnobState, MidiBinding, LightConfig } from '@shared/types'
+import type { MetaKnobState, MidiBinding, LightConfig, BodyControlConfig } from '@shared/types'
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
 import { inputsForShader } from './shaders/isf/inputs'
 import { SHADER_BY_ID } from './shaders/isf'
@@ -1055,6 +1055,14 @@ interface StoreState {
   // Light output (ArtNet/DMX · WLED). Machine-local (venue-specific), persisted.
   lights: LightConfig
   setLights: (partial: Partial<LightConfig>) => void
+  // Embodied control (MediaPipe Hands + Pose). Machine-local (a webcam is
+  // machine-bound, like warp), persisted, NOT part of a session. The tracker
+  // (engine/bodyTracker.ts) follows this; a `body` modulator reads the bus.
+  bodyControl: BodyControlConfig
+  setBodyControl: (partial: Partial<BodyControlConfig>) => void
+  // The full-page Body view (B). Transient.
+  bodyPageOpen: boolean
+  setBodyPageOpen: (on: boolean) => void
   // HIVE output (open NDI-alternative). hiveOutActive is transient; port persists.
   hiveOutActive: boolean
   setHiveOutActive: (on: boolean) => void
@@ -2710,6 +2718,31 @@ export const useStore = create<StoreState>((set, get) => ({
       localStorage.setItem('opsia.lights', JSON.stringify(lights))
       return { lights } // pushed to main by an App effect watching `lights`
     }),
+  bodyControl: (() => {
+    const def: BodyControlConfig = {
+      enabled: false, deviceId: null, hands: true, pose: true, face: false, mirror: true, sensitivity: 0.5,
+      // Face gestures default to unbound : blink / brow move involuntarily, so
+      // the performer opts each one in rather than being surprised by it.
+      gestures: {
+        pinchLeft: 'scenePrev', pinchRight: 'sceneNext', clap: 'randomize', cross: 'panic', handsUp: 'freeze',
+        mouthPop: 'none', browRaise: 'none', winkLeft: 'none', winkRight: 'none'
+      }
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem('opsia.bodyControl') || '{}')
+      // enabled is never restored : a camera must be re-armed each launch (opt-in),
+      // so the app never grabs the webcam on its own at boot.
+      return { ...def, ...saved, enabled: false, gestures: { ...def.gestures, ...(saved.gestures || {}) } }
+    } catch { return def }
+  })(),
+  setBodyControl: (partial) =>
+    set((s) => {
+      const bodyControl = { ...s.bodyControl, ...partial }
+      localStorage.setItem('opsia.bodyControl', JSON.stringify(bodyControl))
+      return { bodyControl } // pushed to the tracker by an App effect watching it
+    }),
+  bodyPageOpen: false,
+  setBodyPageOpen: (on) => set({ bodyPageOpen: on }),
   hiveOutActive: false,
   setHiveOutActive: (on) => set({ hiveOutActive: on }),
   hiveOutPort: Number(localStorage.getItem('opsia.hiveOutPort')) || 51842,

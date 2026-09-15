@@ -677,7 +677,7 @@ export function OutputPage({
 
           <Section
             title="Installation mode"
-            info="Boot straight into a session, fullscreen on the chosen display, hide the operator window, and self-heal if the renderer crashes — for unattended installs. The projector mapping (keystone) is machine-local, so it is applied automatically. Takes effect on the NEXT app launch."
+            info="Boot straight into a session, fullscreen on the chosen display (which covers the operator UI on a single screen), and self-heal if the renderer crashes — for unattended installs. The projector mapping (keystone) is machine-local, so it is applied automatically. Exit a running install with Esc / O on the output or Ctrl+Shift+O anywhere. Takes effect on the NEXT app launch."
             defaultCollapsed={!kioskLaunch.enabled}
           >
             <button
@@ -732,6 +732,12 @@ export function OutputPage({
                 use current session ({sessionName || 'unsaved'})
               </button>
             )}
+            <p className="mt-1 font-mono text-[10px] leading-snug text-muted">
+              To exit a running install : press{' '}
+              <span className="text-text">Esc</span> or <span className="text-text">O</span> on the
+              output, or <span className="text-text">Ctrl+Shift+O</span> anywhere. That returns to
+              the operator UI, it does not disarm this toggle.
+            </p>
           </Section>
         </aside>
       </div>

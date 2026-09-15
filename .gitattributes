@@ -1,0 +1,5 @@
+# MediaPipe model + wasm binaries : never normalise line endings (CRLF munging
+# would corrupt them). CI checks out on Linux/mac, so pin these explicitly.
+*.task binary
+*.wasm binary
+resources/mediapipe/** -text
