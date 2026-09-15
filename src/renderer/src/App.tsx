@@ -349,6 +349,8 @@ export default function App(): JSX.Element {
   const outputPageOpen = useStore((s) => s.outputPageOpen)
   const sonifyPageOpen = useStore((s) => s.sonifyPageOpen)
   const renderScale = useStore((s) => s.renderScale)
+  const compW = useStore((s) => s.compW)
+  const compH = useStore((s) => s.compH)
   const worldPageOpen = useStore((s) => s.worldPageOpen)
   const sequencePageOpen = useStore((s) => s.sequencePageOpen)
   const bodyPageOpen = useStore((s) => s.bodyPageOpen)
@@ -799,8 +801,8 @@ export default function App(): JSX.Element {
     // Internal render resolution = 1920×1080 × renderScale (lo-fi ↔ 4K). The
     // canvas backing store IS the render res; CSS object-contain scales it to the
     // preview (pixelated upscale below 1× for the lo-fi look).
-    canvas.width = Math.max(2, Math.round(1920 * renderScale))
-    canvas.height = Math.max(2, Math.round(1080 * renderScale))
+    canvas.width = Math.max(2, Math.round(compW * renderScale))
+    canvas.height = Math.max(2, Math.round(compH * renderScale))
     let raf = 0
     let comp: Compositor | null = null
     try {
@@ -1284,9 +1286,9 @@ export default function App(): JSX.Element {
       }
       compositorRef.current = null
     }
-    // Recreate the whole engine when the render resolution changes — or when
-    // the GPU comes back from a driver reset (glEpoch).
-  }, [renderScale, glEpoch])
+    // Recreate the whole engine when the render resolution changes (renderScale
+    // or the composition size) — or when the GPU comes back from a driver reset.
+  }, [renderScale, compW, compH, glEpoch])
 
   // ── Save-before-quit handshake (main asks; we ack) ──────────────────
   useEffect(() => {
@@ -1563,7 +1565,7 @@ export default function App(): JSX.Element {
             {/* FPS bottom-right, mirroring the resolution tag bottom-left. */}
             <FpsTag />
             <div className="pointer-events-none absolute bottom-2 left-2 font-mono text-[10px] text-muted/70">
-              output · {Math.round(1920 * renderScale)}×{Math.round(1080 * renderScale)}
+              output · {Math.round(compW * renderScale)}×{Math.round(compH * renderScale)}
             </div>
           </div>
 

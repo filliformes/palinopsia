@@ -320,6 +320,57 @@ function openOutputWindow(displayId: number, windowed = false): void {
           }
         }
   )
+  finalizeOutputWindow()
+}
+
+// Multi-projector SPAN : one borderless window covering the union of several
+// displays (each projector is a separate monitor, arranged adjacent in Windows).
+// Not `fullscreen:true` — that restricts a window to one monitor; a borderless
+// window positioned across the union bounds spans them. Per-projector keystone /
+// edge-blend is a later phase ; this shows one wide composition across the row.
+function openSpanWindow(displayIds: number[]): void {
+  const all = screen.getAllDisplays()
+  const chosen = all.filter((d) => displayIds.includes(d.id))
+  const set = chosen.length > 0 ? chosen : all
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+  for (const d of set) {
+    x0 = Math.min(x0, d.bounds.x); y0 = Math.min(y0, d.bounds.y)
+    x1 = Math.max(x1, d.bounds.x + d.bounds.width); y1 = Math.max(y1, d.bounds.y + d.bounds.height)
+  }
+  const bounds = { x: x0, y: y0, width: x1 - x0, height: y1 - y0 }
+  // A frame change can't be toggled after creation, so always recreate cleanly.
+  if (outputWindow) {
+    const old = outputWindow
+    outputWindow = null
+    old.removeAllListeners('closed')
+    old.destroy()
+  }
+  outputWindow = new BrowserWindow({
+    ...bounds,
+    frame: false,
+    backgroundColor: '#000000',
+    title: 'Palinopsia : Output',
+    icon: windowIcon(),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: false,
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false
+    }
+  })
+  // Enforce the exact union rect after creation (some platforms nudge borderless
+  // bounds). NOT always-on-top : spanning the operator's own display too would
+  // otherwise trap it with no way back (the Esc hatch is kiosk-only). The projector
+  // displays keep showing the output while the operator stays reachable.
+  outputWindow.setBounds(bounds)
+  finalizeOutputWindow()
+}
+
+// Shared teardown + load + frame-port wiring for whichever output window we just
+// built (single display or span).
+function finalizeOutputWindow(): void {
+  if (!outputWindow) return
   outputWindow.on('closed', () => {
     outputWindow = null
     mainWindow?.webContents.send('output:closed')
@@ -510,6 +561,10 @@ app.whenReady().then(async () => {
   })
   safeHandle('output:open', (_e, displayId, windowed) => {
     openOutputWindow(displayId as number, windowed as boolean)
+    return true
+  })
+  safeHandle('output:openSpan', (_e, displayIds) => {
+    openSpanWindow((displayIds as number[]) ?? [])
     return true
   })
   safeHandle('output:close', () => {

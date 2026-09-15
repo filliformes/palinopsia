@@ -980,6 +980,9 @@ export interface ExposedApi {
   // Output window (2nd display / projector) : mirror via WebRTC loopback.
   outputDisplays: () => Promise<DisplayInfo[]>
   outputOpen: (displayId: number, windowed?: boolean) => Promise<boolean>
+  // Multi-projector span : one borderless output window across several displays'
+  // union bounds (each projector a separate, adjacent monitor).
+  outputOpenSpan: (displayIds: number[]) => Promise<boolean>
   outputClose: () => Promise<boolean>
   onOutputClosed: (cb: () => void) => () => void
   outputFrame: (frame: OutputFrame) => void

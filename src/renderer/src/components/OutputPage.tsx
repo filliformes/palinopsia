@@ -83,6 +83,9 @@ export function OutputPage({
   }
   const renderScale = useStore((s) => s.renderScale)
   const setRenderScale = useStore((s) => s.setRenderScale)
+  const compW = useStore((s) => s.compW)
+  const compH = useStore((s) => s.compH)
+  const setCompSize = useStore((s) => s.setCompSize)
   // Resizable inspector width (persisted). A drag handle on its left edge; the
   // panel clips horizontally (overflow-x-hidden) so nothing ever spawns a
   // horizontal scrollbar — widen it instead.
@@ -93,11 +96,24 @@ export function OutputPage({
   const dragW = useRef<{ x: number; w: number } | null>(null)
   const strobeSafe = useStore((s) => s.strobeSafe)
   const setStrobeSafe = useStore((s) => s.setStrobeSafe)
-  const resW = Math.round(1920 * renderScale)
-  const resH = Math.round(1080 * renderScale)
+  // Composition-size draft fields : editing them must NOT rebuild the engine on
+  // every keystroke, so they're local and commit on apply / Enter / blur.
+  const [draftW, setDraftW] = useState(String(compW))
+  const [draftH, setDraftH] = useState(String(compH))
+  useEffect(() => { setDraftW(String(compW)); setDraftH(String(compH)) }, [compW, compH])
+  const applyCompSize = (): void => {
+    const w = Number(draftW), h = Number(draftH)
+    if (Number.isFinite(w) && Number.isFinite(h)) setCompSize(w, h)
+  }
+  const resW = Math.round(compW * renderScale)
+  const resH = Math.round(compH * renderScale)
+  const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a)
+  const arDiv = gcd(compW, compH) || 1
+  const aspectLabel = `${compW / arDiv}:${compH / arDiv}`
 
   const [displays, setDisplays] = useState<DisplayInfo[]>([])
   const [displayId, setDisplayId] = useState<number | null>(null)
+  const [spanSel, setSpanSel] = useState<number[]>([])
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const padRef = useRef<HTMLDivElement | null>(null)
@@ -203,6 +219,12 @@ export function OutputPage({
   const openOutput = async (windowed: boolean): Promise<void> => {
     if (displayId == null) return
     await window.api.outputOpen(displayId, windowed)
+    setOutputActive(true)
+  }
+  const openSpan = async (): Promise<void> => {
+    const ids = spanSel.length > 0 ? spanSel : displays.map((d) => d.id)
+    if (ids.length === 0) return
+    await window.api.outputOpenSpan(ids)
     setOutputActive(true)
   }
   const closeOutput = async (): Promise<void> => {
@@ -365,7 +387,53 @@ export function OutputPage({
             </div>
           </Section>
 
-          <Section title="Resolution" info="The whole engine renders at this resolution (every effect, not just a filter). Below 1080p it upscales with crisp pixels: a genuine lo-fi look; push to 4K for hi-fi (heavier on the GPU). Changing it rebuilds the engine: a brief flicker is normal.">
+          <Section
+            title="Composition size"
+            info="The composition's native pixel size and aspect : the whole engine renders at this shape (not just a crop). Widen it to span several projectors (e.g. 7680×2160 = two 4K projectors side by side). It is machine-local, not saved in the session, so a show file stays resolution-independent. Changing it rebuilds the engine (a brief flicker). Render scale below is a quality multiplier on top."
+          >
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                ['1080p', 1920, 1080],
+                ['1440p', 2560, 1440],
+                ['4K UHD', 3840, 2160],
+                ['2×1 · 3840×1080', 3840, 1080],
+                ['3×1 · 5760×1080', 5760, 1080],
+                ['2×1 · 7680×2160', 7680, 2160]
+              ].map(([lbl, w, h]) => (
+                <button
+                  key={lbl as string}
+                  onClick={() => setCompSize(w as number, h as number)}
+                  className={btn(compW === w && compH === h)}
+                  title={`${w}×${h}`}
+                >
+                  {lbl}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number" min={320} max={15360} step={1} value={draftW}
+                onChange={(e) => setDraftW(e.target.value)}
+                onBlur={applyCompSize}
+                onKeyDown={(e) => { if (e.key === 'Enter') applyCompSize() }}
+                className="input w-20 text-right text-[11px]"
+                title="Composition width in pixels"
+              />
+              <span className="font-mono text-[11px] text-muted">×</span>
+              <input
+                type="number" min={240} max={8640} step={1} value={draftH}
+                onChange={(e) => setDraftH(e.target.value)}
+                onBlur={applyCompSize}
+                onKeyDown={(e) => { if (e.key === 'Enter') applyCompSize() }}
+                className="input w-20 text-right text-[11px]"
+                title="Composition height in pixels"
+              />
+              <button onClick={applyCompSize} className={btn(false)} title="Apply the custom size (rebuilds the engine)">apply</button>
+              <span className="ml-auto font-mono text-[10px] text-muted">{aspectLabel}</span>
+            </div>
+          </Section>
+
+          <Section title="Render scale" info="A quality multiplier on the composition size : below 1× the engine renders coarser and upscales (a genuine lo-fi look, lighter on the GPU); above 1× it supersamples (heavier). The readout is the actual render resolution. Changing it rebuilds the engine.">
 
             <div className="flex items-center gap-2">
               <input
@@ -386,9 +454,9 @@ export function OutputPage({
             <div className="flex flex-wrap gap-1.5">
               {[
                 ['½ (lo-fi)', 0.5],
-                ['1080p', 1],
-                ['1440p', 1.3333],
-                ['4K', 2]
+                ['1×', 1],
+                ['1⅓×', 1.3333],
+                ['2×', 2]
               ].map(([lbl, v]) => (
                 <button
                   key={lbl as string}
@@ -485,6 +553,36 @@ export function OutputPage({
                   title="A normal 1280×720 window : easy to Window-Capture in OBS"
                 >
                   window ▶
+                </button>
+              </div>
+            )}
+            {!outputActive && displays.length >= 2 && (
+              <div className="mt-1 flex flex-col gap-1 rounded border border-border/60 bg-panel3/30 p-1.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono text-[9px] uppercase tracking-wide text-muted">span projectors</span>
+                  <InfoDot text="One borderless window across several adjacent displays (each projector a separate monitor). Pick the displays to span, or span all. Set the composition size to the total pixels, e.g. two 4K projectors side by side → 7680×2160. Per-projector keystone / edge-blend is a later phase; this shows one wide composition across the row." />
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {displays.map((d) => {
+                    const on = spanSel.includes(d.id)
+                    return (
+                      <button
+                        key={d.id}
+                        onClick={() => setSpanSel((s) => (on ? s.filter((x) => x !== d.id) : [...s, d.id]))}
+                        className={btn(on)}
+                        title={`${d.width}×${d.height}${d.isPrimary ? ' · primary' : ''}`}
+                      >
+                        {d.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <button
+                  onClick={() => void openSpan()}
+                  className="w-full rounded border border-accent bg-accent/15 px-2 py-1 font-mono text-[11px] text-accent hover:bg-accent/25"
+                  title="Open one borderless output window across the selected displays (or all if none picked)"
+                >
+                  span {spanSel.length > 0 ? `${spanSel.length} display${spanSel.length > 1 ? 's' : ''}` : 'all displays'} ▶
                 </button>
               </div>
             )}

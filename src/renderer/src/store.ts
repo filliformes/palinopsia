@@ -1134,6 +1134,13 @@ interface StoreState {
   toggleMetaXYPads: () => void
   renderScale: number
   setRenderScale: (v: number) => void
+  // The composition's native resolution (machine-local : the output rig's size,
+  // NOT part of a session, so a show file stays resolution-independent). The
+  // engine renders at compW × compH × renderScale. Default 1920×1080 ; set wider
+  // for multi-projector spans (e.g. 7680×2160). renderScale is the quality dial.
+  compW: number
+  compH: number
+  setCompSize: (w: number, h: number) => void
   // Strobe-safety limiter (photosensitive) : 0 = off, higher = tighter flash cap.
   strobeSafe: number
   setStrobeSafe: (v: number) => void
@@ -2777,6 +2784,21 @@ export const useStore = create<StoreState>((set, get) => ({
     const s = Math.max(0.1, Math.min(2, v))
     localStorage.setItem('opsia.renderScale', String(s))
     set({ renderScale: s })
+  },
+  compW: (() => {
+    const n = Number(localStorage.getItem('opsia.compW'))
+    return Number.isFinite(n) && n >= 320 && n <= 15360 ? n : 1920
+  })(),
+  compH: (() => {
+    const n = Number(localStorage.getItem('opsia.compH'))
+    return Number.isFinite(n) && n >= 240 && n <= 8640 ? n : 1080
+  })(),
+  setCompSize: (w, h) => {
+    const cw = Math.max(320, Math.min(15360, Math.round(w)))
+    const ch = Math.max(240, Math.min(8640, Math.round(h)))
+    localStorage.setItem('opsia.compW', String(cw))
+    localStorage.setItem('opsia.compH', String(ch))
+    set({ compW: cw, compH: ch })
   },
   // Flash safety : mild ON by default (0.35) — it barely touches normal content
   // (only >~17% full-field mean-luminance jumps get damped) but nets real strobes.
