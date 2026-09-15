@@ -140,6 +140,8 @@ const api: ExposedApi = {
 
   // ── Kiosk / installation mode ────────────────────────────────────
   kioskConfig: () => ipcRenderer.invoke('kiosk:config'),
+  kioskGetLaunch: () => ipcRenderer.invoke('kiosk:getLaunch'),
+  kioskSetLaunch: (cfg: unknown) => ipcRenderer.invoke('kiosk:setLaunch', cfg),
   minimizeMain: () => ipcRenderer.send('app:minimizeMain'),
 
   // ── Resource HUD + recording ─────────────────────────────────────

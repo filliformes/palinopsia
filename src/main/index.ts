@@ -15,7 +15,7 @@ import {
   screen
 } from 'electron'
 import { join } from 'path'
-import { existsSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import type { Session, LightConfig } from '@shared/types'
 import { OscSender } from './osc'
 import { OscReceiver, localIPv4s, type OscInMessage } from './osc-receive'
@@ -70,11 +70,13 @@ const oscSender = new OscSender()
 const outputSender = new OutputSender()
 const lightSender = new LightSender()
 
-// Kiosk / installation mode : `--kiosk [--session=<path>] [--display=<id>]`.
-// Boot straight to a session, fullscreen the output, get the operator UI out of
-// the way (renderer-driven, see the kiosk effect), and self-heal on a renderer
-// crash. Parsed once from argv; the renderer reads it via `kiosk:config`.
-const kioskConfig = (() => {
+// Kiosk / installation mode : boot straight to a session, fullscreen the output,
+// get the operator UI out of the way (renderer-driven, see the kiosk effect), and
+// self-heal on a renderer crash. Two sources, merged : the `--kiosk [--session=]
+// [--display=]` CLI flags (one-off), and a persisted `kiosk.json` toggled from the
+// Output inspector's Installation section ("enable on next restart"). argv wins.
+interface KioskLaunch { enabled?: boolean; sessionPath?: string; display?: number }
+const argvKiosk = (() => {
   const argv = process.argv
   const val = (f: string): string | undefined => {
     const a = argv.find((x) => x.startsWith(f + '='))
@@ -88,6 +90,20 @@ const kioskConfig = (() => {
     display: display != null && Number.isFinite(display) ? display : undefined
   }
 })()
+function kioskFilePath(): string {
+  return join(app.getPath('userData'), 'kiosk.json')
+}
+function readKioskFile(): KioskLaunch {
+  try { return JSON.parse(readFileSync(kioskFilePath(), 'utf8')) as KioskLaunch } catch { return {} }
+}
+function getKioskConfig(): { kiosk: boolean; sessionPath?: string; display?: number } {
+  const f = readKioskFile()
+  return {
+    kiosk: argvKiosk.kiosk || !!f.enabled,
+    sessionPath: argvKiosk.sessionPath ?? f.sessionPath,
+    display: argvKiosk.display ?? (typeof f.display === 'number' ? f.display : undefined)
+  }
+}
 // OSC in : the instrument is PLAYED through this: Pandore/TouchOSC send here
 // and the renderer maps addresses onto the store (see renderer/oscInput.ts).
 const oscReceiver = new OscReceiver()
@@ -154,7 +170,7 @@ function createWindow(): void {
   // Kiosk self-heal : an unattended install must not sit on a dead renderer, so
   // reload if the render process dies (crash / GPU process gone). Kiosk-only so
   // normal-mode crashes still surface for debugging.
-  if (kioskConfig.kiosk) {
+  if (getKioskConfig().kiosk) {
     mainWindow.webContents.on('render-process-gone', () => {
       if (mainWindow && !appQuitting) mainWindow.reload()
     })
@@ -529,7 +545,11 @@ app.whenReady().then(async () => {
   )
 
   // ---------- IPC: Kiosk / installation mode ----------
-  safeHandle('kiosk:config', () => kioskConfig)
+  safeHandle('kiosk:config', () => getKioskConfig())
+  safeHandle('kiosk:getLaunch', () => readKioskFile())
+  safeHandle('kiosk:setLaunch', (_e, cfg) => {
+    try { writeFileSync(kioskFilePath(), JSON.stringify((cfg as KioskLaunch) ?? {})); return true } catch { return false }
+  })
   safeOn('app:minimizeMain', () => mainWindow?.minimize())
 
   // ---------- IPC: Session I/O ----------

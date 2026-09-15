@@ -45,6 +45,24 @@ export function OutputPage({
   const setSpoutActive = useStore((s) => s.setSpoutActive)
   const lights = useStore((s) => s.lights)
   const setLights = useStore((s) => s.setLights)
+  // Installation mode : a persisted "enable on next restart" launch config (main
+  // owns kiosk.json). Load it once; toggling writes it back.
+  const sessionPath = useStore((s) => s.sessionPath)
+  const sessionName = useStore((s) => s.name)
+  const [kioskLaunch, setKioskLaunch] = useState<{ enabled: boolean; sessionPath?: string; display?: number }>({
+    enabled: false
+  })
+  useEffect(() => {
+    window.api
+      .kioskGetLaunch()
+      .then((k) => setKioskLaunch({ enabled: !!k.enabled, sessionPath: k.sessionPath, display: k.display }))
+      .catch(() => {})
+  }, [])
+  const saveKiosk = (partial: Partial<typeof kioskLaunch>): void => {
+    const next = { ...kioskLaunch, ...partial }
+    setKioskLaunch(next)
+    window.api.kioskSetLaunch(next).catch(() => {})
+  }
   const hiveOutActive = useStore((s) => s.hiveOutActive)
   const setHiveOutActive = useStore((s) => s.setHiveOutActive)
   const hiveOutPort = useStore((s) => s.hiveOutPort)
@@ -65,6 +83,14 @@ export function OutputPage({
   }
   const renderScale = useStore((s) => s.renderScale)
   const setRenderScale = useStore((s) => s.setRenderScale)
+  // Resizable inspector width (persisted). A drag handle on its left edge; the
+  // panel clips horizontally (overflow-x-hidden) so nothing ever spawns a
+  // horizontal scrollbar — widen it instead.
+  const [inspW, setInspW] = useState(() => {
+    const v = Number(localStorage.getItem('opsia.outInspectorW'))
+    return Number.isFinite(v) && v >= 240 && v <= 560 ? v : 300
+  })
+  const dragW = useRef<{ x: number; w: number } | null>(null)
   const strobeSafe = useStore((s) => s.strobeSafe)
   const setStrobeSafe = useStore((s) => s.setStrobeSafe)
   const resW = Math.round(1920 * renderScale)
@@ -204,7 +230,9 @@ export function OutputPage({
 
   const btn = (on: boolean): string =>
     `rounded border px-3 py-1 font-mono text-[11px] transition-colors ${
-      on ? 'border-accent bg-accent/15 text-accent' : 'border-border text-muted hover:text-text'
+      on
+        ? 'border-accent bg-accent/15 text-accent'
+        : 'border-border bg-panel3/70 text-muted hover:bg-panel3 hover:text-text'
     }`
   const pts = [0, 1, 2, 3].map((i) => `${corners[i * 2] * 100},${corners[i * 2 + 1] * 100}`).join(' ')
 
@@ -297,9 +325,30 @@ export function OutputPage({
          <ResourceHud />
         </div>
 
+        {/* Drag handle : resize the inspector. */}
+        <div
+          onPointerDown={(e) => {
+            dragW.current = { x: e.clientX, w: inspW }
+            ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+          }}
+          onPointerMove={(e) => {
+            if (!dragW.current) return
+            setInspW(Math.max(240, Math.min(560, dragW.current.w + (dragW.current.x - e.clientX))))
+          }}
+          onPointerUp={() => {
+            if (dragW.current) localStorage.setItem('opsia.outInspectorW', String(inspW))
+            dragW.current = null
+          }}
+          className="w-1.5 shrink-0 cursor-col-resize bg-border/50 transition-colors hover:bg-accent/50"
+          title="Drag to resize"
+        />
         {/* Controls */}
-        <aside className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto border-l border-border bg-panel p-4">
-          <Section title="Mapping">
+        <aside
+          style={{ width: inspW }}
+          className="flex shrink-0 flex-col gap-2 overflow-y-auto overflow-x-hidden border-l border-border bg-panel p-2"
+        >
+          <Section title="Mapping" info="Drag the corners over the live preview to keystone the image onto a projector. Turn grid on to align, off for the show.">
+
             <div className="flex flex-wrap gap-1.5">
               <button onClick={() => setWarpEnabled(!warpEnabled)} className={btn(warpEnabled)}>
                 warp {warpEnabled ? 'on' : 'off'}
@@ -314,14 +363,10 @@ export function OutputPage({
                 reset
               </button>
             </div>
-            <p className="text-[11px] leading-tight text-muted">
-              Drag the corners over the live preview to keystone the image onto a
-              projector. Turn <span className="text-text">grid</span> on to align,
-              off for the show.
-            </p>
           </Section>
 
-          <Section title="Resolution">
+          <Section title="Resolution" info="The whole engine renders at this resolution (every effect, not just a filter). Below 1080p it upscales with crisp pixels: a genuine lo-fi look; push to 4K for hi-fi (heavier on the GPU). Changing it rebuilds the engine: a brief flicker is normal.">
+
             <div className="flex items-center gap-2">
               <input
                 type="range"
@@ -354,16 +399,10 @@ export function OutputPage({
                 </button>
               ))}
             </div>
-            <p className="text-[11px] leading-tight text-muted">
-              The whole engine renders at this resolution (every effect, not just a
-              filter). Below <span className="text-text">1080p</span> it upscales
-              with crisp pixels : a genuine lo-fi look; push to{' '}
-              <span className="text-text">4K</span> for hi-fi (heavier on the GPU).
-              Changing it rebuilds the engine : a brief flicker is normal.
-            </p>
           </Section>
 
-          <Section title="Flash safety">
+          <Section title="Flash safety" info="A safety net on the final image: it measures whole-frame brightness each frame and damps big full-field flashes (Shutter, Superimposition, Frame-Weave, datamosh, hard cuts…) so no seizure-inducing strobe reaches the screen. Normal motion is untouched. Mild is on by default and barely affects ordinary content.">
+
             <div className="flex items-center gap-2">
               <input
                 type="range"
@@ -396,14 +435,6 @@ export function OutputPage({
                 </button>
               ))}
             </div>
-            <p className="text-[11px] leading-tight text-muted">
-              A safety net on the final image : it measures the whole-frame brightness
-              each frame and damps big full-field <span className="text-text">flashes</span>{' '}
-              (from Shutter, Superimposition, Frame-Weave, datamosh, hard cuts…) so no
-              seizure-inducing strobe reaches the screen. Normal motion is untouched.
-              <span className="text-text"> Mild</span> is on by default and barely
-              affects ordinary content.
-            </p>
           </Section>
 
           <Section title="Fullscreen output">
@@ -459,7 +490,8 @@ export function OutputPage({
             )}
           </Section>
 
-          <Section title="Record">
+          <Section title="Record" info="Clips + screenshots land in the Recorded folder, at the current output resolution. Captured as a high-bitrate hardware H.264 master, then ffmpeg delivers the chosen format (ProRes / FFV1 / uncompressed included).">
+
             <select
               className="input select-compact w-full text-[11px]"
               value={formatId}
@@ -498,15 +530,14 @@ export function OutputPage({
                 screenshot
               </button>
             </div>
-            <p className="text-[11px] leading-tight text-muted">
-              Clips + screenshots land in the <span className="text-text">Recorded</span>{' '}
-              folder, at the current output resolution. Captured as a high-bitrate
-              hardware H.264 master, then ffmpeg delivers the chosen format
-              (ProRes / FFV1 / uncompressed included).
-            </p>
           </Section>
 
-          <Section title="Send (NDI / Spout)">
+          <Section
+            title="Send (NDI / Spout)"
+            info="NDI / Spout need an optional native sender installed. Spout is the zero-copy path on Windows."
+            defaultCollapsed={!ndiActive && !spoutActive}
+          >
+
             <div className="flex gap-1.5">
               <button
                 onClick={() => toggleSink('ndi', ndiActive, setNdiActive)}
@@ -521,13 +552,14 @@ export function OutputPage({
                 Spout {spoutActive ? 'on' : 'off'}
               </button>
             </div>
-            <p className="text-[11px] leading-tight text-muted">
-              NDI / Spout need an optional native sender installed. Spout is the
-              zero-copy path on Windows.
-            </p>
           </Section>
 
-          <Section title="HIVE (open network output)">
+          <Section
+            title="HIVE (open network output)"
+            info="HEVC over TCP, advertised on the LAN via mDNS: the open NDI alternative. Receive in OBS (HIVE plugin) or any HIVE client. Experimental: needs a hardware HEVC encoder."
+            defaultCollapsed={!hiveOutActive}
+          >
+
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setHiveOutActive(!hiveOutActive)}
@@ -551,14 +583,14 @@ export function OutputPage({
                 />
               </label>
             </div>
-            <p className="text-[11px] leading-tight text-muted">
-              HEVC over TCP, advertised on the LAN via mDNS : the open NDI
-              alternative. Receive in OBS (HIVE plugin) or any HIVE client.
-              Experimental: needs a hardware HEVC encoder.
-            </p>
           </Section>
 
-          <Section title="Lights (ArtNet / WLED)">
+          <Section
+            title="Lights (ArtNet / WLED)"
+            info="Samples the composite into a cols×rows zone grid and streams it as ArtNet/DMX (any console or LED controller) or WLED (DNRGB, port 21324). Set the fixture's IP; ArtNet spills across universes automatically. Machine-local (travels with the venue, not the session)."
+            defaultCollapsed={!lights.enabled}
+          >
+
             <div className="flex gap-1.5">
               <button
                 onClick={() => setLights({ enabled: !lights.enabled })}
@@ -582,7 +614,7 @@ export function OutputPage({
                 className="w-36 rounded bg-panel px-1 py-0.5 text-right font-mono text-[11px] text-fg"
               />
             </label>
-            <div className="flex items-center gap-2 text-[11px] text-muted">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted">
               <label className="flex items-center gap-1">cols
                 <input type="number" min={1} max={64} value={lights.cols}
                   onChange={(e) => setLights({ cols: Math.max(1, Math.min(64, Number(e.target.value) || 1)) })}
@@ -605,7 +637,7 @@ export function OutputPage({
                 onChange={(e) => setLights({ brightness: Number(e.target.value) })} className="flex-1" />
               <span className="w-8 text-right font-mono">{lights.brightness.toFixed(2)}</span>
             </label>
-            <div className="flex items-center gap-3 text-[11px] text-muted">
+            <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted">
               <label className="flex items-center gap-1">gamma
                 <input type="number" min={0.5} max={3} step={0.1} value={lights.gamma}
                   onChange={(e) => setLights({ gamma: Math.max(0.5, Math.min(3, Number(e.target.value) || 1)) })}
@@ -618,7 +650,7 @@ export function OutputPage({
               </label>
             </div>
             {lights.protocol === 'artnet' && (
-              <div className="flex items-center gap-2 text-[11px] text-muted">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted">
                 <label className="flex items-center gap-1">universe
                   <input type="number" min={0} max={32767} value={lights.universe}
                     onChange={(e) => setLights({ universe: Math.max(0, Number(e.target.value) || 0) })}
@@ -641,12 +673,65 @@ export function OutputPage({
                 </label>
               </div>
             )}
-            <p className="text-[11px] leading-tight text-muted">
-              Samples the composite into a cols×rows zone grid and streams it as
-              ArtNet/DMX (any console or LED controller) or WLED (DNRGB, port
-              21324). Set the fixture's IP; ArtNet spills across universes
-              automatically. Machine-local (travels with the venue, not the session).
-            </p>
+          </Section>
+
+          <Section
+            title="Installation mode"
+            info="Boot straight into a session, fullscreen on the chosen display, hide the operator window, and self-heal if the renderer crashes — for unattended installs. The projector mapping (keystone) is machine-local, so it is applied automatically. Takes effect on the NEXT app launch."
+            defaultCollapsed={!kioskLaunch.enabled}
+          >
+            <button
+              onClick={() =>
+                saveKiosk({
+                  enabled: !kioskLaunch.enabled,
+                  // Capture the current session + display when arming.
+                  sessionPath: kioskLaunch.enabled ? kioskLaunch.sessionPath : sessionPath ?? undefined,
+                  display: kioskLaunch.display ?? displayId ?? undefined
+                })
+              }
+              className={`w-full ${btn(kioskLaunch.enabled)}`}
+            >
+              {kioskLaunch.enabled ? 'ON at next restart' : 'Enable on next restart'}
+            </button>
+            <label className="flex items-center justify-between gap-2 text-[11px] text-muted">
+              session
+              <span
+                className="min-w-0 truncate font-mono text-text"
+                title={kioskLaunch.sessionPath ?? sessionPath ?? 'no session saved'}
+              >
+                {kioskLaunch.sessionPath
+                  ? kioskLaunch.sessionPath.split(/[\\/]/).pop()
+                  : sessionPath
+                    ? sessionName || 'current'
+                    : 'save the session first'}
+              </span>
+            </label>
+            <label className="flex items-center gap-2 text-[11px] text-muted">
+              display
+              <select
+                value={kioskLaunch.display ?? ''}
+                onChange={(e) => saveKiosk({ display: e.target.value === '' ? undefined : Number(e.target.value) })}
+                className="input select-compact min-w-0 flex-1 text-[11px]"
+              >
+                <option value="">primary</option>
+                {displays.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.label}
+                    {d.isPrimary ? ' (primary)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {kioskLaunch.enabled && (
+              <button
+                onClick={() => saveKiosk({ sessionPath: sessionPath ?? undefined })}
+                disabled={!sessionPath}
+                className="rounded border border-border bg-panel3/70 px-2 py-0.5 font-mono text-[10px] text-muted hover:text-accent disabled:opacity-40"
+                title="Point Installation mode at the currently-open session file"
+              >
+                use current session ({sessionName || 'unsaved'})
+              </button>
+            )}
           </Section>
         </aside>
       </div>
@@ -654,11 +739,49 @@ export function OutputPage({
   )
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }): JSX.Element {
+// A small "i" that reveals its explanation on hover (native title : never clips,
+// never forces the inspector to scroll horizontally). Replaces the inline
+// paragraphs that used to bulk up the panel.
+function InfoDot({ text }: { text: string }): JSX.Element {
   return (
-    <div className="flex flex-col gap-2">
-      <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{title}</span>
-      {children}
+    <span
+      title={text}
+      className="flex h-3.5 w-3.5 shrink-0 cursor-help items-center justify-center rounded-full border border-border font-mono text-[8px] text-muted hover:border-accent hover:text-accent"
+    >
+      i
+    </span>
+  )
+}
+
+// A collapsible card. Distinct from the panel (its own border + bg-panel2), an
+// optional info dot, and a `defaultCollapsed` so feature sections that are off
+// by default open collapsed.
+function Section({
+  title,
+  info,
+  defaultCollapsed = false,
+  children
+}: {
+  title: string
+  info?: string
+  defaultCollapsed?: boolean
+  children: ReactNode
+}): JSX.Element {
+  const [collapsed, setCollapsed] = useState(defaultCollapsed)
+  return (
+    <div className="rounded-md border border-border bg-panel2">
+      <div className="flex items-center gap-1.5 px-2 py-1.5">
+        <button
+          onClick={() => setCollapsed((c) => !c)}
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+          title={collapsed ? `Expand ${title}` : `Collapse ${title}`}
+        >
+          <span className={`font-mono text-[9px] text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}>▶</span>
+          <span className="truncate font-mono text-[9px] uppercase tracking-wide text-muted">{title}</span>
+        </button>
+        {info && <InfoDot text={info} />}
+      </div>
+      {!collapsed && <div className="flex min-w-0 flex-col gap-2 px-2 pb-2">{children}</div>}
     </div>
   )
 }
