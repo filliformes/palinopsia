@@ -28,7 +28,7 @@ import type {
   SourceSlot,
   World
 } from '@shared/types'
-import type { MetaKnobState, MidiBinding } from '@shared/types'
+import type { MetaKnobState, MidiBinding, LightConfig } from '@shared/types'
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
 import { inputsForShader } from './shaders/isf/inputs'
 import { SHADER_BY_ID } from './shaders/isf'
@@ -1052,6 +1052,9 @@ interface StoreState {
   setNdiActive: (on: boolean) => void
   spoutActive: boolean
   setSpoutActive: (on: boolean) => void
+  // Light output (ArtNet/DMX · WLED). Machine-local (venue-specific), persisted.
+  lights: LightConfig
+  setLights: (partial: Partial<LightConfig>) => void
   // HIVE output (open NDI-alternative). hiveOutActive is transient; port persists.
   hiveOutActive: boolean
   setHiveOutActive: (on: boolean) => void
@@ -2693,6 +2696,20 @@ export const useStore = create<StoreState>((set, get) => ({
   setNdiActive: (on) => set({ ndiActive: on }),
   spoutActive: false,
   setSpoutActive: (on) => set({ spoutActive: on }),
+  lights: (() => {
+    const def: LightConfig = {
+      enabled: false, protocol: 'artnet', host: '', cols: 8, rows: 1, order: 'rgb',
+      brightness: 1, gamma: 2.2, universe: 0, startChannel: 1, serpentine: false, fps: 40
+    }
+    try { return { ...def, ...JSON.parse(localStorage.getItem('opsia.lights') || '{}') } as LightConfig }
+    catch { return def }
+  })(),
+  setLights: (partial) =>
+    set((s) => {
+      const lights = { ...s.lights, ...partial }
+      localStorage.setItem('opsia.lights', JSON.stringify(lights))
+      return { lights } // pushed to main by an App effect watching `lights`
+    }),
   hiveOutActive: false,
   setHiveOutActive: (on) => set({ hiveOutActive: on }),
   hiveOutPort: Number(localStorage.getItem('opsia.hiveOutPort')) || 51842,

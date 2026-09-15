@@ -1548,6 +1548,72 @@ export class Compositor {
   private streamTW = 0;
   private streamTH = 0;
 
+  /** LIGHT OUTPUT : reduce the presented composite to a cols×rows grid of zone
+   *  colours for DMX/ArtNet/WLED. Two cheap passes : copy the clean composite
+   *  into a mipmapped 256² source, then downscale it into the cols×rows target
+   *  so each output texel is a TRILINEAR (mip) box-average of its zone — a true
+   *  representative colour, not a 4-tap point sample. Reads back cols*rows*4
+   *  bytes (tiny). RGBA8, bottom-up (row 0 = bottom of the frame). Returns a
+   *  reused buffer; copy it before the next call. */
+  private zoneMipTex: WebGLTexture | null = null;
+  private zoneMipFbo: WebGLFramebuffer | null = null;
+  private zoneOut: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
+  private zoneCols = 0;
+  private zoneRows = 0;
+  private zoneBuf: Uint8Array | null = null;
+  captureZones(cols: number, rows: number): { cols: number; rows: number; px: Uint8Array } | null {
+    const gl = this.gl;
+    if (!this.lastPresent) return null;
+    cols = Math.max(1, Math.min(64, Math.round(cols)));
+    rows = Math.max(1, Math.min(64, Math.round(rows)));
+    const MIP = 256;
+    if (!this.zoneMipTex) {
+      this.zoneMipTex = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, this.zoneMipTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, MIP, MIP, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      this.zoneMipFbo = gl.createFramebuffer()!;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.zoneMipFbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.zoneMipTex, 0);
+    }
+    if (!this.zoneOut || this.zoneCols !== cols || this.zoneRows !== rows) {
+      if (this.zoneOut) { gl.deleteFramebuffer(this.zoneOut.fbo); gl.deleteTexture(this.zoneOut.tex); }
+      const tex = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, cols, rows, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      const fbo = gl.createFramebuffer()!; gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      this.zoneOut = { fbo, tex }; this.zoneCols = cols; this.zoneRows = rows;
+      this.zoneBuf = new Uint8Array(cols * rows * 4);
+    }
+    gl.bindVertexArray(this.vao);
+    gl.useProgram(this.copyProg);
+    gl.activeTexture(gl.TEXTURE0); gl.uniform1i(this.uCTex, 0);
+    // Pass 1 : clean composite → mipmapped 256² source.
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.zoneMipFbo);
+    gl.viewport(0, 0, MIP, MIP);
+    gl.bindTexture(gl.TEXTURE_2D, this.lastPresent);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    // Switch the render target OFF the mip texture BEFORE generating its mips
+    // (generateMipmap on a texture still attached to the bound FBO is a feedback
+    // hazard), then Pass 2 : mip source → cols×rows (trilinear = zone average).
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.zoneOut.fbo);
+    gl.viewport(0, 0, cols, rows);
+    gl.bindTexture(gl.TEXTURE_2D, this.zoneMipTex);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.readPixels(0, 0, cols, rows, gl.RGBA, gl.UNSIGNED_BYTE, this.zoneBuf!);
+    gl.bindVertexArray(null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return { cols, rows, px: this.zoneBuf! };
+  }
+
   /** PANIC FLUSH (bound to the `0` key) : empty every self-feeding buffer WITHOUT
    *  a rebuild, so a runaway feedback or a stuck accumulator recovers live — no
    *  reload, no black. Each layer's feedback ping-pong + all three of its FX racks'

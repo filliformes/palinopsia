@@ -133,6 +133,11 @@ const api: ExposedApi = {
   spoutSet: (on: boolean) => ipcRenderer.invoke('spout:set', on),
   ndiFrame: (w: number, h: number, pixels: Uint8Array) => ipcRenderer.send('ndi:frame', w, h, pixels),
 
+  // ── Light output (ArtNet/DMX · WLED) ─────────────────────────────
+  lightConfig: (cfg: unknown) => ipcRenderer.send('light:config', cfg),
+  lightFrame: (cols: number, rows: number, pixels: Uint8Array) =>
+    ipcRenderer.send('light:frame', cols, rows, pixels),
+
   // ── Resource HUD + recording ─────────────────────────────────────
   perfStats: () => ipcRenderer.invoke('perf:stats'),
   recordingFormats: () => ipcRenderer.invoke('recording:formats'),

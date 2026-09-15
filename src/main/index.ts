@@ -16,7 +16,7 @@ import {
 } from 'electron'
 import { join } from 'path'
 import { existsSync } from 'fs'
-import type { Session } from '@shared/types'
+import type { Session, LightConfig } from '@shared/types'
 import { OscSender } from './osc'
 import { OscReceiver, localIPv4s, type OscInMessage } from './osc-receive'
 import * as sessionIO from './session'
@@ -29,6 +29,7 @@ import { registerCollage } from './collage'
 import { hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
 import { hiveSendStart, hiveSendChunk, hiveSendStop } from './hiveSend'
 import { OutputSender } from './output'
+import { LightSender } from './light'
 import { samplePerf } from './perf'
 import * as recording from './recording'
 
@@ -67,6 +68,7 @@ app.on('child-process-gone', (_e, details) => {
 const oscSender = new OscSender()
 // External video output (NDI, via optional native sender).
 const outputSender = new OutputSender()
+const lightSender = new LightSender()
 // OSC in : the instrument is PLAYED through this: Pandore/TouchOSC send here
 // and the renderer maps addresses onto the store (see renderer/oscInput.ts).
 const oscReceiver = new OscReceiver()
@@ -89,6 +91,7 @@ function shutdown(): void {
   hiveDisconnectAll()
   hiveSendStop()
   outputSender.dispose()
+  lightSender.dispose()
 }
 
 // Window/taskbar icon. electron-builder stamps the exe icon (which covers the
@@ -489,6 +492,12 @@ app.whenReady().then(async () => {
   safeHandle('spout:set', (_e, on) => outputSender.setSpout(on as boolean))
   safeOn('ndi:frame', (_e, w, h, pixels) =>
     outputSender.send(w as number, h as number, pixels as Uint8Array)
+  )
+
+  // ---------- IPC: Light output (ArtNet/DMX · WLED) ----------
+  safeOn('light:config', (_e, cfg) => lightSender.setConfig(cfg as LightConfig | null))
+  safeOn('light:frame', (_e, cols, rows, pixels) =>
+    lightSender.send(cols as number, rows as number, pixels as Uint8Array)
   )
 
   // ---------- IPC: Session I/O ----------

@@ -801,6 +801,23 @@ export interface HiveStatus {
   error?: string
 }
 
+/** Light output (ArtNet/DMX · WLED). Machine-local (venue-specific), persisted
+ *  to localStorage, pushed to main which owns the UDP senders (see main/light.ts). */
+export interface LightConfig {
+  enabled: boolean
+  protocol: 'artnet' | 'wled'
+  host: string
+  cols: number
+  rows: number
+  order: 'rgb' | 'grb' | 'brg' | 'bgr'
+  brightness: number
+  gamma: number
+  universe: number
+  startChannel: number
+  serpentine: boolean
+  fps: number
+}
+
 export interface ExposedApi {
   // Session I/O
   sessionSaveAs: (s: Session) => Promise<string | null>
@@ -904,6 +921,9 @@ export interface ExposedApi {
   ndiSet: (on: boolean) => Promise<boolean>
   spoutSet: (on: boolean) => Promise<boolean>
   ndiFrame: (w: number, h: number, pixels: Uint8Array) => void
+  // Light output (ArtNet/DMX · WLED) : push config, then zone frames.
+  lightConfig: (cfg: LightConfig) => void
+  lightFrame: (cols: number, rows: number, pixels: Uint8Array) => void
   // Host resource monitor (Output HUD).
   perfStats: () => Promise<PerfStats>
   // Recording: intermediate MediaRecorder chunks streamed to main → ffmpeg

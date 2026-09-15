@@ -77,6 +77,7 @@ let contextPresetIndex = -1
 let depthModePrev = ''
 let lastDepthSample = 0 // throttles the depth-estimator frame readback (~11 Hz)
 let lastVisionSample = 0 // throttles the vision-bus readback (~30 Hz)
+let lastLightSample = 0 // throttles the light-output zone readback (config fps cap)
 
 // Reveal a Finishing Touches sub-section: switch the right column to the
 // Finishing view and expand the relevant sub-row.
@@ -310,6 +311,14 @@ export default function App(): JSX.Element {
     // effect — which does see it — carries the GPU-reset case). (The output-window
     // STREAM is driven from the render loop, not here.)
   }, [ndiActive, spoutActive, renderScale])
+
+  // ── Light output : push the (machine-local) config to main whenever it
+  //    changes, so the ArtNet/WLED sender always has the current mapping. The
+  //    zone frames themselves are shipped from the render loop below. ───────
+  const lights = useStore((s) => s.lights)
+  useEffect(() => {
+    try { window.api.lightConfig(lights) } catch { /* main not ready yet */ }
+  }, [lights])
 
   // ── HIVE output (sender) : start the HEVC encoder + TCP fan-out ───────
   const hiveOutActive = useStore((s) => s.hiveOutActive)
@@ -1038,6 +1047,18 @@ export default function App(): JSX.Element {
             let v = 0
             for (let i = 0; i < dr.data.length; i++) { const e = dr.data[i] - mean; v += e * e }
             visionBus.setDepth(mean, Math.min(1, Math.sqrt(v / dr.data.length) * 3))
+          }
+        }
+        // 3e. Light output (image → room): mip-average the composite into a zone
+        //     grid and ship it to main's ArtNet/DMX · WLED sender. Throttled to
+        //     the config's fps cap (DMX tops out ~44 Hz; LEDs less), so the small
+        //     zone readback never paces the render.
+        if (st.lights.enabled) {
+          const lc = st.lights
+          if (now - lastLightSample > 1000 / Math.max(1, Math.min(60, lc.fps || 40))) {
+            lastLightSample = now
+            const z = comp!.captureZones(lc.cols, lc.rows)
+            if (z) window.api.lightFrame(z.cols, z.rows, z.px)
           }
         }
         // 4. Native output window: push the exact render state so it renders

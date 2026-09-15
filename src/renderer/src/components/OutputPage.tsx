@@ -43,6 +43,8 @@ export function OutputPage({
   const setNdiActive = useStore((s) => s.setNdiActive)
   const spoutActive = useStore((s) => s.spoutActive)
   const setSpoutActive = useStore((s) => s.setSpoutActive)
+  const lights = useStore((s) => s.lights)
+  const setLights = useStore((s) => s.setLights)
   const hiveOutActive = useStore((s) => s.hiveOutActive)
   const setHiveOutActive = useStore((s) => s.setHiveOutActive)
   const hiveOutPort = useStore((s) => s.hiveOutPort)
@@ -553,6 +555,97 @@ export function OutputPage({
               HEVC over TCP, advertised on the LAN via mDNS : the open NDI
               alternative. Receive in OBS (HIVE plugin) or any HIVE client.
               Experimental: needs a hardware HEVC encoder.
+            </p>
+          </Section>
+
+          <Section title="Lights (ArtNet / WLED)">
+            <div className="flex gap-1.5">
+              <button
+                onClick={() => setLights({ enabled: !lights.enabled })}
+                className={`flex-1 ${btn(lights.enabled)}`}
+              >
+                Lights {lights.enabled ? 'on' : 'off'}
+              </button>
+              <button onClick={() => setLights({ protocol: 'artnet' })} className={btn(lights.protocol === 'artnet')}>
+                ArtNet
+              </button>
+              <button onClick={() => setLights({ protocol: 'wled' })} className={btn(lights.protocol === 'wled')}>
+                WLED
+              </button>
+            </div>
+            <label className="flex items-center justify-between gap-1 text-[11px] text-muted">
+              host
+              <input
+                value={lights.host}
+                onChange={(e) => setLights({ host: e.target.value })}
+                placeholder="192.168.1.50"
+                className="w-36 rounded bg-panel px-1 py-0.5 text-right font-mono text-[11px] text-fg"
+              />
+            </label>
+            <div className="flex items-center gap-2 text-[11px] text-muted">
+              <label className="flex items-center gap-1">cols
+                <input type="number" min={1} max={64} value={lights.cols}
+                  onChange={(e) => setLights({ cols: Math.max(1, Math.min(64, Number(e.target.value) || 1)) })}
+                  className="w-12 rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" />
+              </label>
+              <label className="flex items-center gap-1">rows
+                <input type="number" min={1} max={64} value={lights.rows}
+                  onChange={(e) => setLights({ rows: Math.max(1, Math.min(64, Number(e.target.value) || 1)) })}
+                  className="w-12 rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" />
+              </label>
+              <label className="flex items-center gap-1">fps
+                <input type="number" min={1} max={60} value={lights.fps}
+                  onChange={(e) => setLights({ fps: Math.max(1, Math.min(60, Number(e.target.value) || 40)) })}
+                  className="w-12 rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" />
+              </label>
+            </div>
+            <label className="flex items-center gap-2 text-[11px] text-muted">
+              bright
+              <input type="range" min={0} max={1} step={0.01} value={lights.brightness}
+                onChange={(e) => setLights({ brightness: Number(e.target.value) })} className="flex-1" />
+              <span className="w-8 text-right font-mono">{lights.brightness.toFixed(2)}</span>
+            </label>
+            <div className="flex items-center gap-3 text-[11px] text-muted">
+              <label className="flex items-center gap-1">gamma
+                <input type="number" min={0.5} max={3} step={0.1} value={lights.gamma}
+                  onChange={(e) => setLights({ gamma: Math.max(0.5, Math.min(3, Number(e.target.value) || 1)) })}
+                  className="w-12 rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" />
+              </label>
+              <label className="flex items-center gap-1">
+                <input type="checkbox" checked={lights.serpentine}
+                  onChange={(e) => setLights({ serpentine: e.target.checked })} />
+                serpentine
+              </label>
+            </div>
+            {lights.protocol === 'artnet' && (
+              <div className="flex items-center gap-2 text-[11px] text-muted">
+                <label className="flex items-center gap-1">universe
+                  <input type="number" min={0} max={32767} value={lights.universe}
+                    onChange={(e) => setLights({ universe: Math.max(0, Number(e.target.value) || 0) })}
+                    className="w-14 rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" />
+                </label>
+                <label className="flex items-center gap-1">ch
+                  <input type="number" min={1} max={512} value={lights.startChannel}
+                    onChange={(e) => setLights({ startChannel: Math.max(1, Math.min(512, Number(e.target.value) || 1)) })}
+                    className="w-12 rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" />
+                </label>
+                <label className="flex items-center gap-1">order
+                  <select value={lights.order}
+                    onChange={(e) => setLights({ order: e.target.value as 'rgb' | 'grb' | 'brg' | 'bgr' })}
+                    className="rounded bg-panel px-1 py-0.5 font-mono text-fg">
+                    <option value="rgb">RGB</option>
+                    <option value="grb">GRB</option>
+                    <option value="brg">BRG</option>
+                    <option value="bgr">BGR</option>
+                  </select>
+                </label>
+              </div>
+            )}
+            <p className="text-[11px] leading-tight text-muted">
+              Samples the composite into a cols×rows zone grid and streams it as
+              ArtNet/DMX (any console or LED controller) or WLED (DNRGB, port
+              21324). Set the fixture's IP; ArtNet spills across universes
+              automatically. Machine-local (travels with the venue, not the session).
             </p>
           </Section>
         </aside>
