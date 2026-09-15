@@ -334,10 +334,12 @@ export const BODY_GESTURES: BodyGesture[] = [
   'mouthPop', 'browRaise', 'winkLeft', 'winkRight'
 ]
 
-// What a gesture fires. All map to actions the store already exposes, so this is
-// routing, not new engine. 'none' unbinds.
-export type GestureAction = 'none' | 'sceneNext' | 'scenePrev' | 'randomize' | 'panic' | 'freeze'
-export const GESTURE_ACTIONS: GestureAction[] = ['none', 'sceneNext', 'scenePrev', 'randomize', 'panic', 'freeze']
+// What a gesture fires : one of the shared discrete-trigger action ids (the same
+// vocabulary MIDI Learn binds and the keyboard fires — engine/midi.ts
+// TRIGGER_ACTION_IDS, e.g. 'fire:randomize', 'scene:next', 'sonify:voice:0'), or
+// 'none' to unbind. Routing, not new engine : adding an action is a one-liner in
+// engine/midi.ts and it appears for MIDI, keys and gestures at once.
+export type GestureAction = string
 
 // Machine-local embodied-control config (a webcam is machine-bound, like warp).
 // NOT part of a session : it lives in the store's `bodyControl` slice + localStorage.

@@ -31,6 +31,9 @@ class BodyBus {
   private f: Record<BodyFeature, number> = { ...REST }
   private ready = false
   private gestureQueue: BodyGesture[] = []
+  // Non-destructive record of the most recent onset, for the "current gesture"
+  // readout (the queue is drained by the dispatcher, so the UI can't read it).
+  private last: { g: BodyGesture; at: number } | null = null
   // Liveness for the status pip : whether each tracker is producing detections.
   private live = { hands: false, pose: false, face: false, at: 0 }
 
@@ -54,6 +57,11 @@ class BodyBus {
   fireGesture(g: BodyGesture): void {
     // Cap the queue : a frame hitch must never let onsets pile into a burst.
     if (this.gestureQueue.length < 8) this.gestureQueue.push(g)
+    this.last = { g, at: performance.now() }
+  }
+  /** The most recent gesture and how long ago it fired (ms), for the UI. */
+  lastGesture(): { g: BodyGesture; ageMs: number } | null {
+    return this.last ? { g: this.last.g, ageMs: performance.now() - this.last.at } : null
   }
   /** App pulls the frame's gesture onsets and routes them to actions. */
   drainGestures(): BodyGesture[] {

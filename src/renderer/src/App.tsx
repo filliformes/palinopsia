@@ -65,7 +65,7 @@ import { Transport } from './components/Transport'
 import { SessionLoader, GenerateMenu } from './components/TopBarMenus'
 import { ConfirmModal } from './components/PromptModal'
 import type { AutosaveEntry } from '@shared/types'
-import { initMidi } from './midi'
+import { initMidi, fireTrigger } from './midi'
 import { FX_SHADERS, GENERATORS, NATIVE_NODES, shaderSourceById } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
 import { MASTER_PRESETS } from './shaders/isf/masterPresets'
@@ -172,26 +172,11 @@ function RecPill(): JSX.Element | null {
 // fireSelectedRandomize lives in commands.ts now : the R shortcut, the
 // Transport button and a learned MIDI pad all fire the same implementation.
 
-// A body gesture fires one of the store's existing performance actions (this is
-// routing, not new engine). Scene next/prev cycle the scene bank through a shared
-// cursor so a hands-free performer can walk the setlist.
-function dispatchGesture(action: GestureAction, cursor: { i: number }): void {
-  const st = useStore.getState()
-  switch (action) {
-    case 'randomize': fireSelectedRandomize(); break
-    case 'panic': firePanic(); break
-    case 'freeze': fireFreeze(); break
-    case 'sceneNext':
-    case 'scenePrev': {
-      const scenes = st.scenes
-      if (scenes.length === 0) break
-      const step = action === 'sceneNext' ? 1 : -1
-      cursor.i = (cursor.i + step + scenes.length) % scenes.length
-      st.recallScene(scenes[cursor.i].id)
-      break
-    }
-    default: break // 'none'
-  }
+// A body gesture fires one of the shared discrete-trigger actions (the same
+// vocabulary MIDI Learn binds and the keyboard fires : engine/midi.ts fireTrigger).
+// Routing, not new engine.
+function dispatchGesture(action: GestureAction): void {
+  if (action && action !== 'none') fireTrigger(action)
 }
 
 // Small always-on status pip : when embodied control is live it shows a pulsing
@@ -391,14 +376,13 @@ export default function App(): JSX.Element {
     // Drain gesture onsets each frame and fire the bound action. Cheap when the
     // tracker is off (the queue is empty). Reads config live so re-binding a
     // gesture takes effect without re-subscribing.
-    const cursor = { i: -1 }
     let raf = 0
     const tick = (): void => {
       raf = requestAnimationFrame(tick)
       const gs = bodyBus.drainGestures()
       if (gs.length === 0) return
       const map = useStore.getState().bodyControl.gestures
-      for (const g of gs) dispatchGesture(map[g], cursor)
+      for (const g of gs) dispatchGesture(map[g])
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)

@@ -10,9 +10,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { BodyControlConfig, BodyFeature, BodyGesture, GestureAction } from '@shared/types'
-import { BODY_FEATURES, BODY_GESTURES, GESTURE_ACTIONS } from '@shared/types'
+import { BODY_FEATURES, BODY_GESTURES } from '@shared/types'
 import { bodyTracker } from '../engine/bodyTracker'
 import { bodyBus } from '../engine/bodyIn'
+import { TRIGGER_ACTION_IDS, fireTrigger, midiTargetLabel } from '../midi'
 import { useStore } from '../store'
 import { showToast } from './Toast'
 
@@ -39,14 +40,7 @@ const GESTURE_LABEL: Record<BodyGesture, string> = {
   winkLeft: 'wink · left eye',
   winkRight: 'wink · right eye'
 }
-const ACTION_LABEL: Record<GestureAction, string> = {
-  none: '— nothing —',
-  sceneNext: 'next scene',
-  scenePrev: 'previous scene',
-  randomize: 'Randomize',
-  panic: 'panic flush',
-  freeze: 'freeze / hold'
-}
+const actionLabel = (id: GestureAction): string => (id === 'none' ? '— nothing —' : midiTargetLabel(id))
 // Group the feature list for a legible monitor.
 const FEATURE_GROUPS: Array<{ title: string; keys: BodyFeature[] }> = [
   { title: 'Hands', keys: ['handLeftHeight', 'handRightHeight', 'handLeftX', 'handRightX', 'handLeftOpen', 'handRightOpen', 'handsApart', 'handsHeight'] },
@@ -79,6 +73,8 @@ export function BodyPage(): JSX.Element {
   const [cameras, setCameras] = useState<Array<{ id: string; label: string }>>([])
   const [vals, setVals] = useState<Record<string, number>>({})
   const [live, setLive] = useState({ running: false, hands: false, pose: false, face: false, error: null as string | null })
+  // The last gesture that fired + whether it's fresh (lights up briefly).
+  const [cur, setCur] = useState<{ g: BodyGesture; fresh: boolean } | null>(null)
 
   const patch = (p: Partial<BodyControlConfig>): void => setCfg(p)
 
@@ -143,6 +139,8 @@ export function BodyPage(): JSX.Element {
       setVals({ ...all })
       const s = bodyTracker.status(); const b = bodyBus.status()
       setLive({ running: s.running, hands: b.hands, pose: b.pose, face: b.face, error: s.error })
+      const lg = bodyBus.lastGesture()
+      setCur(lg ? { g: lg.g, fresh: lg.ageMs < 700 } : null)
     }, 90)
     return () => { cancelAnimationFrame(raf); window.clearInterval(monitor) }
   }, [])
@@ -275,24 +273,45 @@ export function BodyPage(): JSX.Element {
           </section>
 
           <section className="rounded border border-border bg-panel2 p-2">
-            <div className="mb-1 font-mono text-[9px] uppercase tracking-wide text-accent2">Gestures → actions</div>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <span className="font-mono text-[9px] uppercase tracking-wide text-accent2">Gestures → actions</span>
+              {/* Current gesture : lights up for ~0.7s each time one is detected. */}
+              <span
+                className={`rounded-full border px-2 py-0.5 font-mono text-[10px] transition-colors ${
+                  cur?.fresh ? 'border-accent bg-accent/20 text-accent' : 'border-border bg-panel3/50 text-muted'
+                }`}
+                title="The most recent gesture the tracker detected"
+              >
+                {cur ? `⚡ ${GESTURE_LABEL[cur.g]}` : 'no gesture yet'}
+              </span>
+            </div>
             <p className="mb-2 text-[10px] leading-snug text-muted">
-              Discrete moves fire one-shot actions (threshold + cooldown). Retune how easily they trigger with sensitivity.
+              Discrete moves fire one-shot actions (threshold + cooldown). Retune how easily they trigger with sensitivity. Actions are the same vocabulary as MIDI Learn and the keyboard : new ones are added in one place (engine/midi.ts) and show up here, on a pad, and on a key at once.
             </p>
             <div className="flex flex-col gap-1">
               {BODY_GESTURES.map((gk) => (
-                <label key={gk} className="flex items-center gap-2 font-mono text-[11px] text-muted">
+                <div key={gk} className="flex items-center gap-2 font-mono text-[11px] text-muted">
                   <span className="w-32 shrink-0">{GESTURE_LABEL[gk]}</span>
                   <select
                     value={cfg.gestures[gk]}
                     onChange={(e) => patch({ gestures: { ...cfg.gestures, [gk]: e.target.value as GestureAction } })}
                     className="input select-compact min-w-0 flex-1 text-[11px]"
+                    title="What this gesture fires. Same action vocabulary as MIDI Learn and the keyboard : bind a hardware pad to the same action and they stay in sync."
                   >
-                    {GESTURE_ACTIONS.map((a) => (
-                      <option key={a} value={a}>{ACTION_LABEL[a]}</option>
+                    <option value="none">{actionLabel('none')}</option>
+                    {TRIGGER_ACTION_IDS.map((a) => (
+                      <option key={a} value={a}>{actionLabel(a)}</option>
                     ))}
                   </select>
-                </label>
+                  <button
+                    onClick={() => fireTrigger(cfg.gestures[gk])}
+                    disabled={cfg.gestures[gk] === 'none'}
+                    className="shrink-0 rounded border border-border bg-panel3/70 px-1.5 py-0.5 text-[10px] text-muted hover:border-accent hover:text-accent disabled:opacity-30"
+                    title="Fire this gesture's action now (preview what it does)"
+                  >
+                    test
+                  </button>
+                </div>
               ))}
             </div>
           </section>

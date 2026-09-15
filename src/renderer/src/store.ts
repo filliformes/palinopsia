@@ -2728,18 +2728,26 @@ export const useStore = create<StoreState>((set, get) => ({
   bodyControl: (() => {
     const def: BodyControlConfig = {
       enabled: false, deviceId: null, hands: true, pose: true, face: false, mirror: true, sensitivity: 0.5,
-      // Face gestures default to unbound : blink / brow move involuntarily, so
-      // the performer opts each one in rather than being surprised by it.
+      // Actions are shared trigger ids (engine/midi.ts). Face gestures default to
+      // unbound : blink / brow move involuntarily, so the performer opts each in.
       gestures: {
-        pinchLeft: 'scenePrev', pinchRight: 'sceneNext', clap: 'randomize', cross: 'panic', handsUp: 'freeze',
+        pinchLeft: 'scene:prev', pinchRight: 'scene:next', clap: 'fire:randomize', cross: 'fire:flush', handsUp: 'fire:freeze',
         mouthPop: 'none', browRaise: 'none', winkLeft: 'none', winkRight: 'none'
       }
     }
+    // Migrate the pre-unification action names (before gestures shared the MIDI
+    // trigger vocabulary) so an existing config keeps working.
+    const LEGACY: Record<string, string> = {
+      scenePrev: 'scene:prev', sceneNext: 'scene:next', randomize: 'fire:randomize', panic: 'fire:flush', freeze: 'fire:freeze'
+    }
     try {
       const saved = JSON.parse(localStorage.getItem('opsia.bodyControl') || '{}')
+      const savedGestures: Record<string, string> = saved.gestures || {}
+      const migrated: Record<string, string> = {}
+      for (const k in savedGestures) migrated[k] = LEGACY[savedGestures[k]] ?? savedGestures[k]
       // enabled is never restored : a camera must be re-armed each launch (opt-in),
       // so the app never grabs the webcam on its own at boot.
-      return { ...def, ...saved, enabled: false, gestures: { ...def.gestures, ...(saved.gestures || {}) } }
+      return { ...def, ...saved, enabled: false, gestures: { ...def.gestures, ...migrated } }
     } catch { return def }
   })(),
   setBodyControl: (partial) =>

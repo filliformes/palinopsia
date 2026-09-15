@@ -74,6 +74,43 @@ function toggleSoniVoice(i: number): void {
   useStore.getState().setSonify({ ...cur, [k]: { ...rec[k], on: !rec[k].on } } as SoniConfig)
 }
 
+// The discrete performance actions, as a shared vocabulary. A MIDI pad, a
+// keyboard key AND a body gesture all route through the SAME ids, so adding one
+// action here makes it available to all three at once (this is how you "create a
+// new gesture action" : add a case, list its id below, and it appears in the
+// Body page's per-gesture dropdown, labelled by midiTargetLabel). scene:<i> and
+// sonify:voice:<i> are handled dynamically by index.
+export const TRIGGER_ACTION_IDS: string[] = [
+  'fire:randomize', 'fire:vary', 'fire:flush', 'fire:freeze', 'fire:record',
+  'fire:sonify', 'fire:tap', 'fire:seq', 'fire:soniseq', 'scene:next', 'scene:prev'
+]
+
+/** Execute a discrete trigger action by id. The one place each action lives, so
+ *  MIDI, the keyboard and gestures can never drift apart. */
+export function fireTrigger(id: string): void {
+  const st = useStore.getState()
+  switch (id) {
+    case 'fire:vary': fireVariation(); return
+    case 'fire:randomize': fireSelectedRandomize(); return
+    case 'fire:sonify': st.setSonify({ ...st.sonify, on: !st.sonify.on }); return
+    case 'fire:flush': firePanic(); return
+    case 'fire:freeze': fireFreeze(); return
+    case 'fire:record': fireRecordToggle(); return
+    case 'fire:tap': tapTempo(); return
+    case 'fire:seq': st.toggleSequenceRunning(); return
+    case 'fire:soniseq': st.setSoniSeqOn(!st.soniSeq.on); return
+    case 'scene:next': recallRelativeScene(1); return
+    case 'scene:prev': recallRelativeScene(-1); return
+  }
+  if (id.startsWith('scene:')) {
+    const i = Number(id.slice(6))
+    if (Number.isFinite(i) && st.scenes[i]) st.recallScene(st.scenes[i].id)
+  } else if (id.startsWith('sonify:voice:')) {
+    const i = Number(id.slice(13))
+    if (Number.isFinite(i)) toggleSoniVoice(i)
+  }
+}
+
 export interface MidiDevice {
   id: string
   name: string
@@ -359,25 +396,16 @@ class MidiManager {
     // fires — one pad can drive several actions.
     if (value <= 0) return
     const map = st.midiMap
-    if (matches(map['fire:vary'], binding)) fireVariation()
-    if (matches(map['fire:randomize'], binding)) fireSelectedRandomize()
-    if (matches(map['fire:sonify'], binding)) {
-      const s = useStore.getState().sonify
-      useStore.getState().setSonify({ ...s, on: !s.on })
+    // One pad can drive several actions : every matching trigger fires, each
+    // through the shared fireTrigger (same path as a body gesture).
+    for (const id of TRIGGER_ACTION_IDS) {
+      if (matches(map[id], binding)) fireTrigger(id)
     }
-    if (matches(map['fire:flush'], binding)) firePanic()
-    if (matches(map['fire:freeze'], binding)) fireFreeze()
-    if (matches(map['fire:record'], binding)) fireRecordToggle()
-    if (matches(map['fire:tap'], binding)) tapTempo()
-    if (matches(map['fire:seq'], binding)) st.toggleSequenceRunning()
-    if (matches(map['fire:soniseq'], binding)) st.setSoniSeqOn(!useStore.getState().soniSeq.on)
-    if (matches(map['scene:next'], binding)) recallRelativeScene(1)
-    if (matches(map['scene:prev'], binding)) recallRelativeScene(-1)
     for (let i = 0; i < SONI_VOICE_KEYS.length; i++) {
-      if (matches(map[`sonify:voice:${i}`], binding)) toggleSoniVoice(i)
+      if (matches(map[`sonify:voice:${i}`], binding)) fireTrigger(`sonify:voice:${i}`)
     }
     for (let i = 0; i < st.scenes.length; i++) {
-      if (matches(map[`scene:${i}`], binding)) st.recallScene(st.scenes[i].id)
+      if (matches(map[`scene:${i}`], binding)) fireTrigger(`scene:${i}`)
     }
   }
 }
