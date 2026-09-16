@@ -1,12 +1,10 @@
 // Body (key B) : embodied control. A full-page takeover like Sonify / Output.
-// Turn a camera on (opt-in), and MediaPipe Hands + Pose read the performer into
-// the body bus (engine/bodyIn.ts). The left half is the live camera with the
-// skeleton drawn on it (frame + confidence check) ; the right half is the feature
-// monitor (what is moving, and a one-click route into a modulator slot) plus the
-// discrete-gesture routing (pinch / clap / cross / hands-up → an action).
-//
-// Face is a planned drop-in : when a FaceLandmarker is added to the tracker its
-// features join BODY_FEATURES and appear here with no page changes.
+// Turn a camera on (opt-in), and MediaPipe Hands + Pose + Face read the performer
+// into the body bus (engine/bodyIn.ts). Left column : the live camera with the
+// skeleton on it, the capture controls, and the rule builder ("Create actions").
+// Right column : the feature monitor (what is moving, one-click into a modulator)
+// and the per-gesture routing. Both right-column lists are two columns so the
+// whole page fits without vertical scrolling.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BodyControlConfig, BodyFeature, BodyGesture, GestureAction, GestureRule } from '@shared/types'
@@ -29,21 +27,23 @@ const POSE_CONN: Array<[number, number]> = [
   [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28]
 ]
 
+// Short labels : dense enough for the two-column routing grid. Fuller names ride
+// in the title tooltips at each use site.
 const GESTURE_LABEL: Record<BodyGesture, string> = {
-  pinchLeft: 'pinch · left hand',
-  pinchRight: 'pinch · right hand',
-  clap: 'clap (hands meet)',
-  cross: 'cross wrists',
-  handsUp: 'hands above head',
-  mouthPop: 'mouth pop (jaw)',
-  browRaise: 'brow raise',
-  winkLeft: 'wink · left eye',
-  winkRight: 'wink · right eye',
-  holdHandsUp: 'hold · hands up',
-  holdPinchLeft: 'hold · pinch left',
-  holdPinchRight: 'hold · pinch right',
-  holdArmsWide: 'hold · arms wide',
-  holdMouthOpen: 'hold · mouth open'
+  pinchLeft: 'pinch L',
+  pinchRight: 'pinch R',
+  clap: 'clap',
+  cross: 'cross',
+  handsUp: 'hands up',
+  mouthPop: 'mouth pop',
+  browRaise: 'brow',
+  winkLeft: 'wink L',
+  winkRight: 'wink R',
+  holdHandsUp: 'hold up',
+  holdPinchLeft: 'hold pinch L',
+  holdPinchRight: 'hold pinch R',
+  holdArmsWide: 'hold wide',
+  holdMouthOpen: 'hold mouth'
 }
 const SONI_VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord']
 // Group the feature list for a legible monitor.
@@ -202,6 +202,9 @@ export function BodyPage(): JSX.Element {
   const labelForAction = (id: GestureAction): string =>
     actionOptions.find((o) => o.id === id)?.label ?? (id === 'none' ? '— nothing —' : midiTargetLabel(id))
 
+  const actionOptionEls = actionOptions.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)
+  const gestureOptionEls = BODY_GESTURES.map((g) => <option key={g} value={g}>{GESTURE_LABEL[g]}</option>)
+
   const statusText = !cfg.enabled
     ? 'camera off'
     : live.error
@@ -217,7 +220,7 @@ export function BodyPage(): JSX.Element {
       {/* Header */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border px-3 py-2">
         <span className="text-[13px] font-semibold">Body</span>
-        <span className="font-mono text-[10px] text-muted">embodied control · MediaPipe Hands + Pose</span>
+        <span className="font-mono text-[10px] text-muted">embodied control · MediaPipe Hands + Pose + Face</span>
         <div className="flex items-center gap-1.5">
           <span className={`h-2 w-2 rounded-full ${cfg.enabled && (live.hands || live.pose || live.face) ? 'animate-pulse bg-red-500' : cfg.enabled ? 'bg-yellow-500' : 'bg-muted'}`} />
           <span className="font-mono text-[10px] text-muted">{statusText}</span>
@@ -228,8 +231,8 @@ export function BodyPage(): JSX.Element {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 lg:flex-row">
-        {/* Left : camera + controls */}
-        <div className="flex shrink-0 flex-col gap-2 lg:w-[46%]">
+        {/* Left : camera + controls + rule builder */}
+        <div className="flex shrink-0 flex-col gap-2 lg:w-[42%]">
           <button
             onClick={() => patch({ enabled: !cfg.enabled })}
             className={`w-full rounded px-3 py-2 font-mono text-[12px] transition-colors ${
@@ -242,7 +245,7 @@ export function BodyPage(): JSX.Element {
             {cfg.enabled ? '● embodied control ON — camera live' : 'Enable embodied control (opens camera)'}
           </button>
 
-          <div className="relative aspect-[4/3] w-full overflow-hidden rounded border border-border bg-black">
+          <div className="relative mx-auto aspect-[4/3] w-full max-w-[420px] overflow-hidden rounded border border-border bg-black">
             <canvas ref={canvasRef} width={480} height={360} className="h-full w-full" />
             {!cfg.enabled && (
               <div className="absolute inset-0 flex items-center justify-center px-4 text-center font-mono text-[11px] text-muted">
@@ -273,119 +276,43 @@ export function BodyPage(): JSX.Element {
             <Toggle on={cfg.mirror} label="Mirror" onClick={() => patch({ mirror: !cfg.mirror })} title="Selfie view : moving right moves the value right" />
           </div>
 
-          <label className="flex items-center gap-2 font-mono text-[11px] text-muted">
-            <span className="w-16 shrink-0">sensitivity</span>
-            <input
-              type="range" min={0} max={1} step={0.01} value={cfg.sensitivity}
-              onChange={(e) => patch({ sensitivity: Number(e.target.value) })}
-              className="min-w-0 flex-1"
-              title="How easily gestures fire (pinch distance, clap gap, hands-up threshold). Higher = easier."
-            />
-            <span className="w-8 text-right text-text">{cfg.sensitivity.toFixed(2)}</span>
-          </label>
-
-          <label className="flex items-center gap-2 font-mono text-[11px] text-muted">
-            <span className="w-16 shrink-0">hold time</span>
-            <input
-              type="range" min={400} max={3000} step={50} value={cfg.holdMs}
-              onChange={(e) => patch({ holdMs: Number(e.target.value) })}
-              className="min-w-0 flex-1"
-              title="How long a pose must be held for a hold gesture (hold · hands up, hold · pinch, …) to fire."
-            />
-            <span className="w-8 text-right text-text">{(cfg.holdMs / 1000).toFixed(1)}s</span>
-          </label>
-
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Toggle
-              on={cfg.oscOut}
-              label="OSC out"
-              onClick={() => patch({ oscOut: !cfg.oscOut })}
-              title="Also send an OSC bang on every gesture (/opsia/body/gesture/<name>) and rule (/opsia/body/rule/<name>) to the OSC-out target set in I/O setup — so the body plays the sound side too."
-            />
-            <span className="font-mono text-[10px] text-muted">→ /opsia/body/…</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <label className="flex min-w-[150px] flex-1 items-center gap-2 font-mono text-[11px] text-muted">
+              <span className="w-16 shrink-0">sensitivity</span>
+              <input
+                type="range" min={0} max={1} step={0.01} value={cfg.sensitivity}
+                onChange={(e) => patch({ sensitivity: Number(e.target.value) })}
+                className="min-w-0 flex-1"
+                title="How easily gestures fire (pinch distance, clap gap, hands-up threshold). Higher = easier."
+              />
+              <span className="w-8 text-right text-text">{cfg.sensitivity.toFixed(2)}</span>
+            </label>
+            <label className="flex min-w-[150px] flex-1 items-center gap-2 font-mono text-[11px] text-muted">
+              <span className="w-16 shrink-0">hold time</span>
+              <input
+                type="range" min={400} max={3000} step={50} value={cfg.holdMs}
+                onChange={(e) => patch({ holdMs: Number(e.target.value) })}
+                className="min-w-0 flex-1"
+                title="How long a pose must be held for a hold gesture (hold up, hold pinch, …) to fire."
+              />
+              <span className="w-8 text-right text-text">{(cfg.holdMs / 1000).toFixed(1)}s</span>
+            </label>
+            <div className="flex items-center gap-1.5">
+              <Toggle
+                on={cfg.oscOut}
+                label="OSC out"
+                onClick={() => patch({ oscOut: !cfg.oscOut })}
+                title="Also send an OSC bang on every gesture (/opsia/body/gesture/<name>) and rule (/opsia/body/rule/<name>) to the OSC-out target set in I/O setup — so the body plays the sound side too."
+              />
+              <span className="font-mono text-[10px] text-muted">→ /opsia/body/…</span>
+            </div>
           </div>
-        </div>
 
-        {/* Right : feature monitor + gesture routing */}
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <section className="rounded border border-border bg-panel2 p-2">
-            <div className="mb-1 font-mono text-[9px] uppercase tracking-wide text-accent2">Feature monitor</div>
-            <p className="mb-2 text-[10px] leading-snug text-muted">
-              Live 0..1 values off the body bus. <span className="text-text">→</span> routes one into a free modulator slot (then bind it with a param’s <span className="text-text">M</span> button). Every feature is also selectable in any modulator set to <span className="text-text">body</span> (Modulation : D).
-            </p>
-            {FEATURE_GROUPS.map((grp) => (
-              <div key={grp.title} className="mb-1.5">
-                <div className="mb-0.5 font-mono text-[8px] uppercase tracking-wide text-muted">{grp.title}</div>
-                <div className="flex flex-col gap-0.5">
-                  {grp.keys.map((k) => {
-                    const v = vals[k] ?? 0
-                    return (
-                      <div key={k} className="flex items-center gap-1.5">
-                        <span className="w-28 shrink-0 truncate font-mono text-[10px] text-muted" title={k}>{k}</span>
-                        <div className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-panel3/70">
-                          <div className="absolute inset-y-0 left-0 rounded-full bg-accent" style={{ width: `${Math.round(v * 100)}%` }} />
-                        </div>
-                        <span className="w-8 shrink-0 text-right font-mono text-[9px] text-muted">{v.toFixed(2)}</span>
-                        <button
-                          onClick={() => toSlot(k)}
-                          className="shrink-0 rounded border border-border bg-panel3/70 px-1.5 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
-                          title={`Route ${k} into the first free modulator slot`}
-                        >→</button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </section>
-
-          <section className="rounded border border-border bg-panel2 p-2">
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <span className="font-mono text-[9px] uppercase tracking-wide text-accent2">Gestures → actions</span>
-              {/* Current gesture : lights up for ~0.7s each time one is detected. */}
-              <span
-                className={`rounded-full border px-2 py-0.5 font-mono text-[10px] transition-colors ${
-                  cur?.fresh ? 'border-accent bg-accent/20 text-accent' : 'border-border bg-panel3/50 text-muted'
-                }`}
-                title="The most recent gesture the tracker detected"
-              >
-                {cur ? `⚡ ${GESTURE_LABEL[cur.g]}` : 'no gesture yet'}
-              </span>
-            </div>
-            <p className="mb-2 text-[10px] leading-snug text-muted">
-              Discrete moves fire one-shot actions (threshold + cooldown). Retune how easily they trigger with sensitivity. Actions are the same vocabulary as MIDI Learn and the keyboard : new ones are added in one place (engine/midi.ts) and show up here, on a pad, and on a key at once.
-            </p>
-            <div className="flex flex-col gap-1">
-              {BODY_GESTURES.map((gk) => (
-                <div key={gk} className="flex items-center gap-2 font-mono text-[11px] text-muted">
-                  <span className="w-32 shrink-0">{GESTURE_LABEL[gk]}</span>
-                  <select
-                    value={cfg.gestures[gk]}
-                    onChange={(e) => patch({ gestures: { ...cfg.gestures, [gk]: e.target.value as GestureAction } })}
-                    className="input select-compact min-w-0 flex-1 text-[11px]"
-                    title="What this gesture fires. Same action vocabulary as MIDI Learn and the keyboard : bind a hardware pad to the same action and they stay in sync."
-                  >
-                    {actionOptions.map((o) => (
-                      <option key={o.id} value={o.id}>{o.label}</option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => fireTrigger(cfg.gestures[gk])}
-                    disabled={cfg.gestures[gk] === 'none'}
-                    className="shrink-0 rounded border border-border bg-panel3/70 px-1.5 py-0.5 text-[10px] text-muted hover:border-accent hover:text-accent disabled:opacity-30"
-                    title="Fire this gesture's action now (preview what it does)"
-                  >
-                    test
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
-
+          {/* Create actions : the rule builder, under the preview. */}
           <section className="rounded border border-border bg-panel2 p-2">
             <div className="mb-1 font-mono text-[9px] uppercase tracking-wide text-accent2">Create actions</div>
             <p className="mb-2 text-[10px] leading-snug text-muted">
-              Author your own rules : one gesture, or two combined, fire an action. A combo triggers when both land close together (<span className="text-text">+</span>) or in order (<span className="text-text">→</span>). Rules fire on top of the defaults above, so set a component gesture to <span className="text-text">nothing</span> there if you want the combo alone.
+              Author your own rules : one gesture, or two combined, fire an action. A combo triggers when both land close together (<span className="text-text">+</span>) or in order (<span className="text-text">→</span>). Rules fire on top of the defaults, so set a component gesture to <span className="text-text">nothing</span> if you want the combo alone.
             </p>
 
             {/* Builder line : name · gesture(s) · action · save */}
@@ -399,7 +326,7 @@ export function BodyPage(): JSX.Element {
                 title="A label for this rule (optional : defaults to the gesture names)"
               />
               <select value={rG1} onChange={(e) => setRG1(e.target.value as BodyGesture)} className="input select-compact text-[11px]" title="First gesture">
-                {BODY_GESTURES.map((g) => <option key={g} value={g}>{GESTURE_LABEL[g]}</option>)}
+                {gestureOptionEls}
               </select>
               {rG2 == null ? (
                 <button
@@ -419,7 +346,7 @@ export function BodyPage(): JSX.Element {
                     {comboSym(rCombo)}
                   </button>
                   <select value={rG2} onChange={(e) => setRG2(e.target.value as BodyGesture)} className="input select-compact text-[11px]" title="Second gesture">
-                    {BODY_GESTURES.map((g) => <option key={g} value={g}>{GESTURE_LABEL[g]}</option>)}
+                    {gestureOptionEls}
                   </select>
                   <button
                     onClick={() => setRExcl((v) => !v)}
@@ -433,7 +360,7 @@ export function BodyPage(): JSX.Element {
               )}
               <span className="font-mono text-[11px] text-muted">→</span>
               <select value={rAction} onChange={(e) => setRAction(e.target.value)} className="input select-compact min-w-0 flex-1 text-[11px]" title="What the rule fires">
-                {actionOptions.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                {actionOptionEls}
               </select>
               <button
                 onClick={addRule}
@@ -488,6 +415,81 @@ export function BodyPage(): JSX.Element {
                 })}
               </div>
             )}
+          </section>
+        </div>
+
+        {/* Right : feature monitor + gesture routing (two columns each) */}
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <section className="rounded border border-border bg-panel2 p-2">
+            <div className="mb-1 font-mono text-[9px] uppercase tracking-wide text-accent2">Feature monitor</div>
+            <p className="mb-2 text-[10px] leading-snug text-muted">
+              Live 0..1 values off the body bus. <span className="text-text">→</span> routes one into a free modulator slot (then bind it with a param’s <span className="text-text">M</span> button). Every feature is also selectable in any modulator set to <span className="text-text">body</span> (Modulation : D).
+            </p>
+            {FEATURE_GROUPS.map((grp) => (
+              <div key={grp.title} className="mb-1.5">
+                <div className="mb-0.5 font-mono text-[8px] uppercase tracking-wide text-muted">{grp.title}</div>
+                <div className="grid grid-cols-1 gap-x-3 gap-y-0.5 sm:grid-cols-2">
+                  {grp.keys.map((k) => {
+                    const v = vals[k] ?? 0
+                    return (
+                      <div key={k} className="flex items-center gap-1.5">
+                        <span className="w-[70px] shrink-0 truncate font-mono text-[9px] text-muted" title={k}>{k}</span>
+                        <div className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-panel3/70">
+                          <div className="absolute inset-y-0 left-0 rounded-full bg-accent" style={{ width: `${Math.round(v * 100)}%` }} />
+                        </div>
+                        <span className="w-7 shrink-0 text-right font-mono text-[9px] text-muted">{v.toFixed(2)}</span>
+                        <button
+                          onClick={() => toSlot(k)}
+                          className="shrink-0 rounded border border-border bg-panel3/70 px-1 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
+                          title={`Route ${k} into the first free modulator slot`}
+                        >→</button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </section>
+
+          <section className="rounded border border-border bg-panel2 p-2">
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <span className="font-mono text-[9px] uppercase tracking-wide text-accent2">Gestures → actions</span>
+              {/* Current gesture : lights up for ~0.7s each time one is detected. */}
+              <span
+                className={`rounded-full border px-2 py-0.5 font-mono text-[10px] transition-colors ${
+                  cur?.fresh ? 'border-accent bg-accent/20 text-accent' : 'border-border bg-panel3/50 text-muted'
+                }`}
+                title="The most recent gesture the tracker detected"
+              >
+                {cur ? `⚡ ${GESTURE_LABEL[cur.g]}` : 'no gesture yet'}
+              </span>
+            </div>
+            <p className="mb-2 text-[10px] leading-snug text-muted">
+              Discrete moves fire one-shot actions. Same vocabulary as MIDI Learn and the keyboard, so a pad and a gesture on the same action stay in sync.
+            </p>
+            <div className="grid grid-cols-1 gap-x-3 gap-y-1 sm:grid-cols-2">
+              {BODY_GESTURES.map((gk) => (
+                <div key={gk} className="flex items-center gap-1 font-mono text-[10px] text-muted">
+                  <span className="w-[76px] shrink-0 truncate" title={GESTURE_LABEL[gk]}>{GESTURE_LABEL[gk]}</span>
+                  <select
+                    value={cfg.gestures[gk]}
+                    onChange={(e) => patch({ gestures: { ...cfg.gestures, [gk]: e.target.value as GestureAction } })}
+                    className="input select-compact min-w-0 flex-1 text-[10px]"
+                    title="What this gesture fires. Same action vocabulary as MIDI Learn and the keyboard."
+                  >
+                    {actionOptionEls}
+                  </select>
+                  <button
+                    onClick={() => fireTrigger(cfg.gestures[gk])}
+                    disabled={cfg.gestures[gk] === 'none'}
+                    className="shrink-0 rounded border border-border bg-panel3/70 px-1 py-0.5 text-[9px] text-muted hover:border-accent hover:text-accent disabled:opacity-30"
+                    title="Fire this gesture's action now (preview what it does)"
+                  >
+                    test
+                  </button>
+                </div>
+              ))}
+            </div>
           </section>
         </div>
       </div>
