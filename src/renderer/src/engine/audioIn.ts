@@ -17,6 +17,10 @@
 const BANDS = 6
 export const AUDIO_BANDS = BANDS
 
+// One denoiser notch : centre frequency (Hz) + Q (higher = narrower). Learned by
+// analysing the input's noise (mains-hum combs, digital-clock combs, HF whine).
+export interface NoiseNotch { f: number; q: number }
+
 export type AudioFeatureName = 'level' | 'flux' | 'transient' | 'centroid' | 'band' | 'pitch'
 export const AUDIO_FEATURES: AudioFeatureName[] = [
   'level',
@@ -149,7 +153,7 @@ class AudioBus {
   // BEFORE the analyser + monitor split, so the noise leaves both the sound you
   // hear AND the reactivity. Off + no notches = the raw signal, unchanged.
   private denoiseOn = false
-  private notchFreqs: number[] = []
+  private notches: NoiseNotch[] = [] // learned notch targets (freq + Q)
   private preSplit: GainNode | null = null // feeds analyser + monitor
   private filterNodes: AudioNode[] = [] // hp + notches (rebuilt on change)
   private srcNode: MediaStreamAudioSourceNode | null = null
@@ -187,7 +191,7 @@ class AudioBus {
       // A separate analyser tapped off the RAW src : learnNoise reads this so the
       // noise profile is measured pre-filter regardless of the denoise state.
       const learnAnalyser = ctx.createAnalyser()
-      learnAnalyser.fftSize = 8192 // fine bins (~5.4Hz @48k) to resolve hum harmonics
+      learnAnalyser.fftSize = 32768 // ~1.46Hz bins @48k : resolve 60Hz harmonic combs
       learnAnalyser.smoothingTimeConstant = 0
       src.connect(learnAnalyser)
       // Monitor path : preSplit → gain → output. Gain 0 while monitoring is off,
@@ -252,12 +256,12 @@ class AudioBus {
     for (const n of this.filterNodes) { try { n.disconnect() } catch { /* gone */ } }
     this.filterNodes = []
 
-    if (!this.denoiseOn || this.notchFreqs.length === 0) {
+    if (!this.denoiseOn || this.notches.length === 0) {
       src.connect(preSplit) // bypass : raw signal, untouched
       this.srcOut = preSplit
       return
     }
-    // High-pass to kill sub-rumble / DC offset, then a notch per learned peak.
+    // High-pass to kill sub-rumble / DC offset, then a notch per learned target.
     const hp = ctx.createBiquadFilter()
     hp.type = 'highpass'
     hp.frequency.value = 24
@@ -265,14 +269,12 @@ class AudioBus {
     let node: AudioNode = hp
     this.filterNodes.push(hp)
     const nyq = ctx.sampleRate / 2
-    for (const f of this.notchFreqs) {
-      if (!(f > 20 && f < nyq * 0.98)) continue
+    for (const nch of this.notches) {
+      if (!(nch.f > 20 && nch.f < nyq * 0.98)) continue
       const nf = ctx.createBiquadFilter()
       nf.type = 'notch'
-      nf.frequency.value = f
-      // Narrower notch for stable low-freq hum, a touch wider up top where the
-      // whine wanders. Q ≈ f / bandwidth.
-      nf.Q.value = f < 400 ? 30 : 18
+      nf.frequency.value = nch.f
+      nf.Q.value = nch.q
       node.connect(nf)
       node = nf
       this.filterNodes.push(nf)
@@ -286,22 +288,24 @@ class AudioBus {
     this.denoiseOn = on
     this.rebuildFilter()
   }
-  /** Set the notch frequencies (Hz) directly (e.g. restored from a saved profile). */
-  setNotches(freqs: number[]): void {
-    this.notchFreqs = Array.isArray(freqs) ? freqs.slice(0, 8) : []
+  /** Set the notches directly (e.g. restored from a saved profile). */
+  setNotches(notches: NoiseNotch[]): void {
+    this.notches = Array.isArray(notches) ? notches.filter((n) => n && Number.isFinite(n.f)).slice(0, 48) : []
     this.rebuildFilter()
   }
-  denoiseNotches(): number[] {
-    return this.notchFreqs.slice()
+  denoiseNotches(): NoiseNotch[] {
+    return this.notches.slice()
   }
 
-  /** Measure the input's noise spectrum for `ms`, find the narrowband peaks, and
-   *  set them as notch targets. Call it with the Move connected but SILENT. */
-  async learnNoise(ms = 1800): Promise<number[]> {
+  /** Measure the input's noise spectrum for `ms` (Move connected but SILENT),
+   *  then MODEL a notch set : detect harmonic COMBS (mains hum, digital-clock
+   *  series) and notch the whole series from the fundamental, plus individual
+   *  notches for non-harmonic tones (the HF whine). Returns the notches. */
+  async learnNoise(ms = 2500): Promise<NoiseNotch[]> {
     const an = this.learnAnalyser, buf = this.learnBuf
-    if (!an || !buf) return this.notchFreqs
+    if (!an || !buf) return this.notches
     const n = buf.length
-    const acc = new Float64Array(n) // accumulate LINEAR magnitude (dB → mag)
+    const acc = new Float64Array(n) // accumulate LINEAR magnitude
     let frames = 0
     const t0 = performance.now()
     await new Promise<void>((resolve) => {
@@ -314,42 +318,78 @@ class AudioBus {
       }
       requestAnimationFrame(step)
     })
-    if (frames === 0) return this.notchFreqs
+    if (frames === 0) return this.notches
     const mag = new Float64Array(n)
     for (let i = 0; i < n; i++) mag[i] = acc[i] / frames
-    // Baseline = a wide moving median-ish average (mean over a ±W window), so a
-    // peak is what pokes ABOVE the local broadband floor.
-    const W = 24
-    const peaks: Array<{ f: number; prom: number }> = []
     const binHz = this.sampleRate / an.fftSize
-    for (let i = 2; i < n - 2; i++) {
-      const f = i * binHz
-      if (f < 40 || f > this.sampleRate * 0.45) continue
-      // local baseline (exclude the immediate neighbourhood so a peak doesn't
-      // raise its own floor)
+    const kOf = (f: number): number => Math.round(f / binHz)
+
+    // Local broadband floor : mean over a wide window excluding the ±3-bin peak.
+    const W = Math.max(20, Math.round(120 / binHz)) // ~120Hz window
+    const floor = new Float64Array(n)
+    for (let i = 0; i < n; i++) {
       let sum = 0, cnt = 0
       for (let k = i - W; k <= i + W; k++) {
-        if (k < 0 || k >= n || Math.abs(k - i) <= 2) continue
+        if (k < 2 || k >= n || Math.abs(k - i) <= 3) continue
         sum += mag[k]; cnt++
       }
-      const base = cnt ? sum / cnt : mag[i]
-      const prom = mag[i] / (base + 1e-9) // how far above the floor (linear ratio)
-      const isLocalMax = mag[i] >= mag[i - 1] && mag[i] >= mag[i + 1] && mag[i] >= mag[i - 2] && mag[i] >= mag[i + 2]
-      if (isLocalMax && prom > 2.2) peaks.push({ f, prom }) // >~7dB above floor
+      floor[i] = cnt ? sum / cnt : mag[i]
     }
-    // Keep the most prominent, but spread them out (don't stack 3 notches on one
-    // 60Hz peak's skirt) : merge peaks within 8Hz.
-    peaks.sort((a, b) => b.prom - a.prom)
-    const chosen: number[] = []
-    for (const p of peaks) {
-      if (chosen.length >= 8) break
-      if (chosen.some((f) => Math.abs(f - p.f) < 8)) continue
-      chosen.push(p.f)
+    // Prominence in dB above the local floor. `mag` is linear amplitude, so the
+    // dB ratio is 20·log10 (not 10 — that earlier under-read every peak by half).
+    const promDb = (k: number): number => 20 * Math.log10((mag[k] + 1e-20) / (floor[k] + 1e-20))
+    // Bin of the strongest prominence within ±tolHz of f (-1 = none).
+    const findNear = (f: number, tolHz: number): number => {
+      const k0 = kOf(f), d = Math.max(1, Math.round(tolHz / binHz))
+      let bestK = -1, best = -1e9
+      for (let k = k0 - d; k <= k0 + d; k++) {
+        if (k < 2 || k >= n - 1) continue
+        const p = promDb(k)
+        if (p > best) { best = p; bestK = k }
+      }
+      return bestK
     }
-    chosen.sort((a, b) => a - b)
-    this.notchFreqs = chosen
+    const promAt = (f: number, tol: number): number => { const k = findNear(f, tol); return k < 0 ? -99 : promDb(k) }
+
+    // Peaks : local maxima poking > 6dB above the floor.
+    const rawPeaks: Array<{ f: number; prom: number }> = []
+    for (let k = 3; k < n - 3; k++) {
+      const f = k * binHz
+      if (f < 40 || f > this.sampleRate * 0.47) continue
+      const p = promDb(k)
+      if (p > 6 && mag[k] >= mag[k - 1] && mag[k] >= mag[k + 1] && mag[k] >= mag[k - 2] && mag[k] >= mag[k + 2]) {
+        rawPeaks.push({ f, prom: p })
+      }
+    }
+
+    const MAX = 28
+    const notches: NoiseNotch[] = []
+    const near = (f: number): boolean => notches.some((nch) => Math.abs(nch.f - f) < Math.max(2.5, f * 0.008))
+
+    // 1) Mains hum : pick 50 or 60 Hz by the stronger fundamental + 2nd harmonic,
+    //    then seed the whole low series (hum is annoying even where a harmonic is
+    //    weak). Snap each to the measured peak when there is one. Narrow notches.
+    const mains = promAt(60, 3) + promAt(120, 4) >= promAt(50, 3) + promAt(100, 4) ? 60 : 50
+    for (let h = 1; h <= 8; h++) {
+      const f = mains * h
+      const k = findNear(f, Math.max(2.5, f * 0.004))
+      const ff = k >= 0 && promDb(k) > 3 ? k * binHz : f
+      if (!near(ff)) notches.push({ f: ff, q: Math.min(45, Math.max(20, ff / 8)) })
+    }
+    // 2) The strongest individual tones. This captures the digital-clock series
+    //    (its members are strong peaks) AND the HF whine, one notch each — no
+    //    whole-comb over-notching that would dull the music. Narrower down low,
+    //    a touch wider up top where the whine can drift.
+    const strong = rawPeaks.filter((p) => p.prom > 8).sort((a, b) => b.prom - a.prom)
+    for (const p of strong) {
+      if (notches.length >= MAX) break
+      if (near(p.f)) continue
+      notches.push({ f: p.f, q: p.f < 500 ? 30 : p.f < 3000 ? 24 : 16 })
+    }
+    notches.sort((a, b) => a.f - b.f)
+    this.notches = notches.slice(0, MAX)
     this.rebuildFilter()
-    return chosen
+    return this.notches
   }
 
   /** Monitoring / passthrough : hear the local input through the output. `on`

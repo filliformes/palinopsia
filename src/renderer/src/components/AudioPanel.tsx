@@ -216,9 +216,10 @@ export function AudioPanel(): JSX.Element {
           {notches.length > 0 && (
             <span
               className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted"
-              title={`Notches at ${notches.map((f) => Math.round(f) + ' Hz').join(', ')}`}
+              title={`Notches at ${notches.map((n) => Math.round(n.f) + ' Hz').join(', ')}`}
             >
-              {notches.length} notch{notches.length > 1 ? 'es' : ''} · {notches.map((f) => Math.round(f)).join(' · ')} Hz
+              {notches.length} notch{notches.length > 1 ? 'es' : ''} ·{' '}
+              {Math.round(Math.min(...notches.map((n) => n.f)))}–{Math.round(Math.max(...notches.map((n) => n.f)))} Hz
             </span>
           )}
           {notches.length > 0 && (

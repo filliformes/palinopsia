@@ -1097,8 +1097,8 @@ interface StoreState {
   // frequencies (Hz). Machine-local (the noise is per-rig), persisted.
   audioDenoise: boolean
   setAudioDenoise: (on: boolean) => void
-  audioDenoiseNotches: number[]
-  setAudioDenoiseNotches: (freqs: number[]) => void
+  audioDenoiseNotches: Array<{ f: number; q: number }>
+  setAudioDenoiseNotches: (notches: Array<{ f: number; q: number }>) => void
   // Show the per-layer A/B coupling (CPL) row. Off by default : a visuals-only
   // user never sees the audio-relations control. Persisted.
   showCoupling: boolean
@@ -2679,12 +2679,16 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ audioDenoise: on })
   },
   audioDenoiseNotches: (() => {
-    try { const a = JSON.parse(localStorage.getItem('opsia.audioDenoiseNotches') || '[]'); return Array.isArray(a) ? a : [] }
-    catch { return [] }
+    try {
+      const a = JSON.parse(localStorage.getItem('opsia.audioDenoiseNotches') || '[]')
+      if (!Array.isArray(a)) return []
+      // Migrate the pre-comb format (a bare number[] of freqs) to {f, q}.
+      return a.map((x) => (typeof x === 'number' ? { f: x, q: 20 } : x)).filter((x) => x && Number.isFinite(x.f))
+    } catch { return [] }
   })(),
-  setAudioDenoiseNotches: (freqs) => {
-    localStorage.setItem('opsia.audioDenoiseNotches', JSON.stringify(freqs))
-    set({ audioDenoiseNotches: freqs })
+  setAudioDenoiseNotches: (notches) => {
+    localStorage.setItem('opsia.audioDenoiseNotches', JSON.stringify(notches))
+    set({ audioDenoiseNotches: notches })
   },
   showCoupling: localStorage.getItem('opsia.showCoupling') === '1',
   setShowCoupling: (on) => {
