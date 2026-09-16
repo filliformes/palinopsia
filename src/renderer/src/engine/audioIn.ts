@@ -133,6 +133,15 @@ class AudioBus {
   private pitchCounter = 0
   private lastTick = 0 // wall-clock of the previous tick(), for dt-aware decays
 
+  // Monitoring / passthrough : route the local input straight to the output so
+  // you can HEAR it (e.g. a Move on the interface's inputs) while it also drives
+  // reactivity. Off by default (opt-in : no surprise audio). The gain + sink are
+  // remembered here so a fresh startLocal rebuilds the same monitoring.
+  private monitorGain: GainNode | null = null
+  private monitorOn = false
+  private monitorLevel = 0.8
+  private monitorSink = '' // output device id ('' = system default)
+
   get localActive(): boolean {
     return this.localOn
   }
@@ -141,16 +150,30 @@ class AudioBus {
   async startLocal(deviceId?: string | null): Promise<boolean> {
     this.stopLocal()
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: deviceId ? { deviceId: { exact: deviceId } } : true,
-        video: false
-      })
+      // Disable the browser's voice processing : an interface / line input (a
+      // Move on inputs 1&2) wants the RAW signal, and AGC would flatten the very
+      // dynamics reactivity + monitoring live on.
+      const audioC: MediaTrackConstraints = {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false
+      }
+      if (deviceId) audioC.deviceId = { exact: deviceId }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: audioC, video: false })
       const ctx = new AudioContext()
       const src = ctx.createMediaStreamSource(stream)
       const analyser = ctx.createAnalyser()
       analyser.fftSize = 2048 // 2048 samples ≈ 46ms : enough window for pitch
       analyser.smoothingTimeConstant = 0.5
       src.connect(analyser)
+      // Monitor path : src → gain → output. Gain 0 while monitoring is off, so
+      // the graph is always wired and toggling is a param change (no re-plumb).
+      const monitorGain = ctx.createGain()
+      monitorGain.gain.value = this.monitorOn ? this.monitorLevel : 0
+      src.connect(monitorGain)
+      monitorGain.connect(ctx.destination)
+      this.monitorGain = monitorGain
+      if (this.monitorSink) this.applySink(ctx, this.monitorSink)
       this.stream = stream
       this.ctx = ctx
       this.analyser = analyser
@@ -174,12 +197,33 @@ class AudioBus {
     this.stream = null
     this.ctx = null
     this.analyser = null
+    this.monitorGain = null
     this.freq = this.time = null
     this.timeF = null
     this.prevMag = null
     this.pitchCounter = 0
     this.localOn = false
     this.local = zero()
+  }
+
+  /** Monitoring / passthrough : hear the local input through the output. `on`
+   *  gates it, `level` is the monitor gain (0..1). Applies live if input is up. */
+  setMonitor(on: boolean, level: number): void {
+    this.monitorOn = on
+    this.monitorLevel = Math.max(0, Math.min(1, level))
+    if (this.monitorGain) this.monitorGain.gain.value = on ? this.monitorLevel : 0
+  }
+
+  /** Choose the OUTPUT device the monitor plays to ('' = system default). */
+  setMonitorSink(deviceId: string): void {
+    this.monitorSink = deviceId || ''
+    if (this.ctx) this.applySink(this.ctx, this.monitorSink)
+  }
+
+  // AudioContext.setSinkId (Chromium 110+) isn't in the TS DOM lib yet.
+  private applySink(ctx: AudioContext, id: string): void {
+    const set = (ctx as unknown as { setSinkId?: (id: string) => Promise<void> }).setSinkId
+    if (set) set.call(ctx, id).catch(() => { /* device gone / not permitted */ })
   }
 
   private computeLocal(dt: number): void {

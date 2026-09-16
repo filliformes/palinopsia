@@ -1085,6 +1085,14 @@ interface StoreState {
   setAudioSource: (s: 'both' | 'osc' | 'local') => void
   audioDeviceId: string | null
   setAudioDeviceId: (id: string | null) => void
+  // Monitoring / passthrough : hear the local input through an output device
+  // while it also drives reactivity. Machine-local (venue rig), persisted.
+  audioMonitor: boolean
+  setAudioMonitor: (on: boolean) => void
+  audioMonitorLevel: number
+  setAudioMonitorLevel: (v: number) => void
+  audioMonitorSink: string // output device id ('' = system default)
+  setAudioMonitorSink: (id: string) => void
   // Show the per-layer A/B coupling (CPL) row. Off by default : a visuals-only
   // user never sees the audio-relations control. Persisted.
   showCoupling: boolean
@@ -2639,6 +2647,25 @@ export const useStore = create<StoreState>((set, get) => ({
     if (id) localStorage.setItem('opsia.audioDeviceId', id)
     else localStorage.removeItem('opsia.audioDeviceId')
     set({ audioDeviceId: id })
+  },
+  audioMonitor: localStorage.getItem('opsia.audioMonitor') === '1',
+  setAudioMonitor: (on) => {
+    localStorage.setItem('opsia.audioMonitor', on ? '1' : '0')
+    set({ audioMonitor: on })
+  },
+  audioMonitorLevel: (() => {
+    const n = Number(localStorage.getItem('opsia.audioMonitorLevel'))
+    return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0.8
+  })(),
+  setAudioMonitorLevel: (v) => {
+    const lvl = Math.max(0, Math.min(1, v))
+    localStorage.setItem('opsia.audioMonitorLevel', String(lvl))
+    set({ audioMonitorLevel: lvl })
+  },
+  audioMonitorSink: localStorage.getItem('opsia.audioMonitorSink') || '',
+  setAudioMonitorSink: (id) => {
+    localStorage.setItem('opsia.audioMonitorSink', id)
+    set({ audioMonitorSink: id })
   },
   showCoupling: localStorage.getItem('opsia.showCoupling') === '1',
   setShowCoupling: (on) => {

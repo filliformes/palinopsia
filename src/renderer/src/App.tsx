@@ -553,6 +553,19 @@ export default function App(): JSX.Element {
     }
   }, [audioEnabled, audioSource, audioDeviceId])
 
+  // ── Audio monitoring / passthrough : push the (machine-local) monitor config
+  //    to the bus. It re-applies to a fresh input on its own (startLocal reads
+  //    the stored state), so no re-open is needed on a device change. ───────
+  const audioMonitor = useStore((s) => s.audioMonitor)
+  const audioMonitorLevel = useStore((s) => s.audioMonitorLevel)
+  const audioMonitorSink = useStore((s) => s.audioMonitorSink)
+  useEffect(() => {
+    audioBus.setMonitor(audioMonitor, audioMonitorLevel)
+  }, [audioMonitor, audioMonitorLevel])
+  useEffect(() => {
+    audioBus.setMonitorSink(audioMonitorSink)
+  }, [audioMonitorSink])
+
   // ── Undo/redo (100 levels) + keyboard shortcuts ─────────────────────
   useEffect(() => {
     const unsub = initUndo()

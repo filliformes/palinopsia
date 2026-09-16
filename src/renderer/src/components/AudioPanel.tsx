@@ -25,9 +25,31 @@ export function AudioPanel(): JSX.Element {
   const setDeviceId = useStore((s) => s.setAudioDeviceId)
   const showCoupling = useStore((s) => s.showCoupling)
   const setShowCoupling = useStore((s) => s.setShowCoupling)
+  // Output levels : the input monitor (passthrough) and the Sonify engine, each
+  // independently on/off + level, so both can sound at once from this tab.
+  const monitor = useStore((s) => s.audioMonitor)
+  const setMonitor = useStore((s) => s.setAudioMonitor)
+  const monitorLevel = useStore((s) => s.audioMonitorLevel)
+  const setMonitorLevel = useStore((s) => s.setAudioMonitorLevel)
+  const monitorSink = useStore((s) => s.audioMonitorSink)
+  const setMonitorSink = useStore((s) => s.setAudioMonitorSink)
+  const sonify = useStore((s) => s.sonify)
+  const setSonify = useStore((s) => s.setSonify)
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
+  const [outputs, setOutputs] = useState<MediaDeviceInfo[]>([])
   const showDevice = source === 'local' || source === 'both'
+  const monitorReady = enabled && showDevice // the input monitor needs local input
+
+  // Output devices for the monitor sink.
+  useEffect(() => {
+    let alive = true
+    navigator.mediaDevices
+      ?.enumerateDevices()
+      .then((ds) => { if (alive) setOutputs(ds.filter((d) => d.kind === 'audiooutput')) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [monitor, enabled])
 
   // Enumerate input devices (labels populate once the input has been opened).
   useEffect(() => {
@@ -118,6 +140,78 @@ export function AudioPanel(): JSX.Element {
           (Modulation ▸ M· ▸ audio). Prefer transient / flux over level.
         </p>
       )}
+
+      {/* Output levels : the input MONITOR (passthrough) and the SONIFY engine,
+          each on/off + level, so both can sound at once (independent faders). */}
+      <div className="mt-0.5 flex flex-col gap-1 border-t border-border/50 pt-1">
+        <div className="font-mono text-[9px] uppercase tracking-wide text-muted">Output levels</div>
+        <LevelRow
+          label="Sonify"
+          on={sonify.on}
+          onToggle={() => setSonify({ ...sonify, on: !sonify.on })}
+          level={sonify.master}
+          onLevel={(v) => setSonify({ ...sonify, master: v })}
+          title="The Sonify engine's sound (image → sound). Build its voices on the Sonify page (S)."
+        />
+        <LevelRow
+          label="Input monitor"
+          on={monitor}
+          onToggle={() => setMonitor(!monitor)}
+          level={monitorLevel}
+          onLevel={setMonitorLevel}
+          disabled={!monitorReady}
+          title={
+            monitorReady
+              ? 'Hear the local input through the output (passthrough) while it also drives reactivity — e.g. monitor a Move on the interface inputs.'
+              : 'Turn Audio on with a Local (or Both) source first.'
+          }
+        />
+        {monitor && monitorReady && (
+          <label className="flex items-center gap-2 pl-[26px] font-mono text-[9px] text-muted">
+            <span className="shrink-0">output</span>
+            <select
+              className="input select-compact min-w-0 flex-1 text-[10px]"
+              value={monitorSink}
+              onChange={(e) => setMonitorSink(e.target.value)}
+              title="Which output device the monitor plays to (Sonify has its own on its page)"
+            >
+              <option value="">System default output</option>
+              {outputs.map((d) => (
+                <option key={d.deviceId} value={d.deviceId}>{d.label || `Output ${d.deviceId.slice(0, 6)}`}</option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// One on/off + level fader (Sonify · input monitor).
+function LevelRow({
+  label, on, onToggle, level, onLevel, disabled, title
+}: {
+  label: string
+  on: boolean
+  onToggle: () => void
+  level: number
+  onLevel: (v: number) => void
+  disabled?: boolean
+  title?: string
+}): JSX.Element {
+  return (
+    <div className={`flex items-center gap-2 ${disabled ? 'opacity-50' : ''}`} title={title}>
+      <button onClick={onToggle} disabled={disabled} className="flex w-[92px] shrink-0 items-center gap-1.5">
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full transition-colors ${on && !disabled ? 'bg-accent' : 'bg-panel3'}`} />
+        <span className="font-mono text-[10px] text-muted">{label}</span>
+      </button>
+      <input
+        type="range" min={0} max={1} step={0.01} value={level}
+        onChange={(e) => onLevel(Number(e.target.value))}
+        disabled={disabled}
+        className="min-w-0 flex-1"
+      />
+      <span className="w-8 shrink-0 text-right font-mono text-[9px] text-muted">{Math.round(level * 100)}</span>
     </div>
   )
 }
