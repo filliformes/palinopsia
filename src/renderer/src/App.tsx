@@ -565,6 +565,15 @@ export default function App(): JSX.Element {
   useEffect(() => {
     audioBus.setMonitorSink(audioMonitorSink)
   }, [audioMonitorSink])
+  // USB-noise denoiser : push on/off + the learned notch profile.
+  const audioDenoise = useStore((s) => s.audioDenoise)
+  const audioDenoiseNotches = useStore((s) => s.audioDenoiseNotches)
+  useEffect(() => {
+    audioBus.setDenoise(audioDenoise)
+  }, [audioDenoise])
+  useEffect(() => {
+    audioBus.setNotches(audioDenoiseNotches)
+  }, [audioDenoiseNotches])
 
   // ── Undo/redo (100 levels) + keyboard shortcuts ─────────────────────
   useEffect(() => {

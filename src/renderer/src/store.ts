@@ -1093,6 +1093,12 @@ interface StoreState {
   setAudioMonitorLevel: (v: number) => void
   audioMonitorSink: string // output device id ('' = system default)
   setAudioMonitorSink: (id: string) => void
+  // USB-noise denoiser : adaptive notch filter. On/off + the learned notch
+  // frequencies (Hz). Machine-local (the noise is per-rig), persisted.
+  audioDenoise: boolean
+  setAudioDenoise: (on: boolean) => void
+  audioDenoiseNotches: number[]
+  setAudioDenoiseNotches: (freqs: number[]) => void
   // Show the per-layer A/B coupling (CPL) row. Off by default : a visuals-only
   // user never sees the audio-relations control. Persisted.
   showCoupling: boolean
@@ -2666,6 +2672,19 @@ export const useStore = create<StoreState>((set, get) => ({
   setAudioMonitorSink: (id) => {
     localStorage.setItem('opsia.audioMonitorSink', id)
     set({ audioMonitorSink: id })
+  },
+  audioDenoise: localStorage.getItem('opsia.audioDenoise') === '1',
+  setAudioDenoise: (on) => {
+    localStorage.setItem('opsia.audioDenoise', on ? '1' : '0')
+    set({ audioDenoise: on })
+  },
+  audioDenoiseNotches: (() => {
+    try { const a = JSON.parse(localStorage.getItem('opsia.audioDenoiseNotches') || '[]'); return Array.isArray(a) ? a : [] }
+    catch { return [] }
+  })(),
+  setAudioDenoiseNotches: (freqs) => {
+    localStorage.setItem('opsia.audioDenoiseNotches', JSON.stringify(freqs))
+    set({ audioDenoiseNotches: freqs })
   },
   showCoupling: localStorage.getItem('opsia.showCoupling') === '1',
   setShowCoupling: (on) => {

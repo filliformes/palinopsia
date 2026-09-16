@@ -142,6 +142,21 @@ class AudioBus {
   private monitorLevel = 0.8
   private monitorSink = '' // output device id ('' = system default)
 
+  // USB-noise denoiser : an adaptive multi-notch filter. `learnNoise` measures
+  // the input's average spectrum, finds the narrowband peaks (mains hum + its
+  // harmonics + the digital whine), and this filters them out in real time
+  // (BiquadFilter notches : no added latency, unlike an STFT denoiser). Placed
+  // BEFORE the analyser + monitor split, so the noise leaves both the sound you
+  // hear AND the reactivity. Off + no notches = the raw signal, unchanged.
+  private denoiseOn = false
+  private notchFreqs: number[] = []
+  private preSplit: GainNode | null = null // feeds analyser + monitor
+  private filterNodes: AudioNode[] = [] // hp + notches (rebuilt on change)
+  private srcNode: MediaStreamAudioSourceNode | null = null
+  private srcOut: AudioNode | null = null // what src currently feeds (for disconnect)
+  private learnAnalyser: AnalyserNode | null = null // taps RAW src (for learning)
+  private learnBuf: Float32Array<ArrayBuffer> | null = null
+
   get localActive(): boolean {
     return this.localOn
   }
@@ -165,18 +180,32 @@ class AudioBus {
       const analyser = ctx.createAnalyser()
       analyser.fftSize = 2048 // 2048 samples ≈ 46ms : enough window for pitch
       analyser.smoothingTimeConstant = 0.5
-      src.connect(analyser)
-      // Monitor path : src → gain → output. Gain 0 while monitoring is off, so
-      // the graph is always wired and toggling is a param change (no re-plumb).
+      // preSplit gathers the (optionally denoised) signal and feeds both the
+      // analyser (reactivity) and the monitor. The denoise chain sits src→preSplit.
+      const preSplit = ctx.createGain()
+      preSplit.connect(analyser)
+      // A separate analyser tapped off the RAW src : learnNoise reads this so the
+      // noise profile is measured pre-filter regardless of the denoise state.
+      const learnAnalyser = ctx.createAnalyser()
+      learnAnalyser.fftSize = 8192 // fine bins (~5.4Hz @48k) to resolve hum harmonics
+      learnAnalyser.smoothingTimeConstant = 0
+      src.connect(learnAnalyser)
+      // Monitor path : preSplit → gain → output. Gain 0 while monitoring is off,
+      // so the graph is always wired and toggling is a param change (no re-plumb).
       const monitorGain = ctx.createGain()
       monitorGain.gain.value = this.monitorOn ? this.monitorLevel : 0
-      src.connect(monitorGain)
+      preSplit.connect(monitorGain)
       monitorGain.connect(ctx.destination)
       this.monitorGain = monitorGain
       if (this.monitorSink) this.applySink(ctx, this.monitorSink)
       this.stream = stream
       this.ctx = ctx
+      this.srcNode = src
+      this.preSplit = preSplit
+      this.learnAnalyser = learnAnalyser
+      this.learnBuf = new Float32Array(learnAnalyser.frequencyBinCount)
       this.analyser = analyser
+      this.rebuildFilter() // wire src → [denoise?] → preSplit
       this.sampleRate = ctx.sampleRate
       this.freq = new Uint8Array(analyser.frequencyBinCount)
       this.time = new Uint8Array(analyser.fftSize)
@@ -198,12 +227,129 @@ class AudioBus {
     this.ctx = null
     this.analyser = null
     this.monitorGain = null
+    this.preSplit = null
+    this.srcNode = null
+    this.srcOut = null
+    this.learnAnalyser = null
+    this.learnBuf = null
+    this.filterNodes = []
     this.freq = this.time = null
     this.timeF = null
     this.prevMag = null
     this.pitchCounter = 0
     this.localOn = false
     this.local = zero()
+  }
+
+  // ── USB-noise denoiser ────────────────────────────────────────────────
+  /** Wire src → [denoise chain] → preSplit, matching the current denoise state
+   *  and notch list. Called on start, toggle, and after learning. */
+  private rebuildFilter(): void {
+    const ctx = this.ctx, src = this.srcNode, preSplit = this.preSplit
+    if (!ctx || !src || !preSplit) return
+    // Tear down the previous src→… link + any old filter nodes.
+    if (this.srcOut) { try { src.disconnect(this.srcOut) } catch { /* already gone */ } }
+    for (const n of this.filterNodes) { try { n.disconnect() } catch { /* gone */ } }
+    this.filterNodes = []
+
+    if (!this.denoiseOn || this.notchFreqs.length === 0) {
+      src.connect(preSplit) // bypass : raw signal, untouched
+      this.srcOut = preSplit
+      return
+    }
+    // High-pass to kill sub-rumble / DC offset, then a notch per learned peak.
+    const hp = ctx.createBiquadFilter()
+    hp.type = 'highpass'
+    hp.frequency.value = 24
+    hp.Q.value = 0.707
+    let node: AudioNode = hp
+    this.filterNodes.push(hp)
+    const nyq = ctx.sampleRate / 2
+    for (const f of this.notchFreqs) {
+      if (!(f > 20 && f < nyq * 0.98)) continue
+      const nf = ctx.createBiquadFilter()
+      nf.type = 'notch'
+      nf.frequency.value = f
+      // Narrower notch for stable low-freq hum, a touch wider up top where the
+      // whine wanders. Q ≈ f / bandwidth.
+      nf.Q.value = f < 400 ? 30 : 18
+      node.connect(nf)
+      node = nf
+      this.filterNodes.push(nf)
+    }
+    src.connect(hp)
+    node.connect(preSplit)
+    this.srcOut = hp
+  }
+
+  setDenoise(on: boolean): void {
+    this.denoiseOn = on
+    this.rebuildFilter()
+  }
+  /** Set the notch frequencies (Hz) directly (e.g. restored from a saved profile). */
+  setNotches(freqs: number[]): void {
+    this.notchFreqs = Array.isArray(freqs) ? freqs.slice(0, 8) : []
+    this.rebuildFilter()
+  }
+  denoiseNotches(): number[] {
+    return this.notchFreqs.slice()
+  }
+
+  /** Measure the input's noise spectrum for `ms`, find the narrowband peaks, and
+   *  set them as notch targets. Call it with the Move connected but SILENT. */
+  async learnNoise(ms = 1800): Promise<number[]> {
+    const an = this.learnAnalyser, buf = this.learnBuf
+    if (!an || !buf) return this.notchFreqs
+    const n = buf.length
+    const acc = new Float64Array(n) // accumulate LINEAR magnitude (dB → mag)
+    let frames = 0
+    const t0 = performance.now()
+    await new Promise<void>((resolve) => {
+      const step = (): void => {
+        an.getFloatFrequencyData(buf)
+        for (let i = 0; i < n; i++) acc[i] += Math.pow(10, buf[i] / 20)
+        frames++
+        if (performance.now() - t0 < ms) requestAnimationFrame(step)
+        else resolve()
+      }
+      requestAnimationFrame(step)
+    })
+    if (frames === 0) return this.notchFreqs
+    const mag = new Float64Array(n)
+    for (let i = 0; i < n; i++) mag[i] = acc[i] / frames
+    // Baseline = a wide moving median-ish average (mean over a ±W window), so a
+    // peak is what pokes ABOVE the local broadband floor.
+    const W = 24
+    const peaks: Array<{ f: number; prom: number }> = []
+    const binHz = this.sampleRate / an.fftSize
+    for (let i = 2; i < n - 2; i++) {
+      const f = i * binHz
+      if (f < 40 || f > this.sampleRate * 0.45) continue
+      // local baseline (exclude the immediate neighbourhood so a peak doesn't
+      // raise its own floor)
+      let sum = 0, cnt = 0
+      for (let k = i - W; k <= i + W; k++) {
+        if (k < 0 || k >= n || Math.abs(k - i) <= 2) continue
+        sum += mag[k]; cnt++
+      }
+      const base = cnt ? sum / cnt : mag[i]
+      const prom = mag[i] / (base + 1e-9) // how far above the floor (linear ratio)
+      const isLocalMax = mag[i] >= mag[i - 1] && mag[i] >= mag[i + 1] && mag[i] >= mag[i - 2] && mag[i] >= mag[i + 2]
+      if (isLocalMax && prom > 2.2) peaks.push({ f, prom }) // >~7dB above floor
+    }
+    // Keep the most prominent, but spread them out (don't stack 3 notches on one
+    // 60Hz peak's skirt) : merge peaks within 8Hz.
+    peaks.sort((a, b) => b.prom - a.prom)
+    const chosen: number[] = []
+    for (const p of peaks) {
+      if (chosen.length >= 8) break
+      if (chosen.some((f) => Math.abs(f - p.f) < 8)) continue
+      chosen.push(p.f)
+    }
+    chosen.sort((a, b) => a - b)
+    this.notchFreqs = chosen
+    this.rebuildFilter()
+    return chosen
   }
 
   /** Monitoring / passthrough : hear the local input through the output. `on`

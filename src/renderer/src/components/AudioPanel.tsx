@@ -35,6 +35,11 @@ export function AudioPanel(): JSX.Element {
   const setMonitorSink = useStore((s) => s.setAudioMonitorSink)
   const sonify = useStore((s) => s.sonify)
   const setSonify = useStore((s) => s.setSonify)
+  const denoise = useStore((s) => s.audioDenoise)
+  const setDenoise = useStore((s) => s.setAudioDenoise)
+  const notches = useStore((s) => s.audioDenoiseNotches)
+  const setNotches = useStore((s) => s.setAudioDenoiseNotches)
+  const [learning, setLearning] = useState(false)
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const [outputs, setOutputs] = useState<MediaDeviceInfo[]>([])
@@ -181,6 +186,55 @@ export function AudioPanel(): JSX.Element {
               ))}
             </select>
           </label>
+        )}
+
+        {/* USB-noise denoiser : learn the noise, notch out the tonal peaks. */}
+        <div className={`mt-0.5 flex flex-wrap items-center gap-2 border-t border-border/40 pt-1 ${!monitorReady ? 'opacity-50' : ''}`}>
+          <button
+            onClick={() => setDenoise(!denoise)}
+            disabled={!monitorReady || notches.length === 0}
+            className="flex w-[92px] shrink-0 items-center gap-1.5"
+            title={notches.length === 0 ? 'Learn the noise first' : 'Notch out the measured USB noise (ground hum + digital whine) from the input, on the sound you hear AND the reactivity'}
+          >
+            <span className={`h-2.5 w-2.5 shrink-0 rounded-full transition-colors ${denoise && monitorReady && notches.length ? 'bg-accent' : 'bg-panel3'}`} />
+            <span className="font-mono text-[10px] text-muted">USB denoise</span>
+          </button>
+          <button
+            onClick={async () => {
+              setLearning(true)
+              const freqs = await audioBus.learnNoise()
+              setNotches(freqs)
+              if (freqs.length) setDenoise(true)
+              setLearning(false)
+            }}
+            disabled={!monitorReady || learning}
+            className="shrink-0 rounded border border-accent/50 bg-accent/10 px-2 py-0.5 font-mono text-[9px] text-accent hover:bg-accent/20 disabled:opacity-40"
+            title="Measure the noise for ~2s (Move connected but SILENT), then notch out the peaks it finds"
+          >
+            {learning ? 'learning…' : 'learn noise'}
+          </button>
+          {notches.length > 0 && (
+            <span
+              className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted"
+              title={`Notches at ${notches.map((f) => Math.round(f) + ' Hz').join(', ')}`}
+            >
+              {notches.length} notch{notches.length > 1 ? 'es' : ''} · {notches.map((f) => Math.round(f)).join(' · ')} Hz
+            </span>
+          )}
+          {notches.length > 0 && (
+            <button
+              onClick={() => setNotches([])}
+              className="shrink-0 font-mono text-[9px] text-muted hover:text-danger"
+              title="Clear the learned notch profile"
+            >
+              clear
+            </button>
+          )}
+        </div>
+        {monitorReady && notches.length === 0 && (
+          <p className="pl-[26px] font-mono text-[8px] leading-tight text-muted">
+            Play nothing on the Move while learning, so only the noise is measured.
+          </p>
         )}
       </div>
     </div>
