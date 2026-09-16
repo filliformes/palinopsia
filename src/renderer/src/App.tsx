@@ -23,7 +23,7 @@ import { currentFps, tickFrame } from './perf'
 import { videoSeekRequests } from './engine/videoState'
 import { outputRecorder } from './recorder'
 import { sonifyEngine } from './audio/sonify'
-import { fireSelectedRandomize, registerPanic, firePanic, fireFreeze, isFrozen, registerRecordToggle } from './commands'
+import { fireSelectedRandomize, registerPanic, firePanic, fireFreeze, isFrozen, registerRecordToggle, registerNewSession, registerOpenSession } from './commands'
 import { Toaster, showToast } from './components/Toast'
 import { ShortcutHelp } from './components/ShortcutHelp'
 import { onCaptureError } from './engine/CaptureSource'
@@ -1403,6 +1403,26 @@ export default function App(): JSX.Element {
     }
   }
 
+  // New session (save the current one first, like Open). Shared by the New button
+  // and a learned MIDI pad (session:new).
+  async function doNewSession(): Promise<void> {
+    try {
+      const st = useStore.getState()
+      if (st.sessionPath) await window.api.sessionSave(st.exportSession(), st.sessionPath)
+      else await window.api.sessionSaveToDefault(st.exportSession())
+    } catch {
+      /* best-effort */
+    }
+    useStore.getState().newSession()
+    showToast('New session — previous saved')
+  }
+  // Expose New / Open to the MIDI router so their dice-style buttons are learnable.
+  useEffect(() => {
+    registerNewSession(() => void doNewSession())
+    registerOpenSession(() => void openSession())
+    return () => { registerNewSession(null); registerOpenSession(null) }
+  }, [])
+
   // One-shot blue flash on the Save button (dataFLOU's confirmation gesture) —
   // class re-add restarts the animation on every successful save.
   const saveBtnRef = useRef<HTMLButtonElement>(null)
@@ -1509,28 +1529,22 @@ export default function App(): JSX.Element {
             +
           </button>
         </div>
-        <button
-          className="btn text-[12px]"
-          onClick={async () => {
-            // Same silent save-before-leaving as Open : New must not lose the
-            // current session's scenes.
-            try {
-              const st = useStore.getState()
-              if (st.sessionPath) await window.api.sessionSave(st.exportSession(), st.sessionPath)
-              else await window.api.sessionSaveToDefault(st.exportSession())
-            } catch {
-              /* best-effort */
-            }
-            useStore.getState().newSession()
-            showToast('New session — previous saved')
-          }}
-          title="New blank session (undoable; the current session is saved first)"
-        >
-          New
-        </button>
-        <button className="btn text-[12px]" onClick={openSession}>
-          Open
-        </button>
+        <span className="relative inline-flex">
+          <MidiLearnOverlay id="session:new" />
+          <button
+            className="btn text-[12px]"
+            onClick={() => void doNewSession()}
+            title="New blank session (undoable; the current session is saved first) · MIDI-learnable"
+          >
+            New
+          </button>
+        </span>
+        <span className="relative inline-flex">
+          <MidiLearnOverlay id="session:open" />
+          <button className="btn text-[12px]" onClick={openSession} title="Open a session from a file dialog · MIDI-learnable">
+            Open
+          </button>
+        </span>
         <button
           ref={saveBtnRef}
           className="btn text-[12px]"
@@ -1803,38 +1817,44 @@ function MasterRackStrip(): JSX.Element {
         flashing ? 'animate-pulse border-danger ring-1 ring-danger' : 'border-border'
       }`}
     >
-      <button
-        onClick={toggleMasterChain}
-        disabled={rackFx.length === 0}
-        className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide transition-colors disabled:opacity-40 ${
-          chainOn
-            ? 'border-accent bg-accent/15 text-accent'
-            : 'border-border text-muted hover:text-text'
-        }`}
-        title={
-          rackFx.length === 0
-            ? 'No master FX to toggle'
-            : chainOn
-              ? 'Master FX chain ON : click to bypass all (keeps Finishing Touches)'
-              : 'Master FX chain OFF : click to enable all'
-        }
-      >
-        chain {chainOn ? 'on' : 'off'}
-      </button>
-      <button
-        onClick={() => {
-          randomizeMasterParams()
-          flash()
-        }}
-        className={`shrink-0 rounded border px-1 font-mono text-[10px] leading-4 transition-colors ${
-          flashing
-            ? 'animate-pulse border-danger bg-danger/25 text-danger'
-            : 'border-accent/50 bg-accent/10 text-accent hover:bg-accent/20'
-        }`}
-        title="Randomize the master FX parameters (keeps the chain + your Vibe)"
-      >
-        ⚄
-      </button>
+      <span className="relative inline-flex shrink-0">
+        <MidiLearnOverlay id="master:chain" />
+        <button
+          onClick={toggleMasterChain}
+          disabled={rackFx.length === 0}
+          className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide transition-colors disabled:opacity-40 ${
+            chainOn
+              ? 'border-accent bg-accent/15 text-accent'
+              : 'border-border text-muted hover:text-text'
+          }`}
+          title={
+            rackFx.length === 0
+              ? 'No master FX to toggle'
+              : chainOn
+                ? 'Master FX chain ON : click to bypass all (keeps Finishing Touches)'
+                : 'Master FX chain OFF : click to enable all'
+          }
+        >
+          chain {chainOn ? 'on' : 'off'}
+        </button>
+      </span>
+      <span className="relative inline-flex shrink-0">
+        <MidiLearnOverlay id="rand:master" />
+        <button
+          onClick={() => {
+            randomizeMasterParams()
+            flash()
+          }}
+          className={`shrink-0 rounded border px-1 font-mono text-[10px] leading-4 transition-colors ${
+            flashing
+              ? 'animate-pulse border-danger bg-danger/25 text-danger'
+              : 'border-accent/50 bg-accent/10 text-accent hover:bg-accent/20'
+          }`}
+          title="Randomize the master FX parameters (keeps the chain + your Vibe)"
+        >
+          ⚄
+        </button>
+      </span>
       <SearchSelect
         className="w-32 shrink-0 text-[10px]"
         value={applied}

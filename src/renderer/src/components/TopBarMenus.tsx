@@ -3,11 +3,13 @@
 //  · Generate — a dropdown of 50 visual themes + a Generate button that builds a
 //    whole new (unsaved) session tethered to the theme (store.generateTheme).
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { THEME_FAMILIES, THEMES } from '../themes'
 import { SearchSelect } from './SearchSelect'
 import { showToast } from './Toast'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { registerLoadSession } from '../commands'
 
 type SessionEntry = { name: string; path: string; mtime: number }
 
@@ -62,6 +64,14 @@ export function SessionLoader(): JSX.Element {
       setBusy(false)
     }
   }
+  // Expose "load the selected session" to the MIDI router (session:load) so a
+  // learned pad fires it. A ref keeps the current closure (sel/busy live).
+  const loadRef = useRef(load)
+  loadRef.current = load
+  useEffect(() => {
+    registerLoadSession(() => void loadRef.current())
+    return () => registerLoadSession(null)
+  }, [])
 
   return (
     <div className="flex items-center gap-1" title="Load a saved session">
@@ -80,14 +90,17 @@ export function SessionLoader(): JSX.Element {
           </option>
         ))}
       </select>
-      <button
-        className="btn text-[12px]"
-        onClick={() => void load()}
-        disabled={!sel || busy}
-        title="Load the selected session"
-      >
-        Load
-      </button>
+      <span className="relative inline-flex">
+        <MidiLearnOverlay id="session:load" />
+        <button
+          className="btn text-[12px]"
+          onClick={() => void load()}
+          disabled={!sel || busy}
+          title="Load the selected session · MIDI-learnable"
+        >
+          Load
+        </button>
+      </span>
     </div>
   )
 }

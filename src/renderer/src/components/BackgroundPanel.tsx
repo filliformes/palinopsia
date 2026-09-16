@@ -100,19 +100,22 @@ export function BackgroundPanel(): JSX.Element {
               wide as the widest option ("Difference Bloom"). Popup still expands. */}
           <FxAddSelect scope={{ kind: 'background' }} className="w-16 shrink-0" />
         </span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            randomizeBg()
-            flash()
-          }}
-          title="Randomize the background only (source + params + FX; keeps opacity/speed)"
-          className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[11px] leading-none transition-colors ${
-            flashing ? 'animate-pulse text-accent' : 'text-muted hover:bg-accent/15 hover:text-accent'
-          }`}
-        >
-          ⚄
-        </button>
+        <span className="relative inline-flex shrink-0">
+          <MidiLearnOverlay id="rand:bg" />
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              randomizeBg()
+              flash()
+            }}
+            title="Randomize the background only (source + params + FX; keeps opacity/speed)"
+            className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[11px] leading-none transition-colors ${
+              flashing ? 'animate-pulse text-accent' : 'text-muted hover:bg-accent/15 hover:text-accent'
+            }`}
+          >
+            ⚄
+          </button>
+        </span>
         <SearchSelect
           className="w-[4.75rem] shrink-0 text-[10px]"
           value=""

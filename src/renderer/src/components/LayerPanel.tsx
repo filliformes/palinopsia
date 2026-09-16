@@ -213,18 +213,21 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             onClick={() => toggleFeedback(index)}
             title="Feedback : this layer samples its own previous frame (trails)"
           />
-          <button
-            onClick={() => {
-              randomizeLayer(index)
-              flash()
-            }}
-            title="Randomize this whole layer (sources, FX, blend, feedback)"
-            className={`rounded px-1.5 py-0.5 font-mono text-[11px] leading-none transition-colors ${
-              flashing ? 'animate-pulse text-accent' : 'text-muted hover:bg-accent/15 hover:text-accent'
-            }`}
-          >
-            ⚄
-          </button>
+          <span className="relative inline-flex">
+            <MidiLearnOverlay id={`rand:layer:${index}`} />
+            <button
+              onClick={() => {
+                randomizeLayer(index)
+                flash()
+              }}
+              title="Randomize this whole layer (sources, FX, blend, feedback)"
+              className={`rounded px-1.5 py-0.5 font-mono text-[11px] leading-none transition-colors ${
+                flashing ? 'animate-pulse text-accent' : 'text-muted hover:bg-accent/15 hover:text-accent'
+              }`}
+            >
+              ⚄
+            </button>
+          </span>
         </div>
       </div>
       {modAssign('opacity')}

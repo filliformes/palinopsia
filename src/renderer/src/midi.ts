@@ -18,8 +18,11 @@
 // the target ids below.
 
 import type { MidiBinding } from '@shared/types'
-import { fireSelectedRandomize, fireVariation, firePanic, fireFreeze, fireRecordToggle } from './commands'
-import { setKnobTarget } from './metaSmooth'
+import {
+  fireSelectedRandomize, fireVariation, firePanic, fireFreeze, fireRecordToggle,
+  fireInspectorRandomize, fireNewSession, fireLoadSession, fireOpenSession
+} from './commands'
+import { setKnobTarget, shuffleMetaValues } from './metaSmooth'
 import { useStore } from './store'
 import type { SoniConfig } from './audio/sonify'
 
@@ -101,8 +104,20 @@ export function fireTrigger(id: string): void {
     case 'fire:soniseq': st.setSoniSeqOn(!st.soniSeq.on); return
     case 'scene:next': recallRelativeScene(1); return
     case 'scene:prev': recallRelativeScene(-1); return
+    // Randomize dice (each little ⚄ / ⚄-style button in the UI is learnable) :
+    case 'rand:bg': st.randomizeBg(); return
+    case 'rand:master': st.randomizeMasterParams(); return
+    case 'rand:meta': shuffleMetaValues(); return
+    case 'rand:inspector': fireInspectorRandomize(); return // the selected unit
+    case 'master:chain': st.toggleMasterChain(); return // the master FX on/off
+    case 'session:new': fireNewSession(); return
+    case 'session:load': fireLoadSession(); return // load the selected saved session
+    case 'session:open': fireOpenSession(); return // the Open… file dialog
   }
-  if (id.startsWith('scene:')) {
+  if (id.startsWith('rand:layer:')) {
+    const i = Number(id.slice(11))
+    if (Number.isFinite(i)) st.randomizeLayer(i)
+  } else if (id.startsWith('scene:')) {
     const i = Number(id.slice(6))
     if (Number.isFinite(i) && st.scenes[i]) st.recallScene(st.scenes[i].id)
   } else if (id.startsWith('sonify:voice:')) {
@@ -173,6 +188,26 @@ export function midiTargetLabel(id: string): string {
   if (lm) return `LAYER ${Number(lm[1]) + 1} ${lm[2] === 'mix' ? 'A↔B' : 'opacity'}`
   const sv = /^sonify:voice:(\d+)$/.exec(id)
   if (sv) return `SONIFY ${SONI_VOICE_KEYS[Number(sv[1])] ?? sv[1]} on/off`
+  const rl = /^rand:layer:(\d+)$/.exec(id)
+  if (rl) return `RANDOMIZE layer ${Number(rl[1]) + 1}`
+  switch (id) {
+    case 'rand:bg':
+      return 'RANDOMIZE background'
+    case 'rand:master':
+      return 'RANDOMIZE master FX'
+    case 'rand:meta':
+      return 'RANDOMIZE Meta knobs'
+    case 'rand:inspector':
+      return 'RANDOMIZE inspector'
+    case 'master:chain':
+      return 'MASTER FX on/off'
+    case 'session:new':
+      return 'NEW session'
+    case 'session:load':
+      return 'LOAD session'
+    case 'session:open':
+      return 'OPEN session…'
+  }
   switch (id) {
     case 'transport:bpm':
       return 'BPM'
@@ -477,16 +512,14 @@ class MidiManager {
     // fires — one pad can drive several actions.
     if (value <= 0) return
     const map = st.midiMap
-    // One pad can drive several actions : every matching trigger fires, each
-    // through the shared fireTrigger (same path as a body gesture).
-    for (const id of TRIGGER_ACTION_IDS) {
+    // One pad can drive several actions : every matching DISCRETE binding fires,
+    // through the shared fireTrigger (same path as a body gesture). Iterating the
+    // whole map (minus continuous targets, handled above) means any learnable
+    // trigger — fire:*, scene:*, sonify:voice:*, and every rand:* dice — works
+    // without being listed here.
+    for (const id in map) {
+      if (isContinuousTarget(id)) continue
       if (matches(map[id], binding)) fireTrigger(id)
-    }
-    for (let i = 0; i < SONI_VOICE_KEYS.length; i++) {
-      if (matches(map[`sonify:voice:${i}`], binding)) fireTrigger(`sonify:voice:${i}`)
-    }
-    for (let i = 0; i < st.scenes.length; i++) {
-      if (matches(map[`scene:${i}`], binding)) fireTrigger(`scene:${i}`)
     }
   }
 }

@@ -73,3 +73,39 @@ export function registerRecordToggle(fn: (() => void) | null): void {
 export function fireRecordToggle(): void {
   recordToggleFn?.()
 }
+
+// The Inspector's and Finishing tab's randomize dice act on the CURRENTLY-shown
+// unit (selection-dependent), so those components register a thunk while mounted
+// and a learned MIDI pad fires the same closure. Null when nothing is inspected.
+let inspectorRandFn: (() => void) | null = null
+export function registerInspectorRandomize(fn: (() => void) | null): void {
+  inspectorRandFn = fn
+}
+export function fireInspectorRandomize(): void {
+  inspectorRandFn?.()
+}
+
+// New / Load session are App-side (a save-before-leave step, a file dialog, a
+// dropdown selection), so those components register their thunks and a learned
+// pad fires the same closure.
+let newSessionFn: (() => void) | null = null
+export function registerNewSession(fn: (() => void) | null): void {
+  newSessionFn = fn
+}
+export function fireNewSession(): void {
+  newSessionFn?.()
+}
+let loadSessionFn: (() => void) | null = null
+export function registerLoadSession(fn: (() => void) | null): void {
+  loadSessionFn = fn
+}
+export function fireLoadSession(): void {
+  loadSessionFn?.()
+}
+let openSessionFn: (() => void) | null = null
+export function registerOpenSession(fn: (() => void) | null): void {
+  openSessionFn = fn
+}
+export function fireOpenSession(): void {
+  openSessionFn?.()
+}

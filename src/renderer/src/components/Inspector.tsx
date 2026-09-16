@@ -25,6 +25,8 @@ import { useFlash } from './useFlash'
 import { SourceFraming } from './SourceFraming'
 import { VideoTransport } from './VideoTransport'
 import { AssembleTransport } from './AssembleTransport'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { registerInspectorRandomize } from '../commands'
 
 // The Vibe Palette's "main" colour = its most characterful stop (highest
 // chroma, luma as a tiebreak), brightened a touch so it reads as a light
@@ -170,6 +172,17 @@ export function Inspector(): JSX.Element {
     () => setHeaderMenu(null),
     !!headerUnit?.locked
   )
+  // "Randomize the inspected unit" (the ⚄ header button) as a learnable MIDI
+  // action : register a thunk that a bound pad (rand:inspector) fires. Reset to a
+  // no-op here every render, then set to the real action below once a valid unit
+  // is resolved — so a pad never randomizes a stale selection (or when nothing
+  // is selected, since this component early-returns before that assignment).
+  const inspRandRef = useRef<() => void>(() => {})
+  useEffect(() => {
+    registerInspectorRandomize(() => inspRandRef.current())
+    return () => registerInspectorRandomize(null)
+  }, [])
+  inspRandRef.current = () => {}
 
   if (selection?.type === 'source') {
     const layer = composition.layers[selection.layer]
@@ -413,6 +426,14 @@ export function Inspector(): JSX.Element {
   // The Vibe's preset name is shared with P/Shift+P (controlled picker).
   const isVibe = shaderId === 'fx-vibe'
   const isContext = shaderId === 'fx-context'
+  // Now that a real unit is resolved, point the learnable thunk at it.
+  inspRandRef.current = () => {
+    if (!shaderId) return
+    const next = randomizeInputs(shaderId, values)
+    for (const [k, v] of Object.entries(next)) onChange(k, v)
+    if (isVibe) setVibePresetName(null)
+    flash()
+  }
 
   // Header right-click menu : an FX gets copy/paste + modulation (useFxMenuItems);
   // a source/background gets "Randomize modulation" only when it already carries
@@ -520,23 +541,20 @@ export function Inspector(): JSX.Element {
         >
           ↺
         </button>
-        <button
-          onClick={() => {
-            // Curated-range randomize of THIS shader's params only.
-            const next = randomizeInputs(shaderId, values)
-            for (const [k, v] of Object.entries(next)) onChange(k, v)
-            if (isVibe) setVibePresetName(null)
-            flash()
-          }}
-          className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
-            flashing
-              ? 'animate-pulse border-accent bg-accent/25 text-accent'
-              : 'border-accent/50 bg-accent/10 text-accent hover:bg-accent/20'
-          }`}
-          title="Randomize this shader's parameters (curated ranges)"
-        >
-          ⚄
-        </button>
+        <span className="relative inline-flex shrink-0">
+          <MidiLearnOverlay id="rand:inspector" />
+          <button
+            onClick={() => inspRandRef.current()}
+            className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
+              flashing
+                ? 'animate-pulse border-accent bg-accent/25 text-accent'
+                : 'border-accent/50 bg-accent/10 text-accent hover:bg-accent/20'
+            }`}
+            title="Randomize this shader's parameters (curated ranges) · MIDI-learnable"
+          >
+            ⚄
+          </button>
+        </span>
         {/* key resets the picker's applied-name when the selection moves. Keyed
             on the selection's IDENTITY (an FX instId, or the source/bg slot) so
             two units of the same shader in one rack don't share a picker. */}

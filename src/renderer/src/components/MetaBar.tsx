@@ -62,20 +62,23 @@ export function MetaBar(): JSX.Element {
           </span>
           <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Meta</span>
         </button>
-        <button
-          onClick={() => {
-            shuffleMetaValues()
-            flash()
-          }}
-          className={`rounded border px-1 font-mono text-[10px] leading-4 transition-colors ${
-            flashing
-              ? 'animate-pulse border-danger bg-danger/25 text-danger'
-              : 'border-accent/50 bg-accent/10 text-accent hover:bg-accent/20'
-          }`}
-          title="Randomize the knob positions (keeps bindings)"
-        >
-          ⚄
-        </button>
+        <span className="relative inline-flex">
+          <MidiLearnOverlay id="rand:meta" />
+          <button
+            onClick={() => {
+              shuffleMetaValues()
+              flash()
+            }}
+            className={`rounded border px-1 font-mono text-[10px] leading-4 transition-colors ${
+              flashing
+                ? 'animate-pulse border-danger bg-danger/25 text-danger'
+                : 'border-accent/50 bg-accent/10 text-accent hover:bg-accent/20'
+            }`}
+            title="Randomize the knob positions (keeps bindings)"
+          >
+            ⚄
+          </button>
+        </span>
         <button
           onClick={toggleMetaXYPads}
           className={`ml-auto rounded border px-1.5 font-mono text-[9px] leading-4 transition-colors ${
