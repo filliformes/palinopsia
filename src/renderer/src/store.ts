@@ -2727,12 +2727,15 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
   bodyControl: (() => {
     const def: BodyControlConfig = {
-      enabled: false, deviceId: null, hands: true, pose: true, face: false, mirror: true, sensitivity: 0.5,
-      // Actions are shared trigger ids (engine/midi.ts). Face gestures default to
-      // unbound : blink / brow move involuntarily, so the performer opts each in.
+      enabled: false, deviceId: null, hands: true, pose: true, face: false, mirror: true,
+      sensitivity: 0.5, holdMs: 1200, oscOut: false,
+      // Actions are shared trigger ids (engine/midi.ts). Face + hold gestures
+      // default to unbound : blink / brow move involuntarily, and holds are
+      // deliberate, so the performer opts each in.
       gestures: {
         pinchLeft: 'scene:prev', pinchRight: 'scene:next', clap: 'fire:randomize', cross: 'fire:flush', handsUp: 'fire:freeze',
-        mouthPop: 'none', browRaise: 'none', winkLeft: 'none', winkRight: 'none'
+        mouthPop: 'none', browRaise: 'none', winkLeft: 'none', winkRight: 'none',
+        holdHandsUp: 'none', holdPinchLeft: 'none', holdPinchRight: 'none', holdArmsWide: 'none', holdMouthOpen: 'none'
       },
       rules: []
     }

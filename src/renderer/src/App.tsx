@@ -373,36 +373,64 @@ export default function App(): JSX.Element {
   }, [bodyControl])
   useEffect(() => () => bodyTracker.stop(), []) // release the camera on unmount
   useEffect(() => {
-    // Drain gesture onsets each frame and fire (a) the built-in per-gesture map
-    // and (b) the user's rules, including two-gesture combos. Cheap when the
-    // tracker is off (the queue is empty). Reads config live, so re-binding takes
-    // effect without re-subscribing.
+    // Drain gesture onsets each frame and fire (a) the built-in per-gesture map,
+    // (b) the user's rules (single + two-gesture combos), and (c) an OSC bang if
+    // oscOut is on. Cheap when the tracker is off (the queue is empty). Reads
+    // config live, so re-binding takes effect without re-subscribing.
     const COMBO_MS = 550 // how close two gestures must land to count as a combo
     const recent: Partial<Record<BodyGesture, number>> = {}
+    // Exclusive combos hold a gesture's single action back this long, to see if a
+    // combo consumes it first (then the single is suppressed).
+    const pending: Array<{ g: BodyGesture; due: number }> = []
     const within = (t: number | undefined, now: number): boolean => t != null && t > 0 && now - t <= COMBO_MS
+    const oscSafe = (s: string): string => (s || 'rule').replace(/[^A-Za-z0-9_]/g, '_')
+    const sendOsc = (addr: string): void => {
+      const s = useStore.getState()
+      try { window.api.oscSend(s.oscOutHost, s.oscOutPort, addr, [{ type: 'i', value: 1 }]) } catch { /* socket busy */ }
+    }
+    const fireSingles = (g: BodyGesture, bc: ReturnType<typeof useStore.getState>['bodyControl']): void => {
+      dispatchGesture(bc.gestures[g]) // built-in per-gesture mapping
+      for (const r of bc.rules) {
+        if (r.enabled && !r.g2 && r.g1 === g && r.action && r.action !== 'none') { bodyBus.fireRule(r.id); fireTrigger(r.action) }
+      }
+    }
     let raf = 0
     const tick = (): void => {
       raf = requestAnimationFrame(tick)
+      const now = performance.now()
+      const bc = useStore.getState().bodyControl
+      // Fire any held-back singles whose look-ahead elapsed without a combo.
+      for (let i = pending.length - 1; i >= 0; i--) {
+        if (now >= pending[i].due) { fireSingles(pending[i].g, bc); pending.splice(i, 1) }
+      }
       const gs = bodyBus.drainGestures()
       if (gs.length === 0) return
-      const bc = useStore.getState().bodyControl
-      const now = performance.now()
+      // Gestures that belong to an enabled EXCLUSIVE combo : their singles wait.
+      const excl = new Set<BodyGesture>()
+      for (const r of bc.rules) {
+        if (r.enabled && r.g2 && r.exclusive && r.action && r.action !== 'none') { excl.add(r.g1); excl.add(r.g2) }
+      }
       for (const g of gs) {
-        dispatchGesture(bc.gestures[g]) // built-in single mapping
+        if (bc.oscOut) sendOsc(`/opsia/body/gesture/${g}`)
+        let consumed = false // g just completed an exclusive combo → suppress its single
         for (const r of bc.rules) {
-          if (!r.enabled || !r.action || r.action === 'none') continue
-          if (!r.g2) {
-            if (r.g1 === g) { bodyBus.fireRule(r.id); fireTrigger(r.action) }
-          } else if (r.combo === 'then') {
-            // sequence : g1 first, then g2 within the window
-            if (g === r.g2 && within(recent[r.g1], now)) { bodyBus.fireRule(r.id); fireTrigger(r.action); recent[r.g1] = 0 }
-          } else {
-            // together : both within the window, order-independent
-            if ((g === r.g1 && within(recent[r.g2], now)) || (g === r.g2 && within(recent[r.g1], now))) {
-              bodyBus.fireRule(r.id); fireTrigger(r.action); recent[r.g1] = 0; recent[r.g2] = 0
-            }
+          if (!r.enabled || !r.g2 || !r.action || r.action === 'none') continue
+          const hit = r.combo === 'then'
+            ? (g === r.g2 && within(recent[r.g1], now))
+            : ((g === r.g1 && within(recent[r.g2], now)) || (g === r.g2 && within(recent[r.g1], now)))
+          if (!hit) continue
+          bodyBus.fireRule(r.id); fireTrigger(r.action)
+          if (bc.oscOut) sendOsc(`/opsia/body/rule/${oscSafe(r.name)}`)
+          if (r.combo === 'then') recent[r.g1] = 0
+          else { recent[r.g1] = 0; recent[r.g2] = 0 }
+          if (r.exclusive) {
+            consumed = true
+            for (let i = pending.length - 1; i >= 0; i--) if (pending[i].g === r.g1 || pending[i].g === r.g2) pending.splice(i, 1)
           }
         }
+        if (consumed) { /* single swallowed by the exclusive combo */ }
+        else if (excl.has(g)) pending.push({ g, due: now + COMBO_MS })
+        else fireSingles(g, bc)
         recent[g] = now
       }
     }

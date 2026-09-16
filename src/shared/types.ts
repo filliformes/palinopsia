@@ -329,9 +329,13 @@ export const BODY_FEATURES: BodyFeature[] = [
 export type BodyGesture =
   | 'pinchLeft' | 'pinchRight' | 'clap' | 'cross' | 'handsUp'
   | 'mouthPop' | 'browRaise' | 'winkLeft' | 'winkRight'
+  // Hold-duration triggers : a sustained pose fires ONCE after being held for
+  // `holdMs`, then re-arms when released. Not onsets — a deliberate, held move.
+  | 'holdHandsUp' | 'holdPinchLeft' | 'holdPinchRight' | 'holdArmsWide' | 'holdMouthOpen'
 export const BODY_GESTURES: BodyGesture[] = [
   'pinchLeft', 'pinchRight', 'clap', 'cross', 'handsUp',
-  'mouthPop', 'browRaise', 'winkLeft', 'winkRight'
+  'mouthPop', 'browRaise', 'winkLeft', 'winkRight',
+  'holdHandsUp', 'holdPinchLeft', 'holdPinchRight', 'holdArmsWide', 'holdMouthOpen'
 ]
 
 // What a gesture fires : one of the shared discrete-trigger action ids (the same
@@ -354,6 +358,10 @@ export interface GestureRule {
   combo: 'together' | 'then'
   action: GestureAction
   enabled: boolean
+  // Exclusive : when this combo fires, swallow the component gestures' own single
+  // actions (a chord that doesn't also play its notes). Costs a small look-ahead
+  // delay on those singles, so it is opt-in per rule.
+  exclusive: boolean
 }
 
 // Machine-local embodied-control config (a webcam is machine-bound, like warp).
@@ -366,6 +374,8 @@ export interface BodyControlConfig {
   face: boolean // run the FaceLandmarker (blendshapes + head pose)
   mirror: boolean // flip X so moving right moves the value right (selfie view)
   sensitivity: number // 0..1 : global gain on gesture thresholds (higher = easier)
+  holdMs: number // how long a pose must be held for a hold-* gesture to fire (ms)
+  oscOut: boolean // also emit /opsia/body/gesture/<name> over OSC on each onset
   gestures: Record<BodyGesture, GestureAction> // built-in per-gesture → action routing
   rules: GestureRule[] // user-authored rules (single + combo) from the rule builder
 }

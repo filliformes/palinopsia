@@ -8,7 +8,7 @@
 // Face is a planned drop-in : when a FaceLandmarker is added to the tracker its
 // features join BODY_FEATURES and appear here with no page changes.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BodyControlConfig, BodyFeature, BodyGesture, GestureAction, GestureRule } from '@shared/types'
 import { BODY_FEATURES, BODY_GESTURES } from '@shared/types'
 import { bodyTracker } from '../engine/bodyTracker'
@@ -38,9 +38,14 @@ const GESTURE_LABEL: Record<BodyGesture, string> = {
   mouthPop: 'mouth pop (jaw)',
   browRaise: 'brow raise',
   winkLeft: 'wink · left eye',
-  winkRight: 'wink · right eye'
+  winkRight: 'wink · right eye',
+  holdHandsUp: 'hold · hands up',
+  holdPinchLeft: 'hold · pinch left',
+  holdPinchRight: 'hold · pinch right',
+  holdArmsWide: 'hold · arms wide',
+  holdMouthOpen: 'hold · mouth open'
 }
-const actionLabel = (id: GestureAction): string => (id === 'none' ? '— nothing —' : midiTargetLabel(id))
+const SONI_VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord']
 // Group the feature list for a legible monitor.
 const FEATURE_GROUPS: Array<{ title: string; keys: BodyFeature[] }> = [
   { title: 'Hands', keys: ['handLeftHeight', 'handRightHeight', 'handLeftX', 'handRightX', 'handLeftOpen', 'handRightOpen', 'handsApart', 'handsHeight'] },
@@ -81,6 +86,7 @@ export function BodyPage(): JSX.Element {
   const [rG1, setRG1] = useState<BodyGesture>('pinchLeft')
   const [rG2, setRG2] = useState<BodyGesture | null>(null)
   const [rCombo, setRCombo] = useState<'together' | 'then'>('together')
+  const [rExcl, setRExcl] = useState(false)
   const [rAction, setRAction] = useState<GestureAction>('fire:randomize')
 
   const patch = (p: Partial<BodyControlConfig>): void => setCfg(p)
@@ -173,14 +179,28 @@ export function BodyPage(): JSX.Element {
     if (rAction === 'none') { showToast('Pick an action for the rule first', 'warn'); return }
     const name = rName.trim() || ruleTrigger({ g1: rG1, g2: rG2, combo: rCombo })
     const rule: GestureRule = {
-      id: `r${Date.now().toString(36)}`, name, g1: rG1, g2: rG2, combo: rCombo, action: rAction, enabled: true
+      id: `r${Date.now().toString(36)}`, name, g1: rG1, g2: rG2, combo: rCombo, action: rAction, enabled: true,
+      exclusive: rG2 ? rExcl : false
     }
     patch({ rules: [...cfg.rules, rule] })
-    setRName(''); setRG2(null)
+    setRName(''); setRG2(null); setRExcl(false)
   }
   const updateRule = (id: string, part: Partial<GestureRule>): void =>
     patch({ rules: cfg.rules.map((r) => (r.id === id ? { ...r, ...part } : r)) })
   const deleteRule = (id: string): void => patch({ rules: cfg.rules.filter((r) => r.id !== id) })
+
+  // Action vocabulary for the dropdowns : the shared trigger ids + this session's
+  // scene slots + the Sonify voices (all handled by fireTrigger).
+  const scenes = useStore((s) => s.scenes)
+  const actionOptions = useMemo(() => {
+    const opts: Array<{ id: string; label: string }> = [{ id: 'none', label: '— nothing —' }]
+    for (const id of TRIGGER_ACTION_IDS) opts.push({ id, label: midiTargetLabel(id) })
+    scenes.forEach((s, i) => opts.push({ id: `scene:${i}`, label: `Scene ${i + 1}${s.name ? ' · ' + s.name : ''}` }))
+    SONI_VOICE_NAMES.forEach((n, i) => opts.push({ id: `sonify:voice:${i}`, label: `Sonify: ${n}` }))
+    return opts
+  }, [scenes])
+  const labelForAction = (id: GestureAction): string =>
+    actionOptions.find((o) => o.id === id)?.label ?? (id === 'none' ? '— nothing —' : midiTargetLabel(id))
 
   const statusText = !cfg.enabled
     ? 'camera off'
@@ -263,6 +283,27 @@ export function BodyPage(): JSX.Element {
             />
             <span className="w-8 text-right text-text">{cfg.sensitivity.toFixed(2)}</span>
           </label>
+
+          <label className="flex items-center gap-2 font-mono text-[11px] text-muted">
+            <span className="w-16 shrink-0">hold time</span>
+            <input
+              type="range" min={400} max={3000} step={50} value={cfg.holdMs}
+              onChange={(e) => patch({ holdMs: Number(e.target.value) })}
+              className="min-w-0 flex-1"
+              title="How long a pose must be held for a hold gesture (hold · hands up, hold · pinch, …) to fire."
+            />
+            <span className="w-8 text-right text-text">{(cfg.holdMs / 1000).toFixed(1)}s</span>
+          </label>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Toggle
+              on={cfg.oscOut}
+              label="OSC out"
+              onClick={() => patch({ oscOut: !cfg.oscOut })}
+              title="Also send an OSC bang on every gesture (/opsia/body/gesture/<name>) and rule (/opsia/body/rule/<name>) to the OSC-out target set in I/O setup — so the body plays the sound side too."
+            />
+            <span className="font-mono text-[10px] text-muted">→ /opsia/body/…</span>
+          </div>
         </div>
 
         {/* Right : feature monitor + gesture routing */}
@@ -324,9 +365,8 @@ export function BodyPage(): JSX.Element {
                     className="input select-compact min-w-0 flex-1 text-[11px]"
                     title="What this gesture fires. Same action vocabulary as MIDI Learn and the keyboard : bind a hardware pad to the same action and they stay in sync."
                   >
-                    <option value="none">{actionLabel('none')}</option>
-                    {TRIGGER_ACTION_IDS.map((a) => (
-                      <option key={a} value={a}>{actionLabel(a)}</option>
+                    {actionOptions.map((o) => (
+                      <option key={o.id} value={o.id}>{o.label}</option>
                     ))}
                   </select>
                   <button
@@ -381,13 +421,19 @@ export function BodyPage(): JSX.Element {
                   <select value={rG2} onChange={(e) => setRG2(e.target.value as BodyGesture)} className="input select-compact text-[11px]" title="Second gesture">
                     {BODY_GESTURES.map((g) => <option key={g} value={g}>{GESTURE_LABEL[g]}</option>)}
                   </select>
+                  <button
+                    onClick={() => setRExcl((v) => !v)}
+                    className={`rounded border px-1.5 py-1 font-mono text-[10px] ${rExcl ? 'border-accent bg-accent/15 text-accent' : 'border-border bg-panel3/70 text-muted hover:text-text'}`}
+                    title="Exclusive : when this combo fires, swallow the two gestures' own single actions (a chord that doesn't also play its notes). Adds a small delay to those singles."
+                  >
+                    excl
+                  </button>
                   <button onClick={() => setRG2(null)} className="rounded px-1 font-mono text-[12px] text-muted hover:text-danger" title="Remove the second gesture">×</button>
                 </>
               )}
               <span className="font-mono text-[11px] text-muted">→</span>
               <select value={rAction} onChange={(e) => setRAction(e.target.value)} className="input select-compact min-w-0 flex-1 text-[11px]" title="What the rule fires">
-                <option value="none">{actionLabel('none')}</option>
-                {TRIGGER_ACTION_IDS.map((a) => <option key={a} value={a}>{actionLabel(a)}</option>)}
+                {actionOptions.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
               </select>
               <button
                 onClick={addRule}
@@ -417,8 +463,17 @@ export function BodyPage(): JSX.Element {
                       />
                       <span className="w-16 shrink-0 truncate text-text" title={r.name}>{r.name}</span>
                       <span className="min-w-0 flex-1 truncate text-muted">
-                        {ruleTrigger(r)} <span className="text-muted/60">→</span> <span className="text-accent2">{actionLabel(r.action)}</span>
+                        {ruleTrigger(r)} <span className="text-muted/60">→</span> <span className="text-accent2">{labelForAction(r.action)}</span>
                       </span>
+                      {r.g2 && (
+                        <button
+                          onClick={() => updateRule(r.id, { exclusive: !r.exclusive })}
+                          className={`shrink-0 rounded border px-1 text-[9px] ${r.exclusive ? 'border-accent text-accent' : 'border-border text-muted/60 hover:text-text'}`}
+                          title={r.exclusive ? 'Exclusive : swallows the component singles. Click to disable.' : 'Not exclusive : the component gestures also fire their own actions. Click to make exclusive.'}
+                        >
+                          excl
+                        </button>
+                      )}
                       <button
                         onClick={() => fireTrigger(r.action)}
                         disabled={r.action === 'none'}

@@ -75,8 +75,13 @@ class BodyTracker {
   private winkRDown = false
   private cooldown: Record<BodyGesture, number> = {
     pinchLeft: 0, pinchRight: 0, clap: 0, cross: 0, handsUp: 0,
-    mouthPop: 0, browRaise: 0, winkLeft: 0, winkRight: 0
+    mouthPop: 0, browRaise: 0, winkLeft: 0, winkRight: 0,
+    holdHandsUp: 0, holdPinchLeft: 0, holdPinchRight: 0, holdArmsWide: 0, holdMouthOpen: 0
   }
+  // Hold-duration state : when a pose's condition became true, and whether its
+  // hold has already fired (so it fires once per hold, re-arming on release).
+  private holdSince: Partial<Record<BodyGesture, number>> = {}
+  private holdFired: Partial<Record<BodyGesture, boolean>> = {}
 
   status(): { running: boolean; error: string | null } {
     return { running: this.running, error: this.err }
@@ -265,6 +270,12 @@ class BodyTracker {
     const hasFace = !!this.latestFace
     bodyBus.setLive(hasHands, hasPose, hasFace)
 
+    // A hold whose detector isn't present this frame must reset, or a vanished
+    // hand / body leaves it half-counted and it fires spuriously on return.
+    if (!hasHands) { this.hold('holdPinchLeft', false); this.hold('holdPinchRight', false) }
+    if (!hasPose) { this.hold('holdHandsUp', false); this.hold('holdArmsWide', false) }
+    if (!hasFace) this.hold('holdMouthOpen', false)
+
     if (!hasHands && !hasPose && !hasFace) {
       // Nobody in frame : relax toward neutral so params don't stick.
       bodyBus.relax(0.06)
@@ -332,8 +343,12 @@ class BodyTracker {
 
     // Pinch gestures (per slot). sensitivity raises the trigger distance.
     const pinchThresh = 0.35 + cfg.sensitivity * 0.35
-    this.pinchGate('left', left ? pinchAmt(left) < pinchThresh : false)
-    this.pinchGate('right', right ? pinchAmt(right) < pinchThresh : false)
+    const pinchL = left ? pinchAmt(left) < pinchThresh : false
+    const pinchR = right ? pinchAmt(right) < pinchThresh : false
+    this.pinchGate('left', pinchL)
+    this.pinchGate('right', pinchR)
+    this.hold('holdPinchLeft', pinchL)
+    this.hold('holdPinchRight', pinchR)
 
     // Clap : two wrists collapse together. Fire on the crossing, re-arm apart.
     if (left && right) {
@@ -403,6 +418,9 @@ class BodyTracker {
     } else if (up < upThresh * 0.6) {
       this.handsUpArmed = true
     }
+    // Hold-duration poses (fire after being held holdMs).
+    this.hold('holdHandsUp', up > 0.6)
+    this.hold('holdArmsWide', (out.armSpan ?? 0) > 0.65)
   }
 
   // ── Face → blendshape features + head pose + face gestures ─────────────
@@ -457,6 +475,8 @@ class BodyTracker {
     if (wr && !this.winkRDown) this.emit('winkRight')
     this.winkLDown = wl
     this.winkRDown = wr
+    // Hold : mouth open sustained.
+    this.hold('holdMouthOpen', (out.faceJawOpen ?? 0) > 0.5)
   }
 
   private emit(g: BodyGesture): void {
@@ -464,6 +484,23 @@ class BodyTracker {
     if (now - this.cooldown[g] < 350) return // debounce : no retrigger bursts
     this.cooldown[g] = now
     bodyBus.fireGesture(g)
+  }
+
+  /** Sustained-pose trigger : fire `g` once after its condition has been true for
+   *  the configured hold time, then re-arm when the condition drops. */
+  private hold(g: BodyGesture, active: boolean): void {
+    if (active) {
+      const since = this.holdSince[g]
+      if (since == null) { this.holdSince[g] = performance.now(); return }
+      const holdMs = this.cfg?.holdMs ?? 1200
+      if (!this.holdFired[g] && performance.now() - since >= holdMs) {
+        this.holdFired[g] = true
+        this.emit(g)
+      }
+    } else {
+      this.holdSince[g] = undefined
+      this.holdFired[g] = false
+    }
   }
 }
 
