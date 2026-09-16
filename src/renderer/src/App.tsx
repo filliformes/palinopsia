@@ -54,7 +54,7 @@ import { SequencePage } from './components/SequencePage'
 import { BodyPage } from './components/BodyPage'
 import { bodyTracker } from './engine/bodyTracker'
 import { bodyBus } from './engine/bodyIn'
-import type { GestureAction } from '@shared/types'
+import type { BodyGesture, GestureAction } from '@shared/types'
 import { SceneBank } from './components/SceneBank'
 import { SurfacePad, SurfaceOnToggle } from './components/SurfacePad'
 import { initOscInput, applyOscListen, applyOscOutput, initOscQueryStream } from './oscInput'
@@ -373,16 +373,38 @@ export default function App(): JSX.Element {
   }, [bodyControl])
   useEffect(() => () => bodyTracker.stop(), []) // release the camera on unmount
   useEffect(() => {
-    // Drain gesture onsets each frame and fire the bound action. Cheap when the
-    // tracker is off (the queue is empty). Reads config live so re-binding a
-    // gesture takes effect without re-subscribing.
+    // Drain gesture onsets each frame and fire (a) the built-in per-gesture map
+    // and (b) the user's rules, including two-gesture combos. Cheap when the
+    // tracker is off (the queue is empty). Reads config live, so re-binding takes
+    // effect without re-subscribing.
+    const COMBO_MS = 550 // how close two gestures must land to count as a combo
+    const recent: Partial<Record<BodyGesture, number>> = {}
+    const within = (t: number | undefined, now: number): boolean => t != null && t > 0 && now - t <= COMBO_MS
     let raf = 0
     const tick = (): void => {
       raf = requestAnimationFrame(tick)
       const gs = bodyBus.drainGestures()
       if (gs.length === 0) return
-      const map = useStore.getState().bodyControl.gestures
-      for (const g of gs) dispatchGesture(map[g])
+      const bc = useStore.getState().bodyControl
+      const now = performance.now()
+      for (const g of gs) {
+        dispatchGesture(bc.gestures[g]) // built-in single mapping
+        for (const r of bc.rules) {
+          if (!r.enabled || !r.action || r.action === 'none') continue
+          if (!r.g2) {
+            if (r.g1 === g) { bodyBus.fireRule(r.id); fireTrigger(r.action) }
+          } else if (r.combo === 'then') {
+            // sequence : g1 first, then g2 within the window
+            if (g === r.g2 && within(recent[r.g1], now)) { bodyBus.fireRule(r.id); fireTrigger(r.action); recent[r.g1] = 0 }
+          } else {
+            // together : both within the window, order-independent
+            if ((g === r.g1 && within(recent[r.g2], now)) || (g === r.g2 && within(recent[r.g1], now))) {
+              bodyBus.fireRule(r.id); fireTrigger(r.action); recent[r.g1] = 0; recent[r.g2] = 0
+            }
+          }
+        }
+        recent[g] = now
+      }
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)

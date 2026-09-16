@@ -2733,7 +2733,8 @@ export const useStore = create<StoreState>((set, get) => ({
       gestures: {
         pinchLeft: 'scene:prev', pinchRight: 'scene:next', clap: 'fire:randomize', cross: 'fire:flush', handsUp: 'fire:freeze',
         mouthPop: 'none', browRaise: 'none', winkLeft: 'none', winkRight: 'none'
-      }
+      },
+      rules: []
     }
     // Migrate the pre-unification action names (before gestures shared the MIDI
     // trigger vocabulary) so an existing config keeps working.
@@ -2747,7 +2748,11 @@ export const useStore = create<StoreState>((set, get) => ({
       for (const k in savedGestures) migrated[k] = LEGACY[savedGestures[k]] ?? savedGestures[k]
       // enabled is never restored : a camera must be re-armed each launch (opt-in),
       // so the app never grabs the webcam on its own at boot.
-      return { ...def, ...saved, enabled: false, gestures: { ...def.gestures, ...migrated } }
+      return {
+        ...def, ...saved, enabled: false,
+        gestures: { ...def.gestures, ...migrated },
+        rules: Array.isArray(saved.rules) ? saved.rules : []
+      }
     } catch { return def }
   })(),
   setBodyControl: (partial) =>

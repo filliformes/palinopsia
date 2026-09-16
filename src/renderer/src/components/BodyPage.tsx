@@ -9,7 +9,7 @@
 // features join BODY_FEATURES and appear here with no page changes.
 
 import { useEffect, useRef, useState } from 'react'
-import type { BodyControlConfig, BodyFeature, BodyGesture, GestureAction } from '@shared/types'
+import type { BodyControlConfig, BodyFeature, BodyGesture, GestureAction, GestureRule } from '@shared/types'
 import { BODY_FEATURES, BODY_GESTURES } from '@shared/types'
 import { bodyTracker } from '../engine/bodyTracker'
 import { bodyBus } from '../engine/bodyIn'
@@ -75,6 +75,13 @@ export function BodyPage(): JSX.Element {
   const [live, setLive] = useState({ running: false, hands: false, pose: false, face: false, error: null as string | null })
   // The last gesture that fired + whether it's fresh (lights up briefly).
   const [cur, setCur] = useState<{ g: BodyGesture; fresh: boolean } | null>(null)
+  const [curRule, setCurRule] = useState<{ id: string; fresh: boolean } | null>(null)
+  // Rule builder draft (one line : name, gesture(s), action).
+  const [rName, setRName] = useState('')
+  const [rG1, setRG1] = useState<BodyGesture>('pinchLeft')
+  const [rG2, setRG2] = useState<BodyGesture | null>(null)
+  const [rCombo, setRCombo] = useState<'together' | 'then'>('together')
+  const [rAction, setRAction] = useState<GestureAction>('fire:randomize')
 
   const patch = (p: Partial<BodyControlConfig>): void => setCfg(p)
 
@@ -141,6 +148,8 @@ export function BodyPage(): JSX.Element {
       setLive({ running: s.running, hands: b.hands, pose: b.pose, face: b.face, error: s.error })
       const lg = bodyBus.lastGesture()
       setCur(lg ? { g: lg.g, fresh: lg.ageMs < 700 } : null)
+      const lr = bodyBus.lastRule()
+      setCurRule(lr ? { id: lr.id, fresh: lr.ageMs < 700 } : null)
     }, 90)
     return () => { cancelAnimationFrame(raf); window.clearInterval(monitor) }
   }, [])
@@ -155,6 +164,23 @@ export function BodyPage(): JSX.Element {
     st.updateModulator(free, { enabled: true, type: 'body', body: { feature, smooth: 0.3 } })
     showToast(`Modulator ${free + 1} now follows ${feature} — bind it with a param’s M button (Modulation : D)`, 'ok', 6000)
   }
+
+  // Rule builder actions. Rules live in bodyControl.rules (machine-local).
+  const comboSym = (mode: 'together' | 'then'): string => (mode === 'then' ? '→' : '+')
+  const ruleTrigger = (r: { g1: BodyGesture; g2: BodyGesture | null; combo: 'together' | 'then' }): string =>
+    r.g2 ? `${GESTURE_LABEL[r.g1]} ${comboSym(r.combo)} ${GESTURE_LABEL[r.g2]}` : GESTURE_LABEL[r.g1]
+  const addRule = (): void => {
+    if (rAction === 'none') { showToast('Pick an action for the rule first', 'warn'); return }
+    const name = rName.trim() || ruleTrigger({ g1: rG1, g2: rG2, combo: rCombo })
+    const rule: GestureRule = {
+      id: `r${Date.now().toString(36)}`, name, g1: rG1, g2: rG2, combo: rCombo, action: rAction, enabled: true
+    }
+    patch({ rules: [...cfg.rules, rule] })
+    setRName(''); setRG2(null)
+  }
+  const updateRule = (id: string, part: Partial<GestureRule>): void =>
+    patch({ rules: cfg.rules.map((r) => (r.id === id ? { ...r, ...part } : r)) })
+  const deleteRule = (id: string): void => patch({ rules: cfg.rules.filter((r) => r.id !== id) })
 
   const statusText = !cfg.enabled
     ? 'camera off'
@@ -314,6 +340,99 @@ export function BodyPage(): JSX.Element {
                 </div>
               ))}
             </div>
+          </section>
+
+          <section className="rounded border border-border bg-panel2 p-2">
+            <div className="mb-1 font-mono text-[9px] uppercase tracking-wide text-accent2">Create actions</div>
+            <p className="mb-2 text-[10px] leading-snug text-muted">
+              Author your own rules : one gesture, or two combined, fire an action. A combo triggers when both land close together (<span className="text-text">+</span>) or in order (<span className="text-text">→</span>). Rules fire on top of the defaults above, so set a component gesture to <span className="text-text">nothing</span> there if you want the combo alone.
+            </p>
+
+            {/* Builder line : name · gesture(s) · action · save */}
+            <div className="mb-2 flex flex-wrap items-center gap-1.5 rounded border border-border/60 bg-panel3/30 p-1.5">
+              <input
+                value={rName}
+                onChange={(e) => setRName(e.target.value)}
+                placeholder="name"
+                spellCheck={false}
+                className="input h-[24px] w-20 text-[11px]"
+                title="A label for this rule (optional : defaults to the gesture names)"
+              />
+              <select value={rG1} onChange={(e) => setRG1(e.target.value as BodyGesture)} className="input select-compact text-[11px]" title="First gesture">
+                {BODY_GESTURES.map((g) => <option key={g} value={g}>{GESTURE_LABEL[g]}</option>)}
+              </select>
+              {rG2 == null ? (
+                <button
+                  onClick={() => setRG2(rG1)}
+                  className="rounded border border-border bg-panel3/70 px-1.5 py-1 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
+                  title="Combine a second gesture into this action"
+                >
+                  + gesture&nbsp;2
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setRCombo((c) => (c === 'together' ? 'then' : 'together'))}
+                    className="rounded border border-accent bg-accent/15 px-2 py-1 font-mono text-[12px] text-accent"
+                    title={rCombo === 'together' ? 'Both together (order-independent). Click for a sequence.' : 'In sequence (first, then second). Click for together.'}
+                  >
+                    {comboSym(rCombo)}
+                  </button>
+                  <select value={rG2} onChange={(e) => setRG2(e.target.value as BodyGesture)} className="input select-compact text-[11px]" title="Second gesture">
+                    {BODY_GESTURES.map((g) => <option key={g} value={g}>{GESTURE_LABEL[g]}</option>)}
+                  </select>
+                  <button onClick={() => setRG2(null)} className="rounded px-1 font-mono text-[12px] text-muted hover:text-danger" title="Remove the second gesture">×</button>
+                </>
+              )}
+              <span className="font-mono text-[11px] text-muted">→</span>
+              <select value={rAction} onChange={(e) => setRAction(e.target.value)} className="input select-compact min-w-0 flex-1 text-[11px]" title="What the rule fires">
+                <option value="none">{actionLabel('none')}</option>
+                {TRIGGER_ACTION_IDS.map((a) => <option key={a} value={a}>{actionLabel(a)}</option>)}
+              </select>
+              <button
+                onClick={addRule}
+                className="rounded border border-accent bg-accent/15 px-2 py-1 font-mono text-[11px] text-accent hover:bg-accent/25"
+                title="Save this rule"
+              >
+                save
+              </button>
+            </div>
+
+            {/* Saved rules */}
+            {cfg.rules.length === 0 ? (
+              <p className="text-[10px] text-muted">No custom rules yet.</p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {cfg.rules.map((r) => {
+                  const lit = curRule?.id === r.id && curRule.fresh
+                  return (
+                    <div
+                      key={r.id}
+                      className={`flex items-center gap-1.5 rounded border px-1.5 py-1 font-mono text-[10px] transition-colors ${lit ? 'border-accent bg-accent/15' : 'border-border bg-panel3/30'}`}
+                    >
+                      <button
+                        onClick={() => updateRule(r.id, { enabled: !r.enabled })}
+                        className={`h-3.5 w-3.5 shrink-0 rounded-sm border ${r.enabled ? 'border-accent bg-accent/40' : 'border-border'}`}
+                        title={r.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
+                      />
+                      <span className="w-16 shrink-0 truncate text-text" title={r.name}>{r.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-muted">
+                        {ruleTrigger(r)} <span className="text-muted/60">→</span> <span className="text-accent2">{actionLabel(r.action)}</span>
+                      </span>
+                      <button
+                        onClick={() => fireTrigger(r.action)}
+                        disabled={r.action === 'none'}
+                        className="shrink-0 rounded border border-border bg-panel3/70 px-1.5 text-[10px] text-muted hover:border-accent hover:text-accent disabled:opacity-30"
+                        title="Fire this rule's action now"
+                      >
+                        test
+                      </button>
+                      <button onClick={() => deleteRule(r.id)} className="shrink-0 rounded px-1 text-[12px] text-muted hover:text-danger" title="Delete this rule">×</button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </section>
         </div>
       </div>

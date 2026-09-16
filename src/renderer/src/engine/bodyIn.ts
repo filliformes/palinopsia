@@ -63,6 +63,15 @@ class BodyBus {
   lastGesture(): { g: BodyGesture; ageMs: number } | null {
     return this.last ? { g: this.last.g, ageMs: performance.now() - this.last.at } : null
   }
+  // Same, for a user rule (combo builder) : the dispatcher calls fireRule when a
+  // rule matches, and the Body page flashes that rule.
+  private lastRuleFire: { id: string; at: number } | null = null
+  fireRule(id: string): void {
+    this.lastRuleFire = { id, at: performance.now() }
+  }
+  lastRule(): { id: string; ageMs: number } | null {
+    return this.lastRuleFire ? { id: this.lastRuleFire.id, ageMs: performance.now() - this.lastRuleFire.at } : null
+  }
   /** App pulls the frame's gesture onsets and routes them to actions. */
   drainGestures(): BodyGesture[] {
     if (this.gestureQueue.length === 0) return EMPTY

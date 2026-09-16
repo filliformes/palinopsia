@@ -341,6 +341,21 @@ export const BODY_GESTURES: BodyGesture[] = [
 // engine/midi.ts and it appears for MIDI, keys and gestures at once.
 export type GestureAction = string
 
+// A user-authored gesture rule (the Body page's rule builder). Maps ONE gesture,
+// or a COMBO of two, to an action. Combos fire on top of the built-in per-gesture
+// map, so set a component gesture to 'none' there if you want only the combo.
+//   combo 'together' : both gestures within a short window, order-independent
+//   combo 'then'     : g1 first, then g2, within the window (a sequence)
+export interface GestureRule {
+  id: string
+  name: string
+  g1: BodyGesture
+  g2: BodyGesture | null // null = a single-gesture rule
+  combo: 'together' | 'then'
+  action: GestureAction
+  enabled: boolean
+}
+
 // Machine-local embodied-control config (a webcam is machine-bound, like warp).
 // NOT part of a session : it lives in the store's `bodyControl` slice + localStorage.
 export interface BodyControlConfig {
@@ -351,7 +366,8 @@ export interface BodyControlConfig {
   face: boolean // run the FaceLandmarker (blendshapes + head pose)
   mirror: boolean // flip X so moving right moves the value right (selfie view)
   sensitivity: number // 0..1 : global gain on gesture thresholds (higher = easier)
-  gestures: Record<BodyGesture, GestureAction> // gesture → action routing
+  gestures: Record<BodyGesture, GestureAction> // built-in per-gesture → action routing
+  rules: GestureRule[] // user-authored rules (single + combo) from the rule builder
 }
 
 // Force-driven motion for the `physics` modulator.
