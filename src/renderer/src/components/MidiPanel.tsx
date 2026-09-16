@@ -13,6 +13,12 @@ export function MidiPanel(): JSX.Element {
   const toggleSection = useStore((s) => s.toggleSection)
   const inputName = useStore((s) => s.midiInputName)
   const setInputName = useStore((s) => s.setMidiInputName)
+  const outputName = useStore((s) => s.midiOutputName)
+  const setOutputName = useStore((s) => s.setMidiOutputName)
+  const clockOut = useStore((s) => s.midiClockOut)
+  const setClockOut = useStore((s) => s.setMidiClockOut)
+  const thru = useStore((s) => s.midiThru)
+  const setThru = useStore((s) => s.setMidiThru)
   const learnMode = useStore((s) => s.midiLearnMode)
   const setLearnMode = useStore((s) => s.setMidiLearnMode)
   const midiMap = useStore((s) => s.midiMap)
@@ -21,16 +27,19 @@ export function MidiPanel(): JSX.Element {
   const updateMetaKnob = useStore((s) => s.updateMetaKnob)
 
   const [devices, setDevices] = useState<MidiDevice[]>(() => midi.listDevices())
-  useEffect(() => midi.subscribe(setDevices), [])
+  const [outputs, setOutputs] = useState<MidiDevice[]>(() => midi.listOutputs())
+  useEffect(() => midi.subscribe(() => { setDevices(midi.listDevices()); setOutputs(midi.listOutputs()) }), [])
 
   // Live diagnostics : the last raw message + how many inputs are actually
   // wired. Lets you confirm a controller is talking before hunting bindings.
   const [activity, setActivity] = useState('')
   const [wired, setWired] = useState(0)
+  const [clockRunning, setClockRunning] = useState(false)
   useEffect(() => {
     const id = window.setInterval(() => {
       setActivity(midi.lastMsg)
       setWired(midi.wiredCount)
+      setClockRunning(midi.clockRunning())
     }, 150)
     return () => window.clearInterval(id)
   }, [])
@@ -38,6 +47,11 @@ export function MidiPanel(): JSX.Element {
   // The selected device may be unplugged right now : keep it listed (greyed
   // by the ⚠ suffix) so the choice survives replugging.
   const missing = inputName && !devices.some((d) => d.name === inputName)
+  const missingOut = outputName && !outputs.some((d) => d.name === outputName)
+  const pillCls = (on: boolean): string =>
+    `shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] transition-colors ${
+      on ? 'border-accent bg-accent/15 text-accent' : 'border-border bg-panel2/60 text-muted hover:text-text'
+    }`
 
   // One flat ledger : session-carried Meta-knob CCs first, then the
   // machine-local map (scenes, transport, fires), in a stable order.
@@ -132,6 +146,53 @@ export function MidiPanel(): JSX.Element {
             <span className="min-w-0 flex-1 truncate text-muted">
               in: {activity || '— (no MIDI received yet — move a knob / press a key)'}
             </span>
+          </div>
+
+          {/* Output device : where Opsia sends MIDI clock / transport + thru
+              (e.g. an Ableton Move over USB). Opsia is otherwise input-only. */}
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 font-mono text-[9px] uppercase text-muted">output</span>
+            <select
+              className="input select-compact min-w-0 flex-1 px-1 py-0.5 text-[11px]"
+              value={outputName}
+              onChange={(e) => setOutputName(e.target.value)}
+              title="MIDI output port : where clock / transport and thru are sent (pick your Ableton Move here)"
+            >
+              <option value="">None</option>
+              {outputs.map((d) => (
+                <option key={d.id} value={d.name}>
+                  {d.name}
+                </option>
+              ))}
+              {missingOut && <option value={outputName}>{outputName} ⚠ (unplugged)</option>}
+            </select>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              onClick={() => setClockOut(!clockOut)}
+              disabled={!outputName}
+              className={`${pillCls(clockOut)} disabled:opacity-40`}
+              title="Send MIDI clock (24 PPQN) + Start/Stop at the app BPM, so the device follows Opsia's tempo. The device must be set to external / MIDI-clock sync."
+            >
+              clock {clockOut && clockRunning ? '●' : ''}
+            </button>
+            <button
+              onClick={() => midi.resyncClock()}
+              disabled={!clockRunning}
+              className="shrink-0 rounded border border-border bg-panel2/60 px-1.5 py-0.5 font-mono text-[9px] text-muted hover:text-accent disabled:opacity-40"
+              title="Re-align the follower's downbeat to now (Stop + Start)"
+            >
+              resync
+            </button>
+            <button
+              onClick={() => setThru(!thru)}
+              disabled={!outputName}
+              className={`${pillCls(thru)} disabled:opacity-40`}
+              title="Forward incoming MIDI to the output : Opsia as a router (e.g. a Launch Control XL through to the Move). Never echoes the output back to itself."
+            >
+              thru
+            </button>
+            <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted">→ {outputName || 'no output'}</span>
           </div>
 
           {/* The bindings ledger. */}

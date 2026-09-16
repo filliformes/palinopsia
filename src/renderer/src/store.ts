@@ -1007,6 +1007,16 @@ interface StoreState {
   // Which MIDI input feeds the app ('' = all inputs). Machine-local.
   midiInputName: string
   setMidiInputName: (name: string) => void
+  // MIDI OUTPUT (e.g. to an Ableton Move over USB). Machine-local, not in a session.
+  //   midiOutputName : the chosen output port ('' = none)
+  //   midiClockOut   : send MIDI clock (24 PPQN) + Start/Stop at the app BPM
+  //   midiThru       : forward incoming MIDI to the output (Opsia as a router)
+  midiOutputName: string
+  setMidiOutputName: (name: string) => void
+  midiClockOut: boolean
+  setMidiClockOut: (on: boolean) => void
+  midiThru: boolean
+  setMidiThru: (on: boolean) => void
   updateMetaKnob: (i: number, partial: Partial<MetaKnobState>) => void
   setMetaValue: (i: number, v: number) => void
   // Toggle a destination on a knob (capped at META_MAX_DESTS).
@@ -2392,6 +2402,21 @@ export const useStore = create<StoreState>((set, get) => ({
   setMidiInputName: (name) => {
     localStorage.setItem('opsia.midiInput', name)
     set({ midiInputName: name })
+  },
+  midiOutputName: localStorage.getItem('opsia.midiOutput') ?? '',
+  setMidiOutputName: (name) => {
+    localStorage.setItem('opsia.midiOutput', name)
+    set({ midiOutputName: name })
+  },
+  midiClockOut: localStorage.getItem('opsia.midiClockOut') === '1',
+  setMidiClockOut: (on) => {
+    localStorage.setItem('opsia.midiClockOut', on ? '1' : '0')
+    set({ midiClockOut: on })
+  },
+  midiThru: localStorage.getItem('opsia.midiThru') === '1',
+  setMidiThru: (on) => {
+    localStorage.setItem('opsia.midiThru', on ? '1' : '0')
+    set({ midiThru: on })
   },
   updateMetaKnob: (i, partial) =>
     set((s) => ({

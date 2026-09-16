@@ -65,7 +65,7 @@ import { Transport } from './components/Transport'
 import { SessionLoader, GenerateMenu } from './components/TopBarMenus'
 import { ConfirmModal } from './components/PromptModal'
 import type { AutosaveEntry } from '@shared/types'
-import { initMidi, fireTrigger } from './midi'
+import { initMidi, fireTrigger, midi } from './midi'
 import { FX_SHADERS, GENERATORS, NATIVE_NODES, shaderSourceById } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
 import { MASTER_PRESETS } from './shaders/isf/masterPresets'
@@ -295,6 +295,15 @@ export default function App(): JSX.Element {
       unsubWs()
     }
   }, [])
+
+  // ── MIDI output : start/stop the clock as the output device or clock toggle
+  //    changes (BPM is read live by the scheduler). Halt on teardown. ───────
+  const midiOutputName = useStore((s) => s.midiOutputName)
+  const midiClockOut = useStore((s) => s.midiClockOut)
+  useEffect(() => {
+    midi.applyOutputConfig()
+  }, [midiOutputName, midiClockOut])
+  useEffect(() => () => midi.haltClock(), [])
 
   // ── Output window : reset our flag if the user closes it directly ──────
   const outputActive = useStore((s) => s.outputActive)

@@ -227,6 +227,9 @@ class MidiManager {
   // instantly visible (message arriving vs not; input actually attached).
   lastMsg = ''
   wiredCount = 0
+  // MIDI clock scheduler state (output side).
+  private clockTimer: number | null = null
+  private nextPulse = 0
 
   async init(): Promise<boolean> {
     if (!('requestMIDIAccess' in navigator)) {
@@ -253,6 +256,75 @@ class MidiManager {
     this.access?.inputs.forEach((inp) => out.push({ id: inp.id, name: inp.name ?? inp.id }))
     return out
   }
+
+  /** The output ports the OS exposes (e.g. an Ableton Move over USB). */
+  listOutputs(): MidiDevice[] {
+    const out: MidiDevice[] = []
+    this.access?.outputs.forEach((o) => out.push({ id: o.id, name: o.name ?? o.id }))
+    return out
+  }
+
+  /** The selected output port (by name), or null. */
+  private output(): MIDIOutput | null {
+    const wanted = useStore.getState().midiOutputName
+    if (!this.access || !wanted) return null
+    let found: MIDIOutput | null = null
+    this.access.outputs.forEach((o) => { if ((o.name ?? o.id) === wanted) found = o })
+    return found
+  }
+
+  // ── MIDI OUTPUT : clock / transport + passthrough ─────────────────────
+  // Start/stop + reschedule the clock to match the current output + clock toggle.
+  // Called from App whenever midiOutputName or midiClockOut change.
+  applyOutputConfig(): void {
+    const st = useStore.getState()
+    const wantClock = st.midiClockOut && !!this.output()
+    if (wantClock && this.clockTimer == null) this.startClock()
+    else if (!wantClock && this.clockTimer != null) this.stopClock()
+    else if (wantClock) { this.stopClock(); this.startClock() } // device changed while running
+  }
+
+  /** Send MIDI Start + a 24-PPQN clock at the app BPM. Uses Web MIDI timestamped
+   *  sends with a look-ahead so the tempo stays tight despite JS timer jitter. */
+  private startClock(): void {
+    const out = this.output()
+    if (!out) return
+    const now = performance.now()
+    try { out.send([0xfa]) } catch { /* port busy */ } // Start
+    this.nextPulse = now
+    const LOOKAHEAD = 120, TICK = 25
+    const schedule = (): void => {
+      const cur = performance.now()
+      const o = this.output()
+      if (!o) return
+      const bpm = useStore.getState().composition.bpm || 120
+      const interval = 60000 / (bpm * 24)
+      // Never let a stall dump a burst : if we've fallen far behind, resync.
+      if (this.nextPulse < cur - 500) this.nextPulse = cur
+      while (this.nextPulse < cur + LOOKAHEAD) {
+        try { o.send([0xf8], this.nextPulse) } catch { /* port gone */ }
+        this.nextPulse += interval
+      }
+    }
+    schedule()
+    this.clockTimer = window.setInterval(schedule, TICK)
+  }
+
+  private stopClock(): void {
+    if (this.clockTimer != null) { clearInterval(this.clockTimer); this.clockTimer = null }
+    try { this.output()?.send([0xfc]) } catch { /* port gone */ } // Stop
+  }
+
+  /** Re-align the follower's downbeat to now (Stop then Start). */
+  resyncClock(): void {
+    if (this.clockTimer == null) return
+    this.stopClock()
+    this.startClock()
+  }
+
+  /** Stop the clock (sends Stop) without touching config : app teardown. */
+  haltClock(): void { this.stopClock() }
+  clockRunning(): boolean { return this.clockTimer != null }
 
   /** (Re)wire message handlers to the selected input — or all of them when
    *  no name is chosen. Called on init, hot-plug, and dropdown change. */
@@ -304,6 +376,15 @@ class MidiManager {
       : status === 0xc0 ? 'prog-change'
       : '0x' + status.toString(16)
     this.lastMsg = `${kind} ${number} ch${channel + 1}${status === 0xb0 || status === 0x90 ? ' = ' + value : ''}`
+
+    // MIDI thru : forward this message to the output (Opsia as a router in the
+    // middle), so e.g. a Launch Control XL reaches the Move through Opsia. Guard
+    // against a loop : never echo a message back to the port it came from.
+    if (useStore.getState().midiThru) {
+      const out = this.output()
+      const srcName = (e.target as MIDIInput | null)?.name ?? ''
+      if (out && srcName !== out.name) { try { out.send(data) } catch { /* port gone */ } }
+    }
 
     // A binding candidate from any CC or Note-On. CC value 0 still counts
     // (a knob turned fully down must keep driving its target).
