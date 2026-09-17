@@ -1,10 +1,11 @@
 // Body (key B) : embodied control. A full-page takeover like Sonify / Output.
 // Turn a camera on (opt-in), and MediaPipe Hands + Pose + Face read the performer
-// into the body bus (engine/bodyIn.ts). Left column : the live camera with the
-// skeleton on it, the capture controls, and the rule builder ("Create actions").
-// Right column : the feature monitor (what is moving, one-click into a modulator).
-// Every action is authored as a rule : one gesture (or two combined) fires an
-// action and/or an OSC bang (/body/<name>). No fixed per-gesture map.
+// into the body bus (engine/bodyIn.ts). Top row : the live camera with the
+// skeleton on it + the capture controls (left), and the feature monitor (right,
+// what is moving, one-click into a modulator). Below, full width : the rule
+// builder ("Create actions"). Every action is authored as a rule : one gesture
+// (or two combined) fires an action and/or an OSC bang (/body/<name>). No fixed
+// per-gesture map.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BodyControlConfig, BodyFeature, BodyGesture, GestureAction, GestureRule } from '@shared/types'
@@ -314,9 +315,11 @@ export function BodyPage(): JSX.Element {
         <button onClick={() => setOpen(false)} className="rounded px-2 py-0.5 text-[12px] text-muted hover:text-text" title="Close (Esc)">✕</button>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 lg:flex-row">
-        {/* Left : camera + controls + rule builder */}
-        <div className="flex shrink-0 flex-col gap-2 lg:w-[42%]">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+        {/* Top row : camera + controls · live feature monitor */}
+        <div className="flex flex-col gap-3 lg:flex-row">
+        {/* Left : camera + controls */}
+        <div className="flex shrink-0 flex-col gap-2 lg:w-[420px]">
           <button
             onClick={() => patch({ enabled: !cfg.enabled })}
             className={`w-full rounded px-3 py-2 font-mono text-[12px] transition-colors ${
@@ -391,10 +394,46 @@ export function BodyPage(): JSX.Element {
               <span className="font-mono text-[10px] text-muted">→ /body/…</span>
             </div>
           </div>
+        </div>
 
-          {/* Create actions : the rule builder, under the preview. The only gesture
-              routing — every action is a rule, single or a two-gesture combo. */}
+        {/* Right : the live feature monitor (two columns). */}
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
           <section className="rounded border border-border bg-panel2 p-2">
+            <div className="mb-1 font-mono text-[9px] uppercase tracking-wide text-accent2">Feature monitor</div>
+            <p className="mb-2 text-[10px] leading-snug text-muted">
+              Live 0..1 values off the body bus. <span className="text-text">→</span> routes one into a free modulator slot (then bind it with a param’s <span className="text-text">M</span> button). Every feature is also selectable in any modulator set to <span className="text-text">body</span> (Modulation : D).
+            </p>
+            {FEATURE_GROUPS.map((grp) => (
+              <div key={grp.title} className="mb-1.5">
+                <div className="mb-0.5 font-mono text-[8px] uppercase tracking-wide text-muted">{grp.title}</div>
+                <div className="grid grid-cols-1 gap-x-3 gap-y-0.5 sm:grid-cols-2">
+                  {grp.keys.map((k) => {
+                    const v = vals[k] ?? 0
+                    return (
+                      <div key={k} className="flex items-center gap-1.5">
+                        <span className="w-[70px] shrink-0 truncate font-mono text-[9px] text-muted" title={k}>{k}</span>
+                        <div className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-panel3/70">
+                          <div className="absolute inset-y-0 left-0 rounded-full bg-accent" style={{ width: `${Math.round(v * 100)}%` }} />
+                        </div>
+                        <span className="w-7 shrink-0 text-right font-mono text-[9px] text-muted">{v.toFixed(2)}</span>
+                        <button
+                          onClick={() => toSlot(k)}
+                          className="shrink-0 rounded border border-border bg-panel3/70 px-1 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
+                          title={`Route ${k} into the first free modulator slot`}
+                        >→</button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </section>
+        </div>
+        </div>{/* end top row */}
+
+        {/* Create actions : the rule builder, full width under the row. The only
+            gesture routing — every action is a rule, single or a two-gesture combo. */}
+        <section className="rounded border border-border bg-panel2 p-2">
             <div className="mb-1 flex items-center justify-between gap-2">
               <span className="font-mono text-[9px] uppercase tracking-wide text-accent2">Create actions</span>
               {/* Currently recognised gesture : lights up for ~0.7s each time one fires. */}
@@ -481,7 +520,7 @@ export function BodyPage(): JSX.Element {
             {cfg.rules.length === 0 ? (
               <p className="text-[10px] text-muted">No custom rules yet.</p>
             ) : (
-              <div className="flex flex-col gap-1">
+              <div className="grid grid-cols-1 gap-1 lg:grid-cols-2 2xl:grid-cols-3">
                 {cfg.rules.map((r) => {
                   const lit = curRule?.id === r.id && curRule.fresh
                   return (
@@ -530,41 +569,6 @@ export function BodyPage(): JSX.Element {
               </div>
             )}
           </section>
-        </div>
-
-        {/* Right : feature monitor (two columns). */}
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <section className="rounded border border-border bg-panel2 p-2">
-            <div className="mb-1 font-mono text-[9px] uppercase tracking-wide text-accent2">Feature monitor</div>
-            <p className="mb-2 text-[10px] leading-snug text-muted">
-              Live 0..1 values off the body bus. <span className="text-text">→</span> routes one into a free modulator slot (then bind it with a param’s <span className="text-text">M</span> button). Every feature is also selectable in any modulator set to <span className="text-text">body</span> (Modulation : D).
-            </p>
-            {FEATURE_GROUPS.map((grp) => (
-              <div key={grp.title} className="mb-1.5">
-                <div className="mb-0.5 font-mono text-[8px] uppercase tracking-wide text-muted">{grp.title}</div>
-                <div className="grid grid-cols-1 gap-x-3 gap-y-0.5 sm:grid-cols-2">
-                  {grp.keys.map((k) => {
-                    const v = vals[k] ?? 0
-                    return (
-                      <div key={k} className="flex items-center gap-1.5">
-                        <span className="w-[70px] shrink-0 truncate font-mono text-[9px] text-muted" title={k}>{k}</span>
-                        <div className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-panel3/70">
-                          <div className="absolute inset-y-0 left-0 rounded-full bg-accent" style={{ width: `${Math.round(v * 100)}%` }} />
-                        </div>
-                        <span className="w-7 shrink-0 text-right font-mono text-[9px] text-muted">{v.toFixed(2)}</span>
-                        <button
-                          onClick={() => toSlot(k)}
-                          className="shrink-0 rounded border border-border bg-panel3/70 px-1 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
-                          title={`Route ${k} into the first free modulator slot`}
-                        >→</button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </section>
-        </div>
       </div>
     </div>
   )
