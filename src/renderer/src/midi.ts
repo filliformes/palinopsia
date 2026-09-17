@@ -23,6 +23,7 @@ import {
   fireInspectorRandomize, fireNewSession, fireLoadSession, fireOpenSession
 } from './commands'
 import { setKnobTarget, shuffleMetaValues } from './metaSmooth'
+import { randomSonify } from './audio/autoSonify'
 import { useStore } from './store'
 import type { SoniConfig } from './audio/sonify'
 
@@ -88,6 +89,12 @@ export const TRIGGER_ACTION_IDS: string[] = [
   'fire:sonify', 'fire:tap', 'fire:seq', 'fire:soniseq', 'scene:next', 'scene:prev'
 ]
 
+/** Persisted Randomize intensity (shared with the Transport's dice). */
+function randIntensity(): number {
+  const i = Number(localStorage.getItem('opsia.randIntensity'))
+  return Number.isFinite(i) && i > 0 ? i : 1
+}
+
 /** Execute a discrete trigger action by id. The one place each action lives, so
  *  MIDI, the keyboard and gestures can never drift apart. */
 export function fireTrigger(id: string): void {
@@ -109,6 +116,14 @@ export function fireTrigger(id: string): void {
     case 'rand:master': st.randomizeMasterParams(); return
     case 'rand:meta': shuffleMetaValues(); return
     case 'rand:inspector': fireInspectorRandomize(); return // the selected unit
+    // Randomize by SCOPE (the Transport's modes, as direct targets) :
+    case 'rand:all': st.randomize('all', randIntensity()); return
+    case 'rand:sources': st.randomize('sources', randIntensity()); return
+    case 'rand:sourcefx': st.randomize('sourcefxonly', randIntensity()); return
+    case 'rand:layerfx': st.randomize('layerfxonly', randIntensity()); return
+    case 'rand:mods': st.randomize('modulators', randIntensity()); return
+    case 'rand:finishing': st.randomize('finishing', randIntensity()); return
+    case 'rand:sonify': st.setSonify(randomSonify(st.sonify)); return
     case 'master:chain': st.toggleMasterChain(); return // the master FX on/off
     case 'session:new': fireNewSession(); return
     case 'session:load': fireLoadSession(); return // load the selected saved session
@@ -199,6 +214,20 @@ export function midiTargetLabel(id: string): string {
       return 'RANDOMIZE Meta knobs'
     case 'rand:inspector':
       return 'RANDOMIZE inspector'
+    case 'rand:all':
+      return 'RANDOMIZE everything'
+    case 'rand:sources':
+      return 'RANDOMIZE sources'
+    case 'rand:sourcefx':
+      return 'RANDOMIZE source FX'
+    case 'rand:layerfx':
+      return 'RANDOMIZE layer FX'
+    case 'rand:mods':
+      return 'RANDOMIZE modulators'
+    case 'rand:finishing':
+      return 'RANDOMIZE finishing'
+    case 'rand:sonify':
+      return 'RANDOMIZE Sonify patch'
     case 'master:chain':
       return 'MASTER FX on/off'
     case 'session:new':

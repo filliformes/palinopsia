@@ -2808,8 +2808,13 @@ export const useStore = create<StoreState>((set, get) => ({
       // default to unbound : blink / brow move involuntarily, and holds are
       // deliberate, so the performer opts each in.
       gestures: {
-        pinchLeft: 'scene:prev', pinchRight: 'scene:next', clap: 'fire:randomize', cross: 'fire:flush', handsUp: 'fire:freeze',
+        pinchLeft: 'scene:prev', pinchRight: 'scene:next', clap: 'fire:randomize', cross: 'fire:flush',
+        handsUp: 'fire:freeze', leanLeft: 'none', leanRight: 'none', crouch: 'none', jump: 'none',
+        armsCross: 'none', tPose: 'none', raiseLeft: 'none', raiseRight: 'none',
         mouthPop: 'none', browRaise: 'none', winkLeft: 'none', winkRight: 'none',
+        smile: 'none', frown: 'none', browFurrow: 'none', squint: 'none', cheekPuff: 'none', kiss: 'none',
+        jawLeft: 'none', jawRight: 'none', mouthLeft: 'none', mouthRight: 'none', tongueOut: 'none', blinkBoth: 'none',
+        headLeft: 'none', headRight: 'none', headUp: 'none', headDown: 'none', tiltLeft: 'none', tiltRight: 'none',
         holdHandsUp: 'none', holdPinchLeft: 'none', holdPinchRight: 'none', holdArmsWide: 'none', holdMouthOpen: 'none'
       },
       rules: []

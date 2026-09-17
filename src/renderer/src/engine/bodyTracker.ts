@@ -74,11 +74,11 @@ class BodyTracker {
   private browArmed = true
   private winkLDown = false
   private winkRDown = false
-  private cooldown: Record<BodyGesture, number> = {
-    pinchLeft: 0, pinchRight: 0, clap: 0, cross: 0, handsUp: 0,
-    mouthPop: 0, browRaise: 0, winkLeft: 0, winkRight: 0,
-    holdHandsUp: 0, holdPinchLeft: 0, holdPinchRight: 0, holdArmsWide: 0, holdMouthOpen: 0
-  }
+  private cooldown: Partial<Record<BodyGesture, number>> = {}
+  // Hysteresis-edge arming for the threshold gestures (lean / crouch / smile /
+  // head turn…) : undefined = ready to fire, false = fired and not yet re-armed.
+  private armed: Partial<Record<BodyGesture, boolean>> = {}
+  private prevShoY = 0.5 // shoulder-midpoint height last pose frame (for jump)
   // Hold-duration state : when a pose's condition became true, and whether its
   // hold has already fired (so it fires once per hold, re-arming on release).
   private holdSince: Partial<Record<BodyGesture, number>> = {}
@@ -280,9 +280,11 @@ class BodyTracker {
     if (!hasFace) this.hold('holdMouthOpen', false)
 
     if (!hasHands && !hasPose && !hasFace) {
-      // Nobody in frame : relax toward neutral so params don't stick.
+      // Nobody in frame : relax toward neutral so params don't stick, and drop the
+      // previous pose so `jump` can't false-fire off a stale frame on re-entry.
       bodyBus.relax(0.06)
       bodyBus.update({ bodyPresent: 0, handsPresent: 0, facePresent: 0 })
+      this.prevPose = null
       return
     }
 
@@ -424,6 +426,30 @@ class BodyTracker {
     // Hold-duration poses (fire after being held holdMs).
     this.hold('holdHandsUp', up > 0.6)
     this.hold('holdArmsWide', (out.armSpan ?? 0) > 0.65)
+
+    // ── Discrete pose gestures (rising edge + hysteresis) ──
+    const s = cfg.sensitivity
+    const lean = out.bodyLean ?? 0.5
+    this.edgeHys('leanLeft', 1 - lean, 0.72 - s * 0.1, 0.58)
+    this.edgeHys('leanRight', lean, 0.72 - s * 0.1, 0.58)
+    this.edgeHys('crouch', 1 - (out.bodyHeight ?? 0.5), 0.68 - s * 0.1, 0.55)
+    // Jump : a fast upward move of the shoulder line since the previous frame.
+    if (this.prevPose) this.edgeHys('jump', this.prevShoY - shoMid.y, 0.035 - s * 0.015, 0.008)
+    this.prevShoY = shoMid.y
+    // Arms crossed : each wrist on the opposite side of the body midline from its
+    // own shoulder, and the wrists close together (mirror-invariant).
+    const midX = (shoMid.x + hipMid.x) / 2
+    const crossed = (lm[L_WRI].x - midX) * (lm[L_SHO].x - midX) < 0 &&
+      (lm[R_WRI].x - midX) * (lm[R_SHO].x - midX) < 0 &&
+      dist(lm[L_WRI], lm[R_WRI]) < shoulderW * 1.4
+    this.edgeHys('armsCross', crossed ? 1 : 0, 0.5, 0.5)
+    // T-pose : arms spread wide at shoulder height.
+    const tpose = (out.armSpan ?? 0) > 0.6 &&
+      Math.abs(lm[L_WRI].y - lm[L_SHO].y) < 0.12 && Math.abs(lm[R_WRI].y - lm[R_SHO].y) < 0.12
+    this.edgeHys('tPose', tpose ? 1 : 0, 0.5, 0.5)
+    // Single-hand raise above the head (subject-relative L / R).
+    this.edgeHys('raiseLeft', lm[NOSE].y - lm[L_WRI].y, 0.05, 0.0)
+    this.edgeHys('raiseRight', lm[NOSE].y - lm[R_WRI].y, 0.05, 0.0)
   }
 
   // ── Face → blendshape features + head pose + face gestures ─────────────
@@ -480,13 +506,43 @@ class BodyTracker {
     this.winkRDown = wr
     // Hold : mouth open sustained.
     this.hold('holdMouthOpen', (out.faceJawOpen ?? 0) > 0.5)
+
+    // ── Expression gestures (blendshape thresholds, edge + hysteresis) ──
+    const sm = out.faceSmile ?? 0
+    this.edgeHys('smile', sm, 0.5 - s * 0.15, 0.3)
+    this.edgeHys('frown', (g('mouthFrownLeft') + g('mouthFrownRight')) / 2, 0.4 - s * 0.12, 0.2)
+    this.edgeHys('browFurrow', (g('browDownLeft') + g('browDownRight')) / 2, 0.42 - s * 0.12, 0.22)
+    this.edgeHys('squint', (g('eyeSquintLeft') + g('eyeSquintRight')) / 2, 0.5 - s * 0.15, 0.3)
+    this.edgeHys('cheekPuff', g('cheekPuff'), 0.4 - s * 0.12, 0.2)
+    this.edgeHys('kiss', g('mouthPucker'), 0.55 - s * 0.15, 0.3) // lips pursed
+    this.edgeHys('jawLeft', g('jawLeft'), 0.4 - s * 0.12, 0.2)
+    this.edgeHys('jawRight', g('jawRight'), 0.4 - s * 0.12, 0.2)
+    this.edgeHys('mouthLeft', g('mouthLeft'), 0.4 - s * 0.12, 0.2)
+    this.edgeHys('mouthRight', g('mouthRight'), 0.4 - s * 0.12, 0.2)
+    this.edgeHys('tongueOut', g('tongueOut'), 0.3 - s * 0.1, 0.15)
+    this.edgeHys('blinkBoth', (blinkL + blinkR) / 2, 0.55, 0.2) // both eyes (fires on hard blinks)
+    // ── Head-pose gestures (from the yaw/pitch/roll features, mirror-aware) ──
+    const yaw = out.faceHeadYaw ?? 0.5, pitch = out.faceHeadPitch ?? 0.5, roll = out.faceHeadRoll ?? 0.5
+    this.edgeHys('headLeft', 1 - yaw, 0.72 - s * 0.1, 0.58)
+    this.edgeHys('headRight', yaw, 0.72 - s * 0.1, 0.58)
+    this.edgeHys('headUp', pitch, 0.72 - s * 0.1, 0.58)
+    this.edgeHys('headDown', 1 - pitch, 0.72 - s * 0.1, 0.58)
+    this.edgeHys('tiltLeft', 1 - roll, 0.7 - s * 0.1, 0.58)
+    this.edgeHys('tiltRight', roll, 0.7 - s * 0.1, 0.58)
   }
 
   private emit(g: BodyGesture): void {
     const now = performance.now()
-    if (now - this.cooldown[g] < 350) return // debounce : no retrigger bursts
+    if (now - (this.cooldown[g] ?? 0) < 350) return // debounce : no retrigger bursts
     this.cooldown[g] = now
     bodyBus.fireGesture(g)
+  }
+
+  /** Rising-edge trigger with hysteresis : fire once when `value` crosses `hi`,
+   *  re-arm when it drops below `lo`. Powers the many threshold gestures. */
+  private edgeHys(g: BodyGesture, value: number, hi: number, lo: number): void {
+    if (value > hi) { if (this.armed[g] !== false) { this.emit(g); this.armed[g] = false } }
+    else if (value < lo) this.armed[g] = true
   }
 
   /** Sustained-pose trigger : fire `g` once after its condition has been true for

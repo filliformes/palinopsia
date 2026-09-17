@@ -11,7 +11,7 @@ import type { BodyControlConfig, BodyFeature, BodyGesture, GestureAction, Gestur
 import { BODY_FEATURES, BODY_GESTURES } from '@shared/types'
 import { bodyTracker } from '../engine/bodyTracker'
 import { bodyBus } from '../engine/bodyIn'
-import { TRIGGER_ACTION_IDS, fireTrigger, midiTargetLabel } from '../midi'
+import { fireTrigger, midiTargetLabel } from '../midi'
 import { useStore } from '../store'
 import { showToast } from './Toast'
 
@@ -30,20 +30,14 @@ const POSE_CONN: Array<[number, number]> = [
 // Short labels : dense enough for the two-column routing grid. Fuller names ride
 // in the title tooltips at each use site.
 const GESTURE_LABEL: Record<BodyGesture, string> = {
-  pinchLeft: 'pinch L',
-  pinchRight: 'pinch R',
-  clap: 'clap',
-  cross: 'cross',
-  handsUp: 'hands up',
-  mouthPop: 'mouth pop',
-  browRaise: 'brow',
-  winkLeft: 'wink L',
-  winkRight: 'wink R',
-  holdHandsUp: 'hold up',
-  holdPinchLeft: 'hold pinch L',
-  holdPinchRight: 'hold pinch R',
-  holdArmsWide: 'hold wide',
-  holdMouthOpen: 'hold mouth'
+  pinchLeft: 'pinch L', pinchRight: 'pinch R', clap: 'clap', cross: 'cross',
+  handsUp: 'hands up', leanLeft: 'lean L', leanRight: 'lean R', crouch: 'crouch', jump: 'jump',
+  armsCross: 'arms cross', tPose: 'T-pose', raiseLeft: 'raise L', raiseRight: 'raise R',
+  mouthPop: 'mouth pop', browRaise: 'brow raise', winkLeft: 'wink L', winkRight: 'wink R',
+  smile: 'smile', frown: 'frown', browFurrow: 'brow furrow', squint: 'squint', cheekPuff: 'cheek puff', kiss: 'kiss',
+  jawLeft: 'jaw L', jawRight: 'jaw R', mouthLeft: 'mouth L', mouthRight: 'mouth R', tongueOut: 'tongue out', blinkBoth: 'blink',
+  headLeft: 'head L', headRight: 'head R', headUp: 'head up', headDown: 'head down', tiltLeft: 'tilt L', tiltRight: 'tilt R',
+  holdHandsUp: 'hold up', holdPinchLeft: 'hold pinch L', holdPinchRight: 'hold pinch R', holdArmsWide: 'hold wide', holdMouthOpen: 'hold mouth'
 }
 const SONI_VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord']
 // Group the feature list for a legible monitor.
@@ -189,21 +183,53 @@ export function BodyPage(): JSX.Element {
     patch({ rules: cfg.rules.map((r) => (r.id === id ? { ...r, ...part } : r)) })
   const deleteRule = (id: string): void => patch({ rules: cfg.rules.filter((r) => r.id !== id) })
 
-  // Action vocabulary for the dropdowns : the shared trigger ids + this session's
-  // scene slots + the Sonify voices (all handled by fireTrigger).
+  // Action vocabulary, organised into categories for the dropdowns. Every id is
+  // handled by fireTrigger (the shared MIDI/keyboard/gesture executor).
   const scenes = useStore((s) => s.scenes)
-  const actionOptions = useMemo(() => {
-    const opts: Array<{ id: string; label: string }> = [{ id: 'none', label: '— nothing —' }]
-    for (const id of TRIGGER_ACTION_IDS) opts.push({ id, label: midiTargetLabel(id) })
-    scenes.forEach((s, i) => opts.push({ id: `scene:${i}`, label: `Scene ${i + 1}${s.name ? ' · ' + s.name : ''}` }))
-    SONI_VOICE_NAMES.forEach((n, i) => opts.push({ id: `sonify:voice:${i}`, label: `Sonify: ${n}` }))
-    return opts
+  const actionGroups = useMemo(() => {
+    const opt = (id: string): { id: string; label: string } => ({ id, label: midiTargetLabel(id) })
+    return [
+      { label: 'Randomize', opts: [
+        'fire:randomize', 'rand:all', 'rand:sources', 'rand:sourcefx', 'rand:layerfx', 'rand:mods', 'rand:finishing',
+        'rand:bg', 'rand:master', 'rand:meta', 'rand:inspector', 'rand:sonify', 'fire:vary',
+        'rand:layer:0', 'rand:layer:1', 'rand:layer:2', 'rand:layer:3'
+      ].map(opt) },
+      { label: 'Transport / performance', opts: ['fire:flush', 'fire:freeze', 'fire:record', 'fire:tap', 'fire:seq', 'fire:soniseq'].map(opt) },
+      { label: 'Master FX', opts: ['master:chain'].map(opt) },
+      { label: 'Scenes', opts: [opt('scene:next'), opt('scene:prev'), ...scenes.map((s, i) => ({ id: `scene:${i}`, label: `Scene ${i + 1}${s.name ? ' · ' + s.name : ''}` }))] },
+      { label: 'Sonify', opts: [opt('fire:sonify'), ...SONI_VOICE_NAMES.map((n, i) => ({ id: `sonify:voice:${i}`, label: `Sonify: ${n}` }))] },
+      { label: 'Session', opts: ['session:new', 'session:load', 'session:open'].map(opt) }
+    ]
   }, [scenes])
-  const labelForAction = (id: GestureAction): string =>
-    actionOptions.find((o) => o.id === id)?.label ?? (id === 'none' ? '— nothing —' : midiTargetLabel(id))
+  const actionLabelMap = useMemo(() => {
+    const m: Record<string, string> = { none: '— nothing —' }
+    for (const grp of actionGroups) for (const o of grp.opts) m[o.id] = o.label
+    return m
+  }, [actionGroups])
+  const labelForAction = (id: GestureAction): string => actionLabelMap[id] ?? (id === 'none' ? '— nothing —' : midiTargetLabel(id))
 
-  const actionOptionEls = actionOptions.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)
-  const gestureOptionEls = BODY_GESTURES.map((g) => <option key={g} value={g}>{GESTURE_LABEL[g]}</option>)
+  const actionOptionEls = (
+    <>
+      <option value="none">— nothing —</option>
+      {actionGroups.map((grp) => (
+        <optgroup key={grp.label} label={grp.label}>
+          {grp.opts.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+        </optgroup>
+      ))}
+    </>
+  )
+  // Gestures grouped by body region, for the rule builder dropdowns.
+  const GESTURE_GROUPS: Array<{ label: string; keys: BodyGesture[] }> = [
+    { label: 'Hands', keys: ['pinchLeft', 'pinchRight', 'clap', 'cross'] },
+    { label: 'Pose', keys: ['handsUp', 'leanLeft', 'leanRight', 'crouch', 'jump', 'armsCross', 'tPose', 'raiseLeft', 'raiseRight'] },
+    { label: 'Face', keys: ['mouthPop', 'browRaise', 'winkLeft', 'winkRight', 'smile', 'frown', 'browFurrow', 'squint', 'cheekPuff', 'kiss', 'jawLeft', 'jawRight', 'mouthLeft', 'mouthRight', 'tongueOut', 'blinkBoth', 'headLeft', 'headRight', 'headUp', 'headDown', 'tiltLeft', 'tiltRight'] },
+    { label: 'Holds', keys: ['holdHandsUp', 'holdPinchLeft', 'holdPinchRight', 'holdArmsWide', 'holdMouthOpen'] }
+  ]
+  const gestureOptionEls = GESTURE_GROUPS.map((grp) => (
+    <optgroup key={grp.label} label={grp.label}>
+      {grp.keys.map((g) => <option key={g} value={g}>{GESTURE_LABEL[g]}</option>)}
+    </optgroup>
+  ))
 
   const statusText = !cfg.enabled
     ? 'camera off'

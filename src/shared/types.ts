@@ -327,14 +327,25 @@ export const BODY_FEATURES: BodyFeature[] = [
 // bus's `transient`). An early slice of the ① trigger/event layer : each fires a
 // bound GestureAction. More can be added without touching the routing.
 export type BodyGesture =
-  | 'pinchLeft' | 'pinchRight' | 'clap' | 'cross' | 'handsUp'
+  // Hands
+  | 'pinchLeft' | 'pinchRight' | 'clap' | 'cross'
+  // Pose (whole body)
+  | 'handsUp' | 'leanLeft' | 'leanRight' | 'crouch' | 'jump' | 'armsCross' | 'tPose' | 'raiseLeft' | 'raiseRight'
+  // Face (blendshapes + head pose)
   | 'mouthPop' | 'browRaise' | 'winkLeft' | 'winkRight'
+  | 'smile' | 'frown' | 'browFurrow' | 'squint' | 'cheekPuff' | 'kiss'
+  | 'jawLeft' | 'jawRight' | 'mouthLeft' | 'mouthRight' | 'tongueOut' | 'blinkBoth'
+  | 'headLeft' | 'headRight' | 'headUp' | 'headDown' | 'tiltLeft' | 'tiltRight'
   // Hold-duration triggers : a sustained pose fires ONCE after being held for
   // `holdMs`, then re-arms when released. Not onsets — a deliberate, held move.
   | 'holdHandsUp' | 'holdPinchLeft' | 'holdPinchRight' | 'holdArmsWide' | 'holdMouthOpen'
 export const BODY_GESTURES: BodyGesture[] = [
-  'pinchLeft', 'pinchRight', 'clap', 'cross', 'handsUp',
+  'pinchLeft', 'pinchRight', 'clap', 'cross',
+  'handsUp', 'leanLeft', 'leanRight', 'crouch', 'jump', 'armsCross', 'tPose', 'raiseLeft', 'raiseRight',
   'mouthPop', 'browRaise', 'winkLeft', 'winkRight',
+  'smile', 'frown', 'browFurrow', 'squint', 'cheekPuff', 'kiss',
+  'jawLeft', 'jawRight', 'mouthLeft', 'mouthRight', 'tongueOut', 'blinkBoth',
+  'headLeft', 'headRight', 'headUp', 'headDown', 'tiltLeft', 'tiltRight',
   'holdHandsUp', 'holdPinchLeft', 'holdPinchRight', 'holdArmsWide', 'holdMouthOpen'
 ]
 
