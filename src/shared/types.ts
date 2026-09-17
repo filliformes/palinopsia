@@ -410,6 +410,7 @@ export interface BodyControlConfig {
   silhouette: boolean // run the pose segmentation mask → 3×3 zone coverage features + occlusion gestures (needs pose; heavier)
   mirror: boolean // flip X so moving right moves the value right (selfie view)
   sensitivity: number // 0..1 : global gain on gesture thresholds (higher = easier)
+  gestureSensitivity: Partial<Record<BodyGesture, number>> // per-gesture override of `sensitivity` (a gesture with its own value fires at that threshold instead of the global one)
   holdMs: number // how long a pose must be held for a hold-* gesture to fire (ms)
   oscOut: boolean // when a rule fires, also send /body/<its osc name> over OSC
   gestures: Partial<Record<BodyGesture, GestureAction>> // legacy per-gesture map (unused : all routing is rules now; kept for stored configs)

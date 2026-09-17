@@ -364,9 +364,8 @@ class BodyTracker {
     }
 
     // Pinch gestures (per slot). sensitivity raises the trigger distance.
-    const pinchThresh = 0.35 + cfg.sensitivity * 0.35
-    const pinchL = left ? pinchAmt(left) < pinchThresh : false
-    const pinchR = right ? pinchAmt(right) < pinchThresh : false
+    const pinchL = left ? pinchAmt(left) < 0.35 + this.sens('pinchLeft') * 0.35 : false
+    const pinchR = right ? pinchAmt(right) < 0.35 + this.sens('pinchRight') * 0.35 : false
     this.pinchGate('left', pinchL)
     this.pinchGate('right', pinchR)
     this.hold('holdPinchLeft', pinchL)
@@ -375,7 +374,7 @@ class BodyTracker {
     // Clap : two wrists collapse together. Fire on the crossing, re-arm apart.
     if (left && right) {
       const apart = dist(left[WRIST], right[WRIST])
-      const clapThresh = 0.14 - cfg.sensitivity * 0.05
+      const clapThresh = 0.14 - this.sens('clap') * 0.05
       if (apart < clapThresh && this.clapArmed) {
         this.emit('clap')
         this.clapArmed = false
@@ -433,7 +432,7 @@ class BodyTracker {
     }
 
     // Hands-up gesture : cross a raised threshold, re-arm when lowered.
-    const upThresh = 0.7 - cfg.sensitivity * 0.15
+    const upThresh = 0.7 - this.sens('handsUp') * 0.15
     if (up > upThresh && this.handsUpArmed) {
       this.emit('handsUp')
       this.handsUpArmed = false
@@ -445,13 +444,12 @@ class BodyTracker {
     this.hold('holdArmsWide', (out.armSpan ?? 0) > 0.65)
 
     // ── Discrete pose gestures (rising edge + hysteresis) ──
-    const s = cfg.sensitivity
     const lean = out.bodyLean ?? 0.5
-    this.edgeHys('leanLeft', 1 - lean, 0.72 - s * 0.1, 0.58)
-    this.edgeHys('leanRight', lean, 0.72 - s * 0.1, 0.58)
-    this.edgeHys('crouch', 1 - (out.bodyHeight ?? 0.5), 0.68 - s * 0.1, 0.55)
+    this.edgeHys('leanLeft', 1 - lean, 0.72 - this.sens('leanLeft') * 0.1, 0.58)
+    this.edgeHys('leanRight', lean, 0.72 - this.sens('leanRight') * 0.1, 0.58)
+    this.edgeHys('crouch', 1 - (out.bodyHeight ?? 0.5), 0.68 - this.sens('crouch') * 0.1, 0.55)
     // Jump : a fast upward move of the shoulder line since the previous frame.
-    if (this.prevPose) this.edgeHys('jump', this.prevShoY - shoMid.y, 0.035 - s * 0.015, 0.008)
+    if (this.prevPose) this.edgeHys('jump', this.prevShoY - shoMid.y, 0.035 - this.sens('jump') * 0.015, 0.008)
     this.prevShoY = shoMid.y
     // Arms crossed : each wrist on the opposite side of the body midline from its
     // own shoulder, and the wrists close together (mirror-invariant).
@@ -507,11 +505,10 @@ class BodyTracker {
     // Gestures. Blendshape thresholds scaled by sensitivity. Wink handedness is
     // subject-relative (MediaPipe's eyeBlinkLeft is the person's own left eye),
     // so it stays intuitive regardless of mirror.
-    const s = cfg.sensitivity
-    const jawT = 0.55 - s * 0.2
+    const jawT = 0.55 - this.sens('mouthPop') * 0.2
     if ((out.faceJawOpen ?? 0) > jawT && this.mouthArmed) { this.emit('mouthPop'); this.mouthArmed = false }
     else if ((out.faceJawOpen ?? 0) < jawT * 0.5) this.mouthArmed = true
-    const browT = 0.5 - s * 0.2
+    const browT = 0.5 - this.sens('browRaise') * 0.2
     if ((out.faceBrowUp ?? 0) > browT && this.browArmed) { this.emit('browRaise'); this.browArmed = false }
     else if ((out.faceBrowUp ?? 0) < browT * 0.5) this.browArmed = true
     const winkHi = 0.5, winkLo = 0.25
@@ -526,26 +523,26 @@ class BodyTracker {
 
     // ── Expression gestures (blendshape thresholds, edge + hysteresis) ──
     const sm = out.faceSmile ?? 0
-    this.edgeHys('smile', sm, 0.5 - s * 0.15, 0.3)
-    this.edgeHys('frown', (g('mouthFrownLeft') + g('mouthFrownRight')) / 2, 0.4 - s * 0.12, 0.2)
-    this.edgeHys('browFurrow', (g('browDownLeft') + g('browDownRight')) / 2, 0.42 - s * 0.12, 0.22)
-    this.edgeHys('squint', (g('eyeSquintLeft') + g('eyeSquintRight')) / 2, 0.5 - s * 0.15, 0.3)
-    this.edgeHys('cheekPuff', g('cheekPuff'), 0.4 - s * 0.12, 0.2)
-    this.edgeHys('kiss', g('mouthPucker'), 0.55 - s * 0.15, 0.3) // lips pursed
-    this.edgeHys('jawLeft', g('jawLeft'), 0.4 - s * 0.12, 0.2)
-    this.edgeHys('jawRight', g('jawRight'), 0.4 - s * 0.12, 0.2)
-    this.edgeHys('mouthLeft', g('mouthLeft'), 0.4 - s * 0.12, 0.2)
-    this.edgeHys('mouthRight', g('mouthRight'), 0.4 - s * 0.12, 0.2)
-    this.edgeHys('tongueOut', g('tongueOut'), 0.3 - s * 0.1, 0.15)
+    this.edgeHys('smile', sm, 0.5 - this.sens('smile') * 0.15, 0.3)
+    this.edgeHys('frown', (g('mouthFrownLeft') + g('mouthFrownRight')) / 2, 0.4 - this.sens('frown') * 0.12, 0.2)
+    this.edgeHys('browFurrow', (g('browDownLeft') + g('browDownRight')) / 2, 0.42 - this.sens('browFurrow') * 0.12, 0.22)
+    this.edgeHys('squint', (g('eyeSquintLeft') + g('eyeSquintRight')) / 2, 0.5 - this.sens('squint') * 0.15, 0.3)
+    this.edgeHys('cheekPuff', g('cheekPuff'), 0.4 - this.sens('cheekPuff') * 0.12, 0.2)
+    this.edgeHys('kiss', g('mouthPucker'), 0.55 - this.sens('kiss') * 0.15, 0.3) // lips pursed
+    this.edgeHys('jawLeft', g('jawLeft'), 0.4 - this.sens('jawLeft') * 0.12, 0.2)
+    this.edgeHys('jawRight', g('jawRight'), 0.4 - this.sens('jawRight') * 0.12, 0.2)
+    this.edgeHys('mouthLeft', g('mouthLeft'), 0.4 - this.sens('mouthLeft') * 0.12, 0.2)
+    this.edgeHys('mouthRight', g('mouthRight'), 0.4 - this.sens('mouthRight') * 0.12, 0.2)
+    this.edgeHys('tongueOut', g('tongueOut'), 0.3 - this.sens('tongueOut') * 0.1, 0.15)
     this.edgeHys('blinkBoth', (blinkL + blinkR) / 2, 0.55, 0.2) // both eyes (fires on hard blinks)
     // ── Head-pose gestures (from the yaw/pitch/roll features, mirror-aware) ──
     const yaw = out.faceHeadYaw ?? 0.5, pitch = out.faceHeadPitch ?? 0.5, roll = out.faceHeadRoll ?? 0.5
-    this.edgeHys('headLeft', 1 - yaw, 0.72 - s * 0.1, 0.58)
-    this.edgeHys('headRight', yaw, 0.72 - s * 0.1, 0.58)
-    this.edgeHys('headUp', pitch, 0.72 - s * 0.1, 0.58)
-    this.edgeHys('headDown', 1 - pitch, 0.72 - s * 0.1, 0.58)
-    this.edgeHys('tiltLeft', 1 - roll, 0.7 - s * 0.1, 0.58)
-    this.edgeHys('tiltRight', roll, 0.7 - s * 0.1, 0.58)
+    this.edgeHys('headLeft', 1 - yaw, 0.72 - this.sens('headLeft') * 0.1, 0.58)
+    this.edgeHys('headRight', yaw, 0.72 - this.sens('headRight') * 0.1, 0.58)
+    this.edgeHys('headUp', pitch, 0.72 - this.sens('headUp') * 0.1, 0.58)
+    this.edgeHys('headDown', 1 - pitch, 0.72 - this.sens('headDown') * 0.1, 0.58)
+    this.edgeHys('tiltLeft', 1 - roll, 0.7 - this.sens('tiltLeft') * 0.1, 0.58)
+    this.edgeHys('tiltRight', roll, 0.7 - this.sens('tiltRight') * 0.1, 0.58)
   }
 
   // ── Silhouette → 3×3 zone coverage (segmentation mask) ─────────────────
@@ -586,9 +583,17 @@ class BodyTracker {
     for (let i = 0; i < 9; i++) out[BodyTracker.ZONE_FEATURES[i]] = this.zoneCov[i]
     out.bodyCover = this.bodyCov
     // Occlusion onsets : the body's shadow covers a zone past a threshold, re-arm
-    // when it clears. sensitivity lowers the trigger threshold.
-    const hi = 0.45 - cfg.sensitivity * 0.15, lo = 0.2
-    for (let i = 0; i < 9; i++) this.edgeHys(BodyTracker.ZONE_GESTURES[i], this.zoneCov[i], hi, lo)
+    // when it clears. sensitivity lowers the trigger threshold (per-zone override).
+    for (let i = 0; i < 9; i++) {
+      const gz = BodyTracker.ZONE_GESTURES[i]
+      this.edgeHys(gz, this.zoneCov[i], 0.45 - this.sens(gz) * 0.15, 0.2)
+    }
+  }
+
+  /** Effective sensitivity for one gesture : its per-gesture override (set from a
+   *  single-gesture rule's slider on the Body page), else the global slider. */
+  private sens(g: BodyGesture): number {
+    return this.cfg?.gestureSensitivity?.[g] ?? this.cfg?.sensitivity ?? 0.5
   }
 
   private emit(g: BodyGesture): void {

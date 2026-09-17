@@ -65,13 +65,14 @@ const ACTION_TOKEN: Record<string, string> = {
 }
 // Silhouette zone features in row-major order (TL..BR), for the preview grid.
 const ZONE_KEYS: BodyFeature[] = ['zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR']
-// Group the feature list for a legible monitor.
-const FEATURE_GROUPS: Array<{ title: string; keys: BodyFeature[] }> = [
-  { title: 'Hands', keys: ['handLeftHeight', 'handRightHeight', 'handLeftX', 'handRightX', 'handLeftOpen', 'handRightOpen', 'handsApart', 'handsHeight'] },
-  { title: 'Pose', keys: ['bodyMotion', 'bodyLean', 'bodySway', 'armSpan', 'bodyHeight', 'handsUp', 'weightLR'] },
-  { title: 'Face', keys: ['faceJawOpen', 'faceSmile', 'faceBrowUp', 'faceBlink', 'faceMouthPucker', 'faceHeadYaw', 'faceHeadPitch', 'faceHeadRoll'] },
-  { title: 'Silhouette (zones)', keys: ['zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR', 'bodyCover'] },
-  { title: 'Presence', keys: ['bodyPresent', 'handsPresent', 'facePresent'] }
+// Group the feature list for a legible monitor. Each group gets a colour so the
+// bars and header read at a glance which body region a value belongs to.
+const FEATURE_GROUPS: Array<{ title: string; color: string; keys: BodyFeature[] }> = [
+  { title: 'Hands', color: '#ff8e0f', keys: ['handLeftHeight', 'handRightHeight', 'handLeftX', 'handRightX', 'handLeftOpen', 'handRightOpen', 'handsApart', 'handsHeight'] },
+  { title: 'Pose', color: '#49a6e6', keys: ['bodyMotion', 'bodyLean', 'bodySway', 'armSpan', 'bodyHeight', 'handsUp', 'weightLR'] },
+  { title: 'Face', color: '#5fc281', keys: ['faceJawOpen', 'faceSmile', 'faceBrowUp', 'faceBlink', 'faceMouthPucker', 'faceHeadYaw', 'faceHeadPitch', 'faceHeadRoll'] },
+  { title: 'Silhouette (zones)', color: '#b98cff', keys: ['zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR', 'bodyCover'] },
+  { title: 'Presence', color: '#8b93a7', keys: ['bodyPresent', 'handsPresent', 'facePresent'] }
 ]
 
 function Toggle({ on, label, onClick, title }: { on: boolean; label: string; onClick: () => void; title?: string }): JSX.Element {
@@ -261,6 +262,14 @@ export function BodyPage(): JSX.Element {
   const updateRule = (id: string, part: Partial<GestureRule>): void =>
     patch({ rules: cfg.rules.map((r) => (r.id === id ? { ...r, ...part } : r)) })
   const deleteRule = (id: string): void => patch({ rules: cfg.rules.filter((r) => r.id !== id) })
+  // Per-gesture sensitivity : a single-gesture rule tunes how easily its gesture
+  // fires, overriding the global slider (shared by any rule using that gesture).
+  const gestureSens = (g: BodyGesture): number => cfg.gestureSensitivity[g] ?? cfg.sensitivity
+  const setGestureSens = (g: BodyGesture, v: number): void =>
+    patch({ gestureSensitivity: { ...cfg.gestureSensitivity, [g]: v } })
+  const resetGestureSens = (g: BodyGesture): void => {
+    const gs = { ...cfg.gestureSensitivity }; delete gs[g]; patch({ gestureSensitivity: gs })
+  }
 
   // Action vocabulary, organised into categories for the dropdowns. Every id is
   // handled by fireTrigger (the shared MIDI/keyboard/gesture executor).
@@ -394,7 +403,7 @@ export function BodyPage(): JSX.Element {
         {/* Top row : camera preview · live feature monitor */}
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
         {/* Left : the enable button + live camera preview */}
-        <div className="flex shrink-0 flex-col gap-2 lg:w-[500px]">
+        <div className="flex shrink-0 flex-col gap-2 lg:w-[520px]">
           <button
             onClick={() => patch({ enabled: !cfg.enabled })}
             className={`w-full rounded px-3 py-2 font-mono text-[12px] transition-colors ${
@@ -424,30 +433,39 @@ export function BodyPage(): JSX.Element {
             <p className="mb-2 text-[10px] leading-snug text-muted">
               Live 0..1 values off the body bus. <span className="text-text">→</span> routes one into a free modulator slot (then bind it with a param’s <span className="text-text">M</span> button). Every feature is also selectable in any modulator set to <span className="text-text">body</span> (Modulation : D).
             </p>
-            {FEATURE_GROUPS.map((grp) => (
-              <div key={grp.title} className="mb-1.5">
-                <div className="mb-0.5 font-mono text-[8px] uppercase tracking-wide text-muted">{grp.title}</div>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-1 xl:grid-cols-3 2xl:grid-cols-4">
-                  {grp.keys.map((k) => {
-                    const v = vals[k] ?? 0
-                    return (
-                      <div key={k} className="flex items-center gap-1.5">
-                        <span className="w-[68px] shrink-0 truncate font-mono text-[9px] text-muted" title={k}>{k}</span>
-                        <div className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-panel3/70">
-                          <div className="absolute inset-y-0 left-0 rounded-full bg-accent" style={{ width: `${Math.round(v * 100)}%` }} />
+            <div className="flex flex-col gap-2">
+              {FEATURE_GROUPS.map((grp) => (
+                <div
+                  key={grp.title}
+                  className="rounded-md border-l-2 py-2 pl-2.5 pr-1"
+                  style={{ borderColor: grp.color, background: grp.color + '12' }}
+                >
+                  <div className="mb-1.5 flex items-center gap-1.5 border-b pb-1" style={{ borderColor: grp.color + '33' }}>
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: grp.color }} />
+                    <span className="font-mono text-[10px] font-semibold uppercase tracking-wide" style={{ color: grp.color }}>{grp.title}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 xl:grid-cols-3 2xl:grid-cols-4">
+                    {grp.keys.map((k) => {
+                      const v = vals[k] ?? 0
+                      return (
+                        <div key={k} className="flex items-center gap-1.5">
+                          <span className="w-[74px] shrink-0 truncate font-mono text-[10px] text-muted" title={k}>{k}</span>
+                          <div className="relative h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-panel3/70">
+                            <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.round(v * 100)}%`, background: grp.color }} />
+                          </div>
+                          <span className="w-8 shrink-0 text-right font-mono text-[10px] text-text/80">{v.toFixed(2)}</span>
+                          <button
+                            onClick={() => toSlot(k)}
+                            className="shrink-0 rounded border border-border bg-panel3/70 px-1 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
+                            title={`Route ${k} into the first free modulator slot`}
+                          >→</button>
                         </div>
-                        <span className="w-7 shrink-0 text-right font-mono text-[9px] text-muted">{v.toFixed(2)}</span>
-                        <button
-                          onClick={() => toSlot(k)}
-                          className="shrink-0 rounded border border-border bg-panel3/70 px-1 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
-                          title={`Route ${k} into the first free modulator slot`}
-                        >→</button>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </section>
         </div>
         </div>{/* end top row */}
@@ -566,7 +584,7 @@ export function BodyPage(): JSX.Element {
                           /body/{r.osc}
                         </span>
                       )}
-                      {r.g2 && (
+                      {r.g2 ? (
                         <button
                           onClick={() => updateRule(r.id, { exclusive: !r.exclusive })}
                           className={`shrink-0 rounded border px-1 text-[9px] ${r.exclusive ? 'border-accent text-accent' : 'border-border text-muted/60 hover:text-text'}`}
@@ -574,6 +592,20 @@ export function BodyPage(): JSX.Element {
                         >
                           excl
                         </button>
+                      ) : (
+                        <span
+                          className="flex shrink-0 items-center gap-1"
+                          title={`Sensitivity for “${GESTURE_LABEL[r.g1]}” : how easily it fires. Per-gesture (shared by any rule using it) ; now ${Math.round(gestureSens(r.g1) * 100)}%${cfg.gestureSensitivity[r.g1] == null ? ' (following the global slider)' : ''}. Double-click to reset to the global.`}
+                        >
+                          <span className="text-[8px] uppercase tracking-wide text-muted/60">sens</span>
+                          <input
+                            type="range" min={0} max={1} step={0.01}
+                            value={gestureSens(r.g1)}
+                            onChange={(e) => setGestureSens(r.g1, Number(e.target.value))}
+                            onDoubleClick={() => resetGestureSens(r.g1)}
+                            className={`h-1 w-14 ${cfg.gestureSensitivity[r.g1] == null ? 'accent-muted' : 'accent-accent'}`}
+                          />
+                        </span>
                       )}
                       <button
                         onClick={() => fireTrigger(r.action)}
