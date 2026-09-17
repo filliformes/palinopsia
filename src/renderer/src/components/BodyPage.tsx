@@ -38,7 +38,8 @@ const GESTURE_LABEL: Record<BodyGesture, string> = {
   jawLeft: 'jaw L', jawRight: 'jaw R', mouthLeft: 'mouth L', mouthRight: 'mouth R', tongueOut: 'tongue out', blinkBoth: 'blink',
   headLeft: 'head L', headRight: 'head R', headUp: 'head up', headDown: 'head down', tiltLeft: 'tilt L', tiltRight: 'tilt R',
   holdHandsUp: 'hold up', holdPinchLeft: 'hold pinch L', holdPinchRight: 'hold pinch R', holdArmsWide: 'hold wide', holdMouthOpen: 'hold mouth',
-  coverTL: 'cover TL', coverTC: 'cover T', coverTR: 'cover TR', coverML: 'cover L', coverMC: 'cover C', coverMR: 'cover R', coverBL: 'cover BL', coverBC: 'cover B', coverBR: 'cover BR'
+  coverTL: 'cover TL', coverTC: 'cover T', coverTR: 'cover TR', coverML: 'cover L', coverMC: 'cover C', coverMR: 'cover R', coverBL: 'cover BL', coverBC: 'cover B', coverBR: 'cover BR',
+  bodyEnter: 'body in', bodyLeave: 'body out', handsEnter: 'hands in', handsLeave: 'hands out', faceEnter: 'face in', faceLeave: 'face out'
 }
 const SONI_VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord']
 
@@ -312,7 +313,8 @@ export function BodyPage(): JSX.Element {
     { label: 'Pose', keys: ['handsUp', 'leanLeft', 'leanRight', 'crouch', 'jump', 'armsCross', 'tPose', 'raiseLeft', 'raiseRight'] },
     { label: 'Face', keys: ['mouthPop', 'browRaise', 'winkLeft', 'winkRight', 'smile', 'frown', 'browFurrow', 'squint', 'cheekPuff', 'kiss', 'jawLeft', 'jawRight', 'mouthLeft', 'mouthRight', 'tongueOut', 'blinkBoth', 'headLeft', 'headRight', 'headUp', 'headDown', 'tiltLeft', 'tiltRight'] },
     { label: 'Holds', keys: ['holdHandsUp', 'holdPinchLeft', 'holdPinchRight', 'holdArmsWide', 'holdMouthOpen'] },
-    { label: 'Zones (silhouette)', keys: ['coverTL', 'coverTC', 'coverTR', 'coverML', 'coverMC', 'coverMR', 'coverBL', 'coverBC', 'coverBR'] }
+    { label: 'Zones (silhouette)', keys: ['coverTL', 'coverTC', 'coverTR', 'coverML', 'coverMC', 'coverMR', 'coverBL', 'coverBC', 'coverBR'] },
+    { label: 'Presence (enter / leave)', keys: ['bodyEnter', 'bodyLeave', 'handsEnter', 'handsLeave', 'faceEnter', 'faceLeave'] }
   ]
   const gestureOptionEls = GESTURE_GROUPS.map((grp) => (
     <optgroup key={grp.label} label={grp.label}>

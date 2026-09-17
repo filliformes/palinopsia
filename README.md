@@ -554,10 +554,12 @@ The gesture vocabulary spans **hands** (pinch L/R, clap, cross), **pose** (hands
 lean L/R, crouch, jump, arms-cross, T-pose, single-hand raise L/R), **face** (mouth-pop,
 brow-raise, wink L/R, smile, frown, brow-furrow, squint, cheek-puff, kiss, jaw / mouth
 L/R, tongue-out, blink, head turn / nod / tilt), **holds** (a sustained pose that fires
-once after the hold time: hands-up, pinch L/R, arms-wide, mouth-open), and the
+once after the hold time: hands-up, pinch L/R, arms-wide, mouth-open), the
 **silhouette zones** (`cover TL…BR`: your shadow covering one of the nine screen
-regions past a threshold). A live **⚡ recognised** pill in the panel header names the
-last gesture the tracker saw.
+regions past a threshold), and **presence** edges (body / hands / face **in / out**:
+debounced enter-and-leave onsets, the installation trigger for someone walking into or
+out of frame). A live **⚡ recognised** pill in the panel header names the last gesture
+the tracker saw.
 
 **Silhouette** is the shadow-theatre control: the pose segmentation mask is reduced to
 a 3×3 coverage grid drawn over the camera preview, each cell lighting up as your shadow

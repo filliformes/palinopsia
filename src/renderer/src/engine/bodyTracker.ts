@@ -58,6 +58,13 @@ class BodyTracker {
   private poseSeg = false // whether the current pose landmarker outputs segmentation masks
   private zoneCov = new Array<number>(9).fill(0) // 3×3 silhouette zone coverage (row-major)
   private bodyCov = 0 // whole-frame silhouette coverage
+  // Debounced presence edges (body / hands / face enter+leave the frame). `on` is
+  // the committed state ; `cand`/`since` debounce a one-frame detection drop.
+  private presState: Record<'body' | 'hands' | 'face', { on: boolean; cand: boolean; since: number }> = {
+    body: { on: false, cand: false, since: 0 },
+    hands: { on: false, cand: false, since: 0 },
+    face: { on: false, cand: false, since: 0 }
+  }
   private raf = 0
   private lastTs = -1
   private running = false
@@ -245,6 +252,7 @@ class BodyTracker {
     this.latestPose = null
     this.latestFace = null
     this.prevPose = null
+    for (const ch of ['body', 'hands', 'face'] as const) this.presState[ch] = { on: false, cand: false, since: 0 }
     bodyBus.setLive(false, false, false)
   }
 
@@ -288,6 +296,12 @@ class BodyTracker {
     const hasPose = !!this.latestPose
     const hasFace = !!this.latestFace
     bodyBus.setLive(hasHands, hasPose, hasFace)
+
+    // Presence edges : fire enter/leave before any early-return, so a leave still
+    // fires on the frame the body vanishes. Only the enabled detectors count.
+    if (this.cfg?.pose || this.cfg?.silhouette) this.presenceEdge('body', ts, hasPose, 'bodyEnter', 'bodyLeave')
+    if (this.cfg?.hands) this.presenceEdge('hands', ts, hasHands, 'handsEnter', 'handsLeave')
+    if (this.cfg?.face) this.presenceEdge('face', ts, hasFace, 'faceEnter', 'faceLeave')
 
     // A hold whose detector isn't present this frame must reset, or a vanished
     // hand / body leaves it half-counted and it fires spuriously on return.
@@ -594,6 +608,14 @@ class BodyTracker {
    *  single-gesture rule's slider on the Body page), else the global slider. */
   private sens(g: BodyGesture): number {
     return this.cfg?.gestureSensitivity?.[g] ?? this.cfg?.sensitivity ?? 0.5
+  }
+
+  /** Fire an enter / leave gesture when a channel's presence flips and holds the
+   *  new state for ~250ms (so a one-frame detection dropout can't false-trigger). */
+  private presenceEdge(ch: 'body' | 'hands' | 'face', now: number, cur: boolean, enterG: BodyGesture, leaveG: BodyGesture): void {
+    const st = this.presState[ch]
+    if (cur !== st.cand) { st.cand = cur; st.since = now }
+    else if (cur !== st.on && now - st.since >= 250) { st.on = cur; this.emit(cur ? enterG : leaveG) }
   }
 
   private emit(g: BodyGesture): void {

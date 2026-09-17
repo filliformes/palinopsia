@@ -357,6 +357,10 @@ export type BodyGesture =
   | 'coverTL' | 'coverTC' | 'coverTR'
   | 'coverML' | 'coverMC' | 'coverMR'
   | 'coverBL' | 'coverBC' | 'coverBR'
+  // Presence edges : the body / hands / face enters or leaves the frame (debounced
+  // so a one-frame detection drop can't false-fire). The installation trigger :
+  // someone walks in → fire ; the room empties → reset.
+  | 'bodyEnter' | 'bodyLeave' | 'handsEnter' | 'handsLeave' | 'faceEnter' | 'faceLeave'
 export const BODY_GESTURES: BodyGesture[] = [
   'pinchLeft', 'pinchRight', 'clap', 'cross',
   'handsUp', 'leanLeft', 'leanRight', 'crouch', 'jump', 'armsCross', 'tPose', 'raiseLeft', 'raiseRight',
@@ -365,7 +369,8 @@ export const BODY_GESTURES: BodyGesture[] = [
   'jawLeft', 'jawRight', 'mouthLeft', 'mouthRight', 'tongueOut', 'blinkBoth',
   'headLeft', 'headRight', 'headUp', 'headDown', 'tiltLeft', 'tiltRight',
   'holdHandsUp', 'holdPinchLeft', 'holdPinchRight', 'holdArmsWide', 'holdMouthOpen',
-  'coverTL', 'coverTC', 'coverTR', 'coverML', 'coverMC', 'coverMR', 'coverBL', 'coverBC', 'coverBR'
+  'coverTL', 'coverTC', 'coverTR', 'coverML', 'coverMC', 'coverMR', 'coverBL', 'coverBC', 'coverBR',
+  'bodyEnter', 'bodyLeave', 'handsEnter', 'handsLeave', 'faceEnter', 'faceLeave'
 ]
 
 // What a gesture fires : one of the shared discrete-trigger action ids (the same
