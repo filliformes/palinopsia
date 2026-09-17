@@ -12,6 +12,7 @@
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision'
 import type { BodyControlConfig, BodyFeature, BodyGesture } from '@shared/types'
 import { bodyBus } from './bodyIn'
+import { perfMeter } from './perfMeter'
 
 // opsia-asset:// URLs (served by main from the bundled resources/mediapipe dir).
 const WASM_BASE = 'opsia-asset://local/wasm'
@@ -248,6 +249,7 @@ class BodyTracker {
     this.lastTs = ts
 
     let blendshapes: Array<{ categoryName: string; score: number }> | null = null
+    const mpT0 = performance.now()
     try {
       this.latestHands = this.hands ? (this.hands.detectForVideo(video, ts).landmarks ?? []) : []
       this.latestPose = this.pose
@@ -264,6 +266,7 @@ class BodyTracker {
       // A transient GL/graph hiccup : skip this frame, keep the loop alive.
       return
     }
+    perfMeter.add('mediapipe', performance.now() - mpT0) // Performance panel
 
     const hasHands = this.latestHands.length > 0
     const hasPose = !!this.latestPose

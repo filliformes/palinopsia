@@ -45,6 +45,7 @@ import { ModulationPanel } from './components/ModulationPanel'
 import { OscPanel } from './components/OscPanel'
 import { AudioPanel } from './components/AudioPanel'
 import { MidiPanel } from './components/MidiPanel'
+import { PerformancePanel } from './components/PerformancePanel'
 import { AssemblePanel } from './components/AssemblePanel'
 import { BackgroundPanel } from './components/BackgroundPanel'
 import { OutputPage } from './components/OutputPage'
@@ -54,6 +55,7 @@ import { SequencePage } from './components/SequencePage'
 import { BodyPage } from './components/BodyPage'
 import { bodyTracker } from './engine/bodyTracker'
 import { bodyBus } from './engine/bodyIn'
+import { perfMeter } from './engine/perfMeter'
 import type { BodyGesture, GestureAction } from '@shared/types'
 import { SceneBank } from './components/SceneBank'
 import { SurfacePad, SurfaceOnToggle } from './components/SurfacePad'
@@ -1073,9 +1075,11 @@ export default function App(): JSX.Element {
         // 2. Modulation: refresh the audio bus (OSC/local features), then tick
         //    the 8-slot engine and overlay the mod-matrix on top of the base
         //    values : straight into the Compositor, never through React.
-        audioBus.tick(now)
+        perfMeter.begin('audio'); audioBus.tick(now); perfMeter.end('audio')
+        perfMeter.begin('modulation')
         const modValues = modEngine.tick(now, c.modulators, c.bpm)
         applyModulation(comp!, c, modValues, inputsForShader, st.modBypass)
+        perfMeter.end('modulation')
         // 2a½. Meta-knob glides/drags : in-flight positions fan out to their
         //      destinations engine-side (zero store writes per frame; the
         //      final value commits to the store on settle).
@@ -1180,16 +1184,18 @@ export default function App(): JSX.Element {
         // so the output mirrors that too (else only the pre-sequencer coupling shows).
         const outMix = seqTouchedMix ? comp!.layers.map((L) => (L ? L.sourceMix : 0.5)) : coupledMix
         // 3. Render the frame.
-        comp!.render(now - start)
+        perfMeter.begin('render'); comp!.render(now - start); perfMeter.end('render')
         // 3a. Output window : stream the just-rendered frame to it (identical
         //     mirror). Synchronous readback in lockstep with render — every
         //     frame reaches the projector, unlike the async NDI path.
         if (st.outputActive && pixelPortRef.current) {
+          perfMeter.begin('output')
           const fr = comp!.captureFrameSync(outCapRef.current)
           if (fr) {
             const buf = fr.px.slice(0, fr.w * fr.h * 4).buffer
             pixelPortRef.current.postMessage({ w: fr.w, h: fr.h, buf }, [buf])
           }
+          perfMeter.end('output')
         }
         // 3b. Animated sound (§4.4): sample a scanline of the presented frame and
         //     send it to Pandore over OSC (the drawn optical track).
@@ -1217,8 +1223,10 @@ export default function App(): JSX.Element {
           // Assemble measures its corpus on a GRID² raster, so when it's driving
           // we sample at the same resolution — the scale-dependent axes (edges,
           // texture, grain) only compare meaningfully at a matched raster.
+          perfMeter.begin('vision')
           const vs = comp!.visionSample(assembleLive ? GRID : 32)
           if (vs) visionBus.ingest(vs.grid, vs.size)
+          perfMeter.end('vision')
         }
         // 3d. Depth (2.5D) : keep the shared depth map current. Off = flat (Parallax
         //     passthrough); synth = a test bowl; estimate = the monocular model,
@@ -1242,8 +1250,10 @@ export default function App(): JSX.Element {
           // don't stall the pipeline with a 256² readback every frame.
           if (now - lastDepthSample > 85) {
             lastDepthSample = now
+            perfMeter.begin('depth')
             const df = comp!.depthFrame(256)
             if (df) depthEngine.update(df.data, df.w, df.h, now)
+            perfMeter.end('depth')
           }
           const dr = depthEngine.take()
           if (dr) {
@@ -1266,8 +1276,10 @@ export default function App(): JSX.Element {
           const lc = st.lights
           if (now - lastLightSample > 1000 / Math.max(1, Math.min(60, lc.fps || 40))) {
             lastLightSample = now
+            perfMeter.begin('lights')
             const z = comp!.captureZones(lc.cols, lc.rows)
             if (z) window.api.lightFrame(z.cols, z.rows, z.px)
+            perfMeter.end('lights')
           }
         }
         // 4. Native output window: push the exact render state so it renders
@@ -1321,7 +1333,7 @@ export default function App(): JSX.Element {
         if (st.hiveOutActive) hiveEncoder.encode(canvas, now * 1000)
         // 5b. Sonify : ship the image taps to the audio engine (~30Hz; no-op
         //     while the sound engine is off).
-        sonifyEngine.tick(comp!, now, c.bpm)
+        perfMeter.begin('sonify'); sonifyEngine.tick(comp!, now, c.bpm); perfMeter.end('sonify')
         // 6. Shader warm-up : one registry compile per frame, in the background,
         //    after launch settles. First-ever run pays the compiles here (a few
         //    seconds of background work); afterwards the GPU disk cache makes
@@ -1335,6 +1347,7 @@ export default function App(): JSX.Element {
       } catch (e) {
         console.error('[render loop]', e)
       }
+      perfMeter.frame() // roll this frame's per-section CPU timings
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
@@ -1692,6 +1705,7 @@ export default function App(): JSX.Element {
               <OscPanel />
               <AudioPanel />
               <MidiPanel />
+              <PerformancePanel />
             </>
           ) : (
             <>
