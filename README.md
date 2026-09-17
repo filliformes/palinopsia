@@ -524,17 +524,19 @@ it works offline and in kiosk.
 · **Pose** (33-point whole body) · **Face** (ARKit blendshapes: jaw, smile, brow,
 blink, pucker + head yaw/pitch/roll) · **Silhouette** (the pose segmentation mask
 reduced to a 3×3 zone grid; heavier) · **Mirror** (selfie view) · **sensitivity**
-(how easily gestures fire) · **hold time** (how long a held pose must last) · **OSC
-out**. The camera picker sits in the page header.
+(how easily gestures fire, a global default that any single gesture can override) ·
+**hold time** (how long a held pose must last) · **OSC out**. The camera picker sits
+in the page header.
 
 **Features → modulators.** Every tracked quantity is a normalised 0..1 **feature** on
 the body bus: hand height / horizontal / openness, hands-apart (the accordion), body
 lean / sway / motion-energy / arm-span / stance / weight, the face blendshapes and
 head pose, and (with Silhouette on) each of the nine **zone coverages** `zoneTL…zoneBR`
-plus whole-frame `bodyCover`. The **Feature monitor** shows them live; its **→** routes
-one into the first free modulator slot as a `body` modulator, ready to bind to any
-parameter with a param's **M** button (exactly like an LFO). So a raised hand can open
-a filter, or the body's motion drive feedback, continuously.
+plus whole-frame `bodyCover`. The **Feature monitor** shows them live, grouped and
+colour-coded by body region (Hands · Pose · Face · Silhouette · Presence); its **→**
+routes one into the first free modulator slot as a `body` modulator, ready to bind to
+any parameter with a param's **M** button (exactly like an LFO). So a raised hand can
+open a filter, or the body's motion drive feedback, continuously.
 
 **Gestures → actions (the rule builder).** The **Create actions** panel authors rules:
 **one gesture, or two combined**, fires an action and/or an OSC bang. Combos trigger
@@ -548,7 +550,9 @@ per-layer), the transport (Vary, Flush, Freeze, Record, Tap, sequencer, Sonify-s
 voices, and session New / Load / Open. Leave a rule's **name** blank and it auto-labels
 itself ("hands up randomizes modulators"); leave its **OSC** name blank and it defaults
 to a truncated `/body/HandsUpRndMod`. With **OSC out** on, a firing rule also sends its
-`/body/<name>` bang to the OSC-out target, so the body plays the sound side too.
+`/body/<name>` bang to the OSC-out target, so the body plays the sound side too. A
+**single-gesture** rule carries its own **sensitivity** slider (double-click resets it
+to the global), so one gesture can be tuned to fire eagerly or reluctantly on its own.
 
 The gesture vocabulary spans **hands** (pinch L/R, clap, cross), **pose** (hands-up,
 lean L/R, crouch, jump, arms-cross, T-pose, single-hand raise L/R), **face** (mouth-pop,
