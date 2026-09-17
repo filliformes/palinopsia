@@ -4,7 +4,7 @@
 // know which randomize you're about to play. Every draw comes from curated
 // aesthetic ranges (brief) : the taste layer, not raw min/max.
 //
-// Layout : BPM · SPD · MORPH · PROX · Output ── Seq · Sonify · Vary+amt ·
+// Layout : BPM · SPD · MORPH · PROX · Output ── Body · Seq · Sonify · Vary+amt ·
 // Randomize. All command buttons share ONE look (sans, semibold) : no more
 // mono-caps zoo. The World section lives in the TOP bar now.
 
@@ -89,6 +89,8 @@ export function Transport(): JSX.Element {
   const sonifyPageOpen = useStore((s) => s.sonifyPageOpen)
   const setSonifyPageOpen = useStore((s) => s.setSonifyPageOpen)
   const setOutputPageOpen = useStore((s) => s.setOutputPageOpen)
+  const setBodyPageOpen = useStore((s) => s.setBodyPageOpen)
+  const bodyOn = useStore((s) => s.bodyControl.enabled)
   const proximity = useStore((s) => s.proximity)
   const setProximity = useStore((s) => s.setProximity)
   const proximityAudio = useStore((s) => s.proximityAudio)
@@ -299,7 +301,7 @@ export function Transport(): JSX.Element {
         </button>
       </span>
 
-      {/* Command group, pushed right : Output · Seq · Sonify · Vary · Randomize. */}
+      {/* Command group, pushed right : Output · Body · Seq · Sonify · Vary · Randomize. */}
       <div className="ml-auto flex min-w-0 items-center gap-1.5">
         {/* Output : fullscreen / mapping / record / senders (also O). */}
         <button
@@ -308,6 +310,15 @@ export function Transport(): JSX.Element {
           title="Output & projection mapping : fullscreen output, keystone, record, NDI/Spout/HIVE (O)"
         >
           ⛶ Output
+        </button>
+        {/* Body : embodied control (MediaPipe Hands + Pose + Face). Lights while
+            the camera is live (a privacy tell) (also B). */}
+        <button
+          onClick={() => setBodyPageOpen(true)}
+          className={`${TBTN} ${bodyOn ? TBTN_LIT : TBTN_IDLE}`}
+          title="Open Body, embodied control : camera gestures drive actions and OSC (B). Lights while the camera is live."
+        >
+          {bodyOn ? '◉ Body' : 'Body'}
         </button>
         <span className="relative flex shrink-0">
           <MidiLearnOverlay id="fire:seq" />
