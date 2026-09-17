@@ -33,11 +33,11 @@ const CPU_ROWS: Array<{ key: string; label: string }> = [
 interface SlotLike { kind: string; shaderId: string | null }
 interface LayerLike { sourceA: SlotLike; sourceB: SlotLike | null; feedback: boolean; fx: unknown[] }
 
+// Always returns the SAME groups in the SAME order (0 bytes when absent), so the
+// panel never reflows as sources/feedback come and go — only the values move.
 function estimateVram(renderPx: number, layers: LayerLike[], hands: boolean, pose: boolean, face: boolean): Array<{ name: string; bytes: number }> {
   const rgba8 = renderPx * 4, rgba16 = renderPx * 8
   const NOMINAL = 1920 * 1080 * 4 // an unmeasured source texture's rough footprint
-  const groups: Array<{ name: string; bytes: number }> = []
-  groups.push({ name: 'Composition core', bytes: 6 * rgba8 }) // base ping-pong + present + bg + master
   let layerBytes = 0, fbBytes = 0, srcBytes = 0, collage = 0
   for (const L of layers) {
     if (!L) continue
@@ -52,13 +52,15 @@ function estimateVram(renderPx: number, layers: LayerLike[], hands: boolean, pos
       else if (slot.kind === 'generator' && slot.shaderId === 'gen-collage') collage += 8 * NOMINAL // a decoded pool
     }
   }
-  groups.push({ name: 'Layer buffers', bytes: layerBytes })
-  if (fbBytes) groups.push({ name: 'Feedback buffers', bytes: fbBytes })
-  if (srcBytes) groups.push({ name: 'Source textures', bytes: srcBytes })
-  if (collage) groups.push({ name: 'Collage pool', bytes: collage })
   const nT = (hands ? 1 : 0) + (pose ? 1 : 0) + (face ? 1 : 0)
-  if (nT) groups.push({ name: 'Embodied (MediaPipe)', bytes: (20 + 15 * nT) * MB })
-  return groups
+  return [
+    { name: 'Composition core', bytes: 6 * rgba8 }, // base ping-pong + present + bg + master
+    { name: 'Layer buffers', bytes: layerBytes },
+    { name: 'Feedback buffers', bytes: fbBytes },
+    { name: 'Source textures', bytes: srcBytes },
+    { name: 'Collage pool', bytes: collage },
+    { name: 'Embodied (MediaPipe)', bytes: nT ? (20 + 15 * nT) * MB : 0 }
+  ]
 }
 
 function Bar({ frac, danger }: { frac: number; danger?: boolean }): JSX.Element {
@@ -154,7 +156,7 @@ export function PerformancePanel(): JSX.Element {
             </div>
             {CPU_ROWS.map((r) => {
               const ms = cpu[r.key] ?? 0
-              if (ms < 0.02) return null
+              // Always rendered (fixed layout : idle rows show 0.00, never vanish).
               return (
                 <div key={r.key} className="flex items-center gap-1.5">
                   <span className="w-32 shrink-0 truncate font-mono text-[9px] text-muted" title={r.label}>{r.label}</span>
@@ -181,22 +183,23 @@ export function PerformancePanel(): JSX.Element {
           </div>
 
           {/* Active subsystems. */}
+          {/* Fixed chip set : every chip always rendered (greyed when off), so the
+              grid never reflows — only the highlight state changes. */}
           <div className="flex flex-wrap gap-1 pt-0.5">
             {layers.map((L, i) => chip(Boolean(L && ((L.sourceA?.kind && L.sourceA.kind !== 'none') || (L.sourceB?.kind && L.sourceB.kind !== 'none'))), `L${i + 1}${L?.feedback ? '↺' : ''}`))}
-            {nFeedback > 0 && chip(true, `${nFeedback} feedback`)}
-            {srcCount('video') > 0 && chip(true, `${srcCount('video')} video`)}
-            {collageCount > 0 && chip(true, `${collageCount} collage`)}
-            {srcCount('capture') > 0 && chip(true, `${srcCount('capture')} capture`)}
-            {srcCount('hive') > 0 && chip(true, 'HIVE in')
-            }
-            {fxCount > 0 && chip(true, `${fxCount} master FX`)}
+            {chip(nFeedback > 0, `feedback ${nFeedback}`)}
+            {chip(srcCount('video') > 0, `video ${srcCount('video')}`)}
+            {chip(collageCount > 0, `collage ${collageCount}`)}
+            {chip(srcCount('capture') > 0, `capture ${srcCount('capture')}`)}
+            {chip(srcCount('hive') > 0, 'HIVE in')}
+            {chip(fxCount > 0, `master FX ${fxCount}`)}
             {chip(depthMode !== 'off', 'depth')}
             {chip(surfaceActive, 'metasurface')}
             {chip(ndi, 'NDI')}
             {chip(spout, 'Spout')}
             {chip(hiveOut, 'HIVE out')}
             {chip(lights.enabled, 'lights')}
-            {chip(sonify.on, `Sonify ${soniVoices || 0}v`)}
+            {chip(sonify.on, `Sonify ${soniVoices}v`)}
             {chip(audioEnabled, 'audio')}
             {chip(audioMonitor, 'monitor')}
             {chip(audioDenoise, 'denoise')}
