@@ -55,7 +55,7 @@ racks, palette, World and macro biases : in one click.
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
 - [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix)
 - [Sequencer](#sequencer-key-q) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
-- [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) · [MIDI](#midi) · [Output & mapping](#output--mapping-key-o) : incl. Flash safety
+- [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) · [MIDI](#midi) · [Body : embodied control](#body--embodied-control-key-b) · [Output & mapping](#output--mapping-key-o) : incl. Flash safety
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) : eight voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Chord) · quantizer · audio in recordings
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
@@ -145,6 +145,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `W` | World editor |
 | `Q` | Sequence page |
 | `S` | **Sonify** page (image-to-sound engine) |
+| `B` | **Body** page : embodied control (a camera → gestures + modulators) |
 | `E` | Right column → **assemble** (the automatic editor) |
 | `A` | Right column → **osc/audio/midi** setup tab |
 | `D` / `X` / `I` | Collapse Modulation / Master-FX / Inspector |
@@ -153,7 +154,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `L` | **MIDI Learn** on/off : from any tab or full-page view |
 | `?` | Keyboard **cheat-sheet** : this table, in-app (Esc closes) |
 | `0` | **Panic flush** : clear every self-feeding buffer (feedback / trails / rings / accumulators) at once |
-| `Esc` | Close the cheat-sheet, then MIDI Learn; otherwise close World / Sonify / Output / Sequence |
+| `Esc` | Close the cheat-sheet, then MIDI Learn; otherwise close World / Sonify / Body / Output / Sequence |
 | `Ctrl/Cmd+Z` · `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` | Undo · Redo (100 levels) |
 | `Ctrl/Cmd+S` | Save session |
 | `Ctrl/Cmd` `+` / `-` / `0` · `Ctrl`+wheel | UI zoom in / out / reset |
@@ -264,9 +265,10 @@ Left → right:
   (0–30 s : scene recalls and Randomize crossfade over this).
 - **WRLD** World selector + `⧉` World editor · **❄ Freeze** : hold the output on
   the current frame (the button lights while held; also key `H` or a learned pad) ·
-  **Output** (opens the Output / mapping page) · **Seq** (opens the sequencer;
-  lights when running) · **Sfy** (opens Sonify; lights while the sound engine
-  runs) · **PROX** proximity (far ↔ close depth zone) + `◑` audio-brightness
+  **Output** (opens the Output / mapping page) · **Body** (opens the embodied-control
+  page; lights while the camera is live; also key `B`) · **Seq** (opens the
+  sequencer; lights when running) · **Sfy** (opens Sonify; lights while the sound
+  engine runs) · **PROX** proximity (far ↔ close depth zone) + `◑` audio-brightness
   follow.
 - **Vary** (a baseline-anchored variant : structure fixed, values nudged) + amount.
 - **amt** Randomize intensity (gentle walk ↔ full re-roll) · **Randomize**
@@ -332,8 +334,8 @@ gesture, so gliding a knob costs nothing.
 
 Eight modulator slots, each of a chosen **type** : `lfo` (7 shapes) · `ramp` ·
 `adsr` · `arp` · `random` · `s&h` · `slew` · `chaos` · `audio` (follower) ·
-`organic` · `physics` · `motion` · `vision` · `homeostat` · `euclid` · `turing` ·
-`cellular` (the modulator types are dropdown-listed alphabetically), with a clock
+`organic` · `physics` · `motion` · `vision` · `body` · `homeostat` · `euclid` ·
+`turing` · `cellular` (the modulator types are dropdown-listed alphabetically), with a clock
 (free Hz or BPM division), type-specific params, a live meter, and retrigger. Slot 8
 (`⊛`) is reserved for the active World's audio routing and is skipped by Randomize.
 
@@ -351,11 +353,23 @@ stepped family and take **SLIP** like the rest:
 
 Two of the types close the loop **from the image back to control**:
 
-- **`vision`** follows a feature of the *rendered output* (brightness, motion,
-  edges…) : the picture modulates itself.
+- **`vision`** follows a feature of the *rendered output* (brightness, contrast,
+  motion, edges, entropy, bright-mass X/Y, warmth, **saturation**, **hue**, depth) :
+  the picture modulates itself. The colour features make the crossmodal table
+  playable : bind the picture's **hue** or **saturation** to a Sonify parameter and
+  the *colour drives the sound*, the inverse of Sonify's image-to-sound path.
 - **`homeostat`** is a self-regulating controller: it watches an image feature
   and *steers its target* to hold a setpoint (gain + adaptation), an
   Ashby-style homeostat that keeps a quality of the image in balance.
+
+One type follows the **live performer** instead of the picture:
+
+- **`body`** follows a feature off the [Body page's](#body--embodied-control-key-b)
+  webcam (a hand's height / openness, body lean / motion, a face blendshape, head
+  pose, or a silhouette zone's coverage) : the room in the frame plays the
+  instrument. The `audio` follower also gained a **`noisiness`** feature (spectral
+  flatness) : bind a sound's noise to a layer's tint saturation and the *sound
+  colours the picture* (the other direction of the same crossmodal table).
 
 **SLIP** (on `arp`, `random`, `chaos`, and the LFO's stepped shapes) makes a
 stepped modulator's rhythm impossible to feel. The clock keeps ticking, but some
@@ -405,7 +419,10 @@ each knob its curve, MIDI CC and destination count.*
 ## Sequencer (key `Q`)
 
 An auto-pilot over the scene bank. Each scene carries relation tags : **Diégèse**
-(world) · **Synchrèse** (coupling) · **Espace-temps** · **Climat**. The sequencer
+(world) · **Synchrèse** (coupling) · **Espace-temps** · **Climat** (set in the tag
+editor : click a scene card ; **Climat** also takes a **◔ from picture** suggestion
+that reads the live composite's palette : warm + saturated → tension / expectation,
+cool + muted → release / resolution). The sequencer
 does weighted / arc / shuffle selection with a no-repeat window, morph/cut/auto
 transitions, and subtle no-exact-repeat variation; overlays **Breathe**
 (dense↔void) and a **Climate arc** (repose–disturbance–repose); adds **cadence /
@@ -491,6 +508,61 @@ doesn't travel with sessions). The **MIDI** section of the osc/audio/midi tab
 is handled), a **live-activity readout** (last message + how many controls are
 wired, so you can confirm the port is really talking), and the full bindings
 ledger with per-row clear.
+
+## Body : embodied control (key `B`)
+
+A full-page takeover that turns a **webcam of the performer** into control:
+MediaPipe **Hands + Pose + Face + Silhouette** read the body into a live bus,
+feeding continuous **modulators** and discrete **gestures**. A camera is strictly
+**opt-in**: nothing opens until you press **Enable**, and a pulsing red pip (top
+bar, and the lit toolbar **Body** button) is the privacy tell while it runs. The
+tracker uses a dedicated low-res capture, independent of any webcam layer, on its
+own loop off the render critical path; the MediaPipe models ship inside the app, so
+it works offline and in kiosk.
+
+**Capture bar** (one distributed line): **Hands** (21 landmarks per hand, up to two)
+· **Pose** (33-point whole body) · **Face** (ARKit blendshapes: jaw, smile, brow,
+blink, pucker + head yaw/pitch/roll) · **Silhouette** (the pose segmentation mask
+reduced to a 3×3 zone grid; heavier) · **Mirror** (selfie view) · **sensitivity**
+(how easily gestures fire) · **hold time** (how long a held pose must last) · **OSC
+out**. The camera picker sits in the page header.
+
+**Features → modulators.** Every tracked quantity is a normalised 0..1 **feature** on
+the body bus: hand height / horizontal / openness, hands-apart (the accordion), body
+lean / sway / motion-energy / arm-span / stance / weight, the face blendshapes and
+head pose, and (with Silhouette on) each of the nine **zone coverages** `zoneTL…zoneBR`
+plus whole-frame `bodyCover`. The **Feature monitor** shows them live; its **→** routes
+one into the first free modulator slot as a `body` modulator, ready to bind to any
+parameter with a param's **M** button (exactly like an LFO). So a raised hand can open
+a filter, or the body's motion drive feedback, continuously.
+
+**Gestures → actions (the rule builder).** The **Create actions** panel authors rules:
+**one gesture, or two combined**, fires an action and/or an OSC bang. Combos trigger
+when both land close **together** (`+`) or **in order** (`→`); an **exclusive** combo
+swallows its component gestures' own singles (a chord that doesn't also play its
+notes). Every action is drawn from the **shared trigger vocabulary** (identical to
+MIDI Learn and the keyboard): the Randomize scopes (everything / sources / source-FX /
+layer-FX / modulators / finishing / background / master / meta / inspector / Sonify /
+per-layer), the transport (Vary, Flush, Freeze, Record, Tap, sequencer, Sonify-seq,
+**Undo / Redo**), Master-FX on/off, scenes (next / prev / a numbered slot), Sonify
+voices, and session New / Load / Open. Leave a rule's **name** blank and it auto-labels
+itself ("hands up randomizes modulators"); leave its **OSC** name blank and it defaults
+to a truncated `/body/HandsUpRndMod`. With **OSC out** on, a firing rule also sends its
+`/body/<name>` bang to the OSC-out target, so the body plays the sound side too.
+
+The gesture vocabulary spans **hands** (pinch L/R, clap, cross), **pose** (hands-up,
+lean L/R, crouch, jump, arms-cross, T-pose, single-hand raise L/R), **face** (mouth-pop,
+brow-raise, wink L/R, smile, frown, brow-furrow, squint, cheek-puff, kiss, jaw / mouth
+L/R, tongue-out, blink, head turn / nod / tilt), **holds** (a sustained pose that fires
+once after the hold time: hands-up, pinch L/R, arms-wide, mouth-open), and the
+**silhouette zones** (`cover TL…BR`: your shadow covering one of the nine screen
+regions past a threshold). A live **⚡ recognised** pill in the panel header names the
+last gesture the tracker saw.
+
+**Silhouette** is the shadow-theatre control: the pose segmentation mask is reduced to
+a 3×3 coverage grid drawn over the camera preview, each cell lighting up as your shadow
+fills it. Cover a region to fire its `cover …` rule, or bind a zone's continuous
+coverage to a modulator: screen-space control that reads clearly to an audience.
 
 ## Output & mapping (key `O`)
 
@@ -1137,6 +1209,11 @@ at frame rate; it's advertised for discovery but never echoed).
 Behaviour: a diff loop on a `max(40, interval)` ms timer; a leaf is sent only when it
 moves by ≥ `0.0015`; a first-pass burst cap (~97 leaves/tick) spreads the initial
 sync over subsequent ticks; a full resend on (re)start.
+
+Separately, the [Body page](#body--embodied-control-key-b) emits its own bangs: with
+its **OSC out** on, each time a gesture rule fires it sends a `/body/<name>` message
+(value `1`) to the same OSC-out target, so an embodied gesture can play the sound side
+in Pandore.
 
 ### OSCQuery
 
