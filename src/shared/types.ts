@@ -261,7 +261,9 @@ export type ModulatorType =
   | 'cellular'
 
 // Which audio feature an `audio` modulator follows (bus in engine/audioIn.ts).
-export type AudioFeature = 'level' | 'flux' | 'transient' | 'centroid' | 'band' | 'pitch'
+// `noisiness` (spectral flatness) is the crossmodal partner of image saturation :
+// bind sound noisiness → a layer's tint saturation to make the sound colour the picture.
+export type AudioFeature = 'level' | 'flux' | 'transient' | 'centroid' | 'band' | 'pitch' | 'noisiness'
 
 // Which picture feature a `vision` modulator follows (bus in engine/visionIn.ts) :
 // the RETURN PATH — the composited image drives control.
@@ -274,6 +276,8 @@ export type VisionFeature =
   | 'centroidX'
   | 'centroidY'
   | 'warmth'
+  | 'saturation' // colourfulness : 0 grey, 1 vivid (crossmodal partner of sound noisiness/timbre)
+  | 'hue' // dominant hue angle 0..1 around the wheel (red→yellow→green→cyan→blue→magenta)
   | 'depth'
   | 'depthSpread'
 
@@ -310,6 +314,13 @@ export type BodyFeature =
   | 'faceHeadYaw' // head turn : 0 left, 0.5 centred, 1 right
   | 'faceHeadPitch' // head nod : 0 down, 0.5 level, 1 up
   | 'faceHeadRoll' // head tilt : 0 left, 0.5 level, 1 right
+  // Silhouette (PoseLandmarker segmentation mask : how much of each screen zone the
+  // body fills, 0 empty .. 1 filled). A 3×3 grid + a whole-frame coverage. The
+  // shadow-theatre control : cover a region to drive a param or fire a rule.
+  | 'zoneTL' | 'zoneTC' | 'zoneTR'
+  | 'zoneML' | 'zoneMC' | 'zoneMR'
+  | 'zoneBL' | 'zoneBC' | 'zoneBR'
+  | 'bodyCover' // whole-frame silhouette coverage 0..1
   // Presence gates (smoothed 0..1)
   | 'bodyPresent'
   | 'handsPresent'
@@ -320,6 +331,7 @@ export const BODY_FEATURES: BodyFeature[] = [
   'bodyMotion', 'bodyLean', 'bodySway', 'armSpan', 'bodyHeight', 'handsUp', 'weightLR',
   'faceJawOpen', 'faceSmile', 'faceBrowUp', 'faceBlink', 'faceMouthPucker',
   'faceHeadYaw', 'faceHeadPitch', 'faceHeadRoll',
+  'zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR', 'bodyCover',
   'bodyPresent', 'handsPresent', 'facePresent'
 ]
 
@@ -339,6 +351,12 @@ export type BodyGesture =
   // Hold-duration triggers : a sustained pose fires ONCE after being held for
   // `holdMs`, then re-arms when released. Not onsets — a deliberate, held move.
   | 'holdHandsUp' | 'holdPinchLeft' | 'holdPinchRight' | 'holdArmsWide' | 'holdMouthOpen'
+  // Zone occlusion (silhouette) : the body's shadow covers one of the 3×3 screen
+  // zones past a threshold. A screen-space, shadow-theatre trigger (needs the
+  // Silhouette toggle, which runs the pose segmentation mask).
+  | 'coverTL' | 'coverTC' | 'coverTR'
+  | 'coverML' | 'coverMC' | 'coverMR'
+  | 'coverBL' | 'coverBC' | 'coverBR'
 export const BODY_GESTURES: BodyGesture[] = [
   'pinchLeft', 'pinchRight', 'clap', 'cross',
   'handsUp', 'leanLeft', 'leanRight', 'crouch', 'jump', 'armsCross', 'tPose', 'raiseLeft', 'raiseRight',
@@ -346,7 +364,8 @@ export const BODY_GESTURES: BodyGesture[] = [
   'smile', 'frown', 'browFurrow', 'squint', 'cheekPuff', 'kiss',
   'jawLeft', 'jawRight', 'mouthLeft', 'mouthRight', 'tongueOut', 'blinkBoth',
   'headLeft', 'headRight', 'headUp', 'headDown', 'tiltLeft', 'tiltRight',
-  'holdHandsUp', 'holdPinchLeft', 'holdPinchRight', 'holdArmsWide', 'holdMouthOpen'
+  'holdHandsUp', 'holdPinchLeft', 'holdPinchRight', 'holdArmsWide', 'holdMouthOpen',
+  'coverTL', 'coverTC', 'coverTR', 'coverML', 'coverMC', 'coverMR', 'coverBL', 'coverBC', 'coverBR'
 ]
 
 // What a gesture fires : one of the shared discrete-trigger action ids (the same
@@ -388,11 +407,12 @@ export interface BodyControlConfig {
   hands: boolean // run the HandLandmarker
   pose: boolean // run the PoseLandmarker
   face: boolean // run the FaceLandmarker (blendshapes + head pose)
+  silhouette: boolean // run the pose segmentation mask → 3×3 zone coverage features + occlusion gestures (needs pose; heavier)
   mirror: boolean // flip X so moving right moves the value right (selfie view)
   sensitivity: number // 0..1 : global gain on gesture thresholds (higher = easier)
   holdMs: number // how long a pose must be held for a hold-* gesture to fire (ms)
   oscOut: boolean // when a rule fires, also send /body/<its osc name> over OSC
-  gestures: Record<BodyGesture, GestureAction> // legacy per-gesture map (unused : all routing is rules now; kept for stored configs)
+  gestures: Partial<Record<BodyGesture, GestureAction>> // legacy per-gesture map (unused : all routing is rules now; kept for stored configs)
   rules: GestureRule[] // user-authored rules (single + combo) from the rule builder
 }
 

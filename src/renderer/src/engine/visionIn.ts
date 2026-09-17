@@ -22,6 +22,8 @@ export type VisionFeatureName =
   | 'centroidX' // horizontal centre of the bright mass 0..1
   | 'centroidY' // vertical centre of the bright mass 0..1 (0 = top)
   | 'warmth' // red↔blue balance : 0 cool, 1 warm
+  | 'saturation' // mean HSV colourfulness : 0 grey, 1 vivid
+  | 'hue' // dominant hue (chroma-weighted mean angle) 0..1 : red→yellow→green→cyan→blue→magenta
   | 'depth' // mean scene depth (Depth engine) : 0 far, 1 near
   | 'depthSpread' // near↔far range in frame (depth relief / flatness) 0..1
 
@@ -34,6 +36,8 @@ export const VISION_FEATURES: VisionFeatureName[] = [
   'centroidX',
   'centroidY',
   'warmth',
+  'saturation',
+  'hue',
   'depth',
   'depthSpread'
 ]
@@ -50,6 +54,8 @@ class VisionBus {
     centroidX: 0.5,
     centroidY: 0.5,
     warmth: 0.5,
+    saturation: 0,
+    hue: 0,
     depth: 0.5,
     depthSpread: 0
   }
@@ -76,6 +82,7 @@ class VisionBus {
     const gray = this.gray
     const prev = this.prev as Float32Array
     let sum = 0, cx = 0, cy = 0, wsum = 0, min = 1, max = 0, rSum = 0, bSum = 0
+    let satSum = 0, hx = 0, hy = 0 // colourfulness + chroma-weighted hue vector
     const hist = new Array(16).fill(0)
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
@@ -89,6 +96,18 @@ class VisionBus {
         if (lum < min) min = lum
         if (lum > max) max = lum
         rSum += r; bSum += b
+        // HSV chroma → mean saturation + a chroma-weighted hue vector (averaging
+        // hue directly is meaningless because it wraps ; sum unit vectors instead).
+        const cMax = r > g ? (r > b ? r : b) : (g > b ? g : b)
+        const cMin = r < g ? (r < b ? r : b) : (g < b ? g : b)
+        const chroma = cMax - cMin
+        satSum += cMax > 1e-4 ? chroma / cMax : 0
+        if (chroma > 1e-4) {
+          const hh = cMax === r ? (((g - b) / chroma + 6) % 6) : cMax === g ? ((b - r) / chroma + 2) : ((r - g) / chroma + 4)
+          const ang = hh * (Math.PI / 3)
+          hx += chroma * Math.cos(ang)
+          hy += chroma * Math.sin(ang)
+        }
         hist[Math.min(15, (lum * 16) | 0)]++
       }
     }
@@ -128,6 +147,8 @@ class VisionBus {
     this.f.centroidX = clamp01(cX)
     this.f.centroidY = clamp01(cY)
     this.f.warmth = clamp01(0.5 + (rSum - bSum) / n)
+    this.f.saturation = clamp01((satSum / n) * 1.4)
+    this.f.hue = (hx !== 0 || hy !== 0) ? ((Math.atan2(hy, hx) / (2 * Math.PI)) + 1) % 1 : 0
     this.ready = true
 
     // Corpus-compatible reading of the same grid, on the same code path the

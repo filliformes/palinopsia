@@ -7,7 +7,7 @@
 // depth ≤ .5) so a World can never crush/blow the output. Built-ins ship here;
 // user worlds live in the store (persisted to localStorage).
 
-import type { CompositionState, CouplingMode, SceneEntry, SceneTags, World } from '@shared/types'
+import type { CompositionState, CouplingMode, SceneClimate, SceneEntry, SceneTags, World } from '@shared/types'
 import { MAX_MOD_ASSIGNMENTS, WORLD_AUTOMOD_SLOT } from '@shared/types'
 import { makeDefaultModulator } from './engine/modulation'
 
@@ -38,6 +38,16 @@ export function deriveSceneTags(scene: SceneEntry): SceneTags {
     spaceTime,
     climate: 'release'
   }
+}
+
+/** Suggest a Climat from a picture's palette (crossmodal colour→affect, after the
+ *  colour-psychology results distilled in the NIME reading : warm+saturated reads
+ *  aroused/unresolved, cool+muted reads eased, cool+bright+calm reads settled).
+ *  warmth 0 cool..1 warm, saturation 0 grey..1 vivid, brightness 0 dark..1 light. */
+export function climateFromColour(warmth: number, saturation: number, brightness: number): SceneClimate {
+  if (saturation < 0.22) return 'release' // muted / grey : easing off, neutral
+  if (warmth > 0.55) return brightness < 0.5 ? 'tension' : 'expectation' // warm+dark tense, warm+bright anticipating
+  return brightness > 0.5 ? 'resolution' : 'release' // cool+bright settled, cool+dark eased
 }
 
 const uid = (): string =>

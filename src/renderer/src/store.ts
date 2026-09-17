@@ -2802,7 +2802,7 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
   bodyControl: (() => {
     const def: BodyControlConfig = {
-      enabled: false, deviceId: null, hands: true, pose: true, face: false, mirror: true,
+      enabled: false, deviceId: null, hands: true, pose: true, face: false, silhouette: false, mirror: true,
       sensitivity: 0.5, holdMs: 1200, oscOut: false,
       // Actions are shared trigger ids (engine/midi.ts). Face + hold gestures
       // default to unbound : blink / brow move involuntarily, and holds are

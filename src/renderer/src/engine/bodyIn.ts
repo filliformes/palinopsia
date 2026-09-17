@@ -24,6 +24,7 @@ const REST: Record<BodyFeature, number> = {
   bodyMotion: 0, bodyLean: 0.5, bodySway: 0.5, armSpan: 0, bodyHeight: 0.5, handsUp: 0, weightLR: 0.5,
   faceJawOpen: 0, faceSmile: 0, faceBrowUp: 0, faceBlink: 0, faceMouthPucker: 0,
   faceHeadYaw: 0.5, faceHeadPitch: 0.5, faceHeadRoll: 0.5,
+  zoneTL: 0, zoneTC: 0, zoneTR: 0, zoneML: 0, zoneMC: 0, zoneMR: 0, zoneBL: 0, zoneBC: 0, zoneBR: 0, bodyCover: 0,
   bodyPresent: 0, handsPresent: 0, facePresent: 0
 }
 

@@ -19,6 +19,8 @@ import {
   sequencerSkip
 } from '../engine/sequencer'
 import { frameWeaveActiveCell } from '../engine/frameWeave'
+import { climateFromColour } from '../worlds'
+import { showToast } from './Toast'
 
 const SYNCHRESIS: CouplingMode[] = ['lean', 'hocket', 'cut', 'gate', 'drift']
 const SYNCHRESIS_INFO: Record<string, string> = {
@@ -71,6 +73,31 @@ export function SequencePage({
 
   const selScene = scenes.find((s) => s.id === sel) ?? null
   const worldName = (id: string): string => worlds.find((w) => w.id === id)?.name ?? id
+
+  // Suggest a Climat tag from the live composite's palette. Samples the WebGL
+  // canvas directly (it keeps its drawing buffer), so it works regardless of
+  // whether a vision modulator happens to be running.
+  const suggestClimate = (): void => {
+    const cv = canvasRef.current
+    if (!cv || !selScene) return
+    try {
+      const s = document.createElement('canvas'); s.width = 32; s.height = 32
+      const g2 = s.getContext('2d'); if (!g2) return
+      g2.drawImage(cv, 0, 0, 32, 32)
+      const d = g2.getImageData(0, 0, 32, 32).data
+      let rS = 0, gS = 0, bS = 0
+      const n = 32 * 32
+      for (let i = 0; i < d.length; i += 4) { rS += d[i]; gS += d[i + 1]; bS += d[i + 2] }
+      rS /= 255 * n; gS /= 255 * n; bS /= 255 * n
+      const mx = Math.max(rS, gS, bS), mn = Math.min(rS, gS, bS)
+      const brightness = rS * 0.299 + gS * 0.587 + bS * 0.114
+      const saturation = mx > 1e-4 ? (mx - mn) / mx : 0
+      const warmth = Math.max(0, Math.min(1, 0.5 + (rS - bS)))
+      const cl = climateFromColour(warmth, saturation, brightness)
+      setSceneTags(selScene.id, { climate: cl })
+      showToast(`Climat → ${cl} · from the picture (warmth ${(warmth * 100) | 0}% · sat ${(saturation * 100) | 0}%)`)
+    } catch { showToast('Could not read the picture for a Climat suggestion', 'warn') }
+  }
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-bg">
@@ -289,6 +316,13 @@ export function SequencePage({
                       </button>
                     )
                   })}
+                  <button
+                    onClick={suggestClimate}
+                    className="ml-1 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-accent2 hover:border-accent hover:text-accent"
+                    title="Suggest a Climat from the live picture's palette (warm+saturated → tension/expectation, cool+muted → release/resolution). Reads the composite on screen now."
+                  >
+                    ◔ from picture
+                  </button>
                 </div>
               </Field>
             </div>

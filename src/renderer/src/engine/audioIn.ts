@@ -21,14 +21,15 @@ export const AUDIO_BANDS = BANDS
 // analysing the input's noise (mains-hum combs, digital-clock combs, HF whine).
 export interface NoiseNotch { f: number; q: number }
 
-export type AudioFeatureName = 'level' | 'flux' | 'transient' | 'centroid' | 'band' | 'pitch'
+export type AudioFeatureName = 'level' | 'flux' | 'transient' | 'centroid' | 'band' | 'pitch' | 'noisiness'
 export const AUDIO_FEATURES: AudioFeatureName[] = [
   'level',
   'flux',
   'transient',
   'centroid',
   'band',
-  'pitch'
+  'pitch',
+  'noisiness'
 ]
 
 export type AudioMode = 'off' | 'osc' | 'local' | 'both'
@@ -40,10 +41,11 @@ interface Features {
   centroid: number // spectral brightness 0..1
   bands: number[] // BANDS log-spaced band energies 0..1
   pitch: number // 0..1 (OSC-supplied; local leaves 0 for now)
+  noisiness: number // spectral flatness 0..1 : 0 tonal / pitched, 1 noise-like (hiss, breath)
 }
 
 function zero(): Features {
-  return { level: 0, flux: 0, transient: 0, centroid: 0, bands: new Array(BANDS).fill(0), pitch: 0 }
+  return { level: 0, flux: 0, transient: 0, centroid: 0, bands: new Array(BANDS).fill(0), pitch: 0, noisiness: 0 }
 }
 
 const OSC_STALE_MS = 500 // in 'both', OSC older than this yields to local
@@ -448,6 +450,18 @@ class AudioBus {
       den += m
     }
     L.centroid = den > 0 ? Math.min(1, (num / den / N) * 2) : 0
+    // noisiness : spectral flatness (geometric mean / arithmetic mean of the
+    // magnitude spectrum). ~0 for a pitched tone, ~1 for broadband hiss. Gated by
+    // level so silence reads 0 (empty bins would otherwise flatten to ~1).
+    let logSum = 0, linSum = 0
+    for (let i = 1; i < N; i++) {
+      const m = freq[i] / 255 + 1e-6
+      logSum += Math.log(m)
+      linSum += m
+    }
+    const cnt = N - 1
+    const flat = linSum > 1e-6 ? Math.exp(logSum / cnt) / (linSum / cnt) : 0
+    L.noisiness = L.level > 0.02 ? Math.min(1, flat * 2) : 0
     // flux : sum of positive magnitude increases vs the previous frame.
     let flux = 0
     for (let i = 0; i < N; i++) {
@@ -503,7 +517,7 @@ class AudioBus {
               ? this.osc
               : this.local // 'both' : OSC primary, local fallback
     if (!src) {
-      c.level = c.flux = c.transient = c.centroid = c.pitch = 0
+      c.level = c.flux = c.transient = c.centroid = c.pitch = c.noisiness = 0
       c.bands.fill(0)
       return
     }
@@ -512,6 +526,7 @@ class AudioBus {
     c.transient = src.transient
     c.centroid = src.centroid
     c.pitch = src.pitch
+    c.noisiness = src.noisiness
     for (let i = 0; i < BANDS; i++) c.bands[i] = src.bands[i]
   }
 

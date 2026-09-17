@@ -9,7 +9,7 @@
 // modulation engine smooths them. Face is a planned drop-in : add a FaceLandmarker
 // beside these two and extend the feature derivation, nothing else changes.
 
-import type { NormalizedLandmark } from '@mediapipe/tasks-vision'
+import type { NormalizedLandmark, MPMask } from '@mediapipe/tasks-vision'
 import type { BodyControlConfig, BodyFeature, BodyGesture } from '@shared/types'
 import { bodyBus } from './bodyIn'
 import { perfMeter } from './perfMeter'
@@ -55,6 +55,9 @@ class BodyTracker {
   private hands: Hands | null = null
   private pose: Pose | null = null
   private face: Face | null = null
+  private poseSeg = false // whether the current pose landmarker outputs segmentation masks
+  private zoneCov = new Array<number>(9).fill(0) // 3×3 silhouette zone coverage (row-major)
+  private bodyCov = 0 // whole-frame silhouette coverage
   private raf = 0
   private lastTs = -1
   private running = false
@@ -120,9 +123,9 @@ class BodyTracker {
       // Camera changed : restart the stream on the new device.
       this.stop()
       await this.start()
-    } else if (cfg.enabled && this.running && was && (was.hands !== cfg.hands || was.pose !== cfg.pose || was.face !== cfg.face)) {
-      // Hands / Pose / Face toggled live : create or close the affected landmarker
-      // only (no camera flicker). mirror + sensitivity are read per-frame, no-op here.
+    } else if (cfg.enabled && this.running && was && (was.hands !== cfg.hands || was.pose !== cfg.pose || was.face !== cfg.face || was.silhouette !== cfg.silhouette)) {
+      // Hands / Pose / Face / Silhouette toggled live : create or close the affected
+      // landmarker only (no camera flicker). mirror + sensitivity are read per-frame.
       await this.ensureLandmarkers()
     }
   }
@@ -144,17 +147,25 @@ class BodyTracker {
       this.hands = null
       this.latestHands = []
     }
-    if (cfg.pose && !this.pose) {
-      this.pose = await vision.PoseLandmarker.createFromOptions(fileset, {
-        baseOptions: { modelAssetPath: POSE_MODEL, delegate: 'GPU' },
-        runningMode: 'VIDEO', numPoses: 1
-      }).catch(() => vision.PoseLandmarker.createFromOptions(fileset, {
-        baseOptions: { modelAssetPath: POSE_MODEL, delegate: 'CPU' }, runningMode: 'VIDEO', numPoses: 1
-      }))
-    } else if (!cfg.pose && this.pose) {
+    // Pose runs when Pose OR Silhouette is on (the silhouette rides the same
+    // landmarker with segmentation masks enabled). Recreate if the segmentation
+    // flag flips, since it is a create-time option.
+    const poseNeeded = cfg.pose || cfg.silhouette
+    const wantSeg = cfg.silhouette
+    if (poseNeeded && (!this.pose || this.poseSeg !== wantSeg)) {
+      if (this.pose) { try { this.pose.close() } catch { /* gone */ } this.pose = null }
+      const mk = (delegate: 'GPU' | 'CPU'): Promise<Pose> => vision.PoseLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: POSE_MODEL, delegate },
+        runningMode: 'VIDEO', numPoses: 1, outputSegmentationMasks: wantSeg
+      })
+      this.pose = await mk('GPU').catch(() => mk('CPU'))
+      this.poseSeg = wantSeg
+    } else if (!poseNeeded && this.pose) {
       try { this.pose.close() } catch { /* gone */ }
       this.pose = null
       this.latestPose = null
+      this.poseSeg = false
+      this.zoneCov.fill(0); this.bodyCov = 0
     }
     if (cfg.face && !this.face) {
       // Blendshapes are the control gold (jawOpen, smile, brow, blink…) : ask for
@@ -252,9 +263,14 @@ class BodyTracker {
     const mpT0 = performance.now()
     try {
       this.latestHands = this.hands ? (this.hands.detectForVideo(video, ts).landmarks ?? []) : []
-      this.latestPose = this.pose
-        ? (this.pose.detectForVideo(video, ts).landmarks?.[0] ?? null)
-        : null
+      if (this.pose) {
+        const pr = this.pose.detectForVideo(video, ts)
+        this.latestPose = pr.landmarks?.[0] ?? null
+        // Silhouette : read the segmentation mask into 3×3 zone coverage, then free it.
+        if (cfg.silhouette) this.readMaskZones(pr.segmentationMasks?.[0] ?? null, cfg.mirror)
+      } else {
+        this.latestPose = null
+      }
       if (this.face) {
         const fr = this.face.detectForVideo(video, ts)
         this.latestFace = fr.faceLandmarks?.[0] ?? null
@@ -297,6 +313,7 @@ class BodyTracker {
     if (hasHands) this.deriveHands(this.latestHands, mirror, out, cfg)
     if (hasPose) this.derivePose(this.latestPose as NormalizedLandmark[], mirror, out, cfg, ts)
     if (hasFace) this.deriveFace(this.latestFace as NormalizedLandmark[], blendshapes, mirror, out, cfg)
+    if (cfg.silhouette) this.deriveSilhouette(out, cfg)
     bodyBus.update(out)
     this.prevPose = this.latestPose
   }
@@ -529,6 +546,49 @@ class BodyTracker {
     this.edgeHys('headDown', 1 - pitch, 0.72 - s * 0.1, 0.58)
     this.edgeHys('tiltLeft', 1 - roll, 0.7 - s * 0.1, 0.58)
     this.edgeHys('tiltRight', roll, 0.7 - s * 0.1, 0.58)
+  }
+
+  // ── Silhouette → 3×3 zone coverage (segmentation mask) ─────────────────
+  // Read the pose confidence mask (0..1 person probability) into 9 zone means +
+  // a whole-frame mean, sampling on a stride grid so it stays cheap. The mask is
+  // owned by MediaPipe and MUST be closed after reading to free its GPU buffer.
+  private readMaskZones(mask: MPMask | null, mirror: boolean): void {
+    if (!mask) { this.zoneCov.fill(0); this.bodyCov = 0; return }
+    let arr: Float32Array | null = null
+    const w = mask.width, h = mask.height
+    try { arr = mask.getAsFloat32Array() } catch { arr = null }
+    try { mask.close() } catch { /* already freed */ }
+    if (!arr || !w || !h) { this.zoneCov.fill(0); this.bodyCov = 0; return }
+    const sums = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+    const counts = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+    let total = 0, n = 0
+    const stepX = Math.max(1, Math.floor(w / 96))
+    const stepY = Math.max(1, Math.floor(h / 96))
+    for (let y = 0; y < h; y += stepY) {
+      const row = y * 3 < h ? 0 : y * 3 < h * 2 ? 1 : 2
+      const base = y * w
+      for (let x = 0; x < w; x += stepX) {
+        let col = x * 3 < w ? 0 : x * 3 < w * 2 ? 1 : 2
+        if (mirror) col = 2 - col
+        const v = arr[base + x]
+        const zi = row * 3 + col
+        sums[zi] += v; counts[zi]++
+        total += v; n++
+      }
+    }
+    for (let i = 0; i < 9; i++) this.zoneCov[i] = counts[i] ? clamp01(sums[i] / counts[i]) : 0
+    this.bodyCov = n ? clamp01(total / n) : 0
+  }
+
+  private static ZONE_FEATURES: BodyFeature[] = ['zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR']
+  private static ZONE_GESTURES: BodyGesture[] = ['coverTL', 'coverTC', 'coverTR', 'coverML', 'coverMC', 'coverMR', 'coverBL', 'coverBC', 'coverBR']
+  private deriveSilhouette(out: Partial<Record<BodyFeature, number>>, cfg: BodyControlConfig): void {
+    for (let i = 0; i < 9; i++) out[BodyTracker.ZONE_FEATURES[i]] = this.zoneCov[i]
+    out.bodyCover = this.bodyCov
+    // Occlusion onsets : the body's shadow covers a zone past a threshold, re-arm
+    // when it clears. sensitivity lowers the trigger threshold.
+    const hi = 0.45 - cfg.sensitivity * 0.15, lo = 0.2
+    for (let i = 0; i < 9; i++) this.edgeHys(BodyTracker.ZONE_GESTURES[i], this.zoneCov[i], hi, lo)
   }
 
   private emit(g: BodyGesture): void {

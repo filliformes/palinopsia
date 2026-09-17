@@ -37,7 +37,8 @@ const GESTURE_LABEL: Record<BodyGesture, string> = {
   smile: 'smile', frown: 'frown', browFurrow: 'brow furrow', squint: 'squint', cheekPuff: 'cheek puff', kiss: 'kiss',
   jawLeft: 'jaw L', jawRight: 'jaw R', mouthLeft: 'mouth L', mouthRight: 'mouth R', tongueOut: 'tongue out', blinkBoth: 'blink',
   headLeft: 'head L', headRight: 'head R', headUp: 'head up', headDown: 'head down', tiltLeft: 'tilt L', tiltRight: 'tilt R',
-  holdHandsUp: 'hold up', holdPinchLeft: 'hold pinch L', holdPinchRight: 'hold pinch R', holdArmsWide: 'hold wide', holdMouthOpen: 'hold mouth'
+  holdHandsUp: 'hold up', holdPinchLeft: 'hold pinch L', holdPinchRight: 'hold pinch R', holdArmsWide: 'hold wide', holdMouthOpen: 'hold mouth',
+  coverTL: 'cover TL', coverTC: 'cover T', coverTR: 'cover TR', coverML: 'cover L', coverMC: 'cover C', coverMR: 'cover R', coverBL: 'cover BL', coverBC: 'cover B', coverBR: 'cover BR'
 }
 const SONI_VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord']
 
@@ -62,11 +63,14 @@ const ACTION_TOKEN: Record<string, string> = {
   'fire:seq': 'Seq', 'fire:soniseq': 'SoniSeq', 'fire:sonify': 'Soni', 'fire:undo': 'Undo', 'fire:redo': 'Redo',
   'master:chain': 'MstChain', 'session:new': 'SesNew', 'session:load': 'SesLoad', 'session:open': 'SesOpen'
 }
+// Silhouette zone features in row-major order (TL..BR), for the preview grid.
+const ZONE_KEYS: BodyFeature[] = ['zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR']
 // Group the feature list for a legible monitor.
 const FEATURE_GROUPS: Array<{ title: string; keys: BodyFeature[] }> = [
   { title: 'Hands', keys: ['handLeftHeight', 'handRightHeight', 'handLeftX', 'handRightX', 'handLeftOpen', 'handRightOpen', 'handsApart', 'handsHeight'] },
   { title: 'Pose', keys: ['bodyMotion', 'bodyLean', 'bodySway', 'armSpan', 'bodyHeight', 'handsUp', 'weightLR'] },
   { title: 'Face', keys: ['faceJawOpen', 'faceSmile', 'faceBrowUp', 'faceBlink', 'faceMouthPucker', 'faceHeadYaw', 'faceHeadPitch', 'faceHeadRoll'] },
+  { title: 'Silhouette (zones)', keys: ['zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR', 'bodyCover'] },
   { title: 'Presence', keys: ['bodyPresent', 'handsPresent', 'facePresent'] }
 ]
 
@@ -162,6 +166,22 @@ export function BodyPage(): JSX.Element {
         for (const p of pv.face) { g.beginPath(); g.arc(p.x * W, p.y * H, 1, 0, 7); g.fill() }
       }
       g.restore()
+      // Silhouette : the 3×3 sensor grid, each cell lit by how much shadow fills it
+      // (drawn in screen space, over the mirrored image : TL = performer's top-left).
+      if (useStore.getState().bodyControl.silhouette) {
+        for (let r = 0; r < 3; r++) {
+          for (let c = 0; c < 3; c++) {
+            const v = bodyBus.feature(ZONE_KEYS[r * 3 + c])
+            const x = (c * W) / 3, y = (r * H) / 3, cw = W / 3, ch = H / 3
+            const lit = v > 0.4
+            g.fillStyle = `rgba(255,142,15,${0.05 + v * 0.4})`
+            g.fillRect(x + 1, y + 1, cw - 2, ch - 2)
+            g.lineWidth = lit ? 2 : 1
+            g.strokeStyle = lit ? 'rgba(255,142,15,0.95)' : 'rgba(255,255,255,0.14)'
+            g.strokeRect(x + 1, y + 1, cw - 2, ch - 2)
+          }
+        }
+      }
     }
     raf = requestAnimationFrame(draw)
     const monitor = window.setInterval(() => {
@@ -282,7 +302,8 @@ export function BodyPage(): JSX.Element {
     { label: 'Hands', keys: ['pinchLeft', 'pinchRight', 'clap', 'cross'] },
     { label: 'Pose', keys: ['handsUp', 'leanLeft', 'leanRight', 'crouch', 'jump', 'armsCross', 'tPose', 'raiseLeft', 'raiseRight'] },
     { label: 'Face', keys: ['mouthPop', 'browRaise', 'winkLeft', 'winkRight', 'smile', 'frown', 'browFurrow', 'squint', 'cheekPuff', 'kiss', 'jawLeft', 'jawRight', 'mouthLeft', 'mouthRight', 'tongueOut', 'blinkBoth', 'headLeft', 'headRight', 'headUp', 'headDown', 'tiltLeft', 'tiltRight'] },
-    { label: 'Holds', keys: ['holdHandsUp', 'holdPinchLeft', 'holdPinchRight', 'holdArmsWide', 'holdMouthOpen'] }
+    { label: 'Holds', keys: ['holdHandsUp', 'holdPinchLeft', 'holdPinchRight', 'holdArmsWide', 'holdMouthOpen'] },
+    { label: 'Zones (silhouette)', keys: ['coverTL', 'coverTC', 'coverTR', 'coverML', 'coverMC', 'coverMR', 'coverBL', 'coverBC', 'coverBR'] }
   ]
   const gestureOptionEls = GESTURE_GROUPS.map((grp) => (
     <optgroup key={grp.label} label={grp.label}>
@@ -337,6 +358,7 @@ export function BodyPage(): JSX.Element {
             <Toggle on={cfg.hands} label="Hands" onClick={() => patch({ hands: !cfg.hands })} title="Track hand landmarks (21 per hand, up to two hands)" />
             <Toggle on={cfg.pose} label="Pose" onClick={() => patch({ pose: !cfg.pose })} title="Track the whole-body pose (33 landmarks)" />
             <Toggle on={cfg.face} label="Face" onClick={() => patch({ face: !cfg.face })} title="Track the face (blendshapes : jaw, smile, brow, blink, pucker + head yaw/pitch/roll). Heavier — enable when you want facial control." />
+            <Toggle on={cfg.silhouette} label="Silhouette" onClick={() => patch({ silhouette: !cfg.silhouette, pose: cfg.pose || !cfg.silhouette })} title="Segment the body silhouette (rides the Pose model) into a 3×3 coverage grid : each zone is a continuous feature (for modulators) and an occlusion gesture 'cover …' (for rules). Cover a region with your shadow to fire it. Heavier — enable when you want screen-space control." />
             <Toggle on={cfg.mirror} label="Mirror" onClick={() => patch({ mirror: !cfg.mirror })} title="Selfie view : moving right moves the value right" />
           </div>
           <label className="flex min-w-[200px] flex-1 items-center gap-2 font-mono text-[11px] text-muted">
