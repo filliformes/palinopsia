@@ -368,6 +368,11 @@ export interface GestureRule {
   g2: BodyGesture | null // null = a single-gesture rule
   combo: 'together' | 'then'
   action: GestureAction
+  // Custom OSC output name (the message sent is /body/<osc> when OSC out is on).
+  // Blank at author time is baked to a truncated CamelCase default, e.g.
+  // 'HandsUpRndMod'. A rule may carry only OSC (action 'none') to play the sound
+  // side without touching the picture.
+  osc: string
   enabled: boolean
   // Exclusive : when this combo fires, swallow the component gestures' own single
   // actions (a chord that doesn't also play its notes). Costs a small look-ahead
@@ -386,8 +391,8 @@ export interface BodyControlConfig {
   mirror: boolean // flip X so moving right moves the value right (selfie view)
   sensitivity: number // 0..1 : global gain on gesture thresholds (higher = easier)
   holdMs: number // how long a pose must be held for a hold-* gesture to fire (ms)
-  oscOut: boolean // also emit /opsia/body/gesture/<name> over OSC on each onset
-  gestures: Record<BodyGesture, GestureAction> // built-in per-gesture → action routing
+  oscOut: boolean // when a rule fires, also send /body/<its osc name> over OSC
+  gestures: Record<BodyGesture, GestureAction> // legacy per-gesture map (unused : all routing is rules now; kept for stored configs)
   rules: GestureRule[] // user-authored rules (single + combo) from the rule builder
 }
 

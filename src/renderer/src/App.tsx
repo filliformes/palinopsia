@@ -56,7 +56,7 @@ import { BodyPage } from './components/BodyPage'
 import { bodyTracker } from './engine/bodyTracker'
 import { bodyBus } from './engine/bodyIn'
 import { perfMeter } from './engine/perfMeter'
-import type { BodyGesture, GestureAction } from '@shared/types'
+import type { BodyGesture } from '@shared/types'
 import { SceneBank } from './components/SceneBank'
 import { SurfacePad, SurfaceOnToggle } from './components/SurfacePad'
 import { initOscInput, applyOscListen, applyOscOutput, initOscQueryStream } from './oscInput'
@@ -173,13 +173,6 @@ function RecPill(): JSX.Element | null {
 
 // fireSelectedRandomize lives in commands.ts now : the R shortcut, the
 // Transport button and a learned MIDI pad all fire the same implementation.
-
-// A body gesture fires one of the shared discrete-trigger actions (the same
-// vocabulary MIDI Learn binds and the keyboard fires : engine/midi.ts fireTrigger).
-// Routing, not new engine.
-function dispatchGesture(action: GestureAction): void {
-  if (action && action !== 'none') fireTrigger(action)
-}
 
 // Small always-on status pip : when embodied control is live it shows a pulsing
 // red "camera on" dot (a privacy tell) and doubles as a shortcut to the Body page.
@@ -384,10 +377,12 @@ export default function App(): JSX.Element {
   }, [bodyControl])
   useEffect(() => () => bodyTracker.stop(), []) // release the camera on unmount
   useEffect(() => {
-    // Drain gesture onsets each frame and fire (a) the built-in per-gesture map,
-    // (b) the user's rules (single + two-gesture combos), and (c) an OSC bang if
-    // oscOut is on. Cheap when the tracker is off (the queue is empty). Reads
-    // config live, so re-binding takes effect without re-subscribing.
+    // Drain gesture onsets each frame and fire the user's rules (single gesture or
+    // two-gesture combos). Each rule that fires runs its action (if any) AND, when
+    // OSC out is on, sends an OSC bang to /body/<its osc name>. A rule may carry
+    // only OSC (action 'none') to play the sound side without touching the picture.
+    // Cheap when the tracker is off (the queue is empty). Reads config live, so
+    // re-binding takes effect without re-subscribing.
     const COMBO_MS = 550 // how close two gestures must land to count as a combo
     const recent: Partial<Record<BodyGesture, number>> = {}
     // Exclusive combos hold a gesture's single action back this long, to see if a
@@ -399,10 +394,15 @@ export default function App(): JSX.Element {
       const s = useStore.getState()
       try { window.api.oscSend(s.oscOutHost, s.oscOutPort, addr, [{ type: 'i', value: 1 }]) } catch { /* socket busy */ }
     }
+    type Rule = ReturnType<typeof useStore.getState>['bodyControl']['rules'][number]
+    const fireRule = (r: Rule, oscOut: boolean): void => {
+      bodyBus.fireRule(r.id)
+      if (r.action && r.action !== 'none') fireTrigger(r.action)
+      if (oscOut) sendOsc(`/body/${oscSafe(r.osc || r.name)}`)
+    }
     const fireSingles = (g: BodyGesture, bc: ReturnType<typeof useStore.getState>['bodyControl']): void => {
-      dispatchGesture(bc.gestures[g]) // built-in per-gesture mapping
       for (const r of bc.rules) {
-        if (r.enabled && !r.g2 && r.g1 === g && r.action && r.action !== 'none') { bodyBus.fireRule(r.id); fireTrigger(r.action) }
+        if (r.enabled && !r.g2 && r.g1 === g) fireRule(r, bc.oscOut)
       }
     }
     let raf = 0
@@ -419,19 +419,17 @@ export default function App(): JSX.Element {
       // Gestures that belong to an enabled EXCLUSIVE combo : their singles wait.
       const excl = new Set<BodyGesture>()
       for (const r of bc.rules) {
-        if (r.enabled && r.g2 && r.exclusive && r.action && r.action !== 'none') { excl.add(r.g1); excl.add(r.g2) }
+        if (r.enabled && r.g2 && r.exclusive) { excl.add(r.g1); excl.add(r.g2) }
       }
       for (const g of gs) {
-        if (bc.oscOut) sendOsc(`/opsia/body/gesture/${g}`)
         let consumed = false // g just completed an exclusive combo → suppress its single
         for (const r of bc.rules) {
-          if (!r.enabled || !r.g2 || !r.action || r.action === 'none') continue
+          if (!r.enabled || !r.g2) continue
           const hit = r.combo === 'then'
             ? (g === r.g2 && within(recent[r.g1], now))
             : ((g === r.g1 && within(recent[r.g2], now)) || (g === r.g2 && within(recent[r.g1], now)))
           if (!hit) continue
-          bodyBus.fireRule(r.id); fireTrigger(r.action)
-          if (bc.oscOut) sendOsc(`/opsia/body/rule/${oscSafe(r.name)}`)
+          fireRule(r, bc.oscOut)
           if (r.combo === 'then') recent[r.g1] = 0
           else { recent[r.g1] = 0; recent[r.g2] = 0 }
           if (r.exclusive) {

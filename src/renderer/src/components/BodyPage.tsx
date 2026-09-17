@@ -2,13 +2,12 @@
 // Turn a camera on (opt-in), and MediaPipe Hands + Pose + Face read the performer
 // into the body bus (engine/bodyIn.ts). Left column : the live camera with the
 // skeleton on it, the capture controls, and the rule builder ("Create actions").
-// Right column : the feature monitor (what is moving, one-click into a modulator)
-// and the per-gesture routing. Both right-column lists are two columns so the
-// whole page fits without vertical scrolling.
+// Right column : the feature monitor (what is moving, one-click into a modulator).
+// Every action is authored as a rule : one gesture (or two combined) fires an
+// action and/or an OSC bang (/body/<name>). No fixed per-gesture map.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BodyControlConfig, BodyFeature, BodyGesture, GestureAction, GestureRule } from '@shared/types'
-import { BODY_FEATURES, BODY_GESTURES } from '@shared/types'
 import { bodyTracker } from '../engine/bodyTracker'
 import { bodyBus } from '../engine/bodyIn'
 import { fireTrigger, midiTargetLabel } from '../midi'
@@ -40,6 +39,28 @@ const GESTURE_LABEL: Record<BodyGesture, string> = {
   holdHandsUp: 'hold up', holdPinchLeft: 'hold pinch L', holdPinchRight: 'hold pinch R', holdArmsWide: 'hold wide', holdMouthOpen: 'hold mouth'
 }
 const SONI_VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord']
+
+// Conjugated verb phrases for auto-naming a rule ("<gesture> <verb>"). Only the
+// static ids ; layers / scenes / voices are handled by index in actionVerb().
+const ACTION_VERB: Record<string, string> = {
+  'fire:randomize': 'randomizes', 'rand:all': 'randomizes everything', 'rand:sources': 'randomizes sources',
+  'rand:sourcefx': 'randomizes source FX', 'rand:layerfx': 'randomizes layer FX', 'rand:mods': 'randomizes modulators',
+  'rand:finishing': 'randomizes finishing', 'rand:bg': 'randomizes background', 'rand:master': 'randomizes master FX',
+  'rand:meta': 'randomizes Meta knobs', 'rand:inspector': 'randomizes the inspector', 'rand:sonify': 'randomizes Sonify',
+  'fire:vary': 'varies', 'fire:flush': 'flushes buffers', 'fire:freeze': 'toggles freeze', 'fire:record': 'toggles record',
+  'fire:tap': 'taps tempo', 'fire:seq': 'toggles the sequencer', 'fire:soniseq': 'toggles the Sonify sequencer',
+  'fire:sonify': 'toggles Sonify', 'fire:undo': 'undoes', 'fire:redo': 'redoes', 'master:chain': 'toggles master FX',
+  'session:new': 'starts a new session', 'session:load': 'loads a session', 'session:open': 'opens a session'
+}
+// Truncated CamelCase tokens for the default /body/<osc> name.
+const ACTION_TOKEN: Record<string, string> = {
+  'fire:randomize': 'Rnd', 'rand:all': 'RndAll', 'rand:sources': 'RndSrc', 'rand:sourcefx': 'RndSrcFx',
+  'rand:layerfx': 'RndLyrFx', 'rand:mods': 'RndMod', 'rand:finishing': 'RndFin', 'rand:bg': 'RndBg',
+  'rand:master': 'RndMst', 'rand:meta': 'RndMeta', 'rand:inspector': 'RndInsp', 'rand:sonify': 'RndSoni',
+  'fire:vary': 'Vary', 'fire:flush': 'Flush', 'fire:freeze': 'Freeze', 'fire:record': 'Rec', 'fire:tap': 'Tap',
+  'fire:seq': 'Seq', 'fire:soniseq': 'SoniSeq', 'fire:sonify': 'Soni', 'fire:undo': 'Undo', 'fire:redo': 'Redo',
+  'master:chain': 'MstChain', 'session:new': 'SesNew', 'session:load': 'SesLoad', 'session:open': 'SesOpen'
+}
 // Group the feature list for a legible monitor.
 const FEATURE_GROUPS: Array<{ title: string; keys: BodyFeature[] }> = [
   { title: 'Hands', keys: ['handLeftHeight', 'handRightHeight', 'handLeftX', 'handRightX', 'handLeftOpen', 'handRightOpen', 'handsApart', 'handsHeight'] },
@@ -75,8 +96,9 @@ export function BodyPage(): JSX.Element {
   // The last gesture that fired + whether it's fresh (lights up briefly).
   const [cur, setCur] = useState<{ g: BodyGesture; fresh: boolean } | null>(null)
   const [curRule, setCurRule] = useState<{ id: string; fresh: boolean } | null>(null)
-  // Rule builder draft (one line : name, gesture(s), action).
+  // Rule builder draft (one line : name, gesture(s), action, OSC name).
   const [rName, setRName] = useState('')
+  const [rOsc, setROsc] = useState('')
   const [rG1, setRG1] = useState<BodyGesture>('pinchLeft')
   const [rG2, setRG2] = useState<BodyGesture | null>(null)
   const [rCombo, setRCombo] = useState<'together' | 'then'>('together')
@@ -169,15 +191,51 @@ export function BodyPage(): JSX.Element {
   const comboSym = (mode: 'together' | 'then'): string => (mode === 'then' ? '→' : '+')
   const ruleTrigger = (r: { g1: BodyGesture; g2: BodyGesture | null; combo: 'together' | 'then' }): string =>
     r.g2 ? `${GESTURE_LABEL[r.g1]} ${comboSym(r.combo)} ${GESTURE_LABEL[r.g2]}` : GESTURE_LABEL[r.g1]
+
+  // Auto-naming : an action's verb, conjugated for a third-person subject (the
+  // gesture), so a blank name reads like a sentence — "hands up randomizes
+  // modulators". Dynamic ids (layers, scenes, voices) resolve by index.
+  const actionVerb = (id: GestureAction): string => {
+    if (id === 'none') return 'sends OSC'
+    const rl = /^rand:layer:(\d+)$/.exec(id); if (rl) return `randomizes layer ${Number(rl[1]) + 1}`
+    if (id === 'scene:next') return 'goes to next scene'
+    if (id === 'scene:prev') return 'goes to previous scene'
+    if (id.startsWith('scene:')) return `recalls scene ${Number(id.slice(6)) + 1}`
+    const sv = /^sonify:voice:(\d+)$/.exec(id); if (sv) return `toggles ${SONI_VOICE_NAMES[Number(sv[1])] ?? 'a voice'}`
+    return ACTION_VERB[id] ?? midiTargetLabel(id).toLowerCase()
+  }
+  // Auto OSC token : a truncated CamelCase name from the gesture(s) + action, e.g.
+  // hands up + randomize modulators → "HandsUpRndMod". Used when the OSC box is blank.
+  const camel = (s: string): string =>
+    s.replace(/[^A-Za-z0-9]+/g, ' ').trim().split(' ').filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join('')
+  const gestureToken = (g: BodyGesture): string => camel(GESTURE_LABEL[g])
+  const actionToken = (id: GestureAction): string => {
+    if (id === 'none') return ''
+    const rl = /^rand:layer:(\d+)$/.exec(id); if (rl) return `RndL${Number(rl[1]) + 1}`
+    if (id === 'scene:next') return 'ScnNext'
+    if (id === 'scene:prev') return 'ScnPrev'
+    if (id.startsWith('scene:')) return `Scn${Number(id.slice(6)) + 1}`
+    const sv = /^sonify:voice:(\d+)$/.exec(id); if (sv) return `Voice${Number(sv[1]) + 1}`
+    return ACTION_TOKEN[id] ?? camel(midiTargetLabel(id))
+  }
+  const autoName = (g1: BodyGesture, g2: BodyGesture | null, combo: 'together' | 'then', action: GestureAction): string =>
+    `${ruleTrigger({ g1, g2, combo })} ${actionVerb(action)}`
+  const autoOsc = (g1: BodyGesture, g2: BodyGesture | null, action: GestureAction): string =>
+    (gestureToken(g1) + (g2 ? gestureToken(g2) : '') + actionToken(action)) || 'Rule'
+  // Preview strings for the placeholders (update live with the current draft).
+  const namePreview = autoName(rG1, rG2, rCombo, rAction)
+  const oscPreview = autoOsc(rG1, rG2, rAction)
+
   const addRule = (): void => {
-    if (rAction === 'none') { showToast('Pick an action for the rule first', 'warn'); return }
-    const name = rName.trim() || ruleTrigger({ g1: rG1, g2: rG2, combo: rCombo })
+    const name = rName.trim() || namePreview
+    const typed = rOsc.trim().replace(/^\/*(?:body\/)?/i, '') // accept "/body/Foo", "body/Foo" or "Foo"
+    const osc = typed.replace(/[^A-Za-z0-9_]/g, '') || oscPreview
     const rule: GestureRule = {
-      id: `r${Date.now().toString(36)}`, name, g1: rG1, g2: rG2, combo: rCombo, action: rAction, enabled: true,
+      id: `r${Date.now().toString(36)}`, name, g1: rG1, g2: rG2, combo: rCombo, action: rAction, osc, enabled: true,
       exclusive: rG2 ? rExcl : false
     }
     patch({ rules: [...cfg.rules, rule] })
-    setRName(''); setRG2(null); setRExcl(false)
+    setRName(''); setROsc(''); setRG2(null); setRExcl(false)
   }
   const updateRule = (id: string, part: Partial<GestureRule>): void =>
     patch({ rules: cfg.rules.map((r) => (r.id === id ? { ...r, ...part } : r)) })
@@ -194,7 +252,7 @@ export function BodyPage(): JSX.Element {
         'rand:bg', 'rand:master', 'rand:meta', 'rand:inspector', 'rand:sonify', 'fire:vary',
         'rand:layer:0', 'rand:layer:1', 'rand:layer:2', 'rand:layer:3'
       ].map(opt) },
-      { label: 'Transport / performance', opts: ['fire:flush', 'fire:freeze', 'fire:record', 'fire:tap', 'fire:seq', 'fire:soniseq'].map(opt) },
+      { label: 'Transport / performance', opts: ['fire:flush', 'fire:freeze', 'fire:record', 'fire:tap', 'fire:seq', 'fire:soniseq', 'fire:undo', 'fire:redo'].map(opt) },
       { label: 'Master FX', opts: ['master:chain'].map(opt) },
       { label: 'Scenes', opts: [opt('scene:next'), opt('scene:prev'), ...scenes.map((s, i) => ({ id: `scene:${i}`, label: `Scene ${i + 1}${s.name ? ' · ' + s.name : ''}` }))] },
       { label: 'Sonify', opts: [opt('fire:sonify'), ...SONI_VOICE_NAMES.map((n, i) => ({ id: `sonify:voice:${i}`, label: `Sonify: ${n}` }))] },
@@ -328,30 +386,42 @@ export function BodyPage(): JSX.Element {
                 on={cfg.oscOut}
                 label="OSC out"
                 onClick={() => patch({ oscOut: !cfg.oscOut })}
-                title="Also send an OSC bang on every gesture (/opsia/body/gesture/<name>) and rule (/opsia/body/rule/<name>) to the OSC-out target set in I/O setup — so the body plays the sound side too."
+                title="When a rule fires, also send an OSC bang to /body/<its OSC name> at the OSC-out target set in I/O setup — so the body plays the sound side too."
               />
-              <span className="font-mono text-[10px] text-muted">→ /opsia/body/…</span>
+              <span className="font-mono text-[10px] text-muted">→ /body/…</span>
             </div>
           </div>
 
-          {/* Create actions : the rule builder, under the preview. */}
+          {/* Create actions : the rule builder, under the preview. The only gesture
+              routing — every action is a rule, single or a two-gesture combo. */}
           <section className="rounded border border-border bg-panel2 p-2">
-            <div className="mb-1 font-mono text-[9px] uppercase tracking-wide text-accent2">Create actions</div>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <span className="font-mono text-[9px] uppercase tracking-wide text-accent2">Create actions</span>
+              {/* Currently recognised gesture : lights up for ~0.7s each time one fires. */}
+              <span
+                className={`rounded-full border px-2 py-0.5 font-mono text-[10px] transition-colors ${
+                  cur?.fresh ? 'border-accent bg-accent/20 text-accent' : 'border-border bg-panel3/50 text-muted'
+                }`}
+                title="The most recent gesture the tracker recognised"
+              >
+                {cur ? `⚡ ${GESTURE_LABEL[cur.g]}` : 'no gesture yet'}
+              </span>
+            </div>
             <p className="mb-2 text-[10px] leading-snug text-muted">
-              Author your own rules : one gesture, or two combined, fire an action. A combo triggers when both land close together (<span className="text-text">+</span>) or in order (<span className="text-text">→</span>). Rules fire on top of the defaults, so set a component gesture to <span className="text-text">nothing</span> if you want the combo alone.
+              One gesture, or two combined, fires an action and/or an OSC bang. A combo triggers when both land close together (<span className="text-text">+</span>) or in order (<span className="text-text">→</span>). Leave the name blank for an auto label like <span className="text-text">“{namePreview}”</span> ; leave OSC blank for <span className="text-text">/body/{oscPreview}</span>. Set the action to <span className="text-text">— nothing —</span> for an OSC-only rule.
             </p>
 
-            {/* Builder line : name · gesture(s) · action · save */}
+            {/* Builder line : name · gesture(s) · action · OSC · save */}
             <div className="mb-2 flex flex-wrap items-center gap-1.5 rounded border border-border/60 bg-panel3/30 p-1.5">
               <input
                 value={rName}
                 onChange={(e) => setRName(e.target.value)}
-                placeholder="name"
+                placeholder={namePreview}
                 spellCheck={false}
-                className="input h-[24px] w-20 text-[11px]"
-                title="A label for this rule (optional : defaults to the gesture names)"
+                className="input h-[26px] w-44 text-[11px]"
+                title="A label for this rule. Blank = the auto name shown as the placeholder."
               />
-              <select value={rG1} onChange={(e) => setRG1(e.target.value as BodyGesture)} className="input select-compact text-[11px]" title="First gesture">
+              <select value={rG1} onChange={(e) => setRG1(e.target.value as BodyGesture)} className="input select-compact h-[26px] w-[108px] text-[11px]" title="First gesture">
                 {gestureOptionEls}
               </select>
               {rG2 == null ? (
@@ -371,7 +441,7 @@ export function BodyPage(): JSX.Element {
                   >
                     {comboSym(rCombo)}
                   </button>
-                  <select value={rG2} onChange={(e) => setRG2(e.target.value as BodyGesture)} className="input select-compact text-[11px]" title="Second gesture">
+                  <select value={rG2} onChange={(e) => setRG2(e.target.value as BodyGesture)} className="input select-compact h-[26px] w-[108px] text-[11px]" title="Second gesture">
                     {gestureOptionEls}
                   </select>
                   <button
@@ -385,9 +455,19 @@ export function BodyPage(): JSX.Element {
                 </>
               )}
               <span className="font-mono text-[11px] text-muted">→</span>
-              <select value={rAction} onChange={(e) => setRAction(e.target.value)} className="input select-compact min-w-0 flex-1 text-[11px]" title="What the rule fires">
+              <select value={rAction} onChange={(e) => setRAction(e.target.value)} className="input select-compact h-[26px] w-[172px] text-[11px]" title="What the rule fires. — nothing — makes an OSC-only rule.">
                 {actionOptionEls}
               </select>
+              <div className="flex items-center" title="Custom OSC name. The message sent is /body/<name>. Blank = the truncated default shown as the placeholder.">
+                <span className="rounded-l border border-r-0 border-border bg-panel3/70 px-1.5 py-1 font-mono text-[10px] text-muted">/body/</span>
+                <input
+                  value={rOsc}
+                  onChange={(e) => setROsc(e.target.value)}
+                  placeholder={oscPreview}
+                  spellCheck={false}
+                  className="input h-[26px] w-32 rounded-l-none text-[11px]"
+                />
+              </div>
               <button
                 onClick={addRule}
                 className="rounded border border-accent bg-accent/15 px-2 py-1 font-mono text-[11px] text-accent hover:bg-accent/25"
@@ -414,10 +494,18 @@ export function BodyPage(): JSX.Element {
                         className={`h-3.5 w-3.5 shrink-0 rounded-sm border ${r.enabled ? 'border-accent bg-accent/40' : 'border-border'}`}
                         title={r.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
                       />
-                      <span className="w-16 shrink-0 truncate text-text" title={r.name}>{r.name}</span>
+                      <span className="w-20 shrink-0 truncate text-text" title={r.name}>{r.name}</span>
                       <span className="min-w-0 flex-1 truncate text-muted">
                         {ruleTrigger(r)} <span className="text-muted/60">→</span> <span className="text-accent2">{labelForAction(r.action)}</span>
                       </span>
+                      {r.osc && (
+                        <span
+                          className={`shrink-0 truncate font-mono text-[9px] ${cfg.oscOut ? 'text-accent2/70' : 'text-muted/40'}`}
+                          title={cfg.oscOut ? `Sends /body/${r.osc} over OSC` : `Would send /body/${r.osc} (OSC out is off)`}
+                        >
+                          /body/{r.osc}
+                        </span>
+                      )}
                       {r.g2 && (
                         <button
                           onClick={() => updateRule(r.id, { exclusive: !r.exclusive })}
@@ -444,7 +532,7 @@ export function BodyPage(): JSX.Element {
           </section>
         </div>
 
-        {/* Right : feature monitor + gesture routing (two columns each) */}
+        {/* Right : feature monitor (two columns). */}
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <section className="rounded border border-border bg-panel2 p-2">
             <div className="mb-1 font-mono text-[9px] uppercase tracking-wide text-accent2">Feature monitor</div>
@@ -475,47 +563,6 @@ export function BodyPage(): JSX.Element {
                 </div>
               </div>
             ))}
-          </section>
-
-          <section className="rounded border border-border bg-panel2 p-2">
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <span className="font-mono text-[9px] uppercase tracking-wide text-accent2">Gestures → actions</span>
-              {/* Current gesture : lights up for ~0.7s each time one is detected. */}
-              <span
-                className={`rounded-full border px-2 py-0.5 font-mono text-[10px] transition-colors ${
-                  cur?.fresh ? 'border-accent bg-accent/20 text-accent' : 'border-border bg-panel3/50 text-muted'
-                }`}
-                title="The most recent gesture the tracker detected"
-              >
-                {cur ? `⚡ ${GESTURE_LABEL[cur.g]}` : 'no gesture yet'}
-              </span>
-            </div>
-            <p className="mb-2 text-[10px] leading-snug text-muted">
-              Discrete moves fire one-shot actions. Same vocabulary as MIDI Learn and the keyboard, so a pad and a gesture on the same action stay in sync.
-            </p>
-            <div className="grid grid-cols-1 gap-x-3 gap-y-1 sm:grid-cols-2">
-              {BODY_GESTURES.map((gk) => (
-                <div key={gk} className="flex items-center gap-1 font-mono text-[10px] text-muted">
-                  <span className="w-[76px] shrink-0 truncate" title={GESTURE_LABEL[gk]}>{GESTURE_LABEL[gk]}</span>
-                  <select
-                    value={cfg.gestures[gk]}
-                    onChange={(e) => patch({ gestures: { ...cfg.gestures, [gk]: e.target.value as GestureAction } })}
-                    className="input select-compact min-w-0 flex-1 text-[10px]"
-                    title="What this gesture fires. Same action vocabulary as MIDI Learn and the keyboard."
-                  >
-                    {actionOptionEls}
-                  </select>
-                  <button
-                    onClick={() => fireTrigger(cfg.gestures[gk])}
-                    disabled={cfg.gestures[gk] === 'none'}
-                    className="shrink-0 rounded border border-border bg-panel3/70 px-1 py-0.5 text-[9px] text-muted hover:border-accent hover:text-accent disabled:opacity-30"
-                    title="Fire this gesture's action now (preview what it does)"
-                  >
-                    test
-                  </button>
-                </div>
-              ))}
-            </div>
           </section>
         </div>
       </div>

@@ -24,6 +24,7 @@ import {
 } from './commands'
 import { setKnobTarget, shuffleMetaValues } from './metaSmooth'
 import { randomSonify } from './audio/autoSonify'
+import { undo, redo } from './undo'
 import { useStore } from './store'
 import type { SoniConfig } from './audio/sonify'
 
@@ -86,7 +87,8 @@ function toggleSoniVoice(i: number): void {
 // sonify:voice:<i> are handled dynamically by index.
 export const TRIGGER_ACTION_IDS: string[] = [
   'fire:randomize', 'fire:vary', 'fire:flush', 'fire:freeze', 'fire:record',
-  'fire:sonify', 'fire:tap', 'fire:seq', 'fire:soniseq', 'scene:next', 'scene:prev'
+  'fire:sonify', 'fire:tap', 'fire:seq', 'fire:soniseq', 'fire:undo', 'fire:redo',
+  'scene:next', 'scene:prev'
 ]
 
 /** Persisted Randomize intensity (shared with the Transport's dice). */
@@ -109,6 +111,8 @@ export function fireTrigger(id: string): void {
     case 'fire:tap': tapTempo(); return
     case 'fire:seq': st.toggleSequenceRunning(); return
     case 'fire:soniseq': st.setSoniSeqOn(!st.soniSeq.on); return
+    case 'fire:undo': undo(); return
+    case 'fire:redo': redo(); return
     case 'scene:next': recallRelativeScene(1); return
     case 'scene:prev': recallRelativeScene(-1); return
     // Randomize dice (each little ⚄ / ⚄-style button in the UI is learnable) :
@@ -270,6 +274,10 @@ export function midiTargetLabel(id: string): string {
       return 'SEQUENCER run'
     case 'fire:soniseq':
       return 'SONIFY seq run'
+    case 'fire:undo':
+      return 'UNDO'
+    case 'fire:redo':
+      return 'REDO'
     default:
       return id
   }
