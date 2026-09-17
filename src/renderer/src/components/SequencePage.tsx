@@ -75,7 +75,12 @@ export function SequencePage({
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-bg">
       <header className="flex items-center gap-4 border-b border-border bg-panel px-4 py-2">
-        <span className="font-mono text-[13px] font-semibold uppercase tracking-[0.2em]">Sequence · Macro-form</span>
+        <span
+          className="cursor-help font-mono text-[13px] font-semibold uppercase tracking-[0.2em]"
+          title="Auto-pilot over your saved scenes : tag the scenes on the left to give it a world to wander, then set its pacing, selection and slow macro-form overlays on the right. Play (or Q from the instrument) hands the show to it; skip steps now; score exports the run."
+        >
+          Sequence · Macro-form
+        </span>
         <button
           onClick={toggleRunning}
           className={`rounded border px-3 py-1 font-mono text-[11px] transition-colors ${
@@ -126,9 +131,23 @@ export function SequencePage({
         {/* Scene column: scrolling rail + a live preview pinned at the bottom. */}
         <div className="flex min-w-0 flex-1 flex-col">
          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-4">
-          <span className="font-mono text-[9px] uppercase tracking-wide text-muted">
-            scenes · {scenes.length} : click to tag
-          </span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span
+              className="cursor-help font-mono text-[9px] uppercase tracking-wide text-muted"
+              title="Every saved scene, as a tag card. Click a card to edit its tags below · double-click to jump to that scene live. Tags (world, coupling, fullness, climate) are what the sequencer reads when it chooses where to go."
+            >
+              scenes · {scenes.length} : click to tag · double-click to jump
+            </span>
+            {/* Climate legend : the dot colour on each card. */}
+            <span className="flex items-center gap-2.5">
+              {SCENE_CLIMATES.map((c) => (
+                <span key={c} className="flex cursor-help items-center gap-1 font-mono text-[9px] text-muted" title={CLIMATE_INFO[c]}>
+                  <span className="h-2 w-2 rounded-full" style={{ background: CLIMATE_COLOR[c] }} />
+                  {c}
+                </span>
+              ))}
+            </span>
+          </div>
           {scenes.length === 0 && (
             <p className="text-[12px] text-muted">
               No scenes yet. Save a few scenes in the instrument, then tag them here to give the
@@ -165,12 +184,18 @@ export function SequencePage({
                   </div>
                   {t && (
                     <>
-                      <div className="flex items-center gap-1 font-mono text-[9px] text-muted">
+                      <div
+                        className="flex items-center gap-1 font-mono text-[9px] text-muted"
+                        title={`World : ${worldName(t.world)} · Coupling : ${t.synchresis.join(', ') || 'none'}`}
+                      >
                         <span className="rounded bg-panel2 px-1 py-0.5 text-accent2">{worldName(t.world)}</span>
                         <span className="truncate">{t.synchresis.join('·') || '—'}</span>
                       </div>
                       {/* Espace-temps bar: full ◀ ▶ void */}
-                      <div className="h-1 w-full overflow-hidden rounded-full bg-panel2">
+                      <div
+                        className="h-1 w-full overflow-hidden rounded-full bg-panel2"
+                        title={`Espace-temps ${Math.round(t.spaceTime * 100)}% : left = full / dense, right = sparse / void`}
+                      >
                         <div className="h-full bg-accent/60" style={{ width: `${t.spaceTime * 100}%` }} />
                       </div>
                     </>
@@ -183,7 +208,10 @@ export function SequencePage({
           {/* Tag editor */}
           {selScene?.tags && (
             <div className="mt-2 flex flex-col gap-3 rounded-md border border-border bg-panel p-3">
-              <span className="font-mono text-[9px] uppercase tracking-wide text-muted">
+              <span
+                className="cursor-help font-mono text-[9px] uppercase tracking-wide text-muted"
+                title="Describe this scene so the sequencer can place it : its world, how its two voices couple, how full/empty it feels, and its emotional charge. These four tags drive Selection, Breathe and the Climate arc."
+              >
                 tags · {selScene.name}
               </span>
               <Field label="Diégèse (world)"
@@ -300,7 +328,9 @@ export function SequencePage({
           className="flex shrink-0 flex-col gap-2 overflow-y-auto border-l border-border bg-panel px-3 py-2"
           style={{ width: seqAsideW }}
         >
-          <Section title="Transport">
+          <GroupLabel title="How fast the auto-pilot moves through the bank, and how it picks where to go next.">Pacing &amp; selection</GroupLabel>
+          <Section title="Transport"
+            info="Pacing : how long each scene is held, and how one scene becomes the next (morph / cut, and whether the step waits for an audio event).">
             <Row label={`dwell · ${seq.dwell.toFixed(0)}s`}
               title="How long each scene is held before the sequencer moves on (seconds).">
               <input type="range" min={2} max={60} step={1} value={seq.dwell}
@@ -342,7 +372,8 @@ export function SequencePage({
             </Row>
           </Section>
 
-          <Section title="Selection">
+          <Section title="Selection"
+            info="Which scene plays next : the picking strategy, how long before a scene may repeat, and a per-recall variation so a long run never loops verbatim.">
             <Row label="mode"
               title="How the next scene is chosen: weighted = wander guided by the scene tags (world continuity + a gentle Espace-temps step) · arc = also shaped by the Climate arc · shuffle = flat random.">
               <select className="input select-compact w-full text-[11px]" value={seq.mode}
@@ -366,7 +397,9 @@ export function SequencePage({
             </Row>
           </Section>
 
-          <Section title="Breathe (Espace-temps)">
+          <GroupLabel title="Slow shapes layered over the whole run : durational arcs and textures that evolve independently of the scene stepping.">Macro-form overlays</GroupLabel>
+          <Section title="Breathe (Espace-temps)"
+            info="A slow dense↔void swing of the whole picture (haze / depth / blur), centred on each scene's Espace-temps tag. Set amount to 0 to switch it off.">
             <Row label={`amount · ${Math.round(seq.breathe.amount * 100)}%`}
               title="A slow swing of the whole composition toward dense↔void (Context haze / depth / blur), centred on each scene's Espace-temps tag. 0 = off.">
               <input type="range" min={0} max={1} step={0.01} value={seq.breathe.amount}
@@ -381,7 +414,8 @@ export function SequencePage({
             </Row>
           </Section>
 
-          <Section title="Climate arc">
+          <Section title="Climate arc"
+            info="A slow build-and-release shape (calm → intense → calm) that biases scene choice by their Climat tag and lifts the visuals at its peak. The meter shows where it is in the cycle.">
             <label className="flex items-center gap-2 text-[11px] text-muted"
               title="A slow build-and-release shape (calm → intense → calm) that biases which scenes are chosen and lifts the visuals at its peak.">
               <input type="checkbox" checked={seq.arc.enabled}
@@ -399,7 +433,8 @@ export function SequencePage({
             <ArcMeter enabled={seq.arc.enabled && seq.running} />
           </Section>
 
-          <Section title="Burial → Exhumation">
+          <Section title="Burial → Exhumation"
+            info="A long degrade-then-recover arc : the picture is slowly buried (breakup, crushed shadows, darkening toward illegibility) then exhumed. The meter shows how buried it is right now.">
             <label className="flex items-center gap-2 text-[11px] text-muted"
               title="A durational arc that slowly buries the picture — analog breakup, crushed shadows, softening, darkening the grade toward illegibility — then exhumes it (recovers). A slow cosine over the length below.">
               <input type="checkbox" checked={seq.burial.enabled}
@@ -425,7 +460,8 @@ export function SequencePage({
             <LevelMeter label="buried" enabled={seq.burial.enabled && seq.running} get={sequencerBurialLevel} />
           </Section>
 
-          <Section title="Long-Take / Veil">
+          <Section title="Long-Take / Veil"
+            info="A slowness discipline : forbids auto-cuts (holds one take) and drives one imperceptibly-slow haze over minutes. An antidote to restless macro-forms. Manual skip still works.">
             <label className="flex items-center gap-2 text-[11px] text-muted"
               title="A slowness discipline : FORBIDS auto-cuts (holds a single take) and drives one imperceptibly-slow veil — Context haze thickening and thinning over minutes. An antidote to restless macro-forms (a Fog Line). Manual skip still works.">
               <input type="checkbox" checked={seq.longTake.enabled}
@@ -451,7 +487,8 @@ export function SequencePage({
             <LevelMeter label="veil" enabled={seq.longTake.enabled && seq.running} get={sequencerLongTakeLevel} />
           </Section>
 
-          <Section title="Frame-Weave (interlace)">
+          <Section title="Frame-Weave (interlace)"
+            info="Rose Lowder's temporal interlace : show ONE layer per frame, stepping through the lattice below, so persistence of vision fuses them into a shimmer. Runs live, independent of scene stepping.">
             <label className="flex items-center gap-2 text-[11px] text-muted"
               title="Rose Lowder's temporal interlace : instead of blending, show ONE layer per frame, stepping through the lattice below so persistence-of-vision fuses them into a shimmer. Runs live (independent of scene stepping). Blank cells (·) show black.">
               <input type="checkbox" checked={seq.frameWeave.enabled}
@@ -490,7 +527,9 @@ export function SequencePage({
             )}
           </Section>
 
-          <Section title="Punctuation">
+          <GroupLabel title="Occasional felt marks between scenes : arrivals, ruptures and medium-drops that break the wander.">Punctuation</GroupLabel>
+          <Section title="Punctuation"
+            info="Occasional accents at a transition : a resolved arrival (cadence), a controlled-chaos burst (rupture), or dropping one medium as a tension marker (monomedia).">
             <Row label={`cadence · ${seq.cadenceEvery === 0 ? 'off' : `every ${seq.cadenceEvery}`}`}>
               <input type="range" min={0} max={8} step={1} value={seq.cadenceEvery}
                 onChange={(e) => setSequence({ cadenceEvery: Number(e.target.value) })}
@@ -615,11 +654,25 @@ function SeqPreview({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | nu
   )
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }): JSX.Element {
+// A titled, bordered card. `info` is an overview shown on hovering the header
+// (and flagged by a faint ⓘ), so each cluster of controls explains itself.
+function Section({ title, info, children }: { title: string; info?: string; children: ReactNode }): JSX.Element {
   return (
-    <div className="flex flex-col gap-1">
-      <span className="font-mono text-[9px] uppercase tracking-wide text-accent2/70">{title}</span>
+    <section className="flex flex-col gap-1.5 rounded-md border border-border/60 bg-panel2/20 p-2">
+      <div className="flex items-center gap-1 border-b border-border/40 pb-1" title={info}>
+        <span className="font-mono text-[9px] uppercase tracking-wide text-accent2/80">{title}</span>
+        {info && <span className="ml-auto cursor-help font-mono text-[10px] leading-none text-muted/50" title={info}>ⓘ</span>}
+      </div>
       {children}
+    </section>
+  )
+}
+// A faint divider that clusters the sections into higher-level groups.
+function GroupLabel({ children, title }: { children: ReactNode; title?: string }): JSX.Element {
+  return (
+    <div className="mt-1 flex items-center gap-2 px-0.5 first:mt-0" title={title}>
+      <span className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted/70">{children}</span>
+      <div className="h-px flex-1 bg-border/40" />
     </div>
   )
 }
@@ -652,9 +705,9 @@ function NowMeter({ running }: { running: boolean }): JSX.Element {
     }, 200)
     return () => window.clearInterval(id)
   }, [])
-  if (!running) return <span className="font-mono text-[10px] text-muted">idle</span>
-  if (armed) return <span className="font-mono text-[10px] text-accent2">◉ armed : waiting for trigger</span>
-  return <span className="font-mono text-[10px] text-muted">next in {(ms / 1000).toFixed(1)}s</span>
+  if (!running) return <span className="font-mono text-[10px] text-muted" title="The auto-pilot is stopped. Press play to hand it the show.">idle</span>
+  if (armed) return <span className="font-mono text-[10px] text-accent2" title="Dwell has elapsed : the next step is armed and now waiting for the audio / chaos trigger you set under Transport → advance on.">◉ armed : waiting for trigger</span>
+  return <span className="font-mono text-[10px] text-muted" title="Countdown to the next automatic scene change.">next in {(ms / 1000).toFixed(1)}s</span>
 }
 
 // Live arc-intensity bar (repose ↔ disturbance).
