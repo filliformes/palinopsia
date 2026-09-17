@@ -400,8 +400,10 @@ export function BodyPage(): JSX.Element {
             <span className="font-mono text-[10px] text-muted">→ /body/…</span>
           </div>
         </div>
-        {/* Top row : camera preview · live feature monitor */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+        {/* Top row : camera preview · live feature monitor. Stretch both columns to
+            a shared height so their bottoms line up ; the preview fills its column
+            (letterboxed, so it never distorts). */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
         {/* Left : the enable button + live camera preview */}
         <div className="flex shrink-0 flex-col gap-2 lg:w-[520px]">
           <button
@@ -416,8 +418,8 @@ export function BodyPage(): JSX.Element {
             {cfg.enabled ? '● embodied control ON — camera live' : 'Enable embodied control (opens camera)'}
           </button>
 
-          <div className="relative aspect-[4/3] w-full overflow-hidden rounded border border-border bg-black">
-            <canvas ref={canvasRef} width={480} height={360} className="h-full w-full" />
+          <div className="relative min-h-[300px] w-full flex-1 overflow-hidden rounded border border-border bg-black">
+            <canvas ref={canvasRef} width={480} height={360} className="h-full w-full object-contain" />
             {!cfg.enabled && (
               <div className="absolute inset-0 flex items-center justify-center px-4 text-center font-mono text-[11px] text-muted">
                 enable to preview the camera and skeleton
@@ -428,7 +430,7 @@ export function BodyPage(): JSX.Element {
 
         {/* Right : the live feature monitor (two columns). */}
         <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <section className="rounded border border-border bg-panel2 p-2">
+          <section className="flex-1 rounded border border-border bg-panel2 p-2">
             <div className="mb-1 font-mono text-[9px] uppercase tracking-wide text-accent2">Feature monitor</div>
             <p className="mb-2 text-[10px] leading-snug text-muted">
               Live 0..1 values off the body bus. <span className="text-text">→</span> routes one into a free modulator slot (then bind it with a param’s <span className="text-text">M</span> button). Every feature is also selectable in any modulator set to <span className="text-text">body</span> (Modulation : D).
