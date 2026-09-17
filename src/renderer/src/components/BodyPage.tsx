@@ -310,15 +310,68 @@ export function BodyPage(): JSX.Element {
           <span className={`h-2 w-2 rounded-full ${cfg.enabled && (live.hands || live.pose || live.face) ? 'animate-pulse bg-red-500' : cfg.enabled ? 'bg-yellow-500' : 'bg-muted'}`} />
           <span className="font-mono text-[10px] text-muted">{statusText}</span>
         </div>
+        <label className="flex items-center gap-1.5" title="Which camera feeds the tracker (a dedicated low-res capture, independent of any webcam layer)">
+          <span className="font-mono text-[10px] text-muted">camera</span>
+          <select
+            value={cfg.deviceId ?? ''}
+            onChange={(e) => patch({ deviceId: e.target.value || null })}
+            className="input select-compact max-w-[200px] text-[11px]"
+          >
+            <option value="">default camera</option>
+            {cameras.map((c) => (
+              <option key={c.id} value={c.id}>{c.label}</option>
+            ))}
+          </select>
+        </label>
         <div className="flex-1" />
         <span className="font-mono text-[9px] text-muted">B / Esc closes</span>
         <button onClick={() => setOpen(false)} className="rounded px-2 py-0.5 text-[12px] text-muted hover:text-text" title="Close (Esc)">✕</button>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-        {/* Top row : camera + controls · live feature monitor */}
+        {/* Tracking controls : one distributed line — which streams to track,
+            how easily gestures fire and hold, and the OSC-out toggle. The two
+            sliders grow to fill so there's no blank space. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded border border-border bg-panel2 px-2.5 py-1.5">
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Toggle on={cfg.hands} label="Hands" onClick={() => patch({ hands: !cfg.hands })} title="Track hand landmarks (21 per hand, up to two hands)" />
+            <Toggle on={cfg.pose} label="Pose" onClick={() => patch({ pose: !cfg.pose })} title="Track the whole-body pose (33 landmarks)" />
+            <Toggle on={cfg.face} label="Face" onClick={() => patch({ face: !cfg.face })} title="Track the face (blendshapes : jaw, smile, brow, blink, pucker + head yaw/pitch/roll). Heavier — enable when you want facial control." />
+            <Toggle on={cfg.mirror} label="Mirror" onClick={() => patch({ mirror: !cfg.mirror })} title="Selfie view : moving right moves the value right" />
+          </div>
+          <label className="flex min-w-[200px] flex-1 items-center gap-2 font-mono text-[11px] text-muted">
+            <span className="shrink-0">sensitivity</span>
+            <input
+              type="range" min={0} max={1} step={0.01} value={cfg.sensitivity}
+              onChange={(e) => patch({ sensitivity: Number(e.target.value) })}
+              className="min-w-0 flex-1"
+              title="How easily gestures fire (pinch distance, clap gap, hands-up threshold). Higher = easier."
+            />
+            <span className="w-8 shrink-0 text-right text-text">{cfg.sensitivity.toFixed(2)}</span>
+          </label>
+          <label className="flex min-w-[200px] flex-1 items-center gap-2 font-mono text-[11px] text-muted">
+            <span className="shrink-0">hold time</span>
+            <input
+              type="range" min={400} max={3000} step={50} value={cfg.holdMs}
+              onChange={(e) => patch({ holdMs: Number(e.target.value) })}
+              className="min-w-0 flex-1"
+              title="How long a pose must be held for a hold gesture (hold up, hold pinch, …) to fire."
+            />
+            <span className="w-8 shrink-0 text-right text-text">{(cfg.holdMs / 1000).toFixed(1)}s</span>
+          </label>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Toggle
+              on={cfg.oscOut}
+              label="OSC out"
+              onClick={() => patch({ oscOut: !cfg.oscOut })}
+              title="When a rule fires, also send an OSC bang to /body/<its OSC name> at the OSC-out target set in I/O setup — so the body plays the sound side too."
+            />
+            <span className="font-mono text-[10px] text-muted">→ /body/…</span>
+          </div>
+        </div>
+        {/* Top row : camera preview · live feature monitor */}
         <div className="flex flex-col gap-3 lg:flex-row">
-        {/* Left : camera + controls */}
+        {/* Left : the enable button + live camera preview */}
         <div className="flex shrink-0 flex-col gap-2 lg:w-[420px]">
           <button
             onClick={() => patch({ enabled: !cfg.enabled })}
@@ -339,60 +392,6 @@ export function BodyPage(): JSX.Element {
                 enable to preview the camera and skeleton
               </div>
             )}
-          </div>
-
-          <label className="flex items-center justify-between gap-2 font-mono text-[11px] text-muted">
-            camera
-            <select
-              value={cfg.deviceId ?? ''}
-              onChange={(e) => patch({ deviceId: e.target.value || null })}
-              className="input select-compact min-w-0 flex-1 text-[11px]"
-              title="Which camera feeds the tracker (a dedicated low-res capture, independent of any webcam layer)"
-            >
-              <option value="">default camera</option>
-              {cameras.map((c) => (
-                <option key={c.id} value={c.id}>{c.label}</option>
-              ))}
-            </select>
-          </label>
-
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Toggle on={cfg.hands} label="Hands" onClick={() => patch({ hands: !cfg.hands })} title="Track hand landmarks (21 per hand, up to two hands)" />
-            <Toggle on={cfg.pose} label="Pose" onClick={() => patch({ pose: !cfg.pose })} title="Track the whole-body pose (33 landmarks)" />
-            <Toggle on={cfg.face} label="Face" onClick={() => patch({ face: !cfg.face })} title="Track the face (blendshapes : jaw, smile, brow, blink, pucker + head yaw/pitch/roll). Heavier — enable when you want facial control." />
-            <Toggle on={cfg.mirror} label="Mirror" onClick={() => patch({ mirror: !cfg.mirror })} title="Selfie view : moving right moves the value right" />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <label className="flex min-w-[150px] flex-1 items-center gap-2 font-mono text-[11px] text-muted">
-              <span className="w-16 shrink-0">sensitivity</span>
-              <input
-                type="range" min={0} max={1} step={0.01} value={cfg.sensitivity}
-                onChange={(e) => patch({ sensitivity: Number(e.target.value) })}
-                className="min-w-0 flex-1"
-                title="How easily gestures fire (pinch distance, clap gap, hands-up threshold). Higher = easier."
-              />
-              <span className="w-8 text-right text-text">{cfg.sensitivity.toFixed(2)}</span>
-            </label>
-            <label className="flex min-w-[150px] flex-1 items-center gap-2 font-mono text-[11px] text-muted">
-              <span className="w-16 shrink-0">hold time</span>
-              <input
-                type="range" min={400} max={3000} step={50} value={cfg.holdMs}
-                onChange={(e) => patch({ holdMs: Number(e.target.value) })}
-                className="min-w-0 flex-1"
-                title="How long a pose must be held for a hold gesture (hold up, hold pinch, …) to fire."
-              />
-              <span className="w-8 text-right text-text">{(cfg.holdMs / 1000).toFixed(1)}s</span>
-            </label>
-            <div className="flex items-center gap-1.5">
-              <Toggle
-                on={cfg.oscOut}
-                label="OSC out"
-                onClick={() => patch({ oscOut: !cfg.oscOut })}
-                title="When a rule fires, also send an OSC bang to /body/<its OSC name> at the OSC-out target set in I/O setup — so the body plays the sound side too."
-              />
-              <span className="font-mono text-[10px] text-muted">→ /body/…</span>
-            </div>
           </div>
         </div>
 
