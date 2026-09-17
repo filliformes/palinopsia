@@ -392,9 +392,9 @@ export function BodyPage(): JSX.Element {
           </div>
         </div>
         {/* Top row : camera preview · live feature monitor */}
-        <div className="flex flex-col gap-3 lg:flex-row">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
         {/* Left : the enable button + live camera preview */}
-        <div className="flex shrink-0 flex-col gap-2 lg:w-[420px]">
+        <div className="flex shrink-0 flex-col gap-2 lg:w-[500px]">
           <button
             onClick={() => patch({ enabled: !cfg.enabled })}
             className={`w-full rounded px-3 py-2 font-mono text-[12px] transition-colors ${
@@ -407,7 +407,7 @@ export function BodyPage(): JSX.Element {
             {cfg.enabled ? '● embodied control ON — camera live' : 'Enable embodied control (opens camera)'}
           </button>
 
-          <div className="relative mx-auto aspect-[4/3] w-full max-w-[420px] overflow-hidden rounded border border-border bg-black">
+          <div className="relative aspect-[4/3] w-full overflow-hidden rounded border border-border bg-black">
             <canvas ref={canvasRef} width={480} height={360} className="h-full w-full" />
             {!cfg.enabled && (
               <div className="absolute inset-0 flex items-center justify-center px-4 text-center font-mono text-[11px] text-muted">
@@ -427,12 +427,12 @@ export function BodyPage(): JSX.Element {
             {FEATURE_GROUPS.map((grp) => (
               <div key={grp.title} className="mb-1.5">
                 <div className="mb-0.5 font-mono text-[8px] uppercase tracking-wide text-muted">{grp.title}</div>
-                <div className="grid grid-cols-1 gap-x-3 gap-y-0.5 sm:grid-cols-2">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1 xl:grid-cols-3 2xl:grid-cols-4">
                   {grp.keys.map((k) => {
                     const v = vals[k] ?? 0
                     return (
                       <div key={k} className="flex items-center gap-1.5">
-                        <span className="w-[70px] shrink-0 truncate font-mono text-[9px] text-muted" title={k}>{k}</span>
+                        <span className="w-[68px] shrink-0 truncate font-mono text-[9px] text-muted" title={k}>{k}</span>
                         <div className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-panel3/70">
                           <div className="absolute inset-y-0 left-0 rounded-full bg-accent" style={{ width: `${Math.round(v * 100)}%` }} />
                         </div>
