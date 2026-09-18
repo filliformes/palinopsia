@@ -3,84 +3,161 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Palinopsia Quickstart</title>
-<meta name="description" content="A first-approach guide to Palinopsia (Opsia): the shortest path from a cold launch to something you like on screen.">
+<title>Palinopsia — a visual instrument you play</title>
+<meta name="description" content="Palinopsia (Opsia): an OSC-controlled ISF/WebGL visual instrument. A four-layer compositor you perform, with a modulation brain, image-to-sound, an automatic video editor, and embodied webcam control. Free and open source for Windows, macOS and Linux.">
+<meta property="og:title" content="Palinopsia — a visual instrument you play">
+<meta property="og:description" content="A four-layer WebGL compositor you perform, not a tool you wire. Played by hand, by an internal modulation brain, over OSC/MIDI, or with your body.">
+<meta property="og:image" content="https://filliformes.github.io/palinopsia/images/interface-compositor.jpg">
+<meta name="theme-color" content="#141414">
 <style>
   :root{
-    --bg:#1a1a1a; --panel:#222; --panel2:#2a2a2a; --line:#111;
-    --ink:#d8d8d8; --muted:#8a8a8a; --accent:#ff8e0f; --accent2:#00bef4;
-    --maxw:760px;
+    --bg:#141414; --panel:#1f1f1f; --panel2:#282828; --line:#0e0e0e; --hair:#2f2f2f;
+    --ink:#dcdcdc; --muted:#8a8a8a; --accent:#ff8e0f; --accent2:#00bef4;
+    --maxw:860px;
   }
   *{box-sizing:border-box}
-  html{-webkit-text-size-adjust:100%}
+  html{-webkit-text-size-adjust:100%; scroll-behavior:smooth}
   body{
     margin:0; background:var(--bg); color:var(--ink);
     font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    padding:0 20px;
   }
   a{color:var(--accent); text-decoration:none}
   a:hover{text-decoration:underline}
-  .wrap{max-width:var(--maxw); margin:0 auto}
-  header.hero{padding:64px 0 20px}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 20px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+  /* Top nav */
+  nav{position:sticky; top:0; z-index:20; background:rgba(20,20,20,.86);
+    backdrop-filter:blur(8px); border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex; align-items:center; gap:18px; height:52px}
+  nav .brand{font-weight:700; letter-spacing:.02em; color:#eee; margin-right:auto}
+  nav .brand .dot{color:var(--accent)}
+  nav a.link{color:var(--muted); font-size:13.5px}
+  nav a.link:hover{color:var(--ink); text-decoration:none}
+  nav a.cta{color:var(--accent); font-weight:600; font-size:13.5px}
+  @media (max-width:680px){ nav a.link{display:none} }
+
+  /* Hero */
+  header.hero{padding:70px 0 12px}
   .kicker{font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-    letter-spacing:.18em; text-transform:uppercase; color:var(--muted); margin:0 0 14px}
-  h1{font-size:44px; line-height:1.05; margin:0 0 10px; letter-spacing:-.01em}
+    letter-spacing:.2em; text-transform:uppercase; color:var(--muted); margin:0 0 16px}
+  h1{font-size:52px; line-height:1.02; margin:0 0 14px; letter-spacing:-.015em; color:#f2f2f2}
   h1 .dot{color:var(--accent)}
-  .lede{font-size:19px; color:var(--ink); margin:0 0 4px}
-  .sub{color:var(--muted); font-size:15px; margin:6px 0 0}
+  .lede{font-size:19px; color:var(--ink); margin:0 0 6px; max-width:60ch}
+  .sub{color:var(--muted); font-size:15px; margin:8px 0 0; max-width:64ch}
+  .specs{display:flex; flex-wrap:wrap; gap:10px 26px; margin:26px 0 4px}
+  .specs .s{display:flex; flex-direction:column; line-height:1.15}
+  .specs .n{font:700 22px/1 ui-monospace,monospace; color:#eee}
+  .specs .n em{color:var(--accent); font-style:normal}
+  .specs .l{font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-top:5px}
+  .ctarow{display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:28px 0 6px}
+  .btn{display:inline-flex; align-items:center; gap:8px; padding:11px 18px; border-radius:8px;
+    font-weight:650; font-size:15px; border:1px solid var(--hair)}
+  .btn.primary{background:var(--accent); color:#161616; border-color:var(--accent)}
+  .btn.primary:hover{background:#ffa533; text-decoration:none}
+  .btn.ghost{background:var(--panel); color:#eee}
+  .btn.ghost:hover{background:var(--panel2); text-decoration:none}
+  .freeoss{color:var(--muted); font-size:14px}
+
   figure{margin:34px 0 10px}
-  figure img{width:100%; display:block; border:1px solid var(--line); border-radius:8px}
-  figcaption{color:var(--muted); font-size:13px; margin-top:8px; font-style:italic}
-  h2{font-size:15px; text-transform:uppercase; letter-spacing:.12em; color:var(--accent);
-    margin:48px 0 4px; font-weight:700}
+  figure img{width:100%; display:block; border:1px solid var(--line); border-radius:10px}
+  figcaption{color:var(--muted); font-size:13px; margin-top:9px; font-style:italic}
+
+  h2{font-size:14px; text-transform:uppercase; letter-spacing:.14em; color:var(--accent);
+    margin:56px 0 4px; font-weight:700}
   h2 + p.section-lede{margin-top:6px; color:var(--muted)}
   section p{margin:14px 0}
+
+  /* Download cards */
+  .dl{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin:24px 0 8px}
+  .dl .card{background:var(--panel); border:1px solid var(--hair); border-radius:10px; padding:18px 18px 16px}
+  .dl .os{font-weight:700; color:#eee; font-size:16px; margin:0 0 3px}
+  .dl .files{color:var(--muted); font-size:13px; margin:0 0 12px; min-height:34px}
+  .dl a.get{display:inline-block; font-weight:650; color:var(--accent); font-size:14px}
+  .dl .hint{color:var(--muted); font-size:11.5px; margin-top:9px; line-height:1.45}
+  @media (max-width:680px){ .dl{grid-template-columns:1fr} }
+
+  /* Feature highlights */
+  .feat{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:24px 0 6px}
+  .feat .card{background:var(--panel); border:1px solid var(--hair); border-radius:10px; overflow:hidden}
+  .feat .card img{width:100%; display:block; border-bottom:1px solid var(--line)}
+  .feat .card .body{padding:15px 17px 17px}
+  .feat .card h3{margin:0 0 6px; font-size:16px; color:#eee}
+  .feat .card h3 .k{font:600 11px/1 ui-monospace,monospace; color:var(--accent);
+    border:1px solid var(--hair); border-radius:5px; padding:3px 6px; margin-left:8px; vertical-align:2px}
+  .feat .card p{margin:0; color:var(--muted); font-size:14px}
+  @media (max-width:680px){ .feat{grid-template-columns:1fr} }
+
+  /* Quickstart steps */
   ol.steps{list-style:none; counter-reset:step; padding:0; margin:22px 0}
   ol.steps li{counter-increment:step; position:relative; padding:0 0 20px 52px; margin:0}
   ol.steps li::before{content:counter(step); position:absolute; left:0; top:-2px;
     width:34px; height:34px; border-radius:50%; background:var(--panel2);
-    border:1px solid var(--line); color:var(--accent); font:700 15px/34px ui-monospace,monospace;
-    text-align:center}
-  ol.steps li:not(:last-child)::after{content:""; position:absolute; left:17px; top:36px;
-    bottom:2px; width:1px; background:var(--line)}
+    border:1px solid var(--line); color:var(--accent); font:700 15px/34px ui-monospace,monospace; text-align:center}
+  ol.steps li:not(:last-child)::after{content:""; position:absolute; left:17px; top:36px; bottom:2px; width:1px; background:var(--line)}
   ol.steps b{color:#eee}
   kbd{display:inline-block; min-width:20px; text-align:center; padding:1px 7px;
     font:600 13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-    color:#eee; background:var(--panel2); border:1px solid var(--line);
-    border-bottom-width:2px; border-radius:5px}
+    color:#eee; background:var(--panel2); border:1px solid var(--line); border-bottom-width:2px; border-radius:5px}
+
   .qa{margin:22px 0; border-top:1px solid var(--line)}
   .qa .row{padding:16px 0; border-bottom:1px solid var(--line)}
   .qa .q{font-weight:600; color:#eee; margin:0 0 4px}
   .qa .a{margin:0; color:var(--ink)}
+
   .grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:26px 0 6px}
   .grid figure{margin:0}
   .grid figcaption{font-size:11px; font-style:normal; margin-top:6px; line-height:1.4}
   .grid b{color:#ccc; font-weight:600}
-  .model{border:1px solid var(--line); border-radius:8px; background:var(--panel);
-    padding:6px 22px; margin:22px 0}
+  @media (max-width:560px){ .grid{grid-template-columns:1fr 1fr} }
+
+  .model{border:1px solid var(--hair); border-radius:10px; background:var(--panel); padding:6px 22px; margin:22px 0}
   .model ul{margin:16px 0; padding-left:20px}
   .model li{margin:10px 0}
   .model b{color:#eee}
-  .note{background:var(--panel); border-left:2px solid var(--accent);
+  .note{background:var(--panel); border-left:2px solid var(--accent2);
     padding:12px 18px; border-radius:0 6px 6px 0; margin:22px 0; color:var(--ink); font-size:15px}
-  hr.soft{border:0; border-top:1px solid var(--line); margin:52px 0}
-  footer{color:var(--muted); font-size:14px; padding:8px 0 72px}
+  hr.soft{border:0; border-top:1px solid var(--line); margin:56px 0}
+  footer{color:var(--muted); font-size:14px; padding:10px 0 80px; line-height:1.7}
   footer a{color:var(--muted); text-decoration:underline}
-  @media (max-width:560px){
-    h1{font-size:34px}
-    .grid{grid-template-columns:1fr 1fr}
-    ol.steps li{padding-left:46px}
-  }
+  @media (max-width:560px){ h1{font-size:38px} ol.steps li{padding-left:46px} }
 </style>
 </head>
 <body>
+
+<nav>
+  <div class="wrap">
+    <span class="brand">Palinopsia<span class="dot">.</span></span>
+    <a class="link" href="#download">Download</a>
+    <a class="link" href="#quickstart">Quickstart</a>
+    <a class="link" href="#highlights">Highlights</a>
+    <a class="link" href="#faq">FAQ</a>
+    <a class="cta" href="https://github.com/filliformes/palinopsia">GitHub ↗</a>
+  </div>
+</nav>
+
 <div class="wrap">
 
   <header class="hero">
-    <p class="kicker">Palinopsia · Quickstart</p>
+    <p class="kicker">Palinopsia · Opsia · a visual instrument</p>
     <h1>A visual instrument you play<span class="dot">.</span></h1>
-    <p class="lede">Palinopsia (Opsia for short) is a WebGL2 compositor you perform, not a tool you wire. It stacks layers of generated and treated video, masters the whole picture through a fixed set of stages, and lets you steer every parameter live: by hand, by an internal modulation brain, or over OSC from a companion app like dataFLOU_compositor or hardware like Pandore.</p>
-    <p class="sub">This page is the shortest path from a cold launch to something you like on screen. If you have never opened the app, start here.</p>
+    <p class="lede">Palinopsia is a WebGL2 compositor you perform, not a tool you wire. It stacks layers of generated and treated video, masters the whole picture through a fixed set of stages, and lets you steer every parameter live: by hand, by an internal modulation brain, over OSC and MIDI, or with your own body.</p>
+    <p class="sub">Free and open source, for Windows, macOS and Linux. The name is the persistence of a visual image after the stimulus is gone.</p>
+
+    <div class="specs">
+      <div class="s"><span class="n"><em>4</em></span><span class="l">layers</span></div>
+      <div class="s"><span class="n"><em>33</em></span><span class="l">sources</span></div>
+      <div class="s"><span class="n"><em>52</em></span><span class="l">effects</span></div>
+      <div class="s"><span class="n"><em>8</em></span><span class="l">sonify voices</span></div>
+      <div class="s"><span class="n"><em>76</em></span><span class="l">one-click recipes</span></div>
+      <div class="s"><span class="n mono">OSC·MIDI·body</span><span class="l">played by</span></div>
+    </div>
+
+    <div class="ctarow">
+      <a class="btn primary" href="#download">↓ Download</a>
+      <a class="btn ghost" href="#quickstart">Quickstart</a>
+      <span class="freeoss">Free &amp; open source · <a href="https://github.com/filliformes/palinopsia">source on GitHub</a></span>
+    </div>
   </header>
 
   <figure>
@@ -88,27 +165,35 @@
     <figcaption>The instrument at rest. Live preview and scene bank top-left, the Inspector for whatever is selected below it, the pinned master stages under that, and the layer stack down the right column.</figcaption>
   </figure>
 
-  <section>
-    <h2>What am I looking at?</h2>
-    <p class="section-lede">Four regions, and you will live mostly in two of them.</p>
-    <p>The <b>preview and scene bank</b> sit top-left: the picture as it renders, and the numbered slots where you keep the looks you like. Under the preview is the <b>Inspector</b>, which always shows the controls for whatever you last clicked (a source, an effect, a knob). Below that are the <b>three pinned master stages</b> that colour and finish the whole image. Down the right column is the <b>layer stack</b>: the four layers you build the picture from. That right column also swaps to other views (the mixer, the global feel, the sound page), but the layers are its home.</p>
-  </section>
-
-  <section>
-    <h2>Your first five minutes</h2>
-    <ol class="steps">
-      <li>You land on a fresh, random one-layer scene. Press <kbd>R</kbd> a few times. Each press re-rolls the whole instrument (sources, effects, blends, modulators) from curated ranges, and crossfades over the morph time. This is the fastest way to feel the range of the thing.</li>
-      <li>Open the <b>Feel</b> tab with <kbd>G</kbd> and drag <b>Density</b>, <b>Flow</b> and <b>Drift</b>. These are whole-image macros: one slider reshapes the entire picture at once. Double-click any slider to reset it to neutral.</li>
-      <li>Click a layer's <b>source</b> (the A chip) and play with its parameters in the Inspector under the preview. Every slider carries a dice for a curated random value, a preset menu, and an <b>M</b> button to attach a modulator.</li>
-      <li>Keep something you like: click <kbd>+</kbd> in the scene bank to save it, then press <kbd>1</kbd> to <kbd>9</kbd> to recall your scenes live. Recalls morph over the same crossfade time.</li>
-      <li>Go big: press <kbd>O</kbd> for the Output page, pick a display, and go fullscreen. Or reach for <b>Generate</b> in the toolbar: 76 recipes, each building a whole coherent session (visuals, palette, world and feel) in one click.</li>
-    </ol>
-    <div class="note">Lost at any point? Press <kbd>?</kbd> for the full keyboard cheat-sheet, in the app. <kbd>Esc</kbd> closes it.</div>
+  <section id="download">
+    <h2>Download</h2>
+    <p class="section-lede">The latest release for every platform. Built by CI, unsigned for now.</p>
+    <div class="dl">
+      <div class="card">
+        <p class="os">Windows</p>
+        <p class="files">Installer (<span class="mono">.exe</span>) or a portable single file. x64.</p>
+        <a class="get" href="https://github.com/filliformes/palinopsia/releases/latest">Get the latest ↗</a>
+        <p class="hint">SmartScreen may warn on an unsigned build: <b>More info → Run anyway</b>.</p>
+      </div>
+      <div class="card">
+        <p class="os">macOS</p>
+        <p class="files">A <span class="mono">.dmg</span> for Apple Silicon (arm64) and Intel (x64).</p>
+        <a class="get" href="https://github.com/filliformes/palinopsia/releases/latest">Get the latest ↗</a>
+        <p class="hint">Un-notarized: right-click the app → <b>Open</b>, or run <span class="mono">xattr -cr</span> on it once.</p>
+      </div>
+      <div class="card">
+        <p class="os">Linux</p>
+        <p class="files"><span class="mono">.AppImage</span> (portable) or <span class="mono">.deb</span>. x64.</p>
+        <a class="get" href="https://github.com/filliformes/palinopsia/releases/latest">Get the latest ↗</a>
+        <p class="hint"><span class="mono">chmod +x</span> the AppImage, then run it.</p>
+      </div>
+    </div>
+    <div class="note">Or build it yourself: <span class="mono">npm install</span>, then <span class="mono">npm run dev</span>. The whole app is on <a href="https://github.com/filliformes/palinopsia">GitHub</a> under the MIT license.</div>
   </section>
 
   <section>
     <h2>What it can make</h2>
-    <p class="section-lede">Every frame below was built by the app alone, no external footage. Pick a recipe from Generate and it composes the whole session for you.</p>
+    <p class="section-lede">Every frame below was built by the app alone, no external footage. Pick a recipe from <b>Generate</b> and it composes the whole session for you.</p>
     <div class="grid">
       <figure><img src="images/shot-opart.jpg" alt="Op-Art"><figcaption><b>Op-Art.</b> A grid warped and folded until it breathes.</figcaption></figure>
       <figure><img src="images/shot-datamosh.jpg" alt="Datamosh"><figcaption><b>Datamosh.</b> A slit-scan torn into RGB compression noise.</figcaption></figure>
@@ -119,6 +204,54 @@
     </div>
   </section>
 
+  <section id="quickstart">
+    <h2>Your first five minutes</h2>
+    <ol class="steps">
+      <li>You land on a fresh, random one-layer scene. Press <kbd>R</kbd> a few times. Each press re-rolls the whole instrument (sources, effects, blends, modulators) from curated ranges and crossfades over the morph time. This is the fastest way to feel the range of the thing.</li>
+      <li>Open the <b>Feel</b> tab with <kbd>G</kbd> and drag <b>Density</b>, <b>Flow</b> and <b>Drift</b>. These are whole-image macros: one slider reshapes the entire picture at once. Double-click any slider to reset it to neutral.</li>
+      <li>Click a layer's <b>source</b> (the A chip) and play with its parameters in the Inspector under the preview. Every slider carries a dice for a curated random value, a preset menu, and an <b>M</b> button to attach a modulator.</li>
+      <li>Keep something you like: click <kbd>+</kbd> in the scene bank to save it, then press <kbd>1</kbd>–<kbd>9</kbd> to recall your scenes live. Recalls morph over the same crossfade time.</li>
+      <li>Go big: press <kbd>O</kbd> for the Output page, pick a display, and go fullscreen. Or reach for <b>Generate</b> in the toolbar: 76 recipes, each building a whole coherent session (visuals, palette, world and feel) in one click.</li>
+    </ol>
+    <div class="note">Lost at any point? Press <kbd>?</kbd> for the full keyboard cheat-sheet, in the app. <kbd>Esc</kbd> closes it.</div>
+  </section>
+
+  <section id="highlights">
+    <h2>Beyond the picture</h2>
+    <p class="section-lede">Palinopsia is one instrument with several rooms. Each is a full-page mode reached by a single key.</p>
+    <div class="feat">
+      <div class="card">
+        <img src="images/interface-sonify.jpg" alt="The Sonify page: the composite mirrored large with sound probes drawn on it, and the voice strips on the right.">
+        <div class="body">
+          <h3>Sonify<span class="k">S</span></h3>
+          <p>The image itself synthesizes audio in real time, inside the app, no external software. Eight voices (a scanning spectrogram, the frame as an oscillator, grain clouds off motion, struck edges, raster audification, SSTV, resonant filters, a chord bank) with a shared reverb/delay tail and its own step sequencer.</p>
+        </div>
+      </div>
+      <div class="card">
+        <img src="images/interface-sequencer.jpg" alt="The macro-form sequencer: tagged scenes across the top, a live monitor, and the transport column on the right.">
+        <div class="body">
+          <h3>Sequencer<span class="k">Q</span></h3>
+          <p>An auto-pilot over your scene bank. Tag each scene, then let it wander: weighted or climate-shaped selection, morph or cut transitions, and slow durational long-forms (Burial, Long-Take, Rose Lowder's Frame-Weave) that reshape the whole run over minutes.</p>
+        </div>
+      </div>
+      <div class="card">
+        <img src="images/interface-modulation.jpg" alt="The modulation brain: eight modulators over the sixteen meta knobs and two XY pads.">
+        <div class="body">
+          <h3>Modulation brain<span class="k">D</span></h3>
+          <p>Eight modulators (LFOs, envelopes, chaos, Euclidean and Turing patterns, audio and vision followers, a body follower) and sixteen meta knobs write on top of your values every frame. Dial a value by hand, then let a shape move it. Everything answers to MIDI Learn and OSC too.</p>
+        </div>
+      </div>
+      <div class="card">
+        <img src="images/interface-output.jpg" alt="The Output and mapping page: a keystone editor over a live mirror of the output, with resolution, flash safety and record controls.">
+        <div class="body">
+          <h3>Output &amp; mapping<span class="k">O</span></h3>
+          <p>Fullscreen to any display, projection-map with a keystone editor, and record the take (it keeps rolling when you leave the page). Send over NDI, Spout or HIVE, with a built-in flash-safety limiter on the last stage of the chain.</p>
+        </div>
+      </div>
+    </div>
+    <p><b>Body</b> <kbd>B</kbd> is the newest room: turn a webcam on (opt-in) and MediaPipe reads your hands, pose, face and silhouette into the instrument. Route any tracked feature into a modulator, or author gesture rules that fire actions and OSC: cover a screen zone with your shadow, or trigger on presence when someone walks into frame. <b>Assemble</b> <kbd>E</kbd> is a concatenative video editor: point it at a folder of films and it edits a matching sequence live, as a layer source.</p>
+  </section>
+
   <section>
     <h2>The mental model</h2>
     <p class="section-lede">A few ideas that make everything else click into place.</p>
@@ -127,13 +260,13 @@
         <li>The picture is a <b>stack</b>, built bottom to top: a Background, then Layer 1 to Layer 4.</li>
         <li>Each layer holds <b>two sources</b> (A and B), a mix between them, its own effect racks, a <b>blend</b> mode onto the layers below, a spatial <b>mask</b>, and its own opacity and speed. A source is a generator, an imported video, a live capture, or a network stream.</li>
         <li>Three stages <b>master the whole picture</b>, always last and always on: <b>Vibe Palette</b> (colour), <b>Context</b> (depth and atmosphere), and the <b>Finalizer</b> (final grade, grain, and output shape).</li>
-        <li>Anything you can reach, you can <b>automate</b>. A modulation brain (eight modulators) and sixteen meta knobs write on top of your values every frame, and the same targets answer to MIDI and OSC. You dial in a value by hand, then let a shape move it.</li>
+        <li>Anything you can reach, you can <b>automate</b>. The modulation brain and the meta knobs write on top of your values every frame, and the same targets answer to MIDI and OSC. You dial in a value by hand, then let a shape move it.</li>
       </ul>
     </div>
     <p>That is the instrument. The long list of sources, effects and nodes is vocabulary you learn over time. The shape of the thing does not change.</p>
   </section>
 
-  <section>
+  <section id="faq">
     <h2>How do I&hellip;?</h2>
     <div class="qa">
       <div class="row">
@@ -149,28 +282,18 @@
         <p class="a">Press <kbd>B</kbd> for Body. Turn a webcam on (opt-in, off by default) and MediaPipe reads your hands, pose, face and silhouette: route any tracked feature into a modulator, or author gesture rules that fire actions and OSC. Cover a screen zone with your shadow to trigger it, or fire on presence (someone walking into or out of frame) for an installation.</p>
       </div>
       <div class="row">
+        <p class="q">Drive it from another app?</p>
+        <p class="a">Every parameter is an OSC endpoint (advertised over OSCQuery), so a companion brain like <a href="https://github.com/filliformes/dataFLOU">dataFLOU</a> or hardware like Pandore can play the whole instrument. The picture also streams back out over OSC, so the image can answer the sound.</p>
+      </div>
+      <div class="row">
         <p class="q">Go fullscreen or record a take?</p>
         <p class="a">Press <kbd>O</kbd> for the Output page: pick a display, set the resolution, and record. The take keeps rolling if you leave the page, so you can tweak parameters mid-recording.</p>
       </div>
       <div class="row">
-        <p class="q">Undo a mistake?</p>
-        <p class="a"><kbd>Ctrl</kbd>+<kbd>Z</kbd> and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>, up to 100 steps. <kbd>Ctrl</kbd>+<kbd>S</kbd> saves the session.</p>
-      </div>
-      <div class="row">
-        <p class="q">Calm it down when a feedback effect runs away?</p>
-        <p class="a">Press <kbd>0</kbd> to flush every self-feeding buffer at once (trails, feedback, accumulators), or <kbd>H</kbd> to freeze the output on the current frame while you sort things out.</p>
-      </div>
-      <div class="row">
-        <p class="q">Learn the vocabulary without reading everything?</p>
-        <p class="a">Hover any effect, source or preset for a one-line description, and lean on <b>Generate</b>: it shows you whole families of the look in context, which is faster than adding things blind.</p>
+        <p class="q">Undo a mistake, or calm a runaway feedback?</p>
+        <p class="a"><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> undo up to 100 steps. Press <kbd>0</kbd> to flush every self-feeding buffer at once, or <kbd>H</kbd> to freeze the output on the current frame while you sort things out.</p>
       </div>
     </div>
-  </section>
-
-  <section>
-    <h2>A few habits that help</h2>
-    <p>Save scenes early and often. A scene is a full snapshot of the instrument, and you recall it with <kbd>1</kbd> to <kbd>9</kbd>, so building a small bank gives you somewhere to return to when a session drifts.</p>
-    <p>Double-click any slider or knob to reset it to its neutral value. This works almost everywhere, including the A/B mix and the video trim handles.</p>
   </section>
 
   <hr class="soft">
@@ -181,8 +304,8 @@
   </section>
 
   <footer>
-    Palinopsia, a visual instrument by <a href="https://github.com/filliformes">Vincent Fillion</a>.
-    Palinopsia is the persistence of a visual image after the stimulus is gone.
+    Palinopsia, a visual instrument by <a href="https://github.com/filliformes">Vincent Fillion</a>. MIT licensed.<br>
+    The visual sibling to <a href="https://github.com/filliformes/dataFLOU">dataFLOU</a>, played over OSC by Pandore.
     Source and full documentation on <a href="https://github.com/filliformes/palinopsia">GitHub</a>.
   </footer>
 
