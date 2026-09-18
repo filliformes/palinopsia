@@ -84,8 +84,9 @@ jobs:
         with:
           path: artifacts
       # Drafts (does not auto-publish) a release with every platform artifact.
-      # macOS dmgs are unsigned/un-notarized for v0.1.0 — the release notes should
-      # tell users to right-click → Open (or `xattr -cr`) past Gatekeeper.
+      # Builds are unsigned / un-notarized — the release notes tell users to
+      # right-click → Open (or `xattr -cr`) past Gatekeeper, More info → Run anyway
+      # past SmartScreen.
       - name: Draft GitHub Release
         uses: softprops/action-gh-release@v2
         with:

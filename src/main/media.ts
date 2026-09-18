@@ -9,6 +9,7 @@
 
 import { protocol } from 'electron'
 import { createReadStream, statSync } from 'fs'
+import { isAbsolute } from 'path'
 import { Readable } from 'stream'
 
 export const MEDIA_SCHEME = 'opsia-media'
@@ -48,7 +49,13 @@ export function handleMediaProtocol(): void {
     } catch {
       return new Response('bad url', { status: 400 })
     }
-    // Refuse anything that isn't a known video container (see ALLOWED_EXT).
+    // The scheme addresses clips the user picked, which can live anywhere, so we
+    // can't confine to a base dir the way opsia-asset:// does. Instead the guards
+    // are: an absolute path only (no relative/scheme tricks), no NUL byte, and a
+    // known video extension (ALLOWED_EXT) — so the blast radius stays video files.
+    if (!filePath || filePath.includes('\0') || !isAbsolute(filePath)) {
+      return new Response('forbidden', { status: 403 })
+    }
     if (!ALLOWED_EXT.has(extOf(filePath))) {
       return new Response('forbidden', { status: 403 })
     }
