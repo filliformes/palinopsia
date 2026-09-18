@@ -35,9 +35,9 @@ jobs:
           - os: macos-latest
             platform: mac
             script: build:mac
-          - os: macos-13
-            platform: mac
-            script: build:mac
+          # No Intel-mac (macos-13) build: those runners are scarce and slow to
+          # allocate and only ever blocked the release. Palinopsia ships macOS
+          # Apple-Silicon (arm64) only; Intel-mac users build from source.
           - os: ubuntu-latest
             platform: linux
             script: build:linux
