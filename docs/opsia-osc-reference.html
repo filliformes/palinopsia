@@ -251,7 +251,8 @@
     <h1>Opsia <span class="slash">/</span> OSC Reference</h1>
     <p class="lede">Every knob, slab and macro in the instrument answers to an <strong>OSC address</strong>.
       This is the full <code>/opsia/…</code> namespace — how Pandore, TouchDesigner, or any OSC
-      source plays Opsia, and how Opsia mirrors its state back.</p>
+      source plays Opsia, and how Opsia answers back: mirroring its state, streaming the analysed
+      picture over <code>/opsia/vision</code>, and firing embodied gestures over <code>/body</code>.</p>
     <div class="facts">
       <span class="chip">namespace <b>/opsia/…</b></span>
       <span class="chip">transport <b>UDP</b></span>
@@ -476,6 +477,7 @@
           <tr><td class="addr"><span class="lit">/opsia/audio/</span>transient</td><td class="arg">f 0..1</td><td class="desc"><b>Onset</b> / attack energy.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audio/</span>centroid</td><td class="arg">f 0..1</td><td class="desc">Spectral <b>brightness</b>.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audio/</span>pitch</td><td class="arg">f 0..1</td><td class="desc">Estimated <b>pitch</b>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/audio/</span>noisiness</td><td class="arg">f 0..1</td><td class="desc">Spectral <b>flatness</b> — 0 tonal / pitched, 1 noise-like (hiss, breath).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audio/</span>band/<span class="v">{1-6}</span></td><td class="arg">f 0..1</td><td class="desc">Energy in one of six frequency <b>bands</b>.</td></tr>
         </tbody>
       </table>
@@ -510,10 +512,77 @@
     </div>
   </section>
 
+  <!-- ── Sonify ───────────────────────────────────────────── -->
+  <section id="sonify">
+    <div class="sec-head">
+      <span class="sec-num">11</span>
+      <h2>Sonify</h2>
+      <span class="sec-note">image → sound · v = voice</span>
+    </div>
+    <p class="blurb">The image-to-sound engine speaks its own sub-namespace. The eight voices are
+      <code>spectra · orbit · flow · events · raster · sstv · filter · chord</code>; each takes the same
+      shape of address, so a controller can play any voice's probes, pitch and timbre. The patch also
+      travels with sessions and scenes.</p>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td class="addr"><span class="lit">/opsia/sonify/</span>on</td><td class="arg">bool</td><td class="desc">Master <b>on/off</b> for the sound engine.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/sonify/</span>master</td><td class="arg">f 0..1</td><td class="desc">Output <b>gain</b>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/sonify/</span>root · rootoct · scale</td><td class="arg">i · s</td><td class="desc">Global <b>quantizer</b> — key root, root octave, and scale name.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/sonify/</span><span class="v">{v}</span>/on · gain · pan</td><td class="arg">bool · f</td><td class="desc">Per-<b>voice</b> enable, level and pan.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/sonify/</span><span class="v">{v}</span>/<span class="v">{probe·pitch·param}</span></td><td class="arg">f 0..1</td><td class="desc">A voice's <b>probes</b> (scan column, orbit centre/radius, raster rect…), <b>pitch</b>, and timbre / motion params — same names as the on-screen strip.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/sonify/</span>fx/<span class="v">{input}</span></td><td class="arg">f 0..1</td><td class="desc">The shared <b>reverb / delay</b> tail — <code>send · delaytime · feedback · size · decay · damp · reverbmode · freeze …</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Vision (outbound) ────────────────────────────────── -->
+  <section id="vision">
+    <div class="sec-head">
+      <span class="sec-num">12</span>
+      <h2>Vision</h2>
+      <span class="sec-note">outbound only · the picture answers back</span>
+    </div>
+    <p class="blurb">The composited output is analysed back into features and streamed out (when OSC-out is on),
+      so the image itself can play a sound brain — the inward half of the loop. Each is a single
+      <code>0..1</code> float; bind them on the far side as you would any control.</p>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td class="addr"><span class="lit">/opsia/vision/</span><span class="v">{feature}</span></td><td class="arg">f 0..1 →</td><td class="desc">One picture feature — <code>brightness · contrast · motion · edges · entropy · centroidX · centroidY · warmth · saturation · hue · depth · depthSpread</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Embodied / Body (outbound) ───────────────────────── -->
+  <section id="body">
+    <div class="sec-head">
+      <span class="sec-num">13</span>
+      <h2>Embodied · Body</h2>
+      <span class="sec-note">outbound only · under <b>/body/</b>, not /opsia</span>
+    </div>
+    <p class="blurb">The Body page's gesture rules can fire their own OSC. When a rule fires and its
+      <b>OSC out</b> is on, Opsia sends a bang to the OSC-out target — so a body gesture (a pinch, a pose,
+      a shadow covering a screen zone, someone walking into frame) can play the sound side. These live
+      under <code>/body/…</code>, outside the <code>/opsia</code> namespace, with the name you gave the rule.</p>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td class="addr"><span class="lit">/body/</span><span class="v">{name}</span></td><td class="arg">i 1</td><td class="desc">A gesture <b>rule</b> fired — the custom OSC name, or a truncated default like <code>/body/HandsUpRndMod</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <!-- ── Two-way sync ─────────────────────────────────────── -->
   <section id="sync">
     <div class="sec-head">
-      <span class="sec-num">11</span>
+      <span class="sec-num">14</span>
       <h2>Discovery &amp; feedback</h2>
       <span class="sec-note">two-way sync</span>
     </div>

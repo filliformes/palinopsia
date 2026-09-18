@@ -55,7 +55,7 @@ racks, palette, World and macro biases : in one click.
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
 - [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix)
 - [Sequencer](#sequencer-key-q) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
-- [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) · [MIDI](#midi) · [Body : embodied control](#body--embodied-control-key-b) · [Output & mapping](#output--mapping-key-o) : incl. Flash safety
+- [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) · [Output & mapping](#output--mapping-key-o) : composition size · light out (DMX/WLED) · installation · Flash safety
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) : eight voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Chord) · quantizer · audio in recordings
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
@@ -456,16 +456,31 @@ composite live.
 
 ## Audio in
 
-The **osc/audio/midi** right-column tab (key `A`) holds the control panels:
+The **osc/audio/midi** right-column tab (key `A`) holds the control panels
+(**Audio · OSC · MIDI · Performance**):
 
 - **Audio** : enable the local analyser (input device picker), or receive
   features over OSC from an audio brain (`/opsia/audio/*`). The **coupling**
   master switch (pinned right) reveals each layer's CPL row. Live meters show
-  level / flux / transient / centroid / bands.
+  level / flux / transient / centroid / **noisiness** (spectral flatness) / bands.
+  - **Monitoring / passthrough** : route the input through to a chosen output
+    device (its own **sink** picker), so you can hear a source (e.g. the sound of
+    an Ableton Move on interface inputs 1&2) while it drives the visuals. The
+    **Sonify** sound and the monitored input have **separate levels**, so both run
+    at once without fighting.
+  - **Denoiser** : a built-in filter for USB / interface hum. It **learns** the
+    input's noise (mains-hum series + strong tones), models a set of notches, and
+    applies a high-pass + multi-notch filter to clean the signal before it is
+    monitored or analysed.
 - **OSC** : inbound listener (port, on/off, this machine's IPs), outbound
   feedback (host/port/interval), and the OSCQuery status.
-- **MIDI** : controller input picker + the learned-bindings ledger
-  (see [MIDI](#midi)).
+- **MIDI** : controller input picker + the learned-bindings ledger, plus the
+  **MIDI output** controls (see [MIDI](#midi)).
+- **Performance** : a per-section load monitor — each part of the instrument
+  (render, output, vision, depth, lights, sonify, audio, modulation, MediaPipe)
+  with its CPU frame-budget share, estimated VRAM, and active-feature chips, so you
+  can see what a heavy session is spending, with units and hover tooltips on every
+  figure. Fixed layout (no reflow as modulation comes and goes).
 
 Everything that "listens" to sound reads one shared **audio bus**: coupling,
 Tonicity, the `audio` modulator, World routings, Proximity's `◑` follow, and the
@@ -508,6 +523,13 @@ doesn't travel with sessions). The **MIDI** section of the osc/audio/midi tab
 is handled), a **live-activity readout** (last message + how many controls are
 wired, so you can confirm the port is really talking), and the full bindings
 ledger with per-row clear.
+
+**MIDI output.** The same panel also picks a **MIDI output** device and sends
+Opsia's tempo out over it: a 24-PPQN **clock** + **Start/Stop transport** (both
+toggleable), so an external instrument locks to Opsia's BPM. A **thru / merge**
+pass forwards the learned input to that output (with a loop guard), so one USB
+cable both plays Opsia and drives the gear downstream. Built to sync an **Ableton
+Move** over USB-C: Opsia is the visual sibling, the Move keeps the beat.
 
 ## Body : embodied control (key `B`)
 
@@ -578,6 +600,10 @@ A full-page takeover (the engine keeps rendering underneath):
   the output) + alignment grid + reset.
 - **Resolution** : render-scale 0.1–2× of 1920×1080 (½ lo-fi / 1080p / 1440p / 4K;
   rebuilds the engine).
+- **Composition size** : override the 16:9 base with a **custom composition** (e.g.
+  **7680×2160** for a wide wall or a stack of projectors). The whole engine renders
+  at that shape; the output window can then **span separate displays**, so several
+  projectors show one continuous picture.
 - **Fullscreen output** : pick a display; borderless-fullscreen or windowed. The
   output window runs its own compositor fed per-frame state : pixel-perfect, no
   transcode.
@@ -588,6 +614,14 @@ A full-page takeover (the engine keeps rendering underneath):
 - **Send** : NDI / Spout toggles (optional native senders; the frame readback is
   asynchronous : attaching a sink costs ~nothing); **HIVE** HEVC-over-TCP network
   output + port.
+- **Light output** : push the picture's colour **into the room**. The composite is
+  averaged into a small zone grid and sent over **ArtNet / DMX** (to fixtures or a
+  console) and to **WLED** LED strips, so stage lighting breathes with the visuals.
+- **Installation mode** : a panel to run Opsia as a **kiosk**. Boot a chosen session
+  **fullscreen on a chosen display** on launch (or from the command line:
+  `--kiosk [--session=<file>] [--display=<n>]`), with renderer-crash **self-heal**,
+  and an exit hatch (`O` / `Esc` on the output, or `Ctrl+Shift+O` globally) so a
+  black-boxed machine is never stuck. Toggle "launch on restart" here.
 - **Flash safety** : a photosensitivity limiter on the very last stage of the
   chain: a GPU slew limiter caps how fast the frame's mean luminance may rise,
   taming strobes from any source (Superimposition, Triangle Flicker, feedback
@@ -1187,7 +1221,7 @@ unless the slot actually holds a video.
 | `/opsia/surface/loop` | bool | Close the draw path into a loop |
 
 **Audio sensors** (pushed by the "audio brain"; bypass the store, feed the audio bus
-directly): `/opsia/audio/{level|flux|transient|centroid|pitch}` and
+directly): `/opsia/audio/{level|flux|transient|centroid|pitch|noisiness}` and
 `/opsia/audio/band/{1..6}` : all `f`, `0..1`.
 
 Type resolution: `float` → `min + v·(max−min)`; enum → nearest member;
@@ -1215,6 +1249,11 @@ at frame rate; it's advertised for discovery but never echoed).
 Behaviour: a diff loop on a `max(40, interval)` ms timer; a leaf is sent only when it
 moves by ≥ `0.0015`; a first-pass burst cap (~97 leaves/tick) spreads the initial
 sync over subsequent ticks; a full resend on (re)start.
+
+The composited **picture** is also streamed back as vision features (the inward half of
+the loop, so the image can play a sound brain): `/opsia/vision/{brightness | contrast |
+motion | edges | entropy | centroidX | centroidY | warmth | saturation | hue | depth |
+depthSpread}`, each `f` `0..1`, on the same outbound target.
 
 Separately, the [Body page](#body--embodied-control-key-b) emits its own bangs: with
 its **OSC out** on, each time a gesture rule fires it sends a `/body/<name>` message
