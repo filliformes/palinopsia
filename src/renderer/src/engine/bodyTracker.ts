@@ -69,6 +69,12 @@ class BodyTracker {
   private lastTs = -1
   private running = false
   private starting = false
+  // Bumped on each start(); a start attempt bails after any await if this changed
+  // or the camera was disabled, so a fast enable→disable can't leave a stream live.
+  private startGen = 0
+  // Serialises ensureLandmarkers() so two overlapping config changes can't both
+  // recreate the pose landmarker (leaking one) or desync poseSeg vs silhouette.
+  private ensureChain: Promise<void> = Promise.resolve()
   private err: string | null = null
 
   // Preview + gesture state.
@@ -77,7 +83,7 @@ class BodyTracker {
   private latestFace: NormalizedLandmark[] | null = null
   private prevPose: NormalizedLandmark[] | null = null
   private pinchDown = { left: false, right: false }
-  private crossSign = 0
+  private prevTwoHands: Array<{ x: number; y: number }> | null = null // last frame's two wrist positions (for cross)
   private clapArmed = true
   private handsUpArmed = true
   private mouthArmed = true
@@ -137,11 +143,20 @@ class BodyTracker {
     }
   }
 
-  /** Create the landmarkers the config asks for, close the ones it doesn't.
-   *  Needs `fileset` + `vision` (set in start()). GPU first, CPU fallback. */
-  private async ensureLandmarkers(): Promise<void> {
+  /** Create the landmarkers the config asks for, close the ones it doesn't. Serialised
+   *  through a promise chain so concurrent config changes can't both recreate a
+   *  landmarker (never awaited by the caller of setConfig, so they can overlap). */
+  private ensureLandmarkers(): Promise<void> {
+    this.ensureChain = this.ensureChain.catch(() => {}).then(() => this.doEnsureLandmarkers())
+    return this.ensureChain
+  }
+
+  /** Needs `fileset` + `vision` (set in start()). GPU first, CPU fallback. Never
+   *  throws (a total load failure sets `err`), so the chain above can't reject. */
+  private async doEnsureLandmarkers(): Promise<void> {
     const vision = this.vision, fileset = this.fileset, cfg = this.cfg
     if (!vision || !fileset || !cfg) return
+    try {
     if (cfg.hands && !this.hands) {
       this.hands = await vision.HandLandmarker.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: HAND_MODEL, delegate: 'GPU' },
@@ -189,16 +204,28 @@ class BodyTracker {
       this.face = null
       this.latestFace = null
     }
+    } catch (e) {
+      this.err = (e as Error).message || 'model load failed'
+    }
   }
 
   private async start(): Promise<void> {
     if (this.starting || this.running || !this.cfg?.enabled) return
+    const gen = ++this.startGen
     this.starting = true
     this.err = null
+    // True once the user turned the camera off, or a newer start() superseded us,
+    // at any await point : we must then release whatever we acquired and stop.
+    const stale = (): boolean => gen !== this.startGen || !this.cfg?.enabled
+    let stream: MediaStream | null = null
+    const releaseStream = (): void => {
+      stream?.getTracks().forEach((t) => t.stop())
+      if (this.stream === stream) { this.stream = null; if (this.video) { this.video.srcObject = null; this.video = null } }
+    }
     try {
       // 1) Dedicated low-res webcam (480p is plenty for landmarks, cheap to run).
       const deviceId = this.cfg.deviceId
-      this.stream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 640 },
           height: { ideal: 480 },
@@ -206,31 +233,40 @@ class BodyTracker {
         },
         audio: false
       })
+      if (stale()) { releaseStream(); return }
       const video = document.createElement('video')
       video.autoplay = true
       video.muted = true
       video.playsInline = true
-      video.srcObject = this.stream
+      video.srcObject = stream
       await video.play().catch(() => {})
+      if (stale()) { releaseStream(); return }
+      this.stream = stream
       this.video = video
 
       // 2) MediaPipe : lazy import + self-hosted wasm/models (offline). Cache the
       //    module + fileset so Hands / Pose can be toggled live without reloading.
       if (!this.vision) this.vision = (await import('@mediapipe/tasks-vision')) as MP
       if (!this.fileset) this.fileset = await this.vision.FilesetResolver.forVisionTasks(WASM_BASE)
+      if (stale()) { if (gen === this.startGen) this.stop(); else releaseStream(); return }
       await this.ensureLandmarkers()
+      if (stale()) { if (gen === this.startGen) this.stop(); else releaseStream(); return }
 
       this.running = true
-      this.starting = false
       this.loop()
     } catch (e) {
       this.err = (e as Error).message || 'camera / model load failed'
-      this.starting = false
+      releaseStream()
       this.stop()
+    } finally {
+      // Only the newest attempt owns `starting` ; an old, superseded one must not
+      // clear it out from under the start() that replaced it.
+      if (gen === this.startGen) this.starting = false
     }
   }
 
   stop(): void {
+    this.startGen++ // invalidate any start() still resolving its awaits
     this.running = false
     this.starting = false
     if (this.raf) cancelAnimationFrame(this.raf)
@@ -395,12 +431,15 @@ class BodyTracker {
       } else if (apart > clapThresh * 2) {
         this.clapArmed = true
       }
-      // Cross : the two wrists swap sides.
-      const sign = Math.sign(mx(right[WRIST].x) - mx(left[WRIST].x))
-      if (sign !== 0 && this.crossSign !== 0 && sign !== this.crossSign) this.emit('cross')
-      if (sign !== 0) this.crossSign = sign
+      // Cross : the two hands swap sides. left/right are re-sorted by screen x every
+      // frame, so the labels never show the swap — match this frame's leftmost hand
+      // to last frame's two hands, and if it is nearest the one that was on the
+      // RIGHT, they just crossed. (emit()'s cooldown debounces the crossing frames.)
+      const pt = this.prevTwoHands, aL = left[WRIST]
+      if (pt && Math.hypot(aL.x - pt[1].x, aL.y - pt[1].y) < Math.hypot(aL.x - pt[0].x, aL.y - pt[0].y)) this.emit('cross')
+      this.prevTwoHands = [{ x: aL.x, y: aL.y }, { x: right[WRIST].x, y: right[WRIST].y }]
     } else {
-      this.crossSign = 0
+      this.prevTwoHands = null
     }
   }
 
@@ -422,9 +461,11 @@ class BodyTracker {
     const hipMid = { x: (lm[L_HIP].x + lm[R_HIP].x) / 2, y: (lm[L_HIP].y + lm[R_HIP].y) / 2 }
     const shoulderW = Math.abs(lm[L_SHO].x - lm[R_SHO].x) || 1e-3
 
-    // Overall left/right placement + torso lean.
+    // Overall left/right placement + torso lean. bodyLean is a DELTA (shoulders vs
+    // hips), so mirror flips its sign — applying the position mirror `mx` to it
+    // (which is 1 - delta) would pin it near 1 in the default selfie view.
     out.weightLR = clamp01(mx((shoMid.x + hipMid.x) / 2))
-    out.bodyLean = clamp01(0.5 + mx(shoMid.x - hipMid.x) * 3 - (mirror ? 0 : 0))
+    out.bodyLean = clamp01(0.5 + (mirror ? -1 : 1) * (shoMid.x - hipMid.x) * 3)
     // Shoulder-line tilt : one shoulder higher than the other.
     const tilt = (lm[L_SHO].y - lm[R_SHO].y) * (mirror ? -1 : 1)
     out.bodySway = clamp01(0.5 + tilt * 4)
