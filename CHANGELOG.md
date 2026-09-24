@@ -5,6 +5,38 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Added
+
+- **Fulldome output** (Output page). The engine renders a square **domemaster**
+  (equidistant fisheye, front at the bottom) at 2K / 4K / 8K from the flat
+  composition, aperture 180–230° (210° default, the SAT Satosphère), and it
+  replaces the frame everywhere : preview, projector window, NDI, Spout,
+  recording, stills. Three ways to fit a 2D picture : **wrap** (panorama around
+  the room), **screen** (a flat virtual screen re-projected to read undistorted
+  from the centre) and **fisheye**; rotate, spin, rim feather, flip and an
+  alignment grid burned into the output. A **3D dome simulator** (ported from the
+  TouchDesigner FulldomeSimulator) shows the live master on a dome, from the seat
+  or as an outside cutaway, with tilt, template and sweet spot.
+- **Resolume OSC mapper** (new page, key `K`). Read a Resolume composition
+  (`.avc`) : its layers, groups, columns, clips, effects and dashboard links become
+  the columns of a matrix whose rows are Palinopsia's signals (modulators, Meta
+  knobs, audio / vision / body features, any `/opsia` address). Click / paint to
+  connect, per-cell amount, float / toggle / trigger columns with range and
+  smoothing, **Learn** addresses off Resolume's own OSC output, scene → column
+  triggers, 8 snapshots, a **lock**, and the whole mapping saved with the session.
+- **TouchDesigner recipes** as native nodes, in any rack : **Remap**, **Luma Blur**
+  (with a depth-of-field mode on the depth map), **Gooey** (blur then threshold),
+  **Matte** (three inputs) and **Lookup** (a live layer as the palette). Nodes can
+  now take a second layer input.
+- **LighterColor** blend mode (whole-pixel lighter-wins).
+
+### Fixed
+
+- **Mosaïque** never matched anything : its matcher named a variable `patch`, a
+  reserved word in GLSL ES 3.00, so the matching program never compiled and the
+  node could not choose tiles. Found by compiling every engine shader in a plain
+  WebGL2 context.
+
 ### Changed
 
 - The **window title** now carries the release version, like dataFLOU_compositor:

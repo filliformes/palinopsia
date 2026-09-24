@@ -55,17 +55,18 @@ racks, palette, World and macro biases : in one click.
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
 - [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix)
 - [Sequencer](#sequencer-key-q) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
-- [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) · [Output & mapping](#output--mapping-key-o) : composition size · light out (DMX/WLED) · installation · Flash safety
+- [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) · [Output & mapping](#output--mapping-key-o) : **fulldome** (210° domemaster + 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) : eight voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Chord) · quantizer · audio in recordings
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
 - [Sources](#sources-33-generators) (33 generators) · [Effects](#effects) (52 FX) ·
-  [Native nodes](#native-nodes) (20) · [Master finalizers](#master-finalizers--pinned-always-last)
-- [Blend modes](#blend-modes) (18)
+  [Native nodes](#native-nodes) (25) · [Master finalizers](#master-finalizers--pinned-always-last)
+- [Blend modes](#blend-modes) (19)
 
 **Control & internals**
+- [Resolume OSC mapper](#resolume-osc-mapper-key-k) : Palinopsia signals × any Resolume address, read from a composition
 - [OSC implementation](#osc-implementation) : inbound · outbound · OSCQuery · setup
 - [Stack & architecture](#stack) · [Aesthetic guardrails](#aesthetic-guardrails) · [Credits & license](#credits--license)
 
@@ -146,6 +147,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `Q` | Sequence page |
 | `S` | **Sonify** page (image-to-sound engine) |
 | `B` | **Body** page : embodied control (a camera → gestures + modulators) |
+| `K` | **Resolume OSC mapper** page : drive any Resolume address from Palinopsia's signals |
 | `E` | Right column → **assemble** (the automatic editor) |
 | `A` | Right column → **osc/audio/midi** setup tab |
 | `D` / `X` / `I` | Collapse Modulation / Master-FX / Inspector |
@@ -154,7 +156,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `L` | **MIDI Learn** on/off : from any tab or full-page view |
 | `?` | Keyboard **cheat-sheet** : this table, in-app (Esc closes) |
 | `0` | **Panic flush** : clear every self-feeding buffer (feedback / trails / rings / accumulators) at once |
-| `Esc` | Close the cheat-sheet, then MIDI Learn; otherwise close World / Sonify / Body / Output / Sequence |
+| `Esc` | Close the cheat-sheet, then MIDI Learn; otherwise close Resolume / World / Sonify / Body / Output / Sequence |
 | `Ctrl/Cmd+Z` · `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` | Undo · Redo (100 levels) |
 | `Ctrl/Cmd+S` | Save session |
 | `Ctrl/Cmd` `+` / `-` / `0` · `Ctrl`+wheel | UI zoom in / out / reset |
@@ -181,8 +183,8 @@ Each of the **4 layers** carries:
 | **Source A / B** | Two source slots. Each holds a generator, an imported video (`🎞`), a capture (webcam `📷` / screen `🖥` / device `🎥`), a HIVE network stream (`📡`), or nothing. |
 | **A/B mix** (`MIX`) | `sourceBlend` (how B combines with A, incl. the relation modes Weave / Lumakey / Consume) · `sourceMix` (0 = A only … 1 = full B) · `harmony` (⚖ consonant → dissonant B hue). Inert until B has a source. |
 | **Source FX** | A separate effect rack under **each** source slot (`sourceAFx`, `sourceBFx`). |
-| **Layer FX** (`FX`) | The layer's own effect rack : the only rack that accepts the **sidechain** [native nodes](#native-nodes) (Transfert, Convolution, Mosaïque); the self-contained nodes run in any rack. |
-| **Blend** (`BLEND`) | How the layer composites onto the stack below ([18 blend modes](#blend-modes)). |
+| **Layer FX** (`FX`) | The layer's own effect rack : the only rack that accepts the **sidechain** [native nodes](#native-nodes) (Transfert, Convolution, Mosaïque); the self-contained nodes run in any rack, and so do the TouchDesigner recipes (Remap, Luma Blur, Gooey, Matte, Lookup), whose other-layer inputs are optional. |
+| **Blend** (`BLEND`) | How the layer composites onto the stack below ([19 blend modes](#blend-modes)). |
 | **Mask** | A per-layer spatial mask beyond blend modes: **luma** (keyed off the layer's own brightness, lo/hi + soft knee), **gradient** (a directional wipe at any angle/position), or **shape** (a soft rect/ellipse window : centre, size, aspect, roundness), each invertible. Multiplies into the layer's alpha before the blend. |
 | **Opacity** | Header slider (0–1; double-click → 1). |
 | **Speed** (`SPEED`) | The layer's own clock multiplier (0–20×) over global speed (double-click → 1). |
@@ -596,6 +598,7 @@ coverage to a modulator: screen-space control that reads clearly to an audience.
 
 A full-page takeover (the engine keeps rendering underneath):
 
+- **Fulldome** : render a square **domemaster** for a dome (see [Fulldome](#fulldome) below).
 - **Mapping** : a live keystone editor (drag four corner handles over a mirror of
   the output) + alignment grid + reset.
 - **Resolution** : render-scale 0.1–2× of 1920×1080 (½ lo-fi / 1080p / 1440p / 4K;
@@ -634,6 +637,41 @@ A full-page takeover (the engine keeps rendering underneath):
 *The keystone editor with its four corner handles over a live mirror of the
 output, and the right column holding resolution, flash safety, display + record
 controls. The HUD runs along the bottom.*
+
+### Fulldome
+
+The first section of the Output page turns the output into a **domemaster** : a square,
+equidistant fisheye with the zenith at the centre and the **front of the dome at the
+bottom** (the fulldome standard, what a planetarium or the SAT Satosphère takes). The
+engine keeps rendering the flat composition at its own size; one pass maps it into the
+master at **2K, 4K or 8K**, and the master replaces the flat frame **everywhere** : the
+preview, the projector window (letterboxed, never stretched), NDI, Spout, recordings and
+stills. Keystone warp is off in dome mode (a dome is mapped by its own media server).
+
+- **Aperture** 180–230° (210° default : the Satosphère's 210°, its rim 15° below the
+  horizon). The Satosphère takes **4096×4096 max, live over NDI** on its 10 Gb network.
+  8K is for stills : video encoders stop at 4K, so recording refuses 8K with a hint.
+- **Three ways to fit a 2D picture to a dome** :
+  - **wrap** : a panorama around the room. **turns** (how many times it goes around;
+    fewer = more horizontal stretch), **mirror seams** (alternate copies mirror so the
+    repeats join), **top / bottom** (the elevations its edges reach; −15° is the rim of a
+    210° dome), and what fills the **zenith** above it (fade / stretch / black).
+  - **screen** : the picture hung on the dome as a flat virtual screen, re-projected so it
+    reads **undistorted from the centre** (a giant cinema screen) : **azimuth, elevation,
+    width, roll**, with a dim wrapped **surround** so the dome is never black.
+  - **fisheye** : the picture laid straight onto the master (**scale, offset**).
+- **rotate**, a continuous **spin** (°/s), a **feather** at the rim, **flip**, and a
+  **grid on output** : 10° rings, 30° spokes, the horizon in cyan, the front meridian in
+  red, burned into the master for projector alignment.
+- **3D dome simulator** (the in-app port of the TouchDesigner *FulldomeSimulator*) : the
+  live master wrapped back onto a dome. **inside** puts you in the seat (drag to look
+  around, wheel = field of view); **outside** is a cutaway orbit (the near shell hidden so
+  the far half reads the right way round). **tilt** (for tilted planetariums; the
+  Satosphère is level), an alignment **template** at low opacity, and the **sweet spot**
+  patch (width, low / high elevation) where an audience facing front naturally looks.
+  **master** shows the flat domemaster instead. Double-click the view to reset the camera.
+- The dome settings live on the machine (the venue) **and** travel with the session (the
+  piece).
 
 **If the GPU driver resets** (a Windows TDR : heavy sessions across two displays
 can provoke one), the picture no longer dies for good: both the main window and
@@ -996,7 +1034,10 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
 - **Native nodes**: the three **sidechain** nodes (Transfert, Convolution, Mosaïque) are
   **Layer-FX only** : they read another layer as their input. The self-contained
   nodes run in any rack; Parallax runs in a layer or the Master rack (it needs the
-  whole-picture depth map).
+  whole-picture depth map). The five **TouchDesigner recipes** (Remap, Luma Blur,
+  Gooey, Matte, Lookup) run in any rack : they can read another layer (a Master-rack
+  Lookup can take layer 3 as its palette) and fall back to their own picture when
+  none is picked.
 - **The three master finalizers** (Vibe · Context · Finalizer) are **pinned, locked,
   and always last in the Master rack, in that order.** They can't be added, removed,
   reordered, or duplicated : only bypassed.
@@ -1076,8 +1117,14 @@ another layer, so they are **Layer-FX only** and get a layer picker in the Inspe
 **self-contained** nodes run in any rack (Faultline is happiest on the Master, where
 the whole programme glitches at once).
 
+The last five are **classic TouchDesigner recipes** : the TOP moves people reach for
+in TD, as one-click rack effects. Each reads an optional other layer through a
+labelled picker in the Inspector (**map**, **control**, **palette**; the three-input
+**Matte** gets two : *input 2* and *matte*) and falls back to its own picture when
+none is picked, so all five run in any rack.
+
 <details>
-<summary><b>The full node catalogue (20)</b> (click to expand)</summary>
+<summary><b>The full node catalogue (25)</b> (click to expand)</summary>
 
 | Node | Description |
 |---|---|
@@ -1101,6 +1148,11 @@ the whole programme glitches at once).
 | **Faultline** | A dirty vision-mixer : a **rate** clock and a **dirt** probability fire momentary **structural faults** at the output and the picture is completely clean between them (the SLIP skip-law moved to the blend stage). Each fire is one discrete fault : **dropout** (the signal loses lock and cuts out in sweeping streaks), **cut** (a hard cut to the frame frozen at the fire instant), **timebase** (a head-switch knock : scanline-block shear + field roll + a torn switch band), **noise** (a sweeping switching-static band), or **roulette** (a fresh pick each fire). **Depth** severity, **hold** length, **fire ▸** by hand / OSC / a modulator. Best on the Master rack. |
 | **Sillage** | Advected-noise feedback (IBFV, van Wijk 2002) : a dye buffer is dragged each frame along a **flow field** and topped up with fresh filtered noise, so the noise smears into flow-aligned filaments (a line-integral / LIC look) and **decays into structure** instead of glowing : a wake of dye trailing the motion, reading as material, not neon. The field is a divergence-free **curl-noise** base (**field** : always flowing, so even a still image streams) plus the image's own **optical flow** (**motion** : its movement advects the dye); steer the wake anywhere with **wind** (a drift of strength *push* in any *angle*) and **swirl** (a spiral about the centre). **dye** tints the wake by the picture so it reads as its own substance, **flow** the streak length, **injection** the decay rate, **grain** the noise frequency. |
 | **Toile** | Reworks the picture as a **painting that follows its own structure** : a structure tensor finds each contour's orientation, and the image is smoothed into strokes running **along** it (anisotropic Kuwahara), so forms flatten into coherent paint (steady frame-to-frame, not speckling) while the **edges are preserved**, not washed out. **line** adds flow-XDoG ink : clean outlines measured across each contour and smoothed along it, following the image's own structure. **brush** size, **flatten** hardness, **paint** amount, **line edge** threshold. The real *Peint* + *Griffé* as a rack effect. |
+| **Remap** | TouchDesigner's **Remap TOP** : another layer's red and green channels become the coordinates each pixel of this layer reads from (red = x, green = y). A gradient layer bends the picture smoothly, a noisy one shatters it. **absolute** is TD's behaviour, **offset** displaces around mid-grey instead; **scale** / **offset x·y** reshape the map, **extend** picks hold / repeat / mirror past the edge, **swap roles** makes this layer the map. |
+| **Luma Blur** | TouchDesigner's **Luma Blur TOP** : a blur whose width follows a control image's brightness : **black width** where the control is dark, **white width** where it is bright (pixels at 1080p). The control is another layer, or this layer's own brightness. **control = depth focus** reads the shared depth map around a **focus** plane instead : one depth stays sharp and the rest melts, a real **depth-of-field** blur (Resolume 7.28's Depth Blur, from a node you already have). |
+| **Gooey** | The **blur-then-threshold** recipe : the picture is blurred (at half resolution) and cut at a brightness **level**, so shapes that sit close together melt into soft single blobs, the metaball / lava-lamp look. **blur** sets how far shapes reach for each other, **softness** the edge; **fill** shows the crisp source, the blurred colour pushed to full strength, or a white matte; **outside** keeps some of the source around the blobs. |
+| **Matte** | TouchDesigner's **three-input Matte TOP** : this layer shows where the matte is bright, **input 2** where it is dark. Both inputs are other layers, picked in the Inspector. **matte channel** (luma / R / G / B / alpha), **low / high** levels to choke or soften the edge, **invert**, **swap 1 and 2**. No matte = this layer keys itself by its own brightness; no input 2 = black. |
+| **Lookup** | TouchDesigner's **Lookup TOP with a live palette** : this layer is recoloured through a line drawn across **another layer**, so that layer's moving colours become the colour table. **index** by brightness, each channel on its own, or hue; **axis** + **position** place the line, **band** averages a stripe around it (calm colours from a busy palette), **offset** cycles the table, **cycles** repeats it, **mirror** folds it. No palette layer = the picture is its own palette. |
 
 </details>
 
@@ -1119,18 +1171,65 @@ last word on the frame.
 
 ### Blend modes
 
-18 modes, shared by the layer→stack blend and (via `sourceBlend`) the A/B mix,
+19 modes, shared by the layer→stack blend and (via `sourceBlend`) the A/B mix,
 in index order (for OSC): `normal, add, subtract, multiply, screen, overlay,
 softlight, hardlight, darken, lighten, difference, exclusion, dodge, burn, wrap,
-weave, lumakey, consume`.
+weave, lumakey, consume, lightercolor`.
 
-The last three are **relation modes**, at their best on the A/B mix:
+**lightercolor** (TouchDesigner / Photoshop's *Lighter Color*) keeps the WHOLE pixel
+of whichever side is brighter, so hues never mix channel by channel the way
+**lighten** does : two pictures interlock as clean shapes instead of blending.
+
+Weave, lumakey and consume are **relation modes**, at their best on the A/B mix:
 
 - **weave** : interleaves A and B in alternating bands;
 - **lumakey** : B keys into A by luminance;
 - **consume** : a *stateful competition field*: A and B fight for territory
   frame-by-frame (a reagent surface remembers who held each pixel), so the mix
   boils and creeps instead of crossfading.
+
+---
+
+## Resolume OSC mapper (key `K`)
+
+A matrix to drive **any Resolume address from Palinopsia's signals**, sketched and
+re-sketched live : rows are Palinopsia, columns are Resolume, click a cell to connect.
+It grew out of a Max patch built for the same job (`udpreceive` → per-feature routes →
+`speedlim` → `matrix 18 30` → `udpsend`), and keeps its habits.
+
+- **Open .avc** reads a Resolume composition straight from its file : layers (with
+  their names and groups), groups, columns, the current deck's loaded clips, every
+  composition / group / layer effect chain, and each dashboard's links with the
+  parameter each one drives. That becomes the columns, grouped per composition /
+  selected clip / group / layer / columns / clips : **dashboard links** first (the usual
+  way a Resolume set is built to be played), then masters, opacity, bypass / clear,
+  effect bypass / mix / parameters, column and clip **connect** triggers. Groups fold
+  shut; a folded group still shows the columns that carry a connection. **↻** re-reads
+  the file after you change the set and save, keeping every connection whose address
+  still exists.
+- **Rows** : any modulator, Meta knob, audio / vision / body feature, or **any `/opsia`
+  address** (the whole OSC surface). 18 by default, like the patch (8 modulators, 6
+  picture features, 4 sound features). Each row has a **smooth** and a **gain**.
+- **Cells** : click to connect, drag to paint several, right-click to set the
+  **amount**. Several rows into one column combine by **mean / max / sum**.
+- **Columns** : **float** (with a **low / high** range : Resolume parameters take 0..1),
+  **toggle** (0 / 1 with hysteresis) or **trigger** (sends 1 each time the value rises
+  past the middle), a **smooth**, and a **test** (double-click the column : a float
+  sweeps up and back, a trigger fires, a toggle flips) to find the control in Resolume.
+- **Learn** : turn on Resolume's OSC **output** (Preferences › OSC, target
+  `127.0.0.1` : Palinopsia's OSC input port) and move any control in Resolume : its exact
+  address becomes a column. Transport positions and meters are ignored.
+- **Add an address by hand** for anything else.
+- **scene → column** : recalling Palinopsia scene N connects Resolume column N (+ an
+  offset), the patch's scene trigger.
+- **8 snapshots** of the connections : click recalls, shift+click stores.
+- **Lock** : no connection, row or column can change (sending, snapshot recall and
+  scene follow keep working).
+- The mapping is **saved with the session**, lock and all.
+
+Sending runs at the chosen **rate** (5–60 Hz); only connected columns send, a float only
+when it moved, all in one batched message per tick. In Resolume : Preferences › OSC ›
+**Input** on (port 7000 by default); set the same host and port on the page.
 
 ---
 
