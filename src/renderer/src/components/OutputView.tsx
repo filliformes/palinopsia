@@ -10,7 +10,7 @@
 // texture (warp is post-composite, so it belongs here).
 
 import { useEffect, useRef, useState } from 'react'
-import type { OutputFrame } from '@shared/types'
+import type { OutputWarp } from '@shared/types'
 import { OutputPresenter } from '../engine/OutputPresenter'
 
 export function OutputView(): JSX.Element {
@@ -95,7 +95,7 @@ export function OutputView(): JSX.Element {
     window.postMessage('opsia:want-pixelport', '*')
 
     // Warp corners + grid ride the small composition push (cheap metadata).
-    const off = window.api.onOutputFrame((f: OutputFrame) => {
+    const off = window.api.onOutputFrame((f: OutputWarp) => {
       presenter?.setWarp(f.warpEnabled ? f.warpCorners : null, !!f.warpGrid)
     })
 

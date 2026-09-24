@@ -17,7 +17,7 @@ import type { DisplayInfo, PerfStats } from '@shared/types'
 import { useStore } from '../store'
 import { showToast } from './Toast'
 import { currentFps } from '../perf'
-import { captureScreenshot, outputRecorder, recordingFormats } from '../recorder'
+import { captureScreenshot, outputRecorder, recordingFormats, encoderAccepts, DXV_MAX_EDGE, type RecordingFormat } from '../recorder'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { DomeSim } from './DomeSim'
 import { DOME_RES, defaultDomeConfig, type DomeConfig, type DomeMode } from '@shared/dome'
@@ -142,15 +142,31 @@ export function OutputPage({
   const dragging = useRef<number | null>(null)
 
   // ── Recording + screenshot ──────────────────────────────────────────
-  const [formats, setFormats] = useState<Array<{ id: string; label: string }>>([])
-  const [formatId, setFormatId] = useState<string>('')
+  // The chosen format lives in the store (machine-local, the MIDI record toggle
+  // uses it too). Encoder formats go through the hardware video encoder, which
+  // refuses big frames (3840×2160 max on Windows : the 4096² dome master is too
+  // big) : asked up front, those formats show greyed out at such a size, and a
+  // take in one of them records as DXV3 instead, which takes any size.
+  const [formats, setFormats] = useState<RecordingFormat[]>([])
+  useEffect(() => { void recordingFormats().then(setFormats) }, [])
+  const recordPrefs = useStore((s) => s.recordPrefs)
+  const setRecordPrefs = useStore((s) => s.setRecordPrefs)
+  const canvasW = dome.enabled ? dome.res : Math.round(compW * renderScale)
+  const canvasH = dome.enabled ? dome.res : Math.round(compH * renderScale)
+  const [encoderOk, setEncoderOk] = useState<boolean | null>(null)
   useEffect(() => {
-    void recordingFormats().then((fs) => {
-      setFormats(fs)
-      // Default to MP4/H.264 when available (fast remux, high quality), else first.
-      setFormatId((cur) => cur || fs.find((f) => f.id === 'mp4-h264')?.id || fs[0]?.id || '')
-    })
-  }, [])
+    let live = true
+    setEncoderOk(null)
+    void encoderAccepts(canvasW, canvasH).then((ok) => { if (live) setEncoderOk(ok) })
+    return () => { live = false }
+  }, [canvasW, canvasH])
+  const available = (f: RecordingFormat): boolean => f.kind === 'realtime' || encoderOk !== false
+  const chosen = formats.find((f) => f.id === recordPrefs.format) ?? formats.find((f) => f.id === 'mp4-h264') ?? formats[0]
+  const formatId = chosen && available(chosen) ? chosen.id : formats.some((f) => f.id === 'dxv3') ? 'dxv3' : ''
+  const fellBack = !!chosen && formatId !== chosen.id
+  const recSize = formatId === 'dxv3'
+    ? (() => { const k = Math.min(1, DXV_MAX_EDGE / Math.max(canvasW, canvasH)); return { w: Math.round(canvasW * k), h: Math.round(canvasH * k) } })()
+    : { w: canvasW, h: canvasH }
   // The GLOBAL recorder : the take survives leaving this page (tweak live in
   // the main view; the top-bar REC pill shows and stops it).
   const recording = useStore((s) => s.recording)
@@ -185,12 +201,10 @@ export function OutputPage({
     } else {
       const canvas = canvasRef.current
       if (!canvas || !formatId) return
-      if (dome.enabled && dome.res > 4096) {
-        showToast('Video encoders stop at 4K : record the dome at 4096 (8K is for stills)', 'warn', 6000)
-        return
-      }
       const ok = await outputRecorder.start(canvas, formatId)
-      if (!ok) flashSaved('failed', 'recording could not start')
+      if (!ok) {
+        showToast(`Recording could not start${outputRecorder.lastError ? ` : ${outputRecorder.lastError}` : ''}`, 'warn', 7000)
+      }
     }
   }
 
@@ -263,8 +277,9 @@ export function OutputPage({
   const shareKind = window.api.platform === 'win32' ? 'Spout' : window.api.platform === 'darwin' ? 'Syphon' : null
   const toggleShare = async (): Promise<void> => {
     const next = !shareActive
-    const ok = await window.api.shareSet(next)
-    setShareActive(next && ok)
+    const r = await window.api.shareSet(next)
+    const ok = r.ok
+    setShareActive(next && ok, { local: r.local, topDown: r.topDown })
     if (next && !ok) {
       showToast(
         `${shareKind} could not start : this build of Palinopsia has no ${shareKind} sender (native/${shareKind?.toLowerCase()} was not built)`,
@@ -635,22 +650,44 @@ export function OutputPage({
             )}
           </Section>
 
-          <Section title="Record" info="Clips + screenshots land in the Recorded folder, at the current output resolution. Captured as a high-bitrate hardware H.264 master, then ffmpeg delivers the chosen format (ProRes / FFV1 / uncompressed included).">
+          <Section title="Record" info="Clips + screenshots land in the Recorded folder. DXV3 (Resolume's codec) is compressed on the graphics card and written as it goes : any size (the 4096² dome included; bigger is scaled to 4096), constant frame rate, plays smoothly in Resolume with no conversion, no sound. The other formats are captured as a high-bitrate hardware H.264 master, then ffmpeg delivers the chosen one (ProRes / FFV1 / uncompressed included) : the hardware encoder takes up to 3840×2160, so they're greyed out above that. DXV3 records the clean picture (before keystone); the others record what the preview shows.">
 
             <select
               className="input select-compact w-full text-[11px]"
               value={formatId}
-              onChange={(e) => setFormatId(e.target.value)}
+              onChange={(e) => setRecordPrefs({ format: e.target.value })}
               disabled={recording || formats.length === 0}
               title="Recording format"
             >
               {formats.length === 0 && <option value="">no encoder available</option>}
               {formats.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.label}
+                <option key={f.id} value={f.id} disabled={!available(f)}>
+                  {f.label}{available(f) ? '' : ` · not at ${canvasW}×${canvasH}`}
                 </option>
               ))}
             </select>
+            <div className="flex items-center gap-1.5 font-mono text-[10px] text-muted">
+              <span className="min-w-0 flex-1 truncate" title="The size and rate this take will record at">
+                {recSize.w}×{recSize.h}
+                {formatId === 'dxv3' ? ` · ${recordPrefs.fps} fps constant` : ' · up to 60 fps'}
+              </span>
+              {formatId === 'dxv3' && [30, 60].map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setRecordPrefs({ fps: f as 30 | 60 })}
+                  disabled={recording}
+                  className={`${btn(recordPrefs.fps === f)} !px-2 !py-0.5`}
+                  title={`Record DXV3 at ${f} frames per second`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+            {fellBack && (
+              <div className="font-mono text-[10px] text-yellow-300">
+                {chosen!.label.split(' · ')[0]} can't record {canvasW}×{canvasH} here : this take records DXV3.
+              </div>
+            )}
             <div className="flex gap-1.5">
               <span className="relative flex flex-1">
                 <MidiLearnOverlay id="fire:record" />

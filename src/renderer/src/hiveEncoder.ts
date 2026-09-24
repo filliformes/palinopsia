@@ -25,7 +25,9 @@ export class HiveEncoder {
       width,
       height,
       bitrate: 80_000_000,
-      framerate: 60,
+      // No framerate hint : with `framerate: 60` Windows' hardware encoder answered
+      // "unsupported" at every size, 1080p included (measured), so HIVE could
+      // never start. The encoder paces itself on the frames' timestamps anyway.
       hardwareAcceleration: 'prefer-hardware',
       latencyMode: 'realtime',
       hevc: { format: 'annexb' }

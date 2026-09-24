@@ -1,10 +1,12 @@
 import { ndiConfigure, ndiOnStatus } from './ndi'
+import { shareLocal } from './share'
+import './recWriter' // real-time DXV3 recording : the file writer
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   ExposedApi,
   HiveAU,
   HiveStatus,
-  OutputFrame,
+  OutputWarp,
   OscInEvent,
   Session
 } from '@shared/types'
@@ -104,9 +106,9 @@ const api: ExposedApi = {
   },
   // Control → output window: push the per-frame render state (composition +
   // modulation + warp + clock) so the output renders it natively (pixel-perfect).
-  outputFrame: (frame: OutputFrame) => ipcRenderer.send('output:frame', frame),
-  onOutputFrame: (cb: (frame: OutputFrame) => void) => {
-    const h = (_e: Electron.IpcRendererEvent, frame: OutputFrame): void => cb(frame)
+  outputFrame: (frame: OutputWarp) => ipcRenderer.send('output:frame', frame),
+  onOutputFrame: (cb: (frame: OutputWarp) => void) => {
+    const h = (_e: Electron.IpcRendererEvent, frame: OutputWarp): void => cb(frame)
     ipcRenderer.on('output:frame', h)
     return () => ipcRenderer.off('output:frame', h)
   },
@@ -148,7 +150,18 @@ const api: ExposedApi = {
   },
   // 'win32' | 'darwin' | 'linux' : picks Spout or Syphon, and the NDI installer.
   platform: process.platform as string,
-  shareSet: (on: boolean) => ipcRenderer.invoke('share:set', on),
+  // Spout / Syphon : the sender runs HERE when its addon loads (src/preload/share.ts,
+  // frames by transfer), else in main (frames over IPC : slow at 4K).
+  shareSet: async (on: boolean) => {
+    const local = shareLocal(on)
+    if (!on) {
+      await ipcRenderer.invoke('share:set', false)
+      return { ok: true, local: false, topDown: false }
+    }
+    if (local.ok) return { ok: true, local: true, topDown: local.topDown }
+    const ok = (await ipcRenderer.invoke('share:set', true)) as boolean
+    return { ok, local: false, topDown: false, error: local.error }
+  },
   shareFrame: (w: number, h: number, pixels: Uint8Array) => ipcRenderer.send('share:frame', w, h, pixels),
 
   // ── Light output (ArtNet/DMX · WLED) ─────────────────────────────

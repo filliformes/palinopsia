@@ -1,7 +1,13 @@
 // Output recording + screenshots → the "Recorded" folder next to the app
 // (project root in dev, install dir when packaged; falls back to <userData>).
 //
-// Pipeline: the renderer records the output canvas with MediaRecorder at a HIGH
+// Two kinds of format :
+//   · REAL-TIME (DXV3) : the renderer compresses on the GPU and its preload
+//     writes the file as it goes (src/preload/recWriter.ts); main only names it
+//     (takePath). No size limit from a video encoder : the full dome records.
+//   · ENCODER formats, below.
+//
+// Encoder pipeline: the renderer records the output canvas with MediaRecorder at a HIGH
 // bitrate using a hardware-accelerated codec (H.264 where available) into a
 // temporary intermediate file, streamed here chunk-by-chunk. On stop we hand it
 // to ffmpeg (ffmpeg-static) to produce the chosen delivery format : a fast
@@ -39,21 +45,36 @@ type Fmt = {
   id: string
   label: string
   ext: string
+  kind: 'realtime' | 'encoder'
   needsFfmpeg: boolean
   args?: (src: string, out: string, srcCodec: string) => string[]
 }
 
 const FORMATS: Fmt[] = [
   {
+    // Resolume's GPU codec, written in real time (see the header) : plays back
+    // smoothly in Resolume with no conversion, at any size up to 4096.
+    id: 'dxv3',
+    label: 'DXV3 · Resolume (real time, full size)',
+    ext: 'mov',
+    kind: 'realtime',
+    needsFfmpeg: false
+  },
+  {
+    // What Chromium's hardware encoder wrote, untouched : H.264 in Matroska,
+    // variable frame rate, no seek index. Instant, but editors and Resolume
+    // prefer the MP4 below (also instant : the same video, remuxed).
     id: 'source',
-    label: 'Fast · no re-encode',
+    label: 'MKV · H.264 as captured (instant)',
     ext: 'mkv',
+    kind: 'encoder',
     needsFfmpeg: false
   },
   {
     id: 'mp4-h264',
     label: 'MP4 · H.264 (high quality)',
     ext: 'mp4',
+    kind: 'encoder',
     needsFfmpeg: true,
     // Codecs already match → stream-copy remux (instant, lossless). Else x264.
     args: (src, out, c) =>
@@ -65,6 +86,7 @@ const FORMATS: Fmt[] = [
     id: 'mp4-h265',
     label: 'MP4 · H.265 / HEVC',
     ext: 'mp4',
+    kind: 'encoder',
     needsFfmpeg: true,
     args: (src, out) => ['-i', src, '-c:v', 'libx265', '-preset', 'medium', '-crf', '20', '-pix_fmt', 'yuv420p', '-tag:v', 'hvc1', '-c:a', 'aac', '-b:a', '256k', out]
   },
@@ -72,6 +94,7 @@ const FORMATS: Fmt[] = [
     id: 'mov-prores',
     label: 'MOV · ProRes 422 HQ',
     ext: 'mov',
+    kind: 'encoder',
     needsFfmpeg: true,
     args: (src, out) => ['-i', src, '-c:v', 'prores_ks', '-profile:v', '3', '-pix_fmt', 'yuv422p10le', '-c:a', 'pcm_s16le', out]
   },
@@ -79,6 +102,7 @@ const FORMATS: Fmt[] = [
     id: 'mkv-ffv1',
     label: 'MKV · FFV1 (lossless)',
     ext: 'mkv',
+    kind: 'encoder',
     needsFfmpeg: true,
     args: (src, out) => ['-i', src, '-c:v', 'ffv1', '-level', '3', '-g', '1', '-c:a', 'copy', out]
   },
@@ -86,6 +110,7 @@ const FORMATS: Fmt[] = [
     id: 'avi-raw',
     label: 'AVI · uncompressed (raw)',
     ext: 'avi',
+    kind: 'encoder',
     needsFfmpeg: true,
     args: (src, out) => ['-i', src, '-c:v', 'rawvideo', '-pix_fmt', 'bgr24', '-c:a', 'pcm_s16le', out]
   },
@@ -93,6 +118,7 @@ const FORMATS: Fmt[] = [
     id: 'webm-vp9',
     label: 'WebM · VP9',
     ext: 'webm',
+    kind: 'encoder',
     needsFfmpeg: true,
     args: (src, out, c) =>
       c === 'vp9'
@@ -102,9 +128,20 @@ const FORMATS: Fmt[] = [
 ]
 
 /** The delivery formats offered to the renderer (ffmpeg ones only when present). */
-export function recordingFormats(): Array<{ id: string; label: string }> {
+export function recordingFormats(): Array<{ id: string; label: string; kind: 'realtime' | 'encoder' }> {
   const hasFf = ffmpegAvailable()
-  return FORMATS.filter((f) => !f.needsFfmpeg || hasFf).map((f) => ({ id: f.id, label: f.label }))
+  return FORMATS.filter((f) => !f.needsFfmpeg || hasFf).map((f) => ({ id: f.id, label: f.label, kind: f.kind }))
+}
+
+/** A fresh file path in Recorded/ for a real-time take (its preload writes it). */
+export async function takePath(ext: string): Promise<string | null> {
+  try {
+    const dir = await ensureFolder()
+    return join(dir, `opsia-${stamp()}.${/^[a-z0-9]+$/i.test(ext) ? ext : 'mov'}`)
+  } catch (e) {
+    console.error('[recording] no folder:', (e as Error).message)
+    return null
+  }
 }
 
 function recordedFolder(): string {
@@ -197,6 +234,12 @@ export async function recordingStop(formatId: string): Promise<string | null> {
   stream = null
   tmpPath = null
   if (!src || !existsSync(src)) return null
+  // A take the encoder never fed (e.g. it refused the frame size) : don't leave
+  // an empty file behind under a real clip's name.
+  if ((await fs.stat(src).catch(() => null))?.size === 0) {
+    await fs.rm(src).catch(() => {})
+    return null
+  }
 
   const fmt = FORMATS.find((f) => f.id === formatId) ?? FORMATS[0]
   const dir = dirname(src)

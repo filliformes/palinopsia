@@ -626,6 +626,7 @@ app.whenReady().then(async () => {
 
   // ---------- IPC: Recording + screenshots ----------
   safeHandle('recording:formats', () => recording.recordingFormats())
+  safeHandle('recording:takePath', (_e, ext) => recording.takePath(ext as string))
   safeHandle('recording:start', (_e, ext, codec) =>
     recording.recordingStart(ext as string, codec as string)
   )

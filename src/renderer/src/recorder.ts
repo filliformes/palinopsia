@@ -1,16 +1,59 @@
-// Output recorder : captures the live output canvas with MediaRecorder into a
-// HIGH-bitrate, hardware-accelerated intermediate (H.264 where the platform
-// offers it : smooth, low CPU), streams the chunks to main, and lets ffmpeg
-// turn that into the chosen delivery format on stop (fast stream-copy remux when
-// codecs match; a real transcode for ProRes / FFV1 / uncompressed / H.265 / VP9).
+// Output recorder. Two kinds of take :
 //
-// MediaRecorder taps the canvas compositor output (no per-frame gl.readPixels),
-// so recording doesn't stall the live show. The lo-fi/glitchy look before was
-// MediaRecorder's ~2.5 Mbps default; we now set a resolution-scaled bitrate.
+// · DXV3 (Resolume's GPU codec), REAL TIME : the engine compresses each frame to
+//   DXT1 on the GPU (engine/frameCapture 'dxt1', read back asynchronously), a
+//   few workers turn the blocks into DXV3 frames (workers/dxvWorker.ts), and the
+//   preload writes the QuickTime file as it goes (src/preload/recWriter.ts). No
+//   video encoder in the path, so no size limit : the 4096² dome master records
+//   at full size (bigger masters are scaled to 4096). Constant frame rate : when
+//   the engine falls behind the record rate, the next frame is written again for
+//   the ticks it missed, so the clip always runs in real time. It records the
+//   CLEAN picture (before keystone). No sound.
+//
+// · ENCODER formats : MediaRecorder captures the output canvas into a HIGH-bitrate,
+//   hardware-accelerated intermediate (H.264 where the platform offers it),
+//   streams the chunks to main, and ffmpeg turns that into the chosen delivery
+//   format on stop (fast stream-copy remux when codecs match; a real transcode
+//   for ProRes / FFV1 / uncompressed / H.265 / VP9). The hardware encoder has a
+//   size limit (3840×2160 on this Windows/Chromium, measured : 4096×2304 and the
+//   4096² dome are refused), checked up front by encoderAccepts().
 
 import { sonifyEngine } from './audio/sonify'
 import { useStore } from './store'
 import { showToast } from './components/Toast'
+import { ndiRate } from '@shared/ndi'
+import type { Compositor } from './engine/Compositor'
+import DxvWorker from './workers/dxvWorker?worker&inline'
+
+/** The longest edge a DXV3 take records at (a bigger dome master is scaled). */
+export const DXV_MAX_EDGE = 4096
+
+/** Would this machine's video encoder take a w×h canvas ? (the encoder formats
+ *  go through it; MediaRecorder uses the same hardware encoder as WebCodecs, so
+ *  WebCodecs answers for it.) Cached per size. */
+const acceptCache = new Map<string, Promise<boolean>>()
+export function encoderAccepts(w: number, h: number): Promise<boolean> {
+  const key = `${w}x${h}`
+  let p = acceptCache.get(key)
+  if (!p) {
+    p = (async () => {
+      try {
+        if (typeof VideoEncoder === 'undefined') return w * h <= 3840 * 2160
+        // Size only : adding framerate 60 made Windows' encoder say no even at
+        // sizes it records fine (measured), so asking for it would grey out
+        // formats that work.
+        const r = await VideoEncoder.isConfigSupported({
+          codec: 'avc1.640034', width: w, height: h, hardwareAcceleration: 'prefer-hardware'
+        })
+        return !!r.supported
+      } catch {
+        return false
+      }
+    })()
+    acceptCache.set(key, p)
+  }
+  return p
+}
 
 // Intermediate codec preference: H.264 first (hardware-encoded on Windows/macOS
 // Chromium → smooth + cheap), then VP9, then VP8. Each maps to what we tell main.
@@ -37,12 +80,14 @@ function pickIntermediate(withAudio: boolean): { mime: string; ext: string; code
   )
 }
 
+export type RecordingFormat = { id: string; label: string; kind: 'realtime' | 'encoder' }
+
 /** Delivery formats offered to the UI : comes from main (ffmpeg-gated). */
-export async function recordingFormats(): Promise<Array<{ id: string; label: string }>> {
+export async function recordingFormats(): Promise<RecordingFormat[]> {
   try {
     return await window.api.recordingFormats()
   } catch {
-    return [{ id: 'source', label: 'Fast · no re-encode' }]
+    return [{ id: 'dxv3', label: 'DXV3 · Resolume (real time, full size)', kind: 'realtime' }]
   }
 }
 
@@ -53,7 +98,145 @@ function captureBitrate(w: number, h: number, fps: number): number {
   return Math.min(150_000_000, Math.max(25_000_000, Math.round(w * h * fps * 0.22)))
 }
 
+/** Get the preload's DXV writer port (it answers 'opsia:want-recport'). */
+function recPort(): Promise<MessagePort | null> {
+  return new Promise((res) => {
+    const on = (e: MessageEvent): void => {
+      if (e.data !== 'opsia:recport' || !e.ports[0]) return
+      window.clearTimeout(t)
+      window.removeEventListener('message', on)
+      res(e.ports[0])
+    }
+    const t = window.setTimeout(() => {
+      window.removeEventListener('message', on)
+      res(null)
+    }, 2000)
+    window.addEventListener('message', on)
+    window.postMessage('opsia:want-recport', '*')
+  })
+}
+
+/** One real-time DXV3 take (see the header). The render loop drives it through
+ *  tick() : it captures on the record rate's grid, hands finished frames to the
+ *  workers, and forwards their results to the writer strictly in order. */
+class DxvTake {
+  private workers: Worker[] = []
+  private seq = 0 // frames handed to the workers
+  private next = 0 // the next frame the writer should get
+  private built = new Map<number, { frame: ArrayBuffer; length: number; repeat: number }>()
+  private repeats: number[] = [] // per queued capture : the record ticks it covers, oldest first
+  private pendingRepeats = new Map<number, number>()
+  private ticksDone = 0
+  private t0 = 0
+  private interval: number
+  private kicking = true
+  private waiters = new Map<string, (d: Record<string, unknown>) => void>()
+  path = ''
+  w = 0
+  h = 0
+
+  constructor(private comp: () => Compositor | null, private port: MessagePort, readonly fps: number) {
+    this.interval = 1000 / fps
+    // Frames are independent : a few workers side by side (one DXV3 frame at
+    // 4096² takes ~28 ms to build, a 30 fps take has 33).
+    const k = Math.max(2, Math.min(4, Math.floor((navigator.hardwareConcurrency || 4) / 4)))
+    for (let i = 0; i < k; i++) {
+      const wk = new DxvWorker()
+      wk.onmessage = (e: MessageEvent): void => this.onBuilt(e.data)
+      this.workers.push(wk)
+    }
+    port.onmessage = (e: MessageEvent): void => {
+      const d = e.data as { t: string }
+      if (d.t === 'error') this.waiters.forEach((w) => w(e.data))
+      else this.waiters.get(d.t)?.(e.data)
+    }
+  }
+
+  private wait(t: string, ms: number): Promise<Record<string, unknown>> {
+    return new Promise((res) => {
+      const timer = window.setTimeout(() => {
+        this.waiters.delete(t)
+        res({ t: 'error', message: `the writer did not answer (${t})` })
+      }, ms)
+      this.waiters.set(t, (d) => {
+        window.clearTimeout(timer)
+        this.waiters.delete(t)
+        res(d)
+      })
+    })
+  }
+
+  /** Create the file. Returns an error message, or null when rolling. */
+  async open(): Promise<string | null> {
+    const c = this.comp()
+    if (!c) return 'the engine is not running'
+    const { w, h } = c.captureSizeFor('dxt1', DXV_MAX_EDGE)
+    this.w = w
+    this.h = h
+    const [fpsN, fpsD] = ndiRate(this.fps)
+    this.port.postMessage({ t: 'open', w, h, fpsN, fpsD })
+    const r = await this.wait('opened', 5000)
+    if (r.t !== 'opened') return String(r.message ?? 'the file could not be created')
+    this.path = String(r.path)
+    this.t0 = performance.now()
+    return null
+  }
+
+  private onBuilt(d: { seq: number; frame: ArrayBuffer; length: number; dxt: ArrayBuffer }): void {
+    this.comp()?.captureRecycle('rec', d.dxt)
+    const repeat = this.pendingRepeats.get(d.seq) ?? 1
+    this.pendingRepeats.delete(d.seq)
+    this.built.set(d.seq, { frame: d.frame, length: d.length, repeat })
+    // Deliver in order : the workers finish in any order.
+    for (let f = this.built.get(this.next); f; f = this.built.get(this.next)) {
+      this.built.delete(this.next)
+      this.port.postMessage({ t: 'frame', buf: f.frame, length: f.length, repeat: f.repeat }, [f.frame])
+      this.next++
+    }
+  }
+
+  /** Every render-loop frame, right after the render. */
+  tick(now: number): void {
+    const c = this.comp()
+    if (!c) return
+    // Finished captures first, oldest first, round-robin to the workers.
+    for (let fr = c.captureHarvest('rec'); fr; fr = c.captureHarvest('rec')) {
+      const n = this.seq++
+      this.pendingRepeats.set(n, this.repeats.shift() ?? 1)
+      this.workers[n % this.workers.length].postMessage({ seq: n, buf: fr.buf, blocksPerRow: fr.blocksPerRow }, [fr.buf])
+    }
+    if (!this.kicking) return
+    // Record ticks elapsed since the start; capture when at least one is due.
+    // A capture that finds the GPU behind (no free slot) is skipped : the next
+    // one then covers the missed ticks (written again), so the clip keeps time.
+    const due = Math.floor((now - this.t0) / this.interval) + 1 - this.ticksDone
+    if (due >= 1 && c.captureKick('rec', 'dxt1', DXV_MAX_EDGE)) {
+      this.repeats.push(due)
+      this.ticksDone += due
+    }
+  }
+
+  /** Stop capturing, wait for the frames in flight, close the file. */
+  async finish(): Promise<{ path: string | null; frames: number; dropped: number; error?: string }> {
+    this.kicking = false
+    const c = this.comp()
+    const until = performance.now() + 4000
+    while (performance.now() < until && ((c?.capturePending('rec') ?? 0) > 0 || this.next < this.seq)) {
+      await new Promise((r) => window.setTimeout(r, 30))
+    }
+    this.port.postMessage({ t: 'end' })
+    const r = await this.wait('done', 60000)
+    this.workers.forEach((w) => w.terminate())
+    c?.captureRelease('rec')
+    try { this.port.close() } catch { /* ignore */ }
+    if (r.t !== 'done') return { path: this.path || null, frames: 0, dropped: 0, error: String(r.message ?? 'the file could not be finished') }
+    return { path: (r.path as string) ?? null, frames: Number(r.frames ?? 0), dropped: Number(r.dropped ?? 0) }
+  }
+}
+
 export class OutputRecorder {
+  private dxv: DxvTake | null = null
+  private engine: () => Compositor | null = () => null
   private rec: MediaRecorder | null = null
   private stream: MediaStream | null = null
   private formatId = 'source'
@@ -70,11 +253,62 @@ export class OutputRecorder {
   private watchdog: number | null = null
 
   get active(): boolean {
-    return this.rec !== null
+    return this.rec !== null || this.dxv !== null
+  }
+
+  /** Where the render engine is (a DXV take captures from it). */
+  setEngine(get: () => Compositor | null): void {
+    this.engine = get
+  }
+
+  /** Called by the render loop every frame (does nothing unless a DXV take runs). */
+  tick(now: number): void {
+    this.dxv?.tick(now)
+  }
+
+  /** The size a take in `formatId` would record at, right now. */
+  recordSize(canvas: HTMLCanvasElement | null, formatId: string): { w: number; h: number } | null {
+    if (formatId === 'dxv3') return this.engine()?.captureSizeFor('dxt1', DXV_MAX_EDGE) ?? null
+    return canvas ? { w: canvas.width, h: canvas.height } : null
+  }
+
+  private async startDxv(): Promise<boolean> {
+    const port = await recPort()
+    if (!port) {
+      this.lastError = 'the recording writer did not answer'
+      return false
+    }
+    const take = new DxvTake(() => this.engine(), port, useStore.getState().recordPrefs.fps)
+    const err = await take.open()
+    if (err) {
+      this.lastError = err
+      try { port.close() } catch { /* ignore */ }
+      return false
+    }
+    this.dxv = take
+    this.formatId = 'dxv3'
+    useStore.getState().setRecording(true)
+    return true
+  }
+
+  private async stopDxv(): Promise<string | null> {
+    const take = this.dxv!
+    this.dxv = null
+    try {
+      const r = await take.finish()
+      if (r.error) this.lastError = r.error
+      else if (r.dropped > 0) this.lastError = `${r.dropped} frames dropped : the disk could not keep up at ${take.w}×${take.h}`
+      else if (r.frames === 0) this.lastError = 'no frame was captured'
+      return r.path
+    } finally {
+      useStore.getState().setRecording(false)
+    }
   }
 
   async start(canvas: HTMLCanvasElement, formatId: string): Promise<boolean> {
-    if (this.rec) return false
+    if (this.active) return false
+    this.lastError = null
+    if (formatId === 'dxv3') return this.startDxv()
     // Sonification running → mix its audio into the capture (a true
     // audiovisual take). The audio track belongs to the sound engine's
     // MediaStreamDestination : it is merged, never stopped by us.
@@ -170,7 +404,7 @@ export class OutputRecorder {
    *  clears. Returns the saved path, or null (see `lastError` for why). */
   stop(): Promise<string | null> {
     if (this.stopping) return this.stopping
-    this.stopping = this.doStop().finally(() => {
+    this.stopping = (this.dxv ? this.stopDxv() : this.doStop()).finally(() => {
       this.stopping = null
     })
     return this.stopping

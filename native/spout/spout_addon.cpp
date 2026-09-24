@@ -23,16 +23,23 @@ Napi::Value Open(const Napi::CallbackInfo& info) {
   return Napi::Boolean::New(info.Env(), ok);
 }
 
-// send(buffer, width, height). Buffer is RGBA8, GL bottom-up → flipped here.
+// send(buffer, width, height[, topDown]). Buffer is RGBA8, GL bottom-up → flipped
+// here; topDown = already top-down (the GPU flipped it) : sent as is, which skips
+// a whole-frame copy (33 MB at 4K, several ms on the calling thread).
 Napi::Value Send(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   if (!g_sender) return env.Undefined();
   Napi::Buffer<unsigned char> buf = info[0].As<Napi::Buffer<unsigned char>>();
   uint32_t w = info[1].As<Napi::Number>().Uint32Value();
   uint32_t h = info[2].As<Napi::Number>().Uint32Value();
+  const bool topDown = info.Length() > 3 && info[3].IsBoolean() && info[3].As<Napi::Boolean>().Value();
   const size_t stride = (size_t)w * 4;
   if (buf.Length() < stride * h) return env.Undefined();
   const unsigned char* src = buf.Data();
+  if (topDown) {
+    g_sender->SendImage(src, w, h);
+    return env.Undefined();
+  }
   if (g_flip.size() != stride * h) g_flip.resize(stride * h);
   for (uint32_t y = 0; y < h; ++y)
     memcpy(&g_flip[y * stride], src + (size_t)(h - 1 - y) * stride, stride);
@@ -54,6 +61,9 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
   exports.Set("open", Napi::Function::New(env, Open));
   exports.Set("send", Napi::Function::New(env, Send));
   exports.Set("close", Napi::Function::New(env, Close));
+  // Tells the app this build understands send(…, topDown) (older builds ignore
+  // the argument and flip : the app then sends bottom-up frames instead).
+  exports.Set("topDown", Napi::Boolean::New(env, true));
   return exports;
 }
 

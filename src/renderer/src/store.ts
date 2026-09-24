@@ -222,6 +222,20 @@ function loadResolume(): ResolumeMap {
   }
   return { ...defaultResolumeMap(), inputs: RESO_DEFAULT_ROWS().map(freshInput) }
 }
+/** Recording choices, per machine (like the NDI config) : the delivery format
+ *  and the frame rate a real-time format records at. */
+export interface RecordPrefs {
+  format: string
+  fps: 30 | 60
+}
+function loadRecordPrefs(): RecordPrefs {
+  try {
+    const raw = JSON.parse(localStorage.getItem('opsia.record') ?? 'null') as Partial<RecordPrefs> | null
+    return { format: typeof raw?.format === 'string' ? raw.format : 'mp4-h264', fps: raw?.fps === 60 ? 60 : 30 }
+  } catch {
+    return { format: 'mp4-h264', fps: 30 }
+  }
+}
 function loadNdi(): NdiConfig {
   try {
     const raw = localStorage.getItem('opsia.ndi')
@@ -1148,9 +1162,12 @@ interface StoreState {
   ndiStatus: NdiStatus
   setNdiStatus: (s: NdiStatus) => void
   ndiActive: boolean
-  // Spout (Windows, native addon). Transient.
+  // Spout (Windows) / Syphon (macOS), native addons. Transient. `shareRoute` :
+  // where the sender runs (the preload = fast; main = the fallback) and whether
+  // it takes top-down frames (no CPU flip).
   shareActive: boolean
-  setShareActive: (on: boolean) => void
+  shareRoute: { local: boolean; topDown: boolean }
+  setShareActive: (on: boolean, route?: { local: boolean; topDown: boolean }) => void
   // Light output (ArtNet/DMX · WLED). Machine-local (venue-specific), persisted.
   lights: LightConfig
   setLights: (partial: Partial<LightConfig>) => void
@@ -1295,6 +1312,10 @@ interface StoreState {
   recording: boolean
   recordingSince: number
   setRecording: (on: boolean) => void
+  // The chosen recording format + rate (machine-local; the MIDI record toggle
+  // uses them too).
+  recordPrefs: RecordPrefs
+  setRecordPrefs: (patch: Partial<RecordPrefs>) => void
   sonify: SoniConfig
   setSonify: (next: SoniConfig) => void
   // Sonify step sequencer (Mixer page) : evolves the sound over time.
@@ -2915,7 +2936,8 @@ export const useStore = create<StoreState>((set, get) => ({
   setNdiStatus: (ndiStatus) => set({ ndiStatus }),
   ndiActive: loadNdi().enabled,
   shareActive: false,
-  setShareActive: (on) => set({ shareActive: on }),
+  shareRoute: { local: false, topDown: false },
+  setShareActive: (on, route) => set({ shareActive: on, shareRoute: on && route ? route : { local: false, topDown: false } }),
   lights: (() => {
     const def: LightConfig = {
       enabled: false, protocol: 'artnet', host: '', cols: 8, rows: 1, order: 'rgb',
@@ -3188,6 +3210,13 @@ export const useStore = create<StoreState>((set, get) => ({
   recording: false,
   recordingSince: 0,
   setRecording: (on) => set({ recording: on, recordingSince: on ? performance.now() : 0 }),
+  recordPrefs: loadRecordPrefs(),
+  setRecordPrefs: (patch) =>
+    set((st) => {
+      const recordPrefs = { ...st.recordPrefs, ...patch }
+      try { localStorage.setItem('opsia.record', JSON.stringify(recordPrefs)) } catch { /* quota */ }
+      return { recordPrefs }
+    }),
   sonify: (() => {
     try {
       const raw = localStorage.getItem('opsia.sonify')

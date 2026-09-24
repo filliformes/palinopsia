@@ -878,6 +878,10 @@ export interface CaptureSourceInfo {
 
 // Per-frame render state pushed to the native output window (it drives its own
 // Compositor from this : no WebRTC transcode).
+/** What the output window reads per frame now : the keystone it applies to the
+ *  streamed picture (it no longer renders the composition itself). */
+export type OutputWarp = Pick<OutputFrame, 'warpEnabled' | 'warpCorners' | 'warpGrid'>
+
 export interface OutputFrame {
   c: CompositionState
   modValues: number[]
@@ -1074,8 +1078,8 @@ export interface ExposedApi {
   outputOpenSpan: (displayIds: number[]) => Promise<boolean>
   outputClose: () => Promise<boolean>
   onOutputClosed: (cb: () => void) => () => void
-  outputFrame: (frame: OutputFrame) => void
-  onOutputFrame: (cb: (frame: OutputFrame) => void) => () => void
+  outputFrame: (frame: OutputWarp) => void
+  onOutputFrame: (cb: (frame: OutputWarp) => void) => () => void
   // HIVE live-in.
   hiveConnect: (id: string, host: string, port: number) => void
   hiveDisconnect: (id: string) => void
@@ -1095,7 +1099,7 @@ export interface ExposedApi {
   ndiInstallRuntime: () => Promise<{ ok: boolean; message: string }>
   onNdiInstallProgress: (cb: (p: import('./ndi').NdiInstallProgress) => void) => () => void
   platform: string
-  shareSet: (on: boolean) => Promise<boolean>
+  shareSet: (on: boolean) => Promise<{ ok: boolean; local: boolean; topDown: boolean; error?: string }>
   shareFrame: (w: number, h: number, pixels: Uint8Array) => void
   // Light output (ArtNet/DMX · WLED) : push config, then zone frames.
   lightConfig: (cfg: LightConfig) => void
@@ -1117,7 +1121,7 @@ export interface ExposedApi {
   perfStats: () => Promise<PerfStats>
   // Recording: intermediate MediaRecorder chunks streamed to main → ffmpeg
   // delivery-format transcode/remux on stop → Recorded/. Plus screenshot.
-  recordingFormats: () => Promise<Array<{ id: string; label: string }>>
+  recordingFormats: () => Promise<Array<{ id: string; label: string; kind: 'realtime' | 'encoder' }>>
   recordingStart: (intermediateExt: string, codec: string) => Promise<boolean>
   recordingChunk: (data: Uint8Array) => void
   recordingStop: (formatId: string) => Promise<string | null>

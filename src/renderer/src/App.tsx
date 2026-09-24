@@ -6,7 +6,7 @@
 // the FX racks (Phase 3), the auto-UI (Phase 4), and modulation (Phase 5).
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { AUDIO_TEX_GENS, Compositor } from './engine/Compositor'
+import { Compositor } from './engine/Compositor'
 import { hiveEncoder } from './hiveEncoder'
 import { audioBus } from './engine/audioIn'
 import { applyCoupling } from './engine/coupling'
@@ -21,13 +21,14 @@ import { visionBus } from './engine/visionIn'
 import { depthEngine } from './engine/depthEstimate'
 import { currentFps, tickFrame } from './perf'
 import { videoSeekRequests } from './engine/videoState'
-import { outputRecorder } from './recorder'
+import { outputRecorder, encoderAccepts } from './recorder'
+import StreamRelay from './workers/streamRelay?worker&inline'
 import { sonifyEngine } from './audio/sonify'
 import { fireSelectedRandomize, registerPanic, firePanic, fireFreeze, isFrozen, registerRecordToggle, registerNewSession, registerOpenSession } from './commands'
 import { Toaster, showToast } from './components/Toast'
 import { ShortcutHelp } from './components/ShortcutHelp'
 import { onCaptureError } from './engine/CaptureSource'
-import { collectAssembleSync, syncLiveMatchers } from './assemble/liveMatch'
+import { syncLiveMatchers } from './assemble/liveMatch'
 import { GRID } from '@shared/assemble'
 import { tickSequencer } from './engine/sequencer'
 import { tickSonifySeq } from './audio/soniSeq'
@@ -56,7 +57,7 @@ import { BodyPage } from './components/BodyPage'
 import { ResolumePage } from './components/ResolumePage'
 import { applyResolume } from './resolume'
 import { domePreview, DOME_PREVIEW } from './engine/domePreview'
-import { ndiRate } from '@shared/ndi'
+import { ndiRate, NDI_MAX_EDGE } from '@shared/ndi'
 import { bodyTracker } from './engine/bodyTracker'
 import { bodyBus } from './engine/bodyIn'
 import { perfMeter } from './engine/perfMeter'
@@ -86,6 +87,9 @@ let contextPresetIndex = -1
 // map on a change (synth bowl / clear), rather than every frame.
 let depthModePrev = ''
 let lastDomePreview = 0
+let lastStreamOn = false
+let lastWarpKey = ''
+let lastWarpSent = 0
 let lastDepthSample = 0 // throttles the depth-estimator frame readback (~11 Hz)
 let lastVisionSample = 0 // throttles the vision-bus readback (~30 Hz)
 let lastLightSample = 0 // throttles the light-output zone readback (config fps cap)
@@ -319,8 +323,12 @@ export default function App(): JSX.Element {
     return window.api.onOutputClosed(() => useStore.getState().setOutputActive(false))
   }, [])
 
-  // The zero-copy pixel port to the output window (see main's MessageChannelMain).
-  const pixelPortRef = useRef<MessagePort | null>(null)
+  // The pixel port to the output window (see main's MessageChannelMain), held by
+  // a relay worker (workers/streamRelay.ts) so the cross-process copy of each
+  // frame happens off the render thread. `streamInFlight` : frames handed to it
+  // and not yet posted; past two, a frame is skipped instead of piling up.
+  const streamRelayRef = useRef<Worker | null>(null)
+  const streamInFlight = useRef(0)
   // NDI : the frame pipe to the sender (the preload), and when the last capture
   // was queued (the grid the rate steps on).
   const ndiPortRef = useRef<MessagePort | null>(null)
@@ -335,18 +343,27 @@ export default function App(): JSX.Element {
   useEffect(() => {
     const onMsg = (e: MessageEvent): void => {
       if (e.data === 'opsia:pixelport' && e.ports[0]) {
-        pixelPortRef.current = e.ports[0]
-        pixelPortRef.current.onmessage = (m: MessageEvent): void => {
-          const d = m.data as { type?: string; w?: number; h?: number }
-          if (d && d.type === 'outsize' && d.w && d.h) outCapRef.current = Math.max(d.w, d.h)
+        if (!streamRelayRef.current) {
+          const relay = new StreamRelay()
+          relay.onmessage = (m: MessageEvent): void => {
+            const d = m.data as { t: string; data?: { type?: string; w?: number; h?: number } }
+            if (d.t === 'sent') streamInFlight.current = Math.max(0, streamInFlight.current - 1)
+            else if (d.t === 'out' && d.data?.type === 'outsize' && d.data.w && d.data.h) outCapRef.current = Math.max(d.data.w, d.data.h)
+          }
+          streamRelayRef.current = relay
         }
-        pixelPortRef.current.start()
+        streamInFlight.current = 0
+        streamRelayRef.current.postMessage({ t: 'port', port: e.ports[0] }, [e.ports[0]])
       }
     }
     window.addEventListener('message', onMsg)
     // Ask the preload to hand over the port (handshake — order-independent).
     window.postMessage('opsia:want-pixelport', '*')
-    return () => window.removeEventListener('message', onMsg)
+    return () => {
+      window.removeEventListener('message', onMsg)
+      streamRelayRef.current?.terminate()
+      streamRelayRef.current = null
+    }
   }, [])
 
   // ── NDI : push the config whenever it changes (on/off, name, groups,
@@ -356,7 +373,7 @@ export default function App(): JSX.Element {
   const ndiCfg = useStore((s) => s.ndi)
   useEffect(() => {
     void window.api.ndiConfigure(ndiCfg).then((st) => useStore.getState().setNdiStatus(st)).catch(() => {})
-    if (!ndiCfg.enabled) compositorRef.current?.ndiRelease()
+    if (!ndiCfg.enabled) compositorRef.current?.captureRelease('ndi')
   }, [ndiCfg])
   useEffect(() => window.api.onNdiStatus((st) => useStore.getState().setNdiStatus(st)), [])
   useEffect(() => {
@@ -368,7 +385,7 @@ export default function App(): JSX.Element {
       const port = e.ports[0]
       port.onmessage = (m: MessageEvent): void => {
         const d = m.data as { t?: string; buf?: ArrayBuffer } | null
-        if (d?.t === 'return' && d.buf) compositorRef.current?.ndiRecycle(d.buf)
+        if (d?.t === 'return' && d.buf) compositorRef.current?.captureRecycle('ndi', d.buf)
       }
       ndiPortRef.current = port
     }
@@ -381,7 +398,30 @@ export default function App(): JSX.Element {
     }
   }, [])
 
-  // ── Spout / Syphon : attach the (default-framebuffer) readback while active ──
+  // ── Spout / Syphon : the frame pipe to the sender in this window's preload
+  //    (private MessageChannel, transfers). Frames come from the render loop's
+  //    'share' capture : the CLEAN picture (before keystone), like NDI's; buffers
+  //    come back to be refilled. The main-process fallback gets them over IPC.
+  const sharePortRef = useRef<MessagePort | null>(null)
+  useEffect(() => {
+    const onMsg = (e: MessageEvent): void => {
+      if (e.data !== 'opsia:shareport' || !e.ports[0]) return
+      try { sharePortRef.current?.close() } catch { /* ignore */ }
+      const port = e.ports[0]
+      port.onmessage = (m: MessageEvent): void => {
+        const d = m.data as { t?: string; buf?: ArrayBuffer } | null
+        if (d?.t === 'return' && d.buf) compositorRef.current?.captureRecycle('share', d.buf)
+      }
+      sharePortRef.current = port
+    }
+    window.addEventListener('message', onMsg)
+    window.postMessage('opsia:want-shareport', '*')
+    return () => {
+      window.removeEventListener('message', onMsg)
+      try { sharePortRef.current?.close() } catch { /* ignore */ }
+      sharePortRef.current = null
+    }
+  }, [])
   const ndiActive = useStore((s) => s.ndiActive)
   const shareActive = useStore((s) => s.shareActive)
   const outputPageOpen = useStore((s) => s.outputPageOpen)
@@ -395,19 +435,10 @@ export default function App(): JSX.Element {
   const resolumePageOpen = useStore((s) => s.resolumePageOpen)
   const domeOn = useStore((s) => s.dome.enabled)
   const domeRes = useStore((s) => s.dome.res)
+  // Spout / Syphon off : release the capture's GPU buffers.
   useEffect(() => {
-    const comp = compositorRef.current
-    if (!comp) return
-    comp.setOutputCapture(shareActive ? (w, h, px) => window.api.shareFrame(w, h, px) : null)
-    return () => comp.setOutputCapture(null)
-    // Handles live Spout / Syphon toggles. Re-attachment across an engine REBUILD is
-    // owned by the compositor-build effect instead : this effect is declared
-    // earlier, so on a rebuild it runs first and just reads a null ref (harmless
-    // no-op). `renderScale` stays a dep so this effect's cleanup runs on the LIVE
-    // compositor before it's disposed (glEpoch is declared later, so the build
-    // effect — which does see it — carries the GPU-reset case). (The output-window
-    // STREAM is driven from the render loop, not here.)
-  }, [shareActive, renderScale])
+    if (!shareActive) compositorRef.current?.captureRelease('share')
+  }, [shareActive])
 
   // ── Light output : push the (machine-local) config to main whenever it
   //    changes, so the ArtNet/WLED sender always has the current mapping. The
@@ -560,8 +591,15 @@ export default function App(): JSX.Element {
         return
       }
       if (!ok) {
-        // No WebCodecs HEVC encoder on this host : bail out and flip the toggle.
-        showToast('HIVE output needs a hardware HEVC encoder — unavailable on this machine', 'warn', 6000)
+        // No WebCodecs HEVC encoder for this size on this host : say which, flip back.
+        const big = !!canvas && canvas.width * canvas.height > 3840 * 2160
+        showToast(
+          big
+            ? `HIVE can't encode ${canvas!.width}×${canvas!.height} here (the hardware encoder stops at 3840×2160) : lower the render size or turn the dome off`
+            : 'HIVE output needs a hardware HEVC encoder : none on this machine',
+          'warn',
+          7000
+        )
         useStore.getState().setHiveOutActive(false)
         return
       }
@@ -936,16 +974,10 @@ export default function App(): JSX.Element {
     try {
       comp = new Compositor(canvas, canvas.width, canvas.height)
       compositorRef.current = comp
-      // Re-attach the Spout / Syphon readback to the freshly built compositor.
-      // The separate toggle effect is declared earlier, so on a rebuild
-      // (renderScale change or glEpoch GPU-reset) it runs BEFORE this and reads a
-      // null ref — leaving the sender black until toggled. Restoring it here,
-      // from the live store state, keeps the share alive across any engine
-      // rebuild. (NDI captures from the render loop and needs no re-attach.)
-      {
-        const st = useStore.getState()
-        comp.setOutputCapture(st.shareActive ? (w, h, px) => window.api.shareFrame(w, h, px) : null)
-      }
+      // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
+      // capture from the render loop (Compositor.captureKick) : a rebuilt engine
+      // needs no re-attaching. A real-time recording finds it through this.
+      outputRecorder.setEngine(() => compositorRef.current)
       // The fresh compositor's depth map is empty : force the depth mode to
       // re-apply next frame (else module-level depthModePrev still equals the
       // active mode and synth-depth Parallax silently goes flat after a rebuild).
@@ -956,10 +988,17 @@ export default function App(): JSX.Element {
       // one — the canvas + recorder live here, not in the store.
       registerRecordToggle(() => {
         if (useStore.getState().recording) stopRecordingWithToast()
-        else if (canvasRef.current)
-          void outputRecorder.start(canvasRef.current, 'source').then((ok) => {
-            showToast(ok ? 'Recording started' : 'Recording could not start', ok ? 'ok' : 'warn')
-          })
+        else if (canvasRef.current) {
+          const cv = canvasRef.current
+          const chosen = useStore.getState().recordPrefs.format
+          // The chosen format, unless the video encoder refuses this size (the
+          // dome master) : then DXV3, which records any size.
+          void (chosen === 'dxv3' ? Promise.resolve(true) : encoderAccepts(cv.width, cv.height))
+            .then((fits) => outputRecorder.start(cv, fits ? chosen : 'dxv3'))
+            .then((ok) => {
+              showToast(ok ? 'Recording started' : `Recording could not start${outputRecorder.lastError ? ` : ${outputRecorder.lastError}` : ''}`, ok ? 'ok' : 'warn')
+            })
+        }
       })
       // A live-capture slot that fails to start (denied permission, no device,
       // cancelled screen picker) used to render a silent black source. Surface why.
@@ -1158,34 +1197,21 @@ export default function App(): JSX.Element {
           }
         }
         // 2b. Coupling: audio binds each layer's A/B balance (post-sync so it
-        //     overrides the base mix); returns the coupled mixes for the output.
-        const coupledMix = applyCoupling(comp!, c, now)
+        //     overrides the base mix).
+        applyCoupling(comp!, c, now)
         // 2c. Proximity (Field macro): push the Context mood into a depth zone.
         //     From here on the passes share the per-frame write bus (frameVals) so
         //     co-engaged macros stack on the same param instead of clobbering.
         clearFrameVals()
-        const contextProx = applyProximity(comp!, c, st.proximity, st.proximityAudio ? 0.6 : 0)
+        applyProximity(comp!, c, st.proximity, st.proximityAudio ? 0.6 : 0)
         // 2d. Macro-form sequencer: auto-advance scenes + Breathe/Arc overlay.
         //     The overlay writes master-FX values, layer mixes and freeze straight
-        //     onto the compositor — none of which is otherwise in the payload, so
-        //     the output window desyncs whenever a sequence is running. Capture the
-        //     master-FX writes through a recording proxy (merged into
-        //     masterOverrides below) and the freeze; the final layer mixes are read
-        //     back afterwards so cadence's mix pull travels too.
-        const seqOverrides: Record<string, Record<string, number>> = {}
+        //     onto the compositor; its freeze is kept for the freeze decision below.
         let seqFreeze: boolean | null = null
-        let seqTouchedMix = false
         if (st.sequence.enabled) {
-          const beforeMix = comp!.layers.map((L) => (L ? L.sourceMix : 0))
           const rec = {
-            setFxInput: (
-              scope: { kind: 'master' },
-              id: string,
-              name: string,
-              v: number
-            ): void => {
+            setFxInput: (scope: { kind: 'master' }, id: string, name: string, v: number): void => {
               comp!.setFxInput(scope, id, name, v)
-              ;(seqOverrides[id] ||= {})[name] = v
             },
             layers: comp!.layers,
             setFreeze: (on: boolean): void => {
@@ -1194,7 +1220,6 @@ export default function App(): JSX.Element {
             }
           }
           tickSequencer(now, rec, c)
-          seqTouchedMix = comp!.layers.some((L, i) => L && L.sourceMix !== beforeMix[i])
         }
         // Sonify step sequencer : evolves the sound over time (independent of the
         // scene sequencer above). No-op unless the user started it on the S mixer.
@@ -1204,10 +1229,10 @@ export default function App(): JSX.Element {
         // 2f. Temperament: Tonicity (tonal audio → colour) + Drift
         //     (analog-instability wander). Shutter (stop-motion stepping) freezes
         //     the output on held frames.
-        const tonOv = applyTonicity(comp!, c, st.tonicity)
-        const driftOv = applyDrift(comp!, c, st.drift, now)
+        applyTonicity(comp!, c, st.tonicity)
+        applyDrift(comp!, c, st.drift, now)
         // Flow ↔ Interruption : smooth/liquid ↔ stutter/decimate/blank. Its freeze
-        // ORs into the shutter path; its finishing overrides merge below.
+        // ORs into the shutter path.
         const flowRes = applyFlowInterrupt(comp!, c, st.flow, now)
         const flowActive = Math.abs(st.flow - 0.5) > 0.02
         let freeze = false
@@ -1230,46 +1255,49 @@ export default function App(): JSX.Element {
         //     the scene sequencer). Hard-mutes the non-chosen layers this frame.
         let weaveHot: number | undefined
         if (st.sequence.frameWeave?.enabled) weaveHot = applyFrameWeave(comp!, st.sequence.frameWeave, now)
-        // Merge the temperament results (Tonicity + Drift) into one override map so
-        // the output window can mirror them exactly (they can't re-derive audio/
-        // random/time). Field macros + freeze + flicker travel alongside.
-        // Sequencer overlay first, then temperament on top : the same order the
-        // monitor applied them, so shared inputs resolve identically.
-        const masterOverrides: Record<string, Record<string, number>> = {}
-        for (const ov of [seqOverrides, tonOv, driftOv, flowRes.overrides]) {
-          if (!ov) continue
-          for (const id in ov) masterOverrides[id] = { ...masterOverrides[id], ...ov[id] }
-        }
-        // Cadence pulls the layer mixes toward fused; send the post-sequencer mixes
-        // so the output mirrors that too (else only the pre-sequencer coupling shows).
-        const outMix = seqTouchedMix ? comp!.layers.map((L) => (L ? L.sourceMix : 0.5)) : coupledMix
         // 3. Render the frame.
         perfMeter.begin('render'); comp!.render(now - start); perfMeter.end('render')
-        // 3a. Output window : stream the just-rendered frame to it (identical
-        //     mirror). Synchronous readback in lockstep with render — every
-        //     frame reaches the projector, unlike the async NDI path.
-        if (st.outputActive && pixelPortRef.current) {
+        // Timer clock (the window doesn't paint) : wait for THIS render before
+        // queueing the output captures below, so the GPU reads them back while
+        // we prepare the next frame. Waiting after them instead made the CPU and
+        // GPU take turns : projector + Spout minimized fell to ~17 fps (measured).
+        if (timerMode || document.hidden) comp!.finishFrame()
+        // 3a. Outside consumers of the finished picture. Each one is a GPU
+        //     conversion + an ASYNCHRONOUS readback (engine/frameCapture) : the
+        //     loop never waits on the GPU, a frame arrives a frame or two later.
+        //     The synchronous readbacks these replaced (projector, dome preview)
+        //     stalled the whole pipeline on every frame they ran.
+        //
+        //     Projector window : the newest finished frame, at the size it asked
+        //     for (bottom-up RGBA, as it draws), handed to the relay worker that
+        //     posts it to the output window (the cross-process copy is its cost).
+        const relay = streamRelayRef.current
+        if (st.outputActive && relay) {
           perfMeter.begin('output')
-          const fr = comp!.captureFrameSync(outCapRef.current)
+          const fr = comp!.captureHarvest('stream', true)
           if (fr) {
-            const buf = fr.px.slice(0, fr.w * fr.h * 4).buffer
-            pixelPortRef.current.postMessage({ w: fr.w, h: fr.h, buf }, [buf])
+            if (streamInFlight.current < 2) {
+              relay.postMessage({ t: 'frame', w: fr.w, h: fr.h, buf: fr.buf }, [fr.buf])
+              streamInFlight.current++
+            } else {
+              comp!.captureRecycle('stream', fr.buf) // the window is behind : skip
+            }
           }
+          comp!.captureKick('stream', 'rgba-up', outCapRef.current)
           perfMeter.end('output')
+        } else if (comp!.capturePending('stream') > 0 || lastStreamOn) {
+          comp!.captureRelease('stream')
         }
-        // 3a''. NDI : hand the newest finished frame to the sender (this
-        //       window's preload), then queue the next capture at the NDI rate
-        //       (GPU conversion + async readback : the loop never waits on the GPU).
+        lastStreamOn = st.outputActive
+        //     NDI : every finished frame in order to the sender (this window's
+        //     preload, transferred), then the next capture at the NDI rate.
         const ndiPort = ndiPortRef.current
         if (st.ndi.enabled && st.ndiStatus.state === 'live' && ndiPort) {
           perfMeter.begin('ndi')
-          const fr = comp!.ndiHarvest()
-          if (fr) {
+          for (let fr = comp!.captureHarvest('ndi'); fr; fr = comp!.captureHarvest('ndi')) {
             const [fpsN, fpsD] = ndiRate(st.ndi.fps)
-            // TRANSFER to this window's preload (the NDI sender) : well under a
-            // millisecond for a 4K frame, where any cross-process route copies
-            // for 30–90 ms.
-            ndiPort.postMessage({ t: 'frame', ...fr, fpsN, fpsD }, [fr.buf])
+            const fourcc = fr.format === 'uyvy' ? 'UYVY' : 'RGBX'
+            ndiPort.postMessage({ t: 'frame', w: fr.w, h: fr.h, fourcc, stride: fr.stride, fpsN, fpsD, buf: fr.buf }, [fr.buf])
           }
           const interval = 1000 / st.ndi.fps
           const since = now - ndiLastKick.current
@@ -1277,21 +1305,48 @@ export default function App(): JSX.Element {
             // Step on the grid (last + interval, not "now") so the average rate is
             // exact; re-anchor only after falling more than two frames behind.
             ndiLastKick.current = since > interval * 2 ? now : ndiLastKick.current + interval
-            comp!.ndiKick(st.ndi.format, st.ndi.maxSize)
+            comp!.captureKick('ndi', st.ndi.format, st.ndi.maxSize > 0 ? Math.min(st.ndi.maxSize, NDI_MAX_EDGE) : NDI_MAX_EDGE)
           }
           perfMeter.end('ndi')
         }
-        // 3a'. Fulldome simulator : a small read of the master, only while the
-        //      Output page shows it (~30 Hz).
-        if (st.outputPageOpen && st.dome.enabled && now - lastDomePreview > 33) {
-          lastDomePreview = now
-          const n = DOME_PREVIEW * DOME_PREVIEW * 4
-          if (!domePreview.px || domePreview.px.length !== n) domePreview.px = new Uint8Array(n)
-          if (comp!.readDomePreview(DOME_PREVIEW, domePreview.px)) {
-            domePreview.size = DOME_PREVIEW
+        //     Spout / Syphon : the newest finished frame, every frame. Top-down
+        //     when the addon takes it (no CPU flip), else GL order (it flips).
+        if (st.shareActive) {
+          perfMeter.begin('share')
+          const route = st.shareRoute
+          const fr = comp!.captureHarvest('share', true)
+          if (fr) {
+            const topDown = fr.format === 'rgbx'
+            if (route.local && sharePortRef.current) {
+              sharePortRef.current.postMessage({ t: 'frame', w: fr.w, h: fr.h, topDown, buf: fr.buf }, [fr.buf])
+            } else if (!topDown) {
+              window.api.shareFrame(fr.w, fr.h, new Uint8Array(fr.buf))
+              comp!.captureRecycle('share', fr.buf)
+            }
+          }
+          comp!.captureKick('share', route.local && route.topDown ? 'rgbx' : 'rgba-up', 0)
+          perfMeter.end('share')
+        }
+        //     Fulldome simulator : a 1024² read of the master, ~30 Hz, only while
+        //     the Output page shows it.
+        if (st.outputPageOpen && st.dome.enabled) {
+          const fr = comp!.captureHarvest('domePrev', true)
+          if (fr) {
+            if (domePreview.px) comp!.captureRecycle('domePrev', domePreview.px.buffer as ArrayBuffer)
+            domePreview.px = new Uint8Array(fr.buf)
+            domePreview.size = fr.w
             domePreview.serial++
           }
+          if (now - lastDomePreview > 33) {
+            lastDomePreview = now
+            comp!.captureKick('domePrev', 'rgba-up', DOME_PREVIEW, true)
+          }
+        } else if (domePreview.px) {
+          comp!.captureRelease('domePrev')
+          domePreview.px = null
         }
+        //     A real-time (DXV3) recording captures on its own rate's grid.
+        outputRecorder.tick(now)
         // 3b. Animated sound (§4.4): sample a scanline of the presented frame and
         //     send it to Pandore over OSC (the drawn optical track).
         if (st.markSignalEnabled) pushMarkSignal(comp!, now)
@@ -1379,52 +1434,19 @@ export default function App(): JSX.Element {
             perfMeter.end('lights')
           }
         }
-        // 4. Native output window: push the exact render state so it renders
-        //    the same composition itself (pixel-perfect, no transcode).
+        // 4. Output window : the keystone it applies to the streamed frame (it
+        //    draws our pixels; this is all it still reads of the render state).
+        //    Sent when it changes, and every half second for a window that just
+        //    opened. (It used to get the WHOLE render state every frame, left
+        //    from when it ran its own compositor : cloned and relayed for nothing.)
         if (st.outputActive) {
-          window.api.outputFrame({
-            c,
-            modValues,
-            modBypass: st.modBypass,
-            globalSpeed: st.globalSpeed,
-            // A domemaster is never keystoned : the dome's own server maps it.
-            warpEnabled: st.warpEnabled && !st.dome.enabled,
-            warpCorners: st.warpCorners,
-            warpGrid: st.warpGrid,
-            time: now - start,
-            coupledMix: outMix,
-            contextProx,
-            // Bottom-bar state → exact replica in the output window.
-            density: st.density,
-            gestureTexture: st.gestureTexture,
-            coalesce: st.coalesce,
-            masterOverrides,
-            freeze,
-            superFlicker: st.superFlicker,
-            flickerHot,
-            weaveHot,
-            strobeSafe: st.strobeSafe,
-            // In-flight Meta-knob gestures : the mirror re-applies the same
-            // engine-side fan-out (the store only updates on settle).
-            metaGlides: metaGlides.size ? Array.from(metaGlides) : undefined,
-            // One-shot video seeks : the mirror's own decoders seek too.
-            videoSeeks,
-            // Assemble : the mirror walks its own copy of the edit, so hand it
-            // our position (it snaps only when it has actually drifted) and any
-            // clip a live matcher just chose (it has no vision bus of its own).
-            assemble: collectAssembleSync(comp!),
-            // Per-element audio rows, only when some layer's generator reads them.
-            audioRows: c.layers.some(
-              (l) =>
-                (l.sourceA.shaderId && AUDIO_TEX_GENS.has(l.sourceA.shaderId)) ||
-                (l.sourceB?.shaderId && AUDIO_TEX_GENS.has(l.sourceB.shaderId))
-            )
-              ? {
-                  wave: Array.from(audioBus.waveformBytes() ?? []),
-                  spec: Array.from(audioBus.spectrumBytes() ?? [])
-                }
-              : undefined
-          })
+          const warpEnabled = st.warpEnabled && !st.dome.enabled // a domemaster is never keystoned
+          const key = `${warpEnabled}|${st.warpGrid}|${st.warpCorners.join(',')}`
+          if (key !== lastWarpKey || now - lastWarpSent > 500) {
+            lastWarpKey = key
+            lastWarpSent = now
+            window.api.outputFrame({ warpEnabled, warpCorners: st.warpCorners, warpGrid: st.warpGrid })
+          }
         }
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to
         //    HIVE receivers (an OBS plugin, …). Frame-drops if backed up.
@@ -1475,11 +1497,11 @@ export default function App(): JSX.Element {
     // Timer frames step on a 60 Hz grid : a bare 16 ms timeout lands on the
     // 15.6 ms Windows tick once the window is in the background (~32 Hz), too
     // close to a 30 fps NDI stream to pace it cleanly. And each one waits for
-    // the GPU to finish it first (rAF does that by itself; see finishFrame).
+    // the GPU to finish its render (rAF does that by itself; see finishFrame,
+    // called in the loop right after the render).
     let due = 0
     const schedule = (): void => {
       if (timerMode || document.hidden) {
-        comp?.finishFrame()
         const t = performance.now()
         due = t - due > 100 ? t + 1000 / 60 : due + 1000 / 60
         timer = window.setTimeout(loop, Math.max(0, due - t))

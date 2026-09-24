@@ -44,6 +44,17 @@ that CI builds into cross-platform releases.
 - **NDI on a computer with no NDI** : one click installs NDI's official runtime
   (downloaded from NDI over HTTPS, signature checked, NDI's own installer opened),
   and the NDI source goes live by itself when the install finishes.
+- **DXV3 recording, in real time** (Resolume's GPU codec) : the graphics card
+  compresses each frame (DXT1), a few workers write the DXV3 frames and the file
+  is written as it goes, so there is nothing to convert after and **no size limit**
+  from a video encoder : the **4096² fulldome master records at full size** (a
+  bigger master is scaled to 4096). Constant 30 or 60 fps, the clean picture.
+  Checked against FFmpeg's DXV decoder and Resolume's own file layout.
+- **Recording formats know their limits** : the hardware video encoder takes up to
+  3840×2160 on this machine (measured), so above that (the 4K dome) the other
+  formats show greyed out and a take records DXV3; the MIDI record toggle now uses
+  the chosen format too (it always recorded "Fast"). "Fast · no re-encode" is now
+  labelled for what it is : MKV, H.264 as captured.
 - **Syphon output (macOS)**, the twin of Spout : a built-in Syphon (Metal) server
   named Palinopsia, for Resolume, MadMapper, TouchDesigner, VDMX, OBS on the same
   Mac. Built from the Syphon framework's source in CI.
@@ -54,6 +65,21 @@ that CI builds into cross-platform releases.
   reserved word in GLSL ES 3.00, so the matching program never compiled and the
   node could not choose tiles. Found by compiling every engine shader in a plain
   WebGL2 context.
+- **The output stage no longer stalls the render loop.** Measured at a 4K
+  composition :
+  - the projector window : 25-27 fps with it open, now 60 (its readback was
+    synchronous; the frame is now read back asynchronously and posted to the
+    window from a worker, where the cross-process copy no longer costs the loop);
+  - the Output page with the 4096² dome simulator : 47-49 fps, now 60;
+  - **Spout delivered 0 frames per second at 4K** (its two-slot readback dropped
+    every frame whose fence was late); it now sends ~58 fps of the clean picture
+    from the window's own process, top-down (no CPU flip);
+  - projector + Spout + a DXV3 take together : 57-60 fps.
+- **HIVE output could never start** : its encoder settings asked Windows' hardware
+  encoder for 60 fps, which it refuses at every size (measured). It starts now.
+- The projector window no longer receives the whole render state every frame
+  (left from when it ran its own renderer) : just the keystone, when it changes.
+- A recording the encoder never fed no longer leaves an empty file behind.
 - **Minimizing the window no longer stalls the show.** A minimized window gets
   (almost) no animation frames from Chromium, so the render loop, and with it the
   projector stream, Spout, Sonify and OSC out, dropped to about one frame a

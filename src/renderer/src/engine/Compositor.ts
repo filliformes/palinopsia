@@ -53,8 +53,7 @@ installTextureBridge();
 import type { BlendMode, LayerMask } from '@shared/types';
 import type { DomeConfig } from '@shared/dome';
 import { DomeStage } from './dome';
-import { NdiCapture, type NdiFrameOut } from './ndiCapture';
-import { NDI_MAX_EDGE, type NdiFormat } from '@shared/ndi';
+import { FrameCapture, captureSize, type CaptureFormat, type CapturedFrame } from './frameCapture';
 import { BLEND_MODES } from '@shared/types';
 export type { BlendMode };
 
@@ -1289,33 +1288,6 @@ export class Compositor {
   // frozen frame; safe because monomedia recalls are hard cuts (no xfade).
   private freezeActive = false;
   private freezeCaptured = false;
-  // Output readback (Spout/NDI seam) : set to a callback to grab the final RGBA8
-  // frame each frame; null (default) → zero cost.
-  private outputCapture: ((w: number, h: number, px: Uint8Array) => void) | null = null;
-  private readbackBuf: Uint8Array | null = null;
-  // Async readback (Spout/NDI) : two PIXEL_PACK PBOs ping-pong so readPixels
-  // never stalls the pipeline. Frame N reads into one PBO (async) while frame
-  // N-1's pixels are harvested from the other once its fence signals : one
-  // frame of sink latency instead of a full GPU flush every frame.
-  private capPbos: [WebGLBuffer, WebGLBuffer] | null = null;
-  private capSyncs: [WebGLSync | null, WebGLSync | null] = [null, null];
-  private capW = 0;
-  private capH = 0;
-  private capPhase = 0;
-
-  private freeCapturePbos(): void {
-    const gl = this.gl;
-    if (this.capPbos) {
-      gl.deleteBuffer(this.capPbos[0]);
-      gl.deleteBuffer(this.capPbos[1]);
-      this.capPbos = null;
-    }
-    for (let i = 0; i < 2; i++) {
-      if (this.capSyncs[i]) { gl.deleteSync(this.capSyncs[i]!); this.capSyncs[i] = null; }
-    }
-    this.capW = this.capH = 0;
-    this.capPhase = 0;
-  }
   // Global time multiplier (1/64×…64×) : scales every visual clock.
   private globalSpeed = 1;
   private blendProg: WebGLProgram;
@@ -1499,100 +1471,67 @@ export class Compositor {
     }
   }
 
-  /** Enable/disable final-frame readback for external output (Spout/NDI). The
-   *  callback gets the presented RGBA8 frame each frame (GL bottom-up). */
-  setOutputCapture(cb: ((w: number, h: number, px: Uint8Array) => void) | null): void {
-    this.outputCapture = cb;
+  /** Outside consumers of the finished picture : NDI, Spout / Syphon ('share'),
+   *  recording ('rec'), the projector window ('stream'), the dome simulator
+   *  ('domePrev'). Each has its own GPU conversion + asynchronous readback ring
+   *  (see frameCapture.ts) : none of them ever stalls the render loop (the
+   *  synchronous readbacks the projector and the dome simulator used before
+   *  stalled the whole GPU pipeline on every frame they ran). They all read the
+   *  CLEAN output : the pre-keystone composite, or the domemaster in dome mode
+   *  (a mapping server, a recording or a receiving app does its own warping; the
+   *  projector window applies the keystone itself). */
+  private captures = new Map<string, FrameCapture>();
+  private static readonly CAPTURE_SLOTS: Record<string, number> = { ndi: 6, rec: 6, share: 4, stream: 3, domePrev: 2 };
+
+  /** The clean output's size (the dome master's in dome mode). */
+  outputSize(): { w: number; h: number } {
+    return this.domeTex ? { w: this.dome!.size, h: this.dome!.size } : { w: this.w, h: this.h };
   }
 
-  /** SYNCHRONOUS readback of the just-composited frame, for the output-window
-   *  stream. Called from the render loop right after render(), so the composite
-   *  is already drawn : the readPixels stall is only the tail of GPU work that
-   *  was about to finish anyway. Unlike the async PBO path (built for NDI,
-   *  1-frame latency, fence-gated), this delivers EVERY frame in lockstep with
-   *  the render — which is what an identical mirror needs.
-   *
-   *  Two things this does NOT read from : the default framebuffer. First, that
-   *  is the PRE-projection-warp seam — the present pass keystones the composite
-   *  into the default framebuffer, and the output window applies the SAME warp
-   *  again, so streaming the warped default buffer would double-warp. We read
-   *  `lastPresent` (the clean pre-warp composite) instead. Second, a 4K default
-   *  buffer is 32MB/frame; readback + transfer + re-upload is memory-bandwidth
-   *  bound to ~23fps regardless of scene. So we downscale to a `capLong` long
-   *  edge (1920 → 8MB) first, through the copy shader into a single-sample RGBA8
-   *  target. The control preview stays full-res; only the projector copy is
-   *  capped, and at projection scale the two are indistinguishable. The copy
-   *  shader + bottom-up readback match the full-res path byte-for-byte in
-   *  orientation, so the output presenter's warp UVs need no change.
-   *  Returns a reused buffer; copy it before the next call. */
-  captureFrameSync(capLong = 1920): { w: number; h: number; px: Uint8Array } | null {
-    const gl = this.gl;
-    if (!this.lastPresent) return null;
-    // In dome mode the projector gets the square master, not the flat frame.
-    const srcTex = this.domeTex ?? this.lastPresent;
-    const fw = this.domeTex ? this.dome!.size : this.w, fh = this.domeTex ? this.dome!.size : this.h;
-    if (fw <= 0 || fh <= 0) return null;
-    const long = Math.max(fw, fh);
-    const scale = long > capLong ? capLong / long : 1;
-    const w = scale < 1 ? Math.max(1, Math.round(fw * scale)) : fw;
-    const h = scale < 1 ? Math.max(1, Math.round(fh * scale)) : fh;
-    const need = w * h * 4;
-    if (!this.streamBuf || this.streamBuf.length !== need) this.streamBuf = new Uint8Array(need);
-    // (Re)build the capped RGBA8 stream target when the size changes.
-    if (!this.streamTarget || this.streamTW !== w || this.streamTH !== h) {
-      if (this.streamTarget) { gl.deleteFramebuffer(this.streamTarget.fbo); gl.deleteTexture(this.streamTarget.tex); }
-      const tex = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      const fbo = gl.createFramebuffer()!; gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-      this.streamTarget = { fbo, tex }; this.streamTW = w; this.streamTH = h;
-    }
-    // Downscale the clean composite into the capped target (bilinear), read it.
-    gl.bindVertexArray(this.vao);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.streamTarget.fbo);
-    gl.viewport(0, 0, w, h);
-    gl.useProgram(this.copyProg);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, srcTex); gl.uniform1i(this.uCTex, 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindVertexArray(null);
-    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, this.streamBuf);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    return { w, h, px: this.streamBuf };
+  /** The picture size a capture in `format` capped at `maxEdge` would have now. */
+  captureSizeFor(format: CaptureFormat, maxEdge: number): { w: number; h: number } {
+    const o = this.outputSize();
+    return captureSize(o.w, o.h, maxEdge, format);
   }
-  private streamBuf: Uint8Array | null = null;
-  private streamTarget: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
-  private streamTW = 0;
-  private streamTH = 0;
 
-  /** NDI : queue a GPU conversion + async readback of the CLEAN output (the
-   *  pre-keystone composite, or the domemaster in dome mode : a mapping server
-   *  does its own warping). Longest edge capped at `maxEdge` (0 = native), and
-   *  never above NDI_MAX_EDGE. */
-  ndiKick(format: NdiFormat, maxEdge: number): void {
-    const src = this.domeTex ?? this.lastPresent;
-    if (!src) return;
-    const sw = this.domeTex ? this.dome!.size : this.w;
-    const sh = this.domeTex ? this.dome!.size : this.h;
+  /** Queue a capture for consumer `name`. `domeOnly` : only while the dome is on.
+   *  Returns false when there was nothing to capture or the GPU is behind. */
+  captureKick(name: string, format: CaptureFormat, maxEdge: number, domeOnly = false): boolean {
+    const src = domeOnly ? this.domeTex : this.domeTex ?? this.lastPresent;
+    if (!src) return false;
+    const { w, h } = this.outputSize();
     try {
-      if (!this.ndiCap) this.ndiCap = new NdiCapture(this.gl);
-      const cap = maxEdge > 0 ? Math.min(maxEdge, NDI_MAX_EDGE) : NDI_MAX_EDGE;
-      this.ndiCap.kick(src, sw, sh, format, cap, this.vao);
+      let cap = this.captures.get(name);
+      if (!cap) {
+        cap = new FrameCapture(this.gl, Compositor.CAPTURE_SLOTS[name] ?? 4);
+        this.captures.set(name, cap);
+      }
+      return cap.kick(src, w, h, format, maxEdge, this.vao);
     } catch (e) {
       console.error((e as Error).message);
+      return false;
     }
   }
-  /** The oldest finished NDI frame, or null. */
-  ndiHarvest(): NdiFrameOut | null {
-    return this.ndiCap ? this.ndiCap.harvest() : null;
+  /** The oldest finished frame of `name` (call until null for every frame in
+   *  order), or with `latest` the newest one, older finished ones dropped. */
+  captureHarvest(name: string, latest = false): CapturedFrame | null {
+    const cap = this.captures.get(name);
+    return cap ? (latest ? cap.harvestLatest() : cap.harvest()) : null;
   }
-  /** A frame buffer the NDI sender is done with, back for the next harvest. */
-  ndiRecycle(buf: ArrayBuffer): void {
-    this.ndiCap?.recycle(buf);
+  /** Frames `name` queued and not yet harvested. */
+  capturePending(name: string): number {
+    return this.captures.get(name)?.pending ?? 0;
   }
+  /** A buffer the consumer is done with, back for the next harvest. */
+  captureRecycle(name: string, buf: ArrayBuffer): void {
+    this.captures.get(name)?.recycle(buf);
+  }
+  /** The consumer stopped : release its target and readback buffers. */
+  captureRelease(name: string): void {
+    this.captures.get(name)?.dispose();
+    this.captures.delete(name);
+  }
+
   /** Pacing for the render loop's TIMER clock (the window isn't painting, so
    *  no rAF). rAF waits for the GPU; a timer doesn't, and on a scene that fills
    *  the GPU the loop then queued frames seconds ahead of it : every readback
@@ -1610,42 +1549,6 @@ export class Compositor {
     gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, this.syncPx);
   }
   private syncPx = new Uint8Array(4);
-
-  /** NDI off : release the conversion target and the readback buffers. */
-  ndiRelease(): void {
-    this.ndiCap?.dispose();
-    this.ndiCap = null;
-  }
-  private ndiCap: NdiCapture | null = null;
-
-  /** A small square read of the current domemaster for the in-app simulator
-   *  (bottom-up RGBA8). Null when the dome is off. */
-  readDomePreview(size: number, out: Uint8Array): boolean {
-    const gl = this.gl;
-    if (!this.domeTex) return false;
-    if (!this.domePrevTarget || this.domePrevSize !== size) {
-      if (this.domePrevTarget) { gl.deleteFramebuffer(this.domePrevTarget.fbo); gl.deleteTexture(this.domePrevTarget.tex); }
-      const tex = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      const fbo = gl.createFramebuffer()!; gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-      this.domePrevTarget = { fbo, tex }; this.domePrevSize = size;
-    }
-    gl.bindVertexArray(this.vao);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.domePrevTarget.fbo);
-    gl.viewport(0, 0, size, size);
-    gl.useProgram(this.copyProg);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.domeTex); gl.uniform1i(this.uCTex, 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindVertexArray(null);
-    gl.readPixels(0, 0, size, size, gl.RGBA, gl.UNSIGNED_BYTE, out);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    return true;
-  }
-  private domePrevTarget: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
-  private domePrevSize = 0;
 
   /** LIGHT OUTPUT : reduce the presented composite to a cols×rows grid of zone
    *  colours for DMX/ArtNet/WLED. Two cheap passes : copy the clean composite
@@ -2038,10 +1941,6 @@ export class Compositor {
       this.canvas.height = ch;
     }
     if (!this.domeCfg && this.dome) { this.dome.dispose(); this.dome = null; this.domeTex = null; }
-    if (!this.domeCfg && this.domePrevTarget) {
-      this.gl.deleteFramebuffer(this.domePrevTarget.fbo); this.gl.deleteTexture(this.domePrevTarget.tex);
-      this.domePrevTarget = null; this.domePrevSize = 0;
-    }
   }
 
   /** Set the projection warp for the present pass. `corners` = 8 normalized
@@ -2683,55 +2582,6 @@ export class Compositor {
     // morph starts, so the dissolve begins from the exact frame on screen.
     this.lastPresent = present;
 
-    // External output seam (Spout/NDI): read the presented RGBA8 frame from the
-    // default framebuffer and hand it off. Only runs when a sink is attached.
-    // ASYNC : readPixels goes into a PBO (no stall); the previous frame's PBO is
-    // harvested once its fence signals. One frame of sink latency, zero flushes.
-    if (this.outputCapture) {
-      const w = this.canvas.width, h = this.canvas.height;
-      const need = w * h * 4;
-      if (!this.capPbos || this.capW !== w || this.capH !== h) {
-        this.freeCapturePbos();
-        const a = gl.createBuffer()!, b = gl.createBuffer()!;
-        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, a);
-        gl.bufferData(gl.PIXEL_PACK_BUFFER, need, gl.STREAM_READ);
-        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, b);
-        gl.bufferData(gl.PIXEL_PACK_BUFFER, need, gl.STREAM_READ);
-        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-        this.capPbos = [a, b];
-        this.capW = w; this.capH = h;
-      }
-      const wi = this.capPhase, ri = 1 - this.capPhase;
-      // If the write-side PBO still has a pending fence (sink slower than us),
-      // drop that frame : delete the fence and overwrite.
-      if (this.capSyncs[wi]) { gl.deleteSync(this.capSyncs[wi]!); this.capSyncs[wi] = null; }
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.capPbos[wi]);
-      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, 0); // → PBO, async
-      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-      this.capSyncs[wi] = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-      // Harvest the OTHER PBO (last frame's pixels) if its copy completed.
-      const sync = this.capSyncs[ri];
-      if (sync) {
-        // SYNC_FLUSH_COMMANDS_BIT : flush the fence to the GPU so it can
-        // actually signal on the next poll. Without it the fence sits unflushed
-        // and only clears on some later natural flush, throttling the harvest
-        // (and the output stream) to a small fraction of the render rate.
-        const st = gl.clientWaitSync(sync, gl.SYNC_FLUSH_COMMANDS_BIT, 0);
-        if (st === gl.ALREADY_SIGNALED || st === gl.CONDITION_SATISFIED) {
-          gl.deleteSync(sync); this.capSyncs[ri] = null;
-          if (!this.readbackBuf || this.readbackBuf.length !== need) this.readbackBuf = new Uint8Array(need);
-          gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.capPbos[ri]);
-          gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.readbackBuf);
-          gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-          this.outputCapture(w, h, this.readbackBuf);
-        }
-        // Not signalled yet → leave it; next frame either harvests or drops it.
-      }
-      this.capPhase = ri;
-    } else if (this.capPbos) {
-      this.freeCapturePbos(); // sink detached : release the PBOs
-    }
   }
 
   /** Release EVERY GL resource this compositor owns. Call on unmount so a
@@ -2751,8 +2601,8 @@ export class Compositor {
     this.cameraless?.dispose();
     this.strobeLimiter?.dispose();
     this.dome?.dispose();
-    this.ndiCap?.dispose();
-    if (this.domePrevTarget) { gl.deleteFramebuffer(this.domePrevTarget.fbo); gl.deleteTexture(this.domePrevTarget.tex); this.domePrevTarget = null; }
+    for (const cap of this.captures.values()) cap.dispose();
+    this.captures.clear();
     this.pbrLib?.dispose();
     disposeTarget(gl, this.bgScratch);
     disposeTarget(gl, this.bgFill);
@@ -2763,8 +2613,6 @@ export class Compositor {
     disposeTarget(gl, this.snapshot);
     disposeTarget(gl, this.xfadeTarget);
     if (this.fxOpac) { disposeTarget(gl, this.fxOpac[0]); disposeTarget(gl, this.fxOpac[1]); }
-    if (this.streamTarget) { gl.deleteFramebuffer(this.streamTarget.fbo); gl.deleteTexture(this.streamTarget.tex); this.streamTarget = null; }
-    this.freeCapturePbos();
     if (this.audioTexGL) { gl.deleteTexture(this.audioTexGL); this.audioTexGL = null; }
     if (this.soniFbo) { gl.deleteFramebuffer(this.soniFbo.fbo); gl.deleteTexture(this.soniFbo.tex); this.soniFbo = null; }
     if (this.visionFbo) { gl.deleteFramebuffer(this.visionFbo.fbo); gl.deleteTexture(this.visionFbo.tex); this.visionFbo = null; }

@@ -616,15 +616,33 @@ A full-page takeover (the engine keeps rendering underneath):
   at that shape; the output window can then **span separate displays**, so several
   projectors show one continuous picture.
 - **Fullscreen output** : pick a display; borderless-fullscreen or windowed. The
-  output window runs its own compositor fed per-frame state : pixel-perfect, no
-  transcode.
-- **Record** : format select (MP4/H.264 default; ProRes / FFV1 / uncompressed via
-  ffmpeg) + record / stop + screenshot → `Recorded/`. **The take keeps rolling
-  when you leave the page** : a pulsing REC pill in the top bar shows the
+  output window shows the control window's exact pixels, streamed at the
+  projector's own resolution and keystoned on its side.
+- **Record** : format + record / stop + screenshot → `Recorded/`. **The take keeps
+  rolling when you leave the page** : a pulsing REC pill in the top bar shows the
   elapsed time and stops/saves it, so you can tweak parameters live mid-take.
+  - **DXV3 · Resolume** : Resolume's GPU codec, recorded in **real time** : the
+    graphics card compresses each frame, the file is written as it goes, nothing to
+    convert after. **Any size** (the 4096² dome master included; a bigger master is
+    scaled to 4096), a **constant 30 or 60 fps** (a frame the engine was late for is
+    written again, so the clip keeps time), the clean picture (before keystone).
+    Plays smoothly in Resolume. No sound. Big files : ~1 Gbit/s at 4K 30 fps,
+    ~1.7 Gbit/s for a 4096² dome : record to a fast SSD.
+  - **Encoder formats** (MP4 H.264 / H.265, ProRes 422 HQ, FFV1, uncompressed, VP9) :
+    captured as a high-bitrate hardware H.264 master, then ffmpeg delivers the
+    format when you stop (MP4 H.264 is an instant remux). The hardware encoder
+    takes **up to 3840×2160** : above that (the 4K dome master), they show greyed
+    out and a take records DXV3 instead. The MIDI record button uses your chosen
+    format the same way.
+  - **"MKV · H.264 as captured"** (the former "Fast · no re-encode") is exactly
+    what Chromium's hardware encoder wrote : H.264 in Matroska, variable frame rate,
+    no seek index, Opus sound when Sonify is on. Instant, but editors and Resolume
+    prefer the MP4 (also instant, the same video remuxed).
 - **Spout / Syphon** : share the output with another app on the same computer
   (Resolume, TouchDesigner, MadMapper, OBS…) through the graphics card. Spout on
-  Windows, Syphon on macOS, both built in : nothing to install.
+  Windows, Syphon on macOS, both built in : nothing to install. Sends the clean
+  picture (before keystone) at the full render size, every frame (4K : ~58 fps
+  measured, ~3 ms of the frame).
 - **Send** : **NDI** (built in, see [NDI](#ndi) below) and **HIVE** HEVC-over-TCP
   network output + port.
 - **Light output** : push the picture's colour **into the room**. The composite is
@@ -660,7 +678,8 @@ stills. Keystone warp is off in dome mode (a dome is mapped by its own media ser
 
 - **Aperture** 180–230° (210° default : the Satosphère's 210°, its rim 15° below the
   horizon). The Satosphère takes **4096×4096 max, live over NDI** on its 10 Gb network.
-  8K is for stills : video encoders stop at 4K, so recording refuses 8K with a hint.
+  The dome records in **DXV3** at full 4096² (see Record); an 8K master records
+  scaled to 4096. 8K full size is for stills.
 - **Three ways to fit a 2D picture to a dome** :
   - **full dome** (the default) : the WHOLE Palinopsia frame over the WHOLE 210° :
     its centre at the zenith, its edges all around the rim. **fill** uses every pixel of
@@ -1457,7 +1476,7 @@ config persists to `localStorage`.
 | Control | `osc` (main) in/out + OSCQuery HTTP tree; Web MIDI in the renderer |
 | Video | `ffmpeg-static` ingest (DXV/HAP/ProRes… → all-intra cache) + `<video>` hardware decode; WebCodecs (HEVC) for HIVE; ffmpeg for recording delivery |
 | Audio | Web Audio (local analyser + the Sonify AudioWorklet engine) + OSC audio bus |
-| Output | Fullscreen HDMI · Spout (native DX11) · NDI (optional) · HIVE (HEVC/TCP + mDNS) : async PBO readback |
+| Output | Fullscreen HDMI · Spout (DX11) / Syphon (Metal) · NDI (built in) · HIVE (HEVC/TCP + mDNS) · DXV3 real-time recording : every consumer reads the clean picture through its own GPU conversion + asynchronous readback ring (`engine/frameCapture.ts`), none stalls the render loop |
 
 ## Architecture
 
