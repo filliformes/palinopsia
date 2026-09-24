@@ -51,6 +51,8 @@ import type { CompositionState, FxInstance, FxScope } from '@shared/types';
 installTextureBridge();
 
 import type { BlendMode, LayerMask } from '@shared/types';
+import type { DomeConfig } from '@shared/dome';
+import { DomeStage } from './dome';
 import { BLEND_MODES } from '@shared/types';
 export type { BlendMode };
 
@@ -1273,6 +1275,13 @@ export class Compositor {
   // The texture presented last frame : snapshotted into `snapshot` the moment a
   // crossfade begins (so no per-frame blit in the steady state).
   private lastPresent: WebGLTexture | null = null;
+  // Fulldome : when a config is set, the present pass renders a square
+  // domemaster from the flat composite and the CANVAS becomes that master (so
+  // recording, stills, NDI / Spout and the output stream all carry the dome).
+  // `lastPresent` stays the FLAT composite : snapshots, vision and sonify read it.
+  private dome: DomeStage | null = null;
+  private domeCfg: DomeConfig | null = null;
+  private domeTex: WebGLTexture | null = null;
   // Monomedia "freeze" drop: hold the last presented frame on screen (the
   // sequencer's freeze-style punctuation). Captured into `snapshot` on the first
   // frozen frame; safe because monomedia recalls are hard cuts (no xfade).
@@ -1517,7 +1526,9 @@ export class Compositor {
   captureFrameSync(capLong = 1920): { w: number; h: number; px: Uint8Array } | null {
     const gl = this.gl;
     if (!this.lastPresent) return null;
-    const fw = this.w, fh = this.h;
+    // In dome mode the projector gets the square master, not the flat frame.
+    const srcTex = this.domeTex ?? this.lastPresent;
+    const fw = this.domeTex ? this.dome!.size : this.w, fh = this.domeTex ? this.dome!.size : this.h;
     if (fw <= 0 || fh <= 0) return null;
     const long = Math.max(fw, fh);
     const scale = long > capLong ? capLong / long : 1;
@@ -1543,7 +1554,7 @@ export class Compositor {
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.streamTarget.fbo);
     gl.viewport(0, 0, w, h);
     gl.useProgram(this.copyProg);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.lastPresent); gl.uniform1i(this.uCTex, 0);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, srcTex); gl.uniform1i(this.uCTex, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindVertexArray(null);
     gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, this.streamBuf);
@@ -1933,6 +1944,19 @@ export class Compositor {
       out[i] = (b[p] * 0.299 + b[p + 1] * 0.587 + b[p + 2] * 0.114) / 255;
     }
     return out;
+  }
+
+  /** Fulldome on (a config) or off (null). Resizes the canvas backing store to
+   *  the square master and back; the internal render size never changes. */
+  setDome(cfg: DomeConfig | null): void {
+    this.domeCfg = cfg && cfg.enabled ? cfg : null;
+    const cw = this.domeCfg ? this.domeCfg.res : this.w;
+    const ch = this.domeCfg ? this.domeCfg.res : this.h;
+    if (this.canvas.width !== cw || this.canvas.height !== ch) {
+      this.canvas.width = cw;
+      this.canvas.height = ch;
+    }
+    if (!this.domeCfg && this.dome) { this.dome.dispose(); this.dome = null; this.domeTex = null; }
   }
 
   /** Set the projection warp for the present pass. `corners` = 8 normalized
@@ -2534,10 +2558,28 @@ export class Compositor {
       const cap = 0.25 - this.strobeSafe * 0.235; // 0.02 → ~0.245 (loose) · 1 → 0.015 (tight)
       present = this.strobeLimiter.apply(present, cap, this.w, this.h);
     }
+    // Fulldome : render the domemaster from the flat composite; it replaces the
+    // flat frame on the canvas (no keystone : a dome is mapped by its server).
+    this.domeTex = null;
+    if (this.domeCfg) {
+      try {
+        if (!this.dome) this.dome = new DomeStage(gl);
+        gl.bindVertexArray(this.vao);
+        this.domeTex = this.dome.render(present, this.w / this.h, this.domeCfg, timeMs / 1000);
+      } catch (e) {
+        console.error((e as Error).message);
+        this.domeCfg = null;
+      }
+    }
     // Present to canvas : warped (keystone quad) or straight full-screen.
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    if (this.warpActive) {
+    if (this.domeTex) {
+      gl.bindVertexArray(this.vao);
+      gl.useProgram(this.copyProg);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.domeTex); gl.uniform1i(this.uCTex, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    } else if (this.warpActive) {
       gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
       gl.bindVertexArray(this.warpVao);
       gl.useProgram(this.warpProg);
@@ -2623,6 +2665,7 @@ export class Compositor {
     this.outputShape?.dispose();
     this.cameraless?.dispose();
     this.strobeLimiter?.dispose();
+    this.dome?.dispose();
     this.pbrLib?.dispose();
     disposeTarget(gl, this.bgScratch);
     disposeTarget(gl, this.bgFill);

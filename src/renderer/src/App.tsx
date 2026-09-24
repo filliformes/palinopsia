@@ -352,6 +352,8 @@ export default function App(): JSX.Element {
   const sequencePageOpen = useStore((s) => s.sequencePageOpen)
   const bodyPageOpen = useStore((s) => s.bodyPageOpen)
   const resolumePageOpen = useStore((s) => s.resolumePageOpen)
+  const domeOn = useStore((s) => s.dome.enabled)
+  const domeRes = useStore((s) => s.dome.res)
   useEffect(() => {
     const comp = compositorRef.current
     if (!comp) return
@@ -1085,6 +1087,7 @@ export default function App(): JSX.Element {
         //    Shader hot-swaps preserve feedback buffers (brief §1).
         comp!.setGlobalSpeed(st.globalSpeed)
         comp!.setWarp(st.warpEnabled ? st.warpCorners : null, st.warpGrid)
+        comp!.setDome(st.dome.enabled ? st.dome : null)
         comp!.setStrobeSafe(st.strobeSafe)
         comp!.syncFromState(c, shaderSourceById)
         // 1b. Assemble : hand any target-driven edit its matcher, so its next
@@ -1311,7 +1314,8 @@ export default function App(): JSX.Element {
             modValues,
             modBypass: st.modBypass,
             globalSpeed: st.globalSpeed,
-            warpEnabled: st.warpEnabled,
+            // A domemaster is never keystoned : the dome's own server maps it.
+            warpEnabled: st.warpEnabled && !st.dome.enabled,
             warpCorners: st.warpCorners,
             warpGrid: st.warpGrid,
             time: now - start,
@@ -1678,7 +1682,9 @@ export default function App(): JSX.Element {
             {/* FPS bottom-right, mirroring the resolution tag bottom-left. */}
             <FpsTag />
             <div className="pointer-events-none absolute bottom-2 left-2 font-mono text-[10px] text-muted/70">
-              output · {Math.round(compW * renderScale)}×{Math.round(compH * renderScale)}
+              {domeOn
+                ? `dome · ${domeRes}² master from ${Math.round(compW * renderScale)}×${Math.round(compH * renderScale)}`
+                : `output · ${Math.round(compW * renderScale)}×${Math.round(compH * renderScale)}`}
             </div>
           </div>
 

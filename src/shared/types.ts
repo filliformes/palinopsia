@@ -826,6 +826,8 @@ export interface Session {
   // Resolume OSC mapper : the matrix (rows, columns, connections, snapshots,
   // lock) travels with the session so each piece keeps its own mapping.
   resolume?: import('./resolume').ResolumeMap
+  // Fulldome mapping (the dome view of the Output page).
+  dome?: import('./dome').DomeConfig
   // Opaque renderer UI snapshot (theme, panel sizes, selection). The main
   // process never inspects it : it just round-trips it to disk.
   ui?: unknown

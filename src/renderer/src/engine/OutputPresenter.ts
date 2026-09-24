@@ -180,6 +180,12 @@ export class OutputPresenter {
     gl.viewport(0, 0, this.canvas.width, this.canvas.height)
     gl.clearColor(0, 0, 0, 1)
     gl.clear(gl.COLOR_BUFFER_BIT)
+    // A square frame is a fulldome master : letterbox it (never stretch a
+    // fisheye), centred, instead of filling the window like a flat composite.
+    if (w === h && this.canvas.width !== this.canvas.height) {
+      const side = Math.min(this.canvas.width, this.canvas.height)
+      gl.viewport(Math.round((this.canvas.width - side) / 2), Math.round((this.canvas.height - side) / 2), side, side)
+    }
     gl.useProgram(this.prog)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.tex)

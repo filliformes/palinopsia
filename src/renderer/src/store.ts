@@ -32,6 +32,8 @@ import type { MetaKnobState, MidiBinding, LightConfig, BodyControlConfig } from 
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
 import type { ResolumeMap, ResoOutput, ResoInput, ResoCell, ResoSession } from '@shared/resolume'
 import { defaultResolumeMap, resoCatalogue, RESO_SNAPSHOTS } from '@shared/resolume'
+import type { DomeConfig } from '@shared/dome'
+import { sanitizeDome } from '@shared/dome'
 import { inputsForShader } from './shaders/isf/inputs'
 import { SHADER_BY_ID } from './shaders/isf'
 import { canHostFx } from './fxScopes'
@@ -217,6 +219,23 @@ function loadResolume(): ResolumeMap {
     /* fall through to a fresh mapping */
   }
   return { ...defaultResolumeMap(), inputs: RESO_DEFAULT_ROWS().map(freshInput) }
+}
+function loadDome(): DomeConfig {
+  try {
+    const raw = localStorage.getItem('opsia.dome')
+    if (raw) return sanitizeDome(JSON.parse(raw))
+  } catch {
+    /* fresh defaults */
+  }
+  return sanitizeDome(null)
+}
+function persistDome(d: DomeConfig): DomeConfig {
+  try {
+    localStorage.setItem('opsia.dome', JSON.stringify(d))
+  } catch {
+    /* ignore quota */
+  }
+  return d
 }
 function persistResolume(r: ResolumeMap): ResolumeMap {
   try {
@@ -1130,6 +1149,11 @@ interface StoreState {
   // survives a restart before the session is saved. Every edit is refused while
   // `locked` (recalling a snapshot is a performance move and still works).
   resolume: ResolumeMap
+  // Fulldome output (Output page) : the domemaster mapping + the simulator view.
+  // Kept in localStorage (the venue) AND saved with the session (the piece).
+  dome: DomeConfig
+  setDome: (patch: Partial<DomeConfig>) => void
+  setDomeSim: (patch: Partial<DomeConfig['sim']>) => void
   resolumePageOpen: boolean
   setResolumePageOpen: (on: boolean) => void
   setResolume: (patch: Partial<ResolumeMap>) => void
@@ -2927,6 +2951,9 @@ export const useStore = create<StoreState>((set, get) => ({
   bodyPageOpen: false,
   setBodyPageOpen: (on) => set({ bodyPageOpen: on }),
   resolume: loadResolume(),
+  dome: loadDome(),
+  setDome: (patch) => set((s) => ({ dome: persistDome(sanitizeDome({ ...s.dome, ...patch })) })),
+  setDomeSim: (patch) => set((s) => ({ dome: persistDome(sanitizeDome({ ...s.dome, sim: { ...s.dome.sim, ...patch } })) })),
   resolumePageOpen: false,
   setResolumePageOpen: (on) => set({ resolumePageOpen: on }),
   setResolume: (patch) =>
@@ -3806,6 +3833,9 @@ export const useStore = create<StoreState>((set, get) => ({
     if (s.resolume && typeof s.resolume === 'object') {
       set({ resolume: persistResolume(sanitizeResolume(s.resolume)) })
     }
+    // A piece made for the dome brings its dome mapping back; older sessions
+    // keep whatever the machine had.
+    if (s.dome && typeof s.dome === 'object') set({ dome: persistDome(sanitizeDome(s.dome)) })
     // The session's sound patch (post-set so setSonify's engine push sees it).
     if (s.sonify) {
       const curSoni = get().sonify
@@ -3841,6 +3871,7 @@ export const useStore = create<StoreState>((set, get) => ({
         closed: s.surface.closed
       },
       resolume: s.resolume,
+      dome: s.dome,
       ui: { theme: s.theme }
     }
   }

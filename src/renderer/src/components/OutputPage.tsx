@@ -19,6 +19,8 @@ import { showToast } from './Toast'
 import { currentFps } from '../perf'
 import { captureScreenshot, outputRecorder, recordingFormats } from '../recorder'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { DomeSim } from './DomeSim'
+import { DOME_RES, type DomeConfig, type DomeMode } from '@shared/dome'
 
 const CORNER_LABELS = ['TL', 'TR', 'BR', 'BL']
 
@@ -28,6 +30,20 @@ export function OutputPage({
   canvasRef: RefObject<HTMLCanvasElement | null>
 }): JSX.Element {
   const setOutputPageOpen = useStore((s) => s.setOutputPageOpen)
+  // Fulldome : the master mapping + the simulator's camera (a ref, so orbiting
+  // never re-renders the page).
+  const dome = useStore((s) => s.dome)
+  const setDome = useStore((s) => s.setDome)
+  const setDomeSim = useStore((s) => s.setDomeSim)
+  const [domeView, setDomeView] = useState<'3d' | 'master'>('3d')
+  const simCam = useRef({ yaw: 0, pitch: 0.45, dist: 2.6, fov: dome.sim.fov })
+  simCam.current.fov = dome.sim.fov
+  const simDrag = useRef<{ x: number; y: number } | null>(null)
+  // Inside : from the seat, facing front, eyes a little up. Outside : behind the
+  // dome and above, looking at the front half's inner surface (the cutaway).
+  const resetSimCam = (view: 'inside' | 'outside' = dome.sim.view): void => {
+    Object.assign(simCam.current, view === 'inside' ? { yaw: 0, pitch: 0.45 } : { yaw: Math.PI, pitch: 0.35, dist: 2.6 })
+  }
 
   const warpEnabled = useStore((s) => s.warpEnabled)
   const warpGrid = useStore((s) => s.warpGrid)
@@ -163,6 +179,10 @@ export function OutputPage({
     } else {
       const canvas = canvasRef.current
       if (!canvas || !formatId) return
+      if (dome.enabled && dome.res > 4096) {
+        showToast('Video encoders stop at 4K : record the dome at 4096 (8K is for stills)', 'warn', 6000)
+        return
+      }
       const ok = await outputRecorder.start(canvas, formatId)
       if (!ok) flashSaved('failed', 'recording could not start')
     }
@@ -280,7 +300,9 @@ export function OutputPage({
          <div className="flex min-h-0 flex-1 items-center justify-center p-6">
           <div
             ref={padRef}
-            className="relative aspect-video w-full max-w-5xl select-none rounded border border-border bg-black"
+            className={`relative w-full select-none rounded border border-border bg-black ${
+              dome.enabled && domeView === 'master' ? 'aspect-square max-w-3xl' : 'aspect-video max-w-5xl'
+            }`}
             style={{ touchAction: 'none' }}
             onPointerMove={(e) => {
               if (dragging.current === null) return
@@ -295,7 +317,46 @@ export function OutputPage({
               dragging.current = null
             }}
           >
-            <video ref={videoRef} autoPlay muted playsInline className="h-full w-full bg-black object-contain" />
+            {/* The mirror : the canvas stream. In dome mode it IS the master, and the
+                3D simulator textures itself from it, so it stays mounted (just
+                invisible) behind the simulator. */}
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              className={`h-full w-full bg-black object-contain ${dome.enabled && domeView === '3d' ? 'pointer-events-none absolute inset-0 opacity-0' : ''}`}
+            />
+            {dome.enabled && domeView === '3d' && (
+              <div
+                className="absolute inset-0 cursor-grab active:cursor-grabbing"
+                onPointerDown={(e) => {
+                  simDrag.current = { x: e.clientX, y: e.clientY }
+                  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+                }}
+                onPointerMove={(e) => {
+                  const d = simDrag.current
+                  if (!d) return
+                  const c = simCam.current
+                  const k = dome.sim.view === 'inside' ? -0.005 : 0.008
+                  c.yaw += (e.clientX - d.x) * k
+                  c.pitch = Math.max(-1.45, Math.min(1.5, c.pitch + (e.clientY - d.y) * (dome.sim.view === 'inside' ? 0.005 : -0.008)))
+                  simDrag.current = { x: e.clientX, y: e.clientY }
+                }}
+                onPointerUp={() => { simDrag.current = null }}
+                onWheel={(e) => {
+                  if (dome.sim.view === 'inside') setDomeSim({ fov: Math.max(30, Math.min(150, dome.sim.fov + Math.sign(e.deltaY) * 4)) })
+                  else simCam.current.dist = Math.max(1.2, Math.min(8, simCam.current.dist * (e.deltaY > 0 ? 1.08 : 0.93)))
+                }}
+                onDoubleClick={() => resetSimCam()}
+                title={dome.sim.view === 'inside' ? 'Drag to look around · wheel = field of view · double-click resets' : 'Drag to orbit · wheel = distance · double-click resets'}
+              >
+                <DomeSim video={videoRef} cfg={dome} cam={simCam} />
+                <div className="pointer-events-none absolute left-2 top-2 rounded bg-black/55 px-2 py-1 font-mono text-[10px] text-muted">
+                  {dome.aperture}° dome · {dome.res}² master · {dome.sim.view} view
+                </div>
+              </div>
+            )}
             {/* Recording indicator : top-right, pulsing red dot + elapsed. */}
             {recording && (
               <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1.5 rounded bg-black/55 px-2 py-1 font-mono text-[11px] text-danger">
@@ -308,6 +369,7 @@ export function OutputPage({
                 {savedMsg}
               </div>
             )}
+            {!dome.enabled && (<>
             <svg
               className="pointer-events-none absolute inset-0 h-full w-full"
               viewBox="0 0 100 100"
@@ -341,6 +403,7 @@ export function OutputPage({
                 title={`${CORNER_LABELS[i]} : drag to keystone · double-click to reset`}
               />
             ))}
+            </>)}
           </div>
          </div>
          {/* Resource HUD : one line, spaced across, just under the output. */}
@@ -369,7 +432,9 @@ export function OutputPage({
           style={{ width: inspW }}
           className="flex shrink-0 flex-col gap-2 overflow-y-auto overflow-x-hidden border-l border-border bg-panel p-2"
         >
-          <Section title="Mapping" info="Drag the corners over the live preview to keystone the image onto a projector. Turn grid on to align, off for the show.">
+          <DomeSection dome={dome} setDome={setDome} setDomeSim={setDomeSim} btn={btn} view={domeView} setView={setDomeView} onResetCam={resetSimCam} />
+
+          <Section title="Mapping" info="Drag the corners over the live preview to keystone the image onto a projector. Turn grid on to align, off for the show. (Off in dome mode : a domemaster is mapped by the dome's own server.)">
 
             <div className="flex flex-wrap gap-1.5">
               <button onClick={() => setWarpEnabled(!warpEnabled)} className={btn(warpEnabled)}>
@@ -854,6 +919,133 @@ function InfoDot({ text }: { text: string }): JSX.Element {
     >
       i
     </span>
+  )
+}
+
+function DomeSlider({ label, value, min, max, step, onChange, reset, unit = '', title }: {
+  label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; reset?: number; unit?: string; title?: string
+}): JSX.Element {
+  return (
+    <label className="flex items-center gap-2" title={title}>
+      <span className="w-16 shrink-0 font-mono text-[10px] text-muted">{label}</span>
+      <input
+        type="range" min={min} max={max} step={step} value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        onDoubleClick={() => reset !== undefined && onChange(reset)}
+        className="min-w-0 flex-1 accent-accent"
+      />
+      <span className="w-12 shrink-0 text-right font-mono text-[10px] text-text">{Math.round(value * 100) / 100}{unit}</span>
+    </label>
+  )
+}
+
+// Fulldome : master on/off + resolution + aperture, the mapping mode and its
+// controls, and the simulator's view. Port of the TD FulldomeSimulator's
+// DomeConfig page, plus the mapping it never had.
+function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam }: {
+  dome: DomeConfig
+  setDome: (p: Partial<DomeConfig>) => void
+  setDomeSim: (p: Partial<DomeConfig['sim']>) => void
+  btn: (on: boolean) => string
+  view: '3d' | 'master'
+  setView: (v: '3d' | 'master') => void
+  onResetCam: (view: 'inside' | 'outside') => void
+}): JSX.Element {
+  const MODES: Array<[DomeMode, string, string]> = [
+    ['wrap', 'wrap', 'The picture wraps around the dome like a panorama : its width runs around you, its height climbs from the rim toward the zenith. Made for 360° rooms (the Satosphère).'],
+    ['screen', 'screen', 'The picture hangs on the dome as a flat virtual screen, re-projected so it reads undistorted from the centre : a giant cinema screen. Surround wraps it dimly behind so the dome is never black.'],
+    ['fisheye', 'fisheye', 'The picture laid straight onto the master, inside the circle : the simplest mapping, strongest distortion toward the rim.']
+  ]
+  return (
+    <Section
+      title="Fulldome"
+      info="Renders a square domemaster (equidistant fisheye, front at the bottom, the fulldome standard) from the flat composition. The master replaces the frame everywhere : the preview, the projector window, NDI, Spout, recording and stills. The SAT Satosphère takes 210°, 4096×4096 max, live over NDI. 8K is for stills (video encoders stop at 4K)."
+    >
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button onClick={() => setDome({ enabled: !dome.enabled })} className={btn(dome.enabled)}>
+          dome {dome.enabled ? 'on' : 'off'}
+        </button>
+        {DOME_RES.map((r) => (
+          <button key={r} onClick={() => setDome({ res: r })} className={btn(dome.res === r)} title={`${r}×${r} master${r === 4096 ? ' (Satosphère max)' : r === 8192 ? ' : stills only, heavy' : ''}`}>
+            {r === 2048 ? '2K' : r === 4096 ? '4K' : '8K'}
+          </button>
+        ))}
+      </div>
+      <DomeSlider label="aperture" value={dome.aperture} min={180} max={230} step={1} unit="°" reset={210} onChange={(v) => setDome({ aperture: v })} title="The dome's field of view : 180° a hemisphere, 210° the Satosphère (the rim 15° below the horizon)" />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="font-mono text-[10px] text-muted">mapping</span>
+        {MODES.map(([m, l, t]) => (
+          <button key={m} onClick={() => setDome({ mode: m })} className={btn(dome.mode === m)} title={t}>{l}</button>
+        ))}
+      </div>
+      {(dome.mode === 'wrap' || dome.mode === 'screen') && (
+        <>
+          <DomeSlider label="turns" value={dome.turns} min={1} max={6} step={0.25} reset={2} onChange={(v) => setDome({ turns: v })} title="How many times the picture goes around the dome (fewer = more horizontal stretch)" />
+          <DomeSlider label="top" value={dome.top} min={0} max={90} step={1} unit="°" reset={70} onChange={(v) => setDome({ top: v })} title="Elevation the picture's top edge reaches (90° = the zenith)" />
+          <DomeSlider label="bottom" value={dome.bottom} min={-25} max={80} step={1} unit="°" reset={-15} onChange={(v) => setDome({ bottom: v })} title="Elevation of the picture's bottom edge (−15° = the rim of a 210° dome)" />
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button onClick={() => setDome({ mirrorSeams: !dome.mirrorSeams })} className={btn(dome.mirrorSeams)} title="Alternate copies mirror, so repeats join without a seam">mirror seams</button>
+            <span className="font-mono text-[10px] text-muted">zenith</span>
+            {(['fade', 'stretch', 'black'] as const).map((c) => (
+              <button key={c} onClick={() => setDome({ cap: c })} className={btn(dome.cap === c)} title="What fills the dome above the picture's top edge">{c}</button>
+            ))}
+          </div>
+        </>
+      )}
+      {dome.mode === 'screen' && (
+        <>
+          <DomeSlider label="azimuth" value={dome.azimuth} min={-180} max={180} step={1} unit="°" reset={0} onChange={(v) => setDome({ azimuth: v })} title="Where the screen hangs around the room (0 = front)" />
+          <DomeSlider label="elevation" value={dome.elevation} min={-20} max={90} step={1} unit="°" reset={25} onChange={(v) => setDome({ elevation: v })} title="How high the screen's centre sits" />
+          <DomeSlider label="width" value={dome.width} min={20} max={170} step={1} unit="°" reset={100} onChange={(v) => setDome({ width: v })} title="How much of the view the screen covers, horizontally" />
+          <DomeSlider label="roll" value={dome.roll} min={-180} max={180} step={1} unit="°" reset={0} onChange={(v) => setDome({ roll: v })} />
+          <DomeSlider label="surround" value={dome.surround} min={0} max={1} step={0.01} reset={0.25} onChange={(v) => setDome({ surround: v })} title="The picture wrapped dimly behind the screen" />
+        </>
+      )}
+      {dome.mode === 'fisheye' && (
+        <>
+          <DomeSlider label="scale" value={dome.scale} min={0.2} max={3} step={0.01} reset={1} onChange={(v) => setDome({ scale: v })} />
+          <DomeSlider label="offset x" value={dome.offsetX} min={-1} max={1} step={0.01} reset={0} onChange={(v) => setDome({ offsetX: v })} />
+          <DomeSlider label="offset y" value={dome.offsetY} min={-1} max={1} step={0.01} reset={0} onChange={(v) => setDome({ offsetY: v })} />
+        </>
+      )}
+      <DomeSlider label="rotate" value={dome.rotate} min={-180} max={180} step={1} unit="°" reset={0} onChange={(v) => setDome({ rotate: v })} title="Turn the whole mapping around the dome" />
+      <DomeSlider label="spin" value={dome.spin} min={-30} max={30} step={0.5} unit="°/s" reset={0} onChange={(v) => setDome({ spin: v })} title="Keep turning, degrees per second" />
+      <DomeSlider label="feather" value={dome.feather} min={0} max={0.2} step={0.005} reset={0.01} onChange={(v) => setDome({ feather: v })} title="Soft edge at the rim" />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button onClick={() => setDome({ grid: !dome.grid })} className={btn(dome.grid)} title="Burn an alignment grid into the OUTPUT (10° rings, 30° spokes, the horizon in cyan, the front in red) for projector setup">grid on output</button>
+        <button onClick={() => setDome({ flipX: !dome.flipX })} className={btn(dome.flipX)} title="Mirror the master (some media servers expect it)">flip</button>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2">
+        <span className="font-mono text-[10px] text-muted">preview</span>
+        <button onClick={() => setView('3d')} className={btn(view === '3d')}>3D dome</button>
+        <button onClick={() => setView('master')} className={btn(view === 'master')}>master</button>
+        {view === '3d' && (
+          <>
+            <button onClick={() => { setDomeSim({ view: 'inside' }); onResetCam('inside') }} className={btn(dome.sim.view === 'inside')} title="From the centre of the room, looking around">inside</button>
+            <button onClick={() => { setDomeSim({ view: 'outside' }); onResetCam('outside') }} className={btn(dome.sim.view === 'outside')} title="Orbit the dome from outside">outside</button>
+          </>
+        )}
+      </div>
+      {view === '3d' && (
+        <>
+          <DomeSlider label="tilt" value={dome.sim.tilt} min={-30} max={30} step={1} unit="°" reset={0} onChange={(v) => setDomeSim({ tilt: v })} title="Dome tilt (the TD simulator's default is −15° for a tilted planetarium; the Satosphère is level)" />
+          {dome.sim.view === 'inside' && (
+            <DomeSlider label="camera" value={dome.sim.fov} min={30} max={150} step={1} unit="°" reset={100} onChange={(v) => setDomeSim({ fov: v })} title="Camera field of view" />
+          )}
+          <DomeSlider label="template" value={dome.sim.template} min={0} max={1} step={0.01} reset={0.19} onChange={(v) => setDomeSim({ template: v })} title="Alignment template over the dome (preview only)" />
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setDomeSim({ sweet: !dome.sim.sweet })} className={btn(dome.sim.sweet)} title="The sweet spot : where an audience facing front naturally looks">sweet spot</button>
+          </div>
+          {dome.sim.sweet && (
+            <>
+              <DomeSlider label="sweet w" value={dome.sim.sweetW} min={10} max={360} step={1} unit="°" reset={90} onChange={(v) => setDomeSim({ sweetW: v })} />
+              <DomeSlider label="sweet low" value={dome.sim.sweetLo} min={-20} max={90} step={1} unit="°" reset={10} onChange={(v) => setDomeSim({ sweetLo: v })} />
+              <DomeSlider label="sweet high" value={dome.sim.sweetHi} min={-20} max={90} step={1} unit="°" reset={55} onChange={(v) => setDomeSim({ sweetHi: v })} />
+            </>
+          )}
+        </>
+      )}
+    </Section>
   )
 }
 
