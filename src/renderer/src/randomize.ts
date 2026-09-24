@@ -157,7 +157,12 @@ function randomizeOneInput(
  *  Randomize scopes and by the Inspector's ⚄ button. */
 // Params Randomize must never touch (like the Text source): the Context PBR
 // surface is a deliberate staging decision, not a texture to dice-roll.
-const RANDOMIZE_SKIP: Record<string, RegExp> = { 'fx-context': /^(pbr|lightOrder$)/ }
+// Film damage is a deliberate "worn print" choice too : since it no longer waits
+// for Film Hold, a dice roll would leave every Finishing randomize dirty.
+const RANDOMIZE_SKIP: Record<string, RegExp> = {
+  'fx-context': /^(pbr|lightOrder$)/,
+  'fx-finalizer': /^film(Dust|Scratch|Hair|Gauge|Dirt)$/
+}
 
 export function randomizeInputs(
   shaderId: string,

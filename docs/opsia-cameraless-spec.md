@@ -189,6 +189,14 @@ void main() {
 
 ### 3.3 Émulsion pass — dust, scratch, granulation (GLSL)
 
+> **Superseded for dust and scratch (2026-09-24).** The grid-cell dust below read
+> as little squares and only ran with the hold on. Dust, fibres, a gate hair and
+> scratches now live in their own stage, `src/renderer/src/engine/filmDamage.ts`,
+> on a 24 fps film clock, modelled on measured flaw statistics (Ivanova et al.,
+> Eurographics 2023) : power-law sizes in frame heights scaled by gauge, print vs
+> negative dirt, scratches as objects continuous along the strip (s = frame + 1 - y).
+> Granulation and splice below are still the Cameraless pass.
+
 ```glsl
 /*{ "ISFVSN":"2","DESCRIPTION":"Émulsion — direct-on-film artifact family",
     "CATEGORIES":["Texture"],

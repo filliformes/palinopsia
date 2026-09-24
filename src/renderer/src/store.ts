@@ -395,15 +395,16 @@ export function makeFinalizer(): FxInstance {
   }
 }
 
-// The Cameraless / direct-film input names on the Finalizer. The film stage is
-// gated on filmHold>0, so removing these keys drops the finalizer back to a
-// clean grade (they fall to their neutral ISF defaults). Used by New to open a
+// The Cameraless / direct-film input names on the Finalizer. Removing these keys
+// drops the finalizer back to a clean grade (they fall to their neutral ISF
+// defaults : hold off, no dust / scratch / hair). Used by New to open a
 // blank slate even when the active World is a direct-film mode : Griffé / Peint
 // / Pressé inject filmHold + dust via applyWorldToComposition, which is what
 // used to make a New session open with drawn-film "rectangles" over the picture.
 const FINALIZER_FILM_KEYS = [
   'filmHold', 'filmRate', 'filmJitter', 'filmBoil', 'filmFlutter',
-  'filmBlank', 'filmBlankMode', 'filmDust', 'filmScratch', 'filmGranule', 'filmSplice'
+  'filmBlank', 'filmBlankMode', 'filmDust', 'filmScratch', 'filmHair', 'filmGauge', 'filmDirt',
+  'filmGranule', 'filmSplice'
 ] as const
 
 export function clearFinalizerFilm(c: CompositionState): CompositionState {

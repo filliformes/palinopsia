@@ -36,6 +36,7 @@ import { CollageSource } from './CollageSource';
 import { DepthShadow } from './depthShadow';
 import { OutputShape } from './outputShape';
 import { Cameraless } from './cameraless';
+import { FilmDamage, NO_WEAVE, type FilmWeave } from './filmDamage';
 import { StrobeLimiter } from './strobeLimit';
 import { PbrLib } from './pbrTextures';
 import type { SidechainRef } from '@shared/types';
@@ -1247,10 +1248,16 @@ export class Compositor {
   private cfFlutter = 0.2;
   private cfBlank = 0;
   private cfBlankMode = 0;
-  private cfDust = 0;
-  private cfScratch = 0;
   private cfGranule = 0;
   private cfSplice = 0;
+  // Film damage (dust, fibres, gate hair, scratches) : its own stage right after
+  // Cameraless, on whenever any of it is up (Film Hold or not). fd* ← film* inputs.
+  private filmDamage: FilmDamage | null = null;
+  private fdDust = 0;
+  private fdScratch = 0;
+  private fdHair = 0;
+  private fdGauge = 1; // 0 35 mm · 1 16 mm · 2 Super 8
+  private fdDirt = 0; // 0 print · 1 mixed · 2 negative
   private pbrLib: PbrLib | null = null; // Context PBR material maps (lazy)
   // Outside fill = the Background slab, only meaningful with a shape active.
   private get fzBgLayer(): boolean {
@@ -2132,10 +2139,13 @@ export class Compositor {
     this.cfFlutter = numf(fi.filmFlutter, 0.2);
     this.cfBlank = numf(fi.filmBlank, 0);
     this.cfBlankMode = Math.round(numf(fi.filmBlankMode, 0));
-    this.cfDust = numf(fi.filmDust, 0);
-    this.cfScratch = numf(fi.filmScratch, 0);
     this.cfGranule = numf(fi.filmGranule, 0);
     this.cfSplice = numf(fi.filmSplice, 0);
+    this.fdDust = numf(fi.filmDust, 0);
+    this.fdScratch = numf(fi.filmScratch, 0);
+    this.fdHair = numf(fi.filmHair, 0);
+    this.fdGauge = Math.round(numf(fi.filmGauge, 1));
+    this.fdDirt = Math.round(numf(fi.filmDirt, 0));
 
     // Context PBR surface: feed the selected material's maps (or the neutral
     // flat set) into the Context unit's image inputs every frame. Lazy : no
@@ -2180,10 +2190,13 @@ export class Compositor {
           case 'filmFlutter': this.cfFlutter = value; break;
           case 'filmBlank': this.cfBlank = value; break;
           case 'filmBlankMode': this.cfBlankMode = Math.round(value); break;
-          case 'filmDust': this.cfDust = value; break;
-          case 'filmScratch': this.cfScratch = value; break;
           case 'filmGranule': this.cfGranule = value; break;
           case 'filmSplice': this.cfSplice = value; break;
+          case 'filmDust': this.fdDust = value; break;
+          case 'filmScratch': this.fdScratch = value; break;
+          case 'filmHair': this.fdHair = value; break;
+          case 'filmGauge': this.fdGauge = Math.round(value); break;
+          case 'filmDirt': this.fdDirt = Math.round(value); break;
         }
       }
       return;
@@ -2495,20 +2508,33 @@ export class Compositor {
     // Cameraless / direct-film stage: draw-clock hold + boil (§2.1 pipeline slot).
     // Null when off (hold===0) or effectively smooth (draw ≥ present fps with no
     // artifacts) : skipped entirely so it costs nothing and passes through clean.
+    let weave: FilmWeave = NO_WEAVE;
     if (this.cfHold > 0) {
       const active =
         this.cfRate < 58 || this.cfBoil > 0.001 || this.cfFlutter > 0.001 || this.cfBlank > 0.001 ||
-        this.cfDust > 0.001 || this.cfScratch > 0.001 || this.cfGranule > 0.001 || this.cfSplice > 0.001;
+        this.cfGranule > 0.001 || this.cfSplice > 0.001;
       if (active) {
         if (!this.cameraless) this.cameraless = new Cameraless(gl);
         composite = this.cameraless.apply(
           composite, rawDt,
           { hold: this.cfHold, rate: this.cfRate, jitter: this.cfJitter, boil: this.cfBoil,
             flutter: this.cfFlutter, blank: this.cfBlank, blankMode: this.cfBlankMode,
-            dust: this.cfDust, scratch: this.cfScratch, granule: this.cfGranule, splice: this.cfSplice },
+            granule: this.cfGranule, splice: this.cfSplice },
           this.w, this.h
         );
+        weave = this.cameraless.weave();
       }
+    }
+
+    // Film damage : dust, fibres, gate hair, scratches on a 24 fps film clock
+    // (engine/filmDamage.ts). Dirt rides the boil above; skipped entirely when off.
+    if (this.fdDust > 0.001 || this.fdScratch > 0.001 || this.fdHair > 0.001) {
+      if (!this.filmDamage) this.filmDamage = new FilmDamage(gl);
+      composite = this.filmDamage.apply(
+        composite, rawDt,
+        { dust: this.fdDust, scratch: this.fdScratch, hair: this.fdHair, gauge: this.fdGauge, dirt: this.fdDirt },
+        weave, this.w, this.h
+      );
     }
 
     // Scene crossfade: dissolve the frozen old frame into the new composite.
@@ -2599,6 +2625,7 @@ export class Compositor {
     this.depthShadow?.dispose();
     this.outputShape?.dispose();
     this.cameraless?.dispose();
+    this.filmDamage?.dispose();
     this.strobeLimiter?.dispose();
     this.dome?.dispose();
     for (const cap of this.captures.values()) cap.dispose();

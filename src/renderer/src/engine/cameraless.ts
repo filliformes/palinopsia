@@ -18,6 +18,10 @@
 // Self-contained GL: own program + two persistent targets. The Compositor feeds it the
 // live composite + params each frame and swaps in the returned texture. Off (hold===0)
 // is handled by the Compositor skipping the stage entirely : genuine null passthrough.
+// Dust, hair and scratches are NOT here : they live in filmDamage.ts (their own film
+// clock, and they work with Film Hold off); weave() hands them this stage's boil.
+
+import type { FilmWeave } from './filmDamage'
 
 export interface CameralessParams {
   hold: number // 0 off · 1 film-hold · 2 freeze
@@ -27,9 +31,7 @@ export interface CameralessParams {
   flutter: number // 0..1 : per-tick density/luminance pump
   blank: number // 0..1 : probability a tick shows leader instead of the frame
   blankMode: number // 0 black · 1 white · 2 both
-  // Émulsion : the direct-on-film artifact family (print/handling layer).
-  dust: number // 0..1 : dirt/hair specks (fast reseed = the "sparkle" of dirt)
-  scratch: number // 0..1 : tramline scratches (slow reseed = they persist)
+  // Émulsion : the direct-on-film artifact family (dust/scratch : filmDamage.ts).
   granule: number // 0..1 : dye granulation / pooling (coarse coloured mottle)
   splice: number // 0..1 : rare whole-frame flash + horizontal bar
 }
@@ -47,14 +49,11 @@ uniform float uBoilScale;  // ~0.997..1.003 breathe about centre
 uniform float uFlutter;    // density multiplier
 uniform float uBlank;      // 0 show · 1 leader this frame
 uniform vec3  uBlankCol;   // black or white leader
-uniform float uDust, uScratch, uGranule, uSplice; // émulsion amounts
-uniform float uSeedFast;   // reseeds every tick (dust sparkle · granulation)
-uniform float uSeedSlow;   // reseeds every N ticks (scratch persistence)
+uniform float uGranule, uSplice; // émulsion amounts
+uniform float uSeedFast;   // reseeds every tick (granulation · splice bar)
 
-// Sine-free hash (Hoskins). The old sin(dot(...)) version aliased badly on
-// large integer grids — the dust/granule seeds pushed sin() into its low-
-// precision range, so specks collapsed into wavy banded ROWS (the "little
-// black rectangles" over the picture). This spreads cleanly at every scale.
+// Sine-free hash (Hoskins) : the sin(dot(...)) kind aliases into banded rows on
+// large integer grids.
 float h1(vec2 p){
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
@@ -79,22 +78,6 @@ void main(){
 
   // ── Émulsion (print / handling layer), at screen space ──
   vec2 uv = vUV;
-  // dust & hair : sparse dark specks (+ rare bright emulsion pit), reseed fast.
-  if (uDust > 0.0) {
-    float d = h1(floor(uv * 220.0) + uSeedFast);
-    float speck = step(1.0 - uDust * 0.012, d);
-    col.rgb *= 1.0 - speck * 0.9;
-    float pit = step(1.0 - uDust * 0.004, h1(floor(uv * 180.0) + uSeedFast * 1.7));
-    col.rgb = mix(col.rgb, vec3(0.95), pit);
-  }
-  // tramline scratches : near-vertical, PERSISTENT across ticks (slow seed).
-  if (uScratch > 0.0) {
-    float lane = h1(vec2(floor(uv.x * 60.0), uSeedSlow));
-    float on = step(1.0 - uScratch * 0.08, lane);
-    float wob = (vnoise(vec2(uv.y * 8.0, uSeedSlow)) - 0.5) * 0.004;
-    float line = smoothstep(0.0015, 0.0, abs(fract(uv.x * 60.0) - 0.5 - wob * 60.0) / 60.0);
-    col.rgb = mix(col.rgb, vec3(1.0), on * line * 0.7);
-  }
   // dye granulation / pooling : clumped coloured value noise, subtractive density.
   if (uGranule > 0.0) {
     float clump = vnoise(uv * 23.0);
@@ -107,7 +90,7 @@ void main(){
   if (uSplice > 0.0) {
     col.rgb = mix(col.rgb, vec3(1.0), uSplice * 0.6);
     float barY = fract(uSeedFast * 0.37);
-    float bar = smoothstep(0.02, 0.0, abs(uv.y - barY));
+    float bar = 1.0 - smoothstep(0.0, 0.02, abs(uv.y - barY));
     col.rgb = mix(col.rgb, vec3(1.0), bar * uSplice);
   }
   frag = col;
@@ -135,14 +118,10 @@ export class Cameraless {
   private flut = 1
   private blank = 0
   private blankCol: [number, number, number] = [0, 0, 0]
-  // Émulsion: continuous amounts (per frame) + reseeded seeds (per tick / per N ticks).
-  private dustAmt = 0
-  private scratchAmt = 0
+  // Émulsion: continuous amounts (per frame) + a seed re-rolled per tick.
   private granuleAmt = 0
   private spliceAmt = 0
   private seedFast = 0
-  private seedSlow = 0
-  private tickCount = 0
 
   constructor(private gl: WebGL2RenderingContext) {
     const compile = (type: number, src: string): WebGLShader => {
@@ -234,11 +213,8 @@ export class Cameraless {
     } else {
       this.blank = 0
     }
-    // Émulsion cadences: dust/granulation sparkle every tick; scratches persist
-    // for ~8 drawn frames (slow seed); splice is a rare punctuation.
+    // Granulation re-rolls every tick; splice is a rare punctuation.
     this.seedFast = Math.random() * 1000
-    if (this.tickCount % 8 === 0) this.seedSlow = Math.random() * 1000
-    this.tickCount++
     this.spliceAmt = Math.random() < p.splice * 0.3 ? p.splice : 0
   }
 
@@ -263,12 +239,9 @@ export class Cameraless {
       gl.uniform1f(this.u('uFlutter'), this.flut)
       gl.uniform1f(this.u('uBlank'), this.blank)
       gl.uniform3f(this.u('uBlankCol'), this.blankCol[0], this.blankCol[1], this.blankCol[2])
-      gl.uniform1f(this.u('uDust'), this.dustAmt)
-      gl.uniform1f(this.u('uScratch'), this.scratchAmt)
       gl.uniform1f(this.u('uGranule'), this.granuleAmt)
       gl.uniform1f(this.u('uSplice'), this.spliceAmt)
       gl.uniform1f(this.u('uSeedFast'), this.seedFast)
-      gl.uniform1f(this.u('uSeedSlow'), this.seedSlow)
     } else {
       // Identity copy → the held frame stays CLEAN (émulsion is added at present).
       gl.uniform2f(this.u('uBoil'), 0, 0)
@@ -277,12 +250,9 @@ export class Cameraless {
       gl.uniform1f(this.u('uFlutter'), 1)
       gl.uniform1f(this.u('uBlank'), 0)
       gl.uniform3f(this.u('uBlankCol'), 0, 0, 0)
-      gl.uniform1f(this.u('uDust'), 0)
-      gl.uniform1f(this.u('uScratch'), 0)
       gl.uniform1f(this.u('uGranule'), 0)
       gl.uniform1f(this.u('uSplice'), 0)
       gl.uniform1f(this.u('uSeedFast'), 0)
-      gl.uniform1f(this.u('uSeedSlow'), 0)
     }
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
@@ -292,8 +262,6 @@ export class Cameraless {
   apply(srcTex: WebGLTexture, dt: number, p: CameralessParams, w: number, h: number): WebGLTexture {
     this.ensureTargets(w, h)
     // Émulsion amounts are continuous (read every frame); their seeds reseed on ticks.
-    this.dustAmt = p.dust
-    this.scratchAmt = p.scratch
     this.granuleAmt = p.granule
     const isTick = this.tick(dt, p)
     if (p.hold === 2) {
@@ -313,6 +281,12 @@ export class Cameraless {
     }
     this.blit(this.held!.tex, this.out!.fbo, true)
     return this.out!.tex
+  }
+
+  /** This frame's boil (the held frame's registration), for filmDamage : dirt on
+   *  the film rides it. */
+  weave(): FilmWeave {
+    return { x: this.bx, y: this.by, rot: this.brot, scale: this.bscale }
   }
 
   dispose(): void {

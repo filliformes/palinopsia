@@ -95,6 +95,32 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Film dust and film scratch, rebuilt from how real film gets damaged** (Finalizer).
+  The dust used to be little black and white squares : one cell of a fixed grid
+  switched on, all the same size, far too many, held for a whole drawn frame, and
+  only when Film Hold was on. It is now its own stage (`engine/filmDamage.ts`),
+  on whenever dust, scratch or hair is up :
+  - **Dust** changes every **film frame** (24 fps, Super 8 18), not every drawn
+    frame. Mostly tiny specks, rarely a big one (a power law), with irregular
+    rotated outlines, sharp or out of focus, big pieces mottled like real clumps.
+    Dark on the print, white sparkle from the negative, never pure black or white.
+    The count changes every frame, bunches up and comes in occasional bursts.
+    Specks smaller than a pixel fade instead of flickering, so a 1080p render and
+    an 8K dome master look the same. The odd **fibre** too : thin, curved,
+    tapered, uneven.
+  - **Scratches** run along the strip : each lasts from a fraction of a second to
+    a minute, stays straight within a frame, wanders slowly sideways, starts and
+    ends partway down a frame, breaks up, and has ragged edges. Mostly dark (the
+    print), some white (the negative), some green / yellow (a colour print's
+    emulsion), sometimes two or three running together.
+  - New : **gate hair** (a hair caught in the projector gate, hanging in from an
+    edge and trembling, for seconds to a minute), **film gauge** (35 mm / 16 mm /
+    Super 8 : the same dust is ~4x bigger on Super 8) and **dirt on** (print /
+    mixed / negative).
+  - Dirt and scratches ride the Film Hold boil; the gate hair doesn't.
+  - Under half a millisecond per frame at 4096² (measured).
+  - Griffé, Peint and Pressé retuned; Randomize no longer dirties the Finalizer
+    (dust, scratch, hair, gauge and dirt are left as they are).
 - **Output page order**, top to bottom : Composition size, Render scale, Mapping,
   Fulldome, Fullscreen output, Record, Spout / Syphon, NDI, HIVE, Flash safety,
   Lights, Installation mode. The Spout section is now **Spout / Syphon** and shows

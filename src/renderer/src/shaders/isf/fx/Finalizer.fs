@@ -31,6 +31,9 @@
     { "NAME": "filmBlankMode","TYPE": "long","VALUES": [0, 1, 2], "LABELS": ["black", "white", "both"], "DEFAULT": 0, "LABEL": "blank leader" },
     { "NAME": "filmDust",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "film dust" },
     { "NAME": "filmScratch","TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "film scratch" },
+    { "NAME": "filmHair",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "gate hair" },
+    { "NAME": "filmGauge",  "TYPE": "long",  "VALUES": [0, 1, 2], "LABELS": ["35 mm", "16 mm", "Super 8"], "DEFAULT": 1, "LABEL": "film gauge" },
+    { "NAME": "filmDirt",   "TYPE": "long",  "VALUES": [0, 1, 2], "LABELS": ["print", "mixed", "negative"], "DEFAULT": 0, "LABEL": "dirt on" },
     { "NAME": "filmGranule","TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "film granulation" },
     { "NAME": "filmSplice", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "film splice" },
     { "NAME": "outShape", "TYPE": "long", "VALUES": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
@@ -48,10 +51,11 @@
   ]
 }*/
 // NOTE: outShape / outBg* AND film* are applied NATIVELY as compositor output
-// stages (engine/outputShape.ts, engine/cameraless.ts) : outShape needs the
-// Background-slab texture as the outside fill, and film* needs frame-hold state +
-// a fixed pipeline slot, neither reachable from ISF. Declared here only so the
-// auto-UI shows them in the Finalizer; this shader ignores them.
+// stages (engine/outputShape.ts, engine/cameraless.ts, and engine/filmDamage.ts for
+// dust / scratch / hair / gauge / dirt) : outShape needs the Background-slab texture
+// as the outside fill, and film* needs frame-hold state, a film clock and a fixed
+// pipeline slot, none reachable from ISF. Declared here only so the auto-UI shows
+// them in the Finalizer; this shader ignores them.
 
 float hash21(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);

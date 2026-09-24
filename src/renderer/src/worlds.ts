@@ -122,7 +122,8 @@ export const BUILTIN_WORLDS: World[] = [
     context: { trails: 0.04, blur: 0.0, bloom: 0.06, depth: 0.12, haze: 0.02 },
     finalizer: {
       filmHold: 1, filmRate: 10, filmJitter: 0.2, filmBoil: 0.15, filmFlutter: 0.12,
-      filmBlank: 0.35, filmBlankMode: 0, filmDust: 0.12, filmScratch: 0.3, filmGranule: 0, filmSplice: 0.05
+      filmBlank: 0.35, filmBlankMode: 0, filmDust: 0.2, filmScratch: 0.3, filmHair: 0,
+      filmGauge: 0, filmDirt: 0, filmGranule: 0, filmSplice: 0.05
     },
     autoMod: { feature: 'transient', target: 'bloom', depth: 0.4 }
   },
@@ -135,7 +136,8 @@ export const BUILTIN_WORLDS: World[] = [
     context: { trails: 0.2, blur: 0.06, bloom: 0.18, depth: 0.28, haze: 0.1 },
     finalizer: {
       filmHold: 1, filmRate: 6, filmJitter: 0.4, filmBoil: 0.6, filmFlutter: 0.4,
-      filmBlank: 0.05, filmBlankMode: 2, filmDust: 0.3, filmScratch: 0.1, filmGranule: 0.6, filmSplice: 0.03
+      filmBlank: 0.05, filmBlankMode: 2, filmDust: 0.3, filmScratch: 0.15, filmHair: 0.25,
+      filmGauge: 1, filmDirt: 1, filmGranule: 0.6, filmSplice: 0.03
     },
     autoMod: null // "silent by conviction" : audio decoupled
   },
@@ -148,7 +150,8 @@ export const BUILTIN_WORLDS: World[] = [
     context: { trails: 0.12, blur: 0.05, bloom: 0.1, depth: 0.35, haze: 0.08 },
     finalizer: {
       filmHold: 1, filmRate: 8, filmJitter: 0.35, filmBoil: 0.4, filmFlutter: 0.25,
-      filmBlank: 0.08, filmBlankMode: 0, filmDust: 0.5, filmScratch: 0.5, filmGranule: 0.35, filmSplice: 0.08
+      filmBlank: 0.08, filmBlankMode: 0, filmDust: 0.55, filmScratch: 0.6, filmHair: 0.5,
+      filmGauge: 1, filmDirt: 0, filmGranule: 0.35, filmSplice: 0.08
     },
     autoMod: { feature: 'level', target: 'haze', depth: 0.3 }
   }
@@ -178,10 +181,14 @@ export function applyWorldToComposition(c: CompositionState, world: World): Comp
     layers: c.layers.map((l) => ({ ...l, coupling: { ...world.coupling } })),
     master: c.master.map((f) => {
       if (f.shaderId === 'fx-context') return { ...f, inputs: { ...f.inputs, ...world.context } }
-      // Finalizer: reset the Cameraless hold OFF as a baseline (so a non-film
-      // World clears drawn-film), then apply this World's film character if any.
+      // Finalizer: reset the Cameraless hold and the film damage OFF as a baseline
+      // (so a non-film World clears drawn-film : dust no longer needs the hold),
+      // then apply this World's film character if any.
       if (f.shaderId === 'fx-finalizer')
-        return { ...f, inputs: { ...f.inputs, filmHold: 0, ...(world.finalizer ?? {}) } }
+        return {
+          ...f,
+          inputs: { ...f.inputs, filmHold: 0, filmDust: 0, filmScratch: 0, filmHair: 0, ...(world.finalizer ?? {}) }
+        }
       return f
     })
   }
