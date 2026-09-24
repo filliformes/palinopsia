@@ -10,6 +10,7 @@
 
 import { sonifyEngine } from './audio/sonify'
 import { useStore } from './store'
+import { showToast } from './components/Toast'
 
 // Intermediate codec preference: H.264 first (hardware-encoded on Windows/macOS
 // Chromium → smooth + cheap), then VP9, then VP8. Each maps to what we tell main.
@@ -59,6 +60,14 @@ export class OutputRecorder {
   // Serialize chunk sends: arrayBuffer() is async and the byte stream must reach
   // disk strictly in order or the container is corrupt.
   private queue: Promise<void> = Promise.resolve()
+  // Bytes actually handed to main this take (0 = the encoder never produced video).
+  private bytes = 0
+  // Why the last take ended badly, for the stop toast (null = fine).
+  lastError: string | null = null
+  // One stop in flight at a time : a second click joins it instead of stealing
+  // its resolver (which used to leave the first caller waiting forever).
+  private stopping: Promise<string | null> | null = null
+  private watchdog: number | null = null
 
   get active(): boolean {
     return this.rec !== null
@@ -74,6 +83,8 @@ export class OutputRecorder {
     const inter = pickIntermediate(audioTracks.length > 0)
     if (!inter) return false
     this.formatId = formatId
+    this.bytes = 0
+    this.lastError = null
     const ok = await window.api.recordingStart(inter.ext, inter.codec)
     if (!ok) return false
     try {
@@ -93,35 +104,112 @@ export class OutputRecorder {
       await window.api.recordingStop(formatId)
       return false
     }
-    this.rec.ondataavailable = (e): void => {
+    const rec = this.rec
+    rec.ondataavailable = (e): void => {
       if (!e.data || e.data.size === 0) return
-      this.queue = this.queue.then(async () => {
-        const buf = new Uint8Array(await e.data.arrayBuffer())
-        window.api.recordingChunk(buf)
+      this.bytes += e.data.size
+      // A failed chunk must never poison the chain : every later chunk (and
+      // stop's final flush) would otherwise wait on a rejected promise forever.
+      this.queue = this.queue
+        .then(async () => {
+          const buf = new Uint8Array(await e.data.arrayBuffer())
+          window.api.recordingChunk(buf)
+        })
+        .catch((err) => console.error('[recorder] chunk lost:', err))
+    }
+    // The encoder can die on its own (a frame size it refuses, e.g. a 4096² dome
+    // master; a GPU reset; the canvas track ending). Finalize instead of leaving
+    // the take "recording" with nothing behind it.
+    rec.onerror = (ev): void => {
+      const err = (ev as unknown as { error?: DOMException }).error
+      this.lastError = `the video encoder stopped${err?.message ? ` (${err.message})` : ''}`
+      console.error('[recorder] MediaRecorder error:', err)
+      this.autoStop()
+    }
+    for (const t of this.stream.getVideoTracks()) {
+      t.addEventListener('ended', () => {
+        if (this.rec === rec) {
+          this.lastError = 'the output stopped feeding the recorder'
+          this.autoStop()
+        }
       })
     }
     // Small timeslice → frequent flushes → lower memory + tighter stop latency.
-    this.rec.start(500)
+    rec.start(500)
+    // Nothing after 4 s = the encoder refused this output : say so and stop.
+    this.watchdog = window.setTimeout(() => {
+      this.watchdog = null
+      if (this.rec === rec && this.bytes === 0) {
+        this.lastError = `the encoder produced no video at ${canvas.width}×${canvas.height}${
+          canvas.width > 4096 || canvas.height > 2304 ? ' (too large for it : try a smaller dome master or render size)' : ''
+        }`
+        this.autoStop()
+      }
+    }, 4000)
     useStore.getState().setRecording(true)
     return true
   }
 
-  /** Stop, flush all chunks, then let main produce the delivery file. */
-  async stop(): Promise<string | null> {
-    const rec = this.rec
-    if (!rec) return null
-    await new Promise<void>((res) => {
-      rec.onstop = (): void => res()
-      rec.stop()
+  /** The take ended on its own (encoder error, lost track, nothing captured) :
+   *  finalize it and tell the player why, without waiting for a click. */
+  private autoStop(): void {
+    void this.stop().then((path) => {
+      const why = this.lastError ?? 'the recorder stopped'
+      showToast(
+        path
+          ? `Recording stopped : ${why}. Kept what was captured · ${path.split(/[\\/]/).pop() ?? path}`
+          : `Recording stopped : ${why}. Nothing was saved.`,
+        'warn',
+        8000
+      )
     })
-    // Stop only the canvas video tracks : the audio track is the LIVE sound
-    // engine's output and must keep running for the performance.
-    this.stream?.getVideoTracks().forEach((t) => t.stop())
-    this.rec = null
-    this.stream = null
-    await this.queue // every chunk reached main before we finalize
-    useStore.getState().setRecording(false)
-    return window.api.recordingStop(this.formatId)
+  }
+
+  /** Stop, flush all chunks, then let main produce the delivery file. Never
+   *  hangs and never throws : whatever happens, the take ends and the REC state
+   *  clears. Returns the saved path, or null (see `lastError` for why). */
+  stop(): Promise<string | null> {
+    if (this.stopping) return this.stopping
+    this.stopping = this.doStop().finally(() => {
+      this.stopping = null
+    })
+    return this.stopping
+  }
+
+  private async doStop(): Promise<string | null> {
+    if (this.watchdog !== null) { window.clearTimeout(this.watchdog); this.watchdog = null }
+    const rec = this.rec
+    try {
+      if (rec) {
+        // Wait for the final chunk, but only if the recorder is still running :
+        // one that already stopped (error, lost track) will never fire 'stop'
+        // again, and waiting on it was the hang. 3 s cap regardless.
+        if (rec.state !== 'inactive') {
+          await new Promise<void>((res) => {
+            const done = (): void => { window.clearTimeout(t); res() }
+            const t = window.setTimeout(done, 3000)
+            rec.addEventListener('stop', done, { once: true })
+            try { rec.stop() } catch { done() }
+          })
+        }
+        // Stop only the canvas video tracks : the audio track is the LIVE sound
+        // engine's output and must keep running for the performance.
+        this.stream?.getVideoTracks().forEach((t) => t.stop())
+        this.rec = null
+        this.stream = null
+        await this.queue.catch(() => {}) // every chunk reached main before we finalize
+      }
+    } finally {
+      useStore.getState().setRecording(false)
+    }
+    if (!rec) return null
+    if (this.bytes === 0 && !this.lastError) this.lastError = 'the encoder produced no video'
+    try {
+      return await window.api.recordingStop(this.formatId)
+    } catch (e) {
+      this.lastError = this.lastError ?? `saving failed (${(e as Error).message})`
+      return null
+    }
   }
 }
 

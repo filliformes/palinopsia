@@ -144,8 +144,10 @@ import { metaGlides } from './metaSmooth'
 // or the keyboard — had no confirmation at all; this toast fills that gap.
 function stopRecordingWithToast(): void {
   void outputRecorder.stop().then((path) => {
-    if (path) showToast('Recording saved · ' + (path.split(/[\\/]/).pop() ?? path))
-    else showToast('Recording stopped — the file may not have saved', 'warn')
+    const why = outputRecorder.lastError
+    if (path && !why) showToast('Recording saved · ' + (path.split(/[\\/]/).pop() ?? path))
+    else if (path) showToast(`Recording stopped : ${why}. Kept what was captured · ${path.split(/[\\/]/).pop() ?? path}`, 'warn', 7000)
+    else showToast(`Recording stopped${why ? ` : ${why}` : ''}. Nothing was saved.`, 'warn', 7000)
   })
 }
 
