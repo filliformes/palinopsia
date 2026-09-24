@@ -390,7 +390,10 @@ export function makeFinalizer(): FxInstance {
       grain: 0.06,
       grainSize: 1.5,
       chroma: 0,
-      parasites: 0.1
+      parasites: 0.1,
+      // Present on every finalizer made since film damage stopped needing Film
+      // Hold : the marker normalizeComposition's one-time migration looks for.
+      filmGauge: 1
     }
   }
 }
@@ -413,7 +416,7 @@ export function clearFinalizerFilm(c: CompositionState): CompositionState {
     ...c,
     master: (c.master ?? []).map((f) =>
       f.shaderId === 'fx-finalizer'
-        ? { ...f, inputs: Object.fromEntries(Object.entries(f.inputs).filter(([k]) => !film.has(k))) }
+        ? { ...f, inputs: { ...Object.fromEntries(Object.entries(f.inputs).filter(([k]) => !film.has(k))), filmGauge: 1 } }
         : f
     )
   }
@@ -739,7 +742,16 @@ export function normalizeComposition(c: CompositionState): CompositionState {
       const find = (id: string): FxInstance | undefined => m.find((f) => f.shaderId === id)
       const vibe = find('fx-vibe') ?? makeVibePalette()
       const context = find('fx-context') ?? makeContext()
-      const finalizer = find('fx-finalizer') ?? makeFinalizer()
+      let finalizer = find('fx-finalizer') ?? makeFinalizer()
+      // Film damage no longer waits for Film Hold. A finalizer saved before that
+      // (no filmGauge key) with the hold off carried dust / scratch values nobody
+      // could see (Randomize used to roll them) : drop those once, and stamp
+      // filmGauge so a newer session is never migrated again.
+      if (!('filmGauge' in finalizer.inputs)) {
+        const fi = finalizer.inputs
+        const holdOn = Math.round(Number(fi.filmHold) || 0) > 0
+        finalizer = { ...finalizer, inputs: { ...fi, ...(holdOn ? {} : { filmDust: 0, filmScratch: 0 }), filmGauge: 1 } }
+      }
       const rest = m.filter(
         (f) => f.shaderId !== 'fx-vibe' && f.shaderId !== 'fx-context' && f.shaderId !== 'fx-finalizer'
       )

@@ -121,6 +121,9 @@ that CI builds into cross-platform releases.
   - Under half a millisecond per frame at 4096² (measured).
   - Griffé, Peint and Pressé retuned; Randomize no longer dirties the Finalizer
     (dust, scratch, hair, gauge and dirt are left as they are).
+  - Older sessions and scenes keep their look : Randomize used to roll dust and
+    scratch values that stayed invisible without Film Hold, so a session saved
+    before this change with the hold off opens with them at zero (once).
 - **Output page order**, top to bottom : Composition size, Render scale, Mapping,
   Fulldome, Fullscreen output, Record, Spout / Syphon, NDI, HIVE, Flash safety,
   Lights, Installation mode. The Spout section is now **Spout / Syphon** and shows
