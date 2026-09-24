@@ -33,6 +33,8 @@ import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assembl
 import type { ResolumeMap, ResoOutput, ResoInput, ResoCell, ResoSession } from '@shared/resolume'
 import { defaultResolumeMap, resoCatalogue, RESO_SNAPSHOTS } from '@shared/resolume'
 import type { DomeConfig } from '@shared/dome'
+import type { NdiConfig, NdiStatus } from '@shared/ndi'
+import { sanitizeNdiConfig, idleNdiStatus } from '@shared/ndi'
 import { sanitizeDome } from '@shared/dome'
 import { inputsForShader } from './shaders/isf/inputs'
 import { SHADER_BY_ID } from './shaders/isf'
@@ -219,6 +221,15 @@ function loadResolume(): ResolumeMap {
     /* fall through to a fresh mapping */
   }
   return { ...defaultResolumeMap(), inputs: RESO_DEFAULT_ROWS().map(freshInput) }
+}
+function loadNdi(): NdiConfig {
+  try {
+    const raw = localStorage.getItem('opsia.ndi')
+    if (raw) return sanitizeNdiConfig(JSON.parse(raw))
+  } catch {
+    /* defaults */
+  }
+  return sanitizeNdiConfig(null)
 }
 function loadDome(): DomeConfig {
   try {
@@ -1129,9 +1140,15 @@ interface StoreState {
   // Fullscreen output window (projector) is open + mirroring. Transient.
   outputActive: boolean
   setOutputActive: (on: boolean) => void
-  // NDI / Spout output on (need the optional native senders). Transient.
+  // NDI output : machine-local config (persisted, so NDI comes back on its own
+  // after a restart at the venue) + the live status streamed from the NDI process.
+  // `ndiActive` mirrors ndi.enabled for the places that only need on/off.
+  ndi: NdiConfig
+  setNdi: (patch: Partial<NdiConfig>) => void
+  ndiStatus: NdiStatus
+  setNdiStatus: (s: NdiStatus) => void
   ndiActive: boolean
-  setNdiActive: (on: boolean) => void
+  // Spout (Windows, native addon). Transient.
   spoutActive: boolean
   setSpoutActive: (on: boolean) => void
   // Light output (ArtNet/DMX · WLED). Machine-local (venue-specific), persisted.
@@ -2887,8 +2904,16 @@ export const useStore = create<StoreState>((set, get) => ({
   renameWorld: (id, name) => get().updateWorld(id, { name }),
   worldPageOpen: false,
   setWorldPageOpen: (on) => set({ worldPageOpen: on }),
-  ndiActive: false,
-  setNdiActive: (on) => set({ ndiActive: on }),
+  ndi: loadNdi(),
+  setNdi: (patch) =>
+    set((s) => {
+      const ndi = sanitizeNdiConfig({ ...s.ndi, ...patch })
+      try { localStorage.setItem('opsia.ndi', JSON.stringify(ndi)) } catch { /* quota */ }
+      return { ndi, ndiActive: ndi.enabled }
+    }),
+  ndiStatus: idleNdiStatus(),
+  setNdiStatus: (ndiStatus) => set({ ndiStatus }),
+  ndiActive: loadNdi().enabled,
   spoutActive: false,
   setSpoutActive: (on) => set({ spoutActive: on }),
   lights: (() => {

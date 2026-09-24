@@ -1,3 +1,4 @@
+import { ndiConfigure, ndiOnStatus } from './ndi'
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   ExposedApi,
@@ -135,9 +136,12 @@ const api: ExposedApi = {
   },
 
   // ── External output (NDI / Spout) ────────────────────────────────
-  ndiSet: (on: boolean) => ipcRenderer.invoke('ndi:set', on),
+  // NDI : the sender runs HERE (src/preload/ndi.ts); frames arrive over a
+  // private MessageChannel (transferred), not through this bridge (it copies).
+  ndiConfigure: (cfg: import('@shared/ndi').NdiConfig) => ndiConfigure(cfg),
+  onNdiStatus: (cb: (s: import('@shared/ndi').NdiStatus) => void) => ndiOnStatus(cb),
   spoutSet: (on: boolean) => ipcRenderer.invoke('spout:set', on),
-  ndiFrame: (w: number, h: number, pixels: Uint8Array) => ipcRenderer.send('ndi:frame', w, h, pixels),
+  spoutFrame: (w: number, h: number, pixels: Uint8Array) => ipcRenderer.send('spout:frame', w, h, pixels),
 
   // ── Light output (ArtNet/DMX · WLED) ─────────────────────────────
   lightConfig: (cfg: unknown) => ipcRenderer.send('light:config', cfg),

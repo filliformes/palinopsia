@@ -56,6 +56,7 @@ import { BodyPage } from './components/BodyPage'
 import { ResolumePage } from './components/ResolumePage'
 import { applyResolume } from './resolume'
 import { domePreview, DOME_PREVIEW } from './engine/domePreview'
+import { ndiRate } from '@shared/ndi'
 import { bodyTracker } from './engine/bodyTracker'
 import { bodyBus } from './engine/bodyIn'
 import { perfMeter } from './engine/perfMeter'
@@ -320,6 +321,10 @@ export default function App(): JSX.Element {
 
   // The zero-copy pixel port to the output window (see main's MessageChannelMain).
   const pixelPortRef = useRef<MessagePort | null>(null)
+  // NDI : the frame pipe to the sender (the preload), and when the last capture
+  // was queued (the grid the rate steps on).
+  const ndiPortRef = useRef<MessagePort | null>(null)
+  const ndiLastKick = useRef(0)
   // The long-edge cap for the streamed frame : the output window reports its
   // native drawing-buffer size back over the port, and we stream at exactly that
   // — never larger (a 4K readback is 32MB/frame and memory-bound; the projector
@@ -344,7 +349,39 @@ export default function App(): JSX.Element {
     return () => window.removeEventListener('message', onMsg)
   }, [])
 
-  // ── External output (NDI / Spout) : attach the readback while active ──
+  // ── NDI : push the config whenever it changes (on/off, name, groups,
+  //    network) and mirror the status it streams back. The sender lives in this
+  //    window's preload; frames reach it from the render loop, and come back
+  //    (transferred, no copy) once NDI is done with them, to be refilled.
+  const ndiCfg = useStore((s) => s.ndi)
+  useEffect(() => {
+    void window.api.ndiConfigure(ndiCfg).then((st) => useStore.getState().setNdiStatus(st)).catch(() => {})
+    if (!ndiCfg.enabled) compositorRef.current?.ndiRelease()
+  }, [ndiCfg])
+  useEffect(() => window.api.onNdiStatus((st) => useStore.getState().setNdiStatus(st)), [])
+  useEffect(() => {
+    // The frame pipe to the sender : a private MessageChannel from the preload
+    // (window messages would be deserialized by every listener in both worlds).
+    const onMsg = (e: MessageEvent): void => {
+      if (e.data !== 'opsia:ndiport' || !e.ports[0]) return
+      try { ndiPortRef.current?.close() } catch { /* ignore */ }
+      const port = e.ports[0]
+      port.onmessage = (m: MessageEvent): void => {
+        const d = m.data as { t?: string; buf?: ArrayBuffer } | null
+        if (d?.t === 'return' && d.buf) compositorRef.current?.ndiRecycle(d.buf)
+      }
+      ndiPortRef.current = port
+    }
+    window.addEventListener('message', onMsg)
+    window.postMessage('opsia:want-ndiport', '*')
+    return () => {
+      window.removeEventListener('message', onMsg)
+      try { ndiPortRef.current?.close() } catch { /* ignore */ }
+      ndiPortRef.current = null
+    }
+  }, [])
+
+  // ── Spout : attach the (default-framebuffer) readback while active ──
   const ndiActive = useStore((s) => s.ndiActive)
   const spoutActive = useStore((s) => s.spoutActive)
   const outputPageOpen = useStore((s) => s.outputPageOpen)
@@ -361,17 +398,16 @@ export default function App(): JSX.Element {
   useEffect(() => {
     const comp = compositorRef.current
     if (!comp) return
-    const on = ndiActive || spoutActive
-    comp.setOutputCapture(on ? (w, h, px) => window.api.ndiFrame(w, h, px) : null)
+    comp.setOutputCapture(spoutActive ? (w, h, px) => window.api.spoutFrame(w, h, px) : null)
     return () => comp.setOutputCapture(null)
-    // Handles live NDI/Spout toggles. Re-attachment across an engine REBUILD is
+    // Handles live Spout toggles. Re-attachment across an engine REBUILD is
     // owned by the compositor-build effect instead : this effect is declared
     // earlier, so on a rebuild it runs first and just reads a null ref (harmless
     // no-op). `renderScale` stays a dep so this effect's cleanup runs on the LIVE
     // compositor before it's disposed (glEpoch is declared later, so the build
     // effect — which does see it — carries the GPU-reset case). (The output-window
     // STREAM is driven from the render loop, not here.)
-  }, [ndiActive, spoutActive, renderScale])
+  }, [spoutActive, renderScale])
 
   // ── Light output : push the (machine-local) config to main whenever it
   //    changes, so the ArtNet/WLED sender always has the current mapping. The
@@ -908,9 +944,7 @@ export default function App(): JSX.Element {
       // engine rebuild.
       {
         const st = useStore.getState()
-        comp.setOutputCapture(
-          st.ndiActive || st.spoutActive ? (w, h, px) => window.api.ndiFrame(w, h, px) : null
-        )
+        comp.setOutputCapture(st.spoutActive ? (w, h, px) => window.api.spoutFrame(w, h, px) : null)
       }
       // The fresh compositor's depth map is empty : force the depth mode to
       // re-apply next frame (else module-level depthModePrev still equals the
@@ -1223,6 +1257,30 @@ export default function App(): JSX.Element {
           }
           perfMeter.end('output')
         }
+        // 3a''. NDI : hand the newest finished frame to the sender (this
+        //       window's preload), then queue the next capture at the NDI rate
+        //       (GPU conversion + async readback : the loop never waits on the GPU).
+        const ndiPort = ndiPortRef.current
+        if (st.ndi.enabled && st.ndiStatus.state === 'live' && ndiPort) {
+          perfMeter.begin('ndi')
+          const fr = comp!.ndiHarvest()
+          if (fr) {
+            const [fpsN, fpsD] = ndiRate(st.ndi.fps)
+            // TRANSFER to this window's preload (the NDI sender) : well under a
+            // millisecond for a 4K frame, where any cross-process route copies
+            // for 30–90 ms.
+            ndiPort.postMessage({ t: 'frame', ...fr, fpsN, fpsD }, [fr.buf])
+          }
+          const interval = 1000 / st.ndi.fps
+          const since = now - ndiLastKick.current
+          if (since >= interval - 2) {
+            // Step on the grid (last + interval, not "now") so the average rate is
+            // exact; re-anchor only after falling more than two frames behind.
+            ndiLastKick.current = since > interval * 2 ? now : ndiLastKick.current + interval
+            comp!.ndiKick(st.ndi.format, st.ndi.maxSize)
+          }
+          perfMeter.end('ndi')
+        }
         // 3a'. Fulldome simulator : a small read of the master, only while the
         //      Output page shows it (~30 Hz).
         if (st.outputPageOpen && st.dome.enabled && now - lastDomePreview > 33) {
@@ -1388,13 +1446,60 @@ export default function App(): JSX.Element {
         console.error('[render loop]', e)
       }
       perfMeter.frame() // roll this frame's per-section CPU timings
-      raf = requestAnimationFrame(loop)
+      schedule()
     }
-    raf = requestAnimationFrame(loop)
+    // The clock : requestAnimationFrame while the window paints, a ~60 Hz timer
+    // whenever it doesn't. A window that doesn't paint gets no rAF (hidden) or a
+    // throttled ~1 Hz one (MINIMIZED : the page still reads as visible, since
+    // main turns background throttling off), which dropped NDI to 1 fps, froze
+    // the projector stream, Sonify and OSC out the moment the operator minimized
+    // mid-show. So rather than guess the window state, a watchdog notices rAF
+    // going quiet, hands the loop to the timer (the window is unthrottled in main,
+    // so timers keep full rate), and keeps a probe rAF pending to hand it back
+    // once rAF runs at a real rate again. The switch costs one ~150 ms frame.
+    let timer = 0
+    let watchdog = 0
+    let probeRaf = 0
+    let timerMode = false
+    let lastProbe = 0
+    const fromRaf = (): void => {
+      window.clearTimeout(watchdog)
+      loop()
+    }
+    const probe = (t: number): void => {
+      // Two rAFs close together : the window paints again.
+      if (t - lastProbe < 100) timerMode = false
+      else probeRaf = requestAnimationFrame(probe)
+      lastProbe = t
+    }
+    // Timer frames step on a 60 Hz grid : a bare 16 ms timeout lands on the
+    // 15.6 ms Windows tick once the window is in the background (~32 Hz), too
+    // close to a 30 fps NDI stream to pace it cleanly.
+    let due = 0
+    const schedule = (): void => {
+      if (timerMode || document.hidden) {
+        const t = performance.now()
+        due = t - due > 100 ? t + 1000 / 60 : due + 1000 / 60
+        timer = window.setTimeout(loop, Math.max(0, due - t))
+        return
+      }
+      raf = requestAnimationFrame(fromRaf)
+      watchdog = window.setTimeout(() => {
+        cancelAnimationFrame(raf)
+        timerMode = true
+        lastProbe = -1e9
+        probeRaf = requestAnimationFrame(probe)
+        loop()
+      }, 150)
+    }
+    schedule()
     return () => {
       offGl()
       onCaptureError(null)
       cancelAnimationFrame(raf)
+      cancelAnimationFrame(probeRaf)
+      window.clearTimeout(timer)
+      window.clearTimeout(watchdog)
       // After a GPU reset the old context is dead : dispose would only spray
       // INVALID_OPERATION noise into the console on its way out.
       try {

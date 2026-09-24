@@ -25,3 +25,8 @@ dist-tsc/
 
 # Output recordings + screenshots — local artifacts, not part of the repo.
 /Recorded/
+
+# The NDI runtime a build ships (see resources/ndi/README.md) : a licensed
+# binary put there per machine, never committed.
+/resources/ndi/*/*
+!/resources/ndi/*/.gitkeep

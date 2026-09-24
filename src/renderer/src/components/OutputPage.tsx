@@ -21,6 +21,7 @@ import { captureScreenshot, outputRecorder, recordingFormats } from '../recorder
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { DomeSim } from './DomeSim'
 import { DOME_RES, defaultDomeConfig, type DomeConfig, type DomeMode } from '@shared/dome'
+import { NDI_FPS, NDI_MAX_EDGE, NDI_RUNTIME_URL, type NdiConfig } from '@shared/ndi'
 
 const CORNER_LABELS = ['TL', 'TR', 'BR', 'BL']
 
@@ -62,7 +63,6 @@ export function OutputPage({
   const outputActive = useStore((s) => s.outputActive)
   const setOutputActive = useStore((s) => s.setOutputActive)
   const ndiActive = useStore((s) => s.ndiActive)
-  const setNdiActive = useStore((s) => s.setNdiActive)
   const spoutActive = useStore((s) => s.spoutActive)
   const setSpoutActive = useStore((s) => s.setSpoutActive)
   const lights = useStore((s) => s.lights)
@@ -259,19 +259,13 @@ export function OutputPage({
     await window.api.outputClose()
     setOutputActive(false)
   }
-  const toggleSink = async (
-    kind: 'ndi' | 'spout',
-    active: boolean,
-    setActive: (b: boolean) => void
-  ): Promise<void> => {
-    const next = !active
-    const ok = kind === 'ndi' ? await window.api.ndiSet(next) : await window.api.spoutSet(next)
-    setActive(next && ok)
+  const toggleSpout = async (): Promise<void> => {
+    const next = !spoutActive
+    const ok = await window.api.spoutSet(next)
+    setSpoutActive(next && ok)
     if (next && !ok) {
       showToast(
-        kind === 'ndi'
-          ? 'NDI sender not available — install the optional grandiose module + NDI runtime'
-          : 'Spout sender not available — add a Spout addon (leadedge SDK) for Windows',
+        'Spout sender not available : the Spout addon (native/spout) is not built for this Electron',
         'warn',
         0 // sticky : an install instruction shouldn't vanish on a timer
       )
@@ -455,6 +449,8 @@ export function OutputPage({
           className="flex shrink-0 flex-col gap-2 overflow-y-auto overflow-x-hidden border-l border-border bg-panel p-2"
         >
           <DomeSection dome={dome} setDome={setDome} setDomeSim={setDomeSim} btn={btn} view={domeView} setView={setDomeView} onResetCam={resetSimCam} onWholeDome={wholeDome} />
+
+          <NdiSection btn={btn} defaultCollapsed={!ndiActive} />
 
           <Section title="Mapping" info="Drag the corners over the live preview to keystone the image onto a projector. Turn grid on to align, off for the show. (Off in dome mode : a domemaster is mapped by the dome's own server.)">
 
@@ -718,22 +714,12 @@ export function OutputPage({
           </Section>
 
           <Section
-            title="Send (NDI / Spout)"
-            info="NDI / Spout need an optional native sender installed. Spout is the zero-copy path on Windows."
-            defaultCollapsed={!ndiActive && !spoutActive}
+            title="Spout"
+            info="Spout (Windows) shares the output with another app on the SAME machine (Resolume, TouchDesigner, OBS…). Needs the bundled Spout addon."
+            defaultCollapsed={!spoutActive}
           >
-
             <div className="flex gap-1.5">
-              <button
-                onClick={() => toggleSink('ndi', ndiActive, setNdiActive)}
-                className={`flex-1 ${btn(ndiActive)}`}
-              >
-                NDI {ndiActive ? 'on' : 'off'}
-              </button>
-              <button
-                onClick={() => toggleSink('spout', spoutActive, setSpoutActive)}
-                className={`flex-1 ${btn(spoutActive)}`}
-              >
+              <button onClick={() => void toggleSpout()} className={`flex-1 ${btn(spoutActive)}`}>
                 Spout {spoutActive ? 'on' : 'off'}
               </button>
             </div>
@@ -941,6 +927,145 @@ function InfoDot({ text }: { text: string }): JSX.Element {
     >
       i
     </span>
+  )
+}
+
+// A text field that commits on blur / Enter (so typing a name or an IP doesn't
+// restart the NDI sender on every keystroke).
+function CommitField({ value, onCommit, placeholder, title, mono }: {
+  value: string; onCommit: (v: string) => void; placeholder?: string; title?: string; mono?: boolean
+}): JSX.Element {
+  const [draft, setDraft] = useState(value)
+  const editing = useRef(false)
+  useEffect(() => { if (!editing.current) setDraft(value) }, [value])
+  return (
+    <input
+      className={`input min-w-0 flex-1 text-[11px] ${mono ? 'font-mono' : ''}`}
+      value={draft}
+      placeholder={placeholder}
+      title={title}
+      onFocus={() => { editing.current = true }}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => { editing.current = false; if (draft !== value) onCommit(draft) }}
+      onKeyDown={(e) => { if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur() }}
+    />
+  )
+}
+
+// NDI : the network video link (the SAT's fulldome path : the artist's machine
+// sends, their mapping server receives). Built in : the sender calls the NDI
+// runtime directly (bundled with the app, or found on the machine).
+function NdiSection({ btn, defaultCollapsed }: { btn: (on: boolean) => string; defaultCollapsed: boolean }): JSX.Element {
+  const ndi = useStore((s) => s.ndi)
+  const setNdi = useStore((s) => s.setNdi)
+  const st = useStore((s) => s.ndiStatus)
+  const set = (p: Partial<NdiConfig>): void => setNdi(p)
+  const dot =
+    !ndi.enabled ? 'bg-muted'
+      : st.state === 'live' ? 'bg-green-500'
+        : st.state === 'starting' ? 'animate-pulse bg-yellow-500'
+          : 'bg-red-500'
+  const slow = ndi.enabled && st.state === 'live' && st.connections > 0 && st.fps > 0 && st.fps < ndi.fps * 0.8
+  const label = (fps: number): string => (Number.isInteger(fps) ? String(fps) : fps.toFixed(2))
+  return (
+    <Section
+      title="NDI"
+      defaultCollapsed={defaultCollapsed}
+      info="NDI sends the output over the network to any NDI receiver : a mapping / media server (the SAT's fulldome servers take it live), Resolume, TouchDesigner, OBS, vMix… It sends the CLEAN picture (before keystone), or the domemaster when the dome is on. It keeps its full rate when this window is minimized or covered. NDI stays on across restarts."
+    >
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button onClick={() => set({ enabled: !ndi.enabled })} className={btn(ndi.enabled)}>
+          NDI {ndi.enabled ? 'on' : 'off'}
+        </button>
+        <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
+        <span
+          className="min-w-0 flex-1 truncate font-mono text-[10px] text-muted"
+          title={st.message || (st.state === 'live' ? `${st.connections} NDI connection${st.connections === 1 ? '' : 's'} (a receiver often opens more than one) · ${st.dropped} dropped in the last second` : st.source)}
+        >
+          {!ndi.enabled
+            ? 'off'
+            : st.state === 'live'
+              ? `${st.connections > 0 ? 'receiving' : 'no receiver yet'} · ${st.fps} fps${st.width ? ` · ${st.width}×${st.height}` : ''}`
+              : st.state === 'no-runtime'
+                ? 'no NDI runtime found'
+                : st.state === 'starting'
+                  ? 'starting…'
+                  : st.message || st.state}
+        </span>
+        {ndi.enabled && st.program && <span className="rounded bg-red-600 px-1.5 font-mono text-[9px] font-semibold text-white" title="Tally : a receiver has this source on program (on air)">ON AIR</span>}
+        {ndi.enabled && !st.program && st.preview && <span className="rounded bg-green-700 px-1.5 font-mono text-[9px] font-semibold text-white" title="Tally : a receiver has this source on preview">PREVIEW</span>}
+      </div>
+      {ndi.enabled && st.state === 'live' && (
+        <div className="font-mono text-[10px] text-text" title="The name receivers see on the network">
+          ▸ {st.source}
+        </div>
+      )}
+      {ndi.enabled && st.state === 'no-runtime' && (
+        <div className="flex flex-col gap-1 rounded border border-red-500/40 bg-red-500/10 p-1.5 font-mono text-[10px] text-red-300">
+          <span>No NDI runtime on this machine. Install the free NDI Tools (or any app that ships NDI : Resolume, TouchDesigner, vMix…), then switch NDI off and on.</span>
+          <a href={NDI_RUNTIME_URL} target="_blank" rel="noreferrer" className="underline">get NDI (ndi.video)</a>
+        </div>
+      )}
+      {slow && (
+        <div className="font-mono text-[10px] text-yellow-400">
+          Sending {st.fps} of {label(ndi.fps)} fps : lower the size or the rate, or use UYVY.
+        </div>
+      )}
+      <label className="flex items-center gap-2" title="The source name. Receivers see it as MACHINE (name).">
+        <span className="w-14 shrink-0 font-mono text-[10px] text-muted">name</span>
+        <CommitField value={ndi.name} onCommit={(v) => set({ name: v })} placeholder="Palinopsia" />
+      </label>
+      <div className="flex flex-wrap items-center gap-1" title="Frame rate declared to receivers and paced by the sender">
+        <span className="w-14 shrink-0 font-mono text-[10px] text-muted">rate</span>
+        {NDI_FPS.map((f) => (
+          <button key={f} onClick={() => set({ fps: f })} className={btn(ndi.fps === f)}>{label(f)}</button>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-1" title="Longest edge of the stream. Native follows the output (a 4096² dome master stays 4096²); NDI is capped at 4096.">
+        <span className="w-14 shrink-0 font-mono text-[10px] text-muted">size</span>
+        {[0, 4096, 3840, 2048, 1920, 1280].map((m) => (
+          <button key={m} onClick={() => set({ maxSize: m })} className={btn(ndi.maxSize === m)}>
+            {m === 0 ? `native (≤${NDI_MAX_EDGE})` : m}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-1">
+        <span className="w-14 shrink-0 font-mono text-[10px] text-muted">format</span>
+        <button onClick={() => set({ format: 'uyvy' })} className={btn(ndi.format === 'uyvy')} title="4:2:2 YUV, NDI's own format : half the bytes, converted on the GPU (recommended)">UYVY</button>
+        <button onClick={() => set({ format: 'rgbx' })} className={btn(ndi.format === 'rgbx')} title="Full 8-bit RGB : twice the bytes; NDI converts it itself">RGB</button>
+      </div>
+      <details className="rounded border border-border/60 bg-panel/40 px-1.5 py-1">
+        <summary className="cursor-pointer font-mono text-[10px] text-muted">network (Discovery Server, network card, groups)</summary>
+        <div className="mt-1.5 flex flex-col gap-1.5">
+          <label className="flex items-center gap-2" title="NDI Discovery Server address(es), ip[:port], comma separated. Leave empty to use normal network discovery (mDNS). Venues with a dedicated NDI network often run one.">
+            <span className="w-20 shrink-0 font-mono text-[10px] text-muted">discovery</span>
+            <CommitField value={ndi.discovery} onCommit={(v) => set({ discovery: v })} placeholder="e.g. 10.10.30.2" mono />
+          </label>
+          <label className="flex items-center gap-2" title="Only send NDI through these local IP addresses (your network card on the venue's NDI network). Empty = all cards.">
+            <span className="w-20 shrink-0 font-mono text-[10px] text-muted">network card</span>
+            <CommitField value={ndi.adapter} onCommit={(v) => set({ adapter: v })} placeholder="this machine's IP on the NDI network" mono />
+          </label>
+          <label className="flex items-center gap-2" title="Extra IPs to announce the source to, for receivers on another subnet (comma separated).">
+            <span className="w-20 shrink-0 font-mono text-[10px] text-muted">extra IPs</span>
+            <CommitField value={ndi.extraIps} onCommit={(v) => set({ extraIps: v })} placeholder="receiver IPs on other subnets" mono />
+          </label>
+          <label className="flex items-center gap-2" title="NDI groups (comma separated). Empty = Public, what receivers see by default.">
+            <span className="w-20 shrink-0 font-mono text-[10px] text-muted">groups</span>
+            <CommitField value={ndi.groups} onCommit={(v) => set({ groups: v })} placeholder="Public" mono />
+          </label>
+          <span className="font-mono text-[9px] text-muted">These apply to Palinopsia's sender only (the machine's NDI settings are untouched). Changing them restarts the sender.</span>
+        </div>
+      </details>
+      {st.runtime && (
+        <div className="break-all font-mono text-[9px] leading-snug text-muted" title="The NDI library in use">
+          runtime · NDI {st.version || '?'} · {st.runtime}
+        </div>
+      )}
+      <div className="font-mono text-[9px] text-muted">
+        NDI® is a registered trademark of Vizrt NDI AB ·{' '}
+        <a href="https://ndi.video" target="_blank" rel="noreferrer" className="underline">ndi.video</a>
+      </div>
+    </Section>
   )
 }
 

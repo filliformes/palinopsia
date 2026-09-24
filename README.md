@@ -100,6 +100,10 @@ npm run build:win    # NSIS installer + portable
 npm run build:mac    # DMG
 ```
 
+NDI needs no build step : the sender calls the NDI runtime through an FFI (`koffi`).
+`npm run ndi:bundle` copies an installed official NDI runtime into `resources/ndi/` so
+the next build ships it (see [NDI](#ndi)).
+
 The native Spout addon (`native/spout/`) is optional and Windows-only; it's
 rebuilt against the Electron ABI and loaded at runtime : the app runs fine
 without it (the Spout toggle simply reports unavailable). Video ingest and
@@ -614,9 +618,8 @@ A full-page takeover (the engine keeps rendering underneath):
   ffmpeg) + record / stop + screenshot → `Recorded/`. **The take keeps rolling
   when you leave the page** : a pulsing REC pill in the top bar shows the
   elapsed time and stops/saves it, so you can tweak parameters live mid-take.
-- **Send** : NDI / Spout toggles (optional native senders; the frame readback is
-  asynchronous : attaching a sink costs ~nothing); **HIVE** HEVC-over-TCP network
-  output + port.
+- **Send** : **NDI** (built in, see [NDI](#ndi) below), **Spout** (Windows, optional
+  native sender) and **HIVE** HEVC-over-TCP network output + port.
 - **Light output** : push the picture's colour **into the room**. The composite is
   averaged into a small zone grid and sent over **ArtNet / DMX** (to fixtures or a
   console) and to **WLED** LED strips, so stage lighting breathes with the visuals.
@@ -684,6 +687,42 @@ stills. Keystone warp is off in dome mode (a dome is mapped by its own media ser
 - The dome mapping lives on the machine (the venue) **and** travels with the session (the
   piece). The dome itself always starts **off** (a restart or a session load never switches
   it on) and its section starts collapsed.
+
+### NDI
+
+The network video link, **built in** : no plugin, no OBS, no Spout-to-NDI bridge. It is
+how a fulldome venue takes the picture (at the SAT, the artist's machine sends and the
+mapping server driving the projectors receives). Turn it on in the **NDI** section of the
+Output page; it stays on across restarts.
+
+- It sends the **clean** picture (before keystone), or the **domemaster** when the dome
+  is on : 4096×4096 at 30 fps is the Satosphère's format, and it holds that rate (measured
+  into a receiver) even with a scene that keeps the GPU full, and even when the Palinopsia
+  window is **minimized or covered** (the render loop no longer depends on the window
+  being painted).
+- **Name** (receivers see `MACHINE (name)`), **rate** (25 · 29.97 · 30 · 50 · 59.94 · 60,
+  declared and paced), **size** (native, capped at 4096, or 4096 / 3840 / 2048 / 1920 /
+  1280), **format** (UYVY, NDI's own 4:2:2, converted on the GPU : the default; or RGB).
+- **Network** : a **Discovery Server**, the **network card** to send from, **extra IPs**
+  for receivers on other subnets, and **groups**. These apply to Palinopsia's sender
+  only (your machine's NDI settings are untouched) and take effect at once.
+- The status line shows whether a receiver is connected, the rate actually sent and the
+  size; **ON AIR / PREVIEW** tally lights up when a receiver's switcher has you on
+  program or preview; a warning appears when the rate falls behind.
+- **The NDI runtime** : Palinopsia uses its own bundled copy when the build has one, else
+  the machine's NDI (NDI Tools / Runtime / SDK), else the copy another creative app
+  carries (TouchDesigner, Resolume, vMix…). The section names the one in use, or links
+  to [ndi.video](https://ndi.video/tools/) when there is none. To ship it inside a build,
+  install the NDI SDK or NDI Tools and run `npm run ndi:bundle` before building (see
+  `resources/ndi/README.md`).
+
+How it is fast enough : the GPU converts the frame to UYVY and reads it back
+asynchronously (a ring of four buffers; a capture is skipped rather than ever waiting on
+the GPU), the frame is **transferred** (not copied) to the sender in the window's own
+preload, and NDI reads it in place with its asynchronous send. Moving a 4K frame to any
+other process costs 30–90 ms in Electron, which is why the sender is not a separate process.
+
+NDI® is a registered trademark of Vizrt NDI AB.
 
 **If the GPU driver resets** (a Windows TDR : heavy sessions across two displays
 can provoke one), the picture no longer dies for good: both the main window and

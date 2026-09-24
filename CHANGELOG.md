@@ -31,6 +31,16 @@ that CI builds into cross-platform releases.
   **Matte** (three inputs) and **Lookup** (a live layer as the palette). Nodes can
   now take a second layer input.
 - **LighterColor** blend mode (whole-pixel lighter-wins).
+- **NDI output, built in** (Output page). Replaces the old optional sender stub:
+  Palinopsia now publishes an NDI source itself, calling the NDI runtime directly
+  (bundled with the build, or the machine's NDI Tools / Runtime / SDK, or the copy
+  TouchDesigner, Resolume or vMix carries). Sends the clean picture or the
+  domemaster : **4096×4096 at 30 fps** into a receiver, measured with a GPU-bound
+  scene and with the window minimized. Name, rate (25 to 60, 29.97 / 59.94
+  exact), size cap, UYVY (GPU-converted) or RGB; Discovery Server, network card,
+  extra IPs and groups for venue networks, private to Palinopsia and applied live;
+  receiver status, sent rate, ON AIR / PREVIEW tally. `npm run ndi:bundle` ships
+  an installed official runtime inside the next build.
 
 ### Fixed
 
@@ -38,6 +48,10 @@ that CI builds into cross-platform releases.
   reserved word in GLSL ES 3.00, so the matching program never compiled and the
   node could not choose tiles. Found by compiling every engine shader in a plain
   WebGL2 context.
+- **Minimizing the window no longer stalls the show.** A minimized window gets
+  (almost) no animation frames from Chromium, so the render loop, and with it the
+  projector stream, Spout, Sonify and OSC out, dropped to about one frame a
+  second. The loop now notices and runs on a timer until the window paints again.
 
 ### Changed
 

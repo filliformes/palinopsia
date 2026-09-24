@@ -32,6 +32,8 @@ import { registerResolume } from './resolume'
 import { hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
 import { hiveSendStart, hiveSendChunk, hiveSendStop } from './hiveSend'
 import { OutputSender } from './output'
+import { prepareNdi } from './ndi/prepare'
+import { sanitizeNdiConfig } from '@shared/ndi'
 import { LightSender } from './light'
 import { samplePerf } from './perf'
 import * as recording from './recording'
@@ -47,6 +49,10 @@ app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport,Plat
 // unfocused : Windows native occlusion detection otherwise pauses it (black).
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
+// And keep full CPU priority for a MINIMIZED operator window : it is the render
+// source for NDI / Spout / the projector stream, which must not slow down just
+// because the operator minimized it mid-show.
+app.commandLine.appendSwitch('disable-renderer-backgrounding')
 // Grow the GPU program caches (in-memory + on-disk). The renderer pre-warms the
 // whole shader registry at launch so Randomize's compile bursts become cache
 // hits : ~70 warmed programs need more than Chromium's small default before
@@ -71,7 +77,7 @@ app.on('child-process-gone', (_e, details) => {
 
 // OSC out (renderer → instrument fan-out).
 const oscSender = new OscSender()
-// External video output (NDI, via optional native sender).
+// External video output : Spout (NDI runs in the main window's preload, see ndi/).
 const outputSender = new OutputSender()
 const lightSender = new LightSender()
 
@@ -196,7 +202,12 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      // The instrument keeps playing when its window is minimized or covered :
+      // NDI, the projector stream, Sonify and OSC out all run on the render loop,
+      // which falls back to timers while the window doesn't paint (App.tsx) :
+      // unthrottled here so those timers keep full rate.
+      backgroundThrottling: false
     }
   })
   lockTitle(mainWindow, appTitle())
@@ -638,9 +649,11 @@ app.whenReady().then(async () => {
   safeOn('hiveout:chunk', (_e, key, data) => hiveSendChunk(key as boolean, data as Uint8Array))
 
   // ---------- IPC: External output (NDI / Spout) ----------
-  safeHandle('ndi:set', (_e, on) => outputSender.setNdi(on as boolean))
+  // NDI : the sender lives in the main window's preload (frames never leave the
+  // renderer); main only finds the runtime and writes the network config.
+  safeHandle('ndi:prepare', (_e, cfg) => prepareNdi(sanitizeNdiConfig(cfg)))
   safeHandle('spout:set', (_e, on) => outputSender.setSpout(on as boolean))
-  safeOn('ndi:frame', (_e, w, h, pixels) =>
+  safeOn('spout:frame', (_e, w, h, pixels) =>
     outputSender.send(w as number, h as number, pixels as Uint8Array)
   )
 

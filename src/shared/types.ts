@@ -1087,9 +1087,12 @@ export interface ExposedApi {
   hiveSendChunk: (key: boolean, data: Uint8Array) => void
   onHiveForceKey: (cb: () => void) => () => void
   // External output (NDI / Spout).
-  ndiSet: (on: boolean) => Promise<boolean>
+  // NDI : one call carries on/off + name/groups/network; status streams back.
+  // (Frames reach the preload over a private MessageChannel, not this API.)
+  ndiConfigure: (cfg: import('./ndi').NdiConfig) => Promise<import('./ndi').NdiStatus>
+  onNdiStatus: (cb: (s: import('./ndi').NdiStatus) => void) => () => void
   spoutSet: (on: boolean) => Promise<boolean>
-  ndiFrame: (w: number, h: number, pixels: Uint8Array) => void
+  spoutFrame: (w: number, h: number, pixels: Uint8Array) => void
   // Light output (ArtNet/DMX · WLED) : push config, then zone frames.
   lightConfig: (cfg: LightConfig) => void
   lightFrame: (cols: number, rows: number, pixels: Uint8Array) => void

@@ -53,6 +53,8 @@ installTextureBridge();
 import type { BlendMode, LayerMask } from '@shared/types';
 import type { DomeConfig } from '@shared/dome';
 import { DomeStage } from './dome';
+import { NdiCapture, type NdiFrameOut } from './ndiCapture';
+import { NDI_MAX_EDGE, type NdiFormat } from '@shared/ndi';
 import { BLEND_MODES } from '@shared/types';
 export type { BlendMode };
 
@@ -1566,6 +1568,38 @@ export class Compositor {
   private streamTW = 0;
   private streamTH = 0;
 
+  /** NDI : queue a GPU conversion + async readback of the CLEAN output (the
+   *  pre-keystone composite, or the domemaster in dome mode : a mapping server
+   *  does its own warping). Longest edge capped at `maxEdge` (0 = native), and
+   *  never above NDI_MAX_EDGE. */
+  ndiKick(format: NdiFormat, maxEdge: number): void {
+    const src = this.domeTex ?? this.lastPresent;
+    if (!src) return;
+    const sw = this.domeTex ? this.dome!.size : this.w;
+    const sh = this.domeTex ? this.dome!.size : this.h;
+    try {
+      if (!this.ndiCap) this.ndiCap = new NdiCapture(this.gl);
+      const cap = maxEdge > 0 ? Math.min(maxEdge, NDI_MAX_EDGE) : NDI_MAX_EDGE;
+      this.ndiCap.kick(src, sw, sh, format, cap, this.vao);
+    } catch (e) {
+      console.error((e as Error).message);
+    }
+  }
+  /** The oldest finished NDI frame, or null. */
+  ndiHarvest(): NdiFrameOut | null {
+    return this.ndiCap ? this.ndiCap.harvest() : null;
+  }
+  /** A frame buffer the NDI sender is done with, back for the next harvest. */
+  ndiRecycle(buf: ArrayBuffer): void {
+    this.ndiCap?.recycle(buf);
+  }
+  /** NDI off : release the conversion target and the readback buffers. */
+  ndiRelease(): void {
+    this.ndiCap?.dispose();
+    this.ndiCap = null;
+  }
+  private ndiCap: NdiCapture | null = null;
+
   /** A small square read of the current domemaster for the in-app simulator
    *  (bottom-up RGBA8). Null when the dome is off. */
   readDomePreview(size: number, out: Uint8Array): boolean {
@@ -2699,6 +2733,7 @@ export class Compositor {
     this.cameraless?.dispose();
     this.strobeLimiter?.dispose();
     this.dome?.dispose();
+    this.ndiCap?.dispose();
     if (this.domePrevTarget) { gl.deleteFramebuffer(this.domePrevTarget.fbo); gl.deleteTexture(this.domePrevTarget.tex); this.domePrevTarget = null; }
     this.pbrLib?.dispose();
     disposeTarget(gl, this.bgScratch);
