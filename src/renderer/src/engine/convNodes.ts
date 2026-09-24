@@ -1116,7 +1116,7 @@ float dist(vec3 tM, float tV, vec2 tG, vec3 cM, float cV, vec2 cG, int oi){
   return mix(colorD, uWGrad*gradD, uStructure*0.85);
 }
 void main(){
-  vec2 patch = floor(vUV*uG); vec2 tuv = (patch+0.5)/uG;
+  vec2 cellId = floor(vUV*uG); vec2 tuv = (cellId+0.5)/uG;
   vec4 tm = texture(uTMean, tuv); vec3 tMean = tm.rgb; float tVar = tm.a;
   vec2 tGrad = texture(uTGrad, tuv).rg;
   int norient = (uMode==0)?1:(uMode==1)?2:8;
@@ -1139,7 +1139,7 @@ void main(){
     vec3 dC = tMean - cMean;
     float colorD = dot(dC,dC) + uWVar*(tVar-cVar)*(tVar-cVar);
     float total = mix(colorD, uWGrad*gBest, uStructure*0.85);
-    total += uJitter*0.25*hash(vec3(patch, float(i)));
+    total += uJitter*0.25*hash(vec3(cellId, float(i)));
     if(total < best){ best = total; bcx = float(cx); bcy = float(cy); bo = goBest; }
   }
   vec4 prev = texture(uPrev, tuv);
