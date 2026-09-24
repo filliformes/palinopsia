@@ -7,6 +7,11 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Scan** (Organic) : a real photographed surface. The 30 CC0 ambientCG
+  material scans now ship their colour maps too (4 MB, re-encoded), laid across
+  the frame with hex tiling (Mikkelsen 2022 : shifted, blended tiles, so a 1K
+  scan never visibly repeats) and relit by the organic relief light. Colony's
+  new transparent `ground` grows lichen or rust over it. Ten presets.
 - **Colony** (Organic) : living matter growing across a surface. One generator,
   four kinds : lichen on granite, mould on agar, burning paper, rust on steel
   (verdigris on copper). Seeds spread cell by cell with the rough front measured
