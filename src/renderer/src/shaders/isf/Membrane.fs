@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Membrane : one large soft mass slowly deforming in the dark: a domain-warped low-frequency field thresholded into a breathing silhouette, interior shaded by depth, edge softness adjustable. The organism register: near-black, one body, no symmetry.",
+  "DESCRIPTION": "Membrane : one large soft mass slowly deforming in the dark: a domain-warped low-frequency field thresholded into a breathing silhouette, interior shaded by depth, edge softness adjustable. The organism register: near-black, one body, no symmetry. RELIEF lights the body as a soft mass (wrapped light, like flesh or jelly) at LIGHT ANGLE; 0 = the flat glow.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic"],
@@ -9,7 +9,9 @@
     { "NAME": "warp",     "TYPE": "float", "MIN": 0.0,  "MAX": 1.5, "DEFAULT": 0.6 },
     { "NAME": "softness", "TYPE": "float", "MIN": 0.01, "MAX": 0.5, "DEFAULT": 0.12 },
     { "NAME": "veins",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0, "DEFAULT": 0.3 },
-    { "NAME": "tint",     "TYPE": "color", "DEFAULT": [0.55, 0.5, 0.6, 1.0] }
+    { "NAME": "tint",     "TYPE": "color", "DEFAULT": [0.55, 0.5, 0.6, 1.0] },
+    { "NAME": "relief",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,    "DEFAULT": 0.5,  "LABEL": "relief" },
+    { "NAME": "lightAngle", "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 2.36, "LABEL": "light angle" }
   ]
 }*/
 
@@ -39,8 +41,8 @@ float fbm(vec2 p) {
   return s;
 }
 
-void main() {
-  vec2 uv = isf_FragNormCoord;
+// x = body (silhouette), y = depth inside it, z = veins.
+vec3 membraneField(vec2 uv) {
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
   vec2 p = (uv - vec2(0.45, 0.52)) * vec2(aspect, 1.0); // off-centre body
   float t = TIME * rate;
@@ -59,8 +61,26 @@ void main() {
   float depth = smoothstep(0.2, 0.8, field + 0.25);
   float vein = (1.0 - abs(2.0 * fbm(p * 4.0 + flow * 2.0 + t * 0.1) - 1.0));
   vein = pow(vein, 5.0) * veins;
+  return vec3(body, depth, vein);
+}
 
+// The mass swells from its edge to its depth; veins stand a little proud.
+float og_height(vec2 uv) {
+  vec3 f = membraneField(uv);
+  return clamp(f.x * (0.3 + f.y * 0.55) + f.z * 0.12, 0.0, 1.0);
+}
+
+// A soft body : no cast shadows (the light wraps around it like flesh).
+#define OG_SHADOW_STEPS 0
+// @og-relief
+
+void main() {
+  vec2 uv = isf_FragNormCoord;
+  vec3 f = membraneField(uv);
   vec3 base = vec3(0.02, 0.02, 0.028);
-  vec3 col = base + tint.rgb * body * (0.25 + depth * 0.45 + vein * 0.5);
+  vec3 flatc = base + tint.rgb * f.x * (0.25 + f.y * 0.45 + f.z * 0.5);
+  vec3 alb = base + tint.rgb * f.x * (0.55 + f.z * 0.35);
+  float h = clamp(f.x * (0.3 + f.y * 0.55) + f.z * 0.12, 0.0, 1.0);
+  vec3 col = mix(flatc, og_relief(uv, alb, h, lightAngle, relief), smoothstep(0.0, 0.25, relief));
   gl_FragColor = vec4(col, 1.0);
 }

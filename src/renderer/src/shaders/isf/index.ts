@@ -35,6 +35,8 @@ import opArt from './OpArt.fs?raw'
 import directMarks from './DirectMarks.fs?raw'
 import dyeField from './DyeField.fs?raw'
 import reaction from './Reaction.fs?raw'
+import organicLib from './lib/organic.glsl?raw'
+import organicRelief from './lib/organicRelief.glsl?raw'
 import metamorph from './Metamorph.fs?raw'
 import syncOsc from './SyncOsc.fs?raw'
 import differential from './Differential.fs?raw'
@@ -780,6 +782,22 @@ export const NATIVE_NODES: IsfShader[] = [
   }
 ]
 
+// ── The Organic toolkit ───────────────────────────────────────────────
+// Organic sources opt in with withOrganic(src) : the shared GLSL library
+// (lib/organic.glsl : sine-free hashes, gradient noise with derivatives, exact
+// Voronoi borders, blackbody colour) goes right after the ISF header, and the
+// relief lighting (lib/organicRelief.glsl) at the shader's "// @og-relief" line,
+// after it has defined og_height(uv). The header is untouched, so inputs,
+// presets and the Inspector see the shader exactly as written.
+function withOrganic(src: string): string {
+  const end = src.indexOf('}*/')
+  if (end < 0) return src
+  const out = src.slice(0, end + 3) + '\n' + organicLib + src.slice(end + 3)
+  return out.replace('// @og-relief', organicRelief)
+}
+// Relief + light angle, on every lit organic source (dice keep them tasteful).
+const RELIEF_CURATED = { relief: [0.3, 0.8] as [number, number], lightAngle: [0, 6.2832] as [number, number] }
+
 export const GENERATORS: IsfShader[] = [
   {
     id: 'drift-field',
@@ -934,29 +952,29 @@ export const GENERATORS: IsfShader[] = [
     id: 'erosion',
     name: 'Erosion',
     category: 'Generator',
-    source: erosion,
-    curated: { rate: [0.05, 1], scale: [1.5, 5], streaks: [2, 9], carve: [0.3, 0.9], sediment: [0.15, 0.6] }
+    source: withOrganic(erosion),
+    curated: { rate: [0.05, 1], scale: [1.5, 5], streaks: [2, 9], carve: [0.3, 0.9], sediment: [0.15, 0.6], ...RELIEF_CURATED }
   },
   {
     id: 'membrane',
     name: 'Membrane',
     category: 'Generator',
-    source: membrane,
-    curated: { rate: [0.05, 0.6], mass: [0.3, 0.65], warp: [0.3, 1.2], softness: [0.04, 0.3], veins: [0.1, 0.7] }
+    source: withOrganic(membrane),
+    curated: { rate: [0.05, 0.6], mass: [0.3, 0.65], warp: [0.3, 1.2], softness: [0.04, 0.3], veins: [0.1, 0.7], ...RELIEF_CURATED }
   },
   {
     id: 'mycelium',
     name: 'Mycelium',
     category: 'Generator',
-    source: mycelium,
-    curated: { rate: [0.1, 0.8], scale: [2.5, 8], width: [0.06, 0.3], density: [0.3, 0.85], front: [0.15, 0.7] }
+    source: withOrganic(mycelium),
+    curated: { rate: [0.1, 0.8], scale: [2.5, 8], width: [0.06, 0.3], density: [0.3, 0.85], front: [0.15, 0.7], ...RELIEF_CURATED }
   },
   {
     id: 'swell',
     name: 'Swell',
     category: 'Generator',
-    source: swell,
-    curated: { rate: [0.1, 1.2], scale: [2, 8], chop: [0.15, 0.8], direction: [0, 6.2832], spread: [0.15, 0.7] }
+    source: withOrganic(swell),
+    curated: { rate: [0.2, 1.4], scale: [2, 8], chop: [0.15, 0.8], direction: [0, 6.2832], spread: [0.15, 0.7], lightAngle: [0, 6.2832] }
   },
   {
     id: 'congeal',
@@ -1018,15 +1036,15 @@ export const GENERATORS: IsfShader[] = [
     id: 'dye-field',
     name: 'Dye Field',
     category: 'Generator',
-    source: dyeField,
-    curated: { rate: [0.15, 1.5], scale: [2.5, 7], warp: [0.3, 0.9], pool: [0.2, 0.8], density: [0.35, 0.8], grain: [0.15, 0.6] }
+    source: withOrganic(dyeField),
+    curated: { rate: [0.15, 1.5], scale: [2.5, 7], warp: [0.3, 0.9], pool: [0.2, 0.8], density: [0.35, 0.8], grain: [0.15, 0.6], relief: [0.15, 0.5], lightAngle: [0, 6.2832] }
   },
   {
     id: 'reaction',
     name: 'Reaction',
     category: 'Generator',
-    source: reaction,
-    curated: { feed: [0.02, 0.06], kill: [0.045, 0.065], rate: [0.6, 1.2], scale: [0.2, 0.8], seed: [0.15, 0.6], sharp: [0.2, 0.8], zoom: [0.6, 2.2], panX: [-0.5, 0.5], panY: [-0.5, 0.5], rotate: [-0.5, 0.5] }
+    source: withOrganic(reaction),
+    curated: { feed: [0.02, 0.06], kill: [0.045, 0.065], rate: [0.6, 1.2], scale: [0.2, 0.8], seed: [0.15, 0.6], sharp: [0.2, 0.8], zoom: [0.6, 2.2], panX: [-0.5, 0.5], panY: [-0.5, 0.5], rotate: [-0.5, 0.5], ...RELIEF_CURATED }
   },
   {
     id: 'metamorph',
@@ -1069,7 +1087,7 @@ export const GENERATORS: IsfShader[] = [
     id: 'organic',
     name: 'Organic',
     category: 'Generator',
-    source: organic,
+    source: withOrganic(organic),
     curated: {
       rate: [0.15, 1.1],
       scale: [1.2, 5],
@@ -1507,6 +1525,13 @@ export const SHADER_BY_ID: Record<string, IsfShader> = Object.fromEntries(
 export const GENERATORS_ALPHA: IsfShader[] = [...GENERATORS].sort((a, b) =>
   a.name.localeCompare(b.name)
 )
+
+/** Generators tagged "Organic" in their ISF CATEGORIES : their own section in
+ *  the source picker (living matter : reaction, growth, water, fire, ground). */
+export function isOrganicSource(sh: IsfShader): boolean {
+  const m = sh.source.match(/"CATEGORIES"\s*:\s*\[([^\]]*)\]/)
+  return !!m && /"Organic"/.test(m[1])
+}
 
 // A shader's display group = its first CATEGORIES tag that isn't the top-level
 // "FX" (Color, Glitch, Distortion, …).

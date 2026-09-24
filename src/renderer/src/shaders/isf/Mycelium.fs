@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Mycelium : a thin branching network revealed by a growth front expanding from an off-centre seed, then dissolving and regrowing elsewhere. Ridged-noise hyphae, hair-thin and matte; the cycle is the organism's life.",
+  "DESCRIPTION": "Mycelium : a thin branching network revealed by a growth front expanding from an off-centre seed, then dissolving and regrowing elsewhere. Ridged-noise hyphae, hair-thin and matte; the cycle is the organism's life. RELIEF raises the threads off the ground under one low raking light at LIGHT ANGLE (they catch the light on one side, cast a hair of shadow on the other); 0 = flat.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic"],
@@ -9,7 +9,9 @@
     { "NAME": "width",   "TYPE": "float", "MIN": 0.02, "MAX": 0.5,  "DEFAULT": 0.12 },
     { "NAME": "density", "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.5 },
     { "NAME": "front",   "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.35 },
-    { "NAME": "tint",    "TYPE": "color", "DEFAULT": [0.85, 0.82, 0.7, 1.0] }
+    { "NAME": "tint",    "TYPE": "color", "DEFAULT": [0.85, 0.82, 0.7, 1.0] },
+    { "NAME": "relief",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,    "DEFAULT": 0.5,  "LABEL": "relief" },
+    { "NAME": "lightAngle", "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 2.36, "LABEL": "light angle" }
   ]
 }*/
 
@@ -29,8 +31,7 @@ float vnoise(vec2 p) {
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
-void main() {
-  vec2 uv = isf_FragNormCoord;
+float myceliumLum(vec2 uv) {
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
   vec2 p = uv * vec2(aspect, 1.0);
   float t = TIME * rate;
@@ -58,9 +59,22 @@ void main() {
   float grown = smoothstep(radius, radius - 0.25, dist + edgeNoise);
   float frontier = smoothstep(0.12, 0.0, abs(dist + edgeNoise - radius)) * 0.6;
 
-  float lum = web * grown + frontier * web;
+  return web * grown + frontier * web;
+}
 
+float og_height(vec2 uv) { return clamp(myceliumLum(uv), 0.0, 1.0); }
+
+#define OG_SHADOW_STEPS 3
+// @og-relief
+
+void main() {
+  vec2 uv = isf_FragNormCoord;
+  float lum = myceliumLum(uv);
   vec3 base = vec3(0.022, 0.022, 0.02);
-  vec3 col = base + tint.rgb * lum * 0.85;
+  vec3 flatc = base + tint.rgb * lum * 0.85;
+  // Lit : a faint ground (so the threads' shadows land on something) under the hyphae.
+  vec3 ground = base + tint.rgb * 0.06;
+  vec3 alb = mix(ground, tint.rgb * 0.9, clamp(lum, 0.0, 1.0));
+  vec3 col = mix(flatc, og_relief(uv, alb, clamp(lum, 0.0, 1.0), lightAngle, relief), smoothstep(0.0, 0.25, relief));
   gl_FragColor = vec4(col, 1.0);
 }

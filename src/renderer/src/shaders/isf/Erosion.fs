@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Erosion : sediment washing down a slope: strongly anisotropic ridged noise advected downward, carving streaks that gather and split. The geological register: slow, directional, matte.",
+  "DESCRIPTION": "Erosion : sediment washing down a slope: strongly anisotropic ridged noise advected downward, carving streaks that gather and split. The geological register: slow, directional, matte. RELIEF lights it as a carved surface (banks raised, channels cut in) under one low raking light at LIGHT ANGLE; 0 = the flat print.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Noise", "Organic"],
@@ -9,7 +9,9 @@
     { "NAME": "streaks",  "TYPE": "float", "MIN": 1.0, "MAX": 12.0, "DEFAULT": 5.0 },
     { "NAME": "carve",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.6 },
     { "NAME": "sediment", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.35 },
-    { "NAME": "tint",     "TYPE": "color", "DEFAULT": [0.72, 0.6, 0.45, 1.0] }
+    { "NAME": "tint",     "TYPE": "color", "DEFAULT": [0.72, 0.6, 0.45, 1.0] },
+    { "NAME": "relief",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,    "DEFAULT": 0.5,  "LABEL": "relief" },
+    { "NAME": "lightAngle", "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 2.36, "LABEL": "light angle" }
   ]
 }*/
 
@@ -29,8 +31,8 @@ float vnoise(vec2 p) {
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
-void main() {
-  vec2 uv = isf_FragNormCoord;
+// The field : x = channels (0..1), y = sediment banks (0..1).
+vec2 erosionField(vec2 uv) {
   float t = TIME * rate * 0.3;
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
 
@@ -44,13 +46,31 @@ void main() {
   float n2 = vnoise(p * 2.3 + vec2(wanderX * 2.0, 11.0));
   float ridge = 1.0 - abs(2.0 * (n1 * 0.7 + n2 * 0.3) - 1.0);
 
-  // Carve: channels darken sharply where the ridge peaks.
+  // Carve: channels where the ridge peaks.
   float channel = pow(ridge, 2.0 + carve * 6.0);
 
   // Sediment banks: broad mid-tone mass between channels.
   float banks = vnoise(vec2(p.x * 0.3, uv.y * scale * 0.6 - t * 0.4)) * sediment;
+  return vec2(channel, banks);
+}
 
+// Lit, the channels are cut INTO the ground and the banks stand up between them.
+float og_height(vec2 uv) {
+  vec2 f = erosionField(uv);
+  return clamp(0.55 + f.y * 0.5 - f.x * 0.45, 0.0, 1.0);
+}
+
+#define OG_SHADOW_STEPS 4
+// @og-relief
+
+void main() {
+  vec2 uv = isf_FragNormCoord;
+  vec2 f = erosionField(uv);
   vec3 base = vec3(0.03, 0.028, 0.026);
-  vec3 col = base + tint.rgb * (banks * 0.5 + channel * 0.75);
+  vec3 flatc = base + tint.rgb * (f.y * 0.5 + f.x * 0.75);
+  // Lit : one material (the tint), wet dark sediment in the channels.
+  vec3 alb = tint.rgb * (0.26 + f.y * 0.3) * mix(1.0, 0.5, f.x) + base;
+  float h = clamp(0.55 + f.y * 0.5 - f.x * 0.45, 0.0, 1.0);
+  vec3 col = mix(flatc, og_relief(uv, alb, h, lightAngle, relief), smoothstep(0.0, 0.25, relief));
   gl_FragColor = vec4(col, 1.0);
 }

@@ -95,6 +95,26 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **The Organic family, made physical** (research : noise and growth models,
+  wave physics, flame colour; every change measured at 60 fps at 4K) :
+  - **An Organic section** in the source picker : the living generators first.
+  - **Relief lighting** on Reaction, Erosion, Membrane, Mycelium and Dye Field :
+    none of them had any light, which is the main thing that made them read
+    flat. `relief` and `light angle` : one low raking light, soft shadows, a
+    cavity term, matte (0 = the old flat print).
+  - **Swell** rebuilt : 24 wave trains, each at the speed its length gives it on
+    deep water (longer waves faster), spread around the wind; shaded like water
+    (dark body, sky mirror, sun glitter, whitecaps and wind streaks).
+  - **Organic water** : the caustics are now sunlight focused by real waves onto
+    the bed (the refraction's Jacobian), not a ridge of two noises.
+  - **Organic fire** : flames accelerate and stretch as they rise, puff out of
+    phase (the real flicker rhythm), coloured by temperature on the blackbody curve.
+  - **Reaction** : the field wraps around (no seams when zoomed out), keeps its
+    size in the frame at 4K and on the dome, holds its rate under the stability
+    limit, and no longer seeds new critters in rows (its hash repeated).
+  - **Dye Field** : pools are round, no longer stretched sideways at 16:9.
+  - A shared **organic toolkit** (`shaders/isf/lib/`) : sine-free hashes, gradient
+    noise with derivatives, exact Voronoi borders, blackbody colour, relief lighting.
 - **Film dust and film scratch, rebuilt from how real film gets damaged** (Finalizer).
   The dust used to be little black and white squares : one cell of a fixed grid
   switched on, all the same size, far too many, held for a whole drawn frame, and

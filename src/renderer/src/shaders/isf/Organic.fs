@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Organic : living elemental matter, driven by a real flow field instead of scrolling noise. A divergence-free CURL-NOISE velocity field advects each element so it billows, flows and grows (not just slides), a SWIRL control sets the turbulence, DEPTH stacks parallax layers for volume, and EMBERS seeds a drifting particle layer (rising sparks · sediment/bubbles · pollen/leaves). FIRE: buoyant licking flames over an ember→orange→pale ramp with rising sparks. WATER: flowing caustic surface over a darker parallax deep, with drifting sediment. NATURE: a slowly growing canopy with vein/branch networks, a far foliage layer, and floating pollen. `season` blends each toward its alternate (gas-blue flame · lagoon green · patchy autumn). Matte by design : no plasma, no glow blowouts.",
+  "DESCRIPTION": "Organic : living elemental matter, driven by a real flow field instead of scrolling noise. A divergence-free CURL-NOISE velocity field advects each element so it billows, flows and grows (not just slides), a SWIRL control sets the turbulence, DEPTH stacks parallax layers for volume, and EMBERS seeds a drifting particle layer (rising sparks · sediment/bubbles · pollen/leaves). FIRE: buoyant flames that accelerate and stretch as they rise, tongues puffing out of phase (the real flicker rhythm), coloured by temperature along the blackbody curve (dull red → orange → yellow), with rising sparks. WATER: sunlight focused by real waves onto the bed (caustics computed from the refraction of a wave surface that obeys the deep-water dispersion law), over a darker parallax deep, with drifting sediment. NATURE: a slowly growing canopy with vein/branch networks, a far foliage layer, and floating pollen. `season` blends each toward its alternate (gas-blue flame · lagoon green · patchy autumn). Matte by design : no plasma, no glow blowouts.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic"],
@@ -96,8 +96,11 @@ float particles(vec2 uv, float t, vec2 dir, float density, float baseSize) {
 
 // ── FIRE: buoyant curl-advected flames, hot column base, licking tops, sparks ──
 vec3 fire(vec2 uv, vec2 p, float t) {
+  // Buoyancy accelerates the gas : the vertical axis is compressed with height,
+  // so a steady scroll in q runs faster (and stretches taller) up the screen.
+  vec2 ps = vec2(p.x, p.y * (1.0 - 0.38 * uv.y));
   vec2 rise = vec2(0.0, -t * (1.4 + rate) * (0.5 + flow));
-  vec2 q = p + rise;
+  vec2 q = ps + rise;
   for (int i = 0; i < 2; i++) {
     vec2 v = curl(q * 0.8 + vec2(0.0, t * 0.3));
     v.y -= 0.8; // buoyancy : the flame wants up
@@ -105,7 +108,11 @@ vec3 fire(vec2 uv, vec2 p, float t) {
   }
   float n = fbm(q * vec2(1.0, 0.6));
   n += (fbm(q * 2.4) - 0.5) * detail * 0.8;
-  float col = 1.5 - uv.y * 1.25;               // hot at the base, sparse up top
+  // Puffing : a flame's height pulses at ~1-3 Hz (Cetegen & Ahmed), neighbouring
+  // tongues out of phase, so the fire breathes instead of streaming.
+  float puffPh = og_vnoise(vec2(p.x * 0.6, 3.7)) * 6.2832;
+  float puff = 0.84 + 0.16 * sin(t * 7.5 / sqrt(max(scale, 0.5)) + puffPh);
+  float col = 1.5 - uv.y * 1.25 / puff;        // hot at the base, sparse up top
   float body = clamp(pow(max(n * col, 0.0) * 1.5, 0.75 + contrast), 0.0, 1.0);
   // Rising sparks are hot bits of the SAME fire : raise the local HEAT before the
   // ramp colours it, so a spark is an ember-coloured hot spot IN-FAMILY (not a
@@ -116,9 +123,14 @@ vec3 fire(vec2 uv, vec2 p, float t) {
   // A dim wide back-glow layer for depth (kept matte, never additive white).
   float back = fbm(p * 0.6 + rise * 0.5) * (1.3 - uv.y) * depth * 0.4;
   vec3 c = vec3(0.02, 0.012, 0.01) + vec3(0.10, 0.03, 0.012) * back;
-  c = mix(c, vec3(0.42, 0.06, 0.02), smoothstep(0.06, 0.34, body));
-  c = mix(c, vec3(0.85, 0.36, 0.07), smoothstep(0.34, 0.66, body));
-  c = mix(c, vec3(0.97, 0.78, 0.38), smoothstep(0.70, 0.97, body));
+  // Colour from temperature on the blackbody curve (~900 K dull red to ~2300 K
+  // yellow-white), brightness rising with it : true flame colours, matte cap.
+  // Colour from temperature on the blackbody curve (~900 K dull red to ~2700 K
+  // yellow), brightness rising with it : true flame colours, matte cap.
+  float b = clamp(body, 0.0, 1.0);
+  float kelvin = mix(900.0, 2700.0, pow(b, 1.1));
+  float radiance = pow(smoothstep(0.05, 0.9, b), 1.2);
+  c = mix(c, og_blackbody(kelvin) * (0.3 + 0.67 * radiance), clamp(radiance * 1.4, 0.0, 1.0));
   vec3 gas = vec3(0.10, 0.30, 0.62) * (0.25 + body * 1.1);
   return mix(c, gas, vary * 0.85);
 }
@@ -126,17 +138,37 @@ vec3 fire(vec2 uv, vec2 p, float t) {
 // ── WATER: flowing caustic surface over a darker parallax deep + sediment ──
 vec3 water(vec2 uv, vec2 p, float t) {
   vec2 dir = vec2(0.16, 0.06) * (0.4 + flow);
-  vec2 q = p + dir * t;
-  for (int i = 0; i < 2; i++) q += curl(q * 0.7 - t * 0.05) * (0.05 + swirl * 0.3);
-  float n1 = fbm(q);
-  float n2 = fbm(q * 1.7 + 3.1);
-  float caust = pow(clamp(1.0 - abs(n1 - n2) * 2.6, 0.0, 1.0), 8.0 / max(contrast, 0.5));
+  // Caustics : the bed catches sunlight focused by the waves. A sum of wave
+  // trains (speed from deep-water dispersion) gives the surface slope and its
+  // curvature; where the refracted rays converge (the Jacobian of the mapping
+  // surface → bed goes to 0) the light piles into bright lines.
+  vec2 grad = vec2(0.0);
+  vec3 hess = vec3(0.0);
+  for (int k = 0; k < 16; k++) {
+    float fk = float(k);
+    float r1 = og_hash(vec2(fk, 2.9)), r2 = og_hash(vec2(fk, 6.1)), r3 = og_hash(vec2(fk, 8.3));
+    float ang = 0.36 + (r1 - 0.5) * mix(2.0, 6.2832, swirl);
+    vec2 d = vec2(cos(ang), sin(ang));
+    float lam = exp(mix(-2.3, 0.0, r2));
+    float kk = 6.2832 / lam;
+    float w = sqrt(9.8 * kk) * 0.3 * (0.4 + flow);
+    float a = lam * 0.012 * (0.6 + 0.8 * r3);
+    float ph = dot(d, p) * kk - w * t + r3 * 6.2832;
+    float s = sin(ph);
+    grad += a * kk * cos(ph) * d;
+    hess += -a * kk * kk * s * vec3(d.x * d.x, d.y * d.y, d.x * d.y);
+  }
+  float D = 0.06 + 0.3 * detail;                   // how deep the bed is (focus)
+  float det = (1.0 + D * hess.x) * (1.0 + D * hess.y) - D * D * hess.z * hess.z;
+  float focus = min(1.0 / max(abs(det), 0.05), 9.0);
+  float caust = pow(clamp((focus - 0.8) / 5.0, 0.0, 1.0), 1.0 / max(contrast, 0.5));
+  vec2 q = p + D * grad + dir * t * 0.3;           // the bed, seen through the refraction
   // Drifting sediment / bubbles : fold into the caustic brightness so they glow in
   // the water's own tint (in-family), never as separate foreign-coloured dots.
   float mote = particles(uv, t, vec2(0.05, -0.10), embers * 0.8, 0.09);
   caust = max(caust, mote * embers * 0.7);
   // Deep parallax layer : slower, offset, tinted down for recession.
-  vec2 dp = p * (1.0 - depth * 0.4) + dir * t * 0.4 + 5.0;
+  vec2 dp = q * (1.0 - depth * 0.4) + dir * t * 0.4 + 5.0;
   float deep = fbm(dp * 0.5);
   vec3 c = mix(vec3(0.010, 0.045, 0.070), vec3(0.05, 0.17, 0.21), deep);
   c *= mix(1.0, 0.65, depth * (1.0 - deep));

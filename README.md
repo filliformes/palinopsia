@@ -1041,10 +1041,10 @@ Randomize sub-ranges and its own preset bank.
 | **Ash** | Sparse particulate falling at per-column rates with lateral wander and flicker : near-black particulate weather. |
 | **Murmuration** | A flock of points steered by one shared, slowly-turning wind field : coherent density waves pass through the crowd. |
 | **Filaments** | Vertical strands swaying like kelp, each with its own rate and phase; drift leans the whole bed. |
-| **Erosion** | Anisotropic ridged noise advected downward, carving streaks that gather and split : the geological register. |
-| **Membrane** | One large soft mass slowly deforming in the dark : a breathing thresholded silhouette shaded by depth. |
-| **Mycelium** | A thin branching network revealed by a growth front expanding from an off-centre seed, then dissolving and regrowing. |
-| **Swell** | An open water surface as pure luminance : several wave trains beating plus chop, no horizon. |
+| **Erosion** | Anisotropic ridged noise advected downward, carving streaks that gather and split : the geological register. `relief` lights it as carved ground (banks up, channels cut in) under one low raking light (`light angle`). |
+| **Membrane** | One large soft mass slowly deforming in the dark : a breathing thresholded silhouette shaded by depth. `relief` lights it as a soft body (wrapped light, like flesh or jelly). |
+| **Mycelium** | A thin branching network revealed by a growth front expanding from an off-centre seed, then dissolving and regrowing. `relief` raises the threads off the ground under a raking light. |
+| **Swell** | An open water surface seen from above, no horizon : 24 wave trains around the wind `direction`, each at the speed its length gives it on deep water (longer waves run faster), so the sea builds and breaks up instead of sliding. Shaded the way water is : the dark body, a faint sky mirror, the sun's glitter on facets turned to it (`light angle`), whitecaps and wind streaks with `chop`. |
 | **Congeal** | A self-referential feedback field: sparse seeds injected, then a domain-warped, decayed copy resampled each frame : material congeals and dissolves. |
 | **Slit Scan** | A slit-scan of an internal oscillator : each column is the signal frozen at an earlier moment (time = position), a scrolling time-history. |
 | **Ramps** | Clean voltage-style gradient signals (H / V / diagonal / radial / diamond), optionally stepped and drifting : raw material to colorize or key. |
@@ -1053,13 +1053,13 @@ Randomize sub-ranges and its own preset bank.
 | **Shapes** | Hard-edged primitive fields (circle / ring / bar / cross / triangle), tiled and animatable : a matte source, or a stencil keyed through the A/B mixer. |
 | **Op-Art** | Hard-edged optical-illusion fields (waves, grids, moiré, herringbone) with illusory motion : curated and minimal, at home under anaglyph 3D. |
 | **Direct Marks** | Hand-drawn direct-film marks : ruled lines, dots or scratches in flat ink, appearing on a gate you can drive from audio (marks on the beat). |
-| **Dye Field** | Subtractive pigment pooling over a near-black emulsion, disciplined toward decay and crystallisation : painted-on-film dye, never additive glow. |
-| **Reaction** | A Gray-Scott reaction-diffusion field self-organising into drifting spots, stripes, labyrinths and splitting critters, with its own zoom/pan/rotate framing. |
+| **Dye Field** | Subtractive pigment pooling over a near-black emulsion, disciplined toward decay and crystallisation : painted-on-film dye, never additive glow. `relief` lights the pooled dye as a thin skin of paint. |
+| **Reaction** | A Gray-Scott reaction-diffusion field self-organising into drifting spots, stripes, labyrinths and splitting critters, with its own zoom/pan/rotate framing. `relief` lights the pattern as a surface (coral, brain coral, skin) under one low raking light. The field wraps around (no seams when zoomed out) and keeps its size in the frame at 4K. |
 | **Metamorph** | Birth-from-within (Blu's *Muto* register): a solid organic silhouette lives on screen; each cycle a new form is born from a point inside the old one, grows, and replaces it : endless metamorphosis, matte white-on-black. |
 | **Sync Osc** | A morphing video-synth oscillator : one waveform morphing saw → triangle → sine, with a sync control from scrolling → frozen; colorized between two tints. |
 | **Differential** | Visual polyrhythm : several wave trains at integer speed ratios beating against each other, rendered as pulsing topographic contour bands. |
 | **Solid Color** | A flat colour fill or a smooth 3-stop linear gradient at any angle : the quietest source, to key / tint / grade against. |
-| **Organic** | Living elemental textures in motion : fire (upward flames), water (caustic depth), or nature (growing canopy); `vary` shifts each toward an alternate season. |
+| **Organic** | Living elemental textures in motion : fire (flames that accelerate as they rise and puff out of phase, coloured by temperature on the blackbody curve), water (sunlight focused onto the bed by real waves : caustics from refraction), or nature (growing canopy); `vary` shifts each toward an alternate season. |
 | **Text** *(native)* | Typography as a source : type in the Inspector; choose font / size / weight / spacing / position; a sidechain layer can fill the glyphs. |
 | **Parametric** *(native)* | A literal audio → image reading : the audio bus as a hard raster, waveform trace, spectrum bars, or scrolling spectrogram (needs Audio ingest for real sound). |
 | **Collage** *(native)* | A wall of films cut up by the Autocutter partition : a folder of clips, or your saved Assemble edits, one per piece (see [Collage](#collage--a-wall-of-films-key-source-gen-collage)). |
