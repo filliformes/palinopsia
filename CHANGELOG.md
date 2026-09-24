@@ -7,6 +7,17 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Colony** (Organic) : living matter growing across a surface. One generator,
+  four kinds : lichen on granite, mould on agar, burning paper, rust on steel
+  (verdigris on copper). Seeds spread cell by cell with the rough front measured
+  on real growth (burning paper, bacterial colonies), slowed by poor ground,
+  stopping short of each other; each colony ages (lichen crusts crack into
+  areolae, mould sporulates in rings, char turns to ash, rust pits and flakes).
+  Lit as a relief. Regrow on a button or on a cycle; ten presets.
+- **Ground** (Organic) : the surfaces under the living things, lit as a relief.
+  Cracked mud drying (cracks widening, edges curling, a second generation late),
+  sand ripples migrating with the wind, rock strata, wood end grain, bark; each
+  with an alternate palette. Ten presets.
 - **Fulldome output** (Output page). The engine renders a square **domemaster**
   (equidistant fisheye, front at the bottom) at 2K / 4K / 8K from the flat
   composition, aperture 180–230° (210° default, the SAT Satosphère), and it
