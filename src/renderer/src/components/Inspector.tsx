@@ -62,6 +62,22 @@ const SCOPE_LABEL: Record<FxScope['kind'], string> = {
   sourceB: 'src B fx'
 }
 
+// The native nodes that read OTHER layers, and how each input is labelled. The
+// three-input Matte has two. `none` says what the node does with nothing picked;
+// `layerOnly` nodes can't sit outside a layer rack at all (canHostFx).
+const NODE_INPUTS: Record<string, { label: string; hint: string; none: string; layerOnly?: boolean }[]> = {
+  'node-transfert': [{ label: 'sidechain', hint: 'its motion → this layer', none: '— none —', layerOnly: true }],
+  'node-convolve': [{ label: 'kernel', hint: 'its shape is stamped by bright pixels', none: '— none —', layerOnly: true }],
+  'node-mosaique': [{ label: 'corpus', hint: 'its tiles rebuild this layer', none: '— none —', layerOnly: true }],
+  'node-remap': [{ label: 'map', hint: 'its red/green say where each pixel reads', none: 'self' }],
+  'node-lumablur': [{ label: 'control', hint: 'its brightness sets the blur width', none: 'self' }],
+  'node-matte': [
+    { label: 'input 2', hint: 'shown where the matte is dark', none: 'black' },
+    { label: 'matte', hint: 'bright = this layer, dark = input 2', none: 'self' }
+  ],
+  'node-lookup': [{ label: 'palette', hint: 'a line across it is the colour table', none: 'self' }]
+}
+
 export function Inspector(): JSX.Element {
   const selection = useStore((s) => s.selection)
   const composition = useStore((s) => s.composition)
@@ -140,9 +156,15 @@ export function Inspector(): JSX.Element {
   let fxOpacity: { value: number; set: (v: number) => void } | null = null
   // For a video source (no ISF controls) : the clip name shown in a small panel.
   let videoName: string | null = null
-  // For a native convolution node (layer FX): the sidechain picker.
-  let nodeSidechain: { ref: SidechainRef | null; hostLayer: number; set: (r: SidechainRef | null) => void } | null =
-    null
+  // For a native node that reads other layers : one picker per input (Matte has two).
+  let nodeSidechains: {
+    ref: SidechainRef | null
+    hostLayer: number
+    set: (r: SidechainRef | null) => void
+    label: string
+    hint: string
+    none: string
+  }[] = []
   // For the native Text source: the string field + the glyph-fill sidechain.
   let textCfg: {
     text: string
@@ -269,20 +291,18 @@ export function Inspector(): JSX.Element {
           : `layer ${scope.layer + 1} · ${SCOPE_LABEL[scope.kind]}`
       onChange = (n, v) => setFxInput(scope, instId, n, v)
       modTargetFor = (input) => ({ kind: 'fx', scope, instId, input })
-      // Only the SIDECHAIN nodes read a sidechain; the self-contained
-      // nodes ignore it, so showing the picker for them is misleading.
-      if (
-        (inst.shaderId === 'node-transfert' ||
-          inst.shaderId === 'node-convolve' ||
-          inst.shaderId === 'node-mosaique') &&
-        scope.kind === 'layer'
-      ) {
+      // Only the nodes that READ another layer get pickers; the self-contained
+      // nodes ignore a sidechain, so showing one for them is misleading.
+      const roles = NODE_INPUTS[inst.shaderId]
+      if (roles && (scope.kind === 'layer' || !roles[0].layerOnly)) {
         const sc = scope
-        nodeSidechain = {
-          ref: inst.sidechain ?? null,
-          hostLayer: scope.layer,
-          set: (r) => setFxSidechain(sc, instId, r)
-        }
+        const hostLayer = 'layer' in scope ? scope.layer : -1
+        nodeSidechains = roles.map((role, i) => ({
+          ...role,
+          ref: (i === 0 ? inst.sidechain : inst.sidechain2) ?? null,
+          hostLayer,
+          set: (r: SidechainRef | null) => setFxSidechain(sc, instId, r, i === 0 ? 1 : 2)
+        }))
       }
     }
   }
@@ -610,29 +630,33 @@ export function Inspector(): JSX.Element {
           </select>
         </div>
       )}
-      {/* Native convolution node: the sidechain (impulse) source picker. */}
-      {nodeSidechain && (
-        <div className="flex items-center gap-2 border-b border-border bg-panel2/40 px-2 py-1">
-          <span className="font-mono text-[9px] uppercase tracking-wide text-accent2" title="The layer whose MOVEMENT is imprinted onto this one">
-            sidechain
-          </span>
-          <select
-            className="input select-compact text-[11px]"
-            value={nodeSidechain.ref?.kind === 'layer' ? `layer:${nodeSidechain.ref.layer}` : ''}
-            onChange={(e) => {
-              const v = e.target.value
-              nodeSidechain!.set(v.startsWith('layer:') ? { kind: 'layer', layer: Number(v.slice(6)) } : null)
-            }}
-          >
-            <option value="">— none —</option>
-            {[0, 1, 2, 3].map((li) => (
-              <option key={li} value={`layer:${li}`}>
-                Layer {li + 1}
-                {li === nodeSidechain!.hostLayer ? ' (self)' : ''}
-              </option>
-            ))}
-          </select>
-          <span className="font-mono text-[9px] text-muted">its motion → this layer</span>
+      {/* Native node inputs : the other layer(s) this node reads. */}
+      {nodeSidechains.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border bg-panel2/40 px-2 py-1">
+          {nodeSidechains.map((sc) => (
+            <div key={sc.label} className="flex items-center gap-2">
+              <span className="font-mono text-[9px] uppercase tracking-wide text-accent2" title={sc.hint}>
+                {sc.label}
+              </span>
+              <select
+                className="input select-compact text-[11px]"
+                value={sc.ref?.kind === 'layer' ? `layer:${sc.ref.layer}` : ''}
+                onChange={(e) => {
+                  const v = e.target.value
+                  sc.set(v.startsWith('layer:') ? { kind: 'layer', layer: Number(v.slice(6)) } : null)
+                }}
+              >
+                <option value="">{sc.none}</option>
+                {[0, 1, 2, 3].map((li) => (
+                  <option key={li} value={`layer:${li}`}>
+                    Layer {li + 1}
+                    {li === sc.hostLayer ? ' (self)' : ''}
+                  </option>
+                ))}
+              </select>
+              <span className="font-mono text-[9px] text-muted">{sc.hint}</span>
+            </div>
+          ))}
         </div>
       )}
       {/* Sources (≤8 params) fit their content : wrap onto as few rows as

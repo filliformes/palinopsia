@@ -21,6 +21,7 @@ export interface NodeContext {
   chain: ChainLike // full-res RGBA16F ping-pong for the application output
   host: WebGLTexture // the layer signal so far (what the FX operates on)
   sidechain: WebGLTexture | null // the impulse source (null ⇒ node is inert)
+  sidechain2?: WebGLTexture | null // a second input (the Matte node's matte)
   inputs: Record<string, number | number[]> // param values (from the FxInstance)
   dt: number
   depth?: WebGLTexture | null // shared scene-depth map (Depth engine), if any
@@ -1218,6 +1219,152 @@ void main(){
   o = vec4(mix(dry, mosaic*uGain, uMix), 1.0);
 }`
 
+// ── TouchDesigner recipes (v1.2.0) : Remap · Luma Blur · Gooey · Matte · Lookup ──
+// The classic TOP moves, as native nodes. Each one reads an optional sidechain
+// (another layer) and falls back to the host itself when none is picked, so they
+// work in any rack and never go inert.
+
+// Remap TOP : the map's red/green channels say WHERE each pixel reads from.
+// Absolute = RG is the coordinate (TD's own behaviour); offset = RG around mid-grey
+// displaces from where the pixel already is. EXTEND picks what lies past the edge.
+const F_REMAP = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uImg, uMap, uHost;
+uniform float uAmount, uScale, uMix; uniform vec2 uOffset; uniform int uMode, uExtend;
+vec2 ext(vec2 p){
+  if (uExtend == 1) return fract(p);
+  if (uExtend == 2) return 1.0 - abs(1.0 - mod(p, 2.0));
+  return clamp(p, 0.0, 1.0);
+}
+void main(){
+  vec2 rg = texture(uMap, vUV).rg;
+  vec2 q = (rg - 0.5) * uScale;
+  vec2 uv = uMode == 0 ? mix(vUV, q + 0.5 + uOffset, uAmount) : vUV + (q + uOffset) * uAmount;
+  vec4 c = texture(uImg, ext(uv));
+  vec4 dry = texture(uHost, vUV);
+  o = vec4(mix(dry.rgb, c.rgb, uMix), dry.a);
+}`
+
+// One axis of a variable-width blur : the control's brightness at THIS pixel sets
+// the width (black level width ↔ white level width, TD's Luma Blur). Run twice
+// (H then V) for a separable approximation that reads as a true lens blur.
+const F_VBLUR = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uTex, uCtrl; uniform vec2 uStep;
+uniform float uBlack, uWhite, uGamma, uFocus; uniform int uInvert, uTaps, uDepth;
+void main(){
+  vec3 cv = texture(uCtrl, vUV).rgb;
+  // Depth mode : distance from the focus plane (0 in focus → 1 far from it).
+  float l = uDepth == 1 ? clamp(abs(cv.r - uFocus) * 2.0, 0.0, 1.0)
+                        : clamp(dot(cv, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
+  if (uInvert == 1) l = 1.0 - l;
+  float r = mix(uBlack, uWhite, pow(l, uGamma));
+  if (r < 0.5) { o = texture(uTex, vUV); return; }
+  float sp = r / float(uTaps);
+  vec4 acc = vec4(0.0); float ws = 0.0;
+  for (int i = -uTaps; i <= uTaps; i++) {
+    float x = float(i) / float(uTaps);
+    float w = exp(-x * x * 2.5);
+    acc += texture(uTex, vUV + uStep * float(i) * sp) * w; ws += w;
+  }
+  o = acc / ws;
+}`
+
+// Fixed-width separable gaussian on RGBA (the Gooey's blur stage).
+const F_GBLUR = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uTex; uniform vec2 uStep; uniform float uRadius; uniform int uTaps;
+void main(){
+  if (uRadius < 0.5) { o = texture(uTex, vUV); return; }
+  float sp = uRadius / float(uTaps);
+  vec4 acc = vec4(0.0); float ws = 0.0;
+  for (int i = -uTaps; i <= uTaps; i++) {
+    float x = float(i) / float(uTaps);
+    float w = exp(-x * x * 3.0);
+    acc += texture(uTex, vUV + uStep * float(i) * sp) * w; ws += w;
+  }
+  o = acc / ws;
+}`
+
+// Blur → threshold ("gooey" / metaballs) : shapes near each other melt into one
+// blob because their blurred halos add up past the level. FILL picks what the
+// blob shows : the crisp source, the blurred colour pushed to full strength, or a
+// plain white matte. OUTSIDE is how much of the source survives around the blobs.
+const F_GOOEY = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uBlur;
+uniform float uThresh, uSoft, uBg, uMix; uniform int uFill, uKey, uInvert;
+void main(){
+  vec4 h = texture(uHost, vUV);
+  vec4 b = texture(uBlur, vUV);
+  float mx = max(b.r, max(b.g, b.b));
+  float k = uKey == 0 ? dot(b.rgb, vec3(0.299, 0.587, 0.114)) : mx;
+  if (uInvert == 1) k = 1.0 - k;
+  float m = smoothstep(uThresh - uSoft, uThresh + uSoft, k);
+  vec3 fill = h.rgb;
+  if (uFill == 1) fill = clamp(b.rgb / max(mx, 1e-3) * mix(mx, 1.0, 0.6), 0.0, 1.0);
+  else if (uFill == 2) fill = vec3(1.0);
+  vec3 c = mix(h.rgb * uBg, fill, m);
+  o = vec4(mix(h.rgb, c, uMix), h.a);
+}`
+
+// Matte TOP (three inputs) : input 1 where the matte is bright, input 2 where it
+// is dark. LOW/HIGH are levels on the matte (a contrast / choke control).
+const F_MATTE = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uA, uB, uM;
+uniform int uChan, uInvert, uHasB; uniform float uLo, uHi, uMix;
+void main(){
+  vec4 a = texture(uA, vUV);
+  vec3 b = uHasB == 1 ? texture(uB, vUV).rgb : vec3(0.0);
+  vec4 mm = texture(uM, vUV);
+  float m = uChan == 0 ? dot(mm.rgb, vec3(0.299, 0.587, 0.114))
+          : uChan == 1 ? mm.r : uChan == 2 ? mm.g : uChan == 3 ? mm.b : mm.a;
+  m = clamp((m - uLo) / max(uHi - uLo, 1e-4), 0.0, 1.0);
+  if (uInvert == 1) m = 1.0 - m;
+  o = vec4(mix(a.rgb, mix(b, a.rgb, m), uMix), a.a);
+}`
+
+// Lookup TOP with a LIVE palette : the host's brightness (or each channel, or its
+// hue) indexes a line drawn across the palette layer. POSITION slides that line,
+// OFFSET cycles the table, CYCLES repeats it (MIRROR folds instead of wrapping),
+// BAND averages a stripe around the line so a busy palette reads as a gradient.
+const F_LOOKUP = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uPal;
+uniform int uIndex, uAxis, uMirror;
+uniform float uPos, uOffset, uCycles, uGamma, uBand, uMix;
+vec3 rgb2hsv(vec3 c){
+  vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);
+  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+  float d = q.x - min(q.w, q.y);
+  return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + 1e-10)), d / (q.x + 1e-10), q.x);
+}
+vec3 pal(float l){
+  float t = clamp(l, 0.0, 1.0) * 0.999 * uCycles + uOffset;
+  t = uMirror == 1 ? 1.0 - abs(1.0 - mod(t, 2.0)) : fract(t);
+  vec2 p = uAxis == 0 ? vec2(t, uPos) : uAxis == 1 ? vec2(uPos, t) : vec2(t, mix(uPos, 1.0 - uPos, t));
+  vec2 perp = uAxis == 0 ? vec2(0.0, 1.0) : uAxis == 1 ? vec2(1.0, 0.0) : vec2(-0.7071, 0.7071);
+  vec3 acc = vec3(0.0);
+  for (int i = -2; i <= 2; i++) acc += texture(uPal, clamp(p + perp * float(i) * uBand * 0.12, 0.0, 1.0)).rgb;
+  return acc / 5.0;
+}
+void main(){
+  vec4 h = texture(uHost, vUV);
+  vec3 c;
+  if (uIndex == 1) {
+    vec3 g = pow(clamp(h.rgb, 0.0, 1.0), vec3(uGamma));
+    c = vec3(pal(g.r).r, pal(g.g).g, pal(g.b).b);
+  } else if (uIndex == 2) {
+    c = pal(rgb2hsv(clamp(h.rgb, 0.0, 1.0)).x);
+  } else {
+    c = pal(pow(clamp(dot(h.rgb, vec3(0.299, 0.587, 0.114)), 0.0, 1.0), uGamma));
+  }
+  o = vec4(mix(h.rgb, c, uMix), h.a);
+}`
+
+
 class NodeGL {
   quad: WebGLBuffer
   downsample: Prog
@@ -1259,6 +1406,12 @@ class NodeGL {
   mosaicGrad: Prog
   mosaicMatch: Prog
   mosaicRender: Prog
+  remap: Prog
+  vblur: Prog
+  gblur: Prog
+  gooey: Prog
+  matte: Prog
+  lookup: Prog
 
   constructor(readonly gl: WebGL2RenderingContext) {
     this.quad = gl.createBuffer()!
@@ -1303,6 +1456,12 @@ class NodeGL {
     this.mosaicGrad = this.build(F_MOSAIC_GRAD)
     this.mosaicMatch = this.build(F_MOSAIC_MATCH)
     this.mosaicRender = this.build(F_MOSAIC_RENDER)
+    this.remap = this.build(F_REMAP)
+    this.vblur = this.build(F_VBLUR)
+    this.gblur = this.build(F_GBLUR)
+    this.gooey = this.build(F_GOOEY)
+    this.matte = this.build(F_MATTE)
+    this.lookup = this.build(F_LOOKUP)
   }
 
   private compile(type: number, src: string): WebGLShader {
@@ -3678,9 +3837,206 @@ export class DecimateNode implements ConvNode {
   }
 }
 
+
+// ── TouchDesigner recipes (v1.2.0) ────────────────────────────────────────
+// Single-pass helpers shared by the recipe nodes : bind a texture to a unit and
+// draw the fullscreen triangle into a target.
+function bindTex(gl: WebGL2RenderingContext, unit: number, tex: WebGLTexture): void {
+  gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tex)
+}
+function drawTo(gl: WebGL2RenderingContext, fbo: WebGLFramebuffer, w: number, h: number): void {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.viewport(0, 0, w, h); gl.drawArrays(gl.TRIANGLES, 0, 3)
+}
+
+// Remap : the sidechain's red/green become the coordinates each host pixel reads
+// from (SWAP reverses the roles). No sidechain = the host remaps itself.
+export class RemapNode implements ConvNode {
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl), inp = ctx.inputs
+    const side = ctx.sidechain ?? ctx.host
+    const swap = num(inp.swap, 0) >= 0.5
+    const out = ctx.chain.next()
+    const p = g.use(g.remap)
+    bindTex(gl, 0, swap ? side : ctx.host); gl.uniform1i(p.u('uImg'), 0)
+    bindTex(gl, 1, swap ? ctx.host : side); gl.uniform1i(p.u('uMap'), 1)
+    bindTex(gl, 2, ctx.host); gl.uniform1i(p.u('uHost'), 2)
+    gl.uniform1i(p.u('uMode'), Math.round(num(inp.mode, 0)))
+    gl.uniform1i(p.u('uExtend'), Math.round(num(inp.extend, 2)))
+    gl.uniform1f(p.u('uAmount'), clampf(num(inp.amount, 1), 0, 1))
+    gl.uniform1f(p.u('uScale'), clampf(num(inp.scale, 1), 0, 4))
+    gl.uniform2f(p.u('uOffset'), clampf(num(inp.offsetX, 0), -1, 1), clampf(num(inp.offsetY, 0), -1, 1))
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
+    drawTo(gl, out.fbo, ctx.chain.w, ctx.chain.h)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return out.tex
+  }
+  dispose(): void { this.disposed = true }
+}
+
+// Luma Blur : a blur whose width follows a control image's brightness (the
+// sidechain, or the host's own brightness with none). Separable, two passes.
+export class LumaBlurNode implements ConvNode {
+  private mid: RGBA | null = null
+  private w = 0
+  private h = 0
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl), inp = ctx.inputs
+    const W = ctx.chain.w, H = ctx.chain.h
+    if (!this.mid || this.w !== W || this.h !== H) {
+      if (this.mid) { gl.deleteTexture(this.mid.tex); gl.deleteFramebuffer(this.mid.fbo) }
+      this.mid = makeRGBA(gl, W, H, true); this.w = W; this.h = H
+    }
+    const ref = H / 1080 // widths are authored in 1080p pixels
+    const black = clampf(num(inp.blackWidth, 0), 0, 96) * ref
+    const white = clampf(num(inp.whiteWidth, 24), 0, 96) * ref
+    if (black < 0.5 && white < 0.5) return ctx.host
+    // control 1 = the shared depth map around a focus plane (a depth-of-field
+    // blur); falls back to brightness when no depth map is live.
+    const byDepth = Math.round(num(inp.control, 0)) === 1 && !!ctx.depth
+    const ctrl = byDepth ? (ctx.depth as WebGLTexture) : ctx.sidechain ?? ctx.host
+    const taps = Math.round(num(inp.quality, 1)) >= 1 ? 16 : 8
+    const p = g.use(g.vblur)
+    gl.uniform1i(p.u('uTex'), 0); gl.uniform1i(p.u('uCtrl'), 1)
+    gl.uniform1f(p.u('uBlack'), black); gl.uniform1f(p.u('uWhite'), white)
+    gl.uniform1f(p.u('uGamma'), clampf(num(inp.gamma, 1), 0.25, 4))
+    gl.uniform1i(p.u('uInvert'), num(inp.invert, 0) >= 0.5 ? 1 : 0)
+    gl.uniform1i(p.u('uTaps'), taps)
+    gl.uniform1i(p.u('uDepth'), byDepth ? 1 : 0)
+    gl.uniform1f(p.u('uFocus'), clampf(num(inp.focus, 0.5), 0, 1))
+    bindTex(gl, 1, ctrl)
+    bindTex(gl, 0, ctx.host); gl.uniform2f(p.u('uStep'), 1 / W, 0); drawTo(gl, this.mid.fbo, W, H)
+    const out = ctx.chain.next()
+    bindTex(gl, 0, this.mid.tex); gl.uniform2f(p.u('uStep'), 0, 1 / H); drawTo(gl, out.fbo, W, H)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return out.tex
+  }
+  dispose(): void {
+    this.disposed = true
+    if (this.mid) { this.gl.deleteTexture(this.mid.tex); this.gl.deleteFramebuffer(this.mid.fbo); this.mid = null }
+  }
+}
+
+// Gooey : blur at half resolution, then threshold, so neighbouring shapes merge
+// into soft-edged blobs (the metaball move).
+export class GooeyNode implements ConvNode {
+  private b0: RGBA | null = null
+  private b1: RGBA | null = null
+  private w = 0
+  private h = 0
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+  private free(): void {
+    const gl = this.gl
+    for (const t of [this.b0, this.b1]) if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo) }
+    this.b0 = this.b1 = null
+  }
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl), inp = ctx.inputs
+    const W = ctx.chain.w, H = ctx.chain.h
+    const hw = Math.max(2, W >> 1), hh = Math.max(2, H >> 1)
+    if (!this.b0 || this.w !== hw || this.h !== hh) {
+      this.free()
+      this.b0 = makeRGBA(gl, hw, hh, true); this.b1 = makeRGBA(gl, hw, hh, true)
+      this.w = hw; this.h = hh
+    }
+    const b0 = this.b0 as RGBA, b1 = this.b1 as RGBA
+    const blur = clampf(num(inp.blur, 0.35), 0, 1)
+    const radius = Math.pow(blur, 1.5) * 90 * (H / 1080)
+    let p = g.use(g.gblur)
+    gl.uniform1i(p.u('uTex'), 0); gl.uniform1f(p.u('uRadius'), radius); gl.uniform1i(p.u('uTaps'), 12)
+    bindTex(gl, 0, ctx.host); gl.uniform2f(p.u('uStep'), 1 / W, 0); drawTo(gl, b0.fbo, hw, hh)
+    bindTex(gl, 0, b0.tex); gl.uniform2f(p.u('uStep'), 0, 1 / H); drawTo(gl, b1.fbo, hw, hh)
+    const out = ctx.chain.next()
+    p = g.use(g.gooey)
+    bindTex(gl, 0, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    bindTex(gl, 1, b1.tex); gl.uniform1i(p.u('uBlur'), 1)
+    gl.uniform1f(p.u('uThresh'), clampf(num(inp.threshold, 0.4), 0, 1))
+    gl.uniform1f(p.u('uSoft'), clampf(num(inp.softness, 0.06), 0.002, 0.5))
+    gl.uniform1f(p.u('uBg'), clampf(num(inp.outside, 0), 0, 1))
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
+    gl.uniform1i(p.u('uFill'), Math.round(num(inp.fill, 0)))
+    gl.uniform1i(p.u('uKey'), Math.round(num(inp.key, 0)))
+    gl.uniform1i(p.u('uInvert'), num(inp.invert, 0) >= 0.5 ? 1 : 0)
+    drawTo(gl, out.fbo, W, H)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return out.tex
+  }
+  dispose(): void { this.disposed = true; this.free() }
+}
+
+// Matte (three inputs) : this layer where the matte is bright, input 2 (the
+// sidechain) where it is dark. No matte picked = this layer's own brightness;
+// no input 2 = black.
+export class MatteNode implements ConvNode {
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl), inp = ctx.inputs
+    const swap = num(inp.swap, 0) >= 0.5 && !!ctx.sidechain
+    const a = swap ? (ctx.sidechain as WebGLTexture) : ctx.host
+    const b = swap ? ctx.host : ctx.sidechain
+    const out = ctx.chain.next()
+    const p = g.use(g.matte)
+    bindTex(gl, 0, a); gl.uniform1i(p.u('uA'), 0)
+    bindTex(gl, 1, b ?? ctx.host); gl.uniform1i(p.u('uB'), 1)
+    bindTex(gl, 2, ctx.sidechain2 ?? ctx.host); gl.uniform1i(p.u('uM'), 2)
+    gl.uniform1i(p.u('uHasB'), b ? 1 : 0)
+    gl.uniform1i(p.u('uChan'), Math.round(num(inp.channel, 0)))
+    gl.uniform1i(p.u('uInvert'), num(inp.invert, 0) >= 0.5 ? 1 : 0)
+    gl.uniform1f(p.u('uLo'), clampf(num(inp.low, 0), 0, 1))
+    gl.uniform1f(p.u('uHi'), clampf(num(inp.high, 1), 0, 1))
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
+    drawTo(gl, out.fbo, ctx.chain.w, ctx.chain.h)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return out.tex
+  }
+  dispose(): void { this.disposed = true }
+}
+
+// Lookup : recolour this layer through a line drawn across a live palette layer
+// (the sidechain; none = this layer is its own palette).
+export class LookupNode implements ConvNode {
+  private disposed = false
+  constructor(private gl: WebGL2RenderingContext) {}
+  render(ctx: NodeContext): WebGLTexture {
+    if (this.disposed) return ctx.host
+    const gl = ctx.gl, g = nodeGL(gl), inp = ctx.inputs
+    const out = ctx.chain.next()
+    const p = g.use(g.lookup)
+    bindTex(gl, 0, ctx.host); gl.uniform1i(p.u('uHost'), 0)
+    bindTex(gl, 1, ctx.sidechain ?? ctx.host); gl.uniform1i(p.u('uPal'), 1)
+    gl.uniform1i(p.u('uIndex'), Math.round(num(inp.index, 0)))
+    gl.uniform1i(p.u('uAxis'), Math.round(num(inp.axis, 0)))
+    gl.uniform1i(p.u('uMirror'), num(inp.mirror, 0) >= 0.5 ? 1 : 0)
+    gl.uniform1f(p.u('uPos'), clampf(num(inp.position, 0.5), 0, 1))
+    gl.uniform1f(p.u('uOffset'), num(inp.offset, 0))
+    gl.uniform1f(p.u('uCycles'), clampf(num(inp.cycles, 1), 0.1, 8))
+    gl.uniform1f(p.u('uGamma'), clampf(num(inp.gamma, 1), 0.25, 4))
+    gl.uniform1f(p.u('uBand'), clampf(num(inp.band, 0.2), 0, 1))
+    gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
+    drawTo(gl, out.fbo, ctx.chain.w, ctx.chain.h)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return out.tex
+  }
+  dispose(): void { this.disposed = true }
+}
+
 /** Instantiate the native node for a reserved `node-*` shaderId (null if none). */
 export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): ConvNode | null {
   if (shaderId === 'node-parallax') return new ParallaxNode(gl)
+  if (shaderId === 'node-remap') return new RemapNode(gl)
+  if (shaderId === 'node-lumablur') return new LumaBlurNode(gl)
+  if (shaderId === 'node-gooey') return new GooeyNode(gl)
+  if (shaderId === 'node-matte') return new MatteNode(gl)
+  if (shaderId === 'node-lookup') return new LookupNode(gl)
   if (shaderId === 'node-pulfrich') return new PulfrichNode(gl)
   if (shaderId === 'node-corrode') return new CorrodeNode(gl)
   if (shaderId === 'node-decimate') return new DecimateNode(gl)
@@ -3703,6 +4059,6 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-remap', 'node-lumablur', 'node-gooey', 'node-matte', 'node-lookup']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

@@ -162,6 +162,16 @@ export const SHADER_BLURBS: Record<string, string> = {
     'A dirty vision-mixer that throws momentary faults into the picture and stays completely clean between them. A rate and a dirt dial decide how often it fires — or hit the trigger by hand — and each fire drops the signal out, hard-cuts to a frozen frame, knocks the timebase sideways, or sweeps a band of switching noise across the cut. Best on the master chain, where the whole programme glitches like circuit-bent kit.',
   'node-ibfv':
     'Drags a cloud of dye along a flowing field and keeps topping it up with fresh noise, so the noise smears into long flow-aligned filaments — a wake of material trailing the motion. The field is a slow curl-noise swirl that is always moving (so even a still picture streams) plus the image’s own movement, and the dye can be tinted by the picture so it reads as its own substance flowing. Decays into structure rather than glowing, so it stays matte.',
+  'node-remap':
+    'The TouchDesigner Remap move : another layer tells each pixel where to read from, its red as the horizontal position and its green as the vertical. A gradient layer bends the picture smoothly, a noisy one shatters it. Switch to offset to nudge pixels instead of relocating them.',
+  'node-lumablur':
+    'A blur whose strength changes across the picture, following the brightness of another layer or of the image itself. Set how blurred the dark parts and the bright parts get. In depth focus it reads the depth map instead, so one plane stays sharp and the rest melts like a camera lens.',
+  'node-gooey':
+    'The blur-then-threshold trick : the picture is blurred and cut at a brightness level, so shapes near each other flow together into soft blobs, like metaballs or a lava lamp. Blur sets how far they reach, level where the edge sits.',
+  'node-matte':
+    'Composites with three pictures, like the TouchDesigner Matte : this layer shows where the matte is bright, a second layer where it is dark. Pick the second layer and the matte in the Inspector. With no matte, this layer keys itself by its own brightness.',
+  'node-lookup':
+    'Recolours this layer using another layer as a live colour table : a line across that layer becomes the palette, and the brightness of each pixel picks its colour from it. As the palette layer moves, the colours shift with it.',
   'node-toile':
     'Reworks the picture as a painting that follows its own structure — it finds the direction of each contour and smooths the image into strokes running along it, so forms flatten into coherent paint rather than a uniform blur, and it stays steady from frame to frame instead of speckling. Turn up the line to ink the contours with clean, flow-following outlines. The real painterly / scratch pass, as a rack effect.',
   'node-pulfrich':

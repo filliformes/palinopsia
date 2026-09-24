@@ -77,6 +77,9 @@ vec3 blendMode(int mode, vec3 b, vec3 t){
   if(mode==12) return clamp(b/max(1.0-t, 1e-4), 0.0, 1.0);  // color dodge
   if(mode==13) return 1.0-clamp((1.0-b)/max(t, 1e-4), 0.0, 1.0); // color burn
   if(mode==14) return fract(b+t);                           // wrap
+  // lighter color (TouchDesigner / Photoshop) : the WHOLE pixel of whichever
+  // side is brighter wins, so hues never mix channel by channel like lighten.
+  if(mode==18) return dot(t, vec3(0.299,0.587,0.114)) > dot(b, vec3(0.299,0.587,0.114)) ? t : b;
   return t;                                                 // weave (mixer-only) / fallback
 }`;
 
@@ -512,6 +515,7 @@ interface FxUnit {
   node?: ConvNode | null;
   inputs?: Record<string, number | number[]>;
   sidechain?: SidechainRef | null;
+  sidechain2?: SidechainRef | null; // second input (Matte's matte)
 }
 
 // Everything a native node needs beyond its input texture: the sidechain
@@ -585,6 +589,7 @@ class FxRack {
         // render via setUnitInput) and the sidechain ref.
         unit.inputs = { ...inst.inputs };
         unit.sidechain = inst.sidechain ?? null;
+        unit.sidechain2 = inst.sidechain2 ?? null;
       } else if (unit.isf) {
         // Push declared param values (auto-UI / OSC write these to the store).
         // for-in : Object.entries allocates an array of pairs per unit per frame.
@@ -654,6 +659,7 @@ class FxRack {
           chain,
           host: cur,
           sidechain: nodeCtx.sidechainTex(u.sidechain),
+          sidechain2: nodeCtx.sidechainTex(u.sidechain2),
           inputs: u.inputs ?? {},
           dt: nodeCtx.dt,
           depth: nodeCtx.depth ?? null
@@ -1336,7 +1342,8 @@ export class Compositor {
   private modeIndex: Record<BlendMode, number> = {
     normal: 0, add: 1, subtract: 2, multiply: 3, screen: 4, overlay: 5,
     softlight: 6, hardlight: 7, darken: 8, lighten: 9, difference: 10,
-    exclusion: 11, dodge: 12, burn: 13, wrap: 14, weave: 15, lumakey: 16, consume: 17
+    exclusion: 11, dodge: 12, burn: 13, wrap: 14, weave: 15, lumakey: 16, consume: 17,
+    lightercolor: 18
   };
 
   constructor(public canvas: HTMLCanvasElement, public w = 1920, public h = 1080) {

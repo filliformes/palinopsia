@@ -613,6 +613,112 @@ export const NATIVE_NODES: IsfShader[] = [
       line: [0.0, 0.7], threshold: [0.3, 0.7], mix: [0.6, 1.0]
     }
   },
+  // ── TouchDesigner recipes (v1.2.0) : the classic TOP moves as native nodes.
+  // Each reads an optional sidechain layer and falls back to the host itself,
+  // so all five run in any rack (engine/convNodes RemapNode … LookupNode).
+  {
+    id: 'node-remap',
+    name: 'Remap',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Remap (TouchDesigner's Remap TOP) : the sidechain layer's red and green channels become the coordinates each pixel of this layer reads from. ABSOLUTE is TD's behaviour (red = x, green = y); OFFSET displaces from where the pixel already is, around mid-grey. SCALE and the OFFSET X/Y reshape the map, EXTEND picks what lies past the edge (hold / repeat / mirror), SWAP makes this layer the map and the sidechain the picture. No sidechain = the layer remaps itself.",
+      "CATEGORIES": ["FX", "Distortion"],
+      "INPUTS": [
+        { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["absolute", "offset"], "DEFAULT": 0, "LABEL": "mode" },
+        { "NAME": "amount", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "amount" },
+        { "NAME": "scale", "TYPE": "float", "MIN": 0.0, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "scale" },
+        { "NAME": "offsetX", "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "offset x" },
+        { "NAME": "offsetY", "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "offset y" },
+        { "NAME": "extend", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["hold", "repeat", "mirror"], "DEFAULT": 2, "LABEL": "extend" },
+        { "NAME": "swap", "TYPE": "bool", "DEFAULT": false, "LABEL": "swap roles", "COMPACT": true },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
+      ]
+    }*/`,
+    curated: { amount: [0.2, 0.8], scale: [0.4, 1.6], offsetX: [-0.2, 0.2], offsetY: [-0.2, 0.2], mix: [0.5, 1] }
+  },
+  {
+    id: 'node-lumablur',
+    name: 'Luma Blur',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Luma Blur (TouchDesigner's Luma Blur TOP) : a blur whose width changes across the picture, set by a control image's brightness. BLACK WIDTH is the blur where the control is dark, WHITE WIDTH where it is bright (in pixels at 1080p). The control is the sidechain layer, or this layer's own brightness when none is picked. CONTROL = depth focus reads the shared depth map instead : FOCUS picks the plane that stays sharp and everything nearer or farther melts, a depth-of-field blur. Any rack.",
+      "CATEGORIES": ["FX", "Blur"],
+      "INPUTS": [
+        { "NAME": "control", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["brightness", "depth focus"], "DEFAULT": 0, "LABEL": "control" },
+        { "NAME": "blackWidth", "TYPE": "float", "MIN": 0.0, "MAX": 96.0, "DEFAULT": 0.0, "LABEL": "black width" },
+        { "NAME": "whiteWidth", "TYPE": "float", "MIN": 0.0, "MAX": 96.0, "DEFAULT": 24.0, "LABEL": "white width" },
+        { "NAME": "gamma", "TYPE": "float", "MIN": 0.25, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "control curve" },
+        { "NAME": "focus", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "focus (depth)" },
+        { "NAME": "invert", "TYPE": "bool", "DEFAULT": false, "LABEL": "invert", "COMPACT": true },
+        { "NAME": "quality", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["fast", "fine"], "DEFAULT": 1, "LABEL": "quality", "COMPACT": true }
+      ]
+    }*/`,
+    curated: { blackWidth: [0, 6], whiteWidth: [8, 40], gamma: [0.6, 1.8], focus: [0.3, 0.7] }
+  },
+  {
+    id: 'node-gooey',
+    name: 'Gooey',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Gooey : the TouchDesigner blur-then-threshold recipe. The picture is blurred, then cut at a brightness level, so shapes that sit close together melt into soft single blobs (metaballs). BLUR sets how far shapes reach for each other, LEVEL where the edge falls, SOFTNESS how hard it is. FILL shows the crisp source, the blurred colour pushed to full strength, or a white matte; OUTSIDE keeps some of the source around the blobs. Any rack.",
+      "CATEGORIES": ["FX", "Stylize"],
+      "INPUTS": [
+        { "NAME": "blur", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "blur" },
+        { "NAME": "threshold", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "level" },
+        { "NAME": "softness", "TYPE": "float", "MIN": 0.0, "MAX": 0.5, "DEFAULT": 0.06, "LABEL": "softness" },
+        { "NAME": "fill", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["source", "blurred colour", "matte"], "DEFAULT": 0, "LABEL": "fill" },
+        { "NAME": "key", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["luma", "brightest channel"], "DEFAULT": 0, "LABEL": "key", "COMPACT": true },
+        { "NAME": "outside", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "outside" },
+        { "NAME": "invert", "TYPE": "bool", "DEFAULT": false, "LABEL": "invert", "COMPACT": true },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
+      ]
+    }*/`,
+    curated: { blur: [0.2, 0.6], threshold: [0.25, 0.6], softness: [0.02, 0.15], outside: [0, 0.3], mix: [0.7, 1] }
+  },
+  {
+    id: 'node-matte',
+    name: 'Matte',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Matte (TouchDesigner's three-input Matte TOP) : this layer shows where the matte is bright, input 2 where it is dark. Pick input 2 and the matte in the Inspector (both are other layers). CHANNEL picks what the matte is read from; LOW and HIGH are levels on it, to choke or soften the edge. SWAP exchanges this layer and input 2. No matte = this layer's own brightness keys it; no input 2 = black.",
+      "CATEGORIES": ["FX", "Utility"],
+      "INPUTS": [
+        { "NAME": "channel", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4], "LABELS": ["luma", "red", "green", "blue", "alpha"], "DEFAULT": 0, "LABEL": "matte channel" },
+        { "NAME": "low", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "low" },
+        { "NAME": "high", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "high" },
+        { "NAME": "invert", "TYPE": "bool", "DEFAULT": false, "LABEL": "invert", "COMPACT": true },
+        { "NAME": "swap", "TYPE": "bool", "DEFAULT": false, "LABEL": "swap 1 and 2", "COMPACT": true },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
+      ]
+    }*/`,
+    curated: { low: [0, 0.3], high: [0.6, 1], mix: [0.7, 1] }
+  },
+  {
+    id: 'node-lookup',
+    name: 'Lookup',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Lookup (TouchDesigner's Lookup TOP, with a LIVE palette) : this layer is recoloured through a line drawn across another layer, so its moving colours become the colour table. INDEX reads the brightness, each channel on its own, or the hue. AXIS and POSITION place the line on the palette layer, BAND averages a stripe around it (calmer colours from a busy palette), OFFSET cycles the table and CYCLES repeats it (MIRROR folds instead of wrapping). No sidechain = the layer is its own palette.",
+      "CATEGORIES": ["FX", "Color"],
+      "INPUTS": [
+        { "NAME": "index", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["brightness", "per channel", "hue"], "DEFAULT": 0, "LABEL": "index" },
+        { "NAME": "axis", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["horizontal", "vertical", "diagonal"], "DEFAULT": 0, "LABEL": "axis" },
+        { "NAME": "position", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "position" },
+        { "NAME": "band", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2, "LABEL": "band" },
+        { "NAME": "offset", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "offset" },
+        { "NAME": "cycles", "TYPE": "float", "MIN": 0.25, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "cycles" },
+        { "NAME": "gamma", "TYPE": "float", "MIN": 0.25, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "index curve" },
+        { "NAME": "mirror", "TYPE": "bool", "DEFAULT": false, "LABEL": "mirror", "COMPACT": true },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
+      ]
+    }*/`,
+    curated: { position: [0.2, 0.8], band: [0.1, 0.6], offset: [0, 1], cycles: [0.5, 2], gamma: [0.7, 1.5], mix: [0.6, 1] }
+  },
   {
     id: 'node-pulfrich',
     name: 'Pulfrich',

@@ -25,6 +25,7 @@ export type BlendMode =
   | 'weave'
   | 'lumakey'
   | 'consume'
+  | 'lightercolor'
 
 export const BLEND_MODES: BlendMode[] = [
   'normal',
@@ -44,7 +45,8 @@ export const BLEND_MODES: BlendMode[] = [
   'wrap',
   'weave',
   'lumakey',
-  'consume'
+  'consume',
+  'lightercolor'
 ]
 
 // What feeds a layer slot. ISF generator is the MVP path; the rest land
@@ -141,6 +143,8 @@ export interface FxInstance extends ShaderInstance {
   locked?: boolean
   // Native convolution nodes only: the sidechain (impulse) source.
   sidechain?: SidechainRef | null
+  // A second sidechain, for the three-input nodes (Matte : the matte itself).
+  sidechain2?: SidechainRef | null
 }
 
 // One of the four layers.

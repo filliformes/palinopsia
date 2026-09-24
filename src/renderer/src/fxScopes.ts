@@ -26,7 +26,14 @@ const SELF_CONTAINED = new Set([
   'node-melt',
   'node-faultline',
   'node-ibfv',
-  'node-toile'
+  'node-toile',
+  // The TouchDesigner recipes read an optional sidechain but fall back to the
+  // host itself, so they run anywhere too.
+  'node-remap',
+  'node-lumablur',
+  'node-gooey',
+  'node-matte',
+  'node-lookup'
 ])
 
 /** Can `shaderId` be placed in this rack?

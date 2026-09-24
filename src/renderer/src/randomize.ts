@@ -208,7 +208,10 @@ const CONV_NODES = NATIVE_NODES.filter((n) => CONV_NODE_IDS.includes(n.id))
 const SELF_NODE_IDS = [
   'node-reponse', 'node-datamosh', 'node-feedback', 'node-chronoscan', 'node-sediment',
   'node-scanner', 'node-autocutter', 'node-eternalism', 'node-afterimage',
-  'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile'
+  'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile',
+  // TD recipes safe to draw blind (Remap and Matte can scramble or hide the
+  // whole picture with an arbitrary sidechain, so they stay hand-placed).
+  'node-lumablur', 'node-gooey', 'node-lookup'
 ]
 const SELF_NODES = NATIVE_NODES.filter((n) => SELF_NODE_IDS.includes(n.id))
 const randSidechain = (): SidechainRef => ({ kind: 'layer', layer: Math.floor(rnd() * 4) })
@@ -412,7 +415,7 @@ function randomMatrix(c: CompositionState): ModAssignment[] {
 // they blow out too easily for the matte register).
 const BLENDS = [
   'normal', 'add', 'subtract', 'multiply', 'screen', 'overlay', 'softlight',
-  'hardlight', 'darken', 'lighten', 'difference', 'exclusion', 'wrap'
+  'hardlight', 'darken', 'lighten', 'difference', 'exclusion', 'wrap', 'lightercolor'
 ] as const
 // The A/B source mix can also use the relation modes (Weave / Lumakey / the
 // stateful Consume). Only used for sourceBlend : as a layer-stack blend they'd

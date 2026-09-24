@@ -88,6 +88,57 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Storm', values: { flow: 0.8, inject: 0.08, scale: 0.5, field: 0.8, motion: 0.8, angle: 0.3, push: 0.6, swirl: 0.7, dye: 0.7, speed: 0.75, mix: 0.9 } }
   ],
   // ── Toile (painterly Kuwahara + flow-XDoG line-work) ──
+  // ── TouchDesigner recipes (v1.2.0) ──
+  'node-remap': [
+    { name: 'Gradient remap', values: { mode: 0, amount: 1.0, scale: 1.0, offsetX: 0, offsetY: 0, extend: 2, swap: 0, mix: 1.0 } },
+    { name: 'Half remap', values: { mode: 0, amount: 0.5, scale: 1.0, offsetX: 0, offsetY: 0, extend: 2, swap: 0, mix: 1.0 } },
+    { name: 'Gentle displace', values: { mode: 1, amount: 0.25, scale: 0.6, offsetX: 0, offsetY: 0, extend: 2, swap: 0, mix: 1.0 } },
+    { name: 'Hard displace', values: { mode: 1, amount: 0.8, scale: 1.5, offsetX: 0, offsetY: 0, extend: 1, swap: 0, mix: 1.0 } },
+    { name: 'Tiled scramble', values: { mode: 0, amount: 1.0, scale: 3.0, offsetX: 0, offsetY: 0, extend: 1, swap: 0, mix: 1.0 } },
+    { name: 'Mirror fold', values: { mode: 0, amount: 1.0, scale: 2.2, offsetX: 0.1, offsetY: -0.1, extend: 2, swap: 0, mix: 1.0 } },
+    { name: 'Swapped roles', values: { mode: 0, amount: 0.8, scale: 1.0, offsetX: 0, offsetY: 0, extend: 2, swap: 1, mix: 1.0 } },
+    { name: 'Ghost remap', values: { mode: 0, amount: 0.7, scale: 1.2, offsetX: 0, offsetY: 0, extend: 2, swap: 0, mix: 0.45 } }
+  ],
+  'node-lumablur': [
+    { name: 'Bright blooms soft', values: { control: 0, blackWidth: 0, whiteWidth: 24, gamma: 1.0, focus: 0.5, invert: 0, quality: 1 } },
+    { name: 'Shadows dissolve', values: { control: 0, blackWidth: 28, whiteWidth: 0, gamma: 1.0, focus: 0.5, invert: 0, quality: 1 } },
+    { name: 'Heavy haze', values: { control: 0, blackWidth: 6, whiteWidth: 60, gamma: 0.7, focus: 0.5, invert: 0, quality: 1 } },
+    { name: 'Depth of field', values: { control: 1, blackWidth: 0, whiteWidth: 28, gamma: 1.2, focus: 0.5, invert: 0, quality: 1 } },
+    { name: 'Near focus', values: { control: 1, blackWidth: 0, whiteWidth: 36, gamma: 1.0, focus: 0.8, invert: 0, quality: 1 } },
+    { name: 'Far focus', values: { control: 1, blackWidth: 0, whiteWidth: 36, gamma: 1.0, focus: 0.2, invert: 0, quality: 1 } },
+    { name: 'Tilt shift', values: { control: 1, blackWidth: 0, whiteWidth: 20, gamma: 2.0, focus: 0.5, invert: 0, quality: 1 } },
+    { name: 'Fast soft', values: { control: 0, blackWidth: 2, whiteWidth: 14, gamma: 1.0, focus: 0.5, invert: 0, quality: 0 } }
+  ],
+  'node-gooey': [
+    { name: 'Metaballs', values: { blur: 0.35, threshold: 0.4, softness: 0.05, fill: 0, key: 0, outside: 0, invert: 0, mix: 1.0 } },
+    { name: 'Liquid colour', values: { blur: 0.45, threshold: 0.35, softness: 0.08, fill: 1, key: 1, outside: 0, invert: 0, mix: 1.0 } },
+    { name: 'White goo', values: { blur: 0.4, threshold: 0.4, softness: 0.04, fill: 2, key: 0, outside: 0, invert: 0, mix: 1.0 } },
+    { name: 'Melting shapes', values: { blur: 0.6, threshold: 0.3, softness: 0.12, fill: 0, key: 0, outside: 0.25, invert: 0, mix: 1.0 } },
+    { name: 'Tight blobs', values: { blur: 0.2, threshold: 0.5, softness: 0.02, fill: 0, key: 0, outside: 0, invert: 0, mix: 1.0 } },
+    { name: 'Dark goo', values: { blur: 0.4, threshold: 0.55, softness: 0.06, fill: 0, key: 0, outside: 0.1, invert: 1, mix: 1.0 } },
+    { name: 'Soft lava', values: { blur: 0.55, threshold: 0.4, softness: 0.2, fill: 1, key: 1, outside: 0.15, invert: 0, mix: 0.9 } },
+    { name: 'Ghost blobs', values: { blur: 0.4, threshold: 0.4, softness: 0.08, fill: 0, key: 0, outside: 0.5, invert: 0, mix: 0.6 } }
+  ],
+  'node-matte': [
+    { name: 'Luma key', values: { channel: 0, low: 0.0, high: 1.0, invert: 0, swap: 0, mix: 1.0 } },
+    { name: 'Hard key', values: { channel: 0, low: 0.45, high: 0.55, invert: 0, swap: 0, mix: 1.0 } },
+    { name: 'Soft key', values: { channel: 0, low: 0.1, high: 0.9, invert: 0, swap: 0, mix: 1.0 } },
+    { name: 'Inverted key', values: { channel: 0, low: 0.2, high: 0.8, invert: 1, swap: 0, mix: 1.0 } },
+    { name: 'Red channel', values: { channel: 1, low: 0.2, high: 0.8, invert: 0, swap: 0, mix: 1.0 } },
+    { name: 'Alpha matte', values: { channel: 4, low: 0.0, high: 1.0, invert: 0, swap: 0, mix: 1.0 } },
+    { name: 'Swapped', values: { channel: 0, low: 0.2, high: 0.8, invert: 0, swap: 1, mix: 1.0 } },
+    { name: 'Half blend', values: { channel: 0, low: 0.2, high: 0.8, invert: 0, swap: 0, mix: 0.5 } }
+  ],
+  'node-lookup': [
+    { name: 'Palette line', values: { index: 0, axis: 0, position: 0.5, band: 0.2, offset: 0, cycles: 1, gamma: 1, mirror: 0, mix: 1.0 } },
+    { name: 'Vertical line', values: { index: 0, axis: 1, position: 0.5, band: 0.2, offset: 0, cycles: 1, gamma: 1, mirror: 0, mix: 1.0 } },
+    { name: 'Diagonal', values: { index: 0, axis: 2, position: 0.3, band: 0.3, offset: 0, cycles: 1, gamma: 1, mirror: 0, mix: 1.0 } },
+    { name: 'Per channel', values: { index: 1, axis: 0, position: 0.5, band: 0.2, offset: 0, cycles: 1, gamma: 1, mirror: 0, mix: 1.0 } },
+    { name: 'Hue remap', values: { index: 2, axis: 0, position: 0.5, band: 0.4, offset: 0, cycles: 1, gamma: 1, mirror: 0, mix: 1.0 } },
+    { name: 'Folded twice', values: { index: 0, axis: 0, position: 0.5, band: 0.3, offset: 0, cycles: 2, gamma: 1, mirror: 1, mix: 1.0 } },
+    { name: 'Calm gradient', values: { index: 0, axis: 0, position: 0.5, band: 1.0, offset: 0, cycles: 1, gamma: 1.2, mirror: 0, mix: 0.85 } },
+    { name: 'Tinted', values: { index: 0, axis: 0, position: 0.5, band: 0.5, offset: 0, cycles: 1, gamma: 1, mirror: 0, mix: 0.4 } }
+  ],
   'node-toile': [
     { name: 'Oil paint', values: { radius: 0.5, sharp: 0.5, paint: 1.0, line: 0.3, threshold: 0.5, mix: 1.0 } },
     { name: 'Watercolor', values: { radius: 0.7, sharp: 0.3, paint: 0.9, line: 0.1, threshold: 0.6, mix: 0.85 } },

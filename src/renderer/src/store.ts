@@ -960,14 +960,15 @@ interface StoreState {
   // FX clipboard : copy a unit, then either overwrite another unit of the SAME
   // shader with its settings, or drop a fresh copy into any rack that can host
   // it. Transient — like `rightView`, it is not part of a Session.
-  fxClipboard: { shaderId: string; name: string; inputs: Record<string, number | number[]>; opacity: number; sidechain: SidechainRef | null } | null
+  fxClipboard: { shaderId: string; name: string; inputs: Record<string, number | number[]>; opacity: number; sidechain: SidechainRef | null; sidechain2: SidechainRef | null } | null
   copyFx: (scope: FxScope, instId: string) => void
   /** Overwrite one unit's settings from the clipboard. Same shader only. */
   pasteFxSettings: (scope: FxScope, instId: string) => void
   /** Add a fresh copy to a rack, after `afterId` (null = end of chain). */
   pasteFxAsNew: (scope: FxScope, afterId: string | null) => void
-  // Native convolution nodes: choose the sidechain (impulse) source.
-  setFxSidechain: (scope: FxScope, instId: string, ref: SidechainRef | null) => void
+  // Native convolution nodes: choose the sidechain (impulse) source. `which` 2
+  // sets the second input of a three-input node (the Matte's matte).
+  setFxSidechain: (scope: FxScope, instId: string, ref: SidechainRef | null, which?: 1 | 2) => void
 
   // Randomize (brief §7) : scoped draws from curated aesthetic ranges.
   // `intensity` 1 = full structural re-roll; <1 = a walk from the current scene.
@@ -2175,7 +2176,8 @@ export const useStore = create<StoreState>((set, get) => ({
           Object.entries(inst.inputs).map(([k, v]) => [k, Array.isArray(v) ? [...v] : v])
         ),
         opacity: inst.opacity ?? 1,
-        sidechain: inst.sidechain ?? null
+        sidechain: inst.sidechain ?? null,
+        sidechain2: inst.sidechain2 ?? null
       }
     })
   },
@@ -2196,8 +2198,10 @@ export const useStore = create<StoreState>((set, get) => ({
                     Object.entries(clip.inputs).map(([k, v]) => [k, Array.isArray(v) ? [...v] : v])
                   ),
                   opacity: clip.opacity,
-                  // A sidechain names a LAYER, which only a layer rack resolves.
-                  sidechain: scope.kind === 'layer' ? clip.sidechain : null
+                  // Every rack resolves a layer sidechain (they all get the node
+                  // context), and canHostFx already kept layer-only nodes out.
+                  sidechain: clip.sidechain,
+                  sidechain2: clip.sidechain2
                 }
               : f
           )
@@ -2219,7 +2223,8 @@ export const useStore = create<StoreState>((set, get) => ({
               Object.entries(clip.inputs).map(([k, v]) => [k, Array.isArray(v) ? [...v] : v])
             ),
             opacity: clip.opacity,
-            sidechain: scope.kind === 'layer' ? clip.sidechain : null
+            sidechain: clip.sidechain,
+            sidechain2: clip.sidechain2
           }
           const next = [...fx]
           // Drop it right after the unit that was right-clicked, so a paste
@@ -2322,10 +2327,10 @@ export const useStore = create<StoreState>((set, get) => ({
         )
       )
     })),
-  setFxSidechain: (scope, instId, ref) =>
+  setFxSidechain: (scope, instId, ref, which = 1) =>
     set((s) => ({
       composition: updateFxArray(s.composition, scope, (fx) =>
-        fx.map((f) => (f.id === instId ? { ...f, sidechain: ref } : f))
+        fx.map((f) => (f.id === instId ? (which === 2 ? { ...f, sidechain2: ref } : { ...f, sidechain: ref }) : f))
       )
     })),
 
