@@ -149,6 +149,20 @@ function shutdown(): void {
   globalShortcut.unregisterAll()
 }
 
+// Window-chrome title with the release, like dataFLOU_compositor : "Palinopsia
+// v1.1.0". app.getVersion() reads package.json, so every tagged build titles itself.
+function appTitle(suffix = ''): string {
+  return `Palinopsia v${app.getVersion()}${suffix}`
+}
+
+/** Pin a window's title. Every window loads the same index.html, and Electron
+ *  syncs its <title> onto the window chrome on each load, which would wipe the
+ *  version (and the output windows' ": Output" suffix) back to "Palinopsia". */
+function lockTitle(win: BrowserWindow, title: string): void {
+  win.setTitle(title)
+  win.on('page-title-updated', (e) => e.preventDefault())
+}
+
 // Window/taskbar icon. electron-builder stamps the exe icon (which covers the
 // shortcut), but a RUNNING window's taskbar button uses the WINDOW icon, so it
 // must be set here too. Packaged: bundled via extraResources into resources/;
@@ -175,7 +189,7 @@ function createWindow(): void {
     show: false,
     backgroundColor: '#0a0a0a', // near-black : the instrument's canvas (brief §1)
     autoHideMenuBar: true,
-    title: 'Palinopsia',
+    title: appTitle(),
     icon: windowIcon(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -184,6 +198,7 @@ function createWindow(): void {
       nodeIntegration: false
     }
   })
+  lockTitle(mainWindow, appTitle())
 
   mainWindow.on('ready-to-show', () => mainWindow?.show())
 
@@ -290,7 +305,7 @@ function openOutputWindow(displayId: number, windowed = false): void {
           frame: true,
           resizable: true,
           backgroundColor: '#000000',
-          title: 'Palinopsia : Output',
+          title: appTitle(' : Output'),
           icon: windowIcon(),
           webPreferences: {
             preload: join(__dirname, '../preload/index.js'),
@@ -309,7 +324,7 @@ function openOutputWindow(displayId: number, windowed = false): void {
           frame: false,
           fullscreen: true,
           backgroundColor: '#000000',
-          title: 'Palinopsia : Output',
+          title: appTitle(' : Output'),
           icon: windowIcon(),
           webPreferences: {
             preload: join(__dirname, '../preload/index.js'),
@@ -349,7 +364,7 @@ function openSpanWindow(displayIds: number[]): void {
     ...bounds,
     frame: false,
     backgroundColor: '#000000',
-    title: 'Palinopsia : Output',
+    title: appTitle(' : Output'),
     icon: windowIcon(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -371,6 +386,7 @@ function openSpanWindow(displayIds: number[]): void {
 // built (single display or span).
 function finalizeOutputWindow(): void {
   if (!outputWindow) return
+  lockTitle(outputWindow, appTitle(' : Output'))
   outputWindow.on('closed', () => {
     outputWindow = null
     mainWindow?.webContents.send('output:closed')

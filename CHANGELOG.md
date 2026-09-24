@@ -3,6 +3,16 @@
 All notable changes to Palinopsia. Dates are ISO. Versions follow the `v*` tags
 that CI builds into cross-platform releases.
 
+## Unreleased
+
+### Changed
+
+- The **window title** now carries the release version, like dataFLOU_compositor:
+  `Palinopsia v1.1.0` on the main window, `Palinopsia v1.1.0 : Output` on the output
+  window. Read from `package.json` at launch, so every tagged build titles itself.
+  (The output windows' title was also being silently reset to plain "Palinopsia" by
+  the shared page `<title>`; it now holds.)
+
 ## v1.1.0 — 2026-09-18
 
 The "played by the room" release: embodied control, sound in both directions, and
