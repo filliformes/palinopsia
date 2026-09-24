@@ -118,6 +118,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   organic: ['fire', 'water', 'organic', 'elemental', 'nature'],
   'particle-drift': ['particles', 'points', 'trails', 'flow', 'drift'],
   ramps: ['gradient', 'ramp', 'voltage', 'test', 'matte'],
+  ground: ['mud', 'cracks', 'sand', 'dunes', 'rock', 'strata', 'wood', 'rings', 'bark', 'texture', 'terrain', 'organic'],
   colony: ['lichen', 'mould', 'mold', 'rust', 'burn', 'fire', 'growth', 'organic', 'decay', 'patina', 'verdigris'],
   reaction: ['reaction-diffusion', 'organic', 'cells', 'pattern', 'spots'],
   recurse: ['recursion', 'fractal', 'kaleidoscope', 'geometry', 'droste'],

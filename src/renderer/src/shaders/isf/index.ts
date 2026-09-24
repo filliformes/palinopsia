@@ -36,6 +36,7 @@ import directMarks from './DirectMarks.fs?raw'
 import dyeField from './DyeField.fs?raw'
 import reaction from './Reaction.fs?raw'
 import colony from './Colony.fs?raw'
+import ground from './Ground.fs?raw'
 import organicLib from './lib/organic.glsl?raw'
 import organicRelief from './lib/organicRelief.glsl?raw'
 import metamorph from './Metamorph.fs?raw'
@@ -1054,6 +1055,13 @@ export const GENERATORS: IsfShader[] = [
     source: withOrganic(colony),
     // regrow-every stays off under the dice (a deliberate performance choice).
     curated: { growth: [0.2, 0.6], colonies: [0.2, 0.7], grain: [240, 480], bare: [0.2, 0.6], maturing: [0.3, 0.7], palette: [0, 0.6], cycle: [0, 0], ...RELIEF_CURATED }
+  },
+  {
+    id: 'ground',
+    name: 'Ground',
+    category: 'Generator',
+    source: withOrganic(ground),
+    curated: { scale: [0.6, 1.8], drying: [-1, 1], wander: [0, 0.8], roughness: [0.2, 0.8], palette: [0, 0.8], ...RELIEF_CURATED }
   },
   {
     id: 'metamorph',

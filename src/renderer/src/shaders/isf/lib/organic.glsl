@@ -6,8 +6,9 @@
 // keep their own hash / vnoise.
 //   hashes : sine-free (Dave Hoskins, MIT) : no banding on large grids
 //   og_noised : gradient noise with analytic derivatives (Inigo Quilez, MIT)
-//   og_voronoi : EXACT distance to the cell border (Quilez), so cracks and walls
-//     keep one width and meet in clean junctions (F2 - F1 swells at vertices)
+//   og_voronoi : distance to the cell border (Quilez's two-pass method, second
+//     pass 3x3 : near-exact, a third of the cost), so cracks and walls keep one
+//     width and meet in clean junctions (F2 - F1 swells at the vertices)
 //   og_blackbody : Planck-locus colour for a temperature (Tanner Helland's fit)
 
 float og_hash(vec2 p) {
@@ -75,8 +76,8 @@ vec3 og_voronoi(vec2 x) {
   }
   float f1 = sqrt(md);
   md = 8.0;
-  for (int j = -2; j <= 2; j++) {
-    for (int i = -2; i <= 2; i++) {
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
       vec2 g = mg + vec2(float(i), float(j));
       vec2 r = g + og_hash2(n + g) - f;
       if (dot(mr - r, mr - r) > 0.00001) md = min(md, dot(0.5 * (mr + r), normalize(r - mr)));

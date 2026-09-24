@@ -997,6 +997,18 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Sparse dye', values: { rate: 0.5, scale: 6.5, warp: 0.4, pool: 0.25, density: 0.35, grain: 0.5, pigment: [0.4, 0.12, 0.1, 1] } },
     { name: 'Dense pool', values: { rate: 0.2, scale: 3, warp: 0.7, pool: 0.9, density: 0.8, grain: 0.3, pigment: [0.2, 0.28, 0.36, 1] } }
   ],
+  ground: [
+    { name: 'Drying mud', values: { kind: 0, scale: 1, drying: -1, wander: 0.3, roughness: 0.5, palette: 0 } },
+    { name: 'Red clay pan', values: { kind: 0, scale: 1.4, drying: 0.9, wander: 0.2, roughness: 0.6, palette: 0.8 } },
+    { name: 'Dune ripples', values: { kind: 1, scale: 1, drying: 0, wander: 0.5, roughness: 0.4, palette: 0 } },
+    { name: 'Black sand', values: { kind: 1, scale: 0.8, drying: 0, wander: 0.6, roughness: 0.5, palette: 0.9 } },
+    { name: 'Canyon wall', values: { kind: 2, scale: 1.2, drying: 0, wander: 0.2, roughness: 0.6, palette: 0 } },
+    { name: 'Limestone beds', values: { kind: 2, scale: 0.9, drying: 0, wander: 0.1, roughness: 0.5, palette: 0.85 } },
+    { name: 'Oak end grain', values: { kind: 3, scale: 1, drying: 0, wander: 0.1, roughness: 0.4, palette: 0 } },
+    { name: 'Walnut', values: { kind: 3, scale: 0.7, drying: 0, wander: 0.1, roughness: 0.5, palette: 0.9 } },
+    { name: 'Pine bark', values: { kind: 4, scale: 1, drying: 0, wander: 0.2, roughness: 0.6, palette: 0 } },
+    { name: 'Birch', values: { kind: 4, scale: 1.4, drying: 0, wander: 0.1, roughness: 0.3, palette: 0.9 } }
+  ],
   colony: [
     { name: 'Map lichen', values: { kind: 0, growth: 0.35, colonies: 0.55, grain: 360, bare: 0.35, maturing: 0.6, palette: 0 } },
     { name: 'Orange crust', values: { kind: 0, growth: 0.3, colonies: 0.3, grain: 300, bare: 0.5, maturing: 0.5, palette: 0.25 } },
