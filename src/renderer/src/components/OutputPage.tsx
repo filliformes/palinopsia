@@ -20,7 +20,7 @@ import { currentFps } from '../perf'
 import { captureScreenshot, outputRecorder, recordingFormats } from '../recorder'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { DomeSim } from './DomeSim'
-import { DOME_RES, type DomeConfig, type DomeMode } from '@shared/dome'
+import { DOME_RES, defaultDomeConfig, type DomeConfig, type DomeMode } from '@shared/dome'
 
 const CORNER_LABELS = ['TL', 'TR', 'BR', 'BL']
 
@@ -983,6 +983,20 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
     <Section
       title="Fulldome"
       defaultCollapsed
+      actions={
+        <button
+          onClick={() => {
+            // Every dome setting and the simulator back to their defaults; the
+            // dome's on/off stays as it is (that is the output, not a setting).
+            setDome({ ...defaultDomeConfig(), enabled: dome.enabled })
+            onResetCam('inside')
+          }}
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-muted/40 bg-panel3 font-mono text-[11px] leading-none text-muted transition-colors hover:border-accent/60 hover:text-accent"
+          title="Reset the Fulldome settings to their defaults (mapping, resolution, aperture, simulator); dome on/off is kept"
+        >
+          ↺
+        </button>
+      }
       info="Renders a square domemaster (equidistant fisheye, front at the bottom, the fulldome standard) from the flat composition. The master replaces the frame everywhere : the preview, the projector window, NDI, Spout, recording and stills. The SAT Satosphère takes 210°, 4096×4096 max, live over NDI. 8K is for stills (video encoders stop at 4K)."
     >
       <div className="flex flex-wrap items-center gap-1.5">
@@ -1094,11 +1108,14 @@ function Section({
   title,
   info,
   defaultCollapsed = false,
+  actions,
   children
 }: {
   title: string
   info?: string
   defaultCollapsed?: boolean
+  /** Small header buttons, right-aligned before the info dot (e.g. a reset). */
+  actions?: ReactNode
   children: ReactNode
 }): JSX.Element {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
@@ -1113,6 +1130,7 @@ function Section({
           <span className={`font-mono text-[9px] text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}>▶</span>
           <span className="truncate font-mono text-[9px] uppercase tracking-wide text-muted">{title}</span>
         </button>
+        {actions}
         {info && <InfoDot text={info} />}
       </div>
       {!collapsed && <div className="flex min-w-0 flex-col gap-2 px-2 pb-2">{children}</div>}
