@@ -67,7 +67,7 @@ that CI builds into cross-platform releases.
 - **Output page order**, top to bottom : Composition size, Render scale, Mapping,
   Fulldome, Fullscreen output, Record, Spout / Syphon, NDI, HIVE, Flash safety,
   Lights, Installation mode. The Spout section is now **Spout / Syphon** and shows
-  the one this computer uses.
+  the one this computer uses. Flash safety starts collapsed (it stays on).
 - The **window title** now carries the release version, like dataFLOU_compositor:
   `Palinopsia v1.1.0` on the main window, `Palinopsia v1.1.0 : Output` on the output
   window. Read from `package.json` at launch, so every tagged build titles itself.

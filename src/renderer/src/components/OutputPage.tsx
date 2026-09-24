@@ -728,7 +728,7 @@ export function OutputPage({
             </div>
           </Section>
 
-          <Section title="Flash safety" info="A safety net on the final image: it measures whole-frame brightness each frame and damps big full-field flashes (Shutter, Superimposition, Frame-Weave, datamosh, hard cuts…) so no seizure-inducing strobe reaches the screen. Normal motion is untouched. Mild is on by default and barely affects ordinary content.">
+          <Section title="Flash safety" defaultCollapsed info="A safety net on the final image: it measures whole-frame brightness each frame and damps big full-field flashes (Shutter, Superimposition, Frame-Weave, datamosh, hard cuts…) so no seizure-inducing strobe reaches the screen. Normal motion is untouched. Mild is on by default and barely affects ordinary content.">
 
             <div className="flex items-center gap-2">
               <input
