@@ -652,14 +652,20 @@ stills. Keystone warp is off in dome mode (a dome is mapped by its own media ser
   horizon). The Satosphère takes **4096×4096 max, live over NDI** on its 10 Gb network.
   8K is for stills : video encoders stop at 4K, so recording refuses 8K with a hint.
 - **Three ways to fit a 2D picture to a dome** :
-  - **wrap** : a panorama around the room. **turns** (how many times it goes around;
-    fewer = more horizontal stretch), **mirror seams** (alternate copies mirror so the
-    repeats join), **top / bottom** (the elevations its edges reach; −15° is the rim of a
-    210° dome), and what fills the **zenith** above it (fade / stretch / black).
+  - **full dome** (the default) : the WHOLE Palinopsia frame over the WHOLE 210° :
+    its centre at the zenith, its edges all around the rim. **fill** uses every pixel of
+    the frame and leaves no black anywhere inside the dome (a square-to-disc projection
+    curves the frame to the circle); **cover** spans the dome with the frame's height and
+    crops its sides; **contain** keeps the whole frame inside with black around it.
+    **scale** and **offset** move it on the master.
+  - **panorama** : the picture wrapped around the room. **turns** (how many times it goes
+    around; fewer = more horizontal stretch), **mirror seams** (alternate copies mirror so
+    the repeats join), **top / bottom** (the elevations its edges reach : 90° is the
+    zenith, −15° the rim of a 210° dome), and what fills the **zenith** above a lower top
+    (fade / stretch / black).
   - **screen** : the picture hung on the dome as a flat virtual screen, re-projected so it
     reads **undistorted from the centre** (a giant cinema screen) : **azimuth, elevation,
     width, roll**, with a dim wrapped **surround** so the dome is never black.
-  - **fisheye** : the picture laid straight onto the master (**scale, offset**).
 - **rotate**, a continuous **spin** (°/s), a **feather** at the rim, **flip**, and a
   **grid on output** : 10° rings, 30° spokes, the horizon in cyan, the front meridian in
   red, burned into the master for projector alignment.
@@ -668,7 +674,9 @@ stills. Keystone warp is off in dome mode (a dome is mapped by its own media ser
   around, wheel = field of view); **outside** is a cutaway orbit (the near shell hidden so
   the far half reads the right way round). **tilt** (for tilted planetariums; the
   Satosphère is level), an alignment **template** at low opacity, and the **sweet spot**
-  patch (width, low / high elevation) where an audience facing front naturally looks.
+  patch (width, low / high elevation, off by default) where an audience facing front
+  naturally looks. It reads a small copy of the master straight from the engine, so
+  the Output page keeps full frame rate even with a 4K master.
   **master** shows the flat domemaster instead. Double-click the view to reset the camera.
 - The dome settings live on the machine (the venue) **and** travel with the session (the
   piece).

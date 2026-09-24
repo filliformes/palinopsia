@@ -3,14 +3,16 @@
 // TouchDesigner FulldomeSimulator (equiazimuth sphere cap, dome tilt, camera
 // FOV, sweet-spot patch, alignment template at low opacity, the rim ring).
 //
-// It runs in its OWN WebGL2 context and takes the master from the Output page's
-// mirror <video> (a captureStream of the engine canvas, which in dome mode IS
-// the master), so the engine never pays for the preview. The cap mesh uses the
+// It runs in its OWN WebGL2 context and takes a 1024² read of the master that the
+// engine's render loop leaves in engine/domePreview (a captureStream of the 4K
+// canvas cost the page ~40 fps). `flat` shows that master as a square instead of
+// wrapping it on the dome. The cap mesh uses the
 // same direction ↔ master mapping as engine/dome.ts, so what reads correctly
 // here reads correctly under a real dome.
 
 import { useEffect, useRef, type RefObject } from 'react'
 import type { DomeConfig } from '@shared/dome'
+import { domePreview } from '../engine/domePreview'
 
 const VS = `#version 300 es
 in vec3 aPos; in vec2 aAng;
@@ -63,6 +65,15 @@ void main(){
   o = vec4(col, 1.0);
 }`
 
+// The flat master view : the square master letterboxed into the canvas.
+const FLAT_VS = `#version 300 es
+in vec2 p; uniform vec2 uScale; out vec2 vUv;
+void main(){ vUv = p * 0.5 + 0.5; gl_Position = vec4(p * uScale, 0.0, 1.0); }`
+const FLAT_FS = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o; uniform sampler2D uTex;
+void main(){ o = vec4(texture(uTex, vUv).rgb, 1.0); }`
+
 type M4 = Float32Array
 function persp(fovy: number, aspect: number, near: number, far: number): M4 {
   const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far)
@@ -114,14 +125,16 @@ function buildCap(halfAp: number): { pos: Float32Array; ang: Float32Array; idx: 
   return { pos: new Float32Array(pos), ang: new Float32Array(ang), idx: new Uint32Array(idx) }
 }
 
-export function DomeSim({ video, cfg, cam }: {
-  video: RefObject<HTMLVideoElement | null>
+export function DomeSim({ cfg, cam, flat = false }: {
   cfg: DomeConfig
   cam: RefObject<{ yaw: number; pitch: number; dist: number; fov: number }>
+  flat?: boolean
 }): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const cfgRef = useRef(cfg)
   cfgRef.current = cfg
+  const flatRef = useRef(flat)
+  flatRef.current = flat
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -140,6 +153,19 @@ export function DomeSim({ video, cfg, cam }: {
     gl.attachShader(prog, mk(gl.FRAGMENT_SHADER, FS))
     gl.linkProgram(prog)
     const U = (n: string): WebGLUniformLocation | null => gl.getUniformLocation(prog, n)
+    const flatProg = gl.createProgram()!
+    gl.attachShader(flatProg, mk(gl.VERTEX_SHADER, FLAT_VS))
+    gl.attachShader(flatProg, mk(gl.FRAGMENT_SHADER, FLAT_FS))
+    gl.bindAttribLocation(flatProg, 0, 'p')
+    gl.linkProgram(flatProg)
+    const flatVao = gl.createVertexArray()!
+    const flatBuf = gl.createBuffer()!
+    gl.bindVertexArray(flatVao)
+    gl.bindBuffer(gl.ARRAY_BUFFER, flatBuf)
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW)
+    gl.enableVertexAttribArray(0)
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+    gl.bindVertexArray(null)
     const aPos = gl.getAttribLocation(prog, 'aPos'), aAng = gl.getAttribLocation(prog, 'aAng')
     const vao = gl.createVertexArray()!
     const bPos = gl.createBuffer()!, bAng = gl.createBuffer()!, bIdx = gl.createBuffer()!
@@ -163,6 +189,8 @@ export function DomeSim({ video, cfg, cam }: {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
     let hasTex = false
+    let seen = -1
+    let texSize = 0
 
     let raf = 0
     const draw = (): void => {
@@ -174,23 +202,37 @@ export function DomeSim({ video, cfg, cam }: {
       if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H }
       const halfAp = (c.aperture * Math.PI) / 360
       if (Math.abs(halfAp - meshAp) > 1e-6) { rebuild(halfAp); meshAp = halfAp }
-      // Upload the newest master (the mirror video) : flipped so uv (0,0) is the
-      // bottom-left, the engine's convention.
-      const v = video.current
-      if (v && v.readyState >= 2 && v.videoWidth > 0) {
+      // Upload the newest master read (bottom-up rows = the GL uv convention).
+      if (domePreview.px && domePreview.serial !== seen && domePreview.size > 0) {
+        seen = domePreview.serial
+        const n = domePreview.size
         gl.bindTexture(gl.TEXTURE_2D, tex)
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
-        try {
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, v)
-          hasTex = true
-        } catch {
-          /* a frame not ready yet */
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4)
+        if (texSize !== n) {
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, n, n, 0, gl.RGBA, gl.UNSIGNED_BYTE, domePreview.px)
+          texSize = n
+        } else {
+          gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, n, n, gl.RGBA, gl.UNSIGNED_BYTE, domePreview.px)
         }
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+        hasTex = true
       }
       gl.viewport(0, 0, W, H)
       gl.clearColor(0.02, 0.02, 0.025, 1)
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+      if (flatRef.current) {
+        gl.disable(gl.DEPTH_TEST)
+        gl.disable(gl.CULL_FACE)
+        gl.useProgram(flatProg)
+        const side = Math.min(W, H)
+        gl.uniform2f(gl.getUniformLocation(flatProg, 'uScale'), side / W, side / H)
+        gl.activeTexture(gl.TEXTURE0)
+        gl.bindTexture(gl.TEXTURE_2D, tex)
+        gl.uniform1i(gl.getUniformLocation(flatProg, 'uTex'), 0)
+        gl.bindVertexArray(flatVao)
+        if (hasTex) gl.drawArrays(gl.TRIANGLES, 0, 6)
+        gl.bindVertexArray(null)
+        return
+      }
       gl.enable(gl.DEPTH_TEST)
       const inside = c.sim.view === 'inside'
       // Outside : a CUTAWAY. Seen from outside, the dome's outer shell winds
@@ -231,11 +273,12 @@ export function DomeSim({ video, cfg, cam }: {
     return () => {
       cancelAnimationFrame(raf)
       gl.deleteTexture(tex)
+      gl.deleteBuffer(flatBuf); gl.deleteVertexArray(flatVao); gl.deleteProgram(flatProg)
       gl.deleteBuffer(bPos); gl.deleteBuffer(bAng); gl.deleteBuffer(bIdx)
       gl.deleteVertexArray(vao)
       gl.deleteProgram(prog)
     }
-  }, [video, cam])
+  }, [cam])
 
   return <canvas ref={canvasRef} className="h-full w-full" />
 }

@@ -1566,6 +1566,35 @@ export class Compositor {
   private streamTW = 0;
   private streamTH = 0;
 
+  /** A small square read of the current domemaster for the in-app simulator
+   *  (bottom-up RGBA8). Null when the dome is off. */
+  readDomePreview(size: number, out: Uint8Array): boolean {
+    const gl = this.gl;
+    if (!this.domeTex) return false;
+    if (!this.domePrevTarget || this.domePrevSize !== size) {
+      if (this.domePrevTarget) { gl.deleteFramebuffer(this.domePrevTarget.fbo); gl.deleteTexture(this.domePrevTarget.tex); }
+      const tex = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      const fbo = gl.createFramebuffer()!; gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      this.domePrevTarget = { fbo, tex }; this.domePrevSize = size;
+    }
+    gl.bindVertexArray(this.vao);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.domePrevTarget.fbo);
+    gl.viewport(0, 0, size, size);
+    gl.useProgram(this.copyProg);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.domeTex); gl.uniform1i(this.uCTex, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindVertexArray(null);
+    gl.readPixels(0, 0, size, size, gl.RGBA, gl.UNSIGNED_BYTE, out);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return true;
+  }
+  private domePrevTarget: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
+  private domePrevSize = 0;
+
   /** LIGHT OUTPUT : reduce the presented composite to a cols×rows grid of zone
    *  colours for DMX/ArtNet/WLED. Two cheap passes : copy the clean composite
    *  into a mipmapped 256² source, then downscale it into the cols×rows target
@@ -1957,6 +1986,10 @@ export class Compositor {
       this.canvas.height = ch;
     }
     if (!this.domeCfg && this.dome) { this.dome.dispose(); this.dome = null; this.domeTex = null; }
+    if (!this.domeCfg && this.domePrevTarget) {
+      this.gl.deleteFramebuffer(this.domePrevTarget.fbo); this.gl.deleteTexture(this.domePrevTarget.tex);
+      this.domePrevTarget = null; this.domePrevSize = 0;
+    }
   }
 
   /** Set the projection warp for the present pass. `corners` = 8 normalized
@@ -2666,6 +2699,7 @@ export class Compositor {
     this.cameraless?.dispose();
     this.strobeLimiter?.dispose();
     this.dome?.dispose();
+    if (this.domePrevTarget) { gl.deleteFramebuffer(this.domePrevTarget.fbo); gl.deleteTexture(this.domePrevTarget.tex); this.domePrevTarget = null; }
     this.pbrLib?.dispose();
     disposeTarget(gl, this.bgScratch);
     disposeTarget(gl, this.bgFill);

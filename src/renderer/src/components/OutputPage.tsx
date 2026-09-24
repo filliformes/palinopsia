@@ -194,11 +194,13 @@ export function OutputPage({
     flashSaved(await captureScreenshot(canvas), 'screenshot')
   }
 
-  // Live mirror of the composite into the editor via canvas.captureStream.
+  // Live mirror of the composite into the editor via canvas.captureStream. Not in
+  // dome mode : capturing a 4K master cost ~40 fps; the simulator reads a small
+  // copy of it straight from the engine instead (engine/domePreview).
   useEffect(() => {
     const canvas = canvasRef.current
     const video = videoRef.current
-    if (!canvas || !video) return
+    if (!canvas || !video || dome.enabled) return
     let stream: MediaStream | null = null
     try {
       stream = canvas.captureStream(30)
@@ -211,7 +213,7 @@ export function OutputPage({
       stream?.getTracks().forEach((t) => t.stop())
       if (video) video.srcObject = null
     }
-  }, [canvasRef])
+  }, [canvasRef, dome.enabled])
 
   // Re-enumerable : plug in a projector after opening the page and hit ⟳ rescan.
   const refreshDisplays = useCallback((): void => {
@@ -325,8 +327,13 @@ export function OutputPage({
               autoPlay
               muted
               playsInline
-              className={`h-full w-full bg-black object-contain ${dome.enabled && domeView === '3d' ? 'pointer-events-none absolute inset-0 opacity-0' : ''}`}
+              className={`h-full w-full bg-black object-contain ${dome.enabled ? 'hidden' : ''}`}
             />
+            {dome.enabled && domeView === 'master' && (
+              <div className="absolute inset-0">
+                <DomeSim cfg={dome} cam={simCam} flat />
+              </div>
+            )}
             {dome.enabled && domeView === '3d' && (
               <div
                 className="absolute inset-0 cursor-grab active:cursor-grabbing"
@@ -351,7 +358,7 @@ export function OutputPage({
                 onDoubleClick={() => resetSimCam()}
                 title={dome.sim.view === 'inside' ? 'Drag to look around · wheel = field of view · double-click resets' : 'Drag to orbit · wheel = distance · double-click resets'}
               >
-                <DomeSim video={videoRef} cfg={dome} cam={simCam} />
+                <DomeSim cfg={dome} cam={simCam} />
                 <div className="pointer-events-none absolute left-2 top-2 rounded bg-black/55 px-2 py-1 font-mono text-[10px] text-muted">
                   {dome.aperture}° dome · {dome.res}² master · {dome.sim.view} view
                 </div>
@@ -952,9 +959,9 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
   onResetCam: (view: 'inside' | 'outside') => void
 }): JSX.Element {
   const MODES: Array<[DomeMode, string, string]> = [
-    ['wrap', 'wrap', 'The picture wraps around the dome like a panorama : its width runs around you, its height climbs from the rim toward the zenith. Made for 360° rooms (the Satosphère).'],
-    ['screen', 'screen', 'The picture hangs on the dome as a flat virtual screen, re-projected so it reads undistorted from the centre : a giant cinema screen. Surround wraps it dimly behind so the dome is never black.'],
-    ['fisheye', 'fisheye', 'The picture laid straight onto the master, inside the circle : the simplest mapping, strongest distortion toward the rim.']
+    ['fisheye', 'full dome', 'The whole Palinopsia frame over the whole dome : its centre at the zenith, its edges all around the rim. Fill uses every pixel and leaves no black inside the dome.'],
+    ['wrap', 'panorama', 'The picture wraps around the room like a panorama : its width runs around you (repeated by turns), its height climbs from the rim to the zenith. Made for 360° rooms (the Satosphère).'],
+    ['screen', 'screen', 'The picture hangs on the dome as a flat virtual screen, re-projected so it reads undistorted from the centre : a giant cinema screen. Surround wraps it dimly behind so the dome is never black.']
   ]
   return (
     <Section
@@ -1003,6 +1010,16 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
       )}
       {dome.mode === 'fisheye' && (
         <>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="font-mono text-[10px] text-muted">fit</span>
+            {([
+              ['fill', 'fill', 'The whole frame over the whole dome : nothing cropped, no black inside the circle (the frame is curved to the circle)'],
+              ['cover', 'cover', 'The frame\'s height spans the dome; its sides are cropped'],
+              ['contain', 'contain', 'The whole frame inside the dome, black around it']
+            ] as const).map(([f, l, t]) => (
+              <button key={f} onClick={() => setDome({ fit: f })} className={btn(dome.fit === f)} title={t}>{l}</button>
+            ))}
+          </div>
           <DomeSlider label="scale" value={dome.scale} min={0.2} max={3} step={0.01} reset={1} onChange={(v) => setDome({ scale: v })} />
           <DomeSlider label="offset x" value={dome.offsetX} min={-1} max={1} step={0.01} reset={0} onChange={(v) => setDome({ offsetX: v })} />
           <DomeSlider label="offset y" value={dome.offsetY} min={-1} max={1} step={0.01} reset={0} onChange={(v) => setDome({ offsetY: v })} />

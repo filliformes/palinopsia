@@ -30,7 +30,18 @@ uniform vec3 uC, uR, uU;    // screen centre + basis
 uniform float uHalfW, uHalfH, uSurround;
 uniform float uScale;
 uniform vec2 uOffset;
+uniform int uFit;           // full dome : 0 fill · 1 cover · 2 contain
 const float PI = 3.14159265359;
+
+// Elliptical grid mapping (Fong), disc → square : the inverse of
+// (x, y) → (x·sqrt(1 − y²/2), y·sqrt(1 − x²/2)). It spreads the WHOLE square over
+// the WHOLE disc, so a full frame covers the full dome with nothing cropped.
+vec2 discToSquare(vec2 d){
+  float u2 = d.x * d.x, v2 = d.y * d.y, t = 2.0 * sqrt(2.0);
+  float x = 0.5 * sqrt(max(0.0, 2.0 + u2 - v2 + t * d.x)) - 0.5 * sqrt(max(0.0, 2.0 + u2 - v2 - t * d.x));
+  float y = 0.5 * sqrt(max(0.0, 2.0 - u2 + v2 + t * d.y)) - 0.5 * sqrt(max(0.0, 2.0 - u2 + v2 - t * d.y));
+  return clamp(vec2(x, y), -1.0, 1.0);
+}
 
 vec3 wrapAt(float az, float el){
   float u = az / (2.0 * PI) * uTurns + 0.5;          // the front lands on the picture's centre
@@ -79,7 +90,15 @@ void main(){
   } else {
     float c = cos(uRot), s = sin(uRot);
     vec2 qq = mat2(c, s, -s, c) * q / uScale - uOffset;
-    vec2 p = vec2(qq.x / uAspect, qq.y) * 0.5 + 0.5;  // cover : the height spans the circle
+    vec2 p;
+    if (uFit == 0) {
+      p = length(qq) <= 1.0 ? discToSquare(qq) * 0.5 + 0.5 : vec2(-1.0);
+    } else if (uFit == 1) {
+      p = vec2(qq.x / uAspect, qq.y) * 0.5 + 0.5;       // the height spans the circle
+    } else {
+      float k = sqrt(1.0 + uAspect * uAspect);           // the corners touch the rim
+      p = vec2(qq.x * k / uAspect, qq.y * k) * 0.5 + 0.5;
+    }
     if (p.x >= 0.0 && p.x <= 1.0 && p.y >= 0.0 && p.y <= 1.0) col = texture(src, p).rgb;
   }
   if (uGrid == 1) {
@@ -209,6 +228,7 @@ export class DomeStage {
     gl.uniform1f(this.loc('uSurround'), cfg.surround)
     gl.uniform1f(this.loc('uScale'), cfg.scale)
     gl.uniform2f(this.loc('uOffset'), cfg.offsetX, cfg.offsetY)
+    gl.uniform1i(this.loc('uFit'), cfg.fit === 'cover' ? 1 : cfg.fit === 'contain' ? 2 : 0)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     return t.tex
   }

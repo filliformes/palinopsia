@@ -11,9 +11,11 @@ that CI builds into cross-platform releases.
   (equidistant fisheye, front at the bottom) at 2K / 4K / 8K from the flat
   composition, aperture 180–230° (210° default, the SAT Satosphère), and it
   replaces the frame everywhere : preview, projector window, NDI, Spout,
-  recording, stills. Three ways to fit a 2D picture : **wrap** (panorama around
-  the room), **screen** (a flat virtual screen re-projected to read undistorted
-  from the centre) and **fisheye**; rotate, spin, rim feather, flip and an
+  recording, stills. Three ways to fit a 2D picture : **full dome** (the whole
+  frame over the whole 210°, nothing cropped, no black; or cover / contain),
+  **panorama** (wrapped around the room, up to the zenith) and **screen** (a flat
+  virtual screen re-projected to read undistorted from the centre); rotate, spin,
+  rim feather, flip and an
   alignment grid burned into the output. A **3D dome simulator** (ported from the
   TouchDesigner FulldomeSimulator) shows the live master on a dome, from the seat
   or as an outside cutaway, with tilt, template and sweet spot.

@@ -42,7 +42,11 @@ export interface DomeConfig {
   roll: number // degrees
   surround: number // 0..1 : the picture wrapped dim behind the screen (no black dome)
 
-  // fisheye : the picture laid straight onto the master (the naive inscribe).
+  // fisheye ("full dome" in the UI) : the picture laid onto the master circle.
+  // fill : the WHOLE frame stretched over the WHOLE dome (a square-to-disc map :
+  // nothing cropped, no black inside the circle) · cover : the height spans the
+  // dome, the sides are cropped · contain : the whole frame inside, black around.
+  fit: 'fill' | 'cover' | 'contain'
   scale: number // 0.2..3
   offsetX: number // -1..1
   offsetY: number // -1..1
@@ -67,7 +71,7 @@ export function defaultDomeConfig(): DomeConfig {
     enabled: false,
     res: 4096,
     aperture: 210,
-    mode: 'wrap',
+    mode: 'fisheye',
     spin: 0,
     rotate: 0,
     flipX: false,
@@ -75,7 +79,7 @@ export function defaultDomeConfig(): DomeConfig {
     grid: false,
     turns: 2,
     mirrorSeams: true,
-    top: 70,
+    top: 90,
     bottom: -15,
     cap: 'fade',
     azimuth: 0,
@@ -83,10 +87,11 @@ export function defaultDomeConfig(): DomeConfig {
     width: 100,
     roll: 0,
     surround: 0.25,
+    fit: 'fill',
     scale: 1,
     offsetX: 0,
     offsetY: 0,
-    sim: { tilt: 0, fov: 100, template: 0.19, sweet: true, sweetW: 90, sweetLo: 10, sweetHi: 55, view: 'inside' }
+    sim: { tilt: 0, fov: 100, template: 0.19, sweet: false, sweetW: 90, sweetLo: 10, sweetHi: 55, view: 'inside' }
   }
 }
 
@@ -117,6 +122,7 @@ export function sanitizeDome(raw: unknown): DomeConfig {
     width: num(r.width, d.width, 20, 170),
     roll: num(r.roll, d.roll, -180, 180),
     surround: num(r.surround, d.surround, 0, 1),
+    fit: r.fit === 'cover' || r.fit === 'contain' || r.fit === 'fill' ? r.fit : d.fit,
     scale: num(r.scale, d.scale, 0.2, 3),
     offsetX: num(r.offsetX, d.offsetX, -1, 1),
     offsetY: num(r.offsetY, d.offsetY, -1, 1),

@@ -55,6 +55,7 @@ import { SequencePage } from './components/SequencePage'
 import { BodyPage } from './components/BodyPage'
 import { ResolumePage } from './components/ResolumePage'
 import { applyResolume } from './resolume'
+import { domePreview, DOME_PREVIEW } from './engine/domePreview'
 import { bodyTracker } from './engine/bodyTracker'
 import { bodyBus } from './engine/bodyIn'
 import { perfMeter } from './engine/perfMeter'
@@ -83,6 +84,7 @@ let contextPresetIndex = -1
 // Tracks the last-applied depth mode so the render loop only re-fills the depth
 // map on a change (synth bowl / clear), rather than every frame.
 let depthModePrev = ''
+let lastDomePreview = 0
 let lastDepthSample = 0 // throttles the depth-estimator frame readback (~11 Hz)
 let lastVisionSample = 0 // throttles the vision-bus readback (~30 Hz)
 let lastLightSample = 0 // throttles the light-output zone readback (config fps cap)
@@ -1218,6 +1220,17 @@ export default function App(): JSX.Element {
             pixelPortRef.current.postMessage({ w: fr.w, h: fr.h, buf }, [buf])
           }
           perfMeter.end('output')
+        }
+        // 3a'. Fulldome simulator : a small read of the master, only while the
+        //      Output page shows it (~30 Hz).
+        if (st.outputPageOpen && st.dome.enabled && now - lastDomePreview > 33) {
+          lastDomePreview = now
+          const n = DOME_PREVIEW * DOME_PREVIEW * 4
+          if (!domePreview.px || domePreview.px.length !== n) domePreview.px = new Uint8Array(n)
+          if (comp!.readDomePreview(DOME_PREVIEW, domePreview.px)) {
+            domePreview.size = DOME_PREVIEW
+            domePreview.serial++
+          }
         }
         // 3b. Animated sound (§4.4): sample a scanline of the presented frame and
         //     send it to Pandore over OSC (the drawn optical track).
