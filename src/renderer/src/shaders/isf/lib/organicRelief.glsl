@@ -6,9 +6,13 @@
 // height, one low raking light (azimuth `angle`, ~22° up), a short soft shadow
 // march, and a cavity term; matte (wrap diffuse, no specular) and normalised so
 // a flat patch keeps its albedo. `relief` 0 = off (the albedo untouched).
-// A shader can #define OG_SHADOW_STEPS (default 5, 0 = no shadow) and
-// OG_RELIEF_E (the difference step in pixels, default 1.5 : wider for 8-bit buffers)
-// before the marker.
+// A shader can #define before the marker : OG_SHADOW_STEPS (default 5, 0 = no
+// shadow), OG_RELIEF_E (the difference step in pixels, default 1.5 : wider for
+// 8-bit buffers) and OG_SHADOW_HEIGHT (a cheaper height for the shadow march,
+// default og_height : shadows only need the big forms).
+#ifndef OG_SHADOW_HEIGHT
+#define OG_SHADOW_HEIGHT og_height
+#endif
 #ifndef OG_SHADOW_STEPS
 #define OG_SHADOW_STEPS 5
 #endif
@@ -33,7 +37,7 @@ vec3 og_relief(vec2 uv, vec3 albedo, float h, float angle, float relief) {
   for (int i = 1; i <= OG_SHADOW_STEPS; i++) {
     float d = float(i) * 0.005;
     float rayH = h * depth + d * 0.4;           // tan(22°)
-    sh = min(sh, clamp(1.0 - (og_height(uv + dir * d) * depth - rayH) / (0.25 * depth), 0.0, 1.0));
+    sh = min(sh, clamp(1.0 - (OG_SHADOW_HEIGHT(uv + dir * d) * depth - rayH) / (0.25 * depth), 0.0, 1.0));
   }
   float cav = mix(0.6, 1.0, clamp(h, 0.0, 1.0));
   float lum = clamp(diff / L.z, 0.0, 1.7) * mix(0.3, 1.0, sh);

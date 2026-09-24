@@ -997,6 +997,18 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Sparse dye', values: { rate: 0.5, scale: 6.5, warp: 0.4, pool: 0.25, density: 0.35, grain: 0.5, pigment: [0.4, 0.12, 0.1, 1] } },
     { name: 'Dense pool', values: { rate: 0.2, scale: 3, warp: 0.7, pool: 0.9, density: 0.8, grain: 0.3, pigment: [0.2, 0.28, 0.36, 1] } }
   ],
+  colony: [
+    { name: 'Map lichen', values: { kind: 0, growth: 0.35, colonies: 0.55, grain: 360, bare: 0.35, maturing: 0.6, palette: 0 } },
+    { name: 'Orange crust', values: { kind: 0, growth: 0.3, colonies: 0.3, grain: 300, bare: 0.5, maturing: 0.5, palette: 0.25 } },
+    { name: 'Crustose field', values: { kind: 0, growth: 0.45, colonies: 0.85, grain: 480, bare: 0.15, maturing: 0.7, palette: 0 } },
+    { name: 'Penicillium', values: { kind: 1, growth: 0.3, colonies: 0.35, grain: 360, bare: 0.1, maturing: 0.5, palette: 0 } },
+    { name: 'Petri dish', values: { kind: 1, growth: 0.4, colonies: 0.75, grain: 480, bare: 0.1, maturing: 0.45, palette: 0.55 } },
+    { name: 'Scorch', values: { kind: 2, growth: 0.3, colonies: 0.3, grain: 360, bare: 0.2, maturing: 0.5, palette: 0 } },
+    { name: 'Burning letter', values: { kind: 2, growth: 0.2, colonies: 0.15, grain: 420, bare: 0.3, maturing: 0.4, palette: 0.6 } },
+    { name: 'Rust bloom', values: { kind: 3, growth: 0.3, colonies: 0.5, grain: 360, bare: 0.3, maturing: 0.55, palette: 0 } },
+    { name: 'Verdigris', values: { kind: 3, growth: 0.3, colonies: 0.6, grain: 360, bare: 0.25, maturing: 0.6, palette: 1 } },
+    { name: 'Weathered plate', values: { kind: 3, growth: 0.45, colonies: 0.9, grain: 480, bare: 0.1, maturing: 0.8, palette: 0.2 } }
+  ],
   reaction: [
     { name: 'Mitosis', values: { feed: 0.0367, kill: 0.0649, rate: 1.0, scale: 0.4, seed: 0.3, sharp: 0.5, tint: [0.78, 0.8, 0.74, 1] } },
     { name: 'Coral', values: { feed: 0.0545, kill: 0.062, rate: 1.0, scale: 0.35, seed: 0.25, sharp: 0.6, tint: [0.82, 0.7, 0.55, 1] } },
