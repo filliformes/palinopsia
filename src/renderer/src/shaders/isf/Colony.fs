@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Colony : living matter that GROWS across a surface. Colonies start from seeds and spread cell by cell with the rough, wandering front measured on real growth (burning paper, bacterial colonies : the Kardar-Parisi-Zhang roughness), slowed by poor ground and stopping short of each other where two meet. KIND picks the matter : LICHEN on granite (grey-green, orange and pale crusts cracking into areolae as they age, a black rim where colonies meet), MOULD on agar (a white growing margin, a green sporulating centre, daily rings), BURNING PAPER (a dim ember front, scorch ahead of it, char and ash behind), RUST on steel (spreading from scratches : orange, then red-brown, pitted and flaking; PALETTE toward copper turns it to verdigris). Lit as a relief under one low raking light. REGROW ▸ starts again; REGROW EVERY cycles on its own.",
+  "DESCRIPTION": "Colony : living matter that GROWS across a surface. Colonies start from seeds and spread cell by cell with the rough, wandering front measured on real growth (burning paper, bacterial colonies : the Kardar-Parisi-Zhang roughness), slowed by poor ground and stopping short of each other where two meet. KIND picks the matter : LICHEN on granite (grey-green, orange and pale crusts cracking into areolae as they age, a black rim where colonies meet), MOULD on agar (a white growing margin, a green sporulating centre, daily rings), BURNING PAPER (a dim ember front, scorch ahead of it, char and ash behind), RUST on steel (spreading from scratches : orange, then red-brown, pitted and flaking; PALETTE toward copper turns it to verdigris). Lit as a relief under one low raking light. GROUND : its own surface, or TRANSPARENT so the colonies grow over the layer below (a Scan of real rock or steel, a video). REGROW ▸ starts again; REGROW EVERY cycles on its own.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic"],
@@ -14,6 +14,7 @@
     { "NAME": "relief",     "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.55, "LABEL": "relief" },
     { "NAME": "lightAngle", "TYPE": "float", "MIN": 0.0,  "MAX": 6.2832,"DEFAULT": 2.36, "LABEL": "light angle" },
     { "NAME": "cycle",      "TYPE": "float", "MIN": 0.0,  "MAX": 180.0, "DEFAULT": 0.0,  "LABEL": "regrow every (s)" },
+    { "NAME": "ground",     "TYPE": "long",  "VALUES": [0, 1], "LABELS": ["own", "transparent"], "DEFAULT": 0, "LABEL": "ground" },
     { "NAME": "regrow",     "TYPE": "event", "LABEL": "regrow ▸" }
   ],
   "PASSES": [
@@ -219,8 +220,17 @@ void main() {
     return;
   }
 
-  // Pass 2 : present, lit as a relief.
+  // Pass 2 : present, lit as a relief. A transparent ground keeps only the
+  // colonies (and the scorch / stain / rim just ahead of them).
   float h = og_height(uv);
   vec3 alb = albedo(uv);
-  gl_FragColor = vec4(clamp(og_relief(uv, alb, h, lightAngle, relief), 0.0, 1.0), 1.0);
+  float a = 1.0;
+  if (ground == 1) {
+    vec2 wv = warpUV(uv);
+    vec2 e = 2.5 / stateSize();
+    vec2 q1 = wv + vec2(e.x, 0.0), q2 = wv - vec2(e.x, 0.0), q3 = wv + vec2(0.0, e.y), q4 = wv - vec2(0.0, e.y);
+    float nb = 0.25 * (IMG_NORM_PIXEL(state, q1).r + IMG_NORM_PIXEL(state, q2).r + IMG_NORM_PIXEL(state, q3).r + IMG_NORM_PIXEL(state, q4).r);
+    a = clamp(max(occAt(wv), nb * (kind == 1 ? 0.0 : 0.85)), 0.0, 1.0);
+  }
+  gl_FragColor = vec4(clamp(og_relief(uv, alb, h, lightAngle, relief), 0.0, 1.0), a);
 }

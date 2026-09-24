@@ -468,6 +468,20 @@ interface SharedGL {
   // pushed into any generator that declares an `audioTex` image input so each
   // element can ride its own live sample (the EYESY per-element gesture).
   audioTex?: import('./isfTextureBridge').TextureHandle;
+  // The Scan generator's material maps (colour / height / normal / AO) for a
+  // 1-based PBR material index : lazy, neutral while streaming in.
+  scanMaps?: (idx: number) => import('./pbrTextures').PbrMaps;
+}
+
+/** Push a Scan generator's material maps (its `material` input picks the set). */
+export function pushScanMaps(isf: ISFRenderer, maps: (idx: number) => import('./pbrTextures').PbrMaps): void {
+  const u = (isf as unknown as { uniforms?: Record<string, { value?: unknown }> }).uniforms;
+  const idx = Math.max(1, Math.round(Number(u?.material?.value ?? 1)));
+  const m = maps(idx);
+  isf.setValue('scanColor', m.color);
+  isf.setValue('scanHeight', m.height);
+  isf.setValue('scanNormal', m.normal);
+  isf.setValue('scanAO', m.ao);
 }
 
 // Generators that declare the `audioTex` image input : renderSource pushes the
@@ -1145,6 +1159,7 @@ export class ISFLayer {
     if (sid && this.shared.audioTex && AUDIO_TEX_GENS.has(sid)) {
       isf.setValue('audioTex', this.shared.audioTex);
     }
+    if (sid === 'scan' && this.shared.scanMaps) pushScanMaps(isf, this.shared.scanMaps);
     this.shared.redirect.redirect = scratch.fbo;
     isf.draw({ width: this.w, height: this.h });
     this.shared.redirect.redirect = null;
@@ -1349,6 +1364,10 @@ export class Compositor {
     this.gl = gl;
     const wrapped = makeRedirectableGL(gl);
     this.shared = { gl, rgl: wrapped.gl, redirect: wrapped.state, budget: { n: 0, until: 0 } };
+    this.shared.scanMaps = (idx) => {
+      if (!this.pbrLib) this.pbrLib = new PbrLib(this.gl);
+      return this.pbrLib.get(idx);
+    };
 
     const quad = new Float32Array([-1,-1, 3,-1, -1,3]); // fullscreen triangle
     this.vao = gl.createVertexArray()!; gl.bindVertexArray(this.vao);
@@ -2433,6 +2452,7 @@ export class Compositor {
         if (this.bgNativeSource) {
           this.bgNativeSource.render(this.bgScratch.fbo);
         } else {
+          if (this.bgShaderId === 'scan' && this.shared.scanMaps) pushScanMaps(this.bgIsf!, this.shared.scanMaps);
           this.shared.redirect.redirect = this.bgScratch.fbo;
           this.bgIsf!.draw({ width: this.w, height: this.h });
           this.shared.redirect.redirect = null;

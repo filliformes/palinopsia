@@ -1,8 +1,9 @@
 // PBR material library for the Context finalizer's surface mapping : the
 // whole composition "projected" onto a physical material (crumpled paper,
 // bark, sand…). 30 CC0 material sets from ambientcg.com, shipped as 1K JPGs
-// in the renderer's public dir (pbr/<AssetID>/{normal,height,ao}.jpg : AO is
-// optional, some sets don't publish one).
+// in the renderer's public dir (pbr/<AssetID>/{normal,height,ao,color}.jpg : AO
+// is optional, some sets don't publish one). The colour maps (re-encoded at
+// JPEG q≈85) feed the Scan generator; Context uses the relief maps only.
 //
 // Maps load LAZILY: nothing is fetched until a material is first selected;
 // while its images stream in, the neutral flat maps are served so the frame
@@ -55,6 +56,7 @@ export interface PbrMaps {
   normal: TextureHandle
   height: TextureHandle
   ao: TextureHandle
+  color: TextureHandle
 }
 
 interface Loading {
@@ -72,7 +74,8 @@ export class PbrLib {
     this.neutral = {
       normal: this.solid([128, 128, 255, 255]),
       height: this.solid([128, 128, 128, 255]),
-      ao: this.solid([255, 255, 255, 255])
+      ao: this.solid([255, 255, 255, 255]),
+      color: this.solid([110, 108, 104, 255])
     }
   }
 
@@ -95,12 +98,13 @@ export class PbrLib {
 
   private async load(mat: PbrMaterial, entry: Loading): Promise<void> {
     const base = new URL(`pbr/${mat.id}/`, document.baseURI).href
-    const [normal, height, ao] = await Promise.all([
+    const [normal, height, ao, color] = await Promise.all([
       this.fetchTex(`${base}normal.jpg`, this.neutral.normal),
       this.fetchTex(`${base}height.jpg`, this.neutral.height),
-      this.fetchTex(`${base}ao.jpg`, this.neutral.ao) // optional : neutral if absent
+      this.fetchTex(`${base}ao.jpg`, this.neutral.ao), // optional : neutral if absent
+      this.fetchTex(`${base}color.jpg`, this.neutral.color)
     ])
-    entry.maps = { normal, height, ao }
+    entry.maps = { normal, height, ao, color }
   }
 
   private fetchTex(url: string, fallback: TextureHandle): Promise<TextureHandle> {

@@ -37,6 +37,7 @@ import dyeField from './DyeField.fs?raw'
 import reaction from './Reaction.fs?raw'
 import colony from './Colony.fs?raw'
 import ground from './Ground.fs?raw'
+import scan from './Scan.fs?raw'
 import organicLib from './lib/organic.glsl?raw'
 import organicRelief from './lib/organicRelief.glsl?raw'
 import metamorph from './Metamorph.fs?raw'
@@ -1062,6 +1063,13 @@ export const GENERATORS: IsfShader[] = [
     category: 'Generator',
     source: withOrganic(ground),
     curated: { scale: [0.6, 1.8], drying: [-1, 1], wander: [0, 0.8], roughness: [0.2, 0.8], palette: [0, 0.8], ...RELIEF_CURATED }
+  },
+  {
+    id: 'scan',
+    name: 'Scan',
+    category: 'Generator',
+    source: withOrganic(scan),
+    curated: { scale: [0.8, 3], tiling: [1, 1], drift: [0, 0.15], rotate: [-0.5, 0.5], weather: [0, 0.6], colour: [0.6, 1], ...RELIEF_CURATED }
   },
   {
     id: 'metamorph',
