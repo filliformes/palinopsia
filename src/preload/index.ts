@@ -184,6 +184,10 @@ const api: ExposedApi = {
   // ── Resource HUD + recording ─────────────────────────────────────
   perfStats: () => ipcRenderer.invoke('perf:stats'),
   recordingFormats: () => ipcRenderer.invoke('recording:formats'),
+  recordingFolder: () => ipcRenderer.invoke('recording:folder'),
+  recordingChooseFolder: () => ipcRenderer.invoke('recording:chooseFolder'),
+  recordingResetFolder: () => ipcRenderer.invoke('recording:resetFolder'),
+  recordingOpenFolder: () => ipcRenderer.invoke('recording:openFolder'),
   recordingStart: (ext: string, codec: string) => ipcRenderer.invoke('recording:start', ext, codec),
   recordingChunk: (data: Uint8Array) => ipcRenderer.send('recording:chunk', data),
   recordingStop: (formatId: string) => ipcRenderer.invoke('recording:stop', formatId),

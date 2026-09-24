@@ -878,6 +878,15 @@ export interface CaptureSourceInfo {
 
 // Per-frame render state pushed to the native output window (it drives its own
 // Compositor from this : no WebRTC transcode).
+/** The recording folder, as main reports it (see main/recording.ts). */
+export interface RecordingFolderInfo {
+  path: string
+  chosen: string | null
+  defaultPath: string
+  available: boolean
+  error?: string
+}
+
 /** What the output window reads per frame now : the keystone it applies to the
  *  streamed picture (it no longer renders the composition itself). */
 export type OutputWarp = Pick<OutputFrame, 'warpEnabled' | 'warpCorners' | 'warpGrid'>
@@ -1122,6 +1131,12 @@ export interface ExposedApi {
   // Recording: intermediate MediaRecorder chunks streamed to main → ffmpeg
   // delivery-format transcode/remux on stop → Recorded/. Plus screenshot.
   recordingFormats: () => Promise<Array<{ id: string; label: string; kind: 'realtime' | 'encoder' }>>
+  // Where takes, screenshots and Assemble exports go : Recorded/ next to the app,
+  // or a folder the player chose (remembered per machine).
+  recordingFolder: () => Promise<RecordingFolderInfo>
+  recordingChooseFolder: () => Promise<RecordingFolderInfo>
+  recordingResetFolder: () => Promise<RecordingFolderInfo>
+  recordingOpenFolder: () => Promise<string>
   recordingStart: (intermediateExt: string, codec: string) => Promise<boolean>
   recordingChunk: (data: Uint8Array) => void
   recordingStop: (formatId: string) => Promise<string | null>

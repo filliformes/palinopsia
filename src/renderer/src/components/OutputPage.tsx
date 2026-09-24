@@ -13,7 +13,7 @@ import {
   type RefObject
 } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import type { DisplayInfo, PerfStats } from '@shared/types'
+import type { DisplayInfo, PerfStats, RecordingFolderInfo } from '@shared/types'
 import { useStore } from '../store'
 import { showToast } from './Toast'
 import { currentFps } from '../perf'
@@ -164,6 +164,20 @@ export function OutputPage({
   const chosen = formats.find((f) => f.id === recordPrefs.format) ?? formats.find((f) => f.id === 'mp4-h264') ?? formats[0]
   const formatId = chosen && available(chosen) ? chosen.id : formats.some((f) => f.id === 'dxv3') ? 'dxv3' : ''
   const fellBack = !!chosen && formatId !== chosen.id
+  // Where takes, screenshots and Assemble exports go (main owns the setting).
+  const [recFolder, setRecFolder] = useState<RecordingFolderInfo | null>(null)
+  useEffect(() => { void window.api.recordingFolder().then(setRecFolder).catch(() => {}) }, [])
+  const chooseRecFolder = async (): Promise<void> => {
+    const f = await window.api.recordingChooseFolder()
+    setRecFolder(f)
+    if (f.error) showToast(f.error, 'warn', 6000)
+  }
+  const resetRecFolder = async (): Promise<void> => setRecFolder(await window.api.recordingResetFolder())
+  // The folder's last two parts : enough to recognise it, the rest is in the tooltip.
+  const shortFolder = (p: string): string => {
+    const parts = p.split(/[\\/]/).filter(Boolean)
+    return parts.length > 2 ? `…${p.includes('\\') ? '\\' : '/'}${parts.slice(-2).join(p.includes('\\') ? '\\' : '/')}` : p
+  }
   const recSize = formatId === 'dxv3'
     ? (() => { const k = Math.min(1, DXV_MAX_EDGE / Math.max(canvasW, canvasH)); return { w: Math.round(canvasW * k), h: Math.round(canvasH * k) } })()
     : { w: canvasW, h: canvasH }
@@ -650,7 +664,7 @@ export function OutputPage({
             )}
           </Section>
 
-          <Section title="Record" info="Clips + screenshots land in the Recorded folder. DXV3 (Resolume's codec) is compressed on the graphics card and written as it goes : any size (the 4096² dome included; bigger is scaled to 4096), constant frame rate, plays smoothly in Resolume with no conversion, no sound. The other formats are captured as a high-bitrate hardware H.264 master, then ffmpeg delivers the chosen one (ProRes / FFV1 / uncompressed included) : the hardware encoder takes up to 3840×2160, so they're greyed out above that. DXV3 records the clean picture (before keystone); the others record what the preview shows.">
+          <Section title="Record" info="Clips + screenshots land in the Recorded folder next to the app, or wherever you point location… (remembered on this computer; if that folder can't be reached, takes go to Recorded). DXV3 (Resolume's codec) is compressed on the graphics card and written as it goes : any size (the 4096² dome included; bigger is scaled to 4096), constant frame rate, plays smoothly in Resolume with no conversion, no sound. The other formats are captured as a high-bitrate hardware H.264 master, then ffmpeg delivers the chosen one (ProRes / FFV1 / uncompressed included) : the hardware encoder takes up to 3840×2160, so they're greyed out above that. DXV3 records the clean picture (before keystone); the others record what the preview shows.">
 
             <select
               className="input select-compact w-full text-[11px]"
@@ -707,11 +721,44 @@ export function OutputPage({
               <button
                 onClick={() => void takeScreenshot()}
                 className="flex-1 rounded border border-border px-2 py-1 font-mono text-[11px] text-muted hover:text-accent"
-                title="Save a PNG of the output at its current resolution → Recorded folder"
+                title="Save a PNG of the output at its current resolution, into the recording folder"
               >
                 screenshot
               </button>
             </div>
+            <div className="flex items-center gap-1.5">
+              <span className="shrink-0 font-mono text-[10px] text-muted">into</span>
+              <button
+                onClick={() => void window.api.recordingOpenFolder()}
+                className="min-w-0 flex-1 truncate text-left font-mono text-[10px] text-text hover:text-accent"
+                title={recFolder ? `${recFolder.path}\n(click to open it)` : ''}
+              >
+                {recFolder ? shortFolder(recFolder.path) : '…'}
+              </button>
+              <button
+                onClick={() => void chooseRecFolder()}
+                disabled={recording}
+                className={`${btn(!!recFolder?.chosen)} !px-2 !py-0.5`}
+                title="Choose where recordings, screenshots and Assemble exports go (remembered on this computer)"
+              >
+                location…
+              </button>
+              {recFolder?.chosen && (
+                <button
+                  onClick={() => void resetRecFolder()}
+                  disabled={recording}
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-muted/40 bg-panel3 font-mono text-[11px] leading-none text-muted transition-colors hover:border-accent/60 hover:text-accent disabled:opacity-40"
+                  title={`Back to the default folder (${recFolder.defaultPath})`}
+                >
+                  ↺
+                </button>
+              )}
+            </div>
+            {recFolder && !recFolder.available && (
+              <div className="font-mono text-[10px] text-yellow-300">
+                {recFolder.chosen} can't be reached (an unplugged drive?) : takes go to the default folder.
+              </div>
+            )}
           </Section>
 
           <Section

@@ -618,7 +618,11 @@ A full-page takeover (the engine keeps rendering underneath):
 - **Fullscreen output** : pick a display; borderless-fullscreen or windowed. The
   output window shows the control window's exact pixels, streamed at the
   projector's own resolution and keystoned on its side.
-- **Record** : format + record / stop + screenshot → `Recorded/`. **The take keeps
+- **Record** : format + record / stop + screenshot → `Recorded/`, or any folder you
+  pick with **location…** (remembered on this computer; ↺ goes back to `Recorded/`,
+  the path opens the folder; if the chosen folder can't be reached, an unplugged
+  drive, takes go to `Recorded/` and the section says so). Assemble exports follow
+  the same folder. **The take keeps
   rolling when you leave the page** : a pulsing REC pill in the top bar shows the
   elapsed time and stops/saves it, so you can tweak parameters live mid-take.
   - **DXV3 · Resolume** : Resolume's GPU codec, recorded in **real time** : the

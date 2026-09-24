@@ -50,6 +50,11 @@ that CI builds into cross-platform releases.
   from a video encoder : the **4096² fulldome master records at full size** (a
   bigger master is scaled to 4096). Constant 30 or 60 fps, the clean picture.
   Checked against FFmpeg's DXV decoder and Resolume's own file layout.
+- **Record location** : Output → Record → **location…** picks where takes,
+  screenshots and Assemble exports go (checked writable, remembered on this
+  computer, ↺ back to Recorded/, click the path to open it). A chosen folder that
+  can't be reached (an unplugged drive) falls back to Recorded/ with a warning,
+  instead of losing the take.
 - **Recording formats know their limits** : the hardware video encoder takes up to
   3840×2160 on this machine (measured), so above that (the 4K dome) the other
   formats show greyed out and a take records DXV3; the MIDI record toggle now uses

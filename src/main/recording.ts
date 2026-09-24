@@ -1,5 +1,6 @@
 // Output recording + screenshots → the "Recorded" folder next to the app
-// (project root in dev, install dir when packaged; falls back to <userData>).
+// (project root in dev, install dir when packaged; falls back to <userData>),
+// or the folder the player chose (see "The recording folder" below).
 //
 // Two kinds of format :
 //   · REAL-TIME (DXV3) : the renderer compresses on the GPU and its preload
@@ -15,8 +16,8 @@
 // loss), or a real transcode for ProRes / FFV1 / uncompressed / H.265 / VP9.
 // No ffmpeg on PATH → we just keep the intermediate as-is.
 
-import { app } from 'electron'
-import { createWriteStream, existsSync, promises as fs, type WriteStream } from 'fs'
+import { app, dialog, type BrowserWindow } from 'electron'
+import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync, promises as fs, type WriteStream } from 'fs'
 import { execFile } from 'child_process'
 import { join, dirname } from 'path'
 import { userFilesBase } from './paths'
@@ -133,7 +134,99 @@ export function recordingFormats(): Array<{ id: string; label: string; kind: 're
   return FORMATS.filter((f) => !f.needsFfmpeg || hasFf).map((f) => ({ id: f.id, label: f.label, kind: f.kind }))
 }
 
-/** A fresh file path in Recorded/ for a real-time take (its preload writes it). */
+// ── The recording folder ─────────────────────────────────────────────────
+// Recorded/ next to the app by default, or a folder the player chose (Output →
+// Record → location), remembered per machine in <userData>/recording.json. Takes,
+// screenshots and Assemble exports all land there. A chosen folder that is gone
+// (an unplugged drive) falls back to the default rather than losing the take.
+
+export interface RecordingFolder {
+  path: string // where the next take goes
+  chosen: string | null // the player's folder, null = the default
+  defaultPath: string
+  available: boolean // false : the chosen folder can't be reached (the default is used)
+  error?: string
+}
+
+function settingsPath(): string {
+  return join(app.getPath('userData'), 'recording.json')
+}
+
+function chosenFolder(): string | null {
+  try {
+    const j = JSON.parse(readFileSync(settingsPath(), 'utf8')) as { folder?: unknown }
+    return typeof j.folder === 'string' && j.folder.trim() ? j.folder : null
+  } catch {
+    return null
+  }
+}
+
+function defaultFolder(): string {
+  return join(userFilesBase(), 'Recorded')
+}
+
+/** Where the next take goes, created if needed. */
+export function outputFolder(): string {
+  const chosen = chosenFolder()
+  if (chosen) {
+    try {
+      mkdirSync(chosen, { recursive: true })
+      return chosen
+    } catch {
+      console.warn(`[recording] ${chosen} can't be reached : recording to the default folder`)
+    }
+  }
+  const dir = defaultFolder()
+  try {
+    mkdirSync(dir, { recursive: true })
+    return dir
+  } catch {
+    const fallback = join(app.getPath('userData'), 'Recorded')
+    mkdirSync(fallback, { recursive: true })
+    return fallback
+  }
+}
+
+export function recordingFolderInfo(): RecordingFolder {
+  const chosen = chosenFolder()
+  // Reachable = it exists, or its parent does (it will simply be recreated).
+  const available = !chosen || existsSync(chosen) || existsSync(dirname(chosen))
+  return { path: chosen && available ? chosen : defaultFolder(), chosen, defaultPath: defaultFolder(), available }
+}
+
+function setChosenFolder(folder: string | null): void {
+  writeFileSync(settingsPath(), JSON.stringify({ folder }, null, 2))
+}
+
+/** Ask for a folder; keep it only if we can actually write there. */
+export async function chooseRecordingFolder(parent: BrowserWindow | null): Promise<RecordingFolder> {
+  const cur = recordingFolderInfo()
+  const opts = {
+    title: 'Where should recordings and screenshots go?',
+    defaultPath: cur.path,
+    properties: ['openDirectory', 'createDirectory'] as Array<'openDirectory' | 'createDirectory'>
+  }
+  const r = parent ? await dialog.showOpenDialog(parent, opts) : await dialog.showOpenDialog(opts)
+  if (r.canceled || !r.filePaths.length) return cur
+  const folder = r.filePaths[0]
+  const probe = join(folder, `.opsia-write-test-${process.pid}`)
+  try {
+    await fs.writeFile(probe, '')
+    await fs.rm(probe)
+  } catch {
+    return { ...cur, error: `Palinopsia can't write to ${folder}` }
+  }
+  setChosenFolder(folder)
+  return recordingFolderInfo()
+}
+
+/** Back to Recorded/ next to the app. */
+export function resetRecordingFolder(): RecordingFolder {
+  setChosenFolder(null)
+  return recordingFolderInfo()
+}
+
+/** A fresh file path in the recording folder for a real-time take (its preload writes it). */
 export async function takePath(ext: string): Promise<string | null> {
   try {
     const dir = await ensureFolder()
@@ -144,19 +237,8 @@ export async function takePath(ext: string): Promise<string | null> {
   }
 }
 
-function recordedFolder(): string {
-  return join(userFilesBase(), 'Recorded')
-}
-
 async function ensureFolder(): Promise<string> {
-  let dir = recordedFolder()
-  try {
-    if (!existsSync(dir)) await fs.mkdir(dir, { recursive: true })
-  } catch {
-    dir = join(app.getPath('userData'), 'Recorded')
-    if (!existsSync(dir)) await fs.mkdir(dir, { recursive: true })
-  }
-  return dir
+  return outputFolder()
 }
 
 // yyyymmdd-hhmmss (local) for sortable, collision-resistant filenames.

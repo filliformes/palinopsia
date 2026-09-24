@@ -13,6 +13,7 @@
 // grid fallback comes free from the same code path.
 
 import { app, dialog, ipcMain } from 'electron'
+import { outputFolder } from './recording'
 import { spawn } from 'child_process'
 import { createHash } from 'crypto'
 import {
@@ -33,7 +34,6 @@ import {
   type FrameStats
 } from '@shared/assemble'
 import { children, convertToCache, probe, resolveFfmpeg } from './videoConvert'
-import { userFilesBase } from './paths'
 
 // Bump when the descriptor set or segmentation changes : old caches are then
 // ignored rather than silently mixing incompatible vectors into one corpus.
@@ -537,16 +537,9 @@ async function exportEdl(
   }
 }
 
-/** Same destination the output recorder writes to : next to the app in a
- *  packaged build, the project root in dev, userData as the fallback. */
+/** Same destination the output recorder writes to (Output → Record → location). */
 function recordedFolder(): string {
-  const dir = join(userFilesBase(), 'Recorded')
-  try {
-    mkdirSync(dir, { recursive: true })
-    return dir
-  } catch {
-    return join(app.getPath('userData'), 'Recorded')
-  }
+  return outputFolder()
 }
 
 export function registerAssemble(): void {
