@@ -381,9 +381,9 @@ export default function App(): JSX.Element {
     }
   }, [])
 
-  // ── Spout : attach the (default-framebuffer) readback while active ──
+  // ── Spout / Syphon : attach the (default-framebuffer) readback while active ──
   const ndiActive = useStore((s) => s.ndiActive)
-  const spoutActive = useStore((s) => s.spoutActive)
+  const shareActive = useStore((s) => s.shareActive)
   const outputPageOpen = useStore((s) => s.outputPageOpen)
   const sonifyPageOpen = useStore((s) => s.sonifyPageOpen)
   const renderScale = useStore((s) => s.renderScale)
@@ -398,16 +398,16 @@ export default function App(): JSX.Element {
   useEffect(() => {
     const comp = compositorRef.current
     if (!comp) return
-    comp.setOutputCapture(spoutActive ? (w, h, px) => window.api.spoutFrame(w, h, px) : null)
+    comp.setOutputCapture(shareActive ? (w, h, px) => window.api.shareFrame(w, h, px) : null)
     return () => comp.setOutputCapture(null)
-    // Handles live Spout toggles. Re-attachment across an engine REBUILD is
+    // Handles live Spout / Syphon toggles. Re-attachment across an engine REBUILD is
     // owned by the compositor-build effect instead : this effect is declared
     // earlier, so on a rebuild it runs first and just reads a null ref (harmless
     // no-op). `renderScale` stays a dep so this effect's cleanup runs on the LIVE
     // compositor before it's disposed (glEpoch is declared later, so the build
     // effect — which does see it — carries the GPU-reset case). (The output-window
     // STREAM is driven from the render loop, not here.)
-  }, [spoutActive, renderScale])
+  }, [shareActive, renderScale])
 
   // ── Light output : push the (machine-local) config to main whenever it
   //    changes, so the ArtNet/WLED sender always has the current mapping. The
@@ -936,15 +936,15 @@ export default function App(): JSX.Element {
     try {
       comp = new Compositor(canvas, canvas.width, canvas.height)
       compositorRef.current = comp
-      // Re-attach the external-output (NDI/Spout) readback to the freshly built
-      // compositor. The separate toggle effect is declared earlier, so on a
-      // rebuild (renderScale change or glEpoch GPU-reset) it runs BEFORE this and
-      // reads a null ref — leaving the sender black until toggled. Restoring it
-      // here, from the live store state, keeps NDI/Spout output alive across any
-      // engine rebuild.
+      // Re-attach the Spout / Syphon readback to the freshly built compositor.
+      // The separate toggle effect is declared earlier, so on a rebuild
+      // (renderScale change or glEpoch GPU-reset) it runs BEFORE this and reads a
+      // null ref — leaving the sender black until toggled. Restoring it here,
+      // from the live store state, keeps the share alive across any engine
+      // rebuild. (NDI captures from the render loop and needs no re-attach.)
       {
         const st = useStore.getState()
-        comp.setOutputCapture(st.spoutActive ? (w, h, px) => window.api.spoutFrame(w, h, px) : null)
+        comp.setOutputCapture(st.shareActive ? (w, h, px) => window.api.shareFrame(w, h, px) : null)
       }
       // The fresh compositor's depth map is empty : force the depth mode to
       // re-apply next frame (else module-level depthModePrev still equals the
@@ -1474,10 +1474,12 @@ export default function App(): JSX.Element {
     }
     // Timer frames step on a 60 Hz grid : a bare 16 ms timeout lands on the
     // 15.6 ms Windows tick once the window is in the background (~32 Hz), too
-    // close to a 30 fps NDI stream to pace it cleanly.
+    // close to a 30 fps NDI stream to pace it cleanly. And each one waits for
+    // the GPU to finish it first (rAF does that by itself; see finishFrame).
     let due = 0
     const schedule = (): void => {
       if (timerMode || document.hidden) {
+        comp?.finishFrame()
         const t = performance.now()
         due = t - due > 100 ? t + 1000 / 60 : due + 1000 / 60
         timer = window.setTimeout(loop, Math.max(0, due - t))
@@ -1666,7 +1668,7 @@ export default function App(): JSX.Element {
         {(() => {
           const sinks = [
             ndiActive && 'NDI',
-            spoutActive && 'Spout',
+            shareActive && (window.api.platform === 'darwin' ? 'Syphon' : 'Spout'),
             hiveOutActive && 'HIVE'
           ].filter(Boolean)
           return sinks.length > 0 ? (

@@ -1,7 +1,7 @@
 // OutputPage : a full-screen "Output / Mapping" page that takes over the UI
 // (opened from the toolbar). It carries a LIVE keystone editor (a mirror of the
 // composite with draggable corner handles, so you warp and watch it move), the
-// alignment grid, projector/2nd-display output, and NDI / Spout senders.
+// alignment grid, projector/2nd-display output, and the NDI / Spout / Syphon senders.
 
 import {
   useCallback,
@@ -21,7 +21,7 @@ import { captureScreenshot, outputRecorder, recordingFormats } from '../recorder
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { DomeSim } from './DomeSim'
 import { DOME_RES, defaultDomeConfig, type DomeConfig, type DomeMode } from '@shared/dome'
-import { NDI_FPS, NDI_MAX_EDGE, NDI_RUNTIME_URL, type NdiConfig } from '@shared/ndi'
+import { NDI_FPS, NDI_MAX_EDGE, NDI_REDIST_URL, NDI_LINUX_SDK_URL, type NdiConfig, type NdiInstallProgress } from '@shared/ndi'
 
 const CORNER_LABELS = ['TL', 'TR', 'BR', 'BL']
 
@@ -63,8 +63,8 @@ export function OutputPage({
   const outputActive = useStore((s) => s.outputActive)
   const setOutputActive = useStore((s) => s.setOutputActive)
   const ndiActive = useStore((s) => s.ndiActive)
-  const spoutActive = useStore((s) => s.spoutActive)
-  const setSpoutActive = useStore((s) => s.setSpoutActive)
+  const shareActive = useStore((s) => s.shareActive)
+  const setShareActive = useStore((s) => s.setShareActive)
   const lights = useStore((s) => s.lights)
   const setLights = useStore((s) => s.setLights)
   // Installation mode : a persisted "enable on next restart" launch config (main
@@ -259,15 +259,17 @@ export function OutputPage({
     await window.api.outputClose()
     setOutputActive(false)
   }
-  const toggleSpout = async (): Promise<void> => {
-    const next = !spoutActive
-    const ok = await window.api.spoutSet(next)
-    setSpoutActive(next && ok)
+  // Spout (Windows) / Syphon (macOS) : the platform's texture-sharing sender.
+  const shareKind = window.api.platform === 'win32' ? 'Spout' : window.api.platform === 'darwin' ? 'Syphon' : null
+  const toggleShare = async (): Promise<void> => {
+    const next = !shareActive
+    const ok = await window.api.shareSet(next)
+    setShareActive(next && ok)
     if (next && !ok) {
       showToast(
-        'Spout sender not available : the Spout addon (native/spout) is not built for this Electron',
+        `${shareKind} could not start : this build of Palinopsia has no ${shareKind} sender (native/${shareKind?.toLowerCase()} was not built)`,
         'warn',
-        0 // sticky : an install instruction shouldn't vanish on a timer
+        0 // sticky : a build problem shouldn't vanish on a timer
       )
     }
   }
@@ -448,28 +450,6 @@ export function OutputPage({
           style={{ width: inspW }}
           className="flex shrink-0 flex-col gap-2 overflow-y-auto overflow-x-hidden border-l border-border bg-panel p-2"
         >
-          <DomeSection dome={dome} setDome={setDome} setDomeSim={setDomeSim} btn={btn} view={domeView} setView={setDomeView} onResetCam={resetSimCam} onWholeDome={wholeDome} />
-
-          <NdiSection btn={btn} defaultCollapsed={!ndiActive} />
-
-          <Section title="Mapping" info="Drag the corners over the live preview to keystone the image onto a projector. Turn grid on to align, off for the show. (Off in dome mode : a domemaster is mapped by the dome's own server.)">
-
-            <div className="flex flex-wrap gap-1.5">
-              <button onClick={() => setWarpEnabled(!warpEnabled)} className={btn(warpEnabled)}>
-                warp {warpEnabled ? 'on' : 'off'}
-              </button>
-              <button onClick={() => setWarpGrid(!warpGrid)} className={btn(warpGrid)}>
-                grid
-              </button>
-              <button
-                onClick={resetWarp}
-                className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
-              >
-                reset
-              </button>
-            </div>
-          </Section>
-
           <Section
             title="Composition size"
             info="The composition's native pixel size and aspect : the whole engine renders at this shape (not just a crop). Widen it to span several projectors (e.g. 7680×2160 = two 4K projectors side by side). It is machine-local, not saved in the session, so a show file stays resolution-independent. Changing it rebuilds the engine (a brief flicker). Render scale below is a quality multiplier on top."
@@ -552,41 +532,25 @@ export function OutputPage({
             </div>
           </Section>
 
-          <Section title="Flash safety" info="A safety net on the final image: it measures whole-frame brightness each frame and damps big full-field flashes (Shutter, Superimposition, Frame-Weave, datamosh, hard cuts…) so no seizure-inducing strobe reaches the screen. Normal motion is untouched. Mild is on by default and barely affects ordinary content.">
+          <Section title="Mapping" info="Drag the corners over the live preview to keystone the image onto a projector. Turn grid on to align, off for the show. (Off in dome mode : a domemaster is mapped by the dome's own server.)">
 
-            <div className="flex items-center gap-2">
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={strobeSafe}
-                onChange={(e) => setStrobeSafe(Number(e.target.value))}
-                onDoubleClick={() => setStrobeSafe(0.35)}
-                className="min-w-0 flex-1 accent-accent"
-                title="Photosensitive-safety limiter : caps how fast the whole picture can flash. Applies to the preview AND the projection."
-              />
-              <span className="w-24 shrink-0 text-right font-mono text-[11px] text-muted">
-                {strobeSafe < 0.02 ? 'off' : `${Math.round(strobeSafe * 100)}%`}
-              </span>
-            </div>
             <div className="flex flex-wrap gap-1.5">
-              {[
-                ['off', 0],
-                ['mild', 0.35],
-                ['strong', 0.7],
-                ['max', 1]
-              ].map(([lbl, v]) => (
-                <button
-                  key={lbl as string}
-                  onClick={() => setStrobeSafe(v as number)}
-                  className={btn(Math.abs(strobeSafe - (v as number)) < 0.02)}
-                >
-                  {lbl}
-                </button>
-              ))}
+              <button onClick={() => setWarpEnabled(!warpEnabled)} className={btn(warpEnabled)}>
+                warp {warpEnabled ? 'on' : 'off'}
+              </button>
+              <button onClick={() => setWarpGrid(!warpGrid)} className={btn(warpGrid)}>
+                grid
+              </button>
+              <button
+                onClick={resetWarp}
+                className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
+              >
+                reset
+              </button>
             </div>
           </Section>
+
+          <DomeSection dome={dome} setDome={setDome} setDomeSim={setDomeSim} btn={btn} view={domeView} setView={setDomeView} onResetCam={resetSimCam} onWholeDome={wholeDome} />
 
           <Section title="Fullscreen output">
             <div className="flex items-center gap-1">
@@ -714,16 +678,24 @@ export function OutputPage({
           </Section>
 
           <Section
-            title="Spout"
-            info="Spout (Windows) shares the output with another app on the SAME machine (Resolume, TouchDesigner, OBS…). Needs the bundled Spout addon."
-            defaultCollapsed={!spoutActive}
+            title="Spout / Syphon"
+            info="Shares the output with another app on this same computer (Resolume, TouchDesigner, MadMapper, OBS…) through the graphics card : no network, no delay. Spout on Windows, Syphon on macOS, both built into Palinopsia : nothing to install. Receivers list a source named Palinopsia. To another computer, use NDI."
+            defaultCollapsed={!shareActive}
           >
-            <div className="flex gap-1.5">
-              <button onClick={() => void toggleSpout()} className={`flex-1 ${btn(spoutActive)}`}>
-                Spout {spoutActive ? 'on' : 'off'}
-              </button>
-            </div>
+            {shareKind ? (
+              <div className="flex gap-1.5">
+                <button onClick={() => void toggleShare()} className={`flex-1 ${btn(shareActive)}`}>
+                  {shareKind} {shareActive ? 'on' : 'off'}
+                </button>
+              </div>
+            ) : (
+              <p className="font-mono text-[10px] leading-snug text-muted">
+                Spout and Syphon exist on Windows and macOS only. Here, share the output with NDI.
+              </p>
+            )}
           </Section>
+
+          <NdiSection btn={btn} defaultCollapsed={!ndiActive} />
 
           <Section
             title="HIVE (open network output)"
@@ -753,6 +725,42 @@ export function OutputPage({
                   className="w-16 rounded bg-panel px-1 py-0.5 text-right font-mono text-[11px] text-fg disabled:opacity-50"
                 />
               </label>
+            </div>
+          </Section>
+
+          <Section title="Flash safety" info="A safety net on the final image: it measures whole-frame brightness each frame and damps big full-field flashes (Shutter, Superimposition, Frame-Weave, datamosh, hard cuts…) so no seizure-inducing strobe reaches the screen. Normal motion is untouched. Mild is on by default and barely affects ordinary content.">
+
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={strobeSafe}
+                onChange={(e) => setStrobeSafe(Number(e.target.value))}
+                onDoubleClick={() => setStrobeSafe(0.35)}
+                className="min-w-0 flex-1 accent-accent"
+                title="Photosensitive-safety limiter : caps how fast the whole picture can flash. Applies to the preview AND the projection."
+              />
+              <span className="w-24 shrink-0 text-right font-mono text-[11px] text-muted">
+                {strobeSafe < 0.02 ? 'off' : `${Math.round(strobeSafe * 100)}%`}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                ['off', 0],
+                ['mild', 0.35],
+                ['strong', 0.7],
+                ['max', 1]
+              ].map(([lbl, v]) => (
+                <button
+                  key={lbl as string}
+                  onClick={() => setStrobeSafe(v as number)}
+                  className={btn(Math.abs(strobeSafe - (v as number)) < 0.02)}
+                >
+                  {lbl}
+                </button>
+              ))}
             </div>
           </Section>
 
@@ -964,7 +972,8 @@ function NdiSection({ btn, defaultCollapsed }: { btn: (on: boolean) => string; d
     !ndi.enabled ? 'bg-muted'
       : st.state === 'live' ? 'bg-green-500'
         : st.state === 'starting' ? 'animate-pulse bg-yellow-500'
-          : 'bg-red-500'
+          : st.state === 'no-runtime' ? 'bg-yellow-500' // an action to take, not a fault
+            : 'bg-red-500'
   const slow = ndi.enabled && st.state === 'live' && st.connections > 0 && st.fps > 0 && st.fps < ndi.fps * 0.8
   const label = (fps: number): string => (Number.isInteger(fps) ? String(fps) : fps.toFixed(2))
   return (
@@ -1000,12 +1009,7 @@ function NdiSection({ btn, defaultCollapsed }: { btn: (on: boolean) => string; d
           ▸ {st.source}
         </div>
       )}
-      {ndi.enabled && st.state === 'no-runtime' && (
-        <div className="flex flex-col gap-1 rounded border border-red-500/40 bg-red-500/10 p-1.5 font-mono text-[10px] text-red-300">
-          <span>No NDI runtime on this machine. Install the free NDI Tools (or any app that ships NDI : Resolume, TouchDesigner, vMix…), then switch NDI off and on.</span>
-          <a href={NDI_RUNTIME_URL} target="_blank" rel="noreferrer" className="underline">get NDI (ndi.video)</a>
-        </div>
-      )}
+      {ndi.enabled && st.state === 'no-runtime' && <NdiRuntimeInstall />}
       {slow && (
         <div className="font-mono text-[10px] text-yellow-400">
           Sending {st.fps} of {label(ndi.fps)} fps : lower the size or the rate, or use UYVY.
@@ -1066,6 +1070,69 @@ function NdiSection({ btn, defaultCollapsed }: { btn: (on: boolean) => string; d
         <a href="https://ndi.video" target="_blank" rel="noreferrer" className="underline">ndi.video</a>
       </div>
     </Section>
+  )
+}
+
+// A computer with no NDI at all : one click fetches NDI's official runtime
+// installer (downloaded and signature-checked in main) and opens it. Nothing to
+// switch afterwards : the sender keeps looking, and goes live on its own the
+// moment the install finishes.
+function NdiRuntimeInstall(): JSX.Element {
+  const [p, setP] = useState<NdiInstallProgress | null>(null)
+  useEffect(() => window.api.onNdiInstallProgress(setP), [])
+  const platform = window.api.platform
+  const redist = NDI_REDIST_URL[platform]
+  const mb = (n = 0): string => (n / 1048576).toFixed(1)
+  const install = (): void => {
+    setP({ phase: 'download', received: 0, total: 0 })
+    void window.api.ndiInstallRuntime().then((r) => { if (!r.ok) setP({ phase: 'error', message: r.message }) })
+  }
+  const box = 'flex flex-col gap-1.5 rounded border border-yellow-500/40 bg-yellow-500/10 p-1.5 font-mono text-[10px] leading-snug text-yellow-200'
+  const link = (href: string, label: string): JSX.Element => (
+    <a href={href} target="_blank" rel="noreferrer" className="underline">{label}</a>
+  )
+  if (!redist) {
+    return (
+      <div className={box}>
+        <span>No NDI on this computer. Install libndi from the NDI SDK for Linux : NDI starts here by itself as soon as it is found.</span>
+        {link(NDI_LINUX_SDK_URL, 'NDI SDK for Linux (ndi.video)')}
+      </div>
+    )
+  }
+  const phase = p?.phase
+  return (
+    <div className={box}>
+      {!p && (
+        <>
+          <span>No NDI on this computer yet. Palinopsia can fetch NDI's free runtime (about 10 MB, from ndi.video) and open its installer. NDI starts here by itself once it is installed.</span>
+          <button onClick={install} className="rounded border border-yellow-500/60 bg-yellow-500/15 px-2 py-1 text-[11px] text-yellow-100 hover:bg-yellow-500/25">
+            install NDI runtime
+          </button>
+        </>
+      )}
+      {phase === 'download' && (
+        <>
+          <span>downloading NDI's runtime… {p!.total ? `${mb(p!.received)} / ${mb(p!.total)} MB` : `${mb(p!.received)} MB`}</span>
+          <div className="h-1 overflow-hidden rounded bg-yellow-500/20">
+            <div className="h-full bg-yellow-400 transition-[width]" style={{ width: `${p!.total ? Math.round((100 * (p!.received ?? 0)) / p!.total) : 5}%` }} />
+          </div>
+        </>
+      )}
+      {phase === 'verify' && <span>checking the installer's signature…</span>}
+      {phase === 'open' && <span>opening NDI's installer…</span>}
+      {phase === 'waiting' && (
+        <span>Finish NDI's installer (it may ask for permission first). NDI starts here by itself as soon as it is installed.</span>
+      )}
+      {phase === 'error' && (
+        <>
+          <span className="text-red-300">{p!.message || 'the install did not go through'}</span>
+          <button onClick={install} className="rounded border border-yellow-500/60 bg-yellow-500/15 px-2 py-1 text-[11px] text-yellow-100 hover:bg-yellow-500/25">
+            try again
+          </button>
+        </>
+      )}
+      <span className="text-yellow-200/70">or {link(redist, 'download NDI yourself')} · also works : NDI Tools, or any app that ships NDI</span>
+    </div>
   )
 }
 

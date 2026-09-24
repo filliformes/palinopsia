@@ -33,6 +33,7 @@ import { hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
 import { hiveSendStart, hiveSendChunk, hiveSendStop } from './hiveSend'
 import { OutputSender } from './output'
 import { prepareNdi } from './ndi/prepare'
+import { installNdiRuntime } from './ndi/install'
 import { sanitizeNdiConfig } from '@shared/ndi'
 import { LightSender } from './light'
 import { samplePerf } from './perf'
@@ -50,7 +51,7 @@ app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport,Plat
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
 // And keep full CPU priority for a MINIMIZED operator window : it is the render
-// source for NDI / Spout / the projector stream, which must not slow down just
+// source for NDI / Spout / Syphon / the projector stream, which must not slow down just
 // because the operator minimized it mid-show.
 app.commandLine.appendSwitch('disable-renderer-backgrounding')
 // Grow the GPU program caches (in-memory + on-disk). The renderer pre-warms the
@@ -77,7 +78,7 @@ app.on('child-process-gone', (_e, details) => {
 
 // OSC out (renderer → instrument fan-out).
 const oscSender = new OscSender()
-// External video output : Spout (NDI runs in the main window's preload, see ndi/).
+// Texture sharing : Spout / Syphon (NDI runs in the main window's preload, see ndi/).
 const outputSender = new OutputSender()
 const lightSender = new LightSender()
 
@@ -648,12 +649,15 @@ app.whenReady().then(async () => {
   })
   safeOn('hiveout:chunk', (_e, key, data) => hiveSendChunk(key as boolean, data as Uint8Array))
 
-  // ---------- IPC: External output (NDI / Spout) ----------
+  // ---------- IPC: External output (NDI · Spout / Syphon) ----------
   // NDI : the sender lives in the main window's preload (frames never leave the
   // renderer); main only finds the runtime and writes the network config.
   safeHandle('ndi:prepare', (_e, cfg) => prepareNdi(sanitizeNdiConfig(cfg)))
-  safeHandle('spout:set', (_e, on) => outputSender.setSpout(on as boolean))
-  safeOn('spout:frame', (_e, w, h, pixels) =>
+  // A computer with no NDI : fetch NDI's official runtime installer and open it.
+  safeHandle('ndi:installRuntime', (e) => installNdiRuntime((e as Electron.IpcMainInvokeEvent).sender))
+  // Spout (Windows) / Syphon (macOS) : texture sharing with apps on this machine.
+  safeHandle('share:set', (_e, on) => outputSender.setShare(on as boolean))
+  safeOn('share:frame', (_e, w, h, pixels) =>
     outputSender.send(w as number, h as number, pixels as Uint8Array)
   )
 

@@ -1,0 +1,10 @@
+{
+  "name": "palinopsia-syphon",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Syphon (Metal) sender addon for Palinopsia — over Syphon/Syphon-Framework (BSD), built from source by build.sh.",
+  "gypfile": true,
+  "dependencies": {
+    "node-addon-api": "^8.3.0"
+  }
+}

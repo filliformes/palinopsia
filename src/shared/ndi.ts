@@ -92,5 +92,19 @@ export function idleNdiStatus(): NdiStatus {
   }
 }
 
-/** Where to get the official runtime when none is found on the machine. */
-export const NDI_RUNTIME_URL = 'https://ndi.video/tools/'
+/** NDI's official runtime installers (its SDK's NDILIB_REDIST_URL links) :
+ *  what the NDI section fetches on a computer with no NDI at all. */
+export const NDI_REDIST_URL: Partial<Record<string, string>> = {
+  win32: 'https://ndi.link/NDIRedistV6',
+  darwin: 'https://ndi.link/NDIRedistV6Apple'
+}
+/** Linux has no runtime installer : libndi comes with the NDI SDK for Linux. */
+export const NDI_LINUX_SDK_URL = 'https://ndi.video/for-developers/ndi-sdk/download/'
+
+/** The one-click runtime install, as it goes (main → renderer). */
+export interface NdiInstallProgress {
+  phase: 'download' | 'verify' | 'open' | 'waiting' | 'error'
+  received?: number
+  total?: number
+  message?: string
+}

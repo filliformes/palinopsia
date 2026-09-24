@@ -81,13 +81,13 @@ function compile(gl: WebGL2RenderingContext, fs: string): WebGLProgram {
   return p
 }
 
-// Readbacks in flight. Two is not enough for a 4096² domemaster (33 MB a frame) :
-// its fence regularly reports later than two 30 fps kicks (Chromium refreshes a
-// fence's status only between tasks, and more lazily still while the window
-// doesn't paint). Measured at 4096² / 30 fps : three keep every frame while the
-// window is in front, four also while it is MINIMIZED. ~134 MB of GPU buffers
-// at 4096², ~66 MB at 4K.
-const SLOTS = 4
+// Readbacks in flight. A fence can report well after the GPU is done (Chromium
+// refreshes its status only between tasks, lazier still while the window doesn't
+// paint), and on a scene that keeps the GPU busy the readback itself queues
+// behind several frames. Measured on a GPU-bound scene, 30 fps NDI : four slots
+// still skipped a third of the captures in front (NDI ~13-25 fps), six skipped
+// none (29-30). ~100 MB of readback buffers at 4K, ~200 MB at 4096².
+const SLOTS = 6
 
 export class NdiCapture {
   private progs: Record<NdiFormat, WebGLProgram>

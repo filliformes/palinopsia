@@ -4,21 +4,25 @@ copyright: Copyright © 2026 Vincent Fillion
 directories:
   output: release/${version}
   buildResources: build
-# The engine is pure WebGL2 + ISF in the renderer and OSC is pure-JS. The one
-# native addon is the Spout (DX11) sender (native/spout, vendored leadedge SDK);
-# its prebuilt .node is bundled and asarUnpack'd (a .node can't be loaded from
-# inside the asar). Rebuild it per Electron ABI: see native/spout/README.md.
+# The engine is pure WebGL2 + ISF in the renderer and OSC is pure-JS. The native
+# addons are the texture-share senders : Spout (DX11, native/spout, vendored
+# leadedge SDK) on Windows and Syphon (Metal, native/syphon, + its framework) on
+# macOS. Their prebuilt .node files are bundled and asarUnpack'd (a .node can't be
+# loaded from inside the asar). Rebuild per Electron ABI : see their READMEs.
 npmRebuild: false
 buildDependenciesFromSource: false
 files:
   - out/**/*
   - package.json
   - native/spout/build/Release/spout.node
+  - native/syphon/build/Release/syphon.node
+  - native/syphon/build/Release/Syphon.framework/**/*
   - "!**/*.map"
   - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
 asar: true
 asarUnpack:
   - native/spout/build/Release/*.node
+  - native/syphon/build/Release/**
   # ffmpeg-static ships a platform binary that must be spawned from disk (not
   # loaded from inside the asar) — unpack it so recording transcodes work.
   - node_modules/ffmpeg-static/**

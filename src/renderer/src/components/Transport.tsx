@@ -307,7 +307,7 @@ export function Transport(): JSX.Element {
         <button
           onClick={() => setOutputPageOpen(true)}
           className={`${TBTN} ${TBTN_IDLE}`}
-          title="Output & projection mapping : fullscreen output, keystone, record, NDI/Spout/HIVE (O)"
+          title="Output & projection mapping : fullscreen output, keystone, record, NDI/Spout/Syphon/HIVE (O)"
         >
           ⛶ Output
         </button>

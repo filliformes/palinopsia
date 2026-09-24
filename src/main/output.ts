@@ -1,66 +1,81 @@
-// External GPU output (brief §9) : Spout (Windows).
+// Texture sharing with other apps on the SAME computer (brief §9) : Spout on
+// Windows, Syphon on macOS. Both are built into Palinopsia (native/spout,
+// native/syphon) : nothing to install on the machine.
 //
 // NDI is separate (the sender runs in the main window's preload, see
-// src/preload/ndi.ts; main/ndi/ only finds the runtime). This module keeps the
-// Spout sender : the renderer reads back the presented
-// frame (async PBO, RGBA8 GL bottom-up) and sends it here over IPC; the vendored
-// Spout (DX11) N-API addon (native/spout) publishes it to any Spout receiver.
+// src/preload/ndi.ts; main/ndi/ only finds the runtime). Here the renderer reads
+// back the presented frame (async PBO, RGBA8 GL bottom-up) and sends it over
+// IPC; the platform's N-API addon publishes it.
 
 import { app } from 'electron'
 import { join } from 'path'
 
-// Our vendored Spout (DX11) N-API addon : native/spout/build/Release/spout.node.
-type SpoutAddon = {
+// Both addons expose the same three calls (RGBA8 bottom-up in, flipped inside).
+type ShareAddon = {
   open: (name: string) => boolean
   send: (pixels: Buffer, width: number, height: number) => void
   close: () => void
 }
 
-let spout: SpoutAddon | null = null
-const warned = new Set<string>()
-
-function warnOnce(key: string, msg: string): void {
-  if (!warned.has(key)) {
-    console.warn(msg)
-    warned.add(key)
-  }
+/** 'Spout' on Windows, 'Syphon' on macOS, null elsewhere. */
+export function shareKind(): 'Spout' | 'Syphon' | null {
+  return process.platform === 'win32' ? 'Spout' : process.platform === 'darwin' ? 'Syphon' : null
 }
 
-function ensureSpout(): SpoutAddon | null {
-  if (spout) return spout
+let mod: ShareAddon | null = null
+let loadError = ''
+
+/** Load the platform's addon once (dlopen bypasses the bundler). In dev
+ *  getAppPath() is the project root; packaged builds unpack it (asarUnpack). */
+function loadAddon(): ShareAddon | null {
+  if (mod) return mod
+  const kind = shareKind()?.toLowerCase()
+  if (!kind) { loadError = 'not available on this platform'; return null }
   try {
-    // Load the native .node directly (dlopen bypasses the bundler). In dev
-    // getAppPath() is the project root; packaged builds unpack it (asarUnpack).
     const base = app.getAppPath().replace(/app\.asar$/, 'app.asar.unpacked')
-    const addonPath = join(base, 'native', 'spout', 'build', 'Release', 'spout.node')
-    const m = { exports: {} as SpoutAddon }
-    process.dlopen(m as unknown as NodeModule, addonPath)
-    if (!m.exports.open('Palinopsia')) throw new Error('open failed (no DirectX11?)')
-    spout = m.exports
-    return spout
+    const m = { exports: {} as ShareAddon }
+    process.dlopen(m as unknown as NodeModule, join(base, 'native', kind, 'build', 'Release', `${kind}.node`))
+    mod = m.exports
+    return mod
   } catch (e) {
-    warnOnce('spout', `[output] Spout unavailable : ${(e as Error).message}. Rebuild native/spout for your Electron.`)
+    loadError = (e as Error).message
+    console.warn(`[output] ${shareKind()} unavailable : ${loadError}`)
     return null
   }
 }
 
 export class OutputSender {
-  private spoutOn = false
+  private open = false
 
-  async setSpout(on: boolean): Promise<boolean> {
-    this.spoutOn = on
-    return on ? ensureSpout() !== null : true
+  /** On : create the sender (receivers now list "Palinopsia"). Off : release it
+   *  (the source leaves their lists). Resolves false when it can't run here. */
+  async setShare(on: boolean): Promise<boolean> {
+    if (!on) {
+      if (this.open) mod?.close()
+      this.open = false
+      return true
+    }
+    if (this.open) return true
+    const m = loadAddon()
+    if (!m) return false
+    try {
+      this.open = m.open('Palinopsia')
+    } catch (e) {
+      console.warn(`[output] ${shareKind()} open failed : ${(e as Error).message}`)
+      this.open = false
+    }
+    return this.open
   }
 
-  /** Push a presented RGBA8 frame (from the renderer readback) to Spout. */
+  /** Push a presented RGBA8 frame (from the renderer readback). */
   send(width: number, height: number, pixels: Uint8Array): void {
-    if (this.spoutOn && spout) {
-      spout.send(Buffer.from(pixels.buffer, pixels.byteOffset, pixels.byteLength), width, height)
+    if (this.open && mod) {
+      mod.send(Buffer.from(pixels.buffer, pixels.byteOffset, pixels.byteLength), width, height)
     }
   }
 
   dispose(): void {
-    spout?.close()
-    spout = null
+    if (this.open) mod?.close()
+    this.open = false
   }
 }

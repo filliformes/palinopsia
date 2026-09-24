@@ -1149,8 +1149,8 @@ interface StoreState {
   setNdiStatus: (s: NdiStatus) => void
   ndiActive: boolean
   // Spout (Windows, native addon). Transient.
-  spoutActive: boolean
-  setSpoutActive: (on: boolean) => void
+  shareActive: boolean
+  setShareActive: (on: boolean) => void
   // Light output (ArtNet/DMX · WLED). Machine-local (venue-specific), persisted.
   lights: LightConfig
   setLights: (partial: Partial<LightConfig>) => void
@@ -2914,8 +2914,8 @@ export const useStore = create<StoreState>((set, get) => ({
   ndiStatus: idleNdiStatus(),
   setNdiStatus: (ndiStatus) => set({ ndiStatus }),
   ndiActive: loadNdi().enabled,
-  spoutActive: false,
-  setSpoutActive: (on) => set({ spoutActive: on }),
+  shareActive: false,
+  setShareActive: (on) => set({ shareActive: on }),
   lights: (() => {
     const def: LightConfig = {
       enabled: false, protocol: 'artnet', host: '', cols: 8, rows: 1, order: 'rgb',

@@ -135,13 +135,21 @@ const api: ExposedApi = {
     return () => ipcRenderer.off('hive:forceKey', h)
   },
 
-  // ── External output (NDI / Spout) ────────────────────────────────
+  // ── External output (NDI · Spout / Syphon) ────────────────────────
   // NDI : the sender runs HERE (src/preload/ndi.ts); frames arrive over a
   // private MessageChannel (transferred), not through this bridge (it copies).
   ndiConfigure: (cfg: import('@shared/ndi').NdiConfig) => ndiConfigure(cfg),
   onNdiStatus: (cb: (s: import('@shared/ndi').NdiStatus) => void) => ndiOnStatus(cb),
-  spoutSet: (on: boolean) => ipcRenderer.invoke('spout:set', on),
-  spoutFrame: (w: number, h: number, pixels: Uint8Array) => ipcRenderer.send('spout:frame', w, h, pixels),
+  ndiInstallRuntime: () => ipcRenderer.invoke('ndi:installRuntime'),
+  onNdiInstallProgress: (cb: (p: import('@shared/ndi').NdiInstallProgress) => void) => {
+    const h = (_e: Electron.IpcRendererEvent, p: import('@shared/ndi').NdiInstallProgress): void => cb(p)
+    ipcRenderer.on('ndi:install-progress', h)
+    return () => ipcRenderer.off('ndi:install-progress', h)
+  },
+  // 'win32' | 'darwin' | 'linux' : picks Spout or Syphon, and the NDI installer.
+  platform: process.platform as string,
+  shareSet: (on: boolean) => ipcRenderer.invoke('share:set', on),
+  shareFrame: (w: number, h: number, pixels: Uint8Array) => ipcRenderer.send('share:frame', w, h, pixels),
 
   // ── Light output (ArtNet/DMX · WLED) ─────────────────────────────
   lightConfig: (cfg: unknown) => ipcRenderer.send('light:config', cfg),

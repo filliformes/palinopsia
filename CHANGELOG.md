@@ -41,6 +41,12 @@ that CI builds into cross-platform releases.
   extra IPs and groups for venue networks, private to Palinopsia and applied live;
   receiver status, sent rate, ON AIR / PREVIEW tally. `npm run ndi:bundle` ships
   an installed official runtime inside the next build.
+- **NDI on a computer with no NDI** : one click installs NDI's official runtime
+  (downloaded from NDI over HTTPS, signature checked, NDI's own installer opened),
+  and the NDI source goes live by itself when the install finishes.
+- **Syphon output (macOS)**, the twin of Spout : a built-in Syphon (Metal) server
+  named Palinopsia, for Resolume, MadMapper, TouchDesigner, VDMX, OBS on the same
+  Mac. Built from the Syphon framework's source in CI.
 
 ### Fixed
 
@@ -51,10 +57,17 @@ that CI builds into cross-platform releases.
 - **Minimizing the window no longer stalls the show.** A minimized window gets
   (almost) no animation frames from Chromium, so the render loop, and with it the
   projector stream, Spout, Sonify and OSC out, dropped to about one frame a
-  second. The loop now notices and runs on a timer until the window paints again.
+  second. The loop now notices and runs on a timer until the window paints again,
+  and that timer waits for the GPU to finish each frame : without rAF's pacing, a
+  heavy scene let the loop run seconds ahead of the GPU, and NDI starved behind
+  the queue (measured : 0 to 1 fps, now it follows the render rate).
 
 ### Changed
 
+- **Output page order**, top to bottom : Composition size, Render scale, Mapping,
+  Fulldome, Fullscreen output, Record, Spout / Syphon, NDI, HIVE, Flash safety,
+  Lights, Installation mode. The Spout section is now **Spout / Syphon** and shows
+  the one this computer uses.
 - The **window title** now carries the release version, like dataFLOU_compositor:
   `Palinopsia v1.1.0` on the main window, `Palinopsia v1.1.0 : Output` on the output
   window. Read from `package.json` at launch, so every tagged build titles itself.

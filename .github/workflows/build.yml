@@ -3,11 +3,11 @@ name: build
 # Builds Windows (NSIS + portable), macOS (DMG, per-arch), and Linux (AppImage +
 # deb) artifacts on a tag push, then drafts a GitHub Release with all of them.
 #
-# macOS is built twice — macos-latest (Apple Silicon → arm64) and macos-13 (Intel
-# → x64) — so ffmpeg-static bundles the matching native binary in each dmg. The
-# Windows Spout addon (native/spout) is a DX11 native module whose prebuilt .node
-# is git-ignored, so it is rebuilt against the packaged Electron ABI before
-# electron-builder runs; mac/linux skip it (Spout is Windows-only and guarded).
+# macOS is built on macos-latest (Apple Silicon, arm64) only. The texture-share
+# addons are native modules whose prebuilt .node files are git-ignored, so they
+# are rebuilt against the packaged Electron ABI before electron-builder runs :
+# Spout (native/spout, DX11) on Windows, Syphon (native/syphon, Metal, plus the
+# Syphon framework built from source) on macOS. Linux has neither.
 
 on:
   push:
@@ -63,6 +63,13 @@ jobs:
             --target=$(node -p "require('electron/package.json').version") \
             --dist-url=https://electronjs.org/headers \
             --arch=x64
+      - name: Build Syphon addon (macOS only)
+        if: matrix.platform == 'mac'
+        # A Syphon build problem must never block a release : the app then just
+        # reports Syphon unavailable (see native/syphon/README.md).
+        continue-on-error: true
+        shell: bash
+        run: sh native/syphon/build.sh
       - run: npm run typecheck
       - run: npm run ${{ matrix.script }}
       - uses: actions/upload-artifact@v4

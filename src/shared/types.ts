@@ -1091,8 +1091,12 @@ export interface ExposedApi {
   // (Frames reach the preload over a private MessageChannel, not this API.)
   ndiConfigure: (cfg: import('./ndi').NdiConfig) => Promise<import('./ndi').NdiStatus>
   onNdiStatus: (cb: (s: import('./ndi').NdiStatus) => void) => () => void
-  spoutSet: (on: boolean) => Promise<boolean>
-  spoutFrame: (w: number, h: number, pixels: Uint8Array) => void
+  // No NDI on this computer : download + verify + open NDI's official installer.
+  ndiInstallRuntime: () => Promise<{ ok: boolean; message: string }>
+  onNdiInstallProgress: (cb: (p: import('./ndi').NdiInstallProgress) => void) => () => void
+  platform: string
+  shareSet: (on: boolean) => Promise<boolean>
+  shareFrame: (w: number, h: number, pixels: Uint8Array) => void
   // Light output (ArtNet/DMX · WLED) : push config, then zone frames.
   lightConfig: (cfg: LightConfig) => void
   lightFrame: (cols: number, rows: number, pixels: Uint8Array) => void

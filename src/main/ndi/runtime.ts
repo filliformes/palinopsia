@@ -11,6 +11,7 @@
 
 import { existsSync, readdirSync } from 'fs'
 import { join } from 'path'
+import { execFileSync } from 'child_process'
 
 export interface NdiCandidate {
   path: string
@@ -21,6 +22,27 @@ function libName(): string[] {
   if (process.platform === 'win32') return [process.arch === 'arm64' ? 'Processing.NDI.Lib.arm64.dll' : 'Processing.NDI.Lib.x64.dll']
   if (process.platform === 'darwin') return ['libndi.dylib', 'libndi_advanced.dylib']
   return ['libndi.so.6', 'libndi.so.5', 'libndi.so']
+}
+
+/** The machine-wide environment as the registry holds it NOW (Windows), keys
+ *  upper-cased. The NDI installer sets NDI_RUNTIME_DIR_V6 there, but a process
+ *  started before the install (Palinopsia, when the user installs NDI from
+ *  inside it) never sees it in process.env. One `reg query` (~30 ms). */
+function machineEnv(): Record<string, string> {
+  const env: Record<string, string> = {}
+  if (process.platform !== 'win32') return env
+  try {
+    const out = execFileSync('reg', ['query', 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment'], {
+      encoding: 'utf8', timeout: 3000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore']
+    })
+    for (const line of out.split(/\r?\n/)) {
+      const m = line.match(/^\s+(\S+)\s+REG_(?:EXPAND_)?SZ\s+(.+)$/)
+      if (m) env[m[1].toUpperCase()] = m[2].trim().replace(/%([^%]+)%/g, (_x, k: string) => process.env[k] ?? `%${k}%`)
+    }
+  } catch {
+    /* no reg.exe : fall back to process.env alone */
+  }
+  return env
 }
 
 /** `bundledDir` : resources/ndi (packaged) or <project>/resources/ndi/<os> (dev). */
@@ -38,8 +60,10 @@ export function ndiCandidates(bundledDirs: string[]): NdiCandidate[] {
     }
   }
   for (const d of bundledDirs) add(d, 'bundled')
-  for (const v of ['NDI_RUNTIME_DIR_V6', 'NDI_RUNTIME_DIR_V5', 'NDI_RUNTIME_DIR_V4']) {
-    const d = process.env[v]
+  const vars = ['NDI_RUNTIME_DIR_V6', 'NDI_RUNTIME_DIR_V5', 'NDI_RUNTIME_DIR_V4']
+  const machine = vars.every((v) => process.env[v]) ? {} : machineEnv()
+  for (const v of vars) {
+    const d = process.env[v] ?? machine[v]
     if (d) add(d, `NDI runtime (${v.slice(-2)})`)
   }
   if (process.platform === 'win32') {

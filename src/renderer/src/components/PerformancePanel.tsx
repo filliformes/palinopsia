@@ -91,7 +91,7 @@ export function PerformancePanel(): JSX.Element {
   const lights = useStore((s) => s.lights)
   const body = useStore((s) => s.bodyControl)
   const ndi = useStore((s) => s.ndiActive)
-  const spout = useStore((s) => s.spoutActive)
+  const spout = useStore((s) => s.shareActive)
   const hiveOut = useStore((s) => s.hiveOutActive)
   const sonify = useStore((s) => s.sonify)
   const audioEnabled = useStore((s) => s.audioEnabled)
@@ -210,7 +210,7 @@ export function PerformancePanel(): JSX.Element {
             {chip(depthMode !== 'off', 'depth', 'The Depth engine is on (estimate = the monocular model runs ~11 Hz ; feeds anaglyph / parallax / depth-shadow).')}
             {chip(surfaceActive, 'metasurface', 'The Metasurface is active : it renders a live blend of the placed scenes at the cursor, multiplying render cost by the blended count.')}
             {chip(ndi, 'NDI', 'NDI output is on : the full frame is read back and sent over the network each frame.')}
-            {chip(spout, 'Spout', 'Spout output is on : the frame is shared to other Windows apps (zero-copy) each frame.')}
+            {chip(spout, window.api.platform === 'darwin' ? 'Syphon' : 'Spout', 'Texture sharing is on : the frame is shared with other apps on this computer each frame.')}
             {chip(hiveOut, 'HIVE out', 'HIVE output is on : the frame is HEVC-encoded and fanned out over TCP.')}
             {chip(lights.enabled, 'lights', 'Light output (ArtNet/DMX · WLED) is on : the image is reduced to a zone grid and sent over UDP.')}
             {chip(sonify.on, `Sonify ${soniVoices}v`, 'The Sonify sound engine (image → sound) is on. The number is how many voices are active.')}

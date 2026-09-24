@@ -104,6 +104,10 @@ NDI needs no build step : the sender calls the NDI runtime through an FFI (`koff
 `npm run ndi:bundle` copies an installed official NDI runtime into `resources/ndi/` so
 the next build ships it (see [NDI](#ndi)).
 
+The Syphon addon (`native/syphon/`, macOS) is built by `sh native/syphon/build.sh`
+(needs Xcode : it builds the Syphon framework from source, then the addon); CI does it
+on the macOS job.
+
 The native Spout addon (`native/spout/`) is optional and Windows-only; it's
 rebuilt against the Electron ABI and loaded at runtime : the app runs fine
 without it (the Spout toggle simply reports unavailable). Video ingest and
@@ -618,8 +622,11 @@ A full-page takeover (the engine keeps rendering underneath):
   ffmpeg) + record / stop + screenshot → `Recorded/`. **The take keeps rolling
   when you leave the page** : a pulsing REC pill in the top bar shows the
   elapsed time and stops/saves it, so you can tweak parameters live mid-take.
-- **Send** : **NDI** (built in, see [NDI](#ndi) below), **Spout** (Windows, optional
-  native sender) and **HIVE** HEVC-over-TCP network output + port.
+- **Spout / Syphon** : share the output with another app on the same computer
+  (Resolume, TouchDesigner, MadMapper, OBS…) through the graphics card. Spout on
+  Windows, Syphon on macOS, both built in : nothing to install.
+- **Send** : **NDI** (built in, see [NDI](#ndi) below) and **HIVE** HEVC-over-TCP
+  network output + port.
 - **Light output** : push the picture's colour **into the room**. The composite is
   averaged into a small zone grid and sent over **ArtNet / DMX** (to fixtures or a
   console) and to **WLED** LED strips, so stage lighting breathes with the visuals.
@@ -711,13 +718,18 @@ Output page; it stays on across restarts.
   program or preview; a warning appears when the rate falls behind.
 - **The NDI runtime** : Palinopsia uses its own bundled copy when the build has one, else
   the machine's NDI (NDI Tools / Runtime / SDK), else the copy another creative app
-  carries (TouchDesigner, Resolume, vMix…). The section names the one in use, or links
-  to [ndi.video](https://ndi.video/tools/) when there is none. To ship it inside a build,
-  install the NDI SDK or NDI Tools and run `npm run ndi:bundle` before building (see
-  `resources/ndi/README.md`).
+  carries (TouchDesigner, Resolume, vMix…). The section names the one in use.
+- **A computer with no NDI at all** : the section offers **install NDI runtime**. One click
+  downloads NDI's official runtime installer (about 10 MB on Windows, 5 MB on macOS,
+  the link NDI's own SDK gives applications), checks it came from NDI over HTTPS with a
+  valid signature, and opens it. You go through NDI's installer (and its licence);
+  Palinopsia keeps looking meanwhile and goes live **by itself** as soon as the install
+  finishes, no restart. On Linux (no installer exists) it points to the NDI SDK.
+- To ship the runtime inside a build instead, install the NDI SDK or NDI Tools and run
+  `npm run ndi:bundle` before building (see `resources/ndi/README.md`).
 
 How it is fast enough : the GPU converts the frame to UYVY and reads it back
-asynchronously (a ring of four buffers; a capture is skipped rather than ever waiting on
+asynchronously (a ring of six buffers; a capture is skipped rather than ever waiting on
 the GPU), the frame is **transferred** (not copied) to the sender in the window's own
 preload, and NDI reads it in place with its asynchronous send. Moving a 4K frame to any
 other process costs 30–90 ms in Electron, which is why the sender is not a separate process.

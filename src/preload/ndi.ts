@@ -70,6 +70,10 @@ let lastW = 0
 let lastH = 0
 let listener: ((s: NdiStatus) => void) | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
+// No runtime yet : look again every few seconds, so installing NDI (from the
+// NDI section's button, or by hand) brings the source live with no restart.
+let lastCfg: NdiConfig | null = null
+let retryTimer: ReturnType<typeof setTimeout> | null = null
 
 const status: NdiStatus = {
   state: 'off', message: '', source: '', runtime: '', version: '',
@@ -260,8 +264,11 @@ window.addEventListener('beforeunload', () => {
 
 let busy: Promise<NdiStatus> = Promise.resolve({ ...status })
 
-/** Apply a config : on/off, name, groups, network. Serialized. */
-export function ndiConfigure(cfg: NdiConfig): Promise<NdiStatus> {
+/** Apply a config : on/off, name, groups, network. Serialized. `quiet` : a
+ *  background retry, which must not flash "starting" every few seconds. */
+export function ndiConfigure(cfg: NdiConfig, quiet = false): Promise<NdiStatus> {
+  lastCfg = cfg
+  if (retryTimer) { clearTimeout(retryTimer); retryTimer = null }
   busy = busy.then(async () => {
     try {
       if (!cfg.enabled) {
@@ -277,15 +284,23 @@ export function ndiConfigure(cfg: NdiConfig): Promise<NdiStatus> {
       // A config that changes nothing NDI cares about (the rate, the size, a
       // repeated call) must not touch a live sender : receivers would blink.
       if (needSender) {
-        status.state = 'starting'
-        emit()
+        if (!quiet) {
+          status.state = 'starting'
+          emit()
+        }
         if (needInit) {
           destroySender()
           const prep = (await ipcRenderer.invoke('ndi:prepare', cfg)) as {
             candidates: Array<{ path: string; origin: string }>
             configDir: string | null
           }
-          if (!initLib(prep.candidates, prep.configDir)) { emit(); return { ...status } }
+          if (!initLib(prep.candidates, prep.configDir)) {
+            if (status.state === 'no-runtime') {
+              retryTimer = setTimeout(() => { if (lastCfg?.enabled) void ndiConfigure(lastCfg, true) }, 3000)
+            }
+            emit()
+            return { ...status }
+          }
           netKey = nk
         }
         cfgName = cfg.name

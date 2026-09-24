@@ -1593,6 +1593,24 @@ export class Compositor {
   ndiRecycle(buf: ArrayBuffer): void {
     this.ndiCap?.recycle(buf);
   }
+  /** Pacing for the render loop's TIMER clock (the window isn't painting, so
+   *  no rAF). rAF waits for the GPU; a timer doesn't, and on a scene that fills
+   *  the GPU the loop then queued frames seconds ahead of it : every readback
+   *  (NDI, Spout, the projector stream) waited behind that queue, and NDI fell to
+   *  ~1 fps (measured). So each timer frame ends by waiting for the GPU to finish
+   *  it, through a 1-pixel synchronous read (it can't return before the GPU has
+   *  run everything queued ahead of it). Not gl.finish() : Chromium makes it a
+   *  mere flush, and the queue still ran away (measured). Not a fence either :
+   *  while the window doesn't paint, Chromium reports fences hundreds of ms late,
+   *  and pacing on one held the loop at 3 fps on an idle GPU (measured). The wait
+   *  blocks nothing anyone can see (nothing is painting). */
+  finishFrame(): void {
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, this.syncPx);
+  }
+  private syncPx = new Uint8Array(4);
+
   /** NDI off : release the conversion target and the readback buffers. */
   ndiRelease(): void {
     this.ndiCap?.dispose();
