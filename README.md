@@ -671,15 +671,19 @@ stills. Keystone warp is off in dome mode (a dome is mapped by its own media ser
   red, burned into the master for projector alignment.
 - **3D dome simulator** (the in-app port of the TouchDesigner *FulldomeSimulator*) : the
   live master wrapped back onto a dome. **inside** puts you in the seat (drag to look
-  around, wheel = field of view); **outside** is a cutaway orbit (the near shell hidden so
+  around; wheel out widens the lens, then keeps going by **backing off** away from the
+  centre, the wall it passes through hidden, until the whole inside is in view; wheel in
+  comes back); **whole dome** jumps straight to the entire inside at once, seen from
+  below the opening; **outside** is a cutaway orbit (the near shell hidden so
   the far half reads the right way round). **tilt** (for tilted planetariums; the
   Satosphère is level), an alignment **template** at low opacity, and the **sweet spot**
   patch (width, low / high elevation, off by default) where an audience facing front
   naturally looks. It reads a small copy of the master straight from the engine, so
   the Output page keeps full frame rate even with a 4K master.
   **master** shows the flat domemaster instead. Double-click the view to reset the camera.
-- The dome settings live on the machine (the venue) **and** travel with the session (the
-  piece).
+- The dome mapping lives on the machine (the venue) **and** travels with the session (the
+  piece). The dome itself always starts **off** (a restart or a session load never switches
+  it on) and its section starts collapsed.
 
 **If the GPU driver resets** (a Windows TDR : heavy sessions across two displays
 can provoke one), the picture no longer dies for good: both the main window and

@@ -43,6 +43,12 @@ export function OutputPage({
   // dome and above, looking at the front half's inner surface (the cutaway).
   const resetSimCam = (view: 'inside' | 'outside' = dome.sim.view): void => {
     Object.assign(simCam.current, view === 'inside' ? { yaw: 0, pitch: 0.45 } : { yaw: Math.PI, pitch: 0.35, dist: 2.6 })
+    if (view === 'inside') setDomeSim({ back: 0, fov: 100 })
+  }
+  // The whole inside at once : backed off below the dome's opening, looking up.
+  const wholeDome = (): void => {
+    Object.assign(simCam.current, { yaw: 0, pitch: 1.25 })
+    setDomeSim({ view: 'inside', back: 1.7, fov: 78 })
   }
 
   const warpEnabled = useStore((s) => s.warpEnabled)
@@ -352,11 +358,20 @@ export function OutputPage({
                 }}
                 onPointerUp={() => { simDrag.current = null }}
                 onWheel={(e) => {
-                  if (dome.sim.view === 'inside') setDomeSim({ fov: Math.max(30, Math.min(150, dome.sim.fov + Math.sign(e.deltaY) * 4)) })
+                  if (dome.sim.view === 'inside') {
+                    // Zoom out : widen the lens to 120°, then keep going by backing
+                    // the camera away. Zoom in retraces : come forward, then narrow.
+                    const s = dome.sim
+                    if (e.deltaY > 0) {
+                      if (s.fov < 120) setDomeSim({ fov: Math.min(120, s.fov + 4) })
+                      else setDomeSim({ back: Math.min(3, Math.round((s.back + 0.1) * 100) / 100) })
+                    } else if (s.back > 0) setDomeSim({ back: Math.max(0, Math.round((s.back - 0.1) * 100) / 100) })
+                    else setDomeSim({ fov: Math.max(30, s.fov - 4) })
+                  }
                   else simCam.current.dist = Math.max(1.2, Math.min(8, simCam.current.dist * (e.deltaY > 0 ? 1.08 : 0.93)))
                 }}
                 onDoubleClick={() => resetSimCam()}
-                title={dome.sim.view === 'inside' ? 'Drag to look around · wheel = field of view · double-click resets' : 'Drag to orbit · wheel = distance · double-click resets'}
+                title={dome.sim.view === 'inside' ? 'Drag to look around · wheel out widens, then backs away (wheel in comes back) · double-click resets to the seat' : 'Drag to orbit · wheel = distance · double-click resets'}
               >
                 <DomeSim cfg={dome} cam={simCam} />
                 <div className="pointer-events-none absolute left-2 top-2 rounded bg-black/55 px-2 py-1 font-mono text-[10px] text-muted">
@@ -439,7 +454,7 @@ export function OutputPage({
           style={{ width: inspW }}
           className="flex shrink-0 flex-col gap-2 overflow-y-auto overflow-x-hidden border-l border-border bg-panel p-2"
         >
-          <DomeSection dome={dome} setDome={setDome} setDomeSim={setDomeSim} btn={btn} view={domeView} setView={setDomeView} onResetCam={resetSimCam} />
+          <DomeSection dome={dome} setDome={setDome} setDomeSim={setDomeSim} btn={btn} view={domeView} setView={setDomeView} onResetCam={resetSimCam} onWholeDome={wholeDome} />
 
           <Section title="Mapping" info="Drag the corners over the live preview to keystone the image onto a projector. Turn grid on to align, off for the show. (Off in dome mode : a domemaster is mapped by the dome's own server.)">
 
@@ -949,7 +964,7 @@ function DomeSlider({ label, value, min, max, step, onChange, reset, unit = '', 
 // Fulldome : master on/off + resolution + aperture, the mapping mode and its
 // controls, and the simulator's view. Port of the TD FulldomeSimulator's
 // DomeConfig page, plus the mapping it never had.
-function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam }: {
+function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam, onWholeDome }: {
   dome: DomeConfig
   setDome: (p: Partial<DomeConfig>) => void
   setDomeSim: (p: Partial<DomeConfig['sim']>) => void
@@ -957,6 +972,7 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
   view: '3d' | 'master'
   setView: (v: '3d' | 'master') => void
   onResetCam: (view: 'inside' | 'outside') => void
+  onWholeDome: () => void
 }): JSX.Element {
   const MODES: Array<[DomeMode, string, string]> = [
     ['fisheye', 'full dome', 'The whole Palinopsia frame over the whole dome : its centre at the zenith, its edges all around the rim. Fill uses every pixel and leaves no black inside the dome.'],
@@ -966,6 +982,7 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
   return (
     <Section
       title="Fulldome"
+      defaultCollapsed
       info="Renders a square domemaster (equidistant fisheye, front at the bottom, the fulldome standard) from the flat composition. The master replaces the frame everywhere : the preview, the projector window, NDI, Spout, recording and stills. The SAT Satosphère takes 210°, 4096×4096 max, live over NDI. 8K is for stills (video encoders stop at 4K)."
     >
       <div className="flex flex-wrap items-center gap-1.5">
@@ -1040,6 +1057,7 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
           <>
             <button onClick={() => { setDomeSim({ view: 'inside' }); onResetCam('inside') }} className={btn(dome.sim.view === 'inside')} title="From the centre of the room, looking around">inside</button>
             <button onClick={() => { setDomeSim({ view: 'outside' }); onResetCam('outside') }} className={btn(dome.sim.view === 'outside')} title="Orbit the dome from outside">outside</button>
+            <button onClick={onWholeDome} className={btn(dome.sim.view === 'inside' && dome.sim.back > 1.5)} title="See the whole inside at once : the camera backs off below the dome's opening and looks up">whole dome</button>
           </>
         )}
       </div>
@@ -1047,7 +1065,10 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
         <>
           <DomeSlider label="tilt" value={dome.sim.tilt} min={-30} max={30} step={1} unit="°" reset={0} onChange={(v) => setDomeSim({ tilt: v })} title="Dome tilt (the TD simulator's default is −15° for a tilted planetarium; the Satosphère is level)" />
           {dome.sim.view === 'inside' && (
-            <DomeSlider label="camera" value={dome.sim.fov} min={30} max={150} step={1} unit="°" reset={100} onChange={(v) => setDomeSim({ fov: v })} title="Camera field of view" />
+            <>
+              <DomeSlider label="camera" value={dome.sim.fov} min={30} max={150} step={1} unit="°" reset={100} onChange={(v) => setDomeSim({ fov: v })} title="Camera field of view" />
+              <DomeSlider label="back off" value={dome.sim.back} min={0} max={3} step={0.05} reset={0} onChange={(v) => setDomeSim({ back: v })} title="Back the camera away from the seat (0) until the whole inside of the dome is in view : the wall it passes through is hidden" />
+            </>
           )}
           <DomeSlider label="template" value={dome.sim.template} min={0} max={1} step={0.01} reset={0.19} onChange={(v) => setDomeSim({ template: v })} title="Alignment template over the dome (preview only)" />
           <div className="flex items-center gap-1.5">

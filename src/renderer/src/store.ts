@@ -223,7 +223,8 @@ function loadResolume(): ResolumeMap {
 function loadDome(): DomeConfig {
   try {
     const raw = localStorage.getItem('opsia.dome')
-    if (raw) return sanitizeDome(JSON.parse(raw))
+    // The mapping is remembered; the dome itself always starts OFF.
+    if (raw) return { ...sanitizeDome(JSON.parse(raw)), enabled: false }
   } catch {
     /* fresh defaults */
   }
@@ -3835,7 +3836,8 @@ export const useStore = create<StoreState>((set, get) => ({
     }
     // A piece made for the dome brings its dome mapping back; older sessions
     // keep whatever the machine had.
-    if (s.dome && typeof s.dome === 'object') set({ dome: persistDome(sanitizeDome(s.dome)) })
+    if (s.dome && typeof s.dome === 'object')
+      set({ dome: persistDome({ ...sanitizeDome(s.dome), enabled: get().dome.enabled }) }) // on/off stays yours
     // The session's sound patch (post-set so setSonify's engine push sees it).
     if (s.sonify) {
       const curSoni = get().sonify

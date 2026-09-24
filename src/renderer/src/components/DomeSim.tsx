@@ -238,15 +238,22 @@ export function DomeSim({ cfg, cam, flat = false }: {
       // Outside : a CUTAWAY. Seen from outside, the dome's outer shell winds
       // clockwise (back-facing); culling it leaves the far half's INNER surface,
       // so the content reads the right way round instead of mirrored through the shell.
-      if (inside) gl.disable(gl.CULL_FACE)
-      else { gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK) }
+      // Inside, the inner surface faces the camera, so culling changes nothing at
+      // the seat; once the camera BACKS OFF through the wall, the wall between
+      // it and the dome is culled too and the whole inside stays in view.
+      gl.enable(gl.CULL_FACE)
+      gl.cullFace(gl.BACK)
       const fov = ((inside ? cm.fov : 50) * Math.PI) / 180
       const P = persp(fov, W / H, 0.01, 50)
       const cy = Math.cos(cm.pitch), sy = Math.sin(cm.pitch)
       let V: M4
       if (inside) {
+        // Look direction from yaw / pitch; `back` slides the eye backwards along it,
+        // so backing off turns the seat into an orbit that keeps the centre framed.
         const d = [cy * Math.sin(cm.yaw), sy, -cy * Math.cos(cm.yaw)]
-        V = lookAt([0, 0, 0], d, [0, 1, 0])
+        const b = c.sim.back
+        const e = [-d[0] * b, -d[1] * b, -d[2] * b]
+        V = lookAt(e, [e[0] + d[0], e[1] + d[1], e[2] + d[2]], [0, 1, 0])
       } else {
         const e = [cm.dist * cy * Math.sin(cm.yaw), cm.dist * sy, -cm.dist * cy * Math.cos(cm.yaw)]
         V = lookAt(e, [0, 0.25, 0], [0, 1, 0])

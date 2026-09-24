@@ -55,6 +55,7 @@ export interface DomeConfig {
   sim: {
     tilt: number // dome tilt in degrees (TD default −15 for a tilted planetarium; Satosphère is level)
     fov: number // camera field of view, degrees
+    back: number // inside view : how far the camera backs away from the centre (0 = the seat, up to 3 radii)
     template: number // alignment-template opacity over the dome (TD default ≈ 0.19)
     sweet: boolean // show the sweet-spot patch
     sweetW: number // sweet spot width, degrees of azimuth
@@ -91,7 +92,7 @@ export function defaultDomeConfig(): DomeConfig {
     scale: 1,
     offsetX: 0,
     offsetY: 0,
-    sim: { tilt: 0, fov: 100, template: 0.19, sweet: false, sweetW: 90, sweetLo: 10, sweetHi: 55, view: 'inside' }
+    sim: { tilt: 0, fov: 100, back: 0, template: 0.19, sweet: false, sweetW: 90, sweetLo: 10, sweetHi: 55, view: 'inside' }
   }
 }
 
@@ -129,6 +130,7 @@ export function sanitizeDome(raw: unknown): DomeConfig {
     sim: {
       tilt: num(sim.tilt, d.sim.tilt, -30, 30),
       fov: num(sim.fov, d.sim.fov, 30, 150),
+      back: num(sim.back, d.sim.back, 0, 3),
       template: num(sim.template, d.sim.template, 0, 1),
       sweet: sim.sweet === undefined ? d.sim.sweet : !!sim.sweet,
       sweetW: num(sim.sweetW, d.sim.sweetW, 10, 360),
