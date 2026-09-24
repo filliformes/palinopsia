@@ -11,7 +11,8 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['W', 'World editor'],
       ['Q', 'Sequence (macro-form)'],
       ['S', 'Sonify (image → sound)'],
-      ['B', 'Body (embodied control)']
+      ['B', 'Body (embodied control)'],
+      ['K', 'Resolume OSC mapper']
     ]
   },
   {

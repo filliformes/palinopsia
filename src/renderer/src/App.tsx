@@ -53,6 +53,8 @@ import { SonifyPage } from './components/SonifyPage'
 import { WorldPage } from './components/WorldPage'
 import { SequencePage } from './components/SequencePage'
 import { BodyPage } from './components/BodyPage'
+import { ResolumePage } from './components/ResolumePage'
+import { applyResolume } from './resolume'
 import { bodyTracker } from './engine/bodyTracker'
 import { bodyBus } from './engine/bodyIn'
 import { perfMeter } from './engine/perfMeter'
@@ -290,6 +292,12 @@ export default function App(): JSX.Element {
       unsubWs()
     }
   }, [])
+  // Resolume mapper : its send loop runs whether or not the page is open.
+  const resoEnabled = useStore((s) => s.resolume.enabled)
+  const resoRate = useStore((s) => s.resolume.rateHz)
+  useEffect(() => {
+    applyResolume()
+  }, [resoEnabled, resoRate])
 
   // ── MIDI output : start/stop the clock as the output device or clock toggle
   //    changes (BPM is read live by the scheduler). Halt on teardown. ───────
@@ -343,6 +351,7 @@ export default function App(): JSX.Element {
   const worldPageOpen = useStore((s) => s.worldPageOpen)
   const sequencePageOpen = useStore((s) => s.sequencePageOpen)
   const bodyPageOpen = useStore((s) => s.bodyPageOpen)
+  const resolumePageOpen = useStore((s) => s.resolumePageOpen)
   useEffect(() => {
     const comp = compositorRef.current
     if (!comp) return
@@ -662,6 +671,13 @@ export default function App(): JSX.Element {
         st.setSonifyPageOpen(!st.sonifyPageOpen)
         return
       }
+      // K : the Resolume OSC mapper page.
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        const st = useStore.getState()
+        st.setResolumePageOpen(!st.resolumePageOpen)
+        return
+      }
       // B : the Body page (embodied control : MediaPipe Hands + Pose).
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'b') {
         e.preventDefault()
@@ -754,6 +770,11 @@ export default function App(): JSX.Element {
       // close them in that reverse (topmost-first) order.
       if (e.key === 'Escape' && !inField) {
         const st = useStore.getState()
+        if (st.resolumePageOpen) {
+          e.preventDefault()
+          st.setResolumePageOpen(false)
+          return
+        }
         if (st.bodyPageOpen) {
           e.preventDefault()
           st.setBodyPageOpen(false)
@@ -1215,6 +1236,8 @@ export default function App(): JSX.Element {
           now - lastVisionSample > 33 &&
           (st.oscOutEnabled ||
             assembleLive ||
+            // the Resolume mapper reading picture features
+            (st.resolume.enabled && st.resolume.inputs.some((i) => i.source.startsWith('vision:'))) ||
             c.modulators.some((m) => m.enabled && (m.type === 'vision' || m.type === 'homeostat')))
         ) {
           lastVisionSample = now
@@ -1742,6 +1765,7 @@ export default function App(): JSX.Element {
       {worldPageOpen && <WorldPage />}
       {sequencePageOpen && <SequencePage canvasRef={canvasRef} />}
       {bodyPageOpen && <BodyPage />}
+      {resolumePageOpen && <ResolumePage />}
       <BodyPip />
 
       {/* Crash recovery : offer to restore the last autosave after an unclean exit. */}

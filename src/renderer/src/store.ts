@@ -30,6 +30,8 @@ import type {
 } from '@shared/types'
 import type { MetaKnobState, MidiBinding, LightConfig, BodyControlConfig } from '@shared/types'
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
+import type { ResolumeMap, ResoOutput, ResoInput, ResoCell, ResoSession } from '@shared/resolume'
+import { defaultResolumeMap, resoCatalogue, RESO_SNAPSHOTS } from '@shared/resolume'
 import { inputsForShader } from './shaders/isf/inputs'
 import { SHADER_BY_ID } from './shaders/isf'
 import { canHostFx } from './fxScopes'
@@ -176,6 +178,55 @@ function applyTheme(t: ThemeName): void {
 }
 
 // ── Composition factory ───────────────────────────────────────────────
+// ── Resolume mapper helpers ─────────────────────────────────────────────
+// Fields that stay editable while the mapping is locked : sending on/off, the
+// destination and rate, and the scene-follow switch are performance controls.
+const RESO_LOCK_FREE = new Set(['enabled', 'host', 'port', 'rateHz', 'locked', 'sceneColumns', 'columnOffset'])
+const RESO_DEFAULT_ROWS = (): string[] => [
+  'mod:1', 'mod:2', 'mod:3', 'mod:4', 'mod:5', 'mod:6', 'mod:7', 'mod:8',
+  'vision:brightness', 'vision:motion', 'vision:contrast', 'vision:edges', 'vision:warmth', 'vision:hue',
+  'audio:level', 'audio:transient', 'audio:centroid', 'audio:noisiness'
+]
+function freshInput(source: string): ResoInput {
+  return { id: Math.random().toString(36).slice(2, 10), source, smooth: 0.15, gain: 1 }
+}
+function sanitizeResolume(raw: unknown): ResolumeMap {
+  const d = defaultResolumeMap()
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Partial<ResolumeMap>
+  const arr = <T,>(v: unknown, fb: T[]): T[] => (Array.isArray(v) ? (v as T[]) : fb)
+  const snaps = arr<ResoCell[] | null>(r.snapshots, d.snapshots)
+  return {
+    ...d,
+    ...r,
+    host: typeof r.host === 'string' && r.host ? r.host : d.host,
+    port: Number.isFinite(r.port) ? Math.max(1, Math.min(65535, Number(r.port))) : d.port,
+    rateHz: Number.isFinite(r.rateHz) ? Math.max(1, Math.min(120, Number(r.rateHz))) : d.rateHz,
+    inputs: arr<ResoInput>(r.inputs, []),
+    outputs: arr<ResoOutput>(r.outputs, []),
+    cells: arr<ResoCell>(r.cells, []),
+    folded: arr<string>(r.folded, []),
+    snapshots: Array.from({ length: RESO_SNAPSHOTS }, (_, i) => snaps[i] ?? null),
+    session: r.session ?? null
+  }
+}
+function loadResolume(): ResolumeMap {
+  try {
+    const raw = localStorage.getItem('opsia.resolume')
+    if (raw) return sanitizeResolume(JSON.parse(raw))
+  } catch {
+    /* fall through to a fresh mapping */
+  }
+  return { ...defaultResolumeMap(), inputs: RESO_DEFAULT_ROWS().map(freshInput) }
+}
+function persistResolume(r: ResolumeMap): ResolumeMap {
+  try {
+    localStorage.setItem('opsia.resolume', JSON.stringify(r))
+  } catch {
+    /* a full quota must never break an edit */
+  }
+  return r
+}
+
 const uid = (): string =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
@@ -1074,6 +1125,30 @@ interface StoreState {
   // The full-page Body view (B). Transient.
   bodyPageOpen: boolean
   setBodyPageOpen: (on: boolean) => void
+  // Resolume OSC mapper : Palinopsia signals (rows) × Resolume addresses
+  // (columns). Travels with the session; also kept in localStorage so it
+  // survives a restart before the session is saved. Every edit is refused while
+  // `locked` (recalling a snapshot is a performance move and still works).
+  resolume: ResolumeMap
+  resolumePageOpen: boolean
+  setResolumePageOpen: (on: boolean) => void
+  setResolume: (patch: Partial<ResolumeMap>) => void
+  /** Adopt a parsed composition : its catalogue becomes the columns. Existing
+   *  connections survive wherever their address still exists. */
+  resoLoadSession: (session: ResoSession) => void
+  resoToggleCell: (inputId: string, outputId: string) => void
+  resoSetCellAmount: (inputId: string, outputId: string, amount: number) => void
+  resoAddInput: (source: string) => void
+  resoRemoveInput: (id: string) => void
+  resoUpdateInput: (id: string, patch: Partial<ResoInput>) => void
+  resoMoveInput: (id: string, dir: -1 | 1) => void
+  resoAddOutput: (o: Omit<ResoOutput, 'id'>) => void
+  resoRemoveOutput: (id: string) => void
+  resoUpdateOutput: (id: string, patch: Partial<ResoOutput>) => void
+  resoToggleFold: (group: string) => void
+  resoClearCells: () => void
+  /** store = true writes the current connections into the slot; false recalls it. */
+  resoSnapshot: (slot: number, store: boolean) => void
   // HIVE output (open NDI-alternative). hiveOutActive is transient; port persists.
   hiveOutActive: boolean
   setHiveOutActive: (on: boolean) => void
@@ -2851,6 +2926,149 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
   bodyPageOpen: false,
   setBodyPageOpen: (on) => set({ bodyPageOpen: on }),
+  resolume: loadResolume(),
+  resolumePageOpen: false,
+  setResolumePageOpen: (on) => set({ resolumePageOpen: on }),
+  setResolume: (patch) =>
+    set((s) => {
+      // While locked only the transport-ish fields may change.
+      if (s.resolume.locked && Object.keys(patch).some((k) => !RESO_LOCK_FREE.has(k))) return s
+      return { resolume: persistResolume({ ...s.resolume, ...patch }) }
+    }),
+  resoLoadSession: (session) =>
+    set((s) => {
+      const r = s.resolume
+      if (r.locked) return s
+      // Keep hand-added / learned columns, and any column whose address the new
+      // composition still has (so its connections and shaping survive a reload).
+      const byAddr = new Map(r.outputs.map((o) => [o.address, o]))
+      const fresh: ResoOutput[] = resoCatalogue(session).map((o) => byAddr.get(o.address) ?? { ...o, id: uid() })
+      const known = new Set(fresh.map((o) => o.address))
+      const kept = r.outputs.filter((o) => !known.has(o.address) && (o.group === 'Learned' || o.group === 'Custom'))
+      const outputs = [...fresh, ...kept]
+      const ids = new Set(outputs.map((o) => o.id))
+      const inputs = r.inputs.length ? r.inputs : RESO_DEFAULT_ROWS().map(freshInput)
+      // A big set folds everything but the composition, selected clip and any
+      // group that already carries a connection, so the matrix opens readable.
+      const busy = new Set(r.cells.map((c) => outputs.find((o) => o.id === c.o)?.group).filter(Boolean) as string[])
+      const groups = [...new Set(outputs.map((o) => o.group))]
+      const folded = groups.filter((g) => g !== 'Composition' && g !== 'Selected clip' && !busy.has(g))
+      return {
+        resolume: persistResolume({
+          ...r,
+          session,
+          outputs,
+          inputs,
+          folded,
+          cells: r.cells.filter((c) => ids.has(c.o)),
+          snapshots: r.snapshots.map((sn) => (sn ? sn.filter((c) => ids.has(c.o)) : sn))
+        })
+      }
+    }),
+  resoToggleCell: (i, o) =>
+    set((s) => {
+      const r = s.resolume
+      if (r.locked) return s
+      const has = r.cells.some((c) => c.i === i && c.o === o)
+      const cells = has ? r.cells.filter((c) => !(c.i === i && c.o === o)) : [...r.cells, { i, o, amount: 1 }]
+      return { resolume: persistResolume({ ...r, cells }) }
+    }),
+  resoSetCellAmount: (i, o, amount) =>
+    set((s) => {
+      const r = s.resolume
+      if (r.locked) return s
+      const a = Math.max(0.05, Math.min(1, amount))
+      return { resolume: persistResolume({ ...r, cells: r.cells.map((c) => (c.i === i && c.o === o ? { ...c, amount: a } : c)) }) }
+    }),
+  resoAddInput: (source) =>
+    set((s) => {
+      const r = s.resolume
+      if (r.locked) return s
+      return { resolume: persistResolume({ ...r, inputs: [...r.inputs, freshInput(source)] }) }
+    }),
+  resoRemoveInput: (id) =>
+    set((s) => {
+      const r = s.resolume
+      if (r.locked) return s
+      return {
+        resolume: persistResolume({
+          ...r,
+          inputs: r.inputs.filter((x) => x.id !== id),
+          cells: r.cells.filter((c) => c.i !== id),
+          snapshots: r.snapshots.map((sn) => (sn ? sn.filter((c) => c.i !== id) : sn))
+        })
+      }
+    }),
+  resoUpdateInput: (id, patch) =>
+    set((s) => {
+      const r = s.resolume
+      if (r.locked) return s
+      return { resolume: persistResolume({ ...r, inputs: r.inputs.map((x) => (x.id === id ? { ...x, ...patch, id } : x)) }) }
+    }),
+  resoMoveInput: (id, dir) =>
+    set((s) => {
+      const r = s.resolume
+      if (r.locked) return s
+      const i = r.inputs.findIndex((x) => x.id === id)
+      const j = i + dir
+      if (i < 0 || j < 0 || j >= r.inputs.length) return s
+      const inputs = [...r.inputs]
+      ;[inputs[i], inputs[j]] = [inputs[j], inputs[i]]
+      return { resolume: persistResolume({ ...r, inputs }) }
+    }),
+  resoAddOutput: (o) =>
+    set((s) => {
+      const r = s.resolume
+      if (r.locked || r.outputs.some((x) => x.address === o.address)) return s
+      return {
+        resolume: persistResolume({ ...r, outputs: [...r.outputs, { ...o, id: uid() }], folded: r.folded.filter((g) => g !== o.group) })
+      }
+    }),
+  resoRemoveOutput: (id) =>
+    set((s) => {
+      const r = s.resolume
+      if (r.locked) return s
+      return {
+        resolume: persistResolume({
+          ...r,
+          outputs: r.outputs.filter((x) => x.id !== id),
+          cells: r.cells.filter((c) => c.o !== id),
+          snapshots: r.snapshots.map((sn) => (sn ? sn.filter((c) => c.o !== id) : sn))
+        })
+      }
+    }),
+  resoUpdateOutput: (id, patch) =>
+    set((s) => {
+      const r = s.resolume
+      if (r.locked) return s
+      return { resolume: persistResolume({ ...r, outputs: r.outputs.map((x) => (x.id === id ? { ...x, ...patch, id } : x)) }) }
+    }),
+  resoToggleFold: (group) =>
+    set((s) => {
+      const r = s.resolume
+      const folded = r.folded.includes(group) ? r.folded.filter((g) => g !== group) : [...r.folded, group]
+      return { resolume: persistResolume({ ...r, folded }) }
+    }),
+  resoClearCells: () =>
+    set((s) => {
+      const r = s.resolume
+      if (r.locked) return s
+      return { resolume: persistResolume({ ...r, cells: [] }) }
+    }),
+  resoSnapshot: (slot, store) =>
+    set((s) => {
+      const r = s.resolume
+      if (slot < 0 || slot >= RESO_SNAPSHOTS) return s
+      if (store) {
+        if (r.locked) return s
+        const snapshots = [...r.snapshots]
+        snapshots[slot] = r.cells.map((c) => ({ ...c }))
+        return { resolume: persistResolume({ ...r, snapshots }) }
+      }
+      const sn = r.snapshots[slot]
+      if (!sn) return s
+      return { resolume: persistResolume({ ...r, cells: sn.map((c) => ({ ...c })) }) }
+    }),
   hiveOutActive: false,
   setHiveOutActive: (on) => set({ hiveOutActive: on }),
   hiveOutPort: Number(localStorage.getItem('opsia.hiveOutPort')) || 51842,
@@ -3583,6 +3801,11 @@ export const useStore = create<StoreState>((set, get) => ({
     localStorage.setItem('opsia.globalSpeed', String(get().globalSpeed))
     localStorage.setItem('opsia.morphMs', String(get().morphMs))
     persistSoniSeq(get().soniSeq)
+    // The Resolume mapping is per session : a session that carries one brings it
+    // back (with its lock); an older file without one keeps the current mapping.
+    if (s.resolume && typeof s.resolume === 'object') {
+      set({ resolume: persistResolume(sanitizeResolume(s.resolume)) })
+    }
     // The session's sound patch (post-set so setSonify's engine push sees it).
     if (s.sonify) {
       const curSoni = get().sonify
@@ -3617,6 +3840,7 @@ export const useStore = create<StoreState>((set, get) => ({
         wiggle: s.surface.wiggle,
         closed: s.surface.closed
       },
+      resolume: s.resolume,
       ui: { theme: s.theme }
     }
   }

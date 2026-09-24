@@ -823,6 +823,9 @@ export interface Session {
   // Metasurface draw sequencer : the recorded path + its playback timing.
   // The live cursor / active toggle stay runtime; only the gesture persists.
   surface?: SurfaceSequencer
+  // Resolume OSC mapper : the matrix (rows, columns, connections, snapshots,
+  // lock) travels with the session so each piece keeps its own mapping.
+  resolume?: import('./resolume').ResolumeMap
   // Opaque renderer UI snapshot (theme, panel sizes, selection). The main
   // process never inspects it : it just round-trips it to disk.
   ui?: unknown
@@ -993,6 +996,16 @@ export interface ExposedApi {
     address: string,
     args: Array<{ type: string; value: number | string | boolean }>
   ) => Promise<void>
+  // Many messages to one destination in a single fire-and-forget IPC hop.
+  oscSendBatch: (
+    ip: string,
+    port: number,
+    msgs: Array<{ address: string; args: Array<{ type: string; value: number | string | boolean }> }>
+  ) => void
+  // Resolume mapper : pick an .avc, then read its layout (layers, groups,
+  // columns, clips, effects, dashboard links).
+  resolumePick: () => Promise<string | null>
+  resolumeParse: (path: string) => Promise<import('./resolume').ResoParseResult>
 
   // OSC input : start/stop the listener + OSCQuery, and subscribe to messages
   oscListen: (port: number, enabled: boolean) => Promise<OscListenResult>

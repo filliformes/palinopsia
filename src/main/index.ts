@@ -28,6 +28,7 @@ import { registerAssetScheme, handleAssetProtocol } from './assets'
 import { killAllConverts, registerVideoConvert, warmVideoFolder } from './videoConvert'
 import { registerAssemble } from './assemble'
 import { registerCollage } from './collage'
+import { registerResolume } from './resolume'
 import { hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
 import { hiveSendStart, hiveSendChunk, hiveSendStop } from './hiveSend'
 import { OutputSender } from './output'
@@ -422,6 +423,7 @@ app.whenReady().then(async () => {
   registerVideoConvert()
   registerAssemble()
   registerCollage()
+  registerResolume()
 
   // Allow Web MIDI + camera/mic/screen capture in the renderer (all local,
   // user-initiated: MIDI-CC learn and video-capture sources).
@@ -498,6 +500,17 @@ app.whenReady().then(async () => {
   }
 
   // ---------- IPC: OSC ----------
+  // Fire-and-forget batch (the Resolume mapper sends dozens of addresses per
+  // tick; one invoke round trip each would be wasted IPC).
+  ipcMain.on('osc:sendBatch', (_e, ip: string, port: number, msgs: Array<{ address: string; args: Array<{ type: 'i' | 'f' | 's' | 'T' | 'F'; value: number | string | boolean }> }>) => {
+    try {
+      if (!Array.isArray(msgs)) return
+      for (const m of msgs.slice(0, 2048)) oscSender.sendMany(ip, port, m.address, m.args)
+    } catch (err) {
+      console.error('[osc] batch send failed:', (err as Error).message)
+    }
+  })
+
   safeHandle('osc:send', (_e, ip, port, address, args) =>
     oscSender.sendMany(
       ip as string,

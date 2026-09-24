@@ -27,6 +27,7 @@ const api: ExposedApi = {
   // ── OSC control plane ────────────────────────────────────────────
   oscSend: (ip, port, address, args) =>
     ipcRenderer.invoke('osc:send', ip, port, address, args),
+  oscSendBatch: (ip, port, msgs) => ipcRenderer.send('osc:sendBatch', ip, port, msgs),
 
   // ── OSC input (Pandore → instrument) ─────────────────────────────
   oscListen: (port, enabled) => ipcRenderer.invoke('osc:listen', port, enabled),
@@ -84,6 +85,10 @@ const api: ExposedApi = {
     ipcRenderer.on('collage:progress', h)
     return () => ipcRenderer.off('collage:progress', h)
   },
+
+  // ── Resolume mapper (.avc composition reader) ─────────────────────
+  resolumePick: () => ipcRenderer.invoke('resolume:pick'),
+  resolumeParse: (path: string) => ipcRenderer.invoke('resolume:parse', path),
 
   // ── Output window (2nd display) ──────────────────────────────────
   outputDisplays: () => ipcRenderer.invoke('output:displays'),

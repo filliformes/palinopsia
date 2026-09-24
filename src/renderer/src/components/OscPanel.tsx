@@ -8,6 +8,8 @@ import { applyOscListen, applyOscOutput } from '../oscInput'
 
 export function OscPanel(): JSX.Element {
   const oscEnabled = useStore((s) => s.oscEnabled)
+  const setResolumePageOpen = useStore((s) => s.setResolumePageOpen)
+  const resoEnabled = useStore((s) => s.resolume.enabled)
   const oscPort = useStore((s) => s.oscPort)
   const oscListening = useStore((s) => s.oscListening)
   const oscAddresses = useStore((s) => s.oscAddresses)
@@ -135,6 +137,13 @@ export function OscPanel(): JSX.Element {
           {oscEnabled && oscListening ? 'live' : oscEnabled ? 'bind failed' : 'not listening'}
         </span>
         <div className="flex-1" />
+        <button
+          onClick={() => setResolumePageOpen(true)}
+          className={`rounded border px-1.5 py-0 font-mono text-[10px] ${resoEnabled ? 'border-accent text-accent' : 'border-border text-muted hover:text-text'}`}
+          title="Resolume OSC mapper (K) : drive any Resolume address from Palinopsia's signals, matrix-style"
+        >
+          Resolume ▸
+        </button>
         <span
           ref={dotRef}
           className="h-2 w-2 shrink-0 rounded-full bg-accent"

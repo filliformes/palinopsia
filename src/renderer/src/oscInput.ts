@@ -60,6 +60,7 @@
 //   /opsia/surface/wiggle {0..1}                         float : smooth wobble (→ 0..100 %)
 //   /opsia/surface/loop {0|1}                            bool : close the path into a loop
 
+import { resolumeLearn } from './resolume'
 import type { BlendMode, CouplingMode, AudioFeature, FxScope, OscInEvent, OscQueryLeaf } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
 import { videoKey, videoSeekRequests } from './engine/videoState'
@@ -204,6 +205,12 @@ function rising(address: string, v: number): boolean {
 }
 
 function route(address: string, args: Args): void {
+  // Resolume's own OSC output (its addresses start /composition) feeds the
+  // mapper's LEARN mode : wiggle a control in Resolume and it becomes a column.
+  if (address.startsWith('/composition')) {
+    resolumeLearn(address, args)
+    return
+  }
   let segs = address.split('/').filter(Boolean)
   if (segs[0] !== 'opsia') return
   const st = useStore.getState()
@@ -971,6 +978,19 @@ function enumerateLeaves(): Leaf[] {
   add('/opsia/surface/wiggle', 0, 1, st.surface.wiggle / 100, 'Draw-path smooth wobble (0..1 → 0..100 %)')
   add('/opsia/surface/loop', 0, 1, st.surface.closed ? 1 : 0, 'Close the draw path into a loop (>= 0.5)')
   return out
+}
+
+/** Every /opsia address with its live 0..1 value (the Resolume mapper's
+ *  "Palinopsia OSC" inputs read these, so they speak exactly what OSC out says). */
+export function oscLeafValues(): Map<string, number> {
+  const m = new Map<string, number>()
+  for (const l of enumerateLeaves()) m.set(l.path, l.max > l.min ? (l.value - l.min) / (l.max - l.min) : l.value)
+  return m
+}
+
+/** The advertised address list (path + description), for pickers. */
+export function oscLeafList(): Array<{ path: string; desc: string }> {
+  return enumerateLeaves().map((l) => ({ path: l.path, desc: l.desc }))
 }
 
 /** Enumerate the address space and hand it to the OSCQuery server. */
