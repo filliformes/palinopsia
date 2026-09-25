@@ -20,6 +20,10 @@ export interface IsfInputDesc {
   labels?: string[]
   // Plain-English hover-help (from inputHints.ts) : shown in the control's title.
   hint?: string
+  // A shorter label shown only where a section header already says the rest
+  // (the Finishing sections : "dust" under FILM DAMAGE). Modulation, OSC and the
+  // M panel keep the full `label`.
+  display?: string
   // Opsia extension ("COMPACT": true): small toggles/enums that the Inspector's
   // two-row grid stacks together into ONE cluster cell instead of a cell each.
   compact?: boolean

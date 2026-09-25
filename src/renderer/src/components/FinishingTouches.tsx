@@ -11,7 +11,8 @@ import { SHADER_BY_ID } from '../shaders/isf'
 import { inputsForShader } from '../shaders/isf/inputs'
 import { PRESETS_BY_ID } from '../shaders/isf/presets'
 import { modTargetKey, useStore } from '../store'
-import { AssignContext, AssignRow, AutoControls, XYControl } from './AutoControls'
+import { AssignContext, AssignRow, XYControl } from './AutoControls'
+import { SectionedControls } from './FinishingSections'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 
@@ -49,10 +50,8 @@ const FT_PRESET_WIDTH_CH = (() => {
 
 export function FinishingTouches(): JSX.Element {
   const master = useStore((s) => s.composition.master)
-  const toggleFinishing = useStore((s) => s.toggleFinishing)
   const order = ['fx-vibe', 'fx-context', 'fx-finalizer']
   const units = order.map((id) => master.find((f) => f.shaderId === id)).filter((u): u is FxInstance => !!u)
-  const on = units.length > 0 && units.every((u) => u.enabled)
   // M buttons open the DEDICATED Modulate section pinned at the bottom of this
   // column (mirrors the main Inspector's side panel) : never the old popover.
   const [assign, setAssign] = useState<{ target: ModTarget; label: string } | null>(null)
@@ -67,14 +66,6 @@ export function FinishingTouches(): JSX.Element {
       }}
     >
       <div className="flex min-h-full flex-col gap-1.5">
-        {/* Global bypass for the whole finishing bank. */}
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-[9px] uppercase tracking-wide text-muted">finishing</span>
-          <FinishingToggle on={on} onClick={toggleFinishing} />
-          <span className="font-mono text-[9px] text-muted">
-            Vibe · Context · Finalizer {on ? '' : '— bypassed'}
-          </span>
-        </div>
         {units.map((u) => (
           <FinalizerSection key={u.id} inst={u} />
         ))}
@@ -243,51 +234,46 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
         <div className="border-t border-border">
           {/* Vibe : global dry/wet FIRST — how much the palette re-colours the picture. */}
           {isVibe && <VibeOpacityRow inst={inst} />}
-          {isContext ? (
-            <ContextBody inst={inst} onChange={onChange} modTargetFor={modTargetFor} />
-          ) : (
-            <AutoControls inputs={inputsForShader(shaderId)} values={values} onChange={onChange} modTargetFor={modTargetFor} layout="vertical" />
-          )}
+          {/* Controls in labelled sections (FinishingSections.tsx). */}
+          <SectionedControls
+            shaderId={shaderId}
+            values={values}
+            onChange={onChange}
+            modTargetFor={modTargetFor}
+            extras={isContext ? { light: <ContextLightPad inst={inst} onChange={onChange} /> } : undefined}
+          />
         </div>
       )}
     </div>
   )
 }
 
-// Context has a "light" XY pad. Render the scalar/colour controls normally,
-// then a centered row: the pad, with the "Vibe Color" button to its right.
-function ContextBody({
+// Context's light section ends with the light's XY pad and, beside it, the
+// "Vibe Color" button (the light takes the Vibe Palette's main colour).
+function ContextLightPad({
   inst,
-  onChange,
-  modTargetFor
+  onChange
 }: {
   inst: FxInstance
   onChange: (n: string, v: number | number[]) => void
-  modTargetFor: (input: string) => ModTarget
-}): JSX.Element {
+}): JSX.Element | null {
   const composition = useStore((s) => s.composition)
   const values = inst.inputs
-  const all = inputsForShader('fx-context')
-  const scalars = all.filter((i) => i.type !== 'point2D')
-  const pad = all.find((i) => i.type === 'point2D')
+  const pad = inputsForShader('fx-context').find((i) => i.type === 'point2D')
+  if (!pad) return null
   return (
-    <>
-      <AutoControls inputs={scalars} values={values} onChange={onChange} modTargetFor={modTargetFor} layout="vertical" />
-      {pad && (
-        <div className="flex items-center justify-center gap-3 border-t border-border px-2 py-2">
-          <XYControl inp={pad} value={values[pad.name]} onChange={onChange} />
-          <button
-            onClick={() => {
-              const vibe = composition.master.find((f) => f.shaderId === 'fx-vibe')
-              if (vibe) onChange('lightColor', vibeMainColor(vibe.inputs))
-            }}
-            className="shrink-0 rounded border border-accent2/50 bg-accent2/10 px-1.5 py-0.5 font-mono text-[10px] text-accent2 hover:bg-accent2/20"
-            title="Set the light colour from the Vibe Palette's main colour (brightened)"
-          >
-            Vibe Color
-          </button>
-        </div>
-      )}
-    </>
+    <div className="flex items-center justify-center gap-3 px-2 py-2">
+      <XYControl inp={pad} value={values[pad.name]} onChange={onChange} />
+      <button
+        onClick={() => {
+          const vibe = composition.master.find((f) => f.shaderId === 'fx-vibe')
+          if (vibe) onChange('lightColor', vibeMainColor(vibe.inputs))
+        }}
+        className="shrink-0 rounded border border-accent2/50 bg-accent2/10 px-1.5 py-0.5 font-mono text-[10px] text-accent2 hover:bg-accent2/20"
+        title="Set the light colour from the Vibe Palette's main colour (brightened)"
+      >
+        Vibe Color
+      </button>
+    </div>
   )
 }

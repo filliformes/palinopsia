@@ -1371,6 +1371,7 @@ interface StoreState {
   setDepthMode: (m: 'off' | 'synth' | 'estimate') => void
   collapsed: Record<string, boolean>
   toggleSection: (key: string) => void
+  setCollapsed: (key: string, collapsed: boolean) => void
   // Finishing view: exclusively open one finalizer sub-section (Vibe / Context /
   // Finalizer), collapsing the other two : or collapse it if already open.
   showFinishingSub: (shaderId: string) => void
@@ -3507,6 +3508,12 @@ export const useStore = create<StoreState>((set, get) => ({
   toggleSection: (key) =>
     set((s) => {
       const collapsed = { ...s.collapsed, [key]: !s.collapsed[key] }
+      localStorage.setItem('opsia.collapsed', JSON.stringify(collapsed))
+      return { collapsed }
+    }),
+  setCollapsed: (key, v) =>
+    set((s) => {
+      const collapsed = { ...s.collapsed, [key]: v }
       localStorage.setItem('opsia.collapsed', JSON.stringify(collapsed))
       return { collapsed }
     }),

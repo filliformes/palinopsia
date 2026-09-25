@@ -90,11 +90,15 @@ export function AutoControls({
   values,
   onChange,
   modTargetFor,
-  layout = 'wrap'
+  layout = 'wrap',
+  dim
 }: {
   inputs: IsfInputDesc[]
   values: Record<string, Value>
   onChange: (name: string, value: Value) => void
+  // Vertical layout only : inputs to show greyed out (they do nothing right now),
+  // name → the reason (the row's tooltip).
+  dim?: Record<string, string>
   // When provided, float controls grow an "M" button that binds a modulator
   // to this input (the capped mod-matrix, brief §6).
   modTargetFor?: (inputName: string) => ModTarget
@@ -142,7 +146,15 @@ export function AutoControls({
     // · M · number) : `[&>*]:w-full` overrides each control's fixed w-44.
     return (
       <div className="flex flex-col gap-0.5 px-2 py-1 [&>*]:w-full">
-        {visible(inputs).map((inp) => renderControl(inp, true))}
+        {visible(inputs).map((inp) =>
+          dim?.[inp.name] ? (
+            <div key={inp.name} className="opacity-40 [&>*]:w-full" title={dim[inp.name]}>
+              {renderControl(inp, true)}
+            </div>
+          ) : (
+            renderControl(inp, true)
+          )
+        )}
       </div>
     )
   }
@@ -279,11 +291,11 @@ function Control({
       return <FloatControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} dense={dense} labelExtra={labelExtra} />
     case 'bool':
     case 'event':
-      return <BoolControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} />
+      return <BoolControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} dense={dense} />
     case 'long':
-      return <EnumControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} />
+      return <EnumControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} dense={dense} />
     case 'color':
-      return <ColorControl inp={inp} value={value} onChange={onChange} />
+      return <ColorControl inp={inp} value={value} onChange={onChange} dense={dense} />
     case 'point2D':
       return <XYControl inp={inp} value={value} onChange={onChange} />
     default:
@@ -300,7 +312,19 @@ function labelEl(inp: IsfInputDesc): JSX.Element {
       className="line-clamp-1 min-w-0 font-mono text-[9px] uppercase tracking-wide text-muted"
       title={inp.hint ?? inp.label}
     >
-      {inp.label}
+      {inp.display ?? inp.label}
+    </span>
+  )
+}
+
+// The dense (one-line) rows' label : fixed width so every row's control lines up.
+function denseLabel(inp: IsfInputDesc): JSX.Element {
+  return (
+    <span
+      className="w-24 shrink-0 truncate font-mono text-[9px] uppercase tracking-wide text-muted"
+      title={inp.hint ?? inp.label}
+    >
+      {inp.display ?? inp.label}
     </span>
   )
 }
@@ -348,12 +372,7 @@ function FloatControl({
     return (
       <div className="flex min-w-0 flex-col gap-0.5">
         <div className="flex min-w-0 items-center gap-1.5">
-          <span
-            className="w-20 shrink-0 truncate font-mono text-[9px] uppercase tracking-wide text-muted"
-            title={inp.hint ?? inp.label}
-          >
-            {inp.label}
-          </span>
+          {denseLabel(inp)}
           {labelExtra}
           <input
             ref={sliderRef}
@@ -685,12 +704,14 @@ function BoolControl({
   inp,
   value,
   onChange,
-  modTargetFor
+  modTargetFor,
+  dense = false
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
   modTargetFor?: (inputName: string) => ModTarget
+  dense?: boolean
 }): JSX.Element {
   const def = typeof inp.def === 'number' ? inp.def : 0
   // An `event` input is a MOMENTARY trigger : press pulses it 1 → 0 so the engine
@@ -733,6 +754,25 @@ function BoolControl({
     )
   }
   const on = (typeof value === 'number' ? value : def) >= 0.5
+  if (dense) {
+    const target = modTargetFor?.(inp.name)
+    return (
+      <div className="flex min-w-0 items-center gap-1.5">
+        {denseLabel(inp)}
+        <button
+          onClick={() => onChange(inp.name, on ? 0 : 1)}
+          className={`rounded px-2 py-0 font-mono text-[10px] transition-colors ${
+            on ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted hover:text-text'
+          }`}
+          title={inp.hint ?? inp.label}
+        >
+          {on ? 'ON' : 'OFF'}
+        </button>
+        <div className="flex-1" />
+        {target && <DenseMod target={target} label={inp.label} />}
+      </div>
+    )
+  }
   return (
     <div className="flex w-24 min-w-0 flex-col items-start gap-0.5">
       <LabelRow inp={inp} modTargetFor={modTargetFor} />
@@ -748,17 +788,24 @@ function BoolControl({
   )
 }
 
+function DenseMod({ target, label }: { target: ModTarget; label: string }): JSX.Element {
+  const bound = useBound(modTargetKey(target))
+  return <ModButton target={target} bound={bound} label={label} />
+}
+
 // ── long → dropdown (+ optional mod-assign) ──────────────────────────
 function EnumControl({
   inp,
   value,
   onChange,
-  modTargetFor
+  modTargetFor,
+  dense = false
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
   modTargetFor?: (inputName: string) => ModTarget
+  dense?: boolean
 }): JSX.Element {
   const def = typeof inp.def === 'number' ? inp.def : 0
   const v = typeof value === 'number' ? value : def
@@ -778,6 +825,31 @@ function EnumControl({
     if (!isModulated || !targetKey || !el) return
     return registerLiveOverlay({ el, key: targetKey, format: (x) => String(Math.round(x)) })
   }, [isModulated, targetKey])
+  if (dense) {
+    return (
+      <div className="flex min-w-0 items-center gap-1.5">
+        {denseLabel(inp)}
+        <select
+          ref={selRef}
+          className={`input h-[18px] min-w-0 flex-1 !py-0 !pl-1.5 !pr-1 !text-[10px] leading-none ${isModulated ? '!border-accent2 !text-accent2' : ''}`}
+          value={v}
+          onChange={(e) => onChange(inp.name, Number(e.target.value))}
+          title={
+            isModulated
+              ? `${inp.label} : modulated (showing the live selection; picking sets the base)`
+              : (inp.hint ?? inp.label)
+          }
+        >
+          {values.map((val, i) => (
+            <option key={val} value={val}>
+              {labels[i] ?? val}
+            </option>
+          ))}
+        </select>
+        {target && <ModButton target={target} bound={bound} label={inp.label} />}
+      </div>
+    )
+  }
   return (
     <div className="flex w-44 min-w-0 flex-col gap-0.5">
       <LabelRow inp={inp} modTargetFor={modTargetFor} />
@@ -802,6 +874,54 @@ function EnumControl({
   )
 }
 
+// ── long → a compact dropdown for a section header (no label row) ─────
+// The switch that turns a whole Finishing section on / off or picks its mode
+// (3D stereo, film hold, output shape…) : same live-overlay + M as EnumControl.
+export function EnumSwitch({
+  inp,
+  value,
+  onChange,
+  modTargetFor
+}: {
+  inp: IsfInputDesc
+  value: Value | undefined
+  onChange: (name: string, value: Value) => void
+  modTargetFor?: (inputName: string) => ModTarget
+}): JSX.Element {
+  const def = typeof inp.def === 'number' ? inp.def : 0
+  const v = typeof value === 'number' ? value : def
+  const values = inp.values ?? []
+  const labels = inp.labels ?? values.map(String)
+  const target = modTargetFor?.(inp.name)
+  const targetKey = target ? modTargetKey(target) : null
+  const bound = useBound(targetKey)
+  const isModulated = bound.length > 0
+  const selRef = useRef<HTMLSelectElement | null>(null)
+  useEffect(() => {
+    const el = selRef.current
+    if (!isModulated || !targetKey || !el) return
+    return registerLiveOverlay({ el, key: targetKey, format: (x) => String(Math.round(x)) })
+  }, [isModulated, targetKey])
+  return (
+    <span className="flex min-w-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+      <select
+        ref={selRef}
+        className={`input h-[18px] max-w-[9rem] !py-0 !pl-1.5 !pr-1 !text-[10px] leading-none ${isModulated ? '!border-accent2 !text-accent2' : ''}`}
+        value={v}
+        onChange={(e) => onChange(inp.name, Number(e.target.value))}
+        title={(inp.hint ?? inp.label) + (isModulated ? ' (modulated : picking sets the base)' : '')}
+      >
+        {values.map((val, i) => (
+          <option key={val} value={val}>
+            {labels[i] ?? val}
+          </option>
+        ))}
+      </select>
+      {target && <ModButton target={target} bound={bound} label={inp.label} />}
+    </span>
+  )
+}
+
 // ── color → swatch + alpha ───────────────────────────────────────────
 function toHex(c: number[]): string {
   const h = (x: number): string =>
@@ -821,15 +941,42 @@ function fromHex(hex: string, alpha: number): number[] {
 function ColorControl({
   inp,
   value,
-  onChange
+  onChange,
+  dense = false
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
+  dense?: boolean
 }): JSX.Element {
   const def = Array.isArray(inp.def) ? inp.def : [1, 1, 1, 1]
   const v = Array.isArray(value) && value.length >= 3 ? value : def
   const alpha = v[3] ?? 1
+  if (dense) {
+    return (
+      <div className="flex min-w-0 items-center gap-1.5">
+        {denseLabel(inp)}
+        <input
+          type="color"
+          value={toHex(v)}
+          onChange={(e) => onChange(inp.name, fromHex(e.target.value, alpha))}
+          className="h-4 w-8 shrink-0 cursor-pointer rounded border border-border bg-panel2"
+          title={`${inp.label} : RGB`}
+        />
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={alpha}
+          onChange={(e) => onChange(inp.name, [v[0], v[1], v[2], Number(e.target.value)])}
+          className="min-w-0 flex-1 accent-accent"
+          title={`${inp.label} : alpha ${alpha.toFixed(2)}`}
+        />
+        <span className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">{alpha.toFixed(2)}</span>
+      </div>
+    )
+  }
   return (
     <div className="flex w-44 min-w-0 flex-col gap-0.5">
       {labelEl(inp)}

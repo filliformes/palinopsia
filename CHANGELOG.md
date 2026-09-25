@@ -111,6 +111,23 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Finishing panel in labelled sections.** Vibe Palette, Context and Finalizer
+  were each one long list of sliders; each is now split into named families
+  with a thin coloured header and a matching rail down the left :
+  - Vibe Palette : palette · color chord · tone · split-tone
+  - Context : softness · distance · light · surface
+  - Finalizer : grade · character · 3D · hand-made film · film damage · output shape
+  - A section's master switch (character, 3D stereo, film hold, output shape,
+    PBR surface, color chord) sits in its header, and a section whose switch
+    is off folds itself away until you turn it on (or click its header).
+  - Rows drop only the words their header already says ("film dust" is "dust"
+    under film damage); the modulation lists and OSC keep the full names.
+  - Rows that do nothing right now are greyed with the reason in the tooltip
+    (parasites outside crt / vhs, palette stops beyond "stops used" or under a
+    color chord, the fill color when the Background fills the outside).
+  - Colors, dropdowns and toggles now sit on one line like the sliders.
+  - The "Finishing on · Vibe · Context · Finalizer" line at the top of the tab
+    is gone (the same toggle is in the Master FX strip).
 - **CRT / VHS parasites, rebuilt** (Finalizer character and the Grain FX). They
   were small rectangles : one band out of 60 across the frame (18 px tall at
   1080p) with a hard-edged dash in it. Now counted in real scanlines (480, so a
