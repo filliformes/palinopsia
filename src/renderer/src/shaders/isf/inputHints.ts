@@ -216,7 +216,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     grain: 'Grain amount over the whole output.',
     grainSize: 'Grain particle size.',
     chroma: 'Colour noise in the grain.',
-    parasites: 'CRT/VHS interference (head-switch tear, dropouts) : only with the crt/vhs character.',
+    parasites: 'Only with the crt / vhs character. VHS : wobbling line edges, the head-switch tear at the bottom, single-scanline dropouts (white, a few dark) that fade over a tail and come in bursts; high up, a drifting tracking band. CRT : a soft hum bar rolling up, a faint RF weave, short impulse specks.',
     stereo: 'Render the output as red/cyan anaglyph 3D (needs red/cyan glasses). Gray = half-colour, gentler on the eyes for abstract relief.',
     stereoDepth: 'Strength of the 3D relief : how far the red/cyan eyes separate with depth.',
     stereoConv: 'Convergence : which depth sits ON the screen plane. Negative pushes forms OUT toward you (pop-out).',

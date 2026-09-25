@@ -111,6 +111,19 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **CRT / VHS parasites, rebuilt** (Finalizer character and the Grain FX). They
+  were small rectangles : one band out of 60 across the frame (18 px tall at
+  1080p) with a hard-edged dash in it. Now counted in real scanlines (480, so a
+  dropout is one line tall at any output size) :
+  - **VHS** : line edges wobble (no time-base corrector), the head-switch tear
+    frays the last lines at the bottom, and **dropouts** (the head losing the
+    tape for an instant) turn a single scanline white from where they hit,
+    fading over a tail as the signal recovers, a few dark, in bursts, a new
+    set every field. Pushed high, a **tracking band** of torn, snowy lines
+    drifts through the picture, coming and going.
+  - **CRT** : a soft **hum bar** rolling up the screen, a faint **RF weave**
+    that comes and goes, and short **impulse specks** on single lines.
+  - One shared implementation (`shaders/isf/lib/analogParasites.glsl`).
 - **The Organic family, made physical** (research : noise and growth models,
   wave physics, flame colour; every change measured at 60 fps at 4K) :
   - **An Organic section** in the source picker : the living generators first.

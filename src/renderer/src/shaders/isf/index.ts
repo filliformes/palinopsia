@@ -40,6 +40,7 @@ import ground from './Ground.fs?raw'
 import scan from './Scan.fs?raw'
 import organicLib from './lib/organic.glsl?raw'
 import organicRelief from './lib/organicRelief.glsl?raw'
+import analogParasites from './lib/analogParasites.glsl?raw'
 import metamorph from './Metamorph.fs?raw'
 import syncOsc from './SyncOsc.fs?raw'
 import differential from './Differential.fs?raw'
@@ -798,6 +799,11 @@ function withOrganic(src: string): string {
   const out = src.slice(0, end + 3) + '\n' + organicLib + src.slice(end + 3)
   return out.replace('// @og-relief', organicRelief)
 }
+// The CRT / VHS parasites (lib/analogParasites.glsl) shared by the Finalizer and
+// the Grain FX, inserted at their "// @parasites" line (after hash21 / vnoise).
+function withParasites(src: string): string {
+  return src.replace('// @parasites', analogParasites)
+}
 // Relief + light angle, on every lit organic source (dice keep them tasteful).
 const RELIEF_CURATED = { relief: [0.3, 0.8] as [number, number], lightAngle: [0, 6.2832] as [number, number] }
 
@@ -1300,7 +1306,7 @@ export const FX_SHADERS: IsfShader[] = [
     curated: { blocks: [10, 48], amount: [0.05, 0.3], chance: [0.1, 0.5], rate: [0.1, 0.8], freak: [0, 0.5] }
   },
   {
-    id: 'fx-grain', name: 'Grain', category: 'FX', source: grain,
+    id: 'fx-grain', name: 'Grain', category: 'FX', source: withParasites(grain),
     curated: { amount: [0.05, 0.35], size: [1, 3], chroma: [0, 0.6], parasites: [0.05, 0.5] }
   },
   {
@@ -1510,7 +1516,7 @@ export const FINALIZER_SHADER: IsfShader = {
   id: 'fx-finalizer',
   name: 'Finalizer',
   category: 'FX',
-  source: finalizer,
+  source: withParasites(finalizer),
   curated: {
     black: [0, 0.15],
     white: [0.85, 1],

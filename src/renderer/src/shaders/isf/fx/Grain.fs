@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Grain : physically-modelled noise per medium. FILM: clumped photochemical grain (value-noise, NOT white), 24fps reseed, amplitude peaking in the MIDTONES; optional colour-stock chroma grain. DIGITAL: honest sensor noise : signal-dependent SHOT noise (highlights), a constant READ-noise floor (shadows), and faint static fixed-pattern (PRNU). CRT: row-correlated snow + dropout bands. VHS: luma smear + chroma phase error + streaks. Parasites (dropout/streaks) apply to CRT/VHS only.",
+  "DESCRIPTION": "Grain : physically-modelled noise per medium. FILM: clumped photochemical grain (value-noise, NOT white), 24fps reseed, amplitude peaking in the MIDTONES; optional colour-stock chroma grain. DIGITAL: honest sensor noise : signal-dependent SHOT noise (highlights), a constant READ-noise floor (shadows), and faint static fixed-pattern (PRNU). CRT: row-correlated snow; PARASITES add a rolling hum bar, faint RF herringbone and impulse specks. VHS: luma smear + chroma phase error; PARASITES add line jitter, the head-switch tear at the bottom, single-scanline dropouts with a recovery tail (in bursts) and, high up, a drifting tracking band. Parasites apply to CRT/VHS only.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Texture"],
@@ -38,8 +38,13 @@ float gauss(float u1, float u2) {
   return sqrt(-2.0 * log(max(u1, 1e-6))) * cos(6.2831853 * u2);
 }
 
+// @parasites
+
 void main() {
-  vec2 uv = isf_FragNormCoord;
+  vec2 uv0 = isf_FragNormCoord;
+  float band = 0.0;
+  bool vhsPar = character == 3 && parasites > 0.001;
+  vec2 uv = vhsPar ? vhsWarp(uv0, parasites, TIME, band) : uv0;
   vec4 src = IMG_NORM_PIXEL(inputImage, uv);
   float l = dot(src.rgb, vec3(0.299, 0.587, 0.114));
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
@@ -88,15 +93,8 @@ void main() {
       noise += vec3((hash21(cell + 301.0) - 0.5), 0.0, (hash21(cell + 502.0) - 0.5)) * chroma * 0.5;
     }
     float w = 0.35 + 0.65 * smoothstep(0.0, 0.4, l);
-    // Dropout bands : placed by centre + half-width, ragged edges.
-    float bandH = 1.0 + floor(hash21(vec2(row, seed + 3.0)) * 3.0);
-    float bandQ = floor(row / bandH);
-    float on = step(1.0 - parasites * 0.04, hash21(vec2(bandQ, seed)));
-    float center = hash21(vec2(bandQ, seed + 7.0));
-    float halfW = 0.03 + hash21(vec2(bandQ, seed + 11.0)) * 0.6;
-    float edge = (vnoise(vec2(uv.x * 40.0, bandQ)) - 0.5) * 0.06;
-    float inSeg = 1.0 - smoothstep(halfW - 0.02, halfW + 0.02, abs(uv.x - center) + edge);
-    add = noise * amount * w + vec3(on * inSeg * (hash21(cell + 77.0) - 0.3) * (0.9 + hash21(vec2(bandQ, 91.0)) * 1.5));
+    add = noise * amount * w;
+    if (parasites > 0.001) src.rgb = crtParasites(src.rgb, uv0, parasites, TIME);
   } else {
     // VHS : luma smear (horizontally correlated) + chroma phase error + streaks.
     float row = floor(gl_FragCoord.y / max(size, 1.0));
@@ -107,22 +105,8 @@ void main() {
     float chromaErr = vnoise(vec2(row * 0.4, seed * 2.0)) - 0.5;
     noise += vec3(chromaErr * 0.6, 0.0, -chromaErr * 0.6);
     float w = 0.4 + 0.6 * smoothstep(0.0, 0.35, l);
-    float debris = 0.0;
-    for (int dp = 0; dp < 2; dp++) {
-      float rows_ = dp == 0 ? 90.0 : 40.0;
-      float scell = floor(uv.y * rows_);
-      float ds = seed + float(dp) * 213.0;
-      float son = step(1.0 - parasites * (dp == 0 ? 0.05 : 0.025), hash21(vec2(scell, ds)));
-      float drift = (hash21(vec2(scell, ds + 3.0)) - 0.5) * 0.25 * fract(TIME * 7.7);
-      float center = hash21(vec2(scell, ds + 5.0)) + drift;
-      float halfLen = dp == 0 ? 0.01 + hash21(vec2(scell, ds + 9.0)) * 0.05 : 0.08 + hash21(vec2(scell, ds + 9.0)) * 0.22;
-      float thick = 0.3 + hash21(vec2(scell, ds + 13.0)) * 0.7;
-      float yIn = abs(fract(uv.y * rows_) - 0.5) * 2.0;
-      float dash = son * (1.0 - step(halfLen, abs(uv.x - center))) * (1.0 - smoothstep(thick * 0.4, thick, yIn));
-      float darkDash = step(0.88, hash21(vec2(scell, ds + 17.0)));
-      debris += dash * mix(1.2, -0.7, darkDash) * (dp == 0 ? 1.0 : 0.45);
-    }
-    add = noise * amount * w + vec3(debris);
+    add = noise * amount * w;
+    if (vhsPar) src.rgb = vhsParasites(src.rgb, uv0, parasites, TIME, band);
   }
 
   gl_FragColor = vec4(clamp(src.rgb + add, 0.0, 1.0), src.a);

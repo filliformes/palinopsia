@@ -77,6 +77,8 @@ float gauss(float u1, float u2) {
   return sqrt(-2.0 * log(max(u1, 1e-6))) * cos(6.2831853 * u2);
 }
 
+// @parasites
+
 // LEVELS grade at a UV (input black/white → gamma → per-channel gain). Pulled
 // out so the anaglyph stage can grade a horizontally-displaced second "eye".
 vec3 gradePix(vec2 uv) {
@@ -88,7 +90,12 @@ vec3 gradePix(vec2 uv) {
 }
 
 void main() {
-  vec2 uv = isf_FragNormCoord;
+  vec2 uv0 = isf_FragNormCoord;
+  // VHS parasites move where the picture is read from (line jitter, the
+  // head-switch tear, a tracking band) : everything below reads at uv.
+  float band = 0.0;
+  bool vhsPar = character == 3 && grain > 0.001 && parasites > 0.001;
+  vec2 uv = vhsPar ? vhsWarp(uv0, parasites, TIME, band) : uv0;
   vec4 src = IMG_NORM_PIXEL(inputImage, uv);
 
   // ── LEVELS: input black/white → gamma → per-channel gain ──
@@ -166,13 +173,8 @@ void main() {
       vec2 cell = vec2(floor(gl_FragCoord.x / max(grainSize, 1.0)), row);
       float n = (hash21(cell + seed * 17.3) - 0.5) * (0.5 + hash21(vec2(row, seed)));
       float w = 0.35 + 0.65 * smoothstep(0.0, 0.4, l);
-      float bandH = 1.0 + floor(hash21(vec2(row, seed + 3.0)) * 3.0);
-      float bandQ = floor(row / bandH);
-      float on = step(1.0 - parasites * 0.04, hash21(vec2(bandQ, seed)));
-      float center = hash21(vec2(bandQ, seed + 7.0));
-      float halfW = 0.03 + hash21(vec2(bandQ, seed + 11.0)) * 0.6;
-      float inSeg = 1.0 - smoothstep(halfW - 0.02, halfW + 0.02, abs(uv.x - center) + (vnoise(vec2(uv.x * 40.0, bandQ)) - 0.5) * 0.06);
-      add = vec3(n) * grain * w + vec3(on * inSeg * (hash21(cell + 77.0) - 0.3) * 1.4);
+      add = vec3(n) * grain * w;
+      if (parasites > 0.001) c = crtParasites(c, uv0, parasites, TIME);
     } else {
       float row = floor(gl_FragCoord.y / max(grainSize, 1.0));
       float seed = floor(TIME * 30.0);
@@ -181,11 +183,8 @@ void main() {
       float chromaErr = vnoise(vec2(row * 0.4, seed * 2.0)) - 0.5;
       vec3 noise = vec3(smear * 0.7 + fine) + vec3(chromaErr * 0.6, 0.0, -chromaErr * 0.6);
       float w = 0.4 + 0.6 * smoothstep(0.0, 0.35, l);
-      float scell = floor(uv.y * 60.0);
-      float son = step(1.0 - parasites * 0.05, hash21(vec2(scell, seed)));
-      float ctr = hash21(vec2(scell, seed + 5.0)) + (hash21(vec2(scell, seed + 3.0)) - 0.5) * 0.25 * fract(TIME * 7.7);
-      float dash = son * (1.0 - step(0.02 + hash21(vec2(scell, seed + 9.0)) * 0.08, abs(uv.x - ctr)));
-      add = noise * grain * w + vec3(dash * mix(1.1, -0.6, step(0.88, hash21(vec2(scell, seed + 17.0)))));
+      add = noise * grain * w;
+      if (vhsPar) c = vhsParasites(c, uv0, parasites, TIME, band);
     }
   }
   c += add;
