@@ -82,9 +82,9 @@ const uid = (): string =>
 
 // Restrained color register: any hue, bounded saturation/value : matte.
 function randomColor(alpha: number): number[] {
-  const h = rnd() * 360
-  const s = range(0.35, 0.85)
-  const v = range(0.45, 0.9)
+  return hsv(rnd() * 360, range(0.35, 0.85), range(0.45, 0.9), alpha)
+}
+function hsv(h: number, s: number, v: number, alpha: number): number[] {
   const c = v * s
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
   const m = v - c
@@ -111,6 +111,8 @@ function randomizeOneInput(
         typeof d.max === 'number' ? d.max : 1
       ]
       const [lo, hi] = curatedRange(shaderId, d.name, declared)
+      // A collapsed curated span means "never randomized" : keep the value.
+      if (lo === hi) return typeof current === 'number' ? current : typeof d.def === 'number' ? d.def : lo
       return range(lo, hi)
     }
     case 'event':
@@ -118,11 +120,11 @@ function randomizeOneInput(
       return typeof current === 'number' ? current : typeof d.def === 'number' ? d.def : 0
     case 'bool': {
       const cur = typeof current === 'number' ? current : typeof d.def === 'number' ? d.def : 0
-      // Respect a curated pin (e.g. [0,0]) : a collapsed span forces the value
-      // and is never gambled. The bool/long branches used to ignore curatedRange
-      // entirely, so "never randomized" pins were silently flipped by the dice.
+      // Respect a curated pin (e.g. [0,0]) : a collapsed span means "never
+      // randomized", so the dice leaves the value alone (it used to FORCE the
+      // pinned value, e.g. switching a deliberate output shape off).
       const [blo, bhi] = curatedRange(shaderId, d.name, [0, 1])
-      if (blo === bhi) return blo >= 0.5 ? 1 : 0
+      if (blo === bhi) return cur
       return chance(0.3) ? (cur >= 0.5 ? 0 : 1) : cur
     }
     case 'long': {
@@ -134,9 +136,10 @@ function randomizeOneInput(
       // outShape [0,0] "never randomized", fx-transform.shape, fx-wide-time.mode).
       const declared: [number, number] = [Math.min(...values), Math.max(...values)]
       const [lo, hi] = curatedRange(shaderId, d.name, declared)
+      if (lo === hi) return cur // pinned : never randomized, keep the choice
       const allowed = values.filter((v) => v >= lo && v <= hi)
       const pool = allowed.length ? allowed : values
-      if (pool.length === 1) return pool[0] // pinned : deterministic, never gambled
+      if (pool.length === 1) return pool[0]
       return chance(0.4) ? pick(pool) : cur
     }
     case 'color': {
@@ -161,13 +164,23 @@ function randomizeOneInput(
 // for Film Hold, a dice roll would leave every Finishing randomize dirty.
 const RANDOMIZE_SKIP: Record<string, RegExp> = {
   'fx-context': /^(pbr|lightOrder$)/,
-  'fx-finalizer': /^film(Dust|Scratch|Hair|Gauge|Dirt)$/,
+  // Finalizer staging intent : anaglyph 3D, the film-hold / draw clock, leader
+  // blanks and splices, film damage and the output shape are deliberate show
+  // decisions (a dice used to turn 3D on a quarter of the time and freeze the
+  // picture). The grade, grain and character still roll.
+  'fx-finalizer': /^(film|stereo|out)/,
+  // Vibe : a chord REPLACES the ramped stops, so the dice leaves the harmony mode
+  // where the user put it (the stops still roll as one ramp).
+  'fx-vibe': /^harmony$/,
   // Text : the crawl, fitting, typewriter reveal and line-cue mode are staging
   // intent (a dice must not start a ticker or hide the words).
   'gen-text': /^(scroll|fit|reveal|lines)$/,
   // Dark grounds : a mid-bright random color would lose the near-black paper.
   'direct-marks': /^paper$/,
-  'sync-osc': /^loA$/
+  'sync-osc': /^loA$/,
+  // Feedback Zoom : a rolled center can land the tunnel in a corner; the dice
+  // rolls `drift` instead, which lets the center wander on its own.
+  'fx-feedback-zoom': /^center$/
 }
 
 // Solid Color : one rolled hue drives the whole gradient (a dark end tinted
@@ -191,7 +204,45 @@ export function randomizeInputs(
     out[d.name] = randomizeOneInput(shaderId, d, current[d.name])
   }
   if (shaderId === 'solid-color') deriveGradient(out)
+  const derive = DERIVED_COLORS[shaderId]
+  if (derive) derive(out, skip)
   return out
+}
+
+// One rolled hue for a whole ramp : the dark end stays near-black (the house
+// ground), the middle carries the accent, the top goes pale. Independent
+// mid-bright hues used to lift the blacks and clash (Palette is auto-appended to
+// a third of random master racks).
+function ramp(out: Record<string, number | number[]>, keys: string[], skip?: RegExp): void {
+  const h = rnd() * 360, sat = range(0.4, 0.8)
+  const n = keys.length
+  keys.forEach((k, i) => {
+    if (skip?.test(k)) return
+    const t = n > 1 ? i / (n - 1) : 0.5
+    const a = Array.isArray(out[k]) ? (out[k] as number[])[3] ?? 1 : 1
+    // value climbs from near-black to pale; saturation eases off at both ends
+    const v = 0.04 + 0.9 * Math.pow(t, 0.85)
+    const sv = sat * (t < 0.5 ? 0.6 + 0.8 * t : 1.4 - 0.9 * t)
+    out[k] = hsv((h + (t - 0.5) * 24 + 360) % 360, Math.max(0, Math.min(1, sv)), v, a)
+  })
+}
+const tinted = (sLo: number, sHi: number, vLo: number, vHi: number) =>
+  (out: Record<string, number | number[]>, k: string): void => {
+    const a = Array.isArray(out[k]) ? (out[k] as number[])[3] ?? 1 : 1
+    out[k] = hsv(rnd() * 360, range(sLo, sHi), range(vLo, vHi), a)
+  }
+const DERIVED_COLORS: Record<string, (out: Record<string, number | number[]>, skip?: RegExp) => void> = {
+  'fx-palette': (o, sk) => ramp(o, ['colorA', 'colorB', 'colorC', 'colorD', 'colorE'], sk),
+  'fx-colorizer': (o, sk) => ramp(o, ['low', 'mid', 'high'], sk),
+  'fx-vibe': (o, sk) => {
+    ramp(o, ['colorA', 'colorB', 'colorC', 'colorD', 'colorE'], sk)
+    tinted(0.04, 0.2, 0.45, 0.58)(o, 'shadowTint') // split-tone tints roam near neutral gray
+    tinted(0.04, 0.2, 0.45, 0.58)(o, 'highTint')
+  },
+  'fx-context': (o) => {
+    tinted(0.08, 0.35, 0.3, 0.62)(o, 'atmosphere') // haze tints the air : muted, never a bright wash
+    tinted(0.04, 0.3, 0.85, 1.0)(o, 'lightColor') // a warm or cool near-white
+  }
 }
 
 // ── Structural builders ───────────────────────────────────────────────
@@ -231,7 +282,7 @@ const SELF_NODE_IDS = [
   'node-reponse', 'node-datamosh', 'node-feedback', 'node-chronoscan', 'node-sediment',
   'node-scanner', 'node-autocutter', 'node-eternalism', 'node-afterimage',
   'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile',
-  // TD recipes safe to draw blind (Remap and Matte can scramble or hide the
+  // Sidechain recipes safe to draw blind (Remap and Matte can scramble or hide the
   // whole picture with an arbitrary sidechain, so they stay hand-placed).
   'node-lumablur', 'node-gooey', 'node-lookup'
 ]
@@ -277,7 +328,9 @@ function randomRack(
     enabled: true,
     inputs: randomizeInputs(s.id, {}),
     // A random sidechain layer when a convolution node lands, so it isn't inert.
-    ...(s.native ? { sidechain: randSidechain() } : {})
+    // Lookup is the exception : with no sidechain the layer is its own palette,
+    // while a random (often dark or empty) layer would recolor it toward black.
+    ...(s.native && s.id !== 'node-lookup' ? { sidechain: randSidechain() } : {})
   }))
 }
 
@@ -779,8 +832,21 @@ function jitterOneInput(
   shaderId: string,
   d: IsfInputDesc,
   base: number | number[] | undefined,
-  amount: number
+  amount: number,
+  locked = false
 ): number | number[] {
+  const keep = (): number | number[] => base ?? (d.def as number | number[] | undefined) ?? 0
+  // The same "never touch" rules as a full Randomize : skipped inputs, pinned
+  // curated spans, and on the locked finalizers their brightness-critical levels
+  // and every switch (3D, film hold, output shape, surface) stay as set.
+  if (RANDOMIZE_SKIP[shaderId]?.test(d.name)) return keep()
+  if (locked && (d.type === 'bool' || d.type === 'long' || FINISHING_SAFE[shaderId]?.[d.name])) return keep()
+  if (d.type === 'float' || d.type === 'bool' || d.type === 'long') {
+    const dl = typeof d.min === 'number' ? d.min : 0
+    const dh = typeof d.max === 'number' ? d.max : d.type === 'long' && d.values?.length ? Math.max(...d.values) : 1
+    const [lo, hi] = curatedRange(shaderId, d.name, [dl, dh])
+    if (lo === hi) return keep()
+  }
   switch (d.type) {
     case 'float': {
       const declaredLo = typeof d.min === 'number' ? d.min : 0
@@ -829,10 +895,11 @@ function jitterOneInput(
 function jitterInputs(
   shaderId: string,
   base: Record<string, number | number[]>,
-  amount: number
+  amount: number,
+  locked = false
 ): Record<string, number | number[]> {
   const out: Record<string, number | number[]> = { ...base }
-  for (const d of inputsForShader(shaderId)) out[d.name] = jitterOneInput(shaderId, d, base[d.name], amount)
+  for (const d of inputsForShader(shaderId)) out[d.name] = jitterOneInput(shaderId, d, base[d.name], amount, locked)
   return out
 }
 
@@ -849,7 +916,7 @@ function jitterFxArray(fx: FxInstance[], amount: number): FxInstance[] {
     const amt = f.locked ? amount * 0.4 : amount
     return {
       ...f,
-      inputs: jitterInputs(f.shaderId, f.inputs, amt),
+      inputs: jitterInputs(f.shaderId, f.inputs, amt, !!f.locked),
       opacity: clampN((f.opacity ?? 1) + (rnd() * 2 - 1) * amt * 0.3, 0, 1)
     }
   })

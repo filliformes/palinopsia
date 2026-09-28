@@ -27,7 +27,7 @@ export const SHADER_BLURBS: Record<string, string> = {
   'fx-solarize':
     'Inverts only the parts of the image brighter than a chosen level, leaving the rest alone. Highlights turn inside-out while shadows stay normal, which is the strange tonal flip you see in darkroom prints. Subtle settings read as a glow; extreme ones read as a negative.',
   'fx-vibe':
-    'The always-on color finish for the whole output, and the single biggest influence on how a session looks. It stretches the picture to use its full tonal range, then grades it and can map it through a palette. Every global Randomize leaves it alone, so your chosen look survives.',
+    'The always-on color finish for the whole output, and the single biggest influence on how a session looks. It grades the picture and maps it through a palette of your own stops or a generated color chord, and its auto-levels can stretch it to its full tonal range. A full global Randomize keeps it as it is and a partial one only nudges it, so your chosen look survives; the Finishing dice re-rolls it.',
 
   // ── Stylize ──────────────────────────────────────────────────────────
   'fx-dither':
@@ -183,9 +183,9 @@ export const SHADER_BLURBS: Record<string, string> = {
 
   // ── The pinned finalizers ────────────────────────────────────────────
   'fx-context':
-    'The always-on depth stage, and what makes an image feel like it occupies space. It adds trails that bleed color through time, a soft key light, atmospheric haze, blur and a darkening toward the edges. Every control at zero is a clean passthrough, so it only does what you ask of it.',
+    'The always-on depth stage, and what makes an image feel like it occupies space. It adds trails that bleed color through time, a soft key light, atmospheric haze, a ghosting or smooth blur and a darkening toward the edges. Every control at zero is a clean passthrough, so it only does what you ask of it.',
   'fx-finalizer':
-    'The last stage before the picture leaves the app, and the one that decides its final contrast and texture. It holds the master levels and gamma, sharpening, and film grain over everything. It also carries the output shaping, the anaglyph 3D stage and the cameraless film treatments.'
+    'The last stage before the picture leaves the app, and the one that decides its final contrast and texture. It holds the master levels and gamma, an opacity fader, sharpening, and film grain over the graded picture. It also carries the output shaping, the anaglyph 3D stage and the cameraless film treatments.'
 }
 
 /** Hover text for one shader, if we have written one. */

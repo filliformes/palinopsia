@@ -23,8 +23,11 @@ export interface NodeContext {
   sidechain: WebGLTexture | null // the impulse source (null ⇒ node is inert)
   sidechain2?: WebGLTexture | null // a second input (the Matte node's matte)
   inputs: Record<string, number | number[]> // param values (from the FxInstance)
-  dt: number
-  depth?: WebGLTexture | null // shared scene-depth map (Depth engine), if any
+  dt: number // seconds of THIS rack's clock (layer Speed / global speed / background 0.25x applied; 0 when frozen)
+  depth?: WebGLTexture | null // shared scene-depth map : null when Depth is off (no flat stand-in)
+  audioTex?: WebGLTexture | null // the shared 128x2 R8 audio texture (row 0 waveform at v .25, row 1 log spectrum at v .75)
+  frame?: number // engine frame counter : a node that sees a gap (frame !== last + 1) was just (re)enabled
+  bpm?: number // the transport tempo, for beat-synced nodes
 }
 
 export interface ConvNode {

@@ -5,25 +5,28 @@
 //
 // Applied once, right after the background composites and BEFORE the layers do,
 // so the shadow sits in the background and the foreground lands on top of it.
-// A no-op at depth 0. Presence is luma-based (weighted by each layer's opacity),
-// so a full-frame generator barely shadows while a figure-on-black casts a clear
-// halo : exactly where depth reads.
+// A no-op at depth 0. Presence is luma-based (weighted by each layer's opacity
+// and its own alpha, so transparent areas cast nothing), so a full-frame generator
+// barely shadows while a figure-on-black casts a clear halo : exactly where depth
+// reads. The mask is built at a fixed 540-line resolution, so the blur and the
+// offset are the same share of the frame at 1080p, 4K or on a 4096 dome master.
 
 const VS = `#version 300 es
 in vec2 p; out vec2 vUV;
 void main(){ vUV = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }`
 
-// Foreground presence = max opacity-weighted luma across the four layers.
+// Foreground presence = max opacity- and alpha-weighted luma across the four layers
+// (straight alpha : color left in a transparent area must not cast a shadow).
 const MASK_FS = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uL0, uL1, uL2, uL3; uniform vec4 uW;
-float L(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
+float L(vec4 c){ return dot(c.rgb, vec3(0.299, 0.587, 0.114)) * c.a; }
 void main(){
   float p = 0.0;
-  p = max(p, L(texture(uL0, vUV).rgb) * uW.x);
-  p = max(p, L(texture(uL1, vUV).rgb) * uW.y);
-  p = max(p, L(texture(uL2, vUV).rgb) * uW.z);
-  p = max(p, L(texture(uL3, vUV).rgb) * uW.w);
+  p = max(p, L(texture(uL0, vUV)) * uW.x);
+  p = max(p, L(texture(uL1, vUV)) * uW.y);
+  p = max(p, L(texture(uL2, vUV)) * uW.z);
+  p = max(p, L(texture(uL3, vUV)) * uW.w);
   o = vec4(p, p, p, 1.0);
 }`
 
@@ -45,12 +48,13 @@ const APPLY_FS = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uBg, uMask; uniform float uDepth; uniform vec2 uOffset;
 void main(){
-  vec3 bg = texture(uBg, vUV).rgb;
+  vec4 bgA = texture(uBg, vUV);
+  vec3 bg = bgA.rgb;
   float halo = texture(uMask, vUV + uOffset).r;
   float core = texture(uMask, vUV).r;
   float shadow = clamp(halo - core * 0.5, 0.0, 1.0);
   bg *= 1.0 - clamp(uDepth, 0.0, 1.0) * 0.85 * shadow;
-  o = vec4(bg, 1.0);
+  o = vec4(bg, bgA.a);
 }`
 
 interface Prog {
@@ -166,8 +170,10 @@ export class DepthShadow {
     h: number
   ): void {
     const gl = this.gl
-    const hw = Math.max(2, Math.floor(w / 2))
-    const hh = Math.max(2, Math.floor(h / 2))
+    // A fixed 540-line mask (half-res at 1080p, as before) : its texels, and so the
+    // blur radius, are the same share of the frame at any output size.
+    const hh = 540
+    const hw = Math.max(2, Math.round((540 * w) / Math.max(1, h)))
     this.ensure(hw, hh)
     const a = this.a!
     const b = this.b!
@@ -210,10 +216,12 @@ export class DepthShadow {
     gl.uniform1i(this.applyP.u('uBg'), 0)
     gl.uniform1i(this.applyP.u('uMask'), 1)
     gl.uniform1f(this.applyP.u('uDepth'), depth)
-    // Shadow falls down-right; engine space is bottom-left, so down = -y. Longer
-    // with depth for a lifted, further-above feel.
-    const off = 0.004 * (0.5 + depth)
-    gl.uniform2f(this.applyP.u('uOffset'), off, -off)
+    // Shadow falls down-right (like the output shaper's default). The offset moves
+    // the MASK lookup, so it points the other way : a pixel is shadowed by content
+    // up-left of it (engine space is bottom-left, so up = +y). In frame heights,
+    // aspect-correct (45 degrees on any frame), longer with depth for a lifted feel.
+    const off = 0.0058 * (0.5 + depth)
+    gl.uniform2f(this.applyP.u('uOffset'), -off * (h / Math.max(1, w)), off)
     draw(targetFbo, w, h)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     gl.bindVertexArray(null)

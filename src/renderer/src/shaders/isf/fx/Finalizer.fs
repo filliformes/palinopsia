@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Finalizer : the last always-on master stage after Context: a final 'EQ/compressor' for the whole output. LEVELS (input black/white + gamma + per-channel R/G/B gain + alpha, video-editor-style) for the finishing grade, a round of SHARPEN, and the physically-modeled GRAIN (film / digital sensor / CRT / VHS) laid over everything so the whole image shares one grain structure. All neutral at defaults.",
+  "DESCRIPTION": "Finalizer : the last always-on master stage after Context: a final 'EQ/compressor' for the whole output. LEVELS (input black/white + gamma + per-channel R/G/B gain, video-editor-style, and an OPACITY that fades the whole output toward black) for the finishing grade, a round of SHARPEN, and the physically-modeled GRAIN (film / digital sensor / CRT / VHS) over the whole graded picture so it shares one grain structure (grain size counts 1080p pixels and scales with the output). The output shape fill, film damage and the cameraless granulation are added after this shader, natively, so they carry no grain. All neutral at defaults.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color", "Master"],
@@ -11,7 +11,7 @@
     { "NAME": "rGain",     "TYPE": "float", "MIN": 0.0, "MAX": 2.0, "DEFAULT": 1.0, "LABEL": "R gain" },
     { "NAME": "gGain",     "TYPE": "float", "MIN": 0.0, "MAX": 2.0, "DEFAULT": 1.0, "LABEL": "G gain" },
     { "NAME": "bGain",     "TYPE": "float", "MIN": 0.0, "MAX": 2.0, "DEFAULT": 1.0, "LABEL": "B gain" },
-    { "NAME": "alpha",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "A" },
+    { "NAME": "alpha",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "opacity" },
     { "NAME": "sharpen",   "TYPE": "float", "MIN": 0.0, "MAX": 2.0, "DEFAULT": 0.0 },
     { "NAME": "character", "TYPE": "long", "VALUES": [0, 1, 2, 3], "LABELS": ["digital", "film", "crt", "vhs"], "DEFAULT": 1 },
     { "NAME": "grain",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "grain amount" },
@@ -36,6 +36,7 @@
     { "NAME": "filmDirt",   "TYPE": "long",  "VALUES": [0, 1, 2], "LABELS": ["print", "mixed", "negative"], "DEFAULT": 0, "LABEL": "dirt on" },
     { "NAME": "filmGranule","TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "film granulation" },
     { "NAME": "filmSplice", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "film splice" },
+    { "NAME": "filmGrab",   "TYPE": "event", "DEFAULT": false, "LABEL": "grab frame ▸" },
     { "NAME": "outShape", "TYPE": "long", "VALUES": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
       "LABELS": ["none","circle","square","rectangle","triangle","pentagon","hexagon","heptagon","octagon","diamond","star 5","star 6","ellipse","rounded","cross","ring","half-circle","heart","crescent","trapezoid","capsule"],
       "DEFAULT": 0, "LABEL": "out shape" },
@@ -96,12 +97,16 @@ void main() {
   float band = 0.0;
   bool vhsPar = character == 3 && grain > 0.001 && parasites > 0.001;
   vec2 uv = vhsPar ? vhsWarp(uv0, parasites, TIME, band) : uv0;
+  // A torn / jittered line shows the blanking (black) where it slides past the
+  // frame edge, as on tape, instead of smearing the edge column across it.
+  float inFrame = (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) ? 1.0 : 0.0;
   vec4 src = IMG_NORM_PIXEL(inputImage, uv);
 
   // ── LEVELS: input black/white → gamma → per-channel gain ──
   vec3 c = gradePix(uv);
 
   // ── SHARPEN (luma unsharp mask on the source detail) ──
+  float shp = 0.0;
   if (sharpen > 0.001) {
     vec2 px = 1.0 / RENDERSIZE;
     vec2 cl = uv + vec2(-px.x, 0.0);
@@ -112,7 +117,8 @@ void main() {
     float lc = dot(src.rgb, lw);
     float blur = (dot(IMG_NORM_PIXEL(inputImage, cl).rgb, lw) + dot(IMG_NORM_PIXEL(inputImage, cr).rgb, lw) +
                   dot(IMG_NORM_PIXEL(inputImage, cu).rgb, lw) + dot(IMG_NORM_PIXEL(inputImage, cd).rgb, lw)) * 0.25;
-    c += (lc - blur) * sharpen;
+    shp = (lc - blur) * sharpen;
+    c += shp;
   }
 
   // ── ANAGLYPH 3D (red/cyan stereoscopy) ──────────────────────────────
@@ -129,7 +135,7 @@ void main() {
     vec3 leftEye = gradePix(uv - vec2(sep, 0.0));   // red channel
     vec3 rightEye = gradePix(uv + vec2(sep, 0.0));  // cyan channels
     if (stereo == 2) {
-      // Gray/half-colour anaglyph : feed luma to each eye (less retinal rivalry,
+      // Gray/half-color anaglyph : feed luma to each eye (less retinal rivalry,
       // classic for abstract relief where hue would fight the filters).
       float lL = dot(leftEye, vec3(0.299, 0.587, 0.114));
       float lR = dot(rightEye, vec3(0.299, 0.587, 0.114));
@@ -137,16 +143,21 @@ void main() {
     } else {
       c = vec3(leftEye.r, rightEye.g, rightEye.b);
     }
+    c += shp; // the sharpen detail rides both eyes
   }
+  c *= inFrame;
 
   // ── GRAIN over the graded image (one shared grain structure) ──
   float l = clamp(dot(c, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
   vec3 add = vec3(0.0);
+  // Grain size counts 1080p pixels : the same grain relative to the picture on
+  // a 4K or 4096 master (it used to shrink 2-4x there).
+  float gs = max(grainSize, 1.0) * max(1.0, RENDERSIZE.y / 1080.0);
   if (grain > 0.001) {
     if (character == 1) {
       float seed = mod(floor(TIME * 24.0), 32749.0);
       vec2 jit = hash22(vec2(seed, 1.0)) * 64.0;
-      vec2 p = gl_FragCoord.xy / (max(grainSize, 1.0) * 1.9) + jit;
+      vec2 p = gl_FragCoord.xy / (gs * 1.9) + jit;
       float g = vnoise(p) * 0.62 + vnoise(p * 2.3 + 11.0) * 0.38 - 0.5;
       g = sign(g) * pow(abs(g) * 2.0, 1.3) * 0.5;
       float mid = pow(1.0 - abs(2.0 * l - 1.0), 0.6);
@@ -157,29 +168,33 @@ void main() {
       add = gn * grain * 1.15 * mid;
     } else if (character == 0) {
       float fs = mod(floor(TIME * 30.0), 4096.0);
-      vec2 pxg = gl_FragCoord.xy / max(grainSize, 1.0);
-      float shot = gauss(hash21(pxg + fs * 7.3), hash21(pxg + fs * 7.3 + 57.0)) * sqrt(clamp(l, 0.02, 1.0));
-      float read = gauss(hash21(pxg + fs * 7.3 + 123.0), hash21(pxg + fs * 7.3 + 199.0)) * 0.5;
-      float prnu = (hash21(floor(pxg)) - 0.5) * 0.12 * l;
+      // One sensel per grain cell : the hash needs whole-number-spaced input
+      // (an unfloored coordinate made the size knob do nothing). The frame
+      // offset is wrapped small so the hash keeps its precision.
+      vec2 pxg = floor(gl_FragCoord.xy / gs);
+      vec2 fo = vec2(mod(fs * 37.0, 1024.0), mod(fs * 91.0, 1024.0));
+      float shot = gauss(hash21(pxg + fo), hash21(pxg + fo + 57.0)) * sqrt(clamp(l, 0.02, 1.0));
+      float read = gauss(hash21(pxg + fo + 123.0), hash21(pxg + fo + 199.0)) * 0.5;
+      float prnu = (hash21(pxg) - 0.5) * 0.12 * l;
       vec3 gn = vec3(shot * 0.7 + read * 0.45 + prnu);
       if (chroma > 0.001) {
-        float cn = hash21(pxg * 0.5 + fs * 3.0) - 0.5;
+        float cn = hash21(floor(pxg * 0.5) + fo * 0.5) - 0.5;
         gn += vec3(cn, -cn * 0.3, -cn) * chroma * 0.35 * (1.0 - l * 0.7);
       }
       add = gn * grain * 0.55;
     } else if (character == 2) {
-      float row = floor(gl_FragCoord.y / max(grainSize, 1.0));
+      float row = floor(gl_FragCoord.y / gs);
       float seed = mod(floor(TIME * 50.0), 4096.0);
-      vec2 cell = vec2(floor(gl_FragCoord.x / max(grainSize, 1.0)), row);
-      float n = (hash21(cell + seed * 17.3) - 0.5) * (0.5 + hash21(vec2(row, seed)));
+      vec2 cell = vec2(floor(gl_FragCoord.x / gs), row);
+      float n = (hash21(cell + mod(seed * 17.3, 1024.0)) - 0.5) * (0.5 + hash21(vec2(mod(row, 1024.0), seed)));
       float w = 0.35 + 0.65 * smoothstep(0.0, 0.4, l);
       add = vec3(n) * grain * w;
       if (parasites > 0.001) c = crtParasites(c, uv0, parasites, TIME);
     } else {
-      float row = floor(gl_FragCoord.y / max(grainSize, 1.0));
+      float row = floor(gl_FragCoord.y / gs);
       float seed = mod(floor(TIME * 30.0), 4096.0);
-      float smear = vnoise(vec2(gl_FragCoord.x / (max(grainSize, 1.0) * 14.0), row * 0.7 + seed * 3.0)) - 0.5;
-      float fine = (hash21(vec2(floor(gl_FragCoord.x / max(grainSize, 1.0)), row) + seed * 13.1) - 0.5) * 0.5;
+      float smear = vnoise(vec2(gl_FragCoord.x / (gs * 14.0), row * 0.7 + seed * 3.0)) - 0.5;
+      float fine = (hash21(vec2(floor(gl_FragCoord.x / gs), row) + mod(seed * 13.1, 1024.0)) - 0.5) * 0.5;
       float chromaErr = vnoise(vec2(row * 0.4, seed * 2.0)) - 0.5;
       vec3 noise = vec3(smear * 0.7 + fine) + vec3(chromaErr * 0.6, 0.0, -chromaErr * 0.6);
       float w = 0.4 + 0.6 * smoothstep(0.0, 0.35, l);
@@ -189,5 +204,7 @@ void main() {
   }
   c += add;
 
-  gl_FragColor = vec4(clamp(c, 0.0, 1.0), src.a * alpha);
+  // Opacity fades the picture toward black. (As a straight alpha it reached no
+  // output : every capture is opaque, and the preview only showed the panel.)
+  gl_FragColor = vec4(clamp(c, 0.0, 1.0) * clamp(alpha, 0.0, 1.0), src.a);
 }

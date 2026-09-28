@@ -7,6 +7,7 @@ generator or effect can be checked without launching the app.
 ```
 cd tools/shader-rig
 node build.cjs                                   # after every shader / registry edit
+# (node build.cjs --out <dir> writes a runnable rig to <dir>; run electron there)
 SRCH_PORT=9461 ../../node_modules/electron/dist/electron.exe . &
 node h.cjs 9461 check slabs,ten-print            # generators
 node h.cjs 9461 fxcheck fx-grain,fx-decay        # effects, fed a moving test card

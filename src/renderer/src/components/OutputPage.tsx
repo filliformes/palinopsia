@@ -812,7 +812,7 @@ export function OutputPage({
             </div>
           </Section>
 
-          <Section title="Flash safety" defaultCollapsed info="A safety net on the final image: it measures whole-frame brightness each frame and damps big full-field flashes (Shutter, Superimposition, Frame-Weave, datamosh, hard cuts…) so no seizure-inducing strobe reaches the screen. Normal motion is untouched. Mild is on by default and barely affects ordinary content.">
+          <Section title="Flash safety" defaultCollapsed info="A safety net on the final image, after the common flash-safety guidance (no more than three flashes a second). It measures brightness in linear light, plus saturated red, over regions of the frame, and counts each region's flashes over the last second. A region that flashes faster than the limit (Shutter, Superimposition, Frame-Weave, film blanks, strobe-paced cuts…) is held to a gentle pulse until it stops; cuts, motion and everything else pass untouched. Mild is on by default. It lowers the risk; it can't promise that no harmful flash ever gets through.">
 
             <div className="flex items-center gap-2">
               <input
@@ -824,7 +824,7 @@ export function OutputPage({
                 onChange={(e) => setStrobeSafe(Number(e.target.value))}
                 onDoubleClick={() => setStrobeSafe(0.35)}
                 className="min-w-0 flex-1 accent-accent"
-                title="Photosensitive-safety limiter : caps how fast the whole picture can flash. Applies to the preview AND the projection."
+                title="Photosensitive-safety limiter : counts flashes per second and holds only the regions that strobe. Higher = fewer flashes pass before it holds, and a gentler pulse once it does. Applies to the preview AND every output."
               />
               <span className="w-24 shrink-0 text-right font-mono text-[11px] text-muted">
                 {strobeSafe < 0.02 ? 'off' : `${Math.round(strobeSafe * 100)}%`}

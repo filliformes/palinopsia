@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Context : the always-on DEPTH finalizer, pinned last in the master chain after Vibe. It gives an image the dimensionality that makes it feel lifelike: temporal TRAILS (colors bleeding into one another over time, drifting gently into the distance), a soft key LIGHT with volumetric BLOOM on the highlights, atmospheric HAZE for aerial perspective, spatial BLUR, and a DEPTH vignette that seats the picture in space. Every parameter at zero is a clean passthrough : turn them up to add air, glow and magic.",
+  "DESCRIPTION": "Context : the always-on DEPTH finalizer, pinned last in the master chain after Vibe. It gives an image the dimensionality that makes it feel lifelike: temporal TRAILS (colors bleeding into one another over time, swelling gently outward toward you), a soft key LIGHT with volumetric BLOOM on the highlights, atmospheric HAZE for aerial perspective, spatial BLUR (a ring of ghost copies by default, a jittered soft blur as ghosts↔smooth goes up), and a DEPTH vignette that seats the picture in space. Every parameter at zero is a clean passthrough on the same frame (the output is always opaque) : turn them up to add air, glow and magic.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color", "Master"],
@@ -8,6 +8,7 @@
     { "NAME": "trails",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2,  "LABEL": "trails" },
     { "NAME": "blur",       "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.08, "LABEL": "blur" },
     { "NAME": "bloom",      "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3,  "LABEL": "bloom" },
+    { "NAME": "smoothing",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0,  "LABEL": "ghosts↔smooth" },
     { "NAME": "depth",      "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "depth" },
     { "NAME": "haze",       "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "haze" },
     { "NAME": "atmosphere", "TYPE": "color", "DEFAULT": [0.5, 0.58, 0.72, 1.0], "LABEL": "atmosphere" },
@@ -49,20 +50,44 @@ float vFbm(vec2 p) {
   return s;
 }
 
+// Interleaved gradient noise : a per-pixel jitter that spreads sparse ring taps
+// into a smooth disc (the `smoothing` control).
+float ign(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
+
+// TRAILS : the live frame blended with a slightly zoomed copy of the previous
+// trailed frame, so colors bleed together and swell gently outward (the zoom
+// scales with depth). Frame-rate independent (tuned at 60 fps) and stepping at
+// least one 8-bit level toward the live frame, so even trails 1 clears instead
+// of leaving a faint ghost for good. Capped below 1 : always a leaky
+// integrator, never an infinite hold or a runaway. An empty buffer (first frame,
+// PANIC, resize) starts from the live frame, not from black.
+float gDt60;
+float gK;
+float gZoom;
+vec4 trailAt(vec2 c) {
+  vec4 cur = IMG_NORM_PIXEL(inputImage, c);
+  if (gK < 0.0005) return cur;
+  vec2 tc = (c - 0.5) * gZoom + 0.5;
+  vec4 prev = IMG_NORM_PIXEL(buf, tc);
+  if (prev.a < 0.5 / 255.0) return cur;
+  vec4 d = prev - cur;
+  return cur + sign(d) * max(abs(d) * gK - 1.0 / 255.0, 0.0);
+}
+
 void main() {
   vec2 uv = isf_FragNormCoord;
+  gDt60 = clamp(TIMEDELTA, 0.004, 0.25) * 60.0;
+  gK = pow(clamp(trails, 0.0, 1.0) * 0.9, gDt60);
+  gZoom = pow(1.0 - depth * 0.012, gDt60);
 
   if (PASSINDEX == 0) {
-    // TRAILS: blend the live frame with a slightly zoomed copy of the previous
-    // trailed frame, so colours bleed together and drift gently into the
-    // distance (the zoom scales with depth). Capped below 1 so it always
-    // decays : a leaky integrator, never an infinite hold or a runaway.
-    vec4 cur = IMG_NORM_PIXEL(inputImage, uv);
-    vec2 tuv = (uv - 0.5) * (1.0 - depth * 0.012) + 0.5;
-    vec4 prev = IMG_NORM_PIXEL(buf, tuv);
-    gl_FragColor = mix(cur, prev, trails * 0.9);
+    gl_FragColor = trailAt(uv);
     return;
   }
+  // Pass 1 rebuilds the trailed frame at every tap (live frame + last frame's
+  // trail buffer) instead of reading this frame's pass 0, which the ISF runtime
+  // only flips after the last pass : that read put the whole master output one
+  // frame late.
 
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
 
@@ -80,7 +105,7 @@ void main() {
     // PARALLAX OCCLUSION MAPPING : ray-march the height field so the projected
     // image is displaced by the true DEPTH of each feature (sinks into crevices,
     // rides over bumps) : the "projected onto a complex 3D surface" warp, not a
-    // flat nudge. A gentle perspective throw from centre makes features near the
+    // flat nudge. A gentle perspective throw from center makes features near the
     // edges parallax more, as a real projector throw would.
     // FIELD DEPTH (pbrDepth) = viewing distance. Stepping BACK : you see MORE of
     // the surface (it tiles denser), the relief flattens, and the perspective
@@ -105,25 +130,33 @@ void main() {
       sin(wq.x * 5.3 + wq.y * 2.1) + 0.5 * sin(wq.y * 9.7 - wq.x * 3.3),
       cos(wq.y * 4.7 - wq.x * 2.7) + 0.5 * cos(wq.x * 8.9 + wq.y * 3.1)
     ) * 0.04;
-    vec2 stepUV = vdir * amp / 24.0;
+    // vdir is in aspect space (x scaled by aspect); march in uv, so the throw
+    // is the same length horizontally and vertically.
+    vec2 vuv = vdir / vec2(aspect, 1.0);
+    vec2 stepUV = vuv * amp / 24.0;
     float layer = 1.0 / 24.0;
     vec2 pp = uv;
     float curD = 0.0;
-    float hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, (vec2(pp.x * aspect, pp.y) + warp) * pscl).r;
+    // (Height-map coordinates are hoisted into bare vec2s : the ISF parser
+    // splits IMG_NORM_PIXEL's argument on commas and silently drops the rest.)
+    vec2 hc = (vec2(pp.x * aspect, pp.y) + warp) * pscl;
+    float hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, hc).r;
     for (int i = 0; i < 24; i++) {
       if (curD >= hd) break;
       pp += stepUV;
-      hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, (vec2(pp.x * aspect, pp.y) + warp) * pscl).r;
+      hc = (vec2(pp.x * aspect, pp.y) + warp) * pscl;
+      hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, hc).r;
       curD += layer;
     }
     // Refine : interpolate the exact crossing so the surface reads smooth.
     vec2 prev = pp - stepUV;
     float aft = hd - curD;
-    float bef = (1.0 - IMG_NORM_PIXEL(pbrHeight, (vec2(prev.x * aspect, prev.y) + warp) * pscl).r) - (curD - layer);
+    vec2 hp = (vec2(prev.x * aspect, prev.y) + warp) * pscl;
+    float bef = (1.0 - IMG_NORM_PIXEL(pbrHeight, hp).r) - (curD - layer);
     pp = mix(pp, prev, clamp(aft / (aft - bef + 1e-4), 0.0, 1.0));
     // Reference to the mid-plane (height 0.5) so a FLAT/neutral map (texture off)
     // gives ZERO displacement; raised vs recessed features then shift oppositely.
-    uv = pp - vdir * amp * 0.5;                        // parallax-corrected sample point
+    uv = pp - vuv * amp * 0.5;                         // parallax-corrected sample point
 
     vec2 tuv = (vec2(uv.x * aspect, uv.y) + warp) * pscl;
     pnrm = normalize(IMG_NORM_PIXEL(pbrNormal, tuv).rgb * 2.0 - 1.0);
@@ -139,59 +172,97 @@ void main() {
     if (Ls.z > 0.03) {
       float surfH = IMG_NORM_PIXEL(pbrHeight, tuv).r;
       float occ = 0.0;
+      vec2 Luv = Ls.xy / vec2(aspect, 1.0); // aspect space -> uv
       for (int j = 1; j <= 10; j++) {
-        vec2 sp = uv + Ls.xy * amp * 1.6 * (float(j) / 10.0);
-        float hs = IMG_NORM_PIXEL(pbrHeight, (vec2(sp.x * aspect, sp.y) + warp) * pscl).r;
+        vec2 sp = uv + Luv * amp * 1.6 * (float(j) / 10.0);
+        vec2 sc = (vec2(sp.x * aspect, sp.y) + warp) * pscl;
+        float hs = IMG_NORM_PIXEL(pbrHeight, sc).r;
         occ = max(occ, hs - surfH - float(j) / 10.0 * 0.10);
       }
       pshadow = clamp(1.0 - occ * (5.0 + pbrLight * 11.0), 0.02, 1.0);
     }
   }
 
-  // ── BLUR : 9-tap ring; at blur==0 every tap coincides, so it's identity. ──
-  float rb = blur * 0.03;
+  // ── BLUR : a 9-tap ring (center + 8). Its sparse taps read as a ring of
+  //    ghost copies at larger radii : that double-vision IS the default look.
+  //    `smoothing` jitters the ring per pixel (rotation + radius) into a soft,
+  //    grainy-smooth disc. Radii are in frame heights, aspect-correct (sized so
+  //    the area matches the old 16:9 ellipse). At blur 0 every tap coincides. ──
+  vec2 toUv = vec2(1.0 / aspect, 1.0);
+  float jr = ign(gl_FragCoord.xy);
+  float jd = ign(gl_FragCoord.xy + vec2(47.0, 17.0));
+  float ang = (jr - 0.5) * smoothing * 0.7853982;       // up to +-22.5 deg : fills between the 8 taps
+  float rad = mix(1.0, 0.3 + 0.7 * jd, smoothing);       // and scatters the radius into the disc
+  vec2 ex = vec2(cos(ang), sin(ang)) * rad;           // rotated unit axes
+  vec2 ey = vec2(-ex.y, ex.x);
+  float rb = blur * 0.04;
+  vec2 ax = ex * rb * toUv;
+  vec2 ay = ey * rb * toUv;
   vec2 c0 = uv;
-  vec2 c1 = uv + vec2( rb, 0.0);
-  vec2 c2 = uv + vec2(-rb, 0.0);
-  vec2 c3 = uv + vec2(0.0,  rb);
-  vec2 c4 = uv + vec2(0.0, -rb);
-  vec2 c5 = uv + vec2( rb,  rb) * 0.71;
-  vec2 c6 = uv + vec2(-rb,  rb) * 0.71;
-  vec2 c7 = uv + vec2( rb, -rb) * 0.71;
-  vec2 c8 = uv + vec2(-rb, -rb) * 0.71;
-  vec3 s0 = IMG_NORM_PIXEL(buf, c0).rgb;
-  vec3 s1 = IMG_NORM_PIXEL(buf, c1).rgb;
-  vec3 s2 = IMG_NORM_PIXEL(buf, c2).rgb;
-  vec3 s3 = IMG_NORM_PIXEL(buf, c3).rgb;
-  vec3 s4 = IMG_NORM_PIXEL(buf, c4).rgb;
-  vec3 s5 = IMG_NORM_PIXEL(buf, c5).rgb;
-  vec3 s6 = IMG_NORM_PIXEL(buf, c6).rgb;
-  vec3 s7 = IMG_NORM_PIXEL(buf, c7).rgb;
-  vec3 s8 = IMG_NORM_PIXEL(buf, c8).rgb;
-  vec3 col = s0 * 0.28 + (s1 + s2 + s3 + s4) * 0.12 + (s5 + s6 + s7 + s8) * 0.06;
+  vec2 c1 = uv + ax;
+  vec2 c2 = uv - ax;
+  vec2 c3 = uv + ay;
+  vec2 c4 = uv - ay;
+  vec2 c5 = uv + (ax + ay) * 0.71;
+  vec2 c6 = uv + (ay - ax) * 0.71;
+  vec2 c7 = uv + (ax - ay) * 0.71;
+  vec2 c8 = uv - (ax + ay) * 0.71;
+  vec3 s0 = trailAt(c0).rgb;
+  vec3 col = s0;
+  if (blur > 0.0005) {
+    vec3 s1 = trailAt(c1).rgb;
+    vec3 s2 = trailAt(c2).rgb;
+    vec3 s3 = trailAt(c3).rgb;
+    vec3 s4 = trailAt(c4).rgb;
+    vec3 s5 = trailAt(c5).rgb;
+    vec3 s6 = trailAt(c6).rgb;
+    vec3 s7 = trailAt(c7).rgb;
+    vec3 s8 = trailAt(c8).rgb;
+    col = s0 * 0.28 + (s1 + s2 + s3 + s4) * 0.12 + (s5 + s6 + s7 + s8) * 0.06;
+  }
 
-  // ── BLOOM : wide ring, keep only the bright part, add it back as glow. ──
-  float rg = 0.012 + bloom * 0.05;
-  vec2 g1 = uv + vec2( rg, 0.0);
-  vec2 g2 = uv + vec2(-rg, 0.0);
-  vec2 g3 = uv + vec2(0.0,  rg);
-  vec2 g4 = uv + vec2(0.0, -rg);
-  vec2 g5 = uv + vec2( rg,  rg) * 0.71;
-  vec2 g6 = uv + vec2(-rg,  rg) * 0.71;
-  vec2 g7 = uv + vec2( rg, -rg) * 0.71;
-  vec2 g8 = uv + vec2(-rg, -rg) * 0.71;
-  vec3 h1 = IMG_NORM_PIXEL(buf, g1).rgb;
-  vec3 h2 = IMG_NORM_PIXEL(buf, g2).rgb;
-  vec3 h3 = IMG_NORM_PIXEL(buf, g3).rgb;
-  vec3 h4 = IMG_NORM_PIXEL(buf, g4).rgb;
-  vec3 h5 = IMG_NORM_PIXEL(buf, g5).rgb;
-  vec3 h6 = IMG_NORM_PIXEL(buf, g6).rgb;
-  vec3 h7 = IMG_NORM_PIXEL(buf, g7).rgb;
-  vec3 h8 = IMG_NORM_PIXEL(buf, g8).rgb;
-  vec3 bsum = (h1 + h2 + h3 + h4 + h5 + h6 + h7 + h8) * 0.125;
-  float bl = max(max(bsum.r, bsum.g), bsum.b);
-  vec3 bright = bsum * smoothstep(0.5, 0.95, bl);
-  col += bright * bloom * 1.4;
+  // ── BLOOM : a wide ring, keep only the bright part, add it back as glow.
+  //    Default (smoothing 0) thresholds the ring AVERAGE : only broad highlights
+  //    glow, with a stepped, scalloped halo. Toward smoothing 1 each tap (and the
+  //    center) is thresholded on its own and the ring is jittered, so small
+  //    highlights bloom too, as a soft round glow. ──
+  if (bloom > 0.0005) {
+    float rg = (0.012 + bloom * 0.05) * 1.3333;
+    vec2 gx = ex * rg * toUv;
+    vec2 gy = ey * rg * toUv;
+    vec2 g1 = uv + gx;
+    vec2 g2 = uv - gx;
+    vec2 g3 = uv + gy;
+    vec2 g4 = uv - gy;
+    vec2 g5 = uv + (gx + gy) * 0.71;
+    vec2 g6 = uv + (gy - gx) * 0.71;
+    vec2 g7 = uv + (gx - gy) * 0.71;
+    vec2 g8 = uv - (gx + gy) * 0.71;
+    vec3 h1 = trailAt(g1).rgb;
+    vec3 h2 = trailAt(g2).rgb;
+    vec3 h3 = trailAt(g3).rgb;
+    vec3 h4 = trailAt(g4).rgb;
+    vec3 h5 = trailAt(g5).rgb;
+    vec3 h6 = trailAt(g6).rgb;
+    vec3 h7 = trailAt(g7).rgb;
+    vec3 h8 = trailAt(g8).rgb;
+    vec3 bsum = (h1 + h2 + h3 + h4 + h5 + h6 + h7 + h8) * 0.125;
+    float bl = max(max(bsum.r, bsum.g), bsum.b);
+    vec3 bright = bsum * smoothstep(0.5, 0.95, bl);
+    if (smoothing > 0.001) {
+      vec3 pt = s0 * smoothstep(0.5, 0.95, max(max(s0.r, s0.g), s0.b));
+      pt += h1 * smoothstep(0.5, 0.95, max(max(h1.r, h1.g), h1.b));
+      pt += h2 * smoothstep(0.5, 0.95, max(max(h2.r, h2.g), h2.b));
+      pt += h3 * smoothstep(0.5, 0.95, max(max(h3.r, h3.g), h3.b));
+      pt += h4 * smoothstep(0.5, 0.95, max(max(h4.r, h4.g), h4.b));
+      pt += h5 * smoothstep(0.5, 0.95, max(max(h5.r, h5.g), h5.b));
+      pt += h6 * smoothstep(0.5, 0.95, max(max(h6.r, h6.g), h6.b));
+      pt += h7 * smoothstep(0.5, 0.95, max(max(h7.r, h7.g), h7.b));
+      pt += h8 * smoothstep(0.5, 0.95, max(max(h8.r, h8.g), h8.b));
+      bright = mix(bright, pt / 9.0, smoothing);
+    }
+    col += bright * bloom * 1.4;
+  }
 
   // ── PBR shading : the relief responds to the key light's direction: facets
   //    toward the light lift, facets away fall into shadow, crevices occlude,
@@ -224,11 +295,11 @@ void main() {
     float spec = pow(clamp(dot(pnrm, H), 0.0, 1.0), mix(mix(18.0, 48.0, rk), 12.0, pbrDepth));
     col += lightColor.rgb * spec * pbrAmount * (0.18 + lightGlow * 0.6 + rk * 0.5) * (1.0 - pbrDepth * 0.4);
     // Atmospheric recession : the stepped-back surface settles a touch toward the
-    // atmosphere colour (the "context" shifts as you pull away).
+    // atmosphere color (the "context" shifts as you pull away).
     col = mix(col, atmosphere.rgb, pbrDepth * 0.14 * pbrAmount);
   }
 
-  // ── KEY LIGHT : a soft radial glow from the light position in its own colour;
+  // ── KEY LIGHT : a soft radial glow from the light position in its own color;
   //    lightSize sweeps it from a tight spot to a broad ambient wash. Computed
   //    once, then added either PRE (before haze + vignette, which wash / darken
   //    it : the old behaviour) or POST (after them, so it punches through haze,
@@ -240,14 +311,14 @@ void main() {
   vec3 keyLight = lightColor.rgb * lg * lightGlow * 1.3;
   if (!lightOrder) col += keyLight; // PRE
 
-  // ── HAZE : the whole frame settles toward the atmosphere colour, strongest
+  // ── HAZE : the whole frame settles toward the atmosphere color, strongest
   //    in the shadows/distance (aerial perspective), with a lighter global veil
   //    over the midtones and highlights so the tint always reads. ──
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
   float atmoAmt = haze * (0.18 + 0.82 * (1.0 - smoothstep(0.0, 0.6, lum)));
   col = mix(col, atmosphere.rgb, atmoAmt);
 
-  // ── DEPTH vignette : a lifted, luminous centre falling to a darker,
+  // ── DEPTH vignette : a lifted, luminous center falling to a darker,
   //    receding rim, seating the frame in a volume. ──
   vec2 dv = (uv - 0.5) * vec2(aspect, 1.0);
   float vig = 1.0 - smoothstep(0.35, 0.95, length(dv));

@@ -18,6 +18,12 @@
 // below, keyed by the full uniform name. The declaration must be one line,
 // `uniform float PH_name;`, single-spaced, for the runtime's uniform scanner.
 //
+// A phase is uploaded as a float32 : after a day at a high rate it steps
+// visibly. A shader that only uses the phase periodically can opt into a wrap :
+//   uniform float PH_rate; // wrap 6.2831853
+// keeps the value in [0, period) (the period must be one the shader's use of
+// the phase repeats on : 1 for fract(), 2π for sin(), 4096 for a tiling noise).
+//
 // dt is the renderer's OWN clock (the layer / background / FX clock the
 // Compositor stamps as TIME), so layer Speed, global speed, freeze and reverse
 // all carry through. Each phase starts at a random offset so two layers
@@ -58,12 +64,14 @@ interface PhaseState {
   uniforms: object
   names: string[]
   fns: Array<(v: Get) => number>
+  wrap: number[] // 0 = never wrap
   val: number[]
   lastT: number
 }
 
 interface PhaseHost {
   uniforms?: Record<string, { value?: unknown }>
+  fragmentShader?: string
   setValue: (name: string, value: number) => void
   __opsiaPh?: PhaseState | null
 }
@@ -95,7 +103,13 @@ export function tickPhases(r: PhaseHost, t: number): void {
       const f = integrandFor(n)
       if (f) { kept.push(n); fns.push(f) }
     }
-    st = { uniforms: u, names: kept, fns, val: kept.map(() => Math.random() * 64), lastT: t }
+    const src = r.fragmentShader ?? ''
+    const wrap = kept.map((n) => {
+      const m = src.match(new RegExp('uniform float ' + n + ';[ \\t]*//[ \\t]*wrap[ \\t]+([0-9.eE+-]+)'))
+      const w = m ? Number(m[1]) : 0
+      return Number.isFinite(w) && w > 0 ? w : 0
+    })
+    st = { uniforms: u, names: kept, fns, wrap, val: kept.map((_, i) => (wrap[i] ? Math.random() * wrap[i] : Math.random() * 64)), lastT: t }
     r.__opsiaPh = st
   }
   if (!st) return
@@ -108,7 +122,10 @@ export function tickPhases(r: PhaseHost, t: number): void {
     return typeof x === 'number' ? x : typeof x === 'boolean' ? (x ? 1 : 0) : 0
   }
   for (let i = 0; i < st.names.length; i++) {
-    st.val[i] += dt * st.fns[i](get)
-    r.setValue(st.names[i], st.val[i])
+    let v = st.val[i] + dt * st.fns[i](get)
+    const w = st.wrap[i]
+    if (w) v = ((v % w) + w) % w
+    st.val[i] = v
+    r.setValue(st.names[i], v)
   }
 }

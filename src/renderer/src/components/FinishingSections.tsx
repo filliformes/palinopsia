@@ -1,7 +1,7 @@
 // The Finishing stages (Vibe Palette · Context · Finalizer) as labelled SECTIONS
 // instead of one flat list : each family of controls gets a thin header in its
-// own colour and a matching rail down its left edge. A section with a master
-// switch (3D stereo, film hold, output shape, PBR surface, colour chord…) carries
+// own color and a matching rail down its left edge. A section with a master
+// switch (3D stereo, film hold, output shape, PBR surface, color chord…) carries
 // that switch IN its header, so the header replaces a row rather than adding one,
 // and a section whose switch is off folds itself away until it's turned on.
 // Folding is remembered per section once you click a header.
@@ -16,11 +16,16 @@ import { useStore } from '../store'
 import { AutoControls, EnumSwitch } from './AutoControls'
 
 type Values = Record<string, number | number[]>
+/** What a dim rule may need beyond the unit's own values. */
+export interface DimCtx {
+  /** The Background slot has no source (the shape's outside fill falls back to its color). */
+  bgEmpty: boolean
+}
 
 export interface FinishingSection {
   id: string
   title: string
-  /** CSS colour of the header text and the rail. */
+  /** CSS color of the header text and the rail. */
   color: string
   /** An enum input shown in the header : the section's master switch / mode. */
   switchInput?: string
@@ -29,8 +34,8 @@ export interface FinishingSection {
   inputs: string[]
   /** Row labels inside this section (only where the header says the rest). */
   labels?: Record<string, string>
-  /** Rows that do nothing right now : name → why (greyed, reason in the tooltip). */
-  dim?: (v: Values) => Record<string, string>
+  /** Rows that do nothing right now : name → why (grayed, reason in the tooltip). */
+  dim?: (v: Values, ctx: DimCtx) => Record<string, string>
   /** A short state read-out for sections without a switch. */
   summary?: (v: Values) => string
 }
@@ -55,13 +60,17 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       title: 'grade',
       color: C.neutral,
       inputs: ['black', 'white', 'gamma', 'rGain', 'gGain', 'bGain', 'alpha', 'sharpen'],
-      labels: { black: 'input black', white: 'input white', alpha: 'alpha' },
+      labels: { black: 'input black', white: 'input white', alpha: 'opacity' },
       summary: (v) =>
         near(num(v, 'black', 0), 0) && near(num(v, 'white', 1), 1) && near(num(v, 'gamma', 1), 1) &&
         near(num(v, 'rGain', 1), 1) && near(num(v, 'gGain', 1), 1) && near(num(v, 'bGain', 1), 1) &&
         near(num(v, 'sharpen', 0), 0)
-          ? 'neutral'
-          : 'graded'
+          ? near(num(v, 'alpha', 1), 1)
+            ? 'neutral'
+            : 'faded'
+          : near(num(v, 'alpha', 1), 1)
+            ? 'graded'
+            : 'graded · faded'
     },
     {
       id: 'character',
@@ -72,7 +81,17 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       labels: { grainSize: 'grain size' },
       dim: (v): Record<string, string> => {
         const c = Math.round(num(v, 'character', 1))
-        return c === 2 || c === 3 ? {} : { parasites: 'Parasites only act with the crt or vhs character.' }
+        const out: Record<string, string> = {}
+        if (num(v, 'grain', 0) <= 0.001) {
+          const why = 'Grain amount is 0 : there is no grain to shape.'
+          out.grainSize = why
+          out.chroma = why
+          out.parasites = 'Parasites need grain above 0 and the crt or vhs character.'
+          return out
+        }
+        if (c === 2 || c === 3) out.chroma = 'Chroma grain only acts with the digital or film character.'
+        else out.parasites = 'Parasites only act with the crt or vhs character (and grain above 0).'
+        return out
       }
     },
     {
@@ -90,7 +109,9 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       color: C.amber,
       switchInput: 'filmHold',
       offValue: 0,
-      inputs: ['filmRate', 'filmJitter', 'filmBoil', 'filmFlutter', 'filmBlank', 'filmBlankMode', 'filmGranule', 'filmSplice'],
+      inputs: ['filmRate', 'filmJitter', 'filmBoil', 'filmFlutter', 'filmBlank', 'filmBlankMode', 'filmGranule', 'filmSplice', 'filmGrab'],
+      dim: (v): Record<string, string> =>
+        num(v, 'filmBlank', 0) <= 0.001 ? { filmBlankMode: 'Blanks are at 0 : no leader frames to color.' } : {},
       labels: {
         filmRate: 'draw fps',
         filmJitter: 'draw timing',
@@ -98,7 +119,8 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
         filmFlutter: 'flutter',
         filmBlank: 'blanks',
         filmGranule: 'granulation',
-        filmSplice: 'splice'
+        filmSplice: 'splice',
+        filmGrab: 'grab ▸'
       }
     },
     {
@@ -107,6 +129,12 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       color: C.earth,
       inputs: ['filmDust', 'filmScratch', 'filmHair', 'filmGauge', 'filmDirt'],
       labels: { filmDust: 'dust', filmScratch: 'scratch', filmGauge: 'gauge' },
+      dim: (v): Record<string, string> => {
+        const any = num(v, 'filmDust', 0) > 0.001 || num(v, 'filmScratch', 0) > 0.001 || num(v, 'filmHair', 0) > 0.001
+        if (any) return {}
+        const why = 'Dust, scratch and hair are all 0 : there is no damage to size or place.'
+        return { filmGauge: why, filmDirt: why }
+      },
       summary: (v) => {
         const on = [
           num(v, 'filmDust', 0) > 0.001 && 'dust',
@@ -131,8 +159,18 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
         outDepth: 'shadow',
         outShadowAngle: 'shadow angle'
       },
-      dim: (v): Record<string, string> =>
-        Math.round(num(v, 'outBgSource', 0)) === 1 ? { outBgColor: 'The outside is filled by the Background layer, not this color.' } : {}
+      dim: (v, ctx): Record<string, string> => {
+        const out: Record<string, string> = {}
+        // With the Background slot empty the engine falls back to this color.
+        if (Math.round(num(v, 'outBgSource', 0)) === 1 && !ctx.bgEmpty)
+          out.outBgColor = 'The outside is filled by the Background layer, not this color.'
+        if (num(v, 'outDepth', 0) <= 0.001) {
+          const why = 'Shadow is 0 : there is no shadow to angle or rake.'
+          out.outShadowAngle = why
+          out.outPerspective = why
+        }
+        return out
+      }
     }
   ],
   'fx-context': [
@@ -140,7 +178,11 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       id: 'softness',
       title: 'softness',
       color: C.neutral,
-      inputs: ['trails', 'blur', 'bloom']
+      inputs: ['trails', 'blur', 'bloom', 'smoothing'],
+      dim: (v): Record<string, string> =>
+        num(v, 'blur', 0.08) <= 0.0005 && num(v, 'bloom', 0.3) <= 0.0005
+          ? { smoothing: 'Blur and bloom are 0 : there is no ring to smooth.' }
+          : {}
     },
     {
       id: 'distance',
@@ -154,7 +196,13 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       title: 'light',
       color: C.amber,
       inputs: ['lightGlow', 'lightOrder', 'lightSize', 'lightColor'],
-      labels: { lightGlow: 'glow', lightSize: 'size', lightColor: 'color' }
+      labels: { lightGlow: 'glow', lightSize: 'size', lightColor: 'color' },
+      // lightColor stays live : the surface relief's rim and sheen use it too.
+      dim: (v): Record<string, string> => {
+        if (num(v, 'lightGlow', 0.1) > 0.001) return {}
+        const why = 'Glow is 0 : the key light is off.'
+        return { lightSize: why, lightOrder: why }
+      }
     },
     {
       id: 'surface',
@@ -192,7 +240,9 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       switchInput: 'harmony',
       offValue: 0,
       inputs: ['baseHue', 'chroma', 'spread'],
-      labels: { baseHue: 'hue', chroma: 'chroma', spread: 'spread' }
+      labels: { baseHue: 'hue', chroma: 'chroma', spread: 'spread' },
+      dim: (v): Record<string, string> =>
+        Math.round(num(v, 'harmony', 0)) === 1 ? {} : { spread: 'Spread only acts on the analogous chord.' }
     },
     {
       id: 'tone',
@@ -206,7 +256,12 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       title: 'split-tone',
       color: C.accent2,
       inputs: ['splitTone', 'shadowTint', 'highTint'],
-      labels: { splitTone: 'amount' }
+      labels: { splitTone: 'amount' },
+      dim: (v): Record<string, string> => {
+        if (num(v, 'splitTone', 0) > 0.001) return {}
+        const why = 'Split-tone amount is 0 : the tints are off.'
+        return { shadowTint: why, highTint: why }
+      }
     }
   ]
 }
@@ -277,6 +332,7 @@ function Section({
   const key = `fzs-${shaderId}-${s.id}`
   const stored = useStore((st) => st.collapsed[key])
   const setCollapsed = useStore((st) => st.setCollapsed)
+  const bgEmpty = useStore((st) => !st.composition.background?.source.shaderId)
   const sw = s.switchInput ? byName.get(s.switchInput) : undefined
   const swDef = sw && typeof sw.def === 'number' ? sw.def : 0
   const isOff = sw && s.offValue !== undefined ? Math.round(num(values, sw.name, swDef)) === s.offValue : false
@@ -286,7 +342,7 @@ function Section({
     .map((n) => byName.get(n))
     .filter((i): i is IsfInputDesc => !!i)
     .map((i) => (s.labels?.[i.name] ? { ...i, display: s.labels[i.name] } : i))
-  const dim = s.dim?.(values)
+  const dim = s.dim?.(values, { bgEmpty })
   return (
     <div>
       <div

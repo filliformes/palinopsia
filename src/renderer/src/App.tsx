@@ -14,7 +14,7 @@ import { applyProximity, applyFieldMacros } from './engine/field'
 import { clearFrameVals } from './engine/frameVals'
 import { applyTonicity, applyDrift, applyFlowInterrupt, shutterHold, shutterClear } from './engine/temperament'
 import { applyFlicker } from './engine/flicker'
-import { applyFrameWeave } from './engine/frameWeave'
+import { applyFrameWeave, resetFrameWeave } from './engine/frameWeave'
 import { pushMarkSignal } from './engine/markSignal'
 import { applyMetaGlides, applyModulation, modEngine } from './engine/modulation'
 import { visionBus } from './engine/visionIn'
@@ -1245,19 +1245,22 @@ export default function App(): JSX.Element {
         freeze = freeze || (flowActive && flowRes.freeze) || isFrozen() // MIDI hold latch
         comp!.setFreeze(freeze)
         // 2g. Superimposition flicker (§5.2): cross-cut which layer shows on the
-        //     drawn cadence : rate follows the Cameraless film rate when it's on.
+        //     drawn cadence : it re-rolls on the Cameraless draw ticks when that
+        //     stage runs (so it lands on the drawn frames), else at the film rate.
         let flickerHot = -1
         if (st.superFlicker > 0.02) {
           const fin = c.master.find((f) => f.shaderId === 'fx-finalizer')?.inputs
           const filmOn = fin && Math.round(Number(fin.filmHold) || 0) > 0
           const rateFps = filmOn ? Number(fin!.filmRate) || 8 : 8
-          flickerHot = applyFlicker(comp!, st.superFlicker, rateFps, now)
+          flickerHot = applyFlicker(comp!, st.superFlicker, rateFps, now, comp!.filmTickSerial())
         }
-        // 2h. Frame-Weave (Lowder) : temporal interlace — show ONE layer per frame
-        //     stepping through the lattice. Runs whenever enabled (independent of
-        //     the scene sequencer). Hard-mutes the non-chosen layers this frame.
+        // 2h. Frame-Weave : temporal interlace, show ONE layer per frame stepping
+        //     through the lattice. Runs whenever enabled (independent of the scene
+        //     sequencer). Hard-mutes the non-chosen layers this frame; off, it
+        //     rewinds to the first cell for the next time it's switched on.
         let weaveHot: number | undefined
         if (st.sequence.frameWeave?.enabled) weaveHot = applyFrameWeave(comp!, st.sequence.frameWeave, now)
+        else resetFrameWeave()
         // 3. Render the frame.
         perfMeter.begin('render'); comp!.render(now - start); perfMeter.end('render')
         // Timer clock (the window doesn't paint) : wait for THIS render before

@@ -522,9 +522,9 @@ export function SequencePage({
           </Section>
 
           <Section title="Frame-Weave (interlace)"
-            info="Rose Lowder's temporal interlace : show ONE layer per frame, stepping through the lattice below, so persistence of vision fuses them into a shimmer. Runs live, independent of scene stepping.">
+            info="A frame-by-frame temporal interlace : show ONE layer per frame, stepping through the lattice below, so persistence of vision fuses them into a shimmer. Runs live, independent of scene stepping, and starts from the first cell each time you switch it on.">
             <label className="flex items-center gap-2 text-[11px] text-muted"
-              title="Rose Lowder's temporal interlace : instead of blending, show ONE layer per frame, stepping through the lattice below so persistence-of-vision fuses them into a shimmer. Runs live (independent of scene stepping). Blank cells (·) show black.">
+              title="A frame-by-frame temporal interlace : instead of blending, show ONE layer per frame, stepping through the lattice below so persistence of vision fuses them into a shimmer. Runs live (independent of scene stepping). Blank cells (·) show black.">
               <input type="checkbox" checked={seq.frameWeave.enabled}
                 onChange={(e) => setSequence({ frameWeave: { ...seq.frameWeave, enabled: e.target.checked } })} />
               interleave layers per frame

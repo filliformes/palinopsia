@@ -7,6 +7,10 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Phase wrap** : a shader can declare `uniform float PH_x; // wrap <period>` so a
+  periodic phase stays precise over day-long shows. Finalizer `film grab` (re-draw or
+  re-freeze on a trigger). Context `smoothing`. `tools/shader-rig build.cjs --out` for
+  parallel rigs.
 - **New effect controls** (defaults keep today's look) : per-column / per-band audio on
   Byte Corrupt, Databend, Mosh Blocks, Row Echo, Slice Shuffle, Tiles, Distort (audio
   rings) and Motif (band echoes); `fire` on Databend and Row Echo; Threshold `alpha key`;
@@ -127,22 +131,31 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
-- **Effects audit, glitch / analog / color / geometry (41 effects).** Fixed what was
-  broken and kept what gives character (the corrupted-data smears, the stepped blocks,
-  the CRT moiré, the edge fringes stay the default look; the clean variants are options).
-  - Texture reads that the shader loader silently rewrote : Databend's rotated bands
-    read the frame diagonal, Compress never saw vertical edges, Aperture's blur and
-    Optical Rain's stereo taps went diagonal.
-  - Transparency : Compress, Databend, Pixel Sort, Tiles, CRT Screen, Rutt, Optical Rain
-    and Phosphene turned a transparent layer into an opaque black slab.
-  - Knobs that did nothing : Pixel Sort's length (capped at 96 px), the Compress grid at
-    small blocks, the Pixelmask grid, digital grain size; Row Echo's fade worked
-    backwards.
-  - Rutt drew no lines in bright areas; Phosphene burned in for good and white left no
-    afterimage; Wavefold and Colorizer's fold turned dark grounds white; Palette mapped
-    pure white to the wrong color; Distort's bulge and pinch were swapped; Fold's "Floor
-    fold" smeared a third of the frame.
-  - Knobs that jumped the picture (NTSC field crawl, Scanlines roll, Optical Rain).
-  - Presets set every input, so one no longer leaks into the next; 20 Colorizer presets
-    named after films, film stocks and brands renamed descriptively.
-  - Sizes follow the frame height, so 4K and the dome keep the 1080p look.
+- **Flash safety now does its job.** The limiter measured per frame on gamma-encoded
+  light, so a 10 Hz black / white strobe got through at the default setting (and at
+  144 Hz nothing was limited). It now counts flashes per second in real luminance, with
+  a saturated-red term, per region of the frame, as flash-safety guidance does : a
+  10 Hz strobe comes out with no flashes at the default 0.35, while ordinary content
+  (pans, scrolling stripes, cuts, every generator tested) passes through bit for bit.
+  Film flutter on a very bright scene can now be softened, since it counts as flashing.
+- **The finishing chain.** Vibe mapped pure white to the wrong color stop (clipped
+  highlights went gray or black); Context put the whole master one frame late and its
+  trails could leave a permanent ghost; digital grain size did nothing; sharpening was
+  lost in 3D; torn VHS lines smeared the frame edge. Context's ring-shaped blur and
+  bloom stay the default look, with a new `smoothing` knob for the soft version.
+- **Finalizer opacity** : the old "A" slider (which reached no output) is now a real
+  fade to black, labeled "opacity". A session saved with it below 1 now looks darker.
+- **Output stages** : Cameraless could re-show an old frozen frame and its draw clock
+  could bank debt; the depth shadow fell the wrong way; the output shaper's edge was
+  undefined; Frame-Weave jumped when its rate moved; the superimposition flicker ran
+  at 7.5 Hz and now lands on the drawn film frames.
+- **Native effect nodes run on their layer's clock** (Speed, freeze, global speed and
+  the background's slow clock apply; they used the wall clock), see "no depth" when
+  Depth is off (so their brightness fallbacks work), and can read the audio. The depth
+  estimator now sees the picture upright. PANIC also clears the trail buffers of the
+  rack effects, which could hold a ghost for good.
+- **Randomize and Variation** leave deliberate settings alone : anaglyph 3D, film hold,
+  the output shape and Vibe's chord mode are never rolled; a pinned dice range now
+  keeps the current value (it used to force one); the walk and Variation respect the
+  same rules. Palettes (Palette, Colorizer, Vibe) roll as one hue from near-black to
+  pale instead of five clashing colors; Lookup no longer gets a random palette layer.

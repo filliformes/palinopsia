@@ -1,7 +1,7 @@
 // Film damage : dust, fibres, a hair in the gate and scratches, modelled on what
 // real prints do (research : Ivanova et al., Eurographics 2023, 12k hand-labelled
-// flaws on 4K scans; Kodak handling notes; Joyeux et al. on scratch motion;
-// Sapphire / BCC / Dehancer as the professional baseline). Runs after the
+// flaws on 4K scans; a film stock maker's handling notes; Joyeux et al. on scratch
+// motion; the commercial film-damage plug-ins as the professional baseline). Runs after the
 // Cameraless stage, whenever dust / scratch / hair is up, Film Hold or not.
 //
 // What makes it read as film rather than as noise :
@@ -94,7 +94,7 @@ float vn2(vec2 q, uint seed){
 }
 float n1(float x, uint seed){ float i = floor(x); float f = x - i; f = f*f*(3.0-2.0*f); uint k = uint(int(i) + 65536); return mix(hf(pcg(k) ^ seed), hf(pcg(k + 1u) ^ seed), f); }
 float dot2(vec2 v){ return dot(v, v); }
-// Distance to a quadratic Bezier (Inigo Quilez).
+// Distance to a quadratic Bezier (the closed-form cubic solve).
 float sdBez(vec2 pos, vec2 A, vec2 B, vec2 C){
   vec2 a = B - A; vec2 b = A - 2.0*B + C; vec2 c = a * 2.0; vec2 d = A - pos;
   float kk = 1.0 / max(dot(b, b), 1e-12);
@@ -187,10 +187,10 @@ void main(){
   float asp = uRes.x / uRes.y;
   float px = 1.0 / uRes.y;
   // Where this pixel's picture sits on the strip : the same mapping the Cameraless
-  // boil samples with, so dirt and scratches ride the weave.
-  vec2 c0 = vUV - 0.5;
+  // boil samples with (rotation in square units), so dirt and scratches ride the weave.
+  vec2 c0 = (vUV - 0.5) * vec2(asp, 1.0);
   float sr = sin(uWeave.z), cr = cos(uWeave.z);
-  vec2 w = mat2(cr, -sr, sr, cr) * (c0 / uWeave.w) + 0.5 + uWeave.xy;
+  vec2 w = (mat2(cr, -sr, sr, cr) * (c0 / uWeave.w)) / vec2(asp, 1.0) + 0.5 + uWeave.xy;
   if (w.x >= 0.0 && w.x <= 1.0 && w.y >= 0.0 && w.y <= 1.0) {
     vec2 p = (w - 0.5) * vec2(asp, 1.0);
     float g = uGauge;

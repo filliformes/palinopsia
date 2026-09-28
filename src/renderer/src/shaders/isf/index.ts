@@ -1547,7 +1547,17 @@ export const VIBE_SHADER: IsfShader = {
   id: 'fx-vibe',
   name: 'Vibe Palette',
   category: 'FX',
-  source: vibe
+  source: vibe,
+  // Tasteful dice : no over-sharpened, dither-noisy or bleached rolls, and the
+  // palette always shows (mixSrc 1 would hide it).
+  curated: {
+    sharpen: [0, 0.5],
+    dither: [0, 0.35],
+    saturation: [0.6, 1.4],
+    splitTone: [0, 0.5],
+    mixSrc: [0, 0.7],
+    chroma: [0.25, 0.8]
+  }
 }
 
 // The Context depth finalizer : pinned AFTER Vibe, also store-locked and kept

@@ -73,7 +73,7 @@ vec3 blendMode(int mode, vec3 b, vec3 t){
   if(mode==3) return b*t;                                   // multiply
   if(mode==4) return 1.0-(1.0-b)*(1.0-t);                   // screen
   if(mode==5) return mix(2.0*b*t, 1.0-2.0*(1.0-b)*(1.0-t), step(0.5,b)); // overlay
-  if(mode==6) return (1.0-2.0*t)*b*b + 2.0*t*b;             // soft light (pegtop)
+  if(mode==6) return (1.0-2.0*t)*b*b + 2.0*t*b;             // soft light (the smooth quadratic form)
   if(mode==7) return mix(2.0*b*t, 1.0-2.0*(1.0-b)*(1.0-t), step(0.5,t)); // hard light
   if(mode==8) return min(b, t);                             // darken
   if(mode==9) return max(b, t);                             // lighten
@@ -81,8 +81,10 @@ vec3 blendMode(int mode, vec3 b, vec3 t){
   if(mode==11) return b+t-2.0*b*t;                          // exclusion
   if(mode==12) return clamp(b/max(1.0-t, 1e-4), 0.0, 1.0);  // color dodge
   if(mode==13) return 1.0-clamp((1.0-b)/max(t, 1e-4), 0.0, 1.0); // color burn
-  if(mode==14) return fract(b+t);                           // wrap
-  // lighter color (TouchDesigner / Photoshop) : the WHOLE pixel of whichever
+  // wrap : the sum rolls over past 1, like an 8-bit overflow. A sum of exactly 1
+  // stays 1 (fract turned white over black into black); 2 stays 1 too.
+  if(mode==14){ vec3 x = b+t; return x - max(floor(x - 1e-5), 0.0); }
+  // lighter color : the WHOLE pixel of whichever
   // side is brighter wins, so hues never mix channel by channel like lighten.
   if(mode==18) return dot(t, vec3(0.299,0.587,0.114)) > dot(b, vec3(0.299,0.587,0.114)) ? t : b;
   return t;                                                 // weave (mixer-only) / fallback
@@ -485,6 +487,15 @@ export function pushScanMaps(isf: ISFRenderer, maps: (idx: number) => import('./
   isf.setValue('scanAO', m.ao);
 }
 
+/** Zero every pass buffer of an ISF renderer (PANIC for rack effects). */
+export function clearIsfBuffers(isf: ISFRenderer): void {
+  const bufs = (isf as unknown as { renderBuffers?: Array<{ width?: number; height?: number; textures?: Array<{ width?: number; height?: number }> }> }).renderBuffers;
+  for (const b of bufs ?? []) {
+    b.width = -1; b.height = -1;
+    for (const t of b.textures ?? []) { t.width = -1; t.height = -1; }
+  }
+}
+
 /** Push the shared audio texture into a renderer that declares an `audioTex`
  *  image input (the bridge requires a re-push every frame). Keyed on the
  *  declaration itself, so a generator gains per-element audio by declaring
@@ -545,8 +556,11 @@ interface FxUnit {
 // resolver (ref → texture) and the frame delta. Supplied by the compositor.
 export interface NodeApplyCtx {
   sidechainTex: (ref: SidechainRef | null | undefined) => WebGLTexture | null;
-  dt: number;
-  depth?: WebGLTexture | null; // shared scene-depth map for depth-aware nodes (Parallax)
+  dt: number; // this rack's clock step (seconds) : each rack gets its own scaled copy
+  depth?: WebGLTexture | null; // shared scene-depth map, null when Depth is off
+  audioTex?: WebGLTexture | null; // shared audio texture (waveform / log spectrum rows)
+  frame?: number; // engine frame counter
+  bpm?: number; // transport tempo
 }
 
 /**
@@ -581,9 +595,10 @@ class FxRack {
       const native = isNativeNode(inst.shaderId);
       if (!unit) {
         if (native) {
-          // A native node compiles ALL its pass programs in its constructor —
-          // as heavy as an ISF load, so it pays from the same per-frame budget
-          // (a Randomize that lands nodes in several racks used to stall a
+          // A native node compiles its pass programs on its FIRST RENDER (the
+          // shared NodeGL links each program lazily, on first use), which can be
+          // as heavy as an ISF load, so creating one pays from the same per-frame
+          // budget (a Randomize that lands nodes in several racks used to stall a
           // single frame for seconds).
           if (budgetSpent(this.shared.budget)) continue;
           this.shared.budget.n--;
@@ -609,8 +624,15 @@ class FxRack {
       unit.opacity = inst.opacity ?? 1;
       if (native) {
         // Native node: refresh its base params (modulation overlays these before
-        // render via setUnitInput) and the sidechain ref.
-        unit.inputs = { ...inst.inputs };
+        // render via setUnitInput) and the sidechain ref. The unit keeps ONE map,
+        // refreshed in place (no per-frame object); keys the instance no longer
+        // has (a removed modulation overlay) are dropped so they can't stick.
+        const dst = unit.inputs ?? (unit.inputs = {});
+        const src = inst.inputs;
+        if (src) {
+          for (const k in dst) if (!(k in src)) delete dst[k];
+          for (const k in src) dst[k] = src[k];
+        }
         unit.sidechain = inst.sidechain ?? null;
         unit.sidechain2 = inst.sidechain2 ?? null;
       } else if (unit.isf) {
@@ -677,6 +699,7 @@ class FxRack {
       if (u.node) {
         // Native convolution node : runs its own multi-pass render.
         if (!nodeCtx) continue; // rack not given a node context this frame
+        if (this.shared.gl.isContextLost()) continue; // GPU reset : draw nothing until the engine rebuilds
         wet = u.node.render({
           gl: this.shared.gl,
           chain,
@@ -685,12 +708,19 @@ class FxRack {
           sidechain2: nodeCtx.sidechainTex(u.sidechain2),
           inputs: u.inputs ?? {},
           dt: nodeCtx.dt,
-          depth: nodeCtx.depth ?? null
+          depth: nodeCtx.depth ?? null,
+          audioTex: nodeCtx.audioTex ?? null,
+          frame: nodeCtx.frame,
+          bpm: nodeCtx.bpm
         });
+        // Nodes draw with their own VAO : hand the default one back, which every
+        // ISF draw (and the dry/wet blend) relies on.
+        this.shared.gl.bindVertexArray(null);
         if (wet === cur) continue; // node was inert (no sidechain) : passthrough
       } else if (u.isf) {
         const target = chain.next();
         u.isf.setValue('inputImage', handle(cur, chain.w, chain.h) as unknown as number);
+        pushAudioTex(u.isf, this.shared.audioTex); // rack FX that declare `audioTex` (per-band / per-block audio)
         this.shared.redirect.redirect = target.fbo;
         u.isf.draw({ width: chain.w, height: chain.h });
         this.shared.redirect.redirect = null;
@@ -718,6 +748,11 @@ class FxRack {
         u.node.dispose();
         u.node = makeConvNode(this.shared.gl, u.shaderId);
       }
+      // ISF effects with persistent buffers (trails, echoes, time memories) : zero
+      // them too. Forcing a size change makes the runtime reallocate each target,
+      // and a fresh WebGL texture is all zeros; the effect treats an empty buffer
+      // as "start from the live frame".
+      if (u.isf) clearIsfBuffers(u.isf);
     }
   }
 
@@ -1282,12 +1317,24 @@ export class Compositor {
   private fzPersp = 0; // perspective projection of the cast shadow
   private fzInstId: string | null = null; // the pinned finalizer's instance id
 
-  // Strobe-safety limiter : slew-limits full-field luminance jumps on the FINAL
-  // presented frame (photosensitive safety). 0 = off. Applied last, before present.
+  // Strobe-safety limiter : counts flashes per second on the FINAL presented frame
+  // and holds only the regions that strobe (photosensitive safety). 0 = off.
+  // Applied last, before present.
   private strobeLimiter: StrobeLimiter | null = null;
   private strobeSafe = 0;
-  /** Flash-safety amount 0..1 (0 = off). Higher = tighter mean-luminance cap. */
+  /** Flash-safety amount 0..1 (0 = off). Higher = fewer flashes pass before it
+   *  engages, and a narrower band once it does. */
   setStrobeSafe(v: number): void { this.strobeSafe = v; }
+  /** Test hook : engaged windows + lowest cell alpha of the flash limiter. */
+  strobeDebug(): { windows: number; minAlpha: number } | null {
+    return this.strobeLimiter ? this.strobeLimiter.debugEngaged() : null;
+  }
+  /** The Cameraless draw clock's tick count while the stage runs, -1 when it's
+   *  skipped : the Superimposition flicker re-rolls on these drawn frames. */
+  filmTickSerial(): number {
+    return this.cfRan && this.cameraless ? this.cameraless.tickSerial() : -1;
+  }
+  private cfRan = false; // the Cameraless stage ran last frame
   // Cameraless / direct-film stage (after outputShape, before xfade). Params live
   // on the Finalizer (cf* ← film* inputs), applied natively like the fz* shaper.
   private cameraless: Cameraless | null = null;
@@ -1300,6 +1347,8 @@ export class Compositor {
   private cfBlankMode = 0;
   private cfGranule = 0;
   private cfSplice = 0;
+  private cfGrab = 0; // filmGrab event (momentary 0/1) : re-draw / re-freeze on its rising edge
+  private cfGrabPrev = 0;
   // Film damage (dust, fibres, gate hair, scratches) : its own stage right after
   // Cameraless, on whenever any of it is up (Film Hold or not). fd* ← film* inputs.
   private filmDamage: FilmDamage | null = null;
@@ -1685,8 +1734,10 @@ export class Compositor {
    *  untouched. The buffers that can hold a BAD frame indefinitely — Sediment /
    *  Corrode accumulators, Datamosh persistence, the Réponse/Chronoscan/Eternalism/
    *  Pulfrich rings, Scanner capture, reaction-diffusion feedback — are exactly the
-   *  ones cleared. The ISF trail/bloom passes (Context) DECAY on their own within a
-   *  second, so they are deliberately left running. */
+   *  ones cleared, and so are the persistent buffers of every ISF rack effect
+   *  (Light Trails, Wide Time, Slit Buffer, Context's trails ...), which an 8-bit
+   *  decay can leave holding a ghost for good. Generator buffers (reaction-
+   *  diffusion, Colony, latches) are left alone : they ARE the picture. */
   panic(): void {
     for (const layer of this.layers) layer.flush();
     this.masterRack.flushNodes();
@@ -1728,6 +1779,9 @@ export class Compositor {
         if (node) {
           // Force NodeGL + this node's program(s) to compile now (see warmNodeCtx).
           try { node.render(this.warmNodeCtx()); } catch { /* warm render best-effort */ }
+          // Nodes draw with their own VAO : unbind it before any ISF program is
+          // created or drawn, or the runtime wires its quad into the node's VAO.
+          this.gl.bindVertexArray(null);
           node.dispose();
         }
       } else if (source) {
@@ -1840,13 +1894,19 @@ export class Compositor {
   // ── Depth map (2.5D) : the shared grayscale depth the Parallax FX reads (and
   //    later Context / anaglyph). Filled synthetically or by the depth estimator. ──
   private depthTex: WebGLTexture | null = null;
+  private frameNo = 0; // engine frame counter (native nodes spot a re-enable by a gap)
   private depthAcc: Float32Array | null = null;
   private depthRGBA: Uint8Array | null = null;
   private depthW = 0;
   private depthH = 0;
   private depthFbo: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
   private depthReadBuf: Uint8Array | null = null;
+  private depthFlipBuf: Uint8Array | null = null;
   private depthReadSize = 0;
+  // True once a real depth map is in (synthetic test bowl or the estimator).
+  // With Depth off the map is a flat stand-in that nodes must not mistake for
+  // depth : they get null instead and fall back to their brightness mode.
+  private depthLive = false;
 
   private ensureDepth(w: number, h: number): void {
     if (this.depthTex && this.depthW === w && this.depthH === h) return;
@@ -1865,27 +1925,35 @@ export class Compositor {
   }
 
   /** Push a grayscale depth map (0..1) with temporal EMA; upload to depthTex. */
-  setDepth(data: Float32Array, w: number, h: number, ema: number): void {
+  /** `data` rows run top-down (image order, as the estimator returns them); the
+   *  texture is GL-oriented, so rows are written bottom-up here, with the upload
+   *  flip pinned off (the ISF runtime leaves it on). */
+  setDepth(data: Float32Array, w: number, h: number, ema: number, live = true): void {
     const first = !this.depthTex || this.depthW !== w || this.depthH !== h;
     this.ensureDepth(w, h);
     const acc = this.depthAcc as Float32Array, rgba = this.depthRGBA as Uint8Array;
     const k = first ? 1 : Math.max(0, Math.min(1, ema));
-    const n = w * h;
-    for (let i = 0; i < n; i++) {
-      acc[i] += (data[i] - acc[i]) * k;
-      let v = acc[i] * 255; v = v < 0 ? 0 : v > 255 ? 255 : v;
-      const b = v | 0;
-      rgba[i * 4] = b; rgba[i * 4 + 1] = b; rgba[i * 4 + 2] = b; rgba[i * 4 + 3] = 255;
+    for (let y = 0; y < h; y++) {
+      const o = (h - 1 - y) * w; // GL row for image row y
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x, j = o + x;
+        acc[i] += (data[i] - acc[i]) * k;
+        let v = acc[i] * 255; v = v < 0 ? 0 : v > 255 ? 255 : v;
+        const b = v | 0;
+        rgba[j * 4] = b; rgba[j * 4 + 1] = b; rgba[j * 4 + 2] = b; rgba[j * 4 + 3] = 255;
+      }
     }
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, this.depthTex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+    this.depthLive = live;
   }
 
-  /** Flat 0.5 depth → the Parallax FX becomes a passthrough (Depth off). */
+  /** Flat 0.5 depth (Depth off) : nodes get depth = null and use their fallback. */
   clearDepth(): void {
     const d = new Float32Array(4); d.fill(0.5);
-    this.setDepth(d, 2, 2, 1);
+    this.setDepth(d, 2, 2, 1, false);
   }
 
   /** A synthetic depth bowl (centre near → edges far) : a test map, no model. */
@@ -1927,7 +1995,13 @@ export class Compositor {
     gl.readPixels(0, 0, size, size, gl.RGBA, gl.UNSIGNED_BYTE, this.depthReadBuf as Uint8Array);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindVertexArray(null);
-    return { data: this.depthReadBuf as Uint8Array, w: size, h: size };
+    // readPixels is bottom-up; the depth model expects an upright picture (its
+    // sky / ground priors), so hand it the rows top-down.
+    const src = this.depthReadBuf as Uint8Array, row = size * 4;
+    if (!this.depthFlipBuf || this.depthFlipBuf.length !== src.length) this.depthFlipBuf = new Uint8Array(src.length);
+    const out = this.depthFlipBuf;
+    for (let y = 0; y < size; y++) out.set(src.subarray((size - 1 - y) * row, (size - y) * row), y * row);
+    return { data: out, w: size, h: size };
   }
 
   /** Ensure a shared depth map exists (cleared to neutral until one is computed).
@@ -2222,6 +2296,7 @@ export class Compositor {
     this.cfBlankMode = Math.round(numf(fi.filmBlankMode, 0));
     this.cfGranule = numf(fi.filmGranule, 0);
     this.cfSplice = numf(fi.filmSplice, 0);
+    this.cfGrab = numf(fi.filmGrab, 0);
     this.fdDust = numf(fi.filmDust, 0);
     this.fdScratch = numf(fi.filmScratch, 0);
     this.fdHair = numf(fi.filmHair, 0);
@@ -2273,6 +2348,7 @@ export class Compositor {
           case 'filmBlankMode': this.cfBlankMode = Math.round(value); break;
           case 'filmGranule': this.cfGranule = value; break;
           case 'filmSplice': this.cfSplice = value; break;
+          case 'filmGrab': this.cfGrab = value; break;
           case 'filmDust': this.fdDust = value; break;
           case 'filmScratch': this.fdScratch = value; break;
           case 'filmHair': this.fdHair = value; break;
@@ -2444,9 +2520,16 @@ export class Compositor {
     // Native convolution nodes (layer FX) resolve their sidechain to a live
     // texture: another layer's persisted output (previous frame for layers not
     // yet rendered : fine, the node keeps its own history). Assets land later.
+    this.frameNo++;
+    // One node context per rack clock : native nodes step by THEIR rack's time
+    // (layer Speed and freeze, global speed, the background's slow clock), not
+    // the wall clock. Reverse runs time forward for decays (|dt|).
     const nodeCtx: NodeApplyCtx = {
-      dt: rawDt,
-      depth: this.depthTex, // shared scene depth (Parallax node reads it, layer + master)
+      dt: dtSec,
+      depth: this.depthLive ? this.depthTex : null, // null with Depth off : nodes use their fallback
+      audioTex: this.audioTexGL,
+      frame: this.frameNo,
+      bpm: this.bpm,
       sidechainTex: (ref) => {
         if (!ref) return null;
         if (ref.kind === 'layer') return this.layers[ref.layer]?.texture() ?? null;
@@ -2471,8 +2554,9 @@ export class Compositor {
         L.tickVideos(li, rawDt, this.globalSpeed * L.speed, this.bpm);
         L.tickAssemble(li, rawDt, this.globalSpeed * L.speed);
         gl.bindVertexArray(null); // ISF draws own the default VAO
+        const layerCtx: NodeApplyCtx = { ...nodeCtx, dt: Math.abs(dtSec * L.speed) };
         L.renderSource('A', nodeCtx.sidechainTex);
-        let sig = L.rackA.apply(L.scratchA.tex, this.chain, nodeCtx); // nodeCtx → native nodes on source A
+        let sig = L.rackA.apply(L.scratchA.tex, this.chain, layerCtx); // native nodes on source A, on the layer clock
         if (L.hasB()) {
           // rackA + rackB ping-pong through the SAME ChainBuffers, so rackB can
           // land a write back on the buffer holding A's result (parity-dependent,
@@ -2480,11 +2564,11 @@ export class Compositor {
           this.copyInto(this.abHold.fbo, sig);
           sig = this.abHold.tex;
           L.renderSource('B', nodeCtx.sidechainTex);
-          const sigB = L.rackB.apply(L.scratchB.tex, this.chain, nodeCtx); // nodeCtx → native nodes on source B
+          const sigB = L.rackB.apply(L.scratchB.tex, this.chain, layerCtx); // native nodes on source B
           sig = this.mixSources(sig, sigB, L.sourceMix, L.sourceBlend, L.harmony, L);
         }
         gl.bindVertexArray(null);
-        sig = L.rackLayer.apply(sig, this.chain, nodeCtx);
+        sig = L.rackLayer.apply(sig, this.chain, layerCtx);
         this.persist(L, sig);
       } catch (e) {
         this.shared.redirect.redirect = null;
@@ -2522,7 +2606,7 @@ export class Compositor {
           this.shared.redirect.redirect = null;
         }
         gl.bindVertexArray(null);
-        const bgTex = this.bgRack.apply(this.bgScratch.tex, this.chain, nodeCtx); // nodeCtx → native nodes on the background
+        const bgTex = this.bgRack.apply(this.bgScratch.tex, this.chain, { ...nodeCtx, dt: Math.abs(dtSec * this.bgSpeed) }); // native nodes on the background's slow clock
         this.copyInto(this.bgFill.fbo, bgTex);
         haveBgFill = true;
 
@@ -2593,12 +2677,19 @@ export class Compositor {
     // Null when off (hold===0) or effectively smooth (draw ≥ present fps with no
     // artifacts) : skipped entirely so it costs nothing and passes through clean.
     let weave: FilmWeave = NO_WEAVE;
+    // Grab frame (event) : on its rising edge the stage re-draws / re-freezes now.
+    const grabEdge = this.cfGrab >= 0.5 && this.cfGrabPrev < 0.5;
+    this.cfGrabPrev = this.cfGrab;
+    let filmRan = false;
     if (this.cfHold > 0) {
+      // Freeze always runs (it holds even at a smooth draw rate with no artifacts).
       const active =
-        this.cfRate < 58 || this.cfBoil > 0.001 || this.cfFlutter > 0.001 || this.cfBlank > 0.001 ||
-        this.cfGranule > 0.001 || this.cfSplice > 0.001;
+        this.cfHold === 2 || this.cfRate < 58 || this.cfBoil > 0.001 || this.cfFlutter > 0.001 ||
+        this.cfBlank > 0.001 || this.cfGranule > 0.001 || this.cfSplice > 0.001;
       if (active) {
         if (!this.cameraless) this.cameraless = new Cameraless(gl);
+        if (grabEdge) this.cameraless.grab();
+        filmRan = true;
         composite = this.cameraless.apply(
           composite, rawDt,
           { hold: this.cfHold, rate: this.cfRate, jitter: this.cfJitter, boil: this.cfBoil,
@@ -2609,6 +2700,10 @@ export class Compositor {
         weave = this.cameraless.weave();
       }
     }
+    // Skipped : forget the held frame and the draw clock, so switching it back on
+    // starts from the live picture (it used to flash the old held cell).
+    if (!filmRan) this.cameraless?.reset();
+    this.cfRan = filmRan;
 
     // Film damage : dust, fibres, gate hair, scratches on a 24 fps film clock
     // (engine/filmDamage.ts). Dirt rides the boil above; skipped entirely when off.
@@ -2636,21 +2731,18 @@ export class Compositor {
         present = this.xfadeTarget.tex;
       }
     }
-    // Monomedia freeze-drop: hold the last frame (captured once) on screen.
-    if (this.freezeActive) {
-      if (!this.freezeCaptured && this.lastPresent) {
-        this.copyInto(this.snapshot.fbo, this.lastPresent);
-        this.freezeCaptured = true;
-      }
-      if (this.freezeCaptured) present = this.snapshot.tex;
-    }
+    // Monomedia freeze-drop: hold the frame shown when it began (captured at the end
+    // of that frame, below).
+    if (this.freezeActive && this.freezeCaptured) present = this.snapshot.tex;
     // Strobe-safety limiter : the very last stage on the presented frame, so it nets
     // ALL upstream flash sources (Shutter, Superimposition, Frame-Weave, Cameraless
-    // blank, datamosh bloom, hard cuts…). cap = max mean-luminance step per frame.
+    // blank, datamosh bloom, hard cuts…). It counts flashes per second (real time)
+    // and only holds regions that are actually strobing (engine/strobeLimit.ts).
     if (this.strobeSafe > 0.02) {
       if (!this.strobeLimiter) this.strobeLimiter = new StrobeLimiter(gl);
-      const cap = 0.25 - this.strobeSafe * 0.235; // 0.02 → ~0.245 (loose) · 1 → 0.015 (tight)
-      present = this.strobeLimiter.apply(present, cap, this.w, this.h);
+      present = this.strobeLimiter.apply(present, this.strobeSafe, rawDt, this.w, this.h);
+    } else {
+      this.strobeLimiter?.reset(); // off : its history re-seeds when it comes back
     }
     // Fulldome : render the domemaster from the flat composite; it replaces the
     // flat frame on the canvas (no keystone : a dome is mapped by its server).
@@ -2692,6 +2784,14 @@ export class Compositor {
     // morph starts, so the dissolve begins from the exact frame on screen.
     this.lastPresent = present;
 
+    // Freeze-drop capture : copy the frame just shown NOW. Copying `lastPresent` at
+    // the start of the next frame read a buffer that frame's layer pass may already
+    // have reused (mixTarget), so the freeze could hold a raw layer mix.
+    if (this.freezeActive && !this.freezeCaptured) {
+      this.copyInto(this.snapshot.fbo, present);
+      this.freezeCaptured = true;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
   }
 
   /** Release EVERY GL resource this compositor owns. Call on unmount so a

@@ -29,6 +29,7 @@
   ],
   "PASSES": [
     { "TARGET": "lumBuf", "PERSISTENT": true, "WIDTH": "$WIDTH/64", "HEIGHT": "$HEIGHT/64" },
+    { "TARGET": "lvlBuf", "WIDTH": "1", "HEIGHT": "1" },
     { }
   ]
 }*/
@@ -70,7 +71,7 @@ vec3 chordColor(float idx) {
 }
 
 vec3 stopColor(float idx) {
-  if (harmony >= 1) return chordColor(idx); // colour-chord mode overrides the manual stops
+  if (harmony >= 1) return chordColor(idx); // color-chord mode overrides the manual stops
   if (idx < 0.5) return colorA.rgb;
   if (idx < 1.5) return colorB.rgb;
   if (idx < 2.5) return colorC.rgb;
@@ -86,12 +87,48 @@ float lumaAt(vec2 c) {
 void main() {
   vec2 uv = isf_FragNormCoord;
 
+  // AUTO-LEVELS statistics, two tiny passes (each reads the previous frame of
+  // the pass before it : a frame or two of lag on the STATS only, never on the
+  // picture). Keep their tap counts small : ANGLE's D3D backend flattens the
+  // PASSINDEX branches, so every tap here is paid by every output pixel too
+  // (a 576-tap min/max pass measured 21 ms at 4K).
   if (PASSINDEX == 0) {
-    // Downsampled luma with temporal smoothing : feeds auto-levels. The
-    // 0.92 lerp keeps level estimates from pumping with flicker content.
-    float l = lumaAt(uv);
-    float prev = IMG_NORM_PIXEL(lumBuf, uv).r;
-    gl_FragColor = vec4(mix(l, prev, 0.92), 0.0, 0.0, 1.0);
+    // Downsampled luma, smoothed over time so the levels don't pump with
+    // flicker. Four taps spread over each 64x64 block (each a 2x2-pixel
+    // average) instead of one point sample. The smoothing is frame-rate
+    // independent (tuned at 60 fps) and steps at least one 8-bit level, so it
+    // can't stall short of the target; an empty buffer (first frame, PANIC,
+    // resize) seeds from the live frame instead of ramping up from black.
+    vec2 cell = 0.25 / RENDERSIZE;
+    vec2 q0 = uv + cell * vec2(-1.0, -1.0);
+    vec2 q1 = uv + cell * vec2(1.0, -1.0);
+    vec2 q2 = uv + cell * vec2(-1.0, 1.0);
+    vec2 q3 = uv + cell * vec2(1.0, 1.0);
+    float l = (lumaAt(q0) + lumaAt(q1) + lumaAt(q2) + lumaAt(q3)) * 0.25;
+    vec4 prev = IMG_NORM_PIXEL(lumBuf, uv);
+    if (prev.a < 0.99) { gl_FragColor = vec4(l, 0.0, 0.0, 1.0); return; }
+    float k = pow(0.92, clamp(TIMEDELTA, 0.0, 0.25) * 60.0);
+    float d = l - prev.r;
+    float h = abs(d) < 1.0 / 255.0 ? l : prev.r + sign(d) * max(abs(d) * (1.0 - k), 1.0 / 255.0);
+    gl_FragColor = vec4(h, 0.0, 0.0, 1.0);
+    return;
+  }
+  if (PASSINDEX == 1) {
+    // The frame's smoothed min / max, once (1x1), from the same 6x6 sampling
+    // of the small buffer the output pass used to repeat for every pixel.
+    float mn = 1.0;
+    float mx = 0.0;
+    float ok = 1.0;
+    for (int j = 0; j < 6; j++) {
+      for (int i = 0; i < 6; i++) {
+        vec2 p = (vec2(float(i), float(j)) + 0.5) / 6.0;
+        vec4 sm = IMG_NORM_PIXEL(lumBuf, p);
+        mn = min(mn, sm.r);
+        mx = max(mx, sm.r);
+        ok = min(ok, sm.a);
+      }
+    }
+    gl_FragColor = ok < 0.99 ? vec4(0.0) : vec4(mn, mx, 0.0, 1.0);
     return;
   }
 
@@ -109,35 +146,34 @@ void main() {
     l = clamp(l + (l - blur) * sharpen, 0.0, 1.0);
   }
 
-  // AUTO-LEVELS: estimate the frame's smoothed min/max from the small buffer
-  // (36 taps) and stretch luminance to span the palette fully.
+  // AUTO-LEVELS: stretch luminance between the frame's smoothed min and max
+  // (one read of the 1x1 stats pass) so it spans the palette fully.
   if (autoLevel > 0.001) {
-    float mn = 1.0;
-    float mx = 0.0;
-    for (int j = 0; j < 6; j++) {
-      for (int i = 0; i < 6; i++) {
-        vec2 p = (vec2(float(i), float(j)) + 0.5) / 6.0;
-        float s = IMG_NORM_PIXEL(lumBuf, p).r;
-        mn = min(mn, s);
-        mx = max(mx, s);
-      }
+    vec2 ctr = vec2(0.5);
+    vec4 lv = IMG_NORM_PIXEL(lvlBuf, ctr);
+    if (lv.a > 0.5) {
+      float stretched = clamp((l - lv.r) / max(lv.g - lv.r, 0.05), 0.0, 1.0);
+      l = mix(l, stretched, autoLevel);
     }
-    float stretched = clamp((l - mn) / max(mx - mn, 0.05), 0.0, 1.0);
-    l = mix(l, stretched, autoLevel);
   }
 
-  // Tone gamma shapes WHERE the palette stops land on the image.
+  // Tone gamma shapes WHERE the palette stops land on the image (above 1 pushes
+  // toward the dark stops, below 1 toward the light ones).
   l = pow(l, gamma);
 
-  // Ordered-dither breakup before the map.
+  // Ordered-dither breakup before the map. The 4x4 cell is counted in 1080p
+  // pixels, so it keeps its grain on a 4K or 4096 master.
   float n = floor(stops + 0.5);
-  l += (bayer4(gl_FragCoord.xy) - 0.5) * dither / max(n - 1.0, 1.0);
+  vec2 dc = floor(gl_FragCoord.xy / max(1.0, floor(RENDERSIZE.y / 1080.0 + 0.5)));
+  l += (bayer4(dc) - 0.5) * dither / max(n - 1.0, 1.0);
   l = clamp(l, 0.0, 1.0);
 
-  // The palette map.
+  // The palette map. The segment index stops one short of the last stop, so
+  // luma exactly 1 lands ON the last stop (f = 1) instead of wrapping to the
+  // start of the second-to-last segment.
   float t = l * (n - 1.0);
-  float i = floor(min(t, n - 1.001));
-  float f = fract(t);
+  float i = min(floor(t), n - 2.0);
+  float f = t - i;
   float k = mix(step(0.5, f), f, blend);
   vec3 col = mix(stopColor(i), stopColor(i + 1.0), k);
 
@@ -147,7 +183,7 @@ void main() {
   float l2 = dot(col, vec3(0.299, 0.587, 0.114));
   col = mix(vec3(l2), col, saturation);
 
-  // SPLIT-TONE: multiplicative tints (0.5-grey = neutral), shadows and
+  // SPLIT-TONE: multiplicative tints (0.5-gray = neutral), shadows and
   // highlights independently, crossing at the mids.
   if (splitTone > 0.001) {
     vec3 sh = col * (shadowTint.rgb * 2.0);

@@ -17,7 +17,11 @@
 //
 // Self-contained GL: own program + two persistent targets. The Compositor feeds it the
 // live composite + params each frame and swaps in the returned texture. Off (hold===0)
-// is handled by the Compositor skipping the stage entirely : genuine null passthrough.
+// is handled by the Compositor skipping the stage entirely : genuine null passthrough;
+// it calls reset() on those frames, so coming back starts from the live picture.
+// grab() (the filmGrab event) re-draws now, or re-freezes the gate on the live frame.
+// The draw clock runs on real time (the projector's rate), not on the master Speed :
+// a slowed or paused picture still weaves and steps like film in a running gate.
 // Dust, hair and scratches are NOT here : they live in filmDamage.ts (their own film
 // clock, and they work with Film Hold off); weave() hands them this stage's boil.
 
@@ -51,6 +55,7 @@ uniform float uBlank;      // 0 show · 1 leader this frame
 uniform vec3  uBlankCol;   // black or white leader
 uniform float uGranule, uSplice; // émulsion amounts
 uniform float uSeedFast;   // reseeds every tick (granulation · splice bar)
+uniform float uAspect;     // width / height : rotate and mottle in square units
 
 // Sine-free hash (Hoskins) : the sin(dot(...)) kind aliases into banded rows on
 // large integer grids.
@@ -66,10 +71,12 @@ float vnoise(vec2 p){
 }
 
 void main(){
-  vec2 c = vUV - 0.5;
+  // Rotate in square (aspect) units, so the micro-rotation is a rotation and not a
+  // shear; the weave offset uBoil is already in uv.
+  vec2 c = (vUV - 0.5) * vec2(uAspect, 1.0);
   float s = sin(uBoilRot), co = cos(uBoilRot);
   c = mat2(co, -s, s, co) * (c / uBoilScale);
-  vec2 w = c + 0.5 + uBoil;
+  vec2 w = c / vec2(uAspect, 1.0) + 0.5 + uBoil;
   // Film-gate edge: sampling past the frame shows leader-black, not edge smear.
   if (w.x < 0.0 || w.x > 1.0 || w.y < 0.0 || w.y > 1.0) { frag = vec4(0.0, 0.0, 0.0, 1.0); return; }
   vec4 col = texture(uTex, w);
@@ -78,12 +85,13 @@ void main(){
 
   // ── Émulsion (print / handling layer), at screen space ──
   vec2 uv = vUV;
-  // dye granulation / pooling : clumped coloured value noise, subtractive density.
+  vec2 sq = vec2(uv.x * uAspect, uv.y); // round mottle (sizes in frame heights)
+  // dye granulation / pooling : clumped colored value noise, subtractive density.
   if (uGranule > 0.0) {
-    float clump = vnoise(uv * 23.0);
-    vec3 gv = vec3(vnoise(uv * 90.0 + uSeedFast),
-                   vnoise(uv * 88.0 + uSeedFast + 3.1),
-                   vnoise(uv * 92.0 + uSeedFast + 7.7)) * clump;
+    float clump = vnoise(sq * 23.0);
+    vec3 gv = vec3(vnoise(sq * 90.0 + uSeedFast),
+                   vnoise(sq * 88.0 + uSeedFast + 3.1),
+                   vnoise(sq * 92.0 + uSeedFast + 7.7)) * clump;
     col.rgb *= 1.0 - uGranule * 0.35 * (gv - 0.5);
   }
   // splice : rare whole-frame flash + a bright horizontal bar.
@@ -107,10 +115,13 @@ export class Cameraless {
   private out: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null
   private w = 0
   private h = 0
+  private aspect = 16 / 9
   // Draw clock.
   private acc = 0
   private next = 0
   private frozen = false
+  private grabPending = false
+  private ticks = 0 // drawn frames so far (the flicker re-rolls on them)
   // Held boil uniforms : re-rolled on a tick, held between ticks.
   private bx = 0
   private by = 0
@@ -198,19 +209,47 @@ export class Cameraless {
     const base = 1 / clamp(p.rate, 1, 60)
     if (this.next === 0) {
       this.next = base
+      this.acc = 0
       return true
     }
     this.acc += dt
     if (this.acc < this.next) return false
     this.acc -= this.next
     this.next = base * (1 + (Math.random() * 2 - 1) * p.jitter * 0.5)
+    // At most one interval of debt : a draw rate above the render rate ticks every
+    // frame without banking the excess (a later, slower rate used to tick on every
+    // frame for many seconds while it drained).
+    this.acc = Math.min(this.acc, this.next)
     return true
+  }
+
+  /** Forget the held frame and the draw clock (the Compositor calls this while the
+   *  stage is skipped) : the next run starts from the live picture. */
+  reset(): void {
+    this.frozen = false
+    this.acc = 0
+    this.next = 0
+    this.grabPending = false
+  }
+
+  /** Grab (the filmGrab event) : on the next frame, draw the live picture now and
+   *  restart the draw clock from it; in freeze, re-freeze the gate on it. */
+  grab(): void {
+    this.grabPending = true
+  }
+
+  /** Drawn frames so far (changes on every draw tick). */
+  tickSerial(): number {
+    return this.ticks
   }
 
   /** Re-roll the per-drawn-frame jitter (boil/flutter/blank) + émulsion seeds. */
   private reroll(p: CameralessParams): void {
     const b = p.boil
-    this.bx = (Math.random() * 2 - 1) * b * 0.01
+    // Gate weave : sideways-leaning, as on a real gate (the x range is 1.78 times
+    // the y range, in frame heights, so a 16:9 frame weaves as it always did and
+    // a square dome frame keeps the same lateral lean).
+    this.bx = ((Math.random() * 2 - 1) * b * 0.0178) / this.aspect
     this.by = (Math.random() * 2 - 1) * b * 0.01
     this.brot = (Math.random() * 2 - 1) * b * 0.02
     this.bscale = 1 + (Math.random() * 2 - 1) * b * 0.006
@@ -238,6 +277,7 @@ export class Cameraless {
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, srcTex)
     gl.uniform1i(this.u('uTex'), 0)
+    gl.uniform1f(this.u('uAspect'), this.aspect)
     if (boil) {
       gl.uniform2f(this.u('uBoil'), this.bx, this.by)
       gl.uniform1f(this.u('uBoilRot'), this.brot)
@@ -268,9 +308,17 @@ export class Cameraless {
   /** Run the stage over the live composite; returns the drawn-film texture. */
   apply(srcTex: WebGLTexture, dt: number, p: CameralessParams, w: number, h: number): WebGLTexture {
     this.ensureTargets(w, h)
+    this.aspect = w / Math.max(1, h)
     // Émulsion amounts are continuous (read every frame); their seeds reseed on ticks.
     this.granuleAmt = p.granule
+    if (this.grabPending) {
+      // Grab : draw now (restart the clock from here), re-freeze on the live frame.
+      this.grabPending = false
+      this.next = 0
+      this.frozen = false
+    }
     const isTick = this.tick(dt, p)
+    if (isTick) this.ticks = (this.ticks + 1) % 1000000
     if (p.hold === 2) {
       // freeze : capture once; only the boil animates the held cell thereafter.
       if (!this.frozen) {
