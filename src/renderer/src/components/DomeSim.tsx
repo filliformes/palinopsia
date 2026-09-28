@@ -1,7 +1,8 @@
 // Fulldome simulator : the live domemaster wrapped back onto a dome, seen from
-// inside (the audience's seat) or orbiting outside : the in-app port of the
-// TouchDesigner FulldomeSimulator (equiazimuth sphere cap, dome tilt, camera
-// FOV, sweet-spot patch, alignment template at low opacity, the rim ring).
+// inside (the audience's seat) or orbiting outside, modelled on the fulldome
+// simulator Vincent used for his dome shows (equiazimuth sphere cap, dome tilt,
+// camera FOV, sweet-spot patch, alignment template after Paul Bourke at low
+// opacity, the rim ring).
 //
 // It runs in its OWN WebGL2 context and takes a 1024² read of the master that the
 // engine's render loop leaves in engine/domePreview (a captureStream of the 4K

@@ -763,7 +763,7 @@ export function OutputPage({
 
           <Section
             title="Spout / Syphon"
-            info="Shares the output with another app on this same computer (Resolume, TouchDesigner, MadMapper, OBS…) through the graphics card : no network, no delay. Spout on Windows, Syphon on macOS, both built into Palinopsia : nothing to install. Receivers list a source named Palinopsia. To another computer, use NDI."
+            info="Shares the output with another app on this same computer (a VJ, mapping or streaming app, OBS…) through the graphics card : no network, no delay. Spout on Windows, Syphon on macOS, both built into Palinopsia : nothing to install. Receivers list a source named Palinopsia. To another computer, use NDI."
             defaultCollapsed={!shareActive}
           >
             {shareKind ? (
@@ -1064,7 +1064,7 @@ function NdiSection({ btn, defaultCollapsed }: { btn: (on: boolean) => string; d
     <Section
       title="NDI"
       defaultCollapsed={defaultCollapsed}
-      info="NDI sends the output over the network to any NDI receiver : a mapping / media server (the SAT's fulldome servers take it live), Resolume, TouchDesigner, OBS, vMix… It sends the CLEAN picture (before keystone), or the domemaster when the dome is on. It keeps its full rate when this window is minimized or covered. NDI stays on across restarts."
+      info="NDI sends the output over the network to any NDI receiver : a mapping / media server (the SAT's fulldome servers take it live), a VJ app, OBS… It sends the CLEAN picture (before keystone), or the domemaster when the dome is on. It keeps its full rate when this window is minimized or covered. NDI stays on across restarts."
     >
       <div className="flex flex-wrap items-center gap-1.5">
         <button onClick={() => set({ enabled: !ndi.enabled })} className={btn(ndi.enabled)}>

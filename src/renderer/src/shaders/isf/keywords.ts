@@ -76,7 +76,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   'fx-rgb-shift': ['rgb split', 'chromatic aberration', 'detune', 'chorus', 'glitch'],
   'fx-ringing': ['ringing', 'echo', 'sharpen', 'ghost', 'artifact'],
   'fx-row-echo': ['echo', 'freeze', 'repeat', 'stutter', 'smear'],
-  'fx-rutt': ['rutt etra', 'scan', 'displace', '3d', 'retro'],
+  'fx-rutt': ['rutt', 'scan processor', 'scan', 'displace', '3d', 'retro'],
   'fx-scanlines': ['scanlines', 'crt', 'retro', 'lines', 'monitor'],
   'fx-sharpen': ['sharpen', 'highpass', 'presence', 'crisp', 'detail'],
   'fx-slice-shuffle': ['glitch', 'slice', 'shuffle', 'stutter', 'cut'],

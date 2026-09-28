@@ -833,7 +833,7 @@ export const THEMES: Theme[] = [
     blends: ['screen', 'lighten'], layers: [3, 3], useB: 0, superFlicker: 0.4
   }),
 
-  // ── New effect showcases (BENDR borrows) ──────────────────────────────
+  // ── New effect showcases (borrowed ideas) ──────────────────────────────
   mk({
     id: 'composite-signal', name: 'Composite Signal', family: 'Retro Screen',
     blurb: 'One crowded composite line : colour crawls off the edges and the two scan fields shiver apart.',

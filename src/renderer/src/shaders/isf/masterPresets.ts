@@ -151,7 +151,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     vibe: { mixSrc: 1, contrast: 1.1, saturation: 1.05, gamma: 1, autoLevel: 0.45, splitTone: 0 }
   },
   {
-    name: 'Riso Print',
+    name: 'Stencil Print',
     fx: [
       { shaderId: 'fx-posterize', inputs: { levels: 4, gamma: 1.1 } },
       { shaderId: 'fx-dither', inputs: { levels: 3, scale: 3, amount: 0.8 } },
