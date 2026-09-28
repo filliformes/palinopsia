@@ -14,16 +14,16 @@ export interface ShaderPreset {
 export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
   // ── Convolution nodes (need a sidechain layer; Réponse uses host history) ──
   'node-transfert': [
-    { name: 'Drift', values: { mode: 0, amount: 0.3, inertie: 0.6, flowScale: 1.0, flowBlur: 8, magnitudeGamma: 1.0, channelSpread: 0, flowRes: 1 } },
-    { name: 'Heavy pull', values: { mode: 0, amount: 0.5, inertie: 0.85, flowScale: 1.4, flowBlur: 12, magnitudeGamma: 1.3, channelSpread: 0.1 } },
-    { name: 'Snap', values: { mode: 0, amount: 0.45, inertie: 0.2, flowScale: 1.0, flowBlur: 5, magnitudeGamma: 0.8 } },
-    { name: 'Chroma pull', values: { mode: 0, amount: 0.4, inertie: 0.6, flowBlur: 8, channelSpread: 0.35 } },
-    { name: 'Whiplash', values: { mode: 0, amount: 0.6, inertie: 0.4, flowScale: 1.8, magnitudeGamma: 1.6 } },
-    { name: 'Trail soft', values: { mode: 1, amount: 0.35, inertie: 0.6, flowBlur: 8, taps: 12, falloff: 0.6, bidirectional: 0 } },
-    { name: 'Trail long', values: { mode: 1, amount: 0.55, inertie: 0.75, taps: 18, falloff: 0.3, bidirectional: 0 } },
-    { name: 'Smear both', values: { mode: 1, amount: 0.4, inertie: 0.5, taps: 14, falloff: 0.5, bidirectional: 1 } },
-    { name: 'Gesture blur', values: { mode: 1, amount: 0.3, inertie: 0.85, taps: 16, falloff: 0.4, magnitudeGamma: 1.2, bidirectional: 0 } },
-    { name: 'Fine trace', values: { mode: 1, amount: 0.25, inertie: 0.5, taps: 10, falloff: 0.7, flowRes: 2 } }
+    { name: 'Drift', values: { mode: 0, amount: 0.3, inertie: 0.6, flowScale: 1.0, flowBlur: 8, magnitudeGamma: 1.0, channelSpread: 0, taps: 12, falloff: 0.5, invert: 0, bidirectional: 1, flowRes: 1 } },
+    { name: 'Heavy pull', values: { mode: 0, amount: 0.5, inertie: 0.85, flowScale: 1.4, flowBlur: 12, magnitudeGamma: 1.3, channelSpread: 0.1, taps: 12, falloff: 0.5, invert: 0, bidirectional: 1, flowRes: 1 } },
+    { name: 'Snap', values: { mode: 0, amount: 0.45, inertie: 0.2, flowScale: 1.0, flowBlur: 5, magnitudeGamma: 0.8, channelSpread: 0, taps: 12, falloff: 0.5, invert: 0, bidirectional: 1, flowRes: 1 } },
+    { name: 'Chroma pull', values: { mode: 0, amount: 0.4, inertie: 0.6, flowScale: 1.0, flowBlur: 8, magnitudeGamma: 1.0, channelSpread: 0.35, taps: 12, falloff: 0.5, invert: 0, bidirectional: 1, flowRes: 1 } },
+    { name: 'Whiplash', values: { mode: 0, amount: 0.6, inertie: 0.4, flowScale: 1.8, flowBlur: 8, magnitudeGamma: 1.6, channelSpread: 0, taps: 12, falloff: 0.5, invert: 0, bidirectional: 1, flowRes: 1 } },
+    { name: 'Trail soft', values: { mode: 1, amount: 0.35, inertie: 0.6, flowScale: 1.0, flowBlur: 8, magnitudeGamma: 1.0, channelSpread: 0, taps: 12, falloff: 0.6, invert: 0, bidirectional: 0, flowRes: 1 } },
+    { name: 'Trail long', values: { mode: 1, amount: 0.55, inertie: 0.75, flowScale: 1.0, flowBlur: 8, magnitudeGamma: 1.0, channelSpread: 0, taps: 18, falloff: 0.3, invert: 0, bidirectional: 0, flowRes: 1 } },
+    { name: 'Smear both', values: { mode: 1, amount: 0.4, inertie: 0.5, flowScale: 1.0, flowBlur: 8, magnitudeGamma: 1.0, channelSpread: 0, taps: 14, falloff: 0.5, invert: 0, bidirectional: 1, flowRes: 1 } },
+    { name: 'Gesture blur', values: { mode: 1, amount: 0.3, inertie: 0.85, flowScale: 1.0, flowBlur: 8, magnitudeGamma: 1.2, channelSpread: 0, taps: 16, falloff: 0.4, invert: 0, bidirectional: 0, flowRes: 1 } },
+    { name: 'Fine trace', values: { mode: 1, amount: 0.25, inertie: 0.5, flowScale: 1.0, flowBlur: 8, magnitudeGamma: 1.0, channelSpread: 0, taps: 10, falloff: 0.7, invert: 0, bidirectional: 1, flowRes: 2 } }
   ],
   'node-convolve': [
     { name: 'Soft bloom', values: { scale: 0.6, taps: 7, threshold: 0.1, kernelGamma: 1.0, boost: 0, gain: 1.0, mix: 0.6, additive: 0 } },
@@ -50,45 +50,46 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Color tiles', values: { tile: 16, corpus: 1, structure: 0.15, orient: 0, correct: 0.4, melt: 0.15, stick: 0.65, jitter: 0.1, shape: 0, irregular: 0.5, drift: 0, gain: 1.0, mix: 1.0 } }
   ],
   'node-reponse': [
-    { name: 'Short echo', values: { length: 6, decay: 0.3, attack: 0, gain: 1.0, reverse: 0, mix: 0.5 } },
-    { name: 'Room', values: { length: 10, decay: 0.5, attack: 0.1, gain: 1.0, reverse: 0, mix: 0.6 } },
-    { name: 'Long tail', values: { length: 16, decay: 0.85, attack: 0.05, gain: 1.1, reverse: 0, mix: 0.65 } },
-    { name: 'Pulse', values: { length: 8, decay: 0.25, attack: 0.15, gain: 1.2, reverse: 0, mix: 0.6 } },
-    { name: 'Swell', values: { length: 14, decay: 0.7, attack: 0.1, gain: 1.0, reverse: 1, mix: 0.6 } },
-    { name: 'Stutter trail', values: { length: 6, decay: 0.4, attack: 0, gain: 1.3, reverse: 0, mix: 0.55 } },
-    { name: 'Ghost trail', values: { length: 12, decay: 0.9, attack: 0.2, gain: 0.9, reverse: 0, mix: 0.5 } },
-    { name: 'Rhythmic', values: { length: 10, decay: 0.4, attack: 0.3, gain: 1.1, reverse: 0, mix: 0.6 } },
-    { name: 'Deep reverb', values: { length: 16, decay: 0.95, attack: 0.15, gain: 1.0, reverse: 0, mix: 0.7 } },
-    { name: 'Reverse bloom', values: { length: 10, decay: 0.6, attack: 0, gain: 1.2, reverse: 1, mix: 0.6 } }
+    { name: 'Short echo', values: { length: 6, decay: 0.3, attack: 0, gain: 1.0, reverse: 0, stride: 1, mix: 0.5 } },
+    { name: 'Room', values: { length: 10, decay: 0.5, attack: 0.1, gain: 1.0, reverse: 0, stride: 1, mix: 0.6 } },
+    { name: 'Long tail', values: { length: 16, decay: 0.85, attack: 0.05, gain: 1.1, reverse: 0, stride: 1, mix: 0.65 } },
+    { name: 'Pulse', values: { length: 8, decay: 0.25, attack: 0.15, gain: 1.2, reverse: 0, stride: 1, mix: 0.6 } },
+    { name: 'Swell', values: { length: 14, decay: 0.7, attack: 0.1, gain: 1.0, reverse: 1, stride: 1, mix: 0.6 } },
+    { name: 'Stutter trail', values: { length: 6, decay: 0.4, attack: 0, gain: 1.3, reverse: 0, stride: 3, mix: 0.55 } },
+    { name: 'Ghost trail', values: { length: 12, decay: 0.9, attack: 0.2, gain: 0.9, reverse: 0, stride: 1, mix: 0.5 } },
+    { name: 'Rhythmic', values: { length: 10, decay: 0.4, attack: 0.3, gain: 1.1, reverse: 0, stride: 1, mix: 0.6 } },
+    { name: 'Deep reverb', values: { length: 16, decay: 0.95, attack: 0.15, gain: 1.0, reverse: 0, stride: 1, mix: 0.7 } },
+    { name: 'Reverse bloom', values: { length: 10, decay: 0.6, attack: 0, gain: 1.2, reverse: 1, stride: 1, mix: 0.6 } },
+    { name: 'Slow reverb', values: { length: 16, decay: 0.8, attack: 0.1, gain: 1.0, reverse: 0, stride: 6, mix: 0.6 } }
   ],
   // ── Faultline (dirty vision-mixer : momentary structural faults) ──
   'node-faultline': [
-    { name: 'Sparse dropout', values: { type: 0, rate: 1.5, dirt: 0.4, depth: 0.6, hold: 0.08 } },
-    { name: 'Rolling collapse', values: { type: 0, rate: 3.0, dirt: 0.7, depth: 0.85, hold: 0.15 } },
-    { name: 'Hard cuts', values: { type: 1, rate: 2.0, dirt: 0.5, depth: 0.8, hold: 0.12 } },
-    { name: 'Stutter cut', values: { type: 1, rate: 5.0, dirt: 0.8, depth: 0.7, hold: 0.05 } },
-    { name: 'Head-switch', values: { type: 2, rate: 2.5, dirt: 0.6, depth: 0.7, hold: 0.1 } },
-    { name: 'Tracking tear', values: { type: 2, rate: 4.0, dirt: 0.75, depth: 0.85, hold: 0.08 } },
-    { name: 'Static burst', values: { type: 3, rate: 1.5, dirt: 0.5, depth: 0.6, hold: 0.1 } },
-    { name: 'Noise sweep', values: { type: 3, rate: 3.0, dirt: 0.7, depth: 0.75, hold: 0.12 } },
-    { name: 'Circuit-bent', values: { type: 4, rate: 4.0, dirt: 0.8, depth: 0.8, hold: 0.08 } },
-    { name: 'Occasional fault', values: { type: 4, rate: 0.8, dirt: 0.3, depth: 0.5, hold: 0.06 } }
+    { name: 'Sparse dropout', values: { type: 0, rate: 1.5, sync: 0, dirt: 0.4, depth: 0.6, hold: 0.08 } },
+    { name: 'Rolling collapse', values: { type: 0, rate: 3.0, sync: 0, dirt: 0.7, depth: 0.85, hold: 0.15 } },
+    { name: 'Hard cuts', values: { type: 1, rate: 2.0, sync: 0, dirt: 0.5, depth: 0.8, hold: 0.12 } },
+    { name: 'Stutter cut', values: { type: 1, rate: 5.0, sync: 0, dirt: 0.8, depth: 0.7, hold: 0.05 } },
+    { name: 'Head-switch', values: { type: 2, rate: 2.5, sync: 0, dirt: 0.6, depth: 0.7, hold: 0.1 } },
+    { name: 'Tracking tear', values: { type: 2, rate: 4.0, sync: 0, dirt: 0.75, depth: 0.85, hold: 0.08 } },
+    { name: 'Static burst', values: { type: 3, rate: 1.5, sync: 0, dirt: 0.5, depth: 0.6, hold: 0.1 } },
+    { name: 'Noise sweep', values: { type: 3, rate: 3.0, sync: 0, dirt: 0.7, depth: 0.75, hold: 0.12 } },
+    { name: 'Circuit-bent', values: { type: 4, rate: 4.0, sync: 0, dirt: 0.8, depth: 0.8, hold: 0.08 } },
+    { name: 'Occasional fault', values: { type: 4, rate: 0.8, sync: 0, dirt: 0.3, depth: 0.5, hold: 0.06 } }
   ],
   // ── Sillage (advected-noise feedback : IBFV wake) ──
   'node-ibfv': [
-    { name: 'Soft wake', values: { flow: 0.4, inject: 0.15, scale: 0.4, field: 0.5, motion: 0.6, angle: 0, push: 0, swirl: 0.4, dye: 0.6, speed: 0.4, mix: 0.7 } },
-    { name: 'Long smear', values: { flow: 0.7, inject: 0.06, scale: 0.35, field: 0.4, motion: 0.7, angle: 0, push: 0, swirl: 0.3, dye: 0.7, speed: 0.35, mix: 0.8 } },
-    { name: 'Curl bath', values: { flow: 0.5, inject: 0.12, scale: 0.5, field: 0.9, motion: 0.2, angle: 0, push: 0, swirl: 0.6, dye: 0.6, speed: 0.5, mix: 0.75 } },
-    { name: 'Motion trails', values: { flow: 0.6, inject: 0.1, scale: 0.4, field: 0.2, motion: 0.9, angle: 0, push: 0, swirl: 0.2, dye: 0.7, speed: 0.5, mix: 0.8 } },
-    { name: 'Windswept', values: { flow: 0.6, inject: 0.1, scale: 0.4, field: 0.5, motion: 0.5, angle: 0.15, push: 0.5, swirl: 0.2, dye: 0.6, speed: 0.5, mix: 0.8 } },
-    { name: 'Left drift', values: { flow: 0.55, inject: 0.12, scale: 0.4, field: 0.5, motion: 0.5, angle: 0.5, push: 0.45, swirl: 0.2, dye: 0.6, speed: 0.45, mix: 0.75 } },
-    { name: 'Spiral in', values: { flow: 0.5, inject: 0.12, scale: 0.45, field: 0.6, motion: 0.4, angle: 0, push: 0, swirl: 0.85, dye: 0.6, speed: 0.55, mix: 0.8 } },
-    { name: 'Fine filaments', values: { flow: 0.4, inject: 0.2, scale: 0.75, field: 0.6, motion: 0.5, angle: 0, push: 0, swirl: 0.4, dye: 0.5, speed: 0.5, mix: 0.7 } },
-    { name: 'Ink dye', values: { flow: 0.5, inject: 0.1, scale: 0.35, field: 0.5, motion: 0.6, angle: 0, push: 0, swirl: 0.35, dye: 0.9, speed: 0.4, mix: 0.85 } },
-    { name: 'Storm', values: { flow: 0.8, inject: 0.08, scale: 0.5, field: 0.8, motion: 0.8, angle: 0.3, push: 0.6, swirl: 0.7, dye: 0.7, speed: 0.75, mix: 0.9 } }
+    { name: 'Soft wake', values: { flow: 0.4, inject: 0.15, scale: 0.4, scan: 1, field: 0.5, motion: 0.6, angle: 0, push: 0, swirl: 0.4, swirlX: 0.5, swirlY: 0.5, ground: 0, dye: 0.6, speed: 0.4, mix: 0.7 } },
+    { name: 'Long smear', values: { flow: 0.7, inject: 0.06, scale: 0.35, scan: 1, field: 0.4, motion: 0.7, angle: 0, push: 0, swirl: 0.3, swirlX: 0.5, swirlY: 0.5, ground: 0, dye: 0.7, speed: 0.35, mix: 0.8 } },
+    { name: 'Curl bath', values: { flow: 0.5, inject: 0.12, scale: 0.5, scan: 1, field: 0.9, motion: 0.2, angle: 0, push: 0, swirl: 0.6, swirlX: 0.5, swirlY: 0.5, ground: 0, dye: 0.6, speed: 0.5, mix: 0.75 } },
+    { name: 'Motion trails', values: { flow: 0.6, inject: 0.1, scale: 0.4, scan: 1, field: 0.2, motion: 0.9, angle: 0, push: 0, swirl: 0.2, swirlX: 0.5, swirlY: 0.5, ground: 0, dye: 0.7, speed: 0.5, mix: 0.8 } },
+    { name: 'Windswept', values: { flow: 0.6, inject: 0.1, scale: 0.4, scan: 1, field: 0.5, motion: 0.5, angle: 0.15, push: 0.5, swirl: 0.2, swirlX: 0.5, swirlY: 0.5, ground: 0, dye: 0.6, speed: 0.5, mix: 0.8 } },
+    { name: 'Left drift', values: { flow: 0.55, inject: 0.12, scale: 0.4, scan: 1, field: 0.5, motion: 0.5, angle: 0.5, push: 0.45, swirl: 0.2, swirlX: 0.5, swirlY: 0.5, ground: 0, dye: 0.6, speed: 0.45, mix: 0.75 } },
+    { name: 'Spiral in', values: { flow: 0.5, inject: 0.12, scale: 0.45, scan: 1, field: 0.6, motion: 0.4, angle: 0, push: 0, swirl: 0.85, swirlX: 0.5, swirlY: 0.5, ground: 0, dye: 0.6, speed: 0.55, mix: 0.8 } },
+    { name: 'Fine filaments', values: { flow: 0.4, inject: 0.2, scale: 0.75, scan: 1, field: 0.6, motion: 0.5, angle: 0, push: 0, swirl: 0.4, swirlX: 0.5, swirlY: 0.5, ground: 0, dye: 0.5, speed: 0.5, mix: 0.7 } },
+    { name: 'Ink dye', values: { flow: 0.5, inject: 0.1, scale: 0.35, scan: 1, field: 0.5, motion: 0.6, angle: 0, push: 0, swirl: 0.35, swirlX: 0.5, swirlY: 0.5, ground: 0, dye: 0.9, speed: 0.4, mix: 0.85 } },
+    { name: 'Storm', values: { flow: 0.8, inject: 0.08, scale: 0.5, scan: 1, field: 0.8, motion: 0.8, angle: 0.3, push: 0.6, swirl: 0.7, swirlX: 0.5, swirlY: 0.5, ground: 0, dye: 0.7, speed: 0.75, mix: 0.9 } }
   ],
   // ── Toile (painterly Kuwahara + flow-XDoG line-work) ──
-  // ── TouchDesigner recipes (v1.2.0) ──
+  // ── Sidechain recipes (v1.2.0) ──
   'node-remap': [
     { name: 'Gradient remap', values: { mode: 0, amount: 1.0, scale: 1.0, offsetX: 0, offsetY: 0, extend: 2, swap: 0, mix: 1.0 } },
     { name: 'Half remap', values: { mode: 0, amount: 0.5, scale: 1.0, offsetX: 0, offsetY: 0, extend: 2, swap: 0, mix: 1.0 } },
@@ -100,14 +101,14 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Ghost remap', values: { mode: 0, amount: 0.7, scale: 1.2, offsetX: 0, offsetY: 0, extend: 2, swap: 0, mix: 0.45 } }
   ],
   'node-lumablur': [
-    { name: 'Bright blooms soft', values: { control: 0, blackWidth: 0, whiteWidth: 24, gamma: 1.0, focus: 0.5, invert: 0, quality: 1 } },
-    { name: 'Shadows dissolve', values: { control: 0, blackWidth: 28, whiteWidth: 0, gamma: 1.0, focus: 0.5, invert: 0, quality: 1 } },
-    { name: 'Heavy haze', values: { control: 0, blackWidth: 6, whiteWidth: 60, gamma: 0.7, focus: 0.5, invert: 0, quality: 1 } },
-    { name: 'Depth of field', values: { control: 1, blackWidth: 0, whiteWidth: 28, gamma: 1.2, focus: 0.5, invert: 0, quality: 1 } },
-    { name: 'Near focus', values: { control: 1, blackWidth: 0, whiteWidth: 36, gamma: 1.0, focus: 0.8, invert: 0, quality: 1 } },
-    { name: 'Far focus', values: { control: 1, blackWidth: 0, whiteWidth: 36, gamma: 1.0, focus: 0.2, invert: 0, quality: 1 } },
-    { name: 'Tilt shift', values: { control: 1, blackWidth: 0, whiteWidth: 20, gamma: 2.0, focus: 0.5, invert: 0, quality: 1 } },
-    { name: 'Fast soft', values: { control: 0, blackWidth: 2, whiteWidth: 14, gamma: 1.0, focus: 0.5, invert: 0, quality: 0 } }
+    { name: 'Bright blooms soft', values: { control: 0, blackWidth: 0, whiteWidth: 24, gamma: 1.0, focus: 0.5, invert: 0, quality: 1, mix: 1.0 } },
+    { name: 'Shadows dissolve', values: { control: 0, blackWidth: 28, whiteWidth: 0, gamma: 1.0, focus: 0.5, invert: 0, quality: 1, mix: 1.0 } },
+    { name: 'Heavy haze', values: { control: 0, blackWidth: 6, whiteWidth: 60, gamma: 0.7, focus: 0.5, invert: 0, quality: 1, mix: 1.0 } },
+    { name: 'Depth of field', values: { control: 1, blackWidth: 0, whiteWidth: 28, gamma: 1.2, focus: 0.5, invert: 0, quality: 1, mix: 1.0 } },
+    { name: 'Near focus', values: { control: 1, blackWidth: 0, whiteWidth: 36, gamma: 1.0, focus: 0.8, invert: 0, quality: 1, mix: 1.0 } },
+    { name: 'Far focus', values: { control: 1, blackWidth: 0, whiteWidth: 36, gamma: 1.0, focus: 0.2, invert: 0, quality: 1, mix: 1.0 } },
+    { name: 'Tilt shift', values: { control: 1, blackWidth: 0, whiteWidth: 20, gamma: 2.0, focus: 0.5, invert: 0, quality: 1, mix: 1.0 } },
+    { name: 'Fast soft', values: { control: 0, blackWidth: 2, whiteWidth: 14, gamma: 1.0, focus: 0.5, invert: 0, quality: 0, mix: 1.0 } }
   ],
   'node-gooey': [
     { name: 'Metaballs', values: { blur: 0.35, threshold: 0.4, softness: 0.05, fill: 0, key: 0, outside: 0, invert: 0, mix: 1.0 } },
@@ -120,14 +121,14 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Ghost blobs', values: { blur: 0.4, threshold: 0.4, softness: 0.08, fill: 0, key: 0, outside: 0.5, invert: 0, mix: 0.6 } }
   ],
   'node-matte': [
-    { name: 'Luma key', values: { channel: 0, low: 0.0, high: 1.0, invert: 0, swap: 0, mix: 1.0 } },
-    { name: 'Hard key', values: { channel: 0, low: 0.45, high: 0.55, invert: 0, swap: 0, mix: 1.0 } },
-    { name: 'Soft key', values: { channel: 0, low: 0.1, high: 0.9, invert: 0, swap: 0, mix: 1.0 } },
-    { name: 'Inverted key', values: { channel: 0, low: 0.2, high: 0.8, invert: 1, swap: 0, mix: 1.0 } },
-    { name: 'Red channel', values: { channel: 1, low: 0.2, high: 0.8, invert: 0, swap: 0, mix: 1.0 } },
-    { name: 'Alpha matte', values: { channel: 4, low: 0.0, high: 1.0, invert: 0, swap: 0, mix: 1.0 } },
-    { name: 'Swapped', values: { channel: 0, low: 0.2, high: 0.8, invert: 0, swap: 1, mix: 1.0 } },
-    { name: 'Half blend', values: { channel: 0, low: 0.2, high: 0.8, invert: 0, swap: 0, mix: 0.5 } }
+    { name: 'Luma key', values: { channel: 0, low: 0.0, high: 1.0, invert: 0, swap: 0, empty: 0, mix: 1.0 } },
+    { name: 'Hard key', values: { channel: 0, low: 0.45, high: 0.55, invert: 0, swap: 0, empty: 0, mix: 1.0 } },
+    { name: 'Soft key', values: { channel: 0, low: 0.1, high: 0.9, invert: 0, swap: 0, empty: 0, mix: 1.0 } },
+    { name: 'Inverted key', values: { channel: 0, low: 0.2, high: 0.8, invert: 1, swap: 0, empty: 0, mix: 1.0 } },
+    { name: 'Red channel', values: { channel: 1, low: 0.2, high: 0.8, invert: 0, swap: 0, empty: 0, mix: 1.0 } },
+    { name: 'Alpha matte', values: { channel: 4, low: 0.0, high: 1.0, invert: 0, swap: 0, empty: 0, mix: 1.0 } },
+    { name: 'Swapped', values: { channel: 0, low: 0.2, high: 0.8, invert: 0, swap: 1, empty: 0, mix: 1.0 } },
+    { name: 'Half blend', values: { channel: 0, low: 0.2, high: 0.8, invert: 0, swap: 0, empty: 0, mix: 0.5 } }
   ],
   'node-lookup': [
     { name: 'Palette line', values: { index: 0, axis: 0, position: 0.5, band: 0.2, offset: 0, cycles: 1, gamma: 1, mirror: 0, mix: 1.0 } },
@@ -140,42 +141,44 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Tinted', values: { index: 0, axis: 0, position: 0.5, band: 0.5, offset: 0, cycles: 1, gamma: 1, mirror: 0, mix: 0.4 } }
   ],
   'node-toile': [
-    { name: 'Oil paint', values: { radius: 0.5, sharp: 0.5, paint: 1.0, line: 0.3, threshold: 0.5, mix: 1.0 } },
-    { name: 'Watercolor', values: { radius: 0.7, sharp: 0.3, paint: 0.9, line: 0.1, threshold: 0.6, mix: 0.85 } },
-    { name: 'Thick impasto', values: { radius: 0.85, sharp: 0.7, paint: 1.0, line: 0.2, threshold: 0.5, mix: 1.0 } },
-    { name: 'Ink drawing', values: { radius: 0.3, sharp: 0.6, paint: 0.4, line: 0.7, threshold: 0.45, mix: 1.0 } },
-    { name: 'Pen & wash', values: { radius: 0.5, sharp: 0.5, paint: 0.7, line: 0.55, threshold: 0.4, mix: 0.9 } },
-    { name: 'Fine strokes', values: { radius: 0.35, sharp: 0.6, paint: 0.8, line: 0.35, threshold: 0.5, mix: 0.9 } },
-    { name: 'Flat poster', values: { radius: 0.6, sharp: 0.9, paint: 1.0, line: 0.4, threshold: 0.55, mix: 1.0 } },
-    { name: 'Soft gouache', values: { radius: 0.6, sharp: 0.35, paint: 0.85, line: 0.15, threshold: 0.6, mix: 0.8 } },
-    { name: 'Comic ink', values: { radius: 0.45, sharp: 0.75, paint: 0.6, line: 0.65, threshold: 0.4, mix: 1.0 } },
-    { name: 'Subtle paint', values: { radius: 0.4, sharp: 0.4, paint: 0.5, line: 0.2, threshold: 0.5, mix: 0.6 } }
+    { name: 'Oil paint', values: { radius: 0.5, sharp: 0.5, paint: 1.0, strokes: 0, line: 0.3, threshold: 0.5, mix: 1.0 } },
+    { name: 'Watercolor', values: { radius: 0.7, sharp: 0.3, paint: 0.9, strokes: 0, line: 0.1, threshold: 0.6, mix: 0.85 } },
+    { name: 'Thick impasto', values: { radius: 0.85, sharp: 0.7, paint: 1.0, strokes: 0, line: 0.2, threshold: 0.5, mix: 1.0 } },
+    { name: 'Ink drawing', values: { radius: 0.3, sharp: 0.6, paint: 0.4, strokes: 0, line: 0.7, threshold: 0.45, mix: 1.0 } },
+    { name: 'Pen & wash', values: { radius: 0.5, sharp: 0.5, paint: 0.7, strokes: 0, line: 0.55, threshold: 0.4, mix: 0.9 } },
+    { name: 'Fine strokes', values: { radius: 0.35, sharp: 0.6, paint: 0.8, strokes: 0, line: 0.35, threshold: 0.5, mix: 0.9 } },
+    { name: 'Flat poster', values: { radius: 0.6, sharp: 0.9, paint: 1.0, strokes: 0, line: 0.4, threshold: 0.55, mix: 1.0 } },
+    { name: 'Soft gouache', values: { radius: 0.6, sharp: 0.35, paint: 0.85, strokes: 0, line: 0.15, threshold: 0.6, mix: 0.8 } },
+    { name: 'Comic ink', values: { radius: 0.45, sharp: 0.75, paint: 0.6, strokes: 0, line: 0.65, threshold: 0.4, mix: 1.0 } },
+    { name: 'Subtle paint', values: { radius: 0.4, sharp: 0.4, paint: 0.5, strokes: 0, line: 0.2, threshold: 0.5, mix: 0.6 } }
   ],
   // ── Scanner (flatbed slit-scan : moving head captures each line) ──
   'node-scanner': [
-    { name: 'Flatbed sweep', values: { mode: 0, axis: 0, scanRate: 0.4, drag: 0.3, wobble: 0.15, jitter: 0.1, tear: 0.2, rgb: 0.15, bar: 0.25 } },
-    { name: 'Slow document', values: { mode: 0, axis: 0, scanRate: 0.12, drag: 0.5, wobble: 0.1, jitter: 0.05, tear: 0.1, rgb: 0.1, bar: 0.2 } },
-    { name: 'Fast rip', values: { mode: 0, axis: 0, scanRate: 1.2, drag: 0.6, wobble: 0.4, jitter: 0.4, tear: 0.6, rgb: 0.3, bar: 0.35 } },
-    { name: 'Sideways scan', values: { mode: 0, axis: 2, scanRate: 0.5, drag: 0.4, wobble: 0.2, jitter: 0.15, tear: 0.3, rgb: 0.2, bar: 0.25 } },
-    { name: 'Upward', values: { mode: 0, axis: 1, scanRate: 0.6, drag: 0.35, wobble: 0.25, jitter: 0.2, tear: 0.35, rgb: 0.2, bar: 0.3 } },
-    { name: 'One-shot freeze', values: { mode: 1, axis: 0, scanRate: 0.4, drag: 0.3, wobble: 0.1, jitter: 0.1, tear: 0.2, rgb: 0.15, bar: 0.3 } },
-    { name: 'Hand-wave', values: { mode: 0, axis: 0, scanRate: 0.35, drag: 0.4, wobble: 0.5, jitter: 0.3, tear: 0.3, rgb: 0.25, bar: 0.25 } },
-    { name: 'CCD split', values: { mode: 0, axis: 0, scanRate: 0.45, drag: 0.3, wobble: 0.2, jitter: 0.15, tear: 0.25, rgb: 0.5, bar: 0.3 } },
-    { name: 'Torn lines', values: { mode: 0, axis: 3, scanRate: 0.7, drag: 0.5, wobble: 0.3, jitter: 0.45, tear: 0.6, rgb: 0.3, bar: 0.3 } },
-    { name: 'Clean pass', values: { mode: 0, axis: 0, scanRate: 0.3, drag: 0.15, wobble: 0, jitter: 0, tear: 0, rgb: 0, bar: 0.15 } }
+    { name: 'Flatbed sweep', values: { mode: 0, axis: 0, scanRate: 0.4, drag: 0.3, wobble: 0.15, jitter: 0.1, tear: 0.2, rgb: 0.15, bar: 0.25, audio: 0 } },
+    { name: 'Slow document', values: { mode: 0, axis: 0, scanRate: 0.12, drag: 0.5, wobble: 0.1, jitter: 0.05, tear: 0.1, rgb: 0.1, bar: 0.2, audio: 0 } },
+    { name: 'Fast rip', values: { mode: 0, axis: 0, scanRate: 1.2, drag: 0.6, wobble: 0.4, jitter: 0.4, tear: 0.6, rgb: 0.3, bar: 0.35, audio: 0 } },
+    { name: 'Sideways scan', values: { mode: 0, axis: 2, scanRate: 0.5, drag: 0.4, wobble: 0.2, jitter: 0.15, tear: 0.3, rgb: 0.2, bar: 0.25, audio: 0 } },
+    { name: 'Upward', values: { mode: 0, axis: 1, scanRate: 0.6, drag: 0.35, wobble: 0.25, jitter: 0.2, tear: 0.35, rgb: 0.2, bar: 0.3, audio: 0 } },
+    { name: 'One-shot freeze', values: { mode: 1, axis: 0, scanRate: 0.4, drag: 0.3, wobble: 0.1, jitter: 0.1, tear: 0.2, rgb: 0.15, bar: 0.3, audio: 0 } },
+    { name: 'Hand-wave', values: { mode: 0, axis: 0, scanRate: 0.35, drag: 0.4, wobble: 0.5, jitter: 0.3, tear: 0.3, rgb: 0.25, bar: 0.25, audio: 0 } },
+    { name: 'CCD split', values: { mode: 0, axis: 0, scanRate: 0.45, drag: 0.3, wobble: 0.2, jitter: 0.15, tear: 0.25, rgb: 0.5, bar: 0.3, audio: 0 } },
+    { name: 'Torn lines', values: { mode: 0, axis: 3, scanRate: 0.7, drag: 0.5, wobble: 0.3, jitter: 0.45, tear: 0.6, rgb: 0.3, bar: 0.3, audio: 0 } },
+    { name: 'Clean pass', values: { mode: 0, axis: 0, scanRate: 0.3, drag: 0.15, wobble: 0, jitter: 0, tear: 0, rgb: 0, bar: 0.15, audio: 0 } },
+    { name: 'Oscilloscope scan', values: { mode: 0, axis: 0, scanRate: 0.5, drag: 0.1, wobble: 0, jitter: 0.05, tear: 0.1, rgb: 0.2, bar: 0.25, audio: 0.5 } }
   ],
   // ── Chronoscan (per-pixel time displacement : convolves time) ──
   'node-chronoscan': [
-    { name: 'Slit smear', values: { source: 2, reach: 0.6, angle: 0, sweep: 0.15, curve: 1.0, smooth: 1, mix: 1.0 } },
-    { name: 'Diagonal sweep', values: { source: 2, reach: 0.7, angle: 0.785, sweep: 0.25, curve: 1.0, smooth: 1, mix: 1.0 } },
-    { name: 'Luma time', values: { source: 0, reach: 0.6, curve: 1.2, smooth: 1, mix: 1.0 } },
-    { name: 'Luma inverted', values: { source: 0, reach: 0.7, curve: 1.5, invert: 1, smooth: 1, mix: 0.9 } },
-    { name: 'Sidechain clock', values: { source: 1, reach: 0.6, curve: 1.0, smooth: 1, mix: 1.0 } },
-    { name: 'Deep history', values: { source: 2, reach: 1.0, angle: 0, sweep: 0.1, curve: 2.0, smooth: 1, mix: 1.0 } },
-    { name: 'Fast slit', values: { source: 2, reach: 0.5, angle: 1.5708, sweep: 0.4, curve: 0.8, smooth: 0, mix: 1.0 } },
-    { name: 'Gentle drift', values: { source: 2, reach: 0.4, angle: 0.3, sweep: 0.08, curve: 1.0, smooth: 1, mix: 0.7 } },
-    { name: 'Hard steps', values: { source: 0, reach: 0.8, curve: 0.5, smooth: 0, mix: 1.0 } },
-    { name: 'Vertical roll', values: { source: 2, reach: 0.7, angle: 3.1416, sweep: 0.2, curve: 1.2, smooth: 1, mix: 1.0 } }
+    { name: 'Slit smear', values: { source: 2, reach: 0.6, angle: 0, sweep: 0.15, sweepMode: 0, curve: 1.0, invert: 0, smooth: 1, stride: 1, mix: 1.0 } },
+    { name: 'Diagonal sweep', values: { source: 2, reach: 0.7, angle: 0.785, sweep: 0.25, sweepMode: 0, curve: 1.0, invert: 0, smooth: 1, stride: 1, mix: 1.0 } },
+    { name: 'Luma time', values: { source: 0, reach: 0.6, angle: 0, sweep: 0.15, sweepMode: 0, curve: 1.2, invert: 0, smooth: 1, stride: 1, mix: 1.0 } },
+    { name: 'Luma inverted', values: { source: 0, reach: 0.7, angle: 0, sweep: 0.15, sweepMode: 0, curve: 1.5, invert: 1, smooth: 1, stride: 1, mix: 0.9 } },
+    { name: 'Sidechain clock', values: { source: 1, reach: 0.6, angle: 0, sweep: 0.15, sweepMode: 0, curve: 1.0, invert: 0, smooth: 1, stride: 1, mix: 1.0 } },
+    { name: 'Deep history', values: { source: 2, reach: 1.0, angle: 0, sweep: 0.1, sweepMode: 0, curve: 2.0, invert: 0, smooth: 1, stride: 3, mix: 1.0 } },
+    { name: 'Fast slit', values: { source: 2, reach: 0.5, angle: 1.5708, sweep: 0.4, sweepMode: 0, curve: 0.8, invert: 0, smooth: 0, stride: 1, mix: 1.0 } },
+    { name: 'Gentle drift', values: { source: 2, reach: 0.4, angle: 0.3, sweep: 0.08, sweepMode: 1, curve: 1.0, invert: 0, smooth: 1, stride: 1, mix: 0.7 } },
+    { name: 'Hard steps', values: { source: 0, reach: 0.8, angle: 0, sweep: 0.15, sweepMode: 0, curve: 0.5, invert: 0, smooth: 0, stride: 1, mix: 1.0 } },
+    { name: 'Vertical roll', values: { source: 2, reach: 0.7, angle: 4.7124, sweep: 0.2, sweepMode: 0, curve: 1.2, invert: 0, smooth: 1, stride: 1, mix: 1.0 } },
+    { name: 'Tide (ping-pong)', values: { source: 2, reach: 0.8, angle: 0, sweep: 0.2, sweepMode: 1, curve: 1.0, invert: 0, smooth: 1, stride: 2, mix: 1.0 } }
   ],
   // ── Sediment (long-term image memory : minutes of the past resurface) ──
   'node-sediment': [
@@ -192,130 +195,136 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
   ],
   // ── Parallax (2.5D from the shared depth map) ──
   'node-parallax': [
-    { name: 'Gentle depth', values: { amount: 0.4, angle: 0, sway: 0.3, dof: 0, focus: 0.5, fog: 0, wet: 1.0 } },
-    { name: 'Big parallax', values: { amount: 0.6, angle: 0, sway: 0.5, dof: 0.2, focus: 0.5, fog: 0.2, wet: 1.0 } },
-    { name: 'Diorama', values: { amount: 0.5, angle: 0, sway: 0.4, dof: 0.5, focus: 0.4, fog: 0.3, wet: 1.0 } },
-    { name: 'Aerial fog', values: { amount: 0.3, angle: 0, sway: 0.35, dof: 0.3, focus: 0.6, fog: 0.5, wet: 1.0 } },
-    { name: 'Tilt sway', values: { amount: 0.45, angle: 1.5708, sway: 0.6, dof: 0.2, focus: 0.5, fog: 0.15, wet: 1.0 } },
-    { name: 'Shallow DOF', values: { amount: 0.35, angle: 0, sway: 0.3, dof: 0.5, focus: 0.3, fog: 0.1, wet: 1.0 } },
-    { name: 'Deep focus', values: { amount: 0.5, angle: 0, sway: 0.4, dof: 0, focus: 0.7, fog: 0.2, wet: 1.0 } },
-    { name: 'Inverted depth', values: { amount: 0.4, angle: 0, sway: 0.35, dof: 0.2, focus: 0.5, fog: 0.2, invert: 1, wet: 1.0 } },
-    { name: 'Subtle sway', values: { amount: 0.2, angle: 0.785, sway: 0.5, dof: 0.1, focus: 0.5, fog: 0, wet: 0.7 } },
-    { name: 'Full recession', values: { amount: 0.6, angle: 0, sway: 0.45, dof: 0.4, focus: 0.55, fog: 0.5, wet: 1.0 } }
+    { name: 'Gentle depth', values: { amount: 0.4, angle: 0, sway: 0.3, swayRate: 1, dof: 0, dofShape: 0, focus: 0.5, fog: 0, invert: 0, wet: 1.0 } },
+    { name: 'Big parallax', values: { amount: 0.6, angle: 0, sway: 0.5, swayRate: 1, dof: 0.2, dofShape: 0, focus: 0.5, fog: 0.2, invert: 0, wet: 1.0 } },
+    { name: 'Diorama', values: { amount: 0.5, angle: 0, sway: 0.4, swayRate: 1, dof: 0.5, dofShape: 0, focus: 0.4, fog: 0.3, invert: 0, wet: 1.0 } },
+    { name: 'Aerial fog', values: { amount: 0.3, angle: 0, sway: 0.35, swayRate: 1, dof: 0.3, dofShape: 0, focus: 0.6, fog: 0.5, invert: 0, wet: 1.0 } },
+    { name: 'Tilt sway', values: { amount: 0.45, angle: 1.5708, sway: 0.6, swayRate: 1, dof: 0.2, dofShape: 0, focus: 0.5, fog: 0.15, invert: 0, wet: 1.0 } },
+    { name: 'Shallow DOF', values: { amount: 0.35, angle: 0, sway: 0.3, swayRate: 1, dof: 0.5, dofShape: 1, focus: 0.3, fog: 0.1, invert: 0, wet: 1.0 } },
+    { name: 'Deep focus', values: { amount: 0.5, angle: 0, sway: 0.4, swayRate: 1, dof: 0, dofShape: 0, focus: 0.7, fog: 0.2, invert: 0, wet: 1.0 } },
+    { name: 'Inverted depth', values: { amount: 0.4, angle: 0, sway: 0.35, swayRate: 1, dof: 0.2, dofShape: 0, focus: 0.5, fog: 0.2, invert: 1, wet: 1.0 } },
+    { name: 'Subtle sway', values: { amount: 0.2, angle: 0.785, sway: 0.5, swayRate: 1, dof: 0.1, dofShape: 0, focus: 0.5, fog: 0, invert: 0, wet: 0.7 } },
+    { name: 'Full recession', values: { amount: 0.6, angle: 0, sway: 0.45, swayRate: 1, dof: 0.4, dofShape: 0, focus: 0.55, fog: 0.5, invert: 0, wet: 1.0 } }
   ],
   // ── Feedback engine (video feedback : edge of chaos) ──
   'node-feedback': [
-    { name: 'Slow drift', values: { feedback: 0.85, gain: 1.0, zoom: 0.008, rotate: 0.01, driftX: 0.004, driftY: 0, pivot: 0.5, warp: 0.4, hue: 0, blur: 0.25, blend: 0, agc: 0.5, noise: 0.15 } },
-    { name: 'Wandering tunnel', values: { feedback: 0.9, gain: 1.02, zoom: 0.03, rotate: 0.02, driftX: 0, driftY: 0, pivot: 0.7, warp: 0.3, hue: 0.01, blur: 0.2, blend: 0, agc: 0.55, noise: 0.12 } },
-    { name: 'Boiling', values: { feedback: 0.88, gain: 1.0, zoom: 0.005, rotate: 0, driftX: 0, driftY: 0, pivot: 0.4, warp: 0.85, hue: 0.02, hueCurve: 0.45, blur: 0.3, blend: 0, agc: 0.6, noise: 0.2 } },
-    { name: 'Comet trails', values: { feedback: 0.8, gain: 0.98, zoom: 0, rotate: 0, driftX: 0.02, driftY: 0.01, pivot: 0.3, warp: 0.2, hue: 0, blur: 0.15, blend: 4, agc: 0.4, noise: 0.1 } },
-    { name: 'Light painting', values: { feedback: 0.92, gain: 1.04, zoom: 0.006, rotate: 0.005, driftX: 0, driftY: 0, pivot: 0.5, warp: 0.3, hue: 0, blur: 0.1, blend: 2, agc: 0.5, noise: 0.08 } },
-    { name: 'Reaction texture', values: { feedback: 0.86, gain: 1.0, zoom: 0.003, rotate: 0, driftX: 0, driftY: 0, pivot: 0.35, warp: 0.9, hue: 0, blur: 0.4, blend: 0, agc: 0.7, noise: 0.25 } },
-    { name: 'Oil slick', values: { feedback: 0.9, gain: 1.0, zoom: 0.004, rotate: 0.008, driftX: 0.003, driftY: -0.003, pivot: 0.6, warp: 0.5, hue: 0.05, blur: 0.45, blend: 0, agc: 0.55, noise: 0.15 } },
-    { name: 'Edge of chaos', values: { feedback: 0.94, gain: 1.07, zoom: 0.02, rotate: 0.03, driftX: 0.01, driftY: 0.005, pivot: 0.7, warp: 0.6, hue: 0.03, blur: 0.15, blend: 1, agc: 0.35, noise: 0.1 } },
-    { name: 'Ghost smear', values: { feedback: 0.82, gain: 0.96, zoom: 0.002, rotate: 0, driftX: 0.015, driftY: 0, pivot: 0.4, warp: 0.25, hue: 0, blur: 0.5, blend: 0, agc: 0.45, noise: 0.12 } },
-    { name: 'Crystalline', values: { feedback: 0.88, gain: 1.03, zoom: 0.015, rotate: 0.015, driftX: 0, driftY: 0, pivot: 0.55, warp: 0.35, hue: 0, blur: 0.02, blend: 3, agc: 0.5, noise: 0.1 } },
-    { name: 'Keyed shapes', values: { feedback: 0.9, gain: 1.02, zoom: 0.02, rotate: 0.02, driftX: 0.005, driftY: 0, pivot: 0.6, warp: 0.25, hue: 0.01, blur: 0.1, blend: 0, keyMode: 1, keyThresh: 0.45, keySoft: 0.06, border: 0.5, borderHue: 0.55, agc: 0.5, noise: 0.1 } },
-    { name: 'Time echo', values: { feedback: 0.82, gain: 1.0, zoom: 0.006, rotate: 0.008, driftX: 0.004, driftY: 0, pivot: 0.5, warp: 0.3, hue: 0, blur: 0.2, delay: 8, delayMix: 0.45, blend: 0, agc: 0.5, noise: 0.12 } },
-    { name: 'Coupled twins', values: { feedback: 0.9, gain: 1.02, zoom: 0.02, rotate: 0.02, driftX: 0.004, driftY: -0.003, pivot: 0.65, warp: 0.5, hue: 0.01, blur: 0.2, blend: 0, agc: 0.55, noise: 0.12, couple: 0.4, couple2: 1.4 } },
-    { name: 'Emergent weave', values: { feedback: 0.92, gain: 1.04, zoom: 0.015, rotate: 0.03, driftX: 0, driftY: 0, pivot: 0.7, warp: 0.6, hue: 0.02, hueCurve: 0.4, blur: 0.15, blend: 0, agc: 0.5, noise: 0.1, couple: 0.6, couple2: 0.7 } },
-    { name: 'RGB time-shear', values: { feedback: 0.86, gain: 1.0, zoom: 0.008, rotate: 0.01, driftX: 0.006, driftY: 0, pivot: 0.5, warp: 0.3, hue: 0, blur: 0.15, delay: 9, delayMix: 0.5, rgbDelay: 4, route: 0, blend: 0, agc: 0.5, noise: 0.1 } },
-    { name: 'Feedforward echo', values: { feedback: 0.8, gain: 0.98, zoom: 0.004, rotate: 0, driftX: 0.015, driftY: 0.005, pivot: 0.4, warp: 0.25, hue: 0, blur: 0.2, delay: 10, delayMix: 0.55, rgbDelay: 2, route: 1, blend: 0, agc: 0.45, noise: 0.1 } },
-    { name: 'Coupled chaos', values: { feedback: 0.94, gain: 1.07, zoom: 0.03, rotate: 0.04, driftX: 0.01, driftY: 0.006, pivot: 0.72, warp: 0.7, hue: 0.03, hueCurve: 0.5, blur: 0.12, blend: 0, agc: 0.35, noise: 0.1, couple: 0.5, couple2: 1.6, delay: 6, delayMix: 0.4, rgbDelay: 3 } }
+    // Every preset sets the whole loop (key, echo, couple and placement included) :
+    // presets are partial merges, and a keyer or a coupled buffer left over from
+    // the previous pick changes the picture completely.
+    { name: 'Slow drift', values: { feedback: 0.85, gain: 1.0, zoom: 0.008, rotate: 0.01, driftX: 0.004, driftY: 0, pivot: 0.5, warp: 0.4, hue: 0, hueCurve: 0, sat: 0, blur: 0.25, blend: 0, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 0, delayMix: 0, rgbDelay: 0, route: 0, placement: 0, couple: 0, couple2: 1.3, agc: 0.5, noise: 0.15 } },
+    { name: 'Wandering tunnel', values: { feedback: 0.9, gain: 1.02, zoom: 0.03, rotate: 0.02, driftX: 0, driftY: 0, pivot: 0.7, warp: 0.3, hue: 0.01, hueCurve: 0, sat: 0, blur: 0.2, blend: 0, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 0, delayMix: 0, rgbDelay: 0, route: 0, placement: 0, couple: 0, couple2: 1.3, agc: 0.55, noise: 0.12 } },
+    { name: 'Boiling', values: { feedback: 0.88, gain: 1.0, zoom: 0.005, rotate: 0, driftX: 0, driftY: 0, pivot: 0.4, warp: 0.85, hue: 0.02, hueCurve: 0.45, sat: 0, blur: 0.3, blend: 0, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 0, delayMix: 0, rgbDelay: 0, route: 0, placement: 0, couple: 0, couple2: 1.3, agc: 0.6, noise: 0.2 } },
+    { name: 'Comet trails', values: { feedback: 0.8, gain: 0.98, zoom: 0, rotate: 0, driftX: 0.02, driftY: 0.01, pivot: 0.3, warp: 0.2, hue: 0, hueCurve: 0, sat: 0, blur: 0.15, blend: 4, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 0, delayMix: 0, rgbDelay: 0, route: 0, placement: 0, couple: 0, couple2: 1.3, agc: 0.4, noise: 0.1 } },
+    { name: 'Light painting', values: { feedback: 0.92, gain: 1.04, zoom: 0.006, rotate: 0.005, driftX: 0, driftY: 0, pivot: 0.5, warp: 0.3, hue: 0, hueCurve: 0, sat: 0, blur: 0.1, blend: 2, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 0, delayMix: 0, rgbDelay: 0, route: 0, placement: 0, couple: 0, couple2: 1.3, agc: 0.5, noise: 0.08 } },
+    { name: 'Reaction texture', values: { feedback: 0.86, gain: 1.0, zoom: 0.003, rotate: 0, driftX: 0, driftY: 0, pivot: 0.35, warp: 0.9, hue: 0, hueCurve: 0, sat: 0, blur: 0.4, blend: 0, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 0, delayMix: 0, rgbDelay: 0, route: 0, placement: 0, couple: 0, couple2: 1.3, agc: 0.7, noise: 0.25 } },
+    { name: 'Oil slick', values: { feedback: 0.9, gain: 1.0, zoom: 0.004, rotate: 0.008, driftX: 0.003, driftY: -0.003, pivot: 0.6, warp: 0.5, hue: 0.05, hueCurve: 0, sat: 0, blur: 0.45, blend: 0, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 0, delayMix: 0, rgbDelay: 0, route: 0, placement: 0, couple: 0, couple2: 1.3, agc: 0.55, noise: 0.15 } },
+    { name: 'Edge of chaos', values: { feedback: 0.94, gain: 1.07, zoom: 0.02, rotate: 0.03, driftX: 0.01, driftY: 0.005, pivot: 0.7, warp: 0.6, hue: 0.03, hueCurve: 0, sat: 0, blur: 0.15, blend: 1, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 0, delayMix: 0, rgbDelay: 0, route: 0, placement: 0, couple: 0, couple2: 1.3, agc: 0.35, noise: 0.1 } },
+    { name: 'Ghost smear', values: { feedback: 0.82, gain: 0.96, zoom: 0.002, rotate: 0, driftX: 0.015, driftY: 0, pivot: 0.4, warp: 0.25, hue: 0, hueCurve: 0, sat: 0, blur: 0.5, blend: 0, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 0, delayMix: 0, rgbDelay: 0, route: 0, placement: 0, couple: 0, couple2: 1.3, agc: 0.45, noise: 0.12 } },
+    { name: 'Crystalline', values: { feedback: 0.88, gain: 1.03, zoom: 0.015, rotate: 0.015, driftX: 0, driftY: 0, pivot: 0.55, warp: 0.35, hue: 0, hueCurve: 0, sat: 0, blur: 0.02, blend: 3, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 0, delayMix: 0, rgbDelay: 0, route: 0, placement: 0, couple: 0, couple2: 1.3, agc: 0.5, noise: 0.1 } },
+    { name: 'Keyed shapes', values: { feedback: 0.9, gain: 1.02, zoom: 0.02, rotate: 0.02, driftX: 0.005, driftY: 0, pivot: 0.6, warp: 0.25, hue: 0.01, hueCurve: 0, sat: 0, blur: 0.1, blend: 0, keyMode: 1, keyThresh: 0.45, keySoft: 0.06, border: 0.5, borderHue: 0.55, delay: 0, delayMix: 0, rgbDelay: 0, route: 0, placement: 0, couple: 0, couple2: 1.3, agc: 0.5, noise: 0.1 } },
+    { name: 'Time echo', values: { feedback: 0.82, gain: 1.0, zoom: 0.006, rotate: 0.008, driftX: 0.004, driftY: 0, pivot: 0.5, warp: 0.3, hue: 0, hueCurve: 0, sat: 0, blur: 0.2, blend: 0, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 8, delayMix: 0.45, rgbDelay: 0, route: 0, placement: 0, couple: 0, couple2: 1.3, agc: 0.5, noise: 0.12 } },
+    { name: 'Coupled twins', values: { feedback: 0.9, gain: 1.02, zoom: 0.02, rotate: 0.02, driftX: 0.004, driftY: -0.003, pivot: 0.65, warp: 0.5, hue: 0.01, hueCurve: 0, sat: 0, blur: 0.2, blend: 0, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 0, delayMix: 0, rgbDelay: 0, route: 0, placement: 0, couple: 0.4, couple2: 1.4, agc: 0.55, noise: 0.12 } },
+    { name: 'Emergent weave', values: { feedback: 0.92, gain: 1.04, zoom: 0.015, rotate: 0.03, driftX: 0, driftY: 0, pivot: 0.7, warp: 0.6, hue: 0.02, hueCurve: 0.4, sat: 0, blur: 0.15, blend: 0, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 0, delayMix: 0, rgbDelay: 0, route: 0, placement: 0, couple: 0.6, couple2: 0.7, agc: 0.5, noise: 0.1 } },
+    { name: 'RGB time-shear', values: { feedback: 0.86, gain: 1.0, zoom: 0.008, rotate: 0.01, driftX: 0.006, driftY: 0, pivot: 0.5, warp: 0.3, hue: 0, hueCurve: 0, sat: 0, blur: 0.15, blend: 0, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 9, delayMix: 0.5, rgbDelay: 4, route: 0, placement: 0, couple: 0, couple2: 1.3, agc: 0.5, noise: 0.1 } },
+    { name: 'Feedforward echo', values: { feedback: 0.8, gain: 0.98, zoom: 0.004, rotate: 0, driftX: 0.015, driftY: 0.005, pivot: 0.4, warp: 0.25, hue: 0, hueCurve: 0, sat: 0, blur: 0.2, blend: 0, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 10, delayMix: 0.55, rgbDelay: 2, route: 1, placement: 0, couple: 0, couple2: 1.3, agc: 0.45, noise: 0.1 } },
+    { name: 'Coupled chaos', values: { feedback: 0.94, gain: 1.07, zoom: 0.03, rotate: 0.04, driftX: 0.01, driftY: 0.006, pivot: 0.72, warp: 0.7, hue: 0.03, hueCurve: 0.5, sat: 0, blur: 0.12, blend: 0, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 6, delayMix: 0.4, rgbDelay: 3, route: 0, placement: 0, couple: 0.5, couple2: 1.6, agc: 0.35, noise: 0.1 } }
   ],
   // ── Datamosh (real-time faux-codec mosh) ──
   'node-datamosh': [
-    { name: 'Classic mosh', values: { mode: 1, motion: 1.0, block: 16, decay: 0.92, refresh: 0.06, residual: 0.15, reseed: 0.1, thresh: 0.012, bleed: 0.2, autoBloom: 0.7 } },
-    { name: 'Deep bloom', values: { mode: 1, motion: 1.4, block: 24, decay: 0.96, refresh: 0.0, residual: 0.05, reseed: 0.05, thresh: 0.008, bleed: 0.3, autoBloom: 1.0 } },
-    { name: 'Sticky slide', values: { mode: 1, motion: 0.9, block: 16, decay: 0.94, refresh: 0.04, residual: 0.1, reseed: 0.06, thresh: 0.012, bleed: 0.15, autoBloom: 0.7 } },
-    { name: 'Melt soup', values: { mode: 0, motion: 1.2, block: 20, decay: 0.95, refresh: 0.02, residual: 0.1, reseed: 0.08, thresh: 0.01, bleed: 0.35, autoBloom: 0.8 } },
-    { name: 'Chunky blocks', values: { mode: 1, motion: 1.0, block: 40, decay: 0.9, refresh: 0.08, residual: 0.2, reseed: 0.15, thresh: 0.015, bleed: 0.2, autoBloom: 0.6 } },
-    { name: 'Fine mosh', values: { mode: 1, motion: 0.8, block: 8, decay: 0.9, refresh: 0.1, residual: 0.2, reseed: 0.12, thresh: 0.01, bleed: 0.1, autoBloom: 0.6 } },
-    { name: 'Bleeding pixels', values: { mode: 0, motion: 1.5, block: 16, decay: 0.93, refresh: 0.03, residual: 0.08, reseed: 0.05, thresh: 0.008, bleed: 0.6, autoBloom: 0.8 } },
-    { name: 'Boiling reseed', values: { mode: 1, motion: 0.9, block: 16, decay: 0.92, refresh: 0.05, residual: 0.15, reseed: 0.5, thresh: 0.012, bleed: 0.2, autoBloom: 0.6 } },
-    { name: 'Subtle drag', values: { mode: 1, motion: 0.6, block: 16, decay: 0.88, refresh: 0.15, residual: 0.3, reseed: 0.1, thresh: 0.018, bleed: 0.1, autoBloom: 0.5 } },
-    { name: 'Motion transfer', values: { mode: 1, motion: 1.2, block: 20, decay: 0.95, refresh: 0.02, residual: 0.06, reseed: 0.05, thresh: 0.008, bleed: 0.25, autoBloom: 0.9, sidechainFlow: 1 } },
-    { name: 'Hold the movers', values: { mode: 1, motion: 1.1, block: 18, decay: 0.94, refresh: 0.03, residual: 0.12, reseed: 0.08, thresh: 0.01, bleed: 0.2, autoBloom: 0.7, moshGate: 0.7, edgeRepel: 0.2, resharp: 0.35 } },
-    { name: 'Freeze the still', values: { mode: 1, motion: 1.0, block: 16, decay: 0.95, refresh: 0.02, residual: 0.1, reseed: 0.06, thresh: 0.012, bleed: 0.15, autoBloom: 0.7, moshGate: -0.7, edgeRepel: 0, resharp: 0.2 } },
-    { name: 'Liquid edges', values: { mode: 0, motion: 1.2, block: 20, decay: 0.95, refresh: 0.02, residual: 0.1, reseed: 0.06, thresh: 0.009, bleed: 0.3, autoBloom: 0.8, moshGate: 0.3, edgeRepel: 0.5, resharp: 0.5 } }
+    // Every preset sets every input (presets are partial merges : motion transfer,
+    // the gates or actants left over from the previous pick would carry over).
+    { name: 'Classic mosh', values: { mode: 1, motion: 1.0, swirl: 0, flowInvert: 0, block: 16, decay: 0.92, refresh: 0.06, residual: 0.15, reseed: 0.1, manifest: 0, thresh: 0.012, moshGate: 0, edgeRepel: 0, resharp: 0, bleed: 0.2, autoBloom: 0.7, cutSense: 0.35, pulse: 0, actant: 0, actantLife: 0.6, actantRate: 0, sidechainFlow: 0, flowRes: 1 } },
+    { name: 'Deep bloom', values: { mode: 1, motion: 1.4, swirl: 0, flowInvert: 0, block: 24, decay: 0.96, refresh: 0.0, residual: 0.05, reseed: 0.05, manifest: 0, thresh: 0.008, moshGate: 0, edgeRepel: 0, resharp: 0, bleed: 0.3, autoBloom: 1.0, cutSense: 0.35, pulse: 0, actant: 0, actantLife: 0.6, actantRate: 0, sidechainFlow: 0, flowRes: 1 } },
+    { name: 'Sticky slide', values: { mode: 1, motion: 0.9, swirl: 0, flowInvert: 0, block: 16, decay: 0.94, refresh: 0.04, residual: 0.1, reseed: 0.06, manifest: 0, thresh: 0.012, moshGate: 0, edgeRepel: 0, resharp: 0, bleed: 0.15, autoBloom: 0.7, cutSense: 0.35, pulse: 0, actant: 0, actantLife: 0.6, actantRate: 0, sidechainFlow: 0, flowRes: 1 } },
+    { name: 'Melt soup', values: { mode: 0, motion: 1.2, swirl: 0, flowInvert: 0, block: 20, decay: 0.95, refresh: 0.02, residual: 0.1, reseed: 0.08, manifest: 0, thresh: 0.01, moshGate: 0, edgeRepel: 0, resharp: 0, bleed: 0.35, autoBloom: 0.8, cutSense: 0.35, pulse: 0, actant: 0, actantLife: 0.6, actantRate: 0, sidechainFlow: 0, flowRes: 1 } },
+    { name: 'Chunky blocks', values: { mode: 1, motion: 1.0, swirl: 0, flowInvert: 0, block: 40, decay: 0.9, refresh: 0.08, residual: 0.2, reseed: 0.15, manifest: 0, thresh: 0.015, moshGate: 0, edgeRepel: 0, resharp: 0, bleed: 0.2, autoBloom: 0.6, cutSense: 0.35, pulse: 0, actant: 0, actantLife: 0.6, actantRate: 0, sidechainFlow: 0, flowRes: 1 } },
+    { name: 'Fine mosh', values: { mode: 1, motion: 0.8, swirl: 0, flowInvert: 0, block: 8, decay: 0.9, refresh: 0.1, residual: 0.2, reseed: 0.12, manifest: 0, thresh: 0.01, moshGate: 0, edgeRepel: 0, resharp: 0, bleed: 0.1, autoBloom: 0.6, cutSense: 0.35, pulse: 0, actant: 0, actantLife: 0.6, actantRate: 0, sidechainFlow: 0, flowRes: 1 } },
+    { name: 'Bleeding pixels', values: { mode: 0, motion: 1.5, swirl: 0, flowInvert: 0, block: 16, decay: 0.93, refresh: 0.03, residual: 0.08, reseed: 0.05, manifest: 0, thresh: 0.008, moshGate: 0, edgeRepel: 0, resharp: 0, bleed: 0.6, autoBloom: 0.8, cutSense: 0.35, pulse: 0, actant: 0, actantLife: 0.6, actantRate: 0, sidechainFlow: 0, flowRes: 1 } },
+    { name: 'Boiling reseed', values: { mode: 1, motion: 0.9, swirl: 0, flowInvert: 0, block: 16, decay: 0.92, refresh: 0.05, residual: 0.15, reseed: 0.5, manifest: 0, thresh: 0.012, moshGate: 0, edgeRepel: 0, resharp: 0, bleed: 0.2, autoBloom: 0.6, cutSense: 0.35, pulse: 0, actant: 0, actantLife: 0.6, actantRate: 0, sidechainFlow: 0, flowRes: 1 } },
+    { name: 'Subtle drag', values: { mode: 1, motion: 0.6, swirl: 0, flowInvert: 0, block: 16, decay: 0.88, refresh: 0.15, residual: 0.3, reseed: 0.1, manifest: 0, thresh: 0.018, moshGate: 0, edgeRepel: 0, resharp: 0, bleed: 0.1, autoBloom: 0.5, cutSense: 0.35, pulse: 0, actant: 0, actantLife: 0.6, actantRate: 0, sidechainFlow: 0, flowRes: 1 } },
+    { name: 'Motion transfer', values: { mode: 1, motion: 1.2, swirl: 0, flowInvert: 0, block: 20, decay: 0.95, refresh: 0.02, residual: 0.06, reseed: 0.05, manifest: 0, thresh: 0.008, moshGate: 0, edgeRepel: 0, resharp: 0, bleed: 0.25, autoBloom: 0.9, cutSense: 0.35, pulse: 0, actant: 0, actantLife: 0.6, actantRate: 0, sidechainFlow: 1, flowRes: 1 } },
+    { name: 'Hold the movers', values: { mode: 1, motion: 1.1, swirl: 0, flowInvert: 0, block: 18, decay: 0.94, refresh: 0.03, residual: 0.12, reseed: 0.08, manifest: 0, thresh: 0.01, moshGate: 0.7, edgeRepel: 0.2, resharp: 0.35, bleed: 0.2, autoBloom: 0.7, cutSense: 0.35, pulse: 0, actant: 0, actantLife: 0.6, actantRate: 0, sidechainFlow: 0, flowRes: 1 } },
+    { name: 'Freeze the still', values: { mode: 1, motion: 1.0, swirl: 0, flowInvert: 0, block: 16, decay: 0.95, refresh: 0.02, residual: 0.1, reseed: 0.06, manifest: 0, thresh: 0.012, moshGate: -0.7, edgeRepel: 0, resharp: 0.2, bleed: 0.15, autoBloom: 0.7, cutSense: 0.35, pulse: 0, actant: 0, actantLife: 0.6, actantRate: 0, sidechainFlow: 0, flowRes: 1 } },
+    { name: 'Liquid edges', values: { mode: 0, motion: 1.2, swirl: 0, flowInvert: 0, block: 20, decay: 0.95, refresh: 0.02, residual: 0.1, reseed: 0.06, manifest: 0, thresh: 0.009, moshGate: 0.3, edgeRepel: 0.5, resharp: 0.5, bleed: 0.3, autoBloom: 0.8, cutSense: 0.35, pulse: 0, actant: 0, actantLife: 0.6, actantRate: 0, sidechainFlow: 0, flowRes: 1 } },
+    { name: 'Sticky actants', values: { mode: 1, motion: 1.0, swirl: 0, flowInvert: 0, block: 16, decay: 0.92, refresh: 0.06, residual: 0.15, reseed: 0.1, manifest: 0, thresh: 0.012, moshGate: 0, edgeRepel: 0, resharp: 0, bleed: 0.2, autoBloom: 0.7, cutSense: 0.35, pulse: 0, actant: 0.8, actantLife: 0.6, actantRate: 0.8, sidechainFlow: 0, flowRes: 1 } }
   ],
-  // ── Melt (BENDR borrow : seam-local edge dissolve that creeps) ──
+  // ── Melt (seam-local edge dissolve that creeps) ──
   'node-melt': [
-    { name: 'Contour bleed', values: { amount: 0.6, width: 0.35, dir: 0.3, gate: 0.15 } },
-    { name: 'Edge ghost', values: { amount: 0.7, width: 0.25, dir: 0, gate: 0.2 } },
-    { name: 'Slow crawl', values: { amount: 0.5, width: 0.5, dir: 0.5, gate: 0.1 } },
-    { name: 'Wax', values: { amount: 0.9, width: 0.7, dir: 0.8, gate: 0.05 } },
-    { name: 'Whisper', values: { amount: 0.35, width: 0.3, dir: 0.2, gate: 0.25 } },
-    { name: 'Dissolve out', values: { amount: 0.65, width: 0.45, dir: 0.7, gate: 0.12 } },
-    { name: 'Thaw inward', values: { amount: 0.55, width: 0.5, dir: -0.4, gate: 0.15 } },
-    { name: 'Fine seams', values: { amount: 0.5, width: 0.15, dir: 0.4, gate: 0.3 } },
-    { name: 'Run down', values: { amount: 0.8, width: 0.6, dir: -0.6, gate: 0.08 } },
-    { name: 'Total melt', values: { amount: 1, width: 0.85, dir: 1, gate: 0.02 } }
+    { name: 'Contour bleed', values: { amount: 0.6, width: 0.35, dir: 0.3, gate: 0.15, mix: 1.0 } },
+    { name: 'Edge ghost', values: { amount: 0.7, width: 0.25, dir: 0, gate: 0.2, mix: 1.0 } },
+    { name: 'Slow crawl', values: { amount: 0.5, width: 0.5, dir: 0.5, gate: 0.1, mix: 1.0 } },
+    { name: 'Wax', values: { amount: 0.9, width: 0.7, dir: 0.8, gate: 0.05, mix: 1.0 } },
+    { name: 'Whisper', values: { amount: 0.35, width: 0.3, dir: 0.2, gate: 0.25, mix: 1.0 } },
+    { name: 'Dissolve out', values: { amount: 0.65, width: 0.45, dir: 0.7, gate: 0.12, mix: 1.0 } },
+    { name: 'Thaw inward', values: { amount: 0.55, width: 0.5, dir: -0.4, gate: 0.15, mix: 1.0 } },
+    { name: 'Fine seams', values: { amount: 0.5, width: 0.15, dir: 0.4, gate: 0.3, mix: 1.0 } },
+    { name: 'Run down', values: { amount: 0.8, width: 0.6, dir: -0.6, gate: 0.08, mix: 1.0 } },
+    { name: 'Total melt', values: { amount: 1, width: 0.85, dir: 1, gate: 0.02, mix: 1.0 } }
   ],
   // ── Eternalism (persistence-of-vision : held micro-motion / phase-drift twins) ──
   'node-eternalism': [
-    { name: 'Held frame', values: { mode: 0, gap: 4, rate: 6, interval: 0.3, detune: 0.12, tint: 0.3, mix: 1.0 } },
-    { name: 'Shimmer', values: { mode: 0, gap: 3, rate: 2.5, interval: 0.15, detune: 0.08, tint: 0.2, mix: 1.0 } },
-    { name: 'Fused strobe', values: { mode: 0, gap: 5, rate: 18, interval: 0.4, detune: 0.1, tint: 0.25, mix: 1.0 } },
-    { name: 'Wide micro-motion', values: { mode: 0, gap: 12, rate: 7, interval: 0.35, detune: 0.15, tint: 0.3, mix: 1.0 } },
-    { name: 'Tight tremor', values: { mode: 0, gap: 2, rate: 12, interval: 0.25, detune: 0.06, tint: 0.15, mix: 1.0 } },
-    { name: 'Black shutter', values: { mode: 0, gap: 4, rate: 5, interval: 0.7, detune: 0.1, tint: 0.3, mix: 0.9 } },
-    { name: 'Phase-drift twins', values: { mode: 1, gap: 6, rate: 6, interval: 0.3, detune: 0.35, tint: 0.4, mix: 0.85 } },
-    { name: 'Double exposure', values: { mode: 1, gap: 8, rate: 6, interval: 0.3, detune: 0.6, tint: 0.5, mix: 0.9 } },
-    { name: 'Locking beat', values: { mode: 1, gap: 5, rate: 6, interval: 0.3, detune: 0.25, tint: 0.3, mix: 0.8 } },
-    { name: 'Amber twin', values: { mode: 1, gap: 7, rate: 6, interval: 0.3, detune: 0.45, tint: 0.8, mix: 0.85 } }
+    { name: 'Held frame', values: { mode: 0, gap: 4, rate: 6, interval: 0.3, detune: 0.12, tint: 0.3, freeze: 0, mix: 1.0 } },
+    { name: 'Shimmer', values: { mode: 0, gap: 3, rate: 2.5, interval: 0.15, detune: 0.08, tint: 0.2, freeze: 0, mix: 1.0 } },
+    { name: 'Fused strobe', values: { mode: 0, gap: 5, rate: 18, interval: 0.4, detune: 0.1, tint: 0.25, freeze: 0, mix: 1.0 } },
+    { name: 'Wide micro-motion', values: { mode: 0, gap: 12, rate: 7, interval: 0.35, detune: 0.15, tint: 0.3, freeze: 0, mix: 1.0 } },
+    { name: 'Tight tremor', values: { mode: 0, gap: 2, rate: 12, interval: 0.25, detune: 0.06, tint: 0.15, freeze: 0, mix: 1.0 } },
+    { name: 'Black shutter', values: { mode: 0, gap: 4, rate: 5, interval: 0.7, detune: 0.1, tint: 0.3, freeze: 0, mix: 0.9 } },
+    { name: 'Phase-drift twins', values: { mode: 1, gap: 6, rate: 6, interval: 0.3, detune: 0.35, tint: 0.4, freeze: 0, mix: 0.85 } },
+    { name: 'Double exposure', values: { mode: 1, gap: 8, rate: 6, interval: 0.3, detune: 0.6, tint: 0.5, freeze: 0, mix: 0.9 } },
+    { name: 'Locking beat', values: { mode: 1, gap: 5, rate: 6, interval: 0.3, detune: 0.25, tint: 0.3, freeze: 0, mix: 0.8 } },
+    { name: 'Amber twin', values: { mode: 1, gap: 7, rate: 6, interval: 0.3, detune: 0.45, tint: 0.8, freeze: 0, mix: 0.85 } }
   ],
   // ── Afterimage (Goethe complement : departed forms leave a ghost) ──
   'node-afterimage': [
-    { name: 'Goethe dark', values: { decay: 0.6, amount: 0.5, chroma: 0.0, mix: 1.0 } },
-    { name: 'Complement bloom', values: { decay: 0.6, amount: 0.6, chroma: 1.0, mix: 1.0 } },
-    { name: 'Cyan trace', values: { decay: 0.7, amount: 0.75, chroma: 1.0, mix: 1.0 } },
-    { name: 'Faint ghost', values: { decay: 0.55, amount: 0.3, chroma: 0.5, mix: 0.8 } },
-    { name: 'Long persistence', values: { decay: 0.85, amount: 0.55, chroma: 0.4, mix: 1.0 } },
-    { name: 'Quick fade', values: { decay: 0.35, amount: 0.5, chroma: 0.6, mix: 0.9 } },
-    { name: 'Half tint', values: { decay: 0.6, amount: 0.6, chroma: 0.5, mix: 1.0 } },
-    { name: 'Burned form', values: { decay: 0.8, amount: 0.8, chroma: 0.7, mix: 1.0 } },
-    { name: 'Subtle dark', values: { decay: 0.5, amount: 0.35, chroma: 0.0, mix: 0.75 } },
-    { name: 'Full palinopsia', values: { decay: 0.7, amount: 0.6, chroma: 0.6, mix: 1.0 } }
+    { name: 'Goethe dark', values: { decay: 0.6, amount: 0.5, chroma: 0.0, dwell: 0, mix: 1.0 } },
+    { name: 'Complement bloom', values: { decay: 0.6, amount: 0.6, chroma: 1.0, dwell: 0, mix: 1.0 } },
+    { name: 'Cyan trace', values: { decay: 0.7, amount: 0.75, chroma: 1.0, dwell: 0, mix: 1.0 } },
+    { name: 'Faint ghost', values: { decay: 0.55, amount: 0.3, chroma: 0.5, dwell: 0, mix: 0.8 } },
+    { name: 'Long persistence', values: { decay: 0.85, amount: 0.55, chroma: 0.4, dwell: 0, mix: 1.0 } },
+    { name: 'Quick fade', values: { decay: 0.35, amount: 0.5, chroma: 0.6, dwell: 0, mix: 0.9 } },
+    { name: 'Half tint', values: { decay: 0.6, amount: 0.6, chroma: 0.5, dwell: 0, mix: 1.0 } },
+    { name: 'Burned form', values: { decay: 0.8, amount: 0.8, chroma: 0.7, dwell: 0, mix: 1.0 } },
+    { name: 'Subtle dark', values: { decay: 0.5, amount: 0.35, chroma: 0.0, dwell: 0, mix: 0.75 } },
+    { name: 'Full palinopsia', values: { decay: 0.7, amount: 0.6, chroma: 0.6, dwell: 0, mix: 1.0 } }
   ],
-  // ── Pulfrich (monocular 3D from a temporal eye-delay) ──
+  // ── Pulfrich (monocular 3D from a temporal eye-delay; depth 1 = near) ──
   'node-pulfrich': [
-    { name: 'Anaglyph depth', values: { mode: 0, source: 1, delay: 5, curve: 1.0, separation: 0.4, desat: 0.4, swap: 0, mix: 1.0 } },
-    { name: 'Deep anaglyph', values: { mode: 0, source: 1, delay: 10, curve: 1.2, separation: 0.7, desat: 0.5, swap: 0, mix: 1.0 } },
-    { name: 'Subtle 3D', values: { mode: 0, source: 1, delay: 3, curve: 1.0, separation: 0.2, desat: 0.3, swap: 0, mix: 0.9 } },
-    { name: 'Luma pop', values: { mode: 0, source: 0, delay: 5, curve: 0.8, separation: 0.45, desat: 0.4, swap: 0, mix: 1.0 } },
-    { name: 'Far lag', values: { mode: 0, source: 1, delay: 8, curve: 1.6, separation: 0.5, desat: 0.4, swap: 0, mix: 1.0 } },
-    { name: 'Near lag', values: { mode: 0, source: 1, delay: 6, curve: 1.0, separation: 0.5, desat: 0.4, swap: 1, mix: 1.0 } },
-    { name: 'Gray stereo', values: { mode: 0, source: 1, delay: 6, curve: 1.0, separation: 0.6, desat: 0.85, swap: 0, mix: 1.0 } },
-    { name: 'Free slide', values: { mode: 1, source: 1, delay: 6, curve: 1.0, separation: 0.5, desat: 0.4, swap: 0, mix: 0.9 } },
-    { name: 'Free luma', values: { mode: 1, source: 0, delay: 5, curve: 0.9, separation: 0.4, desat: 0.4, swap: 0, mix: 0.85 } },
-    { name: 'Full parallax', values: { mode: 0, source: 1, delay: 12, curve: 1.2, separation: 0.65, desat: 0.5, swap: 0, mix: 1.0 } }
+    { name: 'Anaglyph depth', values: { mode: 0, source: 1, delay: 5, curve: 1.0, zero: 0, separation: 0.4, desat: 0.4, swap: 0, mix: 1.0 } },
+    { name: 'Deep anaglyph', values: { mode: 0, source: 1, delay: 10, curve: 1.2, zero: 0, separation: 0.7, desat: 0.5, swap: 0, mix: 1.0 } },
+    { name: 'Subtle 3D', values: { mode: 0, source: 1, delay: 3, curve: 1.0, zero: 0, separation: 0.2, desat: 0.3, swap: 0, mix: 0.9 } },
+    { name: 'Luma pop', values: { mode: 0, source: 0, delay: 5, curve: 0.8, zero: 0, separation: 0.45, desat: 0.4, swap: 0, mix: 1.0 } },
+    { name: 'Near lag', values: { mode: 0, source: 1, delay: 8, curve: 1.6, zero: 0, separation: 0.5, desat: 0.4, swap: 0, mix: 1.0 } },
+    { name: 'Far lag', values: { mode: 0, source: 1, delay: 6, curve: 1.0, zero: 0, separation: 0.5, desat: 0.4, swap: 1, mix: 1.0 } },
+    { name: 'Gray stereo', values: { mode: 0, source: 1, delay: 6, curve: 1.0, zero: 0, separation: 0.6, desat: 0.85, swap: 0, mix: 1.0 } },
+    { name: 'Free slide', values: { mode: 1, source: 1, delay: 6, curve: 1.0, zero: 0, separation: 0.5, desat: 0.4, swap: 0, mix: 0.9 } },
+    { name: 'Free luma', values: { mode: 1, source: 0, delay: 5, curve: 0.9, zero: 0, separation: 0.4, desat: 0.4, swap: 0, mix: 0.85 } },
+    { name: 'Full parallax', values: { mode: 0, source: 1, delay: 12, curve: 1.2, zero: 0, separation: 0.65, desat: 0.5, swap: 0, mix: 1.0 } }
   ],
-  // ── Corrode (durational corrosion / buried-weathered) ──
+  // ── Corrode (durational corrosion / buried-weathered; bury = time to full) ──
   'node-corrode': [
-    { name: 'Slow weather', values: { bury: 0.3, spread: 0.3, eat: 0.6, tone: 0.3, crackle: 0.4, mix: 1.0 } },
-    { name: 'Fast rot', values: { bury: 0.8, spread: 0.6, eat: 0.85, tone: 0.35, crackle: 0.5, mix: 1.0 } },
-    { name: 'Rust creep', values: { bury: 0.5, spread: 0.8, eat: 0.7, tone: 0.55, crackle: 0.3, mix: 1.0 } },
-    { name: 'Leader black', values: { bury: 0.6, spread: 0.4, eat: 0.9, tone: 0.0, crackle: 0.2, mix: 1.0 } },
-    { name: 'Sepia stain', values: { bury: 0.4, spread: 0.35, eat: 0.65, tone: 0.7, crackle: 0.3, mix: 0.9 } },
-    { name: 'Cracked varnish', values: { bury: 0.35, spread: 0.3, eat: 0.5, tone: 0.4, crackle: 0.9, mix: 1.0 } },
-    { name: 'Buried', values: { bury: 0.9, spread: 0.5, eat: 1.0, tone: 0.2, crackle: 0.4, mix: 1.0 } },
-    { name: 'Patina', values: { bury: 0.3, spread: 0.55, eat: 0.55, tone: 0.6, crackle: 0.45, mix: 0.85 } },
-    { name: 'Faint decay', values: { bury: 0.25, spread: 0.3, eat: 0.4, tone: 0.3, crackle: 0.25, mix: 0.7 } },
-    { name: 'Total ruin', values: { bury: 1.0, spread: 0.7, eat: 1.0, tone: 0.15, crackle: 0.6, mix: 1.0 } }
+    { name: 'Slow weather', values: { bury: 0.3, spread: 0.3, eat: 0.6, eatTo: 0, tone: 0.3, crackle: 0.4, mix: 1.0 } },
+    { name: 'Fast rot', values: { bury: 0.8, spread: 0.6, eat: 0.85, eatTo: 0, tone: 0.35, crackle: 0.5, mix: 1.0 } },
+    { name: 'Rust creep', values: { bury: 0.5, spread: 0.8, eat: 0.7, eatTo: 0, tone: 0.55, crackle: 0.3, mix: 1.0 } },
+    { name: 'Leader black', values: { bury: 0.6, spread: 0.4, eat: 0.9, eatTo: 0, tone: 0.0, crackle: 0.2, mix: 1.0 } },
+    { name: 'Sepia stain', values: { bury: 0.4, spread: 0.35, eat: 0.65, eatTo: 0, tone: 0.7, crackle: 0.3, mix: 0.9 } },
+    { name: 'Cracked varnish', values: { bury: 0.35, spread: 0.3, eat: 0.5, eatTo: 0, tone: 0.4, crackle: 0.9, mix: 1.0 } },
+    { name: 'Buried', values: { bury: 0.9, spread: 0.5, eat: 1.0, eatTo: 0, tone: 0.2, crackle: 0.4, mix: 1.0 } },
+    { name: 'Patina', values: { bury: 0.3, spread: 0.55, eat: 0.55, eatTo: 0, tone: 0.6, crackle: 0.45, mix: 0.85 } },
+    { name: 'Faint decay', values: { bury: 0.25, spread: 0.3, eat: 0.4, eatTo: 0, tone: 0.3, crackle: 0.25, mix: 0.7 } },
+    { name: 'Total ruin', values: { bury: 1.0, spread: 0.7, eat: 1.0, eatTo: 0, tone: 0.15, crackle: 0.6, mix: 1.0 } }
   ],
   // ── Decimate / Time-Lapse (sample-and-hold at a rate) ──
   'node-decimate': [
-    { name: 'Chunky 3fps', values: { mode: 0, rate: 3, smooth: 0.0, mix: 1.0 } },
-    { name: 'Stop-motion 8fps', values: { mode: 0, rate: 8, smooth: 0.0, mix: 1.0 } },
-    { name: 'Slow lapse', values: { mode: 0, rate: 1.5, smooth: 0.0, mix: 1.0 } },
-    { name: 'Tweened lapse', values: { mode: 0, rate: 2, smooth: 0.6, mix: 1.0 } },
-    { name: 'Slow-mo morph', values: { mode: 0, rate: 4, smooth: 1.0, mix: 1.0 } },
-    { name: 'Filmic 12fps', values: { mode: 0, rate: 12, smooth: 0.0, mix: 1.0 } },
-    { name: 'Half-blend', values: { mode: 0, rate: 6, smooth: 0.4, mix: 0.6 } },
-    { name: 'Strobe grab', values: { mode: 0, rate: 5, smooth: 0.0, mix: 1.0 } },
-    { name: 'Freeze (trig)', values: { mode: 1, rate: 6, smooth: 0.0, mix: 1.0 } },
-    { name: 'Held tween (trig)', values: { mode: 1, rate: 6, smooth: 0.8, mix: 1.0 } }
+    { name: 'Chunky 3fps', values: { mode: 0, rate: 3, sync: 0, smooth: 0.0, mix: 1.0 } },
+    { name: 'Stop-motion 8fps', values: { mode: 0, rate: 8, sync: 0, smooth: 0.0, mix: 1.0 } },
+    { name: 'Slow lapse', values: { mode: 0, rate: 1.5, sync: 0, smooth: 0.0, mix: 1.0 } },
+    { name: 'Tweened lapse', values: { mode: 0, rate: 2, sync: 0, smooth: 0.6, mix: 1.0 } },
+    { name: 'Slow-mo morph', values: { mode: 0, rate: 4, sync: 0, smooth: 1.0, mix: 1.0 } },
+    { name: 'Filmic 12fps', values: { mode: 0, rate: 12, sync: 0, smooth: 0.0, mix: 1.0 } },
+    { name: 'Half-blend', values: { mode: 0, rate: 6, sync: 0, smooth: 0.4, mix: 0.6 } },
+    { name: 'Strobe grab', values: { mode: 0, rate: 5, sync: 0, smooth: 0.0, mix: 1.0 } },
+    { name: 'Freeze (trig)', values: { mode: 1, rate: 6, sync: 0, smooth: 0.0, mix: 1.0 } },
+    { name: 'Held tween (trig)', values: { mode: 1, rate: 6, sync: 0, smooth: 0.8, mix: 1.0 } }
   ],
   // ── Force Lines (incrustation along the image's gradients) ──
   'fx-force-lines': [
@@ -542,19 +551,19 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Frozen deep', values: { width: 400, amount: 1, mode: 0, soften: 0.4, drift: 0, hue: 0.01 } }
   ],
   'node-autocutter': [
-    { name: 'Clean cut-up', values: { cuts: 20, rotate: 0.3, slip: 0, gap: 0.15, contour: 0, torn: 0, mix: 1, rate: 0 } },
-    { name: 'Magazine tear', values: { cuts: 14, rotate: 0.2, slip: 0.05, gap: 0, contour: 0.7, torn: 0.8, mix: 1, rate: 0 } },
-    { name: 'Ripped poster', values: { cuts: 8, rotate: 0.1, slip: 0.1, gap: 0, contour: 1.1, curve: 0.6, torn: 1.2, mix: 1, rate: 0 } },
-    { name: 'Paper storm', values: { cuts: 36, rotate: 0.5, slip: 0.2, gap: 0, contour: 0.6, torn: 0.45, mix: 1, rate: 1.2 } },
-    { name: 'Wavy cut', values: { cuts: 24, rotate: 0.35, slip: 0, gap: 0.2, contour: 0.6, curve: 0.85, torn: 0, mix: 1, rate: 0 } },
-    { name: 'Collage subtle', values: { cuts: 10, rotate: 0.15, slip: 0, gap: 0, contour: 0.4, torn: 0.35, mix: 0.85, rate: 0 } },
-    { name: 'Shredded', values: { cuts: 28, rotate: 0.4, slip: 0.15, gap: 0, contour: 1.8, torn: 1.7, mask: 0, mix: 1, rate: 0 } },
-    { name: 'Scraps', values: { cuts: 24, rotate: 0.3, slip: 0.1, gap: 0, contour: 0.9, torn: 1.0, mask: 0.75, mix: 1, rate: 0 } },
-    { name: 'Last piece', values: { cuts: 16, rotate: 0.2, slip: 0, gap: 0, contour: 0.8, torn: 0.9, mask: 1, mix: 1, rate: 0.5 } },
-    { name: 'Voronoi mosaic', values: { shape: 1, cuts: 28, rotate: 0.3, slip: 0.1, contour: 0.6, torn: 0.4, mix: 1, rate: 0 } },
-    { name: 'Stained glass', values: { shape: 1, cuts: 16, rotate: 0.2, contour: 0.4, torn: 0.25, gap: 0.12, mix: 1, rate: 0 } },
-    { name: 'Morphing cells', values: { shape: 1, cuts: 22, rotate: 0.35, contour: 0.5, torn: 0.3, mix: 1, rate: 0.8, xfade: 1.2 } },
-    { name: 'Dissolving cut-up', values: { shape: 0, cuts: 20, rotate: 0.3, contour: 0.5, torn: 0.6, mix: 1, rate: 0.6, xfade: 1.5 } }
+    { name: 'Clean cut-up', values: { shape: 0, cuts: 20, rotate: 0.3, slip: 0, gap: 0.15, contour: 0, curve: 0.3, torn: 0, mask: 0, mix: 1, rate: 0, xfade: 0 } },
+    { name: 'Magazine tear', values: { shape: 0, cuts: 14, rotate: 0.2, slip: 0.05, gap: 0, contour: 0.7, curve: 0.3, torn: 0.8, mask: 0, mix: 1, rate: 0, xfade: 0 } },
+    { name: 'Ripped poster', values: { shape: 0, cuts: 8, rotate: 0.1, slip: 0.1, gap: 0, contour: 1.1, curve: 0.6, torn: 1.2, mask: 0, mix: 1, rate: 0, xfade: 0 } },
+    { name: 'Paper storm', values: { shape: 0, cuts: 36, rotate: 0.5, slip: 0.2, gap: 0, contour: 0.6, curve: 0.3, torn: 0.45, mask: 0, mix: 1, rate: 1.2, xfade: 0 } },
+    { name: 'Wavy cut', values: { shape: 0, cuts: 24, rotate: 0.35, slip: 0, gap: 0.2, contour: 0.6, curve: 0.85, torn: 0, mask: 0, mix: 1, rate: 0, xfade: 0 } },
+    { name: 'Collage subtle', values: { shape: 0, cuts: 10, rotate: 0.15, slip: 0, gap: 0, contour: 0.4, curve: 0.3, torn: 0.35, mask: 0, mix: 0.85, rate: 0, xfade: 0 } },
+    { name: 'Shredded', values: { shape: 0, cuts: 28, rotate: 0.4, slip: 0.15, gap: 0, contour: 1.8, curve: 0.3, torn: 1.7, mask: 0, mix: 1, rate: 0, xfade: 0 } },
+    { name: 'Scraps', values: { shape: 0, cuts: 24, rotate: 0.3, slip: 0.1, gap: 0, contour: 0.9, curve: 0.3, torn: 1.0, mask: 0.75, mix: 1, rate: 0, xfade: 0 } },
+    { name: 'Last piece', values: { shape: 0, cuts: 16, rotate: 0.2, slip: 0, gap: 0, contour: 0.8, curve: 0.3, torn: 0.9, mask: 1, mix: 1, rate: 0.5, xfade: 0 } },
+    { name: 'Voronoi mosaic', values: { shape: 1, cuts: 28, rotate: 0.3, slip: 0.1, gap: 0.15, contour: 0.6, curve: 0.3, torn: 0.4, mask: 0, mix: 1, rate: 0, xfade: 0 } },
+    { name: 'Stained glass', values: { shape: 1, cuts: 16, rotate: 0.2, slip: 0, gap: 0.12, contour: 0.4, curve: 0.3, torn: 0.25, mask: 0, mix: 1, rate: 0, xfade: 0 } },
+    { name: 'Morphing cells', values: { shape: 1, cuts: 22, rotate: 0.35, slip: 0, gap: 0.15, contour: 0.5, curve: 0.3, torn: 0.3, mask: 0, mix: 1, rate: 0.8, xfade: 1.2 } },
+    { name: 'Dissolving cut-up', values: { shape: 0, cuts: 20, rotate: 0.3, slip: 0, gap: 0.15, contour: 0.5, curve: 0.3, torn: 0.6, mask: 0, mix: 1, rate: 0.6, xfade: 1.5 } }
   ],
   'fx-hue-rotate': [
     { name: 'Quarter turn', values: { shift: 0.25, byLuma: 0, rate: 0 } },

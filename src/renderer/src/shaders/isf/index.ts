@@ -125,15 +125,15 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Transfert : imprint another layer's MOVEMENT onto this one (optical-flow transfer). Déplacement warps by the sidechain's flow; Traînée is a flow-steered line blur (motion blur painted by another layer's gesture). Pick the sidechain in the Inspector.",
+      "DESCRIPTION": "Transfert : imprint another layer's MOVEMENT onto this one (optical-flow transfer). DISPLACE warps this layer by the sidechain's flow; TRAIL BLUR is a flow-steered line blur (motion blur painted by another layer's gesture). The flow is measured the same at every flow resolution and glides the same at any frame rate; the layer's transparency is kept. Pick the sidechain in the Inspector.",
       "CATEGORIES": ["FX", "Convolution"],
       "INPUTS": [
-        { "NAME": "mode", "TYPE": "long", "VALUES": [0,1], "LABELS": ["deplacement","trainee"], "DEFAULT": 0, "LABEL": "mode" },
+        { "NAME": "mode", "TYPE": "long", "VALUES": [0,1], "LABELS": ["displace","trail blur"], "DEFAULT": 0, "LABEL": "mode" },
         { "NAME": "amount", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "amount" },
-        { "NAME": "inertie", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "inertie" },
-        { "NAME": "flowScale", "TYPE": "float", "MIN": 0.25, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "flow scale" },
+        { "NAME": "inertie", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "inertia" },
+        { "NAME": "flowScale", "TYPE": "float", "MIN": 0.25, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "flow gain" },
         { "NAME": "flowBlur", "TYPE": "float", "MIN": 0.0, "MAX": 24.0, "DEFAULT": 8.0, "LABEL": "flow blur" },
-        { "NAME": "magnitudeGamma", "TYPE": "float", "MIN": 0.25, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "mag gamma" },
+        { "NAME": "magnitudeGamma", "TYPE": "float", "MIN": 0.25, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "motion curve" },
         { "NAME": "channelSpread", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "chroma pull" },
         { "NAME": "taps", "TYPE": "float", "MIN": 2.0, "MAX": 24.0, "DEFAULT": 12.0, "LABEL": "taps" },
         { "NAME": "falloff", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "falloff" },
@@ -162,7 +162,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Convolution : treat another layer as a convolution kernel (impulse response). Every bright pixel of this layer stamps a scaled copy of the sidechain's shape, transferring its glare / texture / energy signature (UE convolution-bloom, run forward). Pick the kernel layer in the Inspector. Direct kernel path; a live sidechain = an animated impulse response.",
+      "DESCRIPTION": "Convolution : treat another layer as a convolution kernel (impulse response). Every bright pixel of this layer stamps a scaled copy of the sidechain's shape, transferring its glare / texture / energy signature (a convolution bloom, run forward). Pick the kernel layer in the Inspector; an empty kernel layer leaves this one untouched. Direct kernel path; a live sidechain = an animated impulse response. With the HIGHLIGHT GATE up, only hot pixels stamp, and in mix mode the result can only brighten the layer.",
       "CATEGORIES": ["FX", "Convolution"],
       "INPUTS": [
         { "NAME": "scale", "TYPE": "float", "MIN": 0.05, "MAX": 2.0, "DEFAULT": 0.8, "LABEL": "spread" },
@@ -183,17 +183,17 @@ export const NATIVE_NODES: IsfShader[] = [
   {
     // Mosaïque (MosaiqueNode) : spatial concatenative synthesis. The sidechain
     // frame is a live corpus of tiles; each host patch is replaced by the tile
-    // whose colour + structure match best (nearest-neighbour, orientation search,
+    // whose color + structure match best (nearest-neighbor, orientation search,
     // gain/bias re-tint, seam melt, temporal stickiness). Native (engine/convNodes).
     id: 'node-mosaique',
     name: 'Mosaïque',
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Mosaïque : rebuild this layer as a live mosaic of another. The frame is cut into patches; each is replaced by the corpus tile (from the sidechain layer) whose color + structure match best. Tiles flip/rotate and re-tint to fit, seams melt, and matches hold across frames so it doesn't boil. Spatial concatenation, Assemble's sibling on the other axis. Pick the corpus layer in the Inspector.",
+      "DESCRIPTION": "Mosaïque : rebuild this layer as a live mosaic of another. The frame is cut into square patches; each is replaced by the corpus tile (from the sidechain layer) whose color + structure match best. Tiles flip/rotate and re-tint to fit, seams melt, and matches hold across frames so it doesn't boil. Spatial concatenation, Assemble's sibling on the other axis. The layer's transparency is kept. Pick the corpus layer in the Inspector.",
       "CATEGORIES": ["FX", "Convolution"],
       "INPUTS": [
-        { "NAME": "tile", "TYPE": "float", "MIN": 4.0, "MAX": 64.0, "DEFAULT": 24.0, "LABEL": "tile" },
+        { "NAME": "tile", "TYPE": "float", "MIN": 4.0, "MAX": 64.0, "DEFAULT": 24.0, "LABEL": "tile count" },
         { "NAME": "corpus", "TYPE": "long", "VALUES": [0,1,2,3], "LABELS": ["64","256","576","1024"], "DEFAULT": 1, "LABEL": "corpus" },
         { "NAME": "structure", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.40, "LABEL": "structure" },
         { "NAME": "orient", "TYPE": "long", "VALUES": [0,1,2], "LABELS": ["off","flip","rotate"], "DEFAULT": 1, "LABEL": "orient" },
@@ -223,19 +223,20 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Réponse : temporal convolution: this layer's last 16 frames summed through a shaped envelope (attack onset × decay tail, reversible). Trails that pulse with a captured rhythm : a convolution-reverb for image. Uses the layer's own history (no sidechain).",
+      "DESCRIPTION": "Réponse : temporal convolution: the live frame and up to 15 past frames summed through a shaped envelope (attack onset × decay tail, reversible). Trails that pulse with a captured rhythm : a convolution-reverb for image. GAIN brightens or dims the echo. STRIDE keeps one past frame every N frames (of 60 Hz), stretching the same 16 taps over seconds, stepped. Uses the layer's own history (no sidechain).",
       "CATEGORIES": ["FX", "Feedback", "Convolution"],
       "INPUTS": [
         { "NAME": "length", "TYPE": "float", "MIN": 2.0, "MAX": 16.0, "DEFAULT": 10.0, "LABEL": "length" },
         { "NAME": "decay", "TYPE": "float", "MIN": 0.05, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "decay" },
         { "NAME": "attack", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.1, "LABEL": "attack" },
-        { "NAME": "gain", "TYPE": "float", "MIN": 0.0, "MAX": 2.0, "DEFAULT": 1.0, "LABEL": "gain" },
+        { "NAME": "gain", "TYPE": "float", "MIN": 0.0, "MAX": 2.0, "DEFAULT": 1.0, "LABEL": "echo gain" },
         { "NAME": "reverse", "TYPE": "bool", "DEFAULT": false, "LABEL": "reverse", "COMPACT": true },
+        { "NAME": "stride", "TYPE": "float", "MIN": 1.0, "MAX": 8.0, "DEFAULT": 1.0, "LABEL": "stride (frames)" },
         { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "mix" }
       ]
     }*/`,
     curated: {
-      length: [6, 16], decay: [0.2, 0.9], attack: [0, 0.4], gain: [0.6, 1.4], mix: [0.4, 0.9]
+      length: [6, 16], decay: [0.2, 0.9], attack: [0, 0.4], gain: [0.7, 1.3], stride: [1, 3], mix: [0.4, 0.9]
     }
   },
   {
@@ -248,7 +249,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Feedback : a video-feedback engine. The layer's own last frame is re-sampled through a drifting off-center transform (zoom/rotate/drift) plus a self-displacement that boils the image organically, then mixed with the live layer : trails, tunnels-that-wander, reaction-diffusion textures. A built-in AGC + noise floor hold it at the edge of chaos so it never fades to black or blows to white. COUPLE runs a SECOND buffer under a diverged transform and cross-mixes it in → emergent behavior no single loop shows. RGB DELAY shears the delay-echo channels in time; ROUTE feeds that echo back into the loop or forward onto the output only. PLACEMENT (Memory Palace) sits the spatial process on the recirculating buffer (feedback : a wandering tunnel) or on the incoming live image (painting : the source is smeared into a still accumulator). The KEYER gates on luma (key black/white) or chroma (key desat/chroma : saturation), so only the keyed region re-enters the loop; SAT DRIFT bleaches trails toward gray or intensifies them toward neon a little more each repeat. Off-center + small transforms keep it matte, not a radial mandala.",
+      "DESCRIPTION": "Feedback : a video-feedback engine. The layer's own last frame is re-sampled through a drifting off-center transform (zoom/rotate/drift) plus a self-displacement that boils the image organically, then mixed with the live layer : trails, tunnels-that-wander, reaction-diffusion textures. A built-in AGC (it holds the loop at the brightness of the live layer, so a near-black ground stays near-black) + noise floor keep it at the edge of chaos, neither dying out nor running away. ADD glows with headroom (bright live areas leave less room for the loop). COUPLE runs a SECOND buffer under a diverged transform and cross-mixes it in → emergent behavior no single loop shows. RGB DELAY shears the delay-echo channels in time; ROUTE feeds that echo back into the loop or forward onto the output only. PLACEMENT sits the spatial process on the recirculating buffer (feedback : a wandering tunnel) or on the incoming live image (painting : the source is smeared into a still accumulator). The KEYER gates on luma (key black/white) or chroma (key desat/chroma : saturation), so only the keyed region re-enters the loop; SAT DRIFT bleaches trails toward gray or intensifies them toward neon a little more each repeat. CLEAR restarts the loop from the live frame. Trails, spin and hue keep their speed at any frame rate and hold still on a frozen layer; a transparent layer's trails stay transparent around them. Off-center + small transforms keep it matte, not a radial mandala.",
       "CATEGORIES": ["FX", "Feedback"],
       "INPUTS": [
         { "NAME": "feedback", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.85, "LABEL": "feedback" },
@@ -277,7 +278,8 @@ export const NATIVE_NODES: IsfShader[] = [
         { "NAME": "border", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "key border" },
         { "NAME": "borderHue", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "border hue" },
         { "NAME": "agc", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "auto-gain (safety)" },
-        { "NAME": "noise", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "noise floor" }
+        { "NAME": "noise", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "noise floor" },
+        { "NAME": "clear", "TYPE": "event", "DEFAULT": false, "LABEL": "clear ▸" }
       ]
     }*/`,
     curated: {
@@ -298,7 +300,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Datamosh : the codec 'moshing' look, real-time and codec-free. The layer's own motion (optical flow, quantized to macroblocks) advects a feedback buffer every frame, so the picture keeps SLIDING along movement : the P-frame smear. Turn REFRESH (the I-frame) down and a new scene's motion drags the PREVIOUS scene's texture around : figures melt into and emerge from the image (the bloom). RESIDUAL re-injects live texture (the mosh↔mush line); RESEED snaps whole blocks back so it never fully mushes. STICKY slides each block as a crisp tile (real datamosh tearing); MELT is a softer smear. ACTANTS are sparse sticky patches that a trigger drops into the picture, drifting along the flow as autonomous frozen blocks (Perconte). MANIFEST reveals the live frame only where there's motion, so a new source completes itself out of the retained frame instead of cutting. MOSH GATE holds only the moving parts (+) or only the still ones (−); EDGE REPEL steers the smear along content edges; RE-SHARP crisps the softened result back up. With a sidechain layer + 'motion transfer' on, that layer's MOVEMENT moshes THIS layer's texture.",
+      "DESCRIPTION": "Datamosh : the codec 'moshing' look, real-time and codec-free. The layer's own motion (optical flow, quantized to macroblocks) advects a feedback buffer every frame, so the picture keeps SLIDING along movement : the P-frame smear. Turn REFRESH (the I-frame) down and a new scene's motion drags the PREVIOUS scene's texture around : figures melt into and emerge from the image (the bloom). RESIDUAL re-injects live texture (the mosh↔mush line); RESEED snaps whole blocks back so it never fully mushes. STICKY slides each block as a crisp tile (real datamosh tearing); MELT is a softer smear. ACTANTS are sparse sticky patches that a trigger drops into the picture, drifting along the flow as autonomous frozen blocks, then fading away. MANIFEST reveals the live frame only where there's motion, so a new source completes itself out of the retained frame instead of cutting. MOSH GATE holds only the moving parts (+) or only the still ones (−); EDGE REPEL steers the smear along content edges; RE-SHARP crisps the softened result back up. With a sidechain layer + 'motion transfer' on, that layer's MOVEMENT moshes THIS layer's texture. The smear lingers the same time at any frame rate, macroblocks keep their size at every render resolution, and a transparent layer moshes its transparency too.",
       "CATEGORIES": ["FX", "Glitch", "Feedback"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["melt", "sticky", "fluid"], "DEFAULT": 1, "LABEL": "mode" },
@@ -356,7 +358,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Scanner : a flatbed-scanner slit-scan. A scan head sweeps the frame; the line it crosses is CAPTURED from the live signal at that instant and held until the head passes again. Because each line is grabbed at a different moment, anything MOVING during the sweep smears and tears across the scanlines : the classic 'moved the photo mid-scan' glitch, live. LOOP scans continuously; ONE-SHOT does a single pass on a trigger then holds the frozen document. DRAG shears the capture (the paper sliding under the head), WOBBLE adds a hand-wave, JITTER/TEAR rip lines, CHANNEL SPLIT misregisters the CCD's RGB. TRIGGER (scan ▸) starts a fresh pass on its rising edge : fire it from the button, over OSC, or by binding a modulator (a square LFO / sample&hold / audio edge) with M for rhythmic live re-scans. Layer-FX only.",
+      "DESCRIPTION": "Scanner : a flatbed-scanner slit-scan. A scan head sweeps the frame; the line it crosses is CAPTURED from the live signal at that instant and held until the head passes again. Because each line is grabbed at a different moment, anything MOVING during the sweep smears and tears across the scanlines : the classic 'moved the photo mid-scan' glitch, live. LOOP scans continuously; ONE-SHOT does a single pass on a trigger then holds the frozen document. DRAG shears the capture (the paper sliding under the head), WOBBLE adds a hand-wave (a different one every pass), JITTER/TEAR rip lines, CHANNEL SPLIT misregisters the CCD's RGB, AUDIO offsets each captured line by the sound's waveform (the scan records it like an oscilloscope). TRIGGER (scan ▸) starts a fresh pass on its rising edge : fire it from the button, over OSC, or by binding a modulator (a square LFO / sample&hold / audio edge) with M for rhythmic live re-scans. Works on any rack.",
       "CATEGORIES": ["FX", "Scan", "Glitch"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["loop", "one-shot"], "DEFAULT": 0, "LABEL": "mode" },
@@ -368,10 +370,13 @@ export const NATIVE_NODES: IsfShader[] = [
         { "NAME": "tear", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "tear" },
         { "NAME": "rgb", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2, "LABEL": "channel split" },
         { "NAME": "bar", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.25, "LABEL": "scan bar" },
+        { "NAME": "audio", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "audio wave" },
         { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "scan ▸" }
       ]
     }*/`,
     curated: {
+      mode: [0, 0], // never dice into one-shot : it freezes the layer after one pass
+      audio: [0, 0.4],
       scanRate: [0.1, 1.5],
       drag: [0.1, 0.7],
       wobble: [0, 0.5],
@@ -387,7 +392,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Autocutter : a cut-up collage. The frame is recursively split (binary space partition) into ragged rectangles, then the pieces are SHUFFLED among their slots and optionally rotated, so the picture is chopped and rearranged. The scramble LAYOUT holds still while the live video keeps playing inside every piece, so it stays kinetic. CUTS sets how many pieces, ROTATE how many are turned, SLIP nudges each piece's source, SEAMS draws dark cuts between pieces, MIX blends back toward the original. CONTOUR bends the cuts into uneven, curved tear-lines (the pieces still tessellate perfectly : no gaps, ever); TORN PAPER adds the ripped-magazine edge : a ragged off-white paper fringe along each tear over a soft collage shadow. Both re-tear on every cut, and both run past 1 into genuinely shredded territory. MASK peels pieces away one by one (transparent holes : lower layers show through); at full mask a single seeded piece survives, and every cut ▸ elects a new one, so the last shape keeps changing. SHAPE picks the piece geometry : CUT-UP is the recursive rectangles, MOSAIC is irregular Voronoi polygons (a denser, more organic mosaic). Every other control behaves the same in both. TRIGGER (cut ▸) makes a fresh cut on its rising edge (button / OSC / a modulator via M); AUTO RATE (Hz) re-cuts on its own for hands-free live rhythm, and CROSSFADE (seconds) dissolves the old layout into the new one on each auto/trigger re-cut instead of snapping. Layer-FX only.",
+      "DESCRIPTION": "Autocutter : a cut-up collage. The frame is recursively split (binary space partition) into ragged rectangles, then the pieces are SHUFFLED among their slots and optionally rotated, so the picture is chopped and rearranged. The scramble LAYOUT holds still while the live video keeps playing inside every piece, so it stays kinetic. CUTS sets how many pieces, ROTATE how many are turned, SLIP nudges each piece's source, SEAMS draws dark cuts between pieces, MIX blends back toward the original. CONTOUR bends the cuts into uneven, curved tear-lines (the pieces still tessellate perfectly : no gaps, ever); TORN PAPER adds the ripped-magazine edge : a ragged off-white paper fringe along each tear over a soft collage shadow. Both re-tear on every cut, and both run past 1 into genuinely shredded territory. MASK peels pieces away one by one (transparent holes : lower layers show through); at full mask a single seeded piece survives, and every cut ▸ elects a new one, so the last shape keeps changing. SHAPE picks the piece geometry : CUT-UP is the recursive rectangles, MOSAIC is irregular Voronoi polygons (a denser, more organic mosaic). Every other control behaves the same in both. TRIGGER (cut ▸) makes a fresh cut on its rising edge (button / OSC / a modulator via M); AUTO RATE (Hz) re-cuts on its own for hands-free live rhythm, and CROSSFADE (seconds) dissolves the old layout into the new one on each auto/trigger re-cut instead of snapping (at most 0.9 of the re-cut period, so a fade always finishes). Modulating ROTATE only turns pieces : it never reshuffles the mask. Works on any rack.",
       "CATEGORIES": ["FX", "Glitch"],
       "INPUTS": [
         { "NAME": "shape", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["cut-up", "mosaic"], "DEFAULT": 0, "LABEL": "shape" },
@@ -425,16 +430,18 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Chronoscan : per-pixel time displacement. The node keeps a ring of the last ~32 frames; a CONTROL field then sets, for every pixel, how far into that history it reads, so each region of the picture lives in a DIFFERENT PRESENT. SOURCE picks the control: SLIT-SCAN sweeps a moving gradient (the classic scanner smear, at an angle you set, drifting at SWEEP), LUMA lets the image's own brightness choose each region's age (bright = further back), or SIDECHAIN uses another layer's brightness as the clock. REACH sets how far back the oldest regions go, CURVE bends the time distribution, INVERT flips it, SMOOTH cross-fades between frames. The temporal twin of the convolution nodes : it convolves TIME. Layer-FX only.",
+      "DESCRIPTION": "Chronoscan : per-pixel time displacement. The node keeps a ring of the last 32 frames (one every STRIDE frames of 60 Hz); a CONTROL field then sets, for every pixel, how far into that history it reads, so each region of the picture lives in a DIFFERENT PRESENT. SOURCE picks the control: SLIT-SCAN sweeps a moving gradient (the classic scanner smear, at an angle you set, drifting at SWEEP; SWEEP SHAPE saw wraps with a hard time seam, ping-pong folds back and forth with none), LUMA lets the image's own brightness choose each region's age (bright = further back), or SIDECHAIN uses another layer's brightness as the clock. REACH sets how far back the oldest regions go, CURVE bends the time distribution, INVERT flips it, SMOOTH cross-fades between frames. The present is the live, full-resolution picture; the past is stored at quarter resolution, so it goes soft as it recedes. The temporal twin of the convolution nodes : it convolves TIME. Works on any rack.",
       "CATEGORIES": ["FX", "Time", "Scan"],
       "INPUTS": [
         { "NAME": "source", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["luma (self)", "luma (sidechain)", "slit-scan"], "DEFAULT": 2, "LABEL": "control" },
         { "NAME": "reach", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "time reach" },
         { "NAME": "angle", "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 0.0, "LABEL": "scan angle" },
         { "NAME": "sweep", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "sweep" },
+        { "NAME": "sweepMode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["saw", "ping-pong"], "DEFAULT": 0, "LABEL": "sweep shape" },
         { "NAME": "curve", "TYPE": "float", "MIN": 0.2, "MAX": 3.0, "DEFAULT": 1.0, "LABEL": "curve" },
         { "NAME": "invert", "TYPE": "bool", "DEFAULT": false, "LABEL": "invert", "COMPACT": true },
         { "NAME": "smooth", "TYPE": "bool", "DEFAULT": true, "LABEL": "smooth", "COMPACT": true },
+        { "NAME": "stride", "TYPE": "float", "MIN": 1.0, "MAX": 8.0, "DEFAULT": 1.0, "LABEL": "stride (frames)" },
         { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
       ]
     }*/`,
@@ -443,6 +450,7 @@ export const NATIVE_NODES: IsfShader[] = [
       angle: [0, 6.2832],
       sweep: [0, 0.4],
       curve: [0.5, 2.0],
+      stride: [1, 3],
       mix: [0.6, 1.0]
     }
   },
@@ -452,7 +460,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Sediment : long-term image memory (the app's namesake made literal). It keeps a decaying long-exposure ACCUMULATOR, where the brightest traces of the past sink slowly back to black over seconds to MINUTES (DECAY), plus a sparse KEYFRAME store that snapshots the picture every few seconds (INTERVAL), so minutes of the past stay recallable. AGE sweeps from the recent accumulator to the oldest keyframe; RESURFACE bleeds that memory back under the live image (via BLEND: screen · lighten · under · difference); STIR drifts the memory so it SEDIMENTS rather than sitting as a frozen loop; DEPOSIT sets how strongly the present is laid down. The piece can resurface what it looked like ten minutes ago. Layer-FX only.",
+      "DESCRIPTION": "Sediment : long-term image memory (the app's namesake made literal). It keeps a decaying long-exposure ACCUMULATOR, where the brightest traces of the past sink slowly back to black over seconds to MINUTES (DECAY), plus a sparse KEYFRAME store that snapshots the picture every few seconds (INTERVAL), so minutes of the past stay recallable. AGE sweeps from the recent accumulator to the oldest keyframe; RESURFACE bleeds that memory back into the live image (via BLEND: screen · lighten · under, where the memory shows only in the dark and empty parts of the live picture · difference); STIR drifts the memory so it SEDIMENTS rather than sitting as a frozen loop; DEPOSIT sets how strongly the present is laid down; SNAP stores a keyframe right now, a moment marked to resurface later. The piece can resurface what it looked like ten minutes ago. Works on any rack.",
       "CATEGORIES": ["FX", "Time", "Feedback"],
       "INPUTS": [
         { "NAME": "deposit", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "deposit" },
@@ -462,7 +470,8 @@ export const NATIVE_NODES: IsfShader[] = [
         { "NAME": "interval", "TYPE": "float", "MIN": 0.5, "MAX": 30.0, "DEFAULT": 4.0, "LABEL": "keyframe (s)" },
         { "NAME": "stir", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2, "LABEL": "stir" },
         { "NAME": "blend", "TYPE": "long", "VALUES": [0, 1, 2, 3], "LABELS": ["screen", "lighten", "under", "difference"], "DEFAULT": 0, "LABEL": "blend" },
-        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" },
+        { "NAME": "snap", "TYPE": "event", "DEFAULT": false, "LABEL": "snapshot ▸" }
       ]
     }*/`,
     curated: {
@@ -481,20 +490,22 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Parallax : real 2.5D from the shared depth map. Near features shift more than far ones as an animated camera SWAY drifts the view, with depth-of-field blur around a FOCUS plane and a FOG that sinks the far distance toward black (aerial recession). It reads the depth the Depth engine fills : set Depth in the header (SYNTH for a test bowl, AI for estimated depth on video/capture). With Depth off (or MIX 0) it is an exact passthrough. Works on any rack; best on the MASTER chain (depth of the whole picture).",
+      "DESCRIPTION": "Parallax : real 2.5D from the shared depth map. Near features shift more than far ones as an animated camera SWAY drifts the view (at SWAY RATE), with depth-of-field blur around a FOCUS plane (BLUR SHAPE : a four-way ghosted cross, or a smooth lens disc) and a FOG that sinks the planes beyond the focus depth toward black (aerial recession). It reads the depth the Depth engine fills : set Depth in the header (SYNTH for a test bowl, AI for estimated depth on video/capture). With Depth off (or MIX 0) it is an exact passthrough. Works on any rack; best on the MASTER chain (depth of the whole picture).",
       "CATEGORIES": ["FX", "Distortion", "Depth"],
       "INPUTS": [
         { "NAME": "amount", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "parallax" },
         { "NAME": "angle",  "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 0.0, "LABEL": "angle" },
         { "NAME": "sway",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "sway" },
+        { "NAME": "swayRate", "TYPE": "float", "MIN": 0.0, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "sway rate" },
         { "NAME": "dof",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "depth blur" },
+        { "NAME": "dofShape", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["cross", "disc"], "DEFAULT": 0, "LABEL": "blur shape" },
         { "NAME": "focus",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "focus" },
         { "NAME": "fog",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "depth fog" },
         { "NAME": "invert", "TYPE": "bool", "DEFAULT": false, "LABEL": "invert", "COMPACT": true },
         { "NAME": "wet",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
       ]
     }*/`,
-    curated: { amount: [0.1, 0.6], angle: [0, 6.2832], sway: [0, 0.6], dof: [0, 0.5], focus: [0.3, 0.7], fog: [0, 0.5], wet: [0.6, 1] }
+    curated: { amount: [0.1, 0.6], angle: [0, 6.2832], sway: [0, 0.6], swayRate: [0.4, 2], dof: [0, 0.5], focus: [0.3, 0.7], fog: [0, 0.5], wet: [0.6, 1] }
   },
   {
     id: 'node-eternalism',
@@ -502,7 +513,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Eternalism : persistence of vision made a signal path (the app's namesake). Keeps a short ring of recent frames and reads two temporal taps. HOLD (Ken Jacobs' Eternalism) alternates two frames a GAP apart across a BLACK shutter interval at RATE : an unfrozen slice of time, a held micro-motion going nowhere (sub-fusion rates shimmer; higher rates fuse). DRIFT (Sherwin/McClure phase-drift twins) superimposes two delayed copies whose delay slowly BEATS in and out of lock (coherent → double-exposed → coherent), the second copy a touch larger with an amber TINT. Matte, near-black, no bloom. Layer / source / master.",
+      "DESCRIPTION": "Eternalism : persistence of vision made a signal path (the app's namesake). Keeps a short ring of recent frames and reads two temporal taps. HOLD alternates the newest frame and the one a GAP before it across a BLACK shutter interval at RATE : an unfrozen slice of time, a micro-motion going nowhere (sub-fusion rates shimmer; higher rates fuse). FREEZE stops the ring so the same pair holds for good. DRIFT (phase-drift twins) superimposes two delayed copies whose delay slowly BEATS in and out of lock (coherent → double-exposed → coherent), the second copy a touch larger with an amber TINT, exactly superimposed at lock. Matte, near-black, no bloom; the shutter empties a transparent layer instead of blacking it. Layer / source / master.",
       "CATEGORIES": ["FX", "Time", "Feedback"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["hold", "drift"], "DEFAULT": 0, "LABEL": "mode" },
@@ -511,10 +522,11 @@ export const NATIVE_NODES: IsfShader[] = [
         { "NAME": "interval", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "black interval" },
         { "NAME": "detune", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.12, "LABEL": "detune" },
         { "NAME": "tint", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "twin tint" },
+        { "NAME": "freeze", "TYPE": "bool", "DEFAULT": false, "LABEL": "freeze pair", "COMPACT": true },
         { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
       ]
     }*/`,
-    curated: { gap: [2, 10], rate: [3, 12], interval: [0.1, 0.5], detune: [0.05, 0.4], tint: [0.1, 0.5], mix: [0.6, 1] }
+    curated: { gap: [2, 10], rate: [3, 12], interval: [0.1, 0.5], detune: [0.05, 0.4], tint: [0.1, 0.5], freeze: [0, 0], mix: [0.6, 1] }
   },
   {
     id: 'node-afterimage',
@@ -522,16 +534,17 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Afterimage : Goethe's complement. A bright form, once removed, leaves a ghost in its place (the eye emits the negative/complementary color). Keeps a slowly-decaying brightness high-water of recent frames; where a bright form has DEPARTED a spot, the ghost blooms back over DECAY seconds. CHROMA sweeps the ghost from a dark subtraction (0, the pure Goethe darkening) to its complementary COLOR (1, a red form leaves a cyan trace). AMOUNT sets its strength. The literal meaning of Palinopsia. Matte, near-black. Layer / source / master.",
+      "DESCRIPTION": "Afterimage : Goethe's complement. A bright form, once removed, leaves a ghost in its place (the eye emits the negative/complementary color). Keeps a slowly decaying brightness high-water of recent frames; where a bright form has DEPARTED a spot, the ghost appears at once and fades over PERSISTENCE. CHROMA sweeps the ghost from a dark subtraction (0, the pure Goethe darkening) to its complementary COLOR (1, a red form leaves a cyan trace). GHOST sets its strength. DWELL makes the eye adapt slowly, so a flash leaves a faint ghost and a long stare the full one. The ghost also falls where the layer is transparent, darkening what lies below. The literal meaning of Palinopsia. Matte, near-black. Layer / source / master.",
       "CATEGORIES": ["FX", "Time", "Color"],
       "INPUTS": [
         { "NAME": "decay", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "persistence" },
         { "NAME": "amount", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "ghost" },
         { "NAME": "chroma", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "dark ↔ color" },
+        { "NAME": "dwell", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "dwell (adapt)" },
         { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
       ]
     }*/`,
-    curated: { decay: [0.3, 0.8], amount: [0.3, 0.8], chroma: [0, 1], mix: [0.6, 1] }
+    curated: { decay: [0.3, 0.8], amount: [0.3, 0.8], chroma: [0, 1], dwell: [0, 0.6], mix: [0.6, 1] }
   },
   {
     id: 'node-melt',
@@ -539,16 +552,17 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Melt : a seam-local dissolve that CREEPS. It reads the picture's own light/dark edges, and inside a narrow band along each edge it dissolves the node's OWN previous frame back in, pushed one-sided along the edge normal, so the boundaries between forms soften and slowly walk outward, the image melting at its contours. Unlike Datamosh (motion-driven, whole-frame) this is edge-driven and self-feeding, a structural melt that keeps going on a still picture. WIDTH sets how far from an edge it reaches, GATE which edges qualify, DIR the creep direction and speed (0 = a static edge-ghost, ± = it walks). Layer / source / master.",
+      "DESCRIPTION": "Melt : a seam-local dissolve that CREEPS. It reads the picture's own light/dark edges and keeps dissolving its OWN previous frame back in, pulled from one side of each edge, so the boundaries between forms soften and walk outward, the image melting at its contours : the bright side bleeds out (CREEP > 0) or the dark side eats in (< 0), a few pixels a second, and the melted front holds for a while before it fades. Unlike Datamosh (motion-driven, whole-frame) this is edge-driven and self-feeding, a structural melt that keeps going on a still picture. MELT sets the seam dissolve and how long the melt holds, BAND WIDTH how far from an edge it can reach, GATE which edges qualify, CREEP the direction and speed (0 = a static edge-ghost that only trails motion), MIX the blend over the live frame. Melted forms spill into transparent areas too. Layer / source / master.",
       "CATEGORIES": ["FX", "Feedback", "Distortion"],
       "INPUTS": [
         { "NAME": "amount", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "melt" },
         { "NAME": "width", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "band width" },
         { "NAME": "dir", "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "creep" },
-        { "NAME": "gate", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "edge gate" }
+        { "NAME": "gate", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "edge gate" },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
       ]
     }*/`,
-    curated: { amount: [0.3, 0.8], width: [0.1, 0.5], dir: [-0.6, 0.6], gate: [0.05, 0.35] }
+    curated: { amount: [0.3, 0.8], width: [0.1, 0.5], dir: [-0.6, 0.6], gate: [0.05, 0.35], mix: [0.6, 1] }
   },
   {
     id: 'node-faultline',
@@ -556,18 +570,19 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Faultline : a dirty vision-mixer. A clock (RATE) and a probability (DIRT) fire momentary STRUCTURAL faults at the output, and the picture is COMPLETELY CLEAN between them. It is the same skip-law as SLIP, moved from a single parameter to the whole blend. Each fire is one discrete fault of the chosen TYPE : DROPOUT (the signal loses lock and collapses toward black under a rolling sync bar), CUT (the mixer holds the frame grabbed at the fire instant : a hard cut to a still the live picture snaps back from), TIMEBASE (a head-switch knock : blocks of scanlines shear sideways, the field rolls, a torn band along the switch line), or NOISE (a band of switching static sweeps the cut point); or ROULETTE, a fresh pick each fire. DEPTH is severity, HOLD the length of each fault, TRIG fires one by hand / OSC / a modulator. Best on the master rack (the whole program glitches like circuit-bent kit), but works on any rack.",
+      "DESCRIPTION": "Faultline : a dirty vision-mixer. A clock (RATE, or a beat division of the tempo with SYNC) and a probability (DIRT) fire momentary STRUCTURAL faults at the output, and the picture is COMPLETELY CLEAN between them. It is the same skip-law as SLIP, moved from a single parameter to the whole blend. Each fire is one discrete fault of the chosen TYPE : DROPOUT (the signal loses lock in horizontal streaks that sweep the frame and collapse toward black), CUT (the mixer holds the frame grabbed at the fire instant : a hard cut to a still the live picture snaps back from), TIMEBASE (a head-switch knock : blocks of scanlines shear sideways and blank to black where they slide off, the field rolls, a torn band along the switch line), or NOISE (a band of switching static sweeps the cut point); or ROULETTE, a fresh pick each fire. DEPTH is severity, HOLD the length of each fault, TRIG fires one by hand / OSC / a modulator. Best on the master rack (the whole program glitches like circuit-bent kit), but works on any rack.",
       "CATEGORIES": ["FX", "Glitch"],
       "INPUTS": [
         { "NAME": "type", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4], "LABELS": ["dropout", "cut", "timebase", "noise", "roulette"], "DEFAULT": 4, "LABEL": "fault" },
         { "NAME": "rate", "TYPE": "float", "MIN": 0.0, "MAX": 12.0, "DEFAULT": 2.0, "LABEL": "rate (Hz)" },
+        { "NAME": "sync", "TYPE": "long", "VALUES": [0, 1, 2, 3], "LABELS": ["free (rate)", "1/4", "1/8", "1/16"], "DEFAULT": 0, "LABEL": "sync", "COMPACT": true },
         { "NAME": "dirt", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "dirt" },
         { "NAME": "depth", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "depth" },
         { "NAME": "hold", "TYPE": "float", "MIN": 0.02, "MAX": 0.5, "DEFAULT": 0.08, "LABEL": "hold (s)" },
         { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "fire ▸" }
       ]
     }*/`,
-    curated: { rate: [0, 6], dirt: [0.2, 0.9], depth: [0.3, 0.9], hold: [0.03, 0.2] }
+    curated: { rate: [0.5, 6], sync: [0, 0], dirt: [0.2, 0.9], depth: [0.3, 0.9], hold: [0.03, 0.2] }
   },
   {
     id: 'node-ibfv',
@@ -575,25 +590,31 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Sillage : advected-noise feedback (IBFV, van Wijk 2002). A dye buffer is dragged each frame along a FLOW field and blended with fresh filtered noise, so the noise stretches into flow-aligned filaments (a line-integral / LIC look) and DECAYS INTO STRUCTURE instead of blowing to neon : a wake of dye trailing the motion, reading as material, not glow. The field is a divergence-free CURL-noise base (FIELD : always flowing, so even a still image streams) plus the image's own OPTICAL FLOW (MOTION : its movement advects the dye). Steer it anywhere : WIND pushes the whole wake in the ANGLE direction, and SWIRL spins it about the center (a spiral either way). FLOW is how far the dye travels each frame (streak length), INJECTION how fast fresh noise replaces it (short trails ↔ long smears), GRAIN the noise frequency, DYE tints the wake by the image so it reads as the picture's own material, SPEED the churn rate, MIX the blend over the live frame. Self-contained : any rack.",
+      "DESCRIPTION": "Sillage : advected-noise feedback (IBFV, van Wijk 2002). A dye buffer is dragged each frame along a FLOW field and blended with fresh filtered noise, so the noise stretches into flow-aligned filaments (a line-integral / LIC look) and DECAYS INTO STRUCTURE instead of blowing to neon : a wake of dye trailing the motion, reading as material, not glow. The field is a divergence-free CURL-noise base (FIELD : always flowing, so even a still image streams) plus the image's own OPTICAL FLOW (MOTION : its movement advects the dye). Steer it anywhere : WIND pushes the whole wake in the ANGLE direction, and SWIRL spins it about the SWIRL X / Y point (a spiral either way). FLOW is how far the dye travels (streak length), INJECTION how fast fresh noise replaces it (short trails ↔ long smears), GRAIN the noise size, SCAN how fast the grain slides sideways (1 = the classic horizontal tape-like streaks; 0 = it pulses in place, with no built-in direction), DARK GROUND keeps the noise off the black parts of the picture, DYE tints the wake by the image so it reads as the picture's own material, SPEED the churn rate, MIX the blend over the live frame, CLEAR restarts the wake from the live frame. The wake keeps the layer's transparency and streams into it. Self-contained : any rack.",
       "CATEGORIES": ["FX", "Feedback", "Flow"],
       "INPUTS": [
         { "NAME": "flow", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "flow (streak)" },
         { "NAME": "inject", "TYPE": "float", "MIN": 0.02, "MAX": 0.6, "DEFAULT": 0.12, "LABEL": "injection" },
         { "NAME": "scale", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "grain" },
+        { "NAME": "scan", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "scan (sideways grain)" },
         { "NAME": "field", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "field (curl)" },
         { "NAME": "motion", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "motion (optical)" },
         { "NAME": "angle", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "wind angle" },
         { "NAME": "push", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "wind" },
         { "NAME": "swirl", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "swirl" },
+        { "NAME": "swirlX", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "swirl x" },
+        { "NAME": "swirlY", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "swirl y" },
+        { "NAME": "ground", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "dark ground" },
         { "NAME": "dye", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "dye (tint)" },
         { "NAME": "speed", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "speed" },
-        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.8, "LABEL": "mix" }
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.8, "LABEL": "mix" },
+        { "NAME": "clear", "TYPE": "event", "DEFAULT": false, "LABEL": "clear ▸" }
       ]
     }*/`,
     curated: {
-      flow: [0.2, 0.8], inject: [0.05, 0.3], scale: [0.2, 0.8], field: [0.2, 0.9],
+      flow: [0.2, 0.8], inject: [0.05, 0.3], scale: [0.2, 0.8], scan: [0, 1], field: [0.2, 0.9],
       motion: [0.2, 0.9], angle: [0.0, 1.0], push: [0.0, 0.6], swirl: [0.2, 0.8],
+      swirlX: [0.3, 0.7], swirlY: [0.3, 0.7], ground: [0, 1],
       dye: [0.3, 0.9], speed: [0.2, 0.8], mix: [0.5, 1.0]
     }
   },
@@ -603,12 +624,13 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Toile : a painterly reworking that follows the image's own structure (anisotropic Kuwahara, Kyprianidis) with optional coherent line-work (flow-XDoG). A structure tensor finds the local orientation, and the picture is smoothed into strokes that run ALONG its contours, so forms flatten into paint that stays temporally coherent (not per-frame speckle) instead of a uniform blur. RADIUS is the brush size, SHARP how hard it flattens (edge-preserving ↔ painterly), PAINT how far toward the painting. LINE inks the contours : a difference-of-gaussians measured across each edge and smoothed along it draws clean outlines that follow the structure (THRESHOLD picks how strong an edge must be). MIX blends over the live frame. The real « Peint » + « Griffé » as a rack FX; a spatial filter (no feedback). Any rack.",
+      "DESCRIPTION": "Toile : a painterly reworking that follows the image's own structure (anisotropic Kuwahara, Kyprianidis et al.) with optional coherent line-work (flow-XDoG). A structure tensor finds the local orientation, and the picture is smoothed into strokes that run ALONG its contours, so forms flatten into paint instead of a uniform blur. BRUSH is the stroke size (the same share of the frame at any output size), FLATTEN how hard it flattens (edge-preserving ↔ painterly), PAINT how far toward the painting, STROKES the texture of the paint (CRISP : hard-edged, blocky dabs; SMOOTH : soft, blended strokes). LINE inks the contours : a difference-of-gaussians measured across each edge and smoothed along it draws clean outlines that follow the structure (LINE EDGE picks how strong an edge must be). MIX blends over the live frame. Paint spreads into transparent areas without dark fringes. The real « Peint » + « Griffé » as a rack FX; a spatial filter (no feedback). Any rack.",
       "CATEGORIES": ["FX", "Stylize"],
       "INPUTS": [
         { "NAME": "radius", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "brush" },
         { "NAME": "sharp", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "flatten" },
         { "NAME": "paint", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "paint" },
+        { "NAME": "strokes", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["crisp", "smooth"], "DEFAULT": 0, "LABEL": "strokes", "COMPACT": true },
         { "NAME": "line", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "line (ink)" },
         { "NAME": "threshold", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "line edge" },
         { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
@@ -619,7 +641,7 @@ export const NATIVE_NODES: IsfShader[] = [
       line: [0.0, 0.7], threshold: [0.3, 0.7], mix: [0.6, 1.0]
     }
   },
-  // ── TouchDesigner recipes (v1.2.0) : the classic TOP moves as native nodes.
+  // ── Sidechain recipes (v1.2.0) : classic compositing moves as native nodes.
   // Each reads an optional sidechain layer and falls back to the host itself,
   // so all five run in any rack (engine/convNodes RemapNode … LookupNode).
   {
@@ -628,7 +650,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Remap (TouchDesigner's Remap TOP) : the sidechain layer's red and green channels become the coordinates each pixel of this layer reads from. ABSOLUTE is TD's behavior (red = x, green = y); OFFSET displaces from where the pixel already is, around mid-gray. SCALE and the OFFSET X/Y reshape the map, EXTEND picks what lies past the edge (hold / repeat / mirror), SWAP makes this layer the map and the sidechain the picture. No sidechain = the layer remaps itself.",
+      "DESCRIPTION": "Remap : the sidechain layer's red and green channels become the coordinates each pixel of this layer reads from. ABSOLUTE uses them as the position itself (red = x, green = y); OFFSET displaces from where the pixel already is, around mid-gray. SCALE and the OFFSET X/Y reshape the map, EXTEND picks what lies past the edge (hold / repeat / mirror), SWAP makes this layer the map and the sidechain the picture. Where the map is transparent the picture stays in place, and moved shapes keep their own transparency. No sidechain = the layer remaps itself.",
       "CATEGORIES": ["FX", "Distortion"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["absolute", "offset"], "DEFAULT": 0, "LABEL": "mode" },
@@ -649,7 +671,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Luma Blur (TouchDesigner's Luma Blur TOP) : a blur whose width changes across the picture, set by a control image's brightness. BLACK WIDTH is the blur where the control is dark, WHITE WIDTH where it is bright (in pixels at 1080p). The control is the sidechain layer, or this layer's own brightness when none is picked. CONTROL = depth focus reads the shared depth map instead : FOCUS picks the plane that stays sharp and everything nearer or farther melts, a depth-of-field blur. Any rack.",
+      "DESCRIPTION": "Luma Blur : a blur whose width changes across the picture, set by a control image's brightness. BLACK WIDTH is the blur where the control is dark, WHITE WIDTH where it is bright (in pixels at 1080p). The control is the sidechain layer, or this layer's own brightness when none is picked. CONTROL = depth focus reads the shared depth map instead : FOCUS picks the plane that stays sharp and everything nearer or farther melts, a depth-of-field blur (with Depth off it falls back to brightness). QUALITY : FAST and FINE use a few sparse taps, so wide blurs keep stepped ghost copies of edges; SMOOTH melts them into an even blur. The look is the same at 4K and on the dome as at 1080p. MIX blends over the live frame. Any rack.",
       "CATEGORIES": ["FX", "Blur"],
       "INPUTS": [
         { "NAME": "control", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["brightness", "depth focus"], "DEFAULT": 0, "LABEL": "control" },
@@ -658,10 +680,11 @@ export const NATIVE_NODES: IsfShader[] = [
         { "NAME": "gamma", "TYPE": "float", "MIN": 0.25, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "control curve" },
         { "NAME": "focus", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "focus (depth)" },
         { "NAME": "invert", "TYPE": "bool", "DEFAULT": false, "LABEL": "invert", "COMPACT": true },
-        { "NAME": "quality", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["fast", "fine"], "DEFAULT": 1, "LABEL": "quality", "COMPACT": true }
+        { "NAME": "quality", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["fast", "fine", "smooth"], "DEFAULT": 1, "LABEL": "quality", "COMPACT": true },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
       ]
     }*/`,
-    curated: { blackWidth: [0, 6], whiteWidth: [8, 40], gamma: [0.6, 1.8], focus: [0.3, 0.7] }
+    curated: { blackWidth: [0, 6], whiteWidth: [8, 40], gamma: [0.6, 1.8], focus: [0.3, 0.7], mix: [0.7, 1] }
   },
   {
     id: 'node-gooey',
@@ -669,7 +692,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Gooey : the TouchDesigner blur-then-threshold recipe. The picture is blurred, then cut at a brightness level, so shapes that sit close together melt into soft single blobs (metaballs). BLUR sets how far shapes reach for each other, LEVEL where the edge falls, SOFTNESS how hard it is. FILL shows the crisp source, the blurred color pushed to full strength, or a white matte; OUTSIDE keeps some of the source around the blobs. Any rack.",
+      "DESCRIPTION": "Gooey : the blur-then-threshold recipe. The picture is blurred, then cut at a brightness level, so shapes that sit close together melt into soft single blobs (metaballs). BLUR sets how far shapes reach for each other, LEVEL where the edge falls, SOFTNESS how hard it is. FILL shows the crisp source, the blurred color pushed to full strength, or a white matte; OUTSIDE keeps some of the source around the blobs. On a transparent layer the blobs bridge the gaps too, filled with the blurred color. Any rack.",
       "CATEGORIES": ["FX", "Stylize"],
       "INPUTS": [
         { "NAME": "blur", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "blur" },
@@ -690,7 +713,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Matte (TouchDesigner's three-input Matte TOP) : this layer shows where the matte is bright, input 2 where it is dark. Pick input 2 and the matte in the Inspector (both are other layers). CHANNEL picks what the matte is read from; LOW and HIGH are levels on it, to choke or soften the edge. SWAP exchanges this layer and input 2. No matte = this layer's own brightness keys it; no input 2 = black.",
+      "DESCRIPTION": "Matte (three inputs) : this layer shows where the matte is bright, input 2 where it is dark, each with its own transparency (text keyed over video keeps the video around the letters). Pick input 2 and the matte in the Inspector (both are other layers). CHANNEL picks what the matte is read from; LOW and HIGH are levels on it, to choke or soften the edge (LOW above HIGH inverts the ramp). SWAP exchanges this layer and input 2. No matte = this layer's own brightness keys it; no input 2 = black, or with EMPTY = transparent, a cut-out that shows the layers below.",
       "CATEGORIES": ["FX", "Utility"],
       "INPUTS": [
         { "NAME": "channel", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4], "LABELS": ["luma", "red", "green", "blue", "alpha"], "DEFAULT": 0, "LABEL": "matte channel" },
@@ -698,10 +721,11 @@ export const NATIVE_NODES: IsfShader[] = [
         { "NAME": "high", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "high" },
         { "NAME": "invert", "TYPE": "bool", "DEFAULT": false, "LABEL": "invert", "COMPACT": true },
         { "NAME": "swap", "TYPE": "bool", "DEFAULT": false, "LABEL": "swap 1 and 2", "COMPACT": true },
+        { "NAME": "empty", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["black", "transparent"], "DEFAULT": 0, "LABEL": "no input 2", "COMPACT": true },
         { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
       ]
     }*/`,
-    curated: { low: [0, 0.3], high: [0.6, 1], mix: [0.7, 1] }
+    curated: { low: [0, 0.3], high: [0.6, 1], empty: [0, 0], mix: [0.7, 1] }
   },
   {
     id: 'node-lookup',
@@ -709,7 +733,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Lookup (TouchDesigner's Lookup TOP, with a LIVE palette) : this layer is recolored through a line drawn across another layer, so its moving colors become the color table. INDEX reads the brightness, each channel on its own, or the hue. AXIS and POSITION place the line on the palette layer, BAND averages a stripe around it (calmer colors from a busy palette), OFFSET cycles the table and CYCLES repeats it (MIRROR folds instead of wrapping). No sidechain = the layer is its own palette.",
+      "DESCRIPTION": "Lookup (a color table with a LIVE palette) : this layer is recolored through a line drawn across another layer, so its moving colors become the color table. INDEX reads the brightness, each channel on its own, or the hue (grays and near-blacks keep their own color). AXIS and POSITION place the line on the palette layer (the diagonal slides across the frame), BAND averages a stripe around it (calmer colors from a busy palette), OFFSET cycles the table and CYCLES repeats it (MIRROR folds instead of wrapping). No sidechain, or an empty palette layer = the layer is its own palette.",
       "CATEGORIES": ["FX", "Color"],
       "INPUTS": [
         { "NAME": "index", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["brightness", "per channel", "hue"], "DEFAULT": 0, "LABEL": "index" },
@@ -731,20 +755,21 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Pulfrich : monocular 3D from a temporal eye-delay. One eye reads a slightly DELAYED image (a dark filter slows its neural response) so lateral motion becomes stereo depth. The delay is read per-pixel from a frame ring, keyed by the shared DEPTH map (or luminance) so far/dark planes lag more. The disparity is TEMPORAL, not spatial : a still frame is byte-exact with NO color fringing; depth blooms only on lateral motion. ANAGLYPH gives a red/cyan pair for glasses (DESAT curbs retinal rivalry, SEPARATION widens the split); FREE is a glasses-free parallax slide, gated by motion. A matte companion to the Anaglyph stage. Layer / source / master; falls back to luminance when no depth map is live.",
+      "DESCRIPTION": "Pulfrich : monocular 3D from a temporal eye-delay. One eye reads a slightly DELAYED image (a dark filter slows its neural response) so lateral motion becomes stereo depth. The delay is read per-pixel from a frame ring, keyed by the shared DEPTH map (or the luminance), so near / bright planes lag more; ZERO PLANE sets the key that gets no delay, so planes beyond it lag in one eye and planes before it in the other (in front of and behind the screen). The disparity is TEMPORAL, not spatial : a still picture shows no color fringes (only DESAT tints it); depth blooms only on lateral motion. ANAGLYPH gives a red/cyan pair for glasses (DESAT curbs retinal rivalry, DISPARITY widens the split); FREE is a glasses-free parallax slide, gated by motion. A matte companion to the Anaglyph stage. Layer / source / master; the key falls back to luminance when Depth is off.",
       "CATEGORIES": ["FX", "Depth", "Time"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["anaglyph", "free"], "DEFAULT": 0, "LABEL": "mode" },
         { "NAME": "source", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["luminance", "depth map"], "DEFAULT": 1, "LABEL": "key" },
         { "NAME": "delay", "TYPE": "float", "MIN": 1.0, "MAX": 14.0, "DEFAULT": 5.0, "LABEL": "eye delay (frames)" },
         { "NAME": "curve", "TYPE": "float", "MIN": 0.2, "MAX": 3.0, "DEFAULT": 1.0, "LABEL": "depth curve" },
+        { "NAME": "zero", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "zero plane" },
         { "NAME": "separation", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "disparity" },
         { "NAME": "desat", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "desaturate" },
         { "NAME": "swap", "TYPE": "bool", "DEFAULT": false, "LABEL": "swap eyes", "COMPACT": true },
         { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
       ]
     }*/`,
-    curated: { delay: [3, 10], curve: [0.6, 1.8], separation: [0.2, 0.7], desat: [0.2, 0.7], mix: [0.6, 1] }
+    curated: { delay: [3, 10], curve: [0.6, 1.8], zero: [0, 0.5], separation: [0.2, 0.7], desat: [0.2, 0.7], mix: [0.6, 1] }
   },
   {
     id: 'node-corrode',
@@ -752,19 +777,20 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Corrode : durational corrosion that only ever GROWS (buried / weathered : the entropy family). A blotch field seeds new corrosion as the integrated BURY level rises, and each frame it creeps outward, so the picture is eaten away slowly over minutes and never recovers until you EXHUME (reset ▸). EAT sets how deeply corroded zones are removed; TONE stains them from leader-dark to sepia; CRACKLE adds reticulation (cracked-émulsion) lines. On the Master rack it weathers the whole set. Matte, near-black. Layer / source / master.",
+      "DESCRIPTION": "Corrode : durational corrosion that only ever GROWS (buried / weathered : the entropy family). A blotch field seeds new corrosion as the integrated level rises and the corroded zones creep outward, so the picture is eaten away over minutes and never recovers until you EXHUME (reset ▸). BURY RATE is the time to full corrosion, from about an hour (0) through about 8 minutes (0.5) to a minute (1); CREEP how far the fronts travel over that time. EAT sets how deeply corroded zones are removed; EAT TO stains them (TONE : leader-dark to sepia) or dissolves them into transparency, showing the layers below; CRACKLE adds reticulation (cracked-émulsion) lines. On the Master rack it weathers the whole set. Matte, near-black. Layer / source / master.",
       "CATEGORIES": ["FX", "Time", "Cameraless"],
       "INPUTS": [
         { "NAME": "bury", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "bury rate" },
         { "NAME": "spread", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "creep" },
         { "NAME": "eat", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.7, "LABEL": "eat" },
+        { "NAME": "eatTo", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["stain", "transparent"], "DEFAULT": 0, "LABEL": "eat to", "COMPACT": true },
         { "NAME": "tone", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "dark ↔ sepia" },
         { "NAME": "crackle", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "reticulation" },
         { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" },
         { "NAME": "reset", "TYPE": "event", "DEFAULT": false, "LABEL": "exhume ▸" }
       ]
     }*/`,
-    curated: { bury: [0.2, 0.7], spread: [0.2, 0.7], eat: [0.4, 0.9], tone: [0.1, 0.6], crackle: [0.2, 0.7], mix: [0.6, 1] }
+    curated: { bury: [0.2, 0.7], spread: [0.2, 0.7], eat: [0.4, 0.9], eatTo: [0, 0], tone: [0.1, 0.6], crackle: [0.2, 0.7], mix: [0.6, 1] }
   },
   {
     id: 'node-decimate',
@@ -772,17 +798,18 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Decimate / Time-Lapse : sample-and-hold at a chosen rate. It grabs a fresh frame only every so often and HOLDS it between grabs, so the picture steps through time : the time-lapse / stutter register the smooth 60fps engine erases. SMOOTH crossfades the last two grabs (0 = a hard snap, 1 = a continuous tween across the whole interval → slow-motion). CLOCK mode samples at RATE; HOLD mode freezes and only re-samples on the trigger. The signature move : two rates of the SAME source across A and B (control vs lapse). Matte, no bloom. Layer / source / master.",
+      "DESCRIPTION": "Decimate / Time-Lapse : sample-and-hold at a chosen rate. It grabs a fresh frame only every so often and HOLDS it between grabs, so the picture steps through time : the time-lapse / stutter register the smooth 60fps engine erases. TWEEN crossfades the last two grabs (0 = a hard snap, 1 = a continuous tween across the whole interval → slow-motion). CLOCK mode samples at RATE, or on a beat division of the tempo with SYNC; HOLD mode freezes and only re-samples on the trigger (its tween still lasts one RATE interval). The signature move : two rates of the SAME source across A and B (control vs lapse). Keeps the layer's transparency. Matte, no bloom. Layer / source / master.",
       "CATEGORIES": ["FX", "Time"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["clock", "hold"], "DEFAULT": 0, "LABEL": "mode" },
         { "NAME": "rate", "TYPE": "float", "MIN": 0.2, "MAX": 20.0, "DEFAULT": 6.0, "LABEL": "rate (Hz)" },
+        { "NAME": "sync", "TYPE": "long", "VALUES": [0, 1, 2, 3], "LABELS": ["free (rate)", "1/4", "1/8", "1/16"], "DEFAULT": 0, "LABEL": "sync", "COMPACT": true },
         { "NAME": "smooth", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "tween" },
         { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" },
         { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "sample ▸" }
       ]
     }*/`,
-    curated: { rate: [1, 12], smooth: [0, 0.6], mix: [0.7, 1] }
+    curated: { rate: [1, 12], sync: [0, 0], smooth: [0, 0.6], mix: [0.7, 1] }
   }
 ]
 

@@ -139,9 +139,9 @@ export const SHADER_BLURBS: Record<string, string> = {
   'node-reponse':
     'Sums this layer’s last several frames through a shaped envelope, so trails swell and fade with a rhythm instead of decaying evenly. It is the visual equivalent of a reverb tail. Uses only its own history, so it needs no other layer.',
   'node-feedback':
-    'Points the layer at its own previous frame through a slowly drifting zoom and rotation, which is how tunnels, trails and living textures appear out of nothing. An automatic gain control holds it at the edge of chaos so it never collapses to black or blows out to white. Deliberately off-center, so it stays organic instead of becoming a symmetrical mandala.',
+    'Points the layer at its own previous frame through a slowly drifting zoom and rotation, which is how tunnels, trails and living textures appear out of nothing. An automatic gain control holds the loop at the brightness of the live layer, so it neither dies out nor runs away to white, and a dark picture stays dark. Deliberately off-center, so it stays organic instead of becoming a symmetrical mandala.',
   'node-datamosh':
-    'Makes the picture slide along its own movement, the way a broken video file smears when its keyframes are missing. Turn the refresh down and a new scene drags the previous one around, so figures melt into and out of the image. It is the real compression behavior rather than an imitation of it.',
+    'Makes the picture slide along its own movement, the way a broken video file smears when its keyframes are missing. Turn the refresh down and a new scene drags the previous one around, so figures melt into and out of the image. It rebuilds that compression behavior in real time from the motion itself, with no codec involved.',
   'node-scanner':
     'Works like a flatbed scanner: a head sweeps the frame and captures only the line it is crossing, holding it until the head comes round again. Anything that moves while the head travels is stretched or repeated along the sweep. Fire the trigger to start a pass, or let it run in a loop.',
   'node-autocutter':
@@ -155,29 +155,29 @@ export const SHADER_BLURBS: Record<string, string> = {
   'node-eternalism':
     'Holds two frames a moment apart and alternates them across a black shutter, so a slice of time hangs there moving without ever going anywhere. It is persistence of vision turned into a signal path. Slower rates shimmer; faster ones fuse into a single strange image.',
   'node-afterimage':
-    'Where a bright shape has been and then left, its ghost blooms back in the opposite color. This is what your eye does on its own after staring at something, described by Goethe two centuries ago. The ghost can be a plain dark subtraction or a full complementary color.',
+    'Where a bright shape has been and then left, its ghost appears in the opposite color and slowly fades. This is what your eye does on its own after staring at something, described by Goethe two centuries ago. The ghost can be a plain dark subtraction or a full complementary color.',
   'node-melt':
-    'Softens the picture only along its own light-and-dark edges, dissolving the last frame back in a narrow band so the boundaries between forms bleed. Turn the creep up and the seam slowly walks outward, the image melting at its contours. Unlike a datamosh it is driven by edges, not motion, so it keeps going even on a still picture.',
+    'Softens the picture along its own light-and-dark edges and keeps feeding its last frame back in, so the boundaries between forms bleed. Turn the creep up and the melted front walks outward a few pixels a second, the bright side spilling over the dark (or the dark eating in), the image melting at its contours. Unlike a datamosh it is driven by edges, not motion, so it keeps going even on a still picture.',
   'node-faultline':
     'A dirty vision-mixer that throws momentary faults into the picture and stays completely clean between them. A rate and a dirt dial decide how often it fires (or hit the trigger by hand), and each fire drops the signal out, hard-cuts to a frozen frame, knocks the timebase sideways, or sweeps a band of switching noise across the cut. Best on the master chain, where the whole program glitches like circuit-bent kit.',
   'node-ibfv':
     'Drags a cloud of dye along a flowing field and keeps topping it up with fresh noise, so the noise smears into long flow-aligned filaments : a wake of material trailing the motion. The field is a slow curl-noise swirl that is always moving (so even a still picture streams) plus the image’s own movement, and the dye can be tinted by the picture so it reads as its own substance flowing. Decays into structure rather than glowing, so it stays matte.',
   'node-remap':
-    'The TouchDesigner Remap move : another layer tells each pixel where to read from, its red as the horizontal position and its green as the vertical. A gradient layer bends the picture smoothly, a noisy one shatters it. Switch to offset to nudge pixels instead of relocating them.',
+    'The classic remap move : another layer tells each pixel where to read from, its red as the horizontal position and its green as the vertical. A gradient layer bends the picture smoothly, a noisy one shatters it. Switch to offset to nudge pixels instead of relocating them.',
   'node-lumablur':
     'A blur whose strength changes across the picture, following the brightness of another layer or of the image itself. Set how blurred the dark parts and the bright parts get. In depth focus it reads the depth map instead, so one plane stays sharp and the rest melts like a camera lens.',
   'node-gooey':
     'The blur-then-threshold trick : the picture is blurred and cut at a brightness level, so shapes near each other flow together into soft blobs, like metaballs or a lava lamp. Blur sets how far they reach, level where the edge sits.',
   'node-matte':
-    'Composites with three pictures, like the TouchDesigner Matte : this layer shows where the matte is bright, a second layer where it is dark. Pick the second layer and the matte in the Inspector. With no matte, this layer keys itself by its own brightness.',
+    'Composites with three pictures, like a classic three-input matte : this layer shows where the matte is bright, a second layer where it is dark. Pick the second layer and the matte in the Inspector. With no matte, this layer keys itself by its own brightness.',
   'node-lookup':
     'Recolors this layer using another layer as a live color table : a line across that layer becomes the palette, and the brightness of each pixel picks its color from it. As the palette layer moves, the colors shift with it.',
   'node-toile':
-    'Reworks the picture as a painting that follows its own structure. It finds the direction of each contour and smooths the image into strokes running along it, so forms flatten into coherent paint rather than a uniform blur, and it stays steady from frame to frame instead of speckling. Turn up the line to ink the contours with clean, flow-following outlines. The real painterly / scratch pass, as a rack effect.',
+    'Reworks the picture as a painting that follows its own structure. It finds the direction of each contour and smooths the image into strokes running along it, so forms flatten into coherent paint rather than a uniform blur. Crisp strokes give blocky dabs, smooth ones soft blended paint. Turn up the line to ink the contours with clean, flow-following outlines. The real painterly / scratch pass, as a rack effect.',
   'node-pulfrich':
-    'Creates real depth out of sideways movement by delaying one eye slightly behind the other. It is the illusion that appears when you watch a moving picture with one eye darkened. Needs the anaglyph stage in the Finalizer, and a source that moves laterally.',
+    'Creates real depth out of sideways movement by delaying one eye slightly behind the other. It is the illusion that appears when you watch a moving picture with one eye darkened. Watch the red/cyan pair through anaglyph glasses, or use the glasses-free slide; either way it needs a source that moves sideways.',
   'node-corrode':
-    'Eats the picture away slowly and never repairs it. Blotches seed, then creep outward frame after frame, so over minutes the image is consumed. It only resets when you deliberately exhume it, which makes it a device for long pieces rather than a moment.',
+    'Eats the picture away slowly and never repairs it. Blotches seed, then creep outward, so over minutes (from one to about sixty, your choice) the image is consumed, stained dark or dissolved into transparency. It only resets when you deliberately exhume it, which makes it a device for long pieces rather than a moment.',
   'node-decimate':
     'Grabs a fresh frame only now and then and holds it in between, so the picture steps through time instead of flowing. It is the time-lapse or stop-motion feel that a smooth sixty frames a second erases. It can snap hard between grabs or tween continuously across them.',
 

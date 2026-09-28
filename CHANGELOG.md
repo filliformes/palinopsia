@@ -7,6 +7,13 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **New node controls** (defaults keep today's look) : Feedback `clear`, Sediment
+  `snapshot`, Eternalism `freeze`, Réponse and Chronoscan `stride` (longer memory),
+  Chronoscan ping-pong sweep, Parallax sway rate and a smooth depth-of-field disc,
+  Scanner audio lines, Afterimage `dwell`, Melt `mix`, Faultline and Decimate beat
+  `sync`, Sillage `scan` / `ground` / swirl center / `clear`, Toile smooth strokes,
+  Pulfrich zero plane, Corrode eat-to-transparent, Luma Blur smooth quality and `mix`,
+  Matte transparent cut-out.
 - **Phase wrap** : a shader can declare `uniform float PH_x; // wrap <period>` so a
   periodic phase stays precise over day-long shows. Finalizer `film grab` (re-draw or
   re-freeze on a trigger). Context `smoothing`. `tools/shader-rig build.cjs --out` for
@@ -131,6 +138,20 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Native effect nodes (all 25).** Every node forced an opaque output; they now keep
+  the layer's transparency. Feedback's brightness control lifted near-black grounds into
+  a gray fog and its add blend clipped to white (now it targets the live layer, keeps
+  headroom and turns rigidly at 16:9); Sediment's memory never faded (a half-float
+  stall); Datamosh's actant mask never cleared and its first frame jolted; Réponse's
+  gain did nothing; Chronoscan showed the present at quarter resolution; Eternalism's
+  HOLD frames were always one apart; Parallax's fog darkened the near planes; Pulfrich's
+  delay mapping wrapped; Melt never crept; Corrode ate the frame in seconds instead of
+  minutes (bury is now the time to full corrosion, one minute to an hour) and left a dot
+  grid; Sillage's noise collapsed into stripes over long shows; Toile cost 14 ms at 4K
+  (now about 3); Mosaïque's tiles stretched at 16:9; Luma Blur and Gooey stepped at 4K;
+  Decimate juddered. Nodes restart cleanly after insert, PANIC or a re-enable, follow
+  the frame step, and compile lazily. Their signature looks (Feedback's heat, Datamosh's
+  melt, the Autocutter's torn paper, the stepped ghosts) are kept.
 - **Flash safety now does its job.** The limiter measured per frame on gamma-encoded
   light, so a 10 Hz black / white strobe got through at the default setting (and at
   144 Hz nothing was limited). It now counts flashes per second in real luminance, with

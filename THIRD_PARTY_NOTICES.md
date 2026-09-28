@@ -14,3 +14,11 @@ line, the analog x-distortion and the tinted chroma bleed follow its model).
   (https://github.com/staffantan/unity-vhsglitch), licensed under the Creative
   Commons Attribution 3.0 Unported License
   (https://creativecommons.org/licenses/by/3.0/).
+
+## "Hash without Sine" (many shaders)
+
+The hash functions used across the generators, effects and native nodes
+(`hash12`, `hash13`, `hash22` and their inlined forms, recognisable by the
+`.1031` and `33.33` constants) are David Hoskins' "Hash without Sine"
+(https://www.shadertoy.com/view/4djSRW), MIT License, Copyright (c) 2014
+David Hoskins.
