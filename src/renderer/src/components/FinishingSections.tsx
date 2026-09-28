@@ -127,8 +127,8 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       id: 'damage',
       title: 'film damage',
       color: C.earth,
-      inputs: ['filmDust', 'filmScratch', 'filmHair', 'filmGauge', 'filmDirt'],
-      labels: { filmDust: 'dust', filmScratch: 'scratch', filmGauge: 'gauge' },
+      inputs: ['filmDust', 'filmScratch', 'filmHair', 'filmGauge', 'filmDirt', 'filmBurst'],
+      labels: { filmDust: 'dust', filmScratch: 'scratch', filmGauge: 'gauge', filmBurst: 'burst ▸' },
       dim: (v): Record<string, string> => {
         const any = num(v, 'filmDust', 0) > 0.001 || num(v, 'filmScratch', 0) > 0.001 || num(v, 'filmHair', 0) > 0.001
         if (any) return {}

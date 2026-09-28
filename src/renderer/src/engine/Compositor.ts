@@ -1385,6 +1385,8 @@ export class Compositor {
   private fdHair = 0;
   private fdGauge = 1; // 0 35 mm · 1 16 mm · 2 Super 8
   private fdDirt = 0; // 0 print · 1 mixed · 2 negative
+  private fdBurst = 0; // filmBurst event (momentary 0/1) : a dirt burst on its rising edge
+  private fdBurstPrev = 0;
   private pbrLib: PbrLib | null = null; // Context PBR material maps (lazy)
   // Outside fill = the Background slab, only meaningful with a shape active.
   private get fzBgLayer(): boolean {
@@ -2332,6 +2334,7 @@ export class Compositor {
     this.fdHair = numf(fi.filmHair, 0);
     this.fdGauge = Math.round(numf(fi.filmGauge, 1));
     this.fdDirt = Math.round(numf(fi.filmDirt, 0));
+    this.fdBurst = numf(fi.filmBurst, 0);
 
     // Context PBR surface: feed the selected material's maps (or the neutral
     // flat set) into the Context unit's image inputs every frame. Lazy : no
@@ -2384,6 +2387,7 @@ export class Compositor {
           case 'filmHair': this.fdHair = value; break;
           case 'filmGauge': this.fdGauge = Math.round(value); break;
           case 'filmDirt': this.fdDirt = Math.round(value); break;
+          case 'filmBurst': this.fdBurst = value; break;
         }
       }
       return;
@@ -2758,8 +2762,15 @@ export class Compositor {
     this.cfRan = filmRan;
 
     // Film damage : dust, fibres, gate hair, scratches on a 24 fps film clock
-    // (engine/filmDamage.ts). Dirt rides the boil above; skipped entirely when off.
-    if (this.fdDust > 0.001 || this.fdScratch > 0.001 || this.fdHair > 0.001) {
+    // (engine/filmDamage.ts). Dirt rides the boil above; skipped entirely when off,
+    // except while a triggered dirt burst plays out.
+    const burstEdge = this.fdBurst >= 0.5 && this.fdBurstPrev < 0.5;
+    this.fdBurstPrev = this.fdBurst;
+    if (burstEdge) {
+      if (!this.filmDamage) this.filmDamage = new FilmDamage(gl);
+      this.filmDamage.burstNow();
+    }
+    if (this.fdDust > 0.001 || this.fdScratch > 0.001 || this.fdHair > 0.001 || this.filmDamage?.bursting()) {
       if (!this.filmDamage) this.filmDamage = new FilmDamage(gl);
       composite = this.filmDamage.apply(
         composite, rawDt,

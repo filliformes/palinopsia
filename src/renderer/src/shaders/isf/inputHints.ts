@@ -985,6 +985,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     filmBlankMode: 'Leader color for blanks : black gap, white clear-leader flash, or both.',
     filmDust: 'Dust and dirt on the film : a new set every film frame (24 fps, 18 on Super 8), mostly tiny specks, a few big ones, the odd fiber. 0.15 is a clean print, 0.5 a worn one, 1 a trashed one. Works with Film Hold off too.',
     filmScratch: 'Scratches running along the strip : each lasts from a fraction of a second to a minute, wanders slowly sideways, breaks up and fades. Mostly dark (the print), some white or colored.',
+    filmBurst: 'Burst : a dirty stretch of film passes the gate, four to eight times the dust for about a second, then clean again. Works even with dust at 0 (a clean print hits a dirty patch). Fire it on a beat or an onset (bind M or OSC).',
     filmHair: 'A hair caught in the projector gate : hangs in from an edge, trembles, stays a few seconds to a minute, then goes. Higher = there more of the time.',
     filmGauge: 'Film size : the same dust is about 4 times bigger on Super 8 than on 35 mm. Also sets the film speed (24 fps, Super 8 18).',
     filmDirt: 'Which film the dirt was on : the print shows it dark, the negative prints it as white sparkle. Mixed = both.',

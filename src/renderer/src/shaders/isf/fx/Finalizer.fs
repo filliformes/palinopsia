@@ -34,6 +34,7 @@
     { "NAME": "filmHair",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "gate hair" },
     { "NAME": "filmGauge",  "TYPE": "long",  "VALUES": [0, 1, 2], "LABELS": ["35 mm", "16 mm", "Super 8"], "DEFAULT": 1, "LABEL": "film gauge" },
     { "NAME": "filmDirt",   "TYPE": "long",  "VALUES": [0, 1, 2], "LABELS": ["print", "mixed", "negative"], "DEFAULT": 0, "LABEL": "dirt on" },
+    { "NAME": "filmBurst",  "TYPE": "event", "DEFAULT": false, "LABEL": "dirt burst ▸" },
     { "NAME": "filmGranule","TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "film granulation" },
     { "NAME": "filmSplice", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "film splice" },
     { "NAME": "filmGrab",   "TYPE": "event", "DEFAULT": false, "LABEL": "grab frame ▸" },

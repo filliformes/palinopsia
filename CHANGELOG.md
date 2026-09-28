@@ -7,6 +7,9 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Finalizer `dirt burst ▸`** (film damage) : a dirty stretch of film passes the gate,
+  four to eight times the dust for about a second, then clean again. Works even with
+  dust at 0. Fire it on a beat or an onset (bind M, MIDI or OSC).
 - **Time and feedback controls** : Light Trails `knee` and `clear`, Wide Time `burn` and
   `clear`, Difference Bloom `hold` and `soft`, Feedback Zoom `center`, `drift`, `edge` and
   `clear`, Force Lines `slide`, crawl `rate`, `vary` and `audio`, Granular `stagger`,

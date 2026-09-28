@@ -337,6 +337,8 @@ export class FilmDamage {
   private count = 0
   private burst = 0
   private burstMul = 1
+  private burstFloor = 0 // dust floor while a TRIGGERED burst plays (0 for the random ones)
+  private burstPending = false
   private fibN = 0
   private readonly fib = new Float32Array(MAX_FIBRES * 8)
   // Scratches.
@@ -533,19 +535,36 @@ export class FilmDamage {
     ])
   }
 
+  /** The filmBurst event : a dirty stretch of film reaches the gate on the next
+   *  film frame. Plays even with dust at 0 (a clean print hits a dirty patch). */
+  burstNow(): void {
+    this.burstPending = true
+  }
+
+  /** A burst is pending or playing : the compositor keeps the stage running. */
+  bursting(): boolean {
+    return this.burstPending || this.burst > 0
+  }
+
   // ── One film frame ─────────────────────────────────────────────────────
   private stepFrame(p: FilmDamageParams): void {
     const g = GAUGES[this.gaugeIdx]
-    const dust = clamp(p.dust, 0, 1)
     // Specks this frame : a Gamma-varied count, now and then a burst of dirt.
-    if (this.burst > 0) this.burst--
+    if (this.burstPending) {
+      this.burstPending = false
+      this.burst = Math.round(g.fps * (0.6 + 0.9 * R()))
+      this.burstMul = 4 + 4 * R()
+      this.burstFloor = 0.3
+    } else if (this.burst > 0) this.burst--
     else {
       this.burstMul = 1
-      if (R() < 0.004 * dust) {
+      this.burstFloor = 0
+      if (R() < 0.004 * clamp(p.dust, 0, 1)) {
         this.burst = Math.round(g.fps * (0.5 + 1.5 * R()))
         this.burstMul = 3 + 5 * R()
       }
     }
+    const dust = Math.max(clamp(p.dust, 0, 1), this.burst > 0 ? this.burstFloor : 0)
     this.count = dust > 0.001 ? 80 * Math.pow(dust, 2.2) * (gamma(4) / 4) * (this.burst > 0 ? this.burstMul : 1) : 0
     // Fibres (lint) : thin curved strands, on the film for this one frame.
     this.fibN = this.count > 0 ? Math.min(MAX_FIBRES, poisson(this.count * 0.035)) : 0
