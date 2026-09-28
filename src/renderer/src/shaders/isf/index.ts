@@ -1242,6 +1242,30 @@ export const GENERATORS: IsfShader[] = [
       ]
     })}*/`,
     curated: { gain: [0.6, 2.0], scale: [0.1, 0.8], scan: [0.1, 0.7] }
+  },
+  {
+    // Native neural cellular automaton (engine/NcaSource.ts) : a texture learnt
+    // from a CC0 scan (tools/nca), grown from nothing, alive, healing.
+    id: 'gen-nca',
+    name: 'Grown',
+    category: 'Generator',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Grown : a texture that grows itself. A neural cellular automaton trained on a real scan (lava, mossy rock, bark) : every cell of a grid runs the same tiny learnt rule on its neighbours, and from an empty grid the texture of the photo emerges, stays alive (never frozen, never looping) and heals where it is damaged. CELLS sets how fine the grid (fewer = bigger features, softer), SPEED the steps per second, DAMAGE ▸ tears a hole that grows back, REGROW ▸ starts from nothing. Bind them to M or the audio for a texture that breathes with the sound.',
+      CATEGORIES: ['Generator', 'Organic'],
+      INPUTS: [
+        { NAME: 'texture', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['lava', 'mossy rock', 'bark'], DEFAULT: 0, LABEL: 'texture' },
+        { NAME: 'cells', TYPE: 'float', MIN: 64, MAX: 400, DEFAULT: 216, LABEL: 'cells' },
+        { NAME: 'speed', TYPE: 'float', MIN: 0, MAX: 480, DEFAULT: 90, LABEL: 'speed (steps/s)' },
+        { NAME: 'drift', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'drift' },
+        { NAME: 'colour', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'color' },
+        { NAME: 'bright', TYPE: 'float', MIN: 0.2, MAX: 1.5, DEFAULT: 1, LABEL: 'brightness' },
+        { NAME: 'damage', TYPE: 'event', LABEL: 'damage ▸' },
+        { NAME: 'reseed', TYPE: 'event', LABEL: 'regrow ▸' }
+      ]
+    })}*/`,
+    curated: { cells: [140, 320], speed: [60, 160], drift: [0, 0], colour: [0.8, 1], bright: [0.9, 1.1] }
   }
 ]
 

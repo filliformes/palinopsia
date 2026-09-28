@@ -997,6 +997,14 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Sparse dye', values: { rate: 0.5, scale: 6.5, warp: 0.4, pool: 0.25, density: 0.35, grain: 0.5, pigment: [0.4, 0.12, 0.1, 1] } },
     { name: 'Dense pool', values: { rate: 0.2, scale: 3, warp: 0.7, pool: 0.9, density: 0.8, grain: 0.3, pigment: [0.2, 0.28, 0.36, 1] } }
   ],
+  'gen-nca': [
+    { name: 'Lava field', values: { texture: 0, cells: 216, speed: 90, drift: 0, colour: 1, bright: 1 } },
+    { name: 'Magma close', values: { texture: 0, cells: 120, speed: 60, drift: 0, colour: 1, bright: 0.9 } },
+    { name: 'Moss and stone', values: { texture: 1, cells: 216, speed: 90, drift: 0, colour: 1, bright: 1 } },
+    { name: 'Lichen crust', values: { texture: 1, cells: 360, speed: 150, drift: 0, colour: 0.7, bright: 1 } },
+    { name: 'Bark', values: { texture: 2, cells: 216, speed: 90, drift: 0, colour: 1, bright: 1 } },
+    { name: 'Gray bark', values: { texture: 2, cells: 300, speed: 120, drift: 0, colour: 0.15, bright: 1.05 } }
+  ],
   scan: [
     { name: 'Granite face', values: { material: 11, scale: 1.4, drift: 0.03, weather: 0.35, colour: 1 } },
     { name: 'Deep bark', values: { material: 6, scale: 1.2, drift: 0.02, weather: 0.4, colour: 1 } },

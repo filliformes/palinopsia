@@ -7,6 +7,13 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Grown** (Organic) : a texture that grows itself. A tiny neural cellular
+  automaton, trained offline on a real photographed surface (lava, mossy rock,
+  bark : `tools/nca`, CC0 scans), grows that texture cell by cell from an empty
+  grid and keeps it alive. DAMAGE cuts a hole that heals within a second (the
+  cells were trained to heal wounds), REGROW starts over. Cells, speed, drift,
+  color, brightness; six presets. Paced by the layer clock (Speed and freeze
+  apply).
 - **Scan** (Organic) : a real photographed surface. The 30 CC0 ambientCG
   material scans now ship their colour maps too (4 MB, re-encoded), laid across
   the frame with hex tiling (Mikkelsen 2022 : shifted, blended tiles, so a 1K
