@@ -96,7 +96,7 @@ export function AutoControls({
   inputs: IsfInputDesc[]
   values: Record<string, Value>
   onChange: (name: string, value: Value) => void
-  // Vertical layout only : inputs to show greyed out (they do nothing right now),
+  // Vertical + wrap layouts : inputs to show greyed out (they do nothing right now),
   // name → the reason (the row's tooltip).
   dim?: Record<string, string>
   // When provided, float controls grow an "M" button that binds a modulator
@@ -202,7 +202,15 @@ export function AutoControls({
   // label row straight).
   return (
     <div className="flex flex-wrap items-start gap-x-5 gap-y-2.5 p-2">
-      {visible(inputs).map((inp) => renderControl(inp))}
+      {visible(inputs).map((inp) =>
+        dim?.[inp.name] ? (
+          <div key={inp.name} className="opacity-40" title={dim[inp.name]}>
+            {renderControl(inp)}
+          </div>
+        ) : (
+          renderControl(inp)
+        )
+      )}
     </div>
   )
 }

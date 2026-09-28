@@ -1141,13 +1141,13 @@ export class ISFLayer {
 
     // Native text: rasterized glyphs × (sidechain material | solid colour).
     if (text) {
-      text.render(scratch.fbo, sidechainTex ? sidechainTex(text.sidechain) : null);
+      text.render(scratch.fbo, sidechainTex ? sidechainTex(text.sidechain) : null, this.clockSec);
       return;
     }
 
     // Native parametric: the audio buffer rendered as raster/waveform/spectrogram.
     if (param) {
-      param.render(scratch.fbo);
+      param.render(scratch.fbo, this.clockSec); // layer clock : Speed / freeze apply
       return;
     }
 
@@ -1161,7 +1161,7 @@ export class ISFLayer {
     // Native collage: a wall of simultaneous films through the cut-up partition.
     const collage = slot === 'A' ? this.collageA : this.collageB;
     if (collage) {
-      collage.render(scratch.fbo);
+      collage.render(scratch.fbo, this.clockSec); // layer clock : Speed / global speed apply
       return;
     }
 
@@ -1265,7 +1265,7 @@ export class Compositor {
   private bgSpeed = 0.25;
   private bgDepth = 0;
   private bgIsolate = false;
-  private bgNativeSource: { render(fbo: WebGLFramebuffer): void } | null = null; // true → the 4 layers composite as their own group
+  private bgNativeSource: { render(fbo: WebGLFramebuffer, clockSec?: number): void } | null = null; // true → the 4 layers composite as their own group
   private depthShadow: DepthShadow | null = null;
   // Finalizer output stage (shape + outside fill), applied last.
   private outputShape: OutputShape | null = null;
@@ -2513,7 +2513,7 @@ export class Compositor {
       try {
         gl.bindVertexArray(null);
         if (this.bgNativeSource) {
-          this.bgNativeSource.render(this.bgScratch.fbo);
+          this.bgNativeSource.render(this.bgScratch.fbo, this.bgClockSec);
         } else {
           if (this.bgShaderId === 'scan' && this.shared.scanMaps) pushScanMaps(this.bgIsf!, this.shared.scanMaps);
           pushAudioTex(this.bgIsf!, this.shared.audioTex);

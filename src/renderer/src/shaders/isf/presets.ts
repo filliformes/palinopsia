@@ -377,32 +377,38 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Spectrogram fast', values: { mode: 3, gain: 1.2, scale: 0.4, scan: 0.7, mono: 1 } },
     { name: 'Test pattern', values: { mode: 0, gain: 1.6, scale: 0.8, scan: 0.6, mono: 1, color: [1, 1, 1, 1] } }
   ],
-  // ── Text (styling presets : your typed string is left untouched) ──
+  // ── Collage (a wall of films cut up) ──
   'gen-collage': [
-    { name: 'Contact sheet', values: { cuts: 12, films: 12, hold: 0, churn: 0, zoom: 1.05, rotate: 0, gap: 0, contour: 0, torn: 0, mask: 0, rate: 0, speed: 1 } },
-    { name: 'Torn magazine', values: { cuts: 14, films: 12, hold: 0, churn: 0, zoom: 1.1, rotate: 0.2, gap: 0.12, contour: 1.2, curve: 0.6, torn: 1, mask: 0, rate: 0 } },
-    { name: 'Paper wall', values: { cuts: 24, films: 16, hold: 0, churn: 0, zoom: 1.15, rotate: 0.1, gap: 0.2, contour: 0.6, curve: 0.4, torn: 0.7, rate: 0 } },
-    { name: 'Long curves', values: { cuts: 8, films: 8, hold: 0, churn: 0, zoom: 1.2, contour: 1.4, curve: 0.9, torn: 0.4, gap: 0, rate: 0 } },
-    { name: 'Restless', values: { cuts: 14, films: 12, hold: 2.5, churn: 1, zoom: 1.1, contour: 0.4, curve: 0.85, torn: 0.3, rate: 0 } },
-    { name: 'Half restless', values: { cuts: 16, films: 12, hold: 3, churn: 0.45, zoom: 1.1, contour: 0.5, torn: 0.4, rate: 0 } },
-    { name: 'Slow deal', values: { cuts: 10, films: 10, hold: 0, churn: 0, zoom: 1.05, contour: 0.3, torn: 0.2, rate: 12, speed: 0.6 } },
-    { name: 'Strobe deal', values: { cuts: 20, films: 16, hold: 1.2, churn: 0.8, zoom: 1.1, contour: 0.8, torn: 0.6, rate: 2 } },
-    { name: 'Scraps', values: { cuts: 22, films: 14, hold: 0, churn: 0.3, zoom: 1.2, rotate: 0.4, gap: 0.1, contour: 1.1, curve: 0.5, torn: 1.2, mask: 0.6, rate: 0 } },
-    { name: 'Last film standing', values: { cuts: 18, films: 12, hold: 0, churn: 0, zoom: 1.1, contour: 0.9, curve: 0.7, torn: 0.8, mask: 1, rate: 6 } },
-    { name: 'Two up', values: { cuts: 2, films: 2, hold: 0, churn: 0, zoom: 1, gap: 0.05, contour: 0.2, curve: 0.9, rate: 0 } },
-    { name: 'Slow motion wall', values: { cuts: 12, films: 12, hold: 0, churn: 0, zoom: 1.25, speed: 0.25, contour: 0.5, curve: 0.8, torn: 0.5 } }
+    { name: 'Contact sheet', values: { shape: 0, cuts: 12, films: 12, hold: 0, churn: 0, speed: 1, vary: 0, freeze: 0, zoom: 1.05, rotate: 0, gap: 0, contour: 0, curve: 0.3, contourMode: 1, torn: 0, mask: 0, rate: 0, xfade: 0 } },
+    { name: 'Torn magazine', values: { shape: 0, cuts: 14, films: 12, hold: 0, churn: 0, speed: 1, vary: 0, freeze: 0, zoom: 1.1, rotate: 0.2, gap: 0.12, contour: 1.2, curve: 0.6, contourMode: 1, torn: 1, mask: 0, rate: 0, xfade: 0 } },
+    { name: 'Paper wall', values: { shape: 0, cuts: 24, films: 16, hold: 0, churn: 0, speed: 1, vary: 0.2, freeze: 0, zoom: 1.15, rotate: 0.1, gap: 0.2, contour: 0.6, curve: 0.4, contourMode: 1, torn: 0.7, mask: 0, rate: 0, xfade: 0 } },
+    { name: 'Long curves', values: { shape: 0, cuts: 8, films: 8, hold: 0, churn: 0, speed: 1, vary: 0, freeze: 0, zoom: 1.2, rotate: 0, gap: 0, contour: 1.4, curve: 0.9, contourMode: 1, torn: 0.4, mask: 0, rate: 0, xfade: 0 } },
+    { name: 'Restless', values: { shape: 0, cuts: 14, films: 12, hold: 2.5, churn: 1, speed: 1, vary: 0.3, freeze: 0, zoom: 1.1, rotate: 0, gap: 0, contour: 0.4, curve: 0.85, contourMode: 1, torn: 0.3, mask: 0, rate: 0, xfade: 0 } },
+    { name: 'Half restless', values: { shape: 0, cuts: 16, films: 12, hold: 3, churn: 0.45, speed: 1, vary: 0.15, freeze: 0, zoom: 1.1, rotate: 0, gap: 0, contour: 0.5, curve: 0.3, contourMode: 1, torn: 0.4, mask: 0, rate: 0, xfade: 0 } },
+    { name: 'Slow deal', values: { shape: 0, cuts: 10, films: 10, hold: 0, churn: 0, speed: 0.6, vary: 0, freeze: 0, zoom: 1.05, rotate: 0, gap: 0, contour: 0.3, curve: 0.3, contourMode: 1, torn: 0.2, mask: 0, rate: 12, xfade: 1.2 } },
+    { name: 'Strobe deal', values: { shape: 0, cuts: 20, films: 16, hold: 1.2, churn: 0.8, speed: 1, vary: 0.2, freeze: 0, zoom: 1.1, rotate: 0, gap: 0, contour: 0.8, curve: 0.3, contourMode: 1, torn: 0.6, mask: 0, rate: 2, xfade: 0 } },
+    { name: 'Scraps', values: { shape: 0, cuts: 22, films: 14, hold: 0, churn: 0.3, speed: 1, vary: 0.25, freeze: 0, zoom: 1.2, rotate: 0.4, gap: 0.1, contour: 1.1, curve: 0.5, contourMode: 1, torn: 1.2, mask: 0.6, rate: 0, xfade: 0 } },
+    { name: 'Last film standing', values: { shape: 0, cuts: 18, films: 12, hold: 0, churn: 0, speed: 1, vary: 0, freeze: 0, zoom: 1.1, rotate: 0, gap: 0, contour: 0.9, curve: 0.7, contourMode: 1, torn: 0.8, mask: 1, rate: 6, xfade: 0.8 } },
+    { name: 'Two up', values: { shape: 0, cuts: 2, films: 2, hold: 0, churn: 0, speed: 1, vary: 0, freeze: 0, zoom: 1, rotate: 0, gap: 0.05, contour: 0.2, curve: 0.9, contourMode: 1, torn: 0, mask: 0, rate: 0, xfade: 0 } },
+    { name: 'Slow motion wall', values: { shape: 0, cuts: 12, films: 12, hold: 0, churn: 0, speed: 0.25, vary: 0, freeze: 0, zoom: 1.25, rotate: 0, gap: 0, contour: 0.5, curve: 0.8, contourMode: 1, torn: 0.5, mask: 0, rate: 0, xfade: 0 } },
+    { name: 'Shard mosaic', values: { shape: 1, cuts: 16, films: 12, hold: 0, churn: 0, speed: 1, vary: 0.2, freeze: 0, zoom: 1.1, rotate: 0, gap: 0.25, contour: 0.3, curve: 0.5, contourMode: 0, torn: 0, mask: 0, rate: 0, xfade: 0 } },
+    { name: 'Drifting speeds', values: { shape: 0, cuts: 12, films: 12, hold: 0, churn: 0, speed: 1, vary: 0.8, freeze: 0, zoom: 1.1, rotate: 0, gap: 0.08, contour: 0.4, curve: 0.6, contourMode: 1, torn: 0.3, mask: 0, rate: 0, xfade: 0 } }
   ],
+  // ── Text (styling presets : your typed string, font and line mode are left
+  // untouched; weights beyond what the font has hold at its nearest weight) ──
   'gen-text': [
-    { name: 'Bold centre', values: { font: 1, size: 0.3, weight: 800, spacing: 0, stretch: 1, angle: 0, posX: 0, posY: 0, color: [1, 1, 1, 1] } },
-    { name: 'Tall condensed', values: { font: 1, size: 0.4, weight: 700, spacing: -0.05, stretch: 2.2, angle: 0 } },
-    { name: 'Wide light', values: { font: 1, size: 0.22, weight: 300, spacing: 0.2, stretch: 1, angle: 0 } },
-    { name: 'Slanted', values: { font: 1, size: 0.28, weight: 700, spacing: 0.05, stretch: 1, angle: 0.35 } },
-    { name: 'Small footer', values: { font: 1, size: 0.12, weight: 500, spacing: 0.1, stretch: 1, posY: -0.8 } },
-    { name: 'Big top', values: { font: 1, size: 0.45, weight: 900, spacing: 0, stretch: 1, posY: 0.6 } },
-    { name: 'Spaced caps', values: { font: 1, size: 0.2, weight: 600, spacing: 0.4, stretch: 1.2 } },
-    { name: 'Stacked tall', values: { font: 1, size: 0.35, weight: 800, spacing: 0, stretch: 3 } },
-    { name: 'Tilt left', values: { font: 1, size: 0.3, weight: 700, stretch: 1, angle: -0.4 } },
-    { name: 'Accent tint', values: { font: 1, size: 0.3, weight: 700, stretch: 1, color: [0.95, 0.35, 0.25, 1] } }
+    { name: 'Bold center', values: { size: 0.3, weight: 800, spacing: 0, stretch: 1, angle: 0, posX: 0, posY: 0, scroll: 0, fit: 0, drift: 0, reveal: 1, color: [1, 1, 1, 1] } },
+    { name: 'Tall condensed', values: { size: 0.4, weight: 700, spacing: -0.05, stretch: 2.2, angle: 0, posX: 0, posY: 0, scroll: 0, fit: 0, drift: 0, reveal: 1 } },
+    { name: 'Wide light', values: { size: 0.22, weight: 300, spacing: 0.2, stretch: 1, angle: 0, posX: 0, posY: 0, scroll: 0, fit: 0, drift: 0, reveal: 1 } },
+    { name: 'Slanted', values: { size: 0.28, weight: 700, spacing: 0.05, stretch: 1, angle: 0.35, posX: 0, posY: 0, scroll: 0, fit: 0, drift: 0, reveal: 1 } },
+    { name: 'Small footer', values: { size: 0.12, weight: 500, spacing: 0.1, stretch: 1, angle: 0, posX: 0, posY: -0.8, scroll: 0, fit: 1, drift: 0, reveal: 1 } },
+    { name: 'Big top', values: { size: 0.45, weight: 900, spacing: 0, stretch: 1, angle: 0, posX: 0, posY: 0.6, scroll: 0, fit: 0, drift: 0, reveal: 1 } },
+    { name: 'Spaced caps', values: { size: 0.2, weight: 600, spacing: 0.4, stretch: 1.2, angle: 0, posX: 0, posY: 0, scroll: 0, fit: 1, drift: 0, reveal: 1 } },
+    { name: 'Stacked tall', values: { size: 0.35, weight: 800, spacing: 0, stretch: 3, angle: 0, posX: 0, posY: 0, scroll: 0, fit: 0, drift: 0, reveal: 1 } },
+    { name: 'Tilt left', values: { size: 0.3, weight: 700, spacing: 0, stretch: 1, angle: -0.4, posX: 0, posY: 0, scroll: 0, fit: 0, drift: 0, reveal: 1 } },
+    { name: 'Accent tint', values: { size: 0.3, weight: 700, spacing: 0, stretch: 1, angle: 0, posX: 0, posY: 0, scroll: 0, fit: 0, drift: 0, reveal: 1, color: [0.95, 0.35, 0.25, 1] } },
+    { name: 'Ticker', values: { size: 0.14, weight: 600, spacing: 0.04, stretch: 1, angle: 0, posX: 0, posY: -0.72, scroll: 0.12, fit: 0, drift: 0, reveal: 1 } },
+    { name: 'Restless letters', values: { size: 0.3, weight: 700, spacing: 0.08, stretch: 1, angle: 0, posX: 0, posY: 0, scroll: 0, fit: 1, drift: 0.45, reveal: 1 } }
   ],
   organic: [
     { name: 'Hearth', values: { mode: 0, rate: 0.45, scale: 2.2, detail: 0.6, flow: 0.5, vary: 0, contrast: 1.0 } },

@@ -38,7 +38,10 @@ async function scanFolder(
 ): Promise<CollageScanResult> {
   let names: string[] = []
   try {
-    names = readdirSync(folder).filter((f) => VIDEO_EXTS.test(f)).sort()
+    // Hidden files are skipped : a folder copied from a Mac onto an exFAT or FAT
+    // drive carries a `._name.mp4` resource-fork stub beside every clip, which
+    // matches the extension but holds no video (it used to count as "unreadable").
+    names = readdirSync(folder).filter((f) => !f.startsWith('.') && VIDEO_EXTS.test(f)).sort()
   } catch (e) {
     return { ok: false, clips: [], skipped: [], error: `cannot read folder : ${(e as Error).message}` }
   }
@@ -98,6 +101,9 @@ async function scanFolder(
           height = op.height
         }
       } else if (pr.needsConvert) {
+        // A transcode is minutes, not milliseconds : announce the file first, or
+        // the progress counter sits frozen on the previous one for the whole pass.
+        onProgress({ done: clips.length + skipped.length, total: names.length, file: name })
         // Playback runs through Chromium <video>, which cannot decode DXV / HAP /
         // ProRes / DNxHD / MJPEG / MPEG-2… — exactly the codecs a VJ folder is
         // full of. ffmpeg PROBES them happily, so without this bridge the pool
@@ -130,7 +136,7 @@ async function scanFolder(
 export function registerCollage(): void {
   ipcMain.handle('collage:pickFolder', async () => {
     const r = await dialog.showOpenDialog({
-      title: 'Choose a video folder to analyse',
+      title: 'Choose a folder of videos',
       properties: ['openDirectory']
     })
     return r.canceled || !r.filePaths.length ? null : r.filePaths[0]

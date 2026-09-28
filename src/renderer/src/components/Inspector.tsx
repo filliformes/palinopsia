@@ -27,6 +27,17 @@ import { VideoTransport } from './VideoTransport'
 import { AssembleTransport } from './AssembleTransport'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { registerInspectorRandomize } from '../commands'
+import { TEXT_FONTS, textFontWeightRange } from '../textFonts'
+
+// Text source : grey the weight dial when the chosen face has a single weight
+// (the engine clamps the weight into each face's real range).
+function textDim(values: Record<string, number | number[]>): Record<string, string> | undefined {
+  const idx = Math.round(typeof values.font === 'number' ? values.font : 1)
+  const [lo, hi] = textFontWeightRange(idx)
+  return lo === hi
+    ? { weight: `${TEXT_FONTS[idx] ?? 'This font'} has a single weight : the weight dial has no effect.` }
+    : undefined
+}
 
 // The Vibe Palette's "main" colour = its most characterful stop (highest
 // chroma, luma as a tiebreak), brightened a touch so it reads as a light
@@ -604,11 +615,12 @@ export function Inspector(): JSX.Element {
             value={textCfg.text}
             onChange={(e) => textCfg!.setText(e.target.value)}
             placeholder={'Your text : \\n for a new line'}
+            title={'Type \\n for a new line. With lines = one at a time, each line is a cue that NEXT LINE ▸ steps through.'}
             spellCheck={false}
           />
           <span
             className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-accent2"
-            title="A layer whose texture FILLS the letters (glyphs as a matte). None = solid colour."
+            title="A layer whose picture FILLS the letters (they become a matte over it, fixed to the screen). None = solid color."
           >
             fill
           </span>
@@ -674,6 +686,7 @@ export function Inspector(): JSX.Element {
                   values={values}
                   onChange={onChange}
                   modTargetFor={modTargetFor}
+                  dim={shaderId === 'gen-text' ? textDim(values) : undefined}
                   layout="wrap"
                 />
               </div>

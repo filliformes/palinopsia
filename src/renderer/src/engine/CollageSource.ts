@@ -3,7 +3,7 @@
 // The Autocutter FX partitions the frame and shuffles the pieces of ONE image.
 // This is the same partition driving a WALL of simultaneous videos : each piece
 // shows a different clip, cover-cropped to its own shape, looping and speed-
-// stretched, re-dealt on a trigger or a clock. It is a SOURCE, not an effect —
+// stretched, re-dealt on a trigger or a clock. It is a SOURCE, not an effect :
 // the whole mosaic is one layer, so the normal rack / blend / finishing stack
 // sits on top of it unchanged.
 //
@@ -13,27 +13,36 @@
 //     layer of a `sampler2DArray`, so the fragment shader picks a film with an
 //     index instead of a 16-way branch, and there is no tile-packing maths and
 //     no bleeding between neighbours. Layers must share a size, so each frame is
-//     CONTAIN-fitted into a square layer (its content rect recorded on the CPU)
-//     and the per-cell COVER crop is then computed against that content rect —
-//     which is what makes portrait, landscape and 4K clips interchangeable.
+//     CONTAIN-fitted into a square layer (its content rect recorded on the CPU
+//     at blit time) and the per-cell COVER crop is then computed against that
+//     content rect : which is what makes portrait, landscape and 4K clips
+//     interchangeable. The layer edge follows the output size and the piece
+//     count (a 2-piece wall at 4K needs far more texels per film than 50 pieces
+//     at 1080p), inside a fixed memory budget.
 //
 //  2. **Decks are a pool, cells are a mapping.** More cuts than films is normal
 //     and desirable : several cells then show the same film at different crops
 //     and rotations, which reads as collage rather than repetition. The pool
-//     size is what costs decoder bandwidth, not the number of cuts.
+//     size is what costs decoder bandwidth, not the number of cuts; a deck no
+//     piece shows is paused and never blitted.
 //
-//  3. **Whole films by default, windows on request.** `window` (0 by default)
-//     loops the WHOLE file : the element's native loop, no seeking at all, which
-//     is both the smoothest path and the least surprising — a piece just plays
-//     its film. Setting it non-zero loops a short window instead, which is how
-//     you stop a 30-minute take from reducing a cell to one slow moment; the
-//     cost is a hard cut backwards every `window` seconds, so it is opt-in.
-//     `churn` then decides how many decks re-roll on a fast clock instead of
-//     waiting for the next deal — the span from "every piece holds" to "every
-//     piece is its own little montage".
+//  3. **Whole films by default, windows on request.** `hold` (the "window"
+//     knob, 0 by default) loops the WHOLE file : the element's native loop, no
+//     seeking at all, which is both the smoothest path and the least surprising.
+//     Setting it non-zero loops a short window instead, which is how you stop a
+//     30-minute take from reducing a cell to one slow moment; the cost is a hard
+//     cut backwards every window, so it is opt-in. `churn` then decides how many
+//     decks re-roll on a fast clock instead of waiting for the next deal : the
+//     span from "every piece holds" to "every piece is its own little montage".
+//     Both apply live, not at the next deal.
 //
-// Measured on the target machine (RTX 4070) before designing this : 11 clips —
-// including a 3840×2160 and a portrait 1200×1920 — decoded simultaneously at
+// Time : the wall runs on the LAYER clock the compositor hands `render()` (the
+// layer's Speed x the global speed, or the background's slow clock), so every
+// timer here (auto deal, churn, crossfade) is in layer seconds and every film's
+// playback rate follows the same multiplier.
+//
+// Measured on the target machine (RTX 4070) before designing this : 11 clips,
+// including a 3840x2160 and a portrait 1200x1920, decoded simultaneously at
 // their native rates with the app still at 55-60 fps, and uploading all of them
 // every frame cost ~3.5 ms. Uploads here are gated on a fresh decoded frame
 // (requestVideoFrameCallback), so the steady-state cost is well under that.
@@ -46,55 +55,107 @@ import { AssembleSource } from './AssembleSource'
 const MAX_CELLS = 64
 /** Hard ceiling on simultaneous decoders. */
 export const MAX_DECKS = 50
-/** Edge of one square array layer, traded against how many there are : a wall
- *  of 50 gives each piece a fiftieth of the frame, so it needs far less
- *  resolution than a wall of 8. Keeps the array under ~30 MB at every size
- *  (16×640² ≈ 26 MB, 50×384² ≈ 29 MB) instead of 50×640² ≈ 82 MB. */
-function tileFor(layers: number): number {
-  return layers <= 16 ? 640 : layers <= 32 ? 448 : 384
-}
+/** Mosaic rows the shader's neighbour search can index. */
+const MAX_ROWS = 16
 /** Chromium refuses playback rates outside roughly this band. */
 const RATE_MIN = 0.0625
 const RATE_MAX = 16
+/** Array-layer edges the wall picks from (quantised so a modulated `cuts`
+ *  can't reallocate the array on every frame). */
+const TILE_STEPS = [384, 512, 640, 768, 1024, 1280, 1536, 2048]
+/** Memory the deck array may use, whatever the wall. */
+const ARRAY_BUDGET = 80 * 1024 * 1024
+/** Distinct frame sizes kept as upload staging textures (LRU). */
+const STAGING_MAX = 4
+
+/** The array-layer edge for a wall : a piece covers about 1/cuts of the frame
+ *  (the biggest cut-up pieces about half as much again), and its cover crop out
+ *  of a contain-fitted 16:9 film is ~1/1.8 of the layer edge. So this keeps a
+ *  piece near one texel per output pixel, capped by the memory budget shared by
+ *  every layer (16 x 1024^2 or 50 x 512^2 both land near 64 MB). */
+function tileFor(layers: number, cuts: number, w: number, h: number, maxTex: number): number {
+  const piece = Math.sqrt((1.5 * w * h) / Math.max(1, Math.min(cuts, MAX_CELLS)))
+  const want = piece * 1.8
+  const cap = Math.min(maxTex, Math.sqrt(ARRAY_BUDGET / (4 * Math.max(1, layers))))
+  let t = TILE_STEPS[0]
+  for (const s of TILE_STEPS) {
+    if (s > cap) break
+    t = s
+    if (s >= want) break
+  }
+  return t
+}
+
+/** A frame of this aspect contain-fitted in a square layer. */
+function containRect(w: number, h: number): [number, number, number, number] {
+  const av = w > 0 && h > 0 ? w / h : 16 / 9
+  const cw = av >= 1 ? 1 : av
+  const ch = av >= 1 ? 1 / av : 1
+  return [(1 - cw) / 2, (1 - ch) / 2, cw, ch]
+}
 
 const VS = `#version 300 es
 in vec2 p; out vec2 vUV;
 void main(){ vUV = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }`
 
 // Contain-fit blit of one decoded frame into its array layer. Runs once per
-// deck per DECODED frame, not per rendered frame.
+// deck per DECODED frame, not per rendered frame. When the film is bigger than
+// its layer (a 4K clip into a 1024 layer), a 3x3 box of bilinear taps spans
+// the texels one layer texel covers, so the shrink doesn't alias.
 const FS_TILE = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uSrc;
 uniform vec4 uContent;   // where the picture sits inside the square layer
+uniform vec2 uFoot;      // one layer texel, in the source frame's UV
+uniform int uBox;        // 1 = minifying : box-filter the read
 void main(){
   vec2 uv = (vUV - uContent.xy) / uContent.zw;
   if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { o = vec4(0.0, 0.0, 0.0, 1.0); return; }
-  o = vec4(texture(uSrc, uv).rgb, 1.0);
+  vec3 c;
+  if (uBox == 1){
+    c = vec3(0.0);
+    for (int j = -1; j <= 1; j++)
+      for (int i = -1; i <= 1; i++)
+        c += texture(uSrc, uv + vec2(float(i), float(j)) * uFoot * 0.3333).rgb;
+    c *= 1.0 / 9.0;
+  } else {
+    c = texture(uSrc, uv).rgb;
+  }
+  o = vec4(c, 1.0);
 }`
 
 // The collage itself. The partition, the contour warp, the torn-paper fringe and
-// the mask are the Autocutter's, verbatim in behaviour — same dials, same look —
-// with the single difference that a cell samples its own film out of the deck
-// array instead of sampling a source rect of the host image.
-const FS_COLLAGE = `#version 300 es
+// the mask are the Autocutter's in behaviour (same dials, same look), with the
+// single difference that a cell samples its own film out of the deck array
+// instead of sampling a source rect of the host image. Everything spatial is
+// measured in HEIGHT units (x scaled by the aspect), so seams, fringes, warps and
+// mosaic shards come out the same width in every direction at 16:9 and on a
+// square dome. Compiled TWICE, once per shape (MOSAIC 0/1) : sharing one program
+// behind a uniform branch cost the cut-up path ~1.5x in register pressure.
+const FS_COLLAGE = (mosaic: boolean): string => `#version 300 es
+#define MOSAIC ${mosaic ? 1 : 0}
 precision highp float;
 // GLSL ES 3.00 gives sampler2D a default precision in the fragment stage but
-// NOT sampler2DArray — without this line the whole program fails to compile.
+// NOT sampler2DArray : without this line the whole program fails to compile.
 precision highp sampler2DArray;
 in vec2 vUV; out vec4 o;
 uniform sampler2DArray uDecks;
 uniform int uCount;
-uniform vec4 uCell[64];   // dest rect (x,y,w,h) in output UV
-uniform vec4 uCrop[64];   // source rect inside the deck's layer (cover crop)
-uniform float uDeck[64];  // which array layer this piece plays
-uniform float uRot[64];   // 0..3 (×90°)
-uniform float uRank[64];  // mask dropout order; the survivor holds 2.0
-uniform vec4 uContent[64]; // each cell's deck picture rect inside the square layer
-uniform float uGap, uSeed, uContour, uTorn, uMask, uCurve;
-uniform int uShape;       // 0 = cut-up rectangles (BSP), 1 = mosaic (Voronoi)
+uniform vec4 uCell[64];    // piece rect (x,y,w,h) in output UV (mosaic : the shard's bounding box)
+uniform vec4 uCrop[64];    // film rect inside the deck's layer (cover crop)
+uniform vec4 uContent[64]; // the deck's picture rect inside its layer; reads mirror inside it
+uniform vec4 uMeta[64];    // x deck layer · y quarter turns · z mask rank (survivor 2.0)
+uniform vec4 uSite[64];    // mosaic seed (xy, height units)
+uniform vec4 uRows[16];    // mosaic rows : x first seed index, y seed count
+uniform int uRowCount;
+uniform float uGap, uSeed, uContour, uTorn, uMask, uCurve, uAspect, uTexel, uPx;
 uniform int uContourMode; // 0 = normal (warp edges only), 1 = warped (warp content too)
-float vhash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)) + uSeed * 0.031) * 43758.5453); }
+uniform int uStraight;    // 1 = straight alpha (drawn straight into the layer), 0 = premultiplied
+float vhash(vec2 p){
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031 + uSeed);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
 float vnoise(vec2 p){
   vec2 i = floor(p); vec2 f = fract(p);
   f = f * f * (3.0 - 2.0 * f);
@@ -107,12 +168,14 @@ float vnoise(vec2 p){
 // CURVE LENGTH picks the warp's wavelength : low = many small waves, high = few
 // long sweeping curves.
 vec2 tearWarp(vec2 p){
+  vec2 A = vec2(uAspect, 1.0);
+  vec2 q = p * A;
   float fc = mix(12.0, 2.2, clamp(uCurve, 0.0, 1.0));
   float ff = fc * 5.2;
   float fray = (0.25 + 0.2 * max(uContour - 1.0, 0.0)) * (1.0 - 0.7 * uCurve);
-  vec2 w = (vec2(vnoise(p * fc), vnoise(p * fc + 31.7)) - 0.5) * (1.0 - fray)
-         + (vec2(vnoise(p * ff + 11.3), vnoise(p * ff + 71.9)) - 0.5) * fray;
-  return p + w * uContour * 0.045 * (1.0 + uCurve * 1.1);
+  vec2 w = (vec2(vnoise(q * fc), vnoise(q * fc + 31.7)) - 0.5) * (1.0 - fray)
+         + (vec2(vnoise(q * ff + 11.3), vnoise(q * ff + 71.9)) - 0.5) * fray;
+  return p + w * uContour * 0.045 * (1.0 + uCurve * 1.1) / A;
 }
 vec2 rot90(vec2 p, float r){
   p -= 0.5; int ri = int(r + 0.5);
@@ -121,116 +184,150 @@ vec2 rot90(vec2 p, float r){
   else if (ri == 3) p = vec2(p.y, -p.x);
   return p + 0.5;
 }
+// One piece's film at sUV. Where a piece runs past the film (a frayed NORMAL
+// edge, a shard corner) the read MIRRORS back into the picture instead of
+// clamping, so an overrun shows real film, never a smeared edge row. The mirror
+// sits a texel inside the picture so the black padding never bleeds in.
+vec3 film(int i, vec2 sUV){
+  vec4 d = uCell[i];
+  vec2 luv = rot90((sUV - d.xy) / d.zw, uMeta[i].y);
+  vec4 cr = uCrop[i], ct = uContent[i];
+  vec2 lo = ct.xy + uTexel;
+  vec2 span = max(ct.zw - 2.0 * uTexel, vec2(1e-4));
+  vec2 t = (cr.xy + luv * cr.zw - lo) / span;
+  t = 1.0 - abs(mod(t, 2.0) - 1.0);
+  return texture(uDecks, vec3(lo + t * span, uMeta[i].x)).rgb;
+}
+// Seams + torn-paper fringe from the distance to the piece's border (height
+// units). Widths are floored at a pixel so thin cuts never break into dashes.
+vec3 edges(vec3 col, float ed, vec2 qa){
+  if (uGap > 0.001) col *= smoothstep(0.0, max(uGap * 0.02, uPx), ed);
+  if (uTorn > 0.001){
+    // A heavy-tailed fringe width : long stretches of hairline tear broken
+    // by broad white bites, the way a real rip crosses the paper grain.
+    float bite = pow(vnoise(qa * 6.0 + 13.7), 3.0);
+    float rag = 0.5 + 0.5 * vnoise(qa * 90.0);
+    float fw = max(uTorn * 0.012 * (0.06 + 2.4 * bite + 0.45 * rag), 1.2 * uPx);
+    float sh = smoothstep(fw * 0.8, fw + 0.020 * uTorn, ed);
+    col *= 1.0 - (1.0 - sh) * 0.3 * min(uTorn, 1.0);
+    float paper = 1.0 - smoothstep(0.0, fw, ed);
+    vec3 paperCol = vec3(0.93, 0.91, 0.87) * (0.80 + 0.20 * vnoise(qa * 160.0));
+    col = mix(col, paperCol, paper * min(uTorn * 2.0, 1.0));
+  }
+  return col;
+}
 void main(){
+  vec2 A = vec2(uAspect, 1.0);
   vec3 col = vec3(0.0);
   float keep = 0.0;
   vec2 wUV = uContour > 0.001 ? clamp(tearWarp(vUV), 0.0001, 0.9999) : vUV;
   // CONTOUR MODE : the tear warp always bends where a cell BEGINS (membership +
   // seam/fringe), so the cut edges fray either way. WARPED also samples the film
-  // through the warped coordinate - the whole clip inside the cut ripples; NORMAL
-  // samples through the un-warped vUV - only the edge frays, the picture stays
-  // straight. (Membership stays on wUV so the pieces still tessellate.)
+  // through the warped coordinate (the whole clip inside the cut ripples); NORMAL
+  // samples through the un-warped vUV (only the edge frays, the picture stays
+  // straight). Membership stays on wUV so the pieces still tessellate.
   vec2 sUV = uContourMode == 1 ? wUV : vUV;
+  vec2 qa = wUV * A;
 
-  if (uShape == 1){
-    // ── MOSAIC : Voronoi cells (the Autocutter's mosaic, one film per shard).
-    // Each pixel belongs to its nearest seed, so the pieces are irregular
-    // polygons; the border distance (2nd-nearest − nearest) drives the same
-    // seams / torn fringe / mask the rectangles use. uCell.xy is the seed CENTRE,
-    // uCell.zw the nominal cell size (used to map content into the cover crop).
+#if MOSAIC
+  {
+    // MOSAIC : each pixel belongs to its nearest seed, so the pieces are
+    // irregular polygons; the border distance (2nd-nearest - nearest) drives the
+    // same seams / torn fringe / mask the rectangles use. Seeds sit in rows, so
+    // past 16 shards only the neighbouring rows and columns are searched.
     int mi = 0; float d1 = 1e9, d2 = 1e9;
+    if (uCount <= 16 || uRowCount < 1){
+      for (int i = 0; i < 64; i++){
+        if (i >= uCount) break;
+        float dd = distance(qa, uSite[i].xy);
+        if (dd < d1){ d2 = d1; d1 = dd; mi = i; }
+        else if (dd < d2){ d2 = dd; }
+      }
+    } else {
+      int r0 = clamp(int(wUV.y * float(uRowCount)), 0, uRowCount - 1);
+      for (int dr = -1; dr <= 1; dr++){
+        int r = r0 + dr;
+        if (r < 0 || r >= uRowCount) continue;
+        vec4 R = uRows[r];
+        int b = int(R.x + 0.5);
+        int k = int(R.y + 0.5);
+        int c0 = clamp(int(wUV.x * R.y), 0, k - 1);
+        for (int dc = -2; dc <= 2; dc++){
+          int c = c0 + dc;
+          if (c < 0 || c >= k) continue;
+          float dd = distance(qa, uSite[b + c].xy);
+          if (dd < d1){ d2 = d1; d1 = dd; mi = b + c; }
+          else if (dd < d2){ d2 = dd; }
+        }
+      }
+    }
+    keep = smoothstep(uMask - 0.06, uMask, uMeta[mi].z);
+    col = edges(film(mi, sUV), 0.5 * (d2 - d1), qa);
+  }
+#else
+  {
+    // CUT-UP : find the rectangle, then read its film ONCE outside the loop (a
+    // texture read inside the divergent search loop cost ~2x).
+    int hit = 0;
     for (int i = 0; i < 64; i++){
       if (i >= uCount) break;
-      float dd = distance(wUV, uCell[i].xy);
-      if (dd < d1){ d2 = d1; d1 = dd; mi = i; }
-      else if (dd < d2){ d2 = dd; }
+      vec4 d = uCell[i];
+      if (wUV.x >= d.x && wUV.x < d.x + d.z && wUV.y >= d.y && wUV.y < d.y + d.w){ hit = i; break; }
     }
-    keep = smoothstep(uMask - 0.06, uMask, uRank[mi]);
-    vec4 d = uCell[mi];
-    vec2 topleft = d.xy - d.zw * 0.5;
-    // luv is NOT clamped : where the shard runs past its nominal box the film
-    // keeps going (real pixels fill the shape) instead of smearing an edge; the
-    // final read is clamped to the deck's picture rect so it never hits the
-    // letterbox padding. That is "the video adapts to the shape".
-    vec2 luv = rot90((sUV - topleft) / d.zw, uRot[mi]);
-    vec4 cr = uCrop[mi], ct = uContent[mi];
-    col = texture(uDecks, vec3(clamp(cr.xy + luv * cr.zw, ct.xy, ct.xy + ct.zw), uDeck[mi])).rgb;
-    float ed = 0.5 * (d2 - d1);           // small near a Voronoi boundary
-    if (uGap > 0.001) col *= smoothstep(0.0, uGap * 0.02, ed);
-    if (uTorn > 0.001){
-      float bite = pow(vnoise(wUV * 6.0 + 13.7), 3.0);
-      float rag = 0.5 + 0.5 * vnoise(wUV * 90.0);
-      float fw = uTorn * 0.012 * (0.06 + 2.4 * bite + 0.45 * rag);
-      float sh = smoothstep(fw * 0.8, fw + 0.020 * uTorn, ed);
-      col *= 1.0 - (1.0 - sh) * 0.3 * min(uTorn, 1.0);
-      float paper = 1.0 - smoothstep(0.0, fw, ed);
-      vec3 paperCol = vec3(0.93, 0.91, 0.87) * (0.80 + 0.20 * vnoise(wUV * 160.0));
-      col = mix(col, paperCol, paper * min(uTorn * 2.0, 1.0));
-    }
-    o = vec4(clamp(col, 0.0, 1.0) * keep, keep);
-    return;
+    vec4 d = uCell[hit];
+    keep = smoothstep(uMask - 0.06, uMask, uMeta[hit].z);
+    vec2 e = min(wUV - d.xy, d.xy + d.zw - wUV) * A;
+    col = edges(film(hit, sUV), min(e.x, e.y), qa);
   }
-
-  for (int i = 0; i < 64; i++){
-    if (i >= uCount) break;
-    vec4 d = uCell[i];
-    if (wUV.x >= d.x && wUV.x < d.x + d.z && wUV.y >= d.y && wUV.y < d.y + d.w){
-      keep = smoothstep(uMask - 0.06, uMask, uRank[i]);
-      // NORMAL mode : the frayed boundary means vUV runs past the cell rect; leave
-      // luv unclamped so the straight film fills the fray with its own pixels, and
-      // clamp the read to the deck's picture rect so padding never shows. (In
-      // WARPED mode membership keeps luv in [0,1], so this is a no-op there.)
-      vec2 luv = rot90((sUV - d.xy) / d.zw, uRot[i]);
-      vec4 cr = uCrop[i], ct = uContent[i];
-      col = texture(uDecks, vec3(clamp(cr.xy + luv * cr.zw, ct.xy, ct.xy + ct.zw), uDeck[i])).rgb;
-      vec2 e = min(wUV - d.xy, d.xy + d.zw - wUV);
-      float ed = min(e.x, e.y);
-      if (uGap > 0.001) col *= smoothstep(0.0, uGap * 0.02, ed);
-      if (uTorn > 0.001){
-        // A heavy-tailed fringe width : long stretches of hairline tear broken
-        // by broad white bites, the way a real rip crosses the paper grain.
-        float bite = pow(vnoise(wUV * 6.0 + 13.7), 3.0);
-        float rag = 0.5 + 0.5 * vnoise(wUV * 90.0);
-        float fw = uTorn * 0.012 * (0.06 + 2.4 * bite + 0.45 * rag);
-        float sh = smoothstep(fw * 0.8, fw + 0.020 * uTorn, ed);
-        col *= 1.0 - (1.0 - sh) * 0.3 * min(uTorn, 1.0);
-        float paper = 1.0 - smoothstep(0.0, fw, ed);
-        vec3 paperCol = vec3(0.93, 0.91, 0.87) * (0.80 + 0.20 * vnoise(wUV * 160.0));
-        col = mix(col, paperCol, paper * min(uTorn * 2.0, 1.0));
-      }
-      break;
-    }
-  }
+#endif
   // Masked pieces leave TRANSPARENT holes, so the layers underneath show through.
-  o = vec4(clamp(col, 0.0, 1.0) * keep, keep);
+  vec3 c = clamp(col, 0.0, 1.0);
+  o = uStraight == 1 ? vec4(keep > 0.0 ? c : vec3(0.0), keep) : vec4(c * keep, keep);
 }`
 
-// Crossfade compositor : draw one collage output scaled by uAmt. The collage
-// writes premultiplied colour (rgb·keep, keep), so additively summing two such
-// buffers scaled by t and 1−t gives a correct dissolve of two transparent-holed
-// walls — the same trick the Autocutter's auto-recut crossfade uses.
-const FS_FADE = `#version 300 es
+// Fold : scale one premultiplied wall by uAmt (blended onto another with a
+// constant-alpha blend, it re-captures a crossfade frozen mid-way).
+const FS_FOLD = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uTex; uniform float uAmt;
 void main(){ o = texture(uTex, vUV) * uAmt; }`
 
+// Show : the premultiplied wall (or a dissolve of two, which premultiplied
+// buffers make a plain mix) back to the STRAIGHT alpha the blend stack reads.
+const FS_SHOW = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uCur; uniform sampler2D uPrev;
+uniform float uT; uniform int uFading;
+void main(){
+  vec4 c = texture(uCur, vUV);
+  if (uFading == 1) c = mix(texture(uPrev, vUV), c, uT);
+  o = c.a > 0.002 ? vec4(min(c.rgb / c.a, vec3(1.0)), c.a) : vec4(0.0);
+}`
+
 interface CollageGL {
   tile: WebGLProgram
-  collage: WebGLProgram
-  fade: WebGLProgram
+  collage: WebGLProgram // cut-up
+  mosaic: WebGLProgram
+  fold: WebGLProgram
+  show: WebGLProgram
+  vao: WebGLVertexArrayObject
   quad: WebGLBuffer
   uTile: (n: string) => WebGLUniformLocation | null
   uColl: (n: string) => WebGLUniformLocation | null
-  uFade: (n: string) => WebGLUniformLocation | null
+  uMos: (n: string) => WebGLUniformLocation | null
+  uFold: (n: string) => WebGLUniformLocation | null
+  uShow: (n: string) => WebGLUniformLocation | null
 }
 
-// Programs and the quad are shared per context and NEVER deleted. Deleting a
-// buffer while the default VAO is current resets attribute 0 for every ISF
-// program in the app and freezes the canvas (see the shared-VAO landmine).
+// Programs, the quad and its OWN vertex array are shared per context and never
+// deleted. The ISF runtime keeps its quads on the DEFAULT vertex array's
+// attribute 0, which this source must never rewire (see the default-VAO
+// landmine). After a GPU reset the same context object comes back with every
+// program dead, so a cached set is only reused while its program is live.
 const shared = new WeakMap<WebGL2RenderingContext, CollageGL>()
 function collageGL(gl: WebGL2RenderingContext): CollageGL {
   const hit = shared.get(gl)
-  if (hit) return hit
+  if (hit && gl.isProgram(hit.collage) && gl.isProgram(hit.mosaic) && gl.isVertexArray(hit.vao)) return hit
   const compile = (type: number, src: string): WebGLShader => {
     const s = gl.createShader(type)!
     gl.shaderSource(s, src)
@@ -250,11 +347,19 @@ function collageGL(gl: WebGL2RenderingContext): CollageGL {
     return p
   }
   const tile = link(FS_TILE)
-  const collage = link(FS_COLLAGE)
-  const fade = link(FS_FADE)
+  const collage = link(FS_COLLAGE(false))
+  const mosaic = link(FS_COLLAGE(true))
+  const fold = link(FS_FOLD)
+  const show = link(FS_SHOW)
+  const vao = gl.createVertexArray()!
+  gl.bindVertexArray(vao)
   const quad = gl.createBuffer()!
   gl.bindBuffer(gl.ARRAY_BUFFER, quad)
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
+  gl.enableVertexAttribArray(0)
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+  gl.bindVertexArray(null)
+  gl.bindBuffer(gl.ARRAY_BUFFER, null)
   const cacheOf = (p: WebGLProgram): ((n: string) => WebGLUniformLocation | null) => {
     const c = new Map<string, WebGLUniformLocation | null>()
     return (n) => {
@@ -263,8 +368,9 @@ function collageGL(gl: WebGL2RenderingContext): CollageGL {
     }
   }
   const g: CollageGL = {
-    tile, collage, fade, quad,
-    uTile: cacheOf(tile), uColl: cacheOf(collage), uFade: cacheOf(fade)
+    tile, collage, mosaic, fold, show, vao, quad,
+    uTile: cacheOf(tile), uColl: cacheOf(collage), uMos: cacheOf(mosaic),
+    uFold: cacheOf(fold), uShow: cacheOf(show)
   }
   shared.set(gl, g)
   return g
@@ -272,6 +378,10 @@ function collageGL(gl: WebGL2RenderingContext): CollageGL {
 
 const num = (v: number | number[] | undefined, d: number): number => (typeof v === 'number' ? v : d)
 const clampf = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v)
+/** The window length the wall actually uses : under ~0.4 s a window seeks back so
+ *  often the decoder never settles, so it means "whole film". Quantised so a
+ *  slow knob turn re-windows in steps, not every frame. */
+const holdQ = (hold: number): number => (hold > 0.4 ? Math.round(hold * 10) / 10 : 0)
 
 /** Deterministic PRNG so a seed replays the same deal. */
 function mulberry32(a: number): () => number {
@@ -284,26 +394,44 @@ function mulberry32(a: number): () => number {
   }
 }
 
+/** Does an assemblage deck have a decoded frame waiting? AssembleSource.upload()
+ *  hands back its texture every frame whether or not a new frame arrived, so
+ *  read its live deck's flag instead of re-blitting a still frame 60 times a
+ *  second. Falls back to "yes" if that shape ever changes. */
+function asmFresh(a: AssembleSource): boolean {
+  const p = a as unknown as { decks?: Array<{ pending?: boolean }>; live?: number }
+  const dk = p.decks?.[p.live ?? 0]
+  return dk ? dk.pending !== false : true
+}
+
 interface Deck {
   // Exactly one of these drives the deck. `asm` decks play a saved assemblage
   // (its own edit, its own cuts, its own ping-pong pair for cross-file cuts);
   // `el` decks loop a window of a single file.
   asm: AssembleSource | null
   el: HTMLVideoElement
-  tex: WebGLTexture | null
   src: string // file currently loaded ('' = nothing)
   clip: CollageClip | null
   inSec: number // window start
-  lenSec: number // window length (0 = whole file)
-  content: [number, number, number, number] // picture rect inside the square layer
+  lenSec: number // window length (the whole file when looping natively)
+  content: [number, number, number, number] // picture rect inside the layer, AS BLITTED
+  blitted: boolean // the array layer holds a frame of this deck
+  blitAt: number // performance.now() of the last blit
+  blitT: number // the element's currentTime at the last blit
   pending: boolean // a decoded frame is waiting to be blitted
   rvfc: number
   seeking: boolean // gate : never queue a second seek
   seekAt: number
   pendingSeek: (() => void) | null // a deferred 'loadedmetadata' seek, replaceable
-  churning: boolean // re-rolls its window on the fast clock
-  nextRoll: number // seconds until this deck re-rolls (churn only)
+  churning: boolean // re-rolls its film on the fast clock
+  nextRoll: number // layer seconds until this deck re-rolls (churn only)
   pan: [number, number] // where this deck's cells frame the picture
+  panNext: [number, number] | null // framing for the film just cued, applied with its first frame
+  varyU: number // -1..1 : this film's place in the speed spread
+  used: boolean // at least one piece plays this deck
+  shown: boolean // ... and at least one of those isn't masked out
+  running: boolean // (asm decks) what the edit was last told
+  needFrame: boolean // cued while frozen : play until one frame of it lands
 }
 
 interface Cell {
@@ -313,6 +441,8 @@ interface Cell {
   h: number
   deck: number
   rot: number
+  rotA: number // rotate draws, fixed per partition so the dial sweeps monotonically
+  rotB: number
   crop: [number, number, number, number]
 }
 
@@ -321,12 +451,18 @@ export class CollageSource {
   private cells: Cell[] = []
   private arr: WebGLTexture | null = null
   private arrLayers = 0
-  private tile = 640
+  private tile = 512
+  private tilePending = 0
+  private tileWait = 0
+  private maxTex: number
   private fbo: WebGLFramebuffer | null = null
+  private staging = new Map<string, WebGLTexture>()
   private pool: CollageClip[] = []
   private poolKey = ''
+  private poolFiles = ''
   private poolRef: CollageClip[] | null = null
   private poolDirty = false
+  private filesDirty = false
   private edls: CollageEdl[] = []
   private edlKey = ''
   private edlRef: CollageEdl[] | null = null
@@ -334,37 +470,65 @@ export class CollageSource {
   private lastFeed = -1
   /** Base inputs from the store, overlaid by modulation's per-frame writes. */
   private live: Record<string, number | number[]> = {}
-  private seed = 0x5eed1234
+  // Every instance starts from its own seed : two walls on the same folder (two
+  // slots, or a layer and the background) must not deal the same wall.
+  private seed = (Math.random() * 0x100000000) >>> 0
+  // Churn re-rolls draw from ONE running generator, reseeded at each deal, so
+  // successive re-rolls differ (a PRNG rebuilt from the same seed every frame
+  // drew the same film, crop and window for every roll).
+  private rollRnd = mulberry32(this.seed ^ 0x2545f491)
   private prevDeal = 0
   private dealTimer = 0
   private lastT = 0
+  // The layer clock handed to render() : dt comes from it, and its rate over
+  // realtime (measured over short windows) scales every film's playback rate.
+  private lastClock: number | null = null
+  private clockMul = 1
+  private mulKnown = false
+  private ringT = new Float64Array(128) // (real seconds, clock seconds) of recent frames
+  private ringC = new Float64Array(128)
+  private ringN = 0
+  private ringI = 0
+  private settleUntil = 0
+  private stillFrames = 0
   private lastCuts = -1
   private lastRotate = -1
   private lastZoom = -1
   private lastFilms = -1
   private lastShape = -1
+  private holdNow = 0 // the window the decks loop (quantised)
+  private holdWant = 0 // a new window waiting out its debounce
+  private holdWait = 0
+  private cropsDirty = false
   private disposed = false
   // Crossfade : the collage draws into `cur`, then composites into the layer's
   // scratch target. `prev` holds the last SETTLED wall; on a re-deal it becomes
   // the outgoing (frozen) layer that `cur` dissolves out of. `xfade` is progress
-  // 0..1 (1 = settled, single-pass). Ping-ponged so `prev` tracks last frame for free.
+  // 0..1 (1 = settled). Only allocated once a crossfade time is set : with none,
+  // the wall draws straight into the layer.
   private cur: { tex: WebGLTexture; fbo: WebGLFramebuffer } | null = null
   private prev: { tex: WebGLTexture; fbo: WebGLFramebuffer } | null = null
   private prevValid = false
   private xfade = 1
+  private xfadeDur = 0
+  private foldAt: number | null = null // a deal landed mid-fade : fold the visible mix into prev first
   // Uniform staging, allocated once.
   private cellArr = new Float32Array(MAX_CELLS * 4)
   private cropArr = new Float32Array(MAX_CELLS * 4)
   private contentArr = new Float32Array(MAX_CELLS * 4)
-  private deckArr = new Float32Array(MAX_CELLS)
-  private rotArr = new Float32Array(MAX_CELLS)
-  private rankArr = new Float32Array(MAX_CELLS)
+  private metaArr = new Float32Array(MAX_CELLS * 4)
+  private siteArr = new Float32Array(MAX_CELLS * 4)
+  private rowsArr = new Float32Array(MAX_ROWS * 4)
+  private rowCount = 0
+  private rank = new Float32Array(MAX_CELLS)
 
   constructor(
     private gl: WebGL2RenderingContext,
     private w: number,
     private h: number
-  ) {}
+  ) {
+    this.maxTex = Math.max(1024, Number(gl.getParameter(gl.MAX_TEXTURE_SIZE)) || 2048)
+  }
 
   // ── Decks ──────────────────────────────────────────────────────────────
 
@@ -377,14 +541,18 @@ export class CollageSource {
     el.crossOrigin = 'anonymous'
     const deck: Deck = {
       asm: null,
-      el, tex: null, src: '', clip: null, inSec: 0, lenSec: 0,
-      content: [0, 0, 1, 1], pending: false, rvfc: 0, seeking: false, seekAt: 0,
-      pendingSeek: null, churning: false, nextRoll: 0, pan: [0.5, 0.5]
+      el, src: '', clip: null, inSec: 0, lenSec: 0,
+      content: [0, 0, 1, 1], blitted: false, blitAt: 0, blitT: -1, pending: false, rvfc: 0, seeking: false, seekAt: 0,
+      pendingSeek: null, churning: false, nextRoll: 0, pan: [0.5, 0.5], panNext: null,
+      varyU: 0, used: true, shown: true, running: true, needFrame: false
     }
     el.addEventListener('seeked', () => { deck.seeking = false; deck.pending = true })
     // A bad file must never wedge the wall : clear the gate and let the deck
     // sit on whatever frame it has.
     el.addEventListener('error', () => { deck.seeking = false })
+    // A new src aborts any seek in flight WITHOUT a 'seeked' : clear the gate,
+    // or the window loop waits on a seek that will never report back.
+    el.addEventListener('emptied', () => { deck.seeking = false })
     const step = (): void => {
       deck.pending = true
       if (typeof el.requestVideoFrameCallback === 'function')
@@ -398,24 +566,24 @@ export class CollageSource {
   /** An assemblage-fed deck : AssembleSource already owns playlist walking,
    *  gated seeks and the ping-pong pair that makes cross-FILE cuts free, so
    *  there is no second implementation of any of it here. */
-  private makeAsmDeck(edl: CollageEdl): Deck {
+  private makeAsmDeck(edl: CollageEdl, rnd: () => number): Deck {
     const asm = new AssembleSource(this.gl)
     asm.setPlaylist(edl.clips, true)
     asm.setPlaying(true)
     return {
-      asm, el: document.createElement('video'), tex: null, src: edl.id, clip: null,
-      inSec: 0, lenSec: 0, content: [0, 0, 1, 1], pending: false, rvfc: 0,
-      seeking: false, seekAt: 0, pendingSeek: null, churning: false, nextRoll: 0, pan: [0.5, 0.5]
+      asm, el: document.createElement('video'), src: edl.id, clip: null,
+      inSec: 0, lenSec: 0, content: [0, 0, 1, 1], blitted: false, blitAt: 0, blitT: -1, pending: false, rvfc: 0,
+      seeking: false, seekAt: 0, pendingSeek: null, churning: false, nextRoll: 0,
+      pan: [0.5, 0.5], panNext: null, varyU: rnd() * 2 - 1, used: true, shown: true,
+      running: true, needFrame: false
     }
   }
 
   private killDeck(d: Deck): void {
     if (d.asm) {
-      // The texture belongs to the AssembleSource : disposing that frees it, and
-      // deleting it here as well would double-free.
+      // The texture belongs to the AssembleSource : disposing that frees it.
       d.asm.dispose()
       d.asm = null
-      d.tex = null
       return
     }
     try {
@@ -429,33 +597,52 @@ export class CollageSource {
     } catch {
       /* teardown is best-effort */
     }
-    if (d.tex) this.gl.deleteTexture(d.tex)
-    d.tex = null
   }
 
-  private setDeckCount(n: number): void {
+  private setDeckCount(n: number, cuts: number): void {
     n = Math.max(1, Math.min(MAX_DECKS, Math.round(n)))
     while (this.decks.length > n) this.killDeck(this.decks.pop()!)
     while (this.decks.length < n) this.decks.push(this.makeDeck())
-    if (this.arrLayers !== n) this.allocArray(n)
+    const t = tileFor(n, cuts, this.w, this.h, this.maxTex)
+    if (this.arrLayers !== n || this.tile !== t) this.allocArray(n, t)
   }
 
   /** One deck per selected assemblage. Rebuilt whenever the selection changes;
    *  identity is the edl id list, so re-picking the same set is a no-op. */
-  private setAsmDecks(edls: CollageEdl[]): void {
+  private setAsmDecks(edls: CollageEdl[], cuts: number): void {
     const want = edls.slice(0, MAX_DECKS)
     for (const d of this.decks) this.killDeck(d)
-    this.decks = want.map((e) => this.makeAsmDeck(e))
-    this.allocArray(this.decks.length)
+    const rnd = mulberry32(this.seed ^ 0x51ed27)
+    this.decks = want.map((e) => this.makeAsmDeck(e, rnd))
+    this.allocArray(this.decks.length, tileFor(this.decks.length, cuts, this.w, this.h, this.maxTex))
   }
 
-  private allocArray(layers: number): void {
+  /** The pool emptied : stop every decoder and free the array. Nothing plays
+   *  until a new pool (or feed) arrives, which rebuilds from scratch. */
+  private park(): void {
+    if (!this.decks.length && !this.arr) return
+    for (const d of this.decks) this.killDeck(d)
+    this.decks = []
+    this.cells = []
+    if (this.arr) this.gl.deleteTexture(this.arr)
+    this.arr = null
+    this.arrLayers = 0
+    this.lastFilms = -1
+    this.lastCuts = -1
+    this.lastFeed = -1
+    this.prevValid = false
+    this.xfade = 1
+    this.foldAt = null
+  }
+
+  private allocArray(layers: number, tile: number): void {
     const gl = this.gl
     if (this.arr) gl.deleteTexture(this.arr)
     this.arr = gl.createTexture()
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.arr)
-    this.tile = tileFor(layers)
-    gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, this.tile, this.tile, layers, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+    this.tile = tile
+    this.tilePending = 0
+    gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, tile, tile, layers, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
     gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
@@ -464,7 +651,10 @@ export class CollageSource {
     if (!this.fbo) this.fbo = gl.createFramebuffer()
     this.arrLayers = layers
     // Every deck must re-blit into the new storage.
-    for (const d of this.decks) d.pending = true
+    for (const d of this.decks) {
+      d.pending = true
+      d.blitted = false
+    }
   }
 
   /** One output-sized RGBA8 target (colour + FBO) for the crossfade ping-pong. */
@@ -489,6 +679,26 @@ export class CollageSource {
     if (!this.prev) this.prev = this.makeOut()
   }
 
+  /** Upload one element's current frame into the staging texture for its frame
+   *  size. Each blit reads its staging texture right after the upload, so decks
+   *  of the same size share one (a handful in total instead of one full-size
+   *  texture per deck); keeping one per SIZE means a texture is never
+   *  re-specified at a different size between two decks. */
+  private uploadStaged(el: HTMLVideoElement): WebGLTexture | null {
+    const key = `${el.videoWidth}x${el.videoHeight}`
+    const hit = this.staging.get(key) ?? null
+    if (hit) this.staging.delete(key)
+    else if (this.staging.size >= STAGING_MAX) {
+      const oldest = this.staging.keys().next().value as string
+      const t = this.staging.get(oldest)
+      if (t) this.gl.deleteTexture(t)
+      this.staging.delete(oldest)
+    }
+    const t = uploadVideoFrame(this.gl, el, hit)
+    if (t) this.staging.set(key, t) // (re)insert : most recently used last
+    return t
+  }
+
   // ── Dealing ────────────────────────────────────────────────────────────
 
   /** Give every deck a clip and a window. `rnd` keeps a deal reproducible. */
@@ -496,6 +706,7 @@ export class CollageSource {
     if (!this.pool.length) return
     const rnd = mulberry32(this.seed)
     const n = this.decks.length
+    const nChurn = Math.round(churn * n)
     // Draw without repeats while the pool allows it, so a deal shows as many
     // different films as it can before it starts doubling up.
     const bag: CollageClip[] = []
@@ -509,46 +720,95 @@ export class CollageSource {
       }
       const clip = bag.pop()!
       const d = this.decks[i]
-      // The churning decks are the FIRST `churn × n` : deterministic, so the
+      // The churning decks are the FIRST `churn x n` : deterministic, so the
       // dial sweeps in a stable order instead of reshuffling who churns.
-      d.churning = i < Math.round(churn * n)
-      d.pan = [rnd(), rnd()]
-      this.cue(d, clip, hold, rnd)
+      d.churning = i < nChurn
+      this.cue(d, clip, hold, rnd, false)
+      d.panNext = [rnd(), rnd()]
+      d.nextRoll = (0.25 + rnd() * 1.2) / Math.max(0.15, churn)
     }
-    this.rebuildCrops()
+    this.rollRnd = mulberry32((this.seed ^ 0x2545f491) >>> 0)
+    this.holdNow = this.holdWant = holdQ(hold)
+    this.holdWait = 0
   }
 
-  /** Point one deck at a clip and a window inside it. */
-  private cue(d: Deck, clip: CollageClip, hold: number, rnd: () => number): void {
+  /** Point one deck at a clip and a window inside it. A whole-film cue starts
+   *  at the top, except a churn re-roll, which drops in anywhere (a montage of
+   *  opening seconds is not a montage). */
+  private cue(d: Deck, clip: CollageClip, hold: number, rnd: () => number, randomStart: boolean): void {
     const url = `opsia-media://local/${encodeURIComponent(clip.file)}`
     const dur = Math.max(0.1, clip.durSec)
-    // Floor the window : a sub-second window seeks back so often the decoder
-    // never settles (the "per-frame currentTime write" law). Below ~0.4s just
-    // play the whole file.
     const len = hold > 0.4 ? Math.min(hold, dur) : dur
-    const inSec = len >= dur - 0.05 ? 0 : rnd() * (dur - len)
+    const whole = len >= dur - 0.05
+    const start = whole ? (randomStart ? rnd() * dur * 0.8 : 0) : rnd() * (dur - len)
     d.clip = clip
-    d.inSec = inSec
-    d.lenSec = len
-    d.nextRoll = 0.4 + rnd() * 3
-    const av = clip.width > 0 && clip.height > 0 ? clip.width / clip.height : 16 / 9
-    // Contain-fit inside the square layer : the whole frame is preserved, and
-    // the per-cell COVER crop then chooses which part of it each piece shows.
-    const cw = av >= 1 ? 1 : av
-    const ch = av >= 1 ? 1 / av : 1
-    d.content = [(1 - cw) / 2, (1 - ch) / 2, cw, ch]
-    if (d.src !== url) {
-      d.src = url
-      d.el.src = url
-      d.el.load()
-    }
-    // A window that is the whole file loops natively — no seeking at all, which
+    d.inSec = whole ? 0 : start
+    d.lenSec = whole ? dur : len
+    d.varyU = rnd() * 2 - 1
+    // Until its first frame lands the layer is empty; frame the crop on the
+    // probed size meanwhile (the blit records the real one).
+    if (!d.blitted) d.content = containRect(clip.width, clip.height)
+    if (d.src !== url) this.loadInto(d, url)
+    // A window that is the whole file loops natively : no seeking at all, which
     // is by far the smoothest path. Sub-windows need the gated seek below.
-    d.el.loop = len >= dur - 0.05
-    this.seekTo(d, inSec)
-    void d.el.play().catch(() => {
-      /* autoplay can reject before the element is ready; the frame loop retries */
-    })
+    d.el.loop = whole
+    d.needFrame = true
+    this.seekTo(d, start)
+  }
+
+  private loadInto(d: Deck, url: string): void {
+    if (d.pendingSeek) d.el.removeEventListener('loadedmetadata', d.pendingSeek)
+    d.pendingSeek = null
+    d.seeking = false
+    d.src = url
+    d.el.src = url
+    d.el.load()
+  }
+
+  /** Optimise re-encoded the pool : same clips (same ids), new playable files.
+   *  Swap each deck onto its new file at the same moment of the film. */
+  private swapFiles(): void {
+    const byId = new Map(this.pool.map((c) => [c.id, c]))
+    for (const d of this.decks) {
+      if (d.asm || !d.clip) continue
+      const nc = byId.get(d.clip.id)
+      if (!nc || nc.file === d.clip.file) continue
+      const t = d.el.readyState >= 1 ? d.el.currentTime : d.inSec
+      d.clip = nc
+      this.loadInto(d, `opsia-media://local/${encodeURIComponent(nc.file)}`)
+      d.needFrame = true
+      this.seekTo(d, t)
+    }
+  }
+
+  /** A deck's new film, never the one it is already playing when the pool has
+   *  another. */
+  private pickOther(cur: CollageClip | null): CollageClip | null {
+    const P = this.pool
+    if (!P.length) return cur
+    if (P.length === 1) return P[0]
+    let i = Math.floor(this.rollRnd() * P.length)
+    if (cur && P[i].id === cur.id) i = (i + 1 + Math.floor(this.rollRnd() * (P.length - 1))) % P.length
+    return P[i]
+  }
+
+  /** The window knob moved : re-window every deck around where its playhead
+   *  already is. No seek, no new film : the loop point just moves. */
+  private rewindow(d: Deck, hold: number): void {
+    if (d.asm || !d.clip) return
+    const ed = d.el.duration
+    const dur = Number.isFinite(ed) && ed > 0 ? ed : Math.max(0.1, d.clip.durSec)
+    const len = hold > 0.4 ? Math.min(hold, dur) : dur
+    if (len >= dur - 0.05) {
+      d.inSec = 0
+      d.lenSec = dur
+      d.el.loop = true
+      return
+    }
+    const t = d.el.readyState >= 1 ? d.el.currentTime : d.inSec
+    d.inSec = clampf(t - 0.05, 0, dur - len)
+    d.lenSec = len
+    d.el.loop = false
   }
 
   /** One seek in flight per deck, with a stall safety net : a per-frame
@@ -557,6 +817,7 @@ export class CollageSource {
   private seekTo(d: Deck, t: number): void {
     const now = performance.now()
     if (d.seeking && now - d.seekAt < 4000) return
+    d.seeking = false
     if (d.el.readyState < 1) {
       // Metadata not in yet : defer, REPLACING any earlier deferred seek. A
       // stacked `{once}` handler fires the OLDEST first and parks the deck at a
@@ -580,7 +841,7 @@ export class CollageSource {
 
   // ── Partition ──────────────────────────────────────────────────────────
 
-  /** Cut-up : the Autocutter's BSP — split the largest cell until `cuts` pieces.
+  /** Cut-up : the Autocutter's BSP, split the largest cell until `cuts` pieces.
    *  Each cell is a rect {x,y = top-left, w,h = size}. */
   private bspRects(cuts: number, rnd: () => number): Array<{ x: number; y: number; w: number; h: number }> {
     const minW = 0.06, minH = 0.06
@@ -610,31 +871,82 @@ export class CollageSource {
     return rects
   }
 
-  /** Mosaic : a jittered grid of Voronoi seeds (the Autocutter's mosaic). Each
-   *  "cell" carries its seed CENTRE in {x,y} and a nominal size in {w,h} — the
-   *  shader assigns each pixel to its nearest seed (irregular polygons) and maps
-   *  content through the nominal size into the cover crop. */
+  /** Mosaic : jittered seeds in ROWS whose counts differ by at most one (so a
+   *  cut count that isn't a rectangle never leaves one seed covering half a row),
+   *  rows chosen so the shards come out roughly square at the output aspect.
+   *  Each shard's cell is its real BOUNDING BOX (measured on a coarse grid), so
+   *  the film is cover-cropped to the shape it actually fills. Seeds go to the
+   *  shader in height units, row by row, for its neighbour search. */
   private mosaicSeeds(cuts: number, rnd: () => number): Array<{ x: number; y: number; w: number; h: number }> {
     const n = Math.min(cuts, MAX_CELLS)
-    const cols = Math.max(1, Math.round(Math.sqrt(n)))
-    const rows = Math.max(1, Math.ceil(n / cols))
-    const w = 1 / cols, h = 1 / rows
-    const seeds: Array<{ x: number; y: number; w: number; h: number }> = []
-    for (let r = 0; r < rows && seeds.length < n; r++) {
-      for (let c = 0; c < cols && seeds.length < n; c++) {
-        const jx = (c + 0.15 + rnd() * 0.7) / cols
-        const jy = (r + 0.15 + rnd() * 0.7) / rows
-        seeds.push({ x: jx, y: jy, w, h })
+    const aspect = this.w / this.h
+    const rows = Math.max(1, Math.min(MAX_ROWS, n, Math.round(Math.sqrt(n / aspect))))
+    const base = Math.floor(n / rows), extra = n % rows
+    const sx: number[] = [], sy: number[] = []
+    let idx = 0
+    this.rowsArr.fill(0)
+    for (let r = 0; r < rows; r++) {
+      // Spread the rows that get one extra seed evenly down the frame.
+      const k = base + (Math.floor(((r + 1) * extra) / rows) - Math.floor((r * extra) / rows))
+      this.rowsArr[r * 4] = idx
+      this.rowsArr[r * 4 + 1] = k
+      for (let c = 0; c < k; c++) {
+        sx.push(((c + 0.15 + rnd() * 0.7) / k) * aspect)
+        sy.push((r + 0.15 + rnd() * 0.7) / rows)
+        idx++
       }
     }
-    return seeds
+    this.rowCount = rows
+    this.siteArr.fill(0)
+    for (let i = 0; i < n; i++) {
+      this.siteArr[i * 4] = sx[i]
+      this.siteArr[i * 4 + 1] = sy[i]
+    }
+    // Bounding boxes : nearest seed on a coarse grid (exact brute force; only on
+    // a deal or a cut change), padded by one grid step.
+    const GW = 96, GH = Math.max(32, Math.min(160, Math.round(96 / aspect)))
+    const bx0 = new Array(n).fill(1), by0 = new Array(n).fill(1)
+    const bx1 = new Array(n).fill(0), by1 = new Array(n).fill(0)
+    for (let gy = 0; gy < GH; gy++) {
+      const v = (gy + 0.5) / GH
+      for (let gx = 0; gx < GW; gx++) {
+        const u = (gx + 0.5) / GW
+        const qx = u * aspect
+        let best = 0, bd = 1e9
+        for (let i = 0; i < n; i++) {
+          const dx = qx - sx[i], dy = v - sy[i]
+          const dd = dx * dx + dy * dy
+          if (dd < bd) { bd = dd; best = i }
+        }
+        if (u < bx0[best]) bx0[best] = u
+        if (u > bx1[best]) bx1[best] = u
+        if (v < by0[best]) by0[best] = v
+        if (v > by1[best]) by1[best] = v
+      }
+    }
+    const px = 1 / GW, py = 1 / GH
+    const out: Array<{ x: number; y: number; w: number; h: number }> = []
+    for (let i = 0; i < n; i++) {
+      // A seed that owned no grid sample (can't happen with this jitter, but be
+      // safe) gets a nominal box around itself.
+      if (bx1[i] < bx0[i]) { bx0[i] = sx[i] / aspect - 0.05; bx1[i] = sx[i] / aspect + 0.05; by0[i] = sy[i] - 0.05; by1[i] = sy[i] + 0.05 }
+      const x0 = Math.max(0, bx0[i] - px), x1 = Math.min(1, bx1[i] + px)
+      const y0 = Math.max(0, by0[i] - py), y1 = Math.min(1, by1[i] + py)
+      out.push({ x: x0, y: y0, w: Math.max(1e-3, x1 - x0), h: Math.max(1e-3, y1 - y0) })
+    }
+    return out
   }
 
-  /** Rebuild the partition (cut-up rects or mosaic seeds), then deal decks
+  /** Rebuild the partition (cut-up rects or mosaic shards), then deal decks
    *  round-robin over it and assign the mask dropout order. */
-  private rebuildCells(cuts: number, rotateFrac: number, shape: number): void {
-    const rnd = mulberry32(this.seed ^ 0x9e3779b9)
-    let rects = shape === 1 ? this.mosaicSeeds(cuts, rnd) : this.bspRects(cuts, rnd)
+  private rebuildCells(cuts: number, shape: number): void {
+    const rnd = mulberry32((this.seed ^ 0x9e3779b9) >>> 0)
+    let rects: Array<{ x: number; y: number; w: number; h: number }>
+    if (shape === 1) rects = this.mosaicSeeds(cuts, rnd)
+    else {
+      rects = this.bspRects(cuts, rnd)
+      this.rowCount = 0
+    }
     if (rects.length > MAX_CELLS) rects = rects.slice(0, MAX_CELLS)
     const n = rects.length
     const nd = Math.max(1, this.decks.length)
@@ -645,32 +957,50 @@ export class CollageSource {
       const j = Math.floor(rnd() * (i + 1))
       const t = order[i]; order[i] = order[j]; order[j] = t
     }
-    this.cells = rects.map((r) => ({ ...r, deck: 0, rot: 0, crop: [0, 0, 1, 1] as [number, number, number, number] }))
+    this.cells = rects.map((r) => ({
+      ...r, deck: 0, rot: 0, rotA: 1, rotB: 0, crop: [0, 0, 1, 1] as [number, number, number, number]
+    }))
     for (let i = 0; i < n; i++) {
       const c = this.cells[order[i]]
       c.deck = i % nd
-      c.rot = rotateFrac > 0 && rnd() < rotateFrac ? 1 + Math.floor(rnd() * 3) : 0
+      // ALWAYS two draws, whatever the rotate dial : a draw taken only on a hit
+      // shifted every later draw, so sweeping rotate reshuffled the mask order.
+      c.rotA = rnd()
+      c.rotB = rnd()
     }
     // MASK dropout order : a shuffled EVEN spacing over (0,0.90] so the dial
     // peels pieces at a steady rate. The ceiling sits below the shader's 0.06
-    // fade band, and one seeded survivor holds an unreachable 2.0 — so full
+    // fade band, and one seeded survivor holds an unreachable 2.0 : so full
     // mask always leaves exactly one piece, and every deal elects a new one.
     const drop = rects.map((_, i) => i)
     for (let i = n - 1; i > 0; i--) {
       const j = Math.floor(rnd() * (i + 1))
       const t = drop[i]; drop[i] = drop[j]; drop[j] = t
     }
-    for (let i = 0; i < n; i++) this.rankArr[drop[i]] = ((i + 1) / n) * 0.9
-    this.rankArr[Math.floor(rnd() * n)] = 2.0
+    for (let i = 0; i < n; i++) this.rank[drop[i]] = ((i + 1) / n) * 0.9
+    if (n) this.rank[Math.floor(rnd() * n)] = 2.0
+    for (const d of this.decks) d.used = false
+    for (const c of this.cells) if (this.decks[c.deck]) this.decks[c.deck].used = true
     this.lastCuts = cuts
-    this.lastRotate = rotateFrac
     this.lastShape = shape
+    this.lastRotate = -1 // re-apply the dial to the fresh draws
+    this.cropsDirty = true
+  }
+
+  /** The rotate dial : the pieces whose own draw falls under it turn. */
+  private applyRotate(rotate: number): void {
+    for (const c of this.cells) c.rot = c.rotA < rotate ? 1 + Math.floor(c.rotB * 3) : 0
+    this.lastRotate = rotate
+    this.cropsDirty = true
   }
 
   /** Cover-crop each cell's window into its deck's picture. Cheap, CPU-side,
-   *  and re-run whenever the partition, the zoom or a deck's clip changes. */
-  private rebuildCrops(zoom = this.lastZoom > 0 ? this.lastZoom : 1): void {
+   *  and re-run whenever the partition, the zoom, or a deck's framed picture
+   *  changes. Works on the content rect AS BLITTED, so a freshly cued film of
+   *  another aspect doesn't open black bands on the old film's still frame. */
+  private rebuildCrops(): void {
     const outAspect = this.w / this.h
+    const z = Math.max(1, this.lastZoom > 0 ? this.lastZoom : 1)
     for (const c of this.cells) {
       const d = this.decks[c.deck]
       if (!d) continue
@@ -683,19 +1013,18 @@ export class CollageSource {
       const ac = c.rot % 2 === 1 ? 1 / raw : raw
       let sw: number, sh: number
       if (ac >= av) { sw = cw; sh = ch * (av / ac) } else { sh = ch; sw = cw * (ac / av) }
-      const z = Math.max(1, zoom)
       sw /= z
       sh /= z
       c.crop = [cx + (cw - sw) * d.pan[0], cy + (ch - sh) * d.pan[1], sw, sh]
     }
-    this.lastZoom = zoom
+    this.cropsDirty = false
   }
 
   // ── Frame ──────────────────────────────────────────────────────────────
 
   /** Called every frame by syncFromState with the slot's BASE inputs. The tick
    *  itself runs at render time, because applyModulation lands its overrides
-   *  through setInput in between — reading them here would miss a frame and,
+   *  through setInput in between : reading them here would miss a frame and,
    *  worse, make modulated `cuts` / `films` / `mask` inert. */
   update(
     pool: CollageClip[],
@@ -703,16 +1032,23 @@ export class CollageSource {
     inputs: Record<string, number | number[]>
   ): void {
     if (this.disposed) return
-    // A changed pool (new folder, new selection) re-deals from scratch. The
-    // store passes a STABLE array reference until it actually changes, so a
-    // cheap reference check gates the per-frame id-join (~300 ids × 60 fps).
+    // A changed pool (new folder, new selection) re-deals from scratch; the same
+    // clips with new FILES (an optimise pass) swap in place. The store passes a
+    // STABLE array reference until it actually changes, so a cheap reference
+    // check gates the per-frame joins (~300 ids x 60 fps).
     if (pool !== this.poolRef) {
       this.poolRef = pool
       const key = pool.map((c) => c.id).join('|')
+      const files = pool.map((c) => c.file).join('|')
       if (key !== this.poolKey) {
         this.pool = pool.slice()
         this.poolKey = key
+        this.poolFiles = files
         this.poolDirty = true
+      } else if (files !== this.poolFiles) {
+        this.pool = pool.slice()
+        this.poolFiles = files
+        this.filesDirty = true
       }
     }
     if (edls !== this.edlRef) {
@@ -732,11 +1068,66 @@ export class CollageSource {
     this.live[name] = value
   }
 
-  private tick(): void {
+  private tick(clockSec: number | undefined): void {
     const inputs = this.live
     const now = performance.now()
-    const dt = this.lastT ? Math.min(0.25, (now - this.lastT) / 1000) : 0
+    // Clamped like the compositor's own frame delta, so a hitch reads the same
+    // on both sides of the clock-rate ratio below.
+    const realDt = this.lastT ? Math.min(0.2, (now - this.lastT) / 1000) : 0
     this.lastT = now
+    let dt = realDt
+    if (typeof clockSec === 'number' && Number.isFinite(clockSec)) {
+      const cd = this.lastClock === null ? 0 : clockSec - this.lastClock
+      this.lastClock = clockSec
+      dt = cd > 0 ? Math.min(1, cd) : 0
+      // The clock's rate over realtime, for the films' playbackRate. Frames are
+      // timed here at render time while the compositor times them at the top of
+      // its loop, so one frame's ratio jitters by several percent (tens, on a
+      // timer-driven hidden window). A least-squares slope of clock against time
+      // over the last second averages every frame instead, and is adopted on a
+      // move of more than 3% (then tracked closely for a second while it
+      // settles), snapped to 1 within 2%. A steady clock then never rewrites a
+      // playbackRate. A stopped clock (layer Speed 0) is caught exactly, in
+      // three frames.
+      this.stillFrames = dt > 0 ? 0 : this.stillFrames + 1
+      if (cd < 0) this.ringN = 0 // the clock went backwards : start over
+      if (this.stillFrames >= 3) {
+        this.clockMul = 0
+        this.ringN = 0
+      } else {
+        const R = this.ringT.length
+        this.ringI = (this.ringI + 1) % R
+        this.ringT[this.ringI] = now / 1000
+        this.ringC[this.ringI] = clockSec
+        this.ringN = Math.min(R, this.ringN + 1)
+        const t0 = now / 1000, c0 = clockSec
+        let n = 0, sx = 0, sy = 0, sxx = 0, sxy = 0, span = 0
+        for (let k = 0; k < this.ringN; k++) {
+          const q = (this.ringI - k + R) % R
+          const x = this.ringT[q] - t0
+          if (x < -1) break
+          const y = this.ringC[q] - c0
+          n++; sx += x; sy += y; sxx += x * x; sxy += x * y
+          span = -x
+        }
+        const den = n * sxx - sx * sx
+        if (n >= 8 && span >= 0.25 && den > 0) {
+          const slope = Math.max(0, (n * sxy - sx * sy) / den)
+          const est = Math.abs(slope - 1) < 0.02 ? 1 : slope
+          const off = Math.abs(est - this.clockMul) / Math.max(est, 0.05)
+          if (!this.mulKnown || off > 0.03) {
+            this.clockMul = est
+            this.mulKnown = true
+            this.settleUntil = now + 1000
+          } else if (now < this.settleUntil && off > 0.005) {
+            this.clockMul = est
+          }
+        } else if (this.clockMul === 0 && dt > 0 && realDt > 0) {
+          // Restarting from a stop : a rough guess until the fit has a second.
+          this.clockMul = Math.min(4, dt / realDt)
+        }
+      }
+    }
 
     const films = clampf(num(inputs.films, 12), 1, MAX_DECKS)
     const cuts = Math.round(clampf(num(inputs.cuts, 12), 2, MAX_CELLS))
@@ -745,9 +1136,13 @@ export class CollageSource {
     const churn = clampf(num(inputs.churn, 0), 0, 1)
     const zoom = clampf(num(inputs.zoom, 1.05), 1, 3)
     const speed = clampf(num(inputs.speed, 1), 0.1, 4)
+    const vary = clampf(num(inputs.vary, 0), 0, 1)
+    const freeze = num(inputs.freeze, 0) >= 0.5
     const rate = clampf(num(inputs.rate, 0), 0, 60)
     const shape = Math.round(clampf(num(inputs.shape, 0), 0, 1))
     const xfadeDur = clampf(num(inputs.xfade, 0), 0, 4)
+    const mask = clampf(num(inputs.mask, 0), 0, 1)
+    this.xfadeDur = xfadeDur
 
     // feed 0 = the folder pool (one film per piece) · 1 = the Assemble bank
     // (one saved edit per piece). An empty selection falls back to the folder,
@@ -755,14 +1150,22 @@ export class CollageSource {
     const feed = this.edls.length && Math.round(num(inputs.feed, 0)) === 1 ? 1 : 0
     const poolChanged = this.poolDirty
     this.poolDirty = false
+    const filesChanged = this.filesDirty
+    this.filesDirty = false
     const edlChanged = this.edlDirty
     this.edlDirty = false
+
+    // Nothing to play : stop every decoder rather than keep the old films running.
+    if (feed === 0 && !this.pool.length) {
+      this.park()
+      return
+    }
 
     let deckChanged = feed !== this.lastFeed
     this.lastFeed = feed
     if (feed === 1) {
       if (deckChanged || edlChanged) {
-        this.setAsmDecks(this.edls)
+        this.setAsmDecks(this.edls, cuts)
         deckChanged = true
       }
       this.lastFilms = -1 // force a rebuild when the dial goes back to folder
@@ -775,17 +1178,27 @@ export class CollageSource {
         this.lastFilms = -1
       }
       if (Math.round(films) !== this.lastFilms || deckChanged) {
-        this.setDeckCount(films)
+        this.setDeckCount(films, cuts)
         this.lastFilms = Math.round(films)
         deckChanged = true
       }
     }
-    // A structural edit (cuts / rotate / shape / deck count) rebuilds in place
-    // and SNAPS — no dissolve, so the change is legible.
-    if (cuts !== this.lastCuts || rotate !== this.lastRotate || shape !== this.lastShape || deckChanged) {
+    // A structural edit (cuts / shape / deck count) rebuilds in place and SNAPS :
+    // no dissolve, so the change is legible.
+    if (cuts !== this.lastCuts || shape !== this.lastShape || deckChanged) {
       this.xfade = 1
-      this.rebuildCells(cuts, rotate, shape)
-      this.rebuildCrops(zoom)
+      this.foldAt = null
+      this.rebuildCells(cuts, shape)
+    }
+    // The array's layer edge follows the piece size; debounced, so a modulated
+    // `cuts` settles before the array (and every deck's blit) is redone.
+    const tileWant = tileFor(this.decks.length, cuts, this.w, this.h, this.maxTex)
+    if (tileWant === this.tile) this.tilePending = 0
+    else if (tileWant !== this.tilePending) {
+      this.tilePending = tileWant
+      this.tileWait = 0
+    } else if ((this.tileWait += realDt) >= 0.6) {
+      this.allocArray(this.decks.length, tileWant)
     }
 
     // A rising edge on the `deal` event, or the auto clock, re-deals everything.
@@ -797,8 +1210,8 @@ export class CollageSource {
     let reseedRecut = dealEvent
     if (rate > 0.01) {
       // At least ~0.15s between deals : a deal reloads clips, and dealing every
-      // frame is a reload storm no wall can survive.
-      this.dealTimer += dt
+      // frame is a reload storm no wall can survive. Frozen, the clock waits.
+      if (!freeze) this.dealTimer += dt
       if (this.dealTimer >= Math.max(rate, 0.15)) { this.dealTimer = 0; reseedRecut = true }
     } else {
       this.dealTimer = 0
@@ -806,119 +1219,202 @@ export class CollageSource {
     const redeal = poolChanged || deckChanged || reseedRecut
     if (redeal) {
       if (reseedRecut && !poolChanged && !deckChanged) {
-        this.seed = (this.seed * 1664525 + 1013904223) >>> 0
-        // Dissolve the settled wall into the new deal when a xfade time is set;
-        // the frozen `prev` (last settled frame) is the outgoing layer.
-        this.xfade = xfadeDur > 0 && this.prevValid ? 0 : 1
+        this.seed = (Math.imul(this.seed, 1664525) + 1013904223) >>> 0
+        // Dissolve into the new deal when a xfade time is set. A deal landing
+        // MID-fade first folds what is on screen (the mix) into the outgoing
+        // wall, so a fast deal clock keeps dissolving from the live picture
+        // instead of from one stale settled frame.
+        if (xfadeDur > 0 && this.prevValid) {
+          if (this.xfade < 1) this.foldAt = this.xfade
+          this.xfade = 0
+        } else {
+          this.xfade = 1
+        }
       } else {
         this.xfade = 1 // structural re-deals snap
+        this.foldAt = null
       }
       // Assemblage decks carry their own edit and their own pace : a deal only
       // re-cuts the partition and re-shuffles which piece shows which edit.
       if (feed === 0) this.deal(hold, churn)
-      this.rebuildCells(cuts, rotate, shape)
-      this.rebuildCrops(zoom)
+      this.rebuildCells(cuts, shape)
+    } else if (filesChanged && feed === 0) {
+      this.swapFiles()
     }
-    if (Math.abs(zoom - this.lastZoom) > 1e-4) this.rebuildCrops(zoom)
+    if (rotate !== this.lastRotate) this.applyRotate(rotate)
+    if (Math.abs(zoom - this.lastZoom) > 1e-4) {
+      this.lastZoom = zoom
+      this.cropsDirty = true
+    }
 
     // Advance an in-flight crossfade. If the time is pulled to 0 mid-fade, snap
     // to done rather than freezing a stale outgoing wall.
     if (this.xfade < 1) this.xfade = xfadeDur > 0 ? Math.min(1, this.xfade + dt / xfadeDur) : 1
 
-    // Per-deck housekeeping : rate, window looping, and the churn re-roll.
-    const rnd = mulberry32((this.seed ^ 0x2545f491) >>> 0)
-    let aspectMoved = false
-    for (const d of this.decks) {
+    // The window knob, live : once it has settled for a moment, every deck
+    // re-windows around its own playhead.
+    const hq = holdQ(hold)
+    if (hq === this.holdNow) {
+      this.holdWant = hq
+      this.holdWait = 0
+    } else if (hq !== this.holdWant) {
+      this.holdWant = hq
+      this.holdWait = 0
+    } else if ((this.holdWait += realDt) >= 0.3) {
+      this.holdNow = hq
+      for (const d of this.decks) this.rewindow(d, hq)
+    }
+
+    // Which decks are on screen at all (a masked-out piece needs no fresh frames).
+    for (const d of this.decks) d.shown = false
+    for (let i = 0; i < this.cells.length; i++) {
+      if (this.rank[i] >= mask - 0.06) {
+        const d = this.decks[this.cells[i].deck]
+        if (d) d.shown = true
+      }
+    }
+
+    // Per-deck housekeeping : rate, play/pause, window looping, churn.
+    const nChurn = Math.round(churn * this.decks.length)
+    for (let i = 0; i < this.decks.length; i++) {
+      const d = this.decks[i]
+      if (d.seeking && now - d.seekAt > 4000) d.seeking = false // a seek that never reported back
+      // speed x this film's spread x the layer clock's rate.
+      const r = speed * Math.pow(2, vary * d.varyU) * this.clockMul
       if (d.asm) {
-        // AssembleSource owns the walk; `speed` scales it like a layer clock.
-        d.asm.tick(dt, speed)
-        const [vw, vh] = d.asm.frameSize()
-        if (vw > 0 && vh > 0) {
-          // An edit cuts between clips of DIFFERENT aspects, so the piece has to
-          // re-fit at every cut, not once when the deck was made.
-          const av = vw / vh
-          const cw = av >= 1 ? 1 : av
-          const ch = av >= 1 ? 1 / av : 1
-          if (Math.abs(cw - d.content[2]) > 1e-4 || Math.abs(ch - d.content[3]) > 1e-4) {
-            d.content = [(1 - cw) / 2, (1 - ch) / 2, cw, ch]
-            aspectMoved = true
-          }
+        const run = !freeze && d.used && r > 0.004
+        if (run !== d.running) {
+          d.asm.setPlaying(run)
+          d.running = run
         }
+        // AssembleSource owns the walk; the rate scales it like a layer clock.
+        if (run) d.asm.tick(realDt, r)
         continue
       }
       if (!d.clip) continue
-      if (d.el.videoWidth > 0 && d.el.videoHeight > 0) {
-        const av = d.el.videoWidth / d.el.videoHeight
-        const cw = av >= 1 ? 1 : av
-        const ch = av >= 1 ? 1 / av : 1
-        if (Math.abs(cw - d.content[2]) > 1e-4 || Math.abs(ch - d.content[3]) > 1e-4) {
-          d.content = [(1 - cw) / 2, (1 - ch) / 2, cw, ch]
-          aspectMoved = true
-        }
-      }
-      const want = clampf(speed, RATE_MIN, RATE_MAX)
-      if (Math.abs(d.el.playbackRate - want) > 1e-3) {
+      // Churn applies live : the first round(churn x n) decks re-roll on their
+      // own clock. A deck joining the churn starts at a random point of its
+      // cycle so a turned dial doesn't make every piece jump at once.
+      const was = d.churning
+      d.churning = i < nChurn
+      if (d.churning && !was) d.nextRoll = (0.1 + this.rollRnd() * 1.2) / Math.max(0.15, churn)
+      const run = d.used && r > 0.004 && (!freeze || d.needFrame)
+      const want = clampf(r, RATE_MIN, RATE_MAX)
+      if (Math.abs(d.el.playbackRate - want) > want * 0.02) {
         try { d.el.playbackRate = want } catch { /* out-of-band rate */ }
       }
-      if (d.el.paused && d.el.readyState >= 2) void d.el.play().catch(() => {})
-      if (d.churning && churn > 0.001) {
+      if (run) {
+        if (d.el.paused && d.el.readyState >= 2) void d.el.play().catch(() => {})
+      } else if (!d.el.paused) {
+        d.el.pause()
+      }
+      if (!run) continue
+      if (d.churning && churn > 0.001 && !freeze) {
         d.nextRoll -= dt
         if (d.nextRoll <= 0) {
-          // Re-roll this deck's window (and, when the pool allows, its film) —
+          // Re-roll this deck onto another film (and another window of it) :
           // this cell becomes its own little montage.
-          const clip = this.pool.length ? this.pool[Math.floor(rnd() * this.pool.length)] : d.clip
-          d.pan = [rnd(), rnd()]
-          this.cue(d, clip, hold, rnd)
-          // The window moved, so every cell reading this deck re-frames.
-          this.rebuildCrops(zoom)
-          d.nextRoll = (0.25 + rnd() * 1.2) / Math.max(0.15, churn)
+          const clip = this.pickOther(d.clip)
+          if (clip) {
+            this.cue(d, clip, hold, this.rollRnd, true)
+            d.panNext = [this.rollRnd(), this.rollRnd()]
+          }
+          d.nextRoll = (0.25 + this.rollRnd() * 1.2) / Math.max(0.15, churn)
         }
       }
       // Sub-window looping : native loop only covers whole files.
       if (!d.el.loop && d.el.readyState >= 2 && !d.seeking) {
         const t = d.el.currentTime
-        if (t >= d.inSec + d.lenSec || t < d.inSec - 0.25) this.seekTo(d, d.inSec)
+        if (t >= d.inSec + d.lenSec || t < d.inSec - 0.25 || d.el.ended) this.seekTo(d, d.inSec)
       }
     }
-    if (aspectMoved) this.rebuildCrops(zoom)
   }
 
-  /** Draw the wall into the layer's scratch target. */
-  render(scratchFbo: WebGLFramebuffer): void {
+  /** Draw the wall into the layer's scratch target. `clockSec` is the layer's
+   *  own clock (Speed x global speed; the background's slow clock); without it
+   *  the wall falls back to realtime. */
+  render(scratchFbo: WebGLFramebuffer, clockSec?: number): void {
     if (this.disposed) return
-    this.tick()
     const gl = this.gl
     const g = collageGL(gl)
-
-    // 1) Fold every freshly decoded frame into its array layer.
-    if (this.arr && this.fbo) {
-      for (let i = 0; i < this.decks.length; i++) {
-        const d = this.decks[i]
-        if (d.asm) {
-          const t = d.asm.upload()
-          if (!t) continue
-          d.tex = t
-        } else {
-          if (!d.pending || d.el.readyState < 2 || !d.el.videoWidth) continue
-          d.pending = false
-          d.tex = uploadVideoFrame(gl, d.el, d.tex)
-        }
-        if (!d.tex) continue
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo)
-        gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, this.arr, 0, i)
-        gl.viewport(0, 0, this.tile, this.tile)
-        gl.useProgram(g.tile)
-        gl.bindBuffer(gl.ARRAY_BUFFER, g.quad)
-        gl.enableVertexAttribArray(0)
-        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
-        gl.activeTexture(gl.TEXTURE0)
-        gl.bindTexture(gl.TEXTURE_2D, d.tex)
-        gl.uniform1i(g.uTile('uSrc'), 0)
-        gl.uniform4f(g.uTile('uContent'), d.content[0], d.content[1], d.content[2], d.content[3])
-        gl.disable(gl.BLEND)
-        gl.drawArrays(gl.TRIANGLES, 0, 3)
-      }
+    this.tick(clockSec)
+    // Own vertex array for every draw : the default one belongs to the ISF runtime.
+    gl.bindVertexArray(g.vao)
+    try {
+      this.draw(g, scratchFbo)
+    } finally {
+      gl.bindVertexArray(null)
     }
+  }
+
+  private draw(g: CollageGL, scratchFbo: WebGLFramebuffer): void {
+    const gl = this.gl
+    gl.disable(gl.BLEND)
+
+    // 1) Fold every freshly decoded frame into its array layer. A deck no piece
+    //    shows is skipped (its pending frame waits until it is shown again).
+    if (this.arr && this.fbo) {
+      let bound = false
+      const T = this.tile
+      const now = performance.now()
+      for (let i = 0; i < this.decks.length && i < this.arrLayers; i++) {
+        const d = this.decks[i]
+        if (d.blitted && !d.needFrame && (!d.used || !d.shown)) continue
+        let tex: WebGLTexture | null
+        let vw: number, vh: number
+        if (d.asm) {
+          if (d.blitted && !asmFresh(d.asm)) continue
+          tex = d.asm.upload()
+          ;[vw, vh] = d.asm.frameSize()
+        } else {
+          if (d.el.readyState < 2 || !d.el.videoWidth) continue
+          // rVFC only fires while the page is being composited : with the window
+          // occluded or minimized (the app then runs on a timer to keep the
+          // projector stream alive) it goes quiet and the wall would freeze. A
+          // playing deck whose playhead has moved on since its last blit gets one
+          // anyway; uploading makes the element hand over its current frame.
+          if (!d.pending && (d.el.paused || now - d.blitAt < 120 || Math.abs(d.el.currentTime - d.blitT) < 0.02))
+            continue
+          d.pending = false
+          vw = d.el.videoWidth
+          vh = d.el.videoHeight
+          tex = this.uploadStaged(d.el)
+        }
+        if (!tex || !vw || !vh) continue
+        // The picture rect of THIS frame (an edit cuts between aspects; a new
+        // film lands with its own) : the crops follow what the layer holds.
+        const ct = containRect(vw, vh)
+        if (Math.abs(ct[2] - d.content[2]) > 1e-4 || Math.abs(ct[3] - d.content[3]) > 1e-4) {
+          d.content = ct
+          this.cropsDirty = true
+        }
+        if (d.panNext) {
+          d.pan = d.panNext
+          d.panNext = null
+          this.cropsDirty = true
+        }
+        d.needFrame = false
+        d.blitAt = now
+        d.blitT = d.asm ? -1 : d.el.currentTime
+        if (!bound) {
+          gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo)
+          gl.viewport(0, 0, T, T)
+          gl.useProgram(g.tile)
+          gl.activeTexture(gl.TEXTURE0)
+          gl.uniform1i(g.uTile('uSrc'), 0)
+          bound = true
+        }
+        gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, this.arr, 0, i)
+        gl.bindTexture(gl.TEXTURE_2D, tex)
+        gl.uniform4f(g.uTile('uContent'), d.content[0], d.content[1], d.content[2], d.content[3])
+        gl.uniform2f(g.uTile('uFoot'), 1 / (T * d.content[2]), 1 / (T * d.content[3]))
+        gl.uniform1i(g.uTile('uBox'), vw / (T * d.content[2]) > 1.3 ? 1 : 0)
+        gl.drawArrays(gl.TRIANGLES, 0, 3)
+        d.blitted = true
+      }
+      if (bound) gl.bindTexture(gl.TEXTURE_2D, null)
+    }
+    if (this.cropsDirty) this.rebuildCrops()
 
     // 2) Empty wall (no films yet) : clear the scratch target and bail before
     //    touching the crossfade buffers.
@@ -928,90 +1424,119 @@ export class CollageSource {
       gl.viewport(0, 0, this.w, this.h)
       gl.clearColor(0, 0, 0, 0)
       gl.clear(gl.COLOR_BUFFER_BIT)
+      this.prevValid = false
       return
     }
-    this.ensureOut()
 
-    // 3) Draw the live collage into `cur`.
+    // 3) The collage uniforms.
     for (let i = 0; i < n; i++) {
       const c = this.cells[i]
       this.cellArr[i * 4] = c.x; this.cellArr[i * 4 + 1] = c.y
       this.cellArr[i * 4 + 2] = c.w; this.cellArr[i * 4 + 3] = c.h
       this.cropArr[i * 4] = c.crop[0]; this.cropArr[i * 4 + 1] = c.crop[1]
       this.cropArr[i * 4 + 2] = c.crop[2]; this.cropArr[i * 4 + 3] = c.crop[3]
-      // The deck's picture rect (content) : the shader clamps its film read to it
-      // so an over-running / frayed shape samples real film, never the padding.
+      // The deck's picture rect : the shader mirrors its film read inside it so
+      // an over-running / frayed shape samples real film, never the padding.
       const ct = this.decks[c.deck] ? this.decks[c.deck].content : [0, 0, 1, 1]
       this.contentArr[i * 4] = ct[0]; this.contentArr[i * 4 + 1] = ct[1]
       this.contentArr[i * 4 + 2] = ct[2]; this.contentArr[i * 4 + 3] = ct[3]
-      this.deckArr[i] = c.deck
-      this.rotArr[i] = c.rot
+      this.metaArr[i * 4] = c.deck
+      this.metaArr[i * 4 + 1] = c.rot
+      this.metaArr[i * 4 + 2] = this.rank[i]
+      this.metaArr[i * 4 + 3] = 0
     }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.cur!.fbo)
-    gl.viewport(0, 0, this.w, this.h)
-    gl.clearColor(0, 0, 0, 0)
-    gl.clear(gl.COLOR_BUFFER_BIT)
-    gl.useProgram(g.collage)
-    gl.bindBuffer(gl.ARRAY_BUFFER, g.quad)
-    gl.enableVertexAttribArray(0)
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+    const live = this.live
+    const prog = this.lastShape === 1 ? g.mosaic : g.collage
+    const U = this.lastShape === 1 ? g.uMos : g.uColl
+    gl.useProgram(prog)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.arr)
-    gl.uniform1i(g.uColl('uDecks'), 0)
-    gl.uniform1i(g.uColl('uCount'), n)
-    gl.uniform4fv(g.uColl('uCell'), this.cellArr)
-    gl.uniform4fv(g.uColl('uCrop'), this.cropArr)
-    gl.uniform4fv(g.uColl('uContent'), this.contentArr)
-    gl.uniform1fv(g.uColl('uDeck'), this.deckArr)
-    gl.uniform1fv(g.uColl('uRot'), this.rotArr)
-    gl.uniform1fv(g.uColl('uRank'), this.rankArr)
-    gl.uniform1f(g.uColl('uSeed'), (this.seed & 0xffff) / 65535)
-    gl.uniform1f(g.uColl('uGap'), clampf(num(this.live.gap, 0), 0, 1))
-    gl.uniform1f(g.uColl('uContour'), clampf(num(this.live.contour, 0), 0, 2))
-    gl.uniform1f(g.uColl('uCurve'), clampf(num(this.live.curve, 0.3), 0, 1))
-    gl.uniform1f(g.uColl('uTorn'), clampf(num(this.live.torn, 0), 0, 2))
-    gl.uniform1f(g.uColl('uMask'), clampf(num(this.live.mask, 0), 0, 1))
-    gl.uniform1i(g.uColl('uShape'), Math.round(clampf(num(this.live.shape, 0), 0, 1)))
-    gl.uniform1i(g.uColl('uContourMode'), Math.round(clampf(num(this.live.contourMode, 1), 0, 1)))
-    gl.disable(gl.BLEND)
+    gl.uniform1i(U('uDecks'), 0)
+    gl.uniform1i(U('uCount'), n)
+    gl.uniform4fv(U('uCell'), this.cellArr)
+    gl.uniform4fv(U('uCrop'), this.cropArr)
+    gl.uniform4fv(U('uContent'), this.contentArr)
+    gl.uniform4fv(U('uMeta'), this.metaArr)
+    gl.uniform4fv(U('uSite'), this.siteArr)
+    gl.uniform4fv(U('uRows'), this.rowsArr)
+    gl.uniform1i(U('uRowCount'), this.rowCount)
+    gl.uniform1f(U('uSeed'), (this.seed & 0xffff) / 65535)
+    gl.uniform1f(U('uAspect'), this.w / this.h)
+    gl.uniform1f(U('uTexel'), 1 / this.tile)
+    gl.uniform1f(U('uPx'), 1 / this.h)
+    gl.uniform1f(U('uGap'), clampf(num(live.gap, 0), 0, 1))
+    gl.uniform1f(U('uContour'), clampf(num(live.contour, 0), 0, 2))
+    gl.uniform1f(U('uCurve'), clampf(num(live.curve, 0.3), 0, 1))
+    gl.uniform1f(U('uTorn'), clampf(num(live.torn, 0), 0, 2))
+    gl.uniform1f(U('uMask'), clampf(num(live.mask, 0), 0, 1))
+    gl.uniform1i(U('uContourMode'), Math.round(clampf(num(live.contourMode, 1), 0, 1)))
+
+    // 4a) No crossfade : the wall draws straight into the layer, in the straight
+    //     alpha the blend stack reads. No extra buffers, no copy pass.
+    const buffered = this.xfadeDur > 0 || this.xfade < 1
+    if (!buffered) {
+      gl.uniform1i(U('uStraight'), 1)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, scratchFbo)
+      gl.viewport(0, 0, this.w, this.h)
+      gl.drawArrays(gl.TRIANGLES, 0, 3)
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, null)
+      this.prevValid = false
+      this.foldAt = null
+      return
+    }
+
+    // 4b) Crossfade : premultiplied walls in cur/prev, dissolved and turned back
+    //     to straight alpha on the way into the layer.
+    this.ensureOut()
+    const cur = this.cur!, prev = this.prev!
+    if (this.foldAt !== null && this.prevValid) {
+      // A deal landed mid-fade : prev ← mix(prev, cur, t), the frame on screen.
+      const t = this.foldAt
+      gl.bindFramebuffer(gl.FRAMEBUFFER, prev.fbo)
+      gl.viewport(0, 0, this.w, this.h)
+      gl.useProgram(g.fold)
+      gl.bindTexture(gl.TEXTURE_2D, cur.tex)
+      gl.uniform1i(g.uFold('uTex'), 0)
+      gl.uniform1f(g.uFold('uAmt'), t)
+      gl.enable(gl.BLEND)
+      gl.blendColor(0, 0, 0, t)
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_CONSTANT_ALPHA)
+      gl.drawArrays(gl.TRIANGLES, 0, 3)
+      gl.disable(gl.BLEND)
+      gl.bindTexture(gl.TEXTURE_2D, null)
+      gl.useProgram(prog)
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.arr)
+    }
+    this.foldAt = null
+    gl.uniform1i(U('uStraight'), 0)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, cur.fbo)
+    gl.viewport(0, 0, this.w, this.h)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, null)
 
-    // 4) Composite into the scratch target : a plain copy when settled, or a
-    //    premultiplied crossfade prev·(1−t) + cur·t while a deal dissolves. Both
-    //    layouts are premultiplied (rgb·keep, keep), so the additive sum is correct.
     const fading = this.xfade < 1 && this.prevValid
     gl.bindFramebuffer(gl.FRAMEBUFFER, scratchFbo)
     gl.viewport(0, 0, this.w, this.h)
-    gl.clearColor(0, 0, 0, 0)
-    gl.clear(gl.COLOR_BUFFER_BIT)
-    gl.useProgram(g.fade)
-    gl.bindBuffer(gl.ARRAY_BUFFER, g.quad)
-    gl.enableVertexAttribArray(0)
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+    gl.useProgram(g.show)
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, prev.tex)
     gl.activeTexture(gl.TEXTURE0)
-    gl.uniform1i(g.uFade('uTex'), 0)
-    if (fading) {
-      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE)
-      gl.bindTexture(gl.TEXTURE_2D, this.prev!.tex)
-      gl.uniform1f(g.uFade('uAmt'), 1 - this.xfade)
-      gl.drawArrays(gl.TRIANGLES, 0, 3)
-      gl.bindTexture(gl.TEXTURE_2D, this.cur!.tex)
-      gl.uniform1f(g.uFade('uAmt'), this.xfade)
-      gl.drawArrays(gl.TRIANGLES, 0, 3)
-      gl.disable(gl.BLEND)
-    } else {
-      gl.disable(gl.BLEND)
-      gl.bindTexture(gl.TEXTURE_2D, this.cur!.tex)
-      gl.uniform1f(g.uFade('uAmt'), 1)
-      gl.drawArrays(gl.TRIANGLES, 0, 3)
-    }
+    gl.bindTexture(gl.TEXTURE_2D, cur.tex)
+    gl.uniform1i(g.uShow('uCur'), 0)
+    gl.uniform1i(g.uShow('uPrev'), 1)
+    gl.uniform1f(g.uShow('uT'), this.xfade)
+    gl.uniform1i(g.uShow('uFading'), fading ? 1 : 0)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, null)
+    gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, null)
 
     // 5) Ping-pong : once settled, the frame just drawn becomes the outgoing
     //    layer a future deal dissolves from. Held frozen while a fade runs.
     if (this.xfade >= 1) {
-      const tmp = this.prev; this.prev = this.cur; this.cur = tmp
+      this.prev = cur
+      this.cur = prev
       this.prevValid = true
     }
   }
@@ -1022,11 +1547,15 @@ export class CollageSource {
     const gl = this.gl
     for (const d of this.decks) this.killDeck(d)
     this.decks = []
+    // Textures and framebuffers only : the shared quad / vertex array live for
+    // the context (deleting a buffer is what trips the default-VAO landmine).
     if (this.arr) gl.deleteTexture(this.arr)
     if (this.fbo) gl.deleteFramebuffer(this.fbo)
     for (const o of [this.cur, this.prev]) {
       if (o) { gl.deleteTexture(o.tex); gl.deleteFramebuffer(o.fbo) }
     }
+    for (const t of this.staging.values()) gl.deleteTexture(t)
+    this.staging.clear()
     this.cur = null
     this.prev = null
     this.arr = null

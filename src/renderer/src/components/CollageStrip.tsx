@@ -50,8 +50,13 @@ export function CollageStrip({
     setBusy(optimise ? 'optimising' : 'scanning')
     setProgress('')
     setNote('')
+    // The counter also names the latest file : main announces each file BEFORE a
+    // transcode, so a minutes-long conversion reads as "3/10 · clip.mov" instead
+    // of a count that looks stuck.
     const off = window.api.onCollageProgress((p) => {
-      if (alive.current) setProgress(`${p.done}/${p.total}`)
+      if (!alive.current) return
+      const f = p.file.length > 18 ? `${p.file.slice(0, 17)}…` : p.file
+      setProgress(`${p.done}/${p.total}${f ? ` · ${f}` : ''}`)
     })
     try {
       const res = optimise ? await window.api.collageOptimise(dir) : await window.api.collageScan(dir)

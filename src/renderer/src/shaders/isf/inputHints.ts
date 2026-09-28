@@ -355,6 +355,28 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     rate: 'Auto re-cut rate (Hz) : >0 re-cuts on its own for hands-free live rhythm. 0 = only on trigger.',
     trig: 'Make a fresh cut on the rising edge. Press FIRE, send OSC, or bind a modulator (M) for rhythmic cutting.'
   },
+  'gen-collage': {
+    cuts: 'How many pieces the frame is cut into.',
+    shape: 'CUT-UP = recursive rectangles. MOSAIC = irregular polygon shards.',
+    feed: 'FOLDER = every piece plays a film from the scanned folder. ASSEMBLAGES = every piece plays one of the saved edits picked under "edits…" (the folder stands in while none are picked).',
+    films: 'How many films play at once (each is a decoder). More pieces than films is fine : the extra pieces show the same film at another crop.',
+    hold: '0 = each piece plays its whole film on a loop, with no seeking (the smoothest). A length in seconds = each piece loops a window that long inside its film instead.',
+    churn: 'Fraction of the pieces that switch to another film on their own quick clock, between deals. 0 = every piece holds; 1 = every piece is its own little montage.',
+    speed: 'Playback speed of every film, on top of the layer Speed.',
+    vary: 'Gives each piece its own speed around speed : 0 = all in step, 1 = anywhere from half to double.',
+    freeze: 'Stops every piece on its current frame; auto deal and churn wait too. A deal still re-deals the stopped wall.',
+    zoom: 'Crops tighter into each film.',
+    rotate: 'What fraction of the pieces are turned 90°, 180° or 270°.',
+    gap: 'Dark seams between the pieces.',
+    contour: 'Bends the straight cut lines into wandering, frayed curves.',
+    curve: 'Wavelength of the contour : low = many small waves, high = a few long sweeping curves.',
+    contourMode: 'WARPED = contour ripples the film inside each piece too. NORMAL = only the cut edges fray; the picture stays straight.',
+    torn: 'A pale, ragged torn-paper edge along every cut.',
+    mask: 'Drops pieces out, leaving transparent holes the layers below show through. At 1 a single piece survives (a new one at each deal).',
+    rate: 'Re-deals the whole wall every this many seconds (new films, new cut). 0 = only when you press deal.',
+    xfade: 'Dissolve time from one deal to the next. 0 = a hard cut.',
+    deal: 'Re-deal the wall now : new films, new cut. Press it, send OSC, or bind a modulator.'
+  },
   'fx-vibe': {
     stops: 'How many palette stops (2–5) the image is re-coloured toward : the size of the colour map.',
     blend: 'Blend of the palette re-colour against the original colours.',
@@ -439,4 +461,28 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     outShadowAngle: "Direction the shape's shadow falls (light angle).",
     outPerspective: 'Rakes the shadow onto a receding ground plane : adds depth realism.'
   },
+  'gen-text': {
+    font: 'The typeface. Each font has its own weight range; a font with a single weight greys out the weight dial.',
+    size: 'Letter size : the em height as a share of the frame height (0.25 = a quarter of the frame).',
+    weight: 'Stroke weight, 100 thin to 900 black, within what the chosen font really has : beyond its range it holds at the nearest weight (never a faked bold).',
+    spacing: 'Extra space between letters, in em (0.1 = a tenth of the letter size). Negative tightens.',
+    stretch: 'Stretches the letters along their own vertical axis : above 1 tall and condensed, below 1 squat.',
+    angle: 'Rotation of the whole text block (radians).',
+    posX: 'Horizontal position : ±1 puts the center of the text on the frame edge.',
+    posY: 'Vertical position : ±1 puts the center of the text on the frame edge.',
+    scroll: 'Crawls the text along its own baseline like a ticker, in frame widths per second (positive runs right to left). It loops once the text has fully left the frame. 0 = still.',
+    fit: 'Shrinks the text so the whole block stays inside the frame (it never enlarges it). While crawling only the height is fitted.',
+    drift: 'Each letter wanders and tilts on its own slow path : 0 = still type, 1 = restless letters.',
+    reveal: 'Typewriter : the share of the characters shown, in reading order. Bind a modulator to type the words on.',
+    lines: 'ALL shows every line (type \\n in the text for a new line). ONE AT A TIME shows a single line, and NEXT LINE ▸ steps to the following one : lyric or word cues.',
+    line: 'NEXT LINE ▸ : show the next line, wrapping after the last (one at a time only). Rising edge : over OSC send 1 then 0.',
+    color: 'Letter color; its alpha fades the letters. With a fill layer chosen, the color tints that layer inside the letters.'
+  },
+  'gen-parametric': {
+    mode: 'RASTER = columns that light when their band is loud enough, with scanning seams. WAVEFORM = the wave as a trace. BARS = the spectrum as bars. SPECTROGRAM = the spectrum over time, newest row at the top. Frequencies run bass (left) to treble (right).',
+    gain: 'Input amplification before drawing.',
+    scale: 'Depends on the mode. Raster : how many columns. Waveform : trace thickness. Bars : how many bars. Spectrogram : contrast (low shows quiet detail, high keeps only the peaks).',
+    scan: 'Raster : how fast the seams scroll. Spectrogram : how fast the history scrolls. No effect on waveform and bars.',
+    mono: 'On : white marks. Off : marks in the color.'
+  }
 }

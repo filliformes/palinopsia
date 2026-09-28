@@ -1158,17 +1158,23 @@ export const GENERATORS: IsfShader[] = [
     // registry (and the bundled @font-face set) : one source of truth.
     source: `/*${JSON.stringify({
       DESCRIPTION:
-        "Text : typography as a source. Type in the Inspector; pick a font, size, weight and letter-spacing; place it with angle/position. A sidechain layer can FILL the glyphs (the letters become a matte over that layer's texture) : no sidechain = solid colour.",
+        "Text : typography as a source. Type in the Inspector (\\n for a new line); pick a font, size, weight and letter-spacing; place it with angle and position. LINES shows every line at once, or one at a time stepped by NEXT LINE ▸ (lyric or word cues). CRAWL runs it like a ticker, DRIFT lets each letter wander, REVEAL types it on. A fill layer can show through the letters (they become a matte over that layer's picture) : no fill = solid color.",
       CATEGORIES: ['Generator'],
       INPUTS: [
         { NAME: 'font', TYPE: 'long', VALUES: TEXT_FONTS.map((_, i) => i), LABELS: TEXT_FONTS, DEFAULT: 1, LABEL: 'font' },
         { NAME: 'size', TYPE: 'float', MIN: 0.02, MAX: 1.0, DEFAULT: 0.25, LABEL: 'size' },
         { NAME: 'weight', TYPE: 'float', MIN: 100.0, MAX: 900.0, DEFAULT: 700.0, LABEL: 'weight' },
         { NAME: 'spacing', TYPE: 'float', MIN: -0.15, MAX: 0.8, DEFAULT: 0.0, LABEL: 'spacing' },
-        { NAME: 'stretch', TYPE: 'float', MIN: 0.25, MAX: 4.0, DEFAULT: 1.0, LABEL: 'v stretch' },
+        { NAME: 'stretch', TYPE: 'float', MIN: 0.25, MAX: 4.0, DEFAULT: 1.0, LABEL: 'vertical stretch' },
         { NAME: 'angle', TYPE: 'float', MIN: -3.1416, MAX: 3.1416, DEFAULT: 0.0, LABEL: 'angle' },
         { NAME: 'posX', TYPE: 'float', MIN: -1.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'pos x' },
         { NAME: 'posY', TYPE: 'float', MIN: -1.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'pos y' },
+        { NAME: 'scroll', TYPE: 'float', MIN: -1.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'crawl' },
+        { NAME: 'fit', TYPE: 'bool', DEFAULT: false, LABEL: 'shrink to fit' },
+        { NAME: 'drift', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'letter drift' },
+        { NAME: 'reveal', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 1.0, LABEL: 'reveal' },
+        { NAME: 'lines', TYPE: 'long', VALUES: [0, 1], LABELS: ['all', 'one at a time'], DEFAULT: 0, LABEL: 'lines' },
+        { NAME: 'line', TYPE: 'event', LABEL: 'next line ▸' },
         { NAME: 'color', TYPE: 'color', DEFAULT: [1.0, 1.0, 1.0, 1.0] }
       ]
     })}*/`,
@@ -1179,7 +1185,8 @@ export const GENERATORS: IsfShader[] = [
       stretch: [0.7, 2.2],
       angle: [-0.6, 0.6],
       posX: [-0.4, 0.4],
-      posY: [-0.4, 0.4]
+      posY: [-0.4, 0.4],
+      drift: [0, 0.4]
     }
   },
   {
@@ -1194,7 +1201,7 @@ export const GENERATORS: IsfShader[] = [
     native: true,
     source: `/*${JSON.stringify({
       DESCRIPTION:
-        "Collage : a wall of films cut up like torn paper. Point it at a folder in the Inspector and every piece of the cut-up plays a different clip, cover-cropped to its own shape so portrait, landscape and 4K mix freely. `feed` switches between that folder and a selection from the Assemble bank — with `assemblages` every piece plays one of your saved little edits instead, cutting on its own. `films` is how many play at once, up to 50 (more cuts than films is fine — the extra pieces show the same film at another crop); `window` is 0 for just playing the film on a loop (no seeking at all, the smoothest setting), or a length in seconds to loop a short window of it instead; `churn` decides how many pieces re-cut on their own fast clock, from all holding to every piece its own little montage. `deal` re-deals the wall, `rate` does it on a clock, and `crossfade` dissolves each deal into the next instead of snapping. `shape` picks the piece geometry — CUT-UP is the recursive rectangles, MOSAIC is irregular Voronoi shards. contour / curve length / torn paper / mask are the Autocutter's dials, and behave identically; `contour mode` chooses whether contour warps the whole clip inside each piece (WARPED) or only frays the cut edges while the picture stays straight (NORMAL).",
+        "Collage : a wall of films cut up like torn paper. Pick a folder in the Inspector and every piece of the cut-up plays a different clip, cover-cropped to its own shape, so portrait, landscape and 4K mix freely. feed switches between that folder and a selection of saved assemblages : with assemblages, every piece plays one of your little edits, cutting on its own. films is how many play at once, up to 50 (more cuts than films is fine : the extra pieces show the same film at another crop). window (hold) is 0 to play each whole film on a loop (no seeking at all, the smoothest setting), or a length in seconds to loop a short window of it instead. churn sets how many pieces switch film on their own fast clock, from all holding to every piece its own little montage. speed spread (vary) gives every piece its own playback speed around speed; freeze stops the whole wall on the current frame. deal re-deals the wall, auto deal (rate) does it on a clock, and crossfade (xfade) dissolves each deal into the next instead of snapping. shape picks the piece geometry : CUT-UP is recursive rectangles, MOSAIC is irregular polygon shards. contour, curve length, torn paper and mask are the Autocutter's dials; contour mode chooses whether contour warps the film inside each piece (WARPED) or only frays the cut edges while the picture stays straight (NORMAL). The layer Speed and the global speed scale the whole wall, films and clocks alike.",
       CATEGORIES: ['Generator'],
       INPUTS: [
         { NAME: 'cuts', TYPE: 'float', MIN: 2.0, MAX: 64.0, DEFAULT: 12.0, LABEL: 'cuts' },
@@ -1204,6 +1211,8 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'hold', TYPE: 'float', MIN: 0.0, MAX: 30.0, DEFAULT: 0.0, LABEL: 'window (s)' },
         { NAME: 'churn', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'churn' },
         { NAME: 'speed', TYPE: 'float', MIN: 0.1, MAX: 4.0, DEFAULT: 1.0, LABEL: 'speed' },
+        { NAME: 'vary', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'speed spread' },
+        { NAME: 'freeze', TYPE: 'bool', DEFAULT: false, LABEL: 'freeze' },
         { NAME: 'zoom', TYPE: 'float', MIN: 1.0, MAX: 3.0, DEFAULT: 1.05, LABEL: 'zoom' },
         { NAME: 'rotate', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'rotate' },
         { NAME: 'gap', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'seams' },
@@ -1223,6 +1232,8 @@ export const GENERATORS: IsfShader[] = [
       hold: [0, 10],
       churn: [0, 0.6],
       speed: [0.5, 1.6],
+      vary: [0, 0.6],
+      freeze: [0, 0], // never dice a stopped wall
       zoom: [1, 1.4],
       rotate: [0, 0.35],
       gap: [0, 0.4],
@@ -1237,21 +1248,22 @@ export const GENERATORS: IsfShader[] = [
   {
     // Parametric : the audio-buffer→texture generator (the parametric
     // diegesis; a test-pattern raster). NATIVE (engine/ParametricSource.ts). Reads
-    // the LOCAL audio bus's spectrum/waveform; a procedural signal when silent.
+    // the local audio bus's spectrum/waveform, the six OSC bands when only OSC
+    // audio runs, a procedural signal when there is no audio.
     id: 'gen-parametric',
     name: 'Parametric',
     category: 'Generator',
     native: true,
     source: `/*${JSON.stringify({
       DESCRIPTION:
-        'Parametric : a literal audio→image reading (a test-pattern raster). Renders the LOCAL audio bus as a hard raster, a waveform trace, spectrum bars, or a scrolling spectrogram. Needs Audio ingest ON (local) to read real sound; otherwise a procedural test signal. Abstract by design : a raster/waveform/spectrogram, never an oscilloscope.',
+        'Parametric : a literal audio→image reading (a test-pattern raster). Draws the audio as a hard raster, a waveform trace, spectrum bars, or a scrolling spectrogram, on a log frequency axis (bass left, treble right). Local audio input gives the real spectrum and wave; OSC audio gives its six bands; with no audio it runs a test signal. Abstract by design : a raster/waveform/spectrogram, never an oscilloscope.',
       CATEGORIES: ['Generator'],
       INPUTS: [
         { NAME: 'mode', TYPE: 'long', VALUES: [0, 1, 2, 3], LABELS: ['raster', 'waveform', 'bars', 'spectrogram'], DEFAULT: 0, LABEL: 'mode' },
         { NAME: 'gain', TYPE: 'float', MIN: 0.0, MAX: 4.0, DEFAULT: 1.2, LABEL: 'gain' },
-        { NAME: 'scale', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.4, LABEL: 'scale' },
-        { NAME: 'scan', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.3, LABEL: 'scan' },
-        { NAME: 'mono', TYPE: 'bool', DEFAULT: true, LABEL: 'mono' },
+        { NAME: 'scale', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.4, LABEL: 'scale (per mode)' },
+        { NAME: 'scan', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.3, LABEL: 'scan speed' },
+        { NAME: 'mono', TYPE: 'bool', DEFAULT: true, LABEL: 'mono (white)' },
         { NAME: 'color', TYPE: 'color', DEFAULT: [0.6, 0.85, 1.0, 1.0] }
       ]
     })}*/`,

@@ -7,6 +7,9 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Collage** : `speed spread` (each piece plays at its own rate) and `freeze`.
+- **Text** : crawl (a ticker along the baseline), shrink to fit, letter drift,
+  typewriter reveal, and one line at a time with `next line`.
 - **New source controls** from the generator audit, every default keeping
   today's look :
   - Drift Field `strata angle` and `reseed`;
@@ -117,6 +120,37 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The picture could freeze when a Parametric slot was switched away** : its
+  disposal broke every shader draw. Parametric, Text and Collage now own their
+  vertex setup and survive a GPU reset.
+- **Collage** :
+  - Churn re-rolls were identical, so the wall collapsed onto one film.
+  - Churn and window only applied at the next deal.
+  - Optimise was ignored on a running wall.
+  - Mosaic pieces smeared edge pixels.
+  - Crossfades restarted from a stale frame.
+  - An aborted seek could leave a piece stuck.
+  - Pieces went soft at 4K, because tile size now follows the output.
+  - Presets leaked into each other.
+  - Layer Speed and the background's slow clock were ignored.
+  - Every Collage started from the same seed.
+  - A minimized control window froze the wall.
+- **Text** :
+  - The weight dial did nothing on most fonts; each face is now declared at
+    its real weights, and the dial grays out when a font has only one.
+  - Modulating size or spacing redrew the whole frame every frame and moved in
+    visible steps; Text now uses a glyph atlas, so it is smooth and cheap.
+  - Stretch went soft.
+  - A Text layer was an opaque black slab in Normal blend.
+  - Presets forced the first font.
+- **Parametric** :
+  - Raster ignored the audio.
+  - The frequency axis wasted three quarters of the spectrum; it now uses 512
+    log columns.
+  - The spectrogram blurred as it scrolled, and its speed depended on frame
+    rate.
+  - Bars mode ignored `scale`.
+  - OSC-audio mode now draws the six bus bands.
 - **Source generators, after an audit of all 23.**
   - Every rate-driven source now integrates its rate, so a knob never jumps the picture.
   - Each one still moves, unrepeating, after 24 hours. Before, Slabs froze after about
