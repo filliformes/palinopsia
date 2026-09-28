@@ -1311,7 +1311,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-pixelate', name: 'Pixelate', category: 'FX', source: pixelate,
-    curated: { cells: [40, 240] }
+    curated: { cells: [40, 240], average: [0, 0.6] }
   },
   {
     id: 'fx-displace', name: 'Displace', category: 'FX', source: displace,
@@ -1319,7 +1319,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-scanlines', name: 'Scanlines', category: 'FX', source: scanlines,
-    curated: { count: [200, 900], darkness: [0.1, 0.5], roll: [0, 0.3] }
+    curated: { count: [200, 900], darkness: [0.1, 0.5], roll: [0, 0.3], moire: [0, 1] }
   },
   {
     id: 'fx-edge', name: 'Edge', category: 'FX', source: edge,
@@ -1327,11 +1327,11 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-grade', name: 'Grade', category: 'FX', source: grade,
-    curated: { brightness: [-0.15, 0.15], contrast: [0.8, 1.6], saturation: [0.3, 1.3], lift: [0, 0.08] }
+    curated: { brightness: [-0.15, 0.15], contrast: [0.8, 1.6], saturation: [0.3, 1.3], lift: [0, 0.08], gamma: [0.8, 1.25] }
   },
   {
     id: 'fx-slice-shuffle', name: 'Slice Shuffle', category: 'FX', source: sliceShuffle,
-    curated: { slices: [8, 64], amount: [0.02, 0.25], chance: [0.1, 0.5], rate: [0.1, 0.7] }
+    curated: { slices: [8, 64], amount: [0.02, 0.25], chance: [0.1, 0.5], rate: [0.1, 0.7], audio: [0, 0.5] }
   },
   {
     id: 'fx-smear', name: 'Smear', category: 'FX', source: smear,
@@ -1339,21 +1339,25 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-palette', name: 'Palette', category: 'FX', source: palette,
-    curated: { stops: [2, 5], blend: [0, 1], dither: [0, 0.6], mixSrc: [0, 0.4] }
+    // cycle pinned : a dice never starts the color cycling (Palette closes
+    // many randomized master racks).
+    curated: { stops: [2, 5], blend: [0, 1], dither: [0, 0.6], mixSrc: [0, 0.4], cycle: [0, 0] }
   },
   {
     id: 'fx-threshold', name: 'Threshold', category: 'FX', source: threshold,
     // Curated level sits LOW: the seed generators live near black, and a
     // mid threshold gates them entirely to black (the Randomize-black bug).
-    curated: { level: [0.08, 0.35], soft: [0.05, 0.3] }
+    // invert / alpha key pinned off : on a near-black source an inverted roll
+    // whites out the frame, and an alpha-key roll carves it empty.
+    curated: { level: [0.08, 0.35], soft: [0.05, 0.3], invert: [0, 0], alphaOut: [0, 0] }
   },
   {
     id: 'fx-solarize', name: 'Solarize', category: 'FX', source: solarize,
-    curated: { level: [0.4, 0.8], strength: [0.5, 1] }
+    curated: { level: [0.4, 0.8], strength: [0.5, 1], soft: [0.04, 0.3] }
   },
   {
     id: 'fx-mosh-blocks', name: 'Mosh Blocks', category: 'FX', source: moshBlocks,
-    curated: { blocks: [10, 48], amount: [0.05, 0.3], chance: [0.1, 0.5], rate: [0.1, 0.8], freak: [0, 0.5] }
+    curated: { blocks: [10, 48], amount: [0.05, 0.3], chance: [0.1, 0.5], rate: [0.1, 0.8], freak: [0, 0.5], audio: [0, 0.5] }
   },
   {
     id: 'fx-grain', name: 'Grain', category: 'FX', source: withParasites(grain),
@@ -1376,10 +1380,10 @@ export const FX_SHADERS: IsfShader[] = [
     id: 'fx-transform', name: 'Transform', category: 'FX', source: transform,
     // crop rolls a SHALLOW bite (≤0.2 per edge) : Randomize / Vary reframe with
     // it, but four edges at their max still leave a generous 0.6×0.6 centre, so
-    // a dice never chops the frame to slivers. shape stays pinned at 0.
+    // a dice never chops the frame to slivers. shape and cutout are never rolled.
     curated: {
       zoom: [0.7, 1.6], posX: [-0.3, 0.3], posY: [-0.3, 0.3], rotate: [-0.6, 0.6], shape: [0, 0],
-      cropUp: [0, 0.2], cropDown: [0, 0.2], cropLeft: [0, 0.2], cropRight: [0, 0.2]
+      cropUp: [0, 0.2], cropDown: [0, 0.2], cropLeft: [0, 0.2], cropRight: [0, 0.2], cutout: [0, 0]
     }
   },
   {
@@ -1392,15 +1396,15 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-ntsc', name: 'NTSC', category: 'FX', source: ntsc,
-    curated: { artifact: [0.1, 0.6], carrier: [0.2, 0.8], fringe: [0.05, 0.4], interlace: [0.1, 0.6], fieldHue: [-0.5, 0.5], fieldCrawl: [0, 0.4] }
+    curated: { artifact: [0.1, 0.6], carrier: [0, 0.9], fringe: [0.05, 0.4], interlace: [0.1, 0.6], fieldHue: [-0.5, 0.5], fieldCrawl: [0, 0.4] }
   },
   {
     id: 'fx-row-echo', name: 'Row Echo', category: 'FX', source: rowEcho,
-    curated: { rows: [20, 140], chance: [0.1, 0.6], fade: [0.1, 0.8], rate: [0.1, 0.7] }
+    curated: { rows: [20, 140], chance: [0.1, 0.6], fade: [0.1, 0.8], rate: [0.1, 0.7], audio: [0, 0.5] }
   },
   {
     id: 'fx-byte-corrupt', name: 'Byte Corrupt', category: 'FX', source: byteCorrupt,
-    curated: { depth: [3, 10], scramble: [0.15, 0.7], blocks: [4, 32], warpByte: [0, 0.6], rate: [0.1, 0.7], chaos: [0, 0.6] }
+    curated: { depth: [3, 10], scramble: [0.15, 0.7], blocks: [4, 32], warpByte: [0, 0.6], rate: [0.1, 0.7], chaos: [0, 0.6], audio: [0, 0.5] }
   },
   {
     id: 'fx-ringing', name: 'Ringing', category: 'FX', source: ringing,
@@ -1418,7 +1422,7 @@ export const FX_SHADERS: IsfShader[] = [
     id: 'fx-motif', name: 'Motif', category: 'FX', source: motif,
     curated: {
       offX: [-0.3, 0.3], offY: [-0.25, 0.25], rotate: [-1.2, 1.2],
-      scale: [0.75, 1.15], fade: [0.4, 0.8]
+      scale: [0.75, 1.15], fade: [0.4, 0.8], audio: [0, 0.4]
     }
   },
   {
@@ -1435,7 +1439,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-distort', name: 'Distort', category: 'FX', source: distort,
-    curated: { amount: [0.1, 0.6], scale: [1, 12], angle: [0, 6.2832], rate: [0.1, 2] }
+    curated: { amount: [0.1, 0.6], scale: [1, 12], angle: [0, 6.2832], rate: [0.1, 2], audio: [0, 0.5] }
   },
   {
     id: 'fx-slit-buffer', name: 'Slit Buffer', category: 'FX', source: slitBuffer,
@@ -1451,19 +1455,21 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-colorizer', name: 'Colorizer', category: 'FX', source: colorizer,
-    curated: { gain: [0.5, 2.5], bias: [-0.4, 0.4], fold: [0, 0.6], mixSrc: [0.15, 0.4] }
+    // fold reaches 1 now that it only folds the over/under-range (it used to
+    // crossfade to the negative, flat at 0.5). invert is never rolled.
+    curated: { gain: [0.5, 2.5], bias: [-0.4, 0.4], fold: [0, 1], mixSrc: [0.15, 0.4], invert: [0, 0] }
   },
   {
     id: 'fx-wavefold', name: 'Wavefold', category: 'FX', source: wavefold,
-    curated: { fold: [0.1, 0.8], bias: [-0.3, 0.3], symmetry: [0, 1], wet: [0.4, 1] }
+    curated: { fold: [0.1, 0.8], bias: [-0.3, 0.3], symmetry: [0, 1], wet: [0.4, 1], invert: [0, 0] }
   },
   {
     id: 'fx-rutt', name: 'Rutt', category: 'FX', source: rutt,
-    curated: { lines: [40, 160], amp: [0.03, 0.2], width: [0.08, 0.4], color: [0, 1] }
+    curated: { lines: [40, 160], amp: [0.03, 0.2], width: [0.08, 0.4], color: [0, 1], relief: [0, 1] }
   },
   {
     id: 'fx-crt-screen', name: 'CRT Screen', category: 'FX', source: crtScreen,
-    curated: { curve: [0.05, 0.4], aberration: [0.002, 0.02], scanline: [0.1, 0.5], vignette: [0.15, 0.7], corner: [0.02, 0.12] }
+    curated: { curve: [0.05, 0.4], aberration: [0.002, 0.02], scanline: [0.1, 0.5], vignette: [0.15, 0.7], corner: [0.02, 0.12], lines: [300, 540], moire: [0, 1] }
   },
   {
     id: 'fx-pixelmask', name: 'Pixelmask', category: 'FX', source: pixelmask,
@@ -1491,11 +1497,12 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-hue-rotate', name: 'Hue Rotate', category: 'FX', source: hueRotate,
-    curated: { shift: [0, 1], byLuma: [-0.6, 0.6] }
+    // rate pinned : a dice never sets the whole picture cycling on its own.
+    curated: { shift: [0, 1], byLuma: [-0.6, 0.6], rate: [0, 0] }
   },
   {
     id: 'fx-rgb-shift', name: 'RGB Shift', category: 'FX', source: rgbShift,
-    curated: { offset: [0.003, 0.04], scale: [0, 0.06], angle: [0, 6.2832], wobble: [0, 0.7] }
+    curated: { offset: [0.003, 0.04], scale: [0, 0.06], angle: [0, 6.2832], wobble: [0, 0.7], wobRate: [0.15, 0.8] }
   },
   {
     id: 'fx-granular', name: 'Granular', category: 'FX', source: granular,
@@ -1505,7 +1512,7 @@ export const FX_SHADERS: IsfShader[] = [
     // Historically id 'fx-mosaic' (kept stable for saved sessions/presets); the
     // display name is now Tiles, since Mosaïque (node-mosaique) is the concatenative one.
     id: 'fx-mosaic', name: 'Tiles', category: 'FX', source: tiles,
-    curated: { grid: [0.2, 0.7], size: [0.5, 1], lumaSize: [0.2, 0.9], soft: [0.02, 0.2], gapMix: [0, 0.4] }
+    curated: { grid: [0.2, 0.7], size: [0.5, 1], lumaSize: [0.2, 0.9], soft: [0.02, 0.2], gapMix: [0, 0.4], average: [0, 1], audio: [0, 0.5] }
   },
   {
     id: 'fx-optical-rain', name: 'Optical Rain', category: 'FX', source: opticalRain,
@@ -1517,15 +1524,16 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-compress', name: 'Compress', category: 'FX', source: compress,
-    curated: { block: [6, 16], quality: [0.1, 0.5], ring: [0.2, 0.7], chroma: [0.3, 0.9], grid: [0, 0.3] }
+    curated: { block: [6, 16], quality: [0.1, 0.5], ring: [0.2, 0.7], chroma: [0.3, 0.9], grid: [0, 0.3], vary: [0, 0.6] }
   },
   {
     id: 'fx-databend', name: 'Databend', category: 'FX', source: databend,
-    curated: { bands: [16, 90], shift: [0.03, 0.25], chance: [0.15, 0.5], hold: [0.2, 0.6], channel: [0.2, 0.7], rate: [0.2, 0.7] }
+    curated: { bands: [16, 90], shift: [0.03, 0.25], chance: [0.15, 0.5], hold: [0.2, 0.6], channel: [0.2, 0.7], rate: [0.2, 0.7], audio: [0, 0.5] }
   },
   {
     id: 'fx-pixelsort', name: 'Pixel Sort', category: 'FX', source: pixelSort,
-    curated: { low: [0.1, 0.4], high: [0.6, 0.9], length: [0.1, 0.4] }
+    // angle pinned : a dice keeps the classic axis-aligned sort (tilt by hand).
+    curated: { low: [0.1, 0.4], high: [0.6, 0.9], length: [0.1, 0.4], angle: [0, 0] }
   }
   // PHASE 9 (post-MVP experiment): Cross-FM : a source that takes ANOTHER
   // layer's frame as a video-rate FM input (an A→B→C→A cross-oscillator

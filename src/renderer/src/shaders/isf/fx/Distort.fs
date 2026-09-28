@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Distort : ten warp modes on one control set (amount · scale · center · angle · rate): WAVE (sine ripple), RIPPLE (concentric, from center), BULGE / PINCH (spherize out/in), SWIRL (twist around center), SHEAR (position-dependent skew), GLASS (cell-refracted textured glass), CORRUGATE (accordion ribs along angle), PULL (directional drag from center), TURBULENT (curl-noise domain warp). The compositional bend/warp tool.",
+  "DESCRIPTION": "Distort : ten warp modes on one control set (amount · scale · center · angle · rate): WAVE (sine ripple), RIPPLE (concentric, from center; audio sets each ring's height from its own spectrum band), BULGE / PINCH (magnify / squeeze the middle of a circle around center), SWIRL (twist around center), SHEAR (position-dependent skew), GLASS (cell-refracted textured glass), CORRUGATE (accordion ribs along angle), PULL (directional drag from center), TURBULENT (curl-noise domain warp). Reads past the frame edge are mirrored back in. The compositional bend/warp tool.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Distortion"],
@@ -13,7 +13,9 @@
     { "NAME": "scale",  "TYPE": "float", "MIN": 0.5, "MAX": 20.0,   "DEFAULT": 4.0 },
     { "NAME": "center", "TYPE": "point2D", "DEFAULT": [0.5, 0.5] },
     { "NAME": "angle",  "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 0.0 },
-    { "NAME": "rate",   "TYPE": "float", "MIN": 0.0, "MAX": 5.0,    "DEFAULT": 0.5 }
+    { "NAME": "rate",   "TYPE": "float", "MIN": 0.0, "MAX": 5.0,    "DEFAULT": 0.5 },
+    { "NAME": "audio",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0,    "DEFAULT": 0.0, "LABEL": "audio rings" },
+    { "NAME": "audioTex", "TYPE": "image" }
   ]
 }*/
 
@@ -69,29 +71,37 @@ void main() {
     float d2 = sin(along * scale * 6.2832 + t * 1.3);
     c = uv + (dir * d1 + perp * d2) * 0.06 * amt;
   } else if (mode == 1) {
-    // RIPPLE : concentric rings travelling out from the center.
+    // RIPPLE : concentric rings travelling out from the center. With `audio`
+    // each radius rides its own spectrum band (bass in the middle, treble
+    // outward), so the rings swell with the music; silence flattens them.
     float ring = sin(r * scale * 6.2832 - t * 3.0);
+    vec2 ac = vec2(clamp(r, 0.0, 1.0), 0.75);
+    float band = IMG_NORM_PIXEL(audioTex, ac).r;
+    ring *= mix(1.0, band * 2.5, audio);
     vec2 dir = p / max(r, 1e-4);
     dir.x /= aspect;
     c = uv + dir * ring * 0.05 * amt;
   } else if (mode == 2) {
-    // BULGE : spherize outward (magnify the centre) inside a radius.
+    // BULGE : magnify the middle of a circle of radius `rad` around center.
+    // Sampling nearer the center (exponent > 1) spreads the middle outward.
+    // Outside the circle the picture is untouched (clamping rn at 1 used to
+    // collapse everything beyond onto the rim : a crease and radial smears).
+    // The two exponents were swapped : BULGE squeezed and PINCH magnified.
     float rad = 0.9;
-    float rn = clamp(r / rad, 0.0, 1.0);
-    float rr = pow(rn, mix(1.0, 0.25, amt)) * rad;
+    float rr = r < rad ? pow(r / rad, mix(1.0, 3.5, amt)) * rad : r;
     vec2 pr = (p / max(r, 1e-4)) * rr;
     pr.x /= aspect;
     c = center + pr;
   } else if (mode == 3) {
-    // PINCH : spherize inward (squeeze toward the centre).
+    // PINCH : squeeze the middle of the circle toward center (exponent < 1
+    // samples farther out). Untouched outside the circle, like BULGE.
     float rad = 0.9;
-    float rn = clamp(r / rad, 0.0, 1.0);
-    float rr = pow(rn, mix(1.0, 3.5, amt)) * rad;
+    float rr = r < rad ? pow(r / rad, mix(1.0, 0.25, amt)) * rad : r;
     vec2 pr = (p / max(r, 1e-4)) * rr;
     pr.x /= aspect;
     c = center + pr;
   } else if (mode == 4) {
-    // SWIRL : twist around the centre, falloff tightened by scale.
+    // SWIRL : twist around the center, falloff tightened by scale.
     float ang = amt * 6.2832 * exp(-r * r * scale);
     float cs = cos(ang), sn = sin(ang);
     vec2 pr = vec2(p.x * cs - p.y * sn, p.x * sn + p.y * cs);
@@ -124,9 +134,11 @@ void main() {
     c = uv + perp * (tri - 0.5) * 0.1 * amt;
   } else if (mode == 8) {
     // PULL : directional drag from `center` along `angle`, strong near the
-    // point and fading out (a smear-warp handle).
+    // point and fading out (a smear-warp handle). The drag is measured in frame
+    // widths at every angle, so turning it does not change its reach.
     float pull = amt * 0.35 / (r * scale + 1.0);
-    c = uv - dir * pull;
+    vec2 pdir = vec2(dir.x, dir.y * aspect);
+    c = uv - pdir * pull;
   } else {
     // TURBULENT : curl-noise domain warp. The field is rotated by `angle`
     // and sampled about `center`, with a soft radial emphasis so the pad
@@ -143,6 +155,8 @@ void main() {
     c = uv + curlW * 0.2 * amt * w;
   }
 
-  c = clamp(c, 0.0, 1.0);
+  // Reads past the frame edge mirror back in : the clamp smeared the edge row
+  // into streaks wherever a warp reached out of frame (up to 30% with PULL).
+  c = 1.0 - abs(1.0 - mod(c, 2.0));
   gl_FragColor = IMG_NORM_PIXEL(inputImage, c);
 }

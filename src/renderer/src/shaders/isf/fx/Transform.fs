@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Transform : zoom / pan / rotate the sampling frame, wrap or clamp at the edges, and crop the four edges (up/down/left/right) to black. The compositional utility: place, scale and frame a source inside the layer before FX and blending. With Shape set, the layer is instead clipped into a chosen geometric silhouette (circle, polygon, star, heart…) that you move with Pos, size with Zoom, and spin with Rotate; the crop still applies on top.",
+  "DESCRIPTION": "Transform : zoom / pan / rotate the sampling frame, either wrapping at the edges or leaving the uncovered area transparent, and crop the four edges (up/down/left/right) to black. The compositional utility: place, scale and frame a source inside the layer before FX and blending. With Shape set, the layer is instead clipped into a chosen geometric silhouette (circle, polygon, star, heart…) that you move with Pos, size with Zoom, and spin with Rotate; the crop still applies on top. Cutout turns the crop margins and the outside of the shape transparent instead of black, so the layers below show through.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Utility"],
@@ -16,7 +16,8 @@
     { "NAME": "cropRight", "LABEL": "crop →", "TYPE": "float", "MIN": 0.0, "MAX": 0.5, "DEFAULT": 0.0 },
     { "NAME": "shape",  "TYPE": "long",  "VALUES": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
       "LABELS": ["none","circle","square","rectangle","triangle","pentagon","hexagon","heptagon","octagon","diamond","star 5","star 6","ellipse","rounded","cross","ring","half-circle","heart","crescent","trapezoid","capsule"],
-      "DEFAULT": 0 }
+      "DEFAULT": 0 },
+    { "NAME": "cutout", "TYPE": "bool", "DEFAULT": false, "LABEL": "cut to transparent" }
   ]
 }*/
 
@@ -41,7 +42,7 @@ float sdStar(vec2 p, float r, float pts) {
   return length(p) - rad;
 }
 
-// Signed silhouette: < 0 inside. p is aspect-corrected & centred on the shape.
+// Signed silhouette: < 0 inside. p is aspect-corrected & centered on the shape.
 float shapeDist(int s, vec2 p, float r) {
   if (s == 1)  return length(p) - r;                                   // circle
   if (s == 2)  return sdBox(p, vec2(r));                               // square
@@ -78,7 +79,7 @@ float shapeDist(int s, vec2 p, float r) {
 }
 
 // Screen-space edge crop : 1 inside the kept window, 0 in the cropped margins.
-// A fixed garbage matte : it does NOT move with zoom/pan, it frames the layer's
+// A fixed garbage matte (it does NOT move with zoom/pan) : it frames the layer's
 // final rectangle. uv.y = 0 is the BOTTOM of the displayed frame, so cropUp
 // bites the HIGH-y (top) edge and cropDown the low-y (bottom) edge.
 float cropMask(vec2 uv) {
@@ -92,7 +93,7 @@ void main() {
   vec4 outCol;
 
   if (shape == 0) {
-    // Inverse transform: centre, un-rotate, un-zoom, un-pan.
+    // Inverse transform: center, un-rotate, un-zoom, un-pan.
     vec2 p = uv - 0.5;
     p.x *= aspect;
     float cs = cos(-rotate);
@@ -103,15 +104,19 @@ void main() {
     vec2 c = p + 0.5 - vec2(posX, posY) * 0.5;
 
     if (wrap) {
-      outCol = IMG_NORM_PIXEL(inputImage, fract(c));
+      vec2 cw = fract(c); // hoisted : IMG_NORM_PIXEL takes a bare identifier
+      outCol = IMG_NORM_PIXEL(inputImage, cw);
     } else if (c.x < 0.0 || c.x > 1.0 || c.y < 0.0 || c.y > 1.0) {
-      outCol = vec4(0.0, 0.0, 0.0, 1.0);
+      // Uncovered by the zoomed-out or panned frame : empty, so the layers
+      // below show through (it was opaque black, a slab over everything).
+      outCol = vec4(0.0);
     } else {
       outCol = IMG_NORM_PIXEL(inputImage, c);
     }
   } else {
     // Shape mode: clip the layer into the chosen silhouette, moved by Pos, sized
-    // by Zoom, spun by Rotate. Outside the shape is black.
+    // by Zoom, spun by Rotate. Outside the shape is black, or transparent with
+    // cutout on.
     vec2 sp = (uv - 0.5) * vec2(aspect, 1.0);
     vec2 ctr = vec2(posX * aspect, posY) * 0.5;
     vec2 q = sp - ctr;
@@ -119,12 +124,14 @@ void main() {
     q = vec2(q.x * cs - q.y * sn, q.x * sn + q.y * cs);
     float r = clamp(zoom * 0.35, 0.05, 1.6);
     float d = shapeDist(shape, q, r);
-    float m = smoothstep(0.004, -0.004, d); // 1 inside
+    float m = 1.0 - smoothstep(-0.004, 0.004, d); // 1 inside (never a reversed smoothstep)
     vec4 src = IMG_NORM_PIXEL(inputImage, uv);
-    outCol = vec4(src.rgb * m, src.a);
+    outCol = cutout ? vec4(src.rgb, src.a * m) : vec4(src.rgb * m, src.a);
   }
 
-  // Crop the four edges to black (screen space, after any transform/shape).
-  outCol.rgb *= cropMask(uv);
+  // Crop the four edges (screen space, after any transform/shape) : to black,
+  // or to transparent with cutout on.
+  if (cutout) outCol.a *= cropMask(uv);
+  else outCol.rgb *= cropMask(uv);
   gl_FragColor = outCol;
 }

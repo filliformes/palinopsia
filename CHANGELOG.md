@@ -7,6 +7,13 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **New effect controls** (defaults keep today's look) : per-column / per-band audio on
+  Byte Corrupt, Databend, Mosh Blocks, Row Echo, Slice Shuffle, Tiles, Distort (audio
+  rings) and Motif (band echoes); `fire` on Databend and Row Echo; Threshold `alpha key`;
+  Pixel Sort `angle`; Pixelate and Tiles `average`; Compress `vary`; Databend `wrap`; CRT
+  Screen `lines` and `moire`; Scanlines `moire`; Rutt `relief` (hanging or mountain);
+  Grade `gamma`; Hue Rotate `rate`; Palette `cycle`; RGB Shift wobble rate; Edge `ink`;
+  Transform `cutout`; Wavefold and Colorizer `invert` (the old negative look).
 - **Collage** : `speed spread` (each piece plays at its own rate) and `freeze`.
 - **Text** : crawl (a ticker along the baseline), shrink to fit, letter drift,
   typewriter reveal, and one line at a time with `next line`.
@@ -120,258 +127,22 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
-- **The picture could freeze when a Parametric slot was switched away** : its
-  disposal broke every shader draw. Parametric, Text and Collage now own their
-  vertex setup and survive a GPU reset.
-- **Collage** :
-  - Churn re-rolls were identical, so the wall collapsed onto one film.
-  - Churn and window only applied at the next deal.
-  - Optimise was ignored on a running wall.
-  - Mosaic pieces smeared edge pixels.
-  - Crossfades restarted from a stale frame.
-  - An aborted seek could leave a piece stuck.
-  - Pieces went soft at 4K, because tile size now follows the output.
-  - Presets leaked into each other.
-  - Layer Speed and the background's slow clock were ignored.
-  - Every Collage started from the same seed.
-  - A minimized control window froze the wall.
-- **Text** :
-  - The weight dial did nothing on most fonts; each face is now declared at
-    its real weights, and the dial grays out when a font has only one.
-  - Modulating size or spacing redrew the whole frame every frame and moved in
-    visible steps; Text now uses a glyph atlas, so it is smooth and cheap.
-  - Stretch went soft.
-  - A Text layer was an opaque black slab in Normal blend.
-  - Presets forced the first font.
-- **Parametric** :
-  - Raster ignored the audio.
-  - The frequency axis wasted three quarters of the spectrum; it now uses 512
-    log columns.
-  - The spectrogram blurred as it scrolled, and its speed depended on frame
-    rate.
-  - Bars mode ignored `scale`.
-  - OSC-audio mode now draws the six bus bands.
-- **Source generators, after an audit of all 23.**
-  - Every rate-driven source now integrates its rate, so a knob never jumps the picture.
-  - Each one still moves, unrepeating, after 24 hours. Before, Slabs froze after about
-    3 hours and its cuts looped every 9 s; Particle Drift collapsed into a lattice, Ten
-    Print into vertical stripes, and Ash into evenly spaced strings.
-  - Lines keep a constant pixel width with a 1-px floor.
-  - The 1-px scanlines, which turned into moiré when resampled, are gone.
-  - Aspect is correct at 16:9 and on the square dome.
-  - Highlights:
-    - Murmuration's birds accelerated forever and became strobing dots after about
-      10 minutes; they now move in bounded, heading-aligned travelling waves.
-    - Congeal never faded back to black (a flat fog).
-    - Sync Osc's shape knob had a gray dead zone, and "frozen horizontal" was diagonal.
-    - Metamorph had a notch on every blob and a parent that popped out.
-    - Differential's fast layers strobed and its presets formed rosettes.
-    - Direct Marks' gate swept across the marks as a wave.
-    - Ash sliced flecks at column edges.
-    - Filaments and Column Scan lost the peaks of their lines.
-    - Shapes cut shapes at cell borders.
-    - Solid Color's gradient never reached its end colors.
-    - Presets now set every input, so one preset no longer leaks into the next.
-    - Dice no longer paint the dark grounds a bright color.
-- **Knobs no longer jump the picture.** Motion that ran on `time × rate` jumped
-  whenever the rate moved : half an hour into a show a small nudge flung the
-  picture, and an LFO, a Morph or MIDI on the rate turned it into strobing noise.
-  Rates are now integrated frame by frame (a shader declares `PH_rate` and the
-  engine accumulates it on the layer's own clock, so Speed, freeze and reverse
-  still apply) : the Organic family (Fire / Water / Nature, Membrane, Mycelium,
-  Erosion, Dye Field, Swell, Ground, Scan, Colony) and the glitch effects
-  (Aperture, Byte Corrupt, Databend, Displace, Distort, Granular, Mosh Blocks,
-  Row Echo, Slice Shuffle, Slit Buffer, Stutter, Sync Loss, Tracking, Triangle
-  Flicker).
-- **Long shows.** The old shader hash lost precision as time grew, so glitch
-  effects, the Finalizer's grain and CRT / VHS parasites settled into fixed
-  patterns within an hour or two. A precise hash and wrapped seeds everywhere.
-- **Audio-reactive generators read the wrong row.** The shared audio texture's
-  waveform and spectrum rows were swapped whenever a shader had loaded since the
-  last video frame (the shader runtime leaves the upload flip on). The spectrum
-  row is now log-spaced 30 Hz to 16 kHz, so it spreads musically across elements
-  instead of bunching into the left fifth. Any generator that declares the audio
-  input gets it, on the background slab too.
-- **Freeze-proofing.** The video source and the film, output-shape,
-  flash-safety and depth-shadow stages now each own their vertex setup, so none
-  of them can break every shader draw when it is disposed; the effect nodes
-  rebuild after a GPU reset; photo materials no longer load upside down
-  depending on load order.
-- **Fresh installs started with the wrong defaults** : Flash safety off (meant
-  to be on, mild, at 0.35), the Flow macro fully engaged instead of neutral,
-  Morph at 0 ms, the audio monitor muted.
-- **Mosaïque** never matched anything : its matcher named a variable `patch`, a
-  reserved word in GLSL ES 3.00, so the matching program never compiled and the
-  node could not choose tiles. Found by compiling every engine shader in a plain
-  WebGL2 context.
-- **The output stage no longer stalls the render loop.** Measured at a 4K
-  composition :
-  - the projector window : 25-27 fps with it open, now 60 (its readback was
-    synchronous; the frame is now read back asynchronously and posted to the
-    window from a worker, where the cross-process copy no longer costs the loop);
-  - the Output page with the 4096² dome simulator : 47-49 fps, now 60;
-  - **Spout delivered 0 frames per second at 4K** (its two-slot readback dropped
-    every frame whose fence was late); it now sends ~58 fps of the clean picture
-    from the window's own process, top-down (no CPU flip);
-  - projector + Spout + a DXV3 take together : 57-60 fps.
-- **HIVE output could never start** : its encoder settings asked Windows' hardware
-  encoder for 60 fps, which it refuses at every size (measured). It starts now.
-- The projector window no longer receives the whole render state every frame
-  (left from when it ran its own renderer) : just the keystone, when it changes.
-- A recording the encoder never fed no longer leaves an empty file behind.
-- **Minimizing the window no longer stalls the show.** A minimized window gets
-  (almost) no animation frames from Chromium, so the render loop, and with it the
-  projector stream, Spout, Sonify and OSC out, dropped to about one frame a
-  second. The loop now notices and runs on a timer until the window paints again,
-  and that timer waits for the GPU to finish each frame : without rAF's pacing, a
-  heavy scene let the loop run seconds ahead of the GPU, and NDI starved behind
-  the queue (measured : 0 to 1 fps, now it follows the render rate).
-
-### Changed
-
-- **Finishing panel in labelled sections.** Vibe Palette, Context and Finalizer
-  were each one long list of sliders; each is now split into named families
-  with a thin coloured header and a matching rail down the left :
-  - Vibe Palette : palette · color chord · tone · split-tone
-  - Context : softness · distance · light · surface
-  - Finalizer : grade · character · 3D · hand-made film · film damage · output shape
-  - A section's master switch (character, 3D stereo, film hold, output shape,
-    PBR surface, color chord) sits in its header, and a section whose switch
-    is off folds itself away until you turn it on (or click its header).
-  - Rows drop only the words their header already says ("film dust" is "dust"
-    under film damage); the modulation lists and OSC keep the full names.
-  - Rows that do nothing right now are greyed with the reason in the tooltip
-    (parasites outside crt / vhs, palette stops beyond "stops used" or under a
-    color chord, the fill color when the Background fills the outside).
-  - Colors, dropdowns and toggles now sit on one line like the sliders.
-  - The "Finishing on · Vibe · Context · Finalizer" line at the top of the tab
-    is gone (the same toggle is in the Master FX strip).
-- **CRT / VHS parasites, rebuilt** (Finalizer character and the Grain FX). They
-  were small rectangles : one band out of 60 across the frame (18 px tall at
-  1080p) with a hard-edged dash in it. Now counted in real scanlines (480, so a
-  dropout is one line tall at any output size) :
-  - **VHS** : line edges wobble (no time-base corrector), the head-switch tear
-    frays the last lines at the bottom, and **dropouts** (the head losing the
-    tape for an instant) turn a single scanline white from where they hit,
-    fading over a tail as the signal recovers, a few dark, in bursts, a new
-    set every field. Pushed high, a **tracking band** of torn, snowy lines
-    drifts through the picture, coming and going.
-  - **CRT** : a soft **hum bar** rolling up the screen, a faint **RF weave**
-    that comes and goes, and short **impulse specks** on single lines.
-  - One shared implementation (`shaders/isf/lib/analogParasites.glsl`).
-- **The Organic family, made physical** (research : noise and growth models,
-  wave physics, flame colour; every change measured at 60 fps at 4K) :
-  - **An Organic section** in the source picker : the living generators first.
-  - **Relief lighting** on Reaction, Erosion, Membrane, Mycelium and Dye Field :
-    none of them had any light, which is the main thing that made them read
-    flat. `relief` and `light angle` : one low raking light, soft shadows, a
-    cavity term, matte (0 = the old flat print).
-  - **Swell** rebuilt : 24 wave trains, each at the speed its length gives it on
-    deep water (longer waves faster), spread around the wind; shaded like water
-    (dark body, sky mirror, sun glitter, whitecaps and wind streaks).
-  - **Organic water** : the caustics are now sunlight focused by real waves onto
-    the bed (the refraction's Jacobian), not a ridge of two noises.
-  - **Organic fire** : flames accelerate and stretch as they rise, puff out of
-    phase (the real flicker rhythm), coloured by temperature on the blackbody curve.
-  - **Reaction** : the field wraps around (no seams when zoomed out), keeps its
-    size in the frame at 4K and on the dome, holds its rate under the stability
-    limit, and no longer seeds new critters in rows (its hash repeated).
-  - **Dye Field** : pools are round, no longer stretched sideways at 16:9.
-  - A shared **organic toolkit** (`shaders/isf/lib/`) : sine-free hashes, gradient
-    noise with derivatives, exact Voronoi borders, blackbody colour, relief lighting.
-- **Film dust and film scratch, rebuilt from how real film gets damaged** (Finalizer).
-  The dust used to be little black and white squares : one cell of a fixed grid
-  switched on, all the same size, far too many, held for a whole drawn frame, and
-  only when Film Hold was on. It is now its own stage (`engine/filmDamage.ts`),
-  on whenever dust, scratch or hair is up :
-  - **Dust** changes every **film frame** (24 fps, Super 8 18), not every drawn
-    frame. Mostly tiny specks, rarely a big one (a power law), with irregular
-    rotated outlines, sharp or out of focus, big pieces mottled like real clumps.
-    Dark on the print, white sparkle from the negative, never pure black or white.
-    The count changes every frame, bunches up and comes in occasional bursts.
-    Specks smaller than a pixel fade instead of flickering, so a 1080p render and
-    an 8K dome master look the same. The odd **fibre** too : thin, curved,
-    tapered, uneven.
-  - **Scratches** run along the strip : each lasts from a fraction of a second to
-    a minute, stays straight within a frame, wanders slowly sideways, starts and
-    ends partway down a frame, breaks up, and has ragged edges. Mostly dark (the
-    print), some white (the negative), some green / yellow (a colour print's
-    emulsion), sometimes two or three running together.
-  - New : **gate hair** (a hair caught in the projector gate, hanging in from an
-    edge and trembling, for seconds to a minute), **film gauge** (35 mm / 16 mm /
-    Super 8 : the same dust is ~4x bigger on Super 8) and **dirt on** (print /
-    mixed / negative).
-  - Dirt and scratches ride the Film Hold boil; the gate hair doesn't.
-  - Under half a millisecond per frame at 4096² (measured).
-  - Griffé, Peint and Pressé retuned; Randomize no longer dirties the Finalizer
-    (dust, scratch, hair, gauge and dirt are left as they are).
-  - Older sessions and scenes keep their look : Randomize used to roll dust and
-    scratch values that stayed invisible without Film Hold, so a session saved
-    before this change with the hold off opens with them at zero (once).
-- **Output page order**, top to bottom : Composition size, Render scale, Mapping,
-  Fulldome, Fullscreen output, Record, Spout / Syphon, NDI, HIVE, Flash safety,
-  Lights, Installation mode. The Spout section is now **Spout / Syphon** and shows
-  the one this computer uses. Flash safety starts collapsed (it stays on).
-- The **window title** now carries the release version, like dataFLOU_compositor:
-  `Palinopsia v1.1.0` on the main window, `Palinopsia v1.1.0 : Output` on the output
-  window. Read from `package.json` at launch, so every tagged build titles itself.
-  (The output windows' title was also being silently reset to plain "Palinopsia" by
-  the shared page `<title>`; it now holds.)
-
-## v1.1.0 — 2026-09-18
-
-The "played by the room" release: embodied control, sound in both directions, and
-the instrument reaching out into the space around it (projectors, DMX, MIDI clock).
-
-### Added
-
-- **Body: embodied control (new full-page mode, key `B`).** Opt-in webcam →
-  MediaPipe **Hands + Pose + Face + Silhouette** into a live body bus.
-  - **Features → modulators:** every tracked quantity (hand height / openness,
-    body lean / motion / stance, face blendshapes + head pose, and the silhouette
-    zone coverages) is a `body` modulator source, routed with one click.
-  - **Rule builder:** author actions from one gesture or a two-gesture combo
-    (together `+` or in sequence `→`, with exclusive combos), drawn from the shared
-    MIDI/keyboard trigger vocabulary (Randomize scopes, transport, scenes, Sonify
-    voices, sessions, undo/redo). Auto-named, with a custom `/body/<name>` OSC out.
-  - **Silhouette zones:** the pose segmentation mask reduced to a 3×3 screen grid —
-    each zone a continuous feature and a `cover …` occlusion gesture.
-  - **Presence** enter/leave triggers (body / hands / face), debounced: the
-    installation trigger for someone walking into or out of frame.
-  - **Per-gesture sensitivity** on single-gesture rules (global slider is the default).
-- **Colour ↔ sound.** An `audio` **noisiness** (spectral flatness) feature and
-  `vision` **hue** + **saturation** features, so sound can tint the picture and
-  the picture's colour can drive any Sonify parameter through the mod matrix. The
-  Sequencer's **Climat** tag takes a "from picture" suggestion off the live palette.
-- **Installation / kiosk mode.** Boot a session fullscreen on a chosen display,
-  with renderer-crash self-heal and an exit hatch. Custom composition size and
-  **multi-projector span** for wide outputs.
-- **Light output.** ArtNet/DMX + WLED: push the picture's colour into the room.
-- **MIDI output.** 24-PPQN clock + transport and a thru/merge path to drive an
-  Ableton Move (or any gear) over USB; the Randomize dice, master-FX chain and
-  session buttons are now MIDI-learnable.
-- **Audio input** monitoring / passthrough with separate Sonify and monitor levels,
-  and an adaptive USB-noise **denoiser** (learn the noise, multi-notch filter).
-- **Performance** sub-tab: per-section GPU / CPU / RAM load, with units and tooltips.
-
-### Changed
-
-- Sequencer page: clearer visual sections and hover overviews; a colour-coded,
-  aligned Body feature monitor.
-- Documentation: full Body section in the README, and the GitHub Pages quickstart
-  reworked into a landing page with a download section.
-
-## v1.0.2 — 2026-09-09
-
-- Maintenance and packaging fixes.
-
-## v1.0.1 — 2026-09-09
-
-- Windows app-icon fix.
-
-## v1.0.0 — 2026-09-09
-
-- First public release: the four-layer ISF/WebGL compositor, modulation brain +
-  Meta knobs, curated Randomize + Generate, video / capture / HIVE sources, Output
-  + warp + Spout/NDI, OSC + OSCQuery, the Sonify image-to-sound engine, MIDI Learn,
-  and the Assemble automatic video editor. Windows + macOS + Linux.
+- **Effects audit, glitch / analog / color / geometry (41 effects).** Fixed what was
+  broken and kept what gives character (the corrupted-data smears, the stepped blocks,
+  the CRT moiré, the edge fringes stay the default look; the clean variants are options).
+  - Texture reads that the shader loader silently rewrote : Databend's rotated bands
+    read the frame diagonal, Compress never saw vertical edges, Aperture's blur and
+    Optical Rain's stereo taps went diagonal.
+  - Transparency : Compress, Databend, Pixel Sort, Tiles, CRT Screen, Rutt, Optical Rain
+    and Phosphene turned a transparent layer into an opaque black slab.
+  - Knobs that did nothing : Pixel Sort's length (capped at 96 px), the Compress grid at
+    small blocks, the Pixelmask grid, digital grain size; Row Echo's fade worked
+    backwards.
+  - Rutt drew no lines in bright areas; Phosphene burned in for good and white left no
+    afterimage; Wavefold and Colorizer's fold turned dark grounds white; Palette mapped
+    pure white to the wrong color; Distort's bulge and pinch were swapped; Fold's "Floor
+    fold" smeared a third of the frame.
+  - Knobs that jumped the picture (NTSC field crawl, Scanlines roll, Optical Rain).
+  - Presets set every input, so one no longer leaks into the next; 20 Colorizer presets
+    named after films, film stocks and brands renamed descriptively.
+  - Sizes follow the frame height, so 4K and the dome keep the 1080p look.

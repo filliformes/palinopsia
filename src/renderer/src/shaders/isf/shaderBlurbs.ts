@@ -15,15 +15,15 @@ export const SHADER_BLURBS: Record<string, string> = {
   'fx-posterize':
     'Collapses smooth gradients into a few flat bands of tone. Skies and soft shadows become poster-like steps instead of continuous shading. One of the core building blocks for turning video into graphic, printed-looking imagery.',
   'fx-palette':
-    'Throws away the original colors and re-paints the image using a gradient you choose, from two to five stops. Dark areas take the first color, bright areas the last, everything else blends between. This is the main tool for making any source match a chosen palette.',
+    'Throws away the original colors and re-paints the image using a gradient you choose, from two to five stops. Dark areas take the first color, bright areas the last, everything else blends between. This is the main tool for making any source match a chosen palette. It can also slide the picture slowly along the ramp and back, the old color-cycling trick.',
   'fx-grade':
-    'The everyday brightness, contrast, saturation and lift control. Use it to sit a layer properly in the mix before anything else touches it. Pulling saturation down is often what makes a busy composite read clearly.',
+    'The everyday brightness, contrast, gamma, saturation and lift control. Use it to sit a layer properly in the mix before anything else touches it. Pulling saturation down is often what makes a busy composite read clearly.',
   'fx-hue-rotate':
-    'Rotates every color around the color wheel, so reds become greens, greens become blues, and so on. It can push the shift harder in the bright parts or the dark parts instead of evenly. Good for recoloring a source without flattening it the way a palette map does.',
+    'Rotates every color around the color wheel, so reds become greens, greens become blues, and so on. It can push the shift harder in the bright parts or the dark parts instead of evenly. Good for recoloring a source without flattening it the way a palette map does. Given a cycle rate, it keeps turning the whole picture around the wheel on its own.',
   'fx-colorizer':
-    'Takes the image down to brightness alone and paints it back with two colors, one for the dark end and one for the light. The mapping can be pushed until it wraps and repeats, which folds extra color bands out of a smooth gradient. Modeled on analog video colorizers.',
+    'Takes the image down to brightness alone and paints it back with three colors: one for the darks, one for the mid-tones and one for the lights. Push the gain or bias and the fold wraps the overflow back into range, carving extra color bands out of a smooth gradient; invert runs the map backward into a color negative. Modeled on analog video colorizers.',
   'fx-threshold':
-    'Cuts the picture into just two tones at a brightness you pick, with a softness control for how hard the edge is. Everything above the line goes white, everything below goes black. Put a Palette after it to turn those two tones into any two colors.',
+    'Cuts the picture into just two tones at a brightness you pick, with a softness control for how hard the edge is. Everything above the line goes white, everything below goes black. Put a Palette after it to turn those two tones into any two colors, or switch on the alpha key to keep the colors and cut the dark side away to transparency.',
   'fx-solarize':
     'Inverts only the parts of the image brighter than a chosen level, leaving the rest alone. Highlights turn inside-out while shadows stay normal, which is the strange tonal flip you see in darkroom prints. Subtle settings read as a glow; extreme ones read as a negative.',
   'fx-vibe':
@@ -33,29 +33,29 @@ export const SHADER_BLURBS: Record<string, string> = {
   'fx-dither':
     'Reduces the image to very few tones, then uses a fine grid of dots to fake the shades in between. It is how old newspapers and early computers showed gradients. Gives a crisp, printed texture rather than a smooth blur.',
   'fx-pixelate':
-    'Averages the picture into square blocks so detail disappears into a coarse mosaic. The blocks stay properly square regardless of the frame shape. Pairs naturally with Posterize and Dither for a fully digital-looking treatment.',
+    'Reduces the picture to square blocks of one color each, so detail disappears into a coarse mosaic. Each block takes its center pixel by default, which sparkles as detail moves; the average control calms it. The blocks stay properly square regardless of the frame shape. Pairs naturally with Posterize and Dither for a fully digital-looking treatment.',
   'fx-edge':
-    'Finds the outlines in the image and draws them as lines, which you can blend over the original or use alone. Flat areas go dark and anything with contrast lights up as contour. Turns a photographic source into line-work.',
+    'Finds the outlines in the image and draws them as lines, which you can blend over the original or use alone. Flat areas go dark and anything with contrast lights up as contour; in ink mode the outlines are drawn dark over the picture instead. Turns a photographic source into line-work.',
   'fx-sharpen':
     'Lifts fine detail so edges bite. Most useful after something soft, where it makes dithers crisp again and snaps posterized bands back into shape. A little goes a long way.',
   'fx-grain':
     'Adds noise modeled on real media rather than generic static. Film grain clumps and sits mostly in the mid-tones; digital sensor noise behaves quite differently; the parasite modes add the interference of old broadcast gear. Choose the medium and the picture inherits its texture.',
   'fx-scanlines':
-    'Darkens alternating horizontal lines across the picture, as if it were being displayed on a tube monitor. An optional slow roll drifts them upward. It only ever darkens, so it adds texture without washing the image out.',
+    'Darkens alternating horizontal lines across the picture, as if it were being displayed on a tube monitor. An optional slow roll drifts them down the frame. It only ever darkens, so it adds texture without washing the image out.',
   'fx-crt-screen':
     'Wraps the whole picture in an old television: the glass bulges, color separates toward the corners, a fine grille sits over everything and the edges fall into shadow. It is the complete tube look in one effect rather than a single element of it. Good as a final treatment on an otherwise clean composite.',
   'fx-pixelmask':
-    'Shows the picture only where a repeating pattern allows it, hiding the rest. The pattern can be a monitor grille, a shadow mask, dots, lines or noise. The image ends up looking like it is being viewed through a physical screen.',
+    'Shows the picture only where a repeating pattern allows it, hiding the rest. The pattern can be a monitor grille, a shadow mask, dots, a grid or noise. The image ends up looking like it is being viewed through a physical screen.',
   'fx-fold':
     'Mirrors the image once across a line you can move, with the reflected half slidable. One deliberate fold makes a composition; this is why it will not do radial or kaleidoscope symmetry. Use it to build a diptych or to answer a shape with itself.',
   'fx-transform':
-    'Zooms, moves and rotates the picture inside its layer, either wrapping at the edges or holding the border pixels. It is the plain compositional tool: place and scale a source without touching the layer itself. The four crop sliders black out the top, bottom, left and right edges to reframe the layer. Wrapping turns a slow pan into an endless tile.',
+    'Zooms, moves and rotates the picture inside its layer, either wrapping at the edges or leaving the uncovered area empty so the layers below show through. It is the plain compositional tool: place and scale a source without touching the layer itself. The four crop sliders black out the top, bottom, left and right edges (or cut them to transparent), and a shape can clip the layer to a circle, star or other silhouette. Wrapping turns a slow pan into an endless tile.',
   'fx-ntsc':
     'Recreates the color smearing and rainbow shimmer of old composite video, where the picture and its color share one crowded signal. Sharp edges crawl with dot-rainbows, colors bleed sideways, and the two interlaced scan fields can be pulled slightly apart so the image shivers. A cheap approximation of the look, not a real broadcast encoder.',
   'fx-abstraction':
     'One dial that carries the image away from being a picture of something toward being pure texture. As you raise it the picture is dragged along its own lines of brightness until subjects dissolve into movement. Very useful when you want a recognizable source to stop being recognizable.',
   'fx-motif':
-    'Repeats the image somewhere else in the frame, moved, turned, resized and optionally mirrored. The result is the same gesture answering itself across the picture, like a phrase repeated at a different pitch. Directional rather than radial, so it never becomes a mandala.',
+    'Repeats the image somewhere else in the frame, moved, turned, resized and optionally mirrored, each copy fainter than the last. The result is the same gesture answering itself across the picture, like a phrase repeated at a different pitch. Directional rather than radial, so it never becomes a mandala.',
   'fx-force-lines':
     'Bands the picture by brightness and slides each band along the direction the image itself is heading. The picture appears to be combed along its own internal currents. Strong settings turn a photograph into flowing strata.',
   'fx-aperture':
@@ -69,7 +69,7 @@ export const SHADER_BLURBS: Record<string, string> = {
   'fx-wavefold':
     'Drives the brightness up and reflects it back down each time it would clip, over and over. Smooth gradients get carved into hard contour bands, like a topographic map of the light. Borrowed from analog synthesis, where the same trick turns a plain tone harsh and metallic.',
   'fx-rutt':
-    'Redraws the picture as a stack of horizontal scan lines, each pushed up or down by how bright the image is there. Bright regions rise into ridges and dark ones sink, so a flat frame becomes a relief landscape. This is the classic video-synthesizer scan-processor look.',
+    'Redraws the picture as a stack of horizontal scan lines, each pushed by how bright the image is there, so a flat frame becomes a relief landscape. By default bright regions hang down below their lines; flip the relief and they rise into ridges, the classic video-synthesizer scan-processor look.',
   'fx-smear':
     'Streaks the bright parts of the image along a direction, fading as they go. Only the highlights run, so the picture keeps its structure while the lights bleed. Reads as light dragging rather than as camera blur.',
   'fx-streak':
@@ -89,7 +89,7 @@ export const SHADER_BLURBS: Record<string, string> = {
   'fx-row-echo':
     'Picks bands of rows at random and freezes each one onto its top line, repeating it downward. Whole strips of the picture smear into flat streaks until they refresh. Reads as a display failing to redraw itself.',
   'fx-triangle-flicker':
-    'Pulses the brightness up and down on a steady rhythm, with an optional hard on/off strobe. It can also shuffle the color channels on the beat. Best used sparingly : the output limiter will keep it safe, but it is a strong device.',
+    'Pulses the brightness up and down on a steady rhythm, with an optional hard on/off strobe. It can also shuffle the color channels on each pulse. It runs free at its own rate rather than locking to the tempo. Best used sparingly : the output limiter tempers it, but it is a strong device.',
   'fx-feedback-zoom':
     'Feeds the image back into itself through a zoom and a twist, so echoes march inward or outward forever. Each generation is slightly smaller and turned, building tunnels and spirals out of any source. This is the deepest version of the afterglow the instrument is named after.',
 
@@ -97,7 +97,7 @@ export const SHADER_BLURBS: Record<string, string> = {
   'fx-chroma-shift':
     'Pulls the red, green and blue versions of the picture apart along an angle. Edges pick up colored fringes, the way a cheap lens or a mistuned signal would. Kept subtle by default, it is the house signature rather than a spectacle.',
   'fx-rgb-shift':
-    'Separates the three color channels geometrically, offsetting and scaling each one on its own. Stronger and more controllable than Chroma Shift, it can pull a picture into three drifting ghosts. Useful when you want the split to be the subject, not an accent.',
+    'Separates the color channels geometrically: red and blue are pushed apart in opposite directions and scaled in opposite ways about the center, while green holds still. Stronger and more controllable than Chroma Shift, it can pull a picture into three drifting ghosts. Useful when you want the split to be the subject, not an accent.',
   'fx-slice-shuffle':
     'Cuts the frame into horizontal bands and jumps some of them sideways, re-rolling on a clock. Only a minority move at a time, so the picture stays readable while constantly dislocating. The classic sliced-glitch look.',
   'fx-mosh-blocks':
@@ -109,11 +109,11 @@ export const SHADER_BLURBS: Record<string, string> = {
   'fx-databend':
     'Tears horizontal bands sideways as if the file itself had been edited in the wrong program. It is about damaging the stream rather than the movement, so it sits differently from Datamosh. Sharp, abrupt and rhythmic.',
   'fx-pixelsort':
-    'Finds runs of pixels within a brightness range and reorders them along an axis, so parts of the image pour into smooth streaks. Bright or dark regions can be targeted independently. The signature glitch effect, and still one of the most legible.',
+    'Finds runs of pixels within a brightness range and pulls each run toward its brightest value along an axis, so parts of the image pour into smooth streaks. Bright or dark regions can be targeted independently. The signature glitch effect, and still one of the most legible.',
   'fx-ringing':
     'Repeats faint, alternating-sign echoes just off every hard edge. It is the halo an over-sharpened or over-compressed broadcast picks up. Fine amounts add a subtle electronic crispness; heavy amounts turn edges into ripples.',
   'fx-sync-loss':
-    'The picture climbs the screen, catches, and tears in horizontal bands. It is a monitor losing its hold on the signal. Use it as an event rather than a constant, or bind it to a trigger.',
+    'The picture rolls down the screen, catches, and tears in horizontal bands. It is a monitor losing its hold on the signal. Use it as an event rather than a constant, or bind it to a trigger.',
   'fx-tracking':
     'The tape-tracking error of a worn VHS: a noisy band that drifts through the frame, lines shifted at random, color bleeding at the edges. Rebuilt from a well-known model of the real fault rather than approximated. Instantly reads as domestic video.',
   'fx-decay':
@@ -123,7 +123,7 @@ export const SHADER_BLURBS: Record<string, string> = {
   'fx-granular':
     'Shatters the frame into a grid of small overlapping grains, then scatters, rotates and delays each one. The image survives as a cloud of its own fragments. Borrowed from granular sound synthesis, where the same idea turns a note into a texture.',
   'fx-mosaic':
-    'Reads the picture as a grid of cells and replaces each with its own average color, optionally redrawn as a shape. It is analysis and resynthesis rather than simple blurring, so the result feels constructed. Coarse settings turn any source into a tiled panel.',
+    'Reads the picture as a grid of cells and replaces each with a single color of its own (its center pixel, or its average), redrawn as a shape that swells with brightness. It is analysis and resynthesis rather than simple blurring, so the result feels constructed. Coarse settings turn any source into a tiled panel.',
   'fx-optical-rain':
     'Shatters the edges of the image into vertical streaks that drift downward, each fragment carrying a little of the color it came from. The picture appears to be dissolving into falling threads. One of the stereoscopic-texture effects, and it pairs well with the 3D stage in the Finalizer.',
   'fx-phosphene':

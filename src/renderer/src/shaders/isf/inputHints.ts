@@ -54,12 +54,93 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
   },
   'fx-aperture': {
     shape: 'The gate : IRIS (circle) · vertical / horizontal SLIT · film GATE (rectangle).',
-    size: 'How open the gate rests. Outside is leader-black.',
+    size: 'How open the gate rests. Outside is leader-black. Fully open, the iris clears the frame corners.',
     soft: 'Feather on the gate edge.',
     flicker: 'The opening re-rolls every drawn frame (a breathing shutter). 0 = steady.',
     rate: 'The flicker cadence (drawn frames per second).',
     couple: 'Defocus ↔ gate coupling : as the aperture closes, the lens softens (the focus pull a contracting iris forces).',
     amount: 'Dry/wet against the untouched image.'
+  },
+  'fx-crt-screen': {
+    curve: 'Barrel curvature of the glass : the picture bulges toward you.',
+    aberration: 'Color fringing that grows toward the edges (red and blue pulled apart radially).',
+    scanline: 'How dark the scanline grille gets.',
+    vignette: 'Darkening toward the corners of the tube.',
+    corner: 'Roundness of the bezel corners. Outside the glass is black (transparent where the layer is transparent).',
+    lines: 'Grille lines per frame height. 540 = one dark row every other row at 1080p, the finest; lower = coarser lines, visible at any resolution.',
+    moire: 'RASTER MOIRÉ : 1 keeps the curved moiré bands a fine grille beats into on the curved glass (the 1080p look, now the same at every resolution). 0 draws the grille cleanly and fades whatever is too fine to draw (lower LINES to see it).'
+  },
+  'fx-grain': {
+    character: 'The medium : DIGITAL sensor noise · FILM clumped grain (24 fps) · CRT row snow · VHS tape smear.',
+    amount: 'Noise strength.',
+    size: 'Grain size in 1080p pixels : it keeps its share of the frame at 4K or on the dome.',
+    chroma: 'Color in the noise : film dye-cloud grain, digital chroma blotches, CRT color speckle, VHS chroma phase error (always there on tape, pushed harder).',
+    parasites: 'CRT / VHS only. CRT : rolling hum bar, RF herringbone, impulse specks. VHS : line jitter, the head-switch tear at the bottom, dropouts and, high up, a drifting tracking band.'
+  },
+  'fx-ntsc': {
+    artifact: 'Dot crawl : fine luma detail leaks into the color subcarrier, so sharp vertical edges shimmer with rainbows.',
+    carrier: 'Subcarrier frequency : low = a coarse, broadcast-like crawl, high = the finest stripes the raster can draw. It also sets which rainbow color each edge takes.',
+    fringe: 'Chroma misregistered sideways : the smeared-color bleed.',
+    interlace: 'Separates the two scan fields : alternate lines take a hue rotation and a small brightness offset.',
+    fieldHue: 'How far, and which way, the two fields’ hues rotate apart. Needs INTERLACE.',
+    fieldCrawl: 'Slides the field pattern and the subcarrier so the picture shivers. 0 = still.'
+  },
+  'fx-rutt': {
+    lines: 'Number of scan lines over the frame height.',
+    amp: 'How far brightness pushes each line.',
+    width: 'Line thickness, as a share of the line spacing (never thinner than one pixel).',
+    color: '0 = mono line-work, 1 = each line takes the picture’s color.',
+    relief: 'Which way brightness pushes : DOWN hangs bright areas below their line (the original look), UP lifts them into hills like the classic scan processor.'
+  },
+  'fx-scanlines': {
+    count: 'Lines per frame height.',
+    darkness: 'How dark each line gets (darkening only, never a glow).',
+    roll: 'Slow roll of the lines down the frame. 0 = still.',
+    moire: 'RASTER MOIRÉ : 1 keeps the soft beat bands a count finer than the 1080-row raster makes (the 1080p look, now the same at every resolution). 0 draws the lines cleanly and fades them to an even dim where they get too fine to draw.'
+  },
+  'fx-sync-loss': {
+    roll: 'Vertical-hold drift : how fast the picture rolls down the screen.',
+    tear: 'How far the tearing bands shear sideways.',
+    bands: 'How many horizontal bands can tear.',
+    rate: 'Clock of the tears and catches : each step re-rolls which bands tear and whether the hold catches (snaps into lock for that step).'
+  },
+  'fx-tracking': {
+    band: 'Height of the noisy tracking band.',
+    position: 'Where the band sits : 0 = bottom, 1 = top.',
+    roll: 'Creeps the band up the frame. 0 = parked at POSITION.',
+    wobble: 'Per-line sideways wobble : strong inside the band, a whisper elsewhere.',
+    noise: 'Luminance flutter and white dropout dashes inside the band.',
+    rate: 'Flutter speed : how often the wobble and dashes re-roll.',
+    freeze: 'A wandering freeze line : one row smeared across a stripe of the frame. 0 = off.',
+    distort: 'Per-line analog x-jitter over the whole frame (the tape never sits still).',
+    bleed: 'Tinted chroma bleed : the red channel dragged sideways, magenta at the edges and cyan in the middle, warbling with the scan.',
+    bleedRange: 'How far the chroma bleed reaches.'
+  },
+  'fx-triangle-flicker': {
+    rate: 'Pulses per second. Free-running : it does not lock to the tempo.',
+    depth: 'How dark the trough of each pulse gets.',
+    hard: '0 = smooth triangle pulse, 1 = hard on/off strobe.',
+    swap: 'Shuffles the color channels on the bright half of each pulse.'
+  },
+  'fx-phosphene': {
+    sensitivity: 'How strongly a bright stimulus burns in.',
+    persistence: 'How long the ghost lingers : 0 ≈ 0.2 s, 0.6 ≈ 1.2 s, 1 ≈ 4 s (time constant). It always fades back to black.',
+    strength: 'How visible the ghost is over the live image.',
+    complement: '1 = the ghost takes the complementary color (red leaves cyan, white a pale gray), 0 = a plain luminance ghost.',
+    threshold: 'Only stimuli brighter than this burn an afterimage.'
+  },
+  'fx-optical-rain': {
+    amount: 'How much of the image shatters into falling streaks.',
+    rain: 'Fall speed of the streaks.',
+    streak: 'How far each fragment falls (streak length).',
+    columns: 'Number of rain columns across the frame.',
+    disparity: 'Red/cyan horizontal disparity per fragment, from its brightness : through the Finalizer’s anaglyph 3D the rain floats off the screen.',
+    edges: '0 = the whole frame rains, 1 = only edges shatter and their fragments fall.'
+  },
+  'fx-ringing': {
+    gap: 'Distance between echoes (a share of a 16:9 frame’s width, the same at every angle).',
+    intensity: 'Strength of the ghost edges.',
+    angle: 'Direction the echoes repeat in (radians : 0 = to the right, 1.57 = up).'
   },
   metamorph: {
     rate: 'How often a new form is born from inside the old one. 0 = births only on the birth ▸ trigger.',
@@ -118,16 +199,77 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     actantTrig: 'Drop a burst of actant patches on the rising edge : localized frozen blocks that stick and drift along the motion. Press it, send OSC, or bind a modulator (square LFO / audio onset) with M. Needs actants > 0.'
   },
   'fx-stutter': {
+    bands: 'Splits the screen into this many horizontal bands that freeze independently. 1 = the whole frame holds at once.',
+    jitter: 'Gives each band its own slightly faster or slower clock, so the freezes stop lining up. 0 = every band steps together.',
+    blackout: 'Share of segments where a band goes black instead of playing or holding : the screen switching off region by region.',
     trig: 'PUNCH-IN : while fired, every band freezes (full stutter). Press, OSC, or bind a modulator (M) to glitch on the beat. 0 = the base `chance` applies.'
   },
   'fx-mosh-blocks': {
+    freak: 'A minority of blocks that break the family : content grabbed from anywhere in the frame, zoomed, mirrored, sometimes inverted, held on a slower clock. 0 = none.',
+    audio: 'Raises the odds of each block column corrupting with its own band of the live spectrum (bass on the left). 0 = off.',
     trig: 'PUNCH-IN : while fired, every block moshes (full). Press, OSC, or bind a modulator (M) for beat-locked bursts. 0 = the base `chance` applies.'
   },
   'fx-slice-shuffle': {
+    audio: 'Raises the odds of each slice jumping with its own band of the live spectrum (bass at the bottom). 0 = off.',
     trig: 'PUNCH-IN : while fired, every slice shuffles (full). Press, OSC, or bind a modulator (M). 0 = the base `chance` applies.'
   },
   'fx-byte-corrupt': {
+    depth: 'Levels per color channel after the crush : 2 = one bit (hard two-tone), 16 = four bits. Lower is harsher.',
+    warpByte: 'Bends the block grid and gives every block its own rotation, zoom and offset : warped fragments instead of clean squares. 0 = square blocks.',
+    chaos: 'A few regions leave the grid : their cells stretch into slivers and bars, their content shears and melts, and they always corrupt. 0 = none.',
+    audio: 'Raises the odds of each block column corrupting with its own band of the live spectrum (bass on the left). 0 = off.',
     trig: 'PUNCH-IN : while fired, every block corrupts (full). Press, OSC, or bind a modulator (M) to fire on the beat. 0 = the base `scramble` applies.'
+  },
+  'fx-databend': {
+    shift: 'How far a torn band jumps sideways, as a share of the frame width.',
+    hold: 'Share of torn bands that freeze onto their top line and repeat it downward : the byte-repeat smear.',
+    channel: 'Share of torn bands whose color channels rotate (red takes green, blue takes red) and drift sideways out of registration; also how far they drift.',
+    wrap: 'Torn bands wrap around the frame edge, like a shifted run of bytes. Off = the edge column smears across the gap.',
+    audio: 'Raises the odds of each band tearing with its own band of the live spectrum (bass at the bottom). 0 = off.',
+    trig: 'PUNCH-IN : while fired, every band corrupts. Press, OSC, or bind a modulator (M) to fire on the beat. 0 = the base `chance` applies.'
+  },
+  'fx-row-echo': {
+    fade: 'Lets each held band melt back into the live picture toward its bottom : 0 = a hard repeated line, 1 = a smear that fades out.',
+    audio: 'Raises the odds of each band holding with its own band of the live spectrum (bass at the bottom). 0 = off.',
+    trig: 'PUNCH-IN : while fired, every row band holds. Press, OSC, or bind a modulator (M). 0 = the base `chance` applies.'
+  },
+  'fx-compress': {
+    block: 'Macroblock size in 1080p pixels (it scales with the output, so 4K and the dome look the same).',
+    quality: 'Encoder quality : low collapses each block toward its average color and bands the tones, high keeps the detail.',
+    ring: 'A diagonal ripple inside blocks that hold strong edges : the mosquito noise of a starved encoder.',
+    chroma: 'How far color is averaged over each block : color bleeds across edges while the brightness stays sharp.',
+    grid: 'Darkens a thin line along every block border.',
+    vary: 'Gives every block its own quality, as a real encoder spends its bits unevenly : some blocks stay clean, others crush. 0 = all equal.'
+  },
+  'fx-pixelsort': {
+    low: 'Only pixels brighter than this sort; darker ones stay put and end the runs.',
+    high: 'Only pixels darker than this sort; brighter ones stay put and end the runs.',
+    length: 'Longest run, as a share of the frame along the sort axis.',
+    angle: 'Tilts the sort axis away from horizontal (or vertical). 0 = straight.',
+    reverse: 'Flips the direction the bright values pour : off = rightward (upward when vertical), on = leftward (downward).'
+  },
+  'fx-pixelate': {
+    average: 'Blends each cell from its center pixel (crisp, sparkles as detail moves) toward the average of the cell (calm). 0 = center pixel.'
+  },
+  'fx-pixelmask': {
+    pattern: 'GRILLE vertical stripes · SHADOWMASK red / green / blue phosphor stripes · DOTS · GRID thin lines · NOISE a fixed random stencil.',
+    scale: 'Pattern size in 1080p pixels, rounded to whole pixels (it scales with the output).',
+    amount: 'How dark the unlit part of the mask goes.'
+  },
+  'fx-dither': {
+    levels: 'Tones per color channel (whole numbers : 2 = pure on / off).',
+    scale: 'Dot cell size in 1080p pixels, rounded to whole pixels (it scales with the output).'
+  },
+  'fx-threshold': {
+    soft: 'Width of the transition around the level : 0 = a hard edge.',
+    alphaOut: 'Keeps the source colors and turns the dark side transparent (the bright side with invert) : carves shapes out of the layer instead of painting black and white.'
+  },
+  'fx-mosaic': {
+    grid: 'Number of cells : low = a few big tiles, high = a fine field.',
+    lumaSize: 'How much each tile size follows the brightness of its cell : bright cells swell, dark ones shrink to small marks.',
+    gapMix: 'Fills the gaps with a dim copy of the tile color. 0 = matte black gaps.',
+    average: 'Blends each tile color from the cell center pixel (vivid, pops as detail moves) toward the average of the cell (calm). 0 = center pixel.',
+    audio: 'Swells each column of tiles with its own band of the live spectrum (bass on the left). 0 = off.'
   },
   organic: {
     mode: 'Which element : fire (buoyant flames + sparks) · water (flowing caustics + deep) · nature (growing canopy + pollen).',

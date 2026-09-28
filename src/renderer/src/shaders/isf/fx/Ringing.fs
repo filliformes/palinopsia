@@ -14,7 +14,11 @@
 void main() {
   vec2 uv = isf_FragNormCoord;
   vec4 src = IMG_NORM_PIXEL(inputImage, uv);
-  vec2 dir = vec2(cos(angle), sin(angle));
+  // Aspect-correct echo step : GAP is measured along the frame width of a 16:9
+  // frame (the old horizontal spacing, unchanged), and echoes keep that same
+  // spacing at every angle and aspect (vertical ones used to sit 1.8× closer).
+  float aspect = RENDERSIZE.x / RENDERSIZE.y;
+  vec2 dir = vec2(cos(angle) / aspect, sin(angle)) * (16.0 / 9.0);
 
   // High-pass at each echo distance, added with alternating sign and decay.
   vec3 acc = src.rgb;

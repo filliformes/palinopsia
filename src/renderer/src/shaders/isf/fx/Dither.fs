@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Ordered Dither : 4×4 Bayer-matrix dithering at a chosen dot scale, quantizing into few levels. The libretro/common-shaders dithering register: matte texture, not noise spectacle.",
+  "DESCRIPTION": "Ordered Dither : 4×4 Bayer-matrix dithering at a chosen dot scale (in 1080p pixels, so it holds at 4K), quantizing into few levels. The libretro/common-shaders dithering register: matte texture, not noise spectacle.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],
@@ -27,8 +27,13 @@ float bayer4(vec2 p) {
 void main() {
   vec2 uv = isf_FragNormCoord;
   vec4 c = IMG_NORM_PIXEL(inputImage, uv);
-  float threshold = bayer4(gl_FragCoord.xy / max(scale, 1.0));
-  float steps = max(levels - 1.0, 1.0);
+  // Dot cell in WHOLE pixels, scaled by the frame height : `scale` is in 1080p
+  // pixels, so the screen keeps its size at 4K and on the dome, and a fractional
+  // scale (dice, modulation) no longer mixes 2- and 3-px cells.
+  float s = max(floor(scale * RENDERSIZE.y / 1080.0 + 0.5), 1.0);
+  float threshold = bayer4(floor(gl_FragCoord.xy / s));
+  // Whole levels : a fractional count pushed white off the ramp (a gray checker).
+  float steps = max(floor(levels + 0.5) - 1.0, 1.0);
   vec3 dithered = floor(c.rgb * steps + threshold) / steps;
   gl_FragColor = vec4(mix(c.rgb, dithered, amount), c.a);
 }

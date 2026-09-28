@@ -15,7 +15,9 @@ void main() {
   vec2 uv = isf_FragNormCoord;
   vec4 src = IMG_NORM_PIXEL(inputImage, uv);
   float l = dot(src.rgb, vec3(0.299, 0.587, 0.114));
-  float k = smoothstep(level - soft, level + soft, l);
+  // soft 0 would make edge0 == edge1 (undefined in GLSL) : keep a hair of knee.
+  float s = max(soft, 1e-4);
+  float k = smoothstep(level - s, level + s, l);
   vec3 sol = mix(src.rgb, 1.0 - src.rgb, k * strength);
   gl_FragColor = vec4(sol, src.a);
 }

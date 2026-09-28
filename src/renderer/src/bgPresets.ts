@@ -52,7 +52,7 @@ export const BG_PRESETS: BgPreset[] = [
   { id: 'bg-slate', name: 'Slate', shaderId: 'solid-color', inputs: { gradient: 0, color: [0.09, 0.095, 0.11, 1] } },
   { id: 'bg-dusk', name: 'Dusk gradient', shaderId: 'solid-color', inputs: { gradient: 1, angle: 1.5708, midpoint: 0.45, dither: 0.6, colA: [0.02, 0.02, 0.05, 1], colB: [0.12, 0.08, 0.14, 1], colC: [0.45, 0.22, 0.15, 1] } },
   { id: 'bg-abyss', name: 'Abyss gradient', shaderId: 'solid-color', inputs: { gradient: 1, angle: 1.5708, midpoint: 0.6, dither: 0.6, colA: [0.0, 0.01, 0.03, 1], colB: [0.01, 0.05, 0.09, 1], colC: [0.05, 0.14, 0.18, 1] } },
-  { id: 'bg-ramp-ember', name: 'Ember ramp', shaderId: 'ramps', inputs: { freq: 1, steps: 1, rate: 0.05, angle: 1.5708 }, fx: [{ shaderId: 'fx-palette', inputs: { stops: 3, blend: 1, dither: 0.4 } }] },
+  { id: 'bg-ramp-ember', name: 'Ember ramp', shaderId: 'ramps', inputs: { freq: 1, steps: 1, rate: 0.05, angle: 1.5708 }, fx: [{ shaderId: 'fx-palette', inputs: { stops: 3, blend: 1, dither: 0.4, colorA: [0.04, 0.01, 0.01, 1], colorB: [0.55, 0.16, 0.04, 1], colorC: [1, 0.72, 0.35, 1] } }] },
 
   // ── Organic elements ─────────────────────────────────────────────────
   { id: 'bg-hearth', name: 'Hearth', shaderId: 'organic', inputs: { mode: 0, rate: 0.4, scale: 2.2, detail: 0.55, flow: 0.5, vary: 0, contrast: 0.95 }, opacity: 0.85 },

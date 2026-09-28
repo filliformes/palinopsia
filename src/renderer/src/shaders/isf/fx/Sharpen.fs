@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Sharpen : 3×3 unsharp mask. The utility detail lift: makes dithers bite and posterized bands snap after soft passes.",
+  "DESCRIPTION": "Sharpen : 3×3 unsharp mask. The utility detail lift: makes dithers bite and posterized bands snap after soft passes. The kernel keeps its reach at 1080p, 4K and on the dome.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Utility"],
@@ -11,7 +11,9 @@
 
 void main() {
   vec2 uv = isf_FragNormCoord;
-  vec2 px = 1.0 / RENDERSIZE;
+  // Taps one 1080p pixel apart at any output size (2 px at 4K), so upscaled
+  // content still sharpens instead of the kernel shrinking below its detail.
+  vec2 px = max(1.0, floor(RENDERSIZE.y / 1080.0 + 0.5)) / RENDERSIZE;
   vec4 src = IMG_NORM_PIXEL(inputImage, uv);
 
   vec2 cl = uv + vec2(-px.x, 0.0);

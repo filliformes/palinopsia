@@ -1,17 +1,19 @@
 /*{
-  "DESCRIPTION": "Byte Corrupt : bit-depth quantization with channel entanglement: values crushed to few levels, then per-block arithmetic scrambling folds channels into each other on a stepped clock. Data damage, not noise. `warp byte` bends the block grid and gives every block its own rotation / zoom / offset so the mosaic stops reading as clean squares : irregular warped fragments instead.",
+  "DESCRIPTION": "Byte Corrupt : bit-depth quantization with channel entanglement: values crushed to few levels, then per-block arithmetic scrambling folds channels into each other on a stepped clock. Data damage, not noise. `warp byte` bends the block grid and gives every block its own rotation / zoom / offset so the mosaic stops reading as clean squares : irregular warped fragments instead. `chaos` stretches a few regions into slivers and shears their content. `audio` raises the odds per block column from that column's band of the live spectrum (bass on the left).",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
-    { "NAME": "depth",    "TYPE": "float", "MIN": 2.0, "MAX": 16.0, "DEFAULT": 6.0 },
+    { "NAME": "depth",    "TYPE": "float", "MIN": 2.0, "MAX": 16.0, "DEFAULT": 6.0, "LABEL": "levels" },
     { "NAME": "scramble", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.4 },
     { "NAME": "blocks",   "TYPE": "float", "MIN": 2.0, "MAX": 64.0, "DEFAULT": 12.0 },
     { "NAME": "warpByte", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0, "LABEL": "warp byte" },
     { "NAME": "rate",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.3 },
     { "NAME": "chaos",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0 },
-    { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "fire ▸" }
+    { "NAME": "audio",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0, "LABEL": "audio" },
+    { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "fire ▸" },
+    { "NAME": "audioTex", "TYPE": "image" }
   ]
 }*/
 
@@ -23,6 +25,12 @@ float hash(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031); // precise hash : no rows, no lattice over hours
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);
+}
+
+// Spectrum (row 1, log-spaced : 0 bass .. 1 treble), 0..1. Bare-identifier coord.
+float spec(float u) {
+  vec2 ac = vec2(clamp(u, 0.0, 1.0), 0.75);
+  return IMG_NORM_PIXEL(audioTex, ac).r;
 }
 
 void main() {
@@ -67,17 +75,20 @@ void main() {
   }
 
   // WARP BYTE per-block interior: each block rotates + zooms + offsets its own
-  // content around its centre, so no two blocks warp the same way : the interiors
-  // read as scattered warped fragments rather than clean square crops.
+  // content around its center, so no two blocks warp the same way : the interiors
+  // read as scattered warped fragments rather than clean square crops. The warp
+  // is ADDED to the sampling coordinate, so a chaos block keeps its shear / melt
+  // inside its warped cell (it used to be overwritten here). Edge blocks still
+  // clamp : the smeared edge row is part of the damaged-data read.
   if (warpByte > 0.001) {
     vec2 lc = fract(domUV * grid) - 0.5;                        // -0.5..0.5 in block
     float ang = (hash(cell + 91.0) - 0.5) * 3.1416 * warpByte;  // per-block rotation
     float sc = 1.0 + (hash(cell + 93.0) - 0.5) * 1.2 * warpByte; // per-block zoom
     float ca = cos(ang), sa = sin(ang);
     lc = mat2(ca, -sa, sa, ca) * lc / max(sc, 0.2);
-    vec2 blockCentre = (cell + 0.5) / grid;
+    vec2 blockCenter = (cell + 0.5) / grid;
     vec2 off = (vec2(hash(cell + 95.0), hash(cell + 97.0)) - 0.5) * warpByte * 0.12;
-    suv = blockCentre + lc / grid + off;
+    suv += (blockCenter + lc / grid + off) - domUV;
   }
 
   vec4 src = IMG_NORM_PIXEL(inputImage, suv);
@@ -88,7 +99,9 @@ void main() {
 
   // Per-block entanglement: only some blocks corrupt this step; corrupted
   // blocks get channel arithmetic that folds values (fract = overflow wrap).
-  float on = max(max(step(1.0 - scramble * 0.6, hash(cell + t * 13.1)), isChaos), float(trig)); // trig = punch-in
+  // Audio raises the odds per block COLUMN from its own spectrum band (bass left).
+  float au = audio > 0.0 ? audio * spec((cell.x + 0.5) / grid.x) : 0.0;
+  float on = max(max(step(1.0 - scramble * 0.6 - au, hash(cell + t * 13.1)), isChaos), float(trig)); // trig = punch-in
   float mode = hash(cell + vec2(t, 27.0));
 
   vec3 c = q;

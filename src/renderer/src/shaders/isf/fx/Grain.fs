@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Grain : physically-modeled noise per medium. FILM: clumped photochemical grain (value-noise, NOT white), 24fps reseed, amplitude peaking in the MIDTONES; optional color-stock chroma grain. DIGITAL: honest sensor noise : signal-dependent SHOT noise (highlights), a constant READ-noise floor (shadows), and faint static fixed-pattern (PRNU). CRT: row-correlated snow; PARASITES add a rolling hum bar, faint RF herringbone and impulse specks. VHS: luma smear + chroma phase error; PARASITES add line jitter, the head-switch tear at the bottom, single-scanline dropouts with a recovery tail (in bursts) and, high up, a drifting tracking band. Parasites apply to CRT/VHS only.",
+  "DESCRIPTION": "Grain : physically-modeled noise per medium. FILM: clumped photochemical grain (value-noise, NOT white), 24fps reseed, amplitude peaking in the MIDTONES; optional color-stock chroma grain. DIGITAL: honest sensor noise : signal-dependent SHOT noise (highlights), a constant READ-noise floor (shadows), faint static fixed-pattern (PRNU) and blotchy low-frequency chroma noise. CRT: row-correlated snow with color speckle; PARASITES add a rolling hum bar, faint RF herringbone and impulse specks. VHS: luma smear + chroma phase error (CHROMA GRAIN strengthens it); PARASITES add line jitter, the head-switch tear at the bottom, single-scanline dropouts with a recovery tail (in bursts) and, high up, a drifting tracking band. Parasites apply to CRT/VHS only. SIZE is in 1080p pixels, relative to the frame height : the grain keeps its share of the frame at 4K or on the dome.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Texture"],
@@ -13,7 +13,8 @@
   ]
 }*/
 
-// Dave Hoskins hashes : strong, low-pattern distribution.
+// Hoskins hashes (hash without sine) : strong, low-pattern distribution. They
+// need whole-number-spaced inputs : a continuous input comes out a sawtooth.
 float hash21(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
@@ -50,12 +51,15 @@ void main() {
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
 
   vec3 add = vec3(0.0); // total additive contribution
+  // Grain size in 1080p pixels, scaled to the output height : the grain is the
+  // same share of the frame at 1080p, 4K or on the dome (identical at 1080p).
+  float sz = max(size, 1.0) * RENDERSIZE.y / 1080.0;
 
   if (character == 1) {
     // FILM : clumped grain (value noise), midtone-weighted, 24fps reseed.
     float seed = mod(floor(TIME * 24.0), 32749.0);
     vec2 jit = hash22(vec2(seed, 1.0)) * 64.0;
-    vec2 p = gl_FragCoord.xy / (max(size, 1.0) * 1.9) + jit;
+    vec2 p = gl_FragCoord.xy / (sz * 1.9) + jit;
     float g = vnoise(p) * 0.62 + vnoise(p * 2.3 + 11.0) * 0.38 - 0.5;
     g = sign(g) * pow(abs(g) * 2.0, 1.3) * 0.5; // gentle clump contrast
     float mid = pow(1.0 - abs(2.0 * l - 1.0), 0.6); // grain lives in the mids
@@ -68,41 +72,45 @@ void main() {
     add = gn * amount * 1.15 * mid;
   } else if (character == 0) {
     // DIGITAL : sensor noise: shot (∝√signal, highlights) + read floor
-    // (shadows) + static fixed-pattern gain. Fine, per-pixel. No debris.
+    // (shadows) + static fixed-pattern gain. Fine, per grain cell. No debris.
+    // Cells are FLOORED : the hash needs whole-number inputs, otherwise every
+    // pixel hashes apart and SIZE does nothing.
     float fs = mod(floor(TIME * 30.0), 4096.0);
-    vec2 px = gl_FragCoord.xy / max(size, 1.0);
+    vec2 px = floor(gl_FragCoord.xy / sz);
     float shot = gauss(hash21(px + fs * 7.3), hash21(px + fs * 7.3 + 57.0)) * sqrt(clamp(l, 0.02, 1.0));
     float read = gauss(hash21(px + fs * 7.3 + 123.0), hash21(px + fs * 7.3 + 199.0)) * 0.5;
     float n = shot * 0.7 + read * 0.45;
     float prnu = (hash21(floor(px)) - 0.5) * 0.12 * l; // static PRNU
     vec3 gn = vec3(n + prnu);
     if (chroma > 0.001) {
-      float cn = hash21(px * 0.5 + fs * 3.0) - 0.5; // low-freq colour noise
+      float cn = hash21(floor(px * 0.5) + fs * 3.0) - 0.5; // low-freq color noise (2×2 cells)
       gn += vec3(cn, -cn * 0.3, -cn) * chroma * 0.35 * (1.0 - l * 0.7);
     }
     add = gn * amount * 0.55;
   } else if (character == 2) {
     // CRT : row-correlated snow at field rate + dropout bands (parasites).
-    float row = floor(gl_FragCoord.y / max(size, 1.0));
+    float row = floor(gl_FragCoord.y / sz);
     float seed = mod(floor(TIME * 50.0), 4096.0);
     float rowSeed = hash21(vec2(row, seed));
-    vec2 cell = vec2(floor(gl_FragCoord.x / max(size, 1.0)), row);
+    vec2 cell = vec2(floor(gl_FragCoord.x / sz), row);
     float n = (hash21(cell + seed * 17.3) - 0.5) * (0.5 + rowSeed);
     vec3 noise = vec3(n);
     if (chroma > 0.001) {
-      noise += vec3((hash21(cell + 301.0) - 0.5), 0.0, (hash21(cell + 502.0) - 0.5)) * chroma * 0.5;
+      // The color speckle reseeds with the snow (it used to sit frozen under it).
+      noise += vec3((hash21(cell + 301.0 + seed * 17.3) - 0.5), 0.0, (hash21(cell + 502.0 + seed * 17.3) - 0.5)) * chroma * 0.5;
     }
     float w = 0.35 + 0.65 * smoothstep(0.0, 0.4, l);
     add = noise * amount * w;
     if (parasites > 0.001) src.rgb = crtParasites(src.rgb, uv0, parasites, TIME);
   } else {
     // VHS : luma smear (horizontally correlated) + chroma phase error + streaks.
-    float row = floor(gl_FragCoord.y / max(size, 1.0));
+    float row = floor(gl_FragCoord.y / sz);
     float seed = mod(floor(TIME * 30.0), 4096.0);
-    float smear = vnoise(vec2(gl_FragCoord.x / (max(size, 1.0) * 14.0), row * 0.7 + seed * 3.0)) - 0.5;
-    float fine = (hash21(vec2(floor(gl_FragCoord.x / max(size, 1.0)), row) + seed * 13.1) - 0.5) * 0.5;
+    float smear = vnoise(vec2(gl_FragCoord.x / (sz * 14.0), row * 0.7 + seed * 3.0)) - 0.5;
+    float fine = (hash21(vec2(floor(gl_FragCoord.x / sz), row) + seed * 13.1) - 0.5) * 0.5;
     vec3 noise = vec3(smear * 0.7 + fine);
-    float chromaErr = vnoise(vec2(row * 0.4, seed * 2.0)) - 0.5;
+    // Chroma phase error : always there on tape; CHROMA GRAIN pushes it harder.
+    float chromaErr = (vnoise(vec2(row * 0.4, seed * 2.0)) - 0.5) * (1.0 + 1.5 * chroma);
     noise += vec3(chromaErr * 0.6, 0.0, -chromaErr * 0.6);
     float w = 0.4 + 0.6 * smoothstep(0.0, 0.35, l);
     add = noise * amount * w;

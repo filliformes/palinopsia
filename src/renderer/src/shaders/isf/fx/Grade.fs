@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Grade : brightness / contrast / saturation / lift. The master-rack workhorse: bias toward mid-tone grades and desaturation (the disciplined feedback treatment, brief §1).",
+  "DESCRIPTION": "Grade : brightness / contrast / gamma / saturation / lift. The master-rack workhorse: bias toward mid-tone grades and desaturation (the disciplined feedback treatment, brief §1). Gamma bends the mid-tones without moving black or white.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Utility", "Color"],
@@ -8,7 +8,8 @@
     { "NAME": "brightness", "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0 },
     { "NAME": "contrast",   "TYPE": "float", "MIN": 0.0,  "MAX": 4.0, "DEFAULT": 1.0 },
     { "NAME": "saturation", "TYPE": "float", "MIN": 0.0,  "MAX": 2.0, "DEFAULT": 1.0 },
-    { "NAME": "lift",       "TYPE": "float", "MIN": 0.0,  "MAX": 0.2, "DEFAULT": 0.0 }
+    { "NAME": "lift",       "TYPE": "float", "MIN": 0.0,  "MAX": 0.2, "DEFAULT": 0.0 },
+    { "NAME": "gamma",      "TYPE": "float", "MIN": 0.5,  "MAX": 2.0, "DEFAULT": 1.0, "LABEL": "gamma (mids)" }
   ]
 }*/
 
@@ -17,6 +18,10 @@ void main() {
   vec4 c = IMG_NORM_PIXEL(inputImage, uv);
   vec3 col = c.rgb;
   col = (col - 0.5) * contrast + 0.5 + brightness;
+  // Mid-tone bend : > 1 opens the mids, < 1 sinks them; 0 and 1 stay put.
+  // Sign-preserving, so at gamma 1 an over-driven (negative) channel still
+  // reaches saturation and the clamp exactly as before.
+  col = sign(col) * pow(abs(col), vec3(1.0 / gamma));
   float l = dot(col, vec3(0.299, 0.587, 0.114));
   col = mix(vec3(l), col, saturation);
   col = col * (1.0 - lift) + lift; // gentle black lift : matte floor

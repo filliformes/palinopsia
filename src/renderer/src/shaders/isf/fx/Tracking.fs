@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Tracking : VHS tracking error, rebuilt on the VIDVOX 'VHS Glitch' model (Staffan Widegarn Åhlvik). The classic noisy band (head-switch tear, per-line wobble, dropout dashes) placed by POSITION and crept by ROLL : plus an auto-wandering FREEZE line that smears one row across the frame, per-pixel analog x-distortion, and the tape's tinted chroma BLEED (red channel dragged sideways through magenta↔cyan, warbling with the scan).",
-  "CREDIT": "Palinopsia, after David Lublin / Staffan Widegarn Åhlvik",
+  "DESCRIPTION": "Tracking : VHS tracking error, rebuilt on an open-source VHS-glitch shader model (credited in THIRD_PARTY_NOTICES.md). The classic noisy band (head-switch tear, per-line wobble, dropout dashes) placed by POSITION and crept by ROLL : plus an auto-wandering FREEZE line that smears one row across the frame, per-pixel analog x-distortion, and the tape's tinted chroma BLEED (red channel dragged sideways through magenta↔cyan, warbling with the scan).",
+  "CREDIT": "Palinopsia; derived from an MIT / CC BY 3.0 VHS-glitch shader, attribution in THIRD_PARTY_NOTICES.md",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],
   "INPUTS": [
@@ -21,7 +21,7 @@
 // Integrated phases (engine/phases.ts) : a knob change moves the picture on
 // from where it is instead of jumping it.
 uniform float PH_rate;
-uniform float PH_roll;
+uniform float PH_roll; // wrap 16.666666666666668
 
 const float TAU = 6.28318530718;
 
@@ -52,9 +52,9 @@ void main() {
   float center = fract(position + PH_roll * 0.06);
   float bandHalf = band * 0.5 * (0.8 + 0.2 * hash(vec2(t, 1.0)));
   float d = wd(uv.y, center);
-  float inBand = smoothstep(bandHalf, bandHalf * 0.4, d);
+  float inBand = 1.0 - smoothstep(bandHalf * 0.4, bandHalf, d);
 
-  // ── Auto-wandering FREEZE line (VHS Glitch's actualXLine): a narrow row
+  // ── Auto-wandering FREEZE line (the reference's actualXLine): a narrow row
   // that drifts on stacked incommensurate sines; inside its width the sampled
   // row snaps to the line : one row smeared across a stripe of the frame. ──
   float fLine = mod(0.5 + ((1.0 + sin(0.34 * TIME)) / 2.0 + (1.0 + sin(TIME)) / 3.0 +
@@ -71,7 +71,9 @@ void main() {
   // The hash needs whole-number inputs (a continuous uv.y makes it a sawtooth) :
   // one draw per tape line (480, like the parasites) and per field, wrapped.
   float rX = rand3(vec3(floor(uv.y * 480.0), floor(fLine * 4096.0), mod(floor(TIME * 59.94), 4096.0)));
-  shift += distort * 9.0 * rX / (RENDERSIZE.x / 2.0);
+  // 9 px of a 1080p frame's half-width, taken relative to the frame height so
+  // the jitter is the same share of the frame at 4K or on the dome.
+  shift += distort * 18.0 * rX / (1080.0 * RENDERSIZE.x / RENDERSIZE.y);
 
   vec2 c = vec2(fract(uv.x + shift), uv.y);
   if (freeze > 0.001 && wd(uv.y, fLine) < fWidth) c.y = fLine; // the frozen row
@@ -84,7 +86,7 @@ void main() {
   vec3 col = s.rgb * flutter + vec3(0.9) * dash;
 
   // ── Tinted chroma bleed (the reference's signature): the red channel
-  // dragged through offset taps, tinted magenta at the edges / cyan centre,
+  // dragged through offset taps, tinted magenta at the edges / cyan center,
   // warbling with the scan. Coords hoisted to bare vec2s (runtime rule). ──
   if (bleed > 0.001) {
     vec2 b1 = c + bleedRange * vec2(0.02, 0.0);
@@ -94,7 +96,9 @@ void main() {
     float bl = (IMG_NORM_PIXEL(inputImage, b1).r + IMG_NORM_PIXEL(inputImage, b2).r +
                 IMG_NORM_PIXEL(inputImage, b3).r + IMG_NORM_PIXEL(inputImage, b4).r) / 6.0;
     bl *= bleed * 3.0;
-    if (bl > 0.1) {
+    // Soft gate (a hard bl > 0.1 cut left a contour line across red gradients).
+    bl *= smoothstep(0.05, 0.15, bl);
+    if (bl > 0.0) {
       float bx = c.x + (0.05 + (1.5 + cos(TIME / 13.0 + TAU * (0.5 + (1.0 - c.y)))) / 2.0) *
         sin((TIME / 9.0 + 0.5) * TAU + c.y * c.y * TAU) / 8.0;
       vec3 tintL = vec3(0.8, 0.0, 0.4);
@@ -105,7 +109,7 @@ void main() {
   }
 
   // Head-switch flash rides the band's lower edge (wraps with the roll).
-  float headSwitch = smoothstep(0.012, 0.0, wd(uv.y, fract(center - bandHalf))) * 0.5;
+  float headSwitch = (1.0 - smoothstep(0.0, 0.012, wd(uv.y, fract(center - bandHalf)))) * 0.5;
   col += vec3(headSwitch);
 
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), s.a);

@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Palette : re-color by mapping luminance through a 2–5 stop gradient, with band/blend morph and ordered-dither breakup. The complex-coloring tool: build duotones, tritones, and full matte palettes; MIX returns some of the source color.",
+  "DESCRIPTION": "Palette : re-color by mapping luminance through a 2–5 stop gradient, with band/blend morph and ordered-dither breakup. The complex-coloring tool: build duotones, tritones, and full matte palettes; MIX returns some of the source color. Cycle rate slides the picture along the ramp and back (classic color cycling).",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color"],
@@ -13,9 +13,18 @@
     { "NAME": "colorB", "TYPE": "color", "DEFAULT": [0.35, 0.12, 0.45, 1.0] },
     { "NAME": "colorC", "TYPE": "color", "DEFAULT": [0.16, 0.82, 0.74, 1.0] },
     { "NAME": "colorD", "TYPE": "color", "DEFAULT": [0.92, 0.85, 0.72, 1.0] },
-    { "NAME": "colorE", "TYPE": "color", "DEFAULT": [1.0, 1.0, 1.0, 1.0] }
+    { "NAME": "colorE", "TYPE": "color", "DEFAULT": [1.0, 1.0, 1.0, 1.0] },
+    { "NAME": "cycle",  "TYPE": "float", "MIN": 0.0, "MAX": 0.5, "DEFAULT": 0.0, "LABEL": "cycle rate" }
+  ],
+  "PASSES": [
+    { "TARGET": "cycleLatch", "PERSISTENT": true, "WIDTH": "1", "HEIGHT": "1" },
+    { }
   ]
 }*/
+
+// ∫ cycle dt on the layer clock (engine/phases.ts) : turning `cycle` changes
+// the speed of the color cycling from here on, never jumps the colors.
+uniform float PH_cycle;
 
 float bayer4(vec2 p) {
   vec2 q = floor(mod(p, 4.0));
@@ -37,20 +46,45 @@ vec3 stopColor(float idx) {
 }
 
 void main() {
+  // The engine starts every phase at a random offset, which would shift the
+  // colors by a random amount even at cycle 0. Pass 0 latches the phase this
+  // instance started at (16 bits over two 8-bit channels) and the cycle is
+  // counted from there : cycle 0 is exactly the plain map, and PANIC (which
+  // empties the latch) brings the ramp home. One ping-pong period = 2 units.
+  float ph = fract(PH_cycle * 0.5);
+  vec2 lc = vec2(0.5);
+  vec4 st = IMG_NORM_PIXEL(cycleLatch, lc);
+  if (PASSINDEX == 0) {
+    if (st.a > 0.5) { gl_FragColor = st; return; }
+    gl_FragColor = vec4(floor(ph * 255.0) / 255.0, fract(ph * 255.0), 0.0, 1.0);
+    return;
+  }
+  float cyc = st.a > 0.5 ? fract(ph - (st.x + st.y / 255.0)) * 2.0 : 0.0;
+
   vec2 uv = isf_FragNormCoord;
   vec4 src = IMG_NORM_PIXEL(inputImage, uv);
   float l = clamp(dot(src.rgb, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
 
   // Ordered-dither breakup of the luminance before it hits the palette :
-  // the classic way to keep few stops from banding flatly.
+  // the classic way to keep few stops from banding flatly. The 4×4 cell grows
+  // with the output (1 px at 1080p, 2 px at 4K) so the texture looks the same
+  // on every screen and does not moiré under the dome warp.
   float n = floor(stops + 0.5);
-  l += (bayer4(gl_FragCoord.xy) - 0.5) * dither / max(n - 1.0, 1.0);
+  float dpx = max(1.0, floor(RENDERSIZE.y / 1080.0 + 0.5));
+  vec2 dcell = floor(gl_FragCoord.xy / dpx);
+  l += (bayer4(dcell) - 0.5) * dither / max(n - 1.0, 1.0);
   l = clamp(l, 0.0, 1.0);
 
-  // Position within the gradient.
+  // Color cycling : the luminance slides along the ramp and reflects at the
+  // ends (a ping-pong, so there is no hard wrap). Identity at cyc = 0.
+  l = 1.0 - abs(fract((l + cyc) * 0.5) * 2.0 - 1.0);
+
+  // Position within the gradient. i stops at the second-to-last stop and f
+  // runs to 1 there, so pure white reaches the LAST color (fract(t) reset to 0
+  // at l = 1 and painted white with the second-to-last).
   float t = l * (n - 1.0);
   float i = floor(min(t, n - 1.001));
-  float f = fract(t);
+  float f = t - i;
   // blend 0 → hard bands (posterized palette) · 1 → smooth gradient map.
   float k = mix(step(0.5, f), f, blend);
   vec3 mapped = mix(stopColor(i), stopColor(i + 1.0), k);

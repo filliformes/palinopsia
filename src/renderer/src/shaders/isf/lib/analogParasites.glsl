@@ -44,7 +44,8 @@ vec2 vhsWarp(vec2 uv, float par, float t, out float band) {
   float hsH = (4.0 + 6.0 * par) / PAR_LINES;
   if (uv.y < hsH) {
     float k = 1.0 - uv.y / hsH;
-    dx += k * k * (0.01 + 0.035 * par) * (0.6 + 0.4 * hash21(vec2(line, fseed + 3.0)));
+    // Fades in over the first stretch of the knob : no jump from off to a tear.
+    dx += k * k * (0.01 + 0.035 * par) * (0.6 + 0.4 * hash21(vec2(line, fseed + 3.0))) * smoothstep(0.0, 0.15, par);
   }
   // Tracking band : only at high settings, and not all the time.
   float on = smoothstep(0.45, 1.0, par) * smoothstep(0.3, 0.6, vnoise(vec2(t * 0.22, 7.0)));
@@ -91,7 +92,7 @@ vec3 vhsParasites(vec3 col, vec2 uv, float par, float t, float band) {
   // Snow in the tracking band and the head-switch lines : noise that flows ALONG
   // each line (the FM signal breaking up), a new pattern on every line and field.
   float line = floor(uv.y * PAR_LINES);
-  float along = vnoise(vec2(uv.x * (120.0 + 260.0 * hash21(vec2(line, fseed + 2.0))), line * 1.37 + fseed * 7.1));
+  float along = vnoise(vec2(uv.x * (120.0 + 260.0 * hash21(vec2(line, fseed + 2.0))), line * 1.37 + mod(fseed, 4096.0) * 7.1)); // hash inputs kept < 3e4
   float snow = smoothstep(0.35, 0.95, along) * (0.6 + 0.4 * hash21(vec2(floor(uv.x * 900.0), line + fseed)));
   float hsH = (4.0 + 6.0 * par) / PAR_LINES;
   float hsZone = uv.y < hsH ? (1.0 - uv.y / hsH) * (0.3 + 0.4 * par) : 0.0;

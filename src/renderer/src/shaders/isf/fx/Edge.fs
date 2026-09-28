@@ -1,12 +1,13 @@
 /*{
-  "DESCRIPTION": "Edge : Sobel luminance contours, mixable over the source. Matte line-work for the digital-arts register; gain stays disciplined (no neon bloom).",
+  "DESCRIPTION": "Edge : Sobel luminance contours, mixable over the source. Matte line-work for the digital-arts register; gain stays disciplined (no neon bloom). Ink draws the contours as dark lines over the picture instead of light lines on black. Line weight is the same at 1080p, 4K and on the dome.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Stylize"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "gain", "TYPE": "float", "MIN": 0.5, "MAX": 4.0, "DEFAULT": 1.5 },
-    { "NAME": "blend", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0 }
+    { "NAME": "blend", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0 },
+    { "NAME": "ink", "TYPE": "bool", "DEFAULT": false, "LABEL": "ink (dark lines)" }
   ]
 }*/
 
@@ -17,7 +18,9 @@ float lum(vec2 c) {
 
 void main() {
   vec2 uv = isf_FragNormCoord;
-  vec2 px = 1.0 / RENDERSIZE;
+  // The 3×3 taps are one 1080p pixel apart at any output size (2 px at 4K),
+  // so the lines keep their weight instead of thinning out.
+  vec2 px = max(1.0, floor(RENDERSIZE.y / 1080.0 + 0.5)) / RENDERSIZE;
 
   vec2 c00 = uv + vec2(-px.x, -px.y); vec2 c10 = uv + vec2(0.0, -px.y); vec2 c20 = uv + vec2(px.x, -px.y);
   vec2 c01 = uv + vec2(-px.x, 0.0);                                     vec2 c21 = uv + vec2(px.x, 0.0);
@@ -32,6 +35,7 @@ void main() {
   float e = clamp(length(vec2(gx, gy)) * gain, 0.0, 1.0);
 
   vec4 src = IMG_NORM_PIXEL(inputImage, uv);
-  vec3 edges = vec3(e);
-  gl_FragColor = vec4(mix(src.rgb, edges, blend), src.a);
+  // Light lines on black, or (ink) the picture itself darkened along its contours.
+  vec3 lines = ink ? src.rgb * (1.0 - e) : vec3(e);
+  gl_FragColor = vec4(mix(src.rgb, lines, blend), src.a);
 }
