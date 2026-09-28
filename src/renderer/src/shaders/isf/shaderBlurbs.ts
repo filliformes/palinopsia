@@ -57,7 +57,7 @@ export const SHADER_BLURBS: Record<string, string> = {
   'fx-motif':
     'Repeats the image somewhere else in the frame, moved, turned, resized and optionally mirrored, each copy fainter than the last. The result is the same gesture answering itself across the picture, like a phrase repeated at a different pitch. Directional rather than radial, so it never becomes a mandala.',
   'fx-force-lines':
-    'Bands the picture by brightness and slides each band along the direction the image itself is heading. The picture appears to be combed along its own internal currents. Strong settings turn a photograph into flowing strata.',
+    'Bands the picture by brightness and slides neighboring bands against each other: straight up and down, or along and across the image’s own contours. Edges tear into engraved, gritty seams while flat areas stay whole. Strong settings turn a photograph into flowing strata.',
   'fx-aperture':
     'Puts a projector gate in front of the image: an iris, a slit, or a film-gate rectangle. It can flicker and breathe like a real gate rather than sitting perfectly still. Reach for it when you want the image to feel projected rather than displayed.',
 
@@ -83,7 +83,7 @@ export const SHADER_BLURBS: Record<string, string> = {
   'fx-slit-buffer':
     'A writing head sweeps across the frame, freezing the live image into place as it passes. Every column you see was captured at a different moment, so a still subject looks normal and a moving one is stretched through time. One of the clearest ways to make time itself visible.',
   'fx-difference-bloom':
-    'Shows only what changed between one frame and the next, then spreads it softly outward. Anything that holds still disappears into black; anything that moves glows. Point it at a near-static source and only the gesture survives.',
+    'Shows only what changed between one frame and the next, echoed in a ring of halos around each moving edge, with a short afterglow once the motion stops. Anything that holds still disappears into black; anything that moves glows. Point it at a near-static source and only the gesture survives.',
   'fx-stutter':
     'Freezes the picture in bursts instead of letting it run smoothly. Horizontal bands can hold independently of one another, so parts of the frame stall while the rest keeps moving. The result is a broken, unpredictable rhythm rather than an even stutter.',
   'fx-row-echo':
@@ -91,7 +91,7 @@ export const SHADER_BLURBS: Record<string, string> = {
   'fx-triangle-flicker':
     'Pulses the brightness up and down on a steady rhythm, with an optional hard on/off strobe. It can also shuffle the color channels on each pulse. It runs free at its own rate rather than locking to the tempo. Best used sparingly : the output limiter tempers it, but it is a strong device.',
   'fx-feedback-zoom':
-    'Feeds the image back into itself through a zoom and a twist, so echoes march inward or outward forever. Each generation is slightly smaller and turned, building tunnels and spirals out of any source. This is the deepest version of the afterglow the instrument is named after.',
+    'Feeds the image back into itself through a zoom and a twist, so echoes march inward or outward forever. Each generation is slightly smaller and turned, building tunnels and spirals out of any source, around a center that slowly wanders instead of sitting dead in the middle. This is the deepest version of the afterglow the instrument is named after.',
 
   // ── Glitch ───────────────────────────────────────────────────────────
   'fx-chroma-shift':
@@ -117,11 +117,11 @@ export const SHADER_BLURBS: Record<string, string> = {
   'fx-tracking':
     'The tape-tracking error of a worn VHS: a noisy band that drifts through the frame, lines shifted at random, color bleeding at the edges. Rebuilt from a well-known model of the real fault rather than approximated. Instantly reads as domestic video.',
   'fx-decay':
-    'Wears the picture down the way a tape dub or a worn print wears down: color bleeds, blocks crush, the head switch tears the bottom of the frame. It stacks generations of loss rather than simulating one specific fault. Excellent for taking the digital newness off a source.',
+    'Wears the picture down the way a tape dub or a worn print wears down: color bleeds, blocks crush, lines jitter and drop out, and the head switch can tear the bottom of the frame. It stacks generations of loss rather than simulating one specific fault. Excellent for taking the digital newness off a source.',
 
   // ── Texture ──────────────────────────────────────────────────────────
   'fx-granular':
-    'Shatters the frame into a grid of small overlapping grains, then scatters, rotates and delays each one. The image survives as a cloud of its own fragments. Borrowed from granular sound synthesis, where the same idea turns a note into a texture.',
+    'Shatters the frame into a grid of small overlapping grains, then scatters and rotates each one and lets it bleed into the next frame, so the echoes spiral. The image survives as a cloud of its own fragments. Borrowed from granular sound synthesis, where the same idea turns a note into a texture.',
   'fx-mosaic':
     'Reads the picture as a grid of cells and replaces each with a single color of its own (its center pixel, or its average), redrawn as a shape that swells with brightness. It is analysis and resynthesis rather than simple blurring, so the result feels constructed. Coarse settings turn any source into a tiled panel.',
   'fx-optical-rain':

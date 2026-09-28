@@ -7,6 +7,12 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Time and feedback controls** : Light Trails `knee` and `clear`, Wide Time `burn` and
+  `clear`, Difference Bloom `hold` and `soft`, Feedback Zoom `center`, `drift`, `edge` and
+  `clear`, Force Lines `slide`, crawl `rate`, `vary` and `audio`, Granular `stagger`,
+  `sizeVar`, `edges` and `audio`, Slit Buffer `angle` and `grab`, Smear / Streak `smooth`,
+  Decay `headSwitch`, Abstraction `rate` and `coherence`. Tooltips for the color and
+  geometry effects.
 - **New node controls** (defaults keep today's look) : Feedback `clear`, Sediment
   `snapshot`, Eternalism `freeze`, Réponse and Chronoscan `stride` (longer memory),
   Chronoscan ping-pong sweep, Parallax sway rate and a smooth depth-of-field disc,
@@ -138,45 +144,17 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
-- **Native effect nodes (all 25).** Every node forced an opaque output; they now keep
-  the layer's transparency. Feedback's brightness control lifted near-black grounds into
-  a gray fog and its add blend clipped to white (now it targets the live layer, keeps
-  headroom and turns rigidly at 16:9); Sediment's memory never faded (a half-float
-  stall); Datamosh's actant mask never cleared and its first frame jolted; Réponse's
-  gain did nothing; Chronoscan showed the present at quarter resolution; Eternalism's
-  HOLD frames were always one apart; Parallax's fog darkened the near planes; Pulfrich's
-  delay mapping wrapped; Melt never crept; Corrode ate the frame in seconds instead of
-  minutes (bury is now the time to full corrosion, one minute to an hour) and left a dot
-  grid; Sillage's noise collapsed into stripes over long shows; Toile cost 14 ms at 4K
-  (now about 3); Mosaïque's tiles stretched at 16:9; Luma Blur and Gooey stepped at 4K;
-  Decimate juddered. Nodes restart cleanly after insert, PANIC or a re-enable, follow
-  the frame step, and compile lazily. Their signature looks (Feedback's heat, Datamosh's
-  melt, the Autocutter's torn paper, the stepped ghosts) are kept.
-- **Flash safety now does its job.** The limiter measured per frame on gamma-encoded
-  light, so a 10 Hz black / white strobe got through at the default setting (and at
-  144 Hz nothing was limited). It now counts flashes per second in real luminance, with
-  a saturated-red term, per region of the frame, as flash-safety guidance does : a
-  10 Hz strobe comes out with no flashes at the default 0.35, while ordinary content
-  (pans, scrolling stripes, cuts, every generator tested) passes through bit for bit.
-  Film flutter on a very bright scene can now be softened, since it counts as flashing.
-- **The finishing chain.** Vibe mapped pure white to the wrong color stop (clipped
-  highlights went gray or black); Context put the whole master one frame late and its
-  trails could leave a permanent ghost; digital grain size did nothing; sharpening was
-  lost in 3D; torn VHS lines smeared the frame edge. Context's ring-shaped blur and
-  bloom stay the default look, with a new `smoothing` knob for the soft version.
-- **Finalizer opacity** : the old "A" slider (which reached no output) is now a real
-  fade to black, labeled "opacity". A session saved with it below 1 now looks darker.
-- **Output stages** : Cameraless could re-show an old frozen frame and its draw clock
-  could bank debt; the depth shadow fell the wrong way; the output shaper's edge was
-  undefined; Frame-Weave jumped when its rate moved; the superimposition flicker ran
-  at 7.5 Hz and now lands on the drawn film frames.
-- **Native effect nodes run on their layer's clock** (Speed, freeze, global speed and
-  the background's slow clock apply; they used the wall clock), see "no depth" when
-  Depth is off (so their brightness fallbacks work), and can read the audio. The depth
-  estimator now sees the picture upright. PANIC also clears the trail buffers of the
-  rack effects, which could hold a ghost for good.
-- **Randomize and Variation** leave deliberate settings alone : anaglyph 3D, film hold,
-  the output shape and Vibe's chord mode are never rolled; a pinned dice range now
-  keeps the current value (it used to force one); the walk and Variation respect the
-  same rules. Palettes (Palette, Colorizer, Vibe) roll as one hue from near-black to
-  pale instead of five clashing colors; Lookup no longer gets a random palette layer.
+- **Time and feedback effects (11).** Light Trails and Wide Time never faded back to
+  black (an 8-bit stall left a permanent fog of everything that passed); they now fade
+  fully, with stochastic rounding so the long trails keep their length. Wide Time froze
+  at a quarter of its input, flickered at 30 Hz in difference mode and blew out in add /
+  screen (the blowout is kept as a `burn` mode). Feedback Zoom, Light Trails, Decay and
+  Slit Buffer showed last frame instead of this one. Difference Bloom blinked on video
+  that updates slower than the display. Granular's grains never re-rolled their angle.
+  Force Lines' taps were silently miscompiled; its old vertical slide is kept as the
+  default. Smear and Streak keep their stepped ghost copies, with a `smooth` knob for
+  the clean streak.
+- **Every multi-pass effect sampled a black input on its first frame** (a pushed texture
+  landed on a unit the pass buffers take), which also stored garbage in persistent
+  buffers; and any shader whose last pass renders to a buffer crashed on draw. Both
+  fixed in the shader bridge.

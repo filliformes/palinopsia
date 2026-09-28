@@ -1362,7 +1362,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-smear', name: 'Smear', category: 'FX', source: smear,
-    curated: { reach: [0.02, 0.2], threshold: [0.25, 0.7], angle: [0, 6.2832] }
+    curated: { reach: [0.02, 0.2], threshold: [0.25, 0.7], angle: [0, 6.2832], smoothing: [0, 1] }
   },
   {
     id: 'fx-palette', name: 'Palette', category: 'FX', source: palette,
@@ -1392,7 +1392,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-streak', name: 'Streak', category: 'FX', source: streak,
-    curated: { reach: [0.02, 0.15], angle: [0, 6.2832] }
+    curated: { reach: [0.02, 0.15], angle: [0, 6.2832], smoothing: [0, 1] }
   },
   {
     id: 'fx-sharpen', name: 'Sharpen', category: 'FX', source: sharpen,
@@ -1454,11 +1454,12 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-feedback-zoom', name: 'Feedback Zoom', category: 'FX', source: feedbackZoom,
-    curated: { zoom: [0.95, 1.08], twist: [-0.08, 0.08], amount: [0.35, 0.85] }
+    // center is never rolled (RANDOMIZE_SKIP) : drift makes it wander instead.
+    curated: { zoom: [0.95, 1.08], twist: [-0.08, 0.08], amount: [0.35, 0.85], drift: [0.1, 0.6], edge: [0, 1] }
   },
   {
     id: 'fx-force-lines', name: 'Force Lines', category: 'FX', source: forceLines,
-    curated: { lines: [4, 16], shift: [0.005, 0.04], edge: [0.2, 0.8], gate: [0.3, 0.8], amount: [0.6, 1] }
+    curated: { lines: [4, 16], shift: [0.005, 0.04], edge: [0.2, 0.8], gate: [0.3, 0.8], amount: [0.6, 1], slide: [0, 2], rate: [0, 0.3], vary: [0, 0.8], audio: [0, 0.5] }
   },
   {
     id: 'fx-aperture', name: 'Aperture', category: 'FX', source: aperture,
@@ -1470,11 +1471,11 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-slit-buffer', name: 'Slit Buffer', category: 'FX', source: slitBuffer,
-    curated: { rate: [0.05, 1], width: [0.01, 0.1], jitter: [0, 0.7], jumps: [0, 0.6] }
+    curated: { rate: [0.05, 1], width: [0.01, 0.1], jitter: [0, 0.7], jumps: [0, 0.6], angle: [-0.5, 0.5] }
   },
   {
     id: 'fx-difference-bloom', name: 'Difference Bloom', category: 'FX', source: differenceBloom,
-    curated: { gain: [1.5, 6], spread: [0.004, 0.03], keep: [0, 0.4] }
+    curated: { gain: [1.5, 6], spread: [0.004, 0.03], keep: [0, 0.4], hold: [0.05, 0.4], soft: [0, 1] }
   },
   {
     id: 'fx-triangle-flicker', name: 'Triangle Flicker', category: 'FX', source: triangleFlicker,
@@ -1504,15 +1505,15 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-light-trails', name: 'Light Trails', category: 'FX', source: lightTrails,
-    curated: { decay: [0.9, 0.99], drift: [0, 0.012], angle: [0, 6.2832] }
+    curated: { decay: [0.9, 0.99], drift: [0, 0.012], angle: [0, 6.2832], knee: [0, 0.5] }
   },
   {
     id: 'fx-decay', name: 'Decay', category: 'FX', source: decay,
-    curated: { amount: [0.3, 0.8], smear: [0.1, 0.55], chroma: [0.2, 0.75], blocks: [0.1, 0.6], dropout: [0, 0.4], jitter: [0.1, 0.6] }
+    curated: { amount: [0.3, 0.8], smear: [0.1, 0.55], chroma: [0.2, 0.75], blocks: [0.1, 0.6], dropout: [0, 0.4], jitter: [0.1, 0.6], headSwitch: [0, 0.7] }
   },
   {
     id: 'fx-abstraction', name: 'Abstraction', category: 'FX', source: abstraction,
-    curated: { amount: [0.25, 0.85], disperse: [0.3, 0.9], posterize: [0.2, 0.8], desat: [0.2, 0.8] }
+    curated: { amount: [0.25, 0.85], disperse: [0.3, 0.9], posterize: [0.2, 0.8], desat: [0.2, 0.8], rate: [0.05, 0.4], coherence: [0, 1] }
   },
   {
     id: 'fx-wide-time', name: 'Wide Time', category: 'FX', source: wideTime,
@@ -1533,7 +1534,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-granular', name: 'Granular', category: 'FX', source: granular,
-    curated: { grain: [0.2, 0.8], density: [0.5, 1], scatter: [0, 0.5], rotate: [0, 0.5], smear: [0, 0.6], rate: [0.1, 3] }
+    curated: { grain: [0.2, 0.8], density: [0.5, 1], scatter: [0, 0.5], rotate: [0, 0.5], smear: [0, 0.6], rate: [0.1, 3], stagger: [0, 1], sizeVar: [0, 0.6], edges: [0, 1], audio: [0, 0.5] }
   },
   {
     // Historically id 'fx-mosaic' (kept stable for saved sessions/presets); the

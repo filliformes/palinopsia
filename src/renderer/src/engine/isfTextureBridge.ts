@@ -94,10 +94,24 @@ export function installTextureBridge(): void {
     program?: { cleanup?: () => void }
     paintProgram?: { cleanup?: () => void }
   }) => void
+  // setupGL() calls cleanup() first to drop the PREVIOUS source's program, while
+  // paintProgram (built once in the constructor) must survive it : a shader whose
+  // last pass renders to a TARGET is painted to screen through it, and freeing it
+  // there made every such shader throw on draw. Only a real disposal frees it.
+  const origSetupGL = proto.setupGL as (this: { __opsiaSetup?: boolean }) => void
+  proto.setupGL = function (this: { __opsiaSetup?: boolean }): void {
+    this.__opsiaSetup = true
+    try {
+      origSetupGL.call(this)
+    } finally {
+      this.__opsiaSetup = false
+    }
+  }
   proto.cleanup = function (this: {
     gl?: WebGL2RenderingContext
     program?: { cleanup?: () => void }
     paintProgram?: { cleanup?: () => void }
+    __opsiaSetup?: boolean
   }): void {
     const gl = this.gl
     let vao: WebGLVertexArrayObject | null = null
@@ -112,9 +126,11 @@ export function installTextureBridge(): void {
     try {
       origCleanup.call(this)
       this.program?.cleanup?.()
-      this.paintProgram?.cleanup?.()
       this.program = undefined
-      this.paintProgram = undefined
+      if (!this.__opsiaSetup) {
+        this.paintProgram?.cleanup?.()
+        this.paintProgram = undefined
+      }
     } finally {
       if (gl && vao) gl.bindVertexArray(null)
     }
@@ -127,7 +143,13 @@ export function installTextureBridge(): void {
     if (v && (v as TextureHandle).__opsiaTexture) {
       const gl = this.gl
       const loc = this.program.getUniformLocation(uniform.name)
-      const unit = this.contextState.newTextureIndex()
+      // Never share a unit with a pass buffer : draw() resets the unit counter and
+      // binds the pass buffers from unit 0, so on a renderer's FIRST draw (counter
+      // still at 0) a pushed input landed under buffer 0 and the effect sampled
+      // black (and stored it in its persistent buffers).
+      const nBuf = (this as unknown as { renderBuffers?: unknown[] }).renderBuffers?.length ?? 0
+      let unit = this.contextState.newTextureIndex()
+      while (unit < nBuf) unit = this.contextState.newTextureIndex()
       gl.activeTexture(gl.TEXTURE0 + unit)
       gl.bindTexture(gl.TEXTURE_2D, v.texture)
       if (loc) gl.uniform1i(loc, unit)

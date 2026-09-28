@@ -92,7 +92,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   'fx-triangle-flicker': ['strobe', 'flicker', 'tremolo', 'lfo', 'rhythm'],
   'fx-vibe': ['color grade', 'lut', 'look', 'film', 'palette'],
   'fx-wavefold': ['wavefolder', 'distortion', 'fold', 'saturation', 'drive'],
-  'fx-wide-time': ['reverb', 'blur', 'delay', 'average', 'ghost'],
+  'fx-wide-time': ['reverb', 'delay', 'echo', 'trails', 'blur', 'ghost'],
 
   // ── Generators / sources ─────────────────────────────────────────────
   ash: ['particles', 'ash', 'snow', 'embers', 'texture', 'audio'],

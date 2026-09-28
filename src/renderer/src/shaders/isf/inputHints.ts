@@ -4,6 +4,116 @@
 // a first-timer meets in Finishing and can't guess from the label alone.
 
 export const INPUT_HINTS: Record<string, Record<string, string>> = {
+  // ── Color, tone and geometry rack FX ─────────────────────────────────
+  'fx-chroma-shift': {
+    amount: 'How far red and blue are pulled apart, in frame widths (0.006 ≈ 11 px at 1080p). The same length at every angle.',
+    angle: 'Direction of the split (radians) : 0 = horizontal, 1.57 = vertical.'
+  },
+  'fx-colorizer': {
+    gain: 'Contrast of the brightness signal about mid-gray before it is colored. Above 1 pushes the darks and lights out of range, where fold takes over.',
+    bias: 'Shifts the brightness signal up or down before coloring : more of the picture lands on the high or the low color.',
+    fold: 'What happens to the signal that gain and bias push out of range : 0 = it clips flat at the low and high colors, 1 = it reflects back in, carving extra color bands. Does nothing until gain or bias push the signal out of range.',
+    mixSrc: 'Blends the original colors back over the map : 0 = pure map, 1 = the untouched source.',
+    low: 'Color for the darks.',
+    mid: 'Color for the mid-tones.',
+    high: 'Color for the lights.',
+    invert: 'Runs the map backward : darks take the high color and lights the low one, a color negative.'
+  },
+  'fx-grade': {
+    brightness: 'Adds or removes light evenly across the whole range.',
+    contrast: 'Spreads (above 1) or flattens (below 1) the tones about mid-gray.',
+    saturation: '0 = grayscale, 1 = unchanged, 2 = doubled color.',
+    lift: 'Raises black toward gray : a matte floor, the shadows never reach pure black.',
+    gamma: 'Bends the mid-tones without moving black or white : above 1 opens them (lighter), below 1 sinks them (heavier).'
+  },
+  'fx-hue-rotate': {
+    shift: 'How far every color turns around the color wheel : 0.5 = the complementary color, 1 = a full turn back to the start.',
+    byLuma: 'Weights the shift by brightness : positive turns the lights further than the darks, negative the reverse, 0 = even.',
+    rate: 'Keeps the wheel turning on its own, in turns per second (0.02 = one turn every 50 s). Back to 0, the cycle stops where it is; PANIC returns it to the start.'
+  },
+  'fx-palette': {
+    stops: 'How many of the five colors the ramp uses, from A (darks) upward : white lands on the last one used.',
+    blend: '0 = hard bands of flat color (posterized), 1 = a smooth gradient between the stops.',
+    dither: 'Breaks the band edges up with an ordered dot pattern, the classic way to fake in-between shades with few colors.',
+    mixSrc: 'Blends the original colors back over the map : 0 = pure map, 1 = the untouched source.',
+    colorA: 'First stop : the shadows and black.',
+    colorB: 'Second stop.',
+    colorC: 'Third stop (the lights when stops = 3).',
+    colorD: 'Fourth stop (used when stops ≥ 4).',
+    colorE: 'Fifth stop (used when stops = 5).',
+    cycle: 'Color cycling : slides the picture along the ramp and back, in ramp lengths per second. Back to 0, it stops where it is; PANIC returns it to the start.'
+  },
+  'fx-rgb-shift': {
+    offset: 'How far red and blue are pushed apart along the angle, in frame widths (green holds still).',
+    scale: 'Scales red and blue in opposite ways about the center (red smaller, blue larger), so the split grows toward the edges.',
+    angle: 'Direction of the offset (radians) : 0 = horizontal, 1.57 = vertical.',
+    wobble: 'Makes the split breathe in and out. 0 = still.',
+    wobRate: 'Speed of the breathing (Hz). The default is the original slow breath.'
+  },
+  'fx-solarize': {
+    level: 'Brightness above which the picture inverts.',
+    strength: 'How far the bright side inverts : 1 = a full negative above the level.',
+    soft: 'Width of the knee around the level : small = a hard line where the inversion starts, large = a gradual turn.'
+  },
+  'fx-wavefold': {
+    fold: 'Drive into the folder (1× at 0, 6× at 1) : more drive, more reflections, more contour bands.',
+    bias: 'Offsets the signal before folding : moves where the bands fall and lifts or sinks the darks.',
+    symmetry: 'Bends the drive into a curve before folding : 0 = evenly spaced bands, 1 = the bands crowd toward the lights.',
+    perChannel: 'Folds red, green and blue separately, tearing the color into bands. Off = folds the brightness and keeps the source hue.',
+    wet: 'Dry/wet against the untouched source.',
+    invert: 'Folds into the negative : the darks go light. Off = black stays black.'
+  },
+  'fx-fold': {
+    vertical: 'Off = the fold line is vertical (the left part mirrors onto the right). On = horizontal (the bottom mirrors upward).',
+    seam: 'Where the fold line sits : past it, the picture is a reflection of what lies before it. Below the middle the reflection runs past the far edge and folds again, like folded paper. One deliberate fold, never a kaleidoscope : searching "kaleidoscope" lands here on purpose.',
+    offset: 'Slides the reflected half along the fold line so the mirror image does not line up : the asymmetry that keeps it from reading as a plain mirror.'
+  },
+  'fx-transform': {
+    zoom: 'Frame mode : magnification (below 1 shrinks the picture). Shape mode : the size of the shape.',
+    posX: 'Frame mode : pans the picture. Shape mode : moves the shape (±1 = the frame edge).',
+    posY: 'Frame mode : pans the picture. Shape mode : moves the shape (±1 = the frame edge).',
+    rotate: 'Frame mode : turns the picture (radians). Shape mode : spins the shape.',
+    wrap: 'On = the picture tiles endlessly past its edges. Off = the uncovered area is empty (transparent), so the layers below show through.',
+    cropUp: 'Cuts the top edge to black (to transparent with cutout). A fixed matte : it does not move with zoom or pan.',
+    cropDown: 'Cuts the bottom edge to black (to transparent with cutout). A fixed matte : it does not move with zoom or pan.',
+    cropLeft: 'Cuts the left edge to black (to transparent with cutout). A fixed matte : it does not move with zoom or pan.',
+    cropRight: 'Cuts the right edge to black (to transparent with cutout). A fixed matte : it does not move with zoom or pan.',
+    shape: 'NONE = the zoom / pan / rotate frame. Any shape instead clips the layer into that silhouette : zoom, pos and rotate then size, move and spin the shape while the picture stays put.',
+    cutout: 'Makes the crop margins and the outside of the shape transparent instead of black, so a circle becomes a picture-in-picture over the layers below.'
+  },
+  'fx-distort': {
+    mode: 'Which warp. Amount and center drive every mode. Scale : all but bulge, pinch and shear. Angle : wave, shear, glass, corrugate, pull and turbulent. Rate (motion) : wave, ripple and turbulent; the others are still.',
+    amount: 'Strength of the warp.',
+    scale: 'Wave and ripple frequency, swirl tightness, glass and rib count, pull falloff, turbulence grain. Unused by bulge, pinch and shear.',
+    center: 'The pivot or origin of the warp (the eye of a ripple, bulge, pinch, swirl or pull; the phase origin of a wave).',
+    angle: 'Orientation for wave, shear, glass, corrugate, pull and turbulent (radians).',
+    rate: 'Motion speed for wave, ripple and turbulent.',
+    audio: 'RIPPLE only : each ring rides its own band of the live spectrum (bass in the middle, treble outward), so the rings swell with the music and silence flattens them. 0 = plain rings.'
+  },
+  'fx-displace': {
+    amount: 'How far the noise field pushes the picture (fraction of the frame).',
+    scale: 'Noise cells per frame height : small = broad slow bends, large = fine nervous ripples.',
+    rate: 'How fast the noise field drifts.'
+  },
+  'fx-edge': {
+    gain: 'Line strength : higher catches fainter contours and thickens the lines.',
+    blend: 'Mix over the source : 0 = untouched, 1 = only the lines.',
+    ink: 'On = the outlines are drawn dark over the picture itself (pen and ink). Off = light lines on black.'
+  },
+  'fx-sharpen': {
+    amount: 'Detail lift : around 1 is crisp, above 3 the edges ring with halos.'
+  },
+  'fx-motif': {
+    copies: 'How many echoes. Each one is transposed one step further : offset, rotation and scale compound.',
+    offX: 'Horizontal step from one echo to the next (frame widths).',
+    offY: 'Vertical step from one echo to the next (frame heights).',
+    rotate: 'Turn added per echo (radians).',
+    scale: 'Size factor per echo : below 1 each echo is smaller.',
+    fade: 'Strength of the first echo; each further one is fainter (fade², fade³).',
+    invert: 'Mirrors the echoes left to right.',
+    mode: 'How the echoes combine. OVER lays each echo on top where it has content (its dark ground lets the picture through). ADD brightens and can burn bright material to white. SCREEN brightens gently. MAX keeps the brighter of the two.',
+    audio: 'Echo 1, 2 and 3 ride the low, mid and high bands of the live spectrum : a loud band brings its echo up, silence fades it by this amount. 0 = off.'
+  },
   'node-eternalism': {
     mode: 'HOLD = the newest frame and the one a GAP before it, alternated across a black shutter (a held micro-motion going nowhere). DRIFT = two delayed copies beating in and out of lock (phase-drift twins).',
     gap: 'HOLD : how many frames apart the two alternating frames are (the size of the time-slice). DRIFT : the delay of the first copy.',
@@ -145,10 +255,100 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
   },
   'fx-force-lines': {
     lines: 'How many luminance-contour bands the picture is cut into : the lines of force.',
-    shift: 'How far each ribbon slides along its contour (adjacent bands shear opposite ways).',
+    shift: 'How far each band slides (adjacent bands shear opposite ways), in frame heights.',
     edge: 'Engrave the band boundaries as dark incrust lines.',
     gate: 'Confine the cutting to where there is real structure (gradient energy) : flat areas stay untouched.',
-    amount: 'Dry/wet against the untouched image.'
+    amount: 'Dry/wet against the untouched image.',
+    slide: 'Which way the bands slide. ALONG CONTOURS : the ribbons glide inside the forms (subtle on straight edges). ACROSS : the bands shear over each other. VERTICAL : every band drops or rises, with a gritty fringe along edges (the original look).',
+    rate: 'Crawl : the band boundaries travel through the tonal range, so the contours creep over the picture. 0 = still.',
+    vary: 'Gives each band its own slide distance (from half to one and a half times the slide).',
+    audio: 'Each band slides further with its own part of the spectrum : dark bands ride the bass, bright bands the treble.'
+  },
+  'fx-abstraction': {
+    amount: 'The one knob : from the picture as it is (0) to moving matter (1). Scales every other control.',
+    disperse: 'How far the image is pushed along its luma-driven flow.',
+    posterize: 'Quantizes the color toward fewer levels (strongest near the top of the range).',
+    desat: 'Drains the color toward the image’s own light.',
+    rate: 'How fast the flow direction turns over time.',
+    coherence: 'Reads the flow from a small neighborhood instead of single pixels : 0 = textured areas scatter grain by grain, 1 = they move as one current.'
+  },
+  'fx-difference-bloom': {
+    gain: 'How bright a given amount of motion glows.',
+    spread: 'Radius of the halo around each moving contour, in frame heights. With soft spread at 0 the halo is a ring of eight echoes.',
+    keep: 'Fades the source back in behind the motion (0 = only motion shows).',
+    tint: 'The color of the motion light.',
+    hold: 'Afterglow : seconds for the glow to halve after the motion stops. Also bridges the repeated frames of a slower video so the key does not blink. 0 = the raw frame-to-frame key.',
+    soft: '0 = the octagonal ring of echoes. 1 = a smooth falloff from the center out.'
+  },
+  'fx-feedback-zoom': {
+    zoom: 'Per-frame zoom of the echo (at 60 fps) : above 1 the echoes march outward, below 1 they recede inward.',
+    twist: 'Per-frame turn of the echo (at 60 fps) : spirals.',
+    amount: 'How much of each echo survives into the next : higher = longer trails.',
+    center: 'The point the tunnel turns about.',
+    drift: 'How far and how fast the tunnel’s center wanders around CENTER. 0 = locked on it.',
+    edge: 'What fills in where the zoomed frame leaves the picture. LIVE : the fresh image (no echo there). BLACK : a nested frame. SMEAR : the border pixels stretch inward.',
+    clear: 'CLEAR ▸ : wipes the echoes (hold to keep them wiped).'
+  },
+  'fx-granular': {
+    grain: 'Grain size : low = big grains, high = fine grains.',
+    density: 'The share of grains that are lit : low values open gaps that show the smeared background.',
+    scatter: 'How far each grain lands from where it was cut.',
+    rotate: 'How far each grain turns.',
+    smear: 'How much each grain carries over from the previous frame. The echoes compound each grain’s turn and offset, so they spiral.',
+    rate: 'How often the grain field re-rolls (which grains are lit, how each turns and lands). At 0 it still re-rolls every two seconds.',
+    stagger: '0 = every grain re-rolls at once (the field re-cuts). 1 = each grain re-rolls on its own beat (a shimmer).',
+    sizeVar: 'Scales each grain’s content on its own : some zoom in, some zoom out.',
+    edges: '0 = hard-edged grains (crisp circles where a grain ends). 1 = the grains fade into the gaps.',
+    audio: 'Each grain scatters further with its own band of the spectrum.'
+  },
+  'fx-light-trails': {
+    decay: 'How long the trails last : 1 = permanent, lower = they fade faster. Per frame at 60 fps.',
+    drift: 'The trail slides as it fades (per frame at 60 fps).',
+    angle: 'Direction of the drift.',
+    knee: 'Only light brighter than this enters the trail : 0 = everything leaves a trail, higher = only the highlights.',
+    clear: 'CLEAR ▸ : wipes the trails (hold to keep them wiped).'
+  },
+  'fx-slit-buffer': {
+    rate: 'How fast the write head sweeps (sweeps per second).',
+    width: 'Softness of the write head : how wide a band it writes. It widens on its own when the head moves faster than the band.',
+    jitter: 'Breaks the seam into a ragged edge that wanders band by band.',
+    jumps: 'How often and how far the whole head teleports before or after its swept position.',
+    vertical: 'Sweep top to bottom instead of left to right.',
+    direction: 'NORMAL / INVERTED sweep direction, or PENDULUM (back and forth, no wrap seam).',
+    angle: 'Tilts the slit (radians).',
+    grab: 'GRAB ▸ : writes the whole live frame at once.'
+  },
+  'fx-smear': {
+    reach: 'Length of the streak.',
+    threshold: 'Only pixels brighter than this streak : the highlights run, the rest holds.',
+    angle: 'Direction of the streak.',
+    smoothing: '0 = a comb of discrete ghost copies (the stepped look). 1 = a continuous streak with a fine grain.'
+  },
+  'fx-streak': {
+    reach: 'Length of the blur.',
+    angle: 'Direction of the blur.',
+    smoothing: '0 = discrete ghost copies (the stepped look). 1 = a continuous blur with a fine grain.'
+  },
+  'fx-wide-time': {
+    width: 'How far back the memory reaches, in frames at 60 fps (about width/60 seconds), the same at any frame rate.',
+    amount: 'Dry/wet against the live image.',
+    mode: 'How each frame accumulates. MEAN : a time average. BRIGHTEST : light persists. ADD : a brighter exposure (settles at twice the input). SCREEN : a soft lift. DIFFERENCE : only change glows. DARKEST : dark marks linger. BURN : the uncapped add, which runs to white.',
+    soften: 'Blurs the memory a little each frame, so trails soften as they age.',
+    drift: 'Zooms the memory in or out each frame : breathing scapes.',
+    hue: 'Turns the color of the memory each frame (at 60 fps), so older trails shift hue.',
+    motionBlur: 'Blurs the input where it moves (a shutter), before it enters the memory.',
+    frameBlend: 'A second, smoother pass over the memory : a softer, more symmetric time blend.',
+    preserve: 'Re-anchors the exposure to the live image : 0 = the raw accumulated look, 1 = the trails keep their shape but the brightness follows the live picture.',
+    clear: 'CLEAR ▸ : empties the memory (hold to keep it empty).'
+  },
+  'fx-decay': {
+    amount: 'Overall wear : saturation and contrast loss, like repeated dubs.',
+    smear: 'A bounded ghost of the previous frame (capped so it never runs away).',
+    chroma: 'Color pulled sideways off the picture (VHS chroma lag).',
+    blocks: 'Resamples onto a coarser grid and posterizes : compression breakup (subtle at low values, blocky near the top).',
+    dropout: 'Sparse scan lines that flash to black or white.',
+    jitter: 'Per-line horizontal jitter, tape noise and a slow sway.',
+    headSwitch: 'The torn band at the bottom of the frame where a VCR’s heads hand over.'
   },
   'fx-aperture': {
     shape: 'The gate : IRIS (circle) · vertical / horizontal SLIT · film GATE (rectangle).',

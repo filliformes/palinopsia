@@ -328,14 +328,16 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
   ],
   // ── Force Lines (incrustation along the image's gradients) ──
   'fx-force-lines': [
-    { name: 'Engraved', values: { lines: 8, shift: 0.015, edge: 0.7, gate: 0.6, amount: 1.0 } },
-    { name: 'Ribbons', values: { lines: 6, shift: 0.04, edge: 0.3, gate: 0.5, amount: 1.0 } },
-    { name: 'Fine etch', values: { lines: 18, shift: 0.008, edge: 0.8, gate: 0.7, amount: 1.0 } },
-    { name: 'Sliding forms', values: { lines: 4, shift: 0.06, edge: 0.2, gate: 0.4, amount: 1.0 } },
-    { name: 'Contour map', values: { lines: 14, shift: 0.0, edge: 0.9, gate: 0.5, amount: 1.0 } },
-    { name: 'Loose shear', values: { lines: 5, shift: 0.03, edge: 0.4, gate: 0.2, amount: 0.85 } },
-    { name: 'Hard cuts', values: { lines: 10, shift: 0.05, edge: 0.6, gate: 0.8, amount: 1.0 } },
-    { name: 'Subtle inlay', values: { lines: 8, shift: 0.012, edge: 0.35, gate: 0.6, amount: 0.6 } }
+    { name: 'Engraved', values: { lines: 8, shift: 0.015, edge: 0.7, gate: 0.6, amount: 1.0, slide: 2, rate: 0, vary: 0, audio: 0 } },
+    { name: 'Ribbons', values: { lines: 6, shift: 0.04, edge: 0.3, gate: 0.5, amount: 1.0, slide: 2, rate: 0, vary: 0, audio: 0 } },
+    { name: 'Fine etch', values: { lines: 18, shift: 0.008, edge: 0.8, gate: 0.7, amount: 1.0, slide: 2, rate: 0, vary: 0, audio: 0 } },
+    { name: 'Sliding forms', values: { lines: 4, shift: 0.06, edge: 0.2, gate: 0.4, amount: 1.0, slide: 2, rate: 0, vary: 0, audio: 0 } },
+    { name: 'Contour map', values: { lines: 14, shift: 0.0, edge: 0.9, gate: 0.5, amount: 1.0, slide: 2, rate: 0, vary: 0, audio: 0 } },
+    { name: 'Loose shear', values: { lines: 5, shift: 0.03, edge: 0.4, gate: 0.2, amount: 0.85, slide: 2, rate: 0, vary: 0, audio: 0 } },
+    { name: 'Hard cuts', values: { lines: 10, shift: 0.05, edge: 0.6, gate: 0.8, amount: 1.0, slide: 2, rate: 0, vary: 0, audio: 0 } },
+    { name: 'Subtle inlay', values: { lines: 8, shift: 0.012, edge: 0.35, gate: 0.6, amount: 0.6, slide: 2, rate: 0, vary: 0, audio: 0 } },
+    { name: 'Contour glide', values: { lines: 7, shift: 0.05, edge: 0.5, gate: 0.4, amount: 1.0, slide: 0, rate: 0.08, vary: 0.5, audio: 0 } },
+    { name: 'Crawling strata', values: { lines: 10, shift: 0.03, edge: 0.6, gate: 0.5, amount: 1.0, slide: 1, rate: 0.2, vary: 0.7, audio: 0 } }
   ],
   // ── Aperture (gate mask + defocus↔flicker coupling) ──
   'fx-aperture': [
@@ -503,52 +505,54 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Audio bend', values: { freq: 16, shape: 0.8, sync: 0.35, rate: 0.3, angle: 0, audioFM: 0.6, loA: [0.04, 0.05, 0.08, 1], hiA: [0.85, 0.82, 0.7, 1] } }
   ],
   'fx-light-trails': [
-    { name: 'Long exposure', values: { decay: 0.99, drift: 0, angle: 1.5708 } },
-    { name: 'Fading streaks', values: { decay: 0.95, drift: 0, angle: 1.5708 } },
-    { name: 'Comet drift', values: { decay: 0.97, drift: 0.006, angle: 0 } },
-    { name: 'Rising light', values: { decay: 0.98, drift: 0.004, angle: 1.5708 } },
-    { name: 'Permanent', values: { decay: 1, drift: 0, angle: 0 } },
-    { name: 'Short trails', values: { decay: 0.9, drift: 0, angle: 0 } },
-    { name: 'Diagonal smear', values: { decay: 0.97, drift: 0.008, angle: 0.79 } },
-    { name: 'Falling', values: { decay: 0.96, drift: 0.005, angle: 4.7124 } },
-    { name: 'Slow bloom drift', values: { decay: 0.985, drift: 0.012, angle: 3.1416 } },
-    { name: 'Gentle persist', values: { decay: 0.93, drift: 0.002, angle: 1.5708 } }
+    { name: 'Long exposure', values: { decay: 0.99, drift: 0, angle: 1.5708, knee: 0 } },
+    { name: 'Fading streaks', values: { decay: 0.95, drift: 0, angle: 1.5708, knee: 0 } },
+    { name: 'Comet drift', values: { decay: 0.97, drift: 0.006, angle: 0, knee: 0 } },
+    { name: 'Rising light', values: { decay: 0.98, drift: 0.004, angle: 1.5708, knee: 0 } },
+    { name: 'Permanent', values: { decay: 1, drift: 0, angle: 0, knee: 0 } },
+    { name: 'Short trails', values: { decay: 0.9, drift: 0, angle: 0, knee: 0 } },
+    { name: 'Diagonal smear', values: { decay: 0.97, drift: 0.008, angle: 0.79, knee: 0 } },
+    { name: 'Falling', values: { decay: 0.96, drift: 0.005, angle: 4.7124, knee: 0 } },
+    { name: 'Slow bloom drift', values: { decay: 0.985, drift: 0.012, angle: 3.1416, knee: 0 } },
+    { name: 'Gentle persist', values: { decay: 0.93, drift: 0.002, angle: 1.5708, knee: 0 } },
+    { name: 'Highlights only', values: { decay: 0.985, drift: 0, angle: 1.5708, knee: 0.55 } }
   ],
   'fx-decay': [
-    { name: 'Tape dub', values: { amount: 0.55, smear: 0.3, chroma: 0.5, blocks: 0.2, dropout: 0.15, jitter: 0.3 } },
-    { name: 'Nth generation', values: { amount: 0.8, smear: 0.5, chroma: 0.7, blocks: 0.35, dropout: 0.25, jitter: 0.45 } },
-    { name: 'Gentle age', values: { amount: 0.35, smear: 0.15, chroma: 0.3, blocks: 0.1, dropout: 0.05, jitter: 0.15 } },
-    { name: 'Chroma bleed', values: { amount: 0.5, smear: 0.2, chroma: 0.9, blocks: 0.1, dropout: 0.08, jitter: 0.25 } },
-    { name: 'Dropout storm', values: { amount: 0.6, smear: 0.25, chroma: 0.4, blocks: 0.2, dropout: 0.7, jitter: 0.4 } },
-    { name: 'Compression crush', values: { amount: 0.55, smear: 0.2, chroma: 0.35, blocks: 0.85, dropout: 0.15, jitter: 0.2 } },
-    { name: 'Ghost trails', values: { amount: 0.5, smear: 0.6, chroma: 0.4, blocks: 0.1, dropout: 0.06, jitter: 0.2 } },
-    { name: 'Head-switch tear', values: { amount: 0.5, smear: 0.25, chroma: 0.5, blocks: 0.15, dropout: 0.2, jitter: 0.85 } },
-    { name: 'Worn print', values: { amount: 0.65, smear: 0.35, chroma: 0.55, blocks: 0.3, dropout: 0.3, jitter: 0.35 } },
-    { name: 'Whisper', values: { amount: 0.3, smear: 0.12, chroma: 0.25, blocks: 0.08, dropout: 0.04, jitter: 0.12 } }
+    { name: 'Tape dub', values: { amount: 0.55, smear: 0.3, chroma: 0.5, blocks: 0.2, dropout: 0.15, jitter: 0.3, headSwitch: 0 } },
+    { name: 'Nth generation', values: { amount: 0.8, smear: 0.5, chroma: 0.7, blocks: 0.35, dropout: 0.25, jitter: 0.45, headSwitch: 0 } },
+    { name: 'Gentle age', values: { amount: 0.35, smear: 0.15, chroma: 0.3, blocks: 0.1, dropout: 0.05, jitter: 0.15, headSwitch: 0 } },
+    { name: 'Chroma bleed', values: { amount: 0.5, smear: 0.2, chroma: 0.9, blocks: 0.1, dropout: 0.08, jitter: 0.25, headSwitch: 0 } },
+    { name: 'Dropout storm', values: { amount: 0.6, smear: 0.25, chroma: 0.4, blocks: 0.2, dropout: 0.7, jitter: 0.4, headSwitch: 0 } },
+    { name: 'Compression crush', values: { amount: 0.55, smear: 0.2, chroma: 0.35, blocks: 0.85, dropout: 0.15, jitter: 0.2, headSwitch: 0 } },
+    { name: 'Ghost trails', values: { amount: 0.5, smear: 0.6, chroma: 0.4, blocks: 0.1, dropout: 0.06, jitter: 0.2, headSwitch: 0 } },
+    { name: 'Head-switch tear', values: { amount: 0.5, smear: 0.25, chroma: 0.5, blocks: 0.15, dropout: 0.2, jitter: 0.85, headSwitch: 0.8 } },
+    { name: 'Worn print', values: { amount: 0.65, smear: 0.35, chroma: 0.55, blocks: 0.3, dropout: 0.3, jitter: 0.35, headSwitch: 0 } },
+    { name: 'Whisper', values: { amount: 0.3, smear: 0.12, chroma: 0.25, blocks: 0.08, dropout: 0.04, jitter: 0.12, headSwitch: 0 } }
   ],
   'fx-abstraction': [
-    { name: 'Just off-real', values: { amount: 0.3, disperse: 0.4, posterize: 0.3, desat: 0.3 } },
-    { name: 'Currents', values: { amount: 0.6, disperse: 0.8, posterize: 0.3, desat: 0.4 } },
-    { name: 'Dissolve', values: { amount: 0.85, disperse: 0.9, posterize: 0.6, desat: 0.6 } },
-    { name: 'Poster flow', values: { amount: 0.55, disperse: 0.5, posterize: 0.85, desat: 0.4 } },
-    { name: 'Gray matter', values: { amount: 0.7, disperse: 0.6, posterize: 0.4, desat: 0.85 } },
-    { name: 'Smear drift', values: { amount: 0.5, disperse: 0.95, posterize: 0.2, desat: 0.35 } },
-    { name: 'Ink', values: { amount: 0.75, disperse: 0.7, posterize: 0.7, desat: 0.7 } },
-    { name: 'Barely there', values: { amount: 0.25, disperse: 0.3, posterize: 0.2, desat: 0.2 } },
-    { name: 'Molten', values: { amount: 0.8, disperse: 0.85, posterize: 0.5, desat: 0.5 } },
-    { name: 'Full abstract', values: { amount: 1.0, disperse: 0.9, posterize: 0.65, desat: 0.6 } }
+    { name: 'Just off-real', values: { amount: 0.3, disperse: 0.4, posterize: 0.3, desat: 0.3, rate: 0.15, coherence: 0 } },
+    { name: 'Currents', values: { amount: 0.6, disperse: 0.8, posterize: 0.3, desat: 0.4, rate: 0.15, coherence: 0.7 } },
+    { name: 'Dissolve', values: { amount: 0.85, disperse: 0.9, posterize: 0.6, desat: 0.6, rate: 0.15, coherence: 0 } },
+    { name: 'Poster flow', values: { amount: 0.55, disperse: 0.5, posterize: 0.85, desat: 0.4, rate: 0.15, coherence: 0 } },
+    { name: 'Gray matter', values: { amount: 0.7, disperse: 0.6, posterize: 0.4, desat: 0.85, rate: 0.15, coherence: 0 } },
+    { name: 'Smear drift', values: { amount: 0.5, disperse: 0.95, posterize: 0.2, desat: 0.35, rate: 0.15, coherence: 0 } },
+    { name: 'Ink', values: { amount: 0.75, disperse: 0.7, posterize: 0.7, desat: 0.7, rate: 0.15, coherence: 0 } },
+    { name: 'Barely there', values: { amount: 0.25, disperse: 0.3, posterize: 0.2, desat: 0.2, rate: 0.15, coherence: 0 } },
+    { name: 'Molten', values: { amount: 0.8, disperse: 0.85, posterize: 0.5, desat: 0.5, rate: 0.15, coherence: 0 } },
+    { name: 'Full abstract', values: { amount: 1.0, disperse: 0.9, posterize: 0.65, desat: 0.6, rate: 0.15, coherence: 0 } }
   ],
   'fx-wide-time': [
-    { name: 'Wide scape', values: { width: 40, amount: 1, mode: 0, soften: 0.15, drift: 0, hue: 0, preserve: 0.3 } },
-    { name: 'Gentle smear', values: { width: 14, amount: 0.85, mode: 0, soften: 0.1, drift: 0, hue: 0 } },
-    { name: 'Deep time', values: { width: 150, amount: 1, mode: 0, soften: 0.3, drift: 0, hue: 0 } },
-    { name: 'Breathing scape', values: { width: 90, amount: 1, mode: 0, soften: 0.35, drift: 0.004, hue: 0 } },
-    { name: 'Spectral drift', values: { width: 120, amount: 1, mode: 0, soften: 0.25, drift: 0.002, hue: 0.02 } },
-    { name: 'Light painting', values: { width: 200, amount: 1, mode: 1, soften: 0, drift: 0, hue: 0, preserve: 0.55 } },
-    { name: 'Bloom add', values: { width: 60, amount: 1, mode: 2, soften: 0.2, drift: 0.003, hue: 0, preserve: 0.65 } },
-    { name: 'Screen haze', values: { width: 80, amount: 0.9, mode: 3, soften: 0.3, drift: 0, hue: 0, preserve: 0.65 } },
-    { name: 'Motion edges', values: { width: 20, amount: 0.9, mode: 4, soften: 0.15, drift: 0, hue: 0, preserve: 0.4 } },
-    { name: 'Frozen deep', values: { width: 400, amount: 1, mode: 0, soften: 0.4, drift: 0, hue: 0.01 } }
+    { name: 'Wide scape', values: { width: 40, amount: 1, mode: 0, soften: 0.15, drift: 0, hue: 0, motionBlur: 1, frameBlend: 1, preserve: 0.3 } },
+    { name: 'Gentle smear', values: { width: 14, amount: 0.85, mode: 0, soften: 0.1, drift: 0, hue: 0, motionBlur: 1, frameBlend: 1, preserve: 0 } },
+    { name: 'Deep time', values: { width: 150, amount: 1, mode: 0, soften: 0.3, drift: 0, hue: 0, motionBlur: 1, frameBlend: 1, preserve: 0 } },
+    { name: 'Breathing scape', values: { width: 90, amount: 1, mode: 0, soften: 0.35, drift: 0.004, hue: 0, motionBlur: 1, frameBlend: 1, preserve: 0 } },
+    { name: 'Spectral drift', values: { width: 120, amount: 1, mode: 0, soften: 0.25, drift: 0.002, hue: 0.02, motionBlur: 1, frameBlend: 1, preserve: 0 } },
+    { name: 'Light painting', values: { width: 200, amount: 1, mode: 1, soften: 0, drift: 0, hue: 0, motionBlur: 1, frameBlend: 1, preserve: 0.55 } },
+    { name: 'Bloom add', values: { width: 60, amount: 1, mode: 2, soften: 0.2, drift: 0.003, hue: 0, motionBlur: 1, frameBlend: 1, preserve: 0.65 } },
+    { name: 'Screen haze', values: { width: 80, amount: 0.9, mode: 3, soften: 0.3, drift: 0, hue: 0, motionBlur: 1, frameBlend: 1, preserve: 0.65 } },
+    { name: 'Motion edges', values: { width: 20, amount: 0.9, mode: 4, soften: 0.15, drift: 0, hue: 0, motionBlur: 1, frameBlend: 1, preserve: 0.4 } },
+    { name: 'Frozen deep', values: { width: 400, amount: 1, mode: 0, soften: 0.4, drift: 0, hue: 0.01, motionBlur: 1, frameBlend: 1, preserve: 0 } },
+    { name: 'Burn in', values: { width: 2, amount: 0.8, mode: 6, soften: 0.2, drift: 0, hue: 0, motionBlur: 1, frameBlend: 0, preserve: 0.5 } }
   ],
   'node-autocutter': [
     { name: 'Clean cut-up', values: { shape: 0, cuts: 20, rotate: 0.3, slip: 0, gap: 0.15, contour: 0, curve: 0.3, torn: 0, mask: 0, mix: 1, rate: 0, xfade: 0 } },
@@ -690,28 +694,31 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Amber sweep', values: { shape: 0, freq: 1, steps: 1, rate: 0.5, angle: 0.2, tint: [0.9, 0.6, 0.25, 1], mirror: 0, center: [0.5, 0.5] } }
   ],
   'fx-slit-buffer': [
-    { name: 'Slow sweep', values: { rate: 0.15, width: 0.03, jitter: 0, direction: 0 } },
-    { name: 'Fast head', values: { rate: 0.8, width: 0.02, jitter: 0, direction: 0 } },
-    { name: 'Wide freeze', values: { rate: 0.3, width: 0.08, jitter: 0.15, direction: 0 } },
-    { name: 'Reverse crawl', values: { rate: 0.12, width: 0.04, jitter: 0.1, direction: 1 } },
-    { name: 'Ragged seam', values: { rate: 0.35, width: 0.03, jitter: 0.55, jumps: 0, direction: 0 } },
-    { name: 'Jump cut', values: { rate: 0.4, width: 0.03, jitter: 0.1, jumps: 0.5, direction: 0 } },
-    { name: 'Teleport head', values: { rate: 0.6, width: 0.02, jitter: 0.3, jumps: 0.7, vertical: 1, direction: 0 } },
-    { name: 'Broken reverse', values: { rate: 0.25, width: 0.05, jitter: 0.7, jumps: 0.35, direction: 1 } },
-    { name: 'Storm freeze', values: { rate: 1, width: 0.05, jitter: 0.85, jumps: 0.4, direction: 0 } },
-    { name: 'Glacial drift', values: { rate: 0.05, width: 0.06, jitter: 0.3, jumps: 0.15, direction: 1 } }
+    { name: 'Slow sweep', values: { rate: 0.15, width: 0.03, jitter: 0, jumps: 0, vertical: 0, direction: 0, angle: 0 } },
+    { name: 'Fast head', values: { rate: 0.8, width: 0.02, jitter: 0, jumps: 0, vertical: 0, direction: 0, angle: 0 } },
+    { name: 'Wide freeze', values: { rate: 0.3, width: 0.08, jitter: 0.15, jumps: 0, vertical: 0, direction: 0, angle: 0 } },
+    { name: 'Reverse crawl', values: { rate: 0.12, width: 0.04, jitter: 0.1, jumps: 0, vertical: 0, direction: 1, angle: 0 } },
+    { name: 'Ragged seam', values: { rate: 0.35, width: 0.03, jitter: 0.55, jumps: 0, vertical: 0, direction: 0, angle: 0 } },
+    { name: 'Jump cut', values: { rate: 0.4, width: 0.03, jitter: 0.1, jumps: 0.5, vertical: 0, direction: 0, angle: 0 } },
+    { name: 'Teleport head', values: { rate: 0.6, width: 0.02, jitter: 0.3, jumps: 0.7, vertical: 1, direction: 0, angle: 0 } },
+    { name: 'Broken reverse', values: { rate: 0.25, width: 0.05, jitter: 0.7, jumps: 0.35, vertical: 0, direction: 1, angle: 0 } },
+    { name: 'Storm freeze', values: { rate: 1, width: 0.05, jitter: 0.85, jumps: 0.4, vertical: 0, direction: 0, angle: 0 } },
+    { name: 'Glacial drift', values: { rate: 0.05, width: 0.06, jitter: 0.3, jumps: 0.15, vertical: 0, direction: 1, angle: 0 } },
+    { name: 'Leaning slit', values: { rate: 0.25, width: 0.04, jitter: 0.1, jumps: 0, vertical: 0, direction: 2, angle: 0.45 } }
   ],
   'fx-difference-bloom': [
-    { name: 'Motion trace', values: { gain: 3, spread: 0.012, keep: 0 } },
-    { name: 'Ghost motion', values: { gain: 2, spread: 0.02, keep: 0.25 } },
-    { name: 'Sharp edges', values: { gain: 5, spread: 0.006, keep: 0 } },
-    { name: 'Wide bloom', values: { gain: 2.5, spread: 0.035, keep: 0.1 } },
-    { name: 'Faint', values: { gain: 1.5, spread: 0.01, keep: 0 } },
-    { name: 'Hot motion', values: { gain: 6, spread: 0.015, keep: 0, tint: [0.95, 0.55, 0.25, 1] } },
-    { name: 'Cyan trace', values: { gain: 3.5, spread: 0.012, keep: 0, tint: [0.4, 0.85, 0.9, 1] } },
-    { name: 'Keep half', values: { gain: 3, spread: 0.014, keep: 0.35 } },
-    { name: 'Edge only', values: { gain: 4, spread: 0.008, keep: 0 } },
-    { name: 'Storm', values: { gain: 5, spread: 0.04, keep: 0.05 } }
+    { name: 'Motion trace', values: { gain: 3, spread: 0.012, keep: 0, tint: [0.8, 0.85, 0.9, 1], hold: 0.1, soft: 0 } },
+    { name: 'Ghost motion', values: { gain: 2, spread: 0.02, keep: 0.25, tint: [0.8, 0.85, 0.9, 1], hold: 0.1, soft: 0 } },
+    { name: 'Sharp edges', values: { gain: 5, spread: 0.006, keep: 0, tint: [0.8, 0.85, 0.9, 1], hold: 0.1, soft: 0 } },
+    { name: 'Wide bloom', values: { gain: 2.5, spread: 0.035, keep: 0.1, tint: [0.8, 0.85, 0.9, 1], hold: 0.1, soft: 0 } },
+    { name: 'Faint', values: { gain: 1.5, spread: 0.01, keep: 0, tint: [0.8, 0.85, 0.9, 1], hold: 0.1, soft: 0 } },
+    { name: 'Hot motion', values: { gain: 6, spread: 0.015, keep: 0, tint: [0.95, 0.55, 0.25, 1], hold: 0.1, soft: 0 } },
+    { name: 'Cyan trace', values: { gain: 3.5, spread: 0.012, keep: 0, tint: [0.4, 0.85, 0.9, 1], hold: 0.1, soft: 0 } },
+    { name: 'Keep half', values: { gain: 3, spread: 0.014, keep: 0.35, tint: [0.8, 0.85, 0.9, 1], hold: 0.1, soft: 0 } },
+    { name: 'Edge only', values: { gain: 4, spread: 0.008, keep: 0, tint: [0.8, 0.85, 0.9, 1], hold: 0.1, soft: 0 } },
+    { name: 'Storm', values: { gain: 5, spread: 0.04, keep: 0.05, tint: [0.8, 0.85, 0.9, 1], hold: 0.1, soft: 0 } },
+    { name: 'Soft glow', values: { gain: 3, spread: 0.03, keep: 0, tint: [0.8, 0.85, 0.9, 1], hold: 0.15, soft: 1 } },
+    { name: 'Afterglow', values: { gain: 3, spread: 0.012, keep: 0.1, tint: [0.8, 0.85, 0.9, 1], hold: 0.5, soft: 0.3 } }
   ],
   'fx-triangle-flicker': [
     { name: 'Slow pulse', values: { rate: 2, depth: 0.5, hard: 0, swap: 0 } },
@@ -902,14 +909,16 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Broadcast', values: { alpha: 1, parasites: 0, black: 0.02, white: 0.98, gamma: 1, rGain: 1, gGain: 1, bGain: 1, sharpen: 0.45, character: 0, grain: 0.1, grainSize: 1, chroma: 0.2 } }
   ],
   'fx-granular': [
-    { name: 'Fine grain', values: { grain: 0.7, density: 0.9, scatter: 0.1, rotate: 0.1, smear: 0.2, rate: 0.6 } },
-    { name: 'Coarse tiles', values: { grain: 0.25, density: 0.95, scatter: 0.05, rotate: 0.05, smear: 0.15, rate: 0.3 } },
-    { name: 'Scatter storm', values: { grain: 0.5, density: 0.7, scatter: 0.5, rotate: 0.4, smear: 0.35, rate: 2 } },
-    { name: 'Slow smear', values: { grain: 0.45, density: 0.85, scatter: 0.2, rotate: 0.15, smear: 0.6, rate: 0.2 } },
-    { name: 'Sparse flecks', values: { grain: 0.6, density: 0.45, scatter: 0.35, rotate: 0.25, smear: 0.4, rate: 1 } },
-    { name: 'Spin grains', values: { grain: 0.55, density: 0.9, scatter: 0.15, rotate: 0.6, smear: 0.25, rate: 1.5 } },
-    { name: 'Echo cloud', values: { grain: 0.4, density: 0.75, scatter: 0.3, rotate: 0.2, smear: 0.55, rate: 0.8 } },
-    { name: 'Freeze dust', values: { grain: 0.75, density: 0.6, scatter: 0.45, rotate: 0.3, smear: 0.5, rate: 0.1 } }
+    { name: 'Fine grain', values: { grain: 0.7, density: 0.9, scatter: 0.1, rotate: 0.1, smear: 0.2, rate: 0.6, stagger: 0, sizeVar: 0, edges: 0, audio: 0 } },
+    { name: 'Coarse tiles', values: { grain: 0.25, density: 0.95, scatter: 0.05, rotate: 0.05, smear: 0.15, rate: 0.3, stagger: 0, sizeVar: 0, edges: 0, audio: 0 } },
+    { name: 'Scatter storm', values: { grain: 0.5, density: 0.7, scatter: 0.5, rotate: 0.4, smear: 0.35, rate: 2, stagger: 0, sizeVar: 0, edges: 0, audio: 0 } },
+    { name: 'Slow smear', values: { grain: 0.45, density: 0.85, scatter: 0.2, rotate: 0.15, smear: 0.6, rate: 0.2, stagger: 0, sizeVar: 0, edges: 0, audio: 0 } },
+    { name: 'Sparse flecks', values: { grain: 0.6, density: 0.45, scatter: 0.35, rotate: 0.25, smear: 0.4, rate: 1, stagger: 0, sizeVar: 0, edges: 0, audio: 0 } },
+    { name: 'Spin grains', values: { grain: 0.55, density: 0.9, scatter: 0.15, rotate: 0.6, smear: 0.25, rate: 1.5, stagger: 0, sizeVar: 0, edges: 0, audio: 0 } },
+    { name: 'Echo cloud', values: { grain: 0.4, density: 0.75, scatter: 0.3, rotate: 0.2, smear: 0.55, rate: 0.8, stagger: 0, sizeVar: 0, edges: 0, audio: 0 } },
+    { name: 'Freeze dust', values: { grain: 0.75, density: 0.6, scatter: 0.45, rotate: 0.3, smear: 0.5, rate: 0.1, stagger: 0, sizeVar: 0, edges: 0, audio: 0 } },
+    { name: 'Shimmer field', values: { grain: 0.6, density: 0.8, scatter: 0.2, rotate: 0.2, smear: 0.3, rate: 1.2, stagger: 1, sizeVar: 0.5, edges: 0.7, audio: 0 } },
+    { name: 'Audio flecks', values: { grain: 0.55, density: 0.7, scatter: 0.1, rotate: 0.2, smear: 0.3, rate: 0.8, stagger: 0.5, sizeVar: 0.3, edges: 0.3, audio: 0.8 } }
   ],
   'fx-mosaic': [
     { name: 'Dot screen', values: { grid: 0.5, size: 0.85, lumaSize: 0.7, soft: 0.06, shape: 1, gapMix: 0, average: 0, audio: 0 } },
@@ -1408,18 +1417,21 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Spectrum tear', values: { slices: 32, amount: 0.15, chance: 0.05, rate: 0.7, audio: 0.8 } }
   ],
   'fx-smear': [
-    { name: 'Rain down', values: { reach: 0.08, threshold: 0.45, angle: 4.7124 } },
-    { name: 'Rise', values: { reach: 0.08, threshold: 0.45, angle: 1.5708 } },
-    { name: 'Comet left', values: { reach: 0.15, threshold: 0.5, angle: 3.1416 } },
-    { name: 'Faint drag', values: { reach: 0.03, threshold: 0.35, angle: 0 } },
-    { name: 'Hard sort', values: { reach: 0.25, threshold: 0.6, angle: 1.5708 } },
-    { name: 'Low gate', values: { reach: 0.1, threshold: 0.15, angle: 1.5708 } },
-    { name: 'High gate', values: { reach: 0.12, threshold: 0.8, angle: 1.5708 } },
-    { name: 'Diagonal fall', values: { reach: 0.1, threshold: 0.4, angle: 5.4978 } },
-    { name: 'Full melt', values: { reach: 0.3, threshold: 0.25, angle: 4.7124 } },
-    { name: 'Whisper streaks', values: { reach: 0.05, threshold: 0.55, angle: 0.7854 } }
+    { name: 'Rain down', values: { reach: 0.08, threshold: 0.45, angle: 4.7124, smoothing: 0 } },
+    { name: 'Rise', values: { reach: 0.08, threshold: 0.45, angle: 1.5708, smoothing: 0 } },
+    { name: 'Comet left', values: { reach: 0.15, threshold: 0.5, angle: 3.1416, smoothing: 0 } },
+    { name: 'Faint drag', values: { reach: 0.03, threshold: 0.35, angle: 0, smoothing: 0 } },
+    { name: 'Hard sort', values: { reach: 0.25, threshold: 0.6, angle: 1.5708, smoothing: 0 } },
+    { name: 'Low gate', values: { reach: 0.1, threshold: 0.15, angle: 1.5708, smoothing: 0 } },
+    { name: 'High gate', values: { reach: 0.12, threshold: 0.8, angle: 1.5708, smoothing: 0 } },
+    { name: 'Diagonal fall', values: { reach: 0.1, threshold: 0.4, angle: 5.4978, smoothing: 0 } },
+    { name: 'Full melt', values: { reach: 0.3, threshold: 0.25, angle: 4.7124, smoothing: 0 } },
+    { name: 'Whisper streaks', values: { reach: 0.05, threshold: 0.55, angle: 0.7854, smoothing: 0 } },
+    { name: 'Liquid light', values: { reach: 0.18, threshold: 0.4, angle: 4.7124, smoothing: 1 } }
   ],
-  // 30 palettes, ordered LIGHTER → DARKER (by overall output brightness).
+  // 31 palettes, ordered LIGHTER → DARKER (by overall output brightness). The
+  // stops a palette does not use repeat its last color, so raising `stops`
+  // afterward extends the ramp instead of showing the previous preset's colors.
   'fx-palette': [
     { name: 'Porcelain', values: { stops: 2, blend: 1, dither: 0.05, mixSrc: 0, colorA: [0.85, 0.84, 0.82, 1], colorB: [0.99, 0.99, 0.97, 1], colorC: [0.99, 0.99, 0.97, 1], colorD: [0.99, 0.99, 0.97, 1], colorE: [0.99, 0.99, 0.97, 1], cycle: 0 } },
     { name: 'Overexposed', values: { stops: 3, blend: 1, dither: 0, mixSrc: 0.1, colorA: [0.72, 0.72, 0.7, 1], colorB: [0.9, 0.9, 0.88, 1], colorC: [1, 1, 1, 1], colorD: [1, 1, 1, 1], colorE: [1, 1, 1, 1], cycle: 0 } },
@@ -1507,16 +1519,17 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Broadcast floor', values: { character: 0, amount: 0.1, size: 1, chroma: 0.2, parasites: 0.2 } }
   ],
   'fx-streak': [
-    { name: 'Slight drag', values: { reach: 0.02, angle: 0 } },
-    { name: 'Pan blur', values: { reach: 0.08, angle: 0 } },
-    { name: 'Fall', values: { reach: 0.08, angle: 4.7124 } },
-    { name: 'Long horizon', values: { reach: 0.2, angle: 0 } },
-    { name: 'Diagonal rush', values: { reach: 0.12, angle: 0.7854 } },
-    { name: 'Vertical soften', values: { reach: 0.04, angle: 1.5708 } },
-    { name: 'Full smear', values: { reach: 0.3, angle: 0 } },
-    { name: 'Rain streak', values: { reach: 0.15, angle: 4.9742 } },
-    { name: 'Drift up', values: { reach: 0.06, angle: 1.5708 } },
-    { name: 'Ghost pan', values: { reach: 0.25, angle: 3.1416 } }
+    { name: 'Slight drag', values: { reach: 0.02, angle: 0, smoothing: 0 } },
+    { name: 'Pan blur', values: { reach: 0.08, angle: 0, smoothing: 0 } },
+    { name: 'Fall', values: { reach: 0.08, angle: 4.7124, smoothing: 0 } },
+    { name: 'Long horizon', values: { reach: 0.2, angle: 0, smoothing: 0 } },
+    { name: 'Diagonal rush', values: { reach: 0.12, angle: 0.7854, smoothing: 0 } },
+    { name: 'Vertical soften', values: { reach: 0.04, angle: 1.5708, smoothing: 0 } },
+    { name: 'Full smear', values: { reach: 0.3, angle: 0, smoothing: 0 } },
+    { name: 'Rain streak', values: { reach: 0.15, angle: 4.9742, smoothing: 0 } },
+    { name: 'Drift up', values: { reach: 0.06, angle: 1.5708, smoothing: 0 } },
+    { name: 'Ghost pan', values: { reach: 0.25, angle: 3.1416, smoothing: 0 } },
+    { name: 'Clean pan', values: { reach: 0.12, angle: 0, smoothing: 1 } }
   ],
   'fx-sharpen': [
     { name: 'Gentle', values: { amount: 0.4 } },
@@ -1653,16 +1666,18 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Turbulence', values: { mode: 9, amount: 0.45, scale: 5, center: [0.5, 0.5], angle: 0, rate: 0.8, audio: 0 } }
   ],
   'fx-feedback-zoom': [
-    { name: 'Slow dive', values: { zoom: 1.03, twist: 0.02, amount: 0.65 } },
-    { name: 'Pull out', values: { zoom: 0.97, twist: -0.01, amount: 0.6 } },
-    { name: 'Deep tunnel', values: { zoom: 1.08, twist: 0.05, amount: 0.85 } },
-    { name: 'Gentle echo', values: { zoom: 1.015, twist: 0, amount: 0.45 } },
-    { name: 'Spiral in', values: { zoom: 1.05, twist: 0.15, amount: 0.75 } },
-    { name: 'Counter spiral', values: { zoom: 1.04, twist: -0.12, amount: 0.7 } },
-    { name: 'Breathing walls', values: { zoom: 0.94, twist: 0.03, amount: 0.8 } },
-    { name: 'Faint doubling', values: { zoom: 1.01, twist: 0.005, amount: 0.3 } },
-    { name: 'Vortex hard', values: { zoom: 1.12, twist: 0.2, amount: 0.9 } },
-    { name: 'Recede quiet', values: { zoom: 0.9, twist: -0.04, amount: 0.55 } }
+    { name: 'Slow dive', values: { zoom: 1.03, twist: 0.02, amount: 0.65, center: [0.5, 0.5], drift: 0.3, edge: 0 } },
+    { name: 'Pull out', values: { zoom: 0.97, twist: -0.01, amount: 0.6, center: [0.5, 0.5], drift: 0.3, edge: 0 } },
+    { name: 'Deep tunnel', values: { zoom: 1.08, twist: 0.05, amount: 0.85, center: [0.5, 0.5], drift: 0.35, edge: 0 } },
+    { name: 'Gentle echo', values: { zoom: 1.015, twist: 0, amount: 0.45, center: [0.5, 0.5], drift: 0.2, edge: 0 } },
+    { name: 'Spiral in', values: { zoom: 1.05, twist: 0.15, amount: 0.75, center: [0.5, 0.5], drift: 0.55, edge: 0 } },
+    { name: 'Counter spiral', values: { zoom: 1.04, twist: -0.12, amount: 0.7, center: [0.5, 0.5], drift: 0.55, edge: 0 } },
+    { name: 'Breathing walls', values: { zoom: 0.94, twist: 0.03, amount: 0.8, center: [0.5, 0.5], drift: 0.3, edge: 0 } },
+    { name: 'Faint doubling', values: { zoom: 1.01, twist: 0.005, amount: 0.3, center: [0.5, 0.5], drift: 0.2, edge: 0 } },
+    { name: 'Vortex hard', values: { zoom: 1.12, twist: 0.2, amount: 0.9, center: [0.5, 0.5], drift: 0.65, edge: 0 } },
+    { name: 'Recede quiet', values: { zoom: 0.9, twist: -0.04, amount: 0.55, center: [0.5, 0.5], drift: 0.2, edge: 0 } },
+    { name: 'Nested frames', values: { zoom: 0.92, twist: 0.015, amount: 0.8, center: [0.5, 0.5], drift: 0.25, edge: 1 } },
+    { name: 'Off-axis dive', values: { zoom: 1.04, twist: 0.03, amount: 0.75, center: [0.32, 0.62], drift: 0.4, edge: 0 } }
   ],
   'fx-stutter': [
     { name: 'Rare freeze', values: { rate: 4, chance: 0.2, bands: 1, jitter: 0, blackout: 0 } },
