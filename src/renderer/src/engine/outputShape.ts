@@ -9,9 +9,8 @@ const VS = `#version 300 es
 in vec2 p; out vec2 vUV;
 void main(){ vUV = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }`
 
-// Shape SDFs lifted from Transform.fs so the silhouettes match exactly. The heart is
-// an implicit curve, not a distance : here it is divided by its gradient so its edge
-// and its shadow get the same softness as the other shapes (same outline).
+// Shape SDFs lifted from Transform.fs so the silhouettes match exactly (the heart
+// included : an exact distance, lobes up, so its edge and shadow are even).
 const FS = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 frag;
 uniform sampler2D uSrc, uFill;
@@ -32,8 +31,10 @@ float sdStar(vec2 p, float r, float pts){
   float rad = mix(r * 0.42, r, abs(wed - 0.5) * 2.0);
   return length(p) - rad;
 }
-float heartF(vec2 p, float r){ vec2 hp = p / (r * 1.15); hp.y = -hp.y + 0.35; float hx = abs(hp.x);
-  float b = hx * hx + hp.y * hp.y - 1.0; return b * b * b - hx * hx * hp.y * hp.y * hp.y; }
+float sdHeart(vec2 p){ p.x = abs(p.x);
+  if (p.y + p.x > 1.0) return length(p - vec2(0.25, 0.75)) - 0.35355339;
+  vec2 a = p - vec2(0.0, 1.0); vec2 b = p - 0.5 * max(p.x + p.y, 0.0);
+  return sqrt(min(dot(a, a), dot(b, b))) * sign(p.x - p.y); }
 float shapeDist(int s, vec2 p, float r){
   if (s == 1)  return length(p) - r;
   if (s == 2)  return sdBox(p, vec2(r));
@@ -51,9 +52,7 @@ float shapeDist(int s, vec2 p, float r){
   if (s == 14) return min(sdBox(p, vec2(r, r * 0.33)), sdBox(p, vec2(r * 0.33, r)));
   if (s == 15) return abs(length(p) - r * 0.72) - r * 0.22;
   if (s == 16) return max(length(p) - r, -p.y);
-  if (s == 17){ float f = heartF(p, r); vec2 e = vec2(r * 0.004, 0.0);
-    vec2 g = vec2(heartF(p + e.xy, r) - heartF(p - e.xy, r), heartF(p + e.yx, r) - heartF(p - e.yx, r)) / (2.0 * e.x);
-    return f / max(length(g), 1e-3); }
+  if (s == 17){ float hs = r * 2.17; return sdHeart(p / hs + vec2(0.0, 0.552)) * hs; }
   if (s == 18) return max(length(p) - r, -(length(p - vec2(r * 0.5, 0.0)) - r * 0.95));
   if (s == 19){ float w = mix(r * 1.2, r * 0.5, clamp((p.y + r) / (2.0 * r), 0.0, 1.0));
     return max(abs(p.x) - w, abs(p.y) - r); }

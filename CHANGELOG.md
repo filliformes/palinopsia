@@ -144,6 +144,10 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The heart shape** (Transform and the Finalizer's output shape) stood upside down,
+  tip up, and its edge smudged at the sides and the cusp (it was an implicit curve, not
+  a distance). It is now an exact heart, lobes up, with an edge as clean as every other
+  shape and the same width as before. Rotate it by 180° for the old inverted one.
 - **Weave, lumakey and consume now work as layer blend modes.** They were offered in the
   layer BLEND menu (and reachable by a modulated blend) but only existed in the A/B
   source mixer, so on a layer they quietly acted as normal. Against the stack below :

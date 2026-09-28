@@ -35,6 +35,14 @@ float sdNgon(vec2 p, float r, float sides) {
   }
   return d;
 }
+// Exact heart : lobes up, tip at the origin, 1.1 tall (after Quilez).
+float sdHeart(vec2 p) {
+  p.x = abs(p.x);
+  if (p.y + p.x > 1.0) return length(p - vec2(0.25, 0.75)) - 0.35355339;
+  vec2 a = p - vec2(0.0, 1.0);
+  vec2 b = p - 0.5 * max(p.x + p.y, 0.0);
+  return sqrt(min(dot(a, a), dot(b, b))) * sign(p.x - p.y);
+}
 float sdStar(vec2 p, float r, float pts) {
   float m = 6.2831853 / pts;
   float wed = mod(atan(p.x, p.y) + m * 0.5, m) / m; // 0..1 across a wedge
@@ -60,13 +68,12 @@ float shapeDist(int s, vec2 p, float r) {
   if (s == 14) return min(sdBox(p, vec2(r, r * 0.33)), sdBox(p, vec2(r * 0.33, r))); // cross
   if (s == 15) return abs(length(p) - r * 0.72) - r * 0.22;            // ring
   if (s == 16) return max(length(p) - r, -p.y);                        // half-circle (top)
-  if (s == 17) {                                                       // heart (up)
-    vec2 hp = p / (r * 1.15); hp.y = -hp.y + 0.35;
-    float hx = abs(hp.x);
-    // b can be negative; pow(neg, 3.0) is undefined in GLSL (NaN on strict
-    // drivers) : cube it directly instead.
-    float b = hx * hx + hp.y * hp.y - 1.0;
-    return b * b * b - hx * hx * hp.y * hp.y * hp.y;
+  if (s == 17) {                                                       // heart (lobes up)
+    // An exact distance, so its edge is as even as every other shape's (the old
+    // implicit curve smudged at the cusp and the sides, and stood upside down).
+    // Rotate by pi for the inverted one. hs sizes it to the old width.
+    float hs = r * 2.17;
+    return sdHeart(p / hs + vec2(0.0, 0.552)) * hs;
   }
   if (s == 18) return max(length(p) - r, -(length(p - vec2(r * 0.5, 0.0)) - r * 0.95)); // crescent
   if (s == 19) {                                                       // trapezoid
