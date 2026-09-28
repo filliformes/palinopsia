@@ -62,12 +62,42 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     amount: 'Dry/wet against the untouched image.'
   },
   metamorph: {
-    rate: 'How often a new form is born from inside the old one.',
+    rate: 'How often a new form is born from inside the old one. 0 = births only on the birth ▸ trigger.',
     size: 'The organism’s resting size.',
-    wobble: 'Boil on the outline : the silhouette’s rim churns.',
+    wobble: 'Boil on the outline : the silhouette’s rim churns (faster as it rises).',
     complexity: 'Body warp : from a soft blob toward a carved, asymmetric figure.',
-    drift: 'How far the lineage wanders around the frame between generations.',
-    inner: 'Faint interior shading so the form reads as a body, not a flat sticker.'
+    drift: 'How far each new generation lands from its parent : 0 = the lineage stays in place, 1 = it roams the whole frame. Also a slow sway.',
+    inner: 'Faint interior shading so the form reads as a body, not a flat sticker.',
+    birth: 'Fire a birth now (bind it to the beat) : a new form grows out of the old one in about half a second.'
+  },
+  'direct-marks': {
+    gate: 'How many marks are showing : 1 = all of them, lower = fewer, each blinking on its own random clock. Drive it from audio for marks on the beat.',
+    jitter: 'How far the hand strays : each mark sits a little off its ruled place (scratches wander along their length).',
+    rate: 'How fast each mark blinks when gate is below 1 (each mark at its own pace).',
+    boil: 'Redraws every mark on each drawn frame, the way a hand-made film never holds still. 0 = held marks.',
+    fps: 'How many new drawn frames per second the boil makes (12 = drawing on twos, 24 = on ones).',
+    seed: 'Deals a different hand : a new set of positions, blinks and scratches.',
+    audio: 'Each mark follows the spectrum band at its own place across the frame (bass on the left) : loud bands light their marks. In silence, high values empty the frame.'
+  },
+  'sync-osc': {
+    freq: 'How many lines fill the frame height.',
+    sync: 'Like an analog sync knob : 0 → middle slows the scrolling lines to a frozen horizontal hold; middle → 1 turns the frozen lines to vertical.',
+    rate: 'Scroll speed (only while sync is below the middle).',
+    audioFM: 'Bends every line with the live audio waveform (the classic video-synth audio input). Silence = straight lines.'
+  },
+  differential: {
+    count: 'How many wave trains are layered. In between whole values the next layer fades in.',
+    ratio: 'Speed step between layers : layer k runs at rate × (1 + k × (ratio − 1)). Whole numbers lock into repeating cycles; in-between values never quite repeat.',
+    rate: 'Speed of the slowest layer (the others run faster by the ratio steps).',
+    freq: 'Wavelength of the wave trains : more waves across the frame.',
+    thickness: 'Contour line width (even along the whole line).',
+    lines: 'How many contour levels : more, closer lines.',
+    skew: 'How far the layers fan apart in direction (always less than a right angle, so it never closes into a rosette).',
+    audio: 'Each layer swells with its own band of the spectrum, bass on the slowest layer : the contours pulse with the music.'
+  },
+  'solid-color': {
+    midpoint: 'Where colB sits along the gradient (colA at one edge, colC at the other).',
+    dither: 'A faint, fine noise that stops smooth gradients banding on 8-bit outputs.'
   },
   'node-feedback': {
     couple: 'Runs a SECOND feedback buffer (fb1) under a diverged transform and cross-mixes it into the main loop. 0 = single buffer. Up = emergent structure neither loop makes alone.',
@@ -110,6 +140,169 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     embers: 'Drifting particle layer : rising sparks (fire) · sediment/bubbles (water) · pollen/leaves (nature). 0 = none.',
     vary: 'Season blend toward each element’s alternate : gas-blue flame · lagoon green · patchy autumn.',
     contrast: 'Tonal contrast of the element (harder vs. softer masses).'
+  },
+  'slit-scan': {
+    rate: 'How fast time scrolls across the frame. Negative runs it the other way. Changes glide from the current picture, no jump.',
+    span: 'How much time the width of the frame holds : low = a short, broad history, high = a long one packed into fine, fast-changing columns.',
+    freq: 'How many waves fit across the profile (the axis the scan does not run along).',
+    bands: 'How many flat brightness levels the signal is stepped into (whole numbers, from black to full tint).',
+    vertical: 'Time runs down the frame instead of across it.'
+  },
+  ramps: {
+    freq: 'How many ramps repeat across the frame. 1 = one ramp exactly edge to edge (center to farthest corner for radial and diamond).',
+    steps: '1 = a smooth ramp. Higher = a staircase of that many evenly spaced flat levels.',
+    rate: 'Scroll speed of the ramp. Negative runs it the other way (rings move inward instead of outward).',
+    angle: 'Turns the ramp direction (linear and diamond shapes; a radial ramp looks the same at any angle).',
+    mirror: 'Folds each ramp into a rise and fall (a triangle) : no hard seam, so a lumakey wipe or the Colorizer sees one smooth front.',
+    center: 'Where radial and diamond ramps start from. No effect on the linear shapes.'
+  },
+  'rgb-osc': {
+    freq: 'Stripe frequency : how many cycles fit in the frame height.',
+    spread: 'Detune : how far green and blue run from red in frequency. 0 = the three channels in step (a steady color fringe), higher = faster color crawl.',
+    symmetry: 'Axis blend : 0 = vertical stripes, 1 = horizontal stripes, 0.5 = a plaid of both.',
+    rate: 'How fast the stripes drift. Changes glide from the current picture, no jump.',
+    level: 'Plain gain on all three channels.',
+    chroma: '0 = gray (the brightness the three channels make together), 1 = full oscillator color. Lower it to keep the field matte.',
+    audioFM: 'Bends the stripes into the live audio waveform : vertical stripes follow it down the frame, horizontal ones across it. 0 = off.'
+  },
+  recurse: {
+    iterations: 'How many nested levels are drawn. Fractional values fade the deepest level in, so it can be swept smoothly.',
+    scale: 'How much each level shrinks : low = a fast plunge, high = many close frames.',
+    angle: 'How much each level turns. Negative turns the cascade the other way.',
+    drift: 'How far each level shifts off-center : what keeps it a spiral cascade rather than a centered tunnel.',
+    driftAngle: 'Direction of the off-center shift : which side of the frame the cascade converges toward.',
+    width: 'Line width (the deepest levels never go thinner than about a pixel and a half).',
+    rate: 'Speed of the slow breathing of rotation and drift.',
+    audio: 'Each level rides its own band of the live spectrum (outer frames = lows, deep frames = highs) : louder bands draw thicker, brighter lines.'
+  },
+  shapes: {
+    count: 'How many cells fit in the frame height. The grid is centered, so changing it zooms about the middle.',
+    size: 'Shape size relative to its cell. Large sizes overlap their neighbors (nothing is cut at the cell edge).',
+    soft: 'Edge softness : 0 = crisp (still anti-aliased), higher = a soft halo.',
+    rate: 'Speed of the breathing and turning. Each cell keeps its own pace.',
+    density: 'Share of cells that hold a shape. Below 1 the seed leaves some cells empty (reseed re-deals which).',
+    spin: 'Bars and crosses : 0 = all upright, higher = each cell dealt its own angle and slow turn. Triangles always turn, each its own way.',
+    invert: 'Swaps shape and ground : the tint fills the frame and the shapes become holes.',
+    audioScatter: 'Each cell’s size rides its own sample of the live audio waveform, so the field ripples with the sound. 0 = off.',
+    reseed: 'Re-deals every cell : which are filled, their breathing, their turning.'
+  },
+  'op-art': {
+    scale: 'Pattern density : higher = finer bands and smaller cells.',
+    warp: 'Mode-dependent distortion : wave bend (waves), lens bulge (grid), grating angle (moiré), zig-zag depth (herringbone).',
+    rate: 'Speed of the illusory flow. Negative reverses it.',
+    contrast: '0 = soft sine grays, 1 = hard edges (kept pixel-clean at any scale).',
+    audio: 'The live audio waveform bends the pattern sideways. 0 = off.'
+  },
+  interference: {
+    detune: 'How far the second line field is off in frequency : sets the spacing of the beat bands (small = broad, slow bands; larger = tight, busy moiré).',
+    skew: 'Tilts the second line field against the first (up to about 30°) : the angle mismatch turns the beat into slanted moiré bands.',
+    rate: 'How fast both line fields slide. The beat bands crawl with it, slower the broader they are. Changes glide from the current picture, no jump.',
+    contrast: 'Shapes the beat : higher = darker gaps and narrower bright bands.'
+  },
+  'column-scan': {
+    amp: 'How far the internal signal pushes each line up and down (as a share of the frame height).',
+    scale: 'Horizontal frequency of the internal signal : low = long slow swells, high = a nervous, busy trace.',
+    rate: 'How fast the internal signal drifts. Changes glide from the current picture, no jump.',
+    width: 'Line thickness as a share of the line spacing (never thinner than a pixel).',
+    audio: 'Writes the live audio waveform into the lines : each line traces its own stretch of the signal, oscilloscope-style. 0 = off.'
+  },
+  ash: {
+    speed: 'Fall speed. Changes glide from the current picture, no jump.',
+    physics: 'Mass of the ash : low = heavy flecks dropping fast and straight; high = light ash falling slowly, swaying wider and floating sideways.',
+    wander: 'How far each fleck drifts sideways as it falls.',
+    flicker: 'Slow per-fleck brightness breathing.',
+    accent: 'Share of rare flecks that carry the tint color.',
+    audioScatter: 'Each column of ash gusts sideways on its own sample of the live audio waveform (neighboring columns move together, so gusts travel across the bed). 0 = off.'
+  },
+  murmuration: {
+    speed: 'How fast the birds surge and wander. 0 holds the flock still. Changes glide from the current picture, no jump.',
+    cohesion: 'How tightly the birds share one wind : high = one aligned flock, low = each region turns its own way.',
+    stretch: 'How long each bird is drawn along its heading.',
+    heading: 'Direction of the shared wind : steers the whole flock.',
+    veer: 'How far the wind swings around the heading on its own, slowly (0 = holds the heading exactly, 1 = wanders all the way round).',
+    audioScatter: 'Startles the flock with the sound : each bird jumps along its own direction by the loudness of its own frequency band, and regroups in silence. 0 = off.'
+  },
+  filaments: {
+    rate: 'How fast the strands sway. Changes glide from the current picture, no jump.',
+    sway: 'How far the strands swing (always more toward the free end).',
+    width: 'Strand thickness at the root as a share of the strand spacing; strands taper toward the tip (never thinner than about a pixel and a half).',
+    lean: 'Tilts the whole bed : negative leans left, positive right.',
+    audioScatter: 'Pushes each strand sideways by its own sample of the live audio waveform (quick, jittery). 0 = off.',
+    audioSway: 'Each strand swings wider when its own frequency band is loud (smooth : follows the energy of the music, not the raw wave). 0 = off.'
+  },
+  congeal: {
+    rate: 'How fast the flow drifts and how often new seeds drop. Changes glide from the current picture, no jump.',
+    decay: 'How long material lingers : higher = longer trails and slower dissolving (it always fades fully to black).',
+    warp: 'How hard the flow drags the material each frame : low = still pools, high = long swirling streaks.',
+    seed: 'Seed density : how many bright drops fall into the field (not a random seed).',
+    scale: 'Size of the flow pattern : low = broad currents, high = small eddies.',
+    audioSeed: 'Drops extra seeds where the live spectrum is loud, across the width (bass on the left, treble on the right). 0 = off.',
+    clear: 'CLEAR ▸ : wipes the field to black at once (seeds keep falling). Press it, send OSC, or bind a modulator.'
+  },
+  'drift-field': {
+    rate: 'How fast the field drifts. Changes glide from the current picture, no jump.',
+    scale: 'Size of the flow : low = broad slow strata, high = fine grain.',
+    warp: 'How much the flow folds back on itself : 0 = smooth layers, high = torn, swirling bands.',
+    steps: 'How many terraces the flow is cut into : few = broad matte bands, many = fine strata.',
+    contrast: 'Pushes the field toward the dark end before it is banded : higher = more dark ground and fewer bright strata.',
+    split: 'Red / blue fringes at the band edges, like slightly misregistered color plates. 0 = off (and cheaper).',
+    angle: 'Turns the strata and their drift (0 = horizontal).',
+    reseed: 'RESEED ▸ : cut to a completely new field (rising edge). Press it, send OSC, or bind a modulator to cut on a beat.'
+  },
+  slabs: {
+    rate: 'Cut tempo : how often the slabs re-deal. Changes take effect from the next cut, no jump.',
+    bands: 'How many horizontal bands stack up the frame.',
+    density: 'Share of cells lit in each band.',
+    jitter: 'Share of bands thrown sideways on each cut.',
+    drift: 'Slow sideways scroll of every band between cuts, each at its own speed and direction.',
+    accent: 'Share of lit cells drawn in the accent tint.',
+    chaos: 'Bends every cell on its own curve, and turns a growing minority of bands rogue : odd cell sizes, big throws, thin sub-stripes, a faster clock, inversions.',
+    nonlinear: 'Thins each cell to its own random width and height, so the slabs break into a field of lines.',
+    audioScatter: 'Each band slides sideways on its own sample of the live audio waveform : the sound ripples up the stack. 0 = off.',
+    audioLight: 'Each band lights more of its cells as its own frequency band gets loud (bass at the bottom, treble at the top) : a spectrum-analyzer reading. 0 = off.',
+    reseed: 'RESEED ▸ : re-deal every band (widths, picks, accents) at once. Press it, send OSC, or bind a modulator.'
+  },
+  contour: {
+    rate: 'How fast the basin drifts. Changes glide from the current picture, no jump.',
+    scale: 'Size of the terrain : low = a few wide hills, high = many small ones.',
+    levels: 'How many elevation lines span the full height range.',
+    width: 'Line weight, relative to the frame height : the same on-screen thickness on steep and flat ground, at any resolution.',
+    warp: 'How much the terrain folds back on itself : 0 = soft rounded hills, high = contorted, swirling lines.',
+    fill: 'Faint staircase shading between the lines (higher ground lighter).',
+    major: 'Draws every Nth line heavier, like the index contours of a survey map.',
+    audioSwell: 'Each level thickens with its own frequency band : low ground follows the bass, high ground the treble. 0 = off.'
+  },
+  'grid-drift': {
+    cells: 'How many cells fit across the frame height.',
+    rate: 'Tempo of the breathing and the slips. Changes glide from the current picture, no jump.',
+    breathe: 'How far each row and column wanders out of line, each on its own slow noise.',
+    slip: 'How often the stepped clock knocks a whole lane sideways.',
+    lineW: 'Line weight as a share of a cell (never thinner than about a pixel and a half).',
+    density: 'Share of cells filled with a matte tone, re-dealt on every slip step.',
+    audioScatter: 'Each row and column shifts with its own sample of the live audio waveform (rows read the first half, columns the second). 0 = off.',
+    reseed: 'RESEED ▸ : re-deal every lane and fill at once. Press it, send OSC, or bind a modulator.'
+  },
+  'ten-print': {
+    cells: 'How many cells fit across the frame height.',
+    thickness: 'Stroke weight as a share of a cell (never thinner than about a pixel and a half).',
+    bias: 'Odds of / versus \\ : 0.5 = a fair coin; toward 0 or 1 the maze leans into long diagonal runs.',
+    flip: 'Ticks per second of the flip clock : on each tick a sparse few cells swap their stroke. 0 = the maze holds still until you reseed.',
+    audioScatter: 'Turns each diagonal (or swells each arc) by its own sample of the live audio waveform : the maze shivers apart with sound and reconnects in silence.',
+    accent: 'Share of strokes drawn in the accent tint.',
+    style: 'Diagonals = the classic slash maze. Arcs = a quarter circle at two opposite corners of each cell : a maze of winding curves.',
+    reseed: 'RESEED ▸ : deal a whole new maze (rising edge). Bind a modulator to an audio source to re-deal on every hit.'
+  },
+  'particle-drift': {
+    count: 'Grid size : how many particle cells fit across the frame height.',
+    speed: 'How fast the field travels along the flow. Changes glide, no jump.',
+    flow: 'Direction of travel, in radians : 0 = right, 1.57 = up, 3.14 = left, 4.71 = down. Turning it bends the path, no jump.',
+    size: 'Point size as a share of a cell (tiny points dim instead of flickering).',
+    trail: 'Length of the streak behind each point, in cells.',
+    fade: 'Trail brightness from head to tail : 0 = even dashes, 1 = a bright head fading to nothing.',
+    jitter: 'How far each point wanders around its place in the grid.',
+    vary: 'How different the points are from each other : size, brightness, trail length and wander speed.',
+    density: 'Share of cells that hold a point : 1 = every cell, lower = sparser and less grid-like.',
+    audioPulse: 'Each point listens to its own frequency band and swells (size and brightness) with it. 0 = off.'
   },
   'node-parallax': {
     amount: 'Parallax strength : how far near features shift relative to far ones. Needs the Depth engine on (header).',
@@ -245,5 +438,5 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     outDepth: 'Soft drop shadow : makes the shape float over the fill.',
     outShadowAngle: "Direction the shape's shadow falls (light angle).",
     outPerspective: 'Rakes the shadow onto a receding ground plane : adds depth realism.'
-  }
+  },
 }

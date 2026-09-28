@@ -7,6 +7,29 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **New source controls** from the generator audit, every default keeping
+  today's look :
+  - Drift Field `strata angle` and `reseed`;
+  - Slabs `spectrum light`;
+  - Contour `index lines` and `audio swell`;
+  - Ten Print arcs as a second `style`;
+  - Particle Drift `trail fade`, `density` and `audio pulse`;
+  - Column Scan `audio trace`;
+  - Murmuration `heading` and `veer`;
+  - Filaments `audio sway`;
+  - Congeal `clear` and `audio sparks`;
+  - Ramps `mirror` and a movable center;
+  - RGB Oscillators `chroma` and `audio FM`;
+  - Recurse `drift angle` and per-level `audio`;
+  - Shapes `density` and `spin`;
+  - Op-Art `audio`;
+  - Direct Marks `boil`, `fps`, a `seed` for a new hand, and `audio gate`;
+  - Metamorph `birth` (at rate 0, births happen only on the trigger);
+  - Sync Osc `audio FM`;
+  - Differential `audio bands`.
+
+  Every non-obvious input now has a tooltip, and there are new presets and
+  search words.
 - **tools/shader-rig** : checks any generator or effect offscreen, with no app
   window : a 24-hour show in one step, knob scrubs, 4K cost, stills at 16:9 and
   square, and a moving test card for effects (`tools/shader-rig/README.md`).
@@ -94,6 +117,28 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Source generators, after an audit of all 23.**
+  - Every rate-driven source now integrates its rate, so a knob never jumps the picture.
+  - Each one still moves, unrepeating, after 24 hours. Before, Slabs froze after about
+    3 hours and its cuts looped every 9 s; Particle Drift collapsed into a lattice, Ten
+    Print into vertical stripes, and Ash into evenly spaced strings.
+  - Lines keep a constant pixel width with a 1-px floor.
+  - The 1-px scanlines, which turned into moiré when resampled, are gone.
+  - Aspect is correct at 16:9 and on the square dome.
+  - Highlights:
+    - Murmuration's birds accelerated forever and became strobing dots after about
+      10 minutes; they now move in bounded, heading-aligned travelling waves.
+    - Congeal never faded back to black (a flat fog).
+    - Sync Osc's shape knob had a gray dead zone, and "frozen horizontal" was diagonal.
+    - Metamorph had a notch on every blob and a parent that popped out.
+    - Differential's fast layers strobed and its presets formed rosettes.
+    - Direct Marks' gate swept across the marks as a wave.
+    - Ash sliced flecks at column edges.
+    - Filaments and Column Scan lost the peaks of their lines.
+    - Shapes cut shapes at cell borders.
+    - Solid Color's gradient never reached its end colors.
+    - Presets now set every input, so one preset no longer leaks into the next.
+    - Dice no longer paint the dark grounds a bright color.
 - **Knobs no longer jump the picture.** Motion that ran on `time × rate` jumped
   whenever the rate moved : half an hour into a show a small nudge flung the
   picture, and an LFO, a Morph or MIDI on the rate turned it into strobing noise.

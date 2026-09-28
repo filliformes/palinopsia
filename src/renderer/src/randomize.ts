@@ -161,7 +161,22 @@ function randomizeOneInput(
 // for Film Hold, a dice roll would leave every Finishing randomize dirty.
 const RANDOMIZE_SKIP: Record<string, RegExp> = {
   'fx-context': /^(pbr|lightOrder$)/,
-  'fx-finalizer': /^film(Dust|Scratch|Hair|Gauge|Dirt)$/
+  'fx-finalizer': /^film(Dust|Scratch|Hair|Gauge|Dirt)$/,
+  // Text : the crawl, fitting, typewriter reveal and line-cue mode are staging
+  // intent (a dice must not start a ticker or hide the words).
+  // Dark grounds : a mid-bright random color would lose the near-black paper.
+  'direct-marks': /^paper$/,
+  'sync-osc': /^loA$/
+}
+
+// Solid Color : one rolled hue drives the whole gradient (a dark end tinted
+// with it, the hue itself mid-way, a pale end), so a dice never lands on
+// three clashing hues.
+function deriveGradient(out: Record<string, number | number[]>): void {
+  const b = out.colB
+  if (!Array.isArray(b)) return
+  out.colA = [b[0] * 0.12, b[1] * 0.12, b[2] * 0.12, b[3] ?? 1]
+  out.colC = [b[0] + (1 - b[0]) * 0.55, b[1] + (1 - b[1]) * 0.55, b[2] + (1 - b[2]) * 0.55, b[3] ?? 1]
 }
 
 export function randomizeInputs(
@@ -174,6 +189,7 @@ export function randomizeInputs(
     if (skip?.test(d.name)) continue
     out[d.name] = randomizeOneInput(shaderId, d, current[d.name])
   }
+  if (shaderId === 'solid-color') deriveGradient(out)
   return out
 }
 

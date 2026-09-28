@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Solid Color : a flat colour fill, or a smooth linear gradient across three stops at any angle. The quietest source: a wash to key against, tint under, or grade with. Gradient off = one solid colour; on = colA → colB (at the midpoint) → colC along the angle. A faint dither kills banding. Matte by design.",
+  "DESCRIPTION": "Solid Color : a flat color fill, or a smooth linear gradient across three stops at any angle. The quietest source: a wash to key against, tint under, or grade with. Gradient off = one solid color; on = colA → colB (at the midpoint) → colC along the angle. A faint dither kills banding. Matte by design.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Color"],
@@ -15,11 +15,8 @@
   ]
 }*/
 
-float hash(vec2 p) {
-  p = fract(p * vec2(123.34, 345.45));
-  p += dot(p, p + 34.345);
-  return fract(p.x * p.y);
-}
+// Interleaved gradient noise : a fine, even dither at any resolution (4K too).
+float ign(vec2 xy) { return fract(52.9829189 * fract(dot(xy, vec2(0.06711056, 0.00583715)))); }
 
 void main() {
   vec2 uv = isf_FragNormCoord;
@@ -32,13 +29,17 @@ void main() {
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
   vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
   vec2 dir = vec2(cos(angle), sin(angle));
-  float t = clamp(dot(p, dir) * 0.72 + 0.5, 0.0, 1.0);
+  // Normalize by the frame's half-extent along the gradient, so it runs from
+  // exactly colA at one edge (or corner) to colC at the opposite one, at every
+  // angle and aspect.
+  float halfExt = 0.5 * (abs(dir.x) * aspect + abs(dir.y));
+  float t = clamp(dot(p, dir) / (2.0 * halfExt) + 0.5, 0.0, 1.0);
 
   vec3 c = t < midpoint
     ? mix(colA.rgb, colB.rgb, t / max(midpoint, 0.001))
     : mix(colB.rgb, colC.rgb, (t - midpoint) / max(1.0 - midpoint, 0.001));
 
-  // Faint ordered-ish dither so smooth ramps don't band on 8-bit output.
-  c += (hash(gl_FragCoord.xy) - 0.5) * dither * (1.5 / 255.0);
+  // Faint dither so smooth ramps don't band on 8-bit output.
+  c += (ign(gl_FragCoord.xy) - 0.5) * dither * (1.5 / 255.0);
   gl_FragColor = vec4(c, 1.0);
 }

@@ -527,7 +527,7 @@ export const NATIVE_NODES: IsfShader[] = [
       "INPUTS": [
         { "NAME": "decay", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "persistence" },
         { "NAME": "amount", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "ghost" },
-        { "NAME": "chroma", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "dark ↔ colour" },
+        { "NAME": "chroma", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "dark ↔ color" },
         { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
       ]
     }*/`,
@@ -675,7 +675,7 @@ export const NATIVE_NODES: IsfShader[] = [
         { "NAME": "blur", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "blur" },
         { "NAME": "threshold", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "level" },
         { "NAME": "softness", "TYPE": "float", "MIN": 0.0, "MAX": 0.5, "DEFAULT": 0.06, "LABEL": "softness" },
-        { "NAME": "fill", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["source", "blurred colour", "matte"], "DEFAULT": 0, "LABEL": "fill" },
+        { "NAME": "fill", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["source", "blurred color", "matte"], "DEFAULT": 0, "LABEL": "fill" },
         { "NAME": "key", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["luma", "brightest channel"], "DEFAULT": 0, "LABEL": "key", "COMPACT": true },
         { "NAME": "outside", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "outside" },
         { "NAME": "invert", "TYPE": "bool", "DEFAULT": false, "LABEL": "invert", "COMPACT": true },
@@ -819,7 +819,9 @@ export const GENERATORS: IsfShader[] = [
       warp: [0.2, 1.0],
       steps: [3, 9],
       contrast: [0.9, 1.6],
-      split: [0, 0.5]
+      split: [0, 0.5],
+      // A tilt, not a spin : the horizontal strata are the signature.
+      angle: [-0.6, 0.6]
     }
   },
   {
@@ -835,7 +837,9 @@ export const GENERATORS: IsfShader[] = [
       drift: [0, 0.6],
       accent: [0, 0.5],
       chaos: [0, 0.2],
-      nonlinear: [0, 0.7]
+      nonlinear: [0, 0.7],
+      audioScatter: [0, 0.5],
+      audioLight: [0, 0.6]
     }
   },
   {
@@ -849,7 +853,9 @@ export const GENERATORS: IsfShader[] = [
       levels: [5, 20],
       width: [0.05, 0.3],
       warp: [0.15, 1.1],
-      fill: [0, 0.5]
+      fill: [0, 0.5],
+      major: [0, 10],
+      audioSwell: [0, 0.5]
     }
   },
   {
@@ -868,10 +874,10 @@ export const GENERATORS: IsfShader[] = [
     }
   },
   {
-    // Ten Print : the Commodore maze one-liner as a generator (EYESY lineage).
-    // Reseed is an EVENT (bind M to fire it from an audio modulator : the
-    // re-deal-on-transient gesture); audioScatter rides the shared audio
-    // texture per cell.
+    // Ten Print : the one-line maze program as a generator (diagonals or
+    // quarter-circle arcs). Reseed is an EVENT (bind M to fire it from an audio
+    // modulator : the re-deal-on-transient gesture); audioScatter rides the
+    // shared audio texture per cell.
     id: 'ten-print',
     name: 'Ten Print',
     category: 'Generator',
@@ -882,7 +888,8 @@ export const GENERATORS: IsfShader[] = [
       bias: [0.3, 0.7],
       flip: [0, 2.5],
       audioScatter: [0, 0.6],
-      accent: [0, 0.4]
+      accent: [0, 0.4],
+      style: [0, 1]
     }
   },
   {
@@ -897,7 +904,10 @@ export const GENERATORS: IsfShader[] = [
       size: [0.04, 0.2],
       trail: [0.1, 1.6],
       jitter: [0.2, 0.9],
-      vary: [0.3, 0.9]
+      vary: [0.3, 0.9],
+      fade: [0, 0.8],
+      density: [0.35, 1],
+      audioPulse: [0, 0.6]
     }
   },
   {
@@ -925,7 +935,8 @@ export const GENERATORS: IsfShader[] = [
       amp: [0.015, 0.1],
       scale: [1, 5],
       rate: [0.05, 0.5],
-      width: [0.06, 0.35]
+      width: [0.06, 0.35],
+      audio: [0, 0.5]
     }
   },
   {
@@ -940,7 +951,8 @@ export const GENERATORS: IsfShader[] = [
       size: [0.04, 0.2],
       wander: [0.15, 0.8],
       flicker: [0.1, 0.7],
-      accent: [0.05, 0.6]
+      accent: [0.05, 0.6],
+      audioScatter: [0, 0.5]
     }
   },
   {
@@ -948,14 +960,14 @@ export const GENERATORS: IsfShader[] = [
     name: 'Murmuration',
     category: 'Generator',
     source: murmuration,
-    curated: { count: [14, 45], speed: [0.2, 1.5], cohesion: [0.4, 0.95], size: [0.04, 0.15], stretch: [0.2, 1.1] }
+    curated: { count: [14, 45], speed: [0.2, 1.5], cohesion: [0.4, 0.95], size: [0.04, 0.15], stretch: [0.2, 1.1], heading: [0, 6.2832], veer: [0, 0.8], audioScatter: [0, 0.5] }
   },
   {
     id: 'filaments',
     name: 'Filaments',
     category: 'Generator',
     source: filaments,
-    curated: { strands: [6, 28], rate: [0.1, 1], sway: [0.2, 0.8], width: [0.08, 0.4], lean: [-0.5, 0.5] }
+    curated: { strands: [6, 28], rate: [0.1, 1], sway: [0.2, 0.8], width: [0.08, 0.4], lean: [-0.5, 0.5], audioScatter: [0, 0.5], audioSway: [0, 0.6] }
   },
   {
     id: 'erosion',
@@ -990,7 +1002,7 @@ export const GENERATORS: IsfShader[] = [
     name: 'Congeal',
     category: 'Generator',
     source: congeal,
-    curated: { rate: [0.15, 1.2], decay: [0.9, 0.99], warp: [0.15, 0.8], seed: [0.15, 0.6], scale: [1, 5] }
+    curated: { rate: [0.15, 1.2], decay: [0.9, 0.99], warp: [0.15, 0.8], seed: [0.15, 0.6], scale: [1, 5], audioSeed: [0, 0.5] }
   },
   {
     id: 'slit-scan',
@@ -1004,42 +1016,42 @@ export const GENERATORS: IsfShader[] = [
     name: 'Ramps',
     category: 'Generator',
     source: ramps,
-    curated: { freq: [1, 6], steps: [1, 16], rate: [0, 1], angle: [0, 6.2832] }
+    curated: { freq: [1, 6], steps: [1, 16], rate: [-0.8, 0.8], angle: [0, 6.2832] }
   },
   {
     id: 'rgb-osc',
     name: 'RGB Oscillators',
     category: 'Generator',
     source: rgbOsc,
-    curated: { freq: [2, 20], spread: [0.05, 0.6], symmetry: [0, 1], angle: [0, 6.2832], rate: [0.05, 1.5], level: [0.5, 0.95] }
+    curated: { freq: [2, 20], spread: [0.05, 0.6], symmetry: [0, 1], angle: [0, 6.2832], rate: [0.05, 1.5], level: [0.5, 0.95], chroma: [0.4, 1], audioFM: [0, 0.5] }
   },
   {
     id: 'recurse',
     name: 'Recurse',
     category: 'Generator',
     source: recurse,
-    curated: { iterations: [4, 9], scale: [0.68, 0.9], angle: [0.1, 0.9], drift: [0.05, 0.35], width: [0.02, 0.12], rate: [0.05, 1] }
+    curated: { iterations: [4, 9], scale: [0.68, 0.9], angle: [-0.9, 0.9], drift: [0.05, 0.35], driftAngle: [-3.1416, 3.1416], width: [0.02, 0.12], rate: [0.05, 1], audio: [0, 0.6] }
   },
   {
     id: 'shapes',
     name: 'Shapes',
     category: 'Generator',
     source: shapes,
-    curated: { count: [1, 12], size: [0.2, 0.85], soft: [0.02, 0.3], rate: [0.05, 1.2] }
+    curated: { count: [1, 12], size: [0.2, 0.85], soft: [0.02, 0.3], rate: [0.05, 1.2], density: [0.45, 1], spin: [0, 1], audioScatter: [0, 0.5], invert: [0, 0] }
   },
   {
     id: 'op-art',
     name: 'Op-Art',
     category: 'Generator',
     source: opArt,
-    curated: { scale: [8, 48], warp: [0.15, 0.8], rate: [0.05, 1.2], angle: [-1.6, 1.6], contrast: [0.5, 1] }
+    curated: { scale: [8, 48], warp: [0.15, 0.8], rate: [0.05, 1.2], angle: [-1.6, 1.6], contrast: [0.5, 1], audio: [0, 0.5] }
   },
   {
     id: 'direct-marks',
     name: 'Direct Marks',
     category: 'Generator',
     source: directMarks,
-    curated: { density: [8, 60], weight: [0.1, 0.42], gate: [0.35, 1], jitter: [0.1, 0.6], rate: [0.3, 4], angle: [0, 3.14] }
+    curated: { density: [8, 60], weight: [0.1, 0.42], gate: [0.35, 1], jitter: [0.1, 0.6], rate: [0.3, 4], angle: [0, 3.14], boil: [0, 0.5], fps: [6, 18], seed: [0, 1], audio: [0, 0.4] }
   },
   {
     id: 'dye-field',
@@ -1089,7 +1101,8 @@ export const GENERATORS: IsfShader[] = [
     name: 'Sync Osc',
     category: 'Generator',
     source: syncOsc,
-    curated: { freq: [3, 40], shape: [0, 1], sync: [0, 1], rate: [0.05, 1.5], angle: [0, 6.2832] }
+    // sync stays under 0.4 : above the middle the lines freeze (a still dice roll).
+    curated: { freq: [3, 40], shape: [0, 1], sync: [0, 0.4], rate: [0.05, 1.5], angle: [0, 6.2832], audioFM: [0, 0.5] }
   },
   {
     id: 'differential',
@@ -1104,7 +1117,8 @@ export const GENERATORS: IsfShader[] = [
       thickness: [0.05, 0.3],
       lines: [3, 12],
       skew: [0.1, 0.7],
-      angle: [0, 6.2832]
+      angle: [0, 6.2832],
+      audio: [0, 0.6]
     }
   },
   {
@@ -1135,7 +1149,7 @@ export const GENERATORS: IsfShader[] = [
     // Native Text generator (TextSource.ts) : typography as a source, glyphs
     // fillable by a sidechain layer (the convolution move). Header-only source:
     // the auto-UI/presets parse INPUTS; the engine runs the TS class. Font
-    // VALUES/LABELS order must match TEXT_FONTS in engine/TextSource.ts.
+    // VALUES/LABELS come from TEXT_FONTS in textFonts.ts.
     id: 'gen-text',
     name: 'Text',
     category: 'Generator',
