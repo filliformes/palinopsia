@@ -93,8 +93,9 @@ void main() {
   // out fast and eased : births on the beat, and at rate 0 the lineage rests
   // on a complete form between triggers.
   if (PASSINDEX == 0) {
-    vec4 s0 = IMG_NORM_PIXEL(genState, vec2(0.25, 0.5));
-    vec4 s1 = IMG_NORM_PIXEL(genState, vec2(0.75, 0.5));
+    vec2 st0 = vec2(0.25, 0.5), st1 = vec2(0.75, 0.5); // bare identifiers : the ISF parser splits call arguments on commas
+    vec4 s0 = IMG_NORM_PIXEL(genState, st0);
+    vec4 s1 = IMG_NORM_PIXEL(genState, st1);
     float eFrac = dec16(s0.rg);
     float eInt = floor(s0.b * 255.0 + 0.5);
     float rem = dec16(s1.rg) * 4.0;
@@ -119,7 +120,8 @@ void main() {
   float px = 1.0 / RENDERSIZE.y;
 
   // Generation clock : old form (idx) gives birth to new form (idx + 1).
-  vec4 s0 = IMG_NORM_PIXEL(genState, vec2(0.25, 0.5));
+  vec2 st0 = vec2(0.25, 0.5);
+  vec4 s0 = IMG_NORM_PIXEL(genState, st0);
   float x = fract(PH_rate) + dec16(s0.rg);
   float f = fract(x);
   float idx = mod(floor(PH_rate) + floor(s0.b * 255.0 + 0.5) + floor(x), 256.0);
