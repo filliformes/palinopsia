@@ -1367,6 +1367,7 @@ void main(){
 
 class NodeGL {
   quad: WebGLBuffer
+  checkedAt = 0 // last context-health check (performance.now ms)
   downsample: Prog
   flow: Prog
   blur: Prog
@@ -1509,8 +1510,15 @@ const shared = new WeakMap<WebGL2RenderingContext, NodeGL>()
 function nodeGL(gl: WebGL2RenderingContext): NodeGL {
   let g = shared.get(gl)
   // After a GPU reset the context object survives but every program and buffer
-  // it held is dead : rebuild rather than draw with stale handles.
-  if (g && !gl.isBuffer(g.quad)) g = undefined
+  // it held is dead : rebuild rather than draw with stale handles. isBuffer is a
+  // blocking GPU round-trip, so look at most once a second, never per render.
+  if (g) {
+    const now = performance.now()
+    if (now - g.checkedAt > 1000) {
+      g.checkedAt = now
+      if (!gl.isContextLost() && !gl.isBuffer(g.quad)) g = undefined
+    }
+  }
   if (!g) {
     g = new NodeGL(gl)
     shared.set(gl, g)
