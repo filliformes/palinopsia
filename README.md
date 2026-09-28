@@ -87,6 +87,9 @@ presets, and named Feel macros turn sound→image relations into playable
 structure. A generative macro-form sequencer can then auto-pilot a whole set from
 tagged scenes.
 
+The papers, books and standards the instrument draws on are listed in
+[docs/bibliography.md](docs/bibliography.md) (APA 7).
+
 ---
 
 ## Getting started

@@ -13,10 +13,10 @@ kaleidoscopic symmetry, plasma, Lissajous, or additive-glow-on-black.
    oscillators on the X/Y plates, dynamic and photographed at the "best-balance" moment.
    *Caveat: the figures themselves are Lissajous/harmonograph — radially symmetric — so we
    borrow the lineage and technique, never the symmetry.*
-2. **Collopy, D. (2000). "Color, Form, and Motion: Dimensions of a Musical Art of Light."**
+2. **Collopy, F. (2000). "Color, Form, and Motion: Dimensions of a Musical Art of Light."**
    Visual music organized along colour / form / motion, unified by rhythm; colour serves
    harmony-mood-accent (not pitch); differential dynamics; memory binds motion.
-3. **Collopy, D. (2020). "Visual Synthesizer Design."** 14 performance hypotheses (H1–H14)
+3. **Collopy, F. (2020). "Visual Synthesizer Design."** 14 performance hypotheses (H1–H14)
    of non-arbitrary music↔image correspondence, grounded in synesthesia (bouba/kiki,
    pitch–size); "purity" as a unified value+saturation axis; colour chords.
 4. **Collopy, Fuhrer, Jameson (1999). "Visual Music in a Visual Programming Language"
