@@ -63,8 +63,10 @@ const QUAD_VS = `#version 300 es
 in vec2 p; out vec2 uv;
 void main(){ uv = p*0.5+0.5; gl_Position = vec4(p,0.,1.); }`;
 
-// The 15 blend modes (indices match modeIndex below) : shared by the layer
-// stack pass and the A/B source-mix pass. 'wrap' is the digital-native one.
+// The per-pixel blend modes (indices match modeIndex below) : shared by the layer
+// stack pass and the A/B source-mix pass. 'wrap' is the digital-native one. Weave,
+// lumakey and consume (15-17) read neighboring texels or a state field, so each
+// pass implements them in its own main().
 const BLEND_GLSL = `
 vec3 blendMode(int mode, vec3 b, vec3 t){
   if(mode==0) return t;                                     // normal
@@ -87,7 +89,7 @@ vec3 blendMode(int mode, vec3 b, vec3 t){
   // lighter color : the WHOLE pixel of whichever
   // side is brighter wins, so hues never mix channel by channel like lighten.
   if(mode==18) return dot(t, vec3(0.299,0.587,0.114)) > dot(b, vec3(0.299,0.587,0.114)) ? t : b;
-  return t;                                                 // weave (mixer-only) / fallback
+  return t;                                                 // fallback (15-17 live in main())
 }`;
 
 // Pairwise blend of two textures with opacity on the top layer.
@@ -96,6 +98,7 @@ precision highp float;
 in vec2 uv; out vec4 o;
 uniform sampler2D base;   // accumulator below
 uniform sampler2D top;    // layer above
+uniform sampler2D uState; // this layer's Consume field (mode 17; unused otherwise)
 uniform int mode;
 uniform float opacity;
 // Per-layer spatial mask (0 none · 1 luma · 2 gradient · 3 shape).
@@ -124,7 +127,28 @@ float maskValue(vec2 p, vec3 topRgb){
 void main(){
   vec4 B = texture(base, uv);
   vec4 T = texture(top, uv);
-  vec3 c = blendMode(mode, B.rgb, T.rgb);
+  vec3 lw = vec3(0.299, 0.587, 0.114);
+  vec3 c;
+  if (mode == 15) {
+    // WEAVE : the layer's luminance displaces the stack below vertically, the
+    // stack's displaces the layer horizontally, and the two interleave.
+    float lb = dot(B.rgb, lw), lt = dot(T.rgb, lw);
+    vec2 ub = uv + vec2(0.0, (lt - 0.5) * 0.12);
+    vec2 ut = uv + vec2((lb - 0.5) * 0.12, 0.0);
+    c = mix(texture(base, ub).rgb, texture(top, ut).rgb, 0.5);
+  } else if (mode == 16) {
+    // LUMAKEY : the layer shows where it is bright; its near-black background
+    // keys out to the stack below (soft knee).
+    c = mix(B.rgb, T.rgb, smoothstep(0.04, 0.2, dot(T.rgb, lw)));
+  } else if (mode == 17) {
+    // CONSUME : the layer and the stack below fight over the frame through a
+    // competition field (advanced before this pass); they embrace at the front.
+    float phi = texture(uState, uv).r;
+    vec3 front = mix(B.rgb, T.rgb, smoothstep(0.35, 0.65, phi));
+    c = mix(front, (B.rgb + T.rgb) * 0.5, (1.0 - abs(phi - 0.5) * 2.0) * 0.4);
+  } else {
+    c = blendMode(mode, B.rgb, T.rgb);
+  }
   float a = T.a * opacity * maskValue(uv, T.rgb);
   o = vec4(mix(B.rgb, c, a), max(B.a, a));
 }`;
@@ -864,6 +888,8 @@ export class ISFLayer {
   scratchB: { fbo: WebGLFramebuffer; tex: WebGLTexture };
   // Consume/Reagent competition field (lazy : only when the A/B mix uses 'consume').
   reagent: PingPong | null = null;
+  // The same field between this layer and the stack below (blend mode 'consume').
+  stackReagent: PingPong | null = null;
   // Spatial mask on this layer's stack contribution (null = none).
   mask: LayerMask | null = null;
 
@@ -1244,6 +1270,7 @@ export class ISFLayer {
     this.rackB.flushNodes();
     this.rackLayer.flushNodes();
     if (this.reagent) { this.reagent.dispose(this.shared.gl); this.reagent = null; }
+    if (this.stackReagent) { this.stackReagent.dispose(this.shared.gl); this.stackReagent = null; }
   }
 
   /** Release every GL resource this layer owns (renderers, racks, buffers). */
@@ -1274,6 +1301,7 @@ export class ISFLayer {
     disposeTarget(gl, this.scratchA);
     disposeTarget(gl, this.scratchB);
     this.reagent?.dispose(gl);
+    this.stackReagent?.dispose(gl);
   }
 }
 
@@ -1404,6 +1432,7 @@ export class Compositor {
   private quadBuf: WebGLBuffer;    // the fullscreen-triangle vertex buffer
   private acc: PingPong;            // accumulator for the layer stack
   private uBase: WebGLUniformLocation; private uTop: WebGLUniformLocation;
+  private uBState!: WebGLUniformLocation;
   private uMode: WebGLUniformLocation; private uOpac: WebGLUniformLocation;
   private uMask: Record<string, WebGLUniformLocation | null> = {};
   private uPSrc: WebGLUniformLocation; private uPPrev: WebGLUniformLocation;
@@ -1466,6 +1495,7 @@ export class Compositor {
     this.blendProg = compile(gl, QUAD_VS, BLEND_FS);
     this.uBase = gl.getUniformLocation(this.blendProg, 'base')!;
     this.uTop  = gl.getUniformLocation(this.blendProg, 'top')!;
+    this.uBState = gl.getUniformLocation(this.blendProg, 'uState')!;
     this.uMode = gl.getUniformLocation(this.blendProg, 'mode')!;
     this.uOpac = gl.getUniformLocation(this.blendProg, 'opacity')!;
     for (const n of ['mMode', 'mInvert', 'mSoft', 'mLumaLo', 'mLumaHi', 'mAngle', 'mPos', 'mCx', 'mCy', 'mSize', 'mAspect', 'mRound']) {
@@ -2407,7 +2437,7 @@ export class Compositor {
   }
 
   /** Composite top texture over base into target using the given blend mode. */
-  private blendInto(target: WebGLFramebuffer, base: WebGLTexture, top: WebGLTexture, mode: BlendMode, opacity: number, mask?: LayerMask | null) {
+  private blendInto(target: WebGLFramebuffer, base: WebGLTexture, top: WebGLTexture, mode: BlendMode, opacity: number, mask?: LayerMask | null, state?: WebGLTexture) {
     const gl = this.gl;
     gl.bindVertexArray(this.vao);
     gl.bindFramebuffer(gl.FRAMEBUFFER, target);
@@ -2415,6 +2445,8 @@ export class Compositor {
     gl.useProgram(this.blendProg);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, base); gl.uniform1i(this.uBase, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, top);  gl.uniform1i(this.uTop, 1);
+    // The consume field, or base as a dummy (the branch reading it isn't taken).
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, state ?? base); gl.uniform1i(this.uBState, 2);
     gl.uniform1i(this.uMode, this.modeIndex[mode]);
     gl.uniform1f(this.uOpac, opacity);
     const m = this.uMask;
@@ -2429,6 +2461,25 @@ export class Compositor {
     }
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindVertexArray(null);
+  }
+
+  /** One step of a Consume competition field : `a` eats toward phi = 1, `b`
+   *  toward 0, `rate` sets how hard. Returns the field just written. */
+  private stepReagent(st: PingPong, a: WebGLTexture, b: WebGLTexture, rate: number): WebGLTexture {
+    const gl = this.gl;
+    gl.bindVertexArray(this.vao);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, st.write());
+    gl.viewport(0, 0, this.w, this.h);
+    gl.useProgram(this.reagentProg);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, a); gl.uniform1i(this.uRA, 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, b); gl.uniform1i(this.uRB, 1);
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, st.read()); gl.uniform1i(this.uRState, 2);
+    gl.uniform2f(this.uRTexel, 1 / this.w, 1 / this.h);
+    gl.uniform1f(this.uRRate, rate);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    const out = st.out();
+    st.swap();
+    return out;
   }
 
   /** A/B mix into the shared mix target: mix(A, blendMode(A,B), x). The `consume`
@@ -2446,18 +2497,7 @@ export class Compositor {
         layer.reagent?.dispose(gl);
         layer.reagent = new PingPong(gl, this.w, this.h);
       }
-      const st = layer.reagent;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, st.write());
-      gl.viewport(0, 0, this.w, this.h);
-      gl.useProgram(this.reagentProg);
-      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, a); gl.uniform1i(this.uRA, 0);
-      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, b); gl.uniform1i(this.uRB, 1);
-      gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, st.read()); gl.uniform1i(this.uRState, 2);
-      gl.uniform2f(this.uRTexel, 1 / this.w, 1 / this.h);
-      gl.uniform1f(this.uRRate, x);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      stateTex = st.out(); // the field we just wrote
-      st.swap();
+      stateTex = this.stepReagent(layer.reagent, a, b, x);
     }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.mixTarget.fbo);
@@ -2642,13 +2682,25 @@ export class Compositor {
       // is cleared black, so multiply/overlay/burn would eat it. Standard
       // compositor semantics: the bottom of the stack composites 'normal';
       // blend modes act BETWEEN layers.
+      const mode = first ? 'normal' : L.blend;
+      // Consume against the stack : the layer (eating toward phi = 1) and the
+      // stack below fight over the frame through the layer's own field.
+      let field: WebGLTexture | undefined;
+      if (mode === 'consume') {
+        if (!L.stackReagent || L.stackReagent.w !== this.w || L.stackReagent.h !== this.h) {
+          L.stackReagent?.dispose(gl);
+          L.stackReagent = new PingPong(gl, this.w, this.h);
+        }
+        field = this.stepReagent(L.stackReagent, L.texture(), this.acc.read(), 0.5);
+      }
       this.blendInto(
         this.acc.write(),
         this.acc.read(),
         L.texture(),
-        first ? 'normal' : L.blend,
+        mode,
         L.opacity,
-        L.mask
+        L.mask,
+        field
       );
       first = false;
       this.acc.swap();

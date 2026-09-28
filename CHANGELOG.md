@@ -144,6 +144,13 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Weave, lumakey and consume now work as layer blend modes.** They were offered in the
+  layer BLEND menu (and reachable by a modulated blend) but only existed in the A/B
+  source mixer, so on a layer they quietly acted as normal. Against the stack below :
+  weave displaces the two by each other's brightness and interleaves them, lumakey keys
+  out the layer's near-black background, and consume runs the mixer's living competition
+  field between the layer and the stack (the brighter side eats, they embrace at the
+  front).
 - **Context's material relief works, and the master no longer skips frames.** An image
   pushed into an effect outside its draw (Context's PBR maps) could be replaced on its
   texture unit by any renderer drawing in between. So Context read a random buffer as its
