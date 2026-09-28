@@ -17,14 +17,22 @@
   ]
 }*/
 
+// Integrated phases (engine/phases.ts) : a knob change moves the picture on
+// from where it is instead of jumping it.
+uniform float PH_rate;
+uniform float PH_orgRise;
+uniform float PH_orgFlow;
+uniform float PH_orgPuff;
+
 float hash(vec2 p) {
-  p = fract(p * vec2(123.34, 456.21));
-  p += dot(p, p + 45.32);
-  return fract(p.x * p.y);
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031); // precise hash : no rows, no lattice over hours
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
 }
 vec2 hash2(vec2 p) {
-  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
-  return fract(sin(p) * 43758.5453);
+  vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.xx + p3.yz) * p3.zy);
 }
 
 float vnoise(vec2 p) {
@@ -99,7 +107,7 @@ vec3 fire(vec2 uv, vec2 p, float t) {
   // Buoyancy accelerates the gas : the vertical axis is compressed with height,
   // so a steady scroll in q runs faster (and stretches taller) up the screen.
   vec2 ps = vec2(p.x, p.y * (1.0 - 0.38 * uv.y));
-  vec2 rise = vec2(0.0, -t * (1.4 + rate) * (0.5 + flow));
+  vec2 rise = vec2(0.0, -PH_orgRise);             // ∫ rate·(1.4 + rate)·(0.5 + flow)
   vec2 q = ps + rise;
   for (int i = 0; i < 2; i++) {
     vec2 v = curl(q * 0.8 + vec2(0.0, t * 0.3));
@@ -111,7 +119,7 @@ vec3 fire(vec2 uv, vec2 p, float t) {
   // Puffing : a flame's height pulses at ~1-3 Hz (Cetegen & Ahmed), neighbouring
   // tongues out of phase, so the fire breathes instead of streaming.
   float puffPh = og_vnoise(vec2(p.x * 0.6, 3.7)) * 6.2832;
-  float puff = 0.84 + 0.16 * sin(t * 7.5 / sqrt(max(scale, 0.5)) + puffPh);
+  float puff = 0.84 + 0.16 * sin(PH_orgPuff + puffPh); // ∫ rate·7.5/√scale : bigger flames puff slower
   float col = 1.5 - uv.y * 1.25 / puff;        // hot at the base, sparse up top
   float body = clamp(pow(max(n * col, 0.0) * 1.5, 0.75 + contrast), 0.0, 1.0);
   // Rising sparks are hot bits of the SAME fire : raise the local HEAT before the
@@ -137,7 +145,8 @@ vec3 fire(vec2 uv, vec2 p, float t) {
 
 // ── WATER: flowing caustic surface over a darker parallax deep + sediment ──
 vec3 water(vec2 uv, vec2 p, float t) {
-  vec2 dir = vec2(0.16, 0.06) * (0.4 + flow);
+  vec2 dir = vec2(0.16, 0.06);
+  float tw = PH_orgFlow;                           // ∫ rate·(0.4 + flow) : the water's own clock
   // Caustics : the bed catches sunlight focused by the waves. A sum of wave
   // trains (speed from deep-water dispersion) gives the surface slope and its
   // curvature; where the refracted rays converge (the Jacobian of the mapping
@@ -151,9 +160,9 @@ vec3 water(vec2 uv, vec2 p, float t) {
     vec2 d = vec2(cos(ang), sin(ang));
     float lam = exp(mix(-2.3, 0.0, r2));
     float kk = 6.2832 / lam;
-    float w = sqrt(9.8 * kk) * 0.3 * (0.4 + flow);
+    float w = sqrt(9.8 * kk) * 0.3;
     float a = lam * 0.012 * (0.6 + 0.8 * r3);
-    float ph = dot(d, p) * kk - w * t + r3 * 6.2832;
+    float ph = dot(d, p) * kk - w * tw + r3 * 6.2832;
     float s = sin(ph);
     grad += a * kk * cos(ph) * d;
     hess += -a * kk * kk * s * vec3(d.x * d.x, d.y * d.y, d.x * d.y);
@@ -162,13 +171,13 @@ vec3 water(vec2 uv, vec2 p, float t) {
   float det = (1.0 + D * hess.x) * (1.0 + D * hess.y) - D * D * hess.z * hess.z;
   float focus = min(1.0 / max(abs(det), 0.05), 9.0);
   float caust = pow(clamp((focus - 0.8) / 5.0, 0.0, 1.0), 1.0 / max(contrast, 0.5));
-  vec2 q = p + D * grad + dir * t * 0.3;           // the bed, seen through the refraction
+  vec2 q = p + D * grad + dir * tw * 0.3;           // the bed, seen through the refraction
   // Drifting sediment / bubbles : fold into the caustic brightness so they glow in
   // the water's own tint (in-family), never as separate foreign-coloured dots.
   float mote = particles(uv, t, vec2(0.05, -0.10), embers * 0.8, 0.09);
   caust = max(caust, mote * embers * 0.7);
   // Deep parallax layer : slower, offset, tinted down for recession.
-  vec2 dp = q * (1.0 - depth * 0.4) + dir * t * 0.4 + 5.0;
+  vec2 dp = q * (1.0 - depth * 0.4) + dir * tw * 0.4 + 5.0;
   float deep = fbm(dp * 0.5);
   vec3 c = mix(vec3(0.010, 0.045, 0.070), vec3(0.05, 0.17, 0.21), deep);
   c *= mix(1.0, 0.65, depth * (1.0 - deep));
@@ -206,7 +215,7 @@ void main() {
   vec2 uv = isf_FragNormCoord;
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
   vec2 p = uv * vec2(aspect, 1.0) * scale;
-  float t = TIME * rate;
+  float t = PH_rate;
 
   vec3 c;
   if (mode == 0) c = fire(uv, p, t);

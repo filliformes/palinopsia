@@ -15,7 +15,11 @@
   ]
 }*/
 
-float hash1(float n) { return fract(sin(n * 127.1) * 43758.5453); }
+// Integrated phases (engine/phases.ts) : a knob change moves the picture on
+// from where it is instead of jumping it.
+uniform float PH_rate;
+
+float hash1(float n) { n = fract(n * 0.1031); n *= n + 33.33; n *= n + n; return fract(n); }
 
 void main() {
   vec2 uv = isf_FragNormCoord;
@@ -25,7 +29,7 @@ void main() {
 
   // Gate flicker : the opening re-rolls once per drawn frame (a held random,
   // not per-render noise), so the gate breathes on the cadence.
-  float tick = floor(TIME * rate);
+  float tick = mod(floor(PH_rate), 32749.0);
   float fl = hash1(tick);
   float open = size * (1.0 - flicker * fl * 0.65);
 

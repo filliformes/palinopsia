@@ -1631,6 +1631,15 @@ const startComposition = clearFinalizerFilm(
   applyWorldToComposition(seedRandomStart(makeDefaultComposition()), startWorld)
 )
 
+// A persisted number, or NaN when the key was never written. Number(null) is 0,
+// which passes most range checks : a fresh install then started Flow at 0
+// instead of its neutral 0.5, Morph at 0 ms, the monitor muted and Flash
+// safety off. Every default below relies on a missing key reading as NaN.
+function lsNum(key: string): number {
+  const raw = localStorage.getItem(key)
+  return raw === null ? NaN : Number(raw)
+}
+
 export const useStore = create<StoreState>((set, get) => ({
   theme: loadTheme(),
   setTheme: (t) => {
@@ -2196,7 +2205,7 @@ export const useStore = create<StoreState>((set, get) => ({
   // seeds a fresh session, not the last one) keeps the feel set for a show, and
   // round-tripped through the session file so saved sessions carry it too.
   globalSpeed: (() => {
-    const v = Number(localStorage.getItem('opsia.globalSpeed'))
+    const v = lsNum('opsia.globalSpeed')
     return Number.isFinite(v) && v > 0 ? Math.max(1 / 64, Math.min(64, v)) : 1
   })(),
   setGlobalSpeed: (x) => {
@@ -2205,7 +2214,7 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ globalSpeed: v })
   },
   morphMs: (() => {
-    const v = Number(localStorage.getItem('opsia.morphMs'))
+    const v = lsNum('opsia.morphMs')
     return Number.isFinite(v) && v >= 0 ? Math.max(0, Math.min(30000, v)) : 1000
   })(),
   setMorphMs: (ms) => {
@@ -2758,7 +2767,7 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
 
   uiZoom: (() => {
-    const z = Number(localStorage.getItem('opsia.uiZoom'))
+    const z = lsNum('opsia.uiZoom')
     return Number.isFinite(z) && z >= 0.6 && z <= 1.6 ? z : 1
   })(),
   setUiZoom: (z) => {
@@ -2817,7 +2826,7 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ audioMonitor: on })
   },
   audioMonitorLevel: (() => {
-    const n = Number(localStorage.getItem('opsia.audioMonitorLevel'))
+    const n = lsNum('opsia.audioMonitorLevel')
     return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0.8
   })(),
   setAudioMonitorLevel: (v) => {
@@ -2874,21 +2883,21 @@ export const useStore = create<StoreState>((set, get) => ({
   coalesce: readMacro('opsia.coalesce'),
   setCoalesce: (v) => { persistMacro('opsia.coalesce', v); set({ coalesce: v }) },
   // Temperament controls rest at 0 (off), not the 0.5 deadzone of the field macros.
-  tonicity: (() => { const v = Number(localStorage.getItem('opsia.tonicity')); return Number.isFinite(v) ? v : 0 })(),
+  tonicity: (() => { const v = lsNum('opsia.tonicity'); return Number.isFinite(v) ? v : 0 })(),
   setTonicity: (v) => { persistMacro('opsia.tonicity', v); set({ tonicity: v }) },
   // Shutter + Superimposition are strobe-like performance effects : always start
   // at 0 on load (they never persist a lingering strobe across sessions/reloads).
   shutter: 0,
   setShutter: (v) => set({ shutter: v }),
-  drift: (() => { const v = Number(localStorage.getItem('opsia.drift')); return Number.isFinite(v) ? v : 0 })(),
+  drift: (() => { const v = lsNum('opsia.drift'); return Number.isFinite(v) ? v : 0 })(),
   setDrift: (v) => { persistMacro('opsia.drift', v); set({ drift: v }) },
   // Flow ↔ Interruption is bipolar : rests at 0.5 (neutral) and persists like drift.
-  flow: (() => { const v = Number(localStorage.getItem('opsia.flow')); return Number.isFinite(v) ? v : 0.5 })(),
+  flow: (() => { const v = lsNum('opsia.flow'); return Number.isFinite(v) ? v : 0.5 })(),
   setFlow: (v) => { persistMacro('opsia.flow', v); set({ flow: v }) },
   superFlicker: 0,
   setSuperFlicker: (v) => set({ superFlicker: v }),
   markSignalEnabled: localStorage.getItem('opsia.markSignalEnabled') === '1',
-  markSignalY: (() => { const v = Number(localStorage.getItem('opsia.markSignalY')); return Number.isFinite(v) ? v : 0.5 })(),
+  markSignalY: (() => { const v = lsNum('opsia.markSignalY'); return Number.isFinite(v) ? v : 0.5 })(),
   setMarkSignal: (partial) =>
     set((s) => {
       if (partial.enabled !== undefined) localStorage.setItem('opsia.markSignalEnabled', partial.enabled ? '1' : '0')
@@ -3160,7 +3169,7 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
   hiveOutActive: false,
   setHiveOutActive: (on) => set({ hiveOutActive: on }),
-  hiveOutPort: Number(localStorage.getItem('opsia.hiveOutPort')) || 51842,
+  hiveOutPort: lsNum('opsia.hiveOutPort') || 51842,
   setHiveOutPort: (p) => {
     localStorage.setItem('opsia.hiveOutPort', String(p))
     set({ hiveOutPort: p })
@@ -3185,7 +3194,7 @@ export const useStore = create<StoreState>((set, get) => ({
   // everything, upscaled to the display); 1 = 1080p; 2 = 4K (3840×2160). The App
   // engine recreates the compositor at this resolution when it changes.
   renderScale: (() => {
-    const n = Number(localStorage.getItem('opsia.renderScale'))
+    const n = lsNum('opsia.renderScale')
     return Number.isFinite(n) && n >= 0.1 && n <= 2 ? n : 1
   })(),
   setRenderScale: (v) => {
@@ -3194,11 +3203,11 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ renderScale: s })
   },
   compW: (() => {
-    const n = Number(localStorage.getItem('opsia.compW'))
+    const n = lsNum('opsia.compW')
     return Number.isFinite(n) && n >= 320 && n <= 15360 ? n : 1920
   })(),
   compH: (() => {
-    const n = Number(localStorage.getItem('opsia.compH'))
+    const n = lsNum('opsia.compH')
     return Number.isFinite(n) && n >= 240 && n <= 8640 ? n : 1080
   })(),
   setCompSize: (w, h) => {
@@ -3208,10 +3217,10 @@ export const useStore = create<StoreState>((set, get) => ({
     localStorage.setItem('opsia.compH', String(ch))
     set({ compW: cw, compH: ch })
   },
-  // Flash safety : mild ON by default (0.35) — it barely touches normal content
+  // Flash safety : mild ON by default (0.35) : it barely touches normal content
   // (only >~17% full-field mean-luminance jumps get damped) but nets real strobes.
   strobeSafe: (() => {
-    const n = Number(localStorage.getItem('opsia.strobeSafe'))
+    const n = lsNum('opsia.strobeSafe')
     return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0.35
   })(),
   setStrobeSafe: (v) => {
@@ -3441,7 +3450,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   oscEnabled: localStorage.getItem('opsia.oscEnabled') === '1',
   oscPort: (() => {
-    const p = Number(localStorage.getItem('opsia.oscPort'))
+    const p = lsNum('opsia.oscPort')
     return Number.isInteger(p) && p >= 1 && p <= 65535 ? p : 9000
   })(),
   oscListening: false,
@@ -3462,11 +3471,11 @@ export const useStore = create<StoreState>((set, get) => ({
   oscOutEnabled: localStorage.getItem('opsia.oscOutEnabled') === '1',
   oscOutHost: localStorage.getItem('opsia.oscOutHost') || '127.0.0.1',
   oscOutPort: (() => {
-    const p = Number(localStorage.getItem('opsia.oscOutPort'))
+    const p = lsNum('opsia.oscOutPort')
     return Number.isInteger(p) && p >= 1 && p <= 65535 ? p : 9001
   })(),
   oscOutIntervalMs: (() => {
-    const m = Number(localStorage.getItem('opsia.oscOutIntervalMs'))
+    const m = lsNum('opsia.oscOutIntervalMs')
     return Number.isFinite(m) && m >= 40 && m <= 1000 ? m : 100
   })(),
   setOscOutConfig: (partial) =>

@@ -467,7 +467,7 @@ interface SharedGL {
   blitXform?: (src: WebGLTexture, dstFbo: WebGLFramebuffer, f: Framing) => void;
   // The shared per-frame audio texture (128×2 : row 0 waveform, row 1 spectrum),
   // pushed into any generator that declares an `audioTex` image input so each
-  // element can ride its own live sample (the EYESY per-element gesture).
+  // element can ride its own live sample (the per-element audio gesture).
   audioTex?: import('./isfTextureBridge').TextureHandle;
   // The Scan generator's material maps (colour / height / normal / AO) for a
   // 1-based PBR material index : lazy, neutral while streaming in.
@@ -485,11 +485,15 @@ export function pushScanMaps(isf: ISFRenderer, maps: (idx: number) => import('./
   isf.setValue('scanAO', m.ao);
 }
 
-// Generators that declare the `audioTex` image input : renderSource pushes the
-// shared audio texture into these every frame (the bridge requires a re-push).
-export const AUDIO_TEX_GENS = new Set([
-  'ten-print', 'slabs', 'grid-drift', 'shapes', 'filaments', 'ash'
-]);
+/** Push the shared audio texture into a renderer that declares an `audioTex`
+ *  image input (the bridge requires a re-push every frame). Keyed on the
+ *  declaration itself, so a generator gains per-element audio by declaring
+ *  the input : on a layer AND on the background, with no list to keep. */
+export function pushAudioTex(isf: ISFRenderer, tex: import('./isfTextureBridge').TextureHandle | undefined): void {
+  if (!tex) return;
+  const u = (isf as unknown as { uniforms?: Record<string, unknown> }).uniforms;
+  if (u && u.audioTex) isf.setValue('audioTex', tex);
+}
 
 export interface Framing {
   zoom: number;
@@ -1186,9 +1190,7 @@ export class ISFLayer {
     // Per-element audio : generators that declare `audioTex` get the shared
     // 128×2 waveform/spectrum texture, re-pushed each frame (bridge contract).
     const sid = slot === 'A' ? this.shaderIdA : this.shaderIdB;
-    if (sid && this.shared.audioTex && AUDIO_TEX_GENS.has(sid)) {
-      isf.setValue('audioTex', this.shared.audioTex);
-    }
+    pushAudioTex(isf, this.shared.audioTex);
     if (sid === 'scan' && this.shared.scanMaps) pushScanMaps(isf, this.shared.scanMaps);
     this.shared.redirect.redirect = scratch.fbo;
     isf.draw({ width: this.w, height: this.h });
@@ -1934,7 +1936,7 @@ export class Compositor {
     if (!this.depthTex) this.clearDepth();
   }
 
-  // ── Shared audio texture (per-element audio, the EYESY gesture) ──────────
+  // ── Shared audio texture (per-element audio) ─────────────────────────────
   // 128×2 R8 : row 0 = time-domain waveform (0..255 centred at 128), row 1 =
   // spectrum. Uploaded once per frame (256 bytes); generators with an
   // `audioTex` image input sample it per element. The output window can't run
@@ -1963,12 +1965,28 @@ export class Compositor {
     const ov = this.audioOverride;
     const wave = ov ? ov.wave : audioBus.waveformBytes();
     const spec = ov ? ov.spec : audioBus.spectrumBytes();
+    // Spectrum row on a LOG axis, 30 Hz..16 kHz, each column the loudest bin
+    // it covers : a linear read put everything musical in the left fifth of
+    // the row and skipped three bins in four, so narrow tones blinked.
+    const nyq = audioBus.sampleRateHz() / 2;
     for (let i = 0; i < 128; i++) {
       // 128 = silence for the waveform row so aud() reads ~0 without audio.
       buf[i] = wave && wave.length ? (wave[Math.floor((i / 128) * wave.length)] ?? 128) : 128;
-      buf[128 + i] = spec && spec.length ? (spec[Math.floor((i / 128) * spec.length)] ?? 0) : 0;
+      let m = 0;
+      if (spec && spec.length) {
+        const n = spec.length;
+        const f0 = 30 * Math.pow(16000 / 30, i / 128), f1 = 30 * Math.pow(16000 / 30, (i + 1) / 128);
+        const b0 = Math.min(n - 1, Math.floor((f0 / nyq) * n));
+        const b1 = Math.min(n - 1, Math.max(b0, Math.floor((f1 / nyq) * n)));
+        for (let b = b0; b <= b1; b++) if (spec[b] > m) m = spec[b];
+      }
+      buf[128 + i] = m;
     }
     gl.bindTexture(gl.TEXTURE_2D, this.audioTexGL);
+    // The ISF runtime switches UNPACK_FLIP_Y on whenever it builds a texture and
+    // never switches it back : uploaded under it, the two rows swap and every
+    // generator reading the waveform (v = 0.25) got the spectrum instead.
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 128, 2, gl.RED, gl.UNSIGNED_BYTE, buf);
   }
 
@@ -2498,6 +2516,7 @@ export class Compositor {
           this.bgNativeSource.render(this.bgScratch.fbo);
         } else {
           if (this.bgShaderId === 'scan' && this.shared.scanMaps) pushScanMaps(this.bgIsf!, this.shared.scanMaps);
+          pushAudioTex(this.bgIsf!, this.shared.audioTex);
           this.shared.redirect.redirect = this.bgScratch.fbo;
           this.bgIsf!.draw({ width: this.w, height: this.h });
           this.shared.redirect.redirect = null;

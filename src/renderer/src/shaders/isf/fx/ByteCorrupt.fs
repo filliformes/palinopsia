@@ -15,15 +15,19 @@
   ]
 }*/
 
+// Integrated phases (engine/phases.ts) : a knob change moves the picture on
+// from where it is instead of jumping it.
+uniform float PH_rate;
+
 float hash(vec2 p) {
-  p = fract(p * vec2(123.34, 345.45));
-  p += dot(p, p + 34.345);
-  return fract(p.x * p.y);
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031); // precise hash : no rows, no lattice over hours
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
 }
 
 void main() {
   vec2 uv = isf_FragNormCoord;
-  float t = floor(TIME * (0.5 + rate * 7.5));
+  float t = mod(floor(TIME * 0.5 + PH_rate * 7.5), 32749.0);
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
 
   // CHAOS: a minority of regions abandon the square grid entirely : their

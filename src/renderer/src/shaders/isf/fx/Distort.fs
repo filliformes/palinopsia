@@ -17,6 +17,10 @@
   ]
 }*/
 
+// Integrated phases (engine/phases.ts) : a knob change moves the picture on
+// from where it is instead of jumping it.
+uniform float PH_rate;
+
 vec2 hash22(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
   p3 += dot(p3, p3.yzx + 33.33);
@@ -42,7 +46,7 @@ float fbm(vec2 p) {
 void main() {
   vec2 uv = isf_FragNormCoord;
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
-  float t = TIME * rate;
+  float t = PH_rate;
   float amt = amount;
   // Aspect-corrected vector from the center (radial modes work in this space).
   vec2 p = uv - center;

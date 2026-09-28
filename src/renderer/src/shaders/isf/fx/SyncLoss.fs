@@ -12,19 +12,24 @@
   ]
 }*/
 
+// Integrated phases (engine/phases.ts) : a knob change moves the picture on
+// from where it is instead of jumping it.
+uniform float PH_rate;
+uniform float PH_roll;
+
 float hash(vec2 p) {
-  p = fract(p * vec2(123.34, 345.45));
-  p += dot(p, p + 34.345);
-  return fract(p.x * p.y);
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031); // precise hash : no rows, no lattice over hours
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
 }
 
 void main() {
   vec2 uv = isf_FragNormCoord;
-  float tStep = floor(TIME * (0.5 + rate * 7.5));
+  float tStep = mod(floor(TIME * 0.5 + PH_rate * 7.5), 32749.0);
 
   // Vertical hold: the frame climbs; catch moments (hash) pin it briefly.
   float caught = step(0.6, hash(vec2(tStep, 3.0)));
-  float y = fract(uv.y + TIME * roll * (1.0 - caught * 0.85));
+  float y = fract(uv.y + fract(PH_roll) * (1.0 - caught * 0.85));
 
   // Tear bands: a few horizontal zones shear sideways this step.
   float band = floor(y * bands);

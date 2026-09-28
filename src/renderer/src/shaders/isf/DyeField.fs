@@ -21,7 +21,11 @@
   ]
 }*/
 
-float hash(vec2 p) { p = fract(p * vec2(123.34, 345.45)); p += dot(p, p + 34.35); return fract(p.x * p.y); }
+// Integrated phases (engine/phases.ts) : a knob change moves the picture on
+// from where it is instead of jumping it.
+uniform float PH_rate;
+
+float hash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 float vnoise(vec2 p) {
   vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
@@ -40,7 +44,7 @@ void main() {
   vec2 an = uv * vec2(RENDERSIZE.x / RENDERSIZE.y, 1.0);
 
   if (PASSINDEX == 0) {
-    float t = TIME * rate;
+    float t = PH_rate;
     // Two-tap domain warp : the field folds into itself (pooling, not tiling).
     vec2 q = an + 0.15 * warp * vec2(vnoise(an * scale + t), vnoise(an * scale + 7.0));
     vec2 w = an + 0.35 * warp * vec2(vnoise(q * scale * 1.4 + 1.7), vnoise(q * scale * 1.4 + 9.2));

@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "CRT Screen : a whole-tube finish (Cathodemer CRT surface): barrel curvature, edge-increasing chromatic aberration, scanline grille, corner vignette, and a rounded bezel that blacks out beyond the glass. The 'projected on a tube' master stage : pairs with Grain/Scanlines under it.",
+  "DESCRIPTION": "CRT Screen : a whole-tube finish (a CRT glass surface): barrel curvature, edge-increasing chromatic aberration, scanline grille, corner vignette, and a rounded bezel that blacks out beyond the glass. The 'projected on a tube' master stage : pairs with Grain/Scanlines under it.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Stylize", "Master"],

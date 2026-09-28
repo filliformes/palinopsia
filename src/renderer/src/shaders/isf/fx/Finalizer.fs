@@ -144,7 +144,7 @@ void main() {
   vec3 add = vec3(0.0);
   if (grain > 0.001) {
     if (character == 1) {
-      float seed = floor(TIME * 24.0);
+      float seed = mod(floor(TIME * 24.0), 32749.0);
       vec2 jit = hash22(vec2(seed, 1.0)) * 64.0;
       vec2 p = gl_FragCoord.xy / (max(grainSize, 1.0) * 1.9) + jit;
       float g = vnoise(p) * 0.62 + vnoise(p * 2.3 + 11.0) * 0.38 - 0.5;
@@ -156,7 +156,7 @@ void main() {
       }
       add = gn * grain * 1.15 * mid;
     } else if (character == 0) {
-      float fs = floor(TIME * 30.0);
+      float fs = mod(floor(TIME * 30.0), 4096.0);
       vec2 pxg = gl_FragCoord.xy / max(grainSize, 1.0);
       float shot = gauss(hash21(pxg + fs * 7.3), hash21(pxg + fs * 7.3 + 57.0)) * sqrt(clamp(l, 0.02, 1.0));
       float read = gauss(hash21(pxg + fs * 7.3 + 123.0), hash21(pxg + fs * 7.3 + 199.0)) * 0.5;
@@ -169,7 +169,7 @@ void main() {
       add = gn * grain * 0.55;
     } else if (character == 2) {
       float row = floor(gl_FragCoord.y / max(grainSize, 1.0));
-      float seed = floor(TIME * 50.0);
+      float seed = mod(floor(TIME * 50.0), 4096.0);
       vec2 cell = vec2(floor(gl_FragCoord.x / max(grainSize, 1.0)), row);
       float n = (hash21(cell + seed * 17.3) - 0.5) * (0.5 + hash21(vec2(row, seed)));
       float w = 0.35 + 0.65 * smoothstep(0.0, 0.4, l);
@@ -177,7 +177,7 @@ void main() {
       if (parasites > 0.001) c = crtParasites(c, uv0, parasites, TIME);
     } else {
       float row = floor(gl_FragCoord.y / max(grainSize, 1.0));
-      float seed = floor(TIME * 30.0);
+      float seed = mod(floor(TIME * 30.0), 4096.0);
       float smear = vnoise(vec2(gl_FragCoord.x / (max(grainSize, 1.0) * 14.0), row * 0.7 + seed * 3.0)) - 0.5;
       float fine = (hash21(vec2(floor(gl_FragCoord.x / max(grainSize, 1.0)), row) + seed * 13.1) - 0.5) * 0.5;
       float chromaErr = vnoise(vec2(row * 0.4, seed * 2.0)) - 0.5;

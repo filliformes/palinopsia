@@ -24,6 +24,10 @@
   ]
 }*/
 
+// Integrated phase (engine/phases.ts) : turning `cycle` never fires a regrow.
+uniform float PH_colonyCycle;
+
+
 // The growth runs on its own grid, GRAIN cells tall whatever the output size, so
 // a colony keeps its look from 1080p to a 4096² dome. Cell state (8-bit is enough
 // for a monotone process) : r = occupied, g = colony id, b = age (dithered up),
@@ -166,7 +170,7 @@ void main() {
     vec2 lc = vec2(0.5);
     vec4 prev = IMG_NORM_PIXEL(latch, lc);
     float kz = 0.5 + float(kind) / 8.0;
-    float cyc = cycle > 0.5 ? mod(floor(TIME / cycle), 250.0) / 255.0 : 0.0;
+    float cyc = cycle > 0.5 ? mod(floor(PH_colonyCycle), 250.0) / 255.0 : 0.0;
     bool fire = (regrow && prev.y < 0.5) || abs(prev.z - kz) > 0.02 || abs(prev.w - cyc) > 0.001;
     float s = fire ? fract(prev.x + 0.61803399 + fract(TIME * 0.7317)) : prev.x;
     if (s < 0.02) s += 0.1;

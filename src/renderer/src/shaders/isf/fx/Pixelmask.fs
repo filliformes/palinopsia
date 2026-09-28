@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Pixelmask : stencil the image through a pattern (aperture grille / shadow mask / dot / line / bayer / noise): the picture only shows where the mask is lit, everything else darkens. The RGB-triad shadow-mask option splits the pattern into red/green/blue stripes for a real tube-phosphor read (Cathodemer pixelmask register).",
+  "DESCRIPTION": "Pixelmask : stencil the image through a pattern (aperture grille / shadow mask / dot / line / bayer / noise): the picture only shows where the mask is lit, everything else darkens. The RGB-triad shadow-mask option splits the pattern into red/green/blue stripes for a real tube-phosphor read.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Texture", "Scan"],

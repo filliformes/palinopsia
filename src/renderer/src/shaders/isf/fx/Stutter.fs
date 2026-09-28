@@ -18,18 +18,24 @@
   ]
 }*/
 
+// Integrated phases (engine/phases.ts) : a knob change moves the picture on
+// from where it is instead of jumping it.
+uniform float PH_rate;
+uniform float PH_rate_x_jitter;
+
 float hash(vec2 p) {
-  p = fract(p * vec2(123.34, 345.45));
-  p += dot(p, p + 34.345);
-  return fract(p.x * p.y);
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031); // precise hash : no rows, no lattice over hours
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
 }
 
 // Per-band segment id: each band runs its own clock : jitter detunes the
 // band clocks from each other so freezes stop lining up.
 float segFor(float band) {
-  float ownRate = rate * (1.0 + (hash(vec2(band, 4.2)) - 0.5) * jitter * 1.6);
+  // ∫ rate·(1 + d·jitter) = PH_rate + d·PH_rate_x_jitter : no jump when either moves.
+  float d = (hash(vec2(band, 4.2)) - 0.5) * 1.6;
   float phase = hash(vec2(band, 8.8)) * 7.0 * jitter;
-  return floor(TIME * ownRate + phase);
+  return mod(floor(PH_rate + d * PH_rate_x_jitter + phase), 32749.0);
 }
 
 void main() {

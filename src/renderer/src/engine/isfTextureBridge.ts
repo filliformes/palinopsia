@@ -19,6 +19,7 @@
 // texture object alternates), so the sampler always points at a fresh unit.
 
 import { Renderer } from 'interactive-shader-format'
+import { tickPhases } from './phases'
 
 export interface TextureHandle {
   __opsiaTexture: true
@@ -62,6 +63,12 @@ export function installTextureBridge(): void {
     if (typeof this.__opsiaTimeSec === 'number') {
       this.setValue('TIME', this.__opsiaTimeSec)
     }
+    // Integrated phases (PH_ uniforms) ride the same clock : see phases.ts.
+    const self = this as unknown as Parameters<typeof tickPhases>[0]
+    const t = typeof this.__opsiaTimeSec === 'number'
+      ? this.__opsiaTimeSec
+      : Number(self.uniforms?.TIME?.value ?? 0)
+    tickPhases(self, t)
   }
 
   // ── Program leak fix + shared-attribute quarantine ──────────────────

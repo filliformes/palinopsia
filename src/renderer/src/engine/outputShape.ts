@@ -98,6 +98,7 @@ void main(){
 export class OutputShape {
   private prog: WebGLProgram
   private quad: WebGLBuffer
+  private vao: WebGLVertexArrayObject
   private u: (n: string) => WebGLUniformLocation | null
 
   constructor(private gl: WebGL2RenderingContext) {
@@ -119,6 +120,14 @@ export class OutputShape {
     this.quad = gl.createBuffer()!
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
+    // Own VAO : the ISF runtime owns attribute 0 of the DEFAULT VAO (every ISF
+    // draw reads whatever quad is wired there), so this stage never touches it.
+    this.vao = gl.createVertexArray()!
+    gl.bindVertexArray(this.vao)
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
+    gl.enableVertexAttribArray(0)
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+    gl.bindVertexArray(null)
     const cache = new Map<string, WebGLUniformLocation | null>()
     this.u = (n) => {
       if (!cache.has(n)) cache.set(n, gl.getUniformLocation(this.prog, n))
@@ -146,10 +155,7 @@ export class OutputShape {
   ): void {
     const gl = this.gl
     gl.useProgram(this.prog)
-    gl.bindVertexArray(null)
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
-    gl.enableVertexAttribArray(0)
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+    gl.bindVertexArray(this.vao)
     gl.bindFramebuffer(gl.FRAMEBUFFER, targetFbo)
     gl.viewport(0, 0, w, h)
     gl.activeTexture(gl.TEXTURE0)
@@ -170,10 +176,12 @@ export class OutputShape {
     gl.uniform3f(this.u('uFillColor'), fillColor[0] ?? 0, fillColor[1] ?? 0, fillColor[2] ?? 0)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.bindVertexArray(null)
   }
 
   dispose(): void {
     this.gl.deleteProgram(this.prog)
+    this.gl.deleteVertexArray(this.vao)
     this.gl.deleteBuffer(this.quad)
   }
 }

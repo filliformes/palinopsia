@@ -15,10 +15,14 @@
   ]
 }*/
 
+// Integrated phases (engine/phases.ts) : a knob change moves the picture on
+// from where it is instead of jumping it.
+uniform float PH_rate;
+
 float hash(vec2 p) {
-  p = fract(p * vec2(123.34, 345.45));
-  p += dot(p, p + 34.345);
-  return fract(p.x * p.y);
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031); // precise hash : no rows, no lattice over hours
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
 }
 
 float vnoise(vec2 p) {
@@ -33,7 +37,7 @@ float vnoise(vec2 p) {
 
 // The field : x = channels (0..1), y = sediment banks (0..1).
 vec2 erosionField(vec2 uv) {
-  float t = TIME * rate * 0.3;
+  float t = PH_rate * 0.3;
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
 
   // Anisotropic domain: x compressed by `streaks`, y flowing downward.

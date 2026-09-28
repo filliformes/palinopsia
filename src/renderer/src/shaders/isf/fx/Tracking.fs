@@ -18,15 +18,22 @@
   ]
 }*/
 
+// Integrated phases (engine/phases.ts) : a knob change moves the picture on
+// from where it is instead of jumping it.
+uniform float PH_rate;
+uniform float PH_roll;
+
 const float TAU = 6.28318530718;
 
 float hash(vec2 p) {
-  p = fract(p * vec2(123.34, 345.45));
-  p += dot(p, p + 34.345);
-  return fract(p.x * p.y);
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031); // precise hash : no rows, no lattice over hours
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
 }
 float rand3(vec3 co) {
-  return abs(mod(sin(dot(co, vec3(12.9898, 78.233, 45.5432))) * 43758.5453, 1.0));
+  vec3 p3 = fract(co * 0.1031);
+  p3 += dot(p3, p3.zyx + 31.32);
+  return fract((p3.x + p3.y) * p3.z);
 }
 
 // Vertical distance on a wrapped screen (so a rolling band crosses the top
@@ -38,11 +45,11 @@ float wd(float a, float b) {
 
 void main() {
   vec2 uv = isf_FragNormCoord;
-  float t = floor(TIME * (6.0 + rate * 44.0)); // field-rate flutter
+  float t = mod(floor(TIME * 6.0 + PH_rate * 44.0), 32749.0); // field-rate flutter
   float line = floor(uv.y * 300.0);
 
   // ── The tracking band: `position` places it, `roll` creeps it upward. ──
-  float center = fract(position + roll * TIME * 0.06);
+  float center = fract(position + PH_roll * 0.06);
   float bandHalf = band * 0.5 * (0.8 + 0.2 * hash(vec2(t, 1.0)));
   float d = wd(uv.y, center);
   float inBand = smoothstep(bandHalf, bandHalf * 0.4, d);
@@ -61,7 +68,9 @@ void main() {
 
   // Analog distortion: random per-line x displacement, everywhere (the tape's
   // never-still jitter), scaled like the reference's analogDistort/RENDERSIZE.
-  float rX = rand3(vec3(uv.y, fLine, 1.0 + distort * 9.0));
+  // The hash needs whole-number inputs (a continuous uv.y makes it a sawtooth) :
+  // one draw per tape line (480, like the parasites) and per field, wrapped.
+  float rX = rand3(vec3(floor(uv.y * 480.0), floor(fLine * 4096.0), mod(floor(TIME * 59.94), 4096.0)));
   shift += distort * 9.0 * rX / (RENDERSIZE.x / 2.0);
 
   vec2 c = vec2(fract(uv.x + shift), uv.y);

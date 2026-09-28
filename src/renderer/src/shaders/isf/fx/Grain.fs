@@ -53,7 +53,7 @@ void main() {
 
   if (character == 1) {
     // FILM : clumped grain (value noise), midtone-weighted, 24fps reseed.
-    float seed = floor(TIME * 24.0);
+    float seed = mod(floor(TIME * 24.0), 32749.0);
     vec2 jit = hash22(vec2(seed, 1.0)) * 64.0;
     vec2 p = gl_FragCoord.xy / (max(size, 1.0) * 1.9) + jit;
     float g = vnoise(p) * 0.62 + vnoise(p * 2.3 + 11.0) * 0.38 - 0.5;
@@ -69,7 +69,7 @@ void main() {
   } else if (character == 0) {
     // DIGITAL : sensor noise: shot (∝√signal, highlights) + read floor
     // (shadows) + static fixed-pattern gain. Fine, per-pixel. No debris.
-    float fs = floor(TIME * 30.0);
+    float fs = mod(floor(TIME * 30.0), 4096.0);
     vec2 px = gl_FragCoord.xy / max(size, 1.0);
     float shot = gauss(hash21(px + fs * 7.3), hash21(px + fs * 7.3 + 57.0)) * sqrt(clamp(l, 0.02, 1.0));
     float read = gauss(hash21(px + fs * 7.3 + 123.0), hash21(px + fs * 7.3 + 199.0)) * 0.5;
@@ -84,7 +84,7 @@ void main() {
   } else if (character == 2) {
     // CRT : row-correlated snow at field rate + dropout bands (parasites).
     float row = floor(gl_FragCoord.y / max(size, 1.0));
-    float seed = floor(TIME * 50.0);
+    float seed = mod(floor(TIME * 50.0), 4096.0);
     float rowSeed = hash21(vec2(row, seed));
     vec2 cell = vec2(floor(gl_FragCoord.x / max(size, 1.0)), row);
     float n = (hash21(cell + seed * 17.3) - 0.5) * (0.5 + rowSeed);
@@ -98,7 +98,7 @@ void main() {
   } else {
     // VHS : luma smear (horizontally correlated) + chroma phase error + streaks.
     float row = floor(gl_FragCoord.y / max(size, 1.0));
-    float seed = floor(TIME * 30.0);
+    float seed = mod(floor(TIME * 30.0), 4096.0);
     float smear = vnoise(vec2(gl_FragCoord.x / (max(size, 1.0) * 14.0), row * 0.7 + seed * 3.0)) - 0.5;
     float fine = (hash21(vec2(floor(gl_FragCoord.x / max(size, 1.0)), row) + seed * 13.1) - 0.5) * 0.5;
     vec3 noise = vec3(smear * 0.7 + fine);

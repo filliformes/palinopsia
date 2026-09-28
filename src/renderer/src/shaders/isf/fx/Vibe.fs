@@ -50,7 +50,7 @@ vec3 hsv2rgb(vec3 c) {
   return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
-// Colour CHORDS (after Collopy): generate the palette stops from one base hue
+// Color CHORDS (the color-harmony-as-chord idea): generate the palette stops from one base hue
 // plus a harmony relationship, on a dark→light value ramp. Value carries the
 // tonal placement; the harmony carries the hue relationships.
 vec3 chordColor(float idx) {

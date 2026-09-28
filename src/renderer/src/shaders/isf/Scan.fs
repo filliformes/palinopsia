@@ -14,7 +14,7 @@
     { "NAME": "driftAngle", "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 0.4,  "LABEL": "drift angle" },
     { "NAME": "rotate",     "TYPE": "float", "MIN": -3.1416, "MAX": 3.1416, "DEFAULT": 0.0, "LABEL": "rotate" },
     { "NAME": "weather",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,    "DEFAULT": 0.3,  "LABEL": "weather" },
-    { "NAME": "colour",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,    "DEFAULT": 1.0,  "LABEL": "colour" },
+    { "NAME": "colour",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,    "DEFAULT": 1.0,  "LABEL": "color" },
     { "NAME": "relief",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,    "DEFAULT": 0.6,  "LABEL": "relief" },
     { "NAME": "lightAngle", "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 2.36, "LABEL": "light angle" },
     { "NAME": "scanColor",  "TYPE": "image" },
@@ -23,6 +23,11 @@
     { "NAME": "scanAO",     "TYPE": "image" }
   ]
 }*/
+
+// Integrated phases (engine/phases.ts) : a knob change moves the picture on
+// from where it is instead of jumping it.
+uniform float PH_scanDX;
+uniform float PH_scanDY;
 
 // The maps are pushed by the compositor (engine/Compositor.ts pushScanMaps) :
 // 1K, REPEAT, mipmapped. Hex tiling after Mikkelsen, JCGT 2022 ("Practical
@@ -37,7 +42,7 @@ vec2 scanUV(vec2 uv) {
   vec2 p = (uv - 0.5) * vec2(ASP(), 1.0);
   float c = cos(rotate), s = sin(rotate);
   p = mat2(c, -s, s, c) * p;
-  return p * scale + vec2(cos(driftAngle), sin(driftAngle)) * TIME * drift * 0.05;
+  return p * scale + vec2(PH_scanDX, PH_scanDY) * 0.05;
 }
 
 // Barycentric weights + the three vertex ids of the hex-lattice triangle holding st.

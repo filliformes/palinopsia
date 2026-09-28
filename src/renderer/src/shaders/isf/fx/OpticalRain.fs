@@ -14,7 +14,7 @@
   ]
 }*/
 
-float h11(float x) { return fract(sin(x * 127.1) * 43758.5453); }
+float h11(float x) { x = fract(x * 0.1031); x *= x + 33.33; x *= x + x; return fract(x); }
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 
 // Cheap Sobel-ish edge magnitude on luma : the "form" whose fragments will rain.

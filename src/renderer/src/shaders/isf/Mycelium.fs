@@ -15,10 +15,14 @@
   ]
 }*/
 
+// Integrated phases (engine/phases.ts) : a knob change moves the picture on
+// from where it is instead of jumping it.
+uniform float PH_rate;
+
 float hash(vec2 p) {
-  p = fract(p * vec2(123.34, 345.45));
-  p += dot(p, p + 34.345);
-  return fract(p.x * p.y);
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031); // precise hash : no rows, no lattice over hours
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
 }
 
 float vnoise(vec2 p) {
@@ -34,10 +38,10 @@ float vnoise(vec2 p) {
 float myceliumLum(vec2 uv) {
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
   vec2 p = uv * vec2(aspect, 1.0);
-  float t = TIME * rate;
+  float t = PH_rate;
 
   // Life cycle: each cycle re-seeds the colony somewhere else.
-  float cycle = floor(t * 0.15);
+  float cycle = mod(floor(t * 0.15), 997.0); // a new network each cycle ; wrapped so the seed stays precise
   float phase = fract(t * 0.15); // 0 → growing, →1 fully grown then reset
   vec2 seed = vec2(0.2 + hash(vec2(cycle, 1.0)) * 0.6 * aspect,
                    0.2 + hash(vec2(cycle, 7.0)) * 0.6);

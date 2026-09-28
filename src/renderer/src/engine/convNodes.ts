@@ -1508,6 +1508,9 @@ class NodeGL {
 const shared = new WeakMap<WebGL2RenderingContext, NodeGL>()
 function nodeGL(gl: WebGL2RenderingContext): NodeGL {
   let g = shared.get(gl)
+  // After a GPU reset the context object survives but every program and buffer
+  // it held is dead : rebuild rather than draw with stale handles.
+  if (g && !gl.isBuffer(g.quad)) g = undefined
   if (!g) {
     g = new NodeGL(gl)
     shared.set(gl, g)

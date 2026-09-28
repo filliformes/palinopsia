@@ -64,6 +64,7 @@ interface Buf {
 
 export class DepthShadow {
   private quad: WebGLBuffer
+  private vao: WebGLVertexArrayObject
   private mask: Prog
   private blur: Prog
   private applyP: Prog
@@ -76,6 +77,14 @@ export class DepthShadow {
     this.quad = gl.createBuffer()!
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
+    // Own VAO : the ISF runtime owns attribute 0 of the DEFAULT VAO (every ISF
+    // draw reads whatever quad is wired there), so this stage never touches it.
+    this.vao = gl.createVertexArray()!
+    gl.bindVertexArray(this.vao)
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
+    gl.enableVertexAttribArray(0)
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+    gl.bindVertexArray(null)
     this.mask = this.build(MASK_FS)
     this.blur = this.build(BLUR_FS)
     this.applyP = this.build(APPLY_FS)
@@ -143,10 +152,7 @@ export class DepthShadow {
   private use(p: Prog): void {
     const gl = this.gl
     gl.useProgram(p.prog)
-    gl.bindVertexArray(null)
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
-    gl.enableVertexAttribArray(0)
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+    gl.bindVertexArray(this.vao)
   }
 
   /** Render `bgTex` darkened by the foreground's shadow into `targetFbo`. */
@@ -210,10 +216,12 @@ export class DepthShadow {
     gl.uniform2f(this.applyP.u('uOffset'), off, -off)
     draw(targetFbo, w, h)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.bindVertexArray(null)
   }
 
   dispose(): void {
     const gl = this.gl
+    gl.deleteVertexArray(this.vao)
     gl.deleteBuffer(this.quad)
     for (const p of [this.mask, this.blur, this.applyP]) gl.deleteProgram(p.prog)
     for (const buf of [this.a, this.b]) {

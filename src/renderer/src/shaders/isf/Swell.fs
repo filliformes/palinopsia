@@ -14,11 +14,15 @@
   ]
 }*/
 
+// Integrated phases (engine/phases.ts) : a knob change moves the picture on
+// from where it is instead of jumping it.
+uniform float PH_rate;
+
 void main() {
   vec2 uv = isf_FragNormCoord;
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
   vec2 p = uv * vec2(aspect, 1.0) * scale;
-  float t = TIME * rate;
+  float t = PH_rate;
 
   // Sum of wave trains : wavelengths spread log-uniformly, direction fanned
   // around the wind, speed from deep-water dispersion (omega = sqrt(g k)),

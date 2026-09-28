@@ -7,6 +7,11 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **tools/shader-rig** : checks any generator or effect offscreen, with no app
+  window : a 24-hour show in one step, knob scrubs, 4K cost, stills at 16:9 and
+  square, and a moving test card for effects (`tools/shader-rig/README.md`).
+  **tools/test-build.sh** builds and launches an isolated copy of the app for
+  automated tests, beside the real one, with its own settings.
 - **Grown** (Organic) : a texture that grows itself. A tiny neural cellular
   automaton, trained offline on a real photographed surface (lava, mossy rock,
   bark : `tools/nca`, CC0 scans), grows that texture cell by cell from an empty
@@ -89,6 +94,33 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Knobs no longer jump the picture.** Motion that ran on `time × rate` jumped
+  whenever the rate moved : half an hour into a show a small nudge flung the
+  picture, and an LFO, a Morph or MIDI on the rate turned it into strobing noise.
+  Rates are now integrated frame by frame (a shader declares `PH_rate` and the
+  engine accumulates it on the layer's own clock, so Speed, freeze and reverse
+  still apply) : the Organic family (Fire / Water / Nature, Membrane, Mycelium,
+  Erosion, Dye Field, Swell, Ground, Scan, Colony) and the glitch effects
+  (Aperture, Byte Corrupt, Databend, Displace, Distort, Granular, Mosh Blocks,
+  Row Echo, Slice Shuffle, Slit Buffer, Stutter, Sync Loss, Tracking, Triangle
+  Flicker).
+- **Long shows.** The old shader hash lost precision as time grew, so glitch
+  effects, the Finalizer's grain and CRT / VHS parasites settled into fixed
+  patterns within an hour or two. A precise hash and wrapped seeds everywhere.
+- **Audio-reactive generators read the wrong row.** The shared audio texture's
+  waveform and spectrum rows were swapped whenever a shader had loaded since the
+  last video frame (the shader runtime leaves the upload flip on). The spectrum
+  row is now log-spaced 30 Hz to 16 kHz, so it spreads musically across elements
+  instead of bunching into the left fifth. Any generator that declares the audio
+  input gets it, on the background slab too.
+- **Freeze-proofing.** The video source and the film, output-shape,
+  flash-safety and depth-shadow stages now each own their vertex setup, so none
+  of them can break every shader draw when it is disposed; the effect nodes
+  rebuild after a GPU reset; photo materials no longer load upside down
+  depending on load order.
+- **Fresh installs started with the wrong defaults** : Flash safety off (meant
+  to be on, mild, at 0.35), the Flow macro fully engaged instead of neutral,
+  Morph at 0 ms, the audio monitor muted.
 - **Mosaïque** never matched anything : its matcher named a variable `patch`, a
   reserved word in GLSL ES 3.00, so the matching program never compiled and the
   node could not choose tiles. Found by compiling every engine shader in a plain

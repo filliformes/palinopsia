@@ -15,8 +15,12 @@
   ]
 }*/
 
+// Integrated phases (engine/phases.ts) : a knob change moves the picture on
+// from where it is instead of jumping it.
+uniform float PH_wander;
+
 float ASP() { return RENDERSIZE.x / RENDERSIZE.y; }
-float T() { return TIME * wander; }
+float T() { return PH_wander; }
 
 // How dry the mud is now : fixed, or a slow loop (wet → cracked → a rain resets it).
 float dryness() {

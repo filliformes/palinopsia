@@ -116,6 +116,7 @@ export class VideoSource {
   private blendW = 0
   private blendH = 0
   private quad: WebGLBuffer | null = null
+  private vao: WebGLVertexArrayObject | null = null
 
   setGrain(g: { on: boolean; size: number; spray: number; reverseP: number; jitter: number; sync: number }): void {
     this.grain = g
@@ -235,6 +236,14 @@ void main(){
       this.quad = gl.createBuffer()!
       gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
+      // Own VAO : the ISF runtime owns attribute 0 of the DEFAULT VAO (every ISF
+      // draw reads whatever quad is wired there), so this stage never touches it.
+      this.vao = gl.createVertexArray()!
+      gl.bindVertexArray(this.vao)
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
+      gl.enableVertexAttribArray(0)
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+      gl.bindVertexArray(null)
     }
     if (!this.blendTex || this.blendW !== w || this.blendH !== h) {
       if (this.blendTex) gl.deleteTexture(this.blendTex)
@@ -259,10 +268,7 @@ void main(){
       weights.push(g.tex ? Math.pow(Math.sin(Math.PI * k), 2) : 0)
     }
     gl.useProgram(this.blendProg)
-    gl.bindVertexArray(null)
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
-    gl.enableVertexAttribArray(0)
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+    gl.bindVertexArray(this.vao)
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.blendFbo)
     gl.viewport(0, 0, w, h)
     for (let i = 0; i < 3; i++) {
@@ -275,6 +281,7 @@ void main(){
     gl.uniform3f(this.uW, weights[0], weights[1], weights[2])
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.bindVertexArray(null)
     return this.blendTex
   }
 
@@ -532,7 +539,9 @@ void main(){
     if (this.blendTex) this.gl.deleteTexture(this.blendTex)
     if (this.blendFbo) this.gl.deleteFramebuffer(this.blendFbo)
     if (this.blendProg) this.gl.deleteProgram(this.blendProg)
+    if (this.vao) this.gl.deleteVertexArray(this.vao)
     if (this.quad) this.gl.deleteBuffer(this.quad)
+    this.vao = null
     this.blendTex = null
     this.blendFbo = null
     this.blendProg = null

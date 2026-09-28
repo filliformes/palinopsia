@@ -65,6 +65,7 @@ type Target = { fbo: WebGLFramebuffer; tex: WebGLTexture }
 
 export class StrobeLimiter {
   private quad: WebGLBuffer
+  private vao: WebGLVertexArrayObject
   private measure: Prog
   private meanUpd: Prog
   private limit: Prog
@@ -81,6 +82,14 @@ export class StrobeLimiter {
     this.quad = gl.createBuffer()!
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
+    // Own VAO : the ISF runtime owns attribute 0 of the DEFAULT VAO (every ISF
+    // draw reads whatever quad is wired there), so this stage never touches it.
+    this.vao = gl.createVertexArray()!
+    gl.bindVertexArray(this.vao)
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
+    gl.enableVertexAttribArray(0)
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+    gl.bindVertexArray(null)
     this.measure = this.build(F_MEASURE)
     this.meanUpd = this.build(F_MEANUPD)
     this.limit = this.build(F_LIMIT)
@@ -139,10 +148,7 @@ export class StrobeLimiter {
   private use(p: Prog): void {
     const gl = this.gl
     gl.useProgram(p.prog)
-    gl.bindVertexArray(null)
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
-    gl.enableVertexAttribArray(0)
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+    gl.bindVertexArray(this.vao)
   }
   private draw(fbo: WebGLFramebuffer, w: number, h: number): void {
     const gl = this.gl
@@ -174,6 +180,7 @@ export class StrobeLimiter {
       this.draw(mean[0].fbo, 1, 1); this.draw(mean[1].fbo, 1, 1)
       this.seeded = true
       gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+      gl.bindVertexArray(null)
       return srcTex
     }
 
@@ -197,6 +204,7 @@ export class StrobeLimiter {
     this.draw(safeWrite.fbo, w, h)
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.bindVertexArray(null)
     this.cur = 1 - this.cur
     return safeWrite.tex
   }
@@ -204,6 +212,7 @@ export class StrobeLimiter {
   dispose(): void {
     const gl = this.gl
     for (const p of [this.measure, this.meanUpd, this.limit, this.copy]) gl.deleteProgram(p.prog)
+    gl.deleteVertexArray(this.vao)
     gl.deleteBuffer(this.quad)
     if (this.safe) { this.free(this.safe[0]); this.free(this.safe[1]); this.safe = null }
     if (this.meanBuf) { this.free(this.meanBuf[0]); this.free(this.meanBuf[1]); this.meanBuf = null }

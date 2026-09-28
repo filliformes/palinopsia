@@ -18,16 +18,20 @@
   ]
 }*/
 
+// Integrated phases (engine/phases.ts) : a knob change moves the picture on
+// from where it is instead of jumping it.
+uniform float PH_rate;
+
 float hash21(vec2 p) {
-  p = fract(p * vec2(123.34, 345.45));
-  p += dot(p, p + 34.345);
-  return fract(p.x * p.y);
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031); // precise hash : no rows, no lattice over hours
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
 }
 
 void main() {
   vec2 uv = isf_FragNormCoord;
   if (PASSINDEX == 0) {
-    float t = TIME * rate;
+    float t = PH_rate;
     float sweep = fract(t);                       // 0→1, wraps
     // 0 normal · 1 inverted · 2 pendulum (ping-pongs 0→1→0, no wrap seam).
     float head = sweep;

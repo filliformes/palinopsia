@@ -115,7 +115,11 @@ export class PbrLib {
         const tex = gl.createTexture()!
         this.owned.push(tex)
         gl.bindTexture(gl.TEXTURE_2D, tex)
+        // Upright in GL (image top at v = 1) whatever flip state the ISF runtime
+        // or a video upload last left behind, then back to the neutral default.
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img)
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)

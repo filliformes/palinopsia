@@ -543,6 +543,10 @@ class AudioBus {
   spectrumBytes(): Uint8Array | null {
     return this.localOn ? this.freq : null
   }
+  /** The live input's sample rate (Hz) : what the spectrum bins are in. */
+  sampleRateHz(): number {
+    return this.sampleRate
+  }
   /** Live time-domain waveform (0..255, centred at 128) : local only. */
   waveformBytes(): Uint8Array | null {
     return this.localOn ? this.time : null

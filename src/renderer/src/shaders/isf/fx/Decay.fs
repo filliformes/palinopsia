@@ -19,9 +19,9 @@
 }*/
 
 float dhash(vec2 p) {
-  p = fract(p * vec2(123.34, 456.21));
-  p += dot(p, p + 45.32);
-  return fract(p.x * p.y);
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031); // precise hash : no rows, no lattice over hours
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
 }
 
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
@@ -36,7 +36,7 @@ void main() {
     //    plus a slow whole-frame drift. Bounded : this DISPLACES the source
     //    lookup, it does not synthesize anything.
     float line = floor(uv.y * RENDERSIZE.y);
-    float lj = (dhash(vec2(line, floor(TIME * 24.0))) - 0.5) * jitter * 0.018;
+    float lj = (dhash(vec2(line, mod(floor(TIME * 24.0), 32749.0))) - 0.5) * jitter * 0.018;
     float dft = sin(TIME * 0.8 + uv.y * 6.0) * jitter * 0.002;
     vec2 suv = vec2(uv.x + lj + dft, uv.y);
 
@@ -75,12 +75,12 @@ void main() {
     col = mix(col, prev, clamp(smear, 0.0, 0.7) * 0.7);
 
     // ── Tape noise (luma grain).
-    vec2 nseed = floor(uv * RENDERSIZE) + floor(TIME * 30.0);
+    vec2 nseed = floor(uv * RENDERSIZE) + mod(floor(TIME * 30.0), 4096.0);
     col += (dhash(nseed) - 0.5) * jitter * 0.12;
 
     // ── Dropout lines: sparse whole-scanline drops to black or white that
     //    flicker frame to frame (worn oxide / print scratches).
-    float d = dhash(vec2(line, floor(TIME * 10.0)));
+    float d = dhash(vec2(line, mod(floor(TIME * 10.0), 32749.0)));
     float drop = step(1.0 - dropout * 0.12, d);
     float polarity = step(0.5, dhash(vec2(line, 7.0)));
     col = mix(col, vec3(polarity), drop);

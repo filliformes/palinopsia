@@ -101,6 +101,7 @@ const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > 
 export class Cameraless {
   private prog: WebGLProgram
   private quad: WebGLBuffer
+  private vao: WebGLVertexArrayObject
   private u: (n: string) => WebGLUniformLocation | null
   private held: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null
   private out: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null
@@ -142,6 +143,14 @@ export class Cameraless {
     this.quad = gl.createBuffer()!
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
+    // Own VAO : the ISF runtime owns attribute 0 of the DEFAULT VAO (every ISF
+    // draw reads whatever quad is wired there), so this stage never touches it.
+    this.vao = gl.createVertexArray()!
+    gl.bindVertexArray(this.vao)
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
+    gl.enableVertexAttribArray(0)
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+    gl.bindVertexArray(null)
     const cache = new Map<string, WebGLUniformLocation | null>()
     this.u = (n) => {
       if (!cache.has(n)) cache.set(n, gl.getUniformLocation(this.prog, n))
@@ -223,10 +232,7 @@ export class Cameraless {
   private blit(srcTex: WebGLTexture, fbo: WebGLFramebuffer, boil: boolean): void {
     const gl = this.gl
     gl.useProgram(this.prog)
-    gl.bindVertexArray(null)
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
-    gl.enableVertexAttribArray(0)
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+    gl.bindVertexArray(this.vao)
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
     gl.viewport(0, 0, this.w, this.h)
     gl.activeTexture(gl.TEXTURE0)
@@ -255,6 +261,7 @@ export class Cameraless {
       gl.uniform1f(this.u('uSeedFast'), 0)
     }
     gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.bindVertexArray(null)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   }
 
@@ -292,6 +299,7 @@ export class Cameraless {
   dispose(): void {
     const gl = this.gl
     gl.deleteProgram(this.prog)
+    gl.deleteVertexArray(this.vao)
     gl.deleteBuffer(this.quad)
     if (this.held) {
       gl.deleteFramebuffer(this.held.fbo)

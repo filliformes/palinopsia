@@ -974,6 +974,9 @@ export default function App(): JSX.Element {
     try {
       comp = new Compositor(canvas, canvas.width, canvas.height)
       compositorRef.current = comp
+      // Isolated test builds only (built with VITE_OPSIA_TEST=1) : hand the
+      // store and the engine to a debugger. Compiled out of real builds.
+      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp })
       // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
       // capture from the render loop (Compositor.captureKick) : a rebuilt engine
       // needs no re-attaching. A real-time recording finds it through this.

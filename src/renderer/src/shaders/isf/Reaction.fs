@@ -28,7 +28,7 @@
 // frame) at 4K and on a 4096² dome instead of turning twice as fine; it wraps
 // around (a torus), so zooming out tiles it without seams.
 
-float h21(vec2 p){ p = fract(p * vec2(123.34, 345.45)); p += dot(p, p + 34.35); return fract(p.x * p.y); }
+float h21(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 
 // The display framing : zoom / pan / rotate about the centre, wrapped.
 vec2 reactUV(vec2 uv) {
@@ -76,7 +76,7 @@ void main() {
     // point (also the initial spark once U has filled to 1).
     // (og_hash : the old fract-multiply hash repeated every 50 x 20 blocks, which
     //  lined new critters up in rows.)
-    float s = step(1.0 - seed * 0.006, og_hash(floor(uv * RENDERSIZE / 6.0) + floor(TIME * 1.5) * 17.13));
+    float s = step(1.0 - seed * 0.006, og_hash(floor(uv * RENDERSIZE / 6.0) + mod(floor(TIME * 1.5), 997.0) * 17.13));
     V = min(1.0, V + s * 0.5);
     gl_FragColor = vec4(U, V, 0.0, 1.0);
   } else {

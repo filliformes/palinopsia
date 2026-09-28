@@ -15,10 +15,14 @@
   ]
 }*/
 
+// Integrated phases (engine/phases.ts) : a knob change moves the picture on
+// from where it is instead of jumping it.
+uniform float PH_rate;
+
 float hash(vec2 p) {
-  p = fract(p * vec2(123.34, 345.45));
-  p += dot(p, p + 34.345);
-  return fract(p.x * p.y);
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031); // precise hash : no rows, no lattice over hours
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
 }
 
 float vnoise(vec2 p) {
@@ -45,7 +49,7 @@ float fbm(vec2 p) {
 vec3 membraneField(vec2 uv) {
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
   vec2 p = (uv - vec2(0.45, 0.52)) * vec2(aspect, 1.0); // off-centre body
-  float t = TIME * rate;
+  float t = PH_rate;
 
   // The body field: low-frequency fbm, warped by itself : a breathing blob
   // that never resolves into a circle.

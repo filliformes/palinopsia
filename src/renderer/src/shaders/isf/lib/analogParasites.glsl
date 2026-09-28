@@ -36,7 +36,7 @@ float parLineProfile(float fy) {
 // Where the picture is read from this line : jitter + head switching + tracking.
 // `band` returns how deep this pixel sits in the tracking band (0..1).
 vec2 vhsWarp(vec2 uv, float par, float t, out float band) {
-  float fseed = floor(t * 59.94);
+  float fseed = mod(floor(t * 59.94), 32749.0); // wrapped : hash inputs stay small over hours
   float line = floor(uv.y * PAR_LINES);
   float dx = (hash21(vec2(line, fseed)) - 0.5) * 0.0008 * par;
   dx += sin(uv.y * 7.0 + t * 1.1) * 0.0005 * par;
@@ -83,7 +83,7 @@ vec2 parStreaks(vec2 uv, float p, float fseed, float salt, float lenMax, float d
 }
 
 vec3 vhsParasites(vec3 col, vec2 uv, float par, float t, float band) {
-  float fseed = floor(t * 59.94);
+  float fseed = mod(floor(t * 59.94), 32749.0); // wrapped : hash inputs stay small over hours
   // Dropouts, clustered in bursts (a damaged stretch of tape passing the head).
   float burst = 0.3 + 1.4 * smoothstep(0.5, 0.85, vnoise(vec2(t * 0.6, 3.1)));
   vec2 s = parStreaks(uv, par * 0.012 * burst + band * 0.3, fseed, 31.0, 0.4, 0.85);
@@ -101,7 +101,7 @@ vec3 vhsParasites(vec3 col, vec2 uv, float par, float t, float band) {
 }
 
 vec3 crtParasites(vec3 col, vec2 uv, float par, float t) {
-  float fseed = floor(t * 59.94);
+  float fseed = mod(floor(t * 59.94), 32749.0); // wrapped : hash inputs stay small over hours
   // Hum bar : one broad soft band of lower level rolling slowly upward.
   float hum = 0.5 + 0.5 * sin((uv.y - t * 0.08) * 6.2832);
   col *= 1.0 - par * 0.22 * hum * hum;

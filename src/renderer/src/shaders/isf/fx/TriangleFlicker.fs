@@ -12,11 +12,15 @@
   ]
 }*/
 
+// Integrated phases (engine/phases.ts) : a knob change moves the picture on
+// from where it is instead of jumping it.
+uniform float PH_rate;
+
 void main() {
   vec2 uv = isf_FragNormCoord;
   vec4 src = IMG_NORM_PIXEL(inputImage, uv);
 
-  float tri = abs(fract(TIME * rate) * 2.0 - 1.0);   // 0..1 triangle
+  float tri = abs(fract(PH_rate) * 2.0 - 1.0);   // 0..1 triangle
   float sq = step(0.5, tri);                          // hard on/off
   float env = mix(tri, sq, hard);
   float f = 1.0 - depth * (1.0 - env);                // brightness flicker
