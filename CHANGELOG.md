@@ -144,6 +144,15 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Context's material relief works, and the master no longer skips frames.** An image
+  pushed into an effect outside its draw (Context's PBR maps) could be replaced on its
+  texture unit by any renderer drawing in between. So Context read a random buffer as its
+  brick or bark relief, and when that buffer was its own target, WebGL dropped the
+  pass: Vibe and Context were silently bypassed about 13 times a second, even with no
+  material selected. Image inputs now bind at draw time. A session saved with a Context
+  material now shows that material's relief, which it never did before.
+- **Console noise** : a shader swap waiting on the compile budget no longer logs
+  "No uniform named ..." for every input the new shader brings.
 - **Time and feedback effects (11).** Light Trails and Wide Time never faded back to
   black (an 8-bit stall left a permanent fog of everything that passed); they now fade
   fully, with stochastic rounding so the long trails keep their length. Wide Time froze

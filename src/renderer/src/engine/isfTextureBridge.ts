@@ -13,10 +13,13 @@
 // _imgRect / _flip companion uniforms the parser generates. Everything else
 // falls through to the original implementation.
 //
-// Unit-collision note: the runtime resets its unit counter at each draw() and
-// re-binds only pass buffers (units 0..B-1); values pushed via setValue land
-// on units ≥ B in steady state. We re-push handles EVERY frame (the ping-pong
-// texture object alternates), so the sampler always points at a fresh unit.
+// Units : draw() resets the runtime's unit counter and re-binds ONLY the pass
+// buffers (units 0..B-1). A texture bound when setValue ran (the Context PBR maps
+// are pushed during sync, long before the master rack draws) is overwritten by
+// every renderer that draws in between, so the sampler read whatever sat on its
+// unit, and when that was this draw's own target WebGL dropped the whole pass
+// (a feedback loop). So every image input is bound at draw time instead, on
+// units B.. : the handle's texture, a loaded image, or a blank texel if unfed.
 
 import { Renderer } from 'interactive-shader-format'
 import { tickPhases } from './phases'
@@ -34,15 +37,64 @@ export function handle(texture: WebGLTexture, width: number, height: number): Te
 
 interface IsfUniform {
   name: string
+  type?: string
   value: unknown
   textureLoaded?: boolean
+  texture?: { texture: WebGLTexture } // the runtime's own texture, image inputs only
 }
 
 interface IsfRendererInternals {
   gl: WebGL2RenderingContext
-  program: { getUniformLocation: (n: string) => WebGLUniformLocation | null }
+  program: { use: () => void; getUniformLocation: (n: string) => WebGLUniformLocation | null }
   contextState: { newTextureIndex: () => number }
+  uniforms?: Record<string, IsfUniform>
+  renderBuffers?: { name?: string }[]
   setValue: (name: string, value: number | number[] | boolean) => void
+}
+
+// One transparent 1×1 texture per context : what an image input nothing feeds reads.
+const blanks = new WeakMap<object, WebGLTexture>()
+function blankFor(gl: WebGL2RenderingContext): WebGLTexture | null {
+  let t = blanks.get(gl) ?? null
+  if (!t) {
+    t = gl.createTexture()
+    if (!t) return null
+    gl.bindTexture(gl.TEXTURE_2D, t)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4))
+    blanks.set(gl, t)
+  }
+  return t
+}
+
+function isBufferName(r: IsfRendererInternals, name: string): boolean {
+  const b = r.renderBuffers
+  if (b) for (let i = 0; i < b.length; i++) if (b[i].name === name) return true
+  return false
+}
+
+/** Bind every image input of `r` on units B.. (B = pass buffers, which draw()
+ *  binds itself on 0..B-1). Runs at the top of each draw. */
+function bindImageInputs(r: IsfRendererInternals): void {
+  const us = r.uniforms
+  if (!us) return
+  const gl = r.gl
+  const blank = blankFor(gl) // before any unit is bound : creating it binds a texture
+  r.program.use()
+  let unit = r.renderBuffers?.length ?? 0
+  for (const name in us) {
+    const u = us[name]
+    if (u.type !== 't' || isBufferName(r, name)) continue
+    const loc = r.program.getUniformLocation(name)
+    if (!loc) continue // optimized out : never sampled
+    const v = u.value as TextureHandle | null | undefined
+    const tex = v && v.__opsiaTexture
+      ? v.texture
+      : v && u.textureLoaded && u.texture ? u.texture.texture : blank
+    gl.activeTexture(gl.TEXTURE0 + unit)
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.uniform1i(loc, unit)
+    unit++
+  }
 }
 
 let patched = false
@@ -136,26 +188,33 @@ export function installTextureBridge(): void {
     }
   }
 
+  // Image inputs are bound at draw time (see the header). A pass buffer never
+  // shares a unit with them, so an input can't land under buffer 0 on a
+  // renderer's first draw and seed its persistent buffers with black.
+  const origDraw = proto.draw as (this: IsfRendererInternals, d: unknown) => void
+  proto.draw = function (this: IsfRendererInternals, destination: unknown): void {
+    bindImageInputs(this)
+    origDraw.call(this, destination)
+  }
+
+  // Unknown input names are skipped quietly. The store routinely holds keys the
+  // live renderer lacks for a frame or two (a swap waiting on the compile budget
+  // keeps the old program running while the new shader's inputs arrive; prewarm
+  // feeds inputImage to generators), and the stock setValue logs an error each.
+  const origSetValue = proto.setValue as (this: IsfRendererInternals, n: string, v: unknown) => void
+  proto.setValue = function (this: IsfRendererInternals, name: string, value: unknown): void {
+    if (!this.uniforms?.[name]) return
+    origSetValue.call(this, name, value)
+  }
+
   const orig = proto.pushTexture as (this: IsfRendererInternals, u: IsfUniform) => void
 
   proto.pushTexture = function (this: IsfRendererInternals, uniform: IsfUniform): void {
     const v = uniform.value as TextureHandle | null
     if (v && (v as TextureHandle).__opsiaTexture) {
-      const gl = this.gl
-      const loc = this.program.getUniformLocation(uniform.name)
-      // Never share a unit with a pass buffer : draw() resets the unit counter and
-      // binds the pass buffers from unit 0, so on a renderer's FIRST draw (counter
-      // still at 0) a pushed input landed under buffer 0 and the effect sampled
-      // black (and stored it in its persistent buffers).
-      const nBuf = (this as unknown as { renderBuffers?: unknown[] }).renderBuffers?.length ?? 0
-      let unit = this.contextState.newTextureIndex()
-      while (unit < nBuf) unit = this.contextState.newTextureIndex()
-      gl.activeTexture(gl.TEXTURE0 + unit)
-      gl.bindTexture(gl.TEXTURE_2D, v.texture)
-      if (loc) gl.uniform1i(loc, unit)
       // Companion uniforms the parser generates for every image input. Our
       // buffers are already in GL orientation (same as the runtime's own
-      // persistent buffers), so no flip.
+      // persistent buffers), so no flip. The texture itself binds at draw.
       this.setValue(`_${uniform.name}_imgSize`, [v.width, v.height])
       this.setValue(`_${uniform.name}_imgRect`, [0, 0, 1, 1])
       this.setValue(`_${uniform.name}_flip`, false)
