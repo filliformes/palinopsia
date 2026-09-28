@@ -1,11 +1,11 @@
 // OutputView : the fullscreen output window's entire content. It no longer
-// re-renders the composition (which diverged on every stochastic source —
-// Collage, video, feedback — because it ran its own Compositor with its own
+// re-renders the composition (which diverged on every stochastic source,
+// like Collage, video and feedback, because it ran its own Compositor with its own
 // decoders and seeds). Instead the control window STREAMS its finished RGBA8
 // frame each tick over a zero-copy MessagePort, and this blits it through the
 // projection warp. The projector now shows the control window's EXACT pixels.
 //
-// The small `output:frame` push is still received — but only for the warp
+// The small `output:frame` push is still received, but only for the warp
 // corners + alignment grid, which are applied on this side to the streamed
 // texture (warp is post-composite, so it belongs here).
 
@@ -44,11 +44,11 @@ export function OutputView(): JSX.Element {
     let restoreFallback: number | null = null
     const onLost = (e: Event): void => {
       e.preventDefault()
-      console.warn('[output gl] context LOST — awaiting restore')
+      console.warn('[output gl] context LOST : awaiting restore')
       restoreFallback = window.setTimeout(() => setGlEpoch((n) => n + 1), 6000)
     }
     const onRestored = (): void => {
-      console.warn('[output gl] context restored — rebuilding')
+      console.warn('[output gl] context restored : rebuilding')
       if (restoreFallback) window.clearTimeout(restoreFallback)
       setGlEpoch((n) => n + 1)
     }

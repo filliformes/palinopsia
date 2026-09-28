@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Decay : analogue generation loss. The picture wears like a tape dub or a worn print: VHS chroma bleed, block/quantization crush, horizontal head-switch jitter, a BOUNDED feedback ghost (capped so it can never run away into feedback fractals), tape noise and flickering dropout lines. It only ever DEGRADES the incoming image : it never invents its own pattern. No psychedelia.",
+  "DESCRIPTION": "Decay : analog generation loss. The picture wears like a tape dub or a worn print: VHS chroma bleed, block/quantization crush, horizontal head-switch jitter, a BOUNDED feedback ghost (capped so it can never run away into feedback fractals), tape noise and flickering dropout lines. It only ever DEGRADES the incoming image : it never invents its own pattern. No psychedelia.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],

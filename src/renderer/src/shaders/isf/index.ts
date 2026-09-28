@@ -190,7 +190,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Mosaïque : rebuild this layer as a live mosaic of another. The frame is cut into patches; each is replaced by the corpus tile (from the sidechain layer) whose colour + structure match best — tiles flip/rotate and re-tint to fit, seams melt, and matches hold across frames so it doesn't boil. Spatial concatenation, Assemble's sibling on the other axis. Pick the corpus layer in the Inspector.",
+      "DESCRIPTION": "Mosaïque : rebuild this layer as a live mosaic of another. The frame is cut into patches; each is replaced by the corpus tile (from the sidechain layer) whose color + structure match best. Tiles flip/rotate and re-tint to fit, seams melt, and matches hold across frames so it doesn't boil. Spatial concatenation, Assemble's sibling on the other axis. Pick the corpus layer in the Inspector.",
       "CATEGORIES": ["FX", "Convolution"],
       "INPUTS": [
         { "NAME": "tile", "TYPE": "float", "MIN": 4.0, "MAX": 64.0, "DEFAULT": 24.0, "LABEL": "tile" },
@@ -248,7 +248,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Feedback : a video-feedback engine. The layer's own last frame is re-sampled through a drifting off-centre transform (zoom/rotate/drift) plus a self-displacement that boils the image organically, then mixed with the live layer : trails, tunnels-that-wander, reaction-diffusion textures. A built-in AGC + noise floor hold it at the edge of chaos so it never fades to black or blows to white. COUPLE runs a SECOND buffer under a diverged transform and cross-mixes it in → emergent behaviour no single loop shows. RGB DELAY shears the delay-echo channels in time; ROUTE feeds that echo back into the loop or forward onto the output only. PLACEMENT (Memory Palace) sits the spatial process on the recirculating buffer (feedback : a wandering tunnel) or on the incoming live image (painting : the source is smeared into a still accumulator). The KEYER gates on luma (key black/white) or chroma (key desat/chroma : saturation), so only the keyed region re-enters the loop; SAT DRIFT bleaches trails toward grey or intensifies them toward neon a little more each repeat. Off-centre + small transforms keep it matte, not a radial mandala.",
+      "DESCRIPTION": "Feedback : a video-feedback engine. The layer's own last frame is re-sampled through a drifting off-center transform (zoom/rotate/drift) plus a self-displacement that boils the image organically, then mixed with the live layer : trails, tunnels-that-wander, reaction-diffusion textures. A built-in AGC + noise floor hold it at the edge of chaos so it never fades to black or blows to white. COUPLE runs a SECOND buffer under a diverged transform and cross-mixes it in → emergent behavior no single loop shows. RGB DELAY shears the delay-echo channels in time; ROUTE feeds that echo back into the loop or forward onto the output only. PLACEMENT (Memory Palace) sits the spatial process on the recirculating buffer (feedback : a wandering tunnel) or on the incoming live image (painting : the source is smeared into a still accumulator). The KEYER gates on luma (key black/white) or chroma (key desat/chroma : saturation), so only the keyed region re-enters the loop; SAT DRIFT bleaches trails toward gray or intensifies them toward neon a little more each repeat. Off-center + small transforms keep it matte, not a radial mandala.",
       "CATEGORIES": ["FX", "Feedback"],
       "INPUTS": [
         { "NAME": "feedback", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.85, "LABEL": "feedback" },
@@ -298,7 +298,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Datamosh : the codec 'moshing' look, real-time and codec-free. The layer's own motion (optical flow, quantised to macroblocks) advects a feedback buffer every frame, so the picture keeps SLIDING along movement : the P-frame smear. Turn REFRESH (the I-frame) down and a new scene's motion drags the PREVIOUS scene's texture around : figures melt into and emerge from the image (the bloom). RESIDUAL re-injects live texture (the mosh↔mush line); RESEED snaps whole blocks back so it never fully mushes. STICKY slides each block as a crisp tile (real datamosh tearing); MELT is a softer smear. ACTANTS are sparse sticky patches that a trigger drops into the picture, drifting along the flow as autonomous frozen blocks (Perconte). MANIFEST reveals the live frame only where there's motion, so a new source completes itself out of the retained frame instead of cutting. MOSH GATE holds only the moving parts (+) or only the still ones (−); EDGE REPEL steers the smear along content edges; RE-SHARP crisps the softened result back up. With a sidechain layer + 'motion transfer' on, that layer's MOVEMENT moshes THIS layer's texture.",
+      "DESCRIPTION": "Datamosh : the codec 'moshing' look, real-time and codec-free. The layer's own motion (optical flow, quantized to macroblocks) advects a feedback buffer every frame, so the picture keeps SLIDING along movement : the P-frame smear. Turn REFRESH (the I-frame) down and a new scene's motion drags the PREVIOUS scene's texture around : figures melt into and emerge from the image (the bloom). RESIDUAL re-injects live texture (the mosh↔mush line); RESEED snaps whole blocks back so it never fully mushes. STICKY slides each block as a crisp tile (real datamosh tearing); MELT is a softer smear. ACTANTS are sparse sticky patches that a trigger drops into the picture, drifting along the flow as autonomous frozen blocks (Perconte). MANIFEST reveals the live frame only where there's motion, so a new source completes itself out of the retained frame instead of cutting. MOSH GATE holds only the moving parts (+) or only the still ones (−); EDGE REPEL steers the smear along content edges; RE-SHARP crisps the softened result back up. With a sidechain layer + 'motion transfer' on, that layer's MOVEMENT moshes THIS layer's texture.",
       "CATEGORIES": ["FX", "Glitch", "Feedback"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["melt", "sticky", "fluid"], "DEFAULT": 1, "LABEL": "mode" },
@@ -356,7 +356,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Scanner : a flatbed-scanner slit-scan. A scan head sweeps the frame; the line it crosses is CAPTURED from the live signal at that instant and held until the head passes again. Because each line is grabbed at a different moment, anything MOVING during the sweep smears and tears across the scanlines — the classic 'moved the photo mid-scan' glitch, live. LOOP scans continuously; ONE-SHOT does a single pass on a trigger then holds the frozen document. DRAG shears the capture (the paper sliding under the head), WOBBLE adds a hand-wave, JITTER/TEAR rip lines, CHANNEL SPLIT misregisters the CCD's RGB. TRIGGER (scan ▸) starts a fresh pass on its rising edge — fire it from the button, over OSC, or by binding a modulator (a square LFO / sample&hold / audio edge) with M for rhythmic live re-scans. Layer-FX only.",
+      "DESCRIPTION": "Scanner : a flatbed-scanner slit-scan. A scan head sweeps the frame; the line it crosses is CAPTURED from the live signal at that instant and held until the head passes again. Because each line is grabbed at a different moment, anything MOVING during the sweep smears and tears across the scanlines : the classic 'moved the photo mid-scan' glitch, live. LOOP scans continuously; ONE-SHOT does a single pass on a trigger then holds the frozen document. DRAG shears the capture (the paper sliding under the head), WOBBLE adds a hand-wave, JITTER/TEAR rip lines, CHANNEL SPLIT misregisters the CCD's RGB. TRIGGER (scan ▸) starts a fresh pass on its rising edge : fire it from the button, over OSC, or by binding a modulator (a square LFO / sample&hold / audio edge) with M for rhythmic live re-scans. Layer-FX only.",
       "CATEGORIES": ["FX", "Scan", "Glitch"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["loop", "one-shot"], "DEFAULT": 0, "LABEL": "mode" },
@@ -387,7 +387,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Autocutter : a cut-up collage. The frame is recursively split (binary space partition) into ragged rectangles, then the pieces are SHUFFLED among their slots and optionally rotated — so the picture is chopped and rearranged. The scramble LAYOUT holds still while the live video keeps playing inside every piece, so it stays kinetic. CUTS sets how many pieces, ROTATE how many are turned, SLIP nudges each piece's source, SEAMS draws dark cuts between pieces, MIX blends back toward the original. CONTOUR bends the cuts into uneven, curved tear-lines (the pieces still tessellate perfectly — no gaps, ever); TORN PAPER adds the ripped-magazine edge : a ragged off-white paper fringe along each tear over a soft collage shadow. Both re-tear on every cut, and both run past 1 into genuinely shredded territory. MASK peels pieces away one by one (transparent holes — lower layers show through); at full mask a single seeded piece survives, and every cut ▸ elects a new one, so the last shape keeps changing. SHAPE picks the piece geometry : CUT-UP is the recursive rectangles, MOSAIC is irregular Voronoi polygons (a denser, more organic mosaic) — every other control behaves the same in both. TRIGGER (cut ▸) makes a fresh cut on its rising edge (button / OSC / a modulator via M); AUTO RATE (Hz) re-cuts on its own for hands-free live rhythm, and CROSSFADE (seconds) dissolves the old layout into the new one on each auto/trigger re-cut instead of snapping. Layer-FX only.",
+      "DESCRIPTION": "Autocutter : a cut-up collage. The frame is recursively split (binary space partition) into ragged rectangles, then the pieces are SHUFFLED among their slots and optionally rotated, so the picture is chopped and rearranged. The scramble LAYOUT holds still while the live video keeps playing inside every piece, so it stays kinetic. CUTS sets how many pieces, ROTATE how many are turned, SLIP nudges each piece's source, SEAMS draws dark cuts between pieces, MIX blends back toward the original. CONTOUR bends the cuts into uneven, curved tear-lines (the pieces still tessellate perfectly : no gaps, ever); TORN PAPER adds the ripped-magazine edge : a ragged off-white paper fringe along each tear over a soft collage shadow. Both re-tear on every cut, and both run past 1 into genuinely shredded territory. MASK peels pieces away one by one (transparent holes : lower layers show through); at full mask a single seeded piece survives, and every cut ▸ elects a new one, so the last shape keeps changing. SHAPE picks the piece geometry : CUT-UP is the recursive rectangles, MOSAIC is irregular Voronoi polygons (a denser, more organic mosaic). Every other control behaves the same in both. TRIGGER (cut ▸) makes a fresh cut on its rising edge (button / OSC / a modulator via M); AUTO RATE (Hz) re-cuts on its own for hands-free live rhythm, and CROSSFADE (seconds) dissolves the old layout into the new one on each auto/trigger re-cut instead of snapping. Layer-FX only.",
       "CATEGORIES": ["FX", "Glitch"],
       "INPUTS": [
         { "NAME": "shape", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["cut-up", "mosaic"], "DEFAULT": 0, "LABEL": "shape" },
@@ -425,7 +425,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Chronoscan : per-pixel time displacement. The node keeps a ring of the last ~32 frames; a CONTROL field then sets, for every pixel, how far into that history it reads — so each region of the picture lives in a DIFFERENT PRESENT. SOURCE picks the control: SLIT-SCAN sweeps a moving gradient (the classic scanner smear — an angle you set, drifting at SWEEP), LUMA lets the image's own brightness choose each region's age (bright = further back), or SIDECHAIN uses another layer's brightness as the clock. REACH sets how far back the oldest regions go, CURVE bends the time distribution, INVERT flips it, SMOOTH cross-fades between frames. The temporal twin of the convolution nodes : it convolves TIME. Layer-FX only.",
+      "DESCRIPTION": "Chronoscan : per-pixel time displacement. The node keeps a ring of the last ~32 frames; a CONTROL field then sets, for every pixel, how far into that history it reads, so each region of the picture lives in a DIFFERENT PRESENT. SOURCE picks the control: SLIT-SCAN sweeps a moving gradient (the classic scanner smear, at an angle you set, drifting at SWEEP), LUMA lets the image's own brightness choose each region's age (bright = further back), or SIDECHAIN uses another layer's brightness as the clock. REACH sets how far back the oldest regions go, CURVE bends the time distribution, INVERT flips it, SMOOTH cross-fades between frames. The temporal twin of the convolution nodes : it convolves TIME. Layer-FX only.",
       "CATEGORIES": ["FX", "Time", "Scan"],
       "INPUTS": [
         { "NAME": "source", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["luma (self)", "luma (sidechain)", "slit-scan"], "DEFAULT": 2, "LABEL": "control" },
@@ -452,7 +452,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Sediment : long-term image memory (the app's namesake made literal). It keeps a decaying long-exposure ACCUMULATOR — the brightest traces of the past sink slowly back to black over seconds to MINUTES (DECAY) — plus a sparse KEYFRAME store that snapshots the picture every few seconds (INTERVAL), so minutes of the past stay recallable. AGE sweeps from the recent accumulator to the oldest keyframe; RESURFACE bleeds that memory back under the live image (via BLEND: screen · lighten · under · difference); STIR drifts the memory so it SEDIMENTS rather than sitting as a frozen loop; DEPOSIT sets how strongly the present is laid down. The piece can resurface what it looked like ten minutes ago. Layer-FX only.",
+      "DESCRIPTION": "Sediment : long-term image memory (the app's namesake made literal). It keeps a decaying long-exposure ACCUMULATOR, where the brightest traces of the past sink slowly back to black over seconds to MINUTES (DECAY), plus a sparse KEYFRAME store that snapshots the picture every few seconds (INTERVAL), so minutes of the past stay recallable. AGE sweeps from the recent accumulator to the oldest keyframe; RESURFACE bleeds that memory back under the live image (via BLEND: screen · lighten · under · difference); STIR drifts the memory so it SEDIMENTS rather than sitting as a frozen loop; DEPOSIT sets how strongly the present is laid down. The piece can resurface what it looked like ten minutes ago. Layer-FX only.",
       "CATEGORIES": ["FX", "Time", "Feedback"],
       "INPUTS": [
         { "NAME": "deposit", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "deposit" },
@@ -481,7 +481,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Parallax : real 2.5D from the shared depth map. Near features shift more than far ones as an animated camera SWAY drifts the view, with depth-of-field blur around a FOCUS plane and a FOG that sinks the far distance toward black (aerial recession). It reads the depth the Depth engine fills — set Depth in the header (SYNTH for a test bowl, AI for estimated depth on video/capture). With Depth off (or MIX 0) it is an exact passthrough. Works on any rack; best on the MASTER chain (depth of the whole picture).",
+      "DESCRIPTION": "Parallax : real 2.5D from the shared depth map. Near features shift more than far ones as an animated camera SWAY drifts the view, with depth-of-field blur around a FOCUS plane and a FOG that sinks the far distance toward black (aerial recession). It reads the depth the Depth engine fills : set Depth in the header (SYNTH for a test bowl, AI for estimated depth on video/capture). With Depth off (or MIX 0) it is an exact passthrough. Works on any rack; best on the MASTER chain (depth of the whole picture).",
       "CATEGORIES": ["FX", "Distortion", "Depth"],
       "INPUTS": [
         { "NAME": "amount", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "parallax" },
@@ -502,7 +502,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Eternalism : persistence of vision made a signal path (the app's namesake). Keeps a short ring of recent frames and reads two temporal taps. HOLD (Ken Jacobs' Eternalism) alternates two frames a GAP apart across a BLACK shutter interval at RATE — an unfrozen slice of time, a held micro-motion going nowhere (sub-fusion rates shimmer; higher rates fuse). DRIFT (Sherwin/McClure phase-drift twins) superimposes two delayed copies whose delay slowly BEATS in and out of lock — coherent → double-exposed → coherent — the second copy a touch larger with an amber TINT. Matte, near-black, no bloom. Layer / source / master.",
+      "DESCRIPTION": "Eternalism : persistence of vision made a signal path (the app's namesake). Keeps a short ring of recent frames and reads two temporal taps. HOLD (Ken Jacobs' Eternalism) alternates two frames a GAP apart across a BLACK shutter interval at RATE : an unfrozen slice of time, a held micro-motion going nowhere (sub-fusion rates shimmer; higher rates fuse). DRIFT (Sherwin/McClure phase-drift twins) superimposes two delayed copies whose delay slowly BEATS in and out of lock (coherent → double-exposed → coherent), the second copy a touch larger with an amber TINT. Matte, near-black, no bloom. Layer / source / master.",
       "CATEGORIES": ["FX", "Time", "Feedback"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["hold", "drift"], "DEFAULT": 0, "LABEL": "mode" },
@@ -522,7 +522,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Afterimage : Goethe's complement — a bright form, once removed, leaves a ghost in its place (the eye emits the negative/complementary colour). Keeps a slowly-decaying brightness high-water of recent frames; where a bright form has DEPARTED a spot, the ghost blooms back over DECAY seconds. CHROMA sweeps the ghost from a dark subtraction (0, the pure Goethe darkening) to its complementary COLOUR (1, a red form leaves a cyan trace). AMOUNT sets its strength. The literal meaning of Palinopsia. Matte, near-black. Layer / source / master.",
+      "DESCRIPTION": "Afterimage : Goethe's complement. A bright form, once removed, leaves a ghost in its place (the eye emits the negative/complementary color). Keeps a slowly-decaying brightness high-water of recent frames; where a bright form has DEPARTED a spot, the ghost blooms back over DECAY seconds. CHROMA sweeps the ghost from a dark subtraction (0, the pure Goethe darkening) to its complementary COLOR (1, a red form leaves a cyan trace). AMOUNT sets its strength. The literal meaning of Palinopsia. Matte, near-black. Layer / source / master.",
       "CATEGORIES": ["FX", "Time", "Color"],
       "INPUTS": [
         { "NAME": "decay", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "persistence" },
@@ -539,7 +539,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Melt : a seam-local dissolve that CREEPS. It reads the picture's own light/dark edges, and inside a narrow band along each edge it dissolves the node's OWN previous frame back in, pushed one-sided along the edge normal — so the boundaries between forms soften and slowly walk outward, the image melting at its contours. Unlike Datamosh (motion-driven, whole-frame) this is edge-driven and self-feeding, a structural melt that keeps going on a still picture. WIDTH sets how far from an edge it reaches, GATE which edges qualify, DIR the creep direction and speed (0 = a static edge-ghost, ± = it walks). Layer / source / master.",
+      "DESCRIPTION": "Melt : a seam-local dissolve that CREEPS. It reads the picture's own light/dark edges, and inside a narrow band along each edge it dissolves the node's OWN previous frame back in, pushed one-sided along the edge normal, so the boundaries between forms soften and slowly walk outward, the image melting at its contours. Unlike Datamosh (motion-driven, whole-frame) this is edge-driven and self-feeding, a structural melt that keeps going on a still picture. WIDTH sets how far from an edge it reaches, GATE which edges qualify, DIR the creep direction and speed (0 = a static edge-ghost, ± = it walks). Layer / source / master.",
       "CATEGORIES": ["FX", "Feedback", "Distortion"],
       "INPUTS": [
         { "NAME": "amount", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "melt" },
@@ -556,7 +556,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Faultline : a dirty vision-mixer. A clock (RATE) and a probability (DIRT) fire momentary STRUCTURAL faults at the output, and the picture is COMPLETELY CLEAN between them — the same skip-law as SLIP, moved from a single parameter to the whole blend. Each fire is one discrete fault of the chosen TYPE : DROPOUT (the signal loses lock and collapses toward black under a rolling sync bar), CUT (the mixer holds the frame grabbed at the fire instant — a hard cut to a still the live picture snaps back from), TIMEBASE (a head-switch knock : blocks of scanlines shear sideways, the field rolls, a torn band along the switch line), or NOISE (a band of switching static sweeps the cut point) — or ROULETTE, a fresh pick each fire. DEPTH is severity, HOLD the length of each fault, TRIG fires one by hand / OSC / a modulator. Best on the master rack (the whole programme glitches like circuit-bent kit), but works on any rack.",
+      "DESCRIPTION": "Faultline : a dirty vision-mixer. A clock (RATE) and a probability (DIRT) fire momentary STRUCTURAL faults at the output, and the picture is COMPLETELY CLEAN between them. It is the same skip-law as SLIP, moved from a single parameter to the whole blend. Each fire is one discrete fault of the chosen TYPE : DROPOUT (the signal loses lock and collapses toward black under a rolling sync bar), CUT (the mixer holds the frame grabbed at the fire instant : a hard cut to a still the live picture snaps back from), TIMEBASE (a head-switch knock : blocks of scanlines shear sideways, the field rolls, a torn band along the switch line), or NOISE (a band of switching static sweeps the cut point); or ROULETTE, a fresh pick each fire. DEPTH is severity, HOLD the length of each fault, TRIG fires one by hand / OSC / a modulator. Best on the master rack (the whole program glitches like circuit-bent kit), but works on any rack.",
       "CATEGORIES": ["FX", "Glitch"],
       "INPUTS": [
         { "NAME": "type", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4], "LABELS": ["dropout", "cut", "timebase", "noise", "roulette"], "DEFAULT": 4, "LABEL": "fault" },
@@ -575,7 +575,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Sillage : advected-noise feedback (IBFV, van Wijk 2002). A dye buffer is dragged each frame along a FLOW field and blended with fresh filtered noise, so the noise stretches into flow-aligned filaments (a line-integral / LIC look) and DECAYS INTO STRUCTURE instead of blowing to neon — a wake of dye trailing the motion, reading as material, not glow. The field is a divergence-free CURL-noise base (FIELD : always flowing, so even a still image streams) plus the image's own OPTICAL FLOW (MOTION : its movement advects the dye). Steer it anywhere : WIND pushes the whole wake in the ANGLE direction, and SWIRL spins it about the centre (a spiral either way). FLOW is how far the dye travels each frame (streak length), INJECTION how fast fresh noise replaces it (short trails ↔ long smears), GRAIN the noise frequency, DYE tints the wake by the image so it reads as the picture's own material, SPEED the churn rate, MIX the blend over the live frame. Self-contained : any rack.",
+      "DESCRIPTION": "Sillage : advected-noise feedback (IBFV, van Wijk 2002). A dye buffer is dragged each frame along a FLOW field and blended with fresh filtered noise, so the noise stretches into flow-aligned filaments (a line-integral / LIC look) and DECAYS INTO STRUCTURE instead of blowing to neon : a wake of dye trailing the motion, reading as material, not glow. The field is a divergence-free CURL-noise base (FIELD : always flowing, so even a still image streams) plus the image's own OPTICAL FLOW (MOTION : its movement advects the dye). Steer it anywhere : WIND pushes the whole wake in the ANGLE direction, and SWIRL spins it about the center (a spiral either way). FLOW is how far the dye travels each frame (streak length), INJECTION how fast fresh noise replaces it (short trails ↔ long smears), GRAIN the noise frequency, DYE tints the wake by the image so it reads as the picture's own material, SPEED the churn rate, MIX the blend over the live frame. Self-contained : any rack.",
       "CATEGORIES": ["FX", "Feedback", "Flow"],
       "INPUTS": [
         { "NAME": "flow", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "flow (streak)" },
@@ -603,7 +603,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Toile : a painterly reworking that follows the image's own structure (anisotropic Kuwahara, Kyprianidis) with optional coherent line-work (flow-XDoG). A structure tensor finds the local orientation, and the picture is smoothed into strokes that run ALONG its contours — forms flatten into paint that stays temporally coherent (not per-frame speckle) instead of a uniform blur. RADIUS is the brush size, SHARP how hard it flattens (edge-preserving ↔ painterly), PAINT how far toward the painting. LINE inks the contours : a difference-of-gaussians measured across each edge and smoothed along it draws clean outlines that follow the structure (THRESHOLD picks how strong an edge must be). MIX blends over the live frame. The real « Peint » + « Griffé » as a rack FX; a spatial filter (no feedback). Any rack.",
+      "DESCRIPTION": "Toile : a painterly reworking that follows the image's own structure (anisotropic Kuwahara, Kyprianidis) with optional coherent line-work (flow-XDoG). A structure tensor finds the local orientation, and the picture is smoothed into strokes that run ALONG its contours, so forms flatten into paint that stays temporally coherent (not per-frame speckle) instead of a uniform blur. RADIUS is the brush size, SHARP how hard it flattens (edge-preserving ↔ painterly), PAINT how far toward the painting. LINE inks the contours : a difference-of-gaussians measured across each edge and smoothed along it draws clean outlines that follow the structure (THRESHOLD picks how strong an edge must be). MIX blends over the live frame. The real « Peint » + « Griffé » as a rack FX; a spatial filter (no feedback). Any rack.",
       "CATEGORIES": ["FX", "Stylize"],
       "INPUTS": [
         { "NAME": "radius", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "brush" },
@@ -628,7 +628,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Remap (TouchDesigner's Remap TOP) : the sidechain layer's red and green channels become the coordinates each pixel of this layer reads from. ABSOLUTE is TD's behaviour (red = x, green = y); OFFSET displaces from where the pixel already is, around mid-grey. SCALE and the OFFSET X/Y reshape the map, EXTEND picks what lies past the edge (hold / repeat / mirror), SWAP makes this layer the map and the sidechain the picture. No sidechain = the layer remaps itself.",
+      "DESCRIPTION": "Remap (TouchDesigner's Remap TOP) : the sidechain layer's red and green channels become the coordinates each pixel of this layer reads from. ABSOLUTE is TD's behavior (red = x, green = y); OFFSET displaces from where the pixel already is, around mid-gray. SCALE and the OFFSET X/Y reshape the map, EXTEND picks what lies past the edge (hold / repeat / mirror), SWAP makes this layer the map and the sidechain the picture. No sidechain = the layer remaps itself.",
       "CATEGORIES": ["FX", "Distortion"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["absolute", "offset"], "DEFAULT": 0, "LABEL": "mode" },
@@ -669,7 +669,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Gooey : the TouchDesigner blur-then-threshold recipe. The picture is blurred, then cut at a brightness level, so shapes that sit close together melt into soft single blobs (metaballs). BLUR sets how far shapes reach for each other, LEVEL where the edge falls, SOFTNESS how hard it is. FILL shows the crisp source, the blurred colour pushed to full strength, or a white matte; OUTSIDE keeps some of the source around the blobs. Any rack.",
+      "DESCRIPTION": "Gooey : the TouchDesigner blur-then-threshold recipe. The picture is blurred, then cut at a brightness level, so shapes that sit close together melt into soft single blobs (metaballs). BLUR sets how far shapes reach for each other, LEVEL where the edge falls, SOFTNESS how hard it is. FILL shows the crisp source, the blurred color pushed to full strength, or a white matte; OUTSIDE keeps some of the source around the blobs. Any rack.",
       "CATEGORIES": ["FX", "Stylize"],
       "INPUTS": [
         { "NAME": "blur", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "blur" },
@@ -709,7 +709,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Lookup (TouchDesigner's Lookup TOP, with a LIVE palette) : this layer is recoloured through a line drawn across another layer, so its moving colours become the colour table. INDEX reads the brightness, each channel on its own, or the hue. AXIS and POSITION place the line on the palette layer, BAND averages a stripe around it (calmer colours from a busy palette), OFFSET cycles the table and CYCLES repeats it (MIRROR folds instead of wrapping). No sidechain = the layer is its own palette.",
+      "DESCRIPTION": "Lookup (TouchDesigner's Lookup TOP, with a LIVE palette) : this layer is recolored through a line drawn across another layer, so its moving colors become the color table. INDEX reads the brightness, each channel on its own, or the hue. AXIS and POSITION place the line on the palette layer, BAND averages a stripe around it (calmer colors from a busy palette), OFFSET cycles the table and CYCLES repeats it (MIRROR folds instead of wrapping). No sidechain = the layer is its own palette.",
       "CATEGORIES": ["FX", "Color"],
       "INPUTS": [
         { "NAME": "index", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["brightness", "per channel", "hue"], "DEFAULT": 0, "LABEL": "index" },
@@ -731,7 +731,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Pulfrich : monocular 3D from a temporal eye-delay. One eye reads a slightly DELAYED image (a dark filter slows its neural response) so lateral motion becomes stereo depth. The delay is read per-pixel from a frame ring, keyed by the shared DEPTH map (or luminance) so far/dark planes lag more. The disparity is TEMPORAL, not spatial — a still frame is byte-exact with NO colour fringing; depth blooms only on lateral motion. ANAGLYPH gives a red/cyan pair for glasses (DESAT curbs retinal rivalry, SEPARATION widens the split); FREE is a glasses-free parallax slide, gated by motion. A matte companion to the Anaglyph stage. Layer / source / master; falls back to luminance when no depth map is live.",
+      "DESCRIPTION": "Pulfrich : monocular 3D from a temporal eye-delay. One eye reads a slightly DELAYED image (a dark filter slows its neural response) so lateral motion becomes stereo depth. The delay is read per-pixel from a frame ring, keyed by the shared DEPTH map (or luminance) so far/dark planes lag more. The disparity is TEMPORAL, not spatial : a still frame is byte-exact with NO color fringing; depth blooms only on lateral motion. ANAGLYPH gives a red/cyan pair for glasses (DESAT curbs retinal rivalry, SEPARATION widens the split); FREE is a glasses-free parallax slide, gated by motion. A matte companion to the Anaglyph stage. Layer / source / master; falls back to luminance when no depth map is live.",
       "CATEGORIES": ["FX", "Depth", "Time"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["anaglyph", "free"], "DEFAULT": 0, "LABEL": "mode" },
@@ -752,7 +752,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Corrode : durational corrosion that only ever GROWS (buried / weathered — the entropy family). A blotch field seeds new corrosion as the integrated BURY level rises, and each frame it creeps outward, so the picture is eaten away slowly over minutes and never recovers until you EXHUME (reset ▸). EAT sets how deeply corroded zones are removed; TONE stains them from leader-dark to sepia; CRACKLE adds reticulation (cracked-émulsion) lines. On the Master rack it weathers the whole set. Matte, near-black. Layer / source / master.",
+      "DESCRIPTION": "Corrode : durational corrosion that only ever GROWS (buried / weathered : the entropy family). A blotch field seeds new corrosion as the integrated BURY level rises, and each frame it creeps outward, so the picture is eaten away slowly over minutes and never recovers until you EXHUME (reset ▸). EAT sets how deeply corroded zones are removed; TONE stains them from leader-dark to sepia; CRACKLE adds reticulation (cracked-émulsion) lines. On the Master rack it weathers the whole set. Matte, near-black. Layer / source / master.",
       "CATEGORIES": ["FX", "Time", "Cameraless"],
       "INPUTS": [
         { "NAME": "bury", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "bury rate" },
@@ -772,7 +772,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Decimate / Time-Lapse : sample-and-hold at a chosen rate. It grabs a fresh frame only every so often and HOLDS it between grabs, so the picture steps through time — the time-lapse / stutter register the smooth 60fps engine erases. SMOOTH crossfades the last two grabs (0 = a hard snap, 1 = a continuous tween across the whole interval → slow-motion). CLOCK mode samples at RATE; HOLD mode freezes and only re-samples on the trigger. The signature move : two rates of the SAME source across A and B (control vs lapse). Matte, no bloom. Layer / source / master.",
+      "DESCRIPTION": "Decimate / Time-Lapse : sample-and-hold at a chosen rate. It grabs a fresh frame only every so often and HOLDS it between grabs, so the picture steps through time : the time-lapse / stutter register the smooth 60fps engine erases. SMOOTH crossfades the last two grabs (0 = a hard snap, 1 = a continuous tween across the whole interval → slow-motion). CLOCK mode samples at RATE; HOLD mode freezes and only re-samples on the trigger. The signature move : two rates of the SAME source across A and B (control vs lapse). Matte, no bloom. Layer / source / master.",
       "CATEGORIES": ["FX", "Time"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["clock", "hold"], "DEFAULT": 0, "LABEL": "mode" },
@@ -1278,7 +1278,7 @@ export const GENERATORS: IsfShader[] = [
     native: true,
     source: `/*${JSON.stringify({
       DESCRIPTION:
-        'Grown : a texture that grows itself. A neural cellular automaton trained on a real scan (lava, mossy rock, bark) : every cell of a grid runs the same tiny learnt rule on its neighbours, and from an empty grid the texture of the photo emerges, stays alive (never frozen, never looping) and heals where it is damaged. CELLS sets how fine the grid (fewer = bigger features, softer), SPEED the steps per second, DAMAGE ▸ tears a hole that grows back, REGROW ▸ starts from nothing. Bind them to M or the audio for a texture that breathes with the sound.',
+        'Grown : a texture that grows itself. A neural cellular automaton trained on a real scan (lava, mossy rock, bark) : every cell of a grid runs the same tiny learned rule on its neighbors, and from an empty grid the texture of the photo emerges, stays alive (never frozen, never looping) and heals where it is damaged. CELLS sets how fine the grid (fewer = bigger features, softer), SPEED the steps per second, DAMAGE ▸ tears a hole that grows back, REGROW ▸ starts from nothing. Bind them to M or the audio for a texture that breathes with the sound.',
       CATEGORIES: ['Generator', 'Organic'],
       INPUTS: [
         { NAME: 'texture', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['lava', 'mossy rock', 'bark'], DEFAULT: 0, LABEL: 'texture' },

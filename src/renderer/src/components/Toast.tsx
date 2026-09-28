@@ -1,5 +1,5 @@
 // A single toast line. Transient by default (auto-dismisses) for confirmations
-// with no natural home — a recording saved, a panic fired. One at a time (a
+// with no natural home : a recording saved, a panic fired. One at a time (a
 // newer message replaces the older). `ms <= 0` makes it STICKY : it stays with
 // a ✕ and wraps its full text, for actionable install-instruction errors that
 // shouldn't vanish on a timer.

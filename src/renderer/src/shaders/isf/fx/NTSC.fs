@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "NTSC : the crosstalk of composite-video decode. ARTIFACT bleeds the picture's fine luma detail into the colour subcarrier so sharp vertical edges shimmer with dot-crawl rainbows (CARRIER tunes the subcarrier frequency). FRINGE misregisters the chroma sideways for the smeared-colour bleed. INTERLACE separates the two scan fields : alternate lines take a small hue rotation (FIELD HUE) and brightness offset, and FIELD CRAWL slides the pattern so it shivers. A cheap real-time approximation of composite artefacts, not a full encode/decode — sits on the picture before the grade.",
+  "DESCRIPTION": "NTSC : the crosstalk of composite-video decode. ARTIFACT bleeds the picture's fine luma detail into the color subcarrier so sharp vertical edges shimmer with dot-crawl rainbows (CARRIER tunes the subcarrier frequency). FRINGE misregisters the chroma sideways for the smeared-color bleed. INTERLACE separates the two scan fields : alternate lines take a small hue rotation (FIELD HUE) and brightness offset, and FIELD CRAWL slides the pattern so it shivers. A cheap real-time approximation of composite artifacts, not a full encode/decode. It sits on the picture before the grade.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch", "Color"],
@@ -41,7 +41,7 @@ void main() {
   yiq.y = mix(yiq.y, yiqL.y, fringe);
   yiq.z = mix(yiq.z, yiqR.z, fringe);
 
-  // ARTIFACT : dot-crawl — inject subcarrier-modulated luma detail into chroma,
+  // ARTIFACT (dot-crawl) : inject subcarrier-modulated luma detail into chroma,
   // so sharp vertical edges rainbow-shimmer (the composite luma/chroma crosstalk).
   vec2 uvXR = uv + vec2(px.x, 0.0);
   vec2 uvXL = uv - vec2(px.x, 0.0);

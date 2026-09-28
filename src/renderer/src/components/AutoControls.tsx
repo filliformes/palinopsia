@@ -53,7 +53,7 @@ export function ModButton({
   const key = modTargetKey(target)
   const isBound = bound.length > 0
   const active = activeKey === key
-  // Right-click = kill switch: clear EVERY modulation on this parameter —
+  // Right-click = kill switch: clear EVERY modulation on this parameter :
   // all direct M1–8 bindings and every Meta knob carrying it as a destination.
   function clearAll(): void {
     const st = useStore.getState()
@@ -103,7 +103,7 @@ export function AutoControls({
   // to this input (the capped mod-matrix, brief §6).
   modTargetFor?: (inputName: string) => ModTarget
   // 'wrap' (default): flex-wrap, height follows param count.
-  // 'twoRow': a WIDTH-wrapping grid of fixed 11rem columns — few params sit on one
+  // 'twoRow': a WIDTH-wrapping grid of fixed 11rem columns : few params sit on one
   //   row, many wrap DOWN into as many rows as the band's width needs (no
   //   horizontal scroll; the band scrolls vertically / is drag-resized to show
   //   the extra rows). Named twoRow for history; it's really auto-rows now.
@@ -173,8 +173,8 @@ export function AutoControls({
       ) : null
     // Fixed-width controls (each its own 11rem) that WRAP by width, LEFT-justified so
     // the parameters stay compact and read left-to-right. They flow DOWN into rows as
-    // the width narrows (never a sideways overflow). Vertical centring inside the band
-    // — and the scroll when the rows overflow it — is the band wrapper's `m-auto`.
+    // the width narrows (never a sideways overflow). Vertical centering inside the band
+    // (and the scroll when the rows overflow it) is the band wrapper's `m-auto`.
     return (
       <div className="flex items-center gap-5 p-2">
         <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-5 gap-y-2.5">
@@ -726,7 +726,7 @@ function BoolControl({
   // sees a rising edge (fire) then re-arms. Bind M to drive it from a modulator
   // (a square LFO / sample&hold / audio edge) or fire it over OSC for live use.
   // Hold the deferred 1 → 0 reset in a ref and cancel it when this control
-  // unmounts or its shader/slot changes — the `inp` descriptor is cached per
+  // unmounts or its shader/slot changes : the `inp` descriptor is cached per
   // shader (inputsForShader), so it only changes on a real swap. Without this a
   // reset armed on shader A but landing after a swap would plant a stray
   // `name → 0` on whatever shader now occupies the slot.

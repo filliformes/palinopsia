@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Aperture : a projector's gate over the image — iris, vertical/horizontal slit, or a film-gate rectangle — with the two couplings a real gate has. FLICKER re-rolls the gate's opening on a drawn cadence (RATE), like a shutter breathing; DEFOCUS ties the lens to the gate, so as the aperture closes the image softens (the focus pull a contracting iris forces). Outside the gate is leader-black. SOFT feathers the gate edge.",
+  "DESCRIPTION": "Aperture : a projector's gate over the image (iris, vertical/horizontal slit, or a film-gate rectangle) with the two couplings a real gate has. FLICKER re-rolls the gate's opening on a drawn cadence (RATE), like a shutter breathing; DEFOCUS ties the lens to the gate, so as the aperture closes the image softens (the focus pull a contracting iris forces). Outside the gate is leader-black. SOFT feathers the gate edge.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Cameraless", "Utility"],

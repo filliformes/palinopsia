@@ -1,4 +1,4 @@
-// Search keywords per shader id — the vocabulary a MUSICIAN would reach for.
+// Search keywords per shader id : the vocabulary a MUSICIAN would reach for.
 // The FX / source pickers match the query against these as well as the name and
 // family, so "reverb" surfaces Réponse, "bitcrush" surfaces Posterize / Decimate /
 // Byte Corrupt, "delay" surfaces the echo family, "paint" surfaces Toile / Dye
@@ -6,7 +6,7 @@
 // short tags blending the AUDIO metaphor (delay, reverb, compressor, bitcrush,
 // wavefolder, filter, detune, tremolo, gate, granular…) with plain visual terms.
 //
-// Keep them lowercase; multi-word tags ("sample rate", "rgb split") are fine —
+// Keep them lowercase; multi-word tags ("sample rate", "rgb split") are fine :
 // the matcher does prefix / word / substring hits (see SearchSelect `score`).
 
 export const SHADER_KEYWORDS: Record<string, string[]> = {
@@ -31,7 +31,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   'node-lumablur': ['blur', 'variable blur', 'depth of field', 'dof', 'bokeh', 'touchdesigner', 'lens'],
   'node-gooey': ['gooey', 'metaball', 'blob', 'threshold', 'liquid', 'lava', 'touchdesigner'],
   'node-matte': ['matte', 'key', 'composite', 'mask', 'three inputs', 'touchdesigner', 'sidechain'],
-  'node-lookup': ['lookup', 'lut', 'palette', 'gradient map', 'recolour', 'touchdesigner', 'sidechain'],
+  'node-lookup': ['lookup', 'lut', 'palette', 'gradient map', 'recolor', 'touchdesigner', 'sidechain'],
   'node-toile': ['paint', 'painterly', 'oil', 'ink', 'stylize'],
   'node-pulfrich': ['3d', 'stereo', 'depth', 'delay', 'anaglyph'],
   'node-corrode': ['corrode', 'decay', 'weather', 'rust', 'grunge'],

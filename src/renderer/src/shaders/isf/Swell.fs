@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Swell : an open water surface seen from above, no horizon. 24 wave trains spread around the wind DIRECTION, each travelling at the speed its length gives it on deep water (longer waves run faster, the ocean's dispersion law), so the surface builds, crosses and breaks up like the real thing instead of sliding. It is shaded the way water is : by its slopes, which reflect the brighter horizon sky (the tint) while flat water stays dark, with a subdued glint of sun at LIGHT ANGLE and foam on the sharpest crests. CHOP sets the steepness, SPREAD how far the waves fan from the wind (0 = one swell, 1 = confused sea).",
+  "DESCRIPTION": "Swell : an open water surface seen from above, no horizon. 24 wave trains spread around the wind DIRECTION, each traveling at the speed its length gives it on deep water (longer waves run faster, the ocean's dispersion law), so the surface builds, crosses and breaks up like the real thing instead of sliding. It is shaded the way water is : by its slopes, which reflect the brighter horizon sky (the tint) while flat water stays dark, with a subdued glint of sun at LIGHT ANGLE and foam on the sharpest crests. CHOP sets the steepness, SPREAD how far the waves fan from the wind (0 = one swell, 1 = confused sea).",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic", "Noise"],

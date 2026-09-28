@@ -1,4 +1,4 @@
-// MIDI Learn overlay — dataFLOU's visual language, verbatim : while learn
+// MIDI Learn overlay (dataFLOU's visual language, verbatim) : while learn
 // mode is armed, every learnable control grows a blue film (bright pulsing
 // blue = selected as the learn target, green = already bound). Unlike
 // dataFLOU's (whose targets are buttons that check learn mode themselves),
@@ -7,7 +7,7 @@
 // Right-click clears an existing binding.
 //
 // Render it inside any relatively-positioned wrapper. It renders nothing at
-// all when learn mode is off — zero cost in play mode.
+// all when learn mode is off : zero cost in play mode.
 
 import type { MouseEvent } from 'react'
 import { describeBinding, isContinuousTarget, midiTargetLabel } from '../midi'
@@ -57,7 +57,7 @@ export function MidiLearnOverlay({ id }: { id: string }): JSX.Element | null {
       }}
       title={
         selected
-          ? `${midiTargetLabel(id)} : waiting — ${hint}. Click to deselect.`
+          ? `${midiTargetLabel(id)} : waiting (${hint}). Click to deselect.`
           : bound
             ? `${midiTargetLabel(id)} : bound to ${bound}. Click + move a control to rebind · right-click to clear.`
             : `${midiTargetLabel(id)} : click, then ${hint} to bind.`

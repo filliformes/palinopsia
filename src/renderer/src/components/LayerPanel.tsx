@@ -244,7 +244,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           return (
             <div
               className="flex min-w-0 items-center gap-1 px-1 font-mono text-[9px] text-muted"
-              title="What this collapsed layer holds — expand to edit"
+              title="What this collapsed layer holds (expand to edit)"
             >
               <span className="min-w-0 truncate">{a && b ? `${a} + ${b}` : (a ?? b ?? 'empty')}</span>
               {fxCount > 0 && <span className="shrink-0 text-muted/70">· {fxCount} fx</span>}
@@ -683,7 +683,7 @@ function SourceRow({
         if (probe.needsConvert) {
           if (!probe.ffmpegAvailable) {
             showToast(
-              `"${file.name}" is ${probe.codec ?? 'a codec'} the player can't read — install ffmpeg to import it (add to PATH, npm i ffmpeg-static, or set OPSIA_FFMPEG)`,
+              `"${file.name}" is ${probe.codec ?? 'a codec'} the player can't read : install ffmpeg to import it (add to PATH, npm i ffmpeg-static, or set OPSIA_FFMPEG)`,
               'warn',
               0 // sticky : an install instruction shouldn't vanish on a timer
             )
@@ -701,7 +701,7 @@ function SourceRow({
             }
             onPickVideo(`opsia-media://local/${encodeURIComponent(res.path)}`, file.name)
           } catch (err) {
-            // Convert rejected : surface it and STOP here — don't fall through to
+            // Convert rejected : surface it and STOP here : don't fall through to
             // direct-play a clip the probe already flagged as needing conversion.
             showToast(`Conversion failed : ${(err as Error)?.message ?? 'unknown error'}`, 'warn', 6000)
           } finally {
@@ -771,7 +771,7 @@ function SourceRow({
           className={`min-w-0 flex-1 text-[11px] ${selected ? 'border-accent' : ''}`}
           value={value}
           menuWidth={248}
-          title="Source for this slot — type to search the generators"
+          title="Source for this slot (type to search the generators)"
           options={[
             { value: '', label: '— none —' },
             ...(isVideo

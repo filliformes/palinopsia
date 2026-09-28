@@ -18,7 +18,7 @@ import { SearchSelect, type SearchOption } from './SearchSelect'
 
 export function FxAddSelect({ scope, className = '' }: { scope: FxScope; className?: string }): JSX.Element {
   const addFx = useStore((s) => s.addFx)
-  // Which nodes a rack can host is `canHostFx` — one rule, shared with paste.
+  // Which nodes a rack can host is `canHostFx` : one rule, shared with paste.
   const groups =
     scope.kind === 'layer'
       ? FX_GROUPS
@@ -39,7 +39,7 @@ export function FxAddSelect({ scope, className = '' }: { scope: FxScope; classNa
       onChange={(v) => {
         if (v) addFx(scope, v)
       }}
-      title="Add an FX to this rack — type to search by name or family"
+      title="Add an FX to this rack (type to search by name or family)"
     />
   )
 }
@@ -54,7 +54,7 @@ export function FxChips({
   fx: FxInstance[]
   nowrap?: boolean
   // Rendered as the FIRST item inside the same wrap flow (the "+ fx" picker), so
-  // it stays put at the front and the chips flow after it and wrap underneath —
+  // it stays put at the front and the chips flow after it and wrap underneath,
   // rather than the picker being stranded alone on its own line.
   leading?: JSX.Element
 }): JSX.Element | null {

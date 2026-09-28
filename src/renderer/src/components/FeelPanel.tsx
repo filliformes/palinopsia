@@ -86,7 +86,7 @@ export function FeelPanel(): JSX.Element {
   const setSuperFlicker = useStore((s) => s.setSuperFlicker)
 
   // Return all eight macros to their rest values in one gesture (double-click
-  // only resets one row) — the Feel counterpart to Modulation's global mute.
+  // only resets one row) : the Feel counterpart to Modulation's global mute.
   const resetAll = (): void => {
     setDensity(0.5); setGestureTexture(0.5); setCoalesce(0.5); setFlow(0.5)
     setTonicity(0); setShutter(0); setDrift(0); setSuperFlicker(0)
@@ -117,7 +117,7 @@ export function FeelPanel(): JSX.Element {
         />
         <FeelRow
           label="Gesture ⇄ Texture" left="gesture" right="texture" value={gestureTexture} neutral={0.5} midiId="field:gestureTexture" onChange={setGestureTexture}
-          desc="Clean directional movement (sharpen) ↔ internalised churn (trails)."
+          desc="Clean directional movement (sharpen) ↔ internalized churn (trails)."
         />
         <FeelRow
           label="Coalesce" left="grain" right="mass" value={coalesce} neutral={0.5} midiId="field:coalesce" onChange={setCoalesce}
@@ -128,11 +128,11 @@ export function FeelPanel(): JSX.Element {
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted">Temperament · film character</span>
         <FeelRow
           label="Flow ⇄ Interruption" left="interruption" right="flow" value={flow} neutral={0.5} midiId="field:flow" onChange={setFlow}
-          desc="Stutter — frame-holds, breakup, blank stabs ↔ a liquid, continuous image."
+          desc="Stutter : frame-holds, breakup, blank stabs ↔ a liquid, continuous image."
         />
         <FeelRow
-          label="Tonicity" left="off" right="colour" value={tonicity} neutral={0} midiId="field:tonicity" onChange={setTonicity}
-          desc="Tonal/harmonic audio pulls colour in; noise pulls toward black-and-white (needs Audio on)."
+          label="Tonicity" left="off" right="color" value={tonicity} neutral={0} midiId="field:tonicity" onChange={setTonicity}
+          desc="Tonal/harmonic audio pulls color in; noise pulls toward black-and-white (needs Audio on)."
         />
         <FeelRow
           label="Shutter" left="off" right="stepped" value={shutter} neutral={0} midiId="field:shutter" onChange={setShutter}

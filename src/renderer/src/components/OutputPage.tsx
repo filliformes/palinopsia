@@ -110,7 +110,7 @@ export function OutputPage({
   const setCompSize = useStore((s) => s.setCompSize)
   // Resizable inspector width (persisted). A drag handle on its left edge; the
   // panel clips horizontally (overflow-x-hidden) so nothing ever spawns a
-  // horizontal scrollbar — widen it instead.
+  // horizontal scrollbar : widen it instead.
   const [inspW, setInspW] = useState(() => {
     const v = Number(localStorage.getItem('opsia.outInspectorW'))
     return Number.isFinite(v) && v >= 240 && v <= 560 ? v : 300
@@ -664,7 +664,7 @@ export function OutputPage({
             )}
           </Section>
 
-          <Section title="Record" info="Clips + screenshots land in the Recorded folder next to the app, or wherever you point location… (remembered on this computer; if that folder can't be reached, takes go to Recorded). DXV3 (Resolume's codec) is compressed on the graphics card and written as it goes : any size (the 4096² dome included; bigger is scaled to 4096), constant frame rate, plays smoothly in Resolume with no conversion, no sound. The other formats are captured as a high-bitrate hardware H.264 master, then ffmpeg delivers the chosen one (ProRes / FFV1 / uncompressed included) : the hardware encoder takes up to 3840×2160, so they're greyed out above that. DXV3 records the clean picture (before keystone); the others record what the preview shows.">
+          <Section title="Record" info="Clips + screenshots land in the Recorded folder next to the app, or wherever you point location… (remembered on this computer; if that folder can't be reached, takes go to Recorded). DXV3 (Resolume's codec) is compressed on the graphics card and written as it goes : any size (the 4096² dome included; bigger is scaled to 4096), constant frame rate, plays smoothly in Resolume with no conversion, no sound. The other formats are captured as a high-bitrate hardware H.264 master, then ffmpeg delivers the chosen one (ProRes / FFV1 / uncompressed included) : the hardware encoder takes up to 3840×2160, so they're grayed out above that. DXV3 records the clean picture (before keystone); the others record what the preview shows.">
 
             <select
               className="input select-compact w-full text-[11px]"
@@ -940,7 +940,7 @@ export function OutputPage({
 
           <Section
             title="Installation mode"
-            info="Boot straight into a session, fullscreen on the chosen display (which covers the operator UI on a single screen), and self-heal if the renderer crashes — for unattended installs. The projector mapping (keystone) is machine-local, so it is applied automatically. Exit a running install with Esc / O on the output or Ctrl+Shift+O anywhere. Takes effect on the NEXT app launch."
+            info="Boot straight into a session, fullscreen on the chosen display (which covers the operator UI on a single screen), and self-heal if the renderer crashes, for unattended installs. The projector mapping (keystone) is machine-local, so it is applied automatically. Exit a running install with Esc / O on the output or Ctrl+Shift+O anywhere. Takes effect on the NEXT app launch."
             defaultCollapsed={!kioskLaunch.enabled}
           >
             <button
@@ -1251,9 +1251,9 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
   onWholeDome: () => void
 }): JSX.Element {
   const MODES: Array<[DomeMode, string, string]> = [
-    ['fisheye', 'full dome', 'The whole Palinopsia frame over the whole dome : its centre at the zenith, its edges all around the rim. Fill uses every pixel and leaves no black inside the dome.'],
+    ['fisheye', 'full dome', 'The whole Palinopsia frame over the whole dome : its center at the zenith, its edges all around the rim. Fill uses every pixel and leaves no black inside the dome.'],
     ['wrap', 'panorama', 'The picture wraps around the room like a panorama : its width runs around you (repeated by turns), its height climbs from the rim to the zenith. Made for 360° rooms (the Satosphère).'],
-    ['screen', 'screen', 'The picture hangs on the dome as a flat virtual screen, re-projected so it reads undistorted from the centre : a giant cinema screen. Surround wraps it dimly behind so the dome is never black.']
+    ['screen', 'screen', 'The picture hangs on the dome as a flat virtual screen, re-projected so it reads undistorted from the center : a giant cinema screen. Surround wraps it dimly behind so the dome is never black.']
   ]
   return (
     <Section
@@ -1309,7 +1309,7 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
       {dome.mode === 'screen' && (
         <>
           <DomeSlider label="azimuth" value={dome.azimuth} min={-180} max={180} step={1} unit="°" reset={0} onChange={(v) => setDome({ azimuth: v })} title="Where the screen hangs around the room (0 = front)" />
-          <DomeSlider label="elevation" value={dome.elevation} min={-20} max={90} step={1} unit="°" reset={25} onChange={(v) => setDome({ elevation: v })} title="How high the screen's centre sits" />
+          <DomeSlider label="elevation" value={dome.elevation} min={-20} max={90} step={1} unit="°" reset={25} onChange={(v) => setDome({ elevation: v })} title="How high the screen's center sits" />
           <DomeSlider label="width" value={dome.width} min={20} max={170} step={1} unit="°" reset={100} onChange={(v) => setDome({ width: v })} title="How much of the view the screen covers, horizontally" />
           <DomeSlider label="roll" value={dome.roll} min={-180} max={180} step={1} unit="°" reset={0} onChange={(v) => setDome({ roll: v })} />
           <DomeSlider label="surround" value={dome.surround} min={0} max={1} step={0.01} reset={0.25} onChange={(v) => setDome({ surround: v })} title="The picture wrapped dimly behind the screen" />
@@ -1345,7 +1345,7 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
         <button onClick={() => setView('master')} className={btn(view === 'master')}>master</button>
         {view === '3d' && (
           <>
-            <button onClick={() => { setDomeSim({ view: 'inside' }); onResetCam('inside') }} className={btn(dome.sim.view === 'inside')} title="From the centre of the room, looking around">inside</button>
+            <button onClick={() => { setDomeSim({ view: 'inside' }); onResetCam('inside') }} className={btn(dome.sim.view === 'inside')} title="From the center of the room, looking around">inside</button>
             <button onClick={() => { setDomeSim({ view: 'outside' }); onResetCam('outside') }} className={btn(dome.sim.view === 'outside')} title="Orbit the dome from outside">outside</button>
             <button onClick={onWholeDome} className={btn(dome.sim.view === 'inside' && dome.sim.back > 1.5)} title="See the whole inside at once : the camera backs off below the dome's opening and looks up">whole dome</button>
           </>

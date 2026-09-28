@@ -207,7 +207,7 @@ export function BodyPage(): JSX.Element {
     const free = mods.findIndex((m) => !m.enabled)
     if (free < 0) { showToast('All 8 modulator slots are in use', 'warn'); return }
     st.updateModulator(free, { enabled: true, type: 'body', body: { feature, smooth: 0.3 } })
-    showToast(`Modulator ${free + 1} now follows ${feature} — bind it with a param’s M button (Modulation : D)`, 'ok', 6000)
+    showToast(`Modulator ${free + 1} now follows ${feature}. Bind it with a param’s M button (Modulation : D)`, 'ok', 6000)
   }
 
   // Rule builder actions. Rules live in bodyControl.rules (machine-local).
@@ -216,7 +216,7 @@ export function BodyPage(): JSX.Element {
     r.g2 ? `${GESTURE_LABEL[r.g1]} ${comboSym(r.combo)} ${GESTURE_LABEL[r.g2]}` : GESTURE_LABEL[r.g1]
 
   // Auto-naming : an action's verb, conjugated for a third-person subject (the
-  // gesture), so a blank name reads like a sentence — "hands up randomizes
+  // gesture), so a blank name reads like a sentence : "hands up randomizes
   // modulators". Dynamic ids (layers, scenes, voices) resolve by index.
   const actionVerb = (id: GestureAction): string => {
     if (id === 'none') return 'sends OSC'
@@ -361,15 +361,15 @@ export function BodyPage(): JSX.Element {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-        {/* Tracking controls : one distributed line — which streams to track,
-            how easily gestures fire and hold, and the OSC-out toggle. The two
+        {/* Tracking controls : one distributed line (which streams to track,
+            how easily gestures fire and hold, and the OSC-out toggle). The two
             sliders grow to fill so there's no blank space. */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded border border-border bg-panel2 px-2.5 py-1.5">
           <div className="flex shrink-0 items-center gap-1.5">
             <Toggle on={cfg.hands} label="Hands" onClick={() => patch({ hands: !cfg.hands })} title="Track hand landmarks (21 per hand, up to two hands)" />
             <Toggle on={cfg.pose} label="Pose" onClick={() => patch({ pose: !cfg.pose })} title="Track the whole-body pose (33 landmarks)" />
-            <Toggle on={cfg.face} label="Face" onClick={() => patch({ face: !cfg.face })} title="Track the face (blendshapes : jaw, smile, brow, blink, pucker + head yaw/pitch/roll). Heavier — enable when you want facial control." />
-            <Toggle on={cfg.silhouette} label="Silhouette" onClick={() => patch({ silhouette: !cfg.silhouette, pose: cfg.pose || !cfg.silhouette })} title="Segment the body silhouette (rides the Pose model) into a 3×3 coverage grid : each zone is a continuous feature (for modulators) and an occlusion gesture 'cover …' (for rules). Cover a region with your shadow to fire it. Heavier — enable when you want screen-space control." />
+            <Toggle on={cfg.face} label="Face" onClick={() => patch({ face: !cfg.face })} title="Track the face (blendshapes : jaw, smile, brow, blink, pucker + head yaw/pitch/roll). Heavier : enable when you want facial control." />
+            <Toggle on={cfg.silhouette} label="Silhouette" onClick={() => patch({ silhouette: !cfg.silhouette, pose: cfg.pose || !cfg.silhouette })} title="Segment the body silhouette (rides the Pose model) into a 3×3 coverage grid : each zone is a continuous feature (for modulators) and an occlusion gesture 'cover …' (for rules). Cover a region with your shadow to fire it. Heavier : enable when you want screen-space control." />
             <Toggle on={cfg.mirror} label="Mirror" onClick={() => patch({ mirror: !cfg.mirror })} title="Selfie view : moving right moves the value right" />
           </div>
           <label className="flex min-w-[200px] flex-1 items-center gap-2 font-mono text-[11px] text-muted">
@@ -397,7 +397,7 @@ export function BodyPage(): JSX.Element {
               on={cfg.oscOut}
               label="OSC out"
               onClick={() => patch({ oscOut: !cfg.oscOut })}
-              title="When a rule fires, also send an OSC bang to /body/<its OSC name> at the OSC-out target set in I/O setup — so the body plays the sound side too."
+              title="When a rule fires, also send an OSC bang to /body/<its OSC name> at the OSC-out target set in I/O setup, so the body plays the sound side too."
             />
             <span className="font-mono text-[10px] text-muted">→ /body/…</span>
           </div>
@@ -417,7 +417,7 @@ export function BodyPage(): JSX.Element {
             }`}
             title="Open the camera and start tracking. Off by default : a camera is opt-in and never opens on its own."
           >
-            {cfg.enabled ? '● embodied control ON — camera live' : 'Enable embodied control (opens camera)'}
+            {cfg.enabled ? '● embodied control ON : camera live' : 'Enable embodied control (opens camera)'}
           </button>
 
           <div className="relative min-h-[300px] w-full flex-1 overflow-hidden rounded border border-border bg-black">
@@ -475,7 +475,7 @@ export function BodyPage(): JSX.Element {
         </div>{/* end top row */}
 
         {/* Create actions : the rule builder, full width under the row. The only
-            gesture routing — every action is a rule, single or a two-gesture combo. */}
+            gesture routing : every action is a rule, single or a two-gesture combo. */}
         <section className="rounded border border-border bg-panel2 p-2">
             <div className="mb-1 flex items-center justify-between gap-2">
               <span className="font-mono text-[9px] uppercase tracking-wide text-accent2">Create actions</span>
@@ -484,7 +484,7 @@ export function BodyPage(): JSX.Element {
                 className={`rounded-full border px-2 py-0.5 font-mono text-[10px] transition-colors ${
                   cur?.fresh ? 'border-accent bg-accent/20 text-accent' : 'border-border bg-panel3/50 text-muted'
                 }`}
-                title="The most recent gesture the tracker recognised"
+                title="The most recent gesture the tracker recognized"
               >
                 {cur ? `⚡ ${GESTURE_LABEL[cur.g]}` : 'no gesture yet'}
               </span>
@@ -537,7 +537,7 @@ export function BodyPage(): JSX.Element {
                 </>
               )}
               <span className="font-mono text-[11px] text-muted">→</span>
-              <select value={rAction} onChange={(e) => setRAction(e.target.value)} className="input select-compact h-[26px] w-[172px] text-[11px]" title="What the rule fires. — nothing — makes an OSC-only rule.">
+              <select value={rAction} onChange={(e) => setRAction(e.target.value)} className="input select-compact h-[26px] w-[172px] text-[11px]" title="What the rule fires. “— nothing —” makes an OSC-only rule.">
                 {actionOptionEls}
               </select>
               <div className="flex items-center" title="Custom OSC name. The message sent is /body/<name>. Blank = the truncated default shown as the placeholder.">
@@ -574,7 +574,7 @@ export function BodyPage(): JSX.Element {
                       <button
                         onClick={() => updateRule(r.id, { enabled: !r.enabled })}
                         className={`h-3.5 w-3.5 shrink-0 rounded-sm border ${r.enabled ? 'border-accent bg-accent/40' : 'border-border'}`}
-                        title={r.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
+                        title={r.enabled ? 'Enabled : click to disable' : 'Disabled : click to enable'}
                       />
                       <span className="w-20 shrink-0 truncate text-text" title={r.name}>{r.name}</span>
                       <span className="min-w-0 flex-1 truncate text-muted">

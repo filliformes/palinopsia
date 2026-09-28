@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Reaction : a Gray-Scott reaction-diffusion field. Two virtual chemicals react and diffuse in a persistent buffer, self-organising into drifting spots, stripes, labyrinths and splitting 'critters'. An organic, matte, near-black texture that lives at its own edge of chaos : feed and kill are the two exciters, continuous seeding keeps it alive and never a radial mandala. RELIEF lights the pattern as a surface (one low raking light at LIGHT ANGLE) so it reads as coral, brain-coral or skin instead of a flat print; 0 = the flat print.",
+  "DESCRIPTION": "Reaction : a Gray-Scott reaction-diffusion field. Two virtual chemicals react and diffuse in a persistent buffer, self-organizing into drifting spots, stripes, labyrinths and splitting 'critters'. An organic, matte, near-black texture that lives at its own edge of chaos : feed and kill are the two exciters, continuous seeding keeps it alive and never a radial mandala. RELIEF lights the pattern as a surface (one low raking light at LIGHT ANGLE) so it reads as coral, brain-coral or skin instead of a flat print; 0 = the flat print.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic"],

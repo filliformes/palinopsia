@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Dye Field : painted-on-film dye. Domain-warped SUBTRACTIVE pigment pooling over a near-black emulsion, disciplined toward decay and crystallisation, never additive glow-on-black (brief §1, §5.3). An internal feedback pass pools and crystallises the dye. Matte, near-black, no symmetry, no bloom. RELIEF lights the pooled dye as a thin skin of paint (it gathers into slightly raised pools) at LIGHT ANGLE; 0 = flat.",
+  "DESCRIPTION": "Dye Field : painted-on-film dye. Domain-warped SUBTRACTIVE pigment pooling over a near-black emulsion, disciplined toward decay and crystallization, never additive glow-on-black (brief §1, §5.3). An internal feedback pass pools and crystallizes the dye. Matte, near-black, no symmetry, no bloom. RELIEF lights the pooled dye as a thin skin of paint (it gathers into slightly raised pools) at LIGHT ANGLE; 0 = flat.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic"],

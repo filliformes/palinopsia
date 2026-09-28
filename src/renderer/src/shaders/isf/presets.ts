@@ -47,7 +47,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Melted cells', values: { tile: 20, corpus: 2, structure: 0.4, orient: 2, correct: 0.5, melt: 0.75, stick: 0.7, jitter: 0.15, shape: 2, irregular: 0.55, drift: 0.1, gain: 1.0, mix: 0.9 } },
     { name: 'Raw corpus', values: { tile: 24, corpus: 1, structure: 0.3, orient: 1, correct: 0.0, melt: 0.2, stick: 0.5, jitter: 0.2, shape: 0, irregular: 0.5, drift: 0, gain: 1.0, mix: 1.0 } },
     { name: 'Boiling swap', values: { tile: 18, corpus: 2, structure: 0.4, orient: 1, correct: 0.5, melt: 0.3, stick: 0.0, jitter: 0.35, shape: 2, irregular: 0.45, drift: 0.5, gain: 1.0, mix: 0.9 } },
-    { name: 'Colour tiles', values: { tile: 16, corpus: 1, structure: 0.15, orient: 0, correct: 0.4, melt: 0.15, stick: 0.65, jitter: 0.1, shape: 0, irregular: 0.5, drift: 0, gain: 1.0, mix: 1.0 } }
+    { name: 'Color tiles', values: { tile: 16, corpus: 1, structure: 0.15, orient: 0, correct: 0.4, melt: 0.15, stick: 0.65, jitter: 0.1, shape: 0, irregular: 0.5, drift: 0, gain: 1.0, mix: 1.0 } }
   ],
   'node-reponse': [
     { name: 'Short echo', values: { length: 6, decay: 0.3, attack: 0, gain: 1.0, reverse: 0, mix: 0.5 } },
@@ -111,7 +111,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
   ],
   'node-gooey': [
     { name: 'Metaballs', values: { blur: 0.35, threshold: 0.4, softness: 0.05, fill: 0, key: 0, outside: 0, invert: 0, mix: 1.0 } },
-    { name: 'Liquid colour', values: { blur: 0.45, threshold: 0.35, softness: 0.08, fill: 1, key: 1, outside: 0, invert: 0, mix: 1.0 } },
+    { name: 'Liquid color', values: { blur: 0.45, threshold: 0.35, softness: 0.08, fill: 1, key: 1, outside: 0, invert: 0, mix: 1.0 } },
     { name: 'White goo', values: { blur: 0.4, threshold: 0.4, softness: 0.04, fill: 2, key: 0, outside: 0, invert: 0, mix: 1.0 } },
     { name: 'Melting shapes', values: { blur: 0.6, threshold: 0.3, softness: 0.12, fill: 0, key: 0, outside: 0.25, invert: 0, mix: 1.0 } },
     { name: 'Tight blobs', values: { blur: 0.2, threshold: 0.5, softness: 0.02, fill: 0, key: 0, outside: 0, invert: 0, mix: 1.0 } },
@@ -286,7 +286,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Luma pop', values: { mode: 0, source: 0, delay: 5, curve: 0.8, separation: 0.45, desat: 0.4, swap: 0, mix: 1.0 } },
     { name: 'Far lag', values: { mode: 0, source: 1, delay: 8, curve: 1.6, separation: 0.5, desat: 0.4, swap: 0, mix: 1.0 } },
     { name: 'Near lag', values: { mode: 0, source: 1, delay: 6, curve: 1.0, separation: 0.5, desat: 0.4, swap: 1, mix: 1.0 } },
-    { name: 'Grey stereo', values: { mode: 0, source: 1, delay: 6, curve: 1.0, separation: 0.6, desat: 0.85, swap: 0, mix: 1.0 } },
+    { name: 'Gray stereo', values: { mode: 0, source: 1, delay: 6, curve: 1.0, separation: 0.6, desat: 0.85, swap: 0, mix: 1.0 } },
     { name: 'Free slide', values: { mode: 1, source: 1, delay: 6, curve: 1.0, separation: 0.5, desat: 0.4, swap: 0, mix: 0.9 } },
     { name: 'Free luma', values: { mode: 1, source: 0, delay: 5, curve: 0.9, separation: 0.4, desat: 0.4, swap: 0, mix: 0.85 } },
     { name: 'Full parallax', values: { mode: 0, source: 1, delay: 12, curve: 1.2, separation: 0.65, desat: 0.5, swap: 0, mix: 1.0 } }
@@ -425,7 +425,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
   'solid-color': [
     { name: 'Black', values: { gradient: 0, color: [0, 0, 0, 1] } },
     { name: 'White', values: { gradient: 0, color: [1, 1, 1, 1] } },
-    { name: 'Mid grey', values: { gradient: 0, color: [0.5, 0.5, 0.5, 1] } },
+    { name: 'Mid gray', values: { gradient: 0, color: [0.5, 0.5, 0.5, 1] } },
     { name: 'Deep blue', values: { gradient: 0, color: [0.04, 0.06, 0.16, 1] } },
     { name: 'Warm tint', values: { gradient: 0, color: [0.7, 0.45, 0.28, 1] } },
     { name: 'Sunset', values: { gradient: 1, angle: 1.5708, midpoint: 0.4, dither: 0.5, colA: [0.043, 0.075, 0.169, 1], colB: [0.227, 0.314, 0.42, 1], colC: [0.949, 0.631, 0.329, 1] } },
@@ -521,7 +521,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Currents', values: { amount: 0.6, disperse: 0.8, posterize: 0.3, desat: 0.4 } },
     { name: 'Dissolve', values: { amount: 0.85, disperse: 0.9, posterize: 0.6, desat: 0.6 } },
     { name: 'Poster flow', values: { amount: 0.55, disperse: 0.5, posterize: 0.85, desat: 0.4 } },
-    { name: 'Grey matter', values: { amount: 0.7, disperse: 0.6, posterize: 0.4, desat: 0.85 } },
+    { name: 'Gray matter', values: { amount: 0.7, disperse: 0.6, posterize: 0.4, desat: 0.85 } },
     { name: 'Smear drift', values: { amount: 0.5, disperse: 0.95, posterize: 0.2, desat: 0.35 } },
     { name: 'Ink', values: { amount: 0.75, disperse: 0.7, posterize: 0.7, desat: 0.7 } },
     { name: 'Barely there', values: { amount: 0.25, disperse: 0.3, posterize: 0.2, desat: 0.2 } },
@@ -1024,7 +1024,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Old plaster', values: { material: 17, scale: 1.1, drift: 0, weather: 0.6, colour: 0.8 } },
     { name: 'Snowfield', values: { material: 27, scale: 1.8, drift: 0.04, weather: 0.1, colour: 1 } },
     { name: 'Gravel bed', values: { material: 30, scale: 2.5, drift: 0.02, weather: 0.4, colour: 1 } },
-    { name: 'Grey leather', values: { material: 29, scale: 1.5, drift: 0, weather: 0.3, colour: 0.2 } }
+    { name: 'Gray leather', values: { material: 29, scale: 1.5, drift: 0, weather: 0.3, colour: 0.2 } }
   ],
   ground: [
     { name: 'Drying mud', values: { kind: 0, scale: 1, drying: -1, wander: 0.3, roughness: 0.5, palette: 0 } },
@@ -1183,7 +1183,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Soft float', values: { count: 16, speed: 0.1, physics: 0.85, size: 0.12, wander: 0.25, flicker: 0.2, accent: 0.15, audioScatter: 0 } },
     { name: 'Fine soot', values: { count: 45, speed: 0.35, physics: 0.5, size: 0.04, wander: 0.5, flicker: 0.4, accent: 0.1, audioScatter: 0 } },
     { name: 'Ember drift', values: { count: 20, speed: 0.3, physics: 0.6, size: 0.09, wander: 0.6, flicker: 0.55, accent: 0.6, audioScatter: 0.3, tint: [0.95, 0.45, 0.15, 1] } },
-    { name: 'Grey weather', values: { count: 32, speed: 0.5, physics: 0.3, size: 0.06, wander: 0.7, flicker: 0.25, accent: 0.05, audioScatter: 0 } },
+    { name: 'Gray weather', values: { count: 32, speed: 0.5, physics: 0.3, size: 0.06, wander: 0.7, flicker: 0.25, accent: 0.05, audioScatter: 0 } },
     { name: 'Heavy grit', values: { count: 9, speed: 0.15, physics: 0, size: 0.18, wander: 0.35, flicker: 0.3, accent: 0.3, audioScatter: 0 } },
     { name: 'Blue static', values: { count: 40, speed: 0.7, physics: 0.2, size: 0.05, wander: 0.8, flicker: 0.6, accent: 0.4, audioScatter: 0.2, tint: [0.4, 0.6, 0.95, 1] } },
     { name: 'Aftermath', values: { count: 28, speed: 0.08, physics: 0.7, size: 0.07, wander: 0.2, flicker: 0.15, accent: 0.2, audioScatter: 0 } },
@@ -1362,7 +1362,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Neutral+', values: { brightness: 0.01, contrast: 1.1, saturation: 1.05, lift: 0.01 } },
     { name: 'Hard crush', values: { brightness: -0.15, contrast: 3.2, saturation: 0.9, lift: 0 } },
     { name: 'Bleach', values: { brightness: 0.55, contrast: 1.2, saturation: 0.65, lift: 0 } },
-    { name: 'Flat grey', values: { brightness: 0, contrast: 0.18, saturation: 0.5, lift: 0.06 } },
+    { name: 'Flat gray', values: { brightness: 0, contrast: 0.18, saturation: 0.5, lift: 0.06 } },
     { name: 'High key mono', values: { brightness: 0.35, contrast: 2.4, saturation: 0, lift: 0 } }
   ],
   'fx-slice-shuffle': [
@@ -1511,7 +1511,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
   'fx-transform': [
     { name: 'Punch in', values: { zoom: 1.3, posX: 0, posY: 0, rotate: 0, wrap: 0 } },
     { name: 'Pull back tiled', values: { zoom: 0.7, posX: 0, posY: 0, rotate: 0, wrap: 1 } },
-    { name: 'Off-centre', values: { zoom: 1.1, posX: 0.25, posY: -0.15, rotate: 0, wrap: 1 } },
+    { name: 'Off-center', values: { zoom: 1.1, posX: 0.25, posY: -0.15, rotate: 0, wrap: 1 } },
     { name: 'Slight tilt', values: { zoom: 1.05, posX: 0, posY: 0, rotate: 0.12, wrap: 1 } },
     { name: 'Hard tilt', values: { zoom: 1.2, posX: 0, posY: 0, rotate: 0.5, wrap: 1 } },
     { name: 'Counter tilt', values: { zoom: 1.15, posX: -0.1, posY: 0.1, rotate: -0.35, wrap: 1 } },
@@ -1547,7 +1547,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Chroma smear', values: { artifact: 0.25, carrier: 0.4, fringe: 0.7, interlace: 0.15, fieldHue: 0, fieldCrawl: 0.05 } },
     { name: 'Broken field', values: { artifact: 0.35, carrier: 0.6, fringe: 0.3, interlace: 0.9, fieldHue: -0.4, fieldCrawl: 0.6 } },
     { name: 'Faint signal', values: { artifact: 0.15, carrier: 0.5, fringe: 0.15, interlace: 0.1, fieldHue: 0.05, fieldCrawl: 0.05 } },
-    { name: 'Colour-bar ghost', values: { artifact: 0.5, carrier: 0.75, fringe: 0.4, interlace: 0.3, fieldHue: 0.25, fieldCrawl: 0.2 } },
+    { name: 'Color-bar ghost', values: { artifact: 0.5, carrier: 0.75, fringe: 0.4, interlace: 0.3, fieldHue: 0.25, fieldCrawl: 0.2 } },
     { name: 'Full crosstalk', values: { artifact: 0.8, carrier: 0.65, fringe: 0.55, interlace: 0.5, fieldHue: 0.35, fieldCrawl: 0.35 } }
   ],
   'fx-row-echo': [

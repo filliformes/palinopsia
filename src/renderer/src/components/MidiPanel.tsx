@@ -100,7 +100,7 @@ export function MidiPanel(): JSX.Element {
           }
           title={
             learnMode
-              ? 'MIDI Learn ON — click a highlighted control, then move a MIDI control. Click to exit.'
+              ? 'MIDI Learn ON : click a highlighted control, then move a MIDI control. Click to exit.'
               : 'Enter MIDI Learn mode (same as the toolbar button)'
           }
         >
@@ -144,7 +144,7 @@ export function MidiPanel(): JSX.Element {
               {wired > 0 ? `${wired} input${wired > 1 ? 's' : ''} wired` : 'no input wired'}
             </span>
             <span className="min-w-0 flex-1 truncate text-muted">
-              in: {activity || '— (no MIDI received yet — move a knob / press a key)'}
+              in: {activity || '— (no MIDI received yet : move a knob / press a key)'}
             </span>
           </div>
 

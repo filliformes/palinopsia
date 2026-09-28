@@ -49,7 +49,7 @@ void main() {
     vec4 prev = IMG_NORM_PIXEL(held, uv);
     gl_FragColor = mix(live, prev, freeze);
   } else {
-    // BLACKOUT: a blackout-sized share of segments blank their band —
+    // BLACKOUT: a blackout-sized share of segments blank their band :
     // the screen strobes off region by region.
     float blank = step(1.0 - blackout * 0.5, hash(vec2(seg, band * 17.3 + 41.0)));
     vec4 s = IMG_NORM_PIXEL(held, uv);

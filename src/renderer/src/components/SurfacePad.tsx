@@ -3,7 +3,7 @@
 // scenes (structure snaps to the nearest, numeric params ease). Drag a dot to arrange
 // which scenes sit near which. Also driven by /opsia/surface x y (Pandore's Trill).
 //
-// Draw sequencer : flip to DRAW, sketch a path across the plane, then PLAY — the cursor
+// Draw sequencer : flip to DRAW, sketch a path across the plane, then PLAY, and the cursor
 // auto-traces the drawing over `time` ms, in a direction (forward / backward / ping-pong),
 // with a JUMP % that randomly teleports the playhead to other spots (a jitter). Modeled
 // on dataFLOU's Gesture playback; the actual advance lives in App's render loop.
@@ -277,7 +277,7 @@ export function SurfacePad(): JSX.Element {
         onPointerUp={onUp}
         onPointerCancel={onUp}
       >
-        {/* Territory map — the Voronoi regions of the placed scenes (soft seams). */}
+        {/* Territory map : the Voronoi regions of the placed scenes (soft seams). */}
         <canvas
           ref={canvasRef}
           className="pointer-events-none absolute inset-0 h-full w-full"
@@ -360,7 +360,7 @@ export function SurfacePad(): JSX.Element {
         )}
       </div>
 
-      {/* Draw-sequencer transport — shown once there's a path to play. */}
+      {/* Draw-sequencer transport : shown once there's a path to play. */}
       {hasPath && (
         <div className="flex flex-col gap-1.5 rounded-md border border-border/70 bg-panel2/40 p-1.5">
           <div className="flex items-center gap-1.5">
@@ -453,7 +453,7 @@ export function SurfacePad(): JSX.Element {
               value={surface.wiggle}
               onChange={(e) => setSurfaceWiggle(Number(e.target.value))}
               className="flex-1 accent-accent2"
-              title="Smooth sinusoidal wobble around the traced position (a vibrato — unlike jump's teleports)"
+              title="Smooth sinusoidal wobble around the traced position (a vibrato, unlike jump's teleports)"
             />
             <span className="w-16 text-right tabular-nums text-text">{surface.wiggle} %</span>
           </label>

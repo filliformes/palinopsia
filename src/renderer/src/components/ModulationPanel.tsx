@@ -1,7 +1,7 @@
 // Modulation panel (brief §10.4): the 8-modulator bank + the capped
 // mod-matrix. Each card: type, clock (free Hz / BPM division), the active
 // type's key parameters, output curve, and a live meter. The meters are
-// painted by ONE rAF loop writing DOM styles directly from modEngine.values —
+// painted by ONE rAF loop writing DOM styles directly from modEngine.values :
 // modulation never re-renders React at 60 Hz.
 
 import { useEffect, useRef, type ReactNode } from 'react'
@@ -25,7 +25,7 @@ const PHYSICS_MOTIONS: PhysicsMotion[] = ['bounce', 'spring', 'riser']
 
 // One explanation, shown wherever SLIP appears.
 const SLIP_HELP =
-  "SLIP : how far this modulator strays from its own pulse. The clock keeps ticking — some " +
+  "SLIP : how far this modulator strays from its own pulse. The clock keeps ticking, but some " +
   "ticks simply do not fire, so events stay ON the beat while becoming impossible to " +
   "anticipate. That is what makes it read as a cross-rhythm rather than as sloppiness, and " +
   "why it still works when the clock is BPM-synced. 0 = dead regular; 0.5 is roughly the " +
@@ -90,7 +90,7 @@ export function ModulationPanel(): JSX.Element {
 function ModCard({ index }: { index: number }): JSX.Element {
   const m = useStore((s) => s.composition.modulators[index])
   const update = useStore((s) => s.updateModulator)
-  // How many matrix targets this modulator drives — a glance at what's wired.
+  // How many matrix targets this modulator drives : a glance at what's wired.
   const drives = useStore((s) => s.composition.modMatrix.filter((a) => a.mod === index).length)
 
   return (
@@ -147,7 +147,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
         <button
           onClick={() => modEngine.retrigger(index)}
           className="shrink-0 rounded bg-panel3/60 px-1 font-mono text-[9px] text-muted hover:text-accent"
-          title="Retrigger : re-sync this modulator to NOW — a running LFO / Euclid / Turing / Cellular / arp snaps back to the start of its cycle (line it up on a downbeat), and Ramp / ADSR / Riser restart from zero. Modulators that run on their own clock (Random / S&H / Slew / Chaos) or follow a signal (Audio / Vision) don't move."
+          title="Retrigger : re-sync this modulator to NOW. A running LFO / Euclid / Turing / Cellular / arp snaps back to the start of its cycle (line it up on a downbeat), and Ramp / ADSR / Riser restart from zero. Modulators that run on their own clock (Random / S&H / Slew / Chaos) or follow a signal (Audio / Vision) don't move."
         >
           ⟳
         </button>
@@ -402,7 +402,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             title={SLIP_HELP}
             onChange={(v) => update(index, { slip: v })} />
           <SliderRow label="DIST" value={m.random.distribution} min={0} max={1}
-            title="Distribution : 0.5 uniform · >0.5 centre-hug · <0.5 edge-weight"
+            title="Distribution : 0.5 uniform · >0.5 center-hug · <0.5 edge-weight"
             onChange={(v) => update(index, { random: { distribution: v } })} />
         </>
       )
@@ -414,7 +414,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             title="Chance a clock draws a fresh sample : below 1 locks patterns"
             onChange={(v) => update(index, { sh: { ...m.sh, probability: v } })} />
           <SliderRow label="DIST" value={m.sh.distribution} min={0} max={1}
-            title="Distribution : 0.5 = uniform random · <0.5 favours the extremes · >0.5 hugs the centre"
+            title="Distribution : 0.5 = uniform random · <0.5 favors the extremes · >0.5 hugs the center"
             onChange={(v) => update(index, { sh: { ...m.sh, distribution: v } })} />
         </>
       )
@@ -597,10 +597,10 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             title="Setpoint, relative to the baseline : 0.5 = hold the feature where it's been; above/below biases it higher/lower. Bind in REPLACE mode; the depth's sign sets which way it pushes (flip it if the loop runs to a rail)."
             onChange={(v) => update(index, { homeostat: { ...h, setpoint: v } })} />
           <SliderRow label="GAIN" value={h.gain} min={0} max={1}
-            title="Grip : how tightly it holds the feature — one knob for both sensitivity (how much a small swing fills the range) and drive strength. Turn UP when the feature barely moves (e.g. edges stays near the top); too high hunts/oscillates."
+            title="Grip : how tightly it holds the feature. One knob for both sensitivity (how much a small swing fills the range) and drive strength. Turn UP when the feature barely moves (e.g. edges stays near the top); too high hunts/oscillates."
             onChange={(v) => update(index, { homeostat: { ...h, gain: v } })} />
           <SliderRow label="ADAPT" value={h.adapt} min={0} max={1}
-            title="How fast the baseline re-centres : LOW holds a fixed level (absolute-ish); HIGH only fights quick swings and lets slow drift through. Raise it if the loop keeps pinning a rail."
+            title="How fast the baseline re-centers : LOW holds a fixed level (absolute-ish); HIGH only fights quick swings and lets slow drift through. Raise it if the loop keeps pinning a rail."
             onChange={(v) => update(index, { homeostat: { ...h, adapt: v } })} />
         </>
       )
@@ -645,7 +645,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             className="input select-compact min-w-0 flex-1 text-[10px]"
             value={mt.shape}
             onChange={(e) => update(index, { motion: { shape: e.target.value as MotionShape } })}
-            title="Named motion archetype / force behaviour : a characteristic trajectory"
+            title="Named motion archetype / force behavior : a characteristic trajectory"
           >
             {MOTION_SHAPES.map((sh) => (
               <option key={sh} value={sh}>

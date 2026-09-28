@@ -1,10 +1,10 @@
-// Inspector view for an Assemble source — the video transport's sibling.
+// Inspector view for an Assemble source : the video transport's sibling.
 //
 // Same shape as VideoTransport (play/pause · loop · a scrubbable timeline · a
 // speed slider · mod targets), but the timeline shows the CUTS: each block is
 // one clip, so the edit's rhythm is legible and you can see where you are in it.
 // The playhead is painted straight from the engine's map in a rAF loop, never
-// through React — same discipline as the video transport.
+// through React : same discipline as the video transport.
 
 import { useEffect, useRef, useState } from 'react'
 import type { SourceSlot } from '@shared/types'
@@ -45,7 +45,7 @@ export function AssembleTransport({
   const clipRef = useRef<HTMLSpanElement | null>(null)
 
   // Live playhead : read the engine's map every frame and poke the DOM.
-  // `clips` is derived (`state.edl ?? []`), so it must NOT be a dependency —
+  // `clips` is derived (`state.edl ?? []`), so it must NOT be a dependency :
   // a fresh [] each render would tear down and rebuild this loop every render.
   // VideoTransport's pattern: key on the slot, read everything else live.
   const clipsRef = useRef(clips)
@@ -60,7 +60,7 @@ export function AssembleTransport({
         if (playRef.current) playRef.current.style.left = `${f * 100}%`
         if (timeRef.current) timeRef.current.textContent = fmtT(ph.time)
         if (clipRef.current) {
-          // Which block are we inside? Cheap linear walk — a few dozen clips.
+          // Which block are we inside? Cheap linear walk : a few dozen clips.
           const cs = clipsRef.current
           let acc = 0
           let idx = 0
@@ -151,7 +151,7 @@ export function AssembleTransport({
           onChange={(e) => set({ videoSpeed: speedFromT(Number(e.target.value)) })}
           onDoubleClick={() => set({ videoSpeed: 1 })}
           className="min-w-0 flex-1 accent-accent"
-          title={`${speed.toFixed(2)}× over the whole assemblage — multiplies each clip's own rate. Double-click to reset.`}
+          title={`${speed.toFixed(2)}× over the whole assemblage : multiplies each clip's own rate. Double-click to reset.`}
         />
         <span className="w-10 shrink-0 text-right font-mono text-[9px] text-muted">{speed.toFixed(2)}×</span>
       </div>
@@ -168,7 +168,7 @@ export function AssembleTransport({
   )
 }
 
-/** `position` scrubs the whole edit, `speed` scales it — the same two names the
+/** `position` scrubs the whole edit, `speed` scales it : the same two names the
  *  video slot exposes, so the modulation surface is consistent. */
 function AssembleModRow({ layer, slot }: { layer: number; slot: 'A' | 'B' }): JSX.Element {
   const matrix = useStore((s) => s.composition.modMatrix)

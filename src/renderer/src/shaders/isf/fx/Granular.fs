@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Granular : video granular synthesis (after Forbes & Villegas): the frame is shattered into a grid of Hann-windowed grains, each rotated, scattered and scaled on its own, then resynthesised. A persistent buffer lets grains bleed from the previous frame (temporal smear / echo). Density thins the grain field so the smear shows through the gaps. Matte, glitch-native : the granular texture is the point.",
+  "DESCRIPTION": "Granular : video granular synthesis (after Forbes & Villegas): the frame is shattered into a grid of Hann-windowed grains, each rotated, scattered and scaled on its own, then resynthesized. A persistent buffer lets grains bleed from the previous frame (temporal smear / echo). Density thins the grain field so the smear shows through the gaps. Matte, glitch-native : the granular texture is the point.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch", "Texture"],

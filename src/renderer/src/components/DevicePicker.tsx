@@ -36,7 +36,7 @@ export function DevicePicker({
         setDevices([])
         return
       }
-      // NotFoundError / other : fall through — enumerate will just come back empty.
+      // NotFoundError / other : fall through : enumerate will just come back empty.
     }
     try {
       const all = await navigator.mediaDevices.enumerateDevices()
@@ -96,8 +96,8 @@ export function DevicePicker({
           ) : devices.length === 0 ? (
             <div className="flex flex-col items-center gap-2 p-6 text-center text-[12px] text-muted">
               {err === 'denied'
-                ? 'Camera permission denied — allow camera access in your system settings, then rescan.'
-                : 'No video input devices found — plug in a camera and rescan.'}
+                ? 'Camera permission denied : allow camera access in your system settings, then rescan.'
+                : 'No video input devices found : plug in a camera and rescan.'}
               <button
                 onClick={() => void refresh()}
                 className="rounded border border-accent/50 bg-accent/10 px-2 py-0.5 font-mono text-[11px] text-accent hover:bg-accent/20"

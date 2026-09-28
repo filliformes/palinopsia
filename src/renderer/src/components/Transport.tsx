@@ -164,7 +164,7 @@ export function Transport(): JSX.Element {
     <div className="flex flex-nowrap items-center gap-x-2 overflow-x-clip overflow-y-visible border-t border-border bg-panel px-2 py-1.5">
       <div className="flex shrink-0 items-center gap-1.5">
         {/* Tap tempo is a PAD action (fire:tap); the number box is the CC value
-            target (transport:bpm) — each gets its own relative wrapper so the
+            target (transport:bpm) : each gets its own relative wrapper so the
             two learn films never overlap. */}
         <span className="relative flex shrink-0">
           <MidiLearnOverlay id="fire:tap" />
@@ -236,7 +236,7 @@ export function Transport(): JSX.Element {
         <MidiLearnOverlay id="transport:prox" />
         <span
           className="font-mono text-[10px] text-muted"
-          title="Proximity : one knob places the image in a depth zone — vista/far ↔ personal/close — by pushing the Context mood (double-click the slider for neutral)."
+          title="Proximity : one knob places the image in a depth zone (vista/far ↔ personal/close) by pushing the Context mood. Double-click the slider for neutral."
         >
           PROX
         </span>
@@ -256,7 +256,7 @@ export function Transport(): JSX.Element {
           className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
             proximityAudio ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'
           }`}
-          title="Auto-proximity : when ON (lit), the image's audio brightness (spectral centroid) drives the Prox depth zone automatically — brighter sound pulls the image closer. Off = Prox stays where you set it."
+          title="Auto-proximity : when ON (lit), the image's audio brightness (spectral centroid) drives the Prox depth zone automatically : brighter sound pulls the image closer. Off = Prox stays where you set it."
         >
           ◑
         </button>
@@ -293,8 +293,8 @@ export function Transport(): JSX.Element {
           className={`${TBTN} ${frozen ? TBTN_LIT : TBTN_IDLE}`}
           title={
             frozen
-              ? 'Output FROZEN / held — click (or H) to release'
-              : 'Freeze / hold the output — shortcut H (also MIDI-learnable)'
+              ? 'Output FROZEN / held : click (or H) to release'
+              : 'Freeze / hold the output : shortcut H (also MIDI-learnable)'
           }
         >
           ❄

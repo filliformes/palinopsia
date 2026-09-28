@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Mycelium : a thin branching network revealed by a growth front expanding from an off-centre seed, then dissolving and regrowing elsewhere. Ridged-noise hyphae, hair-thin and matte; the cycle is the organism's life. RELIEF raises the threads off the ground under one low raking light at LIGHT ANGLE (they catch the light on one side, cast a hair of shadow on the other); 0 = flat.",
+  "DESCRIPTION": "Mycelium : a thin branching network revealed by a growth front expanding from an off-center seed, then dissolving and regrowing elsewhere. Ridged-noise hyphae, hair-thin and matte; the cycle is the organism's life. RELIEF raises the threads off the ground under one low raking light at LIGHT ANGLE (they catch the light on one side, cast a hair of shadow on the other); 0 = flat.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic"],

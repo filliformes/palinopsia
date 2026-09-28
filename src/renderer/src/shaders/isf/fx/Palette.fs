@@ -41,7 +41,7 @@ void main() {
   vec4 src = IMG_NORM_PIXEL(inputImage, uv);
   float l = clamp(dot(src.rgb, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
 
-  // Ordered-dither breakup of the luminance before it hits the palette —
+  // Ordered-dither breakup of the luminance before it hits the palette :
   // the classic way to keep few stops from banding flatly.
   float n = floor(stops + 0.5);
   l += (bayer4(gl_FragCoord.xy) - 0.5) * dither / max(n - 1.0, 1.0);

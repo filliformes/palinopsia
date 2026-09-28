@@ -86,7 +86,7 @@ const NODE_INPUTS: Record<string, { label: string; hint: string; none: string; l
     { label: 'input 2', hint: 'shown where the matte is dark', none: 'black' },
     { label: 'matte', hint: 'bright = this layer, dark = input 2', none: 'self' }
   ],
-  'node-lookup': [{ label: 'palette', hint: 'a line across it is the colour table', none: 'self' }]
+  'node-lookup': [{ label: 'palette', hint: 'a line across it is the color table', none: 'self' }]
 }
 
 export function Inspector(): JSX.Element {
@@ -136,9 +136,9 @@ export function Inspector(): JSX.Element {
           : 'none'
   useEffect(() => setAssign(null), [selKey])
 
-  // RULE — the FX-controls band ALWAYS auto-fits its parameters : never blank space
+  // RULE : the FX-controls band ALWAYS auto-fits its parameters. Never blank space
   // over a few, never a hidden/scrolled row when there are many. On every selection
-  // change (and on any reflow — a width change re-flows the wrapped controls) we
+  // change (and on any reflow : a width change re-flows the wrapped controls) we
   // measure the natural content height and size the band to it, clamped to a
   // screen-sensible range (below the cap it fits exactly; above it, it scrolls). The
   // drag handle still lets you override the height until the next selection.
@@ -208,7 +208,7 @@ export function Inspector(): JSX.Element {
   // "Randomize the inspected unit" (the ⚄ header button) as a learnable MIDI
   // action : register a thunk that a bound pad (rand:inspector) fires. Reset to a
   // no-op here every render, then set to the real action below once a valid unit
-  // is resolved — so a pad never randomizes a stale selection (or when nothing
+  // is resolved, so a pad never randomizes a stale selection (or when nothing
   // is selected, since this component early-returns before that assignment).
   const inspRandRef = useRef<() => void>(() => {})
   useEffect(() => {
@@ -353,8 +353,8 @@ export function Inspector(): JSX.Element {
           ? 'bg'
           : String(shaderId)
 
-  // Plain-English hover-help on the title : an FX blurb, or — when a
-  // generator source is selected — a source blurb.
+  // Plain-English hover-help on the title : an FX blurb or, when a
+  // generator source is selected, a source blurb.
   const blurb =
     blurbFor(shaderId) ??
     (selection?.type === 'source' || selection?.type === 'background'
@@ -554,7 +554,7 @@ export function Inspector(): JSX.Element {
               if (vibe) onChange('lightColor', vibeMainColor(vibe.inputs))
             }}
             className="shrink-0 rounded border border-accent2/50 bg-accent2/10 px-1.5 py-0.5 font-mono text-[10px] text-accent2 transition-colors hover:bg-accent2/20"
-            title="Set the light colour from the Vibe Palette's main colour (brightened) : an instant unified look"
+            title="Set the light color from the Vibe Palette's main color (brightened) : an instant unified look"
           >
             Vibe Color
           </button>
@@ -694,7 +694,7 @@ export function Inspector(): JSX.Element {
               <>
               <div style={{ height: fxH }} className="flex overflow-x-hidden overflow-y-auto">
                 {/* The band auto-fits this content (see the auto-fit RULE); m-auto
-                    still centres the controls in the rare case the band is capped
+                    still centers the controls in the rare case the band is capped
                     below the content and has to scroll. */}
                 <div className="m-auto w-full">
                   {/* A plain block that tightly wraps the controls : its height is

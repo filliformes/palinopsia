@@ -2,7 +2,7 @@
 // the same effect offers the same actions wherever you reach it.
 //
 // Two pastes, because they answer different questions. "Paste settings" moves a
-// dialled-in look onto another unit of the SAME shader — a Blur's inputs mean
+// dialed-in look onto another unit of the SAME shader : a Blur's inputs mean
 // nothing to a Datamosh, so it is refused across shaders. "Paste as a new
 // effect" drops a copy into a rack, which is only allowed where that rack can
 // host the shader (`canHostFx`) : the sidechain nodes need a layer to read from,
@@ -81,14 +81,14 @@ export function useFxMenuItems(
   }
 
   if (!clip) {
-    items.push({ label: 'Paste — nothing copied', disabled: true })
+    items.push({ label: 'Paste : nothing copied', disabled: true })
     return items
   }
 
   const sameShader = !!shaderId && shaderId === clip.shaderId
   if (instId) {
     items.push({
-      label: sameShader ? `Paste settings from ${clip.name}` : `Paste settings — needs a ${clip.name}`,
+      label: sameShader ? `Paste settings from ${clip.name}` : `Paste settings : needs a ${clip.name}`,
       disabled: !sameShader,
       onClick: sameShader ? run(() => pasteFxSettings(scope, instId)) : undefined
     })
@@ -96,7 +96,7 @@ export function useFxMenuItems(
 
   const hostable = canHostFx(scope, clip.shaderId)
   items.push({
-    label: hostable ? `Paste ${clip.name} as a new effect` : `Paste ${clip.name} — ${hostRefusal(scope, clip.shaderId)}`,
+    label: hostable ? `Paste ${clip.name} as a new effect` : `Paste ${clip.name} : ${hostRefusal(scope, clip.shaderId)}`,
     disabled: !hostable,
     onClick: hostable ? run(() => pasteFxAsNew(scope, instId)) : undefined
   })

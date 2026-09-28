@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Interference : two near-frequency line fields beating against each other. Moiré handled as MATTE TEXTURE, not op-art: asymmetric angles, posterized product, mid-tone greys with one accent. Detune and skew set the spacing and slant of the beat bands; rate makes both fields slide, so the bands crawl (slower the wider they are).",
+  "DESCRIPTION": "Interference : two near-frequency line fields beating against each other. Moiré handled as MATTE TEXTURE, not op-art: asymmetric angles, posterized product, mid-tone grays with one accent. Detune and skew set the spacing and slant of the beat bands; rate makes both fields slide, so the bands crawl (slower the wider they are).",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Geometry"],

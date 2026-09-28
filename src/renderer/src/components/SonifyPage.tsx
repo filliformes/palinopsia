@@ -1,4 +1,4 @@
-// Sonify (key S) : the image-to-sound page. Full-page takeover like Output —
+// Sonify (key S) : the image-to-sound page. Full-page takeover like Output :
 // the live composite mirrored large with the sound PROBES drawn on it (the
 // Spectra scan line, the Orbit ellipse, the Flow motion dots), because the
 // probe is the instrument. Three voice strips (Spectra · Orbit · Flow) +
@@ -20,7 +20,7 @@ const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 
 const VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord'] as const
 const VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord']
 // Each voice's mark on the mirror, as a coloured GLYPH that hints its SHAPE as
-// well as its hue (matches the overlay painter below) — so a strip tells you
+// well as its hue (matches the overlay painter below), so a strip tells you
 // which mark is yours even when two share a colour (Spectra's line vs Flow's
 // dots are both white). Chord reads horizontal bands, not a spatial probe.
 const PROBE_MARK: Record<string, { glyph: string; color: string; hint: string }> = {
@@ -31,7 +31,7 @@ const PROBE_MARK: Record<string, { glyph: string; color: string; hint: string }>
   Raster: { glyph: '▭', color: 'rgb(120,255,160)', hint: 'a green probe rect' },
   Transmission: { glyph: '─', color: 'rgb(255,120,200)', hint: 'a pink scan row' },
   Filter: { glyph: '─', color: 'rgb(120,200,255)', hint: 'a blue scan line' },
-  Chord: { glyph: '≡', color: 'rgb(160,160,175)', hint: 'horizontal bands — no spatial probe' }
+  Chord: { glyph: '≡', color: 'rgb(160,160,175)', hint: 'horizontal bands, no spatial probe' }
 }
 const filterTag = (x: number): string => (x < 0.49 ? 'LP' : x > 0.51 ? 'HP' : '—')
 
@@ -148,7 +148,7 @@ function ModChip({ param, open, onOpen, inactive = false }: {
           ? 'bg-panel3/30 text-muted/40 cursor-default'
           : a ? 'bg-accent/25 text-accent ring-1 ring-accent' : open ? 'bg-panel3 text-text ring-1 ring-border' : 'bg-panel3/60 text-muted hover:text-text'
       }`}
-      title={inactive ? 'Inactive while sweeping — the scan column is driven by the sweep, not this bind' : a ? `Modulated by M${a.mod + 1} (depth ${a.depth.toFixed(2)}) : click to edit` : 'Bind a modulator to this parameter'}
+      title={inactive ? 'Inactive while sweeping : the scan column is driven by the sweep, not this bind' : a ? `Modulated by M${a.mod + 1} (depth ${a.depth.toFixed(2)}) : click to edit` : 'Bind a modulator to this parameter'}
     >
       {a ? `M${a.mod + 1}` : 'M'}
     </button>
@@ -157,12 +157,12 @@ function ModChip({ param, open, onOpen, inactive = false }: {
 
 const PARAM_LABELS: Record<SonifyModParam, string> = {
   spectraX: 'Spectra scan column', filterX: 'Filter scan column',
-  orbitX: 'Orbit centre x', orbitY: 'Orbit centre y', orbitR: 'Orbit radius', orbitPitch: 'Orbit pitch',
+  orbitX: 'Orbit center x', orbitY: 'Orbit center y', orbitR: 'Orbit radius', orbitPitch: 'Orbit pitch',
   rasterX: 'Raster rect x', rasterY: 'Raster rect y', rasterW: 'Raster rect width', rasterH: 'Raster rect height',
   rasterPitch: 'Raster pitch',
   spectraGain: 'Spectra gain', spectraGamma: 'Spectra contrast', spectraSweep: 'Spectra sweep rate', spectraBreath: 'Spectra breath',
   orbitDrive: 'Orbit drive', orbitSmooth: 'Orbit smooth',
-  flowDur: 'Flow grain', flowColour: 'Flow colour',
+  flowDur: 'Flow grain', flowColour: 'Flow color',
   eventsDecay: 'Events decay',
   rasterSmooth: 'Raster smooth', rasterTone: 'Raster tone',
   sstvLine: 'SSTV line rate', sstvDev: 'SSTV transpose',
@@ -267,7 +267,7 @@ function VoiceShell({ title, on, hint, onToggle, onDice, children }: {
 }
 
 /** The Sonify step sequencer (Mixer page). Each step either loads a whole saved
- *  preset or, with no preset, just sets which voices are on — one transport
+ *  preset or, with no preset, just sets which voices are on : one transport
  *  advances them so a fully evolving sonified work can be built. */
 function SonifySequencer(): JSX.Element {
   const sq = useStore((s) => s.soniSeq)
@@ -674,14 +674,14 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             setSonify(suggestSonify(comp, cfg))
           }}
           className="rounded px-2 py-0.5 font-mono text-[11px] text-muted ring-1 ring-border transition-colors hover:text-accent hover:ring-accent/60"
-          title="Auto-voice : read the session's registers and pick the fitting voices — glitch → Raster, motion → Flow, feedback → Orbit, line-work → Spectra, scan → Transmission, atmosphere → Filter. The strongest voice taps the layer that earned it. Your key, gains and probes are kept."
+          title="Auto-voice : read the session's registers and pick the fitting voices : glitch → Raster, motion → Flow, feedback → Orbit, line-work → Spectra, scan → Transmission, atmosphere → Filter. The strongest voice taps the layer that earned it. Your key, gains and probes are kept."
         >
           ✨ auto
         </button>
         <button
           onClick={diceWhole}
           className="rounded px-2 py-0.5 font-mono text-[11px] text-muted ring-1 ring-border transition-colors hover:text-accent hover:ring-accent/60"
-          title="Randomize the whole Sonify patch — 2–3 voices, their params, a key/octave, maybe an FX tail (your on/off + output are kept)"
+          title="Randomize the whole Sonify patch : 2–3 voices, their params, a key/octave, maybe an FX tail (your on/off + output are kept)"
         >
           🎲
         </button>
@@ -798,7 +798,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             onPointerMove={onPointerMove}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
-            title="Drag the probes : the scan line (Spectra, when not sweeping), the orbit centre, or its edge (radius)"
+            title="Drag the probes : the scan line (Spectra, when not sweeping), the orbit center, or its edge (radius)"
           >
             <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-contain" />
             <canvas ref={overlayRef} width={960} height={540} className="pointer-events-none absolute inset-0 h-full w-full" />
@@ -867,7 +867,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           {assign && <AssignMini param={assign} onClose={() => setAssign(null)} />}
           {view === 'mixer' && (
             <div className="flex flex-col gap-1">
-              <div className="mb-0.5 font-mono text-[9px] uppercase tracking-wide text-muted">mixer — volume · filter (LP ◄ off ► HP)</div>
+              <div className="mb-0.5 font-mono text-[9px] uppercase tracking-wide text-muted">mixer : volume · filter (LP ◄ off ► HP)</div>
               {VOICE_KEYS.map((k, i) => {
                 const vv = cfg[k]
                 return (
@@ -899,7 +899,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           {view === 'voices' && (<>
           <VoiceShell
             title="Spectra" on={cfg.spectra.on}
-            hint="The frame as a spectrogram — vertical position → pitch, brightness → loudness; the sweep plays the image like a score, along a reading path (ANS · Metasynth · vOICe)."
+            hint="The frame as a spectrogram : vertical position → pitch, brightness → loudness; the sweep plays the image like a score, along a reading path (ANS · Metasynth · vOICe)."
             onToggle={() => pv('spectra', { on: !cfg.spectra.on })}
             onDice={() => diceVoice('spectra')}
           >
@@ -926,7 +926,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 className="input select-compact min-w-0 flex-1 text-[10px]"
                 value={cfg.spectra.path ?? 0}
                 onChange={(e) => pv('spectra', { path: Number(e.target.value) })}
-                title="Reading path : how the scan traverses the frame (Aural Mirror) — a column swept across, a row swept down, a rotating ray, or a spiral"
+                title="Reading path : how the scan traverses the frame (Aural Mirror), as a column swept across, a row swept down, a rotating ray, or a spiral"
               >
                 <option value={0}>horizontal →</option>
                 <option value={1}>vertical ↓</option>
@@ -959,7 +959,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 
           <VoiceShell
             title="Orbit" on={cfg.orbit.on}
-            hint="The image itself is the oscillator — an orbit reads pixels at audio rate; drag the orbit to mutate the timbre live (wave terrain · Oramics)."
+            hint="The image itself is the oscillator : an orbit reads pixels at audio rate; drag the orbit to mutate the timbre live (wave terrain · Oramics)."
             onToggle={() => pv('orbit', { on: !cfg.orbit.on })}
             onDice={() => diceVoice('orbit')}
           >
@@ -1013,7 +1013,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 
           <VoiceShell
             title="Flow" on={cfg.flow.on}
-            hint="Whatever MOVES sings — each moving region fires a grain, panned where it is; colour tints each grain (Pelletier flow fields)."
+            hint="Whatever MOVES sings : each moving region fires a grain, panned where it is; color tints each grain (Pelletier flow fields)."
             onToggle={() => pv('flow', { on: !cfg.flow.on })}
             onDice={() => diceVoice('flow')}
           >
@@ -1022,7 +1022,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             <Slider label="density" value={cfg.flow.density} min={0} max={1} neutral={0.5} onChange={(v) => pv('flow', { density: v })} />
             <Slider label="grain" value={cfg.flow.dur} min={0.02} max={0.4} neutral={0.09} fmt={(v) => Math.round(v * 1000) + 'ms'} onChange={(v) => pv('flow', { dur: v })} mod={chip('flowDur')} />
             <Slider label="breath" value={cfg.flow.noise} min={0} max={1} neutral={0.15} onChange={(v) => pv('flow', { noise: v })} />
-            <Slider label="colour" value={cfg.flow.colour ?? 0} min={0} max={1} neutral={0.6} onChange={(v) => pv('flow', { colour: v })} mod={chip('flowColour')} title="Colour → grain timbre : saturation brightens each grain, hue tints it (warm = rounder body, cool = shimmer)" />
+            <Slider label="color" value={cfg.flow.colour ?? 0} min={0} max={1} neutral={0.6} onChange={(v) => pv('flow', { colour: v })} mod={chip('flowColour')} title="Color → grain timbre : saturation brightens each grain, hue tints it (warm = rounder body, cool = shimmer)" />
             <Row label="range">
               <select className="input select-compact text-[10px]" value={cfg.flow.loOct} onChange={(e) => pv('flow', { loOct: Math.min(Number(e.target.value), cfg.flow.hiOct - 1) })} title="Lowest octave">
                 {[1, 2, 3, 4].map((o) => <option key={o} value={o}>oct {o}</option>)}
@@ -1042,7 +1042,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 
           <VoiceShell
             title="Events" on={cfg.events.on}
-            hint="Edges & motion struck as discrete notes — pitch from height, velocity from strength, highs decaying sooner (after Aural Mirror)."
+            hint="Edges & motion struck as discrete notes : pitch from height, velocity from strength, highs decaying sooner (after Aural Mirror)."
             onToggle={() => pv('events', { on: !cfg.events.on })}
             onDice={() => diceVoice('events')}
           >
@@ -1057,10 +1057,10 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                   }`}
                   title={
                     mo === 'spatial'
-                      ? 'Edges / strokes (Sobel) — fires on contours, works on a still image'
+                      ? 'Edges / strokes (Sobel) : fires on contours, works on a still image'
                       : mo === 'motion'
-                        ? 'Frame difference — only what MOVES fires a note'
-                        : 'Both — a moving edge is the strongest, so it dominates'
+                        ? 'Frame difference : only what MOVES fires a note'
+                        : 'Both : a moving edge is the strongest, so it dominates'
                   }
                 >{mo}</button>
               ))}
@@ -1102,7 +1102,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 
           <VoiceShell
             title="Raster" on={cfg.raster.on}
-            hint="Audification — the probe rect read raw, row-major, as the waveform itself: edges buzz, gradients hum, glitch ticks (Ikeda · raster scanning)."
+            hint="Audification : the probe rect read raw, row-major, as the waveform itself, so edges buzz, gradients hum, glitch ticks (Ikeda · raster scanning)."
             onToggle={() => pv('raster', { on: !cfg.raster.on })}
             onDice={() => diceVoice('raster')}
           >
@@ -1153,7 +1153,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 
           <VoiceShell
             title="Transmission" on={cfg.sstv.on}
-            hint="The SSTV register — the image scanned line by line as a monophonic FM voice, the 1200Hz sync tick as a metronome."
+            hint="The SSTV register : the image scanned line by line as a monophonic FM voice, the 1200Hz sync tick as a metronome."
             onToggle={() => pv('sstv', { on: !cfg.sstv.on })}
             onDice={() => diceVoice('sstv')}
           >
@@ -1185,7 +1185,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 
           <VoiceShell
             title="Filter" on={cfg.filter.on}
-            hint="Sonify without synthesizing — 48 band-pass filters gained by the image, playing noise or live line-in THROUGH the frame (Metasynth)."
+            hint="Sonify without synthesizing : 48 band-pass filters gained by the image, playing noise or live line-in THROUGH the frame (Metasynth)."
             onToggle={() => pv('filter', { on: !cfg.filter.on })}
             onDice={() => diceVoice('filter')}
           >
@@ -1242,7 +1242,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
               <button
                 onClick={() => pv('filter', { quantize: !cfg.filter.quantize })}
                 className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.filter.quantize ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
-                title="Tune the 48 band centres to the key/scale (a resonant harmonic wash) or spread them freely"
+                title="Tune the 48 band centers to the key/scale (a resonant harmonic wash) or spread them freely"
               >&#9834; scale</button>
             </Row>
             <Slider label="gain" value={cfg.filter.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('filter', { gain: v })} />
@@ -1251,7 +1251,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 
           <VoiceShell
             title="Chord" on={cfg.chord.on}
-            hint="A scale-tuned bank following the frame brightness BANDS — a sustained chord that swells & fades, so a still image still sings (Aural Mirror additive)."
+            hint="A scale-tuned bank following the frame brightness BANDS : a sustained chord that swells & fades, so a still image still sings (Aural Mirror additive)."
             onToggle={() => pv('chord', { on: !cfg.chord.on })}
             onDice={() => diceVoice('chord')}
           >
@@ -1285,7 +1285,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 
           <VoiceShell
             title="Reverb / Delay" on={cfg.fx.send > 0.0001}
-            hint="a shared FX tail — the whole mix sends into an analog delay → Quartz/Prism reverb"
+            hint="a shared FX tail : the whole mix sends into an analog delay → Quartz/Prism reverb"
             onToggle={() => pfx({ send: cfg.fx.send > 0.0001 ? 0 : 0.35 })}
           >
             <Slider label="send" value={cfg.fx.send} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ send: v })} mod={chip('fxSend')} title="How much of the sonify mix feeds the shared reverb / delay tail" />

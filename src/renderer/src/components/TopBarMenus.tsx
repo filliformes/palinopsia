@@ -1,6 +1,6 @@
 // Two top-toolbar clusters :
-//  · Session Loader — a dropdown of every saved session + a Load button.
-//  · Generate — a dropdown of 50 visual themes + a Generate button that builds a
+//  · Session Loader : a dropdown of every saved session + a Load button.
+//  · Generate : a dropdown of 50 visual themes + a Generate button that builds a
 //    whole new (unsaved) session tethered to the theme (store.generateTheme).
 
 import { useEffect, useRef, useState } from 'react'
@@ -13,7 +13,7 @@ import { registerLoadSession } from '../commands'
 
 type SessionEntry = { name: string; path: string; mtime: number }
 
-/** Save the outgoing session before it's replaced (Load / Generate) — named
+/** Save the outgoing session before it's replaced (Load / Generate) : named
  *  sessions overwrite their file, unnamed ones go to the default Sessions/<name>,
  *  so nothing is ever silently lost. Best-effort : never blocks the replace. */
 async function saveBeforeReplace(): Promise<void> {
@@ -126,12 +126,12 @@ export function GenerateMenu(): JSX.Element {
           f.themes.map((t) => ({ value: t.id, label: t.name, group: f.family, title: t.blurb }))
         )}
         onChange={(v) => setSel(v)}
-        title={current?.blurb ?? 'Pick a visual theme — type to search by name or family'}
+        title={current?.blurb ?? 'Pick a visual theme (type to search by name or family)'}
       />
       <button
         className="btn text-[12px] text-accent2"
         onClick={async () => {
-          await saveBeforeReplace() // Generate wipes the session — save it first, like Load/Open/New
+          await saveBeforeReplace() // Generate wipes the session : save it first, like Load/Open/New
           generateTheme(sel)
           showToast(`Generated · ${current?.name ?? 'theme'} (previous saved)`)
         }}

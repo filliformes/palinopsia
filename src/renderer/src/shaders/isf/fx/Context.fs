@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Context : the always-on DEPTH finalizer, pinned last in the master chain after Vibe. It gives an image the dimensionality that makes it feel lifelike: temporal TRAILS (colours bleeding into one another over time, drifting gently into the distance), a soft key LIGHT with volumetric BLOOM on the highlights, atmospheric HAZE for aerial perspective, spatial BLUR, and a DEPTH vignette that seats the picture in space. Every parameter at zero is a clean passthrough : turn them up to add air, glow and magic.",
+  "DESCRIPTION": "Context : the always-on DEPTH finalizer, pinned last in the master chain after Vibe. It gives an image the dimensionality that makes it feel lifelike: temporal TRAILS (colors bleeding into one another over time, drifting gently into the distance), a soft key LIGHT with volumetric BLOOM on the highlights, atmospheric HAZE for aerial perspective, spatial BLUR, and a DEPTH vignette that seats the picture in space. Every parameter at zero is a clean passthrough : turn them up to add air, glow and magic.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color", "Master"],

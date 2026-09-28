@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Abstraction : one knob from representation to abstraction (an 'abstraction du réel'). As `amount` rises, the image is displaced along a luma-driven flow, quantised (posterised) and desaturated toward its own light : a recognisable source dissolving into moving matter. amount 0 = clean passthrough. Made for video/capture sources, but works on anything.",
+  "DESCRIPTION": "Abstraction : one knob from representation to abstraction (an 'abstraction du réel'). As `amount` rises, the image is displaced along a luma-driven flow, quantized (posterized) and desaturated toward its own light : a recognizable source dissolving into moving matter. amount 0 = clean passthrough. Made for video/capture sources, but works on anything.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Distortion"],

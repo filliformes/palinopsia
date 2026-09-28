@@ -13,7 +13,7 @@ import { useStore } from '../store'
 const SOURCES: Array<{ id: 'both' | 'osc' | 'local'; label: string; title: string }> = [
   { id: 'both', label: 'Both', title: 'OSC (Pandore) primary, local input as fallback' },
   { id: 'osc', label: 'OSC', title: 'Audio features from Pandore over /opsia/audio/*' },
-  { id: 'local', label: 'Local', title: 'Analyse a local mic / line / loopback input' }
+  { id: 'local', label: 'Local', title: 'Analyze a local mic / line / loopback input' }
 ]
 
 export function AudioPanel(): JSX.Element {
@@ -167,7 +167,7 @@ export function AudioPanel(): JSX.Element {
           disabled={!monitorReady}
           title={
             monitorReady
-              ? 'Hear the local input through the output (passthrough) while it also drives reactivity — e.g. monitor a Move on the interface inputs.'
+              ? 'Hear the local input through the output (passthrough) while it also drives reactivity (e.g. monitor a Move on the interface inputs).'
               : 'Turn Audio on with a Local (or Both) source first.'
           }
         />

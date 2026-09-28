@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Organic : living elemental matter, driven by a real flow field instead of scrolling noise. A divergence-free CURL-NOISE velocity field advects each element so it billows, flows and grows (not just slides), a SWIRL control sets the turbulence, DEPTH stacks parallax layers for volume, and EMBERS seeds a drifting particle layer (rising sparks · sediment/bubbles · pollen/leaves). FIRE: buoyant flames that accelerate and stretch as they rise, tongues puffing out of phase (the real flicker rhythm), coloured by temperature along the blackbody curve (dull red → orange → yellow), with rising sparks. WATER: sunlight focused by real waves onto the bed (caustics computed from the refraction of a wave surface that obeys the deep-water dispersion law), over a darker parallax deep, with drifting sediment. NATURE: a slowly growing canopy with vein/branch networks, a far foliage layer, and floating pollen. `season` blends each toward its alternate (gas-blue flame · lagoon green · patchy autumn). Matte by design : no plasma, no glow blowouts.",
+  "DESCRIPTION": "Organic : living elemental matter, driven by a real flow field instead of scrolling noise. A divergence-free CURL-NOISE velocity field advects each element so it billows, flows and grows (not just slides), a SWIRL control sets the turbulence, DEPTH stacks parallax layers for volume, and EMBERS seeds a drifting particle layer (rising sparks · sediment/bubbles · pollen/leaves). FIRE: buoyant flames that accelerate and stretch as they rise, tongues puffing out of phase (the real flicker rhythm), colored by temperature along the blackbody curve (dull red → orange → yellow), with rising sparks. WATER: sunlight focused by real waves onto the bed (caustics computed from the refraction of a wave surface that obeys the deep-water dispersion law), over a darker parallax deep, with drifting sediment. NATURE: a slowly growing canopy with vein/branch networks, a far foliage layer, and floating pollen. `season` blends each toward its alternate (gas-blue flame · lagoon green · patchy autumn). Matte by design : no plasma, no glow blowouts.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Organic"],
@@ -124,7 +124,7 @@ vec3 fire(vec2 uv, vec2 p, float t) {
   float body = clamp(pow(max(n * col, 0.0) * 1.5, 0.75 + contrast), 0.0, 1.0);
   // Rising sparks are hot bits of the SAME fire : raise the local HEAT before the
   // ramp colours it, so a spark is an ember-coloured hot spot IN-FAMILY (not a
-  // separate brighter dot a palette/finish would tint differently — which is why
+  // separate brighter dot a palette/finish would tint differently, which is why
   // they were reading green). Capped into the orange band so they stay warm.
   float sp = particles(uv, t, vec2(0.04, 0.55), embers, 0.14);
   body = max(body, sp * (1.2 - uv.y) * embers * 0.72);

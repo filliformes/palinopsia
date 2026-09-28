@@ -93,7 +93,7 @@ export function BackgroundPanel(): JSX.Element {
             ...BG_SOURCES_ALPHA.map((g): SearchOption => ({ value: g.id, label: g.name, keywords: keywordsFor(g.id), title: generatorBlurb(g.id) }))
           ]}
           onChange={(v) => setBackgroundSource(v || null)}
-          title="Background source : curated ground set — type to search"
+          title="Background source : curated ground set (type to search)"
         />
         <span onClick={(e) => e.stopPropagation()}>
           {/* snug fixed width : fits "+ fx" + arrow without clipping, but not as

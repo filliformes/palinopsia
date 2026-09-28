@@ -191,7 +191,7 @@ export function VideoTransport({
           ) : isSmooth ? (
             <span
               className="rounded border border-border/60 px-1.5 py-0.5 font-mono text-[10px] text-muted/70"
-              title="This clip is all-intra — reverse, pendulum and high-speed scrub smoothly"
+              title="This clip is all-intra : reverse, pendulum and high-speed scrub smoothly"
             >
               ◆ smooth
             </span>
@@ -283,7 +283,7 @@ export function VideoTransport({
             className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] transition-colors ${
               state.grainOn ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'
             }`}
-            title="Video granulation : three grain voices scatter short windows around the playhead (which keeps moving — modulate it to steer the cloud). Best on imported/converted all-intra clips."
+            title="Video granulation : three grain voices scatter short windows around the playhead (which keeps moving : modulate it to steer the cloud). Best on imported/converted all-intra clips."
           >
             ⌗ grain
           </button>

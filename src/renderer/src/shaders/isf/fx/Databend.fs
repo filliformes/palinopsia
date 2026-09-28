@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Databend : the byte-editing register (editing the stream, not the motion : distinct from datamosh's smear). Horizontal bands tear and jump sideways on a stepped clock; some bands HOLD their top line and repeat it downward (the byte 'repeat' smear); per-band the colour channels rotate and drift out of registration; and a subset of bands go stroboscopic. Linear fragmentation, flicker, banded corruption : Betancourt's databent-H.264 look.",
+  "DESCRIPTION": "Databend : the byte-editing register (editing the stream, not the motion : distinct from datamosh's smear). Horizontal bands tear and jump sideways on a stepped clock; some bands HOLD their top line and repeat it downward (the byte 'repeat' smear); per-band the color channels rotate and drift out of registration; and a subset of bands go stroboscopic. Linear fragmentation, flicker, banded corruption : Betancourt's databent-H.264 look.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],

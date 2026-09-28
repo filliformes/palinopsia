@@ -161,7 +161,7 @@ export function BoundedNumberInput({
       }}
       onChange={(e) => {
         const v = e.target.value
-        // Reject invalid characters but DON'T early-return on empty —
+        // Reject invalid characters but DON'T early-return on empty :
         // we still want the input to clear when the user backspaces
         // everything, so they can retype from scratch.
         if (!re.test(v)) return

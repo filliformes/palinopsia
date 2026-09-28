@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Compress : real intra-frame compression artefacts (the JPEG / MPEG keyframe look, not motion). The image is cut into macroblocks, each crushed toward its DC average + a coarse low-frequency reconstruction (blockiness + tone banding as quality drops); chroma is subsampled to a coarser grid so colour bleeds across luma edges; and quantisation RINGING haloes strong edges (Gibbs echoes). Morgan's macroblock / quantisation aesthetic : the successful-lossy-compression artefact.",
+  "DESCRIPTION": "Compress : real intra-frame compression artifacts (the JPEG / MPEG keyframe look, not motion). The image is cut into macroblocks, each crushed toward its DC average + a coarse low-frequency reconstruction (blockiness + tone banding as quality drops); chroma is subsampled to a coarser grid so color bleeds across luma edges; and quantization RINGING haloes strong edges (Gibbs echoes). Morgan's macroblock / quantization aesthetic : the successful-lossy-compression artifact.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch"],

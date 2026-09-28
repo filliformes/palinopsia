@@ -151,7 +151,7 @@ function VibeOpacityRow({ inst }: { inst: FxInstance }): JSX.Element {
         onChange={(e) => setFxOpacity({ kind: 'master' }, inst.id, Number(e.target.value))}
         onDoubleClick={() => setFxOpacity({ kind: 'master' }, inst.id, 1)}
         className="min-w-0 flex-1 accent-accent2"
-        title={`Vibe dry/wet ${v.toFixed(2)} : how much the palette re-colours the picture. Double-click = full.`}
+        title={`Vibe dry/wet ${v.toFixed(2)} : how much the palette re-colors the picture. Double-click = full.`}
       />
       <span className="w-8 shrink-0 text-right font-mono text-[10px] text-muted">{v.toFixed(2)}</span>
     </div>
@@ -232,7 +232,7 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
       </div>
       {!collapsed && (
         <div className="border-t border-border">
-          {/* Vibe : global dry/wet FIRST — how much the palette re-colours the picture. */}
+          {/* Vibe : global dry/wet FIRST : how much the palette re-colors the picture. */}
           {isVibe && <VibeOpacityRow inst={inst} />}
           {/* Controls in labelled sections (FinishingSections.tsx). */}
           <SectionedControls
@@ -270,7 +270,7 @@ function ContextLightPad({
           if (vibe) onChange('lightColor', vibeMainColor(vibe.inputs))
         }}
         className="shrink-0 rounded border border-accent2/50 bg-accent2/10 px-1.5 py-0.5 font-mono text-[10px] text-accent2 hover:bg-accent2/20"
-        title="Set the light colour from the Vibe Palette's main colour (brightened)"
+        title="Set the light color from the Vibe Palette's main color (brightened)"
       >
         Vibe Color
       </button>

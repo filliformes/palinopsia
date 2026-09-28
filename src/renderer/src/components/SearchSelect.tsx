@@ -1,8 +1,8 @@
 // SearchSelect : a native <select> replacement whose first element is a search
 // field. Click it, type, hit Enter.
 //
-// The long pickers in this app — 51 FX + 15 nodes, 32 generators, 76 Generate
-// themes — are exactly the lists a native <select> handles worst: its type-ahead
+// The long pickers in this app (51 FX + 15 nodes, 32 generators, 76 Generate
+// themes) are exactly the lists a native <select> handles worst: its type-ahead
 // only matches from the first letter. Here the query filters, and it matches the
 // entry's GROUP too, so "glitch" surfaces a whole family, while a subsequence
 // match means "atct" still finds Autocutter.
@@ -23,7 +23,7 @@ export interface SearchOption {
   title?: string
   /** Rendered before the label (the source picker's glyphs). */
   prefix?: string
-  /** Concept tags searched alongside the name — the musician's vocabulary, so
+  /** Concept tags searched alongside the name : the musician's vocabulary, so
    *  "reverb" / "bitcrush" / "delay" / "paint" surface the matching effects. */
   keywords?: string[]
 }
@@ -195,7 +195,7 @@ export function SearchSelect({
           onClick={(e) => e.stopPropagation()}
           // Keep the search input focused when clicking the popup's chrome (group
           // headings, padding). Otherwise focus falls to <body> and the app's
-          // bare-key shortcuts (R, S, 1-9, Esc) fire while you type — its guard
+          // bare-key shortcuts (R, S, 1-9, Esc) fire while you type : its guard
           // is `target.tagName === 'INPUT'`. Options handle their own click, so
           // this only preventDefaults the non-interactive regions.
           onMouseDown={(e) => {

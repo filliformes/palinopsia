@@ -283,7 +283,7 @@ export function SequencePage({
                 </div>
               </Field>
               <Field label={`Espace-temps · ${selScene.tags.spaceTime < 0.4 ? 'full' : selScene.tags.spaceTime > 0.6 ? 'void' : 'neutral'}`}
-                title="How full or empty the scene feels: 0 = dense / full frame · 1 = sparse / void. The Breathe macro oscillates around this, and Selection prefers small steps between neighbouring scenes.">
+                title="How full or empty the scene feels: 0 = dense / full frame · 1 = sparse / void. The Breathe macro oscillates around this, and Selection prefers small steps between neighboring scenes.">
 
                 <input
                   type="range"
@@ -371,7 +371,7 @@ export function SequencePage({
                 onChange={(e) => setSequence({ dwell: Number(e.target.value) })}
                 className="w-full accent-accent" />
             </Row>
-            <Row label={`humanise · ${Math.round(seq.dwellJitter * 100)}%`}
+            <Row label={`humanize · ${Math.round(seq.dwellJitter * 100)}%`}
               title="Randomly varies each dwell time by up to this much, so the pacing never feels metronomic.">
               <input type="range" min={0} max={1} step={0.01} value={seq.dwellJitter}
                 onChange={(e) => setSequence({ dwellJitter: Number(e.target.value) })}
@@ -418,7 +418,7 @@ export function SequencePage({
               </select>
             </Row>
             <Row label={`no-repeat · last ${seq.noRepeat}`}
-              title="Won't return to any of the last N scenes it played : keeps the set from cycling on a few favourites.">
+              title="Won't return to any of the last N scenes it played : keeps the set from cycling on a few favorites.">
               <input type="range" min={0} max={8} step={1} value={seq.noRepeat}
                 onChange={(e) => setSequence({ noRepeat: Number(e.target.value) })}
                 className="w-full accent-accent" />
@@ -433,9 +433,9 @@ export function SequencePage({
 
           <GroupLabel title="Slow shapes layered over the whole run : durational arcs and textures that evolve independently of the scene stepping.">Macro-form overlays</GroupLabel>
           <Section title="Breathe (Espace-temps)"
-            info="A slow dense↔void swing of the whole picture (haze / depth / blur), centred on each scene's Espace-temps tag. Set amount to 0 to switch it off.">
+            info="A slow dense↔void swing of the whole picture (haze / depth / blur), centered on each scene's Espace-temps tag. Set amount to 0 to switch it off.">
             <Row label={`amount · ${Math.round(seq.breathe.amount * 100)}%`}
-              title="A slow swing of the whole composition toward dense↔void (Context haze / depth / blur), centred on each scene's Espace-temps tag. 0 = off.">
+              title="A slow swing of the whole composition toward dense↔void (Context haze / depth / blur), centered on each scene's Espace-temps tag. 0 = off.">
               <input type="range" min={0} max={1} step={0.01} value={seq.breathe.amount}
                 onChange={(e) => setSequence({ breathe: { ...seq.breathe, amount: Number(e.target.value) } })}
                 className="w-full accent-accent2" />
@@ -470,7 +470,7 @@ export function SequencePage({
           <Section title="Burial → Exhumation"
             info="A long degrade-then-recover arc : the picture is slowly buried (breakup, crushed shadows, darkening toward illegibility) then exhumed. The meter shows how buried it is right now.">
             <label className="flex items-center gap-2 text-[11px] text-muted"
-              title="A durational arc that slowly buries the picture — analog breakup, crushed shadows, softening, darkening the grade toward illegibility — then exhumes it (recovers). A slow cosine over the length below.">
+              title="A durational arc that slowly buries the picture in analog breakup, crushed shadows, softening and a grade darkening toward illegibility, then exhumes it (recovers). A slow cosine over the length below.">
               <input type="checkbox" checked={seq.burial.enabled}
                 onChange={(e) => setSequence({ burial: { ...seq.burial, enabled: e.target.checked } })} />
               enable degrade → recover
@@ -497,7 +497,7 @@ export function SequencePage({
           <Section title="Long-Take / Veil"
             info="A slowness discipline : forbids auto-cuts (holds one take) and drives one imperceptibly-slow haze over minutes. An antidote to restless macro-forms. Manual skip still works.">
             <label className="flex items-center gap-2 text-[11px] text-muted"
-              title="A slowness discipline : FORBIDS auto-cuts (holds a single take) and drives one imperceptibly-slow veil — Context haze thickening and thinning over minutes. An antidote to restless macro-forms (a Fog Line). Manual skip still works.">
+              title="A slowness discipline : FORBIDS auto-cuts (holds a single take) and drives one imperceptibly-slow veil : Context haze thickening and thinning over minutes. An antidote to restless macro-forms (a Fog Line). Manual skip still works.">
               <input type="checkbox" checked={seq.longTake.enabled}
                 onChange={(e) => setSequence({ longTake: { ...seq.longTake, enabled: e.target.checked } })} />
               hold the shot · slow veil
@@ -771,7 +771,7 @@ function WeaveGrid({ cells, onPaint }: { cells: number[]; onPaint: (i: number) =
               isActive ? 'scale-110 border-accent ring-1 ring-accent' : 'border-border'
             }`}
             style={{ background: bg, color: v < 0 ? 'rgb(var(--c-muted))' : 'white' }}
-            title={`frame ${i + 1} : ${v < 0 ? 'blank' : `layer ${v + 1}`} — click to cycle`}
+            title={`frame ${i + 1} : ${v < 0 ? 'blank' : `layer ${v + 1}`} (click to cycle)`}
           >
             {v < 0 ? '·' : v + 1}
           </button>

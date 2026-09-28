@@ -1,6 +1,6 @@
 // The keyboard cheat-sheet (opened with `?`). This app keys nearly its whole
 // alphabet; without one place to see them the bindings are invisible. Kept in
-// sync BY HAND with App's global onKey handler — when a shortcut changes there,
+// sync BY HAND with App's global onKey handler : when a shortcut changes there,
 // change it here. Closes on backdrop click or Esc (App owns the Esc path).
 
 const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
@@ -95,7 +95,7 @@ export function ShortcutHelp({ onClose }: { onClose: () => void }): JSX.Element 
           ))}
         </div>
         <p className="mt-3 border-t border-border pt-2 text-[10px] text-muted">
-          Bare letters are ignored while a text field is focused. Most of these are also MIDI-learnable — press{' '}
+          Bare letters are ignored while a text field is focused. Most of these are also MIDI-learnable : press{' '}
           <kbd className="rounded border border-border bg-panel2 px-1 font-mono text-[10px]">L</kbd>.
         </p>
       </div>

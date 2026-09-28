@@ -78,7 +78,7 @@ float shapeDist(int s, vec2 p, float r) {
 }
 
 // Screen-space edge crop : 1 inside the kept window, 0 in the cropped margins.
-// A fixed garbage matte — it does NOT move with zoom/pan, it frames the layer's
+// A fixed garbage matte : it does NOT move with zoom/pan, it frames the layer's
 // final rectangle. uv.y = 0 is the BOTTOM of the displayed frame, so cropUp
 // bites the HIGH-y (top) edge and cropDown the low-y (bottom) edge.
 float cropMask(vec2 uv) {

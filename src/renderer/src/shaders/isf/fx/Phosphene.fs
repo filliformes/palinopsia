@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Phosphene : the retinal afterimage that gives the instrument its name (palinopsia). A bright stimulus burns a lingering COMPLEMENTARY-colour negative ghost into a persistent buffer that slowly decays : the afterimage itself, distinct from motion-trail feedback. Bounded (loop gain < 1) so it can never run away. No psychedelia.",
+  "DESCRIPTION": "Phosphene : the retinal afterimage that gives the instrument its name (palinopsia). A bright stimulus burns a lingering COMPLEMENTARY-color negative ghost into a persistent buffer that slowly decays : the afterimage itself, distinct from motion-trail feedback. Bounded (loop gain < 1) so it can never run away. No psychedelia.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Optical"],

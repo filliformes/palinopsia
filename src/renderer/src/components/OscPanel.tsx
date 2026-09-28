@@ -165,7 +165,7 @@ export function OscPanel(): JSX.Element {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
               }}
               className={`input w-16 px-1 py-0.5 text-right text-[11px] ${invalid === 'port' ? 'ring-1 ring-danger' : ''}`}
-              title="Local UDP port to listen on (Pandore sends here) — 1–65535"
+              title="Local UDP port to listen on (Pandore sends here) : 1–65535"
             />
           </div>
 
@@ -249,7 +249,7 @@ export function OscPanel(): JSX.Element {
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
           }}
             className={`input w-12 px-1 py-0.5 text-right text-[11px] ${invalid === 'outPort' ? 'ring-1 ring-danger' : ''}`}
-            title="Destination UDP port Pandore receives on — 1–65535"
+            title="Destination UDP port Pandore receives on : 1–65535"
           />
           </div>
             </>

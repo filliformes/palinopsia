@@ -54,7 +54,7 @@ function parseHeader(source: string): RawInput[] {
   }
 }
 
-/** Controls the auto-UI should render for a shader (image inputs excluded —
+/** Controls the auto-UI should render for a shader (image inputs excluded :
  *  the engine wires those). Booleans normalize to 0/1 floats so the store's
  *  value model stays numeric. */
 export function inputsForShader(shaderId: string): IsfInputDesc[] {

@@ -34,7 +34,7 @@ export function CollageStrip({
   const [picking, setPicking] = useState(false)
   // The running VERB doubles as the busy flag : an optimise pass is minutes where
   // a scan is seconds, and the folder button is the only place that says so.
-  const [busy, setBusy] = useState<'' | 'scanning' | 'optimising'>('')
+  const [busy, setBusy] = useState<'' | 'scanning' | 'optimizing'>('')
   const [progress, setProgress] = useState('')
   const [note, setNote] = useState('')
   // A scan can outlive the selection that started it; don't setState after unmount.
@@ -47,7 +47,7 @@ export function CollageStrip({
   }, [])
 
   const scan = async (dir: string, optimise = false): Promise<void> => {
-    setBusy(optimise ? 'optimising' : 'scanning')
+    setBusy(optimise ? 'optimizing' : 'scanning')
     setProgress('')
     setNote('')
     // The counter also names the latest file : main announces each file BEFORE a
@@ -62,7 +62,7 @@ export function CollageStrip({
       const res = optimise ? await window.api.collageOptimise(dir) : await window.api.collageScan(dir)
       // The store write belongs to the composition, not this component, so it
       // must land even if the strip unmounted mid-scan (selecting another layer
-      // during a minutes-long optimise) — else the finished result is thrown
+      // during a minutes-long optimize), else the finished result is thrown
       // away and the pool stays empty with no sign anything happened.
       if (res.ok) writePool(dir, res.clips)
       if (!alive.current) return
@@ -115,7 +115,7 @@ export function CollageStrip({
         className="btn shrink-0 text-[11px]"
         disabled={!!busy}
         onClick={() => void pick()}
-        title="Pick a folder of videos. Every clip in it joins the pool the pieces are dealt from — any format, portrait or landscape; codecs Chromium can't play are converted once."
+        title="Pick a folder of videos. Every clip in it joins the pool the pieces are dealt from : any format, portrait or landscape; codecs Chromium can't play are converted once."
       >
         {busy ? `${busy} ${progress}` : 'folder…'}
       </button>
@@ -138,9 +138,9 @@ export function CollageStrip({
         <button
           className="btn shrink-0 text-[11px]"
           onClick={() => void scan(folder, true)}
-          title="Re-encode every clip in the folder to 720p all-intra H.264 — the shape the wall's constant seeking wants (every window loop, every re-roll, every cut lands on a keyframe instead of decoding forward from one). Much slower than a scan: minutes for a big folder. One-time cost per file, though — the result is cached and found instantly ever after."
+          title="Re-encode every clip in the folder to 720p all-intra H.264, the shape the wall's constant seeking wants (every window loop, every re-roll, every cut lands on a keyframe instead of decoding forward from one). Much slower than a scan: minutes for a big folder. One-time cost per file, though : the result is cached and found instantly ever after."
         >
-          optimise
+          optimize
         </button>
       )}
       {note && <span className="shrink-0 text-[10px] text-muted">{note}</span>}
@@ -156,7 +156,7 @@ export function CollageStrip({
       <div className="max-h-32 overflow-y-auto border-b border-border bg-panel2/20 px-2 py-1">
         {bank.length === 0 ? (
           <div className="py-1 text-[11px] text-muted">
-            No saved assemblages yet — generate and save some in the assemble tab (<kbd>E</kbd>).
+            No saved assemblages yet : generate and save some in the assemble tab (<kbd>E</kbd>).
           </div>
         ) : (
           bank.map((a) => (

@@ -1,9 +1,9 @@
-// Assemble — the automatic experimental editor (right column tab).
+// Assemble : the automatic experimental editor (right column tab).
 //
 // Mosaïque's workflow, carried to video : point it at a folder, let it segment
 // and analyse every film into a point cloud, shape HOW clips should follow one
 // another, then generate. The result is an edit decision list played live by an
-// Assemble layer source — so it lands in the instrument like any other picture
+// Assemble layer source, so it lands in the instrument like any other picture
 // and takes the whole FX stack on top.
 
 import { useEffect, useRef, useState } from 'react'
@@ -109,7 +109,7 @@ export function AssemblePanel(): JSX.Element {
   // ── Generate / vary ───────────────────────────────────────────────────
   function build(seed: number, label?: string): Assemblage | null {
     if (!corpus || !corpus.units.length) {
-      setErr('Analyse a folder first.')
+      setErr('Analyze a folder first.')
       return null
     }
     const clips = generate({
@@ -120,7 +120,7 @@ export function AssemblePanel(): JSX.Element {
       liveTarget: params.mode === 'live' ? liveDescriptor() : null
     })
     if (!clips.length) {
-      setErr('The corpus produced no clips — try loosening the matching.')
+      setErr('The corpus produced no clips : try loosening the matching.')
       return null
     }
     const a: Assemblage = {
@@ -141,7 +141,7 @@ export function AssemblePanel(): JSX.Element {
 
   const doGenerate = (): void => void build((Math.random() * 2 ** 32) >>> 0)
   // Variation keeps the recipe and re-rolls the dice, exactly like the
-  // instrument's Vary button — same intent, new siblings.
+  // instrument's Vary button : same intent, new siblings.
   const doVary = (): void => {
     if (!draft) return void doGenerate()
     void build((draft.seed + 1 + ((Math.random() * 1000) | 0)) >>> 0, draft.name)
@@ -180,7 +180,7 @@ export function AssemblePanel(): JSX.Element {
               className="shrink-0 font-mono text-[10px] text-muted hover:text-accent"
               onClick={() => void analyze(folder)}
               disabled={!!busy}
-              title="Re-analyse (picks up new or changed files)"
+              title="Re-analyze (picks up new or changed files)"
             >
               ↻
             </button>
@@ -234,7 +234,7 @@ export function AssemblePanel(): JSX.Element {
           value={params.contrast}
           onChange={(v) => setParams({ contrast: v })}
           fmt={(v) => (v < 0.12 ? 'morph' : v > 0.85 ? 'whiplash' : `${Math.round(v * 100)}%`)}
-          title="0 = each cut lands on the nearest neighbour (clips melt into each other) · 1 = the farthest (every cut is a slap)"
+          title="0 = each cut lands on the nearest neighbor (clips melt into each other) · 1 = the farthest (every cut is a slap)"
         />
         <Slider
           label="variety"
@@ -264,8 +264,8 @@ export function AssemblePanel(): JSX.Element {
                 }}
                 title={
                   i < 8
-                    ? `${DESC_LABELS[d]} — also readable from the live output, so it works in follow mode`
-                    : `${DESC_LABELS[d]} — corpus only`
+                    ? `${DESC_LABELS[d]} : also readable from the live output, so it works in follow mode`
+                    : `${DESC_LABELS[d]} : corpus only`
                 }
               />
             ))}
@@ -315,7 +315,7 @@ export function AssemblePanel(): JSX.Element {
             className="min-w-0 flex-1 accent-accent"
             title={
               params.baseCut > 0
-                ? `Base cut ${fmtCut(params.baseCut)} — ~${Math.max(1, Math.round(params.duration / params.baseCut))} clips at ${fmt(params.duration)}. Double-click for natural.`
+                ? `Base cut ${fmtCut(params.baseCut)} : ~${Math.max(1, Math.round(params.duration / params.baseCut))} clips at ${fmt(params.duration)}. Double-click for natural.`
                 : 'Natural : each clip keeps its shot’s own length. Push right for a fixed, faster cutting pace (more clips per second).'
             }
           />
@@ -337,7 +337,7 @@ export function AssemblePanel(): JSX.Element {
           amount={params.spdAmount}
           onShape={(spdShape) => setParams({ spdShape })}
           onAmount={(spdAmount) => setParams({ spdAmount })}
-          hint="Playback rate of each clip, across the sequence. Independent of cut length — cross the two for slow-motion stutter."
+          hint="Playback rate of each clip, across the sequence. Independent of cut length : cross the two for slow-motion stutter."
         />
       </Box>
 
@@ -520,7 +520,7 @@ function Curve({
   for (let i = 0; i <= 28; i++) {
     const t = i / 28
     // Draw the amount-scaled deviation from neutral, so amount 0 is a flat line
-    // whatever the shape — which is exactly what it does to the edit.
+    // whatever the shape, which is exactly what it does to the edit.
     const c = 0.5 + (curveAt(shape, t, 0.5) - 0.5) * amount
     pts.push(`${(t * 60).toFixed(1)},${(14 - c * 12).toFixed(1)}`)
   }
@@ -598,7 +598,7 @@ function CorpusMap(): JSX.Element {
   const H = 132
 
   // The right column is user-resizable, and the backing store is sized from
-  // clientWidth — without this the old bitmap just stretches (oval dots, blur).
+  // clientWidth : without this the old bitmap just stretches (oval dots, blur).
   useEffect(() => {
     const cv = canvasRef.current
     if (!cv || typeof ResizeObserver === 'undefined') return
@@ -624,7 +624,7 @@ function CorpusMap(): JSX.Element {
       if (!u) continue
       const [mx, my] = map[i]
       // Tint each point by its own look : hue from warmth, lightness from
-      // brightness — so the cloud reads as the corpus, not as abstract dots.
+      // brightness, so the cloud reads as the corpus, not as abstract dots.
       const warm = u.desc[7] ?? 0.5
       const bright = u.desc[0] ?? 0.5
       g.fillStyle = `hsl(${200 - warm * 190} ${25 + (u.desc[9] ?? 0) * 55}% ${22 + bright * 55}%)`
@@ -688,7 +688,7 @@ function CorpusMap(): JSX.Element {
       <div className="flex items-center justify-between">
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted">map</span>
         <span className="font-mono text-[8px] text-muted">
-          {params.mode === 'trajectory' ? 'drag A / B to set the path' : 'neighbours look alike'}
+          {params.mode === 'trajectory' ? 'drag A / B to set the path' : 'neighbors look alike'}
         </span>
       </div>
       <canvas
@@ -736,7 +736,7 @@ function CorpusMap(): JSX.Element {
   )
 }
 
-/** Draw a base64 raw-RGB chip. No decoder involved — the analyser already gave
+/** Draw a base64 raw-RGB chip. No decoder involved : the analyzer already gave
  *  us pixels, so this is just a putImageData. */
 function Thumb({ b64, size = 34 }: { b64: string; size?: number }): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null)
