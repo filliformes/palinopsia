@@ -1,4 +1,4 @@
-// Generate : 50 "visual themes", each a RECIPE the generator obeys so every
+// Generate : the "visual themes", each a RECIPE the generator obeys so every
 // result reads unmistakably as its theme (not free Randomize). A theme declares
 // a tight source pool, an FX pool, a blend bias, a Vibe palette, a diegetic World
 // (coupling + Context mood + audio routing), and field-macro / temperament biases.
@@ -62,12 +62,19 @@ export interface Theme {
   /** Per-layer source pools, bottom layer first, overriding `sources` on those
    *  layers (rock under lichen, paper under the burn). */
   stack?: string[][]
-  /** Value draws per source : one of the listed values (a single value is fixed). */
+  /** Value draws per source, effect or node : one of the listed values (a single
+   *  value is fixed). */
   pickInputs?: Record<string, Record<string, number[]>>
   /** Lines a Text source draws from (one to three, stepped with `next line`). */
   words?: string[]
   /** A/B source-mix modes (default normal / screen / difference / multiply). */
   mixBlends?: BlendMode[]
+  /** Lowest layer a native node lands on (1 = never the bottom : the node reads
+   *  the layers under it). */
+  nativeFrom?: number
+  /** Plays the user's clips (Collage) : stands in with painted sources, and says
+   *  so, until a Collage folder has been picked on this computer. */
+  needsClips?: boolean
   /** How the scene moves : overrides the family's motion recipe. */
   motion?: Partial<MotionRecipe>
 }
@@ -139,8 +146,14 @@ const FAMILY_MOTION: Record<string, MotionRecipe> = {
     mods: [1, 2], types: ['lfo', 'euclid'], shapes: ['sine', 'triangle'],
     rate: [0.02, 0.15], bpm: 0.3, depth: [0.15, 0.4]
   },
+  Dome: { ...SLOW, rate: [0.008, 0.05] },
+  'Film Wall': {
+    mods: [2, 3], types: ['sh', 'euclid', 'lfo'], shapes: ['rndStep', 'square', 'triangle'],
+    rate: [0.1, 1], bpm: 0.5, depth: [0.25, 0.55]
+  },
+  'Node Workshop': { ...MOTION_DEFAULT, rate: [0.03, 0.6], bpm: 0.35 },
   // Each study isolates one Feel macro : nothing else may move.
-  Test: { ...MOTION_DEFAULT, mods: [0, 0] }
+  'Feel Studies': { ...MOTION_DEFAULT, mods: [0, 0] }
 }
 
 /** The motion recipe a theme generates with : its family's, bent by the theme. */
@@ -942,79 +955,181 @@ export const THEMES: Theme[] = [
     vibe: { mixSrc: 0.8 }
   }),
 
-  // ── Test : one theme per macro (open Feel · G, then sweep the named macro).
-  // Each isolates ONE macro — clean content, every OTHER macro left neutral.
+  // ── Dome : made for a fulldome. No vignette (it darkens the rim, where a dome
+  // audience looks), nothing that frames the edges, slow motion overhead. ──
   mk({
-    id: 'test-density', name: 'Density', family: 'Test',
-    blurb: 'TEST · Four stacked layers. Sweep DENSITY in Feel (G) : left fades the upper layers out (sparse), right fills them in (dense).',
-    world: 'synthetic',
-    palette: [K, [0.5, 0.3, 0.6, 1], [0.3, 0.6, 0.55, 1], [0.85, 0.8, 0.4, 1]],
-    sources: ['shapes', 'op-art', 'grid-drift', 'contour', 'murmuration'],
-    layerFx: ['fx-grade'],
-    blends: ['screen', 'lighten'], layers: [4, 4], useB: 0
-  }),
-  mk({
-    id: 'test-gesture', name: 'Gesture ⇄ Texture', family: 'Test',
-    blurb: 'TEST · A moving, textured field. Sweep G↔T : left = gesture (crisp, sharpened motion), right = texture (internalised churn / trails).',
-    world: 'musical',
-    palette: [K, [0.14, 0.16, 0.2, 1], [0.75, 0.8, 0.85, 1]],
-    sources: ['murmuration', 'particle-drift'],
-    layerFx: ['fx-grade'],
-    blends: ['screen'], layers: [2, 2], useB: 0
-  }),
-  mk({
-    id: 'test-coalesce', name: 'Coalesce', family: 'Test',
-    blurb: 'TEST · A detailed field. Sweep COALESCE : left breaks it into grain / dither, right pulls it into smooth mass (blur).',
-    world: 'synthetic',
-    palette: [K, [0.2, 0.22, 0.26, 1], [0.85, 0.85, 0.8, 1]],
-    sources: ['op-art', 'interference', 'contour'],
-    layerFx: ['fx-grade'],
-    blends: ['screen'], layers: [1, 2], useB: 0
-  }),
-  mk({
-    id: 'test-tonicity', name: 'Tonicity', family: 'Test',
-    blurb: 'TEST · NEEDS Audio on. A colourful field. Sweep TONICITY : tonal/harmonic audio pulls colour in, noise pulls toward black-and-white.',
-    world: 'peint',
-    palette: [K, [0.7, 0.15, 0.4, 1], [0.15, 0.55, 0.7, 1], [0.9, 0.8, 0.3, 1]],
-    sources: ['dye-field', 'organic'],
-    layerFx: ['fx-grade'],
-    blends: ['screen', 'lighten'], layers: [2, 2], useB: 0, tonicity: 0.7
-  }),
-  mk({
-    id: 'test-shutter', name: 'Shutter', family: 'Test',
-    blurb: 'TEST · Fast motion. Sweep SHUTTER : the whole frame stop-motion-steps — low = chunky (~2fps), high = fluid.',
-    world: 'synthetic',
-    palette: [K, [0.16, 0.18, 0.22, 1], [0.8, 0.82, 0.86, 1]],
-    sources: ['murmuration', 'particle-drift', 'swell'],
-    layerFx: ['fx-grade'],
-    blends: ['screen'], layers: [2, 2], useB: 0, shutter: 0.4
-  }),
-  mk({
-    id: 'test-drift', name: 'Drift', family: 'Test',
-    blurb: 'TEST · A calm graded image. Sweep DRIFT : the grade slowly wanders (gamma / RGB) with rare analog accidents — watch over ~10s.',
+    id: 'dome-aurora', name: 'Aurora', family: 'Dome',
+    blurb: 'Slow curtains of colored light across the whole sky.',
     world: 'sublimated',
-    palette: [K, [0.3, 0.16, 0.12, 1], [0.85, 0.75, 0.6, 1]],
-    sources: ['organic', 'membrane'],
-    layerFx: ['fx-grade'],
-    blends: ['screen'], layers: [1, 1], useB: 0, drift: 0.6
+    palette: [K, [0.04, 0.18, 0.14, 1], [0.3, 0.75, 0.55, 1], [0.7, 0.55, 0.85, 1]],
+    sources: ['dye-field', 'swell', 'membrane'],
+    layerFx: ['fx-light-trails', 'fx-grade', 'fx-hue-rotate'],
+    blends: ['screen', 'lighten'], layers: [1, 2], useB: 0.2, feedback: 0.3, drift: 0.2, density: 0.4,
+    context: { depth: 0, haze: 0.1, bloom: 0.18 }
   }),
   mk({
-    id: 'test-flow', name: 'Flow ⇄ Interruption', family: 'Test',
-    blurb: 'TEST · Moving content. Sweep FLOW : left (interruption) stutters — frame-holds, breakup, blank stabs; right (flow) softens to a liquid image.',
-    world: 'incongruent',
-    palette: [K, [0.18, 0.14, 0.24, 1], [0.75, 0.78, 0.85, 1]],
-    sources: ['particle-drift', 'murmuration'],
-    layerFx: ['fx-grade'],
-    blends: ['screen'], layers: [2, 2], useB: 0
+    id: 'dome-canopy', name: 'Canopy', family: 'Dome',
+    blurb: 'Branching threads growing overhead, like looking up through a forest.',
+    world: 'musical',
+    palette: [K, [0.08, 0.14, 0.08, 1], [0.6, 0.72, 0.5, 1]],
+    sources: ['mycelium', 'filaments'],
+    layerFx: ['fx-grade', 'fx-light-trails'],
+    blends: ['screen', 'lighten'], layers: [1, 2], useB: 0, drift: 0.2, density: 0.45,
+    context: { depth: 0, haze: 0.12 }
   }),
   mk({
-    id: 'test-super', name: 'Superimposition', family: 'Test',
-    blurb: 'TEST · Three distinct layers. Sweep SUPERIMPOSITION : a hypnagogic strobe cross-cuts which single layer shows each drawn frame.',
+    id: 'dome-flock', name: 'Flock Overhead', family: 'Dome',
+    blurb: 'A murmuration wheeling across the whole sky, its trails fading behind it.',
+    world: 'musical',
+    palette: [K, [0.1, 0.12, 0.18, 1], [0.78, 0.8, 0.86, 1]],
+    sources: ['murmuration', 'particle-drift'],
+    layerFx: ['fx-light-trails', 'fx-grade'],
+    nativeNodes: ['node-ibfv'], nativeChance: 0.3,
+    blends: ['screen', 'add'], layers: [1, 2], useB: 0, feedback: 0.3, density: 0.45,
+    context: { depth: 0 }
+  }),
+  mk({
+    id: 'dome-strata', name: 'Strata', family: 'Dome',
+    blurb: 'A ceiling of layered rock lit low from one side : the dome as a cave.',
+    world: 'mineral',
+    palette: [K, [0.2, 0.16, 0.12, 1], [0.76, 0.68, 0.56, 1]],
+    sources: ['scan', 'ground'],
+    stack: [['scan']],
+    pickInputs: { ground: { kind: [2] }, scan: { material: [11, 12, 19] } },
+    layerFx: ['fx-grade', 'fx-grain'],
+    blends: ['normal', 'multiply'], layers: [1, 1], useB: 0.3, mixBlends: ['multiply', 'lumakey'], feedback: 0,
+    vibe: { mixSrc: 0.55 },
+    context: { depth: 0 }
+  }),
+  mk({
+    id: 'dome-deep-water', name: 'Deep Water', family: 'Dome',
+    blurb: 'Looking up at the surface from below : caustics and swell over the whole dome.',
+    world: 'sublimated',
+    palette: [K, [0.03, 0.1, 0.18, 1], [0.35, 0.7, 0.8, 1]],
+    sources: ['organic', 'swell'],
+    pickInputs: { organic: { mode: [1] } },
+    layerFx: ['fx-grade', 'fx-light-trails'],
+    blends: ['screen', 'lighten'], layers: [1, 2], useB: 0.2, drift: 0.2, density: 0.4,
+    context: { depth: 0, haze: 0.08 }
+  }),
+
+  // ── Film Wall : your own films (a Collage folder), cut, graded, damaged ──
+  mk({
+    id: 'film-wall', name: 'Film Wall', family: 'Film Wall',
+    blurb: 'A wall of your films cut up like torn paper, every piece its own clip, graded and grained.',
+    world: 'monomedia',
+    palette: [K, [0.2, 0.18, 0.16, 1], [0.86, 0.82, 0.74, 1]],
+    sources: ['gen-collage'], needsClips: true,
+    pickInputs: { 'gen-collage': { feed: [0], shape: [0, 1] } },
+    layerFx: ['fx-grade', 'fx-grain'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0,
+    vibe: { mixSrc: 0.8 },
+    finalizer: { grain: 0.1, filmDust: 0.2, filmScratch: 0.15, filmGauge: 1 }
+  }),
+  mk({
+    id: 'contact-sheet', name: 'Contact Sheet', family: 'Film Wall',
+    blurb: 'Many small films at once, cut into a tight grid of frames, nearly gray.',
+    world: 'monomedia',
+    palette: [INK, [0.3, 0.3, 0.3, 1], [0.9, 0.9, 0.88, 1]],
+    sources: ['gen-collage'], needsClips: true,
+    pickInputs: { 'gen-collage': { feed: [0], shape: [0], cuts: [24, 32, 40], films: [16, 24] } },
+    layerFx: ['fx-grade', 'fx-sharpen'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0,
+    vibe: { mixSrc: 0.7, saturation: 0.6 }
+  }),
+  mk({
+    id: 'nitrate', name: 'Nitrate', family: 'Film Wall',
+    blurb: 'Old nitrate stock decomposing : amber, scratched, slowly eaten by corrosion.',
+    world: 'monomedia',
+    palette: [K, [0.28, 0.16, 0.06, 1], [0.9, 0.74, 0.46, 1]],
+    sources: ['gen-collage'], needsClips: true,
+    pickInputs: { 'gen-collage': { feed: [0] } },
+    layerFx: ['fx-grain', 'fx-solarize', 'fx-grade'],
+    nativeNodes: ['node-corrode'], nativeChance: 0.6,
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0,
+    vibe: { mixSrc: 0.45 },
+    finalizer: { grain: 0.18, filmDust: 0.45, filmScratch: 0.45, filmHair: 0.3, filmGauge: 0, filmDirt: 1 }
+  }),
+  mk({
+    id: 'projection-booth', name: 'Projection Booth', family: 'Film Wall',
+    blurb: 'Your films through a projector gate : the iris breathes, dust and a hair ride the frame.',
+    world: 'monomedia',
+    palette: [K, [0.22, 0.18, 0.12, 1], [0.92, 0.86, 0.72, 1]],
+    sources: ['gen-collage'], needsClips: true,
+    pickInputs: { 'gen-collage': { feed: [0], cuts: [2, 3, 4] } },
+    layerFx: ['fx-aperture', 'fx-grain'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0,
+    vibe: { mixSrc: 0.75 },
+    finalizer: { filmDust: 0.3, filmScratch: 0.25, filmHair: 0.4, filmGauge: 1 }
+  }),
+
+  // ── Node Workshop : one recipe node per theme, placed where it reads the
+  // layers it needs ──
+  mk({
+    id: 'workshop-gooey', name: 'Gooey Blobs', family: 'Node Workshop',
+    blurb: 'Blur, then cut : shapes that come close melt into soft single blobs.',
     world: 'synthetic',
-    palette: [K, [0.5, 0.3, 0.2, 1], [0.2, 0.5, 0.6, 1], [0.85, 0.85, 0.5, 1]],
-    sources: ['shapes', 'op-art', 'contour', 'grid-drift'],
+    palette: [K, [0.18, 0.1, 0.28, 1], [0.85, 0.78, 0.9, 1]],
+    // Dense, solid forms : sparse points blur away below the cut and leave black.
+    sources: ['shapes', 'metamorph', 'reaction'],
+    pickInputs: { 'node-gooey': { threshold: [0.22, 0.28, 0.34], blur: [0.4, 0.5], fill: [1, 2], mix: [1] } },
     layerFx: ['fx-grade'],
-    blends: ['screen', 'lighten'], layers: [3, 3], useB: 0, superFlicker: 0.4
+    nativeNodes: ['node-gooey'], nativeChance: 0.95,
+    blends: ['screen', 'lighten'], layers: [1, 2], useB: 0.2
+  }),
+  mk({
+    id: 'workshop-palette', name: 'Borrowed Palette', family: 'Node Workshop',
+    blurb: 'Line-work recolored through a live palette read off the moving layer below it.',
+    world: 'parametric',
+    palette: [K, [0.14, 0.16, 0.2, 1], [0.82, 0.84, 0.86, 1]],
+    sources: ['contour', 'op-art', 'differential'],
+    stack: [['dye-field', 'organic', 'swell'], ['contour', 'op-art', 'differential']],
+    layerFx: ['fx-grade'],
+    nativeNodes: ['node-lookup'], nativeChance: 0.95, nativeFrom: 1,
+    blends: ['normal', 'screen', 'lightercolor'], layers: [2, 2], useB: 0
+  }),
+  mk({
+    id: 'workshop-matte', name: 'Layer Matte', family: 'Node Workshop',
+    blurb: 'Three layers keyed into one : a matte decides where each picture shows.',
+    world: 'incongruent',
+    palette: [K, [0.24, 0.1, 0.12, 1], [0.12, 0.4, 0.46, 1], [0.9, 0.86, 0.78, 1]],
+    sources: ['shapes', 'op-art', 'organic'],
+    stack: [['organic', 'dye-field', 'swell'], ['op-art', 'interference', 'ramps'], ['shapes', 'gen-text']],
+    words: ['HERE', 'THERE', 'NOW', 'AFTER'],
+    layerFx: ['fx-grade'],
+    nativeNodes: ['node-matte'], nativeChance: 0.95, nativeFrom: 2,
+    blends: ['normal'], layers: [3, 3], useB: 0
+  }),
+  mk({
+    id: 'workshop-remap', name: 'Displaced', family: 'Node Workshop',
+    blurb: 'A picture pushed around by the brightness of another : one layer remaps the other.',
+    world: 'parametric',
+    palette: [K, [0.16, 0.08, 0.2, 1], [0.8, 0.6, 0.4, 1]],
+    sources: ['dye-field', 'organic'],
+    stack: [['op-art', 'interference', 'ramps'], ['dye-field', 'organic', 'swell']],
+    layerFx: ['fx-grade'],
+    nativeNodes: ['node-remap'], nativeChance: 0.95, nativeFrom: 1,
+    blends: ['normal', 'screen'], layers: [2, 2], useB: 0
+  }),
+  mk({
+    id: 'workshop-focus', name: 'Focus Pull', family: 'Node Workshop',
+    blurb: 'A blur that follows the light : bright parts soften, dark detail stays sharp.',
+    world: 'sublimated',
+    palette: [K, [0.1, 0.12, 0.16, 1], [0.8, 0.8, 0.76, 1]],
+    sources: ['particle-drift', 'shapes', 'ash', 'murmuration'],
+    layerFx: ['fx-grade'],
+    nativeNodes: ['node-lumablur'], nativeChance: 0.95,
+    blends: ['screen', 'lighten'], layers: [1, 2], useB: 0.2
+  }),
+  mk({
+    id: 'workshop-fault', name: 'Fault Line', family: 'Node Workshop',
+    blurb: 'A dirty vision mixer : a clean picture, then a sudden fault on the beat (a dropout, a held cut, a torn line).',
+    world: 'incongruent',
+    palette: [K, [0.14, 0.14, 0.16, 1], [0.8, 0.78, 0.72, 1]],
+    sources: ['slabs', 'column-scan', 'contour'],
+    layerFx: ['fx-grade', 'fx-scanlines'],
+    nativeNodes: ['node-faultline'], nativeChance: 0.95,
+    blends: ['screen', 'lighten'], layers: [1, 2], useB: 0.2
   }),
 
   // ── New effect showcases (borrowed ideas) ──────────────────────────────
@@ -1047,7 +1162,83 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-grade'],
     nativeNodes: ['node-datamosh'], nativeChance: 0.7,
     blends: ['screen', 'difference'], layers: [2, 3], gestureTexture: 0.6, coalesce: 0.35, density: 0.55
+  }),
+
+  // ── Feel Studies : one theme per macro (open Feel · G, then sweep the named
+  // macro). Each isolates ONE macro : clean content, every OTHER macro neutral.
+  mk({
+    id: 'test-density', name: 'Density', family: 'Feel Studies',
+    blurb: 'STUDY · Four stacked layers. Sweep DENSITY in Feel (G) : left fades the upper layers out (sparse), right fills them in (dense).',
+    world: 'synthetic',
+    palette: [K, [0.5, 0.3, 0.6, 1], [0.3, 0.6, 0.55, 1], [0.85, 0.8, 0.4, 1]],
+    sources: ['shapes', 'op-art', 'grid-drift', 'contour', 'murmuration'],
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [4, 4], useB: 0
+  }),
+  mk({
+    id: 'test-gesture', name: 'Gesture ⇄ Texture', family: 'Feel Studies',
+    blurb: 'STUDY · A moving, textured field. Sweep G↔T : left = gesture (crisp, sharpened motion), right = texture (internalised churn / trails).',
+    world: 'musical',
+    palette: [K, [0.14, 0.16, 0.2, 1], [0.75, 0.8, 0.85, 1]],
+    sources: ['murmuration', 'particle-drift'],
+    layerFx: ['fx-grade'],
+    blends: ['screen'], layers: [2, 2], useB: 0
+  }),
+  mk({
+    id: 'test-coalesce', name: 'Coalesce', family: 'Feel Studies',
+    blurb: 'STUDY · A detailed field. Sweep COALESCE : left breaks it into grain / dither, right pulls it into smooth mass (blur).',
+    world: 'synthetic',
+    palette: [K, [0.2, 0.22, 0.26, 1], [0.85, 0.85, 0.8, 1]],
+    sources: ['op-art', 'interference', 'contour'],
+    layerFx: ['fx-grade'],
+    blends: ['screen'], layers: [1, 2], useB: 0
+  }),
+  mk({
+    id: 'test-tonicity', name: 'Tonicity', family: 'Feel Studies',
+    blurb: 'STUDY · NEEDS Audio on. A colourful field. Sweep TONICITY : tonal/harmonic audio pulls colour in, noise pulls toward black-and-white.',
+    world: 'peint',
+    palette: [K, [0.7, 0.15, 0.4, 1], [0.15, 0.55, 0.7, 1], [0.9, 0.8, 0.3, 1]],
+    sources: ['dye-field', 'organic'],
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [2, 2], useB: 0, tonicity: 0.7
+  }),
+  mk({
+    id: 'test-shutter', name: 'Shutter', family: 'Feel Studies',
+    blurb: 'STUDY · Fast motion. Sweep SHUTTER : the whole frame stop-motion-steps — low = chunky (~2fps), high = fluid.',
+    world: 'synthetic',
+    palette: [K, [0.16, 0.18, 0.22, 1], [0.8, 0.82, 0.86, 1]],
+    sources: ['murmuration', 'particle-drift', 'swell'],
+    layerFx: ['fx-grade'],
+    blends: ['screen'], layers: [2, 2], useB: 0, shutter: 0.4
+  }),
+  mk({
+    id: 'test-drift', name: 'Drift', family: 'Feel Studies',
+    blurb: 'STUDY · A calm graded image. Sweep DRIFT : the grade slowly wanders (gamma / RGB) with rare analog accidents — watch over ~10s.',
+    world: 'sublimated',
+    palette: [K, [0.3, 0.16, 0.12, 1], [0.85, 0.75, 0.6, 1]],
+    sources: ['organic', 'membrane'],
+    layerFx: ['fx-grade'],
+    blends: ['screen'], layers: [1, 1], useB: 0, drift: 0.6
+  }),
+  mk({
+    id: 'test-flow', name: 'Flow ⇄ Interruption', family: 'Feel Studies',
+    blurb: 'STUDY · Moving content. Sweep FLOW : left (interruption) stutters — frame-holds, breakup, blank stabs; right (flow) softens to a liquid image.',
+    world: 'incongruent',
+    palette: [K, [0.18, 0.14, 0.24, 1], [0.75, 0.78, 0.85, 1]],
+    sources: ['particle-drift', 'murmuration'],
+    layerFx: ['fx-grade'],
+    blends: ['screen'], layers: [2, 2], useB: 0
+  }),
+  mk({
+    id: 'test-super', name: 'Superimposition', family: 'Feel Studies',
+    blurb: 'STUDY · Three distinct layers. Sweep SUPERIMPOSITION : a hypnagogic strobe cross-cuts which single layer shows each drawn frame.',
+    world: 'synthetic',
+    palette: [K, [0.5, 0.3, 0.2, 1], [0.2, 0.5, 0.6, 1], [0.85, 0.85, 0.5, 1]],
+    sources: ['shapes', 'op-art', 'contour', 'grid-drift'],
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [3, 3], useB: 0, superFlicker: 0.4
   })
+
 ]
 
 /** Themes grouped by family, in declaration order : drives the dropdown's optgroups. */

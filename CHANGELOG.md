@@ -7,6 +7,15 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Three new Generate families** :
+  - **Dome** (Aurora, Canopy, Flock Overhead, Strata, Deep Water) : made for a fulldome,
+    no vignette, nothing framing the edges, slow motion overhead;
+  - **Film Wall** (Film Wall, Contact Sheet, Nitrate, Projection Booth) : your own films
+    through a Collage, graded and damaged. It plays the Collage folder of the session, or
+    the last one picked on this computer; with none yet it stands in with painted sources
+    and says how to pick a folder;
+  - **Node Workshop** (Gooey Blobs, Borrowed Palette, Layer Matte, Displaced, Focus Pull,
+    Fault Line) : one recipe node per theme, on the layer that reads the others.
 - **25 new master chains**, in three groups of the chain presets menu :
   - **Time & memory** : Echo Memory, Sediment, Time Map, Eternal Pair, Ghost Complement,
     Low Frame Rate, Oxidized and Slow Loop (Réponse, Sediment, Chronoscan, Eternalism,
@@ -200,6 +209,8 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **The "Test" family in Generate is now "Feel Studies"**, at the end of the list : one
+  theme per Feel macro, each keeping everything else still so the macro can be heard.
 - **An Analog section in the source pickers** (layers and Background), after Organic :
   RGB Oscillators, Sync Osc, Slit Scan, Ramps, Column Scan, Differential and Interference,
   the analog video-synth lineage in one place. Generate's Analog Video Synthesis themes

@@ -777,6 +777,38 @@ export function normalizeComposition(c: CompositionState): CompositionState {
   }
 }
 
+// The Collage folder last picked on this computer : a Film Wall theme reuses it
+// (a session's own collage wins). Machine-local, like the Assemble bank.
+type CollageClips = { folder: string; pool: import('@shared/collage').CollageClip[] }
+function rememberCollage(folder: string, pool: CollageClips['pool']): void {
+  if (!pool.length) return
+  try {
+    localStorage.setItem('opsia.lastCollage', JSON.stringify({ folder, pool }))
+  } catch {
+    /* storage full or blocked : Generate just won't remember it */
+  }
+}
+function rememberedCollage(): CollageClips | null {
+  try {
+    const v = JSON.parse(localStorage.getItem('opsia.lastCollage') ?? 'null')
+    return v && Array.isArray(v.pool) && v.pool.length ? v : null
+  } catch {
+    return null
+  }
+}
+function sessionCollage(c: CompositionState): CollageClips | null {
+  const slots = [...c.layers.flatMap((l) => [l.sourceA, l.sourceB]), c.background?.source]
+  for (const sl of slots) {
+    if (sl?.shaderId === 'gen-collage' && sl.collagePool?.length)
+      return { folder: sl.collageFolder ?? '', pool: sl.collagePool }
+  }
+  return null
+}
+/** Clips a Film Wall theme can play : the session's collage, else the last folder. */
+export function collageClipsFor(c: CompositionState): CollageClips | null {
+  return sessionCollage(c) ?? rememberedCollage()
+}
+
 // Native nodes that read another layer (their sidechain) : Generate hands each one
 // an active layer other than its own.
 const THEME_READS_LAYER = new Set([
@@ -787,7 +819,7 @@ const THEME_READS_LAYER = new Set([
 // Draws WITHIN the theme's pools so the result reads unmistakably as the theme,
 // with variety from which sources/FX land and their curated params. The World +
 // macros + temperament are applied by the generateTheme action on top of this.
-function buildThemeComposition(theme: Theme): CompositionState {
+function buildThemeComposition(theme: Theme, clips: CollageClips | null): CompositionState {
   const R = Math.random
   const rr = (lo: number, hi: number): number => lo + R() * (hi - lo)
   const pickOf = <T>(a: readonly T[]): T => a[Math.floor(R() * a.length)]
@@ -798,15 +830,27 @@ function buildThemeComposition(theme: Theme): CompositionState {
     for (let j = 0; j < nActive; j++) if (j !== i) o.push(j)
     return o.length ? pickOf(o) : null
   }
+  // A shader's inputs : curated random draws, then the theme's own picks.
+  const pickedInputs = (id: string): Record<string, number | number[]> => {
+    const inputs = randomizeInputs(id, {})
+    const picks = theme.pickInputs?.[id]
+    if (picks) for (const k in picks) if (picks[k].length) inputs[k] = pickOf(picks[k])
+    return inputs
+  }
   // A node that reads another layer is handed one, or dropped when the scene has
   // no other layer (Lookup alone falls back to reading itself, its own palette).
   const themeFx = (id: string, layerIdx: number): FxInstance | null => {
-    const fx: FxInstance = { id: uid(), shaderId: id, enabled: true, inputs: randomizeInputs(id, {}) }
+    const fx: FxInstance = { id: uid(), shaderId: id, enabled: true, inputs: pickedInputs(id) }
     if (THEME_READS_LAYER.has(id)) {
       const j = otherLayer(layerIdx)
       if (j === null) return id === 'node-lookup' ? fx : null
       fx.sidechain = { kind: 'layer', layer: j }
-      if (id === 'node-matte') fx.sidechain2 = { kind: 'layer', layer: otherLayer(layerIdx) ?? j }
+      // Matte's matte is a THIRD layer when there is one (input 2 keyed by itself
+      // is no key at all).
+      if (id === 'node-matte') {
+        const k = [...Array(nActive).keys()].filter((x) => x !== layerIdx && x !== j)
+        fx.sidechain2 = { kind: 'layer', layer: k.length ? pickOf(k) : j }
+      }
     }
     return fx
   }
@@ -829,14 +873,21 @@ function buildThemeComposition(theme: Theme): CompositionState {
     for (let k = 0; k < n; k++) out.push(pool.splice(Math.floor(R() * pool.length), 1)[0])
     return out.join('\n')
   }
+  // With no clips yet, a Collage stands in with painted sources (Generate says so).
+  const playable = (pool: string[]): string[] =>
+    clips || !pool.includes('gen-collage')
+      ? pool
+      : [...pool.filter((id) => id !== 'gen-collage'), 'organic', 'dye-field', 'swell']
   const makeSlot = (i: number, pool: string[]): SourceSlot => {
     const id = pickOf(pool)
-    const inputs = randomizeInputs(id, {})
-    const picks = theme.pickInputs?.[id]
-    if (picks) for (const k in picks) if (picks[k].length) inputs[k] = pickOf(picks[k])
+    const inputs = pickedInputs(id)
     // Colony above another layer grows on a transparent ground (lichen on the rock).
     if (id === 'colony' && i > 0) inputs.ground = 1
     const slot: SourceSlot = { kind: 'generator', shaderId: id, inputs }
+    if (id === 'gen-collage' && clips) {
+      slot.collageFolder = clips.folder
+      slot.collagePool = clips.pool
+    }
     if (id === 'gen-text') {
       slot.text = pickLines(theme.words)
       // Half the time another layer fills the letters : the type becomes a window.
@@ -851,17 +902,17 @@ function buildThemeComposition(theme: Theme): CompositionState {
       l.sourceA = emptySlot()
       return l // an inactive (empty) upper layer
     }
-    const pool = theme.stack?.[i]?.length ? theme.stack[i] : theme.sources
+    const pool = playable(theme.stack?.[i]?.length ? theme.stack[i] : theme.sources)
     l.sourceA = makeSlot(i, pool)
     if (R() < theme.useB) {
-      l.sourceB = makeSlot(i, theme.sources)
+      l.sourceB = makeSlot(i, playable(theme.sources))
       l.sourceMix = rr(0.3, 0.7)
       l.sourceBlend = pickOf(theme.mixBlends ?? (['normal', 'screen', 'difference', 'multiply'] as BlendMode[]))
       l.harmony = rr(0, 0.5)
     }
     l.sourceAFx = R() < 0.4 ? buildRack(theme.layerFx, 1, i) : []
     l.fx = buildRack(theme.layerFx, 2, i)
-    if (theme.nativeNodes?.length && R() < (theme.nativeChance ?? 0.4)) {
+    if (theme.nativeNodes?.length && i >= (theme.nativeFrom ?? 0) && R() < (theme.nativeChance ?? 0.4)) {
       const node = themeFx(pickOf(theme.nativeNodes), i)
       if (node) l.fx.push(node)
     }
@@ -2060,6 +2111,7 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
   setCollagePool: (layer, slot, folder, pool) =>
     set((s) => {
+      rememberCollage(folder, pool)
       const cur = slot === 'A' ? s.composition.layers[layer]?.sourceA : s.composition.layers[layer]?.sourceB
       if (!cur || cur.shaderId !== 'gen-collage') return s
       return {
@@ -2084,6 +2136,7 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
   setBgCollagePool: (folder, pool) =>
     set((s) => {
+      rememberCollage(folder, pool)
       const bg = s.composition.background ?? makeDefaultBackground()
       if (bg.source.shaderId !== 'gen-collage') return s
       return {
@@ -3867,16 +3920,21 @@ export const useStore = create<StoreState>((set, get) => ({
       if (!theme) return s
       beginMorph(s.composition, s.morphMs, performance.now()) // crossfade the reveal
       resetCouplingState()
-      let comp = buildThemeComposition(theme)
+      let comp = buildThemeComposition(theme, collageClipsFor(s.composition))
       const world = s.worlds.find((w) => w.id === theme.world) ?? null
       const worlds = ensureWorld(s.worlds, world)
       if (world) comp = applyWorldToComposition(comp, world)
-      // The theme's Context overrides win over the World's mood nudge.
-      if (theme.context) {
+      // The theme's Context and Finalizer overrides win over the World's (a Film
+      // Wall's damage survives the World resetting the film stage).
+      if (theme.context || theme.finalizer) {
         comp = {
           ...comp,
           master: comp.master.map((f) =>
-            f.shaderId === 'fx-context' ? { ...f, inputs: { ...f.inputs, ...theme.context } } : f
+            f.shaderId === 'fx-context' && theme.context
+              ? { ...f, inputs: { ...f.inputs, ...theme.context } }
+              : f.shaderId === 'fx-finalizer' && theme.finalizer
+                ? { ...f, inputs: { ...f.inputs, ...theme.finalizer } }
+                : f
           )
         }
       }

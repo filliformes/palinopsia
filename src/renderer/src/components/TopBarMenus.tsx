@@ -4,7 +4,7 @@
 //    whole new (unsaved) session tethered to the theme (store.generateTheme).
 
 import { useEffect, useRef, useState } from 'react'
-import { useStore } from '../store'
+import { collageClipsFor, useStore } from '../store'
 import { THEME_FAMILIES, THEMES } from '../themes'
 import { SearchSelect } from './SearchSelect'
 import { showToast } from './Toast'
@@ -132,8 +132,15 @@ export function GenerateMenu(): JSX.Element {
         className="btn text-[12px] text-accent2"
         onClick={async () => {
           await saveBeforeReplace() // Generate wipes the session : save it first, like Load/Open/New
+          const standIn = !!current?.needsClips && !collageClipsFor(useStore.getState().composition)
           generateTheme(sel)
-          showToast(`Generated · ${current?.name ?? 'theme'} (previous saved)`)
+          if (standIn)
+            showToast(
+              `${current?.name ?? 'Film Wall'} plays your films : pick a folder in a Collage source (a layer's source → Collage). Painted sources stand in until then.`,
+              'warn',
+              9000
+            )
+          else showToast(`Generated · ${current?.name ?? 'theme'} (previous saved)`)
         }}
         title={current ? `Generate a “${current.name}” session : ${current.blurb}` : 'Generate'}
       >
