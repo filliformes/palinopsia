@@ -11,7 +11,7 @@
 // guardrails : matte / near-black, one accent, never kaleidoscope / plasma /
 // psychedelia (even the "trippy"-sounding names are read in the matte register).
 
-import type { BlendMode } from '@shared/types'
+import type { BlendMode, LfoShape, ModulatorType } from '@shared/types'
 
 /** RGBA in 0..1. Palettes run darkest → lightest (colorA is the near-black base). */
 type Rgba = [number, number, number, number]
@@ -68,6 +68,84 @@ export interface Theme {
   words?: string[]
   /** A/B source-mix modes (default normal / screen / difference / multiply). */
   mixBlends?: BlendMode[]
+  /** How the scene moves : overrides the family's motion recipe. */
+  motion?: Partial<MotionRecipe>
+}
+
+/** How a generated scene moves : the modulators Generate enables and binds. */
+export interface MotionRecipe {
+  /** How many modulators [min, max] (0 = a still scene, the sources move alone). */
+  mods: [number, number]
+  /** Modulator types drawn from. */
+  types: ModulatorType[]
+  /** LFO shapes drawn from. */
+  shapes: LfoShape[]
+  /** Free-running rate range, Hz. */
+  rate: [number, number]
+  /** Chance a modulator locks to the tempo instead. */
+  bpm: number
+  /** Depth range of each binding. */
+  depth: [number, number]
+}
+
+// Each family's way of moving : slow breathing for living matter and cinema,
+// stepped and on the beat for glitch and data, drawn cadences for film.
+const MOTION_DEFAULT: MotionRecipe = {
+  mods: [2, 3], types: ['lfo', 'sh', 'chaos'], shapes: ['sine', 'triangle', 'rndSmooth'],
+  rate: [0.05, 1], bpm: 0.4, depth: [0.25, 0.55]
+}
+const SLOW: MotionRecipe = {
+  mods: [1, 2], types: ['lfo', 'slew'], shapes: ['sine', 'rndSmooth'],
+  rate: [0.01, 0.06], bpm: 0, depth: [0.15, 0.35]
+}
+const STEPPED: MotionRecipe = {
+  mods: [2, 4], types: ['sh', 'euclid', 'turing', 'arp', 'random', 'lfo'], shapes: ['square', 'rndStep', 'spastic'],
+  rate: [0.3, 3], bpm: 0.7, depth: [0.3, 0.7]
+}
+const FAMILY_MOTION: Record<string, MotionRecipe> = {
+  'Analog Video Synthesis': {
+    mods: [2, 4], types: ['lfo', 'lfo', 'slew', 'chaos'], shapes: ['sine', 'triangle', 'sawtooth', 'rndSmooth'],
+    rate: [0.04, 0.5], bpm: 0.25, depth: [0.25, 0.6]
+  },
+  'Glitch / Datamosh': STEPPED,
+  'Datamosh & Compression': { ...STEPPED, rate: [0.15, 2], bpm: 0.5 },
+  'Cameraless / Direct Film': {
+    mods: [2, 3], types: ['sh', 'euclid', 'random', 'lfo'], shapes: ['rndStep', 'square', 'triangle'],
+    rate: [0.2, 2], bpm: 0.5, depth: [0.3, 0.65]
+  },
+  'Optical / Op-Art': {
+    mods: [2, 3], types: ['lfo', 'lfo', 'turing'], shapes: ['sine', 'triangle'],
+    rate: [0.03, 0.3], bpm: 0.35, depth: [0.2, 0.5]
+  },
+  'Organic / Reaction-Diffusion': {
+    mods: [1, 3], types: ['lfo', 'slew', 'chaos'], shapes: ['sine', 'rndSmooth'],
+    rate: [0.01, 0.12], bpm: 0, depth: [0.2, 0.45]
+  },
+  'Living Surfaces': { ...SLOW, rate: [0.005, 0.05] },
+  'Data / Parametric': {
+    mods: [2, 4], types: ['arp', 'euclid', 'turing', 'sh'], shapes: ['square', 'rndStep'],
+    rate: [0.25, 2], bpm: 0.8, depth: [0.3, 0.65]
+  },
+  'Feedback / Afterimage': {
+    mods: [1, 3], types: ['lfo', 'chaos', 'slew'], shapes: ['sine', 'triangle', 'rndSmooth'],
+    rate: [0.02, 0.25], bpm: 0.2, depth: [0.2, 0.5]
+  },
+  'Cinematic / Atmospheric': SLOW,
+  'Retro Screen': {
+    mods: [2, 3], types: ['sh', 'lfo', 'turing'], shapes: ['square', 'triangle', 'rndStep'],
+    rate: [0.1, 1.2], bpm: 0.5, depth: [0.25, 0.55]
+  },
+  'Minimal / Structural': {
+    mods: [1, 2], types: ['lfo', 'euclid'], shapes: ['sine', 'triangle'],
+    rate: [0.02, 0.15], bpm: 0.3, depth: [0.15, 0.4]
+  },
+  // Each study isolates one Feel macro : nothing else may move.
+  Test: { ...MOTION_DEFAULT, mods: [0, 0] }
+}
+
+/** The motion recipe a theme generates with : its family's, bent by the theme. */
+export function motionFor(t: Theme): MotionRecipe {
+  return { ...(FAMILY_MOTION[t.family] ?? MOTION_DEFAULT), ...(t.motion ?? {}) }
 }
 
 // ── Palette atoms (matte, near-black grounds + disciplined accents) ─────
@@ -836,7 +914,7 @@ export const THEMES: Theme[] = [
     pickInputs: { scan: { material: [1, 2, 3, 4] }, colony: { kind: [2] } },
     layerFx: ['fx-grade', 'fx-grain', 'fx-light-trails'],
     blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, drift: 0.2,
-    vibe: { mixSrc: 0.8 }
+    vibe: { mixSrc: 0.65 }
   }),
   mk({
     id: 'dry-earth', name: 'Dry Earth', family: 'Living Surfaces',

@@ -101,11 +101,12 @@ import {
   randomizeInputs,
   randomizeSingleLayer,
   seedRandomStart,
+  themedMotion,
   varyComposition,
   type RandomizeScope
 } from './randomize'
 import { BG_DEFAULT_SPEED, BG_SOURCES } from './bgPresets'
-import { THEME_BY_ID, type Theme } from './themes'
+import { THEME_BY_ID, motionFor, type Theme } from './themes'
 
 export type { FxScope }
 
@@ -933,15 +934,20 @@ function buildThemeComposition(theme: Theme): CompositionState {
   const finalizer = makeFinalizer()
   if (theme.finalizer) finalizer.inputs = { ...finalizer.inputs, ...theme.finalizer }
 
-  return {
-    layers,
-    background,
-    master: [vibe, context, finalizer],
-    bpm: 120,
-    modulators: makeDefaultModulators(),
-    modMatrix: [],
-    metaKnobs: makeDefaultMetaKnobs()
-  }
+  // Motion : the theme's recipe binds a few modulators across the layers, so the
+  // scene moves the way the theme would (a still scene read as a dead Generate).
+  return themedMotion(
+    {
+      layers,
+      background,
+      master: [vibe, context, finalizer],
+      bpm: 120,
+      modulators: makeDefaultModulators(),
+      modMatrix: [],
+      metaKnobs: makeDefaultMetaKnobs()
+    },
+    motionFor(theme)
+  )
 }
 
 // What the Inspector's auto-UI is pointed at: a source slot or an FX unit

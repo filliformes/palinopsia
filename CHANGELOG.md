@@ -7,6 +7,13 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Generated scenes move.** Every Generate theme now binds a few modulators across its
+  layers, in its family's way of moving : slow breathing for Organic, Living Surfaces and
+  Cinematic, drawn cadences for film, stepped and on the beat for Glitch and Data, sine
+  and saw sweeps for Analog. Every active layer gets at least one moving parameter; the
+  master (the theme's color and finish) and the World's audio route are left alone, and
+  the Feel studies stay still so each one isolates its macro. A theme can bend its
+  family's recipe (`motion` in themes.ts).
 - **Generate uses the whole instrument.** Ten Print, Congeal, Metamorph and Text (with
   words from the theme) join the themes they fit; the eleven effects it never picked
   (Abstraction, Aperture, Difference Bloom, Force Lines, Granular, Tiles, Motif, Slit

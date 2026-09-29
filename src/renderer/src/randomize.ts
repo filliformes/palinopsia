@@ -28,6 +28,7 @@ import { MAX_MOD_ASSIGNMENTS, WORLD_AUTOMOD_SLOT } from '@shared/types'
 import { curatedRange, FX_SHADERS, GENERATORS, NATIVE_NODES } from './shaders/isf'
 import { inputsForShader, type IsfInputDesc } from './shaders/isf/inputs'
 import { BG_SOURCES, BG_DEFAULT_SPEED } from './bgPresets'
+import type { MotionRecipe } from './themes'
 
 export type RandomizeScope =
   | 'all'
@@ -483,6 +484,69 @@ function randomMatrix(c: CompositionState): ModAssignment[] {
     })
   }
   return out
+}
+
+// ── Motion for a generated scene (Generate) ───────────────────────────
+// A theme's MotionRecipe picks how many modulators move the scene and how they
+// move; the bindings stay on the layers (sources and their racks), never the
+// master, so the theme's color and finish hold. Every active layer gets at least
+// one moving parameter, and a row is left free for the World's audio route.
+const MOTION_SKIP = /seed/i // a seed jump reshuffles the whole picture : never swept
+
+export function themedMotion(c: CompositionState, recipe: MotionRecipe): CompositionState {
+  const n = recipe.mods[0] + Math.floor(rnd() * (recipe.mods[1] - recipe.mods[0] + 1))
+  if (n <= 0) return c
+  const targets = collectFloatTargets(c).filter(
+    (t) =>
+      !(t.kind === 'fx' && (t.scope.kind === 'master' || t.scope.kind === 'background')) &&
+      !MOTION_SKIP.test('input' in t ? String(t.input) : '')
+  )
+  if (!targets.length) return c
+  const slots = [0, 1, 2, 3, 4, 5, 6, 7].filter((s) => s !== WORLD_AUTOMOD_SLOT)
+  for (let i = slots.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1))
+    ;[slots[i], slots[j]] = [slots[j], slots[i]]
+  }
+  const chosen = slots.slice(0, Math.min(n, slots.length))
+  const logRate = (): number =>
+    Math.pow(10, range(Math.log10(recipe.rate[0]), Math.log10(recipe.rate[1])))
+  const modulators = c.modulators.map((m, i): ModulatorConfig => {
+    if (i === WORLD_AUTOMOD_SLOT) return m
+    if (!chosen.includes(i)) return { ...m, enabled: false }
+    return {
+      ...freshModulator(m, true),
+      type: pick(recipe.types),
+      shape: pick(recipe.shapes),
+      sync: chance(recipe.bpm) ? 'bpm' : 'free',
+      rateHz: logRate()
+    }
+  })
+  const cap = MAX_MOD_ASSIGNMENTS - 1 // room for the World's audio route
+  const out: ModAssignment[] = []
+  const used = new Set<string>()
+  const bind = (mi: number, t: ModTarget): boolean => {
+    const key = `${mi}|${targetKey(t)}`
+    if (used.has(key) || out.length >= cap) return false
+    used.add(key)
+    const sign = chance(0.2) ? -1 : 1
+    out.push({ id: uid(), mod: mi, target: t, depth: sign * range(recipe.depth[0], recipe.depth[1]), mode: 'replace' })
+    return true
+  }
+  // Sources move the picture most : two draws in three land on one.
+  const sources = targets.filter((t) => t.kind === 'source')
+  const drawTarget = (): ModTarget => (sources.length && chance(0.66) ? pick(sources) : pick(targets))
+  for (const mi of chosen) {
+    const k = chance(0.5) ? 2 : 1
+    for (let i = 0; i < k; i++) bind(mi, drawTarget())
+  }
+  // Every active layer moves.
+  c.layers.forEach((l, li) => {
+    if (!l.sourceA.shaderId && !l.sourceB?.shaderId) return
+    if (out.some((a) => targetOnLayer(a.target, li))) return
+    const local = targets.filter((t) => targetOnLayer(t, li))
+    for (let tries = 0; tries < 4 && local.length; tries++) if (bind(pick(chosen), pick(local))) break
+  })
+  return { ...c, modulators, modMatrix: out }
 }
 
 // ── The scoped randomizer ─────────────────────────────────────────────
