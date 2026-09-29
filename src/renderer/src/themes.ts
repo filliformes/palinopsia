@@ -1070,9 +1070,11 @@ export const THEMES: Theme[] = [
     blurb: 'Blur, then cut : shapes that come close melt into soft single blobs.',
     world: 'synthetic',
     palette: [K, [0.18, 0.1, 0.28, 1], [0.85, 0.78, 0.9, 1]],
-    // Dense, solid forms : sparse points blur away below the cut and leave black.
-    sources: ['shapes', 'metamorph', 'reaction'],
-    pickInputs: { 'node-gooey': { threshold: [0.22, 0.28, 0.34], blur: [0.4, 0.5], fill: [1, 2], mix: [1] } },
+    // Solid forms lit from the first frame : sparse points (or a reaction still
+    // seeding) blur away below the cut and leave black, and so does inverted goo.
+    sources: ['shapes', 'metamorph', 'dye-field'],
+    stack: [['shapes', 'dye-field']],
+    pickInputs: { 'node-gooey': { threshold: [0.18, 0.24, 0.3], blur: [0.4, 0.5], fill: [1, 2], outside: [0.2, 0.3], invert: [0], mix: [1] } },
     layerFx: ['fx-grade'],
     nativeNodes: ['node-gooey'], nativeChance: 0.95,
     blends: ['screen', 'lighten'], layers: [1, 2], useB: 0.2
