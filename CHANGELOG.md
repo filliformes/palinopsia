@@ -7,6 +7,14 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Generate uses the whole instrument.** Ten Print, Congeal, Metamorph and Text (with
+  words from the theme) join the themes they fit; the eleven effects it never picked
+  (Abstraction, Aperture, Difference Bloom, Force Lines, Granular, Tiles, Motif, Slit
+  Buffer, Smear, Solarize, Triangle Flicker) and fourteen native nodes now land too.
+  Nodes that read another layer (Lookup, Matte, Remap, Convolution, Transfert, Mosaïque)
+  are handed a layer that is actually in the scene. LighterColor, weave, lumakey and
+  consume join the blends. A new **Living Surfaces** family : Lichen, Rust, Mold Culture,
+  Burning Paper, Dry Earth and Grown, real surfaces that grow, crack and rust.
 - **Finalizer `dirt burst ▸`** (film damage) : a dirty stretch of film passes the gate,
   four to eight times the dust for about a second, then clean again. Works even with
   dust at 0. Fire it on a beat or an onset (bind M, MIDI or OSC).

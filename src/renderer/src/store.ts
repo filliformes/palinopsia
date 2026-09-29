@@ -776,6 +776,12 @@ export function normalizeComposition(c: CompositionState): CompositionState {
   }
 }
 
+// Native nodes that read another layer (their sidechain) : Generate hands each one
+// an active layer other than its own.
+const THEME_READS_LAYER = new Set([
+  'node-transfert', 'node-convolve', 'node-mosaique', 'node-remap', 'node-matte', 'node-lookup'
+])
+
 // ── Generate : build a whole composition from a theme recipe (themes.ts) ──
 // Draws WITHIN the theme's pools so the result reads unmistakably as the theme,
 // with variety from which sources/FX land and their curated params. The World +
@@ -784,44 +790,80 @@ function buildThemeComposition(theme: Theme): CompositionState {
   const R = Math.random
   const rr = (lo: number, hi: number): number => lo + R() * (hi - lo)
   const pickOf = <T>(a: readonly T[]): T => a[Math.floor(R() * a.length)]
-  const themeFx = (id: string): FxInstance => ({
-    id: uid(),
-    shaderId: id,
-    enabled: true,
-    inputs: randomizeInputs(id, {})
-    // node-feedback / node-reponse (the only native nodes themes use) feed on the
-    // layer itself, so they need no sidechain.
-  })
+  const nActive = theme.layers[0] + Math.floor(R() * (theme.layers[1] - theme.layers[0] + 1))
+  // Another active layer than `i` (for the nodes and Text fills that read one).
+  const otherLayer = (i: number): number | null => {
+    const o: number[] = []
+    for (let j = 0; j < nActive; j++) if (j !== i) o.push(j)
+    return o.length ? pickOf(o) : null
+  }
+  // A node that reads another layer is handed one, or dropped when the scene has
+  // no other layer (Lookup alone falls back to reading itself, its own palette).
+  const themeFx = (id: string, layerIdx: number): FxInstance | null => {
+    const fx: FxInstance = { id: uid(), shaderId: id, enabled: true, inputs: randomizeInputs(id, {}) }
+    if (THEME_READS_LAYER.has(id)) {
+      const j = otherLayer(layerIdx)
+      if (j === null) return id === 'node-lookup' ? fx : null
+      fx.sidechain = { kind: 'layer', layer: j }
+      if (id === 'node-matte') fx.sidechain2 = { kind: 'layer', layer: otherLayer(layerIdx) ?? j }
+    }
+    return fx
+  }
   const buildRack = (pool: string[], max: number, layerIdx: number): FxInstance[] => {
     if (!pool.length || max <= 0) return []
     const n = 1 + Math.floor(R() * max)
     const avail = [...pool]
     const out: FxInstance[] = []
     for (let i = 0; i < n && avail.length; i++) {
-      out.push(themeFx(avail.splice(Math.floor(R() * avail.length), 1)[0]))
+      const fx = themeFx(avail.splice(Math.floor(R() * avail.length), 1)[0], layerIdx)
+      if (fx) out.push(fx)
     }
     return out
   }
-
-  const nActive = theme.layers[0] + Math.floor(R() * (theme.layers[1] - theme.layers[0] + 1))
+  // One to three lines from the theme's words (Text steps them with `next line`).
+  const pickLines = (words: string[] | undefined): string => {
+    const pool = words?.length ? [...words] : ['AFTER', 'IMAGE']
+    const n = Math.min(pool.length, 1 + Math.floor(R() * 3))
+    const out: string[] = []
+    for (let k = 0; k < n; k++) out.push(pool.splice(Math.floor(R() * pool.length), 1)[0])
+    return out.join('\n')
+  }
+  const makeSlot = (i: number, pool: string[]): SourceSlot => {
+    const id = pickOf(pool)
+    const inputs = randomizeInputs(id, {})
+    const picks = theme.pickInputs?.[id]
+    if (picks) for (const k in picks) if (picks[k].length) inputs[k] = pickOf(picks[k])
+    // Colony above another layer grows on a transparent ground (lichen on the rock).
+    if (id === 'colony' && i > 0) inputs.ground = 1
+    const slot: SourceSlot = { kind: 'generator', shaderId: id, inputs }
+    if (id === 'gen-text') {
+      slot.text = pickLines(theme.words)
+      // Half the time another layer fills the letters : the type becomes a window.
+      const j = otherLayer(i)
+      if (j !== null && R() < 0.5) slot.sidechain = { kind: 'layer', layer: j }
+    }
+    return slot
+  }
   const layers: LayerState[] = Array.from({ length: 4 }, (_, i) => {
     const l = makeLayer()
     if (i >= nActive) {
       l.sourceA = emptySlot()
       return l // an inactive (empty) upper layer
     }
-    const srcId = pickOf(theme.sources)
-    l.sourceA = { kind: 'generator', shaderId: srcId, inputs: randomizeInputs(srcId, {}) }
+    const pool = theme.stack?.[i]?.length ? theme.stack[i] : theme.sources
+    l.sourceA = makeSlot(i, pool)
     if (R() < theme.useB) {
-      const bId = pickOf(theme.sources)
-      l.sourceB = { kind: 'generator', shaderId: bId, inputs: randomizeInputs(bId, {}) }
+      l.sourceB = makeSlot(i, theme.sources)
       l.sourceMix = rr(0.3, 0.7)
-      l.sourceBlend = pickOf(['normal', 'screen', 'difference', 'multiply'] as BlendMode[])
+      l.sourceBlend = pickOf(theme.mixBlends ?? (['normal', 'screen', 'difference', 'multiply'] as BlendMode[]))
       l.harmony = rr(0, 0.5)
     }
     l.sourceAFx = R() < 0.4 ? buildRack(theme.layerFx, 1, i) : []
     l.fx = buildRack(theme.layerFx, 2, i)
-    if (theme.nativeNodes?.length && R() < (theme.nativeChance ?? 0.4)) l.fx.push(themeFx(pickOf(theme.nativeNodes)))
+    if (theme.nativeNodes?.length && R() < (theme.nativeChance ?? 0.4)) {
+      const node = themeFx(pickOf(theme.nativeNodes), i)
+      if (node) l.fx.push(node)
+    }
     l.blend = i === 0 ? 'normal' : pickOf(theme.blends)
     l.opacity = i === 0 ? 1 : rr(0.65, 1)
     l.feedback = R() < theme.feedback

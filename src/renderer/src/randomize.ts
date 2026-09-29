@@ -493,8 +493,8 @@ const BLENDS = [
   'hardlight', 'darken', 'lighten', 'difference', 'exclusion', 'wrap', 'lightercolor'
 ] as const
 // The A/B source mix can also use the relation modes (Weave / Lumakey / the
-// stateful Consume). Only used for sourceBlend : as a layer-stack blend they'd
-// fall through to normal.
+// stateful Consume). They work on layers too, but a blind layer draw keeps to the
+// per-pixel modes : a relation mode depends on what happens to sit below.
 const MIX_BLENDS = [...BLENDS, 'weave', 'lumakey', 'consume'] as const
 
 // Occasionally give a layer a spatial mask (mostly none). Keeps the register

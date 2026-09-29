@@ -59,6 +59,15 @@ export interface Theme {
   context?: Record<string, number | number[]>
   /** Finalizer overrides (grain character / grade leanings). */
   finalizer?: Record<string, number | number[]>
+  /** Per-layer source pools, bottom layer first, overriding `sources` on those
+   *  layers (rock under lichen, paper under the burn). */
+  stack?: string[][]
+  /** Value draws per source : one of the listed values (a single value is fixed). */
+  pickInputs?: Record<string, Record<string, number[]>>
+  /** Lines a Text source draws from (one to three, stepped with `next line`). */
+  words?: string[]
+  /** A/B source-mix modes (default normal / screen / difference / multiply). */
+  mixBlends?: BlendMode[]
 }
 
 // ── Palette atoms (matte, near-black grounds + disciplined accents) ─────
@@ -130,7 +139,7 @@ export const THEMES: Theme[] = [
     blurb: 'A camera pointed at its own monitor : the feedback engine at the edge of chaos.',
     world: 'synthetic',
     palette: [K, [0.06, 0.14, 0.16, 1], [0.55, 0.75, 0.72, 1]],
-    sources: ['organic', 'solid-color', 'dye-field'],
+    sources: ['organic', 'solid-color', 'dye-field', 'congeal'],
     layerFx: ['fx-grade'],
     nativeNodes: ['node-feedback'], blends: ['screen', 'add'], feedback: 0.7,
     layers: [1, 2], drift: 0.4, coalesce: 0.55
@@ -153,7 +162,8 @@ export const THEMES: Theme[] = [
     palette: [K, [0.12, 0.14, 0.16, 1], [0.75, 0.78, 0.72, 1]],
     sources: ['column-scan', 'slabs', 'contour'],
     layerFx: ['fx-sync-loss', 'fx-tracking', 'fx-row-echo', 'fx-scanlines'],
-    blends: ['screen', 'lighten'], coalesce: 0.35, drift: 0.3
+    blends: ['screen', 'lighten'], coalesce: 0.35, drift: 0.3,
+    nativeNodes: ['node-faultline']
   }),
   mk({
     id: 'compression-ghost', name: 'Compression Ghost', family: 'Glitch / Datamosh',
@@ -172,7 +182,8 @@ export const THEMES: Theme[] = [
     sources: ['shapes', 'slabs', 'op-art'],
     layerFx: ['fx-byte-corrupt', 'fx-mosh-blocks', 'fx-stutter', 'fx-threshold'],
     blends: ['difference', 'exclusion'], gestureTexture: 0.7, coalesce: 0.25,
-    shutter: 0.35, flow: 0.3, density: 0.5
+    shutter: 0.35, flow: 0.3, density: 0.5,
+    nativeNodes: ['node-decimate']
   }),
   mk({
     id: 'dropout', name: 'Dropout', family: 'Glitch / Datamosh',
@@ -180,7 +191,7 @@ export const THEMES: Theme[] = [
     world: 'presse',
     palette: [K, [0.28, 0.2, 0.12, 1], [0.82, 0.72, 0.55, 1]],
     sources: ['organic', 'drift-field', 'swell'],
-    layerFx: ['fx-decay', 'fx-tracking', 'fx-grain'],
+    layerFx: ['fx-decay', 'fx-tracking', 'fx-grain', 'fx-granular'],
     blends: ['screen', 'lighten'], coalesce: 0.45, drift: 0.3
   }),
   mk({
@@ -199,7 +210,7 @@ export const THEMES: Theme[] = [
     world: 'synthetic',
     palette: [K, [0.1, 0.14, 0.2, 1], [0.68, 0.78, 0.82, 1]],
     sources: ['column-scan', 'contour', 'drift-field'],
-    layerFx: ['fx-scanlines'],
+    layerFx: ['fx-scanlines', 'fx-slit-buffer'],
     nativeNodes: ['node-scanner'], nativeChance: 0.9,
     blends: ['screen', 'lighten'], drift: 0.35, coalesce: 0.3
   }),
@@ -219,7 +230,7 @@ export const THEMES: Theme[] = [
     world: 'synthetic',
     palette: [K, [0.12, 0.1, 0.2, 1], [0.7, 0.72, 0.85, 1]],
     sources: ['interference', 'contour', 'organic'],
-    layerFx: ['fx-wide-time'],
+    layerFx: ['fx-wide-time', 'fx-slit-buffer'],
     nativeNodes: ['node-chronoscan'], nativeChance: 0.9,
     blends: ['screen', 'add'], drift: 0.4, coalesce: 0.3
   }),
@@ -231,9 +242,10 @@ export const THEMES: Theme[] = [
     world: 'peint',
     palette: [K, [0.5, 0.1, 0.35, 1], [0.1, 0.4, 0.55, 1], [0.9, 0.85, 0.5, 1]],
     sources: ['dye-field', 'organic', 'membrane'],
-    layerFx: ['fx-grain', 'fx-hue-rotate', 'fx-wide-time'],
+    layerFx: ['fx-grain', 'fx-hue-rotate', 'fx-wide-time', 'fx-abstraction'],
     blends: ['multiply', 'screen', 'darken'], density: 0.6, gestureTexture: 0.6, drift: 0.25,
-    finalizer: { grain: 0.18, character: 1 }
+    finalizer: { grain: 0.18, character: 1 },
+    nativeNodes: ['node-toile', 'node-lookup']
   }),
   mk({
     id: 'scratch-film', name: 'Scratch Film', family: 'Cameraless / Direct Film',
@@ -241,8 +253,8 @@ export const THEMES: Theme[] = [
     world: 'griffe',
     palette: [INK, [0.9, 0.9, 0.86, 1]],
     sources: ['direct-marks', 'shapes'],
-    layerFx: ['fx-grain', 'fx-decay', 'fx-streak'],
-    blends: ['screen', 'lighten'], useB: 0.15, coalesce: 0.3, superFlicker: 0.3
+    layerFx: ['fx-grain', 'fx-decay', 'fx-streak', 'fx-aperture', 'fx-triangle-flicker'],
+    blends: ['screen', 'lighten', 'lumakey'], useB: 0.15, coalesce: 0.3, superFlicker: 0.3
   }),
   mk({
     id: 'emulsion', name: 'Emulsion', family: 'Cameraless / Direct Film',
@@ -250,7 +262,7 @@ export const THEMES: Theme[] = [
     world: 'peint',
     palette: [K, [0.3, 0.14, 0.06, 1], [0.9, 0.78, 0.55, 1]],
     sources: ['dye-field', 'organic', 'swell'],
-    layerFx: ['fx-grain', 'fx-light-trails', 'fx-grade'],
+    layerFx: ['fx-grain', 'fx-light-trails', 'fx-grade', 'fx-solarize', 'fx-aperture'],
     blends: ['screen', 'lighten'], feedback: 0.3, drift: 0.3,
     finalizer: { grain: 0.2, grainSize: 2, character: 0 }
   }),
@@ -260,8 +272,9 @@ export const THEMES: Theme[] = [
     world: 'griffe',
     palette: [INK, [0.85, 0.2, 0.15, 1], [0.92, 0.9, 0.82, 1]],
     sources: ['direct-marks', 'shapes', 'op-art'],
-    layerFx: ['fx-grain', 'fx-stutter'],
-    blends: ['screen', 'difference'], shutter: 0.45, superFlicker: 0.4, coalesce: 0.3
+    layerFx: ['fx-grain', 'fx-stutter', 'fx-aperture', 'fx-triangle-flicker'],
+    blends: ['screen', 'difference'], shutter: 0.45, superFlicker: 0.4, coalesce: 0.3,
+    nativeNodes: ['node-decimate']
   }),
   mk({
     id: 'boiling-line', name: 'Boiling Line', family: 'Cameraless / Direct Film',
@@ -269,8 +282,9 @@ export const THEMES: Theme[] = [
     world: 'peint',
     palette: [K, [0.1, 0.35, 0.4, 1], [0.85, 0.88, 0.8, 1]],
     sources: ['direct-marks', 'filaments', 'contour'],
-    layerFx: ['fx-wide-time', 'fx-displace', 'fx-grain'],
-    blends: ['screen', 'lighten'], drift: 0.4, gestureTexture: 0.6
+    layerFx: ['fx-wide-time', 'fx-displace', 'fx-grain', 'fx-force-lines'],
+    blends: ['screen', 'lighten'], drift: 0.4, gestureTexture: 0.6,
+    nativeNodes: ['node-toile']
   }),
 
   // ── Optical / Op-Art ──────────────────────────────────────────────────
@@ -281,16 +295,17 @@ export const THEMES: Theme[] = [
     palette: [INK, WHITE],
     sources: ['interference', 'op-art', 'differential'],
     layerFx: ['fx-sharpen', 'fx-posterize'],
-    blends: ['difference', 'screen'], useB: 0.4, gestureTexture: 0.55, coalesce: 0.35
+    blends: ['difference', 'screen', 'weave', 'lightercolor'], useB: 0.4, gestureTexture: 0.55, coalesce: 0.35,
+    nativeNodes: ['node-remap'], mixBlends: ['difference', 'weave']
   }),
   mk({
     id: 'op-field', name: 'Op Field', family: 'Optical / Op-Art',
     blurb: 'Hard monochrome geometry with illusory motion.',
     world: 'parametric',
     palette: [INK, [0.95, 0.93, 0.88, 1]],
-    sources: ['op-art', 'grid-drift', 'shapes'],
-    layerFx: ['fx-fold', 'fx-sharpen', 'fx-edge'],
-    blends: ['difference', 'screen'], useB: 0.3, gestureTexture: 0.5
+    sources: ['op-art', 'grid-drift', 'shapes', 'ten-print'],
+    layerFx: ['fx-fold', 'fx-sharpen', 'fx-edge', 'fx-motif'],
+    blends: ['difference', 'screen', 'lightercolor'], useB: 0.3, gestureTexture: 0.5
   }),
   mk({
     id: 'anaglyph', name: 'Anaglyph', family: 'Optical / Op-Art',
@@ -307,7 +322,7 @@ export const THEMES: Theme[] = [
     world: 'musical',
     palette: [K, [0.1, 0.25, 0.4, 1], [0.7, 0.85, 0.95, 1]],
     sources: ['differential', 'contour', 'interference'],
-    layerFx: ['fx-posterize', 'fx-sharpen', 'fx-hue-rotate'],
+    layerFx: ['fx-posterize', 'fx-sharpen', 'fx-hue-rotate', 'fx-force-lines'],
     blends: ['screen', 'add'], gestureTexture: 0.45
   }),
   mk({
@@ -317,7 +332,8 @@ export const THEMES: Theme[] = [
     palette: [INK, [0.2, 0.2, 0.22, 1], [0.8, 0.8, 0.78, 1]],
     sources: ['op-art', 'interference'],
     layerFx: ['fx-ringing', 'fx-sharpen', 'fx-posterize'],
-    blends: ['difference', 'overlay'], useB: 0.35
+    blends: ['difference', 'overlay', 'weave'], useB: 0.35,
+    mixBlends: ['weave', 'difference']
   }),
 
   // ── Organic / Reaction-Diffusion ──────────────────────────────────────
@@ -328,7 +344,8 @@ export const THEMES: Theme[] = [
     palette: [K, [0.06, 0.2, 0.18, 1], [0.7, 0.85, 0.7, 1]],
     sources: ['reaction', 'membrane', 'mycelium'],
     layerFx: ['fx-sharpen', 'fx-hue-rotate', 'fx-grade'],
-    blends: ['screen', 'lighten'], density: 0.6, coalesce: 0.6, drift: 0.2
+    blends: ['screen', 'lighten', 'consume'], density: 0.6, coalesce: 0.6, drift: 0.2,
+    nativeNodes: ['node-gooey'], mixBlends: ['consume', 'screen']
   }),
   mk({
     id: 'mycelial', name: 'Mycelial', family: 'Organic / Reaction-Diffusion',
@@ -345,8 +362,9 @@ export const THEMES: Theme[] = [
     world: 'musical',
     palette: [K, [0.1, 0.12, 0.2, 1], [0.75, 0.78, 0.85, 1]],
     sources: ['murmuration', 'particle-drift', 'ash'],
-    layerFx: ['fx-light-trails', 'fx-streak'],
-    blends: ['screen', 'add'], density: 0.55, feedback: 0.3, drift: 0.25
+    layerFx: ['fx-light-trails', 'fx-streak', 'fx-difference-bloom'],
+    blends: ['screen', 'add'], density: 0.55, feedback: 0.3, drift: 0.25,
+    nativeNodes: ['node-ibfv', 'node-gooey', 'node-convolve']
   }),
   mk({
     id: 'tide', name: 'Tide', family: 'Organic / Reaction-Diffusion',
@@ -355,7 +373,8 @@ export const THEMES: Theme[] = [
     palette: [K, [0.05, 0.16, 0.24, 1], [0.6, 0.78, 0.82, 1]],
     sources: ['swell', 'dye-field', 'membrane'],
     layerFx: ['fx-wide-time', 'fx-grade', 'fx-hue-rotate'],
-    blends: ['screen', 'lighten'], feedback: 0.4, drift: 0.35, density: 0.45
+    blends: ['screen', 'lighten'], feedback: 0.4, drift: 0.35, density: 0.45,
+    nativeNodes: ['node-ibfv']
   }),
   mk({
     id: 'ember', name: 'Ember', family: 'Organic / Reaction-Diffusion',
@@ -395,7 +414,8 @@ export const THEMES: Theme[] = [
     palette: [K, [0.85, 0.2, 0.2, 1], [0.2, 0.7, 0.8, 1], [0.92, 0.9, 0.85, 1]],
     sources: ['ramps', 'shapes', 'slabs'],
     layerFx: ['fx-dither', 'fx-posterize', 'fx-scanlines'],
-    blends: ['normal', 'screen'], useB: 0.2, coalesce: 0.35, gestureTexture: 0.4
+    blends: ['normal', 'screen'], useB: 0.2, coalesce: 0.35, gestureTexture: 0.4,
+    nativeNodes: ['node-matte'], nativeChance: 0.3
   }),
   mk({
     id: 'barcode', name: 'Barcode', family: 'Data / Parametric',
@@ -424,7 +444,7 @@ export const THEMES: Theme[] = [
     world: 'sublimated',
     palette: [K, [0.18, 0.05, 0.28, 1], [0.5, 0.85, 0.75, 1]],
     sources: ['organic', 'shapes', 'dye-field'],
-    layerFx: ['fx-phosphene', 'fx-wide-time', 'fx-feedback-zoom'],
+    layerFx: ['fx-phosphene', 'fx-wide-time', 'fx-feedback-zoom', 'fx-difference-bloom'],
     nativeNodes: ['node-feedback'], blends: ['screen', 'lighten'], feedback: 0.5, drift: 0.35, density: 0.4
   }),
   mk({
@@ -442,7 +462,7 @@ export const THEMES: Theme[] = [
     world: 'sublimated',
     palette: [K, [0.12, 0.18, 0.22, 1], [0.7, 0.82, 0.8, 1]],
     sources: ['particle-drift', 'murmuration', 'organic'],
-    layerFx: ['fx-wide-time', 'fx-light-trails'],
+    layerFx: ['fx-wide-time', 'fx-light-trails', 'fx-granular'],
     nativeNodes: ['node-reponse'], blends: ['screen', 'add'], feedback: 0.4, drift: 0.3
   }),
   mk({
@@ -450,8 +470,8 @@ export const THEMES: Theme[] = [
     blurb: 'Long-exposure light painting : the brightest pixels smear and decay.',
     world: 'sublimated',
     palette: [K, [0.3, 0.16, 0.04, 1], [1.0, 0.85, 0.5, 1]],
-    sources: ['particle-drift', 'ash', 'filaments'],
-    layerFx: ['fx-light-trails', 'fx-decay', 'fx-phosphene'],
+    sources: ['particle-drift', 'ash', 'filaments', 'congeal'],
+    layerFx: ['fx-light-trails', 'fx-decay', 'fx-phosphene', 'fx-smear'],
     blends: ['screen', 'lighten'], feedback: 0.5, drift: 0.3, flow: 0.66, density: 0.4
   }),
   mk({
@@ -460,7 +480,7 @@ export const THEMES: Theme[] = [
     world: 'musical',
     palette: [K, [0.16, 0.06, 0.2, 1], [0.8, 0.75, 0.9, 1]],
     sources: ['recurse', 'shapes', 'op-art'],
-    layerFx: ['fx-feedback-zoom', 'fx-hue-rotate', 'fx-sharpen'],
+    layerFx: ['fx-feedback-zoom', 'fx-hue-rotate', 'fx-sharpen', 'fx-motif'],
     blends: ['screen', 'add'], feedback: 0.4, drift: 0.35
   }),
   mk({
@@ -488,8 +508,8 @@ export const THEMES: Theme[] = [
     blurb: 'A bright form, once removed, leaves its complementary ghost : Goethe’s afterimage.',
     world: 'sublimated',
     palette: [K, [0.24, 0.05, 0.14, 1], [0.4, 0.85, 0.82, 1]],
-    sources: ['shapes', 'op-art', 'dye-field'],
-    layerFx: ['fx-phosphene', 'fx-decay'],
+    sources: ['shapes', 'op-art', 'dye-field', 'metamorph'],
+    layerFx: ['fx-phosphene', 'fx-decay', 'fx-solarize'],
     nativeNodes: ['node-afterimage'], nativeChance: 0.85,
     blends: ['screen', 'lighten'], drift: 0.25, density: 0.35
   }),
@@ -521,7 +541,7 @@ export const THEMES: Theme[] = [
     world: 'monomedia',
     palette: [INK, [0.5, 0.5, 0.52, 1], [0.95, 0.95, 0.95, 1]],
     sources: ['organic', 'membrane', 'solid-color'],
-    layerFx: ['fx-grade', 'fx-grain', 'fx-threshold'],
+    layerFx: ['fx-grade', 'fx-grain', 'fx-threshold', 'fx-solarize'],
     blends: ['screen', 'multiply'], coalesce: 0.55, density: 0.35,
     vibe: { saturation: 0.15, contrast: 1.3 }, finalizer: { grain: 0.2, black: 0.03 }
   }),
@@ -533,7 +553,8 @@ export const THEMES: Theme[] = [
     sources: ['drift-field', 'contour', 'swell'],
     layerFx: ['fx-grade', 'fx-hue-rotate'],
     blends: ['screen', 'lighten'], density: 0.35, drift: 0.3,
-    context: { haze: 0.24, depth: 0.42, blur: 0.14, bloom: 0.2 }
+    context: { haze: 0.24, depth: 0.42, blur: 0.14, bloom: 0.2 },
+    nativeNodes: ['node-lumablur']
   }),
   mk({
     id: 'bloom', name: 'Bloom', family: 'Cinematic / Atmospheric',
@@ -553,7 +574,8 @@ export const THEMES: Theme[] = [
     sources: ['membrane', 'swell', 'drift-field'],
     layerFx: ['fx-grade', 'fx-streak'],
     blends: ['screen', 'lighten'], density: 0.3, drift: 0.35,
-    context: { haze: 0.26, blur: 0.2, depth: 0.4 }
+    context: { haze: 0.26, blur: 0.2, depth: 0.4 },
+    nativeNodes: ['node-lumablur']
   }),
   mk({
     id: 'nocturne', name: 'Nocturne', family: 'Cinematic / Atmospheric',
@@ -573,8 +595,8 @@ export const THEMES: Theme[] = [
     world: 'parametric',
     palette: [INK, [0.9, 0.15, 0.2, 1], [0.15, 0.6, 0.9, 1], [0.95, 0.9, 0.3, 1]],
     sources: ['shapes', 'grid-drift', 'op-art'],
-    layerFx: ['fx-pixelate', 'fx-posterize', 'fx-pixelmask', 'fx-crt-screen'],
-    blends: ['screen', 'add'], useB: 0.2, coalesce: 0.3, gestureTexture: 0.4
+    layerFx: ['fx-pixelate', 'fx-posterize', 'fx-pixelmask', 'fx-crt-screen', 'fx-mosaic'],
+    blends: ['screen', 'add', 'lightercolor'], useB: 0.2, coalesce: 0.3, gestureTexture: 0.4
   }),
   mk({
     id: 'broadcast', name: 'Broadcast', family: 'Retro Screen',
@@ -592,19 +614,21 @@ export const THEMES: Theme[] = [
     blurb: 'A phosphor-green console : raster text-glow under scanlines.',
     world: 'parametric',
     palette: [INK, [0.05, 0.3, 0.1, 1], [0.4, 1.0, 0.5, 1]],
-    sources: ['gen-parametric', 'column-scan', 'ramps'],
+    sources: ['gen-parametric', 'column-scan', 'ramps', 'ten-print', 'gen-text'],
     bgSources: ['grid-drift', 'ramps'],
     layerFx: ['fx-scanlines', 'fx-crt-screen', 'fx-posterize'],
-    blends: ['screen', 'add'], tonicity: 0.4, coalesce: 0.35, gestureTexture: 0.4
+    blends: ['screen', 'add', 'lumakey'], tonicity: 0.4, coalesce: 0.35, gestureTexture: 0.4,
+    words: ['READY.', 'NO CARRIER', 'SIGNAL', 'RUN', 'CONNECT', 'LOAD', '> _'], mixBlends: ['lumakey', 'screen']
   }),
   mk({
     id: 'teletext', name: 'Teletext', family: 'Retro Screen',
     blurb: 'Blocky primaries on black : the limited-palette information screen.',
     world: 'parametric',
     palette: [INK, [0.9, 0.2, 0.2, 1], [0.2, 0.8, 0.4, 1], [0.95, 0.9, 0.3, 1]],
-    sources: ['shapes', 'slabs', 'grid-drift'],
-    layerFx: ['fx-posterize', 'fx-palette', 'fx-pixelate'],
-    blends: ['normal', 'screen'], useB: 0.15, coalesce: 0.3
+    sources: ['shapes', 'slabs', 'grid-drift', 'gen-text'],
+    layerFx: ['fx-posterize', 'fx-palette', 'fx-pixelate', 'fx-mosaic'],
+    blends: ['normal', 'screen', 'lumakey'], useB: 0.15, coalesce: 0.3,
+    words: ['P100', 'INDEX', 'NEWS', 'WEATHER', 'SUBTITLES', 'PAGE 888']
   }),
   mk({
     id: 'dead-channel', name: 'Dead Channel', family: 'Retro Screen',
@@ -623,19 +647,20 @@ export const THEMES: Theme[] = [
     blurb: 'Bold geometric abstraction : diagonal bars and shapes in red, blue, black and cream.',
     world: 'monomedia',
     palette: [INK, [0.82, 0.12, 0.09, 1], [0.13, 0.28, 0.52, 1], [0.93, 0.9, 0.83, 1]],
-    sources: ['shapes', 'slabs', 'differential'],
-    layerFx: ['fx-transform', 'fx-posterize', 'fx-sharpen'],
-    blends: ['normal', 'multiply', 'screen'], useB: 0.3, layers: [2, 3],
+    sources: ['shapes', 'slabs', 'differential', 'gen-text'],
+    layerFx: ['fx-transform', 'fx-posterize', 'fx-sharpen', 'fx-motif'],
+    blends: ['normal', 'multiply', 'screen', 'lightercolor'], useB: 0.3, layers: [2, 3],
     density: 0.4, coalesce: 0.35, gestureTexture: 0.4, drift: 0.12,
-    vibe: { saturation: 1.2, contrast: 1.15, mixSrc: 0.15 }
+    vibe: { saturation: 1.2, contrast: 1.15, mixSrc: 0.15 },
+    words: ['FORM', 'LINE', 'MASS', 'WORK', 'BUILD', 'SIGNAL'], nativeNodes: ['node-matte'], nativeChance: 0.35
   }),
   mk({
     id: 'grid', name: 'Grid', family: 'Minimal / Structural',
     blurb: 'Architectural greys : a breathing grid, quantised.',
     world: 'parametric',
     palette: [K, [0.2, 0.22, 0.24, 1], [0.78, 0.8, 0.82, 1]],
-    sources: ['grid-drift', 'column-scan', 'contour'],
-    layerFx: ['fx-pixelate', 'fx-posterize', 'fx-sharpen'],
+    sources: ['grid-drift', 'column-scan', 'contour', 'ten-print'],
+    layerFx: ['fx-pixelate', 'fx-posterize', 'fx-sharpen', 'fx-mosaic'],
     blends: ['screen', 'normal'], density: 0.4, coalesce: 0.4
   }),
   mk({
@@ -644,7 +669,7 @@ export const THEMES: Theme[] = [
     world: 'musical',
     palette: [K, [0.12, 0.2, 0.18, 1], [0.7, 0.82, 0.72, 1]],
     sources: ['contour', 'differential', 'erosion'],
-    layerFx: ['fx-sharpen', 'fx-edge', 'fx-posterize'],
+    layerFx: ['fx-sharpen', 'fx-edge', 'fx-posterize', 'fx-force-lines'],
     blends: ['screen', 'add'], density: 0.4, drift: 0.2
   }),
   mk({
@@ -654,8 +679,8 @@ export const THEMES: Theme[] = [
     // clipped into a silhouette, seated by the depth vignette.
     world: 'monomedia',
     palette: [INK, [0.16, 0.16, 0.19, 1], [0.72, 0.72, 0.78, 1]],
-    sources: ['membrane', 'organic', 'shapes'],
-    layerFx: ['fx-transform', 'fx-grade'],
+    sources: ['membrane', 'organic', 'shapes', 'metamorph'],
+    layerFx: ['fx-transform', 'fx-grade', 'fx-abstraction'],
     blends: ['normal', 'lighten'], useB: 0.15, layers: [1, 2], density: 0.35,
     context: { depth: 0.45, bloom: 0.14 }
   }),
@@ -677,7 +702,7 @@ export const THEMES: Theme[] = [
     world: 'sublimated',
     palette: [K, [0.4, 0.08, 0.35, 1], [0.1, 0.5, 0.55, 1], [0.95, 0.8, 0.5, 1]],
     sources: ['organic', 'dye-field', 'swell', 'membrane'],
-    layerFx: ['fx-grade', 'fx-chroma-shift'],
+    layerFx: ['fx-grade', 'fx-chroma-shift', 'fx-smear'],
     nativeNodes: ['node-datamosh'], nativeChance: 0.9,
     blends: ['screen', 'lighten'], layers: [1, 2], feedback: 0.2, drift: 0.3, density: 0.4
   }),
@@ -708,7 +733,8 @@ export const THEMES: Theme[] = [
     palette: [K, [0.2, 0.06, 0.28, 1], [0.85, 0.35, 0.4, 1], [0.9, 0.9, 0.82, 1]],
     sources: ['drift-field', 'slabs', 'shapes', 'organic'],
     layerFx: ['fx-compress', 'fx-pixelate', 'fx-posterize'],
-    blends: ['screen', 'difference'], gestureTexture: 0.55, coalesce: 0.3, density: 0.55
+    blends: ['screen', 'difference'], gestureTexture: 0.55, coalesce: 0.3, density: 0.55,
+    nativeNodes: ['node-mosaique'], nativeChance: 0.45
   }),
   mk({
     id: 'transcode', name: 'Transcode', family: 'Datamosh & Compression',
@@ -726,7 +752,8 @@ export const THEMES: Theme[] = [
     palette: [K, [0.16, 0.16, 0.18, 1], [0.78, 0.78, 0.72, 1]],
     sources: ['slabs', 'column-scan', 'organic', 'drift-field'],
     layerFx: ['fx-databend', 'fx-sync-loss', 'fx-row-echo'],
-    blends: ['screen', 'lighten'], coalesce: 0.35, drift: 0.3
+    blends: ['screen', 'lighten'], coalesce: 0.35, drift: 0.3,
+    nativeNodes: ['node-faultline']
   }),
   mk({
     id: 'pixel-sort', name: 'Pixel Sort', family: 'Datamosh & Compression',
@@ -734,7 +761,7 @@ export const THEMES: Theme[] = [
     world: 'sublimated',
     palette: [K, [0.3, 0.12, 0.28, 1], [1.0, 0.75, 0.55, 1]],
     sources: ['organic', 'dye-field', 'drift-field', 'swell'],
-    layerFx: ['fx-pixelsort', 'fx-grade', 'fx-hue-rotate'],
+    layerFx: ['fx-pixelsort', 'fx-grade', 'fx-hue-rotate', 'fx-smear'],
     blends: ['screen', 'lighten'], feedback: 0.2, drift: 0.25, density: 0.4
   }),
   mk({
@@ -754,8 +781,87 @@ export const THEMES: Theme[] = [
     palette: [K, [0.4, 0.1, 0.3, 1], [0.1, 0.45, 0.55, 1], [0.9, 0.82, 0.5, 1]],
     sources: ['organic', 'shapes', 'dye-field', 'murmuration'],
     layerFx: ['fx-grade', 'fx-chroma-shift'],
-    nativeNodes: ['node-datamosh'], nativeChance: 0.7,
-    blends: ['screen', 'difference'], layers: [2, 2], useB: 0.4, feedback: 0.25, drift: 0.3
+    nativeNodes: ['node-datamosh', 'node-transfert'], nativeChance: 0.7,
+    blends: ['screen', 'difference', 'consume'], layers: [2, 2], useB: 0.4, feedback: 0.25, drift: 0.3,
+    mixBlends: ['consume', 'screen', 'difference']
+  }),
+
+  // ── Living Surfaces : the surfaces that grow, crack and rust ──────────
+  // Real photographed materials and grown matter keep their own color : the Vibe
+  // only tints them (a high source mix), the palette sets the mood of the light.
+  mk({
+    id: 'lichen', name: 'Lichen', family: 'Living Surfaces',
+    blurb: 'Lichen spreading over rock and concrete, crusts cracking as they age.',
+    world: 'mineral',
+    palette: [K, [0.16, 0.2, 0.14, 1], [0.7, 0.74, 0.6, 1]],
+    sources: ['scan', 'colony'],
+    stack: [['scan', 'ground'], ['colony']],
+    pickInputs: { scan: { material: [11, 12, 18, 19] }, ground: { kind: [2] }, colony: { kind: [0] } },
+    layerFx: ['fx-grade', 'fx-grain'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.5, drift: 0.15,
+    vibe: { mixSrc: 0.8 }
+  }),
+  mk({
+    id: 'rust', name: 'Rust', family: 'Living Surfaces',
+    blurb: 'Rust blooming over worn steel : pits, flakes and a slow corrosion eating the picture.',
+    world: 'mineral',
+    palette: [K, [0.3, 0.12, 0.05, 1], [0.8, 0.52, 0.32, 1]],
+    sources: ['scan', 'colony'],
+    stack: [['scan'], ['colony']],
+    pickInputs: { scan: { material: [23, 24] }, colony: { kind: [3] } },
+    layerFx: ['fx-grade', 'fx-grain'],
+    nativeNodes: ['node-corrode'], nativeChance: 0.45,
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, drift: 0.15,
+    vibe: { mixSrc: 0.8 }
+  }),
+  mk({
+    id: 'mold-culture', name: 'Mold Culture', family: 'Living Surfaces',
+    blurb: 'Colonies of mold on agar, sporulating in rings and stopping short of each other.',
+    world: 'sublimated',
+    palette: [K, [0.2, 0.22, 0.16, 1], [0.82, 0.8, 0.68, 1]],
+    sources: ['colony'],
+    pickInputs: { colony: { kind: [1] } },
+    layerFx: ['fx-grade', 'fx-sharpen'],
+    nativeNodes: ['node-lumablur'],
+    blends: ['normal', 'multiply'], layers: [1, 2], useB: 0, feedback: 0, density: 0.45,
+    vibe: { mixSrc: 0.75 }
+  }),
+  mk({
+    id: 'burning-paper', name: 'Burning Paper', family: 'Living Surfaces',
+    blurb: 'Paper catching and charring from its edges : the burn front glows, then turns to ash.',
+    world: 'sublimated',
+    palette: [K, [0.35, 0.1, 0.03, 1], [0.95, 0.72, 0.4, 1]],
+    sources: ['scan', 'colony'],
+    stack: [['scan'], ['colony']],
+    pickInputs: { scan: { material: [1, 2, 3, 4] }, colony: { kind: [2] } },
+    layerFx: ['fx-grade', 'fx-grain', 'fx-light-trails'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, drift: 0.2,
+    vibe: { mixSrc: 0.8 }
+  }),
+  mk({
+    id: 'dry-earth', name: 'Dry Earth', family: 'Living Surfaces',
+    blurb: 'Mud cracking as it dries, sand ripples migrating with the wind, lit low from the side.',
+    world: 'mineral',
+    palette: [K, [0.24, 0.17, 0.1, 1], [0.8, 0.7, 0.54, 1]],
+    sources: ['ground'],
+    pickInputs: { ground: { kind: [0, 1] } },
+    layerFx: ['fx-grade', 'fx-grain'],
+    nativeNodes: ['node-lumablur'], nativeChance: 0.3,
+    blends: ['normal', 'multiply'], layers: [1, 1], useB: 0.25, feedback: 0, drift: 0.15,
+    mixBlends: ['multiply', 'lumakey'],
+    vibe: { mixSrc: 0.75 }
+  }),
+  mk({
+    id: 'grown', name: 'Grown', family: 'Living Surfaces',
+    blurb: 'A texture that grows itself from nothing and heals where it is damaged : lava, moss, bark.',
+    world: 'mineral',
+    palette: [K, [0.22, 0.14, 0.08, 1], [0.85, 0.72, 0.52, 1]],
+    sources: ['gen-nca'],
+    stack: [['gen-nca'], ['colony']],
+    pickInputs: { colony: { kind: [0, 1] } },
+    layerFx: ['fx-grade', 'fx-grain'],
+    blends: ['normal'], layers: [1, 2], useB: 0, feedback: 0, drift: 0.15,
+    vibe: { mixSrc: 0.8 }
   }),
 
   // ── Test : one theme per macro (open Feel · G, then sweep the named macro).
