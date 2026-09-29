@@ -1,6 +1,7 @@
 // Body ingest bus (the FORWARD path : the room plays back). The MediaPipe tracker
 // (engine/bodyTracker.ts) reads a dedicated webcam, reduces hand + pose landmarks
-// to a handful of normalised control features each frame, and writes them here.
+// (and the camera's motion field) to a handful of normalised control features each
+// frame, and writes them here.
 // Those feed `body` modulators (bind a hand or the whole body to any parameter),
 // and discrete gestures (pinch / clap / cross / hands-up) are queued as one-shot
 // onsets that App drains and routes to actions.
@@ -25,6 +26,8 @@ const REST: Record<BodyFeature, number> = {
   faceJawOpen: 0, faceSmile: 0, faceBrowUp: 0, faceBlink: 0, faceMouthPucker: 0,
   faceHeadYaw: 0.5, faceHeadPitch: 0.5, faceHeadRoll: 0.5,
   zoneTL: 0, zoneTC: 0, zoneTR: 0, zoneML: 0, zoneMC: 0, zoneMR: 0, zoneBL: 0, zoneBC: 0, zoneBR: 0, bodyCover: 0,
+  flowEnergy: 0, flowX: 0.5, flowY: 0.5, flowDivergence: 0.5, flowCurl: 0.5, flowCoherence: 0,
+  flowCenterX: 0.5, flowCenterY: 0.5, flowArea: 0,
   bodyPresent: 0, handsPresent: 0, facePresent: 0
 }
 

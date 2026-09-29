@@ -7,6 +7,15 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Motion field** (Body page, **Motion** toggle) : the camera's optical flow (a
+  pyramidal Lucas–Kanade on a small copy of each frame, no body model) read as nine
+  features : how much moves, which way, whether it **spreads out or closes in** (someone
+  approaching, arms opening), whether it **turns**, whether it moves **as one or in every
+  direction**, where, and how much of the frame. New gestures : swipe L / R / up / down,
+  approach, withdraw, turn cw / ccw, and **stillness** (a moving room holding still). It
+  follows anything that moves, a crowd or a curtain as well as a body. The picture itself
+  gains the same reading on the vision bus (`flowX`, `flowY`, `divergence`, `curl`,
+  `coherence`), and body features now stream over OSC as `/opsia/body/<feature>`.
 - **Three new Generate families** :
   - **Dome** (Aurora, Canopy, Flock Overhead, Strata, Deep Water) : made for a fulldome,
     no vignette, nothing framing the edges, slow motion overhead;

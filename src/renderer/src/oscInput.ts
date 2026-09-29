@@ -62,7 +62,8 @@
 
 import { resolumeLearn } from './resolume'
 import type { BlendMode, CouplingMode, AudioFeature, FxScope, OscInEvent, OscQueryLeaf } from '@shared/types'
-import { BLEND_MODES } from '@shared/types'
+import { BLEND_MODES, BODY_FEATURES } from '@shared/types'
+import { bodyBus } from './engine/bodyIn'
 import { videoKey, videoSeekRequests } from './engine/videoState'
 import { SONI_SCALES, withSonifyParam, type SoniConfig } from './audio/sonify'
 import { SONIFY_MOD_DESCS } from './engine/modulation'
@@ -931,6 +932,14 @@ function enumerateLeaves(): Leaf[] {
   // so the composited image plays the synths (echoed by the outbound diff loop).
   for (const vf of VISION_FEATURES) {
     add(`/opsia/vision/${vf}`, 0, 1, visionBus.feature(vf), `Vision ${vf} (0..1) : the composited picture as control`)
+  }
+  // Body features (the room : hands, pose, face, silhouette zones, the camera's
+  // motion field), streamed OUT while the Body camera runs, so a synth can follow a
+  // gesture or a crowd's motion directly (rules still fire /body/<name>).
+  if (st.bodyControl.enabled) {
+    for (const bf of BODY_FEATURES) {
+      add(`/opsia/body/${bf}`, 0, 1, bodyBus.feature(bf), `Body ${bf} (0..1) : the room as control`)
+    }
   }
   for (const [key, sid] of [['vibe', 'fx-vibe'], ['context', 'fx-context'], ['finalizer', 'fx-finalizer']] as const) {
     for (const d of inputsForShader(sid)) {

@@ -558,7 +558,8 @@ it works offline and in kiosk.
 **Capture bar** (one distributed line): **Hands** (21 landmarks per hand, up to two)
 · **Pose** (33-point whole body) · **Face** (ARKit blendshapes: jaw, smile, brow,
 blink, pucker + head yaw/pitch/roll) · **Silhouette** (the pose segmentation mask
-reduced to a 3×3 zone grid; heavier) · **Mirror** (selfie view) · **sensitivity**
+reduced to a 3×3 zone grid; heavier) · **Motion** (the camera's motion field, no body
+model; cheap) · **Mirror** (selfie view) · **sensitivity**
 (how easily gestures fire, a global default that any single gesture can override) ·
 **hold time** (how long a held pose must last) · **OSC out**. The camera picker sits
 in the page header.
@@ -604,6 +605,21 @@ the tracker saw.
 a 3×3 coverage grid drawn over the camera preview, each cell lighting up as your shadow
 fills it. Cover a region to fire its `cover …` rule, or bind a zone's continuous
 coverage to a modulator: screen-space control that reads clearly to an audience.
+
+**Motion** reads the camera's **motion field** (dense optical flow on a small copy of
+each frame, no body model), so it follows anything that moves in front of the camera :
+a hand, a crowd, a curtain, a dancer the models lose. Nine features : how much moves
+(`flowEnergy`), which way (`flowX`, `flowY`), whether the motion **spreads out or closes
+in** (`flowDivergence` : someone approaching the camera or opening their arms reads as
+spreading, walking away or folding as closing), whether it **turns** (`flowCurl`),
+whether everything moves **one way or in every direction** (`flowCoherence` : a sweep
+against a dance), where it happens (`flowCenterX`, `flowCenterY`) and how much of the
+frame moves (`flowArea`). Its gestures : **swipe** L / R / up / down (a coherent sweep, so
+a dance doesn't fire them), **approach** and **withdraw**, **turn** clockwise and
+counter-clockwise, and **stillness**, fired once when a room that was moving holds still.
+
+With **OSC out** on in the app, every body feature also streams as
+`/opsia/body/<feature>` while the camera runs, beside the picture's `/opsia/vision/*`.
 
 ## Output & mapping (key `O`)
 

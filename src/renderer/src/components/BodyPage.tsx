@@ -39,7 +39,9 @@ const GESTURE_LABEL: Record<BodyGesture, string> = {
   headLeft: 'head L', headRight: 'head R', headUp: 'head up', headDown: 'head down', tiltLeft: 'tilt L', tiltRight: 'tilt R',
   holdHandsUp: 'hold up', holdPinchLeft: 'hold pinch L', holdPinchRight: 'hold pinch R', holdArmsWide: 'hold wide', holdMouthOpen: 'hold mouth',
   coverTL: 'cover TL', coverTC: 'cover T', coverTR: 'cover TR', coverML: 'cover L', coverMC: 'cover C', coverMR: 'cover R', coverBL: 'cover BL', coverBC: 'cover B', coverBR: 'cover BR',
-  bodyEnter: 'body in', bodyLeave: 'body out', handsEnter: 'hands in', handsLeave: 'hands out', faceEnter: 'face in', faceLeave: 'face out'
+  bodyEnter: 'body in', bodyLeave: 'body out', handsEnter: 'hands in', handsLeave: 'hands out', faceEnter: 'face in', faceLeave: 'face out',
+  swipeLeft: 'swipe L', swipeRight: 'swipe R', swipeUp: 'swipe up', swipeDown: 'swipe down',
+  approach: 'approach', withdraw: 'withdraw', spinCW: 'turn cw', spinCCW: 'turn ccw', stillness: 'stillness'
 }
 const SONI_VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord']
 
@@ -73,6 +75,7 @@ const FEATURE_GROUPS: Array<{ title: string; color: string; keys: BodyFeature[] 
   { title: 'Pose', color: '#49a6e6', keys: ['bodyMotion', 'bodyLean', 'bodySway', 'armSpan', 'bodyHeight', 'handsUp', 'weightLR'] },
   { title: 'Face', color: '#5fc281', keys: ['faceJawOpen', 'faceSmile', 'faceBrowUp', 'faceBlink', 'faceMouthPucker', 'faceHeadYaw', 'faceHeadPitch', 'faceHeadRoll'] },
   { title: 'Silhouette (zones)', color: '#b98cff', keys: ['zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR', 'bodyCover'] },
+  { title: 'Motion field', color: '#e0b04a', keys: ['flowEnergy', 'flowX', 'flowY', 'flowDivergence', 'flowCurl', 'flowCoherence', 'flowCenterX', 'flowCenterY', 'flowArea'] },
   { title: 'Presence', color: '#8b93a7', keys: ['bodyPresent', 'handsPresent', 'facePresent'] }
 ]
 
@@ -314,7 +317,8 @@ export function BodyPage(): JSX.Element {
     { label: 'Face', keys: ['mouthPop', 'browRaise', 'winkLeft', 'winkRight', 'smile', 'frown', 'browFurrow', 'squint', 'cheekPuff', 'kiss', 'jawLeft', 'jawRight', 'mouthLeft', 'mouthRight', 'tongueOut', 'blinkBoth', 'headLeft', 'headRight', 'headUp', 'headDown', 'tiltLeft', 'tiltRight'] },
     { label: 'Holds', keys: ['holdHandsUp', 'holdPinchLeft', 'holdPinchRight', 'holdArmsWide', 'holdMouthOpen'] },
     { label: 'Zones (silhouette)', keys: ['coverTL', 'coverTC', 'coverTR', 'coverML', 'coverMC', 'coverMR', 'coverBL', 'coverBC', 'coverBR'] },
-    { label: 'Presence (enter / leave)', keys: ['bodyEnter', 'bodyLeave', 'handsEnter', 'handsLeave', 'faceEnter', 'faceLeave'] }
+    { label: 'Presence (enter / leave)', keys: ['bodyEnter', 'bodyLeave', 'handsEnter', 'handsLeave', 'faceEnter', 'faceLeave'] },
+    { label: 'Motion field', keys: ['swipeLeft', 'swipeRight', 'swipeUp', 'swipeDown', 'approach', 'withdraw', 'spinCW', 'spinCCW', 'stillness'] }
   ]
   const gestureOptionEls = GESTURE_GROUPS.map((grp) => (
     <optgroup key={grp.label} label={grp.label}>
@@ -370,6 +374,7 @@ export function BodyPage(): JSX.Element {
             <Toggle on={cfg.pose} label="Pose" onClick={() => patch({ pose: !cfg.pose })} title="Track the whole-body pose (33 landmarks)" />
             <Toggle on={cfg.face} label="Face" onClick={() => patch({ face: !cfg.face })} title="Track the face (blendshapes : jaw, smile, brow, blink, pucker + head yaw/pitch/roll). Heavier : enable when you want facial control." />
             <Toggle on={cfg.silhouette} label="Silhouette" onClick={() => patch({ silhouette: !cfg.silhouette, pose: cfg.pose || !cfg.silhouette })} title="Segment the body silhouette (rides the Pose model) into a 3×3 coverage grid : each zone is a continuous feature (for modulators) and an occlusion gesture 'cover …' (for rules). Cover a region with your shadow to fire it. Heavier : enable when you want screen-space control." />
+            <Toggle on={!!cfg.flow} label="Motion" onClick={() => patch({ flow: !cfg.flow })} title="Read the camera's motion field (optical flow, no body model) : how much moves and which way, whether it spreads out (someone approaches, arms open) or closes in, turns, sweeps one way or scatters, and where. Gestures : swipe L/R/up/down, approach, withdraw, turn, and stillness when the room stops moving. Works on anything that moves, a crowd, a curtain, a hand. Cheap." />
             <Toggle on={cfg.mirror} label="Mirror" onClick={() => patch({ mirror: !cfg.mirror })} title="Selfie view : moving right moves the value right" />
           </div>
           <label className="flex min-w-[200px] flex-1 items-center gap-2 font-mono text-[11px] text-muted">

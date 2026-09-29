@@ -8,11 +8,15 @@
 // offline and in a kiosk. Landmarks are reduced to normalised 0..1 features; the
 // modulation engine smooths them. Face is a planned drop-in : add a FaceLandmarker
 // beside these two and extend the feature derivation, nothing else changes.
+// The Motion toggle adds the camera's motion field (engine/flowField.ts : optical
+// flow on a 64×48 copy of each new camera frame, no model), for anything that
+// moves in front of the camera, not only a body the models recognise.
 
 import type { NormalizedLandmark, MPMask } from '@mediapipe/tasks-vision'
 import type { BodyControlConfig, BodyFeature, BodyGesture } from '@shared/types'
 import { bodyBus } from './bodyIn'
 import { perfMeter } from './perfMeter'
+import { FlowField, STILL, type FlowStats } from './flowField'
 
 // opsia-asset:// URLs (served by main from the bundled resources/mediapipe dir).
 const WASM_BASE = 'opsia-asset://local/wasm'
@@ -27,9 +31,22 @@ type Hands = Awaited<ReturnType<MP['HandLandmarker']['createFromOptions']>>
 type Pose = Awaited<ReturnType<MP['PoseLandmarker']['createFromOptions']>>
 type Face = Awaited<ReturnType<MP['FaceLandmarker']['createFromOptions']>>
 
+/** Motion-field stats as body-bus features. */
+function flowFeatures(f: FlowStats): Partial<Record<BodyFeature, number>> {
+  return {
+    flowEnergy: f.energy, flowX: f.dirX, flowY: f.dirY, flowDivergence: f.divergence, flowCurl: f.curl,
+    flowCoherence: f.coherence, flowCenterX: f.centroidX, flowCenterY: f.centroidY, flowArea: f.area
+  }
+}
+
 const dist = (a: NormalizedLandmark, b: NormalizedLandmark): number =>
   Math.hypot(a.x - b.x, a.y - b.y)
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
+
+// The motion-field grid (a gray copy of each camera frame) : small enough to cost
+// about a millisecond, fine enough to read a hand across a room.
+const FLOW_W = 64
+const FLOW_H = 48
 
 // Pose landmark indices (BlazePose 33).
 const NOSE = 0, L_SHO = 11, R_SHO = 12, L_HIP = 23, R_HIP = 24, L_WRI = 15, R_WRI = 16
@@ -99,6 +116,16 @@ class BodyTracker {
   // hold has already fired (so it fires once per hold, re-arming on release).
   private holdSince: Partial<Record<BodyGesture, number>> = {}
   private holdFired: Partial<Record<BodyGesture, boolean>> = {}
+  // Motion field (the Motion toggle).
+  private flowField = new FlowField(FLOW_W, FLOW_H)
+  private flowCtx: CanvasRenderingContext2D | null = null
+  private flowGray = new Float32Array(FLOW_W * FLOW_H)
+  private flowStats: FlowStats = { ...STILL }
+  private flowLastVT = -1 // the camera frame last read (video.currentTime)
+  private flowLastT = 0
+  private flowOn = false
+  private stillArmed = false // the room moved since the last stillness
+  private stillSince = 0
 
   status(): { running: boolean; error: string | null } {
     return { running: this.running, error: this.err }
@@ -290,6 +317,7 @@ class BodyTracker {
     this.prevPose = null
     for (const ch of ['body', 'hands', 'face'] as const) this.presState[ch] = { on: false, cand: false, since: 0 }
     bodyBus.setLive(false, false, false)
+    this.resetFlow()
   }
 
   private loop = (): void => {
@@ -302,6 +330,10 @@ class BodyTracker {
     let ts = performance.now()
     if (ts <= this.lastTs) ts = this.lastTs + 1
     this.lastTs = ts
+
+    // Motion field : the camera's optical flow, on each NEW camera frame. Read
+    // first : it needs no body in frame (a crowd, a curtain, a hand all move).
+    const flowOut = this.readFlow(video, cfg)
 
     let blendshapes: Array<{ categoryName: string; score: number }> | null = null
     const mpT0 = performance.now()
@@ -350,6 +382,7 @@ class BodyTracker {
       // previous pose so `jump` can't false-fire off a stale frame on re-entry.
       bodyBus.relax(0.06)
       bodyBus.update({ bodyPresent: 0, handsPresent: 0, facePresent: 0 })
+      if (flowOut) bodyBus.update(flowOut) // the motion field needs nobody in frame
       this.prevPose = null
       return
     }
@@ -364,8 +397,94 @@ class BodyTracker {
     if (hasPose) this.derivePose(this.latestPose as NormalizedLandmark[], mirror, out, cfg, ts)
     if (hasFace) this.deriveFace(this.latestFace as NormalizedLandmark[], blendshapes, mirror, out, cfg)
     if (cfg.silhouette) this.deriveSilhouette(out, cfg)
+    if (flowOut) Object.assign(out, flowOut)
     bodyBus.update(out)
     this.prevPose = this.latestPose
+  }
+
+  // ── Motion field → flow features + swipe / approach / turn / stillness ─
+  /** The camera's motion field as body features (null while Motion is off). A new
+   *  flow is computed only on a NEW camera frame : the camera runs ~30 fps, this
+   *  loop at the display rate, and a repeated frame would read as a sudden stop. */
+  private readFlow(video: HTMLVideoElement, cfg: BodyControlConfig): Partial<Record<BodyFeature, number>> | null {
+    if (!cfg.flow) {
+      if (this.flowOn) {
+        // Turned off : hand the features back at rest rather than frozen mid-move.
+        this.resetFlow()
+        bodyBus.update(flowFeatures(STILL))
+      }
+      return null
+    }
+    this.flowOn = true
+    const vt = video.currentTime
+    if (vt !== this.flowLastVT) {
+      this.flowLastVT = vt
+      if (!this.flowCtx) {
+        const c = document.createElement('canvas')
+        c.width = FLOW_W
+        c.height = FLOW_H
+        this.flowCtx = c.getContext('2d', { willReadFrequently: true })
+      }
+      const ctx = this.flowCtx
+      if (ctx) {
+        const t0 = performance.now()
+        ctx.drawImage(video, 0, 0, FLOW_W, FLOW_H)
+        const d = ctx.getImageData(0, 0, FLOW_W, FLOW_H).data
+        const g = this.flowGray
+        for (let i = 0, p = 0; i < g.length; i++, p += 4) g[i] = (d[p] * 0.299 + d[p + 1] * 0.587 + d[p + 2] * 0.114) / 255
+        const now = performance.now()
+        const dt = this.flowLastT ? (now - this.flowLastT) / 1000 : 1 / 30
+        this.flowLastT = now
+        this.flowStats = this.flowField.push(g, dt, false, cfg.mirror)
+        this.flowGestures(this.flowStats)
+        perfMeter.add('motionfield', performance.now() - t0)
+      }
+    }
+    return flowFeatures(this.flowStats)
+  }
+
+  private resetFlow(): void {
+    this.flowField.reset()
+    this.flowStats = { ...STILL }
+    this.flowLastVT = -1
+    this.flowLastT = 0
+    this.flowOn = false
+    this.stillArmed = false
+    this.stillSince = 0
+  }
+
+  /** Discrete gestures from the motion field. A swipe needs the motion to be
+   *  COHERENT (the frame moving one way), so a dance doesn't fire them; approach
+   *  / withdraw / turn read the spreading and turning of the field; stillness
+   *  fires once when a room that was moving holds still for ~0.8 s. */
+  private flowGestures(f: FlowStats): void {
+    const hi = (g: BodyGesture): number => 0.6 - this.sens(g) * 0.2 // 0.5 at the default sensitivity
+    const sx = (f.dirX - 0.5) * 2 * f.coherence
+    const sy = (f.dirY - 0.5) * 2 * f.coherence
+    this.edgeHys('swipeRight', sx, hi('swipeRight'), 0.15)
+    this.edgeHys('swipeLeft', -sx, hi('swipeLeft'), 0.15)
+    this.edgeHys('swipeUp', sy, hi('swipeUp'), 0.15)
+    this.edgeHys('swipeDown', -sy, hi('swipeDown'), 0.15)
+    const dv = (f.divergence - 0.5) * 2
+    const cu = (f.curl - 0.5) * 2
+    this.edgeHys('approach', dv, hi('approach'), 0.15)
+    this.edgeHys('withdraw', -dv, hi('withdraw'), 0.15)
+    this.edgeHys('spinCW', cu, hi('spinCW'), 0.15)
+    this.edgeHys('spinCCW', -cu, hi('spinCCW'), 0.15)
+    if (f.energy > 0.25) {
+      this.stillArmed = true
+      this.stillSince = 0
+    } else if (this.stillArmed && f.energy < 0.04 + this.sens('stillness') * 0.04) {
+      const now = performance.now()
+      if (!this.stillSince) this.stillSince = now
+      else if (now - this.stillSince > 800) {
+        this.emit('stillness')
+        this.stillArmed = false
+        this.stillSince = 0
+      }
+    } else {
+      this.stillSince = 0
+    }
   }
 
   // ── Hands → features + pinch gestures ──────────────────────────────────

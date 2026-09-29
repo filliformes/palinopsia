@@ -325,6 +325,17 @@ export type BodyFeature =
   | 'zoneML' | 'zoneMC' | 'zoneMR'
   | 'zoneBL' | 'zoneBC' | 'zoneBR'
   | 'bodyCover' // whole-frame silhouette coverage 0..1
+  // Motion field (dense optical flow of the camera image, engine/flowField.ts) :
+  // no body model, it reads whatever moves in front of the camera.
+  | 'flowEnergy' // how much moves : 0 still, 1 a lot, fast
+  | 'flowX' // mean horizontal motion : 0 leftward, 0.5 none, 1 rightward
+  | 'flowY' // mean vertical motion : 0 downward, 0.5 none, 1 upward
+  | 'flowDivergence' // 0 closing in (withdraw, arms folding), 0.5 none, 1 spreading (approach, arms opening)
+  | 'flowCurl' // 0 turning counter-clockwise, 0.5 none, 1 turning clockwise
+  | 'flowCoherence' // 0 scattered motion (a dance, a crowd), 1 everything one way (a sweep)
+  | 'flowCenterX' // where the motion is, horizontally 0..1
+  | 'flowCenterY' // where the motion is, vertically 0..1 (0 = top)
+  | 'flowArea' // share of the frame that moves 0..1
   // Presence gates (smoothed 0..1)
   | 'bodyPresent'
   | 'handsPresent'
@@ -336,6 +347,7 @@ export const BODY_FEATURES: BodyFeature[] = [
   'faceJawOpen', 'faceSmile', 'faceBrowUp', 'faceBlink', 'faceMouthPucker',
   'faceHeadYaw', 'faceHeadPitch', 'faceHeadRoll',
   'zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR', 'bodyCover',
+  'flowEnergy', 'flowX', 'flowY', 'flowDivergence', 'flowCurl', 'flowCoherence', 'flowCenterX', 'flowCenterY', 'flowArea',
   'bodyPresent', 'handsPresent', 'facePresent'
 ]
 
@@ -365,6 +377,10 @@ export type BodyGesture =
   // so a one-frame detection drop can't false-fire). The installation trigger :
   // someone walks in → fire ; the room empties → reset.
   | 'bodyEnter' | 'bodyLeave' | 'handsEnter' | 'handsLeave' | 'faceEnter' | 'faceLeave'
+  // Motion field (the Motion toggle) : a sweep one way, an approach or a withdrawal,
+  // a turn, and the room going still after moving (the stillness itself fires).
+  | 'swipeLeft' | 'swipeRight' | 'swipeUp' | 'swipeDown'
+  | 'approach' | 'withdraw' | 'spinCW' | 'spinCCW' | 'stillness'
 export const BODY_GESTURES: BodyGesture[] = [
   'pinchLeft', 'pinchRight', 'clap', 'cross',
   'handsUp', 'leanLeft', 'leanRight', 'crouch', 'jump', 'armsCross', 'tPose', 'raiseLeft', 'raiseRight',
@@ -374,7 +390,8 @@ export const BODY_GESTURES: BodyGesture[] = [
   'headLeft', 'headRight', 'headUp', 'headDown', 'tiltLeft', 'tiltRight',
   'holdHandsUp', 'holdPinchLeft', 'holdPinchRight', 'holdArmsWide', 'holdMouthOpen',
   'coverTL', 'coverTC', 'coverTR', 'coverML', 'coverMC', 'coverMR', 'coverBL', 'coverBC', 'coverBR',
-  'bodyEnter', 'bodyLeave', 'handsEnter', 'handsLeave', 'faceEnter', 'faceLeave'
+  'bodyEnter', 'bodyLeave', 'handsEnter', 'handsLeave', 'faceEnter', 'faceLeave',
+  'swipeLeft', 'swipeRight', 'swipeUp', 'swipeDown', 'approach', 'withdraw', 'spinCW', 'spinCCW', 'stillness'
 ]
 
 // What a gesture fires : one of the shared discrete-trigger action ids (the same
@@ -417,6 +434,7 @@ export interface BodyControlConfig {
   pose: boolean // run the PoseLandmarker
   face: boolean // run the FaceLandmarker (blendshapes + head pose)
   silhouette: boolean // run the pose segmentation mask → 3×3 zone coverage features + occlusion gestures (needs pose; heavier)
+  flow: boolean // read the camera's motion field (optical flow) → flow features + swipe / approach / spin / stillness gestures (no model : cheap)
   mirror: boolean // flip X so moving right moves the value right (selfie view)
   sensitivity: number // 0..1 : global gain on gesture thresholds (higher = easier)
   gestureSensitivity: Partial<Record<BodyGesture, number>> // per-gesture override of `sensitivity` (a gesture with its own value fires at that threshold instead of the global one)

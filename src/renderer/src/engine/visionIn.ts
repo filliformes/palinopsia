@@ -12,6 +12,7 @@
 // from this frame's output) — the same benign latency as audio-reactivity.
 
 import { frameStats } from '@shared/assemble'
+import { FlowField } from './flowField'
 
 export type VisionFeatureName =
   | 'brightness' // mean luminance 0..1
@@ -26,6 +27,12 @@ export type VisionFeatureName =
   | 'hue' // dominant hue (chroma-weighted mean angle) 0..1 : red→yellow→green→cyan→blue→magenta
   | 'depth' // mean scene depth (Depth engine) : 0 far, 1 near
   | 'depthSpread' // near↔far range in frame (depth relief / flatness) 0..1
+  // The picture's motion field (optical flow of the sampled image, flowField.ts)
+  | 'flowX' // mean horizontal motion : 0 leftward, 0.5 none, 1 rightward
+  | 'flowY' // mean vertical motion : 0 downward, 0.5 none, 1 upward
+  | 'divergence' // 0 the picture closes in, 0.5 none, 1 it spreads out (a zoom in, a bloom)
+  | 'curl' // 0 turning counter-clockwise, 0.5 none, 1 turning clockwise
+  | 'coherence' // 0 motion in every direction, 1 the whole picture moving one way
 
 export const VISION_FEATURES: VisionFeatureName[] = [
   'brightness',
@@ -39,7 +46,12 @@ export const VISION_FEATURES: VisionFeatureName[] = [
   'saturation',
   'hue',
   'depth',
-  'depthSpread'
+  'depthSpread',
+  'flowX',
+  'flowY',
+  'divergence',
+  'curl',
+  'coherence'
 ]
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
@@ -57,8 +69,17 @@ class VisionBus {
     saturation: 0,
     hue: 0,
     depth: 0.5,
-    depthSpread: 0
+    depthSpread: 0,
+    flowX: 0.5,
+    flowY: 0.5,
+    divergence: 0.5,
+    curl: 0.5,
+    coherence: 0
   }
+  // The picture's motion field, on the same sampled grid (re-made on a size change).
+  private flow: FlowField | null = null
+  private flowSize = 0
+  private lastIngest = 0
   private gray: Float32Array | null = null
   private prev: Float32Array | null = null
   private ready = false
@@ -168,6 +189,22 @@ class VisionBus {
       1 - fs.centroidY,
       fs.warmth
     ]
+
+    // The picture's motion field : where it flows, whether it spreads or turns.
+    // The GL grid arrives bottom-up.
+    if (!this.flow || this.flowSize !== size) {
+      this.flow = new FlowField(size, size)
+      this.flowSize = size
+    }
+    const now = performance.now()
+    const dt = this.lastIngest ? (now - this.lastIngest) / 1000 : 1 / 30
+    this.lastIngest = now
+    const fl = this.flow.push(gray, dt, true, false)
+    this.f.flowX = fl.dirX
+    this.f.flowY = fl.dirY
+    this.f.divergence = fl.divergence
+    this.f.curl = fl.curl
+    this.f.coherence = fl.coherence
 
     // Ping-pong : this frame becomes the previous one.
     this.gray = prev
