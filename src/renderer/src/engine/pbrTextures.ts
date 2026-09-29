@@ -15,15 +15,16 @@ import { handle, type TextureHandle } from './isfTextureBridge'
 export interface PbrMaterial {
   id: string // ambientCG asset id = folder name under public/pbr/
   name: string // dropdown label (Context.fs LABELS must match this order)
+  noAo?: boolean // the set publishes no AO map : serve the neutral one, never fetch it
 }
 
 // ORDER IS THE ENUM: Context.fs `pbrTexture` VALUES 1..30 index into this
 // list (0 = off). Append only : saved sessions store the index.
 export const PBR_MATERIALS: PbrMaterial[] = [
-  { id: 'Paper001', name: 'paper crumpled' },
-  { id: 'Paper005', name: 'paper rough' },
-  { id: 'Paper006', name: 'paper fibers' },
-  { id: 'Cardboard002', name: 'cardboard' },
+  { id: 'Paper001', name: 'paper crumpled', noAo: true },
+  { id: 'Paper005', name: 'paper rough', noAo: true },
+  { id: 'Paper006', name: 'paper fibers', noAo: true },
+  { id: 'Cardboard002', name: 'cardboard', noAo: true },
   { id: 'Bark006', name: 'bark fine' },
   { id: 'Bark012', name: 'bark deep' },
   { id: 'Bark014', name: 'bark plates' },
@@ -35,20 +36,20 @@ export const PBR_MATERIALS: PbrMaterial[] = [
   { id: 'Fabric030', name: 'fabric weave' },
   { id: 'Fabric061', name: 'fabric knit' },
   { id: 'Carpet016', name: 'carpet' },
-  { id: 'Plaster001', name: 'plaster' },
-  { id: 'PaintedPlaster017', name: 'painted plaster' },
-  { id: 'Concrete034', name: 'concrete' },
+  { id: 'Plaster001', name: 'plaster', noAo: true },
+  { id: 'PaintedPlaster017', name: 'painted plaster', noAo: true },
+  { id: 'Concrete034', name: 'concrete', noAo: true },
   { id: 'Concrete048', name: 'concrete rough' },
   { id: 'Bricks104', name: 'bricks' },
-  { id: 'Wood051', name: 'wood planks' },
-  { id: 'Wood095', name: 'wood grain' },
-  { id: 'Metal063', name: 'metal worn' },
+  { id: 'Wood051', name: 'wood planks', noAo: true },
+  { id: 'Wood095', name: 'wood grain', noAo: true },
+  { id: 'Metal063', name: 'metal worn', noAo: true },
   { id: 'CorrugatedSteel009', name: 'corrugated steel' },
   { id: 'Foil002', name: 'crushed foil' },
   { id: 'Foil003', name: 'foil wrinkles' },
   { id: 'Snow010A', name: 'snow' },
-  { id: 'Lava004', name: 'lava' },
-  { id: 'Leather037', name: 'leather' },
+  { id: 'Lava004', name: 'lava', noAo: true },
+  { id: 'Leather037', name: 'leather', noAo: true },
   { id: 'Gravel043', name: 'gravel' }
 ]
 
@@ -101,7 +102,9 @@ export class PbrLib {
     const [normal, height, ao, color] = await Promise.all([
       this.fetchTex(`${base}normal.jpg`, this.neutral.normal),
       this.fetchTex(`${base}height.jpg`, this.neutral.height),
-      this.fetchTex(`${base}ao.jpg`, this.neutral.ao), // optional : neutral if absent
+      // Optional : a set without one gets the neutral map, and is never requested
+      // (a missing file logs a console error on every load).
+      mat.noAo ? Promise.resolve(this.neutral.ao) : this.fetchTex(`${base}ao.jpg`, this.neutral.ao),
       this.fetchTex(`${base}color.jpg`, this.neutral.color)
     ])
     entry.maps = { normal, height, ao, color }

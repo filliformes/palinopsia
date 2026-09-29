@@ -271,6 +271,8 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- Materials without an ambient-occlusion map no longer log a "file not found" error
+  each time they load (12 of the 30 ship none; the neutral map is used, as before).
 - **The heart shape** (Transform and the Finalizer's output shape) stood upside down,
   tip up, and its edge smudged at the sides and the cusp (it was an implicit curve, not
   a distance). It is now an exact heart, lobes up, with an edge as clean as every other
