@@ -61,7 +61,7 @@ racks, palette, World and macro biases : in one click.
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
-- [Sources](#sources-33-generators) (33 generators) · [Effects](#effects) (52 FX) ·
+- [Sources](#sources-38-generators) (38 generators) · [Effects](#effects) (52 FX) ·
   [Native nodes](#native-nodes) (25) · [Master finalizers](#master-finalizers--pinned-always-last)
 - [Blend modes](#blend-modes) (19)
 
@@ -605,6 +605,11 @@ the tracker saw.
 a 3×3 coverage grid drawn over the camera preview, each cell lighting up as your shadow
 fills it. Cover a region to fire its `cover …` rule, or bind a zone's continuous
 coverage to a modulator: screen-space control that reads clearly to an audience.
+The same mask is also a picture : the **Silhouette** source (listed with the live
+inputs in the source picker) draws it as a **cutout** of the camera (background
+removal, no green screen), a white **matte**, a colored **shadow**, or a **hole** in the
+room, with a `trail` of fading echoes. It only reads the camera : its Inspector line
+says whether the camera is live and offers the one click that turns it on.
 
 **Motion** reads the camera's **motion field** (dense optical flow on a small copy of
 each frame, no body model), so it follows anything that moves in front of the camera :
@@ -1038,9 +1043,9 @@ don't flood your history.
 
 ---
 
-## Sources (33 generators)
+## Sources (38 generators)
 
-33 sources produce an image from nothing. Any generator can fill **Source A or B**
+38 sources produce an image from nothing. Any generator can fill **Source A or B**
 of any layer (and all but a few can be the Background source). Each ships curated
 Randomize sub-ranges and its own preset bank.
 
@@ -1085,6 +1090,8 @@ Randomize sub-ranges and its own preset bank.
 | **Text** *(native)* | Typography as a source : type in the Inspector; choose font / size / weight / spacing / position; a sidechain layer can fill the glyphs. |
 | **Parametric** *(native)* | A literal audio → image reading : the audio bus as a hard raster, waveform trace, spectrum bars, or scrolling spectrogram (needs Audio ingest for real sound). |
 | **Collage** *(native)* | A wall of films cut up by the Autocutter partition : a folder of clips, or your saved Assemble edits, one per piece (see [Collage](#collage--a-wall-of-films-key-source-gen-collage)). |
+| **Grown** *(native)* | A texture that grows itself : a tiny neural network trained on a real scan (lava, mossy rock, bark) runs in every cell of a grid. From nothing the texture of the photo emerges, stays alive and heals where you damage it. |
+| **Silhouette** *(native)* | The body in front of the Body camera, cut out of the room : **cutout** (the camera where you are, nothing elsewhere), **matte** (white on black, to key another layer or feed a Matte node), **shadow** (a flat colored silhouette) or **hole** (the room with you taken out). `trail` leaves fading echoes of the body. Listed with the live inputs; needs the Body camera with Silhouette on and never turns the camera on by itself (see [Body](#body--embodied-control-key-b)). |
 
 </details>
 

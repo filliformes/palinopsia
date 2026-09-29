@@ -1319,6 +1319,28 @@ export const GENERATORS: IsfShader[] = [
       ]
     })}*/`,
     curated: { cells: [140, 320], speed: [60, 160], drift: [0, 0], colour: [0.8, 1], bright: [0.9, 1.1] }
+  },
+  {
+    // The body silhouette as a picture : the Body camera's segmentation mask,
+    // drawn as a cutout, a matte, a shadow or a hole (engine/SilhouetteSource.ts).
+    id: 'gen-silhouette',
+    name: 'Silhouette',
+    category: 'Generator',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Silhouette : the body in front of the Body camera, cut out of the room. CUTOUT shows the camera where the body is and nothing elsewhere (background removal), MATTE a white body on black (to key another layer, or feed a Matte node), SHADOW a flat colored silhouette, HOLE the room with the body taken out. THRESHOLD and SOFTNESS shape the edge, TRAIL leaves fading echoes of the body behind it. Needs the Body camera with Silhouette on; it never turns the camera on by itself.',
+      CATEGORIES: ['Generator', 'Live'],
+      INPUTS: [
+        { NAME: 'mode', TYPE: 'long', VALUES: [0, 1, 2, 3], LABELS: ['cutout', 'matte', 'shadow', 'hole'], DEFAULT: 0, LABEL: 'mode' },
+        { NAME: 'threshold', TYPE: 'float', MIN: 0.05, MAX: 0.95, DEFAULT: 0.5, LABEL: 'threshold' },
+        { NAME: 'softness', TYPE: 'float', MIN: 0.0, MAX: 0.5, DEFAULT: 0.08, LABEL: 'softness' },
+        { NAME: 'trail', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'trail' },
+        { NAME: 'color', TYPE: 'color', DEFAULT: [0.95, 0.92, 0.85, 1.0], LABEL: 'shadow color' },
+        { NAME: 'fit', TYPE: 'long', VALUES: [0, 1], LABELS: ['cover', 'contain'], DEFAULT: 0, LABEL: 'fit' }
+      ]
+    })}*/`,
+    curated: { threshold: [0.4, 0.6], softness: [0.04, 0.2], trail: [0, 0.6] }
   }
 ]
 
@@ -1667,15 +1689,22 @@ export function isAnalogSource(sh: IsfShader): boolean {
   return !!m && /"Analog"/.test(m[1])
 }
 
+/** Generators tagged "Live" : sources that read the room (the Body camera's
+ *  silhouette), listed with the camera and capture entries. */
+export function isLiveSource(sh: IsfShader): boolean {
+  const m = sh.source.match(/"CATEGORIES"\s*:\s*\[([^\]]*)\]/)
+  return !!m && /"Live"/.test(m[1])
+}
+
 /** A generator's section in the source pickers. */
-export function sourceSection(sh: IsfShader): 'organic' | 'analog' | 'generators' {
-  return isOrganicSource(sh) ? 'organic' : isAnalogSource(sh) ? 'analog' : 'generators'
+export function sourceSection(sh: IsfShader): 'live' | 'organic' | 'analog' | 'generators' {
+  return isLiveSource(sh) ? 'live' : isOrganicSource(sh) ? 'organic' : isAnalogSource(sh) ? 'analog' : 'generators'
 }
 
 /** Generators in picker order : living matter, then analog video, then every
  *  other generator, alphabetical within each section. */
 export function inPickerOrder(list: IsfShader[]): IsfShader[] {
-  const rank = { organic: 0, analog: 1, generators: 2 }
+  const rank = { live: -1, organic: 0, analog: 1, generators: 2 }
   return [...list].sort(
     (a, b) => rank[sourceSection(a)] - rank[sourceSection(b)] || a.name.localeCompare(b.name)
   )

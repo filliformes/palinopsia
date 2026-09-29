@@ -7,6 +7,15 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Silhouette source** (listed with the live inputs in the source picker) : the body
+  in front of the Body camera, cut out of the room, as a picture on any layer.
+  **Cutout** shows the camera where you are and nothing elsewhere (background removal,
+  no green screen), **matte** a white body on black (to key another layer or feed a
+  Matte node), **shadow** a flat colored silhouette, **hole** the room with you taken
+  out. Threshold and softness shape the edge, and **trail** leaves fading echoes of the
+  body behind it. It never turns the camera on by itself : its Inspector line says
+  whether the camera is live and offers the click that turns it on. When nobody is in
+  frame the silhouette empties rather than freezing on the last shape.
 - **Motion field** (Body page, **Motion** toggle) : the camera's optical flow (a
   pyramidal Lucas–Kanade on a small copy of each frame, no body model) read as nine
   features : how much moves, which way, whether it **spreads out or closes in** (someone

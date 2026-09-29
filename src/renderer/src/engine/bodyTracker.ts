@@ -126,9 +126,24 @@ class BodyTracker {
   private flowOn = false
   private stillArmed = false // the room moved since the last stillness
   private stillSince = 0
+  // The silhouette as an image (the Silhouette source) : the mask at half size,
+  // 8-bit, row 0 at the top of the camera image; the version bumps per new mask.
+  private silMask: Uint8Array | null = null
+  private silW = 0
+  private silH = 0
+  private silVersion = 0
+  private silEmpty = false // nobody in frame : the mask is all zero
 
   status(): { running: boolean; error: string | null } {
     return { running: this.running, error: this.err }
+  }
+
+  /** The latest silhouette as an image, for the Silhouette source : the mask (half
+   *  size, 8-bit, top-down), the camera video, and the mirror setting. Null unless
+   *  the camera runs with Silhouette on. Never starts the camera. */
+  silhouette(): { mask: Uint8Array; w: number; h: number; version: number; video: HTMLVideoElement | null; mirror: boolean } | null {
+    if (!this.running || !this.cfg?.silhouette || !this.silMask) return null
+    return { mask: this.silMask, w: this.silW, h: this.silH, version: this.silVersion, video: this.video, mirror: this.cfg.mirror }
   }
   preview(): BodyPreview {
     return {
@@ -318,6 +333,7 @@ class BodyTracker {
     for (const ch of ['body', 'hands', 'face'] as const) this.presState[ch] = { on: false, cand: false, since: 0 }
     bodyBus.setLive(false, false, false)
     this.resetFlow()
+    this.silMask = null
   }
 
   private loop = (): void => {
@@ -724,12 +740,39 @@ class BodyTracker {
   // a whole-frame mean, sampling on a stride grid so it stays cheap. The mask is
   // owned by MediaPipe and MUST be closed after reading to free its GPU buffer.
   private readMaskZones(mask: MPMask | null, mirror: boolean): void {
-    if (!mask) { this.zoneCov.fill(0); this.bodyCov = 0; return }
+    // Nobody in frame : an empty silhouette, not the last body frozen in place (the
+    // source's trail fades it out).
+    const empty = (): void => {
+      this.zoneCov.fill(0); this.bodyCov = 0
+      if (this.silEmpty && this.silMask) return
+      if (!this.silMask) { this.silMask = new Uint8Array(1); this.silW = 1; this.silH = 1 }
+      this.silMask.fill(0)
+      this.silVersion++
+      this.silEmpty = true
+    }
+    if (!mask) { empty(); return }
     let arr: Float32Array | null = null
     const w = mask.width, h = mask.height
     try { arr = mask.getAsFloat32Array() } catch { arr = null }
     try { mask.close() } catch { /* already freed */ }
-    if (!arr || !w || !h) { this.zoneCov.fill(0); this.bodyCov = 0; return }
+    if (!arr || !w || !h) { empty(); return }
+    // Keep a half-size 8-bit copy for the Silhouette source (the compositor
+    // uploads it : MediaPipe's own GPU mask lives in another GL context).
+    const hw = w >> 1, hh = h >> 1
+    if (!this.silMask || this.silW !== hw || this.silH !== hh) {
+      this.silMask = new Uint8Array(hw * hh)
+      this.silW = hw
+      this.silH = hh
+    }
+    for (let y = 0; y < hh; y++) {
+      const src = 2 * y * w, dst = y * hw
+      for (let x = 0; x < hw; x++) {
+        const v = arr[src + 2 * x]
+        this.silMask[dst + x] = v <= 0 ? 0 : v >= 1 ? 255 : (v * 255 + 0.5) | 0
+      }
+    }
+    this.silVersion++
+    this.silEmpty = false
     const sums = [0, 0, 0, 0, 0, 0, 0, 0, 0]
     const counts = [0, 0, 0, 0, 0, 0, 0, 0, 0]
     let total = 0, n = 0

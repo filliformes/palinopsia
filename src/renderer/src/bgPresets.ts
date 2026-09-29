@@ -10,7 +10,7 @@
 import type { BackgroundState, FxInstance } from '@shared/types'
 import { GENERATORS } from './shaders/isf'
 
-const BG_EXCLUDED = ['recurse', 'gen-text', 'filaments', 'congeal', 'swell', 'mycelium']
+const BG_EXCLUDED = ['recurse', 'gen-text', 'filaments', 'congeal', 'swell', 'mycelium', 'gen-silhouette']
 export const BG_SOURCES = GENERATORS.filter((g) => !BG_EXCLUDED.includes(g.id))
 
 export const BG_DEFAULT_SPEED = 0.25

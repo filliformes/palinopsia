@@ -4,6 +4,15 @@
 // a first-timer meets in Finishing and can't guess from the label alone.
 
 export const INPUT_HINTS: Record<string, Record<string, string>> = {
+  // ── Silhouette (the Body camera's cutout) ───────────────────────────
+  'gen-silhouette': {
+    mode: 'Cutout : the camera where the body is, nothing elsewhere (background removal). Matte : a white body on black, to key another layer or feed a Matte node. Shadow : a flat colored silhouette. Hole : the room with the body taken out.',
+    threshold: 'Where the edge falls on the body mask : lower takes in more (hair, loose clothes, a halo), higher keeps only the certain body.',
+    softness: 'How soft the edge is : 0 is a hard cut, higher feathers it.',
+    trail: 'Echoes : the body leaves fading copies of itself behind as it moves. 0 = none, 1 = several seconds.',
+    color: 'Color and opacity of the shadow (shadow mode).',
+    fit: 'Cover fills the frame with the camera image (cropping its edges); contain shows all of it, with empty bands.'
+  },
   // ── Color, tone and geometry rack FX ─────────────────────────────────
   'fx-chroma-shift': {
     amount: 'How far red and blue are pulled apart, in frame widths (0.006 ≈ 11 px at 1080p). The same length at every angle.',

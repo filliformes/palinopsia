@@ -33,6 +33,7 @@ import { makeConvNode, isNativeNode, type ConvNode, type NodeContext } from './c
 import { TextSource } from './TextSource';
 import { ParametricSource } from './ParametricSource';
 import { NcaSource } from './NcaSource';
+import { SilhouetteSource } from './SilhouetteSource';
 import { CollageSource } from './CollageSource';
 import { DepthShadow } from './depthShadow';
 import { OutputShape } from './outputShape';
@@ -548,7 +549,7 @@ const IDENTITY_FRAMING: Framing = { zoom: 1, panX: 0, panY: 0, cropL: 0, cropR: 
 // Generators whose picture is drawn by a TS class instead of the ISF runtime :
 // their header-only ISF exists purely to give the Inspector / M / modulation /
 // curated-Randomize surface. syncFromState must keep them OUT of setShader.
-const NATIVE_SOURCE_IDS = new Set(['gen-text', 'gen-parametric', 'gen-collage', 'gen-nca']);
+const NATIVE_SOURCE_IDS = new Set(['gen-text', 'gen-parametric', 'gen-collage', 'gen-nca', 'gen-silhouette']);
 
 const LOADS_PER_FRAME = 12;
 // ms of compile time allowed per frame : one heavy (cache-miss) compile may
@@ -874,6 +875,9 @@ export class ISFLayer {
   // Native neural-CA slots (generator 'gen-nca' : a trained texture that grows).
   private ncaA: NcaSource | null = null;
   private ncaB: NcaSource | null = null;
+  // Native silhouette slots (generator 'gen-silhouette' : the Body camera's cutout).
+  private silA: SilhouetteSource | null = null;
+  private silB: SilhouetteSource | null = null;
   // Native Collage slots (generator 'gen-collage' : a wall of films cut up by
   // the Autocutter's partition — owns its own pool of video decks).
   private collageA: CollageSource | null = null;
@@ -1028,6 +1032,24 @@ export class ISFLayer {
     src.update(cfg.inputs);
   }
 
+  /** Activate/refresh/clear a native SILHOUETTE source (the Body camera's cutout). */
+  setSilhouette(slot: 'A' | 'B', cfg: { inputs: Record<string, number | number[]> } | null): void {
+    const cur = slot === 'A' ? this.silA : this.silB;
+    if (!cfg) {
+      if (cur) {
+        cur.dispose();
+        if (slot === 'A') this.silA = null; else this.silB = null;
+      }
+      return;
+    }
+    let src = cur;
+    if (!src) {
+      src = new SilhouetteSource(this.shared.gl, this.w, this.h);
+      if (slot === 'A') this.silA = src; else this.silB = src;
+    }
+    src.update(cfg.inputs);
+  }
+
   /** Activate/refresh/clear a native NCA source (a trained texture that grows). */
   setNca(slot: 'A' | 'B', cfg: { inputs: Record<string, number | number[]> } | null): void {
     const cur = slot === 'A' ? this.ncaA : this.ncaB;
@@ -1171,10 +1193,11 @@ export class ISFLayer {
     (slot === 'A' ? this.textA : this.textB)?.setInput(name, value); // modulation on text params
     (slot === 'A' ? this.paramA : this.paramB)?.setInput(name, value); // modulation on parametric params
     (slot === 'A' ? this.ncaA : this.ncaB)?.setInput(name, value); // modulation on NCA params
+    (slot === 'A' ? this.silA : this.silB)?.setInput(name, value); // modulation on silhouette params
     (slot === 'A' ? this.collageA : this.collageB)?.setInput(name, value); // modulation on collage params
   }
 
-  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null || this.textB !== null || this.paramB !== null || this.ncaB !== null || this.collageB !== null || this.assembleB !== null; }
+  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null || this.textB !== null || this.paramB !== null || this.ncaB !== null || this.silB !== null || this.collageB !== null || this.assembleB !== null; }
 
   /** Advance the layer clock and stamp it onto every renderer it owns. */
   advanceClock(dtSec: number): void {
@@ -1209,6 +1232,13 @@ export class ISFLayer {
     // Native parametric: the audio buffer rendered as raster/waveform/spectrogram.
     if (param) {
       param.render(scratch.fbo, this.clockSec); // layer clock : Speed / freeze apply
+      return;
+    }
+
+    // Native silhouette : the Body camera's mask drawn as a picture.
+    const sil = slot === 'A' ? this.silA : this.silB;
+    if (sil) {
+      sil.render(scratch.fbo, this.clockSec);
       return;
     }
 
@@ -1269,6 +1299,8 @@ export class ISFLayer {
     this.rackA.flushNodes();
     this.rackB.flushNodes();
     this.rackLayer.flushNodes();
+    this.silA?.flush(); // silhouette echoes
+    this.silB?.flush();
     if (this.reagent) { this.reagent.dispose(this.shared.gl); this.reagent = null; }
     if (this.stackReagent) { this.stackReagent.dispose(this.shared.gl); this.stackReagent = null; }
   }
@@ -1294,6 +1326,8 @@ export class ISFLayer {
     this.paramB?.dispose();
     this.ncaA?.dispose();
     this.ncaB?.dispose();
+    this.silA?.dispose();
+    this.silB?.dispose();
     this.rackA.dispose();
     this.rackB.dispose();
     this.rackLayer.dispose();
@@ -2198,6 +2232,7 @@ export class Compositor {
         : null);
       L.setParam('A', isParamA ? { inputs: l.sourceA.inputs } : null);
       L.setNca('A', isNcaA ? { inputs: l.sourceA.inputs } : null);
+      L.setSilhouette('A', l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-silhouette' ? { inputs: l.sourceA.inputs } : null);
       L.setCollage('A', isCollA ? { pool: l.sourceA.collagePool ?? [], edls: l.sourceA.collageEdls ?? [], inputs: l.sourceA.inputs } : null);
       const nativeB = !!l.sourceB && l.sourceB.kind === 'generator' && NATIVE_SOURCE_IDS.has(l.sourceB.shaderId ?? '');
       const isTextB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-text';
@@ -2219,6 +2254,7 @@ export class Compositor {
         : null);
       L.setParam('B', isParamB && l.sourceB ? { inputs: l.sourceB.inputs } : null);
       L.setNca('B', isNcaB && l.sourceB ? { inputs: l.sourceB.inputs } : null);
+      L.setSilhouette('B', !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-silhouette' ? { inputs: l.sourceB.inputs } : null);
       L.setCollage('B', isCollB && l.sourceB ? { pool: l.sourceB.collagePool ?? [], edls: l.sourceB.collageEdls ?? [], inputs: l.sourceB.inputs } : null);
       L.setVideoPlayback('A', l.sourceA);
       L.setVideoPlayback('B', l.sourceB);

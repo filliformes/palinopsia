@@ -13,6 +13,7 @@ import { inputsForShader, defaultInputs } from '../shaders/isf/inputs'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { CollageStrip } from './CollageStrip'
+import { SilhouetteStrip } from './SilhouetteStrip'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { floatModTargets, hasModulationOn, useFxMenuItems } from './fxMenu'
 import { fxArrayFor, modTargetKey, useStore, type FxScope } from '../store'
@@ -598,6 +599,8 @@ export function Inspector(): JSX.Element {
           onApplied={isVibe ? setVibePresetName : undefined}
         />
       </div>
+      {/* Native Silhouette source : camera status + the explicit turn-on. */}
+      {shaderId === 'gen-silhouette' && <SilhouetteStrip />}
       {/* Native Collage source : the folder / assemblage picker strip. */}
       {collageCfg && (
         <CollageStrip

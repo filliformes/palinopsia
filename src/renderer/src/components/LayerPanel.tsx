@@ -786,7 +786,8 @@ function SourceRow({
             { value: '__cap_live__', label: 'Live Input…', prefix: '🎥 ', group: 'live' },
             { value: '__cap_screen__', label: 'Screen…', prefix: '🖥 ', group: 'live' },
             { value: '__cap_hive__', label: 'HIVE stream…', prefix: '📡 ', group: 'live' },
-            // Living matter first, then analog video, then every other generator.
+            // The body silhouette joins the live entries, then living matter, then
+            // analog video, then every other generator.
             ...inPickerOrder(GENERATORS_ALPHA).map(
               (g): SearchOption => ({
                 value: g.id,
