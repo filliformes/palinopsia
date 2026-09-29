@@ -7,6 +7,18 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **25 new master chains**, in three groups of the chain presets menu :
+  - **Time & memory** : Echo Memory, Sediment, Time Map, Eternal Pair, Ghost Complement,
+    Low Frame Rate, Oxidized and Slow Loop (Réponse, Sediment, Chronoscan, Eternalism,
+    Afterimage, Decimate, Corrode and Feedback on the master bus);
+  - **Node recipes** : Fault Lines, Gooey, Luma Focus, Live Palette, Layer Matte,
+    Remapped, Imprint, Stamp, Live Mosaic, Wake and Painterly (the layer-reading nodes
+    are wired to layers in use);
+  - **Dome** : Clean, Film, Drift, Glow, Memory and Sky, with Context's vignette off
+    (it darkens the rim of a fisheye) and nothing that frames the edges.
+
+  They keep the scene's palette mix (a generated scene keeps its colors and its level)
+  instead of dropping to the raw sources as the older chains do.
 - **Chain presets can wire the nodes that read another layer.** A master chain preset
   says which layer a node reads (the bottom, top or second layer in use), resolved when
   it is applied, so Lookup, Matte, Remap, Transfert, Convolution and Mosaïque work

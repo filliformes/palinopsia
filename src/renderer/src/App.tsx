@@ -2073,7 +2073,7 @@ function MasterRackStrip(): JSX.Element {
         className="w-32 shrink-0 text-[10px]"
         value={applied}
         placeholder="chain presets…"
-        options={MASTER_PRESETS.map((p) => ({ value: p.name, label: p.name }))}
+        options={MASTER_PRESETS.map((p) => ({ value: p.name, label: p.name, group: p.group }))}
         onChange={(v) => {
           const p = MASTER_PRESETS.find((x) => x.name === v)
           if (p) {

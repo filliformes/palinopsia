@@ -19,6 +19,8 @@ export interface MasterPresetFx {
 
 export interface MasterPreset {
   name: string
+  /** A heading in the chain presets menu (the classic chains have none). */
+  group?: string
   fx: MasterPresetFx[]
   // Settings merged onto the pinned Vibe Palette.
   vibe: Record<string, number | number[]>
@@ -668,5 +670,212 @@ export const MASTER_PRESETS: MasterPreset[] = [
       { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.12, size: 1.6, chroma: 0 } }
     ],
     vibe: { mixSrc: 1, contrast: 1, saturation: 0.9, gamma: 1, autoLevel: 0.2, splitTone: 0.3, shadowTint: [0.48, 0.47, 0.5, 1], highTint: [0.56, 0.52, 0.45, 1] }
+  },
+  // ── Time & memory : the native nodes that remember ─────────────────────
+  {
+    name: 'Echo Memory', group: 'Time & memory',
+    fx: [
+      { shaderId: 'node-reponse', inputs: { length: 12, decay: 0.6, attack: 0.1, gain: 1.0, stride: 2, mix: 0.7 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 0.9, lift: 0.02 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.9, gamma: 1, autoLevel: 0.15 }
+  },
+  {
+    name: 'Sediment', group: 'Time & memory',
+    fx: [
+      { shaderId: 'node-sediment', inputs: { deposit: 0.5, decay: 0.7, resurface: 0.45, age: 0.3, interval: 6, stir: 0.25, mix: 0.85 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.1, size: 1.6, chroma: 0 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.85, gamma: 1.05, autoLevel: 0.15, splitTone: 0.2, shadowTint: [0.47, 0.47, 0.5, 1], highTint: [0.55, 0.52, 0.46, 1] }
+  },
+  {
+    name: 'Time Map', group: 'Time & memory',
+    fx: [
+      { shaderId: 'node-chronoscan', inputs: { source: 2, reach: 0.7, angle: 1.5708, sweep: 0.15, curve: 1.2, stride: 2, mix: 0.85 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 0.95, lift: 0.02 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.95, autoLevel: 0.15 }
+  },
+  {
+    name: 'Eternal Pair', group: 'Time & memory',
+    fx: [
+      { shaderId: 'node-eternalism', inputs: { mode: 0, gap: 6, rate: 6, interval: 0.3, detune: 0.2, tint: 0.3, mix: 0.8 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.1, size: 1.5, chroma: 0 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.9, gamma: 1, autoLevel: 0.15 }
+  },
+  {
+    name: 'Ghost Complement', group: 'Time & memory',
+    fx: [
+      { shaderId: 'node-afterimage', inputs: { decay: 0.6, amount: 0.6, chroma: 0.8, dwell: 0.3, mix: 0.85 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 0.9, brightness: -0.02 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.9, gamma: 1.05, autoLevel: 0.12 }
+  },
+  {
+    name: 'Low Frame Rate', group: 'Time & memory',
+    fx: [
+      { shaderId: 'node-decimate', inputs: { mode: 0, rate: 8, smooth: 0.2, mix: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.15, size: 1.8, chroma: 0 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.9, autoLevel: 0.15 }
+  },
+  {
+    // Corrosion eats the picture over minutes; mix keeps it always legible.
+    name: 'Oxidized', group: 'Time & memory',
+    fx: [
+      { shaderId: 'node-corrode', inputs: { bury: 0.5, spread: 0.5, eat: 0.6, tone: 0.4, crackle: 0.5, mix: 0.6 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 0.85, lift: 0.02 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.85, gamma: 1, autoLevel: 0.15, splitTone: 0.25, shadowTint: [0.46, 0.47, 0.5, 1], highTint: [0.57, 0.52, 0.44, 1] }
+  },
+  {
+    name: 'Slow Loop', group: 'Time & memory',
+    fx: [
+      { shaderId: 'node-feedback', inputs: { feedback: 0.7, gain: 1.0, zoom: 0.01, rotate: 0.01, driftX: 0, driftY: 0, warp: 0.4, hue: 0.02 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 0.95 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.95, gamma: 1, autoLevel: 0.2 }
+  },
+
+  // ── Node recipes : Faultline and the layer-reading nodes ───────────────
+  // A node that reads a layer is pointed at an active one when the preset is
+  // applied (`reads` : the bottom, top or second layer in the stack).
+  {
+    name: 'Fault Lines', group: 'Node recipes',
+    fx: [
+      { shaderId: 'node-faultline', inputs: { type: 0, rate: 2, dirt: 0.5, depth: 0.6, hold: 0.08 } },
+      { shaderId: 'fx-scanlines', inputs: { count: 480, darkness: 0.15, roll: 0 } }
+    ],
+    vibe: { contrast: 1.08, saturation: 0.9, autoLevel: 0.15 }
+  },
+  {
+    name: 'Gooey', group: 'Node recipes',
+    fx: [
+      { shaderId: 'node-gooey', inputs: { blur: 0.45, threshold: 0.35, softness: 0.08, fill: 1, key: 1, outside: 0.15, invert: 0, mix: 0.9 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 1 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 1, autoLevel: 0.2 }
+  },
+  {
+    name: 'Luma Focus', group: 'Node recipes',
+    fx: [
+      { shaderId: 'node-lumablur', inputs: { control: 0, blackWidth: 0, whiteWidth: 24, gamma: 1, focus: 0.5, invert: 0, quality: 1, mix: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.08, size: 1.5, chroma: 0 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.95, gamma: 1.05, autoLevel: 0.12 }
+  },
+  {
+    name: 'Live Palette', group: 'Node recipes',
+    fx: [
+      { shaderId: 'node-lookup', reads: 'top', inputs: { index: 0, axis: 2, position: 0.4, band: 0.3, offset: 0, cycles: 1, gamma: 1, mirror: 0, mix: 0.85 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 1 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 1, autoLevel: 0.2 }
+  },
+  {
+    name: 'Layer Matte', group: 'Node recipes',
+    fx: [
+      { shaderId: 'node-matte', reads: 'bottom', reads2: 'top', inputs: { channel: 0, low: 0.2, high: 0.8, invert: 0, swap: 0, empty: 0, mix: 1 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 1, autoLevel: 0.2 }
+  },
+  {
+    name: 'Remapped', group: 'Node recipes',
+    fx: [
+      { shaderId: 'node-remap', reads: 'second', inputs: { mode: 1, amount: 0.3, scale: 0.8, offsetX: 0, offsetY: 0, extend: 2, swap: 0, mix: 1 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 0.95 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.95, autoLevel: 0.15 }
+  },
+  {
+    name: 'Imprint', group: 'Node recipes',
+    fx: [
+      { shaderId: 'node-transfert', reads: 'top', inputs: { mode: 1, amount: 0.35, inertie: 0.6, flowScale: 1, flowBlur: 8, magnitudeGamma: 1, channelSpread: 0, taps: 12, falloff: 0.5, invert: 0, bidirectional: 0, flowRes: 1 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 0.95 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.95, autoLevel: 0.15 }
+  },
+  {
+    name: 'Stamp', group: 'Node recipes',
+    fx: [
+      { shaderId: 'node-convolve', reads: 'top', inputs: { scale: 0.6, taps: 7, threshold: 0.15, kernelGamma: 1.2, boost: 0.2, gain: 1.1, mix: 0.6, additive: 1 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 0.95, brightness: -0.02 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.95, autoLevel: 0.15 }
+  },
+  {
+    name: 'Live Mosaic', group: 'Node recipes',
+    fx: [
+      { shaderId: 'node-mosaique', reads: 'bottom', inputs: { tile: 26, corpus: 2, structure: 0.5, orient: 2, correct: 0.6, melt: 0.35, stick: 0.7, jitter: 0.1, shape: 2, irregular: 0.6, drift: 0.1, gain: 1, mix: 0.9 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 1, autoLevel: 0.2 }
+  },
+  {
+    name: 'Wake', group: 'Node recipes',
+    fx: [
+      { shaderId: 'node-ibfv', inputs: { flow: 0.5, inject: 0.15, scale: 0.5, field: 0.5, motion: 0.5, swirl: 0.5, mix: 0.7 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 0.9 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.9, autoLevel: 0.15 }
+  },
+  {
+    name: 'Painterly', group: 'Node recipes',
+    fx: [
+      { shaderId: 'node-toile', inputs: { radius: 0.5, sharp: 0.5, paint: 1, strokes: 0, line: 0.3, threshold: 0.5, mix: 0.9 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.08, size: 1.8, chroma: 0 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 1, autoLevel: 0.15 }
+  },
+
+  // ── Dome : safe under a fisheye. No vignette (Context's depth darkens the
+  //    rim, where a dome audience looks), nothing that frames the edges. ──
+  {
+    name: 'Dome · Clean', group: 'Dome',
+    fx: [{ shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 1, lift: 0.01 } }],
+    vibe: { contrast: 1.05, saturation: 1, gamma: 1, autoLevel: 0.25 },
+    context: { depth: 0 }
+  },
+  {
+    name: 'Dome · Film', group: 'Dome',
+    fx: [
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.14, size: 1.6, chroma: 0 } },
+      { shaderId: 'fx-grade', inputs: { lift: 0.04, saturation: 0.9, contrast: 1 } }
+    ],
+    vibe: { contrast: 1, saturation: 0.9, gamma: 1, autoLevel: 0.15, splitTone: 0.25, shadowTint: [0.46, 0.48, 0.53, 1], highTint: [0.56, 0.53, 0.46, 1] },
+    context: { depth: 0 }
+  },
+  {
+    name: 'Dome · Drift', group: 'Dome',
+    fx: [
+      { shaderId: 'fx-light-trails', inputs: { decay: 0.96, drift: 0.002, angle: 1.5708 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 0.95, lift: 0.02 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.95, gamma: 1.05, autoLevel: 0.12 },
+    context: { depth: 0, trails: 0.15 }
+  },
+  {
+    name: 'Dome · Glow', group: 'Dome',
+    fx: [{ shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 1, brightness: -0.02 } }],
+    vibe: { contrast: 1.05, saturation: 1, gamma: 1, autoLevel: 0.15 },
+    context: { depth: 0, bloom: 0.25, lightGlow: 0.12 }
+  },
+  {
+    name: 'Dome · Memory', group: 'Dome',
+    fx: [
+      { shaderId: 'node-sediment', inputs: { deposit: 0.45, decay: 0.75, resurface: 0.4, age: 0.3, interval: 8, stir: 0.3, mix: 0.8 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 0.9 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.9, gamma: 1.05, autoLevel: 0.15 },
+    context: { depth: 0 }
+  },
+  {
+    name: 'Dome · Sky', group: 'Dome',
+    fx: [
+      { shaderId: 'fx-hue-rotate', inputs: { shift: 0, byLuma: 0, rate: 0.01 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 0.95, lift: 0.02 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.95, gamma: 1, autoLevel: 0.15 },
+    context: { depth: 0, haze: 0.1 }
   }
 ]
