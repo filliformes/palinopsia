@@ -2,7 +2,7 @@
   "DESCRIPTION": "Ramps : analog-style voltage ramps: a clean gradient signal (horizontal / vertical / diagonal / radial / diamond), optionally stepped into bands, mirrored into a seamless rise-and-fall, and slowly scrolling. At freq 1 one ramp runs exactly edge to edge (or center to farthest corner) at any aspect and angle, so a lumakey wipe against it reveals one clean front. The raw material of analog video synthesis : feed it into Colorizer or key against it. Matte.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["Generator", "Scan"],
+  "CATEGORIES": ["Generator", "Analog", "Scan"],
   "INPUTS": [
     { "NAME": "shape", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4], "LABELS": ["horizontal", "vertical", "diagonal", "radial", "diamond"], "DEFAULT": 0 },
     { "NAME": "freq",  "TYPE": "float", "MIN": 0.5, "MAX": 12.0, "DEFAULT": 1.0 },

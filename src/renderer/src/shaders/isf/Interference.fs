@@ -2,7 +2,7 @@
   "DESCRIPTION": "Interference : two near-frequency line fields beating against each other. Moiré handled as MATTE TEXTURE, not op-art: asymmetric angles, posterized product, mid-tone grays with one accent. Detune and skew set the spacing and slant of the beat bands; rate makes both fields slide, so the bands crawl (slower the wider they are).",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["Generator", "Geometry"],
+  "CATEGORIES": ["Generator", "Analog", "Geometry"],
   "INPUTS": [
     { "NAME": "freq",     "TYPE": "float", "MIN": 5.0,  "MAX": 120.0,  "DEFAULT": 40.0 },
     { "NAME": "detune",   "TYPE": "float", "MIN": 0.0,  "MAX": 0.2,    "DEFAULT": 0.03 },

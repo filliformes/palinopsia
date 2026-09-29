@@ -2,7 +2,7 @@
   "DESCRIPTION": "Differential : visual polyrhythm by differential motion. Several wave trains share one field; layer k runs at rate × (1 + k × (ratio − 1)), so their phases drift against each other and beat like nested rhythms (whole-number ratios lock into repeating cycles, in-between ratios never quite repeat). Rendered as even-width contour lines of the summed field : matte topographic bands that pulse in and out of alignment. SKEW fans the layers inside a narrow angle, so it stays asymmetric (never radial or kaleidoscopic). AUDIO lets each layer swell with its own band of the spectrum, bass on the slowest layer.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["Generator", "Geometry"],
+  "CATEGORIES": ["Generator", "Analog", "Geometry"],
   "INPUTS": [
     { "NAME": "count",     "TYPE": "float", "MIN": 2.0, "MAX": 8.0,  "DEFAULT": 4.0 },
     { "NAME": "ratio",     "TYPE": "float", "MIN": 1.0, "MAX": 3.0,  "DEFAULT": 2.0 },

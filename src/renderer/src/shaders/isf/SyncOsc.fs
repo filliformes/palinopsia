@@ -2,7 +2,7 @@
   "DESCRIPTION": "Sync Osc : a morphing video-synth oscillator. One waveform drawn across the whole frame MORPHS continuously on the shape knob (saw → triangle → sine). SYNC works like an analog sync knob : from 0 to the middle the scrolling lines slow to a frozen horizontal hold, from the middle to the top the frozen lines turn to vertical. AUDIO FM bends every line with the live waveform (the classic video-synth audio input). Colorized between two tints by level : matte.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["Generator", "Scan"],
+  "CATEGORIES": ["Generator", "Analog", "Scan"],
   "INPUTS": [
     { "NAME": "freq",    "TYPE": "float", "MIN": 1.0, "MAX": 60.0,   "DEFAULT": 12.0 },
     { "NAME": "shape",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0,    "DEFAULT": 0.5, "LABEL": "saw↔tri↔sine" },

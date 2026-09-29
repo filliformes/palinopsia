@@ -1660,6 +1660,27 @@ export function isOrganicSource(sh: IsfShader): boolean {
   return !!m && /"Organic"/.test(m[1])
 }
 
+/** Generators tagged "Analog" : the analog video-synthesis lineage (oscillators,
+ *  ramps, scan processing, beating line fields), their own section in the picker. */
+export function isAnalogSource(sh: IsfShader): boolean {
+  const m = sh.source.match(/"CATEGORIES"\s*:\s*\[([^\]]*)\]/)
+  return !!m && /"Analog"/.test(m[1])
+}
+
+/** A generator's section in the source pickers. */
+export function sourceSection(sh: IsfShader): 'organic' | 'analog' | 'generators' {
+  return isOrganicSource(sh) ? 'organic' : isAnalogSource(sh) ? 'analog' : 'generators'
+}
+
+/** Generators in picker order : living matter, then analog video, then every
+ *  other generator, alphabetical within each section. */
+export function inPickerOrder(list: IsfShader[]): IsfShader[] {
+  const rank = { organic: 0, analog: 1, generators: 2 }
+  return [...list].sort(
+    (a, b) => rank[sourceSection(a)] - rank[sourceSection(b)] || a.name.localeCompare(b.name)
+  )
+}
+
 // A shader's display group = its first CATEGORIES tag that isn't the top-level
 // "FX" (Color, Glitch, Distortion, …).
 function fxGroup(sh: IsfShader): string {

@@ -2,7 +2,7 @@
   "DESCRIPTION": "RGB Oscillators : video-synth color: each channel is its own 2D oscillator (one shared waveform, its own spatial frequency and phase, a third of a cycle apart), the three detuned against each other so color separates into drifting interference. Level is a plain gain and chroma pulls the color toward gray, so it can sit matte. Audio FM bends the stripes into the live waveform.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["Generator", "Scan"],
+  "CATEGORIES": ["Generator", "Analog", "Scan"],
   "INPUTS": [
     { "NAME": "waveform", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["sine", "triangle", "square"], "DEFAULT": 0 },
     { "NAME": "freq",     "TYPE": "float", "MIN": 0.5, "MAX": 40.0, "DEFAULT": 6.0 },

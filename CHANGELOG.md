@@ -177,6 +177,10 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **An Analog section in the source pickers** (layers and Background), after Organic :
+  RGB Oscillators, Sync Osc, Slit Scan, Ramps, Column Scan, Differential and Interference,
+  the analog video-synth lineage in one place. Generate's Analog Video Synthesis themes
+  draw on all of it.
 - **Finishing panel in labelled sections.** Vibe Palette, Context and Finalizer
   were each one long list of sliders; each is now split into named families
   with a thin coloured header and a matching rail down the left :

@@ -1111,6 +1111,10 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   which re-rolls the source + depth of what's already bound. Sources are drawn from
   the modulators you have **enabled**. Right-clicking a **source's** name in the
   Inspector header offers the same **Randomize modulation** when it carries any.
+- **The source pickers have sections** : **Organic** (living matter : reaction, growth,
+  water, fire, ground), **Analog** (the analog video-synth lineage : RGB Oscillators, Sync
+  Osc, Slit Scan, Ramps, Column Scan, Differential, Interference), then every other
+  generator. Type `analog` or `organic` to list a whole section.
 - **Every picker is searchable : by concept, not just name.** Click the `+ fx` box, a
   source picker, a preset list or the Generate menu and type : the list filters by name,
   family, *and* a set of **keyword tags** written in a musician's vocabulary. So a **visual

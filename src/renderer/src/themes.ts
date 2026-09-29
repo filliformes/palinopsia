@@ -102,7 +102,7 @@ export const THEMES: Theme[] = [
     blurb: 'Phosphor tube : RGB oscillators run through a scan processor and a CRT surface.',
     world: 'synthetic',
     palette: [K, [0.05, 0.35, 0.12, 1], [0.6, 1.0, 0.5, 1]],
-    sources: ['rgb-osc', 'sync-osc', 'ramps'],
+    sources: ['rgb-osc', 'sync-osc', 'ramps', 'slit-scan', 'interference'],
     layerFx: ['fx-rutt', 'fx-crt-screen', 'fx-scanlines', 'fx-colorizer'],
     blends: ['add', 'screen'], layers: [2, 3], drift: 0.2, coalesce: 0.4,
     finalizer: { grain: 0.12, character: 2 }
@@ -112,7 +112,7 @@ export const THEMES: Theme[] = [
     blurb: 'Voltage ramps coloured by a CV colorizer and pushed into relief.',
     world: 'parametric',
     palette: [K, [0.4, 0.1, 0.5, 1], [1.0, 0.5, 0.1, 1], [0.9, 0.95, 0.4, 1]],
-    sources: ['ramps', 'sync-osc', 'differential'],
+    sources: ['ramps', 'sync-osc', 'differential', 'column-scan', 'slit-scan'],
     layerFx: ['fx-colorizer', 'fx-rutt', 'fx-posterize', 'fx-wavefold'],
     blends: ['screen', 'add'], gestureTexture: 0.35, coalesce: 0.4
   }),
@@ -121,7 +121,7 @@ export const THEMES: Theme[] = [
     blurb: 'One oscillator folded back through a wandering feedback loop.',
     world: 'musical',
     palette: [K, [0.1, 0.2, 0.45, 1], [0.7, 0.85, 1.0, 1]],
-    sources: ['sync-osc', 'rgb-osc'],
+    sources: ['sync-osc', 'rgb-osc', 'slit-scan'],
     layerFx: ['fx-rgb-shift', 'fx-distort', 'fx-colorizer'],
     nativeNodes: ['node-feedback'], blends: ['add', 'screen'], feedback: 0.6, drift: 0.35
   }),

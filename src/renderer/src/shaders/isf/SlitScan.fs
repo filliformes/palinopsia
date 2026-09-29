@@ -2,7 +2,7 @@
   "DESCRIPTION": "Slit Scan : the slit-scan look of an internal oscillator: each column shows the signal at a different moment (position = time), so the frame reads as a time-history of a moving interference profile, a seismograph trace. Matte bands over near-black. No buffer: the whole history is computed from the formula every frame, so turning a knob redraws every column at once rather than entering at the slit and scrolling across. Negative rate runs time the other way.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["Generator", "Scan"],
+  "CATEGORIES": ["Generator", "Analog", "Scan"],
   "INPUTS": [
     { "NAME": "rate",  "TYPE": "float", "MIN": -20.0, "MAX": 20.0,  "DEFAULT": 0.6 },
     { "NAME": "span",  "TYPE": "float", "MIN": 1.0,  "MAX": 30.0, "DEFAULT": 8.0 },

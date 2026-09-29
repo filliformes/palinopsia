@@ -2,7 +2,7 @@
   "DESCRIPTION": "Column Scan : horizontal scan lines vertically displaced by a drifting internal signal, brightness following the displacement slope. A taste of the analog scan-processor register hosted as a plain generator : matte line-work, no phosphor glow. AUDIO writes the live waveform into the raster: each line traces its own stretch of the signal, oscilloscope-style.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["Generator", "Geometry", "Scan"],
+  "CATEGORIES": ["Generator", "Analog", "Geometry", "Scan"],
   "INPUTS": [
     { "NAME": "lines", "TYPE": "float", "MIN": 10.0, "MAX": 100.0, "DEFAULT": 40.0 },
     { "NAME": "amp",   "TYPE": "float", "MIN": 0.0,  "MAX": 0.15,  "DEFAULT": 0.05 },

@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 're
 import type { AudioFeature, BlendMode, CouplingMode, LayerMask, ModTarget, SourceKind, SourceSlot } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
 import { AUDIO_FEATURES } from '../engine/audioIn'
-import { GENERATORS_ALPHA, SHADER_BY_ID, isOrganicSource } from '../shaders/isf'
+import { GENERATORS_ALPHA, SHADER_BY_ID, inPickerOrder, sourceSection } from '../shaders/isf'
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { keywordsFor } from '../shaders/isf/keywords'
 import { makeDefaultMask, modTargetKey, useStore } from '../store'
@@ -786,12 +786,12 @@ function SourceRow({
             { value: '__cap_live__', label: 'Live Input…', prefix: '🎥 ', group: 'live' },
             { value: '__cap_screen__', label: 'Screen…', prefix: '🖥 ', group: 'live' },
             { value: '__cap_hive__', label: 'HIVE stream…', prefix: '📡 ', group: 'live' },
-            // Living matter first (its own section), then every other generator.
-            ...[...GENERATORS_ALPHA.filter(isOrganicSource), ...GENERATORS_ALPHA.filter((g) => !isOrganicSource(g))].map(
+            // Living matter first, then analog video, then every other generator.
+            ...inPickerOrder(GENERATORS_ALPHA).map(
               (g): SearchOption => ({
                 value: g.id,
                 label: g.name,
-                group: isOrganicSource(g) ? 'organic' : 'generators',
+                group: sourceSection(g),
                 keywords: keywordsFor(g.id),
                 title: generatorBlurb(g.id)
               })

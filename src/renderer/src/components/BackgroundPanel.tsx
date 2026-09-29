@@ -8,6 +8,7 @@
 import { useState, type MouseEvent, type ReactNode } from 'react'
 import { useStore } from '../store'
 import { BG_PRESETS, BG_SOURCES, bgPresetToState } from '../bgPresets'
+import { inPickerOrder, sourceSection } from '../shaders/isf'
 import { keywordsFor } from '../shaders/isf/keywords'
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { BoundedNumberInput } from './BoundedNumberInput'
@@ -90,7 +91,7 @@ export function BackgroundPanel(): JSX.Element {
           value={shaderId ?? ''}
           options={[
             { value: '', label: '— none —' },
-            ...BG_SOURCES_ALPHA.map((g): SearchOption => ({ value: g.id, label: g.name, keywords: keywordsFor(g.id), title: generatorBlurb(g.id) }))
+            ...inPickerOrder(BG_SOURCES_ALPHA).map((g): SearchOption => ({ value: g.id, label: g.name, group: sourceSection(g), keywords: keywordsFor(g.id), title: generatorBlurb(g.id) }))
           ]}
           onChange={(v) => setBackgroundSource(v || null)}
           title="Background source : curated ground set (type to search)"
