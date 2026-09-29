@@ -57,6 +57,12 @@ for (const f of files) {
 fs.writeFileSync(path.join(out, 'package.json'), '{"name":"opsia-test","main":"main/index.js"}\n')
 JS
 
+# An unpackaged app serves the bundled MediaPipe models from <app>/resources (the
+# Body page, the Silhouette source) : copy them in (26 MB). A copy, not a link :
+# the rm -rf above must never reach through into the repo.
+mkdir -p "$OUT/resources"
+cp -r "$ROOT/resources/mediapipe" "$OUT/resources/"
+
 cd "$OUT"
 ("$ROOT/node_modules/electron/dist/electron.exe" . > "$OUT.log" 2>&1 &)
 sleep 10
