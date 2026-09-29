@@ -2077,7 +2077,7 @@ function MasterRackStrip(): JSX.Element {
         onChange={(v) => {
           const p = MASTER_PRESETS.find((x) => x.name === v)
           if (p) {
-            applyMasterPreset(p.fx, p.vibe)
+            applyMasterPreset(p.fx, p.vibe, p.context)
             setApplied(p.name)
           }
         }}

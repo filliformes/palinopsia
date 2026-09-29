@@ -1065,8 +1065,9 @@ interface StoreState {
   // Replace the master chain; the chain's vibe settings merge onto the
   // pinned Vibe Palette (which stays pinned, keeps identity + enable state).
   applyMasterPreset: (
-    fx: Array<{ shaderId: string; inputs: Record<string, number | number[]> }>,
-    vibe?: Record<string, number | number[]>
+    fx: import('./shaders/isf/masterPresets').MasterPresetFx[],
+    vibe?: Record<string, number | number[]>,
+    context?: Record<string, number | number[]>
   ) => void
   // Layer lifecycle (context menu): reset to factory / structural randomize.
   initLayer: (layer: number) => void
@@ -2270,18 +2271,37 @@ export const useStore = create<StoreState>((set, get) => ({
     localStorage.setItem('opsia.morphMs', String(v))
     set({ morphMs: v })
   },
-  applyMasterPreset: (fx, vibe) =>
+  applyMasterPreset: (fx, vibe, context) =>
     set((s) => {
       // Locked finalizers (Vibe, then Context) survive a chain preset; the
-      // preset's vibe values land ONLY on the Vibe unit, never on Context.
+      // preset's vibe values land on the Vibe unit, its context values (a
+      // dome-safe chain's vignette off) on Context.
       const locked = s.composition.master
         .filter((f) => f.locked)
-        .map((f) => (vibe && f.shaderId === 'fx-vibe' ? { ...f, inputs: { ...f.inputs, ...vibe } } : f))
+        .map((f) =>
+          vibe && f.shaderId === 'fx-vibe'
+            ? { ...f, inputs: { ...f.inputs, ...vibe } }
+            : context && f.shaderId === 'fx-context'
+              ? { ...f, inputs: { ...f.inputs, ...context } }
+              : f
+        )
+      // A node that reads another layer is pointed at an active one (lowest,
+      // highest or second); with no active layer it is left reading nothing.
+      const active = s.composition.layers
+        .map((l, i) => (l.sourceA.kind !== 'none' || l.sourceB ? i : -1))
+        .filter((i) => i >= 0 && !s.composition.layers[i].mute)
+      const resolve = (p?: 'bottom' | 'top' | 'second'): SidechainRef | undefined => {
+        if (!p || !active.length) return undefined
+        const i = p === 'bottom' ? active[0] : p === 'top' ? active[active.length - 1] : (active[1] ?? active[active.length - 1])
+        return { kind: 'layer', layer: i }
+      }
       const units: FxInstance[] = fx.map((f) => ({
         id: uid(),
         shaderId: f.shaderId,
         enabled: true,
-        inputs: { ...f.inputs }
+        inputs: { ...f.inputs },
+        ...(f.reads && resolve(f.reads) ? { sidechain: resolve(f.reads) } : {}),
+        ...(f.reads2 && resolve(f.reads2) ? { sidechain2: resolve(f.reads2) } : {})
       }))
       const master = [...units, ...locked]
       // The non-locked chain is replaced (fresh ids), so drop master-fx mod/Meta

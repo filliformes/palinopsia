@@ -3,11 +3,28 @@
 // the chain and the vibe are designed together; the vibe's settings merge
 // onto the locked unit without replacing it.
 
+/** Which layer a node in a chain preset reads, resolved when the preset is
+ *  applied : the lowest, the highest, or the second active layer. */
+export type LayerPick = 'bottom' | 'top' | 'second'
+
+export interface MasterPresetFx {
+  shaderId: string
+  inputs: Record<string, number | number[]>
+  /** A node that reads another layer (Lookup, Matte, Remap, Transfert,
+   *  Convolution, Mosaique) : which one. Without it the node reads nothing. */
+  reads?: LayerPick
+  /** Matte's second input (the matte itself). */
+  reads2?: LayerPick
+}
+
 export interface MasterPreset {
   name: string
-  fx: Array<{ shaderId: string; inputs: Record<string, number | number[]> }>
+  fx: MasterPresetFx[]
   // Settings merged onto the pinned Vibe Palette.
   vibe: Record<string, number | number[]>
+  // Settings merged onto the pinned Context (a dome-safe chain turns its
+  // depth vignette off : it darkens the rim of a fisheye).
+  context?: Record<string, number | number[]>
 }
 
 export const MASTER_PRESETS: MasterPreset[] = [

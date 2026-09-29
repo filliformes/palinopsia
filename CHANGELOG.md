@@ -7,6 +7,10 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Chain presets can wire the nodes that read another layer.** A master chain preset
+  says which layer a node reads (the bottom, top or second layer in use), resolved when
+  it is applied, so Lookup, Matte, Remap, Transfert, Convolution and Mosaïque work
+  inside presets. A preset can also set Context (a dome-safe chain turns its vignette off).
 - **Generated scenes move.** Every Generate theme now binds a few modulators across its
   layers, in its family's way of moving : slow breathing for Organic, Living Surfaces and
   Cinematic, drawn cadences for film, stepped and on the beat for Glitch and Data, sine
