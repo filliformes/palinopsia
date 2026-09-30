@@ -90,6 +90,11 @@ void main() {
   // frame late.
 
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
+  // The surface stage runs only with a material chosen : texture "off" is an exact
+  // passthrough whatever relief holds (its flat maps are 8-bit, so "flat" is a
+  // hair off 0.5 : the stage used to shift and shade the whole frame slightly, a
+  // soft blur with every visible slider at 0, since relief hides with the texture).
+  bool pbrOn = pbrAmount > 0.001 && pbrTexture > 0;
 
   // ── PBR SURFACE (maps fed natively by the compositor; pbrTexture picks the
   //    material, this shader only sees its normal/height/AO). The composition
@@ -101,7 +106,7 @@ void main() {
   vec3 pnrm = vec3(0.0, 0.0, 1.0);
   float pao = 1.0;
   float pshadow = 1.0;
-  if (pbrAmount > 0.001) {
+  if (pbrOn) {
     // PARALLAX OCCLUSION MAPPING : ray-march the height field so the projected
     // image is displaced by the true DEPTH of each feature (sinks into crevices,
     // rides over bumps) : the "projected onto a complex 3D surface" warp, not a
@@ -268,7 +273,7 @@ void main() {
   //    toward the light lift, facets away fall into shadow, crevices occlude,
   //    and a restrained specular sheen rides the slopes. Normalized against
   //    the flat normal so a neutral map changes nothing. ──
-  if (pbrAmount > 0.001) {
+  if (pbrOn) {
     float rk = pbrLight; // RAKING : how hard the light grazes the material.
     vec3 L = normalize(vec3((light - uv) * vec2(aspect, 1.0), mix(0.6, 0.28, rk)));
     float ndl = clamp(dot(pnrm, L), 0.0, 1.0);

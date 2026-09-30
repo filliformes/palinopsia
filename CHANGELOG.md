@@ -360,6 +360,12 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Context no longer softens the picture with its sliders at 0** : with the surface
+  texture off, its hidden relief (default 0.5) still ran the surface stage on the
+  flat maps, which are 8-bit and so a hair off flat : the whole frame shifted and
+  darkened slightly, a soft blur nothing visible could turn off. Texture off is now an
+  exact passthrough (measured identical to Context bypassed).
+
 - Materials without an ambient-occlusion map no longer log a "file not found" error
   each time they load (12 of the 30 ship none; the neutral map is used, as before).
 - **The heart shape** (Transform and the Finalizer's output shape) stood upside down,
