@@ -65,7 +65,7 @@ export interface DomeConfig {
   }
 }
 
-export const DOME_RES = [2048, 4096, 8192] as const
+export const DOME_RES = [2048, 4096] as const // no live 8K : ~1.9 GB more VRAM (measured), a blue-screen risk
 
 export function defaultDomeConfig(): DomeConfig {
   return {

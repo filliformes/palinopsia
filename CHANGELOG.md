@@ -236,6 +236,14 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Fulldome is much lighter on the graphics card** (after two blue screens, 0x116
+  VIDEO_TDR_FAILURE with the driver out of resources, in dome output) : the main canvas
+  no longer carries a multisampled colour buffer and a depth buffer it never used, which
+  at a 4096² master cost hundreds of MB of video memory (the dome now adds ~300 MB
+  instead of ~750, measured). The live dome tops out at 4K (a live 8K master added
+  ~1.9 GB); the shared-output capture never exceeds 4096; and the engine skips a frame
+  instead of queueing more work when the card falls two frames behind. A few small
+  graphics-memory leaks are closed (a failed shader load, the light-output zones).
 - **The Body camera tracks each camera frame once** : the models used to run again on
   every display frame, twice or more per picture. Tracking now costs about half. **Hi-res**
   (Body page) runs them on every display frame as before, for a fast camera or the

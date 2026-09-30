@@ -1273,15 +1273,15 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
           ↺
         </button>
       }
-      info="Renders a square domemaster (equidistant fisheye, front at the bottom, the fulldome standard) from the flat composition. The master replaces the frame everywhere : the preview, the projector window, NDI, Spout, recording and stills. The SAT Satosphère takes 210°, 4096×4096 max, live over NDI. 8K is for stills (video encoders stop at 4K)."
+      info="Renders a square domemaster (equidistant fisheye, front at the bottom, the fulldome standard) from the flat composition. The master replaces the frame everywhere : the preview, the projector window, NDI, Spout, recording and stills. The SAT Satosphère takes 210°, 4096×4096 max, live over NDI. 4K is the ceiling : a live 8K master overloads the graphics card."
     >
       <div className="flex flex-wrap items-center gap-1.5">
         <button onClick={() => setDome({ enabled: !dome.enabled })} className={btn(dome.enabled)}>
           dome {dome.enabled ? 'on' : 'off'}
         </button>
         {DOME_RES.map((r) => (
-          <button key={r} onClick={() => setDome({ res: r })} className={btn(dome.res === r)} title={`${r}×${r} master${r === 4096 ? ' (Satosphère max)' : r === 8192 ? ' : stills only, heavy' : ''}`}>
-            {r === 2048 ? '2K' : r === 4096 ? '4K' : '8K'}
+          <button key={r} onClick={() => setDome({ res: r })} className={btn(dome.res === r)} title={`${r}×${r} master${r === 4096 ? ' (Satosphère max)' : ''}`}>
+            {r === 2048 ? '2K' : '4K'}
           </button>
         ))}
       </div>

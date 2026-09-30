@@ -462,6 +462,7 @@ function loadIsf(rgl: WebGL2RenderingContext, id: string, source: string): ISFRe
     r.loadSource(source);
     if (!r.valid) {
       console.error('[ISF] load failed for', id, r.error);
+      try { r.cleanup(); } catch { /* half-built */ }
       return null;
     }
     return r;
@@ -1503,7 +1504,10 @@ export class Compositor {
   constructor(public canvas: HTMLCanvasElement, public w = 1920, public h = 1080) {
     // preserveDrawingBuffer so canvas.captureStream() (the output-window mirror)
     // reliably reads the frame instead of capturing black after the buffer swap.
-    const gl = canvas.getContext('webgl2', { premultipliedAlpha: false, preserveDrawingBuffer: true })!;
+    // No multisampling and no depth buffer : every pass is a full-screen draw, so
+    // they bought nothing, and at a 4096² dome master the default framebuffer's
+    // 4× MSAA colour + depth cost hundreds of MB of video memory (measured).
+    const gl = canvas.getContext('webgl2', { premultipliedAlpha: false, preserveDrawingBuffer: true, antialias: false, depth: false, stencil: false })!;
     if (!gl) throw new Error('WebGL2 unavailable');
     // RGBA16F render targets need this : without it every FBO is incomplete and
     // the whole engine renders black. Surface it rather than fail silently.
@@ -1719,6 +1723,39 @@ export class Compositor {
    *  while the window doesn't paint, Chromium reports fences hundreds of ms late,
    *  and pacing on one held the loop at 3 fps on an idle GPU (measured). The wait
    *  blocks nothing anyone can see (nothing is painting). */
+  // GPU backlog guard : a fence at the end of each frame. When the GPU has not
+  // finished the frame from two frames ago, the loop skips this one instead of
+  // queueing more work : under a heavy load the frame rate drops rather than the
+  // driver's queue (and the memory held by frames in flight) growing, the road to
+  // a GPU timeout. A safety valve renders anyway after ~1.5 s of skipping, so a
+  // fence that never signals can never freeze the picture.
+  private fences: WebGLSync[] = [];
+  private skipSince = 0;
+  backlogSkips = 0;
+  gpuBacklogged(now: number): boolean {
+    const gl = this.gl;
+    while (this.fences.length) {
+      if (gl.getSyncParameter(this.fences[0], gl.SYNC_STATUS) !== gl.SIGNALED) break;
+      gl.deleteSync(this.fences.shift()!);
+    }
+    if (this.fences.length < 2) { this.skipSince = 0; return false; }
+    if (!this.skipSince) this.skipSince = now;
+    if (now - this.skipSince > 1500 || gl.isContextLost()) {
+      for (const f of this.fences) { try { gl.deleteSync(f); } catch { /* lost */ } }
+      this.fences = [];
+      this.skipSince = 0;
+      return false;
+    }
+    this.backlogSkips++;
+    return true;
+  }
+  /** Close a rendered frame for the backlog guard. */
+  markFrame(): void {
+    const gl = this.gl;
+    const s = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    if (s) { this.fences.push(s); gl.flush(); }
+  }
+
   finishFrame(): void {
     const gl = this.gl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -2907,6 +2944,12 @@ export class Compositor {
     this.bgNca?.dispose();
     this.bgRack.dispose();
     this.depthShadow?.dispose();
+    if (this.zoneMipTex) gl.deleteTexture(this.zoneMipTex);
+    if (this.zoneMipFbo) gl.deleteFramebuffer(this.zoneMipFbo);
+    if (this.zoneOut) { gl.deleteTexture(this.zoneOut.tex); gl.deleteFramebuffer(this.zoneOut.fbo); }
+    this.zoneMipTex = null; this.zoneMipFbo = null; this.zoneOut = null;
+    for (const f of this.fences) { try { gl.deleteSync(f); } catch { /* lost */ } }
+    this.fences = [];
     this.outputShape?.dispose();
     this.cameraless?.dispose();
     this.filmDamage?.dispose();

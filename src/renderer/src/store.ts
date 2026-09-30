@@ -2341,7 +2341,7 @@ export const useStore = create<StoreState>((set, get) => ({
       // A node that reads another layer is pointed at an active one (lowest,
       // highest or second); with no active layer it is left reading nothing.
       const active = s.composition.layers
-        .map((l, i) => (l.sourceA.kind !== 'none' || l.sourceB ? i : -1))
+        .map((l, i) => (l.sourceA.kind !== 'none' || (l.sourceB && l.sourceB.kind !== 'none') ? i : -1))
         .filter((i) => i >= 0 && !s.composition.layers[i].mute)
       const resolve = (p?: 'bottom' | 'top' | 'second'): SidechainRef | undefined => {
         if (!p || !active.length) return undefined

@@ -607,7 +607,7 @@ export const THEMES: Theme[] = [
   mk({
     id: 'sediment', name: 'Sediment', family: 'Feedback / Afterimage',
     blurb: 'Long mineral memory : the image settles in layers that never quite wash out.',
-    world: 'mineral',
+    world: 'sublimated',
     palette: [K, [0.16, 0.14, 0.1, 1], [0.72, 0.66, 0.52, 1]],
     sources: ['contour', 'drift-field', 'organic'],
     layerFx: ['fx-decay', 'fx-grain'],
@@ -883,7 +883,7 @@ export const THEMES: Theme[] = [
   mk({
     id: 'lichen', name: 'Lichen', family: 'Living Surfaces',
     blurb: 'Lichen spreading over rock and concrete, crusts cracking as they age.',
-    world: 'mineral',
+    world: 'sublimated',
     palette: [K, [0.16, 0.2, 0.14, 1], [0.7, 0.74, 0.6, 1]],
     sources: ['scan', 'colony'],
     stack: [['scan', 'ground'], ['colony']],
@@ -895,7 +895,7 @@ export const THEMES: Theme[] = [
   mk({
     id: 'rust', name: 'Rust', family: 'Living Surfaces',
     blurb: 'Rust blooming over worn steel : pits, flakes and a slow corrosion eating the picture.',
-    world: 'mineral',
+    world: 'sublimated',
     palette: [K, [0.3, 0.12, 0.05, 1], [0.8, 0.52, 0.32, 1]],
     sources: ['scan', 'colony'],
     stack: [['scan'], ['colony']],
@@ -932,7 +932,7 @@ export const THEMES: Theme[] = [
   mk({
     id: 'dry-earth', name: 'Dry Earth', family: 'Living Surfaces',
     blurb: 'Mud cracking as it dries, sand ripples migrating with the wind, lit low from the side.',
-    world: 'mineral',
+    world: 'sublimated',
     palette: [K, [0.24, 0.17, 0.1, 1], [0.8, 0.7, 0.54, 1]],
     sources: ['ground'],
     pickInputs: { ground: { kind: [0, 1] } },
@@ -945,7 +945,7 @@ export const THEMES: Theme[] = [
   mk({
     id: 'grown', name: 'Grown', family: 'Living Surfaces',
     blurb: 'A texture that grows itself from nothing and heals where it is damaged : lava, moss, bark.',
-    world: 'mineral',
+    world: 'sublimated',
     palette: [K, [0.22, 0.14, 0.08, 1], [0.85, 0.72, 0.52, 1]],
     sources: ['gen-nca'],
     stack: [['gen-nca'], ['colony']],
@@ -991,7 +991,7 @@ export const THEMES: Theme[] = [
   mk({
     id: 'dome-strata', name: 'Strata', family: 'Dome',
     blurb: 'A ceiling of layered rock lit low from one side : the dome as a cave.',
-    world: 'mineral',
+    world: 'sublimated',
     palette: [K, [0.2, 0.16, 0.12, 1], [0.76, 0.68, 0.56, 1]],
     sources: ['scan', 'ground'],
     stack: [['scan']],

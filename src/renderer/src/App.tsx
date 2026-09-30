@@ -1055,6 +1055,8 @@ export default function App(): JSX.Element {
       )
     ]
     const loop = (): void => {
+      // The GPU is still two frames behind : skip this one (see gpuBacklogged).
+      if (comp && comp.gpuBacklogged(performance.now())) { schedule(); return }
       // The whole body is guarded: a shader that throws at load or draw time
       // must never kill the loop (that's a permanent freeze). Lose one frame,
       // keep scheduling : the offending layer simply doesn't render.
@@ -1330,7 +1332,7 @@ export default function App(): JSX.Element {
               comp!.captureRecycle('share', fr.buf)
             }
           }
-          comp!.captureKick('share', route.local && route.topDown ? 'rgbx' : 'rgba-up', 0)
+          comp!.captureKick('share', route.local && route.topDown ? 'rgbx' : 'rgba-up', 4096)
           perfMeter.end('share')
         }
         //     Fulldome simulator : a 1024² read of the master, ~30 Hz, only while
@@ -1474,6 +1476,7 @@ export default function App(): JSX.Element {
         console.error('[render loop]', e)
       }
       perfMeter.frame() // roll this frame's per-section CPU timings
+      try { comp?.markFrame() } catch { /* context lost */ }
       schedule()
     }
     // The clock : requestAnimationFrame while the window paints, a ~60 Hz timer
