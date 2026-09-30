@@ -240,6 +240,13 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Context shows what the picture actually gets** : Proximity (toward far), Coalesce
+  (toward mass), Flow, Gesture⇄Texture and the sequencer's Breathe / Arc add blur,
+  haze, trails or depth ON TOP of Context's sliders, so every slider at 0 could still
+  soften the image with nothing on screen saying why. A line under Context's header now
+  reads e.g. `live blur 0.23 · haze 0.13 ← Proximity, Coalesce` whenever the engine
+  uses more than the sliders, and **neutral** puts those macros back to 0.5. Proximity
+  and the field macros are remembered on the computer between sessions.
 - **Fulldome is much lighter on the graphics card** (after two blue screens, 0x116
   VIDEO_TDR_FAILURE with the driver out of resources, in dome output) : the main canvas
   no longer carries a multisampled colour buffer and a depth buffer it never used, which
