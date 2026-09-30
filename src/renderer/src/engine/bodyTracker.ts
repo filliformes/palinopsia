@@ -389,7 +389,14 @@ class BodyTracker {
         const pr = this.pose.detectForVideo(video, ts)
         this.latestPose = pr.landmarks?.[0] ?? null
         // Silhouette : read the segmentation mask into 3×3 zone coverage, then free it.
-        if (cfg.silhouette) this.readMaskZones(pr.segmentationMasks?.[0] ?? null, cfg.mirror)
+        const masks = pr.segmentationMasks ?? []
+        if (cfg.silhouette) this.readMaskZones(masks[0] ?? null, cfg.mirror)
+        // Free every mask not read above : the model keeps making them for a moment
+        // after Silhouette is switched off (until it is rebuilt), and each one holds
+        // a GPU buffer until closed.
+        for (let i = cfg.silhouette ? 1 : 0; i < masks.length; i++) {
+          try { masks[i].close() } catch { /* already freed */ }
+        }
       } else {
         this.latestPose = null
       }
