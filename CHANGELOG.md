@@ -7,6 +7,10 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Link a folder of sessions** : right-click the Session **Load** button, pick a folder,
+  and every session in it (subfolders included) joins the dropdown, grouped under the
+  folder's name and listed in name order. Linked, not copied : sessions saved there
+  later show up too. The same menu lists the linked folders (click to jump, × to unlink).
 - **Movement qualities** (Body page, with Pose on) : HOW the body moves, not only where.
   Six features read from the pose, measured against the body's own size so near and far
   read alike : **energy** (still to vigorous), **expansion** (folded in to limbs spread

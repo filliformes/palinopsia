@@ -19,6 +19,9 @@ const api: ExposedApi = {
   sessionSaveToDefault: (s) => ipcRenderer.invoke('session:saveToDefault', s),
   sessionOpen: () => ipcRenderer.invoke('session:open'),
   sessionList: () => ipcRenderer.invoke('session:list'),
+  sessionFolders: () => ipcRenderer.invoke('session:folders'),
+  sessionFolderAdd: () => ipcRenderer.invoke('session:folderAdd'),
+  sessionFolderRemove: (folder: string) => ipcRenderer.invoke('session:folderRemove', folder),
   sessionLoad: (path: string) => ipcRenderer.invoke('session:load', path),
 
   // ── Autosave / crash recovery ────────────────────────────────────

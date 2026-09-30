@@ -698,6 +698,9 @@ app.whenReady().then(async () => {
   safeHandle('session:saveToDefault', (_e, s) => sessionIO.saveToDefault(s as Session))
   safeHandle('session:open', () => sessionIO.open(mainWindow))
   safeHandle('session:list', () => sessionIO.listSaved())
+  safeHandle('session:folders', () => sessionIO.linkedFolders())
+  safeHandle('session:folderAdd', () => sessionIO.addFolder(mainWindow))
+  safeHandle('session:folderRemove', (_e, folder) => sessionIO.removeFolder(folder as string))
   safeHandle('session:load', (_e, path) => {
     // Warm the session folder's clips in the background (pre-convert DXV/HAP/
     // ProRes into the all-intra cache) so every clip beside the session is

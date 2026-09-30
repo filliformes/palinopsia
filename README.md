@@ -977,6 +977,11 @@ carry their sequencer tags and are saved inside the session.
 
 **Session Loader** (toolbar) : a dropdown of every saved session + a **Load**
 button, so you can jump between saved sessions without the file dialog.
+**Right-click Load** to link a folder of sessions : every session in it (and its
+subfolders) joins the dropdown under the folder's name, in name order (number them
+01, 02… and they list in show order). The folder is linked, not copied : a session
+saved there later appears too. The same menu lists the linked folders : click one to
+jump to its first session, × to unlink it (the files are never touched).
 
 **Generate** (toolbar) : a dropdown of **76 visual themes** (grouped by family:
 Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,

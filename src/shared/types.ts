@@ -1023,7 +1023,11 @@ export interface ExposedApi {
   sessionSave: (s: Session, path: string) => Promise<boolean>
   sessionSaveToDefault: (s: Session) => Promise<string>
   sessionOpen: () => Promise<{ session: Session; path: string } | null>
-  sessionList: () => Promise<Array<{ name: string; path: string; mtime: number }>>
+  sessionList: () => Promise<Array<{ name: string; path: string; mtime: number; group?: string }>>
+  // Linked session folders (right-click the Session Load button).
+  sessionFolders: () => Promise<string[]>
+  sessionFolderAdd: () => Promise<{ folder: string; count: number } | null>
+  sessionFolderRemove: (folder: string) => Promise<boolean>
   sessionLoad: (path: string) => Promise<Session>
 
   // Autosave / crash recovery
