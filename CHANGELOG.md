@@ -7,6 +7,15 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Movement qualities** (Body page, with Pose on) : HOW the body moves, not only where.
+  Six features read from the pose, measured against the body's own size so near and far
+  read alike : **energy** (still to vigorous), **expansion** (folded in to limbs spread
+  wide), **fluidity** (a shake or a stop-go reads jerky, a sweep smooth), **suddenness**
+  (sustained to sudden), **directness** (circles and meanders to straight to the point)
+  and **symmetry** (left against right). Two new gestures : **impulse**, a burst out of
+  calm, and **freeze**, a quick stop held still. The camera's own jitter is learned and
+  taken off, so a still body reads still on any camera. Streamed over OSC with the other
+  body features (`/opsia/body/moveEnergy` …).
 - **Silhouette source** (listed with the live inputs in the source picker) : the body
   in front of the Body camera, cut out of the room, as a picture on any layer.
   **Cutout** shows the camera where you are and nothing elsewhere (background removal,
@@ -227,6 +236,10 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **The Body camera tracks each camera frame once** : the models used to run again on
+  every display frame, twice or more per picture. Tracking now costs about half. **Hi-res**
+  (Body page) runs them on every display frame as before, for a fast camera or the
+  finest landmarks. Body motion reads as it did.
 - **The "Test" family in Generate is now "Feel Studies"**, at the end of the list : one
   theme per Feel macro, each keeping everything else still so the macro can be heard.
 - **An Analog section in the source pickers** (layers and Background), after Organic :

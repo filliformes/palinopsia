@@ -28,6 +28,7 @@ const REST: Record<BodyFeature, number> = {
   zoneTL: 0, zoneTC: 0, zoneTR: 0, zoneML: 0, zoneMC: 0, zoneMR: 0, zoneBL: 0, zoneBC: 0, zoneBR: 0, bodyCover: 0,
   flowEnergy: 0, flowX: 0.5, flowY: 0.5, flowDivergence: 0.5, flowCurl: 0.5, flowCoherence: 0,
   flowCenterX: 0.5, flowCenterY: 0.5, flowArea: 0,
+  moveEnergy: 0, moveExpansion: 0, moveFluidity: 0.5, moveSuddenness: 0, moveDirectness: 0.5, moveSymmetry: 0.5,
   bodyPresent: 0, handsPresent: 0, facePresent: 0
 }
 

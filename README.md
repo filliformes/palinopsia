@@ -559,17 +559,20 @@ it works offline and in kiosk.
 · **Pose** (33-point whole body) · **Face** (ARKit blendshapes: jaw, smile, brow,
 blink, pucker + head yaw/pitch/roll) · **Silhouette** (the pose segmentation mask
 reduced to a 3×3 zone grid; heavier) · **Motion** (the camera's motion field, no body
-model; cheap) · **Mirror** (selfie view) · **sensitivity**
+model; cheap) · **Mirror** (selfie view) · **Hi-res** (track on every display frame
+instead of once per new camera frame : for a fast camera, at about twice the cost) ·
+**sensitivity**
 (how easily gestures fire, a global default that any single gesture can override) ·
 **hold time** (how long a held pose must last) · **OSC out**. The camera picker sits
 in the page header.
 
 **Features → modulators.** Every tracked quantity is a normalised 0..1 **feature** on
 the body bus: hand height / horizontal / openness, hands-apart (the accordion), body
-lean / sway / motion-energy / arm-span / stance / weight, the face blendshapes and
-head pose, and (with Silhouette on) each of the nine **zone coverages** `zoneTL…zoneBR`
-plus whole-frame `bodyCover`. The **Feature monitor** shows them live, grouped and
-colour-coded by body region (Hands · Pose · Face · Silhouette · Presence); its **→**
+lean / sway / motion-energy / arm-span / stance / weight, the movement qualities (below),
+the face blendshapes and head pose, and (with Silhouette on) each of the nine **zone
+coverages** `zoneTL…zoneBR` plus whole-frame `bodyCover`. The **Feature monitor** shows
+them live, grouped and colour-coded by body region (Hands · Pose · Movement qualities ·
+Face · Silhouette · Motion field · Presence); its **→**
 routes one into the first free modulator slot as a `body` modulator, ready to bind to
 any parameter with a param's **M** button (exactly like an LFO). So a raised hand can
 open a filter, or the body's motion drive feedback, continuously.
@@ -622,6 +625,19 @@ against a dance), where it happens (`flowCenterX`, `flowCenterY`) and how much o
 frame moves (`flowArea`). Its gestures : **swipe** L / R / up / down (a coherent sweep, so
 a dance doesn't fire them), **approach** and **withdraw**, **turn** clockwise and
 counter-clockwise, and **stillness**, fired once when a room that was moving holds still.
+
+**Movement qualities** read HOW the body moves (Pose on), after the effort descriptors
+of dance movement analysis in their computable form (Camurri et al.; Larboulette &
+Gibet) : **energy** (`moveEnergy`, the weight of the movement, held at its peak),
+**expansion** (`moveExpansion`, how far the limbs reach from the body), **fluidity**
+(`moveFluidity`, a shake, a tremor or a stop-go reads jerky, a sweep or a slow reach
+smooth), **suddenness** (`moveSuddenness`, sustained against sudden), **directness**
+(`moveDirectness`, circles and meanders against a straight reach) and **symmetry**
+(`moveSymmetry`, left and right mirroring each other). Everything is measured in torso
+lengths, so a dancer far from the camera reads like one close to it, and the camera's
+own jitter is learned in the first moments and taken off, so a still body reads still.
+Fluidity and directness hold their last value while the body is still. Gestures :
+**impulse** (a burst out of calm) and **freeze** (a quick stop held still).
 
 With **OSC out** on in the app, every body feature also streams as
 `/opsia/body/<feature>` while the camera runs, beside the picture's `/opsia/vision/*`.

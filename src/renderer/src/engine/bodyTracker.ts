@@ -17,6 +17,7 @@ import type { BodyControlConfig, BodyFeature, BodyGesture } from '@shared/types'
 import { bodyBus } from './bodyIn'
 import { perfMeter } from './perfMeter'
 import { FlowField, STILL, type FlowStats } from './flowField'
+import { EffortReader, type EffortStats } from './effort'
 
 // opsia-asset:// URLs (served by main from the bundled resources/mediapipe dir).
 const WASM_BASE = 'opsia-asset://local/wasm'
@@ -30,6 +31,14 @@ type MP = typeof import('@mediapipe/tasks-vision')
 type Hands = Awaited<ReturnType<MP['HandLandmarker']['createFromOptions']>>
 type Pose = Awaited<ReturnType<MP['PoseLandmarker']['createFromOptions']>>
 type Face = Awaited<ReturnType<MP['FaceLandmarker']['createFromOptions']>>
+
+/** Movement qualities as body-bus features. */
+function effortFeatures(e: EffortStats): Partial<Record<BodyFeature, number>> {
+  return {
+    moveEnergy: e.energy, moveExpansion: e.expansion, moveFluidity: e.fluidity,
+    moveSuddenness: e.suddenness, moveDirectness: e.directness, moveSymmetry: e.symmetry
+  }
+}
 
 /** Motion-field stats as body-bus features. */
 function flowFeatures(f: FlowStats): Partial<Record<BodyFeature, number>> {
@@ -84,6 +93,12 @@ class BodyTracker {
   }
   private raf = 0
   private lastTs = -1
+  private lastCamT = -1 // media time of the last camera frame tracked
+  private lastLoopTs = 0 // performance.now() of the last tracked pass
+  private prevPoseTs = 0 // … of the last pose, for bodyMotion's rate
+  // Movement qualities (engine/effort.ts) : fed once per new camera frame.
+  private effort = new EffortReader()
+  private poseLostAt = 0 // when the pose was last lost (the reader resets after a second)
   private running = false
   private starting = false
   // Bumped on each start(); a start attempt bails after any await if this changed
@@ -334,6 +349,11 @@ class BodyTracker {
     bodyBus.setLive(false, false, false)
     this.resetFlow()
     this.silMask = null
+    this.lastCamT = -1
+    this.lastLoopTs = 0
+    this.prevPoseTs = 0
+    this.effort.resetAll() // a new camera, a new room : calibrate the jitter again
+    this.poseLostAt = 0
   }
 
   private loop = (): void => {
@@ -342,10 +362,20 @@ class BodyTracker {
     const video = this.video
     const cfg = this.cfg
     if (!video || !cfg || video.readyState < 2) return
+    // Track once per NEW camera frame : the camera runs ~30 fps and this loop at
+    // the display rate, so tracking every pass runs the models twice (or more) on
+    // the same picture. Hi-res tracking does run them on every display frame.
+    // (A MediaStream video's currentTime steps once per camera frame.)
+    const camT = video.currentTime
+    const newFrame = camT !== this.lastCamT
+    if (!newFrame && !cfg.hiRes) return
+    this.lastCamT = camT
     // detectForVideo needs strictly increasing timestamps (ms).
     let ts = performance.now()
     if (ts <= this.lastTs) ts = this.lastTs + 1
     this.lastTs = ts
+    const dtLoop = this.lastLoopTs ? Math.min(0.1, (ts - this.lastLoopTs) / 1000) : 1 / 60
+    this.lastLoopTs = ts
 
     // Motion field : the camera's optical flow, on each NEW camera frame. Read
     // first : it needs no body in frame (a crowd, a curtain, a hand all move).
@@ -396,7 +426,9 @@ class BodyTracker {
     if (!hasHands && !hasPose && !hasFace) {
       // Nobody in frame : relax toward neutral so params don't stick, and drop the
       // previous pose so `jump` can't false-fire off a stale frame on re-entry.
-      bodyBus.relax(0.06)
+      // (0.06 per pass at 60 passes a second, whatever the tracking rate.)
+      bodyBus.relax(1 - Math.pow(0.94, dtLoop * 60))
+      this.poseLost(ts)
       bodyBus.update({ bodyPresent: 0, handsPresent: 0, facePresent: 0 })
       if (flowOut) bodyBus.update(flowOut) // the motion field needs nobody in frame
       this.prevPose = null
@@ -410,12 +442,33 @@ class BodyTracker {
       facePresent: hasFace ? 1 : 0
     }
     if (hasHands) this.deriveHands(this.latestHands, mirror, out, cfg)
-    if (hasPose) this.derivePose(this.latestPose as NormalizedLandmark[], mirror, out, cfg, ts)
+    if (hasPose) {
+      this.derivePose(this.latestPose as NormalizedLandmark[], mirror, out, cfg, ts)
+      this.poseLostAt = 0
+      // Movement qualities : derivatives, so only real camera frames (with the
+      // frame's own media time), never a repeated picture.
+      if (newFrame) {
+        const aspect = video.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : 4 / 3
+        const e = this.effort.push(this.latestPose as NormalizedLandmark[], camT, aspect, this.sens('impulse'), this.sens('freeze'))
+        if (e.impulse) this.emit('impulse')
+        if (e.freeze) this.emit('freeze')
+      }
+      Object.assign(out, effortFeatures(this.effort.current()))
+    } else {
+      this.poseLost(ts)
+    }
     if (hasFace) this.deriveFace(this.latestFace as NormalizedLandmark[], blendshapes, mirror, out, cfg)
     if (cfg.silhouette) this.deriveSilhouette(out, cfg)
     if (flowOut) Object.assign(out, flowOut)
     bodyBus.update(out)
     this.prevPose = this.latestPose
+  }
+
+  /** The pose is gone : after a second, the movement qualities start over (a
+   *  one-frame dropout only holds them). */
+  private poseLost(ts: number): void {
+    if (!this.poseLostAt) this.poseLostAt = ts
+    else if (ts - this.poseLostAt > 1000) this.effort.reset()
   }
 
   // ── Motion field → flow features + swipe / approach / turn / stillness ─
@@ -589,7 +642,7 @@ class BodyTracker {
     mirror: boolean,
     out: Partial<Record<BodyFeature, number>>,
     cfg: BodyControlConfig,
-    _ts: number
+    ts: number
   ): void {
     const mx = (x: number): number => (mirror ? 1 - x : x)
     const shoMid = { x: (lm[L_SHO].x + lm[R_SHO].x) / 2, y: (lm[L_SHO].y + lm[R_SHO].y) / 2 }
@@ -614,12 +667,16 @@ class BodyTracker {
     const up = clamp01((lm[NOSE].y - meanWristY) / headUnit + 0.15)
     out.handsUp = up
 
-    // Motion energy : mean landmark displacement since the previous pose.
-    if (this.prevPose && this.prevPose.length === lm.length) {
+    // Motion energy : mean landmark displacement since the previous pose, as a
+    // RATE (per second, scaled to read as it always did at 60 passes a second),
+    // so it feels the same whether tracking runs per camera frame or hi-res.
+    if (this.prevPose && this.prevPose.length === lm.length && this.prevPoseTs) {
       let m = 0
       for (let i = 0; i < lm.length; i++) m += Math.hypot(lm[i].x - this.prevPose[i].x, lm[i].y - this.prevPose[i].y)
-      out.bodyMotion = clamp01((m / lm.length) * 12)
+      const dt = Math.max(1 / 240, (ts - this.prevPoseTs) / 1000)
+      out.bodyMotion = clamp01(((m / lm.length) / dt) * 0.2)
     }
+    this.prevPoseTs = ts
 
     // Hands-up gesture : cross a raised threshold, re-arm when lowered.
     const upThresh = 0.7 - this.sens('handsUp') * 0.15

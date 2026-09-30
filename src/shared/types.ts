@@ -336,6 +336,13 @@ export type BodyFeature =
   | 'flowCenterX' // where the motion is, horizontally 0..1
   | 'flowCenterY' // where the motion is, vertically 0..1 (0 = top)
   | 'flowArea' // share of the frame that moves 0..1
+  // Movement qualities (engine/effort.ts, from the pose) : HOW the body moves.
+  | 'moveEnergy' // 0 still .. 1 vigorous (the weight of the movement)
+  | 'moveExpansion' // 0 folded in .. 1 limbs spread far from the body
+  | 'moveFluidity' // 0 jerky (a shake, a stop-go) .. 1 smooth (a sweep)
+  | 'moveSuddenness' // 0 sustained .. 1 sudden
+  | 'moveDirectness' // 0 wandering (circles, meanders) .. 1 straight to the point
+  | 'moveSymmetry' // 0 lopsided .. 1 left and right mirror each other
   // Presence gates (smoothed 0..1)
   | 'bodyPresent'
   | 'handsPresent'
@@ -348,6 +355,7 @@ export const BODY_FEATURES: BodyFeature[] = [
   'faceHeadYaw', 'faceHeadPitch', 'faceHeadRoll',
   'zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR', 'bodyCover',
   'flowEnergy', 'flowX', 'flowY', 'flowDivergence', 'flowCurl', 'flowCoherence', 'flowCenterX', 'flowCenterY', 'flowArea',
+  'moveEnergy', 'moveExpansion', 'moveFluidity', 'moveSuddenness', 'moveDirectness', 'moveSymmetry',
   'bodyPresent', 'handsPresent', 'facePresent'
 ]
 
@@ -381,6 +389,8 @@ export type BodyGesture =
   // a turn, and the room going still after moving (the stillness itself fires).
   | 'swipeLeft' | 'swipeRight' | 'swipeUp' | 'swipeDown'
   | 'approach' | 'withdraw' | 'spinCW' | 'spinCCW' | 'stillness'
+  // Movement qualities (the pose) : a burst out of calm, a quick stop held still.
+  | 'impulse' | 'freeze'
 export const BODY_GESTURES: BodyGesture[] = [
   'pinchLeft', 'pinchRight', 'clap', 'cross',
   'handsUp', 'leanLeft', 'leanRight', 'crouch', 'jump', 'armsCross', 'tPose', 'raiseLeft', 'raiseRight',
@@ -391,7 +401,8 @@ export const BODY_GESTURES: BodyGesture[] = [
   'holdHandsUp', 'holdPinchLeft', 'holdPinchRight', 'holdArmsWide', 'holdMouthOpen',
   'coverTL', 'coverTC', 'coverTR', 'coverML', 'coverMC', 'coverMR', 'coverBL', 'coverBC', 'coverBR',
   'bodyEnter', 'bodyLeave', 'handsEnter', 'handsLeave', 'faceEnter', 'faceLeave',
-  'swipeLeft', 'swipeRight', 'swipeUp', 'swipeDown', 'approach', 'withdraw', 'spinCW', 'spinCCW', 'stillness'
+  'swipeLeft', 'swipeRight', 'swipeUp', 'swipeDown', 'approach', 'withdraw', 'spinCW', 'spinCCW', 'stillness',
+  'impulse', 'freeze'
 ]
 
 // What a gesture fires : one of the shared discrete-trigger action ids (the same
@@ -436,6 +447,7 @@ export interface BodyControlConfig {
   silhouette: boolean // run the pose segmentation mask → 3×3 zone coverage features + occlusion gestures (needs pose; heavier)
   flow: boolean // read the camera's motion field (optical flow) → flow features + swipe / approach / spin / stillness gestures (no model : cheap)
   mirror: boolean // flip X so moving right moves the value right (selfie view)
+  hiRes: boolean // track on every display frame, not only each new camera frame (twice the cost)
   sensitivity: number // 0..1 : global gain on gesture thresholds (higher = easier)
   gestureSensitivity: Partial<Record<BodyGesture, number>> // per-gesture override of `sensitivity` (a gesture with its own value fires at that threshold instead of the global one)
   holdMs: number // how long a pose must be held for a hold-* gesture to fire (ms)

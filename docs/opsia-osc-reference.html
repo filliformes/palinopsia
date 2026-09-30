@@ -553,7 +553,7 @@
         <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
         <tbody>
           <tr><td class="addr"><span class="lit">/opsia/vision/</span><span class="v">{feature}</span></td><td class="arg">f 0..1 →</td><td class="desc">One picture feature — <code>brightness · contrast · motion · edges · entropy · centroidX · centroidY · warmth · saturation · hue · depth · depthSpread · flowX · flowY · divergence · curl · coherence</code> (the last five are the picture's motion field : which way it flows, whether it spreads out or closes in, whether it turns, and whether it moves as one).</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/body/</span><span class="v">{feature}</span></td><td class="arg">f 0..1 →</td><td class="desc">One body feature, streamed while the Body camera runs — hands, pose, face, the nine silhouette zones, presence, and the camera's motion field <code>flowEnergy · flowX · flowY · flowDivergence · flowCurl · flowCoherence · flowCenterX · flowCenterY · flowArea</code>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/body/</span><span class="v">{feature}</span></td><td class="arg">f 0..1 →</td><td class="desc">One body feature, streamed while the Body camera runs : hands, pose, face, the nine silhouette zones, presence, the camera's motion field <code>flowEnergy · flowX · flowY · flowDivergence · flowCurl · flowCoherence · flowCenterX · flowCenterY · flowArea</code>, and the movement qualities <code>moveEnergy · moveExpansion · moveFluidity · moveSuddenness · moveDirectness · moveSymmetry</code>.</td></tr>
         </tbody>
       </table>
     </div>
