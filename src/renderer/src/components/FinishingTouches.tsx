@@ -10,9 +10,9 @@ import { liveModValues } from '../engine/modulation'
 import { useShallow } from 'zustand/react/shallow'
 import { randomizeInputs } from '../randomize'
 import { SHADER_BY_ID } from '../shaders/isf'
-import { inputsForShader } from '../shaders/isf/inputs'
+import { defaultInputs, inputsForShader } from '../shaders/isf/inputs'
 import { PRESETS_BY_ID } from '../shaders/isf/presets'
-import { modTargetKey, useStore } from '../store'
+import { makeContext, makeFinalizer, makeVibePalette, modTargetKey, useStore } from '../store'
 import { AssignContext, AssignRow, XYControl } from './AutoControls'
 import { SectionedControls } from './FinishingSections'
 import { PresetPicker } from './PresetPicker'
@@ -239,6 +239,8 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
   const collapsed = useStore((s) => s.collapsed[sectionKey] ?? true)
   const toggleSection = useStore((s) => s.toggleSection)
   const setFxInput = useStore((s) => s.setFxInput)
+  const setFxInputs = useStore((s) => s.setFxInputs)
+  const setFxOpacity = useStore((s) => s.setFxOpacity)
   const toggleFx = useStore((s) => s.toggleFx)
   const vibePresetName = useStore((s) => s.vibePresetName)
   const setVibePresetName = useStore((s) => s.setVibePresetName)
@@ -281,6 +283,24 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
           {name}
         </span>
         <div className="flex-1" />
+        <button
+          onClick={() => {
+            // The values a New session starts with : the stage's own factory
+            // values over the shader's defaults, so every parameter (the hidden
+            // ones included) goes back, not only the ones the factory names.
+            const factory =
+              shaderId === 'fx-vibe' ? makeVibePalette() : shaderId === 'fx-context' ? makeContext() : shaderId === 'fx-finalizer' ? makeFinalizer() : null
+            setFxInputs({ kind: 'master' }, inst.id, { ...defaultInputs(shaderId), ...(factory?.inputs ?? {}) })
+            if (isVibe) {
+              setFxOpacity({ kind: 'master' }, inst.id, factory?.opacity ?? 1)
+              setVibePresetName(null)
+            }
+          }}
+          className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted transition-colors hover:border-accent hover:text-accent"
+          title={`Back to default : ${name} as a New session starts it (modulators stay bound)`}
+        >
+          default
+        </button>
         <button
           onClick={() => {
             const next = randomizeInputs(shaderId, values)

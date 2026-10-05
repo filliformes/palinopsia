@@ -1172,6 +1172,8 @@ interface StoreState {
   fxClipboard: { shaderId: string; name: string; inputs: Record<string, number | number[]>; opacity: number; sidechain: SidechainRef | null; sidechain2: SidechainRef | null } | null
   copyFx: (scope: FxScope, instId: string) => void
   /** Overwrite one unit's settings from the clipboard. Same shader only. */
+  /** Replace every input of one FX unit at once (one undo step) : the Finishing "default". */
+  setFxInputs: (scope: FxScope, instId: string, inputs: Record<string, number | number[]>) => void
   pasteFxSettings: (scope: FxScope, instId: string) => void
   /** Add a fresh copy to a rack, after `afterId` (null = end of chain). */
   pasteFxAsNew: (scope: FxScope, afterId: string | null) => void
@@ -2624,6 +2626,12 @@ export const useStore = create<StoreState>((set, get) => ({
       // baseline so the next Variation press anchors on this new scene.
       return { composition, variationBaseline: null }
     }),
+  setFxInputs: (scope, instId, inputs) =>
+    set((s) => ({
+      composition: updateFxArray(s.composition, scope, (fx) =>
+        fx.map((f) => (f.id === instId ? { ...f, inputs: { ...inputs } } : f))
+      )
+    })),
 
   // ── Variation (baseline-anchored) ─────────────────────────────────────
   // The first press captures the current scene as a baseline; every press
