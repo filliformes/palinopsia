@@ -1253,6 +1253,7 @@ interface StoreState {
   randomizeModulation: (candidates: ModTarget[], addNew: boolean) => void
   removeAssignment: (id: string) => void
   setAssignmentDepth: (id: string, depth: number) => void
+  toggleAssignmentMuted: (id: string) => void
   setAssignmentMode: (id: string, mode: ModMode) => void
 
   // The currently-selected source/FX whose ISF INPUTS the auto-UI renders.
@@ -2880,6 +2881,13 @@ export const useStore = create<StoreState>((set, get) => ({
       composition: {
         ...s.composition,
         modMatrix: s.composition.modMatrix.filter((a) => a.id !== id)
+      }
+    })),
+  toggleAssignmentMuted: (id) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        modMatrix: s.composition.modMatrix.map((a) => (a.id === id ? { ...a, muted: !a.muted } : a))
       }
     })),
   setAssignmentDepth: (id, depth) =>

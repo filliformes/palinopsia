@@ -1207,6 +1207,7 @@ export function applyModulation(
   ): void => writeModTarget(comp, c, descFor, t, shaped01)
 
   for (const a of c.modMatrix) {
+    if (a.muted) continue // muted : the parameter keeps this frame's base value
     const v = values[a.mod]
     if (v === undefined) continue
     if (a.target.kind === 'meta') {

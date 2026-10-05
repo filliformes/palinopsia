@@ -647,6 +647,7 @@ export interface ModAssignment {
   target: ModTarget
   depth: number // -1..+1 : swing/scale amount
   mode?: ModMode // undefined = 'replace' (back-compat with pre-mode sessions)
+  muted?: boolean // off for now : kept with its depth, the parameter sits at its own value
 }
 
 // The cap is deliberate (simplexité): bounded modulation stays followable.

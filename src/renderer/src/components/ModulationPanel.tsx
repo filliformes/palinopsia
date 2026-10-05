@@ -820,6 +820,7 @@ function MatrixSummary(): JSX.Element {
   const composition = useStore((s) => s.composition)
   const removeAssignment = useStore((s) => s.removeAssignment)
   const setAssignmentDepth = useStore((s) => s.setAssignmentDepth)
+  const toggleAssignmentMuted = useStore((s) => s.toggleAssignmentMuted)
 
   function describe(a: (typeof matrix)[number]): string {
     const t = a.target
@@ -860,10 +861,14 @@ function MatrixSummary(): JSX.Element {
       {matrix.map((a) => (
         <span
           key={a.id}
-          className="flex items-center gap-1 rounded border border-border bg-panel2 px-1.5 py-0.5 font-mono text-[9px]"
+          onClick={() => toggleAssignmentMuted(a.id)}
+          className={`flex cursor-pointer items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[9px] transition-opacity ${
+            a.muted ? 'border-border/50 bg-panel2/40 opacity-50' : 'border-border bg-panel2 hover:border-accent/50'
+          }`}
+          title={a.muted ? `${describe(a)} : off. Click to turn it on.` : `${describe(a)} : click to turn it off (depth and binding are kept)`}
         >
-          <span className="text-accent">M{a.mod + 1}</span>
-          <span className="max-w-[160px] truncate text-muted" title={describe(a)}>
+          <span className={a.muted ? 'text-muted' : 'text-accent'}>M{a.mod + 1}</span>
+          <span className={`max-w-[160px] truncate text-muted ${a.muted ? 'line-through' : ''}`}>
             {describe(a)}
           </span>
           <input
@@ -872,12 +877,16 @@ function MatrixSummary(): JSX.Element {
             max={10}
             step={0.05}
             value={a.depth}
+            onClick={(e) => e.stopPropagation()}
             onChange={(e) => setAssignmentDepth(a.id, Number(e.target.value))}
             className="w-14 accent-accent"
             title={`Depth ${a.depth.toFixed(2)} (bipolar)`}
           />
           <button
-            onClick={() => removeAssignment(a.id)}
+            onClick={(e) => {
+              e.stopPropagation()
+              removeAssignment(a.id)
+            }}
             className="text-muted hover:text-danger"
             title="Remove assignment"
           >
