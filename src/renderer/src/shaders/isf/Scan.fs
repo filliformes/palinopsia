@@ -6,7 +6,7 @@
   "INPUTS": [
     { "NAME": "material", "TYPE": "long",
       "VALUES": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30],
-      "LABELS": ["paper crumpled","paper rough","paper fibers","cardboard","bark fine","bark deep","bark plates","dry ground","sand dunes","sand ripples","rock face","rock rough","fabric weave","fabric knit","carpet","plaster","painted plaster","concrete","concrete rough","bricks","wood planks","wood grain","metal worn","corrugated steel","crushed foil","foil wrinkles","snow","lava","leather","gravel"],
+      "LABELS": ["paper crumpled","paper rough","paper fibers","cardboard","bark fine","bark deep","bark plates","dry ground","sand dunes","sand ripples","rock face","stacked stone","fabric weave","fabric knit","carpet","plaster","painted plaster","concrete","concrete rough","bricks","wood planks","wood grain","metal worn","corrugated steel","crushed foil","foil wrinkles","snow","lava","leather","gravel"],
       "DEFAULT": 11, "LABEL": "material" },
     { "NAME": "scale",      "TYPE": "float", "MIN": 0.3, "MAX": 6.0,    "DEFAULT": 1.6,  "LABEL": "scale" },
     { "NAME": "tiling",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,    "DEFAULT": 1.0,  "LABEL": "hex tiling" },
@@ -37,6 +37,10 @@ uniform float PH_scanDY;
 // instead of averaging it to mush.
 
 float ASP() { return RENDERSIZE.x / RENDERSIZE.y; }
+// The scan's own proportions : a 2:1 scan tiles 2:1 instead of being squeezed into
+// a square (which stretched bricks, concrete, steel… to twice their height). The
+// hex lattice stays in screen-proportioned space; only the lookups are corrected.
+vec2 TA() { vec2 s = IMG_SIZE(scanHeight); return vec2(s.y / max(s.x, 1.0), 1.0); }
 
 vec2 scanUV(vec2 uv) {
   vec2 p = (uv - 0.5) * vec2(ASP(), 1.0);
@@ -83,28 +87,31 @@ void hexSetup(vec2 st, out vec3 w, out vec2 o0, out vec2 o1, out vec2 o2) {
 }
 
 vec4 sampleColor(vec2 st) {
-  if (tiling < 0.01) return IMG_NORM_PIXEL(scanColor, st);
+  vec2 sp = st * TA();
+  if (tiling < 0.01) return IMG_NORM_PIXEL(scanColor, sp);
   vec3 w; vec2 o0, o1, o2;
   hexSetup(st, w, o0, o1, o2);
-  vec2 sa = st + o0, sb = st + o1, sc = st + o2;
+  vec2 sa = (st + o0) * TA(), sb = (st + o1) * TA(), sc = (st + o2) * TA();
   vec4 hx = IMG_NORM_PIXEL(scanColor, sa) * w.x + IMG_NORM_PIXEL(scanColor, sb) * w.y + IMG_NORM_PIXEL(scanColor, sc) * w.z;
-  return mix(IMG_NORM_PIXEL(scanColor, st), hx, tiling);
+  return mix(IMG_NORM_PIXEL(scanColor, sp), hx, tiling);
 }
 float sampleHeight(vec2 st) {
-  if (tiling < 0.01) return IMG_NORM_PIXEL(scanHeight, st).r;
+  vec2 sp = st * TA();
+  if (tiling < 0.01) return IMG_NORM_PIXEL(scanHeight, sp).r;
   vec3 w; vec2 o0, o1, o2;
   hexSetup(st, w, o0, o1, o2);
-  vec2 sa = st + o0, sb = st + o1, sc = st + o2;
+  vec2 sa = (st + o0) * TA(), sb = (st + o1) * TA(), sc = (st + o2) * TA();
   float hx = IMG_NORM_PIXEL(scanHeight, sa).r * w.x + IMG_NORM_PIXEL(scanHeight, sb).r * w.y + IMG_NORM_PIXEL(scanHeight, sc).r * w.z;
-  return mix(IMG_NORM_PIXEL(scanHeight, st).r, hx, tiling);
+  return mix(IMG_NORM_PIXEL(scanHeight, sp).r, hx, tiling);
 }
 float sampleAO(vec2 st) {
-  if (tiling < 0.01) return IMG_NORM_PIXEL(scanAO, st).r;
+  vec2 sp = st * TA();
+  if (tiling < 0.01) return IMG_NORM_PIXEL(scanAO, sp).r;
   vec3 w; vec2 o0, o1, o2;
   hexSetup(st, w, o0, o1, o2);
-  vec2 sa = st + o0, sb = st + o1, sc = st + o2;
+  vec2 sa = (st + o0) * TA(), sb = (st + o1) * TA(), sc = (st + o2) * TA();
   float hx = IMG_NORM_PIXEL(scanAO, sa).r * w.x + IMG_NORM_PIXEL(scanAO, sb).r * w.y + IMG_NORM_PIXEL(scanAO, sc).r * w.z;
-  return mix(IMG_NORM_PIXEL(scanAO, st).r, hx, tiling);
+  return mix(IMG_NORM_PIXEL(scanAO, sp).r, hx, tiling);
 }
 
 float og_height(vec2 uv) { return sampleHeight(scanUV(uv)); }

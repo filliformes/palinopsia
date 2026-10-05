@@ -7,6 +7,13 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Context : surface material evolution.** A new **evolution** slider in the surface
+  material (Finishing > Context) keeps the surface from sitting perfectly still, as if a
+  little wind moved the projector or the camera filming it : the material drifts a few
+  pixels under the image in a slow, irregular sway with light gusts, turns and breathes
+  very slightly, and the raking light shifts with it. 0 (the default) is perfectly
+  still, so existing sessions look the same.
+
 - **Click a modulation chip to turn it off** (and again to turn it back on) : the
   assignment stays with its depth, its parameter sits at its own value meanwhile.
 - **Video : stop, scrub and browse.** A **■ stop** button (pause and back to the in
@@ -249,6 +256,14 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Context's "surface" section is now "surface material"** (plain "surface" also named
+  the Metasurface). The material once called **rock rough** is now **stacked stone**,
+  which is what it is (layered stone blocks); sessions keep it.
+- **Flash safety holds softly** : a held region now fades out over most of a cell
+  instead of a quarter of one, so it reads as a soft patch rather than a 6x6 grid of
+  blocks (dragging a slider fast, e.g. texture scale, used to show the grid). The held
+  cells are limited exactly as before; their neighbours a little more.
+
 - **Context shows what the picture actually gets** : Proximity (toward far), Coalesce
   (toward mass), Flow, Gesture⇄Texture and the sequencer's Breathe / Arc add blur,
   haze, trails or depth ON TOP of Context's sliders, so every slider at 0 could still
@@ -375,6 +390,13 @@ that CI builds into cross-platform releases.
   the shared page `<title>`; it now holds.)
 
 ### Fixed
+
+- **Surface materials keep their proportions** : seven of the 30 scans are not square
+  (bricks, concrete, corrugated steel, painted plaster, rock face, wood grain, paper
+  crumpled) and were squeezed into square tiles, stretched to about twice their height,
+  in Context's surface material and in the Scan source alike. They now tile at their
+  real proportions. **Paper crumpled** also lost a streak of dark pits in its scan that
+  repeated across the frame as vertical lines, and now tiles cleanly.
 
 - **Video above 8x froze on real footage** : each frame was an exact seek, which on an
   ordinary (long-GOP) clip decodes from the previous keyframe : 0.5-3 s per seek on

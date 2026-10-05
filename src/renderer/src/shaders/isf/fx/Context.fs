@@ -19,12 +19,13 @@
     { "NAME": "lightOrder", "TYPE": "bool", "DEFAULT": true, "LABEL": "light order" },
     { "NAME": "pbrTexture", "TYPE": "long",
       "VALUES": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30],
-      "LABELS": ["off","paper crumpled","paper rough","paper fibers","cardboard","bark fine","bark deep","bark plates","dry ground","sand dunes","sand ripples","rock face","rock rough","fabric weave","fabric knit","carpet","plaster","painted plaster","concrete","concrete rough","bricks","wood planks","wood grain","metal worn","corrugated steel","crushed foil","foil wrinkles","snow","lava","leather","gravel"],
+      "LABELS": ["off","paper crumpled","paper rough","paper fibers","cardboard","bark fine","bark deep","bark plates","dry ground","sand dunes","sand ripples","rock face","stacked stone","fabric weave","fabric knit","carpet","plaster","painted plaster","concrete","concrete rough","bricks","wood planks","wood grain","metal worn","corrugated steel","crushed foil","foil wrinkles","snow","lava","leather","gravel"],
       "DEFAULT": 0, "LABEL": "texture" },
     { "NAME": "pbrAmount", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "relief" },
     { "NAME": "pbrLight",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.55, "LABEL": "raking" },
     { "NAME": "pbrScale",  "TYPE": "float", "MIN": 0.25, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "tex scale" },
     { "NAME": "pbrDepth",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "field depth" },
+    { "NAME": "pbrEvolve", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "evolution" },
     { "NAME": "pbrNormal", "TYPE": "image" },
     { "NAME": "pbrHeight", "TYPE": "image" },
     { "NAME": "pbrAO",     "TYPE": "image" },
@@ -74,6 +75,20 @@ vec4 trailAt(vec2 c) {
   return cur + sign(d) * max(abs(d) * gK - 1.0 / 255.0, 0.0);
 }
 
+// Surface coordinate of a frame point (the material's own space) : aspect space,
+// the EVOLUTION sway (the surface drifting under the projection), the organic
+// warp, the tile scale, and the scan's own proportions. Set per frame in main.
+float gAspect;
+vec2 gSway;
+mat2 gSpin;
+vec2 gCtr;
+vec2 gTAsp;
+vec2 gLightP;
+vec2 surfAt(vec2 p, vec2 warp, float pscl) {
+  vec2 q = gSpin * (vec2(p.x * gAspect, p.y) - gCtr) + gCtr + gSway;
+  return (q + warp) * pscl * gTAsp;
+}
+
 void main() {
   vec2 uv = isf_FragNormCoord;
   gDt60 = clamp(TIMEDELTA, 0.004, 0.25) * 60.0;
@@ -117,7 +132,30 @@ void main() {
     // throw becomes less extreme (more orthographic) : the material reads from
     // afar rather than pressed against your eye.
     float pscl = pbrScale * (1.0 + pbrDepth * 2.5);
-    vec2 vdir = (uv - 0.5) * vec2(aspect, 1.0) * (1.0 - pbrDepth * 0.6);
+    // EVOLUTION : a little wind on the projector, or on the camera filming the
+    // surface. The material drifts under the image in a slow irregular sway with a
+    // lighter flutter riding on it in gusts, turns and breathes very slightly; the
+    // viewpoint and the raking light move with it and the organic warp slowly
+    // morphs, so the relief never sits still. 0 = perfectly still, as before.
+    float ev = clamp(pbrEvolve, 0.0, 1.0);
+    float et = TIME;
+    vec2 drift = vec2(sin(et * 0.23) + 0.55 * sin(et * 0.61 + 1.3), sin(et * 0.19 + 2.0) + 0.55 * sin(et * 0.53 + 0.4));
+    vec2 flutter = vec2(sin(et * 1.7 + 0.8) + 0.6 * sin(et * 2.9 + 2.2), sin(et * 1.9 + 1.6) + 0.6 * sin(et * 3.3 + 0.2));
+    float gust = 0.5 + 0.5 * sin(et * 0.37 + 0.9) * sin(et * 0.13 + 2.4);
+    gAspect = aspect;
+    gSway = (drift * 0.006 + flutter * 0.0012 * gust) * ev;
+    float spin = (sin(et * 0.17 + 0.6) + 0.5 * sin(et * 0.43 + 2.1)) * 0.004 * ev;
+    float breathe = 1.0 + (sin(et * 0.29 + 1.1) + 0.5 * sin(et * 0.71 + 0.3)) * 0.004 * ev;
+    gSpin = mat2(cos(spin), sin(spin), -sin(spin), cos(spin)) * breathe;
+    gCtr = vec2(aspect * 0.5, 0.5);
+    gLightP = light + gSway / vec2(aspect, 1.0) * 2.0;
+    float wph = et * 0.09 * ev;
+    // The scans keep their own proportions : a 2:1 scan tiles 2:1. They used to be
+    // squeezed into a square tile, stretching bricks, concrete, steel, plaster,
+    // wood grain and rock face to twice their height.
+    vec2 mapSize = IMG_SIZE(pbrHeight);
+    gTAsp = vec2(mapSize.y / max(mapSize.x, 1.0), 1.0);
+    vec2 vdir = (uv - 0.5 - gSway / vec2(aspect, 1.0) * 1.5) * vec2(aspect, 1.0) * (1.0 - pbrDepth * 0.6);
     // Displacement amplitude : the geometric throw of the projected image into
     // the relief. Much deeper than a flat nudge (features really sink / ride),
     // and it grows with the RAKING control so a hard-lit material also parallaxes
@@ -132,8 +170,8 @@ void main() {
     // incommensurate field so the repeat reads organic rather than as a rigid grid.
     vec2 wq = vec2(uv.x * aspect, uv.y);
     vec2 warp = vec2(
-      sin(wq.x * 5.3 + wq.y * 2.1) + 0.5 * sin(wq.y * 9.7 - wq.x * 3.3),
-      cos(wq.y * 4.7 - wq.x * 2.7) + 0.5 * cos(wq.x * 8.9 + wq.y * 3.1)
+      sin(wq.x * 5.3 + wq.y * 2.1 + wph) + 0.5 * sin(wq.y * 9.7 - wq.x * 3.3 - wph * 1.3),
+      cos(wq.y * 4.7 - wq.x * 2.7 + wph * 0.8) + 0.5 * cos(wq.x * 8.9 + wq.y * 3.1 + wph * 1.1)
     ) * 0.04;
     // vdir is in aspect space (x scaled by aspect); march in uv, so the throw
     // is the same length horizontally and vertically.
@@ -144,26 +182,26 @@ void main() {
     float curD = 0.0;
     // (Height-map coordinates are hoisted into bare vec2s : the ISF parser
     // splits IMG_NORM_PIXEL's argument on commas and silently drops the rest.)
-    vec2 hc = (vec2(pp.x * aspect, pp.y) + warp) * pscl;
+    vec2 hc = surfAt(pp, warp, pscl);
     float hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, hc).r;
     for (int i = 0; i < 24; i++) {
       if (curD >= hd) break;
       pp += stepUV;
-      hc = (vec2(pp.x * aspect, pp.y) + warp) * pscl;
+      hc = surfAt(pp, warp, pscl);
       hd = 1.0 - IMG_NORM_PIXEL(pbrHeight, hc).r;
       curD += layer;
     }
     // Refine : interpolate the exact crossing so the surface reads smooth.
     vec2 prev = pp - stepUV;
     float aft = hd - curD;
-    vec2 hp = (vec2(prev.x * aspect, prev.y) + warp) * pscl;
+    vec2 hp = surfAt(prev, warp, pscl);
     float bef = (1.0 - IMG_NORM_PIXEL(pbrHeight, hp).r) - (curD - layer);
     pp = mix(pp, prev, clamp(aft / (aft - bef + 1e-4), 0.0, 1.0));
     // Reference to the mid-plane (height 0.5) so a FLAT/neutral map (texture off)
     // gives ZERO displacement; raised vs recessed features then shift oppositely.
     uv = pp - vuv * amp * 0.5;                         // parallax-corrected sample point
 
-    vec2 tuv = (vec2(uv.x * aspect, uv.y) + warp) * pscl;
+    vec2 tuv = surfAt(uv, warp, pscl);
     pnrm = normalize(IMG_NORM_PIXEL(pbrNormal, tuv).rgb * 2.0 - 1.0);
     pao = IMG_NORM_PIXEL(pbrAO, tuv).r;
 
@@ -173,14 +211,14 @@ void main() {
     // Graze the light lower across the surface as raking rises (Ls.z shrinks →
     // longer, deeper cast shadows), then march farther and darker. The shadow
     // floor drops toward near-black at full raking : real crevice darkness.
-    vec3 Ls = normalize(vec3((light - uv) * vec2(aspect, 1.0), mix(0.6, 0.22, pbrLight)));
+    vec3 Ls = normalize(vec3((gLightP - uv) * vec2(aspect, 1.0), mix(0.6, 0.22, pbrLight)));
     if (Ls.z > 0.03) {
       float surfH = IMG_NORM_PIXEL(pbrHeight, tuv).r;
       float occ = 0.0;
       vec2 Luv = Ls.xy / vec2(aspect, 1.0); // aspect space -> uv
       for (int j = 1; j <= 10; j++) {
         vec2 sp = uv + Luv * amp * 1.6 * (float(j) / 10.0);
-        vec2 sc = (vec2(sp.x * aspect, sp.y) + warp) * pscl;
+        vec2 sc = surfAt(sp, warp, pscl);
         float hs = IMG_NORM_PIXEL(pbrHeight, sc).r;
         occ = max(occ, hs - surfH - float(j) / 10.0 * 0.10);
       }
@@ -275,7 +313,7 @@ void main() {
   //    the flat normal so a neutral map changes nothing. ──
   if (pbrOn) {
     float rk = pbrLight; // RAKING : how hard the light grazes the material.
-    vec3 L = normalize(vec3((light - uv) * vec2(aspect, 1.0), mix(0.6, 0.28, rk)));
+    vec3 L = normalize(vec3((gLightP - uv) * vec2(aspect, 1.0), mix(0.6, 0.28, rk)));
     float ndl = clamp(dot(pnrm, L), 0.0, 1.0);
     float flatNdl = clamp(L.z, 0.0, 1.0);
     // Diffuse relief lighting × the cast self-shadow × ambient occlusion. The

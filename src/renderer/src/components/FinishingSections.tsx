@@ -206,11 +206,12 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
     },
     {
       id: 'surface',
-      title: 'surface',
+      // "surface material" : plain "surface" also names the Metasurface.
+      title: 'surface material',
       color: C.earth,
       switchInput: 'pbrTexture',
       offValue: 0,
-      inputs: ['pbrAmount', 'pbrLight', 'pbrScale', 'pbrDepth'],
+      inputs: ['pbrAmount', 'pbrLight', 'pbrScale', 'pbrDepth', 'pbrEvolve'],
       labels: { pbrScale: 'texture scale' }
     }
   ],

@@ -965,6 +965,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     pbrAmount: 'RELIEF : how deep the material is. It sets how far the image sinks into crevices and rides over bumps, and how much the surface relights it. 0 = flat passthrough.',
     pbrLight: 'RAKING : how hard the light grazes the material, independent of relief depth. Low = soft, even, front-lit. High = a low grazing light that throws long, near-black cast shadows in the crevices and hot specular sheen on the ridges (deep chiaroscuro contrast). Turn this up when the relief looks too flat.',
     pbrScale: 'Tiling scale of the PBR material : how many times it repeats across the frame.',
+    pbrEvolve: 'EVOLUTION : keeps the surface from sitting perfectly still, as if a little wind moved the projector or the camera filming it. The material drifts a touch under the image in a slow, irregular sway with light gusts, turns and breathes very slightly, and the raking light shifts with it. 0 = perfectly still.',
     pbrDepth: 'FIELD DEPTH : viewing distance. 0 = pressed against your eye (dense parallax, raking contrast). Up = you step back : the material tiles finer, the relief flattens, the light reads softer and more ambient, and the surface settles toward the atmosphere color.'
   },
   'fx-finalizer': {

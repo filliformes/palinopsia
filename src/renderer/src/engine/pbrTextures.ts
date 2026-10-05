@@ -32,7 +32,7 @@ export const PBR_MATERIALS: PbrMaterial[] = [
   { id: 'Ground054', name: 'sand dunes' },
   { id: 'Ground080', name: 'sand ripples' },
   { id: 'Rock063', name: 'rock face' },
-  { id: 'Rock064', name: 'rock rough' },
+  { id: 'Rock064', name: 'stacked stone' }, // layered stone blocks (was 'rock rough')
   { id: 'Fabric030', name: 'fabric weave' },
   { id: 'Fabric061', name: 'fabric knit' },
   { id: 'Carpet016', name: 'carpet' },
