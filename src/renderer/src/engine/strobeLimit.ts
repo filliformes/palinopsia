@@ -173,13 +173,17 @@ void main(){
   o3 = vec4(w3, alpha, ownEng ? 1.0 : 0.0);
 }`
 
-// Output : each pixel takes the lowest alpha of the engaged cells around it, with
-// a short feather outside an engaged cell (so an engaged cell is limited all over,
-// and its neighbors only along a soft edge). Alpha 1 = the live frame, untouched.
+// Output : each pixel takes the lowest alpha of the engaged cells around it. An
+// engaged cell is limited all over (the safety guarantee); outside it the hold
+// fades over most of a cell on a smootherstep curve, so a held region reads as a
+// soft patch breathing with the content rather than a grid of hard-edged blocks
+// (it used to fade over a quarter cell, and fast moves showed the 6x6 grid).
+// Neighbours get partly held : more limiting, never less. Alpha 1 = the live frame.
 const F_LIMIT = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 frag;
 uniform sampler2D uSrc, uSafe, uS3;
 const int G = ${G};
+const float FEATHER = 0.9; // in cells : the 3x3 neighbourhood below reaches 1 cell
 vec3 toLin(vec3 c){ c = clamp(c, 0.0, 1.0); return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c)); }
 vec3 toSrgb(vec3 l){ l = clamp(l, 0.0, 1.0); return mix(l * 12.92, 1.055 * pow(l, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, l)); }
 void main(){
@@ -193,7 +197,8 @@ void main(){
     float ac = texelFetch(uS3, cc, 0).z;
     if (ac >= 0.9999) continue;
     vec2 d = max(max(vec2(cc) - g, g - vec2(cc + 1)), 0.0);
-    a = min(a, mix(ac, 1.0, smoothstep(0.0, 0.25, length(d))));
+    float f = clamp(length(d) / FEATHER, 0.0, 1.0);
+    a = min(a, mix(ac, 1.0, f * f * f * (f * (f * 6.0 - 15.0) + 10.0)));
   }
   if (a >= 0.9999) { frag = src; return; }
   vec4 safe = texture(uSafe, vUV);
