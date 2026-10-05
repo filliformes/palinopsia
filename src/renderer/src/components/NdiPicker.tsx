@@ -4,6 +4,32 @@
 // to read device names; NDI sources come from the network).
 
 import { useCallback, useEffect, useState } from 'react'
+import { ndiInStats, type NdiInStats } from '../engine/ndiIn'
+
+/** What an NDI input layer is receiving, live : size, frame rate and how far
+ *  behind the sender it is (when both clocks agree : same machine or synced). */
+export function NdiInReadout({ name }: { name: string }): JSX.Element {
+  const [s, setS] = useState<NdiInStats | null>(null)
+  useEffect(() => {
+    const tick = (): void => setS(ndiInStats(name))
+    tick()
+    const t = setInterval(tick, 500)
+    return () => clearInterval(t)
+  }, [name])
+  const text = !s
+    ? 'waiting for frames…'
+    : s.fps === 0
+      ? 'no frames : the source stopped or left the network'
+      : `${s.w}×${s.h} · ${s.fps} fps${s.latencyMs === null ? '' : ` · ${s.latencyMs} ms behind`}`
+  return (
+    <div
+      className="px-3 pb-2 font-mono text-[10px] text-muted"
+      title="Received from the network : picture size, frames per second, and how long a frame takes to get here (shown when the sender's clock agrees with this computer's)"
+    >
+      📶 {text}
+    </div>
+  )
+}
 
 export function NdiPicker({
   onPick,

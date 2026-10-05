@@ -6,7 +6,7 @@
 // the main process's setDisplayMediaRequestHandler to pick a source.
 
 import { uploadVideoFrame } from './VideoSource'
-import { ndiInAcquire, ndiInLatest, ndiInRelease } from './ndiIn'
+import { ndiInAcquire, ndiInLatest, ndiInRelease, ndiInStats, type NdiInStats } from './ndiIn'
 
 // A live-capture start can fail silently (permission denied, no device, screen
 // picker cancelled) and the slot just renders transparent — the most confusing
@@ -26,6 +26,16 @@ export class CaptureSource {
   // NDI input ('ndi:<source name>') : frames come from the preload's receiver.
   private ndiName: string | null = null
   private ndiSeq = -1
+  private ndiW = 0
+  private ndiH = 0
+  /** NDI frames arrive top row first and are uploaded as they are : the blit
+   *  samples them upside down (a CPU flip on upload was the slow path). */
+  get flipY(): boolean {
+    return this.ndiName !== null
+  }
+  get ndiStats(): NdiInStats | null {
+    return this.ndiName ? ndiInStats(this.ndiName) : null
+  }
 
   constructor(private gl: WebGL2RenderingContext) {
     this.video = document.createElement('video')
@@ -103,8 +113,8 @@ export class CaptureSource {
     return this.tex
   }
 
-  /** The newest NDI frame (RGBX/RGBA, top-down rows) into the texture, flipped
-   *  like every other video upload. Nothing new : the last frame stays. */
+  /** The newest NDI frame (RGBX/RGBA, top row first) into the texture, as is
+   *  (see flipY), allocated once per size. Nothing new : the last frame stays. */
   private uploadNdi(name: string): WebGLTexture | null {
     const f = ndiInLatest(name)
     if (!f || f.seq === this.ndiSeq) return this.tex
@@ -119,9 +129,14 @@ export class CaptureSource {
     }
     gl.bindTexture(gl.TEXTURE_2D, this.tex)
     gl.pixelStorei(gl.UNPACK_ROW_LENGTH, f.stride / 4)
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, f.w, f.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(f.buf, 0, f.stride * f.h))
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+    const px = new Uint8Array(f.buf, 0, f.stride * f.h)
+    if (f.w !== this.ndiW || f.h !== this.ndiH) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, f.w, f.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, px)
+      this.ndiW = f.w
+      this.ndiH = f.h
+    } else {
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, f.w, f.h, gl.RGBA, gl.UNSIGNED_BYTE, px)
+    }
     gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0)
     this.ndiSeq = f.seq
     return this.tex

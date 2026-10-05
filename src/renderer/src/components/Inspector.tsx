@@ -21,7 +21,7 @@ import { AutoControls, AssignContext, AssignRow, ModButton, useBound } from './A
 import { registerLiveOverlay } from './liveOverlay'
 import { CapturePicker } from './CapturePicker'
 import { DevicePicker } from './DevicePicker'
-import { NdiPicker } from './NdiPicker'
+import { NdiInReadout, NdiPicker } from './NdiPicker'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 import { SourceFraming } from './SourceFraming'
@@ -421,6 +421,7 @@ export function Inspector(): JSX.Element {
               chroma-shift · feedback).
             </p>
           </div>
+          {isNdi && <NdiInReadout name={capId.slice(4)} />}
           {switchCapture && (
             <CapturePicker
               onPick={(spec, name) => {

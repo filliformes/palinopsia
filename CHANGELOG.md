@@ -18,8 +18,11 @@ that CI builds into cross-platform releases.
   phone's NDI camera app, OBS, NDI Tools, another Palinopsia. Received through the same
   NDI runtime as the sender (no virtual-webcam hop), full quality, shared when several
   layers show one source; a session remembers the source by name and reconnects when it
-  appears. Measured : 29-30 fps received from a 30 fps 1080p source, right way up, right
-  colors. Listing never touches the camera.
+  appears. Always the newest frame (NDI's frame sync : skipped, never queued, so it can't
+  drift behind), copied off the main thread and turned the right way up on the GPU; the
+  Inspector shows size, fps and delay. Measured : a 1080p source ~45 ms behind at full
+  rate; a 4096×4096 source ~110 ms behind with the app at 53 fps (the first version :
+  580 ms behind and the whole app down to 17 fps). Listing never touches the camera.
 
 - **Slime Mould** (Organic) : a slime mould's transport network, grown live by
   hundreds of thousands of agents (Jones' Physarum model). A fine mesh within seconds

@@ -46,8 +46,10 @@ interface Lib {
   find_sources: (f: Ptr, count: number[]) => Ptr
   recv_create: (s: Record<string, unknown>) => Ptr
   recv_destroy: (r: Ptr) => void
-  recv_capture: { async: (r: Ptr, v: Record<string, unknown>, a: null, m: null, timeoutMs: number, cb: (err: unknown, res: number) => void) => void }
-  recv_free_video: (r: Ptr, v: Record<string, unknown>) => void
+  fs_create: (r: Ptr) => Ptr
+  fs_destroy: (f: Ptr) => void
+  fs_capture: (f: Ptr, v: Record<string, unknown>, fieldType: number) => void
+  fs_free: (f: Ptr, v: Record<string, unknown>) => void
 }
 
 interface Frame {
@@ -142,8 +144,10 @@ function bind(k: Koffi, path: string): Lib {
     find_sources: l.func('void *NDIlib_find_get_current_sources(void *p_instance, _Out_ uint32_t *p_no_sources)'),
     recv_create: l.func('void *NDIlib_recv_create_v3(const NDIlib_recv_create_v3_t *p_create_settings)'),
     recv_destroy: l.func('void NDIlib_recv_destroy(void *p_instance)'),
-    recv_capture: l.func('int NDIlib_recv_capture_v2(void *p_instance, _Out_ NDIlib_video_frame_v2_t *p_video_data, void *p_audio_data, void *p_metadata, uint32_t timeout_in_ms)'),
-    recv_free_video: l.func('void NDIlib_recv_free_video_v2(void *p_instance, const NDIlib_video_frame_v2_t *p_video_data)')
+    fs_create: l.func('void *NDIlib_framesync_create(void *p_receiver)'),
+    fs_destroy: l.func('void NDIlib_framesync_destroy(void *p_instance)'),
+    fs_capture: l.func('void NDIlib_framesync_capture_video(void *p_instance, _Out_ NDIlib_video_frame_v2_t *p_video_data, int field_type)'),
+    fs_free: l.func('void NDIlib_framesync_free_video(void *p_instance, NDIlib_video_frame_v2_t *p_video_data)')
   } as unknown as Lib
 }
 
@@ -353,30 +357,50 @@ export function ndiOnStatus(cb: (s: NdiStatus) => void): () => void {
 // ── NDI INPUT : another NDI source on the network as a layer source ─────────
 // Receivers live here too, on the same library instance as the sender (one
 // NDI_CONFIG_DIR, one network setup). One receiver per SOURCE, shared by every
-// layer that shows it. Frames arrive as RGBX/RGBA (the SDK converts), are copied
-// into a pooled ArrayBuffer (memcpy : no allocation per frame) and TRANSFERRED
-// to the page over a private MessageChannel; the page transfers each buffer back
-// when a newer frame replaces it. Captures run on koffi's worker threads
-// (.async), so a waiting receiver never blocks this thread.
+// layer that shows it.
+//
+// Each receiver goes through NDI's FRAME SYNC, which always hands over the
+// NEWEST frame : a light timer asks for it and copies it only when a new one has
+// arrived. (A first version pulled frames one by one from NDI's queue on
+// main-thread callbacks; whenever rendering ran slower than the source, NDI
+// queued the rest and the picture drifted seconds behind.) Frames arrive as
+// RGBX/RGBA, top row first, and are copied once (memcpy, no allocation : pooled
+// buffers) and TRANSFERRED to the page over a private MessageChannel; the page
+// sends each buffer back when a newer frame replaces it. The copy runs on
+// koffi's worker thread, not the window's : a 4096² frame is 67 MB and took
+// 25 ms of the main thread (measured). No flip here : the GPU samples them upside
+// down instead (a CPU flip was the slow path).
 
 interface InRecv {
   name: string
   recv: Ptr
+  fs: Ptr
   refs: number
   alive: boolean
-  inFlight: boolean
   pool: ArrayBuffer[]
   out: number // buffers the page holds
+  last: string // the newest frame's identity (timestamp / timecode / address)
+  copy: Copy | null // the frame being copied off-thread (NDI's memory : held until done)
+}
+interface Copy {
+  f: Record<string, unknown>
+  since: number
+  bytes: number
 }
 const recvs = new Map<string, InRecv>()
 let finder: Ptr = null
 let inPort: MessagePort | null = null
-let memcpy: ((dst: ArrayBuffer, src: unknown, n: number) => unknown) | null | false = null
+type Memcpy = ((dst: ArrayBuffer, src: unknown, n: number) => unknown) & {
+  async: (dst: ArrayBuffer, src: unknown, n: number, cb: (err: unknown) => void) => void
+}
+let memcpy: Memcpy | null | false = null
 let libReady: Promise<boolean> | null = null
+let pullTimer: ReturnType<typeof setInterval> | null = null
 
 const RGBX_RGBA = 2 // NDIlib_recv_color_format_RGBX_RGBA
 const BANDWIDTH_HIGHEST = 100
-const FRAME_VIDEO = 1
+const PROGRESSIVE = 1 // NDIlib_frame_format_type_progressive
+const TS_UNDEFINED = 9223372036854775807n
 
 function getMemcpy(k: Koffi): typeof memcpy {
   if (memcpy !== null) return memcpy
@@ -414,12 +438,31 @@ function ensureLib(): Promise<boolean> {
   return libReady
 }
 
+/** Free the frame a receiver holds for an off-thread copy. NDI must not free
+ *  that memory under the copy : wait it out first (a few ms, bounded by its
+ *  size; only when a layer lets go of a source, or the library goes, mid-copy). */
+function settleCopy(r: InRecv): void {
+  const c = r.copy
+  if (!c) return
+  const until = c.since + 40 + c.bytes / 1e6
+  while (performance.now() < until) { /* the copy is on another thread */ }
+  r.copy = null
+  if (lib && r.fs) { try { lib.fs_free(r.fs, c.f) } catch { /* ignore */ } }
+}
+
+function closeRecv(r: InRecv): void {
+  settleCopy(r)
+  if (lib) {
+    if (r.fs) { try { lib.fs_destroy(r.fs) } catch { /* ignore */ } }
+    if (r.recv) { try { lib.recv_destroy(r.recv) } catch { /* ignore */ } }
+  }
+  r.fs = null
+  r.recv = null
+}
+
 /** The library is about to go (a network change, a reload) : stop receiving. */
 function beforeUnload(): void {
-  for (const r of recvs.values()) {
-    if (r.recv && lib && !r.inFlight) { try { lib.recv_destroy(r.recv) } catch { /* ignore */ } }
-    r.recv = null
-  }
+  for (const r of recvs.values()) closeRecv(r)
   if (finder && lib) { try { lib.find_destroy(finder) } catch { /* ignore */ } }
   finder = null
 }
@@ -437,50 +480,72 @@ function openRecv(r: InRecv): void {
       color_format: RGBX_RGBA, bandwidth: BANDWIDTH_HIGHEST, allow_video_fields: false,
       p_ndi_recv_name: 'Palinopsia'
     })
+    r.fs = r.recv ? lib.fs_create(r.recv) : null
   } catch {
-    r.recv = null
+    closeRecv(r)
   }
-  if (r.recv) pump(r)
+  if (r.fs && !pullTimer) pullTimer = setInterval(pullAll, 4)
 }
 
-function pump(r: InRecv): void {
-  if (!lib || !r.alive || !r.recv || r.inFlight) return
-  const l = lib
-  const recv = r.recv
-  const frame: Record<string, unknown> = {}
-  r.inFlight = true
-  l.recv_capture.async(recv, frame, null, null, 250, (err, type) => {
-    r.inFlight = false
-    if (!r.alive || lib !== l || r.recv !== recv) {
-      // Closed (or the library was swapped) while it waited.
-      if (type === FRAME_VIDEO) { try { l.recv_free_video(recv, frame) } catch { /* ignore */ } }
-      if (!r.alive && r.recv === recv) { try { l.recv_destroy(recv) } catch { /* ignore */ } r.recv = null }
-      return
+/** Every few ms : each receiver's newest frame, if it is new and the page has
+ *  room for it. A frame-sync capture never waits. */
+function pullAll(): void {
+  if (!lib || recvs.size === 0) {
+    if (pullTimer) { clearInterval(pullTimer); pullTimer = null }
+    return
+  }
+  const k = koffi!
+  for (const r of recvs.values()) {
+    if (!r.alive || !r.fs || !inPort || r.out >= 2 || r.copy) continue
+    const fs = r.fs
+    const f: Record<string, unknown> = {}
+    try {
+      lib.fs_capture(fs, f, PROGRESSIVE)
+    } catch {
+      continue
     }
-    if (!err && type === FRAME_VIDEO) deliver(r, l, recv, frame)
-    pump(r)
-  })
-}
-
-function deliver(r: InRecv, l: Lib, recv: Ptr, f: Record<string, unknown>): void {
-  const w = Number(f.xres), h = Number(f.yres), stride = Number(f.line_stride_in_bytes)
-  const bytes = stride * h
-  try {
-    // The page still holds three frames it hasn't returned : it is behind, so
-    // skip this one rather than pile up memory.
-    if (!inPort || r.out >= 3 || !(w > 0 && h > 0 && bytes > 0)) return
-    const k = koffi!
-    let buf = r.pool.pop()
-    if (!buf || buf.byteLength !== bytes) buf = new ArrayBuffer(bytes)
-    const mc = getMemcpy(k)
-    if (mc) mc(buf, f.p_data, bytes)
-    else new Uint8Array(buf).set(k.decode(f.p_data, k.array('uint8_t', bytes, 'Typed')) as Uint8Array)
-    r.out++
-    inPort.postMessage({ t: 'in', name: r.name, w, h, stride, buf }, [buf])
-  } catch {
-    /* drop this frame */
-  } finally {
-    try { l.recv_free_video(recv, f) } catch { /* ignore */ }
+    let held = false
+    try {
+      const w = Number(f.xres), h = Number(f.yres), stride = Number(f.line_stride_in_bytes)
+      if (!f.p_data || !(w > 0 && h > 0 && stride > 0)) continue
+      const ts = typeof f.timestamp === 'bigint' ? f.timestamp : BigInt(Number(f.timestamp) || 0)
+      const id = ts !== TS_UNDEFINED && ts !== 0n ? `t${ts}` : `c${String(f.timecode)}:${String(k.address(f.p_data))}`
+      if (id === r.last) continue // the same frame again
+      r.last = id
+      const bytes = stride * h
+      let buf = r.pool.pop()
+      if (!buf || buf.byteLength !== bytes) buf = new ArrayBuffer(bytes)
+      // NDI timestamps : 100 ns ticks since the Unix epoch (sender clock).
+      const sent = ts !== TS_UNDEFINED && ts > 0n ? Number(ts / 10000n) : 0
+      const ship = (b: ArrayBuffer): void => {
+        r.out++
+        inPort!.postMessage({ t: 'in', name: r.name, w, h, stride, buf: b, sent }, [b])
+      }
+      const mc = getMemcpy(k)
+      if (!mc) {
+        new Uint8Array(buf).set(k.decode(f.p_data, k.array('uint8_t', bytes, 'Typed')) as Uint8Array)
+        ship(buf)
+        continue
+      }
+      const c: Copy = { f, since: performance.now(), bytes }
+      const b = buf
+      r.copy = c
+      held = true
+      mc.async(b, f.p_data, bytes, (err) => {
+        if (r.copy !== c) return // let go meanwhile : settleCopy freed the frame
+        r.copy = null
+        if (lib && r.fs === fs) { try { lib.fs_free(fs, f) } catch { /* ignore */ } }
+        if (err || !r.alive || !inPort) {
+          if (r.pool.length < 3) r.pool.push(b)
+          return
+        }
+        ship(b)
+      })
+    } catch {
+      /* drop this frame */
+    } finally {
+      if (!held) { try { lib.fs_free(fs, f) } catch { /* ignore */ } }
+    }
   }
 }
 
@@ -530,7 +595,7 @@ export async function ndiInFind(waitMs = 1500): Promise<{ ok: boolean; sources: 
 export async function ndiInOpen(name: string): Promise<boolean> {
   let r = recvs.get(name)
   if (r) { r.refs++; return true }
-  r = { name, recv: null, refs: 1, alive: true, inFlight: false, pool: [], out: 0 }
+  r = { name, recv: null, fs: null, refs: 1, alive: true, pool: [], out: 0, last: '', copy: null }
   recvs.set(name, r)
   if (!(await ensureLib())) return false
   if (r.alive && !r.recv) openRecv(r)
@@ -545,5 +610,5 @@ export function ndiInClose(name: string): void {
   if (r.refs > 0) return
   r.alive = false
   recvs.delete(name)
-  if (!r.inFlight && r.recv && lib) { try { lib.recv_destroy(r.recv) } catch { /* ignore */ } r.recv = null }
+  closeRecv(r)
 }

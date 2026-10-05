@@ -299,6 +299,7 @@ uniform sampler2D tex;
 uniform float zoom;    // scale about centre (1 = none)
 uniform vec2 pan;      // -1..1 shift
 uniform vec4 crop;     // L, R, T, B  (0..~0.9)
+uniform float flipY;   // 1 : the texture's first row is the TOP (NDI frames)
 void main(){
   // zoom + pan about centre → the visible region p in [0,1]
   vec2 p = (uv - 0.5) / max(zoom, 0.0001) + 0.5 - pan;
@@ -306,6 +307,7 @@ void main(){
   // crop-to-fill: p maps into [cropL, 1-cropR] x [cropB, 1-cropT]
   vec2 s = vec2(crop.x + p.x * (1.0 - crop.x - crop.y),
                 crop.w + p.y * (1.0 - crop.z - crop.w));
+  s.y = mix(s.y, 1.0 - s.y, flipY);
   o = texture(tex, s);
 }`;
 
@@ -540,6 +542,8 @@ export interface Framing {
   cropR: number;
   cropT: number;
   cropB: number;
+  /** The source texture's first row is the top of the picture (NDI input). */
+  flipY?: boolean;
 }
 const IDENTITY_FRAMING: Framing = { zoom: 1, panX: 0, panY: 0, cropL: 0, cropR: 0, cropT: 0, cropB: 0 };
 
@@ -1253,7 +1257,8 @@ export class ISFLayer {
       const tex = feed.upload();
       const framing = slot === 'A' ? this.framingA : this.framingB;
       if (tex && this.shared.blitXform) {
-        this.shared.blitXform(tex, scratch.fbo, framing);
+        const flip = (feed as { flipY?: boolean }).flipY === true;
+        this.shared.blitXform(tex, scratch.fbo, flip ? { ...framing, flipY: true } : framing);
       } else {
         gl.bindFramebuffer(gl.FRAMEBUFFER, scratch.fbo);
         gl.viewport(0, 0, this.w, this.h);
@@ -1476,7 +1481,7 @@ export class Compositor {
   private uCTex: WebGLUniformLocation;
   private xformProg!: WebGLProgram;
   private uXTex!: WebGLUniformLocation; private uXZoom!: WebGLUniformLocation;
-  private uXPan!: WebGLUniformLocation; private uXCrop!: WebGLUniformLocation;
+  private uXPan!: WebGLUniformLocation; private uXCrop!: WebGLUniformLocation; private uXFlip!: WebGLUniformLocation | null;
   // Projection warp present pass.
   private warpProg!: WebGLProgram;
   private warpVao!: WebGLVertexArrayObject;
@@ -1561,6 +1566,7 @@ export class Compositor {
     this.uXZoom = gl.getUniformLocation(this.xformProg, 'zoom')!;
     this.uXPan = gl.getUniformLocation(this.xformProg, 'pan')!;
     this.uXCrop = gl.getUniformLocation(this.xformProg, 'crop')!;
+    this.uXFlip = gl.getUniformLocation(this.xformProg, 'flipY');
 
     // Warp present pass : its own VAO with a 6-vertex (2-triangle) quad, each
     // vertex (x,y, u*q,v*q,q) = 5 floats, re-uploaded when the corners move.
@@ -1607,6 +1613,7 @@ export class Compositor {
       gl.uniform1f(this.uXZoom, f.zoom);
       gl.uniform2f(this.uXPan, f.panX, f.panY);
       gl.uniform4f(this.uXCrop, f.cropL, f.cropR, f.cropT, f.cropB);
+      gl.uniform1f(this.uXFlip, f.flipY ? 1 : 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       gl.bindVertexArray(null);
     };
