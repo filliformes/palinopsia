@@ -296,10 +296,11 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
               setVibePresetName(null)
             }
           }}
-          className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted transition-colors hover:border-accent hover:text-accent"
+          className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[12px] leading-none text-muted transition-colors hover:border-accent hover:text-accent"
           title={`Back to default : ${name} as a New session starts it (modulators stay bound)`}
+          aria-label={`Reset ${name} to default`}
         >
-          default
+          ↺
         </button>
         <button
           onClick={() => {
