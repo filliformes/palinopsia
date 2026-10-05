@@ -70,7 +70,8 @@ import { surfaceComposition, nearestSurfaceScene, samplePath } from './surface'
 import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
 import { SessionLoader, GenerateMenu } from './components/TopBarMenus'
-import { ConfirmModal } from './components/PromptModal'
+import { ConfirmModal, SaveChangesModal } from './components/PromptModal'
+import { leaveSession, markClean, markDirty, registerSessionAsker, type LeaveChoice } from './sessionGuard'
 import type { AutosaveEntry } from '@shared/types'
 import { initMidi, fireTrigger, midi } from './midi'
 import { FX_SHADERS, GENERATORS, NATIVE_NODES, shaderSourceById } from './shaders/isf'
@@ -269,6 +270,22 @@ export default function App(): JSX.Element {
   // (main writes a `.running` sentinel + a 60s snapshot; without this prompt the
   // recovered work sat unreachable in <userData>/autosave.)
   const [crashEntry, setCrashEntry] = useState<AutosaveEntry | null>(null)
+  // "Save changes?" (sessionGuard) : one pending question at a time.
+  const [leaveAsk, setLeaveAsk] = useState<{ title: string; detail: string; done: (c: LeaveChoice) => void } | null>(null)
+  useEffect(() => {
+    registerSessionAsker(
+      (title, detail) =>
+        new Promise<LeaveChoice>((resolve) => {
+          setLeaveAsk({ title, detail, done: (c) => { setLeaveAsk(null); resolve(c) } })
+        })
+    )
+    // The fresh boot (a new random start) is nothing to ask about.
+    const t = setTimeout(() => markClean(), 1200)
+    return () => {
+      registerSessionAsker(null)
+      clearTimeout(t)
+    }
+  }, [])
   useEffect(() => {
     let cancelled = false
     void window.api
@@ -547,10 +564,15 @@ export default function App(): JSX.Element {
     ;(async () => {
       const k = await window.api.kioskConfig().catch(() => null)
       if (cancelled || !k?.kiosk) return
+      kioskMode = true // an installation never stops on a "Save changes?" dialog
       if (k.sessionPath) {
         try {
           const s = await window.api.sessionLoad(k.sessionPath)
-          if (s) useStore.getState().loadSession(s)
+          if (s) {
+            useStore.getState().loadSession(s)
+            useStore.getState().setSessionPath(k.sessionPath)
+            markClean()
+          }
         } catch { /* keep the fresh boot */ }
       }
       try {
@@ -1549,15 +1571,17 @@ export default function App(): JSX.Element {
   // ── Save-before-quit handshake (main asks; we ack) ──────────────────
   useEffect(() => {
     const off = window.api.onAppBeforeClose(async () => {
+      // A session file only changes when you save it (sessionGuard) : quitting
+      // asks when something changed (Save / Don't save / Cancel); an
+      // installation never asks and keeps a recovery copy.
       try {
-        // Overwrite the session's own file when it has one; only unnamed
-        // sessions land in Sessions/<name>.opsia.json (also overwritten —
-        // quitting must never mint a new "Untitled (N)" file).
-        const st = useStore.getState()
-        if (st.sessionPath) await window.api.sessionSave(st.exportSession(), st.sessionPath)
-        else await window.api.sessionSaveToDefault(st.exportSession())
+        if (!kioskMode) await window.api.appCloseHold()
+        if (!(await leaveSession('quitting', !kioskMode))) {
+          await window.api.appCloseCancel()
+          return
+        }
       } catch {
-        /* best-effort autosave on quit */
+        /* never block the quit on an error */
       }
       window.api.appCloseProceed()
     })
@@ -1573,7 +1597,8 @@ export default function App(): JSX.Element {
     // ~once/second : crash recovery then loses at most the last second of work.
     let timer: ReturnType<typeof setTimeout> | null = null
     const push = (): void => {
-      void window.api.setCurrentSession(useStore.getState().exportSession())
+      const st = useStore.getState()
+      void window.api.setCurrentSession({ ...st.exportSession(), opsiaPath: st.sessionPath })
     }
     const schedule = (): void => {
       if (timer) return
@@ -1593,45 +1618,34 @@ export default function App(): JSX.Element {
   async function openSession(): Promise<void> {
     const res = await window.api.sessionOpen()
     if (res) {
-      // Silently save the session being left so switching A→B→A round-trips
-      // everything (scenes included). Unnamed sessions go to the default
-      // Sessions/<name> file rather than being lost.
-      try {
-        const st = useStore.getState()
-        if (st.sessionPath) await window.api.sessionSave(st.exportSession(), st.sessionPath)
-        else await window.api.sessionSaveToDefault(st.exportSession())
-      } catch {
-        /* best-effort : never block the open */
-      }
+      // Changes to the session being left : asked about (sessionGuard), never
+      // saved silently.
+      if (!(await leaveSession(`opening ${res.path.split(/[\\/]/).pop() ?? 'a session'}`))) return
       // Guard the load : loadSession is defensive, but a corrupt/foreign file
       // that slips past validation must not throw here and leave a half-applied
-      // state (the current session is already saved above).
+      // state.
       try {
         useStore.getState().loadSession(res.session)
         useStore.getState().setSessionPath(res.path) // Save now overwrites this file
-        showToast(`Opened · ${res.path.split(/[\\/]/).pop() ?? 'session'} (previous saved)`)
+        markClean()
+        showToast(`Opened · ${res.path.split(/[\\/]/).pop() ?? 'session'}`)
       } catch (e) {
         console.error('[session] load failed:', (e as Error).message)
       }
     }
   }
 
-  // New session (save the current one first, like Open). Shared by the New button
-  // and a learned MIDI pad (session:new).
-  async function doNewSession(): Promise<void> {
-    try {
-      const st = useStore.getState()
-      if (st.sessionPath) await window.api.sessionSave(st.exportSession(), st.sessionPath)
-      else await window.api.sessionSaveToDefault(st.exportSession())
-    } catch {
-      /* best-effort */
-    }
+  // New session. The button asks about unsaved changes; a learned MIDI pad
+  // (session:new) never stops the show : it keeps a recovery copy instead.
+  async function doNewSession(interactive = true): Promise<void> {
+    if (!(await leaveSession('starting a new session', interactive))) return
     useStore.getState().newSession()
-    showToast('New session — previous saved')
+    markClean()
+    showToast('New session')
   }
   // Expose New / Open to the MIDI router so their dice-style buttons are learnable.
   useEffect(() => {
-    registerNewSession(() => void doNewSession())
+    registerNewSession(() => void doNewSession(false))
     registerOpenSession(() => void openSession())
     return () => { registerNewSession(null); registerOpenSession(null) }
   }, [])
@@ -1648,9 +1662,15 @@ export default function App(): JSX.Element {
   }
 
   // Save As : always prompts; remembers the chosen path for later plain Saves.
+  // The session takes the file's name (main writes it inside the file too).
   async function saveSessionAs(): Promise<boolean> {
-    const path = await window.api.sessionSaveAs(useStore.getState().exportSession())
-    if (path) useStore.getState().setSessionPath(path)
+    const st = useStore.getState()
+    const path = await window.api.sessionSaveAs(st.exportSession(), st.sessionPath)
+    if (path) {
+      st.setSessionPath(path)
+      st.setName(path.split(/[\\/]/).pop()?.replace(/\.opsia\.json$/i, '').replace(/\.json$/i, '') ?? st.name)
+      markClean()
+    }
     return path != null
   }
 
@@ -1660,6 +1680,7 @@ export default function App(): JSX.Element {
     const st = useStore.getState()
     if (st.sessionPath) {
       await window.api.sessionSave(st.exportSession(), st.sessionPath)
+      markClean()
       flashSave()
     } else if (await saveSessionAs()) {
       // First-time save promotes Save As → Save; confirm that one too.
@@ -1942,6 +1963,14 @@ export default function App(): JSX.Element {
               try {
                 const session = await window.api.autosaveLoad(entry.path)
                 useStore.getState().loadSession(session)
+                // Re-link the file it came from, so Save goes back there (it
+                // used to restore with no file, and the next switch wrote it
+                // over whatever session shared its name). It differs from that
+                // file, so leaving it asks.
+                const from = (session as { opsiaPath?: string | null }).opsiaPath ?? null
+                useStore.getState().setSessionPath(from)
+                markDirty()
+                if (from) showToast(`Restored · ${from.split(/[\\/]/).pop()} (Save puts it back in that file)`)
               } catch {
                 /* best-effort : a corrupt snapshot just leaves the fresh boot in place */
               }
@@ -1950,6 +1979,7 @@ export default function App(): JSX.Element {
           onNo={() => setCrashEntry(null)}
         />
       )}
+      {leaveAsk && <SaveChangesModal title={leaveAsk.title} detail={leaveAsk.detail} onChoose={leaveAsk.done} />}
       {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
       <Toaster />
     </div>
@@ -1958,6 +1988,9 @@ export default function App(): JSX.Element {
 
 // Live FPS over the preview's bottom-right corner : mirrors the resolution tag
 // on the left, same font. Samples the render-loop meter on a light interval.
+// An installation (kiosk launch) : quitting never stops on a dialog.
+let kioskMode = false
+
 function FpsTag(): JSX.Element {
   const [fps, setFps] = useState(0)
   useEffect(() => {

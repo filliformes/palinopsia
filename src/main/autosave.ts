@@ -14,7 +14,7 @@ import { join } from 'path'
 import type { AutosaveEntry, Session } from '@shared/types'
 
 const AUTOSAVE_INTERVAL_MS = 60_000
-const MAX_AUTOSAVES = 10
+const MAX_AUTOSAVES = 60 // an hour of minutes : recovery after a crash or a bad switch
 
 let timer: ReturnType<typeof setInterval> | null = null
 let current: Session | null = null

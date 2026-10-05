@@ -3,36 +3,120 @@
 
 import { app, dialog, BrowserWindow } from 'electron'
 import { promises as fs, existsSync } from 'fs'
-import { basename, join, relative, resolve } from 'path'
+import { basename, dirname, join, relative, resolve } from 'path'
 import type { Session } from '@shared/types'
 import { userFilesBase } from './paths'
 
 const FILTERS = [{ name: 'Palinopsia Session', extensions: ['opsia.json', 'json'] }]
 
+// ── Session history ──────────────────────────────────────────────────────
+// Before a session file is replaced, its previous content is kept in a hidden
+// `.history/<name>/` folder beside it (the newest HISTORY_KEEP versions), so no
+// overwrite is ever final : a session overwritten by mistake comes back from
+// right-click Load → "Earlier versions". Hidden folders never reach the
+// Session dropdown (scanSessions and listDefault skip them).
+const HISTORY_KEEP = 30
+const historyRoot = (path: string): string => join(dirname(path), '.history')
+const stem = (path: string): string => basename(path).replace(/\.opsia\.json$/i, '').replace(/\.json$/i, '')
+const stamp = (): string => {
+  const d = new Date()
+  const p = (n: number): string => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`
+}
+export const historyDir = (path: string): string => join(historyRoot(path), stem(path))
+
+async function keepHistory(path: string, next: string): Promise<void> {
+  let old: string
+  try {
+    old = await fs.readFile(path, 'utf8')
+  } catch {
+    return // nothing there yet
+  }
+  if (old === next) return // unchanged : no new version
+  const dir = historyDir(path)
+  await fs.mkdir(dir, { recursive: true })
+  await fs.writeFile(join(dir, `${stamp()}.opsia.json`), old, 'utf8')
+  const files = (await fs.readdir(dir)).filter((f) => f.endsWith('.opsia.json')).sort()
+  for (const f of files.slice(0, Math.max(0, files.length - HISTORY_KEEP))) {
+    await fs.rm(join(dir, f)).catch(() => {})
+  }
+}
+
 /**
  * Atomic save: write to `<path>.tmp` then rename onto the final path.
  * `fs.rename` is atomic on the same filesystem, so a crash mid-write can
  * only leave the .tmp around : the original session file stays intact.
+ * The version being replaced goes to the session's history first.
  */
 async function atomicWriteJson(path: string, session: Session): Promise<void> {
   const tmpPath = `${path}.tmp`
   const json = JSON.stringify(session, null, 2)
+  try {
+    await keepHistory(path, json)
+  } catch (e) {
+    console.error('[session] history copy failed:', (e as Error).message)
+  }
   await fs.writeFile(tmpPath, json, 'utf8')
   await fs.rename(tmpPath, path)
 }
 
 export async function saveAs(
   parent: BrowserWindow | null,
-  session: Session
+  session: Session,
+  currentPath?: string | null
 ): Promise<string | null> {
   const result = await dialog.showSaveDialog(parent ?? undefined!, {
     title: 'Save Session',
-    defaultPath: `${session.name || 'session'}.opsia.json`,
+    // Start from the file it came from (its folder and name), else the
+    // Sessions folder and the session's name.
+    defaultPath: currentPath || join(sessionsFolderPath(), `${session.name || 'session'}.opsia.json`),
     filters: FILTERS
   })
   if (result.canceled || !result.filePath) return null
-  await atomicWriteJson(result.filePath, session)
+  // The name INSIDE follows the file name, so a Save As copy never carries the
+  // old session's name (that drift once sent a crash-recovered session onto
+  // another file of that name).
+  await atomicWriteJson(result.filePath, { ...session, name: stem(result.filePath) })
   return result.filePath
+}
+
+/** Keep a copy of a session the user chose not to save (or a performance switch
+ *  that never prompts) in Sessions/.history/_unsaved : never a session file. */
+export async function keepRecovery(session: Session): Promise<string> {
+  const safe = (session.name || 'session').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'session'
+  const dir = join(sessionsFolderPath(), '.history', '_unsaved')
+  await fs.mkdir(dir, { recursive: true })
+  const path = join(dir, `${stamp()} ${safe}.opsia.json`)
+  await fs.writeFile(path, JSON.stringify(session, null, 2), 'utf8')
+  const files = (await fs.readdir(dir)).filter((f) => f.endsWith('.opsia.json')).sort()
+  for (const f of files.slice(0, Math.max(0, files.length - 60))) await fs.rm(join(dir, f)).catch(() => {})
+  return path
+}
+
+/** Pick one of a session's earlier versions (its .history folder). */
+export async function openVersion(
+  parent: BrowserWindow | null,
+  path: string
+): Promise<{ session: Session; path: string } | null> {
+  const dir = historyDir(path)
+  if (!existsSync(dir)) return null
+  const result = await dialog.showOpenDialog(parent ?? undefined!, {
+    title: `Earlier versions of ${stem(path)}`,
+    defaultPath: dir,
+    filters: FILTERS,
+    properties: ['openFile']
+  })
+  if (result.canceled || result.filePaths.length === 0) return null
+  return { session: await loadFromPath(result.filePaths[0]), path: result.filePaths[0] }
+}
+
+/** How many earlier versions a session has. */
+export async function versionCount(path: string): Promise<number> {
+  try {
+    return (await fs.readdir(historyDir(path))).filter((f) => f.endsWith('.opsia.json')).length
+  } catch {
+    return 0
+  }
 }
 
 export async function saveTo(path: string, session: Session): Promise<boolean> {
@@ -47,31 +131,6 @@ export async function saveTo(path: string, session: Session): Promise<boolean> {
  */
 function sessionsFolderPath(): string {
   return join(userFilesBase(), 'Sessions')
-}
-
-export async function saveToDefault(session: Session): Promise<string> {
-  let dir = sessionsFolderPath()
-  try {
-    if (!existsSync(dir)) await fs.mkdir(dir, { recursive: true })
-  } catch (e) {
-    console.error(
-      '[session.saveToDefault] Sessions folder unwritable, falling back to userData:',
-      (e as Error).message
-    )
-    dir = join(app.getPath('userData'), 'Sessions')
-    if (!existsSync(dir)) await fs.mkdir(dir, { recursive: true })
-  }
-  const safe =
-    (session.name || 'session')
-      .replace(/[\\/:*?"<>|]+/g, '_')
-      .replace(/\s+/g, ' ')
-      .trim() || 'session'
-  // Overwrite in place : this is the "keep the latest state of <name>" path
-  // (quit-save / switch-save). Suffixing "(N)" here used to mint a new file on
-  // every app close, flooding Sessions/ with Untitled (N) duplicates.
-  const candidate = join(dir, `${safe}.opsia.json`)
-  await atomicWriteJson(candidate, session)
-  return candidate
 }
 
 // ── Linked session folders ──────────────────────────────────────────────
@@ -143,7 +202,7 @@ export async function removeFolder(folder: string): Promise<boolean> {
 }
 
 /** List every saved session across the Sessions folder(s) : the primary folder
- *  next to the app plus the userData fallback (saveToDefault may land in either),
+ *  next to the app plus the userData fallback (older builds saved there too),
  *  then each linked folder. The display name is the FILENAME (what the user chose
  *  in Save As), not the in-JSON `name` : those are often a stale "Untitled" even
  *  when the file is named meaningfully. The default folders are deduped by

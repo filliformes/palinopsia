@@ -14,14 +14,16 @@ import type { CollageScanResult } from '@shared/collage'
 
 const api: ExposedApi = {
   // ── Session I/O ──────────────────────────────────────────────────
-  sessionSaveAs: (s: Session) => ipcRenderer.invoke('session:saveAs', s),
+  sessionSaveAs: (s: Session, currentPath?: string | null) => ipcRenderer.invoke('session:saveAs', s, currentPath ?? null),
   sessionSave: (s: Session, path: string) => ipcRenderer.invoke('session:saveTo', s, path),
-  sessionSaveToDefault: (s) => ipcRenderer.invoke('session:saveToDefault', s),
   sessionOpen: () => ipcRenderer.invoke('session:open'),
   sessionList: () => ipcRenderer.invoke('session:list'),
   sessionFolders: () => ipcRenderer.invoke('session:folders'),
   sessionFolderAdd: () => ipcRenderer.invoke('session:folderAdd'),
   sessionFolderRemove: (folder: string) => ipcRenderer.invoke('session:folderRemove', folder),
+  sessionKeepRecovery: (s: Session) => ipcRenderer.invoke('session:keepRecovery', s),
+  sessionOpenVersion: (path: string) => ipcRenderer.invoke('session:openVersion', path),
+  sessionVersionCount: (path: string) => ipcRenderer.invoke('session:versionCount', path),
   sessionLoad: (path: string) => ipcRenderer.invoke('session:load', path),
 
   // ── Autosave / crash recovery ────────────────────────────────────
@@ -200,6 +202,8 @@ const api: ExposedApi = {
 
   // ── App lifecycle ────────────────────────────────────────────────
   appCloseProceed: () => ipcRenderer.invoke('app:close-proceed'),
+  appCloseHold: () => ipcRenderer.invoke('app:close-hold'),
+  appCloseCancel: () => ipcRenderer.invoke('app:close-cancel'),
   onAppBeforeClose: (cb) => {
     const h = (): void => cb()
     ipcRenderer.on('app:before-close', h)

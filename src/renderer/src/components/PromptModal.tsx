@@ -94,6 +94,44 @@ export function ConfirmModal({
   )
 }
 
+/** "Save changes?" before the session on screen is replaced : Save · Don't save ·
+ *  Cancel. Save is focused (Enter saves); Escape or a click outside cancels. */
+export function SaveChangesModal({
+  title,
+  detail,
+  onChoose
+}: {
+  title: string
+  detail: string
+  onChoose: (c: 'save' | 'discard' | 'cancel') => void
+}): JSX.Element {
+  useEffect(() => {
+    const key = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onChoose('cancel')
+    }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [onChoose])
+
+  return (
+    <ModalShell onCancel={() => onChoose('cancel')}>
+      <div className="text-[12px]">{title}</div>
+      <div className="text-[11px] text-muted">{detail}</div>
+      <div className="flex justify-end gap-2">
+        <button className="btn text-[11px]" onClick={() => onChoose('cancel')}>
+          Cancel
+        </button>
+        <button className="btn text-[11px]" onClick={() => onChoose('discard')}>
+          Don&apos;t save
+        </button>
+        <button className="btn text-[11px] text-accent" onClick={() => onChoose('save')} autoFocus>
+          Save
+        </button>
+      </div>
+    </ModalShell>
+  )
+}
+
 function ModalShell({
   children,
   onCancel

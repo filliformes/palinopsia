@@ -391,6 +391,19 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **A session could be overwritten without asking.** Load, Open, New, Generate and
+  quitting silently saved the outgoing session into its file, so an experiment or a
+  dice roll replaced the saved work. And after a crash **Restore** forgot which file
+  the work came from, so the next switch wrote it into `Sessions/<the name inside the
+  session>`, which a Save As copy shares with its original : another session was
+  overwritten. Now a session file only changes when you save it : switching asks
+  **Save changes?** (Save · Don't save · Cancel) when something changed, Don't save
+  keeps a recovery copy (`Sessions/.history/_unsaved`), a MIDI-triggered switch
+  never asks and never writes the file, Restore reconnects to its file, Save As names
+  the session after the file, and **every overwrite keeps the previous version**
+  (right-click Load → **Earlier versions**). The autosave ring keeps the last hour
+  (it kept ten minutes).
+
 - **Surface materials keep their proportions** : seven of the 30 scans are not square
   (bricks, concrete, corrugated steel, painted plaster, rock face, wood grain, paper
   crumpled) and were squeezed into square tiles, stretched to about twice their height,

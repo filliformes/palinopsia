@@ -11,30 +11,19 @@ import { ContextMenu, type MenuItem } from './ContextMenu'
 import { showToast } from './Toast'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { registerLoadSession } from '../commands'
+import { leaveSession, markClean, markDirty } from '../sessionGuard'
 
 type SessionEntry = { name: string; path: string; mtime: number; group?: string }
 
 /** A folder's last path segment (Windows or POSIX separators). */
 const folderName = (p: string): string => p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || p
 
-/** Save the outgoing session before it's replaced (Load / Generate) : named
- *  sessions overwrite their file, unnamed ones go to the default Sessions/<name>,
- *  so nothing is ever silently lost. Best-effort : never blocks the replace. */
-async function saveBeforeReplace(): Promise<void> {
-  try {
-    const st = useStore.getState()
-    if (st.sessionPath) await window.api.sessionSave(st.exportSession(), st.sessionPath)
-    else await window.api.sessionSaveToDefault(st.exportSession())
-  } catch {
-    /* best-effort */
-  }
-}
 
 export function SessionLoader(): JSX.Element {
   const [sessions, setSessions] = useState<SessionEntry[]>([])
   const [sel, setSel] = useState('') // selected file path
   const [busy, setBusy] = useState(false)
-  const [menu, setMenu] = useState<{ x: number; y: number; folders: string[] } | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; folders: string[]; versions: number } | null>(null)
   const loadSession = useStore((s) => s.loadSession)
 
   const refresh = async (): Promise<void> => {
@@ -51,17 +40,20 @@ export function SessionLoader(): JSX.Element {
     void refresh()
   }, [])
 
-  const load = async (): Promise<void> => {
+  // `interactive` false = a learned MIDI pad : never a dialog mid-show (changes
+  // to the outgoing session go to a recovery copy, never into its file).
+  const load = async (interactive = true): Promise<void> => {
     if (!sel || busy) return
     setBusy(true)
     try {
       const session = await window.api.sessionLoad(sel)
-      if (session) {
-        await saveBeforeReplace() // A→B→A round-trips everything (scenes included)
+      const label = sessions.find((s) => s.path === sel)?.name ?? 'session'
+      if (session && (await leaveSession(`loading “${label}”`, interactive))) {
         loadSession(session)
         // Remember the file so a later plain Save overwrites it in place.
         useStore.setState({ sessionPath: sel })
-        showToast(`Loaded · ${sessions.find((s) => s.path === sel)?.name ?? 'session'} (previous saved)`)
+        markClean()
+        showToast(`Loaded · ${label}`)
       }
     } catch (e) {
       console.error('[SessionLoader] load failed', e)
@@ -75,8 +67,10 @@ export function SessionLoader(): JSX.Element {
     e.preventDefault()
     const x = e.clientX, y = e.clientY
     let folders: string[] = []
+    let versions = 0
     try { folders = await window.api.sessionFolders() } catch { /* none */ }
-    setMenu({ x, y, folders })
+    try { if (sel) versions = await window.api.sessionVersionCount(sel) } catch { /* none */ }
+    setMenu({ x, y, folders, versions })
   }
   const addFolder = async (): Promise<void> => {
     try {
@@ -89,9 +83,31 @@ export function SessionLoader(): JSX.Element {
       showToast('Could not link that folder', 'warn')
     }
   }
+  // Every overwrite of a session file keeps the version it replaced (the hidden
+  // .history folder beside it) : bring one back as the session on screen; Save
+  // then puts it back in the file.
+  const earlierVersion = async (): Promise<void> => {
+    if (!sel) return
+    try {
+      const r = await window.api.sessionOpenVersion(sel)
+      if (!r) return
+      if (!(await leaveSession('bringing back an earlier version'))) return
+      loadSession(r.session)
+      useStore.setState({ sessionPath: sel })
+      markDirty()
+      const when = r.path.split(/[\\/]/).pop()?.replace(/\.opsia\.json$/i, '') ?? ''
+      showToast(`Earlier version (${when}) on screen : Save puts it back in ${folderName(sel)}`, 'ok', 7000)
+    } catch (e) {
+      console.error('[SessionLoader] earlier version failed', e)
+    }
+  }
+  const selName = sessions.find((s) => s.path === sel)?.name
   const menuItems: MenuItem[] = menu
     ? [
         { label: 'Link a folder of sessions…', onClick: () => void addFolder() },
+        ...(sel && menu.versions > 0
+          ? [{ label: `Earlier versions of “${selName ?? 'session'}” (${menu.versions})…`, onClick: () => void earlierVersion() }]
+          : []),
         ...(menu.folders.length ? [{ divider: true, label: '' }] : []),
         ...menu.folders.map((f) => ({
           label: folderName(f),
@@ -128,7 +144,7 @@ export function SessionLoader(): JSX.Element {
   const loadRef = useRef(load)
   loadRef.current = load
   useEffect(() => {
-    registerLoadSession(() => void loadRef.current())
+    registerLoadSession(() => void loadRef.current(false))
     return () => registerLoadSession(null)
   }, [])
 
@@ -157,7 +173,7 @@ export function SessionLoader(): JSX.Element {
         <MidiLearnOverlay id="session:load" />
         <button
           className="btn text-[12px]"
-          onClick={() => void load()}
+          onClick={() => void load(true)}
           onContextMenu={(e) => void openMenu(e)}
           disabled={busy}
           title="Load the selected session · right-click to link a folder of sessions (all of them join the dropdown) · MIDI-learnable"
@@ -204,16 +220,18 @@ export function GenerateMenu(): JSX.Element {
       <button
         className="btn text-[12px] text-accent2"
         onClick={async () => {
-          await saveBeforeReplace() // Generate wipes the session : save it first, like Load/Open/New
+          // Generate replaces the session : unsaved changes are asked about first.
+          if (!(await leaveSession(`generating “${current?.name ?? 'a theme'}”`))) return
           const standIn = !!current?.needsClips && !collageClipsFor(useStore.getState().composition)
           generateTheme(sel)
+          markClean()
           if (standIn)
             showToast(
               `${current?.name ?? 'Film Wall'} plays your films : pick a folder in a Collage source (a layer's source → Collage). Painted sources stand in until then.`,
               'warn',
               9000
             )
-          else showToast(`Generated · ${current?.name ?? 'theme'} (previous saved)`)
+          else showToast(`Generated · ${current?.name ?? 'theme'}`)
         }}
         title={current ? `Generate a “${current.name}” session : ${current.blurb}` : 'Generate'}
       >

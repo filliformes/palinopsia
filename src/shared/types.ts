@@ -834,6 +834,9 @@ export interface SoniSeq {
 export interface Session {
   version: 1
   name: string
+  // Autosave snapshots only : the file the session on screen came from, so a
+  // crash restore re-links it (never written into a session file).
+  opsiaPath?: string | null
   composition: CompositionState
   // The scene bank travels with the session. It lives OUTSIDE composition:
   // recalling a scene replaces the composition without touching the bank,
@@ -1023,15 +1026,20 @@ export interface LightConfig {
 
 export interface ExposedApi {
   // Session I/O
-  sessionSaveAs: (s: Session) => Promise<string | null>
+  /** Save As : `currentPath` seeds the dialog; the name inside follows the file. */
+  sessionSaveAs: (s: Session, currentPath?: string | null) => Promise<string | null>
   sessionSave: (s: Session, path: string) => Promise<boolean>
-  sessionSaveToDefault: (s: Session) => Promise<string>
   sessionOpen: () => Promise<{ session: Session; path: string } | null>
   sessionList: () => Promise<Array<{ name: string; path: string; mtime: number; group?: string }>>
   // Linked session folders (right-click the Session Load button).
   sessionFolders: () => Promise<string[]>
   sessionFolderAdd: () => Promise<{ folder: string; count: number } | null>
   sessionFolderRemove: (folder: string) => Promise<boolean>
+  /** A copy of an unsaved / not-saved session in Sessions/.history/_unsaved. */
+  sessionKeepRecovery: (s: Session) => Promise<string>
+  /** Pick one of a session file's earlier versions (its .history folder). */
+  sessionOpenVersion: (path: string) => Promise<{ session: Session; path: string } | null>
+  sessionVersionCount: (path: string) => Promise<number>
   sessionLoad: (path: string) => Promise<Session>
 
   // Autosave / crash recovery
@@ -1071,6 +1079,10 @@ export interface ExposedApi {
 
   // App lifecycle : save-before-quit handshake
   appCloseProceed: () => Promise<void>
+  /** The renderer is asking the user (Save changes?) : hold the forced close. */
+  appCloseHold: () => Promise<void>
+  /** The user cancelled the quit. */
+  appCloseCancel: () => Promise<void>
   onAppBeforeClose: (cb: () => void) => () => void
   // Absolute path for a picked File (Electron 33 removed File.path).
   getMediaPath: (file: File) => string

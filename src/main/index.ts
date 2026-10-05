@@ -693,9 +693,11 @@ app.whenReady().then(async () => {
   // ---------- IPC: Session I/O ----------
   // All wrapped in safeHandle so a filesystem throw (path vanished, read-only
   // dir) is logged and returns undefined rather than an uncaught rejection.
-  safeHandle('session:saveAs', (_e, s) => sessionIO.saveAs(mainWindow, s as Session))
+  safeHandle('session:saveAs', (_e, s, cur) => sessionIO.saveAs(mainWindow, s as Session, (cur as string | null) ?? null))
+  safeHandle('session:keepRecovery', (_e, s) => sessionIO.keepRecovery(s as Session))
+  safeHandle('session:openVersion', (_e, path) => sessionIO.openVersion(mainWindow, path as string))
+  safeHandle('session:versionCount', (_e, path) => sessionIO.versionCount(path as string))
   safeHandle('session:saveTo', (_e, s, path) => sessionIO.saveTo(path as string, s as Session))
-  safeHandle('session:saveToDefault', (_e, s) => sessionIO.saveToDefault(s as Session))
   safeHandle('session:open', () => sessionIO.open(mainWindow))
   safeHandle('session:list', () => sessionIO.listSaved())
   safeHandle('session:folders', () => sessionIO.linkedFolders())
@@ -719,6 +721,21 @@ app.whenReady().then(async () => {
   safeHandle('autosave:load', (_e, path) => autosave.loadAutosave(path as string))
 
   // ---------- IPC: App lifecycle ----------
+  // The renderer is asking "Save changes?" : the user may take longer than the
+  // hung-renderer grace period, so hold the forced close (a hung renderer never
+  // sends this, so the fallback still protects that case).
+  safeHandle('app:close-hold', () => {
+    if (closeFallback) {
+      clearTimeout(closeFallback)
+      closeFallback = null
+    }
+  })
+  safeHandle('app:close-cancel', () => {
+    if (closeFallback) {
+      clearTimeout(closeFallback)
+      closeFallback = null
+    }
+  })
   safeHandle('app:close-proceed', () => {
     if (closeFallback) {
       clearTimeout(closeFallback)

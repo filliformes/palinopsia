@@ -986,9 +986,19 @@ living mosaic where every fragment is a different film. Pick it as a layer sourc
 ## Sessions, scenes & themes
 
 Sessions are `.opsia.json` files: **New / Open / Save / Save As** in the toolbar,
-plus **Ctrl/Cmd+S** (overwrites the current file, Save-As the first time). A 60 s
-autosave loop and a save-before-quit handshake protect live state. Theme, worlds,
-scenes and the sequencer all travel inside the session file. Opening a session
+plus **Ctrl/Cmd+S** (overwrites the current file, Save-As the first time). Theme,
+worlds, scenes and the sequencer all travel inside the session file.
+
+**A session file only changes when you save it.** Load, Open, New, Generate and
+quitting ask **Save changes to “…”?** (Save · Don't save · Cancel), and only when
+the session on screen changed since it was loaded or saved; Don't save keeps a
+recovery copy in `Sessions/.history/_unsaved`. A learned MIDI pad never stops the
+show with a dialog : it keeps the recovery copy and never writes the session file.
+**Every overwrite keeps the version it replaced** (the newest 30, in the hidden
+`.history` folder beside the session) : right-click **Load** → **Earlier versions
+of “…”** brings one back, and Save puts it back in the file. A 60 s autosave ring
+(the last hour) covers crashes, and **Restore** after a crash reconnects the
+session to the file it came from. **Save As** names the session after its file. Opening a session
 also **pre-converts every video in its folder** in the background.
 
 **Scenes** are full-instrument snapshots recalled by bare **`1`–`9`** or a
