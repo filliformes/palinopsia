@@ -249,7 +249,9 @@ const DERIVED_COLORS: Record<string, (out: Record<string, number | number[]>, sk
 // ── Structural builders ───────────────────────────────────────────────
 // Native generators (Text) stay out of the random pool : they need user intent
 // (a string, a sidechain), so a random draw would just say "OPSIA" at strangers.
-const RANDOM_GENERATORS = GENERATORS.filter((g) => !g.native)
+// Native engines that need nothing from the user (`dice` : Reaction, the
+// organic engines) stay in, as their ISF forerunners were.
+const RANDOM_GENERATORS = GENERATORS.filter((g) => !g.native || g.dice)
 function randomSlot(): SourceSlot {
   const gen = pick(RANDOM_GENERATORS)
   return { kind: 'generator', shaderId: gen.id, inputs: randomizeInputs(gen.id, {}) }

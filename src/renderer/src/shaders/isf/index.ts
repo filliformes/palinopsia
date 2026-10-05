@@ -34,7 +34,6 @@ import shapes from './Shapes.fs?raw'
 import opArt from './OpArt.fs?raw'
 import directMarks from './DirectMarks.fs?raw'
 import dyeField from './DyeField.fs?raw'
-import reaction from './Reaction.fs?raw'
 import colony from './Colony.fs?raw'
 import ground from './Ground.fs?raw'
 import scan from './Scan.fs?raw'
@@ -112,6 +111,9 @@ export interface IsfShader {
    *  `source` is a header-only stub so the auto-UI/presets/randomize still parse
    *  its INPUTS. Excluded from the Randomize FX pool (needs a sidechain). */
   native?: boolean
+  /** A native GENERATOR that needs nothing from the user (no text, film pool or
+   *  camera) : it stays in Randomize's source pool like an ISF generator. */
+  dice?: boolean
 }
 
 // ── Native convolution nodes (visual-convolution spec) ──────────────────
@@ -1088,10 +1090,35 @@ export const GENERATORS: IsfShader[] = [
     curated: { rate: [0.15, 1.5], scale: [2.5, 7], warp: [0.3, 0.9], pool: [0.2, 0.8], density: [0.35, 0.8], grain: [0.15, 0.6], relief: [0.15, 0.5], lightAngle: [0, 6.2832] }
   },
   {
+    // Native (engine/ReactionSource.ts) : full-precision Gray-Scott on its own
+    // float grid. Same inputs as the ISF version it replaces (sessions keep), plus
+    // regrow; rate runs past the old 1.2 cap.
     id: 'reaction',
     name: 'Reaction',
     category: 'Generator',
-    source: withOrganic(reaction),
+    native: true,
+    dice: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        "Reaction : a Gray-Scott reaction-diffusion field. Two virtual chemicals react and diffuse, self-organizing into drifting spots, stripes, labyrinths and splitting 'critters'. FEED and KILL are the two exciters (small moves change the species), SEEDING keeps it alive with sparse new critters, SCALE sets the size of the pattern in the frame (the same at 1080p, 4K and on the dome), RATE how fast it lives (the same at any frame rate). Full-precision state on a seamless torus : zoom out and it tiles without a seam. RELIEF lights it as a surface (coral, brain coral, skin) under one low raking light at LIGHT ANGLE; 0 = the flat print. REGROW ▸ starts over from a fresh scatter.",
+      CATEGORIES: ['Generator', 'Organic'],
+      INPUTS: [
+        { NAME: 'feed', TYPE: 'float', MIN: 0.008, MAX: 0.09, DEFAULT: 0.037, LABEL: 'feed' },
+        { NAME: 'kill', TYPE: 'float', MIN: 0.03, MAX: 0.07, DEFAULT: 0.06, LABEL: 'kill' },
+        { NAME: 'rate', TYPE: 'float', MIN: 0.0, MAX: 3.0, DEFAULT: 1.0, LABEL: 'rate' },
+        { NAME: 'scale', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.4, LABEL: 'scale' },
+        { NAME: 'seed', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.3, LABEL: 'seeding' },
+        { NAME: 'sharp', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.5, LABEL: 'sharpness' },
+        { NAME: 'zoom', TYPE: 'float', MIN: 0.25, MAX: 4.0, DEFAULT: 1.0, LABEL: 'zoom' },
+        { NAME: 'panX', TYPE: 'float', MIN: -1.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'pan x' },
+        { NAME: 'panY', TYPE: 'float', MIN: -1.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'pan y' },
+        { NAME: 'rotate', TYPE: 'float', MIN: -1.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'rotate' },
+        { NAME: 'tint', TYPE: 'color', DEFAULT: [0.75, 0.78, 0.72, 1.0] },
+        { NAME: 'relief', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.5, LABEL: 'relief' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0.0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
+        { NAME: 'reseed', TYPE: 'event', LABEL: 'regrow ▸' }
+      ]
+    })}*/`,
     curated: { feed: [0.02, 0.06], kill: [0.045, 0.065], rate: [0.6, 1.2], scale: [0.2, 0.8], seed: [0.15, 0.6], sharp: [0.2, 0.8], zoom: [0.6, 2.2], panX: [-0.5, 0.5], panY: [-0.5, 0.5], rotate: [-0.5, 0.5], ...RELIEF_CURATED }
   },
   {

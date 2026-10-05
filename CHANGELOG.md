@@ -256,6 +256,16 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Reaction runs natively, at full precision.** Its chemistry lived in the shader
+  runtime's 8-bit buffer, which stalls the slow terms and bands the pattern; it now
+  runs in 32-bit floats on its own grid. The pattern keeps its size in the frame at
+  1080p, 4K and on the dome, runs the same at any frame rate, `rate` goes up to 3
+  (the old explicit step broke past 1.2), a `scale` change reshapes the living
+  pattern instead of restarting it, and **regrow ▸** starts it over. Same inputs, so
+  sessions keep their settings. It costs about 0.7 ms a frame at 4K. Built on a new
+  registry for native generators (Grown moved onto it), the base for the next organic
+  engines.
+
 - **Context's "surface" section is now "surface material"** (plain "surface" also named
   the Metasurface). The material once called **rock rough** is now **stacked stone**,
   which is what it is (layered stone blocks); sessions keep it.

@@ -32,7 +32,7 @@ import { audioBus } from './audioIn';
 import { makeConvNode, isNativeNode, type ConvNode, type NodeContext } from './convNodes';
 import { TextSource } from './TextSource';
 import { ParametricSource } from './ParametricSource';
-import { NcaSource } from './NcaSource';
+import { NATIVE_GENERATOR_IDS, nativeGeneratorFactory, syncNativeSlot, type NativeSlot } from './nativeGenerators';
 import { SilhouetteSource } from './SilhouetteSource';
 import { CollageSource } from './CollageSource';
 import { DepthShadow } from './depthShadow';
@@ -550,7 +550,7 @@ const IDENTITY_FRAMING: Framing = { zoom: 1, panX: 0, panY: 0, cropL: 0, cropR: 
 // Generators whose picture is drawn by a TS class instead of the ISF runtime :
 // their header-only ISF exists purely to give the Inspector / M / modulation /
 // curated-Randomize surface. syncFromState must keep them OUT of setShader.
-const NATIVE_SOURCE_IDS = new Set(['gen-text', 'gen-parametric', 'gen-collage', 'gen-nca', 'gen-silhouette']);
+const NATIVE_SOURCE_IDS = new Set(['gen-text', 'gen-parametric', 'gen-collage', 'gen-silhouette', ...NATIVE_GENERATOR_IDS]);
 
 const LOADS_PER_FRAME = 12;
 // ms of compile time allowed per frame : one heavy (cache-miss) compile may
@@ -873,9 +873,9 @@ export class ISFLayer {
   // Native Parametric slots (generator 'gen-parametric' : audio→texture).
   private paramA: ParametricSource | null = null;
   private paramB: ParametricSource | null = null;
-  // Native neural-CA slots (generator 'gen-nca' : a trained texture that grows).
-  private ncaA: NcaSource | null = null;
-  private ncaB: NcaSource | null = null;
+  // Registry engines (engine/nativeGenerators.ts : Grown, the organic engines…).
+  private natA: NativeSlot | null = null;
+  private natB: NativeSlot | null = null;
   // Native silhouette slots (generator 'gen-silhouette' : the Body camera's cutout).
   private silA: SilhouetteSource | null = null;
   private silB: SilhouetteSource | null = null;
@@ -1051,22 +1051,10 @@ export class ISFLayer {
     src.update(cfg.inputs);
   }
 
-  /** Activate/refresh/clear a native NCA source (a trained texture that grows). */
-  setNca(slot: 'A' | 'B', cfg: { inputs: Record<string, number | number[]> } | null): void {
-    const cur = slot === 'A' ? this.ncaA : this.ncaB;
-    if (!cfg) {
-      if (cur) {
-        cur.dispose();
-        if (slot === 'A') this.ncaA = null; else this.ncaB = null;
-      }
-      return;
-    }
-    let src = cur;
-    if (!src) {
-      src = new NcaSource(this.shared.gl, this.w, this.h);
-      if (slot === 'A') this.ncaA = src; else this.ncaB = src;
-    }
-    src.update(cfg.inputs);
+  /** Activate/swap/refresh/clear a registry engine (engine/nativeGenerators.ts). */
+  setNative(slot: 'A' | 'B', id: string | null, inputs: Record<string, number | number[]> | null): void {
+    const next = syncNativeSlot(slot === 'A' ? this.natA : this.natB, this.shared.gl, this.w, this.h, id, inputs);
+    if (slot === 'A') this.natA = next; else this.natB = next;
   }
 
   /** Activate/refresh/clear a native COLLAGE source (a wall of film pieces). */
@@ -1193,12 +1181,12 @@ export class ISFLayer {
     (slot === 'A' ? this.isfA : this.isfB)?.setValue(name, value);
     (slot === 'A' ? this.textA : this.textB)?.setInput(name, value); // modulation on text params
     (slot === 'A' ? this.paramA : this.paramB)?.setInput(name, value); // modulation on parametric params
-    (slot === 'A' ? this.ncaA : this.ncaB)?.setInput(name, value); // modulation on NCA params
+    (slot === 'A' ? this.natA : this.natB)?.src.setInput(name, value); // modulation on registry engines
     (slot === 'A' ? this.silA : this.silB)?.setInput(name, value); // modulation on silhouette params
     (slot === 'A' ? this.collageA : this.collageB)?.setInput(name, value); // modulation on collage params
   }
 
-  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null || this.textB !== null || this.paramB !== null || this.ncaB !== null || this.silB !== null || this.collageB !== null || this.assembleB !== null; }
+  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null || this.textB !== null || this.paramB !== null || this.natB !== null || this.silB !== null || this.collageB !== null || this.assembleB !== null; }
 
   /** Advance the layer clock and stamp it onto every renderer it owns. */
   advanceClock(dtSec: number): void {
@@ -1243,10 +1231,11 @@ export class ISFLayer {
       return;
     }
 
-    // Native neural CA : the trained texture growing on its own grid.
-    const nca = slot === 'A' ? this.ncaA : this.ncaB;
-    if (nca) {
-      nca.render(scratch.fbo, this.clockSec); // layer clock : Speed / freeze pace the growth
+    // Registry engine (Grown, the organic engines) : its own GL, on the layer clock
+    // (Speed / freeze pace it).
+    const nat = slot === 'A' ? this.natA : this.natB;
+    if (nat) {
+      nat.src.render(scratch.fbo, this.clockSec);
       return;
     }
 
@@ -1325,8 +1314,10 @@ export class ISFLayer {
     this.textB?.dispose();
     this.paramA?.dispose();
     this.paramB?.dispose();
-    this.ncaA?.dispose();
-    this.ncaB?.dispose();
+    this.natA?.src.dispose();
+    this.natB?.src.dispose();
+    this.natA = null;
+    this.natB = null;
     this.silA?.dispose();
     this.silB?.dispose();
     this.rackA.dispose();
@@ -1353,7 +1344,7 @@ export class Compositor {
   // appeared in the background picker and rendered nothing at all.
   private bgCollage: CollageSource | null = null;
   private bgParam: ParametricSource | null = null;
-  private bgNca: NcaSource | null = null;
+  private bgNat: NativeSlot | null = null; // registry engine on the slab
   private bgShaderId: string | null = null;
   private bgTextWarned = false;
   private bgRack: FxRack;
@@ -2252,7 +2243,7 @@ export class Compositor {
       const nativeA = l.sourceA.kind === 'generator' && NATIVE_SOURCE_IDS.has(l.sourceA.shaderId ?? '');
       const isTextA = l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-text';
       const isParamA = l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-parametric';
-      const isNcaA = l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-nca';
+      const natA = l.sourceA.kind === 'generator' && nativeGeneratorFactory(l.sourceA.shaderId) ? l.sourceA.shaderId ?? null : null;
       const isCollA = l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-collage';
       const wantA = l.sourceA.kind === 'generator' && !nativeA ? l.sourceA.shaderId : null;
       const wantVidA = l.sourceA.kind === 'video' ? (l.sourceA.mediaId ?? null) : null;
@@ -2268,13 +2259,13 @@ export class Compositor {
         ? { text: l.sourceA.text ?? 'OPSIA', inputs: l.sourceA.inputs, sidechain: l.sourceA.sidechain ?? null }
         : null);
       L.setParam('A', isParamA ? { inputs: l.sourceA.inputs } : null);
-      L.setNca('A', isNcaA ? { inputs: l.sourceA.inputs } : null);
+      L.setNative('A', natA, natA ? l.sourceA.inputs : null);
       L.setSilhouette('A', l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-silhouette' ? { inputs: l.sourceA.inputs } : null);
       L.setCollage('A', isCollA ? { pool: l.sourceA.collagePool ?? [], edls: l.sourceA.collageEdls ?? [], inputs: l.sourceA.inputs } : null);
       const nativeB = !!l.sourceB && l.sourceB.kind === 'generator' && NATIVE_SOURCE_IDS.has(l.sourceB.shaderId ?? '');
       const isTextB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-text';
       const isParamB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-parametric';
-      const isNcaB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-nca';
+      const natB = l.sourceB && l.sourceB.kind === 'generator' && nativeGeneratorFactory(l.sourceB.shaderId) ? l.sourceB.shaderId ?? null : null;
       const isCollB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-collage';
       const wantB = l.sourceB && l.sourceB.kind === 'generator' && !nativeB ? l.sourceB.shaderId : null;
       const wantVidB = l.sourceB && l.sourceB.kind === 'video' ? (l.sourceB.mediaId ?? null) : null;
@@ -2290,7 +2281,7 @@ export class Compositor {
         ? { text: l.sourceB.text ?? 'OPSIA', inputs: l.sourceB.inputs, sidechain: l.sourceB.sidechain ?? null }
         : null);
       L.setParam('B', isParamB && l.sourceB ? { inputs: l.sourceB.inputs } : null);
-      L.setNca('B', isNcaB && l.sourceB ? { inputs: l.sourceB.inputs } : null);
+      L.setNative('B', natB, natB && l.sourceB ? l.sourceB.inputs : null);
       L.setSilhouette('B', !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-silhouette' ? { inputs: l.sourceB.inputs } : null);
       L.setCollage('B', isCollB && l.sourceB ? { pool: l.sourceB.collagePool ?? [], edls: l.sourceB.collageEdls ?? [], inputs: l.sourceB.inputs } : null);
       L.setVideoPlayback('A', l.sourceA);
@@ -2340,13 +2331,8 @@ export class Compositor {
       this.bgParam.dispose();
       this.bgParam = null;
     }
-    if (bgId === 'gen-nca' && bg) {
-      if (!this.bgNca) this.bgNca = new NcaSource(this.shared.gl, this.w, this.h);
-      this.bgNca.update(bg.source.inputs);
-    } else if (this.bgNca) {
-      this.bgNca.dispose();
-      this.bgNca = null;
-    }
+    const bgNatId = bg && nativeGeneratorFactory(bgId) ? bgId : null;
+    this.bgNat = syncNativeSlot(this.bgNat, this.shared.gl, this.w, this.h, bgNatId, bgNatId && bg ? bg.source.inputs : null);
     // 'gen-text' is native (kept out of loadIsf) but has no background handler :
     // TextSource.render needs a sidechain texture the background path never wires,
     // so it can't satisfy the one-arg bgNativeSource contract. The curated picker
@@ -2370,7 +2356,7 @@ export class Compositor {
     }
     this.bgRack.sync(bg?.fx ?? [], sourceById);
     this.bgOpacity = bg && bg.source.shaderId ? bg.opacity : 0;
-    this.bgNativeSource = this.bgCollage ?? this.bgParam ?? this.bgNca;
+    this.bgNativeSource = this.bgCollage ?? this.bgParam ?? this.bgNat?.src ?? null;
     this.bgSpeed = bg?.speed ?? 0.25;
     this.bgDepth = bg?.depth ?? 0;
     this.bgIsolate = bg?.blendMode === 'isolate';
@@ -2483,7 +2469,7 @@ export class Compositor {
     this.bgIsf?.setValue(name, value);
     this.bgCollage?.setInput(name, value);
     this.bgParam?.setInput(name, value);
-    this.bgNca?.setInput(name, value);
+    this.bgNat?.src.setInput(name, value);
   }
 
   /** Live override of an FX unit's dry/wet opacity in any rack (modulation path).
@@ -2941,7 +2927,8 @@ export class Compositor {
     this.bgIsf?.cleanup();
     this.bgCollage?.dispose();
     this.bgParam?.dispose();
-    this.bgNca?.dispose();
+    this.bgNat?.src.dispose();
+    this.bgNat = null;
     this.bgRack.dispose();
     this.depthShadow?.dispose();
     if (this.zoneMipTex) gl.deleteTexture(this.zoneMipTex);
