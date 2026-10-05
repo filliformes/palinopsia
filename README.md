@@ -735,14 +735,15 @@ The first section of the Output page turns the output into a **domemaster** : a 
 equidistant fisheye with the zenith at the centre and the **front of the dome at the
 bottom** (the fulldome standard, what a planetarium or the SAT Satosphère takes). The
 engine keeps rendering the flat composition at its own size; one pass maps it into the
-master at **2K, 4K or 8K**, and the master replaces the flat frame **everywhere** : the
+master at **2K or 4K**, and the master replaces the flat frame **everywhere** : the
 preview, the projector window (letterboxed, never stretched), NDI, Spout, recordings and
 stills. Keystone warp is off in dome mode (a dome is mapped by its own media server).
 
 - **Aperture** 180–230° (210° default : the Satosphère's 210°, its rim 15° below the
   horizon). The Satosphère takes **4096×4096 max, live over NDI** on its 10 Gb network.
-  The dome records in **DXV3** at full 4096² (see Record); an 8K master records
-  scaled to 4096. 8K full size is for stills.
+  The dome records in **DXV3** at full 4096² (see Record). The live master stops at 4K :
+  an 8K master cost about 1.9 GB of video memory on its own and pushed the graphics
+  driver into resets (blue screens) during dome shows.
 - **Three ways to fit a 2D picture to a dome** :
   - **full dome** (the default) : the WHOLE Palinopsia frame over the WHOLE 210° :
     its centre at the zenith, its edges all around the rim. **fill** uses every pixel of
