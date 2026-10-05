@@ -247,13 +247,24 @@ folder in the background**.
 
 The selected video slot shows a full **transport** in the Inspector:
 
-- **Play/pause** · play mode **forward → reverse → pendulum** · **loop** (or
-  play-once-and-hold) · **speed** 1/28×–128× (log slider).
+- **Play/pause** · **■ stop** (pause and back to the in point) · play mode
+  **forward → reverse → pendulum** · **loop** (or play-once-and-hold) · **speed**
+  1/64×–128× (log slider). The browser plays a clip natively from 1/16× up to 8×;
+  slower and faster speeds step the frames by seeking, and a clip whose decoder
+  stalls at speed drops to that path on its own instead of freezing.
 - **◇ smooth scrub.** A **native** H.264/VP9/AV1 clip only seeks to keyframes, so
   reverse / pendulum / high-speed jump keyframe-to-keyframe. One press transcodes the
   clip once to the all-intra cache (with a progress badge) and swaps the slot to it : transport, FX and modulation are preserved, after which every direction and speed
   scrubs smoothly. A clip that's already all-intra shows a **◆ smooth** badge instead.
-- A **scrub timeline** with a live playhead and draggable **in/out trim points**.
+  The button lights up when the current settings will strobe on an ordinary clip
+  (fast, reverse, pendulum or grain : about 10 pictures a second, against about 40
+  on a smooth copy).
+- A **scrub timeline** with a live playhead and draggable **in/out trim points** :
+  click or drag anywhere on it to move the playhead, playing or paused.
+- A **clip** row : **◀ / ▶** and a dropdown of every video in the clip's folder
+  (natural order, wraps at the ends). Swapping keeps speed, direction, loop and
+  grain and resets the trim; a clip in a codec the player can't read is converted
+  first, like an import.
 - **`M` targets** : the playhead position, speed, and loop in/out are modulation
   targets like any shader param: a saw LFO loops, S&H jump-cuts, an audio
   follower scrubs, chaos wanders the trim window.

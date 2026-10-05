@@ -7,6 +7,13 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Video : stop, scrub and browse.** A **■ stop** button (pause and back to the in
+  point); click or drag anywhere on the timeline to move the playhead, playing or
+  paused; a **clip** row (◀ / ▶ and a dropdown) steps through the other videos in the
+  clip's folder, keeping speed, direction, loop and grain. The **◇ smooth** button
+  lights up when the settings will strobe on an ordinary clip.
+- **Finishing : default** on Vibe, Context and Finalizer puts the stage back as a New
+  session starts it, every parameter included (Context's hidden surface relief too).
 - **Link a folder of sessions** : right-click the Session **Load** button, pick a folder,
   and every session in it (subfolders included) joins the dropdown, grouped under the
   folder's name and listed in name order. Linked, not copied : sessions saved there
@@ -366,6 +373,16 @@ that CI builds into cross-platform releases.
   the shared page `<title>`; it now holds.)
 
 ### Fixed
+
+- **Video speed** : 8× froze an ordinary (long-GOP) clip outright, and anything slower
+  than 1/16× silently played at 1/16×. A clip now drops to frame-stepping when its
+  decoder stalls at speed, and slow motion runs down to 1/64× (measured : 1/64, 1/28,
+  8 and 64 all play at their set rate).
+- **Video grain was upside down** (the voices were flipped twice), and while a grain
+  voice was still loading its placeholder formed a GL feedback loop that dropped the
+  whole grain picture for those frames.
+- **A paused video ignored seeks** (OSC `/video/position`, modulation) : it now lands
+  and shows the frame.
 
 - **Context no longer softens the picture with its sliders at 0** : with the surface
   texture off, its hidden relief (default 0.5) still ran the surface stage on the

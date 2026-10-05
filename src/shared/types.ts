@@ -78,6 +78,9 @@ export interface SourceSlot extends ShaderInstance {
   mediaId?: string
   // For kind:'video' : the file's display name, shown in the source picker.
   mediaName?: string
+  // For kind:'video' : the ORIGINAL file on disk (mediaId may point at a converted
+  // cache copy) : the Inspector browses its folder for the next clip.
+  mediaPath?: string
   // For kind:'assemble' : the generated edit decision list, carried ON the slot
   // so an assemblage travels with sessions and scenes and can be played back
   // from the source files alone — no corpus re-analysis needed.
@@ -1083,6 +1086,8 @@ export interface ExposedApi {
   onVideoConvertProgress: (cb: (p: { path: string; pct: number }) => void) => () => void
   /** The all-intra cache directory — a clip whose path is under it already scrubs smoothly. */
   videoCacheDir: () => Promise<string>
+  /** The videos in a folder (natural order), for switching a video slot to its neighbours. */
+  videoListFolder: (dir: string) => Promise<{ ok: boolean; files: Array<{ name: string; path: string }>; error?: string }>
   // Collage : pick a folder, then reduce it to a pool of playable clips (one
   // entry per file, non-Chromium codecs converted through the same cache the
   // single-clip import uses).

@@ -15,6 +15,7 @@ import { makeDefaultMask, modTargetKey, useStore } from '../store'
 import { AssignRow } from './AutoControls'
 import { registerLiveOverlay } from './liveOverlay'
 import { showToast } from './Toast'
+import { playableVideoUrl } from './videoImport'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { CapturePicker } from './CapturePicker'
 import { DevicePicker } from './DevicePicker'
@@ -269,7 +270,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             fx={layer.sourceAFx}
             onSelect={() => setSelection({ type: 'source', layer: index, slot: 'A' })}
             onPick={(id) => setSourceShader(index, 'A', id)}
-            onPickVideo={(url, name) => setSourceVideo(index, 'A', url, name)}
+            onPickVideo={(url, name, path) => setSourceVideo(index, 'A', url, name, path)}
             onPickCapture={(spec, name) => setSourceCapture(index, 'A', spec, name)}
             onPickHive={(host, port) => setSourceHive(index, 'A', host, port)}
           />
@@ -396,7 +397,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             fx={layer.sourceBFx}
             onSelect={() => setSelection({ type: 'source', layer: index, slot: 'B' })}
             onPick={(id) => setSourceShader(index, 'B', id)}
-            onPickVideo={(url, name) => setSourceVideo(index, 'B', url, name)}
+            onPickVideo={(url, name, path) => setSourceVideo(index, 'B', url, name, path)}
             onPickCapture={(spec, name) => setSourceCapture(index, 'B', spec, name)}
             onPickHive={(host, port) => setSourceHive(index, 'B', host, port)}
           />
@@ -615,19 +616,6 @@ function Row({ label, children }: { label: string; children: ReactNode }): JSX.E
   )
 }
 
-// A picked video's loadable URL: the persistent opsia-media:// scheme (from its
-// absolute path) so it survives reload, falling back to a session-only object
-// URL if the path can't be resolved.
-function mediaUrlForFile(file: File): string {
-  try {
-    const path = window.api.getMediaPath(file)
-    if (path) return `opsia-media://local/${encodeURIComponent(path)}`
-  } catch {
-    /* getMediaPath unavailable : fall back */
-  }
-  return URL.createObjectURL(file)
-}
-
 // FX chips rows sit indented under their owner's row, inside the gutter.
 function Indented({ children }: { children: ReactNode }): JSX.Element {
   return <div className="min-w-0 pl-[40px]">{children}</div>
@@ -659,7 +647,7 @@ function SourceRow({
   fx: Parameters<typeof FxChips>[0]['fx']
   onSelect: () => void
   onPick: (id: string | null) => void
-  onPickVideo: (url: string, name: string) => void
+  onPickVideo: (url: string, name: string, path?: string) => void
   onPickCapture: (spec: string, name: string) => void
   onPickHive: (host: string, port: number) => void
 }): JSX.Element {
@@ -677,46 +665,13 @@ function SourceRow({
     } catch {
       /* getMediaPath unavailable */
     }
-    if (path) {
-      try {
-        const probe = await window.api.videoProbe(path)
-        if (probe.needsConvert) {
-          if (!probe.ffmpegAvailable) {
-            showToast(
-              `"${file.name}" is ${probe.codec ?? 'a codec'} the player can't read : install ffmpeg to import it (add to PATH, npm i ffmpeg-static, or set OPSIA_FFMPEG)`,
-              'warn',
-              0 // sticky : an install instruction shouldn't vanish on a timer
-            )
-            return
-          }
-          setConverting(0)
-          const off = window.api.onVideoConvertProgress((p) => {
-            if (p.path === path) setConverting(p.pct)
-          })
-          try {
-            const res = await window.api.videoConvert(path)
-            if (!res.ok || !res.path) {
-              showToast(`Conversion failed : ${res.error ?? 'unknown error'}`, 'warn', 6000)
-              return
-            }
-            onPickVideo(`opsia-media://local/${encodeURIComponent(res.path)}`, file.name)
-          } catch (err) {
-            // Convert rejected : surface it and STOP here : don't fall through to
-            // direct-play a clip the probe already flagged as needing conversion.
-            showToast(`Conversion failed : ${(err as Error)?.message ?? 'unknown error'}`, 'warn', 6000)
-          } finally {
-            // Always unsubscribe the progress listener + clear the badge, whether
-            // the convert resolved, failed, or threw (else both leak).
-            off()
-            setConverting(null)
-          }
-          return
-        }
-      } catch {
-        /* probe failed (no ffmpeg) : just try playing it directly */
-      }
+    // No path on disk (rare) : a session-only object URL, no folder to browse.
+    if (!path) {
+      onPickVideo(URL.createObjectURL(file), file.name)
+      return
     }
-    onPickVideo(mediaUrlForFile(file), file.name)
+    const url = await playableVideoUrl(path, file.name, setConverting)
+    if (url) onPickVideo(url, file.name, path)
   }
   const isVideo = sourceKind === 'video'
   const isCapture = sourceKind === 'capture'

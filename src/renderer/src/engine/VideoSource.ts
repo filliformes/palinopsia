@@ -61,6 +61,10 @@ export class VideoSource {
   // frame (perpetual seeking never settles a frame). Cleared by 'seeked' + safety.
   private seeking = false
   private seekAt = 0
+  // The fastest rate the browser plays THIS clip natively. Starts at 8x and drops
+  // when the decoder stalls at speed (a long-GOP clip freezes outright at 8x :
+  // measured), so that speed switches to the seek pump instead of a frozen frame.
+  private nativeCap = 8
   private pb: VideoPlayback = {
     playing: true,
     speed: 1,
@@ -117,6 +121,10 @@ export class VideoSource {
   private blendH = 0
   private quad: WebGLBuffer | null = null
   private vao: WebGLVertexArrayObject | null = null
+  // A 1x1 black stand-in for a voice not decoded yet (weight 0). Binding the blend
+  // OUTPUT there instead formed a framebuffer/texture feedback loop : the GL
+  // refused the whole draw (GL_INVALID_OPERATION) until every voice was ready.
+  private blankTex: WebGLTexture | null = null
 
   setGrain(g: { on: boolean; size: number; spray: number; reverseP: number; jitter: number; sync: number }): void {
     this.grain = g
@@ -217,7 +225,7 @@ export class VideoSource {
         `#version 300 es\nprecision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D t0, t1, t2; uniform vec3 uW;
 void main(){
-  vec2 uv = vec2(vUV.x, 1.0 - vUV.y);
+  vec2 uv = vUV; // voice textures are already in the engine's orientation
   vec3 c = texture(t0, uv).rgb * uW.x + texture(t1, uv).rgb * uW.y + texture(t2, uv).rgb * uW.z;
   o = vec4(c / max(uW.x + uW.y + uW.z, 0.001), 1.0);
 }`))
@@ -275,7 +283,13 @@ void main(){
       gl.activeTexture(gl.TEXTURE0 + i)
       // A not-yet-decodable voice has no texture (weight 0) : bind the blend
       // output as a harmless placeholder instead of null (GL warnings).
-      gl.bindTexture(gl.TEXTURE_2D, this.voices![i].tex ?? this.blendTex)
+      if (!this.voices![i].tex && !this.blankTex) {
+        this.blankTex = gl.createTexture()!
+        gl.bindTexture(gl.TEXTURE_2D, this.blankTex)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]))
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+      }
+      gl.bindTexture(gl.TEXTURE_2D, this.voices![i].tex ?? this.blankTex)
       gl.uniform1i(this.uT[i], i)
     }
     gl.uniform3f(this.uW, weights[0], weights[1], weights[2])
@@ -345,6 +359,7 @@ void main(){
     this.pendDir = 1
     this.posMod = null
     this.speedMod = null
+    this.nativeCap = 8
     if (this.rvfcOn && typeof this.video.cancelVideoFrameCallback === 'function' && this.rvfcId) {
       this.video.cancelVideoFrameCallback(this.rvfcId)
       this.rvfcId = 0
@@ -394,28 +409,37 @@ void main(){
     this.loopOutMod = null
     const lo = Math.max(0, Math.min(1, Math.min(inN, outN))) * d
     const hi = Math.max(lo + 0.04, Math.max(0, Math.min(1, Math.max(inN, outN))) * d)
-    // Native playback is smooth only while the decoder can sustain the rate. Near
-    // its 16× cap it stalls (can't decode 16× realtime; a short clip re-seeking
-    // its loop point every few ms makes it worse) : which reads as a frozen image
-    // even though the playhead moves. Above this we fast-forward with the same
-    // keyframe-seek pump reverse uses (choppier, but it never freezes).
-    const NATIVE_MAX = 8
+    // Native playback is smooth only while the decoder can sustain the rate : up
+    // to `nativeCap` (8x, lowered per clip on a stall). Above it we fast-forward
+    // with the same seek pump reverse uses (choppier on long-GOP clips, smooth on
+    // all-intra ones, never frozen). Below the browser's slowest rate (1/16) the
+    // pump steps the frames too, so a slow-motion setting is honoured.
+    const NATIVE_MIN = 0.0625
+
+    // Modulated playhead / one-shot seek (timeline, Stop, OSC) : a normalized
+    // position written this frame. Consumed per-frame, so unbinding a modulator
+    // hands the transport back seamlessly.
+    const posN = this.posMod
+    this.posMod = null
+    const spMod = this.speedMod ?? 1
+    this.speedMod = null
 
     if (!this.pb.playing) {
       if (!v.paused) v.pause()
+      // Paused, a seek still lands : the timeline and Stop place the playhead and
+      // the sought frame shows ('seeked' flags it for upload).
+      if (posN !== null) {
+        this.pos = lo + posN * Math.max(0, hi - lo - 0.02)
+        if (!Number.isFinite(this.pos)) this.pos = lo
+        this.seekTowardPos(v)
+      }
       return
     }
     // Always keep the media pipeline hot so frames flow to the texture.
     if (v.paused) void v.play().catch(() => {})
 
-    // Modulated playhead : a bound modulator wrote a normalized position this
-    // frame. It OWNS the playhead — place it inside the trim and drive the
-    // element through the override-seek path (below). Consumed per-frame, so
-    // unbinding the modulator hands the transport back seamlessly.
-    const posN = this.posMod
-    this.posMod = null
-    const spMod = this.speedMod ?? 1
-    this.speedMod = null
+    // It OWNS the playhead this frame : place it inside the trim and drive the
+    // element through the override-seek path (below).
     if (posN !== null) {
       if (v.playbackRate !== 0.1) v.playbackRate = 0.1
       this.pos = lo + posN * Math.max(0, hi - lo - 0.02)
@@ -434,16 +458,19 @@ void main(){
     if (this.pos < 0) this.pos = v.currentTime
 
     // Pure-native forward: follow the element's own clock (no per-frame seeking).
-    const pureNative = dir > 0 && rate <= NATIVE_MAX
+    const pureNative = dir > 0 && rate >= NATIVE_MIN && rate <= this.nativeCap
     if (pureNative) {
-      const pr = Math.max(0.0625, rate)
+      const pr = rate
       if (v.playbackRate !== pr) v.playbackRate = pr
       // Stall watchdog : if it claims to be playing but currentTime stops moving,
-      // re-kick play() so a decoder/GL hiccup can't freeze the clip.
+      // re-kick play() so a decoder/GL hiccup can't freeze the clip. A stall at
+      // speed means the decoder can't sustain it : lower this clip's native cap
+      // so that speed runs on the seek pump from now on.
       const t = v.currentTime
       if (Math.abs(t - this.lastCT) < 1e-4) {
         if (this.stallSince === 0) this.stallSince = performance.now()
         else if (performance.now() - this.stallSince > 400) {
+          if (pr > 1.5) this.nativeCap = Math.max(1.5, pr * 0.7)
           void v.play().catch(() => {})
           this.stallSince = performance.now()
         }
@@ -451,12 +478,14 @@ void main(){
       this.lastCT = t
       this.pos = t
     } else {
-      // Reverse / pendulum-reverse / above the native cap: keep the pipeline hot
-      // at a minimal forward rate, drive the intended playhead ourselves at the
-      // TRUE rate, and seek toward it ONE completed seek at a time (below). We do
-      // NOT seek every frame : that keeps the decoder perpetually seeking and the
-      // presented frame never updates (playhead moves, image freezes).
-      if (v.playbackRate !== 0.1) v.playbackRate = 0.1
+      // Reverse / pendulum-reverse / above the native cap / below 1/16 : keep the
+      // pipeline hot at a minimal forward rate, drive the intended playhead
+      // ourselves at the TRUE rate, and seek toward it ONE completed seek at a time
+      // (below). We do NOT seek every frame : that keeps the decoder perpetually
+      // seeking and the presented frame never updates (playhead moves, image
+      // freezes). Slow motion idles at the slowest rate so it drifts least.
+      const idle = dir > 0 && rate < NATIVE_MIN ? NATIVE_MIN : 0.1
+      if (v.playbackRate !== idle) v.playbackRate = idle
       this.pos += rawDt * rate * dir
     }
 
@@ -541,6 +570,8 @@ void main(){
     if (this.blendProg) this.gl.deleteProgram(this.blendProg)
     if (this.vao) this.gl.deleteVertexArray(this.vao)
     if (this.quad) this.gl.deleteBuffer(this.quad)
+    if (this.blankTex) this.gl.deleteTexture(this.blankTex)
+    this.blankTex = null
     this.vao = null
     this.blendTex = null
     this.blendFbo = null

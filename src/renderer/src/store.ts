@@ -1047,10 +1047,16 @@ interface StoreState {
   setSourceShader: (layer: number, slot: 'A' | 'B', shaderId: string | null) => void
   // Point a slot at an imported video clip (kind:'video'). mediaId is the clip's
   // object URL; mediaName is shown in the picker.
-  setSourceVideo: (layer: number, slot: 'A' | 'B', mediaId: string, mediaName: string) => void
+  setSourceVideo: (layer: number, slot: 'A' | 'B', mediaId: string, mediaName: string, mediaPath?: string) => void
   /** Swap ONLY the clip path/name on a video slot (the smooth-scrub transcode),
    *  preserving transport (play/dir/speed/loop/in-out/grain), FX, and modulation. */
-  swapVideoSource: (layer: number, slot: 'A' | 'B', mediaId: string, mediaName: string) => void
+  swapVideoSource: (
+    layer: number,
+    slot: 'A' | 'B',
+    mediaId: string,
+    mediaName: string,
+    opts?: { mediaPath?: string; resetTrim?: boolean }
+  ) => void
   // Point a slot at a live capture source. `spec` is 'webcam', 'screen', or
   // 'desktop:<sourceId>' for a specific window/screen; `name` labels it.
   setSourceCapture: (layer: number, slot: 'A' | 'B', spec: string, name: string) => void
@@ -1166,14 +1172,14 @@ interface StoreState {
   // Drag-and-drop reorder: place instId before beforeId (null = end of chain).
   reorderFx: (scope: FxScope, instId: string, beforeId: string | null) => void
   setFxInput: (scope: FxScope, instId: string, name: string, value: number | number[]) => void
+  /** Replace every input of one FX unit at once (one undo step) : the Finishing "default". */
+  setFxInputs: (scope: FxScope, instId: string, inputs: Record<string, number | number[]>) => void
   // FX clipboard : copy a unit, then either overwrite another unit of the SAME
   // shader with its settings, or drop a fresh copy into any rack that can host
   // it. Transient — like `rightView`, it is not part of a Session.
   fxClipboard: { shaderId: string; name: string; inputs: Record<string, number | number[]>; opacity: number; sidechain: SidechainRef | null; sidechain2: SidechainRef | null } | null
   copyFx: (scope: FxScope, instId: string) => void
   /** Overwrite one unit's settings from the clipboard. Same shader only. */
-  /** Replace every input of one FX unit at once (one undo step) : the Finishing "default". */
-  setFxInputs: (scope: FxScope, instId: string, inputs: Record<string, number | number[]>) => void
   pasteFxSettings: (scope: FxScope, instId: string) => void
   /** Add a fresh copy to a rack, after `afterId` (null = end of chain). */
   pasteFxAsNew: (scope: FxScope, afterId: string | null) => void
@@ -2006,7 +2012,7 @@ export const useStore = create<StoreState>((set, get) => ({
       selection: shaderId ? { type: 'source', layer, slot } : s.selection
       }
     }),
-  setSourceVideo: (layer, slot, mediaId, mediaName) =>
+  setSourceVideo: (layer, slot, mediaId, mediaName, mediaPath) =>
     set((s) => ({
       composition: dropSlotTargets(
         {
@@ -2018,6 +2024,7 @@ export const useStore = create<StoreState>((set, get) => ({
               inputs: {},
               mediaId,
               mediaName,
+              ...(mediaPath ? { mediaPath } : {}),
               videoPlaying: true,
               videoSpeed: 1,
               videoDirection: 'forward' as const,
@@ -2039,14 +2046,22 @@ export const useStore = create<StoreState>((set, get) => ({
       ),
       selection: { type: 'source', layer, slot }
     })),
-  swapVideoSource: (layer, slot, mediaId, mediaName) =>
+  swapVideoSource: (layer, slot, mediaId, mediaName, opts) =>
     set((s) => ({
       composition: {
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => {
           const cur = slot === 'A' ? l.sourceA : l.sourceB
           if (!cur || cur.kind !== 'video') return l
-          const vid = { ...cur, mediaId, mediaName }
+          // Another clip keeps the transport (speed, direction, loop, grain); its
+          // trim starts whole, since the old in/out belonged to another length.
+          const vid = {
+            ...cur,
+            mediaId,
+            mediaName,
+            ...(opts?.mediaPath ? { mediaPath: opts.mediaPath } : {}),
+            ...(opts?.resetTrim ? { videoIn: 0, videoOut: 1 } : {})
+          }
           return slot === 'A' ? { ...l, sourceA: vid } : { ...l, sourceB: vid }
         })
       }
@@ -2611,6 +2626,12 @@ export const useStore = create<StoreState>((set, get) => ({
         )
       )
     })),
+  setFxInputs: (scope, instId, inputs) =>
+    set((s) => ({
+      composition: updateFxArray(s.composition, scope, (fx) =>
+        fx.map((f) => (f.id === instId ? { ...f, inputs: { ...inputs } } : f))
+      )
+    })),
   setFxSidechain: (scope, instId, ref, which = 1) =>
     set((s) => ({
       composition: updateFxArray(s.composition, scope, (fx) =>
@@ -2626,12 +2647,6 @@ export const useStore = create<StoreState>((set, get) => ({
       // baseline so the next Variation press anchors on this new scene.
       return { composition, variationBaseline: null }
     }),
-  setFxInputs: (scope, instId, inputs) =>
-    set((s) => ({
-      composition: updateFxArray(s.composition, scope, (fx) =>
-        fx.map((f) => (f.id === instId ? { ...f, inputs: { ...inputs } } : f))
-      )
-    })),
 
   // ── Variation (baseline-anchored) ─────────────────────────────────────
   // The first press captures the current scene as a baseline; every press

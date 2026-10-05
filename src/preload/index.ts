@@ -59,6 +59,7 @@ const api: ExposedApi = {
   videoProbe: (path: string) => ipcRenderer.invoke('video:probe', path),
   videoConvert: (path: string) => ipcRenderer.invoke('video:convert', path),
   videoCacheDir: () => ipcRenderer.invoke('video:cacheDir') as Promise<string>,
+  videoListFolder: (dir: string) => ipcRenderer.invoke('video:listFolder', dir),
   onVideoConvertProgress: (cb: (p: { path: string; pct: number }) => void) => {
     const h = (_e: Electron.IpcRendererEvent, p: { path: string; pct: number }): void => cb(p)
     ipcRenderer.on('video:convertProgress', h)

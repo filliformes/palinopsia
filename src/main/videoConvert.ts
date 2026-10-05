@@ -376,4 +376,25 @@ export function registerVideoConvert(): void {
   })
 
   ipcMain.handle('video:cacheDir', () => videoCacheDir())
+
+  // The videos beside a clip (the Inspector's folder browser) : one folder, top
+  // level, hidden files skipped (a Mac's `._name.mp4` stubs), natural order (so
+  // 2 sorts before 10). Warms the folder's non-Chromium codecs in the background
+  // so the next clip is ready by the time it's picked.
+  ipcMain.handle('video:listFolder', async (_e, dir: string) => {
+    try {
+      const { readdirSync, statSync: st } = await import('fs')
+      const files = readdirSync(dir)
+        .filter((f) => !f.startsWith('.') && VIDEO_EXTS.test(f))
+        .filter((f) => {
+          try { return st(join(dir, f)).isFile() } catch { return false }
+        })
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+        .map((name) => ({ name, path: join(dir, name) }))
+      void warmVideoFolder(dir)
+      return { ok: true, files }
+    } catch (err) {
+      return { ok: false, files: [], error: (err as Error).message }
+    }
+  })
 }
