@@ -95,7 +95,7 @@ export class OutputPresenter {
   private disposed = false
 
   constructor(private canvas: HTMLCanvasElement) {
-    const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: false })
+    const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: false, powerPreference: 'high-performance' })
     if (!gl) throw new Error('WebGL2 unavailable for output presenter')
     this.gl = gl
     const mk = (t: number, src: string): WebGLShader => {

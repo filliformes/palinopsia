@@ -148,7 +148,7 @@ export function PerformancePanel(): JSX.Element {
           <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Performance</span>
         </button>
         <div className="flex-1" />
-        <span className={`cursor-help font-mono text-[9px] ${fps > 0 && fps < 40 ? 'text-danger' : 'text-accent'}`} title="Frames per second of the composition render (rolling average). Red below 40.">{fps ? `${fps} fps` : '—'}</span>
+        <span className={`cursor-help font-mono text-[9px] ${fps > 0 && fps < 40 ? 'text-danger' : 'text-accent'}`} title="Frames per second of the composition render (rolling average). Red below 40.">{fps ? `${Math.round(fps)} fps` : '—'}</span>
       </div>
 
       {!collapsed && (

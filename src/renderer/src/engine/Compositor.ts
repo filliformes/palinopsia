@@ -1507,7 +1507,7 @@ export class Compositor {
     // No multisampling and no depth buffer : every pass is a full-screen draw, so
     // they bought nothing, and at a 4096² dome master the default framebuffer's
     // 4× MSAA colour + depth cost hundreds of MB of video memory (measured).
-    const gl = canvas.getContext('webgl2', { premultipliedAlpha: false, preserveDrawingBuffer: true, antialias: false, depth: false, stencil: false })!;
+    const gl = canvas.getContext('webgl2', { premultipliedAlpha: false, preserveDrawingBuffer: true, antialias: false, depth: false, stencil: false, powerPreference: 'high-performance' })!;
     if (!gl) throw new Error('WebGL2 unavailable');
     // RGBA16F render targets need this : without it every FBO is incomplete and
     // the whole engine renders black. Surface it rather than fail silently.
