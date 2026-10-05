@@ -94,6 +94,10 @@ export class Prog {
  *  free them all. */
 export class EngineGL {
   readonly vao: WebGLVertexArrayObject
+  /** No attributes at all : point clouds that read their position from a state
+   *  texture by gl_VertexID (agents). The fullscreen VAO's 3-vertex attribute
+   *  would make a large point draw read out of range. */
+  readonly pointVao: WebGLVertexArrayObject
   private quad: WebGLBuffer
   private progs: Prog[] = []
   constructor(readonly gl: WebGL2RenderingContext, readonly label: string) {
@@ -104,6 +108,22 @@ export class EngineGL {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
     gl.enableVertexAttribArray(0)
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+    gl.bindVertexArray(null)
+    this.pointVao = gl.createVertexArray()!
+  }
+
+  /** Draw `count` points (program in use) into `fbo`, ADDED to what is there
+   *  (blend ONE, ONE), then leave blending off as the rest of the engine expects. */
+  drawPointsAdd(fbo: WebGLFramebuffer, w: number, h: number, count: number): void {
+    const gl = this.gl
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
+    gl.viewport(0, 0, w, h)
+    gl.bindVertexArray(this.pointVao)
+    gl.enable(gl.BLEND)
+    gl.blendEquation(gl.FUNC_ADD)
+    gl.blendFunc(gl.ONE, gl.ONE)
+    gl.drawArrays(gl.POINTS, 0, count)
+    gl.disable(gl.BLEND)
     gl.bindVertexArray(null)
   }
 
@@ -186,6 +206,7 @@ export class EngineGL {
     gl.deleteBuffer(this.quad)
     gl.bindVertexArray(null)
     gl.deleteVertexArray(this.vao)
+    gl.deleteVertexArray(this.pointVao)
   }
 }
 

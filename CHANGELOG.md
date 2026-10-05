@@ -7,6 +7,11 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Slime Mould** (Organic) : a slime mould's transport network, grown live by
+  hundreds of thousands of agents (Jones' Physarum model). A fine mesh within seconds
+  matures into a web of veins that thicken, prune and reroute; seeded as a disc it
+  contracts, then migrates and forages with branching fronts. Six presets.
+
 - **Fluid** (Organic) : a real fluid, solved live. **Ink** blooms and folds in still
   water, **smoke** rises from vents into eddies and spreads under the ceiling,
   **fire** is hot gas that lifts, puffs and glows by its temperature, soot above it.
@@ -264,6 +269,13 @@ that CI builds into cross-platform releases.
   Mac. Built from the Syphon framework's source in CI.
 
 ### Changed
+
+- **Mycelium grows for real.** Its threads used to be contour lines of noise : closed
+  loops that never had tips, never branched and never fused. It is now a colony of
+  hyphal tips (native) : they run out from spores, branch, bend toward fresh ground,
+  fuse where they meet the network and eat the soil, so it advances as a front,
+  bundles into cords, stalls, dissolves and starts again elsewhere. Same controls, so
+  sessions keep theirs, plus **regrow ▸** and a ground color.
 
 - **Reaction runs natively, at full precision.** Its chemistry lived in the shader
   runtime's 8-bit buffer, which stalls the slow terms and bands the pattern; it now

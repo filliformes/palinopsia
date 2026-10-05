@@ -119,6 +119,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   'particle-drift': ['particles', 'points', 'trails', 'flow', 'drift', 'audio'],
   ramps: ['gradient', 'ramp', 'voltage', 'test', 'matte', 'wipe', 'key'],
   'gen-silhouette': ['silhouette', 'background removal', 'cutout', 'key', 'matte', 'body', 'camera', 'shadow', 'person', 'segmentation', 'green screen'],
+  'gen-physarum': ['slime mould', 'slime mold', 'physarum', 'agents', 'network', 'veins', 'transport', 'organic', 'swarm'],
   'gen-fluid': ['fluid', 'ink', 'water', 'smoke', 'fire', 'flame', 'navier-stokes', 'stable fluids', 'marbling', 'plume', 'organic'],
   'gen-nca': ['neural', 'cellular automaton', 'nca', 'grow', 'lava', 'moss', 'bark', 'texture', 'alive', 'organic', 'heal'],
   scan: ['photo', 'texture', 'material', 'rock', 'bark', 'sand', 'steel', 'paper', 'lava', 'snow', 'surface', 'pbr', 'organic'],

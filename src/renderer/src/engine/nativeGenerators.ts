@@ -15,6 +15,8 @@
 import { NcaSource } from './NcaSource'
 import { ReactionSource } from './ReactionSource'
 import { FluidSource } from './FluidSource'
+import { PhysarumSource } from './PhysarumSource'
+import { MyceliumSource } from './MyceliumSource'
 
 export interface NativeGenerator {
   /** The slot's whole input map, from the store, every frame. */
@@ -34,7 +36,9 @@ type Factory = (gl: WebGL2RenderingContext, w: number, h: number) => NativeGener
 const REGISTRY: Record<string, Factory> = {
   'gen-nca': (gl, w, h) => new NcaSource(gl, w, h),
   reaction: (gl, w, h) => new ReactionSource(gl, w, h),
-  'gen-fluid': (gl, w, h) => new FluidSource(gl, w, h)
+  'gen-fluid': (gl, w, h) => new FluidSource(gl, w, h),
+  'gen-physarum': (gl, w, h) => new PhysarumSource(gl, w, h),
+  mycelium: (gl, w, h) => new MyceliumSource(gl, w, h)
 }
 
 export const NATIVE_GENERATOR_IDS: readonly string[] = Object.keys(REGISTRY)

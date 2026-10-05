@@ -1038,6 +1038,14 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Sparse dye', values: { rate: 0.5, scale: 6.5, warp: 0.4, pool: 0.25, density: 0.35, grain: 0.5, pigment: [0.4, 0.12, 0.1, 1] } },
     { name: 'Dense pool', values: { rate: 0.2, scale: 3, warp: 0.7, pool: 0.9, density: 0.8, grain: 0.3, pigment: [0.2, 0.28, 0.36, 1] } }
   ],
+  'gen-physarum': [
+    { name: 'Transport network', values: { agents: 0.5, sensor: 9, sensorAngle: 22.5, turn: 45, speed: 1, wobble: 0.15, deposit: 0.5, decay: 0.5, diffuse: 0.5, scale: 0.4, shape: 0, tint: [0.95, 0.82, 0.32, 1], contrast: 0.5, glow: 0.5, relief: 0.4 } },
+    { name: 'Contracting disc', values: { agents: 0.8, sensor: 12, sensorAngle: 35, turn: 25, speed: 1, wobble: 0.1, deposit: 0.6, decay: 0.4, diffuse: 0.4, scale: 0.35, shape: 1, tint: [0.98, 0.88, 0.4, 1], contrast: 0.55, glow: 0.6, relief: 0.45 } },
+    { name: 'Long cords', values: { agents: 0.45, sensor: 22, sensorAngle: 15, turn: 15, speed: 1.4, wobble: 0.05, deposit: 0.6, decay: 0.35, diffuse: 0.3, scale: 0.3, shape: 0, tint: [0.92, 0.9, 0.82, 1], contrast: 0.6, glow: 0.4, relief: 0.5 } },
+    { name: 'Foam cells', values: { agents: 0.6, sensor: 5, sensorAngle: 60, turn: 45, speed: 0.8, wobble: 0.3, deposit: 0.5, decay: 0.6, diffuse: 0.6, scale: 0.5, shape: 0, tint: [0.7, 0.85, 0.95, 1], contrast: 0.5, glow: 0.3, relief: 0.4 } },
+    { name: 'Ring migration', values: { agents: 0.55, sensor: 10, sensorAngle: 25, turn: 35, speed: 1.2, wobble: 0.2, deposit: 0.5, decay: 0.45, diffuse: 0.45, scale: 0.4, shape: 2, tint: [0.95, 0.6, 0.3, 1], contrast: 0.5, glow: 0.7, relief: 0.35 } },
+    { name: 'Neural lace', values: { agents: 0.3, sensor: 16, sensorAngle: 22, turn: 22, speed: 1, wobble: 0.12, deposit: 0.8, decay: 0.55, diffuse: 0.35, scale: 0.6, shape: 0, tint: [0.85, 0.75, 0.95, 1], contrast: 0.7, glow: 0.8, relief: 0.3 } }
+  ],
   'gen-fluid': [
     { name: 'Ink in water', values: { kind: 0, flow: 0.6, sources: 2, size: 1, wander: 0.5, swirl: 0.5, buoyancy: 0.1, viscosity: 0.2, fade: 0.25, rate: 1, detail: 0.5, colorA: [0.86, 0.9, 0.95, 1], colorB: [0.95, 0.45, 0.18, 1], ground: [0.015, 0.018, 0.024, 1], relief: 0.35 } },
     { name: 'Indigo bloom', values: { kind: 0, flow: 0.45, sources: 1, size: 1.4, wander: 0.3, swirl: 0.8, buoyancy: -0.3, viscosity: 0.1, fade: 0.1, rate: 0.8, detail: 0.6, colorA: [0.25, 0.35, 0.85, 1], colorB: [0.12, 0.18, 0.6, 1], ground: [0.01, 0.012, 0.02, 1], relief: 0.4 } },

@@ -23,7 +23,6 @@ import murmuration from './Murmuration.fs?raw'
 import filaments from './Filaments.fs?raw'
 import erosion from './Erosion.fs?raw'
 import membrane from './Membrane.fs?raw'
-import mycelium from './Mycelium.fs?raw'
 import swell from './Swell.fs?raw'
 import congeal from './Congeal.fs?raw'
 import slitScan from './SlitScan.fs?raw'
@@ -1013,10 +1012,30 @@ export const GENERATORS: IsfShader[] = [
     curated: { rate: [0.05, 0.6], mass: [0.3, 0.65], warp: [0.3, 1.2], softness: [0.04, 0.3], veins: [0.1, 0.7], ...RELIEF_CURATED }
   },
   {
+    // Native (engine/MyceliumSource.ts) : a colony that grows from hyphal tips.
+    // Same id and inputs as the ISF version it replaces (sessions keep).
     id: 'mycelium',
     name: 'Mycelium',
     category: 'Generator',
-    source: withOrganic(mycelium),
+    native: true,
+    dice: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Mycelium : a fungal colony that really grows. Hyphal tips run out from a few spores, branching, bending toward fresh ground and fusing into the network where they meet it; the threads use up the ground around them, so the colony advances as a front over a patchy soil and stalls when it has eaten it, then slowly dissolves and a new colony starts elsewhere. RATE paces the growth and the life cycle, SCALE how fine the network (higher = finer), WIDTH the threads, DENSITY how much it branches (and how many spores), FRONT how much brighter the young growing edge is than the old threads. RELIEF raises the threads off the ground under one low raking light at LIGHT ANGLE. REGROW ▸ starts a new colony now.',
+      CATEGORIES: ['Generator', 'Organic'],
+      INPUTS: [
+        { NAME: 'rate', TYPE: 'float', MIN: 0, MAX: 20, DEFAULT: 0.25, LABEL: 'rate' },
+        { NAME: 'scale', TYPE: 'float', MIN: 1, MAX: 10, DEFAULT: 4, LABEL: 'scale' },
+        { NAME: 'width', TYPE: 'float', MIN: 0.02, MAX: 0.5, DEFAULT: 0.12, LABEL: 'width' },
+        { NAME: 'density', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'density' },
+        { NAME: 'front', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'front' },
+        { NAME: 'tint', TYPE: 'color', DEFAULT: [0.85, 0.82, 0.7, 1] },
+        { NAME: 'ground', TYPE: 'color', DEFAULT: [0.018, 0.016, 0.014, 1], LABEL: 'ground' },
+        { NAME: 'relief', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'relief' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
+        { NAME: 'reseed', TYPE: 'event', LABEL: 'regrow ▸' }
+      ]
+    })}*/`,
     curated: { rate: [0.1, 0.8], scale: [2.5, 8], width: [0.06, 0.3], density: [0.3, 0.85], front: [0.15, 0.7], ...RELIEF_CURATED }
   },
   {
@@ -1346,6 +1365,42 @@ export const GENERATORS: IsfShader[] = [
       ]
     })}*/`,
     curated: { cells: [140, 320], speed: [60, 160], drift: [0, 0], colour: [0.8, 1], bright: [0.9, 1.1] }
+  },
+  {
+    // Native (engine/PhysarumSource.ts) : Jones' Physarum agents.
+    id: 'gen-physarum',
+    name: 'Slime Mould',
+    category: 'Generator',
+    native: true,
+    dice: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        "Slime Mould : the transport network of Physarum polycephalum, grown live by hundreds of thousands of agents (after Jones, 2010). Each senses the chemical trail ahead-left, ahead and ahead-right, turns toward the strongest, steps and lays more trail; the trail spreads and evaporates. From those rules alone the slime builds a living network of veins that thicken where traffic is heavy, prune where it isn't, and reroute when disturbed. SENSOR is how far ahead it smells (wider meshes), SENSOR ANGLE and TURN shape the veins (wide angles : cells and foam, narrow : long cords), DECAY and DIFFUSE how long the trail lasts and blurs, AGENTS how many. SHAPE seeds them scattered, as a disc (contracting into veins) or a ring. REGROW ▸ starts over.",
+      CATEGORIES: ['Generator', 'Organic'],
+      INPUTS: [
+        { NAME: 'agents', TYPE: 'float', MIN: 0.05, MAX: 1, DEFAULT: 0.5, LABEL: 'agents' },
+        { NAME: 'sensor', TYPE: 'float', MIN: 2, MAX: 40, DEFAULT: 9, LABEL: 'sensor' },
+        { NAME: 'sensorAngle', TYPE: 'float', MIN: 5, MAX: 90, DEFAULT: 22.5, LABEL: 'sensor angle' },
+        { NAME: 'turn', TYPE: 'float', MIN: 5, MAX: 90, DEFAULT: 45, LABEL: 'turn' },
+        { NAME: 'speed', TYPE: 'float', MIN: 0.2, MAX: 3, DEFAULT: 1, LABEL: 'speed' },
+        { NAME: 'wobble', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.15, LABEL: 'wobble' },
+        { NAME: 'deposit', TYPE: 'float', MIN: 0.05, MAX: 2, DEFAULT: 0.5, LABEL: 'deposit' },
+        { NAME: 'decay', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'decay' },
+        { NAME: 'diffuse', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'diffuse' },
+        { NAME: 'rate', TYPE: 'float', MIN: 0, MAX: 3, DEFAULT: 1, LABEL: 'rate' },
+        { NAME: 'scale', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'scale' },
+        { NAME: 'zoom', TYPE: 'float', MIN: 0.25, MAX: 4, DEFAULT: 1, LABEL: 'zoom' },
+        { NAME: 'shape', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['scattered', 'disc', 'ring'], DEFAULT: 0, LABEL: 'shape' },
+        { NAME: 'tint', TYPE: 'color', DEFAULT: [0.95, 0.82, 0.32, 1], LABEL: 'slime' },
+        { NAME: 'ground', TYPE: 'color', DEFAULT: [0.012, 0.012, 0.01, 1], LABEL: 'ground' },
+        { NAME: 'contrast', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'contrast' },
+        { NAME: 'glow', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 0.5, LABEL: 'glow' },
+        { NAME: 'relief', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'relief' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
+        { NAME: 'reseed', TYPE: 'event', LABEL: 'regrow ▸' }
+      ]
+    })}*/`,
+    curated: { agents: [0.3, 0.8], sensor: [5, 20], sensorAngle: [15, 60], turn: [15, 50], speed: [0.6, 1.6], wobble: [0, 0.4], deposit: [0.3, 1], decay: [0.2, 0.7], diffuse: [0.2, 0.8], rate: [0.7, 1.4], scale: [0.2, 0.7], zoom: [1, 1], contrast: [0.35, 0.75], glow: [0.2, 0.9], ...RELIEF_CURATED }
   },
   {
     // Native (engine/FluidSource.ts) : stable fluids on the GPU, ink / smoke / fire.
