@@ -7,6 +7,12 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Veins** (Organic) : leaf veins and roots grown by the space-colonization model
+  botanists use for real leaves (Runions et al.). A blade grows from its margin and
+  calls its veins; open leaves branch, closed leaves fuse into loops, roots reach down
+  through the soil; widths follow the pipe model. It grows, holds, fades and starts a
+  new one. Six presets (Green leaf, Ginkgo, Skeleton leaf, Autumn, Roots, Fine roots).
+
 - **NDI input** : a layer's source menu → **NDI Input…** lists every NDI® source on the
   network and plays the one you pick like a webcam (framing, FX, blend) : a camera, a
   phone's NDI camera app, OBS, NDI Tools, another Palinopsia. Received through the same

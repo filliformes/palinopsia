@@ -1038,6 +1038,14 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Sparse dye', values: { rate: 0.5, scale: 6.5, warp: 0.4, pool: 0.25, density: 0.35, grain: 0.5, pigment: [0.4, 0.12, 0.1, 1] } },
     { name: 'Dense pool', values: { rate: 0.2, scale: 3, warp: 0.7, pool: 0.9, density: 0.8, grain: 0.3, pigment: [0.2, 0.28, 0.36, 1] } }
   ],
+  'gen-veins': [
+    { name: 'Green leaf', values: { kind: 1, density: 0.5, thickness: 1, rate: 1, cycle: 1, veinColor: [0.86, 0.9, 0.62, 1], blade: [0.12, 0.26, 0.1, 1], bladeAmt: 0.7, ground: [0.012, 0.014, 0.012, 1], relief: 0.5 } },
+    { name: 'Ginkgo (open)', values: { kind: 0, density: 0.45, thickness: 1.1, rate: 1, cycle: 1, veinColor: [0.95, 0.85, 0.45, 1], blade: [0.35, 0.28, 0.06, 1], bladeAmt: 0.75, ground: [0.015, 0.012, 0.008, 1], relief: 0.45 } },
+    { name: 'Skeleton leaf', values: { kind: 1, density: 0.75, thickness: 0.8, rate: 1.2, cycle: 1, veinColor: [0.9, 0.86, 0.78, 1], blade: [0.05, 0.05, 0.05, 1], bladeAmt: 0, ground: [0.01, 0.01, 0.01, 1], relief: 0.6 } },
+    { name: 'Autumn', values: { kind: 1, density: 0.55, thickness: 1.2, rate: 0.8, cycle: 1, veinColor: [0.98, 0.78, 0.35, 1], blade: [0.5, 0.15, 0.04, 1], bladeAmt: 0.8, ground: [0.012, 0.008, 0.006, 1], relief: 0.5 } },
+    { name: 'Roots', values: { kind: 2, density: 0.5, thickness: 1.2, rate: 1, cycle: 1, veinColor: [0.82, 0.74, 0.6, 1], ground: [0.045, 0.03, 0.022, 1], relief: 0.55 } },
+    { name: 'Fine roots', values: { kind: 2, density: 0.8, thickness: 0.7, rate: 1.4, cycle: 1, veinColor: [0.9, 0.86, 0.8, 1], ground: [0.02, 0.015, 0.012, 1], relief: 0.5 } }
+  ],
   'gen-physarum': [
     { name: 'Transport network', values: { agents: 0.5, sensor: 9, sensorAngle: 22.5, turn: 45, speed: 1, wobble: 0.15, deposit: 0.5, decay: 0.5, diffuse: 0.5, scale: 0.4, shape: 0, tint: [0.95, 0.82, 0.32, 1], contrast: 0.5, glow: 0.5, relief: 0.4 } },
     { name: 'Contracting disc', values: { agents: 0.8, sensor: 12, sensorAngle: 35, turn: 25, speed: 1, wobble: 0.1, deposit: 0.6, decay: 0.4, diffuse: 0.4, scale: 0.35, shape: 1, tint: [0.98, 0.88, 0.4, 1], contrast: 0.55, glow: 0.6, relief: 0.45 } },

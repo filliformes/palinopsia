@@ -1367,6 +1367,34 @@ export const GENERATORS: IsfShader[] = [
     curated: { cells: [140, 320], speed: [60, 160], drift: [0, 0], colour: [0.8, 1], bright: [0.9, 1.1] }
   },
   {
+    // Native (engine/VeinsSource.ts) : Runions' space colonization.
+    id: 'gen-veins',
+    name: 'Veins',
+    category: 'Generator',
+    native: true,
+    dice: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        "Veins : leaf veins and roots grown by the model botanists use to reproduce real leaves (space colonization, Runions et al. 2005). A leaf blade grows from its margin and its fresh tissue releases growth signals; each signal pulls the nearest vein, veins branch toward fresh signals and a signal goes when a vein reaches it. OPEN leaves only branch (ginkgo, many ferns); CLOSED leaves reconnect into loops (most leaves); ROOTS grow down from a collar through the soil. The pipe model sets the widths : a vein carries all the veins it feeds, so the midrib is thick and the veinlets hair-thin. DENSITY sets the vein spacing (and the root collars), THICKNESS the widths, RATE the growth; when the leaf is grown it holds, fades and a new one grows (CYCLE), or REGROW ▸.",
+      CATEGORIES: ['Generator', 'Organic'],
+      INPUTS: [
+        { NAME: 'kind', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['leaf, open', 'leaf, closed', 'roots'], DEFAULT: 1, LABEL: 'kind' },
+        { NAME: 'density', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'density' },
+        { NAME: 'thickness', TYPE: 'float', MIN: 0.2, MAX: 3, DEFAULT: 1, LABEL: 'thickness' },
+        { NAME: 'rate', TYPE: 'float', MIN: 0, MAX: 4, DEFAULT: 1, LABEL: 'rate' },
+        { NAME: 'cycle', TYPE: 'bool', DEFAULT: true, LABEL: 'cycle' },
+        { NAME: 'veinColor', TYPE: 'color', DEFAULT: [0.86, 0.9, 0.62, 1], LABEL: 'veins' },
+        { NAME: 'blade', TYPE: 'color', DEFAULT: [0.12, 0.26, 0.1, 1], LABEL: 'blade' },
+        { NAME: 'bladeAmt', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.7, LABEL: 'blade' },
+        { NAME: 'ground', TYPE: 'color', DEFAULT: [0.012, 0.014, 0.012, 1], LABEL: 'ground' },
+        { NAME: 'relief', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'relief' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
+        { NAME: 'reseed', TYPE: 'event', LABEL: 'regrow ▸' }
+      ]
+    })}*/`,
+    curated: { density: [0.3, 0.75], thickness: [0.7, 1.6], rate: [0.7, 1.6], bladeAmt: [0.4, 0.9], ...RELIEF_CURATED }
+  },
+  {
     // Native (engine/PhysarumSource.ts) : Jones' Physarum agents.
     id: 'gen-physarum',
     name: 'Slime Mould',
