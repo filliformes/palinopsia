@@ -1348,6 +1348,41 @@ export const GENERATORS: IsfShader[] = [
     curated: { cells: [140, 320], speed: [60, 160], drift: [0, 0], colour: [0.8, 1], bright: [0.9, 1.1] }
   },
   {
+    // Native (engine/FluidSource.ts) : stable fluids on the GPU, ink / smoke / fire.
+    id: 'gen-fluid',
+    name: 'Fluid',
+    category: 'Generator',
+    native: true,
+    dice: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Fluid : a real fluid, solved live (stable fluids). INK : two inks dropped into still water, pushed by wandering nozzles, blooming, folding and threading the way ink does in a glass. SMOKE : hot plumes rising from vents on the floor, rolling into eddies and breaking into wisps as they cool. FIRE : the same hot gas burning, colored by its temperature (deep red to yellow-white), puffing as the hot column necks off, soot rising dark above. FLOW is how hard the sources push, SWIRL keeps the eddies spinning, BUOYANCY how hot gas lifts (ink sinks below 0), FADE how fast it clears, DETAIL the grid. STIR ▸ turns the water, CLEAR ▸ empties it.',
+      CATEGORIES: ['Generator', 'Organic'],
+      INPUTS: [
+        { NAME: 'kind', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['ink', 'smoke', 'fire'], DEFAULT: 0, LABEL: 'kind' },
+        { NAME: 'flow', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 0.6, LABEL: 'flow' },
+        { NAME: 'sources', TYPE: 'float', MIN: 1, MAX: 6, DEFAULT: 2, LABEL: 'sources' },
+        { NAME: 'size', TYPE: 'float', MIN: 0.2, MAX: 2.5, DEFAULT: 1, LABEL: 'source size' },
+        { NAME: 'wander', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'wander' },
+        { NAME: 'swirl', TYPE: 'float', MIN: 0, MAX: 1.5, DEFAULT: 0.5, LABEL: 'swirl' },
+        { NAME: 'buoyancy', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.4, LABEL: 'buoyancy' },
+        { NAME: 'viscosity', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.2, LABEL: 'viscosity' },
+        { NAME: 'fade', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'fade' },
+        { NAME: 'rate', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 1, LABEL: 'rate' },
+        { NAME: 'detail', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'detail' },
+        { NAME: 'colorA', TYPE: 'color', DEFAULT: [0.86, 0.9, 0.95, 1], LABEL: 'ink / smoke' },
+        { NAME: 'colorB', TYPE: 'color', DEFAULT: [0.95, 0.45, 0.18, 1], LABEL: 'second ink' },
+        { NAME: 'ground', TYPE: 'color', DEFAULT: [0.015, 0.018, 0.024, 1], LABEL: 'ground' },
+        { NAME: 'glow', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 1, LABEL: 'fire glow' },
+        { NAME: 'relief', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'relief' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
+        { NAME: 'stir', TYPE: 'event', LABEL: 'stir ▸' },
+        { NAME: 'clear', TYPE: 'event', LABEL: 'clear ▸' }
+      ]
+    })}*/`,
+    curated: { flow: [0.4, 1.2], sources: [1, 4], size: [0.6, 1.6], wander: [0.2, 0.9], swirl: [0.3, 1], buoyancy: [0.1, 0.8], viscosity: [0, 0.4], fade: [0.15, 0.6], rate: [0.7, 1.3], detail: [0.35, 0.65], glow: [0.8, 1.3], ...RELIEF_CURATED }
+  },
+  {
     // The body silhouette as a picture : the Body camera's segmentation mask,
     // drawn as a cutout, a matte, a shadow or a hole (engine/SilhouetteSource.ts).
     id: 'gen-silhouette',

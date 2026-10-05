@@ -1038,6 +1038,15 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Sparse dye', values: { rate: 0.5, scale: 6.5, warp: 0.4, pool: 0.25, density: 0.35, grain: 0.5, pigment: [0.4, 0.12, 0.1, 1] } },
     { name: 'Dense pool', values: { rate: 0.2, scale: 3, warp: 0.7, pool: 0.9, density: 0.8, grain: 0.3, pigment: [0.2, 0.28, 0.36, 1] } }
   ],
+  'gen-fluid': [
+    { name: 'Ink in water', values: { kind: 0, flow: 0.6, sources: 2, size: 1, wander: 0.5, swirl: 0.5, buoyancy: 0.1, viscosity: 0.2, fade: 0.25, rate: 1, detail: 0.5, colorA: [0.86, 0.9, 0.95, 1], colorB: [0.95, 0.45, 0.18, 1], ground: [0.015, 0.018, 0.024, 1], relief: 0.35 } },
+    { name: 'Indigo bloom', values: { kind: 0, flow: 0.45, sources: 1, size: 1.4, wander: 0.3, swirl: 0.8, buoyancy: -0.3, viscosity: 0.1, fade: 0.1, rate: 0.8, detail: 0.6, colorA: [0.25, 0.35, 0.85, 1], colorB: [0.12, 0.18, 0.6, 1], ground: [0.01, 0.012, 0.02, 1], relief: 0.4 } },
+    { name: 'Marbling', values: { kind: 0, flow: 0.9, sources: 4, size: 0.8, wander: 0.8, swirl: 1.1, buoyancy: 0, viscosity: 0, fade: 0.05, rate: 1, detail: 0.65, colorA: [0.9, 0.86, 0.75, 1], colorB: [0.55, 0.1, 0.12, 1], ground: [0.02, 0.02, 0.025, 1], relief: 0.5 } },
+    { name: 'Smoke column', values: { kind: 1, flow: 0.7, sources: 1, size: 1.2, wander: 0.3, swirl: 0.6, buoyancy: 0.5, viscosity: 0.15, fade: 0.3, rate: 1, detail: 0.5, colorA: [0.75, 0.75, 0.78, 1], ground: [0.012, 0.012, 0.015, 1], relief: 0.45 } },
+    { name: 'Incense', values: { kind: 1, flow: 0.35, sources: 3, size: 0.5, wander: 0.6, swirl: 0.9, buoyancy: 0.35, viscosity: 0.05, fade: 0.2, rate: 0.8, detail: 0.6, colorA: [0.8, 0.82, 0.88, 1], ground: [0.01, 0.01, 0.014, 1], relief: 0.3 } },
+    { name: 'Campfire', values: { kind: 2, flow: 0.9, sources: 3, size: 1, wander: 0.4, swirl: 0.7, buoyancy: 0.6, viscosity: 0.15, fade: 0.3, rate: 1, detail: 0.5, colorA: [0.5, 0.48, 0.46, 1], ground: [0.008, 0.006, 0.006, 1], glow: 1.1 } },
+    { name: 'Candle', values: { kind: 2, flow: 0.5, sources: 1, size: 0.6, wander: 0.15, swirl: 0.35, buoyancy: 0.5, viscosity: 0.3, fade: 0.45, rate: 1, detail: 0.6, colorA: [0.4, 0.38, 0.36, 1], ground: [0.006, 0.005, 0.005, 1], glow: 1.2 } }
+  ],
   'gen-nca': [
     { name: 'Lava field', values: { texture: 0, cells: 216, speed: 90, drift: 0, colour: 1, bright: 1 } },
     { name: 'Magma close', values: { texture: 0, cells: 120, speed: 60, drift: 0, colour: 1, bright: 0.9 } },

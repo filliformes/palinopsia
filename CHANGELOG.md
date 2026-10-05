@@ -7,6 +7,15 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Fluid** (Organic) : a real fluid, solved live. **Ink** blooms and folds in still
+  water, **smoke** rises from vents into eddies and spreads under the ceiling,
+  **fire** is hot gas that lifts, puffs and glows by its temperature, soot above it.
+  Stable fluids on the GPU with vorticity confinement, a grid kept to the frame
+  height (4K and the dome look like 1080p), fixed steps on the layer clock. Flow,
+  sources, wander, swirl, buoyancy, viscosity, fade, detail, `stir ▸` and `clear ▸`;
+  seven presets (Ink in water, Indigo bloom, Marbling, Smoke column, Incense,
+  Campfire, Candle). About 1 to 1.5 ms a frame.
+
 - **Context : surface material evolution.** A new **evolution** slider in the surface
   material (Finishing > Context) keeps the surface from sitting perfectly still, as if a
   little wind moved the projector or the camera filming it : the material drifts a few
