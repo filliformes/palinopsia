@@ -6,6 +6,7 @@
 // the main process's setDisplayMediaRequestHandler to pick a source.
 
 import { uploadVideoFrame } from './VideoSource'
+import { ndiInAcquire, ndiInLatest, ndiInRelease } from './ndiIn'
 
 // A live-capture start can fail silently (permission denied, no device, screen
 // picker cancelled) and the slot just renders transparent — the most confusing
@@ -22,6 +23,9 @@ export class CaptureSource {
   private stream: MediaStream | null = null
   private starting = false
   private disposed = false
+  // NDI input ('ndi:<source name>') : frames come from the preload's receiver.
+  private ndiName: string | null = null
+  private ndiSeq = -1
 
   constructor(private gl: WebGL2RenderingContext) {
     this.video = document.createElement('video')
@@ -36,9 +40,17 @@ export class CaptureSource {
    *                        USB camera / capture card / DJI Osmo in webcam mode)
    *    'desktop:<id>'    → a specific screen/window (chromeMediaSourceId)
    *    'screen'          → the primary display (getDisplayMedia fallback)
+   *    'ndi:<name>'      → an NDI® source on the network (src/preload/ndi.ts)
    *  Safe to call once; ignores re-entrancy. */
   async start(spec: string): Promise<void> {
-    if (this.starting || this.stream || this.disposed) return
+    if (this.starting || this.stream || this.disposed || this.ndiName) return
+    if (spec.startsWith('ndi:')) {
+      this.ndiName = spec.slice('ndi:'.length)
+      const ok = await ndiInAcquire(this.ndiName)
+      // No runtime : say so (the receiver is kept : it starts if NDI arrives).
+      if (!ok && !this.disposed) captureErrorReporter?.(spec, 'NdiUnavailable')
+      return
+    }
     this.starting = true
     try {
       const md = navigator.mediaDevices
@@ -86,12 +98,41 @@ export class CaptureSource {
   }
 
   upload(): WebGLTexture | null {
+    if (this.ndiName) return this.uploadNdi(this.ndiName)
     this.tex = uploadVideoFrame(this.gl, this.video, this.tex)
+    return this.tex
+  }
+
+  /** The newest NDI frame (RGBX/RGBA, top-down rows) into the texture, flipped
+   *  like every other video upload. Nothing new : the last frame stays. */
+  private uploadNdi(name: string): WebGLTexture | null {
+    const f = ndiInLatest(name)
+    if (!f || f.seq === this.ndiSeq) return this.tex
+    const gl = this.gl
+    if (!this.tex) {
+      this.tex = gl.createTexture()
+      gl.bindTexture(gl.TEXTURE_2D, this.tex)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    }
+    gl.bindTexture(gl.TEXTURE_2D, this.tex)
+    gl.pixelStorei(gl.UNPACK_ROW_LENGTH, f.stride / 4)
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, f.w, f.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(f.buf, 0, f.stride * f.h))
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+    gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0)
+    this.ndiSeq = f.seq
     return this.tex
   }
 
   dispose(): void {
     this.disposed = true
+    if (this.ndiName) {
+      ndiInRelease(this.ndiName)
+      this.ndiName = null
+    }
     this.stream?.getTracks().forEach((t) => t.stop())
     this.stream = null
     this.video.srcObject = null

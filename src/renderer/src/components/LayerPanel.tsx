@@ -19,6 +19,7 @@ import { playableVideoUrl } from './videoImport'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { CapturePicker } from './CapturePicker'
 import { DevicePicker } from './DevicePicker'
+import { NdiPicker } from './NdiPicker'
 import { HivePicker } from './HivePicker'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxAddSelect, FxChips } from './FxRackPanel'
@@ -654,6 +655,7 @@ function SourceRow({
   const fileRef = useRef<HTMLInputElement | null>(null)
   const [showCapture, setShowCapture] = useState(false)
   const [showDevices, setShowDevices] = useState(false)
+  const [showNdi, setShowNdi] = useState(false)
   const [showHive, setShowHive] = useState(false)
   // ffmpeg import conversion (DXV3 / HAP / ProRes → all-intra cache) : 0..1, null = idle.
   const [converting, setConverting] = useState<number | null>(null)
@@ -690,6 +692,8 @@ function SourceRow({
           ? '__cap_webcam__'
           : mediaId?.startsWith('device:')
             ? '__cap_live__'
+            : mediaId?.startsWith('ndi:')
+              ? '__cap_ndi__'
             : '__cap_screen__'
         : (shaderId ?? '')
   const active = isVideo || isCapture || isHive || isAsm || !!shaderId
@@ -739,6 +743,7 @@ function SourceRow({
             { value: '__assemble_pick__', label: 'Assemblage…', prefix: '🎬 ', group: 'live' },
             { value: '__cap_webcam__', label: 'Webcam', prefix: '📷 ', group: 'live' },
             { value: '__cap_live__', label: 'Live Input…', prefix: '🎥 ', group: 'live' },
+            { value: '__cap_ndi__', label: 'NDI Input…', prefix: '📶 ', group: 'live', title: 'An NDI® source on the network : a camera, a phone, OBS, NDI Tools, another Palinopsia' },
             { value: '__cap_screen__', label: 'Screen…', prefix: '🖥 ', group: 'live' },
             { value: '__cap_hive__', label: 'HIVE stream…', prefix: '📡 ', group: 'live' },
             // The body silhouette joins the live entries, then living matter, then
@@ -758,6 +763,7 @@ function SourceRow({
             else if (v === '__cap_webcam__') onPickCapture('webcam', 'Webcam')
             else if (v === '__cap_screen__') setShowCapture(true)
             else if (v === '__cap_live__') setShowDevices(true)
+            else if (v === '__cap_ndi__') setShowNdi(true)
             else if (v === '__cap_hive__') setShowHive(true)
             // The assemble entries are informational : an assemblage is placed
             // from the assemble tab (it needs the corpus), so selecting either
@@ -787,6 +793,15 @@ function SourceRow({
             setShowCapture(false)
           }}
           onCancel={() => setShowCapture(false)}
+        />
+      )}
+      {showNdi && (
+        <NdiPicker
+          onPick={(name) => {
+            onPickCapture(`ndi:${name}`, name)
+            setShowNdi(false)
+          }}
+          onCancel={() => setShowNdi(false)}
         />
       )}
       {showDevices && (

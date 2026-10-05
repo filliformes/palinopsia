@@ -1158,6 +1158,11 @@ export interface ExposedApi {
   // (Frames reach the preload over a private MessageChannel, not this API.)
   ndiConfigure: (cfg: import('./ndi').NdiConfig) => Promise<import('./ndi').NdiStatus>
   onNdiStatus: (cb: (s: import('./ndi').NdiStatus) => void) => () => void
+  /** NDI sources on the network, by name (ok false : no runtime, with why). */
+  ndiInFind: (waitMs?: number) => Promise<{ ok: boolean; sources: string[]; message: string }>
+  /** Start (or share) receiving one NDI source; frames flow to the page. */
+  ndiInOpen: (name: string) => Promise<boolean>
+  ndiInClose: (name: string) => void
   // No NDI on this computer : download + verify + open NDI's official installer.
   ndiInstallRuntime: () => Promise<{ ok: boolean; message: string }>
   onNdiInstallProgress: (cb: (p: import('./ndi').NdiInstallProgress) => void) => () => void

@@ -1028,6 +1028,10 @@ export default function App(): JSX.Element {
       // A live-capture slot that fails to start (denied permission, no device,
       // cancelled screen picker) used to render a silent black source. Surface why.
       onCaptureError((spec, errName) => {
+        if (spec.startsWith('ndi:')) {
+          showToast(`NDI input : no NDI runtime on this computer. Install it from Output → NDI; the source starts by itself once NDI is there.`, 'warn', 8000)
+          return
+        }
         const src = spec.startsWith('device:')
           ? 'Live input'
           : spec === 'screen' || spec.startsWith('desktop:')

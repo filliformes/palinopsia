@@ -39,6 +39,15 @@ interface Lib {
   send_async: (i: Ptr, f: Record<string, unknown> | null) => void
   send_conn: (i: Ptr, timeoutMs: number) => number
   send_tally: (i: Ptr, out: Record<string, unknown>, timeoutMs: number) => boolean
+  // receive (NDI input)
+  find_create: (s: { show_local_sources: boolean; p_groups: string | null; p_extra_ips: string | null }) => Ptr
+  find_destroy: (f: Ptr) => void
+  find_wait: { async: (f: Ptr, timeoutMs: number, cb: (err: unknown, res: boolean) => void) => void }
+  find_sources: (f: Ptr, count: number[]) => Ptr
+  recv_create: (s: Record<string, unknown>) => Ptr
+  recv_destroy: (r: Ptr) => void
+  recv_capture: { async: (r: Ptr, v: Record<string, unknown>, a: null, m: null, timeoutMs: number, cb: (err: unknown, res: number) => void) => void }
+  recv_free_video: (r: Ptr, v: Record<string, unknown>) => void
 }
 
 interface Frame {
@@ -101,6 +110,12 @@ function loadKoffi(): Koffi | null {
       p_data: 'uint8_t *', line_stride_in_bytes: 'int', p_metadata: 'const char *', timestamp: 'int64_t'
     })
     koffi.struct('NDIlib_tally_t', { on_program: 'bool', on_preview: 'bool' })
+    koffi.struct('NDIlib_find_create_t', { show_local_sources: 'bool', p_groups: 'const char *', p_extra_ips: 'const char *' })
+    koffi.struct('NDIlib_source_t', { p_ndi_name: 'const char *', p_url_address: 'const char *' })
+    koffi.struct('NDIlib_recv_create_v3_t', {
+      source_to_connect_to: 'NDIlib_source_t', color_format: 'int', bandwidth: 'int',
+      allow_video_fields: 'bool', p_ndi_recv_name: 'const char *'
+    })
     return koffi
   } catch (e) {
     status.state = 'error'
@@ -120,8 +135,16 @@ function bind(k: Koffi, path: string): Lib {
     send_destroy: l.func('void NDIlib_send_destroy(void *p_instance)'),
     send_async: l.func('void NDIlib_send_send_video_async_v2(void *p_instance, const NDIlib_video_frame_v2_t *p_video_data)'),
     send_conn: l.func('int NDIlib_send_get_no_connections(void *p_instance, uint32_t timeout_in_ms)'),
-    send_tally: l.func('bool NDIlib_send_get_tally(void *p_instance, _Out_ NDIlib_tally_t *p_tally, uint32_t timeout_in_ms)')
-  }
+    send_tally: l.func('bool NDIlib_send_get_tally(void *p_instance, _Out_ NDIlib_tally_t *p_tally, uint32_t timeout_in_ms)'),
+    find_create: l.func('void *NDIlib_find_create_v2(const NDIlib_find_create_t *p_create_settings)'),
+    find_destroy: l.func('void NDIlib_find_destroy(void *p_instance)'),
+    find_wait: l.func('bool NDIlib_find_wait_for_sources(void *p_instance, uint32_t timeout_in_ms)'),
+    find_sources: l.func('void *NDIlib_find_get_current_sources(void *p_instance, _Out_ uint32_t *p_no_sources)'),
+    recv_create: l.func('void *NDIlib_recv_create_v3(const NDIlib_recv_create_v3_t *p_create_settings)'),
+    recv_destroy: l.func('void NDIlib_recv_destroy(void *p_instance)'),
+    recv_capture: l.func('int NDIlib_recv_capture_v2(void *p_instance, _Out_ NDIlib_video_frame_v2_t *p_video_data, void *p_audio_data, void *p_metadata, uint32_t timeout_in_ms)'),
+    recv_free_video: l.func('void NDIlib_recv_free_video_v2(void *p_instance, const NDIlib_video_frame_v2_t *p_video_data)')
+  } as unknown as Lib
 }
 
 /** Make NDI let go of the frame it holds (a NULL async send is the SDK's flush),
@@ -170,6 +193,7 @@ function initLib(candidates: Array<{ path: string; origin: string }>, configDir:
   if (configDir) process.env.NDI_CONFIG_DIR = configDir
   else delete process.env.NDI_CONFIG_DIR
   if (lib) {
+    beforeUnload()
     const prev = lib
     lib = null
     try { prev.destroy() } catch { /* ignore */ }
@@ -181,6 +205,7 @@ function initLib(candidates: Array<{ path: string; origin: string }>, configDir:
       const l = bind(k, c.path)
       if (!l.initialize()) { tried.push(`${c.origin} : initialize failed`); continue }
       lib = l
+      afterInit()
       status.runtime = `${c.origin} · ${c.path}`
       try {
         const v = String(l.version() ?? '')
@@ -259,6 +284,7 @@ window.addEventListener('message', (ev) => {
 // "Palinopsia" lingers, and the next page would publish "Palinopsia (2)").
 window.addEventListener('beforeunload', () => {
   destroySender()
+  beforeUnload()
   try { lib?.destroy() } catch { /* ignore */ }
 })
 
@@ -322,4 +348,202 @@ export function ndiOnStatus(cb: (s: NdiStatus) => void): () => void {
   listener = cb
   cb({ ...status })
   return () => { if (listener === cb) listener = null }
+}
+
+// ── NDI INPUT : another NDI source on the network as a layer source ─────────
+// Receivers live here too, on the same library instance as the sender (one
+// NDI_CONFIG_DIR, one network setup). One receiver per SOURCE, shared by every
+// layer that shows it. Frames arrive as RGBX/RGBA (the SDK converts), are copied
+// into a pooled ArrayBuffer (memcpy : no allocation per frame) and TRANSFERRED
+// to the page over a private MessageChannel; the page transfers each buffer back
+// when a newer frame replaces it. Captures run on koffi's worker threads
+// (.async), so a waiting receiver never blocks this thread.
+
+interface InRecv {
+  name: string
+  recv: Ptr
+  refs: number
+  alive: boolean
+  inFlight: boolean
+  pool: ArrayBuffer[]
+  out: number // buffers the page holds
+}
+const recvs = new Map<string, InRecv>()
+let finder: Ptr = null
+let inPort: MessagePort | null = null
+let memcpy: ((dst: ArrayBuffer, src: unknown, n: number) => unknown) | null | false = null
+let libReady: Promise<boolean> | null = null
+
+const RGBX_RGBA = 2 // NDIlib_recv_color_format_RGBX_RGBA
+const BANDWIDTH_HIGHEST = 100
+const FRAME_VIDEO = 1
+
+function getMemcpy(k: Koffi): typeof memcpy {
+  if (memcpy !== null) return memcpy
+  const libs = process.platform === 'win32' ? ['msvcrt.dll'] : process.platform === 'darwin' ? ['/usr/lib/libSystem.B.dylib'] : ['libc.so.6']
+  for (const name of libs) {
+    try {
+      memcpy = k.load(name).func('void *memcpy(void *dst, const void *src, size_t n)') as unknown as typeof memcpy
+      return memcpy
+    } catch { /* try the next */ }
+  }
+  memcpy = false
+  return memcpy
+}
+
+/** The library for receiving : the sender's if it is up, else load it with the
+ *  saved (or default) network setup. */
+function ensureLib(): Promise<boolean> {
+  if (lib) return Promise.resolve(true)
+  if (libReady) return libReady
+  libReady = (async () => {
+    try {
+      const prep = (await ipcRenderer.invoke('ndi:prepare', lastCfg ?? {})) as {
+        candidates: Array<{ path: string; origin: string }>
+        configDir: string | null
+      }
+      const ok = initLib(prep.candidates, prep.configDir)
+      if (ok && lastCfg) netKey = `${lastCfg.discovery}|${lastCfg.adapter}|${lastCfg.extraIps}`
+      return ok
+    } catch {
+      return false
+    } finally {
+      libReady = null
+    }
+  })()
+  return libReady
+}
+
+/** The library is about to go (a network change, a reload) : stop receiving. */
+function beforeUnload(): void {
+  for (const r of recvs.values()) {
+    if (r.recv && lib && !r.inFlight) { try { lib.recv_destroy(r.recv) } catch { /* ignore */ } }
+    r.recv = null
+  }
+  if (finder && lib) { try { lib.find_destroy(finder) } catch { /* ignore */ } }
+  finder = null
+}
+
+/** A fresh library : reopen every receiver a layer still wants. */
+function afterInit(): void {
+  for (const r of recvs.values()) if (r.alive && !r.recv) openRecv(r)
+}
+
+function openRecv(r: InRecv): void {
+  if (!lib) return
+  try {
+    r.recv = lib.recv_create({
+      source_to_connect_to: { p_ndi_name: r.name, p_url_address: null },
+      color_format: RGBX_RGBA, bandwidth: BANDWIDTH_HIGHEST, allow_video_fields: false,
+      p_ndi_recv_name: 'Palinopsia'
+    })
+  } catch {
+    r.recv = null
+  }
+  if (r.recv) pump(r)
+}
+
+function pump(r: InRecv): void {
+  if (!lib || !r.alive || !r.recv || r.inFlight) return
+  const l = lib
+  const recv = r.recv
+  const frame: Record<string, unknown> = {}
+  r.inFlight = true
+  l.recv_capture.async(recv, frame, null, null, 250, (err, type) => {
+    r.inFlight = false
+    if (!r.alive || lib !== l || r.recv !== recv) {
+      // Closed (or the library was swapped) while it waited.
+      if (type === FRAME_VIDEO) { try { l.recv_free_video(recv, frame) } catch { /* ignore */ } }
+      if (!r.alive && r.recv === recv) { try { l.recv_destroy(recv) } catch { /* ignore */ } r.recv = null }
+      return
+    }
+    if (!err && type === FRAME_VIDEO) deliver(r, l, recv, frame)
+    pump(r)
+  })
+}
+
+function deliver(r: InRecv, l: Lib, recv: Ptr, f: Record<string, unknown>): void {
+  const w = Number(f.xres), h = Number(f.yres), stride = Number(f.line_stride_in_bytes)
+  const bytes = stride * h
+  try {
+    // The page still holds three frames it hasn't returned : it is behind, so
+    // skip this one rather than pile up memory.
+    if (!inPort || r.out >= 3 || !(w > 0 && h > 0 && bytes > 0)) return
+    const k = koffi!
+    let buf = r.pool.pop()
+    if (!buf || buf.byteLength !== bytes) buf = new ArrayBuffer(bytes)
+    const mc = getMemcpy(k)
+    if (mc) mc(buf, f.p_data, bytes)
+    else new Uint8Array(buf).set(k.decode(f.p_data, k.array('uint8_t', bytes, 'Typed')) as Uint8Array)
+    r.out++
+    inPort.postMessage({ t: 'in', name: r.name, w, h, stride, buf }, [buf])
+  } catch {
+    /* drop this frame */
+  } finally {
+    try { l.recv_free_video(recv, f) } catch { /* ignore */ }
+  }
+}
+
+function openInPort(): void {
+  try { inPort?.close() } catch { /* ignore */ }
+  const mc = new MessageChannel()
+  inPort = mc.port1
+  inPort.onmessage = (ev): void => {
+    const d = ev.data as { t: string; name: string; buf: ArrayBuffer } | null
+    if (d && d.t === 'in-return') {
+      const r = recvs.get(d.name)
+      if (r) {
+        r.out = Math.max(0, r.out - 1)
+        if (isBuf(d.buf) && r.pool.length < 3) r.pool.push(d.buf)
+      }
+    }
+  }
+  window.postMessage('opsia:ndiinport', '*', [mc.port2])
+}
+window.addEventListener('message', (ev) => {
+  if (ev.data === 'opsia:want-ndiinport') openInPort()
+})
+
+/** NDI sources on the network (and this machine), by name. Waits up to `waitMs`
+ *  for the first answers. No runtime : ok false, with the reason. */
+export async function ndiInFind(waitMs = 1500): Promise<{ ok: boolean; sources: string[]; message: string }> {
+  if (!(await ensureLib()) || !lib) return { ok: false, sources: [], message: status.message || 'no NDI runtime on this computer' }
+  const l = lib
+  try {
+    if (!finder) finder = l.find_create({ show_local_sources: true, p_groups: null, p_extra_ips: null })
+    if (!finder) return { ok: false, sources: [], message: 'NDI refused to look for sources' }
+    const f = finder
+    await new Promise<void>((res) => l.find_wait.async(f, waitMs, () => res()))
+    const n = [0]
+    const ptr = l.find_sources(f, n)
+    const count = n[0] | 0
+    if (!ptr || count <= 0) return { ok: true, sources: [], message: '' }
+    const list = koffi!.decode(ptr, koffi!.array('NDIlib_source_t', count)) as Array<{ p_ndi_name: string | null }>
+    const names = [...new Set(list.map((x) => x.p_ndi_name ?? '').filter(Boolean))].sort((a, b) => a.localeCompare(b))
+    return { ok: true, sources: names, message: '' }
+  } catch (e) {
+    return { ok: false, sources: [], message: (e as Error).message }
+  }
+}
+
+/** Start (or share) the receiver for one source. Frames then flow to the page. */
+export async function ndiInOpen(name: string): Promise<boolean> {
+  let r = recvs.get(name)
+  if (r) { r.refs++; return true }
+  r = { name, recv: null, refs: 1, alive: true, inFlight: false, pool: [], out: 0 }
+  recvs.set(name, r)
+  if (!(await ensureLib())) return false
+  if (r.alive && !r.recv) openRecv(r)
+  return !!r.recv
+}
+
+/** A layer let go of a source : the receiver stops when nobody shows it. */
+export function ndiInClose(name: string): void {
+  const r = recvs.get(name)
+  if (!r) return
+  r.refs--
+  if (r.refs > 0) return
+  r.alive = false
+  recvs.delete(name)
+  if (!r.inFlight && r.recv && lib) { try { lib.recv_destroy(r.recv) } catch { /* ignore */ } r.recv = null }
 }

@@ -191,7 +191,7 @@ Each of the **4 layers** carries:
 
 | Element | What it does |
 |---|---|
-| **Source A / B** | Two source slots. Each holds a generator, an imported video (`🎞`), a capture (webcam `📷` / screen `🖥` / device `🎥`), a HIVE network stream (`📡`), or nothing. |
+| **Source A / B** | Two source slots. Each holds a generator, an imported video (`🎞`), a capture (webcam `📷` / screen `🖥` / device `🎥` / NDI® source `📶`), a HIVE network stream (`📡`), or nothing. |
 | **A/B mix** (`MIX`) | `sourceBlend` (how B combines with A, incl. the relation modes Weave / Lumakey / Consume) · `sourceMix` (0 = A only … 1 = full B) · `harmony` (⚖ consonant → dissonant B hue). Inert until B has a source. |
 | **Source FX** | A separate effect rack under **each** source slot (`sourceAFx`, `sourceBFx`). |
 | **Layer FX** (`FX`) | The layer's own effect rack : the only rack that accepts the **sidechain** [native nodes](#native-nodes) (Transfert, Convolution, Mosaïque); the self-contained nodes run in any rack, and so do the TouchDesigner recipes (Remap, Luma Blur, Gooey, Matte, Lookup), whose other-layer inputs are optional. |
@@ -780,7 +780,19 @@ stills. Keystone warp is off in dome mode (a dome is mapped by its own media ser
 
 ### NDI
 
-The network video link, **built in** : no plugin, no OBS, no Spout-to-NDI bridge. It is
+The network video link, **built in** both ways : no plugin, no OBS, no Spout-to-NDI bridge.
+
+**NDI input** : a layer's source menu → **NDI Input…** lists every NDI source on the
+network (and on this computer) : a camera, a phone running an NDI camera app, OBS, NDI
+Tools, another Palinopsia. Pick one and it plays in the layer like a webcam (framing, FX,
+blend), received at full quality and shown the right way up; **Switch input** in the
+Inspector changes it. Several layers can show the same source (one receiver). A session
+remembers the source by name and picks it up again when it appears on the network.
+Listing never turns the camera on. Over Wi-Fi, prefer NDI HX sources (compressed); a
+closed network with no internet is fine (NDI finds sources on the local network), and a
+Discovery Server (below) reaches other subnets.
+
+**NDI output** is
 how a fulldome venue takes the picture (at the SAT, the artist's machine sends and the
 mapping server driving the projectors receives). Turn it on in the **NDI** section of the
 Output page; it stays on across restarts.

@@ -7,6 +7,14 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **NDI input** : a layer's source menu → **NDI Input…** lists every NDI® source on the
+  network and plays the one you pick like a webcam (framing, FX, blend) : a camera, a
+  phone's NDI camera app, OBS, NDI Tools, another Palinopsia. Received through the same
+  NDI runtime as the sender (no virtual-webcam hop), full quality, shared when several
+  layers show one source; a session remembers the source by name and reconnects when it
+  appears. Measured : 29-30 fps received from a 30 fps 1080p source, right way up, right
+  colors. Listing never touches the camera.
+
 - **Slime Mould** (Organic) : a slime mould's transport network, grown live by
   hundreds of thousands of agents (Jones' Physarum model). A fine mesh within seconds
   matures into a web of veins that thicken, prune and reroute; seeded as a disc it

@@ -1,4 +1,4 @@
-import { ndiConfigure, ndiOnStatus } from './ndi'
+import { ndiConfigure, ndiOnStatus, ndiInFind, ndiInOpen, ndiInClose } from './ndi'
 import { shareLocal } from './share'
 import './recWriter' // real-time DXV3 recording : the file writer
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
@@ -149,6 +149,10 @@ const api: ExposedApi = {
   // private MessageChannel (transferred), not through this bridge (it copies).
   ndiConfigure: (cfg: import('@shared/ndi').NdiConfig) => ndiConfigure(cfg),
   onNdiStatus: (cb: (s: import('@shared/ndi').NdiStatus) => void) => ndiOnStatus(cb),
+  // NDI input : receivers run here too; frames reach the page over their own port.
+  ndiInFind: (waitMs?: number) => ndiInFind(waitMs),
+  ndiInOpen: (name: string) => ndiInOpen(name),
+  ndiInClose: (name: string) => ndiInClose(name),
   ndiInstallRuntime: () => ipcRenderer.invoke('ndi:installRuntime'),
   onNdiInstallProgress: (cb: (p: import('@shared/ndi').NdiInstallProgress) => void) => {
     const h = (_e: Electron.IpcRendererEvent, p: import('@shared/ndi').NdiInstallProgress): void => cb(p)

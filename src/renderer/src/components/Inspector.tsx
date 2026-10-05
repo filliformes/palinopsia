@@ -21,6 +21,7 @@ import { AutoControls, AssignContext, AssignRow, ModButton, useBound } from './A
 import { registerLiveOverlay } from './liveOverlay'
 import { CapturePicker } from './CapturePicker'
 import { DevicePicker } from './DevicePicker'
+import { NdiPicker } from './NdiPicker'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 import { SourceFraming } from './SourceFraming'
@@ -107,6 +108,7 @@ export function Inspector(): JSX.Element {
   const [flashing, flash] = useFlash()
   const [switchCapture, setSwitchCapture] = useState(false)
   const [switchDevice, setSwitchDevice] = useState(false)
+  const [switchNdi, setSwitchNdi] = useState(false)
   // The mod-assign side panel: which parameter's M was clicked (null = closed),
   // and its draggable width (persisted).
   const [assign, setAssign] = useState<{ target: ModTarget; label: string } | null>(null)
@@ -371,7 +373,8 @@ export function Inspector(): JSX.Element {
       const isCap = vslot?.kind === 'capture'
       const isHive = vslot?.kind === 'hive'
       const capId = vslot?.mediaId ?? ''
-      const isDevice = capId.startsWith('device:')
+      const isNdi = capId.startsWith('ndi:')
+      const isDevice = capId.startsWith('device:') || isNdi
       const isScreen = isCap && !isDevice && capId !== 'webcam'
       const isAsm = vslot?.kind === 'assemble'
       const icon = isAsm
@@ -405,7 +408,7 @@ export function Inspector(): JSX.Element {
             )}
             {isDevice && (
               <button
-                onClick={() => setSwitchDevice(true)}
+                onClick={() => (isNdi ? setSwitchNdi(true) : setSwitchDevice(true))}
                 className="shrink-0 rounded border border-accent/50 bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent transition-colors hover:bg-accent/20"
                 title="Choose a different live input device"
               >
@@ -425,6 +428,15 @@ export function Inspector(): JSX.Element {
                 setSwitchCapture(false)
               }}
               onCancel={() => setSwitchCapture(false)}
+            />
+          )}
+          {switchNdi && (
+            <NdiPicker
+              onPick={(name) => {
+                setSourceCapture(selection.layer, selection.slot, `ndi:${name}`, name)
+                setSwitchNdi(false)
+              }}
+              onCancel={() => setSwitchNdi(false)}
             />
           )}
           {switchDevice && (
