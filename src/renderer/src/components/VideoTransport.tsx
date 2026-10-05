@@ -135,6 +135,7 @@ export function VideoTransport({
   const timeRef = useRef<HTMLSpanElement | null>(null)
   const durRef = useRef<HTMLSpanElement | null>(null)
   const dragging = useRef<'in' | 'out' | 'seek' | null>(null)
+  const [scrubbing, setScrubbing] = useState(false)
   // Move the playhead : a one-shot seek (0..1 within the trim) the render loop
   // routes through the playhead's seam : it lands paused or playing.
   const seekTo = (p: number): void => {
@@ -179,6 +180,7 @@ export function VideoTransport({
   }
   const endDrag = (): void => {
     dragging.current = null
+    setScrubbing(false)
   }
 
   const btn = (on: boolean): string =>
@@ -273,6 +275,7 @@ export function VideoTransport({
           className="relative h-6 min-w-0 flex-1 cursor-pointer select-none rounded bg-panel2"
           onPointerDown={(e) => {
             dragging.current = 'seek'
+            setScrubbing(true)
             ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
             seekTo(posFromEvent(e))
           }}
@@ -307,7 +310,9 @@ export function VideoTransport({
         />
         <div
           ref={playheadRef}
-          className="pointer-events-none absolute inset-y-0 w-px bg-text"
+          className={`pointer-events-none absolute transition-[width,background-color] ${
+            scrubbing ? '-inset-y-0.5 -ml-[1.5px] w-[3px] rounded-full bg-accent shadow-[0_0_6px_1px] shadow-accent' : 'inset-y-0 w-px bg-text'
+          }`}
           style={{ left: '0%' }}
         />
         </div>

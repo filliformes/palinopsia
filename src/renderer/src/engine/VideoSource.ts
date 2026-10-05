@@ -65,6 +65,18 @@ export class VideoSource {
   // when the decoder stalls at speed (a long-GOP clip freezes outright at 8x :
   // measured), so that speed switches to the seek pump instead of a frozen frame.
   private nativeCap = 8
+  // Keyframe stepping. A seek that lands ON a keyframe decodes one frame; any
+  // other target decodes from the previous keyframe forward, 0.5-3 s per seek on
+  // heavy long-GOP footage (measured), which freezes fast-forward and reverse.
+  // `seekMs` follows how long this clip's seeks really take; once they are slow
+  // and the clip's keyframes are sparse (an ordinary clip, not an all-intra one),
+  // the seek pump steps keyframe to keyframe from the main process's index.
+  private kf: number[] | null = null
+  private kfSparse = false
+  private lastKf = -1
+  private seekMs = 0
+  private kfMode = false // sticky per clip : keyframe seeks are fast, so leaving on that would flip-flop
+  private loadedSrc = ''
   private pb: VideoPlayback = {
     playing: true,
     speed: 1,
@@ -323,8 +335,12 @@ void main(){
       const e = this.video.error
       console.warn(`[video] load error (${e?.code ?? '?'}): ${e?.message || this.video.currentSrc}`)
     })
-    // A completed seek frees the override seek gate.
+    // A completed seek frees the override seek gate, and times it.
     this.video.addEventListener('seeked', () => {
+      if (this.seeking && this.seekAt) {
+        const dt = performance.now() - this.seekAt
+        this.seekMs = this.seekMs ? this.seekMs * 0.7 + dt * 0.3 : dt
+      }
       this.seeking = false
       this.pendingFrame = true // the seeked frame is now presentable
     })
@@ -360,6 +376,13 @@ void main(){
     this.posMod = null
     this.speedMod = null
     this.nativeCap = 8
+    this.kf = null
+    this.kfSparse = false
+    this.lastKf = -1
+    this.seekMs = 0
+    this.kfMode = false
+    this.loadedSrc = src
+    this.fetchKeyframes(src)
     if (this.rvfcOn && typeof this.video.cancelVideoFrameCallback === 'function' && this.rvfcId) {
       this.video.cancelVideoFrameCallback(this.rvfcId)
       this.rvfcId = 0
@@ -372,6 +395,45 @@ void main(){
     kick()
     this.video.addEventListener('canplay', kick, { once: true })
     this.startFrameLoop()
+  }
+
+  /** Ask the main process for this clip's keyframe index (files on disk only). */
+  private fetchKeyframes(src: string): void {
+    const pfx = 'opsia-media://local/'
+    if (!src.startsWith(pfx)) return
+    let path: string
+    try {
+      path = decodeURIComponent(src.slice(pfx.length))
+    } catch {
+      return
+    }
+    const api = (window as unknown as { api?: { videoKeyframes?: (p: string) => Promise<number[] | null> } }).api
+    if (!api?.videoKeyframes) return
+    void api.videoKeyframes(path).then(
+      (k) => {
+        if (this.loadedSrc !== src || !k || k.length < 2) return
+        this.kf = k
+        // Sparse : more than ~4 frames between keyframes (an all-intra clip has
+        // one per frame and seeks fast anyway).
+        const gaps = k.slice(1, Math.min(k.length, 200)).map((t, i) => t - k[i]).sort((a, b) => a - b)
+        this.kfSparse = gaps[Math.floor(gaps.length / 2)] > 0.12
+      },
+      () => {}
+    )
+  }
+
+  /** The last keyframe at or before `t` (null without an index). */
+  private kfAtOrBefore(t: number): number | null {
+    const k = this.kf
+    if (!k || !k.length) return null
+    let lo = 0, hi = k.length - 1
+    if (t < k[0]) return k[0]
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1
+      if (k[mid] <= t) lo = mid
+      else hi = mid - 1
+    }
+    return k[lo]
   }
 
   setPlayback(p: VideoPlayback): void {
@@ -431,7 +493,7 @@ void main(){
       if (posN !== null) {
         this.pos = lo + posN * Math.max(0, hi - lo - 0.02)
         if (!Number.isFinite(this.pos)) this.pos = lo
-        this.seekTowardPos(v)
+        this.seekTowardPos(v, true)
       }
       return
     }
@@ -516,6 +578,7 @@ void main(){
       if (v.currentTime > hi - 0.02 || v.currentTime < lo - 0.05) {
         try { v.currentTime = this.pos } catch { /* seek can race a reload */ }
       }
+      this.lastKf = -1
     } else {
       this.seekTowardPos(v)
     }
@@ -527,16 +590,30 @@ void main(){
    *  issues a new seek that CANCELS the in-flight one, and the frame never
    *  settles (the >1× reverse / >16× forward freeze). 'seeked' is the primary
    *  release; this only rescues a genuinely hung seek. */
-  private seekTowardPos(v: HTMLVideoElement): void {
+  private seekTowardPos(v: HTMLVideoElement, exact = false): void {
     if (this.seeking && performance.now() - this.seekAt > 4000) this.seeking = false
-    if (!this.seeking && Math.abs(this.pos - v.currentTime) > 0.02) {
-      try {
-        v.currentTime = this.pos
-        this.seeking = true
-        this.seekAt = performance.now()
-      } catch {
-        /* a seek can race a src reload : retry next frame */
+    if (this.seeking) return
+    let target = this.pos
+    // Slow seeks on a sparse-keyframe clip : step keyframe to keyframe (each lands
+    // on a keyframe, so it decodes one frame) instead of freezing on exact seeks.
+    if (!exact && this.kfSparse && (this.kfMode || this.seekMs > 120)) {
+      this.kfMode = true
+      const k = this.kfAtOrBefore(this.pos)
+      if (k !== null) {
+        if (k === this.lastKf) return // already showing this keyframe
+        this.lastKf = k
+        target = k + 0.01 // just past it : the decoder stops on the keyframe
       }
+    } else {
+      this.lastKf = -1
+      if (Math.abs(this.pos - v.currentTime) <= 0.02) return
+    }
+    try {
+      v.currentTime = target
+      this.seeking = true
+      this.seekAt = performance.now()
+    } catch {
+      /* a seek can race a src reload : retry next frame */
     }
   }
 

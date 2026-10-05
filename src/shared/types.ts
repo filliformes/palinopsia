@@ -1089,6 +1089,8 @@ export interface ExposedApi {
   videoCacheDir: () => Promise<string>
   /** The videos in a folder (natural order), for switching a video slot to its neighbours. */
   videoListFolder: (dir: string) => Promise<{ ok: boolean; files: Array<{ name: string; path: string }>; error?: string }>
+  /** A clip's keyframe times (s, sorted), or null : lets the player seek keyframe to keyframe. */
+  videoKeyframes: (path: string) => Promise<number[] | null>
   // Collage : pick a folder, then reduce it to a pool of playable clips (one
   // entry per file, non-Chromium codecs converted through the same cache the
   // single-clip import uses).

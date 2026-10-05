@@ -83,6 +83,71 @@ function runFfmpeg(args: string[], onStderr?: (chunk: string) => void): Promise<
   })
 }
 
+// ── Keyframe index ───────────────────────────────────────────────────────
+// A seek that lands EXACTLY on a keyframe decodes one frame; anywhere else it
+// decodes from the previous keyframe forward : on heavy long-GOP footage that is
+// 0.5-3 s per seek (measured), which freezes fast-forward and reverse. The
+// player uses this index to step keyframe to keyframe when its seeks are slow.
+// ffmpeg decodes only the keyframes (-skip_frame nokey), showinfo prints each
+// one's time. Cached per file (path + size + mtime); deduped while running.
+const kfCache = new Map<string, number[]>()
+const kfInflight = new Map<string, Promise<number[] | null>>()
+const KF_MAX = 50000
+const KF_TIMEOUT_MS = 120000
+
+export function keyframeTimes(path: string): Promise<number[] | null> {
+  let key: string
+  try {
+    const st = statSync(path)
+    key = `${path}|${st.size}|${st.mtimeMs}`
+  } catch {
+    return Promise.resolve(null)
+  }
+  const hit = kfCache.get(key)
+  if (hit) return Promise.resolve(hit)
+  const running = kfInflight.get(key)
+  if (running) return running
+  const job = new Promise<number[] | null>((resolve) => {
+    const bin = resolveFfmpeg()
+    if (!bin) return resolve(null)
+    const child = spawn(
+      bin,
+      ['-hide_banner', '-nostats', '-skip_frame', 'nokey', '-i', path, '-map', '0:v:0', '-an', '-vf', 'showinfo', '-f', 'null', '-'],
+      { windowsHide: true }
+    )
+    children.add(child)
+    const times: number[] = []
+    let buf = ''
+    const timer = setTimeout(() => {
+      try { child.kill() } catch { /* gone */ }
+    }, KF_TIMEOUT_MS)
+    child.stdout?.on('error', () => {})
+    child.stderr.on('error', () => {})
+    child.stderr.on('data', (d: Buffer) => {
+      buf += d.toString()
+      const lines = buf.split(/\r?\n/)
+      buf = lines.pop() ?? ''
+      for (const l of lines) {
+        const m = l.match(/pts_time:\s*(-?[\d.]+)/)
+        if (m && times.length < KF_MAX) times.push(Number(m[1]))
+      }
+    })
+    const done = (ok: boolean): void => {
+      clearTimeout(timer)
+      children.delete(child)
+      kfInflight.delete(key)
+      if (!ok || times.length === 0) return resolve(null)
+      const sorted = Array.from(new Set(times.filter(Number.isFinite))).sort((a, b) => a - b)
+      kfCache.set(key, sorted)
+      resolve(sorted)
+    }
+    child.on('error', () => done(false))
+    child.on('close', (code) => done(code === 0))
+  })
+  kfInflight.set(key, job)
+  return job
+}
+
 const parseClock = (s: string): number => {
   const m = s.match(/(\d+):(\d+):(\d+(?:\.\d+)?)/)
   return m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : 0
@@ -376,6 +441,13 @@ export function registerVideoConvert(): void {
   })
 
   ipcMain.handle('video:cacheDir', () => videoCacheDir())
+  ipcMain.handle('video:keyframes', async (_e, path: string) => {
+    try {
+      return await keyframeTimes(path)
+    } catch {
+      return null
+    }
+  })
 
   // The videos beside a clip (the Inspector's folder browser) : one folder, top
   // level, hidden files skipped (a Mac's `._name.mp4` stubs), natural order (so

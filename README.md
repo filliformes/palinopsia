@@ -251,7 +251,12 @@ The selected video slot shows a full **transport** in the Inspector:
   **forward → reverse → pendulum** · **loop** (or play-once-and-hold) · **speed**
   1/64×–128× (log slider). The browser plays a clip natively from 1/16× up to 8×;
   slower and faster speeds step the frames by seeking, and a clip whose decoder
-  stalls at speed drops to that path on its own instead of freezing.
+  stalls at speed drops to that path on its own instead of freezing. On an ordinary
+  clip a seek decodes from the last keyframe (seconds on heavy footage), so when its
+  seeks run slow the player steps **keyframe to keyframe** from an index ffmpeg
+  builds once per file in the background : about 14-18 pictures a second at 16-64×
+  on 1080p camera footage, where exact seeks managed under one. The playhead lights
+  up while you drag it.
 - **◇ smooth scrub.** A **native** H.264/VP9/AV1 clip only seeks to keyframes, so
   reverse / pendulum / high-speed jump keyframe-to-keyframe. One press transcodes the
   clip once to the all-intra cache (with a progress badge) and swaps the slot to it : transport, FX and modulation are preserved, after which every direction and speed
@@ -406,7 +411,10 @@ now offers a **binary** throw (hard flip between the extremes) or **float**
 
 The **mod-matrix** holds up to **12** assignments (M# → target param, with a
 bipolar depth and a **Multiply** or **Replace** mode). Bindings are made from each
-parameter's **M** button in the Inspector or Meta tile. Modulation reaches
+parameter's **M** button in the Inspector or Meta tile. In the Modulation strip,
+**click an assignment chip to turn it off** (dimmed and struck through : the
+parameter sits at its own value, the depth and binding are kept) and click again to
+turn it back on. Modulation reaches
 **float, enum, and bool** inputs, plus the **video** targets (playhead / speed /
 loop / grain), the compositor-level **layer** controls (opacity / A-B mix /
 blend-mode, from the M chips on the layer strip), and per-**FX dry/wet opacity**, and is written straight to the compositor at frame rate, never through React

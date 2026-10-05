@@ -7,6 +7,8 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Click a modulation chip to turn it off** (and again to turn it back on) : the
+  assignment stays with its depth, its parameter sits at its own value meanwhile.
 - **Video : stop, scrub and browse.** A **■ stop** button (pause and back to the in
   point); click or drag anywhere on the timeline to move the playhead, playing or
   paused; a **clip** row (◀ / ▶ and a dropdown) steps through the other videos in the
@@ -374,6 +376,13 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Video above 8x froze on real footage** : each frame was an exact seek, which on an
+  ordinary (long-GOP) clip decodes from the previous keyframe : 0.5-3 s per seek on
+  heavy 1080p / 4K (measured), so the picture held for seconds. ffmpeg now indexes a
+  clip's keyframes once in the background, and when a clip's seeks run slow the player
+  steps keyframe to keyframe (each such seek decodes one frame) : 14-18 pictures a
+  second at 16-64x on camera-like 1080p, about 3 on clips with a keyframe only every 10
+  s. Reverse uses it too. The ◇ smooth copy still gives the most (about 40).
 - **Video speed** : 8× froze an ordinary (long-GOP) clip outright, and anything slower
   than 1/16× silently played at 1/16×. A clip now drops to frame-stepping when its
   decoder stalls at speed, and slow motion runs down to 1/64× (measured : 1/64, 1/28,
