@@ -94,6 +94,18 @@ The papers, books and standards the instrument draws on are listed in
 
 ## Getting started
 
+**Installing a release** : download it from the [releases page](https://github.com/filliformes/palinopsia/releases).
+
+- **macOS (Apple Silicon)** : the app is signed ad hoc, not notarized. Drag Palinopsia into
+  **Applications** first (run from the disk image or Downloads, macOS runs a hidden
+  temporary copy), then run `xattr -cr /Applications/Palinopsia.app` once in Terminal, or
+  open it and click **Open Anyway** in System Settings → Privacy & Security. Accept the
+  local network prompt on the first launch (OSC, NDI and light output need it), and the
+  camera / microphone prompts when you use them.
+- **Windows** : the installer or the portable exe; SmartScreen : More info → Run anyway.
+
+**Building from source** :
+
 ```bash
 npm install
 npm run dev          # electron-vite dev

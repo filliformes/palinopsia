@@ -72,15 +72,34 @@ nsis:
   allowToChangeInstallationDirectory: true
   deleteAppDataOnUninstall: false
 mac:
+  # Apple Silicon only, built on CI's macos-latest (arm64) runner, so ffmpeg-static
+  # bundles that runner's arm64 binary. No Intel build (its runners only ever
+  # blocked a release); Intel Macs build from source.
   target:
     - target: dmg
-  # No arch pin: electron-builder defaults to the build host's arch. CI builds
-  # mac twice — macos-latest (Apple Silicon → arm64) and macos-13 (Intel → x64) —
-  # so ffmpeg-static bundles the matching native binary in each dmg (a single
-  # "universal" dmg on the arm64 runner would ship an arm64-only ffmpeg that
-  # fails probe/convert/record on Intel Macs).
+      arch:
+        - arm64
   artifactName: ${productName}-${version}-mac-${arch}.${ext}
   category: public.app-category.music
+  # An ad-hoc signature ("-") : Apple Silicon refuses to run unsigned code, and
+  # electron-builder 26 no longer falls back to one by itself (26.15 skipped
+  # signing entirely : "Palinopsia is damaged"). Not notarized : see the README.
+  identity: "-"
+  # The hardened runtime only pays off with notarization, and without the camera
+  # and audio-input entitlements it would silently block the camera and the mic.
+  hardenedRuntime: false
+  # What macOS shows when it asks for each permission. Local network : OSC,
+  # OSCQuery, NDI, Art-Net / WLED and HIVE (macOS 15 blocks it silently otherwise).
+  extendInfo:
+    NSCameraUsageDescription: Palinopsia uses a camera as a live video source and for body tracking, only when you choose one.
+    NSMicrophoneUsageDescription: Palinopsia listens to an audio input to drive the picture and the sound, only when you choose one.
+    NSAudioCaptureUsageDescription: Palinopsia can capture the screen as a video source when you choose it.
+    NSLocalNetworkUsageDescription: Palinopsia sends and receives OSC, NDI video, Art-Net and WLED light data and HIVE streams on your local network.
+    NSDocumentsFolderUsageDescription: Palinopsia keeps its sessions and recordings in Documents/Palinopsia.
+    NSBonjourServices:
+      - _ndi._tcp
+      - _oscjson._tcp
+      - _osc._udp
 linux:
   target:
     - AppImage

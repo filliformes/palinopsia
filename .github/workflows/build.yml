@@ -72,6 +72,19 @@ jobs:
         run: sh native/syphon/build.sh
       - run: npm run typecheck
       - run: npm run ${{ matrix.script }}
+      # The mac app must carry an ad-hoc signature, its ffmpeg included : an
+      # unsigned app does not launch on Apple Silicon ("damaged").
+      - name: Verify the mac app's signature
+        if: matrix.platform == 'mac'
+        shell: bash
+        run: |
+          APP=$(ls -d release/*/mac-arm64/Palinopsia.app)
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dv "$APP" 2>&1 | grep -E "Signature|Identifier|Format"
+          codesign -dv "$APP" 2>&1 | grep -q "Signature=adhoc"
+          FF="$APP/Contents/Resources/app.asar.unpacked/node_modules/ffmpeg-static/ffmpeg"
+          file "$FF"
+          codesign --verify --strict "$FF"
       - uses: actions/upload-artifact@v4
         with:
           name: palinopsia-${{ matrix.os }}

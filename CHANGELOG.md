@@ -586,6 +586,16 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The macOS app is signed again (ad hoc).** electron-builder 26 no longer signs an app
+  ad hoc by itself : the CI build skipped signing entirely, and Apple Silicon refuses to
+  run unsigned code ("Palinopsia is damaged"). `identity: "-"` signs it, the hardened
+  runtime is off (it would silently block the camera and the microphone without
+  notarization), and CI now verifies the signature, the bundled ffmpeg included. The
+  app also declares why it asks for the camera, the microphone, the screen, Documents
+  and the local network (macOS 15 silently blocks OSC, NDI and light output without
+  that last one), and the build is pinned to arm64. The install steps (Applications
+  first, then `xattr -cr` or Open Anyway; right-click → Open stopped working in macOS
+  15) are in the README, the release notes and the site.
 - **A toggle could not be modulated : the Collage's freeze never froze under a
   modulator.** A toggle was assigned Multiply, whose law keeps a zero base at zero, so a
   modulator on a switch stored off did nothing at all; a switch stored on stayed on at
