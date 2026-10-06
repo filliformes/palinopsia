@@ -563,6 +563,12 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The first take after launching the app could come out empty.** The hardware H.264
+  encoder took 1.5 to 2.5 s to deliver its first frames the first time it was used, so a
+  first MP4 or ProRes take shorter than that saved nothing (1 cold start in 3, measured).
+  The app now warms the encoder up a few seconds after launch with a short hidden
+  recording of an offscreen canvas (no file, no toast) : the first take's first data now
+  arrives after about 0.6 s, 4 cold launches out of 4.
 - **The output shape always looked feathered.** Its edge faded over a fixed 0.8 % of the
   frame height whatever the resolution : ~7 px at 1080p and about 33 px on a 4096 dome
   master, a soft edge you could not turn off. It is now anti-aliased over about one pixel

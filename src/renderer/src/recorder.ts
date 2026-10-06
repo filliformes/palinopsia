@@ -85,6 +85,53 @@ function pickIntermediate(withAudio: boolean): { mime: string; ext: string; code
   )
 }
 
+/** Warm the video encoder up once, a few seconds after launch : the first take
+ *  of a session waited 1.5 to 2.5 s for the hardware H.264 encoder to start (a
+ *  take shorter than that came out EMPTY, 1 in 3 cold starts, measured). A
+ *  short hidden recording of an offscreen canvas, its data thrown away : no
+ *  file, no toast, the same codec as a real take, at 720p because a smaller
+ *  frame is handed to the software encoder and leaves the hardware one cold. */
+let warmed: Promise<void> | null = null
+export function warmUpEncoder(): Promise<void> {
+  if (warmed) return warmed
+  warmed = (async () => {
+    const inter = pickIntermediate(true) ?? pickIntermediate(false)
+    if (!inter) return
+    const cv = document.createElement('canvas')
+    cv.width = 1280
+    cv.height = 720
+    const g = cv.getContext('2d')
+    if (!g) return
+    let n = 0
+    let raf = 0
+    const draw = (): void => {
+      // a changing picture, or the canvas track sends no frames
+      g.fillStyle = `hsl(${(n++ * 7) % 360} 60% 50%)`
+      g.fillRect(0, 0, 1280, 720)
+      raf = requestAnimationFrame(draw)
+    }
+    draw()
+    const stream = cv.captureStream(30)
+    try {
+      const rec = new MediaRecorder(stream, { mimeType: inter.mime, videoBitsPerSecond: 2_000_000 })
+      await new Promise<void>((res) => {
+        const done = (): void => { window.clearTimeout(cap); res() }
+        // done at its first encoded data (the encoder is up), or after 6 s
+        rec.ondataavailable = (e): void => { if (e.data && e.data.size > 0) done() }
+        const cap = window.setTimeout(done, 6000)
+        rec.start(250)
+      })
+      if (rec.state !== 'inactive') rec.stop()
+    } catch {
+      /* best effort : a real take still works, just slower to start */
+    } finally {
+      cancelAnimationFrame(raf)
+      stream.getTracks().forEach((t) => t.stop())
+    }
+  })()
+  return warmed
+}
+
 export type RecordingFormat = { id: string; label: string; kind: 'realtime' | 'encoder' }
 
 /** Delivery formats offered to the UI : comes from main (ffmpeg-gated). */
