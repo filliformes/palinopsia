@@ -439,6 +439,14 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The previous session kept playing after a session change.** Loading a session (or
+  New) compiles its shaders a few per frame, and every layer still waiting its turn kept
+  drawing the OLD session's generator, so the projector showed the old visuals for
+  seconds, swapping layer by layer. Now the picture holds still until the new session
+  has compiled (spending more per frame while nobody watches it assemble), then
+  dissolves into it over 0.5 s. Measured with 21 shaders to compile : 2.2 s of old
+  visuals still playing (14 to 20 different frames) became about 1 s of still frame and
+  the dissolve (1.5 s to the new picture on the projector, at most 6 s held).
 - **A session could be overwritten without asking.** Load, Open, New, Generate and
   quitting silently saved the outgoing session into its file, so an experiment or a
   dice roll replaced the saved work. And after a crash **Restore** forgot which file

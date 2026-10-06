@@ -25,6 +25,25 @@ let pendingCrossfadeMs: number | null = null
 // the params morph live. (Matches the Metasurface's short jump-crossfade.)
 const STRUCT_XFADE_MS = 320
 
+// A WHOLE-composition replacement (a session loaded, New) : the engine holds the
+// last frame still until every new shader has compiled, then dissolves. Without
+// it, layers whose new shader was still waiting its turn in the per-frame compile
+// budget kept playing the OLD session for seconds, popping over one by one.
+let pendingSceneChange = false
+
+/** A session load / New : the render loop holds and dissolves (see above). */
+export function requestSceneChange(): void {
+  pendingSceneChange = true
+}
+
+/** The render loop calls this once per frame : true when a scene change was
+ *  requested since (and clears it). */
+export function consumeSceneChange(): boolean {
+  const v = pendingSceneChange
+  pendingSceneChange = false
+  return v
+}
+
 /** The render loop calls this once per frame; returns the ms for a crossfade
  *  that just began (and clears it), else null. */
 export function consumeCrossfade(): number | null {

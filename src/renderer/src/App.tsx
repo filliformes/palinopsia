@@ -65,7 +65,10 @@ import type { BodyGesture } from '@shared/types'
 import { SceneBank } from './components/SceneBank'
 import { SurfacePad, SurfaceOnToggle } from './components/SurfacePad'
 import { initOscInput, applyOscListen, applyOscOutput, initOscQueryStream } from './oscInput'
-import { morphedComposition, consumeCrossfade } from './morph'
+import { morphedComposition, consumeCrossfade, consumeSceneChange } from './morph'
+
+// A session change's dissolve, once the new session has compiled (Compositor.beginSceneChange).
+const SCENE_DISSOLVE_MS = 500
 import { surfaceComposition, nearestSurfaceScene, samplePath } from './surface'
 import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
@@ -1091,7 +1094,10 @@ export default function App(): JSX.Element {
         const st = useStore.getState()
         // A morph just began → dissolve the frozen old frame into the new scene.
         const xfadeMs = consumeCrossfade()
-        if (xfadeMs) comp!.beginCrossfade(xfadeMs)
+        // A session loaded / New : hold the old frame still until the new one has
+        // fully compiled, then dissolve (wins over a plain morph crossfade).
+        if (consumeSceneChange()) comp!.beginSceneChange(SCENE_DISSOLVE_MS)
+        else if (xfadeMs) comp!.beginCrossfade(xfadeMs)
         // Metasurface : when active, the engine renders a live Gaussian blend of the
         // placed scenes at the cursor (structure snaps to the nearest, numeric params
         // ease across the scenes that share it). A new nearest = a structure jump, so

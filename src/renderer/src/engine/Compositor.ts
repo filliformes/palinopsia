@@ -485,7 +485,9 @@ interface SharedGL {
   // ANGLE/D3D one compile+link can cost 100ms+, so once `until` passes no
   // further compiles start this frame (the first one always goes through, so
   // progress is guaranteed).
-  budget: { n: number; until: number };
+  // `deferred` counts loads pushed to a later frame by a spent budget (this
+  // frame's sync) : 0 = everything the composition asks for is loaded.
+  budget: { n: number; until: number; deferred: number };
   // Dry/wet blend for per-FX opacity : writes into a dedicated ping-pong so it
   // can't collide with the chain buffers. Set by the Compositor once its blend
   // program is ready. Returns the texture holding mix(dry, wet, opacity).
@@ -560,9 +562,18 @@ const LOADS_PER_FRAME = 12;
 // ms of compile time allowed per frame : one heavy (cache-miss) compile may
 // overshoot it, after which the rest of the queue defers to later frames.
 const LOAD_MS_PER_FRAME = 8;
-/** True when this frame's compile budget (count OR time) is exhausted. */
-function budgetSpent(b: { n: number; until: number }): boolean {
-  return b.n <= 0 || performance.now() >= b.until;
+// While a session change holds the screen still (beginSceneChange), nobody is
+// watching the new session assemble : spend more per frame so it is ready sooner.
+const LOAD_MS_PER_FRAME_HOLD = 150;
+const LOADS_PER_FRAME_HOLD = 64;
+// A session change never holds the old frame longer than this, ready or not.
+const SCENE_HOLD_MAX_MS = 6000;
+/** True when this frame's compile budget (count OR time) is exhausted. Every
+ *  caller defers a load when it is, so each `true` is one deferred load. */
+function budgetSpent(b: { n: number; until: number; deferred: number }): boolean {
+  const spent = b.n <= 0 || performance.now() >= b.until;
+  if (spent) b.deferred++;
+  return spent;
 }
 
 /** One live FX unit inside a rack. `isf` is null when the shader failed to
@@ -1440,6 +1451,11 @@ export class Compositor {
   private xfadeActive = false;
   private xfadeStartMs = -1;
   private xfadeMs = 0;
+  // Session change (beginSceneChange) : the frozen frame is HELD, not dissolved,
+  // until the new composition has no deferred loads two frames running.
+  private sceneHold = false;
+  private sceneHoldSince = -1;
+  private sceneSettled = 0;
   // The texture presented last frame : snapshotted into `snapshot` the moment a
   // crossfade begins (so no per-frame blit in the steady state).
   private lastPresent: WebGLTexture | null = null;
@@ -1512,7 +1528,7 @@ export class Compositor {
     }
     this.gl = gl;
     const wrapped = makeRedirectableGL(gl);
-    this.shared = { gl, rgl: wrapped.gl, redirect: wrapped.state, budget: { n: 0, until: 0 } };
+    this.shared = { gl, rgl: wrapped.gl, redirect: wrapped.state, budget: { n: 0, until: 0, deferred: 0 } };
     this.shared.scanMaps = (idx) => {
       if (!this.pbrLib) this.pbrLib = new PbrLib(this.gl);
       return this.pbrLib.get(idx);
@@ -1633,10 +1649,28 @@ export class Compositor {
    *  (old-scene) frame : snapshot it here rather than blitting every frame. */
   beginCrossfade(ms: number): void {
     if (ms <= 20) return;
-    if (this.lastPresent) this.copyInto(this.snapshot.fbo, this.lastPresent);
+    // (Already showing the snapshot : a hold or a dissolve in progress. Never copy
+    // a texture into its own framebuffer.)
+    if (this.lastPresent && this.lastPresent !== this.snapshot.tex) this.copyInto(this.snapshot.fbo, this.lastPresent);
     this.xfadeActive = true;
     this.xfadeStartMs = -1; // stamped on the next render (loop clock)
     this.xfadeMs = ms;
+  }
+
+  /** A whole new composition (a session loaded, New) : hold the frame on screen
+   *  still while the new one compiles (its shaders take their turns in the
+   *  per-frame budget : seconds for a big session, during which unready layers
+   *  would keep playing the OLD session), then dissolve into it over `ms`.
+   *  Called before this frame's syncFromState, like beginCrossfade. */
+  beginSceneChange(ms: number): void {
+    if (!this.lastPresent) return; // nothing on screen yet (the launch restore)
+    if (this.lastPresent !== this.snapshot.tex) this.copyInto(this.snapshot.fbo, this.lastPresent);
+    this.xfadeActive = true;
+    this.xfadeStartMs = -1;
+    this.xfadeMs = Math.max(40, ms);
+    this.sceneHold = true;
+    this.sceneHoldSince = -1;
+    this.sceneSettled = 0;
   }
 
   /** Freeze/unfreeze the presented frame (monomedia freeze-drop). */
@@ -2239,8 +2273,9 @@ export class Compositor {
 
   syncFromState(c: CompositionState, sourceById: (id: string) => string | null) {
     this.bpm = c.bpm || 120;
-    this.shared.budget.n = LOADS_PER_FRAME; // cap new shader compiles this frame
-    this.shared.budget.until = performance.now() + LOAD_MS_PER_FRAME; // ...and cap the time they take
+    this.shared.budget.n = this.sceneHold ? LOADS_PER_FRAME_HOLD : LOADS_PER_FRAME; // cap new shader compiles this frame
+    this.shared.budget.until = performance.now() + (this.sceneHold ? LOAD_MS_PER_FRAME_HOLD : LOAD_MS_PER_FRAME); // ...and cap the time they take
+    this.shared.budget.deferred = 0;
     for (let i = 0; i < this.layers.length && i < c.layers.length; i++) {
       const l = c.layers[i];
       const L = this.layers[i];
@@ -2849,7 +2884,15 @@ export class Compositor {
     // The only way a STRUCTURAL morph (Randomize All swaps shaders) can read as
     // a transition : parameter easing can't cross a shader change.
     let present = composite;
-    if (this.xfadeActive) {
+    if (this.xfadeActive && this.sceneHold) {
+      // Session change : hold until this frame's sync deferred nothing, twice
+      // running (the second lets fresh feedback buffers draw once), or the cap.
+      if (this.sceneHoldSince < 0) this.sceneHoldSince = timeMs;
+      this.sceneSettled = this.shared.budget.deferred === 0 ? this.sceneSettled + 1 : 0;
+      if (this.sceneSettled >= 2 || timeMs - this.sceneHoldSince > SCENE_HOLD_MAX_MS) this.sceneHold = false;
+      else present = this.snapshot.tex;
+    }
+    if (this.xfadeActive && !this.sceneHold) {
       if (this.xfadeStartMs < 0) this.xfadeStartMs = timeMs;
       let k = (timeMs - this.xfadeStartMs) / this.xfadeMs;
       if (k >= 1) {

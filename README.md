@@ -1021,6 +1021,11 @@ of “…”** brings one back, and Save puts it back in the file. A 60 s autosa
 session to the file it came from. **Save As** names the session after its file. Opening a session
 also **pre-converts every video in its folder** in the background.
 
+**Changing sessions is a clean cut.** Loading a session (or New) holds the picture still
+while the new session's shaders compile, then dissolves into it over half a second :
+the old session never keeps playing on the projector while the new one assembles layer
+by layer.
+
 **Scenes** are full-instrument snapshots recalled by bare **`1`–`9`** or a
 double-click in the bank; recall crossfades over the **MRPH** morph time. Scenes
 carry their sequencer tags and are saved inside the session.

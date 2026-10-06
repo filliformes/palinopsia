@@ -43,7 +43,7 @@ import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
 import { BLEND_MODES, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
-import { beginMorph, cancelMorph } from './morph'
+import { beginMorph, cancelMorph, requestSceneChange } from './morph'
 import { autoSurfacePos } from './surface'
 import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify'
 import { resetCouplingState } from './engine/coupling'
@@ -3912,6 +3912,7 @@ export const useStore = create<StoreState>((set, get) => ({
     // lands in undo history : an accidental New is one Ctrl+Z away.
     set((s) => {
       cancelMorph() // the composition is being replaced : stop any in-flight ease
+      requestSceneChange() // hold the last frame until the new one is ready, then dissolve
       resetCouplingState()
       // New session resets the section layout too: Meta/Modulation collapsed,
       // Master FX/Inspector open. Persist so it survives the next reload.
@@ -4013,6 +4014,7 @@ export const useStore = create<StoreState>((set, get) => ({
       return
     }
     cancelMorph() // replacing the whole composition : abort any in-flight morph
+    requestSceneChange() // hold the last frame until the new one is ready, then dissolve
     resetCouplingState()
     // Restore the session's World (self-contained → add to bank if missing).
     const cur = get()
