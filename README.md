@@ -798,8 +798,8 @@ The layer always shows the **newest** frame : when Palinopsia renders slower tha
 source, frames are skipped, never queued, so the picture cannot drift behind. The
 Inspector shows what arrives : picture size, frames per second, and how far behind the
 sender it is (when both clocks agree : the same computer, or synced clocks). Measured on
-the Aero : a 1080p source arrives ~45 ms behind at the source's full rate; a 4096×4096
-one ~110 ms behind with the app still at 53 fps. Sources that large are heavy for NDI's
+the Aero (on its integrated graphics, so a floor) : a 1080p source arrives ~45 ms behind
+at the source's full rate; a 4096×4096 one ~110 ms behind with the app still at 53 fps. Sources that large are heavy for NDI's
 own codec (about 15 fps on a laptop CPU) : send 1080p or 2K when motion matters.
 
 **NDI output** is

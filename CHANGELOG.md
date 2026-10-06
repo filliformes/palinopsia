@@ -15,7 +15,7 @@ that CI builds into cross-platform releases.
   same shaders ease their settings; Vibe, Context and Finalizer ease all along. A new
   layer fades in only once compiled (else the old shader flashed), and the fades are
   applied after every modulator so none overrides them. MRPH 0 : a cut once compiled.
-  Measured over 4 s : no still frames, brightness steady through the hand-over.
+  Measured over 4 s (integrated graphics) : no still frames, brightness steady through the hand-over.
 
 - **Context's light moves** : the light pad (now the composition's shape, and larger)
   takes the Metasurface's draw sequencer. **✎ draw** a path, **▶ play**, and the light
@@ -38,7 +38,8 @@ that CI builds into cross-platform releases.
   layers show one source; a session remembers the source by name and reconnects when it
   appears. Always the newest frame (NDI's frame sync : skipped, never queued, so it can't
   drift behind), copied off the main thread and turned the right way up on the GPU; the
-  Inspector shows size, fps and delay. Measured : a 1080p source ~45 ms behind at full
+  Inspector shows size, fps and delay. Measured (on the laptop's integrated graphics,
+  a floor) : a 1080p source ~45 ms behind at full
   rate; a 4096×4096 source ~110 ms behind with the app at 53 fps (the first version :
   580 ms behind and the whole app down to 17 fps). Listing never touches the camera.
 
@@ -485,7 +486,7 @@ that CI builds into cross-platform releases.
   drawing the OLD session's generator, so the projector showed the old visuals for
   seconds, swapping layer by layer. Now the picture holds still until the new session
   has compiled (spending more per frame while nobody watches it assemble), then
-  dissolves into it over 0.5 s. Measured with 21 shaders to compile : 2.2 s of old
+  dissolves into it over 0.5 s. Measured (integrated graphics) with 21 shaders to compile : 2.2 s of old
   visuals still playing (14 to 20 different frames) became about 1 s of still frame and
   the dissolve (1.5 s to the new picture on the projector, at most 6 s held).
 - **A session could be overwritten without asking.** Load, Open, New, Generate and
