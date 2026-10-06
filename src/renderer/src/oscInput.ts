@@ -78,12 +78,20 @@ import { visionBus, VISION_FEATURES } from './engine/visionIn'
 import { sequencerSkip } from './engine/sequencer'
 
 type Args = OscInEvent['args']
+// Sonify : the voices that read the picture (they have a tap), each voice's
+// octave span [lo min, lo max, hi min, hi max], and the Orbit shapes in UI order.
+const SONI_TAP_VOICES = { spectra: 1, orbit: 1, flow: 1, events: 1, raster: 1, sstv: 1, filter: 1, chord: 1 } as const
+const SONI_OCT_SPAN: Record<string, [number, number, number, number] | undefined> = {
+  spectra: [0, 4, 4, 8], flow: [1, 4, 4, 7], events: [1, 4, 4, 7], chord: [0, 4, 3, 8], collage: [0, 4, 3, 8], filter: [0, 4, 4, 8]
+}
+const ORBIT_RATIOS = [1, 2, 1.5, 1.3333333, 3]
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v))
 
 function firstNum(args: Args): number {
   const a = args[0]
   if (!a) return 0
-  if (typeof a.value === 'number') return a.value
+  // a NaN / Inf float is 0 : passed through, it latched Sonify voices to silence
+  if (typeof a.value === 'number') return Number.isFinite(a.value) ? a.value : 0
   if (a.value === true || a.value === 'true') return 1
   if (a.value === false || a.value === 'false') return 0
   const n = Number(a.value)
@@ -515,9 +523,29 @@ function route(address: string, args: Args): void {
       }
       const ctl = segs[3]
       if (!ctl) return
+      // /opsia/sonify/tap/a|b : what each image tap reads (0 master · 1..4 a layer)
+      if (g === 'tap') {
+        const t = ctl === 'b' ? 1 : 0
+        const v = idx(0, 4)
+        const taps = [...c.taps] as SoniConfig['taps']
+        taps[t] = v === 0 ? { kind: 'master', layer: 0 } : { kind: 'layer', layer: v - 1 }
+        apply({ ...c, taps })
+        return
+      }
       const V = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'fx'>(
         k: K, patch: Partial<SoniConfig[K]>
       ): void => apply({ ...c, [k]: { ...c[k], ...patch } })
+      // Every voice that reads the picture : which tap it listens to (0 A · 1 B).
+      if (ctl === 'tap' && g in SONI_TAP_VOICES) { V(g as 'spectra', { tap: idx(0, 1) }); return }
+      // Octave ranges : a raw octave (int) or 0..1 across the voice's span; the
+      // low end always stays below the high end.
+      const oct = SONI_OCT_SPAN[g]
+      if (oct && (ctl === 'looct' || ctl === 'hioct')) {
+        const vc = c[g as 'spectra'] as { loOct: number; hiOct: number }
+        if (ctl === 'looct') V(g as 'spectra', { loOct: Math.min(idx(oct[0], oct[1]), vc.hiOct - 1) })
+        else V(g as 'spectra', { hiOct: Math.max(idx(oct[2], oct[3]), vc.loOct + 1) })
+        return
+      }
       switch (g) {
         case 'spectra':
           if (ctl === 'on') V('spectra', { on: n >= 0.5 })
@@ -525,6 +553,7 @@ function route(address: string, args: Args): void {
           else if (ctl === 'pan') V('spectra', { pan: clamp01(n) * 2 - 1 })
           else if (ctl === 'sweep') V('spectra', { sweepOn: n >= 0.5 })
           else if (ctl === 'rate') V('spectra', { sweepHz: 0.02 * Math.pow(4 / 0.02, clamp01(n)), sync: false })
+          else if (ctl === 'sync') V('spectra', { sync: n >= 0.5 })
           else if (ctl === 'x') probe('spectraX')
           else if (ctl === 'contrast') V('spectra', { gamma: 0.5 + clamp01(n) * 3.5 })
           else if (ctl === 'breath') V('spectra', { breath: clamp01(n) })
@@ -542,6 +571,7 @@ function route(address: string, args: Args): void {
           else if (ctl === 'r') probe('orbitR')
           else if (ctl === 'drive') V('orbit', { drive: 0.2 + clamp01(n) * 3.8 })
           else if (ctl === 'smooth') V('orbit', { smooth: clamp01(n) })
+          else if (ctl === 'shape') V('orbit', { ratio: ORBIT_RATIOS[idx(0, ORBIT_RATIOS.length - 1)] })
           else if (ctl === 'quantize') V('orbit', { quantize: n >= 0.5 })
           return
         case 'flow':
@@ -598,6 +628,7 @@ function route(address: string, args: Args): void {
           else if (ctl === 'x') probe('filterX')
           else if (ctl === 'resonance') V('filter', { q: clamp01(n) })
           else if (ctl === 'noise') V('filter', { noise: clamp01(n) })
+          else if (ctl === 'loop') V('filter', { loop: clamp01(n) })
           else if (ctl === 'contrast') V('filter', { gamma: 0.5 + clamp01(n) * 3.5 })
           else if (ctl === 'linein') V('filter', { lineIn: n >= 0.5 })
           else if (ctl === 'path') V('filter', { path: idx(0, 3) })
@@ -795,6 +826,7 @@ interface Leaf {
   value: number
   desc: string
   stream: boolean
+  int?: boolean // an index : advertised and sent as an OSC int, read raw
 }
 
 /** Enumerate every OSC-addressable control with its CURRENT value. Shared by
@@ -805,6 +837,12 @@ function enumerateLeaves(): Leaf[] {
   const out: Leaf[] = []
   const add = (path: string, min: number, max: number, value: number, desc: string, stream = true): void => {
     out.push({ path, min, max, value, desc, stream })
+  }
+  // An index (root octave, a path, a voice count...) : its raw range, as an int.
+  // Advertised as a float, a client following the advertisement sent 4.0 for
+  // octave 4, which the inbound side read as 0..1 normalized (octave 6).
+  const addI = (path: string, min: number, max: number, value: number, desc: string): void => {
+    out.push({ path, min, max, value: Math.round(value), desc, stream: true, int: true })
   }
   const fxVal = (sid: string, name: string): number => {
     const inst = st.composition.master.find((f) => f.shaderId === sid)
@@ -865,7 +903,23 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/on', 0, 1, so.on ? 1 : 0, 'Sonify engine on (>= 0.5)')
     add('/opsia/sonify/master', 0, 1, so.master, 'Sonify master gain')
     add('/opsia/sonify/root', 0, 1, so.root / 11, 'Quantizer root (index over C..B)')
-    add('/opsia/sonify/rootoct', 1, 6, so.rootOct ?? 3, 'Root octave (global transpose)')
+    addI('/opsia/sonify/rootoct', 1, 6, so.rootOct ?? 3, 'Root octave (global transpose)')
+    const tapIdx = (t: SoniConfig['taps'][number]): number => (t.kind === 'master' ? 0 : t.layer + 1)
+    addI('/opsia/sonify/tap/a', 0, 4, tapIdx(so.taps[0]), 'Tap A reads : 0 master · 1..4 a layer')
+    addI('/opsia/sonify/tap/b', 0, 4, tapIdx(so.taps[1]), 'Tap B reads : 0 master · 1..4 a layer')
+    for (const v of Object.keys(SONI_TAP_VOICES) as Array<keyof typeof SONI_TAP_VOICES>) {
+      addI(`/opsia/sonify/${v}/tap`, 0, 1, so[v].tap, `${v === 'sstv' ? 'Transmission' : v[0].toUpperCase() + v.slice(1)} listens to : 0 tap A · 1 tap B`)
+    }
+    for (const [v, sp] of Object.entries(SONI_OCT_SPAN)) {
+      const vc = (so as unknown as Record<string, { loOct: number; hiOct: number }>)[v]
+      if (!vc || !sp) continue
+      const name = v[0].toUpperCase() + v.slice(1)
+      addI(`/opsia/sonify/${v}/looct`, sp[0], sp[1], vc.loOct, `${name} lowest octave`)
+      addI(`/opsia/sonify/${v}/hioct`, sp[2], sp[3], vc.hiOct, `${name} highest octave`)
+    }
+    add('/opsia/sonify/spectra/sync', 0, 1, so.spectra.sync ? 1 : 0, 'Spectra sweep synced to the tempo (one per bar)')
+    addI('/opsia/sonify/orbit/shape', 0, ORBIT_RATIOS.length - 1, Math.max(0, ORBIT_RATIOS.findIndex((r) => Math.abs(r - so.orbit.ratio) < 1e-3)), 'Orbit shape : 0 circle · 1 1:2 · 2 2:3 · 3 3:4 · 4 1:3')
+    add('/opsia/sonify/filter/loop', 0, 1, so.filter.loop ?? 0, 'Filter noise loop : 0 free noise · up = a frozen stretch replayed (flutter, then buzz)')
     const si = Math.max(0, SONI_SCALES.indexOf(so.scale))
     add('/opsia/sonify/scale', 0, 1, si / (SONI_SCALES.length - 1), 'Quantizer scale (index)')
     const norm = (param: string, v: number): number => {
@@ -876,22 +930,22 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/spectra/gain', 0, 1, so.spectra.gain, 'Spectra gain')
     add('/opsia/sonify/spectra/x', 0, 1, norm('spectraX', so.spectra.x), 'Spectra scan column')
     add('/opsia/sonify/spectra/breath', 0, 1, so.spectra.breath ?? 0, 'Spectra sine-noise morph')
-    add('/opsia/sonify/spectra/path', 0, 3, so.spectra.path ?? 0, 'Spectra reading path : 0 horizontal · 1 vertical · 2 radial · 3 spiral')
+    addI('/opsia/sonify/spectra/path', 0, 3, so.spectra.path ?? 0, 'Spectra reading path : 0 horizontal · 1 vertical · 2 radial · 3 spiral')
     add('/opsia/sonify/spectra/breathe', 0, 1, (so.spectra.pace ?? 0) / 0.95, 'Spectra breathing sweep pace')
     add('/opsia/sonify/orbit/on', 0, 1, so.orbit.on ? 1 : 0, 'Orbit voice on')
     add('/opsia/sonify/orbit/gain', 0, 1, so.orbit.gain, 'Orbit gain')
     // Free-Hz mode : advertise the ACTUAL pitch by converting the live freq to a
     // note number (mirrors sonify's freqNote), instead of a constant 45.
     add('/opsia/sonify/orbit/pitch', 0, 1, norm('orbitPitch', so.orbit.quantize ? so.orbit.note : 69 + 12 * Math.log2(Math.max(1, so.orbit.freq) / 440)), 'Orbit pitch (note span)')
-    add('/opsia/sonify/orbit/x', 0, 1, norm('orbitX', so.orbit.cx), 'Orbit centre x')
-    add('/opsia/sonify/orbit/y', 0, 1, norm('orbitY', so.orbit.cy), 'Orbit centre y')
+    add('/opsia/sonify/orbit/x', 0, 1, norm('orbitX', so.orbit.cx), 'Orbit center x')
+    add('/opsia/sonify/orbit/y', 0, 1, norm('orbitY', so.orbit.cy), 'Orbit center y')
     add('/opsia/sonify/orbit/r', 0, 1, norm('orbitR', so.orbit.rx), 'Orbit radius')
     add('/opsia/sonify/flow/on', 0, 1, so.flow.on ? 1 : 0, 'Flow voice on')
     add('/opsia/sonify/flow/gain', 0, 1, so.flow.gain, 'Flow gain')
-    add('/opsia/sonify/flow/colour', 0, 1, so.flow.colour ?? 0, 'Flow colour → grain timbre')
+    add('/opsia/sonify/flow/colour', 0, 1, so.flow.colour ?? 0.6, 'Flow color → grain timbre')
     add('/opsia/sonify/chord/on', 0, 1, so.chord.on ? 1 : 0, 'Chord bank on')
     add('/opsia/sonify/chord/gain', 0, 1, so.chord.gain, 'Chord gain')
-    add('/opsia/sonify/chord/voices', 2, 16, so.chord.voices, 'Chord note count')
+    addI('/opsia/sonify/chord/voices', 2, 16, so.chord.voices, 'Chord note count')
     add('/opsia/sonify/chord/swell', 0, 1, (so.chord.attack - 0.02) / 2.98, 'Chord attack (swell)')
     add('/opsia/sonify/chord/fade', 0, 1, (so.chord.release - 0.05) / 5.95, 'Chord release (fade)')
     add('/opsia/sonify/chord/tone', 0, 1, so.chord.tone, 'Chord tone (sine → bright)')
@@ -909,7 +963,7 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/fx/feedback', 0, 1, so.fx.dlyFb / 0.95, 'Delay feedback')
     add('/opsia/sonify/fx/delaytone', 0, 1, so.fx.dlyTone, 'Delay BBD tone')
     add('/opsia/sonify/fx/delaymix', 0, 1, so.fx.dlyMix, 'Delay level in the tail')
-    add('/opsia/sonify/fx/delaymode', 0, 2, so.fx.dlyMode, 'Delay routing : 0 mono · 1 stereo · 2 ping-pong')
+    addI('/opsia/sonify/fx/delaymode', 0, 2, so.fx.dlyMode, 'Delay routing : 0 mono · 1 stereo · 2 ping-pong')
     add('/opsia/sonify/fx/reverbmode', 0, 1, so.fx.rvMode, 'Reverb : 0 Quartz · 1 Prism')
     add('/opsia/sonify/fx/size', 0, 1, so.fx.rvSize, 'Reverb size')
     add('/opsia/sonify/fx/decay', 0, 1, so.fx.rvDecay, 'Reverb decay (RT60)')
@@ -922,7 +976,7 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/fx/reverbmix', 0, 1, so.fx.rvMix, 'Reverb level in the tail')
     add('/opsia/sonify/events/on', 0, 1, so.events.on ? 1 : 0, 'Events voice on')
     add('/opsia/sonify/events/gain', 0, 1, so.events.gain, 'Events gain')
-    add('/opsia/sonify/events/mode', 0, 2, so.events.mode === 'blend' ? 2 : so.events.mode === 'motion' ? 1 : 0, 'Events trigger : 0 spatial · 1 motion · 2 blend')
+    addI('/opsia/sonify/events/mode', 0, 2, so.events.mode === 'blend' ? 2 : so.events.mode === 'motion' ? 1 : 0, 'Events trigger : 0 spatial · 1 motion · 2 blend')
     add('/opsia/sonify/events/density', 0, 1, so.events.density, 'Events per instant')
     add('/opsia/sonify/events/decay', 0, 1, so.events.decay, 'Event note decay')
     add('/opsia/sonify/raster/on', 0, 1, so.raster.on ? 1 : 0, 'Raster voice on')
@@ -935,7 +989,7 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/filter/on', 0, 1, so.filter.on ? 1 : 0, 'Filter voice on')
     add('/opsia/sonify/filter/gain', 0, 1, so.filter.gain, 'Filter gain')
     add('/opsia/sonify/filter/x', 0, 1, norm('filterX', so.filter.x), 'Filter scan column')
-    add('/opsia/sonify/filter/path', 0, 3, so.filter.path ?? 0, 'Filter reading path : 0 horizontal · 1 vertical · 2 radial · 3 spiral')
+    addI('/opsia/sonify/filter/path', 0, 3, so.filter.path ?? 0, 'Filter reading path : 0 horizontal · 1 vertical · 2 radial · 3 spiral')
     add('/opsia/sonify/filter/breathe', 0, 1, (so.filter.pace ?? 0) / 0.95, 'Filter breathing sweep pace')
   }
   add('/opsia/bpm', 20, 800, st.composition.bpm, 'Tempo (raw BPM)')
@@ -1022,7 +1076,7 @@ export function oscLeafList(): Array<{ path: string; desc: string }> {
 export function publishOscQuery(): void {
   const nodes: OscQueryLeaf[] = enumerateLeaves().map((n) => ({
     full_path: n.path,
-    type: 'f',
+    type: n.int ? 'i' : 'f',
     range: { min: n.min, max: n.max },
     value: n.value,
     description: n.desc,
@@ -1059,7 +1113,7 @@ function pushFeedback(): void {
     // get cached here and then skipped forever (prev matches value on every later
     // tick), so anything past the cap would never reach Pandore.
     if (prev === undefined && sent > 96) continue
-    window.api.oscSend(host, port, leaf.path, [{ type: 'f', value: leaf.value }])
+    window.api.oscSend(host, port, leaf.path, [leaf.int ? { type: 'i', value: Math.round(leaf.value) } : { type: 'f', value: leaf.value }])
     lastSent.set(leaf.path, leaf.value)
     sent++
   }

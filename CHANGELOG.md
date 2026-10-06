@@ -7,6 +7,12 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Sonify's Filter voice gets a `loop`** : it replays one frozen stretch of its noise,
+  a few hundred milliseconds (a flutter) down to a few milliseconds (a buzz); 0 is free
+  noise. Its quantized band centres get their own octave range, Flow gets a pan slider,
+  and OSC gains the taps (`/sonify/tap/a|b`), each voice's `/tap`, `/looct` and `/hioct`,
+  `/spectra/sync`, `/orbit/shape` and `/filter/loop`.
+
 - **Effects travel between racks.** Right-click an effect's chip for **Copy to Master FX**
   or **Copy to Layer N FX**; or drag a chip from one rack onto another (a chip, or the
   `+ fx` box for the end) to move it, its modulation following, and hold Ctrl or Alt to
@@ -509,6 +515,76 @@ that CI builds into cross-platform releases.
   the shared page `<title>`; it now holds.)
 
 ### Fixed
+
+- **Sonify's Collage voice crossfades instead of cutting.** At every deal the sound
+  dropped to silence for 100 to 200 ms (measured), because a film loading its new clip
+  reads as paused and the voice paused its sound with it; and each piece was rewired to
+  its new film on the spot. Now a deal crossfades every piece (the old places and notes
+  fade out as the new ones come in, equal power) over the Collage's own crossfade time,
+  30 ms at 0; a film taking a new clip, or jumping (a window loop, a re-cue), hands over
+  between two players once the new one sounds. Over three deals the quietest 10 ms now
+  stays within 3 dB of the median, as with no deal at all. Deals faster than the
+  crossfade shorten it, so the fades never pile up.
+
+- **The Sonify audit** (three passes : the audio engine, the page and its links, the DSP) :
+  - **The noise repeated every 218 ms.** The noise generator's arithmetic lost its low
+    bits, so every seed fell into the same 10,466-sample cycle : the Filter voice's wind
+    was a 4.6 Hz loop (correlation 1.0 at that lag). It is true noise now; the loop is
+    the Filter's new `loop` knob if you miss it.
+  - **The reverb mix did nothing** : both reverb sliders, the `fxReverb` modulation and
+    OSC `/fx/reverbmix` were ignored. It works now, with 0.6 (the default) at exactly the
+    level the reverb always had.
+  - **Switching a voice clicked** (the sequencer did it in rhythm) : the jump at a
+    toggle measured 0.49, 4.7x the largest normal sample step; with a 5 ms fade, 0.06.
+    A voice coming back no longer restarts at its old level or fires the notes queued
+    while it was off.
+  - **Every slider move, OSC message and sequencer step wiped the modulation** for up to
+    50 ms (a modulated pitch or probe snapped to its base) : the modulated values now
+    follow every config.
+  - **The FX tail stopped mid-echo** after one quiet block, and the stranded echo came
+    back when the send rose again : it now plays out (stops once quiet for longer than
+    the delay time) and clears.
+  - **Events** : a busy frame let the onsets due in one block overwrite the same note
+    (only the last of five sounded); a stolen note cut with a click. Now each lands on
+    its own voice and a stolen note fades over 3 ms.
+  - **Notes past Nyquist** folded back out of key (a raised root octave put Spectra's top
+    partial at 59.7 kHz, heard at 11.7 kHz) and an Events note could run its phase away
+    into a thump and a dropout : Spectra and Chord partials past it go silent, Flow and
+    Events notes drop an octave; Filter bands above its ceiling drop by octaves instead
+    of stacking into one whistle.
+  - **Prism's freeze dulled** after any size change (a float32 glide stalled a fraction
+    of a sample short); the Orbit's Lissajous jumped every few minutes at high pitches;
+    the frame crossfade could jump (the Orbit now crossfades per sample); the master,
+    delay mix and voice gains stepped; Raster's tone switched hard into its open setting;
+    Flow ignored its pan; new Flow and Events onsets replaced still-pending ones; the
+    reverb's buffers clamped at 96 kHz; a NaN (from OSC) could silence a voice until a
+    restart.
+  - **The audio thread works a third as hard** : the oscillators and Flow's grains read
+    wave tables (the same sound within -120 dB, measured) : Flow 533 to 108 µs per block,
+    Spectra 191 to 73, Chord 68 to 17.
+  - **Turning Sonify on then off quickly** (a double tap, a momentary OSC button) left the
+    engine running under a page that said off; line-in never reopened after a restart;
+    two quick line-in requests could sum the mic twice; a failed start leaked an audio
+    context per retry; a voice switched on burst with motion against a stale frame; the
+    image ticks ran at an uneven 24-30 Hz; the sequencer drifted late; a step whose
+    preset was deleted or missing on this machine did nothing (it plays its voices now).
+    The Collage voice played a new film's first moments before syncing and left dropped
+    pieces attached to their film.
+  - **The page** : the probes were drawn and dragged over the mirror's black bars, not on
+    the picture (a held line at x 0 sat on the left bar); a held line dragged by x
+    whatever its path; the sweeps were drawn at the stored rate, not the synced or
+    modulated one; the Orbit drew a circle whatever its shape; a modulated Raster rect
+    couldn't be grabbed where it showed, and jumped its center onto the pointer.
+    The mixer's double-click reset every voice to 0.5 (now each one's default); older
+    sessions showed Flow's color at 0 while it played 0.6. Suggest could pick a voice set
+    silent on a still frame, and missed a Collage on the background or fed by assemblages.
+  - **OSC** advertised index addresses as floats over their raw range, so a client
+    following the advertisement sent 4.0 for octave 4 and got octave 6 : they are
+    advertised and sent as integers now. A NaN float is read as 0.
+  - **Copy** : the Sonify page names no tools or artists in its tooltips, spells color
+    and center, has no em dashes, and its sequencer columns are two letters (F/F and C/C
+    were twins). The Body page's gesture list can toggle the Collage voice, and the
+    MIDI label says Transmission.
 
 - **Sonify's stereo field.** The Chord, Flow and Events voices panned their notes with a
   linear law, so a note in the middle lost 3 dB against one at the side (measured), and

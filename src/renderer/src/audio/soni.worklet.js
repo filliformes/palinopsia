@@ -1,8 +1,9 @@
 // The Sonify AudioWorklet processor (plain JS : loaded via Vite ?url as a
 // module asset, added with audioContext.audioWorklet.addModule).
 //
-// One processor runs all eight voices (Spectra · Orbit · Flow · Events ·
-// Raster · Transmission · Filter · Chord) plus the master bus with an always-on peak limiter. Rules: zero allocation inside
+// One processor runs all nine voices (Spectra · Orbit · Flow · Events ·
+// Raster · Transmission · Filter · Chord · Collage) plus the master bus with an
+// always-on peak limiter. Rules: zero allocation inside
 // process(); no AudioParams (control flows through port messages); image
 // frames arrive as transferred Uint8Array luma grids, double-buffered and
 // crossfaded so 30Hz video never steps audibly; grain onsets are pre-dithered
@@ -15,36 +16,72 @@ const NEVENT = 24; // Events polyphony (plucked notes)
 const NBAND = 48; // Image-Filter band count
 const NCHORD = 16; // Chord bank max voices
 const TAU = 6.283185307179586;
+const NVOICE = 9;
+// Above this fraction of the sample rate a partial can't be played : it would
+// fold back as an out-of-key whistle (and an Events phase would run away).
+const NYQ_FRAC = 0.45;
+// A switched voice fades in / out over this long instead of cutting mid-cycle
+// (the sequencer toggles voices in rhythm : every step used to click).
+const GATE_S = 0.005;
 
-function clampf(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+// NaN-safe : a NaN (say from an OSC float) lands on `lo` instead of passing
+// through and latching a voice to silence.
+function clampf(v, lo, hi) { return v >= lo ? (v <= hi ? v : hi) : lo; }
+
+// Wave tables, read with a linear interpolation (error ~3e-7, far below
+// hearing) instead of Math.sin / Math.tanh per sample per partial : the Flow
+// grains and the oscillator banks were most of the audio thread's time.
+const TAB_N = 4096;
+function makeTable(f) { const t = new Float64Array(TAB_N + 1); for (let i = 0; i <= TAB_N; i++) t[i] = f(i / TAB_N); return t; }
+const SIN_T = makeTable((p) => Math.sin(p * TAU));
+const SH35_T = makeTable((p) => Math.tanh(3.5 * Math.sin(p * TAU))); // Flow's brightened grain
+const SH3_T = makeTable((p) => Math.tanh(3 * Math.sin(p * TAU))); // Chord's tone
+function tab(t, ph) {
+  const x = ph * TAB_N; const i = Math.floor(x); const f = x - i; const j = i & (TAB_N - 1);
+  return t[j] + (t[j + 1] - t[j]) * f;
+}
+function sinT(ph) { return tab(SIN_T, ph); }
+
+// Shared white noise (rand()'s LCG). Math.imul keeps the product exact : in
+// plain floating point the low bits rounded away and every seed fell into the
+// same 10,466-step cycle, so the Filter voice's "wind" repeated every 218 ms.
+// (That flutter is now the Filter's own `loop` knob, on purpose.)
+let noiseSeed = 1;
+function noise() { noiseSeed = (Math.imul(noiseSeed, 1103515245) + 12345) & 0x7fffffff; return noiseSeed / 0x40000000 - 1; }
 
 // ── Shared FX tail : reverb + analog delay, ported from the Essaim / Res
 // instruments (abl.dsp.quartz~ / abl.dsp.prism~ reverb + a BBD delay). ────────
 
 // Dual-mode modulated 8-line Hadamard FDN reverb (Quartz : dual-band damping ·
 // Prism : per-line frequency-dependent decay). Faithful port of res_reverb.c.
-const RV_NL = 8, RV_LMAX = 6144, RV_NAP = 4, RV_APMAX = 1024, RV_PDMAX = 12288;
+const RV_NL = 8, RV_NAP = 4, RV_APMAX = 1024;
 const RV_BASELEN = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617];
 const RV_APLEN = [225, 341, 441, 556];
 const RV_APG = [0.72, 0.70, 0.68, 0.66];
 class FDNReverb {
   constructor(sr) {
     this.sr = sr > 0 ? sr : 48000;
+    // Buffers sized from the sample rate : fixed 48k-sized lines clamped every
+    // line to the same length at 96k (a metallic comb), and the predelay to 128 ms.
+    this.lmax = Math.ceil(RV_BASELEN[RV_NL - 1] * 2 * this.sr / 44100) + 128;
+    this.pdmax = Math.ceil(0.26 * this.sr);
     this.mode = 0;
     this.size = 0.6; this.decay = 0.6; this.damp = 0.3; this.mix = 0.3;
     this.predelay_ms = 20; this.mod_depth = 6; this.mod_rate = 0.5; this.width = 1;
     this.diffusion = 0.85; this.low_damp = 0.5;
     this.crossover = 0.3; this.lowmult = 1; this.highmult = 1;
     this.freeze = 0; this.locut_hz = 220;
-    this.line = []; for (let i = 0; i < RV_NL; i++) this.line.push(new Float32Array(RV_LMAX));
-    this.linelen = new Int32Array(RV_NL); this.linelen_s = new Float32Array(RV_NL); this.lw = new Int32Array(RV_NL);
+    this.line = []; for (let i = 0; i < RV_NL; i++) this.line.push(new Float32Array(this.lmax));
+    // linelen_s is float64 : in float32 the size glide stalled ~0.2 samples short
+    // of its target, a fractional tap that dulled Prism's freeze after any size move.
+    this.linelen = new Int32Array(RV_NL); this.linelen_s = new Float64Array(RV_NL); this.lw = new Int32Array(RV_NL);
     this.damp_z = new Float32Array(RV_NL); this.lo_z = new Float32Array(RV_NL);
     this.ls_z = new Float32Array(RV_NL); this.hs_z = new Float32Array(RV_NL);
     this.gain = new Float32Array(RV_NL); this.glow = new Float32Array(RV_NL); this.ghigh = new Float32Array(RV_NL);
     this.modph = new Float64Array(RV_NL);
     this.ap = []; for (let i = 0; i < RV_NAP; i++) this.ap.push(new Float32Array(RV_APMAX));
     this.apw = new Int32Array(RV_NAP);
-    this.pd = [new Float32Array(RV_PDMAX), new Float32Array(RV_PDMAX)]; this.pdw = 0;
+    this.pd = [new Float32Array(this.pdmax), new Float32Array(this.pdmax)]; this.pdw = 0;
     this.hp_x = new Float32Array(2); this.hp_y = new Float32Array(2);
     this.ls_a = 0; this.hs_a = 0;
     this.d = new Float32Array(RV_NL); this.a = new Float32Array(RV_NL); this.fb = new Float32Array(RV_NL);
@@ -62,7 +99,7 @@ class FDNReverb {
     this.hs_a = 1 - Math.exp(-TAU * highsplit / this.sr);
     for (let i = 0; i < RV_NL; i++) {
       let L = (RV_BASELEN[i] * scale) | 0;
-      if (L < 8) L = 8; if (L > RV_LMAX - 64) L = RV_LMAX - 64;
+      if (L < 8) L = 8; if (L > this.lmax - 64) L = this.lmax - 64;
       this.linelen[i] = L;
       const t = L / this.sr;
       if (this.freeze) { this.gain[i] = this.glow[i] = this.ghigh[i] = 1; }
@@ -81,9 +118,10 @@ class FDNReverb {
     this.hp_x[0] = this.hp_x[1] = this.hp_y[0] = this.hp_y[1] = 0; this.wL = this.wR = 0;
   }
   lineRead(i, delay) {
-    let rp = this.lw[i] - delay; while (rp < 0) rp += RV_LMAX;
-    let i0 = rp | 0; const frac = rp - i0; if (i0 >= RV_LMAX) i0 -= RV_LMAX;
-    let i1 = i0 + 1; if (i1 >= RV_LMAX) i1 -= RV_LMAX;
+    const LM = this.lmax;
+    let rp = this.lw[i] - delay; while (rp < 0) rp += LM;
+    let i0 = rp | 0; const frac = rp - i0; if (i0 >= LM) i0 -= LM;
+    let i1 = i0 + 1; if (i1 >= LM) i1 -= LM;
     return this.line[i][i0] * (1 - frac) + this.line[i][i1] * frac;
   }
   process(inL, inR) {
@@ -93,16 +131,18 @@ class FDNReverb {
     const ingain = this.freeze ? 0 : 1;
     const lowkeep = clampf(1 - this.low_damp * 0.9, 0.05, 1);
     let locut_a = TAU * this.locut_hz / this.sr; if (locut_a > 0.5) locut_a = 0.5;
-    let pdlen = (this.predelay_ms * 0.001 * this.sr) | 0; if (pdlen < 1) pdlen = 1; if (pdlen > RV_PDMAX - 1) pdlen = RV_PDMAX - 1;
-    let rp = this.pdw - pdlen; while (rp < 0) rp += RV_PDMAX;
+    const PM = this.pdmax;
+    let pdlen = (this.predelay_ms * 0.001 * this.sr) | 0; if (pdlen < 1) pdlen = 1; if (pdlen > PM - 1) pdlen = PM - 1;
+    let rp = this.pdw - pdlen; while (rp < 0) rp += PM;
     const pdL = this.pd[0][rp], pdR = this.pd[1][rp];
-    this.pd[0][this.pdw] = inL; this.pd[1][this.pdw] = inR; this.pdw = (this.pdw + 1) % RV_PDMAX;
+    this.pd[0][this.pdw] = inL; this.pd[1][this.pdw] = inR; this.pdw = (this.pdw + 1) % PM;
     let x = 0.5 * (pdL + pdR);
     for (let i = 0; i < RV_NAP; i++) { const r = this.apw[i], g = RV_APG[i] * dscale, buf = this.ap[i][r], y = -g * x + buf; this.ap[i][r] = x + g * y; this.apw[i] = (r + 1) % RV_APLEN[i]; x = y; }
     const d = this.d;
     for (let i = 0; i < RV_NL; i++) {
       const mod = moddepth * Math.sin(TAU * this.modph[i]);
-      this.linelen_s[i] += (this.linelen[i] - this.linelen_s[i]) * 0.0006;
+      const dl = this.linelen[i] - this.linelen_s[i];
+      this.linelen_s[i] = dl > -1e-3 && dl < 1e-3 ? this.linelen[i] : this.linelen_s[i] + dl * 0.0006;
       d[i] = this.lineRead(i, this.linelen_s[i] - 2 - mod);
       this.modph[i] += this.mod_rate * (0.7 + 0.09 * i) / this.sr;
       if (this.modph[i] >= 1) this.modph[i] -= 1;
@@ -121,7 +161,7 @@ class FDNReverb {
         this.lo_z[i] += locut_a * (v - this.lo_z[i]); v = (v - this.lo_z[i]) + this.lo_z[i] * lowkeep;
       }
       if (v > 4) v = 4; else if (v < -4) v = -4;
-      this.line[i][this.lw[i]] = v; this.lw[i] = (this.lw[i] + 1) % RV_LMAX;
+      this.line[i][this.lw[i]] = v; this.lw[i] = (this.lw[i] + 1) % this.lmax;
     }
     const Lo = (d[0] - d[1] + d[2] - d[3] + d[6] - d[7]) * 0.4082;
     const Ro = (d[4] - d[5] + d[6] - d[7] + d[0] - d[2]) * 0.4082;
@@ -142,10 +182,13 @@ class BBDDelay {
     this.dlen = Math.floor(this.sr * 4);
     this.dbl = new Float32Array(this.dlen); this.dbr = new Float32Array(this.dlen); this.dw = 0;
     this.lp_l = 0; this.lp_r = 0; this.lp2_l = 0; this.lp2_r = 0; this.jit = 0;
-    this.mix = 0.3; this.rate = 0.3; this.rate_s = 0.3; this.fb = 0.35; this.tone = 0.5; this.mode = 1;
+    this.mix = 0.3; this.mixS = 0.3; this.rate = 0.3; this.rate_s = 0.3; this.fb = 0.35; this.tone = 0.5; this.mode = 1;
     this.wL = 0; this.wR = 0;
   }
-  reset() { this.dbl.fill(0); this.dbr.fill(0); this.dw = 0; this.lp_l = this.lp_r = this.lp2_l = this.lp2_r = 0; this.wL = this.wR = 0; }
+  reset() {
+    this.dbl.fill(0); this.dbr.fill(0); this.dw = 0; this.lp_l = this.lp_r = this.lp2_l = this.lp2_r = 0; this.wL = this.wR = 0;
+    if (!Number.isFinite(this.rate_s)) this.rate_s = this.rate;
+  }
   process(inL, inR) {
     this.rate_s += 0.0004 * (this.rate - this.rate_s);
     const delf = this.rate_s * this.sr; let rf = this.dw - delf; if (rf < 0) rf += this.dlen;
@@ -165,7 +208,8 @@ class BBDDelay {
     else if (this.mode === 2) { this.dbl[this.dw] = inR + fbr; this.dbr[this.dw] = inL + fbl; }
     else { this.dbl[this.dw] = inL + fbl; this.dbr[this.dw] = inR + fbr; }
     if (++this.dw >= this.dlen) this.dw = 0;
-    this.wL = Math.tanh(tl * 1.2) * this.mix; this.wR = Math.tanh(tr * 1.2) * this.mix;
+    this.mixS += (this.mix - this.mixS) * 0.002;
+    this.wL = Math.tanh(tl * 1.2) * this.mixS; this.wR = Math.tanh(tr * 1.2) * this.mixS;
   }
 }
 
@@ -234,6 +278,25 @@ class DJFilter {
   }
 }
 
+// Replace any non-finite number in an incoming config (an OSC NaN, a bad
+// preset) with the value it had, else 0 : one bad field used to latch a voice
+// to silence, or kill the whole FX tail, until the engine restarted.
+function sanitize(o, prev) {
+  for (const k in o) {
+    const v = o[k];
+    if (typeof v === 'number') {
+      if (!Number.isFinite(v)) { const p = prev ? prev[k] : undefined; o[k] = typeof p === 'number' && Number.isFinite(p) ? p : 0; }
+    } else if (v && typeof v === 'object' && !ArrayBuffer.isView(v)) sanitize(v, prev ? prev[k] : undefined);
+  }
+}
+// Keep only the scheduled onsets still in the future (compacted in place).
+function dropStale(list, now) {
+  let w = 0;
+  for (let i = 0; i < list.length; i++) if (list[i].t0 >= now) list[w++] = list[i];
+  list.length = w;
+}
+const PENDING_CAP = 512;
+
 class SoniProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -244,6 +307,7 @@ class SoniProcessor extends AudioWorkletProcessor {
         cur: new Float32Array(GRID * GRID),
         prev: new Float32Array(GRID * GRID),
         mix: 1, // 0 = prev … 1 = cur, advanced per quantum for interp
+        mix0: 1, // the mix at the start of this block (Orbit ramps it per sample)
         mixStep: 0.25,
         has: false
       });
@@ -257,7 +321,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       events:  { on: false, gain: 0.6, pan: 0, wave: 1, decay: 0.35, highs: 0.6 },
       raster:  { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
       sstv:    { on: false, tap: 0, gain: 0.5, pan: 0, lineHz: 12, dev: 1, syncLev: 0.5 },
-      filter:  { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0 },
+      filter:  { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, loop: 0, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0 },
       chord:   { on: false, tap: 0, gain: 0.6, pan: 0, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3 },
       collage: { on: false, gain: 0.7, pan: 0 },
       fx:      { send: 0, dlyMix: 0.35, dlyTime: 0.3, dlyFb: 0.35, dlyTone: 0.5, dlyMode: 1, rvMode: 0, rvMix: 0.6, rvSize: 0.6, rvDecay: 0.6, rvDamp: 0.3, rvPre: 20, rvMod: 6, rvModRate: 0.5, rvWidth: 1, rvLocut: 220, rvFreeze: false, rvDiff: 0.85, rvLowDamp: 0.5, rvCross: 0.3, rvLowMult: 1, rvHighMult: 1 }
@@ -270,23 +334,27 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.sTarget = new Float32Array(NPART);
     this.sNz = new Float32Array(NPART); // per-partial lowpassed noise (breath)
     this.sweepPos = 0;
-    this.noiseState = 1;
     // ── Orbit state ──
     this.oPhase = 0;
+    this.oYOff = 0; // the y phase carried across the x phase's wraps (Lissajous stays locked)
     this.dcX = 0; this.dcY = 0; // DC-blocker state
     this.oSlew = 0; // slewed sample for smooth
     // ── Flow grain pool ──
     this.grains = [];
     for (let g = 0; g < NGRAIN; g++) {
-      this.grains.push({ on: false, t0: 0, phase: 0, inc: 0, amp: 0, pan: 0.5, age: 0, dur: 0.1, noise: 0, bright: 0, warm: 0, phase2: 0, inc2: 0 });
+      this.grains.push({ on: false, t0: 0, phase: 0, inc: 0, amp: 0, pan: 0.5, age: 0, dur: 0.1, invDur: 10, noise: 0, bright: 0, warm: 0, phase2: 0, inc2: 0 });
     }
     this.pending = []; // scheduled grain events (small, replaced per flow msg)
     // ── Events poly pool (plucked notes from edges / motion) ──
     this.notes = [];
     for (let k = 0; k < NEVENT; k++) {
-      this.notes.push({ on: false, phase: 0, inc: 0, amp: 0, pan: 0.5, wave: 0, env: 0, atkInc: 1, decMul: 0.999, attacking: false });
+      this.notes.push({ on: false, phase: 0, inc: 0, amp: 0, pan: 0.5, wave: 0, env: 0, atkInc: 1, decMul: 0.999, attacking: false, born: -1, lastL: 0, lastR: 0 });
     }
     this.evPending = []; // scheduled note onsets [{t0, freq, amp, pan}]
+    // a stolen note's last sample, faded over ~3 ms so the steal doesn't click
+    this.evDcL = 0; this.evDcR = 0;
+    this.evDcK = Math.exp(-1 / (0.003 * sampleRate));
+    this.block = 0; // render-quantum counter (a note born this block is never stolen)
     // ── Raster state ──
     this.rPtr = 0; // read pointer in probe pixels (row-major, wraps)
     this.rDcX = 0; this.rDcY = 0;
@@ -304,6 +372,11 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.fGain = new Float32Array(NBAND); // slewed image gains
     this.fTarget = new Float32Array(NBAND);
     this.fSweep = 0;
+    // `loop` : a frozen stretch of noise replayed (0 = free noise). Short loops
+    // buzz, ~200 ms flutters (the old noise's accidental cycle, now a choice).
+    this.fLoopBuf = new Float32Array(Math.ceil(0.4 * sampleRate));
+    for (let i = 0; i < this.fLoopBuf.length; i++) this.fLoopBuf[i] = noise();
+    this.fLoopPos = 0;
     this.rebuildFilterCoefs();
     // ── Chord bank (scale-tuned oscillators following brightness bands) ──
     this.chordFreqs = new Float32Array(NCHORD);
@@ -321,16 +394,24 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.rvRecompute = { size: -1, decay: -1, cross: -1, freeze: -1, low: -1, high: -1 };
     this.delay = new BBDDelay(sampleRate);
     this.fxSend = 0; this.fxSendS = 0; this.fxRinging = false; // global send + smoothing + tail ring-out
+    this.fxQuiet = 0; // seconds the tail has been silent
     // ── mixer : per-voice DJ filter (volume = each voice's own gain) ──
     // Order matches the voice-render order below : spectra·orbit·flow·events·
     // raster·sstv·filter·chord. Voices render into vL/vR then flush through their
     // filter into the master (mixVoice).
-    this.djf = []; for (let i = 0; i < 9; i++) this.djf.push(new DJFilter()); // + Collage (input 1)
+    this.djf = []; for (let i = 0; i < NVOICE; i++) this.djf.push(new DJFilter()); // + Collage (input 1)
     this.vL = new Float32Array(128); this.vR = new Float32Array(128);
+    // ── voice gates + gains : a voice switching on/off fades over GATE_S, and
+    // its gain ramps across the block (both used to step : clicks, zipper) ──
+    this.gate = new Float32Array(NVOICE);
+    this.gateLive = new Uint8Array(NVOICE);
+    this.gateStep = 1 / Math.max(1, GATE_S * sampleRate);
+    this.vGain = new Float32Array(NVOICE).fill(-1); // -1 = not yet set : start at the target
+    this.mgS = -1; // master gain, ramped the same way
     // ── limiter ──
     this.limEnv = 1;
     // ── metering (sent back ~10Hz) ──
-    this.peak = 0; this.lastMeter = 0;
+    this.peak = 0; this.lastMeter = 0; this.limMin = 1;
     this.port.onmessage = (e) => this.onMsg(e.data);
   }
 
@@ -338,18 +419,28 @@ class SoniProcessor extends AudioWorkletProcessor {
     if (m.t === 'grid') {
       const tap = this.taps[m.tap];
       if (!tap) return;
-      // prev <- cur, cur <- new (converted), restart the interp ramp
-      const p = tap.prev; tap.prev = tap.cur; tap.cur = p;
       const d = m.data; // Uint8Array luma
-      const c = tap.cur;
-      for (let i = 0; i < c.length; i++) c[i] = d[i] * 0.00392156862745098;
-      tap.mix = 0;
+      const p = tap.prev, c = tap.cur;
+      if (tap.mix < 1) {
+        // The last crossfade hadn't finished (ticks alternate 33 / 50 ms) : start
+        // the new one from what is heard now, prev↔cur at the current mix,
+        // instead of jumping to cur.
+        const mx = tap.mix;
+        for (let i = 0; i < p.length; i++) p[i] += (c[i] - p[i]) * mx;
+        for (let i = 0; i < c.length; i++) c[i] = d[i] * 0.00392156862745098;
+      } else {
+        // prev <- cur, cur <- new (converted)
+        tap.prev = c; tap.cur = p;
+        for (let i = 0; i < p.length; i++) p[i] = d[i] * 0.00392156862745098;
+      }
+      tap.mix = 0; tap.mix0 = 0;
       // reach mix=1 over ~one frame interval (given ~375 quanta/s)
       tap.mixStep = Math.min(1, (m.dt || 0.033) > 0 ? (128 / sampleRate) / (m.dt || 0.033) : 0.25);
       tap.has = true;
       return;
     }
     if (m.t === 'cfg') {
+      sanitize(m.cfg, this.cfg);
       this.cfg = m.cfg;
       if (m.spectraFreqs) this.spectraFreqs.set(m.spectraFreqs);
       if (m.filterFreqs) { this.fFreqs.set(m.filterFreqs); this.rebuildFilterCoefs(); }
@@ -362,6 +453,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       // Per-tick probe overlay : shallow-merge effective values into the live
       // voice configs (sent every tick, so releases revert cleanly).
       const mm = m.m;
+      sanitize(mm, this.cfg);
       for (const k in mm) {
         const dst = this.cfg[k];
         if (dst) Object.assign(dst, mm[k]);
@@ -373,29 +465,32 @@ class SoniProcessor extends AudioWorkletProcessor {
     if (m.t === 'flow') {
       // events: flat Float32Array [tOffset, freq, amp, pan, bright, warm] × n
       // (already dithered + quantized by the main thread; bright/warm = colour)
+      // APPENDED : grains dithered late in the last frame are still due when the
+      // next batch arrives early. Capped (oldest out) in case nothing drains it.
       const ev = m.events;
-      this.pending.length = 0;
       const base = currentTime;
       for (let i = 0; i + 5 < ev.length; i += 6) {
         this.pending.push({ t0: base + ev[i], freq: ev[i + 1], amp: ev[i + 2], pan: ev[i + 3], bright: ev[i + 4], warm: ev[i + 5] });
       }
+      if (this.pending.length > PENDING_CAP) this.pending.splice(0, this.pending.length - PENDING_CAP);
       return;
     }
     if (m.t === 'events') {
       // events: flat Float32Array [tOffset, freq, amp, pan] × n (dithered +
       // quantized by the main thread) → scheduled discrete note onsets.
       const ev = m.events;
-      this.evPending.length = 0;
       const base = currentTime;
       for (let i = 0; i + 3 < ev.length; i += 4) {
         this.evPending.push({ t0: base + ev[i], freq: ev[i + 1], amp: ev[i + 2], pan: ev[i + 3] });
       }
+      if (this.evPending.length > PENDING_CAP) this.evPending.splice(0, this.evPending.length - PENDING_CAP);
       return;
     }
   }
 
   // Bilinear sample of a tap's interpolated grid at normalized (x, y).
-  terrain(tap, x, y) {
+  terrain(tap, x, y) { return this.terrainM(tap, x, y, tap.mix); }
+  terrainM(tap, x, y, m) {
     if (!tap.has) return 0;
     x = x < 0 ? 0 : x > 1 ? 1 : x;
     y = y < 0 ? 0 : y > 1 ? 1 : y;
@@ -404,7 +499,7 @@ class SoniProcessor extends AudioWorkletProcessor {
     const x1 = x0 + 1 < GRID ? x0 + 1 : x0, y1 = y0 + 1 < GRID ? y0 + 1 : y0;
     const ax = fx - x0, ay = fy - y0;
     const i00 = y0 * GRID + x0, i10 = y0 * GRID + x1, i01 = y1 * GRID + x0, i11 = y1 * GRID + x1;
-    const c = tap.cur, pv = tap.prev, m = tap.mix;
+    const c = tap.cur, pv = tap.prev;
     const sc = (c[i00] * (1 - ax) + c[i10] * ax) * (1 - ay) + (c[i01] * (1 - ax) + c[i11] * ax) * ay;
     const sp = (pv[i00] * (1 - ax) + pv[i10] * ax) * (1 - ay) + (pv[i01] * (1 - ax) + pv[i11] * ax) * ay;
     return sp + (sc - sp) * m;
@@ -437,8 +532,13 @@ class SoniProcessor extends AudioWorkletProcessor {
     // tone filter uses — so raising root octave / hiOct can't push a band past the
     // stable region and blow fLow/fBand to Inf→NaN. (A far-above cap of sr*0.45
     // gave no protection and latched the whole voice to silence.)
+    // Bands above the cap drop by octaves (same note, lower) : clamped, they all
+    // stacked on the cap's one frequency and summed into a whistle.
+    const cap = sampleRate / 6.5;
     for (let i = 0; i < NBAND; i++) {
-      this.fCoef[i] = 2 * Math.sin(Math.PI * Math.min(this.fFreqs[i], sampleRate / 6.5) / sampleRate);
+      let f = this.fFreqs[i];
+      while (f > cap) f *= 0.5;
+      this.fCoef[i] = 2 * Math.sin(Math.PI * f / sampleRate);
     }
   }
 
@@ -471,20 +571,47 @@ class SoniProcessor extends AudioWorkletProcessor {
     }
   }
 
-  // Flush a voice's scratch (vL/vR) through its DJ filter into the master, then
-  // zero the scratch so the next voice starts clean (no per-voice pre-fill).
-  mixVoice(idx, vL, vR, outL, outR, n) {
+  // Whether voice `idx` renders this block : while it's on, and while its gate
+  // is still fading out after it went off. A voice coming back from silence
+  // starts clean (voiceStart).
+  voiceLive(idx, on) {
+    const live = on || this.gate[idx] > 0;
+    if (live && !this.gateLive[idx]) this.voiceStart(idx);
+    this.gateLive[idx] = live ? 1 : 0;
+    return live;
+  }
+  // A voice switching back on : no old amplitudes to restart at full level, no
+  // onsets queued while it was off all firing in its first block.
+  voiceStart(idx) {
+    const now = currentTime;
+    if (idx === 0) this.sAmp.fill(0);
+    else if (idx === 2) { for (let g = 0; g < NGRAIN; g++) this.grains[g].on = false; dropStale(this.pending, now); }
+    else if (idx === 3) { for (let k = 0; k < NEVENT; k++) this.notes[k].on = false; dropStale(this.evPending, now); this.evDcL = this.evDcR = 0; }
+    else if (idx === 7) this.cAmp.fill(0);
+  }
+
+  // Flush a voice's scratch (vL/vR) through its gate, gain and DJ filter into
+  // the master, then zero the scratch so the next voice starts clean.
+  mixVoice(idx, on, gain, vL, vR, outL, outR, n) {
     const f = this.djf[idx];
     f.update(); // glide the DJ-filter cutoff toward its target (anti-pop)
+    let g = this.gate[idx];
+    const gt = on ? 1 : 0, gs = this.gateStep;
+    const v1 = clampf(gain, 0, 4);
+    let v0 = this.vGain[idx]; if (v0 < 0) v0 = v1;
+    const dv = (v1 - v0) / n;
     // Sanitize : a bad param can make a voice go NaN/Inf; if that reached the
     // master or the FX-tail feedback it would silence everything permanently.
     for (let s = 0; s < n; s++) {
       let l = vL[s], r = vR[s];
       if (!Number.isFinite(l)) l = 0;
       if (!Number.isFinite(r)) r = 0;
-      l = f.procL(l); r = f.procR(r); // always filter (unity in bypass) : keeps state warm, click-free
+      if (g !== gt) g = g < gt ? (g + gs < gt ? g + gs : gt) : (g - gs > gt ? g - gs : gt);
+      const k = g * (v0 + dv * (s + 1));
+      l = f.procL(l * k); r = f.procR(r * k); // always filter (unity in bypass) : keeps state warm, click-free
       outL[s] += l; outR[s] += r; vL[s] = 0; vR[s] = 0;
     }
+    this.gate[idx] = g; this.vGain[idx] = v1;
   }
 
   // Nearest-pixel read of a tap's CURRENT grid (the Raster voice wants the
@@ -506,17 +633,21 @@ class SoniProcessor extends AudioWorkletProcessor {
     const L = this.vL, R = this.vR;
     const cfg = this.cfg;
     const dt = 1 / sampleRate;
+    const nyq = NYQ_FRAC * sampleRate;
+    this.block++;
 
     // Advance each tap's frame-interpolation ramp (prev → cur crossfade) :
     // one step per quantum, sized on receipt to span one video frame.
     for (let t = 0; t < this.taps.length; t++) {
       const tap = this.taps[t];
+      tap.mix0 = tap.mix;
       if (tap.mix < 1) tap.mix = Math.min(1, tap.mix + tap.mixStep);
     }
 
     // ── SPECTRA : partial bank riding a column of the frame ──
     const sp = cfg.spectra;
-    if (sp.on) {
+    const spLive = this.voiceLive(0, sp.on);
+    if (spLive) {
       const tap = this.taps[sp.tap] || this.taps[0];
       // advance the sweep once per quantum (375Hz update is plenty)
       if (sp.sweepOn) {
@@ -531,14 +662,16 @@ class SoniProcessor extends AudioWorkletProcessor {
       for (let i = 0; i < NPART; i++) {
         this.scanXY(path, pos, (i + 0.5) / NPART);
         const v = this.terrain(tap, this.sxy[0], this.sxy[1]);
-        this.sTarget[i] = Math.pow(v, sp.gamma);
+        // a partial past Nyquist is silent (it would fold back out of key)
+        this.sTarget[i] = this.spectraFreqs[i] > nyq ? 0 : Math.pow(v, sp.gamma);
       }
       // synthesize : slewed additive bank (slew kills zipper + clicks)
       const slew = 1 - Math.exp(-n * dt / 0.02);
-      const gL = sp.gain * (1 - Math.max(0, sp.pan)) * 0.12;
-      const gR = sp.gain * (1 + Math.min(0, sp.pan)) * 0.12;
+      const gL = (1 - Math.max(0, sp.pan)) * 0.12;
+      const gR = (1 + Math.min(0, sp.pan)) * 0.12;
       for (let i = 0; i < NPART; i++) {
-        const a0 = this.sAmp[i] + (this.sTarget[i] - this.sAmp[i]) * slew;
+        let a0 = this.sAmp[i] + (this.sTarget[i] - this.sAmp[i]) * slew;
+        if (!(a0 > 1e-12)) a0 = 0; // NaN and denormals → 0
         this.sAmp[i] = a0;
         if (a0 < 0.003) { // silent partial : keep phase running cheaply
           this.sPhase[i] = (this.sPhase[i] + this.spectraFreqs[i] * n * dt) % 1;
@@ -553,17 +686,15 @@ class SoniProcessor extends AudioWorkletProcessor {
           // flutters its amplitude — sine → breathy band per partial.
           let nz = this.sNz[i];
           for (let s = 0; s < n; s++) {
-            this.noiseState = (this.noiseState * 1103515245 + 12345) & 0x7fffffff;
-            const w = this.noiseState / 0x40000000 - 1;
-            nz = nz * 0.985 + w * 0.015;
-            const v = Math.sin(ph * 6.283185307179586) * a0 * (1 + br * nz * 6);
+            nz = nz * 0.985 + noise() * 0.015;
+            const v = sinT(ph) * a0 * (1 + br * nz * 6);
             L[s] += v * gL; R[s] += v * gR;
             ph += inc * (1 + br * nz * 3);
           }
           this.sNz[i] = nz;
         } else {
           for (let s = 0; s < n; s++) {
-            const v = Math.sin(ph * 6.283185307179586) * a0;
+            const v = sinT(ph) * a0;
             L[s] += v * gL; R[s] += v * gR;
             ph += inc;
           }
@@ -572,22 +703,26 @@ class SoniProcessor extends AudioWorkletProcessor {
       }
     }
 
-    if (sp.on) this.mixVoice(0, L, R, outL, outR, n);
+    if (spLive) this.mixVoice(0, sp.on, sp.gain, L, R, outL, outR, n);
 
     // ── ORBIT : wave terrain — the frame IS the waveform ──
     const ob = cfg.orbit;
-    if (ob.on) {
+    const obLive = this.voiceLive(1, ob.on);
+    if (obLive) {
       const tap = this.taps[ob.tap] || this.taps[0];
       const inc = ob.freq * dt;
-      const gL = ob.gain * (1 - Math.max(0, ob.pan)) * 0.8;
-      const gR = ob.gain * (1 + Math.min(0, ob.pan)) * 0.8;
+      const gL = (1 - Math.max(0, ob.pan)) * 0.8;
+      const gR = (1 + Math.min(0, ob.pan)) * 0.8;
       const sm = Math.pow(0.5, 1 / (1 + ob.smooth * 48)); // one-pole smooth
+      const ratio = ob.ratio;
+      // the frame crossfade, ramped per SAMPLE here (a per-block step was a
+      // 375 Hz staircase in a voice that reads the image at audio rate)
+      const m0 = tap.mix0, dm = (tap.mix - tap.mix0) / n;
       for (let s = 0; s < n; s++) {
         this.oPhase += inc;
-        const a = this.oPhase * 6.283185307179586;
-        const x = ob.cx + ob.rx * Math.cos(a);
-        const y = ob.cy + ob.ry * Math.sin(a * ob.ratio);
-        let v = this.terrain(tap, x, y);
+        const x = ob.cx + ob.rx * Math.cos(this.oPhase * TAU);
+        const y = ob.cy + ob.ry * Math.sin((this.oPhase * ratio + this.oYOff) * TAU);
+        let v = this.terrainM(tap, x, y, m0 + dm * (s + 1));
         // one-pole smooth (band-limits the terrain edges a touch)
         this.oSlew = this.oSlew * sm + v * (1 - sm);
         v = this.oSlew;
@@ -597,14 +732,19 @@ class SoniProcessor extends AudioWorkletProcessor {
         const shaped = Math.tanh(hp * ob.drive * 3);
         L[s] += shaped * gL; R[s] += shaped * gR;
       }
-      if (this.oPhase > 1e6) this.oPhase %= 1;
+      // Wrap x every block and carry the whole cycles into the y phase : the old
+      // `oPhase %= 1` at 1e6 dropped cycles from x but not from x·ratio, and a
+      // Lissajous jumped up to half a cycle.
+      const k = Math.floor(this.oPhase);
+      if (k) { this.oPhase -= k; this.oYOff = (this.oYOff + k * ratio) % 1; }
     }
 
-    if (ob.on) this.mixVoice(1, L, R, outL, outR, n);
+    if (obLive) this.mixVoice(1, ob.on, ob.gain, L, R, outL, outR, n);
 
     // ── FLOW : grain cloud from the motion field ──
     const fl = cfg.flow;
-    if (fl.on) {
+    const flLive = this.voiceLive(2, fl.on);
+    if (flLive) {
       // activate pending events whose time has come, retaining the rest by
       // compacting in place (a write index) — Array.splice would allocate a
       // throwaway array on every removal inside this render quantum.
@@ -617,9 +757,11 @@ class SoniProcessor extends AudioWorkletProcessor {
             const gr = this.grains[g];
             if (!gr.on) {
               gr.on = true; gr.age = 0; gr.phase = Math.random();
-              gr.inc = ev.freq * dt;
+              let f = ev.freq; while (f > nyq) f *= 0.5; // past Nyquist : an octave down, same note
+              gr.inc = f * dt;
               gr.amp = ev.amp; gr.pan = ev.pan;
               gr.dur = fl.dur * (0.7 + Math.random() * 0.6);
+              gr.invDur = 1 / gr.dur;
               gr.noise = fl.noise;
               // colour → timbre : bright = waveshape drive, warm picks the tint
               // partial (sub-octave body when warm, octave-up shimmer when cool).
@@ -627,6 +769,7 @@ class SoniProcessor extends AudioWorkletProcessor {
               gr.warm = ev.warm || 0;
               gr.phase2 = Math.random();
               gr.inc2 = gr.inc * (gr.warm >= 0 ? 0.5 : 2);
+              while (gr.inc2 > NYQ_FRAC) gr.inc2 *= 0.5;
               break;
             }
           }
@@ -635,39 +778,43 @@ class SoniProcessor extends AudioWorkletProcessor {
         }
       }
       this.pending.length = pw;
-      const g0 = fl.gain * 0.5;
+      const g0 = 0.5;
       const colAmt = fl.colour || 0;
+      const fpan = (fl.pan || 0) * 0.5; // the voice's pan shifts every grain, as Events does
       for (let g = 0; g < NGRAIN; g++) {
         const gr = this.grains[g];
         if (!gr.on) continue;
-        const gL = g0 * panGL(gr.pan);
-        const gR = g0 * panGR(gr.pan);
+        let gp = gr.pan + fpan; gp = gp < 0 ? 0 : gp > 1 ? 1 : gp;
+        const gL = g0 * panGL(gp);
+        const gR = g0 * panGR(gp);
         // colour → timbre (0 when colour off ⇒ identical to the plain grain).
         const eb = gr.bright * colAmt; // waveshape drive : vivid colour = edgier
         const tintAmt = Math.abs(gr.warm) * colAmt * 0.5; // sub-oct / oct-up blend
+        const gn = gr.noise, inv = gr.invDur;
         for (let s = 0; s < n; s++) {
           gr.age += dt;
           if (gr.age >= gr.dur) { gr.on = false; break; }
-          // raised-cosine envelope
-          const e = 0.5 - 0.5 * Math.cos(6.283185307179586 * Math.min(1, gr.age / gr.dur));
-          let s0 = Math.sin(gr.phase * 6.283185307179586);
-          if (eb > 0.001) s0 = s0 * (1 - eb) + Math.tanh(3.5 * s0) * eb * 0.85; // brighten
-          if (tintAmt > 0.001) { s0 = s0 * (1 - tintAmt) + Math.sin(gr.phase2 * 6.283185307179586) * tintAmt; gr.phase2 += gr.inc2; }
+          // raised-cosine envelope : 0.5 - 0.5·cos(2πu) = sin²(πu)
+          const se = sinT(gr.age * inv * 0.5);
+          const e = se * se;
+          let s0 = sinT(gr.phase);
+          if (eb > 0.001) s0 = s0 * (1 - eb) + tab(SH35_T, gr.phase) * eb * 0.85; // brighten : tanh(3.5·sin)
+          if (tintAmt > 0.001) { s0 = s0 * (1 - tintAmt) + sinT(gr.phase2) * tintAmt; gr.phase2 += gr.inc2; }
           // sine + a breath of noise
-          this.noiseState = (this.noiseState * 1103515245 + 12345) & 0x7fffffff;
-          const nz = (this.noiseState / 0x40000000 - 1) * gr.noise;
-          const v = (s0 * (1 - gr.noise) + nz) * e * gr.amp;
+          const nz = gn > 0 ? noise() * gn : 0;
+          const v = (s0 * (1 - gn) + nz) * e * gr.amp;
           gr.phase += gr.inc;
           L[s] += v * gL; R[s] += v * gR;
         }
       }
     }
 
-    if (fl.on) this.mixVoice(2, L, R, outL, outR, n);
+    if (flLive) this.mixVoice(2, fl.on, fl.gain, L, R, outL, outR, n);
 
     // ── EVENTS : edges / motion → plucked notes (Aural-Mirror register) ──
     const ev = cfg.events;
-    if (ev.on) {
+    const evLive = this.voiceLive(3, ev.on);
+    if (evLive) {
       // fire scheduled onsets whose time has come, retaining the rest by
       // compacting in place (a write index) — splice would allocate a throwaway
       // array on every removal inside this render quantum.
@@ -677,20 +824,29 @@ class SoniProcessor extends AudioWorkletProcessor {
       for (let i = 0; i < this.evPending.length; i++) {
         const e = this.evPending[i];
         if (e.t0 <= nowT + n * dt) {
-          // grab a free voice, else steal the quietest
-          let slot = -1, quiet = 2;
-          for (let k = 0; k < NEVENT; k++) {
-            const nt2 = this.notes[k];
-            if (!nt2.on) { slot = k; break; }
-            if (nt2.env < quiet) { quiet = nt2.env; slot = k; }
+          // grab a free voice, else steal the quietest one NOT started in this
+          // block (a note that had just begun read as the quietest, so several
+          // onsets due in one block overwrote the same voice and only the last
+          // sounded). The stolen note's last sample fades out over ~3 ms.
+          let slot = -1;
+          for (let k = 0; k < NEVENT; k++) if (!this.notes[k].on) { slot = k; break; }
+          if (slot < 0) {
+            let quiet = 1e9;
+            for (let k = 0; k < NEVENT; k++) {
+              const nt2 = this.notes[k];
+              if (nt2.born !== this.block && nt2.env < quiet) { quiet = nt2.env; slot = k; }
+            }
+            if (slot < 0) continue; // the whole pool started this block : drop it
+            this.evDcL += this.notes[slot].lastL; this.evDcR += this.notes[slot].lastR;
           }
-          const nt = this.notes[slot < 0 ? 0 : slot];
+          const nt = this.notes[slot];
           // decay time : base 0.05..2.5s, shortened for high notes when `highs`>0
-          const f = e.freq < 20 ? 20 : e.freq;
+          let f = e.freq < 20 ? 20 : e.freq;
+          while (f > nyq) f *= 0.5; // past Nyquist : an octave down (its phase used to run away)
           const baseDecay = 0.05 + ev.decay * 2.45;
           const factor = ev.highs > 0.001 ? Math.pow(220 / f, ev.highs * 1.5) : 1;
           const decayTime = Math.max(0.03, Math.min(6, baseDecay * factor));
-          nt.on = true; nt.phase = 0; nt.inc = e.freq * dt;
+          nt.on = true; nt.phase = 0; nt.inc = f * dt; nt.born = this.block;
           nt.amp = e.amp; nt.pan = e.pan; nt.wave = wave;
           nt.env = 0; nt.attacking = true;
           nt.atkInc = 1 / Math.max(1, 0.004 * sampleRate); // ~4ms attack
@@ -700,7 +856,7 @@ class SoniProcessor extends AudioWorkletProcessor {
         }
       }
       this.evPending.length = ew;
-      const g0 = ev.gain * 0.5;
+      const g0 = 0.5;
       const bias = ev.pan * 0.5;
       // saw / square carry more energy — trim so they don't dominate the mix.
       const wg = wave === 3 ? 0.5 : wave === 2 ? 0.7 : 1;
@@ -709,27 +865,38 @@ class SoniProcessor extends AudioWorkletProcessor {
         if (!nt.on) continue;
         let p = nt.pan + bias; p = p < 0 ? 0 : p > 1 ? 1 : p;
         const gL = g0 * panGL(p) * wg, gR = g0 * panGR(p) * wg;
+        let lv = 0;
         for (let s = 0; s < n; s++) {
           if (nt.attacking) { nt.env += nt.atkInc; if (nt.env >= 1) { nt.env = 1; nt.attacking = false; } }
           else { nt.env *= nt.decMul; if (nt.env < 0.0004) { nt.on = false; break; } }
           const ph = nt.phase;
           let sig;
-          if (wave === 0) sig = Math.sin(ph * TAU);
+          if (wave === 0) sig = sinT(ph);
           else if (wave === 1) { const tr = ph < 0.5 ? ph * 2 : 2 - ph * 2; sig = tr * 2 - 1; } // triangle
           else if (wave === 2) sig = ph * 2 - 1; // saw
           else sig = ph < 0.5 ? 1 : -1; // square
           const v = sig * nt.env * nt.amp;
           nt.phase += nt.inc; if (nt.phase >= 1) nt.phase -= 1;
           L[s] += v * gL; R[s] += v * gR;
+          lv = v;
         }
+        nt.lastL = lv * gL; nt.lastR = lv * gR;
+      }
+      // the stolen notes' tails (a decaying offset from their last sample)
+      if (this.evDcL !== 0 || this.evDcR !== 0) {
+        let dl = this.evDcL, dr = this.evDcR;
+        const k = this.evDcK;
+        for (let s = 0; s < n; s++) { L[s] += dl; R[s] += dr; dl *= k; dr *= k; }
+        this.evDcL = Math.abs(dl) < 1e-7 ? 0 : dl; this.evDcR = Math.abs(dr) < 1e-7 ? 0 : dr;
       }
     }
 
-    if (ev.on) this.mixVoice(3, L, R, outL, outR, n);
+    if (evLive) this.mixVoice(3, ev.on, ev.gain, L, R, outL, outR, n);
 
     // ── RASTER : audification — the probe rect read row-major as samples ──
     const ra = cfg.raster;
-    if (ra.on) {
+    const raLive = this.voiceLive(4, ra.on);
+    if (raLive) {
       const tap = this.taps[ra.tap] || this.taps[0];
       const px0 = Math.max(0, Math.min(GRID - 2, Math.round(ra.rx * GRID)));
       const py0 = Math.max(0, Math.min(GRID - 2, Math.round(ra.ry * GRID)));
@@ -739,12 +906,13 @@ class SoniProcessor extends AudioWorkletProcessor {
       // scan rate in pixels/sec so one full pass of the rect = the period :
       // pitch = freq, timbre = the rect's contents (Yeo/Berger geometry).
       const step = ra.freq * nPix * dt;
-      const gL = ra.gain * (1 - Math.max(0, ra.pan)) * 0.7;
-      const gR = ra.gain * (1 + Math.min(0, ra.pan)) * 0.7;
+      const gL = (1 - Math.max(0, ra.pan)) * 0.7;
+      const gR = (1 + Math.min(0, ra.pan)) * 0.7;
       // TONE : a 12dB/oct lowpass tames the read's aliased edges. Log sweep
       // 300Hz → 8kHz (the Chamberlin SVF is only stable below ~sr/6);
-      // at the top of the dial the filter is BYPASSED (truly open).
-      const toneOpen = ra.tone >= 0.99;
+      // at the top of the dial the filter is BYPASSED (truly open), reached
+      // by a crossfade over the last 2% (a hard switch clicked when modulated).
+      const openMix = clampf((ra.tone - 0.97) / 0.02, 0, 1);
       const fc = 300 * Math.pow(8000 / 300, Math.max(0, Math.min(1, ra.tone)));
       const rc = 2 * Math.sin(Math.PI * Math.min(fc, sampleRate / 6.5) / sampleRate);
       let ptr = this.rPtr;
@@ -771,22 +939,23 @@ class SoniProcessor extends AudioWorkletProcessor {
         this.rLow += rc * this.rBand;
         const rHigh = hp - this.rLow - this.rBand;
         this.rBand += rc * rHigh;
-        const shaped = Math.max(-1, Math.min(1, (toneOpen ? hp : this.rLow) * 1.4));
+        const shaped = Math.max(-1, Math.min(1, (this.rLow + (hp - this.rLow) * openMix) * 1.4));
         L[s] += shaped * gL; R[s] += shaped * gR;
       }
       this.rPtr = ptr;
     }
 
-    if (ra.on) this.mixVoice(4, L, R, outL, outR, n);
+    if (raLive) this.mixVoice(4, ra.on, ra.gain, L, R, outL, outR, n);
 
     // ── TRANSMISSION : the SSTV register — line-sequential FM + sync tick ──
     const tv = cfg.sstv;
-    if (tv.on) {
+    const tvLive = this.voiceLive(5, tv.on);
+    if (tvLive) {
       const tap = this.taps[tv.tap] || this.taps[0];
       const lineDur = 1 / Math.max(0.5, tv.lineHz); // seconds per line
       const syncFrac = Math.min(0.25, 0.005 / lineDur); // ~5ms sync pulse
-      const gL = tv.gain * (1 - Math.max(0, tv.pan)) * 0.5;
-      const gR = tv.gain * (1 + Math.min(0, tv.pan)) * 0.5;
+      const gL = (1 - Math.max(0, tv.pan)) * 0.5;
+      const gR = (1 + Math.min(0, tv.pan)) * 0.5;
       for (let s = 0; s < n; s++) {
         this.tX += dt / lineDur;
         if (this.tX >= 1) {
@@ -804,17 +973,18 @@ class SoniProcessor extends AudioWorkletProcessor {
           amp = 0.55 + luma * 0.45;
         }
         this.tPhase += f * dt;
-        const v = Math.sin(this.tPhase * 6.283185307179586) * amp;
+        const v = sinT(this.tPhase) * amp;
         L[s] += v * gL; R[s] += v * gR;
       }
-      if (this.tPhase > 1e6) this.tPhase %= 1;
+      this.tPhase -= Math.floor(this.tPhase);
     }
 
-    if (tv.on) this.mixVoice(5, L, R, outL, outR, n);
+    if (tvLive) this.mixVoice(5, tv.on, tv.gain, L, R, outL, outR, n);
 
     // ── FILTER : the image as a band-gain matrix over noise / line-in ──
     const fi = cfg.filter;
-    if (fi.on) {
+    const fiLive = this.voiceLive(6, fi.on);
+    if (fiLive) {
       const tap = this.taps[fi.tap] || this.taps[0];
       const input = _inputs[0] && _inputs[0][0] ? _inputs[0][0] : null;
       if (fi.sweepOn) this.fSweep = (this.fSweep + fi.sweepHz * n * dt) % 1;
@@ -829,14 +999,24 @@ class SoniProcessor extends AudioWorkletProcessor {
       }
       const slew = 1 - Math.exp(-n * dt / 0.03);
       const q1 = 1.5 - fi.q * 1.35; // damping : wide/windy → narrow/flute
-      const gL = fi.gain * (1 - Math.max(0, fi.pan)) * 0.9;
-      const gR = fi.gain * (1 + Math.min(0, fi.pan)) * 0.9;
-      for (let i = 0; i < NBAND; i++) this.fGain[i] += (this.fTarget[i] - this.fGain[i]) * slew;
+      const gL = (1 - Math.max(0, fi.pan)) * 0.9;
+      const gR = (1 + Math.min(0, fi.pan)) * 0.9;
+      for (let i = 0; i < NBAND; i++) {
+        const gg = this.fGain[i] + (this.fTarget[i] - this.fGain[i]) * slew;
+        this.fGain[i] = gg > 1e-12 ? gg : 0; // NaN and denormals → 0
+      }
+      // loop 0 = free noise; up = a frozen stretch replayed, ~400 ms down to 5 ms
+      const loop = fi.loop || 0;
+      const loopLen = loop > 0.001
+        ? Math.max(64, Math.min(this.fLoopBuf.length, Math.round(sampleRate * 0.4 * Math.pow(0.0125, loop))))
+        : 0;
+      const nAmt = fi.noise * 0.5;
       for (let s = 0; s < n; s++) {
         // source : line-in when connected, plus an internal noise floor
-        this.noiseState = (this.noiseState * 1103515245 + 12345) & 0x7fffffff;
-        const nz = (this.noiseState / 0x40000000 - 1) * fi.noise * 0.5;
-        const x = (input ? input[s] : 0) + nz;
+        let w;
+        if (loopLen) { if (this.fLoopPos >= loopLen) this.fLoopPos = 0; w = this.fLoopBuf[this.fLoopPos++]; }
+        else w = noise();
+        const x = (input ? input[s] : 0) + w * nAmt;
         let acc = 0;
         for (let i = 0; i < NBAND; i++) {
           const f = this.fCoef[i];
@@ -853,18 +1033,23 @@ class SoniProcessor extends AudioWorkletProcessor {
       // next block. mixVoice sanitizes the OUTPUT but never this internal state —
       // which is why an unguarded NaN here used to latch the Filter to silence.
       for (let i = 0; i < NBAND; i++) {
-        if (!Number.isFinite(this.fBand[i]) || !Number.isFinite(this.fLow[i])) {
+        const b = this.fBand[i], lo = this.fLow[i];
+        if (!Number.isFinite(b) || !Number.isFinite(lo)) {
           this.fLow.fill(0); this.fBand.fill(0);
           break;
         }
+        // flush denormals (a silent input decays the state into them)
+        if (b > -1e-20 && b < 1e-20) this.fBand[i] = 0;
+        if (lo > -1e-20 && lo < 1e-20) this.fLow[i] = 0;
       }
     }
 
-    if (fi.on) this.mixVoice(6, L, R, outL, outR, n);
+    if (fiLive) this.mixVoice(6, fi.on, fi.gain, L, R, outL, outR, n);
 
     // ── CHORD : scale-tuned bank following the frame's brightness bands ──
     const ch = cfg.chord;
-    if (ch.on && this.chordN > 0) {
+    const chLive = this.voiceLive(7, ch.on && this.chordN > 0);
+    if (chLive) {
       const tap = this.taps[ch.tap] || this.taps[0];
       const N = this.chordN;
       // control-rate targets : voice i = avg brightness of its horizontal band
@@ -876,16 +1061,17 @@ class SoniProcessor extends AudioWorkletProcessor {
           const y = y0 + (y1 - y0) * ((yy + 0.5) / 3);
           for (let xx = 0; xx < 5; xx++) { sum += this.terrain(tap, (xx + 0.5) / 5, y); cnt++; }
         }
-        this.cTarget[i] = Math.pow(cnt ? sum / cnt : 0, ch.gamma);
+        this.cTarget[i] = this.chordFreqs[i] > nyq ? 0 : Math.pow(cnt ? sum / cnt : 0, ch.gamma);
       }
       // asymmetric slew : swell in over `attack`, fade over `release`
       const up = 1 - Math.exp(-n * dt / Math.max(0.01, ch.attack || 0.4));
       const dn = 1 - Math.exp(-n * dt / Math.max(0.01, ch.release || 0.8));
-      const gBase = (ch.gain * 1.8) / Math.sqrt(N); // lift the pad into the pack (was 0.5 : ~4× too quiet vs the other voices); the master limiter catches rare bright-frame peaks
+      const gBase = 1.8 / Math.sqrt(N); // lift the pad into the pack (was 0.5 : ~4× too quiet vs the other voices); the master limiter catches rare bright-frame peaks
       const tone = ch.tone || 0, spread = ch.spread || 0, panBase = 0.5 + ch.pan * 0.5;
       for (let i = 0; i < N; i++) {
         const tgt = this.cTarget[i], cur = this.cAmp[i];
-        const a0 = cur + (tgt - cur) * (tgt > cur ? up : dn);
+        let a0 = cur + (tgt - cur) * (tgt > cur ? up : dn);
+        if (!(a0 > 1e-12)) a0 = 0; // NaN and denormals → 0
         this.cAmp[i] = a0;
         if (a0 < 0.003) { this.cPhase[i] = (this.cPhase[i] + this.chordFreqs[i] * n * dt) % 1; continue; }
         // SPREAD : the bass stays in the middle and the notes above fan out,
@@ -898,8 +1084,8 @@ class SoniProcessor extends AudioWorkletProcessor {
         let ph = this.cPhase[i];
         const inc = this.chordFreqs[i] * dt;
         for (let s = 0; s < n; s++) {
-          let v = Math.sin(ph * TAU);
-          if (tone > 0.001) v = v * (1 - tone) + Math.tanh(3 * v) * tone * 0.9;
+          let v = sinT(ph);
+          if (tone > 0.001) v = v * (1 - tone) + tab(SH3_T, ph) * tone * 0.9; // tanh(3·sin)
           v *= a0;
           L[s] += v * gL; R[s] += v * gR;
           ph += inc;
@@ -908,22 +1094,22 @@ class SoniProcessor extends AudioWorkletProcessor {
       }
     }
 
-    if (ch.on) this.mixVoice(7, L, R, outL, outR, n);
+    if (chLive) this.mixVoice(7, ch.on && this.chordN > 0, ch.gain, L, R, outL, outR, n);
 
     // ── COLLAGE : the Collage films' own sound, already panned piece by piece
     // and rung through their scale-tuned resonators in the native graph
     // (collageVoice.ts), arriving on input 1. Here : the voice's gain + balance,
     // then its mixer channel like any other voice.
     const co = cfg.collage;
-    if (co && co.on) {
+    const coOn = !!(co && co.on);
+    if (this.voiceLive(8, coOn)) {
       const inp = _inputs[1];
       if (inp && inp.length) {
         const iL = inp[0], iR = inp[1] || inp[0];
-        const g = co.gain * 1.6;
-        const gL = g * (1 - Math.max(0, co.pan)), gR = g * (1 + Math.min(0, co.pan));
+        const gL = 1.6 * (1 - Math.max(0, co.pan)), gR = 1.6 * (1 + Math.min(0, co.pan));
         for (let s = 0; s < n; s++) { L[s] += iL[s] * gL; R[s] += iR[s] * gR; }
       }
-      this.mixVoice(8, L, R, outL, outR, n);
+      this.mixVoice(8, coOn, co.gain, L, R, outL, outR, n);
     }
 
     // ── shared FX tail : send the (dry) mix into delay → reverb, return the wet ──
@@ -932,26 +1118,37 @@ class SoniProcessor extends AudioWorkletProcessor {
     const wantFx = this.fxSend > 0.0001;
     if (wantFx || this.fxRinging) {
       const rv = this.reverb, dl = this.delay;
+      // the reverb's level in the tail : 0.6 (the default) is the level it
+      // always had (its mix knob used to be ignored), 1 is ~4 dB wetter
+      const rvG = rv.mix * 1.6666667;
       let tail = 0;
       for (let s = 0; s < n; s++) {
         const send = (this.fxSendS += (this.fxSend - this.fxSendS) * 0.002);
         const inL = outL[s] * send, inR = outR[s] * send;
         dl.process(inL, inR);
         rv.process(inL + dl.wL, inR + dl.wR); // reverb hears the send + the echoes
-        let wl = dl.wL + rv.wL, wr = dl.wR + rv.wR;
+        let wl = dl.wL + rv.wL * rvG, wr = dl.wR + rv.wR * rvG;
         // A NaN in the tail's feedback would stick forever (permanent silence) —
         // detect it and clear the buffers so the tail self-heals.
         if (!(Number.isFinite(wl) && Number.isFinite(wr))) { dl.reset(); rv.reset(); wl = 0; wr = 0; }
         outL[s] += wl; outR[s] += wr;
         const amp = Math.abs(wl) + Math.abs(wr); if (amp > tail) tail = amp;
       }
-      this.fxRinging = wantFx || tail > 1e-4;
+      // Stop only after the tail has been quiet for longer than the delay line :
+      // one quiet block used to end it with an echo still in the line, which
+      // came back later when the send rose again. Cleared when it stops.
+      this.fxQuiet = tail > 1e-4 ? 0 : this.fxQuiet + n * dt;
+      if (!wantFx && this.fxQuiet > dl.rate_s + 0.5) { dl.reset(); rv.reset(); this.fxRinging = false; this.fxQuiet = 0; }
+      else this.fxRinging = true;
     }
 
     // ── master : gain + peak limiter (always on) + meter ──
-    const mg = cfg.master;
-    let peak = this.peak;
+    const mg1 = clampf(cfg.master, 0, 2);
+    const mg0 = this.mgS < 0 ? mg1 : this.mgS, dmg = (mg1 - mg0) / n;
+    this.mgS = mg1;
+    let peak = this.peak, limMin = this.limMin;
     for (let s = 0; s < n; s++) {
+      const mg = mg0 + dmg * (s + 1); // ramped : a stepped master zippered
       let l = outL[s] * mg, r = outR[s] * mg;
       if (!Number.isFinite(l)) l = 0;
       if (!Number.isFinite(r)) r = 0;
@@ -960,14 +1157,20 @@ class SoniProcessor extends AudioWorkletProcessor {
       const target = p > 0.89 ? 0.89 / p : 1;
       this.limEnv = target < this.limEnv ? target : this.limEnv + (1 - this.limEnv) * 0.0004;
       l *= this.limEnv; r *= this.limEnv;
+      if (this.limEnv < limMin) limMin = this.limEnv;
       outL[s] = l; outR[s] = r;
       const ap = Math.max(Math.abs(l), Math.abs(r));
       if (ap > peak) peak = ap;
     }
-    this.peak = peak;
+    this.peak = peak; this.limMin = limMin;
     if (currentTime - this.lastMeter > 0.1) {
-      this.port.postMessage({ t: 'meter', peak: this.peak, lim: this.limEnv });
-      this.peak = 0; this.lastMeter = currentTime;
+      // + where the scanning voices really are (and their real rates : sync and
+      // modulation included), so the page's overlay draws what you hear.
+      this.port.postMessage({
+        t: 'meter', peak: this.peak, lim: this.limMin,
+        scan: { at: currentTime, sp: this.sweepPos, spHz: sp.sweepOn ? sp.sweepHz : 0, fi: this.fSweep, fiHz: fi.sweepOn ? fi.sweepHz : 0, tv: (this.tLine + this.tX) / GRID, tvHz: tv.lineHz / GRID }
+      });
+      this.peak = 0; this.limMin = 1; this.lastMeter = currentTime;
     }
     return true;
   }

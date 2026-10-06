@@ -92,6 +92,9 @@ export interface SoniConfig {
   filter: {
     on: boolean; tap: number; gain: number; pan: number
     q: number; noise: number; lineIn: boolean
+    // 0 = free noise · up = a frozen stretch of noise replayed, ~400 ms (a
+    // flutter) down to 5 ms (a buzz)
+    loop: number
     sweepOn: boolean; sweepHz: number; x: number; gamma: number
     path: number; pace: number // reading path + breathing pace (see spectra)
     loOct: number; hiOct: number; quantize: boolean
@@ -153,7 +156,7 @@ export function defaultSoniConfig(): SoniConfig {
     events: { on: false, tap: 0, gain: 0.6, pan: 0, mode: 'blend', sense: 0.5, density: 0.4, decay: 0.35, highs: 0.6, wave: 1, loOct: 3, hiOct: 6, quantize: true },
     raster: { on: false, tap: 0, gain: 0.4, pan: 0, note: 45, freq: 110, quantize: true, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
     sstv: { on: false, tap: 0, gain: 0.4, pan: 0, lineHz: 12, sync: false, dev: 1, syncLev: 0.5 },
-    filter: { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, lineIn: false, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0, loOct: 1, hiOct: 8, quantize: false },
+    filter: { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, lineIn: false, loop: 0, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0, loOct: 1, hiOct: 8, quantize: false },
     chord: { on: false, tap: 0, gain: 0.6, pan: 0, voices: 7, loOct: 2, hiOct: 6, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3 },
     collage: { on: false, gain: 0.7, pan: 0, reso: 0.5, ring: 0.5, bright: 0.5, width: 1, loOct: 2, hiOct: 6 },
     fx: {
@@ -276,6 +279,16 @@ export function withSonifyParam(c: SoniConfig, param: string, v: number): SoniCo
   }
 }
 
+/** Where the scanning voices really are, from the worklet (~10 Hz) : positions
+ *  0..1 and their effective rates (cycles/s, sync and modulation included), so
+ *  the page's overlay draws what you hear. */
+export interface SoniScan {
+  recv: number // performance.now() when it arrived
+  sp: number; spHz: number // Spectra sweep
+  fi: number; fiHz: number // Filter sweep
+  tv: number; tvHz: number // Transmission row
+}
+
 interface GridReader {
   readSonifyGrid: (kind: 'master' | 'layer', layer: number, out: Uint8Array) => boolean
   collageSounds?: () => CollageSoundSet[]
@@ -290,8 +303,10 @@ class SonifyEngine {
   private lineSrc: MediaStreamAudioSourceNode | null = null
   private lineStream: MediaStream | null = null
   private lineWanted = false
+  private lineReq = 0 // the latest line-in request (an older one resolving late is dropped)
   private lastTick = 0
   private lastFrameAt = [0, 0]
+  private tapKey = ['', ''] // what each tap read last (a new source = no motion against the old)
   // The Collage voice : a native graph (players + per-piece resonators) into the
   // worklet's second input, alive while the voice is on.
   private collage: CollageVoice | null = null
@@ -312,6 +327,7 @@ class SonifyEngine {
   eventDots: Float32Array = new Float32Array(0)
   // effective probe values (base + modulation), for the page overlay
   liveProbes: Record<string, number> = {}
+  scan: SoniScan | null = null
 
   constructor() {
     // The mod-matrix swings around each param's BASE : the current config.
@@ -349,14 +365,19 @@ class SonifyEngine {
   async start(): Promise<void> {
     if (this.ctx || this.starting) return
     this.starting = true
+    let ctx: AudioContext | null = null
     try {
-      const ctx = new AudioContext({ latencyHint: 'interactive' })
+      ctx = new AudioContext({ latencyHint: 'interactive' })
       await ctx.audioWorklet.addModule(SONI_WORKLET_URL)
       // Input 0 : the Filter voice's line-in. Input 1 : the Collage voice's films.
       const node = new AudioWorkletNode(ctx, 'soni', { numberOfInputs: 2, outputChannelCount: [2] })
       node.port.onmessage = (e): void => {
         const m = e.data
-        if (m?.t === 'meter') { this.meterPeak = m.peak; this.meterLim = m.lim }
+        if (m?.t === 'meter') {
+          this.meterPeak = m.peak
+          this.meterLim = m.lim
+          if (m.scan) this.scan = { ...m.scan, recv: performance.now() }
+        }
       }
       node.connect(ctx.destination)
       this.recDest = ctx.createMediaStreamDestination()
@@ -368,6 +389,8 @@ class SonifyEngine {
       if (ctx.state !== 'running') await ctx.resume()
     } catch (e) {
       console.error('[sonify] start failed', e)
+      // a context that never became ours would leak (one per retry)
+      if (ctx && ctx !== this.ctx) void ctx.close().catch(() => {})
       this.stop()
     } finally {
       this.starting = false
@@ -381,6 +404,10 @@ class SonifyEngine {
     this.lineSrc = null
     this.lineStream?.getTracks().forEach((t) => t.stop())
     this.lineStream = null
+    // forget the line-in : the next start must open it again (it used to think
+    // it was still open and the Filter voice came back nearly silent)
+    this.lineWanted = false
+    this.lineReq++
     this.node?.disconnect()
     this.node = null
     this.recDest = null
@@ -388,6 +415,7 @@ class SonifyEngine {
     this.ctx = null
     this.meterPeak = 0
     this.flowDots = new Float32Array(0)
+    this.scan = null
   }
 
   private applySink(sinkId: string): void {
@@ -474,7 +502,7 @@ class SonifyEngine {
           on: cfg.filter.on, tap: cfg.filter.tap, gain: cfg.filter.gain, pan: cfg.filter.pan,
           q: cfg.filter.q, noise: cfg.filter.lineIn ? cfg.filter.noise * 0.25 : cfg.filter.noise,
           sweepOn: cfg.filter.sweepOn, sweepHz: cfg.filter.sweepHz, x: cfg.filter.x, gamma: cfg.filter.gamma,
-          path: cfg.filter.path ?? 0, pace: cfg.filter.pace ?? 0
+          path: cfg.filter.path ?? 0, pace: cfg.filter.pace ?? 0, loop: cfg.filter.loop ?? 0
         },
         chord: {
           on: cfg.chord.on, tap: cfg.chord.tap, gain: cfg.chord.gain, pan: cfg.chord.pan,
@@ -489,6 +517,11 @@ class SonifyEngine {
       filterFreqs: filterFreqs(cfg),
       chordFreqs: chordFreqs(cfg)
     })
+    // The config replaced the worklet's whole state, modulation included :
+    // put the modulated values straight back (waiting for the next tick left a
+    // modulated pitch or probe snapping to its base for up to 50 ms on every
+    // slider move, OSC message and sequencer step).
+    if (cfg.on) this.postMod()
     this.syncLineIn(cfg.filter.on && cfg.filter.lineIn)
   }
 
@@ -496,6 +529,7 @@ class SonifyEngine {
   private syncLineIn(want: boolean): void {
     if (want === this.lineWanted) return
     this.lineWanted = want
+    const req = ++this.lineReq
     if (!want) {
       this.lineSrc?.disconnect()
       this.lineSrc = null
@@ -508,7 +542,10 @@ class SonifyEngine {
     navigator.mediaDevices
       .getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
       .then((stream) => {
-        if (!this.lineWanted || !this.ctx || !this.node) { stream.getTracks().forEach((t) => t.stop()); return }
+        if (req !== this.lineReq || !this.lineWanted || !this.ctx || !this.node) { stream.getTracks().forEach((t) => t.stop()); return }
+        // never two mics summed into the Filter : anything still open goes first
+        this.lineSrc?.disconnect()
+        this.lineStream?.getTracks().forEach((t) => t.stop())
         this.lineStream = stream
         this.lineSrc = this.ctx.createMediaStreamSource(stream)
         this.lineSrc.connect(this.node)
@@ -527,6 +564,60 @@ class SonifyEngine {
     return noteFreq(note - rel + best + 12 * ((this.cfg.rootOct ?? 3) - 3))
   }
 
+  /** Probe modulation overlay : ship the EFFECTIVE probe values (base +
+   *  whatever the mod-matrix / Meta knobs wrote this frame), every tick and
+   *  right after every config. Always sent, so releasing a modulator reverts to
+   *  the base cleanly. Guarded so a modulation hiccup can NEVER stop the
+   *  grid-send (which would silence every voice : they all read the same taps). */
+  private postMod(): void {
+    const node = this.node
+    if (!node) return
+    try {
+      const mv = sonifyModValues
+      const g = (k: string, base: number): number => mv.get(k) ?? base
+      const c = this.cfg
+      const oPitch = mv.get('orbitPitch')
+      const rPitch = mv.get('rasterPitch')
+      const m = {
+        spectra: { x: g('spectraX', c.spectra.x) },
+        filter: { x: g('filterX', c.filter.x) },
+        orbit: {
+          cx: g('orbitX', c.orbit.cx), cy: g('orbitY', c.orbit.cy),
+          rx: g('orbitR', c.orbit.rx), ry: g('orbitR', c.orbit.ry),
+          freq: oPitch !== undefined
+            ? (c.orbit.quantize ? this.snapNote(Math.round(oPitch)) : noteFreq(oPitch))
+            : (c.orbit.quantize ? this.snapNote(c.orbit.note) : c.orbit.freq)
+        },
+        raster: {
+          rx: g('rasterX', c.raster.rx), ry: g('rasterY', c.raster.ry),
+          rw: g('rasterW', c.raster.rw), rh: g('rasterH', c.raster.rh),
+          freq: rPitch !== undefined
+            ? (c.raster.quantize ? this.snapNote(Math.round(rPitch)) : noteFreq(rPitch))
+            : (c.raster.quantize ? this.snapNote(c.raster.note) : c.raster.freq)
+        }
+      }
+      // Simple scalar mods : always send the EFFECTIVE value (mod or base), so
+      // releasing a modulator reverts cleanly. The worklet merges these onto its
+      // live cfg (voice renders read them per-block; fx re-applies, see applyFx).
+      const mm = m as unknown as Record<string, Record<string, number>>
+      for (const param in SONI_SIMPLE_MODS) {
+        const [voice, field] = SONI_SIMPLE_MODS[param]
+        const vc = c[voice] as unknown as Record<string, number> | undefined
+        const base = vc ? vc[field] : undefined
+        if (typeof base !== 'number') continue // defensive : partial config → skip
+        ;(mm[voice] ??= {})[field] = g(param, base)
+      }
+      node.port.postMessage({ t: 'mod', m })
+      this.liveProbes = {
+        spectraX: m.spectra.x, filterX: m.filter.x,
+        orbitX: m.orbit.cx, orbitY: m.orbit.cy, orbitR: m.orbit.rx, orbitRY: m.orbit.ry,
+        rasterX: m.raster.rx, rasterY: m.raster.ry, rasterW: m.raster.rw, rasterH: m.raster.rh
+      }
+    } catch (e) {
+      console.error('[sonify] mod overlay skipped', e)
+    }
+  }
+
   /** Per-frame pump : read the active taps from the compositor, ship grids to
    *  the worklet, run flow analysis. Call from the App loop AFTER render().
    *  Throttled to ~30Hz. */
@@ -536,7 +627,9 @@ class SonifyEngine {
       if (this.collage) { this.collage.dispose(); this.collage = null }
       return
     }
-    if (nowMs - this.lastTick < 33) return
+    // ~30 Hz. (33 against a two-frame period of 33.3 ms at 60 Hz let frame
+    // jitter skip to every third frame : an uneven 24..30 Hz.)
+    if (nowMs - this.lastTick < 30) return
     const dt = Math.min(0.1, (nowMs - this.lastTick) / 1000)
     this.lastTick = nowMs
 
@@ -583,55 +676,7 @@ class SonifyEngine {
       }
     }
 
-    // Probe modulation overlay : ship the EFFECTIVE probe values (base +
-    // whatever the mod-matrix / Meta knobs wrote this frame) every tick.
-    // Always sent, so releasing a modulator reverts to the base cleanly.
-    // Wrapped so a modulation hiccup can NEVER stop the grid-send below (which
-    // would silence every voice — the whole engine reads the same taps).
-    try {
-      const mv = sonifyModValues
-      const g = (k: string, base: number): number => mv.get(k) ?? base
-      const c = this.cfg
-      const oPitch = mv.get('orbitPitch')
-      const rPitch = mv.get('rasterPitch')
-      const m = {
-        spectra: { x: g('spectraX', c.spectra.x) },
-        filter: { x: g('filterX', c.filter.x) },
-        orbit: {
-          cx: g('orbitX', c.orbit.cx), cy: g('orbitY', c.orbit.cy),
-          rx: g('orbitR', c.orbit.rx), ry: g('orbitR', c.orbit.ry),
-          freq: oPitch !== undefined
-            ? (c.orbit.quantize ? this.snapNote(Math.round(oPitch)) : noteFreq(oPitch))
-            : (c.orbit.quantize ? this.snapNote(c.orbit.note) : c.orbit.freq)
-        },
-        raster: {
-          rx: g('rasterX', c.raster.rx), ry: g('rasterY', c.raster.ry),
-          rw: g('rasterW', c.raster.rw), rh: g('rasterH', c.raster.rh),
-          freq: rPitch !== undefined
-            ? (c.raster.quantize ? this.snapNote(Math.round(rPitch)) : noteFreq(rPitch))
-            : (c.raster.quantize ? this.snapNote(c.raster.note) : c.raster.freq)
-        }
-      }
-      // Simple scalar mods : always send the EFFECTIVE value (mod or base), so
-      // releasing a modulator reverts cleanly. The worklet merges these onto its
-      // live cfg (voice renders read them per-block; fx re-applies, see applyFx).
-      const mm = m as unknown as Record<string, Record<string, number>>
-      for (const param in SONI_SIMPLE_MODS) {
-        const [voice, field] = SONI_SIMPLE_MODS[param]
-        const vc = c[voice] as unknown as Record<string, number> | undefined
-        const base = vc ? vc[field] : undefined
-        if (typeof base !== 'number') continue // defensive : partial config → skip
-        ;(mm[voice] ??= {})[field] = g(param, base)
-      }
-      node.port.postMessage({ t: 'mod', m })
-      this.liveProbes = {
-        spectraX: m.spectra.x, filterX: m.filter.x,
-        orbitX: m.orbit.cx, orbitY: m.orbit.cy, orbitR: m.orbit.rx,
-        rasterX: m.raster.rx, rasterY: m.raster.ry, rasterW: m.raster.rw, rasterH: m.raster.rh
-      }
-    } catch (e) {
-      console.error('[sonify] mod overlay skipped', e)
-    }
+    this.postMod()
 
     const need = [false, false]
     if (this.cfg.spectra.on) need[this.cfg.spectra.tap] = true
@@ -651,6 +696,12 @@ class SonifyEngine {
       // worklet expects row 0 = image TOP so y maps naturally).
       const prev = this.lumaPrev[t]
       const cur = this.luma[t]
+      // A tap that wasn't read last tick (a voice just switched on, Sonify just
+      // started) or now reads another source has no real previous frame : the
+      // motion against it was a one-frame splash of grains and notes.
+      const key = `${tap.kind}:${tap.layer}`
+      const fresh = this.lastFrameAt[t] === 0 || nowMs - this.lastFrameAt[t] > 150 || key !== this.tapKey[t]
+      this.tapKey[t] = key
       prev.set(cur)
       for (let y = 0; y < GRID; y++) {
         const src = (GRID - 1 - y) * GRID * 4
@@ -660,6 +711,7 @@ class SonifyEngine {
           cur[dst + x] = (this.rgba[i] * 77 + this.rgba[i + 1] * 150 + this.rgba[i + 2] * 29) >> 8
         }
       }
+      if (fresh) prev.set(cur)
       const frameDt = this.lastFrameAt[t] > 0 ? Math.min(0.1, (nowMs - this.lastFrameAt[t]) / 1000) : 0.033
       this.lastFrameAt[t] = nowMs
       // Transfer a copy (the live buffer stays ours)

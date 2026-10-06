@@ -14,7 +14,7 @@
 // than one layer is active, everything else reads the master. The quantizer
 // key/scale, gains the user already set, and probe positions are preserved.
 
-import type { CompositionState, FxInstance } from '@shared/types'
+import type { CompositionState, FxInstance, SourceSlot } from '@shared/types'
 import type { SoniConfig } from './sonify'
 
 type Voice = 'raster' | 'flow' | 'orbit' | 'spectra' | 'sstv' | 'filter' | 'events' | 'chord'
@@ -99,9 +99,13 @@ export function suggestSonify(c: CompositionState, cur: SoniConfig): SoniConfig 
     perLayer.push(mine)
     for (const [v, w] of mine) total.set(v, (total.get(v) ?? 0) + w * Math.max(0.3, l.opacity))
   })
-  const hasCollage = c.layers.some(
-    (l) => !l.mute && [l.sourceA, l.sourceB].some((s) => s?.shaderId === 'gen-collage' && (s.collagePool?.length ?? 0) > 0)
-  )
+  // A Collage with films : on a layer or the background, fed by a folder or
+  // by saved assemblages.
+  const filmed = (s: SourceSlot | null | undefined): boolean =>
+    s?.shaderId === 'gen-collage' && ((s.collagePool?.length ?? 0) > 0 || (s.collageEdls?.length ?? 0) > 0)
+  const hasCollage =
+    c.layers.some((l) => !l.mute && (filmed(l.sourceA) || filmed(l.sourceB))) ||
+    (!!c.background && c.background.opacity > 0 && filmed(c.background.source))
   // Master rack shapes everything : half weight.
   rack(c.master.filter((f) => !f.locked), total, 0.5)
 
@@ -116,6 +120,12 @@ export function suggestSonify(c: CompositionState, cur: SoniConfig): SoniConfig 
     chosen.add(ranked[0].v)
     if (ranked[1].w > 0) chosen.add(ranked[1].v)
     if (ranked[2].w > 0 && ranked[2].w >= ranked[0].w * 0.5) chosen.add(ranked[2].v)
+  }
+  // Flow and Events need MOTION : a set of only those is silent on a still shot
+  // or a paused film. Add the best-ranked voice that sings on any frame.
+  const stillOk: Voice[] = ['spectra', 'orbit', 'raster', 'sstv', 'filter', 'chord']
+  if (![...chosen].some((v) => stillOk.includes(v))) {
+    chosen.add((ranked.find((r) => stillOk.includes(r.v) && r.w > 0) ?? { v: 'spectra' as Voice }).v)
   }
 
   // Tap plan : the strongest voice listens to the layer that earned it when

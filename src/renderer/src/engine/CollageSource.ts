@@ -629,6 +629,9 @@ export class CollageSource {
   private prevValid = false
   private xfade = 1
   private xfadeDur = 0
+  // Bumped on every re-cut of the wall : Sonify's Collage voice crossfades its
+  // pieces on it, over xfadeDur.
+  private dealSerial = 0
   private foldAt: number | null = null // a deal landed mid-fade : fold the visible mix into prev first
   // Uniform staging, allocated once.
   private cellArr = new Float32Array(MAX_CELLS * 4)
@@ -1058,6 +1061,7 @@ export class CollageSource {
   /** Rebuild the partition (cut-up rects or mosaic shards), then deal decks
    *  round-robin over it and assign the mask dropout order. */
   private rebuildCells(cuts: number, shape: number): void {
+    this.dealSerial++
     const rnd = mulberry32((this.seed ^ 0x9e3779b9) >>> 0)
     let rects: Array<{ x: number; y: number; w: number; h: number }>
     if (shape === 1) rects = this.mosaicSeeds(cuts, rnd)
@@ -1190,7 +1194,7 @@ export class CollageSource {
 
   /** For Sonify's Collage voice : every piece (centre, film, shown or masked)
    *  and every film (the video its sound follows, the file to hear). */
-  soundInfo(): { pieces: CollageSoundPiece[]; decks: CollageSoundDeck[] } | null {
+  soundInfo(): { pieces: CollageSoundPiece[]; decks: CollageSoundDeck[]; deal: number; xfade: number } | null {
     if (this.disposed || !this.cells.length) return null
     const mask = clampf(num(this.live.mask, 0), 0, 1)
     const pieces: CollageSoundPiece[] = this.cells.map((c, i) => {
@@ -1210,7 +1214,7 @@ export class CollageSource {
       if (!d.src || !d.clip) return { el: null, path: null }
       return { el: d.el, path: this.originalOf(d.clip) }
     })
-    return { pieces, decks }
+    return { pieces, decks, deal: this.dealSerial, xfade: this.xfadeDur }
   }
 
   /** The clip's ORIGINAL file : its own `src`, or the playable file when that

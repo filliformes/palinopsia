@@ -67,7 +67,10 @@ export function tickSonifySeq(now: number): void {
   // Bounce uses a per-step (accelerating) dwell; forward/drift use a uniform one.
   const dwell = sq.mode === 'bounce' ? bounceStepDuration(sq.stepMs, len, sq.bounceDecay, sq.cur) : sq.stepMs
   if (now - lastStepAt < dwell) return
-  lastStepAt = now
+  // Step on the grid, not on the frame that noticed it : `= now` added up each
+  // step's lateness (up to a frame) and the sequence ran a few percent slow.
+  // A long stall (a hidden window) re-anchors instead of catching up in a burst.
+  lastStepAt = now - lastStepAt > dwell * 2 ? now : lastStepAt + dwell
   const next = sq.mode === 'drift' ? advanceDrift(sq.cur, len, sq.bias, sq.edge) : (sq.cur + 1) % len
   st.setSoniSeqCur(next)
   applyStep(next)
@@ -92,8 +95,12 @@ function applyStep(i: number): void {
     if (step.preset) {
       // A whole preset : keep the machine-local on-state + output device.
       const cfg = loadSoniPreset(step.preset)
-      if (cfg) useStore.getState().setSonify({ ...cfg, on: cur.on, sinkId: cur.sinkId } as SoniConfig)
-      return
+      if (cfg) {
+        useStore.getState().setSonify({ ...cfg, on: cur.on, sinkId: cur.sinkId } as SoniConfig)
+        return
+      }
+      // Deleted, or not on this machine (presets are local, steps travel with
+      // sessions) : play the step's voices instead of nothing.
     }
     useStore.getState().setSonify(applyVoiceMask(cur, step.voices))
   })

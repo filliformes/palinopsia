@@ -165,7 +165,7 @@ export interface MidiDevice {
 // surface:x / :y    CC → the Metasurface cursor axis (drives scene-morphing;
 //                   activates the surface; needs >=2 placed scenes)
 // sonify:master     CC → Sonify master gain
-// sonify:voice:<i>  note/CC press → toggle Sonify voice i on/off (0..7)
+// sonify:voice:<i>  note/CC press → toggle Sonify voice i on/off (0..8)
 // fire:vary         note/CC press → Variation at the current spread
 // fire:randomize    note/CC press → the selected Randomize
 // fire:sonify       note/CC press → Sonify on/off
@@ -206,7 +206,10 @@ export function midiTargetLabel(id: string): string {
   const lm = /^layer:(\d+):(mix|opacity)$/.exec(id)
   if (lm) return `LAYER ${Number(lm[1]) + 1} ${lm[2] === 'mix' ? 'A↔B' : 'opacity'}`
   const sv = /^sonify:voice:(\d+)$/.exec(id)
-  if (sv) return `SONIFY ${SONI_VOICE_KEYS[Number(sv[1])] ?? sv[1]} on/off`
+  if (sv) {
+    const k = SONI_VOICE_KEYS[Number(sv[1])]
+    return `SONIFY ${k === 'sstv' ? 'transmission' : k ?? sv[1]} on/off`
+  }
   const rl = /^rand:layer:(\d+)$/.exec(id)
   if (rl) return `RANDOMIZE layer ${Number(rl[1]) + 1}`
   switch (id) {

@@ -3475,7 +3475,15 @@ export const useStore = create<StoreState>((set, get) => ({
     // a missing voice.
     if (!next.collage) next = { ...next, collage: defaultSoniConfig().collage }
     persistSonify(next)
-    if (next.on && !sonifyEngine.isRunning()) void sonifyEngine.start().then(() => sonifyEngine.pushConfig(useStore.getState().sonify))
+    // The engine starts asynchronously : read the state again once it has, so
+    // an off that arrived meanwhile (a double tap, a momentary OSC button) stops
+    // it instead of leaving it running under a page that says "sound off".
+    if (next.on && !sonifyEngine.isRunning())
+      void sonifyEngine.start().then(() => {
+        const s = useStore.getState().sonify
+        if (s.on) sonifyEngine.pushConfig(s)
+        else sonifyEngine.stop()
+      })
     else if (!next.on && sonifyEngine.isRunning()) sonifyEngine.stop()
     else sonifyEngine.pushConfig(next)
     set({ sonify: next })
@@ -4227,3 +4235,8 @@ export const useStore = create<StoreState>((set, get) => ({
 
 // Apply the persisted theme on module load so first paint is themed.
 applyTheme(useStore.getState().theme)
+
+// Hand the restored Sonify settings to the engine at boot (it only stores them
+// while sound is off) : modulation swings around the engine's copy, which was
+// the factory default until the first Sonify edit.
+sonifyEngine.pushConfig(useStore.getState().sonify)

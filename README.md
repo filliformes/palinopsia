@@ -868,8 +868,8 @@ takeover: the live composite mirrored large with the **probes drawn on it** : be
 | **Events** | Edges and motion are **struck as discrete notes** : a salience field (**spatial** Sobel edges : fires on a still · **motion** frame-difference · **blend** : a moving edge dominates) picks one peak per region and plucks the strongest as scale-quantized notes : pitch from height, velocity from strength, pan from position, and **highs decaying sooner** (a struck-string touch). sine / triangle / saw / square. | after Remo DeVico's *Aural Mirror* : articulation, rhythm |
 | **Raster** | Audification : a draggable **probe rect** read row-major as raw samples : the rect's contents *are* the waveform (edges buzz, gradients hum, datamosh blocks tick). One full scan = the period, so pitch is a note or free Hz; **smooth** 0 is the hard aliased register. | Ikeda · Yeo/Berger raster scanning : harsh, digital |
 | **Transmission** | The SSTV register : the image scanned line-by-line as a **monophonic FM voice** (black 1500 Hz → white 2300 Hz) with the 1200 Hz **sync tick** as a metronome. Line rate free or synced (one line per 16th). The melody *is* the image rows. | slow-scan TV : narrative, decodable |
-| **Filter** | Sonify **without synthesizing** : 48 band-pass filters whose gains come from the image under the (sweepable) line : **noise** or **live line-in** played *through* the frame. Same **reading path** + **breathe** as Spectra. Wide resonance = wind, narrow = flute; band centres can snap to the scale (a resonant harmonic wash). | Metasynth's Filter room · Pelletier's wind |
-| **Collage** | The **films of a Collage source, heard all at once** : every film plays its own sound in its own loop window and speed (held to its picture within a few hundredths of a second, seeks and re-deals included), and every **piece** of the wall is its own voice : a **point source** placed by its position in the frame (left pieces left, centre centre; the film folds to mono so a centred piece really sits in the middle, at the same loudness wherever it is), then rung through a **harmonic resonator** (band-passes on a note and its 2nd and 3rd harmonics) tuned to the Sonify **key / scale** by the piece's **distance from the centre** : the centre sings the lowest note, the pieces rise toward the frame's edges in every direction (up to 64 pieces, 64 resonances). **resonance** goes from the plain films to only the tuned rings (as loud either way), **ring** from a broad colour to a singing tone, **harmonics** weights the overtones, **range** sets the octaves, **width** the stereo spread. Masked pieces fall silent, a hidden or muted layer goes quiet, a fading one fades. It hears the ORIGINAL files, so an optimised wall (whose caches carry no sound) still sings. Only active while a Collage with films is in the composition. | a sound collage : the wall's own audio, tuned and placed by the picture |
+| **Filter** | Sonify **without synthesizing** : 48 band-pass filters whose gains come from the image under the (sweepable) line : **noise** or **live line-in** played *through* the frame. Same **reading path** + **breathe** as Spectra. Wide resonance = wind, narrow = flute; band centres can snap to the scale (a resonant harmonic wash) over their own octave range. **loop** replays one frozen stretch of the noise : a few hundred milliseconds flutters, a few milliseconds buzzes (0 = free noise). | Metasynth's Filter room · Pelletier's wind |
+| **Collage** | The **films of a Collage source, heard all at once** : every film plays its own sound in its own loop window and speed (held to its picture within a few hundredths of a second, seeks and re-deals included), and every **piece** of the wall is its own voice : a **point source** placed by its position in the frame (left pieces left, centre centre; the film folds to mono so a centred piece really sits in the middle, at the same loudness wherever it is), then rung through a **harmonic resonator** (band-passes on a note and its 2nd and 3rd harmonics) tuned to the Sonify **key / scale** by the piece's **distance from the centre** : the centre sings the lowest note, the pieces rise toward the frame's edges in every direction (up to 64 pieces, 64 resonances). **resonance** goes from the plain films to only the tuned rings (as loud either way), **ring** from a broad colour to a singing tone, **harmonics** weights the overtones, **range** sets the octaves, **width** the stereo spread. Nothing cuts : a new **deal** crossfades, the old pieces fading out as the new ones come in, over the Collage's own **crossfade** time (a quick declick at 0), and a film taking a new clip or looping its window splices with a short crossfade, the old sound playing on until the new one sounds. Masked pieces fall silent, a hidden or muted layer goes quiet, a fading one fades. It hears the ORIGINAL files, so an optimised wall (whose caches carry no sound) still sings. Only active while a Collage with films is in the composition. | a sound collage : the wall's own audio, tuned and placed by the picture |
 | **Chord** | A **scale-tuned chord bank** : a few oscillators (2–16 notes spread over the range), one per horizontal **band** of the frame, each note's loudness following that band's brightness : slewed with a **swell** / **fade** so it sustains into a chord that breathes with the image. Unlike Flow it **sings on a still frame**. Low notes = bottom of frame, high = top; **tone** brightens, **spread** fans the bank in stereo : the bass stays in the middle and the notes above alternate right and left, the highest widest. | after Remo DeVico's *Aural Mirror* : sustained harmony from light |
 
 **Shared FX tail : Reverb / Delay** : one **send** feeds the whole mix into an
@@ -880,7 +880,9 @@ BBD **tone** (dark analog repeats ↔ bright) with wow/flutter, mono / stereo /
 ping-pong. The reverb is a modulated 8-line FDN with two colourings : **Quartz**
 (a dual-band-damped pad-verb) and **Prism** (per-band frequency-dependent decay), with full control : **size · decay · damp · predelay · shimmer · width · low-cut ·
 freeze**, plus Quartz's **diffusion / low-damp** or Prism's **crossover / low× /
-high×**. A `❄ freeze` holds the tail forever.
+high×**, and its **mix** (its level in the tail : 0.6 is the usual level, 1 is
+wetter). A `❄ freeze` holds the tail forever. The tail plays out every echo before it
+stops : the delay line empties before it goes quiet.
 
 **Adaptive sources** : each voice listens to one of two **taps** : the
 composited master output or any single layer's post-FX image, so different
@@ -900,8 +902,12 @@ one in the header re-rolls the whole instrument (always keeping at least one voi
 that sings on a still frame); one at the top-right of each voice box re-rolls just
 that voice. **↺ default** resets every voice / FX / mixer setting to the factory
 patch. Each voice box carries an **ⓘ** with its full description. The whole audio
-path is NaN-safe : a wild random patch can't get the reverb/delay stuck or mute the
-output.
+path is NaN-safe : a wild random patch, or a NaN arriving over OSC, can't get the
+reverb/delay stuck or mute a voice. Switching a voice on or off (by hand or from the
+sequencer) fades it over 5 ms instead of cutting mid-cycle, and every gain glides : no
+clicks, no zipper. The probes are drawn and dragged on the picture itself (the mirror
+letterboxes it), where the engine really reads : a held line follows its own reading
+path, the Orbit shows its true Lissajous shape, the sweeps run at their real rate.
 
 **Sequencer** : inside the mixer, a step sequencer lets the sound *evolve on its
 own* : each step stores either a **voice on/off mask** (a rhythmic pattern over
@@ -932,8 +938,12 @@ switches the sonification with it (the on-switch and output device stay
 machine-local). And the whole page speaks **OSC** under `/opsia/sonify/…`
 (on/master/root/**rootoct**/scale + per-voice on·gain·pan·probes·pitches·params,
 the **Chord** bank, the **Collage** voice `/collage/{on,gain,resonance,ring,harmonics,width}`, and the **FX** tail `/fx/{send,delaytime,feedback,size,decay,
-damp,reverbmode,freeze,…}`) : advertised over OSCQuery and streamed outbound like
-everything else. Spectra also gained **breath** : a per-partial sine↔noise morph
+damp,reverbmode,freeze,…}`, plus the taps `/tap/{a,b}` (0 master, 1-4 a layer), each
+voice's `/tap` and `/looct` `/hioct`, `/spectra/sync`, `/orbit/shape`, `/filter/loop`) :
+advertised over OSCQuery and streamed outbound like everything else. Index addresses
+(the root octave, the reading paths, the Orbit shape, the chord's voices, the delay and
+events modes, the octaves) are advertised and sent as **integers** and read raw; a
+float sent there is read as 0..1 across the range. Spectra also gained **breath** : a per-partial sine↔noise morph
 (the Coagula blue) from glassy additive to breathy bands.
 
 ![The Sonify page](docs/images/interface-sonify.jpg)
