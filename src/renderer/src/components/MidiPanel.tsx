@@ -1,4 +1,4 @@
-// MIDI section of the osc/audio/midi tab : pick the external controller
+// MIDI section of the audio/midi/osc tab : pick the external controller
 // (input device dropdown), see every learned binding in one list, and clear
 // them. Binding happens live via the toolbar's MIDI LEARN button (dataFLOU's
 // Ableton-style mode); this panel is the ledger.

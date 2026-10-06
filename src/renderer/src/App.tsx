@@ -823,7 +823,7 @@ export default function App(): JSX.Element {
           st.setRightView(st.rightView === 'assemble' ? 'layers' : 'assemble')
           return
         }
-        // A: show/hide the osc/audio/midi setup tab.
+        // A: show/hide the audio/midi/osc setup tab.
         if (k === 'a') {
           e.preventDefault()
           const st = useStore.getState()
@@ -1898,14 +1898,16 @@ export default function App(): JSX.Element {
           ) : rightView === 'assemble' ? (
             <AssemblePanel />
           ) : rightView === 'io' ? (
-            // Setup lives out of the way : OSC + Audio + MIDI as collapsible
+            // Setup lives out of the way : Audio + MIDI + OSC as collapsible
             // sections (A toggles this tab).
             <>
-              <OscPanel />
               <AudioPanel />
               <MidiPanel />
-              <PerformancePanel />
+              <OscPanel />
             </>
+          ) : rightView === 'perf' ? (
+            // The live load meter, on its own tab : it only meters while shown.
+            <PerformancePanel />
           ) : (
             <>
               {[0, 1, 2, 3].map((i) => (
@@ -1930,7 +1932,7 @@ export default function App(): JSX.Element {
       {/* ── Meta Controller: 32 macro knobs / 4 banks (brief §6) ── */}
       <MetaBar />
 
-      {/* Audio + OSC + MIDI setup lives in the right column's `osc/audio/midi`
+      {/* Audio + MIDI + OSC setup lives in the right column's `audio/midi/osc`
           tab (A) : performance space stays for creation, setup out of the way. */}
 
       {/* ── Transport (BPM + Randomize) ───────────────────────────── */}
@@ -2007,7 +2009,7 @@ function RightViewTabs(): JSX.Element {
   const rightView = useStore((s) => s.rightView)
   const setRightView = useStore((s) => s.setRightView)
   const tabs: Array<{
-    id: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io' | 'assemble'
+    id: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io' | 'perf' | 'assemble'
     label: string
     title: string
   }> = [
@@ -2021,10 +2023,15 @@ function RightViewTabs(): JSX.Element {
       title:
         'Assemble (E) : the automatic editor — analyse a folder of video into a descriptor point cloud, then generate an edit from it'
     },
-    { id: 'io', label: 'osc/audio/midi', title: 'Setup (A) : OSC input/OSCQuery, the audio bus, and MIDI (controller input + learned bindings), each a collapsible section' }
+    { id: 'io', label: 'audio/midi/osc', title: 'Setup (A) : the audio bus, MIDI (controller input + learned bindings + output) and OSC input/OSCQuery, each a collapsible section' },
+    {
+      id: 'perf',
+      label: 'performance',
+      title: 'Performance : the whole instrument\'s live load (fps, GPU, VRAM, CPU per section, estimated memory, what is running)'
+    }
   ]
   return (
-    <div className="flex shrink-0 gap-1">
+    <div className="flex shrink-0 flex-wrap gap-1">
       {tabs.map((t) => (
         <button
           key={t.id}

@@ -160,7 +160,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `B` | **Body** page : embodied control (a camera → gestures + modulators) |
 | `K` | **Resolume OSC mapper** page : drive any Resolume address from Palinopsia's signals |
 | `E` | Right column → **assemble** (the automatic editor) |
-| `A` | Right column → **osc/audio/midi** setup tab |
+| `A` | Right column → **audio/midi/osc** setup tab |
 | `D` / `X` / `I` | Collapse Modulation / Master-FX / Inspector |
 | `R` | Fire the Transport's selected Randomize |
 | `H` | **Freeze / hold** the output (the ❄ latch : the Transport button lights while held) |
@@ -220,11 +220,12 @@ soft contact shadow onto it), and a **blend / isolate** mode against the stack. 
 has its own preset bank and its own dice, and is never touched by the global
 Randomize.
 
-The right column switches between **six views** (tabs, or keys `L` / `M` / `F` /
+The right column switches between **seven views** (tabs, or keys `L` / `M` / `F` /
 `G` / `E` / `A`): **Layers** (the strips + background), **Mixer** (tall
 opacity/speed faders + blend for all four), **Finishing** (the Vibe · Context ·
 Finalizer stack), **Feel** (the global macros), **assemble** (the automatic
-editor), and **osc/audio/midi** (the OSC, Audio and MIDI panels).
+editor), **audio/midi/osc** (the Audio, MIDI and OSC panels) and **performance**
+(the live load meter).
 The main Inspector's FX-controls band **auto-fits its parameters** : selecting any
 effect or source sizes the band to exactly its controls, so there's never blank space
 over a few params nor a hidden row behind a scroll (you can still drag its handle to
@@ -488,8 +489,8 @@ composite live.
 
 ## Audio in
 
-The **osc/audio/midi** right-column tab (key `A`) holds the control panels
-(**Audio · OSC · MIDI · Performance**):
+The **audio/midi/osc** right-column tab (key `A`) holds the control panels
+(**Audio · MIDI · OSC**), and the **performance** tab beside it the load meter:
 
 - **Audio** : enable the local analyser (input device picker), or receive
   features over OSC from an audio brain (`/opsia/audio/*`). The **coupling**
@@ -504,11 +505,12 @@ The **osc/audio/midi** right-column tab (key `A`) holds the control panels
     input's noise (mains-hum series + strong tones), models a set of notches, and
     applies a high-pass + multi-notch filter to clean the signal before it is
     monitored or analysed.
-- **OSC** : inbound listener (port, on/off, this machine's IPs), outbound
-  feedback (host/port/interval), and the OSCQuery status.
 - **MIDI** : controller input picker + the learned-bindings ledger, plus the
   **MIDI output** controls (see [MIDI](#midi)).
-- **Performance** : a per-section load monitor — each part of the instrument
+- **OSC** : inbound listener (port, on/off, this machine's IPs), outbound
+  feedback (host/port/interval), and the OSCQuery status.
+- **Performance** (its own tab, right of audio/midi/osc; it meters only while
+  shown) : a per-section load monitor — each part of the instrument
   (render, output, vision, depth, lights, sonify, audio, modulation, MediaPipe)
   with its CPU frame-budget share, estimated VRAM, and active-feature chips, so you
   can see what a heavy session is spending, with units and hover tooltips on every
@@ -550,7 +552,7 @@ Learnable targets:
   pad can also step **scene next / prev**.
 
 Everything except the Meta-knob CCs is machine-local (survives restarts,
-doesn't travel with sessions). The **MIDI** section of the osc/audio/midi tab
+doesn't travel with sessions). The **MIDI** section of the audio/midi/osc tab
 (key `A`) has the **input dropdown** (all controllers, or just one : hot-plug
 is handled), a **live-activity readout** (last message + how many controls are
 wired, so you can confirm the port is really talking), and the full bindings

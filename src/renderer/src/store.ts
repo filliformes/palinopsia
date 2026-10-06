@@ -1141,8 +1141,8 @@ interface StoreState {
   // Right-side panel view : Layers strips, the compact Mixer (M key), or the
   // Finishing Touches (Vibe/Context/Finalizer) stack. All three occupy the same
   // column; a small tab row switches between them.
-  rightView: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io' | 'assemble'
-  setRightView: (v: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io' | 'assemble') => void
+  rightView: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io' | 'perf' | 'assemble'
+  setRightView: (v: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io' | 'perf' | 'assemble') => void
   // Back-compat: the M key still toggles the Mixer on/off against Layers.
   toggleMixerView: () => void
   mixerPresets: Array<{

@@ -1,4 +1,4 @@
-// Performance sub-tab (osc/audio/midi tab) : the whole instrument's load at a
+// Performance tab (right of audio/midi/osc) : the whole instrument's load at a
 // glance. Three readings :
 //   · Top line : host totals from main's sampler (FPS, frame ms, whole-GPU
 //     util/VRAM, app CPU/RAM). GPU fields are NVIDIA-only, else "—".
@@ -81,8 +81,6 @@ function Bar({ frac, danger }: { frac: number; danger?: boolean }): JSX.Element 
 }
 
 export function PerformancePanel(): JSX.Element {
-  const collapsed = useStore((s) => !!s.collapsed['perf'])
-  const toggleSection = useStore((s) => s.toggleSection)
   // Reactive state for the VRAM estimate + active list.
   const compW = useStore((s) => s.compW)
   const compH = useStore((s) => s.compH)
@@ -108,13 +106,13 @@ export function PerformancePanel(): JSX.Element {
   const [fps, setFps] = useState(0)
   const [cpu, setCpu] = useState<Record<string, number>>({})
 
+  // Its own tab : mounted (and metering) only while shown.
   useEffect(() => {
-    if (collapsed) return
     const fast = window.setInterval(() => { setFps(currentFps()); setCpu(perfMeter.read()) }, 250)
     const slow = window.setInterval(() => { window.api.perfStats().then(setStats).catch(() => {}) }, 800)
     window.api.perfStats().then(setStats).catch(() => {})
     return () => { window.clearInterval(fast); window.clearInterval(slow) }
-  }, [collapsed])
+  }, [])
 
   const renderW = Math.round(compW * renderScale)
   const renderH = Math.round(compH * renderScale)
@@ -143,16 +141,14 @@ export function PerformancePanel(): JSX.Element {
   return (
     <div className="flex min-w-0 flex-col gap-1.5 border-t border-border bg-panel px-3 py-1.5 text-[11px]">
       <div className="flex min-w-0 items-center gap-2">
-        <button onClick={() => toggleSection('perf')} className="flex shrink-0 items-center gap-1.5" title="Live processing load, per section. Click to expand / collapse. Hover any row, number or chip inside for what it measures.">
-          <span className={`font-mono text-[9px] text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}>▶</span>
+        <span className="flex shrink-0 cursor-help items-center gap-1.5" title="Live processing load, per section. Hover any row, number or chip for what it measures.">
           <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Performance</span>
-        </button>
+        </span>
         <div className="flex-1" />
         <span className={`cursor-help font-mono text-[9px] ${fps > 0 && fps < 40 ? 'text-danger' : 'text-accent'}`} title="Frames per second of the composition render (rolling average). Red below 40.">{fps ? `${Math.round(fps)} fps` : '—'}</span>
       </div>
 
-      {!collapsed && (
-        <>
+      <>
           {/* Top line : host totals. */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded bg-panel2/40 px-2 py-1 font-mono text-[9px] text-muted">
             <span className="cursor-help" title="Milliseconds per rendered frame (1000 ÷ FPS). Under 16.7 ms = 60 fps ; above it you are dropping frames.">frame <span className="text-text">{fps ? (1000 / fps).toFixed(1) : '—'}</span> ms</span>
@@ -226,7 +222,6 @@ export function PerformancePanel(): JSX.Element {
             Hover any label, number or chip for what it measures. CPU is measured per section (ms/frame) ; VRAM is estimated from the app’s allocations (render size dominates) ; whole-GPU % needs an NVIDIA card, else “—”. The chips are status indicators, not buttons.
           </p>
         </>
-      )}
     </div>
   )
 }

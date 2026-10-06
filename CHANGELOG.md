@@ -295,6 +295,9 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Performance has its own tab**, right of the setup tab, always open there (and
+  metering only while shown). The setup tab is now **audio/midi/osc**, its sections in
+  that order.
 - **Context's blur is yours alone.** It starts at 0, and New, Randomize (every scope and
   the Context dice), Variation, Generate and Worlds no longer set it : the picture only
   softens when you move the slider (or a modulator, MIDI or OSC you bound to it). The
