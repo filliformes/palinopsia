@@ -919,7 +919,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     contour: 'Bends the straight cut lines into wandering, frayed curves.',
     curve: 'Wavelength of the contour : low = many small waves, high = a few long sweeping curves.',
     contourMode: 'WARPED = contour ripples the film inside each piece too. NORMAL = only the cut edges fray; the picture stays straight.',
-    torn: 'A pale, ragged torn-paper edge along every cut.',
+    torn: 'Tears the cuts like paper : one piece lies over the other and shows the white core of the paper along its ragged edge, with loose fibers and a soft shadow. Past 1, deep ripped bites.',
     mask: 'Drops pieces out, leaving transparent holes the layers below show through. At 1 a single piece survives (a new one at each deal).',
     rate: 'Re-deals the whole wall every this many seconds (new films, new cut). 0 = only when you press deal.',
     xfade: 'Dissolve time from one deal to the next. 0 = a hard cut.',

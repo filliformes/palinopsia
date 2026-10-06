@@ -132,8 +132,9 @@ void main(){
 // mosaic shards come out the same width in every direction at 16:9 and on a
 // square dome. Compiled TWICE, once per shape (MOSAIC 0/1) : sharing one program
 // behind a uniform branch cost the cut-up path ~1.5x in register pressure.
-const FS_COLLAGE = (mosaic: boolean): string => `#version 300 es
+const FS_COLLAGE = (mosaic: boolean, torn: boolean): string => `#version 300 es
 #define MOSAIC ${mosaic ? 1 : 0}
+#define TORN ${torn ? 1 : 0}
 precision highp float;
 // GLSL ES 3.00 gives sampler2D a default precision in the fragment stage but
 // NOT sampler2DArray : without this line the whole program fails to compile.
@@ -196,26 +197,93 @@ vec3 film(int i, vec2 sUV){
   vec2 span = max(ct.zw - 2.0 * uTexel, vec2(1e-4));
   vec2 t = (cr.xy + luv * cr.zw - lo) / span;
   t = 1.0 - abs(mod(t, 2.0) - 1.0);
-  return texture(uDecks, vec3(lo + t * span, uMeta[i].x)).rgb;
+  // An explicit LOD : torn paper reads a neighbour's film inside per-pixel
+  // branches, where implicit derivatives are undefined. The decks have no
+  // mipmaps, so level 0 is exactly what texture() read.
+  return textureLod(uDecks, vec3(lo + t * span, uMeta[i].x), 0.0).rgb;
 }
-// Seams + torn-paper fringe from the distance to the piece's border (height
-// units). Widths are floored at a pixel so thin cuts never break into dashes.
-vec3 edges(vec3 col, float ed, vec2 qa){
+// Seams : a dark cut along every border (height units), floored at a pixel so
+// thin cuts never break into dashes.
+vec3 seam(vec3 col, float ed){
   if (uGap > 0.001) col *= smoothstep(0.0, max(uGap * 0.02, uPx), ed);
-  if (uTorn > 0.001){
-    // A heavy-tailed fringe width : long stretches of hairline tear broken
-    // by broad white bites, the way a real rip crosses the paper grain.
-    float bite = pow(vnoise(qa * 6.0 + 13.7), 3.0);
-    float rag = 0.5 + 0.5 * vnoise(qa * 90.0);
-    float fw = max(uTorn * 0.012 * (0.06 + 2.4 * bite + 0.45 * rag), 1.2 * uPx);
-    float sh = smoothstep(fw * 0.8, fw + 0.020 * uTorn, ed);
-    col *= 1.0 - (1.0 - sh) * 0.3 * min(uTorn, 1.0);
-    float paper = 1.0 - smoothstep(0.0, fw, ed);
-    vec3 paperCol = vec3(0.93, 0.91, 0.87) * (0.80 + 0.20 * vnoise(qa * 160.0));
-    col = mix(col, paperCol, paper * min(uTorn * 2.0, 1.0));
-  }
   return col;
 }
+#if TORN
+// TORN PAPER, modelled on a real torn-magazine collage. Along every tear one
+// piece lies OVER its neighbour (a per-piece order; a masked piece is a hole and
+// always lies under) : only that upper piece shows the white core of the paper,
+// where the tear stripped its printed skin at an angle; the other side is just
+// covered. The rip line is ragged at every scale, the white is a hairline for
+// long stretches and then bites in deep (a heavy-tailed width), its outer rim is
+// thin and fibrous (the picture below shows through), a few loose fibres stick
+// out past it, the printed skin ends in a faint ink line, and the upper piece
+// casts a soft shadow on what lies below, longer on the side away from the light
+// (top left). A tear over a hole drops its shadow onto the layers underneath.
+// Frame borders are cuts, not tears : no fringe there.
+// C : this pixel's piece, N : the piece across the nearest border, ed : distance
+// to that border (height units), dir : unit normal from C toward N (height
+// units). Returns STRAIGHT colour + alpha.
+float order(int i){ return vhash(vec2(float(i) * 1.618 + 0.37, 4.21)); }
+vec4 tornPaper(int C, int N, vec3 colC, float keepC, float ed, vec2 dir, vec2 qa, vec2 sUV){
+  float keepN = smoothstep(uMask - 0.06, uMask, uMeta[N].z);
+  float zC = keepC > 0.5 ? order(C) : -1.0;
+  float zN = keepN > 0.5 ? order(N) : -1.0;
+  if (zC < 0.0 && zN < 0.0) return vec4(0.0);
+  bool upC = zC >= zN;
+  float s = upC ? ed : -ed; // signed distance into the upper piece
+  float keepU = upC ? keepC : keepN;
+  float keepL = upC ? keepN : keepC;
+  float T = uTorn;
+  float along = dot(qa, vec2(-dir.y, dir.x)); // position along the tear
+  // Width : long hairline stretches broken by broad bites.
+  float bite = pow(vnoise(vec2(along * 5.0 + 13.7, 3.1)), 3.0);
+  float rag = vnoise(vec2(along * 70.0, 9.4));
+  float fw = max(T * 0.0095 * (0.10 + 2.8 * bite + 0.55 * rag), 1.5 * uPx);
+  // The rip line itself, ragged at every scale. The fine raggedness is the
+  // paper's own fibre size, the same however deep the bite (scaling it with the
+  // width turned a broad tear furry).
+  float ff = min(600.0, 0.5 / uPx);
+  float jag = (vnoise(vec2(along * 140.0, 1.7)) - 0.5) * 0.35 * fw
+            + (vnoise(vec2(along * ff, 5.3)) - 0.5) * (0.0010 * min(T, 1.5) + 1.2 * uPx);
+  // The white sits partly past the cut (the upper piece overlaps its neighbour).
+  float eOut = -fw * (0.2 + 0.45 * vnoise(vec2(along * 11.0, 7.7))) + jag;
+  float ePrint = eOut + fw;
+  if (s >= ePrint){
+    // The upper piece's printed skin; a faint ink line where it broke off.
+    vec3 cu = upC ? colC : film(N, sUV);
+    float ink = 1.0 - 0.16 * min(T, 1.0) * (1.0 - smoothstep(0.0, 0.15 * fw + 1.5 * uPx, s - ePrint));
+    return vec4(cu * ink, keepU);
+  }
+  vec3 cl = upC ? film(N, sUV) : colC; // the lower piece, under the white and the shadow
+  // Paper core : warm off-white, a fine fibrous grain, a little greyer where the
+  // bevel turns under the print.
+  float fq = min(330.0, 0.33 / uPx);
+  vec3 paper = vec3(0.95, 0.935, 0.90) * (0.88 + 0.12 * vnoise(qa * 260.0));
+  paper *= 1.0 - 0.06 * smoothstep(0.55, 0.95, vnoise(vec2(along * fq, s * 2.0 / fw)));
+  if (s >= eOut){
+    float t = (s - eOut) / fw;
+    paper *= mix(1.0, 0.92, smoothstep(0.55, 1.0, t));
+    // The thin fibrous rim (a fibre's width, not a share of the bite) lets the picture through.
+    float a = mix(0.55, 1.0, smoothstep(0.0, min(0.35 * fw, 0.0018) + uPx, s - eOut));
+    vec4 under = vec4(cl * keepL, keepL);
+    vec4 r = vec4(paper, 1.0) * a + under * (1.0 - a);
+    return vec4(r.a > 0.002 ? r.rgb / r.a : vec3(0.0), r.a);
+  }
+  // Past the torn edge : the lower piece, loose fibres, and the upper piece's shadow.
+  float past = eOut - s;
+  vec2 away = upC ? dir : -dir; // from the upper piece toward the lower
+  float lit = 0.3 + 0.7 * max(0.0, dot(away, vec2(0.55, -0.835))); // light from the top left
+  float shw = (0.0025 + 0.009 * min(T, 1.5)) * lit;
+  float sh = 0.5 * min(T, 1.0) * exp(-past / max(shw, uPx)) * (0.45 + 0.55 * lit);
+  // A few loose fibres, short and sparse : paper, not fur.
+  float fl = 0.06 * fw + 0.0009 * min(T, 1.5);
+  float fib = smoothstep(0.86, 0.98, vnoise(vec2(along * fq, past / max(fl, uPx) * 0.7)))
+            * exp(-past / max(fl, uPx)) * 0.7 * min(T * 1.5, 1.0);
+  vec4 under = vec4(cl * keepL * (1.0 - sh), keepL + (1.0 - keepL) * sh * 0.85);
+  vec4 r = vec4(paper, 1.0) * fib + under * (1.0 - fib);
+  return vec4(r.a > 0.002 ? r.rgb / r.a : vec3(0.0), r.a);
+}
+#endif
 void main(){
   vec2 A = vec2(uAspect, 1.0);
   vec3 col = vec3(0.0);
@@ -235,13 +303,13 @@ void main(){
     // irregular polygons; the border distance (2nd-nearest - nearest) drives the
     // same seams / torn fringe / mask the rectangles use. Seeds sit in rows, so
     // past 16 shards only the neighbouring rows and columns are searched.
-    int mi = 0; float d1 = 1e9, d2 = 1e9;
+    int mi = 0, mi2 = 0; float d1 = 1e9, d2 = 1e9;
     if (uCount <= 16 || uRowCount < 1){
       for (int i = 0; i < 64; i++){
         if (i >= uCount) break;
         float dd = distance(qa, uSite[i].xy);
-        if (dd < d1){ d2 = d1; d1 = dd; mi = i; }
-        else if (dd < d2){ d2 = dd; }
+        if (dd < d1){ d2 = d1; mi2 = mi; d1 = dd; mi = i; }
+        else if (dd < d2){ d2 = dd; mi2 = i; }
       }
     } else {
       int r0 = clamp(int(wUV.y * float(uRowCount)), 0, uRowCount - 1);
@@ -256,13 +324,22 @@ void main(){
           int c = c0 + dc;
           if (c < 0 || c >= k) continue;
           float dd = distance(qa, uSite[b + c].xy);
-          if (dd < d1){ d2 = d1; d1 = dd; mi = b + c; }
-          else if (dd < d2){ d2 = dd; }
+          if (dd < d1){ d2 = d1; mi2 = mi; d1 = dd; mi = b + c; }
+          else if (dd < d2){ d2 = dd; mi2 = b + c; }
         }
       }
     }
     keep = smoothstep(uMask - 0.06, uMask, uMeta[mi].z);
-    col = edges(film(mi, sUV), 0.5 * (d2 - d1), qa);
+    float ed = 0.5 * (d2 - d1);
+    col = film(mi, sUV);
+#if TORN
+    if (uCount > 1 && mi2 != mi && ed < uTorn * 0.035 + 0.02){
+      vec2 dv = uSite[mi2].xy - uSite[mi].xy;
+      vec4 tp = tornPaper(mi, mi2, col, keep, ed, dv / max(length(dv), 1e-5), qa, sUV);
+      col = tp.rgb; keep = tp.a;
+    }
+#endif
+    col = seam(col, ed);
   }
 #else
   {
@@ -276,8 +353,33 @@ void main(){
     }
     vec4 d = uCell[hit];
     keep = smoothstep(uMask - 0.06, uMask, uMeta[hit].z);
-    vec2 e = min(wUV - d.xy, d.xy + d.zw - wUV) * A;
-    col = edges(film(hit, sUV), min(e.x, e.y), qa);
+    vec2 elo = (wUV - d.xy) * A;
+    vec2 ehi = (d.xy + d.zw - wUV) * A;
+    float ed = elo.x; vec2 dir = vec2(-1.0, 0.0);
+    if (ehi.x < ed){ ed = ehi.x; dir = vec2(1.0, 0.0); }
+    if (elo.y < ed){ ed = elo.y; dir = vec2(0.0, -1.0); }
+    if (ehi.y < ed){ ed = ehi.y; dir = vec2(0.0, 1.0); }
+    col = film(hit, sUV);
+#if TORN
+    if (ed < uTorn * 0.035 + 0.02){
+      // The piece just across the nearest border (none past the frame : a cut,
+      // not a tear). Only pixels near a border pay for this second search.
+      vec2 pr = wUV + dir * (ed + 0.5 * uPx) / A;
+      int nb = -1;
+      if (pr.x > 0.0 && pr.x < 1.0 && pr.y > 0.0 && pr.y < 1.0){
+        for (int i = 0; i < 64; i++){
+          if (i >= uCount) break;
+          vec4 c = uCell[i];
+          if (i != hit && pr.x >= c.x && pr.x < c.x + c.z && pr.y >= c.y && pr.y < c.y + c.w){ nb = i; break; }
+        }
+      }
+      if (nb >= 0){
+        vec4 tp = tornPaper(hit, nb, col, keep, ed, dir, qa, sUV);
+        col = tp.rgb; keep = tp.a;
+      }
+    }
+#endif
+    col = seam(col, ed);
   }
 #endif
   // Masked pieces leave TRANSPARENT holes, so the layers underneath show through.
@@ -308,6 +410,10 @@ interface CollageGL {
   tile: WebGLProgram
   collage: WebGLProgram // cut-up
   mosaic: WebGLProgram
+  // The torn-paper variants : the torn code is compiled only into the programs
+  // that use it, so a collage with torn at 0 runs exactly the plain programs.
+  // Linked with the rest, never mid-show (a first torn turn must not hitch).
+  torn: { collage: WebGLProgram; mosaic: WebGLProgram; uColl: (n: string) => WebGLUniformLocation | null; uMos: (n: string) => WebGLUniformLocation | null }
   fold: WebGLProgram
   show: WebGLProgram
   vao: WebGLVertexArrayObject
@@ -327,7 +433,7 @@ interface CollageGL {
 const shared = new WeakMap<WebGL2RenderingContext, CollageGL>()
 function collageGL(gl: WebGL2RenderingContext): CollageGL {
   const hit = shared.get(gl)
-  if (hit && gl.isProgram(hit.collage) && gl.isProgram(hit.mosaic) && gl.isVertexArray(hit.vao)) return hit
+  if (hit && gl.isProgram(hit.collage) && gl.isProgram(hit.mosaic) && gl.isProgram(hit.torn.collage) && gl.isVertexArray(hit.vao)) return hit
   const compile = (type: number, src: string): WebGLShader => {
     const s = gl.createShader(type)!
     gl.shaderSource(s, src)
@@ -347,8 +453,10 @@ function collageGL(gl: WebGL2RenderingContext): CollageGL {
     return p
   }
   const tile = link(FS_TILE)
-  const collage = link(FS_COLLAGE(false))
-  const mosaic = link(FS_COLLAGE(true))
+  const collage = link(FS_COLLAGE(false, false))
+  const mosaic = link(FS_COLLAGE(true, false))
+  const tornColl = link(FS_COLLAGE(false, true))
+  const tornMos = link(FS_COLLAGE(true, true))
   const fold = link(FS_FOLD)
   const show = link(FS_SHOW)
   const vao = gl.createVertexArray()!
@@ -370,7 +478,8 @@ function collageGL(gl: WebGL2RenderingContext): CollageGL {
   const g: CollageGL = {
     tile, collage, mosaic, fold, show, vao, quad,
     uTile: cacheOf(tile), uColl: cacheOf(collage), uMos: cacheOf(mosaic),
-    uFold: cacheOf(fold), uShow: cacheOf(show)
+    uFold: cacheOf(fold), uShow: cacheOf(show),
+    torn: { collage: tornColl, mosaic: tornMos, uColl: cacheOf(tornColl), uMos: cacheOf(tornMos) }
   }
   shared.set(gl, g)
   return g
@@ -1446,8 +1555,9 @@ export class CollageSource {
       this.metaArr[i * 4 + 3] = 0
     }
     const live = this.live
-    const prog = this.lastShape === 1 ? g.mosaic : g.collage
-    const U = this.lastShape === 1 ? g.uMos : g.uColl
+    const tg = num(live.torn, 0) > 0.001 ? g.torn : g
+    const prog = this.lastShape === 1 ? tg.mosaic : tg.collage
+    const U = this.lastShape === 1 ? tg.uMos : tg.uColl
     gl.useProgram(prog)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.arr)

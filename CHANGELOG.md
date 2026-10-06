@@ -305,6 +305,16 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Collage's torn paper tears like real paper.** It used to paint the same off-white
+  band on both sides of every cut (and along the frame's edges), which read as a seam.
+  Now, as in a torn-magazine collage, one piece of each tear lies over the other : only
+  its ripped edge shows the white core of the paper, a hairline for long stretches and
+  then deep bites, ragged at every scale (the fine raggedness stays the paper's fiber
+  size, so a deep bite never turns furry), with a thin translucent rim, a few loose
+  fibers, a faint ink line where the printed skin broke, and a soft shadow longer away
+  from the light. A tear over a masked hole drops its shadow on the layers beneath; the
+  frame's edges stay clean cuts. The torn code compiles into its own programs, so torn
+  at 0 runs exactly as before; on (4K, RTX 4070) it costs about the old torn's 0.3 ms.
 - **Performance has its own tab**, right of the setup tab, always open there (and
   metering only while shown). The setup tab is now **audio/midi/osc**, its sections in
   that order.

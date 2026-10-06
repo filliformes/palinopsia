@@ -995,7 +995,13 @@ living mosaic where every fragment is a different film. Pick it as a layer sourc
   all-holding to every-piece-its-own-montage.
 - **`deal`** re-deals the wall by hand, **`rate`** on a clock, and a **`crossfade`**
   dissolves one deal into the next instead of snapping. contour · curve length · torn
-  paper · mask · rotate are the **Autocutter's own dials**, working identically here;
+  paper · mask · rotate are the **Autocutter's own dials**, working identically here,
+  except that Collage's **torn paper** tears like a real torn-magazine collage : along
+  each tear one piece lies over the other, so only its ripped edge shows the white core
+  of the paper (a hairline for long stretches, then deep bites), ragged at every scale
+  with a few loose fibers, and it casts a soft shadow, longer away from the light. A
+  tear over a masked hole drops its shadow on the layers beneath; the frame's own
+  edges stay clean cuts;
   **`shape`** switches the pieces between the cut-up rectangles and a **Voronoi
   mosaic**, and a **contour mode** (normal / warped) chooses whether Contour frays
   **only the cut edges** (the film inside stays straight) or ripples the whole clip.
