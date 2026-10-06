@@ -19,6 +19,11 @@ PORT="${1:-9555}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TMP="$(node -p "require('os').tmpdir().replace(/\\\\/g, '/')")"
 OUT="$TMP/opsia-testbuild-$PORT"
+# Electron through its REAL path : Windows picks the graphics card per program
+# path, so a copy launched through a worktree's node_modules junction ran on the
+# integrated GPU (about 15x slower, measured) while the repo's own path gets the
+# discrete one.
+ELECTRON="$(node -p "require('fs').realpathSync.native(process.argv[1])" "$ROOT/node_modules/electron/dist/electron.exe")"
 UD="$TMP/opsia-testbuild-$PORT-userdata"
 
 stop() {
@@ -29,7 +34,7 @@ stop
 sleep 1
 if [ "$2" = "launch" ] && [ -f "$OUT/main/index.js" ]; then
   cd "$OUT"
-  ("$ROOT/node_modules/electron/dist/electron.exe" . > "$OUT.log" 2>&1 &)
+  ("$ELECTRON" . > "$OUT.log" 2>&1 &)
   sleep 8
   echo "relaunched test build on CDP port $PORT"
   exit 0
@@ -64,6 +69,6 @@ mkdir -p "$OUT/resources"
 cp -r "$ROOT/resources/mediapipe" "$OUT/resources/"
 
 cd "$OUT"
-("$ROOT/node_modules/electron/dist/electron.exe" . > "$OUT.log" 2>&1 &)
+("$ELECTRON" . > "$OUT.log" 2>&1 &)
 sleep 10
 echo "test build on CDP port $PORT (log: $OUT.log)"
