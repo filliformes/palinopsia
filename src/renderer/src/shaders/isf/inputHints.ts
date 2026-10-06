@@ -921,6 +921,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     contourMode: 'WARPED = contour ripples the film inside each piece too. NORMAL = only the cut edges fray; the picture stays straight.',
     torn: 'Tears the cuts like paper : one piece lies over the other and shows the white core of the paper along its ragged edge, with loose fibers and a soft shadow. Past 1, deep ripped bites.',
     mask: 'Drops pieces out, leaving transparent holes the layers below show through. At 1 a single piece survives (a new one at each deal).',
+    fxFirst: 'ON = the source FX rack (under this source) processes the films only, and the seams, contours, torn paper and holes are drawn afterwards, crisp : a blur, a glitch or a color pass changes the films but never softens the cut shapes. OFF = the FX process the finished wall, shapes and all.',
     rate: 'Re-deals the whole wall every this many seconds (new films, new cut). 0 = only when you press deal.',
     xfade: 'Dissolve time from one deal to the next. 0 = a hard cut.',
     deal: 'Re-deal the wall now : new films, new cut. Press it, send OSC, or bind a modulator.'

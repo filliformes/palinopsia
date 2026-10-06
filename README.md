@@ -1023,6 +1023,11 @@ living mosaic where every fragment is a different film. Pick it as a layer sourc
   **only the cut edges** (the film inside stays straight) or ripples the whole clip.
   Either way the film **adapts to its piece** : normal, warped and mosaic shapes all
   fill edge-to-edge with real video, no black in the cuts.
+- **FX before shapes** : turn it on and the source's own FX rack (the one under
+  the Collage) processes the films only, then the seams, contours, torn paper and
+  holes are drawn afterwards, crisp : blur, pixelate, glitch or recolor every film
+  without softening the cut shapes. Off, the FX process the finished wall. (Torn
+  paper then reads the neighbouring film mirrored across the tear.)
 - **Optimise** (a button in the strip) re-encodes the whole folder to 720p
   all-intra H.264 : the shape the wall's constant seeking wants. Slow (minutes for
   a big folder) but one-time and cached; measured to hold 60 fps with 50 films.

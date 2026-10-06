@@ -1294,6 +1294,7 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'contourMode', TYPE: 'long', VALUES: [0, 1], LABELS: ['normal', 'warped'], DEFAULT: 1, LABEL: 'contour mode' },
         { NAME: 'torn', TYPE: 'float', MIN: 0.0, MAX: 2.0, DEFAULT: 0.0, LABEL: 'torn paper' },
         { NAME: 'mask', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'mask' },
+        { NAME: 'fxFirst', TYPE: 'bool', DEFAULT: false, LABEL: 'FX before shapes' },
         { NAME: 'rate', TYPE: 'float', MIN: 0.0, MAX: 60.0, DEFAULT: 0.0, LABEL: 'auto deal (s)' },
         { NAME: 'xfade', TYPE: 'float', MIN: 0.0, MAX: 4.0, DEFAULT: 0.0, LABEL: 'crossfade (s)' },
         { NAME: 'deal', TYPE: 'event', LABEL: 'deal' }
@@ -1307,6 +1308,7 @@ export const GENERATORS: IsfShader[] = [
       speed: [0.5, 1.6],
       vary: [0, 0.6],
       freeze: [0, 0], // never dice a stopped wall
+      fxFirst: [0, 0], // a structural choice : yours, not the dice's
       zoom: [1, 1.4],
       rotate: [0, 0.35],
       gap: [0, 0.4],

@@ -153,6 +153,11 @@ uniform int uRowCount;
 uniform float uGap, uSeed, uContour, uTorn, uMask, uCurve, uAspect, uTexel, uPx;
 uniform int uContourMode; // 0 = normal (warp edges only), 1 = warped (warp content too)
 uniform int uStraight;    // 1 = straight alpha (drawn straight into the layer), 0 = premultiplied
+// FX BEFORE SHAPES : 0 the whole wall · 1 its films only, every piece whole (the
+// source's FX rack runs on that next) · 2 its shapes (seams, torn paper, holes)
+// drawn crisp over uFx, the films after the FX
+uniform int uPass;
+uniform sampler2D uFx;
 float vhash(vec2 p){
   vec3 p3 = fract(vec3(p.xyx) * 0.1031 + uSeed);
   p3 += dot(p3, p3.yzx + 33.33);
@@ -210,6 +215,12 @@ vec3 seam(vec3 col, float ed){
   return col;
 }
 #if TORN
+// The piece across a tear. Over FX'd films (pass 2) there is no second film to
+// read : mirror across the tear into the neighbour's own (processed) pixels.
+vec3 neighbour(int N, vec2 sUV, vec2 dir, float ed){
+  if (uPass == 2) return textureLod(uFx, clamp(vUV + dir * (2.0 * ed + 2.0 * uPx) / vec2(uAspect, 1.0), 0.0, 1.0), 0.0).rgb;
+  return film(N, sUV);
+}
 // TORN PAPER, modelled on a real torn-magazine collage. Along every tear one
 // piece lies OVER its neighbour (a per-piece order; a masked piece is a hole and
 // always lies under) : only that upper piece shows the white core of the paper,
@@ -251,11 +262,11 @@ vec4 tornPaper(int C, int N, vec3 colC, float keepC, float ed, vec2 dir, vec2 qa
   float ePrint = eOut + fw;
   if (s >= ePrint){
     // The upper piece's printed skin; a faint ink line where it broke off.
-    vec3 cu = upC ? colC : film(N, sUV);
+    vec3 cu = upC ? colC : neighbour(N, sUV, dir, ed);
     float ink = 1.0 - 0.16 * min(T, 1.0) * (1.0 - smoothstep(0.0, 0.15 * fw + 1.5 * uPx, s - ePrint));
     return vec4(cu * ink, keepU);
   }
-  vec3 cl = upC ? film(N, sUV) : colC; // the lower piece, under the white and the shadow
+  vec3 cl = upC ? neighbour(N, sUV, dir, ed) : colC; // the lower piece, under the white and the shadow
   // Paper core : warm off-white, a fine fibrous grain, a little greyer where the
   // bevel turns under the print.
   float fq = min(330.0, 0.33 / uPx);
@@ -332,15 +343,15 @@ void main(){
     }
     keep = smoothstep(uMask - 0.06, uMask, uMeta[mi].z);
     float ed = 0.5 * (d2 - d1);
-    col = film(mi, sUV);
+    col = uPass == 2 ? textureLod(uFx, vUV, 0.0).rgb : film(mi, sUV);
 #if TORN
-    if (uCount > 1 && mi2 != mi && ed < uTorn * 0.035 + 0.02){
+    if (uPass != 1 && uCount > 1 && mi2 != mi && ed < uTorn * 0.035 + 0.02){
       vec2 dv = uSite[mi2].xy - uSite[mi].xy;
       vec4 tp = tornPaper(mi, mi2, col, keep, ed, dv / max(length(dv), 1e-5), qa, sUV);
       col = tp.rgb; keep = tp.a;
     }
 #endif
-    col = seam(col, ed);
+    if (uPass != 1) col = seam(col, ed);
   }
 #else
   {
@@ -360,9 +371,9 @@ void main(){
     if (ehi.x < ed){ ed = ehi.x; dir = vec2(1.0, 0.0); }
     if (elo.y < ed){ ed = elo.y; dir = vec2(0.0, -1.0); }
     if (ehi.y < ed){ ed = ehi.y; dir = vec2(0.0, 1.0); }
-    col = film(hit, sUV);
+    col = uPass == 2 ? textureLod(uFx, vUV, 0.0).rgb : film(hit, sUV);
 #if TORN
-    if (ed < uTorn * 0.035 + 0.02){
+    if (uPass != 1 && ed < uTorn * 0.035 + 0.02){
       // The piece just across the nearest border (none past the frame : a cut,
       // not a tear). Only pixels near a border pay for this second search.
       vec2 pr = wUV + dir * (ed + 0.5 * uPx) / A;
@@ -380,9 +391,11 @@ void main(){
       }
     }
 #endif
-    col = seam(col, ed);
+    if (uPass != 1) col = seam(col, ed);
   }
 #endif
+  // Films only : every piece whole and opaque, so the FX see one full picture.
+  if (uPass == 1) keep = 1.0;
   // Masked pieces leave TRANSPARENT holes, so the layers underneath show through.
   vec3 c = clamp(col, 0.0, 1.0);
   o = uStraight == 1 ? vec4(keep > 0.0 ? c : vec3(0.0), keep) : vec4(c * keep, keep);
@@ -1489,10 +1502,18 @@ export class CollageSource {
     }
   }
 
+  /** FX BEFORE SHAPES : the source's FX rack processes the films alone, and the
+   *  seams, contours, torn paper and holes are drawn afterwards, crisp, over the
+   *  processed films (Compositor : render(…, true) → the rack → renderShapes). */
+  get fxFirst(): boolean {
+    return num(this.live.fxFirst, 0) >= 0.5
+  }
+
   /** Draw the wall into the layer's scratch target. `clockSec` is the layer's
    *  own clock (Speed x global speed; the background's slow clock); without it
-   *  the wall falls back to realtime. */
-  render(scratchFbo: WebGLFramebuffer, clockSec?: number): void {
+   *  the wall falls back to realtime. `filmsOnly` : draw just the films, every
+   *  piece whole (the FX-before-shapes first pass). */
+  render(scratchFbo: WebGLFramebuffer, clockSec?: number, filmsOnly = false): void {
     if (this.disposed) return
     const gl = this.gl
     const g = collageGL(gl)
@@ -1500,19 +1521,34 @@ export class CollageSource {
     // Own vertex array for every draw : the default one belongs to the ISF runtime.
     gl.bindVertexArray(g.vao)
     try {
-      this.draw(g, scratchFbo)
+      this.draw(g, scratchFbo, filmsOnly ? 1 : 0, null)
     } finally {
       gl.bindVertexArray(null)
     }
   }
 
-  private draw(g: CollageGL, scratchFbo: WebGLFramebuffer): void {
+  /** The FX-before-shapes second pass : the wall's shapes over `fxTex` (the
+   *  films after the source's FX), into `fbo`. Same frame as the render() just
+   *  before it : nothing is ticked or uploaded again. */
+  renderShapes(fxTex: WebGLTexture, fbo: WebGLFramebuffer): void {
+    if (this.disposed) return
+    const gl = this.gl
+    const g = collageGL(gl)
+    gl.bindVertexArray(g.vao)
+    try {
+      this.draw(g, fbo, 2, fxTex)
+    } finally {
+      gl.bindVertexArray(null)
+    }
+  }
+
+  private draw(g: CollageGL, scratchFbo: WebGLFramebuffer, pass: number, fxTex: WebGLTexture | null): void {
     const gl = this.gl
     gl.disable(gl.BLEND)
 
     // 1) Fold every freshly decoded frame into its array layer. A deck no piece
     //    shows is skipped (its pending frame waits until it is shown again).
-    if (this.arr && this.fbo) {
+    if (pass !== 2 && this.arr && this.fbo) {
       let bound = false
       const T = this.tile
       const now = performance.now()
@@ -1583,7 +1619,7 @@ export class CollageSource {
       gl.viewport(0, 0, this.w, this.h)
       gl.clearColor(0, 0, 0, 0)
       gl.clear(gl.COLOR_BUFFER_BIT)
-      this.prevValid = false
+      if (pass !== 1) this.prevValid = false
       return
     }
 
@@ -1630,18 +1666,34 @@ export class CollageSource {
     gl.uniform1f(U('uTorn'), clampf(num(live.torn, 0), 0, 2))
     gl.uniform1f(U('uMask'), clampf(num(live.mask, 0), 0, 1))
     gl.uniform1i(U('uContourMode'), Math.round(clampf(num(live.contourMode, 1), 0, 1)))
+    gl.uniform1i(U('uPass'), pass)
+    gl.uniform1i(U('uFx'), 1) // its own unit, never the deck array's
+    // Unit 1 holds the processed films in pass 2, and NOTHING otherwise : uFx is
+    // an active sampler, so whatever was left bound there (the layer's own target)
+    // would be a feedback loop and fail the draw.
+    gl.activeTexture(gl.TEXTURE1)
+    gl.bindTexture(gl.TEXTURE_2D, pass === 2 && fxTex ? fxTex : null)
+    gl.activeTexture(gl.TEXTURE0)
 
     // 4a) No crossfade : the wall draws straight into the layer, in the straight
     //     alpha the blend stack reads. No extra buffers, no copy pass.
-    const buffered = this.xfadeDur > 0 || this.xfade < 1
+    // (The films-only pass never dissolves : the shapes pass after the FX does.)
+    const buffered = pass !== 1 && (this.xfadeDur > 0 || this.xfade < 1)
     if (!buffered) {
       gl.uniform1i(U('uStraight'), 1)
       gl.bindFramebuffer(gl.FRAMEBUFFER, scratchFbo)
       gl.viewport(0, 0, this.w, this.h)
       gl.drawArrays(gl.TRIANGLES, 0, 3)
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, null)
-      this.prevValid = false
-      this.foldAt = null
+      if (pass === 2) {
+        gl.activeTexture(gl.TEXTURE1)
+        gl.bindTexture(gl.TEXTURE_2D, null)
+        gl.activeTexture(gl.TEXTURE0)
+      }
+      if (pass !== 1) {
+        this.prevValid = false
+        this.foldAt = null
+      }
       return
     }
 
@@ -1668,6 +1720,12 @@ export class CollageSource {
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.arr)
     }
     this.foldAt = null
+    if (pass === 2 && fxTex) {
+      // the fold above rebound unit 0; the processed films stay on unit 1
+      gl.activeTexture(gl.TEXTURE1)
+      gl.bindTexture(gl.TEXTURE_2D, fxTex)
+      gl.activeTexture(gl.TEXTURE0)
+    }
     gl.uniform1i(U('uStraight'), 0)
     gl.bindFramebuffer(gl.FRAMEBUFFER, cur.fbo)
     gl.viewport(0, 0, this.w, this.h)

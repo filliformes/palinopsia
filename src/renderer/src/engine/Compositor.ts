@@ -732,6 +732,12 @@ class FxRack {
 
   /** Run the chain on `input`; returns the last written texture. `nodeCtx` is
    *  required for racks that may hold native convolution nodes (layer FX). */
+  /** Any effect switched on (a Collage drawing its shapes after its FX needs to
+   *  know whether there are FX at all). */
+  hasEnabled(): boolean {
+    return this.units.some((u) => u.enabled && (!!u.isf || !!u.node));
+  }
+
   apply(input: WebGLTexture, chain: ChainBuffers, nodeCtx?: NodeApplyCtx): WebGLTexture {
     let cur = input;
     for (const u of this.units) {
@@ -1264,7 +1270,8 @@ export class ISFLayer {
     // Native collage: a wall of simultaneous films through the cut-up partition.
     const collage = slot === 'A' ? this.collageA : this.collageB;
     if (collage) {
-      collage.render(scratch.fbo, this.clockSec); // layer clock : Speed / global speed apply
+      // layer clock : Speed / global speed apply. FX before shapes : the films only.
+      collage.render(scratch.fbo, this.clockSec, this.collageFxFirst(slot) !== null);
       return;
     }
 
@@ -1299,6 +1306,31 @@ export class ISFLayer {
     this.shared.redirect.redirect = scratch.fbo;
     isf.draw({ width: this.w, height: this.h });
     this.shared.redirect.redirect = null;
+  }
+
+  /** This slot's Collage when it draws its shapes AFTER its source FX (the
+   *  toggle on, and FX to run); null otherwise. */
+  private collageFxFirst(slot: 'A' | 'B'): CollageSource | null {
+    const c = slot === 'A' ? this.collageA : this.collageB;
+    const rack = slot === 'A' ? this.rackA : this.rackB;
+    return c && c.fxFirst && rack.hasEnabled() ? c : null;
+  }
+
+  /** After the source rack : a Collage with FX before shapes draws its seams,
+   *  contours, torn paper and holes over the processed films. */
+  collageShapes(slot: 'A' | 'B', sig: WebGLTexture, chain: ChainBuffers, copy: (fbo: WebGLFramebuffer, tex: WebGLTexture) => void): WebGLTexture {
+    const c = this.collageFxFirst(slot);
+    if (!c) return sig;
+    const scratch = slot === 'A' ? this.scratchA : this.scratchB;
+    let src = sig;
+    if (src === scratch.tex) {
+      // Every unit passed through (an inert node) : read a copy, never the target.
+      const t = chain.next();
+      copy(t.fbo, scratch.tex);
+      src = t.tex;
+    }
+    c.renderShapes(src, scratch.fbo);
+    return scratch.tex;
   }
 
   /** The persisted (post-feedback) frame : what the blend stack composites. */
@@ -2755,6 +2787,7 @@ export class Compositor {
         const layerCtx: NodeApplyCtx = { ...nodeCtx, dt: Math.abs(dtSec * L.speed) };
         L.renderSource('A', nodeCtx.sidechainTex);
         let sig = L.rackA.apply(L.scratchA.tex, this.chain, layerCtx); // native nodes on source A, on the layer clock
+        sig = L.collageShapes('A', sig, this.chain, (fbo, tex) => this.copyInto(fbo, tex));
         if (L.hasB()) {
           // rackA + rackB ping-pong through the SAME ChainBuffers, so rackB can
           // land a write back on the buffer holding A's result (parity-dependent,
@@ -2762,7 +2795,7 @@ export class Compositor {
           this.copyInto(this.abHold.fbo, sig);
           sig = this.abHold.tex;
           L.renderSource('B', nodeCtx.sidechainTex);
-          const sigB = L.rackB.apply(L.scratchB.tex, this.chain, layerCtx); // native nodes on source B
+          const sigB = L.collageShapes('B', L.rackB.apply(L.scratchB.tex, this.chain, layerCtx), this.chain, (fbo, tex) => this.copyInto(fbo, tex)); // native nodes on source B
           sig = this.mixSources(sig, sigB, L.sourceMix, L.sourceBlend, L.harmony, L);
         }
         gl.bindVertexArray(null);
@@ -2794,7 +2827,11 @@ export class Compositor {
     if (wantBg) {
       try {
         gl.bindVertexArray(null);
-        if (this.bgNativeSource) {
+        // A background Collage with FX before shapes : films first, shapes after the rack.
+        const bgColl = this.bgCollage && this.bgNativeSource === (this.bgCollage as unknown) && this.bgCollage.fxFirst && this.bgRack.hasEnabled() ? this.bgCollage : null;
+        if (bgColl) {
+          bgColl.render(this.bgScratch.fbo, this.bgClockSec, true);
+        } else if (this.bgNativeSource) {
           this.bgNativeSource.render(this.bgScratch.fbo, this.bgClockSec);
         } else {
           if (this.bgShaderId === 'scan' && this.shared.scanMaps) pushScanMaps(this.bgIsf!, this.shared.scanMaps);
@@ -2804,7 +2841,13 @@ export class Compositor {
           this.shared.redirect.redirect = null;
         }
         gl.bindVertexArray(null);
-        const bgTex = this.bgRack.apply(this.bgScratch.tex, this.chain, { ...nodeCtx, dt: Math.abs(dtSec * this.bgSpeed) }); // native nodes on the background's slow clock
+        let bgTex = this.bgRack.apply(this.bgScratch.tex, this.chain, { ...nodeCtx, dt: Math.abs(dtSec * this.bgSpeed) }); // native nodes on the background's slow clock
+        if (bgColl) {
+          let src = bgTex;
+          if (src === this.bgScratch.tex) { const t = this.chain.next(); this.copyInto(t.fbo, src); src = t.tex; }
+          bgColl.renderShapes(src, this.bgScratch.fbo);
+          bgTex = this.bgScratch.tex;
+        }
         this.copyInto(this.bgFill.fbo, bgTex);
         haveBgFill = true;
 

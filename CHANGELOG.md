@@ -7,6 +7,14 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Collage : FX before shapes.** A toggle in the Collage's Inspector : the source's
+  FX rack processes the films alone, then the seams, contours, torn paper and mask
+  holes are drawn over the processed films, crisp. Measured with a coarse Pixelate in
+  the rack and seams on : off, the seam is pixelated away (its darkest pixel 29-76 on
+  a ~115 median); on, it stays a clean ~22 px black line at 1080p. Works on a layer's
+  A or B and on the background, with crossfades and torn paper (which reads the
+  neighbouring film mirrored across the tear).
+
 - **A Ring bank on Sonify's Collage voice**, after the Torso S-4's Ring : one 48-band
   resonant filterbank per side over the whole voice, its bands snapped to the key and
   scale across the voice's octave range (one per semitone over the default four
