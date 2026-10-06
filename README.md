@@ -1023,6 +1023,10 @@ living mosaic where every fragment is a different film. Pick it as a layer sourc
   **only the cut edges** (the film inside stays straight) or ripples the whole clip.
   Either way the film **adapts to its piece** : normal, warped and mosaic shapes all
   fill edge-to-edge with real video, no black in the cuts.
+- **Modulate `cuts` freely.** One more cut splits ONE piece (the cut-up) or adds one
+  shard (the mosaic) and every other piece keeps its place and its film, so an LFO on
+  `cuts` grows and shrinks the wall instead of reshuffling it; `films` steps add or
+  drop films without restarting the others.
 - **FX before shapes** : turn it on and the source's own FX rack (the one under
   the Collage) processes the films only, then the seams, contours, torn paper and
   holes are drawn afterwards, crisp : blur, pixelate, glitch or recolor every film

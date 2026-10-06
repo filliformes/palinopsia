@@ -517,6 +517,19 @@ function mulberry32(a: number): () => number {
   }
 }
 
+/** A draw in [0,1) for (seed, key) that doesn't depend on any other draw : the
+ *  partition's per-piece choices hang on the piece, not on how many pieces were
+ *  drawn before it, so one more cut leaves every other piece as it was. */
+function hash01(seed: number, key: number): number {
+  let h = (seed ^ Math.imul(key + 1, 0x9e3779b1)) >>> 0
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b)
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35)
+  h ^= h >>> 16
+  return (h >>> 0) / 4294967296
+}
+
+type Rect = { x: number; y: number; w: number; h: number; id: number }
+
 /** The file behind an opsia-media:// URL (null for anything else). */
 function pathFromMediaUrl(url: string | undefined): string | null {
   const pfx = 'opsia-media://local/'
@@ -562,6 +575,7 @@ interface Deck {
   shown: boolean // ... and at least one of those isn't masked out
   running: boolean // (asm decks) what the edit was last told
   needFrame: boolean // cued while frozen : play until one frame of it lands
+  unusedAt: number // when no piece played it any more (0 = in use) : paused after a grace
 }
 
 interface Cell {
@@ -623,6 +637,9 @@ export class CollageSource {
   private settleUntil = 0
   private stillFrames = 0
   private lastCuts = -1
+  private cutsAt = 0 // when the piece count last changed (a modulated count steps at most this often)
+  private baseCuts = 12 // the stored count (the modulated one never resizes the deck array)
+  private filmsAt = 0
   private lastRotate = -1
   private lastZoom = -1
   private lastFilms = -1
@@ -678,7 +695,7 @@ export class CollageSource {
       el, src: '', clip: null, inSec: 0, lenSec: 0,
       content: [0, 0, 1, 1], blitted: false, blitAt: 0, blitT: -1, pending: false, rvfc: 0, seeking: false, seekAt: 0,
       pendingSeek: null, churning: false, nextRoll: 0, pan: [0.5, 0.5], panNext: null,
-      varyU: 0, used: true, shown: true, running: true, needFrame: false
+      varyU: 0, used: true, shown: true, running: true, needFrame: false, unusedAt: 0
     }
     el.addEventListener('seeked', () => { deck.seeking = false; deck.pending = true })
     // A bad file must never wedge the wall : clear the gate and let the deck
@@ -709,7 +726,7 @@ export class CollageSource {
       inSec: 0, lenSec: 0, content: [0, 0, 1, 1], blitted: false, blitAt: 0, blitT: -1, pending: false, rvfc: 0,
       seeking: false, seekAt: 0, pendingSeek: null, churning: false, nextRoll: 0,
       pan: [0.5, 0.5], panNext: null, varyU: rnd() * 2 - 1, used: true, shown: true,
-      running: true, needFrame: false
+      running: true, needFrame: false, unusedAt: 0
     }
   }
 
@@ -836,7 +853,7 @@ export class CollageSource {
   // ── Dealing ────────────────────────────────────────────────────────────
 
   /** Give every deck a clip and a window. `rnd` keeps a deal reproducible. */
-  private deal(hold: number, churn: number): void {
+  private deal(hold: number, churn: number, structural = false): void {
     if (!this.pool.length) return
     const rnd = mulberry32(this.seed)
     const n = this.decks.length
@@ -857,11 +874,19 @@ export class CollageSource {
       // The churning decks are the FIRST `churn x n` : deterministic, so the
       // dial sweeps in a stable order instead of reshuffling who churns.
       d.churning = i < nChurn
-      this.cue(d, clip, hold, rnd, false)
-      d.panNext = [rnd(), rnd()]
+      // A STRUCTURAL re-deal (another film count, a new pool...) keeps the same
+      // seed, so a deck draws the clip it already plays : it plays on (it used to
+      // be cued back to its first frame, so every film restarted on every step
+      // of a modulated `films`). The draws are still taken, in the same order.
+      const keep = structural && d.clip?.id === clip.id && !!d.src
+      this.cue(d, clip, hold, rnd, false, keep)
+      const pn: [number, number] = [rnd(), rnd()]
+      if (!keep) d.panNext = pn
       d.nextRoll = (0.25 + rnd() * 1.2) / Math.max(0.15, churn)
     }
-    this.rollRnd = mulberry32((this.seed ^ 0x2545f491) >>> 0)
+    // The churn generator restarts on a NEW deal only : restarted on structural
+    // re-deals too, it repeated the same re-rolls after every change.
+    if (!structural) this.rollRnd = mulberry32((this.seed ^ 0x2545f491) >>> 0)
     this.holdNow = this.holdWant = holdQ(hold)
     this.holdWait = 0
   }
@@ -869,12 +894,18 @@ export class CollageSource {
   /** Point one deck at a clip and a window inside it. A whole-film cue starts
    *  at the top, except a churn re-roll, which drops in anywhere (a montage of
    *  opening seconds is not a montage). */
-  private cue(d: Deck, clip: CollageClip, hold: number, rnd: () => number, randomStart: boolean): void {
+  private cue(d: Deck, clip: CollageClip, hold: number, rnd: () => number, randomStart: boolean, keep = false): void {
     const url = `opsia-media://local/${encodeURIComponent(clip.file)}`
     const dur = Math.max(0.1, clip.durSec)
     const len = hold > 0.4 ? Math.min(hold, dur) : dur
     const whole = len >= dur - 0.05
     const start = whole ? (randomStart ? rnd() * dur * 0.8 : 0) : rnd() * (dur - len)
+    if (keep) {
+      // Same film : keep its playhead, re-window it around where it is.
+      rnd() // the varyU draw, taken all the same
+      this.rewindow(d, hold)
+      return
+    }
     d.clip = clip
     d.inSec = whole ? 0 : start
     d.lenSec = whole ? dur : len
@@ -977,10 +1008,13 @@ export class CollageSource {
 
   /** Cut-up : the Autocutter's BSP, split the largest cell until `cuts` pieces.
    *  Each cell is a rect {x,y = top-left, w,h = size}. */
-  private bspRects(cuts: number, rnd: () => number): Array<{ x: number; y: number; w: number; h: number }> {
+  private bspRects(cuts: number, seed: number): Rect[] {
     const minW = 0.06, minH = 0.06
-    const rects: Array<{ x: number; y: number; w: number; h: number }> = [{ x: 0, y: 0, w: 1, h: 1 }]
-    while (rects.length < cuts) {
+    // A piece keeps its id when it splits (the first half); the new half takes
+    // the split's number. Each split's draws hang on its number, so the first
+    // n-1 splits are the same whatever the count : one more cut is ONE more split.
+    const rects: Rect[] = [{ x: 0, y: 0, w: 1, h: 1, id: 0 }]
+    for (let s = 1; rects.length < cuts; s++) {
       let idx = -1, area = -1
       for (let i = 0; i < rects.length; i++) {
         const c = rects[i]
@@ -992,14 +1026,14 @@ export class CollageSource {
       if (idx < 0) break
       const c = rects[idx]
       const canV = c.w >= minW * 2, canH = c.h >= minH * 2
-      const vertical = canV && canH ? rnd() < c.w / (c.w + c.h) : canV
-      const t = 0.35 + rnd() * 0.3
+      const vertical = canV && canH ? hash01(seed, 2 * s) < c.w / (c.w + c.h) : canV
+      const t = 0.35 + hash01(seed, 2 * s + 1) * 0.3
       if (vertical) {
         const sw = c.w * t
-        rects.splice(idx, 1, { x: c.x, y: c.y, w: sw, h: c.h }, { x: c.x + sw, y: c.y, w: c.w - sw, h: c.h })
+        rects.splice(idx, 1, { x: c.x, y: c.y, w: sw, h: c.h, id: c.id }, { x: c.x + sw, y: c.y, w: c.w - sw, h: c.h, id: s })
       } else {
         const sh = c.h * t
-        rects.splice(idx, 1, { x: c.x, y: c.y, w: c.w, h: sh }, { x: c.x, y: c.y + sh, w: c.w, h: c.h - sh })
+        rects.splice(idx, 1, { x: c.x, y: c.y, w: c.w, h: sh, id: c.id }, { x: c.x, y: c.y + sh, w: c.w, h: c.h - sh, id: s })
       }
     }
     return rects
@@ -1011,26 +1045,30 @@ export class CollageSource {
    *  Each shard's cell is its real BOUNDING BOX (measured on a coarse grid), so
    *  the film is cover-cropped to the shape it actually fills. Seeds go to the
    *  shader in height units, row by row, for its neighbour search. */
-  private mosaicSeeds(cuts: number, rnd: () => number): Array<{ x: number; y: number; w: number; h: number }> {
+  private mosaicSeeds(cuts: number, seed: number): Rect[] {
     const n = Math.min(cuts, MAX_CELLS)
     const aspect = this.w / this.h
-    const rows = Math.max(1, Math.min(MAX_ROWS, n, Math.round(Math.sqrt(n / aspect))))
-    const base = Math.floor(n / rows), extra = n % rows
+    // Mitchell's best candidate : each seed is the farthest from the earlier
+    // ones of a dozen candidates, so ANY first n seeds spread evenly : one more
+    // cut adds one shard and the others barely move. (Seeds jittered in rows were
+    // re-laid for every count : a modulated `cuts` reshuffled the whole mosaic.)
     const sx: number[] = [], sy: number[] = []
-    let idx = 0
-    this.rowsArr.fill(0)
-    for (let r = 0; r < rows; r++) {
-      // Spread the rows that get one extra seed evenly down the frame.
-      const k = base + (Math.floor(((r + 1) * extra) / rows) - Math.floor((r * extra) / rows))
-      this.rowsArr[r * 4] = idx
-      this.rowsArr[r * 4 + 1] = k
-      for (let c = 0; c < k; c++) {
-        sx.push(((c + 0.15 + rnd() * 0.7) / k) * aspect)
-        sy.push((r + 0.15 + rnd() * 0.7) / rows)
-        idx++
+    for (let k = 0; k < n; k++) {
+      let bx = 0, by = 0, bd = -1
+      const C = k === 0 ? 1 : 12
+      for (let c = 0; c < C; c++) {
+        const x = (0.03 + 0.94 * hash01(seed, 1000 + k * 32 + c * 2)) * aspect
+        const y = 0.03 + 0.94 * hash01(seed, 1001 + k * 32 + c * 2)
+        let dmin = 1e9
+        for (let j = 0; j < k; j++) { const dx = x - sx[j], dy = y - sy[j]; const d = dx * dx + dy * dy; if (d < dmin) dmin = d }
+        if (dmin > bd) { bd = dmin; bx = x; by = y }
       }
+      sx.push(bx); sy.push(by)
     }
-    this.rowCount = rows
+    // The shader searches every seed (64 distances a pixel, nothing on a GPU) :
+    // no row table, so the seeds can sit anywhere.
+    this.rowsArr.fill(0)
+    this.rowCount = 0
     this.siteArr.fill(0)
     for (let i = 0; i < n; i++) {
       this.siteArr[i * 4] = sx[i]
@@ -1059,14 +1097,14 @@ export class CollageSource {
       }
     }
     const px = 1 / GW, py = 1 / GH
-    const out: Array<{ x: number; y: number; w: number; h: number }> = []
+    const out: Rect[] = []
     for (let i = 0; i < n; i++) {
       // A seed that owned no grid sample (can't happen with this jitter, but be
       // safe) gets a nominal box around itself.
       if (bx1[i] < bx0[i]) { bx0[i] = sx[i] / aspect - 0.05; bx1[i] = sx[i] / aspect + 0.05; by0[i] = sy[i] - 0.05; by1[i] = sy[i] + 0.05 }
       const x0 = Math.max(0, bx0[i] - px), x1 = Math.min(1, bx1[i] + px)
       const y0 = Math.max(0, by0[i] - py), y1 = Math.min(1, by1[i] + py)
-      out.push({ x: x0, y: y0, w: Math.max(1e-3, x1 - x0), h: Math.max(1e-3, y1 - y0) })
+      out.push({ x: x0, y: y0, w: Math.max(1e-3, x1 - x0), h: Math.max(1e-3, y1 - y0), id: i })
     }
     return out
   }
@@ -1075,47 +1113,50 @@ export class CollageSource {
    *  round-robin over it and assign the mask dropout order. */
   private rebuildCells(cuts: number, shape: number): void {
     this.dealSerial++
-    const rnd = mulberry32((this.seed ^ 0x9e3779b9) >>> 0)
-    let rects: Array<{ x: number; y: number; w: number; h: number }>
-    if (shape === 1) rects = this.mosaicSeeds(cuts, rnd)
-    else {
-      rects = this.bspRects(cuts, rnd)
-      this.rowCount = 0
-    }
+    const seed = (this.seed ^ 0x9e3779b9) >>> 0
+    let rects: Rect[] = shape === 1 ? this.mosaicSeeds(cuts, seed) : this.bspRects(cuts, seed)
+    if (shape !== 1) this.rowCount = 0
     if (rects.length > MAX_CELLS) rects = rects.slice(0, MAX_CELLS)
     const n = rects.length
     const nd = Math.max(1, this.decks.length)
-    // Deal decks round-robin over a SHUFFLED cell order, so when there are more
-    // cuts than films the repeats are scattered instead of landing side by side.
-    const order = rects.map((_, i) => i)
-    for (let i = n - 1; i > 0; i--) {
-      const j = Math.floor(rnd() * (i + 1))
-      const t = order[i]; order[i] = order[j]; order[j] = t
+    // Everything about a piece hangs on its id (its order of creation), so a
+    // modulated count only adds or removes the newest pieces :
+    // FILMS : each piece, in that order, takes the film fewest pieces play yet
+    // (ties : a fixed per-film draw), so a wall shows as many films as it can
+    // before repeating, and one more cut never moves another piece's film. (A
+    // piece that splits keeps its film in its first half.)
+    const deckOf = new Int32Array(n)
+    const uses = new Int32Array(nd)
+    for (let id = 0; id < n; id++) {
+      let best = 0, bu = 1e9, bk = 2
+      for (let d = 0; d < nd; d++) {
+        const k = hash01(seed, 5000 + d)
+        if (uses[d] < bu || (uses[d] === bu && k < bk)) { bu = uses[d]; bk = k; best = d }
+      }
+      deckOf[id] = best
+      uses[best]++
     }
+    // MASK dropout order : the pieces peel in a fixed order of their own draws,
+    // at an even spacing over (0,0.90] (the dial peels at a steady rate); the
+    // ceiling sits below the shader's 0.06 fade band, and the piece with the
+    // highest draw holds an unreachable 2.0 : full mask leaves exactly one piece,
+    // and every deal elects a new one. One more piece shifts the spacing a hair,
+    // never the order.
+    const ids = Array.from({ length: n }, (_, i) => i)
+    ids.sort((a, b) => hash01(seed, 9000 + a) - hash01(seed, 9000 + b))
+    const rankOf = new Float32Array(n)
+    for (let i = 0; i < n; i++) rankOf[ids[i]] = ((i + 1) / n) * 0.9
+    if (n) rankOf[ids[n - 1]] = 2.0
     this.cells = rects.map((r) => ({
-      ...r, deck: 0, rot: 0, rotA: 1, rotB: 0, crop: [0, 0, 1, 1] as [number, number, number, number]
+      x: r.x, y: r.y, w: r.w, h: r.h, deck: deckOf[r.id],
+      // ROTATE draws, per piece : sweeping the dial turns pieces in a fixed order
+      rot: 0, rotA: hash01(seed, 7000 + 2 * r.id), rotB: hash01(seed, 7001 + 2 * r.id),
+      crop: [0, 0, 1, 1] as [number, number, number, number]
     }))
-    for (let i = 0; i < n; i++) {
-      const c = this.cells[order[i]]
-      c.deck = i % nd
-      // ALWAYS two draws, whatever the rotate dial : a draw taken only on a hit
-      // shifted every later draw, so sweeping rotate reshuffled the mask order.
-      c.rotA = rnd()
-      c.rotB = rnd()
-    }
-    // MASK dropout order : a shuffled EVEN spacing over (0,0.90] so the dial
-    // peels pieces at a steady rate. The ceiling sits below the shader's 0.06
-    // fade band, and one seeded survivor holds an unreachable 2.0 : so full
-    // mask always leaves exactly one piece, and every deal elects a new one.
-    const drop = rects.map((_, i) => i)
-    for (let i = n - 1; i > 0; i--) {
-      const j = Math.floor(rnd() * (i + 1))
-      const t = drop[i]; drop[i] = drop[j]; drop[j] = t
-    }
-    for (let i = 0; i < n; i++) this.rank[drop[i]] = ((i + 1) / n) * 0.9
-    if (n) this.rank[Math.floor(rnd() * n)] = 2.0
+    for (let i = 0; i < n; i++) this.rank[i] = rankOf[rects[i].id]
     for (const d of this.decks) d.used = false
     for (const c of this.cells) if (this.decks[c.deck]) this.decks[c.deck].used = true
+    for (const d of this.decks) if (d.used) d.unusedAt = 0
     this.lastCuts = cuts
     this.lastShape = shape
     this.lastRotate = -1 // re-apply the dial to the fresh draws
@@ -1198,6 +1239,7 @@ export class CollageSource {
       }
     }
     this.live = { ...inputs }
+    this.baseCuts = clampf(num(inputs.cuts, 12), 2, MAX_CELLS)
   }
 
   /** Modulation overlay (applyModulation runs after syncFromState). */
@@ -1301,8 +1343,15 @@ export class CollageSource {
       }
     }
 
-    const films = clampf(num(inputs.films, 12), 1, MAX_DECKS)
-    const cuts = Math.round(clampf(num(inputs.cuts, 12), 2, MAX_CELLS))
+    // CUTS / FILMS step with a little hysteresis (±0.75 around the count in
+    // use) and at most every 120 / 300 ms : a modulator hovering on a .5 used
+    // to flip the wall every frame.
+    const cutsRaw = clampf(num(inputs.cuts, 12), 2, MAX_CELLS)
+    let cuts = this.lastCuts > 0 ? this.lastCuts : Math.round(cutsRaw)
+    if (Math.abs(cutsRaw - cuts) >= 0.75 && now - this.cutsAt >= 120) { cuts = Math.round(cutsRaw); this.cutsAt = now }
+    const filmsRaw = clampf(num(inputs.films, 12), 1, MAX_DECKS)
+    let films = this.lastFilms > 0 ? this.lastFilms : Math.round(filmsRaw)
+    if (Math.abs(filmsRaw - films) >= 0.75 && now - this.filmsAt >= 300) { films = Math.round(filmsRaw); this.filmsAt = now }
     const rotate = clampf(num(inputs.rotate, 0), 0, 1)
     const hold = clampf(num(inputs.hold, 0), 0, 30)
     const churn = clampf(num(inputs.churn, 0), 0, 1)
@@ -1362,9 +1411,10 @@ export class CollageSource {
       this.foldAt = null
       this.rebuildCells(cuts, shape)
     }
-    // The array's layer edge follows the piece size; debounced, so a modulated
-    // `cuts` settles before the array (and every deck's blit) is redone.
-    const tileWant = tileFor(this.decks.length, cuts, this.w, this.h, this.maxTex)
+    // The array's layer edge follows the piece size of the STORED count (never
+    // the modulated one : a slow modulator used to reallocate up to 80 MB and
+    // re-blit every film); debounced on top.
+    const tileWant = tileFor(this.decks.length, Math.round(this.baseCuts), this.w, this.h, this.maxTex)
     if (tileWant === this.tile) this.tilePending = 0
     else if (tileWant !== this.tilePending) {
       this.tilePending = tileWant
@@ -1408,7 +1458,7 @@ export class CollageSource {
       }
       // Assemblage decks carry their own edit and their own pace : a deal only
       // re-cuts the partition and re-shuffles which piece shows which edit.
-      if (feed === 0) this.deal(hold, churn)
+      if (feed === 0) this.deal(hold, churn, !reseedRecut || poolChanged || deckChanged)
       this.rebuildCells(cuts, shape)
     } else if (filesChanged && feed === 0) {
       this.swapFiles()
@@ -1423,17 +1473,15 @@ export class CollageSource {
     // to done rather than freezing a stale outgoing wall.
     if (this.xfade < 1) this.xfade = xfadeDur > 0 ? Math.min(1, this.xfade + dt / xfadeDur) : 1
 
-    // The window knob, live : once it has settled for a moment, every deck
-    // re-windows around its own playhead.
+    // The window knob, live : every deck re-windows around its own playhead, at
+    // most every 0.3 s while the knob moves. (It used to wait for the knob to
+    // STOP for 0.3 s, so a modulated window only changed at the modulator's
+    // turning points.)
     const hq = holdQ(hold)
-    if (hq === this.holdNow) {
-      this.holdWant = hq
+    if (hq === this.holdNow) this.holdWait = 0
+    else if ((this.holdWait += realDt) >= 0.3) {
+      this.holdNow = this.holdWant = hq
       this.holdWait = 0
-    } else if (hq !== this.holdWant) {
-      this.holdWant = hq
-      this.holdWait = 0
-    } else if ((this.holdWait += realDt) >= 0.3) {
-      this.holdNow = hq
       for (const d of this.decks) this.rewindow(d, hq)
     }
 
@@ -1470,7 +1518,12 @@ export class CollageSource {
       const was = d.churning
       d.churning = i < nChurn
       if (d.churning && !was) d.nextRoll = (0.1 + this.rollRnd() * 1.2) / Math.max(0.15, churn)
-      const run = d.used && r > 0.004 && (!freeze || d.needFrame)
+      // A film no piece plays any more keeps running 1.5 s before it pauses : a
+      // modulated `cuts` dipping under `films` used to pause and replay films
+      // on every step.
+      if (!d.used && !d.unusedAt) d.unusedAt = now
+      const inUse = d.used || now - d.unusedAt < 1500
+      const run = inUse && r > 0.004 && (!freeze || d.needFrame)
       const want = clampf(r, RATE_MIN, RATE_MAX)
       if (Math.abs(d.el.playbackRate - want) > want * 0.02) {
         try { d.el.playbackRate = want } catch { /* out-of-band rate */ }

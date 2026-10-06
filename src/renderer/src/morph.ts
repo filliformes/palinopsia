@@ -106,9 +106,17 @@ function lerpInputs(
   return out
 }
 
+// A Collage's film count, piece shape and feed are structural (each step builds
+// or drops decoders) : a morph takes them straight to the target instead of
+// sweeping through every value. `cuts` still eases : the wall splits piece by piece.
+const SNAP_INPUTS: Record<string, string[]> = { 'gen-collage': ['films', 'shape', 'feed'] }
+
 function lerpSlot(a: SourceSlot | null, b: SourceSlot | null, k: number): SourceSlot | null {
   if (!a || !b || a.shaderId !== b.shaderId) return b
-  return { ...b, inputs: lerpInputs(a.inputs, b.inputs, k) }
+  const inputs = lerpInputs(a.inputs, b.inputs, k)
+  const snap = b.shaderId ? SNAP_INPUTS[b.shaderId] : undefined
+  if (snap) for (const key of snap) if (key in b.inputs) inputs[key] = b.inputs[key]
+  return { ...b, inputs }
 }
 
 // Match FX by position + shader id : same shader ⇒ ease its inputs + opacity.

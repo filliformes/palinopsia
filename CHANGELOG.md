@@ -554,6 +554,23 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Collage : `cuts` and `films` can be modulated.** Every whole-number step of `cuts`
+  re-drew the whole partition and its film assignment from one random stream, so an
+  LFO reshuffled the wall every frame (86-100 % of the frame changed film per step).
+  The partition is now stable : each piece's choices hang on the piece (the cut-up's
+  n-1 splits are the same whatever the count; the mosaic seeds are a best-candidate
+  sequence whose every prefix is evenly spread), films go to the least-used film in
+  creation order, and the mask order and rotations are per piece. Measured : 0-13 % of
+  the frame changes film per step (cut-up), 2-14 % (mosaic). The count steps with a
+  little hysteresis (0 rebuilds with a modulator hovering at 12.5) and the deck array
+  is sized from the stored count, never the modulated one (a slow modulator used to
+  reallocate up to 80 MB). A film no piece plays keeps running 1.5 s before it pauses,
+  a `films` step no longer restarts every film (measured : they play on), the churn
+  re-rolls no longer repeat after each change, a modulated `window` applies while it
+  moves (every 0.3 s), and morphs (Randomize, Variation, scenes) take `films`, `shape`
+  and `feed` straight to the target instead of building a decoder per step. The mosaic
+  shader now searches every seed (60 fps at 64 shards with torn paper, RTX 4070).
+
 - **Menus open on their anchor at any UI zoom.** A source picker's list and every
   right-click menu were placed in screen pixels inside the zoomed interface, so the zoom
   was applied twice : at 80 % a layer's source list opened hundreds of pixels to the left
