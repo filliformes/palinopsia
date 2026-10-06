@@ -41,7 +41,7 @@ extraResources:
   # MediaPipe embodied-control assets (Hands + Pose). Self-hosted so tracking
   # works OFFLINE and in a kiosk install : the renderer loads them over the
   # opsia-asset:// scheme (main/assets.ts), never Google's CDN. wasm is the SIMD
-  # build only (Electron 33 / Chromium always has wasm SIMD).
+  # build only (Electron 44 / Chromium always has wasm SIMD).
   - from: resources/mediapipe
     to: mediapipe
   # The NDI runtime, when one was put in resources/ndi/<os> before building
