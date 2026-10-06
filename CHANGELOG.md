@@ -491,6 +491,14 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Sonify's stereo field.** The Chord, Flow and Events voices panned their notes with a
+  linear law, so a note in the middle lost 3 dB against one at the side (measured), and
+  Chord's spread put the root note hard left. They now pan with equal power (every note
+  within 0.6 dB wherever it sits), and Chord's spread keeps the bass in the middle and
+  fans the notes above alternately right and left, the highest widest. The Collage
+  voice's pieces only balanced their stereo films : a centred piece kept the film's own
+  width (a left-only tone stayed 34 dB left) and an edge piece got louder. Each piece is
+  now a point source, the film folded to mono and placed by its position with equal power.
 - **Palinopsia could run on a laptop's integrated graphics.** Windows picks a hybrid
   laptop's graphics card per program, and leaves one it doesn't know on the integrated
   chip unless its graphics settings say otherwise; the WebGL contexts' power preference

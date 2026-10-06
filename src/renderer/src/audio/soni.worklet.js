@@ -172,6 +172,15 @@ class BBDDelay {
 // Per-voice DJ filter (Essaim fx.c) : one knob — <0.5 sweeps a 3-stage lowpass
 // down (18k→200Hz), >0.5 sweeps a 3-stage highpass up (20→8000Hz), 0.5 = bypass.
 // RBJ biquads at Q=0.707, cascaded ×3, independent L/R state.
+// Equal-power pan of a point source, p 0 (left) … 1 (right) : cos / sin, so a
+// note keeps its loudness wherever it sits (the linear 1-p / p law it replaced
+// left a 3 dB hole in the middle, measured). PAN_TRIM brings the average level
+// back to where the linear law had it.
+const HALF_PI = Math.PI / 2;
+const PAN_TRIM = 0.85;
+function panGL(p) { return Math.cos(p * HALF_PI) * PAN_TRIM; }
+function panGR(p) { return Math.sin(p * HALF_PI) * PAN_TRIM; }
+
 class DJFilter {
   constructor() {
     this.b0 = 1; this.b1 = 0; this.b2 = 0; this.a1 = 0; this.a2 = 0; // start at unity (bypass)
@@ -631,8 +640,8 @@ class SoniProcessor extends AudioWorkletProcessor {
       for (let g = 0; g < NGRAIN; g++) {
         const gr = this.grains[g];
         if (!gr.on) continue;
-        const gL = g0 * (1 - gr.pan);
-        const gR = g0 * gr.pan;
+        const gL = g0 * panGL(gr.pan);
+        const gR = g0 * panGR(gr.pan);
         // colour → timbre (0 when colour off ⇒ identical to the plain grain).
         const eb = gr.bright * colAmt; // waveshape drive : vivid colour = edgier
         const tintAmt = Math.abs(gr.warm) * colAmt * 0.5; // sub-oct / oct-up blend
@@ -699,7 +708,7 @@ class SoniProcessor extends AudioWorkletProcessor {
         const nt = this.notes[k];
         if (!nt.on) continue;
         let p = nt.pan + bias; p = p < 0 ? 0 : p > 1 ? 1 : p;
-        const gL = g0 * (1 - p) * wg, gR = g0 * p * wg;
+        const gL = g0 * panGL(p) * wg, gR = g0 * panGR(p) * wg;
         for (let s = 0; s < n; s++) {
           if (nt.attacking) { nt.env += nt.atkInc; if (nt.env >= 1) { nt.env = 1; nt.attacking = false; } }
           else { nt.env *= nt.decMul; if (nt.env < 0.0004) { nt.on = false; break; } }
@@ -879,9 +888,13 @@ class SoniProcessor extends AudioWorkletProcessor {
         const a0 = cur + (tgt - cur) * (tgt > cur ? up : dn);
         this.cAmp[i] = a0;
         if (a0 < 0.003) { this.cPhase[i] = (this.cPhase[i] + this.chordFreqs[i] * n * dt) % 1; continue; }
-        let pan = N > 1 ? panBase + spread * 0.5 * (2 * i / (N - 1) - 1) : panBase;
+        // SPREAD : the bass stays in the middle and the notes above fan out,
+        // alternating right / left, wider as they rise (the top note widest). It
+        // used to fan low → left, high → right, which put the root hard LEFT.
+        const off = N > 1 && i > 0 ? (i % 2 ? 1 : -1) * (i / (N - 1)) : 0;
+        let pan = panBase + spread * 0.5 * off;
         pan = pan < 0 ? 0 : pan > 1 ? 1 : pan;
-        const gL = gBase * (1 - pan), gR = gBase * pan;
+        const gL = gBase * panGL(pan), gR = gBase * panGR(pan);
         let ph = this.cPhase[i];
         const inc = this.chordFreqs[i] * dt;
         for (let s = 0; s < n; s++) {

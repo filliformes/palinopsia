@@ -146,7 +146,14 @@ export class CollageVoice {
     let p = this.pieces.get(key)
     if (p) return p
     const ctx = this.ctx
+    // Each piece is a POINT SOURCE at its place in the frame : its film folds to
+    // mono here, then the panner places it with equal power. (Left stereo, the
+    // panner only BALANCED the film : a centred piece kept the film's whole
+    // width and an edge piece folded one channel into the other, louder.)
     const inG = ctx.createGain()
+    inG.channelCount = 1
+    inG.channelCountMode = 'explicit'
+    inG.channelInterpretation = 'speakers'
     const dry = ctx.createGain()
     const pan = ctx.createStereoPanner()
     const bp: BiquadFilterNode[] = []
@@ -210,7 +217,8 @@ export class CollageVoice {
         nFilms++
       }
       // Pieces.
-      const norm = set.level / Math.sqrt(shown.length)
+      // sqrt(2) : a centred mono piece lands at the level the stereo film had.
+      const norm = (Math.SQRT2 * set.level) / Math.sqrt(shown.length)
       const halfX = set.aspect / 2
       const rMax = Math.sqrt(halfX * halfX + 0.25)
       const Q = 2 + 58 * cfg.ring * cfg.ring
