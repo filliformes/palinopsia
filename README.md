@@ -749,9 +749,28 @@ A full-page takeover (the engine keeps rendering underneath):
   console) and to **WLED** LED strips, so stage lighting breathes with the visuals.
 - **Installation mode** : a panel to run Opsia as a **kiosk**. Boot a chosen session
   **fullscreen on a chosen display** on launch (or from the command line:
-  `--kiosk [--session=<file>] [--display=<n>]`), with renderer-crash **self-heal**,
-  and an exit hatch (`O` / `Esc` on the output, or `Ctrl+Shift+O` globally) so a
-  black-boxed machine is never stuck. Toggle "launch on restart" here.
+  `--kiosk [--session=<file>] [--display=<n>]`), with its sound playing if Sonify (or
+  its step sequence) was on when the session was saved. Toggle "launch on restart" here.
+  - **Start with the computer** : after a reboot or a power cut it starts by itself, and
+    again if it ever crashes (macOS : a LaunchAgent; Windows : a login item and a check
+    every 5 minutes). Turning Installation mode off removes it. Only one copy runs.
+  - **It looks after itself** : the screen never sleeps; a crashed, hung or frozen
+    control window reloads (1, 2, 4… s apart; the whole app relaunches after 5
+    failures in 10 minutes, or if WebGL or the GPU keeps failing); a crashed output
+    reloads; the output reopens if it closes and follows its projector when displays
+    change (found again by name if Windows renumbers it); a camera that drops out
+    reconnects; no dialog ever waits (no "restore the autosave?" after a power cut);
+    the menu's reload / close / quit / dev-tools shortcuts are off, and the output stays
+    above system notices.
+  - **Exit** : hold `Esc` or `O` on the output for 1.5 s (a brushed key no longer ends
+    it), or press `Ctrl+Shift+O` anywhere.
+  - **The log** : every crash, hang and recovery is written to `logs/palinopsia.log`
+    in the app's data folder (`%APPDATA%\Palinopsia` on Windows, `~/Library/Application
+    Support/Palinopsia` on macOS).
+  - **On the machine** : turn on automatic login, turn off the lock screen, screen saver
+    and automatic OS updates (Windows Update can also swap the graphics driver), and
+    launch the app once by hand to accept every permission prompt (local network,
+    camera, microphone, Documents) with the build that will run the show.
 - **Flash safety** : a photosensitivity limiter on the very last stage of the
   chain: a GPU slew limiter caps how fast the frame's mean luminance may rise,
   taming strobes from any source (Superimposition, Triangle Flicker, feedback

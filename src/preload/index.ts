@@ -105,6 +105,7 @@ const api: ExposedApi = {
   outputOpen: (displayId: number, windowed = false) =>
     ipcRenderer.invoke('output:open', displayId, windowed),
   outputOpenSpan: (displayIds: number[]) => ipcRenderer.invoke('output:openSpan', displayIds),
+  outputIsOpen: () => ipcRenderer.invoke('output:isOpen'),
   outputClose: () => ipcRenderer.invoke('output:close'),
   onOutputClosed: (cb: () => void) => {
     const h = (): void => cb()
@@ -190,6 +191,16 @@ const api: ExposedApi = {
     const h = (): void => cb()
     ipcRenderer.on('kiosk:exited', h)
     return () => ipcRenderer.off('kiosk:exited', h)
+  },
+  kioskTargetDisplay: () => ipcRenderer.invoke('kiosk:targetDisplay'),
+  kioskAutostart: () => ipcRenderer.invoke('kiosk:autostart'),
+  kioskSetAutostart: (on: boolean) => ipcRenderer.invoke('kiosk:setAutostart', on),
+  kioskGlFailed: (where: string) => ipcRenderer.send('kiosk:glFailed', where),
+  appAlive: (frames: number) => ipcRenderer.send('app:alive', frames),
+  onKioskReopenOutput: (cb: () => void) => {
+    const h = (): void => cb()
+    ipcRenderer.on('kiosk:reopenOutput', h)
+    return () => ipcRenderer.off('kiosk:reopenOutput', h)
   },
 
   // ── Resource HUD + recording ─────────────────────────────────────

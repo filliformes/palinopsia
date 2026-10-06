@@ -28,6 +28,20 @@ export class CaptureSource {
   private ndiSeq = -1
   private ndiW = 0
   private ndiH = 0
+  // A camera that drops out (unplugged, or reset by USB power saving over a
+  // days-long installation) ends its track : the source reconnects by itself,
+  // finding the camera again by name if it comes back under another id.
+  private spec = ''
+  private label = ''
+  private retries = 0
+  private retryTimer = 0
+  private readonly onDevices = (): void => {
+    if (this.retryTimer && !this.stream && !this.starting && !this.disposed) {
+      window.clearTimeout(this.retryTimer)
+      this.retryTimer = 0
+      void this.reopen()
+    }
+  }
   /** NDI frames arrive top row first and are uploaded as they are : the blit
    *  samples them upside down (a CPU flip on upload was the slow path). */
   get flipY(): boolean {
@@ -51,8 +65,9 @@ export class CaptureSource {
    *    'desktop:<id>'    → a specific screen/window (chromeMediaSourceId)
    *    'screen'          → the primary display (getDisplayMedia fallback)
    *    'ndi:<name>'      → an NDI® source on the network (src/preload/ndi.ts)
-   *  Safe to call once; ignores re-entrancy. */
-  async start(spec: string): Promise<void> {
+   *  Safe to call once; ignores re-entrancy. `quiet` : a reconnection attempt
+   *  (no error reported to the UI each time). */
+  async start(spec: string, quiet = false): Promise<void> {
     if (this.starting || this.stream || this.disposed || this.ndiName) return
     if (spec.startsWith('ndi:')) {
       this.ndiName = spec.slice('ndi:'.length)
@@ -95,15 +110,63 @@ export class CaptureSource {
       }
       this.stream = stream
       this.video.srcObject = this.stream
+      const track = stream.getVideoTracks()[0]
+      if (track && (spec === 'webcam' || spec.startsWith('device:'))) {
+        this.spec = spec
+        this.label = track.label
+        this.retries = 0
+        track.addEventListener('ended', () => this.lost())
+      }
       await this.video.play().catch(() => {})
     } catch (e) {
       // Permission denied / no device / user cancelled the screen picker : the
       // slot renders transparent — report the reason so the UI can say why.
       const err = e as Error
-      console.error('[capture] start failed:', err.message)
-      if (!this.disposed) captureErrorReporter?.(spec, err.name || err.message)
+      if (quiet) console.warn('[capture] reconnect failed:', err.message)
+      else console.error('[capture] start failed:', err.message)
+      if (!this.disposed && !quiet) captureErrorReporter?.(spec, err.name || err.message)
     } finally {
       this.starting = false
+    }
+  }
+
+  /** The camera's track ended : drop the dead stream, try again (2, 4, 8… up to
+   *  30 s, or at once when a device appears). The last frame stays meanwhile. */
+  private lost(): void {
+    if (this.disposed || !this.stream) return
+    console.warn(`[capture] ${this.label || this.spec} was lost : reconnecting`)
+    this.stream.getTracks().forEach((t) => t.stop())
+    this.stream = null
+    this.video.srcObject = null
+    navigator.mediaDevices.addEventListener('devicechange', this.onDevices)
+    this.scheduleRetry()
+  }
+
+  private scheduleRetry(): void {
+    if (this.disposed) return
+    const delay = Math.min(30_000, 2000 * 2 ** Math.min(this.retries++, 4))
+    this.retryTimer = window.setTimeout(() => {
+      this.retryTimer = 0
+      void this.reopen()
+    }, delay)
+  }
+
+  private async reopen(): Promise<void> {
+    if (this.disposed || this.stream || this.starting) return
+    let spec = this.spec
+    // The same camera may come back under another id (another USB port).
+    if (spec.startsWith('device:') && this.label) {
+      const devs = await navigator.mediaDevices.enumerateDevices().catch(() => [] as MediaDeviceInfo[])
+      const same = devs.find((d) => d.kind === 'videoinput' && d.label === this.label)
+      if (same) spec = 'device:' + same.deviceId
+    }
+    await this.start(spec, true)
+    if (this.disposed) return
+    if (this.stream) {
+      console.warn(`[capture] ${this.label || spec} is back`)
+      navigator.mediaDevices.removeEventListener('devicechange', this.onDevices)
+    } else {
+      this.scheduleRetry()
     }
   }
 
@@ -144,6 +207,8 @@ export class CaptureSource {
 
   dispose(): void {
     this.disposed = true
+    window.clearTimeout(this.retryTimer)
+    navigator.mediaDevices?.removeEventListener('devicechange', this.onDevices)
     if (this.ndiName) {
       ndiInRelease(this.ndiName)
       this.ndiName = null

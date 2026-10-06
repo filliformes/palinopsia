@@ -25,16 +25,31 @@ export function OutputView(): JSX.Element {
   // closes this window and brings the operator UI back. (Ctrl+Shift+O is the
   // global backstop registered in main for when focus is elsewhere.) Gated to a
   // real kiosk launch so a normal fullscreen output keeps its keys inert.
+  // HELD for 1.5 s : a key brushed by a visitor (or a cat) no longer ends the
+  // installation.
   useEffect(() => {
     let armed = false
+    let hold = 0
     window.api.kioskConfig().then((k) => { armed = !!k?.kiosk }).catch(() => {})
+    const isExitKey = (e: KeyboardEvent): boolean => e.key === 'Escape' || e.key === 'o' || e.key === 'O'
     const onKey = (e: KeyboardEvent): void => {
-      if (armed && (e.key === 'Escape' || e.key === 'o' || e.key === 'O')) {
-        void window.api.kioskExit()
-      }
+      if (!armed || e.repeat || !isExitKey(e)) return
+      window.clearTimeout(hold)
+      hold = window.setTimeout(() => void window.api.kioskExit(), 1500)
     }
+    const onUp = (e: KeyboardEvent): void => {
+      if (isExitKey(e)) window.clearTimeout(hold)
+    }
+    const onBlur = (): void => window.clearTimeout(hold)
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keyup', onUp)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.clearTimeout(hold)
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onUp)
+      window.removeEventListener('blur', onBlur)
+    }
   }, [])
 
   useEffect(() => {
@@ -65,6 +80,7 @@ export function OutputView(): JSX.Element {
       presenter = new OutputPresenter(canvas)
     } catch (e) {
       console.error('[output presenter]', (e as Error).message)
+      window.api.kioskGlFailed('output') // an installation relaunches
       offGl()
       return
     }

@@ -866,6 +866,11 @@ export interface Session {
   // Sonify step sequencer : travels with the session so an evolving sonified
   // work is self-contained (preset steps reference machine-local preset names).
   soniSeq?: SoniSeq
+  // Whether the sound was playing when the session was saved (Sonify, and its
+  // step sequence) : an installation boots with it playing again. Opening a
+  // session by hand leaves the sound as it is on the machine.
+  sonifyOn?: boolean
+  soniSeqOn?: boolean
   // Performance dials : the global clock multiplier + the scene-morph duration.
   // Optional for back-compat with sessions saved before they were persisted.
   globalSpeed?: number
@@ -1037,6 +1042,24 @@ export interface LightConfig {
   fps: number
 }
 
+/** "Start with the computer" for an installation (main/autostart.ts). */
+export interface AutostartStatus {
+  on: boolean
+  supported: boolean
+  why?: string // why it can't be turned on here
+}
+
+/** The persisted "Installation mode" launch file (kiosk.json). */
+export interface KioskLaunchConfig {
+  enabled?: boolean
+  sessionPath?: string
+  display?: number
+  // The display's name and whether it was the main one, to find it again when
+  // its id changes (Windows renumbers displays across reboots and ports).
+  displayLabel?: string
+  displayWasPrimary?: boolean
+}
+
 export interface ExposedApi {
   // Session I/O
   /** Save As : `currentPath` seeds the dialog; the name inside follows the file. */
@@ -1187,9 +1210,23 @@ export interface ExposedApi {
   lightFrame: (cols: number, rows: number, pixels: Uint8Array) => void
   // Kiosk / installation mode : read the effective launch config; get/set the
   // persisted "enable on next restart" launch file; get the operator UI out.
-  kioskConfig: () => Promise<{ kiosk: boolean; sessionPath?: string; display?: number }>
-  kioskGetLaunch: () => Promise<{ enabled?: boolean; sessionPath?: string; display?: number }>
-  kioskSetLaunch: (cfg: { enabled: boolean; sessionPath?: string; display?: number }) => Promise<boolean>
+  kioskConfig: () => Promise<{ kiosk: boolean; sessionPath?: string; display?: number; windowed?: boolean }>
+  kioskGetLaunch: () => Promise<KioskLaunchConfig>
+  kioskSetLaunch: (cfg: KioskLaunchConfig) => Promise<boolean>
+  // The installation's display (its id, else found again by name), from main.
+  kioskTargetDisplay: () => Promise<number>
+  // Start with the computer (and again after a crash) : status and switch.
+  kioskAutostart: () => Promise<AutostartStatus>
+  kioskSetAutostart: (on: boolean) => Promise<AutostartStatus>
+  // No WebGL at all in this window : an installation relaunches.
+  kioskGlFailed: (where: string) => void
+  // The control window's frame count, every few seconds (the installation
+  // watchdog reloads a picture that stopped advancing).
+  appAlive: (frames: number) => void
+  // An installation's output closed without the exit hatch : open it again.
+  // Is an output window open (a reloaded control window resumes streaming to it).
+  outputIsOpen: () => Promise<boolean>
+  onKioskReopenOutput: (cb: () => void) => () => void
   minimizeMain: () => void
   // Live exit from a running installation : close the fullscreen output and
   // bring the operator window back (bound to Esc / O in the output window, plus

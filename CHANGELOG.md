@@ -7,6 +7,31 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Installation mode looks after itself.** Start with the computer (macOS : a
+  LaunchAgent that also restarts a crashed app; Windows : a login item and a scheduled
+  check every 5 minutes; only one copy ever runs, and a leftover entry with Installation
+  mode off quits at once and removes itself). The display never sleeps while an
+  installation runs or an output window is open. A crashed, hung (20 s) or frozen (no
+  new frame for 45 s) control window reloads with a backoff, and the app relaunches after
+  5 failures in 10 minutes, 3 GPU crashes, or no WebGL (at most 6 relaunches in 30
+  minutes). A crashed output reloads, a closed output reopens, and the output moves back
+  to its projector when displays change (matched by name when Windows renumbers it).
+  The default menu shortcuts are off, the output stays on top, the crash-restore
+  question never waits, and the exit keys must be held for 1.5 s. Measured in a test
+  copy : a control crash, an output crash, a closed output and a renderer stuck in a
+  loop all came back with the picture flowing; Ctrl+R did nothing; a second launch quit.
+- **An installation plays its sound.** A session now records whether Sonify and its step
+  sequence were playing; Installation mode turns them back on at boot and after every
+  self-heal reload (opening a session by hand still never starts the sound). Turning
+  Sonify on or off now counts as an unsaved change.
+- **A log file** : `logs/palinopsia.log` in the app's data folder (2 MB, one previous
+  copy) records main-process errors and exceptions (never an error box on screen),
+  every window's errors and warnings, crashes, hangs and recoveries; a message repeated
+  within a minute is counted, not repeated.
+- **Cameras reconnect.** A camera whose track ends (unplugged, reset by USB power
+  saving) is tried again at 2, 4, 8… up to 30 s, and at once when a device appears,
+  found again by name under another id. Measured with a fake camera : back in 2 s.
+
 - **Recordings carry the Sonify sound, DXV3 included, whenever Sonify plays.** A DXV3
   take now has a PCM sound track (16-bit little-endian, written natively as the frames
   go, in the layout libavformat uses; measured : the sound present, 0 decode errors).
@@ -586,6 +611,17 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **A reloaded window froze the projector.** The frame link between the control window
+  and the output was wired once, at the output's first load : a reloaded control window
+  (a crash self-heal, Ctrl+R) or output never got a new one, and a reloaded control
+  window forgot the output was open. It is wired on every load, and a reloaded control
+  window streams to the open output again (measured : frames flowing after a control
+  reload and after an output crash).
+- **Cmd+Q on macOS left the app half-dead.** The subsystems stopped on `before-quit`,
+  before the Save prompt : cancelling it left OSC, autosave and the senders dead. A quit
+  now closes the window through its prompt first; everything stops on `will-quit`.
+- **macOS output** : moving a fullscreen output to another display rebuilds it (macOS
+  ignored the new bounds), and a span may cover several screens.
 - **The macOS app is signed again (ad hoc).** electron-builder 26 no longer signs an app
   ad hoc by itself : the CI build skipped signing entirely, and Apple Silicon refuses to
   run unsigned code ("Palinopsia is damaged"). `identity: "-"` signs it, the hardened

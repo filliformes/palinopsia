@@ -13,7 +13,7 @@ import {
   type RefObject
 } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import type { DisplayInfo, PerfStats, RecordingFolderInfo } from '@shared/types'
+import type { AutostartStatus, DisplayInfo, KioskLaunchConfig, PerfStats, RecordingFolderInfo } from '@shared/types'
 import { useStore } from '../store'
 import { showToast } from './Toast'
 import { currentFps } from '../perf'
@@ -71,19 +71,30 @@ export function OutputPage({
   // owns kiosk.json). Load it once; toggling writes it back.
   const sessionPath = useStore((s) => s.sessionPath)
   const sessionName = useStore((s) => s.name)
-  const [kioskLaunch, setKioskLaunch] = useState<{ enabled: boolean; sessionPath?: string; display?: number }>({
+  const [kioskLaunch, setKioskLaunch] = useState<KioskLaunchConfig & { enabled: boolean }>({
     enabled: false
   })
+  const [autostart, setAutostartState] = useState<AutostartStatus>({ on: false, supported: true })
   useEffect(() => {
     window.api
       .kioskGetLaunch()
-      .then((k) => setKioskLaunch({ enabled: !!k.enabled, sessionPath: k.sessionPath, display: k.display }))
+      .then((k) => setKioskLaunch({ ...k, enabled: !!k.enabled }))
       .catch(() => {})
+    window.api.kioskAutostart().then(setAutostartState).catch(() => {})
   }, [])
   const saveKiosk = (partial: Partial<typeof kioskLaunch>): void => {
     const next = { ...kioskLaunch, ...partial }
+    // The display's name too, to find it again if its id changes after a reboot.
+    if ('display' in partial) {
+      const d = displays.find((x) => x.id === next.display)
+      next.displayLabel = d?.label
+      next.displayWasPrimary = d ? d.isPrimary : undefined
+    }
     setKioskLaunch(next)
-    window.api.kioskSetLaunch(next).catch(() => {})
+    window.api
+      .kioskSetLaunch(next)
+      .then(() => window.api.kioskAutostart().then(setAutostartState))
+      .catch(() => {})
   }
   const hiveOutActive = useStore((s) => s.hiveOutActive)
   const setHiveOutActive = useStore((s) => s.setHiveOutActive)
@@ -940,7 +951,7 @@ export function OutputPage({
 
           <Section
             title="Installation mode"
-            info="Boot straight into a session, fullscreen on the chosen display (which covers the operator UI on a single screen), and self-heal if the renderer crashes, for unattended installs. The projector mapping (keystone) is machine-local, so it is applied automatically. Exit a running install with Esc / O on the output or Ctrl+Shift+O anywhere. Takes effect on the NEXT app launch."
+            info="Boot straight into a session, fullscreen on the chosen display (which covers the operator UI on a single screen), for unattended installs. It looks after itself : the screen never sleeps, a crash or a frozen picture reloads (the app relaunches after repeated failures), the output comes back if it closes and follows its projector when displays change, no dialog ever waits, and every problem goes to the log file. The projector mapping (keystone) is machine-local, so it is applied automatically. Exit a running install by holding Esc or O on the output for 1.5 s, or Ctrl+Shift+O anywhere. Takes effect on the NEXT app launch."
             defaultCollapsed={!kioskLaunch.enabled}
           >
             <button
@@ -956,6 +967,24 @@ export function OutputPage({
             >
               {kioskLaunch.enabled ? 'ON at next restart' : 'Enable on next restart'}
             </button>
+            {kioskLaunch.enabled && (
+              <button
+                onClick={() => {
+                  window.api.kioskSetAutostart(!autostart.on).then(setAutostartState).catch(() => {})
+                }}
+                disabled={!autostart.supported}
+                className={`w-full ${btn(autostart.on)} disabled:opacity-40`}
+                title={
+                  autostart.why ??
+                  'Starts the installation when the computer starts (after a power cut too), and again if it ever quits by crashing. Turning Installation mode off removes it.'
+                }
+              >
+                {autostart.on ? 'Starts with the computer' : 'Start with the computer'}
+              </button>
+            )}
+            {kioskLaunch.enabled && !autostart.supported && autostart.why && (
+              <p className="font-mono text-[10px] leading-snug text-muted">{autostart.why}</p>
+            )}
             <label className="flex items-center justify-between gap-2 text-[11px] text-muted">
               session
               <span
@@ -996,10 +1025,10 @@ export function OutputPage({
               </button>
             )}
             <p className="mt-1 font-mono text-[10px] leading-snug text-muted">
-              To exit a running install : press{' '}
+              To exit a running install : hold{' '}
               <span className="text-text">Esc</span> or <span className="text-text">O</span> on the
-              output, or <span className="text-text">Ctrl+Shift+O</span> anywhere. That returns to
-              the operator UI, it does not disarm this toggle.
+              output for 1.5 s, or press <span className="text-text">Ctrl+Shift+O</span> anywhere.
+              That returns to the operator UI, it does not disarm this toggle.
             </p>
           </Section>
         </aside>

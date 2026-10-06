@@ -4248,6 +4248,8 @@ export const useStore = create<StoreState>((set, get) => ({
       sequence: s.sequence,
       sonify: { ...s.sonify, on: false, sinkId: '' },
       soniSeq: { ...s.soniSeq, on: false, cur: 0 },
+      sonifyOn: s.sonify.on,
+      soniSeqOn: s.soniSeq.on,
       globalSpeed: s.globalSpeed,
       morphMs: s.morphMs,
       // The drawn gesture + its timing travel with the session; the live cursor,

@@ -294,8 +294,12 @@ export default function App(): JSX.Element {
     let cancelled = false
     void window.api
       .autosaveCrashCheck()
-      .then((res) => {
-        if (!cancelled && res?.crashed && res.entries.length > 0) setCrashEntry(res.entries[0])
+      .then(async (res) => {
+        if (cancelled || !res?.crashed || res.entries.length === 0) return
+        // An installation never waits on a question : after a power cut or a
+        // self-heal reload it just boots its session again.
+        const k = await window.api.kioskConfig().catch(() => null)
+        if (!cancelled && !k?.kiosk) setCrashEntry(res.entries[0])
       })
       .catch(() => {})
     return () => {
@@ -573,25 +577,36 @@ export default function App(): JSX.Element {
         try {
           const s = await window.api.sessionLoad(k.sessionPath)
           if (s) {
-            useStore.getState().loadSession(s)
-            useStore.getState().setSessionPath(k.sessionPath)
+            const st = useStore.getState()
+            st.loadSession(s)
+            st.setSessionPath(k.sessionPath)
+            // The installation plays its sound as it was saved : Sonify and its
+            // step sequence come on with the picture (a normal load never starts it).
+            if (s.sonifyOn) st.setSonify({ ...useStore.getState().sonify, on: true })
+            if (s.soniSeqOn) st.setSoniSeqOn(true)
             markClean()
           }
         } catch { /* keep the fresh boot */ }
       }
-      try {
-        const displays = await window.api.outputDisplays()
-        const target =
-          (k.display != null ? displays.find((d) => d.id === k.display) : undefined) ??
-          displays.find((d) => d.isPrimary) ??
-          displays[0]
-        if (target) {
-          await window.api.outputOpen(target.id, false)
-          useStore.getState().setOutputActive(true)
-        }
-      } catch { /* no display : stay windowed */ }
+      await openKioskOutput(!!k.windowed)
     })()
-    return () => { cancelled = true }
+    // The output closed without the exit hatch (a stray key, a crash it could not
+    // survive) : main asks for it again a few seconds later.
+    const off = window.api.onKioskReopenOutput(() => {
+      void window.api.kioskConfig().then((k) => openKioskOutput(!!k?.windowed)).catch(() => {})
+    })
+    return () => {
+      cancelled = true
+      off()
+    }
+  }, [])
+
+  // ── A reload (a crash self-heal, Ctrl+R) while an output window is open : it
+  //    is still there, so stream to it again (main hands over a fresh frame link).
+  useEffect(() => {
+    void window.api.outputIsOpen().then((open) => {
+      if (open) useStore.getState().setOutputActive(true)
+    }).catch(() => {})
   }, [])
 
   // ── Installation exit : when the operator breaks out of a running install
@@ -1060,6 +1075,7 @@ export default function App(): JSX.Element {
     } catch (e) {
       // WebGL2 unavailable : surface it rather than a blank canvas.
       console.error('[Compositor]', (e as Error).message)
+      window.api.kioskGlFailed('control window') // an installation relaunches
       return
     }
 
@@ -1091,6 +1107,7 @@ export default function App(): JSX.Element {
     const loop = (): void => {
       // The GPU is still two frames behind : skip this one (see gpuBacklogged).
       if (comp && comp.gpuBacklogged(performance.now())) { schedule(); return }
+      engineFrames++
       // The whole body is guarded: a shader that throws at load or draw time
       // must never kill the loop (that's a permanent freeze). Lose one frame,
       // keep scheduling : the offending layer simply doesn't render.
@@ -1559,7 +1576,10 @@ export default function App(): JSX.Element {
       }, 150)
     }
     schedule()
+    // The installation watchdog in main : the frame count, every 5 s.
+    const aliveTimer = window.setInterval(() => window.api.appAlive(engineFrames), 5000)
     return () => {
+      window.clearInterval(aliveTimer)
       offGl()
       onCaptureError(null)
       cancelAnimationFrame(raf)
@@ -2003,6 +2023,19 @@ export default function App(): JSX.Element {
 // on the left, same font. Samples the render-loop meter on a light interval.
 // An installation (kiosk launch) : quitting never stops on a dialog.
 let kioskMode = false
+// Frames the engine has drawn (the installation watchdog's heartbeat).
+let engineFrames = 0
+
+/** Open an installation's output on its display (main finds it, by id or name). */
+async function openKioskOutput(windowed: boolean): Promise<void> {
+  try {
+    const id = await window.api.kioskTargetDisplay()
+    await window.api.outputOpen(id, windowed)
+    useStore.getState().setOutputActive(true)
+  } catch {
+    /* no display : the operator window stays */
+  }
+}
 
 function FpsTag(): JSX.Element {
   const [fps, setFps] = useState(0)
