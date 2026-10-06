@@ -645,6 +645,9 @@ function route(address: string, args: Args): void {
           else if (ctl === 'contrast') V('chord', { gamma: 0.5 + clamp01(n) * 3.5 })
           else if (ctl === 'tone') V('chord', { tone: clamp01(n) })
           else if (ctl === 'spread') V('chord', { spread: clamp01(n) })
+          else if (ctl === 'waves') V('chord', { waves: clamp01(n) })
+          else if (ctl === 'wavesrate') V('chord', { wavesRate: clamp01(n) })
+          else if (ctl === 'wavessync') V('chord', { wavesSync: idx(0, 3) })
           return
         case 'collage':
           if (ctl === 'on') V('collage', { on: n >= 0.5 })
@@ -654,6 +657,24 @@ function route(address: string, args: Args): void {
           else if (ctl === 'ring') V('collage', { ring: clamp01(n) })
           else if (ctl === 'harmonics' || ctl === 'bright') V('collage', { bright: clamp01(n) })
           else if (ctl === 'width') V('collage', { width: clamp01(n) })
+          // the Ring bank
+          else if (ctl === 'bank' || ctl === 'wet') V('collage', { bank: clamp01(n) })
+          else if (ctl === 'send') V('collage', { bankSend: n >= 0.5 })
+          else if (ctl === 'decay') V('collage', { decay: clamp01(n) })
+          else if (ctl === 'choke') V('collage', { choke: n >= 0.5 })
+          else if (ctl === 'cutoff') V('collage', { cutoff: clamp01(n) })
+          else if (ctl === 'peak') V('collage', { peak: clamp01(n) })
+          else if (ctl === 'slope') V('collage', { slope: clamp01(n) })
+          else if (ctl === 'tone') V('collage', { tone: clamp01(n) * 2 - 1 })
+          else if (ctl === 'tilt') V('collage', { tilt: clamp01(n) * 2 - 1 })
+          else if (ctl === 'waves') V('collage', { waves: clamp01(n) })
+          else if (ctl === 'wavesrate') V('collage', { wavesRate: clamp01(n) })
+          else if (ctl === 'wavessync') V('collage', { wavesSync: idx(0, 3) })
+          else if (ctl === 'noise') V('collage', { noise: clamp01(n) })
+          else if (ctl === 'noiserate') V('collage', { noiseRate: clamp01(n) })
+          else if (ctl === 'noisesync') V('collage', { noiseSync: idx(0, 3) })
+          else if (ctl === 'detune') V('collage', { detune: clamp01(n) })
+          else if (ctl === 'voicing') V('collage', { voicing: idx(0, 4) })
           return
         case 'fx':
           // shared reverb / delay tail
@@ -957,6 +978,16 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/collage/ring', 0, 1, co.ring, 'Collage ring (resonator sharpness)')
     add('/opsia/sonify/collage/harmonics', 0, 1, co.bright, 'Collage harmonics (2nd + 3rd)')
     add('/opsia/sonify/collage/width', 0, 1, co.width, 'Collage stereo width')
+    add('/opsia/sonify/collage/bank', 0, 1, co.bank ?? 0, 'Collage ring bank wet (0 = the plain voice)')
+    add('/opsia/sonify/collage/decay', 0, 1, co.decay ?? 0.5, 'Collage ring bank decay (12 ms .. 10 s)')
+    add('/opsia/sonify/collage/cutoff', 0, 1, co.cutoff ?? 1, 'Collage ring bank cutoff')
+    add('/opsia/sonify/collage/peak', 0, 1, co.peak ?? 0, 'Collage ring bank peak')
+    add('/opsia/sonify/collage/slope', 0, 1, co.slope ?? 0, 'Collage ring bank slope : low-pass .. band-pass .. high-pass')
+    add('/opsia/sonify/collage/waves', 0, 1, co.waves ?? 0, 'Collage ring bank waves')
+    add('/opsia/sonify/collage/noise', 0, 1, co.noise ?? 0, 'Collage ring bank noise')
+    add('/opsia/sonify/collage/detune', 0, 1, co.detune ?? 0, 'Collage ring bank detune')
+    addI('/opsia/sonify/collage/voicing', 0, 4, co.voicing ?? 0, 'Collage ring bank voicing : 0 Clean · 1 SEM · 2 MS-20 · 3 Steiner · 4 K35')
+    add('/opsia/sonify/chord/waves', 0, 1, so.chord.waves ?? 0, 'Chord waves (a travelling level across the notes)')
     // shared reverb / delay tail
     add('/opsia/sonify/fx/send', 0, 1, so.fx.send, 'FX tail send (whole mix → delay/reverb)')
     add('/opsia/sonify/fx/delaytime', 0, 1, Math.log(so.fx.dlyTime / 0.02) / Math.log(2 / 0.02), 'Delay time')

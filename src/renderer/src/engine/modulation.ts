@@ -908,6 +908,12 @@ export const SONIFY_MOD_DESCS: Record<string, { min: number; max: number; def: n
   collageReso: { min: 0, max: 1, def: 0.5 },
   collageRing: { min: 0, max: 1, def: 0.5 },
   collageWidth: { min: 0, max: 1, def: 1 },
+  collageBank: { min: 0, max: 1, def: 0 },
+  collageDecay: { min: 0, max: 1, def: 0.5 },
+  collageCutoff: { min: 0, max: 1, def: 1 },
+  collageWaves: { min: 0, max: 1, def: 0 },
+  collageDetune: { min: 0, max: 1, def: 0 },
+  chordWaves: { min: 0, max: 1, def: 0 },
   fxSend: { min: 0, max: 1, def: 0 },
   fxReverb: { min: 0, max: 1, def: 0.6 },
   fxDelay: { min: 0, max: 1, def: 0.35 }

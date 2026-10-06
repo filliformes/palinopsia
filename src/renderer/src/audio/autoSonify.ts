@@ -183,8 +183,15 @@ const R_PARAMS: Record<SoniVoiceKey, (c: SoniConfig) => Record<string, unknown>>
   raster: (c) => ({ ...c.raster, quantize: rnd() < 0.85, note: 33 + Math.floor(rnd() * 24), rx: rr(0.1, 0.5), ry: rr(0.1, 0.5), rw: rr(0.15, 0.45), rh: rr(0.1, 0.35), smooth: rnd() < 0.5 ? 0 : rr(0.3, 1), tone: rr(0.35, 1) }),
   sstv: (c) => ({ ...c.sstv, lineHz: rr(4, 28), sync: rnd() < 0.35, dev: rr(0.5, 1.5), syncLev: rr(0.2, 0.8) }),
   filter: (c) => ({ ...c.filter, quantize: rnd() < 0.4, sweepOn: rnd() < 0.6, sweepHz: rr(0.05, 0.6), x: rr(0.2, 0.8), path: pick([0, 0, 1, 2, 3]), pace: rnd() < 0.4 ? rr(0.2, 0.8) : 0, q: rr(0.3, 0.85), noise: rr(0.3, 0.8), gamma: rr(1.2, 2.4) }),
-  collage: (c) => ({ ...c.collage, reso: rr(0.3, 0.85), ring: rr(0.2, 0.8), bright: rr(0.2, 0.8), width: rr(0.6, 1), loOct: pick([1, 2, 2, 3]), hiOct: pick([5, 6, 6, 7]) }),
-  chord: (c) => ({ ...c.chord, voices: 3 + Math.floor(rnd() * 8), loOct: pick([1, 2, 2, 3]), hiOct: pick([5, 6, 6, 7]), gamma: rr(1.2, 2.4), spread: rr(0.3, 0.9), attack: rr(0.1, 1.2), release: rr(0.3, 2), tone: rr(0, 0.6) })
+  collage: (c) => ({
+    ...c.collage, reso: rr(0.3, 0.85), ring: rr(0.2, 0.8), bright: rr(0.2, 0.8), width: rr(0.6, 1), loOct: pick([1, 2, 2, 3]), hiOct: pick([5, 6, 6, 7]),
+    // the Ring bank half the time, in its musical middle
+    bank: rnd() < 0.5 ? 0 : rr(0.4, 1), bankSend: rnd() < 0.3, decay: rr(0.3, 0.85), choke: rnd() < 0.3,
+    cutoff: rr(0.5, 1), peak: rr(0, 0.5), slope: pick([0, 0, 0.5, 0.25]), tone: rr(-0.4, 0.4), tilt: rr(-0.4, 0.4),
+    waves: rnd() < 0.5 ? 0 : rr(0.2, 0.8), wavesRate: rr(0.2, 0.7), noise: rnd() < 0.6 ? 0 : rr(0.1, 0.5), detune: rr(0, 0.4),
+    voicing: pick([0, 0, 1, 2, 3, 4])
+  }),
+  chord: (c) => ({ ...c.chord, voices: 3 + Math.floor(rnd() * 8), loOct: pick([1, 2, 2, 3]), hiOct: pick([5, 6, 6, 7]), gamma: rr(1.2, 2.4), spread: rr(0.3, 0.9), attack: rr(0.1, 1.2), release: rr(0.3, 2), tone: rr(0, 0.6), waves: rnd() < 0.5 ? 0 : rr(0.1, 0.5), wavesRate: rr(0.15, 0.6) })
 }
 
 /** Randomize the whole Sonify instrument : pick 2–3 voices, re-roll their params,

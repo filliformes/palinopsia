@@ -213,6 +213,236 @@ class BBDDelay {
   }
 }
 
+// ── RING : an S-4-style resonant filterbank on the Collage voice ─────────────
+// 48 bands per side, each a Cytomic (TPT) state-variable band-pass, the filter
+// core of Vincent's Loopex / Fizzik : stable up to Nyquist at any Q, where the
+// Chamberlin form blows up past sr/6. The bands sit on the Sonify key / scale
+// across the voice's octave range (sent from the main thread). Every band rings
+// for the same time (Q = 0.455·f·T60, the ring law of res_spectra, whose 50 ms
+// to 10 s span starts lower here so DECAY 0 is a plain filterbank). The spectral
+// shape (cutoff, peak, slope, tone) follows the BSD-3 s4ring logue unit's laws.
+// SUSTAIN shapes what goes INTO each band (its ring decays on its own); CHOKE
+// shapes what comes out (WAVES and the cutoff chop the ring).
+const RB_N = 48;
+// Rhythmic divisions for synced rates, in beats (8 bars … 1/32).
+const RB_DIV = [32, 16, 8, 4, 2, 1, 0.5, 0.25, 0.125];
+/** A modulation rate : r 0..1; sync 0 free (0.02..20 Hz), 1 straight, 2 triplet,
+ *  3 dotted (r picks the division, the tempo sets the speed). */
+function lfoHz(r, sync, bpm) {
+  r = clampf(r, 0, 1);
+  if (!(sync >= 1)) return 0.02 * Math.pow(1000, r);
+  let beats = RB_DIV[Math.round(r * (RB_DIV.length - 1))];
+  if (sync === 2) beats *= 2 / 3; else if (sync === 3) beats *= 1.5;
+  return (clampf(bpm, 20, 400) / 60) / beats;
+}
+// The voicings, Loopex's SVF family : input drive, how hard the resonance clips,
+// and a damping trim (SEM is broader and rounder).
+const RB_VOICE = [
+  { drive: 1, sat: 0, kmul: 1 }, // Clean
+  { drive: 1, sat: 0, kmul: 1.35 }, // SEM
+  { drive: 1.8, sat: 1, kmul: 1 }, // MS-20 : driven, the ring itself clips
+  { drive: 1.2, sat: 0.5, kmul: 1.1 }, // Steiner
+  { drive: 1.5, sat: 0.8, kmul: 1 } // K35
+];
+// Loopex's rational tanh (exact enough, cheap enough to run per band).
+function rtanh(x) { if (x < -3) return -1; if (x > 3) return 1; const x2 = x * x; return x * (27 + x2) / (27 + 9 * x2); }
+
+class RingBank {
+  constructor(sr) {
+    this.sr = sr > 0 ? sr : 48000;
+    this.freq = new Float64Array(RB_N);
+    this.pos = new Float64Array(RB_N); // each band's place in semitones above the lowest
+    for (let b = 0; b < RB_N; b++) { this.freq[b] = 110 * Math.pow(2, b / 12); this.pos[b] = b; }
+    const M = RB_N * 2; // [band·2 + side]
+    this.ic1 = new Float64Array(M); this.ic2 = new Float64Array(M);
+    this.a1 = new Float64Array(M); this.a2 = new Float64Array(M); this.a3 = new Float64Array(M); this.kk = new Float64Array(M);
+    this.g = new Float64Array(RB_N); this.gd = new Float64Array(RB_N); // band gain, and its per-sample step
+    this.dph = new Float64Array(RB_N); // detune wobble phase per band
+    this.drift = new Float64Array(RB_N); // res_spectra's random-walk detune (cents)
+    this.nz = new Float64Array(RB_N); this.nzT = new Float64Array(RB_N); this.nzPh = new Float64Array(RB_N);
+    for (let b = 0; b < RB_N; b++) {
+      this.dph[b] = Math.random(); this.nzPh[b] = Math.random();
+      this.nzT[b] = Math.random(); this.nz[b] = this.nzT[b];
+    }
+    this.wph = 0; this.dtPh = 0; this.wet = 0; this.idle = true;
+    this.zero = new Float32Array(128);
+    this.mk = 1; this.mkKey = ''; this.fver = 0; // make-up gain, and what it was computed for
+    // level match : the make-up above is right for broadband sound, but a film's
+    // tone landing on a band's note passes at full strength and was then lifted
+    // by it (11 dB over the plain voice, measured). A slow follower (~0.7 s) keeps
+    // the wet at the dry's level; it holds while the films are silent, so the
+    // rings decay on their own.
+    this.dryP = 0; this.wetP = 0; this.agc = 1;
+  }
+  // Make-up gain : the bank's summed response, measured. Overlapping bands (a
+  // short decay) add up coherently and came out ~10 dB over the dry; sharp ones
+  // pass only a sliver. Evaluated on 96 log-spaced frequencies across the bank
+  // (equal weight per octave, like a film's pinkish spectrum) with unit band
+  // gains, so the cutoff, peak, waves... still shape the level as they should.
+  makeup(T60, tilt, kmul) {
+    const key = T60.toFixed(4) + '|' + tilt.toFixed(3) + '|' + kmul + '|' + this.fver;
+    if (key === this.mkKey) return this.mk;
+    this.mkKey = key;
+    const f0 = this.freq[0] / 1.4, f1 = Math.min(this.freq[RB_N - 1] * 1.4, NYQ_FRAC * this.sr);
+    const NG = 96;
+    let acc = 0;
+    for (let j = 0; j < NG; j++) {
+      const f = f0 * Math.pow(f1 / f0, j / (NG - 1));
+      let re = 0, im = 0;
+      for (let b = 0; b < RB_N; b++) {
+        const side = (2 * b) / (RB_N - 1) - 1;
+        const fb = this.freq[b];
+        const Q = clampf(0.4547 * fb * T60 * Math.pow(2, tilt * 2 * side), 0.5, 4000) / kmul;
+        // unity-peak band-pass : (j·x/Q) / (1 − x² + j·x/Q), x = f/fb
+        const x = f / fb, a = 1 - x * x, c = x / Q, d = a * a + c * c;
+        re += (c * c) / d; im += (c * a) / d;
+      }
+      acc += re * re + im * im;
+    }
+    // ×1.25 : measured on pink noise the wet sat ~2 dB under the dry at any decay
+    this.mk = clampf(1.25 / Math.sqrt(acc / NG), 0.05, 50);
+    return this.mk;
+  }
+  setFreqs(f) {
+    const n = Math.min(RB_N, f.length);
+    for (let b = 0; b < n; b++) this.freq[b] = f[b] > 10 ? f[b] : 10;
+    const f0 = this.freq[0];
+    for (let b = 0; b < RB_N; b++) this.pos[b] = 12 * Math.log2(this.freq[b] / f0);
+    this.fver++;
+  }
+  reset() { this.ic1.fill(0); this.ic2.fill(0); this.dryP = 0; this.wetP = 0; this.agc = 1; }
+  /** Add the voice (dry and bank) into L/R. `iL/iR` the Collage bus, `gL/gR`
+   *  its balance. */
+  process(iL, iR, L, R, n, co, bpm, gL, gR) {
+    const sr = this.sr, dt = 1 / sr;
+    const wetT = clampf(co.bank || 0, 0, 1);
+    if (wetT <= 0.0005 && this.wet <= 0.0005) {
+      for (let s = 0; s < n; s++) { L[s] += iL[s] * gL; R[s] += iR[s] * gR; }
+      this.wet = 0; this.idle = true;
+      return;
+    }
+    if (this.idle) { this.reset(); this.idle = false; for (let b = 0; b < RB_N; b++) this.g[b] = 0; }
+    const w0 = this.wet, dw = (wetT - w0) / n;
+    this.wet = wetT;
+    const send = !!co.bankSend, choke = !!co.choke;
+    const vo = RB_VOICE[clampf(co.voicing | 0, 0, RB_VOICE.length - 1)];
+    // ── per block : coefficients, shape, modulation ──
+    const T60 = 0.012 * Math.pow(10 / 0.012, clampf(co.decay != null ? co.decay : 0.5, 0, 1));
+    const tilt = clampf(co.tilt || 0, -1, 1);
+    const det = clampf(co.detune || 0, 0, 1);
+    this.dtPh = (this.dtPh + 0.13 * n * dt) % 1; // DETUNE wobbles at a fixed rate
+    const waves = clampf(co.waves || 0, 0, 1);
+    const wA = Math.min(1, waves / 0.65), wFast = Math.max(0, (waves - 0.65) / 0.35); // past 65 % it speeds up
+    this.wph = (this.wph + lfoHz(co.wavesRate != null ? co.wavesRate : 0.5, co.wavesSync | 0, bpm) * (1 + 3 * wFast) * n * dt) % 1;
+    const nA = clampf(co.noise || 0, 0, 1);
+    const nHz = lfoHz(co.noiseRate != null ? co.noiseRate : 0.5, co.noiseSync | 0, bpm);
+    const span = this.pos[RB_N - 1] > 1 ? this.pos[RB_N - 1] : 1;
+    const cn = -6 + clampf(co.cutoff != null ? co.cutoff : 1, 0, 1) * (span + 12);
+    const slope = clampf(co.slope || 0, 0, 1), peak = clampf(co.peak || 0, 0, 1), tone = clampf(co.tone || 0, -1, 1);
+    const nyqF = NYQ_FRAC * sr;
+    const dmax = det * 30; // ± cents of random walk
+    for (let b = 0; b < RB_N; b++) {
+      const side = (2 * b) / (RB_N - 1) - 1; // -1 the lowest band … 1 the highest
+      // detune : a slow per-band wobble + res_spectra's bounded random walk, the
+      // two sides opposite (the stereo spread)
+      if (dmax > 0) {
+        let dr = this.drift[b] + (Math.random() - 0.5) * 0.05 * dmax;
+        this.drift[b] = dr > dmax ? dmax : dr < -dmax ? -dmax : dr;
+      } else this.drift[b] *= 0.9;
+      const cents = det * 20 * Math.sin(TAU * (this.dtPh + this.dph[b])) + this.drift[b];
+      // TILT : one side rings longer, the other is attenuated
+      const T = T60 * Math.pow(2, tilt * 2 * side);
+      for (let ch = 0; ch < 2; ch++) {
+        let f = this.freq[b] * Math.pow(2, (ch ? -cents : cents) / 1200);
+        if (f > nyqF) f = nyqF;
+        const g = Math.tan(Math.PI * f / sr);
+        const Q = clampf(0.4547 * f * T, 0.5, 4000);
+        const k = vo.kmul / Q;
+        const a1 = 1 / (1 + g * (g + k)), i = b * 2 + ch;
+        this.a1[i] = a1; this.a2[i] = g * a1; this.a3[i] = g * g * a1; this.kk[i] = k;
+      }
+      // shape : low-pass → band-pass → high-pass around the cutoff, + the peak, × tone
+      const oct = (this.pos[b] - cn) / 12;
+      const lp = 1 / (1 + Math.exp(2.8 * oct)), hp = 1 / (1 + Math.exp(-2.8 * oct)), bp = Math.exp(-2.2 * oct * oct);
+      let sh = slope < 0.5 ? lp + (bp - lp) * slope * 2 : bp + (hp - bp) * (slope - 0.5) * 2;
+      sh += peak * 1.25 * Math.exp(-6 * oct * oct);
+      sh *= clampf(1 + tone * side, 0.15, 2.2);
+      sh *= tilt > 0 ? 1 - tilt * 0.8 * Math.max(0, -side) : 1 + tilt * 0.8 * Math.max(0, side);
+      // WAVES : a sine across the bands, travelling
+      const wv = 1 - wA * (0.5 - 0.5 * Math.cos(TAU * ((b / RB_N) * (1 + wFast) - this.wph)));
+      // NOISE : a random level per band, re-drawn at the noise rate, glided
+      let np = this.nzPh[b] + nHz * n * dt;
+      if (np >= 1) { np -= Math.floor(np); this.nzT[b] = Math.random(); }
+      this.nzPh[b] = np;
+      this.nz[b] += (this.nzT[b] - this.nz[b]) * Math.min(1, nHz * 4 * n * dt);
+      const tgt = sh * wv * (1 - nA * this.nz[b]);
+      this.gd[b] = (tgt - this.g[b]) / n;
+    }
+    const M = this.makeup(T60, tilt, vo.kmul) * this.agc;
+    let dryB = 0, wetB = 0;
+    const drive = vo.drive, sat = vo.sat;
+    const ic1 = this.ic1, ic2 = this.ic2, A1 = this.a1, A2 = this.a2, A3 = this.a3, K = this.kk, G = this.g, GD = this.gd;
+    // (The saturations below are written out, not calls to rtanh : not inlined in
+    // this hot loop, every call boxed its result, ~12,000 allocations per block,
+    // and the clipping voicings cost 3.6 ms of a 2.7 ms block. Measured.)
+    for (let s = 0; s < n; s++) {
+      const xl = iL[s] * gL, xr = iR[s] * gR;
+      let dl = xl, dr = xr;
+      if (drive > 1.01) {
+        let u = xl * drive; u = u > 3 ? 1 : u < -3 ? -1 : u * (27 + u * u) / (27 + 9 * u * u); dl = u / drive;
+        u = xr * drive; u = u > 3 ? 1 : u < -3 ? -1 : u * (27 + u * u) / (27 + 9 * u * u); dr = u / drive;
+      }
+      let accL = 0, accR = 0;
+      for (let b = 0; b < RB_N; b++) {
+        const gb = (G[b] += GD[b]);
+        let i = b * 2;
+        // left
+        let v3 = (choke ? dl : dl * gb) - ic2[i];
+        let v1 = A1[i] * ic1[i] + A2[i] * v3;
+        let v2 = ic2[i] + A2[i] * ic1[i] + A3[i] * v3;
+        let c1 = 2 * v1 - ic1[i];
+        if (sat > 0) { let u = c1 * K[i] * 1.5; u = u > 3 ? 1 : u < -3 ? -1 : u * (27 + u * u) / (27 + 9 * u * u); c1 += (u / (1.5 * K[i]) - c1) * sat; }
+        ic1[i] = c1; ic2[i] = 2 * v2 - ic2[i];
+        accL += choke ? v1 * K[i] * gb : v1 * K[i];
+        // right
+        i++;
+        v3 = (choke ? dr : dr * gb) - ic2[i];
+        v1 = A1[i] * ic1[i] + A2[i] * v3;
+        v2 = ic2[i] + A2[i] * ic1[i] + A3[i] * v3;
+        c1 = 2 * v1 - ic1[i];
+        if (sat > 0) { let u = c1 * K[i] * 1.5; u = u > 3 ? 1 : u < -3 ? -1 : u * (27 + u * u) / (27 + 9 * u * u); c1 += (u / (1.5 * K[i]) - c1) * sat; }
+        ic1[i] = c1; ic2[i] = 2 * v2 - ic2[i];
+        accR += choke ? v1 * K[i] * gb : v1 * K[i];
+      }
+      dryB += xl * xl + xr * xr; wetB += accL * accL + accR * accR;
+      // soft ceiling on the wet (a very sharp bank on a loud film)
+      let bl = accL * M * 0.5, br = accR * M * 0.5;
+      bl = (bl > 3 ? 1 : bl < -3 ? -1 : bl * (27 + bl * bl) / (27 + 9 * bl * bl)) * 2;
+      br = (br > 3 ? 1 : br < -3 ? -1 : br * (27 + br * br) / (27 + 9 * br * br)) * 2;
+      const w = w0 + dw * (s + 1);
+      L[s] += send ? xl + bl * w : xl * (1 - w) + bl * w;
+      R[s] += send ? xr + br * w : xr * (1 - w) + br * w;
+    }
+    // the level follower (see the constructor)
+    if (dryB > 1e-7 * n) {
+      const a = 1 - Math.exp(-n / (0.7 * sr));
+      this.dryP += (dryB - this.dryP) * a;
+      this.wetP += (wetB * (M / this.agc) * (M / this.agc) - this.wetP) * a;
+      if (this.wetP > 1e-12) {
+        const t = clampf(Math.sqrt(this.dryP / this.wetP), 0.1, 10);
+        this.agc += (t - this.agc) * a;
+      }
+    }
+    // self-heal + flush denormals
+    for (let i = 0; i < RB_N * 2; i++) {
+      const a = ic1[i], c = ic2[i];
+      if (!Number.isFinite(a) || !Number.isFinite(c)) { this.reset(); break; }
+      if (a > -1e-25 && a < 1e-25) ic1[i] = 0;
+      if (c > -1e-25 && c < 1e-25) ic2[i] = 0;
+    }
+  }
+}
+
 // Per-voice DJ filter (Essaim fx.c) : one knob — <0.5 sweeps a 3-stage lowpass
 // down (18k→200Hz), >0.5 sweeps a 3-stage highpass up (20→8000Hz), 0.5 = bypass.
 // RBJ biquads at Q=0.707, cascaded ×3, independent L/R state.
@@ -322,8 +552,8 @@ class SoniProcessor extends AudioWorkletProcessor {
       raster:  { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
       sstv:    { on: false, tap: 0, gain: 0.5, pan: 0, lineHz: 12, dev: 1, syncLev: 0.5 },
       filter:  { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, loop: 0, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0 },
-      chord:   { on: false, tap: 0, gain: 0.6, pan: 0, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3 },
-      collage: { on: false, gain: 0.7, pan: 0 },
+      chord:   { on: false, tap: 0, gain: 0.6, pan: 0, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3, waves: 0, wavesRate: 0.4, wavesSync: 0 },
+      collage: { on: false, gain: 0.7, pan: 0, bank: 0, bankSend: false, decay: 0.5, choke: false, cutoff: 1, peak: 0, slope: 0, tone: 0, tilt: 0, waves: 0, wavesRate: 0.5, wavesSync: 0, noise: 0, noiseRate: 0.5, noiseSync: 0, detune: 0, voicing: 0 },
       fx:      { send: 0, dlyMix: 0.35, dlyTime: 0.3, dlyFb: 0.35, dlyTone: 0.5, dlyMode: 1, rvMode: 0, rvMix: 0.6, rvSize: 0.6, rvDecay: 0.6, rvDamp: 0.3, rvPre: 20, rvMod: 6, rvModRate: 0.5, rvWidth: 1, rvLocut: 220, rvFreeze: false, rvDiff: 0.85, rvLowDamp: 0.5, rvCross: 0.3, rvLowMult: 1, rvHighMult: 1 }
     };
     this.spectraFreqs = new Float32Array(NPART); // filled by cfg
@@ -384,6 +614,11 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.cPhase = new Float32Array(NCHORD);
     this.cAmp = new Float32Array(NCHORD);
     this.cTarget = new Float32Array(NCHORD);
+    this.cW = new Float32Array(NCHORD).fill(1); // each note's WAVES level (ramped per block)
+    this.cwPh = 0;
+    // ── the Collage voice's Ring bank ──
+    this.ring = new RingBank(sampleRate);
+    this.bpm = 120; // the tempo, for synced modulation rates (sent with the mod overlay)
     // scratch (x,y) for the scan-path read (zero-alloc : written per partial)
     this.sxy = new Float32Array(2);
     // ── shared FX tail : reverb + analog delay (send/return) ──
@@ -445,6 +680,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       if (m.spectraFreqs) this.spectraFreqs.set(m.spectraFreqs);
       if (m.filterFreqs) { this.fFreqs.set(m.filterFreqs); this.rebuildFilterCoefs(); }
       if (m.chordFreqs) { this.chordN = Math.min(NCHORD, m.chordFreqs.length); this.chordFreqs.set(m.chordFreqs.subarray(0, this.chordN)); }
+      if (m.ringFreqs) this.ring.setFreqs(m.ringFreqs);
       if (m.cfg.fx) this.applyFx(m.cfg.fx);
       if (m.cfg.mixFilter) for (let i = 0; i < 9; i++) this.djf[i].setX(m.cfg.mixFilter[i] != null ? m.cfg.mixFilter[i] : 0.5, sampleRate);
       return;
@@ -453,6 +689,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       // Per-tick probe overlay : shallow-merge effective values into the live
       // voice configs (sent every tick, so releases revert cleanly).
       const mm = m.m;
+      if (typeof m.bpm === 'number' && m.bpm > 0 && Number.isFinite(m.bpm)) this.bpm = m.bpm;
       sanitize(mm, this.cfg);
       for (const k in mm) {
         const dst = this.cfg[k];
@@ -1068,7 +1305,15 @@ class SoniProcessor extends AudioWorkletProcessor {
       const dn = 1 - Math.exp(-n * dt / Math.max(0.01, ch.release || 0.8));
       const gBase = 1.8 / Math.sqrt(N); // lift the pad into the pack (was 0.5 : ~4× too quiet vs the other voices); the master limiter catches rare bright-frame peaks
       const tone = ch.tone || 0, spread = ch.spread || 0, panBase = 0.5 + ch.pan * 0.5;
+      // WAVES (as the Ring's) : a sine of level across the chord's notes,
+      // travelling, so a held chord keeps moving inside
+      const cwv = clampf(ch.waves || 0, 0, 1);
+      const cwA = Math.min(1, cwv / 0.65), cwFast = Math.max(0, (cwv - 0.65) / 0.35);
+      if (cwv > 0.001) this.cwPh = (this.cwPh + lfoHz(ch.wavesRate != null ? ch.wavesRate : 0.4, ch.wavesSync | 0, this.bpm) * (1 + 3 * cwFast) * n * dt) % 1;
       for (let i = 0; i < N; i++) {
+        const cw1 = cwv > 0.001 ? 1 - cwA * (0.5 - 0.5 * Math.cos(TAU * ((i / N) * (1 + cwFast) - this.cwPh))) : 1;
+        const cw0 = this.cW[i];
+        this.cW[i] = cw1;
         const tgt = this.cTarget[i], cur = this.cAmp[i];
         let a0 = cur + (tgt - cur) * (tgt > cur ? up : dn);
         if (!(a0 > 1e-12)) a0 = 0; // NaN and denormals → 0
@@ -1083,10 +1328,13 @@ class SoniProcessor extends AudioWorkletProcessor {
         const gL = gBase * panGL(pan), gR = gBase * panGR(pan);
         let ph = this.cPhase[i];
         const inc = this.chordFreqs[i] * dt;
+        let wv = cw0;
+        const dwv = (cw1 - cw0) / n;
         for (let s = 0; s < n; s++) {
           let v = sinT(ph);
           if (tone > 0.001) v = v * (1 - tone) + tab(SH3_T, ph) * tone * 0.9; // tanh(3·sin)
-          v *= a0;
+          wv += dwv;
+          v *= a0 * wv;
           L[s] += v * gL; R[s] += v * gR;
           ph += inc;
         }
@@ -1098,17 +1346,17 @@ class SoniProcessor extends AudioWorkletProcessor {
 
     // ── COLLAGE : the Collage films' own sound, already panned piece by piece
     // and rung through their scale-tuned resonators in the native graph
-    // (collageVoice.ts), arriving on input 1. Here : the voice's gain + balance,
-    // then its mixer channel like any other voice.
+    // (collageVoice.ts), arriving on input 1. Here : the voice's balance, its
+    // Ring bank (the S-4-style filterbank; Wet 0 = straight through), then its
+    // mixer channel like any other voice.
     const co = cfg.collage;
     const coOn = !!(co && co.on);
     if (this.voiceLive(8, coOn)) {
       const inp = _inputs[1];
-      if (inp && inp.length) {
-        const iL = inp[0], iR = inp[1] || inp[0];
-        const gL = 1.6 * (1 - Math.max(0, co.pan)), gR = 1.6 * (1 + Math.min(0, co.pan));
-        for (let s = 0; s < n; s++) { L[s] += iL[s] * gL; R[s] += iR[s] * gR; }
-      }
+      const has = inp && inp.length;
+      const iL = has ? inp[0] : this.ring.zero, iR = has ? inp[1] || inp[0] : this.ring.zero;
+      const gL = 1.6 * (1 - Math.max(0, co.pan)), gR = 1.6 * (1 + Math.min(0, co.pan));
+      this.ring.process(iL, iR, L, R, n, co, this.bpm, gL, gR);
       this.mixVoice(8, coOn, co.gain, L, R, outL, outR, n);
     }
 

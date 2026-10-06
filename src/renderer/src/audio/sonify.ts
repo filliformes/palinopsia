@@ -110,6 +110,10 @@ export interface SoniConfig {
     spread: number // stereo fan across the bank
     attack: number; release: number // swell / fade seconds
     tone: number // 0 sine … 1 brighter (soft-clip harmonics)
+    // WAVES (as the Collage's Ring bank) : a travelling sine of level across the
+    // notes; rate 0..1 (free Hz, or a division when synced : 0 free · 1 straight
+    // · 2 triplet · 3 dotted)
+    waves: number; wavesRate: number; wavesSync: number
   }
   // Collage : the films of a Collage source heard all at once (collageVoice.ts).
   // Each piece pans by its place in the frame and rings through a harmonic
@@ -122,6 +126,19 @@ export interface SoniConfig {
     bright: number // weight of the 2nd and 3rd harmonics
     width: number // stereo spread (0 = all centre · 1 = the frame's width)
     loOct: number; hiOct: number
+    // RING BANK : an S-4-style 48-band resonant filterbank on the whole voice,
+    // its bands on the key / scale over loOct..hiOct. bank = wet (0 = the plain
+    // voice, as before); bankSend = add it on top instead of crossfading.
+    bank: number; bankSend: boolean
+    decay: number // ring time 12 ms .. 10 s
+    choke: boolean // false SUSTAIN (shape before the ring) · true CHOKE (after)
+    cutoff: number; peak: number
+    slope: number // 0 low-pass · 0.5 band-pass · 1 high-pass
+    tone: number; tilt: number // −1..1
+    waves: number; wavesRate: number; wavesSync: number
+    noise: number; noiseRate: number; noiseSync: number
+    detune: number // band wobble + random walk, the two sides opposite (stereo)
+    voicing: number // 0 Clean · 1 SEM · 2 MS-20 · 3 Steiner · 4 K35
   }
   // Shared FX tail (send/return) : the whole mix feeds an analog delay → the
   // Quartz/Prism FDN reverb, ported from Essaim/Res. `send` scales the input.
@@ -157,8 +174,12 @@ export function defaultSoniConfig(): SoniConfig {
     raster: { on: false, tap: 0, gain: 0.4, pan: 0, note: 45, freq: 110, quantize: true, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
     sstv: { on: false, tap: 0, gain: 0.4, pan: 0, lineHz: 12, sync: false, dev: 1, syncLev: 0.5 },
     filter: { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, lineIn: false, loop: 0, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0, loOct: 1, hiOct: 8, quantize: false },
-    chord: { on: false, tap: 0, gain: 0.6, pan: 0, voices: 7, loOct: 2, hiOct: 6, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3 },
-    collage: { on: false, gain: 0.7, pan: 0, reso: 0.5, ring: 0.5, bright: 0.5, width: 1, loOct: 2, hiOct: 6 },
+    chord: { on: false, tap: 0, gain: 0.6, pan: 0, voices: 7, loOct: 2, hiOct: 6, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3, waves: 0, wavesRate: 0.4, wavesSync: 0 },
+    collage: {
+      on: false, gain: 0.7, pan: 0, reso: 0.5, ring: 0.5, bright: 0.5, width: 1, loOct: 2, hiOct: 6,
+      bank: 0, bankSend: false, decay: 0.5, choke: false, cutoff: 1, peak: 0, slope: 0, tone: 0, tilt: 0,
+      waves: 0, wavesRate: 0.5, wavesSync: 0, noise: 0, noiseRate: 0.5, noiseSync: 0, detune: 0, voicing: 0
+    },
     fx: {
       send: 0,
       dlyMix: 0.35, dlyTime: 0.3, dlyFb: 0.35, dlyTone: 0.5, dlyMode: 1,
@@ -190,6 +211,8 @@ const SONI_SIMPLE_MODS: Record<string, [keyof SoniConfig, string]> = {
   filterQ: ['filter', 'q'], filterSweep: ['filter', 'sweepHz'],
   chordTone: ['chord', 'tone'], chordSpread: ['chord', 'spread'], chordAttack: ['chord', 'attack'],
   collageReso: ['collage', 'reso'], collageRing: ['collage', 'ring'], collageWidth: ['collage', 'width'],
+  collageBank: ['collage', 'bank'], collageDecay: ['collage', 'decay'], collageCutoff: ['collage', 'cutoff'],
+  collageWaves: ['collage', 'waves'], collageDetune: ['collage', 'detune'], chordWaves: ['chord', 'waves'],
   fxSend: ['fx', 'send'], fxReverb: ['fx', 'rvMix'], fxDelay: ['fx', 'dlyMix']
 }
 const freqNote = (f: number): number => 69 + 12 * Math.log2(Math.max(1, f) / 440)
@@ -245,6 +268,25 @@ function filterFreqs(cfg: SoniConfig): Float32Array {
     for (let i = 0; i < 48; i++) out[i] = tab[Math.min(tab.length - 1, Math.floor((i / 48) * tab.length))]
   } else {
     for (let i = 0; i < 48; i++) out[i] = 80 * Math.pow(100, i / 47)
+  }
+  return out
+}
+
+/** The Collage Ring bank's 48 band centres : evenly spread in pitch from the
+ *  bottom of loOct to the top of hiOct (one per semitone over the default four
+ *  octaves, as the S-4's), each snapped to the nearest note of the scale. Notes
+ *  shared by several bands are kept : they ring louder, which is the scale. */
+export function ringFreqs(cfg: SoniConfig): Float32Array {
+  const lo = cfg.collage.loOct, hi = Math.max(cfg.collage.loOct + 1, cfg.collage.hiOct)
+  const tab = scaleTable(effRoot(cfg), cfg.scale, lo, hi)
+  const out = new Float32Array(48)
+  if (!tab.length) return out.fill(220)
+  const m0 = freqNote(tab[0]), m1 = freqNote(tab[tab.length - 1])
+  for (let b = 0; b < 48; b++) {
+    const f = noteFreq(m0 + ((m1 - m0) * b) / 47)
+    let best = tab[0]
+    for (const t of tab) if (Math.abs(Math.log(t / f)) < Math.abs(Math.log(best / f))) best = t
+    out[b] = best
   }
   return out
 }
@@ -305,6 +347,7 @@ class SonifyEngine {
   private lineWanted = false
   private lineReq = 0 // the latest line-in request (an older one resolving late is dropped)
   private lastTick = 0
+  private bpm = 120 // the tempo, for the synced modulation rates (sent with the mod overlay)
   private lastFrameAt = [0, 0]
   private tapKey = ['', ''] // what each tap read last (a new source = no motion against the old)
   // The Collage voice : a native graph (players + per-piece resonators) into the
@@ -507,15 +550,24 @@ class SonifyEngine {
         chord: {
           on: cfg.chord.on, tap: cfg.chord.tap, gain: cfg.chord.gain, pan: cfg.chord.pan,
           gamma: cfg.chord.gamma, spread: cfg.chord.spread, attack: cfg.chord.attack,
-          release: cfg.chord.release, tone: cfg.chord.tone
+          release: cfg.chord.release, tone: cfg.chord.tone,
+          waves: cfg.chord.waves, wavesRate: cfg.chord.wavesRate, wavesSync: cfg.chord.wavesSync
         },
-        collage: { on: cfg.collage.on, gain: cfg.collage.gain, pan: cfg.collage.pan },
+        collage: {
+          on: cfg.collage.on, gain: cfg.collage.gain, pan: cfg.collage.pan,
+          bank: cfg.collage.bank, bankSend: cfg.collage.bankSend, decay: cfg.collage.decay, choke: cfg.collage.choke,
+          cutoff: cfg.collage.cutoff, peak: cfg.collage.peak, slope: cfg.collage.slope, tone: cfg.collage.tone,
+          tilt: cfg.collage.tilt, waves: cfg.collage.waves, wavesRate: cfg.collage.wavesRate, wavesSync: cfg.collage.wavesSync,
+          noise: cfg.collage.noise, noiseRate: cfg.collage.noiseRate, noiseSync: cfg.collage.noiseSync,
+          detune: cfg.collage.detune, voicing: cfg.collage.voicing
+        },
         fx: { ...cfg.fx },
         mixFilter: cfg.mixFilter
       },
       spectraFreqs: spectraFreqs(cfg, this.ctx?.sampleRate ?? 48000),
       filterFreqs: filterFreqs(cfg),
-      chordFreqs: chordFreqs(cfg)
+      chordFreqs: chordFreqs(cfg),
+      ringFreqs: ringFreqs(cfg)
     })
     // The config replaced the worklet's whole state, modulation included :
     // put the modulated values straight back (waiting for the next tick left a
@@ -607,7 +659,7 @@ class SonifyEngine {
         if (typeof base !== 'number') continue // defensive : partial config → skip
         ;(mm[voice] ??= {})[field] = g(param, base)
       }
-      node.port.postMessage({ t: 'mod', m })
+      node.port.postMessage({ t: 'mod', m, bpm: this.bpm })
       this.liveProbes = {
         spectraX: m.spectra.x, filterX: m.filter.x,
         orbitX: m.orbit.cx, orbitY: m.orbit.cy, orbitR: m.orbit.rx, orbitRY: m.orbit.ry,
@@ -622,6 +674,7 @@ class SonifyEngine {
    *  the worklet, run flow analysis. Call from the App loop AFTER render().
    *  Throttled to ~30Hz. */
   tick(comp: GridReader, nowMs: number, bpm: number): void {
+    this.bpm = bpm > 0 ? bpm : 120
     const node = this.node
     if (!node || !this.cfg.on) {
       if (this.collage) { this.collage.dispose(); this.collage = null }

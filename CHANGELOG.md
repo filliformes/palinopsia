@@ -7,6 +7,27 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **A Ring bank on Sonify's Collage voice**, after the Torso S-4's Ring : one 48-band
+  resonant filterbank per side over the whole voice, its bands snapped to the key and
+  scale across the voice's octave range (one per semitone over the default four
+  octaves). wet (mix or send; 0 = the voice as before), decay (12 ms to 10 s, every band
+  ringing as long; sustain shapes what goes into the bands, choke what comes out),
+  cutoff, peak, slope (LP, BP, HP), tone, tilt, waves and noise (a travelling sine and a
+  random level across the bands, each with a rate that is free or locked to the tempo :
+  straight, triplet, dotted), detune (a slow wobble plus a random walk, the two sides
+  apart), and five voicings from Loopex's filters (Clean, SEM, MS-20, Steiner, K35; the
+  last three clip the ring). The filters are Cytomic state-variable band-passes, stable
+  up to Nyquist at any sharpness. A make-up computed from the bank's own summed response
+  and a slow level follower (held while the films are silent, so the rings decay) keep
+  it at the plain voice's level (measured -1 dB; it was +11 dB on tones landing on a
+  band). Tuning measured on films : the scale's notes stand 12 to 22 dB over the notes
+  between, against 6 to 8 dB without. About 150 µs per 2.7 ms audio block. Five of its
+  controls are modulation targets; OSC `/sonify/collage/{bank,decay,cutoff,peak,slope,
+  waves,noise,detune,voicing,...}`.
+- **Waves on the Chord voice** : the same travelling level across the chord's notes
+  (each note swings about 55 dB, measured), free or tempo-locked, so a held chord keeps
+  moving inside. A modulation target and `/sonify/chord/waves`.
+
 - **Sonify's Filter voice gets a `loop`** : it replays one frozen stretch of its noise,
   a few hundred milliseconds (a flutter) down to a few milliseconds (a buzz); 0 is free
   noise. Its quantized band centres get their own octave range, Flow gets a pan slider,
