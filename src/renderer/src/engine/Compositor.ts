@@ -2823,6 +2823,8 @@ export class Compositor {
     // the chain buffer the rack returns is reused by the layer loop below.
     const bgSource = this.bgIsf ?? this.bgNativeSource;
     const wantBg = bgSource && (this.bgOpacity > 0.001 || this.fzBgLayer);
+    // A background Collage not drawn : its films stop decoding after a second.
+    if (!wantBg) this.bgCollage?.idle();
     let haveBgFill = false;
     if (wantBg) {
       try {

@@ -155,7 +155,9 @@ const parseClock = (s: string): number => {
 
 // Codecs Chromium's <video> cannot decode : convert these. (h264/hevc/vp8/vp9/
 // av1 in mp4/webm play natively and are left untouched.)
-const CONVERT_CODECS = /\b(dxv[0-9]*|hap|prores|dnxhd|mpeg2video|mjpeg|cfhd|qtrle|rawvideo)\b/i
+const CONVERT_CODECS = /\b(dxv[0-9]*|hap|prores|dnxhd|mpeg2video|mpeg1video|mpeg4|msmpeg4v?[0-9]*|wmv[0-9]|vc1|h263|mjpeg|cfhd|qtrle|rawvideo)\b/i
+// Containers Chromium's stock pipeline doesn't open, whatever the codec inside.
+const CONVERT_CONTAINERS = /\.(avi|mxf|mpg|mpeg|m2v)$/i
 
 export interface VideoProbeResult {
   ok: boolean
@@ -186,7 +188,7 @@ export async function probe(path: string): Promise<VideoProbeResult> {
       durationSec,
       width: dim ? Number(dim[1]) : 0,
       height: dim ? Number(dim[2]) : 0,
-      needsConvert: codec !== null && CONVERT_CODECS.test(codec),
+      needsConvert: codec !== null && (CONVERT_CODECS.test(codec) || CONVERT_CONTAINERS.test(path)),
       ffmpegAvailable: true
     }
   } catch (e) {

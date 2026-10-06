@@ -554,6 +554,22 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Collage : lighter and sturdier.** Frame uploads now share a 4 ms main-thread budget
+  per frame, round-robin (50 films at a speed of 2 uploaded every film every frame,
+  ~15 ms); the upload staging cache holds 16 frame sizes under 160 MB instead of 4 (a
+  mixed folder re-created a texture on every upload). Auto deals faster than a second
+  re-cut the wall and re-shuffle the films already playing instead of reloading files
+  (a reload storm froze pieces on their old frame; measured : 8 re-cuts in 3 s, 0 file
+  loads; a 2 s Strobe deal still loads new films). A file that fails to load or decode
+  is never dealt again and its piece moves to another film (it used to stay frozen, a
+  re-deal re-cueing the same file); the folder scan now converts the containers and
+  codecs Chromium doesn't open (.avi, .mxf, .mpg; MPEG-1, MPEG-4 part 2, WMV). A deal on
+  a stopped wall (layer or global Speed 0) shows its new films; a window ending at the
+  file's end no longer seeks twice per loop; a new file re-arms its frame callback (a
+  stranded one dropped the film to the ~8 fps fallback); a background Collage that
+  isn't shown stops decoding after a second. Measured on the RTX 4070 : 60 fps with 12
+  films (wall 2.9 ms) and with 24 films at speed 2 (6.2 ms).
+
 - **Dragging a modulated slider moves its base by as much as you drag.** The thumb
   shows the live (modulated) value, so grabbing it set the base to wherever the
   modulator happened to be (in Multiply mode the base sank a little with every grab),

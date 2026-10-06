@@ -66,8 +66,19 @@ const RATE_MAX = 16
 const TILE_STEPS = [384, 512, 640, 768, 1024, 1280, 1536, 2048]
 /** Memory the deck array may use, whatever the wall. */
 const ARRAY_BUDGET = 80 * 1024 * 1024
-/** Distinct frame sizes kept as upload staging textures (LRU). */
-const STAGING_MAX = 4
+/** Distinct frame sizes kept as upload staging textures (LRU), and the memory
+ *  they may hold. 4 thrashed on a mixed folder (5+ sizes uploading in turn :
+ *  every upload deleted and re-specified a texture). */
+const STAGING_MAX = 16
+const STAGING_BUDGET = 160 * 1024 * 1024
+/** Main-thread time the frame uploads may take per frame (the rest wait their
+ *  turn, round-robin) : 50 films at a speed of 2 used to upload every film every
+ *  frame, ~15 ms, the whole frame budget. */
+const UPLOAD_BUDGET_MS = 4
+/** Auto deals faster than this re-cut the wall among the films already playing
+ *  instead of loading new ones (a reload every half second froze pieces on their
+ *  old frame and starved the decoders). A pressed deal always loads new films. */
+const FAST_DEAL_S = 1
 
 /** The array-layer edge for a wall : a piece covers about 1/cuts of the frame
  *  (the biggest cut-up pieces about half as much again), and its cover crop out
@@ -576,6 +587,8 @@ interface Deck {
   running: boolean // (asm decks) what the edit was last told
   needFrame: boolean // cued while frozen : play until one frame of it lands
   unusedAt: number // when no piece played it any more (0 = in use) : paused after a grace
+  bad: boolean // its file failed to load or decode : re-cued onto another film
+  onFrame: (() => void) | null // its frame callback (re-armed when a new file loads)
 }
 
 interface Cell {
@@ -638,6 +651,10 @@ export class CollageSource {
   private stillFrames = 0
   private lastCuts = -1
   private cutsAt = 0 // when the piece count last changed (a modulated count steps at most this often)
+  private badClips = new Set<string>() // files that failed : never dealt again
+  private stagingBytes = new Map<string, number>()
+  private upStart = 0 // round-robin start of the frame uploads
+  private hiddenAt = 0 // (the background) when it stopped being drawn
   private baseCuts = 12 // the stored count (the modulated one never resizes the deck array)
   private filmsAt = 0
   private lastRotate = -1
@@ -695,12 +712,16 @@ export class CollageSource {
       el, src: '', clip: null, inSec: 0, lenSec: 0,
       content: [0, 0, 1, 1], blitted: false, blitAt: 0, blitT: -1, pending: false, rvfc: 0, seeking: false, seekAt: 0,
       pendingSeek: null, churning: false, nextRoll: 0, pan: [0.5, 0.5], panNext: null,
-      varyU: 0, used: true, shown: true, running: true, needFrame: false, unusedAt: 0
+      varyU: 0, used: true, shown: true, running: true, needFrame: false, unusedAt: 0, bad: false, onFrame: null
     }
     el.addEventListener('seeked', () => { deck.seeking = false; deck.pending = true })
-    // A bad file must never wedge the wall : clear the gate and let the deck
-    // sit on whatever frame it has.
-    el.addEventListener('error', () => { deck.seeking = false })
+    // A bad file must never wedge the wall : clear the gate, and flag it so the
+    // next tick puts this deck on another film (it used to sit on its last frame
+    // for good : a re-deal with the same seed re-cued the same broken file).
+    el.addEventListener('error', () => {
+      deck.seeking = false
+      if ((el.error?.code ?? 0) >= 2) deck.bad = true
+    })
     // A new src aborts any seek in flight WITHOUT a 'seeked' : clear the gate,
     // or the window loop waits on a seek that will never report back.
     el.addEventListener('emptied', () => { deck.seeking = false })
@@ -709,6 +730,7 @@ export class CollageSource {
       if (typeof el.requestVideoFrameCallback === 'function')
         deck.rvfc = el.requestVideoFrameCallback(step)
     }
+    deck.onFrame = step
     if (typeof el.requestVideoFrameCallback === 'function')
       deck.rvfc = el.requestVideoFrameCallback(step)
     return deck
@@ -726,7 +748,7 @@ export class CollageSource {
       inSec: 0, lenSec: 0, content: [0, 0, 1, 1], blitted: false, blitAt: 0, blitT: -1, pending: false, rvfc: 0,
       seeking: false, seekAt: 0, pendingSeek: null, churning: false, nextRoll: 0,
       pan: [0.5, 0.5], panNext: null, varyU: rnd() * 2 - 1, used: true, shown: true,
-      running: true, needFrame: false, unusedAt: 0
+      running: true, needFrame: false, unusedAt: 0, bad: false, onFrame: null
     }
   }
 
@@ -837,16 +859,27 @@ export class CollageSource {
    *  re-specified at a different size between two decks. */
   private uploadStaged(el: HTMLVideoElement): WebGLTexture | null {
     const key = `${el.videoWidth}x${el.videoHeight}`
+    const bytes = el.videoWidth * el.videoHeight * 4
     const hit = this.staging.get(key) ?? null
     if (hit) this.staging.delete(key)
-    else if (this.staging.size >= STAGING_MAX) {
-      const oldest = this.staging.keys().next().value as string
-      const t = this.staging.get(oldest)
-      if (t) this.gl.deleteTexture(t)
-      this.staging.delete(oldest)
+    else {
+      // evict the least recently used while over the count or the memory cap
+      let total = 0
+      for (const b of this.stagingBytes.values()) total += b
+      while (this.staging.size && (this.staging.size >= STAGING_MAX || total + bytes > STAGING_BUDGET)) {
+        const oldest = this.staging.keys().next().value as string
+        const t = this.staging.get(oldest)
+        if (t) this.gl.deleteTexture(t)
+        this.staging.delete(oldest)
+        total -= this.stagingBytes.get(oldest) ?? 0
+        this.stagingBytes.delete(oldest)
+      }
     }
     const t = uploadVideoFrame(this.gl, el, hit)
-    if (t) this.staging.set(key, t) // (re)insert : most recently used last
+    if (t) {
+      this.staging.set(key, t) // (re)insert : most recently used last
+      this.stagingBytes.set(key, bytes)
+    }
     return t
   }
 
@@ -869,7 +902,12 @@ export class CollageSource {
           const t = bag[k]; bag[k] = bag[j]; bag[j] = t
         }
       }
-      const clip = bag.pop()!
+      let clip = bag.pop()!
+      // a file that failed once is skipped while the pool has others
+      for (let k = 0; this.badClips.has(clip.id) && k < this.pool.length; k++) {
+        if (!bag.length) break
+        clip = bag.pop()!
+      }
       const d = this.decks[i]
       // The churning decks are the FIRST `churn x n` : deterministic, so the
       // dial sweeps in a stable order instead of reshuffling who churns.
@@ -925,9 +963,18 @@ export class CollageSource {
     if (d.pendingSeek) d.el.removeEventListener('loadedmetadata', d.pendingSeek)
     d.pendingSeek = null
     d.seeking = false
+    d.bad = false
     d.src = url
     d.el.src = url
     d.el.load()
+    // Re-arm the frame callback on the new file (as VideoSource.load does) : one
+    // left pending on the old source can be stranded, and the deck then fell
+    // back to the slow ~8 fps poll.
+    if (d.onFrame && typeof d.el.requestVideoFrameCallback === 'function') {
+      if (d.rvfc && typeof d.el.cancelVideoFrameCallback === 'function') d.el.cancelVideoFrameCallback(d.rvfc)
+      d.rvfc = d.el.requestVideoFrameCallback(d.onFrame)
+    }
+    d.pending = true
   }
 
   /** Optimise re-encoded the pool : same clips (same ids), new playable files.
@@ -949,7 +996,8 @@ export class CollageSource {
   /** A deck's new film, never the one it is already playing when the pool has
    *  another. */
   private pickOther(cur: CollageClip | null): CollageClip | null {
-    const P = this.pool
+    const good = this.pool.filter((c) => !this.badClips.has(c.id))
+    const P = good.length ? good : this.pool
     if (!P.length) return cur
     if (P.length === 1) return P[0]
     let i = Math.floor(this.rollRnd() * P.length)
@@ -1430,11 +1478,16 @@ export class CollageSource {
     const dealEvent = dealNow && this.prevDeal < 0.5
     this.prevDeal = dealNow ? 1 : 0
     let reseedRecut = dealEvent
+    let fastRecut = false // an auto deal too quick to load films : re-cut only
     if (rate > 0.01) {
       // At least ~0.15s between deals : a deal reloads clips, and dealing every
       // frame is a reload storm no wall can survive. Frozen, the clock waits.
       if (!freeze) this.dealTimer += dt
-      if (this.dealTimer >= Math.max(rate, 0.15)) { this.dealTimer = 0; reseedRecut = true }
+      if (this.dealTimer >= Math.max(rate, 0.15)) {
+        this.dealTimer = 0
+        if (!reseedRecut) fastRecut = rate < FAST_DEAL_S
+        reseedRecut = true
+      }
     } else {
       this.dealTimer = 0
     }
@@ -1458,7 +1511,9 @@ export class CollageSource {
       }
       // Assemblage decks carry their own edit and their own pace : a deal only
       // re-cuts the partition and re-shuffles which piece shows which edit.
-      if (feed === 0) this.deal(hold, churn, !reseedRecut || poolChanged || deckChanged)
+      // A FAST auto deal re-cuts the wall and re-shuffles the films already
+      // playing over the new pieces : no file loads (see FAST_DEAL_S).
+      if (feed === 0 && !(fastRecut && !poolChanged && !deckChanged)) this.deal(hold, churn, !reseedRecut || poolChanged || deckChanged)
       this.rebuildCells(cuts, shape)
     } else if (filesChanged && feed === 0) {
       this.swapFiles()
@@ -1512,6 +1567,13 @@ export class CollageSource {
         continue
       }
       if (!d.clip) continue
+      if (d.bad) {
+        // Its file failed : never deal it again, put this deck on another film.
+        this.badClips.add(d.clip.id)
+        d.bad = false
+        const other = this.pickOther(d.clip)
+        if (other && other.id !== d.clip.id) this.cue(d, other, hold, this.rollRnd, false)
+      }
       // Churn applies live : the first round(churn x n) decks re-roll on their
       // own clock. A deck joining the churn starts at a random point of its
       // cycle so a turned dial doesn't make every piece jump at once.
@@ -1523,17 +1585,17 @@ export class CollageSource {
       // on every step.
       if (!d.used && !d.unusedAt) d.unusedAt = now
       const inUse = d.used || now - d.unusedAt < 1500
-      const run = inUse && r > 0.004 && (!freeze || d.needFrame)
+      // A film just cued runs until its first frame lands, even on a stopped
+      // wall (freeze, or a layer / global Speed of 0 : a deal used to never show).
+      const run = inUse && (d.needFrame || (!freeze && r > 0.004))
       const want = clampf(r, RATE_MIN, RATE_MAX)
       if (Math.abs(d.el.playbackRate - want) > want * 0.02) {
         try { d.el.playbackRate = want } catch { /* out-of-band rate */ }
       }
-      if (run) {
-        if (d.el.paused && d.el.readyState >= 2) void d.el.play().catch(() => {})
-      } else if (!d.el.paused) {
-        d.el.pause()
+      if (!run) {
+        if (!d.el.paused) d.el.pause()
+        continue
       }
-      if (!run) continue
       if (d.churning && churn > 0.001 && !freeze) {
         d.nextRoll -= dt
         if (d.nextRoll <= 0) {
@@ -1547,11 +1609,27 @@ export class CollageSource {
           d.nextRoll = (0.25 + this.rollRnd() * 1.2) / Math.max(0.15, churn)
         }
       }
-      // Sub-window looping : native loop only covers whole files.
+      // Sub-window looping : native loop only covers whole files. Checked BEFORE
+      // play() : on an ended window, play() rewinds to 0 first and the window
+      // then seeked again (two seeks per loop).
       if (!d.el.loop && d.el.readyState >= 2 && !d.seeking) {
         const t = d.el.currentTime
         if (t >= d.inSec + d.lenSec || t < d.inSec - 0.25 || d.el.ended) this.seekTo(d, d.inSec)
       }
+      if (d.el.paused && d.el.readyState >= 2) void d.el.play().catch(() => {})
+    }
+  }
+
+  /** (The background) not drawn this frame : after a second, stop the decoders
+   *  (a background Collage at opacity 0 kept every film decoding for nothing).
+   *  The next render() plays them again. */
+  idle(): void {
+    const now = performance.now()
+    if (!this.hiddenAt) { this.hiddenAt = now; return }
+    if (now - this.hiddenAt < 1000) return
+    for (const d of this.decks) {
+      if (d.asm) { if (d.running) { d.asm.setPlaying(false); d.running = false } }
+      else if (!d.el.paused) d.el.pause()
     }
   }
 
@@ -1570,6 +1648,7 @@ export class CollageSource {
     if (this.disposed) return
     const gl = this.gl
     const g = collageGL(gl)
+    this.hiddenAt = 0
     this.tick(clockSec)
     // Own vertex array for every draw : the default one belongs to the ISF runtime.
     gl.bindVertexArray(g.vao)
@@ -1605,7 +1684,13 @@ export class CollageSource {
       let bound = false
       const T = this.tile
       const now = performance.now()
-      for (let i = 0; i < this.decks.length && i < this.arrLayers; i++) {
+      // Round-robin under a time budget : the films that miss this frame go
+      // first next frame.
+      const nDeck = Math.min(this.decks.length, this.arrLayers)
+      let spent = 0, uploads = 0
+      for (let k = 0; k < nDeck; k++) {
+        const i = (this.upStart + k) % nDeck
+        if (uploads >= 2 && spent > UPLOAD_BUDGET_MS) { this.upStart = i; break }
         const d = this.decks[i]
         if (d.blitted && !d.needFrame && (!d.used || !d.shown)) continue
         let tex: WebGLTexture | null
@@ -1626,7 +1711,10 @@ export class CollageSource {
           d.pending = false
           vw = d.el.videoWidth
           vh = d.el.videoHeight
+          const t0 = performance.now()
           tex = this.uploadStaged(d.el)
+          spent += performance.now() - t0
+          uploads++
         }
         if (!tex || !vw || !vh) continue
         // The picture rect of THIS frame (an edit cuts between aspects; a new

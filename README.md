@@ -1036,6 +1036,11 @@ living mosaic where every fragment is a different film. Pick it as a layer sourc
   holes are drawn afterwards, crisp : blur, pixelate, glitch or recolor every film
   without softening the cut shapes. Off, the FX process the finished wall. (Torn
   paper then reads the neighbouring film mirrored across the tear.)
+- **Light on the machine.** Frame uploads share a 4 ms budget per frame (the films
+  that miss a frame go first on the next), auto deals faster than a second re-cut the
+  wall among the films already playing instead of loading new files, a file that
+  fails is never dealt again (its piece moves to another film), and a background
+  Collage that isn't shown stops decoding after a second.
 - **Optimise** (a button in the strip) re-encodes the whole folder to 720p
   all-intra H.264 : the shape the wall's constant seeking wants. Slow (minutes for
   a big folder) but one-time and cached; measured to hold 60 fps with 50 films.
