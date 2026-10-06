@@ -126,7 +126,7 @@ export function PerformancePanel(): JSX.Element {
   const nFeedback = layers.filter((L) => L?.feedback).length
   const srcCount = (kind: string): number => layers.reduce((n, L) => n + (L?.sourceA?.kind === kind ? 1 : 0) + (L?.sourceB?.kind === kind ? 1 : 0), 0)
   const collageCount = layers.reduce((n, L) => n + ([L?.sourceA, L?.sourceB].filter((s) => s?.kind === 'generator' && s?.shaderId === 'gen-collage').length), 0)
-  const soniVoices = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord'].filter((k) => (sonify as unknown as Record<string, { on?: boolean }>)[k]?.on).length
+  const soniVoices = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage'].filter((k) => (sonify as unknown as Record<string, { on?: boolean }>)[k]?.on).length
 
   const chip = (on: boolean, label: string, title: string): JSX.Element => (
     <span

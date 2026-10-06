@@ -26,6 +26,7 @@
  * Target: RTX 4070 / WebGL2. 1080p–4K @ 60 is comfortable.
  */
 
+import type { CollageSoundSet } from '../audio/collageVoice';
 import { Renderer as ISFRenderer } from 'interactive-shader-format';
 import { handle, installTextureBridge } from './isfTextureBridge';
 import { audioBus } from './audioIn';
@@ -1079,6 +1080,7 @@ export class ISFLayer {
       pool: import('@shared/collage').CollageClip[];
       edls: import('@shared/collage').CollageEdl[];
       inputs: Record<string, number | number[]>;
+      folder?: string;
     } | null
   ): void {
     const cur = slot === 'A' ? this.collageA : this.collageB;
@@ -1094,7 +1096,12 @@ export class ISFLayer {
       src = new CollageSource(this.shared.gl, this.w, this.h);
       if (slot === 'A') this.collageA = src; else this.collageB = src;
     }
-    src.update(cfg.pool, cfg.edls, cfg.inputs);
+    src.update(cfg.pool, cfg.edls, cfg.inputs, cfg.folder ?? '');
+  }
+
+  /** Sonify's Collage voice : this slot's wall (pieces + films), if it has one. */
+  collageSoundInfo(slot: 'A' | 'B'): ReturnType<CollageSource['soundInfo']> {
+    return (slot === 'A' ? this.collageA : this.collageB)?.soundInfo() ?? null;
   }
 
   /** Load/swap/clear a live CAPTURE source ('webcam' | 'screen' | 'desktop:id'). */
@@ -1689,6 +1696,27 @@ export class Compositor {
   scaleLayerOpacity(i: number, k: number): void {
     const L = this.layers[i];
     if (L) L.opacity *= Math.max(0, Math.min(1, k));
+  }
+
+  /** Sonify's Collage voice : every Collage wall in the composition (layers A/B
+   *  and the background), each with how visible it is (layer opacity, mute /
+   *  solo, the A/B mix) so a hidden wall falls silent and a fading one fades. */
+  collageSounds(): CollageSoundSet[] {
+    const out: CollageSoundSet[] = [];
+    const aspect = this.w / Math.max(1, this.h);
+    const anySolo = this.layers.some((l) => l.solo);
+    this.layers.forEach((L, i) => {
+      const vis = (anySolo ? L.solo : !L.mute) ? L.opacity : 0;
+      for (const slot of ['A', 'B'] as const) {
+        const info = L.collageSoundInfo(slot);
+        if (!info) continue;
+        const w = slot === 'A' ? (L.hasB() ? 1 - L.sourceMix : 1) : L.sourceMix;
+        out.push({ id: `L${i}${slot}`, level: Math.max(0, Math.min(1, vis * w)), aspect, ...info });
+      }
+    });
+    const bgInfo = this.bgCollage?.soundInfo();
+    if (bgInfo) out.push({ id: 'BG', level: Math.max(0, Math.min(1, this.bgOpacity)), aspect, ...bgInfo });
+    return out;
   }
 
   /** True when the last syncFromState deferred no load : every shader the
@@ -2327,7 +2355,7 @@ export class Compositor {
       L.setParam('A', isParamA ? { inputs: l.sourceA.inputs } : null);
       L.setNative('A', natA, natA ? l.sourceA.inputs : null);
       L.setSilhouette('A', l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-silhouette' ? { inputs: l.sourceA.inputs } : null);
-      L.setCollage('A', isCollA ? { pool: l.sourceA.collagePool ?? [], edls: l.sourceA.collageEdls ?? [], inputs: l.sourceA.inputs } : null);
+      L.setCollage('A', isCollA ? { pool: l.sourceA.collagePool ?? [], edls: l.sourceA.collageEdls ?? [], inputs: l.sourceA.inputs, folder: l.sourceA.collageFolder } : null);
       const nativeB = !!l.sourceB && l.sourceB.kind === 'generator' && NATIVE_SOURCE_IDS.has(l.sourceB.shaderId ?? '');
       const isTextB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-text';
       const isParamB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-parametric';
@@ -2349,7 +2377,7 @@ export class Compositor {
       L.setParam('B', isParamB && l.sourceB ? { inputs: l.sourceB.inputs } : null);
       L.setNative('B', natB, natB && l.sourceB ? l.sourceB.inputs : null);
       L.setSilhouette('B', !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-silhouette' ? { inputs: l.sourceB.inputs } : null);
-      L.setCollage('B', isCollB && l.sourceB ? { pool: l.sourceB.collagePool ?? [], edls: l.sourceB.collageEdls ?? [], inputs: l.sourceB.inputs } : null);
+      L.setCollage('B', isCollB && l.sourceB ? { pool: l.sourceB.collagePool ?? [], edls: l.sourceB.collageEdls ?? [], inputs: l.sourceB.inputs, folder: l.sourceB.collageFolder } : null);
       L.setVideoPlayback('A', l.sourceA);
       L.setVideoPlayback('B', l.sourceB);
       L.setFraming('A', l.sourceA);
@@ -2384,7 +2412,8 @@ export class Compositor {
       this.bgCollage.update(
         bg.source.collagePool ?? [],
         bg.source.collageEdls ?? [],
-        bg.source.inputs
+        bg.source.inputs,
+        bg.source.collageFolder ?? ''
       );
     } else if (this.bgCollage) {
       this.bgCollage.dispose();

@@ -10,7 +10,7 @@ import { runSilently } from '../undo'
 import { loadSoniPreset } from './soniPresets'
 import type { SoniConfig } from './sonify'
 
-const VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord'] as const
+const VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage'] as const
 
 let lastStepAt = 0
 let wasOn = false

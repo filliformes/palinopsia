@@ -50,6 +50,7 @@
 import type { CollageClip, CollageEdl } from '@shared/collage'
 import { uploadVideoFrame } from './VideoSource'
 import { AssembleSource } from './AssembleSource'
+import type { CollageSoundDeck, CollageSoundPiece } from '../audio/collageVoice'
 
 /** Same piece cap as the Autocutter : the shader's uniform arrays are sized 64. */
 const MAX_CELLS = 64
@@ -503,6 +504,13 @@ function mulberry32(a: number): () => number {
   }
 }
 
+/** The file behind an opsia-media:// URL (null for anything else). */
+function pathFromMediaUrl(url: string | undefined): string | null {
+  const pfx = 'opsia-media://local/'
+  if (!url || !url.startsWith(pfx)) return null
+  try { return decodeURIComponent(url.slice(pfx.length)) } catch { return null }
+}
+
 /** Does an assemblage deck have a decoded frame waiting? AssembleSource.upload()
  *  hands back its texture every frame whether or not a new frame arrived, so
  *  read its live deck's flag instead of re-blitting a still frame 60 times a
@@ -579,6 +587,7 @@ export class CollageSource {
   private lastFeed = -1
   /** Base inputs from the store, overlaid by modulation's per-frame writes. */
   private live: Record<string, number | number[]> = {}
+  private folder = '' // the pool's folder (older pools rebuild original paths from it)
   // Every instance starts from its own seed : two walls on the same folder (two
   // slots, or a layer and the background) must not deal the same wall.
   private seed = (Math.random() * 0x100000000) >>> 0
@@ -1138,8 +1147,10 @@ export class CollageSource {
   update(
     pool: CollageClip[],
     edls: CollageEdl[],
-    inputs: Record<string, number | number[]>
+    inputs: Record<string, number | number[]>,
+    folder = ''
   ): void {
+    this.folder = folder
     if (this.disposed) return
     // A changed pool (new folder, new selection) re-deals from scratch; the same
     // clips with new FILES (an optimise pass) swap in place. The store passes a
@@ -1175,6 +1186,41 @@ export class CollageSource {
   /** Modulation overlay (applyModulation runs after syncFromState). */
   setInput(name: string, value: number | number[]): void {
     this.live[name] = value
+  }
+
+  /** For Sonify's Collage voice : every piece (centre, film, shown or masked)
+   *  and every film (the video its sound follows, the file to hear). */
+  soundInfo(): { pieces: CollageSoundPiece[]; decks: CollageSoundDeck[] } | null {
+    if (this.disposed || !this.cells.length) return null
+    const mask = clampf(num(this.live.mask, 0), 0, 1)
+    const pieces: CollageSoundPiece[] = this.cells.map((c, i) => {
+      const r = this.rank[i]
+      const t = Math.max(0, Math.min(1, (r - (mask - 0.06)) / 0.06))
+      return { x: c.x + c.w / 2, y: c.y + c.h / 2, deck: c.deck, keep: mask <= 0 ? 1 : t * t * (3 - 2 * t) }
+    })
+    const decks: CollageSoundDeck[] = this.decks.map((d) => {
+      if (d.asm) {
+        // An assemblage deck : follow whichever of its players is on screen,
+        // and hear that file.
+        const a = d.asm as unknown as { decks?: Array<{ el?: HTMLVideoElement }>; live?: number }
+        const el = a.decks?.[a.live ?? 0]?.el ?? null
+        const p = el ? pathFromMediaUrl(el.currentSrc || el.src) : null
+        return { el, path: p }
+      }
+      if (!d.src || !d.clip) return { el: null, path: null }
+      return { el: d.el, path: this.originalOf(d.clip) }
+    })
+    return { pieces, decks }
+  }
+
+  /** The clip's ORIGINAL file : its own `src`, or the playable file when that
+   *  IS the original (same name), or the folder + name for older pools. */
+  private originalOf(clip: CollageClip): string {
+    if (clip.src) return clip.src
+    const base = clip.file.split(/[\\/]/).pop() ?? ''
+    if (base === clip.fileName || !this.folder) return clip.file
+    const sep = this.folder.includes('\\') ? '\\' : '/'
+    return this.folder.replace(/[\\/]+$/, '') + sep + clip.fileName
   }
 
   private tick(clockSec: number | undefined): void {

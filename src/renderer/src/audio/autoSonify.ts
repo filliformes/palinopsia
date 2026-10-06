@@ -99,6 +99,9 @@ export function suggestSonify(c: CompositionState, cur: SoniConfig): SoniConfig 
     perLayer.push(mine)
     for (const [v, w] of mine) total.set(v, (total.get(v) ?? 0) + w * Math.max(0.3, l.opacity))
   })
+  const hasCollage = c.layers.some(
+    (l) => !l.mute && [l.sourceA, l.sourceB].some((s) => s?.shaderId === 'gen-collage' && (s.collagePool?.length ?? 0) > 0)
+  )
   // Master rack shapes everything : half weight.
   rack(c.master.filter((f) => !f.locked), total, 0.5)
 
@@ -145,7 +148,9 @@ export function suggestSonify(c: CompositionState, cur: SoniConfig): SoniConfig 
     raster: { ...cur.raster, on: chosen.has('raster'), tap: tapFor('raster') },
     sstv: { ...cur.sstv, on: chosen.has('sstv'), tap: tapFor('sstv') },
     filter: { ...cur.filter, on: chosen.has('filter'), tap: tapFor('filter') },
-    chord: { ...cur.chord, on: chosen.has('chord'), tap: tapFor('chord') }
+    chord: { ...cur.chord, on: chosen.has('chord'), tap: tapFor('chord') },
+    // A Collage with films : hear them (the voice's own sound, on top of the rest).
+    collage: { ...cur.collage, on: hasCollage }
   }
 }
 
@@ -159,7 +164,7 @@ const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(rnd() * arr.length)]
  *  the dice re-voices the instrument, it never blasts or silences it. */
 // Per-voice parameter randomizers (character only — `on`/`tap` set by the caller).
 // Shared by the whole-instrument dice and the per-voice dice.
-export type SoniVoiceKey = 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord'
+export type SoniVoiceKey = 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage'
 const R_PARAMS: Record<SoniVoiceKey, (c: SoniConfig) => Record<string, unknown>> = {
   spectra: (c) => ({ ...c.spectra, quantize: rnd() < 0.85, sweepOn: rnd() < 0.75, sync: rnd() < 0.3, sweepHz: rr(0.06, 0.8), x: rr(0.2, 0.8), path: pick([0, 0, 0, 1, 2, 3]), pace: rnd() < 0.4 ? rr(0.2, 0.8) : 0, gamma: rr(1.2, 2.6), breath: rnd() < 0.4 ? rr(0.2, 0.7) : 0, loOct: pick([1, 2, 2, 3]), hiOct: pick([6, 7, 7, 8]) }),
   orbit: (c) => ({ ...c.orbit, quantize: rnd() < 0.85, note: 33 + Math.floor(rnd() * 28), cx: rr(0.3, 0.7), cy: rr(0.3, 0.7), rx: rr(0.08, 0.35), ry: rr(0.08, 0.35), ratio: pick([1, 2, 1.5, 3]), drive: rr(0.6, 2), smooth: rr(0.2, 0.8) }),
@@ -168,6 +173,7 @@ const R_PARAMS: Record<SoniVoiceKey, (c: SoniConfig) => Record<string, unknown>>
   raster: (c) => ({ ...c.raster, quantize: rnd() < 0.85, note: 33 + Math.floor(rnd() * 24), rx: rr(0.1, 0.5), ry: rr(0.1, 0.5), rw: rr(0.15, 0.45), rh: rr(0.1, 0.35), smooth: rnd() < 0.5 ? 0 : rr(0.3, 1), tone: rr(0.35, 1) }),
   sstv: (c) => ({ ...c.sstv, lineHz: rr(4, 28), sync: rnd() < 0.35, dev: rr(0.5, 1.5), syncLev: rr(0.2, 0.8) }),
   filter: (c) => ({ ...c.filter, quantize: rnd() < 0.4, sweepOn: rnd() < 0.6, sweepHz: rr(0.05, 0.6), x: rr(0.2, 0.8), path: pick([0, 0, 1, 2, 3]), pace: rnd() < 0.4 ? rr(0.2, 0.8) : 0, q: rr(0.3, 0.85), noise: rr(0.3, 0.8), gamma: rr(1.2, 2.4) }),
+  collage: (c) => ({ ...c.collage, reso: rr(0.3, 0.85), ring: rr(0.2, 0.8), bright: rr(0.2, 0.8), width: rr(0.6, 1), loOct: pick([1, 2, 2, 3]), hiOct: pick([5, 6, 6, 7]) }),
   chord: (c) => ({ ...c.chord, voices: 3 + Math.floor(rnd() * 8), loOct: pick([1, 2, 2, 3]), hiOct: pick([5, 6, 6, 7]), gamma: rr(1.2, 2.4), spread: rr(0.3, 0.9), attack: rr(0.1, 1.2), release: rr(0.3, 2), tone: rr(0, 0.6) })
 }
 
@@ -207,6 +213,6 @@ export function randomSonify(cur: SoniConfig): SoniConfig {
 /** Re-roll a single voice's params (leaving the rest of the mix untouched), and
  *  switch it on — for the per-voice dice. */
 export function randomizeVoice(cur: SoniConfig, voice: SoniVoiceKey): SoniConfig {
-  const params = { ...R_PARAMS[voice](cur), on: true, tap: cur[voice].tap }
+  const params = { ...R_PARAMS[voice](cur), on: true, ...('tap' in cur[voice] ? { tap: (cur[voice] as { tap: number }).tap } : {}) }
   return { ...cur, [voice]: params } as SoniConfig
 }

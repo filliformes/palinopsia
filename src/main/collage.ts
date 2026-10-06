@@ -118,6 +118,7 @@ async function scanFolder(
         id: clipId(path),
         file,
         fileName: name,
+        src: path,
         durSec: pr.durationSec,
         width,
         height

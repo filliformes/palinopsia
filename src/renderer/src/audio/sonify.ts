@@ -13,6 +13,7 @@
 
 import { registerSonifyModBase, sonifyModValues } from '../engine/modulation'
 import { SONI_WORKLET_URL } from './soniWorklet'
+import { CollageVoice, type CollageSoundSet } from './collageVoice'
 
 export const GRID = 96
 const FLOW_BLOCK = 8 // grid px per flow block → 12×12 blocks
@@ -107,6 +108,18 @@ export interface SoniConfig {
     attack: number; release: number // swell / fade seconds
     tone: number // 0 sine … 1 brighter (soft-clip harmonics)
   }
+  // Collage : the films of a Collage source heard all at once (collageVoice.ts).
+  // Each piece pans by its place in the frame and rings through a harmonic
+  // resonator tuned to the key/scale by its distance from the centre (centre =
+  // loOct's root, the frame's edge = hiOct's top). No tap : it hears the films.
+  collage: {
+    on: boolean; gain: number; pan: number
+    reso: number // 0 = the plain films · 1 = only the resonances
+    ring: number // how sharply each resonator rings (Q)
+    bright: number // weight of the 2nd and 3rd harmonics
+    width: number // stereo spread (0 = all centre · 1 = the frame's width)
+    loOct: number; hiOct: number
+  }
   // Shared FX tail (send/return) : the whole mix feeds an analog delay → the
   // Quartz/Prism FDN reverb, ported from Essaim/Res. `send` scales the input.
   fx: {
@@ -120,7 +133,7 @@ export interface SoniConfig {
     rvCross: number; rvLowMult: number; rvHighMult: number // Prism
   }
   // Per-voice DJ filter for the mixer page (one per voice, in render order :
-  // spectra·orbit·flow·events·raster·sstv·filter·chord). 0.5 = bypass, <0.5
+  // spectra·orbit·flow·events·raster·sstv·filter·chord·collage). 0.5 = bypass, <0.5
   // lowpass sweep, >0.5 highpass sweep. Volume is each voice's own `gain`.
   mixFilter: number[]
   taps: [SoniTap, SoniTap]
@@ -142,6 +155,7 @@ export function defaultSoniConfig(): SoniConfig {
     sstv: { on: false, tap: 0, gain: 0.4, pan: 0, lineHz: 12, sync: false, dev: 1, syncLev: 0.5 },
     filter: { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, lineIn: false, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0, loOct: 1, hiOct: 8, quantize: false },
     chord: { on: false, tap: 0, gain: 0.6, pan: 0, voices: 7, loOct: 2, hiOct: 6, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3 },
+    collage: { on: false, gain: 0.7, pan: 0, reso: 0.5, ring: 0.5, bright: 0.5, width: 1, loOct: 2, hiOct: 6 },
     fx: {
       send: 0,
       dlyMix: 0.35, dlyTime: 0.3, dlyFb: 0.35, dlyTone: 0.5, dlyMode: 1,
@@ -149,7 +163,7 @@ export function defaultSoniConfig(): SoniConfig {
       rvWidth: 1, rvLocut: 220, rvFreeze: false, rvDiff: 0.85, rvLowDamp: 0.5,
       rvCross: 0.3, rvLowMult: 1, rvHighMult: 1
     },
-    mixFilter: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+    mixFilter: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
     taps: [{ kind: 'master', layer: 0 }, { kind: 'layer', layer: 0 }]
   }
 }
@@ -172,6 +186,7 @@ const SONI_SIMPLE_MODS: Record<string, [keyof SoniConfig, string]> = {
   sstvLine: ['sstv', 'lineHz'], sstvDev: ['sstv', 'dev'],
   filterQ: ['filter', 'q'], filterSweep: ['filter', 'sweepHz'],
   chordTone: ['chord', 'tone'], chordSpread: ['chord', 'spread'], chordAttack: ['chord', 'attack'],
+  collageReso: ['collage', 'reso'], collageRing: ['collage', 'ring'], collageWidth: ['collage', 'width'],
   fxSend: ['fx', 'send'], fxReverb: ['fx', 'rvMix'], fxDelay: ['fx', 'dlyMix']
 }
 const freqNote = (f: number): number => 69 + 12 * Math.log2(Math.max(1, f) / 440)
@@ -263,6 +278,7 @@ export function withSonifyParam(c: SoniConfig, param: string, v: number): SoniCo
 
 interface GridReader {
   readSonifyGrid: (kind: 'master' | 'layer', layer: number, out: Uint8Array) => boolean
+  collageSounds?: () => CollageSoundSet[]
 }
 
 class SonifyEngine {
@@ -276,6 +292,10 @@ class SonifyEngine {
   private lineWanted = false
   private lastTick = 0
   private lastFrameAt = [0, 0]
+  // The Collage voice : a native graph (players + per-piece resonators) into the
+  // worklet's second input, alive while the voice is on.
+  private collage: CollageVoice | null = null
+  private collageNotes: Float32Array = new Float32Array(0)
   // luma grids per tap : cur + prev (for flow), plus the RGBA readback scratch
   private rgba = new Uint8Array(GRID * GRID * 4)
   private luma: Uint8Array[] = [new Uint8Array(GRID * GRID), new Uint8Array(GRID * GRID)]
@@ -318,6 +338,11 @@ class SonifyEngine {
 
   isRunning(): boolean { return !!this.node }
 
+  /** The Collage voice's live state for the page (walls heard, pieces, films). */
+  collageStatus(): { sets: number; pieces: number; films: number } | null {
+    return this.collage ? { ...this.collage.status } : null
+  }
+
   /** The recorder mixes this stream's audio track into captures (null = off). */
   recordStream(): MediaStream | null { return this.recDest?.stream ?? null }
 
@@ -327,7 +352,8 @@ class SonifyEngine {
     try {
       const ctx = new AudioContext({ latencyHint: 'interactive' })
       await ctx.audioWorklet.addModule(SONI_WORKLET_URL)
-      const node = new AudioWorkletNode(ctx, 'soni', { numberOfInputs: 1, outputChannelCount: [2] })
+      // Input 0 : the Filter voice's line-in. Input 1 : the Collage voice's films.
+      const node = new AudioWorkletNode(ctx, 'soni', { numberOfInputs: 2, outputChannelCount: [2] })
       node.port.onmessage = (e): void => {
         const m = e.data
         if (m?.t === 'meter') { this.meterPeak = m.peak; this.meterLim = m.lim }
@@ -349,6 +375,8 @@ class SonifyEngine {
   }
 
   stop(): void {
+    this.collage?.dispose()
+    this.collage = null
     this.lineSrc?.disconnect()
     this.lineSrc = null
     this.lineStream?.getTracks().forEach((t) => t.stop())
@@ -383,16 +411,15 @@ class SonifyEngine {
       sstv: { ...d.sstv, ...cfg.sstv },
       filter: { ...d.filter, ...cfg.filter },
       chord: { ...d.chord, ...cfg.chord },
+      collage: { ...d.collage, ...cfg.collage },
       fx: { ...d.fx, ...cfg.fx },
+      // Older presets/scenes carried 7 (pre-Chord) or 8 (pre-Collage) entries :
+      // keep their filter positions and pad the newer channels to bypass (0.5)
+      // instead of discarding the whole array. Any other shape → default.
       mixFilter:
-        Array.isArray(cfg.mixFilter) && cfg.mixFilter.length === 8
-          ? cfg.mixFilter
-          : // Pre-Chord presets/scenes carried 7 entries : keep their first-7
-            // filter positions and pad the new Chord channel to bypass (0.5)
-            // instead of discarding the whole array. Any other shape → default.
-            Array.isArray(cfg.mixFilter) && cfg.mixFilter.length === 7
-            ? [...cfg.mixFilter, 0.5]
-            : d.mixFilter
+        Array.isArray(cfg.mixFilter) && cfg.mixFilter.length >= 7 && cfg.mixFilter.length <= 9
+          ? [...cfg.mixFilter, 0.5, 0.5].slice(0, 9)
+          : d.mixFilter
     }
     const sinkChanged = cfg.sinkId !== this.cfg.sinkId
     this.cfg = cfg
@@ -402,6 +429,8 @@ class SonifyEngine {
     this.grainFreqs = cfg.flow.quantize
       ? scaleTable(effRoot(cfg), cfg.scale, cfg.flow.loOct, cfg.flow.hiOct)
       : new Float32Array(0)
+    // the Collage resonators' notes : centre = the lowest, the frame's edge = the highest
+    this.collageNotes = scaleTable(effRoot(cfg), cfg.scale, cfg.collage.loOct, Math.max(cfg.collage.loOct + 1, cfg.collage.hiOct))
     // note pitch table for the events voice
     this.eventFreqs = cfg.events.quantize
       ? scaleTable(effRoot(cfg), cfg.scale, cfg.events.loOct, cfg.events.hiOct)
@@ -452,6 +481,7 @@ class SonifyEngine {
           gamma: cfg.chord.gamma, spread: cfg.chord.spread, attack: cfg.chord.attack,
           release: cfg.chord.release, tone: cfg.chord.tone
         },
+        collage: { on: cfg.collage.on, gain: cfg.collage.gain, pan: cfg.collage.pan },
         fx: { ...cfg.fx },
         mixFilter: cfg.mixFilter
       },
@@ -502,10 +532,37 @@ class SonifyEngine {
    *  Throttled to ~30Hz. */
   tick(comp: GridReader, nowMs: number, bpm: number): void {
     const node = this.node
-    if (!node || !this.cfg.on) return
+    if (!node || !this.cfg.on) {
+      if (this.collage) { this.collage.dispose(); this.collage = null }
+      return
+    }
     if (nowMs - this.lastTick < 33) return
     const dt = Math.min(0.1, (nowMs - this.lastTick) / 1000)
     this.lastTick = nowMs
+
+    // Collage voice : follow every Collage wall's films and pieces. Off = the
+    // whole graph goes (its players stop decoding).
+    try {
+      if (this.cfg.collage.on && this.ctx) {
+        if (!this.collage) {
+          this.collage = new CollageVoice(this.ctx)
+          this.collage.bus.connect(node, 0, 1)
+        }
+        const mv = sonifyModValues
+        const c = this.cfg.collage
+        this.collage.update(comp.collageSounds?.() ?? [], {
+          reso: mv.get('collageReso') ?? c.reso,
+          ring: mv.get('collageRing') ?? c.ring,
+          bright: c.bright,
+          width: mv.get('collageWidth') ?? c.width
+        }, this.collageNotes)
+      } else if (this.collage) {
+        this.collage.dispose()
+        this.collage = null
+      }
+    } catch (e) {
+      console.warn('[sonify] collage voice', e)
+    }
 
     // BPM-synced sweep : re-derive sweepHz continuously so tap-tempo follows.
     if (this.cfg.spectra.sync && this.cfg.spectra.on) {

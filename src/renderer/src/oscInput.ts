@@ -515,7 +515,7 @@ function route(address: string, args: Args): void {
       }
       const ctl = segs[3]
       if (!ctl) return
-      const V = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'fx'>(
+      const V = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'fx'>(
         k: K, patch: Partial<SoniConfig[K]>
       ): void => apply({ ...c, [k]: { ...c[k], ...patch } })
       switch (g) {
@@ -614,6 +614,15 @@ function route(address: string, args: Args): void {
           else if (ctl === 'contrast') V('chord', { gamma: 0.5 + clamp01(n) * 3.5 })
           else if (ctl === 'tone') V('chord', { tone: clamp01(n) })
           else if (ctl === 'spread') V('chord', { spread: clamp01(n) })
+          return
+        case 'collage':
+          if (ctl === 'on') V('collage', { on: n >= 0.5 })
+          else if (ctl === 'gain') V('collage', { gain: clamp01(n) })
+          else if (ctl === 'pan') V('collage', { pan: clamp01(n) * 2 - 1 })
+          else if (ctl === 'resonance' || ctl === 'reso') V('collage', { reso: clamp01(n) })
+          else if (ctl === 'ring') V('collage', { ring: clamp01(n) })
+          else if (ctl === 'harmonics' || ctl === 'bright') V('collage', { bright: clamp01(n) })
+          else if (ctl === 'width') V('collage', { width: clamp01(n) })
           return
         case 'fx':
           // shared reverb / delay tail
@@ -887,6 +896,13 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/chord/fade', 0, 1, (so.chord.release - 0.05) / 5.95, 'Chord release (fade)')
     add('/opsia/sonify/chord/tone', 0, 1, so.chord.tone, 'Chord tone (sine → bright)')
     add('/opsia/sonify/chord/spread', 0, 1, so.chord.spread, 'Chord stereo spread')
+    const co = so.collage ?? { on: false, gain: 0.7, reso: 0.5, ring: 0.5, bright: 0.5, width: 1 }
+    add('/opsia/sonify/collage/on', 0, 1, co.on ? 1 : 0, 'Collage voice on (the Collage films heard)')
+    add('/opsia/sonify/collage/gain', 0, 1, co.gain, 'Collage gain')
+    add('/opsia/sonify/collage/resonance', 0, 1, co.reso, 'Collage resonance (plain films ↔ tuned resonances)')
+    add('/opsia/sonify/collage/ring', 0, 1, co.ring, 'Collage ring (resonator sharpness)')
+    add('/opsia/sonify/collage/harmonics', 0, 1, co.bright, 'Collage harmonics (2nd + 3rd)')
+    add('/opsia/sonify/collage/width', 0, 1, co.width, 'Collage stereo width')
     // shared reverb / delay tail
     add('/opsia/sonify/fx/send', 0, 1, so.fx.send, 'FX tail send (whole mix → delay/reverb)')
     add('/opsia/sonify/fx/delaytime', 0, 1, Math.log(so.fx.dlyTime / 0.02) / Math.log(2 / 0.02), 'Delay time')

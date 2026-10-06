@@ -603,6 +603,7 @@ export type SonifyModParam =
   | 'sstvLine' | 'sstvDev'
   | 'filterQ' | 'filterSweep'
   | 'chordTone' | 'chordSpread' | 'chordAttack'
+  | 'collageReso' | 'collageRing' | 'collageWidth'
   | 'fxSend' | 'fxReverb' | 'fxDelay'
 export const SONIFY_MOD_PARAMS: SonifyModParam[] = [
   'spectraX', 'filterX', 'orbitX', 'orbitY', 'orbitR', 'orbitPitch',
@@ -611,7 +612,7 @@ export const SONIFY_MOD_PARAMS: SonifyModParam[] = [
   'orbitDrive', 'orbitSmooth', 'flowDur', 'flowColour',
   'eventsDecay', 'rasterSmooth', 'rasterTone',
   'sstvLine', 'sstvDev', 'filterQ', 'filterSweep',
-  'chordTone', 'chordSpread', 'chordAttack', 'fxSend', 'fxReverb', 'fxDelay'
+  'chordTone', 'chordSpread', 'chordAttack', 'collageReso', 'collageRing', 'collageWidth', 'fxSend', 'fxReverb', 'fxDelay'
 ]
 
 export type ModTarget =
@@ -822,7 +823,7 @@ export interface LightPath extends SurfaceSequencer {
 // just sets which of the 8 voices are on (a rhythmic on/off pattern over the
 // current sound). One shared transport advances the steps.
 export interface SoniSeqStep {
-  voices: boolean[] // length 8 : per-voice on/off, applied when `preset` is empty
+  voices: boolean[] // length 9 (8 before the Collage voice) : per-voice on/off, applied when `preset` is empty
   preset: string // '' = apply the voices mask; else the name of a saved Sonify preset to load
 }
 export interface SoniSeq {

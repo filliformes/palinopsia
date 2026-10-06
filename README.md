@@ -56,7 +56,7 @@ racks, palette, World and macro biases : in one click.
 - [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix)
 - [Sequencer](#sequencer-key-q) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) · [Output & mapping](#output--mapping-key-o) : **fulldome** (210° domemaster + 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
-- [Sonify : image to sound](#sonify--image-to-sound-key-s) : eight voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Chord) · quantizer · audio in recordings
+- [Sonify : image to sound](#sonify--image-to-sound-key-s) : nine voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Chord · Collage) · quantizer · audio in recordings
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
@@ -858,7 +858,7 @@ The instrument's sound half : the image itself synthesizes audio, in real time,
 inside the app (an AudioWorklet engine : no external software). A full-page
 takeover: the live composite mirrored large with the **probes drawn on it** : because the probe is the instrument, plus three voice strips and a master bus.
 
-**The eight voices** (each one lineage of the sonification literature):
+**The nine voices** (each one lineage of the sonification literature):
 
 | Voice | Mapping | Register |
 |---|---|---|
@@ -869,6 +869,7 @@ takeover: the live composite mirrored large with the **probes drawn on it** : be
 | **Raster** | Audification : a draggable **probe rect** read row-major as raw samples : the rect's contents *are* the waveform (edges buzz, gradients hum, datamosh blocks tick). One full scan = the period, so pitch is a note or free Hz; **smooth** 0 is the hard aliased register. | Ikeda · Yeo/Berger raster scanning : harsh, digital |
 | **Transmission** | The SSTV register : the image scanned line-by-line as a **monophonic FM voice** (black 1500 Hz → white 2300 Hz) with the 1200 Hz **sync tick** as a metronome. Line rate free or synced (one line per 16th). The melody *is* the image rows. | slow-scan TV : narrative, decodable |
 | **Filter** | Sonify **without synthesizing** : 48 band-pass filters whose gains come from the image under the (sweepable) line : **noise** or **live line-in** played *through* the frame. Same **reading path** + **breathe** as Spectra. Wide resonance = wind, narrow = flute; band centres can snap to the scale (a resonant harmonic wash). | Metasynth's Filter room · Pelletier's wind |
+| **Collage** | The **films of a Collage source, heard all at once** : every film plays its own sound in its own loop window and speed (held to its picture within a few hundredths of a second, seeks and re-deals included), and every **piece** of the wall is its own voice : **panned** by its place in the frame (left pieces left, centre centre), then rung through a **harmonic resonator** (band-passes on a note and its 2nd and 3rd harmonics) tuned to the Sonify **key / scale** by the piece's **distance from the centre** : the centre sings the lowest note, the pieces rise toward the frame's edges in every direction (up to 64 pieces, 64 resonances). **resonance** goes from the plain films to only the tuned rings (as loud either way), **ring** from a broad colour to a singing tone, **harmonics** weights the overtones, **range** sets the octaves, **width** the stereo spread. Masked pieces fall silent, a hidden or muted layer goes quiet, a fading one fades. It hears the ORIGINAL files, so an optimised wall (whose caches carry no sound) still sings. Only active while a Collage with films is in the composition. | a sound collage : the wall's own audio, tuned and placed by the picture |
 | **Chord** | A **scale-tuned chord bank** : a few oscillators (2–16 notes spread over the range), one per horizontal **band** of the frame, each note's loudness following that band's brightness : slewed with a **swell** / **fade** so it sustains into a chord that breathes with the image. Unlike Flow it **sings on a still frame**. Low notes = bottom of frame, high = top; **tone** brightens, **spread** fans the bank in stereo. | after Remo DeVico's *Aural Mirror* : sustained harmony from light |
 
 **Shared FX tail : Reverb / Delay** : one **send** feeds the whole mix into an
@@ -890,7 +891,7 @@ notes, or runs free. **Master** : gain + an always-on peak limiter (the audio
 Flash-safety) + live meter, and an **output-device picker**. While the engine
 runs, **recordings mix the sound in** : exports become true audiovisual pieces.
 
-**Mixer** : a **[voices | mixer]** view. The mixer shows all eight voices as
+**Mixer** : a **[voices | mixer]** view. The mixer shows all nine voices as
 channel strips : on/off, **volume**, and a per-voice **HP/LP filter** (a DJ-style
 tilt, ported from the Essaim instrument : one knob sweeps a 3-stage lowpass down or
 a highpass up, centre = bypass), plus the FX-tail send / delay / reverb mix.
@@ -930,7 +931,7 @@ live). The sound patch **travels with sessions and scenes** : recalling a scene
 switches the sonification with it (the on-switch and output device stay
 machine-local). And the whole page speaks **OSC** under `/opsia/sonify/…`
 (on/master/root/**rootoct**/scale + per-voice on·gain·pan·probes·pitches·params,
-the **Chord** bank, and the **FX** tail `/fx/{send,delaytime,feedback,size,decay,
+the **Chord** bank, the **Collage** voice `/collage/{on,gain,resonance,ring,harmonics,width}`, and the **FX** tail `/fx/{send,delaytime,feedback,size,decay,
 damp,reverbmode,freeze,…}`) : advertised over OSCQuery and streamed outbound like
 everything else. Spectra also gained **breath** : a per-partial sine↔noise morph
 (the Coagula blue) from glassy additive to breathy bands.

@@ -17,8 +17,8 @@ import { MidiLearnOverlay } from './MidiLearnOverlay'
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 // Voice order matches the worklet's render/filter order (mixFilter indices).
-const VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord'] as const
-const VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord']
+const VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage'] as const
+const VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord', 'Collage']
 // Each voice's mark on the mirror, as a coloured GLYPH that hints its SHAPE as
 // well as its hue (matches the overlay painter below), so a strip tells you
 // which mark is yours even when two share a colour (Spectra's line vs Flow's
@@ -31,7 +31,8 @@ const PROBE_MARK: Record<string, { glyph: string; color: string; hint: string }>
   Raster: { glyph: '▭', color: 'rgb(120,255,160)', hint: 'a green probe rect' },
   Transmission: { glyph: '─', color: 'rgb(255,120,200)', hint: 'a pink scan row' },
   Filter: { glyph: '─', color: 'rgb(120,200,255)', hint: 'a blue scan line' },
-  Chord: { glyph: '≡', color: 'rgb(160,160,175)', hint: 'horizontal bands, no spatial probe' }
+  Chord: { glyph: '≡', color: 'rgb(160,160,175)', hint: 'horizontal bands, no spatial probe' },
+  Collage: { glyph: '▦', color: 'rgb(220,190,255)', hint: 'the Collage\'s own pieces : centre low, edges high' }
 }
 const filterTag = (x: number): string => (x < 0.49 ? 'LP' : x > 0.51 ? 'HP' : '—')
 
@@ -168,6 +169,7 @@ const PARAM_LABELS: Record<SonifyModParam, string> = {
   sstvLine: 'SSTV line rate', sstvDev: 'SSTV transpose',
   filterQ: 'Filter resonance', filterSweep: 'Filter sweep rate',
   chordTone: 'Chord tone', chordSpread: 'Chord spread', chordAttack: 'Chord swell',
+  collageReso: 'Collage resonance', collageRing: 'Collage ring', collageWidth: 'Collage width',
   fxSend: 'FX send', fxReverb: 'FX reverb mix', fxDelay: 'FX delay mix'
 }
 
@@ -414,6 +416,12 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   const dragging = useRef<'line' | 'orbit' | 'radius' | 'rect' | 'rectsize' | 'fline' | null>(null)
   const [devices, setDevices] = useState<Array<{ id: string; label: string }>>([])
   const [assign, setAssign] = useState<SonifyModParam | null>(null)
+  // What the Collage voice is playing (walls heard · pieces · films), polled.
+  const [colStat, setColStat] = useState<{ sets: number; pieces: number; films: number } | null>(null)
+  useEffect(() => {
+    const t = window.setInterval(() => setColStat(sonifyEngine.collageStatus()), 500)
+    return () => window.clearInterval(t)
+  }, [])
   const chip = (p: SonifyModParam, inactive = false): JSX.Element => (
     <ModChip param={p} open={assign === p} onOpen={(x) => setAssign(assign === x ? null : x)} inactive={inactive} />
   )
@@ -468,11 +476,12 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
     if (presetName === n) setPresetName('')
   }
   const setMixFilter = (i: number, v: number): void => {
-    const mf = [...(cfg.mixFilter ?? [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5])]
+    const mf = [...(cfg.mixFilter ?? [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5])]
+    while (mf.length < VOICE_KEYS.length) mf.push(0.5)
     mf[i] = v
     patch({ mixFilter: mf })
   }
-  const pv = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord'>(k: K, p: Partial<SoniConfig[K]>): void =>
+  const pv = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage'>(k: K, p: Partial<SoniConfig[K]>): void =>
     set({ ...cfg, [k]: { ...cfg[k], ...p } })
   const pfx = (p: Partial<SoniConfig['fx']>): void => set({ ...cfg, fx: { ...cfg.fx, ...p } })
 
@@ -1281,6 +1290,38 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             <Slider label="spread" value={cfg.chord.spread} min={0} max={1} neutral={0.6} onChange={(v) => pv('chord', { spread: v })} mod={chip('chordSpread')} title="Stereo fan across the bank (low notes ↔ high notes)" />
             <Slider label="gain" value={cfg.chord.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('chord', { gain: v })} />
             <Slider label="pan" value={cfg.chord.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('chord', { pan: v })} />
+          </VoiceShell>
+
+          <VoiceShell
+            title="Collage" on={cfg.collage.on}
+            hint="The films of a Collage source, heard all at once in their own loops and speeds : each piece is panned by its place in the frame and rings through a harmonic resonator tuned to the key/scale, the centre low, rising to the frame's edges in every direction (up to 64 pieces, 64 resonances)."
+            onToggle={() => pv('collage', { on: !cfg.collage.on })}
+            onDice={() => diceVoice('collage')}
+          >
+            <div className="mb-0.5 font-mono text-[9px] text-muted">
+              {!cfg.collage.on
+                ? 'off'
+                : !cfg.on
+                  ? 'turn Sonify on to hear the films'
+                  : colStat && colStat.pieces > 0
+                    ? `${colStat.pieces} pieces · ${colStat.films} films${colStat.sets > 1 ? ` · ${colStat.sets} collages` : ''}`
+                    : 'no Collage playing : add a Collage source with a folder of films'}
+            </div>
+            <Slider label="resonance" value={cfg.collage.reso} min={0} max={1} neutral={0.5} onChange={(v) => pv('collage', { reso: v })} mod={chip('collageReso')} title="0 = the plain films · 1 = only the tuned resonances" />
+            <Slider label="ring" value={cfg.collage.ring} min={0} max={1} neutral={0.5} onChange={(v) => pv('collage', { ring: v })} mod={chip('collageRing')} title="How sharply each piece's resonator rings : a broad colour → a pitched, singing tone" />
+            <Slider label="harmonics" value={cfg.collage.bright} min={0} max={1} neutral={0.5} onChange={(v) => pv('collage', { bright: v })} title="How much the 2nd and 3rd harmonics ring with each note" />
+            <Row label="range">
+              <select className="input select-compact text-[10px]" value={cfg.collage.loOct} onChange={(e) => pv('collage', { loOct: Math.min(Number(e.target.value), cfg.collage.hiOct - 1) })} title="The centre's octave (the lowest note)">
+                {[0, 1, 2, 3, 4].map((o) => <option key={o} value={o}>oct {o}</option>)}
+              </select>
+              <span className="text-[9px] text-muted">→</span>
+              <select className="input select-compact text-[10px]" value={cfg.collage.hiOct} onChange={(e) => pv('collage', { hiOct: Math.max(Number(e.target.value), cfg.collage.loOct + 1) })} title="The frame edge's octave (the highest note)">
+                {[3, 4, 5, 6, 7, 8].map((o) => <option key={o} value={o}>oct {o}</option>)}
+              </select>
+            </Row>
+            <Slider label="width" value={cfg.collage.width} min={0} max={1} neutral={1} onChange={(v) => pv('collage', { width: v })} mod={chip('collageWidth')} title="Stereo spread : 0 = every piece in the centre · 1 = left to right across the frame" />
+            <Slider label="gain" value={cfg.collage.gain} min={0} max={1} neutral={0.7} onChange={(v) => pv('collage', { gain: v })} />
+            <Slider label="pan" value={cfg.collage.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('collage', { pan: v })} />
           </VoiceShell>
 
           <VoiceShell

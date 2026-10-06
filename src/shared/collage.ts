@@ -15,6 +15,10 @@ export interface CollageClip {
   // codec is not Chromium-decodable, otherwise the original file itself.
   file: string
   fileName: string // basename of the ORIGINAL file, for display
+  // The ORIGINAL file (absolute). Sonify's Collage voice plays its sound : the
+  // caches above carry no audio. Absent in pools scanned before it existed
+  // (the voice then rebuilds it from the folder + fileName).
+  src?: string
   durSec: number
   width: number
   height: number

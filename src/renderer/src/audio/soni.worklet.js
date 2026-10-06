@@ -250,6 +250,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       sstv:    { on: false, tap: 0, gain: 0.5, pan: 0, lineHz: 12, dev: 1, syncLev: 0.5 },
       filter:  { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0 },
       chord:   { on: false, tap: 0, gain: 0.6, pan: 0, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3 },
+      collage: { on: false, gain: 0.7, pan: 0 },
       fx:      { send: 0, dlyMix: 0.35, dlyTime: 0.3, dlyFb: 0.35, dlyTone: 0.5, dlyMode: 1, rvMode: 0, rvMix: 0.6, rvSize: 0.6, rvDecay: 0.6, rvDamp: 0.3, rvPre: 20, rvMod: 6, rvModRate: 0.5, rvWidth: 1, rvLocut: 220, rvFreeze: false, rvDiff: 0.85, rvLowDamp: 0.5, rvCross: 0.3, rvLowMult: 1, rvHighMult: 1 }
     };
     this.spectraFreqs = new Float32Array(NPART); // filled by cfg
@@ -315,7 +316,7 @@ class SoniProcessor extends AudioWorkletProcessor {
     // Order matches the voice-render order below : spectra·orbit·flow·events·
     // raster·sstv·filter·chord. Voices render into vL/vR then flush through their
     // filter into the master (mixVoice).
-    this.djf = []; for (let i = 0; i < 8; i++) this.djf.push(new DJFilter());
+    this.djf = []; for (let i = 0; i < 9; i++) this.djf.push(new DJFilter()); // + Collage (input 1)
     this.vL = new Float32Array(128); this.vR = new Float32Array(128);
     // ── limiter ──
     this.limEnv = 1;
@@ -345,7 +346,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       if (m.filterFreqs) { this.fFreqs.set(m.filterFreqs); this.rebuildFilterCoefs(); }
       if (m.chordFreqs) { this.chordN = Math.min(NCHORD, m.chordFreqs.length); this.chordFreqs.set(m.chordFreqs.subarray(0, this.chordN)); }
       if (m.cfg.fx) this.applyFx(m.cfg.fx);
-      if (m.cfg.mixFilter) for (let i = 0; i < 8; i++) this.djf[i].setX(m.cfg.mixFilter[i] != null ? m.cfg.mixFilter[i] : 0.5, sampleRate);
+      if (m.cfg.mixFilter) for (let i = 0; i < 9; i++) this.djf[i].setX(m.cfg.mixFilter[i] != null ? m.cfg.mixFilter[i] : 0.5, sampleRate);
       return;
     }
     if (m.t === 'mod') {
@@ -895,6 +896,22 @@ class SoniProcessor extends AudioWorkletProcessor {
     }
 
     if (ch.on) this.mixVoice(7, L, R, outL, outR, n);
+
+    // ── COLLAGE : the Collage films' own sound, already panned piece by piece
+    // and rung through their scale-tuned resonators in the native graph
+    // (collageVoice.ts), arriving on input 1. Here : the voice's gain + balance,
+    // then its mixer channel like any other voice.
+    const co = cfg.collage;
+    if (co && co.on) {
+      const inp = _inputs[1];
+      if (inp && inp.length) {
+        const iL = inp[0], iR = inp[1] || inp[0];
+        const g = co.gain * 1.6;
+        const gL = g * (1 - Math.max(0, co.pan)), gR = g * (1 + Math.min(0, co.pan));
+        for (let s = 0; s < n; s++) { L[s] += iL[s] * gL; R[s] += iR[s] * gR; }
+      }
+      this.mixVoice(8, L, R, outL, outR, n);
+    }
 
     // ── shared FX tail : send the (dry) mix into delay → reverb, return the wet ──
     // Runs while there's send OR the reverb/delay are still ringing (so cutting the

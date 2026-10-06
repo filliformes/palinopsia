@@ -498,7 +498,7 @@ function makeDefaultSoniSeq(): SoniSeq {
     bias: 0,
     edge: 'wrap',
     steps: Array.from({ length: 16 }, () => ({
-      voices: [false, false, false, false, false, false, false, false],
+      voices: [false, false, false, false, false, false, false, false, false],
       preset: ''
     }))
   }
@@ -524,7 +524,10 @@ function sanitizeSoniSeq(raw: unknown, fallback: SoniSeq): SoniSeq {
     ? d.steps.map((ds, i) => {
         const st = s.steps![i] as Partial<SoniSeqStep> | undefined
         return {
-          voices: Array.isArray(st?.voices) && st!.voices.length === 8 ? st!.voices.map(Boolean) : ds.voices,
+          // 8 = saved before the Collage voice : padded, it stays off in those steps.
+          voices: Array.isArray(st?.voices) && (st!.voices.length === 8 || st!.voices.length === 9)
+            ? [...st!.voices.map(Boolean), false].slice(0, 9)
+            : ds.voices,
           preset: typeof st?.preset === 'string' ? st!.preset : ''
         }
       })
@@ -3403,6 +3406,10 @@ export const useStore = create<StoreState>((set, get) => ({
     return defaultSoniConfig()
   })(),
   setSonify: (next) => {
+    // A preset / scene / session saved before the Collage voice has no block
+    // for it : give it the default (off) so the page and the engine never read
+    // a missing voice.
+    if (!next.collage) next = { ...next, collage: defaultSoniConfig().collage }
     persistSonify(next)
     if (next.on && !sonifyEngine.isRunning()) void sonifyEngine.start().then(() => sonifyEngine.pushConfig(useStore.getState().sonify))
     else if (!next.on && sonifyEngine.isRunning()) sonifyEngine.stop()
@@ -3433,7 +3440,7 @@ export const useStore = create<StoreState>((set, get) => ({
   toggleSoniSeqVoice: (step, voice) =>
     set((s) => {
       const steps = s.soniSeq.steps.map((st, i) =>
-        i === step ? { ...st, voices: st.voices.map((v, vi) => (vi === voice ? !v : v)) } : st
+        i === step ? { ...st, voices: [...st.voices, false, false].slice(0, 9).map((v, vi) => (vi === voice ? !v : v)) } : st
       )
       const soniSeq = { ...s.soniSeq, steps }
       persistSoniSeq(soniSeq)
@@ -3449,7 +3456,7 @@ export const useStore = create<StoreState>((set, get) => ({
   clearSoniSeqStep: (step) =>
     set((s) => {
       const steps = s.soniSeq.steps.map((st, i) =>
-        i === step ? { voices: [false, false, false, false, false, false, false, false], preset: '' } : st
+        i === step ? { voices: [false, false, false, false, false, false, false, false, false], preset: '' } : st
       )
       const soniSeq = { ...s.soniSeq, steps }
       persistSoniSeq(soniSeq)
@@ -3492,12 +3499,12 @@ export const useStore = create<StoreState>((set, get) => ({
       // Preset steps keep their preset (its voice mask is unused there anyway).
       const steps = s.soniSeq.steps.map((st, i) => {
         if (i >= s.soniSeq.len) return st
-        const voices = [false, false, false, false, false, false, false, false]
+        const voices = [false, false, false, false, false, false, false, false, false]
         const n = 1 + Math.floor(Math.random() * 3)
         let placed = 0
         let guard = 0
         while (placed < n && guard++ < 40) {
-          const v = Math.floor(Math.random() * 8)
+          const v = Math.floor(Math.random() * 9)
           if (!voices[v]) {
             voices[v] = true
             placed++

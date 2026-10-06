@@ -7,6 +7,20 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Sonify : a Collage voice**, the films of a Collage source heard all at once as a
+  sound collage. Every film plays its own sound in its own loop window and speed, held
+  to its picture (each film gets a hidden player of its ORIGINAL file, resynced on every
+  seek and nudged a percent or two to stay within ±15 ms : measured), so a wall of
+  optimised clips, whose caches carry no audio, still sings. Every piece is its own
+  voice : panned by its place in the frame, then rung through a harmonic resonator
+  (band-passes on a note and its 2nd and 3rd harmonics) tuned to the Sonify key and scale
+  by its distance from the frame's centre, low in the middle and rising to the edges in
+  every direction, up to 64 pieces. resonance (plain films to only the rings, loudness
+  matched within 1 dB at any ring, calibrated on noise), ring, harmonics, range, width,
+  gain, pan; its own mixer channel, sequencer column, OSC `/opsia/sonify/collage/…` and
+  three modulation targets. Masked pieces fall silent; a muted or hidden layer goes quiet,
+  a fading one fades. Auto-Sonify switches it on for a composition with a Collage.
+
 - **New and Generate morph over the MRPH time**, live. The plain morph could only snap a
   whole new composition (and a dissolve froze the outgoing picture), so they hand over
   layer by layer, top first, staggered : a slot free in both compositions hosts the new
