@@ -42,6 +42,7 @@
       "LABELS": ["none","circle","square","rectangle","triangle","pentagon","hexagon","heptagon","octagon","diamond","star 5","star 6","ellipse","rounded","cross","ring","half-circle","heart","crescent","trapezoid","capsule"],
       "DEFAULT": 0, "LABEL": "out shape" },
     { "NAME": "outSize",  "TYPE": "float", "MIN": 0.1, "MAX": 1.6, "DEFAULT": 0.7, "LABEL": "shape size" },
+    { "NAME": "outFeather", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "shape feather" },
     { "NAME": "outAngle", "TYPE": "float", "MIN": -3.1416, "MAX": 3.1416, "DEFAULT": 0.0, "LABEL": "shape angle" },
     { "NAME": "outPosX",  "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "shape x" },
     { "NAME": "outPosY",  "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "shape y" },

@@ -1424,6 +1424,7 @@ export class Compositor {
   private fzDepth = 0; // shape drop-shadow onto the fill (float-over feel)
   private fzShadowAngle = -0.98; // direction the shape's shadow falls
   private fzPersp = 0; // perspective projection of the cast shadow
+  private fzFeather = 0; // soft edge (0 = crisp)
   private fzInstId: string | null = null; // the pinned finalizer's instance id
 
   // Strobe-safety limiter : counts flashes per second on the FINAL presented frame
@@ -2504,6 +2505,7 @@ export class Compositor {
     this.fzDepth = numf(fi.outDepth, 0);
     this.fzShadowAngle = numf(fi.outShadowAngle, -0.98);
     this.fzPersp = numf(fi.outPerspective, 0);
+    this.fzFeather = numf(fi.outFeather, 0);
     // Cameraless / direct-film draw-hold (native, applied after the shaper).
     this.cfHold = fin ? Math.round(numf(fi.filmHold, 0)) : 0;
     this.cfRate = numf(fi.filmRate, 8);
@@ -2558,6 +2560,7 @@ export class Compositor {
           case 'outDepth': this.fzDepth = value; break;
           case 'outShadowAngle': this.fzShadowAngle = value; break;
           case 'outPerspective': this.fzPersp = value; break;
+          case 'outFeather': this.fzFeather = value; break;
           case 'filmHold': this.cfHold = Math.round(value); break;
           case 'filmRate': this.cfRate = value; break;
           case 'filmJitter': this.cfJitter = value; break;
@@ -2976,7 +2979,7 @@ export class Compositor {
       const fill = this.fzBgLayer && haveBgFill ? this.bgFill.tex : null;
       this.outputShape.apply(
         composite, fill, this.fzBgColor, this.fzShape, this.fzSize, this.fzAngle,
-        this.fzPosX, this.fzPosY, this.fzDepth, this.fzShadowAngle, this.fzPersp,
+        this.fzPosX, this.fzPosY, this.fzDepth, this.fzShadowAngle, this.fzPersp, this.fzFeather,
         this.w / this.h, this.mixTarget.fbo, this.w, this.h
       );
       composite = this.mixTarget.tex;

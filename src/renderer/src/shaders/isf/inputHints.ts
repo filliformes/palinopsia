@@ -1005,6 +1005,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     filmGrab: 'Grab : draw the live picture now and restart the draw clock from it; in freeze, re-freeze the gate on the live frame. Fire it on a beat (bind M or OSC).',
     outShape: 'Clip the finished frame into a silhouette (none = full frame).',
     outSize: 'Size of the output shape.',
+    outFeather: "Softens the shape's edge : 0 is a clean edge (anti-aliased over about a pixel), up to a wide soft fade into the fill.",
     outAngle: 'Rotation of the output shape.',
     outPosX: 'Horizontal position of the output shape.',
     outPosY: 'Vertical position of the output shape.',

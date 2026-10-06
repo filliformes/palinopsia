@@ -1796,6 +1796,7 @@ export const FINALIZER_SHADER: IsfShader = {
     parasites: [0, 0.3],
     // The output shaper is a deliberate compositional move : never randomized.
     outShape: [0, 0],
+    outFeather: [0, 0],
     outBgSource: [0, 0]
   }
 }

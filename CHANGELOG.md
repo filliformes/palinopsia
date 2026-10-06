@@ -554,6 +554,13 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The output shape always looked feathered.** Its edge faded over a fixed 0.8 % of the
+  frame height whatever the resolution : ~7 px at 1080p and about 33 px on a 4096 dome
+  master, a soft edge you could not turn off. It is now anti-aliased over about one pixel
+  (measured : the fill-to-picture ramp at 1080p went from 6-7 px to under 1), and a new
+  **feather** control on the output shape softens it on purpose (0.05 is the old edge,
+  0.5 a 54 px fade at 1080p).
+
 - **Collage : lighter and sturdier.** Frame uploads now share a 4 ms main-thread budget
   per frame, round-robin (50 films at a speed of 2 uploaded every film every frame,
   ~15 ms); the upload staging cache holds 16 frame sizes under 160 MB instead of 4 (a

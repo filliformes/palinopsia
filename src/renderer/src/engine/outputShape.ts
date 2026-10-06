@@ -14,7 +14,7 @@ void main(){ vUV = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }`
 const FS = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 frag;
 uniform sampler2D uSrc, uFill;
-uniform float uUseFill, uAspect, uSize, uAngle, uDepth, uShadowAngle, uPersp; uniform int uShape;
+uniform float uUseFill, uAspect, uSize, uAngle, uDepth, uShadowAngle, uPersp, uPx, uFeather; uniform int uShape;
 uniform vec2 uPos; uniform vec3 uFillColor;
 
 float sdBox(vec2 p, vec2 b){ vec2 d = abs(p) - b; return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)); }
@@ -67,7 +67,13 @@ void main(){
   q = vec2(q.x * cs - q.y * sn, q.x * sn + q.y * cs);
   float r = clamp(uSize, 0.05, 1.8);
   float d = shapeDist(uShape, q, r);
-  float m = 1.0 - smoothstep(-0.004, 0.004, d);     // 1 inside the shape
+  // The edge : anti-aliased over about a pixel (uPx, one pixel in these height
+  // units), so it is crisp at any resolution, plus the FEATHER the user asks
+  // for. It used to fade over a fixed 0.8 % of the frame height whatever the
+  // resolution : ~9 px at 1080p, ~33 px on a 4096 dome master, a feather that
+  // was always there. (Feather 0.05 is that old edge.)
+  float fe = 0.75 * uPx + uFeather * 0.08;
+  float m = 1.0 - smoothstep(-fe, fe, d);     // 1 inside the shape
   vec4 srcA = texture(uSrc, uv);
   vec3 src = srcA.rgb;
   vec3 fill = mix(uFillColor, texture(uFill, uv).rgb, uUseFill);
@@ -154,6 +160,7 @@ export class OutputShape {
     depth: number,
     shadowAngle: number,
     perspective: number,
+    feather: number,
     aspect: number,
     targetFbo: WebGLFramebuffer,
     w: number,
@@ -179,6 +186,8 @@ export class OutputShape {
     gl.uniform1f(this.u('uDepth'), Math.max(0, Math.min(1, depth)))
     gl.uniform1f(this.u('uShadowAngle'), shadowAngle)
     gl.uniform1f(this.u('uPersp'), Math.max(0, Math.min(1, perspective)))
+    gl.uniform1f(this.u('uFeather'), Math.max(0, Math.min(1, feather)))
+    gl.uniform1f(this.u('uPx'), 1 / Math.max(1, h))
     gl.uniform3f(this.u('uFillColor'), fillColor[0] ?? 0, fillColor[1] ?? 0, fillColor[2] ?? 0)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
