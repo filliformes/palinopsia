@@ -90,7 +90,7 @@ export function BackgroundPanel(): JSX.Element {
           className={`min-w-[5rem] flex-1 text-[11px] ${selected ? 'border-accent' : ''}`}
           value={shaderId ?? ''}
           options={[
-            { value: '', label: '— none —' },
+            { value: '', label: 'none' },
             ...inPickerOrder(BG_SOURCES_ALPHA).map((g): SearchOption => ({ value: g.id, label: g.name, group: sourceSection(g), keywords: keywordsFor(g.id), title: generatorBlurb(g.id) }))
           ]}
           onChange={(v) => setBackgroundSource(v || null)}

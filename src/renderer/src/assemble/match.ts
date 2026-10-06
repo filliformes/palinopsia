@@ -388,7 +388,7 @@ export function generate({ corpus, params, seed, map, liveTarget }: GenerateInpu
   if (clips.length >= MAX_CLIPS && t < total * 0.95) {
     console.warn(
       `[assemble] hit the ${MAX_CLIPS}-clip ceiling at ${t.toFixed(1)}s of a ` +
-        `${total}s target — the corpus's units are very short. Raise the cut-length ` +
+        `${total}s target : the corpus's units are very short. Raise the cut-length ` +
         `curve or the segmentation's minimum unit for a longer edit.`
     )
   }

@@ -657,7 +657,7 @@ export default function App(): JSX.Element {
     if (wantLocal && !audioBus.localActive) {
       void audioBus.startLocal(audioDeviceId).then((ok) => {
         if (!ok && audioSource === 'local') {
-          showToast('Could not open the audio input — check the device / OS permissions', 'warn', 6000)
+          showToast('Could not open the audio input : check the device / OS permissions', 'warn', 6000)
         }
       })
     } else if (!wantLocal) {
@@ -726,7 +726,7 @@ export default function App(): JSX.Element {
         e.preventDefault()
         firePanic()
         flushFlash() // match the top-bar Flush button's click feedback
-        showToast('Panic flush — buffers emptied', 'warn')
+        showToast('Panic flush : buffers emptied', 'warn')
         return
       }
       // P: open the Vibe Palette in the Inspector · Shift+P: cycle its presets.
@@ -971,7 +971,7 @@ export default function App(): JSX.Element {
     let restoreFallback: number | null = null
     const onLost = (e: Event): void => {
       e.preventDefault()
-      console.warn('[gl] context LOST (GPU reset) — awaiting restore')
+      console.warn('[gl] context LOST (GPU reset) : awaiting restore')
       // If `restored` never fires (repeated crashes can blocklist the GPU),
       // force one rebuild attempt anyway : either the context is quietly back,
       // or the Compositor constructor throws and the existing catch surfaces
@@ -979,7 +979,7 @@ export default function App(): JSX.Element {
       restoreFallback = window.setTimeout(() => setGlEpoch((n) => n + 1), 6000)
     }
     const onRestored = (): void => {
-      console.warn('[gl] context restored — rebuilding the engine')
+      console.warn('[gl] context restored : rebuilding the engine')
       if (restoreFallback) window.clearTimeout(restoreFallback)
       setGlEpoch((n) => n + 1)
     }
@@ -1051,7 +1051,7 @@ export default function App(): JSX.Element {
                 : errName === 'AbortError'
                   ? 'cancelled'
                   : errName
-        showToast(`${src} couldn’t start — ${reason}`, 'warn', 5000)
+        showToast(`${src} couldn’t start : ${reason}`, 'warn', 5000)
       })
     } catch (e) {
       // WebGL2 unavailable : surface it rather than a blank canvas.
@@ -1751,7 +1751,7 @@ export default function App(): JSX.Element {
           }
           title={
             midiLearnMode
-              ? 'MIDI Learn ON — click a highlighted control, then move a knob / hit a pad to bind it. Right-click a green one to clear. Click here (or press L / Esc) to exit.'
+              ? 'MIDI Learn ON : click a highlighted control, then move a knob / hit a pad to bind it. Right-click a green one to clear. Click here (or press L / Esc) to exit.'
               : 'Enter MIDI Learn mode (shortcut : L, from any tab) : map hardware knobs and pads to Meta knobs, transport controls, Vary / Randomize / Sonify and scenes.'
           }
         >
@@ -1834,7 +1834,7 @@ export default function App(): JSX.Element {
               flushFlash()
             }}
             className={`btn text-[12px] ${flushFlashing ? '!border-danger !text-danger' : ''}`}
-            title="Panic flush (0) : empty every self-feeding buffer — feedback, and the datamosh / sediment / corrode / scanner / echo accumulators — so a runaway image recovers WITHOUT a reload. Parameters, modulators and the clock stay put."
+            title="Panic flush (0) : empty every self-feeding buffer (feedback, and the datamosh / sediment / corrode / scanner / echo accumulators) so a runaway image recovers WITHOUT a reload. Parameters, modulators and the clock stay put."
           >
             ⚡ Flush
           </button>
@@ -1961,7 +1961,7 @@ export default function App(): JSX.Element {
       {crashEntry && (
         <ConfirmModal
           title={`Palinopsia didn't close cleanly last time. Restore your last autosave${
-            crashEntry.name ? ` — "${crashEntry.name}"` : ''
+            crashEntry.name ? ` ("${crashEntry.name}")` : ''
           }?`}
           yesLabel="Restore"
           noLabel="Discard"
@@ -2008,7 +2008,7 @@ function FpsTag(): JSX.Element {
   }, [])
   return (
     <div className="pointer-events-none absolute bottom-2 right-2 font-mono text-[10px] text-muted/70">
-      {fps > 0 ? `${Math.round(fps)} fps` : '— fps'}
+      {fps > 0 ? `${Math.round(fps)} fps` : '- fps'}
     </div>
   )
 }
@@ -2025,12 +2025,12 @@ function RightViewTabs(): JSX.Element {
     { id: 'layers', label: 'layers', title: 'The 4 layer strips' },
     { id: 'mixer', label: 'mixer', title: 'Compact opacity/speed/blend for all 4 layers (M)' },
     { id: 'finishing', label: 'finishing', title: 'Finishing Touches : Vibe Palette · Context · Finalizer' },
-    { id: 'feel', label: 'feel', title: 'Feel : the global macros — Field + Temperament (G)' },
+    { id: 'feel', label: 'feel', title: 'Feel : the global macros, Field + Temperament (G)' },
     {
       id: 'assemble',
       label: 'assemble',
       title:
-        'Assemble (E) : the automatic editor — analyse a folder of video into a descriptor point cloud, then generate an edit from it'
+        'Assemble (E) : the automatic editor. Analyze a folder of video into a descriptor point cloud, then generate an edit from it'
     },
     { id: 'io', label: 'audio/midi/osc', title: 'Setup (A) : the audio bus, MIDI (controller input + learned bindings + output) and OSC input/OSCQuery, each a collapsible section' },
     {

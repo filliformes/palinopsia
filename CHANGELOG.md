@@ -493,6 +493,13 @@ that CI builds into cross-platform releases.
   longer carry third-party brand or artist names (the Colorizer film-stock presets, a
   Palette and a master preset are renamed descriptively).
 
+- **No em dashes in the app text.** Empty menu choices read plainly (`none`, `nothing`,
+  `solid color`, `voices`, `no saved sessions`) instead of being wrapped in dashes; an
+  empty readout (FPS, frame time, CPU / GPU %, the Assemble clip counter) shows `-`, an
+  idle MIDI input says `no MIDI received yet`, and Sonify's centered mixer filter shows
+  `off`. Toasts, tooltips, Study blurbs and the OSC panic description use a colon or
+  plain punctuation, and the Body page's help and tooltip quote the new `nothing`.
+
 - **docs/bibliography.md** : the research papers behind the instrument, cited in APA 7.
 
 - The **window title** now carries the release version, like dataFLOU_compositor:

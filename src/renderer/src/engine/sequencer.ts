@@ -477,7 +477,7 @@ export function sequencerScoreMarkdown(): string {
     '|---|---|---|---|---|'
   ]
   for (const h of history) {
-    lines.push(`| ${fmtT(h.atMs)} | ${h.name} | ${h.world ?? '—'} | ${h.climate ?? '—'} | ${h.punct ?? '·'} |`)
+    lines.push(`| ${fmtT(h.atMs)} | ${h.name} | ${h.world ?? '-'} | ${h.climate ?? '-'} | ${h.punct ?? '·'} |`)
   }
   lines.push('', `_${history.length} AVUs · exported from Palinopsia._`)
   return lines.join('\n')

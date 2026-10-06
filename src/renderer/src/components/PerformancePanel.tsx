@@ -136,7 +136,7 @@ export function PerformancePanel(): JSX.Element {
       {label}
     </span>
   )
-  const pct = (v: number | null): string => (v == null ? '—' : `${Math.round(v)}%`)
+  const pct = (v: number | null): string => (v == null ? '-' : `${Math.round(v)}%`)
 
   return (
     <div className="flex min-w-0 flex-col gap-1.5 border-t border-border bg-panel px-3 py-1.5 text-[11px]">
@@ -145,14 +145,14 @@ export function PerformancePanel(): JSX.Element {
           <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Performance</span>
         </span>
         <div className="flex-1" />
-        <span className={`cursor-help font-mono text-[9px] ${fps > 0 && fps < 40 ? 'text-danger' : 'text-accent'}`} title="Frames per second of the composition render (rolling average). Red below 40.">{fps ? `${Math.round(fps)} fps` : '—'}</span>
+        <span className={`cursor-help font-mono text-[9px] ${fps > 0 && fps < 40 ? 'text-danger' : 'text-accent'}`} title="Frames per second of the composition render (rolling average). Red below 40.">{fps ? `${Math.round(fps)} fps` : '-'}</span>
       </div>
 
       <>
           {/* Top line : host totals. */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded bg-panel2/40 px-2 py-1 font-mono text-[9px] text-muted">
-            <span className="cursor-help" title="Milliseconds per rendered frame (1000 ÷ FPS). Under 16.7 ms = 60 fps ; above it you are dropping frames.">frame <span className="text-text">{fps ? (1000 / fps).toFixed(1) : '—'}</span> ms</span>
-            <span className="cursor-help" title="Whole-GPU utilization, percent. Read from the graphics driver (NVIDIA only, via nvidia-smi). Shows “—” on other GPUs.">GPU <span className="text-text">{pct(stats.gpu)}</span></span>
+            <span className="cursor-help" title="Milliseconds per rendered frame (1000 ÷ FPS). Under 16.7 ms = 60 fps ; above it you are dropping frames.">frame <span className="text-text">{fps ? (1000 / fps).toFixed(1) : '-'}</span> ms</span>
+            <span className="cursor-help" title="Whole-GPU utilization, percent. Read from the graphics driver (NVIDIA only, via nvidia-smi). Shows “-” on other GPUs.">GPU <span className="text-text">{pct(stats.gpu)}</span></span>
             <span className="cursor-help" title="Whole-GPU video memory in use, percent of the card’s total (NVIDIA only). This is the real number the estimated VRAM breakdown below approximates.">VRAM <span className="text-text">{pct(stats.vram)}</span></span>
             <span className="cursor-help" title="Palinopsia’s own CPU usage across all its processes, as a percent of one core (so it can exceed 100% on multi-core work).">CPU <span className="text-text">{pct(stats.cpu)}</span></span>
             <span className="cursor-help" title="Palinopsia’s RAM footprint as a percent of total system memory.">RAM <span className="text-text">{pct(stats.ram)}</span></span>
@@ -214,12 +214,12 @@ export function PerformancePanel(): JSX.Element {
             {chip(audioEnabled, 'audio', 'Audio ingest is on (analyzing an input for reactivity).')}
             {chip(audioMonitor, 'monitor', 'Input monitoring / passthrough is on (you hear the input through the output).')}
             {chip(audioDenoise, 'denoise', 'The USB-noise denoiser is on (the learned notch filter).')}
-            {chip(body.enabled, `body ${[body.hands && 'H', body.pose && 'P', body.face && 'F'].filter(Boolean).join('') || '—'}`, 'Embodied control is on. H / P / F = which trackers run (Hands / Pose / Face). Face is the heaviest.')}
+            {chip(body.enabled, `body ${[body.hands && 'H', body.pose && 'P', body.face && 'F'].filter(Boolean).join('') || '-'}`, 'Embodied control is on. H / P / F = which trackers run (Hands / Pose / Face). Face is the heaviest.')}
             {chip(!!midiOut && midiClock, 'MIDI clock', 'Opsia is sending MIDI clock + transport to the selected output device (e.g. the Move).')}
             {chip(recording, 'REC', 'A recording is in progress (the output is being encoded to disk : heavy CPU in the main process).')}
           </div>
           <p className="font-mono text-[8px] leading-tight text-muted">
-            Hover any label, number or chip for what it measures. CPU is measured per section (ms/frame) ; VRAM is estimated from the app’s allocations (render size dominates) ; whole-GPU % needs an NVIDIA card, else “—”. The chips are status indicators, not buttons.
+            Hover any label, number or chip for what it measures. CPU is measured per section (ms/frame) ; VRAM is estimated from the app’s allocations (render size dominates) ; whole-GPU % needs an NVIDIA card, else “-”. The chips are status indicators, not buttons.
           </p>
         </>
     </div>

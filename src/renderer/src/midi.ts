@@ -416,7 +416,7 @@ class MidiManager {
       if (mine) wired++
     })
     this.wiredCount = wired
-    if (wanted && !matched) console.warn(`[midi] input "${wanted}" not found — listening to all inputs instead`)
+    if (wanted && !matched) console.warn(`[midi] input "${wanted}" not found : listening to all inputs instead`)
   }
 
   subscribe(cb: (devs: MidiDevice[]) => void): () => void {

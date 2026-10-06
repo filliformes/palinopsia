@@ -1206,7 +1206,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'test-shutter', name: 'Shutter', family: 'Feel Studies',
-    blurb: 'STUDY · Fast motion. Sweep SHUTTER : the whole frame stop-motion-steps — low = chunky (~2fps), high = fluid.',
+    blurb: 'STUDY · Fast motion. Sweep SHUTTER : the whole frame stop-motion-steps. Low = chunky (~2fps), high = fluid.',
     world: 'synthetic',
     palette: [K, [0.16, 0.18, 0.22, 1], [0.8, 0.82, 0.86, 1]],
     sources: ['murmuration', 'particle-drift', 'swell'],
@@ -1215,7 +1215,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'test-drift', name: 'Drift', family: 'Feel Studies',
-    blurb: 'STUDY · A calm graded image. Sweep DRIFT : the grade slowly wanders (gamma / RGB) with rare analog accidents — watch over ~10s.',
+    blurb: 'STUDY · A calm graded image. Sweep DRIFT : the grade slowly wanders (gamma / RGB) with rare analog accidents. Watch over ~10s.',
     world: 'sublimated',
     palette: [K, [0.3, 0.16, 0.12, 1], [0.85, 0.75, 0.6, 1]],
     sources: ['organic', 'membrane'],
@@ -1224,7 +1224,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'test-flow', name: 'Flow ⇄ Interruption', family: 'Feel Studies',
-    blurb: 'STUDY · Moving content. Sweep FLOW : left (interruption) stutters — frame-holds, breakup, blank stabs; right (flow) softens to a liquid image.',
+    blurb: 'STUDY · Moving content. Sweep FLOW : left (interruption) stutters (frame-holds, breakup, blank stabs); right (flow) softens to a liquid image.',
     world: 'incongruent',
     palette: [K, [0.18, 0.14, 0.24, 1], [0.75, 0.78, 0.85, 1]],
     sources: ['particle-drift', 'murmuration'],

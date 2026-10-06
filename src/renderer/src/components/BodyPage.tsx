@@ -296,15 +296,15 @@ export function BodyPage(): JSX.Element {
     ]
   }, [scenes])
   const actionLabelMap = useMemo(() => {
-    const m: Record<string, string> = { none: '— nothing —' }
+    const m: Record<string, string> = { none: 'nothing' }
     for (const grp of actionGroups) for (const o of grp.opts) m[o.id] = o.label
     return m
   }, [actionGroups])
-  const labelForAction = (id: GestureAction): string => actionLabelMap[id] ?? (id === 'none' ? '— nothing —' : midiTargetLabel(id))
+  const labelForAction = (id: GestureAction): string => actionLabelMap[id] ?? (id === 'none' ? 'nothing' : midiTargetLabel(id))
 
   const actionOptionEls = (
     <>
-      <option value="none">— nothing —</option>
+      <option value="none">nothing</option>
       {actionGroups.map((grp) => (
         <optgroup key={grp.label} label={grp.label}>
           {grp.opts.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
@@ -499,7 +499,7 @@ export function BodyPage(): JSX.Element {
               </span>
             </div>
             <p className="mb-2 text-[10px] leading-snug text-muted">
-              One gesture, or two combined, fires an action and/or an OSC bang. A combo triggers when both land close together (<span className="text-text">+</span>) or in order (<span className="text-text">→</span>). Leave the name blank for an auto label like <span className="text-text">“{namePreview}”</span> ; leave OSC blank for <span className="text-text">/body/{oscPreview}</span>. Set the action to <span className="text-text">— nothing —</span> for an OSC-only rule.
+              One gesture, or two combined, fires an action and/or an OSC bang. A combo triggers when both land close together (<span className="text-text">+</span>) or in order (<span className="text-text">→</span>). Leave the name blank for an auto label like <span className="text-text">“{namePreview}”</span> ; leave OSC blank for <span className="text-text">/body/{oscPreview}</span>. Set the action to <span className="text-text">nothing</span> for an OSC-only rule.
             </p>
 
             {/* Builder line : name · gesture(s) · action · OSC · save */}
@@ -546,7 +546,7 @@ export function BodyPage(): JSX.Element {
                 </>
               )}
               <span className="font-mono text-[11px] text-muted">→</span>
-              <select value={rAction} onChange={(e) => setRAction(e.target.value)} className="input select-compact h-[26px] w-[172px] text-[11px]" title="What the rule fires. “— nothing —” makes an OSC-only rule.">
+              <select value={rAction} onChange={(e) => setRAction(e.target.value)} className="input select-compact h-[26px] w-[172px] text-[11px]" title="What the rule fires. “nothing” makes an OSC-only rule.">
                 {actionOptionEls}
               </select>
               <div className="flex items-center" title="Custom OSC name. The message sent is /body/<name>. Blank = the truncated default shown as the placeholder.">

@@ -732,7 +732,7 @@ function SourceRow({
           menuWidth={248}
           title="Source for this slot (type to search the generators)"
           options={[
-            { value: '', label: '— none —' },
+            { value: '', label: 'none' },
             ...(isVideo
               ? [{ value: '__video__', label: mediaName ?? 'video', prefix: '🎞 ', group: 'live' }]
               : []),

@@ -34,7 +34,7 @@ const PROBE_MARK: Record<string, { glyph: string; color: string; hint: string }>
   Chord: { glyph: '≡', color: 'rgb(160,160,175)', hint: 'horizontal bands, no spatial probe' },
   Collage: { glyph: '▦', color: 'rgb(220,190,255)', hint: 'the Collage\'s own pieces : centre low, edges high' }
 }
-const filterTag = (x: number): string => (x < 0.49 ? 'LP' : x > 0.51 ? 'HP' : '—')
+const filterTag = (x: number): string => (x < 0.49 ? 'LP' : x > 0.51 ? 'HP' : 'off')
 
 const TAU = 6.283185307179586
 /** Breathing rubato warp of a linear sweep phase (mirror of the worklet's warpPace). */
@@ -391,7 +391,7 @@ function SonifySequencer(): JSX.Element {
                 onChange={(e) => setStepPreset(s, e.target.value)}
                 title="Load a full Sonify preset when this step plays (overrides the voice toggles)"
               >
-                <option value="">— voices —</option>
+                <option value="">voices</option>
                 {presets.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
               <button onClick={() => clearStep(s)} className="shrink-0 px-0.5 text-[10px] leading-none text-muted/50 hover:text-danger" title="Clear this step">×</button>

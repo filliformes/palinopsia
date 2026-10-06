@@ -1458,7 +1458,7 @@ function ResourceHud(): JSX.Element {
     return () => cancelAnimationFrame(raf)
   }, [])
 
-  const pct = (v: number | null): string => (v == null ? '—' : `${Math.round(v)}%`)
+  const pct = (v: number | null): string => (v == null ? '-' : `${Math.round(v)}%`)
   const cell = (label: string, value: string): JSX.Element => (
     <div className="flex items-baseline gap-1.5">
       <span className="text-[10px] uppercase tracking-wide text-muted">{label}</span>
@@ -1467,7 +1467,7 @@ function ResourceHud(): JSX.Element {
   )
   return (
     <div className="flex shrink-0 items-center justify-center gap-6 border-t border-border bg-panel/60 py-2 font-mono">
-      {cell('FPS', fps > 0 ? String(Math.round(fps)) : '—')}
+      {cell('FPS', fps > 0 ? String(Math.round(fps)) : '-')}
       {cell('CPU', pct(stats.cpu))}
       {cell('RAM', pct(stats.ram))}
       {cell('VRAM', pct(stats.vram))}

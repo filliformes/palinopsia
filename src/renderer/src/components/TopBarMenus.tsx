@@ -158,7 +158,7 @@ export function SessionLoader(): JSX.Element {
         onChange={(e) => setSel(e.target.value)}
         title="All saved sessions"
       >
-        {sessions.length === 0 && <option value="">— no saved sessions —</option>}
+        {sessions.length === 0 && <option value="">no saved sessions</option>}
         {groups.some((g) => g.label)
           ? groups.map((g) =>
               g.label ? (

@@ -144,7 +144,7 @@ export function MidiPanel(): JSX.Element {
               {wired > 0 ? `${wired} input${wired > 1 ? 's' : ''} wired` : 'no input wired'}
             </span>
             <span className="min-w-0 flex-1 truncate text-muted">
-              in: {activity || '— (no MIDI received yet : move a knob / press a key)'}
+              in: {activity || 'no MIDI received yet (move a knob / press a key)'}
             </span>
           </div>
 

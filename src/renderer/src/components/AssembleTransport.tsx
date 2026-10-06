@@ -72,7 +72,7 @@ export function AssembleTransport({
             acc += cs[i].durSec
             idx = i
           }
-          clipRef.current.textContent = cs.length ? `${idx + 1}/${cs.length}` : '—'
+          clipRef.current.textContent = cs.length ? `${idx + 1}/${cs.length}` : '-'
         }
       }
       raf = requestAnimationFrame(tick)
@@ -111,7 +111,7 @@ export function AssembleTransport({
         <span className="shrink-0 font-mono text-[9px] text-muted">/ {fmtT(total)}</span>
         <div className="flex-1" />
         <span className="shrink-0 font-mono text-[9px] text-muted" title="Clip position in the edit">
-          clip <span ref={clipRef} className="text-accent">—</span>
+          clip <span ref={clipRef} className="text-accent">-</span>
         </span>
       </div>
 

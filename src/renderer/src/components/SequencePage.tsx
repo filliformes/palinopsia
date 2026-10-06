@@ -216,7 +216,7 @@ export function SequencePage({
                         title={`World : ${worldName(t.world)} · Coupling : ${t.synchresis.join(', ') || 'none'}`}
                       >
                         <span className="rounded bg-panel2 px-1 py-0.5 text-accent2">{worldName(t.world)}</span>
-                        <span className="truncate">{t.synchresis.join('·') || '—'}</span>
+                        <span className="truncate">{t.synchresis.join('·') || 'none'}</span>
                       </div>
                       {/* Espace-temps bar: full ◀ ▶ void */}
                       <div

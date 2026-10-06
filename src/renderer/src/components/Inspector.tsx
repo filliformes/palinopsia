@@ -54,9 +54,9 @@ const SCOPE_LABEL: Record<FxScope['kind'], string> = {
 // three-input Matte has two. `none` says what the node does with nothing picked;
 // `layerOnly` nodes can't sit outside a layer rack at all (canHostFx).
 const NODE_INPUTS: Record<string, { label: string; hint: string; none: string; layerOnly?: boolean }[]> = {
-  'node-transfert': [{ label: 'sidechain', hint: 'its motion → this layer', none: '— none —', layerOnly: true }],
-  'node-convolve': [{ label: 'kernel', hint: 'its shape is stamped by bright pixels', none: '— none —', layerOnly: true }],
-  'node-mosaique': [{ label: 'corpus', hint: 'its tiles rebuild this layer', none: '— none —', layerOnly: true }],
+  'node-transfert': [{ label: 'sidechain', hint: 'its motion → this layer', none: 'none', layerOnly: true }],
+  'node-convolve': [{ label: 'kernel', hint: 'its shape is stamped by bright pixels', none: 'none', layerOnly: true }],
+  'node-mosaique': [{ label: 'corpus', hint: 'its tiles rebuild this layer', none: 'none', layerOnly: true }],
   'node-remap': [{ label: 'map', hint: 'its red/green say where each pixel reads', none: 'self' }],
   'node-lumablur': [{ label: 'control', hint: 'its brightness sets the blur width', none: 'self' }],
   'node-matte': [
@@ -610,7 +610,7 @@ export function Inspector(): JSX.Element {
           />
           <span
             className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-accent2"
-            title="A layer whose picture FILLS the letters (they become a matte over it, fixed to the screen). None = solid color."
+            title="A layer whose picture FILLS the letters (they become a matte over it, fixed to the screen). Solid color = no layer."
           >
             fill
           </span>
@@ -622,7 +622,7 @@ export function Inspector(): JSX.Element {
               textCfg!.setRef(v.startsWith('layer:') ? { kind: 'layer', layer: Number(v.slice(6)) } : null)
             }}
           >
-            <option value="">— color —</option>
+            <option value="">solid color</option>
             {[0, 1, 2, 3].map((li) => (
               <option key={li} value={`layer:${li}`}>
                 Layer {li + 1}

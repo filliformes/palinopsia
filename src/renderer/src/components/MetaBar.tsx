@@ -367,7 +367,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
 
       {/* destinations count : what this knob drives */}
       <span className="font-mono text-[9px] leading-none text-muted">
-        {knob.destinations.length > 0 ? `${knob.destinations.length} dest` : '—'}
+        {knob.destinations.length > 0 ? `${knob.destinations.length} dest` : 'no dest'}
       </span>
 
       {renaming ? (
