@@ -611,6 +611,12 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **macOS installation** : the control window (which renders the picture the output
+  shows) now keeps full speed while the fullscreen output covers it (Chromium's Mac
+  occlusion tracking is off, like Windows' already was, in the SAME switch : a second
+  `disable-features` would have replaced the first), the app opts out of App Nap
+  (`NSAppSleepDisabled`), and the installation output's always-on-top is Windows only
+  (on macOS it could fight the fullscreen Space). The README gains a Mac checklist.
 - **OSC video speed now matches the slider.** `/opsia/layer{n}/video/speed` mapped 0..1
   across 1/28× to 128× (log) while the transport slider runs from 1/64×, so a
   controller's value and the slider disagreed (outbound feedback too). Both use 1/64×

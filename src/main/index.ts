@@ -52,9 +52,12 @@ registerAssetScheme()
 // measured on Electron 44.5.1, these lists still reach the GPU and renderer
 // processes with their case intact (check their command lines after an upgrade).
 app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport,PlatformHEVCEncoderSupport')
-// Keep the fullscreen output window rendering when it's on a 2nd display and
-// unfocused : Windows native occlusion detection otherwise pauses it (black).
-app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
+// Keep every window rendering when it is covered : the control window renders
+// the picture the output shows, and on a single screen the fullscreen output
+// covers it. Windows' native occlusion detection (CalculateNativeWinOcclusion)
+// and macOS's (MacWebContentsOcclusion) would otherwise mark it hidden and slow
+// it down. ONE switch : a second disable-features would replace the first.
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion,MacWebContentsOcclusion')
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
 // And keep full CPU priority for a MINIMIZED operator window : it is the render
 // source for NDI / Spout / Syphon / the projector stream, which must not slow down just
@@ -646,8 +649,10 @@ function finalizeOutputWindow(kind: 'full' | 'windowed' | 'span'): void {
   win.webContents.on('console-message', (e) => logFrom('output', e.level, e.message))
   if (kioskActive()) {
     guardKioskKeys(win)
-    // Above everything (a system notice, an update toast) in an installation.
-    if (kind === 'full') win.setAlwaysOnTop(true, 'screen-saver')
+    // Above everything (a system notice, an update toast) in an installation, on
+    // Windows. Not on macOS : its fullscreen output lives in its own Space, where a
+    // window level can fight the fullscreen itself.
+    if (kind === 'full' && process.platform === 'win32') win.setAlwaysOnTop(true, 'screen-saver')
   }
   if (process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(`${process.env.ELECTRON_RENDERER_URL}#output`)

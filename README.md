@@ -801,6 +801,13 @@ bottom:
     and automatic OS updates (Windows Update can also swap the graphics driver), and
     launch the app once by hand to accept every permission prompt (local network,
     camera, microphone, Documents) with the build that will run the show.
+  - **On a Mac** : Palinopsia in **Applications** and `xattr -cr` run on it (or Open
+    Anyway) BEFORE turning on Start with the computer (it refuses from the disk image).
+    Automatic login needs FileVault off (System Settings → Users & Groups). Turn on a
+    **Focus** mode so notifications stay quiet, set the display to never sleep on power
+    adapter, turn off automatic macOS updates, and keep the Mac on its charger. The app
+    keeps itself out of App Nap and keeps rendering while its fullscreen output covers
+    its control window.
 - A resource **HUD** (FPS · CPU · RAM · VRAM · GPU).
 
 ![Output and mapping](docs/images/interface-output.jpg)

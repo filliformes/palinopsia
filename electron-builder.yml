@@ -100,6 +100,9 @@ mac:
       - _ndi._tcp
       - _oscjson._tcp
       - _osc._udp
+    # No App Nap : macOS slows an app it judges idle (a covered window, no input),
+    # and an installation that renders behind its own fullscreen output is exactly that.
+    NSAppSleepDisabled: true
 linux:
   target:
     - AppImage
