@@ -554,6 +554,15 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Dragging a modulated slider moves its base by as much as you drag.** The thumb
+  shows the live (modulated) value, so grabbing it set the base to wherever the
+  modulator happened to be (in Multiply mode the base sank a little with every grab),
+  and after the release the thumb stayed frozen until something else took the focus.
+  Now a drag or an arrow key moves the base relative to where the thumb was grabbed
+  (measured : the thumb at 2, the base at 20, a +3 drag → 23), and the slider lets go
+  of the focus on release. Counts (Collage `cuts`, `films`) step and read in whole
+  numbers, and the modulation depth slider is five times finer.
+
 - **Collage : `cuts` and `films` can be modulated.** Every whole-number step of `cuts`
   re-drew the whole partition and its film assignment from one random stream, so an
   LFO reshuffled the wall every frame (86-100 % of the frame changed film per step).

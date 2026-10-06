@@ -27,6 +27,9 @@ export interface IsfInputDesc {
   // Opsia extension ("COMPACT": true): small toggles/enums that the Inspector's
   // two-row grid stacks together into ONE cluster cell instead of a cell each.
   compact?: boolean
+  // Opsia extension ("INTEGER": true) : a float that only means whole numbers (a
+  // count) : its slider steps by 1 and its readout shows no decimals.
+  integer?: boolean
 }
 
 interface RawInput {
@@ -39,6 +42,7 @@ interface RawInput {
   VALUES?: number[]
   LABELS?: string[]
   COMPACT?: boolean
+  INTEGER?: boolean
 }
 
 const cache = new Map<string, IsfInputDesc[]>()
@@ -80,6 +84,7 @@ export function inputsForShader(shaderId: string): IsfInputDesc[] {
       values: raw.VALUES,
       labels: raw.LABELS,
       compact: raw.COMPACT,
+      integer: raw.INTEGER,
       hint: hints?.[raw.NAME]
     })
   }

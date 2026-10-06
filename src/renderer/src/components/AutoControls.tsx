@@ -356,12 +356,42 @@ function FloatControl({
   const min = typeof inp.min === 'number' ? inp.min : 0
   const max = typeof inp.max === 'number' ? inp.max : 1
   const def = typeof inp.def === 'number' ? inp.def : min
-  const v = typeof value === 'number' ? value : def
-  const step = (max - min) / 200 || 0.005
+  const raw = typeof value === 'number' ? value : def
+  const v = inp.integer ? Math.round(raw) : raw
+  const step = inp.integer ? 1 : (max - min) / 200 || 0.005
   const target = modTargetFor?.(inp.name)
   const targetKey = target ? modTargetKey(target) : null
   const bound = useBound(targetKey)
   const isModulated = bound.length > 0
+
+  // A MODULATED slider's thumb shows the live value, not the base. Grabbing it
+  // used to set the base to wherever the modulator happened to be (and, in
+  // Multiply mode, ratchet it down a little with every grab). Now a drag (or an
+  // arrow key) moves the base by how far the thumb moves, from where it was
+  // grabbed; on release the slider lets go of the focus, so the thumb follows
+  // the modulator again (it froze while focused).
+  const grab = useRef<{ base: number; shown: number } | null>(null)
+  const onGrab = (e: { currentTarget: HTMLInputElement }): void => {
+    grab.current = isModulated ? { base: v, shown: Number(e.currentTarget.value) } : null
+  }
+  const onSlide = (e: { currentTarget: HTMLInputElement }): void => {
+    const x = Number(e.currentTarget.value)
+    const g = grab.current
+    let next = g && isModulated ? g.base + (x - g.shown) : x
+    next = Math.max(min, Math.min(max, next))
+    onChange(inp.name, inp.integer ? Math.round(next) : next)
+  }
+  const onLetGo = (e: { currentTarget: HTMLInputElement }): void => {
+    grab.current = null
+    if (isModulated) e.currentTarget.blur()
+  }
+  const slideProps = {
+    onPointerDown: onGrab,
+    onKeyDown: (e: { currentTarget: HTMLInputElement }) => { if (!grab.current) onGrab(e) },
+    onChange: onSlide,
+    onPointerUp: onLetGo,
+    onKeyUp: (e: { currentTarget: HTMLInputElement }) => { grab.current = null; void e }
+  }
 
   // Modulated sliders MOVE with the live value (dataFLOU behaviour): one rAF
   // writes the thumb position straight to the DOM : React keeps rendering the
@@ -389,13 +419,13 @@ function FloatControl({
             max={max}
             step={step}
             value={v}
-            onChange={(e) => onChange(inp.name, Number(e.target.value))}
+            {...slideProps}
             onDoubleClick={() => onChange(inp.name, def)}
             className={`min-w-0 flex-1 ${isModulated ? 'accent-accent2' : 'accent-accent'}`}
             title={
               (inp.hint ? inp.hint + ' · ' : '') +
               (isModulated
-                ? `${inp.label} : modulated (drag sets the base)`
+                ? `${inp.label} : modulated (a drag moves the base by as much as you move it)`
                 : `${inp.label} : double-click to reset (${def})`)
             }
           />
@@ -405,7 +435,8 @@ function FloatControl({
               value={v}
               min={min}
               max={max}
-              onChange={(n) => onChange(inp.name, n)}
+              onChange={(n) => onChange(inp.name, inp.integer ? Math.round(n) : n)}
+              integer={!!inp.integer}
               liveKey={isModulated ? (targetKey ?? undefined) : undefined}
               className="input w-full px-1 py-0.5 text-right text-[11px]"
             />
@@ -429,7 +460,8 @@ function FloatControl({
               value={v}
               min={min}
               max={max}
-              onChange={(n) => onChange(inp.name, n)}
+              onChange={(n) => onChange(inp.name, inp.integer ? Math.round(n) : n)}
+              integer={!!inp.integer}
               liveKey={isModulated ? (targetKey ?? undefined) : undefined}
               className="input w-full px-1 py-0.5 text-right text-[11px]"
             />
@@ -443,13 +475,13 @@ function FloatControl({
         max={max}
         step={step}
         value={v}
-        onChange={(e) => onChange(inp.name, Number(e.target.value))}
+        {...slideProps}
         onDoubleClick={() => onChange(inp.name, def)}
         className={`min-w-0 ${isModulated ? 'accent-accent2' : 'accent-accent'}`}
         title={
           (inp.hint ? inp.hint + ' · ' : '') +
           (isModulated
-            ? `${inp.label} : modulated (moving with the live value; drag sets the base)`
+            ? `${inp.label} : modulated (moving with the live value; a drag moves the base by as much as you move it)`
             : `${inp.label} : double-click to reset (${def})`)
         }
       />
@@ -540,7 +572,7 @@ export function AssignRow({
               type="range"
               min={-10}
               max={10}
-              step={0.05}
+              step={0.01}
               value={b.depth}
               onChange={(e) => setAssignmentDepth(b.id, Number(e.target.value))}
               className={`min-w-0 flex-1 ${mult ? 'accent-accent' : 'accent-accent2'}`}

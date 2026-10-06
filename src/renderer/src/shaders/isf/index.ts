@@ -1277,10 +1277,10 @@ export const GENERATORS: IsfShader[] = [
         "Collage : a wall of films cut up like torn paper. Pick a folder in the Inspector and every piece of the cut-up plays a different clip, cover-cropped to its own shape, so portrait, landscape and 4K mix freely. feed switches between that folder and a selection of saved assemblages : with assemblages, every piece plays one of your little edits, cutting on its own. films is how many play at once, up to 50 (more cuts than films is fine : the extra pieces show the same film at another crop). window (hold) is 0 to play each whole film on a loop (no seeking at all, the smoothest setting), or a length in seconds to loop a short window of it instead. churn sets how many pieces switch film on their own fast clock, from all holding to every piece its own little montage. speed spread (vary) gives every piece its own playback speed around speed; freeze stops the whole wall on the current frame. deal re-deals the wall, auto deal (rate) does it on a clock, and crossfade (xfade) dissolves each deal into the next instead of snapping. shape picks the piece geometry : CUT-UP is recursive rectangles, MOSAIC is irregular polygon shards. contour, curve length, torn paper and mask are the Autocutter's dials; contour mode chooses whether contour warps the film inside each piece (WARPED) or only frays the cut edges while the picture stays straight (NORMAL). The layer Speed and the global speed scale the whole wall, films and clocks alike.",
       CATEGORIES: ['Generator'],
       INPUTS: [
-        { NAME: 'cuts', TYPE: 'float', MIN: 2.0, MAX: 64.0, DEFAULT: 12.0, LABEL: 'cuts' },
+        { NAME: 'cuts', TYPE: 'float', MIN: 2.0, MAX: 64.0, DEFAULT: 12.0, LABEL: 'cuts', INTEGER: true },
         { NAME: 'shape', TYPE: 'long', VALUES: [0, 1], LABELS: ['cut-up', 'mosaic'], DEFAULT: 0, LABEL: 'shape' },
         { NAME: 'feed', TYPE: 'long', VALUES: [0, 1], LABELS: ['folder', 'assemblages'], DEFAULT: 0, LABEL: 'feed' },
-        { NAME: 'films', TYPE: 'float', MIN: 1.0, MAX: 50.0, DEFAULT: 12.0, LABEL: 'films' },
+        { NAME: 'films', TYPE: 'float', MIN: 1.0, MAX: 50.0, DEFAULT: 12.0, LABEL: 'films', INTEGER: true },
         { NAME: 'hold', TYPE: 'float', MIN: 0.0, MAX: 30.0, DEFAULT: 0.0, LABEL: 'window (s)' },
         { NAME: 'churn', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'churn' },
         { NAME: 'speed', TYPE: 'float', MIN: 0.1, MAX: 4.0, DEFAULT: 1.0, LABEL: 'speed' },

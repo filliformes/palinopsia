@@ -440,6 +440,10 @@ The two modes differ in what the parameter's own slider means once bound:
   already dialled in.
 - **Replace** swings bipolarly *around* the base, so the parameter moves even
   from a standstill.
+- A modulated slider's thumb moves with the live value. **Dragging it moves the base
+  by as much as you drag** (from wherever the thumb was when you grabbed it); let go
+  and it follows the modulator again. Counts (a Collage's `cuts` and `films`) step in
+  whole numbers.
 
 Binding from the **M** button picks the mode for you: a target sitting at (or
 near) zero gets **Replace**, anything else gets **Multiply**. This matters because
