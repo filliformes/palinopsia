@@ -475,6 +475,12 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Palinopsia could run on a laptop's integrated graphics.** Windows picks a hybrid
+  laptop's graphics card per program, and leaves one it doesn't know on the integrated
+  chip unless its graphics settings say otherwise; the WebGL contexts' power preference
+  alone didn't move it. The app now asks Chromium for the discrete GPU at launch.
+  Measured from a path Windows had put on the Intel Iris Xe : the RTX 4070 with the
+  switch, the Iris Xe without it, about 15x apart.
 - **Context's Vibe Color button picked a color that wasn't on screen.** It read the
   Vibe's five manual stops whatever the mode : with a color chord on (whose stops
   replace them) or only two stops active, it usually landed on white and the light

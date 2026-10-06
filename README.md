@@ -117,6 +117,10 @@ without it (the Spout toggle simply reports unavailable). Video ingest and
 recording delivery use the bundled `ffmpeg-static`; a system `ffmpeg` on PATH (or
 `OPSIA_FFMPEG`) overrides it.
 
+On a laptop with two graphics chips, Palinopsia **asks for the discrete GPU** itself
+(Windows otherwise leaves a program it doesn't know on the integrated chip, about 15x
+slower on an RTX 4070 laptop), so no Windows graphics setting is needed.
+
 On launch the app quietly **pre-warms the whole shader registry** in the
 background (one compile per frame, starting ~1 s in) so scene recalls and
 Randomize bursts hit the GPU program cache instead of stalling the driver. The

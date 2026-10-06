@@ -60,6 +60,12 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding')
 // they start evicting each other.
 app.commandLine.appendSwitch('gpu-program-cache-size-kb', '16384')
 app.commandLine.appendSwitch('gpu-disk-cache-size-kb', '65536')
+// Run on the discrete GPU. Windows picks a hybrid laptop's graphics card per
+// program path and leaves an unknown program on the integrated chip unless the
+// machine's graphics settings say otherwise : about 15x slower here (an RTX 4070
+// laptop, measured). The WebGL contexts' powerPreference alone does not move
+// Chromium's GPU process; this switch does (macOS too : the discrete GPU).
+app.commandLine.appendSwitch('force_high_performance_gpu')
 
 let mainWindow: BrowserWindow | null = null
 
