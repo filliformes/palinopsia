@@ -30,6 +30,7 @@ import { AssembleTransport } from './AssembleTransport'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { registerInspectorRandomize } from '../commands'
 import { TEXT_FONTS, textFontWeightRange } from '../textFonts'
+import { applyVibeColor } from '../vibeColor'
 
 // Text source : grey the weight dial when the chosen face has a single weight
 // (the engine clamps the weight into each face's real range).
@@ -39,32 +40,6 @@ function textDim(values: Record<string, number | number[]>): Record<string, stri
   return lo === hi
     ? { weight: `${TEXT_FONTS[idx] ?? 'This font'} has a single weight : the weight dial has no effect.` }
     : undefined
-}
-
-// The Vibe Palette's "main" colour = its most characterful stop (highest
-// chroma, luma as a tiebreak), brightened a touch so it reads as a light
-// source. Fed into Context's light colour for an instant unified look.
-function vibeMainColor(inputs: Record<string, number | number[]>): number[] {
-  const stops = ['colorA', 'colorB', 'colorC', 'colorD', 'colorE']
-    .map((k) => inputs[k])
-    .filter((c): c is number[] => Array.isArray(c) && c.length >= 3)
-  let best = stops[0] ?? [1, 1, 1, 1]
-  let bestScore = -1
-  for (const c of stops) {
-    const chroma = Math.max(c[0], c[1], c[2]) - Math.min(c[0], c[1], c[2])
-    const luma = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
-    const score = chroma * 2 + luma * 0.4
-    if (score > bestScore) {
-      bestScore = score
-      best = c
-    }
-  }
-  return [
-    Math.min(1, best[0] * 1.25 + 0.08),
-    Math.min(1, best[1] * 1.25 + 0.08),
-    Math.min(1, best[2] * 1.25 + 0.08),
-    1
-  ]
 }
 
 const SCOPE_LABEL: Record<FxScope['kind'], string> = {
@@ -562,13 +537,12 @@ export function Inspector(): JSX.Element {
         {isContext && (
           <button
             onClick={() => {
-              // Pull the Vibe Palette's signature colour into the key light
-              // (brightened) so the whole frame reads as one lit space.
-              const vibe = composition.master.find((f) => f.shaderId === 'fx-vibe')
-              if (vibe) onChange('lightColor', vibeMainColor(vibe.inputs))
+              // Pull the Vibe Palette's signature colour into the key light so
+              // the whole frame reads as one lit space.
+              applyVibeColor(composition.master, onChange)
             }}
             className="shrink-0 rounded border border-accent2/50 bg-accent2/10 px-1.5 py-0.5 font-mono text-[10px] text-accent2 transition-colors hover:bg-accent2/20"
-            title="Set the light color from the Vibe Palette's main color (brightened) : an instant unified look"
+            title="Light the scene in the Vibe Palette's main color (the one it is painting with now, at full brightness; a light that is off is turned up) : an instant unified look"
           >
             Vibe Color
           </button>

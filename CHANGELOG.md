@@ -443,6 +443,12 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Context's Vibe Color button picked a color that wasn't on screen.** It read the
+  Vibe's five manual stops whatever the mode : with a color chord on (whose stops
+  replace them) or only two stops active, it usually landed on white and the light
+  looked unchanged. It now takes the colors the Vibe is actually painting with (the
+  chord's, or the active stops), at full brightness, and turns the light up to 0.25 if
+  it was off. One shared helper for the Context section and the Inspector.
 - **The previous session kept playing after a session change.** Loading a session (or
   New) compiles its shaders a few per frame, and every layer still waiting its turn kept
   drawing the OLD session's generator, so the projector showed the old visuals for

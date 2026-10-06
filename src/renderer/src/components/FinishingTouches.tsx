@@ -17,26 +17,7 @@ import { AssignContext, AssignRow, XYControl } from './AutoControls'
 import { SectionedControls } from './FinishingSections'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
-
-// Duplicated from the Inspector : the Vibe Palette's most characterful stop,
-// brightened, for Context's "Vibe Color" button.
-function vibeMainColor(inputs: Record<string, number | number[]>): number[] {
-  const stops = ['colorA', 'colorB', 'colorC', 'colorD', 'colorE']
-    .map((k) => inputs[k])
-    .filter((c): c is number[] => Array.isArray(c) && c.length >= 3)
-  let best = stops[0] ?? [1, 1, 1, 1]
-  let bestScore = -1
-  for (const c of stops) {
-    const chroma = Math.max(c[0], c[1], c[2]) - Math.min(c[0], c[1], c[2])
-    const luma = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
-    const score = chroma * 2 + luma * 0.4
-    if (score > bestScore) {
-      bestScore = score
-      best = c
-    }
-  }
-  return [Math.min(1, best[0] * 1.25 + 0.08), Math.min(1, best[1] * 1.25 + 0.08), Math.min(1, best[2] * 1.25 + 0.08), 1]
-}
+import { applyVibeColor } from '../vibeColor'
 
 const AC: Record<string, string> = { 'fx-vibe': 'accent2', 'fx-context': 'accent', 'fx-finalizer': 'active' }
 
@@ -364,12 +345,9 @@ function ContextLightPad({
     <div className="flex items-center justify-center gap-3 px-2 py-2">
       <XYControl inp={pad} value={values[pad.name]} onChange={onChange} />
       <button
-        onClick={() => {
-          const vibe = composition.master.find((f) => f.shaderId === 'fx-vibe')
-          if (vibe) onChange('lightColor', vibeMainColor(vibe.inputs))
-        }}
+        onClick={() => applyVibeColor(composition.master, onChange)}
         className="shrink-0 rounded border border-accent2/50 bg-accent2/10 px-1.5 py-0.5 font-mono text-[10px] text-accent2 hover:bg-accent2/20"
-        title="Set the light color from the Vibe Palette's main color (brightened)"
+        title="Light the scene in the Vibe Palette's main color (the one it is painting with now, at full brightness; a light that is off is turned up)"
       >
         Vibe Color
       </button>
