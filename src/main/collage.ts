@@ -16,6 +16,7 @@ import { readdirSync, statSync } from 'fs'
 import { join } from 'path'
 import type { CollageClip, CollageScanResult } from '@shared/collage'
 import { collageCacheFor, convertForCollage, convertToCache, probe } from './videoConvert'
+import { lastDir, rememberDir } from './lastDir'
 
 const VIDEO_EXTS = /\.(mp4|m4v|mov|dxv|webm|mkv|avi|mpg|mpeg|mxf|m2v)$/i
 
@@ -138,9 +139,12 @@ export function registerCollage(): void {
   ipcMain.handle('collage:pickFolder', async () => {
     const r = await dialog.showOpenDialog({
       title: 'Choose a folder of videos',
+      defaultPath: lastDir('videoFolder'),
       properties: ['openDirectory']
     })
-    return r.canceled || !r.filePaths.length ? null : r.filePaths[0]
+    if (r.canceled || !r.filePaths.length) return null
+    rememberDir('videoFolder', r.filePaths[0])
+    return r.filePaths[0]
   })
 
   ipcMain.handle('collage:scan', async (e, folder: string) => {

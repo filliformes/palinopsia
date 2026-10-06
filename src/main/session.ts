@@ -6,6 +6,7 @@ import { promises as fs, existsSync } from 'fs'
 import { basename, dirname, join, relative, resolve } from 'path'
 import type { Session } from '@shared/types'
 import { userFilesBase } from './paths'
+import { lastDir, rememberDir } from './lastDir'
 
 const FILTERS = [{ name: 'Palinopsia Session', extensions: ['opsia.json', 'json'] }]
 
@@ -73,6 +74,7 @@ export async function saveAs(
     filters: FILTERS
   })
   if (result.canceled || !result.filePath) return null
+  rememberDir('session', result.filePath)
   // The name INSIDE follows the file name, so a Save As copy never carries the
   // old session's name (that drift once sent a crash-recovered session onto
   // another file of that name).
@@ -179,10 +181,12 @@ async function scanSessions(dir: string, depth: number, out: string[]): Promise<
 export async function addFolder(parent: BrowserWindow | null): Promise<{ folder: string; count: number } | null> {
   const result = await dialog.showOpenDialog(parent ?? undefined!, {
     title: 'Link a folder of sessions',
+    defaultPath: lastDir('sessionFolder', sessionsFolderPath()),
     properties: ['openDirectory']
   })
   if (result.canceled || result.filePaths.length === 0) return null
   const folder = resolve(result.filePaths[0])
+  rememberDir('sessionFolder', folder)
   const list = await linkedFolders()
   if (!list.some((f) => resolve(f).toLowerCase() === folder.toLowerCase())) {
     list.push(folder)
@@ -284,11 +288,13 @@ export async function open(
 ): Promise<{ session: Session; path: string } | null> {
   const result = await dialog.showOpenDialog(parent ?? undefined!, {
     title: 'Open Session',
+    defaultPath: lastDir('session', sessionsFolderPath()),
     filters: FILTERS,
     properties: ['openFile']
   })
   if (result.canceled || result.filePaths.length === 0) return null
   const path = result.filePaths[0]
+  rememberDir('session', path)
   const text = await fs.readFile(path, 'utf8')
   let session: Session
   try {

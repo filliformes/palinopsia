@@ -704,8 +704,9 @@ A full-page takeover (the engine keeps rendering underneath):
   **Sound** : every format records the **Sonify** sound whenever Sonify plays during
   the take (switched on before or during it, off and on again : silence while it is
   off, in sync with the picture); a take during which Sonify never played is saved
-  with no sound at all. The video encoder warms up quietly a few seconds after launch,
-  so even the first take of a session starts recording at once.
+  with no sound at all. The video encoder and the sound card warm up quietly a few
+  seconds after launch (the sound card then stays awake, silent), so every take starts
+  recording at once, even the first one and even after a long pause.
   - **DXV3 · Resolume** : Resolume's GPU codec, recorded in **real time** : the
     graphics card compresses each frame, the file is written as it goes, nothing to
     convert after. **Any size** (the 4096² dome master included; a bigger master is

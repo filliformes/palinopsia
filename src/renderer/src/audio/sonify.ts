@@ -345,6 +345,7 @@ class SonifyEngine {
   // (bus > 0) so its sound track lives for the whole take, Sonify on or off,
   // and a DXV3 take reads the sound as PCM through the tap.
   private bus = 0
+  private warm = false // keepWarm : the context stays open between takes and plays
   private tap: AudioWorkletNode | null = null
   private tapSink: GainNode | null = null
   private tapFlush: (() => void) | null = null
@@ -492,10 +493,30 @@ class SonifyEngine {
     }
   }
 
-  /** The take ended : let the context go if the sound is off too. */
+  /** The take ended : let the context go if the sound is off too (unless it is
+   *  kept warm). */
   releaseRecordBus(): void {
     this.bus = Math.max(0, this.bus - 1)
-    if (this.bus === 0 && !this.node && !this.starting) this.closeCtx()
+    if (this.bus === 0 && !this.node && !this.starting && !this.warm) this.closeCtx()
+  }
+
+  /** Open the audio context now and keep it running for the rest of the session,
+   *  silent while nothing plays, instead of closing it whenever the sound and the
+   *  recordings stop. A sound card left idle for a few seconds goes to sleep, and
+   *  waking it held the audio clock still for up to 3 s (measured, Electron 44) :
+   *  every take after a pause started a second late, and Sonify was slow to
+   *  sound. Opened with no output device the clock starts in 0.26 s, but routing
+   *  it to the speakers mid-take stalls it for that long instead, and the take's
+   *  sound would slide out of sync : so the card is simply kept awake. */
+  async keepWarm(): Promise<void> {
+    this.warm = true
+    try {
+      const ctx = await this.ensureCtx()
+      if (ctx.state !== 'running') await ctx.resume().catch(() => {})
+    } catch (e) {
+      this.warm = false
+      console.warn('[sonify] could not open the audio context', e)
+    }
   }
 
   /** The bus's sample rate (0 = no bus). */
@@ -569,7 +590,7 @@ class SonifyEngine {
     this.scan = null
     // A recording holding the sound bus keeps the context (and its sound track)
     // alive; it plays silence until the sound comes back.
-    if (this.bus === 0) this.closeCtx()
+    if (this.bus === 0 && !this.warm) this.closeCtx()
   }
 
   private applySink(sinkId: string): void {

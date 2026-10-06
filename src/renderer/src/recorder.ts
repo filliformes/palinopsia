@@ -85,16 +85,31 @@ function pickIntermediate(withAudio: boolean): { mime: string; ext: string; code
   )
 }
 
-/** Warm the video encoder up once, a few seconds after launch : the first take
- *  of a session waited 1.5 to 2.5 s for the hardware H.264 encoder to start (a
- *  take shorter than that came out EMPTY, 1 in 3 cold starts, measured). A
- *  short hidden recording of an offscreen canvas, its data thrown away : no
- *  file, no toast, the same codec as a real take, at 720p because a smaller
- *  frame is handed to the software encoder and leaves the hardware one cold. */
+/** Warm the recording path up once, a few seconds after launch, so the first
+ *  take of a session starts at once.
+ *  - The video encoder : the first take waited 1.5 to 2.5 s for the hardware
+ *    H.264 encoder to start (a take shorter than that came out EMPTY, 1 in 3
+ *    cold starts, measured). A short hidden recording of an offscreen canvas,
+ *    its data thrown away : no file, no toast, the same codec as a real take, at
+ *    720p because a smaller frame is handed to the software encoder and leaves
+ *    the hardware one cold.
+ *  - The sound : every take holds Sonify's audio context, whose clock waited up
+ *    to 3 s for an idle sound card to wake, so a take after any pause began a
+ *    second after REC (0.1 s once awake, measured). The context is opened now
+ *    and kept running (sonifyEngine.keepWarm). */
 let warmed: Promise<void> | null = null
-export function warmUpEncoder(): Promise<void> {
+export function warmUpRecorder(): Promise<void> {
   if (warmed) return warmed
-  warmed = (async () => {
+  warmed = Promise.all([warmVideo(), warmSound()]).then(() => undefined)
+  return warmed
+}
+
+function warmSound(): Promise<void> {
+  return sonifyEngine.keepWarm()
+}
+
+function warmVideo(): Promise<void> {
+  return (async () => {
     const inter = pickIntermediate(true) ?? pickIntermediate(false)
     if (!inter) return
     const cv = document.createElement('canvas')
@@ -129,7 +144,6 @@ export function warmUpEncoder(): Promise<void> {
       stream.getTracks().forEach((t) => t.stop())
     }
   })()
-  return warmed
 }
 
 export type RecordingFormat = { id: string; label: string; kind: 'realtime' | 'encoder' }

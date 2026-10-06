@@ -371,6 +371,29 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Electron 44** (from 33), with electron-builder 26, Vite 7, electron-vite 5 and
+  plugin-react 5; CI builds on Node 22. Adapted to it :
+  - the app's own file schemes (`opsia-media://` for films, `opsia-asset://` for the
+    MediaPipe models) are CORS-enabled and answer every request with
+    `Access-Control-Allow-Origin` : Chromium 152 refuses a cross-origin request to a
+    custom scheme otherwise, which left every Collage, Assemble and Collage-voice film
+    unloaded (readyState 0) and hand / pose / face tracking unable to load;
+  - screen capture asks for the `display-capture` permission (Electron 36), which the
+    permission handler now grants;
+  - file pickers (Collage and Assemble folders, Open Session, Link a folder of
+    sessions) open where they were last used, remembered across launches : since
+    Electron 43 a picker without a starting folder always opened in Downloads;
+  - `postcss.config.js` is now `postcss.config.mjs` (the build's module-type warning).
+  Checked on the upgrade : the HEVC and occlusion feature switches still reach Chromium
+  with their case (Electron 36 documents `app.commandLine` as lowercasing), hardware
+  HEVC decode + encode, Spout, OSC in, recordings with sound, the discrete GPU.
+- **The sound card stays awake.** Sonify's audio context opens a few seconds after
+  launch and stays running, silent, instead of closing whenever the sound and the
+  recordings stop. A sound card idle for a few seconds goes to sleep, and waking it
+  held the audio clock still for up to 3 s : every take after a pause started a second
+  after REC, and Sonify was slow to sound. Measured : a take starts in 46 to 68 ms after
+  any pause (was 1.1 to 1.2 s), Sonify sounds within 0.1 s.
+
 - **Messages dock in the bottom toolbar** : a warning or a confirmation (a refused effect
   drop, a saved recording) appears centered in the toolbar's empty middle, over no
   control, instead of at the window's bottom center, which the side panels made land on

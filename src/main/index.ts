@@ -44,7 +44,10 @@ registerMediaScheme()
 // Same : opsia-asset:// serves the bundled MediaPipe wasm + models (offline).
 registerAssetScheme()
 // Ask Chromium to enable the platform HEVC decoder + encoder (HIVE live-in and
-// HIVE output both use WebCodecs HEVC).
+// HIVE output both use WebCodecs HEVC). Electron 36+ documents app.commandLine
+// as lowercasing what it is given, and feature names are case-sensitive :
+// measured on Electron 44.5.1, these lists still reach the GPU and renderer
+// processes with their case intact (check their command lines after an upgrade).
 app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport,PlatformHEVCEncoderSupport')
 // Keep the fullscreen output window rendering when it's on a 2nd display and
 // unfocused : Windows native occlusion detection otherwise pauses it (black).
@@ -444,9 +447,12 @@ app.whenReady().then(async () => {
   registerResolume()
 
   // Allow Web MIDI + camera/mic/screen capture in the renderer (all local,
-  // user-initiated: MIDI-CC learn and video-capture sources).
+  // user-initiated: MIDI-CC learn and video-capture sources). Screen capture asks
+  // as 'display-capture' since Electron 36 (it used to come in as 'media'), so
+  // without it the screen-capture source was refused.
   electronSession.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => {
-    if (permission === 'midi' || permission === 'midiSysex' || permission === 'media') return cb(true)
+    if (permission === 'midi' || permission === 'midiSysex' || permission === 'media' || permission === 'display-capture')
+      return cb(true)
     cb(false)
   })
 

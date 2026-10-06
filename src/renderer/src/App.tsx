@@ -21,7 +21,7 @@ import { visionBus } from './engine/visionIn'
 import { depthEngine } from './engine/depthEstimate'
 import { currentFps, tickFrame } from './perf'
 import { videoSeekRequests } from './engine/videoState'
-import { outputRecorder, encoderAccepts, warmUpEncoder } from './recorder'
+import { outputRecorder, encoderAccepts, warmUpRecorder } from './recorder'
 import StreamRelay from './workers/streamRelay?worker&inline'
 import { sonifyEngine } from './audio/sonify'
 import { fireSelectedRandomize, registerPanic, firePanic, fireFreeze, isFrozen, registerRecordToggle, registerNewSession, registerOpenSession } from './commands'
@@ -1013,9 +1013,10 @@ export default function App(): JSX.Element {
       depthModePrev = ''
       // The `0` key + the Transport's flush button both fire panic through here.
       registerPanic(() => compositorRef.current?.panic())
-      // Warm the video encoder up, once, after the launch has settled : the first
-      // take of a session no longer waits for it (see warmUpEncoder).
-      window.setTimeout(() => { if (!outputRecorder.active) void warmUpEncoder() }, 4000)
+      // Warm the video encoder and the sound bus up, once, after the launch has
+      // settled : the first take of a session no longer waits for them (see
+      // warmUpRecorder).
+      window.setTimeout(() => { if (!outputRecorder.active) void warmUpRecorder() }, 4000)
       // MIDI record toggle : start a fast (no-reencode) take or stop the running
       // one — the canvas + recorder live here, not in the store.
       registerRecordToggle(() => {

@@ -34,6 +34,7 @@ import {
   type FrameStats
 } from '@shared/assemble'
 import { children, convertToCache, probe, resolveFfmpeg } from './videoConvert'
+import { lastDir, rememberDir } from './lastDir'
 
 // Bump when the descriptor set or segmentation changes : old caches are then
 // ignored rather than silently mixing incompatible vectors into one corpus.
@@ -546,9 +547,12 @@ export function registerAssemble(): void {
   ipcMain.handle('assemble:pickFolder', async () => {
     const r = await dialog.showOpenDialog({
       title: 'Choose a video folder to analyse',
+      defaultPath: lastDir('videoFolder'),
       properties: ['openDirectory']
     })
-    return r.canceled || !r.filePaths.length ? null : r.filePaths[0]
+    if (r.canceled || !r.filePaths.length) return null
+    rememberDir('videoFolder', r.filePaths[0])
+    return r.filePaths[0]
   })
 
   ipcMain.handle('assemble:analyze', async (e, folder: string, opts?: Partial<AnalyzeOptions>) => {

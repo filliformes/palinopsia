@@ -34,6 +34,12 @@ const extOf = (path: string): string => path.split('.').pop()?.toLowerCase() ?? 
 // Only these may be served : the scheme resolves under one bundled dir, but the
 // allowlist keeps a malformed request from ever coughing up an unexpected file.
 const ALLOWED_EXT = new Set(Object.keys(MIME))
+// CORS : MediaPipe fetches its wasm and models from the renderer's own origin
+// (file://, or the dev server's), so since Electron 44 (Chromium 152) the scheme
+// must be corsEnabled and every response must allow the origin, or each fetch
+// fails and hand / pose / face tracking never loads (see media.ts).
+const reply = (body: BodyInit | null, status: number, headers: Record<string, string> = {}): Response =>
+  new Response(body, { status, headers: { 'Access-Control-Allow-Origin': '*', ...headers } })
 
 /** The bundled mediapipe/ base : extraResources → resources/mediapipe when
  *  packaged; the repo's resources/mediapipe in dev (same seam as windowIcon). */
@@ -47,43 +53,41 @@ function mediapipeBase(): string {
  *  internal fetch / wasm instantiation works from the packaged file:// renderer. */
 export function registerAssetScheme(): void {
   protocol.registerSchemesAsPrivileged([
-    { scheme: ASSET_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }
+    { scheme: ASSET_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true, corsEnabled: true } }
   ])
 }
 
 /** Must run AFTER app ready : serve the requested file from the mediapipe base. */
 export function handleAssetProtocol(): void {
   protocol.handle(ASSET_SCHEME, async (request) => {
+    if (request.method === 'OPTIONS') return reply(null, 204, { 'Access-Control-Allow-Methods': 'GET, HEAD' })
     let rel: string
     try {
       rel = decodeURIComponent(new URL(request.url).pathname.replace(/^\//, ''))
     } catch {
-      return new Response('bad url', { status: 400 })
+      return reply('bad url', 400)
     }
-    if (!ALLOWED_EXT.has(extOf(rel))) return new Response('forbidden', { status: 403 })
+    if (!ALLOWED_EXT.has(extOf(rel))) return reply('forbidden', 403)
     const base = mediapipeBase()
     // Resolve under base and refuse anything that escapes it (path traversal).
     const filePath = normalize(join(base, rel))
     if (filePath !== base && !filePath.startsWith(base + sep)) {
-      return new Response('forbidden', { status: 403 })
+      return reply('forbidden', 403)
     }
     let size: number
     try {
       const st = statSync(filePath)
-      if (!st.isFile()) return new Response('not found', { status: 404 })
+      if (!st.isFile()) return reply('not found', 404)
       size = st.size
     } catch {
-      return new Response('not found', { status: 404 })
+      return reply('not found', 404)
     }
     const body = Readable.toWeb(createReadStream(filePath)) as unknown as ReadableStream
-    return new Response(body, {
-      status: 200,
-      headers: {
-        'Content-Type': MIME[extOf(rel)] ?? 'application/octet-stream',
-        'Content-Length': String(size),
-        // The graph runner may issue a range probe; advertise none (whole-file).
-        'Cache-Control': 'no-cache'
-      }
+    return reply(body, 200, {
+      'Content-Type': MIME[extOf(rel)] ?? 'application/octet-stream',
+      'Content-Length': String(size),
+      // The graph runner may issue a range probe; advertise none (whole-file).
+      'Cache-Control': 'no-cache'
     })
   })
 }
