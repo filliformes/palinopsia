@@ -333,6 +333,15 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Messages dock in the bottom toolbar** : a warning or a confirmation (a refused effect
+  drop, a saved recording) appears centered in the toolbar's empty middle, over no
+  control, instead of at the window's bottom center, which the side panels made land on
+  the toolbar's buttons. A long instruction grows upward from there; too narrow a window
+  falls back to the old place.
+- **A, B and BG are buttons** : the layer's source selectors and the background's look
+  like the toolbar buttons (Output, Sonify, World), lit when selected, instead of plain
+  letters nobody would think to click.
+
 - **The Finalizer's output shape comes last**, after the film hold, boil and film damage
   (only the scene dissolve, freeze, Flash safety and the dome follow it). It used to come
   first, so dust, hairs and scratches landed on the fill outside the shape; now the film

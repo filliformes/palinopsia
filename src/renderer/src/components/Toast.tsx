@@ -3,12 +3,18 @@
 // newer message replaces the older). `ms <= 0` makes it STICKY : it stays with
 // a ✕ and wraps its full text, for actionable install-instruction errors that
 // shouldn't vanish on a timer.
+//
+// It docks in the empty middle of the bottom toolbar (ToastDock), so it always
+// appears in the same place, over nothing; too narrow a window falls back to
+// the bottom center of the window.
 
-import { useSyncExternalStore } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 
 type ToastMsg = { id: number; text: string; kind: 'ok' | 'warn'; sticky: boolean }
 
 let current: ToastMsg | null = null
+let dockEl: HTMLElement | null = null
 let seq = 0
 let timer: ReturnType<typeof setTimeout> | null = null
 const listeners = new Set<() => void>()
@@ -51,18 +57,33 @@ function subscribe(cb: () => void): () => void {
 function snapshot(): ToastMsg | null {
   return current
 }
+function dockSnapshot(): HTMLElement | null {
+  return dockEl
+}
+
+/** The toast's home : the bottom toolbar's empty middle. */
+export function ToastDock({ className }: { className?: string }): JSX.Element {
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    dockEl = el
+    emit()
+  }, [])
+  return <div ref={ref} className={className} />
+}
+
+const DOCK_MIN_W = 180 // narrower than this, the toast would be a sliver : use the window
 
 /** Mount once near the app root. Renders the current toast (or nothing). */
 export function Toaster(): JSX.Element | null {
   const msg = useSyncExternalStore(subscribe, snapshot)
+  const dock = useSyncExternalStore(subscribe, dockSnapshot)
   if (!msg) return null
   const tint = msg.kind === 'warn' ? 'border-danger/70 text-danger' : 'border-accent/70 text-text'
-  return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[200] flex justify-center">
+  const docked = !!dock && dock.isConnected && dock.clientWidth >= DOCK_MIN_W
+  const box = (
       <div
         key={msg.id}
         className={`pointer-events-auto flex items-start gap-2 rounded-md border bg-panel2/95 px-3 py-1.5 font-mono text-[11px] shadow-lg backdrop-blur ${tint} ${
-          msg.sticky ? 'max-w-md' : 'max-w-[80vw]'
+          docked ? 'max-w-full' : msg.sticky ? 'max-w-md' : 'max-w-[80vw]'
         }`}
         title={msg.sticky ? undefined : msg.text}
       >
@@ -77,6 +98,15 @@ export function Toaster(): JSX.Element | null {
           </button>
         )}
       </div>
-    </div>
   )
+  if (docked) {
+    // Centered in the dock; a sticky (wrapping) one grows upward from the bar.
+    return createPortal(
+      <div className={`pointer-events-none absolute inset-0 z-[200] flex justify-center ${msg.sticky ? 'items-end' : 'items-center'}`}>
+        {box}
+      </div>,
+      dock!
+    )
+  }
+  return <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[200] flex justify-center">{box}</div>
 }

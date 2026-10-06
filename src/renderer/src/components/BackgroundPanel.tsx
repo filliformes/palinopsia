@@ -6,6 +6,7 @@
 // ground stays put while the layers churn.
 
 import { useState, type MouseEvent, type ReactNode } from 'react'
+import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT } from './buttonStyles'
 import { useStore } from '../store'
 import { BG_PRESETS, BG_SOURCES, bgPresetToState } from '../bgPresets'
 import { inPickerOrder, sourceSection } from '../shaders/isf'
@@ -78,14 +79,13 @@ export function BackgroundPanel(): JSX.Element {
           Inspector column drops the presets/dice to a second line instead of
           overflowing the section; the source select keeps a min width. */}
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        <span
-          className={`w-[34px] shrink-0 font-mono text-[11px] font-bold ${
-            selected ? 'text-accent' : shaderId ? 'text-text' : 'text-muted'
-          }`}
-          title="Background : the ground under the four layers (its own slow clock; the global Randomize never touches it)"
+        <button
+          type="button"
+          className={`${TBTN} w-[34px] px-0 text-center ${selected ? TBTN_LIT : shaderId ? TBTN_IDLE_ON : TBTN_IDLE}`}
+          title="Background : the ground under the four layers (its own slow clock; the global Randomize never touches it). Click to show its controls in the Inspector."
         >
           BG
-        </span>
+        </button>
         <SearchSelect
           className={`min-w-[5rem] flex-1 text-[11px] ${selected ? 'border-accent' : ''}`}
           value={shaderId ?? ''}

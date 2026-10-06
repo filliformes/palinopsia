@@ -195,7 +195,7 @@ Each of the **4 layers** carries:
 
 | Element | What it does |
 |---|---|
-| **Source A / B** | Two source slots. Each holds a generator, an imported video (`🎞`), a capture (webcam `📷` / screen `🖥` / device `🎥` / NDI® source `📶`), a HIVE network stream (`📡`), or nothing. |
+| **Source A / B** | Two source slots; the **A** / **B** buttons (and **BG** on the background) show that source's controls in the Inspector. Each holds a generator, an imported video (`🎞`), a capture (webcam `📷` / screen `🖥` / device `🎥` / NDI® source `📶`), a HIVE network stream (`📡`), or nothing. |
 | **A/B mix** (`MIX`) | `sourceBlend` (how B combines with A, incl. the relation modes Weave / Lumakey / Consume) · `sourceMix` (0 = A only … 1 = full B) · `harmony` (⚖ consonant → dissonant B hue). Inert until B has a source. |
 | **Source FX** | A separate effect rack under **each** source slot (`sourceAFx`, `sourceBFx`). |
 | **Layer FX** (`FX`) | The layer's own effect rack : the only rack that accepts the **sidechain** [native nodes](#native-nodes) (Transfert, Convolution, Mosaïque); the self-contained nodes run in any rack, and so do the TouchDesigner recipes (Remap, Luma Blur, Gooey, Matte, Lookup), whose other-layer inputs are optional. |
@@ -303,7 +303,8 @@ Left → right:
   page; lights while the camera is live; also key `B`) · **Seq** (opens the
   sequencer; lights when running) · **Sfy** (opens Sonify; lights while the sound
   engine runs) · **PROX** proximity (far ↔ close depth zone) + `◑` audio-brightness
-  follow.
+  follow. Messages (a refused effect drop, a saved recording) appear in the toolbar's
+  empty middle, always in the same place, over nothing.
 - **Vary** (a baseline-anchored variant : structure fixed, values nudged) + amount.
 - **amt** Randomize intensity (gentle walk ↔ full re-roll) · **Randomize**
   split-button (main fires the selected scope; `▾` picks the scope : see

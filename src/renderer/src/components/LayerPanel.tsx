@@ -5,6 +5,7 @@
 // presets (save/apply/delete : app-persistent).
 
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT } from './buttonStyles'
 import type { AudioFeature, BlendMode, CouplingMode, LayerMask, ModTarget, SourceKind, SourceSlot } from '@shared/types'
 import { BLEND_MODES } from '@shared/types'
 import { AUDIO_FEATURES } from '../engine/audioIn'
@@ -700,13 +701,15 @@ function SourceRow({
   return (
     <>
       <div className="flex min-w-0 items-center gap-1.5" onClick={onSelect}>
-        <span
-          className={`w-[34px] shrink-0 font-app text-[14px] font-bold leading-none ${
-            selected ? 'text-accent' : active ? 'text-text' : 'text-muted'
-          }`}
+        {/* A real button (it selects this source : its controls go to the
+            Inspector); the click bubbles to the row's onSelect. */}
+        <button
+          type="button"
+          className={`${TBTN} w-[34px] px-0 text-center ${selected ? TBTN_LIT : active ? TBTN_IDLE_ON : TBTN_IDLE}`}
+          title={`Source ${label} : show its controls in the Inspector`}
         >
           {label}
-        </span>
+        </button>
         <input
           ref={fileRef}
           type="file"

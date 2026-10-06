@@ -17,6 +17,8 @@ import type { RandomizeScope } from '../randomize'
 import { useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { ToastDock } from './Toast'
+import { TBTN, TBTN_IDLE, TBTN_LIT } from './buttonStyles'
 
 const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
   { scope: 'all', label: 'Randomize All' },
@@ -56,9 +58,6 @@ const loadNum = (key: string, dflt: number): number => {
 const pct = (v: number): string => Math.round(v * 100) + '%'
 
 // The ONE command-button look for this bar (sans, semibold : no mono-caps).
-const TBTN = 'shrink-0 rounded border px-2.5 py-1 text-[11.5px] font-semibold transition-colors'
-const TBTN_IDLE = 'border-border bg-panel2 text-muted hover:border-accent/50 hover:text-accent'
-const TBTN_LIT = 'border-accent bg-accent/20 text-accent'
 
 // 1/64×…64× shown as a compact fraction/multiple.
 function fmtSpeed(s: number): string {
@@ -301,8 +300,11 @@ export function Transport(): JSX.Element {
         </button>
       </span>
 
+      {/* The empty middle : where messages (a refused drop, a saved recording) appear. */}
+      <ToastDock className="relative min-w-0 flex-1 self-stretch" />
+
       {/* Command group, pushed right : Output · Body · Seq · Sonify · Vary · Randomize. */}
-      <div className="ml-auto flex min-w-0 items-center gap-1.5">
+      <div className="flex min-w-0 items-center gap-1.5">
         {/* Output : fullscreen / mapping / record / senders (also O). */}
         <button
           onClick={() => setOutputPageOpen(true)}
