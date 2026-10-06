@@ -2,7 +2,9 @@
 // closes on outside mousedown / Escape. Items can be actions, dividers, or
 // rows with a trailing delete affordance (used by preset lists).
 
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useStore } from '../store'
+import { effectiveZoom } from './uiZoom'
 
 export interface MenuItem {
   label: string
@@ -30,6 +32,14 @@ export function ContextMenu({
   header?: ReactNode
 }): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null)
+  // The cursor (x, y) is in viewport pixels; the menu sits in the zoomed chrome
+  // (see uiZoom.ts) : measured before paint, so it opens right at the cursor.
+  const [z, setZ] = useState(1)
+  const uiZoom = useStore((s) => s.uiZoom) // a zoom change while open re-measures
+  useLayoutEffect(() => {
+    const zz = effectiveZoom(ref.current)
+    if (Math.abs(zz - z) > 0.005) setZ(zz)
+  }, [z, uiZoom])
 
   useEffect(() => {
     const down = (e: MouseEvent): void => {
@@ -56,12 +66,13 @@ export function ContextMenu({
   // Keep the whole menu inside the viewport : estimate its height, clamp the top
   // so it never runs off the bottom, and cap + scroll when the list is very long
   // (a layer/background with many saved presets used to spill off-screen).
-  const estH = Math.min(items.length * 28 + 40, window.innerHeight - 16)
-  const top = Math.max(8, Math.min(y, window.innerHeight - 8 - estH))
+  const vw = window.innerWidth / z, vh = window.innerHeight / z // the viewport in the menu's own pixels
+  const estH = Math.min(items.length * 28 + 40, vh - 16)
+  const top = Math.max(8, Math.min(y / z, vh - 8 - estH))
   const style: React.CSSProperties = {
-    left: Math.min(x, window.innerWidth - 220),
+    left: Math.min(x / z, vw - 220),
     top,
-    maxHeight: window.innerHeight - top - 8
+    maxHeight: vh - top - 8
   }
 
   return (

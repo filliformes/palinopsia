@@ -525,6 +525,12 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Menus open on their anchor at any UI zoom.** A source picker's list and every
+  right-click menu were placed in screen pixels inside the zoomed interface, so the zoom
+  was applied twice : at 80 % a layer's source list opened hundreds of pixels to the left
+  of its button. They now open on the button (or the cursor) at 80, 100 and 125 %
+  (within 2 px, measured), and follow it when you zoom with a menu open.
+
 - **Sonify's Collage voice crossfades instead of cutting.** At every deal the sound
   dropped to silence for 100 to 200 ms (measured), because a film loading its new clip
   reads as paused and the voice paused its sound with it; and each piece was rewired to

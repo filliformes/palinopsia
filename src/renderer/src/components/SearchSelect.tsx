@@ -14,6 +14,8 @@
 // of the menu stays recognisable.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useStore } from '../store'
+import { effectiveZoom } from './uiZoom'
 
 export interface SearchOption {
   value: string
@@ -83,6 +85,7 @@ export function SearchSelect({
   menuWidth?: number
 }): JSX.Element {
   const [open, setOpen] = useState(false)
+  const uiZoom = useStore((s) => s.uiZoom)
   const [q, setQ] = useState('')
   const [cursor, setCursor] = useState(0)
   const [rect, setRect] = useState<{ left: number; top: number; below: boolean } | null>(null)
@@ -121,13 +124,16 @@ export function SearchSelect({
   useLayoutEffect(() => {
     if (!open) return
     const place = (): void => {
-      const b = btnRef.current?.getBoundingClientRect()
-      if (!b) return
+      const btn = btnRef.current
+      const b = btn?.getBoundingClientRect()
+      if (!btn || !b) return
+      // Viewport pixels → the zoomed chrome's own pixels (see uiZoom.ts).
+      const z = effectiveZoom(btn)
       const room = window.innerHeight - b.bottom
       setRect({
-        left: Math.max(4, Math.min(b.left, window.innerWidth - menuWidth - 4)),
-        top: room > 260 ? b.bottom + 2 : b.top - 2,
-        below: room > 260
+        left: Math.max(4, Math.min(b.left, window.innerWidth - menuWidth * z - 4)) / z,
+        top: (room > 260 * z ? b.bottom + 2 : b.top - 2) / z,
+        below: room > 260 * z
       })
     }
     place()
@@ -137,7 +143,9 @@ export function SearchSelect({
       window.removeEventListener('scroll', place, true)
       window.removeEventListener('resize', place)
     }
-  }, [open, menuWidth])
+    // uiZoom : zooming the UI moves the button without any resize or scroll
+    // event, so re-anchor on it too.
+  }, [open, menuWidth, uiZoom])
 
   useEffect(() => {
     if (!open) return
@@ -188,7 +196,7 @@ export function SearchSelect({
           ref={popRef}
           style={{
             left: rect.left,
-            ...(rect.below ? { top: rect.top } : { bottom: window.innerHeight - rect.top }),
+            ...(rect.below ? { top: rect.top } : { bottom: window.innerHeight / effectiveZoom(btnRef.current) - rect.top }),
             width: menuWidth
           }}
           className="fixed z-50 flex max-h-[17rem] flex-col overflow-hidden rounded border border-border bg-panel2 shadow-lg"
