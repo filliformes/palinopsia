@@ -1673,6 +1673,30 @@ export class Compositor {
     this.sceneSettled = 0;
   }
 
+  /** Swap two layer slots' engine Layers (renderers, videos, feedback, racks).
+   *  A New / Generate relay plays a new layer in a free slot while the old one
+   *  fades, then hands it over to its own slot this way : nothing reloads. */
+  swapLayerSlots(i: number, j: number): void {
+    const a = this.layers[i];
+    const b = this.layers[j];
+    if (!a || !b || i === j) return;
+    this.layers[i] = b;
+    this.layers[j] = a;
+  }
+
+  /** Scale a layer's opacity this frame (the relay's hand-over envelope : after
+   *  every modulator and macro, so none can override it). */
+  scaleLayerOpacity(i: number, k: number): void {
+    const L = this.layers[i];
+    if (L) L.opacity *= Math.max(0, Math.min(1, k));
+  }
+
+  /** True when the last syncFromState deferred no load : every shader the
+   *  composition asks for is compiled and in place. */
+  loadsSettled(): boolean {
+    return this.shared.budget.deferred === 0;
+  }
+
   /** Freeze/unfreeze the presented frame (monomedia freeze-drop). */
   setFreeze(on: boolean): void {
     if (on) {

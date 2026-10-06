@@ -42,7 +42,7 @@ import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
 import { BLEND_MODES, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
-import { beginMorph, cancelMorph, requestSceneChange } from './morph'
+import { beginMorph, beginRelayMorph, cancelMorph, requestSceneChange } from './morph'
 import { DEFAULT_LIGHT_PATH } from './lightPath'
 import { autoSurfacePos } from './surface'
 import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify'
@@ -3933,8 +3933,6 @@ export const useStore = create<StoreState>((set, get) => ({
     // A blank slate. Goes through the normal composition write path, so it
     // lands in undo history : an accidental New is one Ctrl+Z away.
     set((s) => {
-      cancelMorph() // the composition is being replaced : stop any in-flight ease
-      requestSceneChange() // hold the last frame until the new one is ready, then dissolve
       resetCouplingState()
       // New session resets the section layout too: Meta/Modulation collapsed,
       // Master FX/Inspector open. Persist so it survives the next reload.
@@ -3949,6 +3947,13 @@ export const useStore = create<StoreState>((set, get) => ({
       // strip the Finalizer's film stage back off so a New session never opens with
       // drawn-film artifacts — film is still one World-pick away from the selector.
       const built = clearFinalizerFilm(activeWorld ? applyWorldToComposition(fresh, activeWorld) : fresh)
+      // Morph into it over the Morph time (layer by layer, live : morph.ts relay);
+      // at 0, a clean cut once the new one has compiled.
+      if (s.morphMs > 20) beginRelayMorph(s.composition, built, s.morphMs, performance.now())
+      else {
+        cancelMorph()
+        requestSceneChange(0)
+      }
       return {
         name: 'Untitled',
         composition: built,
@@ -3972,7 +3977,6 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const theme = THEME_BY_ID[themeId]
       if (!theme) return s
-      beginMorph(s.composition, s.morphMs, performance.now()) // crossfade the reveal
       resetCouplingState()
       let comp = buildThemeComposition(theme, collageClipsFor(s.composition))
       const world = s.worlds.find((w) => w.id === theme.world) ?? null
@@ -3991,6 +3995,13 @@ export const useStore = create<StoreState>((set, get) => ({
                 : f
           )
         }
+      }
+      // Morph into it over the Morph time (layer by layer, live : morph.ts relay);
+      // at 0, a clean cut once the new one has compiled.
+      if (s.morphMs > 20) beginRelayMorph(s.composition, comp, s.morphMs, performance.now())
+      else {
+        cancelMorph()
+        requestSceneChange(0)
       }
       // Field macros + persisted temperament (shutter/superFlicker stay state-only :
       // strobes never persist across a reload).

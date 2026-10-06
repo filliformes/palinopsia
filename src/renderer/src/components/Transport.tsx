@@ -207,12 +207,12 @@ export function Transport(): JSX.Element {
         <span className="w-7 shrink-0 font-mono text-[9px] text-muted">{fmtSpeed(globalSpeed)}</span>
       </div>
 
-      {/* Morph : scene recalls & Randomize crossfade over this time. */}
+      {/* Morph : scene recalls, Randomize, New and Generate morph over this time. */}
       <div className="relative flex min-w-0 items-center gap-1">
         <MidiLearnOverlay id="transport:morph" />
         <span
           className="font-mono text-[10px] text-muted"
-          title="Morph : how long a scene recall or a Randomize takes to crossfade into the new look (double-click the slider for 1s)."
+          title="Morph : how long a scene recall, a Randomize, New or Generate takes to morph into the new look. New and Generate hand the picture over layer by layer, live. Double-click the slider for 1s."
         >
           MORPH
         </span>
@@ -225,7 +225,7 @@ export function Transport(): JSX.Element {
           onChange={(e) => setMorphMs(tToMs(Number(e.target.value)))}
           onDoubleClick={() => setMorphMs(1000)}
           className="w-16 min-w-0 accent-accent"
-          title={`Scene / Randomize morph ${fmtMorph(morphMs)} : double-click for 1s`}
+          title={`Morph ${fmtMorph(morphMs)} (scenes, Randomize, New, Generate) : double-click for 1s`}
         />
         <span className="w-8 shrink-0 font-mono text-[9px] text-muted">{fmtMorph(morphMs)}</span>
       </div>

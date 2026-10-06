@@ -7,6 +7,16 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **New and Generate morph over the MRPH time**, live. The plain morph could only snap a
+  whole new composition (and a dissolve froze the outgoing picture), so they hand over
+  layer by layer, top first, staggered : a slot free in both compositions hosts the new
+  layer while the old fades (a true crossfade, after which the engine swaps the two
+  slots' Layers, nothing reloads); without a free slot the old fades out and the new in;
+  same shaders ease their settings; Vibe, Context and Finalizer ease all along. A new
+  layer fades in only once compiled (else the old shader flashed), and the fades are
+  applied after every modulator so none overrides them. MRPH 0 : a cut once compiled.
+  Measured over 4 s : no still frames, brightness steady through the hand-over.
+
 - **Context's light moves** : the light pad (now the composition's shape, and larger)
   takes the Metasurface's draw sequencer. **✎ draw** a path, **▶ play**, and the light
   travels it : direction (forward, backward, ping-pong), **⟳ loop**, **time** (0.2 to

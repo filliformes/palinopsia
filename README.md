@@ -292,7 +292,7 @@ Left → right:
 
 - **BPM** (20–800) : the label is a **tap-tempo button** (tap it in time) ·
   **SPD** global speed (1/64×–64×, log; double-click → 1×) · **MRPH** morph time
-  (0–30 s : scene recalls and Randomize crossfade over this).
+  (0–30 s : scene recalls and Randomize crossfade over this; New and Generate morph over it, layer by layer).
 - **WRLD** World selector + `⧉` World editor · **❄ Freeze** : hold the output on
   the current frame (the button lights while held; also key `H` or a learned pad) ·
   **Output** (opens the Output / mapping page) · **Body** (opens the embodied-control
@@ -1023,10 +1023,17 @@ of “…”** brings one back, and Save puts it back in the file. A 60 s autosa
 session to the file it came from. **Save As** names the session after its file. Opening a session
 also **pre-converts every video in its folder** in the background.
 
-**Changing sessions is a clean cut.** Loading a session (or New) holds the picture still
-while the new session's shaders compile, then dissolves into it over half a second :
-the old session never keeps playing on the projector while the new one assembles layer
-by layer.
+**Changing sessions is a clean cut.** Loading a session holds the picture still while
+the new session's shaders compile, then dissolves into it over half a second : the old
+session never keeps playing on the projector while the new one assembles layer by layer.
+
+**New and Generate morph** into the new composition over the **MRPH** morph time, live :
+the picture is handed over layer by layer (top first, staggered). A layer slot free in
+both compositions hosts the new layer while the old one fades, a true crossfade, then
+the engine moves it into its own slot without reloading anything; a layer that keeps
+its shaders eases its settings instead; Vibe, Context and Finalizer ease the whole way.
+A new layer fades in only once its shaders have compiled, so nothing pops. At MRPH 0,
+New and Generate cut, once the new composition has compiled.
 
 **Scenes** are full-instrument snapshots recalled by bare **`1`–`9`** or a
 double-click in the bank; recall crossfades over the **MRPH** morph time. Scenes

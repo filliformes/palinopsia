@@ -65,10 +65,8 @@ import type { BodyGesture } from '@shared/types'
 import { SceneBank } from './components/SceneBank'
 import { SurfacePad, SurfaceOnToggle } from './components/SurfacePad'
 import { initOscInput, applyOscListen, applyOscOutput, initOscQueryStream } from './oscInput'
-import { morphedComposition, consumeCrossfade, consumeSceneChange } from './morph'
+import { morphedComposition, consumeCrossfade, consumeSceneChange, noteMorphSync, consumeLayerSwaps, relayEnvelopes } from './morph'
 
-// A session change's dissolve, once the new session has compiled (Compositor.beginSceneChange).
-const SCENE_DISSOLVE_MS = 500
 import { surfaceComposition, nearestSurfaceScene, tracePath, newPlayhead } from './surface'
 import { liveLight } from './lightPath'
 import { useFlash } from './components/useFlash'
@@ -1099,7 +1097,8 @@ export default function App(): JSX.Element {
         const xfadeMs = consumeCrossfade()
         // A session loaded / New : hold the old frame still until the new one has
         // fully compiled, then dissolve (wins over a plain morph crossfade).
-        if (consumeSceneChange()) comp!.beginSceneChange(SCENE_DISSOLVE_MS)
+        const sceneMs = consumeSceneChange()
+        if (sceneMs !== null) comp!.beginSceneChange(sceneMs)
         else if (xfadeMs) comp!.beginCrossfade(xfadeMs)
         // Metasurface : when active, the engine renders a live Gaussian blend of the
         // placed scenes at the cursor (structure snaps to the nearest, numeric params
@@ -1176,7 +1175,13 @@ export default function App(): JSX.Element {
         comp!.setWarp(st.warpEnabled ? st.warpCorners : null, st.warpGrid)
         comp!.setDome(st.dome.enabled ? st.dome : null)
         comp!.setStrobeSafe(st.strobeSafe)
+        // A New / Generate relay hands a layer played in a free slot over to its
+        // own slot : swap the engine Layers first, so the sync finds it loaded.
+        for (const [si, sj] of consumeLayerSwaps()) comp!.swapLayerSlots(si, sj)
         comp!.syncFromState(c, shaderSourceById)
+        // A New / Generate relay fades each layer's new content in only once the
+        // engine has compiled it : tell it what this sync left pending.
+        noteMorphSync(comp!.loadsSettled(), now)
         // 1b. Assemble : hand any target-driven edit its matcher, so its next
         //     cut is chosen from the corpus by what the output looks like now.
         //     Cheap : a no-op unless the assemblage on a slot actually changed.
@@ -1283,6 +1288,10 @@ export default function App(): JSX.Element {
         let weaveHot: number | undefined
         if (st.sequence.frameWeave?.enabled) weaveHot = applyFrameWeave(comp!, st.sequence.frameWeave, now)
         else resetFrameWeave()
+        // 2i. New / Generate relay : each layer's hand-over envelope, applied last
+        //     so no modulator or macro can override it.
+        const relayEnv = relayEnvelopes()
+        if (relayEnv) relayEnv.forEach((k, i) => { if (k < 0.999) comp!.scaleLayerOpacity(i, k) })
         // 3. Render the frame.
         perfMeter.begin('render'); comp!.render(now - start); perfMeter.end('render')
         // Timer clock (the window doesn't paint) : wait for THIS render before
