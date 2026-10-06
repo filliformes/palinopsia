@@ -440,13 +440,19 @@ The two modes differ in what the parameter's own slider means once bound:
   already dialled in.
 - **Replace** swings bipolarly *around* the base, so the parameter moves even
   from a standstill.
+- A **toggle** (a Collage's `freeze`, any on/off switch) follows one law in both modes,
+  so its chip reads `tgl`. At depth 1 it follows the modulator : on while the modulator
+  is in its upper half, half the time with an LFO. Less depth leans toward the stored
+  state : stored off, it switches on only near the modulator's peaks (depth 0.5 : the
+  top quarter); stored on, it switches off only near the troughs.
 - A modulated slider's thumb moves with the live value. **Dragging it moves the base
   by as much as you drag** (from wherever the thumb was when you grabbed it); let go
   and it follows the modulator again. Counts (a Collage's `cuts` and `films`) step in
   whole numbers.
 
 Binding from the **M** button picks the mode for you: a target sitting at (or
-near) zero gets **Replace**, anything else gets **Multiply**. This matters because
+near) zero gets **Replace** (so does a menu sitting on its first choice), anything else
+gets **Multiply**. This matters because
 Multiply's law is a guaranteed no-op on a zero base, before the auto-pick,
 binding an LFO to a freshly-added effect's `torn`, `contour` or any zeroed slider
 looked like broken modulation. You can still flip the mode per assignment from

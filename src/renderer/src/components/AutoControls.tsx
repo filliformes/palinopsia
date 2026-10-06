@@ -15,7 +15,7 @@ import type { ModMode, ModTarget } from '@shared/types'
 import type { IsfInputDesc } from '../shaders/isf/inputs'
 import { registerLiveOverlay } from './liveOverlay'
 import { useShallow } from 'zustand/react/shallow'
-import { modTargetKey, useStore } from '../store'
+import { isToggleTarget, modTargetKey, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 
 // Clicking an M button opens the mod-assign in the provider's side panel (the
@@ -506,6 +506,8 @@ export function AssignRow({
   const setAssignmentMode = useStore((s) => s.setAssignmentMode)
   const toggleMetaDest = useStore((s) => s.toggleMetaDest)
   const targetKey = modTargetKey(target)
+  // A toggle runs one law in both modes (modulation.ts toggleFromMod) : no chip.
+  const toggle = useStore((s) => isToggleTarget(s, target))
   // Which Meta knobs already carry this input as a destination. useShallow so
   // this fresh boolean-array selector doesn't re-render on every store change.
   const metaBound = useStore(
@@ -552,22 +554,32 @@ export function AssignRow({
         return (
           <div key={b.id} className="flex items-center gap-1">
             <span className="w-8 shrink-0 font-mono text-[9px] text-accent">M{b.mod + 1}</span>
-            {/* Mode: Multiply (scale the base : default) ↔ Replace (swing over it). */}
-            <button
-              onClick={() => setAssignmentMode(b.id, mult ? 'replace' : 'multiply')}
-              className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] uppercase transition-colors ${
-                mult
-                  ? 'bg-accent/20 text-accent ring-1 ring-accent'
-                  : 'bg-accent2/20 text-accent2 ring-1 ring-accent2'
-              }`}
-              title={
-                mult
-                  ? 'Multiply : the modulator scales the base value (|depth| = amount). Click for Replace.'
-                  : 'Replace : the modulator swings the value around the base. Click for Multiply.'
-              }
-            >
-              {mult ? 'mul' : 'rep'}
-            </button>
+            {/* Mode: Multiply (scale the base : default) ↔ Replace (swing over it).
+                A toggle has one law, so it shows a fixed label instead. */}
+            {toggle ? (
+              <span
+                className="shrink-0 cursor-help rounded bg-panel3/60 px-1 py-0.5 font-mono text-[9px] uppercase text-muted"
+                title="Toggle : at depth 1 it follows the modulator (on while it is in its upper half). Less depth leans toward the stored state : stored off, it switches on only near the peaks; stored on, it switches off only near the troughs. Negative depth inverts the modulator."
+              >
+                tgl
+              </span>
+            ) : (
+              <button
+                onClick={() => setAssignmentMode(b.id, mult ? 'replace' : 'multiply')}
+                className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] uppercase transition-colors ${
+                  mult
+                    ? 'bg-accent/20 text-accent ring-1 ring-accent'
+                    : 'bg-accent2/20 text-accent2 ring-1 ring-accent2'
+                }`}
+                title={
+                  mult
+                    ? 'Multiply : the modulator scales the base value (|depth| = amount). Click for Replace.'
+                    : 'Replace : the modulator swings the value around the base. Click for Multiply.'
+                }
+              >
+                {mult ? 'mul' : 'rep'}
+              </button>
+            )}
             <input
               type="range"
               min={-10}

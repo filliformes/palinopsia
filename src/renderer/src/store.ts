@@ -578,6 +578,57 @@ function loadMidiMap(): Record<string, MidiBinding> {
   }
 }
 
+/** The FX chain an FX scope names. */
+function fxChainOf(st: { composition: CompositionState }, s: FxScope): FxInstance[] | undefined {
+  return s.kind === 'master'
+    ? st.composition.master
+    : s.kind === 'background'
+      ? st.composition.background?.fx
+      : s.kind === 'layer'
+        ? st.composition.layers[s.layer]?.fx
+        : s.kind === 'sourceA'
+          ? st.composition.layers[s.layer]?.sourceAFx
+          : st.composition.layers[s.layer]?.sourceBFx
+}
+
+/** The ISF input a mod target drives : its shader, the stored inputs and the
+ *  input name. null for targets that are not an ISF input (Meta knobs, layer
+ *  params, video slots, an FX's dry/wet, Sonify). */
+function shaderInputOf(
+  st: { composition: CompositionState },
+  t: ModTarget
+): { shaderId: string; inputs: Record<string, number | number[]> | undefined; input: string } | null {
+  if (t.kind === 'source') {
+    const l = st.composition.layers[t.layer]
+    const slot = t.slot === 'A' ? l?.sourceA : l?.sourceB
+    return slot?.shaderId ? { shaderId: slot.shaderId, inputs: slot.inputs, input: t.input } : null
+  }
+  if (t.kind === 'bgSource') {
+    const src = st.composition.background?.source
+    return src?.shaderId ? { shaderId: src.shaderId, inputs: src.inputs, input: t.input } : null
+  }
+  if (t.kind === 'fx') {
+    if (t.input === FX_OPACITY_INPUT) return null
+    const inst = fxChainOf(st, t.scope)?.find((f) => f.id === t.instId)
+    return inst?.shaderId ? { shaderId: inst.shaderId, inputs: inst.inputs, input: t.input } : null
+  }
+  return null
+}
+
+/** True when a mod target is an on/off toggle (a bool or event input) : both
+ *  modulation modes drive a toggle by the same law, so the mul/rep chip shows
+ *  a fixed label for it. */
+export function isToggleTarget(st: { composition: CompositionState }, t: ModTarget): boolean {
+  try {
+    const r = shaderInputOf(st, t)
+    if (!r) return false
+    const ty = inputsForShader(r.shaderId).find((x) => x.name === r.input)?.type
+    return ty === 'bool' || ty === 'event'
+  } catch {
+    return false
+  }
+}
+
 /** Normalized (0..1) CURRENT base of a mod target, for assignMod's automatic
  *  mode choice. 0.5 (→ multiply) wherever the base can't be resolved. */
 function baseNormForTarget(st: { composition: CompositionState }, t: ModTarget): number {
@@ -591,48 +642,31 @@ function baseNormForTarget(st: { composition: CompositionState }, t: ModTarget):
       const i = BLEND_MODES.indexOf(l.blend)
       return BLEND_MODES.length > 1 ? Math.max(0, i) / (BLEND_MODES.length - 1) : 0.5
     }
-    let shaderId: string | null = null
-    let inputs: Record<string, number | number[]> | undefined
-    let input = ''
-    if (t.kind === 'source') {
-      const l = st.composition.layers[t.layer]
-      const slot = t.slot === 'A' ? l?.sourceA : l?.sourceB
-      if (!slot?.shaderId) return 0.5 // video slots : neutral, keep multiply
-      shaderId = slot.shaderId
-      inputs = slot.inputs
-      input = t.input
-    } else if (t.kind === 'bgSource') {
-      shaderId = st.composition.background?.source.shaderId ?? null
-      inputs = st.composition.background?.source.inputs
-      input = t.input
-    } else if (t.kind === 'fx') {
-      const s = t.scope
-      const arr =
-        s.kind === 'master'
-          ? st.composition.master
-          : s.kind === 'background'
-            ? st.composition.background?.fx
-            : s.kind === 'layer'
-              ? st.composition.layers[s.layer]?.fx
-              : s.kind === 'sourceA'
-                ? st.composition.layers[s.layer]?.sourceAFx
-                : st.composition.layers[s.layer]?.sourceBFx
-      const inst = arr?.find((f) => f.id === t.instId)
-      if (!inst?.shaderId) return 0.5
-      // FX dry/wet opacity is a compositor property, not an ISF input : its base
-      // is the unit's opacity (default 1), so a full-wet FX defaults to Multiply.
-      if (t.input === FX_OPACITY_INPUT) return inst.opacity ?? 1
-      shaderId = inst.shaderId
-      inputs = inst.inputs
-      input = t.input
-    } else {
-      return 0.5 // sonify etc : defaults are non-zero, multiply is fine
+    // FX dry/wet opacity is a compositor property, not an ISF input : its base
+    // is the unit's opacity (default 1), so a full-wet FX defaults to Multiply.
+    if (t.kind === 'fx' && t.input === FX_OPACITY_INPUT) {
+      return fxChainOf(st, t.scope)?.find((f) => f.id === t.instId)?.opacity ?? 1
     }
-    if (!shaderId) return 0.5
-    const d = inputsForShader(shaderId).find((x) => x.name === input)
-    if (!d || d.type !== 'float' || typeof d.min !== 'number' || typeof d.max !== 'number' || d.max === d.min)
+    // video slots, Sonify etc : neutral, keep multiply (their defaults are non-zero)
+    const r = shaderInputOf(st, t)
+    if (!r) return 0.5
+    const d = inputsForShader(r.shaderId).find((x) => x.name === r.input)
+    if (!d) return 0.5
+    const raw = r.inputs?.[r.input]
+    // A toggle : its state. An enum : its place among its values (one sitting on
+    // its FIRST value under Multiply could never leave it).
+    if (d.type === 'bool' || d.type === 'event') {
+      const on = typeof raw === 'number' ? raw : typeof d.def === 'number' ? d.def : 0
+      return on >= 0.5 ? 1 : 0
+    }
+    if (d.type === 'long' && d.values && d.values.length > 1) {
+      const lo = Math.min(...d.values)
+      const hi = Math.max(...d.values)
+      const cur = typeof raw === 'number' ? raw : typeof d.def === 'number' ? d.def : lo
+      return hi > lo ? (cur - lo) / (hi - lo) : 0.5
+    }
+    if (d.type !== 'float' || typeof d.min !== 'number' || typeof d.max !== 'number' || d.max === d.min)
       return 0.5
-    const raw = inputs?.[input]
     const v = typeof raw === 'number' ? raw : typeof d.def === 'number' ? d.def : d.min
     return (v - d.min) / (d.max - d.min)
   } catch {

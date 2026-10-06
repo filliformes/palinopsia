@@ -957,6 +957,22 @@ const nearest = (vals: number[], raw: number): number => {
   return best
 }
 
+/** A toggle (bool / event) under a direct modulator, the same law in both modes.
+ *  At |depth| 1 the toggle FOLLOWS the modulator : on while it is in its upper
+ *  half, whatever the stored state (an LFO square or sine : half the time). Less
+ *  depth leans toward the stored state : a toggle stored OFF only switches on
+ *  near the modulator's peaks (depth 0.5 : its top quarter), one stored ON only
+ *  switches off near its troughs. Negative depth inverts the modulator, past 1
+ *  the flipped share keeps growing. It used to threshold the float laws : a
+ *  Multiply on a toggle stored off was 0 forever (and a toggle is assigned
+ *  Multiply), a Swing never flipped it under depth 0.5, so a Freeze or any
+ *  switch could not be modulated at all at the default depth. */
+function toggleFromMod(base: number, v: number, depth: number): number {
+  const amt = Math.min(2, Math.abs(depth))
+  const m = depth < 0 ? 1 - v : v
+  return base >= 0.5 ? (m >= amt / 2 ? 1 : 0) : m > 1 - amt / 2 ? 1 : 0
+}
+
 /** Map an ABSOLUTE 0..1 position onto a settable value for any modulatable type
  *  (float spans [min,max]; enum maps across its ordered values; bool thresholds).
  *  null = not modulatable. Used by Meta destinations (knob position is absolute). */
@@ -994,8 +1010,7 @@ function inputValueFromSwing(
     return nearest(vals, base + (v - 0.5) * 2 * depth * (max - min))
   }
   if (d.type === 'bool' || d.type === 'event') {
-    const base = typeof stored === 'number' ? stored : asNum(d.def, 0)
-    return base + (v - 0.5) * 2 * depth >= 0.5 ? 1 : 0
+    return toggleFromMod(typeof stored === 'number' ? stored : asNum(d.def, 0), v, depth)
   }
   return null
 }
@@ -1027,8 +1042,7 @@ function inputValueFromMultiply(
     return nearest(vals, base * factor)
   }
   if (d.type === 'bool' || d.type === 'event') {
-    const base = typeof stored === 'number' ? stored : asNum(d.def, 0)
-    return base * factor >= 0.5 ? 1 : 0
+    return toggleFromMod(typeof stored === 'number' ? stored : asNum(d.def, 0), v, depth)
   }
   return null
 }

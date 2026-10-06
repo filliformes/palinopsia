@@ -563,6 +563,17 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **A toggle could not be modulated : the Collage's freeze never froze under a
+  modulator.** A toggle was assigned Multiply, whose law keeps a zero base at zero, so a
+  modulator on a switch stored off did nothing at all; a switch stored on stayed on at
+  the default depth; and even Replace never flipped one under depth 0.5. Toggles now
+  follow one law in both modes (the chip reads `tgl`) : at depth 1 the toggle follows the
+  modulator (on in its upper half), and less depth leans toward the stored state.
+  Measured on a Collage with a 0.5 Hz sine : freeze stored off, default depth, frozen
+  0 % of the time before and 34 % now, 50 % at depth 1; stored on, default depth, 100 %
+  before and 68 % now; every film resumes after. Saved sessions' toggle assignments
+  start working too. A menu sitting on its first choice is now also assigned Replace
+  (Multiply could never move it off that choice).
 - **The first take after launching the app could come out empty.** The hardware H.264
   encoder took 1.5 to 2.5 s to deliver its first frames the first time it was used, so a
   first MP4 or ProRes take shorter than that saved nothing (1 cold start in 3, measured).
