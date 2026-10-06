@@ -1096,7 +1096,7 @@ export class CollageSource {
   private mosaicSeeds(cuts: number, seed: number): Rect[] {
     const n = Math.min(cuts, MAX_CELLS)
     const aspect = this.w / this.h
-    // Mitchell's best candidate : each seed is the farthest from the earlier
+    // Best-candidate sampling : each seed is the farthest from the earlier
     // ones of a dozen candidates, so ANY first n seeds spread evenly : one more
     // cut adds one shard and the others barely move. (Seeds jittered in rows were
     // re-laid for every count : a modulated `cuts` reshuffled the whole mosaic.)

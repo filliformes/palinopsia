@@ -126,7 +126,7 @@ export interface SoniConfig {
     bright: number // weight of the 2nd and 3rd harmonics
     width: number // stereo spread (0 = all centre · 1 = the frame's width)
     loOct: number; hiOct: number
-    // RING BANK : an S-4-style 48-band resonant filterbank on the whole voice,
+    // RING BANK : a 48-band resonant filterbank on the whole voice,
     // its bands on the key / scale over loOct..hiOct. bank = wet (0 = the plain
     // voice, as before); bankSend = add it on top instead of crossfading.
     bank: number; bankSend: boolean
@@ -274,7 +274,7 @@ function filterFreqs(cfg: SoniConfig): Float32Array {
 
 /** The Collage Ring bank's 48 band centres : evenly spread in pitch from the
  *  bottom of loOct to the top of hiOct (one per semitone over the default four
- *  octaves, as the S-4's), each snapped to the nearest note of the scale. Notes
+ *  octaves), each snapped to the nearest note of the scale. Notes
  *  shared by several bands are kept : they ring louder, which is the scale. */
 export function ringFreqs(cfg: SoniConfig): Float32Array {
   const lo = cfg.collage.loOct, hi = Math.max(cfg.collage.loOct + 1, cfg.collage.hiOct)

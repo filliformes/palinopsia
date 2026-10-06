@@ -213,14 +213,14 @@ class BBDDelay {
   }
 }
 
-// ── RING : an S-4-style resonant filterbank on the Collage voice ─────────────
-// 48 bands per side, each a Cytomic (TPT) state-variable band-pass, the filter
+// ── RING : a resonant filterbank on the Collage voice ──────────────────────────
+// 48 bands per side, each a trapezoidal (TPT) state-variable band-pass, the filter
 // core of Vincent's Loopex / Fizzik : stable up to Nyquist at any Q, where the
 // Chamberlin form blows up past sr/6. The bands sit on the Sonify key / scale
 // across the voice's octave range (sent from the main thread). Every band rings
 // for the same time (Q = 0.455·f·T60, the ring law of res_spectra, whose 50 ms
 // to 10 s span starts lower here so DECAY 0 is a plain filterbank). The spectral
-// shape (cutoff, peak, slope, tone) follows the BSD-3 s4ring logue unit's laws.
+// shape (cutoff, peak, slope, tone) follows an open-source (BSD-3) bank's laws.
 // SUSTAIN shapes what goes INTO each band (its ring decays on its own); CHOKE
 // shapes what comes out (WAVES and the cutoff chop the ring).
 const RB_N = 48;
@@ -1347,7 +1347,7 @@ class SoniProcessor extends AudioWorkletProcessor {
     // ── COLLAGE : the Collage films' own sound, already panned piece by piece
     // and rung through their scale-tuned resonators in the native graph
     // (collageVoice.ts), arriving on input 1. Here : the voice's balance, its
-    // Ring bank (the S-4-style filterbank; Wet 0 = straight through), then its
+    // Ring bank (the resonant filterbank; Wet 0 = straight through), then its
     // mixer channel like any other voice.
     const co = cfg.collage;
     const coOn = !!(co && co.on);

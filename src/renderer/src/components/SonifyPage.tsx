@@ -1478,7 +1478,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             <Slider label="width" value={cfg.collage.width} min={0} max={1} neutral={1} onChange={(v) => pv('collage', { width: v })} mod={chip('collageWidth')} title="Stereo spread : 0 = every piece in the center · 1 = left to right across the frame" />
             <Slider label="gain" value={cfg.collage.gain} min={0} max={1} neutral={0.7} onChange={(v) => pv('collage', { gain: v })} />
             <Slider label="pan" value={cfg.collage.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('collage', { pan: v })} />
-            {/* The Ring bank : an S-4-style resonant filterbank over the whole voice. */}
+            {/* The Ring bank : a resonant filterbank over the whole voice. */}
             <div className="mt-1 flex items-center gap-1.5">
               <span className="font-mono text-[8px] uppercase tracking-wide text-muted/70" title="A 48-band resonant filterbank over the whole voice, its bands on the key / scale across the range : the films ring as a tuned instrument">ring bank</span>
               <span className="min-w-0 flex-1" />
