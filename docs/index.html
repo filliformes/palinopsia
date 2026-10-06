@@ -224,7 +224,7 @@
         <img src="images/interface-sonify.jpg" alt="The Sonify page: the composite mirrored large with sound probes drawn on it, and the voice strips on the right.">
         <div class="body">
           <h3>Sonify<span class="k">S</span></h3>
-          <p>The image itself synthesizes audio in real time, inside the app, no external software. Eight voices (a scanning spectrogram, the frame as an oscillator, grain clouds off motion, struck edges, raster audification, SSTV, resonant filters, a chord bank) with a shared reverb/delay tail and its own step sequencer.</p>
+          <p>The image itself synthesizes audio in real time, inside the app, no external software. Nine voices (a scanning spectrogram, the frame as an oscillator, grain clouds off motion, struck edges, raster audification, SSTV, resonant filters, a chord bank, and a Collage's own films heard as a tuned sound collage through an S-4-style Ring bank) with a shared reverb/delay tail and its own step sequencer.</p>
         </div>
       </div>
       <div class="card">
@@ -245,11 +245,11 @@
         <img src="images/interface-output.jpg" alt="The Output and mapping page: a keystone editor over a live mirror of the output, with resolution, flash safety and record controls.">
         <div class="body">
           <h3>Output &amp; mapping<span class="k">O</span></h3>
-          <p>Fullscreen to any display, projection-map with a keystone editor, and record the take (it keeps rolling when you leave the page). Send over NDI, Spout or HIVE, span a custom composition across several projectors, run it as an unattended kiosk, and push the picture's colour into the room over DMX / WLED — all behind a built-in flash-safety limiter.</p>
+          <p>Fullscreen to any display, projection-map with a keystone editor, and record the take (it keeps rolling when you leave the page). Send over NDI, Spout, Syphon or HIVE (and play any NDI source on the network as a layer), go under a fulldome, span a custom composition across several projectors, run it as an unattended kiosk, and push the picture's color into the room over DMX / WLED, all behind a built-in flash-safety limiter.</p>
         </div>
       </div>
     </div>
-    <p><b>Body</b> <kbd>B</kbd> is the newest room: turn a webcam on (opt-in) and MediaPipe reads your hands, pose, face and silhouette into the instrument. Route any tracked feature into a modulator, or author gesture rules that fire actions and OSC: cover a screen zone with your shadow, or trigger on presence when someone walks into frame. <b>Assemble</b> <kbd>E</kbd> is a concatenative video editor: point it at a folder of films and it edits a matching sequence live, as a layer source.</p>
+    <p><b>Body</b> <kbd>B</kbd> is the newest room: turn a webcam on (opt-in) and MediaPipe reads your hands, pose, face and silhouette into the instrument. Route any tracked feature into a modulator, or author gesture rules that fire actions and OSC: cover a screen zone with your shadow, or trigger on presence when someone walks into frame. <b>Assemble</b> <kbd>E</kbd> is a concatenative video editor: point it at a folder of films and it edits a matching sequence live, as a layer source. And <b>Collage</b> is a source: a wall of films cut up like torn paper, every piece its own film, that you can modulate, run through effects and hear in Sonify.</p>
   </section>
 
   <section>
@@ -272,6 +272,18 @@
       <div class="row">
         <p class="q">Get sound out of it?</p>
         <p class="a">Press <kbd>S</kbd> for Sonify. The image itself synthesizes audio in real time, inside the app, no external software. The probes you see drawn on the picture are the instrument.</p>
+      </div>
+      <div class="row">
+        <p class="q">Make a collage of my films?</p>
+        <p class="a">Pick <b>Collage</b> as a layer source and open a folder in the Inspector: every piece plays its own film. Bind a modulator to <code>cuts</code> and the wall grows and shrinks a piece at a time; turn on <b>FX before shapes</b> to run the source's effects on the films while the seams and torn paper stay crisp; and turn on Sonify's <b>Collage</b> voice to hear them, tuned to your key.</p>
+      </div>
+      <div class="row">
+        <p class="q">Move an effect from a layer to the master?</p>
+        <p class="a">Drag its chip onto the other rack (hold <kbd>Ctrl</kbd> to copy instead), or right-click it for <b>Copy to Master FX</b> / <b>Copy to Layer N FX</b>. Its modulation follows a move. A rack that can't host an effect says why.</p>
+      </div>
+      <div class="row">
+        <p class="q">Change sessions during a show?</p>
+        <p class="a">Loading a session holds the picture still while the new one compiles, then dissolves into it; the projector never shows the old session playing on. <b>New</b> and <b>Generate</b> morph into the new composition over the <b>MRPH</b> time, layer by layer.</p>
       </div>
       <div class="row">
         <p class="q">Use a MIDI controller?</p>
@@ -300,7 +312,7 @@
 
   <section>
     <h2>Where to go next</h2>
-    <p>When you want the full vocabulary (33 sources, 52 effects, 20 native nodes, the modulation matrix, the sequencer and the Sonify voices), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
+    <p>When you want the full vocabulary (38 sources, 52 effects, 25 native nodes, the modulation matrix, the sequencer and the Sonify voices), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
   </section>
 
   <footer>

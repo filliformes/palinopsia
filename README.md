@@ -942,7 +942,7 @@ live). The sound patch **travels with sessions and scenes** : recalling a scene
 switches the sonification with it (the on-switch and output device stay
 machine-local). And the whole page speaks **OSC** under `/opsia/sonify/…`
 (on/master/root/**rootoct**/scale + per-voice on·gain·pan·probes·pitches·params,
-the **Chord** bank, the **Collage** voice `/collage/{on,gain,resonance,ring,harmonics,width}`, and the **FX** tail `/fx/{send,delaytime,feedback,size,decay,
+the **Chord** bank, the **Collage** voice `/collage/{on,gain,resonance,ring,harmonics,width}` and its Ring bank `/collage/{bank,send,decay,choke,cutoff,peak,slope,tone,tilt,waves,wavesrate,wavessync,noise,noiserate,noisesync,detune,voicing}`, the Chord's `/chord/{waves,wavesrate,wavessync}`, and the **FX** tail `/fx/{send,delaytime,feedback,size,decay,
 damp,reverbmode,freeze,…}`, plus the taps `/tap/{a,b}` (0 master, 1-4 a layer), each
 voice's `/tap` and `/looct` `/hioct`, `/spectra/sync`, `/orbit/shape`, `/filter/loop`) :
 advertised over OSCQuery and streamed outbound like everything else. Index addresses
