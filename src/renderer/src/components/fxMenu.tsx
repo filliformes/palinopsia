@@ -10,7 +10,9 @@
 
 import type { FxScope, ModAssignment, ModTarget } from '@shared/types'
 import { modTargetKey, useStore } from '../store'
-import { canHostFx, hostRefusal } from '../fxScopes'
+import { canHostFx, hostRefusal, rackName, refusalPopup } from '../fxScopes'
+import { SHADER_BY_ID } from '../shaders/isf'
+import { showToast } from './Toast'
 import { inputsForShader } from '../shaders/isf/inputs'
 import type { MenuItem } from './ContextMenu'
 
@@ -49,6 +51,8 @@ export function useFxMenuItems(
   const pasteFxAsNew = useStore((s) => s.pasteFxAsNew)
   const modMatrix = useStore((s) => s.composition.modMatrix)
   const randomizeModulation = useStore((s) => s.randomizeModulation)
+  const copyFxTo = useStore((s) => s.copyFxTo)
+  const layerCount = useStore((s) => s.composition.layers.length)
 
   const run = (fn: () => void) => (): void => {
     fn()
@@ -78,6 +82,24 @@ export function useFxMenuItems(
 
   if (instId && !locked) {
     items.push({ label: 'Copy effect', onClick: run(() => copyFx(scope, instId)) })
+    // Straight into another rack : the Master FX, or any layer's FX rack. A rack
+    // that can't host this effect says so in a popup (and why).
+    const targets: FxScope[] = []
+    if (scope.kind !== 'master') targets.push({ kind: 'master' })
+    for (let l = 0; l < layerCount; l++) {
+      if (!(scope.kind === 'layer' && scope.layer === l)) targets.push({ kind: 'layer', layer: l })
+    }
+    const name = SHADER_BY_ID[shaderId ?? '']?.name ?? shaderId ?? 'effect'
+    for (const to of targets) {
+      items.push({
+        label: `Copy to ${rackName(to).replace(/^the /, '')}`,
+        onClick: run(() => {
+          if (copyFxTo(scope, instId, to)) showToast(`${name} copied to ${rackName(to)}`)
+          else showToast(refusalPopup(to, shaderId), 'warn')
+        })
+      })
+    }
+    items.push({ label: '', divider: true })
   }
 
   if (!clip) {

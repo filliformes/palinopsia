@@ -1186,6 +1186,13 @@ interface StoreState {
   pasteFxSettings: (scope: FxScope, instId: string) => void
   /** Add a fresh copy to a rack, after `afterId` (null = end of chain). */
   pasteFxAsNew: (scope: FxScope, afterId: string | null) => void
+  // One FX unit into ANOTHER rack : the right-click "Copy to…" rows and the
+  // cross-rack drag. Copy = a fresh unit (its own id, no modulation); move = the
+  // same unit, its modulation following it. Both insert before `beforeId` (else
+  // at the end), never past the pinned finalizers, and refuse (false) where the
+  // target rack can't host the shader (canHostFx).
+  copyFxTo: (from: FxScope, instId: string, to: FxScope, beforeId?: string | null) => boolean
+  moveFxTo: (from: FxScope, instId: string, to: FxScope, beforeId?: string | null) => boolean
   // Native convolution nodes: choose the sidechain (impulse) source. `which` 2
   // sets the second input of a three-input node (the Matte's matte).
   setFxSidechain: (scope: FxScope, instId: string, ref: SidechainRef | null, which?: 1 | 2) => void
@@ -1687,6 +1694,25 @@ function dropLayerTargets(c: CompositionState, layer: number): CompositionState 
 /** The slot a swap is about to overwrite. */
 function slotOf(c: CompositionState, layer: number, slot: 'A' | 'B'): SourceSlot | null {
   return (slot === 'A' ? c.layers[layer]?.sourceA : c.layers[layer]?.sourceB) ?? null
+}
+
+/** The same rack ? */
+export function sameFxScope(a: FxScope, b: FxScope): boolean {
+  if (a.kind !== b.kind) return false
+  if (a.kind === 'master' || a.kind === 'background') return true
+  return (a as { layer: number }).layer === (b as { layer: number }).layer
+}
+
+/** Insert a unit before `beforeId` (else at the end), never past the pinned
+ *  finalizers, which must stay last. */
+function insertFx(fx: FxInstance[], unit: FxInstance, beforeId: string | null | undefined): FxInstance[] {
+  const next = [...fx]
+  const lockedAt = next.findIndex((f) => f.locked)
+  let at = beforeId ? next.findIndex((f) => f.id === beforeId) : -1
+  if (at < 0) at = lockedAt >= 0 ? lockedAt : next.length
+  if (lockedAt >= 0 && at > lockedAt) at = lockedAt
+  next.splice(at, 0, unit)
+  return next
 }
 
 /** Read the FX array a scope addresses. The Inspector, the copy/paste actions
@@ -2597,6 +2623,44 @@ export const useStore = create<StoreState>((set, get) => ({
         fx.map((f) => (f.id === instId ? { ...f, opacity: Math.max(0, Math.min(1, v)) } : f))
       )
     })),
+  copyFxTo: (from, instId, to, beforeId = null) => {
+    const s = get()
+    const unit = fxArrayFor(s.composition, from).find((f) => f.id === instId)
+    if (!unit || unit.locked || !canHostFx(to, unit.shaderId)) return false
+    const copy: FxInstance = {
+      ...unit,
+      id: uid(),
+      inputs: Object.fromEntries(Object.entries(unit.inputs).map(([k, v]) => [k, Array.isArray(v) ? [...v] : v])),
+      lightPath: undefined
+    }
+    set({ composition: updateFxArray(s.composition, to, (fx) => insertFx(fx, copy, beforeId)) })
+    return true
+  },
+  moveFxTo: (from, instId, to, beforeId = null) => {
+    if (sameFxScope(from, to)) {
+      get().reorderFx(from, instId, beforeId)
+      return true
+    }
+    const s = get()
+    const unit = fxArrayFor(s.composition, from).find((f) => f.id === instId)
+    if (!unit || unit.locked || !canHostFx(to, unit.shaderId)) return false
+    let c = updateFxArray(s.composition, from, (fx) => fx.filter((f) => f.id !== instId))
+    c = updateFxArray(c, to, (fx) => insertFx(fx, unit, beforeId))
+    // Its modulation and Meta destinations follow it (same id, new rack).
+    const hit = (t: ModTarget): boolean => t.kind === 'fx' && t.instId === instId && sameFxScope(t.scope, from)
+    const moveT = (t: ModTarget): ModTarget => (hit(t) && t.kind === 'fx' ? { ...t, scope: to } : t)
+    c = {
+      ...c,
+      modMatrix: c.modMatrix.map((a) => (hit(a.target) ? { ...a, target: moveT(a.target) } : a)),
+      metaKnobs: c.metaKnobs.map((k) => (k.destinations.some(hit) ? { ...k, destinations: k.destinations.map(moveT) } : k))
+    }
+    const sel = s.selection
+    set({
+      composition: c,
+      selection: sel && sel.type === 'fx' && sel.instId === instId ? { type: 'fx', scope: to, instId } : sel
+    })
+    return true
+  },
   moveFx: (scope, instId, dir) =>
     set((s) => ({
       composition: updateFxArray(s.composition, scope, (fx) => {

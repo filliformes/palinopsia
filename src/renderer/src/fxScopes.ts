@@ -57,6 +57,20 @@ export function canHostFx(scope: FxScope, shaderId: string | null | undefined): 
   return scope.kind === 'master' && shaderId === 'node-parallax'
 }
 
+/** A rack's name, for menus and popups. */
+export function rackName(scope: FxScope): string {
+  if (scope.kind === 'master') return 'the Master FX'
+  if (scope.kind === 'background') return 'the Background FX'
+  const n = scope.layer + 1
+  return scope.kind === 'layer' ? `Layer ${n} FX` : `Layer ${n} source ${scope.kind === 'sourceA' ? 'A' : 'B'} FX`
+}
+
+/** The popup when a copy or a drop is refused : what, where, and where it CAN go. */
+export function refusalPopup(scope: FxScope, shaderId: string | null | undefined): string {
+  const name = SHADER_BY_ID[shaderId ?? '']?.name ?? shaderId ?? 'This effect'
+  return `${name} can't go in ${rackName(scope)} : ${hostRefusal(scope, shaderId)}.`
+}
+
 /** Human-readable reason a paste is refused, for a disabled menu row : it names
  *  WHERE the shader can go, computed from the same rule, so the message is never
  *  wrong (Parallax is layer-or-master, the sidechain nodes are layer-only). */

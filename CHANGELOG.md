@@ -7,6 +7,13 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Effects travel between racks.** Right-click an effect's chip for **Copy to Master FX**
+  or **Copy to Layer N FX**; or drag a chip from one rack onto another (a chip, or the
+  `+ fx` box for the end) to move it, its modulation following, and hold Ctrl or Alt to
+  copy instead. Right-clicking the `+ fx` box pastes a copied effect into an empty rack.
+  An effect the rack can't host is refused with a popup that says why (`Transfert can't
+  go in the Master FX : Transfert is layer-only.`), and the drop marker turns red over it.
+
 - **Sonify : a Collage voice**, the films of a Collage source heard all at once as a
   sound collage. Every film plays its own sound in its own loop window and speed, held
   to its picture (each film gets a hidden player of its ORIGINAL file, resynced on every

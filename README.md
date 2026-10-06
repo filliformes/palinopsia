@@ -1233,6 +1233,13 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   which re-rolls the source + depth of what's already bound. Sources are drawn from
   the modulators you have **enabled**. Right-clicking a **source's** name in the
   Inspector header offers the same **Randomize modulation** when it carries any.
+- **Effects travel between racks.** Right-click an effect's chip for **Copy to Master FX**
+  or **Copy to Layer N FX** (a fresh copy, settings and all). Or **drag** a chip onto
+  another rack (onto a chip to drop it before that one, or onto the `+ fx` box to drop it
+  at the end) : a plain drag **moves** it, and its modulation goes with it; hold **Ctrl**
+  (or Alt) to **copy** instead. Right-click the `+ fx` box to paste a copied effect into
+  an empty rack. An effect a rack can't host (a layer-only node into the Master, say) is
+  refused with a popup saying why, and the drop marker turns red while you hover.
 - **The source pickers have sections** : **Organic** (living matter : reaction, growth,
   water, fire, ground), **Analog** (the analog video-synth lineage : RGB Oscillators, Sync
   Osc, Slit Scan, Ramps, Column Scan, Differential, Interference), then every other
