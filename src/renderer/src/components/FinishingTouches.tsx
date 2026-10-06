@@ -10,14 +10,14 @@ import { liveModValues } from '../engine/modulation'
 import { useShallow } from 'zustand/react/shallow'
 import { randomizeInputs } from '../randomize'
 import { SHADER_BY_ID } from '../shaders/isf'
-import { defaultInputs, inputsForShader } from '../shaders/isf/inputs'
+import { defaultInputs } from '../shaders/isf/inputs'
 import { PRESETS_BY_ID } from '../shaders/isf/presets'
 import { makeContext, makeFinalizer, makeVibePalette, modTargetKey, useStore } from '../store'
-import { AssignContext, AssignRow, XYControl } from './AutoControls'
+import { AssignContext, AssignRow } from './AutoControls'
 import { SectionedControls } from './FinishingSections'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
-import { applyVibeColor } from '../vibeColor'
+import { ContextLightPad } from './ContextLightPad'
 
 const AC: Record<string, string> = { 'fx-vibe': 'accent2', 'fx-context': 'accent', 'fx-finalizer': 'active' }
 
@@ -328,29 +328,3 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
   )
 }
 
-// Context's light section ends with the light's XY pad and, beside it, the
-// "Vibe Color" button (the light takes the Vibe Palette's main colour).
-function ContextLightPad({
-  inst,
-  onChange
-}: {
-  inst: FxInstance
-  onChange: (n: string, v: number | number[]) => void
-}): JSX.Element | null {
-  const composition = useStore((s) => s.composition)
-  const values = inst.inputs
-  const pad = inputsForShader('fx-context').find((i) => i.type === 'point2D')
-  if (!pad) return null
-  return (
-    <div className="flex items-center justify-center gap-3 px-2 py-2">
-      <XYControl inp={pad} value={values[pad.name]} onChange={onChange} />
-      <button
-        onClick={() => applyVibeColor(composition.master, onChange)}
-        className="shrink-0 rounded border border-accent2/50 bg-accent2/10 px-1.5 py-0.5 font-mono text-[10px] text-accent2 hover:bg-accent2/20"
-        title="Light the scene in the Vibe Palette's main color (the one it is painting with now, at full brightness; a light that is off is turned up)"
-      >
-        Vibe Color
-      </button>
-    </div>
-  )
-}

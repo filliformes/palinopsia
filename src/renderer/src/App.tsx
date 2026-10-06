@@ -69,7 +69,8 @@ import { morphedComposition, consumeCrossfade, consumeSceneChange } from './morp
 
 // A session change's dissolve, once the new session has compiled (Compositor.beginSceneChange).
 const SCENE_DISSOLVE_MS = 500
-import { surfaceComposition, nearestSurfaceScene, samplePath } from './surface'
+import { surfaceComposition, nearestSurfaceScene, tracePath, newPlayhead } from './surface'
+import { liveLight } from './lightPath'
 import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
 import { SessionLoader, GenerateMenu } from './components/TopBarMenus'
@@ -226,6 +227,8 @@ export default function App(): JSX.Element {
   // Draw sequencer playback state (loop-local, off the store to avoid per-frame
   // React churn). phase wraps in [0,∞); jump* hold a random-teleport target
   // between refreshes; lastStoreT throttles the pad-cursor visual write.
+  // Context's light path playhead (same model, its own phase).
+  const lightSeq = useRef(newPlayhead())
   const surfaceSeq = useRef({
     phase: 0,
     lastT: 0,
@@ -1113,37 +1116,7 @@ export default function App(): JSX.Element {
         let sy = surf.y
         if (surf.active && surf.play && surf.path.length >= 2) {
           const seq = surfaceSeq.current
-          const dt = seq.lastT ? Math.min(200, now - seq.lastT) : 0
-          seq.lastT = now
-          seq.phase += dt / Math.max(100, surf.timeMs)
-          const pf = seq.phase - Math.floor(seq.phase)
-          let base = pf
-          if (surf.way === 'backward') base = 1 - pf
-          else if (surf.way === 'pingpong') base = 1 - Math.abs(2 * pf - 1)
-          // jump : refresh a held random target on an interval that tightens as
-          // jump grows; each refresh has `jumpAmt` odds of teleporting (else it
-          // rejoins the smooth path). 0 % = clean traversal, 100 % = near-chaos.
-          const jumpAmt = Math.max(0, Math.min(1, surf.jump / 100))
-          let ph = base
-          if (jumpAmt > 0) {
-            const holdMs = 60 + (1 - jumpAmt) * 340
-            if (now - seq.lastJumpT >= holdMs) {
-              seq.lastJumpT = now
-              seq.jumpActive = Math.random() < jumpAmt
-              if (seq.jumpActive) seq.jumpTarget = Math.random()
-            }
-          }
-          if (jumpAmt > 0 && seq.jumpActive) {
-            // A discrete teleport overrides the smooth position for this hold window.
-            ph = seq.jumpTarget
-          } else if (surf.wiggle > 0) {
-            // Smooth sinusoidal wobble around the traced position (a vibrato). ~0.8 Hz
-            // so it reads as a shimmer regardless of loop length; amplitude by %.
-            const span = (surf.wiggle / 100) * 0.12
-            ph = base + Math.sin((now / 1000) * 0.8 * Math.PI * 2) * span
-            ph = ((ph % 1) + 1) % 1
-          }
-          const s = samplePath(surf.path, ph, surf.closed)
+          const s = tracePath(seq, surf, now)
           sx = s.x
           sy = s.y
           // Throttle the store write (pad-cursor visual) to ~25 Hz — the blend
@@ -1220,6 +1193,21 @@ export default function App(): JSX.Element {
         //      destinations engine-side (zero store writes per frame; the
         //      final value commits to the store on settle).
         if (metaGlides.size) applyMetaGlides(comp!, c, inputsForShader, metaGlides)
+        // 2a⅝. Context's light tracing its drawn path (the Metasurface's draw
+        //      sequencer over the light pad) : written engine-side each frame like
+        //      a modulator; the pad's dot follows through liveLight.
+        const ctxFx = c.master.find((f) => f.shaderId === 'fx-context')
+        const lp = ctxFx?.lightPath
+        if (ctxFx && lp && lp.play && lp.path.length >= 2) {
+          const p = tracePath(lightSeq.current, lp, now)
+          comp!.setFxInput({ kind: 'master' }, ctxFx.id, 'light', [p.x, p.y])
+          liveLight.x = p.x
+          liveLight.y = p.y
+          liveLight.on = true
+        } else {
+          lightSeq.current.lastT = 0
+          liveLight.on = false
+        }
         // 2a¾. One-shot video seeks (OSC /video/position) : drained into the
         //      same consumed-per-frame seam the playhead modulators use, and
         //      kept for the output-window payload so the mirror seeks too.

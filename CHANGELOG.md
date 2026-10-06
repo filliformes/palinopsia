@@ -7,6 +7,14 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Context's light moves** : the light pad (now the composition's shape, and larger)
+  takes the Metasurface's draw sequencer. **✎ draw** a path, **▶ play**, and the light
+  travels it : direction (forward, backward, ping-pong), **⟳ loop**, **time** (0.2 to
+  60 s per pass), **jump** (random teleports) and **wiggle** (a vibrato). Dragging the
+  pad places the light and stops the path. The path lives on the Context unit, so it is
+  saved with the session and recalled with scenes. The Metasurface and the light share
+  one playhead and one transport, so they trace alike.
+
 - **Veins** (Organic) : leaf veins and roots grown by the space-colonization model
   botanists use for real leaves (Runions et al.). A blade grows from its margin and
   calls its veins; open leaves branch, closed leaves fuse into loops, roots reach down

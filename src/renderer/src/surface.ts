@@ -9,7 +9,7 @@
 // is fed to the engine each frame while the Surface is active, down the same
 // interpolated-composition path the global Morph already uses (zero React churn).
 
-import type { CompositionState, FxInstance, LayerState, SceneEntry, SourceSlot } from '@shared/types'
+import type { CompositionState, FxInstance, LayerState, SceneEntry, SourceSlot, SurfaceSequencer } from '@shared/types'
 
 interface Contrib {
   c: CompositionState
@@ -75,6 +75,61 @@ export function samplePath(
   const a = path[i % n]
   const b = path[(i + 1) % n]
   return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f }
+}
+
+/** A draw-sequencer playhead, loop-local (off the store : no per-frame React
+ *  churn). `phase` wraps in [0,∞); jump* hold a random-teleport target between
+ *  refreshes. */
+export interface PathPlayhead {
+  phase: number
+  lastT: number
+  jumpActive: boolean
+  jumpTarget: number
+  lastJumpT: number
+}
+export const newPlayhead = (): PathPlayhead => ({ phase: 0, lastT: 0, jumpActive: false, jumpTarget: 0.5, lastJumpT: 0 })
+
+/** Advance a playhead to `now` along a drawn path and return the traced point.
+ *  dataFLOU's Gesture model : a phase advancing in real time over `timeMs`; `way`
+ *  maps phase to playhead; `jump`% overlays random teleports (a held
+ *  sample-and-hold jitter), else `wiggle`% a smooth vibrato. Shared by the
+ *  Metasurface cursor and Context's light, so both trace alike. */
+export function tracePath(
+  seq: PathPlayhead,
+  cfg: Pick<SurfaceSequencer, 'path' | 'timeMs' | 'way' | 'jump' | 'wiggle' | 'closed'>,
+  now: number
+): { x: number; y: number } {
+  const dt = seq.lastT ? Math.min(200, now - seq.lastT) : 0
+  seq.lastT = now
+  seq.phase += dt / Math.max(100, cfg.timeMs)
+  const pf = seq.phase - Math.floor(seq.phase)
+  let base = pf
+  if (cfg.way === 'backward') base = 1 - pf
+  else if (cfg.way === 'pingpong') base = 1 - Math.abs(2 * pf - 1)
+  // jump : refresh a held random target on an interval that tightens as jump
+  // grows; each refresh has `jumpAmt` odds of teleporting (else it rejoins the
+  // smooth path). 0 % = clean traversal, 100 % = near-chaos.
+  const jumpAmt = Math.max(0, Math.min(1, cfg.jump / 100))
+  let ph = base
+  if (jumpAmt > 0) {
+    const holdMs = 60 + (1 - jumpAmt) * 340
+    if (now - seq.lastJumpT >= holdMs) {
+      seq.lastJumpT = now
+      seq.jumpActive = Math.random() < jumpAmt
+      if (seq.jumpActive) seq.jumpTarget = Math.random()
+    }
+  }
+  if (jumpAmt > 0 && seq.jumpActive) {
+    // A discrete teleport overrides the smooth position for this hold window.
+    ph = seq.jumpTarget
+  } else if (cfg.wiggle > 0) {
+    // Smooth sinusoidal wobble around the traced position (a vibrato). ~0.8 Hz
+    // so it reads as a shimmer regardless of loop length; amplitude by %.
+    const span = (cfg.wiggle / 100) * 0.12
+    ph = base + Math.sin((now / 1000) * 0.8 * Math.PI * 2) * span
+    ph = ((ph % 1) + 1) % 1
+  }
+  return samplePath(cfg.path, ph, cfg.closed)
 }
 
 /** Index of the scene nearest the cursor (its structure becomes the base). */

@@ -26,8 +26,7 @@ import type {
   SoniSeqStep,
   SidechainRef,
   SourceSlot,
-  World
-} from '@shared/types'
+  World, LightPath } from '@shared/types'
 import type { MetaKnobState, MidiBinding, LightConfig, BodyControlConfig } from '@shared/types'
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
 import type { ResolumeMap, ResoOutput, ResoInput, ResoCell, ResoSession } from '@shared/resolume'
@@ -44,6 +43,7 @@ import { corpusMap } from './assemble/match'
 import { BLEND_MODES, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
 import { beginMorph, cancelMorph, requestSceneChange } from './morph'
+import { DEFAULT_LIGHT_PATH } from './lightPath'
 import { autoSurfacePos } from './surface'
 import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify'
 import { resetCouplingState } from './engine/coupling'
@@ -1561,6 +1561,9 @@ interface StoreState {
   setSurfaceJump: (pct: number) => void
   setSurfaceWiggle: (pct: number) => void
   setSurfaceClosed: (closed: boolean) => void
+  // Context's light draw sequencer (on the Context unit : travels with sessions,
+  // scenes and undo). A partial patch over the current (or default) path.
+  setContextLightPath: (patch: Partial<LightPath>) => void
   setScenePos: (id: string, x: number, y: number) => void
   // Auto-place any scenes without a surface position (a sunflower spread).
   autoPlaceScenes: (force?: boolean) => void
@@ -3842,6 +3845,25 @@ export const useStore = create<StoreState>((set, get) => ({
   setSurfaceWiggle: (pct) =>
     set((s) => ({ surface: { ...s.surface, wiggle: Math.max(0, Math.min(100, pct)) } })),
   setSurfaceClosed: (closed) => set((s) => ({ surface: { ...s.surface, closed } })),
+  setContextLightPath: (patch) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        master: s.composition.master.map((f) => {
+          if (f.shaderId !== 'fx-context') return f
+          const cur = { ...DEFAULT_LIGHT_PATH, ...(f.lightPath ?? {}), ...patch }
+          return {
+            ...f,
+            lightPath: {
+              ...cur,
+              timeMs: Math.max(200, Math.min(60000, cur.timeMs)),
+              jump: Math.max(0, Math.min(100, cur.jump)),
+              wiggle: Math.max(0, Math.min(100, cur.wiggle))
+            }
+          }
+        })
+      }
+    })),
   setScenePos: (id, x, y) =>
     set((s) => ({
       scenes: s.scenes.map((sc) =>

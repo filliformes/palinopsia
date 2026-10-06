@@ -148,6 +148,9 @@ export interface FxInstance extends ShaderInstance {
   sidechain?: SidechainRef | null
   // A second sidechain, for the three-input nodes (Matte : the matte itself).
   sidechain2?: SidechainRef | null
+  // Context only : the light's drawn path (the Metasurface's draw sequencer
+  // over the light pad). Points in the light's own space (0..1, y up).
+  lightPath?: LightPath
 }
 
 // One of the four layers.
@@ -805,6 +808,12 @@ export interface SurfaceSequencer {
   // Closed path : connect the last point back to the first, so forward looping
   // flows around the cycle instead of teleporting end→start.
   closed: boolean
+}
+
+// The same draw sequencer over Context's light : a drawn path the light traces
+// while `play` is on. Travels on the Context unit (sessions, scenes, undo).
+export interface LightPath extends SurfaceSequencer {
+  play: boolean
 }
 
 // ── Sonify sequencer ─────────────────────────────────────────────────

@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { nearestSurfaceScene, surfaceWeights } from '../surface'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { DrawPathTransport } from './DrawPathTransport'
 
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v))
 
@@ -362,102 +363,21 @@ export function SurfacePad(): JSX.Element {
 
       {/* Draw-sequencer transport : shown once there's a path to play. */}
       {hasPath && (
-        <div className="flex flex-col gap-1.5 rounded-md border border-border/70 bg-panel2/40 p-1.5">
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setSurfacePlay(!surface.play)}
-              className={`rounded border px-2 py-0.5 font-mono text-[10px] transition-colors ${
-                surface.play
-                  ? 'border-accent2 bg-accent2/20 text-accent2'
-                  : 'border-border text-muted hover:text-text'
-              }`}
-              title="Auto-trace the drawn path across the plane"
-            >
-              {surface.play ? '■ stop' : '▶ play'}
-            </button>
-            {/* way : direction of travel */}
-            <div className="flex overflow-hidden rounded border border-border font-mono text-[10px]">
-              {([
-                ['forward', '→', 'forward'],
-                ['backward', '←', 'backward'],
-                ['pingpong', '⇄', 'ping-pong']
-              ] as const).map(([w, glyph, label]) => (
-                <button
-                  key={w}
-                  onClick={() => setSurfaceWay(w)}
-                  className={`px-1.5 py-0.5 transition-colors ${
-                    surface.way === w ? 'bg-accent2/20 text-accent2' : 'text-muted hover:text-text'
-                  }`}
-                  title={label}
-                >
-                  {glyph}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setSurfaceClosed(!surface.closed)}
-              className={`rounded border px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
-                surface.closed ? 'border-accent2 bg-accent2/20 text-accent2' : 'border-border text-muted hover:text-text'
-              }`}
-              title="Loop the path : connect the end back to the start so forward play flows around instead of teleporting"
-            >
-              ⟳ loop
-            </button>
-            <button
-              onClick={() => {
-                setSurfacePath([])
-                setSurfacePlay(false)
-              }}
-              className="ml-auto rounded border border-border px-2 py-0.5 font-mono text-[10px] text-muted transition-colors hover:text-text"
-              title="Erase the drawn path"
-            >
-              clear
-            </button>
-          </div>
-          <label className="flex items-center gap-1.5 font-mono text-[10px] text-muted">
-            <span className="w-8">time</span>
-            <input
-              type="range"
-              min={200}
-              max={60000}
-              step={100}
-              value={surface.timeMs}
-              onChange={(e) => setSurfaceTimeMs(Number(e.target.value))}
-              className="flex-1 accent-accent2"
-            />
-            <span className="w-16 text-right tabular-nums text-text">
-              {(surface.timeMs / 1000).toFixed(1)} s
-            </span>
-          </label>
-          <label className="flex items-center gap-1.5 font-mono text-[10px] text-muted">
-            <span className="w-8">jump</span>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={surface.jump}
-              onChange={(e) => setSurfaceJump(Number(e.target.value))}
-              className="flex-1 accent-accent2"
-              title="Chance the playhead randomly teleports to another spot on the path (jitter)"
-            />
-            <span className="w-16 text-right tabular-nums text-text">{surface.jump} %</span>
-          </label>
-          <label className="flex items-center gap-1.5 font-mono text-[10px] text-muted">
-            <span className="w-8">wiggle</span>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={surface.wiggle}
-              onChange={(e) => setSurfaceWiggle(Number(e.target.value))}
-              className="flex-1 accent-accent2"
-              title="Smooth sinusoidal wobble around the traced position (a vibrato, unlike jump's teleports)"
-            />
-            <span className="w-16 text-right tabular-nums text-text">{surface.wiggle} %</span>
-          </label>
-        </div>
+        <DrawPathTransport
+          cfg={surface}
+          playing={surface.play}
+          onPlay={setSurfacePlay}
+          onWay={setSurfaceWay}
+          onClosed={setSurfaceClosed}
+          onClear={() => {
+            setSurfacePath([])
+            setSurfacePlay(false)
+          }}
+          onTime={setSurfaceTimeMs}
+          onJump={setSurfaceJump}
+          onWiggle={setSurfaceWiggle}
+          playTitle="Auto-trace the drawn path across the plane"
+        />
       )}
     </div>
   )
