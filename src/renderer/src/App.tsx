@@ -614,7 +614,7 @@ export default function App(): JSX.Element {
   //    launching again next time. ───────
   useEffect(() => {
     return window.api.onKioskExited(() => {
-      showToast('Exited installation mode. Turn off "launch on restart" in Output → Installation to stop it.', 'warn', 8000)
+      showToast('Exited installation mode. Turn off "Enable on next restart" in Output → Installation to stop it launching again.', 'warn', 8000)
     })
   }, [])
 

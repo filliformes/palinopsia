@@ -611,6 +611,13 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **OSC video speed now matches the slider.** `/opsia/layer{n}/video/speed` mapped 0..1
+  across 1/28× to 128× (log) while the transport slider runs from 1/64×, so a
+  controller's value and the slider disagreed (outbound feedback too). Both use 1/64×
+  to 128× now : a controller mapped to the old range lands a little slower at the low
+  end. Two app texts were also out of date : the Record section said DXV3 has no sound,
+  and the toast after leaving an installation named a "launch on restart" button that is
+  now "Enable on next restart".
 - **A reloaded window froze the projector.** The frame link between the control window
   and the output was wired once, at the output's first load : a reloaded control window
   (a crash self-heal, Ctrl+R) or output never got a new one, and a reloaded control

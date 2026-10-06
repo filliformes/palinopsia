@@ -19,7 +19,7 @@
 //   /opsia/layer{n}/fx/{i}/{input}                    f 0..1 → range
 //   /opsia/layer{n}/video[/{A|B}]/play|loop|grain     >= 0.5 (slotless form: first video slot)
 //   /opsia/layer{n}/video[/{A|B}]/direction            i index | f 0..1 | s forward|reverse|pendulum
-//   /opsia/layer{n}/video[/{A|B}]/speed                f 0..1 (log across 1/28x..128x)
+//   /opsia/layer{n}/video[/{A|B}]/speed                f 0..1 (log across 1/64x..128x)
 //   /opsia/layer{n}/video[/{A|B}]/position             f 0..1 (one-shot seek within trim)
 //   /opsia/layer{n}/video[/{A|B}]/in|out               f 0..1 (trim points)
 //   /opsia/layer{n}/video[/{A|B}]/grainsize|grainspray|grainrev|grainjit  f 0..1
@@ -182,9 +182,10 @@ const COUPLING_MODES: readonly CouplingMode[] = ['off', 'lean', 'hocket', 'cut',
 const COUPLING_FEATURES: readonly AudioFeature[] = ['level', 'flux', 'transient', 'centroid', 'band', 'pitch']
 
 // Video transport enums + the transport's log speed range (mirrors the UI
-// slider in VideoTransport.tsx : 1/28× .. 128×).
+// slider in VideoTransport.tsx : 1/64× .. 128×; it was left at 1/28 when the
+// slider widened, so a controller's 0..1 and the slider disagreed).
 const VIDEO_DIRECTIONS = ['forward', 'reverse', 'pendulum'] as const
-const VSMIN = 1 / 28
+const VSMIN = 1 / 64
 const VSMAX = 128
 const GRAIN_SYNCS = ['free', '1/16', '1/8', '1/4', '1/2'] as const
 const GRAIN_SYNC_VALUES = [0, 0.25, 0.5, 1, 2] as const
@@ -299,7 +300,7 @@ function route(address: string, args: Args): void {
             return
           }
           case 'speed':
-            // 0..1 across the transport's log range (1/28× .. 128×).
+            // 0..1 across the transport's log range (1/64× .. 128×).
             st.setVideoPlayback(li, slot, { videoSpeed: VSMIN * Math.pow(VSMAX / VSMIN, clamp01(n)) })
             return
           case 'position':
@@ -900,7 +901,7 @@ function enumerateLeaves(): Leaf[] {
       add(`${p}/direction`, 0, 1, di / (VIDEO_DIRECTIONS.length - 1), 'Play mode (index: forward·reverse·pendulum)')
       add(`${p}/loop`, 0, 1, (s.videoLoop ?? true) ? 1 : 0, 'Loop between in/out (>= 0.5)')
       const sp = Math.max(VSMIN, Math.min(VSMAX, s.videoSpeed ?? 1))
-      add(`${p}/speed`, 0, 1, Math.log(sp / VSMIN) / Math.log(VSMAX / VSMIN), 'Clip speed (0..1 log across 1/28×..128×)')
+      add(`${p}/speed`, 0, 1, Math.log(sp / VSMIN) / Math.log(VSMAX / VSMIN), 'Clip speed (0..1 log across 1/64×..128×)')
       add(`${p}/position`, 0, 1, 0, 'One-shot seek (0..1 within the in/out trim)', false)
       add(`${p}/in`, 0, 1, s.videoIn ?? 0, 'Trim in point')
       add(`${p}/out`, 0, 1, s.videoOut ?? 1, 'Trim out point')

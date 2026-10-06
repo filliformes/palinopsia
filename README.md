@@ -61,7 +61,7 @@ racks, palette, World and macro biases : in one click.
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
-- [Sources](#sources-38-generators) (38 generators) · [Effects](#effects) (52 FX) ·
+- [Sources](#sources-41-generators) (41 generators) · [Effects](#effects) (52 FX) ·
   [Native nodes](#native-nodes) (25) · [Master finalizers](#master-finalizers--pinned-always-last)
 - [Blend modes](#blend-modes) (19)
 
@@ -103,6 +103,7 @@ The papers, books and standards the instrument draws on are listed in
   local network prompt on the first launch (OSC, NDI and light output need it), and the
   camera / microphone prompts when you use them.
 - **Windows** : the installer or the portable exe; SmartScreen : More info → Run anyway.
+- **Linux** : the AppImage (`chmod +x` it, then run it) or the `.deb`.
 
 **Building from source** :
 
@@ -113,6 +114,7 @@ npm run typecheck    # tsc : node + web projects (both must be green)
 npm run build        # electron-vite build (bundle only)
 npm run build:win    # NSIS installer + portable
 npm run build:mac    # DMG
+npm run build:linux  # AppImage + deb
 ```
 
 NDI needs no build step : the sender calls the NDI runtime through an FFI (`koffi`).
@@ -142,18 +144,18 @@ first-ever launch pays this once; it persists on disk afterwards.
 
 1. **Launch.** You land on a fresh random one-layer scene. Press **`R`** a few
    times : each press re-rolls the whole instrument (sources, racks, blends,
-   modulators) from curated ranges, crossfading over the **MRPH** time.
+   modulators) from curated ranges, crossfading over the **MORPH** time.
 2. **Open the Feel tab (`G`).** Drag **Density**, **Flow ⇄ Interruption**,
    **Drift** : these are the instrument's whole-image "feel" macros. Double-click
    any slider to reset it.
-3. **Click a layer's source** (the A chip) and play with its parameters in the
+3. **Click a layer's source** (the **A** button) and play with its parameters in the
    **Inspector** below the preview. Every slider has a dice `⚄`, presets, and an
    **M** button to bind a modulator.
 4. **Save a scene**: get something you like, click `+` in the Scene bank, then
-   press `1`–`9` to recall it live (recalls morph over MRPH).
+   press `1`–`9` to recall it live (recalls morph over MORPH).
 5. **Go fullscreen**: press **`O`**, pick a display, hit fullscreen. Or try
-   **Generate** in the toolbar : 76 themed recipes that build a coherent
-   session (visuals + World + palette + macro biases) in one click.
+   **Generate** in the toolbar : 100 themed recipes that build a coherent
+   session (visuals + World + palette + macro biases + motion) in one click.
 
 **Lost?** Press **`?`** anytime for the full keyboard cheat-sheet.
 
@@ -192,7 +194,8 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 anywhere : maps any controller; see [MIDI](#midi).
 **Everywhere:** double-click a slider/knob to reset it to its neutral value : including the A/B mix, harmony, coupling, background opacity / depth and the
 video **in / out** trim handles.
-**Feedback:** a brief bottom **toast** confirms actions with no natural home on
+**Feedback:** a brief **toast**, docked in the empty middle of the
+[bottom toolbar](#the-transport-bar-bottom), confirms actions with no natural home on
 screen : a recording saved (with its filename), a panic flush, or a live-capture
 that couldn't start *and why* (permission denied / no device / cancelled).
 
@@ -236,8 +239,8 @@ soft contact shadow onto it), and a **blend / isolate** mode against the stack. 
 has its own preset bank and its own dice, and is never touched by the global
 Randomize.
 
-The right column switches between **seven views** (tabs, or keys `L` / `M` / `F` /
-`G` / `E` / `A`): **Layers** (the strips + background), **Mixer** (tall
+The right column switches between **seven views** (tabs, or keys `M` / `F` / `G` /
+`E` / `A`): **Layers** (the strips + background), **Mixer** (tall
 opacity/speed faders + blend for all four), **Finishing** (the Vibe · Context ·
 Finalizer stack), **Feel** (the global macros), **assemble** (the automatic
 editor), **audio/midi/osc** (the Audio, MIDI and OSC panels) and **performance**
@@ -298,25 +301,30 @@ The selected video slot shows a full **transport** in the Inspector:
   With grain on, `gr·size` and `gr·spray` also become modulation targets.
   Granulation is at its best on imported/converted (all-intra) clips.
 
-Live **captures** (webcam / screen / device) and **HIVE** (HEVC-over-TCP network
-streams) fill slots the same way, and every video/capture slot has zoom / pan /
-crop **framing** and its own Source-FX rack.
+Live **captures** (webcam / screen / device), [NDI](#ndi) sources and **HIVE**
+(HEVC-over-TCP network streams) fill slots the same way, and every video/capture slot
+has zoom / pan / crop **framing** and its own Source-FX rack. A camera that drops out
+(unplugged, or reset by USB power saving) **reconnects by itself** : it is tried again
+2, 4, 8… up to 30 s apart, and at once when a device appears, found again by name if it
+comes back under another id; its last frame holds meanwhile.
 
 ## The Transport bar (bottom)
 
 Left → right:
 
 - **BPM** (20–800) : the label is a **tap-tempo button** (tap it in time) ·
-  **SPD** global speed (1/64×–64×, log; double-click → 1×) · **MRPH** morph time
-  (0–30 s : scene recalls and Randomize crossfade over this; New and Generate morph over it, layer by layer).
-- **WRLD** World selector + `⧉` World editor · **❄ Freeze** : hold the output on
-  the current frame (the button lights while held; also key `H` or a learned pad) ·
-  **Output** (opens the Output / mapping page) · **Body** (opens the embodied-control
+  **SPD** global speed (1/64×–64×, log; double-click → 1×) · **MORPH** time (0–30 s,
+  default 1 s : scene recalls and Randomize crossfade over this; New and Generate morph
+  over it, layer by layer) · **PROX** proximity (far ↔ close depth zone) + `◑` audio-brightness follow.
+- **World** (opens the World editor, also key `W`) + the World selector · **❄ Freeze** :
+  hold the output on the current frame (the button lights while held; also key `H` or a
+  learned pad). Messages (a refused effect drop, a saved recording) appear in the
+  toolbar's empty middle, always in the same place, over nothing; a long instruction
+  grows upward from there.
+- **Output** (opens the Output / mapping page) · **Body** (opens the embodied-control
   page; lights while the camera is live; also key `B`) · **Seq** (opens the
-  sequencer; lights when running) · **Sfy** (opens Sonify; lights while the sound
-  engine runs) · **PROX** proximity (far ↔ close depth zone) + `◑` audio-brightness
-  follow. Messages (a refused effect drop, a saved recording) appear in the toolbar's
-  empty middle, always in the same place, over nothing.
+  sequencer; lights when running) · **Sonify** (opens Sonify; lights while the sound
+  engine runs).
 - **Vary** (a baseline-anchored variant : structure fixed, values nudged) + amount.
 - **amt** Randomize intensity (gentle walk ↔ full re-roll) · **Randomize**
   split-button (main fires the selected scope; `▾` picks the scope : see
@@ -328,8 +336,11 @@ button (key `L`), the **REC** pill (stop it here and a toast confirms the saved
 file), undo / redo, UI zoom, and, at the far right, **⚡ Flush**, the panic
 button (also key `0`) that drops every self-feeding buffer at once: per-layer
 trails, the Feedback / Réponse / Chronoscan frame rings, the Sediment / Scanner
-accumulators, the reaction-diffusion field, so a runaway feedback build-up
-clears instantly without reloading anything.
+accumulators, the consume blend's competition field, and the persistent buffers of
+every rack effect (Light Trails, Wide Time, Slit Buffer, Context's trails), so a
+runaway feedback build-up clears instantly without reloading anything. Generators
+that grow their picture (Reaction, Colony…) are left alone : their buffer *is* the
+picture.
 
 ## Feel : the global macros (key `G`)
 
@@ -401,8 +412,9 @@ stepped family and take **SLIP** like the rest:
 Two of the types close the loop **from the image back to control**:
 
 - **`vision`** follows a feature of the *rendered output* (brightness, contrast,
-  motion, edges, entropy, bright-mass X/Y, warmth, **saturation**, **hue**, depth) :
-  the picture modulates itself. The colour features make the crossmodal table
+  motion, edges, entropy, bright-mass X/Y, warmth, **saturation**, **hue**, depth, depth
+  spread, and the picture's own **motion field** : `flowX`, `flowY`, `divergence`,
+  `curl`, `coherence`) : the picture modulates itself. The colour features make the crossmodal table
   playable : bind the picture's **hue** or **saturation** to a Sonify parameter and
   the *colour drives the sound*, the inverse of Sonify's image-to-sound path.
 - **`homeostat`** is a self-regulating controller: it watches an image feature
@@ -537,7 +549,7 @@ The **audio/midi/osc** right-column tab (key `A`) holds the control panels
 - **OSC** : inbound listener (port, on/off, this machine's IPs), outbound
   feedback (host/port/interval), and the OSCQuery status.
 - **Performance** (its own tab, right of audio/midi/osc; it meters only while
-  shown) : a per-section load monitor — each part of the instrument
+  shown) : a per-section load monitor : each part of the instrument
   (render, output, vision, depth, lights, sonify, audio, modulation, MediaPipe)
   with its CPU frame-budget share, estimated VRAM, and active-feature chips, so you
   can see what a heavy session is spending, with units and hover tooltips on every
@@ -692,17 +704,19 @@ With **OSC out** on in the app, every body feature also streams as
 
 ## Output & mapping (key `O`)
 
-A full-page takeover (the engine keeps rendering underneath):
+A full-page takeover (the engine keeps rendering underneath). Its sections, top to
+bottom:
 
-- **Fulldome** : render a square **domemaster** for a dome (see [Fulldome](#fulldome) below).
-- **Mapping** : a live keystone editor (drag four corner handles over a mirror of
-  the output) + alignment grid + reset.
-- **Resolution** : render-scale 0.1–2× of 1920×1080 (½ lo-fi / 1080p / 1440p / 4K;
-  rebuilds the engine).
 - **Composition size** : override the 16:9 base with a **custom composition** (e.g.
   **7680×2160** for a wide wall or a stack of projectors). The whole engine renders
   at that shape; the output window can then **span separate displays**, so several
-  projectors show one continuous picture.
+  projectors show one continuous picture. The size lives on the machine, not in the
+  session, so a show file stays resolution-independent.
+- **Render scale** : a quality multiplier (0.1–2×) on the composition size (½ lo-fi /
+  1× / 1⅓× / 2×; the readout shows the real render resolution; rebuilds the engine).
+- **Mapping** : a live keystone editor (drag four corner handles over a mirror of
+  the output) + alignment grid + reset.
+- **Fulldome** : render a square **domemaster** for a dome (see [Fulldome](#fulldome) below).
 - **Fullscreen output** : pick a display; borderless-fullscreen or windowed. The
   output window shows the control window's exact pixels, streamed at the
   projector's own resolution and keystoned on its side.
@@ -741,16 +755,29 @@ A full-page takeover (the engine keeps rendering underneath):
   (Resolume, TouchDesigner, MadMapper, OBS…) through the graphics card. Spout on
   Windows, Syphon on macOS, both built in : nothing to install. Sends the clean
   picture (before keystone) at the full render size, every frame (4K : ~58 fps
-  measured, ~3 ms of the frame).
+  measured, ~3 ms of the frame). Syphon is built in CI but not yet tried with a Syphon
+  client.
 - **Send** : **NDI** (built in, see [NDI](#ndi) below) and **HIVE** HEVC-over-TCP
   network output + port.
+- **Flash safety** : a photosensitivity limiter on the very last stage of the
+  chain, after the common flash-safety guidance (no more than three flashes a second).
+  It measures brightness in linear light, plus saturated red, over regions of the
+  frame, and counts each region's flashes over the last second : a region that strobes
+  faster than that (Shutter, Superimposition, Frame-Weave, film blanks, feedback
+  accidents) is held to a soft, gentle pulse until it stops, while cuts, motion and a
+  steady image pass untouched (on a very bright scene it can soften film flutter too).
+  One slider plus **off / mild / strong / max**; it ships **on** at **mild** (0.35),
+  applies to the preview and every output, and its section starts collapsed.
 - **Light output** : push the picture's colour **into the room**. The composite is
   averaged into a small zone grid and sent over **ArtNet / DMX** (to fixtures or a
   console) and to **WLED** LED strips, so stage lighting breathes with the visuals.
 - **Installation mode** : a panel to run Opsia as a **kiosk**. Boot a chosen session
   **fullscreen on a chosen display** on launch (or from the command line:
   `--kiosk [--session=<file>] [--display=<n>]`), with its sound playing if Sonify (or
-  its step sequence) was on when the session was saved. Toggle "launch on restart" here.
+  its step sequence) was on when the session was saved (at boot and after every
+  self-heal reload; opening a session by hand never starts the sound). **Enable on next
+  restart** arms it (it takes effect at the next launch); **use current session**
+  points it at the open session file.
   - **Start with the computer** : after a reboot or a power cut it starts by itself, and
     again if it ever crashes (macOS : a LaunchAgent; Windows : a login item and a check
     every 5 minutes). Turning Installation mode off removes it. Only one copy runs.
@@ -763,19 +790,17 @@ A full-page takeover (the engine keeps rendering underneath):
     the menu's reload / close / quit / dev-tools shortcuts are off, and the output stays
     above system notices.
   - **Exit** : hold `Esc` or `O` on the output for 1.5 s (a brushed key no longer ends
-    it), or press `Ctrl+Shift+O` anywhere.
+    it), or press `Ctrl/Cmd+Shift+O` anywhere. That returns to the operator UI; it does
+    not disarm Installation mode.
   - **The log** : every crash, hang and recovery is written to `logs/palinopsia.log`
     in the app's data folder (`%APPDATA%\Palinopsia` on Windows, `~/Library/Application
-    Support/Palinopsia` on macOS).
+    Support/Palinopsia` on macOS), with main-process errors (never an error box on
+    screen) and every window's errors and warnings. It holds 2 MB plus one previous copy;
+    a message repeated within a minute is counted, not repeated.
   - **On the machine** : turn on automatic login, turn off the lock screen, screen saver
     and automatic OS updates (Windows Update can also swap the graphics driver), and
     launch the app once by hand to accept every permission prompt (local network,
     camera, microphone, Documents) with the build that will run the show.
-- **Flash safety** : a photosensitivity limiter on the very last stage of the
-  chain: a GPU slew limiter caps how fast the frame's mean luminance may rise,
-  taming strobes from any source (Superimposition, Triangle Flicker, feedback
-  accidents) without touching a steady image. One slider from loose to tight;
-  it ships **on** at a moderate setting and mirrors to the output window.
 - A resource **HUD** (FPS · CPU · RAM · VRAM · GPU).
 
 ![Output and mapping](docs/images/interface-output.jpg)
@@ -786,13 +811,13 @@ controls. The HUD runs along the bottom.*
 
 ### Fulldome
 
-The first section of the Output page turns the output into a **domemaster** : a square,
+The **Fulldome** section of the Output page turns the output into a **domemaster** : a square,
 equidistant fisheye with the zenith at the centre and the **front of the dome at the
 bottom** (the fulldome standard, what a planetarium or the SAT Satosphère takes). The
 engine keeps rendering the flat composition at its own size; one pass maps it into the
 master at **2K or 4K**, and the master replaces the flat frame **everywhere** : the
-preview, the projector window (letterboxed, never stretched), NDI, Spout, recordings and
-stills. Keystone warp is off in dome mode (a dome is mapped by its own media server).
+preview, the projector window (letterboxed, never stretched), NDI, Spout / Syphon,
+recordings and stills. Keystone warp is off in dome mode (a dome is mapped by its own media server).
 
 - **Aperture** 180–230° (210° default : the Satosphère's 210°, its rim 15° below the
   horizon). The Satosphère takes **4096×4096 max, live over NDI** on its 10 Gb network.
@@ -831,7 +856,8 @@ stills. Keystone warp is off in dome mode (a dome is mapped by its own media ser
   **master** shows the flat domemaster instead. Double-click the view to reset the camera.
 - The dome mapping lives on the machine (the venue) **and** travels with the session (the
   piece). The dome itself always starts **off** (a restart or a session load never switches
-  it on) and its section starts collapsed.
+  it on) and its section starts collapsed. The section's **↺** puts every dome setting and
+  the simulator back to their defaults, leaving the dome on or off as it is.
 
 ### NDI
 
@@ -876,7 +902,8 @@ Output page; it stays on across restarts.
   program or preview; a warning appears when the rate falls behind.
 - **The NDI runtime** : Palinopsia uses its own bundled copy when the build has one, else
   the machine's NDI (NDI Tools / Runtime / SDK), else the copy another creative app
-  carries (TouchDesigner, Resolume, vMix…). The section names the one in use.
+  carries (TouchDesigner, Resolume, vMix…). The section names the one in use. NDI is
+  tested on Windows; the macOS and Linux paths are written but untested.
 - **A computer with no NDI at all** : the section offers **install NDI runtime**. One click
   downloads NDI's official runtime installer (about 10 MB on Windows, 5 MB on macOS,
   the link NDI's own SDK gives applications), checks it came from NDI over HTTPS with a
@@ -905,7 +932,7 @@ or need to restart.
 
 The instrument's sound half : the image itself synthesizes audio, in real time,
 inside the app (an AudioWorklet engine : no external software). A full-page
-takeover: the live composite mirrored large with the **probes drawn on it** : because the probe is the instrument, plus three voice strips and a master bus.
+takeover: the live composite mirrored large with the **probes drawn on it** : because the probe is the instrument, plus the nine voices' strips and a master bus.
 
 **The nine voices** (each one lineage of the sonification literature):
 
@@ -913,7 +940,7 @@ takeover: the live composite mirrored large with the **probes drawn on it** : be
 |---|---|---|
 | **Spectra** | The frame as a spectrogram : a column of 96 partials reads the image under a scan line : vertical position → pitch, brightness → loudness. The line **sweeps** (tempo-syncable, one sweep per bar) or **holds** (drag it), along a **reading path** : horizontal · vertical · radial (a rotating ray) · **spiral**, with an optional **breathe** that slows the sweep at the edges and rushes the middle. | ANS · Metasynth · vOICe · Aural Mirror : shimmering masses; the musical one |
 | **Orbit** | The frame as a **waveform** : an orbit (circle or Lissajous) reads pixels at audio rate : the image *is* the oscillator, so the visuals mutate the timbre live. Drag the centre and radius on the mirror; pitch is a note or free Hz. | wave terrain · Oramics : alive, analog-adjacent |
-| **Flow** | Whatever **moves** sings : each moving region fires a grain : position → pan, motion energy → loudness, height → pitch. Onsets are dithered across the frame interval so 30 Hz control never quantizes audibly. A **colour** amount steers each grain's **timbre** from the colour it sits on : saturation brightens (vivid = edgier), hue tints (warm hues → a rounder sub-octave body, cool → an octave-up shimmer). | Pelletier's flow fields · Aural Mirror's granular : Gestalt grain clouds |
+| **Flow** | Whatever **moves** sings : each moving region fires a grain : position → pan, motion energy → loudness, height → pitch. Onsets are dithered across the frame interval so 30 Hz control never quantizes audibly. A **color** amount steers each grain's **timbre** from the color it sits on : saturation brightens (vivid = edgier), hue tints (warm hues → a rounder sub-octave body, cool → an octave-up shimmer). | Pelletier's flow fields · Aural Mirror's granular : Gestalt grain clouds |
 | **Events** | Edges and motion are **struck as discrete notes** : a salience field (**spatial** Sobel edges : fires on a still · **motion** frame-difference · **blend** : a moving edge dominates) picks one peak per region and plucks the strongest as scale-quantized notes : pitch from height, velocity from strength, pan from position, and **highs decaying sooner** (a struck-string touch). sine / triangle / saw / square. | after Remo DeVico's *Aural Mirror* : articulation, rhythm |
 | **Raster** | Audification : a draggable **probe rect** read row-major as raw samples : the rect's contents *are* the waveform (edges buzz, gradients hum, datamosh blocks tick). One full scan = the period, so pitch is a note or free Hz; **smooth** 0 is the hard aliased register. | Ikeda · Yeo/Berger raster scanning : harsh, digital |
 | **Transmission** | The SSTV register : the image scanned line-by-line as a **monophonic FM voice** (black 1500 Hz → white 2300 Hz) with the 1200 Hz **sync tick** as a metronome. Line rate free or synced (one line per 16th). The melody *is* the image rows. | slow-scan TV : narrative, decodable |
@@ -973,14 +1000,18 @@ play/stop is MIDI-learnable (the Sonify-sequence transport).
 **✨ Auto-voice** : one button reads the session's actual vocabulary : which
 generators, nodes and FX are live on which layers, and picks the fitting
 voices by register : glitch/datamosh → Raster, motion/video → Flow, feedback →
-Orbit, line-work → Spectra, scan registers → Transmission, atmosphere → Filter.
-The strongest voice taps the layer that earned it; your key, gains and probes
-are kept. Deterministic : the same session always suggests the same setup.
+Orbit, line-work → Spectra, scan registers → Transmission, atmosphere → Filter,
+edges and marks → Events, drones and slow accumulation → Chord, and a Collage with
+films (on a layer or the background, folder or assemblages) → the Collage voice. A set
+that would fall silent on a still frame (only Flow and Events) always gets a voice that
+sings on one. The strongest voice taps the layer that earned it; your key, gains and
+probes are kept. Deterministic : the same session always suggests the same setup.
 
 **Fully integrated** : not just every probe and pitch (scan columns, orbit centre/
 radius/pitch, the raster rect and its pitch) but **most timbre & motion params** : Spectra gain/contrast/sweep/breath, orbit drive/smooth, flow grain/colour, events
 decay, raster smooth/tone, SSTV line/transpose, filter resonance/sweep, chord tone/
-spread/swell, and the FX send/reverb/delay : are **modulation targets**. Bind M1–M8
+spread/swell/waves, the Collage voice's resonance/ring/width and its Ring bank's
+wet/decay/cutoff/waves/detune, and the FX send/reverb/delay : are **modulation targets**. Bind M1–M8
 or a Meta knob via the M chips on the Sonify strips, and the mod-matrix stirs the
 listening the same way it stirs the image (overlays show the modulated probes
 live). The sound patch **travels with sessions and scenes** : recalling a scene
@@ -1058,9 +1089,13 @@ living mosaic where every fragment is a different film. Pick it as a layer sourc
   **`window`** loops a slice of each clip (0 = play the whole film, the smoothest
   setting); **`churn`** is how many pieces re-cut on their own fast clock, from
   all-holding to every-piece-its-own-montage.
-- **`deal`** re-deals the wall by hand, **`rate`** on a clock, and a **`crossfade`**
-  dissolves one deal into the next instead of snapping. contour · curve length · torn
-  paper · mask · rotate are the **Autocutter's own dials**, working identically here.
+- **`speed`** sets the films' playback rate and **`speed spread`** gives every piece its
+  own rate around it; **`freeze`** stops the whole wall on its current frame (a toggle a
+  modulator can play, see the [toggle law](#modulation-brain-8-modulators--matrix)).
+  Layer Speed and the global speed scale the whole wall, films and clocks alike.
+- **`deal`** re-deals the wall by hand, **`auto deal`** on a clock, and a **`crossfade`**
+  dissolves one deal into the next instead of snapping. seams · contour · curve length ·
+  torn paper · mask · rotate are the **Autocutter's own dials**, working identically here.
   **torn paper** tears like a real torn-magazine collage : along each tear one piece
   lies over the other, so only its ripped edge shows the white core
   of the paper (a hairline for long stretches, then deep bites), ragged at every scale
@@ -1086,7 +1121,7 @@ living mosaic where every fragment is a different film. Pick it as a layer sourc
   wall among the films already playing instead of loading new files, a file that
   fails is never dealt again (its piece moves to another film), and a background
   Collage that isn't shown stops decoding after a second.
-- **Optimise** (a button in the strip) re-encodes the whole folder to 720p
+- **optimize** (a button in the strip) re-encodes the whole folder to 720p
   all-intra H.264 : the shape the wall's constant seeking wants. Slow (minutes for
   a big folder) but one-time and cached; measured to hold 60 fps with 50 films.
 
@@ -1106,22 +1141,27 @@ show with a dialog : it keeps the recovery copy and never writes the session fil
 of “…”** brings one back, and Save puts it back in the file. A 60 s autosave ring
 (the last hour) covers crashes, and **Restore** after a crash reconnects the
 session to the file it came from. **Save As** names the session after its file. Opening a session
-also **pre-converts every video in its folder** in the background.
+also **pre-converts every video in its folder** in the background. A session also notes
+whether Sonify and its step sequence were playing, so switching Sonify on or off counts
+as a change; only [Installation mode](#output--mapping-key-o) acts on it.
+
+The file pickers (Open, Link a folder of sessions, a Collage or Assemble folder) open
+where they were last used, remembered across launches.
 
 **Changing sessions is a clean cut.** Loading a session holds the picture still while
 the new session's shaders compile, then dissolves into it over half a second : the old
 session never keeps playing on the projector while the new one assembles layer by layer.
 
-**New and Generate morph** into the new composition over the **MRPH** morph time, live :
+**New and Generate morph** into the new composition over the **MORPH** time, live :
 the picture is handed over layer by layer (top first, staggered). A layer slot free in
 both compositions hosts the new layer while the old one fades, a true crossfade, then
 the engine moves it into its own slot without reloading anything; a layer that keeps
 its shaders eases its settings instead; Vibe, Context and Finalizer ease the whole way.
-A new layer fades in only once its shaders have compiled, so nothing pops. At MRPH 0,
+A new layer fades in only once its shaders have compiled, so nothing pops. At MORPH 0,
 New and Generate cut, once the new composition has compiled.
 
 **Scenes** are full-instrument snapshots recalled by bare **`1`–`9`** or a
-double-click in the bank; recall crossfades over the **MRPH** morph time. Scenes
+double-click in the bank; recall crossfades over the **MORPH** time. Scenes
 carry their sequencer tags and are saved inside the session.
 
 **Session Loader** (toolbar) : a dropdown of every saved session + a **Load**
@@ -1132,15 +1172,26 @@ subfolders) joins the dropdown under the folder's name, in name order (number th
 saved there later appears too. The same menu lists the linked folders : click one to
 jump to its first session, × to unlink it (the files are never touched).
 
-**Generate** (toolbar) : a dropdown of **76 visual themes** (grouped by family:
-Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,
+**Generate** (toolbar) : a dropdown of **100 visual themes** in 16 families
+(Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,
 Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage,
-Cinematic/Atmospheric, Retro Screen, Minimal/Structural, Datamosh & Compression, plus a **Test** family with one diagnostic theme per Feel macro) + a **Generate**
-button. Each theme is
-a *recipe* : a tight source/FX pool, a Vibe palette, a matching World (coupling +
-audio routing), and Feel biases, so Generate builds a whole new, coherent,
-on-theme session in place (unsaved; Ctrl+S keeps it). Pressing it again re-rolls
-a fresh variation within the same theme.
+Cinematic/Atmospheric, Retro Screen, Minimal/Structural, Datamosh & Compression,
+**Living Surfaces** (lichen, rust, mold, burning paper, dry earth, grown textures),
+**Dome** (made for a fulldome : no vignette, nothing framing the edges, slow motion
+overhead), **Film Wall** (your own films through a Collage, graded and damaged : it plays
+the session's Collage folder, or the last one picked on this computer, and with none yet
+stands in with painted sources and says how to pick one), **Node Workshop** (one recipe
+node per theme, on the layer that reads the others), and, at the end, **Feel Studies**,
+one theme per Feel macro with everything else held still) + a **Generate** button. Each
+theme is a *recipe* : a tight source/FX pool drawn from the whole instrument (nodes that
+read another layer are handed one that is in the scene), a Vibe palette, a matching World
+(coupling + audio routing), Feel biases, and a way of **moving** : it binds a few
+modulators across its layers in its family's manner (slow breathing for Organic, Living
+Surfaces and Cinematic, drawn cadences for film, stepped and on the beat for Glitch and
+Data, sine and saw sweeps for Analog), so every active layer has at least one moving
+parameter while the master and the World's audio route are left alone. Generate builds
+a whole new, coherent, on-theme session in place (unsaved; Ctrl+S keeps it). Pressing it
+again re-rolls a fresh variation within the same theme.
 
 ## Metasurface : the continuous scene-space
 
@@ -1197,6 +1248,10 @@ Built-in guarantees so a roll always *plays*:
   limiter guards the output regardless.
 - The Vibe Palette, Context, the Background, and World slot-8 routing survive
   every global roll.
+- **Deliberate settings stay put:** anaglyph 3D, the film hold, the output shape, Vibe's
+  chord mode, the film damage and Context's blur are never rolled (by Randomize, the
+  walk or Vary); a pinned dice range keeps the current value; palettes (Palette,
+  Colorizer, Vibe) roll as one hue from near-black to pale, never five clashing colors.
 
 The **intensity** slider (amt) turns a full re-roll into a *walk*: below 100%,
 each unit keeps its structure with probability (1 − intensity) and is merely
@@ -1213,9 +1268,10 @@ don't flood your history.
 
 ---
 
-## Sources (38 generators)
+## Sources (41 generators)
 
-38 sources produce an image from nothing. Any generator can fill **Source A or B**
+41 sources produce an image from nothing (all but two : Collage plays a folder of films,
+Silhouette reads the Body camera). Any generator can fill **Source A or B**
 of any layer (and all but a few can be the Background source). Each ships curated
 Randomize sub-ranges and its own preset bank.
 
@@ -1252,7 +1308,7 @@ Randomize sub-ranges and its own preset bank.
 | **Dye Field** | Subtractive pigment pooling over a near-black emulsion, disciplined toward decay and crystallisation : painted-on-film dye, never additive glow. `relief` lights the pooled dye as a thin skin of paint. |
 | **Colony** | Living matter that grows across a surface, one `kind` at a time : **lichen** on granite (grey-green, orange and pale crusts cracking into areolae as they age, a black rim where colonies meet, bare rock where the ground is poor), **mould** on agar (a white growing margin, a green sporulating centre, rings), **burning paper** (a dim ember front, scorch ahead, char and ash behind), **rust** on steel spreading from scratches (orange, then red-brown, pitted and flaking; `palette` toward copper gives verdigris). The fronts have the roughness measured on real growth, colonies stop short of each other, all lit as a relief. `ground` : its own surface, or transparent so it grows over the layer below. `regrow ▸` starts again, `regrow every` cycles on its own; `grain` sets the cell size so it looks the same from 1080p to a 4096² dome. |
 | **Ground** | The surfaces under the living things, built the way the real ones form and lit as a relief : **cracked mud** drying (plates shrink apart, cracks widen and their edges curl, a thinner second generation splits them late; `drying` fixed or on a 45 s cycle), **sand ripples** migrating under a veering wind (gentle stoss, steep lee, heavy minerals in the troughs), **rock strata** (beds of very different thickness, hard ones standing proud, laminae, joints that never line up), **wood** end grain (early / late wood, rays, drying checks), **bark** (furrowed plates, fibre). `palette` shifts each to an alternate material (red clay, black sand, limestone, walnut, birch). |
-| **Scan** | A real photographed surface : the 30 CC0 ambientCG scans (rock, bark, sand, steel, paper, plaster, lava, snow…) with their colour, height, normal and AO maps, laid across the frame with **hex tiling** (every tile shifted and blended, so the scan never visibly repeats) and relit by the organic relief light. `drift` slides it, `weather` darkens the hollows, `colour` fades to its greys. Put **Colony** above it with a transparent `ground` and lichen or rust grows over the real rock or steel. |
+| **Scan** | A real photographed surface : the 30 CC0 ambientCG scans (rock, bark, sand, steel, paper, plaster, lava, snow…) with their colour, height, normal and AO maps, laid across the frame with **hex tiling** (every tile shifted and blended, so the scan never visibly repeats) and relit by the organic relief light. `drift` slides it, `weather` darkens the hollows, `color` fades to its grays. Put **Colony** above it with a transparent `ground` and lichen or rust grows over the real rock or steel. |
 | **Fluid** *(native)* | A real fluid, solved live (Stam's stable fluids on the GPU, with vorticity confinement). **ink** : two inks in still water, pushed by wandering nozzles, blooming, folding and threading as ink does in a glass. **smoke** : hot plumes from vents on the floor, lifted by their temperature, rolling into eddies and spreading under the ceiling as they cool. **fire** : the same gas burning, colored by its temperature (deep red to yellow-white, blackbody), puffing as the hot column necks off, soot above. `flow`, `sources`, `source size`, `wander`, `swirl` (keeps the eddies spinning), `buoyancy` (ink sinks below 0), `viscosity`, `fade`, `rate`, `detail` (grid, kept to the frame height so 4K and the dome look like 1080p). `stir ▸` turns the water, `clear ▸` empties it. About 1 to 1.5 ms a frame at any resolution. |
 | **Reaction** *(native)* | A Gray-Scott reaction-diffusion field self-organising into drifting spots, stripes, labyrinths and splitting critters, with its own zoom/pan/rotate framing. `relief` lights the pattern as a surface (coral, brain coral, skin) under one low raking light. Full-precision state on its own grid : the pattern keeps its size in the frame at 1080p, 4K and on the dome, runs the same at any frame rate (`rate` up to 3), wraps around (no seams when zoomed out), and a `scale` change reshapes the living pattern instead of restarting it. `regrow ▸` starts over. |
 | **Metamorph** | Birth-from-within (Blu's *Muto* register): a solid organic silhouette lives on screen; each cycle a new form is born from a point inside the old one, grows, and replaces it : endless metamorphosis, matte white-on-black. |
@@ -1260,7 +1316,7 @@ Randomize sub-ranges and its own preset bank.
 | **Differential** | Visual polyrhythm : several wave trains at integer speed ratios beating against each other, rendered as pulsing topographic contour bands. |
 | **Solid Color** | A flat colour fill or a smooth 3-stop linear gradient at any angle : the quietest source, to key / tint / grade against. |
 | **Organic** | Living elemental textures in motion : fire (flames that accelerate as they rise and puff out of phase, coloured by temperature on the blackbody curve), water (sunlight focused onto the bed by real waves : caustics from refraction), or nature (growing canopy); `vary` shifts each toward an alternate season. |
-| **Text** *(native)* | Typography as a source : type in the Inspector; choose font / size / weight / spacing / position; a sidechain layer can fill the glyphs. |
+| **Text** *(native)* | Typography as a source : type in the Inspector; choose font / size / weight / spacing / position; a sidechain layer can fill the glyphs. A `crawl` runs it as a ticker along the baseline, `shrink to fit` keeps it in frame, `letter drift` loosens the letters, `reveal` types it out, and `lines` set to *one at a time* shows a line per `next line ▸`. |
 | **Parametric** *(native)* | A literal audio → image reading : the audio bus as a hard raster, waveform trace, spectrum bars, or scrolling spectrogram (needs Audio ingest for real sound). |
 | **Collage** *(native)* | A wall of films cut up by the Autocutter partition : a folder of clips, or your saved Assemble edits, one per piece (see [Collage](#collage--a-wall-of-films-key-source-gen-collage)). |
 | **Grown** *(native)* | A texture that grows itself : a tiny neural network trained on a real scan (lava, mossy rock, bark) runs in every cell of a grid. From nothing the texture of the photo emerges, stays alive and heals where you damage it. |
@@ -1314,6 +1370,14 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   (or Alt) to **copy** instead. Right-click the `+ fx` box to paste a copied effect into
   an empty rack. An effect a rack can't host (a layer-only node into the Master, say) is
   refused with a popup saying why, and the drop marker turns red while you hover.
+- **Master chain presets** : the `chain presets…` box in the Master FX strip replaces the
+  whole master chain with one of **100** designed chains and sets the Vibe to match (the
+  finalizers stay). The newer ones sit in three groups : **Time & memory** (Réponse,
+  Sediment, Chronoscan, Eternalism, Afterimage, Decimate, Corrode, Feedback on the master
+  bus), **Node recipes** (a node that reads another layer is wired, when the preset is
+  applied, to a layer in use) and **Dome** (dome-safe : Context's vignette off, nothing
+  framing the edges); they keep the scene's palette mix. The `chain on/off` pill beside
+  it bypasses every master effect except the finalizers.
 - **The source pickers have sections** : **Organic** (living matter : reaction, growth,
   water, fire, ground), **Analog** (the analog video-synth lineage : RGB Oscillators, Sync
   Osc, Slit Scan, Ramps, Column Scan, Differential, Interference), then every other
@@ -1366,7 +1430,7 @@ FX treat the whole composite before the finalizers.
 | **Threshold** | Luma key to hard two-tone with a soft knee and optional invert : carve shapes. |
 | **Solarize** | Invert everything whose luminance clears a level, with a soft knee (Sabattier). |
 | **Mosh Blocks** | Macroblock corruption on a stepped clock : displaced, sometimes channel-swapped blocks (datamosh register). |
-| **Grain** | Physically-modelled noise per medium : film (clumped, midtone-peaked), digital sensor (shot / read / fixed-pattern), CRT (snow / dropout), VHS (smear / chroma error). |
+| **Grain** | Physically-modelled noise per medium : film (clumped, midtone-peaked), digital sensor (shot / read / fixed-pattern), CRT (snow / dropout), VHS (smear / chroma error). Its **parasites**, counted in real scanlines, add a rolling hum bar, a faint RF weave and impulse specks on CRT; on VHS, wobbling line edges, a frayed head-switch tear, white dropouts with a recovery tail and, pushed high, a drifting tracking band. |
 | **Streak** | Uniform 16-tap directional blur : camera-drag motion smear (not luma-gated). |
 | **Sharpen** | 3×3 unsharp mask : makes dithers bite and posterized bands snap. |
 | **Fold** | A single-axis mirror at a movable seam with a slide offset : one deliberate fold, kept asymmetric. |
@@ -1394,7 +1458,7 @@ FX treat the whole composite before the finalizers.
 | **Light Trails** | max()-blend trails : the brightest pixels persist and streak (long-exposure light-painting); optional drift. |
 | **Decay** | Analogue generation loss : chroma bleed, block crush, head-switch jitter, a bounded feedback ghost, tape noise and dropout lines; only ever degrades. |
 | **Abstraction** | One knob from representation to abstraction : luma-driven displacement + posterize + desaturation; a source dissolving into moving matter. |
-| **Wide Time** | A temporal average across the last N frames : the image crossfades with its own recent past into evolving scapes (mean / brightest / add / screen / difference / darkest). Because those modes brighten or darken by construction, a **preserve** dial re-anchors the output's exposure to the live image (0 = the raw accumulated look, 1 = fully re-anchored) so you can keep the base colours readable without pre-compensating with contrast. |
+| **Wide Time** | A temporal average across the last N frames : the image crossfades with its own recent past into evolving scapes (mean / brightest / add / screen / difference / darkest / burn, the blown-out one). Because those modes brighten or darken by construction, a **preserve** dial re-anchors the output's exposure to the live image (0 = the raw accumulated look, 1 = fully re-anchored) so you can keep the base colours readable without pre-compensating with contrast. |
 | **Hue Rotate** | Rotate the image's hue, optionally weighted by luminance : the missing colour primitive, beautiful under a slow LFO. |
 | **RGB Shift** | The three channels pulled apart geometrically (offset + independently scaled about centre) with an animated wobble : the channel-separation look. |
 | **Granular** | Video granular synthesis : the frame shattered into a grid of windowed grains, each rotated / scattered / scaled, with a persistent buffer for temporal smear. |
@@ -1460,8 +1524,16 @@ none is picked, so all five run in any rack.
 | Stage | Description |
 |---|---|
 | **Vibe Palette** | The always-on colour-**mastering** stage: an **opacity** dry/wet on top, auto-levels (temporally smoothed min/max), gamma tone placement, palette map, source mix-back, contrast, saturation, and split-tone. Decides the whole output's look; survives every global Randomize. Ships 56 palettes. |
-| **Context** | The always-on **depth** finalizer: temporal trails, a soft key light with volumetric bloom (place it on its pad, or **✎ draw** a path and **play** it : the light travels the drawing with the Metasurface's draw sequencer, direction, loop, time, jump and wiggle; **Vibe Color** lights it in the color the Vibe Palette is painting with), atmospheric haze, spatial blur (yours alone : it starts at 0, and New, Randomize, Variation, Generate and Worlds never set it), a depth vignette, a **void / edge-dissolve** (the frame's edges eaten toward black), and a **surface material** (project the composition onto one of 30 scanned materials; **evolution** keeps it from sitting still, as if a little wind moved the projector or the camera). Every parameter at zero is a clean passthrough. |
-| **Finalizer** | The last always-on stage: a final grade (input black/white + gamma + per-channel R/G/B gain), sharpen, and physically-modelled grain over everything, plus an **output shaper** (clip the frame to any of ~21 silhouettes with a drop-shadow, filled by a colour or the Background; a clean edge at any resolution, or as soft as its **feather** asks), the **anaglyph 3D stage** (`stereo`: off / red-cyan / grayscale, with depth, convergence and invert : this is where the shaders described as "at home under anaglyph" get their glasses), the **Cameraless film hold** (a hand-made-film pass: draw-clock hold + boil / flutter, granulation and splice), and **film damage**, modelled on real prints and working with or without the hold : **dust** that changes every film frame (24 fps, Super 8 18; mostly tiny specks, rarely a big mottled clump, dark on the print or white sparkle from the negative, the odd fibre), **scratches** that run along the strip (they last, wander slowly, break up, dark / white / emulsion-coloured, sometimes in tramlines), a **gate hair**, the **film gauge** (35 mm / 16 mm / Super 8 scales it all) and **dirt on** (print / mixed / negative). Sizes are in fractions of the frame, so a 1080p render and an 8K dome master look the same. All of it ships **off on a fresh or New session** and is switched on by the direct-film Worlds (Griffé · Peint · Pressé) or by hand, so a blank slate never opens with specks over the picture. The **output shape comes last**, after the film hold and the damage : the film weaves and gathers dust inside a fixed aperture, and the fill outside stays clean. Neutral at defaults. |
+| **Context** | The always-on **depth** finalizer: temporal trails, a soft key light with volumetric bloom (place it on its pad, or **✎ draw** a path and **play** it : the light travels the drawing with the Metasurface's draw sequencer, direction, loop, time, jump and wiggle; **Vibe Color** lights it in the color the Vibe Palette is painting with), atmospheric haze, spatial blur (yours alone : it starts at 0, and New, Randomize, Variation, Generate and Worlds never set it; its ring-shaped blur and bloom are the default look, and `smoothing` gives the soft version), a depth vignette, a **void / edge-dissolve** (the frame's edges eaten toward black), and a **surface material** (project the composition onto one of 30 scanned materials; **evolution** keeps it from sitting still, as if a little wind moved the projector or the camera). Every parameter at zero is a clean passthrough. When Proximity, Coalesce, Flow, Gesture⇄Texture, the sequencer's Breathe / Arc or a modulator add blur, haze, trails or depth on top of the sliders, a line under Context's header says what the picture really gets (e.g. `live blur 0.23 · haze 0.13 ← Proximity, Coalesce`), and its **neutral** button puts those macros back to 0.5. |
+| **Finalizer** | The last always-on stage: a final grade (input black/white + gamma + per-channel R/G/B gain, and an **opacity** that fades the whole picture to black), sharpen, and physically-modelled grain over everything (its **crt** and **vhs** characters carry the same scanline **parasites** as the [Grain](#the-catalogue-52-effects) effect), plus an **output shaper** (clip the frame to any of ~21 silhouettes with a drop-shadow, filled by a colour or the Background; a clean edge at any resolution, or as soft as its **feather** asks), the **anaglyph 3D stage** (`stereo`: off / red-cyan / grayscale, with depth, convergence and invert : this is where the shaders described as "at home under anaglyph" get their glasses), the **Cameraless film hold** (a hand-made-film pass: draw-clock hold + boil / flutter, granulation and splice; **grab ▸** re-draws or re-freezes it on a trigger), and **film damage**, modelled on real prints and working with or without the hold : **dust** that changes every film frame (24 fps, Super 8 18; mostly tiny specks, rarely a big mottled clump, dark on the print or white sparkle from the negative, the odd fibre), **scratches** that run along the strip (they last, wander slowly, break up, dark / white / emulsion-coloured, sometimes in tramlines), a **gate hair**, the **film gauge** (35 mm / 16 mm / Super 8 scales it all) and **dirt on** (print / mixed / negative), plus **burst ▸** : a dirty stretch of film passes the gate (four to eight times the dust for about a second, even with dust at 0), to fire on a beat or an onset (bind M, MIDI or OSC). Sizes are in fractions of the frame, so a 1080p render and an 8K dome master look the same. All of it ships **off on a fresh or New session** and is switched on by the direct-film Worlds (Griffé · Peint · Pressé) or by hand, so a blank slate never opens with specks over the picture. The **output shape comes last**, after the film hold and the damage : the film weaves and gathers dust inside a fixed aperture, and the fill outside stays clean. Neutral at defaults. |
+
+In the **Finishing** view (key `F`) each stage is split into labeled sections : Vibe
+Palette (palette · color chord · tone · split-tone), Context (softness · distance ·
+light · surface material), Finalizer (grade · character · 3D · hand-made film · film
+damage · output shape). A section's on/off switch sits in its header, and a section
+switched off folds away until you turn it on (or click its header); rows that do nothing
+right now are grayed, with the reason in their tooltip. Each stage's **↺** puts it back
+as a New session starts it, every parameter included (modulators stay bound).
 
 `toggleFinishing` bypasses/enables the three as one bank; they are excluded from
 Randomize (only their own dice re-rolls their params, holding brightness-critical
@@ -1481,11 +1553,17 @@ of whichever side is brighter, so hues never mix channel by channel the way
 
 Weave, lumakey and consume are **relation modes**, at their best on the A/B mix:
 
-- **weave** : interleaves A and B in alternating bands;
+- **weave** : each source's brightness displaces the other's picture, then the two
+  interleave : a woven two-source warp;
 - **lumakey** : B keys into A by luminance;
 - **consume** : a *stateful competition field*: A and B fight for territory
   frame-by-frame (a reagent surface remembers who held each pixel), so the mix
   boils and creeps instead of crossfading.
+
+They work as layer blends too, against the stack below : weave displaces the layer and
+the stack by each other's brightness and interleaves them, lumakey keys out the layer's
+near-black background, and consume runs the same competition field between the layer
+and the stack (the brighter side eats).
 
 ---
 
@@ -1551,7 +1629,7 @@ the only raw value.** All indices in addresses are **1-based**.
 | `…/speed` | f | Layer speed (0..1 → 0..20×) |
 | `…/mix` | f | A/B source mix |
 | `…/trail` | f | Feedback trail amount |
-| `…/blend` | i / f / s | Layer blend mode (index, 0..1 across 18, or name) |
+| `…/blend` | i / f / s | Layer blend mode (index, 0..1 across 19, or name) |
 | `…/sourceblend` | i / f / s | A/B blend mode |
 | `…/mute` · `…/solo` · `…/feedback` | bool | Toggles (≥ 0.5) |
 | `…/source/{A\|B}` | s | Set source shader (id / name / `none`) |
@@ -1570,7 +1648,7 @@ unless the slot actually holds a video.
 |---|---|---|
 | `…/video/play` · `…/loop` · `…/grain` | bool | Play/pause · loop · granulation on (≥ 0.5) |
 | `…/video/direction` | i / f / s | `forward·reverse·pendulum` |
-| `…/video/speed` | f | Clip speed, 0..1 log across 1/28×..128× |
+| `…/video/speed` | f | Clip speed, 0..1 log across 1/64×..128× (the slider's range) |
 | `…/video/position` | f | **One-shot seek** to 0..1 within the in/out trim |
 | `…/video/in` · `…/video/out` | f | Trim points (0..1; kept ordered) |
 | `…/video/grainsize` | f | Grain length (0..1 → 0.05..1 s) |
@@ -1651,7 +1729,8 @@ sync over subsequent ticks; a full resend on (re)start.
 The composited **picture** is also streamed back as vision features (the inward half of
 the loop, so the image can play a sound brain): `/opsia/vision/{brightness | contrast |
 motion | edges | entropy | centroidX | centroidY | warmth | saturation | hue | depth |
-depthSpread}`, each `f` `0..1`, on the same outbound target.
+depthSpread | flowX | flowY | divergence | curl | coherence}`, each `f` `0..1`, on the
+same outbound target.
 
 Separately, the [Body page](#body--embodied-control-key-b) emits its own bangs: with
 its **OSC out** on, each time a gesture rule fires it sends a `/body/<name>` message
@@ -1701,8 +1780,11 @@ config persists to `localStorage`.
 src/
   main/       Electron main : OSC in/out, OSCQuery, output window, HIVE in/out,
               video ingest (ffmpeg → all-intra cache), Assemble corpus analysis
-              + edit export, Spout/NDI senders
-  preload/    contextBridge API surface (window.api)
+              + edit export, the NDI runtime (find / install), Installation mode
+              (start with the computer, self-healing, the log file)
+  preload/    contextBridge API surface (window.api), plus the Spout / Syphon / NDI
+              senders, the NDI receiver and the DXV3 file writer (in the window's
+              own process : a 4K frame costs 30–90 ms to move to another one)
   renderer/   React UI + the WebGL2 engine
     engine/   Compositor (per-layer ISF → blend → stack), modulation engine,
               audio bus, coupling, Feel macros + Proximity, macro-form sequencer,
@@ -1714,6 +1796,7 @@ src/
   shared/     types shared across processes (incl. the descriptor definitions,
               so corpus and live image are measured with one ruler)
 native/spout/ N-API DX11 Spout sender addon (vendored Spout2 SDK)
+native/syphon/ macOS Syphon (Metal) server addon, built from the Syphon source in CI
 docs/         specs (convolution · cameraless · sequencer), research notes, and
               the screenshots used by this README
 ```

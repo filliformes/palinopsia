@@ -675,7 +675,7 @@ export function OutputPage({
             )}
           </Section>
 
-          <Section title="Record" info="Clips + screenshots land in the Recorded folder next to the app, or wherever you point location… (remembered on this computer; if that folder can't be reached, takes go to Recorded). DXV3 (Resolume's codec) is compressed on the graphics card and written as it goes : any size (the 4096² dome included; bigger is scaled to 4096), constant frame rate, plays smoothly in Resolume with no conversion, no sound. The other formats are captured as a high-bitrate hardware H.264 master, then ffmpeg delivers the chosen one (ProRes / FFV1 / uncompressed included) : the hardware encoder takes up to 3840×2160, so they're grayed out above that. DXV3 records the clean picture (before keystone); the others record what the preview shows.">
+          <Section title="Record" info="Clips + screenshots land in the Recorded folder next to the app, or wherever you point location… (remembered on this computer; if that folder can't be reached, takes go to Recorded). DXV3 (Resolume's codec) is compressed on the graphics card and written as it goes : any size (the 4096² dome included; bigger is scaled to 4096), constant frame rate, plays smoothly in Resolume with no conversion, with the Sonify sound as a PCM track when Sonify plays. The other formats are captured as a high-bitrate hardware H.264 master, then ffmpeg delivers the chosen one (ProRes / FFV1 / uncompressed included) : the hardware encoder takes up to 3840×2160, so they're grayed out above that. DXV3 records the clean picture (before keystone); the others record what the preview shows.">
 
             <select
               className="input select-compact w-full text-[11px]"
