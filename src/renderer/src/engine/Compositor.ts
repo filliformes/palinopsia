@@ -2869,20 +2869,6 @@ export class Compositor {
     gl.bindVertexArray(null);
     composite = this.masterRack.apply(composite, this.chain, nodeCtx); // nodeCtx → native nodes (Parallax) work on master too
 
-    // Finalizer output stage: clip the finished frame into a shape, filling
-    // OUTSIDE with a solid colour or the (moved) Background slab. No-op unless a
-    // shape is chosen. mixTarget is free here (the layer loop is long done).
-    if (this.fzShape > 0) {
-      if (!this.outputShape) this.outputShape = new OutputShape(this.gl);
-      const fill = this.fzBgLayer && haveBgFill ? this.bgFill.tex : null;
-      this.outputShape.apply(
-        composite, fill, this.fzBgColor, this.fzShape, this.fzSize, this.fzAngle,
-        this.fzPosX, this.fzPosY, this.fzDepth, this.fzShadowAngle, this.fzPersp,
-        this.w / this.h, this.mixTarget.fbo, this.w, this.h
-      );
-      composite = this.mixTarget.tex;
-    }
-
     // Cameraless / direct-film stage: draw-clock hold + boil (§2.1 pipeline slot).
     // Null when off (hold===0) or effectively smooth (draw ≥ present fps with no
     // artifacts) : skipped entirely so it costs nothing and passes through clean.
@@ -2931,6 +2917,24 @@ export class Compositor {
         { dust: this.fdDust, scratch: this.fdScratch, hair: this.fdHair, gauge: this.fdGauge, dirt: this.fdDirt },
         weave, this.w, this.h
       );
+    }
+
+    // Finalizer output stage: clip the finished frame into a shape, filling
+    // OUTSIDE with a solid colour or the (moved) Background slab. No-op unless a
+    // shape is chosen. LAST in the picture, after the film hold, boil and damage :
+    // the film weaves and gets dusty INSIDE a fixed aperture, and the fill outside
+    // stays clean (it used to come first, so dust and scratches landed on the
+    // fill). Only presentation follows (crossfade, freeze, flash safety, dome).
+    // mixTarget is free here (the layer loop is long done).
+    if (this.fzShape > 0) {
+      if (!this.outputShape) this.outputShape = new OutputShape(this.gl);
+      const fill = this.fzBgLayer && haveBgFill ? this.bgFill.tex : null;
+      this.outputShape.apply(
+        composite, fill, this.fzBgColor, this.fzShape, this.fzSize, this.fzAngle,
+        this.fzPosX, this.fzPosY, this.fzDepth, this.fzShadowAngle, this.fzPersp,
+        this.w / this.h, this.mixTarget.fbo, this.w, this.h
+      );
+      composite = this.mixTarget.tex;
     }
 
     // Scene crossfade: dissolve the frozen old frame into the new composite.

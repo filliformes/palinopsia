@@ -320,6 +320,11 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **The Finalizer's output shape comes last**, after the film hold, boil and film damage
+  (only the scene dissolve, freeze, Flash safety and the dome follow it). It used to come
+  first, so dust, hairs and scratches landed on the fill outside the shape; now the film
+  gathers them inside a fixed aperture and the outside stays clean (measured : 97-122
+  specks on the black fill over 20 frames before, 0 after).
 - **Torn paper tears like real paper** (Collage and the Autocutter). It used to paint the same off-white
   band on both sides of every cut (and along the frame's edges), which read as a seam.
   Now, as in a torn-magazine collage, one piece of each tear lies over the other : only
