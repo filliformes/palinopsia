@@ -642,7 +642,7 @@ app.whenReady().then(async () => {
     recording.recordingStart(ext as string, codec as string)
   )
   safeOn('recording:chunk', (_e, data) => recording.recordingChunk(data as Uint8Array))
-  safeHandle('recording:stop', (_e, formatId) => recording.recordingStop(formatId as string))
+  safeHandle('recording:stop', (_e, formatId, withSound) => recording.recordingStop(formatId as string, withSound !== false))
   safeHandle('screenshot:save', (_e, data) => recording.saveScreenshot(data as Uint8Array))
 
   // ---------- IPC: HIVE live-in ----------

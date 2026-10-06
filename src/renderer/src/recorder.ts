@@ -8,7 +8,12 @@
 //   at full size (bigger masters are scaled to 4096). Constant frame rate : when
 //   the engine falls behind the record rate, the next frame is written again for
 //   the ticks it missed, so the clip always runs in real time. It records the
-//   CLEAN picture (before keystone). No sound.
+//   CLEAN picture (before keystone), and the Sonify sound as a PCM track.
+//
+// SOUND, both kinds : a take holds Sonify's sound bus open for its whole length
+// (sonifyEngine.holdRecordBus), so the sound is recorded whenever Sonify plays,
+// switched on before or during the take, off and on again; silence while it is
+// off. A take during which Sonify never played is saved with no sound at all.
 //
 // · ENCODER formats : MediaRecorder captures the output canvas into a HIGH-bitrate,
 //   hardware-accelerated intermediate (H.264 where the platform offers it),
@@ -134,8 +139,9 @@ class DxvTake {
   path = ''
   w = 0
   h = 0
+  heard = false // Sonify played at some point of the take
 
-  constructor(private comp: () => Compositor | null, private port: MessagePort, readonly fps: number) {
+  constructor(private comp: () => Compositor | null, private port: MessagePort, readonly fps: number, private rate: number) {
     this.interval = 1000 / fps
     // Frames are independent : a few workers side by side (one DXV3 frame at
     // 4096² takes ~28 ms to build, a 30 fps take has 33).
@@ -174,11 +180,15 @@ class DxvTake {
     this.w = w
     this.h = h
     const [fpsN, fpsD] = ndiRate(this.fps)
-    this.port.postMessage({ t: 'open', w, h, fpsN, fpsD })
+    const rate = this.rate > 0 && this.rate <= 65535 ? this.rate : 0
+    this.port.postMessage({ t: 'open', w, h, fpsN, fpsD, rate })
     const r = await this.wait('opened', 5000)
     if (r.t !== 'opened') return String(r.message ?? 'the file could not be created')
     this.path = String(r.path)
     this.t0 = performance.now()
+    // The sound, from the same moment : PCM chunks straight to the writer.
+    if (rate) sonifyEngine.startTap((buf) => { try { this.port.postMessage({ t: 'audio', buf }, [buf]) } catch { /* closed */ } })
+    this.heard = sonifyEngine.isRunning()
     return null
   }
 
@@ -197,6 +207,7 @@ class DxvTake {
 
   /** Every render-loop frame, right after the render. */
   tick(now: number): void {
+    if (sonifyEngine.isRunning()) this.heard = true
     const c = this.comp()
     if (!c) return
     // Finished captures first, oldest first, round-robin to the workers.
@@ -224,7 +235,8 @@ class DxvTake {
     while (performance.now() < until && ((c?.capturePending('rec') ?? 0) > 0 || this.next < this.seq)) {
       await new Promise((r) => window.setTimeout(r, 30))
     }
-    this.port.postMessage({ t: 'end' })
+    await sonifyEngine.stopTap() // its last chunk reaches the writer before 'end'
+    this.port.postMessage({ t: 'end', sound: this.heard })
     const r = await this.wait('done', 60000)
     this.workers.forEach((w) => w.terminate())
     c?.captureRelease('rec')
@@ -251,6 +263,8 @@ export class OutputRecorder {
   // its resolver (which used to leave the first caller waiting forever).
   private stopping: Promise<string | null> | null = null
   private watchdog: number | null = null
+  private heldBus = false // this take holds Sonify's sound bus
+  private heard = false // Sonify played at some point of the (encoder) take
 
   get active(): boolean {
     return this.rec !== null || this.dxv !== null
@@ -261,9 +275,17 @@ export class OutputRecorder {
     this.engine = get
   }
 
-  /** Called by the render loop every frame (does nothing unless a DXV take runs). */
+  /** Called by the render loop every frame : drives a DXV take, and notes
+   *  whether Sonify plays during an encoder take. */
   tick(now: number): void {
+    if (this.rec && sonifyEngine.isRunning()) this.heard = true
     this.dxv?.tick(now)
+  }
+
+  private releaseBus(): void {
+    if (!this.heldBus) return
+    this.heldBus = false
+    sonifyEngine.releaseRecordBus()
   }
 
   /** The size a take in `formatId` would record at, right now. */
@@ -278,11 +300,14 @@ export class OutputRecorder {
       this.lastError = 'the recording writer did not answer'
       return false
     }
-    const take = new DxvTake(() => this.engine(), port, useStore.getState().recordPrefs.fps)
+    const bus = await sonifyEngine.holdRecordBus()
+    this.heldBus = !!bus
+    const take = new DxvTake(() => this.engine(), port, useStore.getState().recordPrefs.fps, bus ? sonifyEngine.busRate : 0)
     const err = await take.open()
     if (err) {
       this.lastError = err
       try { port.close() } catch { /* ignore */ }
+      this.releaseBus()
       return false
     }
     this.dxv = take
@@ -301,6 +326,7 @@ export class OutputRecorder {
       else if (r.frames === 0) this.lastError = 'no frame was captured'
       return r.path
     } finally {
+      this.releaseBus()
       useStore.getState().setRecording(false)
     }
   }
@@ -309,18 +335,20 @@ export class OutputRecorder {
     if (this.active) return false
     this.lastError = null
     if (formatId === 'dxv3') return this.startDxv()
-    // Sonification running → mix its audio into the capture (a true
-    // audiovisual take). The audio track belongs to the sound engine's
-    // MediaStreamDestination : it is merged, never stopped by us.
-    const soniStream = sonifyEngine.recordStream()
-    const audioTracks = soniStream && sonifyEngine.isRunning() ? soniStream.getAudioTracks() : []
+    // The take's sound : Sonify's sound bus, held open for the whole take (see
+    // the header). The track belongs to the sound engine : it is merged, never
+    // stopped by us.
+    const bus = await sonifyEngine.holdRecordBus()
+    this.heldBus = !!bus
+    this.heard = sonifyEngine.isRunning()
+    const audioTracks = bus ? bus.getAudioTracks() : []
     const inter = pickIntermediate(audioTracks.length > 0)
-    if (!inter) return false
+    if (!inter) { this.releaseBus(); return false }
     this.formatId = formatId
     this.bytes = 0
     this.lastError = null
     const ok = await window.api.recordingStart(inter.ext, inter.codec)
-    if (!ok) return false
+    if (!ok) { this.releaseBus(); return false }
     try {
       const fps = 60
       const canvasStream = canvas.captureStream(fps)
@@ -335,7 +363,8 @@ export class OutputRecorder {
     } catch {
       this.stream?.getVideoTracks().forEach((t) => t.stop())
       this.stream = null
-      await window.api.recordingStop(formatId)
+      this.releaseBus()
+      await window.api.recordingStop(formatId, false)
       return false
     }
     const rec = this.rec
@@ -434,12 +463,14 @@ export class OutputRecorder {
         await this.queue.catch(() => {}) // every chunk reached main before we finalize
       }
     } finally {
+      this.releaseBus()
       useStore.getState().setRecording(false)
     }
     if (!rec) return null
     if (this.bytes === 0 && !this.lastError) this.lastError = 'the encoder produced no video'
     try {
-      return await window.api.recordingStop(this.formatId)
+      // No Sonify during the whole take : the delivery file has no sound track.
+      return await window.api.recordingStop(this.formatId, this.heard)
     } catch (e) {
       this.lastError = this.lastError ?? `saving failed (${(e as Error).message})`
       return null

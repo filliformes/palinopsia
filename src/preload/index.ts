@@ -201,7 +201,7 @@ const api: ExposedApi = {
   recordingOpenFolder: () => ipcRenderer.invoke('recording:openFolder'),
   recordingStart: (ext: string, codec: string) => ipcRenderer.invoke('recording:start', ext, codec),
   recordingChunk: (data: Uint8Array) => ipcRenderer.send('recording:chunk', data),
-  recordingStop: (formatId: string) => ipcRenderer.invoke('recording:stop', formatId),
+  recordingStop: (formatId: string, withSound = true) => ipcRenderer.invoke('recording:stop', formatId, withSound),
   saveScreenshot: (data: Uint8Array) => ipcRenderer.invoke('screenshot:save', data),
 
   // ── App lifecycle ────────────────────────────────────────────────

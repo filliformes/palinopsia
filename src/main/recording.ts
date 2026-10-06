@@ -307,7 +307,19 @@ function runFfmpeg(args: string[]): Promise<void> {
 
 /** Close the intermediate, then produce the chosen delivery format. Returns the
  *  finished clip's path (falls back to the raw intermediate if ffmpeg fails). */
-export async function recordingStop(formatId: string): Promise<string | null> {
+/** Delivery args with the sound left out : the audio codec options dropped and
+ *  -an before the output (a take during which Sonify never played). */
+function silent(args: string[]): string[] {
+  const out: string[] = []
+  for (let i = 0; i < args.length - 1; i++) {
+    if (args[i] === '-c:a' || args[i] === '-b:a') { i++; continue }
+    if (args[i] === '-c' && args[i + 1] === 'copy') { out.push('-c:v', 'copy'); i++; continue }
+    out.push(args[i])
+  }
+  return [...out, '-an', args[args.length - 1]]
+}
+
+export async function recordingStop(formatId: string, withSound = true): Promise<string | null> {
   const src = tmpPath
   await new Promise<void>((resolve) => {
     if (!stream) return resolve()
@@ -327,6 +339,16 @@ export async function recordingStop(formatId: string): Promise<string | null> {
   const dir = dirname(src)
   const finalPath = join(dir, `opsia-${stamp()}.${fmt.ext}`)
 
+  // Passthrough with no sound to keep : a stream copy of the picture alone.
+  if (!fmt.args && !withSound && ffmpegAvailable()) {
+    try {
+      await runFfmpeg(['-i', src, '-map', '0:v', '-c', 'copy', finalPath])
+      await fs.rm(src).catch(() => {})
+      return finalPath
+    } catch (e) {
+      console.error('[recording] silent remux failed, keeping the take as it is:', (e as Error).message)
+    }
+  }
   // Passthrough (or no ffmpeg): just rename the intermediate into place.
   if (!fmt.args || !ffmpegAvailable()) {
     try {
@@ -338,7 +360,8 @@ export async function recordingStop(formatId: string): Promise<string | null> {
   }
   // Transcode / remux, then delete the intermediate.
   try {
-    await runFfmpeg(fmt.args(src, finalPath, srcCodec))
+    const args = fmt.args(src, finalPath, srcCodec)
+    await runFfmpeg(withSound ? args : silent(args))
     await fs.rm(src).catch(() => {})
     return finalPath
   } catch (e) {

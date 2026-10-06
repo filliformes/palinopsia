@@ -338,8 +338,16 @@ interface GridReader {
 
 class SonifyEngine {
   private ctx: AudioContext | null = null
+  private ctxReady: Promise<AudioContext> | null = null
   private node: AudioWorkletNode | null = null
   private recDest: MediaStreamAudioDestinationNode | null = null
+  // THE SOUND BUS for recordings : a take holds Sonify's audio context open
+  // (bus > 0) so its sound track lives for the whole take, Sonify on or off,
+  // and a DXV3 take reads the sound as PCM through the tap.
+  private bus = 0
+  private tap: AudioWorkletNode | null = null
+  private tapSink: GainNode | null = null
+  private tapFlush: (() => void) | null = null
   private cfg: SoniConfig = defaultSoniConfig()
   private starting = false
   private lineSrc: MediaStreamAudioSourceNode | null = null
@@ -405,13 +413,40 @@ class SonifyEngine {
   /** The recorder mixes this stream's audio track into captures (null = off). */
   recordStream(): MediaStream | null { return this.recDest?.stream ?? null }
 
+  /** The audio context, its worklet module and the recording destination,
+   *  created once and shared by the sound and by a recording's sound bus. */
+  private ensureCtx(): Promise<AudioContext> {
+    if (this.ctxReady) return this.ctxReady
+    this.ctxReady = (async (): Promise<AudioContext> => {
+      const ctx = new AudioContext({ latencyHint: 'interactive' })
+      try {
+        await ctx.audioWorklet.addModule(SONI_WORKLET_URL)
+      } catch (e) {
+        void ctx.close().catch(() => {}) // never leak a context (one per retry)
+        this.ctxReady = null
+        throw e
+      }
+      this.recDest = ctx.createMediaStreamDestination()
+      // A constant silent source keeps the recording track delivering samples
+      // while nothing plays : with no input it delivered NONE, and the video
+      // recorder then waited for sound (a take with Sonify off saved nothing) or
+      // closed the gaps up (the sound slid out of sync with the picture).
+      const hush = ctx.createConstantSource()
+      hush.offset.value = 0
+      hush.connect(this.recDest)
+      hush.start()
+      this.ctx = ctx
+      if (this.cfg.sinkId) this.applySink(this.cfg.sinkId)
+      return ctx
+    })()
+    return this.ctxReady
+  }
+
   async start(): Promise<void> {
-    if (this.ctx || this.starting) return
+    if (this.node || this.starting) return
     this.starting = true
-    let ctx: AudioContext | null = null
     try {
-      ctx = new AudioContext({ latencyHint: 'interactive' })
-      await ctx.audioWorklet.addModule(SONI_WORKLET_URL)
+      const ctx = await this.ensureCtx()
       // Input 0 : the Filter voice's line-in. Input 1 : the Collage voice's films.
       const node = new AudioWorkletNode(ctx, 'soni', { numberOfInputs: 2, outputChannelCount: [2] })
       node.port.onmessage = (e): void => {
@@ -423,21 +458,97 @@ class SonifyEngine {
         }
       }
       node.connect(ctx.destination)
-      this.recDest = ctx.createMediaStreamDestination()
-      node.connect(this.recDest)
-      this.ctx = ctx
+      if (this.recDest) node.connect(this.recDest)
+      if (this.tap) node.connect(this.tap)
       this.node = node
-      if (this.cfg.sinkId) this.applySink(this.cfg.sinkId)
       this.pushConfig(this.cfg)
       if (ctx.state !== 'running') await ctx.resume()
     } catch (e) {
       console.error('[sonify] start failed', e)
-      // a context that never became ours would leak (one per retry)
-      if (ctx && ctx !== this.ctx) void ctx.close().catch(() => {})
       this.stop()
     } finally {
       this.starting = false
     }
+  }
+
+  /** A recording holds the sound bus for its take : the context (and its sound
+   *  track) stays alive while Sonify comes and goes. Returns the track's stream. */
+  async holdRecordBus(): Promise<MediaStream | null> {
+    this.bus++
+    try {
+      const ctx = await this.ensureCtx()
+      if (ctx.state !== 'running') await ctx.resume().catch(() => {})
+      // Wait (up to a second) for the audio clock to actually run : a recorder
+      // started on a context that hasn't produced samples yet waits for them,
+      // and a short first take after launch came out empty.
+      const t0 = ctx.currentTime
+      const until = performance.now() + 1000
+      while (ctx.currentTime <= t0 + 0.05 && performance.now() < until) await new Promise((r) => window.setTimeout(r, 20))
+      return this.recDest?.stream ?? null
+    } catch (e) {
+      console.warn('[sonify] no sound bus for the recording', e)
+      this.bus = Math.max(0, this.bus - 1)
+      return null
+    }
+  }
+
+  /** The take ended : let the context go if the sound is off too. */
+  releaseRecordBus(): void {
+    this.bus = Math.max(0, this.bus - 1)
+    if (this.bus === 0 && !this.node && !this.starting) this.closeCtx()
+  }
+
+  /** The bus's sample rate (0 = no bus). */
+  get busRate(): number {
+    return this.ctx?.sampleRate ?? 0
+  }
+
+  /** Start sending the sound as 16-bit stereo PCM chunks (a DXV3 take). */
+  startTap(onPcm: (pcm: ArrayBuffer) => void): boolean {
+    const ctx = this.ctx
+    if (!ctx) return false
+    try {
+      if (!this.tap) {
+        this.tap = new AudioWorkletNode(ctx, 'soni-tap', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] })
+        // Kept pulled by the graph (a node nothing listens to may not run).
+        this.tapSink = ctx.createGain()
+        this.tapSink.gain.value = 0
+        this.tap.connect(this.tapSink).connect(ctx.destination)
+        if (this.node) this.node.connect(this.tap)
+      }
+      this.tap.port.onmessage = (e): void => {
+        const m = e.data as { t: string; buf: ArrayBuffer; last?: boolean }
+        if (m?.t !== 'pcm') return
+        if (m.buf.byteLength) onPcm(m.buf)
+        if (m.last) { this.tapFlush?.(); this.tapFlush = null }
+      }
+      this.tap.port.postMessage({ t: 'tap', on: true })
+      return true
+    } catch (e) {
+      console.warn('[sonify] recording tap', e)
+      return false
+    }
+  }
+
+  /** Stop the tap; resolves once its last chunk has been handed over. */
+  stopTap(): Promise<void> {
+    const tap = this.tap
+    if (!tap) return Promise.resolve()
+    return new Promise<void>((res) => {
+      const t = window.setTimeout(() => { this.tapFlush = null; res() }, 500)
+      this.tapFlush = (): void => { window.clearTimeout(t); res() }
+      tap.port.postMessage({ t: 'tap', on: false })
+    })
+  }
+
+  private closeCtx(): void {
+    try { this.tap?.disconnect(); this.tapSink?.disconnect() } catch { /* already gone */ }
+    this.tap = null
+    this.tapSink = null
+    this.recDest = null
+    void this.ctx?.close().catch(() => {})
+    this.ctx = null
+    this.ctxReady = null
   }
 
   stop(): void {
@@ -453,12 +564,12 @@ class SonifyEngine {
     this.lineReq++
     this.node?.disconnect()
     this.node = null
-    this.recDest = null
-    void this.ctx?.close()
-    this.ctx = null
     this.meterPeak = 0
     this.flowDots = new Float32Array(0)
     this.scan = null
+    // A recording holding the sound bus keeps the context (and its sound track)
+    // alive; it plays silence until the sound comes back.
+    if (this.bus === 0) this.closeCtx()
   }
 
   private applySink(sinkId: string): void {

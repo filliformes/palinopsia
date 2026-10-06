@@ -1424,3 +1424,50 @@ class SoniProcessor extends AudioWorkletProcessor {
   }
 }
 registerProcessor('soni', SoniProcessor);
+
+// ── The recording tap : the Sonify output as 16-bit PCM for a DXV3 take (the
+// file writer muxes it as the take's sound track). It hears silence while
+// Sonify is off, so the take's timeline never has a hole. ~0.1 s chunks; turning
+// it off sends the rest.
+class SoniTap extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.on = false;
+    this.n = Math.max(128, Math.round(sampleRate / 10));
+    this.buf = new Int16Array(this.n * 2);
+    this.k = 0;
+    this.port.onmessage = (e) => {
+      const m = e.data;
+      if (!m || m.t !== 'tap') return;
+      if (m.on) { this.on = true; this.k = 0; return; }
+      if (this.on) {
+        this.on = false;
+        const rest = this.buf.slice(0, this.k * 2);
+        this.port.postMessage({ t: 'pcm', buf: rest.buffer, last: true }, [rest.buffer]);
+        this.k = 0;
+      }
+    };
+  }
+  process(inputs) {
+    if (!this.on) return true;
+    const inp = inputs[0];
+    const L = inp && inp.length ? inp[0] : null;
+    const R = inp && inp.length > 1 ? inp[1] : L;
+    const n = L ? L.length : 128;
+    for (let s = 0; s < n; s++) {
+      let l = L ? L[s] : 0, r = R ? R[s] : 0;
+      l = l > 1 ? 1 : l < -1 ? -1 : l;
+      r = r > 1 ? 1 : r < -1 ? -1 : r;
+      this.buf[this.k * 2] = Math.round(l * 32767);
+      this.buf[this.k * 2 + 1] = Math.round(r * 32767);
+      if (++this.k >= this.n) {
+        const out = this.buf;
+        this.port.postMessage({ t: 'pcm', buf: out.buffer }, [out.buffer]);
+        this.buf = new Int16Array(this.n * 2);
+        this.k = 0;
+      }
+    }
+    return true;
+  }
+}
+registerProcessor('soni-tap', SoniTap);

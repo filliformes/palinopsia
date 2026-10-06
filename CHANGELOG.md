@@ -7,6 +7,15 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Recordings carry the Sonify sound, DXV3 included, whenever Sonify plays.** A DXV3
+  take now has a PCM sound track (16-bit little-endian, written natively as the frames
+  go, in the layout libavformat uses; measured : the sound present, 0 decode errors).
+  Every take holds Sonify's audio context open for its length, so the sound is
+  recorded when Sonify is switched on before or during the take, or off and on again,
+  with silence in between, in sync with the picture (it used to be recorded only if
+  Sonify was on at the start, and a restart mid-take lost it for good). A take during
+  which Sonify never played is saved with no sound stream at all.
+
 - **Collage : FX before shapes.** A toggle in the Collage's Inspector : the source's
   FX rack processes the films alone, then the seams, contours, torn paper and mask
   holes are drawn over the processed films, crisp. Measured with a coarse Pixelate in

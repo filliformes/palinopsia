@@ -1211,7 +1211,7 @@ export interface ExposedApi {
   recordingOpenFolder: () => Promise<string>
   recordingStart: (intermediateExt: string, codec: string) => Promise<boolean>
   recordingChunk: (data: Uint8Array) => void
-  recordingStop: (formatId: string) => Promise<string | null>
+  recordingStop: (formatId: string, withSound?: boolean) => Promise<string | null>
   saveScreenshot: (data: Uint8Array) => Promise<string | null>
 }
 
