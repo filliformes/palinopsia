@@ -730,7 +730,10 @@ void main(){
 // distances are measured in aspect-true units (frame height), so vertical and
 // horizontal cuts match. Output is straight alpha; the crossfade passes
 // (uPremul = 1) write premultiplied for their additive blend.
-const F_AUTOCUT = `#version 300 es
+// TORN : the torn-paper code is compiled only into its own variant, so an
+// Autocutter with torn at 0 runs exactly the plain program.
+const F_AUTOCUT = (torn: boolean): string => `#version 300 es
+#define TORN ${torn ? 1 : 0}
 precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uHost;
 uniform int uCount;
@@ -740,6 +743,7 @@ uniform vec4 uMap[64];    // rect: source rect  - mosaic: source seed .xy
 uniform float uRot[64];   // 0..3 (x90 deg)
 uniform float uGap, uSlip, uMix, uSeed, uContour, uTorn, uMask, uCurve, uFade, uAspect, uPremul;
 uniform float uRank[64];  // per-piece dropout order; the survivor holds 2.0
+uniform float uPx;        // one pixel, in frame-height units
 ${GLSL_HASH}
 float hash(float i, float k){ return hash13(vec3(i, k, uSeed)); }
 // 2D value noise for the tear lines : re-seeded per cut, so every re-cut tears
@@ -783,6 +787,86 @@ vec2 rotL(vec2 v, float r){
   if (ri == 3) return vec2(v.y, -v.x);
   return v;
 }
+float keepOf(int i){ return smoothstep(uMask - 0.06, uMask, uRank[i]); }
+// Piece i's picture at wUV (its source region, turned and slipped). Past the
+// piece's own edge it simply reads on into the host (a torn overhang is a few
+// pixels). Explicit LOD : torn paper reads a neighbour inside per-pixel
+// branches, where implicit derivatives are undefined (the chain has no mips).
+vec4 pieceAt(int i, vec2 wUV, vec2 A){
+  if (uShape == 1){
+    vec2 slip = (vec2(hash(float(i), 1.0), hash(float(i), 2.0)) - 0.5) * uSlip * 0.3;
+    vec2 local = rotL((wUV - uCell[i].xy) * A, uRot[i]) / A;
+    return textureLod(uHost, clamp(uMap[i].xy + local + slip, 0.0, 1.0), 0.0);
+  }
+  vec4 d = uCell[i];
+  vec2 luv = rot90((wUV - d.xy) / d.zw, uRot[i]);
+  vec4 sr = uMap[i];
+  vec2 slip = (vec2(hash(float(i), 1.0), hash(float(i), 2.0)) - 0.5) * uSlip;
+  return textureLod(uHost, sr.xy + (luv + slip) * sr.zw, 0.0);
+}
+#if TORN
+// TORN PAPER, modelled on a real torn-magazine collage (as Collage's). Along
+// every tear one piece lies OVER its neighbour (a per-piece order; a masked
+// piece is a hole and always lies under) : only that upper piece shows the
+// white core of the paper, where the tear stripped its printed skin at an
+// angle; the other side is just covered. The rip line is ragged at every scale,
+// the white is a hairline for long stretches and then bites in deep (a
+// heavy-tailed width), its outer rim is thin and fibrous, a few loose fibres
+// stick out past it, the printed skin ends in a faint ink line, and the upper
+// piece casts a soft shadow on what lies below, longer on the side away from
+// the light (top left). The fine raggedness, rim and fibres are the paper's own
+// fibre size, never a share of the bite (that turned a deep tear furry). A tear
+// over a hole drops its shadow onto the layers underneath. Frame borders are
+// cuts, not tears. Returns PREMULTIPLIED colour, coverage in alpha.
+float order(int i){ return hash(float(i) * 1.618 + 0.37, 4.21); }
+vec4 tornPaper(int C, int N, vec4 colC, float ed, vec2 dir, vec2 qa, vec2 wUV, vec2 A){
+  float keepC = keepOf(C);
+  float keepN = keepOf(N);
+  float zC = keepC > 0.5 ? order(C) : -1.0;
+  float zN = keepN > 0.5 ? order(N) : -1.0;
+  if (zC < 0.0 && zN < 0.0) return vec4(0.0);
+  bool upC = zC >= zN;
+  float s = upC ? ed : -ed; // signed distance into the upper piece
+  float keepU = upC ? keepC : keepN;
+  float keepL = upC ? keepN : keepC;
+  float T = uTorn;
+  float along = dot(qa, vec2(-dir.y, dir.x)); // position along the tear
+  float bite = pow(vnoise(vec2(along * 5.0 + 13.7, 3.1)), 3.0);
+  float rag = vnoise(vec2(along * 70.0, 9.4));
+  float fw = max(T * 0.0095 * (0.10 + 2.8 * bite + 0.55 * rag), 1.5 * uPx);
+  float ff = min(600.0, 0.5 / uPx);
+  float jag = (vnoise(vec2(along * 140.0, 1.7)) - 0.5) * 0.35 * fw
+            + (vnoise(vec2(along * ff, 5.3)) - 0.5) * (0.0010 * min(T, 1.5) + 1.2 * uPx);
+  float eOut = -fw * (0.2 + 0.45 * vnoise(vec2(along * 11.0, 7.7))) + jag;
+  float ePrint = eOut + fw;
+  if (s >= ePrint){
+    vec4 cu = upC ? colC : pieceAt(N, wUV, A);
+    float ink = 1.0 - 0.16 * min(T, 1.0) * (1.0 - smoothstep(0.0, 0.15 * fw + 1.5 * uPx, s - ePrint));
+    return vec4(cu.rgb * ink * cu.a, cu.a) * keepU;
+  }
+  vec4 cl = upC ? pieceAt(N, wUV, A) : colC; // the lower piece, under the white and the shadow
+  float fq = min(330.0, 0.33 / uPx);
+  vec3 paper = vec3(0.95, 0.935, 0.90) * (0.88 + 0.12 * vnoise(qa * 260.0));
+  paper *= 1.0 - 0.06 * smoothstep(0.55, 0.95, vnoise(vec2(along * fq, s * 2.0 / fw)));
+  vec4 under = vec4(cl.rgb * cl.a, cl.a) * keepL;
+  if (s >= eOut){
+    float t = (s - eOut) / fw;
+    paper *= mix(1.0, 0.92, smoothstep(0.55, 1.0, t));
+    float a = mix(0.55, 1.0, smoothstep(0.0, min(0.35 * fw, 0.0018) + uPx, s - eOut));
+    return vec4(paper, 1.0) * a + under * (1.0 - a);
+  }
+  float past = eOut - s;
+  vec2 away = upC ? dir : -dir; // from the upper piece toward the lower
+  float lit = 0.3 + 0.7 * max(0.0, dot(away, vec2(0.55, -0.835))); // light from the top left
+  float shw = (0.0025 + 0.009 * min(T, 1.5)) * lit;
+  float sh = 0.5 * min(T, 1.0) * exp(-past / max(shw, uPx)) * (0.45 + 0.55 * lit);
+  float fl = 0.06 * fw + 0.0009 * min(T, 1.5);
+  float fib = smoothstep(0.86, 0.98, vnoise(vec2(along * fq, past / max(fl, uPx) * 0.7)))
+            * exp(-past / max(fl, uPx)) * 0.7 * min(T * 1.5, 1.0);
+  under = vec4(under.rgb * (1.0 - sh), under.a + (1.0 - under.a) * sh * 0.85);
+  return vec4(paper, 1.0) * fib + under * (1.0 - fib);
+}
+#endif
 void main(){
   vec4 orig = texture(uHost, vUV);
   vec4 col = orig;
@@ -790,83 +874,89 @@ void main(){
   vec2 wUV = uContour > 0.001 ? clamp(tearWarp(vUV), 0.0001, 0.9999) : vUV;
   vec2 A = vec2(uAspect, 1.0);             // UV → aspect-true (frame-height) units
   vec2 wq = wUV * A;                        // torn-paper noise domain
-
+  // This pixel's piece C, the distance to its nearest border (warped domain, so
+  // seams, shadow and fringe follow the torn contour; frame-height units, so
+  // vertical and horizontal seams match) and the direction across it.
+  int C = -1, N = -1;
+  float ed = 1e9;
+  vec2 dir = vec2(0.0);
   if (uShape == 1) {
     // ── MOSAIC : Voronoi cells. Each pixel belongs to its nearest seed, so the
     // pieces are irregular convex polygons instead of rectangles. The border
-    // distance (2nd-nearest minus nearest) drives the same seams / torn fringe
+    // distance (2nd-nearest minus nearest) drives the same seams / torn paper
     // the rectangles use, so contour, torn and mask all behave identically.
-    int mi = 0; float d1 = 1e9, d2 = 1e9;
+    int mi = 0, mi2 = 0; float d1 = 1e9, d2 = 1e9;
     for (int i = 0; i < 64; i++){
       if (i >= uCount) break;
       float dd = distance(wq, uCell[i].xy * A);
-      if (dd < d1) { d2 = d1; d1 = dd; mi = i; }
-      else if (dd < d2) { d2 = dd; }
+      if (dd < d1) { d2 = d1; mi2 = mi; d1 = dd; mi = i; }
+      else if (dd < d2) { d2 = dd; mi2 = i; }
     }
-    keep = smoothstep(uMask - 0.06, uMask, uRank[mi]);
-    vec2 slip = (vec2(hash(float(mi), 1.0), hash(float(mi), 2.0)) - 0.5) * uSlip * 0.3;
-    vec2 local = rotL((wUV - uCell[mi].xy) * A, uRot[mi]) / A; // rigid quarter-turns
-    vec2 suv = clamp(uMap[mi].xy + local + slip, 0.0, 1.0);
-    col = texture(uHost, suv);
-    float ed = 0.5 * (d2 - d1);           // small near a Voronoi boundary
-    if (uGap > 0.001) col.rgb *= smoothstep(0.0, uGap * 0.02, ed);
-    if (uTorn > 0.001){
-      float bite = pow(vnoise(wq * 6.0 + 13.7), 3.0);
-      float rag = 0.5 + 0.5 * vnoise(wq * 90.0);
-      float fw = uTorn * 0.012 * (0.06 + 2.4 * bite + 0.45 * rag);
-      float sh = smoothstep(fw * 0.8, fw + 0.020 * uTorn, ed);
-      col.rgb *= 1.0 - (1.0 - sh) * 0.3 * min(uTorn, 1.0);
-      float paper = (1.0 - smoothstep(0.0, fw, ed)) * min(uTorn * 2.0, 1.0);
-      vec3 paperCol = vec3(0.93, 0.91, 0.87) * (0.80 + 0.20 * vnoise(wq * 160.0));
-      col = mix(col, vec4(paperCol, 1.0), paper);
+    C = mi;
+    ed = 0.5 * (d2 - d1);
+    if (uCount > 1 && mi2 != mi){
+      N = mi2;
+      vec2 dv = (uCell[mi2].xy - uCell[mi].xy) * A;
+      dir = dv / max(length(dv), 1e-5);
     }
   } else {
-
-  for (int i = 0; i < 64; i++){
-    if (i >= uCount) break;
-    vec4 d = uCell[i];
-    if (wUV.x >= d.x && wUV.x < d.x + d.z && wUV.y >= d.y && wUV.y < d.y + d.w){
-      // MASK : pieces drop out in their seeded order as the dial rises; a
-      // quick per-piece fade instead of a hard pop so modulation sweeps read
-      // as pieces peeling away. The survivor's rank of 2 can never be reached,
-      // so at full mask exactly one shape remains - and each cut re-rolls
-      // which one, so the last piece keeps changing.
-      keep = smoothstep(uMask - 0.06, uMask, uRank[i]);
-      vec2 luv = rot90((wUV - d.xy) / d.zw, uRot[i]);
-      vec4 sr = uMap[i];
-      vec2 slip = (vec2(hash(float(i), 1.0), hash(float(i), 2.0)) - 0.5) * uSlip;
-      vec2 suv = sr.xy + (luv + slip) * sr.zw;
-      col = texture(uHost, suv);
-      // Distance to the piece's edge, measured in the WARPED domain so seams,
-      // shadow and fringe all follow the torn contour, not the hidden rectangle
-      // (in frame-height units, so vertical and horizontal seams match).
-      vec2 e = min(wUV - d.xy, d.xy + d.zw - wUV) * A;
-      float ed = min(e.x, e.y);
-      if (uGap > 0.001){                                             // dark seams
-        col.rgb *= smoothstep(0.0, uGap * 0.02, ed);
-      }
-      if (uTorn > 0.001){
-        // TORN PAPER : a ragged off-white fringe along the tear (the magazine
-        // page's substrate showing at the rip), over a soft collage shadow just
-        // inside the piece. The fringe width is a HEAVY-TAILED patch field, not
-        // a gentle wobble : a low-frequency selector cubed gives long stretches
-        // of hairline tear broken by broad white bites - the way a real rip
-        // crosses the paper grain unevenly - with mid-frequency fiber raggedness
-        // on top. Runs to 2.0 for fat, chewed-up edges.
-        // ('patch' is a RESERVED WORD in GLSL ES 3.00 - naming this variable
-        // that killed the whole program compile and every Autocutter with it.)
-        float bite = pow(vnoise(wq * 6.0 + 13.7), 3.0);
-        float rag = 0.5 + 0.5 * vnoise(wq * 90.0);
-        float fw = uTorn * 0.012 * (0.06 + 2.4 * bite + 0.45 * rag);
-        float sh = smoothstep(fw * 0.8, fw + 0.020 * uTorn, ed);
-        col.rgb *= 1.0 - (1.0 - sh) * 0.3 * min(uTorn, 1.0);
-        float paper = (1.0 - smoothstep(0.0, fw, ed)) * min(uTorn * 2.0, 1.0);
-        vec3 paperCol = vec3(0.93, 0.91, 0.87) * (0.80 + 0.20 * vnoise(wq * 160.0));
-        col = mix(col, vec4(paperCol, 1.0), paper);
-      }
-      break;
+    // ── CUT-UP : the rectangle holding this pixel.
+    for (int i = 0; i < 64; i++){
+      if (i >= uCount) break;
+      vec4 d = uCell[i];
+      if (wUV.x >= d.x && wUV.x < d.x + d.z && wUV.y >= d.y && wUV.y < d.y + d.w){ C = i; break; }
+    }
+    if (C >= 0){
+      vec4 d = uCell[C];
+      vec2 elo = (wUV - d.xy) * A;
+      vec2 ehi = (d.xy + d.zw - wUV) * A;
+      ed = elo.x; dir = vec2(-1.0, 0.0);
+      if (ehi.x < ed){ ed = ehi.x; dir = vec2(1.0, 0.0); }
+      if (elo.y < ed){ ed = elo.y; dir = vec2(0.0, -1.0); }
+      if (ehi.y < ed){ ed = ehi.y; dir = vec2(0.0, 1.0); }
     }
   }
+  if (C >= 0){
+    // MASK : pieces drop out in their seeded order as the dial rises; a quick
+    // per-piece fade instead of a hard pop so modulation sweeps read as pieces
+    // peeling away. The survivor's rank of 2 can never be reached, so at full
+    // mask exactly one shape remains - and each cut re-rolls which one.
+    keep = keepOf(C);
+    if (uShape == 1){
+      vec2 slip = (vec2(hash(float(C), 1.0), hash(float(C), 2.0)) - 0.5) * uSlip * 0.3;
+      vec2 local = rotL((wUV - uCell[C].xy) * A, uRot[C]) / A; // rigid quarter-turns
+      col = texture(uHost, clamp(uMap[C].xy + local + slip, 0.0, 1.0));
+    } else {
+      vec4 d = uCell[C];
+      vec2 luv = rot90((wUV - d.xy) / d.zw, uRot[C]);
+      vec4 sr = uMap[C];
+      vec2 slip = (vec2(hash(float(C), 1.0), hash(float(C), 2.0)) - 0.5) * uSlip;
+      col = texture(uHost, sr.xy + (luv + slip) * sr.zw);
+    }
+#if TORN
+    if (ed < uTorn * 0.035 + 0.02){
+      if (uShape != 1){
+        // The rectangle just across the nearest border (none past the frame :
+        // a cut, not a tear). Only pixels near a border pay for this search.
+        vec2 pr = wUV + dir * (ed + 0.5 * uPx) / A;
+        if (pr.x > 0.0 && pr.x < 1.0 && pr.y > 0.0 && pr.y < 1.0){
+          for (int i = 0; i < 64; i++){
+            if (i >= uCount) break;
+            vec4 c = uCell[i];
+            if (i != C && pr.x >= c.x && pr.x < c.x + c.z && pr.y >= c.y && pr.y < c.y + c.w){ N = i; break; }
+          }
+        }
+      }
+      if (N >= 0){
+        // Coverage moves into the mask (keep), so dry/wet treats a tear's
+        // see-through edge exactly like a hole.
+        vec4 t = tornPaper(C, N, col, ed, dir, wq, wUV, A);
+        keep = t.a;
+        col = vec4(t.a > 1e-5 ? t.rgb / t.a : vec3(0.0), 1.0);
+      }
+    }
+#endif
+    if (uGap > 0.001) col.rgb *= smoothstep(0.0, uGap * 0.02, ed); // dark seams
   }
   // Masked pieces leave TRANSPARENT holes (the collage's table shows through :
   // lower layers / background), whatever the dry/wet mix says. Straight alpha;
@@ -1788,6 +1878,7 @@ class NodeGL {
   scan: Prog
   scanout: Prog
   autocut: Prog
+  autocutTorn: Prog
   chrono: Prog
   sedAcc: Prog
   sedOut: Prog
@@ -1847,7 +1938,8 @@ class NodeGL {
     this.energy = this.build(F_ENERGY)
     this.scan = this.build(F_SCAN)
     this.scanout = this.build(F_SCANOUT)
-    this.autocut = this.build(F_AUTOCUT)
+    this.autocut = this.build(F_AUTOCUT(false))
+    this.autocutTorn = this.build(F_AUTOCUT(true))
     this.chrono = this.build(F_CHRONO)
     this.sedAcc = this.build(F_SED_ACC)
     this.sedOut = this.build(F_SED_OUT)
@@ -3236,6 +3328,7 @@ export class AutocutterNode implements ConvNode {
     gl.uniform1fv(p.u('uRot'), rot, 0, n)
     gl.uniform1fv(p.u('uRank'), rank, 0, n)
     gl.uniform1f(p.u('uAspect'), W / Math.max(1, H))
+    gl.uniform1f(p.u('uPx'), 1 / Math.max(1, H))
     gl.uniform1f(p.u('uPremul'), premul ? 1 : 0)
     gl.uniform1f(p.u('uGap'), clampf(num(inp.gap, 0.15), 0, 1))
     gl.uniform1f(p.u('uSlip'), clampf(num(inp.slip, 0), 0, 1))
@@ -3298,7 +3391,7 @@ export class AutocutterNode implements ConvNode {
       if (this.xfade >= 1) this.oldCount = 0
     }
 
-    const p = g.use(g.autocut)
+    const p = g.use(num(inp.torn, 0) > 0.001 ? g.autocutTorn : g.autocut)
     const out = ctx.chain.next()
     if (this.xfade >= 1 || this.oldCount === 0) {
       // Single pass, straight alpha : identical cost to before the crossfade existed.

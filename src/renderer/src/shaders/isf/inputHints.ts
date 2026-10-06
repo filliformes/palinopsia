@@ -896,7 +896,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     gap: 'Dark seams drawn between the pieces (the collage cut lines).',
     contour: 'Bends the cuts into uneven, curved tear-lines. The pieces still fit together exactly; past 1 they shred.',
     curve: 'Wavelength of the contour : low = many small waves, high = a few long sweeping curves.',
-    torn: 'Torn-paper edge : a ragged off-white fringe along each cut over a soft shadow. Past 1 the edges get chewed up.',
+    torn: 'Tears the cuts like paper : one piece lies over the other and shows the white core of the paper along its ragged edge, with loose fibers and a soft shadow. Past 1, deep ripped bites.',
     mask: 'Peels pieces away one by one, leaving transparent holes (the layers below show through). At full mask a single piece survives, a new one at every cut.',
     mix: 'Blend of the rearranged cut-up against the untouched original.',
     rate: 'Auto re-cut rate (Hz) : >0 re-cuts on its own for hands-free live rhythm. 0 = only on trigger.',
