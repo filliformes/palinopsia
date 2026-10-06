@@ -21,7 +21,7 @@ cloning or changing Electron:
 :: from a VS Developer prompt (or after calling vcvars64.bat), in native/spout:
 npm install --ignore-scripts
 :: match your Electron version (node -p "require('electron/package.json').version")
-node-gyp rebuild --target=33.4.11 --dist-url=https://electronjs.org/headers --arch=x64
+node-gyp rebuild --target=44.5.1 --dist-url=https://electronjs.org/headers --arch=x64
 ```
 
 Then the **Spout** toggle in ⛶ Output → *Send* activates and streams a
