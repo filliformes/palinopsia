@@ -141,7 +141,7 @@ export function FinishingToggle({ on, onClick }: { on: boolean; onClick: () => v
 // Context params the performance macros add onto (they write the engine, not the
 // store, so the sliders keep showing the base).
 const CONTEXT_LIVE: Array<[string, string, number]> = [
-  ['blur', 'blur', 0.08], ['trails', 'trails', 0.2], ['haze', 'haze', 0.15], ['depth', 'depth', 0.35], ['bloom', 'bloom', 0.3]
+  ['blur', 'blur', 0], ['trails', 'trails', 0.2], ['haze', 'haze', 0.15], ['depth', 'depth', 0.35], ['bloom', 'bloom', 0.3]
 ]
 const NEUTRAL = (v: number): boolean => Math.abs(v - 0.5) <= 0.02
 

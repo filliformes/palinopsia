@@ -180,7 +180,7 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       color: C.neutral,
       inputs: ['trails', 'blur', 'bloom', 'smoothing'],
       dim: (v): Record<string, string> =>
-        num(v, 'blur', 0.08) <= 0.0005 && num(v, 'bloom', 0.3) <= 0.0005
+        num(v, 'blur', 0) <= 0.0005 && num(v, 'bloom', 0.3) <= 0.0005
           ? { smoothing: 'Blur and bloom are 0 : there is no ring to smooth.' }
           : {}
     },

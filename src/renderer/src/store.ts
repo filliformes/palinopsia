@@ -47,7 +47,7 @@ import { beginMorph, cancelMorph, requestSceneChange } from './morph'
 import { autoSurfacePos } from './surface'
 import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify'
 import { resetCouplingState } from './engine/coupling'
-import { applyWorldToComposition, BUILTIN_WORLDS, cloneWorld, deriveSceneTags } from './worlds'
+import { applyWorldToComposition, BUILTIN_WORLDS, cloneWorld, deriveSceneTags, sansBlur } from './worlds'
 
 // User worlds (builtin === false) persist to localStorage; built-ins ship in code.
 function saveUserWorlds(worlds: World[]): void {
@@ -3963,7 +3963,7 @@ export const useStore = create<StoreState>((set, get) => ({
           ...comp,
           master: comp.master.map((f) =>
             f.shaderId === 'fx-context' && theme.context
-              ? { ...f, inputs: { ...f.inputs, ...theme.context } }
+              ? { ...f, inputs: { ...f.inputs, ...sansBlur(theme.context) } }
               : f.shaderId === 'fx-finalizer' && theme.finalizer
                 ? { ...f, inputs: { ...f.inputs, ...theme.finalizer } }
                 : f

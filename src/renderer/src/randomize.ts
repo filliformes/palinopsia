@@ -160,11 +160,13 @@ function randomizeOneInput(
 /** Randomize every input of one shader within curated ranges : used by
  *  Randomize scopes and by the Inspector's ⚄ button. */
 // Params Randomize must never touch (like the Text source): the Context PBR
-// surface is a deliberate staging decision, not a texture to dice-roll.
+// surface is a deliberate staging decision, not a texture to dice-roll. Context's
+// blur is the user's alone : no dice, no Variation, no New / Generate / World
+// ever sets it (it stays 0 unless moved by hand).
 // Film damage is a deliberate "worn print" choice too : since it no longer waits
 // for Film Hold, a dice roll would leave every Finishing randomize dirty.
 const RANDOMIZE_SKIP: Record<string, RegExp> = {
-  'fx-context': /^(pbr|lightOrder$)/,
+  'fx-context': /^(pbr|lightOrder$|blur$)/,
   // Finalizer staging intent : anaglyph 3D, the film-hold / draw clock, leader
   // blanks and splices, film damage and the output shape are deliberate show
   // decisions (a dice used to turn 3D on a quarter of the time and freeze the

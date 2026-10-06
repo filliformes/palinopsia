@@ -88,7 +88,7 @@ export function applyFieldMacros(
   // ── Coalesce → Context blur (mass) vs Vibe dither (grain). ──
   if (Math.abs(coalesce - 0.5) > 0.02) {
     const t = (coalesce - 0.5) * 2 // -1 grain .. +1 mass
-    if (ctx) setF(ctx, 'blur', clamp01(liveVal(ctx, 'blur', 0.08) + t * 0.18))
+    if (ctx) setF(ctx, 'blur', clamp01(liveVal(ctx, 'blur', 0) + t * 0.18))
     if (vibe) setF(vibe, 'dither', clamp01(liveVal(vibe, 'dither', 0) - t * 0.5))
   }
 }

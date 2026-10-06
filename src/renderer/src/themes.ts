@@ -644,7 +644,7 @@ export const THEMES: Theme[] = [
     sources: ['drift-field', 'contour', 'swell'],
     layerFx: ['fx-grade', 'fx-hue-rotate'],
     blends: ['screen', 'lighten'], density: 0.35, drift: 0.3,
-    context: { haze: 0.24, depth: 0.42, blur: 0.14, bloom: 0.2 },
+    context: { haze: 0.24, depth: 0.42, bloom: 0.2 },
     nativeNodes: ['node-lumablur']
   }),
   mk({
@@ -665,7 +665,7 @@ export const THEMES: Theme[] = [
     sources: ['membrane', 'swell', 'drift-field'],
     layerFx: ['fx-grade', 'fx-streak'],
     blends: ['screen', 'lighten'], density: 0.3, drift: 0.35,
-    context: { haze: 0.26, blur: 0.2, depth: 0.4 },
+    context: { haze: 0.26, depth: 0.4 },
     nativeNodes: ['node-lumablur']
   }),
   mk({

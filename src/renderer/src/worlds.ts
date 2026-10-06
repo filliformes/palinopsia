@@ -62,7 +62,7 @@ export const BUILTIN_WORLDS: World[] = [
     builtin: true,
     blurb: 'Abstract concordance : audio leans the A/B texture (default).',
     coupling: { mode: 'lean', amount: 0.5, tightness: 0.7, feature: 'flux' },
-    context: { trails: 0.22, blur: 0.08, bloom: 0.18, depth: 0.28, haze: 0.16 },
+    context: { trails: 0.22, bloom: 0.18, depth: 0.28, haze: 0.16 },
     autoMod: { feature: 'flux', target: 'haze', depth: 0.4 }
   },
   {
@@ -71,7 +71,7 @@ export const BUILTIN_WORLDS: World[] = [
     builtin: true,
     blurb: 'Data-mapped : transient cut, crisp and digital.',
     coupling: { mode: 'cut', amount: 0.8, tightness: 0.9, feature: 'transient' },
-    context: { trails: 0.05, blur: 0.0, bloom: 0.05, depth: 0.15, haze: 0.03 },
+    context: { trails: 0.05, bloom: 0.05, depth: 0.15, haze: 0.03 },
     autoMod: { feature: 'transient', target: 'bloom', depth: 0.5 }
   },
   {
@@ -80,7 +80,7 @@ export const BUILTIN_WORLDS: World[] = [
     builtin: true,
     blurb: 'Visual reading of the music : pitch drifts the balance.',
     coupling: { mode: 'drift', amount: 0.6, tightness: 0.6, feature: 'pitch' },
-    context: { trails: 0.2, blur: 0.06, bloom: 0.22, depth: 0.25, haze: 0.1 },
+    context: { trails: 0.2, bloom: 0.22, depth: 0.25, haze: 0.1 },
     autoMod: { feature: 'centroid', target: 'bloom', depth: 0.35 }
   },
   {
@@ -89,7 +89,7 @@ export const BUILTIN_WORLDS: World[] = [
     builtin: true,
     blurb: 'Independent voices : coupling off, detached.',
     coupling: { mode: 'off', amount: 0.5, tightness: 0.7, feature: 'level' },
-    context: { trails: 0.15, blur: 0.1, bloom: 0.1, depth: 0.3, haze: 0.06 },
+    context: { trails: 0.15, bloom: 0.1, depth: 0.3, haze: 0.06 },
     autoMod: null
   },
   {
@@ -98,7 +98,7 @@ export const BUILTIN_WORLDS: World[] = [
     builtin: true,
     blurb: 'Mood over sync : warm, dreamy, gently level-led.',
     coupling: { mode: 'lean', amount: 0.3, tightness: 0.4, feature: 'level' },
-    context: { trails: 0.35, blur: 0.14, bloom: 0.28, depth: 0.4, haze: 0.28 },
+    context: { trails: 0.35, bloom: 0.28, depth: 0.4, haze: 0.28 },
     autoMod: { feature: 'level', target: 'trails', depth: 0.45 }
   },
   {
@@ -107,7 +107,7 @@ export const BUILTIN_WORLDS: World[] = [
     builtin: true,
     blurb: 'Absence as tension : stark, near-black, uncoupled.',
     coupling: { mode: 'off', amount: 0.5, tightness: 0.7, feature: 'level' },
-    context: { trails: 0.1, blur: 0.04, bloom: 0.0, depth: 0.5, haze: 0.0 },
+    context: { trails: 0.1, bloom: 0.0, depth: 0.5, haze: 0.0 },
     autoMod: null
   },
   // ── Cameraless / direct-film modes (spec §6). These bias the whole comp toward
@@ -119,7 +119,7 @@ export const BUILTIN_WORLDS: World[] = [
     builtin: true,
     blurb: 'Graphic, rhythmic, tightly synced. Marks on the beat.',
     coupling: { mode: 'cut', amount: 0.85, tightness: 0.9, feature: 'transient' },
-    context: { trails: 0.04, blur: 0.0, bloom: 0.06, depth: 0.12, haze: 0.02 },
+    context: { trails: 0.04, bloom: 0.06, depth: 0.12, haze: 0.02 },
     finalizer: {
       filmHold: 1, filmRate: 10, filmJitter: 0.2, filmBoil: 0.15, filmFlutter: 0.12,
       filmBlank: 0.35, filmBlankMode: 0, filmDust: 0.2, filmScratch: 0.3, filmHair: 0,
@@ -133,7 +133,7 @@ export const BUILTIN_WORLDS: World[] = [
     builtin: true,
     blurb: 'Dense, gestural, silent. Dye, boil, granulation.',
     coupling: { mode: 'drift', amount: 0.6, tightness: 0.35, feature: 'level' },
-    context: { trails: 0.2, blur: 0.06, bloom: 0.18, depth: 0.28, haze: 0.1 },
+    context: { trails: 0.2, bloom: 0.18, depth: 0.28, haze: 0.1 },
     finalizer: {
       filmHold: 1, filmRate: 6, filmJitter: 0.4, filmBoil: 0.6, filmFlutter: 0.4,
       filmBlank: 0.05, filmBlankMode: 2, filmDust: 0.3, filmScratch: 0.15, filmHair: 0.25,
@@ -147,7 +147,7 @@ export const BUILTIN_WORLDS: World[] = [
     builtin: true,
     blurb: 'Pressed material. Heavy handling, scratch, dust.',
     coupling: { mode: 'drift', amount: 0.5, tightness: 0.5, feature: 'level' },
-    context: { trails: 0.12, blur: 0.05, bloom: 0.1, depth: 0.35, haze: 0.08 },
+    context: { trails: 0.12, bloom: 0.1, depth: 0.35, haze: 0.08 },
     finalizer: {
       filmHold: 1, filmRate: 8, filmJitter: 0.35, filmBoil: 0.4, filmFlutter: 0.25,
       filmBlank: 0.08, filmBlankMode: 0, filmDust: 0.55, filmScratch: 0.6, filmHair: 0.5,
@@ -156,6 +156,14 @@ export const BUILTIN_WORLDS: World[] = [
     autoMod: { feature: 'level', target: 'haze', depth: 0.3 }
   }
 ]
+
+/** Context's blur is the user's alone : no World, theme or New sets it (a world
+ *  saved before carried one). Every automatic Context write goes through this. */
+export function sansBlur(ctx: Record<string, number | number[]>): Record<string, number | number[]> {
+  const out = { ...ctx }
+  delete out.blur
+  return out
+}
 
 /** A fresh user world, cloned from an existing one (defaults to Synthetic). */
 export function cloneWorld(src: World, name: string): World {
@@ -180,7 +188,7 @@ export function applyWorldToComposition(c: CompositionState, world: World): Comp
     ...c,
     layers: c.layers.map((l) => ({ ...l, coupling: { ...world.coupling } })),
     master: c.master.map((f) => {
-      if (f.shaderId === 'fx-context') return { ...f, inputs: { ...f.inputs, ...world.context } }
+      if (f.shaderId === 'fx-context') return { ...f, inputs: { ...f.inputs, ...sansBlur(world.context) } }
       // Finalizer: reset the Cameraless hold and the film damage OFF as a baseline
       // (so a non-film World clears drawn-film : dust no longer needs the hold),
       // then apply this World's film character if any.

@@ -6,7 +6,7 @@
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "trails",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2,  "LABEL": "trails" },
-    { "NAME": "blur",       "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.08, "LABEL": "blur" },
+    { "NAME": "blur",       "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0,  "LABEL": "blur" },
     { "NAME": "bloom",      "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3,  "LABEL": "bloom" },
     { "NAME": "smoothing",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0,  "LABEL": "ghosts↔smooth" },
     { "NAME": "depth",      "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "depth" },

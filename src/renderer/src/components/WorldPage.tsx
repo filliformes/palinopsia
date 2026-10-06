@@ -18,7 +18,6 @@ const SIM_SHAPES: SimAudio['shape'][] = ['pulse', 'sine', 'ramp', 'noise']
 const COUPLING_MODES: CouplingMode[] = ['off', 'lean', 'hocket', 'cut', 'gate', 'drift']
 const CONTEXT_KEYS: Array<{ k: string; label: string; hint: string }> = [
   { k: 'trails', label: 'trails', hint: 'Temporal color bleed : past frames linger and drift into the distance.' },
-  { k: 'blur', label: 'blur', hint: 'Soft spatial blur : takes the edge off, pushes things back in space.' },
   { k: 'bloom', label: 'bloom', hint: 'Highlights glow / bleed light : dreamier, more luminous.' },
   { k: 'depth', label: 'depth', hint: 'Vignette + aerial recession that seats the image in a volume.' },
   { k: 'haze', label: 'haze', hint: 'Atmospheric veil toward the atmosphere color : distance, air.' }

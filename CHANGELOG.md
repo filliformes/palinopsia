@@ -287,6 +287,10 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Context's blur is yours alone.** It starts at 0, and New, Randomize (every scope and
+  the Context dice), Variation, Generate and Worlds no longer set it : the picture only
+  softens when you move the slider (or a modulator, MIDI or OSC you bound to it). The
+  World editor drops its blur row. Saved sessions keep their blur.
 - **Mycelium grows for real.** Its threads used to be contour lines of noise : closed
   loops that never had tips, never branched and never fused. It is now a colony of
   hyphal tips (native) : they run out from spores, branch, bend toward fresh ground,
