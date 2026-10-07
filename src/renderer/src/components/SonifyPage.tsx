@@ -324,7 +324,7 @@ function VoiceShell({ title, on, hint, onToggle, onDice, children }: {
   )
 }
 
-/** The Sonify step sequencer (Mixer page). Each step either loads a whole saved
+/** The Sonify step sequencer (the Seq view). Each step either loads a whole saved
  *  preset or, with no preset, just sets which voices are on : one transport
  *  advances them so a fully evolving sonified work can be built. */
 function SonifySequencer({ presets }: { presets: string[] }): JSX.Element {
@@ -496,7 +496,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 
   const set = (next: SoniConfig): void => setSonify(next)
   const patch = (p: Partial<SoniConfig>): void => set({ ...cfg, ...p })
-  const [view, setView] = useState<'voices' | 'mixer'>('voices')
+  const [view, setView] = useState<'voices' | 'mixer' | 'seq'>('voices')
   // The voice/mixer column is drag-resizable (persisted), like the Sequence page.
   const [voiceW, setVoiceW] = useState(() => {
     const v = Number(localStorage.getItem('opsia.soniVoiceW'))
@@ -864,6 +864,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
         <div className="flex overflow-hidden rounded ring-1 ring-border font-mono text-[10px]">
           <button onClick={() => setView('voices')} className={`px-2 py-0.5 transition-colors ${view === 'voices' ? 'bg-accent/20 text-accent' : 'text-muted hover:text-text'}`} title="Per-voice parameter strips">voices</button>
           <button onClick={() => setView('mixer')} className={`px-2 py-0.5 transition-colors ${view === 'mixer' ? 'bg-accent/20 text-accent' : 'text-muted hover:text-text'}`} title="Mixer : per-voice volume + HP/LP filter, and the FX-tail mix">▤ mixer</button>
+          <button onClick={() => setView('seq')} className={`px-2 py-0.5 transition-colors ${view === 'seq' ? 'bg-accent/20 text-accent' : 'text-muted hover:text-text'}`} title="Sequencers : the effects sequencer, stepping through Sonify presets">▸ seq</button>
         </div>
         {/* Master + meter */}
         <span className="font-mono text-[9px] uppercase text-muted">master</span>
@@ -1038,6 +1039,11 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 <Slider label="delay" value={cfg.fx.dlyMix} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ dlyMix: v })} title="How loud the delay is in the FX tail" />
                 <Slider label="reverb" value={cfg.fx.rvMix} min={0} max={1} neutral={0.6} onChange={(v) => pfx({ rvMix: v })} title="How loud the reverb is in the FX tail" />
               </div>
+            </div>
+          )}
+          {/* The sequencers have their own view (they used to sit under the mixer). */}
+          {view === 'seq' && (
+            <div className="flex flex-col gap-1">
               <SonifySequencer presets={presetList} />
             </div>
           )}

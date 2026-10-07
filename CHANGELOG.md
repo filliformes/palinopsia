@@ -404,6 +404,8 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Sonify has a seq view** (voices · mixer · seq) : the effects sequencer moved there
+  from under the mixer, room for the sequencers to grow.
 - **Every Sonify parameter explains itself on hover**, like the Inspector's : 45 sliders
   (every voice's gain and pan, Spectra's rate / contrast / breath, Orbit's radius / drive
   / smooth, Flow's sense / density / grain / breath, Events' sense / density / decay /

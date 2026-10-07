@@ -996,7 +996,7 @@ clicks, no zipper. The probes are drawn and dragged on the picture itself (the m
 letterboxes it), where the engine really reads : a held line follows its own reading
 path, the Orbit shows its true Lissajous shape, the sweeps run at their real rate.
 
-**Sequencer** : inside the mixer, a step sequencer lets the sound *evolve on its
+**Sequencer** : in the **seq** view (voices · mixer · seq), a step sequencer lets the sound *evolve on its
 own* : each step stores either a **voice on/off mask** (a rhythmic pattern over
 the current patch) or a **whole saved preset** (a structural change), so a full
 evolving sonified piece can be built. The rate spans 80 ms – 6 s (log). Three
