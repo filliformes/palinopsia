@@ -14,6 +14,8 @@ import { defaultSoniConfig, SONI_SCALES, sonifyEngine, type SoniConfig } from '.
 import { deleteSoniPreset, listSoniPresets, loadSoniPreset, saveSoniPreset } from '../audio/soniPresets'
 import { modTargetKey, useStore } from '../store'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { SonifyKeySequencer } from './SonifyKeySequencer'
+import { SONI_RATES, RATE_LABEL } from '../audio/soniClock'
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 // Voice order matches the worklet's render/filter order (mixFilter indices).
@@ -331,6 +333,7 @@ function SonifySequencer({ presets }: { presets: string[] }): JSX.Element {
   const sq = useStore((s) => s.soniSeq)
   const setOn = useStore((s) => s.setSoniSeqOn)
   const setStepMs = useStore((s) => s.setSoniSeqStepMs)
+  const setRate = useStore((s) => s.setSoniSeqRate)
   const setLen = useStore((s) => s.setSoniSeqLen)
   const toggleVoice = useStore((s) => s.toggleSoniSeqVoice)
   const setStepPreset = useStore((s) => s.setSoniSeqStepPreset)
@@ -373,12 +376,23 @@ function SonifySequencer({ presets }: { presets: string[] }): JSX.Element {
       </div>
       <div className="flex items-center gap-1">
         <span className="font-mono text-[8px] text-muted">rate</span>
-        <input
-          type="range" min={0} max={1} step={0.005} value={msToT(sq.stepMs)}
-          onChange={(e) => setStepMs(Math.round(80 * Math.pow(R, Number(e.target.value))))}
-          className="min-w-0 flex-1 accent-accent2" title={`${fmtMs(sq.stepMs)} per step`}
-        />
-        <span className="w-10 shrink-0 text-right font-mono text-[8px] text-muted">{fmtMs(sq.stepMs)}</span>
+        <select
+          className="input select-compact w-20 text-[9px]" value={sq.rate ?? 'free'}
+          onChange={(e) => setRate(e.target.value as (typeof SONI_RATES)[number])}
+          title="How long each step lasts : free time, or beats and bars of the composition tempo (in phase with the key sequencer)"
+        >
+          {SONI_RATES.map((r) => <option key={r} value={r}>{RATE_LABEL[r]}</option>)}
+        </select>
+        {(sq.rate ?? 'free') === 'free' && (
+          <>
+            <input
+              type="range" min={0} max={1} step={0.005} value={msToT(sq.stepMs)}
+              onChange={(e) => setStepMs(Math.round(80 * Math.pow(R, Number(e.target.value))))}
+              className="min-w-0 flex-1 accent-accent2" title={`${fmtMs(sq.stepMs)} per step`}
+            />
+            <span className="w-10 shrink-0 text-right font-mono text-[8px] text-muted">{fmtMs(sq.stepMs)}</span>
+          </>
+        )}
       </div>
       {/* Advance mode (dataFLOU's) : forward · bounce (accelerating rhythm) · drift (random walk). */}
       <div className="flex flex-wrap items-center gap-1">
@@ -864,7 +878,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
         <div className="flex overflow-hidden rounded ring-1 ring-border font-mono text-[10px]">
           <button onClick={() => setView('voices')} className={`px-2 py-0.5 transition-colors ${view === 'voices' ? 'bg-accent/20 text-accent' : 'text-muted hover:text-text'}`} title="Per-voice parameter strips">voices</button>
           <button onClick={() => setView('mixer')} className={`px-2 py-0.5 transition-colors ${view === 'mixer' ? 'bg-accent/20 text-accent' : 'text-muted hover:text-text'}`} title="Mixer : per-voice volume + HP/LP filter, and the FX-tail mix">▤ mixer</button>
-          <button onClick={() => setView('seq')} className={`px-2 py-0.5 transition-colors ${view === 'seq' ? 'bg-accent/20 text-accent' : 'text-muted hover:text-text'}`} title="Sequencers : the effects sequencer, stepping through Sonify presets">▸ seq</button>
+          <button onClick={() => setView('seq')} className={`px-2 py-0.5 transition-colors ${view === 'seq' ? 'bg-accent/20 text-accent' : 'text-muted hover:text-text'}`} title="Sequencers : the effects sequencer (Sonify presets and voices over time) and the key sequencer (the root and scale over time)">▸ seq</button>
         </div>
         {/* Master + meter */}
         <span className="font-mono text-[9px] uppercase text-muted">master</span>
@@ -1045,6 +1059,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           {view === 'seq' && (
             <div className="flex flex-col gap-1">
               <SonifySequencer presets={presetList} />
+              <SonifyKeySequencer />
             </div>
           )}
           {view === 'voices' && (<>

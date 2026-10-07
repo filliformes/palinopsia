@@ -55,6 +55,7 @@ const ACTION_VERB: Record<string, string> = {
   'rand:meta': 'randomizes Meta knobs', 'rand:inspector': 'randomizes the inspector', 'rand:sonify': 'randomizes Sonify',
   'fire:vary': 'varies', 'fire:flush': 'flushes buffers', 'fire:freeze': 'toggles freeze', 'fire:record': 'toggles record',
   'fire:tap': 'taps tempo', 'fire:seq': 'toggles the sequencer', 'fire:soniseq': 'toggles the Sonify sequencer',
+  'fire:keyseq': 'toggles the Key sequencer',
   'fire:sonify': 'toggles Sonify', 'fire:undo': 'undoes', 'fire:redo': 'redoes', 'master:chain': 'toggles master FX',
   'session:new': 'starts a new session', 'session:load': 'loads a session', 'session:open': 'opens a session'
 }
@@ -64,7 +65,7 @@ const ACTION_TOKEN: Record<string, string> = {
   'rand:layerfx': 'RndLyrFx', 'rand:mods': 'RndMod', 'rand:finishing': 'RndFin', 'rand:bg': 'RndBg',
   'rand:master': 'RndMst', 'rand:meta': 'RndMeta', 'rand:inspector': 'RndInsp', 'rand:sonify': 'RndSoni',
   'fire:vary': 'Vary', 'fire:flush': 'Flush', 'fire:freeze': 'Freeze', 'fire:record': 'Rec', 'fire:tap': 'Tap',
-  'fire:seq': 'Seq', 'fire:soniseq': 'SoniSeq', 'fire:sonify': 'Soni', 'fire:undo': 'Undo', 'fire:redo': 'Redo',
+  'fire:seq': 'Seq', 'fire:soniseq': 'SoniSeq', 'fire:keyseq': 'KeySeq', 'fire:sonify': 'Soni', 'fire:undo': 'Undo', 'fire:redo': 'Redo',
   'master:chain': 'MstChain', 'session:new': 'SesNew', 'session:load': 'SesLoad', 'session:open': 'SesOpen'
 }
 // Silhouette zone features in row-major order (TL..BR), for the preview grid.
@@ -288,7 +289,7 @@ export function BodyPage(): JSX.Element {
         'rand:bg', 'rand:master', 'rand:meta', 'rand:inspector', 'rand:sonify', 'fire:vary',
         'rand:layer:0', 'rand:layer:1', 'rand:layer:2', 'rand:layer:3'
       ].map(opt) },
-      { label: 'Transport / performance', opts: ['fire:flush', 'fire:freeze', 'fire:record', 'fire:tap', 'fire:seq', 'fire:soniseq', 'fire:undo', 'fire:redo'].map(opt) },
+      { label: 'Transport / performance', opts: ['fire:flush', 'fire:freeze', 'fire:record', 'fire:tap', 'fire:seq', 'fire:soniseq', 'fire:keyseq', 'fire:undo', 'fire:redo'].map(opt) },
       { label: 'Master FX', opts: ['master:chain'].map(opt) },
       { label: 'Scenes', opts: [opt('scene:next'), opt('scene:prev'), ...scenes.map((s, i) => ({ id: `scene:${i}`, label: `Scene ${i + 1}${s.name ? ' · ' + s.name : ''}` }))] },
       { label: 'Sonify', opts: [opt('fire:sonify'), ...SONI_VOICE_NAMES.map((n, i) => ({ id: `sonify:voice:${i}`, label: `Sonify: ${n}` }))] },

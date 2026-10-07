@@ -87,7 +87,7 @@ function toggleSoniVoice(i: number): void {
 // sonify:voice:<i> are handled dynamically by index.
 export const TRIGGER_ACTION_IDS: string[] = [
   'fire:randomize', 'fire:vary', 'fire:flush', 'fire:freeze', 'fire:record',
-  'fire:sonify', 'fire:tap', 'fire:seq', 'fire:soniseq', 'fire:undo', 'fire:redo',
+  'fire:sonify', 'fire:tap', 'fire:seq', 'fire:soniseq', 'fire:keyseq', 'fire:undo', 'fire:redo',
   'scene:next', 'scene:prev'
 ]
 
@@ -111,6 +111,7 @@ export function fireTrigger(id: string): void {
     case 'fire:tap': tapTempo(); return
     case 'fire:seq': st.toggleSequenceRunning(); return
     case 'fire:soniseq': st.setSoniSeqOn(!st.soniSeq.on); return
+    case 'fire:keyseq': st.setSoniKeySeqOn(!st.soniKeySeq.on); return
     case 'fire:undo': undo(); return
     case 'fire:redo': redo(); return
     case 'scene:next': recallRelativeScene(1); return
@@ -175,6 +176,7 @@ export interface MidiDevice {
 // fire:tap          note/CC press → tap tempo
 // fire:seq          note/CC press → toggle the scene sequencer
 // fire:soniseq      note/CC press → toggle the Sonify step sequencer
+// fire:keyseq       note/CC press → toggle the Sonify key sequencer
 
 /** Continuous targets take knobs/faders only : notes are ignored while one
  *  of these is the armed learn target (keep twisting until it takes). */
@@ -277,6 +279,8 @@ export function midiTargetLabel(id: string): string {
       return 'SEQUENCER run'
     case 'fire:soniseq':
       return 'SONIFY seq run'
+    case 'fire:keyseq':
+      return 'KEY seq run'
     case 'fire:undo':
       return 'UNDO'
     case 'fire:redo':

@@ -22,7 +22,7 @@ const FLOW_BLOCKS = GRID / FLOW_BLOCK
 export type SoniEventMode = 'spatial' | 'motion' | 'blend'
 export type SoniScale = 'chromatic' | 'major' | 'minor' | 'pentatonic' | 'wholetone' | 'dorian' | 'phrygian' | 'lydian'
 export const SONI_SCALES: SoniScale[] = ['chromatic', 'major', 'minor', 'pentatonic', 'wholetone', 'dorian', 'phrygian', 'lydian']
-const SCALE_STEPS: Record<SoniScale, number[]> = {
+export const SCALE_STEPS: Record<SoniScale, number[]> = {
   chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
   major: [0, 2, 4, 5, 7, 9, 11],
   minor: [0, 2, 3, 5, 7, 8, 10],
@@ -373,6 +373,14 @@ class SonifyEngine {
   // worklet's second input, alive while the voice is on.
   private collage: CollageVoice | null = null
   private collageNotes: Float32Array = new Float32Array(0)
+  // Key glide (the key sequencer) : the next config's pitches slide over this
+  // many seconds instead of jumping (one shot, see glideNext). The worklet glides
+  // its own tables; the Collage resonators' notes glide here.
+  private glideOnce = 0
+  private colFrom: Float32Array | null = null
+  private colT0 = 0
+  private colDur = 0
+  private colNow = new Float32Array(0)
   // luma grids per tap : cur + prev (for flow), plus the RGBA readback scratch
   private rgba = new Uint8Array(GRID * GRID * 4)
   private luma: Uint8Array[] = [new Uint8Array(GRID * GRID), new Uint8Array(GRID * GRID)]
@@ -701,6 +709,24 @@ class SonifyEngine {
     if (ctx?.setSinkId) ctx.setSinkId(sinkId).catch((e) => console.warn('[sonify] setSinkId', e))
   }
 
+  /** The next pushConfig's pitch change slides over `sec` seconds (the key
+   *  sequencer sets it around its own key change, then clears it). */
+  glideNext(sec: number): void {
+    this.glideOnce = Math.max(0, Math.min(8, sec || 0))
+  }
+
+  /** The Collage resonators' notes now : the table, or mid-glide toward it. */
+  private collageNotesNow(): Float32Array {
+    const from = this.colFrom, to = this.collageNotes
+    if (!from) return to
+    const u = (performance.now() - this.colT0) / this.colDur
+    if (u >= 1 || from.length !== to.length) { this.colFrom = null; return to }
+    const e = u * u * (3 - 2 * u)
+    if (this.colNow.length !== to.length) this.colNow = new Float32Array(to.length)
+    for (let i = 0; i < to.length; i++) this.colNow[i] = from[i] * Math.pow(to[i] / from[i], e)
+    return this.colNow
+  }
+
   pushConfig(cfg: SoniConfig): void {
     // Deep-fill against the defaults so no voice — or voice FIELD — is ever
     // missing (old localStorage / sessions / scenes / presets saved before a
@@ -729,14 +755,27 @@ class SonifyEngine {
     }
     const sinkChanged = cfg.sinkId !== this.cfg.sinkId
     this.cfg = cfg
+    const glide = this.glideOnce
+    this.glideOnce = 0
     if (!this.node) return
     if (sinkChanged) this.applySink(cfg.sinkId)
     // grain pitch table for the flow voice
     this.grainFreqs = cfg.flow.quantize
       ? scaleTable(effRoot(cfg), cfg.scale, cfg.flow.loOct, cfg.flow.hiOct)
       : new Float32Array(0)
-    // the Collage resonators' notes : centre = the lowest, the frame's edge = the highest
-    this.collageNotes = scaleTable(effRoot(cfg), cfg.scale, cfg.collage.loOct, Math.max(cfg.collage.loOct + 1, cfg.collage.hiOct))
+    // the Collage resonators' notes : centre = the lowest, the frame's edge = the
+    // highest. A glide starts from where they are now; a table re-sent unchanged
+    // (any slider move re-sends it) leaves a glide running.
+    const notes = scaleTable(effRoot(cfg), cfg.scale, cfg.collage.loOct, Math.max(cfg.collage.loOct + 1, cfg.collage.hiOct))
+    const sameNotes = notes.length === this.collageNotes.length && notes.every((f, i) => f === this.collageNotes[i])
+    if (!sameNotes) {
+      if (glide > 0 && notes.length === this.collageNotes.length && notes.length) {
+        this.colFrom = Float32Array.from(this.collageNotesNow())
+        this.colT0 = performance.now()
+        this.colDur = glide * 1000
+      } else this.colFrom = null
+      this.collageNotes = notes
+    }
     // note pitch table for the events voice
     this.eventFreqs = cfg.events.quantize
       ? scaleTable(effRoot(cfg), cfg.scale, cfg.events.loOct, cfg.events.hiOct)
@@ -803,7 +842,8 @@ class SonifyEngine {
       spectraFreqs: spectraFreqs(cfg, this.ctx?.sampleRate ?? 48000),
       filterFreqs: filterFreqs(cfg),
       chordFreqs: chordFreqs(cfg),
-      ringFreqs: ringFreqs(cfg)
+      ringFreqs: ringFreqs(cfg),
+      glide
     })
     // The config replaced the worklet's whole state, modulation included :
     // put the modulated values straight back (waiting for the next tick left a
@@ -937,7 +977,7 @@ class SonifyEngine {
           ring: mv.get('collageRing') ?? c.ring,
           bright: c.bright,
           width: mv.get('collageWidth') ?? c.width
-        }, this.collageNotes)
+        }, this.collageNotesNow())
       } else if (this.collage) {
         this.collage.dispose()
         this.collage = null

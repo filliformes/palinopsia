@@ -4,16 +4,22 @@
 // 8 voices are on (a rhythmic on/off pattern over the current sound). Driven from
 // App's render loop (like tickSequencer). Every apply goes through setSonify
 // wrapped in runSilently so the auto-advances never flood undo history.
+// Its rate is its own milliseconds (free) or beats / bars on the Sonify beat
+// clock it shares with the key sequencer (soniClock.ts), which keeps the two in
+// phase.
 
 import { useStore } from '../store'
 import { runSilently } from '../undo'
 import { loadSoniPreset } from './soniPresets'
 import type { SoniConfig } from './sonify'
+import { RATE_BEATS, soniClockStart } from './soniClock'
 
 const VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage'] as const
 
-let lastStepAt = 0
+let lastStepAt = 0 // ms (free rate) or beats (beat rates)
 let wasOn = false
+let waiting = false // a beat start waits for the bar the key sequencer is on
+let onBeat = false // the rate the last step was timed on (a switch re-anchors)
 
 // ── Advance modes (ported from dataFLOU's factory.ts) ─────────────────────
 // Bounce : forward order, but each cycle's step durations shrink geometrically
@@ -29,7 +35,7 @@ function bounceStepDuration(stepMs: number, steps: number, decay: number, i: num
   return Math.max(1, (total / sumGeom) * Math.pow(e, ((i % s) + s) % s))
 }
 // Drift : a biased random walk over the steps, wrapping or reflecting at the ends.
-function advanceDrift(pos: number, steps: number, bias: number, edge: 'wrap' | 'reflect'): number {
+export function advanceDrift(pos: number, steps: number, bias: number, edge: 'wrap' | 'reflect'): number {
   const s = Math.max(1, Math.min(16, Math.floor(steps)))
   if (s <= 1) return 0
   const b = Math.max(-100, Math.min(100, bias)) / 100
@@ -49,7 +55,7 @@ function advanceDrift(pos: number, steps: number, bias: number, edge: 'wrap' | '
   return next
 }
 
-export function tickSonifySeq(now: number): void {
+export function tickSonifySeq(now: number, beats: number): void {
   const st = useStore.getState()
   const sq = st.soniSeq
   if (!sq.on) {
@@ -57,20 +63,46 @@ export function tickSonifySeq(now: number): void {
     return
   }
   const len = Math.max(1, sq.len)
+  const rate = sq.rate ?? 'free'
+  const beat = rate !== 'free'
+  // the clock this step is timed on : milliseconds, or beats
+  const t = beat ? beats : now
   if (!wasOn) {
-    // Just started : apply the current step immediately, then time from here.
+    // Just started : apply the current step at once (on the beat : at the next
+    // bar when the key sequencer runs on the beat, so the two stay in phase),
+    // then time from there.
     wasOn = true
-    lastStepAt = now
+    onBeat = beat
+    if (beat) {
+      const ks = st.soniKeySeq
+      lastStepAt = soniClockStart(ks.on && ks.rate !== 'free')
+      waiting = beats < lastStepAt
+      if (waiting) return
+    } else lastStepAt = now
+    applyStep(sq.cur)
+    return
+  }
+  if (beat !== onBeat) {
+    // Switched between free and the beat : time from here on the new clock.
+    onBeat = beat
+    waiting = false
+    lastStepAt = t
+    return
+  }
+  if (waiting) {
+    if (beats < lastStepAt) return
+    waiting = false
     applyStep(sq.cur)
     return
   }
   // Bounce uses a per-step (accelerating) dwell; forward/drift use a uniform one.
-  const dwell = sq.mode === 'bounce' ? bounceStepDuration(sq.stepMs, len, sq.bounceDecay, sq.cur) : sq.stepMs
-  if (now - lastStepAt < dwell) return
+  const base = beat ? RATE_BEATS[rate as Exclude<typeof rate, 'free'>] : sq.stepMs
+  const dwell = sq.mode === 'bounce' ? bounceStepDuration(base, len, sq.bounceDecay, sq.cur) : base
+  if (t - lastStepAt < dwell) return
   // Step on the grid, not on the frame that noticed it : `= now` added up each
   // step's lateness (up to a frame) and the sequence ran a few percent slow.
   // A long stall (a hidden window) re-anchors instead of catching up in a burst.
-  lastStepAt = now - lastStepAt > dwell * 2 ? now : lastStepAt + dwell
+  lastStepAt = t - lastStepAt > dwell * 2 ? t : lastStepAt + dwell
   const next = sq.mode === 'drift' ? advanceDrift(sq.cur, len, sq.bias, sq.edge) : (sq.cur + 1) % len
   st.setSoniSeqCur(next)
   applyStep(next)
@@ -93,10 +125,12 @@ function applyStep(i: number): void {
   const cur = st.sonify
   runSilently(() => {
     if (step.preset) {
-      // A whole preset : keep the machine-local on-state + output device.
+      // A whole preset : keep the machine-local on-state + output device, and
+      // the key while the key sequencer composes it.
       const cfg = loadSoniPreset(step.preset)
       if (cfg) {
-        useStore.getState().setSonify({ ...cfg, on: cur.on, sinkId: cur.sinkId } as SoniConfig)
+        const key = st.soniKeySeq.on ? { root: cur.root, scale: cur.scale, rootOct: cur.rootOct } : {}
+        useStore.getState().setSonify({ ...cfg, ...key, on: cur.on, sinkId: cur.sinkId } as SoniConfig)
         return
       }
       // Deleted, or not on this machine (presets are local, steps travel with

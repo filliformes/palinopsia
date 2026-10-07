@@ -24,6 +24,9 @@ import type {
   Session,
   SoniSeq,
   SoniSeqStep,
+  SoniSeqRate,
+  SoniKeySeq,
+  SoniKeyStep,
   SidechainRef,
   SourceSlot,
   World, LightPath } from '@shared/types'
@@ -46,6 +49,8 @@ import { beginMorph, beginRelayMorph, cancelMorph, requestSceneChange } from './
 import { DEFAULT_LIGHT_PATH } from './lightPath'
 import { autoSurfacePos } from './surface'
 import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify'
+import { makeDefaultKeySeq, sanitizeKeySeq } from './audio/soniKeyModel'
+import { isSoniRate } from './audio/soniClock'
 import { resetCouplingState } from './engine/coupling'
 import { applyWorldToComposition, BUILTIN_WORLDS, cloneWorld, deriveSceneTags, sansBlur } from './worlds'
 
@@ -535,6 +540,7 @@ function sanitizeSoniSeq(raw: unknown, fallback: SoniSeq): SoniSeq {
   return {
     on: false, // never auto-run on load
     cur: 0,
+    rate: isSoniRate(s.rate) ? s.rate : 'free',
     stepMs: typeof s.stepMs === 'number' ? Math.max(30, Math.min(20000, s.stepMs)) : fallback.stepMs,
     len: typeof s.len === 'number' ? Math.max(2, Math.min(16, s.len | 0)) : fallback.len,
     mode: s.mode === 'bounce' || s.mode === 'drift' ? s.mode : 'forward',
@@ -544,6 +550,29 @@ function sanitizeSoniSeq(raw: unknown, fallback: SoniSeq): SoniSeq {
     steps
   }
 }
+// The key sequencer (root / scale over time) : the same machine-local memory
+// as the step sequence, saved stopped.
+let soniKeySeqPersistTimer: ReturnType<typeof setTimeout> | null = null
+function persistSoniKeySeq(ks: SoniKeySeq): void {
+  if (soniKeySeqPersistTimer) clearTimeout(soniKeySeqPersistTimer)
+  soniKeySeqPersistTimer = setTimeout(() => {
+    soniKeySeqPersistTimer = null
+    try {
+      localStorage.setItem('opsia.soniKeySeq', JSON.stringify({ ...ks, on: false }))
+    } catch {
+      console.warn('[soniKeySeq] could not persist (quota)')
+    }
+  }, 250)
+}
+function loadSoniKeySeq(): SoniKeySeq {
+  try {
+    const raw = localStorage.getItem('opsia.soniKeySeq')
+    return raw ? sanitizeKeySeq(JSON.parse(raw), makeDefaultKeySeq()) : makeDefaultKeySeq()
+  } catch {
+    return makeDefaultKeySeq()
+  }
+}
+
 function loadSoniSeq(): SoniSeq {
   try {
     const raw = localStorage.getItem('opsia.soniSeq')
@@ -1487,6 +1516,7 @@ interface StoreState {
   // Sonify step sequencer (Mixer page) : evolves the sound over time.
   soniSeq: SoniSeq
   setSoniSeqOn: (on: boolean) => void
+  setSoniSeqRate: (rate: SoniSeqRate) => void
   setSoniSeqStepMs: (ms: number) => void
   setSoniSeqLen: (n: number) => void
   toggleSoniSeqVoice: (step: number, voice: number) => void
@@ -1499,6 +1529,15 @@ interface StoreState {
   setSoniSeqEdge: (edge: SoniSeq['edge']) => void
   randomizeSoniSeq: () => void
   resetSoniSeq: () => void
+  // The key sequencer (Sonify seq view) : root / scale over time.
+  soniKeySeq: SoniKeySeq
+  soniKeyCur: number // runtime : the List step playing (-1 = none)
+  setSoniKeySeq: (patch: Partial<SoniKeySeq>) => void
+  setSoniKeySeqOn: (on: boolean) => void
+  setSoniKeyStep: (i: number, patch: Partial<SoniKeyStep>) => void
+  setSoniKeyCur: (i: number) => void
+  randomizeSoniKeySteps: () => void
+  resetSoniKeySeq: () => void
 
   // ── Assemble : the corpus-based automatic editor ──────────────────────
   // The corpus is machine-local and derived (re-analysing is near-instant from
@@ -3530,6 +3569,12 @@ export const useStore = create<StoreState>((set, get) => ({
       persistSoniSeq(soniSeq)
       return { soniSeq }
     }),
+  setSoniSeqRate: (rate) =>
+    set((s) => {
+      const soniSeq = { ...s.soniSeq, rate }
+      persistSoniSeq(soniSeq)
+      return { soniSeq }
+    }),
   setSoniSeqStepMs: (ms) =>
     set((s) => {
       const soniSeq = { ...s.soniSeq, stepMs: Math.max(30, Math.min(20000, ms)) }
@@ -3622,6 +3667,46 @@ export const useStore = create<StoreState>((set, get) => ({
       persistSoniSeq(soniSeq)
       return { soniSeq }
     }),
+
+  soniKeySeq: loadSoniKeySeq(),
+  soniKeyCur: -1,
+  setSoniKeySeq: (patch) =>
+    set((s) => {
+      // Every patch through the same validation as a load (ranges, a pool never
+      // empty), keeping the running state.
+      const soniKeySeq = { ...sanitizeKeySeq({ ...s.soniKeySeq, ...patch }, s.soniKeySeq), on: s.soniKeySeq.on }
+      persistSoniKeySeq(soniKeySeq)
+      return { soniKeySeq }
+    }),
+  setSoniKeySeqOn: (on) => set((s) => ({ soniKeySeq: { ...s.soniKeySeq, on } })),
+  setSoniKeyStep: (i, patch) =>
+    set((s) => {
+      const steps = s.soniKeySeq.steps.map((st, j) => (j === i ? { ...st, ...patch } : st))
+      const soniKeySeq = { ...sanitizeKeySeq({ ...s.soniKeySeq, steps }, s.soniKeySeq), on: s.soniKeySeq.on }
+      persistSoniKeySeq(soniKeySeq)
+      return { soniKeySeq }
+    }),
+  setSoniKeyCur: (i) => set({ soniKeyCur: i }),
+  randomizeSoniKeySteps: () =>
+    set((s) => {
+      // Fresh keys for the List from the pool (roots + scales), octaves kept.
+      const ks = s.soniKeySeq
+      const roots = ks.poolRoots.map((on, i) => (on ? i : -1)).filter((i) => i >= 0)
+      const scales = ks.poolScales.length ? ks.poolScales : ['major', 'minor']
+      const steps = ks.steps.map((st) => ({
+        ...st,
+        root: roots.length ? roots[Math.floor(Math.random() * roots.length)] : Math.floor(Math.random() * 12),
+        scale: scales[Math.floor(Math.random() * scales.length)]
+      }))
+      const soniKeySeq = { ...ks, steps }
+      persistSoniKeySeq(soniKeySeq)
+      return { soniKeySeq }
+    }),
+  resetSoniKeySeq: () => {
+    const soniKeySeq = { ...makeDefaultKeySeq(), on: get().soniKeySeq.on }
+    persistSoniKeySeq(soniKeySeq)
+    set({ soniKeySeq })
+  },
 
   // ── Assemble ──────────────────────────────────────────────────────────
   assembleFolder: localStorage.getItem('opsia.assembleFolder') ?? '',
@@ -4194,8 +4279,10 @@ export const useStore = create<StoreState>((set, get) => ({
       // keeps the current (localStorage-restored) values rather than resetting.
       globalSpeed: typeof s.globalSpeed === 'number' ? Math.max(1 / 64, Math.min(64, s.globalSpeed)) : cur.globalSpeed,
       morphMs: typeof s.morphMs === 'number' ? Math.max(0, Math.min(30000, s.morphMs)) : cur.morphMs,
-      // The Sonify step sequence travels with the session (opens paused at 0).
+      // The Sonify step sequence travels with the session (opens paused at 0),
+      // the key sequence too (stopped); an older file keeps the current one.
       soniSeq: sanitizeSoniSeq(s.soniSeq, cur.soniSeq),
+      soniKeySeq: s.soniKeySeq ? sanitizeKeySeq(s.soniKeySeq, cur.soniKeySeq) : { ...cur.soniKeySeq, on: false },
       // The drawn surface gesture + timing travel too; the live cursor / active
       // / play toggles reset (a session opens paused at the plane centre).
       surface: {
@@ -4217,6 +4304,7 @@ export const useStore = create<StoreState>((set, get) => ({
     localStorage.setItem('opsia.globalSpeed', String(get().globalSpeed))
     localStorage.setItem('opsia.morphMs', String(get().morphMs))
     persistSoniSeq(get().soniSeq)
+    persistSoniKeySeq(get().soniKeySeq)
     // The Resolume mapping is per session : a session that carries one brings it
     // back (with its lock); an older file without one keeps the current mapping.
     if (s.resolume && typeof s.resolume === 'object') {
@@ -4250,6 +4338,8 @@ export const useStore = create<StoreState>((set, get) => ({
       soniSeq: { ...s.soniSeq, on: false, cur: 0 },
       sonifyOn: s.sonify.on,
       soniSeqOn: s.soniSeq.on,
+      soniKeySeq: { ...s.soniKeySeq, on: false },
+      soniKeySeqOn: s.soniKeySeq.on,
       globalSpeed: s.globalSpeed,
       morphMs: s.morphMs,
       // The drawn gesture + its timing travel with the session; the live cursor,

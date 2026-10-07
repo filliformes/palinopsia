@@ -45,6 +45,9 @@
 //   /opsia/seq/skip                                     trigger (advance to next scene)
 //   /opsia/sonify/on|master                             >= 0.5 | f 0..1
 //   /opsia/sonify/root|scale                            i index | s name
+//   /opsia/sonify/keyseq/on|next                        >= 0.5 (run · a key change now)
+//   /opsia/sonify/keyseq/mode                           s name | i index (list circle affinity pivot picture)
+//   /opsia/sonify/keyseq/glide|chance                   f 0..1 (glide over 0..4 s)
 //   /opsia/sonify/{voice}/on|gain|pan + voice params    f 0..1 (see case below)
 //   /opsia/meta/{1..16}                                f 0..1 (drives the knob)
 //   /opsia/bpm                                          f 20..800 (raw)
@@ -66,6 +69,8 @@ import { BLEND_MODES, BODY_FEATURES } from '@shared/types'
 import { bodyBus } from './engine/bodyIn'
 import { videoKey, videoSeekRequests } from './engine/videoState'
 import { SONI_SCALES, withSonifyParam, type SoniConfig } from './audio/sonify'
+import { KEY_MODES } from './audio/soniKeyModel'
+import { keySeqNext } from './audio/soniKeySeq'
 import { SONIFY_MOD_DESCS } from './engine/modulation'
 import { useStore } from './store'
 import type { RandomizeScope } from './randomize'
@@ -524,6 +529,16 @@ function route(address: string, args: Args): void {
       }
       const ctl = segs[3]
       if (!ctl) return
+      // /opsia/sonify/keyseq/* : the key sequencer (root / scale over time)
+      if (g === 'keyseq') {
+        const st = useStore.getState()
+        if (ctl === 'on') st.setSoniKeySeqOn(n >= 0.5)
+        else if (ctl === 'next') { if (n >= 0.5) keySeqNext() }
+        else if (ctl === 'mode') { const m = enumFrom(args, KEY_MODES); if (m) st.setSoniKeySeq({ mode: m }) }
+        else if (ctl === 'glide') st.setSoniKeySeq({ glide: clamp01(n) * 4 })
+        else if (ctl === 'chance') st.setSoniKeySeq({ chance: clamp01(n) })
+        return
+      }
       // /opsia/sonify/tap/a|b : what each image tap reads (0 master · 1..4 a layer)
       if (g === 'tap') {
         const t = ctl === 'b' ? 1 : 0
@@ -928,6 +943,12 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/master', 0, 1, so.master, 'Sonify master gain')
     add('/opsia/sonify/root', 0, 1, so.root / 11, 'Quantizer root (index over C..B)')
     addI('/opsia/sonify/rootoct', 1, 6, so.rootOct ?? 3, 'Root octave (global transpose)')
+    const ks = st.soniKeySeq
+    add('/opsia/sonify/keyseq/on', 0, 1, ks.on ? 1 : 0, 'Key sequencer running (>= 0.5)')
+    add('/opsia/sonify/keyseq/next', 0, 1, 0, 'Key sequencer : a key change now (>= 0.5)')
+    addI('/opsia/sonify/keyseq/mode', 0, KEY_MODES.length - 1, KEY_MODES.indexOf(ks.mode), 'Key sequencer mode : 0 list · 1 circle · 2 affinity · 3 pivot · 4 picture')
+    add('/opsia/sonify/keyseq/glide', 0, 1, ks.glide / 4, 'Key sequencer glide (0..4 s)')
+    add('/opsia/sonify/keyseq/chance', 0, 1, ks.chance, 'Key sequencer chance of a change')
     const tapIdx = (t: SoniConfig['taps'][number]): number => (t.kind === 'master' ? 0 : t.layer + 1)
     addI('/opsia/sonify/tap/a', 0, 4, tapIdx(so.taps[0]), 'Tap A reads : 0 master · 1..4 a layer')
     addI('/opsia/sonify/tap/b', 0, 4, tapIdx(so.taps[1]), 'Tap B reads : 0 master · 1..4 a layer')

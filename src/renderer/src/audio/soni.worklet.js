@@ -303,12 +303,12 @@ class RingBank {
     this.mk = clampf(1.25 / Math.sqrt(acc / NG), 0.05, 50);
     return this.mk;
   }
-  setFreqs(f) {
+  setFreqs(f, remeasure = true) {
     const n = Math.min(RB_N, f.length);
     for (let b = 0; b < n; b++) this.freq[b] = f[b] > 10 ? f[b] : 10;
     const f0 = this.freq[0];
     for (let b = 0; b < RB_N; b++) this.pos[b] = 12 * Math.log2(this.freq[b] / f0);
-    this.fver++;
+    if (remeasure) this.fver++;
   }
   reset() { this.ic1.fill(0); this.ic2.fill(0); this.dryP = 0; this.wetP = 0; this.agc = 1; }
   /** Add the voice (dry and bank) into L/R. `iL/iR` the Collage bus, `gL/gR`
@@ -627,6 +627,14 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.cNzG = 0;
     // ── the Collage voice's Ring bank ──
     this.ring = new RingBank(sampleRate);
+    this.ringF = new Float32Array(RB_N); // the Ring bank's band centres (glided here)
+    // ── Key glide (the key sequencer's glide) : a pitch table slides to its new
+    // values over `glide` seconds (eased, in log frequency) instead of jumping.
+    // One entry per table : { cur, from, to, lr, t, dur }. Orbit and Raster have
+    // one pitch each : `pg` slides them from where they were.
+    this.glides = {};
+    this.pg = null;
+    this.obF = 0; this.raF = 0;
     this.bpm = 120; // the tempo, for synced modulation rates (sent with the mod overlay)
     // scratch (x,y) for the scan-path read (zero-alloc : written per partial)
     this.sxy = new Float32Array(2);
@@ -685,11 +693,24 @@ class SoniProcessor extends AudioWorkletProcessor {
     }
     if (m.t === 'cfg') {
       sanitize(m.cfg, this.cfg);
+      const prev = this.cfg;
       this.cfg = m.cfg;
-      if (m.spectraFreqs) this.spectraFreqs.set(m.spectraFreqs);
-      if (m.filterFreqs) { this.fFreqs.set(m.filterFreqs); this.rebuildFilterCoefs(); }
-      if (m.chordFreqs) { this.chordN = Math.min(NCHORD, m.chordFreqs.length); this.chordFreqs.set(m.chordFreqs.subarray(0, this.chordN)); }
-      if (m.ringFreqs) this.ring.setFreqs(m.ringFreqs);
+      const gl = m.glide > 0 ? Math.min(8, m.glide) : 0;
+      if (m.spectraFreqs) this.retune('sp', this.spectraFreqs, m.spectraFreqs, gl);
+      if (m.filterFreqs && this.retune('fl', this.fFreqs, m.filterFreqs, gl)) this.rebuildFilterCoefs();
+      if (m.chordFreqs) {
+        const n = Math.min(NCHORD, m.chordFreqs.length);
+        if (n !== this.chordN) {
+          // a new voice count : a new chord, at once
+          delete this.glides.ch;
+          this.chordN = n; this.chordFreqs.set(m.chordFreqs.subarray(0, n));
+        } else this.retune('ch', this.chordFreqs.subarray(0, n), m.chordFreqs, gl);
+      }
+      if (m.ringFreqs && this.retune('rg', this.ringF, m.ringFreqs, gl)) this.ring.setFreqs(this.ringF);
+      // Orbit / Raster : a key change slides their pitch from where it is.
+      if (gl > 0 && (m.cfg.orbit.freq !== prev.orbit.freq || m.cfg.raster.freq !== prev.raster.freq)) {
+        this.pg = { t: 0, dur: gl, ob: this.obF || prev.orbit.freq, ra: this.raF || prev.raster.freq };
+      }
       if (m.cfg.fx) this.applyFx(m.cfg.fx);
       if (m.cfg.mixFilter) for (let i = 0; i < 9; i++) this.djf[i].setX(m.cfg.mixFilter[i] != null ? m.cfg.mixFilter[i] : 0.5, sampleRate);
       return;
@@ -770,6 +791,57 @@ class SoniProcessor extends AudioWorkletProcessor {
     else if (path === 2) { const a = pos * TAU, r = pp * 0.48; s[0] = 0.5 + r * Math.cos(a); s[1] = 0.5 + r * Math.sin(a); }
     else if (path === 3) { const a = pos * TAU + pp * TAU * 2.5, r = pp * 0.48; s[0] = 0.5 + r * Math.cos(a); s[1] = 0.5 + r * Math.sin(a); }
     else { s[0] = pos; s[1] = 1 - pp; }
+  }
+
+  /** A pitch table's new values : at once (no glide, a first fill), or sliding
+   *  over `gl` seconds. True when `cur` changed now. The tables come with every
+   *  config (any slider move) : one re-sent unchanged leaves a glide alone. */
+  retune(key, cur, next, gl) {
+    const n = cur.length;
+    if (next.length < n) return false;
+    const g = this.glides[key];
+    const same = (a) => { for (let i = 0; i < n; i++) if (a[i] !== next[i]) return false; return true; };
+    if (g ? same(g.to) : same(cur)) return false;
+    let ok = gl > 0;
+    for (let i = 0; ok && i < n; i++) if (!(cur[i] > 1) || !(next[i] > 1)) ok = false;
+    if (!ok) {
+      delete this.glides[key];
+      for (let i = 0; i < n; i++) cur[i] = next[i];
+      return true;
+    }
+    const from = Float32Array.from(cur), to = new Float32Array(n), lr = new Float32Array(n);
+    for (let i = 0; i < n; i++) { to[i] = next[i]; lr[i] = Math.log(to[i] / from[i]); }
+    this.glides[key] = { cur, from, to, lr, t: 0, dur: gl };
+    return false;
+  }
+
+  /** Per block : the running glides take their next step. */
+  stepGlides(n) {
+    const dt = n / sampleRate;
+    for (const key in this.glides) {
+      const g = this.glides[key];
+      g.t += dt;
+      const u = Math.min(1, g.t / g.dur), e = u * u * (3 - 2 * u);
+      const c = g.cur, f = g.from, lr = g.lr;
+      if (u >= 1) { for (let i = 0; i < c.length; i++) c[i] = g.to[i]; delete this.glides[key]; }
+      else for (let i = 0; i < c.length; i++) c[i] = f[i] * Math.exp(lr[i] * e);
+      if (key === 'fl') this.rebuildFilterCoefs();
+      // the bank's make-up gain is measured again every 16th block and at the end
+      else if (key === 'rg') this.ring.setFreqs(c, u >= 1 || (this.block & 15) === 0);
+    }
+    if (this.pg) { this.pg.t += dt; if (this.pg.t >= this.pg.dur) this.pg = null; }
+  }
+
+  /** Orbit / Raster's pitch this block : the config's, or sliding to it. */
+  glidePitch(which, target) {
+    const pg = this.pg;
+    let f = target;
+    if (pg && pg[which] > 1 && target > 1) {
+      const u = Math.min(1, pg.t / pg.dur), e = u * u * (3 - 2 * u);
+      f = pg[which] * Math.pow(target / pg[which], e);
+    }
+    if (which === 'ob') this.obF = f; else this.raF = f;
+    return f;
   }
 
   rebuildFilterCoefs() {
@@ -881,6 +953,7 @@ class SoniProcessor extends AudioWorkletProcessor {
     const dt = 1 / sampleRate;
     const nyq = NYQ_FRAC * sampleRate;
     this.block++;
+    this.stepGlides(n);
 
     // Advance each tap's frame-interpolation ramp (prev → cur crossfade) :
     // one step per quantum, sized on receipt to span one video frame.
@@ -956,7 +1029,7 @@ class SoniProcessor extends AudioWorkletProcessor {
     const obLive = this.voiceLive(1, ob.on);
     if (obLive) {
       const tap = this.taps[ob.tap] || this.taps[0];
-      const inc = ob.freq * dt;
+      const inc = this.glidePitch('ob', ob.freq) * dt;
       const gL = (1 - Math.max(0, ob.pan)) * 0.8;
       const gR = (1 + Math.min(0, ob.pan)) * 0.8;
       const sm = Math.pow(0.5, 1 / (1 + ob.smooth * 48)); // one-pole smooth
@@ -1151,7 +1224,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       const nPix = pw * ph;
       // scan rate in pixels/sec so one full pass of the rect = the period :
       // pitch = freq, timbre = the rect's contents (Yeo/Berger geometry).
-      const step = ra.freq * nPix * dt;
+      const step = this.glidePitch('ra', ra.freq) * nPix * dt;
       const gL = (1 - Math.max(0, ra.pan)) * 0.7;
       const gR = (1 + Math.min(0, ra.pan)) * 0.7;
       // TONE : a 12dB/oct lowpass tames the read's aliased edges. Log sweep

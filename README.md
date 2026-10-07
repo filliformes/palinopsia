@@ -1007,13 +1007,40 @@ path, the Orbit shows its true Lissajous shape, the sweeps run at their real rat
 **Sequencer** : in the **seq** view (voices · mixer · seq), a step sequencer lets the sound *evolve on its
 own* : each step stores either a **voice on/off mask** (a rhythmic pattern over
 the current patch) or a **whole saved preset** (a structural change), so a full
-evolving sonified piece can be built. The rate spans 80 ms – 6 s (log). Three
+evolving sonified piece can be built. The rate is free (80 ms – 6 s, log) or
+beats and bars of the composition tempo (1 beat … 16 bars). Three
 advance **modes**, ported from dataFLOU's generative section: **forward**,
 **bounce** (each cycle's steps accelerate like a settling ball, the total cycle
 time preserved) and **drift** (a biased random walk with a **wrap** or **reflect**
 edge). A **🎲** re-rolls the pattern (1–3 voices per active step, presets kept)
 and a **↺** resets it; the section grows to fit its steps (no scrollbar). Its
 play/stop is MIDI-learnable (the Sonify-sequence transport).
+
+**Key sequencer** : under it, a second sequencer composes the **root, scale and
+octave** of the whole instrument over time, so a piece can modulate on its own. On
+each tick of its clock (**rate** : 1 beat … 16 bars of the composition tempo, or free
+time), a **chance** decides whether the key changes, and an optional **Euclid** rhythm
+(pulses / steps / rotation) decides which ticks may change it. Five **modes** :
+
+| Mode | The next key |
+|---|---|
+| **List** | the keys you write (root, scale, octave; up to 8), **forward**, **bounce** (there and back) or **drift** (a random walk, with a bias) |
+| **Circle** | a walk on the circle of fifths : **flats ↔ sharps** lean, a **leap** of 1 to 3 fifths, and a **relative** % of hops to the relative major / minor |
+| **Affinity** | chosen by the notes it shares with this one, **jarring ↔ smooth**; **no repeat** skips the last few keys, **tour** visits the whole pool before anything comes back |
+| **Pivot** | **same notes** on a new tonic (C major, D dorian, E phrygian, F lydian, A minor) or the **same tonic** in a **brighter** / **darker** mode |
+| **Picture** | read off the picture : its **color** picks the root around the circle of fifths (a grey picture keeps it), its brightness the mood (bright lydian … dark phrygian), on the clock or at each scene **cut**, never faster than **hold** |
+
+The generative modes choose from a **pool** of roots (12 toggles) and scales (8 chips).
+**Glide** (0 … 4 s) slides every pitch to the new key instead of jumping : Spectra,
+Chord, the Filter bank, the Ring bank, Orbit, Raster and the Collage resonators retune
+along an eased curve on the audio thread. A key set by hand (or over OSC, or by a
+preset) while it runs becomes its **home** and the walk carries on from there;
+**↩ home on stop** goes back to it when you stop. While it runs, the effects
+sequencer's preset steps keep the key. Both sequencers read **one Sonify beat
+clock** : one started while the other runs on the beat waits for the next bar, so
+they stay in phase. The key sequence travels with the session (an installation
+starts it again), its play/stop is MIDI-learnable, and OSC drives it :
+`/opsia/sonify/keyseq/on`, `/next` (a change now), `/mode`, `/glide`, `/chance`.
 
 **✨ Auto-voice** : one button reads the session's actual vocabulary : which
 generators, nodes and FX are live on which layers, and picks the fitting

@@ -32,6 +32,8 @@ import { syncLiveMatchers } from './assemble/liveMatch'
 import { GRID } from '@shared/assemble'
 import { tickSequencer } from './engine/sequencer'
 import { tickSonifySeq } from './audio/soniSeq'
+import { tickKeySeq } from './audio/soniKeySeq'
+import { soniClockTick } from './audio/soniClock'
 import { Collapsible } from './components/Collapsible'
 import { FxRackPanel, FxChips } from './components/FxRackPanel'
 import { SearchSelect } from './components/SearchSelect'
@@ -585,6 +587,7 @@ export default function App(): JSX.Element {
             // step sequence come on with the picture (a normal load never starts it).
             if (s.sonifyOn) st.setSonify({ ...useStore.getState().sonify, on: true })
             if (s.soniSeqOn) st.setSoniSeqOn(true)
+            if (s.soniKeySeqOn) st.setSoniKeySeqOn(true)
             markClean()
           }
         } catch { /* keep the fresh boot */ }
@@ -1283,9 +1286,14 @@ export default function App(): JSX.Element {
           }
           tickSequencer(now, rec, c)
         }
-        // Sonify step sequencer : evolves the sound over time (independent of the
-        // scene sequencer above). No-op unless the user started it on the S mixer.
-        tickSonifySeq(now)
+        // Sonify sequencers : the step sequence evolves the sound, the key
+        // sequence its root / scale, both on one Sonify beat clock (independent
+        // of the scene sequencer above). No-ops unless started in the seq view.
+        {
+          const beats = soniClockTick(now, c.bpm)
+          tickSonifySeq(now, beats)
+          tickKeySeq(now, beats)
+        }
         // 2e. Field macros: Density / Gesture⇄Texture / Coalesce (post-mod, 0.5 deadzone).
         applyFieldMacros(comp!, c, st.density, st.gestureTexture, st.coalesce)
         // 2f. Temperament: Tonicity (tonal audio → colour) + Drift
@@ -1438,6 +1446,8 @@ export default function App(): JSX.Element {
             assembleLive ||
             // the Resolume mapper reading picture features
             (st.resolume.enabled && st.resolume.inputs.some((i) => i.source.startsWith('vision:'))) ||
+            // the key sequencer reading the picture's color / cuts
+            (st.soniKeySeq.on && st.soniKeySeq.mode === 'picture') ||
             c.modulators.some((m) => m.enabled && (m.type === 'vision' || m.type === 'homeostat')))
         ) {
           lastVisionSample = now

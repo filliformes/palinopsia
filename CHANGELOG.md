@@ -7,6 +7,36 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **The key sequencer** (Sonify, seq view) : composes the root, scale and octave of the
+  whole instrument over time. Five modes : **List** (written keys, forward / bounce /
+  drift), **Circle** (a walk on the circle of fifths : flats / sharps lean, leap 1-3,
+  relative major / minor hops), **Affinity** (the next key weighted by shared notes,
+  Jaccard over pitch-class sets, `exp(6·smooth·(2a−1))`; no-repeat, tour of the pool),
+  **Pivot** (same notes on a new degree : I major, II dorian, III phrygian, IV lydian,
+  VI minor; or same tonic, brighter / darker) and **Picture** (hue around the circle of
+  fifths, brightness to the mood; on the clock or at scene cuts, with a hold). Rate
+  (1 beat … 16 bars or free ms), chance, an optional Euclidean gate, a pool of roots and
+  scales, glide 0-4 s, home on stop (a key set by hand while it runs becomes home).
+  Effects-sequencer preset steps keep the key while it runs. Sessions carry
+  `soniKeySeq` + `soniKeySeqOn` (Installation mode starts it); MIDI `fire:keyseq`; OSC
+  `/opsia/sonify/keyseq/on|next|mode|glide|chance`. Measured in a test copy at 240 bpm :
+  every mode steps on the beat (250 ms), Circle walks G D A E B F# C# G# D# A#, Pivot
+  C major → D dorian → E phrygian → F lydian → A minor, Euclid 3/8 falls 750 / 750 /
+  500 ms apart, chance 0 never changes, a hand-set E minor became home and came back
+  on stop, the picture's green + dark gave E phrygian and its red C phrygian.
+- **Key glide** : a key change can slide every pitch instead of jumping. The worklet
+  glides its pitch tables (Spectra, Chord, Filter, Ring bank) per block, eased
+  (smoothstep) in log frequency, and Orbit / Raster's single pitch from where it was;
+  the Collage resonators glide on the main thread. A table re-sent unchanged (every
+  slider move re-sends them) leaves a glide alone; the Ring bank's make-up gain is
+  measured every 16th block while it moves. Measured : Orbit C3 → B2 jumps within one
+  analysis frame at glide 0 and eases over 1.96 s at glide 2; the Chord's middle note
+  F3 → B3 follows the curve (≈224 Hz at 2.8 s of 4 s); the level holds at −12 dB through
+  jumps and glides.
+- **The Sonify beat clock** : the effects sequencer gains beat / bar rates (1 beat …
+  16 bars, free stays its default) on one clock shared with the key sequencer; one
+  started while the other runs on the beat waits for the next bar (measured : the
+  effects steps then land on the key changes' downbeats).
 - **Chord noise** (Sonify) : a smooth pink noise blended into the Chord voice, one
   band-pass on each note (two pink generators, so it is stereo), each band riding its
   note's swell, fade and WAVES like the tone, so the noise breathes with the chord.

@@ -829,9 +829,14 @@ export interface SoniSeqStep {
   voices: boolean[] // length 9 (8 before the Collage voice) : per-voice on/off, applied when `preset` is empty
   preset: string // '' = apply the voices mask; else the name of a saved Sonify preset to load
 }
+// A sequencer's clock : `free` = its own milliseconds, or beats / bars of the
+// composition's tempo on the Sonify beat clock both sequencers share.
+export type SoniSeqRate = 'free' | 'b1' | 'b2' | 'bar1' | 'bar2' | 'bar4' | 'bar8' | 'bar16'
+
 export interface SoniSeq {
   on: boolean // transport running
-  stepMs: number // dwell per step
+  rate?: SoniSeqRate // absent = 'free' (stepMs)
+  stepMs: number // dwell per step (free rate)
   len: number // active step count (2..16)
   cur: number // current step (runtime; resets to 0 on load)
   // Step-advance mode (dataFLOU's): forward = linear loop · bounce = forward but
@@ -842,6 +847,52 @@ export interface SoniSeq {
   bias: number // -100..100 (drift) : random-walk direction bias (back ↔ forward)
   edge: 'wrap' | 'reflect' // (drift) : behaviour at the ends
   steps: SoniSeqStep[] // length 16 (only the first `len` are used)
+}
+
+// ── Sonify key sequencer ─────────────────────────────────────────────
+// Composes the ROOT, SCALE and octave of the whole Sonify instrument over time
+// (the Seq view). List plays written keys; the other modes choose the next key
+// themselves : a walk on the circle of fifths, a pick by shared notes, a pivot
+// to another mode, or a key read off the picture.
+export type SoniKeyMode = 'list' | 'circle' | 'affinity' | 'pivot' | 'picture'
+export interface SoniKeyStep {
+  root: number // 0..11 (C..B)
+  scale: string // a Sonify scale name
+  oct: number // 1..6 : the root octave (3 = no shift)
+}
+export interface SoniKeySeq {
+  on: boolean // running (runtime; sessions carry soniKeySeqOn)
+  mode: SoniKeyMode
+  rate: SoniSeqRate // how often a change may fall
+  freeMs: number // the period when rate is 'free'
+  chance: number // 0..1 : the odds a change falls when it may
+  glide: number // seconds : the pitches slide to the new key (0 = they jump)
+  returnHome: boolean // on stop : back to the key it started from
+  poolRoots: boolean[] // 12 : the roots the generative modes may choose
+  poolScales: string[] // the scales they may choose
+  euclid: boolean // changes fall on a Euclidean rhythm of the clock's ticks
+  ePulses: number
+  eSteps: number
+  eRot: number
+  // List
+  steps: SoniKeyStep[] // 8 (the first `len` play)
+  len: number
+  order: 'forward' | 'bounce' | 'drift'
+  bias: number // -100..100 (drift)
+  // Circle
+  circBias: number // -1 toward the flats … +1 toward the sharps
+  circLeap: number // 1..3 : the most fifths one change may move
+  circRel: number // 0..1 : the odds of a hop to the relative major / minor
+  // Affinity
+  affSmooth: number // -100 jarring (few shared notes) … +100 smooth (many)
+  affNoRepeat: boolean // never one of the last few keys
+  affTour: boolean // visit every key of the pool before any comes back
+  // Pivot
+  pivKind: 'modes' | 'tonic' // same notes, new tonic · same tonic, new mode
+  pivDir: 'up' | 'down' | 'random'
+  // Picture
+  picSource: 'color' | 'cuts' // the picture's color on the clock · a scene cut
+  picHold: number // seconds : the shortest a key stays
 }
 
 export interface Session {
@@ -871,6 +922,9 @@ export interface Session {
   // session by hand leaves the sound as it is on the machine.
   sonifyOn?: boolean
   soniSeqOn?: boolean
+  // The key sequencer (root / scale over time) : travels like the step sequence.
+  soniKeySeq?: SoniKeySeq
+  soniKeySeqOn?: boolean
   // Performance dials : the global clock multiplier + the scene-morph duration.
   // Optional for back-compat with sessions saved before they were persisted.
   globalSpeed?: number
