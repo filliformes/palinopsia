@@ -1001,7 +1001,9 @@ function inputValueFromSwing(
     const min = asNum(d.min, 0)
     const max = asNum(d.max, 1)
     const base = typeof stored === 'number' ? stored : asNum(d.def, min)
-    return Math.max(min, Math.min(max, base + (v - 0.5) * 2 * depth * (max - min)))
+    const a = Math.abs(depth) * (max - min)
+    const shift = fitShift(base - a, base + a, min, max)
+    return Math.max(min, Math.min(max, base + shift + (v - 0.5) * 2 * depth * (max - min)))
   }
   if (d.type === 'long') {
     const vals = d.values ?? []
@@ -1009,12 +1011,27 @@ function inputValueFromSwing(
     const min = Math.min(...vals)
     const max = Math.max(...vals)
     const base = typeof stored === 'number' ? stored : asNum(d.def, min)
-    return nearest(vals, base + (v - 0.5) * 2 * depth * (max - min))
+    const a = Math.abs(depth) * (max - min)
+    const shift = fitShift(base - a, base + a, min, max)
+    return nearest(vals, base + shift + (v - 0.5) * 2 * depth * (max - min))
   }
   if (d.type === 'bool' || d.type === 'event') {
     return toggleFromMod(typeof stored === 'number' ? stored : asNum(d.def, 0), v, depth)
   }
   return null
+}
+
+/** A swing keeps its FULL travel at the edge of a range : when the span it sweeps
+ *  [lo, hi] fits in [min, max] but crosses an edge, it is shifted inside. A base
+ *  sitting at its minimum (a Collage's cuts at 2) used to lose half the cycle
+ *  against the edge (Replace : held there half the time, then only rising;
+ *  Multiply : never moving). Mid-range swings are untouched (shift 0); a swing
+ *  wider than the range still clamps, as before. */
+function fitShift(lo: number, hi: number, min: number, max: number): number {
+  if (hi - lo > max - min) return 0
+  if (lo < min) return min - lo
+  if (hi > max) return max - hi
+  return 0
 }
 
 /** VCA-style 'multiply': scale the base by the modulator. `factor` = 1 at
@@ -1031,17 +1048,21 @@ function inputValueFromMultiply(
   const amt = Math.abs(depth)
   const m = depth < 0 ? 1 - v : v
   const factor = 1 - amt + amt * m
+  // The span the VCA sweeps, between base·(1−amt) and base : kept whole inside
+  // the range (fitShift). Over-drive (amt > 1) keeps its deliberate clamp.
+  const fit = (base: number, min: number, max: number): number =>
+    amt > 1 ? 0 : fitShift(Math.min(base, base * (1 - amt)), Math.max(base, base * (1 - amt)), min, max)
   if (d.type === 'float') {
     const min = asNum(d.min, 0)
     const max = asNum(d.max, 1)
     const base = typeof stored === 'number' ? stored : asNum(d.def, min)
-    return Math.max(min, Math.min(max, base * factor))
+    return Math.max(min, Math.min(max, base * factor + fit(base, min, max)))
   }
   if (d.type === 'long') {
     const vals = d.values ?? []
     if (!vals.length) return null
     const base = typeof stored === 'number' ? stored : asNum(d.def, vals[0])
-    return nearest(vals, base * factor)
+    return nearest(vals, base * factor + fit(base, Math.min(...vals), Math.max(...vals)))
   }
   if (d.type === 'bool' || d.type === 'event') {
     return toggleFromMod(typeof stored === 'number' ? stored : asNum(d.def, 0), v, depth)

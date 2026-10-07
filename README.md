@@ -464,6 +464,8 @@ The two modes differ in what the parameter's own slider means once bound:
   already dialled in.
 - **Replace** swings bipolarly *around* the base, so the parameter moves even
   from a standstill.
+- At the **edge of a range** (a base at its minimum or maximum) a swing keeps its full
+  travel : it shifts inside the range instead of losing half its cycle against the edge.
 - A **toggle** (a Collage's `freeze`, any on/off switch) follows one law in both modes,
   so its chip reads `tgl`. At depth 1 it follows the modulator : on while the modulator
   is in its upper half, half the time with an LFO. Less depth leans toward the stored

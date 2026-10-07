@@ -404,6 +404,15 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **A modulation keeps its full swing at the edge of a range.** A base at its minimum
+  (a Collage's `cuts` at 2) lost half the cycle : Replace held the edge half the time
+  and only ever rose, Multiply never moved. When the span a modulation sweeps fits in
+  the range but crosses an edge, it now shifts inside (Vincent's choice). Measured over
+  an LFO cycle : cuts at 2, Replace 0.5 → 2..64 with no time held at the edge (was
+  2..33, held 50 %); Multiply 0.5 → 2..3 (was stuck at 2); mid-range swings unchanged;
+  a swing wider than the range and Multiply's over-drive keep their clamp. A Replace
+  depth of 0.5 or more sweeps a span as wide as the range, so it now covers the whole
+  range whatever the base; sessions whose modulations hugged an edge swing further.
 - **Sonify has a seq view** (voices · mixer · seq) : the effects sequencer moved there
   from under the mixer, room for the sequencers to grow.
 - **Every Sonify parameter explains itself on hover**, like the Inspector's : 45 sliders
