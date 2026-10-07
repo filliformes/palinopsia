@@ -470,7 +470,9 @@ function loadIsf(rgl: WebGL2RenderingContext, id: string, source: string): ISFRe
     }
     return r;
   } catch (e) {
-    console.error('[ISF] threw while loading', id, e);
+    // Name the error : an object logged as such read "[object Object]".
+    const msg = e instanceof Error ? e.message : (() => { try { return JSON.stringify(e); } catch { return String(e); } })();
+    console.error('[ISF] threw while loading', id, msg);
     return null;
   }
 }

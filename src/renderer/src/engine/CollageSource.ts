@@ -51,6 +51,7 @@ import type { CollageClip, CollageEdl } from '@shared/collage'
 import { uploadVideoFrame } from './VideoSource'
 import { AssembleSource } from './AssembleSource'
 import type { CollageSoundDeck, CollageSoundPiece } from '../audio/collageVoice'
+import { glGeneration } from './glGeneration'
 
 /** Same piece cap as the Autocutter : the shader's uniform arrays are sized 64. */
 const MAX_CELLS = 64
@@ -443,6 +444,7 @@ interface CollageGL {
   show: WebGLProgram
   vao: WebGLVertexArrayObject
   quad: WebGLBuffer
+  gen: number // the GL generation it was built in (glGeneration.ts)
   uTile: (n: string) => WebGLUniformLocation | null
   uColl: (n: string) => WebGLUniformLocation | null
   uMos: (n: string) => WebGLUniformLocation | null
@@ -458,7 +460,10 @@ interface CollageGL {
 const shared = new WeakMap<WebGL2RenderingContext, CollageGL>()
 function collageGL(gl: WebGL2RenderingContext): CollageGL {
   const hit = shared.get(gl)
-  if (hit && gl.isProgram(hit.collage) && gl.isProgram(hit.mosaic) && gl.isProgram(hit.torn.collage) && gl.isVertexArray(hit.vao)) return hit
+  // Valid until a GPU reset bumps the generation. (It used to ask gl.isProgram x3
+  // + isVertexArray, four blocking GPU round trips, on every render : twice a
+  // frame with FX before shapes.)
+  if (hit && hit.gen === glGeneration()) return hit
   const compile = (type: number, src: string): WebGLShader => {
     const s = gl.createShader(type)!
     gl.shaderSource(s, src)
@@ -501,7 +506,7 @@ function collageGL(gl: WebGL2RenderingContext): CollageGL {
     }
   }
   const g: CollageGL = {
-    tile, collage, mosaic, fold, show, vao, quad,
+    tile, collage, mosaic, fold, show, vao, quad, gen: glGeneration(),
     uTile: cacheOf(tile), uColl: cacheOf(collage), uMos: cacheOf(mosaic),
     uFold: cacheOf(fold), uShow: cacheOf(show),
     torn: { collage: tornColl, mosaic: tornMos, uColl: cacheOf(tornColl), uMos: cacheOf(tornMos) }

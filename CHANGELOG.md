@@ -611,6 +611,18 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **After a GPU crash the engine came back broken.** A GPU reset hands back the SAME
+  WebGL context object with every program, texture and vertex array dead, and five
+  caches keyed by it kept serving the dead objects (the shader bridge's blank texture
+  and cleanup VAO, Collage, Text, Parametric, the native nodes) : "object does not
+  belong to this context" on every frame, shaders failing to load, then no WebGL at all
+  until a restart (seen twice in a Kamouropsia run). A GL generation
+  (`engine/glGeneration.ts`), bumped when a context is lost AND when it is restored, now
+  invalidates them all; the old engine stops drawing at the loss. Measured with a
+  simulated reset : no GL error after the restore (it was a steady stream), the Collage
+  playing and the picture moving. The Collage also stopped asking the GPU four blocking
+  questions per render (twice a frame with FX before shapes). An ISF load error now
+  logs its message instead of "[object Object]".
 - **macOS installation** : the control window (which renders the picture the output
   shows) now keeps full speed while the fullscreen output covers it (Chromium's Mac
   occlusion tracking is off, like Windows' already was, in the SAME switch : a second

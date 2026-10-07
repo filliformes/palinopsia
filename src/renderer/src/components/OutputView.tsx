@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { OutputWarp } from '@shared/types'
 import { OutputPresenter } from '../engine/OutputPresenter'
+import { bumpGlGeneration } from '../engine/glGeneration'
 
 export function OutputView(): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -59,10 +60,12 @@ export function OutputView(): JSX.Element {
     let restoreFallback: number | null = null
     const onLost = (e: Event): void => {
       e.preventDefault()
+      bumpGlGeneration() // every per-context GL cache rebuilds (engine/glGeneration.ts)
       console.warn('[output gl] context LOST : awaiting restore')
       restoreFallback = window.setTimeout(() => setGlEpoch((n) => n + 1), 6000)
     }
     const onRestored = (): void => {
+      bumpGlGeneration() // anything built while lost was built dead
       console.warn('[output gl] context restored : rebuilding')
       if (restoreFallback) window.clearTimeout(restoreFallback)
       setGlEpoch((n) => n + 1)

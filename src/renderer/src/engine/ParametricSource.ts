@@ -18,6 +18,7 @@
 // targets are only allocated once the spectrogram mode is first drawn.
 
 import { audioBus } from './audioIn'
+import { glGeneration } from './glGeneration'
 
 const AUDIO_W = 512 // columns of the audio texture
 const F_LO = 30
@@ -154,6 +155,7 @@ const UNIFORMS = ['uAudio', 'uHist', 'uGain', 'uScale', 'uSeam', 'uMono', 'uColo
 interface Prog {
   prog: WebGLProgram
   u: Record<(typeof UNIFORMS)[number], WebGLUniformLocation | null>
+  gen: number // the GL generation it was built in (glGeneration.ts)
 }
 
 // Programs shared per context and compiled on first use, validated once per
@@ -166,7 +168,7 @@ function paramProg(gl: WebGL2RenderingContext, key: ProgKey): Prog {
   let m = progs.get(gl)
   if (!m) progs.set(gl, (m = new Map()))
   const have = m.get(key)
-  if (have && gl.isProgram(have.prog)) return have
+  if (have && have.gen === glGeneration() && gl.isProgram(have.prog)) return have
   const compile = (type: number, src: string): WebGLShader => {
     const s = gl.createShader(type)!
     gl.shaderSource(s, src)
@@ -185,7 +187,7 @@ function paramProg(gl: WebGL2RenderingContext, key: ProgKey): Prog {
   gl.deleteShader(f)
   const u = {} as Prog['u']
   for (const n of UNIFORMS) u[n] = gl.getUniformLocation(prog, n)
-  const g = { prog, u }
+  const g = { prog, u, gen: glGeneration() }
   m.set(key, g)
   return g
 }

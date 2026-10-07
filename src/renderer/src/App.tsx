@@ -61,6 +61,7 @@ import { ndiRate, NDI_MAX_EDGE } from '@shared/ndi'
 import { bodyTracker } from './engine/bodyTracker'
 import { bodyBus } from './engine/bodyIn'
 import { perfMeter } from './engine/perfMeter'
+import { bumpGlGeneration } from './engine/glGeneration'
 import type { BodyGesture } from '@shared/types'
 import { SceneBank } from './components/SceneBank'
 import { SurfacePad, SurfaceOnToggle } from './components/SurfacePad'
@@ -984,8 +985,14 @@ export default function App(): JSX.Element {
     // context. Engine-side buffers (feedback trails, Context) reset — after a
     // GPU crash that is the acceptable cost of coming back at all.
     let restoreFallback: number | null = null
+    // This engine stops at the loss : drawing on a lost context does nothing, and
+    // its last frames on the RESTORED one sprayed dead-object errors before the
+    // rebuild replaced it. The rebuilt engine (glEpoch) runs its own loop.
+    let halted = false
     const onLost = (e: Event): void => {
       e.preventDefault()
+      halted = true
+      bumpGlGeneration() // every per-context GL cache rebuilds (engine/glGeneration.ts)
       console.warn('[gl] context LOST (GPU reset) : awaiting restore')
       // If `restored` never fires (repeated crashes can blocklist the GPU),
       // force one rebuild attempt anyway : either the context is quietly back,
@@ -994,6 +1001,9 @@ export default function App(): JSX.Element {
       restoreFallback = window.setTimeout(() => setGlEpoch((n) => n + 1), 6000)
     }
     const onRestored = (): void => {
+      // Again : anything built while the context was lost (the loop keeps going)
+      // was built dead, yet carries the generation bumped at the loss.
+      bumpGlGeneration()
       console.warn('[gl] context restored : rebuilding the engine')
       if (restoreFallback) window.clearTimeout(restoreFallback)
       setGlEpoch((n) => n + 1)
@@ -1017,7 +1027,7 @@ export default function App(): JSX.Element {
       compositorRef.current = comp
       // Isolated test builds only (built with VITE_OPSIA_TEST=1) : hand the
       // store and the engine to a debugger. Compiled out of real builds.
-      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __rec: outputRecorder })
+      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __rec: outputRecorder, __perf: perfMeter })
       // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
       // capture from the render loop (Compositor.captureKick) : a rebuilt engine
       // needs no re-attaching. A real-time recording finds it through this.
@@ -1105,6 +1115,7 @@ export default function App(): JSX.Element {
       )
     ]
     const loop = (): void => {
+      if (halted) return // the context was lost : the rebuilt engine takes over
       // The GPU is still two frames behind : skip this one (see gpuBacklogged).
       if (comp && comp.gpuBacklogged(performance.now())) { schedule(); return }
       engineFrames++
@@ -1589,6 +1600,8 @@ export default function App(): JSX.Element {
       // After a GPU reset the old context is dead : dispose would only spray
       // INVALID_OPERATION noise into the console on its way out.
       try {
+        // Even after a loss : besides GL objects (their deletes then warn "not from
+        // this context", harmless), it stops video decoders, audio and workers.
         comp?.dispose() // free all GL resources so a remount can't orphan them
       } catch {
         /* context already gone */

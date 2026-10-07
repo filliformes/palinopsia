@@ -23,6 +23,7 @@
 
 import { Renderer } from 'interactive-shader-format'
 import { tickPhases } from './phases'
+import { glGeneration } from './glGeneration'
 
 export interface TextureHandle {
   __opsiaTexture: true
@@ -53,16 +54,16 @@ interface IsfRendererInternals {
 }
 
 // One transparent 1×1 texture per context : what an image input nothing feeds reads.
-const blanks = new WeakMap<object, WebGLTexture>()
+// Rebuilt after a GPU reset (glGeneration) : a dead one broke every image input.
+const blanks = new WeakMap<object, { t: WebGLTexture; gen: number }>()
 function blankFor(gl: WebGL2RenderingContext): WebGLTexture | null {
-  let t = blanks.get(gl) ?? null
-  if (!t) {
-    t = gl.createTexture()
-    if (!t) return null
-    gl.bindTexture(gl.TEXTURE_2D, t)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4))
-    blanks.set(gl, t)
-  }
+  const have = blanks.get(gl)
+  if (have && have.gen === glGeneration()) return have.t
+  const t = gl.createTexture()
+  if (!t) return null
+  gl.bindTexture(gl.TEXTURE_2D, t)
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4))
+  blanks.set(gl, { t, gen: glGeneration() })
   return t
 }
 
@@ -141,7 +142,7 @@ export function installTextureBridge(): void {
   // exactly what the startup shader pre-warm did : ~70 create→cleanup cycles
   // with no successor = frozen first frame on every launch.) Quarantine ALL
   // deletions inside a sacrificial VAO so the default VAO's binding survives.
-  const cleanupVaos = new WeakMap<object, WebGLVertexArrayObject>()
+  const cleanupVaos = new WeakMap<object, { vao: WebGLVertexArrayObject; gen: number }>()
   const origCleanup = proto.cleanup as (this: {
     program?: { cleanup?: () => void }
     paintProgram?: { cleanup?: () => void }
@@ -168,10 +169,13 @@ export function installTextureBridge(): void {
     const gl = this.gl
     let vao: WebGLVertexArrayObject | null = null
     if (gl && typeof gl.createVertexArray === 'function') {
-      vao = cleanupVaos.get(gl) ?? null
+      // Rebuilt after a GPU reset (glGeneration) : a dead one left the default VAO
+      // unprotected, the very landmine this quarantine exists for.
+      const have = cleanupVaos.get(gl)
+      vao = have && have.gen === glGeneration() ? have.vao : null
       if (!vao) {
         vao = gl.createVertexArray()
-        if (vao) cleanupVaos.set(gl, vao)
+        if (vao) cleanupVaos.set(gl, { vao, gen: glGeneration() })
       }
       if (vao) gl.bindVertexArray(vao)
     }

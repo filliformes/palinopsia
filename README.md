@@ -783,7 +783,8 @@ bottom:
     every 5 minutes). Turning Installation mode off removes it. Only one copy runs.
   - **It looks after itself** : the screen never sleeps; a crashed, hung or frozen
     control window reloads (1, 2, 4… s apart; the whole app relaunches after 5
-    failures in 10 minutes, or if WebGL or the GPU keeps failing); a crashed output
+    failures in 10 minutes, or if WebGL or the GPU keeps failing); a GPU reset rebuilds
+    the engine in about two seconds, in any mode (feedback trails start over); a crashed output
     reloads; the output reopens if it closes and follows its projector when displays
     change (found again by name if Windows renumbers it); a camera that drops out
     reconnects; no dialog ever waits (no "restore the autosave?" after a power cut);

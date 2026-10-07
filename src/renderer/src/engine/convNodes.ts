@@ -10,6 +10,8 @@
 // per-pixel flow-steered line blur (« Traînée », poor-man's SepConv). This is the
 // M factor of Filter Flow's T = MK, run forward (synthesis).
 
+import { glGeneration } from './glGeneration'
+
 export interface ChainLike {
   next(): { fbo: WebGLFramebuffer; tex: WebGLTexture }
   readonly w: number
@@ -1858,6 +1860,7 @@ class NodeGL {
   vao: WebGLVertexArrayObject
   private vs: WebGLShader | null = null // one vertex shader shared by every program
   checkedAt = 0 // last context-health check (performance.now ms)
+  gen = glGeneration() // the GL generation it was built in (glGeneration.ts)
   convKernel: Prog
   fbAgc: Prog
   unpremul: Prog
@@ -2039,6 +2042,9 @@ function nodeGL(gl: WebGL2RenderingContext): NodeGL {
   // After a GPU reset the context object survives but every program and buffer
   // it held is dead : rebuild rather than draw with stale handles. isBuffer is a
   // blocking GPU round-trip, so look at most once a second, never per render.
+  // A GPU reset this window saw bumps the generation : rebuild at once (the check
+  // below alone drew up to a second with dead programs first).
+  if (g && g.gen !== glGeneration()) g = undefined
   if (g) {
     const now = performance.now()
     if (now - g.checkedAt > 1000) {

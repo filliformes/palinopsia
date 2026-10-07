@@ -26,6 +26,7 @@
 
 import type { SidechainRef } from '@shared/types'
 import { TEXT_FONTS, textFontWeightRange } from '../textFonts'
+import { glGeneration } from './glGeneration'
 
 const VS = `#version 300 es
 layout(location = 0) in vec2 aCorner;  // quad corner 0..1
@@ -82,6 +83,7 @@ type UName = (typeof UNIFORMS)[number]
 interface TextProg {
   prog: WebGLProgram
   u: Record<UName, WebGLUniformLocation | null>
+  gen: number // the GL generation it was built in (glGeneration.ts)
 }
 
 // One program per context, validated once per TextSource (never per frame :
@@ -91,7 +93,7 @@ interface TextProg {
 const progs = new WeakMap<WebGL2RenderingContext, TextProg>()
 function textProg(gl: WebGL2RenderingContext): TextProg {
   const have = progs.get(gl)
-  if (have && gl.isProgram(have.prog)) return have
+  if (have && have.gen === glGeneration() && gl.isProgram(have.prog)) return have
   const compile = (type: number, src: string): WebGLShader => {
     const s = gl.createShader(type)!
     gl.shaderSource(s, src)
@@ -112,7 +114,7 @@ function textProg(gl: WebGL2RenderingContext): TextProg {
   gl.deleteShader(fs)
   const u = {} as Record<UName, WebGLUniformLocation | null>
   for (const n of UNIFORMS) u[n] = gl.getUniformLocation(prog, n)
-  const g = { prog, u }
+  const g = { prog, u, gen: glGeneration() }
   progs.set(gl, g)
   return g
 }
