@@ -114,6 +114,10 @@ export interface SoniConfig {
     // notes; rate 0..1 (free Hz, or a division when synced : 0 free · 1 straight
     // · 2 triplet · 3 dotted)
     waves: number; wavesRate: number; wavesSync: number
+    // NOISE : a smooth pink noise blended in (0 = the plain chord), a band on
+    // each note riding its swell and its waves; AIR = the band width, from a
+    // narrow pitched breath (0) to a wide pink wash (1).
+    noise: number; air: number
   }
   // Collage : the films of a Collage source heard all at once (collageVoice.ts).
   // Each piece pans by its place in the frame and rings through a harmonic
@@ -174,7 +178,7 @@ export function defaultSoniConfig(): SoniConfig {
     raster: { on: false, tap: 0, gain: 0.4, pan: 0, note: 45, freq: 110, quantize: true, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
     sstv: { on: false, tap: 0, gain: 0.4, pan: 0, lineHz: 12, sync: false, dev: 1, syncLev: 0.5 },
     filter: { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, lineIn: false, loop: 0, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0, loOct: 1, hiOct: 8, quantize: false },
-    chord: { on: false, tap: 0, gain: 0.6, pan: 0, voices: 7, loOct: 2, hiOct: 6, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3, waves: 0, wavesRate: 0.4, wavesSync: 0 },
+    chord: { on: false, tap: 0, gain: 0.6, pan: 0, voices: 7, loOct: 2, hiOct: 6, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3, waves: 0, wavesRate: 0.4, wavesSync: 0, noise: 0, air: 0.4 },
     collage: {
       on: false, gain: 0.7, pan: 0, reso: 0.5, ring: 0.5, bright: 0.5, width: 1, loOct: 2, hiOct: 6,
       bank: 0, bankSend: false, decay: 0.5, choke: false, cutoff: 1, peak: 0, slope: 0, tone: 0, tilt: 0,
@@ -213,6 +217,7 @@ const SONI_SIMPLE_MODS: Record<string, [keyof SoniConfig, string]> = {
   collageReso: ['collage', 'reso'], collageRing: ['collage', 'ring'], collageWidth: ['collage', 'width'],
   collageBank: ['collage', 'bank'], collageDecay: ['collage', 'decay'], collageCutoff: ['collage', 'cutoff'],
   collageWaves: ['collage', 'waves'], collageDetune: ['collage', 'detune'], chordWaves: ['chord', 'waves'],
+  chordNoise: ['chord', 'noise'], chordAir: ['chord', 'air'],
   fxSend: ['fx', 'send'], fxReverb: ['fx', 'rvMix'], fxDelay: ['fx', 'dlyMix']
 }
 const freqNote = (f: number): number => 69 + 12 * Math.log2(Math.max(1, f) / 440)
@@ -771,7 +776,8 @@ class SonifyEngine {
           on: cfg.chord.on, tap: cfg.chord.tap, gain: cfg.chord.gain, pan: cfg.chord.pan,
           gamma: cfg.chord.gamma, spread: cfg.chord.spread, attack: cfg.chord.attack,
           release: cfg.chord.release, tone: cfg.chord.tone,
-          waves: cfg.chord.waves, wavesRate: cfg.chord.wavesRate, wavesSync: cfg.chord.wavesSync
+          waves: cfg.chord.waves, wavesRate: cfg.chord.wavesRate, wavesSync: cfg.chord.wavesSync,
+          noise: cfg.chord.noise, air: cfg.chord.air
         },
         collage: {
           on: cfg.collage.on, gain: cfg.collage.gain, pan: cfg.collage.pan,

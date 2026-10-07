@@ -224,6 +224,7 @@ const PARAM_LABELS: Record<SonifyModParam, string> = {
   collageReso: 'Collage resonance', collageRing: 'Collage ring', collageWidth: 'Collage width',
   collageBank: 'Collage ring bank wet', collageDecay: 'Collage ring bank decay', collageCutoff: 'Collage ring bank cutoff',
   collageWaves: 'Collage ring bank waves', collageDetune: 'Collage ring bank detune', chordWaves: 'Chord waves',
+  chordNoise: 'Chord noise', chordAir: 'Chord air',
   fxSend: 'FX send', fxReverb: 'FX reverb mix', fxDelay: 'FX delay mix'
 }
 
@@ -1444,6 +1445,10 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             <Slider label="waves" value={cfg.chord.waves ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('chord', { waves: v })} mod={chip('chordWaves')} title="A sine of level travelling across the chord's notes : the held chord keeps moving inside (past 65 % it speeds up)" />
             {(cfg.chord.waves ?? 0) > 0 && (
               <RateRow label="rate" rate={cfg.chord.wavesRate ?? 0.4} sync={cfg.chord.wavesSync ?? 0} onRate={(v) => pv('chord', { wavesRate: v })} onSync={(v) => pv('chord', { wavesSync: v })} title="How fast the waves travel" />
+            )}
+            <Slider label="noise" value={cfg.chord.noise ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('chord', { noise: v })} mod={chip('chordNoise')} title="A smooth pink noise blended into the chord : a band of it on every note, swelling, fading and riding the waves with its note, so the noise breathes with the chord. 0 = the plain chord" />
+            {(cfg.chord.noise ?? 0) > 0 && (
+              <Slider label="air" value={cfg.chord.air ?? 0.4} min={0} max={1} neutral={0.4} onChange={(v) => pv('chord', { air: v })} mod={chip('chordAir')} title="How wide each note's noise band is : a narrow pitched breath around the note (0) to a wide pink wash (1)" />
             )}
             <Slider label="gain" value={cfg.chord.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('chord', { gain: v })} />
             <Slider label="pan" value={cfg.chord.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('chord', { pan: v })} />

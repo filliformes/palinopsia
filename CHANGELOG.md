@@ -7,6 +7,14 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Chord noise** (Sonify) : a smooth pink noise blended into the Chord voice, one
+  band-pass on each note (two pink generators, so it is stereo), each band riding its
+  note's swell, fade and WAVES like the tone, so the noise breathes with the chord.
+  **noise** (0 = the plain chord) and **air** (Q 40 → 1.2 : a pitched breath to a wide
+  wash; the band gain follows sqrt(Q), so the level holds at any width). Both are
+  modulation targets and OSC (`/chord/noise`, `/chord/air`). Measured : at noise 1 the
+  bands sit as loud as the tones (+3 dB overall), flatness 0.007 plain → 0.021 (air 0) …
+  0.042 (air 1), level within 0.6 dB across air.
 - **Installation mode looks after itself.** Start with the computer (macOS : a
   LaunchAgent that also restarts a crashed app; Windows : a login item and a scheduled
   check every 5 minutes; only one copy ever runs, and a leftover entry with Installation

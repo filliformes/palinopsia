@@ -554,7 +554,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       raster:  { on: false, tap: 0, gain: 0.5, pan: 0, freq: 110, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
       sstv:    { on: false, tap: 0, gain: 0.5, pan: 0, lineHz: 12, dev: 1, syncLev: 0.5 },
       filter:  { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, loop: 0, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0 },
-      chord:   { on: false, tap: 0, gain: 0.6, pan: 0, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3, waves: 0, wavesRate: 0.4, wavesSync: 0 },
+      chord:   { on: false, tap: 0, gain: 0.6, pan: 0, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3, waves: 0, wavesRate: 0.4, wavesSync: 0, noise: 0, air: 0.4 },
       collage: { on: false, gain: 0.7, pan: 0, bank: 0, bankSend: false, decay: 0.5, choke: false, cutoff: 1, peak: 0, slope: 0, tone: 0, tilt: 0, waves: 0, wavesRate: 0.5, wavesSync: 0, noise: 0, noiseRate: 0.5, noiseSync: 0, detune: 0, voicing: 0 },
       fx:      { send: 0, dlyMix: 0.35, dlyTime: 0.3, dlyFb: 0.35, dlyTone: 0.5, dlyMode: 1, rvMode: 0, rvMix: 0.6, rvSize: 0.6, rvDecay: 0.6, rvDamp: 0.3, rvPre: 20, rvMod: 6, rvModRate: 0.5, rvWidth: 1, rvLocut: 220, rvFreeze: false, rvDiff: 0.85, rvLowDamp: 0.5, rvCross: 0.3, rvLowMult: 1, rvHighMult: 1 }
     };
@@ -618,6 +618,13 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.cTarget = new Float32Array(NCHORD);
     this.cW = new Float32Array(NCHORD).fill(1); // each note's WAVES level (ramped per block)
     this.cwPh = 0;
+    // NOISE : a pink noise per side, shared by every note's band-pass (TPT SVF
+    // states per note per side), its level ramped per block.
+    this.cNzL = new Float32Array(128); this.cNzR = new Float32Array(128);
+    this.cPk = new Float64Array(6); this.cSeedL = 0x2545f491; this.cSeedR = 0x9e3779b9;
+    this.cZ1L = new Float32Array(NCHORD); this.cZ2L = new Float32Array(NCHORD);
+    this.cZ1R = new Float32Array(NCHORD); this.cZ2R = new Float32Array(NCHORD);
+    this.cNzG = 0;
     // ── the Collage voice's Ring bank ──
     this.ring = new RingBank(sampleRate);
     this.bpm = 120; // the tempo, for synced modulation rates (sent with the mod overlay)
@@ -1312,6 +1319,32 @@ class SoniProcessor extends AudioWorkletProcessor {
       const cwv = clampf(ch.waves || 0, 0, 1);
       const cwA = Math.min(1, cwv / 0.65), cwFast = Math.max(0, (cwv - 0.65) / 0.35);
       if (cwv > 0.001) this.cwPh = (this.cwPh + lfoHz(ch.wavesRate != null ? ch.wavesRate : 0.4, ch.wavesSync | 0, this.bpm) * (1 + 3 * cwFast) * n * dt) % 1;
+      // NOISE : a smooth pink noise blended in, one band-pass per note (on the
+      // note, as wide as AIR), each band riding its note's swell and its WAVES like
+      // the tone does, so the noise breathes with the chord. Pink (Kellet's
+      // filter) puts equal power per octave, so a band times sqrt(Q) holds one
+      // level at any note and width (measured : 0.075 RMS ±8 %) : x 9.4 makes a
+      // band at noise 1 as loud as its note's sine.
+      const cno = clampf(ch.noise || 0, 0, 1);
+      const nzG1 = cno > 0.001 ? cno * 9.4 * Math.sqrt(40 * Math.pow(0.03, clampf(ch.air != null ? ch.air : 0.4, 0, 1))) : 0;
+      const nzG0 = this.cNzG;
+      this.cNzG = nzG1;
+      const noisy = nzG1 > 0 || nzG0 > 0;
+      const cQ = 40 * Math.pow(0.03, clampf(ch.air != null ? ch.air : 0.4, 0, 1)), ck = 1 / cQ;
+      if (noisy) {
+        const nl = this.cNzL, nr = this.cNzR, pk = this.cPk;
+        let sl = this.cSeedL, sr = this.cSeedR;
+        let l0 = pk[0], l1 = pk[1], l2 = pk[2], r0 = pk[3], r1 = pk[4], r2 = pk[5];
+        for (let s = 0; s < n; s++) {
+          sl = (Math.imul(sl, 1664525) + 1013904223) >>> 0; sr = (Math.imul(sr, 1664525) + 1013904223) >>> 0;
+          const wl = sl / 2147483648 - 1, wr = sr / 2147483648 - 1;
+          l0 = 0.99765 * l0 + wl * 0.0990460; l1 = 0.96300 * l1 + wl * 0.2965164; l2 = 0.57000 * l2 + wl * 1.0526913;
+          r0 = 0.99765 * r0 + wr * 0.0990460; r1 = 0.96300 * r1 + wr * 0.2965164; r2 = 0.57000 * r2 + wr * 1.0526913;
+          nl[s] = (l0 + l1 + l2 + wl * 0.1848) * 0.11; nr[s] = (r0 + r1 + r2 + wr * 0.1848) * 0.11;
+        }
+        pk[0] = l0; pk[1] = l1; pk[2] = l2; pk[3] = r0; pk[4] = r1; pk[5] = r2;
+        this.cSeedL = sl; this.cSeedR = sr;
+      }
       for (let i = 0; i < N; i++) {
         const cw1 = cwv > 0.001 ? 1 - cwA * (0.5 - 0.5 * Math.cos(TAU * ((i / N) * (1 + cwFast) - this.cwPh))) : 1;
         const cw0 = this.cW[i];
@@ -1320,7 +1353,11 @@ class SoniProcessor extends AudioWorkletProcessor {
         let a0 = cur + (tgt - cur) * (tgt > cur ? up : dn);
         if (!(a0 > 1e-12)) a0 = 0; // NaN and denormals → 0
         this.cAmp[i] = a0;
-        if (a0 < 0.003) { this.cPhase[i] = (this.cPhase[i] + this.chordFreqs[i] * n * dt) % 1; continue; }
+        if (a0 < 0.003) {
+          this.cPhase[i] = (this.cPhase[i] + this.chordFreqs[i] * n * dt) % 1;
+          this.cZ1L[i] = this.cZ2L[i] = this.cZ1R[i] = this.cZ2R[i] = 0; // a silent band starts clean
+          continue;
+        }
         // SPREAD : the bass stays in the middle and the notes above fan out,
         // alternating right / left, wider as they rise (the top note widest). It
         // used to fan low → left, high → right, which put the root hard LEFT.
@@ -1332,13 +1369,38 @@ class SoniProcessor extends AudioWorkletProcessor {
         const inc = this.chordFreqs[i] * dt;
         let wv = cw0;
         const dwv = (cw1 - cw0) / n;
-        for (let s = 0; s < n; s++) {
-          let v = sinT(ph);
-          if (tone > 0.001) v = v * (1 - tone) + tab(SH3_T, ph) * tone * 0.9; // tanh(3·sin)
-          wv += dwv;
-          v *= a0 * wv;
-          L[s] += v * gL; R[s] += v * gR;
-          ph += inc;
+        const fN = this.chordFreqs[i];
+        if (noisy && fN < nyq * 0.9) {
+          // the note's noise band (TPT SVF band-pass, v1 * k = unity at the note)
+          const g = Math.tan(Math.PI * fN * dt), A1 = 1 / (1 + g * (g + ck)), A2 = g * A1, A3 = g * A2;
+          let z1l = this.cZ1L[i], z2l = this.cZ2L[i], z1r = this.cZ1R[i], z2r = this.cZ2R[i];
+          const nl = this.cNzL, nr = this.cNzR;
+          let ng = nzG0 * ck;
+          const dng = (nzG1 - nzG0) * ck / n;
+          for (let s = 0; s < n; s++) {
+            let v = sinT(ph);
+            if (tone > 0.001) v = v * (1 - tone) + tab(SH3_T, ph) * tone * 0.9; // tanh(3·sin)
+            wv += dwv;
+            ng += dng;
+            const amp = a0 * wv;
+            let v3 = nl[s] - z2l; let v1 = A1 * z1l + A2 * v3; let v2 = z2l + A2 * z1l + A3 * v3; z1l = 2 * v1 - z1l; z2l = 2 * v2 - z2l;
+            const bl = v1 * ng;
+            v3 = nr[s] - z2r; v1 = A1 * z1r + A2 * v3; v2 = z2r + A2 * z1r + A3 * v3; z1r = 2 * v1 - z1r; z2r = 2 * v2 - z2r;
+            const br = v1 * ng;
+            v *= amp;
+            L[s] += (v + bl * amp) * gL; R[s] += (v + br * amp) * gR;
+            ph += inc;
+          }
+          this.cZ1L[i] = z1l; this.cZ2L[i] = z2l; this.cZ1R[i] = z1r; this.cZ2R[i] = z2r;
+        } else {
+          for (let s = 0; s < n; s++) {
+            let v = sinT(ph);
+            if (tone > 0.001) v = v * (1 - tone) + tab(SH3_T, ph) * tone * 0.9; // tanh(3·sin)
+            wv += dwv;
+            v *= a0 * wv;
+            L[s] += v * gL; R[s] += v * gR;
+            ph += inc;
+          }
         }
         this.cPhase[i] = ph % 1;
       }

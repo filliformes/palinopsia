@@ -604,7 +604,7 @@ export type SonifyModParam =
   | 'filterQ' | 'filterSweep'
   | 'chordTone' | 'chordSpread' | 'chordAttack'
   | 'collageReso' | 'collageRing' | 'collageWidth'
-  | 'collageBank' | 'collageDecay' | 'collageCutoff' | 'collageWaves' | 'collageDetune' | 'chordWaves'
+  | 'collageBank' | 'collageDecay' | 'collageCutoff' | 'collageWaves' | 'collageDetune' | 'chordWaves' | 'chordNoise' | 'chordAir'
   | 'fxSend' | 'fxReverb' | 'fxDelay'
 export const SONIFY_MOD_PARAMS: SonifyModParam[] = [
   'spectraX', 'filterX', 'orbitX', 'orbitY', 'orbitR', 'orbitPitch',
@@ -614,7 +614,7 @@ export const SONIFY_MOD_PARAMS: SonifyModParam[] = [
   'eventsDecay', 'rasterSmooth', 'rasterTone',
   'sstvLine', 'sstvDev', 'filterQ', 'filterSweep',
   'chordTone', 'chordSpread', 'chordAttack', 'collageReso', 'collageRing', 'collageWidth',
-  'collageBank', 'collageDecay', 'collageCutoff', 'collageWaves', 'collageDetune', 'chordWaves',
+  'collageBank', 'collageDecay', 'collageCutoff', 'collageWaves', 'collageDetune', 'chordWaves', 'chordNoise', 'chordAir',
   'fxSend', 'fxReverb', 'fxDelay'
 ]
 

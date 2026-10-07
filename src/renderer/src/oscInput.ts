@@ -649,6 +649,8 @@ function route(address: string, args: Args): void {
           else if (ctl === 'waves') V('chord', { waves: clamp01(n) })
           else if (ctl === 'wavesrate') V('chord', { wavesRate: clamp01(n) })
           else if (ctl === 'wavessync') V('chord', { wavesSync: idx(0, 3) })
+          else if (ctl === 'noise') V('chord', { noise: clamp01(n) })
+          else if (ctl === 'air') V('chord', { air: clamp01(n) })
           return
         case 'collage':
           if (ctl === 'on') V('collage', { on: n >= 0.5 })
@@ -989,6 +991,8 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/collage/detune', 0, 1, co.detune ?? 0, 'Collage ring bank detune')
     addI('/opsia/sonify/collage/voicing', 0, 4, co.voicing ?? 0, 'Collage ring bank voicing : 0 Clean · 1 SEM · 2 MS-20 · 3 Steiner · 4 K35')
     add('/opsia/sonify/chord/waves', 0, 1, so.chord.waves ?? 0, 'Chord waves (a travelling level across the notes)')
+    add('/opsia/sonify/chord/noise', 0, 1, so.chord.noise ?? 0, 'Chord noise (a pink noise band on every note)')
+    add('/opsia/sonify/chord/air', 0, 1, so.chord.air ?? 0.4, 'Chord air (the noise bands, narrow to wide)')
     // shared reverb / delay tail
     add('/opsia/sonify/fx/send', 0, 1, so.fx.send, 'FX tail send (whole mix → delay/reverb)')
     add('/opsia/sonify/fx/delaytime', 0, 1, Math.log(so.fx.dlyTime / 0.02) / Math.log(2 / 0.02), 'Delay time')
