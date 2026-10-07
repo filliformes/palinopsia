@@ -611,6 +611,14 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Sonify heals itself after an audio device error.** Its audio context now stays open
+  for the whole session, so a device error (an interface unplugged, the output switched,
+  a driver hiccup : twice in one Windows run) could leave it closed, suspended or
+  silently stalled for good. It now listens for the device's error and state changes and
+  checks every 5 s that its clock still moves; then it resumes, or rebuilds the context
+  and restarts the sound. Never in the middle of a take (its sound track belongs to the
+  context) : right after it. Measured : suspended → back in 0.45 s; closed → a new
+  context, sound on; closed during a take → the take saved, rebuilt as it ended.
 - **Double-clicking a modulation depth slider resets it to 0.5** (the depth a new binding
   starts at), like every other slider : in the Inspector's modulate panel, the Modulation
   panel, a Meta knob's binding and Sonify's targets. Their tooltips say so.

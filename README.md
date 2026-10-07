@@ -787,7 +787,8 @@ bottom:
     the engine in about two seconds, in any mode (feedback trails start over); a crashed output
     reloads; the output reopens if it closes and follows its projector when displays
     change (found again by name if Windows renumbers it); a camera that drops out
-    reconnects; no dialog ever waits (no "restore the autosave?" after a power cut);
+    reconnects; Sonify's sound comes back by itself after an audio device error; no
+    dialog ever waits (no "restore the autosave?" after a power cut);
     the menu's reload / close / quit / dev-tools shortcuts are off, and the output stays
     above system notices.
   - **Exit** : hold `Esc` or `O` on the output for 1.5 s (a brushed key no longer ends

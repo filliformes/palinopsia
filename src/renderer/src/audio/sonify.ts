@@ -346,6 +346,11 @@ class SonifyEngine {
   // and a DXV3 take reads the sound as PCM through the tap.
   private bus = 0
   private warm = false // keepWarm : the context stays open between takes and plays
+  // Self-healing (heal()) : a device error or a stalled clock rebuilds the context.
+  private healing = false
+  private healAfterTake = false // a rebuild waits for the take holding the bus
+  private watchTimer = 0
+  private lastClock = -1
   private tap: AudioWorkletNode | null = null
   private tapSink: GainNode | null = null
   private tapFlush: (() => void) | null = null
@@ -438,9 +443,86 @@ class SonifyEngine {
       hush.start()
       this.ctx = ctx
       if (this.cfg.sinkId) this.applySink(this.cfg.sinkId)
+      // An audio device error (an interface unplugged, the default output
+      // switched, a driver hiccup) can leave the context closed, suspended or
+      // silently stalled. Kept open for days now, it must heal by itself.
+      ctx.addEventListener('error', () => void this.heal('the audio device reported an error'))
+      ctx.addEventListener('statechange', () => {
+        if (this.ctx !== ctx) return
+        if (ctx.state === 'closed') void this.heal('the audio context closed')
+        else if (ctx.state === 'suspended' && this.wanted()) window.setTimeout(() => {
+          if (this.ctx === ctx && ctx.state === 'suspended') void this.heal('the audio context was suspended')
+        }, 1500)
+      })
+      this.lastClock = -1
+      window.clearInterval(this.watchTimer)
+      this.watchTimer = window.setInterval(() => this.watch(), 5000)
       return ctx
     })()
     return this.ctxReady
+  }
+
+  /** Is the context supposed to be running (the sound, a take, or kept warm)? */
+  private wanted(): boolean {
+    return !!this.node || this.bus > 0 || this.warm
+  }
+
+  /** Every 5 s : a running context whose clock no longer moves is stalled (a
+   *  device can die without any event). */
+  private watch(): void {
+    const ctx = this.ctx
+    if (!ctx || !this.wanted() || this.healing) return
+    const t = ctx.currentTime
+    if (ctx.state === 'running' && this.lastClock >= 0 && t <= this.lastClock) void this.heal('the audio clock stopped')
+    this.lastClock = t
+  }
+
+  /** Bring the sound back after a device problem : resume first, and if the
+   *  clock still does not run, rebuild the context and restart the sound on it.
+   *  Never during a take (its sound track belongs to this context) : then once
+   *  the take ends. */
+  private async heal(why: string): Promise<void> {
+    const ctx = this.ctx
+    if (!ctx || this.healing || !this.wanted()) return
+    this.healing = true
+    try {
+      console.warn('[sonify] audio trouble :', why)
+      if (ctx.state !== 'closed') {
+        await ctx.resume().catch(() => {})
+        const t0 = ctx.currentTime
+        await new Promise((r) => window.setTimeout(r, 400))
+        if (this.ctx === ctx && ctx.state === 'running' && ctx.currentTime > t0) {
+          console.warn('[sonify] the audio is back (resumed)')
+          return
+        }
+      }
+      if (this.bus > 0) {
+        this.healAfterTake = true
+        return
+      }
+      await this.rebuild()
+    } finally {
+      this.healing = false
+    }
+  }
+
+  /** A fresh context, and the sound restarted on it if it was playing. */
+  private async rebuild(): Promise<void> {
+    const wasOn = !!this.node
+    this.collage?.dispose()
+    this.collage = null
+    try { this.node?.disconnect() } catch { /* gone */ }
+    this.node = null
+    window.clearInterval(this.watchTimer)
+    this.closeCtx()
+    try {
+      if (wasOn) await this.start()
+      else await this.ensureCtx()
+      if (this.ctx && this.ctx.state !== 'running') await this.ctx.resume().catch(() => {})
+      console.warn('[sonify] the audio is back (a new context)')
+    } catch (e) {
+      console.warn('[sonify] the audio could not come back yet', e)
+    }
   }
 
   async start(): Promise<void> {
@@ -497,6 +579,11 @@ class SonifyEngine {
    *  kept warm). */
   releaseRecordBus(): void {
     this.bus = Math.max(0, this.bus - 1)
+    if (this.bus === 0 && this.healAfterTake) {
+      this.healAfterTake = false
+      void this.rebuild()
+      return
+    }
     if (this.bus === 0 && !this.node && !this.starting && !this.warm) this.closeCtx()
   }
 
@@ -563,6 +650,7 @@ class SonifyEngine {
   }
 
   private closeCtx(): void {
+    window.clearInterval(this.watchTimer)
     try { this.tap?.disconnect(); this.tapSink?.disconnect() } catch { /* already gone */ }
     this.tap = null
     this.tapSink = null
