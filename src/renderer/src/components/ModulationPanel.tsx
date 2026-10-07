@@ -287,6 +287,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
               </select>
             </Row>
           )}
+          {m.shape === 'spastic' && <SpasticHoldRow index={index} />}
         </>
       )
     case 'ramp':
@@ -747,6 +748,42 @@ function MiniSlider({
         className="input w-9 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
       />
     </div>
+  )
+}
+
+// Spastic's HOLD : 0 (the far left) = off, it stays up until the next throw;
+// else a log track over 5 ms … 10 s.
+const HOLD_MIN = 5
+const HOLD_MAX = 10000
+function SpasticHoldRow({ index }: { index: number }): JSX.Element {
+  const m = useStore((s) => s.composition.modulators[index])
+  const update = useStore((s) => s.updateModulator)
+  const ms = Math.max(0, m.spasticHold ?? 0)
+  const pos = ms <= 0 ? 0 : Math.max(0.001, Math.min(1, Math.log(Math.max(HOLD_MIN, ms) / HOLD_MIN) / Math.log(HOLD_MAX / HOLD_MIN)))
+  const title =
+    'HOLD : how long each throw stays up before it drops straight back to the bottom, in ' +
+    'milliseconds. The rate then only sets WHEN it may rise (once in a while, as the coin ' +
+    'decides); the time up is this. 0 (far left) = off : it stays up until the next throw.'
+  return (
+    <Row label="HOLD" title={title}>
+      <input
+        type="range" min={0} max={1} step={0.001} value={pos}
+        onChange={(e) => {
+          const p = Number(e.target.value)
+          update(index, { spasticHold: p <= 0 ? 0 : Math.round(HOLD_MIN * Math.pow(HOLD_MAX / HOLD_MIN, p)) })
+        }}
+        className="min-w-0 flex-1 accent-accent"
+        title={title}
+      />
+      <BoundedNumberInput
+        value={ms}
+        min={0}
+        max={HOLD_MAX}
+        integer
+        onChange={(v) => update(index, { spasticHold: v })}
+        className="input w-12 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+      />
+    </Row>
   )
 }
 

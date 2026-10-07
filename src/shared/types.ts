@@ -542,6 +542,10 @@ export interface ModulatorConfig {
   // which is the same stepped-noise family with the quantisation removed.
   // Optional so older sessions keep the binary behaviour they were made with.
   spasticMode?: 'binary' | 'float'
+  // Spastic only : how long (ms) a throw stays up before it drops back to the
+  // bottom. The clock (rate) then only decides WHEN it may rise; the time up is
+  // its own. 0 / absent = it holds until the next throw (the original).
+  spasticHold?: number
   ramp: { rampMs: number; curvePct: number; mode: 'normal' | 'inverted' | 'loop' }
   adsr: {
     attackMs: number

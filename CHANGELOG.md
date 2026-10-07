@@ -7,6 +7,14 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Spastic HOLD** (LFO) : how long each throw stays up, separate from the rate. With
+  HOLD on, the coin only decides whether it RISES on a tick; the rise holds for HOLD ms,
+  then drops to the bottom (the next frame) and rests there until the next rise; a rise
+  while up starts the hold again; float throws to a level of its own. 0 (absent) = the
+  original. `ModulatorConfig.spasticHold`. Simulated 60 s at 2 Hz : HOLD 100 rose on 68
+  of 120 ticks, up 100-117 ms each (frame-quantized), down otherwise; HOLD 5 = one frame;
+  HOLD 0 unchanged (up 51 %, runs of 500-2500 ms). The LFO card's params still fit its
+  fixed height (85 of 85 px).
 - **The key sequencer** (Sonify, seq view) : composes the root, scale and octave of the
   whole instrument over time. Five modes : **List** (written keys, forward / bounce /
   drift), **Circle** (a walk on the circle of fifths : flats / sharps lean, leap 1-3,

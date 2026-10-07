@@ -441,7 +441,11 @@ unpredictable, which reads as a cross-rhythm rather than as sloppiness (and it
 survives BPM sync, where jittered timing wouldn't). It generalises the
 un-feelable clock that the **Spastic** LFO shape has always had; Spastic itself
 now offers a **binary** throw (hard flip between the extremes) or **float**
-(anywhere in between, with the same irregular timing).
+(anywhere in between, with the same irregular timing), and a **HOLD** (0 … 10 s,
+log) : the rate then only decides *when* it may rise, once in a while as the coin
+falls, and each rise stays up for the hold before dropping straight back to the
+bottom, where it rests until the next one (a pulse rather than a held state; at
+5 ms it is a one-frame blip). HOLD 0 keeps the original : up until the next throw.
 
 The **mod-matrix** holds up to **12** assignments (M# → target param, with a
 bipolar depth and a **Multiply** or **Replace** mode). Bindings are made from each

@@ -209,6 +209,7 @@ interface SlotState {
   rndStepValue: number
   rndSmoothPrev: number
   rndSmoothNext: number
+  spasticFallAt: number // Spastic HOLD : when the throw drops back down (0 = up for good)
   shHeld: number
   shPrev: number
   shLastAdvanceAt: number
@@ -249,6 +250,7 @@ function makeSlot(now: number): SlotState {
     rndStepValue: 0,
     rndSmoothPrev: 0,
     rndSmoothNext: Math.random() * 2 - 1,
+    spasticFallAt: 0,
     shHeld: 0,
     shPrev: 0,
     shLastAdvanceAt: now,
@@ -364,6 +366,12 @@ export class ModEngine {
           // Resample stepped/smooth noise on every full-cycle wrap; iterate
           // multiple wraps so a rate jump can't freeze the held value.
           const wraps = Math.floor(s.phase) - Math.floor(prevPhase)
+          const spasticShape = cfg.shape === 'spastic'
+          const spasticBinary = spasticShape && (cfg.spasticMode ?? 'binary') === 'binary'
+          // Spastic HOLD : the throw only decides whether it RISES on a tick; how
+          // long it stays up is its own time, then it drops to the bottom (on the
+          // next frame : one frame down). A rise while up starts the hold again.
+          const hold = spasticShape ? Math.max(0, cfg.spasticHold ?? 0) : 0
           if (wraps > 0) {
             // SPASTIC's whole point is that you can't feel its clock — the
             // speed reads as random, near-polyrhythmic against everything else.
@@ -378,8 +386,6 @@ export class ModEngine {
             // to move FAR enough to read as a jump, since a tiny step is
             // indistinguishable from a hold and would quietly reintroduce the
             // metronome at half rate.
-            const spasticShape = cfg.shape === 'spastic'
-            const spasticBinary = spasticShape && (cfg.spasticMode ?? 'binary') === 'binary'
             for (let w = 0; w < wraps; w++) {
               // SLIP holds the two stepped shapes on a skipped tick. The two
               // shapes hold DIFFERENTLY : rndStep holds a sampled value, so it
@@ -394,7 +400,14 @@ export class ModEngine {
               s.rndSmoothPrev = s.rndSmoothNext
               if (!slipHold) s.rndSmoothNext = Math.random() * 2 - 1
               if (slipHold) continue
-              if (spasticBinary) {
+              if (spasticShape && hold > 0) {
+                if (Math.random() < 0.5) {
+                  // binary rises to the top; float to a level of its own, far
+                  // enough above the bottom to read as a throw
+                  s.rndStepValue = spasticBinary ? 1 : -0.3 + Math.random() * 1.3
+                  s.spasticFallAt = now + hold
+                }
+              } else if (spasticBinary) {
                 s.rndStepValue = Math.random() < 0.5 ? -1 : 1
               } else if (spasticShape) {
                 if (Math.random() < 0.5) {
@@ -410,6 +423,13 @@ export class ModEngine {
                 s.rndStepValue = Math.random() * 2 - 1 // rndStep : steady grid
               }
             }
+          }
+          if (spasticShape) {
+            // with HOLD it rests at the bottom between its rises
+            if (hold > 0 && (!s.spasticFallAt || now >= s.spasticFallAt)) {
+              s.rndStepValue = -1
+              s.spasticFallAt = 0
+            } else if (hold <= 0) s.spasticFallAt = 0
           }
           v01 = (lfoValue(cfg.shape, s.phase, s) + 1) / 2
           break
