@@ -611,6 +611,10 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **A modulated on/off button now looks modulated** (accent2, blue in the Studio theme,
+  like a modulated slider or menu) and shows its LIVE state, ON and OFF flipping with
+  the modulator (a Collage's `freeze` driven by an LFO); a click still sets the stored
+  state. The shared live overlay gained a paint-it-yourself subscriber for it.
 - **The Ring bank's driven voicings rasped like a ring modulator.** MS-20, Steiner and
   K35 soft-clipped the WHOLE mix of the Collage's pieces before the bank; the loud low
   pieces (the centre of the frame gets the lowest notes) intermodulated there, sums and

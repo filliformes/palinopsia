@@ -7,20 +7,23 @@
 
 import { liveModValues } from '../engine/modulation'
 
-interface LiveSub {
-  el: HTMLInputElement | HTMLSelectElement
-  key: string
-  format: (v: number) => string
-}
+type LiveSub =
+  | { el: HTMLInputElement | HTMLSelectElement; key: string; format: (v: number) => string }
+  // Anything else (a toggle button showing its live ON / OFF) : paint it yourself.
+  | { key: string; apply: (v: number) => void }
 
 const subs = new Set<LiveSub>()
 let raf = 0
 
 function tick(): void {
   for (const s of subs) {
-    if (document.activeElement === s.el) continue // don't clobber a drag/edit
     const live = liveModValues.get(s.key)
     if (live === undefined) continue
+    if ('apply' in s) {
+      s.apply(live)
+      continue
+    }
+    if (document.activeElement === s.el) continue // don't clobber a drag/edit
     const next = s.format(live)
     if (s.el.value !== next) s.el.value = next
   }

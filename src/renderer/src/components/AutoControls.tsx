@@ -786,6 +786,33 @@ function BoolControl({
     },
     [inp]
   )
+  // A modulated toggle looks modulated (accent2, like a modulated slider) and
+  // shows its LIVE state as the modulator flips it : the shared overlay repaints
+  // the button each frame (React keeps rendering the stored state).
+  const target = modTargetFor?.(inp.name)
+  const targetKey = target ? modTargetKey(target) : null
+  const isModulated = useBound(targetKey).length > 0
+  const btnRef = useRef<HTMLButtonElement | null>(null)
+  useEffect(() => {
+    const el = btnRef.current
+    if (!isModulated || !targetKey || !el) return
+    let last: boolean | null = null
+    return registerLiveOverlay({
+      key: targetKey,
+      apply: (v) => {
+        const live = v >= 0.5
+        if (live === last) return
+        last = live
+        el.textContent = live ? 'ON' : 'OFF'
+        el.classList.toggle('bg-accent2/25', live)
+        el.classList.toggle('text-accent2', live)
+        el.classList.toggle('ring-accent2', live)
+        el.classList.toggle('bg-panel2', !live)
+        el.classList.toggle('text-accent2/70', !live)
+        el.classList.toggle('ring-accent2/40', !live)
+      }
+    })
+  }, [isModulated, targetKey])
   if (inp.type === 'event') {
     return (
       <div className="flex w-24 min-w-0 flex-col items-start gap-0.5">
@@ -808,20 +835,34 @@ function BoolControl({
     )
   }
   const on = (typeof value === 'number' ? value : def) >= 0.5
+  const look = (state: boolean, modulated: boolean): string =>
+    modulated
+      ? state
+        ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
+        : 'bg-panel2 text-accent2/70 ring-1 ring-accent2/40'
+      : state
+        ? 'bg-accent/20 text-accent ring-1 ring-accent'
+        : 'bg-panel2 text-muted hover:text-text'
+  const pad = dense ? 'px-2 py-0' : 'px-2 py-0.5'
+  const title = isModulated
+    ? `${inp.label} : modulated (showing the live state; a click sets the stored one)`
+    : (inp.hint ?? inp.label)
+  const button = (
+    <button
+      ref={btnRef}
+      onClick={() => onChange(inp.name, on ? 0 : 1)}
+      className={`rounded ${pad} font-mono text-[10px] transition-colors ${look(on, isModulated)}`}
+      title={title}
+    >
+      {on ? 'ON' : 'OFF'}
+    </button>
+  )
   if (dense) {
     const target = modTargetFor?.(inp.name)
     return (
       <div className="flex min-w-0 items-center gap-1.5">
         {denseLabel(inp)}
-        <button
-          onClick={() => onChange(inp.name, on ? 0 : 1)}
-          className={`rounded px-2 py-0 font-mono text-[10px] transition-colors ${
-            on ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted hover:text-text'
-          }`}
-          title={inp.hint ?? inp.label}
-        >
-          {on ? 'ON' : 'OFF'}
-        </button>
+        {button}
         <div className="flex-1" />
         {target && <DenseMod target={target} label={inp.label} />}
       </div>
@@ -830,14 +871,7 @@ function BoolControl({
   return (
     <div className="flex w-24 min-w-0 flex-col items-start gap-0.5">
       <LabelRow inp={inp} modTargetFor={modTargetFor} />
-      <button
-        onClick={() => onChange(inp.name, on ? 0 : 1)}
-        className={`rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
-          on ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted hover:text-text'
-        }`}
-      >
-        {on ? 'ON' : 'OFF'}
-      </button>
+      {button}
     </div>
   )
 }
