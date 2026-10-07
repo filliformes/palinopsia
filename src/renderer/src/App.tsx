@@ -191,11 +191,15 @@ function RecPill(): JSX.Element | null {
 // fireSelectedRandomize lives in commands.ts now : the R shortcut, the
 // Transport button and a learned MIDI pad all fire the same implementation.
 
-// Small always-on status pip : when embodied control is live it shows a pulsing
-// red "camera on" dot (a privacy tell) and doubles as a shortcut to the Body page.
+// Small status pip : when embodied control is live it shows a pulsing red
+// "camera on" dot (a privacy tell) and doubles as a shortcut to the Body page.
+// Only over the full-page views (Sonify, Output, World, Sequence, Resolume),
+// which hide the toolbar, in their lower right corner : on the main view the
+// toolbar's lit Body button is the tell (the pip covered its tap-tempo end).
 function BodyPip(): JSX.Element | null {
   const enabled = useStore((s) => s.bodyControl.enabled)
   const pageOpen = useStore((s) => s.bodyPageOpen)
+  const overPage = useStore((s) => s.sonifyPageOpen || s.outputPageOpen || s.worldPageOpen || s.sequencePageOpen || s.resolumePageOpen)
   const setPage = useStore((s) => s.setBodyPageOpen)
   const [live, setLive] = useState(false)
   useEffect(() => {
@@ -206,12 +210,12 @@ function BodyPip(): JSX.Element | null {
     }, 300)
     return () => window.clearInterval(id)
   }, [enabled])
-  if (!enabled || pageOpen) return null
+  if (!enabled || pageOpen || !overPage) return null
   return (
     <button
       onClick={() => setPage(true)}
       title="Embodied control is live (camera on). Click for the Body page (B)."
-      className="fixed bottom-2 left-2 z-[60] flex items-center gap-1.5 rounded-full border border-border bg-panel/90 px-2.5 py-1 font-mono text-[10px] text-muted shadow-lg backdrop-blur hover:text-text"
+      className="fixed bottom-2 right-2 z-[60] flex items-center gap-1.5 rounded-full border border-border bg-panel/90 px-2.5 py-1 font-mono text-[10px] text-muted shadow-lg backdrop-blur hover:text-text"
     >
       <span className={`h-2 w-2 rounded-full ${live ? 'animate-pulse bg-red-500' : 'bg-yellow-500'}`} />
       BODY

@@ -620,8 +620,10 @@ Move** over USB-C: Opsia is the visual sibling, the Move keeps the beat.
 A full-page takeover that turns a **webcam of the performer** into control:
 MediaPipe **Hands + Pose + Face + Silhouette** read the body into a live bus,
 feeding continuous **modulators** and discrete **gestures**. A camera is strictly
-**opt-in**: nothing opens until you press **Enable**, and a pulsing red pip (top
-bar, and the lit toolbar **Body** button) is the privacy tell while it runs. The
+**opt-in**: nothing opens until you press **Enable**, and the lit toolbar **Body**
+button is the privacy tell while it runs (over a full-page view that hides the toolbar,
+Sonify, Output, World, Sequence or Resolume, a pulsing red **BODY** pip in the lower
+right corner takes over, a click opens the Body page). The
 tracker uses a dedicated low-res capture, independent of any webcam layer. The
 MediaPipe models run on **their own thread** : the picture only hands each camera
 frame over (about 0.1 ms) and reads back the landmarks, so tracking never slows the

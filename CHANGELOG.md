@@ -689,6 +689,10 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The Body pip sits in the lower right** of the full-page views (Sonify, Output,
+  World, Sequence, Resolume), where it no longer covers Sonify's tap menu. On the main
+  view it steps aside : it covered the tap-tempo end of the toolbar, whose lit Body
+  button is the tell there.
 - **Development (`npm run dev`) : a hot update no longer leaves a second engine
   running.** Editing the sound engine, the audio input or the body tracker re-runs
   that module with a fresh copy, and the old one played on with nothing left to stop
