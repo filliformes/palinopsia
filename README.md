@@ -942,7 +942,7 @@ or need to restart.
 
 The instrument's sound half : the image itself synthesizes audio, in real time,
 inside the app (an AudioWorklet engine : no external software). A full-page
-takeover: the live composite mirrored large with the **probes drawn on it** : because the probe is the instrument, plus the nine voices' strips and a master bus.
+takeover: the live composite mirrored large with the **probes drawn on it** : because the probe is the instrument, plus the nine voices' strips and a master bus. Every parameter explains itself on hover.
 
 **The nine voices** (each one lineage of the sonification literature):
 

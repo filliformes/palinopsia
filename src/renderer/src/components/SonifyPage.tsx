@@ -91,7 +91,7 @@ function RateRow({ label, rate, sync, onRate, onSync, title }: {
   label: string; rate: number; sync: number; onRate: (v: number) => void; onSync: (v: number) => void; title: string
 }): JSX.Element {
   return (
-    <Row label={label}>
+    <Row label={label} hint={title}>
       <input
         type="range" min={0} max={1} step={0.005} value={rate}
         onChange={(e) => onRate(Number(e.target.value))}
@@ -111,10 +111,10 @@ function RateRow({ label, rate, sync, onRate, onSync, title }: {
 }
 const RING_VOICINGS = ['Clean', 'SEM', 'MS-20', 'Steiner', 'K35']
 
-function Row({ label, children }: { label: string; children: ReactNode }): JSX.Element {
+function Row({ label, children, hint }: { label: string; children: ReactNode; hint?: string }): JSX.Element {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
-      <span className="w-14 shrink-0 font-mono text-[9px] uppercase text-muted">{label}</span>
+      <span className="w-14 shrink-0 font-mono text-[9px] uppercase text-muted" title={hint}>{label}</span>
       {children}
     </div>
   )
@@ -145,7 +145,7 @@ function Slider({
     return registerLiveOverlay({ el: ref.current, key: modTargetKey({ kind: 'sonify', param: modParam }), format: (x) => String(x) })
   }, [live, modParam])
   return (
-    <Row label={label}>
+    <Row label={label} hint={title}>
       <input
         ref={ref}
         type="range" min={min} max={max} step={step} value={value}
@@ -1034,9 +1034,9 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
               })}
               <div className="mt-1 flex flex-col gap-0.5 rounded border border-accent2/40 bg-panel2/40 px-1.5 py-1">
                 <div className="font-mono text-[8px] uppercase tracking-wide text-muted/70">fx tail</div>
-                <Slider label="send" value={cfg.fx.send} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ send: v })} />
-                <Slider label="delay" value={cfg.fx.dlyMix} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ dlyMix: v })} />
-                <Slider label="reverb" value={cfg.fx.rvMix} min={0} max={1} neutral={0.6} onChange={(v) => pfx({ rvMix: v })} />
+                <Slider label="send" value={cfg.fx.send} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ send: v })} title="How much of the whole Sonify mix feeds the shared delay and reverb (the FX tail)" />
+                <Slider label="delay" value={cfg.fx.dlyMix} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ dlyMix: v })} title="How loud the delay is in the FX tail" />
+                <Slider label="reverb" value={cfg.fx.rvMix} min={0} max={1} neutral={0.6} onChange={(v) => pfx({ rvMix: v })} title="How loud the reverb is in the FX tail" />
               </div>
               <SonifySequencer presets={presetList} />
             </div>
@@ -1064,7 +1064,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
               {chip('spectraX', cfg.spectra.sweepOn)}
             </Row>
             {!cfg.spectra.sync && cfg.spectra.sweepOn && (
-              <Slider label="rate" value={cfg.spectra.sweepHz} min={0.02} max={4} neutral={0.25} fmt={(v) => v.toFixed(2) + 'Hz'} onChange={(v) => pv('spectra', { sweepHz: v })} mod={chip('spectraSweep')} />
+              <Slider label="rate" value={cfg.spectra.sweepHz} min={0.02} max={4} neutral={0.25} fmt={(v) => v.toFixed(2) + 'Hz'} onChange={(v) => pv('spectra', { sweepHz: v })} mod={chip('spectraSweep')} title="How fast the scan line sweeps across the frame (sweeps per second)" />
             )}
             <Row label="path">
               <select
@@ -1082,8 +1082,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             {cfg.spectra.sweepOn && (
               <Slider label="pace" value={cfg.spectra.pace ?? 0} min={0} max={0.95} neutral={0} onChange={(v) => pv('spectra', { pace: v })} title="Breathing pace : the sweep slows at the edges and rushes the middle (0 = even)" />
             )}
-            <Slider label="contrast" value={cfg.spectra.gamma} min={0.5} max={4} neutral={1.8} onChange={(v) => pv('spectra', { gamma: v })} mod={chip('spectraGamma')} />
-            <Slider label="breath" value={cfg.spectra.breath ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('spectra', { breath: v })} mod={chip('spectraBreath')} />
+            <Slider label="contrast" value={cfg.spectra.gamma} min={0.5} max={4} neutral={1.8} onChange={(v) => pv('spectra', { gamma: v })} mod={chip('spectraGamma')} title="Brightness contrast : higher lets only the brightest parts of the picture sing, lower lets the dim parts in too" />
+            <Slider label="breath" value={cfg.spectra.breath ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('spectra', { breath: v })} mod={chip('spectraBreath')} title="The sweep breathes : it slows near the frame's edges and rushes through the middle (0 = an even sweep)" />
             <Row label="range">
               <select className="input select-compact text-[10px]" value={cfg.spectra.loOct} onChange={(e) => pv('spectra', { loOct: Math.min(Number(e.target.value), cfg.spectra.hiOct - 1) })} title="Lowest octave">
                 {[0, 1, 2, 3, 4].map((o) => <option key={o} value={o}>oct {o}</option>)}
@@ -1098,8 +1098,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 title="Snap the partial rows onto the key/scale, or spread them freely"
               >♪ scale</button>
             </Row>
-            <Slider label="gain" value={cfg.spectra.gain} min={0} max={1} neutral={0.5} onChange={(v) => pv('spectra', { gain: v })} mod={chip('spectraGain')} />
-            <Slider label="pan" value={cfg.spectra.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('spectra', { pan: v })} />
+            <Slider label="gain" value={cfg.spectra.gain} min={0} max={1} neutral={0.5} onChange={(v) => pv('spectra', { gain: v })} mod={chip('spectraGain')} title="How loud the Spectra voice is (before its mixer channel)" />
+            <Slider label="pan" value={cfg.spectra.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('spectra', { pan: v })} title="Places the Spectra voice left (-1) or right (+1)" />
           </VoiceShell>
 
           <VoiceShell
@@ -1149,11 +1149,11 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 <option value={3}>lissajous 1:3</option>
               </select>
             </Row>
-            <Slider label="radius" value={cfg.orbit.rx} min={0.02} max={0.5} neutral={0.25} onChange={(v) => pv('orbit', { rx: v, ry: v })} />
-            <Slider label="drive" value={cfg.orbit.drive} min={0.2} max={4} neutral={1} onChange={(v) => pv('orbit', { drive: v })} mod={chip('orbitDrive')} />
-            <Slider label="smooth" value={cfg.orbit.smooth} min={0} max={1} neutral={0.5} onChange={(v) => pv('orbit', { smooth: v })} mod={chip('orbitSmooth')} />
-            <Slider label="gain" value={cfg.orbit.gain} min={0} max={1} neutral={0.5} onChange={(v) => pv('orbit', { gain: v })} />
-            <Slider label="pan" value={cfg.orbit.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('orbit', { pan: v })} />
+            <Slider label="radius" value={cfg.orbit.rx} min={0.02} max={0.5} neutral={0.25} onChange={(v) => pv('orbit', { rx: v, ry: v })} title="The size of the orbit that reads the picture as a waveform : bigger reads more of the frame, a richer timbre" />
+            <Slider label="drive" value={cfg.orbit.drive} min={0.2} max={4} neutral={1} onChange={(v) => pv('orbit', { drive: v })} mod={chip('orbitDrive')} title="Pushes the waveform read off the picture into a soft clip : warmer, then grittier" />
+            <Slider label="smooth" value={cfg.orbit.smooth} min={0} max={1} neutral={0.5} onChange={(v) => pv('orbit', { smooth: v })} mod={chip('orbitSmooth')} title="Smooths the waveform read off the picture : 0 = raw and buzzy, 1 = round and soft" />
+            <Slider label="gain" value={cfg.orbit.gain} min={0} max={1} neutral={0.5} onChange={(v) => pv('orbit', { gain: v })} title="How loud the Orbit voice is (before its mixer channel)" />
+            <Slider label="pan" value={cfg.orbit.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('orbit', { pan: v })} title="Places the Orbit voice left (-1) or right (+1)" />
           </VoiceShell>
 
           <VoiceShell
@@ -1163,10 +1163,10 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             onDice={() => diceVoice('flow')}
           >
             <TapSelect cfg={cfg} voice={cfg.flow} onChange={(tap) => pv('flow', { tap })} />
-            <Slider label="sense" value={cfg.flow.sense} min={0} max={1} neutral={0.4} onChange={(v) => pv('flow', { sense: v })} />
-            <Slider label="density" value={cfg.flow.density} min={0} max={1} neutral={0.5} onChange={(v) => pv('flow', { density: v })} />
-            <Slider label="grain" value={cfg.flow.dur} min={0.02} max={0.4} neutral={0.09} fmt={(v) => Math.round(v * 1000) + 'ms'} onChange={(v) => pv('flow', { dur: v })} mod={chip('flowDur')} />
-            <Slider label="breath" value={cfg.flow.noise} min={0} max={1} neutral={0.15} onChange={(v) => pv('flow', { noise: v })} />
+            <Slider label="sense" value={cfg.flow.sense} min={0} max={1} neutral={0.4} onChange={(v) => pv('flow', { sense: v })} title="How little motion it takes to fire a grain : higher hears smaller movements" />
+            <Slider label="density" value={cfg.flow.density} min={0} max={1} neutral={0.5} onChange={(v) => pv('flow', { density: v })} title="How many grains can sound at once : sparse drops to a dense cloud" />
+            <Slider label="grain" value={cfg.flow.dur} min={0.02} max={0.4} neutral={0.09} fmt={(v) => Math.round(v * 1000) + 'ms'} onChange={(v) => pv('flow', { dur: v })} mod={chip('flowDur')} title="How long each grain lasts" />
+            <Slider label="breath" value={cfg.flow.noise} min={0} max={1} neutral={0.15} onChange={(v) => pv('flow', { noise: v })} title="Breath in each grain : a little noise blended into its tone" />
             <Slider label="color" value={cfg.flow.colour ?? 0.6} min={0} max={1} neutral={0.6} onChange={(v) => pv('flow', { colour: v })} mod={chip('flowColour')} title="Color → grain timbre : saturation brightens each grain, hue tints it (warm = rounder body, cool = shimmer)" />
             <Row label="range">
               <select className="input select-compact text-[10px]" value={cfg.flow.loOct} onChange={(e) => pv('flow', { loOct: Math.min(Number(e.target.value), cfg.flow.hiOct - 1) })} title="Lowest octave">
@@ -1182,7 +1182,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 title="Grains land on scale notes (a rain of pitches) or free frequencies"
               >♪ scale</button>
             </Row>
-            <Slider label="gain" value={cfg.flow.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('flow', { gain: v })} />
+            <Slider label="gain" value={cfg.flow.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('flow', { gain: v })} title="How loud the Flow voice is (before its mixer channel)" />
             <Slider label="pan" value={cfg.flow.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('flow', { pan: v })} title="Shifts every grain left or right of where it moves" />
           </VoiceShell>
 
@@ -1211,10 +1211,10 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 >{mo}</button>
               ))}
             </Row>
-            <Slider label="sense" value={cfg.events.sense} min={0} max={1} neutral={0.5} onChange={(v) => pv('events', { sense: v })} />
-            <Slider label="density" value={cfg.events.density} min={0} max={1} neutral={0.4} onChange={(v) => pv('events', { density: v })} />
-            <Slider label="decay" value={cfg.events.decay} min={0} max={1} neutral={0.35} fmt={(v) => Math.round((0.05 + v * 2.45) * 1000) + 'ms'} onChange={(v) => pv('events', { decay: v })} mod={chip('eventsDecay')} />
-            <Slider label="highs↓" value={cfg.events.highs} min={0} max={1} neutral={0.6} onChange={(v) => pv('events', { highs: v })} />
+            <Slider label="sense" value={cfg.events.sense} min={0} max={1} neutral={0.5} onChange={(v) => pv('events', { sense: v })} title="How strong an edge or a movement must be to strike a note : higher strikes more of them" />
+            <Slider label="density" value={cfg.events.density} min={0} max={1} neutral={0.4} onChange={(v) => pv('events', { density: v })} title="How many notes it may strike per second" />
+            <Slider label="decay" value={cfg.events.decay} min={0} max={1} neutral={0.35} fmt={(v) => Math.round((0.05 + v * 2.45) * 1000) + 'ms'} onChange={(v) => pv('events', { decay: v })} mod={chip('eventsDecay')} title="How long each struck note rings" />
+            <Slider label="highs↓" value={cfg.events.highs} min={0} max={1} neutral={0.6} onChange={(v) => pv('events', { highs: v })} title="High notes die away sooner, like a struck string (0 = every note rings as long)" />
             <Row label="wave">
               <select
                 className="input select-compact min-w-0 flex-1 text-[10px]"
@@ -1242,8 +1242,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 title="Notes land on scale degrees or free frequencies"
               >♪ scale</button>
             </Row>
-            <Slider label="gain" value={cfg.events.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('events', { gain: v })} />
-            <Slider label="pan" value={cfg.events.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('events', { pan: v })} />
+            <Slider label="gain" value={cfg.events.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('events', { gain: v })} title="How loud the Events voice is (before its mixer channel)" />
+            <Slider label="pan" value={cfg.events.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('events', { pan: v })} title="Places the Events voice left (-1) or right (+1)" />
           </VoiceShell>
 
           <VoiceShell
@@ -1286,14 +1286,15 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
               <span className="font-mono text-[9px] text-muted">w</span>{chip('rasterW')}
               <span className="font-mono text-[9px] text-muted">h</span>{chip('rasterH')}
             </Row>
-            <Slider label="smooth" value={cfg.raster.smooth} min={0} max={1} neutral={0} onChange={(v) => pv('raster', { smooth: v })} mod={chip('rasterSmooth')} />
+            <Slider label="smooth" value={cfg.raster.smooth} min={0} max={1} neutral={0} onChange={(v) => pv('raster', { smooth: v })} mod={chip('rasterSmooth')} title="Rounds the scanned waveform : 0 = the hard, aliased digital register, higher = softer" />
             <Slider
               label="tone" value={cfg.raster.tone ?? 0.6} min={0} max={1} neutral={0.6}
               fmt={(v) => (v >= 0.99 ? 'open' : Math.round(300 * Math.pow(8000 / 300, v)) + 'Hz')}
               onChange={(v) => pv('raster', { tone: v })} mod={chip('rasterTone')}
+              title="A low-pass on the scanned waveform, 300 Hz to 8 kHz : darker to brighter (fully up = open, the raw buzz)"
             />
-            <Slider label="gain" value={cfg.raster.gain} min={0} max={1} neutral={0.4} onChange={(v) => pv('raster', { gain: v })} />
-            <Slider label="pan" value={cfg.raster.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('raster', { pan: v })} />
+            <Slider label="gain" value={cfg.raster.gain} min={0} max={1} neutral={0.4} onChange={(v) => pv('raster', { gain: v })} title="How loud the Raster voice is (before its mixer channel)" />
+            <Slider label="pan" value={cfg.raster.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('raster', { pan: v })} title="Places the Raster voice left (-1) or right (+1)" />
             <p className="text-[9px] leading-tight text-muted">Drag the green rect (corner resizes). The rect IS the waveform : edges buzz, gradients hum, datamosh blocks tick. Smooth 0 = the hard aliased register.</p>
           </VoiceShell>
 
@@ -1323,10 +1324,10 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 title={`Sync : one scan line per 16th note @ ${bpm} BPM (the sync tick becomes the clock)`}
               >{cfg.sstv.sync ? `sync 1/16 @ ${bpm}` : 'sync'}</button>
             </Row>
-            <Slider label="transpose" value={cfg.sstv.dev} min={0.25} max={2} neutral={1} fmt={(v) => v.toFixed(2) + 'x'} onChange={(v) => pv('sstv', { dev: v })} mod={chip('sstvDev')} />
-            <Slider label="tick" value={cfg.sstv.syncLev} min={0} max={1} neutral={0.5} onChange={(v) => pv('sstv', { syncLev: v })} />
-            <Slider label="gain" value={cfg.sstv.gain} min={0} max={1} neutral={0.4} onChange={(v) => pv('sstv', { gain: v })} />
-            <Slider label="pan" value={cfg.sstv.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('sstv', { pan: v })} />
+            <Slider label="transpose" value={cfg.sstv.dev} min={0.25} max={2} neutral={1} fmt={(v) => v.toFixed(2) + 'x'} onChange={(v) => pv('sstv', { dev: v })} mod={chip('sstvDev')} title="Scales every frequency of the transmission : 1 = the real slow-scan TV pitches (black 1500 Hz to white 2300 Hz)" />
+            <Slider label="tick" value={cfg.sstv.syncLev} min={0} max={1} neutral={0.5} onChange={(v) => pv('sstv', { syncLev: v })} title="How loud the 1200 Hz sync tick is : the transmission's metronome between lines" />
+            <Slider label="gain" value={cfg.sstv.gain} min={0} max={1} neutral={0.4} onChange={(v) => pv('sstv', { gain: v })} title="How loud the Transmission voice is (before its mixer channel)" />
+            <Slider label="pan" value={cfg.sstv.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('sstv', { pan: v })} title="Places the Transmission voice left (-1) or right (+1)" />
           </VoiceShell>
 
           <VoiceShell
@@ -1381,15 +1382,15 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             {cfg.filter.sweepOn && (
               <Slider label="pace" value={cfg.filter.pace ?? 0} min={0} max={0.95} neutral={0} onChange={(v) => pv('filter', { pace: v })} title="Breathing pace : the sweep slows at the edges and rushes the middle (0 = even)" />
             )}
-            <Slider label="resonance" value={cfg.filter.q} min={0} max={1} neutral={0.5} onChange={(v) => pv('filter', { q: v })} mod={chip('filterQ')} />
-            <Slider label="noise" value={cfg.filter.noise} min={0} max={1} neutral={0.5} onChange={(v) => pv('filter', { noise: v })} />
+            <Slider label="resonance" value={cfg.filter.q} min={0} max={1} neutral={0.5} onChange={(v) => pv('filter', { q: v })} mod={chip('filterQ')} title="The bands' width : wide = wind, narrow = flute" />
+            <Slider label="noise" value={cfg.filter.noise} min={0} max={1} neutral={0.5} onChange={(v) => pv('filter', { noise: v })} title="How loud the noise played through the bands is (when the source is noise, not the line-in)" />
             <Slider
               label="loop" value={cfg.filter.loop ?? 0} min={0} max={1} neutral={0}
               fmt={(v) => (v < 0.001 ? 'free' : Math.round(400 * Math.pow(0.0125, v)) + 'ms')}
               onChange={(v) => pv('filter', { loop: v })}
               title="0 = free noise (wind) · up = the same stretch of noise replayed : a few hundred ms flutters, a few ms buzzes"
             />
-            <Slider label="contrast" value={cfg.filter.gamma} min={0.5} max={4} neutral={1.6} onChange={(v) => pv('filter', { gamma: v })} />
+            <Slider label="contrast" value={cfg.filter.gamma} min={0.5} max={4} neutral={1.6} onChange={(v) => pv('filter', { gamma: v })} title="Brightness contrast of the bands : higher lets only the brightest parts of the picture through" />
             <Row label="bands">
               <button
                 onClick={() => pv('filter', { quantize: !cfg.filter.quantize })}
@@ -1408,8 +1409,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 </>
               )}
             </Row>
-            <Slider label="gain" value={cfg.filter.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('filter', { gain: v })} />
-            <Slider label="pan" value={cfg.filter.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('filter', { pan: v })} />
+            <Slider label="gain" value={cfg.filter.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('filter', { gain: v })} title="How loud the Filter voice is (before its mixer channel)" />
+            <Slider label="pan" value={cfg.filter.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('filter', { pan: v })} title="Places the Filter voice left (-1) or right (+1)" />
           </VoiceShell>
 
           <VoiceShell
@@ -1439,7 +1440,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             </Row>
             <Slider label="swell" value={cfg.chord.attack} min={0.02} max={3} neutral={0.4} fmt={(v) => v.toFixed(2) + 's'} onChange={(v) => pv('chord', { attack: v })} mod={chip('chordAttack')} title="Attack : how slowly each note fades IN as its band brightens" />
             <Slider label="fade" value={cfg.chord.release} min={0.05} max={6} neutral={0.8} fmt={(v) => v.toFixed(2) + 's'} onChange={(v) => pv('chord', { release: v })} title="Release : how slowly each note fades OUT as its band darkens" />
-            <Slider label="contrast" value={cfg.chord.gamma} min={0.5} max={4} neutral={1.6} onChange={(v) => pv('chord', { gamma: v })} />
+            <Slider label="contrast" value={cfg.chord.gamma} min={0.5} max={4} neutral={1.6} onChange={(v) => pv('chord', { gamma: v })} title="Brightness contrast : higher keeps only the brightest bands' notes singing, lower lets the dim ones in" />
             <Slider label="tone" value={cfg.chord.tone} min={0} max={1} neutral={0.3} onChange={(v) => pv('chord', { tone: v })} mod={chip('chordTone')} title="Sine → brighter (soft-clip harmonics)" />
             <Slider label="spread" value={cfg.chord.spread} min={0} max={1} neutral={0.6} onChange={(v) => pv('chord', { spread: v })} mod={chip('chordSpread')} title="Stereo spread : the bass stays in the middle, the notes above fan out left and right, the highest widest" />
             <Slider label="waves" value={cfg.chord.waves ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('chord', { waves: v })} mod={chip('chordWaves')} title="A sine of level travelling across the chord's notes : the held chord keeps moving inside (past 65 % it speeds up)" />
@@ -1450,8 +1451,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             {(cfg.chord.noise ?? 0) > 0 && (
               <Slider label="air" value={cfg.chord.air ?? 0.4} min={0} max={1} neutral={0.4} onChange={(v) => pv('chord', { air: v })} mod={chip('chordAir')} title="How wide each note's noise band is : a narrow pitched breath around the note (0) to a wide pink wash (1)" />
             )}
-            <Slider label="gain" value={cfg.chord.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('chord', { gain: v })} />
-            <Slider label="pan" value={cfg.chord.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('chord', { pan: v })} />
+            <Slider label="gain" value={cfg.chord.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('chord', { gain: v })} title="How loud the Chord voice is (before its mixer channel)" />
+            <Slider label="pan" value={cfg.chord.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('chord', { pan: v })} title="Places the Chord voice left (-1) or right (+1)" />
           </VoiceShell>
 
           <VoiceShell
@@ -1482,8 +1483,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
               </select>
             </Row>
             <Slider label="width" value={cfg.collage.width} min={0} max={1} neutral={1} onChange={(v) => pv('collage', { width: v })} mod={chip('collageWidth')} title="Stereo spread : 0 = every piece in the center · 1 = left to right across the frame" />
-            <Slider label="gain" value={cfg.collage.gain} min={0} max={1} neutral={0.7} onChange={(v) => pv('collage', { gain: v })} />
-            <Slider label="pan" value={cfg.collage.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('collage', { pan: v })} />
+            <Slider label="gain" value={cfg.collage.gain} min={0} max={1} neutral={0.7} onChange={(v) => pv('collage', { gain: v })} title="How loud the Collage voice is (before its mixer channel)" />
+            <Slider label="pan" value={cfg.collage.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('collage', { pan: v })} title="Places the Collage voice left (-1) or right (+1)" />
             {/* The Ring bank : a resonant filterbank over the whole voice. */}
             <div className="mt-1 flex items-center gap-1.5">
               <span className="font-mono text-[8px] uppercase tracking-wide text-muted/70" title="A 48-band resonant filterbank over the whole voice, its bands on the key / scale across the range : the films ring as a tuned instrument">ring bank</span>
@@ -1546,12 +1547,12 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
               <button onClick={() => pfx({ rvMode: 1 })} className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.fx.rvMode === 1 ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`} title="Prism : per-band frequency-dependent decay">Prism</button>
               <button onClick={() => pfx({ rvFreeze: !cfg.fx.rvFreeze })} className={`ml-auto rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.fx.rvFreeze ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2' : 'bg-panel3/60 text-muted'}`} title="Infinite freeze (hold the tail)">❄ freeze</button>
             </Row>
-            <Slider label="size" value={cfg.fx.rvSize} min={0} max={1} neutral={0.6} onChange={(v) => pfx({ rvSize: v })} />
+            <Slider label="size" value={cfg.fx.rvSize} min={0} max={1} neutral={0.6} onChange={(v) => pfx({ rvSize: v })} title="The reverb's room size : small and close to a vast hall" />
             <Slider label="decay" value={cfg.fx.rvDecay} min={0} max={1} neutral={0.6} fmt={(v) => (0.25 + v * v * 11.75).toFixed(1) + 's'} onChange={(v) => pfx({ rvDecay: v })} title="RT60 (0.25–12 s)" />
             <Slider label="damp" value={cfg.fx.rvDamp} min={0} max={1} neutral={0.3} onChange={(v) => pfx({ rvDamp: v })} title="HF absorption (darker tail)" />
-            <Slider label="predelay" value={cfg.fx.rvPre} min={0} max={200} neutral={20} fmt={(v) => Math.round(v) + 'ms'} onChange={(v) => pfx({ rvPre: v })} />
+            <Slider label="predelay" value={cfg.fx.rvPre} min={0} max={200} neutral={20} fmt={(v) => Math.round(v) + 'ms'} onChange={(v) => pfx({ rvPre: v })} title="The gap before the reverb starts (ms) : a longer gap keeps the dry sound clear in front" />
             <Slider label="shimmer" value={cfg.fx.rvMod} min={0} max={40} neutral={6} fmt={(v) => v.toFixed(0)} onChange={(v) => pfx({ rvMod: v })} title="Tail modulation depth (chorusing)" />
-            <Slider label="mod rate" value={cfg.fx.rvModRate} min={0.01} max={8} neutral={0.5} fmt={(v) => v.toFixed(2) + 'Hz'} onChange={(v) => pfx({ rvModRate: v })} />
+            <Slider label="mod rate" value={cfg.fx.rvModRate} min={0.01} max={8} neutral={0.5} fmt={(v) => v.toFixed(2) + 'Hz'} onChange={(v) => pfx({ rvModRate: v })} title="How fast the reverb tail slowly wobbles (Hz) : the chorus that keeps a long tail alive" />
             <Slider label="width" value={cfg.fx.rvWidth} min={0} max={1} neutral={1} onChange={(v) => pfx({ rvWidth: v })} title="Stereo width (0 mono … 1 wide)" />
             <Slider label="low-cut" value={cfg.fx.rvLocut} min={20} max={2000} neutral={220} fmt={(v) => Math.round(v) + 'Hz'} onChange={(v) => pfx({ rvLocut: v })} title="Wet low-cut (keeps the tail airy)" />
             {cfg.fx.rvMode === 0 ? (

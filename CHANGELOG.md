@@ -404,6 +404,12 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Every Sonify parameter explains itself on hover**, like the Inspector's : 45 sliders
+  (every voice's gain and pan, Spectra's rate / contrast / breath, Orbit's radius / drive
+  / smooth, Flow's sense / density / grain / breath, Events' sense / density / decay /
+  highs, Raster's smooth / tone, Transmission's transpose / tick, Filter's resonance /
+  noise / contrast, the FX tail's send / delay / reverb / size / predelay / mod rate)
+  showed only their value; each row's label now carries the same info.
 - **The Output button lights while the external output is on** (◉ Output), like Sonify's
   while its sound runs.
 - **Electron 44** (from 33), with electron-builder 26, Vite 7, electron-vite 5 and
