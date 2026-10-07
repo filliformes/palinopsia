@@ -322,6 +322,12 @@ class BodyTracker {
     }
   }
 
+  /** Stop for good (a dev hot update replacing this tracker : end of file). */
+  dispose(): void {
+    this.cfg = null
+    this.stop()
+  }
+
   stop(): void {
     this.startGen++ // invalidate any start() still resolving its awaits
     this.running = false
@@ -918,3 +924,14 @@ class BodyTracker {
 }
 
 export const bodyTracker = new BodyTracker()
+
+// Dev only : a hot update re-runs this module and makes a new tracker ; the
+// previous one kept its camera and its tracking loop running beside the new one
+// (two trackers on one camera : lag, and the camera driver's "Failed to reserve
+// output capture buffer"). The new tracker stops the old one. Compiled out of a
+// real build.
+if (import.meta.hot) {
+  const g = globalThis as { __opsiaBodyTracker?: BodyTracker }
+  g.__opsiaBodyTracker?.dispose()
+  g.__opsiaBodyTracker = bodyTracker
+}

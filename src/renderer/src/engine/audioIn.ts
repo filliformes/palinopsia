@@ -556,3 +556,12 @@ class AudioBus {
 // One bus per renderer. The App loop ticks it; audio modulators + the Audio
 // panel read it.
 export const audioBus = new AudioBus()
+
+// Dev only : a hot update re-runs this module and makes a new bus ; the previous
+// one would keep its input (and its monitor, on the speakers) open with nothing
+// left to close it. The new bus closes the old one. Compiled out of a real build.
+if (import.meta.hot) {
+  const g = globalThis as { __opsiaAudioBus?: AudioBus }
+  g.__opsiaAudioBus?.stopLocal()
+  g.__opsiaAudioBus = audioBus
+}

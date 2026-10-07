@@ -638,6 +638,13 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Development (`npm run dev`) : a hot update no longer leaves a second engine
+  running.** Editing the sound engine, the audio input or the body tracker re-runs
+  that module with a fresh copy, and the old one played on with nothing left to stop
+  it : Sonify off and the sound still going (its audio context is kept open now), a
+  line-in monitor still on the speakers, or two trackers on one camera (lag, and the
+  camera driver's "Failed to reserve output capture buffer"). The new copy now shuts
+  the old one down. Compiled out of a real build, which never had the problem.
 - **A modulated on/off button now looks modulated** (accent2, blue in the Studio theme,
   like a modulated slider or menu) and shows its LIVE state, ON and OFF flipping with
   the modulator (a Collage's `freeze` driven by an LFO); a click still sets the stored

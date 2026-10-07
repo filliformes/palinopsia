@@ -665,6 +665,16 @@ class SonifyEngine {
     this.ctxReady = null
   }
 
+  /** Silence and release everything for good (a dev hot update replacing this
+   *  engine : see the end of this file). */
+  shutdown(): void {
+    this.warm = false
+    this.bus = 0
+    this.healAfterTake = false
+    this.stop()
+    this.closeCtx()
+  }
+
   stop(): void {
     this.collage?.dispose()
     this.collage = null
@@ -1170,3 +1180,13 @@ class SonifyEngine {
 }
 
 export const sonifyEngine = new SonifyEngine()
+
+// Dev only (`npm run dev`) : a hot update re-runs this module and makes a new
+// engine, while the previous one, its audio context kept open (keepWarm), played
+// on with nothing left to turn it off : Sonify off, the sound still going. The
+// new engine shuts the old one down. Compiled out of a real build.
+if (import.meta.hot) {
+  const g = globalThis as { __opsiaSonify?: SonifyEngine }
+  g.__opsiaSonify?.shutdown()
+  g.__opsiaSonify = sonifyEngine
+}

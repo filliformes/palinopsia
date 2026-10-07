@@ -109,13 +109,17 @@ The papers, books and standards the instrument draws on are listed in
 
 ```bash
 npm install
-npm run dev          # electron-vite dev
+npm run dev          # electron-vite dev (edits hot-reload into the running app)
 npm run typecheck    # tsc : node + web projects (both must be green)
 npm run build        # electron-vite build (bundle only)
 npm run build:win    # NSIS installer + portable
 npm run build:mac    # DMG
 npm run build:linux  # AppImage + deb
 ```
+
+A hot update re-runs the edited module in place. The long-lived engines (Sonify, the
+audio input, the body tracker) shut down their previous copy when that happens, so a
+reload is only needed after a main-process or preload change.
 
 NDI needs no build step : the sender calls the NDI runtime through an FFI (`koffi`).
 `npm run ndi:bundle` copies an installed official NDI runtime into `resources/ndi/` so
