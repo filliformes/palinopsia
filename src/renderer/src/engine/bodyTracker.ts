@@ -1,8 +1,10 @@
 // Embodied-control tracker : a dedicated low-res webcam → MediaPipe Hands + Pose
-// → the body bus (engine/bodyIn.ts). Runs ONLY while enabled (a camera : opt-in),
-// on its own rAF loop off the render critical path. The heavy MediaPipe module +
-// wasm load lazily (dynamic import) the first time it starts, so the app costs
-// nothing for it until the performer turns it on.
+// → the body bus (engine/bodyIn.ts). Runs ONLY while enabled (a camera : opt-in).
+// The models run in a worker (engine/bodyWorker.ts) : this thread only hands each
+// new camera frame over and turns the landmarks that come back into features
+// (process()). If the worker can't start, the models run here, on this loop, as
+// they did before. MediaPipe loads the first time the camera starts, so the app
+// costs nothing for it until the performer turns it on.
 //
 // Everything is self-hosted over opsia-asset:// (main/assets.ts) : no CDN, works
 // offline and in a kiosk. Landmarks are reduced to normalised 0..1 features; the
@@ -18,12 +20,15 @@ import { bodyBus } from './bodyIn'
 import { perfMeter } from './perfMeter'
 import { FlowField, STILL, type FlowStats } from './flowField'
 import { EffortReader, type EffortStats } from './effort'
+import { createBodyWorker } from './bodyWorker'
 
 // opsia-asset:// URLs (served by main from the bundled resources/mediapipe dir).
 const WASM_BASE = 'opsia-asset://local/wasm'
 const HAND_MODEL = 'opsia-asset://local/models/hand_landmarker.task'
 const POSE_MODEL = 'opsia-asset://local/models/pose_landmarker_lite.task'
 const FACE_MODEL = 'opsia-asset://local/models/face_landmarker.task'
+// MediaPipe's own CommonJS bundle, loaded by the tracking worker (bodyWorker.ts).
+const BUNDLE_URL = 'opsia-asset://local/vision_bundle.js'
 
 type MP = typeof import('@mediapipe/tasks-vision')
 // The landmarker classes have private constructors, so derive the instance type
@@ -63,6 +68,21 @@ const NOSE = 0, L_SHO = 11, R_SHO = 12, L_HIP = 23, R_HIP = 24, L_WRI = 15, R_WR
 const WRIST = 0, THUMB = 4, INDEX = 8, PINKY = 20, INDEX_MCP = 5, PINKY_MCP = 17, MID_MCP = 9
 // Face-mesh canonical indices (478) used for head pose from geometry.
 const F_NOSE = 1, F_CHIN = 152, F_FORE = 10, F_LCHEEK = 234, F_RCHEEK = 454, F_LEYE = 33, F_REYE = 263
+
+/** One tracked camera frame : from the worker, or the main-thread fallback. */
+interface WorkerResult {
+  ts: number
+  camT: number
+  newFrame: boolean
+  hands: NormalizedLandmark[][]
+  pose: NormalizedLandmark[] | null
+  face: NormalizedLandmark[] | null
+  blend: Array<{ categoryName: string; score: number }> | null
+  // The silhouette (Silhouette on) : null = no change this frame (not asked).
+  sil: { empty?: boolean; mask?: Uint8Array; w?: number; h?: number; zones?: number[]; cov?: number } | null
+  ms: number
+  error?: string
+}
 
 export interface BodyPreview {
   video: HTMLVideoElement | null
@@ -108,6 +128,17 @@ class BodyTracker {
   // recreate the pose landmarker (leaking one) or desync poseSeg vs silhouette.
   private ensureChain: Promise<void> = Promise.resolve()
   private err: string | null = null
+  // The tracking worker : MediaPipe off the main thread. useWorker drops to false
+  // for the session when the worker can't start (the main-thread path takes over).
+  private worker: Worker | null = null
+  private useWorker = true
+  private workerReady: Promise<boolean> | null = null
+  private workerReadyRes: ((ok: boolean) => void) | null = null
+  private cfgWaiters: Array<(ok: boolean) => void> = []
+  private inFlight = false // a frame is in the worker : the next waits for its result
+  private inFlightAt = 0
+  private inFlightTs = -1 // the frame in the worker (its detectForVideo timestamp)
+  private workerMs = 0 // the worker's detection time for the last frame
 
   // Preview + gesture state.
   private latestHands: NormalizedLandmark[][] = []
@@ -153,6 +184,11 @@ class BodyTracker {
     return { running: this.running, error: this.err }
   }
 
+  /** Where the models run, and the last frame's detection time there (tests). */
+  thread(): { worker: boolean; ms: number } {
+    return { worker: this.useWorker && !!this.worker, ms: this.workerMs }
+  }
+
   /** The latest silhouette as an image, for the Silhouette source : the mask (half
    *  size, 8-bit, top-down), the camera video, and the mirror setting. Null unless
    *  the camera runs with Silhouette on. Never starts the camera. */
@@ -196,8 +232,100 @@ class BodyTracker {
     } else if (cfg.enabled && this.running && was && (was.hands !== cfg.hands || was.pose !== cfg.pose || was.face !== cfg.face || was.silhouette !== cfg.silhouette)) {
       // Hands / Pose / Face / Silhouette toggled live : create or close the affected
       // landmarker only (no camera flicker). mirror + sensitivity are read per-frame.
-      await this.ensureLandmarkers()
+      if (this.useWorker && this.worker) {
+        if (!(await this.configureWorker())) this.workerFailed()
+      } else await this.ensureLandmarkers()
     }
+  }
+
+  // ── The tracking worker (bodyWorker.ts) ───────────────────────────────────
+  /** Start (or reuse) the worker, load MediaPipe in it and apply the config.
+   *  False when it can't (the tracker then runs on the main thread, as before). */
+  private async startWorker(): Promise<boolean> {
+    if (!this.worker) {
+      let w: Worker
+      try {
+        w = createBodyWorker()
+      } catch (e) {
+        console.warn('[body] no tracking worker : on the main thread', e)
+        return false
+      }
+      this.worker = w
+      this.workerReady = new Promise<boolean>((res) => { this.workerReadyRes = res })
+      w.onmessage = (e: MessageEvent): void => this.onWorker(e.data)
+      w.onerror = (e: ErrorEvent): void => {
+        console.warn('[body] tracking worker error :', e.message)
+        this.workerFailed()
+      }
+      w.postMessage({ t: 'init', urls: { bundle: BUNDLE_URL, wasm: WASM_BASE, hand: HAND_MODEL, pose: POSE_MODEL, face: FACE_MODEL } })
+    }
+    const ready = await Promise.race([
+      this.workerReady ?? Promise.resolve(false),
+      new Promise<boolean>((res) => window.setTimeout(() => res(false), 30000))
+    ])
+    if (!ready) { this.workerFailed(); return false }
+    const ok = await this.configureWorker()
+    if (!ok) this.workerFailed()
+    return ok
+  }
+
+  /** Send the detector toggles; resolves once the worker built its landmarkers. */
+  private configureWorker(): Promise<boolean> {
+    const w = this.worker, cfg = this.cfg
+    if (!w || !cfg) return Promise.resolve(false)
+    return new Promise<boolean>((res) => {
+      this.cfgWaiters.push(res)
+      w.postMessage({ t: 'config', cfg: { hands: !!cfg.hands, pose: !!cfg.pose, face: !!cfg.face, silhouette: !!cfg.silhouette } })
+    })
+  }
+
+  private onWorker(m: { t: string; msg?: string } & Partial<WorkerResult>): void {
+    if (m.t === 'ready') {
+      this.workerReadyRes?.(true)
+    } else if (m.t === 'configured') {
+      const ws = this.cfgWaiters
+      this.cfgWaiters = []
+      ws.forEach((r) => r(true))
+    } else if (m.t === 'error') {
+      // Loading or building the models failed : the waiters fall back to the main
+      // thread. (A frame's own hiccup comes back as a result with `error`.)
+      console.warn('[body] tracking worker :', m.msg)
+      this.inFlight = false
+      this.workerReadyRes?.(false)
+      const ws = this.cfgWaiters
+      this.cfgWaiters = []
+      ws.forEach((r) => r(false))
+    } else if (m.t === 'result') {
+      const r = m as WorkerResult
+      if (r.ts !== this.inFlightTs) return // a frame from before a stop
+      this.inFlight = false
+      if (!this.running || !this.cfg) return
+      this.workerMs = r.ms
+      if (r.error) return // a transient GL / graph hiccup : this frame only
+      this.process(r, null)
+    }
+  }
+
+  /** The worker died or would not start : the tracker carries on, on the main
+   *  thread (the path the worker replaced), for the rest of the session. */
+  private workerFailed(): void {
+    if (!this.useWorker) return
+    this.useWorker = false
+    this.inFlight = false
+    try { this.worker?.terminate() } catch { /* gone */ }
+    this.worker = null
+    this.workerReadyRes?.(false)
+    const ws = this.cfgWaiters
+    this.cfgWaiters = []
+    ws.forEach((r) => r(false))
+    if (this.running) void this.startInline()
+  }
+
+  /** MediaPipe on the main thread (the fallback). */
+  private async startInline(): Promise<void> {
+    if (!this.vision) this.vision = (await import('@mediapipe/tasks-vision')) as MP
+    if (!this.fileset) this.fileset = await this.vision.FilesetResolver.forVisionTasks(WASM_BASE)
+    await this.ensureLandmarkers()
   }
 
   /** Create the landmarkers the config asks for, close the ones it doesn't. Serialised
@@ -301,12 +429,13 @@ class BodyTracker {
       this.stream = stream
       this.video = video
 
-      // 2) MediaPipe : lazy import + self-hosted wasm/models (offline). Cache the
-      //    module + fileset so Hands / Pose can be toggled live without reloading.
-      if (!this.vision) this.vision = (await import('@mediapipe/tasks-vision')) as MP
-      if (!this.fileset) this.fileset = await this.vision.FilesetResolver.forVisionTasks(WASM_BASE)
+      // 2) MediaPipe : self-hosted wasm/models (offline), in the tracking worker
+      //    (off the main thread). The worker keeps the module + fileset, so Hands /
+      //    Pose can be toggled live without reloading. When it can't start, the
+      //    models load here instead (lazy import), as they always did.
+      const viaWorker = this.useWorker && (await this.startWorker())
       if (stale()) { if (gen === this.startGen) this.stop(); else releaseStream(); return }
-      await this.ensureLandmarkers()
+      if (!viaWorker) await this.startInline()
       if (stale()) { if (gen === this.startGen) this.stop(); else releaseStream(); return }
 
       this.running = true
@@ -326,6 +455,8 @@ class BodyTracker {
   dispose(): void {
     this.cfg = null
     this.stop()
+    try { this.worker?.terminate() } catch { /* gone */ }
+    this.worker = null
   }
 
   stop(): void {
@@ -341,6 +472,8 @@ class BodyTracker {
     this.hands = null
     this.pose = null
     this.face = null
+    this.worker?.postMessage({ t: 'stop' })
+    this.inFlight = false
     this.stream?.getTracks().forEach((t) => t.stop())
     this.stream = null
     if (this.video) {
@@ -375,25 +508,55 @@ class BodyTracker {
     const camT = video.currentTime
     const newFrame = camT !== this.lastCamT
     if (!newFrame && !cfg.hiRes) return
+    const worker = this.useWorker ? this.worker : null
+    // One frame in the worker at a time : while it works, a new camera frame skips
+    // the models (the motion field, no model, still reads it). A result lost for
+    // two seconds (a hung worker) frees the slot.
+    if (worker && this.inFlight && performance.now() - this.inFlightAt < 2000) {
+      if (newFrame) {
+        this.lastCamT = camT
+        const f = this.readFlow(video, cfg)
+        if (f) bodyBus.update(f)
+      }
+      return
+    }
     this.lastCamT = camT
     // detectForVideo needs strictly increasing timestamps (ms).
     let ts = performance.now()
     if (ts <= this.lastTs) ts = this.lastTs + 1
     this.lastTs = ts
-    const dtLoop = this.lastLoopTs ? Math.min(0.1, (ts - this.lastLoopTs) / 1000) : 1 / 60
-    this.lastLoopTs = ts
 
     // Motion field : the camera's optical flow, on each NEW camera frame. Read
     // first : it needs no body in frame (a crowd, a curtain, a hand all move).
     const flowOut = this.readFlow(video, cfg)
 
+    if (worker) {
+      // The worker tracks a copy of this frame ; its result comes back through
+      // process(). Only the copy costs this thread anything.
+      this.inFlight = true
+      this.inFlightAt = performance.now()
+      this.inFlightTs = ts
+      const t0 = performance.now()
+      const silhouette = !!cfg.silhouette, mirror = cfg.mirror
+      createImageBitmap(video).then((bitmap) => {
+        if (!this.running || this.worker !== worker || this.inFlightTs !== ts) { bitmap.close(); return }
+        worker.postMessage({ t: 'frame', bitmap, ts, camT, newFrame, silhouette, mirror }, [bitmap])
+      }).catch(() => { if (this.inFlightTs === ts) this.inFlight = false })
+      perfMeter.add('mediapipe', performance.now() - t0) // Performance panel
+      if (flowOut) bodyBus.update(flowOut)
+      return
+    }
+
     let blendshapes: Array<{ categoryName: string; score: number }> | null = null
+    let hands: NormalizedLandmark[][] = []
+    let pose: NormalizedLandmark[] | null = null
+    let face: NormalizedLandmark[] | null = null
     const mpT0 = performance.now()
     try {
-      this.latestHands = this.hands ? (this.hands.detectForVideo(video, ts).landmarks ?? []) : []
+      if (this.hands) hands = this.hands.detectForVideo(video, ts).landmarks ?? []
       if (this.pose) {
         const pr = this.pose.detectForVideo(video, ts)
-        this.latestPose = pr.landmarks?.[0] ?? null
+        pose = pr.landmarks?.[0] ?? null
         // Silhouette : read the segmentation mask into 3×3 zone coverage, then free it.
         const masks = pr.segmentationMasks ?? []
         if (cfg.silhouette) this.readMaskZones(masks[0] ?? null, cfg.mirror)
@@ -403,21 +566,34 @@ class BodyTracker {
         for (let i = cfg.silhouette ? 1 : 0; i < masks.length; i++) {
           try { masks[i].close() } catch { /* already freed */ }
         }
-      } else {
-        this.latestPose = null
       }
       if (this.face) {
         const fr = this.face.detectForVideo(video, ts)
-        this.latestFace = fr.faceLandmarks?.[0] ?? null
+        face = fr.faceLandmarks?.[0] ?? null
         blendshapes = fr.faceBlendshapes?.[0]?.categories ?? null
-      } else {
-        this.latestFace = null
       }
     } catch {
       // A transient GL/graph hiccup : skip this frame, keep the loop alive.
       return
     }
-    perfMeter.add('mediapipe', performance.now() - mpT0) // Performance panel
+    const ms = performance.now() - mpT0
+    perfMeter.add('mediapipe', ms) // Performance panel
+    this.process({ ts, camT, newFrame, hands, pose, face, blend: blendshapes, sil: null, ms }, flowOut)
+  }
+
+  /** One tracked frame (the worker's result, or the main thread's) → features,
+   *  gestures and presence on the body bus. */
+  private process(r: WorkerResult, flowOut: Partial<Record<BodyFeature, number>> | null): void {
+    const cfg = this.cfg
+    if (!cfg) return
+    const ts = r.ts
+    const dtLoop = this.lastLoopTs ? Math.min(0.1, Math.max(0, ts - this.lastLoopTs) / 1000) : 1 / 60
+    this.lastLoopTs = ts
+    if (r.sil) this.applySil(r.sil)
+    this.latestHands = r.hands
+    this.latestPose = r.pose
+    this.latestFace = r.face
+    const blendshapes = r.blend
 
     const hasHands = this.latestHands.length > 0
     const hasPose = !!this.latestPose
@@ -460,9 +636,10 @@ class BodyTracker {
       this.poseLostAt = 0
       // Movement qualities : derivatives, so only real camera frames (with the
       // frame's own media time), never a repeated picture.
-      if (newFrame) {
-        const aspect = video.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : 4 / 3
-        const e = this.effort.push(this.latestPose as NormalizedLandmark[], camT, aspect, this.sens('impulse'), this.sens('freeze'))
+      if (r.newFrame) {
+        const video = this.video
+        const aspect = video && video.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : 4 / 3
+        const e = this.effort.push(this.latestPose as NormalizedLandmark[], r.camT, aspect, this.sens('impulse'), this.sens('freeze'))
         if (e.impulse) this.emit('impulse')
         if (e.freeze) this.emit('freeze')
       }
@@ -809,6 +986,28 @@ class BodyTracker {
   // Read the pose confidence mask (0..1 person probability) into 9 zone means +
   // a whole-frame mean, sampling on a stride grid so it stays cheap. The mask is
   // owned by MediaPipe and MUST be closed after reading to free its GPU buffer.
+  /** The worker's silhouette (bodyWorker.ts maskOut) into the state readMaskZones
+   *  keeps on the main-thread path. */
+  private applySil(sil: NonNullable<WorkerResult['sil']>): void {
+    if (sil.empty || !sil.mask || !sil.w || !sil.h) {
+      this.zoneCov.fill(0); this.bodyCov = 0
+      if (this.silEmpty && this.silMask) return
+      if (!this.silMask) { this.silMask = new Uint8Array(1); this.silW = 1; this.silH = 1 }
+      this.silMask.fill(0)
+      this.silVersion++
+      this.silEmpty = true
+      return
+    }
+    this.silMask = sil.mask
+    this.silW = sil.w
+    this.silH = sil.h
+    this.silVersion++
+    this.silEmpty = false
+    const z = sil.zones ?? []
+    for (let i = 0; i < 9; i++) this.zoneCov[i] = clamp01(z[i] ?? 0)
+    this.bodyCov = clamp01(sil.cov ?? 0)
+  }
+
   private readMaskZones(mask: MPMask | null, mirror: boolean): void {
     // Nobody in frame : an empty silhouette, not the last body frozen in place (the
     // source's trail fades it out).

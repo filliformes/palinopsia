@@ -27,7 +27,7 @@ const CPU_ROWS: Array<{ key: string; label: string; desc: string }> = [
   { key: 'sonify', label: 'Sonify', desc: 'Sampling the image taps that feed the Sonify sound engine (image → sound). The voices themselves run on the audio thread.' },
   { key: 'audio', label: 'Audio ingest', desc: 'Analyzing the audio input into level / flux / transient / bands / pitch for audio-reactivity (plus the denoiser + monitor graph).' },
   { key: 'modulation', label: 'Modulation', desc: 'Ticking the 8 modulator slots + Meta knobs and applying the mod-matrix onto the composition. Cheap, but always running : this is the row you saw flicker before.' },
-  { key: 'mediapipe', label: 'Embodied (MediaPipe)', desc: 'Hand / Pose / Face landmark detection on the embodied-control camera. Runs on its own loop ; Face is the heaviest.' },
+  { key: 'mediapipe', label: 'Embodied (MediaPipe)', desc: 'Hand / Pose / Face landmark detection on the embodied-control camera. The detection runs on its own thread, so this row is only what it costs the picture : handing each camera frame over (a fraction of a millisecond). On a machine where that thread cannot start, the detection runs here instead (Face is the heaviest).' },
   { key: 'motionfield', label: 'Motion field (camera)', desc: 'Optical flow on a 64×48 copy of each new camera frame (Body page : Motion) : the swipe / approach / turn / stillness features. About a millisecond per camera frame.' }
 ]
 const VRAM_DESC: Record<string, string> = {

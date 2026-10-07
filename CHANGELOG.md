@@ -404,6 +404,19 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Body tracking runs on its own thread.** MediaPipe Hands / Pose / Face (and the
+  Silhouette mask) now run in a worker that loads MediaPipe's own bundle over
+  `opsia-asset://` (`resources/mediapipe/vision_bundle.js`, the package's
+  `vision_bundle.cjs`; keep it the wasm's version). The main thread only copies each new
+  camera frame to an ImageBitmap and turns the landmarks that come back into features,
+  gestures and the silhouette, exactly as before. One frame is in the worker at a time;
+  the motion field still reads every camera frame. If the worker cannot start or build
+  its models, the tracker falls back to the main thread for the session. Measured on the
+  RTX 4070, synthetic camera, Mycelial at 1080p : main-thread cost per frame hands
+  3.1 -> 0.1 ms, hands + pose 4.4 -> 0.1, + face 5.4 -> 0.09, + silhouette + motion
+  4.7 -> 0.03 (the worker itself takes 8 to 17 ms a frame, off the picture's thread);
+  60 fps with everything on (55.8 on the main thread). A fast off / on comes back
+  tracking with the silhouette.
 - **A modulation keeps its full swing at the edge of a range.** A base at its minimum
   (a Collage's `cuts` at 2) lost half the cycle : Replace held the edge half the time
   and only ever rose, Multiply never moved. When the span a modulation sweeps fits in

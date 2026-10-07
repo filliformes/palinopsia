@@ -618,9 +618,11 @@ MediaPipe **Hands + Pose + Face + Silhouette** read the body into a live bus,
 feeding continuous **modulators** and discrete **gestures**. A camera is strictly
 **opt-in**: nothing opens until you press **Enable**, and a pulsing red pip (top
 bar, and the lit toolbar **Body** button) is the privacy tell while it runs. The
-tracker uses a dedicated low-res capture, independent of any webcam layer, on its
-own loop off the render critical path; the MediaPipe models ship inside the app, so
-it works offline and in kiosk.
+tracker uses a dedicated low-res capture, independent of any webcam layer. The
+MediaPipe models run on **their own thread** : the picture only hands each camera
+frame over (about 0.1 ms) and reads back the landmarks, so tracking never slows the
+render (on a machine where that thread cannot start, they run on the main thread as
+before). The models ship inside the app, so it works offline and in kiosk.
 
 **Capture bar** (one distributed line): **Hands** (21 landmarks per hand, up to two)
 · **Pose** (33-point whole body) · **Face** (ARKit blendshapes: jaw, smile, brow,
