@@ -611,6 +611,14 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The Ring bank's driven voicings rasped like a ring modulator.** MS-20, Steiner and
+  K35 soft-clipped the WHOLE mix of the Collage's pieces before the bank; the loud low
+  pieces (the centre of the frame gets the lowest notes) intermodulated there, sums and
+  differences of their notes. The drive now pushes each band's own clip instead : the
+  grit stays (every band still clips, harder), the rasp goes. Measured offline on the
+  worklet's own RingBank (low scale tones + film noise, the Kamouropsia settings) : 2.22 %
+  of the MS-20 output fell off every note, 0.09 % now (Steiner 0.84 → 0.06, K35 1.45 →
+  0.08, Clean 0.04); peaks unchanged; 0.2-0.55 ms per audio block.
 - **Sonify heals itself after an audio device error.** Its audio context now stays open
   for the whole session, so a device error (an interface unplugged, the output switched,
   a driver hiccup : twice in one Windows run) could leave it closed, suspended or

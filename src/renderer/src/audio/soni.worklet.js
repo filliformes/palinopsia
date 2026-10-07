@@ -380,18 +380,20 @@ class RingBank {
     }
     const M = this.makeup(T60, tilt, vo.kmul) * this.agc;
     let dryB = 0, wetB = 0;
-    const drive = vo.drive, sat = vo.sat;
+    const sat = vo.sat;
+    // The voicing's DRIVE pushes each band's own clip (kd), never a waveshaper on
+    // the input : that one clipped the whole mix of pieces before the bank, and the
+    // loud low centre pieces intermodulated there (sums and differences of their
+    // notes, a ring-modulator rasp : 2.2 % of the MS-20 output off every note,
+    // 0.09 % now, Clean 0.04 %; measured offline). Each band still clips, harder.
+    const kd = 1.5 * vo.drive;
     const ic1 = this.ic1, ic2 = this.ic2, A1 = this.a1, A2 = this.a2, A3 = this.a3, K = this.kk, G = this.g, GD = this.gd;
     // (The saturations below are written out, not calls to rtanh : not inlined in
     // this hot loop, every call boxed its result, ~12,000 allocations per block,
     // and the clipping voicings cost 3.6 ms of a 2.7 ms block. Measured.)
     for (let s = 0; s < n; s++) {
       const xl = iL[s] * gL, xr = iR[s] * gR;
-      let dl = xl, dr = xr;
-      if (drive > 1.01) {
-        let u = xl * drive; u = u > 3 ? 1 : u < -3 ? -1 : u * (27 + u * u) / (27 + 9 * u * u); dl = u / drive;
-        u = xr * drive; u = u > 3 ? 1 : u < -3 ? -1 : u * (27 + u * u) / (27 + 9 * u * u); dr = u / drive;
-      }
+      const dl = xl, dr = xr;
       let accL = 0, accR = 0;
       for (let b = 0; b < RB_N; b++) {
         const gb = (G[b] += GD[b]);
@@ -401,7 +403,7 @@ class RingBank {
         let v1 = A1[i] * ic1[i] + A2[i] * v3;
         let v2 = ic2[i] + A2[i] * ic1[i] + A3[i] * v3;
         let c1 = 2 * v1 - ic1[i];
-        if (sat > 0) { let u = c1 * K[i] * 1.5; u = u > 3 ? 1 : u < -3 ? -1 : u * (27 + u * u) / (27 + 9 * u * u); c1 += (u / (1.5 * K[i]) - c1) * sat; }
+        if (sat > 0) { let u = c1 * K[i] * kd; u = u > 3 ? 1 : u < -3 ? -1 : u * (27 + u * u) / (27 + 9 * u * u); c1 += (u / (kd * K[i]) - c1) * sat; }
         ic1[i] = c1; ic2[i] = 2 * v2 - ic2[i];
         accL += choke ? v1 * K[i] * gb : v1 * K[i];
         // right
@@ -410,7 +412,7 @@ class RingBank {
         v1 = A1[i] * ic1[i] + A2[i] * v3;
         v2 = ic2[i] + A2[i] * ic1[i] + A3[i] * v3;
         c1 = 2 * v1 - ic1[i];
-        if (sat > 0) { let u = c1 * K[i] * 1.5; u = u > 3 ? 1 : u < -3 ? -1 : u * (27 + u * u) / (27 + 9 * u * u); c1 += (u / (1.5 * K[i]) - c1) * sat; }
+        if (sat > 0) { let u = c1 * K[i] * kd; u = u > 3 ? 1 : u < -3 ? -1 : u * (27 + u * u) / (27 + 9 * u * u); c1 += (u / (kd * K[i]) - c1) * sat; }
         ic1[i] = c1; ic2[i] = 2 * v2 - ic2[i];
         accR += choke ? v1 * K[i] * gb : v1 * K[i];
       }
