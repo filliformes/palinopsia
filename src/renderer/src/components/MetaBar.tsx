@@ -503,8 +503,9 @@ function KnobModAssign({
           step={0.05}
           value={current.depth}
           onChange={(e) => setAssignmentDepth(current.id, Number(e.target.value))}
+          onDoubleClick={() => setAssignmentDepth(current.id, 0.5)}
           className="w-full accent-accent2"
-          title={`M${current.mod + 1} depth ${current.depth.toFixed(2)} : bipolar swing around the base`}
+          title={`M${current.mod + 1} depth ${current.depth.toFixed(2)} : bipolar swing around the base. Double-click : 0.5`}
         />
       )}
     </div>

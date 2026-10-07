@@ -587,11 +587,13 @@ export function AssignRow({
               step={0.01}
               value={b.depth}
               onChange={(e) => setAssignmentDepth(b.id, Number(e.target.value))}
+              // Back to 0.5, the depth a new binding starts at (like every slider's double-click).
+              onDoubleClick={() => setAssignmentDepth(b.id, 0.5)}
               className={`min-w-0 flex-1 ${mult ? 'accent-accent' : 'accent-accent2'}`}
               title={
                 mult
-                  ? `Amount ${b.depth.toFixed(2)} : how deeply the modulator scales the base (− inverts)`
-                  : `Depth ${b.depth.toFixed(2)} : bipolar swing around the base value`
+                  ? `Amount ${b.depth.toFixed(2)} : how deeply the modulator scales the base (− inverts). Double-click : 0.5`
+                  : `Depth ${b.depth.toFixed(2)} : bipolar swing around the base value. Double-click : 0.5`
               }
             />
             {/* The slider gave no readout of the depth : a bipolar ±1 box, so

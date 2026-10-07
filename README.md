@@ -472,7 +472,7 @@ The two modes differ in what the parameter's own slider means once bound:
 - A modulated slider's thumb moves with the live value. **Dragging it moves the base
   by as much as you drag** (from wherever the thumb was when you grabbed it); let go
   and it follows the modulator again. Counts (a Collage's `cuts` and `films`) step in
-  whole numbers.
+  whole numbers. Double-clicking a binding's depth slider puts it back to 0.5.
 
 Binding from the **M** button picks the mode for you: a target sitting at (or
 near) zero gets **Replace** (so does a menu sitting on its first choice), anything else

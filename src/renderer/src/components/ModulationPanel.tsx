@@ -879,8 +879,12 @@ function MatrixSummary(): JSX.Element {
             value={a.depth}
             onClick={(e) => e.stopPropagation()}
             onChange={(e) => setAssignmentDepth(a.id, Number(e.target.value))}
+            onDoubleClick={(e) => {
+              e.stopPropagation()
+              setAssignmentDepth(a.id, 0.5)
+            }}
             className="w-14 accent-accent"
-            title={`Depth ${a.depth.toFixed(2)} (bipolar)`}
+            title={`Depth ${a.depth.toFixed(2)} (bipolar). Double-click : 0.5`}
           />
           <button
             onClick={(e) => {

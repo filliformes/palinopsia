@@ -265,8 +265,9 @@ function AssignMini({ param, onClose }: { param: SonifyModParam; onClose: () => 
           type="range" min={-1} max={1} step={0.01} value={a?.depth ?? 0.5}
           disabled={!a}
           onChange={(e) => a && setAssignmentDepth(a.id, Number(e.target.value))}
+          onDoubleClick={() => a && setAssignmentDepth(a.id, 0.5)}
           className="min-w-0 flex-1 accent-accent"
-          title={`Depth ${(a?.depth ?? 0.5).toFixed(2)} (negative inverts)`}
+          title={`Depth ${(a?.depth ?? 0.5).toFixed(2)} (negative inverts). Double-click : 0.5`}
         />
         <button
           disabled={!a}

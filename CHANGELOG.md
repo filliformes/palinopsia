@@ -611,6 +611,9 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Double-clicking a modulation depth slider resets it to 0.5** (the depth a new binding
+  starts at), like every other slider : in the Inspector's modulate panel, the Modulation
+  panel, a Meta knob's binding and Sonify's targets. Their tooltips say so.
 - **After a GPU crash the engine came back broken.** A GPU reset hands back the SAME
   WebGL context object with every program, texture and vertex array dead, and five
   caches keyed by it kept serving the dead objects (the shader bridge's blank texture
