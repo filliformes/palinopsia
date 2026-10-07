@@ -321,7 +321,7 @@ Left → right:
   learned pad). Messages (a refused effect drop, a saved recording) appear in the
   toolbar's empty middle, always in the same place, over nothing; a long instruction
   grows upward from there.
-- **Output** (opens the Output / mapping page) · **Body** (opens the embodied-control
+- **Output** (opens the Output / mapping page; lights while the external output is on) · **Body** (opens the embodied-control
   page; lights while the camera is live; also key `B`) · **Seq** (opens the
   sequencer; lights when running) · **Sonify** (opens Sonify; lights while the sound
   engine runs).

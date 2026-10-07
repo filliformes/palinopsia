@@ -404,6 +404,8 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **The Output button lights while the external output is on** (◉ Output), like Sonify's
+  while its sound runs.
 - **Electron 44** (from 33), with electron-builder 26, Vite 7, electron-vite 5 and
   plugin-react 5; CI builds on Node 22. Adapted to it :
   - the app's own file schemes (`opsia-media://` for films, `opsia-asset://` for the

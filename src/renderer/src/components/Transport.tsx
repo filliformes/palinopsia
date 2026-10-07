@@ -88,6 +88,7 @@ export function Transport(): JSX.Element {
   const sonifyPageOpen = useStore((s) => s.sonifyPageOpen)
   const setSonifyPageOpen = useStore((s) => s.setSonifyPageOpen)
   const setOutputPageOpen = useStore((s) => s.setOutputPageOpen)
+  const outputOn = useStore((s) => s.outputActive)
   const setBodyPageOpen = useStore((s) => s.setBodyPageOpen)
   const bodyOn = useStore((s) => s.bodyControl.enabled)
   const proximity = useStore((s) => s.proximity)
@@ -308,10 +309,10 @@ export function Transport(): JSX.Element {
         {/* Output : fullscreen / mapping / record / senders (also O). */}
         <button
           onClick={() => setOutputPageOpen(true)}
-          className={`${TBTN} ${TBTN_IDLE}`}
-          title="Output & projection mapping : fullscreen output, keystone, record, NDI/Spout/Syphon/HIVE (O)"
+          className={`${TBTN} ${outputOn ? TBTN_LIT : TBTN_IDLE}`}
+          title="Output & projection mapping : fullscreen output, keystone, record, NDI/Spout/Syphon/HIVE (O) : lights while the external output is on"
         >
-          ⛶ Output
+          {outputOn ? '◉ Output' : '⛶ Output'}
         </button>
         {/* Body : embodied control (MediaPipe Hands + Pose + Face). Lights while
             the camera is live (a privacy tell) (also B). */}
