@@ -571,7 +571,9 @@ that CI builds into cross-platform releases.
     MIDI-learnable;
   - OSC `/opsia/bg/source` accepts only grounds (an effect name was taken, an unknown
     name cleared it), `/opsia/bg/randomize` and `/opsia/bg/shadow` are new;
-  - Generate never puts an empty Collage in the Background (Film Wall did); New's seed
+  - Generate lays its themed Background in **group** (Layer 1 lands opaque 'normal', so in
+    blend the ground was hidden; grouped it shows through the dark parts), and never
+    puts an empty Collage in it (Film Wall did); New's seed
     layer lets the ground show (screen / lighten / add, or 'normal' at 0.6 to 0.8)
     instead of covering it at 85 % 'normal';
   - an older session's Background gets the fields it lacks.

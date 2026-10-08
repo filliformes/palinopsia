@@ -258,7 +258,8 @@ modulate it) and its dice, and folded it says what it holds (`Sea Glass · 2 fx 
 MIDI-learnable. It has its own presets (built-ins set a ground and its rack and keep
 your shadow and mode; yours keep everything) and its own dice (a new ground and rack;
 modulation aimed at the old ones goes with them). **Init background** (right-click)
-empties it completely. The global Randomize never touches it. When the Finalizer's
+empties it completely. The global Randomize never touches it. **Generate** lays its
+themed ground in **group**, so it shows through the layers' dark parts. When the Finalizer's
 output shape uses it as the **outside fill**, the fill follows its opacity (over the
 fill color) and goes through Vibe, Context and the Finalizer like the rest of the
 picture; only the film dust stays inside the shape.

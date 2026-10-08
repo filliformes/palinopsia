@@ -1031,12 +1031,16 @@ function buildThemeComposition(theme: Theme, clips: CollageClips | null): Compos
     id !== 'gen-collage' && BG_SOURCES.some((g) => g.id === id)
   )
   const bgId = bgPool.length ? pickOf(bgPool) : 'drift-field'
+  // In GROUP : Layer 1 lands opaque and 'normal', so in blend mode the themed
+  // ground was hidden behind it; grouped, it shows through the layers' dark and
+  // transparent parts and the theme's ground is part of the picture.
   const background: BackgroundState = {
     source: { kind: 'generator', shaderId: bgId, inputs: randomizeInputs(bgId, {}) },
     fx: [],
     opacity: 1,
     speed: BG_DEFAULT_SPEED,
-    depth: rr(0, 0.35)
+    depth: rr(0, 0.35),
+    blendMode: 'isolate'
   }
 
   // Vibe palette carries the theme's colours (the strongest theme signal).
