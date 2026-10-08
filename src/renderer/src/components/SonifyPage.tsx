@@ -15,6 +15,7 @@ import { deleteSoniPreset, listSoniPresets, loadSoniPreset, saveSoniPreset } fro
 import { modTargetKey, useStore } from '../store'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { SonifyKeySequencer } from './SonifyKeySequencer'
+import { AudioOutputSelect } from './AudioOutputSelect'
 import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, CardGrip, useCardSpace, spaceGap, SUB_GAP, chip, pill } from './sonifyUi'
 import { SONI_RATES, RATE_LABEL } from '../audio/soniClock'
 
@@ -485,7 +486,6 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   // The output meter : per channel an RMS bar and a held peak tick, in dB.
   const meterRef = useRef<HTMLDivElement | null>(null)
   const dragging = useRef<'line' | 'orbit' | 'radius' | 'rect' | 'rectsize' | 'fline' | null>(null)
-  const [devices, setDevices] = useState<Array<{ id: string; label: string }>>([])
   const [assign, setAssign] = useState<SonifyModParam | null>(null)
   // What the Collage voice is playing (walls heard · pieces · films), polled.
   const [colStat, setColStat] = useState<{ sets: number; pieces: number; films: number } | null>(null)
@@ -619,16 +619,6 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
       video.removeEventListener('loadedmetadata', fit)
     }
   }, [canvasRef])
-
-  // Output devices for the sink picker.
-  useEffect(() => {
-    navigator.mediaDevices?.enumerateDevices?.().then((ds) => {
-      setDevices(
-        ds.filter((d) => d.kind === 'audiooutput')
-          .map((d, i) => ({ id: d.deviceId, label: d.label || `output ${i + 1}` }))
-      )
-    }).catch(() => {})
-  }, [])
 
   // Overlay painter : flow dots + live scan paths + meter, straight from the
   // engine each rAF (no React re-renders). The scanning voices are drawn where
@@ -943,16 +933,13 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
         >
           {SONI_SCALES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        {/* Output device */}
-        <select
+        {/* Output device (the same setting as Sonify's row in the audio/midi/osc tab) */}
+        <AudioOutputSelect
           className="input select-compact max-w-[180px] text-[10px]"
           value={cfg.sinkId}
-          onChange={(e) => patch({ sinkId: e.target.value })}
-          title="Audio output device"
-        >
-          <option value="">default output</option>
-          {devices.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
-        </select>
+          onChange={(id) => patch({ sinkId: id })}
+          title="Which output device Sonify plays to (also in the audio/midi/osc tab)"
+        />
         <div className="flex-1" />
         <span className="font-mono text-[9px] text-muted">S / Esc closes</span>
         <button onClick={() => setOpen(false)} className="rounded px-2 py-0.5 text-[12px] text-muted hover:text-text" title="Close (Esc)">✕</button>

@@ -7,6 +7,13 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Sonify's output device in the audio/midi/osc tab** : under Sonify's level, the same
+  menu as the Sonify page's (both drive `sonify.sinkId`). One `AudioOutputSelect` now
+  serves the Sonify page, that row and the input monitor's row; its list follows
+  `devicechange`, a device saved in a session but not plugged in reads "(not
+  connected)" instead of "default", and the system's own "default" entry folds into
+  "default output".
+
 - **A Picture readout** (Performance tab, its own **picture** section) : all 17 vision
   features live, grouped (light and color, texture, motion, where and how deep), with
   what 0 and 1 mean, swing bars for the signed ones, a dot for the bright mass and a

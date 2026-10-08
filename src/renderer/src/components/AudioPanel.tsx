@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { audioBus, AUDIO_BANDS } from '../engine/audioIn'
 import { useStore } from '../store'
+import { AudioOutputSelect } from './AudioOutputSelect'
 
 const SOURCES: Array<{ id: 'both' | 'osc' | 'local'; label: string; title: string }> = [
   { id: 'both', label: 'Both', title: 'OSC (Pandore) primary, local input as fallback' },
@@ -42,19 +43,8 @@ export function AudioPanel(): JSX.Element {
   const [learning, setLearning] = useState(false)
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
-  const [outputs, setOutputs] = useState<MediaDeviceInfo[]>([])
   const showDevice = source === 'local' || source === 'both'
   const monitorReady = enabled && showDevice // the input monitor needs local input
-
-  // Output devices for the monitor sink.
-  useEffect(() => {
-    let alive = true
-    navigator.mediaDevices
-      ?.enumerateDevices()
-      .then((ds) => { if (alive) setOutputs(ds.filter((d) => d.kind === 'audiooutput')) })
-      .catch(() => {})
-    return () => { alive = false }
-  }, [monitor, enabled])
 
   // Enumerate input devices (labels populate once the input has been opened).
   useEffect(() => {
@@ -158,6 +148,15 @@ export function AudioPanel(): JSX.Element {
           onLevel={(v) => setSonify({ ...sonify, master: v })}
           title="The Sonify engine's sound (image → sound). Build its voices on the Sonify page (S)."
         />
+        {/* Sonify's output device : the same setting as the Sonify page's menu */}
+        <label className="flex items-center gap-2 pl-[26px] font-mono text-[9px] text-muted">
+          <span className="shrink-0">output</span>
+          <AudioOutputSelect
+            value={sonify.sinkId}
+            onChange={(id) => setSonify({ ...useStore.getState().sonify, sinkId: id })}
+            title="Which output device Sonify plays to (the same choice as on the Sonify page)"
+          />
+        </label>
         <LevelRow
           label="Input monitor"
           on={monitor}
@@ -174,17 +173,11 @@ export function AudioPanel(): JSX.Element {
         {monitor && monitorReady && (
           <label className="flex items-center gap-2 pl-[26px] font-mono text-[9px] text-muted">
             <span className="shrink-0">output</span>
-            <select
-              className="input select-compact min-w-0 flex-1 text-[10px]"
+            <AudioOutputSelect
               value={monitorSink}
-              onChange={(e) => setMonitorSink(e.target.value)}
-              title="Which output device the monitor plays to (Sonify has its own on its page)"
-            >
-              <option value="">System default output</option>
-              {outputs.map((d) => (
-                <option key={d.deviceId} value={d.deviceId}>{d.label || `Output ${d.deviceId.slice(0, 6)}`}</option>
-              ))}
-            </select>
+              onChange={setMonitorSink}
+              title="Which output device the input monitor plays to (Sonify has its own, above)"
+            />
           </label>
         )}
 
