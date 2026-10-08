@@ -664,6 +664,9 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.limEnv = 1;
     // ── metering (sent back ~10Hz) ──
     this.peak = 0; this.lastMeter = 0; this.limMin = 1;
+    // per channel, after the limiter : the peak and the mean square (the meter's
+    // bar is the RMS level in dB, its tick the peak)
+    this.pkL = 0; this.pkR = 0; this.ssL = 0; this.ssR = 0; this.nMeter = 0;
     this.port.onmessage = (e) => this.onMsg(e.data);
   }
 
@@ -1544,18 +1547,26 @@ class SoniProcessor extends AudioWorkletProcessor {
       l *= this.limEnv; r *= this.limEnv;
       if (this.limEnv < limMin) limMin = this.limEnv;
       outL[s] = l; outR[s] = r;
-      const ap = Math.max(Math.abs(l), Math.abs(r));
+      const al = Math.abs(l), ar = Math.abs(r);
+      const ap = al > ar ? al : ar;
       if (ap > peak) peak = ap;
+      if (al > this.pkL) this.pkL = al;
+      if (ar > this.pkR) this.pkR = ar;
+      this.ssL += l * l; this.ssR += r * r;
     }
+    this.nMeter += n;
     this.peak = peak; this.limMin = limMin;
     if (currentTime - this.lastMeter > 0.1) {
       // + where the scanning voices really are (and their real rates : sync and
       // modulation included), so the page's overlay draws what you hear.
       this.port.postMessage({
         t: 'meter', peak: this.peak, lim: this.limMin,
+        pkL: this.pkL, pkR: this.pkR,
+        rmsL: Math.sqrt(this.ssL / Math.max(1, this.nMeter)), rmsR: Math.sqrt(this.ssR / Math.max(1, this.nMeter)),
         scan: { at: currentTime, sp: this.sweepPos, spHz: sp.sweepOn ? sp.sweepHz : 0, fi: this.fSweep, fiHz: fi.sweepOn ? fi.sweepHz : 0, tv: (this.tLine + this.tX) / GRID, tvHz: tv.lineHz / GRID }
       });
       this.peak = 0; this.limMin = 1; this.lastMeter = currentTime;
+      this.pkL = 0; this.pkR = 0; this.ssL = 0; this.ssR = 0; this.nMeter = 0;
     }
     return true;
   }

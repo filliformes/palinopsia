@@ -391,6 +391,9 @@ class SonifyEngine {
   // live meter (UI reads these; written from the worklet's meter messages)
   meterPeak = 0
   meterLim = 1
+  /** Per channel, after the limiter, over the last ~100 ms : peak and RMS (linear). */
+  meterL = { peak: 0, rms: 0 }
+  meterR = { peak: 0, rms: 0 }
   // live flow vectors for the overlay ([x01,y01,mag] × n)
   flowDots: Float32Array = new Float32Array(0)
   // live event onsets for the overlay ([x01,y01,mag] × n), fade painted by the UI
@@ -550,6 +553,10 @@ class SonifyEngine {
         if (m?.t === 'meter') {
           this.meterPeak = m.peak
           this.meterLim = m.lim
+          if (typeof m.rmsL === 'number') {
+            this.meterL = { peak: m.pkL, rms: m.rmsL }
+            this.meterR = { peak: m.pkR, rms: m.rmsR }
+          }
           if (m.scan) this.scan = { ...m.scan, recv: performance.now() }
         }
       }
@@ -697,6 +704,8 @@ class SonifyEngine {
     this.node?.disconnect()
     this.node = null
     this.meterPeak = 0
+    this.meterL = { peak: 0, rms: 0 }
+    this.meterR = { peak: 0, rms: 0 }
     this.flowDots = new Float32Array(0)
     this.scan = null
     // A recording holding the sound bus keeps the context (and its sound track)

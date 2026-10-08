@@ -990,7 +990,11 @@ voices can sonify different layers (a real ensemble). **Quantizer** : a global
 key (root + **root octave** + scale : chromatic, major, minor, pentatonic,
 whole-tone, modes) with a per-voice **♪ snap** : sonified data lands on real
 notes, or runs free. **Master** : gain + an always-on peak limiter (the audio
-Flash-safety) + live meter, and an **output-device picker**. While the engine
+Flash-safety) + a level meter (left and right : the bar is the average level, the tick
+the peak held a moment, on a dB scale from -54 to 0 with lines at -36, -18 and -6, the
+peak in dB beside it; yellow above -9 dB, orange while the limiter works; measured
+after the master and the limiter, so it is what reaches the speakers), and an
+**output-device picker**. While the engine
 plays, **recordings carry the sound** (DXV3 included), even when you switch it on
 mid-take : exports become true audiovisual pieces.
 
@@ -1014,14 +1018,19 @@ path, the Orbit shows its true Lissajous shape, the sweeps run at their real rat
 **Sequencer** : in the **seq** view (voices · mixer · seq), a step sequencer lets the sound *evolve on its
 own* : each step stores either a **voice on/off mask** (a rhythmic pattern over
 the current patch) or a **whole saved preset** (a structural change), so a full
-evolving sonified piece can be built. The rate is free (80 ms – 6 s, log) or
-beats and bars of the composition tempo (1 beat … 16 bars). Three
+evolving sonified piece can be built. The rate is free (80 ms – 6 s, log, on its own
+**every** row) or beats and bars of the composition tempo (1 beat … 16 bars). Three
 advance **modes**, ported from dataFLOU's generative section: **forward**,
 **bounce** (each cycle's steps accelerate like a settling ball, the total cycle
 time preserved) and **drift** (a biased random walk with a **wrap** or **reflect**
 edge). A **🎲** re-rolls the pattern (1–3 voices per active step, presets kept)
 and a **↺** resets it; the section grows to fit its steps (no scrollbar). Its
 play/stop is MIDI-learnable (the Sonify-sequence transport).
+
+Both sequencer cards resize : drag the bar at a card's foot down for more air between
+its rows (up for less; double-click goes back), and its left corner sideways to widen the
+sequencers' column, which keeps its own width apart from the voices' (the column's
+edge handle works too). Remembered on this machine.
 
 **Key sequencer** : under it, a second sequencer composes the **root, scale and
 octave** of the whole instrument over time, so a piece can modulate on its own. Each
@@ -1030,7 +1039,7 @@ circle of fifths) : the list's tiles, the circle of fifths with the walk's lean 
 the affinity constellation (closer = more shared notes, bigger = likelier), the pivot's
 note clock and degrees, the picture's hue wheel and moods. On
 each tick of its clock (**rate** : 1 beat … 16 bars of the composition tempo, or free
-time), a **chance** decides whether the key changes, and an optional **Euclid** rhythm
+time : 250 ms to 5 min, 5 s by default, the default rate), a **chance** decides whether the key changes, and an optional **Euclid** rhythm
 (pulses / steps / rotation) decides which ticks may change it. Five **modes** :
 
 | Mode | The next key |

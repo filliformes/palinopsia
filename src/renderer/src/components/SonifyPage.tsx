@@ -15,7 +15,7 @@ import { deleteSoniPreset, listSoniPresets, loadSoniPreset, saveSoniPreset } fro
 import { modTargetKey, useStore } from '../store'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { SonifyKeySequencer } from './SonifyKeySequencer'
-import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, chip, pill } from './sonifyUi'
+import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, CardGrip, useCardSpace, spaceGap, SUB_GAP, chip, pill } from './sonifyUi'
 import { SONI_RATES, RATE_LABEL } from '../audio/soniClock'
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
@@ -80,6 +80,50 @@ function nearScan(path: number, pos: number, x: number, y: number): boolean {
   return path >= 2 ? Math.min(d, 1 - d) < 0.03 : d < 0.02
 }
 const clampN = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
+
+// ── The output meter (see the paint loop) ──
+const METER_FLOOR = -54 // dB at the left edge
+const METER_FALL = 24 // dB per second
+const METER_HOLD = 1.2 // s a peak tick stays before it falls
+const toDb = (x: number): number => (x > 1e-6 ? 20 * Math.log10(x) : -120)
+const meterX = (db: number): number => clampN((db - METER_FLOOR) / -METER_FLOOR, 0, 1)
+const meterState = new WeakMap<HTMLElement, { at: number; rms: [number, number]; pk: [number, number]; held: [number, number] }>()
+function meterStep(el: HTMLElement, now: number): void {
+  let s = meterState.get(el)
+  if (!s) {
+    s = { at: now, rms: [-120, -120], pk: [-120, -120], held: [0, 0] }
+    meterState.set(el, s)
+  }
+  const dt = Math.min(0.25, (now - s.at) / 1000)
+  s.at = now
+  const run = sonifyEngine.isRunning()
+  const chans = [sonifyEngine.meterL, sonifyEngine.meterR]
+  const limiting = run && sonifyEngine.meterLim < 0.95
+  let readout = -120
+  for (let c = 0; c < 2; c++) {
+    const rms = run ? toDb(chans[c].rms) : -120
+    const pk = run ? toDb(chans[c].peak) : -120
+    s.rms[c] = rms >= s.rms[c] ? rms : Math.max(rms, s.rms[c] - METER_FALL * dt)
+    if (pk >= s.pk[c]) {
+      s.pk[c] = pk
+      s.held[c] = METER_HOLD
+    } else if ((s.held[c] -= dt) <= 0) s.pk[c] = Math.max(pk, s.pk[c] - METER_FALL * dt)
+    readout = Math.max(readout, s.pk[c])
+    const bar = el.querySelector<HTMLElement>(`[data-m="b${c}"]`)
+    const tick = el.querySelector<HTMLElement>(`[data-m="t${c}"]`)
+    if (bar) {
+      bar.style.width = `${(meterX(s.rms[c]) * 100).toFixed(1)}%`
+      bar.style.background = limiting ? 'rgb(230,120,60)' : s.rms[c] > -9 ? 'rgb(214,196,90)' : 'rgb(120,200,140)'
+    }
+    if (tick) {
+      tick.style.left = `calc(${(meterX(s.pk[c]) * 100).toFixed(1)}% - 1px)`
+      tick.style.opacity = s.pk[c] > METER_FLOOR ? '1' : '0'
+      tick.style.background = s.pk[c] > -1.5 ? 'rgb(230,120,60)' : 'rgb(230,230,230)'
+    }
+  }
+  const txt = el.parentElement?.querySelector<HTMLElement>('[data-m="db"]')
+  if (txt) txt.textContent = readout > METER_FLOOR ? `${readout.toFixed(0)}` : '-∞'
+}
 
 // A modulation rate (Waves, Noise) : free Hz, or a rhythmic division when synced
 // (mirror of the worklet's lfoHz).
@@ -300,7 +344,8 @@ function VoiceShell({ title, on, hint, onToggle, onDice, children }: {
 /** The Sonify step sequencer (the Seq view). Each step either loads a whole saved
  *  preset or, with no preset, just sets which voices are on : one transport
  *  advances them so a fully evolving sonified work can be built. */
-function SonifySequencer({ presets }: { presets: string[] }): JSX.Element {
+function SonifySequencer({ presets, onWidth }: { presets: string[]; onWidth: (dx: number, done: boolean) => void }): JSX.Element {
+  const [space, setSpace, resetSpace] = useCardSpace('fx')
   const sq = useStore((s) => s.soniSeq)
   const setOn = useStore((s) => s.setSoniSeqOn)
   const setStepMs = useStore((s) => s.setSoniSeqStepMs)
@@ -330,6 +375,8 @@ function SonifySequencer({ presets }: { presets: string[] }): JSX.Element {
       midiId="fire:soniseq"
       open
       roomy
+      space={space}
+      foot={<CardGrip space={space} onSpace={setSpace} onReset={resetSpace} onWidth={onWidth} />}
       right={(
         <>
           <IconBtn onClick={randomize} title="Randomize the step pattern (1–3 voices per step; keeps presets)">🎲</IconBtn>
@@ -339,33 +386,29 @@ function SonifySequencer({ presets }: { presets: string[] }): JSX.Element {
     >
       <Row label="rate" hint="How long each step lasts : free time, or beats and bars of the composition tempo (in phase with the key sequencer)">
         <select
-          className="input select-compact text-[10px]" value={sq.rate ?? 'free'}
+          className="input select-compact min-w-0 flex-1 text-[10px]" value={sq.rate ?? 'free'}
           onChange={(e) => setRate(e.target.value as (typeof SONI_RATES)[number])}
           title="How long each step lasts"
         >
           {SONI_RATES.map((r) => <option key={r} value={r}>{RATE_LABEL[r]}</option>)}
         </select>
-        {free && (
-          <>
-            <input
-              type="range" min={0} max={1} step={0.005} value={msToT(sq.stepMs)}
-              onChange={(e) => setStepMs(Math.round(80 * Math.pow(R, Number(e.target.value))))}
-              className="min-w-0 flex-1 accent-accent" title={`${fmtMs(sq.stepMs)} per step`}
-            />
-            <span className="w-10 shrink-0 text-right font-mono text-[9px] text-muted">{fmtMs(sq.stepMs)}</span>
-          </>
-        )}
       </Row>
+      {free && (
+        <Row label="every" hint="How long each step lasts, in free time (80 ms to 6 s)">
+          <input
+            type="range" min={0} max={1} step={0.005} value={msToT(sq.stepMs)}
+            onChange={(e) => setStepMs(Math.round(80 * Math.pow(R, Number(e.target.value))))}
+            className="min-w-0 flex-1 accent-accent" title={`${fmtMs(sq.stepMs)} per step`}
+          />
+          <span className="w-12 shrink-0 text-right font-mono text-[9px] text-muted">{fmtMs(sq.stepMs)}</span>
+        </Row>
+      )}
       {/* Advance mode (dataFLOU's) : forward · bounce (accelerating rhythm) · drift (random walk). */}
       <Row label="mode" hint="How the steps advance">
-        {(['forward', 'bounce', 'drift'] as const).map((m) => (
-          <button
-            key={m}
-            onClick={() => setMode(m)}
-            className={chip(sq.mode === m)}
-            title={m === 'forward' ? 'Play the steps in order, looping' : m === 'bounce' ? 'Forward order, but each cycle accelerates like a bouncing ball settling' : 'A biased random walk across the steps (bias + wrap/reflect below)'}
-          >{m}</button>
-        ))}
+        <Seg
+          options={['forward', 'bounce', 'drift'] as const} value={sq.mode} onChange={setMode}
+          title={(m) => (m === 'forward' ? 'Play the steps in order, looping' : m === 'bounce' ? 'Forward order, but each cycle accelerates like a bouncing ball settling' : 'A biased random walk across the steps (bias + wrap/reflect below)')}
+        />
       </Row>
       {sq.mode === 'bounce' && (
         <RangeRow label="decay" value={sq.bounceDecay} min={0} max={100} step={1} neutral={60} onChange={setBounceDecay} shown={String(sq.bounceDecay)} title="Bounce decay : higher = sharper acceleration (the cycle still lasts the same total time)" />
@@ -374,8 +417,7 @@ function SonifySequencer({ presets }: { presets: string[] }): JSX.Element {
         <>
           <RangeRow label="bias" value={sq.bias} min={-100} max={100} step={1} neutral={0} onChange={setBias} shown={sq.bias > 0 ? '+' + sq.bias : String(sq.bias)} title="Drift bias : − walks backward, + walks forward, 0 = even wander" />
           <Row label="edge" hint="At the ends : wrap (loop around) or reflect (bounce back inward)">
-            <button onClick={() => setEdge('wrap')} className={chip(sq.edge === 'wrap')}>wrap</button>
-            <button onClick={() => setEdge('reflect')} className={chip(sq.edge === 'reflect')}>reflect</button>
+            <Seg options={['wrap', 'reflect'] as const} value={sq.edge} onChange={setEdge} />
           </Row>
         </>
       )}
@@ -390,7 +432,7 @@ function SonifySequencer({ presets }: { presets: string[] }): JSX.Element {
         ))}
         <span className="ml-1.5 flex-1 truncate font-mono text-[8px] uppercase text-muted/70">preset</span>
       </div>
-      <div className="flex flex-col gap-1.5">
+      <div data-subrows className="flex flex-col" style={{ gap: spaceGap(space) * SUB_GAP }}>
         {Array.from({ length: sq.len }).map((_, s) => {
           const step = sq.steps[s]
           const isCur = sq.on && sq.cur === s
@@ -408,7 +450,7 @@ function SonifySequencer({ presets }: { presets: string[] }): JSX.Element {
                 />
               ))}
               <select
-                className="input select-compact ml-1.5 min-w-0 flex-1 text-[10px]" value={hasPreset ? step.preset : ''}
+                className="input select-compact ml-1.5 min-w-[88px] flex-1 text-[10px]" value={hasPreset ? step.preset : ''}
                 onChange={(e) => setStepPreset(s, e.target.value)}
                 title="voices : the step plays the voices ticked on its left · a preset : the step loads that whole Sonify preset instead"
               >
@@ -440,6 +482,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   // swing from the base at grab time, so a modulated probe moves under the hand).
   const grip = useRef({ dx: 0, dy: 0, sx: 0, sy: 0 })
   const overlayRef = useRef<HTMLCanvasElement | null>(null)
+  // The output meter : per channel an RMS bar and a held peak tick, in dB.
   const meterRef = useRef<HTMLDivElement | null>(null)
   const dragging = useRef<'line' | 'orbit' | 'radius' | 'rect' | 'rectsize' | 'fline' | null>(null)
   const [devices, setDevices] = useState<Array<{ id: string; label: string }>>([])
@@ -466,6 +509,23 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
     const v = Number(localStorage.getItem('opsia.soniVoiceW'))
     return v >= 240 && v <= 640 ? v : 320
   })
+  // The sequencers' column has its own width (they like more room : wider rows,
+  // longer step names), set by the same handle or by a card's corner grip.
+  const SEQ_W: [number, number] = [280, 900]
+  const [seqW, setSeqW] = useState(() => {
+    const v = Number(localStorage.getItem('opsia.soniSeqW'))
+    return v >= SEQ_W[0] && v <= SEQ_W[1] ? v : 380
+  })
+  const seqW0 = useRef(seqW)
+  const onSeqWidth = (dx: number, done: boolean): void => {
+    const w = Math.max(SEQ_W[0], Math.min(SEQ_W[1], seqW0.current + dx))
+    setSeqW(w)
+    if (done) {
+      seqW0.current = w
+      try { localStorage.setItem('opsia.soniSeqW', String(Math.round(w))) } catch { /* full */ }
+    }
+  }
+  const colW = view === 'seq' ? seqW : voiceW
   const [presetList, setPresetList] = useState<string[]>(() => listSoniPresets())
   const [presetName, setPresetName] = useState('')
   // While the Sonify page is open, M toggles ITS Voices↔Mixer view. Capture phase
@@ -677,12 +737,12 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           g.fill()
         }
       }
-      // Meter
-      if (meterRef.current) {
-        const p = Math.min(1, sonifyEngine.meterPeak)
-        meterRef.current.style.width = `${Math.round(p * 100)}%`
-        meterRef.current.style.background = sonifyEngine.meterLim < 0.95 ? 'rgb(230,120,60)' : 'rgb(120,200,140)'
-      }
+      // Meter : the worklet's levels after master and limiter (what reaches the
+      // speakers), in dB on a -54..0 scale (a linear width put every ordinary
+      // level in the bottom tenth), RMS as the bar, the peak as a tick held
+      // 1.2 s; both fall at 24 dB/s, so the bar moves like a meter, not a
+      // 10 Hz flicker. Orange while the limiter works.
+      if (meterRef.current) meterStep(meterRef.current, now)
       raf = requestAnimationFrame(paint)
     }
     raf = requestAnimationFrame(paint)
@@ -843,8 +903,19 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           />
         </span>
         <span className="w-7 shrink-0 text-right font-mono text-[9px] text-muted">{cfg.master.toFixed(2)}</span>
-        <div className="h-2 w-24 overflow-hidden rounded bg-panel3" title="Output level (orange = the limiter is working)">
-          <div ref={meterRef} className="h-full w-0" />
+        <div className="flex shrink-0 items-center gap-1" title="Output level after the master and the limiter, per channel (L above, R below) : the bar is the average (RMS) level, the tick the peak, on a dB scale from -54 to 0 (lines at -36, -18, -6 dB). Yellow above -9 dB, orange while the limiter works (it holds the peak under -1 dB).">
+          <div ref={meterRef} className="relative flex h-[9px] w-28 flex-col justify-between overflow-hidden rounded-sm bg-panel3">
+            {[0, 1].map((c) => (
+              <div key={c} className="relative h-[4px] w-full">
+                <div data-m={`b${c}`} className="absolute inset-y-0 left-0 w-0" />
+                <div data-m={`t${c}`} className="absolute inset-y-0 w-[2px] opacity-0" />
+              </div>
+            ))}
+            {[-36, -18, -6].map((db) => (
+              <div key={db} className="pointer-events-none absolute inset-y-0 w-px bg-black/50" style={{ left: `${(meterX(db) * 100).toFixed(1)}%` }} />
+            ))}
+          </div>
+          <span data-m="db" className="w-6 text-right font-mono text-[9px] tabular-nums text-muted">-∞</span>
         </div>
         {/* Quantizer */}
         <span className="ml-2 font-mono text-[9px] uppercase text-muted">key</span>
@@ -946,30 +1017,35 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           style={{ touchAction: 'none' }}
           onPointerDown={(e) => {
             const startX = e.clientX
-            const startW = voiceW
+            const seq = view === 'seq'
+            const startW = seq ? seqW : voiceW
             let last = startW
             const el = e.currentTarget
             el.setPointerCapture(e.pointerId)
             const move = (ev: PointerEvent): void => {
-              last = Math.max(240, Math.min(640, startW + (startX - ev.clientX)))
-              setVoiceW(last)
+              last = seq
+                ? Math.max(SEQ_W[0], Math.min(SEQ_W[1], startW + (startX - ev.clientX)))
+                : Math.max(240, Math.min(640, startW + (startX - ev.clientX)))
+              if (seq) setSeqW(last)
+              else setVoiceW(last)
             }
             const up = (): void => {
               el.removeEventListener('pointermove', move)
               el.removeEventListener('pointerup', up)
               el.removeEventListener('pointercancel', up)
-              localStorage.setItem('opsia.soniVoiceW', String(Math.round(last)))
+              if (seq) seqW0.current = last
+              localStorage.setItem(seq ? 'opsia.soniSeqW' : 'opsia.soniVoiceW', String(Math.round(last)))
             }
             el.addEventListener('pointermove', move)
             el.addEventListener('pointerup', up)
             el.addEventListener('pointercancel', up)
           }}
-          title="Drag to resize the voice column"
+          title="Drag to resize the column (the sequencers keep their own width)"
         />
         {/* Voice strips : dimmed while the master engine is OFF, so the green
             "● on" pills don't read as live sound (still fully editable). */}
         <aside
-          style={{ width: voiceW }}
+          style={{ width: colW }}
           className={`flex shrink-0 flex-col gap-2 overflow-y-auto border-l border-border bg-panel px-3 py-2 transition-opacity ${
             cfg.on ? '' : 'opacity-[0.65]'
           }`}
@@ -1015,8 +1091,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           {/* The sequencers have their own view (they used to sit under the mixer). */}
           {view === 'seq' && (
             <div className="flex flex-col gap-2.5">
-              <SonifySequencer presets={presetList} />
-              <SonifyKeySequencer />
+              <SonifySequencer presets={presetList} onWidth={onSeqWidth} />
+              <SonifyKeySequencer onWidth={onSeqWidth} />
             </div>
           )}
           {view === 'voices' && (<>

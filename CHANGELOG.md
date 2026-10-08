@@ -77,6 +77,23 @@ that CI builds into cross-platform releases.
   the voices' label column, and the key sequencer shows the key now on its own row.
   The two sequencer cards are roomier (more padding and space between rows, thin dividers
   between their groups, bigger mode / root / scale targets).
+- **Sonify's level meter tells the truth at a glance.** It did measure the real output
+  (after the master and the limiter, films included) but drew the raw amplitude on a
+  linear width, so an ordinary -20 dB level filled a tenth of it, the limiter's -1 dB
+  ceiling never reached the end, and it jumped between 10 Hz readings. The worklet now
+  sends per-channel peak and RMS; the meter draws L and R on a -54..0 dB scale (lines at
+  -36 / -18 / -6), RMS as the bar, the peak as a tick held 1.2 s, both falling at 24 dB/s,
+  a dB readout beside it, yellow above -9 dB, orange while the limiter works.
+- **The sequencers' buttons are the voices' buttons, and the cards resize.** Choices are
+  full-width segments (Seg / Toggle in sonifyUi, like Events' spatial / motion / blend),
+  the rate is a full-width menu with the free time on its own **every** row, the step
+  menus read whole. Each sequencer card has a grip at its foot : drag down / up for more
+  or less air between its rows (the card follows the pointer : the drag is shared among
+  its gaps, its step list at 3/4), its left corner widens the sequencers' column, which
+  now has its own width (280–900 px, `opsia.soniSeqW`; air per card in
+  `opsia.soniSpace.fx|key`).
+- **The key sequencer runs on free time by default, 5 s**, and free time now reaches
+  5 minutes (it stopped at 2); minutes read as `2m30`, double-click the slider for 5 s.
 - **A Resolume section in the audio/midi/osc tab** : SENDING / OFF (a click toggles it),
   where it sends, the pin count and messages a second, and **mapper ▸** to open the page
   (it replaces the small Resolume button in the OSC header).

@@ -11,7 +11,7 @@ import { SONI_SCALES } from '../audio/sonify'
 import { NOTE_NAMES, KEY_MODES, euclidHit } from '../audio/soniKeyModel'
 import { SONI_RATES, RATE_LABEL, soniBeats } from '../audio/soniClock'
 import { keySeqNext, keySeqPhase } from '../audio/soniKeySeq'
-import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, chip, chipBig } from './sonifyUi'
+import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, Toggle, CardGrip, useCardSpace, chipBig } from './sonifyUi'
 import { KeySeqVisual } from './KeySeqVisual'
 
 const SCALE_ABBR: Record<string, string> = {
@@ -48,7 +48,8 @@ const MODE_INFO: Record<SoniKeyMode, { name: string; hint: string; icon: ReactNo
 
 /** The key sequencer : composes the root, scale and octave of the whole Sonify
  *  instrument over time. */
-export function SonifyKeySequencer(): JSX.Element {
+export function SonifyKeySequencer({ onWidth }: { onWidth: (dx: number, done: boolean) => void }): JSX.Element {
+  const [space, setSpace, resetSpace] = useCardSpace('key')
   const ks = useStore((s) => s.soniKeySeq)
   const set = useStore((s) => s.setSoniKeySeq)
   const setOn = useStore((s) => s.setSoniKeySeqOn)
@@ -76,8 +77,14 @@ export function SonifyKeySequencer(): JSX.Element {
   const p = (patch: Partial<SoniKeySeq>): void => set(patch)
   const generative = ks.mode !== 'list'
   const onCuts = ks.mode === 'picture' && ks.picSource === 'cuts'
-  const fmtMs = (ms: number): string => (ms >= 1000 ? (ms / 1000).toFixed(ms >= 10000 ? 0 : 1) + 's' : Math.round(ms) + 'ms')
-  const R = 120000 / 250 // the free period : 250 ms … 2 min, log-mapped
+  const fmtMs = (ms: number): string => {
+    if (ms >= 60000) {
+      const s = Math.round(ms / 1000)
+      return `${Math.floor(s / 60)}m${s % 60 ? String(s % 60).padStart(2, '0') : ''}`
+    }
+    return ms >= 1000 ? (ms / 1000).toFixed(ms >= 10000 ? 0 : 1) + 's' : Math.round(ms) + 'ms'
+  }
+  const R = 300000 / 250 // the free period : 250 ms … 5 min, log-mapped
   const toggleScale = (sc: string): void => {
     const has = ks.poolScales.includes(sc)
     if (has && ks.poolScales.length === 1) return // a pool always keeps one scale
@@ -100,6 +107,8 @@ export function SonifyKeySequencer(): JSX.Element {
       midiId="fire:keyseq"
       open
       roomy
+      space={space}
+      foot={<CardGrip space={space} onSpace={setSpace} onReset={resetSpace} onWidth={onWidth} />}
       right={(
         <>
           <IconBtn
@@ -135,23 +144,24 @@ export function SonifyKeySequencer(): JSX.Element {
       {/* the clock */}
       <Row label="rate" hint={onCuts ? 'Picture on cuts : the scene cuts set the time, not a clock' : 'How often a change may fall : beats or bars of the composition tempo (in phase with the effects sequencer), or free time'}>
         <select
-          className="input select-compact text-[10px]" value={ks.rate} disabled={onCuts}
+          className="input select-compact min-w-0 flex-1 text-[10px]" value={ks.rate} disabled={onCuts}
           onChange={(e) => p({ rate: e.target.value as SoniKeySeq['rate'] })}
           title="How often a change may fall"
         >
           {SONI_RATES.map((r) => <option key={r} value={r}>{RATE_LABEL[r]}</option>)}
         </select>
-        {ks.rate === 'free' && !onCuts && (
-          <>
-            <input
-              type="range" min={0} max={1} step={0.002} value={Math.log(ks.freeMs / 250) / Math.log(R)}
-              onChange={(e) => p({ freeMs: Math.round(250 * Math.pow(R, Number(e.target.value))) })}
-              className="min-w-0 flex-1 accent-accent" title={`Every ${fmtMs(ks.freeMs)}`}
-            />
-            <span className="w-10 shrink-0 text-right font-mono text-[9px] text-muted">{fmtMs(ks.freeMs)}</span>
-          </>
-        )}
       </Row>
+      {ks.rate === 'free' && !onCuts && (
+        <Row label="every" hint="How often a change may fall, in free time (250 ms to 5 min)">
+          <input
+            type="range" min={0} max={1} step={0.002} value={Math.log(ks.freeMs / 250) / Math.log(R)}
+            onChange={(e) => p({ freeMs: Math.round(250 * Math.pow(R, Number(e.target.value))) })}
+            onDoubleClick={() => p({ freeMs: 5000 })}
+            className="min-w-0 flex-1 accent-accent" title={`Every ${fmtMs(ks.freeMs)} (double-click : 5 s)`}
+          />
+          <span className="w-12 shrink-0 text-right font-mono text-[9px] text-muted">{fmtMs(ks.freeMs)}</span>
+        </Row>
+      )}
       <RangeRow
         label="chance" value={ks.chance} min={0} max={1} step={0.01} neutral={1} onChange={(v) => p({ chance: v })}
         shown={`${Math.round(ks.chance * 100)}%`}
@@ -163,7 +173,7 @@ export function SonifyKeySequencer(): JSX.Element {
         title="The pitches slide to the new key over this time (every voice : Spectra, Chord, Filter, the Ring bank, Orbit, Raster, the Collage resonators). 0 = they jump at once"
       />
       <Row label="euclid" hint="The changes fall on a Euclidean rhythm of the clock's ticks (pulses spread as evenly as they can over the steps) instead of on every tick">
-        <button onClick={() => p({ euclid: !ks.euclid })} disabled={onCuts} className={chip(ks.euclid)}>{ks.euclid ? 'on' : 'off'}</button>
+        <Toggle on={ks.euclid} onClick={() => p({ euclid: !ks.euclid })} disabled={onCuts}>{ks.euclid ? 'on' : 'off'}</Toggle>
         {ks.euclid && (
           <>
             <Stepper value={ks.ePulses} min={1} max={ks.eSteps} onChange={(v) => p({ ePulses: v })} title="Pulses : how many of the steps carry a change" />
@@ -210,13 +220,10 @@ export function SonifyKeySequencer(): JSX.Element {
       {ks.mode === 'list' && (
         <>
           <Row label="order" hint="How the list is played">
-            {(['forward', 'bounce', 'drift'] as const).map((o) => (
-              <button
-                key={o} onClick={() => p({ order: o })} className={chip(ks.order === o)}
-                title={o === 'forward' ? 'Play the keys in order, looping' : o === 'bounce' ? 'There and back : to the last key, then back to the first' : 'A random walk across the keys (bias leans it forward or back)'}
-              >{o}</button>
-            ))}
-            <span className="flex-1" />
+            <Seg
+              options={['forward', 'bounce', 'drift'] as const} value={ks.order} onChange={(o) => p({ order: o })}
+              title={(o) => (o === 'forward' ? 'Play the keys in order, looping' : o === 'bounce' ? 'There and back : to the last key, then back to the first' : 'A random walk across the keys (bias leans it forward or back)')}
+            />
             <Stepper value={ks.len} min={1} max={8} onChange={(v) => p({ len: v })} title="How many keys the list plays" />
           </Row>
           {ks.order === 'drift' && (
@@ -244,9 +251,7 @@ export function SonifyKeySequencer(): JSX.Element {
             title="Which way the walk leans on the circle of fifths : toward the flats (F, Bb, Eb…) or the sharps (G, D, A…). Leaning, it keeps travelling; even, it wanders around home"
           />
           <Row label="leap" hint="The most fifths one change may move (1 = to a neighbor key, the smoothest)">
-            {[1, 2, 3].map((n) => (
-              <button key={n} onClick={() => p({ circLeap: n })} className={chip(ks.circLeap === n)} title={`Up to ${n} fifth${n > 1 ? 's' : ''} per change`}>{n}</button>
-            ))}
+            <Seg options={[1, 2, 3] as const} value={ks.circLeap as 1 | 2 | 3} onChange={(n) => p({ circLeap: n })} title={(n) => `Up to ${n} fifth${n > 1 ? 's' : ''} per change`} />
           </Row>
           <RangeRow
             label="relative" value={ks.circRel} min={0} max={1} step={0.01} neutral={0.25} onChange={(v) => p({ circRel: v })}
@@ -263,32 +268,36 @@ export function SonifyKeySequencer(): JSX.Element {
             title="Smooth (+) : the next key shares most of its notes with this one (a gentle move). Jarring (−) : as few as it can (a jolt). 0 = any key of the pool alike"
           />
           <Row label="memory" hint="What the walk remembers">
-            <button onClick={() => p({ affNoRepeat: !ks.affNoRepeat })} className={chip(ks.affNoRepeat)} title="Never return to one of the last few keys">no repeat</button>
-            <button onClick={() => p({ affTour: !ks.affTour })} className={chip(ks.affTour)} title="Tour : visit every key of the pool once before any comes back">tour</button>
+            <Toggle on={ks.affNoRepeat} onClick={() => p({ affNoRepeat: !ks.affNoRepeat })} title="Never return to one of the last few keys">no repeat</Toggle>
+            <Toggle on={ks.affTour} onClick={() => p({ affTour: !ks.affTour })} title="Tour : visit every key of the pool once before any comes back">tour</Toggle>
           </Row>
         </>
       )}
       {ks.mode === 'pivot' && (
         <>
           <Row label="pivot" hint="What stays the same">
-            <button onClick={() => p({ pivKind: 'modes' })} className={chip(ks.pivKind === 'modes')} title="The same notes, a new tonic : C major, D dorian, E phrygian, F lydian, A minor (from a major, minor or modal key; others keep their tonic)">same notes</button>
-            <button onClick={() => p({ pivKind: 'tonic' })} className={chip(ks.pivKind === 'tonic')} title="The same tonic, a new mode : C lydian, C major, C dorian, C minor, C phrygian…">same tonic</button>
+            <Seg
+              options={['modes', 'tonic'] as const} value={ks.pivKind} onChange={(v) => p({ pivKind: v })}
+              label={(v) => (v === 'modes' ? 'same notes' : 'same tonic')}
+              title={(v) => (v === 'modes' ? 'The same notes, a new tonic : C major, D dorian, E phrygian, F lydian, A minor (from a major, minor or modal key; others keep their tonic)' : 'The same tonic, a new mode : C lydian, C major, C dorian, C minor, C phrygian…')}
+            />
           </Row>
           <Row label="way" hint="Which way it pivots">
-            {(['up', 'down', 'random'] as const).map((d) => (
-              <button
-                key={d} onClick={() => p({ pivDir: d })} className={chip(ks.pivDir === d)}
-                title={d === 'random' ? 'Any other one' : ks.pivKind === 'modes' ? `To the next degree ${d}` : d === 'up' ? 'Brighter each time' : 'Darker each time'}
-              >{ks.pivKind === 'tonic' && d !== 'random' ? (d === 'up' ? 'brighter' : 'darker') : d}</button>
-            ))}
+            <Seg
+              options={['up', 'down', 'random'] as const} value={ks.pivDir} onChange={(d) => p({ pivDir: d })}
+              label={(d) => (ks.pivKind === 'tonic' && d !== 'random' ? (d === 'up' ? 'brighter' : 'darker') : d)}
+              title={(d) => (d === 'random' ? 'Any other one' : ks.pivKind === 'modes' ? `To the next degree ${d}` : d === 'up' ? 'Brighter each time' : 'Darker each time')}
+            />
           </Row>
         </>
       )}
       {ks.mode === 'picture' && (
         <>
           <Row label="reads" hint="When the picture is read">
-            <button onClick={() => p({ picSource: 'color' })} className={chip(ks.picSource === 'color')} title="On the clock : the picture's color and brightness choose the key (a grey picture keeps its root)">color</button>
-            <button onClick={() => p({ picSource: 'cuts' })} className={chip(ks.picSource === 'cuts')} title="At each scene cut (the whole picture changing at once), a new key read off the new picture">cuts</button>
+            <Seg
+              options={['color', 'cuts'] as const} value={ks.picSource} onChange={(v) => p({ picSource: v })}
+              title={(v) => (v === 'color' ? "On the clock : the picture's color and brightness choose the key (a grey picture keeps its root)" : 'At each scene cut (the whole picture changing at once), a new key read off the new picture')}
+            />
           </Row>
           <RangeRow
             label="hold" value={ks.picHold} min={0} max={60} step={0.5} neutral={8} onChange={(v) => p({ picHold: v })}
@@ -299,9 +308,9 @@ export function SonifyKeySequencer(): JSX.Element {
 
       <Divider />
       <Row label="home" hint="On stop, go back to the key it started from (or the last key you set by hand while it ran). Off : it stays where it is. A key set by hand while it runs becomes its home.">
-        <button onClick={() => p({ returnHome: !ks.returnHome })} className={chip(ks.returnHome)}>
+        <Toggle on={ks.returnHome} onClick={() => p({ returnHome: !ks.returnHome })}>
           {ks.returnHome ? '↩ back home on stop' : 'stays on stop'}
-        </button>
+        </Toggle>
       </Row>
     </Shell>
   )
