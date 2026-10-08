@@ -111,7 +111,7 @@ import {
   varyComposition,
   type RandomizeScope
 } from './randomize'
-import { BG_DEFAULT_SPEED, BG_SOURCES } from './bgPresets'
+import { BG_DEFAULT_SPEED, BG_SPEED_MAX, BG_SOURCES } from './bgPresets'
 import { THEME_BY_ID, motionFor, type Theme } from './themes'
 
 export type { FxScope }
@@ -682,6 +682,11 @@ export function isToggleTarget(st: { composition: CompositionState }, t: ModTarg
 function baseNormForTarget(st: { composition: CompositionState }, t: ModTarget): number {
   try {
     if (t.kind === 'meta') return st.composition.metaKnobs[t.knob]?.value ?? 0.5
+    if (t.kind === 'bg') {
+      const b = st.composition.background
+      if (!b) return 0.5
+      return t.field === 'opacity' ? b.opacity : t.field === 'speed' ? (b.speed ?? BG_DEFAULT_SPEED) / BG_SPEED_MAX : (b.depth ?? 0)
+    }
     if (t.kind === 'layer') {
       const l = st.composition.layers[t.layer]
       if (!l) return 0.5
@@ -800,8 +805,19 @@ export function makeDefaultComposition(): CompositionState {
 export function normalizeComposition(c: CompositionState): CompositionState {
   return {
     ...c,
-    // Older sessions have no Background slab : normalize to the blank (off) one.
-    background: c.background ?? makeBlankBackground(),
+    // Older sessions have no Background slab : normalize to the blank (off) one;
+    // an older slab gets the fields it lacks (a missing speed ran the clock at 0).
+    background: c.background
+      ? {
+          ...makeBlankBackground(),
+          ...c.background,
+          source: c.background.source ?? emptySlot(),
+          fx: Array.isArray(c.background.fx) ? c.background.fx : [],
+          opacity: typeof c.background.opacity === 'number' ? c.background.opacity : 1,
+          speed: typeof c.background.speed === 'number' ? c.background.speed : BG_DEFAULT_SPEED,
+          depth: typeof c.background.depth === 'number' ? c.background.depth : 0
+        }
+      : makeBlankBackground(),
     // Normalize layers from older session files : new fields get defaults.
     layers: c.layers.map((l) => ({
       ...l,
@@ -1010,8 +1026,9 @@ function buildThemeComposition(theme: Theme, clips: CollageClips | null): Compos
   })
 
   // Background : a legal bg source from the theme's pool (falls back to a drift).
+  // (never a Collage : Generate has no films for the ground, it played an empty wall)
   const bgPool = (theme.bgSources?.length ? theme.bgSources : theme.sources).filter((id) =>
-    BG_SOURCES.some((g) => g.id === id)
+    id !== 'gen-collage' && BG_SOURCES.some((g) => g.id === id)
   )
   const bgId = bgPool.length ? pickOf(bgPool) : 'drift-field'
   const background: BackgroundState = {
@@ -1101,6 +1118,7 @@ export function modTargetKey(t: ModTarget): string {
   if (t.kind === 'meta') return `meta:${t.knob}`
   if (t.kind === 'sonify') return `soni:${t.param}`
   if (t.kind === 'layer') return `lay:${t.layer}:${t.field}`
+  if (t.kind === 'bg') return `bg:${t.field}`
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
@@ -1175,7 +1193,9 @@ interface StoreState {
   setBackgroundSpeed: (v: number) => void
   setBackgroundDepth: (v: number) => void
   setBackgroundBlendMode: (m: 'blend' | 'isolate') => void
-  randomizeBg: () => void // the background's own dice (global Randomize skips it)
+  randomizeBg: () => void
+  /** Empty the Background : no source, no rack, default opacity / speed / shadow / mode. */
+  initBackground: () => void // the background's own dice (global Randomize skips it)
   // Apply a materialized background (built-in preset via bgPresetToState, or a
   // user preset's saved state). FX get fresh instance ids.
   applyBgPreset: (bg: BackgroundState) => void
@@ -2350,7 +2370,7 @@ export const useStore = create<StoreState>((set, get) => ({
   setBackgroundSpeed: (v) =>
     set((s) => {
       const bg = s.composition.background ?? makeDefaultBackground()
-      return { composition: { ...s.composition, background: { ...bg, speed: Math.max(0, Math.min(4, v)) } } }
+      return { composition: { ...s.composition, background: { ...bg, speed: Math.max(0, Math.min(BG_SPEED_MAX, v)) } } }
     }),
   setBackgroundDepth: (v) =>
     set((s) => {
@@ -2363,9 +2383,25 @@ export const useStore = create<StoreState>((set, get) => ({
       return { composition: { ...s.composition, background: { ...bg, blendMode: m } } }
     }),
   randomizeBg: () =>
-    set((s) => ({
-      composition: { ...s.composition, background: randomizeBackground(s.composition.background) }
-    })),
+    set((s) => {
+      const prev = s.composition.background
+      const background = randomizeBackground(prev)
+      // The rack is new (fresh ids) and the source may be : drop the rows aimed at
+      // the old ones (bg-fx rows dangled on dead ids and ate the 12-row cap; a
+      // source row seized the new source's input of the same name).
+      const c = dropBgTargets({ ...s.composition, background }, prev?.source ?? null)
+      return { composition: dropTargets(c, (t) => t.kind === 'fx' && t.scope.kind === 'background') }
+    }),
+  initBackground: () =>
+    set((s) => {
+      // Back to an empty ground : no source, no rack, the default opacity, clock,
+      // shadow and mode, and no modulation left on the old source or rack.
+      const c = { ...s.composition, background: makeBlankBackground() }
+      return {
+        composition: dropTargets(c, (t) => t.kind === 'bgSource' || (t.kind === 'fx' && t.scope.kind === 'background')),
+        selection: s.selection?.type === 'background' ? null : s.selection
+      }
+    }),
   applyBgPreset: (bg) =>
     set((s) => {
       const composition = {

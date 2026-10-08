@@ -2,18 +2,20 @@
 //
 // The Background is the GROUND under the four layers: its picker offers every
 // generator except the ones that read as figures or need user intent
-// (Recurse, Text, Filaments, Congeal, Swell, Mycelium : per Vincent).
+// (Recurse, Text, Filaments, Congeal, Swell, Mycelium : per Vincent) and the
+// Silhouette (it needs the camera; the Background has no camera path).
 // A preset = source + params + FX chain + opacity/speed. Values are PARTIAL
 // inputs (unset params keep their defaults). Default background speed 0.25 —
 // grounds move slowly.
 
 import type { BackgroundState, FxInstance } from '@shared/types'
+import { BG_DEFAULT_SPEED } from '@shared/types'
 import { GENERATORS } from './shaders/isf'
 
 const BG_EXCLUDED = ['recurse', 'gen-text', 'filaments', 'congeal', 'swell', 'mycelium', 'gen-silhouette']
 export const BG_SOURCES = GENERATORS.filter((g) => !BG_EXCLUDED.includes(g.id))
 
-export const BG_DEFAULT_SPEED = 0.25
+export { BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
 
 export interface BgPreset {
   id: string

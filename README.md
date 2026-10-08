@@ -208,7 +208,8 @@ that couldn't start *and why* (permission denied / no device / cancelled).
 ## The layer stack
 
 Bottom → top: **Background → Layer 1 → Layer 2 → Layer 3 → Layer 4.** Four layers
-composite over one background "ground."
+composite over one background "ground." The Layers column reads in that order, top
+down : the Background strip first, then Layer 1 to Layer 4.
 
 Each of the **4 layers** carries:
 
@@ -237,11 +238,30 @@ modulatable too : select a loaded effect and its opacity slider grows the same
 **M** pill. (These are compositor-level, so they apply as a final per-frame
 override with the base value preserved, and they travel with sessions.)
 
-The **Background** slab has one source (from a curated set), its own full FX rack,
-opacity, a slow clock (default 0.25×), a **Depth** control (the foreground casts a
-soft contact shadow onto it), and a **blend / isolate** mode against the stack. It
-has its own preset bank and its own dice, and is never touched by the global
-Randomize.
+The **Background** has one source (from a curated set of grounds), its own full FX
+rack, opacity, its own clock (**SPEED**, 0 to 4×, 0.25× by default : its source, its
+effects and a Collage's films all play at it), a **SHADOW** (the layers cast a soft
+shadow onto it, offset down-right, which lifts them off the ground), and **LAYERS**,
+how the four layers sit on it :
+
+- **blend in** : Layer 1 blends onto the Background in its own blend mode (screen lets
+  it glow through, multiply darkens it). As the Background fades out, Layer 1 eases
+  toward landing as if nothing were under it, so a multiply layer never turns black
+  at a low opacity and a morph never pops;
+- **group** : the four layers composite among themselves, as if alone, and the group
+  sits over the Background, which shows through wherever the layers are transparent
+  or dark (a saturated color covers it as much as white does).
+
+Its strip is collapsible like a layer's : the header keeps its opacity (**M** to
+modulate it) and its dice, and folded it says what it holds (`Sea Glass · 2 fx ·
+0.25× · group`). Speed and shadow have an **M** too, and opacity, speed and shadow are
+MIDI-learnable. It has its own presets (built-ins set a ground and its rack and keep
+your shadow and mode; yours keep everything) and its own dice (a new ground and rack;
+modulation aimed at the old ones goes with them). **Init background** (right-click)
+empties it completely. The global Randomize never touches it. When the Finalizer's
+output shape uses it as the **outside fill**, the fill follows its opacity (over the
+fill color) and goes through Vibe, Context and the Finalizer like the rest of the
+picture; only the film dust stays inside the shape.
 
 The right column switches between **seven views** (tabs, or keys `M` / `F` / `G` /
 `E` / `A`): **Layers** (the strips + background), **Mixer** (tall
@@ -564,7 +584,14 @@ The **audio/midi/osc** right-column tab (key `A`) holds the control panels
   (render, output, vision, depth, lights, sonify, audio, modulation, MediaPipe)
   with its CPU frame-budget share, estimated VRAM, and active-feature chips, so you
   can see what a heavy session is spending, with units and hover tooltips on every
-  figure. Fixed layout (no reflow as modulation comes and goes).
+  figure. Fixed layout (no reflow as modulation comes and goes). Under it, the
+  **picture** section reads out every feature the picture reports, live : light and
+  color (brightness, contrast, saturation, hue, warmth), texture (edges, entropy),
+  motion (amount, flow sideways and up/down, spreading or closing, turning, moving as
+  one) and where and how deep (the bright mass on a little plane, depth, relief), each
+  with what 0 and 1 mean and its `/opsia/vision/…` address. These are the numbers
+  `vision` modulators follow and OSC, the Resolume mapper and the dataflou mesh read;
+  the readout keeps them computed while it is open.
 
 Everything that "listens" to sound reads one shared **audio bus**: coupling,
 Tonicity, the `audio` modulator, World routings, Proximity's `◑` follow, and the
@@ -1261,7 +1288,7 @@ again re-rolls a fresh variation within the same theme.
 
 ## Metasurface : the continuous scene-space
 
-The **surface** section (in the right column's Layers view, under the Background)
+The **surface** section (in the right column's Layers view, under Layer 4)
 turns the discrete bank into a **continuous 2D plane** (Bencina, NIME 2005): every
 scene is a point, and a cursor
 **blends** between them, so you *navigate* the bank by dragging rather than stepping
@@ -1752,9 +1779,11 @@ unless the slot actually holds a video.
 
 | Address | Meaning |
 |---|---|
-| `bg/opacity` · `bg/speed` · `bg/depth` | f (0..1) |
-| `bg/blend` | bool → `isolate` (≥ 0.5) else `blend` |
-| `bg/source` · `bg/source/{input}` · `bg/fx/{i}/{input}` | Background source / its inputs / FX inputs |
+| `bg/opacity` · `bg/depth` (alias `bg/shadow`) | f (0..1) |
+| `bg/speed` | f 0..1 → 0..4× (`0.0625` = the default 0.25×) |
+| `bg/blend` | bool → **group** (≥ 0.5) else **blend in** |
+| `bg/randomize` | trigger : the Background's own dice |
+| `bg/source` · `bg/source/{input}` · `bg/fx/{i}/{input}` | Background source (a ground's id or name, or `none`; anything else is ignored) / its inputs / FX inputs |
 
 **Feel macros & temperament** : each a single `0..1` float:
 `/opsia/density`, `/gesture`, `/coalesce`, `/proximity` (field macros; 0.5 = centre)

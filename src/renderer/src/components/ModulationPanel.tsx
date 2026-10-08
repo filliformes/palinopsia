@@ -872,6 +872,7 @@ function MatrixSummary(): JSX.Element {
       const f = t.field === 'mix' ? 'A/B mix' : t.field
       return `L${t.layer + 1} ${f}`
     }
+    if (t.kind === 'bg') return `BG ${t.field === 'depth' ? 'shadow' : t.field}`
     const inst =
       t.scope.kind === 'master'
         ? composition.master.find((f) => f.id === t.instId)

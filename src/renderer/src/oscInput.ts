@@ -29,8 +29,10 @@
 //   /opsia/layer{n}/coupling/feature                  i index | f 0..1 | s name
 //   /opsia/master/fx/{i}/{input}                       f 0..1 → range
 //   /opsia/master/vibe|context|finalizer/{input}       f 0..1 → range (color/point2D: N args)
-//   /opsia/bg/opacity|speed|depth                      f 0..1
-//   /opsia/bg/blend                                     0=blend · 1=isolate (>= 0.5)
+//   /opsia/bg/opacity|depth (= shadow)                 f 0..1
+//   /opsia/bg/speed                                     f 0..1 → 0..4× (0.0625 = the default 0.25×)
+//   /opsia/bg/blend                                     0=blend · 1=group (>= 0.5)
+//   /opsia/bg/randomize                                 trigger (the Background's own dice)
 //   /opsia/bg/source                                    s shaderId | name | "none"
 //   /opsia/bg/source/{input}                           f 0..1 → range (color/point2D: N args)
 //   /opsia/bg/fx/{i}/{input}                           f 0..1 → range
@@ -65,7 +67,8 @@
 
 import { resolumeLearn } from './resolume'
 import type { BlendMode, CouplingMode, AudioFeature, FxScope, OscInEvent, OscQueryLeaf } from '@shared/types'
-import { BLEND_MODES, BODY_FEATURES } from '@shared/types'
+import { BLEND_MODES, BODY_FEATURES, BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
+import { BG_SOURCES } from './bgPresets'
 import { bodyBus } from './engine/bodyIn'
 import { videoKey, videoSeekRequests } from './engine/videoState'
 import { SONI_SCALES, withSonifyParam, type SoniConfig } from './audio/sonify'
@@ -391,13 +394,20 @@ function route(address: string, args: Args): void {
     case 'bg': {
       const ctl = segs[2]
       if (ctl === 'opacity') { st.setBackgroundOpacity(clamp01(n)); return }
-      if (ctl === 'speed') { st.setBackgroundSpeed(clamp01(n)); return }
-      if (ctl === 'depth') { st.setBackgroundDepth(clamp01(n)); return }
+      if (ctl === 'speed') { st.setBackgroundSpeed(clamp01(n) * BG_SPEED_MAX); return }
+      if (ctl === 'depth' || ctl === 'shadow') { st.setBackgroundDepth(clamp01(n)); return }
       if (ctl === 'blend') { st.setBackgroundBlendMode(n >= 0.5 ? 'isolate' : 'blend'); return }
+      if (ctl === 'randomize') { if (rising(address, n)) st.randomizeBg(); return }
       if (ctl === 'source') {
         if (segs[3] === undefined) {
           const str = firstStr(args)
-          if (str !== null) st.setBackgroundSource(resolveGenerator(str))
+          if (str === null) return
+          // "none" empties it; otherwise only a ground the Background can play
+          // (an effect, a figure or an unknown name used to clear it)
+          const lc = str.trim().toLowerCase()
+          if (lc === 'none' || lc === 'off' || lc === '') { st.setBackgroundSource(null); return }
+          const g = BG_SOURCES.find((x) => x.id === str || x.name.toLowerCase() === lc)
+          if (g) st.setBackgroundSource(g.id)
           return
         }
         const sid = st.composition.background?.source?.shaderId
@@ -1089,9 +1099,9 @@ function enumerateLeaves(): Leaf[] {
   // Background layer.
   const bg = st.composition.background
   add('/opsia/bg/opacity', 0, 1, bg?.opacity ?? 0, 'Background opacity')
-  add('/opsia/bg/speed', 0, 1, bg?.speed ?? 0.5, 'Background speed')
-  add('/opsia/bg/depth', 0, 1, bg?.depth ?? 0, 'Background depth push')
-  add('/opsia/bg/blend', 0, 1, bg?.blendMode === 'isolate' ? 1 : 0, 'Background blend (0=blend · 1=isolate)')
+  add('/opsia/bg/speed', 0, 1, (bg?.speed ?? BG_DEFAULT_SPEED) / BG_SPEED_MAX, 'Background clock speed (0..1 → 0..4×; 0.0625 = 0.25×)')
+  add('/opsia/bg/depth', 0, 1, bg?.depth ?? 0, 'Background shadow : the soft shadow the layers cast on it')
+  add('/opsia/bg/blend', 0, 1, bg?.blendMode === 'isolate' ? 1 : 0, 'How the layers sit on the Background (0 = blend · 1 = group)')
   if (bg?.source?.shaderId) {
     const sid = bg.source.shaderId
     for (const d of inputsForShader(sid)) {

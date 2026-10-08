@@ -220,6 +220,17 @@ class VisionBus {
   feature(name: VisionFeatureName): number {
     return this.f[name] ?? 0
   }
+
+  // Readers that keep the features computed without being a modulator (the
+  // Picture readout) : the App loop samples while any is registered.
+  private wants = new Set<string>()
+  want(key: string, on: boolean): void {
+    if (on) this.wants.add(key)
+    else this.wants.delete(key)
+  }
+  wanted(): boolean {
+    return this.wants.size > 0
+  }
   hasData(): boolean {
     return this.ready
   }

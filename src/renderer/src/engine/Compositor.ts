@@ -265,6 +265,23 @@ in vec2 uv; out vec4 o;
 uniform sampler2D tex;
 void main(){ o = texture(tex, uv); }`;
 
+// The Background's GROUP mode : the four layers composited on their own (from
+// transparent, so `grp` is premultiplied by their coverage) sit over the
+// Background, which shows through where they are transparent or dark : the
+// group covers it in proportion to its brightest channel (a saturated red covers
+// as much as a white; a black lets it all through).
+const GROUP_FS = `#version 300 es
+precision highp float;
+in vec2 uv; out vec4 o;
+uniform sampler2D bg;
+uniform sampler2D grp;
+void main(){
+  vec3 b = texture(bg, uv).rgb;
+  vec3 g = texture(grp, uv).rgb;
+  float k = clamp(max(g.r, max(g.g, g.b)), 0.0, 1.0);
+  o = vec4(clamp(g + b * (1.0 - k), 0.0, 1.0), 1.0);
+}`;
+
 // Projection warp (keystone / corner-pin): the composite is drawn as a quad
 // with 4 movable corners, perspective-correct via the per-vertex q (w) coord,
 // with an optional alignment grid + border for lining up on a projector.
@@ -1410,12 +1427,20 @@ export class Compositor {
   private bgOpacity = 0;
   private bgSpeed = 0.25;
   private bgDepth = 0;
-  private bgIsolate = false;
-  private bgNativeSource: { render(fbo: WebGLFramebuffer, clockSec?: number): void } | null = null; // true → the 4 layers composite as their own group
+  private bgIsolate = false; // GROUP mode : the 4 layers composite as their own group over it (GROUP_FS)
+  private bgNativeSource: { render(fbo: WebGLFramebuffer, clockSec?: number): void } | null = null;
   private depthShadow: DepthShadow | null = null;
   // Finalizer output stage (shape + outside fill), applied last.
   private outputShape: OutputShape | null = null;
   private bgFill!: { fbo: WebGLFramebuffer; tex: WebGLTexture }; // stable copy of the bg for the fill
+  // The Background's extra working pair (made on first need) : the layers'
+  // group in GROUP mode, layer 1's two takes in BLEND mode under a faded
+  // Background, the outside fill before the master stages. And a 1×1 black.
+  private bgWork: PingPong | null = null;
+  private black1: WebGLTexture | null = null;
+  private groupProg!: WebGLProgram;
+  private uGBg!: WebGLUniformLocation;
+  private uGGrp!: WebGLUniformLocation;
   private fzShape = 0;
   private fzSize = 0.7;
   private fzAngle = 0;
@@ -1618,6 +1643,9 @@ export class Compositor {
 
     this.copyProg = compile(gl, QUAD_VS, COPY_FS);
     this.uCTex = gl.getUniformLocation(this.copyProg, 'tex')!;
+    this.groupProg = compile(gl, QUAD_VS, GROUP_FS);
+    this.uGBg = gl.getUniformLocation(this.groupProg, 'bg')!;
+    this.uGGrp = gl.getUniformLocation(this.groupProg, 'grp')!;
 
     this.xformProg = compile(gl, QUAD_VS, XFORM_FS);
     this.uXTex = gl.getUniformLocation(this.xformProg, 'tex')!;
@@ -2339,6 +2367,69 @@ export class Compositor {
   }
 
   /** Blit `tex` into `fbo` unchanged (used to keep the crossfade snapshot). */
+  /** The Background's working pair at the current size (see bgWork). */
+  private bgPair(): PingPong {
+    if (!this.bgWork || this.bgWork.w !== this.w || this.bgWork.h !== this.h) {
+      this.bgWork?.dispose(this.gl);
+      this.bgWork = new PingPong(this.gl, this.w, this.h);
+    }
+    return this.bgWork;
+  }
+
+  /** An opaque black texture (1×1, sampled everywhere) : "nothing under". */
+  private blackTex(): WebGLTexture {
+    if (!this.black1) {
+      const gl = this.gl;
+      const t = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      this.black1 = t;
+    }
+    return this.black1;
+  }
+
+  /** Clear a framebuffer to one color. */
+  private clearTo(fbo: WebGLFramebuffer, r: number, g: number, b: number, a: number): void {
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.viewport(0, 0, this.w, this.h);
+    gl.clearColor(r, g, b, a);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+  }
+
+  /** GROUP mode : the layers' group over the Background (GROUP_FS). */
+  private groupOver(target: WebGLFramebuffer, bg: WebGLTexture, grp: WebGLTexture): void {
+    const gl = this.gl;
+    gl.bindVertexArray(this.vao);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target);
+    gl.viewport(0, 0, this.w, this.h);
+    gl.useProgram(this.groupProg);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bg); gl.uniform1i(this.uGBg, 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, grp); gl.uniform1i(this.uGGrp, 1);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindVertexArray(null);
+  }
+
+  /** One layer onto a stack (`pp` : the accumulator, or the Background's group). */
+  private drawLayer(L: ISFLayer, mode: BlendMode, pp: PingPong): void {
+    const field = mode === 'consume' ? this.consumeField(L, pp.read()) : undefined;
+    this.blendInto(pp.write(), pp.read(), L.texture(), mode, L.opacity, L.mask, field);
+    pp.swap();
+  }
+
+  /** Consume against a stack : the layer (eating toward phi = 1) and the stack
+   *  below fight over the frame through the layer's own field. */
+  private consumeField(L: ISFLayer, base: WebGLTexture): WebGLTexture {
+    const gl = this.gl;
+    if (!L.stackReagent || L.stackReagent.w !== this.w || L.stackReagent.h !== this.h) {
+      L.stackReagent?.dispose(gl);
+      L.stackReagent = new PingPong(gl, this.w, this.h);
+    }
+    return this.stepReagent(L.stackReagent, L.texture(), base, 0.5);
+  }
+
   private copyInto(fbo: WebGLFramebuffer, tex: WebGLTexture): void {
     const gl = this.gl;
     gl.bindVertexArray(this.vao);
@@ -2619,6 +2710,14 @@ export class Compositor {
    *  mix, or blend-against-the-stack mode (as an index into BLEND_MODES). The
    *  render reads these fields directly; syncFromState re-seeds the base each
    *  frame, applyModulation runs after, so the override wins the frame. */
+  /** The Background's opacity / speed / shadow, overridden for this frame. */
+  setBgParam(field: 'opacity' | 'speed' | 'depth', value: number): void {
+    if (!Number.isFinite(value)) return;
+    if (field === 'opacity') this.bgOpacity = value < 0 ? 0 : value > 1 ? 1 : value;
+    else if (field === 'speed') this.bgSpeed = value < 0 ? 0 : value > 4 ? 4 : value;
+    else this.bgDepth = value < 0 ? 0 : value > 1 ? 1 : value;
+  }
+
   setLayerParam(layer: number, field: 'opacity' | 'mix' | 'blend', value: number): void {
     const L = this.layers[layer];
     if (!L) return;
@@ -2820,9 +2919,8 @@ export class Compositor {
     this.acc.swap(); // cleared buffer is now acc.read()
 
     const anySolo = this.layers.some((l) => l.solo);
-    let first = true;
 
-    // Background slab. Rendered whenever it's needed either behind the layers OR
+    // The Background. Rendered whenever it's needed either behind the layers OR
     // as the finalizer's outside fill (fzBgLayer "moves" it there : so it must
     // NOT also sit behind the layers). Copied into a STABLE bgFill buffer since
     // the chain buffer the rack returns is reused by the layer loop below.
@@ -2858,66 +2956,93 @@ export class Compositor {
         this.copyInto(this.bgFill.fbo, bgTex);
         haveBgFill = true;
 
-        // Composite behind the layers UNLESS moved to the finalizer's fill.
-        if (this.bgOpacity > 0.001 && !this.fzBgLayer) {
-          this.blendInto(this.acc.write(), this.acc.read(), this.bgFill.tex, 'normal', this.bgOpacity);
-          this.acc.swap();
-          // 'blend' (default): the first layer blends onto the background with its
-          // own mode. 'isolate': keep `first` true so the background never alters
-          // the inter-layer blends.
-          if (!this.bgIsolate) first = false;
-
-          // Depth: the foreground casts a soft shadow onto the background (now in
-          // acc). No-op at depth 0.
-          if (this.bgDepth > 0.001) {
-            if (!this.depthShadow) this.depthShadow = new DepthShadow(this.gl);
-            const tex = this.layers.map((l) => l.texture());
-            const wts = this.layers.map((l) => ((anySolo ? l.solo : !l.mute) ? l.opacity : 0));
-            this.depthShadow.apply(this.acc.read(), tex, wts, this.bgDepth, this.acc.write(), this.w, this.h);
-            this.acc.swap();
-            gl.bindVertexArray(null);
-          }
-        }
       } catch (e) {
         this.shared.redirect.redirect = null;
         console.error('[render] background skipped this frame:', e);
+        haveBgFill = false;
       }
     }
-    for (const L of this.layers) {
-      const audible = anySolo ? L.solo : !L.mute;
-      if (!audible) continue;
-      // The first visible layer has nothing real below it : the accumulator
-      // is cleared black, so multiply/overlay/burn would eat it. Standard
-      // compositor semantics: the bottom of the stack composites 'normal';
-      // blend modes act BETWEEN layers.
-      const mode = first ? 'normal' : L.blend;
-      // Consume against the stack : the layer (eating toward phi = 1) and the
-      // stack below fight over the frame through the layer's own field.
-      let field: WebGLTexture | undefined;
-      if (mode === 'consume') {
-        if (!L.stackReagent || L.stackReagent.w !== this.w || L.stackReagent.h !== this.h) {
-          L.stackReagent?.dispose(gl);
-          L.stackReagent = new PingPong(gl, this.w, this.h);
-        }
-        field = this.stepReagent(L.stackReagent, L.texture(), this.acc.read(), 0.5);
-      }
-      this.blendInto(
-        this.acc.write(),
-        this.acc.read(),
-        L.texture(),
-        mode,
-        L.opacity,
-        L.mask,
-        field
-      );
-      first = false;
+
+    // How the layers sit on the Background (unless it is the outside fill) :
+    //  · BLEND : layer 1 blends onto it in its own mode. A faded Background no
+    //    longer flips layer 1 to 'normal' at a threshold (that flashed black
+    //    under multiply at a low opacity and popped halfway through a morph) :
+    //    layer 1 is taken onto the whole Background in its mode and alone (as
+    //    if nothing were under it), and the two are mixed by the opacity.
+    //  · GROUP (isolate) : the layers composite among themselves as if alone,
+    //    then the group sits over the Background (GROUP_FS), which shows
+    //    through where they are transparent or dark.
+    const o = this.bgOpacity;
+    const bgUnder = haveBgFill && !this.fzBgLayer && o > 0.001;
+    const audible = this.layers.filter((l) => (anySolo ? l.solo : !l.mute));
+    const lead = audible[0];
+    const ease = bgUnder && !this.bgIsolate && !!lead && lead.blend !== 'normal' && o < 0.999;
+    if (bgUnder) {
+      // The Background in acc : at its opacity, or whole when layer 1 is about
+      // to be eased onto it (the opacity is the mix then).
+      this.blendInto(this.acc.write(), this.acc.read(), this.bgFill.tex, 'normal', ease ? 1 : o);
       this.acc.swap();
+      // Depth : the foreground casts a soft shadow onto the Background. No-op at 0.
+      if (this.bgDepth > 0.001) {
+        if (!this.depthShadow) this.depthShadow = new DepthShadow(this.gl);
+        const tex = this.layers.map((l) => l.texture());
+        const wts = this.layers.map((l) => ((anySolo ? l.solo : !l.mute) ? l.opacity : 0));
+        this.depthShadow.apply(this.acc.read(), tex, wts, this.bgDepth, this.acc.write(), this.w, this.h);
+        this.acc.swap();
+        gl.bindVertexArray(null);
+      }
+    }
+    if (bgUnder && this.bgIsolate) {
+      const grp = this.bgPair();
+      this.clearTo(grp.write(), 0, 0, 0, 0);
+      grp.swap();
+      audible.forEach((L, i) => this.drawLayer(L, i === 0 ? 'normal' : L.blend, grp));
+      this.groupOver(this.acc.write(), this.acc.read(), grp.read());
+      this.acc.swap();
+    } else {
+      audible.forEach((L, i) => {
+        if (i === 0 && ease) {
+          const w = this.bgPair();
+          // layer 1 onto the whole Background, in its mode
+          this.blendInto(w.write(), this.acc.read(), L.texture(), L.blend, L.opacity, L.mask,
+            L.blend === 'consume' ? this.consumeField(L, this.acc.read()) : undefined);
+          w.swap();
+          // and alone, landing 'normal' on nothing
+          this.blendInto(w.write(), this.blackTex(), L.texture(), 'normal', L.opacity, L.mask);
+          // mixed by the Background's opacity : alone at 0, blended at 1
+          this.blendInto(this.acc.write(), w.out(), w.read(), 'normal', o);
+          this.acc.swap();
+          return;
+        }
+        // The first layer with nothing under it lands 'normal' (multiply / overlay /
+        // burn on black would eat it); blend modes act BETWEEN layers, and onto
+        // the Background in BLEND mode.
+        this.drawLayer(L, i === 0 && !bgUnder ? 'normal' : L.blend, this.acc);
+      });
     }
     let composite = this.acc.read();
+    const gradedFill = this.fzBgLayer && haveBgFill && this.fzShape > 0;
+    if (gradedFill) {
+      if (!this.outputShape) this.outputShape = new OutputShape(this.gl);
+      const w = this.bgPair();
+      const c = this.fzBgColor;
+      this.clearTo(w.write(), c[0], c[1], c[2], 1);
+      w.swap();
+      this.blendInto(w.write(), w.read(), this.bgFill.tex, 'normal', this.bgOpacity);
+      w.swap();
+      this.outputShape.apply(
+        composite, w.read(), this.fzBgColor, this.fzShape, this.fzSize, this.fzAngle,
+        this.fzPosX, this.fzPosY, 0, this.fzShadowAngle, this.fzPersp, this.fzFeather,
+        this.w / this.h, w.write(), this.w, this.h
+      );
+      composite = w.out();
+    }
 
     // Master rack (glitch / dither / chroma / grade; warp joins in Phase 8).
     gl.bindVertexArray(null);
     composite = this.masterRack.apply(composite, this.chain, nodeCtx); // nodeCtx → native nodes (Parallax) work on master too
+    // The fill as graded (kept clean of the film stages that follow).
+    if (gradedFill) this.copyInto(this.bgFill.fbo, composite);
 
     // Cameraless / direct-film stage: draw-clock hold + boil (§2.1 pipeline slot).
     // Null when off (hold===0) or effectively smooth (draw ≥ present fps with no
@@ -3104,6 +3229,10 @@ export class Compositor {
     this.pbrLib?.dispose();
     disposeTarget(gl, this.bgScratch);
     disposeTarget(gl, this.bgFill);
+    this.bgWork?.dispose(gl);
+    this.bgWork = null;
+    if (this.black1) gl.deleteTexture(this.black1);
+    this.black1 = null;
     this.acc.dispose(gl);
     this.chain.dispose(gl);
     disposeTarget(gl, this.mixTarget);

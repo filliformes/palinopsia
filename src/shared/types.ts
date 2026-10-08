@@ -632,6 +632,14 @@ export type ModTarget =
   // its A/B source mix, and its blend-against-the-stack mode (driven as an enum
   // index that cycles through BLEND_MODES). Applied as a final per-frame override.
   | { kind: 'layer'; layer: number; field: 'opacity' | 'mix' | 'blend' }
+  // The Background's own controls : opacity, its clock's speed (0..4×) and the
+  // contact shadow the layers cast on it ('depth'). Same final override.
+  | { kind: 'bg'; field: 'opacity' | 'speed' | 'depth' }
+
+// The Background's clock : grounds move slowly by default, up to 4× (every
+// path : the slider, the store, OSC, modulation, the Meta knobs).
+export const BG_DEFAULT_SPEED = 0.25
+export const BG_SPEED_MAX = 4
 
 // Sentinel `input` name that turns an `fx` ModTarget into the FX unit's dry/wet
 // OPACITY (a compositor property, not an ISF uniform), so per-FX opacity rides
@@ -702,10 +710,13 @@ export interface BackgroundState {
   depth?: number
   // How the four layers sit over the background:
   //  'blend'   : layer 1 blends onto the background with its own blend mode
-  //              (Photoshop-standard; additive/screen layers glow it through).
-  //  'isolate' : the four layers composite as their own group (layer 1 forced
-  //              'normal'), then sit over the background; the background is a
-  //              pure backdrop that never alters the inter-layer blends.
+  //              (additive / screen layers glow it through); as the background
+  //              fades, layer 1 eases toward landing as if nothing were under it.
+  //  'isolate' : GROUP (the UI's word) : the four layers composite among
+  //              themselves as if alone, then the group sits over the
+  //              background, which shows through where they are transparent or
+  //              dark (Compositor GROUP_FS). The background never alters the
+  //              inter-layer blends.
   blendMode?: 'blend' | 'isolate'
 }
 

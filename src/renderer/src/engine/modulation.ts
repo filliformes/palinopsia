@@ -16,6 +16,7 @@ import { BLEND_MODES, FX_OPACITY_INPUT } from '@shared/types'
 import { audioBus } from './audioIn'
 import { visionBus } from './visionIn'
 import { bodyBus } from './bodyIn'
+import { BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
 
 const TWO_PI = Math.PI * 2
 // The 60fps reference frame time (ms). The picture / audio one-pole followers
@@ -969,6 +970,7 @@ function liveKey(t: import('@shared/types').ModTarget): string {
   if (t.kind === 'meta') return `meta:${t.knob}`
   if (t.kind === 'sonify') return `soni:${t.param}`
   if (t.kind === 'layer') return `lay:${t.layer}:${t.field}`
+  if (t.kind === 'bg') return `bg:${t.field}`
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
@@ -1152,6 +1154,8 @@ export interface ModComp {
     value: number
   ) => void
   setBgSourceInput: (name: string, value: number) => void
+  // The Background's opacity / speed / shadow (a final override, like a layer's).
+  setBgParam: (field: 'opacity' | 'speed' | 'depth', value: number) => void
   // Compositor-level overrides (not ISF inputs) : per-FX dry/wet opacity, and a
   // layer's own opacity / A-B mix / blend-mode index. Applied post-syncFromState.
   setFxOpacity: (scope: import('@shared/types').FxScope, instId: string, value: number) => void
@@ -1179,6 +1183,14 @@ export function writeModTarget(
     const v = d.min + Math.max(0, Math.min(1, shaped01)) * (d.max - d.min)
     sonifyModValues.set(t.param, v)
     liveModValues.set(liveKey(t), v)
+    return
+  }
+  // The Background's opacity / speed (0..4×) / shadow : absolute over the span.
+  if (t.kind === 'bg') {
+    const x = Math.max(0, Math.min(1, shaped01))
+    const value = t.field === 'speed' ? x * BG_SPEED_MAX : x
+    liveModValues.set(liveKey(t), value)
+    comp.setBgParam(t.field, value)
     return
   }
   // Layer opacity / A-B mix / blend-index : compositor overrides, absolute 0..1.
@@ -1332,6 +1344,18 @@ export function applyModulation(
       if (final === null || typeof final !== 'number') continue
       sonifyModValues.set(a.target.param, final)
       liveModValues.set(liveKey(a.target), final)
+      continue
+    }
+    if (a.target.kind === 'bg') {
+      const b = c.background
+      if (!b) continue
+      const f = a.target.field
+      const max = f === 'speed' ? BG_SPEED_MAX : 1
+      const base = f === 'opacity' ? b.opacity : f === 'speed' ? (b.speed ?? BG_DEFAULT_SPEED) : (b.depth ?? 0)
+      const final = inputValueForMode({ type: 'float', min: 0, max, def: base }, base, v, a.depth, a.mode)
+      if (final === null || typeof final !== 'number') continue
+      liveModValues.set(liveKey(a.target), final)
+      comp.setBgParam(f, final)
       continue
     }
     if (a.target.kind === 'layer') {

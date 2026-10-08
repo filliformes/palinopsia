@@ -7,6 +7,13 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **A Picture readout** (Performance tab, its own **picture** section) : all 17 vision
+  features live, grouped (light and color, texture, motion, where and how deep), with
+  what 0 and 1 mean, swing bars for the signed ones, a dot for the bright mass and a
+  color swatch, each row's `/opsia/vision/…` address on hover. Drawn from refs at
+  15 Hz; it registers on the vision bus (`visionBus.want`) so the App loop samples the
+  picture while it is open, and releases it when folded.
+
 - **Palinopsia is a dataflou node.** A new **dataflou** section in the audio/midi/osc tab
   (ON THE MESH pill, name, universe) joins the decentralized parameter mesh its sibling
   instruments speak, and monitors it : every node on the network (online, remembered,
@@ -531,6 +538,37 @@ that CI builds into cross-platform releases.
   Mac. Built from the Syphon framework's source in CI.
 
 ### Changed
+
+- **The Background, audited.** Its strip is first in the Layers column (Background, then
+  Layers 1 to 4 : the stack read bottom to top) and collapsible like a layer's, with
+  opacity, M and dice in the header and a summary when folded. Fixes :
+  - **group** (was "isolate") is a real group now : the layers composite on
+    transparency (`bgWork` pair) and sit over the Background by `GROUP_FS`
+    (`grp + bg × (1 − max(grp.rgb))`); it only forced Layer 1 to 'normal', so an opaque
+    Layer 1 hid the Background entirely;
+  - **blend in** under a fading Background : Layer 1 is taken onto the whole Background
+    in its mode and alone, mixed by the opacity (it switched at 0.001 : a multiply
+    Layer 1 went black at a low opacity, and a morph popped at its halfway point);
+  - the **outside fill** follows the Background's opacity (over the fill color) and is
+    graded with the picture : the Background takes the shape's outside before the
+    master stages, the graded frame becomes the fill, the shape is still cut last so
+    the film dust stays inside (it was the raw Background);
+  - its **dice** drops modulation aimed at the old source and rack (bg-fx rows dangled on
+    dead ids and ate the 12-row cap); **Init background** empties it entirely (it only
+    cleared the source); built-in presets keep the shadow and mode;
+  - **speed** is 0 to 4× everywhere (the slider stopped at 2, OSC at 1×; OSCQuery
+    advertised 0.5); opacity, speed and **shadow** (the "Depth" control, renamed for
+    what it is) are modulation targets (`{ kind: 'bg' }`), Meta destinations and
+    MIDI-learnable;
+  - OSC `/opsia/bg/source` accepts only grounds (an effect name was taken, an unknown
+    name cleared it), `/opsia/bg/randomize` and `/opsia/bg/shadow` are new;
+  - Generate never puts an empty Collage in the Background (Film Wall did); New's seed
+    layer lets the ground show (screen / lighten / add, or 'normal' at 0.6 to 0.8)
+    instead of covering it at 85 % 'normal';
+  - an older session's Background gets the fields it lacks.
+  Measured : multiply over a fading green ground goes white → green with no black step;
+  in group, the dark side of a black-to-white layer shows the red ground (149,63,66 vs
+  40,43,47); the fill moves with the Finalizer's gamma and the Background's opacity.
 
 - **Every change morphs, without the flick.** A scene recall, Randomize, Variation or the
   sequencer used to hide every structural change (a source, an effect, a blend mode, a

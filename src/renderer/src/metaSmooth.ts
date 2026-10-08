@@ -19,6 +19,7 @@ import { withSonifyParam } from './audio/sonify'
 import { shapeCurve, inputValueFrom01, SONIFY_MOD_DESCS } from './engine/modulation'
 import { inputsForShader } from './shaders/isf/inputs'
 import { useStore } from './store'
+import { BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
 
 const knobDisplay: number[] = []
 const tweens: Array<{ from: number; to: number; startedAt: number; ms: number } | null> = []
@@ -68,6 +69,14 @@ function applyDest(target: ModTarget, shaped: number): void {
     if (target.field === 'opacity') st.setOpacity(target.layer, x)
     else if (target.field === 'mix') st.setSourceMix(target.layer, x)
     else st.setBlend(target.layer, BLEND_MODES[Math.min(BLEND_MODES.length - 1, Math.floor(x * BLEND_MODES.length))])
+    return
+  }
+  // The Background's opacity / speed / shadow : committed into the store.
+  if (target.kind === 'bg') {
+    const x = Math.max(0, Math.min(1, shaped))
+    if (target.field === 'opacity') st.setBackgroundOpacity(x)
+    else if (target.field === 'speed') st.setBackgroundSpeed(x * BG_SPEED_MAX)
+    else st.setBackgroundDepth(x)
     return
   }
   // Per-FX dry/wet opacity : a compositor property, committed via its store action.

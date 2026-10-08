@@ -18,6 +18,7 @@
 // the target ids below.
 
 import type { MidiBinding } from '@shared/types'
+import { BG_SPEED_MAX } from '@shared/types'
 import {
   fireSelectedRandomize, fireVariation, firePanic, fireFreeze, fireRecordToggle,
   fireInspectorRandomize, fireNewSession, fireLoadSession, fireOpenSession
@@ -190,6 +191,8 @@ export function isContinuousTarget(id: string): boolean {
     id === 'surface:y' ||
     id === 'sonify:master' ||
     id === 'bg:opacity' ||
+    id === 'bg:speed' ||
+    id === 'bg:depth' ||
     /^layer:\d+:(mix|opacity)$/.test(id)
   )
 }
@@ -206,6 +209,8 @@ export function midiTargetLabel(id: string): string {
   if (id.startsWith('scene:')) return `SCENE ${Number(id.slice(6)) + 1}`
   if (id in FIELD_LABELS) return FIELD_LABELS[id]
   if (id === 'bg:opacity') return 'BACKGROUND opacity'
+  if (id === 'bg:speed') return 'BACKGROUND speed'
+  if (id === 'bg:depth') return 'BACKGROUND shadow'
   const lm = /^layer:(\d+):(mix|opacity)$/.exec(id)
   if (lm) return `LAYER ${Number(lm[1]) + 1} ${lm[2] === 'mix' ? 'A↔B' : 'opacity'}`
   const sv = /^sonify:voice:(\d+)$/.exec(id)
@@ -537,6 +542,8 @@ class MidiManager {
         if (matches(map[`layer:${i}:opacity`], binding)) { st.setOpacity(i, t); ccHandled = true }
       }
       if (matches(map['bg:opacity'], binding)) { st.setBackgroundOpacity(t); ccHandled = true }
+      if (matches(map['bg:speed'], binding)) { st.setBackgroundSpeed(t * BG_SPEED_MAX); ccHandled = true }
+      if (matches(map['bg:depth'], binding)) { st.setBackgroundDepth(t); ccHandled = true }
       // Metasurface cursor (activates the surface; needs ≥2 placed scenes).
       if (matches(map['surface:x'], binding)) {
         st.setSurfaceXY(t, st.surface.y)

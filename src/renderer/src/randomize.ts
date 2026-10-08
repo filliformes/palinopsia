@@ -428,6 +428,7 @@ function targetKey(t: ModTarget): string {
   if (t.kind === 'meta') return `meta:${t.knob}`
   if (t.kind === 'sonify') return `soni:${t.param}`
   if (t.kind === 'layer') return `lay:${t.layer}:${t.field}`
+  if (t.kind === 'bg') return `bg:${t.field}`
   const s = t.scope
   return `fx:${s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`}:${t.instId}:${t.input}`
 }
@@ -635,7 +636,7 @@ export function randomizeBackground(cur: BackgroundState | undefined): Backgroun
  *
  *  This path MUST carry the same guarantees as Randomize All (it used to skip
  *  them, which is why cold launches could land on a dead or black "first
- *  frame" : a static source, a dark blend over the near-black background, and
+ *  frame" : a static source, a dark blend over a dark background, and
  *  no modulation = a frozen-looking boot):
  *   - the seed source is never a static-by-design generator (Solid Color);
  *   - the layer sits directly on the background, so its blend is stack-safe
@@ -652,12 +653,20 @@ export function seedRandomStart(base: CompositionState): CompositionState {
   if (l0.sourceAFx.length + l0.sourceBFx.length + l0.fx.length === 0) {
     l0 = { ...l0, sourceAFx: randomRack([0, 1]) } // exactly one
   }
-  // The seed layer composites straight onto the near-black background : a dark
-  // blend there is the classic black-window draw. Stack-safe blend + solid
-  // opacity, same rule as Randomize All's bottom layer.
-  const SAFE_BOTTOM = ['normal', 'add', 'screen', 'lighten']
-  if (!SAFE_BOTTOM.includes(l0.blend)) l0 = { ...l0, blend: pick(SAFE_BOTTOM) as LayerState['blend'] }
-  l0 = { ...l0, opacity: Math.max(l0.opacity, 0.85) }
+  // The seed layer composites straight onto the Background : a dark blend there
+  // is the classic black-window draw, so a stack-safe one. And the ground is part
+  // of the picture : with one (New's random tint), the layer lets it show (it sat
+  // under an opaque 'normal' and barely read) : mostly screen / lighten / add,
+  // or 'normal' at an opacity that leaves it some air. With none, solid.
+  const bgShows = !!base.background?.source.shaderId && (base.background.opacity ?? 1) > 0.05
+  if (bgShows) {
+    const blend = pick(['screen', 'screen', 'screen', 'lighten', 'lighten', 'add', 'normal']) as LayerState['blend']
+    l0 = { ...l0, blend, opacity: blend === 'normal' ? 0.6 + Math.random() * 0.2 : Math.max(l0.opacity, 0.85) }
+  } else {
+    const SAFE_BOTTOM = ['normal', 'add', 'screen', 'lighten']
+    if (!SAFE_BOTTOM.includes(l0.blend)) l0 = { ...l0, blend: pick(SAFE_BOTTOM) as LayerState['blend'] }
+    l0 = { ...l0, opacity: Math.max(l0.opacity, 0.85) }
+  }
   let next: CompositionState = {
     ...base,
     layers: base.layers.map((l, i) =>

@@ -50,6 +50,7 @@ import { OscPanel } from './components/OscPanel'
 import { AudioPanel } from './components/AudioPanel'
 import { MidiPanel } from './components/MidiPanel'
 import { PerformancePanel } from './components/PerformancePanel'
+import { PictureReadout } from './components/PictureReadout'
 import { AssemblePanel } from './components/AssemblePanel'
 import { BackgroundPanel } from './components/BackgroundPanel'
 import { OutputPage } from './components/OutputPage'
@@ -1466,6 +1467,8 @@ export default function App(): JSX.Element {
             (st.resolume.enabled && st.resolume.inputs.some((i) => i.source.startsWith('vision:'))) ||
             // a dataflou node listening to the picture
             dataflouWantsVision() ||
+            // the Picture readout (Performance tab) while it is open
+            visionBus.wanted() ||
             // the key sequencer reading the picture's color / cuts (and its
             // visual showing them while the Sonify page is open)
             (st.soniKeySeq.mode === 'picture' && (st.soniKeySeq.on || st.sonifyPageOpen)) ||
@@ -1986,15 +1989,21 @@ export default function App(): JSX.Element {
             </>
           ) : rightView === 'perf' ? (
             // The live load meter, on its own tab : it only meters while shown.
-            <PerformancePanel />
+            // Under it, the Picture readout : every feature the picture reports.
+            <>
+              <PerformancePanel />
+              <Collapsible sectionKey="picture" title="picture" className="border-t border-border bg-panel px-3 py-1.5" extra={<span className="font-mono text-[9px] normal-case text-muted/70">what the picture reports</span>}>
+                <PictureReadout />
+              </Collapsible>
+            </>
           ) : (
             <>
+              {/* The stack in its order, bottom to top : the Background (under
+                  everything), then Layer 1 (on it) up to Layer 4 (on top). */}
+              <BackgroundPanel />
               {[0, 1, 2, 3].map((i) => (
                 <LayerPanel key={i} index={i} />
               ))}
-              {/* Background slab : pinned last, matching the stack (renders
-                  under everything). */}
-              <BackgroundPanel />
               {/* Metasurface : the scene bank as a continuous 2D plane you play
                   by dragging (Bencina 2005). Collapsed by default. */}
               <Collapsible sectionKey="surface" title="surface" extra={<SurfaceOnToggle />}>
