@@ -570,8 +570,9 @@ The **audio/midi/osc** right-column tab (key `A`) holds the control panels
     device (its own **sink** picker), so you can hear a source (e.g. the sound of
     an Ableton Move on interface inputs 1&2) while it drives the visuals. The
     **Sonify** sound and the monitored input have **separate levels**, so both run
-    at once without fighting, and each its **output** device : Sonify's menu here
-    is the same choice as the Sonify page's (change either, both follow), and the
+    at once without fighting, and each its **output** device : Sonify's sits right
+    under the input device menu, the same size, and is the same choice as the Sonify
+    page's (change either, both follow; it shows even with the analyser off); the
     lists follow devices plugged in or out.
   - **Denoiser** : a built-in filter for USB / interface hum. It **learns** the
     input's noise (mains-hum series + strong tones), models a set of notches, and
@@ -1023,8 +1024,8 @@ Flash-safety) + a level meter (left and right : the bar is the average level, th
 the peak held a moment, on a dB scale from -54 to 0 with lines at -36, -18 and -6, the
 peak in dB beside it; yellow above -9 dB, orange while the limiter works; measured
 after the master and the limiter, so it is what reaches the speakers), and an
-**output-device picker** (also in the audio/midi/osc tab, under Sonify's level : the
-same setting). While the engine
+**output-device picker** (also in the audio/midi/osc tab, under the input device
+menu : the same setting). While the engine
 plays, **recordings carry the sound** (DXV3 included), even when you switch it on
 mid-take : exports become true audiovisual pieces.
 

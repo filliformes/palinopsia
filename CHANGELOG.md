@@ -7,8 +7,10 @@ that CI builds into cross-platform releases.
 
 ### Added
 
-- **Sonify's output device in the audio/midi/osc tab** : under Sonify's level, the same
-  menu as the Sonify page's (both drive `sonify.sinkId`). One `AudioOutputSelect` now
+- **Sonify's output device in the audio/midi/osc tab** : right under the audio input
+  menu, the same size (the two stacked in one column beside the meters; alone at full
+  width while the analyser is off), the same menu as the Sonify page's (both drive
+  `sonify.sinkId`). One `AudioOutputSelect` now
   serves the Sonify page, that row and the input monitor's row; its list follows
   `devicechange`, a device saved in a session but not plugged in reads "(not
   connected)" instead of "default", and the system's own "default" entry folds into

@@ -107,12 +107,15 @@ export function AudioPanel(): JSX.Element {
           </>
         )}
       </div>
-      {/* Second line : the device dropdown at full width + the meters. */}
-      {enabled && (
-        <div className="flex min-w-0 items-center gap-2">
-          {showDevice && (
+      {/* The devices, one above the other at the same width : the input it
+          analyses, and the output Sonify plays to (the same setting as the
+          Sonify page's menu; shown even with the analyser off). The meters
+          beside them. */}
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          {enabled && showDevice && (
             <select
-              className="input select-compact min-w-0 flex-1 text-[10px]"
+              className="input select-compact w-full min-w-0 text-[10px]"
               value={deviceId ?? ''}
               onChange={(e) => setDeviceId(e.target.value || null)}
               title="Local audio input device"
@@ -125,10 +128,16 @@ export function AudioPanel(): JSX.Element {
               ))}
             </select>
           )}
-          {!showDevice && <div className="flex-1" />}
-          <Meters />
+          <AudioOutputSelect
+            className="input select-compact w-full min-w-0 text-[10px]"
+            defaultLabel="Default output (Sonify)"
+            value={sonify.sinkId}
+            onChange={(id) => setSonify({ ...useStore.getState().sonify, sinkId: id })}
+            title="Which output device Sonify plays to (the same choice as on the Sonify page)"
+          />
         </div>
-      )}
+        {enabled && <Meters />}
+      </div>
       {enabled && (
         <p className="font-mono text-[9px] leading-tight text-muted">
           Assign to parameters via the <span className="text-accent">audio</span> modulator type
@@ -148,15 +157,7 @@ export function AudioPanel(): JSX.Element {
           onLevel={(v) => setSonify({ ...sonify, master: v })}
           title="The Sonify engine's sound (image → sound). Build its voices on the Sonify page (S)."
         />
-        {/* Sonify's output device : the same setting as the Sonify page's menu */}
-        <label className="flex items-center gap-2 pl-[26px] font-mono text-[9px] text-muted">
-          <span className="shrink-0">output</span>
-          <AudioOutputSelect
-            value={sonify.sinkId}
-            onChange={(id) => setSonify({ ...useStore.getState().sonify, sinkId: id })}
-            title="Which output device Sonify plays to (the same choice as on the Sonify page)"
-          />
-        </label>
+
         <LevelRow
           label="Input monitor"
           on={monitor}

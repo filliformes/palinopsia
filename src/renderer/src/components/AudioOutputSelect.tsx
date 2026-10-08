@@ -38,11 +38,12 @@ export function useAudioOutputs(): AudioOutput[] {
   return outs
 }
 
-export function AudioOutputSelect({ value, onChange, title, className }: {
+export function AudioOutputSelect({ value, onChange, title, className, defaultLabel = 'default output' }: {
   value: string
   onChange: (deviceId: string) => void
   title: string
   className?: string
+  defaultLabel?: string
 }): JSX.Element {
   const outs = useAudioOutputs()
   // The system's own "default" entry is the first option ('') here.
@@ -52,7 +53,7 @@ export function AudioOutputSelect({ value, onChange, title, className }: {
   const missing = v && !outs.some((o) => o.id === v)
   return (
     <select className={className ?? 'input select-compact min-w-0 flex-1 text-[10px]'} value={v} onChange={(e) => onChange(e.target.value)} title={title}>
-      <option value="">default output</option>
+      <option value="">{defaultLabel}</option>
       {outs.map((o) => (
         <option key={o.id} value={o.id}>{o.label}</option>
       ))}
