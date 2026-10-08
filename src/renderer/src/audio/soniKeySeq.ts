@@ -53,7 +53,7 @@ const rt = {
 const keyOf = (c: SoniConfig): Key => ({ root: mod12(c.root), scale: c.scale, oct: c.rootOct ?? 3 })
 
 /** The pool's roots (all twelve if none is ticked) and its scales. */
-function pool(ks: SoniKeySeq): { roots: number[]; scales: Key['scale'][] } {
+export function pool(ks: SoniKeySeq): { roots: number[]; scales: Key['scale'][] } {
   let roots = ks.poolRoots.map((on, i) => (on ? i : -1)).filter((i) => i >= 0)
   if (!roots.length) roots = Array.from({ length: 12 }, (_, i) => i)
   let scales = ks.poolScales.filter(isScale)
@@ -117,6 +117,13 @@ function nextCircle(ks: SoniKeySeq, cur: Key): Key | null {
   return scale !== cur.scale ? { root: cur.root, scale, oct: cur.oct } : null
 }
 
+/** How much a key sharing `a` (0..1) of its notes weighs at this smoothness :
+ *  +100 the keys sharing the most notes all but always, −100 the fewest, 0 any
+ *  key alike. (The visual draws the same law.) */
+export function affinityWeight(smooth: number, a: number): number {
+  return Math.exp(6 * (smooth / 100) * (a - 0.5) * 2)
+}
+
 function nextAffinity(ks: SoniKeySeq, cur: Key): Key | null {
   const { roots, scales } = pool(ks)
   const gather = (useTour: boolean, useRecent: boolean): Key[] => {
@@ -142,10 +149,7 @@ function nextAffinity(ks: SoniKeySeq, cur: Key): Key | null {
   }
   if (!cands.length) cands = gather(false, false)
   if (!cands.length) return null
-  // smooth +100 : the keys sharing the most notes all but always; −100 : the
-  // fewest; 0 : any key alike.
-  const k = 6 * (ks.affSmooth / 100)
-  const w = cands.map((c) => Math.exp(k * (affinity(cur, c) - 0.5) * 2))
+  const w = cands.map((c) => affinityWeight(ks.affSmooth, affinity(cur, c)))
   let r = Math.random() * w.reduce((a, b) => a + b, 0)
   for (let i = 0; i < cands.length; i++) {
     r -= w[i]
@@ -182,7 +186,7 @@ function nextPivot(ks: SoniKeySeq, cur: Key): Key | null {
 
 /** The key the picture asks for : its hue around the circle of fifths (a grey
  *  picture keeps the root), its brightness for the mood. */
-function pictureKey(ks: SoniKeySeq, cur: Key): Key | null {
+export function pictureKey(ks: SoniKeySeq, cur: Key): Key | null {
   if (!visionBus.hasData()) return null
   const { roots, scales } = pool(ks)
   let root = cur.root
@@ -337,6 +341,11 @@ export function keySeqNext(fresh = false): void {
     if (sameKey(next, cur)) next = nextAffinity({ ...ks, affSmooth: 0 }, cur)
   } else next = choose(ks, cur)
   if (next && !sameKey(next, cur)) apply(next, ks.glide)
+}
+
+/** What the walk remembers (the visual's trail and the keys it rules out). */
+export function keySeqMemory(): { recent: string[]; visited: ReadonlySet<string>; started: boolean } {
+  return { recent: rt.recent, visited: rt.visited, started: rt.started }
 }
 
 /** The page's readout : where the clock stands toward the next change (0..1),

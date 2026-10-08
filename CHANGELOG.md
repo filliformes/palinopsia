@@ -7,6 +7,21 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **The key sequencer draws each mode** (a stage under the mode strip, after dataFLOU's
+  per-mode sequencer previews), in one color language : a key's hue is its place on the
+  circle of fifths, the key playing glows, pops and ripples when it changes. **List** :
+  the written keys as tiles, the playing one lit, a trail behind (bounce, drift).
+  **Circle** : the circle of fifths, majors outside and relative minors inside, the pool
+  lit, the key and its last four, the lean as an arrow as long as the leap, the relative
+  hop as a dashed link. **Affinity** : a constellation around the key, closer = more shared
+  notes, bigger = likelier at this smoothness (the engine's own law, `affinityWeight`),
+  hollow = ruled out by no repeat or the tour, the three likeliest named. **Pivot** : the
+  twelve notes as a clock with the scale lit and its targets ringed, beside the degrees
+  (same notes) or the bright-to-dark ladder (same tonic). **Picture** : the picture's hue
+  on a wheel (the marker's distance is its saturation), its brightness against the pool's
+  moods, the key they give; on cuts, the motion strip with the spikes past the cut line.
+  The vision bus is fed in Picture mode while the sequencer runs or the Sonify page is
+  open.
 - **An OSC monitor, and an OSC section in two halves** (audio/midi/osc tab) : **↙ IN**
   (listen, port, where to send, the last message) and **↗ OUT** (destination, FEEDBACK,
   MARK, a note that the body rules' OSC goes there and the Resolume mapper has its own),

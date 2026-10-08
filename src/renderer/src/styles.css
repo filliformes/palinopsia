@@ -588,6 +588,27 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
 /* When a cell's sequencer is on the active step, its step-value input or the
    cell tile itself pulses with accent color. */
 
+/* The Sonify key sequencer's visual : the key playing pops in, a ring ripples out. */
+@keyframes ks-pop {
+  0% { transform: scale(0.55); opacity: 0.5; }
+  60% { transform: scale(1.22); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.ks-pop {
+  animation: ks-pop 520ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes ks-ring {
+  0% { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+.ks-ring {
+  animation: ks-ring 900ms ease-out forwards;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
 @keyframes seq-pulse {
   0% {
     box-shadow: 0 0 0 2px rgb(var(--c-accent) / 0.8) inset;

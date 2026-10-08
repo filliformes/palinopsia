@@ -1024,7 +1024,11 @@ and a **↺** resets it; the section grows to fit its steps (no scrollbar). Its
 play/stop is MIDI-learnable (the Sonify-sequence transport).
 
 **Key sequencer** : under it, a second sequencer composes the **root, scale and
-octave** of the whole instrument over time, so a piece can modulate on its own. On
+octave** of the whole instrument over time, so a piece can modulate on its own. Each
+mode is drawn as it thinks, under its mode strip (a key's color is its place on the
+circle of fifths) : the list's tiles, the circle of fifths with the walk's lean and leap,
+the affinity constellation (closer = more shared notes, bigger = likelier), the pivot's
+note clock and degrees, the picture's hue wheel and moods. On
 each tick of its clock (**rate** : 1 beat … 16 bars of the composition tempo, or free
 time), a **chance** decides whether the key changes, and an optional **Euclid** rhythm
 (pulses / steps / rotation) decides which ticks may change it. Five **modes** :

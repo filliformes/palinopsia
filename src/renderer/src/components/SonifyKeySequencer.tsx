@@ -12,6 +12,7 @@ import { NOTE_NAMES, KEY_MODES, euclidHit } from '../audio/soniKeyModel'
 import { SONI_RATES, RATE_LABEL, soniBeats } from '../audio/soniClock'
 import { keySeqNext, keySeqPhase } from '../audio/soniKeySeq'
 import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, chip, chipBig } from './sonifyUi'
+import { KeySeqVisual } from './KeySeqVisual'
 
 const SCALE_ABBR: Record<string, string> = {
   chromatic: 'chr', major: 'maj', minor: 'min', pentatonic: 'pent', wholetone: 'whole', dorian: 'dor', phrygian: 'phr', lydian: 'lyd'
@@ -128,6 +129,8 @@ export function SonifyKeySequencer(): JSX.Element {
         ))}
       </div>
 
+      {/* each mode drawn as it thinks */}
+      <KeySeqVisual />
       <Divider />
       {/* the clock */}
       <Row label="rate" hint={onCuts ? 'Picture on cuts : the scene cuts set the time, not a clock' : 'How often a change may fall : beats or bars of the composition tempo (in phase with the effects sequencer), or free time'}>

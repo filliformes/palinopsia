@@ -1455,8 +1455,9 @@ export default function App(): JSX.Element {
             assembleLive ||
             // the Resolume mapper reading picture features
             (st.resolume.enabled && st.resolume.inputs.some((i) => i.source.startsWith('vision:'))) ||
-            // the key sequencer reading the picture's color / cuts
-            (st.soniKeySeq.on && st.soniKeySeq.mode === 'picture') ||
+            // the key sequencer reading the picture's color / cuts (and its
+            // visual showing them while the Sonify page is open)
+            (st.soniKeySeq.mode === 'picture' && (st.soniKeySeq.on || st.sonifyPageOpen)) ||
             c.modulators.some((m) => m.enabled && (m.type === 'vision' || m.type === 'homeostat')))
         ) {
           lastVisionSample = now
