@@ -7,6 +7,18 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **An OSC monitor, and an OSC section in two halves** (audio/midi/osc tab) : **↙ IN**
+  (listen, port, where to send, the last message) and **↗ OUT** (destination, FEEDBACK,
+  MARK, a note that the body rules' OSC goes there and the Resolume mapper has its own),
+  each with a traffic light and msg/s, both also in the folded header. OUT no longer
+  hides until the input is on (it never depended on it). **monitor** shows every message
+  both ways (time, direction, address, values, destination), filters by direction and
+  address, pauses and clears; **latest** keeps one row per address. Every UDP send now goes
+  through one tap (`oscMonitor.ts` : sendOsc / sendOscBatch, used by the feedback mirror,
+  MARK, the body rules and the Resolume mapper) and the inbound stream is counted once;
+  messages are kept (500, ring) only while a monitor is open. Measured in a test copy :
+  in 21/s from a test sender, out 106/s of feedback, both listed, a value coming in and
+  FEEDBACK mirroring it back out side by side.
 - **The Resolume mapper (K) is a pin board** : a connection is a pin colored by its
   signal's family (modulators, Meta knobs, audio, vision, body, OSC), sized by its amount,
   with a halo that follows what it carries; each column group has its own hue (band, tint,

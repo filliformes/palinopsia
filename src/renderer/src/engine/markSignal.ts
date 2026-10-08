@@ -11,6 +11,7 @@
 //   /opsia/av/mark-flux      f    frame-to-frame change (onset-ish)
 
 import { useStore } from '../store'
+import { sendOsc } from '../oscMonitor'
 
 const N = 32 // scanline samples sent per frame
 let lastSend = 0
@@ -43,8 +44,8 @@ export function pushMarkSignal(comp: StripReader, nowMs: number): void {
 
   const host = st.oscOutHost, port = st.oscOutPort
   const arg = (v: number): { type: 'f'; value: number } => ({ type: 'f', value: v })
-  window.api.oscSend(host, port, '/opsia/av/mark-signal', Array.from(strip, arg))
-  window.api.oscSend(host, port, '/opsia/av/mark-level', [arg(level)])
-  window.api.oscSend(host, port, '/opsia/av/mark-centroid', [arg(centroid)])
-  window.api.oscSend(host, port, '/opsia/av/mark-flux', [arg(flux)])
+  sendOsc(host, port, '/opsia/av/mark-signal', Array.from(strip, arg))
+  sendOsc(host, port, '/opsia/av/mark-level', [arg(level)])
+  sendOsc(host, port, '/opsia/av/mark-centroid', [arg(centroid)])
+  sendOsc(host, port, '/opsia/av/mark-flux', [arg(flux)])
 }

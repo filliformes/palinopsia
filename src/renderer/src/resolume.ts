@@ -18,6 +18,7 @@ import { bodyBus } from './engine/bodyIn'
 import { BODY_FEATURES, type BodyFeature, type OscInEvent } from '@shared/types'
 import type { ResoKind, ResoOutput } from '@shared/resolume'
 import { oscLeafList, oscLeafValues } from './oscInput'
+import { sendOscBatch } from './oscMonitor'
 
 // ── Input sources ─────────────────────────────────────────────────────
 
@@ -173,7 +174,7 @@ function tick(): void {
     if (idx >= 0) msgs.push({ address: `/composition/columns/${idx + 1 + (r.columnOffset | 0)}/connect`, args: [{ type: 'i', value: 1 }] })
   }
 
-  if (msgs.length) window.api.oscSendBatch(r.host, r.port, msgs)
+  if (msgs.length) sendOscBatch(r.host, r.port, msgs)
   sentWindow += msgs.length
   if (now - sentWindowAt > 1000) {
     resoLive.sentPerSec = Math.round((sentWindow * 1000) / (now - sentWindowAt))
@@ -214,7 +215,7 @@ function emit(
 export function resoTest(o: ResoOutput): void {
   const { host, port } = useStore.getState().resolume
   const send = (v: number, type: 'f' | 'i'): void =>
-    window.api.oscSendBatch(host, port, [{ address: o.address, args: [{ type, value: v }] }])
+    sendOscBatch(host, port, [{ address: o.address, args: [{ type, value: v }] }])
   if (o.kind === 'trigger') return send(1, 'i')
   if (o.kind === 'toggle') {
     const s = outState.get(o.id)

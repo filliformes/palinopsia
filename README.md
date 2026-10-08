@@ -1680,6 +1680,16 @@ Enums accept a name (`s`), an int index (`i`), or a `0..1` float across members.
 Bools/toggles are true at `≥ 0.5`. Triggers fire on the **rising edge**. **BPM is
 the only raw value.** All indices in addresses are **1-based**.
 
+The **OSC** section of the audio/midi/osc tab is in two halves : **↙ IN** (listen on/off,
+the port, the address to send to, the last message) and **↗ OUT** (the destination,
+**FEEDBACK** and **MARK**; the body rules' OSC goes there too), each with a light that
+blinks with its traffic and its messages a second, also shown in the folded header.
+**monitor** opens the OSC monitor : every message coming in and going out, live (time,
+direction, address, values, and where an outgoing one went), filtered by direction and
+by address, with pause and clear; its **latest** view keeps one row per address (last
+value, how many, how long ago). It records only while open; the OSCQuery web stream is
+another protocol and is not shown.
+
 ### Inbound (control → instrument)
 
 **Layers** : `/opsia/layer{1..4}/…` (canonical; the segmented form

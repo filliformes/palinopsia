@@ -73,6 +73,7 @@ import { KEY_MODES } from './audio/soniKeyModel'
 import { keySeqNext } from './audio/soniKeySeq'
 import { SONIFY_MOD_DESCS } from './engine/modulation'
 import { useStore } from './store'
+import { sendOsc } from './oscMonitor'
 import type { RandomizeScope } from './randomize'
 import { setKnobTarget } from './metaSmooth'
 import { firePanic } from './commands'
@@ -1170,7 +1171,7 @@ function pushFeedback(): void {
     // get cached here and then skipped forever (prev matches value on every later
     // tick), so anything past the cap would never reach Pandore.
     if (prev === undefined && sent > 96) continue
-    window.api.oscSend(host, port, leaf.path, [leaf.int ? { type: 'i', value: Math.round(leaf.value) } : { type: 'f', value: leaf.value }])
+    void sendOsc(host, port, leaf.path, [leaf.int ? { type: 'i', value: Math.round(leaf.value) } : { type: 'f', value: leaf.value }])
     lastSent.set(leaf.path, leaf.value)
     sent++
   }

@@ -16,6 +16,7 @@ import { applyTonicity, applyDrift, applyFlowInterrupt, shutterHold, shutterClea
 import { applyFlicker } from './engine/flicker'
 import { applyFrameWeave, resetFrameWeave } from './engine/frameWeave'
 import { pushMarkSignal } from './engine/markSignal'
+import { installOscMonitor, sendOsc as sendOscMsg } from './oscMonitor'
 import { applyMetaGlides, applyModulation, modEngine } from './engine/modulation'
 import { visionBus } from './engine/visionIn'
 import { depthEngine } from './engine/depthEstimate'
@@ -329,9 +330,12 @@ export default function App(): JSX.Element {
     applyOscOutput()
     // Stream values to OSCQuery WS clients while any are attached.
     const unsubWs = initOscQueryStream()
+    // Count (and, while a monitor is open, keep) what comes in.
+    const unsubMon = installOscMonitor()
     return () => {
       unsub()
       unsubWs()
+      unsubMon()
     }
   }, [])
   // Resolume mapper : its send loop runs whether or not the page is open.
@@ -507,7 +511,7 @@ export default function App(): JSX.Element {
     const oscSafe = (s: string): string => (s || 'rule').replace(/[^A-Za-z0-9_]/g, '_')
     const sendOsc = (addr: string): void => {
       const s = useStore.getState()
-      try { window.api.oscSend(s.oscOutHost, s.oscOutPort, addr, [{ type: 'i', value: 1 }]) } catch { /* socket busy */ }
+      try { void sendOscMsg(s.oscOutHost, s.oscOutPort, addr, [{ type: 'i', value: 1 }]) } catch { /* socket busy */ }
     }
     type Rule = ReturnType<typeof useStore.getState>['bodyControl']['rules'][number]
     const fireRule = (r: Rule, oscOut: boolean): void => {
