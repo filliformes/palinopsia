@@ -59,7 +59,9 @@ import { SequencePage } from './components/SequencePage'
 import { BodyPage } from './components/BodyPage'
 import { ResolumePage } from './components/ResolumePage'
 import { ResolumeSection } from './components/ResolumeSection'
+import { DataflouSection } from './components/DataflouSection'
 import { applyResolume } from './resolume'
+import { initDataflou, applyDataflou, dataflouWantsVision } from './dataflou'
 import { domePreview, DOME_PREVIEW } from './engine/domePreview'
 import { ndiRate, NDI_MAX_EDGE } from '@shared/ndi'
 import { bodyTracker } from './engine/bodyTracker'
@@ -344,6 +346,15 @@ export default function App(): JSX.Element {
   useEffect(() => {
     applyResolume()
   }, [resoEnabled, resoRate])
+  // The dataflou mesh : values in and out while the node runs (in main), and the
+  // node itself started / renamed / stopped as the section's settings change.
+  useEffect(() => initDataflou(), [])
+  const dfEnabled = useStore((s) => s.dataflou.enabled)
+  const dfLabel = useStore((s) => s.dataflou.label)
+  const dfUniverse = useStore((s) => s.dataflou.universe)
+  useEffect(() => {
+    void applyDataflou()
+  }, [dfEnabled, dfLabel, dfUniverse])
 
   // ── MIDI output : start/stop the clock as the output device or clock toggle
   //    changes (BPM is read live by the scheduler). Halt on teardown. ───────
@@ -1453,6 +1464,8 @@ export default function App(): JSX.Element {
             assembleLive ||
             // the Resolume mapper reading picture features
             (st.resolume.enabled && st.resolume.inputs.some((i) => i.source.startsWith('vision:'))) ||
+            // a dataflou node listening to the picture
+            dataflouWantsVision() ||
             // the key sequencer reading the picture's color / cuts (and its
             // visual showing them while the Sonify page is open)
             (st.soniKeySeq.mode === 'picture' && (st.soniKeySeq.on || st.sonifyPageOpen)) ||
@@ -1969,6 +1982,7 @@ export default function App(): JSX.Element {
               <MidiPanel />
               <OscPanel />
               <ResolumeSection />
+              <DataflouSection />
             </>
           ) : rightView === 'perf' ? (
             // The live load meter, on its own tab : it only meters while shown.

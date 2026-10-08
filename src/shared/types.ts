@@ -1171,6 +1171,15 @@ export interface ExposedApi {
   oscQueryValues: (updates: Array<{ path: string; value: number | number[] }>) => void
   onOscQueryWsActive: (cb: (active: boolean) => void) => () => void
 
+  // ── dataflou mesh (the dataflou section) ─────────────────────────
+  dataflouConfigure: (cfg: import('./dataflou').DfConfig) => Promise<import('./dataflou').DfStatus>
+  dataflouStatus: () => Promise<import('./dataflou').DfStatus>
+  dataflouValues: (values: Record<string, import('./dataflou').DfValue>) => void
+  dataflouBind: (b: { destSku: string; destPath: string; srcSku: string; srcPath: string; on: boolean }) => Promise<boolean>
+  dataflouForget: (sku: string) => Promise<boolean>
+  onDataflouStatus: (cb: (s: import('./dataflou').DfStatus) => void) => () => void
+  onDataflouIn: (cb: (batch: Array<{ path: string; value: import('./dataflou').DfValue }>) => void) => () => void
+
   // App lifecycle : save-before-quit handshake
   appCloseProceed: () => Promise<void>
   /** The renderer is asking the user (Save changes?) : hold the forced close. */

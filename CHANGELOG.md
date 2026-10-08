@@ -7,6 +7,28 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Palinopsia is a dataflou node.** A new **dataflou** section in the audio/midi/osc tab
+  (ON THE MESH pill, name, universe) joins the decentralized parameter mesh its sibling
+  instruments speak, and monitors it : every node on the network (online, remembered,
+  forget), its parameters with pickers to wire them to Palinopsia or from it, and every
+  connection on the mesh with ✕ to unwire. Palinopsia declares 81 entries (6.9 KB, under
+  the 8 KB a microcontroller node can receive) : 38 destinations that play like their
+  `/opsia` OSC address (Meta knobs, layer opacity / speed / mix, the feel macros, scene
+  recall / next / randomize, BPM) and 31 sources sampled at 30 Hz only while someone
+  listens (audio, picture, body, the 8 modulators; Meta knobs are both). The node is a
+  TypeScript port of dataflou's reference core in main (`src/main/dataflou/` : a CBOR
+  codec with QCBOR's strict typing and preferred float widths, the proto 2 messages, the
+  stream_codec UDP plane, gossip / digest / keepalive / range mapping), with its own
+  mDNS responder on multicast-dns : bonjour-service's announcements put the service-type
+  PTR before our A record, and the reference parser then took 127.0.0.1 every other
+  packet (5 reconnects in 45 s, 0 after). Tested against the reference `dataflou-node`
+  (built for Windows) : discovery both ways, DECLARE decoded on both sides, values
+  streamed both ways (947 values in 45 s), SETVAL, SUBREQ, SUBANNOUNCE, STREAMSTOP,
+  gossip relay to a third node, reconnection after a restart with the wires restored.
+  Identity : one SKU per install (`userData/dataflou/identity.json`), wires per universe
+  beside it. `multicast-dns` is now a direct dependency (it already shipped with
+  bonjour-service).
+
 - **The key sequencer draws each mode** (a stage under the mode strip, after dataFLOU's
   per-mode sequencer previews), in one color language : a key's hue is its place on the
   circle of fifths, the key playing glows, pops and ripples when it changes. **List** :

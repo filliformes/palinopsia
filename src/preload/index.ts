@@ -46,6 +46,23 @@ const api: ExposedApi = {
   },
   oscQueryPublish: (nodes) => ipcRenderer.invoke('oscquery:publish', nodes),
   oscQueryValues: (updates) => ipcRenderer.send('oscquery:values', updates),
+
+  // ── dataflou mesh ────────────────────────────────────────────────
+  dataflouConfigure: (cfg) => ipcRenderer.invoke('dataflou:configure', cfg),
+  dataflouStatus: () => ipcRenderer.invoke('dataflou:status'),
+  dataflouValues: (values) => ipcRenderer.send('dataflou:values', values),
+  dataflouBind: (b) => ipcRenderer.invoke('dataflou:bind', b),
+  dataflouForget: (sku) => ipcRenderer.invoke('dataflou:forget', sku),
+  onDataflouStatus: (cb) => {
+    const h = (_e: Electron.IpcRendererEvent, s: Parameters<typeof cb>[0]): void => cb(s)
+    ipcRenderer.on('dataflou:status', h)
+    return () => ipcRenderer.off('dataflou:status', h)
+  },
+  onDataflouIn: (cb) => {
+    const h = (_e: Electron.IpcRendererEvent, b: Parameters<typeof cb>[0]): void => cb(b)
+    ipcRenderer.on('dataflou:in', h)
+    return () => ipcRenderer.off('dataflou:in', h)
+  },
   onOscQueryWsActive: (cb) => {
     const h = (_e: Electron.IpcRendererEvent, active: boolean): void => cb(active)
     ipcRenderer.on('oscquery:ws-active', h)

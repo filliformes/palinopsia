@@ -33,6 +33,7 @@ import type {
 import type { MetaKnobState, MidiBinding, LightConfig, BodyControlConfig } from '@shared/types'
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
 import type { ResolumeMap, ResoOutput, ResoInput, ResoCell, ResoSession } from '@shared/resolume'
+import { DF_DEFAULT_CONFIG, type DfConfig } from '@shared/dataflou'
 import { defaultResolumeMap, resoCatalogue, RESO_SNAPSHOTS } from '@shared/resolume'
 import type { DomeConfig } from '@shared/dome'
 import type { NdiConfig, NdiStatus } from '@shared/ndi'
@@ -218,6 +219,24 @@ function sanitizeResolume(raw: unknown): ResolumeMap {
     snapshots: Array.from({ length: RESO_SNAPSHOTS }, (_, i) => snaps[i] ?? null),
     session: r.session ?? null
   }
+}
+// The dataflou mesh section : on/off, this node's name and universe (per
+// machine, like OSC). The node itself runs in main (src/main/dataflou).
+function loadDataflou(): DfConfig {
+  try {
+    const raw = localStorage.getItem('opsia.dataflou')
+    if (raw) {
+      const j = JSON.parse(raw) as Partial<DfConfig>
+      return {
+        enabled: !!j.enabled,
+        label: typeof j.label === 'string' && j.label.trim() ? j.label.slice(0, 32) : DF_DEFAULT_CONFIG.label,
+        universe: typeof j.universe === 'string' && j.universe.trim() ? j.universe.slice(0, 32) : DF_DEFAULT_CONFIG.universe
+      }
+    }
+  } catch {
+    /* fall through to the defaults */
+  }
+  return { ...DF_DEFAULT_CONFIG }
 }
 function loadResolume(): ResolumeMap {
   try {
@@ -1379,6 +1398,9 @@ interface StoreState {
   // survives a restart before the session is saved. Every edit is refused while
   // `locked` (recalling a snapshot is a performance move and still works).
   resolume: ResolumeMap
+  // The dataflou mesh : Palinopsia as a node (on/off, name, universe).
+  dataflou: DfConfig
+  setDataflou: (patch: Partial<DfConfig>) => void
   // Fulldome output (Output page) : the domemaster mapping + the simulator view.
   // Kept in localStorage (the venue) AND saved with the session (the piece).
   dome: DomeConfig
@@ -3320,6 +3342,17 @@ export const useStore = create<StoreState>((set, get) => ({
   bodyPageOpen: false,
   setBodyPageOpen: (on) => set({ bodyPageOpen: on }),
   resolume: loadResolume(),
+  dataflou: loadDataflou(),
+  setDataflou: (patch) =>
+    set((s) => {
+      const dataflou = { ...s.dataflou, ...patch }
+      try {
+        localStorage.setItem('opsia.dataflou', JSON.stringify(dataflou))
+      } catch {
+        /* a full quota must never break an edit */
+      }
+      return { dataflou }
+    }),
   dome: loadDome(),
   setDome: (patch) => set((s) => ({ dome: persistDome(sanitizeDome({ ...s.dome, ...patch })) })),
   setDomeSim: (patch) => set((s) => ({ dome: persistDome(sanitizeDome({ ...s.dome, sim: { ...s.dome.sim, ...patch } })) })),

@@ -75,7 +75,7 @@ export const RESO_DEFAULT_SOURCES = [
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 
-function readSource(source: string, leaves: Map<string, number> | null): number {
+export function readSource(source: string, leaves: Map<string, number> | null): number {
   const i = source.indexOf(':')
   const kind = source.slice(0, i)
   const rest = source.slice(i + 1)

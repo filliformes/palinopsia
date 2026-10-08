@@ -1840,6 +1840,46 @@ config persists to `localStorage`.
 
 ---
 
+## dataflou mesh
+
+Palinopsia can be a **node of a dataflou mesh**, the decentralized parameter network
+its sibling instruments speak : nodes on the same local network find each other (mDNS),
+exchange what parameters they have, and wire any node's sources to any node's
+destinations, with no central controller. The **dataflou** section of the audio/midi/osc
+tab has the whole setup :
+
+- **ON THE MESH / OFF** joins or leaves (off by default, remembered on this machine).
+- **name** : how the other nodes see this Palinopsia. **universe** : only nodes of the
+  same universe see each other (`default` unless you split a room into several).
+- **network** : every other node, online or remembered (dataflou never forgets a node
+  that went offline; **forget** removes it from the whole mesh), with what it publishes
+  (↗) and takes (↙). Open one to see its parameters, each with a picker : **→ Palinopsia…**
+  wires that source to one of Palinopsia's destinations, **← Palinopsia…** feeds that
+  destination from one of Palinopsia's sources.
+- **connections** : every wire on the mesh that Palinopsia knows of (its own, and the ones
+  the other nodes announce), with ✕ to unwire. The header shows the values received and
+  sent per second.
+
+What Palinopsia declares (81 entries, about 7 KB, small enough for microcontroller
+nodes) :
+
+| | Paths | Notes |
+|---|---|---|
+| ↙ destinations | `meta/1..16` (also sources), `layer/1..4/opacity · speed · mix`, `feel/density · proximity · gesture · coalesce · flow · drift`, `scene/recall` (0 to 9), `scene/next`, `scene/randomize` (bools), `bpm` (20 to 300) | each plays exactly like its `/opsia` OSC address, once per change |
+| ↗ sources | `audio/level · flux · transient · centroid · pitch · noisiness`, `vision/brightness · contrast · motion · edges · warmth · saturation · hue · centroidX · centroidY`, `body/bodyPresent · bodyMotion · handLeftHeight · handRightHeight · handLeftX · handRightX · handsApart · moveEnergy`, `mod/1..8` | 0 to 1, sent 30 times a second, only while a node listens |
+
+dataflou maps every value from its source's range onto its destination's, so a 0..1
+here meets a synth's 20..20000 Hz there. A wire Palinopsia makes on its own destinations
+is kept (per universe) and comes back by itself when the other node reappears.
+
+The node is written in TypeScript in the main process (`src/main/dataflou/`) after
+dataflou's reference core, message for message : mDNS `_dataflou._tcp` with the `sku` /
+`univ` TXT keys, the CBOR topology protocol over TCP (HELLO, DECLARE, DIGEST, SUBREQ,
+STREAMREQ…) and the UDP data plane on the TCP port + 1. It was tested against the
+reference C++ node in both directions.
+
+---
+
 ## Stack
 
 | Layer | Choice |

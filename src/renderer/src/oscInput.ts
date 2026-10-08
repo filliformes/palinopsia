@@ -811,6 +811,15 @@ function route(address: string, args: Args): void {
   }
 }
 
+/** Play one /opsia address as if it came in over OSC (the dataflou bridge). */
+export function routeOsc(address: string, args: Args): void {
+  try {
+    route(address, args)
+  } catch {
+    // an unmapped or malformed message must never break the caller
+  }
+}
+
 /** Subscribe to inbound OSC and apply it. Returns an unsubscribe fn. */
 export function initOscInput(): () => void {
   return window.api.onOscReceived((batch) => {
