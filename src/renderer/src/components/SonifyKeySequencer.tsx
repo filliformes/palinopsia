@@ -11,7 +11,7 @@ import { SONI_SCALES } from '../audio/sonify'
 import { NOTE_NAMES, KEY_MODES, euclidHit } from '../audio/soniKeyModel'
 import { SONI_RATES, RATE_LABEL, soniBeats } from '../audio/soniClock'
 import { keySeqNext, keySeqPhase } from '../audio/soniKeySeq'
-import { Shell, Row, RangeRow, Stepper, IconBtn, chip } from './sonifyUi'
+import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, chip, chipBig } from './sonifyUi'
 
 const SCALE_ABBR: Record<string, string> = {
   chromatic: 'chr', major: 'maj', minor: 'min', pentatonic: 'pent', wholetone: 'whole', dorian: 'dor', phrygian: 'phr', lydian: 'lyd'
@@ -98,6 +98,7 @@ export function SonifyKeySequencer(): JSX.Element {
       toggleTitle="Play / stop the key sequencer : it changes the root, scale and octave of every Sonify voice over time"
       midiId="fire:keyseq"
       open
+      roomy
       right={(
         <>
           <IconBtn
@@ -115,11 +116,11 @@ export function SonifyKeySequencer(): JSX.Element {
         </span>
       </Row>
       {/* the five modes, the card's full width (a tab strip) */}
-      <div className="grid grid-cols-5 gap-0.5" title="How the next key is chosen">
+      <div className="grid grid-cols-5 gap-1" title="How the next key is chosen">
         {KEY_MODES.map((m) => (
           <button
             key={m} onClick={() => p({ mode: m })} title={MODE_INFO[m].hint}
-            className={`${chip(ks.mode === m).replace('text-[9px]', 'text-[8px]')} flex min-w-0 flex-col items-center gap-0.5 px-0`}
+            className={`${chipBig(ks.mode === m).replace('text-[9px]', 'text-[8px]')} flex min-w-0 flex-col items-center gap-1 px-0 py-1.5`}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round">{MODE_INFO[m].icon}</svg>
             <span className="max-w-full truncate">{MODE_INFO[m].name}</span>
@@ -127,6 +128,7 @@ export function SonifyKeySequencer(): JSX.Element {
         ))}
       </div>
 
+      <Divider />
       {/* the clock */}
       <Row label="rate" hint={onCuts ? 'Picture on cuts : the scene cuts set the time, not a clock' : 'How often a change may fall : beats or bars of the composition tempo (in phase with the effects sequencer), or free time'}>
         <select
@@ -181,22 +183,25 @@ export function SonifyKeySequencer(): JSX.Element {
       {/* the pool : the keys the generative modes may choose */}
       {generative && (
         <>
+          <Divider />
           <Row label="roots" hint="The roots the sequencer may choose (List plays its own keys)">
-            <div className="grid min-w-0 flex-1 grid-cols-6 gap-[2px]">
+            <div className="grid min-w-0 flex-1 grid-cols-6 gap-1">
               {NOTE_NAMES.map((n, i) => (
-                <button key={n} onClick={() => toggleRoot(i)} className={`${chip(ks.poolRoots[i])} px-0`}>{n}</button>
+                <button key={n} onClick={() => toggleRoot(i)} className={`${chipBig(ks.poolRoots[i])} px-0`}>{n}</button>
               ))}
             </div>
           </Row>
           <Row label="scales" hint="The scales the sequencer may choose">
-            <div className="grid min-w-0 flex-1 grid-cols-4 gap-[2px]">
+            <div className="grid min-w-0 flex-1 grid-cols-4 gap-1">
               {SONI_SCALES.map((sc) => (
-                <button key={sc} onClick={() => toggleScale(sc)} title={sc} className={`${chip(ks.poolScales.includes(sc))} px-0`}>{SCALE_ABBR[sc]}</button>
+                <button key={sc} onClick={() => toggleScale(sc)} title={sc} className={`${chipBig(ks.poolScales.includes(sc))} px-0`}>{SCALE_ABBR[sc]}</button>
               ))}
             </div>
           </Row>
         </>
       )}
+
+      <Divider />
 
       {/* the mode's own rows */}
       {ks.mode === 'list' && (
@@ -215,7 +220,7 @@ export function SonifyKeySequencer(): JSX.Element {
             <RangeRow label="bias" value={ks.bias} min={-100} max={100} step={1} neutral={0} onChange={(v) => p({ bias: v })} shown={ks.bias > 0 ? `+${ks.bias}` : `${ks.bias}`} title="The walk's lean : − toward earlier keys, + toward later ones, 0 = an even wander" />
           )}
           {ks.steps.slice(0, ks.len).map((st, i) => (
-            <div key={i} className={`flex min-w-0 items-center gap-1 rounded px-0.5 ${ks.on && curStep === i ? 'bg-accent/20 ring-1 ring-accent' : ''}`}>
+            <div key={i} className={`flex min-w-0 items-center gap-1.5 rounded px-0.5 py-0.5 ${ks.on && curStep === i ? 'bg-accent/20 ring-1 ring-accent' : ''}`}>
               <span className="w-[52px] shrink-0 font-mono text-[9px] uppercase text-muted">key {i + 1}</span>
               <select className="input select-compact w-12 text-[10px]" value={st.root} onChange={(e) => setStep(i, { root: Number(e.target.value) })} title="The root">
                 {NOTE_NAMES.map((n, r) => <option key={n} value={r}>{n}</option>)}
@@ -289,6 +294,7 @@ export function SonifyKeySequencer(): JSX.Element {
         </>
       )}
 
+      <Divider />
       <Row label="home" hint="On stop, go back to the key it started from (or the last key you set by hand while it ran). Off : it stays where it is. A key set by hand while it runs becomes its home.">
         <button onClick={() => p({ returnHome: !ks.returnHome })} className={chip(ks.returnHome)}>
           {ks.returnHome ? '↩ back home on stop' : 'stays on stop'}

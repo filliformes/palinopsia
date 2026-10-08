@@ -15,7 +15,7 @@ import { deleteSoniPreset, listSoniPresets, loadSoniPreset, saveSoniPreset } fro
 import { modTargetKey, useStore } from '../store'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { SonifyKeySequencer } from './SonifyKeySequencer'
-import { Shell, Row, RangeRow, Stepper, IconBtn, chip, pill } from './sonifyUi'
+import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, chip, pill } from './sonifyUi'
 import { SONI_RATES, RATE_LABEL } from '../audio/soniClock'
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
@@ -329,6 +329,7 @@ function SonifySequencer({ presets }: { presets: string[] }): JSX.Element {
       toggleTitle="Play / stop the Sonify step sequence"
       midiId="fire:soniseq"
       open
+      roomy
       right={(
         <>
           <IconBtn onClick={randomize} title="Randomize the step pattern (1–3 voices per step; keeps presets)">🎲</IconBtn>
@@ -381,14 +382,15 @@ function SonifySequencer({ presets }: { presets: string[] }): JSX.Element {
       <Row label="steps" hint="How many steps the sequence plays">
         <Stepper value={sq.len} min={2} max={16} onChange={setLen} title="How many steps the sequence plays" />
       </Row>
-      <div className="mt-0.5 flex items-center gap-0.5">
+      <Divider />
+      <div className="flex items-center gap-[3px] px-0.5">
         <span className="w-4 shrink-0" />
         {VOICE_NAMES.map((n, i) => (
           <span key={i} className="w-3.5 shrink-0 text-center font-mono text-[7px] text-muted/70" title={n}>{VOICE_ABBR[i]}</span>
         ))}
-        <span className="ml-1 flex-1 truncate font-mono text-[8px] uppercase text-muted/70">preset</span>
+        <span className="ml-1.5 flex-1 truncate font-mono text-[8px] uppercase text-muted/70">preset</span>
       </div>
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-col gap-1.5">
         {Array.from({ length: sq.len }).map((_, s) => {
           const step = sq.steps[s]
           const isCur = sq.on && sq.cur === s
@@ -396,7 +398,7 @@ function SonifySequencer({ presets }: { presets: string[] }): JSX.Element {
           // local, steps travel with sessions) : the step plays its voices.
           const hasPreset = !!step.preset && presets.includes(step.preset)
           return (
-            <div key={s} className={`flex items-center gap-0.5 rounded px-0.5 ${isCur ? 'bg-accent/20 ring-1 ring-accent' : ''}`}>
+            <div key={s} className={`flex items-center gap-[3px] rounded px-0.5 py-0.5 ${isCur ? 'bg-accent/20 ring-1 ring-accent' : ''}`}>
               <span className="w-4 shrink-0 text-center font-mono text-[9px] text-muted">{s + 1}</span>
               {VOICE_NAMES.map((vn, vi) => (
                 <button
@@ -406,11 +408,11 @@ function SonifySequencer({ presets }: { presets: string[] }): JSX.Element {
                 />
               ))}
               <select
-                className="input select-compact ml-1 min-w-0 flex-1 text-[10px]" value={hasPreset ? step.preset : ''}
+                className="input select-compact ml-1.5 min-w-0 flex-1 text-[10px]" value={hasPreset ? step.preset : ''}
                 onChange={(e) => setStepPreset(s, e.target.value)}
-                title="Load a full Sonify preset when this step plays (overrides the voice toggles)"
+                title="voices : the step plays the voices ticked on its left · a preset : the step loads that whole Sonify preset instead"
               >
-                <option value="">voices only</option>
+                <option value="">voices</option>
                 {presets.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
               <IconBtn onClick={() => clearStep(s)} title="Clear this step">×</IconBtn>
@@ -1012,7 +1014,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           )}
           {/* The sequencers have their own view (they used to sit under the mixer). */}
           {view === 'seq' && (
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2.5">
               <SonifySequencer presets={presetList} />
               <SonifyKeySequencer />
             </div>

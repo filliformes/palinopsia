@@ -19,6 +19,14 @@ export const chip = (on: boolean): string =>
     on ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'
   }`
 
+/** The same chip, a bigger target (grids of roots, scales, modes). */
+export const chipBig = (on: boolean): string => chip(on).replace('py-0.5', 'py-1')
+
+/** A thin line between a card's groups of rows. */
+export function Divider(): JSX.Element {
+  return <div className="my-0.5 h-px bg-border/60" />
+}
+
 /** A card's label column, then its controls. */
 export function Row({ label, children, hint }: { label: string; children: ReactNode; hint?: string }): JSX.Element {
   return (
@@ -33,7 +41,7 @@ export function Row({ label, children, hint }: { label: string; children: ReactN
  *  card's own buttons on the right. `open` shows the body (a voice hides it
  *  while off; a sequencer keeps it open to be edited while stopped). */
 export function Shell({
-  title, hint, on, onToggle, toggleText = ['● on', '○ off'], toggleTitle, midiId, lead, right, open, children
+  title, hint, on, onToggle, toggleText = ['● on', '○ off'], toggleTitle, midiId, lead, right, open, roomy, children
 }: {
   title: string
   hint?: string
@@ -45,11 +53,13 @@ export function Shell({
   lead?: ReactNode
   right?: ReactNode
   open?: boolean
+  // A card with many rows (the sequencers) : more padding and air between rows.
+  roomy?: boolean
   children?: ReactNode
 }): JSX.Element {
   return (
-    <section className={`rounded border px-2 py-1.5 transition-colors ${on ? 'border-accent/40 bg-panel2' : 'border-border bg-panel2/40'}`}>
-      <div className="mb-1 flex min-w-0 items-center gap-2">
+    <section className={`rounded border transition-colors ${roomy ? 'px-3 py-2.5' : 'px-2 py-1.5'} ${on ? 'border-accent/40 bg-panel2' : 'border-border bg-panel2/40'}`}>
+      <div className={`flex min-w-0 items-center gap-2 ${roomy ? 'mb-2.5' : 'mb-1'}`}>
         {onToggle && (
           <span className="relative flex shrink-0">
             {midiId && <MidiLearnOverlay id={midiId} />}
@@ -64,7 +74,7 @@ export function Shell({
         <span className="min-w-0 flex-1" />
         {right}
       </div>
-      {(open ?? on) && children && <div className="flex flex-col gap-1">{children}</div>}
+      {(open ?? on) && children && <div className={`flex flex-col ${roomy ? 'gap-2' : 'gap-1'}`}>{children}</div>}
     </section>
   )
 }

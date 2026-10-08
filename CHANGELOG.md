@@ -26,6 +26,8 @@ that CI builds into cross-platform releases.
   views. The mixer is a voice card per channel (pill, name, volume, filter) and an FX tail
   card; the effects and key sequencers are voice cards with a play pill, their rows in
   the voices' label column, and the key sequencer shows the key now on its own row.
+  The two sequencer cards are roomier (more padding and space between rows, thin dividers
+  between their groups, bigger mode / root / scale targets).
 - **A Resolume section in the audio/midi/osc tab** : SENDING / OFF (a click toggles it),
   where it sends, the pin count and messages a second, and **mapper ▸** to open the page
   (it replaces the small Resolume button in the OSC header).
