@@ -231,7 +231,9 @@
       <li><b>Hear the Collage.</b> A new Sonify voice plays the wall's films at once, each piece placed in the stereo field and tuned to your key, through a Ring bank inspired by the S-4. And a real level meter, in decibels.</li>
       <li><b>Generate builds scenes that move</b>: 100 recipes using the whole instrument, with Dome, Film Wall and Node Workshop families and 25 new master chains.</li>
       <li><b>Installations look after themselves</b>: start with the computer, heal a crashed or frozen picture, reopen a closed output, reconnect the camera and the sound card, keep a log.</li>
-      <li><b>An OSC monitor</b> shows every message in and out, live, and effects travel between racks with a drag.</li>
+      <li><b>The Background reads like the stack.</b> It comes first in the Layers column (Background, then Layers 1 to 4, bottom to top), folds like a layer, and its <b>group</b> mode lets it show through the layers' dark parts; Generate and New let the ground show.</li>
+      <li><b>A Picture readout</b> under Performance : every feature the picture reports (light, color, texture, motion, depth), live, in plain words.</li>
+      <li><b>An OSC monitor</b> shows every message in and out, live, and effects travel between racks with a drag. Sonify's output device sits in the audio tab too.</li>
     </ul>
     <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.0.md">release notes</a>.</p>
   </section>
@@ -301,7 +303,7 @@
     <p class="section-lede">A few ideas that make everything else click into place.</p>
     <div class="model">
       <ul>
-        <li>The picture is a <b>stack</b>, built bottom to top: a Background, then Layer 1 to Layer 4.</li>
+        <li>The picture is a <b>stack</b>, built bottom to top: a Background, then Layer 1 to Layer 4. The Layers column reads in that order, top down. The layers either blend onto the Background (Layer 1 in its own blend mode) or sit over it as a <b>group</b>, letting it through their dark parts.</li>
         <li>Each layer holds <b>two sources</b> (A and B), a mix between them, its own effect racks, a <b>blend</b> mode onto the layers below, a spatial <b>mask</b>, and its own opacity and speed. A source is a generator, an imported video, a live capture, or a network stream.</li>
         <li>Three stages <b>master the whole picture</b>, always last and always on: <b>Vibe Palette</b> (colour), <b>Context</b> (depth and atmosphere), and the <b>Finalizer</b> (final grade, grain, and output shape).</li>
         <li>Anything you can reach, you can <b>automate</b>. The modulation brain and the meta knobs write on top of your values every frame, and the same targets answer to MIDI and OSC. You dial in a value by hand, then let a shape move it.</li>

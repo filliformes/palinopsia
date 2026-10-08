@@ -548,6 +548,14 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **The docs catch up.** The OSC reference (docs/opsia-osc-reference.html) gains the
+  video transport (`layer{n}/video/…`), the Background's new rows (speed 0..4×, shadow,
+  group, randomize, grounds only), `flow` and the temperament dials, the key
+  sequencer, the MARK stream and the OSC monitor; the README's outbound section names
+  MARK and the picture readout; the `?` cheat-sheet calls the `A` tab what it holds
+  (Audio · MIDI · OSC · Resolume · dataflou); the landing page lists the Background,
+  the Picture readout and the audio output.
+
 - **The Background, audited.** Its strip is first in the Layers column (Background, then
   Layers 1 to 4 : the stack read bottom to top) and collapsible like a layer's, with
   opacity, M and dice in the header and a summary when folded. Fixes :

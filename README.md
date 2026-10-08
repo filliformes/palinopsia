@@ -1850,7 +1850,11 @@ The composited **picture** is also streamed back as vision features (the inward 
 the loop, so the image can play a sound brain): `/opsia/vision/{brightness | contrast |
 motion | edges | entropy | centroidX | centroidY | warmth | saturation | hue | depth |
 depthSpread | flowX | flowY | divergence | curl | coherence}`, each `f` `0..1`, on the
-same outbound target.
+same outbound target (see them all live in the Performance tab's **picture** section).
+
+**MARK** (the ↗ out half's second switch) draws the picture as sound : a scanline of the
+output read like an optical soundtrack, `/opsia/av/mark-signal` (32 floats) plus
+`/opsia/av/mark-level`, `mark-centroid` and `mark-flux`, to the same target.
 
 Separately, the [Body page](#body--embodied-control-key-b) emits its own bangs: with
 its **OSC out** on, each time a gesture rule fires it sends a `/body/<name>` message

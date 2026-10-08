@@ -22,7 +22,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['F', 'Finishing'],
       ['G', 'Feel (global macros)'],
       ['E', 'Assemble tab'],
-      ['A', 'I/O setup tab'],
+      ['A', 'Audio · MIDI · OSC · Resolume · dataflou tab'],
       ['D', 'Fold Modulation'],
       ['X', 'Fold Master FX'],
       ['I', 'Fold Inspector']
