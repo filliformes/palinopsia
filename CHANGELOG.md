@@ -3,10 +3,21 @@
 All notable changes to Palinopsia. Dates are ISO. Versions follow the `v*` tags
 that CI builds into cross-platform releases.
 
-## v1.2.0 — 2026-10-07
+## v1.2.0 — 2026-10-08
 
 ### Added
 
+- **The Resolume mapper (K) is a pin board** : a connection is a pin colored by its
+  signal's family (modulators, Meta knobs, audio, vision, body, OSC), sized by its amount,
+  with a halo that follows what it carries; each column group has its own hue (band, tint,
+  separators); rows show their pin count and a live bar in their color; a status line under
+  the board describes what is under the cursor and what a click does; the page is set in
+  Rubik with Unbounded titles (bundled), and an empty page offers Open .avc and Learn.
+  Light themes get deeper shades. The canvas draws at dpr × the UI zoom, so it stays sharp
+  zoomed.
+- **A Resolume section in the audio/midi/osc tab** : SENDING / OFF (a click toggles it),
+  where it sends, the pin count and messages a second, and **mapper ▸** to open the page
+  (it replaces the small Resolume button in the OSC header).
 - **Spastic HOLD** (LFO) : how long each throw stays up, separate from the rate. With
   HOLD on, the coin only decides whether it RISES on a tick; the rise holds for HOLD ms,
   then drops to the bottom (the next frame) and rests there until the next rise; a rise
@@ -95,7 +106,7 @@ that CI builds into cross-platform releases.
   A or B and on the background, with crossfades and torn paper (which reads the
   neighbouring film mirrored across the tear).
 
-- **A Ring bank on Sonify's Collage voice**, after the Torso S-4's Ring : one 48-band
+- **A Ring bank on Sonify's Collage voice**, inspired by the S-4 : one 48-band
   resonant filterbank per side over the whole voice, its bands snapped to the key and
   scale across the voice's octave range (one per semitone over the default four
   octaves). wet (mix or send; 0 = the voice as before), decay (12 ms to 10 s, every band
@@ -689,6 +700,11 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **A click in the Resolume mapper toggled a pin far to its left** at any UI zoom below
+  100 % (and to its right above) : the matrix compared viewport pixels with its own. Hit
+  tests now divide by the effective zoom. Measured in a test copy : four clicks at 80 %,
+  100 % and 125 % each toggled exactly the clicked pin. The msg/s readout no longer
+  shows 0 for its first second.
 - **The Body pip sits in the lower right** of the full-page views (Sonify, Output,
   World, Sequence, Resolume), where it no longer covers Sonify's tap menu. On the main
   view it steps aside : it covered the tap-tempo end of the toolbar, whose lit Body

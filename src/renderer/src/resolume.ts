@@ -119,6 +119,8 @@ export function applyResolume(): void {
   outState.clear()
   if (!r.enabled) { resoLive.sentPerSec = 0; return }
   lastTick = performance.now()
+  sentWindow = 0
+  sentWindowAt = lastTick
   timer = setInterval(tick, Math.max(10, 1000 / Math.max(1, Math.min(120, r.rateHz || 30))))
 }
 

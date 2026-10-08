@@ -57,6 +57,7 @@ import { WorldPage } from './components/WorldPage'
 import { SequencePage } from './components/SequencePage'
 import { BodyPage } from './components/BodyPage'
 import { ResolumePage } from './components/ResolumePage'
+import { ResolumeSection } from './components/ResolumeSection'
 import { applyResolume } from './resolume'
 import { domePreview, DOME_PREVIEW } from './engine/domePreview'
 import { ndiRate, NDI_MAX_EDGE } from '@shared/ndi'
@@ -1964,6 +1965,7 @@ export default function App(): JSX.Element {
               <AudioPanel />
               <MidiPanel />
               <OscPanel />
+              <ResolumeSection />
             </>
           ) : rightView === 'perf' ? (
             // The live load meter, on its own tab : it only meters while shown.
