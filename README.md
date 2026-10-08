@@ -318,8 +318,8 @@ Left → right:
 
 - **BPM** (20–800) : the label is a **tap-tempo button** (tap it in time) ·
   **SPD** global speed (1/64×–64×, log; double-click → 1×) · **MORPH** time (0–30 s,
-  default 1 s : scene recalls and Randomize crossfade over this; New and Generate morph
-  over it, layer by layer) · **PROX** proximity (far ↔ close depth zone) + `◑` audio-brightness follow.
+  default 1 s : scene recalls, Randomize, Variation, the sequencer, sessions, New and
+  Generate all morph over this, live) · **PROX** proximity (far ↔ close depth zone) + `◑` audio-brightness follow.
 - **World** (opens the World editor, also key `W`) + the World selector · **❄ Freeze** :
   hold the output on the current frame (the button lights while held; also key `H` or a
   learned pad). Messages (a refused effect drop, a saved recording) appear in the
@@ -1204,17 +1204,18 @@ as a change; only [Installation mode](#output--mapping-key-o) acts on it.
 The file pickers (Open, Link a folder of sessions, a Collage or Assemble folder) open
 where they were last used, remembered across launches.
 
-**Changing sessions is a clean cut.** Loading a session holds the picture still while
-the new session's shaders compile, then dissolves into it over half a second : the old
-session never keeps playing on the projector while the new one assembles layer by layer.
-
-**New and Generate morph** into the new composition over the **MORPH** time, live :
-the picture is handed over layer by layer (top first, staggered). A layer slot free in
-both compositions hosts the new layer while the old one fades, a true crossfade, then
-the engine moves it into its own slot without reloading anything; a layer that keeps
-its shaders eases its settings instead; Vibe, Context and Finalizer ease the whole way.
-A new layer fades in only once its shaders have compiled, so nothing pops. At MORPH 0,
-New and Generate cut, once the new composition has compiled.
+**Every change morphs over the MORPH time, live** : a scene recall, Randomize,
+Variation, the sequencer, loading a session, New and Generate. Nothing freezes and
+nothing snaps : with the same sources and switches on both sides, every number eases
+over the whole morph (modulation included : the old modulators keep running while
+their assignments fade out and the new ones fade in). When anything structural
+changes (a source, an effect, a blend mode, a switch like mirror), the picture is
+handed over layer by layer (top first, staggered) : a layer slot free in both
+compositions, right beside the layer, hosts the new layer while the old one fades, a
+true crossfade, then the engine moves it into its own slot without reloading
+anything; otherwise the old layer fades out and the new one in. A new layer fades in
+only once its shaders have compiled, so nothing pops. At MORPH 0 a change cuts (a
+session holds the picture still until the new one has compiled, then dissolves).
 
 **Scenes** are full-instrument snapshots recalled by bare **`1`–`9`** or a
 double-click in the bank; recall crossfades over the **MORPH** time. Scenes

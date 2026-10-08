@@ -70,7 +70,7 @@ import type { BodyGesture } from '@shared/types'
 import { SceneBank } from './components/SceneBank'
 import { SurfacePad, SurfaceOnToggle } from './components/SurfacePad'
 import { initOscInput, applyOscListen, applyOscOutput, initOscQueryStream } from './oscInput'
-import { morphedComposition, consumeCrossfade, consumeSceneChange, noteMorphSync, consumeLayerSwaps, relayEnvelopes } from './morph'
+import { morphedComposition, consumeSceneChange, noteMorphSync, consumeLayerSwaps, relayEnvelopes, morphDebug } from './morph'
 
 import { surfaceComposition, nearestSurfaceScene, tracePath, newPlayhead } from './surface'
 import { liveLight } from './lightPath'
@@ -1039,7 +1039,7 @@ export default function App(): JSX.Element {
       compositorRef.current = comp
       // Isolated test builds only (built with VITE_OPSIA_TEST=1) : hand the
       // store and the engine to a debugger. Compiled out of real builds.
-      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __rec: outputRecorder, __perf: perfMeter })
+      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug })
       // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
       // capture from the render loop (Compositor.captureKick) : a rebuilt engine
       // needs no re-attaching. A real-time recording finds it through this.
@@ -1137,13 +1137,11 @@ export default function App(): JSX.Element {
       try {
         const now = performance.now()
         const st = useStore.getState()
-        // A morph just began → dissolve the frozen old frame into the new scene.
-        const xfadeMs = consumeCrossfade()
-        // A session loaded / New : hold the old frame still until the new one has
-        // fully compiled, then dissolve (wins over a plain morph crossfade).
+        // A session loaded / New at Morph 0 : hold the old frame still until the
+        // new one has fully compiled, then dissolve. (A morph never freezes the
+        // picture : morph.ts eases or relays it live.)
         const sceneMs = consumeSceneChange()
         if (sceneMs !== null) comp!.beginSceneChange(sceneMs)
-        else if (xfadeMs) comp!.beginCrossfade(xfadeMs)
         // Metasurface : when active, the engine renders a live Gaussian blend of the
         // placed scenes at the cursor (structure snaps to the nearest, numeric params
         // ease across the scenes that share it). A new nearest = a structure jump, so

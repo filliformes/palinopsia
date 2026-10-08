@@ -493,6 +493,25 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Every change morphs, without the flick.** A scene recall, Randomize, Variation or the
+  sequencer used to hide every structural change (a source, an effect, a blend mode, a
+  switch) behind a 320 ms dissolve of a FROZEN frame, whatever the Morph time : the
+  "flick" at each scene change. `beginSceneMorph` (morph.ts) now picks : the same
+  structure on both sides (sources, racks, blends, mute/solo/feedback, mask kind,
+  coupling mode, and every bool/long input of the sources and effects) eases every number
+  over the whole morph (masks, coupling and harmony too); anything else goes through the
+  relay New and Generate use, so changed layers crossfade live. Sessions now relay over
+  the Morph time too (Morph 0 keeps the hold-then-dissolve). Modulation : ModEngine runs
+  16 slots, a morph forks the 8 modulators into ghost slots 8..15 (`forkGhosts`) so the
+  old assignments fade out on the old motion while the new ones fade in, and a morph that
+  starts mid-morph starts from what is showing. Relay fixes : a borrowed host must sit
+  right beside the layer (with a visible layer between, the new content composited over it
+  then dropped under it at the hand-over, one frame 3x brighter); a host slot no longer
+  overwrites the borrowed content with its own empty layer; and a slot the old content
+  just left stays dark 400 ms (its stale frames flashed at full opacity for four frames).
+  Measured frame by frame with the picture held still : no frozen frame, no flash at the
+  hand-overs; what remains is each source's own motion.
+
 - **Body tracking runs on its own thread.** MediaPipe Hands / Pose / Face (and the
   Silhouette mask) now run in a worker that loads MediaPipe's own bundle over
   `opsia-asset://` (`resources/mediapipe/vision_bundle.js`, the package's

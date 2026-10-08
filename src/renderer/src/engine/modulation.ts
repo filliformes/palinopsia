@@ -314,9 +314,15 @@ function cellNext(row: number[], rule: number): number[] {
   return out
 }
 
+// A morph runs the OLD modulators in ghost slots 8..15 (forkGhosts) while their
+// assignments fade out and the new ones fade in, so a modulated parameter never
+// jumps because the next scene changed or switched off its modulator.
+const SLOTS = 16
+
 export class ModEngine {
-  /** Latest post-curve values, 0..1 per slot : read by the panel's meters. */
-  readonly values: number[] = new Array(8).fill(0)
+  /** Latest post-curve values, 0..1 per slot : read by the panel's meters
+   *  (0..7; 8..15 are a morph's ghosts). */
+  readonly values: number[] = new Array(SLOTS).fill(0)
   private slots: SlotState[] = []
   private lastNow = 0
 
@@ -330,16 +336,26 @@ export class ModEngine {
     s.arpDir = 1
   }
 
+  /** A morph begins : each ghost slot takes over its modulator's exact state
+   *  (phase, held values), so the old motion carries on unbroken in the ghost. */
+  forkGhosts(): void {
+    const now = this.lastNow || performance.now()
+    while (this.slots.length < SLOTS) this.slots.push(makeSlot(now))
+    for (let i = 0; i < 8; i++) {
+      this.slots[i + 8] = structuredClone(this.slots[i])
+      this.values[i + 8] = this.values[i]
+    }
+  }
+
   /** Advance every enabled modulator to `now` and return post-curve values. */
   tick(now: number, cfgs: ModulatorConfig[], bpm: number): number[] {
-    if (this.slots.length === 0) {
-      for (let i = 0; i < 8; i++) this.slots.push(makeSlot(now))
-    }
+    while (this.slots.length < SLOTS) this.slots.push(makeSlot(now))
     const dtMs = this.lastNow > 0 ? Math.min(200, now - this.lastNow) : 16
     this.lastNow = now
     const dt = dtMs / 1000
 
-    for (let i = 0; i < 8; i++) {
+    const n = Math.min(SLOTS, Math.max(8, cfgs.length))
+    for (let i = 0; i < n; i++) {
       const cfg = cfgs[i]
       const s = this.slots[i]
       if (!cfg || !cfg.enabled) {

@@ -45,7 +45,7 @@ import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
 import { BLEND_MODES, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
-import { beginMorph, beginRelayMorph, cancelMorph, requestSceneChange } from './morph'
+import { beginSceneMorph, beginRelayMorph, cancelMorph, requestSceneChange } from './morph'
 import { DEFAULT_LIGHT_PATH } from './lightPath'
 import { autoSurfacePos } from './surface'
 import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify'
@@ -2789,7 +2789,7 @@ export const useStore = create<StoreState>((set, get) => ({
   randomize: (scope, intensity = 1) =>
     set((s) => {
       const composition = randomizeComposition(s.composition, scope, intensity)
-      beginMorph(s.composition, s.morphMs, performance.now()) // crossfade to the new draw
+      beginSceneMorph(s.composition, composition, s.morphMs, performance.now()) // morph to the new draw
       // A structural randomize is a fresh starting point : drop the Variation
       // baseline so the next Variation press anchors on this new scene.
       return { composition, variationBaseline: null }
@@ -2805,7 +2805,7 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const base = s.variationBaseline ?? s.composition
       const composition = varyComposition(base, amount)
-      beginMorph(s.composition, s.morphMs, performance.now())
+      beginSceneMorph(s.composition, composition, s.morphMs, performance.now())
       return { composition, variationBaseline: base }
     }),
 
@@ -4013,8 +4013,10 @@ export const useStore = create<StoreState>((set, get) => ({
       if (!scene) return s
       // Goes through the composition write path: undoable, hot-swap-safe
       // (the engine reconciles; feedback buffers survive the recall). The
-      // engine crossfades to it over morphMs (App loop reads morph.ts).
-      beginMorph(s.composition, s.morphMs, performance.now())
+      // engine morphs to it over morphMs, live (App loop reads morph.ts).
+      // Normalize defensively (idempotent) : a scene may predate a schema field.
+      const composition = normalizeComposition(scene.composition)
+      beginSceneMorph(s.composition, composition, s.morphMs, performance.now())
       resetCouplingState() // stale cut/drift state mustn't seed the recalled scene
       // Restore the scene's World for the selector label (composition already
       // carries its baked effect); add it to the bank if this install lacks it.
@@ -4028,7 +4030,7 @@ export const useStore = create<StoreState>((set, get) => ({
         const next = { ...defaultSoniConfig(), ...(scene.sonify as Partial<SoniConfig>), on: cur.on, sinkId: cur.sinkId } as SoniConfig
         queueMicrotask(() => useStore.getState().setSonify(next))
       }
-      return { composition: normalizeComposition(scene.composition), activeSceneId: id, worlds, world, variationBaseline: null }
+      return { composition, activeSceneId: id, worlds, world, variationBaseline: null }
     }),
   renameScene: (id, name) =>
     set((s) => ({
@@ -4133,13 +4135,13 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const scene = s.scenes.find((x) => x.id === id)
       if (!scene) return s
-      beginMorph(s.composition, Math.max(0, crossfadeMs), performance.now())
       resetCouplingState()
       // Subtle per-recall variation → long sets never loop verbatim. Normalized
       // like recallScene (idempotent) so an old-shape scene can't skip migration.
       const composition = normalizeComposition(
         variation > 0 ? varyComposition(scene.composition, variation) : scene.composition
       )
+      beginSceneMorph(s.composition, composition, Math.max(0, crossfadeMs), performance.now())
       const worlds = ensureWorld(s.worlds, scene.world)
       const world = scene.world ? scene.world.id : s.world
       if (scene.world) localStorage.setItem('opsia.world', world)
@@ -4272,8 +4274,16 @@ export const useStore = create<StoreState>((set, get) => ({
       console.warn('[session] ignored a malformed session (missing composition.layers)')
       return
     }
-    cancelMorph() // replacing the whole composition : abort any in-flight morph
-    requestSceneChange() // hold the last frame until the new one is ready, then dissolve
+    // Another session over the Morph time, layer by layer and live (morph.ts
+    // relay : each new layer fades in once compiled, the old ones out). At Morph
+    // 0 : hold the last frame until the new one is ready, then dissolve.
+    const before = get()
+    const incoming = normalizeComposition(s.composition)
+    if (before.morphMs > 20) beginRelayMorph(before.composition, incoming, before.morphMs, performance.now())
+    else {
+      cancelMorph()
+      requestSceneChange()
+    }
     resetCouplingState()
     // Restore the session's World (self-contained → add to bank if missing).
     const cur = get()
@@ -4325,7 +4335,7 @@ export const useStore = create<StoreState>((set, get) => ({
         wiggle: typeof s.surface?.wiggle === 'number' ? s.surface!.wiggle : 0,
         closed: !!s.surface?.closed
       },
-      composition: normalizeComposition(s.composition)
+      composition: incoming
     })
     // Keep the performance-dial localStorage in sync with the loaded session so a
     // later restart preserves the loaded feel, not the previously-set one.
