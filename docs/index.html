@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Palinopsia — a visual instrument you play</title>
-<meta name="description" content="Palinopsia (Opsia): an OSC-controlled ISF/WebGL visual instrument. A four-layer compositor you perform, with a modulation brain, image-to-sound, an automatic video editor, and embodied webcam control. Free and open source for Windows, macOS and Linux.">
+<meta name="description" content="Palinopsia (Opsia): an OSC-controlled ISF/WebGL visual instrument. A four-layer compositor you perform, with a modulation brain, image-to-sound, an automatic video editor, embodied webcam control, fulldome output and a seat on the dataflou mesh. Free and open source for Windows, macOS and Linux.">
 <meta property="og:title" content="Palinopsia — a visual instrument you play">
 <meta property="og:description" content="A four-layer WebGL compositor you perform, not a tool you wire. Played by hand, by an internal modulation brain, over OSC/MIDI, or with your body.">
 <meta property="og:image" content="https://filliformes.github.io/palinopsia/images/interface-compositor.jpg">
@@ -115,6 +115,15 @@
   .model ul{margin:16px 0; padding-left:20px}
   .model li{margin:10px 0}
   .model b{color:#eee}
+  /* What's new */
+  .new{display:grid; grid-template-columns:1fr 1fr; gap:10px 22px; margin:22px 0 6px; padding:0; list-style:none}
+  .new li{position:relative; padding:0 0 0 16px; font-size:14.5px; color:var(--ink); line-height:1.55}
+  .new li::before{content:""; position:absolute; left:0; top:.62em; width:6px; height:6px; border-radius:50%; background:var(--accent)}
+  .new li b{color:#eee}
+  @media (max-width:680px){ .new{grid-template-columns:1fr} }
+  .feat .card.text .body{padding:18px 18px 18px}
+  .feat .card.text{border-top:2px solid var(--accent2)}
+
   .note{background:var(--panel); border-left:2px solid var(--accent2);
     padding:12px 18px; border-radius:0 6px 6px 0; margin:22px 0; color:var(--ink); font-size:15px}
   hr.soft{border:0; border-top:1px solid var(--line); margin:56px 0}
@@ -129,6 +138,7 @@
   <div class="wrap">
     <span class="brand">Palinopsia<span class="dot">.</span></span>
     <a class="link" href="#download">Download</a>
+    <a class="link" href="#new">What's new</a>
     <a class="link" href="#quickstart">Quickstart</a>
     <a class="link" href="#highlights">Highlights</a>
     <a class="link" href="#faq">FAQ</a>
@@ -141,16 +151,16 @@
   <header class="hero">
     <p class="kicker">Palinopsia · Opsia · a visual instrument</p>
     <h1>A visual instrument you play<span class="dot">.</span></h1>
-    <p class="lede">Palinopsia is a WebGL2 compositor you perform, not a tool you wire. It stacks layers of generated and treated video, masters the whole picture through a fixed set of stages, and lets you steer every parameter live: by hand, by an internal modulation brain, over OSC and MIDI, or with your own body.</p>
+    <p class="lede">Palinopsia is a WebGL2 compositor you perform, not a tool you wire. It stacks layers of generated and treated video, masters the whole picture through a fixed set of stages, and lets you steer every parameter live: by hand, by an internal modulation brain, over OSC and MIDI, from the other instruments of a dataflou mesh, or with your own body.</p>
     <p class="sub">Free and open source, for Windows, macOS and Linux. The name is the persistence of a visual image after the stimulus is gone.</p>
 
     <div class="specs">
       <div class="s"><span class="n"><em>4</em></span><span class="l">layers</span></div>
-      <div class="s"><span class="n"><em>33</em></span><span class="l">sources</span></div>
+      <div class="s"><span class="n"><em>38</em></span><span class="l">sources</span></div>
       <div class="s"><span class="n"><em>52</em></span><span class="l">effects</span></div>
-      <div class="s"><span class="n"><em>8</em></span><span class="l">sonify voices</span></div>
-      <div class="s"><span class="n"><em>76</em></span><span class="l">one-click recipes</span></div>
-      <div class="s"><span class="n mono">OSC·MIDI·body</span><span class="l">played by</span></div>
+      <div class="s"><span class="n"><em>9</em></span><span class="l">sonify voices</span></div>
+      <div class="s"><span class="n"><em>100</em></span><span class="l">one-click recipes</span></div>
+      <div class="s"><span class="n mono">OSC·MIDI·body·mesh</span><span class="l">played by</span></div>
     </div>
 
     <div class="ctarow">
@@ -204,14 +214,36 @@
     </div>
   </section>
 
+  <section id="new">
+    <h2>New in 1.2</h2>
+    <p class="section-lede">The dome and the grain. The biggest release yet: the picture goes under a dome and over the network, the camera reads movement, the sound gets a key of its own, and every change now morphs.</p>
+    <ul class="new">
+      <li><b>Fulldome output.</b> A square domemaster (2K or 4K, 180 to 230°) feeding the projector, NDI, Spout, Syphon and recording, with a 3D dome simulator to check it from the seat or from outside.</li>
+      <li><b>NDI in and out, built in.</b> Any NDI source on the network plays in a layer like a webcam, and Palinopsia is its own NDI source, 4096² at 30 fps. No NDI yet? One click installs the runtime.</li>
+      <li><b>Real-time DXV3 recording</b>, the GPU compressing each frame as it goes, with the Sonify sound when it plays. <b>Syphon</b> on macOS, the twin of Spout.</li>
+      <li><b>Every change morphs.</b> Scene recalls, Randomize, the sequencer, sessions, New and Generate move into the next composition over the Morph time, live and layer by layer, with no flick.</li>
+      <li><b>A dataflou node.</b> Palinopsia joins the dataflou mesh: the other instruments on the network see what it senses and what plays it, and wire to it both ways, no central computer. A monitor shows every node and connection.</li>
+      <li><b>Resolume OSC mapper</b> <kbd>K</kbd>. Open a Resolume composition and wire Palinopsia's signals to its layers, clips and effects on a pin board, with snapshots, a lock and a dice.</li>
+      <li><b>The camera reads movement.</b> A motion field, six movement qualities of a body (energy, fluidity, suddenness…), and a <b>Silhouette</b> source that cuts the body out of the room, no green screen. Tracking runs on its own thread.</li>
+      <li><b>Living surfaces.</b> New Organic generators that grow, crack, drift and heal (Grown, Colony, Ground, Scan), and the whole family lit as a relief.</li>
+      <li><b>Film damage, rebuilt from real film</b>: dust, fibers, scratches and a hair in the gate per gauge, plus a dirt burst you can fire on a beat.</li>
+      <li><b>A key sequencer</b> for Sonify composes the root and scale of every voice over time (a list, the circle of fifths, shared notes, a pivot, the picture's color), each mode drawn as it thinks, with a glide between keys.</li>
+      <li><b>Hear the Collage.</b> A new Sonify voice plays the wall's films at once, each piece placed in the stereo field and tuned to your key, through a Ring bank inspired by the S-4. And a real level meter, in decibels.</li>
+      <li><b>Generate builds scenes that move</b>: 100 recipes using the whole instrument, with Dome, Film Wall and Node Workshop families and 25 new master chains.</li>
+      <li><b>Installations look after themselves</b>: start with the computer, heal a crashed or frozen picture, reopen a closed output, reconnect the camera and the sound card, keep a log.</li>
+      <li><b>An OSC monitor</b> shows every message in and out, live, and effects travel between racks with a drag.</li>
+    </ul>
+    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.0.md">release notes</a>.</p>
+  </section>
+
   <section id="quickstart">
     <h2>Your first five minutes</h2>
     <ol class="steps">
       <li>You land on a fresh, random one-layer scene. Press <kbd>R</kbd> a few times. Each press re-rolls the whole instrument (sources, effects, blends, modulators) from curated ranges and crossfades over the morph time. This is the fastest way to feel the range of the thing.</li>
       <li>Open the <b>Feel</b> tab with <kbd>G</kbd> and drag <b>Density</b>, <b>Flow</b> and <b>Drift</b>. These are whole-image macros: one slider reshapes the entire picture at once. Double-click any slider to reset it to neutral.</li>
       <li>Click a layer's <b>source</b> (the A chip) and play with its parameters in the Inspector under the preview. Every slider carries a dice for a curated random value, a preset menu, and an <b>M</b> button to attach a modulator.</li>
-      <li>Keep something you like: click <kbd>+</kbd> in the scene bank to save it, then press <kbd>1</kbd>–<kbd>9</kbd> to recall your scenes live. Recalls morph over the same crossfade time.</li>
-      <li>Go big: press <kbd>O</kbd> for the Output page, pick a display, and go fullscreen. Or reach for <b>Generate</b> in the toolbar: 76 recipes, each building a whole coherent session (visuals, palette, world and feel) in one click.</li>
+      <li>Keep something you like: click <kbd>+</kbd> in the scene bank to save it, then press <kbd>1</kbd>–<kbd>9</kbd> to recall your scenes live. Recalls morph over the <b>Morph</b> time, live: set it long and one scene slowly becomes the next.</li>
+      <li>Go big: press <kbd>O</kbd> for the Output page, pick a display, and go fullscreen. Or reach for <b>Generate</b> in the toolbar: 100 recipes, each building a whole coherent session (visuals, palette, world and feel) in one click.</li>
     </ol>
     <div class="note">Lost at any point? Press <kbd>?</kbd> for the full keyboard cheat-sheet, in the app. <kbd>Esc</kbd> closes it.</div>
   </section>
@@ -224,14 +256,14 @@
         <img src="images/interface-sonify.jpg" alt="The Sonify page: the composite mirrored large with sound probes drawn on it, and the voice strips on the right.">
         <div class="body">
           <h3>Sonify<span class="k">S</span></h3>
-          <p>The image itself synthesizes audio in real time, inside the app, no external software. Nine voices (a scanning spectrogram, the frame as an oscillator, grain clouds off motion, struck edges, raster audification, SSTV, resonant filters, a chord bank, and a Collage's own films heard as a tuned sound collage through a Ring bank inspired by the S-4) with a shared reverb/delay tail and its own step sequencer.</p>
+          <p>The image itself synthesizes audio in real time, inside the app, no external software. Nine voices (a scanning spectrogram, the frame as an oscillator, grain clouds off motion, struck edges, raster audification, SSTV, resonant filters, a chord bank, and a Collage's own films heard as a tuned sound collage through a Ring bank inspired by the S-4) with a shared reverb/delay tail, an effects sequencer, and a key sequencer that composes the key of the whole instrument over time.</p>
         </div>
       </div>
       <div class="card">
         <img src="images/interface-sequencer.jpg" alt="The macro-form sequencer: tagged scenes across the top, a live monitor, and the transport column on the right.">
         <div class="body">
           <h3>Sequencer<span class="k">Q</span></h3>
-          <p>An auto-pilot over your scene bank. Tag each scene, then let it wander: weighted or climate-shaped selection, morph or cut transitions, and slow durational long-forms (Burial, Long-Take, Rose Lowder's Frame-Weave) that reshape the whole run over minutes.</p>
+          <p>An auto-pilot over your scene bank. Tag each scene, then let it wander: weighted or climate-shaped selection, morph or cut transitions, and slow durational long-forms (Burial, Long-Take, Frame-Weave) that reshape the whole run over minutes.</p>
         </div>
       </div>
       <div class="card">
@@ -245,11 +277,23 @@
         <img src="images/interface-output.jpg" alt="The Output and mapping page: a keystone editor over a live mirror of the output, with resolution, flash safety and record controls.">
         <div class="body">
           <h3>Output &amp; mapping<span class="k">O</span></h3>
-          <p>Fullscreen to any display, projection-map with a keystone editor, and record the take (it keeps rolling when you leave the page). Send over NDI, Spout, Syphon or HIVE (and play any NDI source on the network as a layer), go under a fulldome, span a custom composition across several projectors, run it as an unattended kiosk, and push the picture's color into the room over DMX / WLED, all behind a built-in flash-safety limiter.</p>
+          <p>Fullscreen to any display, projection-map with a keystone editor, and record the take in real time, DXV3 included (it keeps rolling when you leave the page). Send over NDI, Spout, Syphon or HIVE (and play any NDI source on the network as a layer), go under a fulldome with a 3D simulator, span a custom composition across several projectors, run it as a self-healing installation, and push the picture's color into the room over DMX / WLED, all behind a built-in flash-safety limiter.</p>
+        </div>
+      </div>
+      <div class="card text">
+        <div class="body">
+          <h3>Resolume mapper<span class="k">K</span></h3>
+          <p>Open a Resolume composition and its layers, clips, effects and dashboard become columns of a pin board whose rows are Palinopsia's signals: modulators, Meta knobs, the audio, picture and body features, any OSC address. Click to connect, set an amount, smooth it, and recall scenes as Resolume columns. 8 snapshots, a lock, and a dice for happy accidents.</p>
+        </div>
+      </div>
+      <div class="card text">
+        <div class="body">
+          <h3>dataflou mesh<span class="k">A</span></h3>
+          <p>Turn on the <b>dataflou</b> section of the audio/midi/osc tab and Palinopsia becomes a node of the mesh its sibling instruments speak. Nodes on the network find each other on their own, show what they publish and what they take, and wire any source to any destination, both ways. Palinopsia shares what it senses (sound, picture, body, modulators) and takes Meta knobs, layers, the feel macros, scenes and tempo.</p>
         </div>
       </div>
     </div>
-    <p><b>Body</b> <kbd>B</kbd> is the newest room: turn a webcam on (opt-in) and MediaPipe reads your hands, pose, face and silhouette into the instrument. Route any tracked feature into a modulator, or author gesture rules that fire actions and OSC: cover a screen zone with your shadow, or trigger on presence when someone walks into frame. <b>Assemble</b> <kbd>E</kbd> is a concatenative video editor: point it at a folder of films and it edits a matching sequence live, as a layer source. And <b>Collage</b> is a source: a wall of films cut up like torn paper, every piece its own film, that you can modulate, run through effects and hear in Sonify.</p>
+    <p><b>Body</b> <kbd>B</kbd> reads the room: turn a webcam on (opt-in) and MediaPipe reads your hands, pose, face and silhouette into the instrument. Route any tracked feature, any movement quality or the motion field into a modulator, or author gesture rules that fire actions and OSC: cover a screen zone with your shadow, or trigger on presence when someone walks into frame. <b>Assemble</b> <kbd>E</kbd> is a concatenative video editor: point it at a folder of films and it edits a matching sequence live, as a layer source. And <b>Collage</b> is a source: a wall of films cut up like torn paper, every piece its own film, that you can modulate, run through effects and hear in Sonify.</p>
   </section>
 
   <section>
@@ -282,8 +326,8 @@
         <p class="a">Drag its chip onto the other rack (hold <kbd>Ctrl</kbd> to copy instead), or right-click it for <b>Copy to Master FX</b> / <b>Copy to Layer N FX</b>. Its modulation follows a move. A rack that can't host an effect says why.</p>
       </div>
       <div class="row">
-        <p class="q">Change sessions during a show?</p>
-        <p class="a">Loading a session holds the picture still while the new one compiles, then dissolves into it; the projector never shows the old session playing on. <b>New</b> and <b>Generate</b> morph into the new composition over the <b>MRPH</b> time, layer by layer.</p>
+        <p class="q">Change scenes or sessions during a show without a jump?</p>
+        <p class="a">Set the <b>Morph</b> time in the transport. Scene recalls, Randomize, the sequencer, loading a session, <b>New</b> and <b>Generate</b> all move into the next composition over that time, live: the same sources ease their every value, anything else crossfades layer by layer, and a new layer only fades in once it is ready. At Morph 0 a session holds the picture still while it compiles, then dissolves.</p>
       </div>
       <div class="row">
         <p class="q">Use a MIDI controller?</p>
@@ -295,11 +339,23 @@
       </div>
       <div class="row">
         <p class="q">Drive it from another app?</p>
-        <p class="a">Every parameter is an OSC endpoint (advertised over OSCQuery), so a companion brain like <a href="https://github.com/filliformes/dataFLOU">dataFLOU</a> or hardware like Pandore can play the whole instrument. The picture also streams back out over OSC, so the image can answer the sound.</p>
+        <p class="a">Every parameter is an OSC endpoint (advertised over OSCQuery), so a companion brain like <a href="https://github.com/filliformes/dataFLOU">dataFLOU</a> or hardware like Pandore can play the whole instrument. The picture also streams back out over OSC, so the image can answer the sound. The <b>OSC monitor</b> shows every message both ways, live.</p>
+      </div>
+      <div class="row">
+        <p class="q">Wire it to my other instruments on the network?</p>
+        <p class="a">Turn on the <b>dataflou</b> section in the audio/midi/osc tab (pick a name and a universe). Every dataflou node on the network appears there with its parameters: wire one of theirs to Palinopsia, or Palinopsia's sound, picture or body features to one of theirs, and watch every connection on the mesh. Wires come back on their own when a node reappears.</p>
+      </div>
+      <div class="row">
+        <p class="q">Drive Resolume with it?</p>
+        <p class="a">Press <kbd>K</kbd> for the Resolume mapper, open your composition (<span class="mono">.avc</span>), and pin Palinopsia's signals to Resolume's controls. Turn on OSC input in Resolume's preferences; the Resolume section of the audio/midi/osc tab says when it is sending.</p>
+      </div>
+      <div class="row">
+        <p class="q">Project in a dome?</p>
+        <p class="a">On the Output page, turn on <b>Fulldome</b>: Palinopsia renders a square domemaster (front at the bottom), fits a flat picture as full dome, panorama or screen, and shows it in a 3D dome simulator. Everything downstream (projector, NDI, Spout, Syphon, recording) gets the dome.</p>
       </div>
       <div class="row">
         <p class="q">Go fullscreen or record a take?</p>
-        <p class="a">Press <kbd>O</kbd> for the Output page: pick a display, set the resolution, and record. The take keeps rolling if you leave the page, so you can tweak parameters mid-recording.</p>
+        <p class="a">Press <kbd>O</kbd> for the Output page: pick a display, set the resolution, and record (DXV3 records in real time, even the 4096² dome master). The take keeps rolling if you leave the page, so you can tweak parameters mid-recording, and it carries the Sonify sound when it plays.</p>
       </div>
       <div class="row">
         <p class="q">Undo a mistake, or calm a runaway feedback?</p>
@@ -312,7 +368,7 @@
 
   <section>
     <h2>Where to go next</h2>
-    <p>When you want the full vocabulary (38 sources, 52 effects, 25 native nodes, the modulation matrix, the sequencer and the Sonify voices), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
+    <p>When you want the full vocabulary (38 sources, 52 effects, 25 native nodes, the modulation matrix, the sequencers, the Sonify voices and the dataflou mesh), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>, and the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.0.md">1.2 release notes</a> for what changed. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
   </section>
 
   <footer>
