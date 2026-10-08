@@ -11,10 +11,21 @@ that CI builds into cross-platform releases.
   signal's family (modulators, Meta knobs, audio, vision, body, OSC), sized by its amount,
   with a halo that follows what it carries; each column group has its own hue (band, tint,
   separators); rows show their pin count and a live bar in their color; a status line under
-  the board describes what is under the cursor and what a click does; the page is set in
-  Rubik with Unbounded titles (bundled), and an empty page offers Open .avc and Learn.
-  Light themes get deeper shades. The canvas draws at dpr × the UI zoom, so it stays sharp
-  zoomed.
+  the board describes what is under the cursor and what a click does; an empty page offers
+  Open .avc and Learn. It wears the app's own look : the full pages' title bar (RESOLUME ·
+  MAPPER, mono, spaced), the theme's UI font, the toolbar buttons. Light themes get deeper
+  shades. The canvas draws at dpr × the UI zoom, so it stays sharp zoomed.
+- **A dice for the Resolume pins** (🎲, MIDI-learnable as `rand:resolume`) : every row gets
+  none, one or two new pins (35 / 45 / 20 %) at amounts 0.4..1, among the unfolded groups'
+  float and toggle columns : never a trigger (no clip or column launches at random) nor the
+  composition master (no blackout). **↶** puts the previous pins back. Measured : 19 pins
+  over 18 rows, none on a trigger, the master or a folded group.
+- **Sonify's mixer and sequencers look like its voices** : one set of parts
+  (`components/sonifyUi.tsx` : the voice card, the label column, the on / play pill,
+  option chips, slider rows, the stepper, the dice / reset buttons) builds all three
+  views. The mixer is a voice card per channel (pill, name, volume, filter) and an FX tail
+  card; the effects and key sequencers are voice cards with a play pill, their rows in
+  the voices' label column, and the key sequencer shows the key now on its own row.
 - **A Resolume section in the audio/midi/osc tab** : SENDING / OFF (a click toggles it),
   where it sends, the pin count and messages a second, and **mapper ▸** to open the page
   (it replaces the small Resolume button in the OSC header).
@@ -700,6 +711,10 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The Resolume mapper's scrollbars flickered** : the canvas sat inside the scroll area,
+  so a redraw could add and remove the scrollbars frame after frame. It is laid over the
+  scroll area now and never changes what scrolls (measured : one scroll-area size over 2 s
+  of frames).
 - **A click in the Resolume mapper toggled a pin far to its left** at any UI zoom below
   100 % (and to its right above) : the matrix compared viewport pixels with its own. Hit
   tests now divide by the effective zoom. Measured in a test copy : four clicks at 80 %,

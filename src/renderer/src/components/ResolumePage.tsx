@@ -8,6 +8,10 @@
 // groups (Layer 4, Group 2, Columns…) fold shut, and a folded group still shows
 // the columns that carry a connection so nothing wired ever hides.
 //
+// The canvas is laid over the scroll area, not inside it : inside, it was part of
+// what scrolls, and a redraw that nudged its size could add and remove the
+// scrollbars frame after frame (they flickered).
+//
 // The page sits inside the app's CSS zoom (the UI zoom) : mouse events and
 // getBoundingClientRect() are viewport pixels while the layout (CELL, scroll
 // offsets) is in the page's own pixels, so every hit test divides by the
@@ -28,6 +32,8 @@ import {
 import { SearchSelect } from './SearchSelect'
 import { showToast } from './Toast'
 import { effectiveZoom } from './uiZoom'
+import { TBTN, TBTN_IDLE, TBTN_LIT } from './buttonStyles'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
 
 const CELL = 20
 const LABEL_W = 224
@@ -36,10 +42,9 @@ const HEAD_H = 132
 const METER_H = 6
 const TOP = GROUP_H + HEAD_H + METER_H
 
-// The page's own faces : rounded and friendly for everything, a wide display
-// face for the titles (both bundled, OFL). OSC addresses stay monospaced.
-const FACE = "'Rubik', 'Inter', ui-sans-serif, system-ui, sans-serif"
-const DISPLAY = "'Unbounded', 'Rubik', ui-sans-serif, sans-serif"
+// The app's type : its UI face (each theme sets --font-app) for the labels, the
+// mono the other pages use for titles, headings and readouts.
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
 
 type Col = { kind: 'out'; o: ResoOutput; group: string; gi: number } | { kind: 'stub'; group: string; count: number; gi: number }
 interface Span { group: string; c0: number; c1: number; folded: boolean; count: number; gi: number }
@@ -96,14 +101,14 @@ function Btn({ on, label, onClick, title, danger, strong }: {
     <button
       onClick={onClick}
       title={title}
-      className={`rounded-full px-3 py-1 text-[11.5px] font-medium transition-colors ${
+      className={`${TBTN} ${
         on
           ? danger
-            ? 'border border-red-500/70 bg-red-500/15 text-red-300'
-            : 'border border-accent bg-accent/20 text-accent'
+            ? 'border-red-500/70 bg-red-500/15 text-red-300'
+            : TBTN_LIT
           : strong
-            ? 'border border-accent/60 bg-accent/10 text-accent hover:bg-accent/20'
-            : 'border border-border bg-panel3/70 text-muted hover:bg-panel3 hover:text-text'
+            ? 'border-accent/60 bg-panel2 text-accent hover:bg-accent/15'
+            : TBTN_IDLE
       }`}
     >
       {label}
@@ -115,18 +120,18 @@ function Slider({ label, value, min, max, step, onChange, fmt, title }: {
   label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; fmt?: (v: number) => string; title?: string
 }): JSX.Element {
   return (
-    <label className="flex items-center gap-2 text-[11px] text-muted" title={title}>
-      <span className="w-14 shrink-0">{label}</span>
+    <label className="flex items-center gap-2 font-mono text-[10px] text-muted" title={title}>
+      <span className="w-14 shrink-0 uppercase">{label}</span>
       <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="min-w-0 flex-1 accent-accent" />
-      <span className="w-10 shrink-0 text-right tabular-nums text-text">{fmt ? fmt(value) : value.toFixed(2)}</span>
+      <span className="w-10 shrink-0 text-right text-text">{fmt ? fmt(value) : value.toFixed(2)}</span>
     </label>
   )
 }
 
 function Card({ title, color, children }: { title: string; color?: string; children: React.ReactNode }): JSX.Element {
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-border bg-panel2 p-2.5">
-      <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-accent2">
+    <div className="flex flex-col gap-1.5 rounded border border-border bg-panel2 p-2">
+      <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wide text-accent2">
         {color && <span className="h-2 w-2 rounded-full" style={{ background: color }} />}
         {title}
       </span>
@@ -148,6 +153,21 @@ export function ResolumePage(): JSX.Element {
   const [lastLearned, setLastLearned] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [custom, setCustom] = useState({ address: '/composition/', kind: 'float' as ResoKind })
+  // The pins before the last dice : ↶ puts them back (until they change again).
+  const [beforeDice, setBeforeDice] = useState<typeof r.cells | null>(null)
+  useEffect(() => {
+    if (beforeDice && r.cells !== lastDiceCells.current) setBeforeDice(null)
+  }, [r.cells, beforeDice])
+  const lastDiceCells = useRef<typeof r.cells | null>(null)
+  const dice = (): void => {
+    if (r.locked) { showToast('The mapping is locked : unlock it to roll the pins', 'warn'); return }
+    const prev = st().resolume.cells // the live pins (a render may not have caught up)
+    const n = st().resoRandomize()
+    if (n < 0) { showToast('Nothing to wire yet : open a composition or add an address', 'warn'); return }
+    lastDiceCells.current = st().resolume.cells
+    setBeforeDice(prev)
+    showToast(`${n} new ${n === 1 ? 'pin' : 'pins'} · ↶ puts the old ones back`)
+  }
   // A slow re-render for the msg/s readout (the canvas has its own rAF).
   const [, setBeat] = useState(0)
   useEffect(() => {
@@ -196,13 +216,6 @@ export function ResolumePage(): JSX.Element {
     return () => setResoLearning(false)
   }, [learning])
   useEffect(() => onResoLearned((a) => setLastLearned(a)), [])
-  useEffect(() => {
-    let live = true
-    void Promise.all([document.fonts.load(`500 11px Rubik`), document.fonts.load(`600 11px Unbounded`)])
-      .catch(() => undefined)
-      .then(() => { if (live) clipRef.current.clear() })
-    return () => { live = false }
-  }, [])
 
   const openAvc = async (path?: string): Promise<void> => {
     const p = path ?? (await window.api.resolumePick())
@@ -256,6 +269,7 @@ export function ResolumePage(): JSX.Element {
       // Theme colours resolved ONCE per frame (getComputedStyle is not free).
       const cs = getComputedStyle(document.documentElement)
       const v = (n: string): string => cs.getPropertyValue(n).trim()
+      const FACE = v('--font-app') || 'ui-sans-serif, system-ui, sans-serif'
       const accV = v('--c-accent'), acc2V = v('--c-accent2'), bgV = v('--c-bg')
       const [br, bgg, bb] = bgV.split(/\s+/).map(Number)
       const lightTheme = 0.2126 * (br || 0) + 0.7152 * (bgg || 0) + 0.0722 * (bb || 0) > 140
@@ -490,15 +504,19 @@ export function ResolumePage(): JSX.Element {
       g.fillStyle = C.border
       g.fillRect(0, TOP - 1, W, 1)
       g.fillRect(LABEL_W - 1, 0, 1, TOP)
-      g.font = `600 12px ${DISPLAY}`
+      // the page titles' look : mono, upper case, spaced out
+      const gl = g as CanvasRenderingContext2D & { letterSpacing: string }
+      g.font = `600 10px ${MONO}`
+      gl.letterSpacing = '1.5px'
       g.textAlign = 'right'
       g.fillStyle = C.acc2(1)
-      g.fillText('Resolume →', LABEL_W - 12, 20)
+      g.fillText('RESOLUME →', LABEL_W - 12, 20)
       g.textAlign = 'left'
       g.fillStyle = C.acc(1)
-      g.fillText('Palinopsia ↓', 12, TOP - 20)
+      g.fillText('PALINOPSIA ↓', 12, TOP - 20)
+      gl.letterSpacing = '0px'
       // the counts sit above the diagonal, right-aligned under "Resolume →"
-      g.font = `450 11px ${FACE}`
+      g.font = `10px ${MONO}`
       g.textAlign = 'right'
       g.fillStyle = C.muted
       g.fillText(`${rows.length} signals`, LABEL_W - 12, 44)
@@ -631,44 +649,52 @@ export function ResolumePage(): JSX.Element {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-bg" style={{ fontFamily: FACE }}>
-      {/* Header */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border px-4 py-2.5">
-        <span className="text-[16px] font-semibold tracking-tight" style={{ fontFamily: DISPLAY }}>
-          Resolume <span className="text-accent">mapper</span>
+    <div className="fixed inset-0 z-40 flex flex-col bg-bg">
+      {/* Header : the other full pages' title bar */}
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-border bg-panel px-4 py-2">
+        <span
+          className="cursor-help font-mono text-[13px] font-semibold uppercase tracking-[0.2em]"
+          title="Wire Palinopsia's signals (the rows) to any Resolume control (the columns) : a pin where they meet sends that signal to that control, live, over OSC."
+        >
+          Resolume · Mapper
         </span>
-        <span className="text-[11.5px] text-muted">wire Palinopsia's signals to any Resolume control</span>
         <div
-          className="flex items-center gap-1.5 rounded-full border border-border bg-panel2 px-2.5 py-1"
+          className="flex items-center gap-1.5 rounded border border-border bg-panel2 px-2 py-0.5"
           title={s ? `${s.path}\n${s.version} · ${s.width}×${s.height}` : 'No composition loaded yet'}
         >
           <span className={`h-2 w-2 rounded-full ${r.enabled ? 'animate-pulse bg-accent' : 'bg-muted'}`} />
-          <span className="text-[11px] text-muted">
+          <span className="font-mono text-[10px] text-muted">
             {s
-              ? <><span className="font-medium text-text">{s.name}</span> · {s.layers.length} layers · {s.groups.length} groups · {s.columns} columns · {s.clips.length} clips · {fxCount} effects</>
+              ? <><span className="text-text">{s.name}</span> · {s.layers.length} layers · {s.groups.length} groups · {s.columns} columns · {s.clips.length} clips · {fxCount} effects</>
               : 'no composition yet'}
           </span>
         </div>
         <Btn strong label={loading ? 'reading…' : 'Open .avc'} onClick={() => void openAvc()} title="Read a Resolume composition (.avc) : its layers, groups, columns, clips, effects and dashboard links become the matrix columns" />
         {s && <Btn label="↻ re-read" onClick={() => void openAvc(s.path)} title="Re-read the same composition (after changing it in Resolume and saving). Connections survive wherever the address still exists." />}
         <div className="flex-1" />
-        <span className="text-[10px] text-muted">K / Esc closes</span>
-        <button onClick={() => setOpen(false)} className="rounded-full px-2 py-0.5 text-[13px] text-muted hover:bg-panel3 hover:text-text" title="Close (Esc)">✕</button>
-      </div>
+        <span className="font-mono text-[9px] text-muted">K / Esc closes</span>
+        <button
+          onClick={() => setOpen(false)}
+          className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
+          title="Close (Esc)"
+        >
+          ← back to instrument
+        </button>
+      </header>
 
-      {/* Transport : send, destination, rate, learn, scene follow, snapshots, lock */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-panel2 px-4 py-2">
+      {/* Transport : send, destination, rate, learn, scene follow, snapshots, dice, lock */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-panel2 px-4 py-1.5">
         <div className="flex items-center gap-1.5">
           <Btn on={r.enabled} label={r.enabled ? '● sending' : '○ send'} onClick={() => setR({ enabled: !r.enabled })} title="Stream the connected columns to Resolume over OSC" />
-          <input className="input w-28 rounded-full px-2.5 text-[11px]" value={r.host} onChange={(e) => setR({ host: e.target.value.trim() })} title="Resolume's machine (127.0.0.1 when it runs here)" />
-          <input className="input w-16 rounded-full px-2.5 text-[11px]" type="number" value={r.port} onChange={(e) => setR({ port: Number(e.target.value) || 7000 })} title="Resolume's OSC INPUT port (Preferences › OSC, 7000 by default)" />
+          <input className="input w-28 text-[11px]" value={r.host} onChange={(e) => setR({ host: e.target.value.trim() })} title="Resolume's machine (127.0.0.1 when it runs here)" />
+          <input className="input w-16 text-[11px]" type="number" value={r.port} onChange={(e) => setR({ port: Number(e.target.value) || 7000 })} title="Resolume's OSC INPUT port (Preferences › OSC, 7000 by default)" />
         </div>
-        <label className="flex items-center gap-1.5 text-[11px] text-muted" title="How many times a second the matrix sends (the patch's speedlim)">
+        <label className="flex items-center gap-1.5 font-mono text-[10px] text-muted" title="How many times a second the matrix sends (the patch's speedlim)">
           rate
           <input type="range" min={5} max={60} step={1} value={r.rateHz} onChange={(e) => setR({ rateHz: Number(e.target.value) })} className="w-24 accent-accent" />
-          <span className="w-11 tabular-nums text-text">{r.rateHz} Hz</span>
+          <span className="w-10 text-text">{r.rateHz} Hz</span>
         </label>
-        <span className="text-[11px] tabular-nums text-muted" title="OSC messages actually sent per second (only moved values go out)">{r.enabled ? `${resoLive.sentPerSec} msg/s` : ''}</span>
+        <span className="font-mono text-[10px] text-muted" title="OSC messages actually sent per second (only moved values go out)">{r.enabled ? `${resoLive.sentPerSec} msg/s` : ''}</span>
         <div className="flex items-center gap-1.5">
           <Btn
             on={learning}
@@ -684,11 +710,11 @@ export function ResolumePage(): JSX.Element {
         <div className="flex items-center gap-1.5" title="Recalling Palinopsia scene N connects Resolume column N (+ offset) : the patch's scene trigger">
           <Btn on={r.sceneColumns} label="scene → column" onClick={() => setR({ sceneColumns: !r.sceneColumns })} />
           {r.sceneColumns && (
-            <input className="input w-12 rounded-full px-2 text-[11px]" type="number" value={r.columnOffset} onChange={(e) => setR({ columnOffset: Number(e.target.value) || 0 })} title="Column offset (scene 1 → column 1 + offset)" />
+            <input className="input w-12 text-[11px]" type="number" value={r.columnOffset} onChange={(e) => setR({ columnOffset: Number(e.target.value) || 0 })} title="Column offset (scene 1 → column 1 + offset)" />
           )}
         </div>
         <div className="flex items-center gap-1" title="Connection snapshots : click recalls, shift+click stores the current connections">
-          <span className="mr-1 text-[11px] text-muted">snapshots</span>
+          <span className="mr-1 font-mono text-[10px] text-muted">snap</span>
           {Array.from({ length: RESO_SNAPSHOTS }, (_, i) => (
             <button
               key={i}
@@ -697,11 +723,32 @@ export function ResolumePage(): JSX.Element {
                 if (e.shiftKey) showToast(r.locked ? 'Locked : unlock to store a snapshot' : `Snapshot ${i + 1} stored`, r.locked ? 'warn' : 'ok')
               }}
               title={r.snapshots[i] ? `Snapshot ${i + 1} : ${r.snapshots[i]!.length} pins (click recalls, shift+click stores)` : `Snapshot ${i + 1} : empty (shift+click stores the pins now)`}
-              className={`h-6 w-6 rounded-full text-[11px] font-medium ${r.snapshots[i] ? 'border border-accent2/70 bg-accent2/20 text-accent2' : 'border border-border text-muted hover:text-text'}`}
+              className={`h-5 w-5 rounded font-mono text-[10px] ${r.snapshots[i] ? 'border border-accent2/70 bg-accent2/15 text-accent2' : 'border border-border text-muted hover:text-text'}`}
             >
               {i + 1}
             </button>
           ))}
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="relative flex shrink-0">
+            <MidiLearnOverlay id="rand:resolume" />
+            <button
+              onClick={dice}
+              className={`${TBTN} ${TBTN_IDLE} px-2 text-[13px] leading-none`}
+              title="Roll the pins : every row gets none, one or two new connections, at random amounts, among the unfolded groups' float and toggle columns (never a trigger : no clip or column launches; never the composition master). ↶ puts the old pins back."
+            >
+              🎲
+            </button>
+          </span>
+          {beforeDice && (
+            <button
+              onClick={() => { if (!r.locked) { setR({ cells: beforeDice }); setBeforeDice(null) } }}
+              className={`${TBTN} ${TBTN_IDLE} px-2`}
+              title={`Put back the ${beforeDice.length} pins from before the dice`}
+            >
+              ↶
+            </button>
+          )}
         </div>
         <div className="flex-1" />
         <Btn label="clear pins" onClick={() => { if (!r.locked && r.cells.length && confirm('Remove every connection?')) st().resoClearCells() }} title="Remove every connection (rows and columns stay)" />
@@ -711,22 +758,24 @@ export function ResolumePage(): JSX.Element {
       <div className="flex min-h-0 flex-1">
         {/* Matrix + its status line */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <div
-            ref={scrollRef}
-            className="relative min-h-0 flex-1 overflow-auto"
-            onMouseDown={onDown}
-            onMouseMove={onMove}
-            onMouseLeave={() => { hover.current = null; setStatus('') }}
-            onDoubleClick={onDbl}
-            onContextMenu={(e) => e.preventDefault()}
-          >
-            <div style={{ width: totalW, height: totalH, position: 'relative' }}>
-              <canvas ref={canvasRef} style={{ position: 'sticky', top: 0, left: 0, display: 'block' }} />
+          <div className="relative min-h-0 flex-1">
+            <div
+              ref={scrollRef}
+              className="absolute inset-0 overflow-auto"
+              onMouseDown={onDown}
+              onMouseMove={onMove}
+              onMouseLeave={() => { hover.current = null; setStatus('') }}
+              onDoubleClick={onDbl}
+              onContextMenu={(e) => e.preventDefault()}
+            >
+              <div style={{ width: totalW, height: totalH }} />
             </div>
+            {/* drawn over the scroller's view (never its scrollbars), clicks pass through */}
+            <canvas ref={canvasRef} className="pointer-events-none absolute left-0 top-0 block" />
             {r.outputs.length === 0 && (
-              <div className="pointer-events-none absolute inset-x-0 top-32 flex justify-center px-6" style={{ paddingLeft: LABEL_W }}>
-                <div className="pointer-events-auto flex max-w-md flex-col items-center gap-3 rounded-2xl border border-border bg-panel/95 px-6 py-5 text-center shadow-xl" onMouseDown={(e) => e.stopPropagation()}>
-                  <span className="text-[17px] font-semibold" style={{ fontFamily: DISPLAY }}>
+              <div className="pointer-events-none absolute inset-x-0 top-28 flex justify-center px-6" style={{ paddingLeft: LABEL_W }}>
+                <div className="pointer-events-auto flex max-w-md flex-col items-center gap-3 rounded border border-border bg-panel px-6 py-5 text-center shadow-xl">
+                  <span className="font-mono text-[12px] font-semibold uppercase tracking-[0.2em]">
                     Plug Palinopsia into <span className="text-accent2">Resolume</span>
                   </span>
                   <span className="text-[12px] leading-relaxed text-muted">
@@ -734,9 +783,9 @@ export function ResolumePage(): JSX.Element {
                     sends that signal to that control, live.
                   </span>
                   <ol className="flex flex-col gap-1 text-left text-[12px] text-text">
-                    <li><span className="mr-1.5 font-semibold text-accent">1</span>open your composition (.avc), or Learn its controls</li>
-                    <li><span className="mr-1.5 font-semibold text-accent">2</span>click where a signal meets a control</li>
-                    <li><span className="mr-1.5 font-semibold text-accent">3</span>press send</li>
+                    <li><span className="mr-1.5 font-mono font-semibold text-accent">1</span>open your composition (.avc), or Learn its controls</li>
+                    <li><span className="mr-1.5 font-mono font-semibold text-accent">2</span>click where a signal meets a control</li>
+                    <li><span className="mr-1.5 font-mono font-semibold text-accent">3</span>press send</li>
                   </ol>
                   <div className="flex gap-2">
                     <Btn strong label={loading ? 'reading…' : 'Open .avc'} onClick={() => void openAvc()} />
@@ -751,14 +800,14 @@ export function ResolumePage(): JSX.Element {
           </div>
           <div
             ref={statusRef}
-            className="shrink-0 truncate border-t border-border bg-panel2 px-4 py-1.5 text-[11px] text-muted"
+            className="shrink-0 truncate border-t border-border bg-panel2 px-4 py-1 font-mono text-[10px] text-muted"
           >
             {IDLE}
           </div>
         </div>
 
         {/* Side panel */}
-        <div className="flex w-72 shrink-0 flex-col gap-3 overflow-y-auto border-l border-border bg-panel p-3 text-[11.5px]">
+        <div className="flex w-72 shrink-0 flex-col gap-2.5 overflow-y-auto border-l border-border bg-panel p-3 text-[11px]">
           <Card title="add a row">
             <SearchSelect
               value=""
@@ -771,7 +820,7 @@ export function ResolumePage(): JSX.Element {
             />
             <div className="flex flex-wrap gap-x-2.5 gap-y-1">
               {Object.entries(FAMILY).map(([k, f]) => (
-                <span key={k} className="flex items-center gap-1 text-[10.5px] text-muted">
+                <span key={k} className="flex items-center gap-1 font-mono text-[9px] text-muted">
                   <span className="h-2 w-2 rounded-full" style={{ background: lightTheme ? f.light : f.dark }} />
                   {f.name}
                 </span>
@@ -801,7 +850,7 @@ export function ResolumePage(): JSX.Element {
 
           {selIn && (
             <Card title="row" color={famColor(selIn.source)}>
-              <span className="text-[12.5px] font-medium text-text">{resoSourceLabel(selIn.source)}</span>
+              <span className="text-[12px] font-semibold text-text">{resoSourceLabel(selIn.source)}</span>
               <Slider label="smooth" value={selIn.smooth} min={0} max={1} step={0.01} onChange={(v) => st().resoUpdateInput(selIn.id, { smooth: v })} title="Slew on the incoming signal (0 = raw)" />
               <Slider label="gain" value={selIn.gain} min={0} max={4} step={0.05} onChange={(v) => st().resoUpdateInput(selIn.id, { gain: v })} title="Scales the signal before it is clipped to 0..1" />
               <div className="flex gap-1.5">
@@ -838,7 +887,7 @@ export function ResolumePage(): JSX.Element {
               <Slider label="smooth" value={selOut.smooth} min={0} max={1} step={0.01} onChange={(v) => st().resoUpdateOutput(selOut.id, { smooth: v })} title="Slew on what is sent (the patch's slide)" />
               {selCell && selCellIn && (
                 <div className="flex flex-col gap-1.5 border-t border-border pt-2">
-                  <span className="flex items-center gap-1.5 text-[11px] text-muted">
+                  <span className="flex items-center gap-1.5 font-mono text-[10px] text-muted">
                     <span className="h-2 w-2 rounded-full" style={{ background: famColor(selCellIn.source) }} />
                     pin from {resoSourceLabel(selCellIn.source)}
                   </span>
@@ -853,8 +902,8 @@ export function ResolumePage(): JSX.Element {
             </Card>
           )}
 
-          <div className="mt-auto flex flex-col gap-1 text-[11px] leading-snug text-muted">
-            <span className="font-semibold text-accent2">in Resolume</span>
+          <div className="mt-auto flex flex-col gap-1 font-mono text-[10px] leading-snug text-muted">
+            <span className="uppercase tracking-wide text-accent2">in Resolume</span>
             <span>Preferences › OSC › Input on, port {r.port}.</span>
             <span>Dashboard links are the usual targets : link any parameter to a dashboard dial in Resolume, then drive the link from here.</span>
             <span>Learn needs Resolume's OSC Output on, pointed at 127.0.0.1 : {oscPort} (Palinopsia's OSC input{oscEnabled ? '' : ', currently off'}).</span>

@@ -52,7 +52,7 @@ const ACTION_VERB: Record<string, string> = {
   'fire:randomize': 'randomizes', 'rand:all': 'randomizes everything', 'rand:sources': 'randomizes sources',
   'rand:sourcefx': 'randomizes source FX', 'rand:layerfx': 'randomizes layer FX', 'rand:mods': 'randomizes modulators',
   'rand:finishing': 'randomizes finishing', 'rand:bg': 'randomizes background', 'rand:master': 'randomizes master FX',
-  'rand:meta': 'randomizes Meta knobs', 'rand:inspector': 'randomizes the inspector', 'rand:sonify': 'randomizes Sonify',
+  'rand:meta': 'randomizes Meta knobs', 'rand:inspector': 'randomizes the inspector', 'rand:sonify': 'randomizes Sonify', 'rand:resolume': 'rolls the Resolume pins',
   'fire:vary': 'varies', 'fire:flush': 'flushes buffers', 'fire:freeze': 'toggles freeze', 'fire:record': 'toggles record',
   'fire:tap': 'taps tempo', 'fire:seq': 'toggles the sequencer', 'fire:soniseq': 'toggles the Sonify sequencer',
   'fire:keyseq': 'toggles the Key sequencer',
@@ -63,7 +63,7 @@ const ACTION_VERB: Record<string, string> = {
 const ACTION_TOKEN: Record<string, string> = {
   'fire:randomize': 'Rnd', 'rand:all': 'RndAll', 'rand:sources': 'RndSrc', 'rand:sourcefx': 'RndSrcFx',
   'rand:layerfx': 'RndLyrFx', 'rand:mods': 'RndMod', 'rand:finishing': 'RndFin', 'rand:bg': 'RndBg',
-  'rand:master': 'RndMst', 'rand:meta': 'RndMeta', 'rand:inspector': 'RndInsp', 'rand:sonify': 'RndSoni',
+  'rand:master': 'RndMst', 'rand:meta': 'RndMeta', 'rand:inspector': 'RndInsp', 'rand:sonify': 'RndSoni', 'rand:resolume': 'RndReso',
   'fire:vary': 'Vary', 'fire:flush': 'Flush', 'fire:freeze': 'Freeze', 'fire:record': 'Rec', 'fire:tap': 'Tap',
   'fire:seq': 'Seq', 'fire:soniseq': 'SoniSeq', 'fire:keyseq': 'KeySeq', 'fire:sonify': 'Soni', 'fire:undo': 'Undo', 'fire:redo': 'Redo',
   'master:chain': 'MstChain', 'session:new': 'SesNew', 'session:load': 'SesLoad', 'session:open': 'SesOpen'
@@ -286,7 +286,7 @@ export function BodyPage(): JSX.Element {
     return [
       { label: 'Randomize', opts: [
         'fire:randomize', 'rand:all', 'rand:sources', 'rand:sourcefx', 'rand:layerfx', 'rand:mods', 'rand:finishing',
-        'rand:bg', 'rand:master', 'rand:meta', 'rand:inspector', 'rand:sonify', 'fire:vary',
+        'rand:bg', 'rand:master', 'rand:meta', 'rand:inspector', 'rand:sonify', 'rand:resolume', 'fire:vary',
         'rand:layer:0', 'rand:layer:1', 'rand:layer:2', 'rand:layer:3'
       ].map(opt) },
       { label: 'Transport / performance', opts: ['fire:flush', 'fire:freeze', 'fire:record', 'fire:tap', 'fire:seq', 'fire:soniseq', 'fire:keyseq', 'fire:undo', 'fire:redo'].map(opt) },

@@ -994,8 +994,9 @@ Flash-safety) + live meter, and an **output-device picker**. While the engine
 plays, **recordings carry the sound** (DXV3 included), even when you switch it on
 mid-take : exports become true audiovisual pieces.
 
-**Mixer** : a **[voices | mixer]** view. The mixer shows all nine voices as
-channel strips : on/off, **volume**, and a per-voice **HP/LP filter** (a DJ-style
+**Mixer** : the **mixer** view (voices · mixer · seq, all three built from the same
+cards as the voices). The mixer shows all nine voices as
+channel cards : on/off, **volume**, and a per-voice **HP/LP filter** (a DJ-style
 tilt, ported from the Essaim instrument : one knob sweeps a 3-stage lowpass down or
 a highpass up, centre = bypass), plus the FX-tail send / delay / reverb mix.
 **Presets** : name + save + a load dropdown keep whole Sonify patches. **🎲 dice** :
@@ -1655,6 +1656,10 @@ It grew out of a Max patch built for the same job (`udpreceive` → per-feature 
 - **scene → column** : recalling Palinopsia scene N connects Resolume column N (+ an
   offset), the patch's scene trigger.
 - **8 snapshots** of the connections : click recalls, shift+click stores.
+- **🎲 Roll the pins** : every row gets none, one or two new connections at random
+  amounts, among the unfolded groups' float and toggle columns (never a trigger, so no
+  clip or column launches at random, and never the composition master); **↶** puts the
+  previous pins back. MIDI-learnable.
 - **Lock** : no connection, row or column can change (sending, snapshot recall and
   scene follow keep working).
 - The mapping is **saved with the session**, lock and all.

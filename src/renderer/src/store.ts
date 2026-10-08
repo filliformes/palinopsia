@@ -1401,6 +1401,9 @@ interface StoreState {
   resoUpdateOutput: (id: string, patch: Partial<ResoOutput>) => void
   resoToggleFold: (group: string) => void
   resoClearCells: () => void
+  /** Roll the pins : a fresh random set of connections. Returns how many, or −1
+   *  when there is nothing to wire (no rows or no eligible columns, or locked). */
+  resoRandomize: () => number
   /** store = true writes the current connections into the slot; false recalls it. */
   resoSnapshot: (slot: number, store: boolean) => void
   // HIVE output (open NDI-alternative). hiveOutActive is transient; port persists.
@@ -3358,6 +3361,31 @@ export const useStore = create<StoreState>((set, get) => ({
         })
       }
     }),
+  resoRandomize: () => {
+    const r = get().resolume
+    if (r.locked || !r.inputs.length) return -1
+    // A dice wires continuous controls and switches only : never a trigger (it
+    // would launch clips and columns at random) nor the composition master (it
+    // would black the whole output out). The unfolded groups first : the pins
+    // land where you can see them.
+    const ok = r.outputs.filter((o) => o.kind !== 'trigger' && o.address !== '/composition/master')
+    const open = ok.filter((o) => !r.folded.includes(o.group))
+    const pool = open.length ? open : ok
+    if (!pool.length) return -1
+    const cells: typeof r.cells = []
+    for (const inp of r.inputs) {
+      const n = Math.random() < 0.35 ? 0 : Math.random() < 0.7 ? 1 : 2
+      const used = new Set<string>()
+      for (let k = 0; k < n && used.size < pool.length; k++) {
+        const o = pool[Math.floor(Math.random() * pool.length)]
+        if (used.has(o.id)) continue
+        used.add(o.id)
+        cells.push({ i: inp.id, o: o.id, amount: Math.round((0.4 + Math.random() * 0.6) * 100) / 100 })
+      }
+    }
+    set({ resolume: persistResolume({ ...r, cells }) })
+    return cells.length
+  },
   resoToggleCell: (i, o) =>
     set((s) => {
       const r = s.resolume

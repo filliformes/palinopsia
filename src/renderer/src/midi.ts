@@ -129,6 +129,7 @@ export function fireTrigger(id: string): void {
     case 'rand:mods': st.randomize('modulators', randIntensity()); return
     case 'rand:finishing': st.randomize('finishing', randIntensity()); return
     case 'rand:sonify': st.setSonify(randomSonify(st.sonify)); return
+    case 'rand:resolume': st.resoRandomize(); return
     case 'master:chain': st.toggleMasterChain(); return // the master FX on/off
     case 'session:new': fireNewSession(); return
     case 'session:load': fireLoadSession(); return // load the selected saved session
@@ -237,6 +238,8 @@ export function midiTargetLabel(id: string): string {
       return 'RANDOMIZE finishing'
     case 'rand:sonify':
       return 'RANDOMIZE Sonify patch'
+    case 'rand:resolume':
+      return 'RANDOMIZE Resolume pins'
     case 'master:chain':
       return 'MASTER FX on/off'
     case 'session:new':
