@@ -102,13 +102,16 @@ export class GridReadback {
 
   /** Queue one `size`x`size` downsample of `src` and its readback. `prog`/`uTex`
    *  is a copy shader sampling unit 0, `vao` a fullscreen triangle. Returns false
-   *  when every slot is still in flight (the GPU is behind : never wait for it). */
+   *  when every slot is still in flight (the GPU is behind : never wait for it).
+   *  `flush` submits the work at once; leave it off when the caller knows the
+   *  window is about to paint, which submits it anyway (see below). */
   kick(
     size: number,
     src: WebGLTexture,
     prog: WebGLProgram,
     uTex: WebGLUniformLocation | null,
-    vao: WebGLVertexArrayObject
+    vao: WebGLVertexArrayObject,
+    flush = true
   ): boolean {
     const gl = this.gl
     this.ensure(size)
@@ -131,7 +134,15 @@ export class GridReadback {
     // Submit now : a window that doesn't paint (minimized, the output window on
     // another space) never flushes on its own, and the GPU would only start this
     // readback when we came to read it, which is the stall we are avoiding.
-    gl.flush()
+    //
+    // Skipped when the window IS painting, because the paint submits this work
+    // anyway a moment later, and ready() asks with SYNC_FLUSH_COMMANDS_BIT, which
+    // flushes by itself if nothing else has. So an extra flush there only submits
+    // a few microseconds sooner, and it is not free : a submit into a full command
+    // queue BLOCKS until a slot frees, so on a saturated GPU this call was charged
+    // to whichever section kicked it (measured at 11.5 ms in the vision section of
+    // a scene holding the GPU at 98%, with not one synchronous read left anywhere).
+    if (flush) gl.flush()
     this.phase = (wi + 1) % this.slots
     return true
   }

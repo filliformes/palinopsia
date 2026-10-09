@@ -16,7 +16,7 @@ import { useShallow } from 'zustand/react/shallow'
 import type { AutostartStatus, DisplayInfo, KioskLaunchConfig, PerfStats, RecordingFolderInfo } from '@shared/types'
 import { useStore } from '../store'
 import { showToast } from './Toast'
-import { currentFps } from '../perf'
+import { currentFps, formatHz } from '../perf'
 import { captureScreenshot, outputRecorder, recordingFormats, encoderAccepts, DXV_MAX_EDGE, type RecordingFormat } from '../recorder'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { DomeSim } from './DomeSim'
@@ -1508,7 +1508,7 @@ function ResourceHud(): JSX.Element {
   const fpsValue =
     fps > 0
       ? hz != null
-        ? `${Math.round(fps)} / ${Number.isInteger(hz) ? hz : hz.toFixed(2)} Hz`
+        ? `${Math.round(fps)} / ${formatHz(hz)} Hz`
         : String(Math.round(fps))
       : '-'
   return (

@@ -20,7 +20,7 @@ import { installOscMonitor, sendOsc as sendOscMsg } from './oscMonitor'
 import { applyMetaGlides, applyModulation, modEngine } from './engine/modulation'
 import { visionBus } from './engine/visionIn'
 import { depthEngine } from './engine/depthEstimate'
-import { currentFps, tickFrame, tickSkip } from './perf'
+import { currentFps, formatHz, tickFrame, tickSkip } from './perf'
 import { videoSeekRequests } from './engine/videoState'
 import { outputRecorder, encoderAccepts, warmUpRecorder } from './recorder'
 import StreamRelay from './workers/streamRelay?worker&inline'
@@ -1364,7 +1364,12 @@ export default function App(): JSX.Element {
         // queueing the output captures below, so the GPU reads them back while
         // we prepare the next frame. Waiting after them instead made the CPU and
         // GPU take turns : projector + Spout minimized fell to ~17 fps (measured).
-        if (timerMode || document.hidden) comp!.finishFrame()
+        const painting = !(timerMode || document.hidden)
+        // The grid readbacks below submit their own work only when nothing else
+        // will. Painting, the paint does it, and an extra submit can block on a
+        // full command queue (see gridReadback.kick).
+        comp!.paintingClock = painting
+        if (!painting) comp!.finishFrame()
         // 3a. Outside consumers of the finished picture. Each one is a GPU
         //     conversion + an ASYNCHRONOUS readback (engine/frameCapture) : the
         //     loop never waits on the GPU, a frame arrives a frame or two later.
@@ -2139,7 +2144,7 @@ function FpsTag(): JSX.Element {
       title={title}
     >
       {fps > 0
-        ? `${Math.round(fps)} fps${hz != null ? ` / ${Number.isInteger(hz) ? hz : hz.toFixed(2)} Hz` : ''}`
+        ? `${Math.round(fps)} fps${hz != null ? ` / ${formatHz(hz)} Hz` : ''}`
         : '- fps'}
     </div>
   )

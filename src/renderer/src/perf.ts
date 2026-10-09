@@ -55,3 +55,13 @@ export function currentSkips(nowMs: number): number {
   }
   return skipRate
 }
+
+/** The display's refresh rate as a readout should show it. The platform reports
+ *  a float, and a mode set to a round rate comes back a hair off it
+ *  (60.000003814697266 for 60 Hz on one machine), so a bare integer test fails
+ *  and two useless decimals appear. Rounds to two places first, then drops them
+ *  when nothing is left : "60", "59.94", "23.98". */
+export function formatHz(hz: number): string {
+  const r = Math.round(hz * 100) / 100
+  return Number.isInteger(r) ? String(r) : r.toFixed(2)
+}

@@ -26,7 +26,14 @@ that CI builds into cross-platform releases.
   single frame went from **42.8 ms to 5.5 ms**; blocking readback time per second went
   from **560 ms (mean) to 0.1 ms**. The picture is unchanged : the same passes, the same
   formats, the same resolution. Only when the bytes come back moved, and every consumer
-  of them already sampled at 11 to 30 Hz, slower than the latency this adds.
+  of them already sampled at 11 to 30 Hz, slower than the latency this adds. The queued
+  read is submitted to the GPU only when nothing else will submit it : a window that is
+  painting does that on its own a moment later, and a submit into a full command queue
+  blocks until a slot frees, so submitting by hand there charged the wait to whichever
+  section had queued the read (measured at 11.5 ms in the vision section of a scene
+  holding the GPU at 98%, with no synchronous read left anywhere). Measured on a 60 Hz
+  display, that removed 26 submits per second, exactly one per queued read, and left the
+  frame rate at a flat 60.
 
 - **The GPU and VRAM meters work on a Mac.** They shelled out to a discrete-card driver
   tool that does not exist there, so both read "-" for the whole session. Where the GPU
@@ -54,7 +61,11 @@ that CI builds into cross-platform releases.
   perfect 24-of-24 on a 24 Hz display a fault and sent a whole debugging session after
   it. The low-frame-rate warning turns red below 85% of the refresh rate rather than
   below a fixed 40, and the CPU frame-budget figures are measured against one frame on
-  that display (20.0 ms at 50 Hz) instead of 16.7 ms.
+  that display (20.0 ms at 50 Hz) instead of 16.7 ms. The rate is printed to two
+  decimal places only when it needs them, because the platform reports a mode set to a
+  round rate a hair off it (60.000003814697266 for 60 Hz) and a bare integer test let
+  that through as `60.00 Hz`. Fractional rates that are real, like 59.94 and 23.98,
+  keep their decimals.
 
 - **The frames the GPU backlog guard dropped are now counted**, as `skips` beside the
   frame rate. The guard skips a frame whenever the fence from two frames back has not

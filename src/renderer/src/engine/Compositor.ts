@@ -1880,6 +1880,11 @@ export class Compositor {
   private fences: WebGLSync[] = [];
   private skipSince = 0;
   backlogSkips = 0;
+  /** True while the render loop is on rAF, i.e. the window paints. The grid
+   *  readbacks use it to skip their own submit, since the paint submits their
+   *  work anyway and submitting into a full command queue blocks. The loop sets
+   *  it where it already decides between the rAF and timer clocks. */
+  paintingClock = true;
   gpuBacklogged(now: number): boolean {
     const gl = this.gl;
     while (this.fences.length) {
@@ -2083,7 +2088,7 @@ export class Compositor {
   visionSample(size: number): { grid: Uint8Array; size: number } | null {
     if (!this.lastPresent) return null;
     if (!this.visionRead) this.visionRead = new GridReadback(this.gl);
-    this.visionRead.kick(size, this.lastPresent, this.copyProg, this.uCTex, this.vao);
+    this.visionRead.kick(size, this.lastPresent, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
     return this.visionRead.takeLatest();
   }
 
@@ -2103,7 +2108,7 @@ export class Compositor {
     const key = kind === 'master' ? 'master' : `layer:${layer}`;
     let ring = this.soniRead.get(key);
     if (!ring) { ring = new GridReadback(this.gl); this.soniRead.set(key, ring); }
-    ring.kick(size, src, this.copyProg, this.uCTex, this.vao);
+    ring.kick(size, src, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
     const got = ring.takeLatest();
     if (!got) return false; // nothing has landed yet : the caller skips this tick
     out.set(got.grid);
@@ -2191,7 +2196,7 @@ export class Compositor {
   depthFrame(size: number): { data: Uint8Array; w: number; h: number } | null {
     if (!this.lastPresent) return null;
     if (!this.depthRead) this.depthRead = new GridReadback(this.gl);
-    this.depthRead.kick(size, this.lastPresent, this.copyProg, this.uCTex, this.vao);
+    this.depthRead.kick(size, this.lastPresent, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
     const got = this.depthRead.takeLatest();
     if (!got) return null;
     // readPixels is bottom-up; the depth model expects an upright picture (its

@@ -13,7 +13,7 @@
 import { useEffect, useState } from 'react'
 import type { PerfStats } from '@shared/types'
 import { perfMeter } from '../engine/perfMeter'
-import { currentFps, currentSkips } from '../perf'
+import { currentFps, currentSkips, formatHz } from '../perf'
 import { useStore } from '../store'
 
 const MB = 1024 * 1024
@@ -143,7 +143,7 @@ export function PerformancePanel(): JSX.Element {
   // on a 24 Hz display a fault and sent a whole debugging session after it. Short
   // of a reading, fall back to the old fixed threshold.
   const hz = stats.hz
-  const hzLabel = hz == null ? '' : ` / ${Number.isInteger(hz) ? hz : hz.toFixed(2)} Hz`
+  const hzLabel = hz == null ? '' : ` / ${formatHz(hz)} Hz`
   const fpsLow = fps > 0 && (hz != null ? fps < hz * 0.85 : fps < 40)
   // One frame's worth of time on THIS display, which is what the per-section
   // bars below are measured against. A 60 Hz constant made every bar read short
@@ -173,7 +173,7 @@ export function PerformancePanel(): JSX.Element {
 
           {/* CPU frame budget : measured ms/frame per section. */}
           <div className="flex flex-col gap-0.5">
-            <div className="flex cursor-help items-baseline justify-between font-mono text-[8px] uppercase tracking-wide text-muted" title={`CPU milliseconds spent per frame, measured per section (JS dispatch + readbacks + audio / MediaPipe work). The right-hand figure is the sum of the measured sections against one frame's worth of time on this display${hz != null ? `, ${budget.toFixed(1)} ms at ${Number.isInteger(hz) ? hz : hz.toFixed(2)} Hz` : ''}. Hover any row for what it covers.`}>
+            <div className="flex cursor-help items-baseline justify-between font-mono text-[8px] uppercase tracking-wide text-muted" title={`CPU milliseconds spent per frame, measured per section (JS dispatch + readbacks + audio / MediaPipe work). The right-hand figure is the sum of the measured sections against one frame's worth of time on this display${hz != null ? `, ${budget.toFixed(1)} ms at ${formatHz(hz)} Hz` : ''}. Hover any row for what it covers.`}>
               <span>CPU per frame (ms)</span>
               <span>measured {cpuMeasured.toFixed(1)} / {budget.toFixed(1)} ms</span>
             </div>
