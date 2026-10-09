@@ -1449,10 +1449,17 @@ function fmtClock(sec: number): string {
 }
 
 // Floating realtime resource monitor (top-left of the preview). Polls main for
-// Palinopsia's CPU/RAM + the GPU's VRAM/util once a second; reads the renderer
-// FPS meter every rAF. Pure DOM sampling, no store churn.
+// Palinopsia's CPU/RAM + the GPU's VRAM/util + the display's refresh rate once a
+// second; reads the renderer FPS meter every rAF. Pure DOM sampling, no store
+// churn.
 function ResourceHud(): JSX.Element {
-  const [stats, setStats] = useState<PerfStats>({ cpu: null, ram: null, vram: null, gpu: null })
+  const [stats, setStats] = useState<PerfStats>({
+    cpu: null,
+    ram: null,
+    vram: null,
+    gpu: null,
+    hz: null
+  })
   const [fps, setFps] = useState(0)
 
   useEffect(() => {
@@ -1488,15 +1495,29 @@ function ResourceHud(): JSX.Element {
   }, [])
 
   const pct = (v: number | null): string => (v == null ? '-' : `${Math.round(v)}%`)
-  const cell = (label: string, value: string): JSX.Element => (
-    <div className="flex items-baseline gap-1.5">
+  const cell = (label: string, value: string, title?: string): JSX.Element => (
+    <div className={`flex items-baseline gap-1.5 ${title ? 'cursor-help' : ''}`} title={title}>
       <span className="text-[10px] uppercase tracking-wide text-muted">{label}</span>
       <span className="tabular-nums text-[14px] text-text">{value}</span>
     </div>
   )
+  // The render rides the display's vsync, so the frame rate cannot exceed the
+  // refresh rate. Showing the rate beside it is what makes the number readable :
+  // 24 of 24 is every frame drawn, and looks nothing like 24 of 60.
+  const hz = stats.hz
+  const fpsValue =
+    fps > 0
+      ? hz != null
+        ? `${Math.round(fps)} / ${Number.isInteger(hz) ? hz : hz.toFixed(2)} Hz`
+        : String(Math.round(fps))
+      : '-'
   return (
     <div className="flex shrink-0 items-center justify-center gap-6 border-t border-border bg-panel/60 py-2 font-mono">
-      {cell('FPS', fps > 0 ? String(Math.round(fps)) : '-')}
+      {cell(
+        'FPS',
+        fpsValue,
+        'Composition frames per second, then the refresh rate of the display this window is on. The render is locked to that refresh rate, so matching it means every frame is being drawn.'
+      )}
       {cell('CPU', pct(stats.cpu))}
       {cell('RAM', pct(stats.ram))}
       {cell('VRAM', pct(stats.vram))}

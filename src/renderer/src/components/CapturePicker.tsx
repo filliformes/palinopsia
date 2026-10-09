@@ -2,7 +2,7 @@
 // thumbnails from the main process) for choosing a screen-capture source.
 
 import { useCallback, useEffect, useState } from 'react'
-import type { CaptureSourceInfo } from '@shared/types'
+import type { CaptureSourceInfo, ScreenAccess } from '@shared/types'
 
 export function CapturePicker({
   onPick,
@@ -12,11 +12,21 @@ export function CapturePicker({
   onCancel: () => void
 }): JSX.Element {
   const [sources, setSources] = useState<CaptureSourceInfo[] | null>(null)
+  // macOS will not let an app read the screen without a permission granted in
+  // its own settings, and no app can prompt for it. Denied, the enumeration
+  // below still answers : every thumbnail comes back black and every window
+  // loses its title. Without asking first, this modal is a grid of black
+  // rectangles with no explanation.
+  const [access, setAccess] = useState<ScreenAccess>('granted')
 
   // Re-enumerable : plug in a window/projector after opening and hit ⟳ rescan
   // instead of having to close and reopen the modal.
   const refresh = useCallback((): void => {
     setSources(null)
+    window.api
+      .captureScreenAccess()
+      .then(setAccess)
+      .catch(() => setAccess('granted'))
     window.api.captureListSources().then(setSources).catch(() => setSources([]))
   }, [])
   useEffect(() => refresh(), [refresh])
@@ -64,6 +74,7 @@ export function CapturePicker({
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          {access !== 'granted' && <ScreenAccessNotice onRescan={refresh} />}
           {sources === null ? (
             <div className="p-6 text-center text-[12px] text-muted">Enumerating sources…</div>
           ) : sources.length === 0 ? (
@@ -83,6 +94,41 @@ export function CapturePicker({
             </>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+/** Shown when the system refuses screen reading, which only macOS does. The two
+ *  facts that matter are not guessable from a black thumbnail : where the switch
+ *  is, and that it takes effect only on the next start, because the permission
+ *  is read once when the app launches. */
+function ScreenAccessNotice({ onRescan }: { onRescan: () => void }): JSX.Element {
+  return (
+    <div className="mb-3 rounded border border-danger/50 bg-danger/10 p-3">
+      <div className="mb-1 font-mono text-[9px] uppercase tracking-wide text-danger">
+        screen recording is off
+      </div>
+      <p className="text-[12px] leading-snug text-muted">
+        This computer is not letting Palinopsia read the screen, so the pictures below are
+        black and windows have no names. Turn Palinopsia on under Privacy &amp; Security,
+        Screen &amp; System Audio Recording, then start Palinopsia again : the permission is
+        only read at launch. A camera or a video file needs none of this.
+      </p>
+      <div className="mt-2 flex items-center gap-1">
+        <button
+          onClick={() => void window.api.captureOpenScreenSettings()}
+          className="rounded border border-danger/50 bg-danger/10 px-2 py-0.5 font-mono text-[11px] text-danger hover:bg-danger/20"
+        >
+          open the setting
+        </button>
+        <button
+          onClick={onRescan}
+          className="rounded border border-border px-2 py-0.5 font-mono text-[11px] text-muted hover:text-accent"
+          title="Already granted it and started the app again? Rescan."
+        >
+          ⟳ rescan
+        </button>
       </div>
     </div>
   )

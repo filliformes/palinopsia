@@ -101,7 +101,11 @@ The papers, books and standards the instrument draws on are listed in
   temporary copy), then run `xattr -cr /Applications/Palinopsia.app` once in Terminal, or
   open it and click **Open Anyway** in System Settings → Privacy & Security. Accept the
   local network prompt on the first launch (OSC, NDI and light output need it), and the
-  camera / microphone prompts when you use them.
+  camera / microphone prompts when you use them. **Screen capture is the one permission
+  macOS never prompts for** : to use a screen or a window as a source, switch Palinopsia
+  on under System Settings → Privacy & Security → **Screen & System Audio Recording**, then
+  start the app again, because the permission is only read at launch. Until then the
+  capture picker says so and offers the setting on a click. Nothing else needs it.
 - **Windows** : the installer or the portable exe; SmartScreen : More info → Run anyway.
 - **Linux** : the AppImage (`chmod +x` it, then run it) or the `.deb`.
 
@@ -588,7 +592,12 @@ The **audio/midi/osc** right-column tab (key `A`) holds the control panels
   (render, output, vision, depth, lights, sonify, audio, modulation, MediaPipe)
   with its CPU frame-budget share, estimated VRAM, and active-feature chips, so you
   can see what a heavy session is spending, with units and hover tooltips on every
-  figure. Fixed layout (no reflow as modulation comes and goes). Under it, the
+  figure. The header reads the frame rate against the display's refresh rate, and
+  counts the frames the GPU backlog guard dropped (`skips`), which never reach the
+  frame counter : a steady count there means the guard is throttling the render, and
+  near zero means the frame rate is simply the display's own pace. The frame-budget
+  figures are measured against one frame on that display, not a fixed 60 Hz.
+  Fixed layout (no reflow as modulation comes and goes). Under it, the
   **picture** section reads out every feature the picture reports, live : light and
   color (brightness, contrast, saturation, hue, warmth), texture (edges, entropy),
   motion (amount, flow sideways and up/down, spreading or closing, turning, moving as
@@ -848,15 +857,22 @@ bottom:
   - **On the machine** : turn on automatic login, turn off the lock screen, screen saver
     and automatic OS updates (Windows Update can also swap the graphics driver), and
     launch the app once by hand to accept every permission prompt (local network,
-    camera, microphone, Documents) with the build that will run the show.
+    camera, microphone, Documents) with the build that will run the show. If the show
+    captures a screen or a window, grant that too : on a Mac it is never prompted for
+    (see below), and it is read only at launch, so an installation that asks for it after
+    boot gets a black picture until something restarts the app.
   - **On a Mac** : Palinopsia in **Applications** and `xattr -cr` run on it (or Open
     Anyway) BEFORE turning on Start with the computer (it refuses from the disk image).
+    Screen capture needs Palinopsia switched on under System Settings → Privacy &
+    Security → **Screen & System Audio Recording**, by hand, before the show.
     Automatic login needs FileVault off (System Settings → Users & Groups). Turn on a
     **Focus** mode so notifications stay quiet, set the display to never sleep on power
     adapter, turn off automatic macOS updates, and keep the Mac on its charger. The app
     keeps itself out of App Nap and keeps rendering while its fullscreen output covers
     its control window.
-- A resource **HUD** (FPS · CPU · RAM · VRAM · GPU).
+- A resource **HUD** (FPS and the display's refresh rate · CPU · RAM · VRAM · GPU). The
+  render is locked to the refresh rate of the display the window is on, so that rate is
+  the ceiling : `50 / 50 Hz` is every frame drawn, and reads nothing like `50 / 60 Hz`.
 
 ![Output and mapping](docs/images/interface-output.jpg)
 

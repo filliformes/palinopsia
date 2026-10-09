@@ -74,6 +74,8 @@ const api: ExposedApi = {
   // removed File.path). The renderer turns this into an opsia-media:// URL.
   getMediaPath: (file: File) => webUtils.getPathForFile(file),
   captureListSources: () => ipcRenderer.invoke('capture:listSources'),
+  captureScreenAccess: () => ipcRenderer.invoke('capture:screenAccess'),
+  captureOpenScreenSettings: () => ipcRenderer.invoke('capture:openScreenSettings'),
   // Codec probe + ffmpeg conversion (DXV3 / HAP / ProRes… → all-intra H.264 cache).
   videoProbe: (path: string) => ipcRenderer.invoke('video:probe', path),
   videoConvert: (path: string) => ipcRenderer.invoke('video:convert', path),
@@ -222,6 +224,7 @@ const api: ExposedApi = {
 
   // ── Resource HUD + recording ─────────────────────────────────────
   perfStats: () => ipcRenderer.invoke('perf:stats'),
+  displayHz: () => ipcRenderer.invoke('display:hz'),
   recordingFormats: () => ipcRenderer.invoke('recording:formats'),
   recordingFolder: () => ipcRenderer.invoke('recording:folder'),
   recordingChooseFolder: () => ipcRenderer.invoke('recording:chooseFolder'),

@@ -14,7 +14,8 @@ import {
   desktopCapturer,
   screen,
   globalShortcut,
-  powerSaveBlocker
+  powerSaveBlocker,
+  systemPreferences
 } from 'electron'
 import { join } from 'path'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
@@ -38,7 +39,7 @@ import { prepareNdi } from './ndi/prepare'
 import { installNdiRuntime } from './ndi/install'
 import { sanitizeNdiConfig } from '@shared/ndi'
 import { LightSender } from './light'
-import { samplePerf } from './perf'
+import { displayHz, samplePerf } from './perf'
 import * as recording from './recording'
 import { installLogging, log, logFrom } from './log'
 import { autostartStatus, removeAutostartNow, setAutostart, WATCHDOG_ARG } from './autostart'
@@ -835,6 +836,33 @@ app.whenReady().then(async () => {
   // ---------- IPC: Capture ----------
   // Enumerate screens + windows (with thumbnails) so the renderer can offer a
   // source picker for screen capture.
+  // Whether this machine will actually let us read the screen. Only macOS gates
+  // it : there, screen capture needs a permission the operating system grants in
+  // its own settings and that NO app can prompt for. Without it the enumeration
+  // below still succeeds, it just comes back with black thumbnails and windows
+  // stripped of their titles, so the picker has to say why instead of showing a
+  // grid of black rectangles. For screen capture macOS answers only "granted" or
+  // "denied" : there is no "not yet asked" to distinguish.
+  safeHandle('capture:screenAccess', () => {
+    if (process.platform !== 'darwin') return 'granted'
+    try {
+      return systemPreferences.getMediaAccessStatus('screen')
+    } catch {
+      return 'granted' // no such API : assume nothing is in the way
+    }
+  })
+
+  // Open the exact settings pane for that permission, so granting it is one click
+  // away rather than a hunt. The app has to be started again afterwards : the
+  // permission is read once, when the process launches.
+  safeHandle('capture:openScreenSettings', async () => {
+    if (process.platform !== 'darwin') return false
+    await shell.openExternal(
+      'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture'
+    )
+    return true
+  })
+
   safeHandle('capture:listSources', async () => {
     const sources = await desktopCapturer.getSources({
       types: ['screen', 'window'],
@@ -885,7 +913,12 @@ app.whenReady().then(async () => {
   })
 
   // ---------- IPC: Resource HUD ----------
-  safeHandle('perf:stats', () => samplePerf())
+  // The window is passed so the sample can report the refresh rate of the
+  // display it is actually on, which is the render loop's frame-rate ceiling.
+  safeHandle('perf:stats', () => samplePerf(mainWindow))
+  // The ceiling on its own : a screen lookup, no helper process, so a readout
+  // can poll it all session without costing anything.
+  safeHandle('display:hz', () => displayHz(mainWindow))
 
   // ---------- IPC: Recording + screenshots ----------
   safeHandle('recording:formats', () => recording.recordingFormats())

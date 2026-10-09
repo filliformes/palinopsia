@@ -58,6 +58,7 @@ import type { BlendMode, LayerMask } from '@shared/types';
 import type { DomeConfig } from '@shared/dome';
 import { DomeStage } from './dome';
 import { FrameCapture, captureSize, type CaptureFormat, type CapturedFrame } from './frameCapture';
+import { GridReadback } from './gridReadback';
 import { BLEND_MODES } from '@shared/types';
 export type { BlendMode };
 
@@ -2066,78 +2067,46 @@ export class Compositor {
   //    Call AFTER render() (the default framebuffer then holds the presented frame).
   private markStripBuf: Uint8Array | null = null;
   // ── Vision feature sampling (the return path : image → control) ──────────
-  private visionFbo: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
-  private visionBuf: Uint8Array | null = null;
-  private visionSize = 0;
+  private visionRead: GridReadback | null = null;
 
-  /** Downsample the just-presented frame to a size×size grid and read it back (a
-   *  few KB) so the renderer can extract control features from the picture. One
-   *  linear-filtered copy draw : a sparse but representative sample, cheap. Call
-   *  AFTER render() (uses the presented texture). Null if nothing shown yet. */
+  /** Downsample the just-presented frame to a size×size grid and read it back so
+   *  the renderer can extract control features from the picture. One
+   *  linear-filtered copy draw : a sparse but representative sample. Call AFTER
+   *  render() (uses the presented texture).
+   *
+   *  The readback is ASYNCHRONOUS (see gridReadback.ts), so this queues THIS
+   *  frame and returns the grid of a frame or two ago, or null until the first
+   *  one lands. That staleness costs nothing : the caller samples at ~30Hz, so
+   *  the reading it used to get synchronously was already older than this.
+   *  Reading it synchronously drained the GPU pipeline instead, which on an
+   *  integrated GPU cost ~17ms of real frame time per call. */
   visionSample(size: number): { grid: Uint8Array; size: number } | null {
-    const gl = this.gl;
     if (!this.lastPresent) return null;
-    if (!this.visionFbo || this.visionSize !== size) {
-      if (this.visionFbo) { gl.deleteFramebuffer(this.visionFbo.fbo); gl.deleteTexture(this.visionFbo.tex); }
-      const tex = gl.createTexture()!;
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      const fbo = gl.createFramebuffer()!;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-      this.visionFbo = { fbo, tex };
-      this.visionSize = size;
-      this.visionBuf = new Uint8Array(size * size * 4);
-    }
-    gl.bindVertexArray(this.vao);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.visionFbo.fbo);
-    gl.viewport(0, 0, size, size);
-    gl.useProgram(this.copyProg);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.lastPresent); gl.uniform1i(this.uCTex, 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.readPixels(0, 0, size, size, gl.RGBA, gl.UNSIGNED_BYTE, this.visionBuf as Uint8Array);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.bindVertexArray(null);
-    return { grid: this.visionBuf as Uint8Array, size };
+    if (!this.visionRead) this.visionRead = new GridReadback(this.gl);
+    this.visionRead.kick(size, this.lastPresent, this.copyProg, this.uCTex, this.vao);
+    return this.visionRead.takeLatest();
   }
 
   // ── Sonify tap readback : a 96×96 downsample of the presented frame OR one
   //    layer's post-FX image, read by the sonification engine at ~30Hz. Same
-  //    pattern as visionSample (tiny sync read after a downsample draw). ──
-  private soniFbo: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
+  //    pattern as visionSample : queue this frame, hand back the one that has
+  //    landed. One ring per tap, since the two taps can read different sources.
+  private soniRead = new Map<string, GridReadback>();
 
   readSonifyGrid(kind: 'master' | 'layer', layer: number, out: Uint8Array): boolean {
-    const gl = this.gl;
     const size = 96;
     if (out.length < size * size * 4) return false;
     const src = kind === 'master' ? this.lastPresent : this.layers[layer]?.texture() ?? null;
     if (!src) return false;
-    if (!this.soniFbo) {
-      const tex = gl.createTexture()!;
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      const fbo = gl.createFramebuffer()!;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-      this.soniFbo = { fbo, tex };
-    }
-    gl.bindVertexArray(this.vao);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.soniFbo.fbo);
-    gl.viewport(0, 0, size, size);
-    gl.useProgram(this.copyProg);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src); gl.uniform1i(this.uCTex, 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.readPixels(0, 0, size, size, gl.RGBA, gl.UNSIGNED_BYTE, out);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.bindVertexArray(null);
+    // Keyed on the SOURCE, not the tap : the master tap ignores `layer`, and a
+    // key that carried it would open a ring per layer index for the same picture.
+    const key = kind === 'master' ? 'master' : `layer:${layer}`;
+    let ring = this.soniRead.get(key);
+    if (!ring) { ring = new GridReadback(this.gl); this.soniRead.set(key, ring); }
+    ring.kick(size, src, this.copyProg, this.uCTex, this.vao);
+    const got = ring.takeLatest();
+    if (!got) return false; // nothing has landed yet : the caller skips this tick
+    out.set(got.grid);
     return true;
   }
 
@@ -2149,10 +2118,8 @@ export class Compositor {
   private depthRGBA: Uint8Array | null = null;
   private depthW = 0;
   private depthH = 0;
-  private depthFbo: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
-  private depthReadBuf: Uint8Array | null = null;
+  private depthRead: GridReadback | null = null;
   private depthFlipBuf: Uint8Array | null = null;
-  private depthReadSize = 0;
   // True once a real depth map is in (synthetic test bowl or the estimator).
   // With Depth off the map is a flat stand-in that nodes must not mistake for
   // depth : they get null instead and fall back to their brightness mode.
@@ -2217,37 +2184,19 @@ export class Compositor {
     this.setDepth(d, S, S, 1);
   }
 
-  /** Read the presented frame down to size×size RGBA (the depth estimator input). */
+  /** Read the presented frame down to size×size RGBA (the depth estimator input).
+   *  Asynchronous like visionSample : queues this frame, returns one from a
+   *  frame or two back. The estimator runs at ~11Hz and smooths its result into
+   *  the map with an EMA, so it cannot tell the difference. */
   depthFrame(size: number): { data: Uint8Array; w: number; h: number } | null {
-    const gl = this.gl;
     if (!this.lastPresent) return null;
-    if (!this.depthFbo || this.depthReadSize !== size) {
-      if (this.depthFbo) { gl.deleteFramebuffer(this.depthFbo.fbo); gl.deleteTexture(this.depthFbo.tex); }
-      const tex = gl.createTexture()!;
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      const fbo = gl.createFramebuffer()!;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-      this.depthFbo = { fbo, tex }; this.depthReadSize = size;
-      this.depthReadBuf = new Uint8Array(size * size * 4);
-    }
-    gl.bindVertexArray(this.vao);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.depthFbo.fbo);
-    gl.viewport(0, 0, size, size);
-    gl.useProgram(this.copyProg);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.lastPresent); gl.uniform1i(this.uCTex, 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.readPixels(0, 0, size, size, gl.RGBA, gl.UNSIGNED_BYTE, this.depthReadBuf as Uint8Array);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.bindVertexArray(null);
+    if (!this.depthRead) this.depthRead = new GridReadback(this.gl);
+    this.depthRead.kick(size, this.lastPresent, this.copyProg, this.uCTex, this.vao);
+    const got = this.depthRead.takeLatest();
+    if (!got) return null;
     // readPixels is bottom-up; the depth model expects an upright picture (its
     // sky / ground priors), so hand it the rows top-down.
-    const src = this.depthReadBuf as Uint8Array, row = size * 4;
+    const src = got.grid, row = size * 4;
     if (!this.depthFlipBuf || this.depthFlipBuf.length !== src.length) this.depthFlipBuf = new Uint8Array(src.length);
     const out = this.depthFlipBuf;
     for (let y = 0; y < size; y++) out.set(src.subarray((size - 1 - y) * row, (size - y) * row), y * row);
@@ -3226,6 +3175,11 @@ export class Compositor {
     this.dome?.dispose();
     for (const cap of this.captures.values()) cap.dispose();
     this.captures.clear();
+    // Readback rings hold fences : drop them before the context goes.
+    this.visionRead?.dispose(); this.visionRead = null;
+    this.depthRead?.dispose(); this.depthRead = null;
+    for (const r of this.soniRead.values()) r.dispose();
+    this.soniRead.clear();
     this.pbrLib?.dispose();
     disposeTarget(gl, this.bgScratch);
     disposeTarget(gl, this.bgFill);
@@ -3241,10 +3195,7 @@ export class Compositor {
     disposeTarget(gl, this.xfadeTarget);
     if (this.fxOpac) { disposeTarget(gl, this.fxOpac[0]); disposeTarget(gl, this.fxOpac[1]); }
     if (this.audioTexGL) { gl.deleteTexture(this.audioTexGL); this.audioTexGL = null; }
-    if (this.soniFbo) { gl.deleteFramebuffer(this.soniFbo.fbo); gl.deleteTexture(this.soniFbo.tex); this.soniFbo = null; }
-    if (this.visionFbo) { gl.deleteFramebuffer(this.visionFbo.fbo); gl.deleteTexture(this.visionFbo.tex); this.visionFbo = null; }
     if (this.depthTex) { gl.deleteTexture(this.depthTex); this.depthTex = null; }
-    if (this.depthFbo) { gl.deleteFramebuffer(this.depthFbo.fbo); gl.deleteTexture(this.depthFbo.tex); this.depthFbo = null; }
     if (this.warmFbo) { disposeTarget(gl, this.warmFbo); this.warmFbo = null; }
     if (this.warmInput) { disposeTarget(gl, this.warmInput); this.warmInput = null; }
     if (this.warmNode) { for (const t of this.warmNode.targets) disposeTarget(gl, t); this.warmNode = null; }

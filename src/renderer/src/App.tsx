@@ -20,7 +20,7 @@ import { installOscMonitor, sendOsc as sendOscMsg } from './oscMonitor'
 import { applyMetaGlides, applyModulation, modEngine } from './engine/modulation'
 import { visionBus } from './engine/visionIn'
 import { depthEngine } from './engine/depthEstimate'
-import { currentFps, tickFrame } from './perf'
+import { currentFps, tickFrame, tickSkip } from './perf'
 import { videoSeekRequests } from './engine/videoState'
 import { outputRecorder, encoderAccepts, warmUpRecorder } from './recorder'
 import StreamRelay from './workers/streamRelay?worker&inline'
@@ -1141,7 +1141,14 @@ export default function App(): JSX.Element {
     const loop = (): void => {
       if (halted) return // the context was lost : the rebuilt engine takes over
       // The GPU is still two frames behind : skip this one (see gpuBacklogged).
-      if (comp && comp.gpuBacklogged(performance.now())) { schedule(); return }
+      // Counted, because a skip returns before tickFrame() below and so cannot
+      // appear in the FPS readout : the Performance tab reports skips/s next to
+      // the frame rate, which is what tells a throttling guard from a display
+      // that is simply running slower.
+      if (comp) {
+        const tSkip = performance.now()
+        if (comp.gpuBacklogged(tSkip)) { tickSkip(tSkip); schedule(); return }
+      }
       engineFrames++
       // The whole body is guarded: a shader that throws at load or draw time
       // must never kill the loop (that's a permanent freeze). Lose one frame,
@@ -1449,9 +1456,13 @@ export default function App(): JSX.Element {
         // 3c. Return path (image → control): reduce the presented frame to vision
         //     features that drive `vision` modulators next frame + stream out over
         //     OSC. Gated to when something actually reads them (a vision modulator
-        //     or outbound feedback), so the tiny readback is skipped otherwise.
-        //     Throttled to ~30Hz : a sync readPixels (even 4KB) flushes the GPU
-        //     pipeline, and the vision features don't need frame-rate freshness.
+        //     or outbound feedback), so the readback is skipped otherwise.
+        //     Throttled to ~30Hz : the vision features don't need frame-rate
+        //     freshness, and each sample is still a draw. The readback itself is
+        //     asynchronous now (see gridReadback.ts), so the grid this returns is
+        //     one or two frames old ; reading it synchronously instead drained the
+        //     GPU pipeline and cost ~17ms of frame time on an integrated GPU,
+        //     which was most of the cost of having the Performance tab open.
         //     Assemble's target-driven mode reads the SAME bus, so it has to be
         //     in this gate too : without it the matcher saw an all-defaults bus
         //     forever and "follow the live output" silently did nothing unless
@@ -1501,8 +1512,10 @@ export default function App(): JSX.Element {
           }
         }
         if (st.depthMode === 'estimate') {
-          // Throttle the frame readback to the estimator's cadence (~11 Hz) so we
-          // don't stall the pipeline with a 256² readback every frame.
+          // Throttle to the estimator's cadence (~11 Hz) : it cannot consume more,
+          // and every sample is still a 256² downsample draw. The readback is
+          // asynchronous (see gridReadback.ts), so this hands the estimator a
+          // frame from one or two frames back and the EMA absorbs the difference.
           if (now - lastDepthSample > 85) {
             lastDepthSample = now
             perfMeter.begin('depth')
@@ -2094,13 +2107,40 @@ async function openKioskOutput(windowed: boolean): Promise<void> {
 
 function FpsTag(): JSX.Element {
   const [fps, setFps] = useState(0)
+  // The render rides the display's vsync, so this number cannot exceed the
+  // refresh rate. Showing the rate beside it is the difference between "the
+  // instrument is drawing every frame" and "the instrument is dropping half of
+  // them", and this corner is where that gets read mid-performance. Polled
+  // slowly : it only changes if the display mode does, or the window moves to
+  // another screen.
+  const [hz, setHz] = useState<number | null>(null)
   useEffect(() => {
     const id = window.setInterval(() => setFps(currentFps()), 400)
-    return () => window.clearInterval(id)
+    const readHz = (): void => {
+      window.api
+        .displayHz()
+        .then(setHz)
+        .catch(() => {})
+    }
+    readHz()
+    const hzId = window.setInterval(readHz, 2000)
+    return () => {
+      window.clearInterval(id)
+      window.clearInterval(hzId)
+    }
   }, [])
+  const title =
+    hz != null
+      ? 'Composition frames per second, then the refresh rate of the display this window is on. The render is locked to that rate, so matching it means every frame is drawn.'
+      : 'Composition frames per second (rolling average).'
   return (
-    <div className="pointer-events-none absolute bottom-2 right-2 font-mono text-[10px] text-muted/70">
-      {fps > 0 ? `${Math.round(fps)} fps` : '- fps'}
+    <div
+      className="pointer-events-none absolute bottom-2 right-2 font-mono text-[10px] text-muted/70"
+      title={title}
+    >
+      {fps > 0
+        ? `${Math.round(fps)} fps${hz != null ? ` / ${Number.isInteger(hz) ? hz : hz.toFixed(2)} Hz` : ''}`
+        : '- fps'}
     </div>
   )
 }

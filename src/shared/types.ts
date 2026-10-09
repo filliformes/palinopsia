@@ -1000,6 +1000,11 @@ export interface CaptureSourceInfo {
   thumbnail: string // data URL
 }
 
+/** What the operating system says about reading the screen. macOS is the only
+ *  platform that gates it, and for screen capture it answers only the first two :
+ *  there is no "not yet asked" state to tell apart, because no app can ask. */
+export type ScreenAccess = 'granted' | 'denied' | 'restricted' | 'unknown'
+
 // Per-frame render state pushed to the native output window (it drives its own
 // Compositor from this : no WebRTC transcode).
 /** The recording folder, as main reports it (see main/recording.ts). */
@@ -1247,6 +1252,13 @@ export interface ExposedApi {
   onAssembleExportProgress: (cb: (p: { pct: number }) => void) => () => void
   // Screens + windows for the capture source picker.
   captureListSources: () => Promise<CaptureSourceInfo[]>
+  // Whether this machine lets the app read the screen at all. Always "granted"
+  // off macOS, which is the only one that gates it. Ask before trusting a
+  // thumbnail : denied, the enumeration still answers, with black pictures.
+  captureScreenAccess: () => Promise<ScreenAccess>
+  // Open the settings pane that grants it (macOS). The app has to be started
+  // again afterwards.
+  captureOpenScreenSettings: () => Promise<boolean>
   // Output window (2nd display / projector) : mirror via WebRTC loopback.
   outputDisplays: () => Promise<DisplayInfo[]>
   outputOpen: (displayId: number, windowed?: boolean) => Promise<boolean>
@@ -1315,6 +1327,9 @@ export interface ExposedApi {
   onKioskExited: (cb: () => void) => () => void
   // Host resource monitor (Output HUD).
   perfStats: () => Promise<PerfStats>
+  // Just the refresh rate of the display the window is on, for readouts that
+  // want the frame-rate ceiling without paying for a whole resource sample.
+  displayHz: () => Promise<number | null>
   // Recording: intermediate MediaRecorder chunks streamed to main → ffmpeg
   // delivery-format transcode/remux on stop → Recorded/. Plus screenshot.
   recordingFormats: () => Promise<Array<{ id: string; label: string; kind: 'realtime' | 'encoder' }>>
@@ -1332,11 +1347,17 @@ export interface ExposedApi {
 
 // A snapshot of the host resources Palinopsia is using, for the Output HUD.
 // `cpu`/`ram` are Palinopsia's own share; `vram`/`gpu` are GPU-wide (per-process
-// VRAM isn't reliably attributable). Any field is null when unavailable
-// (e.g. no nvidia-smi).
+// VRAM isn't reliably attributable). Any field is null when the host has no way
+// to report it.
 export interface PerfStats {
   cpu: number | null // % CPU (summed across Palinopsia's processes)
   ram: number | null // % of host RAM used by Palinopsia
-  vram: number | null // % of GPU VRAM in use (whole GPU)
+  // % of GPU memory in use (whole GPU). On a unified-memory machine there is no
+  // separate pool, so this is the share of system memory the GPU driver holds.
+  vram: number | null
   gpu: number | null // % GPU utilisation (whole GPU)
+  // Refresh rate of the display the main window is on. The render loop is
+  // vsync-locked to it, so it is the ceiling the FPS readout should be read
+  // against : 24 fps on a 24 Hz display is every frame, not a dropped one.
+  hz: number | null
 }

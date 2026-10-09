@@ -93,7 +93,10 @@ mac:
   extendInfo:
     NSCameraUsageDescription: Palinopsia uses a camera as a live video source and for body tracking, only when you choose one.
     NSMicrophoneUsageDescription: Palinopsia listens to an audio input to drive the picture and the sound, only when you choose one.
-    NSAudioCaptureUsageDescription: Palinopsia can capture the screen as a video source when you choose it.
+    # No screen-capture key here on purpose : macOS does not let an app word that
+    # one, and no app can prompt for it either. It is granted by hand under
+    # Privacy & Security, and read only at launch, so the capture picker asks the
+    # system for the answer and says so itself (capture:screenAccess in main).
     NSLocalNetworkUsageDescription: Palinopsia sends and receives OSC, NDI video, Art-Net and WLED light data and HIVE streams on your local network.
     NSDocumentsFolderUsageDescription: Palinopsia keeps its sessions and recordings in Documents/Palinopsia.
     NSBonjourServices:

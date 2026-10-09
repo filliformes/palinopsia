@@ -1,7 +1,8 @@
 // Performance tab (right of audio/midi/osc) : the whole instrument's load at a
 // glance. Three readings :
-//   · Top line : host totals from main's sampler (FPS, frame ms, whole-GPU
-//     util/VRAM, app CPU/RAM). GPU fields are NVIDIA-only, else "—".
+//   · Top line : host totals from main's sampler (FPS and the display's refresh
+//     rate, guard skips, frame ms, whole-GPU util/VRAM, app CPU/RAM). The GPU
+//     fields come from whichever driver query the host answers, else "-".
 //   · CPU frame budget : measured ms/frame per section (engine/perfMeter). This
 //     is the CPU-side toll (dispatch + readbacks + audio / MediaPipe work) ;
 //     WebGL doesn't expose per-section GPU time, so that's not claimed here.
@@ -12,7 +13,7 @@
 import { useEffect, useState } from 'react'
 import type { PerfStats } from '@shared/types'
 import { perfMeter } from '../engine/perfMeter'
-import { currentFps } from '../perf'
+import { currentFps, currentSkips } from '../perf'
 import { useStore } from '../store'
 
 const MB = 1024 * 1024
@@ -102,13 +103,14 @@ export function PerformancePanel(): JSX.Element {
   const depthMode = useStore((s) => s.depthMode)
   const recording = useStore((s) => s.recording)
 
-  const [stats, setStats] = useState<PerfStats>({ cpu: null, ram: null, vram: null, gpu: null })
+  const [stats, setStats] = useState<PerfStats>({ cpu: null, ram: null, vram: null, gpu: null, hz: null })
   const [fps, setFps] = useState(0)
+  const [skips, setSkips] = useState(0)
   const [cpu, setCpu] = useState<Record<string, number>>({})
 
   // Its own tab : mounted (and metering) only while shown.
   useEffect(() => {
-    const fast = window.setInterval(() => { setFps(currentFps()); setCpu(perfMeter.read()) }, 250)
+    const fast = window.setInterval(() => { setFps(currentFps()); setSkips(currentSkips(performance.now())); setCpu(perfMeter.read()) }, 250)
     const slow = window.setInterval(() => { window.api.perfStats().then(setStats).catch(() => {}) }, 800)
     window.api.perfStats().then(setStats).catch(() => {})
     return () => { window.clearInterval(fast); window.clearInterval(slow) }
@@ -120,7 +122,6 @@ export function PerformancePanel(): JSX.Element {
   const vramTotal = vram.reduce((s, g) => s + g.bytes, 0)
   const vramMax = Math.max(vramTotal, ...vram.map((g) => g.bytes), 1)
   const cpuMeasured = CPU_ROWS.reduce((s, r) => s + (cpu[r.key] ?? 0), 0)
-  const budget = 1000 / 60 // 16.7ms/frame reference
 
   const fxCount = (Array.isArray(master) ? master.length : 0)
   const nFeedback = layers.filter((L) => L?.feedback).length
@@ -137,6 +138,17 @@ export function PerformancePanel(): JSX.Element {
     </span>
   )
   const pct = (v: number | null): string => (v == null ? '-' : `${Math.round(v)}%`)
+  // The render loop is vsync-locked, so the frame rate's ceiling is the display's
+  // refresh rate, not 60. Judging it against a fixed 60 called a perfect 24-of-24
+  // on a 24 Hz display a fault and sent a whole debugging session after it. Short
+  // of a reading, fall back to the old fixed threshold.
+  const hz = stats.hz
+  const hzLabel = hz == null ? '' : ` / ${Number.isInteger(hz) ? hz : hz.toFixed(2)} Hz`
+  const fpsLow = fps > 0 && (hz != null ? fps < hz * 0.85 : fps < 40)
+  // One frame's worth of time on THIS display, which is what the per-section
+  // bars below are measured against. A 60 Hz constant made every bar read short
+  // on a 50 Hz display and long on a 120 Hz one.
+  const budget = hz != null ? 1000 / hz : 1000 / 60
 
   return (
     <div className="flex min-w-0 flex-col gap-1.5 border-t border-border bg-panel px-3 py-1.5 text-[11px]">
@@ -145,22 +157,23 @@ export function PerformancePanel(): JSX.Element {
           <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Performance</span>
         </span>
         <div className="flex-1" />
-        <span className={`cursor-help font-mono text-[9px] ${fps > 0 && fps < 40 ? 'text-danger' : 'text-accent'}`} title="Frames per second of the composition render (rolling average). Red below 40.">{fps ? `${Math.round(fps)} fps` : '-'}</span>
+        <span className={`cursor-help font-mono text-[9px] ${fpsLow ? 'text-danger' : 'text-accent'}`} title="Frames per second of the composition render (rolling average), followed by the refresh rate of the display this window is on. The render is locked to that refresh rate, so matching it means every frame is being drawn : 24 fps on a 24 Hz display is not a dropped frame. Red below 85% of the refresh rate.">{fps ? `${Math.round(fps)} fps${hzLabel}` : '-'}</span>
+        <span className={`cursor-help font-mono text-[9px] ${skips >= 1 ? 'text-danger' : 'text-muted'}`} title="Frames per second the loop gave up on because the GPU had not finished the frame from two frames back. These are dropped before the frame counter runs, so they never show up in the figure to the left. A steady count here means the backlog guard is throttling the render ; near zero means the frame rate above is the display's own pace.">skips <span className={skips >= 1 ? '' : 'text-text'}>{skips >= 0.1 ? skips.toFixed(1) : '0'}</span>/s</span>
       </div>
 
       <>
           {/* Top line : host totals. */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded bg-panel2/40 px-2 py-1 font-mono text-[9px] text-muted">
-            <span className="cursor-help" title="Milliseconds per rendered frame (1000 ÷ FPS). Under 16.7 ms = 60 fps ; above it you are dropping frames.">frame <span className="text-text">{fps ? (1000 / fps).toFixed(1) : '-'}</span> ms</span>
-            <span className="cursor-help" title="Whole-GPU utilization, percent. Read from the graphics driver (NVIDIA only, via nvidia-smi). Shows “-” on other GPUs.">GPU <span className="text-text">{pct(stats.gpu)}</span></span>
-            <span className="cursor-help" title="Whole-GPU video memory in use, percent of the card’s total (NVIDIA only). This is the real number the estimated VRAM breakdown below approximates.">VRAM <span className="text-text">{pct(stats.vram)}</span></span>
+            <span className="cursor-help" title={`Milliseconds per rendered frame (1000 ÷ FPS). ${hz != null ? `This display gives the render ${(1000 / hz).toFixed(1)} ms per frame ; above that you are dropping frames.` : 'Compare it against 1000 ÷ the display’s refresh rate : above that you are dropping frames.'}`}>frame <span className="text-text">{fps ? (1000 / fps).toFixed(1) : '-'}</span> ms</span>
+            <span className="cursor-help" title="Whole-GPU utilization, percent, read from the graphics driver. Shows “-” where the driver reports no figure.">GPU <span className="text-text">{pct(stats.gpu)}</span></span>
+            <span className="cursor-help" title="Whole-GPU memory in use, percent of what the GPU can address. Where the GPU shares system memory there is no separate pool, so this is the driver’s share of total memory. This is the real number the estimated VRAM breakdown below approximates.">VRAM <span className="text-text">{pct(stats.vram)}</span></span>
             <span className="cursor-help" title="Palinopsia’s own CPU usage across all its processes, as a percent of one core (so it can exceed 100% on multi-core work).">CPU <span className="text-text">{pct(stats.cpu)}</span></span>
             <span className="cursor-help" title="Palinopsia’s RAM footprint as a percent of total system memory.">RAM <span className="text-text">{pct(stats.ram)}</span></span>
           </div>
 
           {/* CPU frame budget : measured ms/frame per section. */}
           <div className="flex flex-col gap-0.5">
-            <div className="flex cursor-help items-baseline justify-between font-mono text-[8px] uppercase tracking-wide text-muted" title="CPU milliseconds spent per frame, measured per section (JS dispatch + readbacks + audio / MediaPipe work). The right-hand figure is the sum of the measured sections against the 16.7 ms = 60 fps budget. Hover any row for what it covers.">
+            <div className="flex cursor-help items-baseline justify-between font-mono text-[8px] uppercase tracking-wide text-muted" title={`CPU milliseconds spent per frame, measured per section (JS dispatch + readbacks + audio / MediaPipe work). The right-hand figure is the sum of the measured sections against one frame's worth of time on this display${hz != null ? `, ${budget.toFixed(1)} ms at ${Number.isInteger(hz) ? hz : hz.toFixed(2)} Hz` : ''}. Hover any row for what it covers.`}>
               <span>CPU per frame (ms)</span>
               <span>measured {cpuMeasured.toFixed(1)} / {budget.toFixed(1)} ms</span>
             </div>
@@ -219,7 +232,7 @@ export function PerformancePanel(): JSX.Element {
             {chip(recording, 'REC', 'A recording is in progress (the output is being encoded to disk : heavy CPU in the main process).')}
           </div>
           <p className="font-mono text-[8px] leading-tight text-muted">
-            Hover any label, number or chip for what it measures. CPU is measured per section (ms/frame) ; VRAM is estimated from the app’s allocations (render size dominates) ; whole-GPU % needs an NVIDIA card, else “-”. The chips are status indicators, not buttons.
+            Hover any label, number or chip for what it measures. CPU is measured per section (ms/frame) ; VRAM is estimated from the app’s allocations (render size dominates) ; the whole-GPU and VRAM percentages are read from the graphics driver, and show “-” where it reports no figure. The chips are status indicators, not buttons.
           </p>
         </>
     </div>

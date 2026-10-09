@@ -3,6 +3,66 @@
 All notable changes to Palinopsia. Dates are ISO. Versions follow the `v*` tags
 that CI builds into cross-platform releases.
 
+## v1.2.1 — 2026-10-09
+
+### Fixed
+
+- **The picture readout no longer costs the frame rate.** Everything that reads the
+  composed picture back as control data (the 17 vision features, the Sonify taps, the
+  depth estimator's input frame) pulled its grid with a synchronous `readPixels`. That
+  call cannot return until the GPU has finished every command queued ahead of it, so it
+  drains the whole pipeline, and the drain costs the same whether you ask for one pixel
+  or 64K of them : on a GPU that shares memory with the processor and resolves its render
+  passes lazily, each read measured about 17 ms (1x1 and 256x256 alike). Opening the
+  Performance tab turns the vision readout on, which read at 30 Hz, so the instrument
+  spent 391 to 650 ms of every second stopped inside the graphics driver, and the cost
+  showed nowhere in the frame budget because the stall happens below the app. The reads
+  now go through a ring of pixel-pack buffers with fences, the same way the frame capture
+  already did : the read is queued and collected one or two frames later, and nothing
+  ever waits on the GPU. Measured on an 8 GB Apple-silicon Mac Mini, blank 1920x1080
+  session, 50 Hz display, Performance tab open : **41.9 to 50.0 fps before (three runs),
+  50.0 fps in all three after**; the app's own meter reads **1.4 ms of CPU per frame
+  instead of 14.2**, of which the vision return is **1.0 ms instead of 13.5**; the worst
+  single frame went from **42.8 ms to 5.5 ms**; blocking readback time per second went
+  from **560 ms (mean) to 0.1 ms**. The picture is unchanged : the same passes, the same
+  formats, the same resolution. Only when the bytes come back moved, and every consumer
+  of them already sampled at 11 to 30 Hz, slower than the latency this adds.
+
+- **The GPU and VRAM meters work on a Mac.** They shelled out to a discrete-card driver
+  tool that does not exist there, so both read "-" for the whole session. Where the GPU
+  shares system memory, they now come from the accelerator statistics the operating
+  system already publishes (no privileges, no helper to install), and report utilization
+  and the driver's share of total memory. The sampler stops asking after one unanswered
+  query instead of spawning a helper every second forever.
+
+- **The capture picker says when the system is refusing it the screen.** On a Mac,
+  reading the screen needs a permission granted by hand in the system settings, and no
+  app is allowed to prompt for it. Denied, the enumeration still succeeds : it just
+  returns a black picture for every screen and strips every window of its name, so the
+  picker was a grid of black rectangles with nothing to explain them. It now asks the
+  system first, and when the answer is no it says so, opens the right settings pane on a
+  click, and states the one thing nothing else does : the permission is read once at
+  launch, so granting it only takes effect the next time the app starts. A camera or a
+  video file was never affected. Windows and Linux have no such gate and see no change.
+
+### Changed
+
+- **The frame rate is shown against the display's refresh rate**, in the Performance tab
+  header and in the corner of the preview : `50 fps / 50 Hz`. The render is locked to the
+  vsync of the display the window is on, so that rate is the ceiling, and a bare frame
+  rate cannot be read without it. A fixed 60 was the reference before, which called a
+  perfect 24-of-24 on a 24 Hz display a fault and sent a whole debugging session after
+  it. The low-frame-rate warning turns red below 85% of the refresh rate rather than
+  below a fixed 40, and the CPU frame-budget figures are measured against one frame on
+  that display (20.0 ms at 50 Hz) instead of 16.7 ms.
+
+- **The frames the GPU backlog guard dropped are now counted**, as `skips` beside the
+  frame rate. The guard skips a frame whenever the fence from two frames back has not
+  signaled, which keeps the driver's queue from running away under load. Those frames
+  return before the frame counter runs, so they could never appear in the frame rate :
+  nothing showed that the guard was throttling. A steady count there says it is; near
+  zero says the frame rate is the display's own pace.
+
 ## v1.2.0 — 2026-10-08
 
 ### Added

@@ -5,7 +5,10 @@
 //
 // Data path per frame (App loop → engine.tick):
 //   Compositor.readSonifyGrid(tap) → 96×96 RGBA readback → luma Uint8Array →
-//   transferred to the worklet (~9KB @ 30Hz per tap). The FLOW voice's motion
+//   transferred to the worklet (~9KB @ 30Hz per tap). The readback is
+//   asynchronous, so a tap's grid is a frame or two behind the picture and the
+//   first call after a voice switches on returns nothing (that tick is skipped,
+//   same as a tap with no source yet). The FLOW voice's motion
 //   field is computed HERE on the luma grids (block matching cur vs prev),
 //   median-thresholded, converted to grain events with per-event random onset
 //   dither across the frame interval (Pelletier), pitch quantized via the
