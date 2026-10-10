@@ -3,9 +3,31 @@
 All notable changes to Palinopsia. Dates are ISO. Versions follow the `v*` tags
 that CI builds into cross-platform releases.
 
-## Unreleased
+## v1.2.5 — unreleased
 
 ### Added
+
+- **Lowercase**, a new source : machine-cut marks on a stepped clock. Eight figures, from
+  a dense data matrix whose cells subdivide into one to three narrow bars, through blocks,
+  columns, ticks, a scan rule and a thin lattice, to sprocket ladders down the frame edges
+  and a single white slab with bars cut out of it. Everything lands on a step and holds,
+  so the picture changes between frames and is still in between, which is what separates
+  it from the optical fields of Op-Art and the hand-made edges of Direct Marks. It carries
+  its own divided clock (rate up to 120 steps a second, divided by STEP up to 64, a deal
+  held for up to 32 steps), so it pulses the moment you pick it, and its gate is a
+  modulation target, so a Euclid, a Spastic or an audio transient plays it instead.
+  HOLD, JUMP, SHEAR and FLIP decide how it reacts; SMEAR recomputes the previous step and
+  trails it behind, the way a filmed projection does, with no buffer to keep. CELLS runs
+  to 512 : as cells fall below a pixel the grid figures stay crisp 1-bit static instead of
+  averaging into gray, and the slab becomes a barcode of about 128 bars. A SIDECHAIN reads
+  another layer one sample per cell, so a film arrives as a 1-bit halftone of cells on
+  this clock. A single accent color marks a regular lattice of cells (one in a period
+  squared, so it reads as meaning rather than as confetti). Flat, hard-edged, never
+  radial. It holds its structure with no lattice or banding at 24 hours of show time.
+  Cost : 11.8 ms for a 4K frame (about 3 ms at 1080p), against 4.1 for Direct Marks; the
+  sidechain's sampler alone accounts for 4.6 of it, even unused, a cost of the sampler
+  being declared rather than of the reads, which went from five a pixel to one with no
+  change in the number.
 
 - **Signal**, a new Sonify voice, before Chord : read heads walk the picture on a
   clock and every cell they cross that is brighter than a threshold fires one
@@ -28,50 +50,46 @@ that CI builds into cross-platform releases.
   Voices are stored BY INDEX (mixer channel, DJ filter, sequencer mask, MIDI
   binding), so Signal is appended as voice 9 and only SHOWN before Chord : no
   saved session's settings move to another voice.
+
 - **A Vary for each layer**, under Speed : the global Vary aimed at one layer
   alone, with its own amount. Its button is a modulation target that fires on
   the crossing, so a Euclid or a Spastic can re-vary a layer on a pattern; an
   auto-fire stays out of the undo history.
+
 - **Per-rack dice** on a layer's right-click menu : randomize the effects of
   source A, of source B, or the layer FX, leaving the sources and the other
   racks alone. Only the modulation aimed at the units that went is dropped.
+
 - **Every fired action blinks** : the Vary buttons, the global Randomize (button,
   R key, MIDI pad, every scope) and the six return-to-default buttons, each in
   the color of its kind of action.
-- **Lowercase reads another layer** (a sidechain), one sample per cell : the
-  picture arrives as a 1-bit halftone of cells on its clock.
-- **Lowercase**, a new source : machine-cut marks on a stepped clock. Eight figures, from
-  a dense data matrix whose cells subdivide into one to three narrow bars, through blocks,
-  columns, ticks, a scan rule and a thin lattice, to sprocket ladders down the frame edges
-  and a single white slab with bars cut out of it. Everything lands on a step and holds,
-  so the picture changes between frames and is still in between, which is what separates
-  it from the optical fields of Op-Art and the hand-made edges of Direct Marks. It carries
-  its own divided clock, so it pulses the moment you pick it, and its gate is a modulation
-  target, so a Euclid, a Spastic or an audio transient plays it instead. HOLD, JUMP, SHEAR
-  and FLIP decide how it reacts; SMEAR recomputes the previous step and trails it behind,
-  the way a filmed projection does, with no buffer to keep. A single accent color marks a
-  regular lattice of cells (one in a period squared, so it reads as meaning rather than as
-  confetti). Flat, hard-edged, never radial. Measured at 7.5 ms for a 4K frame, against
-  4.1 for Direct Marks, and holding its structure with no lattice or banding at 24 hours
-  of show time.
 
 ### Changed
+
+- **The frame rate is shown against the display's refresh rate**, in the Performance tab
+  header and in the corner of the preview : `50 fps / 50 Hz`. The render is locked to the
+  vsync of the display the window is on, so that rate is the ceiling, and a bare frame
+  rate cannot be read without it. A fixed 60 was the reference before, which called a
+  perfect 24-of-24 on a 24 Hz display a fault and sent a whole debugging session after
+  it. The low-frame-rate warning turns red below 85% of the refresh rate rather than
+  below a fixed 40, and the CPU frame-budget figures are measured against one frame on
+  that display (20.0 ms at 50 Hz) instead of 16.7 ms. The rate is printed to two
+  decimal places only when it needs them, because the platform reports a mode set to a
+  round rate a hair off it (60.000003814697266 for 60 Hz) and a bare integer test let
+  that through as `60.00 Hz`. Fractional rates that are real, like 59.94 and 23.98,
+  keep their decimals.
+
+- **The frames the GPU backlog guard dropped are now counted**, as `skips` beside the
+  frame rate. The guard skips a frame whenever the fence from two frames back has not
+  signaled, which keeps the driver's queue from running away under load. Those frames
+  return before the frame counter runs, so they could never appear in the frame rate :
+  nothing showed that the guard was throttling. A steady count there says it is; near
+  zero says the frame rate is the display's own pace.
 
 - **Dealt racks reach four effects** on both sources and the layer (they stopped
   at 2, 2 and 3, and a source rack was empty about half the time). Over 200,000
   deals : source A 0.70 to 1.65 effects on average, source B 0.55 to 1.48, the
   layer 0.95 to 1.77.
-- **Lowercase** : rate to 120 steps a second, step to 64, hold to 32, cells to
-  512 (a slab at 512 is a barcode of about 128 bars); the grid figures stay 1-bit
-  as cells go below a pixel, instead of averaging into grey.
-
-### Fixed
-
-- **A fullscreen output closes on Esc** when it is not an installation. Its keys
-  were armed only for a kiosk launch, so a plain fullscreen output on one
-  display could only be left with Cmd+W.
-
-## v1.2.1 — 2026-10-09
 
 ### Fixed
 
@@ -120,27 +138,9 @@ that CI builds into cross-platform releases.
   launch, so granting it only takes effect the next time the app starts. A camera or a
   video file was never affected. Windows and Linux have no such gate and see no change.
 
-### Changed
-
-- **The frame rate is shown against the display's refresh rate**, in the Performance tab
-  header and in the corner of the preview : `50 fps / 50 Hz`. The render is locked to the
-  vsync of the display the window is on, so that rate is the ceiling, and a bare frame
-  rate cannot be read without it. A fixed 60 was the reference before, which called a
-  perfect 24-of-24 on a 24 Hz display a fault and sent a whole debugging session after
-  it. The low-frame-rate warning turns red below 85% of the refresh rate rather than
-  below a fixed 40, and the CPU frame-budget figures are measured against one frame on
-  that display (20.0 ms at 50 Hz) instead of 16.7 ms. The rate is printed to two
-  decimal places only when it needs them, because the platform reports a mode set to a
-  round rate a hair off it (60.000003814697266 for 60 Hz) and a bare integer test let
-  that through as `60.00 Hz`. Fractional rates that are real, like 59.94 and 23.98,
-  keep their decimals.
-
-- **The frames the GPU backlog guard dropped are now counted**, as `skips` beside the
-  frame rate. The guard skips a frame whenever the fence from two frames back has not
-  signaled, which keeps the driver's queue from running away under load. Those frames
-  return before the frame counter runs, so they could never appear in the frame rate :
-  nothing showed that the guard was throttling. A steady count there says it is; near
-  zero says the frame rate is the display's own pace.
+- **A fullscreen output closes on Esc** when it is not an installation. Its keys
+  were armed only for a kiosk launch, so a plain fullscreen output on one
+  display could only be left with Cmd+W.
 
 ## v1.2.0 — 2026-10-08
 

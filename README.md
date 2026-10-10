@@ -61,7 +61,7 @@ racks, palette, World and macro biases : in one click.
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
-- [Sources](#sources-41-generators) (41 generators) · [Effects](#effects) (52 FX) ·
+- [Sources](#sources-42-generators) (42 generators) · [Effects](#effects) (52 FX) ·
   [Native nodes](#native-nodes) (25) · [Master finalizers](#master-finalizers--pinned-always-last)
 - [Blend modes](#blend-modes) (19)
 
@@ -193,7 +193,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `L` | **MIDI Learn** on/off : from any tab or full-page view |
 | `?` | Keyboard **cheat-sheet** : this table, in-app (Esc closes) |
 | `0` | **Panic flush** : clear every self-feeding buffer (feedback / trails / rings / accumulators) at once |
-| `Esc` | Close the cheat-sheet, then MIDI Learn; otherwise close Resolume / World / Sonify / Body / Output / Sequence |
+| `Esc` | Close the cheat-sheet, then MIDI Learn; otherwise close Resolume / World / Sonify / Body / Output / Sequence. On a **fullscreen output** that is not an installation, a tap of `Esc` closes the output itself |
 | `Ctrl/Cmd+Z` · `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` | Undo · Redo (100 levels) |
 | `Ctrl/Cmd+S` | Save session |
 | `Ctrl/Cmd` `+` / `-` / `0` · `Ctrl`+wheel | UI zoom in / out / reset (menus stay anchored at any zoom) |
@@ -227,12 +227,16 @@ Each of the **4 layers** carries:
 | **Mask** | A per-layer spatial mask beyond blend modes: **luma** (keyed off the layer's own brightness, lo/hi + soft knee), **gradient** (a directional wipe at any angle/position), or **shape** (a soft rect/ellipse window : centre, size, aspect, roundness), each invertible. Multiplies into the layer's alpha before the blend. |
 | **Opacity** | Header slider (0–1; double-click → 1). |
 | **Speed** (`SPEED`) | The layer's own clock multiplier (0–20×) over global speed (double-click → 1). |
+| **Vary** | The global [Vary](#randomize--vary) aimed at this layer alone : its sources, its racks and their parameters nudge around where they already sit, by the amount beside the button (0.15 by default; double-click resets). The button is a modulation target that fires as its modulator crosses the middle going up, so a Euclid or a Spastic re-varies the layer on a pattern, and an auto-fire stays out of the undo history. It blinks each time it fires, however it was fired. |
 | **Feedback** (`FB` + `TRAIL`) | Samples the layer's own previous frame (ping-pong FBO decay-feedback). |
 | **Solo / Mute** (`S` / `⊘`) | Per-layer isolation; per-layer dice `⚄`. (Mute moved off the letter `M` so it never reads as the Modulate **M** chips. The same `S` / `⊘` chips now also ride each column of the **Mixer** view.) |
 | **Coupling** (`CPL`) | Audio drives the A/B balance (hidden until Coupling is enabled in the Audio tab): modes off/lean/hocket/cut/gate/drift + audio feature + amount + tightness. |
 
 Shader hot-swaps preserve feedback buffers : no reset-to-black mid-performance.
-Right-click a layer for Init / Randomize / Copy / Paste / layer presets.
+Right-click a layer for Init / Randomize / Copy / Paste / layer presets, and three
+dice that re-deal ONE rack : **Randomize effects for source A**, **for source B**,
+and **Randomize layer FX**. The sources and the other racks stay as they are, and
+only the modulation aimed at the effects that went is dropped.
 
 A layer's **opacity, A/B mix and blend mode** are themselves [modulation](#modulation-brain-8-modulators--matrix)
 targets : a small **M** chip beside each opens the same M1–8 binding row as any
@@ -774,7 +778,10 @@ bottom:
 - **Fulldome** : render a square **domemaster** for a dome (see [Fulldome](#fulldome) below).
 - **Fullscreen output** : pick a display; borderless-fullscreen or windowed. The
   output window shows the control window's exact pixels, streamed at the
-  projector's own resolution and keystoned on its side.
+  projector's own resolution and keystoned on its side. A tap of `Esc` on the
+  output closes it, so it can never strand you on a one-display computer; an
+  installation asks for a 1.5 s hold instead (below). For one second as it opens,
+  the output says which.
 - **Record** : format + record / stop + screenshot → `Recorded/`, or any folder you
   pick with **location…** (remembered on this computer; ↺ goes back to `Recorded/`,
   the path opens the folder; if the chosen folder can't be reached, an unplugged
@@ -848,7 +855,7 @@ bottom:
     above system notices.
   - **Exit** : hold `Esc` or `O` on the output for 1.5 s (a brushed key no longer ends
     it), or press `Ctrl/Cmd+Shift+O` anywhere. That returns to the operator UI; it does
-    not disarm Installation mode.
+    not disarm Installation mode. The output names both for one second as it opens.
   - **The log** : every crash, hang and recovery is written to `logs/palinopsia.log`
     in the app's data folder (`%APPDATA%\Palinopsia` on Windows, `~/Library/Application
     Support/Palinopsia` on macOS), with main-process errors (never an error box on
@@ -1342,7 +1349,8 @@ and its timing travel in the session. Drivable over OSC too: **`/opsia/surface/p
 ## Randomize & Vary
 
 **Randomize** is structural: it doesn't just re-roll parameters, it rebuilds its
-targets : picks generators per layer, builds FX racks of random length, enables
+targets : picks generators per layer, builds FX racks of random length (up to four
+effects on each source and on the layer), enables
 2–5 modulators and rolls a fresh mod-matrix. Every float draw comes from the
 shader's **curated aesthetic sub-range**; colors stay matte.
 
@@ -1372,6 +1380,10 @@ The **intensity** slider (amt) turns a full re-roll into a *walk*: below 100%,
 each unit keeps its structure with probability (1 − intensity) and is merely
 jittered. **Vary** is the third mode: a baseline-anchored variant : structure
 completely fixed, every continuous value nudged around the captured baseline.
+Each layer also carries its **own Vary**, under its Speed : the same nudge aimed at
+that layer alone, and a modulation target, so a pattern can fire it. Every Vary
+and the Randomize button blink when they fire, whether by a click, a modulator,
+a MIDI pad or a key.
 
 ## Undo
 
@@ -1383,9 +1395,9 @@ don't flood your history.
 
 ---
 
-## Sources (41 generators)
+## Sources (42 generators)
 
-41 sources produce an image from nothing (all but two : Collage plays a folder of films,
+42 sources produce an image from nothing (all but two : Collage plays a folder of films,
 Silhouette reads the Body camera). Any generator can fill **Source A or B**
 of any layer (and all but a few can be the Background source). Each ships curated
 Randomize sub-ranges and its own preset bank.
@@ -1420,7 +1432,7 @@ Randomize sub-ranges and its own preset bank.
 | **Shapes** | Hard-edged primitive fields (circle / ring / bar / cross / triangle), tiled and animatable : a matte source, or a stencil keyed through the A/B mixer. |
 | **Op-Art** | Hard-edged optical-illusion fields (waves, grids, moiré, herringbone) with illusory motion : curated and minimal, at home under anaglyph 3D. |
 | **Direct Marks** | Hand-drawn direct-film marks : ruled lines, dots or scratches in flat ink, appearing on a gate you can drive from audio (marks on the beat). |
-| **Lowercase** | Machine-cut marks on a stepped clock : a data matrix of subdivided cells, blocks, columns, ticks, a scan rule, a lattice, sprocket ladders, or one white slab with bars cut out. Everything lands on a step and holds, never sweeps. It pulses on its own, and binding its gate to a Euclid, a Spastic or an audio transient makes it play that rhythm instead. One accent color on a regular lattice of cells; the previous step trails behind as a filmed projection does. |
+| **Lowercase** | Machine-cut marks on a stepped clock, in eight figures : a **matrix** of cells that subdivide into one to three narrow bars, **blocks**, **bars**, **ticks**, a scan **rule**, a thin **grid**, sprocket **ladders** down the frame edges, and one white **slab** with bars cut out of it. Everything lands on a step and holds; nothing sweeps. It pulses on its own (**rate** up to 120 steps a second, divided by **step**, one deal kept for up to 32 steps by **hold**), and binding its **gate** to a Euclid, a Spastic or an audio transient plays that rhythm instead. **cells** runs to 512 : the grid figures turn to crisp 1-bit static as cells fall below a pixel, and the slab becomes a barcode of about 128 bars. A **sidechain** reads another layer one sample per cell, so a film arrives as a 1-bit halftone of cells on this clock. One accent color marks a regular lattice of cells, and the previous step trails behind as a filmed projection does. Sonify's **Signal** voice reads its marks back as data. |
 | **Dye Field** | Subtractive pigment pooling over a near-black emulsion, disciplined toward decay and crystallisation : painted-on-film dye, never additive glow. `relief` lights the pooled dye as a thin skin of paint. |
 | **Colony** | Living matter that grows across a surface, one `kind` at a time : **lichen** on granite (grey-green, orange and pale crusts cracking into areolae as they age, a black rim where colonies meet, bare rock where the ground is poor), **mould** on agar (a white growing margin, a green sporulating centre, rings), **burning paper** (a dim ember front, scorch ahead, char and ash behind), **rust** on steel spreading from scratches (orange, then red-brown, pitted and flaking; `palette` toward copper gives verdigris). The fronts have the roughness measured on real growth, colonies stop short of each other, all lit as a relief. `ground` : its own surface, or transparent so it grows over the layer below. `regrow ▸` starts again, `regrow every` cycles on its own; `grain` sets the cell size so it looks the same from 1080p to a 4096² dome. |
 | **Ground** | The surfaces under the living things, built the way the real ones form and lit as a relief : **cracked mud** drying (plates shrink apart, cracks widen and their edges curl, a thinner second generation splits them late; `drying` fixed or on a 45 s cycle), **sand ripples** migrating under a veering wind (gentle stoss, steep lee, heavy minerals in the troughs), **rock strata** (beds of very different thickness, hard ones standing proud, laminae, joints that never line up), **wood** end grain (early / late wood, rays, drying checks), **bark** (furrowed plates, fibre). `palette` shifts each to an alternate material (red clay, black sand, limestone, walnut, birch). |

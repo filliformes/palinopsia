@@ -43,7 +43,8 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['R', 'Randomize (Transport’s current mode)'],
       ['H', 'Freeze / hold the output'],
       ['L', 'MIDI Learn on/off'],
-      ['Esc', 'Close top overlay · exit MIDI Learn']
+      ['Esc', 'Close top overlay · exit MIDI Learn'],
+      ['Esc on the output', 'Close a fullscreen output (an installation : hold 1.5 s)']
     ]
   },
   {

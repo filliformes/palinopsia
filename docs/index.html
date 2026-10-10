@@ -187,7 +187,7 @@
       </div>
       <div class="card">
         <p class="os">macOS</p>
-        <p class="files">A <span class="mono">.dmg</span> for Apple Silicon (arm64) and Intel (x64).</p>
+        <p class="files">A <span class="mono">.dmg</span> for Apple Silicon (arm64). On an Intel Mac, build it from source.</p>
         <a class="get" href="https://github.com/filliformes/palinopsia/releases/latest">Get the latest ↗</a>
         <p class="hint">Not notarized: drag Palinopsia into <b>Applications</b> first, then run <span class="mono">xattr -cr /Applications/Palinopsia.app</span> once in Terminal (or open it, then System Settings → Privacy &amp; Security → <b>Open Anyway</b>).</p>
       </div>
@@ -212,6 +212,22 @@
       <figure><img src="images/shot-moire.jpg" alt="Analog moiré"><figcaption><b>Analog moiré.</b> A wobbulated interference field.</figcaption></figure>
       <figure><img src="images/visual-cut-up.jpg" alt="Cut-Up"><figcaption><b>Cut-Up.</b> A wall of films, each in its own torn piece.</figcaption></figure>
     </div>
+  </section>
+
+  <section id="new-125">
+    <h2>New in 1.2.5</h2>
+    <p class="section-lede">Data and rhythm. A source of machine-cut marks, a sound voice that reads the picture as data, a Vary for every layer, and the readout that used to stall the frame rate made free.</p>
+    <ul class="new">
+      <li><b>Lowercase</b>, a new source : machine-cut marks on a stepped clock. A data matrix, blocks, bars, ticks, a scan rule, a lattice, sprocket ladders and a slab with bars cut out of it, landing on a step and holding. It pulses on its own, or plays any rhythm you bind to its gate, and it can read another layer as a 1-bit halftone of cells. At 512 cells the slab is a barcode.</li>
+      <li><b>Signal</b>, a new Sonify voice <kbd>S</kbd> : read heads walk the picture on a clock and every bright cell they cross fires a micro-grain, from a 0.2 ms tick to a 500 ms ring. The picture is the pattern; point it at Lowercase and the marks play themselves. Up to four heads drift in and out of step, and every grain lands on its exact sample.</li>
+      <li><b>A Vary for each layer</b>, under its Speed : the same nudge as the global Vary, aimed at one layer, and a modulation target, so a pattern can fire it.</li>
+      <li><b>Re-deal one rack</b> from a layer's right-click menu : the effects of source A, of source B, or the layer's own, and nothing else. Dealt racks now reach four effects.</li>
+      <li><b>You see what fires.</b> Every Vary, the Randomize button and the return-to-default buttons blink when they act, however they were triggered.</li>
+      <li><b>A free picture readout.</b> The vision features, Sonify's taps and the depth input used to stop the graphics chip for about 17 ms each read on a Mac. They are queued now, and on an Apple-silicon Mac Mini a session with the Performance tab open went from as low as 42 to a steady 50 frames on a 50 Hz display.</li>
+      <li><b>The frame rate reads against your display</b> (<span class="mono">50 fps / 50 Hz</span>), dropped frames are counted, and the GPU and VRAM meters work on a Mac.</li>
+      <li><b>Esc closes a fullscreen output</b>, so one display can never trap you, and screen capture on a Mac says how to grant its permission instead of showing black.</li>
+    </ul>
+    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.5.md">release notes</a>.</p>
   </section>
 
   <section id="new">
@@ -370,7 +386,7 @@
 
   <section>
     <h2>Where to go next</h2>
-    <p>When you want the full vocabulary (38 sources, 52 effects, 25 native nodes, the modulation matrix, the sequencers, the Sonify voices and the dataflou mesh), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>, and the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.0.md">1.2 release notes</a> for what changed. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
+    <p>When you want the full vocabulary (42 sources, 52 effects, 25 native nodes, the modulation matrix, the sequencers, the Sonify voices and the dataflou mesh), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>, and the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.5.md">1.2.5 release notes</a> for what changed. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
   </section>
 
   <footer>
