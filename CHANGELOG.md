@@ -3,7 +3,7 @@
 All notable changes to Palinopsia. Dates are ISO. Versions follow the `v*` tags
 that CI builds into cross-platform releases.
 
-## v1.2.5 — unreleased
+## v1.2.5 — 2026-10-10
 
 ### Added
 
