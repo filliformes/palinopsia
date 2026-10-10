@@ -167,6 +167,7 @@ export function suggestSonify(c: CompositionState, cur: SoniConfig): SoniConfig 
     sstv: { ...cur.sstv, on: chosen.has('sstv'), tap: tapFor('sstv') },
     filter: { ...cur.filter, on: chosen.has('filter'), tap: tapFor('filter') },
     chord: { ...cur.chord, on: chosen.has('chord'), tap: tapFor('chord') },
+    signal: { ...cur.signal, on: chosen.has('signal'), tap: tapFor('signal') },
     // A Collage with films : hear them (the voice's own sound, on top of the rest).
     collage: { ...cur.collage, on: hasCollage }
   }

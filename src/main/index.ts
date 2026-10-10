@@ -496,6 +496,23 @@ function createWindow(): void {
 //   fullscreen → borderless, fills the chosen display (projector)
 //   windowed   → a normal 16:9 window (easy to Window-Capture in OBS)
 let outputWindow: BrowserWindow | null = null
+let outputKind: 'full' | 'windowed' | 'span' | null = null
+
+/** What Esc does in the output window, decided when it is pressed :
+ *  · 'hold'   : an installation, where Esc must be HELD (the renderer times it).
+ *  · 'close'  : a fullscreen output on the control window's own display, which
+ *    it covers. On one screen that is the only way out, so a tap closes it.
+ *  · 'return' : anything else (a projector on another display, a span, a framed
+ *    window). The control window is reachable there, and the output holds focus
+ *    from the moment it opens : an Esc meant for the Output page used to land
+ *    here and end the show. It hands focus back to the control window instead. */
+function outputEscMode(): 'hold' | 'close' | 'return' {
+  if (kioskActive()) return 'hold'
+  const w = outputWindow
+  if (!w || w.isDestroyed() || outputKind !== 'full' || !mainWindow || mainWindow.isDestroyed()) return 'return'
+  const outD = screen.getDisplayMatching(w.getBounds()).id
+  return screen.getDisplayMatching(mainWindow.getBounds()).id === outD ? 'close' : 'return'
+}
 
 function openOutputWindow(displayId: number, windowed = false): void {
   const displays = screen.getAllDisplays()
@@ -626,8 +643,9 @@ function finalizeOutputWindow(kind: 'full' | 'windowed' | 'span'): void {
   if (!outputWindow) return
   const win = outputWindow
   lockTitle(win, appTitle(' : Output'))
+  outputKind = kind
   win.on('closed', () => {
-    if (outputWindow === win) outputWindow = null
+    if (outputWindow === win) { outputWindow = null; outputKind = null }
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('output:closed')
     updateSleepBlock()
     // An installation's projector never stays dark : closed by a stray key, or by
@@ -902,6 +920,17 @@ app.whenReady().then(async () => {
   safeHandle('output:close', () => {
     outputWindow?.close()
     return true
+  })
+  safeHandle('output:escMode', () => outputEscMode())
+  safeHandle('output:escape', () => {
+    const mode = outputEscMode()
+    if (mode === 'close') outputWindow?.close()
+    else if (mode === 'return' && mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    }
+    return mode
   })
   // Per-frame render state: control window → output window. Guard the window +
   // its webContents : a frame in flight while the output window is closing would

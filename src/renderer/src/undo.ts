@@ -168,6 +168,11 @@ export function initUndo(): () => void {
  *  which changes the composition every few seconds and would otherwise evict all
  *  real history. The new state becomes the baseline the next edit diffs from. */
 export function runSilently(fn: () => void): void {
+  // An edit still inside its quiet window is the user's : commit it first.
+  // Without this the silent change became the baseline with that edit folded
+  // into it, and an auto-fire (a sequencer step, a modulated Vary) landing
+  // within 300 ms of a drag took the drag out of the undo history.
+  if (!applying && flushPending()) bump()
   applying = true
   try {
     fn()
@@ -177,9 +182,10 @@ export function runSilently(fn: () => void): void {
   }
 }
 
-/** Flush any pending quiet-timer commit immediately (called before undo). */
-function flushPending(): void {
-  if (!quietTimer) return
+/** Flush any pending quiet-timer commit immediately (called before undo and
+ *  before a silent change). True when it committed a step. */
+function flushPending(): boolean {
+  if (!quietTimer) return false
   clearTimeout(quietTimer)
   quietTimer = null
   const cur = snap()
@@ -188,7 +194,9 @@ function flushPending(): void {
     if (past.length > CAPACITY) past.shift()
     future = []
     committed = cur
+    return true
   }
+  return false
 }
 
 // Name what a step touched, so the toast says "Undone · layers" not just "Undone".

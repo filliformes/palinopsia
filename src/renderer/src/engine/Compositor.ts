@@ -569,10 +569,14 @@ export function pushSideTex(
   w: number,
   h: number
 ): void {
-  const u = (isf as unknown as { uniforms?: Record<string, unknown> }).uniforms;
-  if (!u || !u.sideTex || !resolve || !ref) return;
-  const tex = resolve(ref);
+  const u = (isf as unknown as { uniforms?: Record<string, { value?: unknown }> }).uniforms;
+  if (!u || !u.sideTex) return;
+  const tex = resolve && ref ? resolve(ref) : null;
   if (tex) isf.setValue('sideTex', handle(tex, w, h));
+  // No layer picked (or one that renders nothing) : unfeed the input, which
+  // then reads the bridge's transparent texel. Left as it was, "none" kept the
+  // last layer's texture bound and the sidechain went on reading it.
+  else if (u.sideTex.value) isf.setValue('sideTex', null);
 }
 
 export interface Framing {
@@ -2123,6 +2127,11 @@ export class Compositor {
   //    pattern as visionSample : queue this frame, hand back the one that has
   //    landed. One ring per tap, since the two taps can read different sources.
   private soniRead = new Map<string, GridReadback>();
+  // The grid each source handed out this engine frame. Both taps on ONE source
+  // share a ring, and a ring hands a landed grid out once : the first tap took
+  // it and the second found nothing, every tick, so tap B went silent whenever
+  // it pointed where tap A did. The second read of a frame reuses the first.
+  private soniLast = new Map<string, { frame: number; ok: boolean; grid: Uint8Array; at: number }>();
 
   readSonifyGrid(kind: 'master' | 'layer', layer: number, out: Uint8Array): boolean {
     const size = 96;
@@ -2132,11 +2141,27 @@ export class Compositor {
     // Keyed on the SOURCE, not the tap : the master tap ignores `layer`, and a
     // key that carried it would open a ring per layer index for the same picture.
     const key = kind === 'master' ? 'master' : `layer:${layer}`;
+    let last = this.soniLast.get(key);
+    if (last && last.frame === this.frameNo) {
+      if (last.ok) out.set(last.grid);
+      return last.ok;
+    }
     let ring = this.soniRead.get(key);
     if (!ring) { ring = new GridReadback(this.gl); this.soniRead.set(key, ring); }
+    // Back from a pause (unread for 150 ms, the gap after which the engine
+    // treats a tap's next grid as a fresh start, AND for several frames, so a
+    // slow frame rate is never taken for one) : what was left in flight is the
+    // picture from before it. Dropped, the first grid back is a current one.
+    const now = performance.now();
+    if (last && now - last.at > 150 && this.frameNo - last.frame > 8) ring.dropInFlight();
     ring.kick(size, src, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
     const got = ring.takeLatest();
+    if (!last) { last = { frame: 0, ok: false, grid: new Uint8Array(size * size * 4), at: 0 }; this.soniLast.set(key, last); }
+    last.frame = this.frameNo;
+    last.at = now;
+    last.ok = !!got;
     if (!got) return false; // nothing has landed yet : the caller skips this tick
+    last.grid.set(got.grid);
     out.set(got.grid);
     return true;
   }
@@ -3215,6 +3240,7 @@ export class Compositor {
     this.depthRead?.dispose(); this.depthRead = null;
     for (const r of this.soniRead.values()) r.dispose();
     this.soniRead.clear();
+    this.soniLast.clear();
     this.pbrLib?.dispose();
     disposeTarget(gl, this.bgScratch);
     disposeTarget(gl, this.bgFill);

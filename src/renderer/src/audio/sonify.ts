@@ -15,10 +15,15 @@
 //   active scale table, then posted to the worklet.
 
 import { registerSonifyModBase, sonifyModValues } from '../engine/modulation'
+import { soniBeats } from './soniClock'
 import { SONI_WORKLET_URL } from './soniWorklet'
 import { CollageVoice, type CollageSoundSet } from './collageVoice'
 
 export const GRID = 96
+// Signal's grains play this long after their step : a fixed latency, longer
+// than a frame (50 ms covers a 24 Hz display), so every grain keeps the
+// clock's spacing whatever the frame times did.
+const SIG_AHEAD = 0.05
 const FLOW_BLOCK = 8 // grid px per flow block → 12×12 blocks
 const FLOW_BLOCKS = GRID / FLOW_BLOCK
 
@@ -420,6 +425,13 @@ class SonifyEngine {
   // Signal's step clock, in steps. A double, so it stays exact for weeks of
   // show time at any rate : no wrap to beat against the heads' sweep lengths.
   private sigClock = 0
+  // Synced : the shared beat clock at the last scan (-1 : free, or just
+  // switched on, so the next synced scan re-anchors on the bar).
+  private sigBeats = -1
+  // Each head's place on its own sweep. Kept per head rather than derived
+  // from the clock, so a sweep length that changes (SPREAD under a modulator)
+  // moves a head on from where it is instead of throwing it across the frame.
+  private sigIdx = [0, 0, 0, 0]
   private sigRead = { x: 0, y: 0 } // scratch for the path geometry
   private salience = new Float32Array(GRID * GRID) // Events detection scratch
   // live meter (UI reads these; written from the worklet's meter messages)
@@ -1075,6 +1087,13 @@ class SonifyEngine {
     // Signal reads the picture too. Missing here, its tap was read only when
     // ANOTHER voice happened to claim it : alone, Signal never scanned at all.
     if (this.cfg.signal.on) need[this.cfg.signal.tap] = true
+    else if (this.sigBeats !== -1 || this.signalDots.length || this.signalBars.length) {
+      // off : no marks left on the overlay for the next switch-on to show
+      // before its first step, and a synced clock re-anchors on the bar then
+      this.sigBeats = -1
+      this.signalDots = new Float32Array(0)
+      this.signalBars = new Float32Array(0)
+    }
 
     for (let t = 0; t < 2; t++) {
       if (!need[t]) continue
@@ -1215,25 +1234,27 @@ class SonifyEngine {
    *  bar; the place along the bar is the pitch.
    *
    *  Onsets are timed to the step, not dithered : this voice is a grid, and the
-   *  spacing between two marks is the clock's. They play one window late (the
-   *  frame interval), which is a constant latency, never a wobble. */
+   *  spacing between two marks is the clock's. Every grain plays SIG_AHEAD
+   *  after its step. Played one scan window late instead (as it first was), the
+   *  latency was the window itself, and the windows follow the picture's frame
+   *  times and the readback : every uneven frame moved the grains. */
   private analyzeSignal(t: number, frameDt: number): void {
     const sg = this.cfg.signal
     const lum = this.luma[t]
     // The EFFECTIVE values : a modulator on rate, threshold or density has to
     // reach the scan, and the overlay only ships values to the worklet.
     const mv = sonifyModValues
-    const eff = (k: string, base: number): number => mv.get(k) ?? base
+    const eff = (k: string, base: number): number => {
+      const v = mv.get(k) ?? base
+      return Number.isFinite(v) ? v : base
+    }
     const rate = eff('signalRate', sg.rate)
     const spread = Math.max(0, Math.min(1, eff('signalSpread', sg.spread)))
     const thresh = eff('signalThresh', sg.thresh)
     const density = eff('signalDensity', sg.density)
-    const sps = sg.sync
-      ? (this.bpm / 60) * Math.max(0.25, Math.min(16, rate))
-      : Math.max(0.25, Math.min(64, rate))
-    const c0 = this.sigClock
-    const c1 = c0 + sps * frameDt
-    this.sigClock = c1
+    const r = sg.sync ? Math.max(0.25, Math.min(16, rate)) : Math.max(0.25, Math.min(64, rate))
+    const bps = Math.max(1, this.bpm) / 60
+    const sps = sg.sync ? bps * r : r
     const H = Math.max(1, Math.min(4, Math.round(sg.heads)))
     const steps = Math.max(2, Math.min(96, Math.round(sg.steps)))
     // The polymeter set : one sweep at `steps`, the others pulled toward 12, 10
@@ -1241,13 +1262,54 @@ class SonifyEngine {
     const RATIOS = [1, 0.75, 0.625, 0.4375]
     const lens: number[] = []
     for (let h = 0; h < H; h++) lens.push(Math.max(2, Math.round(steps * (1 + (RATIOS[h] - 1) * spread))))
+    const idx = this.sigIdx
+    for (let h = 0; h < 4; h++) if (!(idx[h] >= 0)) idx[h] = 0
+
+    let c0 = Number.isFinite(this.sigClock) ? this.sigClock : 0
+    let c1: number
+    if (sg.sync) {
+      // Synced, the clock runs on the beat clock both Sonify sequencers share,
+      // not on this tap's frame times, and its steps are pulled onto the beat's
+      // own grid (step n at beat n / rate) : four steps a beat are sixteenths
+      // in time with the sequencers instead of drifting against them. The pull
+      // is gentle, so a modulated rate bends the grid rather than jumping it.
+      const beats = soniBeats()
+      if (this.sigBeats < 0) {
+        // switched on, or just synced : anchor on the beat grid, the heads on
+        // the bar, and fire nothing this frame rather than a burst of the
+        // steps between the old clock and the new one
+        c0 = c1 = beats * r
+        for (let h = 0; h < 4; h++) { const L = lens[h] ?? lens[0]; idx[h] = ((Math.floor(c1) % L) + L) % L }
+      } else {
+        c1 = c0 + Math.max(0, Math.min(bps * 0.1, beats - this.sigBeats)) * r
+        let e = beats * r - c1
+        e -= Math.round(e)
+        c1 += e * 0.25
+        if (c1 < c0) c1 = c0
+      }
+      this.sigBeats = beats
+    } else {
+      this.sigBeats = -1
+      c1 = c0 + sps * frameDt
+    }
+    this.sigClock = c1
+
     const reads = Math.max(4, Math.round(24 / H)) // cells sampled along one head's band
+    // Each read is the brightest point of its whole cell on the 96 grid, not
+    // the cell's center : a mark thinner than the gap between two steps (a bar
+    // of a Lowercase barcode) fell between the read points and never fired.
+    // The ring paths sweep a longer arc at the rim, so they sample more along.
+    const path = sg.path | 0
+    const along = Math.max(1, Math.min(12, Math.ceil((GRID * (path >= 2 ? 3 : 1)) / steps)))
+    const across = Math.max(1, Math.min(6, Math.ceil(GRID / (reads * H))))
     const perStep = 1 + Math.round(Math.max(0, Math.min(1, density)) * 7)
     const thr = Math.max(1, Math.min(254, thresh * 255))
-    const path = sg.path | 0
     const tbl = this.signalFreqs
+    // SNAP's two ends span the same notes : the free spread runs from the
+    // table's lowest note to its highest, not to the next octave's root.
     const root = effRoot(this.cfg)
-    const f0 = noteFreq(12 * (sg.loOct + 1) + root), f1 = noteFreq(12 * (sg.hiOct + 1) + root)
+    const f0 = tbl.length ? tbl[0] : noteFreq(12 * (sg.loOct + 1) + root)
+    const f1 = tbl.length > 1 ? tbl[tbl.length - 1] : noteFreq(12 * (sg.hiOct + 1) + root)
     const snap = Math.max(0, Math.min(1, eff('signalSnap', sg.snap)))
 
     const onsets: number[] = []
@@ -1255,21 +1317,34 @@ class SonifyEngine {
     type C = { pp: number; v: number; x: number; y: number }
     const cand: C[] = []
     let stepped = false
-    // every step whose boundary falls inside this window
-    for (let k = Math.floor(c0) + 1; k <= c1; k++) {
+    // every step whose boundary falls inside this window (a long stall plays
+    // its last steps, never a pile of them at once)
+    const kLast = Math.floor(c1)
+    for (let k = Math.max(Math.floor(c0) + 1, kLast - 31); k <= kLast; k++) {
       stepped = true
-      const tOff = (k - c0) / sps
+      const tOff = Math.max(0, SIG_AHEAD - (c1 - k) / sps)
       for (let h = 0; h < H; h++) {
         const len = lens[h]
-        const pos = ((k % len) + 0.5) / len
+        idx[h] = (idx[h] + 1) % len
+        // a head sharing the first one's sweep length falls back in step with
+        // it at the top of the sweep (after SPREAD came back to 0, say)
+        if (h > 0 && len === lens[0] && idx[0] === 0) idx[h] = 0
+        const i0 = idx[h]
         cand.length = 0
-        for (let r = 0; r < reads; r++) {
-          const pp = (h + (r + 0.5) / reads) / H
-          this.signalPoint(path, pos, pp)
-          const gx = Math.min(GRID - 1, Math.max(0, Math.floor(this.sigRead.x * GRID)))
-          const gy = Math.min(GRID - 1, Math.max(0, Math.floor(this.sigRead.y * GRID)))
-          const v = lum[gy * GRID + gx]
-          if (v > thr) cand.push({ pp, v, x: this.sigRead.x, y: this.sigRead.y })
+        for (let rr = 0; rr < reads; rr++) {
+          let best = -1, bx = 0, by = 0
+          for (let a = 0; a < along; a++) {
+            const pos = (i0 + (a + 0.5) / along) / len
+            for (let b = 0; b < across; b++) {
+              const pp = (h + (rr + (b + 0.5) / across) / reads) / H
+              this.signalPoint(path, pos, pp)
+              const gx = Math.min(GRID - 1, Math.max(0, Math.floor(this.sigRead.x * GRID)))
+              const gy = Math.min(GRID - 1, Math.max(0, Math.floor(this.sigRead.y * GRID)))
+              const v = lum[gy * GRID + gx]
+              if (v > best) { best = v; bx = this.sigRead.x; by = this.sigRead.y }
+            }
+          }
+          if (best > thr) cand.push({ pp: (h + (rr + 0.5) / reads) / H, v: best, x: bx, y: by })
         }
         // the brightest marks first, as many as DENSITY allows
         cand.sort((a, b) => b.v - a.v)
@@ -1282,6 +1357,7 @@ class SonifyEngine {
           // rather than a crossfade between two notes
           const freq = Math.exp(Math.log(free) * (1 - snap) + Math.log(q) * snap)
           const amp = 0.35 + 0.65 * ((c.v - thr) / Math.max(1, 255 - thr))
+          if (!Number.isFinite(freq) || !Number.isFinite(amp)) continue
           onsets.push(tOff, freq, amp, Math.max(0, Math.min(1, c.x)))
           dots.push(c.x, c.y, amp)
         }
@@ -1291,7 +1367,7 @@ class SonifyEngine {
     // the read bars where they stand now, for the overlay
     const bars = new Float32Array(H * 4)
     for (let h = 0; h < H; h++) {
-      const pos = ((Math.floor(c1) % lens[h]) + 0.5) / lens[h]
+      const pos = (Math.min(idx[h], lens[h] - 1) + 0.5) / lens[h]
       this.signalPoint(path, pos, h / H)
       bars[h * 4] = this.sigRead.x; bars[h * 4 + 1] = this.sigRead.y
       this.signalPoint(path, pos, (h + 1) / H)

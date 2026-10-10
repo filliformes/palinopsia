@@ -17,7 +17,7 @@ import { applyFlicker } from './engine/flicker'
 import { applyFrameWeave, resetFrameWeave } from './engine/frameWeave'
 import { pushMarkSignal } from './engine/markSignal'
 import { installOscMonitor, sendOsc as sendOscMsg } from './oscMonitor'
-import { applyMetaGlides, applyModulation, modEngine, setVaryTrigger } from './engine/modulation'
+import { applyMetaGlides, applyModulation, flushVaryEdges, modEngine, setVaryTrigger } from './engine/modulation'
 import { visionBus } from './engine/visionIn'
 import { depthEngine } from './engine/depthEstimate'
 import { currentFps, formatHz, tickFrame, tickSkip } from './perf'
@@ -151,7 +151,7 @@ function cycleContextPreset(): void {
 }
 import { initUndo, redo, runSilently, undo, useUndoState } from './undo'
 import { THEME_ORDER, useStore, type ThemeName } from './store'
-import { metaGlides } from './metaSmooth'
+import { commitKnob, metaGlides, setKnobImmediate } from './metaSmooth'
 
 // The global REC pill : visible in the top bar while a take is rolling, so you
 // can leave the Output page and tweak live. Click ■ to stop + save the take.
@@ -1051,7 +1051,7 @@ export default function App(): JSX.Element {
       compositorRef.current = comp
       // Isolated test builds only (built with VITE_OPSIA_TEST=1) : hand the
       // store and the engine to a debugger. Compiled out of real builds.
-      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug })
+      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo } })
       // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
       // capture from the render loop (Compositor.captureKick) : a rebuilt engine
       // needs no re-attaching. A real-time recording finds it through this.
@@ -1259,6 +1259,8 @@ export default function App(): JSX.Element {
         //      destinations engine-side (zero store writes per frame; the
         //      final value commits to the store on settle).
         if (metaGlides.size) applyMetaGlides(comp!, c, inputsForShader, metaGlides)
+        // every driver of a layer's Vary has spoken : fire the crossings, once
+        flushVaryEdges(now)
         // 2a⅝. Context's light tracing its drawn path (the Metasurface's draw
         //      sequencer over the light pad) : written engine-side each frame like
         //      a modulator; the pad's dot follows through liveLight.
@@ -2144,8 +2146,11 @@ function FpsTag(): JSX.Element {
       ? 'Composition frames per second, then the refresh rate of the display this window is on. The render is locked to that rate, so matching it means every frame is drawn.'
       : 'Composition frames per second (rolling average).'
   return (
+    // Hoverable (cursor-help) : under pointer-events-none its explanation could
+    // never show. The tag is a few characters in the corner, so it takes no
+    // drag the preview would miss.
     <div
-      className="pointer-events-none absolute bottom-2 right-2 font-mono text-[10px] text-muted/70"
+      className="absolute bottom-2 right-2 cursor-help font-mono text-[10px] text-muted/70"
       title={title}
     >
       {fps > 0

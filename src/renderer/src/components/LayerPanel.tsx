@@ -159,8 +159,9 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const menuItems: MenuItem[] = [
     { label: 'Init layer', onClick: () => initLayer(index) },
     { label: 'Randomize layer', onClick: () => randomizeLayer(index) },
-    { label: 'Randomize effects for source A', onClick: () => randomizeLayerFx(index, 'A') },
-    { label: 'Randomize effects for source B', onClick: () => randomizeLayerFx(index, 'B') },
+    // An empty source has nothing to process : its rack is not offered
+    { label: 'Randomize effects for source A', onClick: () => randomizeLayerFx(index, 'A'), disabled: !layer.sourceA || layer.sourceA.kind === 'none' },
+    { label: 'Randomize effects for source B', onClick: () => randomizeLayerFx(index, 'B'), disabled: !layer.sourceB || layer.sourceB.kind === 'none' },
     { label: 'Randomize layer FX', onClick: () => randomizeLayerFx(index, 'layer') },
     { divider: true, label: '' },
     { label: 'Copy layer', onClick: () => copyLayer(index) },

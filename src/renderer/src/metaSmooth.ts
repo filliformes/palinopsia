@@ -65,6 +65,10 @@ function applyDest(target: ModTarget, shaped: number): void {
   }
   // Layer opacity / A-B mix / blend : commit into the store (compositor reads it).
   if (target.kind === 'layer') {
+    // Vary is a trigger, fired by the per-frame path as the knob crosses its
+    // middle : nothing to commit. Unguarded, it fell through to the blend
+    // below, so a knob bound to Vary rewrote the layer's blend mode.
+    if (target.field === 'vary') return
     const x = Math.max(0, Math.min(1, shaped))
     if (target.field === 'opacity') st.setOpacity(target.layer, x)
     else if (target.field === 'mix') st.setSourceMix(target.layer, x)

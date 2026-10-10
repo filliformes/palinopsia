@@ -1,7 +1,7 @@
 // The Sonify step sequencer's clock. Advances the store's `soniSeq` on its
 // interval and applies each step to the sound engine — either loading a whole
 // saved preset (structural change) or, with no preset, just setting which of the
-// 8 voices are on (a rhythmic on/off pattern over the current sound). Driven from
+// voices are on (a rhythmic on/off pattern over the current sound). Driven from
 // App's render loop (like tickSequencer). Every apply goes through setSonify
 // wrapped in runSilently so the auto-advances never flood undo history.
 // Its rate is its own milliseconds (free) or beats / bars on the Sonify beat

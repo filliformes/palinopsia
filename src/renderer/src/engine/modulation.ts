@@ -911,14 +911,43 @@ let varyTrigger: ((layer: number) => void) | null = null
 export function setVaryTrigger(fn: ((layer: number) => void) | null): void {
   varyTrigger = fn
 }
-// Last value seen per layer, for the crossing test. Not reset between frames.
-const varyLast = new Map<number, number>()
-/** Fire as the modulator crosses the middle going UP. One fire per crossing,
- *  so a slow LFO fires once a cycle rather than every frame it spends high. */
+// This frame's drive per layer : the HIGHEST of all its drivers (two
+// modulators, a modulator and a Meta knob, a morph's outgoing rows), tested
+// ONCE a frame by flushVaryEdges. Each driver used to test on its own against
+// one shared last value, so two drivers that sat either side of the middle
+// fired the layer on every frame : sixty variations a second.
+const varyFrame = new Map<number, number>()
+// Per layer : true while the drive is high (fired, waiting to fall back below
+// the re-arm level), and the time of the last fire.
+const varyHigh = new Map<number, boolean>()
+const varyAt = new Map<number, number>()
+const VARY_REARM = 0.4
+const VARY_GAP_MS = 60 // the fastest a layer re-varies (a 16th at 250 BPM)
 function varyEdge(layer: number, x: number): void {
-  const prev = varyLast.get(layer) ?? 0
-  varyLast.set(layer, x)
-  if (prev < 0.5 && x >= 0.5) varyTrigger?.(layer)
+  varyFrame.set(layer, Math.max(varyFrame.get(layer) ?? 0, x))
+}
+/** Once a frame, after every modulation path : fire each layer whose drive
+ *  crossed the middle going UP. One fire per crossing, so a slow LFO fires once
+ *  a cycle rather than on every frame it spends high. It re-arms only below
+ *  0.4, so a drive hovering at the middle (a noisy follower) fires once rather
+ *  than chattering. A layer seen for the first time (a binding just made, a
+ *  session just loaded, a knob just grabbed) takes its state WITHOUT firing :
+ *  a drive that is already high has not crossed anything. */
+export function flushVaryEdges(now: number): void {
+  for (const [layer, x] of varyFrame) {
+    const high = varyHigh.get(layer)
+    if (high === undefined) varyHigh.set(layer, x >= 0.5)
+    else if (!high && x >= 0.5) {
+      varyHigh.set(layer, true)
+      if (now - (varyAt.get(layer) ?? -Infinity) >= VARY_GAP_MS) {
+        varyAt.set(layer, now)
+        varyTrigger?.(layer)
+      }
+    } else if (high && x < VARY_REARM) varyHigh.set(layer, false)
+  }
+  // a layer nothing drives any more forgets, so its next binding seeds again
+  for (const layer of varyHigh.keys()) if (!varyFrame.has(layer)) varyHigh.delete(layer)
+  varyFrame.clear()
 }
 
 export const liveModValues = new Map<string, number>()

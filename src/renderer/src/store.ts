@@ -524,7 +524,7 @@ function makeDefaultSoniSeq(): SoniSeq {
     bias: 0,
     edge: 'wrap',
     steps: Array.from({ length: 16 }, () => ({
-      voices: [false, false, false, false, false, false, false, false, false],
+      voices: [false, false, false, false, false, false, false, false, false, false],
       preset: ''
     }))
   }
@@ -550,9 +550,10 @@ function sanitizeSoniSeq(raw: unknown, fallback: SoniSeq): SoniSeq {
     ? d.steps.map((ds, i) => {
         const st = s.steps![i] as Partial<SoniSeqStep> | undefined
         return {
-          // 8 = saved before the Collage voice : padded, it stays off in those steps.
-          voices: Array.isArray(st?.voices) && (st!.voices.length === 8 || st!.voices.length === 9)
-            ? [...st!.voices.map(Boolean), false].slice(0, 9)
+          // 8 = saved before the Collage voice, 9 before Signal : padded, the
+          // newer voices stay off in those steps.
+          voices: Array.isArray(st?.voices) && st!.voices.length >= 8 && st!.voices.length <= 10
+            ? [...st!.voices.map(Boolean), false, false].slice(0, 10)
             : ds.voices,
           preset: typeof st?.preset === 'string' ? st!.preset : ''
         }
@@ -1746,6 +1747,11 @@ interface StoreState {
 
 /** A new pulse array with one counter advanced : a fresh array, so the one
  *  button subscribed to that index sees a change and replays its blink. */
+// Each layer's Vary anchor (see varyLayer) : the layer before its first fire,
+// and the variant we last made from it. Runtime only, never saved or undone.
+const layerVaryBase: (LayerState | null)[] = []
+const layerVaryLast: (LayerState | null)[] = []
+
 function bumpPulse(p: number[] | undefined, i: number): number[] {
   const next = (p && p.length >= 5 ? p : [0, 0, 0, 0, 0]).slice()
   next[i] = (next[i] ?? 0) + 1
@@ -2027,22 +2033,29 @@ export const useStore = create<StoreState>((set, get) => ({
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => randomizeSingleLayer(l))
       }
-      return { composition: dropLayerTargets(composition, layer) }
+      return { composition: dropLayerTargets(composition, layer), variationBaseline: null }
     }),
 
   varyLayer: (layer) =>
     set((s) => {
       const cur = s.composition.layers[layer]
       if (!cur) return {}
+      // Anchored like the global Vary : every fire is a fresh variant at the
+      // amount's distance from the layer as it was BEFORE the first fire, so a
+      // modulator firing it all night circles your settings. Jittering the last
+      // result instead was a random walk : an hour of an LFO left the layer
+      // anywhere. A layer that changed since our last variant (an edit, a recall)
+      // anchors again on what it is now.
+      const base = layerVaryLast[layer] === cur && layerVaryBase[layer] ? layerVaryBase[layer]! : cur
+      const next = jitterLayer(base, cur.varyAmount ?? DEFAULT_LAYER_VARY)
+      // the amount is the layer's own setting, never part of the variant
+      next.varyAmount = cur.varyAmount
+      layerVaryBase[layer] = base
+      layerVaryLast[layer] = next
       // No target pruning : a jitter moves values, it never removes a unit, so
       // every modulation row still points at something that exists.
       return {
-        composition: {
-          ...s.composition,
-          layers: updateLayer(s.composition.layers, layer, (l) =>
-            jitterLayer(l, l.varyAmount ?? DEFAULT_LAYER_VARY)
-          )
-        },
+        composition: { ...s.composition, layers: updateLayer(s.composition.layers, layer, () => next) },
         varyPulse: bumpPulse(s.varyPulse, layer)
       }
     }),
@@ -2061,6 +2074,9 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const cur = s.composition.layers[layer]
       if (!cur) return {}
+      // a rack on an empty source would process nothing (OSC, a stale menu)
+      const src = which === 'A' ? cur.sourceA : which === 'B' ? cur.sourceB : null
+      if (which !== 'layer' && (!src || src.kind === 'none')) return {}
       const old = which === 'A' ? cur.sourceAFx : which === 'B' ? cur.sourceBFx : cur.fx
       const gone = new Set((old ?? []).filter((f) => !f.locked).map((f) => f.id))
       const next = randomizeRack(which)
@@ -2076,7 +2092,13 @@ export const useStore = create<StoreState>((set, get) => ({
       }
       // Only the units that actually went : a rack dice must not clear the
       // modulation aimed at the layer's sources or at its other two racks.
-      return { composition: dropTargets(composition, (t) => t.kind === 'fx' && gone.has(t.instId)) }
+      // New effects are a new starting point, as a structural randomize is :
+      // the next global Vary anchors on them rather than dealing the old rack
+      // back from its baseline.
+      return {
+        composition: dropTargets(composition, (t) => t.kind === 'fx' && gone.has(t.instId)),
+        variationBaseline: null
+      }
     }),
 
   layerPresets: (() => {
@@ -3785,7 +3807,7 @@ export const useStore = create<StoreState>((set, get) => ({
   toggleSoniSeqVoice: (step, voice) =>
     set((s) => {
       const steps = s.soniSeq.steps.map((st, i) =>
-        i === step ? { ...st, voices: [...st.voices, false, false].slice(0, 9).map((v, vi) => (vi === voice ? !v : v)) } : st
+        i === step ? { ...st, voices: [...st.voices, false, false].slice(0, 10).map((v, vi) => (vi === voice ? !v : v)) } : st
       )
       const soniSeq = { ...s.soniSeq, steps }
       persistSoniSeq(soniSeq)
@@ -3801,7 +3823,7 @@ export const useStore = create<StoreState>((set, get) => ({
   clearSoniSeqStep: (step) =>
     set((s) => {
       const steps = s.soniSeq.steps.map((st, i) =>
-        i === step ? { voices: [false, false, false, false, false, false, false, false, false], preset: '' } : st
+        i === step ? { voices: [false, false, false, false, false, false, false, false, false, false], preset: '' } : st
       )
       const soniSeq = { ...s.soniSeq, steps }
       persistSoniSeq(soniSeq)
@@ -3844,12 +3866,12 @@ export const useStore = create<StoreState>((set, get) => ({
       // Preset steps keep their preset (its voice mask is unused there anyway).
       const steps = s.soniSeq.steps.map((st, i) => {
         if (i >= s.soniSeq.len) return st
-        const voices = [false, false, false, false, false, false, false, false, false]
+        const voices = [false, false, false, false, false, false, false, false, false, false]
         const n = 1 + Math.floor(Math.random() * 3)
         let placed = 0
         let guard = 0
         while (placed < n && guard++ < 40) {
-          const v = Math.floor(Math.random() * 9)
+          const v = Math.floor(Math.random() * 10)
           if (!voices[v]) {
             voices[v] = true
             placed++

@@ -37,6 +37,17 @@ export class GridReadback {
     private slots = 3
   ) {}
 
+  /** Forget every read still in flight. For a consumer coming back from a pause
+   *  (a voice switched off, Sonify stopped) : what it left queued is a picture
+   *  from before the pause, and a consumer that compares two grids (motion)
+   *  takes that one for a frame and splashes on the jump to the next. */
+  dropInFlight(): void {
+    const gl = this.gl
+    for (let k = 0; k < this.fences.length; k++) {
+      if (this.fences[k]) { gl.deleteSync(this.fences[k]!); this.fences[k] = null }
+    }
+  }
+
   private ensure(size: number): void {
     if (this.size === size) return
     const gl = this.gl
@@ -141,7 +152,7 @@ export class GridReadback {
     // a few microseconds sooner, and it is not free : a submit into a full command
     // queue BLOCKS until a slot frees, so on a saturated GPU this call was charged
     // to whichever section kicked it (measured at 11.5 ms in the vision section of
-    // a scene holding the GPU at 98%, with not one synchronous read left anywhere).
+    // a scene holding the GPU at 98%, once its reads had all gone asynchronous).
     if (flush) gl.flush()
     this.phase = (wi + 1) % this.slots
     return true

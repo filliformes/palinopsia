@@ -643,7 +643,12 @@ function route(address: string, args: Args): void {
           else if (ctl === 'fm') V('signal', { fm: clamp01(n) })
           else if (ctl === 'heads') V('signal', { heads: idx(1, 4) })
           else if (ctl === 'rate') V('signal', { rate: 0.25 + clamp01(n) * (sg.sync ? 15.75 : 63.75) })
-          else if (ctl === 'sync') V('signal', { sync: n >= 0.5 })
+          else if (ctl === 'sync') {
+            // as the page's button does : the rate carries over from steps a
+            // second to steps a beat (and back) instead of jumping to a new pace
+            const on = n >= 0.5
+            if (on !== sg.sync) V('signal', { sync: on, rate: on ? Math.min(16, Math.max(1, Math.round(sg.rate / 2))) : Math.min(64, sg.rate * 2) })
+          }
           else if (ctl === 'steps') V('signal', { steps: [8, 12, 16, 24, 32, 48, 64, 96][idx(0, 7)] })
           else if (ctl === 'spread') V('signal', { spread: clamp01(n) })
           else if (ctl === 'thresh') V('signal', { thresh: clamp01(n) })
@@ -788,6 +793,7 @@ function route(address: string, args: Args): void {
       ]
       if (!valid.includes(scope)) return // ignore unknown scopes (don't track their edge)
       if (!rising(address, n)) return
+      st.bumpRandPulse() // the Randomize button blinks however it was fired
       st.randomize(scope as RandomizeScope)
       return
     }
@@ -1092,7 +1098,7 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/signal/fm', 0, 1, so.signal.fm, 'Signal fm depth')
     addI('/opsia/sonify/signal/heads', 1, 4, so.signal.heads, 'Signal read heads')
     addI('/opsia/sonify/signal/steps', 0, 7, Math.max(0, [8, 12, 16, 24, 32, 48, 64, 96].indexOf(so.signal.steps)), 'Signal steps per sweep : 8 · 12 · 16 · 24 · 32 · 48 · 64 · 96')
-    add('/opsia/sonify/signal/rate', 0, 1, (so.signal.rate - 0.25) / (so.signal.sync ? 15.75 : 63.75), 'Signal steps per second, or per beat when synced')
+    add('/opsia/sonify/signal/rate', 0, 1, Math.max(0, Math.min(1, (so.signal.rate - 0.25) / (so.signal.sync ? 15.75 : 63.75))), 'Signal steps per second, or per beat when synced')
     add('/opsia/sonify/signal/sync', 0, 1, so.signal.sync ? 1 : 0, 'Signal clock locked to the tempo')
     add('/opsia/sonify/signal/spread', 0, 1, so.signal.spread, 'Signal polymeter between the heads')
     add('/opsia/sonify/signal/thresh', 0, 1, so.signal.thresh, 'Signal : how bright a cell must be to fire')

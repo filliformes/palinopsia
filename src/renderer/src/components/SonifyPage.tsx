@@ -34,7 +34,7 @@ const VOICE_ORDER = [0, 1, 2, 3, 4, 5, 6, 9, 7, 8]
 const VOICE_ABBR = ['Sp', 'Or', 'Fl', 'Ev', 'Ra', 'Tr', 'Fi', 'Ch', 'Co', 'Sg']
 // Each voice's mark on the mirror, as a coloured GLYPH that hints its SHAPE as
 // well as its hue (matches the overlay painter below), so a strip tells you
-// which mark is yours even when two share a colour (Spectra's line vs Flow's
+// which mark is yours even when two share a color (Spectra's line vs Flow's
 // dots are both white). Chord reads horizontal bands, not a spatial probe.
 const PROBE_MARK: Record<string, { glyph: string; color: string; hint: string }> = {
   Spectra: { glyph: '─', color: 'rgb(255,255,255)', hint: 'a white scan line' },
@@ -45,7 +45,8 @@ const PROBE_MARK: Record<string, { glyph: string; color: string; hint: string }>
   Transmission: { glyph: '─', color: 'rgb(255,120,200)', hint: 'a pink scan row' },
   Filter: { glyph: '─', color: 'rgb(120,200,255)', hint: 'a blue scan line' },
   Chord: { glyph: '≡', color: 'rgb(160,160,175)', hint: 'horizontal bands, no spatial probe' },
-  Collage: { glyph: '▦', color: 'rgb(220,190,255)', hint: 'the Collage\'s own pieces : center low, edges high' }
+  Collage: { glyph: '▦', color: 'rgb(220,190,255)', hint: 'the Collage\'s own pieces : center low, edges high' },
+  Signal: { glyph: '▪', color: 'rgb(40,255,215)', hint: 'cyan read bars, and a square at every mark it fires' }
 }
 const filterTag = (x: number): string => (x < 0.49 ? 'LP' : x > 0.51 ? 'HP' : 'off')
 
@@ -682,7 +683,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
         // grid, and the two should not be confused at a glance.
         if (st.on && st.signal?.on) {
           const bars = sonifyEngine.signalBars
-          g.strokeStyle = 'rgba(120,230,255,0.75)'
+          // a green-leaning cyan : Filter's line is the sky blue next to it
+          g.strokeStyle = 'rgba(40,255,215,0.75)'
           g.lineWidth = 1.5
           for (let i = 0; i + 3 < bars.length; i += 4) {
             g.beginPath()
@@ -691,7 +693,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             g.stroke()
           }
           const marks = sonifyEngine.signalDots
-          g.fillStyle = 'rgba(120,230,255,0.9)'
+          g.fillStyle = 'rgba(40,255,215,0.9)'
           for (let i = 0; i + 2 < marks.length; i += 3) {
             const r = 2 + marks[i + 2] * 4
             g.fillRect(marks[i] * w - r, marks[i + 1] * h - r, r * 2, r * 2)
@@ -853,7 +855,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             setSonify(suggestSonify(comp, cfg))
           }}
           className="rounded px-2 py-0.5 font-mono text-[11px] text-muted ring-1 ring-border transition-colors hover:text-accent hover:ring-accent/60"
-          title="Auto-voice : read the session's registers and pick the fitting voices : glitch → Raster, motion → Flow, feedback → Orbit, line-work → Spectra, scan → Transmission, atmosphere → Filter. The strongest voice taps the layer that earned it. Your key, gains and probes are kept."
+          title="Auto-voice : read the session's registers and pick the fitting voices : glitch → Raster, motion → Flow, feedback → Orbit, line-work → Spectra, scan → Transmission, atmosphere → Filter, machine marks → Signal. The strongest voice taps the layer that earned it. Your key, gains and probes are kept."
         >
           ✨ auto
         </button>

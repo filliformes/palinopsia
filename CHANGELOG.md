@@ -16,18 +16,21 @@ that CI builds into cross-platform releases.
   its own divided clock (rate up to 120 steps a second, divided by STEP up to 64, a deal
   held for up to 32 steps), so it pulses the moment you pick it, and its gate is a
   modulation target, so a Euclid, a Spastic or an audio transient plays it instead.
-  HOLD, JUMP, SHEAR and FLIP decide how it reacts; SMEAR recomputes the previous step and
-  trails it behind, the way a filmed projection does, with no buffer to keep. CELLS runs
+  HOLD, JUMP, SCROLL, SHEAR and FLIP decide how it reacts. Every deal is a fresh draw
+  (measured over 119 steps : 44 new deals, no slides); SCROLL turns that by degrees into
+  the same draw slid one cell per deal, up to only ever sliding, the field read as a
+  stream of data. SMEAR recomputes the previous step and trails it behind, the way a
+  filmed projection does, with no buffer to keep. CELLS runs
   to 512 : as cells fall below a pixel the grid figures stay crisp 1-bit static instead of
   averaging into gray, and the slab becomes a barcode of about 128 bars. A SIDECHAIN reads
   another layer one sample per cell, so a film arrives as a 1-bit halftone of cells on
-  this clock. A single accent color marks a regular lattice of cells (one in a period
-  squared, so it reads as meaning rather than as confetti). Flat, hard-edged, never
-  radial. It holds its structure with no lattice or banding at 24 hours of show time.
-  Cost : 11.8 ms for a 4K frame (about 3 ms at 1080p), against 4.1 for Direct Marks; the
-  sidechain's sampler alone accounts for 4.6 of it, even unused, a cost of the sampler
-  being declared rather than of the reads, which went from five a pixel to one with no
-  change in the number.
+  this clock; it is weighed by the layer's alpha, so where that layer is transparent (or
+  when none is picked) the cells keep their own density. A single accent color marks a
+  regular lattice of cells (one in a period squared, so it reads as meaning rather than
+  as confetti). Flat, hard-edged, never radial. It holds its structure with no lattice
+  or banding at 24 hours of show time.
+  Cost on an Apple M2 : about 6.8 ms for a 4K frame (under 2 ms at 1080p), against 4.0
+  for Direct Marks; the sidechain and the audio gate add under half a millisecond.
 
 - **Signal**, a new Sonify voice, before Chord : read heads walk the picture on a
   clock and every cell they cross that is brighter than a threshold fires one
@@ -47,6 +50,13 @@ that CI builds into cross-platform releases.
   out 13 dB under). All eight of its controls are modulation targets that move
   the sound, the scan's included : it reads the modulated values itself, where a
   detector reading only its base config would have ignored them.
+  Every grain plays a fixed 50 ms after its step, so the grains keep the clock's
+  spacing whatever the frame times do : 83.33 ms apart at 12 steps a second, with
+  0.8 ms of jitter. Synced, it runs on the beat clock both Sonify sequencers share
+  (125.0 ms apart at four steps a beat and 120 BPM). Each read takes the brightest
+  point of its whole cell, so a mark thinner than the gap between two steps (a
+  Lowercase barcode bar) still fires. The effects sequencer holds it and Auto picks
+  it, for machine marks.
   Voices are stored BY INDEX (mixer channel, DJ filter, sequencer mask, MIDI
   binding), so Signal is appended as voice 9 and only SHOWN before Chord : no
   saved session's settings move to another voice.
@@ -54,15 +64,23 @@ that CI builds into cross-platform releases.
 - **A Vary for each layer**, under Speed : the global Vary aimed at one layer
   alone, with its own amount. Its button is a modulation target that fires on
   the crossing, so a Euclid or a Spastic can re-vary a layer on a pattern; an
-  auto-fire stays out of the undo history.
+  auto-fire stays out of the undo history. Each fire is a fresh variant around the
+  layer as it stood before the first, as the global Vary works around its baseline,
+  so a modulator can fire it all night and the layer circles your settings instead
+  of wandering off. Every driver of one layer counts as one : two modulators fire
+  4 times in 4 s, not on every frame, and a Meta knob on it leaves the blend alone.
 
 - **Per-rack dice** on a layer's right-click menu : randomize the effects of
   source A, of source B, or the layer FX, leaving the sources and the other
-  racks alone. Only the modulation aimed at the units that went is dropped.
+  racks alone. Only the modulation aimed at the units that went is dropped. An
+  empty source's rack is not offered. A new rack is a new starting point for the
+  global Vary (so is Randomize layer), which used to deal the old rack back.
 
 - **Every fired action blinks** : the Vary buttons, the global Randomize (button,
-  R key, MIDI pad, every scope) and the six return-to-default buttons, each in
-  the color of its kind of action.
+  R key, MIDI pad, OSC, every scope) and the six return-to-default buttons, each in
+  the color of its kind of action. A return-to-default that disables or hides its
+  own button as it acts still shows its blink, and reopening a panel never
+  replays an old one.
 
 ### Changed
 
@@ -117,9 +135,14 @@ that CI builds into cross-platform releases.
   painting does that on its own a moment later, and a submit into a full command queue
   blocks until a slot frees, so submitting by hand there charged the wait to whichever
   section had queued the read (measured at 11.5 ms in the vision section of a scene
-  holding the GPU at 98%, with no synchronous read left anywhere). Measured on a 60 Hz
-  display, that removed 26 submits per second, exactly one per queued read, and left the
-  frame rate at a flat 60.
+  holding the GPU at 98%, once its reads had all gone asynchronous). Measured on a 60 Hz
+  display, that removed 26 flush calls per second, exactly one per queued read, and left
+  the frame rate at a flat 60. Two readers still read synchronously, both off unless you
+  use them : the light output's zone colors and the strip behind `/opsia/av/mark-signal`.
+  A queued read hands its grid out once, so two Sonify taps on one source share each
+  frame's read (the second found nothing and went silent; both now update 27 times in
+  a second), and a tap back from a pause drops what it left in flight, so its first
+  grid is the picture now.
 
 - **The GPU and VRAM meters work on a Mac.** They shelled out to a discrete-card driver
   tool that does not exist there, so both read "-" for the whole session. Where the GPU
@@ -138,9 +161,19 @@ that CI builds into cross-platform releases.
   launch, so granting it only takes effect the next time the app starts. A camera or a
   video file was never affected. Windows and Linux have no such gate and see no change.
 
-- **A fullscreen output closes on Esc** when it is not an installation. Its keys
-  were armed only for a kiosk launch, so a plain fullscreen output on one
-  display could only be left with Cmd+W.
+- **A fullscreen output closes on Esc** when it covers the control window and is not an
+  installation. Its keys were armed only for a kiosk launch, so a plain fullscreen output
+  on one display could only be left with Cmd+W. Where the control window is reachable
+  (a projector on another display, a span, a framed window), Esc hands focus back to it
+  and the show goes on : the output takes focus as it opens, so an Esc meant for the
+  Output page would otherwise end it. An installation no longer prints its exit keys on
+  the projector for its audience to read.
+
+- **An edit made just before an automatic change stays undoable.** A sequencer step, a
+  key-sequencer step or a modulated Vary lands in the history silently, and it became
+  the baseline with any edit still inside its 300 ms grouping window folded into it :
+  a drag finished just before a step could not be undone. The pending edit is now
+  committed first.
 
 ## v1.2.0 — 2026-10-08
 

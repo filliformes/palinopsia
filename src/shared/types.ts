@@ -850,10 +850,10 @@ export interface LightPath extends SurfaceSequencer {
 // ── Sonify sequencer ─────────────────────────────────────────────────
 // A step timeline that evolves the Sonify engine over time (Mixer page). Each
 // step either loads a whole saved preset (structural change) or, with no preset,
-// just sets which of the 8 voices are on (a rhythmic on/off pattern over the
+// just sets which of the voices are on (a rhythmic on/off pattern over the
 // current sound). One shared transport advances the steps.
 export interface SoniSeqStep {
-  voices: boolean[] // length 9 (8 before the Collage voice) : per-voice on/off, applied when `preset` is empty
+  voices: boolean[] // length 10 (8 before the Collage voice, 9 before Signal) : per-voice on/off, applied when `preset` is empty
   preset: string // '' = apply the voices mask; else the name of a saved Sonify preset to load
 }
 // A sequencer's clock : `free` = its own milliseconds, or beats / bars of the
@@ -1278,6 +1278,12 @@ export interface ExposedApi {
   // union bounds (each projector a separate, adjacent monitor).
   outputOpenSpan: (displayIds: number[]) => Promise<boolean>
   outputClose: () => Promise<boolean>
+  // What Esc does in the output window : 'hold' (an installation : held 1.5 s),
+  // 'close' (a fullscreen output covering the control window : a tap closes it)
+  // or 'return' (the control window is reachable : focus goes back to it).
+  outputEscMode: () => Promise<'hold' | 'close' | 'return'>
+  /** Esc in the output window : closes it or returns focus, per outputEscMode. */
+  outputEscape: () => Promise<'hold' | 'close' | 'return'>
   onOutputClosed: (cb: () => void) => () => void
   outputFrame: (frame: OutputWarp) => void
   onOutputFrame: (cb: (frame: OutputWarp) => void) => () => void

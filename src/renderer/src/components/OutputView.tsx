@@ -32,35 +32,41 @@ export function OutputView(): JSX.Element {
   //   · an INSTALLATION (kiosk) : Esc or O HELD for 1.5 s, so a key brushed by a
   //     visitor (or a cat) cannot end the show. Ctrl/Cmd+Shift+O is the global
   //     backstop in main for when focus is elsewhere.
-  //   · a plain fullscreen output : Esc at a tap closes it. There is no show to
-  //     protect, nothing is lost by closing, and it reopens from the same button
-  //     that opened it. Holding a key with no feedback reads exactly like a dead
-  //     keyboard, which is how this window used to strand people : the handler
-  //     was armed only for an installation, so Esc did nothing at all here.
+  //   · a plain fullscreen output that covers the control window : Esc at a tap
+  //     closes it. There is no show to protect, nothing is lost by closing, and
+  //     it reopens from the same button that opened it. Holding a key with no
+  //     feedback reads exactly like a dead keyboard, which is how this window
+  //     used to strand people : the handler was armed only for an installation,
+  //     so Esc did nothing at all here.
+  //   · an output the control window is NOT behind (a projector on another
+  //     display, a span, a framed window) : Esc hands focus back to the control
+  //     window and the show goes on. This window takes focus as it opens, so an
+  //     Esc meant for the Output page landed here and closed the projector.
   //
-  // `kioskConfig().kiosk` is the SETTING, which stays on after an exit-kiosk, so
-  // the live state decides : a window opened after breaking out of an
-  // installation takes the tap, not the hold.
+  // Main decides which (outputEscMode), from the LIVE installation state and
+  // where the two windows sit : `kioskConfig().kiosk` is the SETTING, which
+  // stays on after an exit-kiosk.
   useEffect(() => {
     let armed: boolean | null = null
     let hold = 0
-    const mod = window.api.platform === 'darwin' ? 'Cmd' : 'Ctrl'
     window.api
-      .kioskActive()
-      .then((live) => {
-        armed = !!live
-        setHint(live ? `hold Esc to exit  ·  ${mod}+Shift+O anywhere` : 'Esc to close')
+      .outputEscMode()
+      .then((mode) => {
+        armed = mode === 'hold'
+        // Said only where the operator is the one looking : an installation's
+        // projector is the audience's, and "hold Esc to exit" on it is an
+        // invitation. A projector across the room needs no instructions either.
+        if (mode === 'close') setHint('Esc to close')
       })
       .catch(() => {
         armed = false
-        setHint('Esc to close')
       })
     const isExitKey = (e: KeyboardEvent): boolean => e.key === 'Escape' || e.key === 'o' || e.key === 'O'
     const onKey = (e: KeyboardEvent): void => {
       if (armed === null || e.repeat) return
       if (!armed) {
         // Esc only : O is the one a sleeve catches, and here it would close at a touch.
-        if (e.key === 'Escape') void window.api.outputClose()
+        if (e.key === 'Escape') void window.api.outputEscape()
         return
       }
       if (!isExitKey(e)) return

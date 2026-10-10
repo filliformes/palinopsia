@@ -44,7 +44,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['H', 'Freeze / hold the output'],
       ['L', 'MIDI Learn on/off'],
       ['Esc', 'Close top overlay · exit MIDI Learn'],
-      ['Esc on the output', 'Close a fullscreen output (an installation : hold 1.5 s)']
+      ['Esc on the output', 'Close a fullscreen output over the controls, else back to them (an installation : hold 1.5 s)']
     ]
   },
   {

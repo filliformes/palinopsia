@@ -20,6 +20,9 @@ import type { PerfStats } from '@shared/types'
 let gpuCache: { vram: number | null; gpu: number | null } = { vram: null, gpu: null }
 let lastSpawn = 0
 let gpuToolMissing = false // stop trying after the first failure (no such tool)
+// One helper at a time : a slow answer (up to its 2 s timeout) must not stack a
+// second and a third behind it on a once-a-second sampler.
+let gpuBusy = false
 
 /** First `"<key>" = <integer>` in an IO registry dump, or null. */
 function ioregInt(text: string, key: string): number | null {
@@ -37,6 +40,7 @@ function refreshGpuUnified(): void {
     ['-r', '-d', '1', '-w', '0', '-c', 'AGXAccelerator'],
     { timeout: 2000, maxBuffer: 4 * 1024 * 1024 },
     (err, stdout) => {
+      gpuBusy = false
       if (err) {
         if ((err as NodeJS.ErrnoException).code === 'ENOENT') gpuToolMissing = true
         gpuCache = { vram: null, gpu: null }
@@ -68,6 +72,7 @@ function refreshGpuDiscrete(): void {
     ['--query-gpu=memory.used,memory.total,utilization.gpu', '--format=csv,noheader,nounits'],
     { timeout: 2000, windowsHide: true },
     (err, stdout) => {
+      gpuBusy = false
       if (err) {
         // ENOENT = the tool is not on PATH (no such GPU) → give up permanently.
         if ((err as NodeJS.ErrnoException).code === 'ENOENT') gpuToolMissing = true
@@ -89,10 +94,11 @@ function refreshGpuDiscrete(): void {
 }
 
 function refreshGpu(): void {
-  if (gpuToolMissing) return
+  if (gpuToolMissing || gpuBusy) return
   const now = Date.now()
   if (now - lastSpawn < 900) return
   lastSpawn = now
+  gpuBusy = true
   if (process.platform === 'darwin') refreshGpuUnified()
   else refreshGpuDiscrete()
 }

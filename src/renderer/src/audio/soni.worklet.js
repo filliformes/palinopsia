@@ -768,7 +768,11 @@ class SoniProcessor extends AudioWorkletProcessor {
       const ev = m.events;
       const base = currentTime;
       for (let i = 0; i + 3 < ev.length; i += 4) {
-        this.sigPending.push({ t0: base + ev[i], freq: ev[i + 1], amp: ev[i + 2], pan: ev[i + 3] });
+        // one bad number would ride a grain's phase into every later sample
+        // of the mix, so a grain that is not all finite is dropped here
+        const t0 = ev[i], f = ev[i + 1], a = ev[i + 2], p = ev[i + 3];
+        if (!(Number.isFinite(t0) && Number.isFinite(f) && Number.isFinite(a) && Number.isFinite(p))) continue;
+        this.sigPending.push({ t0: base + (t0 < 0 ? 0 : t0 > 1 ? 1 : t0), freq: f, amp: a < 0 ? 0 : a > 1 ? 1 : a, pan: p < 0 ? 0 : p > 1 ? 1 : p });
       }
       if (this.sigPending.length > PENDING_CAP) this.sigPending.splice(0, this.sigPending.length - PENDING_CAP);
       return;
@@ -1552,10 +1556,14 @@ class SoniProcessor extends AudioWorkletProcessor {
           let slot = -1;
           for (let k = 0; k < NSIG; k++) if (!this.sig[k].on) { slot = k; break; }
           if (slot < 0) {
+            // the pip and the ping keep env at 1 (their window is their
+            // envelope) : what is left of the window is their loudness
             let quiet = 1e9;
+            const win = wave === 0 || wave === 8;
             for (let k = 0; k < NSIG; k++) {
               const g2 = this.sig[k];
-              if (g2.born !== this.block && g2.env < quiet) { quiet = g2.env; slot = k; }
+              const lvl = win ? 1 - g2.age / g2.len : g2.env;
+              if (g2.born !== this.block && lvl < quiet) { quiet = lvl; slot = k; }
             }
             if (slot < 0) continue; // the whole pool started this block : drop it
             this.sgDcL += this.sig[slot].lastL; this.sgDcR += this.sig[slot].lastR;
@@ -1657,7 +1665,7 @@ class SoniProcessor extends AudioWorkletProcessor {
         let dl = this.sgDcL, dr = this.sgDcR;
         const kk = this.evDcK;
         for (let s = 0; s < n; s++) { L[s] += dl; R[s] += dr; dl *= kk; dr *= kk; }
-        this.sgDcL = Math.abs(dl) < 1e-7 ? 0 : dl; this.sgDcR = Math.abs(dr) < 1e-7 ? 0 : dr;
+        this.sgDcL = Math.abs(dl) < 1e-7 || !Number.isFinite(dl) ? 0 : dl; this.sgDcR = Math.abs(dr) < 1e-7 || !Number.isFinite(dr) ? 0 : dr;
       }
       this.mixVoice(9, sg.on, sg.gain, L, R, outL, outR, n);
     }
