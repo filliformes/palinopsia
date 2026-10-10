@@ -869,7 +869,9 @@ function MatrixSummary(): JSX.Element {
     }
     if (t.kind === 'sonify') return `SONIFY ${t.param}`
     if (t.kind === 'layer') {
-      const f = t.field === 'mix' ? 'A/B mix' : t.field
+      // `vary` is a trigger, so it is named as one : the row fires on a
+      // crossing rather than holding a value, which the panel should not hide.
+      const f = t.field === 'mix' ? 'A/B mix' : t.field === 'vary' ? 'vary ▸' : t.field
       return `L${t.layer + 1} ${f}`
     }
     if (t.kind === 'bg') return `BG ${t.field === 'depth' ? 'shadow' : t.field}`

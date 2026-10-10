@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT } from './buttonStyles'
 import type { AudioFeature, BlendMode, CouplingMode, LayerMask, ModTarget, SourceKind, SourceSlot } from '@shared/types'
-import { BLEND_MODES } from '@shared/types'
+import { BLEND_MODES, DEFAULT_LAYER_VARY } from '@shared/types'
 import { AUDIO_FEATURES } from '../engine/audioIn'
 import { GENERATORS_ALPHA, SHADER_BY_ID, inPickerOrder, sourceSection } from '../shaders/isf'
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
@@ -47,6 +47,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const setSourceCapture = useStore((s) => s.setSourceCapture)
   const setSourceHive = useStore((s) => s.setSourceHive)
   const setLayerSpeed = useStore((s) => s.setLayerSpeed)
+  const varyLayer = useStore((s) => s.varyLayer)
+  const setLayerVary = useStore((s) => s.setLayerVary)
   const setSelection = useStore((s) => s.setSelection)
   const selection = useStore((s) => s.selection)
   const collapsed = useStore((s) => !!s.collapsed[`layer${index}`])
@@ -70,7 +72,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   // ── Modulation of the compositor-level layer controls (opacity / A-B mix /
   // blend). A small M chip beside each toggles its M1–8 binding row; bound
   // sliders tint accent2 and MOVE with the live value (the app-wide behaviour).
-  type LayerField = 'opacity' | 'mix' | 'blend'
+  type LayerField = 'opacity' | 'mix' | 'blend' | 'vary'
   const modMatrix = useStore((s) => s.composition.modMatrix)
   const [openMod, setOpenMod] = useState<LayerField | null>(null)
   const layerTarget = (field: LayerField): ModTarget => ({ kind: 'layer', layer: index, field })
@@ -481,6 +483,40 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                 min={0}
                 max={20}
                 onChange={(v) => setLayerSpeed(index, v)}
+                className="input w-full px-1 py-0.5 text-right text-[11px]"
+              />
+            </div>
+          </Row>
+
+          {/* VARY : the global Vary, aimed at this layer alone. The button is a
+              modulation target like the other layer fields, so a modulator can
+              fire the variation instead of a hand. */}
+          <Row label="VARY">
+            <button
+              onClick={() => varyLayer(index)}
+              className="shrink-0 rounded border border-border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted hover:border-accent hover:text-accent"
+              title="Nudge THIS layer around where it already sits : its sources, its racks and their parameters move by the amount beside this, and nothing else in the composition changes. Bind the M to fire it from a modulator."
+            >
+              vary ▸
+            </button>
+            {modChip('vary', 'M')}
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={layer.varyAmount ?? DEFAULT_LAYER_VARY}
+              onChange={(e) => setLayerVary(index, Number(e.target.value))}
+              onDoubleClick={() => setLayerVary(index, DEFAULT_LAYER_VARY)}
+              className="min-w-0 flex-1 accent-accent"
+              title="How far one Vary moves this layer : double-click resets"
+            />
+            <div className="w-11 shrink-0">
+              <BoundedNumberInput
+                value={layer.varyAmount ?? DEFAULT_LAYER_VARY}
+                min={0}
+                max={1}
+                onChange={(v) => setLayerVary(index, v)}
                 className="input w-full px-1 py-0.5 text-right text-[11px]"
               />
             </div>

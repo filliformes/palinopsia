@@ -902,6 +902,25 @@ export function makeDefaultModulators(): ModulatorConfig[] {
 // Live modulated value per target key : the UI's sliders read this each rAF
 // to move with the modulation (the dataFLOU behaviour). Key format matches
 // the store's modTargetKey exactly.
+// A layer's Vary is a TRIGGER. The engine writes values every frame; firing on
+// one needs an EDGE, and the variation itself is a store edit the engine must
+// not make. So the edge is detected here and handed out, exactly as a capture
+// error is : App registers a handler that runs the store action silently (an
+// auto-fire must not flood the 100-level undo history).
+let varyTrigger: ((layer: number) => void) | null = null
+export function setVaryTrigger(fn: ((layer: number) => void) | null): void {
+  varyTrigger = fn
+}
+// Last value seen per layer, for the crossing test. Not reset between frames.
+const varyLast = new Map<number, number>()
+/** Fire as the modulator crosses the middle going UP. One fire per crossing,
+ *  so a slow LFO fires once a cycle rather than every frame it spends high. */
+function varyEdge(layer: number, x: number): void {
+  const prev = varyLast.get(layer) ?? 0
+  varyLast.set(layer, x)
+  if (prev < 0.5 && x >= 0.5) varyTrigger?.(layer)
+}
+
 export const liveModValues = new Map<string, number>()
 // Live modulated Meta-knob positions (0..1) : the dials read these each rAF.
 export const metaLiveValues = new Map<number, number>()
@@ -1196,6 +1215,11 @@ export function writeModTarget(
   // Layer opacity / A-B mix / blend-index : compositor overrides, absolute 0..1.
   if (t.kind === 'layer') {
     const x = Math.max(0, Math.min(1, shaped01))
+    if (t.field === 'vary') {
+      liveModValues.set(liveKey(t), x)
+      varyEdge(t.layer, x)
+      return
+    }
     const value =
       t.field === 'blend'
         ? Math.min(BLEND_INDICES.length - 1, Math.floor(x * BLEND_INDICES.length))
@@ -1362,6 +1386,14 @@ export function applyModulation(
       const layer = c.layers[a.target.layer]
       if (!layer) continue
       const f = a.target.field
+      if (f === 'vary') {
+        // A trigger, so depth and mode have nothing to scale : the modulator's
+        // own shape decides when it crosses, and the crossing is the event.
+        const x = Math.max(0, Math.min(1, v))
+        liveModValues.set(liveKey(a.target), x)
+        varyEdge(a.target.layer, x)
+        continue
+      }
       let final: number | null
       if (f === 'blend') {
         const baseIdx = Math.max(0, BLEND_MODES.indexOf(layer.blend))

@@ -44,7 +44,7 @@ import { SHADER_BY_ID } from './shaders/isf'
 import { canHostFx } from './fxScopes'
 import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
-import { BLEND_MODES, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
+import { BLEND_MODES, DEFAULT_LAYER_VARY, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
 import { beginSceneMorph, beginRelayMorph, cancelMorph, requestSceneChange } from './morph'
 import { DEFAULT_LIGHT_PATH } from './lightPath'
@@ -105,6 +105,7 @@ import {
   randomizeBackground,
   randomizeComposition,
   randomizeInputs,
+  jitterLayer,
   randomizeRack,
   randomizeSingleLayer,
   seedRandomStart,
@@ -1242,6 +1243,9 @@ interface StoreState {
   /** Re-roll ONE of a layer's racks (source A, source B, or the layer's own),
    *  leaving its sources and the other racks untouched. */
   randomizeLayerFx: (layer: number, which: 'A' | 'B' | 'layer') => void
+  /** Nudge ONE layer around where it sits : the per-layer Vary. */
+  varyLayer: (layer: number) => void
+  setLayerVary: (layer: number, amount: number) => void
   // Layer presets : whole-layer states (sources + all racks), app-persistent.
   layerPresets: Array<{ id: string; name: string; layer: LayerState }>
   saveLayerPreset: (layer: number, name: string) => void
@@ -2008,6 +2012,32 @@ export const useStore = create<StoreState>((set, get) => ({
       }
       return { composition: dropLayerTargets(composition, layer) }
     }),
+
+  varyLayer: (layer) =>
+    set((s) => {
+      const cur = s.composition.layers[layer]
+      if (!cur) return {}
+      // No target pruning : a jitter moves values, it never removes a unit, so
+      // every modulation row still points at something that exists.
+      return {
+        composition: {
+          ...s.composition,
+          layers: updateLayer(s.composition.layers, layer, (l) =>
+            jitterLayer(l, l.varyAmount ?? DEFAULT_LAYER_VARY)
+          )
+        }
+      }
+    }),
+  setLayerVary: (layer, amount) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({
+          ...l,
+          varyAmount: Math.max(0, Math.min(1, amount))
+        }))
+      }
+    })),
 
   randomizeLayerFx: (layer, which) =>
     set((s) => {

@@ -1010,7 +1010,10 @@ function jitterFxArray(fx: FxInstance[], amount: number): FxInstance[] {
   })
 }
 
-function jitterLayer(l: LayerState, amount: number): LayerState {
+/** Nudge ONE layer around where it already sits : the per-layer form of
+ *  Vary. Exported so a layer can be varied on its own, from its strip or
+ *  from a modulator, without the whole composition moving with it. */
+export function jitterLayer(l: LayerState, amount: number): LayerState {
   return {
     ...l,
     sourceA: jitterSlot(l.sourceA, amount) as SourceSlot,

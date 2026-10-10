@@ -224,6 +224,9 @@ export interface LayerState {
   harmony: number
   // Global time multiplier for this layer's sources + racks (1 = realtime).
   speed: number
+  // How far this layer's own Vary nudges it. Optional : a session saved before
+  // the control existed has none, and reads as the default.
+  varyAmount?: number
   // A/B audio coupling (Slab 1). Off by default.
   coupling: LayerCoupling
   // Per-layer spatial mask : multiplies the layer's contribution to the stack,
@@ -631,7 +634,9 @@ export type ModTarget =
   // Compositor-level layer controls (not ISF inputs) : the layer's own opacity,
   // its A/B source mix, and its blend-against-the-stack mode (driven as an enum
   // index that cycles through BLEND_MODES). Applied as a final per-frame override.
-  | { kind: 'layer'; layer: number; field: 'opacity' | 'mix' | 'blend' }
+  // `vary` is a TRIGGER, not a value : the modulation path edge-detects it and
+  // fires one variation as the modulator crosses its middle going up.
+  | { kind: 'layer'; layer: number; field: 'opacity' | 'mix' | 'blend' | 'vary' }
   // The Background's own controls : opacity, its clock's speed (0..4×) and the
   // contact shadow the layers cast on it ('depth'). Same final override.
   | { kind: 'bg'; field: 'opacity' | 'speed' | 'depth' }
@@ -670,6 +675,10 @@ export interface ModAssignment {
 }
 
 // The cap is deliberate (simplexité): bounded modulation stays followable.
+/** A layer's Vary, when it has not been set. The same 15% the global Vary
+ *  starts at, so one layer on its own nudges as far as all of them would. */
+export const DEFAULT_LAYER_VARY = 0.15
+
 export const MAX_MOD_ASSIGNMENTS = 12
 
 // ── Meta Controller (brief §6 : dataFLOU's macro surface) ─────────────
@@ -1301,6 +1310,10 @@ export interface ExposedApi {
   // Kiosk / installation mode : read the effective launch config; get/set the
   // persisted "enable on next restart" launch file; get the operator UI out.
   kioskConfig: () => Promise<{ kiosk: boolean; sessionPath?: string; display?: number; windowed?: boolean }>
+  // Whether THIS session is actually running as an installation, which is not
+  // what kioskConfig reports : that is the stored setting, still on after an
+  // exit-kiosk. The output window's escape keys branch on this.
+  kioskActive: () => Promise<boolean>
   kioskGetLaunch: () => Promise<KioskLaunchConfig>
   kioskSetLaunch: (cfg: KioskLaunchConfig) => Promise<boolean>
   // The installation's display (its id, else found again by name), from main.

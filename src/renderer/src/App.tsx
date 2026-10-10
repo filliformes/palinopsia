@@ -17,7 +17,7 @@ import { applyFlicker } from './engine/flicker'
 import { applyFrameWeave, resetFrameWeave } from './engine/frameWeave'
 import { pushMarkSignal } from './engine/markSignal'
 import { installOscMonitor, sendOsc as sendOscMsg } from './oscMonitor'
-import { applyMetaGlides, applyModulation, modEngine } from './engine/modulation'
+import { applyMetaGlides, applyModulation, modEngine, setVaryTrigger } from './engine/modulation'
 import { visionBus } from './engine/visionIn'
 import { depthEngine } from './engine/depthEstimate'
 import { currentFps, formatHz, tickFrame, tickSkip } from './perf'
@@ -149,7 +149,7 @@ function cycleContextPreset(): void {
   }
   revealFinishing('ft-context')
 }
-import { initUndo, redo, undo, useUndoState } from './undo'
+import { initUndo, redo, runSilently, undo, useUndoState } from './undo'
 import { THEME_ORDER, useStore, type ThemeName } from './store'
 import { metaGlides } from './metaSmooth'
 
@@ -1639,12 +1639,17 @@ export default function App(): JSX.Element {
       }, 150)
     }
     schedule()
+    // A modulator bound to a layer's VARY fires the variation here : the engine
+    // detects the crossing, the store makes the change. Silently, because an
+    // auto-fire every LFO cycle would bury the 100-level undo history.
+    setVaryTrigger((layer) => runSilently(() => useStore.getState().varyLayer(layer)))
     // The installation watchdog in main : the frame count, every 5 s.
     const aliveTimer = window.setInterval(() => window.api.appAlive(engineFrames), 5000)
     return () => {
       window.clearInterval(aliveTimer)
       offGl()
       onCaptureError(null)
+      setVaryTrigger(null)
       cancelAnimationFrame(raf)
       cancelAnimationFrame(probeRaf)
       window.clearTimeout(timer)
