@@ -8,10 +8,10 @@
     { "NAME": "cells",   "TYPE": "float", "MIN": 3.0,  "MAX": 64.0,  "DEFAULT": 14.0, "LABEL": "cells" },
     { "NAME": "density", "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.55, "LABEL": "density" },
     { "NAME": "split",   "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.6,  "LABEL": "split" },
-    { "NAME": "rate",    "TYPE": "float", "MIN": 0.0,  "MAX": 24.0,  "DEFAULT": 6.0,  "LABEL": "rate" },
-    { "NAME": "quant",   "TYPE": "float", "MIN": 1.0,  "MAX": 16.0,  "DEFAULT": 1.0,  "LABEL": "step" },
+    { "NAME": "rate",    "TYPE": "float", "MIN": 0.0,  "MAX": 120.0, "DEFAULT": 6.0,  "LABEL": "rate" },
+    { "NAME": "quant",   "TYPE": "float", "MIN": 1.0,  "MAX": 64.0,  "DEFAULT": 1.0,  "LABEL": "step" },
     { "NAME": "gate",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 1.0,  "LABEL": "gate" },
-    { "NAME": "hold",    "TYPE": "float", "MIN": 1.0,  "MAX": 8.0,   "DEFAULT": 1.0,  "LABEL": "hold" },
+    { "NAME": "hold",    "TYPE": "float", "MIN": 1.0,  "MAX": 32.0,  "DEFAULT": 1.0,  "LABEL": "hold" },
     { "NAME": "jump",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.35, "LABEL": "jump" },
     { "NAME": "shear",   "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.0,  "LABEL": "shear" },
     { "NAME": "flip",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.0,  "LABEL": "flip" },
@@ -171,12 +171,39 @@ float figureCov(vec2 q, float aspect, float S, float px, float dens, int fig, fl
   } else {
     // SLAB : one white field with bars cut OUT of it. The only inverted figure,
     // and the only one where the ink is the ground.
-    vec2 c = vec2(qs.x - aspect * 0.5, qs.y - 0.5);
-    float hwx = 0.21 * aspect + 0.08;
-    float body = rectCov(c, vec2(hwx, 0.30), eq);
-    float nb = 2.0 + floor(hash12(vec2(S, hand + 3.0)) * 3.0 * split);
-    float bf = fract((c.x / hwx * 0.5 + 0.5) * nb) - 0.5;
-    float cut = (1.0 - smoothstep(0.16 - eq, 0.16 + eq, abs(bf))) * step(abs(c.y), 0.24);
+    //
+    // Every knob means here what it means in the grids, so the figure is not a
+    // one-shape special case : DENSITY is how much frame the slab covers, CELLS
+    // is how many bars are cut from it, SPLIT makes the comb uneven and can turn
+    // it on its side, JUMP moves and resizes it on each deal.
+    float cover = clamp(density, 0.0, 1.0);
+    float sz = 1.0 + (hash12(vec2(S, hand + 97.0)) - 0.5) * jump * 0.7;
+    vec2 hw = vec2(mix(0.16, 0.46, cover) * aspect, mix(0.13, 0.44, cover)) * sz;
+    vec2 ctr = vec2(aspect, 1.0) * 0.5
+             + (vec2(hash12(vec2(S, hand + 61.0)), hash12(vec2(S, hand + 83.0))) - 0.5)
+               * jump * vec2(aspect * 0.42, 0.38);
+    vec2 c = qs - ctr;
+    float body = rectCov(c, hw, eq);
+
+    // Bars run across the slab's short axis by default, and SPLIT above half
+    // lets a deal turn them sideways instead : the references use both, and one
+    // orientation on its own reads as a logo rather than a vocabulary.
+    float turn = step(1.0 - (split - 0.5) * 1.6, hash12(vec2(S, hand + 131.0)));
+    float along = mix(c.x / max(hw.x, 1e-4), c.y / max(hw.y, 1e-4), turn);
+    float across = mix(c.y / max(hw.y, 1e-4), c.x / max(hw.x, 1e-4), turn);
+
+    float nb = clamp(floor(cells * 0.25), 1.0, 14.0);
+    float t = along * 0.5 + 0.5;
+    float bi = floor(t * nb);
+    float bf = fract(t * nb) - 0.5;
+    // An uneven comb : each bar keeps its own width and sits a little off its
+    // slot. At split 0 they are a perfect ruled comb, which is the plain look.
+    float jw = (hash12(vec2(bi, floor(S * 0.3) + hand)) - 0.5) * split * 0.22;
+    float jp = (hash12(vec2(bi + 41.0, hand + floor(S * 0.3))) - 0.5) * split * 0.30;
+    float w = clamp(0.17 + jw, 0.03, 0.42);
+    float e2 = eq * nb * 2.0; // the edge, in bar units
+    float cut = (1.0 - smoothstep(w - e2, w + e2, abs(bf - jp)))
+              * step(abs(across), 0.80);
     cov = max(body - cut, 0.0);
     isAcc = 0.0;
   }

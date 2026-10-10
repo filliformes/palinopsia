@@ -1111,8 +1111,8 @@ export const GENERATORS: IsfShader[] = [
     category: 'Generator',
     source: lowercase,
     curated: {
-      cells: [6, 36], density: [0.25, 0.8], split: [0.2, 1], rate: [1.5, 14],
-      quant: [1, 6], gate: [0.6, 1], hold: [1, 4], jump: [0, 0.7],
+      cells: [6, 40], density: [0.25, 0.8], split: [0.2, 1], rate: [1.5, 40],
+      quant: [1, 16], gate: [0.6, 1], hold: [1, 10], jump: [0, 0.7],
       shear: [0, 0.35], flip: [0, 0.12], smear: [0, 0.5], halo: [0.05, 0.4],
       accentAmt: [0, 0.6], accentEvery: [3, 9], seed: [0, 1], audio: [0, 0.4]
     }
