@@ -10,6 +10,9 @@ import { useStore } from './store'
 /** Fire the Randomize mode the Transport's chevron currently points at
  *  (persisted in localStorage) at the persisted intensity. */
 export function fireSelectedRandomize(): void {
+  // The R key and a MIDI pad land here rather than on the button : pulse it so
+  // the Randomize button blinks however it was fired.
+  useStore.getState().bumpRandPulse()
   const raw = localStorage.getItem('opsia.randScope') as RandomizeScope | null
   const scope: RandomizeScope = raw ?? 'all'
   if (scope === 'meta') {

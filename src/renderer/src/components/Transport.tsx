@@ -19,6 +19,7 @@ import { BoundedNumberInput } from './BoundedNumberInput'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { ToastDock } from './Toast'
 import { TBTN, TBTN_IDLE, TBTN_LIT } from './buttonStyles'
+import { Blink } from './Blink'
 
 const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
   { scope: 'all', label: 'Randomize All' },
@@ -39,6 +40,9 @@ const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
 // else is a pure composition transform through the store. `intensity` 1 = full
 // re-roll, <1 = a walk from the current scene (Meta/Sonify always re-roll).
 function fireRandomize(scope: RandomizeScope, intensity: number): void {
+  // Pulsed here, not in the store's randomize : the Meta and Sonify scopes
+  // never reach it, and every scope should blink the button.
+  useStore.getState().bumpRandPulse()
   if (scope === 'meta') randomizeMetaKnobs()
   else if (scope === 'sonify') {
     const st = useStore.getState()
@@ -106,6 +110,7 @@ export function Transport(): JSX.Element {
   const setComposition = useStore.setState
   const applyVariation = useStore((s) => s.applyVariation)
   const globalVaryPulse = useStore((s) => s.varyPulse[4] ?? 0)
+  const randPulse = useStore((s) => s.randPulse)
   const [menuOpen, setMenuOpen] = useState(false)
   const [scope, setScope] = useState<RandomizeScope>(loadScope)
   // Randomize intensity (walk↔full) and Variation spread, both persisted.
@@ -355,7 +360,7 @@ export function Transport(): JSX.Element {
             title={`Variation ${pct(varAmt)} : a fresh variant of the current scene (same structure, values nudged). First press sets the baseline; each press is a new sibling at this spread.`}
           >
             Vary
-            {globalVaryPulse > 0 && <span key={globalVaryPulse} className="vary-blink" />}
+            <Blink n={globalVaryPulse} color="accent2" />
           </button>
         </span>
         <input
@@ -395,10 +400,11 @@ export function Transport(): JSX.Element {
             <MidiLearnOverlay id="fire:randomize" />
             <button
               onClick={() => fireRandomize(scope, intensity)}
-              className={`${TBTN} rounded-r-none border-accent/60 bg-accent/10 text-accent hover:bg-accent/20`}
+              className={`relative ${TBTN} rounded-r-none border-accent/60 bg-accent/10 text-accent hover:bg-accent/20`}
               title={`Fire ${current.label} : every draw from curated aesthetic ranges`}
             >
               {current.label}
+              <Blink n={randPulse} color="accent" />
             </button>
           </span>
           <button

@@ -3,6 +3,7 @@
 // composite with draggable corner handles, so you warp and watch it move), the
 // alignment grid, projector/2nd-display output, and the NDI / Spout / Syphon senders.
 
+import { Blink } from './Blink'
 import {
   useCallback,
   useEffect,
@@ -758,10 +759,11 @@ export function OutputPage({
                 <button
                   onClick={() => void resetRecFolder()}
                   disabled={recording}
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-muted/40 bg-panel3 font-mono text-[11px] leading-none text-muted transition-colors hover:border-accent/60 hover:text-accent disabled:opacity-40"
+                  className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded border border-muted/40 bg-panel3 font-mono text-[11px] leading-none text-muted transition-colors hover:border-accent/60 hover:text-accent disabled:opacity-40"
                   title={`Back to the default folder (${recFolder.defaultPath})`}
                 >
                   ↺
+                  <Blink />
                 </button>
               )}
             </div>
@@ -1296,10 +1298,11 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
             setDome({ ...defaultDomeConfig(), enabled: dome.enabled })
             onResetCam('inside')
           }}
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-muted/40 bg-panel3 font-mono text-[11px] leading-none text-muted transition-colors hover:border-accent/60 hover:text-accent"
+          className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded border border-muted/40 bg-panel3 font-mono text-[11px] leading-none text-muted transition-colors hover:border-accent/60 hover:text-accent"
           title="Reset the Fulldome settings to their defaults (mapping, resolution, aperture, simulator); dome on/off is kept"
         >
           ↺
+          <Blink />
         </button>
       }
       info="Renders a square domemaster (equidistant fisheye, front at the bottom, the fulldome standard) from the flat composition. The master replaces the frame everywhere : the preview, the projector window, NDI, Spout, recording and stills. The SAT Satosphère takes 210°, 4096×4096 max, live over NDI. 4K is the ceiling : a live 8K master overloads the graphics card."

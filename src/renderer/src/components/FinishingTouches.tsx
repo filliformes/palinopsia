@@ -4,6 +4,7 @@
 // its parameters stacked vertically. Default collapsed.
 
 import type { FxInstance, ModTarget } from '@shared/types'
+import { Blink } from './Blink'
 import { useEffect, useState } from 'react'
 import { frameVals } from '../engine/frameVals'
 import { liveModValues } from '../engine/modulation'
@@ -277,11 +278,12 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
               setVibePresetName(null)
             }
           }}
-          className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[12px] leading-none text-muted transition-colors hover:border-accent hover:text-accent"
+          className="relative shrink-0 rounded border border-border px-1.5 py-0.5 text-[12px] leading-none text-muted transition-colors hover:border-accent hover:text-accent"
           title={`Back to default : ${name} as a New session starts it (modulators stay bound)`}
           aria-label={`Reset ${name} to default`}
         >
           ↺
+          <Blink />
         </button>
         <button
           onClick={() => {

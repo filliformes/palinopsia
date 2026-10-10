@@ -7,6 +7,7 @@
 // picker. The sound engine lives in audio/sonify.ts (AudioWorklet).
 
 import { isValidElement, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
+import { Blink } from './Blink'
 import type { ModTarget, SonifyModParam } from '@shared/types'
 import { registerLiveOverlay } from './liveOverlay'
 import { randomSonify, randomizeVoice, suggestSonify, type SoniVoiceKey } from '../audio/autoSonify'
@@ -836,10 +837,11 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
         </button>
         <button
           onClick={resetDefault}
-          className="rounded px-2 py-0.5 font-mono text-[11px] text-muted ring-1 ring-border transition-colors hover:text-accent hover:ring-accent/60"
+          className="relative rounded px-2 py-0.5 font-mono text-[11px] text-muted ring-1 ring-border transition-colors hover:text-accent hover:ring-accent/60"
           title="Reset every Sonify voice / FX / mixer setting back to the defaults (keeps sound on/off + output device)"
         >
           ↺
+          <Blink />
         </button>
         {/* Presets */}
         <div className="flex items-center gap-1">

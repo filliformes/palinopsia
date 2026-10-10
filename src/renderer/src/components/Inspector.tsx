@@ -4,6 +4,7 @@
 // OSC and the modulators (Phase 5) use, so the engine follows automatically.
 
 import type { FxInstance, ModTarget, SidechainRef, SourceSlot } from '@shared/types'
+import { Blink } from './Blink'
 import { FX_OPACITY_INPUT } from '@shared/types'
 import { randomizeInputs } from '../randomize'
 import { SHADER_BY_ID } from '../shaders/isf'
@@ -566,10 +567,11 @@ export function Inspector(): JSX.Element {
             for (const [k, v] of Object.entries(def)) onChange(k, v)
             if (isVibe) setVibePresetName(null)
           }}
-          className="shrink-0 rounded border border-border bg-panel2/60 px-1.5 py-0.5 font-mono text-[10px] text-muted transition-colors hover:border-fg/40 hover:text-fg"
+          className="relative shrink-0 rounded border border-border bg-panel2/60 px-1.5 py-0.5 font-mono text-[10px] text-muted transition-colors hover:border-fg/40 hover:text-fg"
           title="Reset this effect to its default state (every parameter to its default value)"
         >
           ↺
+          <Blink />
         </button>
         <span className="relative inline-flex shrink-0">
           <MidiLearnOverlay id="rand:inspector" />

@@ -507,19 +507,24 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
   animation: show-pulse 2s ease-in-out infinite;
   white-space: nowrap;
 }
-/* A Vary just fired. One-shot, remounted per fire (keyed on a count), so a
-   modulator firing on every beat blinks on every beat. accent2, the Vary
-   colour : the global button already wears it, and so does a modulated one. */
-.vary-blink {
+/* A fired action, seen (components/Blink.tsx). One-shot, remounted per fire
+   (keyed on a count), so a modulator firing on every beat blinks on every
+   beat. The colour says what kind of action it was : accent2 a Vary (the
+   colour the Vary buttons and every modulated control already wear), accent a
+   Randomize (as the dice), text a return to default (neutral : back to plain). */
+.fire-blink {
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  animation: vary-blink 280ms ease-out 1 forwards;
+  animation: fire-blink 280ms ease-out 1 forwards;
 }
-@keyframes vary-blink {
-  0% { background: rgb(var(--c-accent2) / 0.85); }
-  100% { background: rgb(var(--c-accent2) / 0); }
+.fire-blink.c-accent { --blink-c: var(--c-accent); }
+.fire-blink.c-accent2 { --blink-c: var(--c-accent2); }
+.fire-blink.c-text { --blink-c: var(--c-text); }
+@keyframes fire-blink {
+  0% { background: rgb(var(--blink-c) / 0.85); }
+  100% { background: rgb(var(--blink-c) / 0); }
 }
 
 @keyframes show-pulse {

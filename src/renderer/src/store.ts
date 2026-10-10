@@ -1300,6 +1300,10 @@ interface StoreState {
    *  however it was fired (a click, a modulator, MIDI, OSC). Transient : not in
    *  the composition, so it never enters undo or a session. */
   varyPulse: number[]
+  /** How many times the global Randomize has fired (button, R key, MIDI pad) :
+   *  the button blinks on it. Transient, like varyPulse. */
+  randPulse: number
+  bumpRandPulse: () => void
   copyFx: (scope: FxScope, instId: string) => void
   /** Overwrite one unit's settings from the clipboard. Same shader only. */
   pasteFxSettings: (scope: FxScope, instId: string) => void
@@ -2704,6 +2708,8 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
   fxClipboard: null,
   varyPulse: [0, 0, 0, 0, 0],
+  randPulse: 0,
+  bumpRandPulse: () => set((s) => ({ randPulse: s.randPulse + 1 })),
   copyFx: (scope, instId) => {
     const inst = fxArrayFor(get().composition, scope).find((f) => f.id === instId)
     if (!inst?.shaderId) return

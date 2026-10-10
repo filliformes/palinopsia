@@ -5,6 +5,7 @@
 // the two poles + a one-line description. Reach it with the G key.
 
 import { useStore } from '../store'
+import { Blink } from './Blink'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 
 function FeelRow({
@@ -103,10 +104,11 @@ export function FeelPanel(): JSX.Element {
         <button
           onClick={resetAll}
           disabled={!anyOff}
-          className="rounded px-1 py-0.5 text-[12px] leading-none text-muted transition-colors hover:text-accent disabled:opacity-30"
+          className="relative rounded px-1 py-0.5 text-[12px] leading-none text-muted transition-colors hover:text-accent disabled:opacity-30"
           title="Reset all eight Feel macros to neutral"
         >
           ↺
+          <Blink />
         </button>
       </div>
       <section className="flex flex-col gap-1.5">

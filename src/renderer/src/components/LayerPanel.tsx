@@ -28,6 +28,7 @@ import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { SearchSelect, type SearchOption } from './SearchSelect'
 import { ConfirmModal, PromptModal } from './PromptModal'
 import { useFlash } from './useFlash'
+import { Blink } from './Blink'
 
 export function LayerPanel({ index }: { index: number }): JSX.Element {
   const layer = useStore((s) => s.composition.layers[index])
@@ -501,7 +502,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               title="Nudge THIS layer around where it already sits : its sources, its racks and their parameters move by the amount beside this, and nothing else in the composition changes. Bind the M to fire it from a modulator."
             >
               Vary
-              {varyPulse > 0 && <span key={varyPulse} className="vary-blink" />}
+              <Blink n={varyPulse} color="accent2" />
             </button>
             {modChip('vary', 'M')}
             <input
