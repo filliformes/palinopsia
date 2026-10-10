@@ -155,6 +155,10 @@ export function Inspector(): JSX.Element {
     none: string
   }[] = []
   // For the native Text source: the string field + the glyph-fill sidechain.
+  // A plain sidechain row for a SOURCE that reads another layer but has nothing
+  // else to configure. Text cannot be reused for this : its strip carries a text
+  // box and calls its picker "fill", which is Text's own idea, not a sidechain.
+  let sideCfg: { ref: SidechainRef | null; setRef: (r: SidechainRef | null) => void; hostLayer: number } | null = null
   let textCfg: {
     text: string
     setText: (t: string) => void
@@ -215,13 +219,8 @@ export function Inspector(): JSX.Element {
           edls: slot.collageEdls ?? []
         }
       }
-      // Lowercase reads another layer the same way Text does : one sample per
-      // cell as that cell's density, so the picture arrives as a field of lit
-      // cells rather than a copy of itself.
       if (slot.shaderId === 'lowercase') {
-        textCfg = {
-          text: '',
-          setText: () => {},
+        sideCfg = {
           ref: slot.sidechain ?? null,
           setRef: (r) => setSourceSidechain(li, sl, r),
           hostLayer: li
@@ -639,6 +638,32 @@ export function Inspector(): JSX.Element {
               <option key={li} value={`layer:${li}`}>
                 Layer {li + 1}
                 {li === textCfg!.hostLayer ? ' (self)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {sideCfg && (
+        <div className="flex items-center gap-2 border-b border-border bg-panel2/40 px-2 py-1">
+          <span
+            className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-accent2"
+            title="A layer this source reads, one sample per cell, as that cell's density : the picture arrives as a field of lit and unlit cells rather than a copy of itself. Raise the sidechain control to hear it. None = the source's own density."
+          >
+            sidechain
+          </span>
+          <select
+            className="input select-compact text-[11px]"
+            value={sideCfg.ref?.kind === 'layer' ? `layer:${sideCfg.ref.layer}` : ''}
+            onChange={(e) => {
+              const v = e.target.value
+              sideCfg!.setRef(v.startsWith('layer:') ? { kind: 'layer', layer: Number(v.slice(6)) } : null)
+            }}
+          >
+            <option value="">none</option>
+            {[0, 1, 2, 3].map((li) => (
+              <option key={li} value={`layer:${li}`}>
+                Layer {li + 1}
+                {li === sideCfg!.hostLayer ? ' (self)' : ''}
               </option>
             ))}
           </select>
