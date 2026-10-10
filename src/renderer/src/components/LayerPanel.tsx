@@ -53,6 +53,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const toggleSection = useStore((s) => s.toggleSection)
   const initLayer = useStore((s) => s.initLayer)
   const randomizeLayer = useStore((s) => s.randomizeLayer)
+  const randomizeLayerFx = useStore((s) => s.randomizeLayerFx)
   const layerPresets = useStore((s) => s.layerPresets)
   const saveLayerPreset = useStore((s) => s.saveLayerPreset)
   const applyLayerPreset = useStore((s) => s.applyLayerPreset)
@@ -153,6 +154,9 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const menuItems: MenuItem[] = [
     { label: 'Init layer', onClick: () => initLayer(index) },
     { label: 'Randomize layer', onClick: () => randomizeLayer(index) },
+    { label: 'Randomize effects for source A', onClick: () => randomizeLayerFx(index, 'A') },
+    { label: 'Randomize effects for source B', onClick: () => randomizeLayerFx(index, 'B') },
+    { label: 'Randomize layer FX', onClick: () => randomizeLayerFx(index, 'layer') },
     { divider: true, label: '' },
     { label: 'Copy layer', onClick: () => copyLayer(index) },
     {

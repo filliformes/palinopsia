@@ -596,6 +596,17 @@ const LAYER_ACTIVE_P = [0.95, 0.7, 0.45, 0.25]
 /** Structural randomize of ONE layer (the layer dice / context-menu action):
  *  fresh source(s), fresh racks, blend/feedback : always active. OPACITY is the
  *  player's mix decision and survives the dice untouched. */
+/** Re-roll ONE of a layer's three racks, leaving its sources and the other two
+ *  alone. The weights are the ones randomizeSingleLayer uses, so a rack dealt
+ *  on its own has the same character as one dealt with the whole layer : source
+ *  racks stay short, the layer rack runs longer and may draw a convolution
+ *  node (it is the only one that can host them). */
+export function randomizeRack(which: 'A' | 'B' | 'layer'): FxInstance[] {
+  if (which === 'A') return randomRack([0.45, 0.4, 0.15])
+  if (which === 'B') return randomRack([0.55, 0.35, 0.1])
+  return randomRack([0.35, 0.4, 0.2, 0.05], false, [], true)
+}
+
 export function randomizeSingleLayer(l: LayerState): LayerState {
   const withB = chance(0.25)
   return {

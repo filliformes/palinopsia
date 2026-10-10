@@ -105,6 +105,7 @@ import {
   randomizeBackground,
   randomizeComposition,
   randomizeInputs,
+  randomizeRack,
   randomizeSingleLayer,
   seedRandomStart,
   themedMotion,
@@ -1238,6 +1239,9 @@ interface StoreState {
   // Layer lifecycle (context menu): reset to factory / structural randomize.
   initLayer: (layer: number) => void
   randomizeLayer: (layer: number) => void
+  /** Re-roll ONE of a layer's racks (source A, source B, or the layer's own),
+   *  leaving its sources and the other racks untouched. */
+  randomizeLayerFx: (layer: number, which: 'A' | 'B' | 'layer') => void
   // Layer presets : whole-layer states (sources + all racks), app-persistent.
   layerPresets: Array<{ id: string; name: string; layer: LayerState }>
   saveLayerPreset: (layer: number, name: string) => void
@@ -2003,6 +2007,28 @@ export const useStore = create<StoreState>((set, get) => ({
         layers: updateLayer(s.composition.layers, layer, (l) => randomizeSingleLayer(l))
       }
       return { composition: dropLayerTargets(composition, layer) }
+    }),
+
+  randomizeLayerFx: (layer, which) =>
+    set((s) => {
+      const cur = s.composition.layers[layer]
+      if (!cur) return {}
+      const old = which === 'A' ? cur.sourceAFx : which === 'B' ? cur.sourceBFx : cur.fx
+      const gone = new Set((old ?? []).filter((f) => !f.locked).map((f) => f.id))
+      const next = randomizeRack(which)
+      const composition = {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) =>
+          which === 'A'
+            ? { ...l, sourceAFx: next }
+            : which === 'B'
+              ? { ...l, sourceBFx: next }
+              : { ...l, fx: next }
+        )
+      }
+      // Only the units that actually went : a rack dice must not clear the
+      // modulation aimed at the layer's sources or at its other two racks.
+      return { composition: dropTargets(composition, (t) => t.kind === 'fx' && gone.has(t.instId)) }
     }),
 
   layerPresets: (() => {
