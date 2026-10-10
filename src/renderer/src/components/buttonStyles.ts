@@ -6,3 +6,7 @@ export const TBTN_IDLE = 'border-border bg-panel2 text-muted hover:border-accent
 // idle, but holding something (a slot with a source) : brighter text
 export const TBTN_IDLE_ON = 'border-border bg-panel2 text-text hover:border-accent/50 hover:text-accent'
 export const TBTN_LIT = 'border-accent bg-accent/20 text-accent'
+// MODULATED : accent2, the colour every modulated control already uses (the
+// Inspector's toggles, the sliders' thumbs). A button that something is
+// driving must not read as a button the user turned on.
+export const TBTN_MOD = 'border-accent2 bg-accent2/20 text-accent2'

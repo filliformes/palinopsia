@@ -5,7 +5,7 @@
 // presets (save/apply/delete : app-persistent).
 
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
-import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT } from './buttonStyles'
+import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT, TBTN_MOD } from './buttonStyles'
 import type { AudioFeature, BlendMode, CouplingMode, LayerMask, ModTarget, SourceKind, SourceSlot } from '@shared/types'
 import { BLEND_MODES, DEFAULT_LAYER_VARY } from '@shared/types'
 import { AUDIO_FEATURES } from '../engine/audioIn'
@@ -496,7 +496,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           <div className="flex min-w-0 items-center gap-1.5">
             <button
               onClick={() => varyLayer(index)}
-              className={`${TBTN} ${varyBound ? TBTN_LIT : TBTN_IDLE}`}
+              className={`${TBTN} ${varyBound ? TBTN_MOD : TBTN_IDLE}`}
               title="Nudge THIS layer around where it already sits : its sources, its racks and their parameters move by the amount beside this, and nothing else in the composition changes. Bind the M to fire it from a modulator."
             >
               Vary
