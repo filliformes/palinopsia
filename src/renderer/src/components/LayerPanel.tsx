@@ -81,6 +81,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
     return modMatrix.filter((a) => modTargetKey(a.target) === key)
   }
   const opacityBound = boundFor('opacity').length > 0
+  const varyBound = boundFor('vary').length > 0
   const mixBound = boundFor('mix').length > 0
   const blendBound = boundFor('blend').length > 0
   const opacityRef = useRef<HTMLInputElement | null>(null)
@@ -488,16 +489,17 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             </div>
           </Row>
 
-          {/* VARY : the global Vary, aimed at this layer alone. The button is a
-              modulation target like the other layer fields, so a modulator can
+          {/* VARY : the global Vary, aimed at this layer alone. The button IS the
+              label, shaped like every other command button in the app, and it is
+              a modulation target like the other layer fields, so a modulator can
               fire the variation instead of a hand. */}
-          <Row label="VARY">
+          <div className="flex min-w-0 items-center gap-1.5">
             <button
               onClick={() => varyLayer(index)}
-              className="shrink-0 rounded border border-border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted hover:border-accent hover:text-accent"
+              className={`${TBTN} ${varyBound ? TBTN_LIT : TBTN_IDLE}`}
               title="Nudge THIS layer around where it already sits : its sources, its racks and their parameters move by the amount beside this, and nothing else in the composition changes. Bind the M to fire it from a modulator."
             >
-              vary ▸
+              Vary
             </button>
             {modChip('vary', 'M')}
             <input
@@ -520,7 +522,10 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                 className="input w-full px-1 py-0.5 text-right text-[11px]"
               />
             </div>
-          </Row>
+          </div>
+          {/* The binding row this chip opens. Without it the M toggled state
+              that nothing rendered, so the chip looked dead. */}
+          {modAssign('vary')}
         </>
       )}
 
