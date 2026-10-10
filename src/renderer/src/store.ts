@@ -3721,10 +3721,26 @@ export const useStore = create<StoreState>((set, get) => ({
     return defaultSoniConfig()
   })(),
   setSonify: (next) => {
-    // A preset / scene / session saved before the Collage voice has no block
-    // for it : give it the default (off) so the page and the engine never read
-    // a missing voice.
-    if (!next.collage) next = { ...next, collage: defaultSoniConfig().collage }
+    // A preset / scene / session saved before a voice existed has no block for
+    // it, and one saved before a field existed lacks that field : merge every
+    // voice with its default, so the page and the engine never read a missing
+    // voice or a missing field. The Collage once needed this on its own; with
+    // Signal it is general, so the next voice needs nothing here. Arrays (the
+    // taps, the mixer filters) are kept as saved : their own readers pad them.
+    {
+      const d = defaultSoniConfig()
+      const filled = { ...d, ...next } as unknown as Record<string, unknown>
+      const dd = d as unknown as Record<string, unknown>
+      const nn = next as unknown as Record<string, unknown>
+      for (const k of Object.keys(dd)) {
+        const dv = dd[k]
+        if (dv && typeof dv === 'object' && !Array.isArray(dv)) {
+          const nv = nn[k]
+          filled[k] = { ...(dv as object), ...(nv && typeof nv === 'object' ? (nv as object) : {}) }
+        }
+      }
+      next = filled as unknown as SoniConfig
+    }
     persistSonify(next)
     // The engine starts asynchronously : read the state again once it has, so
     // an off that arrived meanwhile (a double tap, a momentary OSC button) stops

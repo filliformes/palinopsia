@@ -1072,6 +1072,9 @@ class SonifyEngine {
     if (this.cfg.sstv.on) need[this.cfg.sstv.tap] = true
     if (this.cfg.filter.on) need[this.cfg.filter.tap] = true
     if (this.cfg.chord.on) need[this.cfg.chord.tap] = true
+    // Signal reads the picture too. Missing here, its tap was read only when
+    // ANOTHER voice happened to claim it : alone, Signal never scanned at all.
+    if (this.cfg.signal.on) need[this.cfg.signal.tap] = true
 
     for (let t = 0; t < 2; t++) {
       if (!need[t]) continue
