@@ -626,26 +626,29 @@ function route(address: string, args: Args): void {
           else if (ctl === 'quantize') V('events', { quantize: n >= 0.5 })
           return
         case 'signal': {
-          // Same conventions as the other voices : continuous 0..1, an enum
-          // takes 0..1 across its choices, a switch is on at 0.5 and above.
+          // Same conventions as the other voices : continuous 0..1, an enum an
+          // index or 0..1 across its choices, a switch on at 0.5 and above.
           // `rate` spans whatever the clock allows : steps per beat when synced
           // (0.25..16), steps per second when free (0.25..64).
           const sg = c.signal
           if (ctl === 'on') V('signal', { on: n >= 0.5 })
           else if (ctl === 'gain') V('signal', { gain: clamp01(n) })
           else if (ctl === 'pan') V('signal', { pan: clamp01(n) * 2 - 1 })
-          else if (ctl === 'wave') V('signal', { wave: Math.round(clamp01(n) * 8) })
+          // The enums go through idx() : an integer argument is the index, a
+          // float is 0..1 across the choices. OSCQuery advertises them as
+          // integers, so a controller that binds from it sends the index.
+          else if (ctl === 'wave') V('signal', { wave: idx(0, 8) })
           else if (ctl === 'decay') V('signal', { decay: clamp01(n) })
           else if (ctl === 'tone') V('signal', { tone: clamp01(n) })
           else if (ctl === 'fm') V('signal', { fm: clamp01(n) })
-          else if (ctl === 'heads') V('signal', { heads: 1 + Math.round(clamp01(n) * 3) })
+          else if (ctl === 'heads') V('signal', { heads: idx(1, 4) })
           else if (ctl === 'rate') V('signal', { rate: 0.25 + clamp01(n) * (sg.sync ? 15.75 : 63.75) })
           else if (ctl === 'sync') V('signal', { sync: n >= 0.5 })
-          else if (ctl === 'steps') V('signal', { steps: [8, 12, 16, 24, 32, 48, 64, 96][Math.round(clamp01(n) * 7)] })
+          else if (ctl === 'steps') V('signal', { steps: [8, 12, 16, 24, 32, 48, 64, 96][idx(0, 7)] })
           else if (ctl === 'spread') V('signal', { spread: clamp01(n) })
           else if (ctl === 'thresh') V('signal', { thresh: clamp01(n) })
           else if (ctl === 'density') V('signal', { density: clamp01(n) })
-          else if (ctl === 'path') V('signal', { path: Math.round(clamp01(n) * 3) })
+          else if (ctl === 'path') V('signal', { path: idx(0, 3) })
           else if (ctl === 'snap') V('signal', { snap: clamp01(n) })
           return
         }
@@ -1088,6 +1091,7 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/signal/tone', 0, 1, so.signal.tone, 'Signal noise brightness')
     add('/opsia/sonify/signal/fm', 0, 1, so.signal.fm, 'Signal fm depth')
     addI('/opsia/sonify/signal/heads', 1, 4, so.signal.heads, 'Signal read heads')
+    addI('/opsia/sonify/signal/steps', 0, 7, Math.max(0, [8, 12, 16, 24, 32, 48, 64, 96].indexOf(so.signal.steps)), 'Signal steps per sweep : 8 · 12 · 16 · 24 · 32 · 48 · 64 · 96')
     add('/opsia/sonify/signal/rate', 0, 1, (so.signal.rate - 0.25) / (so.signal.sync ? 15.75 : 63.75), 'Signal steps per second, or per beat when synced')
     add('/opsia/sonify/signal/sync', 0, 1, so.signal.sync ? 1 : 0, 'Signal clock locked to the tempo')
     add('/opsia/sonify/signal/spread', 0, 1, so.signal.spread, 'Signal polymeter between the heads')
