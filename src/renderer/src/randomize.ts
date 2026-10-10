@@ -264,6 +264,17 @@ function emptySlot(): SourceSlot {
 }
 
 /** Draw a count from an explicit distribution (index = count). */
+// How many effects a dealt rack gets : index = count, value = weight. One
+// definition per rack, because every randomizer deals them (Randomize All, a
+// layer's dice, its per-rack dice, the source + FX scope) and nine copies of
+// the same arrays drifted the moment one was changed. All three reach FOUR.
+// The shape is kept : the layer rack runs longest, source A sits between,
+// source B (the second voice) is the lightest. An empty rack stays possible,
+// just no longer close to half the time.
+const SOURCE_A_RACK = [0.2, 0.3, 0.25, 0.15, 0.1]
+const SOURCE_B_RACK = [0.25, 0.3, 0.25, 0.12, 0.08]
+const LAYER_RACK = [0.15, 0.3, 0.27, 0.18, 0.1]
+
 function drawCount(weights: number[]): number {
   const total = weights.reduce((a, b) => a + b, 0)
   let r = rnd() * total
@@ -602,9 +613,9 @@ const LAYER_ACTIVE_P = [0.95, 0.7, 0.45, 0.25]
  *  racks stay short, the layer rack runs longer and may draw a convolution
  *  node (it is the only one that can host them). */
 export function randomizeRack(which: 'A' | 'B' | 'layer'): FxInstance[] {
-  if (which === 'A') return randomRack([0.45, 0.4, 0.15])
-  if (which === 'B') return randomRack([0.55, 0.35, 0.1])
-  return randomRack([0.35, 0.4, 0.2, 0.05], false, [], true)
+  if (which === 'A') return randomRack(SOURCE_A_RACK)
+  if (which === 'B') return randomRack(SOURCE_B_RACK)
+  return randomRack(LAYER_RACK, false, [], true)
 }
 
 export function randomizeSingleLayer(l: LayerState): LayerState {
@@ -613,9 +624,9 @@ export function randomizeSingleLayer(l: LayerState): LayerState {
     ...l,
     sourceA: randomSlot(),
     sourceB: withB ? randomSlot() : null,
-    sourceAFx: randomRack([0.45, 0.4, 0.15]),
-    sourceBFx: withB ? randomRack([0.55, 0.35, 0.1]) : [],
-    fx: randomRack([0.35, 0.4, 0.2, 0.05], false, [], true),
+    sourceAFx: randomRack(SOURCE_A_RACK),
+    sourceBFx: withB ? randomRack(SOURCE_B_RACK) : [],
+    fx: randomRack(LAYER_RACK, false, [], true),
     sourceMix: withB ? range(0.25, 0.75) : l.sourceMix,
     sourceBlend: withB ? pick(MIX_BLENDS) : l.sourceBlend,
     blend: pick(BLENDS),
@@ -741,8 +752,8 @@ function randomizeStructural(
       ...c,
       layers: c.layers.map((l) => ({
         ...l,
-        sourceAFx: slotActive(l.sourceA) ? randomRack([0.45, 0.4, 0.15]) : l.sourceAFx,
-        sourceBFx: slotActive(l.sourceB) ? randomRack([0.55, 0.35, 0.1]) : l.sourceBFx
+        sourceAFx: slotActive(l.sourceA) ? randomRack(SOURCE_A_RACK) : l.sourceAFx,
+        sourceBFx: slotActive(l.sourceB) ? randomRack(SOURCE_B_RACK) : l.sourceBFx
       }))
     }
   }
@@ -753,7 +764,7 @@ function randomizeStructural(
       ...c,
       layers: c.layers.map((l) => ({
         ...l,
-        fx: slotActive(l.sourceA) || slotActive(l.sourceB) ? randomRack([0.35, 0.4, 0.2, 0.05], false, [], true) : l.fx
+        fx: slotActive(l.sourceA) || slotActive(l.sourceB) ? randomRack(LAYER_RACK, false, [], true) : l.fx
       }))
     }
   }
@@ -808,15 +819,15 @@ function randomizeStructural(
       if (doSourceFx) {
         layer = {
           ...layer,
-          sourceAFx: layer.sourceA.shaderId ? randomRack([0.45, 0.4, 0.15]) : [],
-          sourceBFx: layer.sourceB?.shaderId ? randomRack([0.55, 0.35, 0.1]) : []
+          sourceAFx: layer.sourceA.shaderId ? randomRack(SOURCE_A_RACK) : [],
+          sourceBFx: layer.sourceB?.shaderId ? randomRack(SOURCE_B_RACK) : []
         }
       }
       if (doLayer) {
         const hasSource = !!layer.sourceA.shaderId || !!layer.sourceB?.shaderId
         layer = {
           ...layer,
-          fx: hasSource ? randomRack([0.35, 0.4, 0.2, 0.05], false, [], true) : [],
+          fx: hasSource ? randomRack(LAYER_RACK, false, [], true) : [],
           blend: pick(BLENDS),
           opacity: range(0.55, 1),
           feedback: hasSource ? chance(0.3) : false,
@@ -839,7 +850,7 @@ function randomizeStructural(
         layers = layers.map((l) => {
           if (need > 0 && !isOn(l)) {
             need--
-            return { ...l, sourceA: randomSlot(), sourceAFx: randomRack([0.45, 0.4, 0.15]), mute: false }
+            return { ...l, sourceA: randomSlot(), sourceAFx: randomRack(SOURCE_A_RACK), mute: false }
           }
           return l
         })
