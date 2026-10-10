@@ -105,6 +105,7 @@ export function Transport(): JSX.Element {
   const activeWorld = worlds.find((w) => w.id === world)
   const setComposition = useStore.setState
   const applyVariation = useStore((s) => s.applyVariation)
+  const globalVaryPulse = useStore((s) => s.varyPulse[4] ?? 0)
   const [menuOpen, setMenuOpen] = useState(false)
   const [scope, setScope] = useState<RandomizeScope>(loadScope)
   // Randomize intensity (walk↔full) and Variation spread, both persisted.
@@ -350,10 +351,11 @@ export function Transport(): JSX.Element {
           <MidiLearnOverlay id="fire:vary" />
           <button
             onClick={() => applyVariation(varAmt)}
-            className={`${TBTN} border-accent2/60 bg-accent2/10 text-accent2 hover:bg-accent2/20`}
+            className={`relative ${TBTN} border-accent2/60 bg-accent2/10 text-accent2 hover:bg-accent2/20`}
             title={`Variation ${pct(varAmt)} : a fresh variant of the current scene (same structure, values nudged). First press sets the baseline; each press is a new sibling at this spread.`}
           >
             Vary
+            {globalVaryPulse > 0 && <span key={globalVaryPulse} className="vary-blink" />}
           </button>
         </span>
         <input

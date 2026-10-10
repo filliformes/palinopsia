@@ -49,6 +49,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const setLayerSpeed = useStore((s) => s.setLayerSpeed)
   const varyLayer = useStore((s) => s.varyLayer)
   const setLayerVary = useStore((s) => s.setLayerVary)
+  const varyPulse = useStore((s) => s.varyPulse[index] ?? 0)
   const setSelection = useStore((s) => s.setSelection)
   const selection = useStore((s) => s.selection)
   const collapsed = useStore((s) => !!s.collapsed[`layer${index}`])
@@ -496,10 +497,11 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           <div className="flex min-w-0 items-center gap-1.5">
             <button
               onClick={() => varyLayer(index)}
-              className={`${TBTN} ${varyBound ? TBTN_MOD : TBTN_IDLE}`}
+              className={`relative ${TBTN} ${varyBound ? TBTN_MOD : TBTN_IDLE}`}
               title="Nudge THIS layer around where it already sits : its sources, its racks and their parameters move by the amount beside this, and nothing else in the composition changes. Bind the M to fire it from a modulator."
             >
               Vary
+              {varyPulse > 0 && <span key={varyPulse} className="vary-blink" />}
             </button>
             {modChip('vary', 'M')}
             <input

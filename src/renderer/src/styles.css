@@ -507,6 +507,21 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
   animation: show-pulse 2s ease-in-out infinite;
   white-space: nowrap;
 }
+/* A Vary just fired. One-shot, remounted per fire (keyed on a count), so a
+   modulator firing on every beat blinks on every beat. accent2, the Vary
+   colour : the global button already wears it, and so does a modulated one. */
+.vary-blink {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: vary-blink 280ms ease-out 1 forwards;
+}
+@keyframes vary-blink {
+  0% { background: rgb(var(--c-accent2) / 0.85); }
+  100% { background: rgb(var(--c-accent2) / 0); }
+}
+
 @keyframes show-pulse {
   0%, 100% { opacity: 0.65; }
   50%      { opacity: 1.0; }

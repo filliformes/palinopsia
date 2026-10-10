@@ -1295,6 +1295,11 @@ interface StoreState {
   // shader with its settings, or drop a fresh copy into any rack that can host
   // it. Transient — like `rightView`, it is not part of a Session.
   fxClipboard: { shaderId: string; name: string; inputs: Record<string, number | number[]>; opacity: number; sidechain: SidechainRef | null; sidechain2: SidechainRef | null } | null
+  /** How many times each Vary has fired : index 0..3 the layers, 4 the global
+   *  one. A button keys a one-shot blink on its count, so every fire is seen,
+   *  however it was fired (a click, a modulator, MIDI, OSC). Transient : not in
+   *  the composition, so it never enters undo or a session. */
+  varyPulse: number[]
   copyFx: (scope: FxScope, instId: string) => void
   /** Overwrite one unit's settings from the clipboard. Same shader only. */
   pasteFxSettings: (scope: FxScope, instId: string) => void
@@ -1735,6 +1740,14 @@ interface StoreState {
   toggleFinishing: () => void
 }
 
+/** A new pulse array with one counter advanced : a fresh array, so the one
+ *  button subscribed to that index sees a change and replays its blink. */
+function bumpPulse(p: number[] | undefined, i: number): number[] {
+  const next = (p && p.length >= 5 ? p : [0, 0, 0, 0, 0]).slice()
+  next[i] = (next[i] ?? 0) + 1
+  return next
+}
+
 function updateLayer(
   layers: LayerState[],
   i: number,
@@ -2025,7 +2038,8 @@ export const useStore = create<StoreState>((set, get) => ({
           layers: updateLayer(s.composition.layers, layer, (l) =>
             jitterLayer(l, l.varyAmount ?? DEFAULT_LAYER_VARY)
           )
-        }
+        },
+        varyPulse: bumpPulse(s.varyPulse, layer)
       }
     }),
   setLayerVary: (layer, amount) =>
@@ -2689,6 +2703,7 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     }),
   fxClipboard: null,
+  varyPulse: [0, 0, 0, 0, 0],
   copyFx: (scope, instId) => {
     const inst = fxArrayFor(get().composition, scope).find((f) => f.id === instId)
     if (!inst?.shaderId) return
@@ -2924,7 +2939,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const base = s.variationBaseline ?? s.composition
       const composition = varyComposition(base, amount)
       beginSceneMorph(s.composition, composition, s.morphMs, performance.now())
-      return { composition, variationBaseline: base }
+      return { composition, variationBaseline: base, varyPulse: bumpPulse(s.varyPulse, 4) }
     }),
 
   randomizeMetaBank: () =>
