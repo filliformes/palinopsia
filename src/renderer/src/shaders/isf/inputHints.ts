@@ -475,7 +475,8 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     accentAmt: 'How strongly the accent color marks its cells. At 0 the picture is black and white.',
     accentEvery: 'The accent lattice spacing. It marks one cell in this many squared, so 5 is about one cell in twenty : regular enough to read as meaning rather than as confetti.',
     seed: 'Deals another hand. Everything else held, this is a different arrangement of the same figure.',
-    audio: 'Leans each cell toward the loudness of the spectrum band at its own column (bass at the left), so cells answer the sound where they stand.'
+    audio: 'Leans each cell toward the loudness of the spectrum band at its own column (bass at the left), so cells answer the sound where they stand.',
+    side: 'Reads another layer, one sample per cell, and uses it as that cell own density : the picture arrives as a field of lit and unlit cells on this clock, a 1-bit halftone of it, rather than a blurred copy. Pick the layer under the controls. At 0 it is ignored.'
   },
   'direct-marks': {
     gate: 'How many marks are showing : 1 = all of them, lower = fewer, each blinking on its own random clock. Drive it from audio for marks on the beat.',

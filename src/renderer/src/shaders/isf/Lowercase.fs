@@ -24,6 +24,8 @@
     { "NAME": "ink",     "TYPE": "color", "DEFAULT": [0.92, 0.95, 0.94, 1.0] },
     { "NAME": "accent",  "TYPE": "color", "DEFAULT": [0.95, 0.22, 0.10, 1.0] },
     { "NAME": "ground",  "TYPE": "color", "DEFAULT": [0.03, 0.03, 0.035, 1.0] },
+    { "NAME": "side",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.0,  "LABEL": "sidechain" },
+    { "NAME": "sideTex", "TYPE": "image" },
     { "NAME": "audioTex", "TYPE": "image" }
   ]
 }*/
@@ -51,7 +53,7 @@ float rectCov(vec2 q, vec2 hw, float e) {
 // function of its step, which is what makes a stateless trail possible.
 // `soft` scales the edge width, which is how halation is sampled (one extra
 // call with a fat edge) rather than by blurring a buffer.
-float figureCov(vec2 q, float aspect, float S, float px, float dens, int fig, float soft, out float isAcc) {
+float figureCov(vec2 q, float aspect, float S, float px, float dens, float sideDens, int fig, float soft, out float isAcc) {
   isAcc = 0.0;
   float hand = floor(seed * 997.0);
   // Every hash input stays floored and under ~1e4 (§2) : S is wrapped by the
@@ -88,6 +90,12 @@ float figureCov(vec2 q, float aspect, float S, float px, float dens, int fig, fl
   vec2 ac = vec2(clamp(qs.x / aspect, 0.0, 1.0), 0.75);
   float band = IMG_NORM_PIXEL(audioTex, ac).r;
   float g1 = clamp(mix(dens, band, audio), 0.0, 1.0);
+
+  // SIDECHAIN : sampled once in main and handed in, because it is a SPATIAL
+  // lookup and so the same for the live deal, the smear's previous deal and the
+  // halation pass. Sampling it in here instead cost five texture fetches a
+  // pixel and 4 ms of a 4K frame even with the control at zero.
+  g1 = clamp(mix(g1, sideDens, side), 0.0, 1.0);
   float lit = step(1.0 - g1, hash12(ci + vec2(floor(S * 0.37) + hand, hand + 3.0)));
 
   // ACCENT rides a REGULAR lattice, not a sprinkle. A random scatter of color
@@ -238,8 +246,23 @@ void main() {
   float dens = clamp(density * clamp(gate, 0.0, 1.0), 0.0, 1.0);
   int fig = int(figure);
 
+  // ONE sample per cell of the sidechain layer, at the cell's own centre on the
+  // base grid (before jump and shear, which move the field by under a cell and
+  // would only add a fetch). Per CELL rather than per pixel is the whole idea :
+  // the picture arrives as a field of lit and unlit cells on this clock, a
+  // 1-bit halftone of it, rather than as a blurred copy of itself. Dark areas
+  // drop cells, bright areas fill them.
+  float sideDens = 0.0;
+  if (side > 0.001) {
+    float nC = max(3.0, floor(cells + 0.5));
+    vec2 cc = (floor(q * nC) + 0.5) / nC;
+    vec2 sc = vec2(clamp(cc.x / aspect, 0.0, 1.0), clamp(cc.y, 0.0, 1.0));
+    vec4 sTex = IMG_NORM_PIXEL(sideTex, sc);
+    sideDens = dot(sTex.rgb, vec3(0.2126, 0.7152, 0.0722)) * sTex.a;
+  }
+
   float accNow = 0.0;
-  float cov = figureCov(q, aspect, Sh, px, dens, fig, 1.0, accNow);
+  float cov = figureCov(q, aspect, Sh, px, dens, sideDens, fig, 1.0, accNow);
 
   // SMEAR : the PREVIOUS deal, trailing behind and dimmed. A filmed projection
   // trails its moving cells, and that trail is half of why the references read
@@ -253,7 +276,7 @@ void main() {
       float fi = float(i);
       float a2 = 0.0;
       vec2 qo = vec2(q.x + fi * 0.012 * smear, q.y);
-      t = max(t, figureCov(qo, aspect, Sh - 1.0, px, dens, fig, 1.0, a2) * (1.0 - fi / 4.0));
+      t = max(t, figureCov(qo, aspect, Sh - 1.0, px, dens, sideDens, fig, 1.0, a2) * (1.0 - fi / 4.0));
       accPrev = max(accPrev, a2);
     }
     float ghost = t * smear * 0.55 * (1.0 - cov);
@@ -267,7 +290,7 @@ void main() {
   // black the brief warns off.
   if (halo > 0.001) {
     float aH = 0.0;
-    float wide = figureCov(q, aspect, Sh, px, dens, fig, 1.0 + 14.0 * halo, aH);
+    float wide = figureCov(q, aspect, Sh, px, dens, sideDens, fig, 1.0 + 14.0 * halo, aH);
     cov = clamp(cov + max(wide - cov, 0.0) * halo * 0.5, 0.0, 1.0);
   }
 

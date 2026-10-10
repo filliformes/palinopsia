@@ -215,6 +215,18 @@ export function Inspector(): JSX.Element {
           edls: slot.collageEdls ?? []
         }
       }
+      // Lowercase reads another layer the same way Text does : one sample per
+      // cell as that cell's density, so the picture arrives as a field of lit
+      // cells rather than a copy of itself.
+      if (slot.shaderId === 'lowercase') {
+        textCfg = {
+          text: '',
+          setText: () => {},
+          ref: slot.sidechain ?? null,
+          setRef: (r) => setSourceSidechain(li, sl, r),
+          hostLayer: li
+        }
+      }
       if (slot.shaderId === 'gen-text') {
         textCfg = {
           text: slot.text ?? 'OPSIA',

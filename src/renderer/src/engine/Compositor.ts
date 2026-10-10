@@ -557,6 +557,24 @@ export function pushAudioTex(isf: ISFRenderer, tex: import('./isfTextureBridge')
   if (u && u.audioTex) isf.setValue('audioTex', tex);
 }
 
+/** Feed a slot's sidechain to an ISF source that declares `sideTex`. Keyed on
+ *  the declaration (same contract as pushAudioTex), so adding another source
+ *  that reads a layer needs no registration anywhere. Pushed every frame : the
+ *  bridge binds image inputs at DRAW time, and the resolved texture can change
+ *  under us when the referenced layer re-renders. */
+export function pushSideTex(
+  isf: ISFRenderer,
+  resolve: ((ref: SidechainRef | null | undefined) => WebGLTexture | null) | undefined,
+  ref: SidechainRef | null,
+  w: number,
+  h: number
+): void {
+  const u = (isf as unknown as { uniforms?: Record<string, unknown> }).uniforms;
+  if (!u || !u.sideTex || !resolve || !ref) return;
+  const tex = resolve(ref);
+  if (tex) isf.setValue('sideTex', handle(tex, w, h));
+}
+
 export interface Framing {
   zoom: number;
   panX: number;
@@ -866,6 +884,11 @@ export class ISFLayer {
   /** The layer's own clock (seconds) : advances by dt·speed each frame. */
   clockSec = 0;
   shaderIdA: string | null = null;
+  // Each slot's sidechain ref. Native sources keep their own (text.sidechain);
+  // an ISF generator has nowhere to put one, so the layer holds it and the
+  // draw resolves it to a texture for any shader that declares `sideTex`.
+  sideRefA: SidechainRef | null = null;
+  sideRefB: SidechainRef | null = null;
   shaderIdB: string | null = null;
 
   private isfA: ISFRenderer | null = null;
@@ -1323,6 +1346,9 @@ export class ISFLayer {
     const sid = slot === 'A' ? this.shaderIdA : this.shaderIdB;
     pushAudioTex(isf, this.shared.audioTex);
     if (sid === 'scan' && this.shared.scanMaps) pushScanMaps(isf, this.shared.scanMaps);
+    // A generator that declares `sideTex` reads another layer. Keyed on the
+    // declaration, like the audio texture, so there is no list to maintain.
+    pushSideTex(isf, sidechainTex, slot === 'A' ? this.sideRefA : this.sideRefB, this.w, this.h);
     this.shared.redirect.redirect = scratch.fbo;
     isf.draw({ width: this.w, height: this.h });
     this.shared.redirect.redirect = null;
@@ -2414,6 +2440,10 @@ export class Compositor {
       // Each slot is a generator, a video, or empty : reconcile both engines so
       // switching kinds swaps cleanly (video↔generator never overlap). The Text
       // generator is NATIVE (a TS class, no ISF compile) : route it to setText.
+      // The slot's sidechain ref travels to the layer each frame, so an ISF
+      // source that reads another layer gets it at draw time.
+      L.sideRefA = l.sourceA.sidechain ?? null;
+      L.sideRefB = l.sourceB?.sidechain ?? null;
       const nativeA = l.sourceA.kind === 'generator' && NATIVE_SOURCE_IDS.has(l.sourceA.shaderId ?? '');
       const isTextA = l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-text';
       const isParamA = l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-parametric';
