@@ -5,7 +5,7 @@
   "CATEGORIES": ["Generator", "Geometry"],
   "INPUTS": [
     { "NAME": "figure",  "TYPE": "long", "VALUES": [0, 1, 2, 3, 4, 5, 6, 7], "LABELS": ["matrix", "blocks", "bars", "ticks", "rule", "grid", "ladder", "slab"], "DEFAULT": 0 },
-    { "NAME": "cells",   "TYPE": "float", "MIN": 3.0,  "MAX": 64.0,  "DEFAULT": 14.0, "LABEL": "cells" },
+    { "NAME": "cells",   "TYPE": "float", "MIN": 3.0,  "MAX": 512.0, "DEFAULT": 14.0, "LABEL": "cells" },
     { "NAME": "density", "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.55, "LABEL": "density" },
     { "NAME": "split",   "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.6,  "LABEL": "split" },
     { "NAME": "rate",    "TYPE": "float", "MIN": 0.0,  "MAX": 120.0, "DEFAULT": 6.0,  "LABEL": "rate" },
@@ -58,6 +58,13 @@ float figureCov(vec2 q, float aspect, float S, float px, float dens, int fig, fl
   // caller, `hand` is a small integer, cell indices are bounded by `cells`.
   float n = max(3.0, floor(cells + 0.5));
   float pxc = n * px;      // one pixel, in cell units
+  // How many pixels a cell gets. Under about six it can no longer hold a mark
+  // AND a margin, and anti-aliasing averages the pair into flat grey : at 512
+  // cells on a 1080-line frame the whole field was one grey slab. `solid` grows
+  // the mark to fill its own cell instead, so the top of the range is crisp
+  // 1-bit static rather than mush, and the way there is continuous.
+  float cellPx = 1.0 / max(pxc, 1e-6);
+  float solid = 1.0 - smoothstep(2.5, 7.0, cellPx);
   float e = pxc * soft;    // the anti-aliased edge, widened for halation
   float eq = px * soft;    // the same, in frame-height units
 
@@ -101,12 +108,13 @@ float figureCov(vec2 q, float aspect, float S, float px, float dens, int fig, fl
     // The subdivision is what makes the field read as data instead of a
     // checkerboard, and it is the thing the references have that a plain grid
     // of squares does not.
-    float nb = 1.0 + floor(hash12(ci + vec2(hand + 5.0, floor(S * 0.11))) * 3.0 * split);
+    float nb = mix(1.0 + floor(hash12(ci + vec2(hand + 5.0, floor(S * 0.11))) * 3.0 * split), 1.0, solid);
     float bf = fract((f.x + 0.5) * nb) - 0.5;
-    cov = rectCov(vec2(bf / nb, f.y), vec2(0.30 / nb, 0.26), e) * lit;
+    vec2 hwm = mix(vec2(0.30 / nb, 0.26), vec2(0.5, 0.5), solid);
+    cov = rectCov(vec2(bf / nb, f.y), hwm, e) * lit;
   } else if (fig == 1) {
     // BLOCKS : the cell filled whole, with a margin so the lattice breathes.
-    cov = rectCov(f, vec2(0.33, 0.33), e) * lit;
+    cov = rectCov(f, mix(vec2(0.33), vec2(0.5), solid), e) * lit;
   } else if (fig == 2) {
     // BARS : full-height columns on quantized widths. Rows play no part here.
     float col = floor(qs.x * n);
@@ -121,7 +129,7 @@ float figureCov(vec2 q, float aspect, float S, float px, float dens, int fig, fl
     // TICKS : short dashes, mostly empty frame. The density is deliberately
     // scaled down : this figure is about what is NOT there.
     float sparse = step(1.0 - g1 * 0.35, hash12(ci + vec2(floor(S * 0.29) + hand, 17.0)));
-    cov = rectCov(f, vec2(0.34, 0.055), e) * sparse;
+    cov = rectCov(f, mix(vec2(0.34, 0.055), vec2(0.5), solid), e) * sparse;
     isAcc *= sparse;
   } else if (fig == 4) {
     // RULE : one or two full-width hairlines at stepped heights. The scan bar.
@@ -192,7 +200,7 @@ float figureCov(vec2 q, float aspect, float S, float px, float dens, int fig, fl
     float along = mix(c.x / max(hw.x, 1e-4), c.y / max(hw.y, 1e-4), turn);
     float across = mix(c.y / max(hw.y, 1e-4), c.x / max(hw.x, 1e-4), turn);
 
-    float nb = clamp(floor(cells * 0.25), 1.0, 14.0);
+    float nb = clamp(floor(cells * 0.25), 1.0, 192.0);
     float t = along * 0.5 + 0.5;
     float bi = floor(t * nb);
     float bf = fract(t * nb) - 0.5;
@@ -201,7 +209,8 @@ float figureCov(vec2 q, float aspect, float S, float px, float dens, int fig, fl
     float jw = (hash12(vec2(bi, floor(S * 0.3) + hand)) - 0.5) * split * 0.22;
     float jp = (hash12(vec2(bi + 41.0, hand + floor(S * 0.3))) - 0.5) * split * 0.30;
     float w = clamp(0.17 + jw, 0.03, 0.42);
-    float e2 = eq * nb * 2.0; // the edge, in bar units
+    float halfLen = mix(hw.x, hw.y, turn);              // the axis bars count along
+    float e2 = eq * nb / max(2.0 * halfLen, 1e-4);      // one pixel, in bar units
     float cut = (1.0 - smoothstep(w - e2, w + e2, abs(bf - jp)))
               * step(abs(across), 0.80);
     cov = max(body - cut, 0.0);

@@ -458,6 +458,25 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     inner: 'Faint interior shading so the form reads as a body, not a flat sticker.',
     birth: 'Fire a birth now (bind it to the beat) : a new form grows out of the old one in about half a second.'
   },
+  'lowercase': {
+    figure: 'Which marks are drawn. Matrix is the dense field of subdivided cells; ladder is the sprocket column down each edge; slab is the one white field with bars cut out of it, the only inverted figure.',
+    cells: 'How fine the lattice is. Past about 120 the grid figures fall below a pixel per cell and read as fine static rather than marks, which is its own texture but no longer legible. Slab is the exception : its bars are measured against the slab, not the frame, so it holds its structure all the way to 512, where it is a barcode of about 128 bars.',
+    density: 'How much ink : how many cells are lit. On slab it is instead how much of the frame the slab covers.',
+    split: 'How many narrow bars each lit cell carries (one to three). On slab it makes the comb uneven, and past half it lets a deal turn the bars sideways.',
+    rate: 'Steps per second. The clock is its own, so it pulses with nothing patched. Near the display rate it starts aliasing against the screen, which breaks the field up.',
+    quant: 'Divides the clock without changing it, so rate 40 at step 8 is a slow pulse on the same grid rather than a different clock.',
+    gate: 'How many marks are on. This is the one to bind : a Euclid, a Spastic or an audio transient on gate makes the field play that rhythm instead of its own.',
+    hold: 'How many steps one deal survives. Above 1 the picture stutters against its own clock instead of strobing.',
+    jump: 'How far the field moves when it re-deals. At 0 it breathes in place, at 1 the frame is dealt again. On slab it moves and resizes the slab itself.',
+    shear: 'Knocks whole rows sideways, the index-corruption fault. Per row, never per pixel.',
+    flip: 'The chance that a step inverts the whole frame. This is the one control here that can strobe : the dice never takes it past 0.12, and the app flash limiter still sits after it.',
+    smear: 'Leaves the previous step trailing behind, the way a filmed projection does. Costs nothing to keep : the past is recomputed, not stored.',
+    halo: 'A tight bloom on the edge of a mark. It can only widen a mark that is already there, never light empty frame.',
+    accentAmt: 'How strongly the accent color marks its cells. At 0 the picture is black and white.',
+    accentEvery: 'The accent lattice spacing. It marks one cell in this many squared, so 5 is about one cell in twenty : regular enough to read as meaning rather than as confetti.',
+    seed: 'Deals another hand. Everything else held, this is a different arrangement of the same figure.',
+    audio: 'Leans each cell toward the loudness of the spectrum band at its own column (bass at the left), so cells answer the sound where they stand.'
+  },
   'direct-marks': {
     gate: 'How many marks are showing : 1 = all of them, lower = fewer, each blinking on its own random clock. Drive it from audio for marks on the beat.',
     jitter: 'How far the hand strays : each mark sits a little off its ruled place (scratches wander along their length).',
