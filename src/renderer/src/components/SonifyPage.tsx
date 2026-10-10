@@ -22,10 +22,16 @@ import { SONI_RATES, RATE_LABEL } from '../audio/soniClock'
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 // Voice order matches the worklet's render/filter order (mixFilter indices).
-const VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage'] as const
-const VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord', 'Collage']
+// BY INDEX. A voice's index is what a session saves : its mixer channel, its DJ
+// filter, its sequencer mask, its MIDI on/off binding (`sonify:voice:i`). So a
+// new voice is APPENDED, and VOICE_ORDER below is where the page SHOWS it.
+const VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal'] as const
+const VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord', 'Collage', 'Signal']
+// The order the mixer and the sequencer list the voices in : Signal (9) before
+// Chord (7), as its card sits, without moving anything a session stored.
+const VOICE_ORDER = [0, 1, 2, 3, 4, 5, 6, 9, 7, 8]
 // Two letters each : one letter made Flow/Filter and Chord/Collage twins.
-const VOICE_ABBR = ['Sp', 'Or', 'Fl', 'Ev', 'Ra', 'Tr', 'Fi', 'Ch', 'Co']
+const VOICE_ABBR = ['Sp', 'Or', 'Fl', 'Ev', 'Ra', 'Tr', 'Fi', 'Ch', 'Co', 'Sg']
 // Each voice's mark on the mirror, as a coloured GLYPH that hints its SHAPE as
 // well as its hue (matches the overlay painter below), so a strip tells you
 // which mark is yours even when two share a colour (Spectra's line vs Flow's
@@ -257,6 +263,9 @@ const PARAM_LABELS: Record<SonifyModParam, string> = {
   orbitDrive: 'Orbit drive', orbitSmooth: 'Orbit smooth',
   flowDur: 'Flow grain', flowColour: 'Flow color',
   eventsDecay: 'Events decay',
+  signalDecay: 'Signal decay', signalTone: 'Signal tone', signalFm: 'Signal fm',
+  signalRate: 'Signal rate', signalSpread: 'Signal spread', signalThresh: 'Signal threshold',
+  signalDensity: 'Signal density', signalSnap: 'Signal snap',
   rasterSmooth: 'Raster smooth', rasterTone: 'Raster tone',
   sstvLine: 'Transmission line rate', sstvDev: 'Transmission transpose',
   filterQ: 'Filter resonance', filterSweep: 'Filter sweep rate',
@@ -429,8 +438,8 @@ function SonifySequencer({ presets, onWidth }: { presets: string[]; onWidth: (dx
       <Divider />
       <div className="flex items-center gap-[3px] px-0.5">
         <span className="w-4 shrink-0" />
-        {VOICE_NAMES.map((n, i) => (
-          <span key={i} className="w-3.5 shrink-0 text-center font-mono text-[7px] text-muted/70" title={n}>{VOICE_ABBR[i]}</span>
+        {VOICE_ORDER.map((i) => (
+          <span key={i} className="w-3.5 shrink-0 text-center font-mono text-[7px] text-muted/70" title={VOICE_NAMES[i]}>{VOICE_ABBR[i]}</span>
         ))}
         <span className="ml-1.5 flex-1 truncate font-mono text-[8px] uppercase text-muted/70">preset</span>
       </div>
@@ -444,11 +453,11 @@ function SonifySequencer({ presets, onWidth }: { presets: string[]; onWidth: (dx
           return (
             <div key={s} className={`flex items-center gap-[3px] rounded px-0.5 py-0.5 ${isCur ? 'bg-accent/20 ring-1 ring-accent' : ''}`}>
               <span className="w-4 shrink-0 text-center font-mono text-[9px] text-muted">{s + 1}</span>
-              {VOICE_NAMES.map((vn, vi) => (
+              {VOICE_ORDER.map((vi) => (
                 <button
                   key={vi} disabled={hasPreset} onClick={() => toggleVoice(s, vi)}
                   className={`h-3.5 w-3.5 shrink-0 rounded-sm transition-colors ${hasPreset ? 'cursor-default bg-panel3/25' : step.voices[vi] ? 'bg-accent' : 'bg-panel3/70 hover:bg-panel3'}`}
-                  title={hasPreset ? 'preset step : voices come from the preset' : `${vn} ${step.voices[vi] ? 'on' : 'off'} at step ${s + 1}`}
+                  title={hasPreset ? 'preset step : voices come from the preset' : `${VOICE_NAMES[vi]} ${step.voices[vi] ? 'on' : 'off'} at step ${s + 1}`}
                 />
               ))}
               <select
@@ -574,7 +583,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
     mf[i] = v
     patch({ mixFilter: mf })
   }
-  const pv = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage'>(k: K, p: Partial<SoniConfig[K]>): void =>
+  const pv = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'signal'>(k: K, p: Partial<SoniConfig[K]>): void =>
     set({ ...cfg, [k]: { ...cfg[k], ...p } })
   const pfx = (p: Partial<SoniConfig['fx']>): void => set({ ...cfg, fx: { ...cfg.fx, ...p } })
 
@@ -666,6 +675,26 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             g.beginPath()
             g.arc(dots[i] * w, dots[i + 1] * h, r, 0, 6.2832)
             g.stroke()
+          }
+        }
+        // Signal : each head's read bar where it stands, and a square at every
+        // mark it just fired. Squares, not Events' rings : this voice reads a
+        // grid, and the two should not be confused at a glance.
+        if (st.on && st.signal?.on) {
+          const bars = sonifyEngine.signalBars
+          g.strokeStyle = 'rgba(120,230,255,0.75)'
+          g.lineWidth = 1.5
+          for (let i = 0; i + 3 < bars.length; i += 4) {
+            g.beginPath()
+            g.moveTo(bars[i] * w, bars[i + 1] * h)
+            g.lineTo(bars[i + 2] * w, bars[i + 3] * h)
+            g.stroke()
+          }
+          const marks = sonifyEngine.signalDots
+          g.fillStyle = 'rgba(120,230,255,0.9)'
+          for (let i = 0; i + 2 < marks.length; i += 3) {
+            const r = 2 + marks[i + 2] * 4
+            g.fillRect(marks[i] * w - r, marks[i + 1] * h - r, r * 2, r * 2)
           }
         }
         // Spectra reading path (the worklet's position, pace + path)
@@ -1047,7 +1076,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 <span className="flex-1 font-mono text-[9px] uppercase text-muted" title="Each voice's volume (double-click : its default)">volume</span>
                 <span className="flex-1 font-mono text-[9px] uppercase text-muted" title="Each voice's DJ filter : left of the middle a low-pass, right a high-pass, the middle is off (double-click : off)">filter</span>
               </div>
-              {VOICE_KEYS.map((k, i) => {
+              {VOICE_ORDER.map((i) => {
+                const k = VOICE_KEYS[i]
                 const vv = cfg[k]
                 const fx = cfg.mixFilter?.[i] ?? 0.5
                 return (
@@ -1454,6 +1484,93 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             </Row>
             <Slider label="gain" value={cfg.filter.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('filter', { gain: v })} title="How loud the Filter voice is (before its mixer channel)" />
             <Slider label="pan" value={cfg.filter.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('filter', { pan: v })} title="Places the Filter voice left (-1) or right (+1)" />
+          </VoiceShell>
+
+          <VoiceShell
+            title="Signal" on={cfg.signal.on}
+            hint="Read heads walk the picture on a clock; every mark they cross fires a micro-grain. The picture is the pattern : point it at machine marks and it plays them as data."
+            onToggle={() => pv('signal', { on: !cfg.signal.on })}
+            onDice={() => diceVoice('signal')}
+          >
+            <TapSelect cfg={cfg} voice={cfg.signal} onChange={(tap) => pv('signal', { tap })} />
+            <Row label="wave">
+              <select
+                className="input select-compact min-w-0 flex-1 text-[10px]"
+                value={cfg.signal.wave}
+                onChange={(e) => pv('signal', { wave: Number(e.target.value) })}
+                title="The grain each mark fires. Pip and ping are windowed tones (decay is their length); the others are struck and die away over the decay."
+              >
+                <option value={0}>pip</option>
+                <option value={1}>damped</option>
+                <option value={2}>noise</option>
+                <option value={3}>click</option>
+                <option value={4}>fm</option>
+                <option value={5}>square</option>
+                <option value={6}>tri</option>
+                <option value={7}>pink</option>
+                <option value={8}>ping</option>
+              </select>
+            </Row>
+            <Slider label="decay" value={cfg.signal.decay} min={0} max={1} neutral={0.3} fmt={(v) => { const ms = 0.2 * Math.pow(2500, v); return ms < 10 ? ms.toFixed(1) + 'ms' : Math.round(ms) + 'ms' }} onChange={(v) => pv('signal', { decay: v })} mod={chip('signalDecay')} title="How long a grain lasts, from a 0.2 ms tick to a 500 ms ring" />
+            <Slider label="tone" value={cfg.signal.tone} min={0} max={1} neutral={0.6} onChange={(v) => pv('signal', { tone: v })} mod={chip('signalTone')} title="Brightness of the noise, click and pink grains (a lowpass from 200 Hz up)" />
+            <Slider label="fm" value={cfg.signal.fm} min={0} max={1} neutral={0.4} onChange={(v) => pv('signal', { fm: v })} mod={chip('signalFm')} title="How metallic the fm grain is (its modulator sits at 1.5 times the pitch)" />
+            <Row label="heads">
+              {[1, 2, 3, 4].map((h) => (
+                <button
+                  key={h}
+                  onClick={() => pv('signal', { heads: h })}
+                  className={`flex-1 rounded px-1.5 py-0.5 font-mono text-[9px] transition-colors ${
+                    cfg.signal.heads === h ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'
+                  }`}
+                  title={h === 1 ? 'One head reading the whole bar' : `${h} heads, each reading its own band : with spread up, their sweeps drift in and out of step`}
+                >{h}</button>
+              ))}
+            </Row>
+            <Slider label="rate" value={cfg.signal.rate} min={0.25} max={cfg.signal.sync ? 16 : 64} neutral={8} fmt={(v) => (v < 10 ? v.toFixed(1) : String(Math.round(v))) + (cfg.signal.sync ? '/beat' : '/s')} onChange={(v) => pv('signal', { rate: v })} mod={chip('signalRate')} title={cfg.signal.sync ? `Steps per beat, at ${bpm} BPM` : 'Steps per second'} />
+            <Row label="clock">
+              <button
+                onClick={() => pv('signal', { sync: !cfg.signal.sync, rate: !cfg.signal.sync ? Math.min(16, Math.max(1, Math.round(cfg.signal.rate / 2))) : cfg.signal.rate * 2 })}
+                className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.signal.sync ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
+                title={`Lock the steps to the tempo (${bpm} BPM) : rate becomes steps per beat`}
+              >sync</button>
+              <span className="ml-1 text-[9px] text-muted">steps</span>
+              <select
+                className="input select-compact text-[10px]"
+                value={cfg.signal.steps}
+                onChange={(e) => pv('signal', { steps: Number(e.target.value) })}
+                title="Positions in one sweep of a head : its resolution across the picture"
+              >
+                {[8, 12, 16, 24, 32, 48, 64, 96].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </Row>
+            <Slider label="spread" value={cfg.signal.spread} min={0} max={1} neutral={0.5} onChange={(v) => pv('signal', { spread: v })} mod={chip('signalSpread')} title="The polymeter : at 0 every head sweeps in unison, toward 1 their sweeps shorten to 12, 10 and 7 sixteenths and drift in and out of phase" />
+            <Slider label="thresh" value={cfg.signal.thresh} min={0} max={1} neutral={0.5} onChange={(v) => pv('signal', { thresh: v })} mod={chip('signalThresh')} title="What counts as a mark : a cell must be brighter than this to fire. Low = the head fires on almost anything, high = only the brightest" />
+            <Slider label="density" value={cfg.signal.density} min={0} max={1} neutral={0.35} onChange={(v) => pv('signal', { density: v })} mod={chip('signalDensity')} title="How many marks one head may fire per step (the brightest first)" />
+            <Row label="path">
+              <select
+                className="input select-compact min-w-0 flex-1 text-[10px]"
+                value={cfg.signal.path}
+                onChange={(e) => pv('signal', { path: Number(e.target.value) })}
+                title="How a head travels : across, down, around the center, or out along a spiral (the same paths as Spectra and Filter)"
+              >
+                <option value={0}>horizontal</option>
+                <option value={1}>vertical</option>
+                <option value={2}>radial</option>
+                <option value={3}>spiral</option>
+              </select>
+            </Row>
+            <Row label="range">
+              <select className="input select-compact text-[10px]" value={cfg.signal.loOct} onChange={(e) => pv('signal', { loOct: Math.min(Number(e.target.value), cfg.signal.hiOct - 1) })} title="Lowest octave">
+                {[1, 2, 3, 4, 5, 6].map((o) => <option key={o} value={o}>oct {o}</option>)}
+              </select>
+              <span className="text-[9px] text-muted">→</span>
+              <select className="input select-compact text-[10px]" value={cfg.signal.hiOct} onChange={(e) => pv('signal', { hiOct: Math.max(Number(e.target.value), cfg.signal.loOct + 1) })} title="Highest octave">
+                {[4, 5, 6, 7, 8, 9].map((o) => <option key={o} value={o}>oct {o}</option>)}
+              </select>
+            </Row>
+            <Slider label="snap" value={cfg.signal.snap} min={0} max={1} neutral={1} fmt={(v) => (v < 0.02 ? 'free' : v > 0.98 ? 'scale' : Math.round(v * 100) + '%')} onChange={(v) => pv('signal', { snap: v })} mod={chip('signalSnap')} title="Pitch from height : free frequency at 0, the global scale at 1. The middle is microtonal (a blend in pitch, not a crossfade of two notes)" />
+            <Slider label="gain" value={cfg.signal.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('signal', { gain: v })} title="How loud the Signal voice is (before its mixer channel)" />
+            <Slider label="pan" value={cfg.signal.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('signal', { pan: v })} title="Places the Signal voice left (-1) or right (+1); each grain is also panned by where its mark sits" />
           </VoiceShell>
 
           <VoiceShell

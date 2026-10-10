@@ -7,6 +7,39 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Signal**, a new Sonify voice, before Chord : read heads walk the picture on a
+  clock and every cell they cross that is brighter than a threshold fires one
+  micro-grain. It is a picture-driven version of the author's Signal instrument,
+  and the one thing it drops is the thing that instrument needed most : its 35
+  stored rhythms. Here the picture is the pattern, so a field of machine marks
+  plays as data (point it at a Lowercase layer and the two close a loop). Kept :
+  the micro-synth, as nine grains (pip, damped, noise, click, fm, square, tri,
+  pink, ping) from a 0.2 ms tick to a 500 ms ring; and the polymeter, as one to
+  four heads whose sweeps SPREAD pulls to 12, 10 and 7 sixteenths of each other.
+  Pitch from the place along the bar, with a SNAP from free frequency to the
+  scale whose middle is microtonal. Onsets land on their exact sample instead of
+  the 128-sample audio block, which is what keeps a fast grid a grid : rendered
+  offline, a grain placed 37 samples into a block started on that sample, where
+  block quantizing would have moved it 101 samples early. All nine grains sound,
+  none ever NaN, every one within 5 dB of the pip after trimming (pink had come
+  out 13 dB under). All eight of its controls are modulation targets that move
+  the sound, the scan's included : it reads the modulated values itself, where a
+  detector reading only its base config would have ignored them.
+  Voices are stored BY INDEX (mixer channel, DJ filter, sequencer mask, MIDI
+  binding), so Signal is appended as voice 9 and only SHOWN before Chord : no
+  saved session's settings move to another voice.
+- **A Vary for each layer**, under Speed : the global Vary aimed at one layer
+  alone, with its own amount. Its button is a modulation target that fires on
+  the crossing, so a Euclid or a Spastic can re-vary a layer on a pattern; an
+  auto-fire stays out of the undo history.
+- **Per-rack dice** on a layer's right-click menu : randomize the effects of
+  source A, of source B, or the layer FX, leaving the sources and the other
+  racks alone. Only the modulation aimed at the units that went is dropped.
+- **Every fired action blinks** : the Vary buttons, the global Randomize (button,
+  R key, MIDI pad, every scope) and the six return-to-default buttons, each in
+  the color of its kind of action.
+- **Lowercase reads another layer** (a sidechain), one sample per cell : the
+  picture arrives as a 1-bit halftone of cells on its clock.
 - **Lowercase**, a new source : machine-cut marks on a stepped clock. Eight figures, from
   a dense data matrix whose cells subdivide into one to three narrow bars, through blocks,
   columns, ticks, a scan rule and a thin lattice, to sprocket ladders down the frame edges
@@ -21,6 +54,22 @@ that CI builds into cross-platform releases.
   confetti). Flat, hard-edged, never radial. Measured at 7.5 ms for a 4K frame, against
   4.1 for Direct Marks, and holding its structure with no lattice or banding at 24 hours
   of show time.
+
+### Changed
+
+- **Dealt racks reach four effects** on both sources and the layer (they stopped
+  at 2, 2 and 3, and a source rack was empty about half the time). Over 200,000
+  deals : source A 0.70 to 1.65 effects on average, source B 0.55 to 1.48, the
+  layer 0.95 to 1.77.
+- **Lowercase** : rate to 120 steps a second, step to 64, hold to 32, cells to
+  512 (a slab at 512 is a barcode of about 128 bars); the grid figures stay 1-bit
+  as cells go below a pixel, instead of averaging into grey.
+
+### Fixed
+
+- **A fullscreen output closes on Esc** when it is not an installation. Its keys
+  were armed only for a kiosk launch, so a plain fullscreen output on one
+  display could only be left with Cmd+W.
 
 ## v1.2.1 — 2026-10-09
 

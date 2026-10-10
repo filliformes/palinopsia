@@ -105,6 +105,26 @@ export interface SoniConfig {
   // Chord bank (Aural Mirror's additive layer) : a few scale-tuned oscillators,
   // each following the brightness of a horizontal band → a sustained chord that
   // swells and fades with the image (sings even on a STILL frame).
+  // SIGNAL : scan heads read the picture as bits on a clock, and every cell
+  // they cross that is brighter than `thresh` fires one micro-grain. The
+  // picture IS the pattern : nothing here is a stored rhythm.
+  signal: {
+    on: boolean; tap: number; gain: number; pan: number
+    wave: number // 0 pip · 1 damped · 2 noise · 3 click · 4 fm · 5 square · 6 tri · 7 pink · 8 ping
+    decay: number // 0..1 -> 0.2 ms .. 500 ms (the window, for pip and ping)
+    tone: number // 0..1 the noise waves' lowpass
+    fm: number // 0..1 FM depth (the fm wave)
+    heads: number // 1..4 read heads, each on its own band of the bar
+    rate: number // steps per second, or per beat when synced
+    sync: boolean
+    steps: number // positions in one sweep of a head (its resolution)
+    spread: number // 0..1 : how far the heads' sweeps diverge (the polymeter)
+    thresh: number // 0..1 : what brightness counts as a mark
+    density: number // 0..1 : how many marks one head may fire per step
+    path: number // 0 horizontal · 1 vertical · 2 radial · 3 spiral (as Spectra)
+    loOct: number; hiOct: number
+    snap: number // 0 free frequency .. 1 on the global scale
+  }
   chord: {
     on: boolean; tap: number; gain: number; pan: number
     voices: number // 3..16 notes, spread across the octave range
@@ -159,8 +179,10 @@ export interface SoniConfig {
     rvDiff: number; rvLowDamp: number // Quartz
     rvCross: number; rvLowMult: number; rvHighMult: number // Prism
   }
-  // Per-voice DJ filter for the mixer page (one per voice, in render order :
-  // spectra·orbit·flow·events·raster·sstv·filter·chord·collage). 0.5 = bypass, <0.5
+  // Per-voice DJ filter for the mixer page (one per voice, BY INDEX :
+  // spectra·orbit·flow·events·raster·sstv·filter·chord·collage·signal). Signal is
+  // appended at 9 so a saved session's channels stay on their voices; the UI
+  // shows it before Chord all the same. 0.5 = bypass, <0.5
   // lowpass sweep, >0.5 highpass sweep. Volume is each voice's own `gain`.
   mixFilter: number[]
   taps: [SoniTap, SoniTap]
@@ -181,6 +203,7 @@ export function defaultSoniConfig(): SoniConfig {
     raster: { on: false, tap: 0, gain: 0.4, pan: 0, note: 45, freq: 110, quantize: true, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
     sstv: { on: false, tap: 0, gain: 0.4, pan: 0, lineHz: 12, sync: false, dev: 1, syncLev: 0.5 },
     filter: { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, lineIn: false, loop: 0, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0, loOct: 1, hiOct: 8, quantize: false },
+    signal: { on: false, tap: 0, gain: 0.6, pan: 0, wave: 0, decay: 0.3, tone: 0.6, fm: 0.4, heads: 2, rate: 8, sync: false, steps: 16, spread: 0.5, thresh: 0.5, density: 0.35, path: 0, loOct: 4, hiOct: 8, snap: 1 },
     chord: { on: false, tap: 0, gain: 0.6, pan: 0, voices: 7, loOct: 2, hiOct: 6, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3, waves: 0, wavesRate: 0.4, wavesSync: 0, noise: 0, air: 0.4 },
     collage: {
       on: false, gain: 0.7, pan: 0, reso: 0.5, ring: 0.5, bright: 0.5, width: 1, loOct: 2, hiOct: 6,
@@ -194,7 +217,7 @@ export function defaultSoniConfig(): SoniConfig {
       rvWidth: 1, rvLocut: 220, rvFreeze: false, rvDiff: 0.85, rvLowDamp: 0.5,
       rvCross: 0.3, rvLowMult: 1, rvHighMult: 1
     },
-    mixFilter: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+    mixFilter: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
     taps: [{ kind: 'master', layer: 0 }, { kind: 'layer', layer: 0 }]
   }
 }
@@ -213,6 +236,9 @@ const SONI_SIMPLE_MODS: Record<string, [keyof SoniConfig, string]> = {
   orbitDrive: ['orbit', 'drive'], orbitSmooth: ['orbit', 'smooth'],
   flowDur: ['flow', 'dur'], flowColour: ['flow', 'colour'],
   eventsDecay: ['events', 'decay'],
+  signalDecay: ['signal', 'decay'], signalTone: ['signal', 'tone'], signalFm: ['signal', 'fm'],
+  signalRate: ['signal', 'rate'], signalSpread: ['signal', 'spread'], signalThresh: ['signal', 'thresh'],
+  signalDensity: ['signal', 'density'], signalSnap: ['signal', 'snap'],
   rasterSmooth: ['raster', 'smooth'], rasterTone: ['raster', 'tone'],
   sstvLine: ['sstv', 'lineHz'], sstvDev: ['sstv', 'dev'],
   filterQ: ['filter', 'q'], filterSweep: ['filter', 'sweepHz'],
@@ -390,6 +416,11 @@ class SonifyEngine {
   private lumaPrev: Uint8Array[] = [new Uint8Array(GRID * GRID), new Uint8Array(GRID * GRID)]
   private grainFreqs: Float32Array = new Float32Array(0)
   private eventFreqs: Float32Array = new Float32Array(0)
+  private signalFreqs: Float32Array = new Float32Array(0)
+  // Signal's step clock, in steps. A double, so it stays exact for weeks of
+  // show time at any rate : no wrap to beat against the heads' sweep lengths.
+  private sigClock = 0
+  private sigRead = { x: 0, y: 0 } // scratch for the path geometry
   private salience = new Float32Array(GRID * GRID) // Events detection scratch
   // live meter (UI reads these; written from the worklet's meter messages)
   meterPeak = 0
@@ -401,6 +432,10 @@ class SonifyEngine {
   flowDots: Float32Array = new Float32Array(0)
   // live event onsets for the overlay ([x01,y01,mag] × n), fade painted by the UI
   eventDots: Float32Array = new Float32Array(0)
+  // Signal, for the overlay : the marks fired this frame ([x01,y01,mag] × n) and
+  // each head's read bar as it stands ([x0,y0,x1,y1] × heads).
+  signalDots: Float32Array = new Float32Array(0)
+  signalBars: Float32Array = new Float32Array(0)
   // effective probe values (base + modulation), for the page overlay
   liveProbes: Record<string, number> = {}
   scan: SoniScan | null = null
@@ -754,15 +789,17 @@ class SonifyEngine {
       raster: { ...d.raster, ...cfg.raster },
       sstv: { ...d.sstv, ...cfg.sstv },
       filter: { ...d.filter, ...cfg.filter },
+      signal: { ...d.signal, ...cfg.signal },
       chord: { ...d.chord, ...cfg.chord },
       collage: { ...d.collage, ...cfg.collage },
       fx: { ...d.fx, ...cfg.fx },
-      // Older presets/scenes carried 7 (pre-Chord) or 8 (pre-Collage) entries :
-      // keep their filter positions and pad the newer channels to bypass (0.5)
-      // instead of discarding the whole array. Any other shape → default.
+      // Older presets/scenes carried 7 (pre-Chord), 8 (pre-Collage) or 9
+      // (pre-Signal) entries : keep their filter positions and pad the newer
+      // channels to bypass (0.5) instead of discarding the whole array. Any
+      // other shape → default.
       mixFilter:
-        Array.isArray(cfg.mixFilter) && cfg.mixFilter.length >= 7 && cfg.mixFilter.length <= 9
-          ? [...cfg.mixFilter, 0.5, 0.5].slice(0, 9)
+        Array.isArray(cfg.mixFilter) && cfg.mixFilter.length >= 7 && cfg.mixFilter.length <= 10
+          ? [...cfg.mixFilter, 0.5, 0.5, 0.5].slice(0, 10)
           : d.mixFilter
     }
     const sinkChanged = cfg.sinkId !== this.cfg.sinkId
@@ -788,6 +825,9 @@ class SonifyEngine {
       } else this.colFrom = null
       this.collageNotes = notes
     }
+    // Signal's scale table. Built whatever `snap` says : snap BLENDS the free
+    // frequency with this one, so the quantized end must always exist.
+    this.signalFreqs = scaleTable(effRoot(cfg), cfg.scale, cfg.signal.loOct, cfg.signal.hiOct)
     // note pitch table for the events voice
     this.eventFreqs = cfg.events.quantize
       ? scaleTable(effRoot(cfg), cfg.scale, cfg.events.loOct, cfg.events.hiOct)
@@ -832,6 +872,10 @@ class SonifyEngine {
           q: cfg.filter.q, noise: cfg.filter.lineIn ? cfg.filter.noise * 0.25 : cfg.filter.noise,
           sweepOn: cfg.filter.sweepOn, sweepHz: cfg.filter.sweepHz, x: cfg.filter.x, gamma: cfg.filter.gamma,
           path: cfg.filter.path ?? 0, pace: cfg.filter.pace ?? 0, loop: cfg.filter.loop ?? 0
+        },
+        signal: {
+          on: cfg.signal.on, gain: cfg.signal.gain, pan: cfg.signal.pan,
+          wave: cfg.signal.wave, decay: cfg.signal.decay, tone: cfg.signal.tone, fm: cfg.signal.fm
         },
         chord: {
           on: cfg.chord.on, tap: cfg.chord.tap, gain: cfg.chord.gain, pan: cfg.chord.pan,
@@ -1061,6 +1105,7 @@ class SonifyEngine {
 
       if (this.cfg.flow.on && this.cfg.flow.tap === t) this.analyzeFlow(t, dt)
       if (this.cfg.events.on && this.cfg.events.tap === t) this.analyzeEvents(t, frameDt)
+      if (this.cfg.signal.on && this.cfg.signal.tap === t) this.analyzeSignal(t, frameDt)
     }
   }
 
@@ -1140,6 +1185,124 @@ class SonifyEngine {
       out[i * 4 + 3] = c.x
     }
     this.node.port.postMessage({ t: 'events', events: out }, [out.buffer])
+  }
+
+  /** The read point of a path, the same geometry the worklet's scanXY gives
+   *  Spectra and Filter, so a path means the same thing in every voice : `pos`
+   *  is the place along the travel (0..1), `pp` the place across it. */
+  private signalPoint(path: number, pos: number, pp: number): void {
+    const o = this.sigRead
+    if (path === 1) { o.x = pp; o.y = pos }
+    else if (path === 2) { const a = pos * Math.PI * 2, r = pp * 0.48; o.x = 0.5 + r * Math.cos(a); o.y = 0.5 + r * Math.sin(a) }
+    else if (path === 3) { const a = pos * Math.PI * 2 + pp * Math.PI * 5, r = pp * 0.48; o.x = 0.5 + r * Math.cos(a); o.y = 0.5 + r * Math.sin(a) }
+    else { o.x = pos; o.y = 1 - pp }
+  }
+
+  /** SIGNAL : read heads walk the picture on a clock and every cell they cross
+   *  that is bright enough fires one micro-grain. The picture is the pattern,
+   *  which is the whole difference from the instrument this voice comes from :
+   *  that one had to invent its rhythms (Morse, primes, Rule 30, breakbeats);
+   *  here they are whatever the image holds, so a field of machine marks plays
+   *  as a stream of data.
+   *
+   *  Heads share one step clock but not one sweep length : head h's sweep is
+   *  `steps` scaled toward 12/16, 10/16 or 7/16 by SPREAD, so they drift out of
+   *  phase and back. That is the polymeter, taken from the image instead of
+   *  from four separate sequencers. Each head reads its own band across the
+   *  bar; the place along the bar is the pitch.
+   *
+   *  Onsets are timed to the step, not dithered : this voice is a grid, and the
+   *  spacing between two marks is the clock's. They play one window late (the
+   *  frame interval), which is a constant latency, never a wobble. */
+  private analyzeSignal(t: number, frameDt: number): void {
+    const sg = this.cfg.signal
+    const lum = this.luma[t]
+    // The EFFECTIVE values : a modulator on rate, threshold or density has to
+    // reach the scan, and the overlay only ships values to the worklet.
+    const mv = sonifyModValues
+    const eff = (k: string, base: number): number => mv.get(k) ?? base
+    const rate = eff('signalRate', sg.rate)
+    const spread = Math.max(0, Math.min(1, eff('signalSpread', sg.spread)))
+    const thresh = eff('signalThresh', sg.thresh)
+    const density = eff('signalDensity', sg.density)
+    const sps = sg.sync
+      ? (this.bpm / 60) * Math.max(0.25, Math.min(16, rate))
+      : Math.max(0.25, Math.min(64, rate))
+    const c0 = this.sigClock
+    const c1 = c0 + sps * frameDt
+    this.sigClock = c1
+    const H = Math.max(1, Math.min(4, Math.round(sg.heads)))
+    const steps = Math.max(2, Math.min(96, Math.round(sg.steps)))
+    // The polymeter set : one sweep at `steps`, the others pulled toward 12, 10
+    // and 7 sixteenths of it as SPREAD rises. At spread 0 they read in unison.
+    const RATIOS = [1, 0.75, 0.625, 0.4375]
+    const lens: number[] = []
+    for (let h = 0; h < H; h++) lens.push(Math.max(2, Math.round(steps * (1 + (RATIOS[h] - 1) * spread))))
+    const reads = Math.max(4, Math.round(24 / H)) // cells sampled along one head's band
+    const perStep = 1 + Math.round(Math.max(0, Math.min(1, density)) * 7)
+    const thr = Math.max(1, Math.min(254, thresh * 255))
+    const path = sg.path | 0
+    const tbl = this.signalFreqs
+    const root = effRoot(this.cfg)
+    const f0 = noteFreq(12 * (sg.loOct + 1) + root), f1 = noteFreq(12 * (sg.hiOct + 1) + root)
+    const snap = Math.max(0, Math.min(1, eff('signalSnap', sg.snap)))
+
+    const onsets: number[] = []
+    const dots: number[] = []
+    type C = { pp: number; v: number; x: number; y: number }
+    const cand: C[] = []
+    let stepped = false
+    // every step whose boundary falls inside this window
+    for (let k = Math.floor(c0) + 1; k <= c1; k++) {
+      stepped = true
+      const tOff = (k - c0) / sps
+      for (let h = 0; h < H; h++) {
+        const len = lens[h]
+        const pos = ((k % len) + 0.5) / len
+        cand.length = 0
+        for (let r = 0; r < reads; r++) {
+          const pp = (h + (r + 0.5) / reads) / H
+          this.signalPoint(path, pos, pp)
+          const gx = Math.min(GRID - 1, Math.max(0, Math.floor(this.sigRead.x * GRID)))
+          const gy = Math.min(GRID - 1, Math.max(0, Math.floor(this.sigRead.y * GRID)))
+          const v = lum[gy * GRID + gx]
+          if (v > thr) cand.push({ pp, v, x: this.sigRead.x, y: this.sigRead.y })
+        }
+        // the brightest marks first, as many as DENSITY allows
+        cand.sort((a, b) => b.v - a.v)
+        const m = Math.min(perStep, cand.length)
+        for (let i = 0; i < m; i++) {
+          const c = cand[i]
+          const free = f0 * Math.pow(f1 / f0, c.pp)
+          const q = tbl.length ? tbl[Math.min(tbl.length - 1, Math.floor(c.pp * tbl.length))] : free
+          // SNAP blends the two in log frequency, so its middle is microtonal
+          // rather than a crossfade between two notes
+          const freq = Math.exp(Math.log(free) * (1 - snap) + Math.log(q) * snap)
+          const amp = 0.35 + 0.65 * ((c.v - thr) / Math.max(1, 255 - thr))
+          onsets.push(tOff, freq, amp, Math.max(0, Math.min(1, c.x)))
+          dots.push(c.x, c.y, amp)
+        }
+      }
+    }
+
+    // the read bars where they stand now, for the overlay
+    const bars = new Float32Array(H * 4)
+    for (let h = 0; h < H; h++) {
+      const pos = ((Math.floor(c1) % lens[h]) + 0.5) / lens[h]
+      this.signalPoint(path, pos, h / H)
+      bars[h * 4] = this.sigRead.x; bars[h * 4 + 1] = this.sigRead.y
+      this.signalPoint(path, pos, (h + 1) / H)
+      bars[h * 4 + 2] = this.sigRead.x; bars[h * 4 + 3] = this.sigRead.y
+    }
+    this.signalBars = bars
+    // The marks HOLD until the next step, like a Lowercase deal : most frames
+    // fall between two steps (12 a second against a 60 Hz loop), and clearing
+    // them every frame left each square on screen for one frame, unseen. A
+    // step that fires nothing still clears them, so a dark frame reads dark.
+    if (stepped) this.signalDots = new Float32Array(dots)
+    if (!onsets.length || !this.node) return
+    const out = new Float32Array(onsets)
+    this.node.port.postMessage({ t: 'signal', events: out }, [out.buffer])
   }
 
   /** Block-matching motion field on the 96×96 luma grids → grain events. */

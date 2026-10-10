@@ -15,8 +15,13 @@ const NGRAIN = 64; // Flow grain pool
 const NEVENT = 24; // Events polyphony (plucked notes)
 const NBAND = 48; // Image-Filter band count
 const NCHORD = 16; // Chord bank max voices
+const NSIG = 32; // Signal polyphony (micro-grains)
 const TAU = 6.283185307179586;
-const NVOICE = 9;
+// Voices are addressed BY INDEX (the DJ filters, the gates, the mixer and the
+// sequencer masks a session saves), so a new voice is APPENDED : Signal is 9,
+// and only the UI shows it before Chord. Inserting it at 7 would have moved
+// Chord and the Collage, and every saved mixer setting with them.
+const NVOICE = 10;
 // Above this fraction of the sample rate a partial can't be played : it would
 // fold back as an out-of-key whistle (and an Events phase would run away).
 const NYQ_FRAC = 0.45;
@@ -555,6 +560,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       sstv:    { on: false, tap: 0, gain: 0.5, pan: 0, lineHz: 12, dev: 1, syncLev: 0.5 },
       filter:  { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, loop: 0, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0 },
       chord:   { on: false, tap: 0, gain: 0.6, pan: 0, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3, waves: 0, wavesRate: 0.4, wavesSync: 0, noise: 0, air: 0.4 },
+      signal:  { on: false, gain: 0.6, pan: 0, wave: 0, decay: 0.3, tone: 0.6, fm: 0.4 },
       collage: { on: false, gain: 0.7, pan: 0, bank: 0, bankSend: false, decay: 0.5, choke: false, cutoff: 1, peak: 0, slope: 0, tone: 0, tilt: 0, waves: 0, wavesRate: 0.5, wavesSync: 0, noise: 0, noiseRate: 0.5, noiseSync: 0, detune: 0, voicing: 0 },
       fx:      { send: 0, dlyMix: 0.35, dlyTime: 0.3, dlyFb: 0.35, dlyTone: 0.5, dlyMode: 1, rvMode: 0, rvMix: 0.6, rvSize: 0.6, rvDecay: 0.6, rvDamp: 0.3, rvPre: 20, rvMod: 6, rvModRate: 0.5, rvWidth: 1, rvLocut: 220, rvFreeze: false, rvDiff: 0.85, rvLowDamp: 0.5, rvCross: 0.3, rvLowMult: 1, rvHighMult: 1 }
     };
@@ -586,6 +592,17 @@ class SoniProcessor extends AudioWorkletProcessor {
     // a stolen note's last sample, faded over ~3 ms so the steal doesn't click
     this.evDcL = 0; this.evDcR = 0;
     this.evDcK = Math.exp(-1 / (0.003 * sampleRate));
+    // ── Signal poly pool (micro-grains fired by the scan heads) ──
+    // `wait` delays a grain to its exact sample inside the block : onsets are
+    // not quantized to the 128-sample quantum, so a fast grid stays a grid.
+    this.sig = [];
+    for (let k = 0; k < NSIG; k++) {
+      this.sig.push({ on: false, wait: 0, phase: 0, inc: 0, amp: 0, pan: 0.5, env: 0, decMul: 0.999,
+        age: 0, len: 1, fmPh: 0, lp: 0, seed: 1, p0: 0, p1: 0, p2: 0, p3: 0, p4: 0, p5: 0, p6: 0,
+        born: -1, lastL: 0, lastR: 0 });
+    }
+    this.sigPending = []; // scheduled onsets [{t0, freq, amp, pan}]
+    this.sgDcL = 0; this.sgDcR = 0; // stolen grains' last samples, faded like Events'
     this.block = 0; // render-quantum counter (a note born this block is never stolen)
     // ── Raster state ──
     this.rPtr = 0; // read pointer in probe pixels (row-major, wraps)
@@ -715,7 +732,7 @@ class SoniProcessor extends AudioWorkletProcessor {
         this.pg = { t: 0, dur: gl, ob: this.obF || prev.orbit.freq, ra: this.raF || prev.raster.freq };
       }
       if (m.cfg.fx) this.applyFx(m.cfg.fx);
-      if (m.cfg.mixFilter) for (let i = 0; i < 9; i++) this.djf[i].setX(m.cfg.mixFilter[i] != null ? m.cfg.mixFilter[i] : 0.5, sampleRate);
+      if (m.cfg.mixFilter) for (let i = 0; i < NVOICE; i++) this.djf[i].setX(m.cfg.mixFilter[i] != null ? m.cfg.mixFilter[i] : 0.5, sampleRate);
       return;
     }
     if (m.t === 'mod') {
@@ -743,6 +760,17 @@ class SoniProcessor extends AudioWorkletProcessor {
         this.pending.push({ t0: base + ev[i], freq: ev[i + 1], amp: ev[i + 2], pan: ev[i + 3], bright: ev[i + 4], warm: ev[i + 5] });
       }
       if (this.pending.length > PENDING_CAP) this.pending.splice(0, this.pending.length - PENDING_CAP);
+      return;
+    }
+    if (m.t === 'signal') {
+      // [tOffset, freq, amp, pan] × n : one scan window of onsets, timed by the
+      // main thread to the step (not dithered), so the spacing is the clock's.
+      const ev = m.events;
+      const base = currentTime;
+      for (let i = 0; i + 3 < ev.length; i += 4) {
+        this.sigPending.push({ t0: base + ev[i], freq: ev[i + 1], amp: ev[i + 2], pan: ev[i + 3] });
+      }
+      if (this.sigPending.length > PENDING_CAP) this.sigPending.splice(0, this.sigPending.length - PENDING_CAP);
       return;
     }
     if (m.t === 'events') {
@@ -909,6 +937,7 @@ class SoniProcessor extends AudioWorkletProcessor {
     else if (idx === 2) { for (let g = 0; g < NGRAIN; g++) this.grains[g].on = false; dropStale(this.pending, now); }
     else if (idx === 3) { for (let k = 0; k < NEVENT; k++) this.notes[k].on = false; dropStale(this.evPending, now); this.evDcL = this.evDcR = 0; }
     else if (idx === 7) this.cAmp.fill(0);
+    else if (idx === 9) { for (let k = 0; k < NSIG; k++) this.sig[k].on = false; dropStale(this.sigPending, now); this.sgDcL = this.sgDcR = 0; }
   }
 
   // Flush a voice's scratch (vL/vR) through its gate, gain and DJ filter into
@@ -1498,6 +1527,139 @@ class SoniProcessor extends AudioWorkletProcessor {
       const gL = 1.6 * (1 - Math.max(0, co.pan)), gR = 1.6 * (1 + Math.min(0, co.pan));
       this.ring.process(iL, iR, L, R, n, co, this.bpm, gL, gR);
       this.mixVoice(8, coOn, co.gain, L, R, outL, outR, n);
+    }
+
+    // ── SIGNAL : the scan heads' micro-grains (the test-equipment register) ──
+    // Every helper the per-sample loop needs is written INLINE : a helper called
+    // per sample was once left un-inlined (boxed doubles, 3.6 ms per block).
+    const sg = cfg.signal;
+    if (this.voiceLive(9, sg.on)) {
+      const nowT = currentTime;
+      const wave = sg.wave | 0;
+      // decay 0..1 -> 0.2 ms .. 500 ms, logarithmic : the whole pip-to-bell axis
+      // in one knob (it is also the window length of the pip and the ping).
+      const decSamp = Math.max(4, 0.0002 * Math.pow(2500, clampf(sg.decay, 0, 1)) * sampleRate);
+      const decMul = Math.exp(-6.9077552 / decSamp); // -60 dB over the decay
+      // tone : the noise waves' one-pole lowpass, 200 Hz .. 20 kHz
+      const toneHz = 200 * Math.pow(100, clampf(sg.tone, 0, 1));
+      const lpK = 1 - Math.exp(-TAU * (toneHz < nyq ? toneHz : nyq) * dt);
+      const fmIdx = clampf(sg.fm, 0, 1) * 0.9; // FM depth, in turns of phase
+      let sw = 0;
+      for (let i = 0; i < this.sigPending.length; i++) {
+        const e = this.sigPending[i];
+        if (e.t0 <= nowT + n * dt) {
+          // a free grain, else steal the quietest one not started this block
+          let slot = -1;
+          for (let k = 0; k < NSIG; k++) if (!this.sig[k].on) { slot = k; break; }
+          if (slot < 0) {
+            let quiet = 1e9;
+            for (let k = 0; k < NSIG; k++) {
+              const g2 = this.sig[k];
+              if (g2.born !== this.block && g2.env < quiet) { quiet = g2.env; slot = k; }
+            }
+            if (slot < 0) continue; // the whole pool started this block : drop it
+            this.sgDcL += this.sig[slot].lastL; this.sgDcR += this.sig[slot].lastR;
+          }
+          const g = this.sig[slot];
+          let f = e.freq < 20 ? 20 : e.freq;
+          while (f > nyq) f *= 0.5;
+          let w0 = Math.round((e.t0 - nowT) / dt);
+          g.wait = w0 < 0 ? 0 : w0 > n - 1 ? n - 1 : w0;
+          g.on = true; g.born = this.block; g.phase = 0; g.inc = f * dt; g.amp = e.amp; g.pan = e.pan;
+          g.age = 0; g.len = decSamp; g.env = 1; g.decMul = decMul; g.fmPh = 0; g.lp = 0;
+          g.p0 = g.p1 = g.p2 = g.p3 = g.p4 = g.p5 = g.p6 = 0;
+          g.seed = ((Math.random() * 2147483646) | 0) + 1;
+        } else {
+          this.sigPending[sw++] = e;
+        }
+      }
+      this.sigPending.length = sw;
+      const g0 = 0.5;
+      const bias = sg.pan * 0.5;
+      // energy differs a great deal between waves : trim so they sit together.
+      // Measured in an offline render (decay 0.35, 880 Hz) : pink came out 13 dB
+      // under the pip and square 8 dB under, so picking them sounded broken.
+      // After : every wave within 5 dB of the pip (damped's -5 is its own : at a
+      // short decay a struck sine has lost half its level by its first crest).
+      const wg = wave === 5 ? 0.75 : wave === 7 ? 2.6 : wave === 2 ? 0.95 : wave === 4 ? 0.8 : 1;
+      for (let k = 0; k < NSIG; k++) {
+        const g = this.sig[k];
+        if (!g.on) continue;
+        let p = g.pan + bias; p = p < 0 ? 0 : p > 1 ? 1 : p;
+        const gL = g0 * panGL(p) * wg, gR = g0 * panGR(p) * wg;
+        let lv = 0;
+        for (let s = 0; s < n; s++) {
+          if (g.wait > 0) { g.wait--; continue; }
+          const ph = g.phase;
+          let sig;
+          if (wave === 0 || wave === 8) {
+            // PIP (0) : a Hann-windowed sine, symmetric, the tone pip.
+            // PING (8) : a Gaussian-windowed one, softer at both ends.
+            if (g.age >= g.len) { g.on = false; break; }
+            const u = g.age / g.len;
+            let w;
+            if (wave === 0) { const h = sinT(u * 0.5); w = h * h; } // sin^2(pi u) = Hann
+            else { const c = u * 2 - 1; w = Math.exp(-4.5 * c * c); }
+            sig = sinT(ph) * w;
+          } else {
+            g.env *= g.decMul;
+            if (g.env < 0.0004) { g.on = false; break; }
+            if (wave === 1) {
+              sig = sinT(ph); // DAMPED : struck, instant attack, the tuning fork
+            } else if (wave === 2 || wave === 3 || wave === 7) {
+              let x = g.seed | 0; x ^= x << 13; x ^= x >>> 17; x ^= x << 5; g.seed = x;
+              const wn = ((x >>> 0) / 4294967296) * 2 - 1;
+              if (wave === 7) {
+                // PINK : a filter-bank pink noise, colored, deeper than white
+                g.p0 = 0.99886 * g.p0 + wn * 0.0555179; g.p1 = 0.99332 * g.p1 + wn * 0.0750759;
+                g.p2 = 0.969 * g.p2 + wn * 0.153852; g.p3 = 0.8665 * g.p3 + wn * 0.3104856;
+                g.p4 = 0.55 * g.p4 + wn * 0.5329522; g.p5 = -0.7616 * g.p5 - wn * 0.016898;
+                const pk = g.p0 + g.p1 + g.p2 + g.p3 + g.p4 + g.p5 + g.p6 + wn * 0.5362;
+                g.p6 = wn * 0.115926;
+                g.lp += (pk * 0.11 - g.lp) * lpK;
+                sig = g.lp * 1.8;
+              } else {
+                g.lp += (wn - g.lp) * lpK;
+                // CLICK (3) : a two-sample bipolar spike over a tail of the same
+                // noise, so DECAY turns a tick into a tsk. NOISE (2) : the burst.
+                sig = wave === 3 ? (g.age === 0 ? 1 : g.age === 1 ? -0.7 : 0) + g.lp * 0.3 : g.lp * 1.6;
+              }
+            } else if (wave === 4) {
+              // FM : a sine carrier, its modulator at 1.5x (inharmonic, so metal)
+              g.fmPh += g.inc * 1.5; if (g.fmPh >= 1) g.fmPh -= 1;
+              let q = ph + fmIdx * sinT(g.fmPh); q -= Math.floor(q);
+              sig = sinT(q);
+            } else if (wave === 5) {
+              // SQUARE : PolyBLEP-corrected at both edges, the clean digital burst
+              const t0 = g.inc;
+              let sq = ph < 0.5 ? 1 : -1;
+              if (ph < t0) { const t = ph / t0; sq += t + t - t * t - 1; }
+              else if (ph > 1 - t0) { const t = (ph - 1) / t0; sq += t * t + t + t + 1; }
+              let p2 = ph + 0.5; if (p2 >= 1) p2 -= 1;
+              if (p2 < t0) { const t = p2 / t0; sq -= t + t - t * t - 1; }
+              else if (p2 > 1 - t0) { const t = (p2 - 1) / t0; sq -= t * t + t + t + 1; }
+              sig = sq;
+            } else {
+              sig = ph < 0.5 ? ph * 4 - 1 : 3 - ph * 4; // TRI (6)
+            }
+            sig *= g.env;
+          }
+          const v = sig * g.amp;
+          g.phase += g.inc; if (g.phase >= 1) g.phase -= 1;
+          g.age++;
+          L[s] += v * gL; R[s] += v * gR;
+          lv = v;
+        }
+        g.lastL = lv * gL; g.lastR = lv * gR;
+      }
+      // the stolen grains' tails (a decaying offset from their last sample)
+      if (this.sgDcL !== 0 || this.sgDcR !== 0) {
+        let dl = this.sgDcL, dr = this.sgDcR;
+        const kk = this.evDcK;
+        for (let s = 0; s < n; s++) { L[s] += dl; R[s] += dr; dl *= kk; dr *= kk; }
+        this.sgDcL = Math.abs(dl) < 1e-7 ? 0 : dl; this.sgDcR = Math.abs(dr) < 1e-7 ? 0 : dr;
+      }
+      this.mixVoice(9, sg.on, sg.gain, L, R, outL, outR, n);
     }
 
     // ── shared FX tail : send the (dry) mix into delay → reverb, return the wet ──

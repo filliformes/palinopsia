@@ -606,6 +606,9 @@ export type SonifyModParam =
   | 'orbitDrive' | 'orbitSmooth'
   | 'flowDur' | 'flowColour'
   | 'eventsDecay'
+  // Signal : the synth and the scan (the scan reads them on the main thread)
+  | 'signalDecay' | 'signalTone' | 'signalFm' | 'signalRate' | 'signalSpread'
+  | 'signalThresh' | 'signalDensity' | 'signalSnap'
   | 'rasterSmooth' | 'rasterTone'
   | 'sstvLine' | 'sstvDev'
   | 'filterQ' | 'filterSweep'

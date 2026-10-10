@@ -89,9 +89,10 @@ import { sequencerSkip } from './engine/sequencer'
 type Args = OscInEvent['args']
 // Sonify : the voices that read the picture (they have a tap), each voice's
 // octave span [lo min, lo max, hi min, hi max], and the Orbit shapes in UI order.
-const SONI_TAP_VOICES = { spectra: 1, orbit: 1, flow: 1, events: 1, raster: 1, sstv: 1, filter: 1, chord: 1 } as const
+const SONI_TAP_VOICES = { spectra: 1, orbit: 1, flow: 1, events: 1, raster: 1, sstv: 1, filter: 1, chord: 1, signal: 1 } as const
 const SONI_OCT_SPAN: Record<string, [number, number, number, number] | undefined> = {
-  spectra: [0, 4, 4, 8], flow: [1, 4, 4, 7], events: [1, 4, 4, 7], chord: [0, 4, 3, 8], collage: [0, 4, 3, 8], filter: [0, 4, 4, 8]
+  spectra: [0, 4, 4, 8], flow: [1, 4, 4, 7], events: [1, 4, 4, 7], chord: [0, 4, 3, 8], collage: [0, 4, 3, 8], filter: [0, 4, 4, 8],
+  signal: [1, 6, 4, 9]
 }
 const ORBIT_RATIOS = [1, 2, 1.5, 1.3333333, 3]
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v))
@@ -559,7 +560,7 @@ function route(address: string, args: Args): void {
         apply({ ...c, taps })
         return
       }
-      const V = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'fx'>(
+      const V = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'signal' | 'fx'>(
         k: K, patch: Partial<SoniConfig[K]>
       ): void => apply({ ...c, [k]: { ...c[k], ...patch } })
       // Every voice that reads the picture : which tap it listens to (0 A · 1 B).
@@ -624,6 +625,30 @@ function route(address: string, args: Args): void {
           else if (ctl === 'wave') V('events', { wave: Math.round(clamp01(n) * 3) })
           else if (ctl === 'quantize') V('events', { quantize: n >= 0.5 })
           return
+        case 'signal': {
+          // Same conventions as the other voices : continuous 0..1, an enum
+          // takes 0..1 across its choices, a switch is on at 0.5 and above.
+          // `rate` spans whatever the clock allows : steps per beat when synced
+          // (0.25..16), steps per second when free (0.25..64).
+          const sg = c.signal
+          if (ctl === 'on') V('signal', { on: n >= 0.5 })
+          else if (ctl === 'gain') V('signal', { gain: clamp01(n) })
+          else if (ctl === 'pan') V('signal', { pan: clamp01(n) * 2 - 1 })
+          else if (ctl === 'wave') V('signal', { wave: Math.round(clamp01(n) * 8) })
+          else if (ctl === 'decay') V('signal', { decay: clamp01(n) })
+          else if (ctl === 'tone') V('signal', { tone: clamp01(n) })
+          else if (ctl === 'fm') V('signal', { fm: clamp01(n) })
+          else if (ctl === 'heads') V('signal', { heads: 1 + Math.round(clamp01(n) * 3) })
+          else if (ctl === 'rate') V('signal', { rate: 0.25 + clamp01(n) * (sg.sync ? 15.75 : 63.75) })
+          else if (ctl === 'sync') V('signal', { sync: n >= 0.5 })
+          else if (ctl === 'steps') V('signal', { steps: [8, 12, 16, 24, 32, 48, 64, 96][Math.round(clamp01(n) * 7)] })
+          else if (ctl === 'spread') V('signal', { spread: clamp01(n) })
+          else if (ctl === 'thresh') V('signal', { thresh: clamp01(n) })
+          else if (ctl === 'density') V('signal', { density: clamp01(n) })
+          else if (ctl === 'path') V('signal', { path: Math.round(clamp01(n) * 3) })
+          else if (ctl === 'snap') V('signal', { snap: clamp01(n) })
+          return
+        }
         case 'raster':
           if (ctl === 'on') V('raster', { on: n >= 0.5 })
           else if (ctl === 'gain') V('raster', { gain: clamp01(n) })
@@ -1056,6 +1081,20 @@ function enumerateLeaves(): Leaf[] {
     addI('/opsia/sonify/events/mode', 0, 2, so.events.mode === 'blend' ? 2 : so.events.mode === 'motion' ? 1 : 0, 'Events trigger : 0 spatial · 1 motion · 2 blend')
     add('/opsia/sonify/events/density', 0, 1, so.events.density, 'Events per instant')
     add('/opsia/sonify/events/decay', 0, 1, so.events.decay, 'Event note decay')
+    add('/opsia/sonify/signal/on', 0, 1, so.signal.on ? 1 : 0, 'Signal voice on')
+    add('/opsia/sonify/signal/gain', 0, 1, so.signal.gain, 'Signal gain')
+    addI('/opsia/sonify/signal/wave', 0, 8, so.signal.wave, 'Signal grain : 0 pip · 1 damped · 2 noise · 3 click · 4 fm · 5 square · 6 tri · 7 pink · 8 ping')
+    add('/opsia/sonify/signal/decay', 0, 1, so.signal.decay, 'Signal grain length, 0.2 ms to 500 ms')
+    add('/opsia/sonify/signal/tone', 0, 1, so.signal.tone, 'Signal noise brightness')
+    add('/opsia/sonify/signal/fm', 0, 1, so.signal.fm, 'Signal fm depth')
+    addI('/opsia/sonify/signal/heads', 1, 4, so.signal.heads, 'Signal read heads')
+    add('/opsia/sonify/signal/rate', 0, 1, (so.signal.rate - 0.25) / (so.signal.sync ? 15.75 : 63.75), 'Signal steps per second, or per beat when synced')
+    add('/opsia/sonify/signal/sync', 0, 1, so.signal.sync ? 1 : 0, 'Signal clock locked to the tempo')
+    add('/opsia/sonify/signal/spread', 0, 1, so.signal.spread, 'Signal polymeter between the heads')
+    add('/opsia/sonify/signal/thresh', 0, 1, so.signal.thresh, 'Signal : how bright a cell must be to fire')
+    add('/opsia/sonify/signal/density', 0, 1, so.signal.density, 'Signal marks per head per step')
+    addI('/opsia/sonify/signal/path', 0, 3, so.signal.path, 'Signal path : 0 horizontal · 1 vertical · 2 radial · 3 spiral')
+    add('/opsia/sonify/signal/snap', 0, 1, so.signal.snap, 'Signal pitch : free frequency (0) to the scale (1)')
     add('/opsia/sonify/raster/on', 0, 1, so.raster.on ? 1 : 0, 'Raster voice on')
     add('/opsia/sonify/raster/gain', 0, 1, so.raster.gain, 'Raster gain')
     add('/opsia/sonify/raster/x', 0, 1, norm('rasterX', so.raster.rx), 'Raster rect x')

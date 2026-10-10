@@ -8,6 +8,7 @@
 //   line-work / lattices        → SPECTRA       (a spectrogram wants lines)
 //   scan / broadcast register   → TRANSMISSION  (line-sequential is its shape)
 //   smooth atmosphere / fields  → FILTER        (the frame as a band EQ)
+//   machine marks / grids / data → SIGNAL       (a scan that reads bits)
 //
 // The top 2 (3 when the third is close) voices switch on with sensible params;
 // the strongest voice listens to the LAYER that earned it (tap B) when more
@@ -17,7 +18,7 @@
 import type { CompositionState, FxInstance, SourceSlot } from '@shared/types'
 import type { SoniConfig } from './sonify'
 
-type Voice = 'raster' | 'flow' | 'orbit' | 'spectra' | 'sstv' | 'filter' | 'events' | 'chord'
+type Voice = 'raster' | 'flow' | 'orbit' | 'spectra' | 'sstv' | 'filter' | 'events' | 'chord' | 'signal'
 
 // Register tables : shader/node id → (voice, weight). Weights are taste.
 const AFFINITY: Array<[RegExp, Voice, number]> = [
@@ -46,7 +47,14 @@ const AFFINITY: Array<[RegExp, Voice, number]> = [
   // sustained harmonic wash / drones / accumulation → Chord (a scale-tuned bank
   // that swells with the brightness bands — sings even on a still frame).
   [/^(swell|membrane|dye-field|drift-field|erosion)$/, 'chord', 2],
-  [/^(congeal|node-sediment|node-eternalism|node-afterimage|recurse|sync-osc)$/, 'chord', 2]
+  [/^(congeal|node-sediment|node-eternalism|node-afterimage|recurse|sync-osc)$/, 'chord', 2],
+  // machine marks / grids / data → Signal (scan heads that read the picture as
+  // bits). Lowercase leads at 4 : the two were made as a pair, its marks ARE
+  // the trigger pattern this voice reads. The rest are secondary, at 2, so
+  // they color a set rather than demote its anchor.
+  [/^(lowercase)$/, 'signal', 4],
+  [/^(ten-print|grid-drift|slabs|shapes|op-art|column-scan)$/, 'signal', 2],
+  [/^(fx-pixelmask|fx-threshold|fx-dither|fx-posterize|fx-pixelate)$/, 'signal', 2]
 ]
 
 function scoreId(id: string | null | undefined, into: Map<Voice, number>, weightMul = 1): void {
@@ -110,7 +118,7 @@ export function suggestSonify(c: CompositionState, cur: SoniConfig): SoniConfig 
   rack(c.master.filter((f) => !f.locked), total, 0.5)
 
   // Rank; always have something to say (a quiet scene defaults to Spectra+Filter).
-  const ranked = (['spectra', 'orbit', 'flow', 'raster', 'sstv', 'filter', 'events', 'chord'] as Voice[])
+  const ranked = (['spectra', 'orbit', 'flow', 'raster', 'sstv', 'filter', 'events', 'signal', 'chord'] as Voice[])
     .map((v) => ({ v, w: total.get(v) ?? 0 }))
     .sort((a, b) => b.w - a.w)
   const chosen = new Set<Voice>()
@@ -123,7 +131,7 @@ export function suggestSonify(c: CompositionState, cur: SoniConfig): SoniConfig 
   }
   // Flow and Events need MOTION : a set of only those is silent on a still shot
   // or a paused film. Add the best-ranked voice that sings on any frame.
-  const stillOk: Voice[] = ['spectra', 'orbit', 'raster', 'sstv', 'filter', 'chord']
+  const stillOk: Voice[] = ['spectra', 'orbit', 'raster', 'sstv', 'filter', 'chord', 'signal']
   if (![...chosen].some((v) => stillOk.includes(v))) {
     chosen.add((ranked.find((r) => stillOk.includes(r.v) && r.w > 0) ?? { v: 'spectra' as Voice }).v)
   }
@@ -174,7 +182,7 @@ const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(rnd() * arr.length)]
  *  the dice re-voices the instrument, it never blasts or silences it. */
 // Per-voice parameter randomizers (character only — `on`/`tap` set by the caller).
 // Shared by the whole-instrument dice and the per-voice dice.
-export type SoniVoiceKey = 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage'
+export type SoniVoiceKey = 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'signal'
 const R_PARAMS: Record<SoniVoiceKey, (c: SoniConfig) => Record<string, unknown>> = {
   spectra: (c) => ({ ...c.spectra, quantize: rnd() < 0.85, sweepOn: rnd() < 0.75, sync: rnd() < 0.3, sweepHz: rr(0.06, 0.8), x: rr(0.2, 0.8), path: pick([0, 0, 0, 1, 2, 3]), pace: rnd() < 0.4 ? rr(0.2, 0.8) : 0, gamma: rr(1.2, 2.6), breath: rnd() < 0.4 ? rr(0.2, 0.7) : 0, loOct: pick([1, 2, 2, 3]), hiOct: pick([6, 7, 7, 8]) }),
   orbit: (c) => ({ ...c.orbit, quantize: rnd() < 0.85, note: 33 + Math.floor(rnd() * 28), cx: rr(0.3, 0.7), cy: rr(0.3, 0.7), rx: rr(0.08, 0.35), ry: rr(0.08, 0.35), ratio: pick([1, 2, 1.5, 3]), drive: rr(0.6, 2), smooth: rr(0.2, 0.8) }),
@@ -191,13 +199,25 @@ const R_PARAMS: Record<SoniVoiceKey, (c: SoniConfig) => Record<string, unknown>>
     waves: rnd() < 0.5 ? 0 : rr(0.2, 0.8), wavesRate: rr(0.2, 0.7), noise: rnd() < 0.6 ? 0 : rr(0.1, 0.5), detune: rr(0, 0.4),
     voicing: pick([0, 0, 1, 2, 3, 4])
   }),
+  // Signal : the pip and the struck sine weigh double (the register this voice
+  // is for). Synced, the rate is a musical division of the beat; free, a pace.
+  signal: (c) => {
+    const sync = rnd() < 0.4
+    return {
+      ...c.signal, sync, rate: sync ? pick([1, 2, 3, 4, 6, 8]) : rr(3, 20),
+      wave: pick([0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 8]), decay: rr(0.1, 0.55), tone: rr(0.3, 0.95), fm: rr(0.1, 0.8),
+      heads: pick([1, 2, 2, 3, 4]), steps: pick([8, 12, 16, 16, 24, 32]), spread: rr(0, 1),
+      thresh: rr(0.3, 0.7), density: rr(0.15, 0.6), path: pick([0, 0, 0, 1, 2, 3]),
+      loOct: pick([3, 4, 4, 5]), hiOct: pick([7, 8, 8, 9]), snap: pick([1, 1, 0.5, 0])
+    }
+  },
   chord: (c) => ({ ...c.chord, voices: 3 + Math.floor(rnd() * 8), loOct: pick([1, 2, 2, 3]), hiOct: pick([5, 6, 6, 7]), gamma: rr(1.2, 2.4), spread: rr(0.3, 0.9), attack: rr(0.1, 1.2), release: rr(0.3, 2), tone: rr(0, 0.6), waves: rnd() < 0.5 ? 0 : rr(0.1, 0.5), wavesRate: rr(0.15, 0.6) })
 }
 
 /** Randomize the whole Sonify instrument : pick 2–3 voices, re-roll their params,
  *  a key/scale/octave, and maybe an FX tail. `on`/`sinkId` are kept by the caller. */
 export function randomSonify(cur: SoniConfig): SoniConfig {
-  const all: SoniVoiceKey[] = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord']
+  const all: SoniVoiceKey[] = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'signal', 'chord']
   const bag = [...all]
   for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1));[bag[i], bag[j]] = [bag[j], bag[i]] }
   const chosen = new Set(bag.slice(0, rnd() < 0.4 ? 3 : 2))
@@ -220,6 +240,7 @@ export function randomSonify(cur: SoniConfig): SoniConfig {
     raster: V('raster') as SoniConfig['raster'],
     sstv: V('sstv') as SoniConfig['sstv'],
     filter: V('filter') as SoniConfig['filter'],
+    signal: V('signal') as SoniConfig['signal'],
     chord: V('chord') as SoniConfig['chord'],
     fx: rnd() < 0.5
       ? { ...cur.fx, send: rr(0.2, 0.5), rvMode: pick([0, 1]), rvSize: rr(0.4, 0.85), rvDecay: rr(0.4, 0.8), dlyTime: rr(0.1, 0.6), dlyFb: rr(0.2, 0.5), dlyMode: pick([0, 1, 2]) }

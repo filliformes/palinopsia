@@ -952,6 +952,18 @@ export const SONIFY_MOD_DESCS: Record<string, { min: number; max: number; def: n
   flowDur: { min: 0.02, max: 0.4, def: 0.09 },
   flowColour: { min: 0, max: 1, def: 0.6 },
   eventsDecay: { min: 0, max: 1, def: 0.35 },
+  // Signal : the synth (decay, tone, fm) AND the scan (rate, spread, thresh,
+  // density, snap). The scan runs on the main thread and reads these through
+  // sonifyModValues, so all eight move the sound, unlike a detector that reads
+  // only its base config.
+  signalDecay: { min: 0, max: 1, def: 0.3 },
+  signalTone: { min: 0, max: 1, def: 0.6 },
+  signalFm: { min: 0, max: 1, def: 0.4 },
+  signalRate: { min: 0.25, max: 64, def: 8 },
+  signalSpread: { min: 0, max: 1, def: 0.5 },
+  signalThresh: { min: 0, max: 1, def: 0.5 },
+  signalDensity: { min: 0, max: 1, def: 0.35 },
+  signalSnap: { min: 0, max: 1, def: 1 },
   rasterSmooth: { min: 0, max: 1, def: 0 },
   rasterTone: { min: 0, max: 1, def: 0.6 },
   sstvLine: { min: 1, max: 60, def: 12 },
