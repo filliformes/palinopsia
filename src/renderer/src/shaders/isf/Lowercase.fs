@@ -1,0 +1,249 @@
+/*{
+  "DESCRIPTION": "Lowercase : machine-cut marks on a stepped clock. Hard rectangles, bars, ticks and sprocket ladders land on a step and hold, never sweep : the picture changes between frames and is still in between. FIGURE picks the vocabulary, from a dense data matrix down to one white slab with bars cut out of it. It carries its own clock (RATE, divided by STEP), so it pulses the moment you pick it; bind GATE to a Euclid, a Spastic or an audio transient and it plays that rhythm instead. HOLD is how many steps a deal survives, JUMP how far it moves when it re-deals, SHEAR knocks rows sideways, FLIP inverts the whole frame for one step. SMEAR leaves the previous step trailing behind, the way a filmed projection does. ACCENT marks a regular lattice of cells in its own color, so it reads as meaning and not as noise. Flat and hard-edged, never radial, never a gradient.",
+  "CREDIT": "Palinopsia",
+  "ISFVSN": "2",
+  "CATEGORIES": ["Generator", "Geometry"],
+  "INPUTS": [
+    { "NAME": "figure",  "TYPE": "long", "VALUES": [0, 1, 2, 3, 4, 5, 6, 7], "LABELS": ["matrix", "blocks", "bars", "ticks", "rule", "grid", "ladder", "slab"], "DEFAULT": 0 },
+    { "NAME": "cells",   "TYPE": "float", "MIN": 3.0,  "MAX": 64.0,  "DEFAULT": 14.0, "LABEL": "cells" },
+    { "NAME": "density", "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.55, "LABEL": "density" },
+    { "NAME": "split",   "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.6,  "LABEL": "split" },
+    { "NAME": "rate",    "TYPE": "float", "MIN": 0.0,  "MAX": 24.0,  "DEFAULT": 6.0,  "LABEL": "rate" },
+    { "NAME": "quant",   "TYPE": "float", "MIN": 1.0,  "MAX": 16.0,  "DEFAULT": 1.0,  "LABEL": "step" },
+    { "NAME": "gate",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 1.0,  "LABEL": "gate" },
+    { "NAME": "hold",    "TYPE": "float", "MIN": 1.0,  "MAX": 8.0,   "DEFAULT": 1.0,  "LABEL": "hold" },
+    { "NAME": "jump",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.35, "LABEL": "jump" },
+    { "NAME": "shear",   "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.0,  "LABEL": "shear" },
+    { "NAME": "flip",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.0,  "LABEL": "flip" },
+    { "NAME": "smear",   "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.25, "LABEL": "smear" },
+    { "NAME": "halo",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.18, "LABEL": "halation" },
+    { "NAME": "accentAmt", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0,  "LABEL": "accent" },
+    { "NAME": "accentEvery", "TYPE": "float", "MIN": 2.0, "MAX": 16.0, "DEFAULT": 5.0, "LABEL": "accent every" },
+    { "NAME": "seed",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.0,  "LABEL": "seed" },
+    { "NAME": "audio",   "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.0,  "LABEL": "audio gate" },
+    { "NAME": "ink",     "TYPE": "color", "DEFAULT": [0.92, 0.95, 0.94, 1.0] },
+    { "NAME": "accent",  "TYPE": "color", "DEFAULT": [0.95, 0.22, 0.10, 1.0] },
+    { "NAME": "ground",  "TYPE": "color", "DEFAULT": [0.03, 0.03, 0.035, 1.0] },
+    { "NAME": "audioTex", "TYPE": "image" }
+  ]
+}*/
+
+// The clock is an INTEGRATED phase, not TIME * rate : turning rate mid-show
+// changes the pace from here on instead of flinging the picture (authoring
+// rules §1). `quant` divides it into coarser steps without touching the phase,
+// so a step division stays a clean ratio of the same clock.
+uniform float PH_rate;
+
+float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+
+// A hard-edged rectangle, anti-aliased over `e` and never thinner than a pixel.
+// A sub-pixel mark breaks into dashes and shimmers at 1080p, which reads as a
+// broken shader rather than a fast one (§3). `e` is also the halation knob :
+// widen it and the same rectangle grows a soft skirt instead of a hard edge.
+float rectCov(vec2 q, vec2 hw, float e) {
+  vec2 d = abs(q) - max(hw, vec2(e * 0.5));
+  float o = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+  return 1.0 - smoothstep(-e, e, o);
+}
+
+// One deal of one figure. `S` is the step index, so the same function draws the
+// PREVIOUS step for the smear with no buffer to keep : the figure is a pure
+// function of its step, which is what makes a stateless trail possible.
+// `soft` scales the edge width, which is how halation is sampled (one extra
+// call with a fat edge) rather than by blurring a buffer.
+float figureCov(vec2 q, float aspect, float S, float px, float dens, int fig, float soft, out float isAcc) {
+  isAcc = 0.0;
+  float hand = floor(seed * 997.0);
+  // Every hash input stays floored and under ~1e4 (§2) : S is wrapped by the
+  // caller, `hand` is a small integer, cell indices are bounded by `cells`.
+  float n = max(3.0, floor(cells + 0.5));
+  float pxc = n * px;      // one pixel, in cell units
+  float e = pxc * soft;    // the anti-aliased edge, widened for halation
+  float eq = px * soft;    // the same, in frame-height units
+
+  // SHEAR knocks whole ROWS sideways. Per row, not per pixel, or it stops being
+  // a structural fault and becomes a blur.
+  float row0 = floor(q.y * n);
+  float sh = (hash12(vec2(row0, floor(S * 0.5) + hand + 71.0)) - 0.5) * shear * 2.0;
+  vec2 qs = vec2(q.x + sh, q.y);
+
+  // JUMP re-places the whole field on each deal rather than re-rolling it in
+  // place : at 0 the lattice breathes, at 1 the frame is dealt again.
+  vec2 off = (vec2(hash12(vec2(S, hand + 11.0)), hash12(vec2(S, hand + 29.0))) - 0.5) * jump;
+
+  vec2 g = (qs + off) * n;
+  vec2 ci = floor(g);
+  vec2 f = fract(g) - 0.5;
+
+  // Per-cell gate. AUDIO GATE leans each cell toward the spectrum band at its
+  // own column (bass at the left), so cells answer the sound where they stand
+  // rather than all pulsing together (§5).
+  vec2 ac = vec2(clamp(qs.x / aspect, 0.0, 1.0), 0.75);
+  float band = IMG_NORM_PIXEL(audioTex, ac).r;
+  float g1 = clamp(mix(dens, band, audio), 0.0, 1.0);
+  float lit = step(1.0 - g1, hash12(ci + vec2(floor(S * 0.37) + hand, hand + 3.0)));
+
+  // ACCENT rides a REGULAR lattice, not a sprinkle. A random scatter of color
+  // reads as noise; a periodic one reads as meaning, which is the whole point
+  // of keeping to a single accent.
+  // The lattice is periodic in BOTH axes, so it marks one cell in per² rather
+  // than one in per. Measured against the references : a combined index hit 20%
+  // of cells at per 5 and the frame turned into confetti; they carry nearer 5%.
+  float per = max(2.0, floor(accentEvery + 0.5));
+  float accHit = step(mod(ci.x + floor(S * 0.25), per), 0.5)
+               * step(mod(ci.y + floor(S * 0.17), per), 0.5);
+  isAcc = accHit * lit;
+
+  float cov = 0.0;
+
+  if (fig == 0) {
+    // MATRIX : the signature. Each lit cell carries one to three NARROW bars.
+    // The subdivision is what makes the field read as data instead of a
+    // checkerboard, and it is the thing the references have that a plain grid
+    // of squares does not.
+    float nb = 1.0 + floor(hash12(ci + vec2(hand + 5.0, floor(S * 0.11))) * 3.0 * split);
+    float bf = fract((f.x + 0.5) * nb) - 0.5;
+    cov = rectCov(vec2(bf / nb, f.y), vec2(0.30 / nb, 0.26), e) * lit;
+  } else if (fig == 1) {
+    // BLOCKS : the cell filled whole, with a margin so the lattice breathes.
+    cov = rectCov(f, vec2(0.33, 0.33), e) * lit;
+  } else if (fig == 2) {
+    // BARS : full-height columns on quantized widths. Rows play no part here.
+    float col = floor(qs.x * n);
+    float lx = fract(qs.x * n) - 0.5;
+    float onc = step(1.0 - g1, hash12(vec2(col, floor(S * 0.41) + hand)));
+    float w = 0.12 + 0.30 * hash12(vec2(col + 7.0, hand + floor(S * 0.13)));
+    cov = (1.0 - smoothstep(w - e, w + e, abs(lx))) * onc;
+    // BARS has no row index, so its lattice is one-dimensional : the period is
+    // squared here to keep an accent as rare as it is in the other figures.
+    isAcc = step(mod(col + floor(S * 0.25), per * per), 0.5) * onc;
+  } else if (fig == 3) {
+    // TICKS : short dashes, mostly empty frame. The density is deliberately
+    // scaled down : this figure is about what is NOT there.
+    float sparse = step(1.0 - g1 * 0.35, hash12(ci + vec2(floor(S * 0.29) + hand, 17.0)));
+    cov = rectCov(f, vec2(0.34, 0.055), e) * sparse;
+    isAcc *= sparse;
+  } else if (fig == 4) {
+    // RULE : one or two full-width hairlines at stepped heights. The scan bar.
+    // Width is floored at a pixel and measured in height units, never in
+    // scanlines : a one-pixel rule moires through every later resample (§3).
+    float k = 0.0;
+    for (int i = 0; i < 2; i++) {
+      float fi = float(i);
+      float on2 = step(fi, 0.5 + split); // the second rule only above split 0.5
+      float on3 = step(1.0 - g1, hash12(vec2(S + fi * 31.0, hand + 57.0)));
+      float y = floor(hash12(vec2(S + fi * 31.0, hand + 13.0)) * n) / n + 0.5 / n;
+      float w = max(0.9 * px, 0.004 + 0.010 * split);
+      k = max(k, (1.0 - smoothstep(w - eq, w + eq, abs(qs.y - y))) * on2 * on3);
+    }
+    cov = k;
+  } else if (fig == 5) {
+    // GRID : the thin lattice, with segments dropping out. Lines are measured
+    // in HEIGHT units so the mesh stays square at any aspect (§3).
+    float w = max(1.2 * pxc, 0.02 + 0.05 * split);
+    float lx = 1.0 - smoothstep(w - e, w + e, abs(f.x));
+    float ly = 1.0 - smoothstep(w - e, w + e, abs(f.y));
+    float keepX = step(1.0 - g1, hash12(ci + vec2(hand + 2.0, floor(S * 0.19))));
+    float keepY = step(1.0 - g1, hash12(ci + vec2(floor(S * 0.23), hand + 8.0)));
+    cov = max(lx * keepX, ly * keepY);
+  } else if (fig == 6) {
+    // LADDER : sprocket and optical-track columns down the edges, the middle
+    // left almost empty. The columns sit at fixed fractions of the WIDTH so
+    // they stay at the edges whatever the aspect.
+    float u = qs.x / aspect;
+    float k = 0.0;
+    float rows = n * 1.6;
+    for (int i = 0; i < 4; i++) {
+      float fi = float(i);
+      float cu = fi < 2.0 ? 0.045 + fi * 0.075 : 0.880 + (fi - 2.0) * 0.075;
+      float cx = cu * aspect;
+      float ri = floor(qs.y * rows);
+      float rf = (fract(qs.y * rows) - 0.5) / rows;
+      float onr = step(0.18, hash12(vec2(ri, floor(cu * 37.0) + hand + floor(S * 0.07))));
+      k = max(k, rectCov(vec2(qs.x - cx, rf), vec2(0.016, 0.010), eq) * onr);
+    }
+    // A few dashes adrift in the dark middle.
+    float mid = step(0.18, u) * step(u, 0.86);
+    float sparse = step(1.0 - g1 * 0.12, hash12(ci + vec2(floor(S * 0.31) + hand, 23.0)));
+    k = max(k, rectCov(f, vec2(0.30, 0.045), e) * sparse * mid);
+    cov = k;
+    isAcc *= mid;
+  } else {
+    // SLAB : one white field with bars cut OUT of it. The only inverted figure,
+    // and the only one where the ink is the ground.
+    vec2 c = vec2(qs.x - aspect * 0.5, qs.y - 0.5);
+    float hwx = 0.21 * aspect + 0.08;
+    float body = rectCov(c, vec2(hwx, 0.30), eq);
+    float nb = 2.0 + floor(hash12(vec2(S, hand + 3.0)) * 3.0 * split);
+    float bf = fract((c.x / hwx * 0.5 + 0.5) * nb) - 0.5;
+    float cut = (1.0 - smoothstep(0.16 - eq, 0.16 + eq, abs(bf))) * step(abs(c.y), 0.24);
+    cov = max(body - cut, 0.0);
+    isAcc = 0.0;
+  }
+
+  return clamp(cov, 0.0, 1.0);
+}
+
+void main() {
+  vec2 uv = isf_FragNormCoord;
+  float aspect = RENDERSIZE.x / RENDERSIZE.y;
+  vec2 q = vec2(uv.x * aspect, uv.y);
+  float px = 1.0 / RENDERSIZE.y;
+
+  // The stepped clock. Wrapped before it ever reaches a hash : a step index that
+  // grows all night lands in float32's gaps and the field freezes into stripes
+  // (§1, §2). 32749 is prime, so the wrap does not beat against the divisions.
+  float qn = max(1.0, floor(quant + 0.5));
+  float S = mod(floor(PH_rate / qn), 32749.0);
+  // HOLD keeps one deal alive for several steps, which is what turns a strobe
+  // into a stutter against the same clock.
+  float Sh = floor(S / max(1.0, floor(hold + 0.5)));
+
+  float dens = clamp(density * clamp(gate, 0.0, 1.0), 0.0, 1.0);
+  int fig = int(figure);
+
+  float accNow = 0.0;
+  float cov = figureCov(q, aspect, Sh, px, dens, fig, 1.0, accNow);
+
+  // SMEAR : the PREVIOUS deal, trailing behind and dimmed. A filmed projection
+  // trails its moving cells, and that trail is half of why the references read
+  // as photographed rather than rendered. Three taps rather than a persistent
+  // buffer : the figure is a pure function of its step, so the past is simply
+  // recomputed, which costs no 8-bit decay and no multipass frame of lag (§4).
+  if (smear > 0.001) {
+    float t = 0.0;
+    float accPrev = 0.0;
+    for (int i = 1; i <= 3; i++) {
+      float fi = float(i);
+      float a2 = 0.0;
+      vec2 qo = vec2(q.x + fi * 0.012 * smear, q.y);
+      t = max(t, figureCov(qo, aspect, Sh - 1.0, px, dens, fig, 1.0, a2) * (1.0 - fi / 4.0));
+      accPrev = max(accPrev, a2);
+    }
+    float ghost = t * smear * 0.55 * (1.0 - cov);
+    accNow = max(accNow, accPrev * step(0.02, ghost));
+    cov = max(cov, ghost);
+  }
+
+  // HALATION : the same figure re-read with a FAT edge, kept only where the
+  // hard mark is not. So it widens a mark that exists and can never light empty
+  // frame, which is the line between film halation and the additive glow on
+  // black the brief warns off.
+  if (halo > 0.001) {
+    float aH = 0.0;
+    float wide = figureCov(q, aspect, Sh, px, dens, fig, 1.0 + 14.0 * halo, aH);
+    cov = clamp(cov + max(wide - cov, 0.0) * halo * 0.5, 0.0, 1.0);
+  }
+
+  // FLIP : the whole frame inverts for the length of one step. The Ikeda flash,
+  // and the one control here that can strobe, so its curated dice range is kept
+  // shallow and the app's own flash limiter still sits downstream.
+  float fl = step(1.0 - flip, hash12(vec2(Sh, 613.0)));
+  cov = mix(cov, 1.0 - cov, fl);
+
+  vec3 inkCol = mix(ink.rgb, accent.rgb, clamp(accNow * accentAmt, 0.0, 1.0));
+  // Straight alpha (§6). With the ground's own alpha at 0 the marks composite
+  // over the layers below; at 1 it is the filmed-on-black ground of the
+  // references. Never premultiplied, or every mark gets a dark fringe.
+  gl_FragColor = vec4(mix(ground.rgb, inkCol, cov), mix(ground.a, 1.0, cov));
+}

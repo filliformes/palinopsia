@@ -3,6 +3,25 @@
 All notable changes to Palinopsia. Dates are ISO. Versions follow the `v*` tags
 that CI builds into cross-platform releases.
 
+## Unreleased
+
+### Added
+
+- **Lowercase**, a new source : machine-cut marks on a stepped clock. Eight figures, from
+  a dense data matrix whose cells subdivide into one to three narrow bars, through blocks,
+  columns, ticks, a scan rule and a thin lattice, to sprocket ladders down the frame edges
+  and a single white slab with bars cut out of it. Everything lands on a step and holds,
+  so the picture changes between frames and is still in between, which is what separates
+  it from the optical fields of Op-Art and the hand-made edges of Direct Marks. It carries
+  its own divided clock, so it pulses the moment you pick it, and its gate is a modulation
+  target, so a Euclid, a Spastic or an audio transient plays it instead. HOLD, JUMP, SHEAR
+  and FLIP decide how it reacts; SMEAR recomputes the previous step and trails it behind,
+  the way a filmed projection does, with no buffer to keep. A single accent color marks a
+  regular lattice of cells (one in a period squared, so it reads as meaning rather than as
+  confetti). Flat, hard-edged, never radial. Measured at 7.5 ms for a 4K frame, against
+  4.1 for Direct Marks, and holding its structure with no lattice or banding at 24 hours
+  of show time.
+
 ## v1.2.1 — 2026-10-09
 
 ### Fixed

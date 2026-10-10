@@ -1013,6 +1013,18 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Tight grid', values: { mode: 1, scale: 48, warp: 0.3, rate: 0.2, angle: 0, contrast: 1.0, tint: [0.92, 0.92, 0.9, 1], audio: 0 } }
   ],
   // ── Cameraless / direct-film sources (film marks and dye) ──
+  'lowercase': [
+    { name: 'Data matrix', values: { figure: 0, cells: 20, density: 0.6, split: 0.8, rate: 6, quant: 1, gate: 1, hold: 1, jump: 0.3, shear: 0, flip: 0, smear: 0.25, halo: 0.18, accentAmt: 0, accentEvery: 5, seed: 0, audio: 0 } },
+    { name: 'Slow read', values: { figure: 0, cells: 12, density: 0.35, split: 0.5, rate: 2, quant: 2, gate: 1, hold: 2, jump: 0.15, shear: 0, flip: 0, smear: 0.15, halo: 0.22, accentAmt: 0, accentEvery: 5, seed: 0.21, audio: 0 } },
+    { name: 'Accent lattice', values: { figure: 0, cells: 18, density: 0.6, split: 0.7, rate: 5, quant: 1, gate: 1, hold: 1, jump: 0.25, shear: 0, flip: 0, smear: 0.3, halo: 0.2, accentAmt: 0.85, accentEvery: 5, seed: 0, audio: 0 } },
+    { name: 'Stutter', values: { figure: 1, cells: 10, density: 0.5, split: 0, rate: 12, quant: 1, gate: 1, hold: 4, jump: 0.6, shear: 0.2, flip: 0.06, smear: 0.4, halo: 0.15, accentAmt: 0, accentEvery: 5, seed: 0.5, audio: 0 } },
+    { name: 'Columns', values: { figure: 2, cells: 16, density: 0.45, split: 0.4, rate: 4, quant: 1, gate: 1, hold: 1, jump: 0.2, shear: 0, flip: 0, smear: 0.2, halo: 0.18, accentAmt: 0.3, accentEvery: 6, seed: 0, audio: 0 } },
+    { name: 'Ticks adrift', values: { figure: 3, cells: 14, density: 0.5, split: 0.3, rate: 3, quant: 2, gate: 1, hold: 2, jump: 0.5, shear: 0, flip: 0, smear: 0.2, halo: 0.25, accentAmt: 0, accentEvery: 7, seed: 0.77, audio: 0 } },
+    { name: 'Scan rule', values: { figure: 4, cells: 24, density: 0.9, split: 0.7, rate: 8, quant: 1, gate: 1, hold: 1, jump: 0, shear: 0, flip: 0, smear: 0.45, halo: 0.3, accentAmt: 0, accentEvery: 5, seed: 0, audio: 0 } },
+    { name: 'Lattice', values: { figure: 5, cells: 18, density: 0.7, split: 0.25, rate: 2.5, quant: 2, gate: 1, hold: 2, jump: 0.1, shear: 0, flip: 0, smear: 0.1, halo: 0.12, accentAmt: 0, accentEvery: 5, seed: 0.33, audio: 0 } },
+    { name: 'Film edge', values: { figure: 6, cells: 16, density: 0.5, split: 0.5, rate: 5, quant: 1, gate: 1, hold: 1, jump: 0.2, shear: 0, flip: 0, smear: 0.3, halo: 0.22, accentAmt: 0, accentEvery: 5, seed: 0, audio: 0 } },
+    { name: 'One slab', values: { figure: 7, cells: 14, density: 0.6, split: 0.6, rate: 1.5, quant: 3, gate: 1, hold: 2, jump: 0, shear: 0, flip: 0, smear: 0.1, halo: 0.1, accentAmt: 0, accentEvery: 5, seed: 0, audio: 0 } }
+  ],
   'direct-marks': [
     { name: 'Ruled lines', values: { markType: 0, density: 20, weight: 0.28, gate: 1, jitter: 0.25, rate: 1.2, angle: 0, boil: 0, fps: 12, seed: 0, audio: 0 } },
     { name: 'Fine rules', values: { markType: 0, density: 48, weight: 0.12, gate: 1, jitter: 0.15, rate: 0.8, angle: 0.1, boil: 0, fps: 12, seed: 0, audio: 0 } },

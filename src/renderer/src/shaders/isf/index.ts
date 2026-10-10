@@ -32,6 +32,7 @@ import recurse from './Recurse.fs?raw'
 import shapes from './Shapes.fs?raw'
 import opArt from './OpArt.fs?raw'
 import directMarks from './DirectMarks.fs?raw'
+import lowercase from './Lowercase.fs?raw'
 import dyeField from './DyeField.fs?raw'
 import colony from './Colony.fs?raw'
 import ground from './Ground.fs?raw'
@@ -1100,6 +1101,21 @@ export const GENERATORS: IsfShader[] = [
     category: 'Generator',
     source: directMarks,
     curated: { density: [8, 60], weight: [0.1, 0.42], gate: [0.35, 1], jitter: [0.1, 0.6], rate: [0.3, 4], angle: [0, 3.14], boil: [0, 0.5], fps: [6, 18], seed: [0, 1], audio: [0, 0.4] }
+  },
+  {
+    // Machine-cut marks on a stepped clock, filmed rather than displayed. `flip` is the only control here that can strobe, so its
+    // curated range stops well short of its legal max (the dice must never hand
+    // anyone a seizure risk; the app's flash limiter is the second line).
+    id: 'lowercase',
+    name: 'Lowercase',
+    category: 'Generator',
+    source: lowercase,
+    curated: {
+      cells: [6, 36], density: [0.25, 0.8], split: [0.2, 1], rate: [1.5, 14],
+      quant: [1, 6], gate: [0.6, 1], hold: [1, 4], jump: [0, 0.7],
+      shear: [0, 0.35], flip: [0, 0.12], smear: [0, 0.5], halo: [0.05, 0.4],
+      accentAmt: [0, 0.6], accentEvery: [3, 9], seed: [0, 1], audio: [0, 0.4]
+    }
   },
   {
     id: 'dye-field',

@@ -101,6 +101,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   contour: ['contour', 'topographic', 'lines', 'noise', 'matte', 'map', 'audio'],
   differential: ['polyrhythm', 'oscillator', 'waves', 'harmonograph', 'geometry', 'contour'],
   'direct-marks': ['film', 'scratches', 'marks', 'ink', 'hand-drawn', 'cameraless'],
+  'lowercase': ['data', 'grid', 'strobe', 'minimal', 'barcode', 'sprocket', 'rhythm', 'black and white'],
   'drift-field': ['flow', 'noise', 'bands', 'drift', 'matte'],
   'dye-field': ['paint', 'dye', 'ink', 'pigment', 'organic'],
   erosion: ['erosion', 'streaks', 'noise', 'geological', 'flow'],
