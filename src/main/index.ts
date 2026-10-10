@@ -971,6 +971,11 @@ app.whenReady().then(async () => {
 
   // ---------- IPC: Kiosk / installation mode ----------
   safeHandle('kiosk:config', () => getKioskConfig())
+  // The LIVE state, which 'kiosk:config' is not : that reports the stored
+  // setting, which stays on after an exit-kiosk and is still on while a normal
+  // window is open. The output window's escape keys have to know which of the
+  // two it is (hold to end a show, tap to close a window), so it asks this.
+  safeHandle('kiosk:active', () => kioskActive())
   safeHandle('kiosk:getLaunch', () => readKioskFile())
   safeHandle('kiosk:setLaunch', async (_e, cfg) => {
     try {

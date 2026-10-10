@@ -20,21 +20,50 @@ export function OutputView(): JSX.Element {
   // control window : preventDefault on `lost`, rebuild on `restored`).
   const [glEpoch, setGlEpoch] = useState(0)
 
-  // Installation escape hatch : the fullscreen output usually holds focus, so a
-  // borderless kiosk boot that comes up black (or on the wrong display) is a trap
-  // with no titlebar and the operator window behind. Esc or O breaks out : main
-  // closes this window and brings the operator UI back. (Ctrl+Shift+O is the
-  // global backstop registered in main for when focus is elsewhere.) Gated to a
-  // real kiosk launch so a normal fullscreen output keeps its keys inert.
-  // HELD for 1.5 s : a key brushed by a visitor (or a cat) no longer ends the
-  // installation.
+  // What this window says, for one second, about getting out of it. Null once
+  // it has been said.
+  const [hint, setHint] = useState<string | null>(null)
+
+  // Escape hatch. The output usually holds focus, and it is borderless : no
+  // titlebar, no close button, and the operator window behind it. On one display
+  // it covers the only UI that could dismiss it, so this window has to answer
+  // for itself. Two behaviors, because the stakes differ:
+  //
+  //   · an INSTALLATION (kiosk) : Esc or O HELD for 1.5 s, so a key brushed by a
+  //     visitor (or a cat) cannot end the show. Ctrl/Cmd+Shift+O is the global
+  //     backstop in main for when focus is elsewhere.
+  //   · a plain fullscreen output : Esc at a tap closes it. There is no show to
+  //     protect, nothing is lost by closing, and it reopens from the same button
+  //     that opened it. Holding a key with no feedback reads exactly like a dead
+  //     keyboard, which is how this window used to strand people : the handler
+  //     was armed only for an installation, so Esc did nothing at all here.
+  //
+  // `kioskConfig().kiosk` is the SETTING, which stays on after an exit-kiosk, so
+  // the live state decides : a window opened after breaking out of an
+  // installation takes the tap, not the hold.
   useEffect(() => {
-    let armed = false
+    let armed: boolean | null = null
     let hold = 0
-    window.api.kioskConfig().then((k) => { armed = !!k?.kiosk }).catch(() => {})
+    const mod = window.api.platform === 'darwin' ? 'Cmd' : 'Ctrl'
+    window.api
+      .kioskActive()
+      .then((live) => {
+        armed = !!live
+        setHint(live ? `hold Esc to exit  ·  ${mod}+Shift+O anywhere` : 'Esc to close')
+      })
+      .catch(() => {
+        armed = false
+        setHint('Esc to close')
+      })
     const isExitKey = (e: KeyboardEvent): boolean => e.key === 'Escape' || e.key === 'o' || e.key === 'O'
     const onKey = (e: KeyboardEvent): void => {
-      if (!armed || e.repeat || !isExitKey(e)) return
+      if (armed === null || e.repeat) return
+      if (!armed) {
+        // Esc only : O is the one a sleeve catches, and here it would close at a touch.
+        if (e.key === 'Escape') void window.api.outputClose()
+        return
+      }
+      if (!isExitKey(e)) return
       window.clearTimeout(hold)
       hold = window.setTimeout(() => void window.api.kioskExit(), 1500)
     }
@@ -52,6 +81,15 @@ export function OutputView(): JSX.Element {
       window.removeEventListener('blur', onBlur)
     }
   }, [])
+
+  // One second, then gone for the life of the window : long enough to read six
+  // words, short enough that it is never part of the picture. A projector feed
+  // being filmed or recorded keeps 1 s of text and no more.
+  useEffect(() => {
+    if (hint == null) return
+    const id = window.setTimeout(() => setHint(null), 1000)
+    return () => window.clearTimeout(id)
+  }, [hint])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -134,6 +172,14 @@ export function OutputView(): JSX.Element {
   return (
     <div className="fixed inset-0 bg-black">
       <canvas ref={canvasRef} className="h-full w-full bg-black" />
+      {hint != null && (
+        <div
+          className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-black/60 px-2 py-1 font-mono text-[11px] tracking-wide text-white/70"
+          aria-hidden="true"
+        >
+          {hint}
+        </div>
+      )}
     </div>
   )
 }
