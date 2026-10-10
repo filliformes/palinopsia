@@ -509,8 +509,8 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
 }
 /* A fired action, seen (components/Blink.tsx). One-shot, remounted per fire
    (keyed on a count), so a modulator firing on every beat blinks on every
-   beat. The colour says what kind of action it was : accent2 a Vary (the
-   colour the Vary buttons and every modulated control already wear), accent a
+   beat. The color says what kind of action it was : accent2 a Vary (the
+   color the Vary buttons and every modulated control already wear), accent a
    Randomize (as the dice), text a return to default (neutral : back to plain). */
 .fire-blink {
   position: absolute;
