@@ -7,6 +7,27 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Perspective**, a new effect : the layer laid on a plane in space and seen through a
+  lens. **tilt** / **turn** / **roll** place the plane (up to 80 degrees, where it is
+  almost edge on), **lens** is the focal length from a 9 degree telephoto to an 80 degree
+  wide angle, with the plane kept at the focal distance so it fills the frame at any lens
+  and only the convergence changes; **zoom** and **shift** move it. **bend** (a parabola,
+  flat beyond 2.5 half lengths so a tiled plane stays a halfpipe) and **wave** (a sine
+  that can travel, integrated so turning its rate never jumps the picture) shape it along
+  **bend axis**. **repeat** : once (a card, transparent around it, its edge anti-aliased
+  over one screen pixel at any distance), tile or mirror to the horizon. **travel** /
+  **drift** slide the picture along the plane on integrated clocks, **fog** fades the far
+  side into transparency, **shade** darkens by the true surface normal, **soften** filters
+  over the pixel's footprint (four premultiplied taps along its long side; 0 lets the far
+  side shimmer). A bent or waved surface is found by marching the ray across the band the
+  surface can occupy (24 steps, first crossing kept so folds hide what lies behind) and
+  six halvings; a plain fixed-point solve was tried first and never settled where the
+  surface turns steeply toward a grazing ray (holes in the ribbon, slivers beside it).
+  Measured on the RTX at 4K : 1.0 ms flat, 2.6 ms bent and waved; in the app at 1080p,
+  Lowercase through a waved Perspective 59.9 → 59.8 fps. The dice leans it gently and
+  always tiles (never "once"), so a roll reframes the picture in depth without opening a
+  hole. Ten presets, hints for every control, keywords, a hover blurb.
+
 - **Lowercase : a ninth figure, slant.** Full-height bars that each lean their own way and
   cross into X shapes and fans, dealt on the step and held like every other figure.
   **split** is how far a bar may lean (0 stands them upright, 1 crosses them steeply),

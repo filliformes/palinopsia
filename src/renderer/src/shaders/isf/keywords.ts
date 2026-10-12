@@ -51,6 +51,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   'fx-difference-bloom': ['motion', 'gate', 'difference', 'key', 'trails'],
   'fx-displace': ['displace', 'warp', 'wobble', 'lfo', 'distortion'],
   'fx-distort': ['distort', 'warp', 'ripple', 'swirl', 'bulge', 'pinch'],
+  'fx-perspective': ['perspective', '3d', 'plane', 'floor', 'tilt', 'horizon', 'depth'],
   'fx-dither': ['dither', 'bitcrush', 'retro', 'texture', 'lofi'],
   'fx-edge': ['edge', 'outline', 'highpass', 'filter', 'contour', 'line', 'ink'],
   'fx-feedback-zoom': ['feedback', 'zoom', 'echo', 'tunnel', 'trails'],

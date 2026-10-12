@@ -90,6 +90,26 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     shape: 'NONE = the zoom / pan / rotate frame. Any shape instead clips the layer into that silhouette : zoom, pos and rotate then size, move and spin the shape while the picture stays put.',
     cutout: 'Makes the crop margins and the outside of the shape transparent instead of black, so a circle becomes a picture-in-picture over the layers below.'
   },
+  'fx-perspective': {
+    tilt: 'Leans the plane back so its top recedes into the distance (negative : the bottom recedes). Toward the ends it lies almost flat, a floor seen from just above.',
+    turn: 'Swings the plane sideways so one side runs off toward a vanishing point : a wall seen along its length.',
+    roll: 'Spins the plane in its own surface before it is leaned and turned.',
+    lens: 'From a long telephoto (0 : almost flat, parallel lines stay parallel) to a wide angle (1 : lines converge hard). The plane is kept the same size in the frame whatever the lens.',
+    zoom: 'Brings the plane closer (above 1) or sends it away (below 1).',
+    posX: 'Moves the plane sideways in the frame, which moves its vanishing point with it.',
+    posY: 'Moves the plane up or down in the frame.',
+    axis: 'Which way BEND curls and WAVE ripples : across the width or down the height.',
+    bend: 'Curls the plane along the bend axis : positive brings the edges toward you like a curved screen, negative pushes them away like a page bowed outward.',
+    wave: 'Ripples the plane into a ribbon along the bend axis. At a grazing angle a steep wave folds over itself.',
+    waves: 'How many ripples run across the plane.',
+    waveRate: 'Makes the ripples travel along the plane (negative : the other way).',
+    repeat: 'Once : one card floating in space, transparent around it. Tile : the picture repeats to the horizon. Mirror : it repeats mirrored, so no seam shows.',
+    travel: 'Slides the picture along the plane, toward you or away (negative), like a floor moving under a camera.',
+    drift: 'Slides the picture sideways along the plane.',
+    fog: 'Fades the far side into transparency, so the layers below show through where the plane recedes.',
+    shade: 'Darkens the surface where it turns away from you, so bends and waves read as a shape.',
+    soften: 'Filters the far side, where one pixel covers a lot of the picture, so fine lines crawl less. At 0 the far side shimmers and beats against the screen.'
+  },
   'fx-distort': {
     mode: 'Which warp. Amount and center drive every mode. Scale : all but bulge, pinch and shear. Angle : wave, shear, glass, corrugate, pull and turbulent. Rate (motion) : wave, ripple and turbulent; the others are still.',
     amount: 'Strength of the warp.',

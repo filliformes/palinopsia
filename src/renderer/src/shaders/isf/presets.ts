@@ -1692,6 +1692,18 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Almost fine', values: { band: 0.03, position: 0.06, roll: 0, wobble: 0.01, noise: 0.15, rate: 0.35, freeze: 0, distort: 0.05, bleed: 0.08, bleedRange: 0.5 } },
     { name: 'Full chew', values: { band: 0.4, position: 0.06, roll: 0.2, wobble: 0.2, noise: 1, rate: 0.9, freeze: 0.8, distort: 0.6, bleed: 0.6, bleedRange: 1.6 } }
   ],
+  'fx-perspective': [
+    { name: 'Floor', values: { tilt: 0.55, turn: 0, roll: 0, lens: 0.6, zoom: 1.2, posX: 0, posY: 0, axis: 0, bend: 0, wave: 0, waves: 1.5, waveRate: 0, repeat: 1, travel: 0, drift: 0, fog: 0.35, shade: 0, soften: 0.6 } },
+    { name: 'Corridor wall', values: { tilt: 0, turn: 0.6, roll: 0, lens: 0.7, zoom: 1, posX: -0.2, posY: 0, axis: 0, bend: 0, wave: 0, waves: 1.5, waveRate: 0, repeat: 1, travel: 0, drift: 0, fog: 0.4, shade: 0.2, soften: 0.6 } },
+    { name: 'Ribbon', values: { tilt: 0.1, turn: 0.45, roll: 0, lens: 0.65, zoom: 0.9, posX: 0, posY: 0, axis: 0, bend: 0.15, wave: 0.45, waves: 1.2, waveRate: 0.08, repeat: 0, travel: 0, drift: 0, fog: 0.3, shade: 0.4, soften: 0.6 } },
+    { name: 'Endless road', values: { tilt: 0.75, turn: 0, roll: 0, lens: 0.75, zoom: 1, posX: 0, posY: 0.35, axis: 0, bend: 0, wave: 0, waves: 1.5, waveRate: 0, repeat: 2, travel: 0.12, drift: 0, fog: 0.5, shade: 0, soften: 0.7 } },
+    { name: 'Floating card', values: { tilt: 0.25, turn: -0.35, roll: 0.04, lens: 0.5, zoom: 0.7, posX: 0, posY: 0, axis: 0, bend: 0, wave: 0, waves: 1.5, waveRate: 0, repeat: 0, travel: 0, drift: 0, fog: 0, shade: 0.3, soften: 0.5 } },
+    { name: 'Curved screen', values: { tilt: 0, turn: 0, roll: 0, lens: 0.6, zoom: 0.85, posX: 0, posY: 0, axis: 0, bend: 0.6, wave: 0, waves: 1.5, waveRate: 0, repeat: 0, travel: 0, drift: 0, fog: 0, shade: 0.35, soften: 0.5 } },
+    { name: 'Rolling page', values: { tilt: 0.3, turn: 0, roll: 0, lens: 0.55, zoom: 1, posX: 0, posY: 0, axis: 1, bend: -0.4, wave: 0.2, waves: 2, waveRate: 0.15, repeat: 1, travel: 0.05, drift: 0, fog: 0.25, shade: 0.45, soften: 0.6 } },
+    { name: 'Horizon', values: { tilt: 0.85, turn: 0, roll: 0, lens: 0.8, zoom: 1, posX: 0, posY: -0.2, axis: 0, bend: 0, wave: 0, waves: 1.5, waveRate: 0, repeat: 1, travel: 0.06, drift: 0, fog: 0.7, shade: 0, soften: 0.8 } },
+    { name: 'Turned floor', values: { tilt: 0.6, turn: 0, roll: 0.3, lens: 0.6, zoom: 1.3, posX: 0, posY: 0, axis: 0, bend: 0, wave: 0, waves: 1.5, waveRate: 0, repeat: 2, travel: 0, drift: 0.05, fog: 0.4, shade: 0, soften: 0.6 } },
+    { name: 'Telephoto lean', values: { tilt: 0.4, turn: 0.25, roll: 0, lens: 0.1, zoom: 1.1, posX: 0, posY: 0, axis: 0, bend: 0, wave: 0, waves: 1.5, waveRate: 0, repeat: 1, travel: 0, drift: 0, fog: 0.15, shade: 0, soften: 0.5 } }
+  ],
   'fx-distort': [
     { name: 'Gentle wave', values: { mode: 0, amount: 0.25, scale: 3, center: [0.5, 0.5], angle: 0, rate: 0.5, audio: 0 } },
     { name: 'Pond ripple', values: { mode: 1, amount: 0.4, scale: 6, center: [0.5, 0.5], angle: 0, rate: 1.2, audio: 0 } },

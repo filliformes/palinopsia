@@ -96,6 +96,7 @@ import feedbackZoom from './fx/FeedbackZoom.fs?raw'
 import forceLines from './fx/ForceLines.fs?raw'
 import aperture from './fx/Aperture.fs?raw'
 import distort from './fx/Distort.fs?raw'
+import perspective from './fx/Perspective.fs?raw'
 import vibe from './fx/Vibe.fs?raw'
 import context from './fx/Context.fs?raw'
 import finalizer from './fx/Finalizer.fs?raw'
@@ -1655,6 +1656,18 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-distort', name: 'Distort', category: 'FX', source: distort,
     curated: { amount: [0.1, 0.6], scale: [1, 12], angle: [0, 6.2832], rate: [0.1, 2], audio: [0, 0.5] }
+  },
+  {
+    // A dice leans the plane gently and always tiles it (never ONCE, which can
+    // leave the frame mostly empty) : within these ranges the horizon stays out
+    // of the frame, so a roll reframes the picture in depth and never opens a hole.
+    id: 'fx-perspective', name: 'Perspective', category: 'FX', source: perspective,
+    curated: {
+      tilt: [-0.15, 0.55], turn: [-0.45, 0.45], roll: [-0.08, 0.08], lens: [0.3, 0.8], zoom: [1, 1.6],
+      posX: [-0.2, 0.2], posY: [-0.2, 0.2], bend: [-0.3, 0.3], wave: [0, 0.25], waves: [0.5, 3],
+      waveRate: [-0.4, 0.4], repeat: [1, 2], travel: [-0.15, 0.15], drift: [-0.1, 0.1], fog: [0, 0.4],
+      shade: [0, 0.5], soften: [0.4, 0.9]
+    }
   },
   {
     id: 'fx-slit-buffer', name: 'Slit Buffer', category: 'FX', source: slitBuffer,

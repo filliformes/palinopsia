@@ -66,6 +66,8 @@ export const SHADER_BLURBS: Record<string, string> = {
     'Pushes the picture around with a slowly drifting noise field, so it ripples and wanders. The distortion is deliberately lopsided rather than symmetrical, which keeps it feeling organic. A small amount adds life; a lot dissolves the subject.',
   'fx-distort':
     'Ten different warps under one set of controls: waves, ripples, bulges, pinches, twists, glass and more. Because they share an amount, scale, center and angle, you can audition very different distortions without relearning anything. The workhorse when you know you want the image bent but not how.',
+  'fx-perspective':
+    'Lays the layer on a plane in space and looks at it through a lens : lean it back into a floor, swing it into a wall that runs off to the side, curl it like a page or ripple it into a ribbon. Tiled, the plane runs all the way to the horizon, and fog lets the far side melt into the layers below. Flat sources become architecture.',
   'fx-wavefold':
     'Drives the brightness up and reflects it back down each time it would clip, over and over. Smooth gradients get carved into hard contour bands, like a topographic map of the light. Borrowed from analog synthesis, where the same trick turns a plain tone harsh and metallic.',
   'fx-rutt':
