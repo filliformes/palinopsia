@@ -100,7 +100,7 @@ export function defaultDomeConfig(): DomeConfig {
     spin: 0,
     rotate: 0,
     flipX: false,
-    feather: 0.01,
+    feather: 0,
     grid: false,
     turns: 2,
     mirrorSeams: true,

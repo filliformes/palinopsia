@@ -923,8 +923,9 @@ recordings and stills. Keystone warp is off in dome mode (a dome is mapped by it
     surround is the panorama, dimmed : while it is up, its **turns / top / bottom /
     zenith** appear under *behind the screen* and shape it.
 - **rotate**, a continuous **spin** (up to 360°/s either way, a full turn a second;
-  changing it changes the speed from there on, the dome never jumps), **feather** (softens every edge : the screen's border, the
-  panorama's top and bottom, a cropped or contained frame, and the rim), **flip**, and a
+  changing it changes the speed from there on, the dome never jumps), **feather** (0 by default : crisp edges; raised, it softens
+  every edge : the screen's border, the panorama's top and bottom, a cropped or
+  contained frame, and the rim), **flip**, and a
   **grid on output** : 10° rings, 30° spokes, the horizon in cyan, the front meridian in
   red, burned into the master for projector alignment. (The Mapping section's grid and
   warp sit out while the dome is on, on the projector window too.)

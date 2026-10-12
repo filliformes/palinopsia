@@ -1437,7 +1437,7 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
       )}
       <DomeSlider label="rotate" value={dome.rotate} min={-180} max={180} step={1} unit="°" reset={0} onChange={(v) => setDome({ rotate: v })} title="Turn the whole mapping around the dome" {...mp('rotate')} />
       <DomeSlider label="spin" value={dome.spin} min={-360} max={360} step={0.5} unit="°/s" reset={0} onChange={(v) => setDome({ spin: v })} title="Keep turning, degrees per second (changing it changes the speed from here on : the dome never jumps)" {...mp('spin')} />
-      <DomeSlider label="feather" value={dome.feather} min={0} max={0.2} step={0.005} reset={0.01} onChange={(v) => setDome({ feather: v })} title="Softens the edges : the picture's own (the screen's border, the panorama's top and bottom, a cropped or contained frame) and the dome's rim" {...mp('feather')} />
+      <DomeSlider label="feather" value={dome.feather} min={0} max={0.2} step={0.005} reset={0} onChange={(v) => setDome({ feather: v })} title="Softens the edges : the picture's own (the screen's border, the panorama's top and bottom, a cropped or contained frame) and the dome's rim" {...mp('feather')} />
       <div className="flex flex-wrap items-center gap-1.5">
         <button onClick={() => setDome({ grid: !dome.grid })} className={btn(dome.grid)} title="Burn an alignment grid into the OUTPUT (10° rings, 30° spokes, the horizon in cyan, the front in red) for projector setup">grid on output</button>
         <button onClick={() => setDome({ flipX: !dome.flipX })} className={btn(dome.flipX)} title="Mirror the master (some media servers expect it)">flip</button>

@@ -121,10 +121,12 @@ that CI builds into cross-platform releases.
 
 - **Fulldome feather works in every mode.** It only softened the master's rim (15°
   under the horizon on a 210° dome, usually black or out of view), never the picture's
-  own edges. It now also softens the screen's border (the default 0.01 keeps the old
-  1.5 % edge), the panorama's bottom (and top under a black zenith) and a cropped or
-  contained full-dome frame. Measured on a white frame : screen border 8 → 168 px
-  across at 0.2, panorama bottom 0 → 428, a contained frame 0 → 522.
+  own edges. It now also softens the screen's border, the panorama's bottom (and top
+  under a black zenith) and a cropped or contained full-dome frame, and **defaults to
+  0** : every edge crisp but anti-aliased over about a pixel and a half of the master
+  (at 0 the rim and the band edges were hard steps, and the screen kept a fixed 1.5 %
+  softness of its own, 8 px on a 2K master). Measured on a white frame at 0.2 : screen
+  border 168 px across, panorama bottom 428, a contained frame 522.
 - **The Mapping grid no longer sits over a domemaster on the projector window.** Dome
   mode stopped sending the keystone to the output window but still sent the Mapping
   section's grid flag, so a grid left on from a projector setup stayed over the master

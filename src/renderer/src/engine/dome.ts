@@ -51,8 +51,10 @@ vec3 wrapAt(float az, float el){
   float v = (el - uBottom) / max(uTop - uBottom, 1e-4);
   if (v < 0.0) return vec3(0.0);
   // FEATHER softens the band's own edges : the bottom always, the top when the
-  // zenith is black (fade and stretch have their own way above the top).
-  float fw = max(uFeather * 1.5, 1e-4);
+  // zenith is black (fade and stretch have their own way above the top). Never
+  // under ~1.5 master pixels : at 0 the edge is crisp, not stair-stepped (v moves
+  // uPix / (top - bottom) per pixel).
+  float fw = max(uFeather * 1.5, 1.5 * uPix / max(uTop - uBottom, 1e-3));
   float fade = smoothstep(0.0, fw, v);
   if (v > 1.0) {
     if (uCap == 2) return vec3(0.0);
@@ -89,9 +91,11 @@ void main(){
       if (m < 1.0) {
         vec2 s = vec2(sx, sy) * 0.5 + 0.5;
         vec3 scr = texture(src, s).rgb;
-        // FEATHER softens the screen's border (the default 0.01 keeps the old
-        // 1.5 % edge; 0.2 melts the outer third into the surround).
-        float sw = max(0.015, uFeather * 1.5);
+        // FEATHER softens the screen's border (0.2 melts the outer third into the
+        // surround). At 0 it is crisp, anti-aliased over ~1.5 master pixels : a
+        // tangent-plane coordinate moves (1 + x²) per radian, x = halfW at the
+        // edge. (It used to keep a fixed 1.5 % softness, 8 px on a 2K master.)
+        float sw = max(uFeather * 1.5, 1.5 * uPix * (1.0 + uHalfW * uHalfW) / max(uHalfW, 1e-3));
         col = mix(back, scr, 1.0 - smoothstep(1.0 - sw, 1.0, m));
       }
     }
@@ -110,7 +114,11 @@ void main(){
     if (p.x >= 0.0 && p.x <= 1.0 && p.y >= 0.0 && p.y <= 1.0) {
       // FEATHER softens a cropped or contained frame's own edges inside the
       // circle (fill reaches the rim, which the rim feather below handles).
-      float fe = uFit == 0 ? 1.0 : smoothstep(0.0, max(uFeather * 1.5, 1e-4), min(min(p.x, 1.0 - p.x), min(p.y, 1.0 - p.y)));
+      // (one master pixel is uPix / uHalfAp of the radius; through the scale and
+      // the fit that is pxF of the frame's own uv)
+      float fitK = uFit == 1 ? max(1.0 / uAspect, 1.0) : sqrt(1.0 + uAspect * uAspect) * max(1.0 / uAspect, 1.0);
+      float pxF = uPix / uHalfAp / max(uScale, 0.05) * fitK * 0.5;
+      float fe = uFit == 0 ? 1.0 : smoothstep(0.0, max(uFeather * 1.5, 1.5 * pxF), min(min(p.x, 1.0 - p.x), min(p.y, 1.0 - p.y)));
       col = texture(src, p).rgb * fe;
     }
   }
@@ -127,7 +135,8 @@ void main(){
     col = mix(col, vec3(0.1, 0.9, 1.0), hor);
     col = mix(col, vec3(1.0, 0.15, 0.1), front);
   }
-  float edge = 1.0 - smoothstep(1.0 - max(uFeather, 1e-4), 1.0, r);
+  // The rim : feathered, or at 0 anti-aliased over ~1.5 master pixels.
+  float edge = 1.0 - smoothstep(1.0 - max(uFeather, 1.5 * uPix / uHalfAp), 1.0, r);
   o = vec4(col * edge, 1.0);
 }`
 
