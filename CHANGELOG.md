@@ -7,7 +7,7 @@ that CI builds into cross-platform releases.
 
 ### Added
 
-- **Fulldome spin reaches 180°/s** either way (half a turn a second; it stopped at
+- **Fulldome spin reaches 360°/s** either way (a full turn a second; it stopped at
   30 on the slider and for modulation, 90 in saved settings). The angle is integrated,
   so even at that speed a change of spin never jumps the dome.
 

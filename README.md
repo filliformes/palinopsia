@@ -922,7 +922,7 @@ recordings and stills. Keystone warp is off in dome mode (a dome is mapped by it
     width, roll**, with a dim wrapped **surround** so the dome is never black. The
     surround is the panorama, dimmed : while it is up, its **turns / top / bottom /
     zenith** appear under *behind the screen* and shape it.
-- **rotate**, a continuous **spin** (up to 180°/s either way, half a turn a second;
+- **rotate**, a continuous **spin** (up to 360°/s either way, a full turn a second;
   changing it changes the speed from there on, the dome never jumps), **feather** (softens every edge : the screen's border, the
   panorama's top and bottom, a cropped or contained frame, and the rim), **flip**, and a
   **grid on output** : 10° rings, 30° spokes, the horizon in cyan, the front meridian in

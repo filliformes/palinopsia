@@ -20,7 +20,7 @@ export interface DomeConfig {
   res: number // domemaster edge in pixels : 2048 · 4096 · 8192
   aperture: number // dome field of view in degrees (180..230; Satosphère 210)
   mode: DomeMode
-  spin: number // continuous azimuth rotation, degrees / second (-180..180 : half a turn a second)
+  spin: number // continuous azimuth rotation, degrees / second (-360..360 : a full turn a second)
   rotate: number // azimuth offset in degrees (-180..180)
   flipX: boolean // mirror the master (some media servers expect it)
   feather: number // soft edges, 0..0.2 : the picture's own (screen border, panorama top / bottom, a contained frame) and the rim
@@ -74,7 +74,7 @@ export type DomeModField =
   | 'azimuth' | 'elevation' | 'width' | 'roll' | 'surround' | 'scale' | 'offsetX' | 'offsetY'
 export const DOME_MOD_RANGE: Record<DomeModField, { min: number; max: number; label: string }> = {
   rotate: { min: -180, max: 180, label: 'rotate' },
-  spin: { min: -180, max: 180, label: 'spin' },
+  spin: { min: -360, max: 360, label: 'spin' },
   feather: { min: 0, max: 0.2, label: 'feather' },
   turns: { min: 1, max: 6, label: 'turns' },
   top: { min: 0, max: 90, label: 'top' },
@@ -132,7 +132,7 @@ export function sanitizeDome(raw: unknown): DomeConfig {
     res: (DOME_RES as readonly number[]).includes(Number(r.res)) ? Number(r.res) : d.res,
     aperture: num(r.aperture, d.aperture, 180, 230),
     mode: r.mode === 'screen' || r.mode === 'fisheye' || r.mode === 'wrap' ? r.mode : d.mode,
-    spin: num(r.spin, d.spin, -180, 180),
+    spin: num(r.spin, d.spin, -360, 360),
     rotate: num(r.rotate, d.rotate, -180, 180),
     flipX: !!r.flipX,
     feather: num(r.feather, d.feather, 0, 0.2),
