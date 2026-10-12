@@ -930,8 +930,8 @@ recordings and stills. Keystone warp is off in dome mode (a dome is mapped by it
   warp sit out while the dome is on, on the projector window too.)
 - **Every mapping slider can be modulated** : rotate, spin, feather, turns, top, bottom,
   azimuth, elevation, width, roll, surround, scale, offset x / y each have an **M** (a
-  modulator or a Meta knob; right-click clears), and while bound the slider follows the
-  live value. A screen that drifts around the room, a panorama breathing between the
+  modulator or a Meta knob; right-click clears), and while bound the slider turns the
+  modulated color and follows the live value. A screen that drifts around the room, a panorama breathing between the
   horizon and the zenith, a full-dome frame that swells on the beat. Aperture and
   resolution are the venue's and stay put.
 - **3D dome simulator** (the in-app port of the TouchDesigner *FulldomeSimulator*) : the

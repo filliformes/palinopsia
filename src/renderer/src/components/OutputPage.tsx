@@ -1278,6 +1278,9 @@ function DomeSlider({ label, value, min, max, step, onChange, reset, unit = '', 
     return registerLiveOverlay({ el, key, format: (x) => String(x) })
   }, [key, bound.length, onMeta])
   const open = !!mod && openMod === mod
+  // Modulated reads like every other modulated control : accent2 on the thumb and
+  // the readout (a modulator row or a Meta knob aimed at it).
+  const modulated = bound.length > 0 || onMeta
   return (
     <>
       <div className="flex items-center gap-2" title={title}>
@@ -1287,9 +1290,9 @@ function DomeSlider({ label, value, min, max, step, onChange, reset, unit = '', 
           type="range" min={min} max={max} step={step} value={value}
           onChange={(e) => onChange(Number(e.target.value))}
           onDoubleClick={() => reset !== undefined && onChange(reset)}
-          className="min-w-0 flex-1 accent-accent"
+          className={`min-w-0 flex-1 ${modulated ? 'accent-accent2' : 'accent-accent'}`}
         />
-        <span className="w-12 shrink-0 text-right font-mono text-[10px] text-text">{Math.round(value * 100) / 100}{unit}</span>
+        <span className={`w-12 shrink-0 text-right font-mono text-[10px] ${modulated ? 'text-accent2' : 'text-text'}`}>{Math.round(value * 100) / 100}{unit}</span>
         {mod && (
           <button
             onClick={() => setOpenMod?.(open ? null : mod)}
@@ -1302,7 +1305,7 @@ function DomeSlider({ label, value, min, max, step, onChange, reset, unit = '', 
               })
             }}
             className={`shrink-0 rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
-              bound.length || onMeta
+              modulated
                 ? 'bg-accent/20 text-accent ring-1 ring-accent'
                 : open
                   ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'

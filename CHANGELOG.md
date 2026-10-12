@@ -11,7 +11,8 @@ that CI builds into cross-platform releases.
   (`{ kind: 'dome', field }`, ranges in `shared/dome.ts` `DOME_MOD_RANGE`) : rotate,
   spin, feather, turns, top, bottom, azimuth, elevation, width, roll, surround, scale,
   offset x / y. Each dome slider has an **M** (the assign row : modulators and Meta
-  knobs; right-click clears) and follows the live value while bound. A final override
+  knobs; right-click clears) and, while bound, turns the modulated color (accent2) and
+  follows the live value. A final override
   on the dome stage (`Compositor.setDomeParam`, the base back from the store every
   frame), so the stored settings never move; Meta commits land in the dome settings.
   Aperture and resolution are left out : they describe the venue, and the 3D preview
