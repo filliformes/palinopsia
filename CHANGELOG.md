@@ -7,6 +7,10 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Fulldome spin reaches 180°/s** either way (half a turn a second; it stopped at
+  30 on the slider and for modulation, 90 in saved settings). The angle is integrated,
+  so even at that speed a change of spin never jumps the dome.
+
 - **Fulldome : every mapping slider can be modulated.** A new modulation target
   (`{ kind: 'dome', field }`, ranges in `shared/dome.ts` `DOME_MOD_RANGE`) : rotate,
   spin, feather, turns, top, bottom, azimuth, elevation, width, roll, surround, scale,
