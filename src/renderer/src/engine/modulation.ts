@@ -17,6 +17,7 @@ import { audioBus } from './audioIn'
 import { visionBus } from './visionIn'
 import { bodyBus } from './bodyIn'
 import { BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
+import { DOME_MOD_RANGE, type DomeModField } from '@shared/dome'
 
 const TWO_PI = Math.PI * 2
 // The 60fps reference frame time (ms). The picture / audio one-pole followers
@@ -1031,6 +1032,7 @@ function liveKey(t: import('@shared/types').ModTarget): string {
   if (t.kind === 'sonify') return `soni:${t.param}`
   if (t.kind === 'layer') return `lay:${t.layer}:${t.field}`
   if (t.kind === 'bg') return `bg:${t.field}`
+  if (t.kind === 'dome') return `dome:${t.field}`
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
@@ -1216,6 +1218,9 @@ export interface ModComp {
   setBgSourceInput: (name: string, value: number) => void
   // The Background's opacity / speed / shadow (a final override, like a layer's).
   setBgParam: (field: 'opacity' | 'speed' | 'depth', value: number) => void
+  // The fulldome mapping's sliders (a final override; null base while the dome is off).
+  setDomeParam: (field: DomeModField, value: number) => void
+  domeParam: (field: DomeModField) => number | null
   // Compositor-level overrides (not ISF inputs) : per-FX dry/wet opacity, and a
   // layer's own opacity / A-B mix / blend-mode index. Applied post-syncFromState.
   setFxOpacity: (scope: import('@shared/types').FxScope, instId: string, value: number) => void
@@ -1243,6 +1248,14 @@ export function writeModTarget(
     const v = d.min + Math.max(0, Math.min(1, shaped01)) * (d.max - d.min)
     sonifyModValues.set(t.param, v)
     liveModValues.set(liveKey(t), v)
+    return
+  }
+  // A dome slider : absolute over its span.
+  if (t.kind === 'dome') {
+    const r = DOME_MOD_RANGE[t.field]
+    const value = r.min + Math.max(0, Math.min(1, shaped01)) * (r.max - r.min)
+    liveModValues.set(liveKey(t), value)
+    comp.setDomeParam(t.field, value)
     return
   }
   // The Background's opacity / speed (0..4×) / shadow : absolute over the span.
@@ -1409,6 +1422,16 @@ export function applyModulation(
       if (final === null || typeof final !== 'number') continue
       sonifyModValues.set(a.target.param, final)
       liveModValues.set(liveKey(a.target), final)
+      continue
+    }
+    if (a.target.kind === 'dome') {
+      const base = comp.domeParam(a.target.field)
+      if (base === null) continue // the dome is off : nothing to move
+      const r = DOME_MOD_RANGE[a.target.field]
+      const final = inputValueForMode({ type: 'float', min: r.min, max: r.max, def: base }, base, v, a.depth, a.mode)
+      if (final === null || typeof final !== 'number') continue
+      liveModValues.set(liveKey(a.target), final)
+      comp.setDomeParam(a.target.field, final)
       continue
     }
     if (a.target.kind === 'bg') {

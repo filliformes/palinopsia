@@ -919,10 +919,21 @@ recordings and stills. Keystone warp is off in dome mode (a dome is mapped by it
     (fade / stretch / black).
   - **screen** : the picture hung on the dome as a flat virtual screen, re-projected so it
     reads **undistorted from the centre** (a giant cinema screen) : **azimuth, elevation,
-    width, roll**, with a dim wrapped **surround** so the dome is never black.
-- **rotate**, a continuous **spin** (°/s), a **feather** at the rim, **flip**, and a
+    width, roll**, with a dim wrapped **surround** so the dome is never black. The
+    surround is the panorama, dimmed : while it is up, its **turns / top / bottom /
+    zenith** appear under *behind the screen* and shape it.
+- **rotate**, a continuous **spin** (°/s; changing it changes the speed from there on,
+  the dome never jumps), **feather** (softens every edge : the screen's border, the
+  panorama's top and bottom, a cropped or contained frame, and the rim), **flip**, and a
   **grid on output** : 10° rings, 30° spokes, the horizon in cyan, the front meridian in
-  red, burned into the master for projector alignment.
+  red, burned into the master for projector alignment. (The Mapping section's grid and
+  warp sit out while the dome is on, on the projector window too.)
+- **Every mapping slider can be modulated** : rotate, spin, feather, turns, top, bottom,
+  azimuth, elevation, width, roll, surround, scale, offset x / y each have an **M** (a
+  modulator or a Meta knob; right-click clears), and while bound the slider follows the
+  live value. A screen that drifts around the room, a panorama breathing between the
+  horizon and the zenith, a full-dome frame that swells on the beat. Aperture and
+  resolution are the venue's and stay put.
 - **3D dome simulator** (the in-app port of the TouchDesigner *FulldomeSimulator*) : the
   live master wrapped back onto a dome. **inside** puts you in the seat (drag to look
   around; wheel out widens the lens, then keeps going by **backing off** away from the

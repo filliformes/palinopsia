@@ -7,6 +7,17 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Fulldome : every mapping slider can be modulated.** A new modulation target
+  (`{ kind: 'dome', field }`, ranges in `shared/dome.ts` `DOME_MOD_RANGE`) : rotate,
+  spin, feather, turns, top, bottom, azimuth, elevation, width, roll, surround, scale,
+  offset x / y. Each dome slider has an **M** (the assign row : modulators and Meta
+  knobs; right-click clears) and follows the live value while bound. A final override
+  on the dome stage (`Compositor.setDomeParam`, the base back from the store every
+  frame), so the stored settings never move; Meta commits land in the dome settings.
+  Aperture and resolution are left out : they describe the venue, and the 3D preview
+  maps the master with the stored aperture. Measured : a 1 Hz LFO on the screen's width
+  swings it 54 → 100° while the stored value stays 100; dome off, the row moves nothing.
+
 - **A Space family in Generate, and a Space group of master chains**, so the three new
   pieces are reached from Generate and the chain menu, not only from their pickers.
   Eight themes : **Gravity Well**, **Starfield**, **Crystal Room**, **Dot Sea**, **Spectral
@@ -102,6 +113,27 @@ that CI builds into cross-platform releases.
   (163 of 180 polls, was 143). Found with an isolated lab page on the same Electron :
   read-usage 38 warnings in 20 read cycles at 0.5 ms a read, copy-usage none at 0.2 ms,
   however long the read waited after the fence.
+
+- **Fulldome feather works in every mode.** It only softened the master's rim (15°
+  under the horizon on a 210° dome, usually black or out of view), never the picture's
+  own edges. It now also softens the screen's border (the default 0.01 keeps the old
+  1.5 % edge), the panorama's bottom (and top under a black zenith) and a cropped or
+  contained full-dome frame. Measured on a white frame : screen border 8 → 168 px
+  across at 0.2, panorama bottom 0 → 428, a contained frame 0 → 522.
+- **The Mapping grid no longer sits over a domemaster on the projector window.** Dome
+  mode stopped sending the keystone to the output window but still sent the Mapping
+  section's grid flag, so a grid left on from a projector setup stayed over the master
+  there, with nothing in the Fulldome section to take it off (and never in the 3D
+  preview, which reads the master itself). The Mapping section now says it sits out
+  while the dome is on.
+- **Top / bottom in Screen mode** shape the dimmed surround behind the screen (they did,
+  745 pixels change for a top of 70° → 30° at surround 0.5, but sat among the screen's
+  own sliders and read as dead). They now appear under *behind the screen*, only while
+  there is a surround.
+- **Dome spin is integrated.** It was rotate + spin × the show's elapsed time, so any
+  change of spin swung the dome by spin × hours; the angle now accumulates frame by
+  frame. Measured at 20 → 22°/s : the picture moves 2.8 across the change, 3.5 in a
+  plain frame step.
 
 ## v1.2.5 — 2026-10-10
 

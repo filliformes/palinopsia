@@ -23,7 +23,7 @@ export interface DomeConfig {
   spin: number // continuous azimuth rotation, degrees / second (can be negative)
   rotate: number // azimuth offset in degrees (-180..180)
   flipX: boolean // mirror the master (some media servers expect it)
-  feather: number // soft edge at the rim, 0..0.2 of the radius
+  feather: number // soft edges, 0..0.2 : the picture's own (screen border, panorama top / bottom, a contained frame) and the rim
   grid: boolean // burn a polar alignment grid into the OUTPUT (projector setup)
 
   // wrap : the flat picture wrapped around the dome like a panorama. Its width
@@ -63,6 +63,30 @@ export interface DomeConfig {
     sweetHi: number // sweet spot upper elevation
     view: 'inside' | 'outside'
   }
+}
+
+/** The dome controls a modulator or a Meta knob can move : the picture's mapping
+ *  in every mode. Not the venue (aperture, resolution) nor the simulator : the
+ *  3D preview maps the master with the STORED aperture, so a moving one would
+ *  make the preview lie. Ranges are the sliders'. */
+export type DomeModField =
+  | 'rotate' | 'spin' | 'feather' | 'turns' | 'top' | 'bottom'
+  | 'azimuth' | 'elevation' | 'width' | 'roll' | 'surround' | 'scale' | 'offsetX' | 'offsetY'
+export const DOME_MOD_RANGE: Record<DomeModField, { min: number; max: number; label: string }> = {
+  rotate: { min: -180, max: 180, label: 'rotate' },
+  spin: { min: -30, max: 30, label: 'spin' },
+  feather: { min: 0, max: 0.2, label: 'feather' },
+  turns: { min: 1, max: 6, label: 'turns' },
+  top: { min: 0, max: 90, label: 'top' },
+  bottom: { min: -25, max: 80, label: 'bottom' },
+  azimuth: { min: -180, max: 180, label: 'azimuth' },
+  elevation: { min: -20, max: 90, label: 'elevation' },
+  width: { min: 20, max: 170, label: 'width' },
+  roll: { min: -180, max: 180, label: 'roll' },
+  surround: { min: 0, max: 1, label: 'surround' },
+  scale: { min: 0.2, max: 3, label: 'scale' },
+  offsetX: { min: -1, max: 1, label: 'offset x' },
+  offsetY: { min: -1, max: 1, label: 'offset y' }
 }
 
 export const DOME_RES = [2048, 4096] as const // no live 8K : ~1.9 GB more VRAM (measured), a blue-screen risk

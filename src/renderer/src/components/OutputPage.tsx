@@ -14,14 +14,16 @@ import {
   type RefObject
 } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import type { AutostartStatus, DisplayInfo, KioskLaunchConfig, PerfStats, RecordingFolderInfo } from '@shared/types'
-import { useStore } from '../store'
+import type { AutostartStatus, DisplayInfo, KioskLaunchConfig, ModTarget, PerfStats, RecordingFolderInfo } from '@shared/types'
+import { modTargetKey, useStore } from '../store'
+import { AssignRow } from './AutoControls'
+import { registerLiveOverlay } from './liveOverlay'
 import { showToast } from './Toast'
 import { currentFps, formatHz } from '../perf'
 import { captureScreenshot, outputRecorder, recordingFormats, encoderAccepts, DXV_MAX_EDGE, type RecordingFormat } from '../recorder'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { DomeSim } from './DomeSim'
-import { DOME_RES, defaultDomeConfig, type DomeConfig, type DomeMode } from '@shared/dome'
+import { DOME_RES, defaultDomeConfig, type DomeConfig, type DomeMode, type DomeModField } from '@shared/dome'
 import { NDI_FPS, NDI_MAX_EDGE, NDI_REDIST_URL, NDI_LINUX_SDK_URL, type NdiConfig, type NdiInstallProgress } from '@shared/ndi'
 
 const CORNER_LABELS = ['TL', 'TR', 'BR', 'BL']
@@ -575,7 +577,12 @@ export function OutputPage({
 
           <Section title="Mapping" info="Drag the corners over the live preview to keystone the image onto a projector. Turn grid on to align, off for the show. (Off in dome mode : a domemaster is mapped by the dome's own server.)">
 
-            <div className="flex flex-wrap gap-1.5">
+            {dome.enabled && (
+              <div className="mb-1.5 font-mono text-[10px] text-muted">
+                off while the dome is on : warp and grid wait for a flat output (the dome has its own grid, in Fulldome)
+              </div>
+            )}
+            <div className={`flex flex-wrap gap-1.5 ${dome.enabled ? 'opacity-40' : ''}`}>
               <button onClick={() => setWarpEnabled(!warpEnabled)} className={btn(warpEnabled)}>
                 warp {warpEnabled ? 'on' : 'off'}
               </button>
@@ -1251,20 +1258,68 @@ function NdiRuntimeInstall(): JSX.Element {
   )
 }
 
-function DomeSlider({ label, value, min, max, step, onChange, reset, unit = '', title }: {
+// One dome slider. With `mod` it also takes modulation, like a layer's controls :
+// an M button opens the assign row (modulators and Meta knobs; right-click clears),
+// and while bound the thumb follows the live value.
+type DomeModProps = { mod?: DomeModField; openMod?: DomeModField | null; setOpenMod?: (f: DomeModField | null) => void }
+function DomeSlider({ label, value, min, max, step, onChange, reset, unit = '', title, mod, openMod, setOpenMod }: {
   label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; reset?: number; unit?: string; title?: string
-}): JSX.Element {
+} & DomeModProps): JSX.Element {
+  const modMatrix = useStore((s) => s.composition.modMatrix)
+  const metaKnobs = useStore((s) => s.composition.metaKnobs)
+  const target: ModTarget | null = mod ? { kind: 'dome', field: mod } : null
+  const key = target ? modTargetKey(target) : ''
+  const bound = target ? modMatrix.filter((a) => modTargetKey(a.target) === key) : []
+  const onMeta = target ? metaKnobs.some((k) => k.destinations.some((d) => modTargetKey(d) === key)) : false
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  useEffect(() => {
+    const el = inputRef.current
+    if (!key || !el || (!bound.length && !onMeta)) return
+    return registerLiveOverlay({ el, key, format: (x) => String(x) })
+  }, [key, bound.length, onMeta])
+  const open = !!mod && openMod === mod
   return (
-    <label className="flex items-center gap-2" title={title}>
-      <span className="w-16 shrink-0 font-mono text-[10px] text-muted">{label}</span>
-      <input
-        type="range" min={min} max={max} step={step} value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        onDoubleClick={() => reset !== undefined && onChange(reset)}
-        className="min-w-0 flex-1 accent-accent"
-      />
-      <span className="w-12 shrink-0 text-right font-mono text-[10px] text-text">{Math.round(value * 100) / 100}{unit}</span>
-    </label>
+    <>
+      <div className="flex items-center gap-2" title={title}>
+        <span className="w-16 shrink-0 font-mono text-[10px] text-muted">{label}</span>
+        <input
+          ref={inputRef}
+          type="range" min={min} max={max} step={step} value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          onDoubleClick={() => reset !== undefined && onChange(reset)}
+          className="min-w-0 flex-1 accent-accent"
+        />
+        <span className="w-12 shrink-0 text-right font-mono text-[10px] text-text">{Math.round(value * 100) / 100}{unit}</span>
+        {mod && (
+          <button
+            onClick={() => setOpenMod?.(open ? null : mod)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              const st = useStore.getState()
+              st.composition.modMatrix.filter((a) => modTargetKey(a.target) === key).forEach((a) => st.removeAssignment(a.id))
+              st.composition.metaKnobs.forEach((k, i) => {
+                if (k.destinations.some((d) => modTargetKey(d) === key)) st.toggleMetaDest(i, target!)
+              })
+            }}
+            className={`shrink-0 rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
+              bound.length || onMeta
+                ? 'bg-accent/20 text-accent ring-1 ring-accent'
+                : open
+                  ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
+                  : 'bg-panel3/60 text-muted hover:text-text'
+            }`}
+            title={`Modulate the ${label} : a modulator or a Meta knob moves it. Right-click clears its modulation.`}
+          >
+            M{bound.length ? bound.map((b) => b.mod + 1).join('·') : ''}
+          </button>
+        )}
+      </div>
+      {open && target && (
+        <div className="pb-0.5">
+          <AssignRow target={target} bound={bound} />
+        </div>
+      )}
+    </>
   )
 }
 
@@ -1281,6 +1336,24 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
   onResetCam: (view: 'inside' | 'outside') => void
   onWholeDome: () => void
 }): JSX.Element {
+  const [openMod, setOpenMod] = useState<DomeModField | null>(null)
+  const mp = (f: DomeModField): DomeModProps => ({ mod: f, openMod, setOpenMod })
+  // The panorama's own controls : the whole picture in panorama mode, and the
+  // dimmed surround behind the screen in screen mode.
+  const wrapControls = (
+    <>
+      <DomeSlider label="turns" value={dome.turns} min={1} max={6} step={0.25} reset={2} onChange={(v) => setDome({ turns: v })} title="How many times the picture goes around the dome (fewer = more horizontal stretch)" {...mp('turns')} />
+      <DomeSlider label="top" value={dome.top} min={0} max={90} step={1} unit="°" reset={70} onChange={(v) => setDome({ top: v })} title="Elevation the picture's top edge reaches (90° = the zenith)" {...mp('top')} />
+      <DomeSlider label="bottom" value={dome.bottom} min={-25} max={80} step={1} unit="°" reset={-15} onChange={(v) => setDome({ bottom: v })} title="Elevation of the picture's bottom edge (−15° = the rim of a 210° dome)" {...mp('bottom')} />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button onClick={() => setDome({ mirrorSeams: !dome.mirrorSeams })} className={btn(dome.mirrorSeams)} title="Alternate copies mirror, so repeats join without a seam">mirror seams</button>
+        <span className="font-mono text-[10px] text-muted">zenith</span>
+        {(['fade', 'stretch', 'black'] as const).map((c) => (
+          <button key={c} onClick={() => setDome({ cap: c })} className={btn(dome.cap === c)} title="What fills the dome above the picture's top edge">{c}</button>
+        ))}
+      </div>
+    </>
+  )
   const MODES: Array<[DomeMode, string, string]> = [
     ['fisheye', 'full dome', 'The whole Palinopsia frame over the whole dome : its center at the zenith, its edges all around the rim. Fill uses every pixel and leaves no black inside the dome.'],
     ['wrap', 'panorama', 'The picture wraps around the room like a panorama : its width runs around you (repeated by turns), its height climbs from the rim to the zenith. Made for 360° rooms (the Satosphère).'],
@@ -1324,27 +1397,22 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
           <button key={m} onClick={() => setDome({ mode: m })} className={btn(dome.mode === m)} title={t}>{l}</button>
         ))}
       </div>
-      {(dome.mode === 'wrap' || dome.mode === 'screen') && (
-        <>
-          <DomeSlider label="turns" value={dome.turns} min={1} max={6} step={0.25} reset={2} onChange={(v) => setDome({ turns: v })} title="How many times the picture goes around the dome (fewer = more horizontal stretch)" />
-          <DomeSlider label="top" value={dome.top} min={0} max={90} step={1} unit="°" reset={70} onChange={(v) => setDome({ top: v })} title="Elevation the picture's top edge reaches (90° = the zenith)" />
-          <DomeSlider label="bottom" value={dome.bottom} min={-25} max={80} step={1} unit="°" reset={-15} onChange={(v) => setDome({ bottom: v })} title="Elevation of the picture's bottom edge (−15° = the rim of a 210° dome)" />
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button onClick={() => setDome({ mirrorSeams: !dome.mirrorSeams })} className={btn(dome.mirrorSeams)} title="Alternate copies mirror, so repeats join without a seam">mirror seams</button>
-            <span className="font-mono text-[10px] text-muted">zenith</span>
-            {(['fade', 'stretch', 'black'] as const).map((c) => (
-              <button key={c} onClick={() => setDome({ cap: c })} className={btn(dome.cap === c)} title="What fills the dome above the picture's top edge">{c}</button>
-            ))}
-          </div>
-        </>
-      )}
+      {dome.mode === 'wrap' && wrapControls}
       {dome.mode === 'screen' && (
         <>
-          <DomeSlider label="azimuth" value={dome.azimuth} min={-180} max={180} step={1} unit="°" reset={0} onChange={(v) => setDome({ azimuth: v })} title="Where the screen hangs around the room (0 = front)" />
-          <DomeSlider label="elevation" value={dome.elevation} min={-20} max={90} step={1} unit="°" reset={25} onChange={(v) => setDome({ elevation: v })} title="How high the screen's center sits" />
-          <DomeSlider label="width" value={dome.width} min={20} max={170} step={1} unit="°" reset={100} onChange={(v) => setDome({ width: v })} title="How much of the view the screen covers, horizontally" />
-          <DomeSlider label="roll" value={dome.roll} min={-180} max={180} step={1} unit="°" reset={0} onChange={(v) => setDome({ roll: v })} />
-          <DomeSlider label="surround" value={dome.surround} min={0} max={1} step={0.01} reset={0.25} onChange={(v) => setDome({ surround: v })} title="The picture wrapped dimly behind the screen" />
+          <DomeSlider label="azimuth" value={dome.azimuth} min={-180} max={180} step={1} unit="°" reset={0} onChange={(v) => setDome({ azimuth: v })} title="Where the screen hangs around the room (0 = front)" {...mp('azimuth')} />
+          <DomeSlider label="elevation" value={dome.elevation} min={-20} max={90} step={1} unit="°" reset={25} onChange={(v) => setDome({ elevation: v })} title="How high the screen's center sits" {...mp('elevation')} />
+          <DomeSlider label="width" value={dome.width} min={20} max={170} step={1} unit="°" reset={100} onChange={(v) => setDome({ width: v })} title="How much of the view the screen covers, horizontally" {...mp('width')} />
+          <DomeSlider label="roll" value={dome.roll} min={-180} max={180} step={1} unit="°" reset={0} onChange={(v) => setDome({ roll: v })} {...mp('roll')} />
+          <DomeSlider label="surround" value={dome.surround} min={0} max={1} step={0.01} reset={0.25} onChange={(v) => setDome({ surround: v })} title="The picture wrapped dimly around the room behind the screen (0 = a black dome around it)" {...mp('surround')} />
+          {/* turns / top / bottom shape that surround, not the screen : shown under
+              their own heading and only while there is a surround to shape */}
+          {dome.surround > 0.001 && (
+            <>
+              <div className="font-mono text-[10px] text-muted" title="The surround is the panorama mapping, dimmed : these shape it">behind the screen</div>
+              {wrapControls}
+            </>
+          )}
         </>
       )}
       {dome.mode === 'fisheye' && (
@@ -1359,14 +1427,14 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
               <button key={f} onClick={() => setDome({ fit: f })} className={btn(dome.fit === f)} title={t}>{l}</button>
             ))}
           </div>
-          <DomeSlider label="scale" value={dome.scale} min={0.2} max={3} step={0.01} reset={1} onChange={(v) => setDome({ scale: v })} />
-          <DomeSlider label="offset x" value={dome.offsetX} min={-1} max={1} step={0.01} reset={0} onChange={(v) => setDome({ offsetX: v })} />
-          <DomeSlider label="offset y" value={dome.offsetY} min={-1} max={1} step={0.01} reset={0} onChange={(v) => setDome({ offsetY: v })} />
+          <DomeSlider label="scale" value={dome.scale} min={0.2} max={3} step={0.01} reset={1} onChange={(v) => setDome({ scale: v })} {...mp('scale')} />
+          <DomeSlider label="offset x" value={dome.offsetX} min={-1} max={1} step={0.01} reset={0} onChange={(v) => setDome({ offsetX: v })} {...mp('offsetX')} />
+          <DomeSlider label="offset y" value={dome.offsetY} min={-1} max={1} step={0.01} reset={0} onChange={(v) => setDome({ offsetY: v })} {...mp('offsetY')} />
         </>
       )}
-      <DomeSlider label="rotate" value={dome.rotate} min={-180} max={180} step={1} unit="°" reset={0} onChange={(v) => setDome({ rotate: v })} title="Turn the whole mapping around the dome" />
-      <DomeSlider label="spin" value={dome.spin} min={-30} max={30} step={0.5} unit="°/s" reset={0} onChange={(v) => setDome({ spin: v })} title="Keep turning, degrees per second" />
-      <DomeSlider label="feather" value={dome.feather} min={0} max={0.2} step={0.005} reset={0.01} onChange={(v) => setDome({ feather: v })} title="Soft edge at the rim" />
+      <DomeSlider label="rotate" value={dome.rotate} min={-180} max={180} step={1} unit="°" reset={0} onChange={(v) => setDome({ rotate: v })} title="Turn the whole mapping around the dome" {...mp('rotate')} />
+      <DomeSlider label="spin" value={dome.spin} min={-30} max={30} step={0.5} unit="°/s" reset={0} onChange={(v) => setDome({ spin: v })} title="Keep turning, degrees per second (changing it changes the speed from here on : the dome never jumps)" {...mp('spin')} />
+      <DomeSlider label="feather" value={dome.feather} min={0} max={0.2} step={0.005} reset={0.01} onChange={(v) => setDome({ feather: v })} title="Softens the edges : the picture's own (the screen's border, the panorama's top and bottom, a cropped or contained frame) and the dome's rim" {...mp('feather')} />
       <div className="flex flex-wrap items-center gap-1.5">
         <button onClick={() => setDome({ grid: !dome.grid })} className={btn(dome.grid)} title="Burn an alignment grid into the OUTPUT (10° rings, 30° spokes, the horizon in cyan, the front in red) for projector setup">grid on output</button>
         <button onClick={() => setDome({ flipX: !dome.flipX })} className={btn(dome.flipX)} title="Mirror the master (some media servers expect it)">flip</button>

@@ -55,7 +55,8 @@ import type { CompositionState, FxInstance, FxScope } from '@shared/types';
 installTextureBridge();
 
 import type { BlendMode, LayerMask } from '@shared/types';
-import type { DomeConfig } from '@shared/dome';
+import type { DomeConfig, DomeModField } from '@shared/dome';
+import { DOME_MOD_RANGE } from '@shared/dome';
 import { DomeStage } from './dome';
 import { FrameCapture, captureSize, type CaptureFormat, type CapturedFrame } from './frameCapture';
 import { GridReadback } from './gridReadback';
@@ -2353,6 +2354,18 @@ export class Compositor {
       this.canvas.height = ch;
     }
     if (!this.domeCfg && this.dome) { this.dome.dispose(); this.dome = null; this.domeTex = null; }
+  }
+
+  /** A dome slider overridden for this frame (a modulator or a Meta knob). The
+   *  base comes back with the next setDome, every frame. */
+  setDomeParam(field: DomeModField, value: number): void {
+    if (!this.domeCfg || !Number.isFinite(value)) return;
+    const r = DOME_MOD_RANGE[field];
+    this.domeCfg = { ...this.domeCfg, [field]: Math.max(r.min, Math.min(r.max, value)) };
+  }
+  /** The dome slider's value this frame, null while the dome is off. */
+  domeParam(field: DomeModField): number | null {
+    return this.domeCfg ? this.domeCfg[field] : null;
   }
 
   /** Set the projection warp for the present pass. `corners` = 8 normalized

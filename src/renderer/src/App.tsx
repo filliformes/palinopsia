@@ -1564,11 +1564,15 @@ export default function App(): JSX.Element {
         //    from when it ran its own compositor : cloned and relayed for nothing.)
         if (st.outputActive) {
           const warpEnabled = st.warpEnabled && !st.dome.enabled // a domemaster is never keystoned
-          const key = `${warpEnabled}|${st.warpGrid}|${st.warpCorners.join(',')}`
+          // ...nor gridded by the Mapping section : left on from a projector setup,
+          // its grid sat over the master on the output window with nothing in the
+          // Fulldome section to take it off (the dome has its own, `grid on output`).
+          const warpGrid = st.warpGrid && !st.dome.enabled
+          const key = `${warpEnabled}|${warpGrid}|${st.warpCorners.join(',')}`
           if (key !== lastWarpKey || now - lastWarpSent > 500) {
             lastWarpKey = key
             lastWarpSent = now
-            window.api.outputFrame({ warpEnabled, warpCorners: st.warpCorners, warpGrid: st.warpGrid })
+            window.api.outputFrame({ warpEnabled, warpCorners: st.warpCorners, warpGrid })
           }
         }
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to

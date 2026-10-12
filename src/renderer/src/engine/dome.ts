@@ -50,11 +50,16 @@ vec3 wrapAt(float az, float el){
   if (uMirror == 1 && mod(k, 2.0) > 0.5) fu = 1.0 - fu; // alternate copies mirror : no seams
   float v = (el - uBottom) / max(uTop - uBottom, 1e-4);
   if (v < 0.0) return vec3(0.0);
-  float fade = 1.0;
+  // FEATHER softens the band's own edges : the bottom always, the top when the
+  // zenith is black (fade and stretch have their own way above the top).
+  float fw = max(uFeather * 1.5, 1e-4);
+  float fade = smoothstep(0.0, fw, v);
   if (v > 1.0) {
     if (uCap == 2) return vec3(0.0);
-    if (uCap == 0) fade = 1.0 - smoothstep(0.0, 1.0, (el - uTop) / max(0.5 * PI - uTop, 1e-3));
+    if (uCap == 0) fade *= 1.0 - smoothstep(0.0, 1.0, (el - uTop) / max(0.5 * PI - uTop, 1e-3));
     v = 1.0;
+  } else if (uCap == 2) {
+    fade *= 1.0 - smoothstep(1.0 - fw, 1.0, v);
   }
   vec2 s = vec2(fu, v);
   return texture(src, s).rgb * fade;
@@ -84,7 +89,10 @@ void main(){
       if (m < 1.0) {
         vec2 s = vec2(sx, sy) * 0.5 + 0.5;
         vec3 scr = texture(src, s).rgb;
-        col = mix(back, scr, 1.0 - smoothstep(0.985, 1.0, m));
+        // FEATHER softens the screen's border (the default 0.01 keeps the old
+        // 1.5 % edge; 0.2 melts the outer third into the surround).
+        float sw = max(0.015, uFeather * 1.5);
+        col = mix(back, scr, 1.0 - smoothstep(1.0 - sw, 1.0, m));
       }
     }
   } else {
@@ -99,7 +107,12 @@ void main(){
       float k = sqrt(1.0 + uAspect * uAspect);           // the corners touch the rim
       p = vec2(qq.x * k / uAspect, qq.y * k) * 0.5 + 0.5;
     }
-    if (p.x >= 0.0 && p.x <= 1.0 && p.y >= 0.0 && p.y <= 1.0) col = texture(src, p).rgb;
+    if (p.x >= 0.0 && p.x <= 1.0 && p.y >= 0.0 && p.y <= 1.0) {
+      // FEATHER softens a cropped or contained frame's own edges inside the
+      // circle (fill reaches the rim, which the rim feather below handles).
+      float fe = uFit == 0 ? 1.0 : smoothstep(0.0, max(uFeather * 1.5, 1e-4), min(min(p.x, 1.0 - p.x), min(p.y, 1.0 - p.y)));
+      col = texture(src, p).rgb * fe;
+    }
   }
   if (uGrid == 1) {
     // Alignment grid : every 10° of elevation, every 30° of azimuth; the horizon
@@ -145,6 +158,11 @@ const norm = (a: V3): V3 => {
 }
 
 export class DomeStage {
+  // SPIN is a speed : its angle is integrated here, frame by frame (authoring
+  // rules §1). As rotate + spin × time, any change of spin (the slider, and now
+  // a modulator) swung the whole dome by spin × the show's elapsed time.
+  private spinDeg = 0
+  private lastT = -1
   private prog: WebGLProgram
   private u = new Map<string, WebGLUniformLocation | null>()
   private target: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null
@@ -189,7 +207,10 @@ export class DomeStage {
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, src)
     gl.uniform1i(this.loc('src'), 0)
-    const rot = rad(cfg.rotate + cfg.spin * timeSec)
+    const dt = this.lastT < 0 ? 0 : Math.max(0, Math.min(0.25, timeSec - this.lastT))
+    this.lastT = timeSec
+    this.spinDeg = (this.spinDeg + cfg.spin * dt) % 360
+    const rot = rad(cfg.rotate + this.spinDeg)
     gl.uniform1f(this.loc('uHalfAp'), rad(cfg.aperture) / 2)
     gl.uniform1i(this.loc('uMode'), cfg.mode === 'wrap' ? 0 : cfg.mode === 'screen' ? 1 : 2)
     gl.uniform1f(this.loc('uRot'), rot)

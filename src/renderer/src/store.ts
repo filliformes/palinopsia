@@ -38,7 +38,7 @@ import { defaultResolumeMap, resoCatalogue, RESO_SNAPSHOTS } from '@shared/resol
 import type { DomeConfig } from '@shared/dome'
 import type { NdiConfig, NdiStatus } from '@shared/ndi'
 import { sanitizeNdiConfig, idleNdiStatus } from '@shared/ndi'
-import { sanitizeDome } from '@shared/dome'
+import { DOME_MOD_RANGE, sanitizeDome } from '@shared/dome'
 import { inputsForShader } from './shaders/isf/inputs'
 import { SHADER_BY_ID } from './shaders/isf'
 import { canHostFx } from './fxScopes'
@@ -682,9 +682,14 @@ export function isToggleTarget(st: { composition: CompositionState }, t: ModTarg
 
 /** Normalized (0..1) CURRENT base of a mod target, for assignMod's automatic
  *  mode choice. 0.5 (→ multiply) wherever the base can't be resolved. */
-function baseNormForTarget(st: { composition: CompositionState }, t: ModTarget): number {
+function baseNormForTarget(st: { composition: CompositionState; dome?: DomeConfig }, t: ModTarget): number {
   try {
     if (t.kind === 'meta') return st.composition.metaKnobs[t.knob]?.value ?? 0.5
+    if (t.kind === 'dome') {
+      if (!st.dome) return 0.5
+      const r = DOME_MOD_RANGE[t.field]
+      return (st.dome[t.field] - r.min) / (r.max - r.min)
+    }
     if (t.kind === 'bg') {
       const b = st.composition.background
       if (!b) return 0.5
@@ -1133,6 +1138,7 @@ export function modTargetKey(t: ModTarget): string {
   if (t.kind === 'sonify') return `soni:${t.param}`
   if (t.kind === 'layer') return `lay:${t.layer}:${t.field}`
   if (t.kind === 'bg') return `bg:${t.field}`
+  if (t.kind === 'dome') return `dome:${t.field}`
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`

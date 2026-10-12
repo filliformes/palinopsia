@@ -643,6 +643,9 @@ export type ModTarget =
   // The Background's own controls : opacity, its clock's speed (0..4×) and the
   // contact shadow the layers cast on it ('depth'). Same final override.
   | { kind: 'bg'; field: 'opacity' | 'speed' | 'depth' }
+  // The fulldome mapping's own sliders (shared/dome.ts DOME_MOD_RANGE) : a final
+  // override on the dome stage, like the Background's.
+  | { kind: 'dome'; field: import('./dome').DomeModField }
 
 // The Background's clock : grounds move slowly by default, up to 4× (every
 // path : the slider, the store, OSC, modulation, the Meta knobs).
