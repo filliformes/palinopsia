@@ -63,6 +63,24 @@ that CI builds into cross-platform releases.
   the RTX at 4K : all figures 1.9 → 12.5 ms). Measured at 4K : matrix 1.9 → 2.0 ms, bars
   1.9 → 2.2, slab 2.5 → 2.6 (within noise), slant 4.4 ms (about 1.1 ms at 1080p).
 
+### Fixed
+
+- **No more readback warning flooding the console.** The picture's read-back buffers
+  (the vision, Sonify and depth grids, and every output capture : projector, NDI,
+  Spout / Syphon, recording, the dome preview) were created as READ-usage buffers, for
+  which Chromium copies the data into shared memory at every fence to serve the read
+  from there. Our reads never used that copy, so each fence threw the previous one away
+  and printed "READ-usage buffer was written, then fenced, but written again before
+  being read back" : 256 times in 20 idle seconds from boot, which also used up WebGL's
+  32-message console budget, so a real GL error after that would never have been shown.
+  The buffers now carry a COPY usage hint, so Chromium makes no shadow copy at all.
+  Measured in the test build : 256 warnings → 0 (idle and under stress), "too many
+  errors" gone; a 1280-wide newest-frame capture 7.3 → 2.6 ms median (10.6 → 5.2 ms
+  95th percentile), the grids unchanged at about 0.5 ms a read and landing more often
+  (163 of 180 polls, was 143). Found with an isolated lab page on the same Electron :
+  read-usage 38 warnings in 20 read cycles at 0.5 ms a read, copy-usage none at 0.2 ms,
+  however long the read waited after the fence.
+
 ## v1.2.5 — 2026-10-10
 
 ### Added

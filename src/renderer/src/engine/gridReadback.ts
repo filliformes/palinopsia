@@ -68,7 +68,17 @@ export class GridReadback {
     for (let i = 0; i < this.slots; i++) {
       const pb = gl.createBuffer()!
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pb)
-      gl.bufferData(gl.PIXEL_PACK_BUFFER, bytes, gl.STREAM_READ)
+      // STREAM_COPY, not STREAM_READ. For a READ-usage buffer Chromium copies
+      // the data into shared memory at every fence, to serve the read from
+      // there; that copy was never used by our reads (each one took the direct
+      // path), so every fence threw the last one away and printed "READ-usage
+      // buffer was written, then fenced, but written again before being read
+      // back" : about 13 times a second from boot, flooding the console. With a
+      // COPY hint Chromium makes no shadow copy at all. Measured in isolation on
+      // this Electron : 38 warnings in 20 read cycles -> 0, read median
+      // 0.5 -> 0.2 ms. The usage is only a hint : readPixels and
+      // getBufferSubData work the same on either.
+      gl.bufferData(gl.PIXEL_PACK_BUFFER, bytes, gl.STREAM_COPY)
       this.pbos.push(pb)
     }
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null)

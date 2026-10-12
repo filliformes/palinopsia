@@ -212,7 +212,9 @@ export class FrameCapture {
       for (let i = 0; i < this.slots; i++) {
         const pb = gl.createBuffer()!
         gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pb)
-        gl.bufferData(gl.PIXEL_PACK_BUFFER, bytes, gl.STREAM_READ)
+        // STREAM_COPY, not STREAM_READ : no shadow copy at every fence (that
+        // copy went unused and printed a warning each time; gridReadback.ts).
+        gl.bufferData(gl.PIXEL_PACK_BUFFER, bytes, gl.STREAM_COPY)
         this.pbos.push(pb)
       }
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null)
