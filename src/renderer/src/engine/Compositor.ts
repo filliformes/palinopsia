@@ -1310,6 +1310,12 @@ export class ISFLayer {
     // (Speed / freeze pace it).
     const nat = slot === 'A' ? this.natA : this.natB;
     if (nat) {
+      // An engine that reads the sound or another layer gets both resolved here,
+      // every frame (the referenced layer's texture can change under us).
+      if (nat.src.feed) {
+        const ref = slot === 'A' ? this.sideRefA : this.sideRefB;
+        nat.src.feed(this.shared.audioTex?.texture ?? null, sidechainTex && ref ? sidechainTex(ref) : null);
+      }
       nat.src.render(scratch.fbo, this.clockSec);
       return;
     }
@@ -2946,6 +2952,8 @@ export class Compositor {
         if (bgColl) {
           bgColl.render(this.bgScratch.fbo, this.bgClockSec, true);
         } else if (this.bgNativeSource) {
+          // The slab has no sidechain : the sound only.
+          this.bgNat?.src.feed?.(this.shared.audioTex?.texture ?? null, null);
           this.bgNativeSource.render(this.bgScratch.fbo, this.bgClockSec);
         } else {
           if (this.bgShaderId === 'scan' && this.shared.scanMaps) pushScanMaps(this.bgIsf!, this.shared.scanMaps);

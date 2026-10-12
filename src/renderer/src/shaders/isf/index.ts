@@ -1507,6 +1507,51 @@ export const GENERATORS: IsfShader[] = [
       ]
     })}*/`,
     curated: { threshold: [0.4, 0.6], softness: [0.04, 0.2], trail: [0, 0.6] }
+  },
+  {
+    // Native (engine/LatticeSource.ts) : instanced capsules from gl_InstanceID, MAX
+    // blended into a coverage map, laid over the ground in straight alpha.
+    id: 'gen-lattice',
+    name: 'Lattice',
+    category: 'Generator',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Lattice : a lattice of points in space, seen through a moving camera. FORM lays them on a PLANE (a floor of dots seen from above) or fills a VOLUME with them (a room of stars). COUNT is how many per side, SIZE how big, VARY lets a few grow large and bright, JITTER loosens the grid into a scatter. TILT, TURN, HEIGHT and LENS frame the camera, FLY carries it forward, SPIN turns it. Where the camera looks, a WELL sinks the plane into a funnel (in a volume it pulls the points into a knot), over REACH; RIPPLE rings out from it (RINGS of them, travelling at PACE), SWELL heaves the surface, AUDIO lifts it with the spectrum (bass at the heart), SIDECHAIN with another layer’s brightness. STREAK draws each point as the trail of the camera’s motion, FOG fades the distance. Never additive : overlapping dots never pile up into a glow.',
+      CATEGORIES: ['Generator', 'Geometry'],
+      INPUTS: [
+        { NAME: 'form', TYPE: 'long', VALUES: [0, 1], LABELS: ['plane', 'volume'], DEFAULT: 0, LABEL: 'form' },
+        { NAME: 'count', TYPE: 'float', MIN: 16, MAX: 256, DEFAULT: 200, LABEL: 'count' },
+        { NAME: 'size', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'size' },
+        { NAME: 'vary', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.2, LABEL: 'vary' },
+        { NAME: 'jitter', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'jitter' },
+        { NAME: 'tilt', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.45, LABEL: 'tilt' },
+        { NAME: 'turn', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'turn' },
+        { NAME: 'height', TYPE: 'float', MIN: 0.3, MAX: 30, DEFAULT: 10, LABEL: 'height' },
+        { NAME: 'lens', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'lens' },
+        { NAME: 'fly', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.15, LABEL: 'fly' },
+        { NAME: 'spin', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'spin' },
+        { NAME: 'well', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'well' },
+        { NAME: 'reach', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'reach' },
+        { NAME: 'ripple', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'ripple' },
+        { NAME: 'rings', TYPE: 'float', MIN: 0.25, MAX: 12, DEFAULT: 3, LABEL: 'rings' },
+        { NAME: 'pace', TYPE: 'float', MIN: -2, MAX: 2, DEFAULT: 0.3, LABEL: 'pace' },
+        { NAME: 'swell', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'swell' },
+        { NAME: 'audio', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'audio' },
+        { NAME: 'side', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'sidechain' },
+        { NAME: 'streak', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'streak' },
+        { NAME: 'fog', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'fog' },
+        { NAME: 'ink', TYPE: 'color', DEFAULT: [0.92, 0.94, 0.95, 1.0], LABEL: 'ink' },
+        { NAME: 'ground', TYPE: 'color', DEFAULT: [0.02, 0.02, 0.025, 1.0], LABEL: 'ground' }
+      ]
+    })}*/`,
+    // The sidechain is a choice made with a layer in mind : never dealt.
+    curated: {
+      count: [90, 220], size: [0.15, 0.6], vary: [0, 0.6], jitter: [0, 0.35], tilt: [0.15, 0.7], turn: [-1, 1],
+      height: [4, 18], lens: [0.35, 0.8], fly: [-0.3, 0.3], spin: [-0.08, 0.08], well: [0, 0.8], reach: [0.15, 0.6],
+      ripple: [0, 0.6], rings: [1.5, 6], pace: [-0.6, 0.6], swell: [0, 0.5], audio: [0, 0.4], side: [0, 0],
+      streak: [0, 0.4], fog: [0.2, 0.6]
+    }
   }
 ]
 

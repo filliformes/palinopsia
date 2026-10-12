@@ -159,7 +159,7 @@ export function Inspector(): JSX.Element {
   // A plain sidechain row for a SOURCE that reads another layer but has nothing
   // else to configure. Text cannot be reused for this : its strip carries a text
   // box and calls its picker "fill", which is Text's own idea, not a sidechain.
-  let sideCfg: { ref: SidechainRef | null; setRef: (r: SidechainRef | null) => void; hostLayer: number } | null = null
+  let sideCfg: { ref: SidechainRef | null; setRef: (r: SidechainRef | null) => void; hostLayer: number; hint: string } | null = null
   let textCfg: {
     text: string
     setText: (t: string) => void
@@ -220,11 +220,15 @@ export function Inspector(): JSX.Element {
           edls: slot.collageEdls ?? []
         }
       }
-      if (slot.shaderId === 'lowercase') {
+      if (slot.shaderId === 'lowercase' || slot.shaderId === 'gen-lattice') {
         sideCfg = {
           ref: slot.sidechain ?? null,
           setRef: (r) => setSourceSidechain(li, sl, r),
-          hostLayer: li
+          hostLayer: li,
+          hint:
+            slot.shaderId === 'lowercase'
+              ? "A layer this source reads, one sample per cell, as that cell's density : the picture arrives as a field of lit and unlit cells rather than a copy of itself. Raise the sidechain control to hear it. None = the source's own density."
+              : 'A layer this source reads where each point appears : on a plane its brightness lifts the dots, so the picture stands up out of the field as the camera sees it; in a volume it lights and grows the points. Raise the sidechain control to use it. None = the field on its own.'
         }
       }
       if (slot.shaderId === 'gen-text') {
@@ -649,7 +653,7 @@ export function Inspector(): JSX.Element {
         <div className="flex items-center gap-2 border-b border-border bg-panel2/40 px-2 py-1">
           <span
             className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-accent2"
-            title="A layer this source reads, one sample per cell, as that cell's density : the picture arrives as a field of lit and unlit cells rather than a copy of itself. Raise the sidechain control to hear it. None = the source's own density."
+            title={sideCfg.hint}
           >
             sidechain
           </span>

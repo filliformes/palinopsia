@@ -183,6 +183,8 @@ const RANDOMIZE_SKIP: Record<string, RegExp> = {
   // Black and white with one accent : the accent rolls, the ink and the
   // ground stay the white mark on its near-black ground.
   'lowercase': /^(ink|ground)$/,
+  // Points of light on a dark ground : the field stays a white dot on near-black.
+  'gen-lattice': /^(ink|ground)$/,
   'sync-osc': /^loA$/,
   // Feedback Zoom : a rolled center can land the tunnel in a corner; the dice
   // rolls `drift` instead, which lets the center wander on its own.

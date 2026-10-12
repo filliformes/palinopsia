@@ -7,6 +7,28 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Lattice**, a new native source (`gen-lattice`, `engine/LatticeSource.ts`) : a
+  lattice of points in space through a moving camera, a **plane** of dots or a
+  **volume** the camera flies through. Each point is one instance of a 4-vertex strip
+  whose cell comes from `gl_InstanceID` (no vertex data : a count change is a uniform),
+  drawn as a capsule from where it sits back to where it sat **streak** seconds ago,
+  anti-aliased over a pixel, floored at 1.5 px across (dimmer, not smaller) and capped
+  near the lens (a passing star swelled into a ball a sixth of the frame tall). MAX
+  blending into an 8-bit coverage map, then ink over ground in straight alpha : overlaps
+  never add into a glow. Infinite : the cells wrap around the camera, whose position
+  wraps at 4096 cells where every per-point draw and the swell noise repeat, so flying
+  never ends and the wrap is seamless; the lattice's edge always fades. **well** /
+  **reach** / **ripple** / **rings** / **pace** / **swell** / **audio** (the shared spectrum by
+  distance from the well, read with `texelFetch` in the vertex shader) / **sidechain**
+  (another layer's brightness where each point appears, read once per point). The
+  registry contract gains an optional `feed(audio, side)` the Compositor calls before
+  render (the Background feeds sound only); the Inspector's sidechain row now serves
+  Lattice too, with its own hint. Measured on the RTX at 1080p : 57.7 fps at the
+  default (200² = 40 000 points), 59.1 fps at 256² on the plane and 56³ (175 000
+  points) in a volume; getError 0; no compile messages; the camera parked at 4095.5
+  cells flew through the wrap with no step in the picture's brightness. Ten presets,
+  hints, keywords, a blurb; the dice never colors its ink or ground.
+
 - **Perspective**, a new effect : the layer laid on a plane in space and seen through a
   lens. **tilt** / **turn** / **roll** place the plane (up to 80 degrees, where it is
   almost edge on), **lens** is the focal length from a 9 degree telephoto to an 80 degree

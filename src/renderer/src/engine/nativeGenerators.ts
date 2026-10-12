@@ -18,6 +18,7 @@ import { FluidSource } from './FluidSource'
 import { PhysarumSource } from './PhysarumSource'
 import { MyceliumSource } from './MyceliumSource'
 import { VeinsSource } from './VeinsSource'
+import { LatticeSource } from './LatticeSource'
 
 export interface NativeGenerator {
   /** The slot's whole input map, from the store, every frame. */
@@ -27,6 +28,10 @@ export interface NativeGenerator {
   /** Draw this frame into `targetFbo` (the composition size), paced by the slot's
    *  own clock in seconds (layer Speed, freeze, the background's slow clock). */
   render(targetFbo: WebGLFramebuffer, clockSec: number): void
+  /** Optional : the shared audio texture (row 0 waveform, row 1 log spectrum) and
+   *  the slot's sidechain layer (null when none or on the Background), handed in
+   *  just before render. An engine that reads neither leaves this out. */
+  feed?(audio: WebGLTexture | null, side: WebGLTexture | null): void
   // No PANIC hook on purpose : a generator's state IS the picture (Compositor.panic);
   // each engine carries its own regrow / reseed event instead.
   dispose(): void
@@ -40,7 +45,8 @@ const REGISTRY: Record<string, Factory> = {
   'gen-fluid': (gl, w, h) => new FluidSource(gl, w, h),
   'gen-physarum': (gl, w, h) => new PhysarumSource(gl, w, h),
   mycelium: (gl, w, h) => new MyceliumSource(gl, w, h),
-  'gen-veins': (gl, w, h) => new VeinsSource(gl, w, h)
+  'gen-veins': (gl, w, h) => new VeinsSource(gl, w, h),
+  'gen-lattice': (gl, w, h) => new LatticeSource(gl, w, h)
 }
 
 export const NATIVE_GENERATOR_IDS: readonly string[] = Object.keys(REGISTRY)
