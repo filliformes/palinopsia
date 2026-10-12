@@ -1,10 +1,10 @@
 /*{
-  "DESCRIPTION": "Lowercase : machine-cut marks on a stepped clock. Hard rectangles, bars, ticks and sprocket ladders land on a step and hold, never sweep : the picture changes between frames and is still in between. FIGURE picks the vocabulary, from a dense data matrix down to one white slab with bars cut out of it. It carries its own clock (RATE, divided by STEP), so it pulses the moment you pick it; bind GATE to a Euclid, a Spastic or an audio transient and it plays that rhythm instead. HOLD is how many steps a deal survives, JUMP how far it moves on each deal, SCROLL whether a deal is a fresh draw or the last one slid a cell along, SHEAR knocks rows sideways, FLIP inverts the whole frame for one step. SMEAR leaves the previous step trailing behind, the way a filmed projection does. ACCENT marks a regular lattice of cells in its own color, so it reads as meaning and not as noise. Flat and hard-edged, never radial, never a gradient.",
+  "DESCRIPTION": "Lowercase : machine-cut marks on a stepped clock. Hard rectangles, bars, ticks and sprocket ladders land on a step and hold, never sweep : the picture changes between frames and is still in between. FIGURE picks the vocabulary, from a dense data matrix down to one white slab with bars cut out of it, or SLANT : full-height bars that each lean their own way and cross. It carries its own clock (RATE, divided by STEP), so it pulses the moment you pick it; bind GATE to a Euclid, a Spastic or an audio transient and it plays that rhythm instead. HOLD is how many steps a deal survives, JUMP how far it moves on each deal, SCROLL whether a deal is a fresh draw or the last one slid a cell along, SHEAR knocks rows sideways, FLIP inverts the whole frame for one step. SMEAR leaves the previous step trailing behind, the way a filmed projection does. ACCENT marks a regular lattice of cells in its own color, so it reads as meaning and not as noise. Flat and hard-edged, never radial, never a gradient.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Geometry"],
   "INPUTS": [
-    { "NAME": "figure",  "TYPE": "long", "VALUES": [0, 1, 2, 3, 4, 5, 6, 7], "LABELS": ["matrix", "blocks", "bars", "ticks", "rule", "grid", "ladder", "slab"], "DEFAULT": 0 },
+    { "NAME": "figure",  "TYPE": "long", "VALUES": [0, 1, 2, 3, 4, 5, 6, 7, 8], "LABELS": ["matrix", "blocks", "bars", "ticks", "rule", "grid", "ladder", "slab", "slant"], "DEFAULT": 0 },
     { "NAME": "cells",   "TYPE": "float", "MIN": 3.0,  "MAX": 512.0, "DEFAULT": 14.0, "LABEL": "cells" },
     { "NAME": "density", "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.55, "LABEL": "density" },
     { "NAME": "split",   "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.6,  "LABEL": "split" },
@@ -51,6 +51,18 @@ float deal(vec2 c, float t, vec2 salt, vec2 dir) {
   float run = scroll > 0.995 ? 65536.0 : 1.0 + floor(scroll * 15.0 + 0.5);
   float d = floor(t / run);
   return hash13(vec3(c + salt + dir * (t - d * run), mod(d, 4093.0)));
+}
+
+// Three draws from one deal, for a mark that is one object (SLANT's bar :
+// whether it stands, its lean, its width). Hoskins' hash33, the same family and
+// the same small floored inputs as hash13 (§2).
+vec3 deal3(vec2 c, float t, vec2 salt, vec2 dir) {
+  float run = scroll > 0.995 ? 65536.0 : 1.0 + floor(scroll * 15.0 + 0.5);
+  float d = floor(t / run);
+  vec3 p3 = vec3(c + salt + dir * (t - d * run), mod(d, 4093.0));
+  p3 = fract(p3 * vec3(0.1031, 0.1030, 0.0973));
+  p3 += dot(p3, p3.yxz + 33.33);
+  return fract((p3.xxy + p3.yxx) * p3.zyx);
 }
 
 // A hard-edged rectangle, anti-aliased over `e` and never thinner than a pixel.
@@ -213,6 +225,54 @@ float figureCov(vec2 q, float aspect, float S, float px, float dens, vec2 sideLA
     k = max(k, rectCov(f, vec2(0.30, 0.045), e) * sparse * mid);
     cov = k;
     isAcc *= mid;
+  } else if (fig == 8) {
+    // SLANT : full-height bars that each lean their own way, so they cross into
+    // X's and fans. Dealt on the step and held like every other figure : SPLIT is
+    // how far a bar may lean, DENSITY how many of the slots stand, CELLS how many
+    // slots. Rows play no part, as in BARS, so SHEAR breaks a bar into steps.
+    //
+    // A bar can reach a pixel from up to half its lean away, so the search covers
+    // the lean (§3), and only that far : the loop runs over the slots the lean can
+    // actually reach (3 each side at the defaults). At a steep lean over many
+    // slots the count is capped to what nine slots can reach; the lean never is.
+    //
+    // No texture read in here : a read inside one figure's branch makes the
+    // compiler run EVERY figure for every pixel (measured : all of them went from
+    // 1.9 to 12.5 ms at 4K). So the gate is the cell's, as in BARS : a bar opens
+    // where the band under it is loud and can break where it crosses a quiet one.
+    isAcc = 0.0;
+    float lean = split * 0.6;                     // top-to-bottom drift, frame heights
+    float nb = max(1.0, floor(cells + 0.5));
+    nb = min(nb, max(2.0, floor(16.0 * aspect / max(lean, 1e-3))));
+    float pitch = aspect / nb;
+    float xs = qs.x + off.x;
+    float c0 = floor(xs / pitch);
+    int reach = int(min(9.0, ceil(0.5 * lean / pitch + 1.5)));
+    // Under about six pixels a slot cannot hold a bar and a gap : the bar grows
+    // to fill its slot, as the grids' cells do, instead of averaging to grey.
+    float solidB = 1.0 - smoothstep(2.5, 7.0, pitch / max(px, 1e-6));
+    for (int i = 0; i < 19; i++) {
+      if (i > 2 * reach) break;
+      float col = c0 + float(i - reach);
+      // One draw per bar per deal : whether it stands, its lean, its width. A bar
+      // is one object, so all three change together.
+      vec3 r3 = deal3(vec2(col, 0.0), floor(S * 0.41), vec2(hand + 9.0, 0.0), vec2(1.0, 0.0));
+      float on = step(1.0 - g1, r3.x);
+      float l = (r3.y * 2.0 - 1.0) * lean;
+      // Widths lean thin (squared draw) : a few fat bars among many narrow ones,
+      // rather than an even comb.
+      float w = mix(pitch * (0.05 + 0.42 * r3.z * r3.z), 0.5 * pitch, solidB);
+      w = max(w, eq * 0.5);
+      // Distance across the bar, not along x : a leaning bar keeps its width.
+      float xc = (col + 0.5) * pitch + l * (qs.y - 0.5);
+      float d = abs(xs - xc) * inversesqrt(1.0 + l * l);
+      float cv = (1.0 - smoothstep(w - eq, w + eq, d)) * on;
+      if (cv > cov) {
+        cov = cv;
+        // one slot in per² carries the accent, as in BARS
+        isAcc = step(mod(col + floor(S * 0.25), per * per), 0.5);
+      }
+    }
   } else {
     // SLAB : one white field with bars cut OUT of it. The only inverted figure,
     // and the only one where the ink is the ground.

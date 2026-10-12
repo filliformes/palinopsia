@@ -8,13 +8,17 @@ generator or effect can be checked without launching the app.
 cd tools/shader-rig
 node build.cjs                                   # after every shader / registry edit
 # (node build.cjs --out <dir> writes a runnable rig to <dir>; run electron there)
-SRCH_PORT=9461 ../../node_modules/electron/dist/electron.exe . &
+SRCH_PORT=9461 ../../node_modules/electron/dist/electron.exe . --force_high_performance_gpu &
 node h.cjs 9461 check slabs,ten-print            # generators
 node h.cjs 9461 fxcheck fx-grain,fx-decay        # effects, fed a moving test card
 node h.cjs 9461 quit                             # always close it when done
 ```
 
 The default ids are in `src/renderer/src/shaders/isf/index.ts`.
+
+On a laptop with two GPUs the rig starts on the integrated one unless it is launched with
+`--force_high_performance_gpu`, and its `ms4k` then reads about seven times slower than the
+app. Check with `node h.cjs 9461 eval "(()=>{const c=document.createElement('canvas').getContext('webgl2');return c.getParameter(c.getExtension('WEBGL_debug_renderer_info').UNMASKED_RENDERER_WEBGL)})()"`.
 
 | command | what it tells you |
 |---|---|

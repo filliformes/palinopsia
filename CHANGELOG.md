@@ -3,6 +3,23 @@
 All notable changes to Palinopsia. Dates are ISO. Versions follow the `v*` tags
 that CI builds into cross-platform releases.
 
+## Unreleased (v1.2.6)
+
+### Added
+
+- **Lowercase : a ninth figure, slant.** Full-height bars that each lean their own way and
+  cross into X shapes and fans, dealt on the step and held like every other figure.
+  **split** is how far a bar may lean (0 stands them upright, 1 crosses them steeply),
+  **density** how many of the slots stand, **cells** how many slots; widths are drawn
+  thin-leaning, so a few fat bars stand among many narrow ones. Each bar's stand, lean and
+  width come from one draw, so a bar changes as one object. **scroll** slides it,
+  **shear** breaks bars into steps, the accent marks one slot in every per² like the bars
+  figure. Three presets : Crossing, Leaning comb, Fallen bars. The search for nearby bars
+  covers exactly how far the lean can carry one, and nothing in the new branch reads a
+  texture : a read there made the compiler run every figure for every pixel (measured on
+  the RTX at 4K : all figures 1.9 → 12.5 ms). Measured at 4K : matrix 1.9 → 2.0 ms, bars
+  1.9 → 2.2, slab 2.5 → 2.6 (within noise), slant 4.4 ms (about 1.1 ms at 1080p).
+
 ## v1.2.5 — 2026-10-10
 
 ### Added
