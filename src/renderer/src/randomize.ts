@@ -512,16 +512,22 @@ function randomMatrix(c: CompositionState): ModAssignment[] {
 // move; the bindings stay on the layers (sources and their racks), never the
 // master, so the theme's color and finish hold. Every active layer gets at least
 // one moving parameter, and a row is left free for the World's audio route.
-const MOTION_SKIP = /seed/i // a seed jump reshuffles the whole picture : never swept
+// A seed jump reshuffles the whole picture, and a swept flip (Lowercase) inverts
+// the whole frame on every swing : a strobe. Never bound by a theme.
+const MOTION_SKIP = /seed|^flip$/i
 
 export function themedMotion(c: CompositionState, recipe: MotionRecipe): CompositionState {
   const n = recipe.mods[0] + Math.floor(rnd() * (recipe.mods[1] - recipe.mods[0] + 1))
   if (n <= 0) return c
-  const targets = collectFloatTargets(c).filter(
-    (t) =>
+  const own = recipe.skip ? new RegExp(recipe.skip) : null
+  const targets = collectFloatTargets(c).filter((t) => {
+    const name = 'input' in t ? String(t.input) : ''
+    return (
       !(t.kind === 'fx' && (t.scope.kind === 'master' || t.scope.kind === 'background')) &&
-      !MOTION_SKIP.test('input' in t ? String(t.input) : '')
-  )
+      !MOTION_SKIP.test(name) &&
+      !(own && own.test(name))
+    )
+  })
   if (!targets.length) return c
   const slots = [0, 1, 2, 3, 4, 5, 6, 7].filter((s) => s !== WORLD_AUTOMOD_SLOT)
   for (let i = slots.length - 1; i > 0; i--) {

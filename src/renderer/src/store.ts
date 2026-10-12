@@ -1020,6 +1020,13 @@ function buildThemeComposition(theme: Theme, clips: CollageClips | null): Compos
       const node = themeFx(pickOf(theme.nativeNodes), i)
       if (node) l.fx.push(node)
     }
+    // The effect this layer cannot do without closes its rack, after everything
+    // drawn by chance (a Perspective lays the whole treated picture on its plane).
+    const must = theme.stackFx?.[i]
+    if (must?.length) {
+      const fx = themeFx(pickOf(must), i)
+      if (fx) l.fx = [...l.fx.filter((f) => f.shaderId !== fx.shaderId), fx]
+    }
     l.blend = i === 0 ? 'normal' : pickOf(theme.blends)
     l.opacity = i === 0 ? 1 : rr(0.65, 1)
     l.feedback = R() < theme.feedback
@@ -1040,7 +1047,7 @@ function buildThemeComposition(theme: Theme, clips: CollageClips | null): Compos
   const background: BackgroundState = {
     source: { kind: 'generator', shaderId: bgId, inputs: randomizeInputs(bgId, {}) },
     fx: [],
-    opacity: 1,
+    opacity: theme.bgOpacity ?? 1,
     speed: BG_DEFAULT_SPEED,
     depth: rr(0, 0.35),
     blendMode: 'isolate'

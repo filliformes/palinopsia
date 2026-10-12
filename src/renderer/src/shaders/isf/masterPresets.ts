@@ -877,5 +877,77 @@ export const MASTER_PRESETS: MasterPreset[] = [
     ],
     vibe: { contrast: 1.05, saturation: 0.95, gamma: 1, autoLevel: 0.15 },
     context: { depth: 0, haze: 0.1 }
+  },
+  // ── Space : the picture laid on a plane in space (Perspective), and the
+  // chains that flatter points of light (Lattice, Lowercase). No mixSrc : a
+  // Generate scene keeps its palette mapping.
+  {
+    name: 'Space · Floor', group: 'Space',
+    fx: [
+      { shaderId: 'fx-perspective', inputs: { tilt: 0.55, turn: 0, roll: 0, lens: 0.6, zoom: 1.2, posX: 0, posY: 0, axis: 0, bend: 0, wave: 0, waves: 1.5, waveRate: 0, repeat: 1, travel: 0, drift: 0, fog: 0.35, shade: 0, soften: 0.6 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 1, lift: 0.01 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 1, gamma: 1, autoLevel: 0.2 }
+  },
+  {
+    name: 'Space · Corridor', group: 'Space',
+    fx: [
+      { shaderId: 'fx-perspective', inputs: { tilt: 0, turn: 0.6, roll: 0, lens: 0.7, zoom: 1, posX: -0.2, posY: 0, axis: 0, bend: 0, wave: 0, waves: 1.5, waveRate: 0, repeat: 1, travel: 0, drift: 0, fog: 0.4, shade: 0.2, soften: 0.6 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.95, gamma: 1, autoLevel: 0.2 }
+  },
+  {
+    name: 'Space · Ribbon', group: 'Space',
+    fx: [
+      { shaderId: 'fx-perspective', inputs: { tilt: 0.1, turn: 0.45, roll: 0, lens: 0.65, zoom: 0.9, posX: 0, posY: 0, axis: 0, bend: 0.15, wave: 0.45, waves: 1.2, waveRate: 0.08, repeat: 0, travel: 0, drift: 0, fog: 0.3, shade: 0.4, soften: 0.6 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 1, gamma: 1, autoLevel: 0.15 }
+  },
+  {
+    name: 'Space · Horizon', group: 'Space',
+    fx: [
+      { shaderId: 'fx-perspective', inputs: { tilt: 0.85, turn: 0, roll: 0, lens: 0.8, zoom: 1, posX: 0, posY: -0.2, axis: 0, bend: 0, wave: 0, waves: 1.5, waveRate: 0, repeat: 1, travel: 0.06, drift: 0, fog: 0.7, shade: 0, soften: 0.8 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.1, size: 1.5, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.95, gamma: 1.05, autoLevel: 0.2 }
+  },
+  {
+    name: 'Space · Curved Screen', group: 'Space',
+    fx: [
+      { shaderId: 'fx-perspective', inputs: { tilt: 0, turn: 0, roll: 0, lens: 0.6, zoom: 0.85, posX: 0, posY: 0, axis: 0, bend: 0.6, wave: 0, waves: 1.5, waveRate: 0, repeat: 0, travel: 0, drift: 0, fog: 0, shade: 0.35, soften: 0.5 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 1, gamma: 1, autoLevel: 0.15 }
+  },
+  {
+    name: 'Space · Data Wall', group: 'Space',
+    fx: [
+      { shaderId: 'fx-threshold', inputs: { level: 0.45, soft: 0.06, invert: 0, alphaOut: 0 } },
+      { shaderId: 'fx-perspective', inputs: { tilt: 0.05, turn: 0.55, roll: 0, lens: 0.7, zoom: 0.95, posX: 0, posY: 0, axis: 0, bend: 0, wave: 0.3, waves: 1.1, waveRate: 0.04, repeat: 0, travel: 0, drift: 0, fog: 0.25, shade: 0.3, soften: 0.7 } }
+    ],
+    vibe: { contrast: 1.1, saturation: 0.9, gamma: 1, autoLevel: 0.2 }
+  },
+  {
+    name: 'Space · Halftone Floor', group: 'Space',
+    fx: [
+      { shaderId: 'fx-pixelmask', inputs: { pattern: 2, scale: 4, amount: 1, invert: 0 } },
+      { shaderId: 'fx-perspective', inputs: { tilt: 0.6, turn: 0, roll: 0, lens: 0.65, zoom: 1.1, posX: 0, posY: 0, axis: 0, bend: 0, wave: 0, waves: 1.5, waveRate: 0, repeat: 1, travel: 0, drift: 0, fog: 0.45, shade: 0, soften: 0.7 } }
+    ],
+    vibe: { contrast: 1.1, saturation: 1, gamma: 1, autoLevel: 0.3 }
+  },
+  {
+    name: 'Space · Scan Relief', group: 'Space',
+    fx: [
+      { shaderId: 'fx-rutt', inputs: { lines: 90, amp: 0.1, width: 0.2, color: 0.6, relief: 1 } },
+      { shaderId: 'fx-perspective', inputs: { tilt: 0.5, turn: 0, roll: 0, lens: 0.6, zoom: 1.1, posX: 0, posY: 0, axis: 0, bend: 0, wave: 0, waves: 1.5, waveRate: 0, repeat: 1, travel: 0, drift: 0, fog: 0.4, shade: 0, soften: 0.7 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 1, gamma: 1, autoLevel: 0.25 }
+  },
+  {
+    name: 'Space · Starlight', group: 'Space',
+    fx: [
+      { shaderId: 'fx-light-trails', inputs: { decay: 0.9, drift: 0, angle: 1.5708, knee: 0.5 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 0.95, lift: 0 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.95, gamma: 1, autoLevel: 0.15 }
   }
 ]

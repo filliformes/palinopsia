@@ -162,7 +162,7 @@ first-ever launch pays this once; it persists on disk afterwards.
 4. **Save a scene**: get something you like, click `+` in the Scene bank, then
    press `1`–`9` to recall it live (recalls morph over MORPH).
 5. **Go fullscreen**: press **`O`**, pick a display, hit fullscreen. Or try
-   **Generate** in the toolbar : 100 themed recipes that build a coherent
+   **Generate** in the toolbar : 108 themed recipes that build a coherent
    session (visuals + World + palette + macro biases + motion) in one click.
 
 **Lost?** Press **`?`** anytime for the full keyboard cheat-sheet.
@@ -1297,7 +1297,7 @@ subfolders) joins the dropdown under the folder's name, in name order (number th
 saved there later appears too. The same menu lists the linked folders : click one to
 jump to its first session, × to unlink it (the files are never touched).
 
-**Generate** (toolbar) : a dropdown of **100 visual themes** in 16 families
+**Generate** (toolbar) : a dropdown of **108 visual themes** in 17 families
 (Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,
 Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage,
 Cinematic/Atmospheric, Retro Screen, Minimal/Structural, Datamosh & Compression,
@@ -1306,7 +1306,10 @@ Cinematic/Atmospheric, Retro Screen, Minimal/Structural, Datamosh & Compression,
 overhead), **Film Wall** (your own films through a Collage, graded and damaged : it plays
 the session's Collage folder, or the last one picked on this computer, and with none yet
 stands in with painted sources and says how to pick one), **Node Workshop** (one recipe
-node per theme, on the layer that reads the others), and, at the end, **Feel Studies**,
+node per theme, on the layer that reads the others), **Space** (points in space and line
+fields laid on planes : Gravity Well, Starfield, Crystal Room, Dot Sea, Spectral Floor
+with Lattice, Line Wall and Data Floor with Lowercase through Perspective, Crossing with
+its slanted bars), and, at the end, **Feel Studies**,
 one theme per Feel macro with everything else held still) + a **Generate** button. Each
 theme is a *recipe* : a tight source/FX pool drawn from the whole instrument (nodes that
 read another layer are handed one that is in the scene), a Vibe palette, a matching World
@@ -1505,12 +1508,15 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   an empty rack. An effect a rack can't host (a layer-only node into the Master, say) is
   refused with a popup saying why, and the drop marker turns red while you hover.
 - **Master chain presets** : the `chain presets…` box in the Master FX strip replaces the
-  whole master chain with one of **100** designed chains and sets the Vibe to match (the
-  finalizers stay). The newer ones sit in three groups : **Time & memory** (Réponse,
+  whole master chain with one of **109** designed chains and sets the Vibe to match (the
+  finalizers stay). The newer ones sit in four groups : **Time & memory** (Réponse,
   Sediment, Chronoscan, Eternalism, Afterimage, Decimate, Corrode, Feedback on the master
   bus), **Node recipes** (a node that reads another layer is wired, when the preset is
-  applied, to a layer in use) and **Dome** (dome-safe : Context's vignette off, nothing
-  framing the edges); they keep the scene's palette mix. The `chain on/off` pill beside
+  applied, to a layer in use), **Dome** (dome-safe : Context's vignette off, nothing
+  framing the edges) and **Space** (the whole picture laid on a plane by Perspective : a
+  floor, a corridor wall, a ribbon, a horizon, a curved screen, a thresholded data wall, a
+  halftone or scan-relief floor; and Starlight, light trails that flatter points);
+  they keep the scene's palette mix. The `chain on/off` pill beside
   it bypasses every master effect except the finalizers.
 - **The source pickers have sections** : **Organic** (living matter : reaction, growth,
   water, fire, ground), **Analog** (the analog video-synth lineage : RGB Oscillators, Sync

@@ -62,6 +62,11 @@ export interface Theme {
   /** Per-layer source pools, bottom layer first, overriding `sources` on those
    *  layers (rock under lichen, paper under the burn). */
   stack?: string[][]
+  /** Per-layer effects, bottom layer first, that CLOSE that layer's rack (one
+   *  drawn from each pool) : the effect a theme cannot do without, e.g. the
+   *  Perspective that lays a line field on a plane. Kept out of `layerFx`, whose
+   *  draws are by chance. */
+  stackFx?: string[][]
   /** Value draws per source, effect or node : one of the listed values (a single
    *  value is fixed). */
   pickInputs?: Record<string, Record<string, number[]>>
@@ -75,6 +80,11 @@ export interface Theme {
   /** Plays the user's clips (Collage) : stands in with painted sources, and says
    *  so, until a Collage folder has been picked on this computer. */
   needsClips?: boolean
+  /** The Background's opacity (default 1). A theme whose layers sit on a dark
+   *  ground of their own lowers it : in group mode the Background shows through
+   *  every dark part of the layers, and points of light on a mottled ground stop
+   *  reading as points of light. */
+  bgOpacity?: number
   /** How the scene moves : overrides the family's motion recipe. */
   motion?: Partial<MotionRecipe>
 }
@@ -93,6 +103,10 @@ export interface MotionRecipe {
   bpm: number
   /** Depth range of each binding. */
   depth: [number, number]
+  /** Inputs never bound (a RegExp source matched against the input name), on top
+   *  of the ones no theme may sweep (randomize.ts MOTION_SKIP) : what re-deals
+   *  or re-tiles the whole picture when it moves. */
+  skip?: string
 }
 
 // Each family's way of moving : slow breathing for living matter and cinema,
@@ -152,6 +166,14 @@ const FAMILY_MOTION: Record<string, MotionRecipe> = {
     rate: [0.1, 1], bpm: 0.5, depth: [0.25, 0.55]
   },
   'Node Workshop': { ...MOTION_DEFAULT, rate: [0.03, 0.6], bpm: 0.35 },
+  // Points and planes in space : a slow camera, nothing that jolts the view.
+  Space: {
+    mods: [1, 2], types: ['lfo', 'slew', 'lfo'], shapes: ['sine', 'triangle', 'rndSmooth'],
+    rate: [0.01, 0.08], bpm: 0.15, depth: [0.15, 0.35],
+    // a moving count / cells re-deals every point, a moving repeat re-tiles the
+    // plane; side and audio do nothing until a layer or a sound is routed in
+    skip: '^(count|cells|repeat|side|audio)$'
+  },
   // Each study isolates one Feel macro : nothing else may move.
   'Feel Studies': { ...MOTION_DEFAULT, mods: [0, 0] }
 }
@@ -1164,6 +1186,165 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-grade'],
     nativeNodes: ['node-datamosh'], nativeChance: 0.7,
     blends: ['screen', 'difference'], layers: [2, 3], gestureTexture: 0.6, coalesce: 0.35, density: 0.55
+  }),
+
+  // ── Space : points in space (Lattice) and line fields laid on planes
+  // (Lowercase through Perspective). White on near-black, one cool shade.
+  mk({
+    id: 'gravity-well', name: 'Gravity Well', family: 'Space',
+    blurb: 'A floor of dots sinking into a funnel where you look, rings travelling out from it.',
+    world: 'synthetic',
+    palette: [K, [0.22, 0.25, 0.3, 1], [0.92, 0.94, 0.96, 1]],
+    sources: ['gen-lattice'],
+    stack: [['gen-lattice']],
+    bgSources: ['drift-field'], bgOpacity: 0.2,
+    pickInputs: {
+      'gen-lattice': {
+        form: [0], well: [0.6, 0.75, 0.85], ripple: [0.3, 0.45, 0.6], rings: [2, 3, 4], reach: [0.3, 0.35, 0.45],
+        tilt: [0.3, 0.38, 0.45], height: [8, 10, 12], fly: [0], spin: [0.01, 0.02, -0.015], pace: [0.25, 0.35],
+        swell: [0], audio: [0], streak: [0], jitter: [0], vary: [0, 0.1], count: [180, 220], size: [0.25, 0.32],
+        fog: [0.25, 0.35], lens: [0.6, 0.7]
+      }
+    },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [1, 1], useB: 0, feedback: 0, density: 0.45, coalesce: 0.45
+  }),
+  mk({
+    id: 'starfield', name: 'Starfield', family: 'Space',
+    blurb: 'Flying through a room of scattered stars, the near ones streaking past.',
+    // synthetic, not sublimated : that World's haze, bloom and trails washed the
+    // small stars into a grey veil (mean 42-62, no black left, measured)
+    world: 'synthetic',
+    context: { haze: 0, bloom: 0.06, trails: 0 },
+    palette: [K, [0.18, 0.2, 0.26, 1], [0.94, 0.95, 0.97, 1]],
+    sources: ['gen-lattice'],
+    stack: [['gen-lattice']],
+    bgSources: ['drift-field'], bgOpacity: 0.2,
+    pickInputs: {
+      'gen-lattice': {
+        form: [1], fly: [0.2, 0.35, 0.5], streak: [0.2, 0.35, 0.5], jitter: [0.4, 0.55, 0.7], vary: [0.4, 0.6],
+        tilt: [0, 0.05, -0.05], turn: [0, 0.5, -0.5], spin: [0, 0.01], well: [0], ripple: [0], swell: [0], audio: [0],
+        count: [160, 200], size: [0.35, 0.45], fog: [0.35, 0.45], lens: [0.6, 0.7]
+      }
+    },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [1, 1], useB: 0, feedback: 0, density: 0.45
+  }),
+  mk({
+    id: 'crystal-room', name: 'Crystal Room', family: 'Space',
+    blurb: 'Inside a perfect lattice of points : every row runs to its vanishing point.',
+    world: 'synthetic',
+    palette: [K, [0.2, 0.23, 0.28, 1], [0.93, 0.95, 0.97, 1]],
+    sources: ['gen-lattice'],
+    stack: [['gen-lattice']],
+    bgSources: ['drift-field'], bgOpacity: 0.2,
+    pickInputs: {
+      'gen-lattice': {
+        form: [1], jitter: [0], vary: [0, 0.2], fly: [0.05, 0.1], spin: [0.02, 0.03, -0.02], tilt: [0.05, 0.1, -0.05],
+        turn: [0, 0.15, -0.15], count: [140, 160, 180], well: [0], ripple: [0], swell: [0], audio: [0], streak: [0],
+        fog: [0.3, 0.4], size: [0.3, 0.4], lens: [0.65, 0.75]
+      }
+    },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [1, 1], useB: 0, feedback: 0, density: 0.45
+  }),
+  mk({
+    id: 'dot-sea', name: 'Dot Sea', family: 'Space',
+    blurb: 'Skimming low over a heaving sea of points that runs to a misty horizon.',
+    world: 'sublimated',
+    palette: [K, [0.16, 0.22, 0.28, 1], [0.86, 0.92, 0.96, 1]],
+    sources: ['gen-lattice'],
+    stack: [['gen-lattice']],
+    bgSources: ['drift-field'], bgOpacity: 0.2,
+    pickInputs: {
+      'gen-lattice': {
+        form: [0], swell: [0.5, 0.6, 0.7], tilt: [0.15, 0.2, 0.25], height: [3, 5, 6], fly: [0.08, 0.12, 0.18],
+        well: [0], ripple: [0], spin: [0], audio: [0], streak: [0, 0.15], count: [200, 240], size: [0.25, 0.3],
+        fog: [0.45, 0.55], vary: [0, 0.1], jitter: [0], lens: [0.65, 0.75]
+      }
+    },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [1, 1], useB: 0, feedback: 0, density: 0.45, coalesce: 0.55
+  }),
+  mk({
+    id: 'spectral-floor', name: 'Spectral Floor', family: 'Space',
+    blurb: 'A floor of dots the sound lifts in rings : bass at the heart, treble at the rim.',
+    world: 'musical',
+    palette: [K, [0.2, 0.18, 0.28, 1], [0.9, 0.92, 0.96, 1]],
+    sources: ['gen-lattice'],
+    stack: [['gen-lattice']],
+    bgSources: ['drift-field'], bgOpacity: 0.2,
+    pickInputs: {
+      'gen-lattice': {
+        form: [0], audio: [0.6, 0.8, 1], well: [0.1, 0.2], ripple: [0, 0.1], tilt: [0.35, 0.45], height: [8, 10],
+        spin: [0.01, 0.015], fly: [0], swell: [0], streak: [0], jitter: [0], vary: [0], count: [180, 220],
+        size: [0.28, 0.32], fog: [0.3], lens: [0.6, 0.7], reach: [0.4, 0.5]
+      }
+    },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [1, 1], useB: 0, feedback: 0, density: 0.45, tonicity: 0.2
+  }),
+  mk({
+    id: 'line-wall', name: 'Line Wall', family: 'Space',
+    blurb: 'A ribbon of machine-cut lines turned away into space, rippling as it goes.',
+    world: 'parametric',
+    palette: [INK, [0.3, 0.32, 0.35, 1], [0.95, 0.95, 0.95, 1]],
+    sources: ['lowercase'],
+    stack: [['lowercase']],
+    stackFx: [['fx-perspective']],
+    bgSources: ['drift-field'], bgOpacity: 0.2,
+    pickInputs: {
+      lowercase: {
+        figure: [2, 8], cells: [36, 48, 60], density: [0.85, 1], split: [0, 0.1], rate: [2, 4], quant: [1, 2],
+        hold: [2, 4], jump: [0], scroll: [0, 1], shear: [0], flip: [0], smear: [0, 0.1], halo: [0.05, 0.1], accentAmt: [0]
+      },
+      'fx-perspective': {
+        repeat: [0], turn: [0.45, 0.55, 0.65, -0.55], tilt: [0, 0.1], wave: [0.2, 0.35, 0.5], waves: [1, 1.3],
+        waveRate: [0.03, 0.06, -0.04], zoom: [0.85, 0.95], shade: [0.3, 0.45], fog: [0.2, 0.3], lens: [0.6, 0.7],
+        bend: [0, 0.1], roll: [0], posX: [0], posY: [0], axis: [0], travel: [0], drift: [0, 0.03], soften: [0.7]
+      }
+    },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, coalesce: 0.4
+  }),
+  mk({
+    id: 'crossing', name: 'Crossing', family: 'Space',
+    blurb: 'Hard white bars leaning every way and crossing, cut and held on a stepped clock.',
+    world: 'parametric',
+    palette: [INK, WHITE],
+    sources: ['lowercase'],
+    stack: [['lowercase'], ['lowercase']],
+    bgSources: ['drift-field'], bgOpacity: 0.2,
+    pickInputs: {
+      lowercase: {
+        figure: [8], split: [0.6, 0.75, 0.9], cells: [20, 30, 40], density: [0.55, 0.7], rate: [1.5, 3, 5],
+        quant: [1, 2], hold: [1, 2, 4], smear: [0, 0.15], halo: [0.08, 0.15], jump: [0], scroll: [0], shear: [0],
+        flip: [0], accentAmt: [0]
+      }
+    },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten', 'difference'], layers: [1, 2], useB: 0, feedback: 0, density: 0.5,
+    motion: { mods: [1, 2], types: ['euclid', 'sh', 'lfo'], shapes: ['square', 'rndStep'], rate: [0.2, 1.5], bpm: 0.6, depth: [0.25, 0.5] }
+  }),
+  mk({
+    id: 'data-floor', name: 'Data Floor', family: 'Space',
+    blurb: 'A data matrix laid out as a floor to the horizon, sliding toward you.',
+    world: 'parametric',
+    palette: [K, [0.12, 0.2, 0.24, 1], [0.85, 0.92, 0.94, 1]],
+    sources: ['lowercase'],
+    stack: [['lowercase']],
+    stackFx: [['fx-perspective']],
+    bgSources: ['drift-field'], bgOpacity: 0.2,
+    pickInputs: {
+      lowercase: { figure: [0, 1, 5], cells: [18, 24, 32], density: [0.5, 0.65], flip: [0], shear: [0, 0.1] },
+      'fx-perspective': {
+        repeat: [1, 2], tilt: [0.55, 0.7, 0.8], turn: [-0.15, 0, 0.15], fog: [0.4, 0.5, 0.6], lens: [0.6, 0.75],
+        travel: [0.03, 0.06], drift: [0], wave: [0], bend: [0], roll: [0], zoom: [1, 1.2], posX: [0], posY: [0, 0.15],
+        shade: [0], soften: [0.7, 0.8], waves: [1.5], waveRate: [0], axis: [0]
+      }
+    },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5
   }),
 
   // ── Feel Studies : one theme per macro (open Feel · G, then sweep the named

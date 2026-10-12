@@ -7,6 +7,28 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **A Space family in Generate, and a Space group of master chains**, so the three new
+  pieces are reached from Generate and the chain menu, not only from their pickers.
+  Eight themes : **Gravity Well**, **Starfield**, **Crystal Room**, **Dot Sea**, **Spectral
+  Floor** (Lattice), **Line Wall** and **Data Floor** (Lowercase laid on a plane by
+  Perspective), **Crossing** (slant). Nine chains : Floor, Corridor, Ribbon, Horizon,
+  Curved Screen, Data Wall (threshold, then the wall), Halftone Floor (Pixelmask dots,
+  then the floor), Scan Relief (Rutt, then the floor), Starlight. Three recipe fields
+  make them hold : **`stackFx`** (per-layer effects that close that layer's rack : the
+  Perspective a Line Wall cannot do without, kept out of the chance draws of `layerFx`),
+  **`bgOpacity`** (in group mode the Background shows through every dark part of the
+  layers, so points of light on the drift-field ground read as mottle : the Space themes
+  keep it at 0.2) and a motion recipe's **`skip`** (inputs a theme never binds : a moving
+  count / cells re-deals every point, a moving repeat re-tiles the plane; side and audio
+  do nothing until routed). **`flip` joins `seed` in the inputs no theme may sweep** : a
+  modulated Lowercase flip inverted the whole frame on every swing (a strobe, seen while
+  testing the chains). Starfield runs in the synthetic World : the sublimated one's haze,
+  bloom and trails washed its small stars into a grey veil (mean 42-62, no black left).
+  Measured in the test build, each theme generated three times : the theme's source on
+  the bottom layer every time, Perspective closing the rack every time it is demanded,
+  2-5 modulation rows, no console messages, getError 0; every chain applied over a still
+  scene.
+
 - **Lattice**, a new native source (`gen-lattice`, `engine/LatticeSource.ts`) : a
   lattice of points in space through a moving camera, a **plane** of dots or a
   **volume** the camera flies through. Each point is one instance of a 4-vertex strip
