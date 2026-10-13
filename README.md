@@ -530,6 +530,12 @@ slider (rotate, spin, feather, the panorama's and the screen's own; see
 [Fulldome](#fulldome)), the **Sonify** parameters and the **Meta knobs** themselves. It
 is written straight to the compositor at frame rate, never through React re-renders.
 
+The matrix holds **12** bindings (bounded on purpose, so a patch stays readable;
+the Meta knobs are outside it). Binding a new one when it is full first lets go of
+bindings left pointing at a removed effect or an emptied source; if it is still
+full, the modulator buttons grey out and a message says how to free one
+(right-click an M to clear it, or click its chip in Modulate).
+
 The **Mul** (depth) control spans **−10 … +10**. Between −1 and +1 it behaves as
 before; past ±1 it **over-drives** : in Multiply mode the modulator's trough is
 pushed below zero (clamped to the param's minimum), a harder downward scale, and in

@@ -27,6 +27,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { modTargetKey, useStore } from '../store'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { useFlash } from './useFlash'
+import { warnModMatrixFull } from './AutoControls'
 
 const KNOB_PX = 44
 const ARC_SWEEP_DEG = 270
@@ -481,7 +482,7 @@ function KnobModAssign({
                 // clicked modulator (unless it was already the active one).
                 const keepDepth = current?.depth ?? 0.5
                 bound.forEach((b) => removeAssignment(b.id))
-                if (!active) assignMod(i, target, keepDepth)
+                if (!active && !assignMod(i, target, keepDepth)) warnModMatrixFull()
               }}
               className={`rounded py-0.5 font-mono text-[9px] transition-colors ${
                 active

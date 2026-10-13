@@ -1832,6 +1832,33 @@ function sameSource(a: SourceSlot | null, b: SourceSlot | null): boolean {
   return a.kind === b.kind && a.shaderId === b.shaderId && (a.mediaId ?? null) === (b.mediaId ?? null)
 }
 
+/** Whether a modulation target still points at something : an effect instance
+ *  that is still in its rack, a source slot that still holds a source. Anything
+ *  else (layer controls, Meta, Sonify, the Background's and the dome's own
+ *  controls) always exists. */
+function targetAlive(c: CompositionState, t: ModTarget): boolean {
+  if (t.kind === 'fx') {
+    const s = t.scope
+    const arr =
+      s.kind === 'master'
+        ? c.master
+        : s.kind === 'background'
+          ? c.background?.fx
+          : s.kind === 'layer'
+            ? c.layers[s.layer]?.fx
+            : s.kind === 'sourceA'
+              ? c.layers[s.layer]?.sourceAFx
+              : c.layers[s.layer]?.sourceBFx
+    return !!arr?.some((f) => f.id === t.instId)
+  }
+  if (t.kind === 'source') {
+    const L = c.layers[t.layer]
+    return !!(t.slot === 'A' ? L?.sourceA : L?.sourceB)
+  }
+  if (t.kind === 'bgSource') return !!c.background?.source
+  return true
+}
+
 function dropTargets(
   c: CompositionState,
   hits: (t: ModTarget) => boolean
@@ -3144,14 +3171,19 @@ export const useStore = create<StoreState>((set, get) => ({
           }
         }
       }
-      if (st.composition.modMatrix.length >= MAX_MOD_ASSIGNMENTS) {
+      // Full : first let go of DEAD bindings (an effect removed, a source
+      // emptied) : they still count against the cap, and a matrix full of them
+      // read as "modulation stopped working" (nothing happened on a click).
+      let matrix = st.composition.modMatrix
+      if (matrix.length >= MAX_MOD_ASSIGNMENTS) matrix = matrix.filter((a) => targetAlive(st.composition, a.target))
+      if (matrix.length >= MAX_MOD_ASSIGNMENTS) {
         result = false
         return {}
       }
       // New bindings default to Multiply (VCA scaling of the base).
       const entry: ModAssignment = { id: uid(), mod, target, depth, mode }
       return {
-        composition: { ...st.composition, modMatrix: [...st.composition.modMatrix, entry] }
+        composition: { ...st.composition, modMatrix: [...matrix, entry] }
       }
     })
     return result

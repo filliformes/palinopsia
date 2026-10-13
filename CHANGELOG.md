@@ -63,6 +63,15 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **A full modulation matrix no longer swallows clicks.** The matrix holds 12
+  bindings; once full, binding a modulator (an M chip's 1 to 8, a Meta bar slot, a
+  Sonify row) silently did nothing, which read as "modulation stopped working"
+  while the bindings already there kept running and the Meta knobs (outside the
+  matrix) still worked. Binding now first lets go of DEAD bindings (an effect since
+  removed, a source slot since emptied : they counted against the cap); if the
+  matrix is still full, the modulator buttons grey out and say so, and a click
+  says how to make room. Measured : 9 live + 3 dead → a new binding goes in (10);
+  12 live → refused, with the message.
 - **An imported video plays in its layer again.** The plain video source loads its
   clip from `opsia-media://` without asking for CORS, so the element was "tainted" (the
   page and the scheme are different origins) and WebGL refused every frame : a

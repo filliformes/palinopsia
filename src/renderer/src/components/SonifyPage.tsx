@@ -19,6 +19,7 @@ import { SonifyKeySequencer } from './SonifyKeySequencer'
 import { AudioOutputSelect } from './AudioOutputSelect'
 import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, CardGrip, useCardSpace, spaceGap, SUB_GAP, chip, pill } from './sonifyUi'
 import { SONI_RATES, RATE_LABEL } from '../audio/soniClock'
+import { warnModMatrixFull } from './AutoControls'
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 // Voice order matches the worklet's render/filter order (mixFilter indices).
@@ -303,9 +304,8 @@ function AssignMini({ param, onClose }: { param: SonifyModParam; onClose: () => 
           onChange={(e) => {
             const mi = Number(e.target.value)
             if (a) removeAssignment(a.id)
-            if (mi >= 0 && !assignMod(mi, target, a?.depth ?? 0.5, a?.mode ?? 'replace')) {
-              // matrix cap reached : nothing to do, the select snaps back
-            }
+            // Matrix cap reached : the select snaps back, and says why.
+            if (mi >= 0 && !assignMod(mi, target, a?.depth ?? 0.5, a?.mode ?? 'replace')) warnModMatrixFull()
           }}
           title="Which modulator drives this parameter"
         >

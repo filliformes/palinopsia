@@ -17,6 +17,18 @@ import { registerLiveOverlay } from './liveOverlay'
 import { useShallow } from 'zustand/react/shallow'
 import { isToggleTarget, modTargetKey, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
+import { showToast } from './Toast'
+import { MAX_MOD_ASSIGNMENTS } from '@shared/types'
+
+/** The modulation matrix is full : say so (a click that does nothing reads as
+ *  broken), and how to make room. */
+export function warnModMatrixFull(): void {
+  showToast(
+    `Modulation is full (${MAX_MOD_ASSIGNMENTS} of ${MAX_MOD_ASSIGNMENTS} bindings) : clear one to bind this (right-click an M to clear it, or see Modulate).`,
+    'warn',
+    6000
+  )
+}
 
 // Clicking an M button opens the mod-assign in the provider's side panel (the
 // Inspector, or the Finishing column) via `onAssign`. `activeKey` highlights the
@@ -517,6 +529,8 @@ export function AssignRow({
       )
     )
   )
+  const used = useStore((s) => s.composition.modMatrix.length)
+  const full = used >= MAX_MOD_ASSIGNMENTS
   return (
     <div className="flex flex-col gap-1 rounded border border-border bg-panel2/60 p-1">
       <div className="flex min-w-0 items-center gap-1">
@@ -531,16 +545,23 @@ export function AssignRow({
                 key={i}
                 onClick={() => {
                   if (existing) removeAssignment(existing.id)
-                  else if (!assignMod(i, target, 0.5)) {
-                    // Cap reached : the matrix stays legible by design.
-                  }
+                  // Cap reached (the matrix stays legible by design) : say so.
+                  else if (!assignMod(i, target, 0.5)) warnModMatrixFull()
                 }}
                 className={`min-w-0 flex-1 rounded px-0.5 py-0.5 font-mono text-[9px] transition-colors ${
                   existing
                     ? 'bg-accent/25 text-accent ring-1 ring-accent'
-                    : 'bg-panel3/60 text-muted hover:text-text'
+                    : full
+                      ? 'bg-panel3/30 text-muted/50'
+                      : 'bg-panel3/60 text-muted hover:text-text'
                 }`}
-                title={existing ? `Unbind M${i + 1}` : `Bind M${i + 1}`}
+                title={
+                  existing
+                    ? `Unbind M${i + 1}`
+                    : full
+                      ? `Modulation is full (${used} of ${MAX_MOD_ASSIGNMENTS}) : clear a binding first`
+                      : `Bind M${i + 1}`
+                }
               >
                 {i + 1}
               </button>
