@@ -199,6 +199,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `Esc` | Close the cheat-sheet, then MIDI Learn; otherwise close Resolume / World / Sonify / Body / Output / Sequence. On a **fullscreen output** over the control window (not an installation), a tap of `Esc` closes the output itself; on any other output it hands focus back to the controls |
 | `Ctrl/Cmd+Z` · `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` | Undo · Redo (100 levels) |
 | `Ctrl/Cmd+S` | Save session |
+| `Ctrl/Cmd+F` | **Fulldome** output on / off (a toast says which) |
 | `Ctrl/Cmd` `+` / `-` / `0` · `Ctrl`+wheel | UI zoom in / out / reset (menus stay anchored at any zoom) |
 
 **MIDI:** the **MIDI Learn** toolbar button (top bar), or the `L` key from

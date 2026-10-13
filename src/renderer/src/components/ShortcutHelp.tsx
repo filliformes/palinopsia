@@ -51,6 +51,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
     title: 'Session & zoom',
     rows: [
       ['Ctrl S', 'Save session'],
+      ['Ctrl F', 'Fulldome output on / off'],
       ['Ctrl Z', 'Undo  ·  Ctrl ⇧Z / Ctrl Y redo'],
       ['Ctrl + / −', 'Zoom UI  ·  Ctrl 0 resets'],
       ['Ctrl wheel', 'Zoom UI']

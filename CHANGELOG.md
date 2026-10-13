@@ -7,6 +7,11 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **`Ctrl/Cmd+F` turns the Fulldome output on and off** from anywhere in the
+  control window (not while typing in a field), with a toast saying which. In the
+  cheat-sheet (`?`) and the README's shortcut table. Plain `F` still opens the
+  Finishing column.
+
 - **An iPhone or iPad by USB as a live input (macOS).** Plug it in, trust the
   computer, open its Camera app : the Live Input picker lists it (`📱 usb`) and its
   screen plays in the layer, by cable, nothing to install on the phone. macOS shows

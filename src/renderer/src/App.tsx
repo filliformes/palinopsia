@@ -964,6 +964,14 @@ export default function App(): JSX.Element {
         // is universally "save", so it fires even while an input is focused.
         e.preventDefault()
         void saveSession()
+      } else if (!inField && (e.key === 'f' || e.key === 'F')) {
+        // Fulldome output on / off (Output → Fulldome), from anywhere. A toast
+        // says which : the whole output changes shape (a square domemaster).
+        e.preventDefault()
+        const st = useStore.getState()
+        const on = !st.dome.enabled
+        st.setDome({ enabled: on })
+        showToast(on ? 'Fulldome on : the output is a domemaster' : 'Fulldome off : the output is flat again', 'ok', 2200)
       } else if (!inField && (e.key === '=' || e.key === '+')) {
         e.preventDefault()
         setUiZoom(useStore.getState().uiZoom + 0.05)
