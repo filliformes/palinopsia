@@ -7,6 +7,7 @@
 
 import { uploadVideoFrame } from './VideoSource'
 import { ndiInAcquire, ndiInLatest, ndiInRelease, ndiInStats, type NdiInStats } from './ndiIn'
+import { AVF_PREFIX, avfInAcquire, avfInLatest, avfInRelease } from './avfIn'
 
 // A live-capture start can fail silently (permission denied, no device, screen
 // picker cancelled) and the slot just renders transparent — the most confusing
@@ -25,9 +26,12 @@ export class CaptureSource {
   private disposed = false
   // NDI input ('ndi:<source name>') : frames come from the preload's receiver.
   private ndiName: string | null = null
-  private ndiSeq = -1
-  private ndiW = 0
-  private ndiH = 0
+  private frameSeq = -1
+  private frameW = 0
+  private frameH = 0
+  // USB input ('device:avf:<id>', macOS) : an iPhone by USB or another camera
+  // Chromium cannot list; frames come from the preload (src/preload/avcapture.ts).
+  private avfId: string | null = null
   // A camera that drops out (unplugged, or reset by USB power saving over a
   // days-long installation) ends its track : the source reconnects by itself,
   // finding the camera again by name if it comes back under another id.
@@ -42,10 +46,11 @@ export class CaptureSource {
       void this.reopen()
     }
   }
-  /** NDI frames arrive top row first and are uploaded as they are : the blit
-   *  samples them upside down (a CPU flip on upload was the slow path). */
+  /** NDI and USB-input frames arrive top row first and are uploaded as they
+   *  are : the blit samples them upside down (a CPU flip on upload was the slow
+   *  path). */
   get flipY(): boolean {
-    return this.ndiName !== null
+    return this.ndiName !== null || this.avfId !== null
   }
   get ndiStats(): NdiInStats | null {
     return this.ndiName ? ndiInStats(this.ndiName) : null
@@ -64,11 +69,22 @@ export class CaptureSource {
    *                        USB camera / capture card / DJI Osmo in webcam mode)
    *    'desktop:<id>'    → a specific screen/window (chromeMediaSourceId)
    *    'screen'          → the primary display (getDisplayMedia fallback)
+   *    'device:avf:<id>' → a USB input on macOS (an iPhone by USB…), captured
+   *                        natively : the preload keeps looking for it
    *    'ndi:<name>'      → an NDI® source on the network (src/preload/ndi.ts)
    *  Safe to call once; ignores re-entrancy. `quiet` : a reconnection attempt
-   *  (no error reported to the UI each time). */
-  async start(spec: string, quiet = false): Promise<void> {
-    if (this.starting || this.stream || this.disposed || this.ndiName) return
+   *  (no error reported to the UI each time). `label` : the device's name as
+   *  picked, to find it again if it comes back under another id. */
+  async start(spec: string, quiet = false, label = ''): Promise<void> {
+    if (this.starting || this.stream || this.disposed || this.ndiName || this.avfId) return
+    if (label && !this.label) this.label = label
+    if (spec.startsWith('device:' + AVF_PREFIX)) {
+      this.avfId = spec.slice(('device:' + AVF_PREFIX).length)
+      // Not a Mac, or the module is missing : say so. A device that is simply
+      // not there yet is no error : the preload keeps looking for it.
+      if (!avfInAcquire(this.avfId) && !this.disposed) captureErrorReporter?.(spec, 'AvfUnavailable')
+      return
+    }
     if (spec.startsWith('ndi:')) {
       this.ndiName = spec.slice('ndi:'.length)
       const ok = await ndiInAcquire(this.ndiName)
@@ -122,9 +138,17 @@ export class CaptureSource {
       // Permission denied / no device / user cancelled the screen picker : the
       // slot renders transparent — report the reason so the UI can say why.
       const err = e as Error
-      if (quiet) console.warn('[capture] reconnect failed:', err.message)
-      else console.error('[capture] start failed:', err.message)
+      if (quiet) console.warn('[capture] reconnect failed:', err.name, err.message)
+      else console.error('[capture] start failed:', err.name, err.message)
       if (!this.disposed && !quiet) captureErrorReporter?.(spec, err.name || err.message)
+      // A camera that is not there AT LAUNCH (an installation whose camera powers
+      // up after the computer) is looked for the same way as one that drops out
+      // later : until it appears. A refused permission is not retried.
+      if (!quiet && !this.disposed && (spec === 'webcam' || spec.startsWith('device:')) && err.name !== 'NotAllowedError') {
+        this.spec = spec
+        navigator.mediaDevices.addEventListener('devicechange', this.onDevices)
+        this.scheduleRetry()
+      }
     } finally {
       this.starting = false
     }
@@ -171,16 +195,17 @@ export class CaptureSource {
   }
 
   upload(): WebGLTexture | null {
-    if (this.ndiName) return this.uploadNdi(this.ndiName)
+    if (this.ndiName) return this.uploadFrame(ndiInLatest(this.ndiName))
+    if (this.avfId) return this.uploadFrame(avfInLatest(this.avfId))
     this.tex = uploadVideoFrame(this.gl, this.video, this.tex)
     return this.tex
   }
 
-  /** The newest NDI frame (RGBX/RGBA, top row first) into the texture, as is
-   *  (see flipY), allocated once per size. Nothing new : the last frame stays. */
-  private uploadNdi(name: string): WebGLTexture | null {
-    const f = ndiInLatest(name)
-    if (!f || f.seq === this.ndiSeq) return this.tex
+  /** The newest NDI or USB-input frame (RGBA, top row first) into the texture,
+   *  as is (see flipY), allocated once per size. Nothing new : the last frame
+   *  stays. */
+  private uploadFrame(f: { w: number; h: number; stride: number; buf: ArrayBuffer; seq: number } | null): WebGLTexture | null {
+    if (!f || f.seq === this.frameSeq) return this.tex
     const gl = this.gl
     if (!this.tex) {
       this.tex = gl.createTexture()
@@ -193,15 +218,15 @@ export class CaptureSource {
     gl.bindTexture(gl.TEXTURE_2D, this.tex)
     gl.pixelStorei(gl.UNPACK_ROW_LENGTH, f.stride / 4)
     const px = new Uint8Array(f.buf, 0, f.stride * f.h)
-    if (f.w !== this.ndiW || f.h !== this.ndiH) {
+    if (f.w !== this.frameW || f.h !== this.frameH) {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, f.w, f.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, px)
-      this.ndiW = f.w
-      this.ndiH = f.h
+      this.frameW = f.w
+      this.frameH = f.h
     } else {
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, f.w, f.h, gl.RGBA, gl.UNSIGNED_BYTE, px)
     }
     gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0)
-    this.ndiSeq = f.seq
+    this.frameSeq = f.seq
     return this.tex
   }
 
@@ -212,6 +237,10 @@ export class CaptureSource {
     if (this.ndiName) {
       ndiInRelease(this.ndiName)
       this.ndiName = null
+    }
+    if (this.avfId) {
+      avfInRelease(this.avfId)
+      this.avfId = null
     }
     this.stream?.getTracks().forEach((t) => t.stop())
     this.stream = null

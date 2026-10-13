@@ -870,6 +870,21 @@ app.whenReady().then(async () => {
     }
   })
 
+  // Camera permission for the USB input (src/preload/avcapture.ts), asked HERE so
+  // the system prompt names the app. Chromium asks on its own for the cameras it
+  // opens, but a Mac with no camera of its own and only an iPhone by USB never
+  // gets that far. Only macOS asks; an answer is remembered by the system.
+  safeHandle('camera:access', async () => {
+    if (process.platform !== 'darwin') return 'granted'
+    try {
+      const s = systemPreferences.getMediaAccessStatus('camera')
+      if (s !== 'not-determined') return s
+      return (await systemPreferences.askForMediaAccess('camera')) ? 'granted' : 'denied'
+    } catch {
+      return 'granted' // no such API : let the capture itself find out
+    }
+  })
+
   // Open the exact settings pane for that permission, so granting it is one click
   // away rather than a hunt. The app has to be started again afterwards : the
   // permission is read once, when the process launches.

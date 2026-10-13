@@ -70,6 +70,13 @@ jobs:
         continue-on-error: true
         shell: bash
         run: sh native/syphon/build.sh
+      - name: Build USB input addon (macOS only)
+        if: matrix.platform == 'mac'
+        # The iPhone-by-USB input (native/avcapture). Same rule as Syphon : a
+        # failure here only leaves the input unavailable, never blocks a release.
+        continue-on-error: true
+        shell: bash
+        run: sh native/avcapture/build.sh
       - run: npm run typecheck
       - run: npm run ${{ matrix.script }}
       # The mac app must carry an ad-hoc signature, its ffmpeg included : an

@@ -222,7 +222,7 @@ Each of the **4 layers** carries:
 
 | Element | What it does |
 |---|---|
-| **Source A / B** | Two source slots; the **A** / **B** buttons (and **BG** on the background) show that source's controls in the Inspector. Each holds a generator, an imported video (`🎞`), a capture (webcam `📷` / screen `🖥` / device `🎥` / NDI® source `📶`), a HIVE network stream (`📡`), or nothing. |
+| **Source A / B** | Two source slots; the **A** / **B** buttons (and **BG** on the background) show that source's controls in the Inspector. Each holds a generator, an imported video (`🎞`), a capture (webcam `📷` / screen `🖥` / device `🎥` / an iPhone by USB `📱` / NDI® source `📶`), a HIVE network stream (`📡`), or nothing. |
 | **A/B mix** (`MIX`) | `sourceBlend` (how B combines with A, incl. the relation modes Weave / Lumakey / Consume) · `sourceMix` (0 = A only … 1 = full B) · `harmony` (⚖ consonant → dissonant B hue). Inert until B has a source. |
 | **Source FX** | A separate effect rack under **each** source slot (`sourceAFx`, `sourceBFx`). |
 | **Layer FX** (`FX`) | The layer's own effect rack : the only rack that accepts the **sidechain** [native nodes](#native-nodes) (Transfert, Convolution, Mosaïque); the self-contained nodes run in any rack, and so do the TouchDesigner recipes (Remap, Luma Blur, Gooey, Matte, Lookup), whose other-layer inputs are optional. |
@@ -342,7 +342,27 @@ Live **captures** (webcam / screen / device), [NDI](#ndi) sources and **HIVE**
 has zoom / pan / crop **framing** and its own Source-FX rack. A camera that drops out
 (unplugged, or reset by USB power saving) **reconnects by itself** : it is tried again
 2, 4, 8… up to 30 s apart, and at once when a device appears, found again by name if it
-comes back under another id; its last frame holds meanwhile.
+comes back under another id; its last frame holds meanwhile. A camera that is **not
+there yet** when the session opens (an installation whose camera powers up after the
+computer) is looked for the same way.
+
+**An iPhone or iPad by USB (macOS).** Plug it in, unlock it, accept *Trust This
+Computer*, open its **Camera** app : the Live Input picker lists it with a `📱` and
+*usb*. What comes through is the device's **screen** (what QuickTime's *New Movie
+Recording* shows), by cable, with no app to install on the phone and no network in
+between; crop the Camera app's buttons away with the slot's framing. macOS shows this
+camera only to an app that asks, and as a sound-and-picture device the browser engine
+skips, so Palinopsia captures it itself (`native/avcapture`). Frames come in at up to
+1920 on their long side (an iPhone X : 887×1920). The Inspector says what it receives
+(size, frames per second) or what it waits for; a device that is unplugged, rebooted
+or not there yet is looked for every 2 s for as long as a layer shows it, so an
+installation's phone that charges and boots after the power comes back joins by
+itself. For a phone left alone : Auto-Lock *Never*, locked to the Camera app (Apple
+Configurator's *Single App Mode* survives a reboot, Guided Access does not), and no
+passcode (after a restart, iOS keeps a passcode-locked phone's USB closed until it is
+unlocked once). macOS asks for camera access the first time. Any iPhone or iPad that
+QuickTime can show works; a recent iPhone (XR or later, iOS 16+) can also be a wireless
+camera through *Continuity Camera*, listed with the others.
 
 ## The Transport bar (bottom)
 
@@ -857,8 +877,9 @@ bottom:
     failures in 10 minutes, or if WebGL or the GPU keeps failing); a GPU reset rebuilds
     the engine in about two seconds, in any mode (feedback trails start over); a crashed output
     reloads; the output reopens if it closes and follows its projector when displays
-    change (found again by name if Windows renumbers it); a camera that drops out
-    reconnects; Sonify's sound comes back by itself after an audio device error; no
+    change (found again by name if Windows renumbers it); a camera that drops out, or
+    is not there yet when the computer starts (an iPhone by USB still charging),
+    joins as soon as it appears; Sonify's sound comes back by itself after an audio device error; no
     dialog ever waits (no "restore the autosave?" after a power cut);
     the menu's reload / close / quit / dev-tools shortcuts are off, and the output stays
     above system notices.
@@ -2029,6 +2050,8 @@ src/
               so corpus and live image are measured with one ruler)
 native/spout/ N-API DX11 Spout sender addon (vendored Spout2 SDK)
 native/syphon/ macOS Syphon (Metal) server addon, built from the Syphon source in CI
+native/avcapture/ macOS USB input addon (AVFoundation) : an iPhone by USB and the other
+              cameras Chromium cannot list, captured in the preload
 docs/         specs (convolution · cameraless · sequencer), research notes, and
               the screenshots used by this README
 ```

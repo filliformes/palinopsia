@@ -21,7 +21,7 @@ import { fxArrayFor, modTargetKey, useStore, type FxScope } from '../store'
 import { AutoControls, AssignContext, AssignRow, ModButton, useBound } from './AutoControls'
 import { registerLiveOverlay } from './liveOverlay'
 import { CapturePicker } from './CapturePicker'
-import { DevicePicker } from './DevicePicker'
+import { AvfReadout, DevicePicker } from './DevicePicker'
 import { NdiInReadout, NdiPicker } from './NdiPicker'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
@@ -413,6 +413,7 @@ export function Inspector(): JSX.Element {
             </p>
           </div>
           {isNdi && <NdiInReadout name={capId.slice(4)} />}
+          {capId.startsWith('device:avf:') && <AvfReadout id={capId.slice('device:avf:'.length)} />}
           {switchCapture && (
             <CapturePicker
               onPick={(spec, name) => {

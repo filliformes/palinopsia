@@ -5,7 +5,31 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Added
+
+- **An iPhone or iPad by USB as a live input (macOS).** Plug it in, trust the
+  computer, open its Camera app : the Live Input picker lists it (`📱 usb`) and its
+  screen plays in the layer, by cable, nothing to install on the phone. macOS shows
+  that camera only to an app that opts in, and as a muxed (sound-and-picture) device
+  that Chromium's enumeration skips (it asks AVFoundation for video-type devices only),
+  so a new addon captures it natively : `native/avcapture` (AVFoundation, N-API, the
+  same recipe as OBS's mac-avcapture), run in the preload like the NDI receiver,
+  frames scaled to a 1920 long side with vImage, BGRA to RGBA, transferred to the page.
+  It lists every video and muxed device AVFoundation sees, so any camera Chromium
+  misses comes through too. A device that is missing, unplugged or rebooted is opened
+  again every 2 s for as long as a layer shows it, with a readout in the Inspector.
+  Camera access is asked by the main process (a Mac mini with no camera of its own
+  may never have been asked). CI builds the addon on the macOS job
+  (`native/avcapture/build.sh`, which also loads it once and lists the devices); a
+  failure there leaves the input unavailable, never blocks a release.
+
 ### Fixed
+
+- **A camera that is not there at launch is looked for until it appears.** The
+  reconnection only covered a camera that dropped out after it had started; one that
+  powered up after the computer (an installation) failed once and stayed black. It
+  now gets the same retries (2, 4, 8… up to 30 s, and at once when a device appears),
+  found again by the name it was picked under.
 
 - **Lowercase's accent and ground colors explain themselves on hover**, like every
   other control (they shipped in v1.2.5 without a hint).

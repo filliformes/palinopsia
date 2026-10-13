@@ -1310,6 +1310,13 @@ export interface ExposedApi {
   /** Start (or share) receiving one NDI source; frames flow to the page. */
   ndiInOpen: (name: string) => Promise<boolean>
   ndiInClose: (name: string) => void
+  /** USB input (macOS) : the cameras AVFoundation sees, an iPhone by USB included
+   *  (ok false off a Mac or without the module, with why). */
+  avfList: () => Promise<{ ok: boolean; devices: import('./avf').AvfDevice[]; message: string }>
+  /** Start (or share) capturing one; frames flow to the page. False : not possible here. */
+  avfOpen: (id: string) => boolean
+  avfClose: (id: string) => void
+  avfStatus: (id: string) => import('./avf').AvfStatus | null
   // No NDI on this computer : download + verify + open NDI's official installer.
   ndiInstallRuntime: () => Promise<{ ok: boolean; message: string }>
   onNdiInstallProgress: (cb: (p: import('./ndi').NdiInstallProgress) => void) => () => void

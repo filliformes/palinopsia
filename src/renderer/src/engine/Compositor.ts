@@ -1158,8 +1158,10 @@ export class ISFLayer {
     return (slot === 'A' ? this.collageA : this.collageB)?.soundInfo() ?? null;
   }
 
-  /** Load/swap/clear a live CAPTURE source ('webcam' | 'screen' | 'desktop:id'). */
-  setCapture(slot: 'A' | 'B', spec: string | null): void {
+  /** Load/swap/clear a live CAPTURE source ('webcam' | 'screen' | 'desktop:id' |
+   *  'device:id' | 'ndi:name'). `label` : the device's name as picked, so a camera
+   *  that comes back under another id is found again. */
+  setCapture(slot: 'A' | 'B', spec: string | null, label = ''): void {
     const curId = slot === 'A' ? this.captureIdA : this.captureIdB;
     if (spec === curId) return;
     const cur = slot === 'A' ? this.captureA : this.captureB;
@@ -1167,7 +1169,7 @@ export class ISFLayer {
     let next: CaptureSource | null = null;
     if (spec) {
       next = new CaptureSource(this.shared.gl);
-      void next.start(spec);
+      void next.start(spec, false, label);
     }
     if (slot === 'A') { this.captureA = next; this.captureIdA = spec; }
     else { this.captureB = next; this.captureIdB = spec; }
@@ -2500,7 +2502,7 @@ export class Compositor {
       const wantAsmA = l.sourceA.kind === 'assemble' ? (l.sourceA.mediaId ?? null) : null;
       if (wantA !== L.shaderIdA) L.setShader('A', wantA, wantA ? sourceById(wantA) : null);
       L.setVideo('A', wantVidA);
-      L.setCapture('A', wantCapA);
+      L.setCapture('A', wantCapA, l.sourceA.mediaName);
       L.setHive('A', wantHiveA);
       L.setAssemble('A', wantAsmA, l.sourceA.edl, l.sourceA.videoLoop ?? true);
       L.setText('A', isTextA
@@ -2522,7 +2524,7 @@ export class Compositor {
       const wantAsmB = l.sourceB && l.sourceB.kind === 'assemble' ? (l.sourceB.mediaId ?? null) : null;
       if (wantB !== L.shaderIdB) L.setShader('B', wantB, wantB ? sourceById(wantB) : null);
       L.setVideo('B', wantVidB);
-      L.setCapture('B', wantCapB);
+      L.setCapture('B', wantCapB, l.sourceB?.mediaName);
       L.setHive('B', wantHiveB);
       L.setAssemble('B', wantAsmB, l.sourceB?.edl, l.sourceB?.videoLoop ?? true);
       L.setText('B', isTextB && l.sourceB

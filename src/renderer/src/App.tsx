@@ -1089,6 +1089,16 @@ export default function App(): JSX.Element {
           showToast(`NDI input : no NDI runtime on this computer. Install it from Output → NDI; the source starts by itself once NDI is there.`, 'warn', 8000)
           return
         }
+        if (errName === 'AvfUnavailable') {
+          showToast(
+            window.api.platform === 'darwin'
+              ? 'USB input : the module that captures it is missing from this build. Rebuild it (sh native/avcapture/build.sh) or use a release.'
+              : 'USB input : an iPhone by USB is a Mac-only source.',
+            'warn',
+            8000
+          )
+          return
+        }
         const src = spec.startsWith('device:')
           ? 'Live input'
           : spec === 'screen' || spec.startsWith('desktop:')

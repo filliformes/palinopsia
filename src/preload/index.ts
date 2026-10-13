@@ -1,4 +1,5 @@
 import { ndiConfigure, ndiOnStatus, ndiInFind, ndiInOpen, ndiInClose } from './ndi'
+import { avfList, avfOpen, avfClose, avfStatus } from './avcapture'
 import { shareLocal } from './share'
 import './recWriter' // real-time DXV3 recording : the file writer
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
@@ -175,6 +176,13 @@ const api: ExposedApi = {
   ndiInFind: (waitMs?: number) => ndiInFind(waitMs),
   ndiInOpen: (name: string) => ndiInOpen(name),
   ndiInClose: (name: string) => ndiInClose(name),
+  // USB input (macOS) : an iPhone by USB and the other cameras Chromium cannot
+  // list, captured here (src/preload/avcapture.ts); frames reach the page over
+  // their own port, like NDI's.
+  avfList: () => avfList(),
+  avfOpen: (id: string) => avfOpen(id),
+  avfClose: (id: string) => avfClose(id),
+  avfStatus: (id: string) => avfStatus(id),
   ndiInstallRuntime: () => ipcRenderer.invoke('ndi:installRuntime'),
   onNdiInstallProgress: (cb: (p: import('@shared/ndi').NdiInstallProgress) => void) => {
     const h = (_e: Electron.IpcRendererEvent, p: import('@shared/ndi').NdiInstallProgress): void => cb(p)
