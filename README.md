@@ -124,6 +124,16 @@ npm run build:mac    # DMG
 npm run build:linux  # AppImage + deb
 ```
 
+npm 11 runs a dependency's install script only when the project allows it :
+`package.json` → `allowScripts` lets ffmpeg-static (it downloads ffmpeg), koffi (the
+NDI bridge) and esbuild (the bundler) run theirs, and refuses serialport's native build
+(it comes with the OSC library, ships its binaries, and is never used) and
+electron-winstaller's (a Squirrel installer this app does not build). Electron itself
+has no install script : on a brand-new clone, fetch its binary once with
+`node node_modules/electron/install.js`. Don't run `npm audit fix --force` here : it
+swaps in breaking majors (Tailwind 4 among them) to silence advisories in build-time
+tools.
+
 A hot update re-runs the edited module in place. The long-lived engines (Sonify, the
 audio input, the body tracker) shut down their previous copy when that happens, so a
 reload is only needed after a main-process or preload change.

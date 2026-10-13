@@ -45,5 +45,12 @@
     "tailwindcss": "^3.4.15",
     "typescript": "^5.6.3",
     "vite": "^7.3.7"
+  },
+  "allowScripts": {
+    "ffmpeg-static": true,
+    "koffi": true,
+    "esbuild": true,
+    "@serialport/bindings-cpp": false,
+    "electron-winstaller": false
   }
 }

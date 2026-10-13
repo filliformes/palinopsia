@@ -80,6 +80,12 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Install scripts are allowed by name** (`package.json` → `allowScripts`, npm 11) :
+  ffmpeg-static, koffi and esbuild run theirs on a fresh install (without it npm 11
+  skipped them, so a clean clone had no ffmpeg); serialport's native build and
+  electron-winstaller's are refused (unused here). Entries are unpinned so a version
+  bump cannot silently block them, the trap that once left Electron without its
+  binary.
 - **The modulation matrix holds 32 bindings (was 12).** Twelve for a whole
   session filled up quickly by hand. The automatic binders (Randomize's modulation,
   Generate's motion, a World's audio route) keep the old budget (`AUTO_MOD_BUDGET`
