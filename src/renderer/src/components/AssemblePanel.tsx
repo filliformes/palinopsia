@@ -20,6 +20,7 @@ import { curveAt, edlDuration, generate } from '../assemble/match'
 import { liveDescriptor } from '../assemble/liveMatch'
 import { useStore } from '../store'
 import { ConfirmModal } from './PromptModal'
+import { MONO_FONT } from '../monoFont'
 
 const fmt = (s: number): string =>
   s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${s.toFixed(1)}s`
@@ -653,7 +654,7 @@ function CorpusMap(): JSX.Element {
         g.arc(p[0] * w, p[1] * H, 5, 0, Math.PI * 2)
         g.fill()
         g.fillStyle = '#000'
-        g.font = '8px monospace'
+        g.font = `8px ${MONO_FONT}`
         g.textAlign = 'center'
         g.textBaseline = 'middle'
         g.fillText(label, p[0] * w, p[1] * H)

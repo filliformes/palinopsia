@@ -80,6 +80,17 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Labels and readouts are set in Fragment Mono** (OFL, bundled in
+  `src/renderer/src/fonts/` with its licence), where they used whatever monospace
+  the system had (Consolas / Cascadia, Menlo : the code-editor look). One stack for
+  all of it : Tailwind's `font-mono`, a `--font-mono` CSS variable, and
+  `MONO_FONT` (`monoFont.ts`) for canvas and SVG text. One weight : bold is
+  synthesized. It runs about 17 % wider than Consolas; measured in a test build :
+  no label clips and no modulator card body overflows, any of the 18 types.
+- **The right column opens wide enough for its seven tabs on one line** : 480 px by
+  default (was 320; Fragment Mono needs about 475). A width still saved at the old
+  default moves up; a dragged one stays. Measured at UI zoom 0.8, 0.85, 1 and 1.2 :
+  one line.
 - **Install scripts are allowed by name** (`package.json` → `allowScripts`, npm 11) :
   ffmpeg-static, koffi and esbuild run theirs on a fresh install (without it npm 11
   skipped them, so a clean clone had no ffmpeg); serialport's native build and

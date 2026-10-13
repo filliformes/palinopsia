@@ -21,7 +21,8 @@ export default {
       },
       fontFamily: {
         app: ['var(--font-app)'],
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace']
+        // Fragment Mono (bundled, styles.css), then the system's : see monoFont.ts.
+        mono: ['"Fragment Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace']
       }
     }
   },

@@ -274,9 +274,13 @@ export default function App(): JSX.Element {
   const setUiZoom = useStore((s) => s.setUiZoom)
   const rightView = useStore((s) => s.rightView)
   // Layers-column width : draggable via the handle between preview and strips.
+  // The right column's default : wide enough for its seven tabs on ONE line in
+  // Fragment Mono (about 475 CSS px with the column's padding; measured, and the
+  // UI zoom scales both alike). 320 was the old default : a width still saved at
+  // exactly that was never dragged, so it moves up too.
   const [layersWidth, setLayersWidth] = useState<number>(() => {
     const saved = Number(localStorage.getItem('opsia.layersWidth'))
-    return Number.isFinite(saved) && saved >= 240 ? saved : 320
+    return Number.isFinite(saved) && saved >= 240 && saved !== 320 ? saved : 480
   })
   useEffect(() => {
     localStorage.setItem('opsia.layersWidth', String(layersWidth))

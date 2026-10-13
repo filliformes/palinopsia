@@ -18,6 +18,7 @@ import { NOTE_NAMES, BRIGHT, DIATONIC, affinity, fifthsPos, rootAtFifths, keyId,
 import { affinityWeight, keySeqMemory, pictureKey, pool } from '../audio/soniKeySeq'
 import { SCALE_STEPS, type SoniScale } from '../audio/sonify'
 import type { SoniKeySeq } from '@shared/types'
+import { MONO_FONT } from '../monoFont'
 
 const TAU = Math.PI * 2
 const SCALE_ABBR: Record<string, string> = {
@@ -165,7 +166,7 @@ function CircleVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): JS
             <g key={pos}>
               <circle cx={x} cy={y} r={5} fill={inPool ? col(hh, 0.35) : 'none'} stroke={inPool ? col(hh, 0.9) : BORDER} strokeWidth={1.2} />
               <circle cx={xi} cy={yi} r={2.6} fill={inPool ? col(keyHue(mod12(r + 9)), 0.5) : 'none'} stroke={inPool ? 'none' : BORDER} strokeWidth={0.8} />
-              <text x={xl} y={yl} textAnchor="middle" dominantBaseline="central" fontSize={8} fontFamily="ui-monospace, monospace" fill={inPool ? TEXT : MUTED} opacity={inPool ? 0.85 : 0.5}>{NOTE_NAMES[r]}</text>
+              <text x={xl} y={yl} textAnchor="middle" dominantBaseline="central" fontSize={8} fontFamily={MONO_FONT} fill={inPool ? TEXT : MUTED} opacity={inPool ? 0.85 : 0.5}>{NOTE_NAMES[r]}</text>
             </g>
           )
         })}
@@ -191,8 +192,8 @@ function CircleVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): JS
           <circle cx={p.x} cy={p.y} r={inner ? 6.5 : 8.5} fill="none" stroke={col(h)} strokeWidth={1.5} className="ks-ring" />
           <circle cx={p.x} cy={p.y} r={inner ? 5.5 : 7.5} fill={col(h, 0.95)} className="ks-pop" style={{ filter: `drop-shadow(0 0 5px ${col(h, 0.9)})` }} />
         </g>
-        <text x={cx} y={cy - 3} textAnchor="middle" fontSize={9.5} fontWeight={600} fontFamily="ui-monospace, monospace" fill={col(h)}>{NOTE_NAMES[cur.root]}</text>
-        <text x={cx} y={cy + 8} textAnchor="middle" fontSize={7.5} fontFamily="ui-monospace, monospace" fill={MUTED}>{cur.scale}</text>
+        <text x={cx} y={cy - 3} textAnchor="middle" fontSize={9.5} fontWeight={600} fontFamily={MONO_FONT} fill={col(h)}>{NOTE_NAMES[cur.root]}</text>
+        <text x={cx} y={cy + 8} textAnchor="middle" fontSize={7.5} fontFamily={MONO_FONT} fill={MUTED}>{cur.scale}</text>
       </svg>
     </Stage>
   )
@@ -241,13 +242,13 @@ function AffinityVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): 
         })}
         {top.map((c, i) => {
           const q = pt(c)
-          return <text key={`l${i}`} x={q.x + 7} y={q.y + 3} fontSize={7.5} fontFamily="ui-monospace, monospace" fill={TEXT} opacity={0.85}>{`${NOTE_NAMES[c.k.root]} ${SCALE_ABBR[c.k.scale]}`}</text>
+          return <text key={`l${i}`} x={q.x + 7} y={q.y + 3} fontSize={7.5} fontFamily={MONO_FONT} fill={TEXT} opacity={0.85}>{`${NOTE_NAMES[c.k.root]} ${SCALE_ABBR[c.k.scale]}`}</text>
         })}
         <g key={keyId(cur)}>
           <circle cx={cx} cy={cy} r={9} fill="none" stroke={col(h)} strokeWidth={1.5} className="ks-ring" />
           <circle cx={cx} cy={cy} r={8} fill={col(h, 0.95)} className="ks-pop" style={{ filter: `drop-shadow(0 0 6px ${col(h, 0.9)})` }} />
         </g>
-        <text x={cx} y={cy + 3} textAnchor="middle" fontSize={7.5} fontWeight={700} fontFamily="ui-monospace, monospace" fill="#111">{NOTE_NAMES[cur.root]}</text>
+        <text x={cx} y={cy + 3} textAnchor="middle" fontSize={7.5} fontWeight={700} fontFamily={MONO_FONT} fill="#111">{NOTE_NAMES[cur.root]}</text>
       </svg>
     </Stage>
   )
@@ -285,25 +286,25 @@ function PivotVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): JSX
                 ? <g key={keyId(cur)}><circle cx={x} cy={y} r={7.5} fill={col(h, 0.95)} className="ks-pop" style={{ filter: `drop-shadow(0 0 5px ${col(h, 0.9)})` }} /></g>
                 : <circle cx={x} cy={y} r={lit ? 4.6 : 2.6} fill={lit ? col(h, 0.55) : 'none'} stroke={lit ? col(h, 0.9) : BORDER} strokeWidth={1} />}
               {degree && <circle cx={x} cy={y} r={7.5} fill="none" stroke={col(keyHue(pc), 0.9)} strokeWidth={1.2} strokeDasharray="2 2" />}
-              <text x={xl} y={yl} textAnchor="middle" dominantBaseline="central" fontSize={7.5} fontFamily="ui-monospace, monospace" fill={lit ? TEXT : MUTED} opacity={lit ? 0.9 : 0.45}>{NOTE_NAMES[pc]}</text>
+              <text x={xl} y={yl} textAnchor="middle" dominantBaseline="central" fontSize={7.5} fontFamily={MONO_FONT} fill={lit ? TEXT : MUTED} opacity={lit ? 0.9 : 0.45}>{NOTE_NAMES[pc]}</text>
             </g>
           )
         })}
-        <text x={cx} y={cy - 2} textAnchor="middle" fontSize={9} fontWeight={600} fontFamily="ui-monospace, monospace" fill={col(h)}>{NOTE_NAMES[cur.root]}</text>
-        <text x={cx} y={cy + 9} textAnchor="middle" fontSize={7} fontFamily="ui-monospace, monospace" fill={MUTED}>{cur.scale}</text>
+        <text x={cx} y={cy - 2} textAnchor="middle" fontSize={9} fontWeight={600} fontFamily={MONO_FONT} fill={col(h)}>{NOTE_NAMES[cur.root]}</text>
+        <text x={cx} y={cy + 9} textAnchor="middle" fontSize={7} fontFamily={MONO_FONT} fill={MUTED}>{cur.scale}</text>
         {/* where it may go */}
-        <text x={136} y={12} fontSize={7} fontFamily="ui-monospace, monospace" fill={MUTED}>{modes ? 'the degrees' : 'bright'}</text>
+        <text x={136} y={12} fontSize={7} fontFamily={MONO_FONT} fill={MUTED}>{modes ? 'the degrees' : 'bright'}</text>
         {ladder.map((l, i) => {
           const y = 24 + i * 15
           const hh = keyHue(l.root)
           return (
             <g key={l.label}>
               <rect x={134} y={y - 8} width={100} height={13} rx={4} fill={l.here ? col(hh, 0.5) : col(hh, 0.1)} stroke={col(hh, l.here ? 1 : 0.4)} strokeWidth={l.here ? 1.4 : 0.8} style={l.here ? { filter: `drop-shadow(0 0 4px ${col(hh, 0.7)})` } : undefined} />
-              <text x={140} y={y + 1.5} fontSize={7.5} fontFamily="ui-monospace, monospace" fill={l.here ? TEXT : MUTED}>{l.label}</text>
+              <text x={140} y={y + 1.5} fontSize={7.5} fontFamily={MONO_FONT} fill={l.here ? TEXT : MUTED}>{l.label}</text>
             </g>
           )
         })}
-        {!modes && <text x={136} y={24 + ladder.length * 15} fontSize={7} fontFamily="ui-monospace, monospace" fill={MUTED}>dark</text>}
+        {!modes && <text x={136} y={24 + ladder.length * 15} fontSize={7} fontFamily={MONO_FONT} fill={MUTED}>dark</text>}
       </svg>
     </Stage>
   )
@@ -353,8 +354,8 @@ function PictureVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): J
             <circle cx={cx + mr * Math.cos(ma)} cy={cy + mr * Math.sin(ma)} r={4.5} fill={grey ? MUTED : `hsl(${hue * 360} 85% 60%)`} stroke="#fff" strokeWidth={1.2} style={{ filter: grey ? undefined : `drop-shadow(0 0 4px hsl(${hue * 360} 90% 60%))` }} />
           </>
         )}
-        <text x={cx} y={cy + 4} textAnchor="middle" fontSize={11} fontWeight={700} fontFamily="ui-monospace, monospace" fill={pk ? col(keyHue(pk.root)) : MUTED}>{pk ? NOTE_NAMES[pk.root] : '·'}</text>
-        {grey && has && <text x={cx} y={cy + 15} textAnchor="middle" fontSize={6.5} fontFamily="ui-monospace, monospace" fill={MUTED}>grey : keeps root</text>}
+        <text x={cx} y={cy + 4} textAnchor="middle" fontSize={11} fontWeight={700} fontFamily={MONO_FONT} fill={pk ? col(keyHue(pk.root)) : MUTED}>{pk ? NOTE_NAMES[pk.root] : '·'}</text>
+        {grey && has && <text x={cx} y={cy + 15} textAnchor="middle" fontSize={6.5} fontFamily={MONO_FONT} fill={MUTED}>grey : keeps root</text>}
         {/* the brightness against the moods */}
         <defs>
           <linearGradient id="ksBri" x1="0" y1="1" x2="0" y2="0">
@@ -369,11 +370,11 @@ function PictureVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): J
           const here = pk?.scale === m
           return (
             <g key={m}>
-              <text x={134} y={y + 2.5} fontSize={here ? 8.5 : 7.5} fontWeight={here ? 700 : 400} fontFamily="ui-monospace, monospace" fill={here ? col(keyHue(pk!.root)) : MUTED}>{m}</text>
+              <text x={134} y={y + 2.5} fontSize={here ? 8.5 : 7.5} fontWeight={here ? 700 : 400} fontFamily={MONO_FONT} fill={here ? col(keyHue(pk!.root)) : MUTED}>{m}</text>
             </g>
           )
         })}
-        {pk && <text x={234} y={130} textAnchor="end" fontSize={8} fontFamily="ui-monospace, monospace" fill={col(keyHue(pk.root))}>{`→ ${NOTE_NAMES[pk.root]} ${pk.scale}`}</text>}
+        {pk && <text x={234} y={130} textAnchor="end" fontSize={8} fontFamily={MONO_FONT} fill={col(keyHue(pk.root))}>{`→ ${NOTE_NAMES[pk.root]} ${pk.scale}`}</text>}
         {/* the motion, for cuts */}
         {cuts && (
           <g>

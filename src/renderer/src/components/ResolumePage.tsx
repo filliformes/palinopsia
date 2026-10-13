@@ -34,6 +34,7 @@ import { showToast } from './Toast'
 import { effectiveZoom } from './uiZoom'
 import { TBTN, TBTN_IDLE, TBTN_LIT } from './buttonStyles'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { MONO_FONT } from '../monoFont'
 
 const CELL = 20
 const LABEL_W = 224
@@ -44,7 +45,7 @@ const TOP = GROUP_H + HEAD_H + METER_H
 
 // The app's type : its UI face (each theme sets --font-app) for the labels, the
 // mono the other pages use for titles, headings and readouts.
-const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+const MONO = MONO_FONT
 
 type Col = { kind: 'out'; o: ResoOutput; group: string; gi: number } | { kind: 'stub'; group: string; count: number; gi: number }
 interface Span { group: string; c0: number; c1: number; folded: boolean; count: number; gi: number }
