@@ -80,6 +80,12 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Collage holds up to 100 films** (was 50). The deck array keeps its 80 MB
+  budget by itself (100 films get the smallest layer edge, 384 px : 59 MB). A film
+  decodes only while a piece shows it and the wall has at most 64 pieces, so past
+  64 the extra films wait in the pool and rotate in through churn and deal.
+  Measured on the RTX 4070 with a 1080p clip : 50 films, 50 decoding, 60 fps; 100
+  films, 64 decoding (64 cuts), 60 fps.
 - **The right column fits its seven tabs on one line, exactly** : its width is
   measured from the tab row itself (the system monospace differs per computer), no
   wider, where it was a fixed 320 px and the tabs wrapped. A width dragged with the
