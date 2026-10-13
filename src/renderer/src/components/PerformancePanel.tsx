@@ -25,6 +25,7 @@ const CPU_ROWS: Array<{ key: string; label: string; desc: string }> = [
   { key: 'vision', label: 'Vision return', desc: 'Downsampling the composited image and reducing it to features (brightness, motion, edges…) that drive `vision` / `homeostat` modulators and stream out over OSC. Only runs when something reads them.' },
   { key: 'depth', label: 'Depth engine', desc: 'Running the monocular depth estimate on a low-res readback (~11 Hz). Only in Depth : estimate mode (used by anaglyph / parallax / depth-shadow).' },
   { key: 'lights', label: 'Light output', desc: 'Mip-averaging the image into a zone grid and shipping it to the ArtNet/DMX · WLED sender. Only when Lights are on ; throttled to the light fps.' },
+  { key: 'mark', label: 'Mark signal', desc: 'Reading one line of the image and sending it over OSC as the drawn optical soundtrack (/opsia/av/mark-*). Only while MARK is on in the OSC OUT box ; about 30 times a second.' },
   { key: 'sonify', label: 'Sonify', desc: 'Sampling the image taps that feed the Sonify sound engine (image → sound). The voices themselves run on the audio thread.' },
   { key: 'audio', label: 'Audio ingest', desc: 'Analyzing the audio input into level / flux / transient / bands / pitch for audio-reactivity (plus the denoiser + monitor graph).' },
   { key: 'modulation', label: 'Modulation', desc: 'Ticking the 8 modulator slots + Meta knobs and applying the mod-matrix onto the composition. Cheap, but always running : this is the row you saw flicker before.' },

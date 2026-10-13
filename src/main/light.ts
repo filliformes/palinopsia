@@ -1,12 +1,12 @@
 // Light output : turn the composite's zone grid into room light. The renderer
-// mip-averages the frame into a small cols×rows grid (Compositor.captureZones)
+// mip-averages the frame into a small cols×rows grid (Compositor.kickZones / takeZones)
 // and ships it here; we map the zones to RGB and push over UDP as either
 // ArtNet/DMX (universal : most consoles, LED controllers, dimmers) or WLED's
 // realtime DNRGB (cheap addressable strips/matrices). Best-effort throughout :
 // a bad host or a closed socket must never take down the main process.
 //
 // Zone buffer contract : RGBA8, cols*rows, BOTTOM-UP (row 0 = bottom of frame),
-// matching Compositor.captureZones' GL readback orientation.
+// matching the GL readback orientation of Compositor.takeZones.
 
 import { createSocket, type Socket } from 'dgram'
 import type { LightConfig } from '@shared/types'
@@ -54,7 +54,12 @@ export class LightSender {
     const cfg = this.cfg
     if (!cfg || !cfg.enabled || !this.sock || !cfg.host) return
     const now = Date.now()
-    if (now - this.lastSend < 1000 / Math.max(1, Math.min(60, cfg.fps || 40))) return
+    // The renderer already paces the grids at the fps cap; this only stops a
+    // runaway sender. Half an interval of slack : a grid is read back
+    // asynchronously and lands one or two frames after it was queued, so two
+    // grids can arrive a frame apart, and a full interval here dropped the
+    // second one (about one grid in 40, a 50 ms hole in the light).
+    if (now - this.lastSend < 500 / Math.max(1, Math.min(60, cfg.fps || 40))) return
     this.lastSend = now
     const g = Math.max(0.1, Math.min(3, cfg.gamma || 1))
     const b = Math.max(0, Math.min(1, cfg.brightness))

@@ -2128,23 +2128,28 @@ export class Compositor {
   private syncPx = new Uint8Array(4);
 
   /** LIGHT OUTPUT : reduce the presented composite to a cols×rows grid of zone
-   *  colours for DMX/ArtNet/WLED. Two cheap passes : copy the clean composite
+   *  colors for DMX/ArtNet/WLED. Two cheap passes : copy the clean composite
    *  into a mipmapped 256² source, then downscale it into the cols×rows target
-   *  so each output texel is a TRILINEAR (mip) box-average of its zone — a true
-   *  representative colour, not a 4-tap point sample. Reads back cols*rows*4
-   *  bytes (tiny). RGBA8, bottom-up (row 0 = bottom of the frame). Returns a
-   *  reused buffer; copy it before the next call. */
+   *  so each output texel is a TRILINEAR (mip) box-average of its zone : a true
+   *  representative color, not a 4-tap point sample. cols*rows*4 bytes (tiny).
+   *
+   *  The readback is ASYNCHRONOUS (see gridReadback.ts) : kickZones() queues
+   *  this frame's grid, takeZones() hands back the newest one that has landed,
+   *  a frame or two later. The synchronous read this replaced drained the GPU
+   *  pipeline on every light frame, ~17 ms each on an integrated GPU, however
+   *  few zones it asked for. */
   private zoneMipTex: WebGLTexture | null = null;
   private zoneMipFbo: WebGLFramebuffer | null = null;
-  private zoneOut: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
-  private zoneCols = 0;
-  private zoneRows = 0;
-  private zoneBuf: Uint8Array | null = null;
-  captureZones(cols: number, rows: number): { cols: number; rows: number; px: Uint8Array } | null {
+  private zoneRead: GridReadback | null = null;
+  kickZones(cols: number, rows: number): boolean {
     const gl = this.gl;
-    if (!this.lastPresent) return null;
+    if (!this.lastPresent) return false;
     cols = Math.max(1, Math.min(64, Math.round(cols)));
     rows = Math.max(1, Math.min(64, Math.round(rows)));
+    if (!this.zoneRead) this.zoneRead = new GridReadback(gl);
+    // Every slot still in flight (the GPU is behind) : skip this grid, and skip
+    // pass 1 with it rather than draw it for a read that will not be queued.
+    if (this.zoneRead.full) return false;
     const MIP = 256;
     if (!this.zoneMipTex) {
       this.zoneMipTex = gl.createTexture()!;
@@ -2158,19 +2163,6 @@ export class Compositor {
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.zoneMipFbo);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.zoneMipTex, 0);
     }
-    if (!this.zoneOut || this.zoneCols !== cols || this.zoneRows !== rows) {
-      if (this.zoneOut) { gl.deleteFramebuffer(this.zoneOut.fbo); gl.deleteTexture(this.zoneOut.tex); }
-      const tex = gl.createTexture()!; gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, cols, rows, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      const fbo = gl.createFramebuffer()!; gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-      this.zoneOut = { fbo, tex }; this.zoneCols = cols; this.zoneRows = rows;
-      this.zoneBuf = new Uint8Array(cols * rows * 4);
-    }
     gl.bindVertexArray(this.vao);
     gl.useProgram(this.copyProg);
     gl.activeTexture(gl.TEXTURE0); gl.uniform1i(this.uCTex, 0);
@@ -2181,16 +2173,27 @@ export class Compositor {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     // Switch the render target OFF the mip texture BEFORE generating its mips
     // (generateMipmap on a texture still attached to the bound FBO is a feedback
-    // hazard), then Pass 2 : mip source → cols×rows (trilinear = zone average).
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.zoneOut.fbo);
-    gl.viewport(0, 0, cols, rows);
+    // hazard), then Pass 2 : mip source → cols×rows (trilinear = zone average),
+    // drawn by the ring into its own RGBA8 target and queued for the readback.
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindTexture(gl.TEXTURE_2D, this.zoneMipTex);
     gl.generateMipmap(gl.TEXTURE_2D);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.readPixels(0, 0, cols, rows, gl.RGBA, gl.UNSIGNED_BYTE, this.zoneBuf!);
     gl.bindVertexArray(null);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    return { cols, rows, px: this.zoneBuf! };
+    return this.zoneRead.kick(cols, rows, this.zoneMipTex!, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
+  }
+
+  /** The newest zone grid that has landed (null while none has). RGBA8,
+   *  bottom-up (row 0 = bottom of the frame). A reused buffer : send or copy it
+   *  before the next kick. */
+  takeZones(): { cols: number; rows: number; px: Uint8Array } | null {
+    const got = this.zoneRead?.takeLatest();
+    return got ? { cols: got.w, rows: got.h, px: got.grid } : null;
+  }
+
+  /** The light output was switched off : what it left in flight is a picture
+   *  from before, which must not go out first when it comes back on. */
+  dropZones(): void {
+    this.zoneRead?.dropInFlight();
   }
 
   /** PANIC FLUSH (bound to the `0` key) : empty every self-feeding buffer WITHOUT
@@ -2279,9 +2282,11 @@ export class Compositor {
 
   // ── Animated sound (spec §4.4): read one horizontal scanline of the PRESENTED
   //    frame and downsample it to `n` luma samples in 0..1 : the "optical
-  //    soundtrack" a drawn gesture writes. Cheap (one row, sub-rect readback).
-  //    Call AFTER render() (the default framebuffer then holds the presented frame).
-  private markStripBuf: Uint8Array | null = null;
+  //    soundtrack" a drawn gesture writes. One row of the canvas, read through
+  //    its own asynchronous ring (gridReadback.ts) : kickMarkStrip() queues this
+  //    frame's row, takeMarkStrip() reduces the newest one that has landed.
+  //    Kick AFTER render() (the default framebuffer then holds the presented frame).
+  private markRead: GridReadback | null = null;
   // ── Vision feature sampling (the return path : image → control) ──────────
   private visionRead: GridReadback | null = null;
 
@@ -2299,8 +2304,9 @@ export class Compositor {
   visionSample(size: number): { grid: Uint8Array; size: number } | null {
     if (!this.lastPresent) return null;
     if (!this.visionRead) this.visionRead = new GridReadback(this.gl);
-    this.visionRead.kick(size, this.lastPresent, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
-    return this.visionRead.takeLatest();
+    this.visionRead.kick(size, size, this.lastPresent, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
+    const got = this.visionRead.takeLatest();
+    return got ? { grid: got.grid, size: got.w } : null;
   }
 
   // ── Sonify tap readback : a 96×96 downsample of the presented frame OR one
@@ -2335,7 +2341,7 @@ export class Compositor {
     // picture from before it. Dropped, the first grid back is a current one.
     const now = performance.now();
     if (last && now - last.at > 150 && this.frameNo - last.frame > 8) ring.dropInFlight();
-    ring.kick(size, src, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
+    ring.kick(size, size, src, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
     const got = ring.takeLatest();
     if (!last) { last = { frame: 0, ok: false, grid: new Uint8Array(size * size * 4), at: 0 }; this.soniLast.set(key, last); }
     last.frame = this.frameNo;
@@ -2428,7 +2434,7 @@ export class Compositor {
   depthFrame(size: number): { data: Uint8Array; w: number; h: number } | null {
     if (!this.lastPresent) return null;
     if (!this.depthRead) this.depthRead = new GridReadback(this.gl);
-    this.depthRead.kick(size, this.lastPresent, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
+    this.depthRead.kick(size, size, this.lastPresent, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
     const got = this.depthRead.takeLatest();
     if (!got) return null;
     // readPixels is bottom-up; the depth model expects an upright picture (its
@@ -2500,21 +2506,32 @@ export class Compositor {
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 128, 2, gl.RED, gl.UNSIGNED_BYTE, buf);
   }
 
-  readMarkStrip(n: number, y01: number): Float32Array | null {
-    const gl = this.gl, w = this.canvas.width, h = this.canvas.height;
-    if (w < 2 || h < 2 || n < 1) return null;
+  kickMarkStrip(y01: number): boolean {
+    const w = this.canvas.width, h = this.canvas.height;
+    if (w < 2 || h < 2) return false;
     // GL is bottom-up; y01 is top-down (0 = top of image).
     const y = Math.max(0, Math.min(h - 1, Math.round((1 - y01) * (h - 1))));
-    const need = w * 4;
-    if (!this.markStripBuf || this.markStripBuf.length !== need) this.markStripBuf = new Uint8Array(need);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.readPixels(0, y, w, 1, gl.RGBA, gl.UNSIGNED_BYTE, this.markStripBuf);
-    const out = new Float32Array(n), b = this.markStripBuf;
+    if (!this.markRead) this.markRead = new GridReadback(this.gl);
+    return this.markRead.kickRead(null, 0, y, w, 1, !this.paintingClock);
+  }
+
+  /** The newest landed scanline as `n` luma samples (null while none has). The
+   *  row is as wide as the canvas was when it was queued. */
+  takeMarkStrip(n: number): Float32Array | null {
+    if (n < 1) return null;
+    const got = this.markRead?.takeLatest();
+    if (!got) return null;
+    const w = got.w, out = new Float32Array(n), b = got.grid;
     for (let i = 0; i < n; i++) {
       const p = Math.min(w - 1, Math.floor((i / n) * w)) * 4;
       out[i] = (b[p] * 0.299 + b[p + 1] * 0.587 + b[p + 2] * 0.114) / 255;
     }
     return out;
+  }
+
+  /** The mark signal was switched off : forget the rows it left in flight. */
+  dropMarkStrip(): void {
+    this.markRead?.dropInFlight();
   }
 
   /** Fulldome on (a config) or off (null). Resizes the canvas backing store to
@@ -3450,8 +3467,7 @@ export class Compositor {
     this.depthShadow?.dispose();
     if (this.zoneMipTex) gl.deleteTexture(this.zoneMipTex);
     if (this.zoneMipFbo) gl.deleteFramebuffer(this.zoneMipFbo);
-    if (this.zoneOut) { gl.deleteTexture(this.zoneOut.tex); gl.deleteFramebuffer(this.zoneOut.fbo); }
-    this.zoneMipTex = null; this.zoneMipFbo = null; this.zoneOut = null;
+    this.zoneMipTex = null; this.zoneMipFbo = null;
     for (const f of this.fences) { try { gl.deleteSync(f); } catch { /* lost */ } }
     this.fences = [];
     this.outputShape?.dispose();
@@ -3464,6 +3480,8 @@ export class Compositor {
     // Readback rings hold fences : drop them before the context goes.
     this.visionRead?.dispose(); this.visionRead = null;
     this.depthRead?.dispose(); this.depthRead = null;
+    this.zoneRead?.dispose(); this.zoneRead = null;
+    this.markRead?.dispose(); this.markRead = null;
     for (const r of this.soniRead.values()) r.dispose();
     this.soniRead.clear();
     this.soniLast.clear();

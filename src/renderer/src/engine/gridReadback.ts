@@ -1,6 +1,7 @@
 // Small-grid readback WITHOUT stalling the render loop : the return path for
 // everything that turns the picture back into control data (vision features,
-// the sonify taps, the depth estimator's input frame).
+// the sonify taps, the depth estimator's input frame, the light output's zone
+// colors, the scanline behind /opsia/av/mark-signal).
 //
 // These grids are tiny — a few KB — so the cost was assumed to be the bytes.
 // It isn't. A synchronous readPixels cannot return until the GPU has finished
@@ -19,11 +20,17 @@
 // these consumers are all throttled to 11-30 Hz anyway, so the reading they got
 // synchronously was already older than the latency this adds. Nothing here ever
 // WAITS on the GPU : when every slot is still in flight, kick() skips.
+//
+// A grid is w x h, not only square : the light output reads cols x rows zones
+// (its own two-pass mip average drawn first, then kick() for the last pass),
+// and kickRead() reads a region of a framebuffer the caller already drew, with
+// no downsample of its own (the mark signal's one row of the canvas).
 
 export class GridReadback {
   private fbo: WebGLFramebuffer | null = null
   private tex: WebGLTexture | null = null
-  private size = 0
+  private w = 0
+  private h = 0
   private pbos: WebGLBuffer[] = []
   private fences: Array<WebGLSync | null> = []
   private phase = 0 // the next slot to write = the oldest one
@@ -31,7 +38,7 @@ export class GridReadback {
 
   /** `slots` : readbacks in flight. Three is enough for a consumer polling at
    *  30 Hz or slower (the fence from the previous poll has long signaled), and
-   *  the whole ring costs size²·4·3 bytes — 110 KB at 96², nothing. */
+   *  the whole ring costs w·h·4·3 bytes, 110 KB at 96², nothing. */
   constructor(
     private gl: WebGL2RenderingContext,
     private slots = 3
@@ -48,23 +55,12 @@ export class GridReadback {
     }
   }
 
-  private ensure(size: number): void {
-    if (this.size === size) return
+  private ensure(w: number, h: number): void {
+    if (this.w === w && this.h === h) return
     const gl = this.gl
     // A size change makes everything in flight the wrong shape : drop it all.
     this.release()
-    const tex = gl.createTexture()!
-    gl.bindTexture(gl.TEXTURE_2D, tex)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-    const fbo = gl.createFramebuffer()!
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0)
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
-    const bytes = size * size * 4
+    const bytes = w * h * 4
     for (let i = 0; i < this.slots; i++) {
       const pb = gl.createBuffer()!
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pb)
@@ -84,9 +80,29 @@ export class GridReadback {
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null)
     this.fences = new Array(this.slots).fill(null)
     this.out = new Uint8Array(bytes)
+    this.w = w
+    this.h = h
+  }
+
+  /** The downsample target, made on first use : a ring that only reads a
+   *  framebuffer someone else drew (kickRead) never needs one. */
+  private target(): WebGLFramebuffer {
+    if (this.fbo) return this.fbo
+    const gl = this.gl
+    const tex = gl.createTexture()!
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, this.w, this.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    const fbo = gl.createFramebuffer()!
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     this.fbo = fbo
     this.tex = tex
-    this.size = size
+    return fbo
   }
 
   private release(): void {
@@ -112,7 +128,8 @@ export class GridReadback {
       this.tex = null
     }
     this.out = null
-    this.size = 0
+    this.w = 0
+    this.h = 0
     this.phase = 0
   }
 
@@ -121,13 +138,23 @@ export class GridReadback {
     return this.fences.reduce((n: number, f) => n + (f ? 1 : 0), 0)
   }
 
-  /** Queue one `size`x`size` downsample of `src` and its readback. `prog`/`uTex`
-   *  is a copy shader sampling unit 0, `vao` a fullscreen triangle. Returns false
-   *  when every slot is still in flight (the GPU is behind : never wait for it).
-   *  `flush` submits the work at once; leave it off when the caller knows the
-   *  window is about to paint, which submits it anyway (see below). */
+  /** True when the next kick would be refused (every slot still in flight). A
+   *  caller with GPU work of its own to do before the kick checks this first,
+   *  so a refused kick does not leave that work drawn for nothing. */
+  get full(): boolean {
+    return !!this.fences[this.phase]
+  }
+
+  /** Queue one `w`x`h` downsample of `src` and its readback. `prog`/`uTex` is a
+   *  copy shader sampling unit 0 (with `src`'s own filtering : a mipmapped
+   *  source gives a box average per texel), `vao` a fullscreen triangle.
+   *  Returns false when every slot is still in flight (the GPU is behind :
+   *  never wait for it). `flush` submits the work at once; leave it off when
+   *  the caller knows the window is about to paint, which submits it anyway
+   *  (see submit()). */
   kick(
-    size: number,
+    w: number,
+    h: number,
     src: WebGLTexture,
     prog: WebGLProgram,
     uTex: WebGLUniformLocation | null,
@@ -135,22 +162,43 @@ export class GridReadback {
     flush = true
   ): boolean {
     const gl = this.gl
-    this.ensure(size)
+    this.ensure(w, h)
     const wi = this.phase
     if (this.fences[wi]) return false
     gl.bindVertexArray(vao)
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo)
-    gl.viewport(0, 0, size, size)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.target())
+    gl.viewport(0, 0, w, h)
     gl.useProgram(prog)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, src)
     gl.uniform1i(uTex, 0)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
-    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbos[wi])
-    gl.readPixels(0, 0, size, size, gl.RGBA, gl.UNSIGNED_BYTE, 0)
-    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null)
+    this.submit(wi, 0, 0, flush)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     gl.bindVertexArray(null)
+    return true
+  }
+
+  /** Queue the readback of a `w`x`h` region at (`x`, `y`) of a framebuffer
+   *  already drawn (null = the canvas), as it stands now in the command
+   *  stream : no copy of its own. Same ring, same rules as kick(). */
+  kickRead(fb: WebGLFramebuffer | null, x: number, y: number, w: number, h: number, flush = true): boolean {
+    const gl = this.gl
+    this.ensure(w, h)
+    const wi = this.phase
+    if (this.fences[wi]) return false
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb)
+    this.submit(wi, x, y, flush)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    return true
+  }
+
+  /** Read the bound framebuffer's region into slot `wi`'s buffer and fence it. */
+  private submit(wi: number, x: number, y: number, flush: boolean): void {
+    const gl = this.gl
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbos[wi])
+    gl.readPixels(x, y, this.w, this.h, gl.RGBA, gl.UNSIGNED_BYTE, 0)
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null)
     this.fences[wi] = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0)
     // Submit now : a window that doesn't paint (minimized, the output window on
     // another space) never flushes on its own, and the GPU would only start this
@@ -165,7 +213,6 @@ export class GridReadback {
     // a scene holding the GPU at 98%, once its reads had all gone asynchronous).
     if (flush) gl.flush()
     this.phase = (wi + 1) % this.slots
-    return true
   }
 
   private ready(ri: number): boolean {
@@ -180,7 +227,7 @@ export class GridReadback {
    *  signal wants the freshest reading, not every one. Null while none is ready
    *  (the first poll after a start or a size change). Rows run bottom-up, as GL
    *  reads them. The buffer is reused, so read it before the next kick. */
-  takeLatest(): { grid: Uint8Array; size: number } | null {
+  takeLatest(): { grid: Uint8Array; w: number; h: number } | null {
     const gl = this.gl
     const out = this.out
     if (!out) return null
@@ -204,7 +251,7 @@ export class GridReadback {
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbos[best])
     gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, out)
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null)
-    return { grid: out, size: this.size }
+    return { grid: out, w: this.w, h: this.h }
   }
 
   dispose(): void {

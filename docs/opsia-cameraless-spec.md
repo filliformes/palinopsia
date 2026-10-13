@@ -16,7 +16,7 @@
 > Congeal is additive where Dye needs subtractive). **Superimposition flicker**
 > (§5.2, `engine/flicker.ts`, Transport SUPER — rate follows the film draw clock)
 > and the **animated-sound loop** (§4.4, `engine/markSignal.ts` +
-> `Compositor.readMarkStrip` → `/opsia/av/mark-*` to Pandore) are BUILT. **The spec
+> `Compositor.kickMarkStrip` → `/opsia/av/mark-*` to Pandore) are BUILT. **The spec
 > is essentially complete** — only `drawSync` BPM-locked ticks (§3.1) remain, a minor add.
 > Companion to `opsia-convolution-spec.md` (T = M·K). This spec covers the
 > **cameraless / direct-on-film** family: making the continuous procedural engine

@@ -2086,8 +2086,10 @@ src/
               Slime Mould, Mycelium, Veins, Grown, each its own GL engine, handed
               the audio texture and its sidechain layer through an optional
               feed()), native nodes (convNodes), strobe limiter, output shaper,
-              PBR, the fulldome stage (dome.ts) and the capture rings that feed
-              every output (frameCapture.ts)
+              PBR, the fulldome stage (dome.ts), the capture rings that feed
+              every output (frameCapture.ts) and the small readback rings that
+              turn the picture back into control data : vision, Sonify taps,
+              depth, light zones, the mark scanline (gridReadback.ts)
     shaders/  ISF .fs files + registry (curated ranges) + presets
     audio/    the Sonify engine : AudioWorklet + voice managers + auto-voice
     assemble/ the corpus matcher : descriptor costs, live matching, PCA map

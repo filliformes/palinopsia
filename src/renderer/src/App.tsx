@@ -105,6 +105,7 @@ let lastWarpSent = 0
 let lastDepthSample = 0 // throttles the depth-estimator frame readback (~11 Hz)
 let lastVisionSample = 0 // throttles the vision-bus readback (~30 Hz)
 let lastLightSample = 0 // throttles the light-output zone readback (config fps cap)
+let lastLightsOn = false
 
 // Reveal a Finishing Touches sub-section: switch the right column to the
 // Finishing view and expand the relevant sub-row.
@@ -1507,8 +1508,11 @@ export default function App(): JSX.Element {
         //     A real-time (DXV3) recording captures on its own rate's grid.
         outputRecorder.tick(now)
         // 3b. Animated sound (§4.4): sample a scanline of the presented frame and
-        //     send it to Pandore over OSC (the drawn optical track).
-        if (st.markSignalEnabled) pushMarkSignal(comp!, now)
+        //     send it to Pandore over OSC (the drawn optical track). Called every
+        //     frame, on or off : the scanline is read asynchronously (see
+        //     gridReadback.ts), so it collects a landed row each frame, and it
+        //     drops what is still in flight when the signal is switched off.
+        pushMarkSignal(comp!, now)
         // 3c. Return path (image → control): reduce the presented frame to vision
         //     features that drive `vision` modulators next frame + stream out over
         //     OSC. Gated to when something actually reads them (a vision modulator
@@ -1593,19 +1597,28 @@ export default function App(): JSX.Element {
           }
         }
         // 3e. Light output (image → room): mip-average the composite into a zone
-        //     grid and ship it to main's ArtNet/DMX · WLED sender. Throttled to
-        //     the config's fps cap (DMX tops out ~44 Hz; LEDs less), so the small
-        //     zone readback never paces the render.
+        //     grid and ship it to main's ArtNet/DMX · WLED sender. A grid is
+        //     queued at the config's fps cap (DMX tops out ~44 Hz; LEDs less) and
+        //     read back asynchronously (see gridReadback.ts) : it is shipped the
+        //     frame it lands, one or two after it was queued, so it is looked for
+        //     every frame and the cap only paces the queueing (collected on the
+        //     cap instead, a 1 Hz rig would run a whole second late). The
+        //     synchronous read this replaced drained the GPU pipeline on every
+        //     light frame, ~17 ms each on an integrated GPU.
         if (st.lights.enabled) {
           const lc = st.lights
+          perfMeter.begin('lights')
+          const z = comp!.takeZones()
+          if (z) window.api.lightFrame(z.cols, z.rows, z.px)
           if (now - lastLightSample > 1000 / Math.max(1, Math.min(60, lc.fps || 40))) {
             lastLightSample = now
-            perfMeter.begin('lights')
-            const z = comp!.captureZones(lc.cols, lc.rows)
-            if (z) window.api.lightFrame(z.cols, z.rows, z.px)
-            perfMeter.end('lights')
+            comp!.kickZones(lc.cols, lc.rows)
           }
+          perfMeter.end('lights')
+        } else if (lastLightsOn) {
+          comp!.dropZones() // switched off : nothing from before goes out when it is back on
         }
+        lastLightsOn = st.lights.enabled
         // 4. Output window : the keystone it applies to the streamed frame (it
         //    draws our pixels; this is all it still reads of the render state).
         //    Sent when it changes, and every half second for a window that just

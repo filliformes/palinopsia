@@ -12,26 +12,44 @@
 
 import { useStore } from '../store'
 import { sendOsc } from '../oscMonitor'
+import { perfMeter } from './perfMeter'
 
 const N = 32 // scanline samples sent per frame
-let lastSend = 0
+let lastKick = 0
 let prevLevel = 0
+let reading = false // rows queued since the signal was last switched on
 
 interface StripReader {
-  readMarkStrip: (n: number, y01: number) => Float32Array | null
+  kickMarkStrip: (y01: number) => boolean
+  takeMarkStrip: (n: number) => Float32Array | null
+  dropMarkStrip: () => void
 }
 
-/** Sample the presented scanline and push it to Pandore. Throttled to ~30 Hz.
- *  No-op unless enabled + an outbound host is set. Call AFTER comp.render(). */
+/** Sample the presented scanline and push it to Pandore, ~30 Hz. Call EVERY
+ *  frame, AFTER comp.render() : the row is read asynchronously (queued on the
+ *  ~30 Hz grid, collected when it lands), and looking for it every frame is
+ *  what keeps it a frame or two behind the picture rather than a whole grid
+ *  step. No-op unless enabled + an outbound host is set. */
 export function pushMarkSignal(comp: StripReader, nowMs: number): void {
   const st = useStore.getState()
-  if (!st.markSignalEnabled || !st.oscOutHost) return
-  if (nowMs - lastSend < 33) return
-  lastSend = nowMs
+  if (!st.markSignalEnabled || !st.oscOutHost) {
+    // Switched off : forget the rows still in flight, or the first one sent when
+    // it comes back on would be a picture from before.
+    if (reading) { reading = false; comp.dropMarkStrip() }
+    return
+  }
+  reading = true
+  perfMeter.begin('mark')
+  if (nowMs - lastKick >= 33) {
+    lastKick = nowMs
+    comp.kickMarkStrip(st.markSignalY ?? 0.5)
+  }
+  const strip = comp.takeMarkStrip(N)
+  if (strip) sendStrip(strip, st.oscOutHost, st.oscOutPort)
+  perfMeter.end('mark')
+}
 
-  const strip = comp.readMarkStrip(N, st.markSignalY ?? 0.5)
-  if (!strip) return
-
+function sendStrip(strip: Float32Array, host: string, port: number): void {
   let sum = 0, csum = 0
   for (let i = 0; i < N; i++) {
     sum += strip[i]
@@ -42,7 +60,6 @@ export function pushMarkSignal(comp: StripReader, nowMs: number): void {
   const flux = Math.min(1, Math.abs(level - prevLevel) * 4)
   prevLevel = level
 
-  const host = st.oscOutHost, port = st.oscOutPort
   const arg = (v: number): { type: 'f'; value: number } => ({ type: 'f', value: v })
   sendOsc(host, port, '/opsia/av/mark-signal', Array.from(strip, arg))
   sendOsc(host, port, '/opsia/av/mark-level', [arg(level)])

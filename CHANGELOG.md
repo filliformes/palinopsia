@@ -104,6 +104,32 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The light output and MARK no longer cost the frame rate.** They were the last two
+  readers still pulling the picture back from the GPU synchronously (v1.2.5 left them
+  so) : the light output's zone colors (ArtNet/DMX, WLED) and the scanline behind
+  `/opsia/av/mark-signal`. Where the GPU shares the computer's memory, each such read
+  waits for the whole pipeline to drain, however little it asks for. Both now go
+  through the ring of pixel-pack buffers and fences the vision features, the Sonify
+  taps and the depth input already use (`engine/gridReadback.ts`, which now reads any
+  width and height, and a region of the canvas as drawn) : the read is queued, then
+  collected and sent the frame it lands. The values are unchanged : on a held frame,
+  all 432 channels of a 16 x 9 zone grid and all 32 strip values matched a synchronous
+  read of the same frame exactly, in the old build and the new one. Only the timing
+  moved : a grid leaves about 16 ms after its frame was drawn instead of about 12 (the
+  time the stalled read itself took), measured at 4 grids a second. Measured in an
+  isolated test copy on an 8 GB computer with an integrated GPU, 60 Hz display, a
+  light scene holding 60 fps, Performance tab open, three runs of each build : with
+  the lights on, the tab's **Light output** row went from **5.9 to 6.9 ms per frame
+  to 0.3 to 0.5**, blocking readback time from **354 to 363 ms of every second to 0**,
+  the worst frame from **33 ms to 22**; with the lights and MARK together, blocking
+  reads from **545 to 568 ms a second to 0** and the worst frame from **35 to 37 ms to
+  22**. The light rate holds (30 grids a second under the default 40 fps cap at
+  60 Hz), and so does MARK's (about 26 strips a second). The main process's own light
+  limiter now leaves half an interval of slack : two grids can now arrive a frame
+  apart, and a full interval there dropped about one grid in 40. The Performance tab
+  gains a **Mark signal** row (0.5 ms per frame, nearly all of it collecting the
+  landed row); the synchronous read it replaced showed in no row at all.
+
 - **Two NDI or USB-input layers opening together no longer go black.** A session
   with two such layers asked the window for its frame channel twice in one tick;
   the second answer closed the first channel while both listeners took it, so
