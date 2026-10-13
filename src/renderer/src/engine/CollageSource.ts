@@ -55,8 +55,8 @@ import { glGeneration } from './glGeneration'
 
 /** Same piece cap as the Autocutter : the shader's uniform arrays are sized 64. */
 const MAX_CELLS = 64
-/** Hard ceiling on simultaneous decoders. */
-export const MAX_DECKS = 50
+/** Hard ceiling on simultaneous decoders (Vincent, 2026-10-13 : 50 → 100). */
+export const MAX_DECKS = 100
 /** Mosaic rows the shader's neighbour search can index. */
 const MAX_ROWS = 16
 /** Chromium refuses playback rates outside roughly this band. */
@@ -85,7 +85,8 @@ const FAST_DEAL_S = 1
  *  (the biggest cut-up pieces about half as much again), and its cover crop out
  *  of a contain-fitted 16:9 film is ~1/1.8 of the layer edge. So this keeps a
  *  piece near one texel per output pixel, capped by the memory budget shared by
- *  every layer (16 x 1024^2 or 50 x 512^2 both land near 64 MB). */
+ *  every layer (16 x 1024^2 or 50 x 512^2 both land near 64 MB; 100 films get
+ *  the smallest edge, 100 x 384^2 = 59 MB). */
 function tileFor(layers: number, cuts: number, w: number, h: number, maxTex: number): number {
   const piece = Math.sqrt((1.5 * w * h) / Math.max(1, Math.min(cuts, MAX_CELLS)))
   const want = piece * 1.8

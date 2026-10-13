@@ -1294,8 +1294,11 @@ living mosaic where every fragment is a different film. Pick it as a layer sourc
   of your saved Assemble edits per piece, each cutting on its own : selected from
   the Assemble bank in the same strip. The chosen edits copy onto the layer, so a
   session replays without the bank.
-- **`films`** is how many decode at once (up to **50**); **more cuts than films**
-  is fine : extra pieces show the same film at another crop and rotation.
+- **`films`** is how many films the wall holds (up to **100**); **more cuts than
+  films** is fine : extra pieces show the same film at another crop and rotation. A
+  film decodes only while a piece shows it, and the wall has at most 64 pieces, so
+  beyond 64 films the rest wait in the pool and come in through **churn** and
+  **deal**.
   **`window`** loops a slice of each clip (0 = play the whole film, the smoothest
   setting); **`churn`** is how many pieces re-cut on their own fast clock, from
   all-holding to every-piece-its-own-montage.
