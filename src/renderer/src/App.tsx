@@ -5,7 +5,7 @@
 // skeleton: preview + layers + transport, ready for the ISF runtime (Phase 1),
 // the FX racks (Phase 3), the auto-UI (Phase 4), and modulation (Phase 5).
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Compositor } from './engine/Compositor'
 import { hiveEncoder } from './hiveEncoder'
 import { audioBus } from './engine/audioIn'
@@ -273,19 +273,27 @@ export default function App(): JSX.Element {
   const uiZoom = useStore((s) => s.uiZoom)
   const setUiZoom = useStore((s) => s.setUiZoom)
   const rightView = useStore((s) => s.rightView)
-  // Layers-column width : draggable via the handle between preview and strips.
-  // The right column's default : wide enough for its seven tabs on ONE line in
-  // the widest system monospace (Menlo on a Mac needs about 475 CSS px with the
-  // column's padding, Consolas less; the UI zoom scales both alike). 320 was the
-  // old default : a width still saved at exactly that was never dragged, so it
-  // moves up too.
+  // The right column : exactly as wide as its seven tabs need on ONE line,
+  // measured from the tab row itself (the system monospace differs per computer :
+  // Consolas, Menlo...), unless the handle was dragged : that width is kept
+  // (opsia.layersWidthSet). A double-click on the handle goes back to fitting.
+  // 0 = fit. Widths saved before this (always written, dragged or not) fit again.
   const [layersWidth, setLayersWidth] = useState<number>(() => {
+    if (localStorage.getItem('opsia.layersWidthSet') !== '1') return 0
     const saved = Number(localStorage.getItem('opsia.layersWidth'))
-    return Number.isFinite(saved) && saved >= 240 && saved !== 320 ? saved : 480
+    return Number.isFinite(saved) && saved >= 240 ? saved : 0
   })
-  useEffect(() => {
-    localStorage.setItem('opsia.layersWidth', String(layersWidth))
-  }, [layersWidth])
+  const [fitWidth, setFitWidth] = useState(0)
+  const columnWidth = layersWidth || fitWidth || 320
+  const dragColumn = useCallback((w: number): void => {
+    setLayersWidth(w)
+    localStorage.setItem('opsia.layersWidth', String(w))
+    localStorage.setItem('opsia.layersWidthSet', '1')
+  }, [])
+  const fitColumn = useCallback((): void => {
+    setLayersWidth(0)
+    localStorage.removeItem('opsia.layersWidthSet')
+  }, [])
 
   // Crash recovery : on launch, if the previous run didn't shut down cleanly and
   // a rotating autosave snapshot exists, offer to restore the most recent one.
@@ -2030,15 +2038,17 @@ export default function App(): JSX.Element {
         </section>
 
         {/* Drag handle : the layers column is resizable */}
-        <LayerColumnHandle onResize={setLayersWidth} width={layersWidth} />
+        <LayerColumnHandle onResize={dragColumn} onFit={fitColumn} width={columnWidth} />
 
         {/* Right column : three switchable views: Layers strips, the compact
             Mixer (M key), or the Finishing Touches finalizers stack. */}
         <aside
           className="flex shrink-0 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-0.5"
-          style={{ width: layersWidth }}
+          // The scrollbar's room is always kept : with it coming and going, the
+          // width that fits the tabs flipped between two values (a render loop).
+          style={{ width: columnWidth, scrollbarGutter: 'stable' }}
         >
-          <RightViewTabs />
+          <RightViewTabs onNeed={setFitWidth} />
           {rightView === 'mixer' ? (
             <MixerPanel />
           ) : rightView === 'finishing' ? (
@@ -2206,9 +2216,42 @@ function FpsTag(): JSX.Element {
 }
 
 // Segmented switch at the top of the right column: Layers / Mixer / Finishing.
-function RightViewTabs(): JSX.Element {
+/** The right column's tabs. `onNeed` reports the column width (CSS px) that holds
+ *  them on one line : the tabs' own widths and gaps plus whatever the column adds
+ *  around the row (its padding, the scrollbar's kept room), converted out of the
+ *  UI zoom by the column's rendered width over its CSS width. Measured once on
+ *  mount and when the column resizes; a change under 2 px is ignored, so the
+ *  resize it causes settles at once. */
+function RightViewTabs({ onNeed }: { onNeed: (w: number | ((prev: number) => number)) => void }): JSX.Element {
   const rightView = useStore((s) => s.rightView)
   const setRightView = useStore((s) => s.setRightView)
+  const rowRef = useRef<HTMLDivElement | null>(null)
+  useLayoutEffect(() => {
+    const row = rowRef.current
+    const col = row?.parentElement
+    if (!row || !col) return
+    const measure = (): void => {
+      // A hidden one-line copy of the row, as wide as its content : the tabs, their
+      // gaps and the font's own rounding at this zoom, exactly as drawn.
+      const probe = row.cloneNode(true) as HTMLElement
+      probe.style.cssText = 'position:absolute;left:0;top:0;visibility:hidden;pointer-events:none;flex-wrap:nowrap;width:max-content'
+      col.appendChild(probe)
+      const tabs = probe.getBoundingClientRect().width
+      probe.remove()
+      const colW = col.getBoundingClientRect().width
+      const cssW = parseFloat(col.style.width) || col.offsetWidth
+      const k = colW / cssW // rendered px per CSS px (the UI zoom)
+      if (!(k > 0)) return
+      const need = Math.max(240, Math.min(560, Math.ceil((tabs + (colW - row.getBoundingClientRect().width)) / k) + 1))
+      onNeed((prev) => (Math.abs(prev - need) <= 2 ? prev : need))
+    }
+    measure()
+    // A scrollbar coming or going, the UI zoom, the window : measure again.
+    const ro = new ResizeObserver(measure)
+    ro.observe(col)
+    void document.fonts?.ready.then(measure)
+    return () => ro.disconnect()
+  }, [onNeed])
   const tabs: Array<{
     id: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io' | 'perf' | 'assemble'
     label: string
@@ -2232,7 +2275,7 @@ function RightViewTabs(): JSX.Element {
     }
   ]
   return (
-    <div className="flex shrink-0 flex-wrap gap-1">
+    <div ref={rowRef} className="flex shrink-0 flex-wrap gap-1">
       {tabs.map((t) => (
         <button
           key={t.id}
@@ -2361,17 +2404,20 @@ function UndoButtons(): JSX.Element {
 /** Thin draggable divider between the preview and the layers column. */
 function LayerColumnHandle({
   width,
-  onResize
+  onResize,
+  onFit
 }: {
   width: number
   onResize: (w: number) => void
+  /** Back to fitting the tabs (double-click). */
+  onFit: () => void
 }): JSX.Element {
   const drag = useRef<{ startX: number; startW: number; pointerId: number } | null>(null)
   return (
     <div
       className="w-1 shrink-0 cursor-col-resize rounded bg-border/60 transition-colors hover:bg-accent/60"
       style={{ touchAction: 'none' }}
-      title="Drag to resize the layers column · double-click to reset"
+      title="Drag to resize the layers column · double-click to fit it to its tabs again"
       onPointerDown={(e: ReactPointerEvent<HTMLDivElement>) => {
         drag.current = { startX: e.clientX, startW: width, pointerId: e.pointerId }
         ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
@@ -2389,7 +2435,7 @@ function LayerColumnHandle({
       onPointerCancel={() => {
         drag.current = null
       }}
-      onDoubleClick={() => onResize(320)}
+      onDoubleClick={onFit}
     />
   )
 }

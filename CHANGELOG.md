@@ -80,10 +80,16 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
-- **The right column opens wide enough for its seven tabs on one line** : 480 px by
-  default (was 320, where they wrapped; Menlo on a Mac needs about 475). A width
-  still saved at the old default moves up; a dragged one stays. Measured at UI zoom
-  0.8, 0.85, 1 and 1.2 : one line.
+- **The right column fits its seven tabs on one line, exactly** : its width is
+  measured from the tab row itself (the system monospace differs per computer), no
+  wider, where it was a fixed 320 px and the tabs wrapped. A width dragged with the
+  handle is kept (`opsia.layersWidthSet`); a double-click on the handle fits it
+  again (it reset to 320). Widths saved before this fit again too. Measured from a
+  hidden one-line copy of the row (gaps and the font's rounding at the current
+  zoom included), with the scrollbar's room always kept (`scrollbar-gutter:
+  stable` : without it the fitted width flipped between two values, a render
+  loop caught in the test build). Measured : one line with 2 px to spare at UI
+  zoom 0.8, 1 and 1.2; a dragged 530 px kept; a double-click back to 435.
 - **Install scripts are allowed by name** (`package.json` → `allowScripts`, npm 11) :
   ffmpeg-static, koffi and esbuild run theirs on a fresh install (without it npm 11
   skipped them, so a clean clone had no ffmpeg); serialport's native build and
