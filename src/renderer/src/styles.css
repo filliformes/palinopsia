@@ -6,11 +6,6 @@
    Bundled as woff2 + loaded via @font-face so Electron's file:// renderer
    works without hitting any CDN. Vite fingerprints these at build time. */
 @font-face { font-family: 'Inter'; font-weight: 400; font-style: normal; font-display: swap; src: url('./fonts/inter-400.woff2') format('woff2'); }
-/* Fragment Mono : the monospace of every label and readout (OFL : fonts/FragmentMono-OFL.txt).
-   One weight : bold is synthesized where a label asks for it. */
-@font-face { font-family: 'Fragment Mono'; font-weight: 400; font-style: normal; font-display: swap; src: url('./fonts/FragmentMono-Regular.ttf') format('truetype'); }
-@font-face { font-family: 'Fragment Mono'; font-weight: 400; font-style: italic; font-display: swap; src: url('./fonts/FragmentMono-Italic.ttf') format('truetype'); }
-:root { --font-mono: 'Fragment Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; }
 @font-face { font-family: 'Inter'; font-weight: 500; font-style: normal; font-display: swap; src: url('./fonts/inter-500.woff2') format('woff2'); }
 @font-face { font-family: 'Inter'; font-weight: 600; font-style: normal; font-display: swap; src: url('./fonts/inter-600.woff2') format('woff2'); }
 @font-face { font-family: 'Inter'; font-weight: 700; font-style: normal; font-display: swap; src: url('./fonts/inter-700.woff2') format('woff2'); }
@@ -1209,7 +1204,7 @@ input[type='range'].live-overlay {
   color: rgb(var(--c-accent));
   border: 1px solid rgb(var(--c-border) / 0.6);
   border-radius: 4px;
-  font-family: var(--font-mono);
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 11px;
   text-align: right;
   padding: 2px 6px;
@@ -1299,13 +1294,13 @@ input[type='range'].live-overlay {
 }
 .rc-arc-label {
   fill: rgb(var(--c-muted));
-  font-family: var(--font-mono);
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 10px;
   text-anchor: middle;
 }
 .rc-arc-readout {
   fill: rgb(var(--c-accent));
-  font-family: var(--font-mono);
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 11px;
   text-anchor: middle;
   font-weight: 600;
