@@ -64,10 +64,14 @@ that CI builds into cross-platform releases.
 - **The projector warp can travel with the session.** Output → Mapping →
   **save with session** (a per-computer choice, persisted) : on, a saved session
   carries the warp (on / off and the four corners, `Session.warp`) and opening a
-  session that has one restores it, Installation boots included; off (the
-  default), the warp stays the computer's, as before. Measured : on, the corners
-  round-trip exactly; off, nothing is written and a session's warp leaves the
-  computer's alone.
+  session that has one uses it, Installation boots included (`warpFromSession`);
+  edits made then are the session's. The computer's own warp stays in
+  localStorage, untouched, and comes back with a session that has none, with New,
+  or when the option is turned off. Off (the default), the warp stays the
+  computer's, as before. The unsaved-changes check counts the warp only when it is
+  the session's. Measured : on, the corners round-trip exactly and an edit leaves
+  the computer's warp alone; a session without one, or the option turned off,
+  brings the computer's back.
 
 ### Changed
 
@@ -79,6 +83,36 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Two NDI or USB-input layers opening together no longer go black.** A session
+  with two such layers asked the window for its frame channel twice in one tick;
+  the second answer closed the first channel while both listeners took it, so
+  every NDI (and USB-input) layer stayed black for the whole run. The channel is
+  asked for once (`ndiIn.ts`, `avfIn.ts`).
+- **Audit of the work since v1.2.6** (three independent reviews, each fix checked
+  in a test build) :
+  - People is released whenever its slot stops showing a camera or a film (a
+    generator picked, the slot emptied, a New / Generate hand-over), where its
+    model kept running; its readout follows a layer that moves; a new clip forgets
+    the old silhouette; grain mode reads the voice on screen; NDI and USB frames
+    are scaled down sample by sample before the model (a 4096 frame was copied
+    whole on the main thread at every look) and a repeated frame is not looked at
+    again.
+  - Post warp on a square composition (letterboxed on the projector) uses the
+    square's proportions : it came out an ellipse.
+  - Framing (fit, zoom, crop, feather) reaches Assemble and HIVE sources : the
+    controls showed but did nothing.
+  - Modulation : an emptied slot counts as dead; the full state counts live
+    bindings only; Assign-and-randomize says when the matrix is full; random
+    modulation skips what Randomize leaves to the hand (the output shape, the film
+    stage, blur).
+  - USB input : a capture can no longer be opened for a receiver already let go;
+    a start that delivers nothing is retried after 15 s; a frame's size is checked
+    with its bytes (a phone turned mid-copy); the picker no longer lists Chromium's
+    own USB cameras twice (their names carry " (vid:pid)"); the microphone is asked
+    with the camera (macOS may refuse a sound-and-picture device without it).
+  - A webcam missing at launch is found again by name only when its own id is gone
+    and the name is unique (two identical cameras : never the other layer's).
+  - The Finalizer says why post warp waits while the dome is on.
 - **A full modulation matrix no longer swallows clicks.** The matrix holds 12
   bindings; once full, binding a modulator (an M chip's 1 to 8, a Meta bar slot, a
   Sonify row) silently did nothing, which read as "modulation stopped working"

@@ -14,7 +14,8 @@ function Slider({
   max,
   def,
   onChange,
-  fmt
+  fmt,
+  hint
 }: {
   label: string
   value: number
@@ -23,6 +24,8 @@ function Slider({
   def: number
   onChange: (v: number) => void
   fmt?: (v: number) => string
+  /** What the control does (the tooltip, before the reset note). */
+  hint?: string
 }): JSX.Element {
   return (
     <div className="flex items-center gap-1.5">
@@ -36,7 +39,7 @@ function Slider({
         onChange={(e) => onChange(Number(e.target.value))}
         onDoubleClick={() => onChange(def)}
         className="min-w-0 flex-1 accent-accent"
-        title={`${label} : double-click to reset (${def})`}
+        title={`${hint ? hint + ' ' : `${label} : `}double-click to reset (${def})`}
       />
       <span className="w-9 shrink-0 text-right font-mono text-[10px] text-muted">
         {(fmt ?? ((v) => v.toFixed(2)))(value)}
@@ -52,7 +55,8 @@ function MiniSlider({
   min,
   max,
   def,
-  onChange
+  onChange,
+  hint
 }: {
   label: string
   value: number
@@ -60,6 +64,7 @@ function MiniSlider({
   max: number
   def: number
   onChange: (v: number) => void
+  hint?: string
 }): JSX.Element {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1">
@@ -73,7 +78,7 @@ function MiniSlider({
         onChange={(e) => onChange(Number(e.target.value))}
         onDoubleClick={() => onChange(def)}
         className="min-w-0 flex-1 accent-accent"
-        title={`${label} : double-click to reset (${def})`}
+        title={`${hint ? hint + ' ' : `${label} : `}double-click to reset (${def})`}
       />
       <span className="w-8 shrink-0 text-right font-mono text-[9px] text-muted">{value.toFixed(2)}</span>
     </div>
@@ -205,14 +210,14 @@ export function SourceFraming({
         <MiniSlider label="pan y" value={panY} min={-1} max={1} def={0} onChange={(v) => set({ panY: v })} />
       </PairRow>
       <PairRow>
-        <MiniSlider label="crop l" value={cropL} min={0} max={0.9} def={0} onChange={(v) => set({ cropL: v })} />
-        <MiniSlider label="crop r" value={cropR} min={0} max={0.9} def={0} onChange={(v) => set({ cropR: v })} />
+        <MiniSlider label="crop l" value={cropL} min={0} max={0.9} def={0} onChange={(v) => set({ cropL: v })} hint="Cuts this edge of the picture away (transparent there); the rest stays where it is, never stretched. Zoom to fill again." />
+        <MiniSlider label="crop r" value={cropR} min={0} max={0.9} def={0} onChange={(v) => set({ cropR: v })} hint="Cuts this edge of the picture away (transparent there); the rest stays where it is, never stretched. Zoom to fill again." />
       </PairRow>
       <PairRow>
-        <MiniSlider label="crop t" value={cropT} min={0} max={0.9} def={0} onChange={(v) => set({ cropT: v })} />
-        <MiniSlider label="crop b" value={cropB} min={0} max={0.9} def={0} onChange={(v) => set({ cropB: v })} />
+        <MiniSlider label="crop t" value={cropT} min={0} max={0.9} def={0} onChange={(v) => set({ cropT: v })} hint="Cuts this edge of the picture away (transparent there); the rest stays where it is, never stretched. Zoom to fill again." />
+        <MiniSlider label="crop b" value={cropB} min={0} max={0.9} def={0} onChange={(v) => set({ cropB: v })} hint="Cuts this edge of the picture away (transparent there); the rest stays where it is, never stretched. Zoom to fill again." />
       </PairRow>
-      <Slider label="feather" value={feather} min={0} max={0.5} def={0} onChange={(v) => set({ feather: v })} />
+      <Slider label="feather" value={feather} min={0} max={0.5} def={0} onChange={(v) => set({ feather: v })} hint="Softens the edge of the picture (its crop's, or its own when zoomed out), up to half the layer's height. 0 : a crisp edge." />
       {(state.kind === 'video' || state.kind === 'capture') && (
         <>
           <div className="mt-1 flex items-center gap-2">
@@ -240,11 +245,12 @@ export function SourceFraming({
                 def={2}
                 onChange={(v) => set({ personCount: Math.round(v) })}
                 fmt={(v) => String(Math.round(v))}
+                hint="How many people to look for, up to 4 (each is found on its own; more costs a little more time per look)." 
               />
               {person === 'blur' && (
-                <Slider label="blur" value={blur} min={0} max={1} def={0.5} onChange={(v) => set({ personBlur: v })} />
+                <Slider label="blur" value={blur} min={0} max={1} def={0.5} onChange={(v) => set({ personBlur: v })} hint="How much the room around the people is blurred." />
               )}
-              <Slider label="edge" value={soft} min={0} max={1} def={0.3} onChange={(v) => set({ personSoft: v })} />
+              <Slider label="edge" value={soft} min={0} max={1} def={0.3} onChange={(v) => set({ personSoft: v })} hint="The outline of the people : 0 a hard cut, 1 a soft fade." />
               <PeopleReadout layer={layer} slot={slot} />
             </>
           )}

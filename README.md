@@ -346,7 +346,7 @@ comes back under another id; its last frame holds meanwhile. A camera that is **
 there yet** when the session opens (an installation whose camera powers up after the
 computer) is looked for the same way.
 
-**Framing** (under a video or capture source in the Inspector) : **fit** sets how the
+**Framing** (under a video, capture, Assemble or HIVE source in the Inspector) : **fit** sets how the
 whole picture sits in the layer (*stretch* fills it whatever its shape, the default;
 *cover* fills it with its shape kept, cutting what sticks out; *contain* shows all of
 it, transparent around), then **zoom** and **pan**. **Crop** cuts the picture's edges
@@ -355,7 +355,8 @@ whatever edge remains, the crop's or the picture's own (0 to half the layer's he
 
 **People** (video and capture sources) finds the people in the slot's own picture,
 with the Body page's pose model run beside the picture on a thread of its own (up to
-four people, about 10 ms a look; the picture never waits for it) : **cut out** keeps
+four people, about 10 to 25 ms a look; the picture never waits for it, and a
+paused picture is not looked at again) : **cut out** keeps
 only them, **blur** blurs everything around them (**blur** sets how much), **remove**
 takes them out of the room, **matte** draws them white on black to key another layer
 or feed a Matte node. **edge** goes from a hard to a soft outline, and the readout
@@ -827,8 +828,10 @@ bottom:
 - **Mapping** : a live keystone editor (drag four corner handles over a mirror of
   the output) + alignment grid + reset. The warp belongs to the computer (its
   projector) and survives restarts; **save with session** makes it travel with the
-  session instead : saved into it, and restored when a session that carries one is
-  opened (one keystone per piece or per venue). The choice is this computer's : off,
+  session too : saved into it, and used while a session that carries one is open
+  (one keystone per piece or per venue). Edits made then are that session's. The
+  computer's own warp is kept apart and comes back with a session that has none,
+  with New, or when the option is turned off. The choice is this computer's : off,
   sessions neither save nor change its warp. A Finalizer output shape with **post warp**
   on is measured on the projector after this warp (a circle stays round there).
   Recordings, NDI and Spout get the picture before the warp, so there the shape is
