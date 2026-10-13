@@ -339,12 +339,28 @@ The selected video slot shows a full **transport** in the Inspector:
 
 Live **captures** (webcam / screen / device), [NDI](#ndi) sources and **HIVE**
 (HEVC-over-TCP network streams) fill slots the same way, and every video/capture slot
-has zoom / pan / crop **framing** and its own Source-FX rack. A camera that drops out
+has its own **framing** and Source-FX rack. A camera that drops out
 (unplugged, or reset by USB power saving) **reconnects by itself** : it is tried again
 2, 4, 8… up to 30 s apart, and at once when a device appears, found again by name if it
 comes back under another id; its last frame holds meanwhile. A camera that is **not
 there yet** when the session opens (an installation whose camera powers up after the
 computer) is looked for the same way.
+
+**Framing** (under a video or capture source in the Inspector) : **fit** sets how the
+whole picture sits in the layer (*stretch* fills it whatever its shape, the default;
+*cover* fills it with its shape kept, cutting what sticks out; *contain* shows all of
+it, transparent around), then **zoom** and **pan**. **Crop** cuts the picture's edges
+away where they are : what is left neither moves nor stretches. **Feather** softens
+whatever edge remains, the crop's or the picture's own (0 to half the layer's height).
+
+**People** (video and capture sources) finds the people in the slot's own picture,
+with the Body page's pose model run beside the picture on a thread of its own (up to
+four people, about 10 ms a look; the picture never waits for it) : **cut out** keeps
+only them, **blur** blurs everything around them (**blur** sets how much), **remove**
+takes them out of the room, **matte** draws them white on black to key another layer
+or feed a Matte node. **edge** goes from a hard to a soft outline, and the readout
+says how many people it finds. It never turns a camera on : it reads the picture the
+slot already shows.
 
 **An iPhone or iPad by USB (macOS).** Plug it in, unlock it, accept *Trust This
 Computer*, open its **Camera** app : the Live Input picker lists it with a `📱` and

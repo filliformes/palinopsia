@@ -13,9 +13,14 @@
 // the wasm beside it). workerMain must not reference anything outside itself.
 //
 // Messages in  : init {urls} · config {cfg} · frame {bitmap, ts, camT, newFrame,
-//                silhouette, mirror} (the bitmap is transferred) · stop
+//                silhouette, mirror, full} (the bitmap is transferred) · stop
 // Messages out : ready · configured · error {msg} · result {hands, pose, face,
-//                blend, sil, ts, camT, newFrame, ms} (the mask buffer transferred)
+//                blend, sil, people, ts, camT, newFrame, ms} (the mask buffer
+//                transferred)
+//
+// cfg.people (default 1) : how many bodies Pose looks for; with several, the
+// silhouette is every one of them, merged (a layer's People, personMask.ts).
+// frame.full : the mask at the size it was computed, not halved.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function workerMain(): void {
@@ -26,8 +31,9 @@ function workerMain(): void {
   let pose: any = null
   let face: any = null
   let poseSeg = false
+  let posePeople = 1
   let urls: any = null
-  let cfg: any = { hands: false, pose: false, face: false, silhouette: false }
+  let cfg: any = { hands: false, pose: false, face: false, silhouette: false, people: 1 }
   let chain: Promise<void> = Promise.resolve()
 
   const fail = (e: any): void => g.postMessage({ t: 'error', msg: String((e && e.message) || e) })
@@ -50,28 +56,44 @@ function workerMain(): void {
     else if (!cfg.hands && hands) { close(hands); hands = null }
     const poseNeeded = cfg.pose || cfg.silhouette
     const wantSeg = !!cfg.silhouette
-    if (poseNeeded && (!pose || poseSeg !== wantSeg)) {
+    const people = Math.max(1, Math.min(4, (cfg.people | 0) || 1))
+    if (poseNeeded && (!pose || poseSeg !== wantSeg || posePeople !== people)) {
       close(pose); pose = null
-      pose = await make(mp.PoseLandmarker, urls.pose, { numPoses: 1, outputSegmentationMasks: wantSeg })
+      pose = await make(mp.PoseLandmarker, urls.pose, { numPoses: people, outputSegmentationMasks: wantSeg })
       poseSeg = wantSeg
+      posePeople = people
     } else if (!poseNeeded && pose) { close(pose); pose = null; poseSeg = false }
     if (cfg.face && !face) face = await make(mp.FaceLandmarker, urls.face, { numFaces: 1, outputFaceBlendshapes: true })
     else if (!cfg.face && face) { close(face); face = null }
   }
 
-  // The silhouette : a half-size 8-bit copy of the confidence mask (top-down) and
-  // its 3×3 zone coverage + whole-frame coverage (the main thread's readMaskZones).
-  const maskOut = (mask: any, mirror: boolean): any => {
+  // The silhouette : a half-size (full : same-size) 8-bit copy of the confidence
+  // mask (top-down), every body's merged (the most confident wins), and its 3×3
+  // zone coverage + whole-frame coverage (the main thread's readMaskZones).
+  const maskOut = (masks: any[], mirror: boolean, full: boolean): any => {
     let arr: Float32Array | null = null
-    const w = mask.width, h = mask.height
-    try { arr = mask.getAsFloat32Array() } catch { arr = null }
+    let w = 0, h = 0
+    for (const mk of masks) {
+      let a: Float32Array | null = null
+      try { a = mk.getAsFloat32Array() } catch { a = null }
+      if (!a || !mk.width || !mk.height) continue
+      if (!arr) {
+        // One body : read in place. Several : merge into a copy (the mask's own
+        // array goes with it when it is closed).
+        arr = masks.length > 1 ? new Float32Array(a) : a
+        w = mk.width; h = mk.height
+      } else if (mk.width === w && mk.height === h) {
+        for (let i = 0; i < arr.length; i++) if (a[i] > arr[i]) arr[i] = a[i]
+      }
+    }
     if (!arr || !w || !h) return { empty: true }
-    const hw = w >> 1, hh = h >> 1
+    const f = full ? 1 : 2
+    const hw = Math.floor(w / f), hh = Math.floor(h / f)
     const out = new Uint8Array(hw * hh)
     for (let y = 0; y < hh; y++) {
-      const src = 2 * y * w, dst = y * hw
+      const src = f * y * w, dst = y * hw
       for (let x = 0; x < hw; x++) {
-        const v = arr[src + 2 * x]
+        const v = arr[src + f * x]
         out[dst + x] = v <= 0 ? 0 : v >= 1 ? 255 : (v * 255 + 0.5) | 0
       }
     }
@@ -98,15 +120,16 @@ function workerMain(): void {
 
   const detect = (m: any): void => {
     const t0 = performance.now()
-    const out: any = { t: 'result', ts: m.ts, camT: m.camT, newFrame: m.newFrame, hands: [], pose: null, face: null, blend: null, sil: null }
+    const out: any = { t: 'result', ts: m.ts, camT: m.camT, newFrame: m.newFrame, hands: [], pose: null, face: null, blend: null, sil: null, people: 0 }
     const bmp = m.bitmap
     try {
       if (hands) out.hands = hands.detectForVideo(bmp, m.ts).landmarks ?? []
       if (pose) {
         const pr = pose.detectForVideo(bmp, m.ts)
         out.pose = (pr.landmarks && pr.landmarks[0]) || null
+        out.people = (pr.landmarks && pr.landmarks.length) || 0
         const masks = pr.segmentationMasks ?? []
-        if (m.silhouette) out.sil = masks[0] ? maskOut(masks[0], m.mirror) : { empty: true }
+        if (m.silhouette) out.sil = masks.length ? maskOut(masks, m.mirror, !!m.full) : { empty: true }
         // Every mask holds a GPU buffer until closed.
         for (const mk of masks) close(mk)
       }
@@ -149,6 +172,7 @@ function workerMain(): void {
         close(hands); close(pose); close(face)
         hands = pose = face = null
         poseSeg = false
+        posePeople = 1
       }).catch(fail)
     }
   }

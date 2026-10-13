@@ -194,6 +194,19 @@ export class CaptureSource {
     }
   }
 
+  /** The picture's size (0×0 before the first frame) : for the framing's fit. */
+  frameSize(): [number, number] {
+    if (this.ndiName || this.avfId) return [this.frameW, this.frameH]
+    return [this.video.videoWidth, this.video.videoHeight]
+  }
+
+  /** The current frame, for People (personMask.ts) to look at. */
+  personFrame(): HTMLVideoElement | { w: number; h: number; stride: number; buf: ArrayBuffer } | null {
+    if (this.ndiName) return ndiInLatest(this.ndiName)
+    if (this.avfId) return avfInLatest(this.avfId)
+    return this.stream ? this.video : null
+  }
+
   upload(): WebGLTexture | null {
     if (this.ndiName) return this.uploadFrame(ndiInLatest(this.ndiName))
     if (this.avfId) return this.uploadFrame(avfInLatest(this.avfId))

@@ -104,13 +104,27 @@ export interface SourceSlot extends ShaderInstance {
   // (grainSize seconds); else beats-per-grain (0.25 = 16th … 2 = half note).
   grainSync?: number
   // Source framing (video + capture): sample transform applied on upload.
+  // How the whole picture sits in the layer : 'stretch' fills it whatever the
+  // aspect (the default, the old look), 'cover' fills it with the aspect kept
+  // (edges cut), 'contain' shows all of it with the aspect kept (transparent around).
+  fit?: 'stretch' | 'cover' | 'contain'
   zoom?: number // scale about centre, default 1
   panX?: number // -1..1, default 0
   panY?: number // -1..1, default 0
+  // The crop CUTS the picture's edges away (transparent there); what is left
+  // stays where it was. (It used to stretch what was left over the whole layer.)
   cropL?: number // trim left edge 0..0.9, default 0
   cropR?: number // trim right edge 0..0.9, default 0
   cropT?: number // trim top edge 0..0.9, default 0
   cropB?: number // trim bottom edge 0..0.9, default 0
+  feather?: number // softens the picture's edges (the crop's or its own), 0..0.5 of the layer's height, default 0
+  // People (video + capture) : a pose model finds the people in the slot's own
+  // picture (engine/personMask.ts) : 'cutout' keeps only them, 'blur' blurs what is
+  // around them, 'remove' takes them out, 'matte' is them in white on black.
+  person?: 'off' | 'cutout' | 'blur' | 'remove' | 'matte'
+  personCount?: number // how many people to look for, 1..4, default 2
+  personBlur?: number // the background's blur, 0..1, default 0.5
+  personSoft?: number // the mask's edge, 0..1 (hard → soft), default 0.3
   // For the native Text generator (shaderId 'gen-text'): the string, and an
   // optional sidechain whose texture FILLS the glyphs (letters as a matte).
   text?: string

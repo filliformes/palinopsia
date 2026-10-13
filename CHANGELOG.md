@@ -23,6 +23,28 @@ that CI builds into cross-platform releases.
   (`native/avcapture/build.sh`, which also loads it once and lists the devices); a
   failure there leaves the input unavailable, never blocks a release.
 
+- **Framing : fit, a real crop, feather.** A video or capture source's **fit** is
+  *stretch* (the default and the old look), *cover* or *contain* (the aspect kept,
+  from the picture's own size). **Crop** now CUTS the edges away where they are (it
+  used to stretch what was left over the whole layer, so a session that cropped a
+  source now shows the same picture cut instead of stretched : zoom fills again).
+  **Feather** (0..0.5 of the layer height) softens the remaining edge, measured in
+  output pixels from the shader's derivatives; at 0 the edge is crisp and
+  anti-aliased. Measured : crop left 0.3 leaves the kept 70 % pixel-identical (mean
+  difference 0) and the cut side transparent; feather 0.1 at 1080p ramps the alpha
+  over about 115 px.
+- **People : who is in a video or capture source.** A mode under the framing finds
+  the people in the slot's own frames (`engine/personMask.ts` : its own body worker,
+  MediaPipe Pose lite, the shipped model, 1 to 4 people with their masks merged, a
+  320-wide feed, one frame in flight) and keeps the newest mask as an R8 texture in
+  the picture's coordinates : **cut out**, **blur** (the background, nine taps on the
+  picture's mip chain, rebuilt only while blur is on), **remove**, **matte**; **edge**
+  softness, a readout (people found, ms a look). The body worker learned
+  `cfg.people` (numPoses) and `frame.full` (an unhalved mask); the Body page's calls
+  keep their defaults. Measured on a webcam clip : 1 person found, 10 ms a look; the
+  matte and the cut out cover the same 13.7 % of the frame and remove the other
+  86.3 %; the blur brings the background's mean gradient from 0.74 to 0.16.
+
 ### Fixed
 
 - **An imported video plays in its layer again.** The plain video source loads its

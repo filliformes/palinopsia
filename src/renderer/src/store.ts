@@ -1240,7 +1240,11 @@ interface StoreState {
     layer: number,
     slot: 'A' | 'B',
     patch: Partial<
-      Pick<SourceSlot, 'zoom' | 'panX' | 'panY' | 'cropL' | 'cropR' | 'cropT' | 'cropB'>
+      Pick<
+        SourceSlot,
+        | 'zoom' | 'panX' | 'panY' | 'cropL' | 'cropR' | 'cropT' | 'cropB'
+        | 'fit' | 'feather' | 'person' | 'personCount' | 'personBlur' | 'personSoft'
+      >
     >
   ) => void
   setLayerSpeed: (layer: number, v: number) => void

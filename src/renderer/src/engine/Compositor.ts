@@ -46,6 +46,7 @@ import type { SidechainRef } from '@shared/types';
 import { VideoSource } from './VideoSource';
 import { AssembleSource } from './AssembleSource';
 import { CaptureSource } from './CaptureSource';
+import { PersonMask } from './personMask';
 import { HiveSource } from './HiveSource';
 import { videoPlayheads, videoKey } from './videoState';
 import type { SourceSlot } from '@shared/types';
@@ -310,25 +311,76 @@ void main(){
   o = c;
 }`;
 
-// Source framing: zoom about centre, pan, and per-edge crop (crop-to-fill).
-// Sampling outside the visible region → transparent, so zoom-out shows black.
+// Source framing : the whole picture fitted into the layer (stretch / cover /
+// contain), zoomed about the centre and panned; the crop then CUTS its edges away
+// where they are (it used to stretch what was left over the layer), and feather
+// softens whatever edge remains, in output pixels. Outside → transparent, so a
+// zoom-out shows the layers below. Straight alpha, like every source.
+//
+// People (personMask.ts) : a mask of the people in the picture, R8, top-down, in
+// the picture's own coordinates. cut out keeps them, remove takes them away,
+// matte draws them white on black, blur softens what is around them (nine taps on
+// the picture's mip chain : no extra pass).
 const XFORM_FS = `#version 300 es
 precision highp float;
 in vec2 uv; out vec4 o;
 uniform sampler2D tex;
+uniform sampler2D maskTex;
 uniform float zoom;    // scale about centre (1 = none)
 uniform vec2 pan;      // -1..1 shift
-uniform vec4 crop;     // L, R, T, B  (0..~0.9)
+uniform vec4 crop;     // L, R, T, B  (0..~0.9) : cut away
 uniform float flipY;   // 1 : the texture's first row is the TOP (NDI frames)
+uniform int fit;       // 0 stretch, 1 cover, 2 contain
+uniform float aspectK; // picture aspect / layer aspect (0 : unknown, stretch)
+uniform float featherPx; // edge softness in output pixels (0 : a crisp, anti-aliased edge)
+uniform int person;    // 0 off, 1 cut out, 2 blur around, 3 remove, 4 matte
+uniform float pThresh, pSoft, pBlur;
+uniform vec2 texel;    // 1 / picture size
+
+vec3 blurAt(vec2 st) {
+  float lod = pBlur * 6.0;
+  vec2 r = texel * exp2(lod) * 1.5;
+  vec3 acc = textureLod(tex, st, lod).rgb * 0.25;
+  acc += (textureLod(tex, st + vec2(r.x, 0.0), lod).rgb + textureLod(tex, st - vec2(r.x, 0.0), lod).rgb
+        + textureLod(tex, st + vec2(0.0, r.y), lod).rgb + textureLod(tex, st - vec2(0.0, r.y), lod).rgb) * 0.125;
+  acc += (textureLod(tex, st + r, lod).rgb + textureLod(tex, st - r, lod).rgb
+        + textureLod(tex, st + vec2(r.x, -r.y), lod).rgb + textureLod(tex, st + vec2(-r.x, r.y), lod).rgb) * 0.0625;
+  return acc;
+}
+
 void main(){
-  // zoom + pan about centre → the visible region p in [0,1]
-  vec2 p = (uv - 0.5) / max(zoom, 0.0001) + 0.5 - pan;
-  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) { o = vec4(0.0); return; }
-  // crop-to-fill: p maps into [cropL, 1-cropR] x [cropB, 1-cropT]
-  vec2 s = vec2(crop.x + p.x * (1.0 - crop.x - crop.y),
-                crop.w + p.y * (1.0 - crop.z - crop.w));
-  s.y = mix(s.y, 1.0 - s.y, flipY);
-  o = texture(tex, s);
+  // The whole picture fitted into the layer : q in picture units.
+  vec2 q = uv;
+  if (fit != 0 && aspectK > 0.0) {
+    bool wider = aspectK > 1.0;
+    // cover + wider picture : its sides cut; contain + narrower : bars at the sides.
+    if ((fit == 1) == wider) q.x = 0.5 + (uv.x - 0.5) / aspectK;
+    else q.y = 0.5 + (uv.y - 0.5) * aspectK;
+  }
+  // zoom + pan about centre
+  vec2 p = (q - 0.5) / max(zoom, 0.0001) + 0.5 - pan;
+  // What the crop keeps : the picture's own rectangle, its edges cut in place.
+  vec2 lo = vec2(crop.x, crop.w), hi = vec2(1.0 - crop.y, 1.0 - crop.z);
+  vec2 inside = min(p - lo, hi - p);
+  // ... measured in output pixels (p is affine in uv : constant derivatives).
+  vec2 perPx = vec2(length(vec2(dFdx(p.x), dFdy(p.x))), length(vec2(dFdx(p.y), dFdy(p.y))));
+  float d = min(inside.x / max(perPx.x, 1e-7), inside.y / max(perPx.y, 1e-7));
+  float edge = featherPx > 0.5 ? smoothstep(0.0, featherPx, d) : clamp(d + 0.5, 0.0, 1.0);
+  if (edge <= 0.0) { o = vec4(0.0); return; }
+  vec2 st = vec2(p.x, mix(p.y, 1.0 - p.y, flipY));
+  // Level 0, explicitly : the same read as ever, and no implicit derivatives
+  // after the branch above (the blur turns the mip chain on).
+  vec4 c = textureLod(tex, st, 0.0);
+  float a = c.a * edge;
+  if (person != 0) {
+    float raw = texture(maskTex, vec2(p.x, 1.0 - p.y)).r;
+    float m = smoothstep(pThresh - pSoft, pThresh + pSoft, raw);
+    if (person == 1) a *= m;
+    else if (person == 3) a *= 1.0 - m;
+    else if (person == 4) { c.rgb = vec3(m); a = edge; }
+    else c.rgb = mix(blurAt(st), c.rgb, m);
+  }
+  o = vec4(c.rgb, a);
 }`;
 
 function compile(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram {
@@ -588,10 +640,22 @@ export interface Framing {
   cropR: number;
   cropT: number;
   cropB: number;
+  fit?: 'stretch' | 'cover' | 'contain';
+  feather?: number; // 0..0.5 of the layer's height
+  person?: 'off' | 'cutout' | 'blur' | 'remove' | 'matte';
+  personCount?: number;
+  personBlur?: number;
+  personSoft?: number;
   /** The source texture's first row is the top of the picture (NDI input). */
   flipY?: boolean;
+  /** Per draw : the picture's aspect (w / h; 0 unknown), its size, the People mask. */
+  srcAspect?: number;
+  srcW?: number;
+  srcH?: number;
+  mask?: WebGLTexture | null;
 }
 const IDENTITY_FRAMING: Framing = { zoom: 1, panX: 0, panY: 0, cropL: 0, cropR: 0, cropT: 0, cropB: 0 };
+const PERSON_MODE = { off: 0, cutout: 1, blur: 2, remove: 3, matte: 4 } as const;
 
 // Generous COUNT cap (the time gate below is the real guard) : with a warm
 // program cache a whole Randomize-All burst (~20 loads at <1ms each) lands
@@ -929,6 +993,12 @@ export class ISFLayer {
   // Live capture slots (kind:'capture'). Like video: a slot is one kind at once.
   private captureA: CaptureSource | null = null;
   private captureB: CaptureSource | null = null;
+  // People : a mask of who is in the slot's picture (video / capture slots).
+  private personA: PersonMask | null = null;
+  private personB: PersonMask | null = null;
+  private mipA = false; // the slot's picture has its mip chain on (People : blur)
+  private mipB = false;
+  private index = 0; // this layer's place in the stack (for the People readout)
   private captureIdA: string | null = null;
   private captureIdB: string | null = null;
   // Live HIVE (HEVC-over-TCP) slots.
@@ -1191,7 +1261,8 @@ export class ISFLayer {
   }
 
   /** Push framing (zoom/pan/crop) to a video or capture slot. */
-  setFraming(slot: 'A' | 'B', s: SourceSlot | null | undefined): void {
+  setFraming(slot: 'A' | 'B', s: SourceSlot | null | undefined, index = this.index): void {
+    this.index = index;
     if (!s) return;
     const f: Framing = {
       zoom: s.zoom ?? 1,
@@ -1200,7 +1271,14 @@ export class ISFLayer {
       cropL: s.cropL ?? 0,
       cropR: s.cropR ?? 0,
       cropT: s.cropT ?? 0,
-      cropB: s.cropB ?? 0
+      cropB: s.cropB ?? 0,
+      fit: s.fit ?? 'stretch',
+      feather: s.feather ?? 0,
+      // People only where there is a picture of the world to look at.
+      person: s.kind === 'video' || s.kind === 'capture' ? s.person ?? 'off' : 'off',
+      personCount: s.personCount ?? 2,
+      personBlur: s.personBlur ?? 0.5,
+      personSoft: s.personSoft ?? 0.3
     };
     if (slot === 'A') this.framingA = f;
     else this.framingB = f;
@@ -1337,9 +1415,28 @@ export class ISFLayer {
     if (feed) {
       const tex = feed.upload();
       const framing = slot === 'A' ? this.framingA : this.framingB;
+      const pm = this.personFor(slot, framing, video ?? capture);
       if (tex && this.shared.blitXform) {
         const flip = (feed as { flipY?: boolean }).flipY === true;
-        this.shared.blitXform(tex, scratch.fbo, flip ? { ...framing, flipY: true } : framing);
+        const size = (feed as { frameSize?: () => [number, number] }).frameSize?.() ?? [0, 0];
+        // The background blur reads the picture's mip chain : rebuilt each frame
+        // while it is on, and switched off again after (stale mips must never be
+        // sampled when the picture is drawn smaller).
+        const mip = !!pm && framing.person === 'blur';
+        if (mip || (slot === 'A' ? this.mipA : this.mipB)) {
+          gl.bindTexture(gl.TEXTURE_2D, tex);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mip ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
+          if (mip) gl.generateMipmap(gl.TEXTURE_2D);
+        }
+        if (slot === 'A') this.mipA = mip; else this.mipB = mip;
+        this.shared.blitXform(tex, scratch.fbo, {
+          ...framing,
+          flipY: flip,
+          srcW: size[0],
+          srcH: size[1],
+          srcAspect: size[0] > 0 && size[1] > 0 ? size[0] / size[1] : 0,
+          mask: pm ? pm.texture() : null
+        });
       } else {
         gl.bindFramebuffer(gl.FRAMEBUFFER, scratch.fbo);
         gl.viewport(0, 0, this.w, this.h);
@@ -1409,9 +1506,35 @@ export class ISFLayer {
     if (this.stackReagent) { this.stackReagent.dispose(this.shared.gl); this.stackReagent = null; }
   }
 
+  /** The slot's People mask : made when People is turned on, fed the slot's
+   *  current frame, let go when it is turned off or the slot shows something
+   *  else. Null : People is off (or this slot has no picture of the world). */
+  private personFor(slot: 'A' | 'B', f: Framing, src: VideoSource | CaptureSource | null): PersonMask | null {
+    const want = !!src && !!f.person && f.person !== 'off';
+    let pm = slot === 'A' ? this.personA : this.personB;
+    if (!want) {
+      if (pm) {
+        pm.dispose();
+        if (slot === 'A') this.personA = null; else this.personB = null;
+      }
+      return null;
+    }
+    if (!pm) {
+      pm = new PersonMask(this.shared.gl, `${this.index}${slot}`);
+      if (slot === 'A') this.personA = pm; else this.personB = pm;
+    }
+    pm.setPeople(f.personCount ?? 2);
+    pm.feed(src!.personFrame());
+    return pm;
+  }
+
   /** Release every GL resource this layer owns (renderers, racks, buffers). */
   dispose(): void {
     const gl = this.shared.gl;
+    this.personA?.dispose();
+    this.personB?.dispose();
+    this.personA = null;
+    this.personB = null;
     this.isfA?.cleanup();
     this.isfB?.cleanup();
     this.videoA?.dispose();
@@ -1605,6 +1728,8 @@ export class Compositor {
   private xformProg!: WebGLProgram;
   private uXTex!: WebGLUniformLocation; private uXZoom!: WebGLUniformLocation;
   private uXPan!: WebGLUniformLocation; private uXCrop!: WebGLUniformLocation; private uXFlip!: WebGLUniformLocation | null;
+  private uX: Record<string, WebGLUniformLocation | null> = {};
+  private blankMask: WebGLTexture | null = null;
   // Projection warp present pass.
   private warpProg!: WebGLProgram;
   private warpVao!: WebGLVertexArrayObject;
@@ -1693,6 +1818,14 @@ export class Compositor {
     this.uXPan = gl.getUniformLocation(this.xformProg, 'pan')!;
     this.uXCrop = gl.getUniformLocation(this.xformProg, 'crop')!;
     this.uXFlip = gl.getUniformLocation(this.xformProg, 'flipY');
+    for (const n of ['maskTex', 'fit', 'aspectK', 'featherPx', 'person', 'pThresh', 'pSoft', 'pBlur', 'texel'])
+      this.uX[n] = gl.getUniformLocation(this.xformProg, n);
+    // People with no mask yet : a 1×1 "nobody" (never sampled while People is off).
+    this.blankMask = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.blankMask);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 1, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array(1));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
     // Warp present pass : its own VAO with a 6-vertex (2-triangle) quad, each
     // vertex (x,y, u*q,v*q,q) = 5 floats, re-uploaded when the corners move.
@@ -1740,6 +1873,20 @@ export class Compositor {
       gl.uniform2f(this.uXPan, f.panX, f.panY);
       gl.uniform4f(this.uXCrop, f.cropL, f.cropR, f.cropT, f.cropB);
       gl.uniform1f(this.uXFlip, f.flipY ? 1 : 0);
+      const u = this.uX;
+      gl.uniform1i(u.fit, f.fit === 'cover' ? 1 : f.fit === 'contain' ? 2 : 0);
+      gl.uniform1f(u.aspectK, f.srcAspect && f.srcAspect > 0 ? f.srcAspect / (this.w / this.h) : 0);
+      gl.uniform1f(u.featherPx, Math.max(0, f.feather ?? 0) * this.h);
+      // People : no mask yet → off (the picture as it is) until the first arrives.
+      const mode = f.mask ? PERSON_MODE[f.person ?? 'off'] ?? 0 : 0;
+      gl.uniform1i(u.person, mode);
+      const soft = Math.max(0, Math.min(1, f.personSoft ?? 0.3));
+      gl.uniform1f(u.pThresh, 0.5);
+      gl.uniform1f(u.pSoft, 0.02 + soft * 0.45);
+      gl.uniform1f(u.pBlur, Math.max(0, Math.min(1, f.personBlur ?? 0.5)));
+      gl.uniform2f(u.texel, 1 / Math.max(1, f.srcW || this.w), 1 / Math.max(1, f.srcH || this.h));
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, f.mask ?? this.blankMask); gl.uniform1i(u.maskTex, 1);
+      gl.activeTexture(gl.TEXTURE0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       gl.bindVertexArray(null);
     };
@@ -2536,8 +2683,8 @@ export class Compositor {
       L.setCollage('B', isCollB && l.sourceB ? { pool: l.sourceB.collagePool ?? [], edls: l.sourceB.collageEdls ?? [], inputs: l.sourceB.inputs, folder: l.sourceB.collageFolder } : null);
       L.setVideoPlayback('A', l.sourceA);
       L.setVideoPlayback('B', l.sourceB);
-      L.setFraming('A', l.sourceA);
-      L.setFraming('B', l.sourceB);
+      L.setFraming('A', l.sourceA, i);
+      L.setFraming('B', l.sourceB, i);
       L.blend = l.blend;
       L.opacity = l.opacity;
       L.mute = l.mute;
@@ -3288,6 +3435,7 @@ export class Compositor {
     gl.deleteProgram(this.mixProg);
     gl.deleteProgram(this.copyProg);
     gl.deleteProgram(this.xformProg);
+    if (this.blankMask) gl.deleteTexture(this.blankMask);
     gl.deleteProgram(this.warpProg);
     gl.deleteProgram(this.reagentProg);
     gl.deleteVertexArray(this.vao);
