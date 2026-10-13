@@ -283,6 +283,7 @@ void main(){
     }
     // Upload each voice's current frame + compute its raised-cosine envelope.
     const weights: number[] = []
+    this.voiceWeights = weights
     for (const g of this.voices!) {
       g.tex = uploadVideoFrame(gl, g.v, g.tex)
       const k = g.dur > 0 ? Math.max(0, Math.min(1, (nowS - g.born) / g.dur)) : 1
@@ -633,10 +634,18 @@ void main(){
     return [this.video.videoWidth, this.video.videoHeight]
   }
 
-  /** The current frame, for People (personMask.ts) to look at. */
+  /** The current frame, for People (personMask.ts) to look at : with grain on,
+   *  the voice that weighs most in the blend on screen (the main element is not
+   *  even kept in time then). */
   personFrame(): HTMLVideoElement | null {
+    if (this.grain.on && this.voices) {
+      let best = -1, bestW = 0
+      this.voiceWeights.forEach((w, i) => { if (w > bestW) { bestW = w; best = i } })
+      if (best >= 0) return this.voices[best].v
+    }
     return this.video
   }
+  private voiceWeights: number[] = []
 
   upload(): WebGLTexture | null {
     if (this.grain.on && this.voices) return this.blendVoices(performance.now() / 1000)

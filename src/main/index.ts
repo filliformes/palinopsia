@@ -874,9 +874,15 @@ app.whenReady().then(async () => {
   // the system prompt names the app. Chromium asks on its own for the cameras it
   // opens, but a Mac with no camera of its own and only an iPhone by USB never
   // gets that far. Only macOS asks; an answer is remembered by the system.
-  safeHandle('camera:access', async () => {
+  safeHandle('camera:access', async (_e, withMicArg) => {
+    const withMic = withMicArg === true
     if (process.platform !== 'darwin') return 'granted'
     try {
+      // The microphone too, when asked (an iPhone's screen carries sound and
+      // picture together, and macOS may refuse it without both). Its answer is
+      // not required : the camera's is.
+      if (withMic && systemPreferences.getMediaAccessStatus('microphone') === 'not-determined')
+        await systemPreferences.askForMediaAccess('microphone').catch(() => false)
       const s = systemPreferences.getMediaAccessStatus('camera')
       if (s !== 'not-determined') return s
       return (await systemPreferences.askForMediaAccess('camera')) ? 'granted' : 'denied'

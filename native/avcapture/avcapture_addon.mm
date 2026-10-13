@@ -379,18 +379,23 @@ static Napi::Value Frame(const Napi::CallbackInfo& info) {
   return o;
 }
 
-// copy(handle, arrayBuffer) → the seq copied, or 0 (no frame, or the buffer is
-// not exactly w*h*4 : ask frame() for the size first).
+// copy(handle, arrayBuffer, w, h) → the seq copied, or 0 (no frame, or the
+// newest frame is not w×h : ask frame() for the size again). The size, not only
+// the byte count : a phone turned between frame() and copy() keeps its bytes
+// (887×1920 = 1920×887) and the frame would go out labelled with the old shape.
 static Napi::Value Copy(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
-  if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsArrayBuffer()) return Napi::Number::New(env, 0);
+  if (info.Length() < 4 || !info[0].IsNumber() || !info[1].IsArrayBuffer() || !info[2].IsNumber() || !info[3].IsNumber())
+    return Napi::Number::New(env, 0);
   auto it = g_caps.find(info[0].As<Napi::Number>().Int32Value());
   if (it == g_caps.end()) return Napi::Number::New(env, 0);
   Napi::ArrayBuffer ab = info[1].As<Napi::ArrayBuffer>();
+  const int ew = info[2].As<Napi::Number>().Int32Value(), eh = info[3].As<Napi::Number>().Int32Value();
   Cap* c = it->second->cap.get();
   std::lock_guard<std::mutex> lock(c->m);
   const size_t bytes = (size_t)c->w * (size_t)c->h * 4;
-  if (!c->seq || bytes == 0 || ab.ByteLength() != bytes || c->front.size() < bytes) return Napi::Number::New(env, 0);
+  if (!c->seq || bytes == 0 || c->w != ew || c->h != eh || ab.ByteLength() != bytes || c->front.size() < bytes)
+    return Napi::Number::New(env, 0);
   std::memcpy(ab.Data(), c->front.data(), bytes);
   return Napi::Number::New(env, (double)c->seq);
 }

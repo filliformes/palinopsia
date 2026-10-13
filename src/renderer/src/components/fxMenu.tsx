@@ -13,6 +13,7 @@ import { modTargetKey, useStore } from '../store'
 import { canHostFx, hostRefusal, rackName, refusalPopup } from '../fxScopes'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { showToast } from './Toast'
+import { warnModMatrixFull } from './AutoControls'
 import { inputsForShader } from '../shaders/isf/inputs'
 import type { MenuItem } from './ContextMenu'
 
@@ -68,7 +69,9 @@ export function useFxMenuItems(
     if (cands.length) {
       items.push({
         label: 'Assign and randomize modulation',
-        onClick: run(() => randomizeModulation(cands, true))
+        onClick: run(() => {
+          if (!randomizeModulation(cands, true)) warnModMatrixFull()
+        })
       })
       if (hasModulationOn(modMatrix, cands)) {
         items.push({

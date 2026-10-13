@@ -1263,6 +1263,12 @@ export class ISFLayer {
   /** Push framing (zoom/pan/crop) to a video or capture slot. */
   setFraming(slot: 'A' | 'B', s: SourceSlot | null | undefined, index = this.index): void {
     this.index = index;
+    // People is let go HERE, every sync, whenever the slot no longer asks for it
+    // (turned off, a generator picked, the slot emptied, source B removed, a New /
+    // Generate relay parking this layer in a free slot) : the render path only
+    // reaches it for a slot that still shows a picture of the world.
+    const wantPeople = !!s && (s.kind === 'video' || s.kind === 'capture') && !!s.person && s.person !== 'off';
+    if (!wantPeople) this.dropPerson(slot);
     if (!s) return;
     const f: Framing = {
       zoom: s.zoom ?? 1,
@@ -1523,9 +1529,20 @@ export class ISFLayer {
       pm = new PersonMask(this.shared.gl, `${this.index}${slot}`);
       if (slot === 'A') this.personA = pm; else this.personB = pm;
     }
+    // A layer can move to another index (the New / Generate relay) : the readout follows.
+    pm.setKey(`${this.index}${slot}`);
+    // Another clip or camera in the same slot : the old silhouette must not linger.
+    pm.setOwner(src);
     pm.setPeople(f.personCount ?? 2);
     pm.feed(src!.personFrame());
     return pm;
+  }
+
+  private dropPerson(slot: 'A' | 'B'): void {
+    const pm = slot === 'A' ? this.personA : this.personB;
+    if (!pm) return;
+    pm.dispose();
+    if (slot === 'A') this.personA = null; else this.personB = null;
   }
 
   /** Release every GL resource this layer owns (renderers, racks, buffers). */
@@ -2542,8 +2559,10 @@ export class Compositor {
   /** The shape's depth lean and, when asked, its after-the-warp measure. A
    *  domemaster has no projector warp : there it stays in the frame. */
   private shapeExtra(): ShapeExtra {
+    // A square frame is letterboxed into a square on the projector window
+    // (OutputPresenter), so its corners live in a square : aspect 1 there.
     const post = this.fzPost && !this.domeCfg
-      ? { m: this.shapeWarpM, aspect: this.shapeProjAspect || this.w / this.h }
+      ? { m: this.shapeWarpM, aspect: this.w === this.h ? 1 : this.shapeProjAspect || this.w / this.h }
       : null;
     return { tilt: this.fzTilt, turn: this.fzTurn, post };
   }

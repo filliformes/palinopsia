@@ -178,11 +178,18 @@ export class CaptureSource {
   private async reopen(): Promise<void> {
     if (this.disposed || this.stream || this.starting) return
     let spec = this.spec
-    // The same camera may come back under another id (another USB port).
+    // The same camera may come back under another id (another USB port) : found
+    // by its name, but only when its own id is gone AND exactly one camera has
+    // that name (two identical cameras : never grab the other layer's).
     if (spec.startsWith('device:') && this.label) {
-      const devs = await navigator.mediaDevices.enumerateDevices().catch(() => [] as MediaDeviceInfo[])
-      const same = devs.find((d) => d.kind === 'videoinput' && d.label === this.label)
-      if (same) spec = 'device:' + same.deviceId
+      const devs = (await navigator.mediaDevices.enumerateDevices().catch(() => [] as MediaDeviceInfo[])).filter(
+        (d) => d.kind === 'videoinput'
+      )
+      const id = spec.slice('device:'.length)
+      if (!devs.some((d) => d.deviceId === id)) {
+        const same = devs.filter((d) => d.label === this.label)
+        if (same.length === 1) spec = 'device:' + same[0].deviceId
+      }
     }
     await this.start(spec, true)
     if (this.disposed) return

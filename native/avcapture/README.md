@@ -23,7 +23,7 @@ receiver : frames reach the page by transfer, not IPC. Calls :
 | `list()` | `[{ id, name, model, muxed }]` |
 | `open(id, maxSide)` | start capturing in the background, returns a handle |
 | `frame(handle)` | `{ state, w, h, srcW, srcH, seq, idle, error }` : `starting` · `running` · `missing` · `denied` · `failed` · `gone` |
-| `copy(handle, arrayBuffer)` | the newest frame into a buffer of exactly `w*h*4` bytes, returns its `seq` (0 : nothing) |
+| `copy(handle, arrayBuffer, w, h)` | the newest frame into a buffer of exactly `w*h*4` bytes if it is still w×h, returns its `seq` (0 : nothing, or the size changed) |
 | `setMaxSide(handle, px)` | the size cap, from the next frame |
 | `close(handle)` | stop |
 

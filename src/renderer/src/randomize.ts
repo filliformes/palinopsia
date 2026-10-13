@@ -412,8 +412,11 @@ export function collectFloatTargets(c: CompositionState): ModTarget[] {
   const addFxTargets = (fx: FxInstance[], scope: FxScope): void => {
     for (const inst of fx) {
       if (!inst.shaderId) continue
+      // What Randomize leaves to the hand (RANDOMIZE_SKIP : the output shape,
+      // the film stage, blur…) is not handed to a random modulator either.
+      const skip = RANDOMIZE_SKIP[inst.shaderId]
       for (const d of inputsForShader(inst.shaderId)) {
-        if (d.type === 'float') out.push({ kind: 'fx', scope, instId: inst.id, input: d.name })
+        if (d.type === 'float' && !skip?.test(d.name)) out.push({ kind: 'fx', scope, instId: inst.id, input: d.name })
       }
     }
   }

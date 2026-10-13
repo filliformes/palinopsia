@@ -105,9 +105,11 @@ export function DevicePicker({
     // a muxed camera) comes through the USB input.
     const native = await usb
     if (native?.ok) {
-      const seen = new Set(list.map((d) => d.label))
+      // Chromium on macOS adds " (vid:pid)" to a USB camera's name : compare without it.
+      const bare = (s: string): string => s.replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '').trim()
+      const seen = new Set(list.map((d) => bare(d.label)))
       for (const d of native.devices) {
-        if (d.muxed || !seen.has(d.name)) list.push({ id: AVF_PREFIX + d.id, label: d.name, usb: true })
+        if (d.muxed || !seen.has(bare(d.name))) list.push({ id: AVF_PREFIX + d.id, label: d.name, usb: true })
       }
     }
     setDevices(list)

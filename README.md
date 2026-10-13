@@ -515,7 +515,7 @@ falls, and each rise stays up for the hold before dropping straight back to the
 bottom, where it rests until the next one (a pulse rather than a held state; at
 5 ms it is a one-frame blip). HOLD 0 keeps the original : up until the next throw.
 
-The **mod-matrix** holds up to **12** assignments (M# → target param, with a
+The **mod-matrix** holds up to **32** assignments (M# → target param, with a
 bipolar depth and a **Multiply** or **Replace** mode). Bindings are made from each
 parameter's **M** button in the Inspector or Meta tile. In the Modulation strip,
 **click an assignment chip to turn it off** (dimmed and struck through : the

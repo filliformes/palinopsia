@@ -32,7 +32,7 @@ interface Addon {
     idle: number
     error: string
   } | null
-  copy: (h: number, buf: ArrayBuffer) => number
+  copy: (h: number, buf: ArrayBuffer, w: number, hh: number) => number
   setMaxSide: (h: number, px: number) => void
   close: (h: number) => void
 }
@@ -106,6 +106,7 @@ interface Recv {
   status: AvfStatus
   frames: number
   fpsT0: number
+  openedAt: number // when the current capture was opened (a start that never delivers is retried)
 }
 const recvs = new Map<string, Recv>()
 let port: MessagePort | null = null
@@ -116,7 +117,9 @@ let access: Promise<string> | null = null
  *  a Mac mini with no camera of its own may never have been asked). */
 function cameraAccess(): Promise<string> {
   if (!access) {
-    access = (ipcRenderer.invoke('camera:access') as Promise<string>).catch(() => 'granted')
+    // With the microphone too : an iPhone's screen is a sound-and-picture device,
+    // which macOS may refuse to open without both.
+    access = (ipcRenderer.invoke('camera:access', true) as Promise<string>).catch(() => 'granted')
     // Asked once per launch; a refusal is looked at again on the next try.
     void access.then((s) => { if (s !== 'granted') access = null })
   }
@@ -128,7 +131,13 @@ function closeHandle(r: Recv): void {
     try { mod?.close(r.handle) } catch { /* ignore */ }
   }
   r.handle = null
+  // A new capture counts its frames from 1 again.
+  r.lastSeq = 0
 }
+
+// A capture that has not delivered a single frame this long is opened again
+// (a session that stopped before its first frame, a start that never returned).
+const START_TIMEOUT_MS = 15000
 
 /** Try again later : at once-ish while a device is missing or just went away
  *  (it comes back on its own), more slowly when it refuses to open. */
@@ -150,7 +159,9 @@ async function openRecv(r: Recv, a: Addon): Promise<void> {
   opening = true
   try {
     const s = await cameraAccess()
-    if (!recvs.has(r.id) || r.handle !== null) return
+    // Still the receiver for this device? (It may have been let go and asked
+    // for again meanwhile : a capture opened for this one would never be closed.)
+    if (recvs.get(r.id) !== r || r.handle !== null) return
     if (s !== 'granted') {
       retryLater(r, 'denied', 'camera access denied : allow Palinopsia under Privacy & Security, Camera')
       return
@@ -159,8 +170,9 @@ async function openRecv(r: Recv, a: Addon): Promise<void> {
     // Freshly opted in : give an iPhone its second to appear.
     const wait = APPEAR_MS - (performance.now() - enabledAt)
     if (wait > 0) await sleep(wait)
-    if (!recvs.has(r.id) || r.handle !== null) return
+    if (recvs.get(r.id) !== r || r.handle !== null) return
     r.handle = a.open(r.id, MAX_SIDE)
+    r.openedAt = performance.now()
     r.status = { ...r.status, state: 'starting', error: '' }
     if (r.handle === null) retryLater(r, 'failed', 'the device would not open')
   } catch (e) {
@@ -198,6 +210,10 @@ function pull(): void {
       retryLater(r, f.state, f.error)
       continue
     }
+    if (f.state === 'starting' && f.seq === 0 && now - r.openedAt > START_TIMEOUT_MS) {
+      retryLater(r, 'failed', 'no picture came : opening it again')
+      continue
+    }
     if (f.state === 'running' && r.status.state !== 'running') {
       console.warn(`[usb input] ${r.id} is capturing (${f.srcW}×${f.srcH})`)
       r.failures = 0
@@ -214,7 +230,7 @@ function pull(): void {
     if (!buf || buf.byteLength !== bytes) buf = new ArrayBuffer(bytes)
     let seq = 0
     try {
-      seq = a.copy(r.handle, buf)
+      seq = a.copy(r.handle, buf, f.w, f.h)
     } catch {
       seq = 0
     }
@@ -262,7 +278,7 @@ export function avfOpen(id: string): boolean {
   r = {
     id, refs: 1, handle: null, openAt: 0, failures: 0, pool: [], out: 0, lastSeq: 0,
     status: { state: 'starting', w: 0, h: 0, srcW: 0, srcH: 0, fps: 0, error: '' },
-    frames: 0, fpsT0: performance.now()
+    frames: 0, fpsT0: performance.now(), openedAt: 0
   }
   recvs.set(id, r)
   if (!addon()) {

@@ -27,7 +27,11 @@ function fnv(s: string): string {
 }
 
 function fingerprint(): string {
-  return fnv(JSON.stringify(useStore.getState().exportSession()))
+  // The warp counts only when it is the session's own : turning "save with
+  // session" on or off, or nudging this computer's warp, changes no piece.
+  const st = useStore.getState()
+  const { warp, ...rest } = st.exportSession()
+  return fnv(JSON.stringify(st.warpFromSession ? { ...rest, warp } : rest))
 }
 
 let baseline: string | null = null

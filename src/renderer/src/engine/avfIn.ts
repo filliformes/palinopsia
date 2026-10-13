@@ -22,8 +22,15 @@ const users = new Map<string, number>()
 let port: MessagePort | null = null
 let seq = 0
 
+// Asked once : a session opening two of these layers in the same tick used to
+// ask twice, the preload answered twice (closing its first channel), both
+// listeners took the FIRST (dead) channel and nobody took the second : every
+// such layer stayed black for the whole run.
+let requested = false
+
 function ensurePort(): void {
-  if (port) return
+  if (port || requested) return
+  requested = true
   const onMsg = (ev: MessageEvent): void => {
     if (ev.data !== 'opsia:avfinport' || !ev.ports?.[0]) return
     window.removeEventListener('message', onMsg)

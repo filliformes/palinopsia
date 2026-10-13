@@ -15,7 +15,7 @@ import type { ModMode, ModTarget } from '@shared/types'
 import type { IsfInputDesc } from '../shaders/isf/inputs'
 import { registerLiveOverlay } from './liveOverlay'
 import { useShallow } from 'zustand/react/shallow'
-import { isToggleTarget, modTargetKey, useStore } from '../store'
+import { isToggleTarget, modTargetKey, targetAlive, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { showToast } from './Toast'
 import { MAX_MOD_ASSIGNMENTS } from '@shared/types'
@@ -529,7 +529,8 @@ export function AssignRow({
       )
     )
   )
-  const used = useStore((s) => s.composition.modMatrix.length)
+  // Live bindings only : a dead one (its effect removed) is cleared to make room.
+  const used = useStore((s) => s.composition.modMatrix.filter((a) => targetAlive(s.composition, a.target)).length)
   const full = used >= MAX_MOD_ASSIGNMENTS
   return (
     <div className="flex flex-col gap-1 rounded border border-border bg-panel2/60 p-1">

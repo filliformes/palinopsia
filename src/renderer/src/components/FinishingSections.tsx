@@ -20,6 +20,8 @@ type Values = Record<string, number | number[]>
 export interface DimCtx {
   /** The Background slot has no source (the shape's outside fill falls back to its color). */
   bgEmpty: boolean
+  /** The fulldome output is on (no projector warp : post warp waits). */
+  dome: boolean
 }
 
 export interface FinishingSection {
@@ -168,6 +170,8 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
         // With the Background slot empty the engine falls back to this color.
         if (Math.round(num(v, 'outBgSource', 0)) === 1 && !ctx.bgEmpty)
           out.outBgColor = 'The outside is filled by the Background layer, not this color.'
+        if (ctx.dome)
+          out.outPostWarp = 'The fulldome output is on : a domemaster has no projector warp, so the shape stays in the picture.'
         if (num(v, 'outDepth', 0) <= 0.001) {
           const why = 'Shadow is 0 : there is no shadow to angle or rake.'
           out.outShadowAngle = why
@@ -338,6 +342,7 @@ function Section({
   const stored = useStore((st) => st.collapsed[key])
   const setCollapsed = useStore((st) => st.setCollapsed)
   const bgEmpty = useStore((st) => !st.composition.background?.source.shaderId)
+  const dome = useStore((st) => st.dome.enabled)
   const sw = s.switchInput ? byName.get(s.switchInput) : undefined
   const swDef = sw && typeof sw.def === 'number' ? sw.def : 0
   const isOff = sw && s.offValue !== undefined ? Math.round(num(values, sw.name, swDef)) === s.offValue : false
@@ -347,7 +352,7 @@ function Section({
     .map((n) => byName.get(n))
     .filter((i): i is IsfInputDesc => !!i)
     .map((i) => (s.labels?.[i.name] ? { ...i, display: s.labels[i.name] } : i))
-  const dim = s.dim?.(values, { bgEmpty })
+  const dim = s.dim?.(values, { bgEmpty, dome })
   return (
     <div>
       <div

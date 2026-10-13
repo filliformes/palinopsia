@@ -1401,7 +1401,7 @@ interface StoreState {
   // seeds random assignments onto a subset of the still-unassigned ones (respecting
   // the cap). The Inspector/rack right-click menus drive this : "Assign and
   // randomize modulation" passes addNew=true, "Randomize modulation" passes false.
-  randomizeModulation: (candidates: ModTarget[], addNew: boolean) => void
+  randomizeModulation: (candidates: ModTarget[], addNew: boolean) => boolean
   removeAssignment: (id: string) => void
   setAssignmentDepth: (id: string, depth: number) => void
   toggleAssignmentMuted: (id: string) => void
@@ -1428,6 +1428,11 @@ interface StoreState {
   // per-computer choice (persisted) : off, the warp stays this computer's.
   warpInSession: boolean
   setWarpInSession: (on: boolean) => void
+  // The warp on screen came from the open session (Mapping : save with session).
+  // Its edits then belong to that session and never touch this computer's own
+  // warp (kept in localStorage), which comes back with a session that has none,
+  // with New, or when the option is turned off. Transient.
+  warpFromSession: boolean
   // Fullscreen output window (projector) is open + mirroring. Transient.
   outputActive: boolean
   setOutputActive: (on: boolean) => void
@@ -1840,7 +1845,23 @@ function sameSource(a: SourceSlot | null, b: SourceSlot | null): boolean {
  *  that is still in its rack, a source slot that still holds a source. Anything
  *  else (layer controls, Meta, Sonify, the Background's and the dome's own
  *  controls) always exists. */
-function targetAlive(c: CompositionState, t: ModTarget): boolean {
+/** Back to this computer's own warp (localStorage) after a session's. */
+function restoreMachineWarp(
+  set: (p: Partial<{ warpCorners: number[]; warpEnabled: boolean; warpFromSession: boolean }>) => void,
+  get: () => { warpFromSession: boolean }
+): void {
+  if (!get().warpFromSession) return
+  let corners = [0, 0, 1, 0, 1, 1, 0, 1]
+  try {
+    const s = JSON.parse(localStorage.getItem('opsia.warpCorners') ?? '')
+    if (Array.isArray(s) && s.length === 8 && s.every((v) => typeof v === 'number')) corners = s
+  } catch {
+    /* none stored : the identity */
+  }
+  set({ warpCorners: corners, warpEnabled: localStorage.getItem('opsia.warpEnabled') === '1', warpFromSession: false })
+}
+
+export function targetAlive(c: CompositionState, t: ModTarget): boolean {
   if (t.kind === 'fx') {
     const s = t.scope
     const arr =
@@ -1857,7 +1878,9 @@ function targetAlive(c: CompositionState, t: ModTarget): boolean {
   }
   if (t.kind === 'source') {
     const L = c.layers[t.layer]
-    return !!(t.slot === 'A' ? L?.sourceA : L?.sourceB)
+    const slot = t.slot === 'A' ? L?.sourceA : L?.sourceB
+    // An emptied slot is { kind: 'none' } (slot A always exists).
+    return !!slot && slot.kind !== 'none'
   }
   if (t.kind === 'bgSource') return !!c.background?.source
   return true
@@ -2615,7 +2638,9 @@ export const useStore = create<StoreState>((set, get) => ({
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => {
           const cur = slot === 'A' ? l.sourceA : l.sourceB
-          if (!cur || (cur.kind !== 'video' && cur.kind !== 'capture')) return l
+          // Every source drawn through the framing blit (People itself stays
+          // video / capture only : Compositor.setFraming).
+          if (!cur || (cur.kind !== 'video' && cur.kind !== 'capture' && cur.kind !== 'assemble' && cur.kind !== 'hive')) return l
           const next = { ...cur, ...patch }
           return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
         })
@@ -3193,7 +3218,8 @@ export const useStore = create<StoreState>((set, get) => ({
     return result
   },
   randomizeModulation: (candidates, addNew) => {
-    if (!candidates.length) return
+    if (!candidates.length) return true
+    let ok = true
     set((st) => {
       const c = st.composition
       // Eligible SOURCES : the ENABLED modulators (what's actually running); fall
@@ -3216,6 +3242,11 @@ export const useStore = create<StoreState>((set, get) => ({
       })
 
       // (b) optionally seed a random subset of the still-unassigned candidates.
+      // Full : dead bindings go first (as in assignMod); still full, the caller says so.
+      if (addNew && matrix.length >= MAX_MOD_ASSIGNMENTS) {
+        const alive = matrix.filter((a) => targetAlive(c, a.target))
+        if (alive.length < matrix.length) { matrix = alive; changed = true }
+      }
       if (addNew) {
         const assigned = new Set(matrix.map((a) => modTargetKey(a.target)))
         const open = candidates.filter((t) => !assigned.has(modTargetKey(t)))
@@ -3226,6 +3257,7 @@ export const useStore = create<StoreState>((set, get) => ({
         const budget = MAX_MOD_ASSIGNMENTS - matrix.length
         const want = Math.max(1, Math.round(open.length * 0.6))
         const k = Math.min(open.length, Math.max(0, budget), 6, want)
+        if (open.length > 0 && budget <= 0) ok = false
         for (let i = 0; i < k; i++) {
           const target = open[i]
           const mode: ModMode = baseNormForTarget(st, target) < 0.05 ? 'replace' : 'multiply'
@@ -3235,6 +3267,7 @@ export const useStore = create<StoreState>((set, get) => ({
       }
       return changed ? { composition: { ...c, modMatrix: matrix } } : {}
     })
+    return ok
   },
   removeAssignment: (id) =>
     set((s) => ({
@@ -3300,7 +3333,7 @@ export const useStore = create<StoreState>((set, get) => ({
     return [0, 0, 1, 0, 1, 1, 0, 1] // identity: TL, TR, BR, BL
   })(),
   setWarpEnabled: (on) => {
-    localStorage.setItem('opsia.warpEnabled', on ? '1' : '0')
+    if (!get().warpFromSession) localStorage.setItem('opsia.warpEnabled', on ? '1' : '0')
     set({ warpEnabled: on })
   },
   setWarpGrid: (on) => set({ warpGrid: on }),
@@ -3309,19 +3342,21 @@ export const useStore = create<StoreState>((set, get) => ({
       const c = [...s.warpCorners]
       c[corner * 2] = Math.max(-0.5, Math.min(1.5, x))
       c[corner * 2 + 1] = Math.max(-0.5, Math.min(1.5, y))
-      localStorage.setItem('opsia.warpCorners', JSON.stringify(c))
+      if (!s.warpFromSession) localStorage.setItem('opsia.warpCorners', JSON.stringify(c))
       return { warpCorners: c }
     }),
   resetWarp: () => {
     const c = [0, 0, 1, 0, 1, 1, 0, 1]
-    localStorage.setItem('opsia.warpCorners', JSON.stringify(c))
+    if (!get().warpFromSession) localStorage.setItem('opsia.warpCorners', JSON.stringify(c))
     set({ warpCorners: c })
   },
   warpInSession: localStorage.getItem('opsia.warpInSession') === '1',
   setWarpInSession: (on) => {
     localStorage.setItem('opsia.warpInSession', on ? '1' : '0')
     set({ warpInSession: on })
+    if (!on) restoreMachineWarp(set, get)
   },
+  warpFromSession: false,
   outputActive: false,
   setOutputActive: (on) => set({ outputActive: on }),
   audioEnabled: false,
@@ -4416,6 +4451,8 @@ export const useStore = create<StoreState>((set, get) => ({
       // active World applied so the World selector matches the layers' coupling
       // (else it'd read e.g. "Musical" over factory-uncoupled layers).
       const activeWorld = s.worlds.find((w) => w.id === s.world) ?? null
+      // A New session carries no warp : this computer's own comes back.
+      restoreMachineWarp(set, get)
       const fresh = seedRandomStart(makeDefaultComposition())
       // NEW is a clean slate. Even under a direct-film World (Griffé/Peint/Pressé),
       // strip the Finalizer's film stage back off so a New session never opens with
@@ -4599,16 +4636,18 @@ export const useStore = create<StoreState>((set, get) => ({
     if (s.dome && typeof s.dome === 'object')
       set({ dome: persistDome({ ...sanitizeDome(s.dome), enabled: get().dome.enabled }) }) // on/off stays yours
     // The projector warp, when the session carries one AND this computer lets
-    // sessions bring theirs (Output → Mapping : save with the session).
+    // sessions bring theirs (Output → Mapping : save with the session). It is the
+    // session's : this computer's own warp stays stored and comes back with a
+    // session that carries none.
     const sw = s.warp
     if (
       get().warpInSession && sw && Array.isArray(sw.corners) && sw.corners.length === 8 &&
       sw.corners.every((v) => typeof v === 'number' && Number.isFinite(v))
     ) {
       const corners = sw.corners.map((v) => Math.max(-0.5, Math.min(1.5, v)))
-      localStorage.setItem('opsia.warpCorners', JSON.stringify(corners))
-      localStorage.setItem('opsia.warpEnabled', sw.enabled ? '1' : '0')
-      set({ warpCorners: corners, warpEnabled: !!sw.enabled })
+      set({ warpCorners: corners, warpEnabled: !!sw.enabled, warpFromSession: true })
+    } else {
+      restoreMachineWarp(set, get)
     }
     // The session's sound patch (post-set so setSonify's engine push sees it).
     if (s.sonify) {

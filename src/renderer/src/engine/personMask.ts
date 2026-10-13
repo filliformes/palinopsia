@@ -33,8 +33,9 @@ export function personStatus(layer: number, slot: 'A' | 'B'): PersonStatus | nul
   return statuses.get(`${layer}${slot}`) ?? null
 }
 
-/** A frame the slot already holds : its <video>, or an RGBA buffer (top row first). */
-export type PersonFrame = HTMLVideoElement | { w: number; h: number; stride: number; buf: ArrayBuffer }
+/** A frame the slot already holds : its <video>, or an RGBA buffer (top row first;
+ *  `seq` tells a new frame from the same one again). */
+export type PersonFrame = HTMLVideoElement | { w: number; h: number; stride: number; buf: ArrayBuffer; seq?: number }
 
 export class PersonMask {
   private worker: Worker | null = null
@@ -51,12 +52,20 @@ export class PersonMask {
   private texH = 0
   private pending: { mask: Uint8Array; w: number; h: number } | null = null
   private has = false
+  private owner: unknown = null // the source whose frames are being read
+  private gen = 0 // bumped when the owner changes : older results are dropped
+  private inFlightGen = 0
+  private lastVideoTime = -1
+  private lastSeq = -1
   readonly status: PersonStatus = { state: 'loading', people: 0, ms: 0, error: '' }
+
+  private key: string
 
   constructor(
     private gl: WebGL2RenderingContext,
-    private key: string
+    key: string
   ) {
+    this.key = key
     statuses.set(key, this.status)
     try {
       const w = createBodyWorker()
@@ -67,6 +76,26 @@ export class PersonMask {
     } catch (e) {
       this.fail((e as Error).message)
     }
+  }
+
+  /** The readout's key ("<layer><slot>") : a layer can move to another index. */
+  setKey(key: string): void {
+    if (key === this.key) return
+    if (statuses.get(this.key) === this.status) statuses.delete(this.key)
+    this.key = key
+    statuses.set(key, this.status)
+  }
+
+  /** The source being read. Another one (a new clip, another camera) : forget
+   *  the old silhouette and any detection still on its way. */
+  setOwner(owner: unknown): void {
+    if (owner === this.owner) return
+    this.owner = owner
+    this.gen++
+    this.has = false
+    this.pending = null
+    this.lastVideoTime = -1
+    this.lastSeq = -1
   }
 
   /** How many people to look for (1 to 4 : the model finds each one separately). */
@@ -112,6 +141,7 @@ export class PersonMask {
       this.fail(m.msg || 'the model did not load')
     } else if (m.t === 'result') {
       this.inFlight = false
+      if (this.inFlightGen !== this.gen) return // a frame of the previous source
       this.status.ms = Math.round(m.ms ?? 0)
       if (m.error) return // a hiccup on this frame only
       this.status.people = m.people ?? 0
@@ -131,18 +161,44 @@ export class PersonMask {
     try {
       if (frame instanceof HTMLVideoElement) {
         if (frame.readyState < 2 || !frame.videoWidth || !frame.videoHeight) return
+        // The same picture again (a paused clip) : nothing new to find.
+        if (this.has && frame.currentTime === this.lastVideoTime) return
+        this.lastVideoTime = frame.currentTime
         const h = Math.max(1, Math.round((FEED_W * frame.videoHeight) / frame.videoWidth))
         make = createImageBitmap(frame, { resizeWidth: FEED_W, resizeHeight: h, resizeQuality: 'low' })
       } else {
-        if (!(frame.w > 0 && frame.h > 0) || frame.stride !== frame.w * 4 || frame.buf.byteLength < frame.w * frame.h * 4) return
-        const img = new ImageData(new Uint8ClampedArray(frame.buf, 0, frame.w * frame.h * 4), frame.w, frame.h)
-        const h = Math.max(1, Math.round((FEED_W * frame.h) / frame.w))
-        make = createImageBitmap(img, { resizeWidth: FEED_W, resizeHeight: h, resizeQuality: 'low' })
+        const { w, h, stride, buf } = frame
+        if (!(w > 0 && h > 0) || stride < w * 4 || buf.byteLength < stride * h) return
+        if (frame.seq !== undefined) {
+          if (this.has && frame.seq === this.lastSeq) return // the same frame again
+          this.lastSeq = frame.seq
+        }
+        // Scaled down HERE, sample by sample, to the model's own size : a 4096²
+        // NDI frame is 64 MB, and handing it whole to createImageBitmap copied and
+        // scaled all of it on this thread every detection. This reads ~100 k
+        // pixels. Rows may be padded (stride).
+        const tw = Math.min(FEED_W, w)
+        const th = Math.max(1, Math.round((tw * h) / w))
+        const src = new Uint8Array(buf, 0, stride * h)
+        const out = new Uint8ClampedArray(tw * th * 4)
+        for (let y = 0; y < th; y++) {
+          const row = Math.min(h - 1, Math.floor(((y + 0.5) * h) / th)) * stride
+          for (let x = 0; x < tw; x++) {
+            const s = row + Math.min(w - 1, Math.floor(((x + 0.5) * w) / tw)) * 4
+            const d = (y * tw + x) * 4
+            out[d] = src[s]
+            out[d + 1] = src[s + 1]
+            out[d + 2] = src[s + 2]
+            out[d + 3] = 255
+          }
+        }
+        make = createImageBitmap(new ImageData(out, tw, th))
       }
     } catch {
       return
     }
     this.inFlight = true
+    this.inFlightGen = this.gen
     this.inFlightAt = performance.now()
     // The model wants its frame times strictly increasing.
     const ts = Math.max(this.lastTs + 1, Math.round(performance.now()))
@@ -194,7 +250,8 @@ export class PersonMask {
 
   dispose(): void {
     this.disposed = true
-    statuses.delete(this.key)
+    // Only our own entry : a newer mask may already hold this key.
+    if (statuses.get(this.key) === this.status) statuses.delete(this.key)
     try {
       this.worker?.postMessage({ t: 'stop' })
       this.worker?.terminate()
