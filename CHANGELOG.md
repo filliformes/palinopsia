@@ -3,6 +3,23 @@
 All notable changes to Palinopsia. Dates are ISO. Versions follow the `v*` tags
 that CI builds into cross-platform releases.
 
+## Unreleased
+
+### Fixed
+
+- **Lowercase's accent and ground colors explain themselves on hover**, like every
+  other control (they shipped in v1.2.5 without a hint).
+
+### Docs
+
+- **Caught up with v1.2.6** : the README's source and effect counts (43 / 53, the
+  Sources heading and its anchor), the modulation-target list (the layer Vary, the
+  Background, every Fulldome mapping slider, Sonify, the Meta knobs), the native
+  generators, dome stage and capture rings in the Architecture map, and a gallery row
+  from the Space themes (Gravity Well, Line Wall, Crossing); the site's figures (43
+  sources, 53 effects, 10 Sonify voices, 108 recipes) and the same three frames in its
+  gallery.
+
 ## v1.2.6 — 2026-10-12
 
 ### Added

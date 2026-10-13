@@ -520,6 +520,8 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     halo: 'A tight bloom on the edge of a mark. It can only widen a mark that is already there, never light empty frame.',
     accentAmt: 'How strongly the accent color marks its cells. At 0 the picture is black and white.',
     accentEvery: 'The accent lattice spacing. It marks one cell in this many squared, so 5 marks one cell in twenty-five : regular enough to read as meaning rather than as confetti.',
+    accent: 'The one color that marks a regular lattice of cells (the accent slider sets how strongly, accent every how far apart).',
+    ground: 'The color behind the marks. Lower its alpha to show the layers below between them.',
     seed: 'Deals another hand. Everything else held, this is a different arrangement of the same figure.',
     audio: 'Leans each cell toward the loudness of the spectrum band at its own column (bass at the left), so cells answer the sound where they stand.',
     side: 'Reads another layer, one sample per cell on every frame, and uses its brightness as that cell’s own density : the picture arrives as a field of lit and unlit cells on this clock, a 1-bit halftone of it, rather than a blurred copy. Where the layer is transparent the cells keep their own density. Pick the layer under the controls. At 0 it is ignored.'

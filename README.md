@@ -37,8 +37,11 @@ racks, palette, World and macro biases : in one click.
 |---|---|---|
 | ![Op-Art](docs/images/shot-opart.jpg)<br>**Op-Art** : a grid warped and folded until it breathes | ![Datamosh](docs/images/shot-datamosh.jpg)<br>**Datamosh** : a slit-scan torn into RGB compression noise | ![Mycelial](docs/images/shot-mycelial.jpg)<br>**Mycelial** : reaction-diffusion filaments, grown then eroded |
 | ![Cathode Ray](docs/images/shot-crt.jpg)<br>**Cathode Ray** : phosphor scanlines, one colour on black | ![Analog moiré](docs/images/shot-moire.jpg)<br>**Analog moiré** : a wobbulated interference field | ![Cut-Up](docs/images/visual-cut-up.jpg)<br>**Cut-Up** : a wall of films, each in its own torn piece |
+| ![Gravity Well](docs/images/shot-gravity-well.jpg)<br>**Gravity Well** : a floor of points sinking into a funnel, ringing with ripples | ![Line Wall](docs/images/shot-line-wall.jpg)<br>**Line Wall** : machine-cut bars laid on a wall that runs off to the side | ![Crossing](docs/images/shot-crossing.jpg)<br>**Crossing** : full-height bars, each leaning its own way |
 
-*(These frames are fresh from v1.0.0. The older shots stay in `docs/images/`.)*
+*(The first two rows are from v1.0.0, the last from v1.2.6 : Lattice, Perspective and
+Lowercase's slant, each straight from its Space theme. The older shots stay in
+`docs/images/`.)*
 
 ---
 
@@ -55,13 +58,13 @@ racks, palette, World and macro biases : in one click.
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
 - [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix)
 - [Sequencer](#sequencer-key-q) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
-- [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) · [Output & mapping](#output--mapping-key-o) : **fulldome** (210° domemaster + 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
+- [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) · [Output & mapping](#output--mapping-key-o) : **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) : ten voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Signal · Chord · Collage) · quantizer · audio in recordings
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
-- [Sources](#sources-42-generators) (42 generators) · [Effects](#effects) (52 FX) ·
+- [Sources](#sources-43-generators) (43 generators) · [Effects](#effects) (53 FX) ·
   [Native nodes](#native-nodes) (25) · [Master finalizers](#master-finalizers--pinned-always-last)
 - [Blend modes](#blend-modes) (19)
 
@@ -484,8 +487,12 @@ parameter sits at its own value, the depth and binding are kept) and click again
 turn it back on. Modulation reaches
 **float, enum, and bool** inputs, plus the **video** targets (playhead / speed /
 loop / grain), the compositor-level **layer** controls (opacity / A-B mix /
-blend-mode, from the M chips on the layer strip), and per-**FX dry/wet opacity**, and is written straight to the compositor at frame rate, never through React
-re-renders.
+blend-mode, from the M chips on the layer strip, and the layer's **Vary**, a trigger
+that fires as the modulator crosses its middle going up), per-**FX dry/wet opacity**,
+the **Background**'s opacity, speed and contact shadow, every **Fulldome** mapping
+slider (rotate, spin, feather, the panorama's and the screen's own; see
+[Fulldome](#fulldome)), the **Sonify** parameters and the **Meta knobs** themselves. It
+is written straight to the compositor at frame rate, never through React re-renders.
 
 The **Mul** (depth) control spans **−10 … +10**. Between −1 and +1 it behaves as
 before; past ±1 it **over-drives** : in Multiply mode the modulator's trough is
@@ -923,18 +930,19 @@ recordings and stills. Keystone warp is off in dome mode (a dome is mapped by it
     surround is the panorama, dimmed : while it is up, its **turns / top / bottom /
     zenith** appear under *behind the screen* and shape it.
 - **rotate**, a continuous **spin** (up to 360°/s either way, a full turn a second;
-  changing it changes the speed from there on, the dome never jumps), **feather** (0 by default : crisp edges; raised, it softens
-  every edge : the screen's border, the panorama's top and bottom, a cropped or
-  contained frame, and the rim), **flip**, and a
+  changing it changes the speed from there on, the dome never jumps), **feather** (0
+  by default : crisp edges, still anti-aliased; raised, it softens every edge : the
+  screen's border, the panorama's top and bottom, a cropped or contained frame, and the
+  rim), **flip**, and a
   **grid on output** : 10° rings, 30° spokes, the horizon in cyan, the front meridian in
   red, burned into the master for projector alignment. (The Mapping section's grid and
   warp sit out while the dome is on, on the projector window too.)
 - **Every mapping slider can be modulated** : rotate, spin, feather, turns, top, bottom,
   azimuth, elevation, width, roll, surround, scale, offset x / y each have an **M** (a
   modulator or a Meta knob; right-click clears), and while bound the slider turns the
-  modulated color and follows the live value. A screen that drifts around the room, a panorama breathing between the
-  horizon and the zenith, a full-dome frame that swells on the beat. Aperture and
-  resolution are the venue's and stay put.
+  modulated color and follows the live value. A screen that drifts around the room, a
+  panorama breathing between the horizon and the zenith, a full-dome frame that swells
+  on the beat. Aperture and resolution are the venue's and stay put.
 - **3D dome simulator** (the in-app port of the TouchDesigner *FulldomeSimulator*) : the
   live master wrapped back onto a dome. **inside** puts you in the seat (drag to look
   around; wheel out widens the lens, then keeps going by **backing off** away from the
@@ -1415,7 +1423,7 @@ don't flood your history.
 
 ---
 
-## Sources (42 generators)
+## Sources (43 generators)
 
 43 sources produce an image from nothing (all but two : Collage plays a folder of films,
 Silhouette reads the Body camera). Any generator can fill **Source A or B**
@@ -2007,8 +2015,13 @@ src/
   renderer/   React UI + the WebGL2 engine
     engine/   Compositor (per-layer ISF → blend → stack), modulation engine,
               audio bus, coupling, Feel macros + Proximity, macro-form sequencer,
-              Video/Capture/Hive/Text/Parametric/Assemble sources, native nodes
-              (convNodes), strobe limiter, output shaper, PBR
+              Video/Capture/Hive/Text/Parametric/Assemble/Collage sources, the
+              native generators (nativeGenerators.ts : Lattice, Reaction, Fluid,
+              Slime Mould, Mycelium, Veins, Grown, each its own GL engine, handed
+              the audio texture and its sidechain layer through an optional
+              feed()), native nodes (convNodes), strobe limiter, output shaper,
+              PBR, the fulldome stage (dome.ts) and the capture rings that feed
+              every output (frameCapture.ts)
     shaders/  ISF .fs files + registry (curated ranges) + presets
     audio/    the Sonify engine : AudioWorklet + voice managers + auto-voice
     assemble/ the corpus matcher : descriptor costs, live matching, PCA map
@@ -2037,7 +2050,9 @@ canvas, one accent, glitch as controlled texture. New parameters are a fixed, cu
 set : never an open-ended pile of knobs.
 
 *Not a clip-launcher VJ app · not a node patcher · not a timeline compositor · not a
-3D engine · not defined by analog-video-synth emulation · not cheap psychedelia.*
+3D engine (Lattice and Perspective put points and planes in space through a fixed set of
+controls : there is no scene to build) · not defined by analog-video-synth emulation ·
+not cheap psychedelia.*
 
 ---
 
