@@ -61,6 +61,22 @@ that CI builds into cross-platform releases.
   0.64), z turn 40° the width to 0.77; with no warp, post warp on equals the old shape
   (max difference 0.0005).
 
+- **The projector warp can travel with the session.** Output → Mapping →
+  **save with session** (a per-computer choice, persisted) : on, a saved session
+  carries the warp (on / off and the four corners, `Session.warp`) and opening a
+  session that has one restores it, Installation boots included; off (the
+  default), the warp stays the computer's, as before. Measured : on, the corners
+  round-trip exactly; off, nothing is written and a session's warp leaves the
+  computer's alone.
+
+### Changed
+
+- **The modulation matrix holds 32 bindings (was 12).** Twelve for a whole
+  session filled up quickly by hand. The automatic binders (Randomize's modulation,
+  Generate's motion, a World's audio route) keep the old budget (`AUTO_MOD_BUDGET`
+  = 12), so a randomized session carries the same amount of motion as before and
+  the other 20 stay for the hand.
+
 ### Fixed
 
 - **A full modulation matrix no longer swallows clicks.** The matrix holds 12

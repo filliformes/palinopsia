@@ -24,7 +24,7 @@ import type {
   SidechainRef,
   SourceSlot
 } from '@shared/types'
-import { MAX_MOD_ASSIGNMENTS, WORLD_AUTOMOD_SLOT } from '@shared/types'
+import { AUTO_MOD_BUDGET, WORLD_AUTOMOD_SLOT } from '@shared/types'
 import { curatedRange, FX_SHADERS, GENERATORS, NATIVE_NODES } from './shaders/isf'
 import { inputsForShader, type IsfInputDesc } from './shaders/isf/inputs'
 import { BG_SOURCES, BG_DEFAULT_SPEED } from './bgPresets'
@@ -474,7 +474,7 @@ function randomMatrix(c: CompositionState): ModAssignment[] {
     enabledMods.push(mi)
     const n = drawCount([0.1, 0.5, 0.4]) // 0..2 assignments per mod
     for (let i = 0; i < n; i++) {
-      if (out.length >= MAX_MOD_ASSIGNMENTS) return
+      if (out.length >= AUTO_MOD_BUDGET) return
       const t = pick(targets)
       const key = `${mi}|${targetKey(t)}`
       if (used.has(key)) continue
@@ -487,7 +487,7 @@ function randomMatrix(c: CompositionState): ModAssignment[] {
   // Coverage pass : hand every untargeted active layer one solid assignment.
   if (enabledMods.length > 0) {
     c.layers.forEach((l, li) => {
-      if (out.length >= MAX_MOD_ASSIGNMENTS) return
+      if (out.length >= AUTO_MOD_BUDGET) return
       if (!l.sourceA.shaderId && !l.sourceB?.shaderId) return
       if (out.some((a) => targetOnLayer(a.target, li))) return
       const local = targets.filter((t) => targetOnLayer(t, li))
@@ -549,7 +549,7 @@ export function themedMotion(c: CompositionState, recipe: MotionRecipe): Composi
       rateHz: logRate()
     }
   })
-  const cap = MAX_MOD_ASSIGNMENTS - 1 // room for the World's audio route
+  const cap = AUTO_MOD_BUDGET - 1 // room for the World's audio route
   const out: ModAssignment[] = []
   const used = new Set<string>()
   const bind = (mi: number, t: ModTarget): boolean => {

@@ -209,7 +209,7 @@ export function applyWorldToComposition(c: CompositionState, world: World): Comp
   const matrix = next.modMatrix.filter((a) => a.mod !== slot)
   const modulators = next.modulators.slice()
   const am = world.autoMod
-  // Only install the row if it stays within the matrix cap (never a 13th row).
+  // Only install the row if the matrix has room for it (never past the cap).
   if (am && am.target !== 'none' && contextInst && matrix.length < MAX_MOD_ASSIGNMENTS) {
     modulators[slot] = {
       ...makeDefaultModulator(),

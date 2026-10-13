@@ -530,8 +530,10 @@ slider (rotate, spin, feather, the panorama's and the screen's own; see
 [Fulldome](#fulldome)), the **Sonify** parameters and the **Meta knobs** themselves. It
 is written straight to the compositor at frame rate, never through React re-renders.
 
-The matrix holds **12** bindings (bounded on purpose, so a patch stays readable;
-the Meta knobs are outside it). Binding a new one when it is full first lets go of
+The matrix holds **32** bindings (bounded, so a patch stays readable; the Meta
+knobs are outside it). Randomize, Generate and a World's audio route use at most 12
+of them, so a randomized session keeps the motion it always had and the rest is
+yours. Binding a new one when it is full first lets go of
 bindings left pointing at a removed effect or an emptied source; if it is still
 full, the modulator buttons grey out and a message says how to free one
 (right-click an M to clear it, or click its chip in Modulate).
@@ -823,7 +825,11 @@ bottom:
 - **Render scale** : a quality multiplier (0.1–2×) on the composition size (½ lo-fi /
   1× / 1⅓× / 2×; the readout shows the real render resolution; rebuilds the engine).
 - **Mapping** : a live keystone editor (drag four corner handles over a mirror of
-  the output) + alignment grid + reset. A Finalizer output shape with **post warp**
+  the output) + alignment grid + reset. The warp belongs to the computer (its
+  projector) and survives restarts; **save with session** makes it travel with the
+  session instead : saved into it, and restored when a session that carries one is
+  opened (one keystone per piece or per venue). The choice is this computer's : off,
+  sessions neither save nor change its warp. A Finalizer output shape with **post warp**
   on is measured on the projector after this warp (a circle stays round there).
   Recordings, NDI and Spout get the picture before the warp, so there the shape is
   pre-bent to come out right on the projector.

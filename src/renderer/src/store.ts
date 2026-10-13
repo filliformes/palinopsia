@@ -1424,6 +1424,10 @@ interface StoreState {
   setWarpGrid: (on: boolean) => void
   setWarpCorner: (corner: number, x: number, y: number) => void
   resetWarp: () => void
+  // The warp travels with the session : saved into it, restored from it. A
+  // per-computer choice (persisted) : off, the warp stays this computer's.
+  warpInSession: boolean
+  setWarpInSession: (on: boolean) => void
   // Fullscreen output window (projector) is open + mirroring. Transient.
   outputActive: boolean
   setOutputActive: (on: boolean) => void
@@ -1875,7 +1879,7 @@ function dropTargets(
 /** Prune mod / Meta targets orphaned when a WHOLE layer is replaced (initLayer /
  *  randomizeLayer / applyLayerPreset / pasteLayer). Source-kind rows would else
  *  seize the new source's same-named inputs, and layer-scoped fx rows dangle
- *  once fresh FX instance ids are minted — dead rows that eat the 12-assignment
+ *  once fresh FX instance ids are minted — dead rows that eat the assignment
  *  cap. Mirrors dropSlotTargets / removeFx for the whole-layer replace case. */
 function dropLayerTargets(c: CompositionState, layer: number): CompositionState {
   return dropTargets(
@@ -2859,7 +2863,7 @@ export const useStore = create<StoreState>((set, get) => ({
         fx.filter((f) => f.id !== instId || f.locked)
       )
       // Drop any modulation / Meta target that pointed at the removed unit, else
-      // it lingers as a dead matrix row (counting against the 12-assignment cap)
+      // it lingers as a dead matrix row (counting against the assignment cap)
       // that renders nothing and can't be found to delete.
       return { composition: dropTargets(composition, (t) => t.kind === 'fx' && t.instId === instId) }
     }),
@@ -3312,6 +3316,11 @@ export const useStore = create<StoreState>((set, get) => ({
     const c = [0, 0, 1, 0, 1, 1, 0, 1]
     localStorage.setItem('opsia.warpCorners', JSON.stringify(c))
     set({ warpCorners: c })
+  },
+  warpInSession: localStorage.getItem('opsia.warpInSession') === '1',
+  setWarpInSession: (on) => {
+    localStorage.setItem('opsia.warpInSession', on ? '1' : '0')
+    set({ warpInSession: on })
   },
   outputActive: false,
   setOutputActive: (on) => set({ outputActive: on }),
@@ -4589,6 +4598,18 @@ export const useStore = create<StoreState>((set, get) => ({
     // keep whatever the machine had.
     if (s.dome && typeof s.dome === 'object')
       set({ dome: persistDome({ ...sanitizeDome(s.dome), enabled: get().dome.enabled }) }) // on/off stays yours
+    // The projector warp, when the session carries one AND this computer lets
+    // sessions bring theirs (Output → Mapping : save with the session).
+    const sw = s.warp
+    if (
+      get().warpInSession && sw && Array.isArray(sw.corners) && sw.corners.length === 8 &&
+      sw.corners.every((v) => typeof v === 'number' && Number.isFinite(v))
+    ) {
+      const corners = sw.corners.map((v) => Math.max(-0.5, Math.min(1.5, v)))
+      localStorage.setItem('opsia.warpCorners', JSON.stringify(corners))
+      localStorage.setItem('opsia.warpEnabled', sw.enabled ? '1' : '0')
+      set({ warpCorners: corners, warpEnabled: !!sw.enabled })
+    }
     // The session's sound patch (post-set so setSonify's engine push sees it).
     if (s.sonify) {
       const curSoni = get().sonify
@@ -4629,6 +4650,7 @@ export const useStore = create<StoreState>((set, get) => ({
       },
       resolume: s.resolume,
       dome: s.dome,
+      ...(s.warpInSession ? { warp: { enabled: s.warpEnabled, corners: [...s.warpCorners] } } : {}),
       ui: { theme: s.theme }
     }
   }

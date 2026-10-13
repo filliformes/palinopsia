@@ -62,6 +62,8 @@ export function OutputPage({
   const setWarpGrid = useStore((s) => s.setWarpGrid)
   const setWarpCorner = useStore((s) => s.setWarpCorner)
   const resetWarp = useStore((s) => s.resetWarp)
+  const warpInSession = useStore((s) => s.warpInSession)
+  const setWarpInSession = useStore((s) => s.setWarpInSession)
 
   const outputActive = useStore((s) => s.outputActive)
   const setOutputActive = useStore((s) => s.setOutputActive)
@@ -594,6 +596,17 @@ export function OutputPage({
                 className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
               >
                 reset
+              </button>
+              <button
+                onClick={() => setWarpInSession(!warpInSession)}
+                className={btn(warpInSession)}
+                title={
+                  warpInSession
+                    ? 'The warp is saved with the session and restored when a session that carries one is opened (one keystone per piece or per venue). Click to keep the warp to this computer.'
+                    : 'The warp belongs to this computer (its projector) : sessions neither save nor change it. Click to save it with the session instead.'
+                }
+              >
+                save with session
               </button>
             </div>
           </Section>

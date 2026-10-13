@@ -699,7 +699,14 @@ export interface ModAssignment {
  *  starts at, so one layer on its own nudges as far as all of them would. */
 export const DEFAULT_LAYER_VARY = 0.15
 
-export const MAX_MOD_ASSIGNMENTS = 12
+// How many modulator bindings a session holds in all (the Meta knobs are
+// outside it). It was 12, which a hand-built patch filled quickly (Vincent,
+// 2026-10-13 : raise it to 32).
+export const MAX_MOD_ASSIGNMENTS = 32
+// What the AUTOMATIC binders may use (Randomize, Generate, a World's audio
+// route) : the old 12, so a randomized session keeps the amount of motion it
+// always had and the rest of the room stays for the hand.
+export const AUTO_MOD_BUDGET = 12
 
 // ── Meta Controller (brief §6 : dataFLOU's macro surface) ─────────────
 // 16 knobs, one flat bank. Each knob maps its 0..1 position through a curve
@@ -981,6 +988,10 @@ export interface Session {
   resolume?: import('./resolume').ResolumeMap
   // Fulldome mapping (the dome view of the Output page).
   dome?: import('./dome').DomeConfig
+  // The projector warp (Output → Mapping), written only when "save with the
+  // session" is on, and applied on load only where that option is on : the
+  // warp is otherwise the computer's (its projector), not the piece's.
+  warp?: { enabled: boolean; corners: number[] }
   // Opaque renderer UI snapshot (theme, panel sizes, selection). The main
   // process never inspects it : it just round-trips it to disk.
   ui?: unknown
