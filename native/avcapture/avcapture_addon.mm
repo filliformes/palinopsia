@@ -352,7 +352,19 @@ static Napi::Value Frame(const Napi::CallbackInfo& info) {
   if (info.Length() < 1 || !info[0].IsNumber()) return env.Null();
   auto it = g_caps.find(info[0].As<Napi::Number>().Int32Value());
   if (it == g_caps.end()) return env.Null();
-  Cap* c = it->second->cap.get();
+  Capture* k = it->second.get();
+  Cap* c = k->cap.get();
+  // Looked at directly too, not only through the notifications : an unplugged
+  // device must never sit there as a dead "running" capture.
+  @autoreleasepool {
+    const int st = c->state.load();
+    AVCaptureDevice* d = k->device;
+    AVCaptureSession* s = k->session;
+    if (st == kRunning || st == kStarting) {
+      if (d && !d.connected) Fail(c, kGone, @"disconnected");
+      else if (st == kRunning && s && !s.running) Fail(c, kGone, @"the capture stopped");
+    }
+  }
   Napi::Object o = Napi::Object::New(env);
   std::lock_guard<std::mutex> lock(c->m);
   o.Set("state", Napi::String::New(env, StateName(c->state.load())));
