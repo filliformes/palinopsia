@@ -45,6 +45,22 @@ that CI builds into cross-platform releases.
   matte and the cut out cover the same 13.7 % of the frame and remove the other
   86.3 %; the blur brings the background's mean gradient from 0.74 to 0.16.
 
+- **Finalizer output shape : post warp, z tilt, z turn.** With **post warp** the
+  shape is measured on the projector, after the Mapping warp : each pixel goes
+  through the warp's homography (`warpHomography`, Heckbert's square-to-quad, the
+  same projective map as the warp's quad) and the shape is evaluated in the
+  projector's proportions (the output window's size, asked of main once a second
+  through `output:size`; the composition's own without one), so the warp lands it as
+  an exact circle. It is still cut in the frame, so the fill, the Background fill,
+  the shadow and the feather all work; the edge is anti-aliased from the distance's
+  own screen rate (fwidth), right under any warp. Off a domemaster only. **z tilt** /
+  **z turn** lean the shape's own plane into depth (a fixed lens) : a circle becomes
+  any perspective ellipse; the spin stays in the shape's plane. Measured under a
+  lopsided warp, on the projector raster : post warp off 1.22 between the longest
+  and shortest radius, on 1.008; z tilt 50° shrinks the height to 0.65 (cos 50° =
+  0.64), z turn 40° the width to 0.77; with no warp, post warp on equals the old shape
+  (max difference 0.0005).
+
 ### Fixed
 
 - **An imported video plays in its layer again.** The plain video source loads its

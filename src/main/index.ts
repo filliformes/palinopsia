@@ -932,6 +932,13 @@ app.whenReady().then(async () => {
   // A reloaded control window asks whether an output is still open, to stream
   // to it again (it used to forget, and the open output froze).
   safeHandle('output:isOpen', () => !!outputWindow && !outputWindow.isDestroyed())
+  // The output window's drawing size : the projector's proportions, for the
+  // Finalizer shape measured after the warp. Null : no output window.
+  safeHandle('output:size', () => {
+    if (!outputWindow || outputWindow.isDestroyed()) return null
+    const [w, h] = outputWindow.getContentSize()
+    return { w, h }
+  })
   safeHandle('output:close', () => {
     outputWindow?.close()
     return true

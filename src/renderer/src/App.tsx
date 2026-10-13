@@ -1136,6 +1136,10 @@ export default function App(): JSX.Element {
     }
 
     const start = performance.now()
+    // The projector's proportions (w / h; 0 : not known, the composition's own),
+    // for the Finalizer shape after the warp. Asked of main once a second.
+    let projAspect = 0
+    let projAskedAt = -1e9
     // Shader warm-up queue : every registry shader + native node, compiled ONE
     // per frame in the background (starting a beat after launch) and discarded.
     // Chromium's GPU program cache (memory + disk) keeps the results, so a
@@ -1245,6 +1249,19 @@ export default function App(): JSX.Element {
         //    Shader hot-swaps preserve feedback buffers (brief §1).
         comp!.setGlobalSpeed(st.globalSpeed)
         comp!.setWarp(st.warpEnabled ? st.warpCorners : null, st.warpGrid)
+        // The Finalizer shape after the warp : the projector's corners and its
+        // proportions (the output window's size, asked once a second; without
+        // an output window, the composition's own).
+        if (now - projAskedAt > 1000) {
+          projAskedAt = now
+          if (st.outputActive)
+            void window.api
+              .outputSize()
+              .then((s) => { projAspect = s && s.w > 0 && s.h > 0 ? s.w / s.h : 0 })
+              .catch(() => {})
+          else projAspect = 0
+        }
+        comp!.setShapeWarp(st.warpEnabled && !st.dome.enabled ? st.warpCorners : null, projAspect)
         comp!.setDome(st.dome.enabled ? st.dome : null)
         comp!.setStrobeSafe(st.strobeSafe)
         // A New / Generate relay hands a layer played in a free slot over to its

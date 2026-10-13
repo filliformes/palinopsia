@@ -50,7 +50,10 @@
     { "NAME": "outBgColor", "TYPE": "color", "DEFAULT": [0.0, 0.0, 0.0, 1.0], "LABEL": "fill color" },
     { "NAME": "outDepth", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "shape depth" },
     { "NAME": "outShadowAngle", "TYPE": "float", "MIN": -3.1416, "MAX": 3.1416, "DEFAULT": -0.98, "LABEL": "depth angle" },
-    { "NAME": "outPerspective", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "perspective" }
+    { "NAME": "outPerspective", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "perspective" },
+    { "NAME": "outPostWarp", "TYPE": "bool", "DEFAULT": false, "LABEL": "post warp" },
+    { "NAME": "outTilt", "TYPE": "float", "MIN": -1.3963, "MAX": 1.3963, "DEFAULT": 0.0, "LABEL": "z tilt" },
+    { "NAME": "outTurn", "TYPE": "float", "MIN": -1.3963, "MAX": 1.3963, "DEFAULT": 0.0, "LABEL": "z turn" }
   ]
 }*/
 // NOTE: outShape / outBg* AND film* are applied NATIVELY as compositor output

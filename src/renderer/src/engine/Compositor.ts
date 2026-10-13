@@ -37,7 +37,7 @@ import { NATIVE_GENERATOR_IDS, nativeGeneratorFactory, syncNativeSlot, type Nati
 import { SilhouetteSource } from './SilhouetteSource';
 import { CollageSource } from './CollageSource';
 import { DepthShadow } from './depthShadow';
-import { OutputShape } from './outputShape';
+import { OutputShape, warpHomography, type ShapeExtra } from './outputShape';
 import { Cameraless } from './cameraless';
 import { FilmDamage, NO_WEAVE, type FilmWeave } from './filmDamage';
 import { StrobeLimiter } from './strobeLimit';
@@ -1615,6 +1615,14 @@ export class Compositor {
   private fzShadowAngle = -0.98; // direction the shape's shadow falls
   private fzPersp = 0; // perspective projection of the cast shadow
   private fzFeather = 0; // soft edge (0 = crisp)
+  private fzPost = false; // measured after the projection warp (outputShape.ts)
+  private fzTilt = 0; // the shape's plane leaned back / forward (radians)
+  private fzTurn = 0; // ... swung left / right
+  // After the warp : the warp's homography and the projector's proportions (App
+  // pushes them each frame : setShapeWarp). Identity while no warp is on.
+  private shapeWarpM: Float32Array = warpHomography([0, 0, 1, 0, 1, 1, 0, 1]);
+  private shapeWarpKey = '';
+  private shapeProjAspect = 0;
   private fzInstId: string | null = null; // the pinned finalizer's instance id
 
   // Strobe-safety limiter : counts flashes per second on the FINAL presented frame
@@ -2517,6 +2525,29 @@ export class Compositor {
     return this.domeCfg ? this.domeCfg[field] : null;
   }
 
+  /** The Finalizer shape AFTER THE WARP : the projector's warp corners (null :
+   *  none, a plain fit) and its proportions (w / h; 0 : this frame's own). The
+   *  projector window warps a copy of this frame, so the shape is pre-measured
+   *  through the same homography (outputShape.ts). */
+  setShapeWarp(corners: number[] | null, projAspect: number): void {
+    const c = corners && corners.length === 8 ? corners : null;
+    const key = c ? c.join(',') : '';
+    if (key !== this.shapeWarpKey) {
+      this.shapeWarpKey = key;
+      this.shapeWarpM = warpHomography(c ?? [0, 0, 1, 0, 1, 1, 0, 1]);
+    }
+    this.shapeProjAspect = projAspect > 0 ? projAspect : 0;
+  }
+
+  /** The shape's depth lean and, when asked, its after-the-warp measure. A
+   *  domemaster has no projector warp : there it stays in the frame. */
+  private shapeExtra(): ShapeExtra {
+    const post = this.fzPost && !this.domeCfg
+      ? { m: this.shapeWarpM, aspect: this.shapeProjAspect || this.w / this.h }
+      : null;
+    return { tilt: this.fzTilt, turn: this.fzTurn, post };
+  }
+
   /** Set the projection warp for the present pass. `corners` = 8 normalized
    *  numbers (TL,TR,BR,BL x,y; top-left origin) or null to disable. */
   setWarp(corners: number[] | null, grid: boolean): void {
@@ -2776,6 +2807,9 @@ export class Compositor {
     this.fzShadowAngle = numf(fi.outShadowAngle, -0.98);
     this.fzPersp = numf(fi.outPerspective, 0);
     this.fzFeather = numf(fi.outFeather, 0);
+    this.fzPost = numf(fi.outPostWarp, 0) > 0.5 || (fi.outPostWarp as unknown) === true;
+    this.fzTilt = numf(fi.outTilt, 0);
+    this.fzTurn = numf(fi.outTurn, 0);
     // Cameraless / direct-film draw-hold (native, applied after the shaper).
     this.cfHold = fin ? Math.round(numf(fi.filmHold, 0)) : 0;
     this.cfRate = numf(fi.filmRate, 8);
@@ -2831,6 +2865,9 @@ export class Compositor {
           case 'outShadowAngle': this.fzShadowAngle = value; break;
           case 'outPerspective': this.fzPersp = value; break;
           case 'outFeather': this.fzFeather = value; break;
+          case 'outPostWarp': this.fzPost = value > 0.5; break;
+          case 'outTilt': this.fzTilt = value; break;
+          case 'outTurn': this.fzTurn = value; break;
           case 'filmHold': this.cfHold = Math.round(value); break;
           case 'filmRate': this.cfRate = value; break;
           case 'filmJitter': this.cfJitter = value; break;
@@ -3212,7 +3249,7 @@ export class Compositor {
       this.outputShape.apply(
         composite, w.read(), this.fzBgColor, this.fzShape, this.fzSize, this.fzAngle,
         this.fzPosX, this.fzPosY, 0, this.fzShadowAngle, this.fzPersp, this.fzFeather,
-        this.w / this.h, w.write(), this.w, this.h
+        this.w / this.h, w.write(), this.w, this.h, this.shapeExtra()
       );
       composite = w.out();
     }
@@ -3286,7 +3323,7 @@ export class Compositor {
       this.outputShape.apply(
         composite, fill, this.fzBgColor, this.fzShape, this.fzSize, this.fzAngle,
         this.fzPosX, this.fzPosY, this.fzDepth, this.fzShadowAngle, this.fzPersp, this.fzFeather,
-        this.w / this.h, this.mixTarget.fbo, this.w, this.h
+        this.w / this.h, this.mixTarget.fbo, this.w, this.h, this.shapeExtra()
       );
       composite = this.mixTarget.tex;
     }

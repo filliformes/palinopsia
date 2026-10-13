@@ -150,13 +150,16 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       color: C.accent2,
       switchInput: 'outShape',
       offValue: 0,
-      inputs: ['outSize', 'outFeather', 'outAngle', 'outPosX', 'outPosY', 'outBgSource', 'outBgColor', 'outDepth', 'outShadowAngle', 'outPerspective'],
+      inputs: ['outSize', 'outFeather', 'outAngle', 'outPosX', 'outPosY', 'outTilt', 'outTurn', 'outPostWarp', 'outBgSource', 'outBgColor', 'outDepth', 'outShadowAngle', 'outPerspective'],
       labels: {
         outSize: 'size',
         outFeather: 'feather',
         outAngle: 'angle',
         outPosX: 'x',
         outPosY: 'y',
+        outTilt: 'z tilt',
+        outTurn: 'z turn',
+        outPostWarp: 'post warp',
         outDepth: 'shadow',
         outShadowAngle: 'shadow angle'
       },

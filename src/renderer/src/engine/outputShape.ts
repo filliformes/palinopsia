@@ -4,6 +4,20 @@
 // texture (the Background slab, "moved" here from behind the layers). Runs as the
 // very last compositor stage. No-op when shape is 0 (the compositor skips it).
 // The fill is opaque; inside the shape the finished frame keeps its own alpha.
+//
+// AFTER THE WARP (post) : the shape is measured in the projector's own pixels.
+// The frame is drawn here before the projection warp, so each pixel is first sent
+// through the warp's homography (uH : the frame's top-down uv → the projector's
+// normalized position) and the shape is evaluated THERE, in the projector's
+// proportions : the warp then lands it as an exact circle on the projector, where
+// a shape drawn in the frame's own space comes out an oval. Everything else (the
+// fill, the Background fill, the shadow, the feather) keeps working, since the
+// cut still happens in the frame.
+//
+// Z TILT / Z TURN : the shape's own plane leans back (tilt, about the horizontal
+// axis) or swings (turn, about the vertical one) into depth, seen through a fixed
+// lens : a circle becomes a perspective ellipse, nearer side larger, independent
+// of the picture's warp. The spin (angle) stays in the shape's own plane.
 
 const VS = `#version 300 es
 in vec2 p; out vec2 vUV;
@@ -16,6 +30,8 @@ precision highp float; in vec2 vUV; out vec4 frag;
 uniform sampler2D uSrc, uFill;
 uniform float uUseFill, uAspect, uSize, uAngle, uDepth, uShadowAngle, uPersp, uPx, uFeather; uniform int uShape;
 uniform vec2 uPos; uniform vec3 uFillColor;
+uniform float uPost, uProjAspect, uTilt, uTurn;
+uniform mat3 uH;
 
 float sdBox(vec2 p, vec2 b){ vec2 d = abs(p) - b; return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)); }
 float sdNgon(vec2 p, float r, float sides){
@@ -58,21 +74,53 @@ float shapeDist(int s, vec2 p, float r){
     return max(abs(p.x) - w, abs(p.y) - r); }
   vec2 cp = p; cp.y -= clamp(cp.y, -r * 0.5, r * 0.5); return length(cp) - r * 0.5;
 }
+// The shape's plane leaned into depth : the point q on the screen seen from an
+// eye at distance F, onto the plane through the shape's centre turned by
+// (tilt, turn). Returns the point in the plane's own coordinates; hit = false
+// where the plane is seen edge-on or from behind.
+const float LENS_F = 2.5;
+vec2 onPlane(vec2 q, out bool hit) {
+  float ct = cos(uTilt), st = sin(uTilt), cu = cos(uTurn), su = sin(uTurn);
+  // R = Ry(turn) * Rx(tilt)
+  vec3 e1 = vec3(cu, 0.0, -su);
+  vec3 e2 = vec3(su * st, ct, cu * st);
+  vec3 n = vec3(su * ct, -st, cu * ct);
+  vec3 dir = vec3(q, LENS_F);
+  float dn = dot(dir, n);
+  hit = dn > 1e-4;
+  if (!hit) return vec2(1e3);
+  vec3 x = vec3(0.0, 0.0, -LENS_F) + dir * (LENS_F * n.z / dn);
+  return vec2(dot(x, e1), dot(x, e2));
+}
+
 void main(){
   vec2 uv = vUV;
-  vec2 sp = (uv - 0.5) * vec2(uAspect, 1.0);
-  vec2 ctr = vec2(uPos.x * uAspect, uPos.y) * 0.5;
+  // Where this pixel is measured : the frame itself, or the projector after the warp.
+  vec2 base = uv;
+  float aspect = uAspect;
+  if (uPost > 0.5) {
+    vec3 hp = uH * vec3(uv.x, 1.0 - uv.y, 1.0);
+    vec2 pr = hp.xy / hp.z;
+    base = vec2(pr.x, 1.0 - pr.y);
+    aspect = uProjAspect;
+  }
+  vec2 sp = (base - 0.5) * vec2(aspect, 1.0);
+  vec2 ctr = vec2(uPos.x * aspect, uPos.y) * 0.5;
   vec2 q = sp - ctr;
+  bool hit = true;
+  if (abs(uTilt) + abs(uTurn) > 1e-4) q = onPlane(q, hit);
   float cs = cos(uAngle), sn = sin(uAngle);
   q = vec2(q.x * cs - q.y * sn, q.x * sn + q.y * cs);
   float r = clamp(uSize, 0.05, 1.8);
-  float d = shapeDist(uShape, q, r);
-  // The edge : anti-aliased over about a pixel (uPx, one pixel in these height
-  // units), so it is crisp at any resolution, plus the FEATHER the user asks
-  // for. It used to fade over a fixed 0.8 % of the frame height whatever the
-  // resolution : ~9 px at 1080p, ~33 px on a 4096 dome master, a feather that
-  // was always there. (Feather 0.05 is that old edge.)
-  float fe = 0.75 * uPx + uFeather * 0.08;
+  float d = hit ? shapeDist(uShape, q, r) : 1e3;
+  // The edge : anti-aliased over about a pixel of THIS frame (the distance's own
+  // screen rate : after the warp or leaned into depth, a unit of shape space is
+  // not one frame pixel), so it is crisp at any resolution and any warp, plus
+  // the FEATHER the user asks for. It used to fade over a fixed 0.8 % of the
+  // frame height whatever the resolution : ~9 px at 1080p, ~33 px on a 4096 dome
+  // master, a feather that was always there. (Feather 0.05 is that old edge.)
+  float px = clamp(fwidth(d), uPx * 0.25, 0.05);
+  float fe = 0.75 * px + uFeather * 0.08;
   float m = 1.0 - smoothstep(-fe, fe, d);     // 1 inside the shape
   vec4 srcA = texture(uSrc, uv);
   vec3 src = srcA.rgb;
@@ -106,6 +154,37 @@ void main(){
   }
   frag = vec4(mix(fill, src, m), mix(1.0, srcA.a, m));
 }`
+
+/** The shape's depth lean, and (after the warp) the warp's homography with the
+ *  projector's proportions. */
+export interface ShapeExtra {
+  tilt: number
+  turn: number
+  post: { m: Float32Array; aspect: number } | null
+}
+const IDENTITY3 = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1])
+const NO_EXTRA: ShapeExtra = { tilt: 0, turn: 0, post: null }
+
+/** The projection warp as a homography : the frame's top-down uv (0..1) → the
+ *  projector's normalized position, for corners TL, TR, BR, BL (x, y, top-left
+ *  origin : the warp's own). The same projective map as the warp's quad
+ *  (Heckbert's square-to-quad). Column-major mat3, for uniformMatrix3fv. */
+export function warpHomography(c: number[]): Float32Array {
+  const [x0, y0, x1, y1, x2, y2, x3, y3] = c
+  const dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3
+  const dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3
+  let g = 0, h = 0
+  if (Math.abs(dx3) > 1e-9 || Math.abs(dy3) > 1e-9) {
+    const den = dx1 * dy2 - dx2 * dy1
+    if (Math.abs(den) > 1e-12) {
+      g = (dx3 * dy2 - dx2 * dy3) / den
+      h = (dx1 * dy3 - dx3 * dy1) / den
+    }
+  }
+  const a = x1 - x0 + g * x1, b = x3 - x0 + h * x3, cc = x0
+  const d = y1 - y0 + g * y1, e = y3 - y0 + h * y3, f = y0
+  return new Float32Array([a, d, g, b, e, h, cc, f, 1])
+}
 
 export class OutputShape {
   private prog: WebGLProgram
@@ -164,7 +243,8 @@ export class OutputShape {
     aspect: number,
     targetFbo: WebGLFramebuffer,
     w: number,
-    h: number
+    h: number,
+    extra: ShapeExtra = NO_EXTRA
   ): void {
     const gl = this.gl
     gl.useProgram(this.prog)
@@ -189,6 +269,11 @@ export class OutputShape {
     gl.uniform1f(this.u('uFeather'), Math.max(0, Math.min(1, feather)))
     gl.uniform1f(this.u('uPx'), 1 / Math.max(1, h))
     gl.uniform3f(this.u('uFillColor'), fillColor[0] ?? 0, fillColor[1] ?? 0, fillColor[2] ?? 0)
+    gl.uniform1f(this.u('uTilt'), extra.tilt)
+    gl.uniform1f(this.u('uTurn'), extra.turn)
+    gl.uniform1f(this.u('uPost'), extra.post ? 1 : 0)
+    gl.uniform1f(this.u('uProjAspect'), extra.post ? extra.post.aspect : aspect)
+    gl.uniformMatrix3fv(this.u('uH'), false, extra.post ? extra.post.m : IDENTITY3)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     gl.bindVertexArray(null)

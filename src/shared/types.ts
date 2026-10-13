@@ -1362,6 +1362,8 @@ export interface ExposedApi {
   // An installation's output closed without the exit hatch : open it again.
   // Is an output window open (a reloaded control window resumes streaming to it).
   outputIsOpen: () => Promise<boolean>
+  /** The output window's drawing size (the projector's proportions), null when closed. */
+  outputSize: () => Promise<{ w: number; h: number } | null>
   onKioskReopenOutput: (cb: () => void) => () => void
   minimizeMain: () => void
   // Live exit from a running installation : close the fullscreen output and

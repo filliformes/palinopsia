@@ -126,6 +126,7 @@ const api: ExposedApi = {
     ipcRenderer.invoke('output:open', displayId, windowed),
   outputOpenSpan: (displayIds: number[]) => ipcRenderer.invoke('output:openSpan', displayIds),
   outputIsOpen: () => ipcRenderer.invoke('output:isOpen'),
+  outputSize: () => ipcRenderer.invoke('output:size'),
   outputClose: () => ipcRenderer.invoke('output:close'),
   outputEscMode: () => ipcRenderer.invoke('output:escMode'),
   outputEscape: () => ipcRenderer.invoke('output:escape'),
