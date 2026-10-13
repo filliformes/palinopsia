@@ -160,6 +160,7 @@ export class VideoSource {
       v.playsInline = true
       v.preload = 'auto'
       v.loop = false
+      v.crossOrigin = 'anonymous' // uploaded too : untainted, as the main element
       v.src = this.video.src
       v.playbackRate = 0.1 // pipeline kept hot; grains are seek-driven
       void v.play().catch(() => {})
@@ -329,6 +330,11 @@ void main(){
     this.video.muted = true
     this.video.playsInline = true
     this.video.preload = 'auto'
+    // A CORS request, like the Collage's and Assemble's films : the page and an
+    // opsia-media:// clip are different origins, so without it the element is
+    // "tainted" and WebGL refuses every frame (a SecurityError on upload, the
+    // layer black). The scheme answers every request with Access-Control-Allow-Origin.
+    this.video.crossOrigin = 'anonymous'
     // Surface a failed load instead of a silent black frame (protocol 404, moved
     // file, unsupported codec) so "the video won't play" is diagnosable.
     this.video.addEventListener('error', () => {
@@ -622,6 +628,16 @@ void main(){
    *  re-uploads when a new frame was actually presented (rVFC) : so a seek's
    *  frame reaches the texture and steady playback isn't re-uploaded needlessly.
    *  Without rVFC support it uploads every frame (previous behaviour). */
+  /** The clip's size (0×0 before it loads) : for the framing's fit. */
+  frameSize(): [number, number] {
+    return [this.video.videoWidth, this.video.videoHeight]
+  }
+
+  /** The current frame, for People (personMask.ts) to look at. */
+  personFrame(): HTMLVideoElement | null {
+    return this.video
+  }
+
   upload(): WebGLTexture | null {
     if (this.grain.on && this.voices) return this.blendVoices(performance.now() / 1000)
     if (this.pendingFrame || !this.rvfcOn || !this.tex) {

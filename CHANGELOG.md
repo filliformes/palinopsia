@@ -25,6 +25,14 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **An imported video plays in its layer again.** The plain video source loads its
+  clip from `opsia-media://` without asking for CORS, so the element was "tainted" (the
+  page and the scheme are different origins) and WebGL refused every frame : a
+  SecurityError on upload, the layer black. The Collage and Assemble films already ask
+  (`crossOrigin = 'anonymous'`, the scheme answers with `Access-Control-Allow-Origin`
+  since the Electron 44 fix); the video source and its grain voices now do too.
+  Measured in a test build : the upload failed on every frame before, a clip uploads
+  and plays after.
 - **A camera that is not there at launch is looked for until it appears.** The
   reconnection only covered a camera that dropped out after it had started; one that
   powered up after the computer (an installation) failed once and stayed black. It
