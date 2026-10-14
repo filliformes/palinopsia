@@ -25,6 +25,7 @@ import { videoSeekRequests } from './engine/videoState'
 import { outputRecorder, encoderAccepts, warmUpRecorder } from './recorder'
 import StreamRelay from './workers/streamRelay?worker&inline'
 import { sonifyEngine } from './audio/sonify'
+import { spaceEngine } from './audio/space'
 import { fireSelectedRandomize, registerPanic, firePanic, fireFreeze, isFrozen, registerRecordToggle, registerNewSession, registerOpenSession } from './commands'
 import { Toaster, showToast } from './components/Toast'
 import { ShortcutHelp } from './components/ShortcutHelp'
@@ -1074,7 +1075,7 @@ export default function App(): JSX.Element {
       compositorRef.current = comp
       // Isolated test builds only (built with VITE_OPSIA_TEST=1) : hand the
       // store and the engine to a debugger. Compiled out of real builds.
-      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus })
+      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus })
       // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
       // capture from the render loop (Compositor.captureKick) : a rebuilt engine
       // needs no re-attaching. A real-time recording finds it through this.
@@ -1648,7 +1649,7 @@ export default function App(): JSX.Element {
         if (st.hiveOutActive) hiveEncoder.encode(canvas, now * 1000)
         // 5b. Sonify : ship the image taps to the audio engine (~30Hz; no-op
         //     while the sound engine is off).
-        perfMeter.begin('sonify'); sonifyEngine.tick(comp!, now, c.bpm); perfMeter.end('sonify')
+        perfMeter.begin('sonify'); sonifyEngine.tick(comp!, now, c.bpm); spaceEngine.tick(comp!, now); perfMeter.end('sonify')
         // 6. Shader warm-up : one registry compile per frame, in the background,
         //    after launch settles. First-ever run pays the compiles here (a few
         //    seconds of background work); afterwards the GPU disk cache makes

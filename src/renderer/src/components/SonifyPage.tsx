@@ -17,6 +17,7 @@ import { modTargetKey, useStore } from '../store'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { SonifyKeySequencer } from './SonifyKeySequencer'
 import { AudioOutputSelect } from './AudioOutputSelect'
+import { SpacePanel } from './SpacePanel'
 import { EqCard } from './SonifyEq'
 import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, CardGrip, useCardSpace, spaceGap, SUB_GAP, chip, pill } from './sonifyUi'
 import { SONI_RATES, RATE_LABEL } from '../audio/soniClock'
@@ -515,7 +516,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 
   const set = (next: SoniConfig): void => setSonify(next)
   const patch = (p: Partial<SoniConfig>): void => set({ ...cfg, ...p })
-  const [view, setView] = useState<'voices' | 'mixer' | 'seq'>('voices')
+  const [view, setView] = useState<'voices' | 'mixer' | 'seq' | 'space'>('voices')
   // The voice/mixer column is drag-resizable (persisted), like the Sequence page.
   const [voiceW, setVoiceW] = useState(() => {
     const v = Number(localStorage.getItem('opsia.soniVoiceW'))
@@ -915,6 +916,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           <button onClick={() => setView('voices')} className={`px-2 py-0.5 transition-colors ${view === 'voices' ? 'bg-accent/20 text-accent' : 'text-muted hover:text-text'}`} title="Per-voice parameter strips">voices</button>
           <button onClick={() => setView('mixer')} className={`px-2 py-0.5 transition-colors ${view === 'mixer' ? 'bg-accent/20 text-accent' : 'text-muted hover:text-text'}`} title="Mixer : per-voice volume + HP/LP filter, and the FX-tail mix">▤ mixer</button>
           <button onClick={() => setView('seq')} className={`px-2 py-0.5 transition-colors ${view === 'seq' ? 'bg-accent/20 text-accent' : 'text-muted hover:text-text'}`} title="Sequencers : the effects sequencer (Sonify presets and voices over time) and the key sequencer (the root and scale over time)">▸ seq</button>
+          <button onClick={() => setView('space')} className={`px-2 py-0.5 transition-colors ${view === 'space' ? 'bg-accent/20 text-accent' : 'text-muted hover:text-text'}`} title="Space : the voices placed in the room, on a speaker layout or as objects for a renderer (SpatGRIS, ADM-OSC)">◎ space</button>
         </div>
         {/* Master + meter */}
         <span className="font-mono text-[9px] uppercase text-muted">master</span>
@@ -1114,6 +1116,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             </div>
           )}
           {/* The sequencers have their own view (they used to sit under the mixer). */}
+          {view === 'space' && <SpacePanel />}
           {view === 'seq' && (
             <div className="flex flex-col gap-2.5">
               <SonifySequencer presets={presetList} onWidth={onSeqWidth} />

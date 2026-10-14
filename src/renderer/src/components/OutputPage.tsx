@@ -1487,6 +1487,22 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
             {r === 2048 ? '2K' : '4K'}
           </button>
         ))}
+        <button
+          onClick={() => {
+            // The SAT Satosphère's own numbers (its fulldome guide) : an equidistant
+            // fisheye of 210°, 4096 × 4096 at 60 fps, live over NDI; its 93.5
+            // speakers are SpatGRIS's (Space : objects). The mapping fills the dome.
+            const st = useStore.getState()
+            setDome({ res: 4096, aperture: 210, mode: 'fisheye', fit: 'fill' })
+            st.setNdi({ fps: 60, format: 'uyvy', maxSize: 0 })
+            st.setSpace({ mode: 'objects', protocol: 'spatgris', port: 18032, firstSource: 1, firstChannel: 1, pairs: true })
+            showToast('Satosphère : 4096² · 210° · full dome · NDI 60 fps · Sonify as objects to SpatGRIS (port 18032 : set the address of the venue audio server in Sonify → space).', 'ok', 8000)
+          }}
+          className={btn(false)}
+          title="Set everything the SAT Satosphère asks for : a 210° equidistant domemaster at 4096², the whole picture over the whole dome, NDI at 60 fps, and Sonify's voices as objects for the venue's SpatGRIS (its 93 speakers and 5 subwoofers). Dome on/off and NDI on/off stay yours."
+        >
+          Satosphère
+        </button>
       </div>
       <DomeSlider label="aperture" value={dome.aperture} min={180} max={230} step={1} unit="°" reset={210} onChange={(v) => setDome({ aperture: v })} title="The dome's field of view : 180° a hemisphere, 210° the Satosphère (the rim 15° below the horizon)" />
       <div className="flex flex-wrap items-center gap-1.5">

@@ -40,6 +40,7 @@ import type { NdiConfig, NdiStatus } from '@shared/ndi'
 import { sanitizeNdiConfig, idleNdiStatus } from '@shared/ndi'
 import { DOME_MOD_RANGE, sanitizeDome } from '@shared/dome'
 import { OUT_IDENTITY, OUTX_MOD_RANGE, sanitizeOutXform, type OutXform } from '@shared/outXform'
+import { defaultVoicePlaces, sanitizeSpaceConfig, sanitizeVoicePlaces, type SpaceConfig, type SpaceVoice, type VoicePlace } from '@shared/spatial'
 import { inputsForShader } from './shaders/isf/inputs'
 import { SHADER_BY_ID } from './shaders/isf'
 import { canHostFx } from './fxScopes'
@@ -272,6 +273,19 @@ function loadNdi(): NdiConfig {
     /* defaults */
   }
   return sanitizeNdiConfig(null)
+}
+function loadSpace(): SpaceConfig {
+  try {
+    const raw = localStorage.getItem('opsia.space')
+    if (raw) return sanitizeSpaceConfig(JSON.parse(raw))
+  } catch {
+    /* defaults */
+  }
+  return sanitizeSpaceConfig(null)
+}
+function persistSpace(c: SpaceConfig): SpaceConfig {
+  try { localStorage.setItem('opsia.space', JSON.stringify(c)) } catch { /* quota */ }
+  return c
 }
 function loadDome(): DomeConfig {
   try {
@@ -1490,6 +1504,12 @@ interface StoreState {
   // Bumped by a reset : the engine zeroes its spin angle when it changes.
   outXformReset: number
   resetOutXform: () => void
+  // Space (shared/spatial.ts) : Sonify on a speaker array or as objects for a
+  // renderer. The venue part is this computer's (localStorage); the voices'
+  // places travel with the session.
+  space: SpaceConfig
+  setSpace: (patch: Partial<SpaceConfig>) => void
+  setSpaceVoice: (voice: SpaceVoice, patch: Partial<VoicePlace>) => void
   setDomeSim: (patch: Partial<DomeConfig['sim']>) => void
   resolumePageOpen: boolean
   setResolumePageOpen: (on: boolean) => void
@@ -3621,6 +3641,12 @@ export const useStore = create<StoreState>((set, get) => ({
   setOutXform: (patch) => set((s) => ({ outXform: sanitizeOutXform({ ...s.outXform, ...patch }) })),
   outXformReset: 0,
   resetOutXform: () => set((s) => ({ outXform: OUT_IDENTITY, outXformReset: s.outXformReset + 1 })),
+  space: loadSpace(),
+  setSpace: (patch) => set((s) => ({ space: persistSpace(sanitizeSpaceConfig({ ...s.space, ...patch })) })),
+  setSpaceVoice: (voice, patch) =>
+    set((s) => ({
+      space: persistSpace(sanitizeSpaceConfig({ ...s.space, voices: { ...s.space.voices, [voice]: { ...s.space.voices[voice], ...patch } } }))
+    })),
   setDomeSim: (patch) => set((s) => ({ dome: persistDome(sanitizeDome({ ...s.dome, sim: { ...s.dome.sim, ...patch } })) })),
   resolumePageOpen: false,
   setResolumePageOpen: (on) => set({ resolumePageOpen: on }),
@@ -4509,9 +4535,10 @@ export const useStore = create<StoreState>((set, get) => ({
         variationBaseline: null,
         sequence: makeDefaultSequence(), // empty bank → stop the auto-pilot
         sessionPath: null, // New = no file yet; next Save prompts for one.
-        // A fresh slate : the frame where it belongs.
+        // A fresh slate : the frame where it belongs, the voices where they start.
         outXform: OUT_IDENTITY,
         outXformReset: s.outXformReset + 1,
+        space: persistSpace({ ...s.space, voices: defaultVoicePlaces() }),
         // Reset the draw-sequencer gesture (else a stale path exports into the
         // new session and reactivates once two scenes are placed).
         surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0, wiggle: 0, closed: false },
@@ -4675,6 +4702,8 @@ export const useStore = create<StoreState>((set, get) => ({
     // The output transform is the piece's : its own, or none (an older file must
     // not open turned the way the last piece was left).
     set({ outXform: sanitizeOutXform(s.outXform ?? null), outXformReset: get().outXformReset + 1 })
+    // Where the voices sit is the piece's too (an older file : where they start).
+    set({ space: persistSpace({ ...get().space, voices: sanitizeVoicePlaces(s.spaceVoices ?? null) }) })
     // The projector warp, when the session carries one AND this computer lets
     // sessions bring theirs (Output → Mapping : save with the session). It is the
     // session's : this computer's own warp stays stored and comes back with a
@@ -4731,6 +4760,7 @@ export const useStore = create<StoreState>((set, get) => ({
       resolume: s.resolume,
       dome: s.dome,
       outXform: s.outXform,
+      spaceVoices: s.space.voices,
       ...(s.warpInSession ? { warp: { enabled: s.warpEnabled, corners: [...s.warpCorners], feather: s.warpFeather } } : {}),
       ui: { theme: s.theme }
     }

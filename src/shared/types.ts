@@ -999,6 +999,9 @@ export interface Session {
   // The output transform (the whole frame moved as one picture). Absent in older
   // files : they load at identity.
   outXform?: import('./outXform').OutXform
+  // Space : where each Sonify voice sits in the room (the venue setup itself,
+  // speakers / objects / OSC, belongs to the computer, not the piece).
+  spaceVoices?: Record<string, import('./spatial').VoicePlace>
   // The projector warp (Output → Mapping), written only when "save with the
   // session" is on, and applied on load only where that option is on : the
   // warp is otherwise the computer's (its projector), not the piece's.

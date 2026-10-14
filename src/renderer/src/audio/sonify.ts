@@ -18,6 +18,7 @@ import { registerSonifyModBase, sonifyModValues } from '../engine/modulation'
 import { soniBeats } from './soniClock'
 import { SONI_WORKLET_URL } from './soniWorklet'
 import { CollageVoice, type CollageSoundSet } from './collageVoice'
+import { SPACE_MAX_CH } from '@shared/spatial'
 import { defaultEq, normalizeEq, type SoniEq } from './eqMath'
 
 export const GRID = 96
@@ -375,6 +376,17 @@ export interface SoniScan {
   tv: number; tvHz: number // Transmission row
 }
 
+/** Space : one matrix for the worklet's second output (see SpaceBus there). */
+export interface SpaceMsg {
+  t: 'space'
+  on: boolean
+  nch: number // output channels used (≤ SPACE_MAX_CH)
+  gains?: Float32Array // (sources × 2 sides × SPACE_MAX_CH)
+  subs?: number[] // 0-based channels fed the low end
+  subGain?: number
+  xover?: number // Hz
+}
+
 interface GridReader {
   readSonifyGrids: (taps: Array<{ kind: 'master' | 'layer'; layer: number } | null>, outs: Uint8Array[]) => boolean[]
   collageSounds?: () => CollageSoundSet[]
@@ -469,6 +481,12 @@ class SonifyEngine {
   // effective probe values (base + modulation), for the page overlay
   liveProbes: Record<string, number> = {}
   scan: SoniScan | null = null
+  /** Space (audio/space.ts) : each output channel's peak, while it plays. */
+  spaceMeter: Float32Array | null = null
+  // Space : the worklet's second output to the device instead of the stereo EQ
+  // path, and the last matrix (re-sent to a rebuilt node).
+  private spaceRoute = { on: false, nch: 0 }
+  private spaceMsg: SpaceMsg | null = null
 
   constructor() {
     // The mod-matrix swings around each param's BASE : the current config.
@@ -625,7 +643,9 @@ class SonifyEngine {
     try {
       const ctx = await this.ensureCtx()
       // Input 0 : the Filter voice's line-in. Input 1 : the Collage voice's films.
-      const node = new AudioWorkletNode(ctx, 'soni', { numberOfInputs: 2, outputChannelCount: [2] })
+      // Output 0 : the stereo mix. Output 1 : Space (the voices placed on
+      // speakers or sent as objects), only connected while Space is on.
+      const node = new AudioWorkletNode(ctx, 'soni', { numberOfInputs: 2, numberOfOutputs: 2, outputChannelCount: [2, SPACE_MAX_CH] })
       node.port.onmessage = (e): void => {
         const m = e.data
         if (m?.t === 'meter') {
@@ -636,6 +656,7 @@ class SonifyEngine {
             this.meterR = { peak: m.pkR, rms: m.rmsR }
           }
           if (m.scan) this.scan = { ...m.scan, recv: performance.now() }
+          this.spaceMeter = m.spk ?? null
         }
       }
       // To the speakers through the output EQ; the recordings (recDest, the DXV3
@@ -662,6 +683,8 @@ class SonifyEngine {
       if (this.tap) node.connect(this.tap)
       this.node = node
       this.pushConfig(this.cfg)
+      if (this.spaceMsg) node.port.postMessage(this.spaceMsg)
+      this.applySpaceRoute()
       if (ctx.state !== 'running') await ctx.resume()
     } catch (e) {
       console.error('[sonify] start failed', e)
@@ -819,7 +842,53 @@ class SonifyEngine {
 
   private applySink(sinkId: string): void {
     const ctx = this.ctx as (AudioContext & { setSinkId?: (id: string) => Promise<void> }) | null
-    if (ctx?.setSinkId) ctx.setSinkId(sinkId).catch((e) => console.warn('[sonify] setSinkId', e))
+    if (ctx?.setSinkId)
+      ctx
+        .setSinkId(sinkId)
+        .then(() => this.applySpaceRoute()) // another device : another channel count
+        .catch((e) => console.warn('[sonify] setSinkId', e))
+  }
+
+  /** Space : the worklet's matrix (see soni.worklet.js SpaceBus) and whether its
+   *  second output feeds the device (`nch` channels, discrete) instead of the
+   *  stereo path through the EQ. The recordings keep the stereo mix either way. */
+  setSpace(msg: SpaceMsg): void {
+    this.spaceMsg = msg
+    this.node?.port.postMessage(msg)
+    const on = msg.on && msg.nch > 0
+    if (on !== this.spaceRoute.on || (on && msg.nch !== this.spaceRoute.nch)) {
+      this.spaceRoute = { on, nch: msg.nch }
+      this.applySpaceRoute()
+    }
+    if (!on) this.spaceMeter = null
+  }
+
+  /** The most channels the output device takes (Web Audio stops at 32). */
+  outputChannels(): number {
+    return Math.min(SPACE_MAX_CH, this.ctx?.destination.maxChannelCount ?? 2)
+  }
+
+  private applySpaceRoute(): void {
+    const ctx = this.ctx, node = this.node
+    if (!ctx || !node) return
+    const dst = ctx.destination
+    try { node.disconnect(dst) } catch { /* not connected */ }
+    try { this.eqNode?.disconnect(dst) } catch { /* not connected */ }
+    try {
+      if (this.spaceRoute.on) {
+        dst.channelCount = Math.max(1, Math.min(this.spaceRoute.nch, dst.maxChannelCount, SPACE_MAX_CH))
+        dst.channelCountMode = 'explicit'
+        dst.channelInterpretation = 'discrete'
+        node.connect(dst, 1)
+      } else {
+        dst.channelCount = Math.min(2, dst.maxChannelCount)
+        dst.channelInterpretation = 'speakers'
+        this.eqNode?.connect(dst)
+      }
+    } catch (e) {
+      console.warn('[sonify] space route', e)
+      this.eqNode?.connect(dst)
+    }
   }
 
   /** The next pushConfig's pitch change slides over `sec` seconds (the key

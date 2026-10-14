@@ -1930,6 +1930,12 @@ export class Compositor {
   /** Sonify's Collage voice : every Collage wall in the composition (layers A/B
    *  and the background), each with how visible it is (layer opacity, mute /
    *  solo, the A/B mix) so a hidden wall falls silent and a fading one fades. */
+  /** The fulldome stage's spin phase in degrees (Space : sound that turns with
+   *  the dome picture). 0 while the dome is off. */
+  domeSpinDeg(): number {
+    return (this.dome as unknown as { spinDeg?: number } | null)?.spinDeg ?? 0;
+  }
+
   collageSounds(): CollageSoundSet[] {
     const out: CollageSoundSet[] = [];
     const aspect = this.w / Math.max(1, this.h);

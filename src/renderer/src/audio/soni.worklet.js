@@ -534,6 +534,150 @@ function dropStale(list, now) {
 }
 const PENDING_CAP = 512;
 
+// ── Space : the voices as positioned sources (shared/spatial.ts). A second
+// output of up to SPACE_CH channels; the stereo master is left as it is (it
+// still feeds the recordings : a stereo take of the piece, and the stereo
+// backup a venue asks for). The main thread sends one gain matrix : for each
+// source (the ten voices, then the FX tail's return) and each of its sides
+// (left, right), one gain per output channel. Panning onto speakers (VBAP) and
+// sending a voice out on its own object channels are both just matrices, so
+// this stage never knows which it is doing. A new matrix glides in over one
+// block; the subwoofers get the low end of every source (two cascaded
+// Butterworth low-passes : 24 dB/oct); one limiter holds all the channels.
+const SPACE_CH = 32;
+const SPACE_SRC = NVOICE + 1;
+const SPACE_FX = NVOICE;
+class SpaceBus {
+  constructor(sr) {
+    this.sr = sr;
+    this.on = false;
+    this.nch = 0;
+    this.dirty = 0; // channels to clear once after switching off (no stale buffer)
+    this.tgt = new Float32Array(SPACE_SRC * 2 * SPACE_CH);
+    this.cur = new Float32Array(SPACE_SRC * 2 * SPACE_CH);
+    this.ramp = false;
+    this.lists = [];
+    for (let i = 0; i < SPACE_SRC * 2; i++) this.lists.push(new Int16Array(SPACE_CH));
+    this.listN = new Int16Array(SPACE_SRC * 2);
+    this.subs = new Int16Array(SPACE_CH); this.subN = 0; this.subGain = 0;
+    this.mono = new Float32Array(128);
+    this.lpA = new Float64Array(5); // b0 b1 b2 a1 a2
+    this.lpS = new Float64Array(8); // two sections, DF-II transposed : z1 z2 each … ×2 spare
+    this.setXover(90);
+    this.peakS = new Float32Array(128);
+    this.limEnv = 1; this.mgS = -1;
+    this.pk = new Float32Array(SPACE_CH);
+    this.out = null;
+  }
+  setXover(f) {
+    const w0 = TAU * clampf(f, 20, this.sr * 0.45) / this.sr, alpha = Math.sin(w0) / (2 * 0.7071067811865476);
+    const c = Math.cos(w0), a0 = 1 + alpha;
+    this.lpA[0] = (1 - c) / 2 / a0; this.lpA[1] = (1 - c) / a0; this.lpA[2] = (1 - c) / 2 / a0;
+    this.lpA[3] = -2 * c / a0; this.lpA[4] = (1 - alpha) / a0;
+  }
+  set(m) {
+    const was = this.on, wasN = this.nch;
+    this.on = !!m.on && m.nch > 0;
+    this.nch = Math.max(0, Math.min(SPACE_CH, m.nch | 0));
+    if (!this.on) { this.dirty = Math.max(was ? wasN : 0, this.dirty); return; }
+    if (m.gains && m.gains.length === this.tgt.length) {
+      for (let i = 0; i < this.tgt.length; i++) { const g = m.gains[i]; this.tgt[i] = Number.isFinite(g) ? g : 0; }
+    }
+    if (!was) this.cur.set(this.tgt); // switched on : no glide from silence's matrix
+    this.ramp = true;
+    this.relist(true);
+    this.subN = 0;
+    if (m.subs) for (let i = 0; i < m.subs.length && this.subN < SPACE_CH; i++) {
+      const c = m.subs[i] | 0; if (c >= 0 && c < this.nch) this.subs[this.subN++] = c;
+    }
+    this.subGain = clampf(m.subGain || 0, 0, 2);
+    if (m.xover > 0) this.setXover(m.xover);
+  }
+  // the channels each source side reaches (the old matrix's too, while gliding)
+  relist(withCur) {
+    for (let k = 0; k < SPACE_SRC * 2; k++) {
+      const base = k * SPACE_CH, list = this.lists[k];
+      let c = 0;
+      for (let ch = 0; ch < this.nch; ch++)
+        if (this.tgt[base + ch] !== 0 || (withCur && this.cur[base + ch] !== 0)) list[c++] = ch;
+      this.listN[k] = c;
+    }
+  }
+  begin(out, n) {
+    this.out = out;
+    const clear = this.on ? this.nch : this.dirty;
+    for (let ch = 0; ch < clear && ch < out.length; ch++) out[ch].fill(0);
+    if (!this.on) { this.dirty = 0; return; }
+    this.mono.fill(0, 0, n);
+  }
+  add(src, pL, pR, n) {
+    const out = this.out;
+    if (!out) return;
+    for (let side = 0; side < 2; side++) {
+      const k = src * 2 + side, base = k * SPACE_CH, list = this.lists[k], cnt = this.listN[k];
+      const x = side ? pR : pL;
+      for (let i = 0; i < cnt; i++) {
+        const ch = list[i];
+        if (ch >= out.length) continue;
+        const o = out[ch], g1 = this.tgt[base + ch];
+        if (this.ramp) {
+          const g0 = this.cur[base + ch], dg = (g1 - g0) / n;
+          for (let s = 0; s < n; s++) o[s] += x[s] * (g0 + dg * (s + 1));
+        } else {
+          for (let s = 0; s < n; s++) o[s] += x[s] * g1;
+        }
+      }
+    }
+    if (this.subN > 0) { const m = this.mono; for (let s = 0; s < n; s++) m[s] += (pL[s] + pR[s]) * 0.5; }
+  }
+  finish(master, n) {
+    const out = this.out;
+    if (!out) return;
+    const nch = Math.min(this.nch, out.length);
+    // subwoofers : the low end of everything
+    if (this.subN > 0 && this.subGain > 0) {
+      const a = this.lpA, z = this.lpS, m = this.mono, g = this.subGain;
+      for (let s = 0; s < n; s++) {
+        let x = m[s];
+        let y = a[0] * x + z[0]; z[0] = a[1] * x - a[3] * y + z[1]; z[1] = a[2] * x - a[4] * y; x = y;
+        y = a[0] * x + z[2]; z[2] = a[1] * x - a[3] * y + z[3]; z[3] = a[2] * x - a[4] * y;
+        if (!Number.isFinite(y)) { z.fill(0); y = 0; }
+        m[s] = y * g;
+      }
+      for (let i = 0; i < this.subN; i++) { const ch = this.subs[i]; if (ch < nch) { const o = out[ch]; for (let s = 0; s < n; s++) o[s] += m[s]; } }
+    }
+    // master gain (ramped) + one limiter for every channel (-1 dBFS, linked)
+    const mg1 = clampf(master, 0, 2);
+    const mg0 = this.mgS < 0 ? mg1 : this.mgS, dmg = (mg1 - mg0) / n;
+    this.mgS = mg1;
+    const pkS = this.peakS;
+    pkS.fill(0, 0, n);
+    for (let ch = 0; ch < nch; ch++) {
+      const o = out[ch];
+      for (let s = 0; s < n; s++) {
+        let v = o[s] * (mg0 + dmg * (s + 1));
+        if (!Number.isFinite(v)) v = 0;
+        o[s] = v;
+        const a = v < 0 ? -v : v; if (a > pkS[s]) pkS[s] = a;
+      }
+    }
+    let env = this.limEnv;
+    for (let s = 0; s < n; s++) {
+      const p = pkS[s], target = p > 0.89 ? 0.89 / p : 1;
+      env = target < env ? target : env + (1 - env) * 0.0004;
+      pkS[s] = env;
+    }
+    this.limEnv = env;
+    for (let ch = 0; ch < nch; ch++) {
+      const o = out[ch];
+      let pk = this.pk[ch];
+      for (let s = 0; s < n; s++) { const v = o[s] * pkS[s]; o[s] = v; const a = v < 0 ? -v : v; if (a > pk) pk = a; }
+      this.pk[ch] = pk;
+    }
+    if (this.ramp) { this.cur.set(this.tgt); this.ramp = false; this.relist(false); }
+  }
+}
+
 class SoniProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -684,10 +828,15 @@ class SoniProcessor extends AudioWorkletProcessor {
     // per channel, after the limiter : the peak and the mean square (the meter's
     // bar is the RMS level in dB, its tick the peak)
     this.pkL = 0; this.pkR = 0; this.ssL = 0; this.ssR = 0; this.nMeter = 0;
+    // ── Space (output 1) : each voice's flushed signal and the FX return ──
+    this.space = new SpaceBus(sampleRate);
+    this.pL = new Float32Array(128); this.pR = new Float32Array(128);
+    this.fxL = new Float32Array(128); this.fxR = new Float32Array(128);
     this.port.onmessage = (e) => this.onMsg(e.data);
   }
 
   onMsg(m) {
+    if (m.t === 'space') { this.space.set(m); return; }
     if (m.t === 'grid') {
       const tap = this.taps[m.tap];
       if (!tap) return;
@@ -964,8 +1113,10 @@ class SoniProcessor extends AudioWorkletProcessor {
       const k = g * (v0 + dv * (s + 1));
       l = f.procL(l * k); r = f.procR(r * k); // always filter (unity in bypass) : keeps state warm, click-free
       outL[s] += l; outR[s] += r; vL[s] = 0; vR[s] = 0;
+      this.pL[s] = l; this.pR[s] = r;
     }
     this.gate[idx] = g; this.vGain[idx] = v1;
+    if (this.space.on) this.space.add(idx, this.pL, this.pR, n);
   }
 
   // Nearest-pixel read of a tap's CURRENT grid (the Raster voice wants the
@@ -982,6 +1133,9 @@ class SoniProcessor extends AudioWorkletProcessor {
     const outL = out[0], outR = out[1] || out[0];
     const n = outL.length;
     outL.fill(0); if (outR !== outL) outR.fill(0);
+    const spc = this.space;
+    if (outputs[1] && (spc.on || spc.dirty)) spc.begin(outputs[1], n);
+    else spc.out = null;
     // Voices render into a per-voice scratch (L/R), then flush through their DJ
     // filter into the master (outL/outR) via mixVoice — see the constructor.
     const L = this.vL, R = this.vR;
@@ -1690,11 +1844,13 @@ class SoniProcessor extends AudioWorkletProcessor {
         // detect it and clear the buffers so the tail self-heals.
         if (!(Number.isFinite(wl) && Number.isFinite(wr))) { dl.reset(); rv.reset(); wl = 0; wr = 0; }
         outL[s] += wl; outR[s] += wr;
+        this.fxL[s] = wl; this.fxR[s] = wr;
         const amp = Math.abs(wl) + Math.abs(wr); if (amp > tail) tail = amp;
       }
       // Stop only after the tail has been quiet for longer than the delay line :
       // one quiet block used to end it with an echo still in the line, which
       // came back later when the send rose again. Cleared when it stops.
+      if (spc.on && spc.out) spc.add(SPACE_FX, this.fxL, this.fxR, n);
       this.fxQuiet = tail > 1e-4 ? 0 : this.fxQuiet + n * dt;
       if (!wantFx && this.fxQuiet > dl.rate_s + 0.5) { dl.reset(); rv.reset(); this.fxRinging = false; this.fxQuiet = 0; }
       else this.fxRinging = true;
@@ -1724,6 +1880,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       if (ar > this.pkR) this.pkR = ar;
       this.ssL += l * l; this.ssR += r * r;
     }
+    if (spc.on && spc.out) spc.finish(cfg.master, n);
     this.nMeter += n;
     this.peak = peak; this.limMin = limMin;
     if (currentTime - this.lastMeter > 0.1) {
@@ -1733,8 +1890,11 @@ class SoniProcessor extends AudioWorkletProcessor {
         t: 'meter', peak: this.peak, lim: this.limMin,
         pkL: this.pkL, pkR: this.pkR,
         rmsL: Math.sqrt(this.ssL / Math.max(1, this.nMeter)), rmsR: Math.sqrt(this.ssR / Math.max(1, this.nMeter)),
-        scan: { at: currentTime, sp: this.sweepPos, spHz: sp.sweepOn ? sp.sweepHz : 0, fi: this.fSweep, fiHz: fi.sweepOn ? fi.sweepHz : 0, tv: (this.tLine + this.tX) / GRID, tvHz: tv.lineHz / GRID }
+        scan: { at: currentTime, sp: this.sweepPos, spHz: sp.sweepOn ? sp.sweepHz : 0, fi: this.fSweep, fiHz: fi.sweepOn ? fi.sweepHz : 0, tv: (this.tLine + this.tX) / GRID, tvHz: tv.lineHz / GRID },
+        // Space : each output channel's peak (after its limiter)
+        spk: spc.on ? spc.pk.slice(0, spc.nch) : null
       });
+      if (spc.on) spc.pk.fill(0);
       this.peak = 0; this.limMin = 1; this.lastMeter = currentTime;
       this.pkL = 0; this.pkR = 0; this.ssL = 0; this.ssR = 0; this.nMeter = 0;
     }

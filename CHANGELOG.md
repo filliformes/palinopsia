@@ -7,6 +7,33 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Space : Sonify in the room** (Sonify → ◎ space). The worklet gains a second output
+  of up to 32 channels fed by a gain matrix (each voice's left and right, and the FX
+  tail's return, to every channel), with the subwoofers' low end (two cascaded
+  Butterworth low-passes) and one limiter over every channel; the stereo master is
+  untouched and still feeds the recordings. **speakers** pans each voice onto a layout
+  with VBAP and an MDAP span (`shared/spatial.ts` : the speaker hull as the convex hull
+  of the speaker directions, closed by a virtual nadir under a dome, coplanar faces
+  fanned once); built-in quad / rings / domes, or an imported **SpatGRIS speaker setup**
+  (`SPEAKER_SETUP` XML : speaker n on channel n, gains, muted left out, direct-out =
+  subwoofers). **objects** sends each voice on its own channel(s) and its position over
+  OSC : SpatGRIS `/spat/serv deg` (port 18032) or ADM-OSC `/adm/obj/n/aed` + `/w`, only
+  what moved, everything every 2 s. A voice **follows** the picture (what Sonify reads :
+  sweeps, probes, the latest onsets, the Collage pieces) through the inverse of the
+  dome mapping in every mode, the dome stage's spin included (checked against the
+  shader : 0.0000° worst error over 5,000 points), or sits **fixed**; width, span, spin
+  per voice; turn / mirror / glide for the scene; a live **Room** map. The venue setup
+  is per computer (`opsia.space`), the voices' places travel with the session
+  (`spaceVoices`). Clean-room : no SpatGRIS code (GPL-3.0), only its OSC and file
+  format. Measured in the test build on a Dome 8 + 4 + 1 : zenith → the top speaker
+  alone; 90° on the horizon → speakers 3 and 4 even; width 90 → 2 to 5; turned 180° →
+  7 and 8; objects in pairs → the Chord on channels 15-16 and `/spat/serv deg 15/16`;
+  back to stereo → the EQ path and 2 channels again. On the Satosphère's own setup (93 +
+  5 subs) : 185 triangles in 53 ms, every speaker alone at its own direction, unit
+  power to 1e-15, a voice under the horizon on the lowest ring.
+- **Satosphère** in the Fulldome section : 4096², 210°, full dome (fill), NDI at 60 fps
+  (UYVY, native size), Sonify as objects to SpatGRIS. Dome and NDI on / off untouched.
+
 - **Sonify output EQ** (mixer view, under the FX tail) : twelve bands after all of
   Sonify, to tune the room : low cut, low shelf, eight bells, high shelf, high cut,
   each with frequency, gain, Q and a slope of 6, 12, 24 or 36 dB per octave. A

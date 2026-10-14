@@ -59,7 +59,7 @@ Lowercase's slant, each straight from its Space theme. The older shots stay in
 - [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix)
 - [Sequencer](#sequencer-key-q) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) · [Output & mapping](#output--mapping-key-o) : **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
-- [Sonify : image to sound](#sonify--image-to-sound-key-s) : ten voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Signal · Chord · Collage) · quantizer · audio in recordings
+- [Sonify : image to sound](#sonify--image-to-sound-key-s) : ten voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Signal · Chord · Collage) · quantizer · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
@@ -1023,6 +1023,11 @@ master at **2K or 4K**, and the master replaces the flat frame **everywhere** : 
 preview, the projector window (letterboxed, never stretched), NDI, Spout / Syphon,
 recordings and stills. Keystone warp is off in dome mode (a dome is mapped by its own media server).
 
+- **Satosphère** (beside 2K / 4K) sets everything the SAT asks for in one click : an
+  equidistant 210° master at **4096 × 4096**, the whole picture over the whole dome,
+  **NDI at 60 fps** (its guide : 4096 × 4096 at 60 fps, live over NDI), and Sonify's
+  voices as objects for the venue's SpatGRIS (see [Space](#space--the-voices-in-the-room)).
+  Dome on / off and NDI on / off stay yours.
 - **Aperture** 180–230° (210° default : the Satosphère's 210°, its rim 15° below the
   horizon). The Satosphère takes **4096×4096 max, live over NDI** on its 10 Gb network.
   The dome records in **DXV3** at full 4096² (see Record). The live master stops at 4K :
@@ -1310,6 +1315,70 @@ float sent there is read as 0..1 across the range. Spectra also gained **breath*
 *The composite mirrored large with the probes drawn on it : the probe is the
 instrument, and the voice strips on the right, each with its own tap, gain,
 pitch and ♪ snap.*
+
+### Space : the voices in the room
+
+The **◎ space** view of the Sonify page places the voices in the room the way the
+picture is placed on the dome. Three outputs :
+
+- **stereo** : the mix as always.
+- **speakers** : Palinopsia pans every voice onto a speaker layout itself (VBAP, with a
+  **span** that spreads a voice over a patch of the room), on as many channels as the
+  layout has, **up to 32** (the most one audio output carries in Chromium). Built-in
+  layouts : a quad, rings of 8 and 16, and domes of 13 (8 + 4 + 1), 25 (12 + 8 + 4 + 1)
+  and 29 (16 + 8 + 4 + 1), numbered from the lowest ring up, each clockwise from the
+  speaker left of the front. Or **import a SpatGRIS speaker setup** (.xml) : the setups
+  venues publish for SpatGRIS play as they are, speaker *n* on channel *n*, its gains
+  kept, its muted speakers left out, and its **direct-out** speakers (the subwoofers)
+  fed the low end of every voice (**subs** level, **crossover** 40 to 200 Hz, 24 dB per
+  octave).
+- **objects** : every voice leaves on its own channels (a left / right **pair**, so its
+  own notes keep moving across it, or **mono**), the FX tail's return on two more, and
+  where each one is goes over **OSC** to the renderer that owns the room : **SpatGRIS**
+  (`/spat/serv deg <source> <azimuth> <elevation> <radius> <h-span> <v-span>`, port
+  18032) or anything that speaks **ADM-OSC** (`/adm/obj/<n>/aed` and `/w`). Only what
+  moved is sent, and the whole scene again every two seconds, so a renderer that
+  restarts picks it back up. The page lists the channels each voice takes (Spectra
+  1-2, Orbit 3-4 … FX 21-22 in pairs); SpatGRIS plays source *n* from its input *n*, so
+  patch channel *n* to input *n*.
+
+**Where a voice sits.** Each voice **follows** the picture by default : it sounds where it
+plays in the picture (Spectra's and Filter's sweep, Orbit's centre, Raster's rect,
+Transmission's line, the latest Flow, Events and Signal onsets, the Collage pieces it
+hears), carried through the **fulldome mapping**, mode by mode, with its spin : a voice
+whose picture is at the zenith sounds from the zenith, and turns with the dome. With
+the fulldome off, the flat picture spans an arc in front (**picture**, 10 to 360°, its
+top edge at **height**). A voice can also sit at a **fixed** place (az / el), and every
+voice has a **width** (how far apart its own left and right are), a **span** and a
+**spin** (degrees a second around the zenith). Chord starts fixed at the zenith. **turn**
+rotates the whole sound scene to line the sound's front up with the picture's in the
+room, **mirror** swaps left and right, **glide** softens a voice that jumps. The **Room**
+map draws it all as the domemaster does (the zenith in the middle, the front at the
+bottom), with the speakers lit by their level.
+
+Directions follow SpatGRIS : azimuth clockwise from the front (90 = the audience's
+right), elevation above the horizon. Choose a multichannel output in the Sonify bar (a
+sound card, or a **Dante Virtual Soundcard** to reach a venue's Dante network); the page
+says how many channels it has and what the setup needs. One limiter holds all the
+channels. **Recordings keep the stereo mix**, which is also the stereo backup a venue
+asks for. The venue setup belongs to the computer; where the voices sit is saved with
+the session.
+
+**At the SAT Satosphère** : its 93 speakers and 5 subwoofers (93.5, six heights) are
+rendered by SpatGRIS on the venue's audio server, over Dante (speaker setup
+`Dome93(32-32-16-8-4-1)Subs5 Satosphere`). The **SAT** button sets objects, SpatGRIS,
+port 18032, sources from 1, voices as pairs : set the host to the audio server's
+address, choose the Dante Virtual Soundcard as Sonify's output, patch Palinopsia's 22
+channels to SpatGRIS's inputs 1 to 22. The Fulldome section's **Satosphère** button
+sets the picture side too.
+
+The panning is Palinopsia's own (vector base amplitude panning and its spread, from
+the published method; the speaker hull closed under a dome so a voice below the
+horizon lands on the lowest ring); SpatGRIS is read only through its OSC and its
+speaker-setup file, never its code. Measured on a Dome 8 + 4 + 1 : a voice at the
+zenith plays from the top speaker alone, a voice at 90° on the horizon splits evenly
+between the two speakers around it, and a voice placed on a speaker plays from it
+alone, at unit power everywhere (also on the Satosphère's own setup).
 
 ## Assemble : the automatic editor (key `E`)
 
@@ -2219,7 +2288,9 @@ src/
               turn the picture back into control data : vision, Sonify taps,
               depth, light zones, the mark scanline (gridReadback.ts)
     shaders/  ISF .fs files + registry (curated ranges) + presets
-    audio/    the Sonify engine : AudioWorklet + voice managers + auto-voice
+    audio/    the Sonify engine : AudioWorklet + voice managers + auto-voice,
+              and Space (space.ts : the voices placed on speakers or sent as
+              objects; the panning in shared/spatial.ts)
     assemble/ the corpus matcher : descriptor costs, live matching, PCA map
   shared/     types shared across processes (incl. the descriptor definitions,
               so corpus and live image are measured with one ruler)
