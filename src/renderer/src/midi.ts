@@ -93,7 +93,7 @@ export const TRIGGER_ACTION_IDS: string[] = [
 ]
 
 /** Persisted Randomize intensity (shared with the Transport's dice). */
-function randIntensity(): number {
+export function randIntensity(): number {
   const i = Number(localStorage.getItem('opsia.randIntensity'))
   return Number.isFinite(i) && i > 0 ? i : 1
 }

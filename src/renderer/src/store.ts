@@ -39,6 +39,7 @@ import type { DomeConfig } from '@shared/dome'
 import type { NdiConfig, NdiStatus } from '@shared/ndi'
 import { sanitizeNdiConfig, idleNdiStatus } from '@shared/ndi'
 import { DOME_MOD_RANGE, sanitizeDome } from '@shared/dome'
+import { OUT_IDENTITY, OUTX_MOD_RANGE, sanitizeOutXform, type OutXform } from '@shared/outXform'
 import { inputsForShader } from './shaders/isf/inputs'
 import { SHADER_BY_ID } from './shaders/isf'
 import { canHostFx } from './fxScopes'
@@ -682,13 +683,18 @@ export function isToggleTarget(st: { composition: CompositionState }, t: ModTarg
 
 /** Normalized (0..1) CURRENT base of a mod target, for assignMod's automatic
  *  mode choice. 0.5 (→ multiply) wherever the base can't be resolved. */
-function baseNormForTarget(st: { composition: CompositionState; dome?: DomeConfig }, t: ModTarget): number {
+function baseNormForTarget(st: { composition: CompositionState; dome?: DomeConfig; outXform?: OutXform }, t: ModTarget): number {
   try {
     if (t.kind === 'meta') return st.composition.metaKnobs[t.knob]?.value ?? 0.5
     if (t.kind === 'dome') {
       if (!st.dome) return 0.5
       const r = DOME_MOD_RANGE[t.field]
       return (st.dome[t.field] - r.min) / (r.max - r.min)
+    }
+    if (t.kind === 'outx') {
+      if (!st.outXform) return 0.5
+      const r = OUTX_MOD_RANGE[t.field]
+      return (st.outXform[t.field] - r.min) / (r.max - r.min)
     }
     if (t.kind === 'bg') {
       const b = st.composition.background
@@ -1139,6 +1145,7 @@ export function modTargetKey(t: ModTarget): string {
   if (t.kind === 'layer') return `lay:${t.layer}:${t.field}`
   if (t.kind === 'bg') return `bg:${t.field}`
   if (t.kind === 'dome') return `dome:${t.field}`
+  if (t.kind === 'outx') return `outx:${t.field}`
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
@@ -1473,6 +1480,13 @@ interface StoreState {
   // Kept in localStorage (the venue) AND saved with the session (the piece).
   dome: DomeConfig
   setDome: (patch: Partial<DomeConfig>) => void
+  // The output transform : the whole frame moved as one picture (flat output).
+  // Saved with the session; New and older files start at identity.
+  outXform: OutXform
+  setOutXform: (patch: Partial<OutXform>) => void
+  // Bumped by a reset : the engine zeroes its spin angle when it changes.
+  outXformReset: number
+  resetOutXform: () => void
   setDomeSim: (patch: Partial<DomeConfig['sim']>) => void
   resolumePageOpen: boolean
   setResolumePageOpen: (on: boolean) => void
@@ -3587,6 +3601,10 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
   dome: loadDome(),
   setDome: (patch) => set((s) => ({ dome: persistDome(sanitizeDome({ ...s.dome, ...patch })) })),
+  outXform: OUT_IDENTITY,
+  setOutXform: (patch) => set((s) => ({ outXform: sanitizeOutXform({ ...s.outXform, ...patch }) })),
+  outXformReset: 0,
+  resetOutXform: () => set((s) => ({ outXform: OUT_IDENTITY, outXformReset: s.outXformReset + 1 })),
   setDomeSim: (patch) => set((s) => ({ dome: persistDome(sanitizeDome({ ...s.dome, sim: { ...s.dome.sim, ...patch } })) })),
   resolumePageOpen: false,
   setResolumePageOpen: (on) => set({ resolumePageOpen: on }),
@@ -4475,6 +4493,9 @@ export const useStore = create<StoreState>((set, get) => ({
         variationBaseline: null,
         sequence: makeDefaultSequence(), // empty bank → stop the auto-pilot
         sessionPath: null, // New = no file yet; next Save prompts for one.
+        // A fresh slate : the frame where it belongs.
+        outXform: OUT_IDENTITY,
+        outXformReset: s.outXformReset + 1,
         // Reset the draw-sequencer gesture (else a stale path exports into the
         // new session and reactivates once two scenes are placed).
         surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0, wiggle: 0, closed: false },
@@ -4635,6 +4656,9 @@ export const useStore = create<StoreState>((set, get) => ({
     // keep whatever the machine had.
     if (s.dome && typeof s.dome === 'object')
       set({ dome: persistDome({ ...sanitizeDome(s.dome), enabled: get().dome.enabled }) }) // on/off stays yours
+    // The output transform is the piece's : its own, or none (an older file must
+    // not open turned the way the last piece was left).
+    set({ outXform: sanitizeOutXform(s.outXform ?? null), outXformReset: get().outXformReset + 1 })
     // The projector warp, when the session carries one AND this computer lets
     // sessions bring theirs (Output → Mapping : save with the session). It is the
     // session's : this computer's own warp stays stored and comes back with a
@@ -4689,6 +4713,7 @@ export const useStore = create<StoreState>((set, get) => ({
       },
       resolume: s.resolume,
       dome: s.dome,
+      outXform: s.outXform,
       ...(s.warpInSession ? { warp: { enabled: s.warpEnabled, corners: [...s.warpCorners] } } : {}),
       ui: { theme: s.theme }
     }

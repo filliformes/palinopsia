@@ -60,6 +60,13 @@ export function encodeHello(seq: number, from: string, identity: DfIdentity, ver
   return encodeCbor({ ...header('HELLO', seq, from), proto: PROTO_VERSION, identity: identityMap(identity), versions: versionsMap(versions), listen_port: listenPort })
 }
 
+// TERSE : a key whose value is what EVERY decoder on the mesh reads for a missing
+// key is left out (the reference core, its TypeScript port and ours all default
+// ground / hardware to false, smooth to [0, 0], nature to lin, topology to span,
+// unit / desc to '', and flow source / access read / rate 0, as the core's own
+// terse DECLARE relies on for unit, label and desc). It keeps the tree under the
+// 8 KB a Teensy node takes. `mode` is always sent : decoders disagree on its
+// default. A group sends no range (nothing reads one).
 function paramMap(p: DfParam): Map<number, CborIn> {
   const m = new Map<number, CborIn>()
   const boolRange = p.type === 'bool'
@@ -68,18 +75,18 @@ function paramMap(p: DfParam): Map<number, CborIn> {
   m.set(2, ix(KINDS, p.kind))
   m.set(3, ix(TYPES, p.type))
   m.set(4, ix(MODES, p.mode))
-  m.set(5, ix(FLOWS, p.flow))
-  m.set(6, f(p.rate))
-  m.set(7, ix(ACCESS, p.access))
-  m.set(8, p.ground)
-  m.set(9, p.hardware)
-  m.set(10, { min: rv(p.min), max: rv(p.max), init: rv(p.init) })
-  m.set(11, [f(p.smooth[0]), f(p.smooth[1])])
-  m.set(13, ix(NATURES, p.nature))
-  m.set(17, ix(TOPOLOGIES, p.topology))
-  m.set(12, p.unit)
+  if (p.flow !== 'source') m.set(5, ix(FLOWS, p.flow))
+  if (p.rate !== 0) m.set(6, f(p.rate))
+  if (p.access !== 'read') m.set(7, ix(ACCESS, p.access))
+  if (p.ground) m.set(8, true)
+  if (p.hardware) m.set(9, true)
+  if (p.kind !== 'group') m.set(10, { min: rv(p.min), max: rv(p.max), init: rv(p.init) })
+  if (p.smooth[0] !== 0 || p.smooth[1] !== 0) m.set(11, [f(p.smooth[0]), f(p.smooth[1])])
+  if (p.nature !== 'lin') m.set(13, ix(NATURES, p.nature))
+  if (p.topology !== 'span') m.set(17, ix(TOPOLOGIES, p.topology))
+  if (p.unit) m.set(12, p.unit)
   m.set(14, p.label)
-  m.set(15, p.desc)
+  if (p.desc) m.set(15, p.desc)
   return m
 }
 

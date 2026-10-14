@@ -18,6 +18,7 @@ import { visionBus } from './visionIn'
 import { bodyBus } from './bodyIn'
 import { BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
 import { DOME_MOD_RANGE, type DomeModField } from '@shared/dome'
+import { OUTX_MOD_RANGE, type OutXformField } from '@shared/outXform'
 
 const TWO_PI = Math.PI * 2
 // The 60fps reference frame time (ms). The picture / audio one-pole followers
@@ -1033,6 +1034,7 @@ function liveKey(t: import('@shared/types').ModTarget): string {
   if (t.kind === 'layer') return `lay:${t.layer}:${t.field}`
   if (t.kind === 'bg') return `bg:${t.field}`
   if (t.kind === 'dome') return `dome:${t.field}`
+  if (t.kind === 'outx') return `outx:${t.field}`
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
@@ -1221,6 +1223,9 @@ export interface ModComp {
   // The fulldome mapping's sliders (a final override; null base while the dome is off).
   setDomeParam: (field: DomeModField, value: number) => void
   domeParam: (field: DomeModField) => number | null
+  // The output transform's sliders (a final override; null base while the dome is on).
+  setOutXformParam: (field: OutXformField, value: number) => void
+  outXformParam: (field: OutXformField) => number | null
   // Compositor-level overrides (not ISF inputs) : per-FX dry/wet opacity, and a
   // layer's own opacity / A-B mix / blend-mode index. Applied post-syncFromState.
   setFxOpacity: (scope: import('@shared/types').FxScope, instId: string, value: number) => void
@@ -1248,6 +1253,14 @@ export function writeModTarget(
     const v = d.min + Math.max(0, Math.min(1, shaped01)) * (d.max - d.min)
     sonifyModValues.set(t.param, v)
     liveModValues.set(liveKey(t), v)
+    return
+  }
+  // An output-transform slider : absolute over its span.
+  if (t.kind === 'outx') {
+    const r = OUTX_MOD_RANGE[t.field]
+    const value = r.min + Math.max(0, Math.min(1, shaped01)) * (r.max - r.min)
+    liveModValues.set(liveKey(t), value)
+    comp.setOutXformParam(t.field, value)
     return
   }
   // A dome slider : absolute over its span.
@@ -1422,6 +1435,16 @@ export function applyModulation(
       if (final === null || typeof final !== 'number') continue
       sonifyModValues.set(a.target.param, final)
       liveModValues.set(liveKey(a.target), final)
+      continue
+    }
+    if (a.target.kind === 'outx') {
+      const base = comp.outXformParam(a.target.field)
+      if (base === null) continue // the dome is on : its own mapping rules
+      const r = OUTX_MOD_RANGE[a.target.field]
+      const final = inputValueForMode({ type: 'float', min: r.min, max: r.max, def: base }, base, v, a.depth, a.mode)
+      if (final === null || typeof final !== 'number') continue
+      liveModValues.set(liveKey(a.target), final)
+      comp.setOutXformParam(a.target.field, final)
       continue
     }
     if (a.target.kind === 'dome') {

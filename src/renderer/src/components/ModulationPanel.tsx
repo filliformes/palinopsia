@@ -9,6 +9,7 @@ import type { ArpMode, AudioFeature, BodyFeature, LfoShape, ModulatorType, Motio
 import { BODY_FEATURES, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, MOTION_SHAPES, WORLD_AUTOMOD_SLOT } from '@shared/types'
 import { DIVISIONS, modEngine } from '../engine/modulation'
 import { DOME_MOD_RANGE } from '@shared/dome'
+import { OUTX_MOD_RANGE } from '@shared/outXform'
 import { AUDIO_BANDS, AUDIO_FEATURES } from '../engine/audioIn'
 import { VISION_FEATURES } from '../engine/visionIn'
 import { SHADER_BY_ID } from '../shaders/isf'
@@ -877,6 +878,7 @@ function MatrixSummary(): JSX.Element {
     }
     if (t.kind === 'bg') return `BG ${t.field === 'depth' ? 'shadow' : t.field}`
     if (t.kind === 'dome') return `Dome ${DOME_MOD_RANGE[t.field].label}`
+    if (t.kind === 'outx') return `Output ${OUTX_MOD_RANGE[t.field].label}`
     const inst =
       t.scope.kind === 'master'
         ? composition.master.find((f) => f.id === t.instId)

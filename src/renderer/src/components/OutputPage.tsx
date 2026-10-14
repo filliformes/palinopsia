@@ -24,6 +24,7 @@ import { captureScreenshot, outputRecorder, recordingFormats, encoderAccepts, DX
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { DomeSim } from './DomeSim'
 import { DOME_RES, defaultDomeConfig, type DomeConfig, type DomeMode, type DomeModField } from '@shared/dome'
+import { OUT_EDGES, type OutXformField } from '@shared/outXform'
 import { NDI_FPS, NDI_MAX_EDGE, NDI_REDIST_URL, NDI_LINUX_SDK_URL, type NdiConfig, type NdiInstallProgress } from '@shared/ndi'
 
 const CORNER_LABELS = ['TL', 'TR', 'BR', 'BL']
@@ -610,6 +611,8 @@ export function OutputPage({
               </button>
             </div>
           </Section>
+
+          <OutXformSection btn={btn} />
 
           <DomeSection dome={dome} setDome={setDome} setDomeSim={setDomeSim} btn={btn} view={domeView} setView={setDomeView} onResetCam={resetSimCam} onWholeDome={wholeDome} />
 
@@ -1271,16 +1274,18 @@ function NdiRuntimeInstall(): JSX.Element {
   )
 }
 
-// One dome slider. With `mod` it also takes modulation, like a layer's controls :
-// an M button opens the assign row (modulators and Meta knobs; right-click clears),
-// and while bound the thumb follows the live value.
-type DomeModProps = { mod?: DomeModField; openMod?: DomeModField | null; setOpenMod?: (f: DomeModField | null) => void }
-function DomeSlider({ label, value, min, max, step, onChange, reset, unit = '', title, mod, openMod, setOpenMod }: {
+// One dome (or output-transform) slider. With `mod` (or `outx`) it also takes
+// modulation, like a layer's controls : an M button opens the assign row
+// (modulators and Meta knobs; right-click clears), and while bound the thumb
+// follows the live value.
+type DomeModProps = { mod?: DomeModField; outx?: OutXformField; openMod?: string | null; setOpenMod?: (f: string | null) => void }
+function DomeSlider({ label, value, min, max, step, onChange, reset, unit = '', title, mod, outx, openMod, setOpenMod }: {
   label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; reset?: number; unit?: string; title?: string
 } & DomeModProps): JSX.Element {
   const modMatrix = useStore((s) => s.composition.modMatrix)
   const metaKnobs = useStore((s) => s.composition.metaKnobs)
-  const target: ModTarget | null = mod ? { kind: 'dome', field: mod } : null
+  const target: ModTarget | null = mod ? { kind: 'dome', field: mod } : outx ? { kind: 'outx', field: outx } : null
+  const slot = mod ?? outx
   const key = target ? modTargetKey(target) : ''
   const bound = target ? modMatrix.filter((a) => modTargetKey(a.target) === key) : []
   const onMeta = target ? metaKnobs.some((k) => k.destinations.some((d) => modTargetKey(d) === key)) : false
@@ -1290,7 +1295,7 @@ function DomeSlider({ label, value, min, max, step, onChange, reset, unit = '', 
     if (!key || !el || (!bound.length && !onMeta)) return
     return registerLiveOverlay({ el, key, format: (x) => String(x) })
   }, [key, bound.length, onMeta])
-  const open = !!mod && openMod === mod
+  const open = !!slot && openMod === slot
   // Modulated reads like every other modulated control : accent2 on the thumb and
   // the readout (a modulator row or a Meta knob aimed at it).
   const modulated = bound.length > 0 || onMeta
@@ -1306,9 +1311,9 @@ function DomeSlider({ label, value, min, max, step, onChange, reset, unit = '', 
           className={`min-w-0 flex-1 ${modulated ? 'accent-accent2' : 'accent-accent'}`}
         />
         <span className={`w-12 shrink-0 text-right font-mono text-[10px] ${modulated ? 'text-accent2' : 'text-text'}`}>{Math.round(value * 100) / 100}{unit}</span>
-        {mod && (
+        {slot && (
           <button
-            onClick={() => setOpenMod?.(open ? null : mod)}
+            onClick={() => setOpenMod?.(open ? null : slot)}
             onContextMenu={(e) => {
               e.preventDefault()
               const st = useStore.getState()
@@ -1339,6 +1344,68 @@ function DomeSlider({ label, value, min, max, step, onChange, reset, unit = '', 
   )
 }
 
+// Output transform : the whole finished frame moved as one picture on the flat
+// output (the fulldome has its own mapping). Saved with the session; every slider
+// takes a modulator or a Meta knob, and OSC and dataflou reach them all.
+function OutXformSection({ btn }: { btn: (on: boolean) => string }): JSX.Element {
+  const ox = useStore((s) => s.outXform)
+  const setOx = useStore((s) => s.setOutXform)
+  const reset = useStore((s) => s.resetOutXform)
+  const domeOn = useStore((s) => s.dome.enabled)
+  const [openMod, setOpenMod] = useState<string | null>(null)
+  const mp = (f: OutXformField): DomeModProps => ({ outx: f, openMod, setOpenMod })
+  return (
+    <Section
+      title="Output transform"
+      defaultCollapsed
+      actions={
+        <button
+          onClick={reset}
+          className="relative flex h-5 w-5 shrink-0 items-center justify-center rounded border border-muted/40 bg-panel3 font-mono text-[11px] leading-none text-muted transition-colors hover:border-accent/60 hover:text-accent"
+          title="Back to the frame as it is : no offset, scale 1, no rotation or spin, no feather, no flips"
+        >
+          ↺
+          <Blink />
+        </button>
+      }
+      info="Moves the whole finished frame as one picture, after everything (the Finalizer and its shape, the crossfade, the flash limiter) : slide it, scale it, turn it, keep it spinning, soften its edges, flip it. The preview, the projector, NDI, Spout, recording and stills all show it; the keystone warp still comes after. Saved with the session. While the fulldome is on, its own mapping moves the frame instead."
+    >
+      {domeOn && (
+        <p className="font-mono text-[10px] text-muted">The fulldome is on : its own mapping moves the frame. These wait for the flat output.</p>
+      )}
+      <div className={`flex flex-col gap-1 ${domeOn ? 'pointer-events-none opacity-40' : ''}`}>
+        <DomeSlider label="offset x" value={ox.offsetX} min={-1} max={1} step={0.005} reset={0} onChange={(v) => setOx({ offsetX: v })} title="Slide the frame sideways (1 = a whole frame width to the right)" {...mp('offsetX')} />
+        <DomeSlider label="offset y" value={ox.offsetY} min={-1} max={1} step={0.005} reset={0} onChange={(v) => setOx({ offsetY: v })} title="Slide the frame up or down (1 = a whole frame height up)" {...mp('offsetY')} />
+        <DomeSlider label="scale" value={ox.scale} min={0} max={2} step={0.005} reset={1} onChange={(v) => setOx({ scale: v })} title="1 = the frame as it is; below, it shrinks into the edge fill; above, it zooms in (up to 2)" {...mp('scale')} />
+        <DomeSlider label="rotate" value={ox.rotate} min={-180} max={180} step={0.5} unit="°" reset={0} onChange={(v) => setOx({ rotate: v })} title="Turn the frame around its center" {...mp('rotate')} />
+        <DomeSlider label="spin" value={ox.spin} min={-360} max={360} step={0.5} unit="°/s" reset={0} onChange={(v) => setOx({ spin: v })} title="Keep turning, degrees per second (changing it changes the speed from here on : the frame never jumps; ↺ brings it back upright)" {...mp('spin')} />
+        <DomeSlider label="feather" value={ox.feather} min={0} max={0.2} step={0.005} reset={0} onChange={(v) => setOx({ feather: v })} title="Softens the frame's edges into the black (black edge only)" {...mp('feather')} />
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+          <button onClick={() => setOx({ flipX: !ox.flipX })} className={btn(ox.flipX)} title="Mirror the frame left to right">flip x</button>
+          <button onClick={() => setOx({ flipY: !ox.flipY })} className={btn(ox.flipY)} title="Turn the frame upside down (mirror top to bottom)">flip y</button>
+          <span className="ml-2 font-mono text-[10px] text-muted">edge</span>
+          {OUT_EDGES.map((e) => (
+            <button
+              key={e}
+              onClick={() => setOx({ edge: e })}
+              className={btn(ox.edge === e)}
+              title={
+                e === 'black'
+                  ? 'Black where the frame no longer reaches (feather softens into it)'
+                  : e === 'repeat'
+                    ? 'The frame repeats as tiles where it no longer reaches'
+                    : 'The frame repeats mirrored, so the tiles meet without a seam'
+              }
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      </div>
+    </Section>
+  )
+}
+
 // Fulldome : master on/off + resolution + aperture, the mapping mode and its
 // controls, and the simulator's view. Port of the TD FulldomeSimulator's
 // DomeConfig page, plus the mapping it never had.
@@ -1352,7 +1419,7 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
   onResetCam: (view: 'inside' | 'outside') => void
   onWholeDome: () => void
 }): JSX.Element {
-  const [openMod, setOpenMod] = useState<DomeModField | null>(null)
+  const [openMod, setOpenMod] = useState<string | null>(null)
   const mp = (f: DomeModField): DomeModProps => ({ mod: f, openMod, setOpenMod })
   // The panorama's own controls : the whole picture in panorama mode, and the
   // dimmed surround behind the screen in screen mode.

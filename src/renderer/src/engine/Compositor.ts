@@ -59,6 +59,9 @@ import type { BlendMode, LayerMask } from '@shared/types';
 import type { DomeConfig, DomeModField } from '@shared/dome';
 import { DOME_MOD_RANGE } from '@shared/dome';
 import { DomeStage } from './dome';
+import { OutXformStage, outXformActive } from './outXform';
+import type { OutXform, OutXformField } from '@shared/outXform';
+import { OUT_IDENTITY, OUTX_MOD_RANGE } from '@shared/outXform';
 import { FrameCapture, captureSize, type CaptureFormat, type CapturedFrame } from './frameCapture';
 import { GridReadback } from './gridReadback';
 import { BLEND_MODES } from '@shared/types';
@@ -1720,6 +1723,14 @@ export class Compositor {
   // `lastPresent` stays the FLAT composite : snapshots, vision and sonify read it.
   private dome: DomeStage | null = null;
   private domeCfg: DomeConfig | null = null;
+  // Output transform (flat output only) : the finished frame moved as one
+  // picture. `outTex` is what the canvas and every capture show while it is
+  // active; `lastPresent` stays the unmoved frame (crossfade and freeze copies,
+  // vision, depth and Sonify read it, so a spinning output is not "motion").
+  private outX: OutXformStage | null = null;
+  private outXCfg: OutXform = OUT_IDENTITY;
+  private outXSpin = 0; // spin integrated so far, degrees
+  private outTex: WebGLTexture | null = null;
   private domeTex: WebGLTexture | null = null;
   // Monomedia "freeze" drop: hold the last presented frame on screen (the
   // sequencer's freeze-style punctuation). Captured into `snapshot` on the first
@@ -2036,7 +2047,7 @@ export class Compositor {
   /** Queue a capture for consumer `name`. `domeOnly` : only while the dome is on.
    *  Returns false when there was nothing to capture or the GPU is behind. */
   captureKick(name: string, format: CaptureFormat, maxEdge: number, domeOnly = false): boolean {
-    const src = domeOnly ? this.domeTex : this.domeTex ?? this.lastPresent;
+    const src = domeOnly ? this.domeTex : this.domeTex ?? this.outTex ?? this.lastPresent;
     if (!src) return false;
     const { w, h } = this.outputSize();
     try {
@@ -2557,6 +2568,25 @@ export class Compositor {
   /** The dome slider's value this frame, null while the dome is off. */
   domeParam(field: DomeModField): number | null {
     return this.domeCfg ? this.domeCfg[field] : null;
+  }
+
+  /** The output transform's base, set every frame (modulation overrides after). */
+  setOutXform(cfg: OutXform): void {
+    this.outXCfg = cfg;
+  }
+  /** An output-transform slider overridden for this frame (a modulator or a Meta knob). */
+  setOutXformParam(field: OutXformField, value: number): void {
+    if (!Number.isFinite(value)) return;
+    const r = OUTX_MOD_RANGE[field];
+    this.outXCfg = { ...this.outXCfg, [field]: Math.max(r.min, Math.min(r.max, value)) };
+  }
+  /** Its value this frame; null while the dome is on (the dome's own mapping rules). */
+  outXformParam(field: OutXformField): number | null {
+    return this.domeCfg ? null : this.outXCfg[field];
+  }
+  /** Back to no spin angle (the transform's reset). */
+  resetOutXformSpin(): void {
+    this.outXSpin = 0;
   }
 
   /** The Finalizer shape AFTER THE WARP : the projector's warp corners (null :
@@ -3400,6 +3430,25 @@ export class Compositor {
     } else {
       this.strobeLimiter?.reset(); // off : its history re-seeds when it comes back
     }
+    // Output transform : the finished flat frame moved as one picture (slid,
+    // scaled, turned, spun, flipped, its edges softened). After everything, before
+    // the keystone; skipped at identity, and while the dome maps the frame itself.
+    this.outTex = null;
+    let shown = present;
+    if (!this.domeCfg) {
+      this.outXSpin = (this.outXSpin + this.outXCfg.spin * rawDt) % 360;
+      if (outXformActive(this.outXCfg, this.outXSpin)) {
+        try {
+          if (!this.outX) this.outX = new OutXformStage(gl);
+          gl.bindVertexArray(this.vao);
+          shown = this.outX.render(present, this.w, this.h, this.outXCfg, this.outXSpin);
+          this.outTex = shown;
+        } catch (e) {
+          console.error((e as Error).message);
+          this.outXCfg = OUT_IDENTITY;
+        }
+      }
+    }
     // Fulldome : render the domemaster from the flat composite; it replaces the
     // flat frame on the canvas (no keystone : a dome is mapped by its server).
     this.domeTex = null;
@@ -3425,13 +3474,13 @@ export class Compositor {
       gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
       gl.bindVertexArray(this.warpVao);
       gl.useProgram(this.warpProg);
-      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, present); gl.uniform1i(this.uWTex, 0);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, shown); gl.uniform1i(this.uWTex, 0);
       gl.uniform1f(this.uWGrid, this.warpGridOn ? 1 : 0);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     } else {
       gl.bindVertexArray(this.vao);
       gl.useProgram(this.copyProg);
-      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, present); gl.uniform1i(this.uCTex, 0);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, shown); gl.uniform1i(this.uCTex, 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     }
     gl.bindVertexArray(null);

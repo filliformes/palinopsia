@@ -966,6 +966,22 @@ bottom:
 output, and the right column holding resolution, flash safety, display + record
 controls. The HUD runs along the bottom.*
 
+### Output transform
+
+Moves the **whole finished frame** as one picture on the flat output, after everything
+(the Finalizer and its shape, the crossfade, the flash limiter) and before the keystone
+warp : **offset x / y** (in frame widths and heights), **scale** (0 to 2, 1 = as is),
+**rotate**, **spin** (keeps turning, degrees a second; changing it never makes the
+frame jump, ↺ brings it back upright), **feather** (softens the frame's edges into the
+black), **flip x / y**, and the **edge** : black, the frame repeated, or mirrored so the
+tiles meet without a seam. The preview, the projector, NDI, Spout, recording and stills
+all show it; the analyses (vision, depth, Sonify) keep reading the unmoved frame, so a
+spinning output is not read as motion. Every slider takes a modulator or a Meta knob
+(its M), and OSC (`/opsia/output/...`) and dataflou (`output/...`) reach them all. It is
+saved with the session; a New session or an older file starts at identity. While the
+fulldome is on, its own mapping moves the frame and these wait. One pass, skipped at
+identity : 60 fps unmoved, 59 moved, 57 spinning with mirrored edges (1080p, RTX 4070).
+
 ### Fulldome
 
 The **Fulldome** section of the Output page turns the output into a **domemaster** : a square,
@@ -1968,7 +1984,12 @@ unless the slot actually holds a video.
 | `/opsia/seq/run` | level | Run (≥ 0.5) / stop the sequencer |
 | `/opsia/seq/skip` | trigger | Advance to next scene |
 | `/opsia/scene/{n}` | trigger | Recall scene *n* (1-based) |
-| `/opsia/randomize[/{scope}]` | trigger | Fire Randomize (scope defaults to `all`; `sources`, `sourceparams`, `sourcefx`, `sourcefxonly`, `layer`, `layerfxonly`, `master`, `finishing`, `modulators`) |
+| `/opsia/randomize[/{scope}]` | trigger | Fire Randomize at the Transport's intensity (scope defaults to `all`; `sources`, `sourceparams`, `sourcefx`, `sourcefxonly`, `layer`, `layerfxonly`, `master`, `finishing`, `modulators`) |
+| `/opsia/randomize/masterparams · meta · inspector · sonify · resolume · background` | trigger | The other randomizes, exactly as MIDI Learn fires them : the master FX parameters in place, the Meta knob values, the selected Inspector unit, the Sonify patch, the Resolume pins, the Background's dice |
+| `/opsia/output/x · y · scale · rotate · spin · feather` | f 0..1 | The **output transform** (0.5 = none for x, y, scale, rotate, spin; scale runs 0 to 2) |
+| `/opsia/output/flipx · flipy` | bool | Flips (≥ 0.5) |
+| `/opsia/output/edge` | i / f / s | `black` · `repeat` · `mirror` |
+| `/opsia/output/reset` | trigger | Back to the frame as it is |
 | `/opsia/panic` | trigger | **Panic flush** : drop every self-feeding buffer (same as key `0` / the ⚡ Flush button); advertised over OSCQuery |
 | `/opsia/vary` | trigger | **Vary** : a variant of the whole scene at the Transport's spread (its Vary button); advertised over OSCQuery |
 | `/opsia/surface` | f f | **Metasurface** cursor : two `0..1` floats (x, y) on the scene plane; sending it turns the surface on (Pandore's Trill Square) |
@@ -2071,12 +2092,13 @@ tab has the whole setup :
   the other nodes announce), with ✕ to unwire. The header shows the values received and
   sent per second.
 
-What Palinopsia declares (86 entries, 7.3 KB, small enough for microcontroller
-nodes, whose frames stop at 8 KB) :
+What Palinopsia declares (119 entries, 7.1 KB, small enough for microcontroller
+nodes, whose frames stop at 8 KB; a field whose value is every decoder's default is
+left out, as the core's own terse DECLARE does) :
 
 | | Paths | Notes |
 |---|---|---|
-| ↙ destinations | `meta/1..16` (also sources), `layer/1..4/opacity · speed · mix`, `layer/1..4/vary` (bools : that layer's Vary), `feel/density · proximity · gesture · coalesce · flow · drift`, `scene/recall` (0 to 9), `scene/next`, `scene/randomize`, `scene/vary` (bools : the global Vary), `bpm` (20 to 300) | each plays exactly like its `/opsia` OSC address, once per change |
+| ↙ destinations | `meta/1..16` (also sources), `layer/1..4/opacity · speed · mix`, `layer/1..4/vary · mute` (bools), `bg/opacity`, `feel/density · proximity · gesture · coalesce · flow · drift`, `scene/recall` (0 to 9), `scene/next`, `scene/randomize`, `scene/vary` (bools : the global Vary), `randomize/sources · sourceparams · sourcefx · sourcefxonly · layerfxonly · layer · master · finishing · modulators · masterparams · meta · inspector · sonify · resolume · background` (bools), `output/x · y · scale · rotate · spin · feather · edge` (0 to 1) and `output/flipx · flipy · reset` (bools), `bpm` (20 to 800) | each plays exactly like its `/opsia` OSC address, once per change |
 | ↗ sources | `audio/level · flux · transient · centroid · pitch · noisiness`, `vision/brightness · contrast · motion · edges · warmth · saturation · hue · centroidX · centroidY`, `body/bodyPresent · bodyMotion · handLeftHeight · handRightHeight · handLeftX · handRightX · handsApart · moveEnergy`, `mod/1..8` | 0 to 1, sent 30 times a second, only while a node listens |
 
 dataflou maps every value from its source's range onto its destination's, so a 0..1

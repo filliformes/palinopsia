@@ -55,7 +55,12 @@
 //   /opsia/meta/{1..16}                                f 0..1 (drives the knob)
 //   /opsia/bpm                                          f 20..800 (raw)
 //   /opsia/scene/{n}                                    trigger
-//   /opsia/randomize[/{scope}]                          trigger
+//   /opsia/randomize[/{scope}]                          trigger (at the Transport's intensity)
+//   /opsia/randomize/masterparams|meta|inspector|sonify|resolume|background   trigger (MIDI Learn's own)
+//   /opsia/output/x|y|scale|rotate|spin|feather         f 0..1 (the output transform; 0.5 = none for x y scale rotate spin)
+//   /opsia/output/flipx|flipy                           >= 0.5
+//   /opsia/output/edge                                  i index | f 0..1 | s black|repeat|mirror
+//   /opsia/output/reset                                 trigger (back to the frame as it is)
 //   /opsia/panic                                        trigger (flush self-feeding buffers)
 //   /opsia/vary                                         trigger (the Transport's Vary, at its spread)
 //   /opsia/surface x y                                  two 0..1 floats : the Metasurface cursor
@@ -82,6 +87,8 @@ import { sendOsc } from './oscMonitor'
 import type { RandomizeScope } from './randomize'
 import { setKnobTarget } from './metaSmooth'
 import { firePanic, fireVariation } from './commands'
+import { fireTrigger, randIntensity } from './midi'
+import { OUT_EDGES, OUTX_MOD_RANGE, type OutXformField } from '@shared/outXform'
 import { GENERATORS, SHADER_BY_ID } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
 import { audioBus, type AudioFeatureName } from './engine/audioIn'
@@ -799,10 +806,48 @@ function route(address: string, args: Args): void {
         'finishing',
         'modulators'
       ]
+      // The randomizes that are not scopes of the Transport's dice : MIDI Learn's
+      // own triggers, so OSC, dataflou and MIDI fire exactly the same action.
+      const other: Record<string, string> = {
+        masterparams: 'rand:master',
+        meta: 'rand:meta',
+        inspector: 'rand:inspector',
+        sonify: 'rand:sonify',
+        resolume: 'rand:resolume',
+        background: 'rand:bg'
+      }
+      if (other[scope]) {
+        if (rising(address, n)) fireTrigger(other[scope])
+        return
+      }
       if (!valid.includes(scope)) return // ignore unknown scopes (don't track their edge)
       if (!rising(address, n)) return
       st.bumpRandPulse() // the Randomize button blinks however it was fired
-      st.randomize(scope as RandomizeScope)
+      // at the Transport's intensity, like the dice and MIDI
+      st.randomize(scope as RandomizeScope, randIntensity())
+      return
+    }
+
+    case 'output': {
+      // The output transform : the whole frame moved as one picture.
+      const ctl = segs[2]
+      const sliders: Record<string, OutXformField> = {
+        x: 'offsetX', y: 'offsetY', scale: 'scale', rotate: 'rotate', spin: 'spin', feather: 'feather'
+      }
+      const f = sliders[ctl]
+      if (f) {
+        const r = OUTX_MOD_RANGE[f]
+        st.setOutXform({ [f]: r.min + clamp01(n) * (r.max - r.min) })
+        return
+      }
+      if (ctl === 'flipx') { st.setOutXform({ flipX: n >= 0.5 }); return }
+      if (ctl === 'flipy') { st.setOutXform({ flipY: n >= 0.5 }); return }
+      if (ctl === 'edge') {
+        const e = enumFrom(args, OUT_EDGES)
+        if (e) st.setOutXform({ edge: e })
+        return
+      }
+      if (ctl === 'reset') { if (rising(address, n)) st.resetOutXform(); return }
       return
     }
 
@@ -1192,6 +1237,22 @@ function enumerateLeaves(): Leaf[] {
   add('/opsia/seq/skip', 0, 1, 0, 'Advance to the next scene (trigger)', false)
   add('/opsia/panic', 0, 1, 0, 'Panic flush : drop every self-feeding buffer (trigger)', false)
   add('/opsia/vary', 0, 1, 0, 'Vary : a variant of the whole scene at the Transport spread (trigger)', false)
+  for (const sc of ['sources', 'sourceparams', 'sourcefx', 'sourcefxonly', 'layerfxonly', 'layer', 'master', 'finishing', 'modulators', 'masterparams', 'meta', 'inspector', 'sonify', 'resolume', 'background'])
+    add(`/opsia/randomize/${sc}`, 0, 1, 0, `Randomize ${sc} (trigger)`, false)
+  {
+    const ox = st.outXform
+    const n01 = (f: OutXformField): number => (ox[f] - OUTX_MOD_RANGE[f].min) / (OUTX_MOD_RANGE[f].max - OUTX_MOD_RANGE[f].min)
+    add('/opsia/output/x', 0, 1, n01('offsetX'), 'Output transform : offset x (0.5 = none)')
+    add('/opsia/output/y', 0, 1, n01('offsetY'), 'Output transform : offset y (0.5 = none)')
+    add('/opsia/output/scale', 0, 1, n01('scale'), 'Output transform : scale (0..2, 0.5 = 1)')
+    add('/opsia/output/rotate', 0, 1, n01('rotate'), 'Output transform : rotate (0.5 = none)')
+    add('/opsia/output/spin', 0, 1, n01('spin'), 'Output transform : spin speed (0.5 = still)')
+    add('/opsia/output/feather', 0, 1, n01('feather'), 'Output transform : feathered edges')
+    add('/opsia/output/flipx', 0, 1, ox.flipX ? 1 : 0, 'Output transform : flip x (>= 0.5)')
+    add('/opsia/output/flipy', 0, 1, ox.flipY ? 1 : 0, 'Output transform : flip y (>= 0.5)')
+    add('/opsia/output/edge', 0, 1, OUT_EDGES.indexOf(ox.edge) / 2, 'Output transform : edge (black · repeat · mirror)')
+    add('/opsia/output/reset', 0, 1, 0, 'Output transform : back to the frame as it is (trigger)', false)
+  }
   add('/opsia/surface', 0, 1, st.surface.x, 'Metasurface cursor X (send x y together; turns it on)')
   add('/opsia/surface/active', 0, 1, st.surface.active ? 1 : 0, 'Enable the Metasurface (>= 0.5)')
   add('/opsia/surface/play', 0, 1, st.surface.play ? 1 : 0, 'Auto-trace the drawn path (>= 0.5)')

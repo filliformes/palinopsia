@@ -116,8 +116,10 @@ export const DF_DESTS: DfDest[] = [
     { path: `layer/${l}/opacity`, label: `L${l} opacity`, osc: `/opsia/layer${l}/opacity`, type: 'number' as const },
     { path: `layer/${l}/speed`, label: `L${l} speed`, osc: `/opsia/layer${l}/speed`, type: 'number' as const },
     { path: `layer/${l}/mix`, label: `L${l} A/B mix`, osc: `/opsia/layer${l}/mix`, type: 'number' as const },
-    { path: `layer/${l}/vary`, label: `L${l} vary`, osc: `/opsia/layer${l}/vary`, type: 'bool' as const }
+    { path: `layer/${l}/vary`, label: `L${l} vary`, osc: `/opsia/layer${l}/vary`, type: 'bool' as const },
+    { path: `layer/${l}/mute`, label: `L${l} mute`, osc: `/opsia/layer${l}/mute`, type: 'bool' as const }
   ]),
+  { path: 'bg/opacity', label: 'background opacity', osc: '/opsia/bg/opacity', type: 'number' },
   { path: 'feel/density', label: 'density', osc: '/opsia/density', type: 'number', init: 0.5 },
   { path: 'feel/proximity', label: 'proximity', osc: '/opsia/proximity', type: 'number', init: 0.5 },
   { path: 'feel/gesture', label: 'gesture / texture', osc: '/opsia/gesture', type: 'number', init: 0.5 },
@@ -128,7 +130,24 @@ export const DF_DESTS: DfDest[] = [
   { path: 'scene/next', label: 'next scene', osc: '/opsia/seq/skip', type: 'bool' },
   { path: 'scene/randomize', label: 'randomize', osc: '/opsia/randomize', type: 'bool' },
   { path: 'scene/vary', label: 'vary (global)', osc: '/opsia/vary', type: 'bool' },
-  { path: 'bpm', label: 'BPM', osc: '/opsia/bpm', type: 'number', min: 20, max: 300, init: 120 }
+  { path: 'bpm', label: 'BPM', osc: '/opsia/bpm', type: 'number', min: 20, max: 800, init: 120 },
+  // Every other randomize (scene/randomize is the whole thing) : the Transport's
+  // scopes, then the ones only MIDI Learn fired before.
+  ...(['sources', 'sourceparams', 'sourcefx', 'sourcefxonly', 'layerfxonly', 'layer', 'master', 'finishing', 'modulators', 'masterparams', 'meta', 'inspector', 'sonify', 'resolume', 'background'] as const).map((sc) => ({
+    path: `randomize/${sc}`, label: `randomize ${sc}`, osc: `/opsia/randomize/${sc}`, type: 'bool' as const
+  })),
+  // The output transform : the whole frame moved as one picture (0.5 = none for
+  // offset, scale, rotate and spin).
+  { path: 'output/x', label: 'output offset x', osc: '/opsia/output/x', type: 'number', init: 0.5 },
+  { path: 'output/y', label: 'output offset y', osc: '/opsia/output/y', type: 'number', init: 0.5 },
+  { path: 'output/scale', label: 'output scale', osc: '/opsia/output/scale', type: 'number', init: 0.5 },
+  { path: 'output/rotate', label: 'output rotate', osc: '/opsia/output/rotate', type: 'number', init: 0.5 },
+  { path: 'output/spin', label: 'output spin', osc: '/opsia/output/spin', type: 'number', init: 0.5 },
+  { path: 'output/feather', label: 'output feather', osc: '/opsia/output/feather', type: 'number' },
+  { path: 'output/flipx', label: 'output flip x', osc: '/opsia/output/flipx', type: 'bool' },
+  { path: 'output/flipy', label: 'output flip y', osc: '/opsia/output/flipy', type: 'bool' },
+  { path: 'output/edge', label: 'output edge', osc: '/opsia/output/edge', type: 'number' },
+  { path: 'output/reset', label: 'output reset', osc: '/opsia/output/reset', type: 'bool' }
 ]
 
 export const DF_SOURCES: DfSource[] = [
@@ -144,6 +163,7 @@ export const DF_SOURCES: DfSource[] = [
 
 const GROUP_LABELS: Record<string, string> = {
   meta: 'Meta knobs', layer: 'Layers', feel: 'Feel', scene: 'Scenes',
+  bg: 'Background', randomize: 'Randomize', output: 'Output transform',
   audio: 'Audio in', vision: 'Picture', body: 'Body', mod: 'Modulators'
 }
 

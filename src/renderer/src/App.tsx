@@ -1161,6 +1161,7 @@ export default function App(): JSX.Element {
     // The projector's proportions (w / h; 0 : not known, the composition's own),
     // for the Finalizer shape after the warp. Asked of main once a second.
     let projAspect = 0
+    let outReset = -1 // the output transform's last reset (zeroes the engine's spin angle)
     let projAskedAt = -1e9
     // Shader warm-up queue : every registry shader + native node, compiled ONE
     // per frame in the background (starting a beat after launch) and discarded.
@@ -1285,6 +1286,11 @@ export default function App(): JSX.Element {
         }
         comp!.setShapeWarp(st.warpEnabled && !st.dome.enabled ? st.warpCorners : null, projAspect)
         comp!.setDome(st.dome.enabled ? st.dome : null)
+        comp!.setOutXform(st.outXform)
+        if (st.outXformReset !== outReset) {
+          outReset = st.outXformReset
+          comp!.resetOutXformSpin()
+        }
         comp!.setStrobeSafe(st.strobeSafe)
         // A New / Generate relay hands a layer played in a free slot over to its
         // own slot : swap the engine Layers first, so the sync finds it loaded.

@@ -660,6 +660,9 @@ export type ModTarget =
   // The fulldome mapping's own sliders (shared/dome.ts DOME_MOD_RANGE) : a final
   // override on the dome stage, like the Background's.
   | { kind: 'dome'; field: import('./dome').DomeModField }
+  // The output transform's sliders (shared/outXform.ts OUTX_MOD_RANGE) : a final
+  // override on the transform stage (flat output only).
+  | { kind: 'outx'; field: import('./outXform').OutXformField }
 
 // The Background's clock : grounds move slowly by default, up to 4× (every
 // path : the slider, the store, OSC, modulation, the Meta knobs).
@@ -988,6 +991,9 @@ export interface Session {
   resolume?: import('./resolume').ResolumeMap
   // Fulldome mapping (the dome view of the Output page).
   dome?: import('./dome').DomeConfig
+  // The output transform (the whole frame moved as one picture). Absent in older
+  // files : they load at identity.
+  outXform?: import('./outXform').OutXform
   // The projector warp (Output → Mapping), written only when "save with the
   // session" is on, and applied on load only where that option is on : the
   // warp is otherwise the computer's (its projector), not the piece's.

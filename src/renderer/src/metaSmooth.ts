@@ -21,6 +21,7 @@ import { inputsForShader } from './shaders/isf/inputs'
 import { useStore } from './store'
 import { BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
 import { DOME_MOD_RANGE } from '@shared/dome'
+import { OUTX_MOD_RANGE } from '@shared/outXform'
 
 const knobDisplay: number[] = []
 const tweens: Array<{ from: number; to: number; startedAt: number; ms: number } | null> = []
@@ -74,6 +75,12 @@ function applyDest(target: ModTarget, shaped: number): void {
     if (target.field === 'opacity') st.setOpacity(target.layer, x)
     else if (target.field === 'mix') st.setSourceMix(target.layer, x)
     else st.setBlend(target.layer, BLEND_MODES[Math.min(BLEND_MODES.length - 1, Math.floor(x * BLEND_MODES.length))])
+    return
+  }
+  // An output-transform slider : committed into the session's transform.
+  if (target.kind === 'outx') {
+    const r = OUTX_MOD_RANGE[target.field]
+    st.setOutXform({ [target.field]: r.min + Math.max(0, Math.min(1, shaped)) * (r.max - r.min) })
     return
   }
   // A dome slider : committed into the (machine-local) dome settings.

@@ -7,6 +7,32 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Output transform** : the whole finished frame moved as one picture on the flat
+  output, the way the fulldome mapping moves it on a dome. Offset x / y, scale (0 to
+  2), rotate, spin (integrated, so a new speed never jumps), feather, flip x / y and the
+  edge (black, repeat, mirror), in one fragment pass after the flash limiter and before
+  the keystone (`engine/outXform.ts`, `shared/outXform.ts`), skipped at identity and
+  while the dome is on. The canvas and every capture (projector stream, NDI, Spout,
+  recording, stills) show it; `lastPresent` stays the unmoved frame for the crossfade
+  and freeze copies, vision, depth and Sonify. A new modulation target kind (`outx`)
+  gives every slider an M (modulators and Meta knobs); OSC `/opsia/output/x · y ·
+  scale · rotate · spin · feather · flipx · flipy · edge · reset`, in OSCQuery too.
+  Saved with the session; New and older files load at identity. Output page →
+  Output transform. Measured at 1080p : 60 fps unmoved, 59 moved, 57 spinning with
+  mirrored edges.
+- **More dataflou destinations, and every randomize over OSC.** dataflou gains
+  `layer/1..4/mute`, `bg/opacity`, fifteen `randomize/...` triggers (the Transport's
+  scopes, then master FX parameters, Meta knobs, the selected Inspector unit, the
+  Sonify patch, the Resolume pins and the Background's dice, which only MIDI Learn
+  could fire before) and the output transform (`output/...`). OSC gains the same
+  randomizes as `/opsia/randomize/masterparams · meta · inspector · sonify · resolume ·
+  background` (MIDI Learn's own triggers, so all three fire the same action). The
+  DECLARE leaves out every field whose value is what all the mesh's decoders read for
+  a missing key (the core, its TypeScript port and ours, checked field by field on all
+  119 entries : no mismatch), so it shrinks from 86 entries / 7,316 bytes to 119 /
+  7,119, under the 8 KB a Teensy node takes. The `bpm` destination now spans 20 to 800,
+  like OSC.
+
 - **Vary over OSC and dataflou.** `/opsia/vary` fires the global Vary (the Transport's,
   at its spread) and `/opsia/layer{1..4}/vary` a layer's Vary (at its own amount), on
   the rising edge like the other triggers (a held value fires once), each listed in
@@ -122,6 +148,9 @@ that CI builds into cross-platform releases.
   brings the computer's back.
 
 ### Changed
+
+- **A randomize sent over OSC or dataflou now plays at the Transport's intensity**,
+  like the dice and MIDI Learn (it always ran at full intensity).
 
 - **The top bar stays on one line** in a window that is not full screen (it wrapped
   its right half onto a second line below about 1560 px at 100 % zoom; the default
