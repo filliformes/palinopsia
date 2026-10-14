@@ -20,6 +20,8 @@
 // from 60 to ~23 fps (measured). A consumer that hands the buffers back
 // (recycle) makes a steady stream allocate nothing.
 
+import { perfMeter } from './perfMeter'
+
 export type CaptureFormat = 'uyvy' | 'rgbx' | 'rgba-up' | 'dxt1'
 
 const VS = `#version 300 es
@@ -330,7 +332,9 @@ export class FrameCapture {
     let buf = this.pool.pop()
     if (!buf || buf.byteLength !== need) buf = new ArrayBuffer(need)
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbos![ri])
+    const t0 = performance.now()
     gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, new Uint8Array(buf))
+    perfMeter.wait(performance.now() - t0)
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null)
     return { ...meta, buf }
   }

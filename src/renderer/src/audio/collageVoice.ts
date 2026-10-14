@@ -25,7 +25,11 @@
 // notes out while the new ones come in, over the Collage's own crossfade time
 // (a short declick when it is 0). A film taking a new clip, or jumping (a window
 // loop, a churn re-cue), crossfades between two players of the same deck : the
-// old keeps playing until the new one actually sounds.
+// old keeps playing until the new one actually sounds. The faded-out one is
+// then kept, paused and loaded, for the deck's next jump : a jump is a seek on
+// it, not a new player. (Measured on an installation's wall of 12 to 16 films :
+// a new player for every window loop, each one opening, probing and decoding
+// its file from the start, and as many torn down.)
 
 const mediaUrlForPath = (path: string): string => `opsia-media://local/${encodeURIComponent(path)}`
 
@@ -62,6 +66,7 @@ interface Player {
   src: MediaElementAudioSourceNode
   g: GainNode // its crossfade gain
   started: boolean // positioned and playing at least once
+  path: string
 }
 
 interface DeckPlayer {
@@ -71,6 +76,7 @@ interface DeckPlayer {
   nextT: number // the crossfade time it will use
   nextSince: number
   fading: Array<{ p: Player; until: number }>
+  spare: Player | null // faded out, paused and loaded : the next jump's player
   path: string // the file asked for
   video: HTMLVideoElement | null
   onSeek: () => void
@@ -141,7 +147,27 @@ export class CollageVoice {
     const g = this.ctx.createGain()
     g.gain.value = gain
     src.connect(g).connect(out)
-    return { audio, src, g, started: false }
+    return { audio, src, g, started: false, path }
+  }
+
+  /** The player for a jump within the deck's clip : its spare, silent and
+   *  ready to be positioned, or a new one. */
+  private jumpPlayer(d: DeckPlayer): Player {
+    const p = d.spare
+    if (!p || p.path !== d.path) return this.makePlayer(d.path, d.bus, 0)
+    d.spare = null
+    p.g.gain.cancelScheduledValues(0)
+    p.g.gain.value = 0
+    p.started = false
+    return p
+  }
+
+  /** A player done fading out : kept as the deck's spare when it plays the
+   *  deck's file and there is none yet, released otherwise. */
+  private parkPlayer(d: DeckPlayer, p: Player): void {
+    if (d.spare || p.path !== d.path) { this.killPlayer(p); return }
+    p.audio.pause()
+    d.spare = p
   }
 
   private killPlayer(p: Player): void {
@@ -157,6 +183,7 @@ export class CollageVoice {
     let d = this.decks.get(key)
     if (d && d.path !== path) {
       d.path = path
+      if (d.spare) { this.killPlayer(d.spare); d.spare = null }
       if (d.next) this.killPlayer(d.next)
       d.next = this.makePlayer(path, d.bus, 0)
       d.nextT = T
@@ -165,7 +192,7 @@ export class CollageVoice {
     if (!d) {
       const bus = this.ctx.createGain()
       const dp: DeckPlayer = {
-        bus, cur: this.makePlayer(path, bus, 1), next: null, nextT: 0, nextSince: 0, fading: [],
+        bus, cur: this.makePlayer(path, bus, 1), next: null, nextT: 0, nextSince: 0, fading: [], spare: null,
         path, video: null, onSeek: () => {}, used: true
       }
       dp.onSeek = (): void => this.resyncDeck(dp, true)
@@ -226,8 +253,8 @@ export class CollageVoice {
     // is until the picture runs again.
     if (v.readyState < 2) return
     if (!this.resyncPlayer(d.cur.audio, d.cur, v, force, d.cur.started)) {
-      // An audible jump : splice a fresh player of the same file in instead.
-      d.next = this.makePlayer(d.path, d.bus, 0)
+      // An audible jump : splice another player of the same file in instead.
+      d.next = this.jumpPlayer(d)
       d.nextT = SPLICE_XF
       d.nextSince = this.ctx.currentTime
       this.resyncPlayer(d.next.audio, d.next, v, false, false)
@@ -239,13 +266,14 @@ export class CollageVoice {
     if (d.fading.length) {
       d.fading = d.fading.filter((f) => {
         if (now < f.until) return true
-        this.killPlayer(f.p)
+        this.parkPlayer(d, f.p)
         return false
       })
     }
     const nx = d.next
     if (!nx) return
-    const sounding = nx.started && !nx.audio.paused && nx.audio.readyState >= 3
+    // (not while it seeks : a reused player still holds its old position)
+    const sounding = nx.started && !nx.audio.paused && !nx.audio.seeking && nx.audio.readyState >= 3
     if (sounding || now - d.nextSince > NEXT_WAIT_S || !d.video) {
       fade(d.cur.g.gain, now, d.nextT, 'out')
       d.fading.push({ p: d.cur, until: now + d.nextT + 0.1 })
@@ -316,6 +344,7 @@ export class CollageVoice {
     this.bindVideo(d, null)
     this.killPlayer(d.cur)
     if (d.next) this.killPlayer(d.next)
+    if (d.spare) this.killPlayer(d.spare)
     for (const f of d.fading) this.killPlayer(f.p)
     try { d.bus.disconnect() } catch { /* already gone */ }
     this.decks.delete(key)

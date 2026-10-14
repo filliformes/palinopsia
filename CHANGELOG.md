@@ -23,6 +23,26 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The Performance tab no longer blames Sonify for a full GPU.** A read of a picture
+  the GPU already drew (the projector stream, the Sonify taps, vision, depth, lights,
+  mark) waits for the GPU process, and with the GPU full that wait is milliseconds
+  whoever asks. It was charged to the row that asked : an installation read Sonify at
+  8 to 30 ms a frame, and a CPU profile put 63 to 142 ms of every second inside its
+  read, nearly all of it waiting. The wait now has its own row, **GPU wait**, taken
+  out of the others : on that installation's session Sonify reads 0.3 to 0.6 ms a
+  frame and the output stream 0.1, with about 35 ms of GPU wait per frame between
+  them.
+- **The Collage voice reuses its players.** A film jumping within its clip (a window
+  loop, a re-cue) built a new audio player for every jump, opening and decoding its
+  file again, and threw the old one away. The old one now stays loaded as the film's
+  spare and takes the next jump : in a forced test, 14 of 24 jumps on 8 films were
+  served by a spare, every one taking over and playing. Its rare error is now logged
+  by name instead of as `[object DOMException]`.
+- **The media keys and the Now Playing panel leave the instrument alone.** Every film
+  the Collage voice plays is a media element, so the app announced itself to the
+  system's Now Playing about once a second (50 to 86 times a minute in an
+  installation's system log, none now), and a keyboard's play / pause key could have
+  paused the instrument's own sound.
 - **A keystoned projector edge no longer steps.** The warp drew its quad bare, so a
   nearly vertical side became a staircase of very long one-pixel steps : measured on
   an installation's projector, the left side ran from x 111 to 119 down 1080 rows, 9

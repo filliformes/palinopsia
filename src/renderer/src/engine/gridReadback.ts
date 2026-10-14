@@ -26,6 +26,8 @@
 // and kickRead() reads a region of a framebuffer the caller already drew, with
 // no downsample of its own (the mark signal's one row of the canvas).
 
+import { perfMeter } from './perfMeter'
+
 export class GridReadback {
   private fbo: WebGLFramebuffer | null = null
   private tex: WebGLTexture | null = null
@@ -285,7 +287,9 @@ export class GridReadback {
     gl.deleteSync(this.fences[best]!)
     this.fences[best] = null
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbos[best])
+    const t0 = performance.now()
     gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, out)
+    perfMeter.wait(performance.now() - t0)
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null)
     return { grid: out, w: this.w, h: this.h }
   }

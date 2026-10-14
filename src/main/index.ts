@@ -60,7 +60,12 @@ app.commandLine.appendSwitch('enable-features', 'PlatformHEVCDecoderSupport,Plat
 // covers it. Windows' native occlusion detection (CalculateNativeWinOcclusion)
 // and macOS's (MacWebContentsOcclusion) would otherwise mark it hidden and slow
 // it down. ONE switch : a second disable-features would replace the first.
-app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion,MacWebContentsOcclusion')
+// HardwareMediaKeyHandling : the system's media keys and its Now Playing panel.
+// Every film the Collage voice plays is a media element, so the app registered
+// with Now Playing about once a second (seen in the macOS log, waking four system
+// services each time), and a keyboard's play / pause key would have paused the
+// instrument's own sound.
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion,MacWebContentsOcclusion,HardwareMediaKeyHandling')
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
 // And keep full CPU priority for a MINIMIZED operator window : it is the render
 // source for NDI / Spout / Syphon / the projector stream, which must not slow down just

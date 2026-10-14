@@ -1114,7 +1114,9 @@ class SonifyEngine {
         this.collage = null
       }
     } catch (e) {
-      console.warn('[sonify] collage voice', e)
+      // by name : the log file printed a DOMException as [object DOMException]
+      const err = e as Error
+      console.warn('[sonify] collage voice', err?.name ? `${err.name}: ${err.message}\n${String(err.stack ?? '').split('\n').slice(1, 4).join('\n')}` : e)
     }
 
     // BPM-synced sweep : re-derive sweepHz continuously so tap-tempo follows.

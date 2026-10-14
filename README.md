@@ -686,7 +686,10 @@ The **audio/midi/osc** right-column tab (key `A`) holds the control panels
 - **Performance** (its own tab, right of audio/midi/osc; it meters only while
   shown) : a per-section load monitor : each part of the instrument
   (render, output, vision, depth, lights, sonify, audio, modulation, MediaPipe)
-  with its CPU frame-budget share, estimated VRAM, and active-feature chips, so you
+  with its CPU frame-budget share, plus a **GPU wait** row : the time the window sits
+  waiting for the GPU to hand back pictures it already drew (the projector stream, the
+  Sonify taps, the other reads). That wait is taken out of the rows it happened in, so
+  each of them shows only its own work and a full GPU reads as a full GPU, estimated VRAM, and active-feature chips, so you
   can see what a heavy session is spending, with units and hover tooltips on every
   figure. The header reads the frame rate against the display's refresh rate, and
   counts the frames the GPU backlog guard dropped (`skips`), which never reach the
