@@ -113,6 +113,11 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Hover help for Slime Mold, Fluid, Reaction, Colony and Veins**, which had none :
+  every control says what it does, which way it goes and when it waits for a regrow
+  (Slime Mold's pattern size and Fluid's detail start over; Reaction keeps its living
+  pattern). Read off each engine's code. The Colony, Toile, Granular and Tiles
+  descriptions no longer name the researchers behind their models.
 - **Twenty more Inspectors sorted into columns, inert controls greyed out.** An
   audit of every source and FX (124 shaders, read off their code) gave columns to
   the ones that read as a jumble in one row : Lattice (points · camera · well),

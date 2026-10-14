@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Tiles : an analysis/resynthesis grid (after Villegas & Forbes): the frame is read as an N×M field of cells, each replaced by one color and redrawn as a tile whose SIZE follows the cell's luminance (bright cells swell, dark cells shrink to small marks). The color is the cell's center pixel (crisp and vivid, it pops as detail moves through the cell); `average` blends toward the mean of the cell for a calmer field. Shape, gap and softness are yours; `audio` swells each column of tiles with its own band of the live spectrum. A matte, tiled resynthesis : the image survives as a field of marks, not pixels.",
+  "DESCRIPTION": "Tiles : an analysis/resynthesis grid : the frame is read as an N×M field of cells, each replaced by one color and redrawn as a tile whose SIZE follows the cell's luminance (bright cells swell, dark cells shrink to small marks). The color is the cell's center pixel (crisp and vivid, it pops as detail moves through the cell); `average` blends toward the mean of the cell for a calmer field. Shape, gap and softness are yours; `audio` swells each column of tiles with its own band of the live spectrum. A matte, tiled resynthesis : the image survives as a field of marks, not pixels.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Stylize", "Texture"],
