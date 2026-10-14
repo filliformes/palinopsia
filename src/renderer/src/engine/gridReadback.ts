@@ -179,6 +179,42 @@ export class GridReadback {
     return true
   }
 
+  /** Several sources side by side, `cellW` x `h` each, in ONE readback : one
+   *  read to collect instead of one per source. On a GPU that shares memory with
+   *  the processor, collecting a read is a synchronous round trip to the GPU
+   *  process that waits behind everything queued before it, whatever its size
+   *  (the two 96x96 Sonify taps blocked an installation's window ~90 ms a
+   *  second). Same ring, same rules as kick(); a different count of sources is
+   *  a size change, which drops what is in flight. */
+  kickStrip(
+    cellW: number,
+    h: number,
+    srcs: WebGLTexture[],
+    prog: WebGLProgram,
+    uTex: WebGLUniformLocation | null,
+    vao: WebGLVertexArrayObject,
+    flush = true
+  ): boolean {
+    const gl = this.gl
+    this.ensure(cellW * srcs.length, h)
+    const wi = this.phase
+    if (this.fences[wi]) return false
+    gl.bindVertexArray(vao)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.target())
+    gl.useProgram(prog)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.uniform1i(uTex, 0)
+    for (let i = 0; i < srcs.length; i++) {
+      gl.viewport(i * cellW, 0, cellW, h)
+      gl.bindTexture(gl.TEXTURE_2D, srcs[i])
+      gl.drawArrays(gl.TRIANGLES, 0, 3)
+    }
+    this.submit(wi, 0, 0, flush)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.bindVertexArray(null)
+    return true
+  }
+
   /** Queue the readback of a `w`x`h` region at (`x`, `y`) of a framebuffer
    *  already drawn (null = the canvas), as it stands now in the command
    *  stream : no copy of its own. Same ring, same rules as kick(). */

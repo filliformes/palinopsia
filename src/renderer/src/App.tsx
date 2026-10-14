@@ -1271,7 +1271,7 @@ export default function App(): JSX.Element {
         //    everything: UI edits, session loads, OSC : the engine follows.
         //    Shader hot-swaps preserve feedback buffers (brief §1).
         comp!.setGlobalSpeed(st.globalSpeed)
-        comp!.setWarp(st.warpEnabled ? st.warpCorners : null, st.warpGrid)
+        comp!.setWarp(st.warpEnabled ? st.warpCorners : null, st.warpGrid, st.warpFeather)
         // The Finalizer shape after the warp : the projector's corners and its
         // proportions (the output window's size, asked once a second; without
         // an output window, the composition's own).
@@ -1636,11 +1636,11 @@ export default function App(): JSX.Element {
           // its grid sat over the master on the output window with nothing in the
           // Fulldome section to take it off (the dome has its own, `grid on output`).
           const warpGrid = st.warpGrid && !st.dome.enabled
-          const key = `${warpEnabled}|${warpGrid}|${st.warpCorners.join(',')}`
+          const key = `${warpEnabled}|${warpGrid}|${st.warpFeather}|${st.warpCorners.join(',')}`
           if (key !== lastWarpKey || now - lastWarpSent > 500) {
             lastWarpKey = key
             lastWarpSent = now
-            window.api.outputFrame({ warpEnabled, warpCorners: st.warpCorners, warpGrid })
+            window.api.outputFrame({ warpEnabled, warpCorners: st.warpCorners, warpGrid, warpFeather: st.warpFeather })
           }
         }
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to

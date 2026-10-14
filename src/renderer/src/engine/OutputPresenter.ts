@@ -5,81 +5,12 @@
 // the projector shows the control window's pixels EXACTLY, not an independent
 // re-render that diverges on every stochastic source (Collage, video, feedback).
 //
-// The warp shader, corner→vertex maths and UV orientation are copied verbatim
-// from Compositor's present pass : the streamed buffer is a `readPixels` of the
+// The warp shader, corner→vertex maths and UV orientation are the compositor's
+// own (engine/warpQuad.ts) : the streamed buffer is a `readPixels` of the
 // composite (GL bottom-up), which is precisely the orientation those UVs assume,
 // so the result is pixel-for-pixel what the compositor presents.
 
-const WARP_VS = `#version 300 es
-in vec2 pos;
-in vec3 uvq;
-out vec3 vUvq;
-void main(){ vUvq = uvq; gl_Position = vec4(pos, 0.0, 1.0); }`
-
-const WARP_FS = `#version 300 es
-precision highp float;
-in vec3 vUvq; out vec4 o;
-uniform sampler2D tex;
-uniform float grid;
-void main(){
-  vec2 uv = vUvq.xy / vUvq.z;
-  vec4 c = texture(tex, uv);
-  if (grid > 0.5){
-    vec2 g = abs(fract(uv * 8.0) - 0.5);
-    float line = smoothstep(0.47, 0.5, max(g.x, g.y));
-    c.rgb = mix(c.rgb, vec3(0.0, 1.0, 1.0), line * 0.5);
-    float edge = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y));
-    c.rgb = mix(c.rgb, vec3(1.0, 0.2, 0.2), 1.0 - smoothstep(0.0, 0.006, edge));
-  }
-  o = c;
-}`
-
-function lineIntersect(a1: number[], a2: number[], b1: number[], b2: number[]): number[] | null {
-  const d = (a2[0] - a1[0]) * (b2[1] - b1[1]) - (a2[1] - a1[1]) * (b2[0] - b1[0])
-  if (Math.abs(d) < 1e-9) return null
-  const t = ((b1[0] - a1[0]) * (b2[1] - b1[1]) - (b1[1] - a1[1]) * (b2[0] - b1[0])) / d
-  return [a1[0] + t * (a2[0] - a1[0]), a1[1] + t * (a2[1] - a1[1])]
-}
-
-/** 4 normalized corners (TL,TR,BR,BL) → 6 perspective-correct textured verts.
- *  Identity corners (0,0,1,0,1,1,0,1) give a plain full-frame fit. */
-function computeWarpVerts(c: number[]): Float32Array {
-  const p = [
-    [c[0], c[1]],
-    [c[2], c[3]],
-    [c[4], c[5]],
-    [c[6], c[7]]
-  ]
-  const q = [1, 1, 1, 1]
-  const inter = lineIntersect(p[0], p[2], p[1], p[3])
-  if (inter) {
-    const dist = p.map((pt) => Math.hypot(pt[0] - inter[0], pt[1] - inter[1]))
-    for (let i = 0; i < 4; i++) {
-      const dopp = dist[(i + 2) % 4]
-      q[i] = dopp > 1e-6 ? (dist[i] + dopp) / dopp : 1
-    }
-  }
-  const uv = [
-    [0, 1],
-    [1, 1],
-    [1, 0],
-    [0, 0]
-  ]
-  const clip = p.map((pt) => [pt[0] * 2 - 1, 1 - pt[1] * 2])
-  const idx = [0, 1, 2, 0, 2, 3]
-  const out = new Float32Array(30)
-  let o = 0
-  for (const i of idx) {
-    out[o++] = clip[i][0]
-    out[o++] = clip[i][1]
-    out[o++] = uv[i][0] * q[i]
-    out[o++] = uv[i][1] * q[i]
-    out[o++] = q[i]
-  }
-  return out
-}
-
-const IDENTITY_CORNERS = [0, 0, 1, 0, 1, 1, 0, 1]
+import { IDENTITY_CORNERS, WARP_FS, WARP_VS, computeWarpVerts } from './warpQuad'
 
 export class OutputPresenter {
   private gl: WebGL2RenderingContext
@@ -89,6 +20,10 @@ export class OutputPresenter {
   private tex: WebGLTexture
   private uTex: WebGLUniformLocation
   private uGrid: WebGLUniformLocation
+  private uFeather: WebGLUniformLocation
+  private feather = 0
+  private vertsW = 0 // the drawn size the quad was built for (its margin is in pixels)
+  private vertsH = 0
   private texW = 0
   private texH = 0
   private lastCorners: number[] = []
@@ -115,13 +50,14 @@ export class OutputPresenter {
     this.prog = prog
     this.uTex = gl.getUniformLocation(prog, 'tex')!
     this.uGrid = gl.getUniformLocation(prog, 'grid')!
+    this.uFeather = gl.getUniformLocation(prog, 'feather')!
     const aPos = gl.getAttribLocation(prog, 'pos')
     const aUvq = gl.getAttribLocation(prog, 'uvq')
     this.vao = gl.createVertexArray()!
     gl.bindVertexArray(this.vao)
     this.buf = gl.createBuffer()!
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf)
-    gl.bufferData(gl.ARRAY_BUFFER, computeWarpVerts(IDENTITY_CORNERS), gl.DYNAMIC_DRAW)
+    gl.bufferData(gl.ARRAY_BUFFER, 30 * 4, gl.DYNAMIC_DRAW)
     gl.enableVertexAttribArray(aPos)
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 20, 0)
     gl.enableVertexAttribArray(aUvq)
@@ -137,20 +73,18 @@ export class OutputPresenter {
   }
 
   /** Set the projection warp. `corners` = 8 normalized numbers (TL,TR,BR,BL x,y)
-   *  or null for a plain full-frame fit. */
-  setWarp(corners: number[] | null, grid: boolean): void {
+   *  or null for a plain full-frame fit; `feather` = output pixels its edge fades
+   *  over (0 : crisp, still anti-aliased). */
+  setWarp(corners: number[] | null, grid: boolean, feather = 0): void {
     const c = corners && corners.length === 8 ? corners : IDENTITY_CORNERS
     let changed = this.lastCorners.length !== c.length
     if (!changed) for (let i = 0; i < c.length; i++) if (this.lastCorners[i] !== c[i]) { changed = true; break }
     if (changed) {
       this.lastCorners = c.slice()
-      const gl = this.gl
-      gl.bindVertexArray(this.vao)
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.buf)
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, computeWarpVerts(c))
-      gl.bindVertexArray(null)
+      this.vertsW = 0 // rebuilt at the next present, at the drawn size
     }
     this.gridOn = grid
+    this.feather = Math.max(0, feather)
   }
   private gridOn = false
 
@@ -182,15 +116,29 @@ export class OutputPresenter {
     gl.clear(gl.COLOR_BUFFER_BIT)
     // A square frame is a fulldome master : letterbox it (never stretch a
     // fisheye), centred, instead of filling the window like a flat composite.
+    let vw = this.canvas.width, vh = this.canvas.height
     if (w === h && this.canvas.width !== this.canvas.height) {
       const side = Math.min(this.canvas.width, this.canvas.height)
       gl.viewport(Math.round((this.canvas.width - side) / 2), Math.round((this.canvas.height - side) / 2), side, side)
+      vw = vh = side
+    }
+    // The quad reaches a couple of pixels past the frame for its anti-aliased
+    // edge : rebuilt when the corners or the drawn size change.
+    if (this.lastCorners.length !== 8) this.lastCorners = IDENTITY_CORNERS.slice()
+    if (this.vertsW !== vw || this.vertsH !== vh) {
+      this.vertsW = vw
+      this.vertsH = vh
+      gl.bindVertexArray(this.vao)
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.buf)
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, computeWarpVerts(this.lastCorners, vw, vh))
+      gl.bindVertexArray(null)
     }
     gl.useProgram(this.prog)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.tex)
     gl.uniform1i(this.uTex, 0)
     gl.uniform1f(this.uGrid, this.gridOn ? 1 : 0)
+    gl.uniform1f(this.uFeather, this.feather)
     gl.bindVertexArray(this.vao)
     gl.drawArrays(gl.TRIANGLES, 0, 6)
     gl.bindVertexArray(null)

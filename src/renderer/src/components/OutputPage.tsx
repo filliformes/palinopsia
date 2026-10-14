@@ -61,6 +61,8 @@ export function OutputPage({
   const corners = useStore(useShallow((s) => s.warpCorners))
   const setWarpEnabled = useStore((s) => s.setWarpEnabled)
   const setWarpGrid = useStore((s) => s.setWarpGrid)
+  const warpFeather = useStore((s) => s.warpFeather)
+  const setWarpFeather = useStore((s) => s.setWarpFeather)
   const setWarpCorner = useStore((s) => s.setWarpCorner)
   const resetWarp = useStore((s) => s.resetWarp)
   const warpInSession = useStore((s) => s.warpInSession)
@@ -609,6 +611,19 @@ export function OutputPage({
               >
                 save with session
               </button>
+            </div>
+            <div className={dome.enabled ? 'opacity-40' : ''}>
+              <DomeSlider
+                label="feather"
+                value={warpFeather}
+                min={0}
+                max={200}
+                step={1}
+                reset={0}
+                unit="px"
+                onChange={setWarpFeather}
+                title="Softens the warped frame's edges into the black, over this many projector pixels. At 0 the edges are crisp, and still anti-aliased : a keystoned side no longer steps"
+              />
             </div>
           </Section>
 

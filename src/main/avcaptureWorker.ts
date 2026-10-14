@@ -29,7 +29,7 @@ import type { AvfDevice, AvfStatus } from '@shared/avf'
 interface Addon {
   enable: () => void
   list: () => Array<{ id: string; name: string; model: string; muxed: boolean }>
-  open: (id: string, maxSide: number) => number | null
+  open: (id: string, boxW: number, boxH: number) => number | null
   frame: (h: number) => {
     state: string
     w: number
@@ -46,10 +46,13 @@ interface Addon {
   pump: (seconds: number) => void
 }
 
-// The long side of a frame at most this : an iPhone X screen (1125×2436) comes
-// in at 887×1920, a 1080p capture card untouched, a 4K one at 1080p. Smaller
-// frames cost less to copy and upload, and latency comes first here.
-const MAX_SIDE = 1920
+// A frame fits inside this box, aspect kept : an iPhone X screen (1126x2436,
+// portrait) comes in at 499x1080, a 1080p capture card untouched, a 4K one at
+// 1080p. The box is the composition's default size : a portrait frame taller
+// than the picture it is drawn into is bytes copied and uploaded for nothing
+// (887x1920 before, 1920 being the LONG side whichever way the phone turned).
+const BOX_W = 1920
+const BOX_H = 1080
 // An iPhone appears about a second after the opt-in : the DAL publishes it
 // asynchronously, so the first look waits for it.
 const APPEAR_MS = 1500
@@ -178,7 +181,7 @@ async function openRecv(r: Recv, a: Addon): Promise<void> {
     // Still wanted, and still not open? (It may have been let go meanwhile : a
     // capture opened for it would never be closed.)
     if (recvs.get(r.id) !== r || r.handle !== null) return
-    r.handle = a.open(r.id, MAX_SIDE)
+    r.handle = a.open(r.id, BOX_W, BOX_H)
     r.openedAt = performance.now()
     r.status = { ...r.status, state: 'starting', error: '' }
     if (r.handle === null) retryLater(r, 'failed', 'the device would not open')

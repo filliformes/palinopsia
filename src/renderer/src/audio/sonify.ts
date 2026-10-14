@@ -4,7 +4,7 @@
 // recording tap (a MediaStreamDestination the recorder can mix in).
 //
 // Data path per frame (App loop → engine.tick):
-//   Compositor.readSonifyGrid(tap) → 96×96 RGBA readback → luma Uint8Array →
+//   Compositor.readSonifyGrids(taps) → 96×96 RGBA per tap, one readback → luma Uint8Array →
 //   transferred to the worklet (~9KB @ 30Hz per tap). The readback is
 //   asynchronous, so a tap's grid is a frame or two behind the picture and the
 //   first call after a voice switches on returns nothing (that tick is skipped,
@@ -371,7 +371,7 @@ export interface SoniScan {
 }
 
 interface GridReader {
-  readSonifyGrid: (kind: 'master' | 'layer', layer: number, out: Uint8Array) => boolean
+  readSonifyGrids: (taps: Array<{ kind: 'master' | 'layer'; layer: number } | null>, outs: Uint8Array[]) => boolean[]
   collageSounds?: () => CollageSoundSet[]
 }
 
@@ -416,7 +416,10 @@ class SonifyEngine {
   private colDur = 0
   private colNow = new Float32Array(0)
   // luma grids per tap : cur + prev (for flow), plus the RGBA readback scratch
-  private rgba = new Uint8Array(GRID * GRID * 4)
+  // One RGBA grid per tap, filled by one readback for both; `rgba` is the one
+  // being analyzed (blockColour reads it).
+  private rgbaTap = [new Uint8Array(GRID * GRID * 4), new Uint8Array(GRID * GRID * 4)]
+  private rgba = this.rgbaTap[0]
   private luma: Uint8Array[] = [new Uint8Array(GRID * GRID), new Uint8Array(GRID * GRID)]
   private lumaPrev: Uint8Array[] = [new Uint8Array(GRID * GRID), new Uint8Array(GRID * GRID)]
   private grainFreqs: Float32Array = new Float32Array(0)
@@ -1095,10 +1098,13 @@ class SonifyEngine {
       this.signalBars = new Float32Array(0)
     }
 
+    // Both taps in one read (Compositor.readSonifyGrids).
+    const got = comp.readSonifyGrids([need[0] ? this.cfg.taps[0] : null, need[1] ? this.cfg.taps[1] : null], this.rgbaTap)
     for (let t = 0; t < 2; t++) {
-      if (!need[t]) continue
+      if (!need[t] || !got[t]) continue
       const tap = this.cfg.taps[t]
-      if (!comp.readSonifyGrid(tap.kind, tap.layer, this.rgba)) continue
+      const rgba = this.rgbaTap[t]
+      this.rgba = rgba
       // RGBA → luma (Rec.601), flipped vertically (GL reads bottom-up; the
       // worklet expects row 0 = image TOP so y maps naturally).
       const prev = this.lumaPrev[t]

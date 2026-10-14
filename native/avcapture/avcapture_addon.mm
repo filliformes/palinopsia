@@ -103,6 +103,7 @@ struct Cap {
   uint64_t seq = 0;           // under m
   std::atomic<int> state{kStarting};
   std::atomic<int> maxSide{0};
+  std::atomic<int> boxW{0}, boxH{0}; // fit inside boxW x boxH instead, when both are set
   std::atomic<double> lastAt{0};
   std::string error;          // under m
 };
@@ -129,13 +130,23 @@ struct Cap {
   void* base = CVPixelBufferGetBaseAddress(pb);
   if (base && w > 0 && h > 0) {
     vImage_Buffer src = {base, (vImagePixelCount)h, (vImagePixelCount)w, CVPixelBufferGetBytesPerRow(pb)};
-    // A size cap : the long side at most maxSide, aspect kept (an iPhone turns
-    // between portrait and landscape, so the cap applies per frame).
+    // A size cap, aspect kept, per frame (an iPhone turns between portrait and
+    // landscape). A box (boxW x boxH) fits the frame inside the picture it will
+    // be drawn into : a portrait phone in a 1920x1080 box arrives 1080 tall, not
+    // 1920, a third of the bytes to copy and upload for nothing lost (measured
+    // 2026-10-13 : 887x1920 frames cost the installation's window about half
+    // its blocked readback time). Else the long side at most maxSide.
     size_t ow = w, oh = h;
-    const int cap = c->maxSide.load();
-    const size_t longSide = std::max(w, h);
-    if (cap > 0 && longSide > (size_t)cap) {
-      const double k = (double)cap / (double)longSide;
+    const int bw = c->boxW.load(), bh = c->boxH.load();
+    double k = 1;
+    if (bw > 0 && bh > 0) {
+      k = std::min(1.0, std::min((double)bw / (double)w, (double)bh / (double)h));
+    } else {
+      const int cap = c->maxSide.load();
+      const size_t longSide = std::max(w, h);
+      if (cap > 0 && longSide > (size_t)cap) k = (double)cap / (double)longSide;
+    }
+    if (k < 1) {
       ow = std::max<size_t>(1, (size_t)std::lround(w * k));
       oh = std::max<size_t>(1, (size_t)std::lround(h * k));
     }
@@ -328,15 +339,22 @@ static Napi::Value List(const Napi::CallbackInfo& info) {
   return arr;
 }
 
-// open(id, maxSide) → handle. Starts in the background : poll frame(handle).
+// open(id, maxSide) or open(id, boxW, boxH) → handle. Starts in the background :
+// poll frame(handle).
 static Napi::Value Open(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   if (info.Length() < 1 || !info[0].IsString()) return env.Null();
   std::string id = info[0].As<Napi::String>().Utf8Value();
   int maxSide = info.Length() > 1 && info[1].IsNumber() ? info[1].As<Napi::Number>().Int32Value() : 0;
+  int boxH = info.Length() > 2 && info[2].IsNumber() ? info[2].As<Napi::Number>().Int32Value() : 0;
   @autoreleasepool {
     auto k = std::make_unique<Capture>();
-    k->cap->maxSide = std::max(0, maxSide);
+    if (boxH > 0) {
+      k->cap->boxW = std::max(0, maxSide);
+      k->cap->boxH = boxH;
+    } else {
+      k->cap->maxSide = std::max(0, maxSide);
+    }
     k->delegate = [[OpsiaCaptureDelegate alloc] initWithCap:k->cap];
     k->sessionQueue = dispatch_queue_create("opsia.avcapture.session", DISPATCH_QUEUE_SERIAL);
     k->frameQueue = dispatch_queue_create("opsia.avcapture.frames", DISPATCH_QUEUE_SERIAL);

@@ -3,6 +3,48 @@
 All notable changes to Palinopsia. Dates are ISO. Versions follow the `v*` tags
 that CI builds into cross-platform releases.
 
+## Unreleased
+
+### Added
+
+- **Feather for the projection warp** (Output → Mapping) : the warped frame's edges
+  fade into the black over 0 to 200 projector pixels, rounded at the corners. Saved
+  with the warp (this computer's, or the session's when the warp travels with it),
+  applied on the projector window and on the control window's own warped preview.
+
+### Fixed
+
+- **A keystoned projector edge no longer steps.** The warp drew its quad bare, so a
+  nearly vertical side became a staircase of very long one-pixel steps : measured on
+  an installation's projector, the left side ran from x 111 to 119 down 1080 rows, 9
+  steps of about 120 rows and not one blended pixel, which read on the wall as long
+  lines down the sides. The quad is now drawn 2 px larger, with the same perspective
+  mapping carried past its corners, and the shader turns each pixel's distance to the
+  frame's edge (in output pixels, from the screen-space rate of the texture
+  coordinates, so it holds under any keystone) into coverage. Measured through the
+  same corners on a 1280x692 projector window : 644 of 679 rows now blend their edge
+  pixel (0 before), the rest falling exactly on a pixel boundary, over a 1 px ramp at
+  feather 0 and 17 px at feather 20. The warp now lives in one module
+  (`engine/warpQuad.ts`) shared by the compositor and the projector window, which had
+  each kept a copy.
+
+- **The iPhone feed costs a third as much.** It was scaled to fit 1920 px on its LONG
+  side, so a portrait phone arrived 887x1920, nearly twice the height of the picture
+  it is drawn into, and every frame (6.8 MB) was copied to the GPU through the same
+  command queue the picture's readbacks wait on : on an installation, the phone's
+  frames caused about half of the window's blocked readback time. A frame now fits
+  inside 1920x1080 (the addon's open() takes a box) : a portrait iPhone X arrives
+  499x1080, a landscape 1080p camera or capture card unchanged.
+
+- **Sonify reads its two taps in one readback.** Each tap read the picture back on its
+  own, and on a GPU that shares memory with the processor collecting a read is a
+  synchronous round trip that waits behind everything queued before it, whatever its
+  size : the two 96x96 taps blocked an installation's window about 90 ms a second.
+  Both sources are now drawn side by side into one 192x96 strip and read once a tick
+  (`GridReadback.kickStrip`, `Compositor.readSonifyGrids`); two taps on one source share
+  its cell. Measured : both taps update every tick (21 of 21), each with its own picture
+  (all 9216 cells differ between a master tap and a layer tap).
+
 ## v1.2.7 — 2026-10-13
 
 ### Added

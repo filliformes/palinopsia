@@ -26,6 +26,7 @@
  * Target: RTX 4070 / WebGL2. 1080p–4K @ 60 is comfortable.
  */
 
+import { WARP_FS, WARP_VS, computeWarpVerts } from './warpQuad';
 import type { CollageSoundSet } from '../audio/collageVoice';
 import { Renderer as ISFRenderer } from 'interactive-shader-format';
 import { handle, installTextureBridge } from './isfTextureBridge';
@@ -288,31 +289,7 @@ void main(){
   o = vec4(clamp(g + b * (1.0 - k), 0.0, 1.0), 1.0);
 }`;
 
-// Projection warp (keystone / corner-pin): the composite is drawn as a quad
-// with 4 movable corners, perspective-correct via the per-vertex q (w) coord,
-// with an optional alignment grid + border for lining up on a projector.
-const WARP_VS = `#version 300 es
-in vec2 pos;      // clip-space corner
-in vec3 uvq;      // u*q, v*q, q
-out vec3 vUvq;
-void main(){ vUvq = uvq; gl_Position = vec4(pos, 0.0, 1.0); }`;
-const WARP_FS = `#version 300 es
-precision highp float;
-in vec3 vUvq; out vec4 o;
-uniform sampler2D tex;
-uniform float grid;   // >0.5 → draw the alignment overlay
-void main(){
-  vec2 uv = vUvq.xy / vUvq.z;
-  vec4 c = texture(tex, uv);
-  if (grid > 0.5){
-    vec2 g = abs(fract(uv * 8.0) - 0.5);
-    float line = smoothstep(0.47, 0.5, max(g.x, g.y));
-    c.rgb = mix(c.rgb, vec3(0.0, 1.0, 1.0), line * 0.5);
-    float edge = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y));
-    c.rgb = mix(c.rgb, vec3(1.0, 0.2, 0.2), 1.0 - smoothstep(0.0, 0.006, edge));
-  }
-  o = c;
-}`;
+// Projection warp : engine/warpQuad.ts (shared with the projector window).
 
 // Source framing : the whole picture fitted into the layer (stretch / cover /
 // contain), zoomed about the centre and panned; the crop then CUTS its edges away
@@ -441,53 +418,6 @@ class PingPong {
 function disposeTarget(gl: WebGL2RenderingContext, t: { fbo: WebGLFramebuffer; tex: WebGLTexture }) {
   gl.deleteFramebuffer(t.fbo);
   gl.deleteTexture(t.tex);
-}
-
-function lineIntersect(a1: number[], a2: number[], b1: number[], b2: number[]): number[] | null {
-  const d = (a2[0] - a1[0]) * (b2[1] - b1[1]) - (a2[1] - a1[1]) * (b2[0] - b1[0]);
-  if (Math.abs(d) < 1e-9) return null;
-  const t = ((b1[0] - a1[0]) * (b2[1] - b1[1]) - (b1[1] - a1[1]) * (b2[0] - b1[0])) / d;
-  return [a1[0] + t * (a2[0] - a1[0]), a1[1] + t * (a2[1] - a1[1])];
-}
-
-/** 4 normalized corners (TL,TR,BR,BL; 0..1, top-left origin) → 6 verts of
- *  (clipX, clipY, u·q, v·q, q) for a perspective-correct textured quad. The q
- *  (w) coords come from the diagonal intersection so the mapping is a true
- *  keystone, not a bilinear smear. */
-function computeWarpVerts(c: number[]): Float32Array {
-  const p = [
-    [c[0], c[1]],
-    [c[2], c[3]],
-    [c[4], c[5]],
-    [c[6], c[7]]
-  ];
-  const q = [1, 1, 1, 1];
-  const inter = lineIntersect(p[0], p[2], p[1], p[3]);
-  if (inter) {
-    const dist = p.map((pt) => Math.hypot(pt[0] - inter[0], pt[1] - inter[1]));
-    for (let i = 0; i < 4; i++) {
-      const dopp = dist[(i + 2) % 4];
-      q[i] = dopp > 1e-6 ? (dist[i] + dopp) / dopp : 1;
-    }
-  }
-  const uv = [
-    [0, 1],
-    [1, 1],
-    [1, 0],
-    [0, 0]
-  ];
-  const clip = p.map((pt) => [pt[0] * 2 - 1, 1 - pt[1] * 2]);
-  const idx = [0, 1, 2, 0, 2, 3];
-  const out = new Float32Array(30);
-  let o = 0;
-  for (const i of idx) {
-    out[o++] = clip[i][0];
-    out[o++] = clip[i][1];
-    out[o++] = uv[i][0] * q[i];
-    out[o++] = uv[i][1] * q[i];
-    out[o++] = q[i];
-  }
-  return out;
 }
 
 /**
@@ -1777,7 +1707,10 @@ export class Compositor {
   private warpProg!: WebGLProgram;
   private warpVao!: WebGLVertexArrayObject;
   private warpBuf!: WebGLBuffer;
-  private uWTex!: WebGLUniformLocation; private uWGrid!: WebGLUniformLocation;
+  private uWTex!: WebGLUniformLocation; private uWGrid!: WebGLUniformLocation; private uWFeather!: WebGLUniformLocation;
+  private warpFeather = 0;
+  private warpVertsW = 0; // the canvas size the quad was built for (its margin is in pixels)
+  private warpVertsH = 0;
   private warpActive = false;
   private warpGridOn = false;
   private warpCorners: number[] = [];
@@ -1875,6 +1808,7 @@ export class Compositor {
     this.warpProg = compile(gl, WARP_VS, WARP_FS);
     this.uWTex = gl.getUniformLocation(this.warpProg, 'tex')!;
     this.uWGrid = gl.getUniformLocation(this.warpProg, 'grid')!;
+    this.uWFeather = gl.getUniformLocation(this.warpProg, 'feather')!;
     const wpos = gl.getAttribLocation(this.warpProg, 'pos');
     const wuvq = gl.getAttribLocation(this.warpProg, 'uvq');
     this.warpVao = gl.createVertexArray()!;
@@ -2330,47 +2264,68 @@ export class Compositor {
   }
 
   // ── Sonify tap readback : a 96×96 downsample of the presented frame OR one
-  //    layer's post-FX image, read by the sonification engine at ~30Hz. Same
-  //    pattern as visionSample : queue this frame, hand back the one that has
-  //    landed. One ring per tap, since the two taps can read different sources.
-  private soniRead = new Map<string, GridReadback>();
-  // The grid each source handed out this engine frame. Both taps on ONE source
-  // share a ring, and a ring hands a landed grid out once : the first tap took
-  // it and the second found nothing, every tick, so tap B went silent whenever
-  // it pointed where tap A did. The second read of a frame reuses the first.
-  private soniLast = new Map<string, { frame: number; ok: boolean; grid: Uint8Array; at: number }>();
+  //    layer's post-FX image per tap, read by the sonification engine at ~30Hz.
+  //    Same pattern as visionSample : queue this frame, hand back the one that
+  //    has landed. The taps' sources go side by side in ONE strip and ONE read
+  //    (see kickStrip) : read one ring each, the two taps cost two blocking
+  //    round trips a tick. Two taps on the same source share its cell.
+  private soniStrip: GridReadback | null = null;
+  private soniStripKey = ''; // the sources of the strips in flight, in cell order
+  private soniStripAt = 0; // when the strip was last read
+  private soniStripFrame = -1; // the engine frame it was last read in
+  private soniStripRes: boolean[] = [];
 
-  readSonifyGrid(kind: 'master' | 'layer', layer: number, out: Uint8Array): boolean {
+  readSonifyGrids(taps: Array<{ kind: 'master' | 'layer'; layer: number } | null>, outs: Uint8Array[]): boolean[] {
     const size = 96;
-    if (out.length < size * size * 4) return false;
-    const src = kind === 'master' ? this.lastPresent : this.layers[layer]?.texture() ?? null;
-    if (!src) return false;
-    // Keyed on the SOURCE, not the tap : the master tap ignores `layer`, and a
-    // key that carried it would open a ring per layer index for the same picture.
-    const key = kind === 'master' ? 'master' : `layer:${layer}`;
-    let last = this.soniLast.get(key);
-    if (last && last.frame === this.frameNo) {
-      if (last.ok) out.set(last.grid);
-      return last.ok;
-    }
-    let ring = this.soniRead.get(key);
-    if (!ring) { ring = new GridReadback(this.gl); this.soniRead.set(key, ring); }
-    // Back from a pause (unread for 150 ms, the gap after which the engine
-    // treats a tap's next grid as a fresh start, AND for several frames, so a
-    // slow frame rate is never taken for one) : what was left in flight is the
-    // picture from before it. Dropped, the first grid back is a current one.
+    const res = taps.map(() => false);
+    // the distinct sources, in tap order. Keyed on the SOURCE, not the tap : the
+    // master tap ignores `layer`.
+    const keys: string[] = [];
+    const texs: WebGLTexture[] = [];
+    const cellOf: number[] = taps.map(() => -1);
+    taps.forEach((t, i) => {
+      if (!t || (outs[i]?.length ?? 0) < size * size * 4) return;
+      const key = t.kind === 'master' ? 'master' : `layer:${t.layer}`;
+      let c = keys.indexOf(key);
+      if (c < 0) {
+        const src = t.kind === 'master' ? this.lastPresent : this.layers[t.layer]?.texture() ?? null;
+        if (!src) return;
+        c = keys.length;
+        keys.push(key);
+        texs.push(src);
+      }
+      cellOf[i] = c;
+    });
+    if (!keys.length) return res;
+    // Asked twice in one engine frame : the strip has already been taken.
+    if (this.soniStripFrame === this.frameNo) return this.soniStripRes.slice(0, taps.length);
+    if (!this.soniStrip) this.soniStrip = new GridReadback(this.gl);
+    const strip = this.soniStrip;
+    const key = keys.join('|');
     const now = performance.now();
-    if (last && now - last.at > 150 && this.frameNo - last.frame > 8) ring.dropInFlight();
-    ring.kick(size, size, src, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
-    const got = ring.takeLatest();
-    if (!last) { last = { frame: 0, ok: false, grid: new Uint8Array(size * size * 4), at: 0 }; this.soniLast.set(key, last); }
-    last.frame = this.frameNo;
-    last.at = now;
-    last.ok = !!got;
-    if (!got) return false; // nothing has landed yet : the caller skips this tick
-    last.grid.set(got.grid);
-    out.set(got.grid);
-    return true;
+    // Other sources, or back from a pause (unread for 150 ms, the gap after
+    // which the engine treats a tap's next grid as a fresh start, AND for
+    // several frames, so a slow frame rate is never taken for one) : what is in
+    // flight shows other pictures, or pictures from before. Dropped, the first
+    // grid back is a current one.
+    if (key !== this.soniStripKey || (now - this.soniStripAt > 150 && this.frameNo - this.soniStripFrame > 8)) strip.dropInFlight();
+    this.soniStripKey = key;
+    this.soniStripAt = now;
+    this.soniStripFrame = this.frameNo;
+    strip.kickStrip(size, size, texs, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
+    const got = strip.takeLatest();
+    if (got && got.w === size * keys.length) {
+      const W = got.w;
+      taps.forEach((_, i) => {
+        const c = cellOf[i];
+        if (c < 0) return;
+        const out = outs[i];
+        for (let y = 0; y < size; y++) out.set(got.grid.subarray((y * W + c * size) * 4, (y * W + c * size + size) * 4), y * size * 4);
+        res[i] = true;
+      });
+    }
+    this.soniStripRes = res;
+    return res;
   }
 
   // ── Depth map (2.5D) : the shared grayscale depth the Parallax FX reads (and
@@ -2625,23 +2580,20 @@ export class Compositor {
 
   /** Set the projection warp for the present pass. `corners` = 8 normalized
    *  numbers (TL,TR,BR,BL x,y; top-left origin) or null to disable. */
-  setWarp(corners: number[] | null, grid: boolean): void {
+  setWarp(corners: number[] | null, grid: boolean, feather = 0): void {
     if (!corners || corners.length !== 8) {
       this.warpActive = false;
       return;
     }
     this.warpActive = true;
     this.warpGridOn = grid;
+    this.warpFeather = Math.max(0, feather);
     // Numeric diff (a join() would allocate a string every frame while warping).
     let changed = this.warpCorners.length !== corners.length;
     if (!changed) for (let i = 0; i < corners.length; i++) if (this.warpCorners[i] !== corners[i]) { changed = true; break; }
     if (changed) {
       this.warpCorners = corners.slice();
-      const gl = this.gl;
-      gl.bindVertexArray(this.warpVao);
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.warpBuf);
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, computeWarpVerts(corners));
-      gl.bindVertexArray(null);
+      this.warpVertsW = 0; // rebuilt at the next present
     }
   }
 
@@ -3482,9 +3434,18 @@ export class Compositor {
     } else if (this.warpActive) {
       gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
       gl.bindVertexArray(this.warpVao);
+      // The quad reaches a couple of pixels past the frame for its anti-aliased
+      // edge : rebuilt when the corners or the canvas size change.
+      if (this.warpVertsW !== this.canvas.width || this.warpVertsH !== this.canvas.height) {
+        this.warpVertsW = this.canvas.width;
+        this.warpVertsH = this.canvas.height;
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.warpBuf);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, computeWarpVerts(this.warpCorners, this.warpVertsW, this.warpVertsH));
+      }
       gl.useProgram(this.warpProg);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, shown); gl.uniform1i(this.uWTex, 0);
       gl.uniform1f(this.uWGrid, this.warpGridOn ? 1 : 0);
+      gl.uniform1f(this.uWFeather, this.warpFeather);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     } else {
       gl.bindVertexArray(this.vao);
@@ -3540,9 +3501,9 @@ export class Compositor {
     this.depthRead?.dispose(); this.depthRead = null;
     this.zoneRead?.dispose(); this.zoneRead = null;
     this.markRead?.dispose(); this.markRead = null;
-    for (const r of this.soniRead.values()) r.dispose();
-    this.soniRead.clear();
-    this.soniLast.clear();
+    this.soniStrip?.dispose();
+    this.soniStrip = null;
+    this.soniStripKey = '';
     this.pbrLib?.dispose();
     disposeTarget(gl, this.bgScratch);
     disposeTarget(gl, this.bgFill);

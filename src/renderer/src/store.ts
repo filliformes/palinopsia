@@ -1429,6 +1429,9 @@ interface StoreState {
   warpCorners: number[]
   setWarpEnabled: (on: boolean) => void
   setWarpGrid: (on: boolean) => void
+  /** Output pixels the warped frame's edge fades over (0 : crisp, anti-aliased). */
+  warpFeather: number
+  setWarpFeather: (px: number) => void
   setWarpCorner: (corner: number, x: number, y: number) => void
   resetWarp: () => void
   // The warp travels with the session : saved into it, restored from it. A
@@ -1859,9 +1862,16 @@ function sameSource(a: SourceSlot | null, b: SourceSlot | null): boolean {
  *  that is still in its rack, a source slot that still holds a source. Anything
  *  else (layer controls, Meta, Sonify, the Background's and the dome's own
  *  controls) always exists. */
+/** This computer's warp feather (localStorage), in output pixels. */
+function storedWarpFeather(): number {
+  const n = Number(localStorage.getItem('opsia.warpFeather'))
+  return Number.isFinite(n) ? Math.max(0, Math.min(WARP_FEATHER_MAX, n)) : 0
+}
+const WARP_FEATHER_MAX = 200
+
 /** Back to this computer's own warp (localStorage) after a session's. */
 function restoreMachineWarp(
-  set: (p: Partial<{ warpCorners: number[]; warpEnabled: boolean; warpFromSession: boolean }>) => void,
+  set: (p: Partial<{ warpCorners: number[]; warpEnabled: boolean; warpFeather: number; warpFromSession: boolean }>) => void,
   get: () => { warpFromSession: boolean }
 ): void {
   if (!get().warpFromSession) return
@@ -1872,7 +1882,7 @@ function restoreMachineWarp(
   } catch {
     /* none stored : the identity */
   }
-  set({ warpCorners: corners, warpEnabled: localStorage.getItem('opsia.warpEnabled') === '1', warpFromSession: false })
+  set({ warpCorners: corners, warpEnabled: localStorage.getItem('opsia.warpEnabled') === '1', warpFeather: storedWarpFeather(), warpFromSession: false })
 }
 
 export function targetAlive(c: CompositionState, t: ModTarget): boolean {
@@ -3351,6 +3361,12 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ warpEnabled: on })
   },
   setWarpGrid: (on) => set({ warpGrid: on }),
+  warpFeather: storedWarpFeather(),
+  setWarpFeather: (px) => {
+    const v = Math.max(0, Math.min(WARP_FEATHER_MAX, Number.isFinite(px) ? px : 0))
+    if (!get().warpFromSession) localStorage.setItem('opsia.warpFeather', String(v))
+    set({ warpFeather: v })
+  },
   setWarpCorner: (corner, x, y) =>
     set((s) => {
       const c = [...s.warpCorners]
@@ -4669,7 +4685,8 @@ export const useStore = create<StoreState>((set, get) => ({
       sw.corners.every((v) => typeof v === 'number' && Number.isFinite(v))
     ) {
       const corners = sw.corners.map((v) => Math.max(-0.5, Math.min(1.5, v)))
-      set({ warpCorners: corners, warpEnabled: !!sw.enabled, warpFromSession: true })
+      const feather = typeof sw.feather === 'number' && Number.isFinite(sw.feather) ? Math.max(0, Math.min(WARP_FEATHER_MAX, sw.feather)) : 0
+      set({ warpCorners: corners, warpEnabled: !!sw.enabled, warpFeather: feather, warpFromSession: true })
     } else {
       restoreMachineWarp(set, get)
     }
@@ -4714,7 +4731,7 @@ export const useStore = create<StoreState>((set, get) => ({
       resolume: s.resolume,
       dome: s.dome,
       outXform: s.outXform,
-      ...(s.warpInSession ? { warp: { enabled: s.warpEnabled, corners: [...s.warpCorners] } } : {}),
+      ...(s.warpInSession ? { warp: { enabled: s.warpEnabled, corners: [...s.warpCorners], feather: s.warpFeather } } : {}),
       ui: { theme: s.theme }
     }
   }

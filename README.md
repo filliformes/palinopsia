@@ -403,8 +403,8 @@ Recording* shows), by cable, with no app to install on the phone and no network 
 between; crop the Camera app's buttons away with the slot's framing. macOS shows this
 camera only to an app that asks, and as a sound-and-picture device the browser engine
 skips, so Palinopsia captures it itself (`native/avcapture`, in a process of its own
-that stays up for the whole session). Frames come in at up to
-1920 on their long side (an iPhone X : 887×1920). The Inspector says what it receives
+that stays up for the whole session). Frames come in fitted
+inside 1920x1080 (a portrait iPhone X : 499x1080). The Inspector says what it receives
 (size, frames per second) or what it waits for; a device that is unplugged, rebooted
 or not there yet is looked for every 2 s for as long as a layer shows it, so an
 installation's phone that charges and boots after the power comes back joins by
@@ -872,7 +872,9 @@ bottom:
   (one keystone per piece or per venue). Edits made then are that session's. The
   computer's own warp is kept apart and comes back with a session that has none,
   with New, or when the option is turned off. The choice is this computer's : off,
-  sessions neither save nor change its warp. A Finalizer output shape with **post warp**
+  sessions neither save nor change its warp. Its edges are anti-aliased (a keystoned
+  side no longer steps), and **feather** softens them into the black over up to 200
+  projector pixels. A Finalizer output shape with **post warp**
   on is measured on the projector after this warp (a circle stays round there).
   Recordings, NDI and Spout get the picture before the warp, so there the shape is
   pre-bent to come out right on the projector.

@@ -1002,7 +1002,7 @@ export interface Session {
   // The projector warp (Output → Mapping), written only when "save with the
   // session" is on, and applied on load only where that option is on : the
   // warp is otherwise the computer's (its projector), not the piece's.
-  warp?: { enabled: boolean; corners: number[] }
+  warp?: { enabled: boolean; corners: number[]; feather?: number }
   // Opaque renderer UI snapshot (theme, panel sizes, selection). The main
   // process never inspects it : it just round-trips it to disk.
   ui?: unknown
@@ -1069,7 +1069,7 @@ export interface RecordingFolderInfo {
 
 /** What the output window reads per frame now : the keystone it applies to the
  *  streamed picture (it no longer renders the composition itself). */
-export type OutputWarp = Pick<OutputFrame, 'warpEnabled' | 'warpCorners' | 'warpGrid'>
+export type OutputWarp = Pick<OutputFrame, 'warpEnabled' | 'warpCorners' | 'warpGrid' | 'warpFeather'>
 
 export interface OutputFrame {
   c: CompositionState
@@ -1079,6 +1079,8 @@ export interface OutputFrame {
   warpEnabled: boolean
   warpCorners: number[]
   warpGrid: boolean
+  /** Output pixels the warped frame's edge fades over (0 : crisp, anti-aliased). */
+  warpFeather?: number
   time: number
   // Per-layer coupled A/B mix (audio-driven) so the output window matches the
   // control window; absent when no layer is coupled.
