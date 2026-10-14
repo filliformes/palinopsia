@@ -4,113 +4,126 @@
 // in one). The Live Input picker lists them beside the ordinary cameras, as
 // `device:avf:<id>`.
 //
-// Lives in the window's own process like the NDI receiver (see ndi.ts) : frames
-// are copied once out of the addon into pooled buffers and TRANSFERRED to the
-// page over a private MessageChannel (no copy); the page sends each buffer back
-// when a newer frame replaces it.
-//
-// Built for installations : a device that is not there yet (an iPhone still
-// charging after the power came back) or that goes away (unplugged, rebooted) is
-// looked for again every two seconds, for as long as a layer shows it, with no
-// one at the computer.
+// The captures run in a process of their own (src/main/avcaptureWorker.ts) :
+// macOS never shows an iPhone's screen to a window's renderer, which is where
+// they first ran, and where the picker then listed nothing with the phone
+// plugged in. This side talks to that process over a MessagePort the main
+// process hands out, and passes each frame on to the page over a private
+// MessageChannel (a transfer : no copy within the window). The page's API is
+// unchanged : avfList / avfOpen / avfClose / avfStatus, and frames on the
+// `opsia:avfinport` channel (src/renderer/src/engine/avfIn.ts).
 
 import { ipcRenderer } from 'electron'
+import { existsSync } from 'fs'
 import { join } from 'path'
 import type { AvfDevice, AvfStatus } from '@shared/avf'
 
-interface Addon {
-  enable: () => void
-  list: () => Array<{ id: string; name: string; model: string; muxed: boolean }>
-  open: (id: string, maxSide: number) => number | null
-  frame: (h: number) => {
-    state: string
-    w: number
-    h: number
-    srcW: number
-    srcH: number
-    seq: number
-    idle: number
-    error: string
-  } | null
-  copy: (h: number, buf: ArrayBuffer, w: number, hh: number) => number
-  setMaxSide: (h: number, px: number) => void
-  close: (h: number) => void
+// out/preload → the project (dev) or app.asar (packaged, unpacked beside it).
+const ADDON = join(__dirname, '..', '..', 'native', 'avcapture', 'build', 'Release', 'avcapture.node').replace(
+  /app\.asar(?=$|[\\/])/,
+  'app.asar.unpacked'
+)
+const MISSING = 'the USB input module is missing from this build (sh native/avcapture/build.sh)'
+
+/** Whether this computer can capture at all : a Mac, with the module built. */
+function available(): boolean {
+  return process.platform === 'darwin' && existsSync(ADDON)
 }
 
-// The long side of a frame at most this : an iPhone X screen (1125×2436) comes
-// in at 887×1920, a 1080p capture card untouched, a 4K one at 1080p. Smaller
-// frames cost less to copy and upload, and latency comes first here.
-const MAX_SIDE = 1920
-// An iPhone appears about a second after the opt-in : the DAL publishes it
-// asynchronously, so the first look waits for it.
-const APPEAR_MS = 1500
+let ctrl: MessagePort | null = null
+let connecting: Promise<MessagePort | null> | null = null
 
-let mod: Addon | null = null
-let loadError = ''
-let enabledAt = 0
+/** The port to the capture process, asked of the main process once (and again
+ *  if that process is ever lost). */
+function connect(): Promise<MessagePort | null> {
+  if (ctrl) return Promise.resolve(ctrl)
+  if (connecting) return connecting
+  connecting = new Promise((resolve) => {
+    const done = (p: MessagePort | null): void => {
+      clearTimeout(t)
+      ipcRenderer.off('avf:port', onPort)
+      connecting = null
+      resolve(p)
+    }
+    const onPort = (e: Electron.IpcRendererEvent): void => {
+      const p = e.ports[0]
+      if (!p) return done(null)
+      ctrl = p
+      p.onmessage = onWorker
+      p.start()
+      // Whatever this window was showing before a lost process : open it again.
+      for (const id of wanted.keys()) if (granted.has(id)) p.postMessage({ t: 'open', id })
+      done(p)
+    }
+    const t = setTimeout(() => done(null), 5000)
+    ipcRenderer.on('avf:port', onPort)
+    ipcRenderer.send('avf:connect')
+  })
+  return connecting
+}
 
-function addon(): Addon | null {
-  if (mod) return mod
-  if (process.platform !== 'darwin') {
-    loadError = 'macOS only'
-    return null
+// The capture process stopped : statuses say so, and the next look connects again.
+ipcRenderer.on('avf:lost', () => {
+  ctrl = null
+  for (const id of wanted.keys()) {
+    statuses.set(id, { ...(statuses.get(id) ?? blank()), state: 'failed', error: 'the USB input stopped : starting it again', fps: 0 })
   }
-  if (loadError) return null
-  try {
-    // out/preload → the project (dev) or app.asar (packaged, unpacked beside it).
-    const root = join(__dirname, '..', '..').replace(/app\.asar(?=$|[\\/])/, 'app.asar.unpacked')
-    const m = { exports: {} as Addon }
-    process.dlopen(m as unknown as NodeModule, join(root, 'native', 'avcapture', 'build', 'Release', 'avcapture.node'))
-    mod = m.exports
-    return mod
-  } catch (e) {
-    loadError = `the USB input module did not load (${(e as Error).message})`
-    return null
+  setTimeout(() => {
+    if (wanted.size > 0) void connect()
+  }, 2000)
+})
+
+const blank = (): AvfStatus => ({ state: 'starting', w: 0, h: 0, srcW: 0, srcH: 0, fps: 0, error: '' })
+
+const statuses = new Map<string, AvfStatus>()
+const wanted = new Map<string, number>() // device → how many layers of this window show it
+const granted = new Set<string>() // devices sent to the capture process (camera access given)
+const lists = new Map<number, (r: { ok: boolean; devices: AvfDevice[]; message: string }) => void>()
+let nextRid = 1
+let pagePort: MessagePort | null = null
+
+function onWorker(e: MessageEvent): void {
+  const d = e.data as
+    | { t: 'list'; rid: number; ok: boolean; devices: AvfDevice[]; message: string }
+    | { t: 'status'; id: string; status: AvfStatus }
+    | { t: 'in'; name: string; w: number; h: number; stride: number; buf: ArrayBuffer }
+    | null
+  if (!d) return
+  if (d.t === 'list') {
+    lists.get(d.rid)?.({ ok: d.ok, devices: d.devices, message: d.message })
+    lists.delete(d.rid)
+  } else if (d.t === 'status') {
+    if (wanted.has(d.id)) statuses.set(d.id, d.status)
+  } else if (d.t === 'in') {
+    // On to the page, moved rather than copied. No page listening : taken at once.
+    if (pagePort && wanted.has(d.name)) pagePort.postMessage({ ...d, sent: 0 }, [d.buf])
+    else ctrl?.postMessage({ t: 'ack', id: d.name })
   }
 }
 
-function enable(a: Addon): void {
-  if (enabledAt) return
-  a.enable()
-  enabledAt = performance.now()
-}
-
-const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
-
-/** The devices AVFoundation sees, iPhones included. The first call opts in to
- *  screen-capture devices and waits for them to appear. */
+/** The devices AVFoundation sees, iPhones included. The first look opts in to
+ *  screen-capture devices and waits a moment for them to appear. */
 export async function avfList(): Promise<{ ok: boolean; devices: AvfDevice[]; message: string }> {
-  const a = addon()
-  if (!a) return { ok: false, devices: [], message: loadError }
-  try {
-    enable(a)
-    const wait = APPEAR_MS - (performance.now() - enabledAt)
-    if (wait > 0) await sleep(wait)
-    return { ok: true, devices: a.list(), message: '' }
-  } catch (e) {
-    return { ok: false, devices: [], message: (e as Error).message }
-  }
+  if (process.platform !== 'darwin') return { ok: false, devices: [], message: 'macOS only' }
+  if (!available()) return { ok: false, devices: [], message: MISSING }
+  const p = await connect()
+  if (!p) return { ok: false, devices: [], message: 'the USB input process did not start' }
+  const rid = nextRid++
+  return new Promise((resolve) => {
+    const t = setTimeout(() => {
+      lists.delete(rid)
+      resolve({ ok: false, devices: [], message: 'the USB input process did not answer' })
+    }, 10000)
+    lists.set(rid, (r) => {
+      clearTimeout(t)
+      resolve(r)
+    })
+    p.postMessage({ t: 'list', rid })
+  })
 }
 
-// ── Receivers : one per device, shared by every layer that shows it ─────────
+// ── Camera permission ───────────────────────────────────────────────────────
 
-interface Recv {
-  id: string
-  refs: number
-  handle: number | null
-  openAt: number // when to try again (performance.now())
-  failures: number
-  pool: ArrayBuffer[]
-  out: number // buffers the page holds
-  lastSeq: number
-  status: AvfStatus
-  frames: number
-  fpsT0: number
-  openedAt: number // when the current capture was opened (a start that never delivers is retried)
-}
-const recvs = new Map<string, Recv>()
-let port: MessagePort | null = null
-let timer: ReturnType<typeof setInterval> | null = null
 let access: Promise<string> | null = null
 
 /** Camera permission, asked by the main process (the prompt then names the app;
@@ -126,179 +139,71 @@ function cameraAccess(): Promise<string> {
   return access
 }
 
-function closeHandle(r: Recv): void {
-  if (r.handle !== null) {
-    try { mod?.close(r.handle) } catch { /* ignore */ }
-  }
-  r.handle = null
-  // A new capture counts its frames from 1 again.
-  r.lastSeq = 0
-}
-
-// A capture that has not delivered a single frame this long is opened again
-// (a session that stopped before its first frame, a start that never returned).
-const START_TIMEOUT_MS = 15000
-
-/** Try again later : at once-ish while a device is missing or just went away
- *  (it comes back on its own), more slowly when it refuses to open. */
-function retryLater(r: Recv, state: AvfStatus['state'], error: string): void {
-  closeHandle(r)
-  r.status = { ...r.status, state, error, fps: 0 }
-  const now = performance.now()
-  if (state === 'failed') {
-    r.failures++
-    r.openAt = now + Math.min(30_000, 2000 * 2 ** Math.min(r.failures - 1, 4))
-  } else {
-    r.openAt = now + (state === 'denied' ? 5000 : 2000)
-  }
-}
-
-let opening = false
-async function openRecv(r: Recv, a: Addon): Promise<void> {
-  if (opening) return
-  opening = true
-  try {
-    const s = await cameraAccess()
-    // Still the receiver for this device? (It may have been let go and asked
-    // for again meanwhile : a capture opened for this one would never be closed.)
-    if (recvs.get(r.id) !== r || r.handle !== null) return
-    if (s !== 'granted') {
-      retryLater(r, 'denied', 'camera access denied : allow Palinopsia under Privacy & Security, Camera')
-      return
-    }
-    enable(a)
-    // Freshly opted in : give an iPhone its second to appear.
-    const wait = APPEAR_MS - (performance.now() - enabledAt)
-    if (wait > 0) await sleep(wait)
-    if (recvs.get(r.id) !== r || r.handle !== null) return
-    r.handle = a.open(r.id, MAX_SIDE)
-    r.openedAt = performance.now()
-    r.status = { ...r.status, state: 'starting', error: '' }
-    if (r.handle === null) retryLater(r, 'failed', 'the device would not open')
-  } catch (e) {
-    retryLater(r, 'failed', (e as Error).message)
-  } finally {
-    opening = false
-  }
-}
-
-/** Every few ms : each device's newest frame, if it is new and the page has room. */
-function pull(): void {
-  const a = mod
-  if (!a || recvs.size === 0) {
-    if (timer) { clearInterval(timer); timer = null }
+/** Ask, then hand the device to the capture process. Refused : said in the
+ *  status, and asked again every 5 s for as long as a layer shows it. */
+async function start(id: string): Promise<void> {
+  const s = await cameraAccess()
+  if (!wanted.has(id) || granted.has(id)) return
+  if (s !== 'granted') {
+    statuses.set(id, { ...(statuses.get(id) ?? blank()), state: 'denied', error: 'camera access denied : allow Palinopsia under Privacy & Security, Camera', fps: 0 })
+    setTimeout(() => { if (wanted.has(id)) void start(id) }, 5000)
     return
   }
-  const now = performance.now()
-  for (const r of recvs.values()) {
-    if (r.handle === null) {
-      if (now >= r.openAt) void openRecv(r, a)
-      continue
-    }
-    let f: ReturnType<Addon['frame']>
-    try {
-      f = a.frame(r.handle)
-    } catch {
-      f = null
-    }
-    if (!f) {
-      retryLater(r, 'failed', 'lost the capture')
-      continue
-    }
-    if (f.state === 'missing' || f.state === 'gone' || f.state === 'failed' || f.state === 'denied') {
-      if (f.state === 'gone') console.warn(`[usb input] ${r.id} went away (${f.error}) : looking for it again`)
-      retryLater(r, f.state, f.error)
-      continue
-    }
-    if (f.state === 'starting' && f.seq === 0 && now - r.openedAt > START_TIMEOUT_MS) {
-      retryLater(r, 'failed', 'no picture came : opening it again')
-      continue
-    }
-    if (f.state === 'running' && r.status.state !== 'running') {
-      console.warn(`[usb input] ${r.id} is capturing (${f.srcW}×${f.srcH})`)
-      r.failures = 0
-    }
-    r.status = { ...r.status, state: f.state as AvfStatus['state'], w: f.w, h: f.h, srcW: f.srcW, srcH: f.srcH, error: f.error }
-    if (now - r.fpsT0 >= 1000) {
-      r.status.fps = Math.round((r.frames * 1000) / (now - r.fpsT0))
-      r.frames = 0
-      r.fpsT0 = now
-    }
-    if (f.seq === r.lastSeq || !port || r.out >= 2 || !(f.w > 0 && f.h > 0)) continue
-    const bytes = f.w * f.h * 4
-    let buf = r.pool.pop()
-    if (!buf || buf.byteLength !== bytes) buf = new ArrayBuffer(bytes)
-    let seq = 0
-    try {
-      seq = a.copy(r.handle, buf, f.w, f.h)
-    } catch {
-      seq = 0
-    }
-    if (!seq) {
-      // Resized between frame() and copy() : next time.
-      if (r.pool.length < 3) r.pool.push(buf)
-      continue
-    }
-    r.lastSeq = seq
-    r.frames++
-    r.out++
-    port.postMessage({ t: 'in', name: r.id, w: f.w, h: f.h, stride: f.w * 4, buf, sent: 0 }, [buf])
+  granted.add(id)
+  const p = await connect()
+  if (!p) {
+    granted.delete(id)
+    statuses.set(id, { ...(statuses.get(id) ?? blank()), state: 'failed', error: 'the USB input process did not start', fps: 0 })
+    setTimeout(() => { if (wanted.has(id)) void start(id) }, 2000)
+    return
   }
+  if (wanted.has(id)) p.postMessage({ t: 'open', id })
 }
 
+// ── The page's port (frames) ────────────────────────────────────────────────
+
 function openPort(): void {
-  try { port?.close() } catch { /* ignore */ }
+  try { pagePort?.close() } catch { /* ignore */ }
   const mc = new MessageChannel()
-  port = mc.port1
-  port.onmessage = (ev): void => {
-    const d = ev.data as { t: string; name: string; buf: ArrayBuffer } | null
-    if (!d || d.t !== 'in-return') return
-    const r = recvs.get(d.name)
-    if (!r) return
-    r.out = Math.max(0, r.out - 1)
-    if (d.buf instanceof ArrayBuffer && r.pool.length < 3) r.pool.push(d.buf)
+  pagePort = mc.port1
+  pagePort.onmessage = (ev): void => {
+    const d = ev.data as { t: string; name: string } | null
+    // The page is done with a frame : the capture process may send another.
+    if (d?.t === 'in-return') ctrl?.postMessage({ t: 'ack', id: d.name })
   }
   window.postMessage('opsia:avfinport', '*', [mc.port2])
 }
 window.addEventListener('message', (ev) => {
   if (ev.data === 'opsia:want-avfinport') openPort()
 })
-window.addEventListener('beforeunload', () => {
-  for (const r of recvs.values()) closeHandle(r)
-})
 
 /** A layer starts showing a device. False : this computer cannot (not a Mac, or
- *  the module is missing); the receiver is kept either way. */
+ *  the module is missing); the request is kept either way. */
 export function avfOpen(id: string): boolean {
-  let r = recvs.get(id)
-  if (r) {
-    r.refs++
-    return !!addon()
-  }
-  r = {
-    id, refs: 1, handle: null, openAt: 0, failures: 0, pool: [], out: 0, lastSeq: 0,
-    status: { state: 'starting', w: 0, h: 0, srcW: 0, srcH: 0, fps: 0, error: '' },
-    frames: 0, fpsT0: performance.now(), openedAt: 0
-  }
-  recvs.set(id, r)
-  if (!addon()) {
-    r.status = { ...r.status, state: 'unavailable', error: loadError }
+  const n = (wanted.get(id) ?? 0) + 1
+  wanted.set(id, n)
+  if (n > 1) return available()
+  if (!available()) {
+    statuses.set(id, { ...blank(), state: 'unavailable', error: process.platform === 'darwin' ? MISSING : 'macOS only' })
     return false
   }
-  if (!timer) timer = setInterval(pull, 4)
+  statuses.set(id, blank())
+  void start(id)
   return true
 }
 
 /** A layer let go of a device : the capture stops when nobody shows it. */
 export function avfClose(id: string): void {
-  const r = recvs.get(id)
-  if (!r) return
-  r.refs--
-  if (r.refs > 0) return
-  recvs.delete(id)
-  closeHandle(r)
+  const n = (wanted.get(id) ?? 0) - 1
+  if (n > 0) {
+    wanted.set(id, n)
+    return
+  }
+  wanted.delete(id)
+  statuses.delete(id)
+  if (granted.delete(id)) ctrl?.postMessage({ t: 'close', id })
 }
 
 export function avfStatus(id: string): AvfStatus | null {
-  return recvs.get(id)?.status ?? null
+  return wanted.has(id) ? statuses.get(id) ?? null : null
 }

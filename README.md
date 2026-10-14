@@ -386,7 +386,8 @@ Computer*, open its **Camera** app : the Live Input picker lists it with a `📱
 Recording* shows), by cable, with no app to install on the phone and no network in
 between; crop the Camera app's buttons away with the slot's framing. macOS shows this
 camera only to an app that asks, and as a sound-and-picture device the browser engine
-skips, so Palinopsia captures it itself (`native/avcapture`). Frames come in at up to
+skips, so Palinopsia captures it itself (`native/avcapture`, in a process of its own
+that stays up for the whole session). Frames come in at up to
 1920 on their long side (an iPhone X : 887×1920). The Inspector says what it receives
 (size, frames per second) or what it waits for; a device that is unplugged, rebooted
 or not there yet is looked for every 2 s for as long as a layer shows it, so an
@@ -394,7 +395,10 @@ installation's phone that charges and boots after the power comes back joins by
 itself. For a phone left alone : Auto-Lock *Never*, locked to the Camera app (Apple
 Configurator's *Single App Mode* survives a reboot, Guided Access does not), and no
 passcode (after a restart, iOS keeps a passcode-locked phone's USB closed until it is
-unlocked once). macOS asks for camera access the first time. Any iPhone or iPad that
+unlocked once). macOS asks for camera access the first time (started from a
+terminal with `npm run dev`, it asks on behalf of that terminal app). macOS lends the
+phone to one app at a time : quit and reopen Palinopsia quickly and the phone can take
+a minute to come back, or unplug and replug it. Any iPhone or iPad that
 QuickTime can show works; a recent iPhone (XR or later, iOS 16+) can also be a wireless
 camera through *Continuity Camera*, listed with the others.
 
@@ -2158,7 +2162,8 @@ src/
 native/spout/ N-API DX11 Spout sender addon (vendored Spout2 SDK)
 native/syphon/ macOS Syphon (Metal) server addon, built from the Syphon source in CI
 native/avcapture/ macOS USB input addon (AVFoundation) : an iPhone by USB and the other
-              cameras Chromium cannot list, captured in the preload
+              cameras Chromium cannot list, captured in a utility process of its own
+              (src/main/avcaptureWorker.ts : a renderer never hears the phone arrive)
 docs/         specs (convolution · cameraless · sequencer), research notes, and
               the screenshots used by this README
 ```

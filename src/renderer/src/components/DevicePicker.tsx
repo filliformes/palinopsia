@@ -71,26 +71,29 @@ export function DevicePicker({
   // 'denied' distinguishes a refused permission from a genuinely absent camera,
   // so the empty state gives the right advice (settings vs. plug one in).
   const [err, setErr] = useState<'denied' | null>(null)
+  // What the Mac's USB input said when it listed nothing (camera access off)
+  const [usbMsg, setUsbMsg] = useState('')
 
   const refresh = useCallback(async (): Promise<void> => {
     setDevices(null)
     setErr(null)
+    // The Mac's USB input FIRST, finished before the browser engine's own camera
+    // service is woken. An iPhone switches its USB connection over for whichever
+    // process asks for its screen, and a second process asking during that switch
+    // misses the phone for as long as it runs : measured 2026-10-13, the picker
+    // woke both within a second and the USB input listed nothing, while a single
+    // asker found the phone in 0.1 s.
+    const native = window.api.platform === 'darwin' ? await window.api.avfList().catch(() => null) : null
     let prime: MediaStream | null = null
     try {
       // Prime permission so enumerateDevices returns real labels.
       prime = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     } catch (e) {
       const name = (e as Error)?.name
-      if (name === 'NotAllowedError' || name === 'SecurityError') {
-        setErr('denied')
-        setDevices([])
-        return
-      }
+      // Refused : the cameras say so, the USB input's devices still list.
+      if (name === 'NotAllowedError' || name === 'SecurityError') setErr('denied')
       // NotFoundError / other : fall through : enumerate will just come back empty.
     }
-    // The Mac's USB input in parallel (its first look waits a second for an
-    // iPhone to appear).
-    const usb = window.api.platform === 'darwin' ? window.api.avfList().catch(() => null) : Promise.resolve(null)
     let list: Device[] = []
     try {
       const all = await navigator.mediaDevices.enumerateDevices()
@@ -103,7 +106,7 @@ export function DevicePicker({
     }
     // What Chromium already lists stays Chromium's; the rest (an iPhone by USB,
     // a muxed camera) comes through the USB input.
-    const native = await usb
+    setUsbMsg(native && !native.ok ? native.message : '')
     if (native?.ok) {
       // Chromium on macOS adds " (vid:pid)" to a USB camera's name : compare without it.
       const bare = (s: string): string => s.replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '').trim()
@@ -161,7 +164,9 @@ export function DevicePicker({
             <div className="flex flex-col items-center gap-2 p-6 text-center text-[12px] text-muted">
               {err === 'denied'
                 ? 'Camera permission denied : allow camera access in your system settings, then rescan.'
-                : window.api.platform === 'darwin'
+                : usbMsg
+                  ? `USB input : ${usbMsg}.`
+                  : window.api.platform === 'darwin'
                   ? 'No video input devices found : plug in a camera (or an iPhone by USB, unlocked, this computer trusted) and rescan.'
                   : 'No video input devices found : plug in a camera and rescan.'}
               <button

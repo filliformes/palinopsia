@@ -93,8 +93,9 @@ that CI builds into cross-platform releases.
   that camera only to an app that opts in, and as a muxed (sound-and-picture) device
   that Chromium's enumeration skips (it asks AVFoundation for video-type devices only),
   so a new addon captures it natively : `native/avcapture` (AVFoundation, N-API, the
-  same recipe as OBS's mac-avcapture), run in the preload like the NDI receiver,
-  frames scaled to a 1920 long side with vImage, BGRA to RGBA, transferred to the page.
+  same recipe as OBS's mac-avcapture), run in a capture process of its own (an
+  Electron utility process, see Fixed), frames scaled to a 1920 long side with vImage,
+  BGRA to RGBA, sent to the window and moved on to the page.
   It lists every video and muxed device AVFoundation sees, so any camera Chromium
   misses comes through too. A device that is missing, unplugged or rebooted is opened
   again every 2 s for as long as a layer shows it, with a readout in the Inspector.
@@ -264,6 +265,30 @@ that CI builds into cross-platform releases.
   the other 20 stay for the hand.
 
 ### Fixed
+
+- **An iPhone by USB shows up.** On a Mac mini M2 with an iPhone X it never did : the
+  Live Input picker said "no video input devices" with the phone plugged in, unlocked
+  and trusted, while QuickTime showed it. Three causes, each measured on that pair :
+  - **The phone's arrival was never heard.** It appears a moment AFTER an app opts in
+    (it switches its USB connection over first), and CoreMediaIO announces that
+    through the main thread's run loop, which a Cocoa app like QuickTime runs all the
+    time and Electron's helper processes never do; it has no setting to use a thread
+    of its own (Core Audio does). The addon's new `pump()` runs that loop for a moment,
+    and the capture process calls it while it looks for a device and a little all the
+    time. Before : nothing, with QuickTime listing the phone. After : listed, and
+    captured at 48 to 60 frames a second (887x1920 from the phone's 1126x2436 screen,
+    about a third of a core in the capture process).
+  - **A second asker loses.** The picker woke Chromium's own camera service and the
+    USB input within a second of each other, and the second process to ask while the
+    phone switches over misses it for good. The picker now asks the USB input first,
+    and the capture process looks again for 3 s before answering "none".
+  - **A process that let go of the phone wedged it for the next one** : after it
+    quit, a new process waited 5 s for the opt-in and saw nothing, until about a
+    minute had passed or the phone was replugged. The captures now live in a utility
+    process of their own (`src/main/avcaptureWorker.ts`, started by
+    `avcaptureHost.ts`), shared by the windows and alive for the whole session, so a
+    window reload no longer lets go of it. The preload keeps the same API for the
+    page.
 
 - **The light output and MARK no longer cost the frame rate.** They were the last two
   readers still pulling the picture back from the GPU synchronously (v1.2.5 left them

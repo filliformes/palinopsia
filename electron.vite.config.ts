@@ -12,7 +12,8 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
-        input: { index: resolve('src/main/index.ts') }
+        // the USB input's capture process (macOS) is a utility process of its own
+        input: { index: resolve('src/main/index.ts'), avcaptureWorker: resolve('src/main/avcaptureWorker.ts') }
       }
     }
   },

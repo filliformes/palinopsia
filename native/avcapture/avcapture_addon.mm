@@ -36,8 +36,8 @@
 static std::atomic<bool> g_enabled{false};
 
 // The DAL publishes an iPhone only after this, and asynchronously (about a
-// second later), through the main thread's run loop : the window's main thread
-// runs one (Chromium's pump on macOS is CFRunLoop-based).
+// second later), through the main thread's run loop : a process whose main
+// thread never runs it must call pump() (below) to see the phone at all.
 static void Enable() {
   if (g_enabled.exchange(true)) return;
   CMIOObjectPropertyAddress allow = {kCMIOHardwarePropertyAllowScreenCaptureDevices, kCMIOObjectPropertyScopeGlobal,
@@ -290,6 +290,25 @@ static Napi::Value EnableJs(const Napi::CallbackInfo& info) {
   return info.Env().Undefined();
 }
 
+// pump(seconds) : run this thread's run loop for a moment, if it is the main
+// thread. CoreMediaIO announces a device that appears (an iPhone, a moment
+// AFTER the opt-in : it switches its USB connection over first) through the
+// main thread's run loop. A Cocoa app runs that loop all the time; Electron's
+// helper processes never do, so there the announcement was never delivered and
+// the phone stayed invisible for as long as the process ran (measured
+// 2026-10-13 : QuickTime listed the phone while the app's capture process,
+// which had asked first, listed nothing). CoreMediaIO has no way to move its
+// announcements to a thread of its own, unlike Core Audio. A no-op off the main
+// thread.
+static Napi::Value Pump(const Napi::CallbackInfo& info) {
+  double s = info.Length() > 0 && info[0].IsNumber() ? info[0].As<Napi::Number>().DoubleValue() : 0.01;
+  s = s < 0 ? 0 : s > 1 ? 1 : s;
+  @autoreleasepool {
+    if (CFRunLoopGetCurrent() == CFRunLoopGetMain()) CFRunLoopRunInMode(kCFRunLoopDefaultMode, s, false);
+  }
+  return info.Env().Undefined();
+}
+
 // list() → [{ id, name, model, muxed }]
 static Napi::Value List(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
@@ -426,6 +445,7 @@ static Napi::Value Close(const Napi::CallbackInfo& info) {
 static Napi::Object Init(Napi::Env env, Napi::Object exports) {
   exports.Set("enable", Napi::Function::New(env, EnableJs));
   exports.Set("list", Napi::Function::New(env, List));
+  exports.Set("pump", Napi::Function::New(env, Pump));
   exports.Set("open", Napi::Function::New(env, Open));
   exports.Set("frame", Napi::Function::New(env, Frame));
   exports.Set("copy", Napi::Function::New(env, Copy));

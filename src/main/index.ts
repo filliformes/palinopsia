@@ -30,6 +30,7 @@ import { registerAssetScheme, handleAssetProtocol } from './assets'
 import { killAllConverts, registerVideoConvert, warmVideoFolder } from './videoConvert'
 import { registerAssemble } from './assemble'
 import { registerCollage } from './collage'
+import { installAvcaptureHost } from './avcaptureHost'
 import { registerResolume } from './resolume'
 import { initDataflou } from './dataflou'
 import { hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
@@ -869,6 +870,9 @@ app.whenReady().then(async () => {
       return 'granted' // no such API : assume nothing is in the way
     }
   })
+
+  // The USB input's capture process (macOS) : started the first time a window asks.
+  installAvcaptureHost()
 
   // Camera permission for the USB input (src/preload/avcapture.ts), asked HERE so
   // the system prompt names the app. Chromium asks on its own for the cameras it
