@@ -89,20 +89,22 @@ function PairRow({ children }: { children: ReactNode }): JSX.Element {
   return <div className="flex min-w-0 items-center gap-3">{children}</div>
 }
 
-// A row of mutually exclusive buttons (fit, People mode).
+// A row of mutually exclusive buttons (fit, mirror, People mode).
 function Choice<T extends string>({
   label,
   value,
   options,
-  onChange
+  onChange,
+  className = ''
 }: {
   label: string
   value: T
   options: Array<{ v: T; label: string; title: string }>
   onChange: (v: T) => void
+  className?: string
 }): JSX.Element {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className={`flex items-center gap-1.5 ${className}`}>
       <span className="w-12 shrink-0 font-mono text-[9px] uppercase text-muted">{label}</span>
       <div className="flex min-w-0 flex-1 flex-wrap gap-1">
         {options.map((o) => (
@@ -195,27 +197,32 @@ export function SourceFraming({
           reset
         </button>
       </div>
-      <Choice
-        label="fit"
-        value={fit}
-        onChange={(v) => set({ fit: v })}
-        options={[
-          { v: 'stretch', label: 'stretch', title: 'The whole picture over the whole layer, whatever its shape (a portrait phone or a 4:3 camera gets stretched)' },
-          { v: 'cover', label: 'cover', title: 'The picture fills the layer with its shape kept : what sticks out is cut' },
-          { v: 'contain', label: 'contain', title: 'All of the picture, its shape kept : the rest of the layer stays transparent' }
-        ]}
-      />
-      <Choice
-        label="mirror"
-        value={mirror}
-        onChange={(v) => set({ mirror: v })}
-        options={[
-          { v: 'off', label: 'off', title: 'The picture the way it arrives' },
-          { v: 'x', label: 'left-right', title: 'Turned left to right, like a mirror : the selfie view of a webcam (you move right, the picture moves right)' },
-          { v: 'y', label: 'upside down', title: 'Turned top to bottom : for a camera hung or mounted upside down' },
-          { v: 'xy', label: 'both', title: 'Both at once : the picture turned half a turn' }
-        ]}
-      />
+      {/* fit and mirror share one line, split like the pan and crop pairs below */}
+      <PairRow>
+        <Choice
+          className="min-w-0 flex-1"
+          label="fit"
+          value={fit}
+          onChange={(v) => set({ fit: v })}
+          options={[
+            { v: 'stretch', label: 'stretch', title: 'The whole picture over the whole layer, whatever its shape (a portrait phone or a 4:3 camera gets stretched)' },
+            { v: 'cover', label: 'cover', title: 'The picture fills the layer with its shape kept : what sticks out is cut' },
+            { v: 'contain', label: 'contain', title: 'All of the picture, its shape kept : the rest of the layer stays transparent' }
+          ]}
+        />
+        <Choice
+          className="min-w-0 flex-1"
+          label="mirror"
+          value={mirror}
+          onChange={(v) => set({ mirror: v })}
+          options={[
+            { v: 'off', label: 'off', title: 'The picture the way it arrives' },
+            { v: 'x', label: 'left-right', title: 'Turned left to right, like a mirror : the selfie view of a webcam (you move right, the picture moves right)' },
+            { v: 'y', label: 'upside down', title: 'Turned top to bottom : for a camera hung or mounted upside down' },
+            { v: 'xy', label: 'both', title: 'Both at once : the picture turned half a turn' }
+          ]}
+        />
+      </PairRow>
       <Slider label="zoom" value={zoom} min={0.1} max={4} def={1} onChange={(v) => set({ zoom: v })} fmt={(v) => `${v.toFixed(2)}×`} />
       <PairRow>
         <MiniSlider label="pan x" value={panX} min={-1} max={1} def={0} onChange={(v) => set({ panX: v })} />
