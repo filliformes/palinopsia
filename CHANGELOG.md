@@ -23,18 +23,29 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
-- **The piled Collage walls draw in about half the GPU time, the same picture.**
-  Torn, shaped and stacked walls tested every piece's outline at every pixel, two or
-  three times per piece, in both passes when the FX run before the shapes : each
-  test evaluated the piece's tilt (a cos and a sin) and a shaped piece's lobes (an
-  atan and three cos). Now the tilt and the lobes' phases come per piece, the lobes
-  from powers of the pixel's direction (the same values to 7e-16), the films-only
-  pass skips the shadows and edges it used to work out and drop, and the shapes pass
-  reads the films pass's answer (the top piece, and a mosaic's nearest seeds, one
-  32-bit word per pixel) instead of searching again : byte-identical output, 0 of
-  8,294,400 bytes differ. GPU ms per frame at 1920x1080, 10 pieces, FX before
-  shapes, measured on an M2 : shaped 10.9 to 5.6, torn 13.5 to 8.0, stacked mosaic
-  10.9 to 6.4, stacked cut-up 5.8 to 4.4.
+- **The piled Collage walls draw in about half the GPU time, bit for bit the same
+  picture.** With the FX before the shapes, torn, shaped and stacked walls tested
+  every piece's outline at every pixel in both passes. Now the films-only pass skips
+  the shadows and edges it used to work out and drop, and the shapes pass reads the
+  films pass's answer (the top piece, and a mosaic's nearest seeds, one 32-bit word
+  per pixel) instead of searching again. Proven on a fixed wall (one deal seed,
+  every film paused on the same frame), the build before against this one, read
+  back as float : 0 of 8,294,400 values differ, all four shapes, FX first or not.
+  (Working each piece's tilt and lobes out once per piece was tried and dropped :
+  the CPU's rounding moved one boundary pixel a frame onto its neighbour's film.)
+  GPU ms per frame at 1920x1080, 10 pieces, FX before shapes, on an M2 : shaped
+  10.2 to 5.9, torn 14.0 to 7.6, stacked mosaic 10.9 to 6.5, stacked cut-up 5.6 to
+  4.5.
+- **Toile costs 60 % less at PAINT 0, bit for bit the same picture.** Its painterly
+  pass (an anisotropic Kuwahara) ran every frame and was then mixed in at zero
+  weight : an installation used Toile for its line work alone, 7.9 ms a frame at
+  1080p of which 4.8 drew nothing. At PAINT 0 the pass is skipped (and a 1x1 black
+  stands in for its target), no shader changed. 7.9 to 3.1 ms; the old and new
+  builds' output on a real frame compared value by value, six settings (paint 0,
+  0.5, 1, crisp and smooth strokes, radius 0 to 1, line 0 to 1) : 0 of 8,294,400
+  differ. (Three shader rewrites that saved 0.2 ms more were dropped : each changed
+  how the compiler rounded, 2 to 36 values a frame off by under 0.03 of an 8-bit
+  step.)
 - **A Collage loads only the films a piece can show.** Every deal loaded, sought and
   decoded a frame of every film of the `films` count, though pieces take their films
   in a fixed order and a wall of n pieces can only show the first n : at 30 films

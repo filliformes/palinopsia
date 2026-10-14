@@ -261,17 +261,10 @@ vec2 rot90(vec2 p, float r){
 // A torn or shaped piece is tilted : x its tilt (radians), y z w its own shape
 // draws. Its film rect (uCell) is untilted, centred on it.
 uniform vec4 uForm[64];
-// Per piece, from the CPU : uRot xy its tilt's cos and sin (SHAPED : zw the
-// 2-lobe phase's), uLobe the 3- and 5-lobe phases' (SHAPED). Every pixel
-// evaluated a piece's tilt (a cos and a sin) and its lobes (an atan and three
-// cos) for every piece it tested, two or three tests per piece per pixel, in
-// both passes : most of what the shaped wall cost.
-uniform vec4 uRot[64];
-uniform vec4 uLobe[64];
+// (The tilt and the lobes stay per pixel, on the GPU : computed once per piece
+// on the CPU they rounded differently, and one boundary pixel a frame took its
+// neighbour's film. Measured 2026-10-14, old build vs new, bit for bit.)
 vec2 rotv(vec2 v, float a){ float c = cos(a), s = sin(a); return vec2(c * v.x - s * v.y, s * v.x + c * v.y); }
-// By piece i's tilt (tilt), and back (untilt).
-vec2 tilt(vec2 v, int i){ vec2 r = uRot[i].xy; return vec2(r.x * v.x - r.y * v.y, r.y * v.x + r.x * v.y); }
-vec2 untilt(vec2 v, int i){ vec2 r = uRot[i].xy; return vec2(r.x * v.x + r.y * v.y, r.x * v.y - r.y * v.x); }
 vec2 centreOf(int i){ vec4 d = uCell[i]; return (d.xy + 0.5 * d.zw) * vec2(uAspect, 1.0); }
 // Half its film rect, height units : its shape fits inside.
 vec2 halfOf(int i){ return 0.5 * uCell[i].zw * vec2(uAspect, 1.0); }
@@ -280,7 +273,7 @@ vec2 halfOf(int i){ return 0.5 * uCell[i].zw * vec2(uAspect, 1.0); }
 // scrap curls into a curved strip, a shaped cut-out swirls into a hook. Each
 // piece bends its own way and amount.
 vec2 localOf(int i, vec2 q){
-  vec2 lp = untilt(q - centreOf(i), i);
+  vec2 lp = rotv(q - centreOf(i), -uForm[i].x);
   if (uWarp > 0.0){
     float b = fract(uForm[i].w * 17.31) * 2.0 - 1.0;
     b = sign(b) * (0.35 + 0.65 * abs(b));
@@ -503,7 +496,7 @@ vec2 normalOf(int i, vec2 q){
   vec2 lp = localOf(i, q);
   vec2 h = halfOf(i);
   vec2 n = abs(lp.x) * h.y > abs(lp.y) * h.x ? vec2(sign(lp.x), 0.0) : vec2(0.0, sign(lp.y));
-  return tilt(n, i);
+  return rotv(n, uForm[i].x);
 }
 #elif SHAPE == 3
 // SHAPED : a rounded abstract cut-out. An ellipse whose radius swells and dips
@@ -515,21 +508,14 @@ float sdPiece(int i, vec2 q){
   float a2 = 0.05 + 0.15 * fract(f.y * 7.13), a3 = 0.15 * f.z, a5 = 0.08 * f.w;
   vec2 R = halfOf(i) / (1.0 + a2 + a3 + a5);
   vec2 u = localOf(i, q) / R + 1e-6;
-  // cos(k·θ + φk) for the 2, 3 and 5 lobes, θ the angle of u : the real part of
-  // z^k·e^(iφk), z the unit direction, so no atan and no cos here (φk's cos and
-  // sin come per piece).
-  vec2 z = normalize(u);
-  vec2 z2 = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y);
-  vec2 z3 = vec2(z2.x * z.x - z2.y * z.y, z2.x * z.y + z2.y * z.x);
-  vec2 z5 = vec2(z3.x * z2.x - z3.y * z2.y, z3.x * z2.y + z3.y * z2.x);
-  vec4 L = uLobe[i];
-  float m = 1.0 + a2 * (z2.x * uRot[i].z - z2.y * uRot[i].w) + a3 * (z3.x * L.x - z3.y * L.y)
-          + a5 * (z5.x * L.z - z5.y * L.w);
+  float th = atan(u.y, u.x);
+  float m = 1.0 + a2 * cos(2.0 * th + 6.2832 * f.y) + a3 * cos(3.0 * th + 6.2832 * fract(f.z * 13.7))
+          + a5 * cos(5.0 * th + 6.2832 * fract(f.w * 29.3));
   return (length(u) - m) * min(R.x, R.y);
 }
 vec2 normalOf(int i, vec2 q){
   vec2 R = halfOf(i);
-  return normalize(tilt(localOf(i, q) / (R * R), i) + 1e-9);
+  return normalize(rotv(localOf(i, q) / (R * R), uForm[i].x) + 1e-9);
 }
 #endif
 #if FORM
@@ -1220,13 +1206,11 @@ export class CollageSource {
   private contentArr = new Float32Array(MAX_CELLS * 4)
   private metaArr = new Float32Array(MAX_CELLS * 4)
   private formArr = new Float32Array(MAX_CELLS * 4)
-  private rotArr = new Float32Array(MAX_CELLS * 4)
   // The piled pieces (torn, shaped, a stacked mosaic) : what the films pass
   // found at each pixel, written by it and read
   // by the shapes pass of the same frame (see the shader's oId).
   private idTex: WebGLTexture | null = null
   private idReady = false
-  private lobeArr = new Float32Array(MAX_CELLS * 4)
   private siteArr = new Float32Array(MAX_CELLS * 4)
   private rowsArr = new Float32Array(MAX_ROWS * 4)
   private rowCount = 0
@@ -2461,7 +2445,6 @@ export class CollageSource {
           rx = px * (1 + Math.abs(taper)) + 0.02 * ks
           ry = py + 0.02 * ks
           this.formArr.set([ang, taper, ks, c.form[3]], i * 4)
-          this.rotArr.set([Math.cos(ang), Math.sin(ang), 0, 0], i * 4)
         } else {
           // SHAPED : an ellipse around the turned rect (a little more for the
           // lobes' dips), the film rect out to the lobes' furthest reach.
@@ -2472,13 +2455,6 @@ export class CollageSource {
           rx = (W / 2) * k
           ry = (H / 2) * k
           this.formArr.set([ang, fy, fz, fw], i * 4)
-          // the lobes' phases, as the shader had them (6.2832, and fract of the
-          // float32 draws)
-          const p2 = 6.2832 * Math.fround(fy)
-          const t3 = Math.fround(fz) * 13.7, p3 = 6.2832 * (t3 - Math.floor(t3))
-          const t5 = Math.fround(fw) * 29.3, p5 = 6.2832 * (t5 - Math.floor(t5))
-          this.rotArr.set([Math.cos(ang), Math.sin(ang), Math.cos(p2), Math.sin(p2)], i * 4)
-          this.lobeArr.set([Math.cos(p3), Math.sin(p3), Math.cos(p5), Math.sin(p5)], i * 4)
         }
         const cx = c.x + c.w / 2, cy = c.y + c.h / 2
         x = cx - rx / aspect; y = cy - ry; w = (2 * rx) / aspect; h = 2 * ry
@@ -2544,11 +2520,7 @@ export class CollageSource {
     gl.uniform1f(U('uMask'), clampf(num(live.mask, 0), 0, 1))
     gl.uniform1f(U('uWarp'), clampf(num(live.warp, 0), 0, 1))
     if (sg) gl.uniform1f(U('uStack'), stack)
-    if (sg && shape >= 2) {
-      gl.uniform4fv(U('uForm'), this.formArr)
-      gl.uniform4fv(U('uRot'), this.rotArr)
-      gl.uniform4fv(U('uLobe'), this.lobeArr)
-    }
+    if (sg && shape >= 2) gl.uniform4fv(U('uForm'), this.formArr)
     gl.uniform1i(U('uContourMode'), Math.round(clampf(num(live.contourMode, 1), 0, 1)))
     gl.uniform1i(U('uPass'), pass)
     // The piled pieces : the films pass writes the top-piece target, the shapes

@@ -4483,6 +4483,9 @@ void main(){
   float phi = 0.5 * atan(2.0 * F, E - G);
   vec2 grad = vec2(cos(phi), sin(phi));
   vec2 tang = vec2(-grad.y, grad.x);
+  // (PAINT 0 : the paint pass did not run; whatever it last left mixes in at
+  // zero weight. The mix stays as it is : branching it changed the compiled
+  // arithmetic, 36 values a frame off at other settings, measured.)
   vec4 col = mix(hp, texture(uPaintT, vUV), uPaint);
 
   // ── flow-XDoG line : a high-pass ACROSS the contour, smoothed ALONG it. ──
@@ -4510,7 +4513,24 @@ export class ToileNode implements ConvNode {
   private pw = 0
   private ph = 0
   private disposed = false
+  private black: WebGLTexture | null = null
   constructor(private gl: WebGL2RenderingContext) { this.src = new MipTarget(gl) }
+
+  /** A 1x1 transparent black (RGBA16F, as the paint target). */
+  private blank(): WebGLTexture {
+    if (this.black) return this.black
+    const gl = this.gl
+    const t = gl.createTexture()!
+    gl.bindTexture(gl.TEXTURE_2D, t)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 1, 1, 0, gl.RGBA, gl.HALF_FLOAT, null)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.bindTexture(gl.TEXTURE_2D, null)
+    this.black = t
+    return t
+  }
 
   private freeWork(): void {
     const gl = this.gl
@@ -4560,23 +4580,33 @@ export class ToileNode implements ConvNode {
     bindTex(gl, 0, t0.tex); gl.uniform1i(p.u('uTex'), 0); gl.uniform1f(p.u('uRadius'), coh)
     gl.uniform2f(p.u('uStep'), 1 / pw, 0); drawTo(gl, t1.fbo, pw, ph)
     bindTex(gl, 0, t1.tex); gl.uniform2f(p.u('uStep'), 0, 1 / ph); drawTo(gl, t0.fbo, pw, ph)
-    // 3) paint (premultiplied) at the working size.
-    p = g.use(Math.round(num(inp.strokes, 0)) === 1 ? extraProg(g, 'toileSmooth', F_TOILE_SMOOTH) : g.toile)
-    bindTex(gl, 0, src); gl.uniform1i(p.u('uHost'), 0)
-    bindTex(gl, 1, t0.tex); gl.uniform1i(p.u('uTensor'), 1)
-    gl.uniform2f(p.u('uTexel'), 1 / pw, 1 / ph)
-    gl.uniform1f(p.u('uRadius'), radius)
-    gl.uniform1f(p.u('uSharp'), clampf(num(inp.sharp, 0.5), 0, 1))
-    gl.uniform1f(p.u('uLod'), lod)
-    drawTo(gl, pt.fbo, pw, ph)
+    // 3) paint (premultiplied) at the working size. Not at PAINT 0 : the last pass
+    //    mixes it in at zero weight (mix(live, paint, 0) is the live frame, bit for
+    //    bit), so it was the frame's costliest pass drawn for nothing (an
+    //    installation ran Toile for its line work alone).
+    const paintAmt = clampf(num(inp.paint, 1), 0, 1)
+    // (made here, before the units below are bound : making it binds a texture)
+    const blackTex = paintAmt > 0 ? null : this.blank()
+    if (paintAmt > 0) {
+      p = g.use(Math.round(num(inp.strokes, 0)) === 1 ? extraProg(g, 'toileSmooth', F_TOILE_SMOOTH) : g.toile)
+      bindTex(gl, 0, src); gl.uniform1i(p.u('uHost'), 0)
+      bindTex(gl, 1, t0.tex); gl.uniform1i(p.u('uTensor'), 1)
+      gl.uniform2f(p.u('uTexel'), 1 / pw, 1 / ph)
+      gl.uniform1f(p.u('uRadius'), radius)
+      gl.uniform1f(p.u('uSharp'), clampf(num(inp.sharp, 0.5), 0, 1))
+      gl.uniform1f(p.u('uLod'), lod)
+      drawTo(gl, pt.fbo, pw, ph)
+    }
     // 4) full size : paint over the live frame, line work, mix.
     const out = ctx.chain.next()
     p = g.use(extraProg(g, 'toileFinal', F_TOILE_FINAL))
     bindTex(gl, 0, ctx.host); gl.uniform1i(p.u('uHost'), 0)
     bindTex(gl, 1, t0.tex); gl.uniform1i(p.u('uTensor'), 1)
-    bindTex(gl, 2, pt.tex); gl.uniform1i(p.u('uPaintT'), 2)
+    // (PAINT 0 : a 1x1 black stands in for the paint target, which the pass mixes
+    // in at zero weight : the same values, without reading a full-size target)
+    bindTex(gl, 2, blackTex ?? pt.tex); gl.uniform1i(p.u('uPaintT'), 2)
     gl.uniform2f(p.u('uTexel'), sc / W, sc / H)
-    gl.uniform1f(p.u('uPaint'), clampf(num(inp.paint, 1), 0, 1))
+    gl.uniform1f(p.u('uPaint'), paintAmt)
     gl.uniform1f(p.u('uLine'), clampf(num(inp.line, 0.4), 0, 1))
     gl.uniform1f(p.u('uThresh'), clampf(num(inp.threshold, 0.5), 0, 1))
     gl.uniform1f(p.u('uMix'), clampf(num(inp.mix, 1), 0, 1))
@@ -4589,6 +4619,8 @@ export class ToileNode implements ConvNode {
     this.disposed = true
     this.freeWork()
     this.src.free()
+    if (this.black) this.gl.deleteTexture(this.black)
+    this.black = null
   }
 }
 

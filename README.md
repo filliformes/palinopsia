@@ -1430,14 +1430,13 @@ sit in four columns : **films** (what plays), **pieces** (how the frame is cut),
   holes are drawn afterwards, crisp : blur, pixelate, glitch or recolor every film
   without softening the cut shapes. Off, the FX process the finished wall. (Torn
   paper then reads the neighbouring film mirrored across the tear.)
-- **Light on the GPU.** The piled walls (torn, shaped, a stacked mosaic or cut-up)
-  draw in about half the time they took, with the same picture : each piece's tilt
-  and outline are worked out once per piece instead of once per pixel, the
-  films-only pass no longer draws shadows it throws away, and the shapes pass reads
-  which piece lies on top from the films pass instead of searching every piece
-  again. Measured at 1920x1080, 10 pieces, FX before shapes : shaped 10.9 to 5.6 ms,
-  torn 13.5 to 8.0, stacked mosaic 10.9 to 6.4, stacked cut-up 5.8 to 4.4 (a plain
-  cut-up costs 0.7).
+- **Light on the GPU.** With the FX before the shapes, the piled walls (torn,
+  shaped, a stacked mosaic or cut-up) draw in about half the time they took, bit for
+  bit the same picture : the films-only pass no longer draws shadows it throws away,
+  and the shapes pass reads which piece lies on top from the films pass instead of
+  searching every piece again. Measured at 1920x1080, 10 pieces : shaped 10.2 to
+  5.9 ms, torn 14.0 to 7.6, stacked mosaic 10.9 to 6.5, stacked cut-up 5.6 to 4.5 (a
+  plain cut-up costs 0.8).
 - **Light on the machine.** Frame uploads share a 4 ms budget per frame (the films
   that miss a frame go first on the next), auto deals faster than a second re-cut the
   wall among the films already playing instead of loading new files, a file that
