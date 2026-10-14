@@ -118,6 +118,11 @@ export interface SourceSlot extends ShaderInstance {
   cropT?: number // trim top edge 0..0.9, default 0
   cropB?: number // trim bottom edge 0..0.9, default 0
   feather?: number // softens the picture's edges (the crop's or its own), 0..0.5 of the layer's height, default 0
+  // Which way the picture faces, before the framing : 'x' turned left to right (a
+  // mirror : the selfie view of a webcam), 'y' upside down (a camera hung upside
+  // down), 'xy' both (half a turn). Default 'off'. Not part of Reset framing : it
+  // is how the camera hangs, not how the picture is framed.
+  mirror?: 'off' | 'x' | 'y' | 'xy'
   // People (video + capture) : a pose model finds the people in the slot's own
   // picture (engine/personMask.ts) : 'cutout' keeps only them, 'blur' blurs what is
   // around them, 'remove' takes them out, 'matte' is them in white on black.

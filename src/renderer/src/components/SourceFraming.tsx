@@ -1,5 +1,5 @@
-// SourceFraming : fit / zoom / pan / crop / feather controls for a video or
-// capture source, and its People mode, shown in its Inspector panel. Applied by
+// SourceFraming : fit / mirror / zoom / pan / crop / feather controls for a video
+// or capture source, and its People mode, shown in its Inspector panel. Applied by
 // the engine as a transform on upload (Compositor XFORM_FS; People : personMask.ts).
 
 import { useEffect, useState, type ReactNode } from 'react'
@@ -174,6 +174,7 @@ export function SourceFraming({
   const cropB = state.cropB ?? 0
   const fit = state.fit ?? 'stretch'
   const feather = state.feather ?? 0
+  const mirror = state.mirror ?? 'off'
   const person = state.person ?? 'off'
   const people = state.personCount ?? 2
   const blur = state.personBlur ?? 0.5
@@ -189,7 +190,7 @@ export function SourceFraming({
             set({ zoom: 1, panX: 0, panY: 0, cropL: 0, cropR: 0, cropT: 0, cropB: 0, fit: 'stretch', feather: 0 })
           }
           className="rounded border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted hover:text-accent"
-          title="Reset framing"
+          title="Reset framing (the mirror stays : it is how the camera hangs)"
         >
           reset
         </button>
@@ -202,6 +203,17 @@ export function SourceFraming({
           { v: 'stretch', label: 'stretch', title: 'The whole picture over the whole layer, whatever its shape (a portrait phone or a 4:3 camera gets stretched)' },
           { v: 'cover', label: 'cover', title: 'The picture fills the layer with its shape kept : what sticks out is cut' },
           { v: 'contain', label: 'contain', title: 'All of the picture, its shape kept : the rest of the layer stays transparent' }
+        ]}
+      />
+      <Choice
+        label="mirror"
+        value={mirror}
+        onChange={(v) => set({ mirror: v })}
+        options={[
+          { v: 'off', label: 'off', title: 'The picture the way it arrives' },
+          { v: 'x', label: 'left-right', title: 'Turned left to right, like a mirror : the selfie view of a webcam (you move right, the picture moves right)' },
+          { v: 'y', label: 'upside down', title: 'Turned top to bottom : for a camera hung or mounted upside down' },
+          { v: 'xy', label: 'both', title: 'Both at once : the picture turned half a turn' }
         ]}
       />
       <Slider label="zoom" value={zoom} min={0.1} max={4} def={1} onChange={(v) => set({ zoom: v })} fmt={(v) => `${v.toFixed(2)}×`} />

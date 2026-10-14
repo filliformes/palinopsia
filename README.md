@@ -363,7 +363,10 @@ computer) is looked for the same way.
 **Framing** (under a video, capture, Assemble or HIVE source in the Inspector) : **fit** sets how the
 whole picture sits in the layer (*stretch* fills it whatever its shape, the default;
 *cover* fills it with its shape kept, cutting what sticks out; *contain* shows all of
-it, transparent around), then **zoom** and **pan**. **Crop** cuts the picture's edges
+it, transparent around), and **mirror** which way it faces (*left-right* is the selfie
+view of a webcam, *upside down* is for a camera hung upside down, *both* is half a
+turn; it stays through *reset*, since it is how the camera hangs), then **zoom** and
+**pan**. **Crop** cuts the picture's edges
 away where they are : what is left neither moves nor stretches. **Feather** softens
 whatever edge remains, the crop's or the picture's own (0 to half the layer's height).
 

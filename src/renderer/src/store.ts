@@ -1250,7 +1250,7 @@ interface StoreState {
       Pick<
         SourceSlot,
         | 'zoom' | 'panX' | 'panY' | 'cropL' | 'cropR' | 'cropT' | 'cropB'
-        | 'fit' | 'feather' | 'person' | 'personCount' | 'personBlur' | 'personSoft'
+        | 'fit' | 'feather' | 'mirror' | 'person' | 'personCount' | 'personBlur' | 'personSoft'
       >
     >
   ) => void

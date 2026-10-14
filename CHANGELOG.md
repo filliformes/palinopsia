@@ -7,6 +7,12 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Mirror in a source's framing** (webcam, live input, NDI, screen, video, Assemble,
+  HIVE) : off · left-right (the selfie view) · upside down · both. One more uniform in
+  the framing blit (`XFORM_FS`) turning the picture over where it is read, so fit,
+  zoom, pan, crop and feather stay in what you see and the People mask turns with the
+  picture. Saved on the slot (`mirror`); Reset framing leaves it alone.
+
 - **Output transform** : the whole finished frame moved as one picture on the flat
   output, the way the fulldome mapping moves it on a dome. Offset x / y, scale (0 to
   2), rotate, spin (integrated, so a new speed never jumps), feather, flip x / y and the

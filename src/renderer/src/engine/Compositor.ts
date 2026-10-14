@@ -333,6 +333,7 @@ uniform float zoom;    // scale about centre (1 = none)
 uniform vec2 pan;      // -1..1 shift
 uniform vec4 crop;     // L, R, T, B  (0..~0.9) : cut away
 uniform float flipY;   // 1 : the texture's first row is the TOP (NDI frames)
+uniform vec2 mirror;   // 1 : the picture turned over on that axis (x : a mirror, y : upside down)
 uniform int fit;       // 0 stretch, 1 cover, 2 contain
 uniform float aspectK; // picture aspect / layer aspect (0 : unknown, stretch)
 uniform float featherPx; // edge softness in output pixels (0 : a crisp, anti-aliased edge)
@@ -370,13 +371,17 @@ void main(){
   float d = min(inside.x / max(perPx.x, 1e-7), inside.y / max(perPx.y, 1e-7));
   float edge = featherPx > 0.5 ? smoothstep(0.0, featherPx, d) : clamp(d + 0.5, 0.0, 1.0);
   if (edge <= 0.0) { o = vec4(0.0); return; }
-  vec2 st = vec2(p.x, mix(p.y, 1.0 - p.y, flipY));
+  // The mirror turns the picture over where it is read : the fit, zoom, pan, crop
+  // and feather above all stay in what you see, and the People mask (in the
+  // picture's own coordinates) is read through the same turn so it stays on them.
+  vec2 mp = mix(p, 1.0 - p, mirror);
+  vec2 st = vec2(mp.x, mix(mp.y, 1.0 - mp.y, flipY));
   // Level 0, explicitly : the same read as ever, and no implicit derivatives
   // after the branch above (the blur turns the mip chain on).
   vec4 c = textureLod(tex, st, 0.0);
   float a = c.a * edge;
   if (person != 0) {
-    float raw = texture(maskTex, vec2(p.x, 1.0 - p.y)).r;
+    float raw = texture(maskTex, vec2(mp.x, 1.0 - mp.y)).r;
     float m = smoothstep(pThresh - pSoft, pThresh + pSoft, raw);
     if (person == 1) a *= m;
     else if (person == 3) a *= 1.0 - m;
@@ -645,6 +650,7 @@ export interface Framing {
   cropB: number;
   fit?: 'stretch' | 'cover' | 'contain';
   feather?: number; // 0..0.5 of the layer's height
+  mirror?: 'off' | 'x' | 'y' | 'xy';
   person?: 'off' | 'cutout' | 'blur' | 'remove' | 'matte';
   personCount?: number;
   personBlur?: number;
@@ -1283,6 +1289,7 @@ export class ISFLayer {
       cropB: s.cropB ?? 0,
       fit: s.fit ?? 'stretch',
       feather: s.feather ?? 0,
+      mirror: s.mirror ?? 'off',
       // People only where there is a picture of the world to look at.
       person: s.kind === 'video' || s.kind === 'capture' ? s.person ?? 'off' : 'off',
       personCount: s.personCount ?? 2,
@@ -1854,7 +1861,7 @@ export class Compositor {
     this.uXPan = gl.getUniformLocation(this.xformProg, 'pan')!;
     this.uXCrop = gl.getUniformLocation(this.xformProg, 'crop')!;
     this.uXFlip = gl.getUniformLocation(this.xformProg, 'flipY');
-    for (const n of ['maskTex', 'fit', 'aspectK', 'featherPx', 'person', 'pThresh', 'pSoft', 'pBlur', 'texel'])
+    for (const n of ['maskTex', 'fit', 'aspectK', 'featherPx', 'mirror', 'person', 'pThresh', 'pSoft', 'pBlur', 'texel'])
       this.uX[n] = gl.getUniformLocation(this.xformProg, n);
     // People with no mask yet : a 1×1 "nobody" (never sampled while People is off).
     this.blankMask = gl.createTexture();
@@ -1913,6 +1920,8 @@ export class Compositor {
       gl.uniform1i(u.fit, f.fit === 'cover' ? 1 : f.fit === 'contain' ? 2 : 0);
       gl.uniform1f(u.aspectK, f.srcAspect && f.srcAspect > 0 ? f.srcAspect / (this.w / this.h) : 0);
       gl.uniform1f(u.featherPx, Math.max(0, f.feather ?? 0) * this.h);
+      const mi = f.mirror;
+      gl.uniform2f(u.mirror, mi === 'x' || mi === 'xy' ? 1 : 0, mi === 'y' || mi === 'xy' ? 1 : 0);
       // People : no mask yet → off (the picture as it is) until the first arrives.
       const mode = f.mask ? PERSON_MODE[f.person ?? 'off'] ?? 0 : 0;
       gl.uniform1i(u.person, mode);
