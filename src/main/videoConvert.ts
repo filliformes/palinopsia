@@ -15,7 +15,7 @@
 import { app, ipcMain } from 'electron'
 import { spawn, type ChildProcess } from 'child_process'
 import { createHash } from 'crypto'
-import { existsSync, mkdirSync, renameSync, statSync, unlinkSync } from 'fs'
+import { existsSync, mkdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 
 // In-flight converts keyed by CACHE path : a second request for the same clip
@@ -372,6 +372,74 @@ export function convertForCollage(
     }
   })()
   inflight.set(out, job)
+  return job
+}
+
+// ── The Collage voice's sound files ─────────────────────────────────────────
+// Sonify's Collage voice hears every film's ORIGINAL file (the Collage caches
+// carry no sound), through an <audio> element. An element playing a video file
+// still reads the whole file to get at its sound : an iPhone original runs 15 to
+// 36 Mbit/s for 0.15 of audio, so ten pieces had the main process streaming up
+// to 360 Mbit/s of picture nobody decoded (measured on an installation's pool of
+// 1080p and 4K iPhone clips). Each original gets an audio-only copy instead :
+// its first audio track, stream-copied when it is AAC (no re-encode : a 30 s
+// clip takes a fraction of a second), AAC 192k otherwise. Same timeline as the
+// original, so the voice holds it to the film exactly as before. A file with
+// no sound gets an empty `.a.none` marker, so it is never probed again.
+const AUDIO_TAG = 'audio1'
+
+function audioPathsFor(src: string): { out: string; none: string } {
+  const st = statSync(src)
+  const key = createHash('sha1').update(`${src}|${st.size}|${st.mtimeMs}|${AUDIO_TAG}`).digest('hex').slice(0, 20)
+  const dir = videoCacheDir()
+  mkdirSync(dir, { recursive: true })
+  return { out: join(dir, `${key}.a.m4a`), none: join(dir, `${key}.a.none`) }
+}
+
+const audioInflight = new Map<string, Promise<{ ok: boolean; path?: string; silent?: boolean; error?: string }>>()
+
+/** The audio-only copy of `src` for the Collage voice : made once, then found. */
+export function audioForCollage(src: string): Promise<{ ok: boolean; path?: string; silent?: boolean; error?: string }> {
+  let paths: { out: string; none: string }
+  try {
+    paths = audioPathsFor(src)
+  } catch (e) {
+    return Promise.resolve({ ok: false, error: (e as Error).message })
+  }
+  const { out, none } = paths
+  if (existsSync(out) && statSync(out).size > 0) return Promise.resolve({ ok: true, path: out })
+  if (existsSync(none)) return Promise.resolve({ ok: true, silent: true })
+  const running = audioInflight.get(out)
+  if (running) return running
+  const job = (async (): Promise<{ ok: boolean; path?: string; silent?: boolean; error?: string }> => {
+    const tmp = `${out}.tmp`
+    try {
+      const { err } = await runFfmpeg(['-hide_banner', '-i', src])
+      const codec = err.match(/Stream #\d+:\d+[^\n]*?: Audio:\s*([a-z0-9_]+)/i)?.[1]?.toLowerCase() ?? null
+      if (!codec) {
+        writeFileSync(none, '')
+        return { ok: true, silent: true }
+      }
+      const { code } = await runFfmpeg([
+        '-hide_banner', '-y', '-i', src,
+        '-map', '0:a:0', '-vn', '-sn', '-dn',
+        ...(codec === 'aac' ? ['-c:a', 'copy'] : ['-c:a', 'aac', '-b:a', '192k']),
+        '-movflags', '+faststart', '-f', 'mp4', tmp
+      ])
+      if (code !== 0 || !existsSync(tmp) || statSync(tmp).size === 0) {
+        try { if (existsSync(tmp)) unlinkSync(tmp) } catch { /* best effort */ }
+        return { ok: false, error: `ffmpeg exited ${code}` }
+      }
+      renameSync(tmp, out)
+      return { ok: true, path: out }
+    } catch (e) {
+      try { if (existsSync(tmp)) unlinkSync(tmp) } catch { /* best effort */ }
+      return { ok: false, error: (e as Error).message }
+    } finally {
+      audioInflight.delete(out)
+    }
+  })()
+  audioInflight.set(out, job)
   return job
 }
 

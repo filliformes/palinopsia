@@ -15,7 +15,7 @@ import { createHash } from 'crypto'
 import { readdirSync, statSync } from 'fs'
 import { join } from 'path'
 import type { CollageClip, CollageScanResult } from '@shared/collage'
-import { collageCacheFor, convertForCollage, convertToCache, probe } from './videoConvert'
+import { audioForCollage, collageCacheFor, convertForCollage, convertToCache, probe } from './videoConvert'
 import { lastDir, rememberDir } from './lastDir'
 
 const VIDEO_EXTS = /\.(mp4|m4v|mov|dxv|webm|mkv|avi|mpg|mpeg|mxf|m2v)$/i
@@ -160,6 +160,13 @@ export function registerCollage(): void {
   // Same walk, same result shape — the renderer swaps its pool with this exactly
   // as it does a scan's — but every file is re-encoded to the seek-friendly
   // profile on the way through, so the wall stops stuttering on its own seeks.
+  // Sonify's Collage voice : a film's audio-only copy (see audioForCollage).
+  // Video files only, as the scan reads.
+  ipcMain.handle('collage:audio', async (_e, path: string) => {
+    if (typeof path !== 'string' || !VIDEO_EXTS.test(path)) return { ok: false, error: 'not a video file' }
+    return audioForCollage(path)
+  })
+
   ipcMain.handle('collage:optimise', async (e, folder: string) => {
     try {
       return await scanFolder(

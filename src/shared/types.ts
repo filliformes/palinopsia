@@ -1285,6 +1285,9 @@ export interface ExposedApi {
   // time cost per file, then cached; same result shape, so the pool is swapped
   // with it directly.
   collageOptimise: (folder: string) => Promise<import('./collage').CollageScanResult>
+  // Sonify's Collage voice : a film's audio-only copy (made once, cached), or
+  // `silent` when the film has no sound.
+  collageAudio: (path: string) => Promise<{ ok: boolean; path?: string; silent?: boolean; error?: string }>
   onCollageProgress: (
     cb: (p: { done: number; total: number; file: string }) => void
   ) => () => void

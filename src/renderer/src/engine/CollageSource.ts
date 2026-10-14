@@ -24,7 +24,12 @@
 //     and desirable : several cells then show the same film at different crops
 //     and rotations, which reads as collage rather than repetition. The pool
 //     size is what costs decoder bandwidth, not the number of cuts; a deck no
-//     piece shows is paused and never blitted.
+//     piece shows is paused and never blitted. And a deck no piece CAN show is
+//     not even loaded : pieces take their films in a fixed order of the decks,
+//     so a wall of n pieces plays the first n decks of that order whatever the
+//     film count, and every deal used to open, seek and decode a frame of every
+//     film for nothing (30 films for 10 pieces : 20 files a deal, measured).
+//     Each deal still draws from the whole folder.
 //
 //  3. **Whole films by default, windows on request.** `hold` (the "window"
 //     knob, 0 by default) loops the WHOLE file : the element's native loop, no
@@ -159,8 +164,20 @@ precision highp float;
 // GLSL ES 3.00 gives sampler2D a default precision in the fragment stage but
 // NOT sampler2DArray : without this line the whole program fails to compile.
 precision highp sampler2DArray;
-in vec2 vUV; out vec4 o;
+in vec2 vUV; layout(location = 0) out vec4 o;
 uniform sampler2DArray uDecks;
+#if FORM || (STACK && MOSAIC)
+// The piled pieces (torn, shaped, a stacked mosaic) : the films pass (1)
+// writes what it found at each pixel to a second target, and the shapes pass
+// (2) of the same frame reads it back (uHasId) instead of searching every
+// piece again. That search was half of what each pass cost. One 32-bit word :
+// the top piece +1 (0 = none), and for the mosaic the runner-up +1 and the
+// three nearest seeds (7, 7, 6, 6, 6 bits; 64 pieces at most). See
+// CollageSource.draw.
+layout(location = 1) out uvec4 oId;
+uniform highp usampler2D uId;
+uniform int uHasId;
+#endif
 uniform int uCount;
 uniform vec4 uCell[64];    // piece rect (x,y,w,h) in output UV (mosaic : the shard's bounding box; STACK : grown; FORM : the film rect, untilted)
 uniform vec4 uCrop[64];    // film rect inside the deck's layer (cover crop)
@@ -244,7 +261,17 @@ vec2 rot90(vec2 p, float r){
 // A torn or shaped piece is tilted : x its tilt (radians), y z w its own shape
 // draws. Its film rect (uCell) is untilted, centred on it.
 uniform vec4 uForm[64];
+// Per piece, from the CPU : uRot xy its tilt's cos and sin (SHAPED : zw the
+// 2-lobe phase's), uLobe the 3- and 5-lobe phases' (SHAPED). Every pixel
+// evaluated a piece's tilt (a cos and a sin) and its lobes (an atan and three
+// cos) for every piece it tested, two or three tests per piece per pixel, in
+// both passes : most of what the shaped wall cost.
+uniform vec4 uRot[64];
+uniform vec4 uLobe[64];
 vec2 rotv(vec2 v, float a){ float c = cos(a), s = sin(a); return vec2(c * v.x - s * v.y, s * v.x + c * v.y); }
+// By piece i's tilt (tilt), and back (untilt).
+vec2 tilt(vec2 v, int i){ vec2 r = uRot[i].xy; return vec2(r.x * v.x - r.y * v.y, r.y * v.x + r.x * v.y); }
+vec2 untilt(vec2 v, int i){ vec2 r = uRot[i].xy; return vec2(r.x * v.x + r.y * v.y, r.x * v.y - r.y * v.x); }
 vec2 centreOf(int i){ vec4 d = uCell[i]; return (d.xy + 0.5 * d.zw) * vec2(uAspect, 1.0); }
 // Half its film rect, height units : its shape fits inside.
 vec2 halfOf(int i){ return 0.5 * uCell[i].zw * vec2(uAspect, 1.0); }
@@ -253,7 +280,7 @@ vec2 halfOf(int i){ return 0.5 * uCell[i].zw * vec2(uAspect, 1.0); }
 // scrap curls into a curved strip, a shaped cut-out swirls into a hook. Each
 // piece bends its own way and amount.
 vec2 localOf(int i, vec2 q){
-  vec2 lp = rotv(q - centreOf(i), -uForm[i].x);
+  vec2 lp = untilt(q - centreOf(i), i);
   if (uWarp > 0.0){
     float b = fract(uForm[i].w * 17.31) * 2.0 - 1.0;
     b = sign(b) * (0.35 + 0.65 * abs(b));
@@ -476,7 +503,7 @@ vec2 normalOf(int i, vec2 q){
   vec2 lp = localOf(i, q);
   vec2 h = halfOf(i);
   vec2 n = abs(lp.x) * h.y > abs(lp.y) * h.x ? vec2(sign(lp.x), 0.0) : vec2(0.0, sign(lp.y));
-  return rotv(n, uForm[i].x);
+  return tilt(n, i);
 }
 #elif SHAPE == 3
 // SHAPED : a rounded abstract cut-out. An ellipse whose radius swells and dips
@@ -488,14 +515,21 @@ float sdPiece(int i, vec2 q){
   float a2 = 0.05 + 0.15 * fract(f.y * 7.13), a3 = 0.15 * f.z, a5 = 0.08 * f.w;
   vec2 R = halfOf(i) / (1.0 + a2 + a3 + a5);
   vec2 u = localOf(i, q) / R + 1e-6;
-  float th = atan(u.y, u.x);
-  float m = 1.0 + a2 * cos(2.0 * th + 6.2832 * f.y) + a3 * cos(3.0 * th + 6.2832 * fract(f.z * 13.7))
-          + a5 * cos(5.0 * th + 6.2832 * fract(f.w * 29.3));
+  // cos(k·θ + φk) for the 2, 3 and 5 lobes, θ the angle of u : the real part of
+  // z^k·e^(iφk), z the unit direction, so no atan and no cos here (φk's cos and
+  // sin come per piece).
+  vec2 z = normalize(u);
+  vec2 z2 = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y);
+  vec2 z3 = vec2(z2.x * z.x - z2.y * z.y, z2.x * z.y + z2.y * z.x);
+  vec2 z5 = vec2(z3.x * z2.x - z3.y * z2.y, z3.x * z2.y + z3.y * z2.x);
+  vec4 L = uLobe[i];
+  float m = 1.0 + a2 * (z2.x * uRot[i].z - z2.y * uRot[i].w) + a3 * (z3.x * L.x - z3.y * L.y)
+          + a5 * (z5.x * L.z - z5.y * L.w);
   return (length(u) - m) * min(R.x, R.y);
 }
 vec2 normalOf(int i, vec2 q){
   vec2 R = halfOf(i);
-  return normalize(rotv(localOf(i, q) / (R * R), uForm[i].x) + 1e-9);
+  return normalize(tilt(localOf(i, q) / (R * R), i) + 1e-9);
 }
 #endif
 #if FORM
@@ -539,6 +573,14 @@ void main(){
 #if MOSAIC
     // A shard grown by g holds every point less than g past its cell.
     int mi = 0, mi2 = 0, mi3 = 0; float d1 = 1e9, d2 = 1e9, d3 = 1e9;
+    if (uPass == 2 && uHasId == 1){
+      // the films pass already found them (oId)
+      uint w = texelFetch(uId, ivec2(gl_FragCoord.xy), 0).r;
+      int c = int(w & 127u) - 1;
+      if (c >= 0){ top = c; kt = 1.0; }
+      sec = int((w >> 7u) & 127u) - 1;
+      mi = int((w >> 14u) & 63u); mi2 = int((w >> 20u) & 63u); mi3 = int(w >> 26u);
+    } else {
     for (int i = 0; i < 64; i++){
       if (i >= uCount) break;
       float dd = wdist(i, qa);
@@ -553,13 +595,20 @@ void main(){
       if (key > kt){ sec = kt >= 0.0 ? top : -1; ks = kt; top = i; kt = key; }
       else if (key > ks){ sec = i; ks = key; }
     }
+    }
 #elif FORM
+    if (uPass == 2 && uHasId == 1){
+      // the films pass already found it (oId); only pass 0 reads sec
+      int c = int(texelFetch(uId, ivec2(gl_FragCoord.xy), 0).r) - 1;
+      if (c >= 0){ top = c; kt = 1.0; }
+    } else {
     for (int i = 0; i < 64; i++){
       if (i >= uCount) break;
       if (distance(qa, centreOf(i)) > length(halfOf(i)) || sdPiece(i, qa) > 0.0) continue;
       float key = uMeta[i].w + (keepOf(i) > 0.0 ? 2.0 : 0.0);
       if (key > kt){ sec = kt >= 0.0 ? top : -1; ks = kt; top = i; kt = key; }
       else if (key > ks){ sec = i; ks = key; }
+    }
     }
 #else
     for (int i = 0; i < 64; i++){
@@ -575,6 +624,11 @@ void main(){
     // (torn and shaped scraps can leave a gap no piece covers : a hole)
     bool none = kt < 0.0;
     int C = top;
+#if MOSAIC
+    oId = uvec4(uint(none ? 0 : C + 1) | (uint(sec + 1) << 7u) | (uint(mi) << 14u) | (uint(mi2) << 20u) | (uint(mi3) << 26u), 0u, 0u, 0u);
+#elif FORM
+    oId = uvec4(none ? 0u : uint(C + 1), 0u, 0u, 0u);
+#endif
     keep = none ? 0.0 : keepOf(C);
     bool hole = keep <= 0.0;
     float zC = hole ? -0.05 : uMeta[C].w;
@@ -587,6 +641,10 @@ void main(){
         keep = a;
       }
     }
+    // Everything below (edges, shadows, shade, torn paper, seams) is drawn by
+    // the whole wall (pass 0) or by the shapes over the processed films (pass
+    // 2); the films-only pass (1) used to work all of it out and drop it.
+    if (uPass != 1){
     // The nearest edge in sight : this piece's own (it lies over what is past
     // it) or a higher piece's close by (that one lies over this one).
     float ed; vec2 dir; int N = -1; bool own = true;
@@ -700,6 +758,7 @@ void main(){
       float a = keep + (1.0 - keep) * shade * 0.85;
       col = a > 0.002 ? col * keep / a : vec3(0.0);
       keep = a;
+    }
     }
   }
 #elif MOSAIC
@@ -1054,6 +1113,7 @@ interface Deck {
   unusedAt: number // when no piece played it any more (0 = in use) : paused after a grace
   bad: boolean // its file failed to load or decode : re-cued onto another film
   onFrame: (() => void) | null // its frame callback (re-armed when a new file loads)
+  cueStart: number // where its cue starts playing (loaded later when a piece takes it)
 }
 
 interface Cell {
@@ -1124,6 +1184,8 @@ export class CollageSource {
   private cutsAt = 0 // when the piece count last changed (a modulated count steps at most this often)
   private badClips = new Set<string>() // files that failed : never dealt again
   private stagingBytes = new Map<string, number>()
+  private soundFiles: string[] = [] // the pool's originals, for Sonify's Collage voice
+  private soundFilesKey = ''
   private upStart = 0 // round-robin start of the frame uploads
   private hiddenAt = 0 // (the background) when it stopped being drawn
   private baseCuts = 12 // the stored count (the modulated one never resizes the deck array)
@@ -1158,10 +1220,27 @@ export class CollageSource {
   private contentArr = new Float32Array(MAX_CELLS * 4)
   private metaArr = new Float32Array(MAX_CELLS * 4)
   private formArr = new Float32Array(MAX_CELLS * 4)
+  private rotArr = new Float32Array(MAX_CELLS * 4)
+  // The piled pieces (torn, shaped, a stacked mosaic) : what the films pass
+  // found at each pixel, written by it and read
+  // by the shapes pass of the same frame (see the shader's oId).
+  private idTex: WebGLTexture | null = null
+  private idReady = false
+  private lobeArr = new Float32Array(MAX_CELLS * 4)
   private siteArr = new Float32Array(MAX_CELLS * 4)
   private rowsArr = new Float32Array(MAX_ROWS * 4)
   private rowCount = 0
   private rank = new Float32Array(MAX_CELLS)
+  // LAZY FILMS (see the header) : each deck's place in the order pieces take
+  // films under the current seed, the most pieces the wall has had lately, and
+  // whether every deck stays loaded anyway (a fast auto deal re-cuts among the
+  // films already playing; an assemblage feed owns its decks).
+  private deckRank = new Int32Array(0)
+  private reachHigh = 0
+  private reachPrev = 0
+  private reachAt = 0
+  private eager = true
+  private reserveAt = 0 // when the last reserve film was loaded
 
   constructor(
     private gl: WebGL2RenderingContext,
@@ -1185,7 +1264,8 @@ export class CollageSource {
       el, src: '', clip: null, inSec: 0, lenSec: 0,
       content: [0, 0, 1, 1], blitted: false, blitAt: 0, blitT: -1, pending: false, rvfc: 0, seeking: false, seekAt: 0,
       pendingSeek: null, churning: false, nextRoll: 0, pan: [0.5, 0.5], panNext: null,
-      varyU: 0, used: true, shown: true, running: true, needFrame: false, unusedAt: 0, bad: false, onFrame: null
+      varyU: 0, used: true, shown: true, running: true, needFrame: false, unusedAt: 0, bad: false, onFrame: null,
+      cueStart: 0
     }
     el.addEventListener('seeked', () => { deck.seeking = false; deck.pending = true })
     // A bad file must never wedge the wall : clear the gate, and flag it so the
@@ -1221,7 +1301,7 @@ export class CollageSource {
       inSec: 0, lenSec: 0, content: [0, 0, 1, 1], blitted: false, blitAt: 0, blitT: -1, pending: false, rvfc: 0,
       seeking: false, seekAt: 0, pendingSeek: null, churning: false, nextRoll: 0,
       pan: [0.5, 0.5], panNext: null, varyU: rnd() * 2 - 1, used: true, shown: true,
-      running: true, needFrame: false, unusedAt: 0, bad: false, onFrame: null
+      running: true, needFrame: false, unusedAt: 0, bad: false, onFrame: null, cueStart: 0
     }
   }
 
@@ -1303,6 +1383,24 @@ export class CollageSource {
     }
   }
 
+  /** The top-piece target (R32UI, output-sized), made on first use. */
+  private idTarget(): WebGLTexture {
+    if (this.idTex) return this.idTex
+    const gl = this.gl
+    const t = gl.createTexture()!
+    gl.activeTexture(gl.TEXTURE2)
+    gl.bindTexture(gl.TEXTURE_2D, t)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32UI, this.w, this.h, 0, gl.RED_INTEGER, gl.UNSIGNED_INT, null)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    gl.bindTexture(gl.TEXTURE_2D, null)
+    gl.activeTexture(gl.TEXTURE0)
+    this.idTex = t
+    return t
+  }
+
   /** One output-sized RGBA8 target (colour + FBO) for the crossfade ping-pong. */
   private makeOut(): { tex: WebGLTexture; fbo: WebGLFramebuffer } {
     const gl = this.gl
@@ -1364,6 +1462,7 @@ export class CollageSource {
     const rnd = mulberry32(this.seed)
     const n = this.decks.length
     const nChurn = Math.round(churn * n)
+    this.rankDecks((this.seed ^ 0x9e3779b9) >>> 0)
     // Draw without repeats while the pool allows it, so a deal shows as many
     // different films as it can before it starts doubling up.
     const bag: CollageClip[] = []
@@ -1390,7 +1489,7 @@ export class CollageSource {
       // be cued back to its first frame, so every film restarted on every step
       // of a modulated `films`). The draws are still taken, in the same order.
       const keep = structural && d.clip?.id === clip.id && !!d.src
-      this.cue(d, clip, hold, rnd, false, keep)
+      this.cue(d, clip, hold, rnd, false, keep, this.wants(i, true))
       const pn: [number, number] = [rnd(), rnd()]
       if (!keep) d.panNext = pn
       d.nextRoll = (0.25 + rnd() * 1.2) / Math.max(0.15, churn)
@@ -1402,10 +1501,62 @@ export class CollageSource {
     this.holdWait = 0
   }
 
+  /** Each deck's place in the order pieces take films under `seed` : the same
+   *  draws and the same tie-break as rebuildCells, so a wall of n pieces plays
+   *  exactly the decks ranked under n. */
+  private rankDecks(seed: number): void {
+    const nd = this.decks.length
+    const k = Array.from({ length: nd }, (_, d) => hash01(seed, 5000 + d))
+    const order = Array.from({ length: nd }, (_, d) => d).sort((a, b) => k[a] - k[b] || a - b)
+    if (this.deckRank.length !== nd) this.deckRank = new Int32Array(nd)
+    order.forEach((d, r) => { this.deckRank[d] = r })
+  }
+
+  /** Should deck `i` hold its film loaded : a piece plays it, or the piece
+   *  count reaches it (the stored count, or the most the wall had lately,
+   *  plus one). `ignoreUsed` : at a deal, before the new partition is cut. */
+  private wants(i: number, ignoreUsed = false): boolean {
+    if (this.eager) return true
+    const d = this.decks[i]
+    if (!d || (!ignoreUsed && d.used)) return true
+    const reach = Math.max(this.cells.length, Math.round(this.baseCuts), this.reachHigh, this.reachPrev) + 1
+    return (this.deckRank[i] ?? 0) < reach
+  }
+
+  /** Unload a deck's film (its decoder and buffers go) but keep its cue : it
+   *  loads again when a piece takes it. */
+  private release(d: Deck): void {
+    if (d.asm || !d.src) return
+    if (d.pendingSeek) d.el.removeEventListener('loadedmetadata', d.pendingSeek)
+    d.pendingSeek = null
+    d.seeking = false
+    d.pending = false
+    d.needFrame = false
+    try {
+      d.el.pause()
+      d.el.removeAttribute('src')
+      d.el.load()
+    } catch {
+      /* best-effort */
+    }
+    d.src = ''
+  }
+
+  /** Load a released deck's film at its cue, as cue() would have. */
+  private realize(d: Deck): void {
+    if (!d.clip || d.asm) return
+    this.loadInto(d, `opsia-media://local/${encodeURIComponent(d.clip.file)}`)
+    const dur = Math.max(0.1, d.clip.durSec)
+    d.el.loop = d.lenSec >= dur - 0.05
+    d.needFrame = true
+    const t = d.cueStart >= d.inSec && d.cueStart < d.inSec + d.lenSec ? d.cueStart : d.inSec
+    this.seekTo(d, t)
+  }
+
   /** Point one deck at a clip and a window inside it. A whole-film cue starts
    *  at the top, except a churn re-roll, which drops in anywhere (a montage of
    *  opening seconds is not a montage). */
-  private cue(d: Deck, clip: CollageClip, hold: number, rnd: () => number, randomStart: boolean, keep = false): void {
+  private cue(d: Deck, clip: CollageClip, hold: number, rnd: () => number, randomStart: boolean, keep = false, want = true): void {
     const url = `opsia-media://local/${encodeURIComponent(clip.file)}`
     const dur = Math.max(0.1, clip.durSec)
     const len = hold > 0.4 ? Math.min(hold, dur) : dur
@@ -1424,6 +1575,13 @@ export class CollageSource {
     // Until its first frame lands the layer is empty; frame the crop on the
     // probed size meanwhile (the blit records the real one).
     if (!d.blitted) d.content = containRect(clip.width, clip.height)
+    d.cueStart = start
+    if (!want) {
+      // No piece can show it yet : dealt (the same draws, so the wall is the
+      // one every film loaded would have dealt) but not loaded.
+      this.release(d)
+      return
+    }
     if (d.src !== url) this.loadInto(d, url)
     // A window that is the whole file loops natively : no seeking at all, which
     // is by far the smoothest path. Sub-windows need the gated seek below.
@@ -1458,6 +1616,7 @@ export class CollageSource {
       if (d.asm || !d.clip) continue
       const nc = byId.get(d.clip.id)
       if (!nc || nc.file === d.clip.file) continue
+      if (!d.src) { d.clip = nc; continue } // not loaded : it loads the new file when taken
       const t = d.el.readyState >= 1 ? d.el.currentTime : d.inSec
       d.clip = nc
       this.loadInto(d, `opsia-media://local/${encodeURIComponent(nc.file)}`)
@@ -1649,6 +1808,7 @@ export class CollageSource {
     // (ties : a fixed per-film draw), so a wall shows as many films as it can
     // before repeating, and one more cut never moves another piece's film. (A
     // piece that splits keeps its film in its first half.)
+    this.rankDecks(seed)
     const deckOf = new Int32Array(n)
     const uses = new Int32Array(nd)
     for (let id = 0; id < n; id++) {
@@ -1765,7 +1925,7 @@ export class CollageSource {
 
   /** For Sonify's Collage voice : every piece (centre, film, shown or masked)
    *  and every film (the video its sound follows, the file to hear). */
-  soundInfo(): { pieces: CollageSoundPiece[]; decks: CollageSoundDeck[]; deal: number; xfade: number } | null {
+  soundInfo(): { pieces: CollageSoundPiece[]; decks: CollageSoundDeck[]; deal: number; xfade: number; files: string[] } | null {
     if (this.disposed || !this.cells.length) return null
     const mask = clampf(num(this.live.mask, 0), 0, 1)
     const pieces: CollageSoundPiece[] = this.cells.map((c, i) => {
@@ -1785,7 +1945,12 @@ export class CollageSource {
       if (!d.src || !d.clip) return { el: null, path: null }
       return { el: d.el, path: this.originalOf(d.clip) }
     })
-    return { pieces, decks, deal: this.dealSerial, xfade: this.xfadeDur }
+    // every film the wall may deal, as heard : one array until the pool changes
+    if (this.soundFilesKey !== this.poolFiles) {
+      this.soundFilesKey = this.poolFiles
+      this.soundFiles = this.pool.map((c) => this.originalOf(c))
+    }
+    return { pieces, decks, deal: this.dealSerial, xfade: this.xfadeDur, files: this.soundFiles }
   }
 
   /** The clip's ORIGINAL file : its own `src`, or the playable file when that
@@ -1876,6 +2041,7 @@ export class CollageSource {
     const vary = clampf(num(inputs.vary, 0), 0, 1)
     const freeze = num(inputs.freeze, 0) >= 0.5
     const rate = clampf(num(inputs.rate, 0), 0, 60)
+    this.eager = Math.round(num(inputs.feed, 0)) === 1 || (rate > 0.01 && rate < FAST_DEAL_S)
     const shape = Math.round(clampf(num(inputs.shape, 0), 0, 3))
     const xfadeDur = clampf(num(inputs.xfade, 0), 0, 4)
     const mask = clampf(num(inputs.mask, 0), 0, 1)
@@ -1987,6 +2153,15 @@ export class CollageSource {
       this.swapFiles()
     }
     if (rotate !== this.lastRotate) this.applyRotate(rotate)
+    // The most pieces the wall has had lately (a modulated count : this two-
+    // minute window and the one before) : the films that many pieces reach
+    // stay loaded (LAZY FILMS).
+    if (now - this.reachAt > 120000) {
+      this.reachPrev = this.reachHigh
+      this.reachHigh = 0
+      this.reachAt = now
+    }
+    this.reachHigh = Math.max(this.reachHigh, this.cells.length)
     if (Math.abs(zoom - this.lastZoom) > 1e-4) {
       this.lastZoom = zoom
       this.cropsDirty = true
@@ -2040,7 +2215,22 @@ export class CollageSource {
         this.badClips.add(d.clip.id)
         d.bad = false
         const other = this.pickOther(d.clip)
-        if (other && other.id !== d.clip.id) this.cue(d, other, hold, this.rollRnd, false)
+        if (other && other.id !== d.clip.id) this.cue(d, other, hold, this.rollRnd, false, false, this.wants(i))
+      }
+      // LAZY FILMS : load a film a piece can now reach; let go of one no piece
+      // has played for a while (the same 1.5 s grace as the pause below). A
+      // film a piece shows loads at once; the others (a fast deal's reserve)
+      // one every 120 ms : 19 at once held the films on screen up for 3.5 s.
+      if (!d.src) {
+        if (!this.wants(i)) continue
+        if (!d.used) {
+          if (now - this.reserveAt < 120) continue
+          this.reserveAt = now
+        }
+        this.realize(d)
+      } else if (!d.used && d.unusedAt && now - d.unusedAt > 1500 && !this.wants(i)) {
+        this.release(d)
+        continue
       }
       // Churn applies live : the first round(churn x n) decks re-roll on their
       // own clock. A deck joining the churn starts at a random point of its
@@ -2117,6 +2307,7 @@ export class CollageSource {
     const gl = this.gl
     const g = collageGL(gl)
     this.hiddenAt = 0
+    this.idReady = false
     this.tick(clockSec)
     // Own vertex array for every draw : the default one belongs to the ISF runtime.
     gl.bindVertexArray(g.vao)
@@ -2270,6 +2461,7 @@ export class CollageSource {
           rx = px * (1 + Math.abs(taper)) + 0.02 * ks
           ry = py + 0.02 * ks
           this.formArr.set([ang, taper, ks, c.form[3]], i * 4)
+          this.rotArr.set([Math.cos(ang), Math.sin(ang), 0, 0], i * 4)
         } else {
           // SHAPED : an ellipse around the turned rect (a little more for the
           // lobes' dips), the film rect out to the lobes' furthest reach.
@@ -2280,6 +2472,13 @@ export class CollageSource {
           rx = (W / 2) * k
           ry = (H / 2) * k
           this.formArr.set([ang, fy, fz, fw], i * 4)
+          // the lobes' phases, as the shader had them (6.2832, and fract of the
+          // float32 draws)
+          const p2 = 6.2832 * Math.fround(fy)
+          const t3 = Math.fround(fz) * 13.7, p3 = 6.2832 * (t3 - Math.floor(t3))
+          const t5 = Math.fround(fw) * 29.3, p5 = 6.2832 * (t5 - Math.floor(t5))
+          this.rotArr.set([Math.cos(ang), Math.sin(ang), Math.cos(p2), Math.sin(p2)], i * 4)
+          this.lobeArr.set([Math.cos(p3), Math.sin(p3), Math.cos(p5), Math.sin(p5)], i * 4)
         }
         const cx = c.x + c.w / 2, cy = c.y + c.h / 2
         x = cx - rx / aspect; y = cy - ry; w = (2 * rx) / aspect; h = 2 * ry
@@ -2345,9 +2544,26 @@ export class CollageSource {
     gl.uniform1f(U('uMask'), clampf(num(live.mask, 0), 0, 1))
     gl.uniform1f(U('uWarp'), clampf(num(live.warp, 0), 0, 1))
     if (sg) gl.uniform1f(U('uStack'), stack)
-    if (sg && shape >= 2) gl.uniform4fv(U('uForm'), this.formArr)
+    if (sg && shape >= 2) {
+      gl.uniform4fv(U('uForm'), this.formArr)
+      gl.uniform4fv(U('uRot'), this.rotArr)
+      gl.uniform4fv(U('uLobe'), this.lobeArr)
+    }
     gl.uniform1i(U('uContourMode'), Math.round(clampf(num(live.contourMode, 1), 0, 1)))
     gl.uniform1i(U('uPass'), pass)
+    // The piled pieces : the films pass writes the top-piece target, the shapes
+    // pass reads it on unit 2 (and nothing is bound there otherwise : the films
+    // pass renders INTO it, and an active sampler on a bound target would be a
+    // feedback loop).
+    const useId = !!sg && shape !== 0
+    const readId = useId && pass === 2 && this.idReady
+    if (useId) {
+      gl.uniform1i(U('uId'), 2)
+      gl.uniform1i(U('uHasId'), readId ? 1 : 0)
+      gl.activeTexture(gl.TEXTURE2)
+      gl.bindTexture(gl.TEXTURE_2D, readId ? this.idTex : null)
+      gl.activeTexture(gl.TEXTURE0)
+    }
     gl.uniform1i(U('uFx'), 1) // its own unit, never the deck array's
     // Unit 1 holds the processed films in pass 2, and NOTHING otherwise : uFx is
     // an active sampler, so whatever was left bound there (the layer's own target)
@@ -2364,7 +2580,25 @@ export class CollageSource {
       gl.uniform1i(U('uStraight'), 1)
       gl.bindFramebuffer(gl.FRAMEBUFFER, scratchFbo)
       gl.viewport(0, 0, this.w, this.h)
+      const writeId = useId && pass === 1
+      if (writeId) {
+        // the layer's own target keeps its color; the top-piece target rides
+        // along as a second attachment for this one draw
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, this.idTarget(), 0)
+        gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1])
+      }
       gl.drawArrays(gl.TRIANGLES, 0, 3)
+      if (writeId) {
+        gl.drawBuffers([gl.COLOR_ATTACHMENT0])
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, null, 0)
+        this.idReady = true
+      }
+      if (readId) {
+        gl.activeTexture(gl.TEXTURE2)
+        gl.bindTexture(gl.TEXTURE_2D, null)
+        gl.activeTexture(gl.TEXTURE0)
+        this.idReady = false
+      }
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, null)
       if (pass === 2) {
         gl.activeTexture(gl.TEXTURE1)
@@ -2412,6 +2646,12 @@ export class CollageSource {
     gl.viewport(0, 0, this.w, this.h)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, null)
+    if (readId) {
+      gl.activeTexture(gl.TEXTURE2)
+      gl.bindTexture(gl.TEXTURE_2D, null)
+      gl.activeTexture(gl.TEXTURE0)
+      this.idReady = false
+    }
 
     const fading = this.xfade < 1 && this.prevValid
     gl.bindFramebuffer(gl.FRAMEBUFFER, scratchFbo)
@@ -2455,6 +2695,8 @@ export class CollageSource {
     }
     for (const t of this.staging.values()) gl.deleteTexture(t)
     this.staging.clear()
+    if (this.idTex) gl.deleteTexture(this.idTex)
+    this.idTex = null
     this.cur = null
     this.prev = null
     this.arr = null

@@ -33,6 +33,42 @@
 
 const mediaUrlForPath = (path: string): string => `opsia-media://local/${encodeURIComponent(path)}`
 
+// Each film is heard from its AUDIO-ONLY copy (main : audioForCollage), not the
+// original : an <audio> element playing a video file reads the whole file to
+// get at its sound, and an iPhone original runs 15 to 36 Mbit/s for 0.15 of
+// audio. Original path → the copy's path; null while it is being made, or when
+// there is none (no sound, a failed copy) : the original plays meanwhile. Made
+// one at a time in the background, the whole pool as soon as the voice sees it.
+const audioCopy = new Map<string, string | null>()
+const audioQueue: string[] = []
+let audioBusy = false
+async function pumpAudioCopies(): Promise<void> {
+  if (audioBusy) return
+  audioBusy = true
+  try {
+    while (audioQueue.length) {
+      const p = audioQueue.shift()!
+      try {
+        const r = await window.api.collageAudio(p)
+        if (r?.ok && r.path) audioCopy.set(p, r.path)
+      } catch { /* the original keeps playing */ }
+    }
+  } finally {
+    audioBusy = false
+  }
+}
+function wantAudioCopy(path: string): void {
+  if (audioCopy.has(path)) return
+  audioCopy.set(path, null)
+  audioQueue.push(path)
+  void pumpAudioCopies()
+}
+/** The file to play for a film : its audio-only copy once it exists. */
+function soundFileFor(path: string): string {
+  wantAudioCopy(path)
+  return audioCopy.get(path) ?? path
+}
+
 export interface CollageSoundPiece {
   x: number // piece centre, 0..1 of the frame
   y: number
@@ -51,6 +87,7 @@ export interface CollageSoundSet {
   decks: CollageSoundDeck[]
   deal?: number // changes on every re-cut of the wall
   xfade?: number // the wall's crossfade time between deals (s)
+  files?: string[] // every film the wall may deal, as heard (one array until the pool changes)
 }
 
 export interface CollageVoiceCfg {
@@ -92,6 +129,21 @@ interface PieceChain {
   pan: StereoPannerNode
   xf: GainNode // the deal crossfade
   used: boolean
+  tg: Float64Array // the target each glide was last sent (see glide)
+}
+
+// The glide slots of a piece's targets (PieceChain.tg).
+const TG_F = 0, TG_Q = 3, TG_G = 6, TG_DRY = 9, TG_PAN = 10, TG_IN = 11
+
+/** Glide `param` to `v`, unless that is already where it is gliding. Every
+ *  piece sent its twelve targets on every update (~30 a second) whether they
+ *  moved or not, each a new automation event on the audio thread. A repeated
+ *  glide to the same target traces the same curve (the approach is memoryless),
+ *  so skipping it changes nothing but the work. */
+function glide(p: PieceChain, k: number, param: AudioParam, v: number, now: number): void {
+  if (p.tg[k] === v) return
+  p.tg[k] = v
+  param.setTargetAtTime(v, now, SMOOTH)
 }
 
 const HARM = [1, 2, 3]
@@ -128,6 +180,7 @@ export class CollageVoice {
   private retiring: Array<{ p: PieceChain; until: number }> = []
   private dealOf = new Map<string, number>()
   private dealAt = new Map<string, number>()
+  private filesSeen = new Map<string, string[]>()
   readonly bus: GainNode
   /** For the page : what the voice is playing right now. */
   status = { sets: 0, pieces: 0, films: 0 }
@@ -141,7 +194,7 @@ export class CollageVoice {
     audio.crossOrigin = 'anonymous' // the graph only hears same-origin / CORS media
     audio.preload = 'auto'
     audio.loop = true
-    audio.src = mediaUrlForPath(path)
+    audio.src = mediaUrlForPath(soundFileFor(path))
     // Routed into the graph BEFORE it ever plays : never a blip on the speakers.
     const src = this.ctx.createMediaElementSource(audio)
     const g = this.ctx.createGain()
@@ -323,7 +376,7 @@ export class CollageVoice {
       xf.gain.value = 0
       fade(xf.gain, ctx.currentTime, fadeIn, 'in')
     }
-    p = { deckKey: '', inG, dry, bp, bpG, pan, xf, used: true }
+    p = { deckKey: '', inG, dry, bp, bpG, pan, xf, used: true, tg: new Float64Array(12).fill(NaN) }
     this.pieces.set(key, p)
     return p
   }
@@ -359,6 +412,11 @@ export class CollageVoice {
     let nPieces = 0
     let nFilms = 0
     for (const set of sets) {
+      // the whole pool's audio-only copies, made ahead of the deals that need them
+      if (set.files && set.files !== this.filesSeen.get(set.id)) {
+        this.filesSeen.set(set.id, set.files)
+        for (const f of set.files) wantAudioCopy(f)
+      }
       if (set.level <= 0.001) continue
       // A re-cut since last time : every piece of this wall hands over to the
       // new deal through a crossfade (the old places and notes fade out).
@@ -436,21 +494,20 @@ export class CollageVoice {
           p.inG.gain.value = norm * pc.keep
         }
         for (let h = 0; h < HARM.length; h++) {
-          const f = Math.min(nyq, f0 * HARM[h])
-          p.bp[h].frequency.setTargetAtTime(f, now, SMOOTH)
-          p.bp[h].Q.setTargetAtTime(Q, now, SMOOTH)
-          p.bpG[h].gain.setTargetAtTime(wet * hw[h], now, SMOOTH)
+          glide(p, TG_F + h, p.bp[h].frequency, Math.min(nyq, f0 * HARM[h]), now)
+          glide(p, TG_Q + h, p.bp[h].Q, Q, now)
+          glide(p, TG_G + h, p.bpG[h].gain, wet * hw[h], now)
         }
-        p.dry.gain.setTargetAtTime(1 - cfg.reso, now, SMOOTH)
-        p.pan.pan.setTargetAtTime(panV, now, SMOOTH)
-        p.inG.gain.setTargetAtTime(norm * pc.keep, now, SMOOTH)
+        glide(p, TG_DRY, p.dry.gain, 1 - cfg.reso, now)
+        glide(p, TG_PAN, p.pan.pan, panV, now)
+        glide(p, TG_IN, p.inG.gain, norm * pc.keep, now)
         nPieces++
       })
     }
     // Whatever is no longer shown fades out, then goes.
     for (const [k, p] of this.pieces) {
       if (p.used) continue
-      if (p.inG.gain.value > 0.001) p.inG.gain.setTargetAtTime(0, now, SMOOTH)
+      if (p.inG.gain.value > 0.001) glide(p, TG_IN, p.inG.gain, 0, now)
       else { this.dropPiece(p); this.pieces.delete(k) }
     }
     // A deal's outgoing pieces, once faded.

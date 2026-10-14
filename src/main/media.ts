@@ -22,7 +22,8 @@ const MIME: Record<string, string> = {
   mkv: 'video/x-matroska',
   avi: 'video/x-msvideo',
   ogv: 'video/ogg',
-  dxv: 'video/quicktime' // DXV3 clips are MOV containers (converted on import)
+  dxv: 'video/quicktime', // DXV3 clips are MOV containers (converted on import)
+  m4a: 'audio/mp4' // the Collage voice's audio-only copies (videoConvert.audioForCollage)
 }
 const extOf = (path: string): string => path.split('.').pop()?.toLowerCase() ?? ''
 const mimeFor = (path: string): string => MIME[extOf(path)] ?? 'video/mp4'

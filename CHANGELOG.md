@@ -23,6 +23,42 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The piled Collage walls draw in about half the GPU time, the same picture.**
+  Torn, shaped and stacked walls tested every piece's outline at every pixel, two or
+  three times per piece, in both passes when the FX run before the shapes : each
+  test evaluated the piece's tilt (a cos and a sin) and a shaped piece's lobes (an
+  atan and three cos). Now the tilt and the lobes' phases come per piece, the lobes
+  from powers of the pixel's direction (the same values to 7e-16), the films-only
+  pass skips the shadows and edges it used to work out and drop, and the shapes pass
+  reads the films pass's answer (the top piece, and a mosaic's nearest seeds, one
+  32-bit word per pixel) instead of searching again : byte-identical output, 0 of
+  8,294,400 bytes differ. GPU ms per frame at 1920x1080, 10 pieces, FX before
+  shapes, measured on an M2 : shaped 10.9 to 5.6, torn 13.5 to 8.0, stacked mosaic
+  10.9 to 6.4, stacked cut-up 5.8 to 4.4.
+- **A Collage loads only the films a piece can show.** Every deal loaded, sought and
+  decoded a frame of every film of the `films` count, though pieces take their films
+  in a fixed order and a wall of n pieces can only show the first n : at 30 films
+  for 10 pieces, 20 files a deal for nothing. Now a film loads when a piece can reach
+  it (the pieces now, plus one, plus the most a modulated count reached in the last
+  two to four minutes) and lets go 1.5 s after its last piece. Every deal still draws
+  from the whole folder. An installation's wall (30 films, 10 pieces, cuts and deal
+  modulated) : 11 films loaded instead of 30, 2.2 loads a second instead of 3.8, the
+  longest a piece waited for its film 0.25 s instead of 1.1; at 55 films, 0.5 s
+  instead of 10.3. A fast auto deal (rate under a second) still loads every film,
+  the ones on screen first and the rest one every 120 ms. The `films` hint says so.
+- **Sonify's Collage voice reads a hundredth of the data.** It heard each film from
+  its original file, and an `<audio>` element playing a video file reads the whole
+  file to get at its sound : 15 to 36 Mbit/s of iPhone picture per piece for 0.15 of
+  sound. Each film now plays an audio-only copy (its first sound track stream-copied
+  when it is AAC, AAC 192k otherwise; about 0.2 s to make, in the background, the
+  whole pool as soon as the voice sees it). Measured : the same sound sample for
+  sample (0 difference, 0 offset), 648 KB instead of 59.8 MB for a 30 s clip, and
+  ten films playing cost the main process 0.5 % of a core instead of 6.1 %. A film
+  with no sound is noted once and never probed again.
+- **Sonify's Collage voice glides only what moves.** Every piece sent its twelve
+  parameter glides about 30 times a second whether they changed or not, each a new
+  event on the audio thread (about 1,440 a second for 4 pieces); now about 5. The
+  same curves : a repeated glide to the same target traces the same approach.
 - **The Performance tab no longer blames Sonify for a full GPU.** A read of a picture
   the GPU already drew (the projector stream, the Sonify taps, vision, depth, lights,
   mark) waits for the GPU process, and with the GPU full that wait is milliseconds
