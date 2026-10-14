@@ -113,6 +113,22 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **The top bar stays on one line** in a window that is not full screen (it wrapped
+  its right half onto a second line below about 1560 px at 100 % zoom; the default
+  window is 1400). The header is a size container and its row gives up room in steps
+  as it narrows, in its own CSS pixels so the UI zoom counts : the SESSION / GENERATE
+  labels and some spacing first (the Load and Generate buttons say it), then width in
+  the session name and the two menus, then the zoom readout and the "Learn" of MIDI
+  Learn (Ctrl+= / Ctrl+- still zoom), then button padding and the title's letter
+  spacing. Every button stays. Measured at 100 % zoom : one line at 1700, 1560, 1440,
+  1384, 1300, 1200 and 1100 px; only the 1024 px minimum still wraps.
+- **Every shader now has hover help** : the last nine (Erosion, Membrane, Swell, Dye
+  Field, Ground, Scan, Mycelium, Grown, Posterize) explain every control, read off
+  their code (what each does, which way it goes, what restarts the growth). Grown's
+  "color" was a saturation amount, now labeled so (like Scan's). Erosion, Membrane
+  and Ground grey out their light angle at relief 0, and Ground its drying unless the
+  kind is cracked mud. Scan's description no longer names the library its scans come
+  from.
 - **The Inspector takes the least room in the most useful order.** An XY pad no
   longer sits in the flow of controls, where it stretched its whole row and left the
   rest of it blank (Ramps' center) : it stands at the right and the other controls

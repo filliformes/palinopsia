@@ -1339,3 +1339,33 @@ input[type='range'].live-overlay {
     box-shadow: 0 0 0 3px rgba(90, 150, 255, 1) inset;
   }
 }
+
+/* ── Top bar : one line at any usual window size ─────────────────────────────
+   The header is a size container; its row gives up room in steps as it narrows,
+   measured in its own CSS pixels (so the UI zoom counts) : first the SESSION /
+   GENERATE labels (the Load and Generate buttons say it) and some spacing, then
+   width in the text fields, then the zoom readout (Ctrl+= / Ctrl+- still work)
+   and "Learn". It wraps only past the last step. Two classes deep, so these beat
+   the Tailwind utilities on the same elements. */
+.topbar { container: topbar / inline-size; }
+@container topbar (max-width: 1580px) {
+  .topbar .tb-row, .topbar .tb-group { column-gap: 8px; }
+  .topbar .tb-label { display: none; }
+}
+@container topbar (max-width: 1400px) {
+  .topbar .tb-row { padding-left: 12px; padding-right: 12px; }
+  .topbar .tb-name { width: 76px; }
+  .topbar .tb-session { width: 90px; }
+  .topbar .tb-generate { width: 100px; }
+}
+@container topbar (max-width: 1290px) {
+  .topbar .tb-zoompct, .topbar .tb-long { display: none; }
+}
+@container topbar (max-width: 1220px) {
+  .topbar .tb-row, .topbar .tb-group { column-gap: 6px; }
+  .topbar .tb-row .btn { padding-left: 6px; padding-right: 6px; }
+  .topbar h1 { letter-spacing: 0.1em; }
+  .topbar .tb-name { width: 64px; }
+  .topbar .tb-session { width: 80px; }
+  .topbar .tb-generate { width: 88px; }
+}

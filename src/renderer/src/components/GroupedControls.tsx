@@ -250,6 +250,14 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (zero('relief')) put(d, ['lightAngle'], NO_RELIEF)
     return d
   },
+  erosion: ({ zero }) => one(zero('relief'), 'lightAngle', NO_RELIEF),
+  membrane: ({ zero }) => one(zero('relief'), 'lightAngle', NO_RELIEF),
+  ground: ({ zero, isnt }) => {
+    const d: Why = {}
+    if (isnt('kind', 0)) put(d, ['drying'], 'Only cracked mud dries.')
+    if (zero('relief')) put(d, ['lightAngle'], NO_RELIEF)
+    return d
+  },
   slabs: ({ zero }) => one(zero('accent'), 'tint', 'Accent is at 0 : no accent cells to color.'),
   'particle-drift': ({ zero }) => one(zero('trail'), 'fade', 'Trail is at 0 : no trail to fade.'),
   shapes: ({ is }) => one(is('shape', 0, 1, 4), 'spin', 'This shape does not turn.'),

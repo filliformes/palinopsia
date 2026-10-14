@@ -1383,7 +1383,7 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'cells', TYPE: 'float', MIN: 64, MAX: 400, DEFAULT: 216, LABEL: 'cells' },
         { NAME: 'speed', TYPE: 'float', MIN: 0, MAX: 480, DEFAULT: 90, LABEL: 'speed (steps/s)' },
         { NAME: 'drift', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'drift' },
-        { NAME: 'colour', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'color' },
+        { NAME: 'colour', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'saturation' },
         { NAME: 'bright', TYPE: 'float', MIN: 0.2, MAX: 1.5, DEFAULT: 1, LABEL: 'brightness' },
         { NAME: 'damage', TYPE: 'event', LABEL: 'damage ▸' },
         { NAME: 'reseed', TYPE: 'event', LABEL: 'regrow ▸' }

@@ -1865,7 +1865,11 @@ export default function App(): JSX.Element {
       style={{ zoom: uiZoom, height: `calc(100vh / ${uiZoom})` }}
     >
       {/* ── Top bar ─────────────────────────────────────────────── */}
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border bg-panel px-4 py-2 pr-6">
+      {/* One line at any usual window size : the bar (a size container) gives up
+          room in steps as it narrows (styles.css, "top bar"), wrapping only past
+          the last one. */}
+      <header className="topbar border-b border-border bg-panel">
+      <div className="tb-row flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2 pr-6">
         <h1
           className="select-none font-mono text-[15px] font-semibold uppercase tracking-[0.2em]"
           // Restrained glitch signature on the title : a faint chromatic
@@ -1875,7 +1879,7 @@ export default function App(): JSX.Element {
           Palinopsia
         </h1>
         <input
-          className="input w-28 text-[12px]"
+          className="tb-name input w-28 text-[12px]"
           value={name}
           onChange={(e) => setName(e.target.value)}
           title="Session name"
@@ -1885,7 +1889,7 @@ export default function App(): JSX.Element {
         {/* Right-side controls as one ml-auto group : they wrap together (still
             right-aligned) instead of the old flex-1 spacer stranding them on a
             half-empty second line. */}
-        <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <div className="tb-group ml-auto flex flex-wrap items-center gap-x-3 gap-y-1.5">
         {(() => {
           const sinks = [
             ndiActive && 'NDI',
@@ -1917,7 +1921,7 @@ export default function App(): JSX.Element {
               : 'Enter MIDI Learn mode (shortcut : L, from any tab) : map hardware knobs and pads to Meta knobs, transport controls, Vary / Randomize / Sonify and scenes.'
           }
         >
-          MIDI Learn
+          MIDI<span className="tb-long"> Learn</span>
         </button>
         <RecPill />
         <UndoButtons />
@@ -1925,7 +1929,7 @@ export default function App(): JSX.Element {
           <button className="btn px-1.5 text-[12px]" onClick={() => setUiZoom(uiZoom - 0.05)}>
             −
           </button>
-          <span className="w-9 text-center font-mono text-[10px] text-muted">
+          <span className="tb-zoompct w-9 text-center font-mono text-[10px] text-muted">
             {Math.round(uiZoom * 100)}%
           </span>
           <button className="btn px-1.5 text-[12px]" onClick={() => setUiZoom(uiZoom + 0.05)}>
@@ -2002,6 +2006,7 @@ export default function App(): JSX.Element {
           </button>
         </span>
         </div>
+      </div>
       </header>
 
       {/* ── Body: preview + layer strips ────────────────────────── */}

@@ -150,9 +150,9 @@ export function SessionLoader(): JSX.Element {
 
   return (
     <div className="flex items-center gap-1" title="Load a saved session">
-      <span className="font-mono text-[9px] uppercase text-muted">Session</span>
+      <span className="tb-label font-mono text-[9px] uppercase text-muted">Session</span>
       <select
-        className="input w-[104px] text-[12px]"
+        className="tb-session input w-[104px] text-[12px]"
         value={sel}
         onFocus={() => void refresh()}
         onChange={(e) => setSel(e.target.value)}
@@ -204,11 +204,11 @@ export function GenerateMenu(): JSX.Element {
       className="flex items-center gap-1"
       title="Generate a whole new session tethered to a visual theme"
     >
-      <span className="font-mono text-[9px] uppercase text-muted">Generate</span>
+      <span className="tb-label font-mono text-[9px] uppercase text-muted">Generate</span>
       <SearchSelect
         // Fixed width : the closed control stays theme-name wide, while the
         // popup is free to be as wide as it needs.
-        className="w-[120px] text-[12px]"
+        className="tb-generate w-[120px] text-[12px]"
         value={sel}
         menuWidth={248}
         options={THEME_FAMILIES.flatMap((f) =>
