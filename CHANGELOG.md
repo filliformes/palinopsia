@@ -374,6 +374,14 @@ that CI builds into cross-platform releases.
 
 ### Docs
 
+- **Caught up with the work since v1.2.6** : Generate's theme count (109, with
+  Paste-Up) and Film Wall's description; the Inspector's columns, balanced panels,
+  grey-outs and hover help; the right column's fitted width and the one-line top bar;
+  Randomize and Vary fired over OSC and dataflou (every scope now, at the Transport's
+  intensity); what a session file carries (output transform, framing and mirror, the
+  optional projector warp); `outXform.ts` in the architecture map; the OSC reference's
+  randomize rows.
+
 - **Caught up with v1.2.6** : the README's source and effect counts (43 / 53, the
   Sources heading and its anchor), the modulation-target list (the layer Vary, the
   Background, every Fulldome mapping slider, Sonify, the Meta knobs), the native

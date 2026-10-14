@@ -58,7 +58,7 @@ Lowercase's slant, each straight from its Space theme. The older shots stay in
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
 - [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix)
 - [Sequencer](#sequencer-key-q) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
-- [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) · [Output & mapping](#output--mapping-key-o) : **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
+- [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) · [Output & mapping](#output--mapping-key-o) : **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) : ten voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Signal · Chord · Collage) · quantizer · audio in recordings
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
@@ -71,6 +71,7 @@ Lowercase's slant, each straight from its Space theme. The older shots stay in
 **Control & internals**
 - [Resolume OSC mapper](#resolume-osc-mapper-key-k) : Palinopsia signals × any Resolume address, read from a composition
 - [OSC implementation](#osc-implementation) : inbound · outbound · OSCQuery · setup
+- [dataflou mesh](#dataflou-mesh) : Palinopsia as a node on the mesh, its sources and destinations
 - [Stack & architecture](#stack) · [Aesthetic guardrails](#aesthetic-guardrails) · [Credits & license](#credits--license)
 
 ---
@@ -178,7 +179,7 @@ first-ever launch pays this once; it persists on disk afterwards.
 4. **Save a scene**: get something you like, click `+` in the Scene bank, then
    press `1`–`9` to recall it live (recalls morph over MORPH).
 5. **Go fullscreen**: press **`O`**, pick a display, hit fullscreen. Or try
-   **Generate** in the toolbar : 108 themed recipes that build a coherent
+   **Generate** in the toolbar : 109 themed recipes that build a coherent
    session (visuals + World + palette + macro biases + motion) in one click.
 
 **Lost?** Press **`?`** anytime for the full keyboard cheat-sheet.
@@ -294,7 +295,9 @@ The right column switches between **seven views** (tabs, or keys `M` / `F` / `G`
 opacity/speed faders + blend for all four), **Finishing** (the Vibe · Context ·
 Finalizer stack), **Feel** (the global macros), **assemble** (the automatic
 editor), **audio/midi/osc** (the Audio, MIDI and OSC panels) and **performance**
-(the live load meter).
+(the live load meter). The column is exactly as wide as its seven tabs on one line,
+measured on your computer's own font : drag its edge to make it wider (the width is
+kept), double-click the edge to fit it again.
 The main Inspector's FX-controls band **auto-fits its parameters** : selecting any
 effect or source sizes the band to exactly its controls, so there's never blank space
 over a few params nor a hidden row behind a scroll (you can still drag its handle to
@@ -302,6 +305,19 @@ override until the next selection). The Modulate side panel is resizable too (wi
 heights persist). Every effect, generator and source in a picker, and each FX
 chip already in a rack : shows a **one-line description on hover**, so the whole
 catalogue is learnable without adding-then-reading.
+
+**The Inspector takes the least room in the most useful order.** The busiest sources,
+nodes and effects (Collage, Lattice, Lowercase, Text, Direct Marks, Feedback, Datamosh,
+Perspective, the whole organic family and more) sort their controls into titled
+columns, balanced so the panel is as short as it can be; the organic family always
+ends on the same LIGHT column. An XY pad stands at the right with the other controls
+beside it, an x / y pair inside a column is two aligned rows, each with its M, and a
+number box shows only the decimals its range needs (the stored value keeps every
+digit). A control that does nothing in the current setting is greyed out, with the
+reason on hover (a keyer that is off, the light angle of a flat relief, a palette's
+unused stops); it still works. **Every control of every source and effect explains
+itself on hover** : what it does, which way it goes, and whether it restarts a growing
+picture.
 
 ## Video sources
 
@@ -424,7 +440,10 @@ Left → right:
   split-button (main fires the selected scope; `▾` picks the scope : see
   [Randomize & Vary](#randomize--vary)).
 
-The **top bar** carries the session controls (name · Session · Generate · New /
+The **top bar** stays on one line in a window narrower than the screen : as it
+narrows it tucks the SESSION / GENERATE labels away, then tightens the session name,
+the menus and the zoom readout, never dropping a button (only the 1024 px minimum
+window still wraps). It carries the session controls (name · Session · Generate · New /
 Open / Save / Save As · render-depth + theme selectors), the **MIDI Learn**
 button (key `L`), the **REC** pill (stop it here and a toast confirms the saved
 file), undo / redo, UI zoom, and, at the far right, **⚡ Flush**, the panic
@@ -1395,7 +1414,9 @@ sit in four columns : **films** (what plays), **pieces** (how the frame is cut),
 
 Sessions are `.opsia.json` files: **New / Open / Save / Save As** in the toolbar,
 plus **Ctrl/Cmd+S** (overwrites the current file, Save-As the first time). Theme,
-worlds, scenes and the sequencer all travel inside the session file.
+worlds, scenes and the sequencer all travel inside the session file, and so do the
+[output transform](#output-transform), each source's framing (its mirror included) and,
+when you ask for it, the [projector warp](#output--mapping-key-o).
 
 **A session file only changes when you save it.** Load, Open, New, Generate and
 quitting ask **Save changes to “…”?** (Save · Don't save · Cancel), and only when
@@ -1439,13 +1460,14 @@ subfolders) joins the dropdown under the folder's name, in name order (number th
 saved there later appears too. The same menu lists the linked folders : click one to
 jump to its first session, × to unlink it (the files are never touched).
 
-**Generate** (toolbar) : a dropdown of **108 visual themes** in 17 families
+**Generate** (toolbar) : a dropdown of **109 visual themes** in 17 families
 (Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,
 Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage,
 Cinematic/Atmospheric, Retro Screen, Minimal/Structural, Datamosh & Compression,
 **Living Surfaces** (lichen, rust, mold, burning paper, dry earth, grown textures),
 **Dome** (made for a fulldome : no vignette, nothing framing the edges, slow motion
-overhead), **Film Wall** (your own films through a Collage, graded and damaged : it plays
+overhead), **Film Wall** (your own films through a Collage, graded and damaged, or cut
+out and piled at different heights in **Paste-Up** : it plays
 the session's Collage folder, or the last one picked on this computer, and with none yet
 stands in with painted sources and says how to pick one), **Node Workshop** (one recipe
 node per theme, on the layer that reads the others), **Space** (points in space and line
@@ -1504,8 +1526,12 @@ shader's **curated aesthetic sub-range**; colors stay matte.
 
 Scopes (the `▾` next to the button): **All · Sources · Source Parameters ·
 Source+FX · Source FX · Layers · Layer FX · Master FX · Finishing · Modulators ·
-Meta Knobs · Sonification.** All except *Meta Knobs* and *Sonification* are also
-OSC-fireable (see the [table below](#inbound-control--instrument)).
+Meta Knobs · Sonification.** Every scope can also be fired over OSC and the
+[dataflou mesh](#dataflou-mesh), at the intensity set here, except Meta Knobs : there,
+`randomize/meta` shuffles the knobs' values and keeps their destinations, like the Meta
+strip's `⚄`. The randomizes MIDI Learn has (the master FX parameters in place, the
+selected Inspector unit, the Resolume pins, the Background's dice) fire the same way :
+see the [OSC table](#inbound-control--instrument).
 
 Built-in guarantees so a roll always *plays*:
 
@@ -1533,7 +1559,8 @@ that layer alone, and a modulation target, so a pattern can fire it : each fire 
 variant around where the layer stood, so it can run all night without the layer
 wandering off. Every Vary
 and the Randomize button blink when they fire, whether by a click, a modulator,
-a MIDI pad or a key.
+a MIDI pad or a key. The global Vary and each layer's Vary are also OSC triggers
+(`/opsia/vary`, `/opsia/layer1/vary` …) and dataflou destinations.
 
 ## Undo
 
@@ -2150,7 +2177,8 @@ src/
               Slime Mold, Mycelium, Veins, Grown, each its own GL engine, handed
               the audio texture and its sidechain layer through an optional
               feed()), native nodes (convNodes), strobe limiter, output shaper,
-              PBR, the fulldome stage (dome.ts), the capture rings that feed
+              the output transform (outXform.ts), PBR, the fulldome stage
+              (dome.ts), the capture rings that feed
               every output (frameCapture.ts) and the small readback rings that
               turn the picture back into control data : vision, Sonify taps,
               depth, light zones, the mark scanline (gridReadback.ts)
