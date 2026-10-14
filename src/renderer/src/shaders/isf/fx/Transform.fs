@@ -6,8 +6,8 @@
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "zoom",   "TYPE": "float", "MIN": 0.25, "MAX": 4.0,   "DEFAULT": 1.0 },
-    { "NAME": "posX",   "TYPE": "float", "MIN": -1.0, "MAX": 1.0,   "DEFAULT": 0.0 },
-    { "NAME": "posY",   "TYPE": "float", "MIN": -1.0, "MAX": 1.0,   "DEFAULT": 0.0 },
+    { "NAME": "posX",   "TYPE": "float", "MIN": -1.0, "MAX": 1.0,   "DEFAULT": 0.0, "LABEL": "pos x" },
+    { "NAME": "posY",   "TYPE": "float", "MIN": -1.0, "MAX": 1.0,   "DEFAULT": 0.0, "LABEL": "pos y" },
     { "NAME": "rotate", "TYPE": "float", "MIN": -3.1416, "MAX": 3.1416, "DEFAULT": 0.0 },
     { "NAME": "wrap",   "TYPE": "bool",  "DEFAULT": true },
     { "NAME": "cropUp",    "LABEL": "crop ↑", "TYPE": "float", "MIN": 0.0, "MAX": 0.5, "DEFAULT": 0.0 },

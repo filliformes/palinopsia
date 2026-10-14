@@ -113,6 +113,18 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **The Inspector takes the least room in the most useful order.** An XY pad no
+  longer sits in the flow of controls, where it stretched its whole row and left the
+  rest of it blank (Ramps' center) : it stands at the right and the other controls
+  wrap beside it, as the FX band already did. Grouped panels are as tall as their
+  longest column, so the columns are now balanced : Colony 153 to 83 px, Perspective
+  153 to 115, Reaction 118 to 85, Veins 114 to 76, Direct Marks 114 to 85, Mycelium 82
+  to 66, Fluid 152 to 132 (measured on every source, node and FX : 121 panels, each
+  loaded and its cells measured). Inside a column an x / y pair is two rows of its
+  own, aligned and each with its M (Perspective's shift, Text's and Transform's pos,
+  the latter now labeled). And a number box shows only the decimals its range needs
+  (a range of 100 or more none, 10 one, 1 two, 0.1 three, less four), where a
+  randomized 4.316481 overflowed it; the stored value keeps every digit.
 - **Hover help for Slime Mold, Fluid, Reaction, Colony and Veins**, which had none :
   every control says what it does, which way it goes and when it waits for a regrow
   (Slime Mold's pattern size and Fluid's detail start over; Reaction keeps its living

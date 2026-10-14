@@ -29,6 +29,10 @@ const g = (title: string, ...inputs: string[]): ControlGroup => ({ title, inputs
 // Only the shaders whose parameters read as a jumble in one row (the audit of
 // 2026-10-13 : the heaviest sources, nodes and FX, and the whole organic family so
 // it reads alike). The lighter ones stay one row.
+// THE RULE (Vincent) : the most logical order for exploring and creating, in the
+// least space. The panel is as tall as its longest column, so the columns are
+// BALANCED (up to four; a long column beside short ones is blank space), and a
+// column never holds an XY pad (pads stand at the right).
 export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
   // ── Sources ──
   // Collage : what plays · how the frame is cut · how the pieces meet · how the
@@ -56,42 +60,44 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('motion', 'lines', 'line', 'reveal', 'scroll', 'drift')
   ],
   'direct-marks': [
-    g('marks', 'markType', 'density', 'weight', 'angle', 'ink', 'paper'),
+    g('marks', 'markType', 'density', 'weight', 'angle'),
     g('blink', 'gate', 'rate', 'audio'),
-    g('hand', 'jitter', 'boil', 'fps', 'seed')
+    g('hand', 'jitter', 'boil', 'fps', 'seed'),
+    g('color', 'ink', 'paper')
   ],
   // The organic family : what grows, how it looks, and always last the same
   // LIGHT column (relief, light angle).
   'gen-physarum': [
     g('growth', 'rate', 'scale', 'shape', 'zoom', 'reseed'),
     g('agents', 'agents', 'speed', 'sensor', 'sensorAngle', 'turn', 'wobble'),
-    g('trail', 'deposit', 'decay', 'diffuse'),
-    g('light', 'tint', 'ground', 'contrast', 'glow', 'relief', 'lightAngle')
+    g('trail', 'deposit', 'decay', 'diffuse', 'contrast', 'glow'),
+    g('light', 'tint', 'ground', 'relief', 'lightAngle')
   ],
   'gen-fluid': [
-    g('sources', 'kind', 'sources', 'flow', 'size', 'wander'),
-    g('motion', 'rate', 'swirl', 'buoyancy', 'viscosity', 'fade', 'detail', 'stir', 'clear'),
-    g('color', 'colorA', 'colorB', 'ground'),
-    g('light', 'glow', 'relief', 'lightAngle')
+    g('sources', 'kind', 'sources', 'flow', 'size', 'wander', 'stir', 'clear'),
+    g('motion', 'rate', 'swirl', 'buoyancy', 'viscosity', 'fade', 'detail'),
+    g('light', 'colorA', 'colorB', 'ground', 'glow', 'relief', 'lightAngle')
   ],
   reaction: [
-    g('pattern', 'feed', 'kill', 'seed', 'scale', 'rate', 'reseed'),
+    g('pattern', 'feed', 'kill', 'seed', 'scale'),
+    g('growth', 'rate', 'reseed'),
     g('view', 'zoom', 'panX', 'panY', 'rotate'),
     g('light', 'tint', 'sharp', 'relief', 'lightAngle')
   ],
   'gen-veins': [
-    g('growth', 'kind', 'density', 'thickness', 'rate', 'cycle', 'reseed'),
+    g('form', 'kind', 'density', 'thickness'),
+    g('growth', 'rate', 'cycle', 'reseed'),
     g('color', 'veinColor', 'blade', 'bladeAmt', 'ground'),
     g('light', 'relief', 'lightAngle')
   ],
   colony: [
-    g('growth', 'kind', 'growth', 'colonies', 'bare', 'maturing', 'grain', 'cycle', 'regrow'),
-    g('color', 'palette', 'ground'),
-    g('light', 'relief', 'lightAngle')
+    g('growth', 'kind', 'growth', 'colonies', 'grain'),
+    g('life', 'bare', 'maturing', 'cycle', 'regrow'),
+    g('light', 'palette', 'ground', 'relief', 'lightAngle')
   ],
   mycelium: [
-    g('growth', 'rate', 'density', 'front', 'reseed'),
-    g('form', 'scale', 'width'),
+    g('growth', 'rate', 'front', 'reseed'),
+    g('form', 'scale', 'width', 'density'),
     g('color', 'tint', 'ground'),
     g('light', 'relief', 'lightAngle')
   ],
@@ -143,9 +149,9 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
   ],
   // ── FX ──
   'fx-perspective': [
-    g('view', 'tilt', 'turn', 'roll', 'lens', 'zoom', 'posX', 'posY'),
+    g('view', 'tilt', 'turn', 'roll', 'lens', 'zoom'),
+    g('place', 'posX', 'posY', 'repeat', 'travel', 'drift'),
     g('surface', 'bend', 'wave', 'waves', 'waveRate', 'axis'),
-    g('tiling', 'repeat', 'travel', 'drift'),
     g('depth', 'fog', 'shade', 'soften')
   ],
   'fx-transform': [
@@ -371,9 +377,12 @@ export function GroupedControls({
   modTargetFor?: (inputName: string) => ModTarget
   dim?: Record<string, string>
 }): JSX.Element {
-  const byName = new Map(inputs.map((i) => [i.name, i]))
+  // XY pads never go in a column (a pad one line tall per row would be a wall of
+  // blank space) : they stand together at the right.
+  const pads = inputs.filter((i) => i.type === 'point2D')
+  const byName = new Map(inputs.filter((i) => i.type !== 'point2D').map((i) => [i.name, i]))
   const named = new Set(groups.flatMap((g) => g.inputs))
-  const rest = inputs.filter((i) => !named.has(i.name))
+  const rest = inputs.filter((i) => !named.has(i.name) && i.type !== 'point2D')
   const cols = [
     ...groups.map((gr, i) => ({
       ...gr,
@@ -405,6 +414,11 @@ export function GroupedControls({
           />
         </div>
       ))}
+      {pads.length > 0 && (
+        <div className="shrink-0">
+          <AutoControls inputs={pads} values={values} onChange={onChange} modTargetFor={modTargetFor} dim={dim} layout="wrap" />
+        </div>
+      )}
     </div>
   )
 }

@@ -130,8 +130,10 @@ export function AutoControls({
     return <div className="p-2 text-[11px] text-muted">This shader exposes no controls.</div>
   }
   // posX + posY collapse into one "POS" cell with the two sliders side by side.
+  // Not in the one-line rows (a column) : there they stay two rows of their own,
+  // aligned with the rest and each with its M.
   const hasPosPair =
-    inputs.some((i) => i.name === 'posX') && inputs.some((i) => i.name === 'posY')
+    layout !== 'vertical' && inputs.some((i) => i.name === 'posX') && inputs.some((i) => i.name === 'posY')
   // Context's `lightOrder` bool renders as a small PRE/POST toggle beside the
   // "light" label instead of its own control row.
   const hasLightOrder =
@@ -222,18 +224,25 @@ export function AutoControls({
   }
   // 'wrap' : items-start so every control's label sits on the same top line
   // (colours, sliders and enums have different heights; aligning tops keeps the
-  // label row straight).
+  // label row straight). XY pads are tall : in the flow, one stretched its whole
+  // row and left the rest of it blank (Ramps' center). They stand at the RIGHT,
+  // and the other controls wrap beside them (the twoRow rule).
+  const flowPads = inputs.filter((i) => i.type === 'point2D')
+  const flowRest = visible(inputs).filter((i) => i.type !== 'point2D')
+  const cell = (inp: IsfInputDesc): JSX.Element =>
+    dim?.[inp.name] ? (
+      <div key={inp.name} className="opacity-40" title={dim[inp.name]}>
+        {renderControl(inp)}
+      </div>
+    ) : (
+      renderControl(inp)
+    )
+  if (!flowPads.length)
+    return <div className="flex flex-wrap items-start gap-x-5 gap-y-2.5 p-2">{flowRest.map(cell)}</div>
   return (
-    <div className="flex flex-wrap items-start gap-x-5 gap-y-2.5 p-2">
-      {visible(inputs).map((inp) =>
-        dim?.[inp.name] ? (
-          <div key={inp.name} className="opacity-40" title={dim[inp.name]}>
-            {renderControl(inp)}
-          </div>
-        ) : (
-          renderControl(inp)
-        )
-      )}
+    <div className="flex items-start gap-5 p-2">
+      <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-5 gap-y-2.5">{flowRest.map(cell)}</div>
+      <div className="flex shrink-0 items-start gap-5">{flowPads.map(cell)}</div>
     </div>
   )
 }
@@ -348,6 +357,13 @@ function labelEl(inp: IsfInputDesc): JSX.Element {
   )
 }
 
+/** Decimals a number box shows for a range this wide : 100 or more none, 10 one,
+ *  1 two, 0.1 three, less four. Enough to read a slider, never so many it clips. */
+export function fracFor(span: number): number {
+  const s = Math.abs(span)
+  return s >= 100 ? 0 : s >= 10 ? 1 : s >= 1 ? 2 : s >= 0.1 ? 3 : 4
+}
+
 // The dense (one-line) rows' label : fixed width so every row's control lines up.
 function denseLabel(inp: IsfInputDesc): JSX.Element {
   return (
@@ -382,6 +398,9 @@ function FloatControl({
   const raw = typeof value === 'number' ? value : def
   const v = inp.integer ? Math.round(raw) : raw
   const step = inp.integer ? 1 : (max - min) / 200 || 0.005
+  // The box shows as many decimals as the range needs (a randomized 4.316481…
+  // clipped in it) : the stored value keeps all of them.
+  const frac = fracFor(max - min)
   const target = modTargetFor?.(inp.name)
   const targetKey = target ? modTargetKey(target) : null
   const bound = useBound(targetKey)
@@ -460,6 +479,7 @@ function FloatControl({
               max={max}
               onChange={(n) => onChange(inp.name, inp.integer ? Math.round(n) : n)}
               integer={!!inp.integer}
+              maxFrac={frac}
               liveKey={isModulated ? (targetKey ?? undefined) : undefined}
               className="input w-full px-1 py-0.5 text-right text-[11px]"
             />
@@ -485,6 +505,7 @@ function FloatControl({
               max={max}
               onChange={(n) => onChange(inp.name, inp.integer ? Math.round(n) : n)}
               integer={!!inp.integer}
+              maxFrac={frac}
               liveKey={isModulated ? (targetKey ?? undefined) : undefined}
               className="input w-full px-1 py-0.5 text-right text-[11px]"
             />
