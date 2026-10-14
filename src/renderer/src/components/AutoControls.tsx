@@ -109,7 +109,7 @@ export function AutoControls({
   inputs: IsfInputDesc[]
   values: Record<string, Value>
   onChange: (name: string, value: Value) => void
-  // Vertical + wrap layouts : inputs to show greyed out (they do nothing right now),
+  // Inputs to show greyed out (they do nothing right now),
   // name → the reason (the row's tooltip).
   dim?: Record<string, string>
   // When provided, float controls grow an "M" button that binds a modulator
@@ -193,7 +193,15 @@ export function AutoControls({
     return (
       <div className="flex items-center gap-5 p-2">
         <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-5 gap-y-2.5">
-          {visible(rest).map((inp) => renderControl(inp))}
+          {visible(rest).map((inp) =>
+            dim?.[inp.name] ? (
+              <div key={inp.name} className="opacity-40" title={dim[inp.name]}>
+                {renderControl(inp)}
+              </div>
+            ) : (
+              renderControl(inp)
+            )
+          )}
           {compactCell}
         </div>
         {pads.length > 0 && (
@@ -287,7 +295,7 @@ function PosPairControl({
   )
   return (
     <div className="flex w-44 min-w-0 flex-col gap-0.5">
-      <span className="font-mono text-[9px] uppercase tracking-wide text-muted">pos</span>
+      <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{dx?.label?.startsWith('shift') ? 'shift' : 'pos'}</span>
       {axis('X', vx, minx, maxx, defx, 'posX')}
       {axis('Y', vy, miny, maxy, defy, 'posY')}
     </div>

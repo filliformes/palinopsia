@@ -11,7 +11,7 @@
     { "NAME": "density", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.5 },
     { "NAME": "grain",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.3, "LABEL": "granulation" },
     { "NAME": "pigment", "TYPE": "color", "DEFAULT": [0.44, 0.1, 0.11, 1.0] },
-    { "NAME": "base",    "TYPE": "color", "DEFAULT": [0.03, 0.03, 0.04, 1.0] },
+    { "NAME": "base",    "TYPE": "color", "DEFAULT": [0.03, 0.03, 0.04, 1.0], "LABEL": "ground" },
     { "NAME": "relief",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,    "DEFAULT": 0.3,  "LABEL": "relief" },
     { "NAME": "lightAngle", "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 2.36, "LABEL": "light angle" }
   ],

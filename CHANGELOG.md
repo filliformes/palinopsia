@@ -113,6 +113,41 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Twenty more Inspectors sorted into columns, inert controls greyed out.** An
+  audit of every source and FX (124 shaders, read off their code) gave columns to
+  the ones that read as a jumble in one row : Lattice (points · camera · well),
+  Lowercase (figure · clock · deal · color), Text (type · place · motion), Direct
+  Marks (marks · blink · hand), the whole organic family so it reads alike, always
+  ending on the same LIGHT column (Slime Mold, Fluid, Reaction, Veins, Colony,
+  Mycelium, Dye Field, Scan), the nodes Feedback (loop · motion · trails · key),
+  Datamosh (mosh · motion · texture · bursts), Sillage, Autocutter (the Collage's
+  pieces · edges, then recut), Mosaique, Transfert, and the FX Perspective (view ·
+  surface · tiling · depth) and Transform (frame · mask). FX and nodes take columns
+  in their own band now. The lighter ones stay one row. And 32 shaders grey out
+  the inputs that provably do nothing in the current state (each rule read off the
+  shader's code) : Feedback's keyer while it is off, its delay controls at delay
+  echo 0; Palette's unused stops; Transfert's trail column in displace mode; light
+  angle at relief 0 across the organic family; Lattice's camera height in a volume;
+  Lowercase's split, scroll and accents per figure; Fluid's second ink, glow and
+  relief per kind; and more. A greyed control still works, and an input driven by
+  a modulator or a Meta knob never counts as off (its base can sit at 0 while it
+  moves). The table lives in `GroupedControls.tsx` (`CONTROL_GROUPS`, `DIMS`); the
+  two-row FX layout greys out too. Labels fixed on the way : Palette's colors read
+  stop 1 to stop 5 (they showed colorA..E); Granular's "grain size" ran backwards
+  (now "fineness"); Perspective's pair reads "shift", "waves" is "wave count";
+  Tracking's band and rate are "band height" and "flutter rate"; Wide Time's drift
+  and hue are "zoom drift" and "hue turn"; Datamosh's "motion gate" and "pulse (Hz)"
+  are "motion floor" and "bloom rate (Hz)"; Autocutter's are "auto cut (Hz)" and
+  "crossfade (s)" like the Collage; Chronoscan's "sweep speed" and "time curve";
+  Parallax's "flip depth"; Transfert's "both ways"; Scanner's "rip size"; Sillage's
+  "streak length"; Reaction's and Slime Mold's grid "pattern size" (beside their
+  display zoom); two controls that were both named "accent" or "blade" now differ
+  (accent color, blade amount); Ten Print's and Slabs' accent tint, Mycelium's
+  "threads", Dye Field's "ground", Scan's "saturation" (it was "color"), Direct
+  Marks' "marks", "count" and "hand", Differential's "layers"; four labels too long
+  for a column shortened. **Slime Mould is Slime Mold** (American spelling), and two
+  source descriptions no longer name the researchers behind their models. Names
+  (OSC, sessions, presets, modulation) are unchanged.
 - **The Collage's controls are sorted into four columns** : FILMS (feed, films,
   window, speed, speed spread, zoom), PIECES (shape, cuts, stack, warp, rotate, mask),
   EDGES (seams, torn paper, contour, curve length, contour mode, FX before shapes) and

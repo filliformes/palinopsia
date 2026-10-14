@@ -23,7 +23,7 @@
     { "NAME": "seed",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.0,  "LABEL": "seed" },
     { "NAME": "audio",   "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.0,  "LABEL": "audio gate" },
     { "NAME": "ink",     "TYPE": "color", "DEFAULT": [0.92, 0.95, 0.94, 1.0] },
-    { "NAME": "accent",  "TYPE": "color", "DEFAULT": [0.95, 0.22, 0.10, 1.0] },
+    { "NAME": "accent",  "TYPE": "color", "DEFAULT": [0.95, 0.22, 0.10, 1.0], "LABEL": "accent color" },
     { "NAME": "ground",  "TYPE": "color", "DEFAULT": [0.03, 0.03, 0.035, 1.0] },
     { "NAME": "side",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.0,  "LABEL": "sidechain" },
     { "NAME": "sideTex", "TYPE": "image" },

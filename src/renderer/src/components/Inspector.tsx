@@ -11,7 +11,7 @@ import { SHADER_BY_ID } from '../shaders/isf'
 import { blurbFor } from '../shaders/isf/shaderBlurbs'
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { inputsForShader, defaultInputs } from '../shaders/isf/inputs'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { CollageStrip } from './CollageStrip'
 import { SilhouetteStrip } from './SilhouetteStrip'
@@ -19,7 +19,7 @@ import { ContextMenu, type MenuItem } from './ContextMenu'
 import { floatModTargets, hasModulationOn, useFxMenuItems } from './fxMenu'
 import { fxArrayFor, modTargetKey, useStore, type FxScope } from '../store'
 import { AutoControls, AssignContext, AssignRow, ModButton, useBound } from './AutoControls'
-import { GroupedControls, SOURCE_GROUPS, groupDim } from './GroupedControls'
+import { GroupedControls, CONTROL_GROUPS, groupDim } from './GroupedControls'
 import { registerLiveOverlay } from './liveOverlay'
 import { CapturePicker } from './CapturePicker'
 import { AvfReadout, DevicePicker } from './DevicePicker'
@@ -36,6 +36,13 @@ import { applyVibeColor } from '../vibeColor'
 
 // Text source : grey the weight dial when the chosen face has a single weight
 // (the engine clamps the weight into each face's real range).
+function mergeDims(
+  a: Record<string, string> | undefined,
+  b: Record<string, string> | undefined
+): Record<string, string> | undefined {
+  return a || b ? { ...b, ...a } : undefined
+}
+
 function textDim(values: Record<string, number | number[]>): Record<string, string> | undefined {
   const idx = Math.round(typeof values.font === 'number' ? values.font : 1)
   const [lo, hi] = textFontWeightRange(idx)
@@ -318,6 +325,22 @@ export function Inspector(): JSX.Element {
   // any other FX parameter. useBound is a hook, so it must run before any early
   // return below (it no-ops on a null key when no FX is selected).
   const fxOpaTarget: ModTarget | null = fxOpacity && modTargetFor ? modTargetFor(FX_OPACITY_INPUT) : null
+  // The inputs a modulator or a Meta knob drives : the grey-out rules never take
+  // one of those as off (its base can sit at 0 while it moves). A joined string,
+  // so the store selector stays stable between frames.
+  const modNames = useStore((s) => {
+    const tf = modTargetFor
+    if (!shaderId || !tf) return ''
+    const keys = new Set<string>()
+    for (const a of s.composition.modMatrix) keys.add(modTargetKey(a.target))
+    for (const k of s.composition.metaKnobs) for (const d of k.destinations) keys.add(modTargetKey(d))
+    if (!keys.size) return ''
+    return inputsForShader(shaderId)
+      .filter((i) => keys.has(modTargetKey(tf(i.name))))
+      .map((i) => i.name)
+      .join(',')
+  })
+  const modulated = useMemo(() => new Set(modNames ? modNames.split(',') : []), [modNames])
   const fxOpaBound = useBound(fxOpaTarget ? modTargetKey(fxOpaTarget) : null)
   // One shared assign-context value : the header's FX-opacity pill and the body's
   // parameter pills both toggle the same side panel (`assign`).
@@ -716,15 +739,15 @@ export function Inspector(): JSX.Element {
           <div className="min-w-0 flex-1">
             {selection?.type === 'source' || selection?.type === 'background' ? (
               <div className="min-h-[3.25rem]">
-                {SOURCE_GROUPS[shaderId] ? (
+                {CONTROL_GROUPS[shaderId] ? (
                   // Many parameters : sorted into titled columns.
                   <GroupedControls
-                    groups={SOURCE_GROUPS[shaderId]}
+                    groups={CONTROL_GROUPS[shaderId]}
                     inputs={inputsForShader(shaderId)}
                     values={values}
                     onChange={onChange}
                     modTargetFor={modTargetFor}
-                    dim={groupDim(shaderId, values)}
+                    dim={shaderId === 'gen-text' ? mergeDims(textDim(values), groupDim(shaderId, values, modulated)) : groupDim(shaderId, values, modulated)}
                   />
                 ) : (
                   <AutoControls
@@ -732,7 +755,7 @@ export function Inspector(): JSX.Element {
                     values={values}
                     onChange={onChange}
                     modTargetFor={modTargetFor}
-                    dim={shaderId === 'gen-text' ? textDim(values) : undefined}
+                    dim={shaderId === 'gen-text' ? textDim(values) : groupDim(shaderId, values, modulated)}
                     layout="wrap"
                   />
                 )}
@@ -748,13 +771,26 @@ export function Inspector(): JSX.Element {
                       exactly the content, so measuring it (auto-fit RULE) is immune
                       to the parent's flex stretch. */}
                   <div ref={fxContentRef}>
-                    <AutoControls
-                      inputs={inputsForShader(shaderId)}
-                      values={values}
-                      onChange={onChange}
-                      modTargetFor={modTargetFor}
-                      layout="twoRow"
-                    />
+                    {CONTROL_GROUPS[shaderId] ? (
+                      // Many parameters : sorted into titled columns, like the sources.
+                      <GroupedControls
+                        groups={CONTROL_GROUPS[shaderId]}
+                        inputs={inputsForShader(shaderId)}
+                        values={values}
+                        onChange={onChange}
+                        modTargetFor={modTargetFor}
+                        dim={groupDim(shaderId, values, modulated)}
+                      />
+                    ) : (
+                      <AutoControls
+                        inputs={inputsForShader(shaderId)}
+                        values={values}
+                        onChange={onChange}
+                        modTargetFor={modTargetFor}
+                        dim={groupDim(shaderId, values, modulated)}
+                        layout="twoRow"
+                      />
+                    )}
                   </div>
                 </div>
               </div>

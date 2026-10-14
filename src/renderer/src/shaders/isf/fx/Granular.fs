@@ -5,7 +5,7 @@
   "CATEGORIES": ["FX", "Glitch", "Texture"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
-    { "NAME": "grain",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.45, "LABEL": "grain size" },
+    { "NAME": "grain",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.45, "LABEL": "fineness" },
     { "NAME": "density", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.85 },
     { "NAME": "scatter", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.25 },
     { "NAME": "rotate",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2 },

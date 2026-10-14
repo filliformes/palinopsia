@@ -14,7 +14,7 @@
     { "NAME": "driftAngle", "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 0.4,  "LABEL": "drift angle" },
     { "NAME": "rotate",     "TYPE": "float", "MIN": -3.1416, "MAX": 3.1416, "DEFAULT": 0.0, "LABEL": "rotate" },
     { "NAME": "weather",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,    "DEFAULT": 0.3,  "LABEL": "weather" },
-    { "NAME": "colour",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,    "DEFAULT": 1.0,  "LABEL": "color" },
+    { "NAME": "colour",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,    "DEFAULT": 1.0,  "LABEL": "saturation" },
     { "NAME": "relief",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,    "DEFAULT": 0.6,  "LABEL": "relief" },
     { "NAME": "lightAngle", "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 2.36, "LABEL": "light angle" },
     { "NAME": "scanColor",  "TYPE": "image" },

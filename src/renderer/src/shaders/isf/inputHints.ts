@@ -99,8 +99,8 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     posX: 'Moves the plane sideways in the frame, which moves its vanishing point with it.',
     posY: 'Moves the plane up or down in the frame.',
     axis: 'Which way BEND curls and WAVE ripples : across the width or down the height.',
-    bend: 'Curls the plane along the bend axis : positive brings the edges toward you like a curved screen, negative pushes them away like a page bowed outward.',
-    wave: 'Ripples the plane into a ribbon along the bend axis. At a grazing angle a steep wave folds over itself.',
+    bend: 'Curls the plane along the axis : positive brings the edges toward you like a curved screen, negative pushes them away like a page bowed outward.',
+    wave: 'Ripples the plane into a ribbon along the axis. At a grazing angle a steep wave folds over itself.',
     waves: 'How many ripples run across the plane.',
     waveRate: 'Makes the ripples travel along the plane (negative : the other way).',
     repeat: 'Once : one card floating in space, transparent around it. Tile : the picture repeats to the horizon. Mirror : it repeats mirrored, so no seam shows.',
@@ -319,7 +319,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     clear: 'CLEAR ▸ : wipes the echoes (hold to keep them wiped).'
   },
   'fx-granular': {
-    grain: 'Grain size : low = big grains, high = fine grains.',
+    grain: 'Fineness : low = big grains, high = fine grains.',
     density: 'The share of grains that are lit : low values open gaps that show the smeared background.',
     scatter: 'How far each grain lands from where it was cut.',
     rotate: 'How far each grain turns.',
@@ -640,7 +640,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     refresh: 'The I-frame : how quickly the live picture returns. 0 = the smear never resets on its own (the full bloom).',
     residual: 'Re-injects live texture into the smear : the line between mosh and mush.',
     reseed: 'Chance that whole blocks snap back to the live picture, so the smear never fully mushes.',
-    thresh: 'Motion gate : motion smaller than this is ignored, so still areas don’t creep.',
+    thresh: 'Motion floor : motion smaller than this is ignored, so still areas don’t creep.',
     moshGate: 'Holds the smear only on the MOVING parts (+) or only on the STILL parts (−). 0 = everywhere.',
     edgeRepel: 'Steers the smear along the picture’s own edges : + away from bright, − toward bright.',
     resharp: 'Adds the live picture’s fine detail back on top, so the mosh stays crisp.',

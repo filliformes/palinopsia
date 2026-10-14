@@ -12,7 +12,7 @@
     { "NAME": "accent",       "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.12 },
     { "NAME": "style",        "TYPE": "long",  "VALUES": [0, 1], "LABELS": ["diagonals", "arcs"], "DEFAULT": 0, "LABEL": "style" },
     { "NAME": "ink",          "TYPE": "color", "DEFAULT": [0.78, 0.79, 0.76, 1.0] },
-    { "NAME": "tint",         "TYPE": "color", "DEFAULT": [0.9, 0.5, 0.18, 1.0] },
+    { "NAME": "tint",         "TYPE": "color", "DEFAULT": [0.9, 0.5, 0.18, 1.0], "LABEL": "accent color" },
     { "NAME": "reseed",       "TYPE": "event", "LABEL": "reseed ▸" },
     { "NAME": "audioTex",     "TYPE": "image" }
   ],

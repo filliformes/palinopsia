@@ -11,10 +11,10 @@
     { "NAME": "drift",     "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.2 },
     { "NAME": "accent",    "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.2 },
     { "NAME": "chaos",     "TYPE": "float", "MIN": 0.0, "MAX": 0.2,  "DEFAULT": 0.0, "LABEL": "chaos (bend + break)" },
-    { "NAME": "nonlinear", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0, "LABEL": "nonlinear (thin)" },
+    { "NAME": "nonlinear", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0, "LABEL": "thin" },
     { "NAME": "audioScatter", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "audio scatter" },
     { "NAME": "audioLight", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "spectrum light" },
-    { "NAME": "tint",      "TYPE": "color", "DEFAULT": [0.9, 0.5, 0.18, 1.0] },
+    { "NAME": "tint",      "TYPE": "color", "DEFAULT": [0.9, 0.5, 0.18, 1.0], "LABEL": "accent color" },
     { "NAME": "reseed",    "TYPE": "event", "LABEL": "reseed ▸" },
     { "NAME": "audioTex",  "TYPE": "image" }
   ],

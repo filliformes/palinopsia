@@ -4,7 +4,7 @@
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Analog", "Geometry"],
   "INPUTS": [
-    { "NAME": "count",     "TYPE": "float", "MIN": 2.0, "MAX": 8.0,  "DEFAULT": 4.0 },
+    { "NAME": "count",     "TYPE": "float", "MIN": 2.0, "MAX": 8.0,  "DEFAULT": 4.0, "LABEL": "layers" },
     { "NAME": "ratio",     "TYPE": "float", "MIN": 1.0, "MAX": 3.0,  "DEFAULT": 2.0 },
     { "NAME": "rate",      "TYPE": "float", "MIN": 0.0, "MAX": 6.0,  "DEFAULT": 0.4 },
     { "NAME": "freq",      "TYPE": "float", "MIN": 0.5, "MAX": 12.0, "DEFAULT": 3.0 },

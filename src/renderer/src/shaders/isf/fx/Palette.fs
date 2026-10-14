@@ -9,11 +9,11 @@
     { "NAME": "blend",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "bands↔smooth" },
     { "NAME": "dither", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "dither breakup" },
     { "NAME": "mixSrc", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "source mix" },
-    { "NAME": "colorA", "TYPE": "color", "DEFAULT": [0.02, 0.02, 0.03, 1.0] },
-    { "NAME": "colorB", "TYPE": "color", "DEFAULT": [0.35, 0.12, 0.45, 1.0] },
-    { "NAME": "colorC", "TYPE": "color", "DEFAULT": [0.16, 0.82, 0.74, 1.0] },
-    { "NAME": "colorD", "TYPE": "color", "DEFAULT": [0.92, 0.85, 0.72, 1.0] },
-    { "NAME": "colorE", "TYPE": "color", "DEFAULT": [1.0, 1.0, 1.0, 1.0] },
+    { "NAME": "colorA", "TYPE": "color", "DEFAULT": [0.02, 0.02, 0.03, 1.0], "LABEL": "stop 1" },
+    { "NAME": "colorB", "TYPE": "color", "DEFAULT": [0.35, 0.12, 0.45, 1.0], "LABEL": "stop 2" },
+    { "NAME": "colorC", "TYPE": "color", "DEFAULT": [0.16, 0.82, 0.74, 1.0], "LABEL": "stop 3" },
+    { "NAME": "colorD", "TYPE": "color", "DEFAULT": [0.92, 0.85, 0.72, 1.0], "LABEL": "stop 4" },
+    { "NAME": "colorE", "TYPE": "color", "DEFAULT": [1.0, 1.0, 1.0, 1.0], "LABEL": "stop 5" },
     { "NAME": "cycle",  "TYPE": "float", "MIN": 0.0, "MAX": 0.5, "DEFAULT": 0.0, "LABEL": "cycle rate" }
   ],
   "PASSES": [
