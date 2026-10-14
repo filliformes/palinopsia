@@ -7,6 +7,39 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Collage : two new shapes, `stack` and `warp`.** `shape` gains **torn** (ragged
+  paper scraps, tilted up to 24°, each around its cell of the cut-up partition and
+  padded past it by its deepest bite so the wall stays covered; the outline is a
+  tapered box displaced by three noise octaves and a cubed low-frequency bite, scaled
+  with the scrap) and **shaped** (an ellipse around the tilted cell, its radius
+  modulated by 2, 3 and 5-lobe harmonics of per-piece size and phase). Both are always
+  a pile. **`stack`** (0..1) grows every piece past its cut (cut-up : per side, up to
+  0.42 of its smaller side and 0.4 of the mean piece; mosaic : all round, up to 0.24
+  of the mean seed spacing, measured against the borders shared with the pixel's three
+  nearest seeds, so grown shards keep straight sides) and gives each piece a height
+  (a per-id draw, also now the torn-paper over/under order, so a modulated `cuts`
+  never reshuffles it). The highest present piece holding a pixel shows; higher pieces
+  cast a penumbra shadow offset 0.05 x stack x the height gap toward the bottom right
+  plus a contact shade; lower pieces dim up to 20 %; a 1.5 px rim lights or shades the
+  edges by their facing. Masked pieces drop out of the pile, the runner-up shows
+  through a fading one, and a shadow past every piece reaches the layers below as
+  alpha. The film of a grown, torn or shaped piece is cover-cropped to its new rect
+  (torn and shaped tilt the film with the piece), never stretched. **`warp`** (0..1)
+  bends every shape its own way and every piece differently : the cut-up's partition
+  is bowed around a per-deal point plus three per-deal swells (fading at the frame, a
+  one-to-one map) and every cut-up or mosaic piece lenses its own film (bulge, pinch,
+  swirl or ripple, by its draw); mosaic seeds carry per-seed weights (curved borders,
+  unequal shards); torn scraps curl along, across or into an S; shaped cut-outs swirl
+  or bend into a crescent. The pile programs (four shapes x torn edge) compile on
+  first use through `KHR_parallel_shader_compile` and the wall draws its flat cut
+  until they link, so nothing hitches; a wall with stack 0 on cut-up or mosaic runs
+  the flat programs. Measured on the Aero (1080p, one clip, 14 to 64 pieces, every
+  shape, stack, torn edge and warp) : 56 to 60 fps. Ten new presets (*Pile*, *Torn
+  pile*, *Shard pile*, *Scrapbook*, *Torn scraps*, *Torn heap*, *Cut-outs*, *Swirled
+  cut-outs*, *Bent wall*, *Curved shards*); the others now set stack and warp to 0. A
+  **Paste-Up** Generate theme (Film Wall family) piles your films; Film Wall also
+  deals torn walls, Contact Sheet and Projection Booth stay flat.
+
 - **`Ctrl/Cmd+F` turns the Fulldome output on and off** from anywhere in the
   control window (not while typing in a field), with a toast saying which. In the
   cheat-sheet (`?`) and the README's shortcut table. Plain `F` still opens the
@@ -80,6 +113,15 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **The Collage's controls are sorted into four columns** : FILMS (feed, films,
+  window, speed, speed spread, zoom), PIECES (shape, cuts, stack, warp, rotate, mask),
+  EDGES (seams, torn paper, contour, curve length, contour mode, FX before shapes) and
+  DEAL (deal, auto deal, crossfade, churn, freeze), one control per line, where they
+  were one unordered wrapping row. Curve length and contour mode grey out while
+  contour is at 0 (contour mode stays live while warp bends a cut-up). The grouping is
+  a table (`SOURCE_GROUPS`, `GroupedControls.tsx`) any source can join; an input no
+  group names lands in a last "more" column, so none can go missing. An `event` input
+  (the deal button) now has a one-line form.
 - **Collage holds up to 100 films** (was 50). The deck array keeps its 80 MB
   budget by itself (100 films get the smallest layer edge, 384 px : 59 MB). A film
   decodes only while a piece shows it and the wall has at most 64 pieces, so past

@@ -54,7 +54,7 @@ Lowercase's slant, each straight from its Space theme. The older shots stay in
 **The instrument**
 - [The layer stack](#the-layer-stack) : sources · A/B mix · racks · blends · masks · coupling
 - [Video sources](#video-sources) : import (DXV/HAP/ProRes…) · transport · modulatable playhead · granulation
-- [Collage](#collage--a-wall-of-films-key-source-gen-collage) : a wall of films cut up by the Autocutter partition · folder or Assemble-bank feed
+- [Collage](#collage--a-wall-of-films-key-source-gen-collage) : a wall of films cut up by the Autocutter partition · four shapes (cut-up, mosaic, torn, shaped) · stack · warp · folder or Assemble-bank feed
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
 - [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix)
 - [Sequencer](#sequencer-key-q) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
@@ -1285,7 +1285,9 @@ Autocutter's partition : folder feed, no post work.*
 Point the **Collage** source at a folder of videos and it plays every clip at
 once, each inside its own piece of the **Autocutter's** cut-up partition : a
 living mosaic where every fragment is a different film. Pick it as a layer source
-(or the Background source), then open the folder from the Inspector.
+(or the Background source), then open the folder from the Inspector. Its controls
+sit in four columns : **films** (what plays), **pieces** (how the frame is cut),
+**edges** (how the pieces meet) and **deal** (how the wall changes over time).
 
 - **Any format, any shape.** The folder scan takes the same codecs as Assemble
   and converts anything Chromium can't decode; portrait, landscape and 4K all
@@ -1315,11 +1317,36 @@ living mosaic where every fragment is a different film. Pick it as a layer sourc
   with a few loose fibers, and it casts a soft shadow, longer away from the light. A
   tear over a masked hole drops its shadow on the layers beneath; the frame's own
   edges stay clean cuts;
-  **`shape`** switches the pieces between the cut-up rectangles and a **Voronoi
-  mosaic**, and a **contour mode** (normal / warped) chooses whether Contour frays
+  **`shape`** picks the pieces : the **cut-up** rectangles, a **Voronoi mosaic**,
+  **torn** (ragged scraps torn out of paper, tilted, every one around its own piece of
+  the cut-up and big enough to cover it, piled over and under each other : long
+  waves in the outline, a rag at every scale, a deep bite now and then) or **shaped**
+  (rounded abstract cut-outs, ellipses swelling and dipping into beans, kidneys and
+  soft blobs, piled the same way). Switching between cut-up, torn and shaped keeps
+  the deal : the same pieces, the same films, a new outline. A **contour mode**
+  (normal / warped) chooses whether Contour frays
   **only the cut edges** (the film inside stays straight) or ripples the whole clip.
   Either way the film **adapts to its piece** : normal, warped and mosaic shapes all
   fill edge-to-edge with real video, no black in the cuts.
+- **`stack`** lifts the pieces off the flat sheet into a pile. Every piece grows past
+  its cut (a cut-up piece by its own amount on each side, a mosaic shard all round,
+  its film re-cropped to the grown shape, never stretched) and lies at its own height,
+  so neighbours overlap and the higher one lies on top. A higher piece drops a soft
+  shadow on whatever is lower (light from the top left), longer and softer the
+  higher it stands above it, with a little contact shade along its edge; the low
+  pieces sit in a little less light, and an edge catches a hairline of light where it
+  faces it. A masked piece is gone : what lay under it shows, or, past the whole
+  pile, the layers beneath with the pile's shadow on them. Torn and shaped pieces are
+  a pile at any stack; there it only lifts them apart. Each deal piles them in a new
+  order; a modulated `cuts` keeps every piece's height.
+- **`warp`** bends the pieces, each shape its own way and every piece a little
+  differently. **Cut-up** : the whole cut bows around a point, swells and dips here
+  and there (the straight cuts turn to arcs, a new bend each deal), and every piece
+  bulges, pinches, swirls or ripples its own film. **Mosaic** : every seed pulls its
+  own weight, so the borders curve and the shards grow unequal, and every piece bends
+  its film. **Torn** : every scrap curls along its length, across it or into an S.
+  **Shaped** : every cut-out swirls into a hook or bends into a crescent. The films
+  bend with their pieces.
 - **Modulate `cuts` freely.** One more cut splits ONE piece (the cut-up) or adds one
   shard (the mosaic) and every other piece keeps its place and its film, so an LFO on
   `cuts` grows and shrinks the wall instead of reshuffling it; `films` steps add or

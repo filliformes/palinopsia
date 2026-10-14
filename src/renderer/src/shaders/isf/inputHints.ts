@@ -973,7 +973,9 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
   },
   'gen-collage': {
     cuts: 'How many pieces the frame is cut into.',
-    shape: 'CUT-UP = recursive rectangles. MOSAIC = irregular polygon shards.',
+    shape: 'CUT-UP = recursive rectangles. MOSAIC = irregular polygon shards. TORN = ragged scraps torn out of paper, tilted, piled over and under each other. SHAPED = rounded abstract cut-outs (beans, blobs, soft lobes), piled the same way. A new deal tears or cuts them anew.',
+    stack: 'Lifts the pieces into a pile : each grows past its cut and lies at its own height, so they overlap like cut-outs laid one over another. The higher ones drop a shadow on the lower, longer and softer the higher they stand. 0 = one flat sheet. A new deal piles them in a new order.',
+    warp: 'Bends the pieces, each shape its own way and every piece a little differently. CUT-UP : the cut bows around a point and swells and dips here and there, the straight cuts turning to arcs, and every piece bulges, pinches, swirls or ripples its own film. MOSAIC : the borders curve, the shards grow unequal, and every piece bends its film its own way. TORN : every scrap curls along, across or into an S. SHAPED : every cut-out swirls into a hook or bends into a crescent. The films bend with their pieces.',
     feed: 'FOLDER = every piece plays a film from the scanned folder. ASSEMBLAGES = every piece plays one of the saved edits picked under "edits…" (the folder stands in while none are picked).',
     films: 'How many films play at once (each is a decoder). More pieces than films is fine : the extra pieces show the same film at another crop.',
     hold: '0 = each piece plays its whole film on a loop, with no seeking (the smoothest). A length in seconds = each piece loops a window that long inside its film instead.',

@@ -19,6 +19,7 @@ import { ContextMenu, type MenuItem } from './ContextMenu'
 import { floatModTargets, hasModulationOn, useFxMenuItems } from './fxMenu'
 import { fxArrayFor, modTargetKey, useStore, type FxScope } from '../store'
 import { AutoControls, AssignContext, AssignRow, ModButton, useBound } from './AutoControls'
+import { GroupedControls, SOURCE_GROUPS, groupDim } from './GroupedControls'
 import { registerLiveOverlay } from './liveOverlay'
 import { CapturePicker } from './CapturePicker'
 import { AvfReadout, DevicePicker } from './DevicePicker'
@@ -715,14 +716,26 @@ export function Inspector(): JSX.Element {
           <div className="min-w-0 flex-1">
             {selection?.type === 'source' || selection?.type === 'background' ? (
               <div className="min-h-[3.25rem]">
-                <AutoControls
-                  inputs={inputsForShader(shaderId)}
-                  values={values}
-                  onChange={onChange}
-                  modTargetFor={modTargetFor}
-                  dim={shaderId === 'gen-text' ? textDim(values) : undefined}
-                  layout="wrap"
-                />
+                {SOURCE_GROUPS[shaderId] ? (
+                  // Many parameters : sorted into titled columns.
+                  <GroupedControls
+                    groups={SOURCE_GROUPS[shaderId]}
+                    inputs={inputsForShader(shaderId)}
+                    values={values}
+                    onChange={onChange}
+                    modTargetFor={modTargetFor}
+                    dim={groupDim(shaderId, values)}
+                  />
+                ) : (
+                  <AutoControls
+                    inputs={inputsForShader(shaderId)}
+                    values={values}
+                    onChange={onChange}
+                    modTargetFor={modTargetFor}
+                    dim={shaderId === 'gen-text' ? textDim(values) : undefined}
+                    layout="wrap"
+                  />
+                )}
               </div>
             ) : (
               <>

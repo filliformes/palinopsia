@@ -1042,11 +1042,23 @@ export const THEMES: Theme[] = [
     world: 'monomedia',
     palette: [K, [0.2, 0.18, 0.16, 1], [0.86, 0.82, 0.74, 1]],
     sources: ['gen-collage'], needsClips: true,
-    pickInputs: { 'gen-collage': { feed: [0], shape: [0, 1] } },
+    pickInputs: { 'gen-collage': { feed: [0], shape: [0, 1, 2] } },
     layerFx: ['fx-grade', 'fx-grain'],
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0,
     vibe: { mixSrc: 0.8 },
     finalizer: { grain: 0.1, filmDust: 0.2, filmScratch: 0.15, filmGauge: 1 }
+  }),
+  mk({
+    id: 'paste-up', name: 'Paste-Up', family: 'Film Wall',
+    blurb: 'Your films cut out and piled at different heights, the higher pieces casting soft shadows on the ones beneath.',
+    world: 'monomedia',
+    palette: [K, [0.24, 0.2, 0.17, 1], [0.92, 0.88, 0.8, 1]],
+    sources: ['gen-collage'], needsClips: true,
+    pickInputs: { 'gen-collage': { feed: [0], shape: [0, 1, 2, 2, 3, 3], stack: [0.45, 0.65, 0.85], warp: [0, 0, 0.3], cuts: [8, 12, 16, 20], gap: [0] } },
+    layerFx: ['fx-grade', 'fx-grain'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0,
+    vibe: { mixSrc: 0.8 },
+    finalizer: { grain: 0.08 }
   }),
   mk({
     id: 'contact-sheet', name: 'Contact Sheet', family: 'Film Wall',
@@ -1054,7 +1066,7 @@ export const THEMES: Theme[] = [
     world: 'monomedia',
     palette: [INK, [0.3, 0.3, 0.3, 1], [0.9, 0.9, 0.88, 1]],
     sources: ['gen-collage'], needsClips: true,
-    pickInputs: { 'gen-collage': { feed: [0], shape: [0], cuts: [24, 32, 40], films: [16, 24] } },
+    pickInputs: { 'gen-collage': { feed: [0], shape: [0], stack: [0], warp: [0], cuts: [24, 32, 40], films: [16, 24] } },
     layerFx: ['fx-grade', 'fx-sharpen'],
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0,
     vibe: { mixSrc: 0.7, saturation: 0.6 }
@@ -1078,7 +1090,7 @@ export const THEMES: Theme[] = [
     world: 'monomedia',
     palette: [K, [0.22, 0.18, 0.12, 1], [0.92, 0.86, 0.72, 1]],
     sources: ['gen-collage'], needsClips: true,
-    pickInputs: { 'gen-collage': { feed: [0], cuts: [2, 3, 4] } },
+    pickInputs: { 'gen-collage': { feed: [0], stack: [0], cuts: [2, 3, 4] } },
     layerFx: ['fx-aperture', 'fx-grain'],
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0,
     vibe: { mixSrc: 0.75 },

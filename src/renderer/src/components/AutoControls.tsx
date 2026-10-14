@@ -103,7 +103,8 @@ export function AutoControls({
   onChange,
   modTargetFor,
   layout = 'wrap',
-  dim
+  dim,
+  bare = false
 }: {
   inputs: IsfInputDesc[]
   values: Record<string, Value>
@@ -122,6 +123,8 @@ export function AutoControls({
   // 'vertical': one full-width control per row, stacked : for narrow tall panels
   //   (the Finishing Touches finalizers).
   layout?: 'wrap' | 'twoRow' | 'vertical'
+  // Vertical : no padding of its own (it sits in a column that has it).
+  bare?: boolean
 }): JSX.Element {
   if (inputs.length === 0) {
     return <div className="p-2 text-[11px] text-muted">This shader exposes no controls.</div>
@@ -157,7 +160,7 @@ export function AutoControls({
     // Full-width controls stacked, one dense single-line row each (label · slider
     // · M · number) : `[&>*]:w-full` overrides each control's fixed w-44.
     return (
-      <div className="flex flex-col gap-0.5 px-2 py-1 [&>*]:w-full">
+      <div className={`flex flex-col gap-0.5 [&>*]:w-full ${bare ? '' : 'px-2 py-1'}`}>
         {visible(inputs).map((inp) =>
           dim?.[inp.name] ? (
             <div key={inp.name} className="opacity-40 [&>*]:w-full" title={dim[inp.name]}>
@@ -835,6 +838,29 @@ function BoolControl({
       }
     })
   }, [isModulated, targetKey])
+  if (inp.type === 'event' && dense) {
+    return (
+      <div className="flex min-w-0 items-center gap-1.5">
+        {denseLabel(inp)}
+        <button
+          onPointerDown={() => {
+            if (fireTimer.current !== null) window.clearTimeout(fireTimer.current)
+            onChange(inp.name, 1)
+            fireTimer.current = window.setTimeout(() => {
+              onChange(inp.name, 0)
+              fireTimer.current = null
+            }, 140)
+          }}
+          className="rounded bg-panel2 px-2 py-0 font-mono text-[10px] text-accent ring-1 ring-accent/40 transition-colors hover:bg-accent/20 active:bg-accent/50"
+          title={inp.hint ?? `${inp.label} : fire (momentary trigger; bind M for rhythmic auto-fire)`}
+        >
+          FIRE ▸
+        </button>
+        <div className="flex-1" />
+        {target && <DenseMod target={target} label={inp.label} />}
+      </div>
+    )
+  }
   if (inp.type === 'event') {
     return (
       <div className="flex w-24 min-w-0 flex-col items-start gap-0.5">

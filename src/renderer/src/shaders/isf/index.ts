@@ -1293,11 +1293,13 @@ export const GENERATORS: IsfShader[] = [
     native: true,
     source: `/*${JSON.stringify({
       DESCRIPTION:
-        "Collage : a wall of films cut up like torn paper. Pick a folder in the Inspector and every piece of the cut-up plays a different clip, cover-cropped to its own shape, so portrait, landscape and 4K mix freely. feed switches between that folder and a selection of saved assemblages : with assemblages, every piece plays one of your little edits, cutting on its own. films is how many play at once, up to 100 (more cuts than films is fine : the extra pieces show the same film at another crop). window (hold) is 0 to play each whole film on a loop (no seeking at all, the smoothest setting), or a length in seconds to loop a short window of it instead. churn sets how many pieces switch film on their own fast clock, from all holding to every piece its own little montage. speed spread (vary) gives every piece its own playback speed around speed; freeze stops the whole wall on the current frame. deal re-deals the wall, auto deal (rate) does it on a clock, and crossfade (xfade) dissolves each deal into the next instead of snapping. shape picks the piece geometry : CUT-UP is recursive rectangles, MOSAIC is irregular polygon shards. contour, curve length, torn paper and mask are the Autocutter's dials; contour mode chooses whether contour warps the film inside each piece (WARPED) or only frays the cut edges while the picture stays straight (NORMAL). The layer Speed and the global speed scale the whole wall, films and clocks alike.",
+        "Collage : a wall of films cut up like torn paper. Pick a folder in the Inspector and every piece of the cut-up plays a different clip, cover-cropped to its own shape, so portrait, landscape and 4K mix freely. feed switches between that folder and a selection of saved assemblages : with assemblages, every piece plays one of your little edits, cutting on its own. films is how many play at once, up to 100 (more cuts than films is fine : the extra pieces show the same film at another crop). window (hold) is 0 to play each whole film on a loop (no seeking at all, the smoothest setting), or a length in seconds to loop a short window of it instead. churn sets how many pieces switch film on their own fast clock, from all holding to every piece its own little montage. speed spread (vary) gives every piece its own playback speed around speed; freeze stops the whole wall on the current frame. deal re-deals the wall, auto deal (rate) does it on a clock, and crossfade (xfade) dissolves each deal into the next instead of snapping. shape picks the piece geometry : CUT-UP is recursive rectangles, MOSAIC is irregular polygon shards, TORN is ragged scraps of torn paper, tilted and piled over each other, SHAPED is rounded abstract cut-outs, piled the same way. stack lifts the pieces off the flat sheet into a pile : each one grows past its cut and lies at its own height, the higher ones over the lower with a shadow that lengthens with the drop. warp bends the pieces, each shape its own way and every piece a little differently : the cut-up bows and its pieces bulge, pinch or swirl their films, mosaic borders curve, torn scraps curl, shaped cut-outs swirl or bend into crescents. contour, curve length, torn paper and mask are the Autocutter's dials; contour mode chooses whether contour warps the film inside each piece (WARPED) or only frays the cut edges while the picture stays straight (NORMAL). The layer Speed and the global speed scale the whole wall, films and clocks alike.",
       CATEGORIES: ['Generator'],
       INPUTS: [
         { NAME: 'cuts', TYPE: 'float', MIN: 2.0, MAX: 64.0, DEFAULT: 12.0, LABEL: 'cuts', INTEGER: true },
-        { NAME: 'shape', TYPE: 'long', VALUES: [0, 1], LABELS: ['cut-up', 'mosaic'], DEFAULT: 0, LABEL: 'shape' },
+        { NAME: 'shape', TYPE: 'long', VALUES: [0, 1, 2, 3], LABELS: ['cut-up', 'mosaic', 'torn', 'shaped'], DEFAULT: 0, LABEL: 'shape' },
+        { NAME: 'stack', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'stack' },
+        { NAME: 'warp', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'warp' },
         { NAME: 'feed', TYPE: 'long', VALUES: [0, 1], LABELS: ['folder', 'assemblages'], DEFAULT: 0, LABEL: 'feed' },
         { NAME: 'films', TYPE: 'float', MIN: 1.0, MAX: 100.0, DEFAULT: 12.0, LABEL: 'films', INTEGER: true },
         { NAME: 'hold', TYPE: 'float', MIN: 0.0, MAX: 30.0, DEFAULT: 0.0, LABEL: 'window (s)' },
@@ -1330,6 +1332,8 @@ export const GENERATORS: IsfShader[] = [
       fxFirst: [0, 0], // a structural choice : yours, not the dice's
       zoom: [1, 1.4],
       rotate: [0, 0.35],
+      stack: [0, 0.6],
+      warp: [0, 0.5],
       gap: [0, 0.4],
       contour: [0.3, 1.5],
       curve: [0.1, 0.9],

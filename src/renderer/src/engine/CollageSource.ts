@@ -144,11 +144,17 @@ void main(){
 // instead of sampling a source rect of the host image. Everything spatial is
 // measured in HEIGHT units (x scaled by the aspect), so seams, fringes, warps and
 // mosaic shards come out the same width in every direction at 16:9 and on a
-// square dome. Compiled TWICE, once per shape (MOSAIC 0/1) : sharing one program
-// behind a uniform branch cost the cut-up path ~1.5x in register pressure.
-const FS_COLLAGE = (mosaic: boolean, torn: boolean): string => `#version 300 es
-#define MOSAIC ${mosaic ? 1 : 0}
+// square dome. Compiled once per shape (SHAPE 0 cut-up, 1 mosaic, 2 torn, 3
+// shaped) : sharing one program behind a uniform branch cost the cut-up path
+// ~1.5x in register pressure. TORN (the torn-paper edge) and STACK (the pile)
+// are compiled variants too, so a wall without them runs none of their code.
+// The torn and shaped pieces are always a pile (FORM).
+const FS_COLLAGE = (shape: number, torn: boolean, stack = false): string => `#version 300 es
+#define SHAPE ${shape}
+#define MOSAIC ${shape === 1 ? 1 : 0}
+#define FORM ${shape >= 2 ? 1 : 0}
 #define TORN ${torn ? 1 : 0}
+#define STACK ${stack || shape >= 2 ? 1 : 0}
 precision highp float;
 // GLSL ES 3.00 gives sampler2D a default precision in the fragment stage but
 // NOT sampler2DArray : without this line the whole program fails to compile.
@@ -156,14 +162,14 @@ precision highp sampler2DArray;
 in vec2 vUV; out vec4 o;
 uniform sampler2DArray uDecks;
 uniform int uCount;
-uniform vec4 uCell[64];    // piece rect (x,y,w,h) in output UV (mosaic : the shard's bounding box)
+uniform vec4 uCell[64];    // piece rect (x,y,w,h) in output UV (mosaic : the shard's bounding box; STACK : grown; FORM : the film rect, untilted)
 uniform vec4 uCrop[64];    // film rect inside the deck's layer (cover crop)
 uniform vec4 uContent[64]; // the deck's picture rect inside its layer; reads mirror inside it
-uniform vec4 uMeta[64];    // x deck layer · y quarter turns · z mask rank (survivor 2.0)
-uniform vec4 uSite[64];    // mosaic seed (xy, height units)
+uniform vec4 uMeta[64];    // x deck layer · y quarter turns · z mask rank (survivor 2.0) · w height in the pile
+uniform vec4 uSite[64];    // mosaic seed (xy, height units) · z (STACK) how far the shard grows past its cut · w its WARP weight
 uniform vec4 uRows[16];    // mosaic rows : x first seed index, y seed count
 uniform int uRowCount;
-uniform float uGap, uSeed, uContour, uTorn, uMask, uCurve, uAspect, uTexel, uPx;
+uniform float uGap, uSeed, uContour, uTorn, uMask, uCurve, uAspect, uTexel, uPx, uStack, uWarp;
 uniform int uContourMode; // 0 = normal (warp edges only), 1 = warped (warp content too)
 uniform int uStraight;    // 1 = straight alpha (drawn straight into the layer), 0 = premultiplied
 // FX BEFORE SHAPES : 0 the whole wall · 1 its films only, every piece whole (the
@@ -197,6 +203,36 @@ vec2 tearWarp(vec2 p){
          + (vec2(vnoise(q * ff + 11.3), vnoise(q * ff + 71.9)) - 0.5) * fray;
   return p + w * uContour * 0.045 * (1.0 + uCurve * 1.1) / A;
 }
+// WARP bends the pieces, each shape its own way, and every piece a little
+// differently.
+#if SHAPE == 0
+// Cut-up : the whole cut bows around a point, as if the wall were bent over it
+// (straight cuts become arcs), and three smaller swells and dips (some pushing,
+// some pulling) bend each stretch of cut its own way. All of it moves with each
+// deal. No fold : the map stays one-to-one, and inside the frame.
+vec2 bendGrid(vec2 p){
+  vec2 A = vec2(uAspect, 1.0);
+  vec2 c = vec2(0.3 + 0.4 * vhash(vec2(3.7, 1.1)), 0.3 + 0.4 * vhash(vec2(8.3, 2.9)));
+  vec2 d = (p - c) * A;
+  float r2 = dot(d, d);
+  vec2 q = c * A + d * (1.0 - uWarp * 0.4 * r2 / (1.0 + r2));
+  // (the swells fade out toward the frame, which stays where it is)
+  vec2 edge = smoothstep(0.0, 0.15, min(p, 1.0 - p));
+  for (int k = 0; k < 3; k++){
+    float fk = float(k);
+    vec2 ck = vec2(0.15 + 0.7 * vhash(vec2(5.1 + fk * 3.3, 7.7)), 0.15 + 0.7 * vhash(vec2(2.9 + fk * 4.1, 9.3))) * A;
+    vec2 dk = p * A - ck;
+    float sk = vhash(vec2(fk * 1.7, 6.6)) < 0.5 ? -1.0 : 1.0;
+    q += uWarp * sk * 0.35 * dk * exp(-4.0 * dot(dk, dk)) * edge;
+  }
+  return clamp(q / A, 0.0001, 0.9999);
+}
+#endif
+#if MOSAIC
+// Mosaic : every seed carries its own weight (uSite.w), so the borders curve
+// (hyperbolas, not straight bisectors) and the shards come out unequal.
+float wdist(int i, vec2 q){ return distance(q, uSite[i].xy) - uWarp * uSite[i].w; }
+#endif
 vec2 rot90(vec2 p, float r){
   p -= 0.5; int ri = int(r + 0.5);
   if (ri == 1) p = vec2(-p.y, p.x);
@@ -204,13 +240,66 @@ vec2 rot90(vec2 p, float r){
   else if (ri == 3) p = vec2(p.y, -p.x);
   return p + 0.5;
 }
+#if FORM
+// A torn or shaped piece is tilted : x its tilt (radians), y z w its own shape
+// draws. Its film rect (uCell) is untilted, centred on it.
+uniform vec4 uForm[64];
+vec2 rotv(vec2 v, float a){ float c = cos(a), s = sin(a); return vec2(c * v.x - s * v.y, s * v.x + c * v.y); }
+vec2 centreOf(int i){ vec4 d = uCell[i]; return (d.xy + 0.5 * d.zw) * vec2(uAspect, 1.0); }
+// Half its film rect, height units : its shape fits inside.
+vec2 halfOf(int i){ return 0.5 * uCell[i].zw * vec2(uAspect, 1.0); }
+// q (height units) in the piece's own frame : centred on it, untilted, and
+// bent by WARP (the film is printed on the piece, so it bends along) : a torn
+// scrap curls into a curved strip, a shaped cut-out swirls into a hook. Each
+// piece bends its own way and amount.
+vec2 localOf(int i, vec2 q){
+  vec2 lp = rotv(q - centreOf(i), -uForm[i].x);
+  if (uWarp > 0.0){
+    float b = fract(uForm[i].w * 17.31) * 2.0 - 1.0;
+    b = sign(b) * (0.35 + 0.65 * abs(b));
+    float kind = fract(uForm[i].w * 5.77);
+    vec2 h = halfOf(i);
+#if SHAPE == 2
+    // a curl along its length, across it, or an S
+    if (kind < 0.4) lp.y -= uWarp * b * 0.9 * lp.x * lp.x / max(h.x, 0.05);
+    else if (kind < 0.7) lp.x -= uWarp * b * 0.9 * lp.y * lp.y / max(h.y, 0.05);
+    else lp.y -= uWarp * b * 1.2 * lp.x * lp.x * lp.x / max(h.x * h.x, 0.0025);
+#else
+    // a swirl, or a crescent bend
+    if (kind < 0.55) lp = rotv(lp, uWarp * b * 2.4 * min(length(lp) / max(max(h.x, h.y), 0.05), 1.5));
+    else lp.y -= uWarp * b * 0.8 * lp.x * lp.x / max(h.x, 0.05);
+#endif
+  }
+  return lp;
+}
+#endif
 // One piece's film at sUV. Where a piece runs past the film (a frayed NORMAL
 // edge, a shard corner) the read MIRRORS back into the picture instead of
 // clamping, so an overrun shows real film, never a smeared edge row. The mirror
 // sits a texel inside the picture so the black padding never bleeds in.
 vec3 film(int i, vec2 sUV){
   vec4 d = uCell[i];
+#if FORM
+  // the picture is tilted with its piece
+  sUV = (centreOf(i) + localOf(i, sUV * vec2(uAspect, 1.0))) / vec2(uAspect, 1.0);
+#endif
   vec2 luv = rot90((sUV - d.xy) / d.zw, uMeta[i].y);
+#if !FORM
+  // WARP : every piece bends its own film its own way (a bulge, a pinch, a
+  // swirl or a ripple, its own amount), drawn from its height draw.
+  if (uWarp > 0.0){
+    float h = uMeta[i].w;
+    float amt = uWarp * (0.4 + 0.6 * fract(h * 53.7));
+    int kind = int(fract(h * 17.9) * 4.0);
+    vec2 q = luv - 0.5;
+    float r2 = dot(q, q);
+    if (kind == 0) q *= 1.0 - amt * 0.45 * (1.0 - min(r2 * 4.0, 1.0));
+    else if (kind == 1) q *= 1.0 + amt * 0.5 * (1.0 - min(r2 * 4.0, 1.0));
+    else if (kind == 2) { float a = amt * 3.0 * (0.5 - min(sqrt(r2), 0.5)) * (fract(h * 91.3) < 0.5 ? -1.0 : 1.0); float cs = cos(a), sn = sin(a); q = vec2(cs * q.x - sn * q.y, sn * q.x + cs * q.y); }
+    else q.x += amt * 0.07 * sin(q.y * 12.566 + 6.2832 * fract(h * 7.3));
+    luv = q + 0.5;
+  }
+#endif
   vec4 cr = uCrop[i], ct = uContent[i];
   vec2 lo = ct.xy + uTexel;
   vec2 span = max(ct.zw - 2.0 * uTexel, vec2(1e-4));
@@ -227,6 +316,12 @@ vec3 seam(vec3 col, float ed){
   if (uGap > 0.001) col *= smoothstep(0.0, max(uGap * 0.02, uPx), ed);
   return col;
 }
+// A piece's height in the pile : which one lies over which along a torn edge,
+// and with STACK how far above the others it stands. Drawn per piece on the CPU
+// (per piece id), so a modulated cut count never reshuffles who lies on top.
+float order(int i){ return uMeta[i].w; }
+// How much of a piece the mask leaves (0 = a hole).
+float keepOf(int i){ return smoothstep(uMask - 0.06, uMask, uMeta[i].z); }
 #if TORN
 // The piece across a tear. Over FX'd films (pass 2) there is no second film to
 // read : mirror across the tear into the neighbour's own (processed) pixels.
@@ -248,9 +343,8 @@ vec3 neighbour(int N, vec2 sUV, vec2 dir, float ed){
 // C : this pixel's piece, N : the piece across the nearest border, ed : distance
 // to that border (height units), dir : unit normal from C toward N (height
 // units). Returns STRAIGHT colour + alpha.
-float order(int i){ return vhash(vec2(float(i) * 1.618 + 0.37, 4.21)); }
 vec4 tornPaper(int C, int N, vec3 colC, float keepC, float ed, vec2 dir, vec2 qa, vec2 sUV){
-  float keepN = smoothstep(uMask - 0.06, uMask, uMeta[N].z);
+  float keepN = keepOf(N);
   float zC = keepC > 0.5 ? order(C) : -1.0;
   float zN = keepN > 0.5 ? order(N) : -1.0;
   if (zC < 0.0 && zN < 0.0) return vec4(0.0);
@@ -309,11 +403,125 @@ vec4 tornPaper(int C, int N, vec3 colC, float keepC, float ed, vec2 dir, vec2 qa
   return vec4(r.a > 0.002 ? r.rgb / r.a : vec3(0.0), r.a);
 }
 #endif
+#if STACK
+// STACK : the pieces are cut-outs lying at different heights, a pile rather
+// than one flat sheet. Every piece is grown past its cut (uCell holds the grown
+// rect; a mosaic shard grows by uSite.z), so neighbours overlap, and where they
+// do the higher one (uMeta.w) lies on top. A higher piece drops a shadow on
+// whatever lies lower, longer and softer the higher it stands above it, plus a
+// little contact shade along its edge; the low pieces sit in a little less
+// light. A masked piece is gone : what lay under it shows, or the layers below.
+// TORN and SHAPED pieces are a pile at any stack : each is a scrap of its own
+// shape around its cell of the cut-up, tilted, big enough to cover the cell,
+// lying over or under its neighbours; the stack only lifts them apart.
+const vec2 SHADOW = vec2(0.55, -0.835); // where shadows fall : light from the top left, as torn paper's
+// Signed distance to a piece's rect, height units (negative inside).
+float sdBox(vec2 q, int i){
+  vec4 d = uCell[i];
+  vec2 A = vec2(uAspect, 1.0);
+  vec2 e = abs(q - (d.xy + 0.5 * d.zw) * A) - 0.5 * d.zw * A;
+  return length(max(e, 0.0)) + min(max(e.x, e.y), 0.0);
+}
+// What a piece standing dz above this pixel casts on it : sdHere = the distance
+// to its edge, sdCast = the same from where its shadow is thrown (off = how far).
+float castShade(float sdHere, float sdCast, float dz, float off, float k){
+  float pen = 0.0012 + 0.45 * off;
+  float sh = (1.0 - smoothstep(-pen, pen, sdCast)) * (0.55 - 0.25 * dz);
+  float ao = 0.3 * exp(-max(sdHere, 0.0) / (0.0012 + 0.12 * off)) * min(dz * 5.0, 1.0);
+  return max(sh, ao) * k * smoothstep(0.0, 0.2, uStack);
+}
+#if MOSAIC
+// How far q lies past the straight border between shard i and shard n (n's
+// side positive) : the distance to their bisector. dqi, dqn : q's distances to
+// the two seeds.
+float pastBorder(int i, int n, float dqi, float dqn){
+  float b = (dqi * dqi - dqn * dqn) / (2.0 * max(distance(uSite[i].xy, uSite[n].xy), 1e-4));
+  // weighted (WARP) the border is a curve : half the distance gap, near it
+  return mix(b, 0.5 * (dqi - dqn), clamp(uWarp * 3.0, 0.0, 1.0));
+}
+// How far q lies past shard i's cell (negative inside) : against the borders
+// it shares with the three seeds nearest this pixel, so a grown shard keeps
+// straight sides and sharp corners.
+float pastCell(int i, vec2 q, int j0, int j1, int j2){
+  float di = wdist(i, q);
+  float s = -1e9;
+  if (j0 != i) s = max(s, pastBorder(i, j0, di, wdist(j0, q)));
+  if (j1 != i) s = max(s, pastBorder(i, j1, di, wdist(j1, q)));
+  if (j2 != i) s = max(s, pastBorder(i, j2, di, wdist(j2, q)));
+  return s;
+}
+#endif
+#if SHAPE == 2
+// TORN : a scrap torn out of a page. A box (one end a little wider) whose
+// outline wanders in long waves, is ragged at every scale and now and then
+// bitten deep. Form y = the taper (its sign : which end widens), z = the rag's
+// scale (a small scrap tears finer), w = its own noise. Signed distance, height
+// units.
+float sdPiece(int i, vec2 q){
+  vec4 f = uForm[i];
+  vec2 lp = localOf(i, q);
+  float ks = f.z;
+  vec2 R = halfOf(i) - 0.02 * ks;
+  vec2 h = vec2(R.x / (1.0 + abs(f.y)), R.y);
+  lp.x /= 1.0 + abs(f.y) * clamp(0.5 + sign(f.y) * lp.y / (2.0 * h.y), 0.0, 1.0);
+  vec2 e = abs(lp) - h;
+  float sd = length(max(e, 0.0)) + min(max(e.x, e.y), 0.0);
+  vec2 n = lp / ks + f.w * 61.0;
+  float rag = (vnoise(n * 9.0) - 0.5) * 0.03 + (vnoise(n * 60.0 + 7.1) - 0.5) * 0.008
+            + (vnoise(n * 220.0 + 3.3) - 0.5) * 0.0025 - pow(vnoise(n * 4.0 + 5.3), 3.0) * 0.035;
+  return sd - rag * ks;
+}
+// Its outward normal at q (the nearest side's), world.
+vec2 normalOf(int i, vec2 q){
+  vec2 lp = localOf(i, q);
+  vec2 h = halfOf(i);
+  vec2 n = abs(lp.x) * h.y > abs(lp.y) * h.x ? vec2(sign(lp.x), 0.0) : vec2(0.0, sign(lp.y));
+  return rotv(n, uForm[i].x);
+}
+#elif SHAPE == 3
+// SHAPED : a rounded abstract cut-out. An ellipse whose radius swells and dips
+// with the angle (two, three and five lobes, each its own size and turn), so it
+// comes out a bean, a kidney, a soft blob, never a polygon. Form y z w : the
+// lobes' draws.
+float sdPiece(int i, vec2 q){
+  vec4 f = uForm[i];
+  float a2 = 0.05 + 0.15 * fract(f.y * 7.13), a3 = 0.15 * f.z, a5 = 0.08 * f.w;
+  vec2 R = halfOf(i) / (1.0 + a2 + a3 + a5);
+  vec2 u = localOf(i, q) / R + 1e-6;
+  float th = atan(u.y, u.x);
+  float m = 1.0 + a2 * cos(2.0 * th + 6.2832 * f.y) + a3 * cos(3.0 * th + 6.2832 * fract(f.z * 13.7))
+          + a5 * cos(5.0 * th + 6.2832 * fract(f.w * 29.3));
+  return (length(u) - m) * min(R.x, R.y);
+}
+vec2 normalOf(int i, vec2 q){
+  vec2 R = halfOf(i);
+  return normalize(rotv(localOf(i, q) / (R * R), uForm[i].x) + 1e-9);
+}
+#endif
+#if FORM
+// The highest piece holding q (a masked one only where none still in is),
+// skipping one; -1 : none does.
+int topAt(vec2 q, int skip){
+  int t = -1; float kt = -1.0;
+  for (int i = 0; i < 64; i++){
+    if (i >= uCount) break;
+    if (i == skip || distance(q, centreOf(i)) > length(halfOf(i))) continue;
+    if (sdPiece(i, q) > 0.0) continue;
+    float key = uMeta[i].w + (keepOf(i) > 0.0 ? 2.0 : 0.0);
+    if (key > kt){ kt = key; t = i; }
+  }
+  return t;
+}
+#endif
+#endif
 void main(){
   vec2 A = vec2(uAspect, 1.0);
   vec3 col = vec3(0.0);
   float keep = 0.0;
   vec2 wUV = uContour > 0.001 ? clamp(tearWarp(vUV), 0.0001, 0.9999) : vUV;
+#if SHAPE == 0
+  if (uWarp > 0.0) wUV = bendGrid(wUV);
+#endif
   // CONTOUR MODE : the tear warp always bends where a cell BEGINS (membership +
   // seam/fringe), so the cut edges fray either way. WARPED also samples the film
   // through the warped coordinate (the whole clip inside the cut ripples); NORMAL
@@ -322,7 +530,179 @@ void main(){
   vec2 sUV = uContourMode == 1 ? wUV : vUV;
   vec2 qa = wUV * A;
 
+#if STACK
+  {
+    // The piece on top here : the highest one still in (a masked one only where
+    // none is : its film still feeds the films-only pass) whose shape holds this
+    // pixel. The runner-up shows through a top piece the mask fades.
+    int top = 0, sec = -1; float kt = -1.0, ks = -1.0;
 #if MOSAIC
+    // A shard grown by g holds every point less than g past its cell.
+    int mi = 0, mi2 = 0, mi3 = 0; float d1 = 1e9, d2 = 1e9, d3 = 1e9;
+    for (int i = 0; i < 64; i++){
+      if (i >= uCount) break;
+      float dd = wdist(i, qa);
+      if (dd < d1){ d3 = d2; mi3 = mi2; d2 = d1; mi2 = mi; d1 = dd; mi = i; }
+      else if (dd < d2){ d3 = d2; mi3 = mi2; d2 = dd; mi2 = i; }
+      else if (dd < d3){ d3 = dd; mi3 = i; }
+    }
+    for (int i = 0; i < 64; i++){
+      if (i >= uCount) break;
+      if (pastCell(i, qa, mi, mi2, mi3) > uSite[i].z) continue;
+      float key = uMeta[i].w + (keepOf(i) > 0.0 ? 2.0 : 0.0);
+      if (key > kt){ sec = kt >= 0.0 ? top : -1; ks = kt; top = i; kt = key; }
+      else if (key > ks){ sec = i; ks = key; }
+    }
+#elif FORM
+    for (int i = 0; i < 64; i++){
+      if (i >= uCount) break;
+      if (distance(qa, centreOf(i)) > length(halfOf(i)) || sdPiece(i, qa) > 0.0) continue;
+      float key = uMeta[i].w + (keepOf(i) > 0.0 ? 2.0 : 0.0);
+      if (key > kt){ sec = kt >= 0.0 ? top : -1; ks = kt; top = i; kt = key; }
+      else if (key > ks){ sec = i; ks = key; }
+    }
+#else
+    for (int i = 0; i < 64; i++){
+      if (i >= uCount) break;
+      vec4 d = uCell[i];
+      if (wUV.x >= d.x && wUV.x < d.x + d.z && wUV.y >= d.y && wUV.y < d.y + d.w){
+        float key = uMeta[i].w + (keepOf(i) > 0.0 ? 2.0 : 0.0);
+        if (key > kt){ sec = kt >= 0.0 ? top : -1; ks = kt; top = i; kt = key; }
+        else if (key > ks){ sec = i; ks = key; }
+      }
+    }
+#endif
+    // (torn and shaped scraps can leave a gap no piece covers : a hole)
+    bool none = kt < 0.0;
+    int C = top;
+    keep = none ? 0.0 : keepOf(C);
+    bool hole = keep <= 0.0;
+    float zC = hole ? -0.05 : uMeta[C].w;
+    col = uPass == 2 ? textureLod(uFx, vUV, 0.0).rgb : none ? vec3(0.0) : film(C, sUV);
+    if (uPass == 0 && !hole && keep < 1.0 && sec >= 0){
+      float k2 = keepOf(sec);
+      if (k2 > 0.0){
+        float a = keep + k2 * (1.0 - keep);
+        col = (col * keep + film(sec, sUV) * k2 * (1.0 - keep)) / a;
+        keep = a;
+      }
+    }
+    // The nearest edge in sight : this piece's own (it lies over what is past
+    // it) or a higher piece's close by (that one lies over this one).
+    float ed; vec2 dir; int N = -1; bool own = true;
+#if MOSAIC
+    {
+      // its own border : the one of the three it is furthest past
+      float dC = wdist(C, qa), sb = -1e9; int jb = mi2;
+      for (int k = 0; k < 3; k++){
+        int j = k == 0 ? mi : k == 1 ? mi2 : mi3;
+        if (j == C) continue;
+        float sj = pastBorder(C, j, dC, wdist(j, qa));
+        if (sj > sb){ sb = sj; jb = j; }
+      }
+      ed = uSite[C].z - sb;
+      dir = normalize(uSite[jb].xy - uSite[C].xy + 1e-6);
+      N = sec >= 0 ? sec : jb;
+    }
+#elif FORM
+    ed = none ? 1e9 : -sdPiece(C, qa);
+    dir = none ? vec2(1.0, 0.0) : normalOf(C, qa);
+#else
+    vec4 d = uCell[C];
+    vec2 elo = (wUV - d.xy) * A;
+    vec2 ehi = (d.xy + d.zw - wUV) * A;
+    ed = elo.x; dir = vec2(-1.0, 0.0);
+    if (ehi.x < ed){ ed = ehi.x; dir = vec2(1.0, 0.0); }
+    if (elo.y < ed){ ed = elo.y; dir = vec2(0.0, -1.0); }
+    if (ehi.y < ed){ ed = ehi.y; dir = vec2(0.0, 1.0); }
+    // Past this piece's own edge : the frame (a cut, nothing lies beyond).
+    vec2 pr = wUV + dir * (ed + 0.5 * uPx) / A;
+    bool atFrame = pr.x <= 0.0 || pr.x >= 1.0 || pr.y <= 0.0 || pr.y >= 1.0;
+#endif
+    float edOwn = ed;
+    // Every higher piece : its edge if it is the nearest, its shadow, its shade.
+    float shade = 0.0;
+    for (int i = 0; i < 64; i++){
+      if (i >= uCount) break;
+      float ki = keepOf(i);
+      float dz = uMeta[i].w - zC;
+      if (i == C || ki <= 0.0 || dz <= 0.0) continue;
+      float off = uStack * 0.05 * dz;
+#if MOSAIC
+      float sd = pastCell(i, qa, mi, mi2, mi3) - uSite[i].z;
+      // (near enough a distance : a shard farther than its shadow reaches
+      // casts nothing here)
+      if (sd > 2.0 * off + 0.04) continue;
+      float sdC = pastCell(i, qa - SHADOW * off, mi, mi2, mi3) - uSite[i].z;
+      vec2 toward = normalize(uSite[i].xy - uSite[mi].xy + 1e-6);
+#elif FORM
+      if (distance(qa, centreOf(i)) > length(halfOf(i)) + 2.0 * off + 0.04) continue;
+      float sd = sdPiece(i, qa);
+      float sdC = sdPiece(i, qa - SHADOW * off);
+      vec2 toward = -normalOf(i, qa);
+#else
+      float sd = sdBox(qa, i);
+      float sdC = sdBox(qa - SHADOW * off, i);
+      vec4 c = uCell[i];
+      vec2 e = abs(qa - (c.xy + 0.5 * c.zw) * A) - 0.5 * c.zw * A;
+      vec2 toward = -sign(qa - (c.xy + 0.5 * c.zw) * A) * max(e, 0.0);
+      toward /= max(length(toward), 1e-6);
+#endif
+      if (sd < ed){ ed = sd; N = i; dir = toward; own = false; }
+      shade = max(shade, castShade(sd, sdC, dz, off, ki));
+    }
+    // Light and shadow on this piece (before torn paper : a higher piece's white
+    // edge lies over its own shadow, not under it).
+    if (uPass != 1) col *= (1.0 - uStack * 0.2 * (1.0 - max(zC, 0.0))) * (1.0 - shade);
+#if TORN
+    if (uPass != 1 && ed < uTorn * 0.035 + 0.02){
+      int nb = N;
+#if FORM
+      // Past this piece's own edge : whatever lies highest there.
+      if (own) nb = none ? -1 : topAt(qa + dir * (ed + 0.5 * uPx), C);
+#elif !MOSAIC
+      if (own){
+        nb = -1;
+        if (!atFrame){
+          float kb = -1.0;
+          for (int i = 0; i < 64; i++){
+            if (i >= uCount) break;
+            vec4 c = uCell[i];
+            if (i != C && pr.x >= c.x && pr.x < c.x + c.z && pr.y >= c.y && pr.y < c.y + c.w){
+              float key = uMeta[i].w + (keepOf(i) > 0.0 ? 2.0 : 0.0);
+              if (key > kb){ kb = key; nb = i; }
+            }
+          }
+        }
+      }
+#endif
+      if (nb >= 0){
+        vec4 tp = tornPaper(C, nb, col, keep, ed, dir, qa, sUV);
+        col = tp.rgb; keep = tp.a;
+      }
+    }
+#else
+    // The paper's thickness : a hairline catching the light on the edges that
+    // face it, in shade on the others.
+#if MOSAIC || FORM
+    bool rimOK = own && !hole;
+#else
+    bool rimOK = own && !hole && !atFrame;
+#endif
+    if (uPass != 1 && rimOK){
+      float f = (1.0 - smoothstep(0.0, max(1.5 * uPx, 0.0008), edOwn)) * smoothstep(0.0, 0.2, uStack);
+      col *= 1.0 + f * (dot(dir, SHADOW) < 0.0 ? 0.22 : -0.3);
+    }
+#endif
+    if (uPass != 1){
+      col = seam(col, ed);
+      // Shadow falling past every piece (a hole) lands on the layers underneath.
+      float a = keep + (1.0 - keep) * shade * 0.85;
+      col = a > 0.002 ? col * keep / a : vec3(0.0);
+      keep = a;
+    }
+  }
+#elif MOSAIC
   {
     // MOSAIC : each pixel belongs to its nearest seed, so the pieces are
     // irregular polygons; the border distance (2nd-nearest - nearest) drives the
@@ -332,7 +712,7 @@ void main(){
     if (uCount <= 16 || uRowCount < 1){
       for (int i = 0; i < 64; i++){
         if (i >= uCount) break;
-        float dd = distance(qa, uSite[i].xy);
+        float dd = wdist(i, qa);
         if (dd < d1){ d2 = d1; mi2 = mi; d1 = dd; mi = i; }
         else if (dd < d2){ d2 = dd; mi2 = i; }
       }
@@ -348,13 +728,13 @@ void main(){
         for (int dc = -2; dc <= 2; dc++){
           int c = c0 + dc;
           if (c < 0 || c >= k) continue;
-          float dd = distance(qa, uSite[b + c].xy);
+          float dd = wdist(b + c, qa);
           if (dd < d1){ d2 = d1; mi2 = mi; d1 = dd; mi = b + c; }
           else if (dd < d2){ d2 = dd; mi2 = b + c; }
         }
       }
     }
-    keep = smoothstep(uMask - 0.06, uMask, uMeta[mi].z);
+    keep = keepOf(mi);
     float ed = 0.5 * (d2 - d1);
     col = uPass == 2 ? textureLod(uFx, vUV, 0.0).rgb : film(mi, sUV);
 #if TORN
@@ -377,7 +757,7 @@ void main(){
       if (wUV.x >= d.x && wUV.x < d.x + d.z && wUV.y >= d.y && wUV.y < d.y + d.w){ hit = i; break; }
     }
     vec4 d = uCell[hit];
-    keep = smoothstep(uMask - 0.06, uMask, uMeta[hit].z);
+    keep = keepOf(hit);
     vec2 elo = (wUV - d.xy) * A;
     vec2 ehi = (d.xy + d.zw - wUV) * A;
     float ed = elo.x; vec2 dir = vec2(-1.0, 0.0);
@@ -441,6 +821,11 @@ interface CollageGL {
   // that use it, so a collage with torn at 0 runs exactly the plain programs.
   // Linked with the rest, never mid-show (a first torn turn must not hitch).
   torn: { collage: WebGLProgram; mosaic: WebGLProgram; uColl: (n: string) => WebGLUniformLocation | null; uMos: (n: string) => WebGLUniformLocation | null }
+  // The pile programs (STACK, and the torn and shaped pieces), per shape and
+  // torn edge : compiled the first time a wall asks for one, in the background
+  // where the driver can (KHR_parallel_shader_compile); until it is linked the
+  // wall draws its flat cut.
+  piles: Map<string, PileGL>
   fold: WebGLProgram
   show: WebGLProgram
   vao: WebGLVertexArrayObject
@@ -451,6 +836,12 @@ interface CollageGL {
   uMos: (n: string) => WebGLUniformLocation | null
   uFold: (n: string) => WebGLUniformLocation | null
   uShow: (n: string) => WebGLUniformLocation | null
+}
+
+interface PileGL {
+  prog: WebGLProgram
+  u: (n: string) => WebGLUniformLocation | null
+  state: 0 | 1 | -1 // compiling · linked · failed (never asked again)
 }
 
 // Programs, the quad and its OWN vertex array are shared per context and never
@@ -484,10 +875,10 @@ function collageGL(gl: WebGL2RenderingContext): CollageGL {
     return p
   }
   const tile = link(FS_TILE)
-  const collage = link(FS_COLLAGE(false, false))
-  const mosaic = link(FS_COLLAGE(true, false))
-  const tornColl = link(FS_COLLAGE(false, true))
-  const tornMos = link(FS_COLLAGE(true, true))
+  const collage = link(FS_COLLAGE(0, false))
+  const mosaic = link(FS_COLLAGE(1, false))
+  const tornColl = link(FS_COLLAGE(0, true))
+  const tornMos = link(FS_COLLAGE(1, true))
   const fold = link(FS_FOLD)
   const show = link(FS_SHOW)
   const vao = gl.createVertexArray()!
@@ -499,21 +890,63 @@ function collageGL(gl: WebGL2RenderingContext): CollageGL {
   gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
   gl.bindVertexArray(null)
   gl.bindBuffer(gl.ARRAY_BUFFER, null)
-  const cacheOf = (p: WebGLProgram): ((n: string) => WebGLUniformLocation | null) => {
-    const c = new Map<string, WebGLUniformLocation | null>()
-    return (n) => {
-      if (!c.has(n)) c.set(n, gl.getUniformLocation(p, n))
-      return c.get(n)!
-    }
-  }
   const g: CollageGL = {
-    tile, collage, mosaic, fold, show, vao, quad, gen: glGeneration(),
-    uTile: cacheOf(tile), uColl: cacheOf(collage), uMos: cacheOf(mosaic),
-    uFold: cacheOf(fold), uShow: cacheOf(show),
-    torn: { collage: tornColl, mosaic: tornMos, uColl: cacheOf(tornColl), uMos: cacheOf(tornMos) }
+    tile, collage, mosaic, fold, show, vao, quad, gen: glGeneration(), piles: new Map(),
+    uTile: cacheOf(gl, tile), uColl: cacheOf(gl, collage), uMos: cacheOf(gl, mosaic),
+    uFold: cacheOf(gl, fold), uShow: cacheOf(gl, show),
+    torn: { collage: tornColl, mosaic: tornMos, uColl: cacheOf(gl, tornColl), uMos: cacheOf(gl, tornMos) }
   }
   shared.set(gl, g)
   return g
+}
+
+function cacheOf(gl: WebGL2RenderingContext, p: WebGLProgram): (n: string) => WebGLUniformLocation | null {
+  const c = new Map<string, WebGLUniformLocation | null>()
+  return (n) => {
+    if (!c.has(n)) c.set(n, gl.getUniformLocation(p, n))
+    return c.get(n)!
+  }
+}
+
+/** The pile program for a shape (and torn edge) once it is linked, else null
+ *  (the wall draws its flat cut a few frames longer). Its first request queues
+ *  the compile, with its torn twin, and asks nothing back : a status query would
+ *  wait for it. With KHR_parallel_shader_compile each later call polls
+ *  COMPLETION_STATUS, which never waits; without it the link status is read on
+ *  the next frame, by when the GPU process has usually compiled it. */
+function pileGL(gl: WebGL2RenderingContext, g: CollageGL, shape: number, torn: boolean): PileGL | null {
+  const par = gl.getExtension('KHR_parallel_shader_compile') as { COMPLETION_STATUS_KHR: number } | null
+  const key = `${shape}${torn ? 't' : ''}`
+  let pg = g.piles.get(key)
+  if (!pg) {
+    for (const t of [torn, !torn]) {
+      const k = `${shape}${t ? 't' : ''}`
+      if (g.piles.has(k)) continue
+      const p = gl.createProgram()!
+      for (const [type, src] of [[gl.VERTEX_SHADER, VS], [gl.FRAGMENT_SHADER, FS_COLLAGE(shape, t, true)]] as const) {
+        const sh = gl.createShader(type)!
+        gl.shaderSource(sh, src)
+        gl.compileShader(sh)
+        gl.attachShader(p, sh)
+      }
+      gl.bindAttribLocation(p, 0, 'p')
+      gl.linkProgram(p)
+      g.piles.set(k, { prog: p, u: cacheOf(gl, p), state: 0 })
+    }
+    return null
+  }
+  if (pg.state === 1) return pg
+  if (pg.state === -1) return null
+  if (par && !gl.getProgramParameter(pg.prog, par.COMPLETION_STATUS_KHR)) return null
+  if (gl.getProgramParameter(pg.prog, gl.LINK_STATUS)) {
+    pg.state = 1
+    return pg
+  }
+  pg.state = -1
+  console.error('[collage] pile link:', key, gl.getProgramInfoLog(pg.prog))
+  for (const sh of gl.getAttachedShaders(pg.prog) ?? [])
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) console.error('[collage] pile shader compile:', key, gl.getShaderInfoLog(sh))
+  return null
 }
 
 const num = (v: number | number[] | undefined, d: number): number => (typeof v === 'number' ? v : d)
@@ -546,6 +979,32 @@ function hash01(seed: number, key: number): number {
 }
 
 type Rect = { x: number; y: number; w: number; h: number; id: number }
+
+/** Cover-crop a piece's window into its film : the film rect (inside the deck's
+ *  layer) a piece of `raw` aspect (real pixels) frames, quarter-turned pieces
+ *  through the flipped aspect, `pan` placing it, `zoom` cropping tighter. */
+function coverCrop(
+  content: [number, number, number, number],
+  pan: [number, number],
+  raw: number,
+  rot: number,
+  zoom: number,
+  out: Float32Array | number[],
+  o: number
+): void {
+  const [cx, cy, cw, ch] = content
+  // The layer is square, so the content rect's own ratio IS the clip aspect.
+  const av = ch > 0 ? cw / ch : 1
+  const ac = rot % 2 === 1 ? 1 / raw : raw
+  let sw: number, sh: number
+  if (ac >= av) { sw = cw; sh = ch * (av / ac) } else { sh = ch; sw = cw * (ac / av) }
+  sw /= zoom
+  sh /= zoom
+  out[o] = cx + (cw - sw) * pan[0]
+  out[o + 1] = cy + (ch - sh) * pan[1]
+  out[o + 2] = sw
+  out[o + 3] = sh
+}
 
 /** The file behind an opsia-media:// URL (null for anything else). */
 function pathFromMediaUrl(url: string | undefined): string | null {
@@ -607,6 +1066,12 @@ interface Cell {
   rotA: number // rotate draws, fixed per partition so the dial sweeps monotonically
   rotB: number
   crop: [number, number, number, number]
+  // STACK : the piece's height in the pile (0..1) and its four growth draws
+  // (left, right, bottom, top; a mosaic shard uses the first), per piece id.
+  z: number
+  grow: [number, number, number, number]
+  // TORN / SHAPED : the tilt draw and three shape draws, per piece id.
+  form: [number, number, number, number]
 }
 
 export class CollageSource {
@@ -671,6 +1136,7 @@ export class CollageSource {
   private holdWant = 0 // a new window waiting out its debounce
   private holdWait = 0
   private cropsDirty = false
+  private stackOn = false // the last films pass drew the pile
   private disposed = false
   // Crossfade : the collage draws into `cur`, then composites into the layer's
   // scratch target. `prev` holds the last SETTLED wall; on a re-deal it becomes
@@ -691,6 +1157,7 @@ export class CollageSource {
   private cropArr = new Float32Array(MAX_CELLS * 4)
   private contentArr = new Float32Array(MAX_CELLS * 4)
   private metaArr = new Float32Array(MAX_CELLS * 4)
+  private formArr = new Float32Array(MAX_CELLS * 4)
   private siteArr = new Float32Array(MAX_CELLS * 4)
   private rowsArr = new Float32Array(MAX_ROWS * 4)
   private rowCount = 0
@@ -1124,9 +1591,12 @@ export class CollageSource {
     this.rowsArr.fill(0)
     this.rowCount = 0
     this.siteArr.fill(0)
+    // WARP weights : a seed's own pull, up to about half the mean spacing.
+    const spacing = Math.sqrt(aspect / Math.max(1, n))
     for (let i = 0; i < n; i++) {
       this.siteArr[i * 4] = sx[i]
       this.siteArr[i * 4 + 1] = sy[i]
+      this.siteArr[i * 4 + 3] = spacing * 0.5 * hash01(seed, 13000 + i)
     }
     // Bounding boxes : nearest seed on a coarse grid (exact brute force; only on
     // a deal or a cut change), padded by one grid step.
@@ -1205,7 +1675,10 @@ export class CollageSource {
       x: r.x, y: r.y, w: r.w, h: r.h, deck: deckOf[r.id],
       // ROTATE draws, per piece : sweeping the dial turns pieces in a fixed order
       rot: 0, rotA: hash01(seed, 7000 + 2 * r.id), rotB: hash01(seed, 7001 + 2 * r.id),
-      crop: [0, 0, 1, 1] as [number, number, number, number]
+      crop: [0, 0, 1, 1] as [number, number, number, number],
+      z: hash01(seed, 11000 + r.id),
+      grow: [0, 1, 2, 3].map((k) => hash01(seed, 11100 + 4 * r.id + k)) as [number, number, number, number],
+      form: [0, 1, 2, 3].map((k) => hash01(seed, 11500 + 4 * r.id + k)) as [number, number, number, number]
     }))
     for (let i = 0; i < n; i++) this.rank[i] = rankOf[rects[i].id]
     for (const d of this.decks) d.used = false
@@ -1234,18 +1707,7 @@ export class CollageSource {
     for (const c of this.cells) {
       const d = this.decks[c.deck]
       if (!d) continue
-      const [cx, cy, cw, ch] = d.content
-      // The layer is square, so the content rect's own ratio IS the clip aspect.
-      const av = ch > 0 ? cw / ch : 1
-      // The cell's aspect in real pixels; a quarter-turned piece frames the
-      // picture through its flipped aspect.
-      const raw = (c.w / c.h) * outAspect
-      const ac = c.rot % 2 === 1 ? 1 / raw : raw
-      let sw: number, sh: number
-      if (ac >= av) { sw = cw; sh = ch * (av / ac) } else { sh = ch; sw = cw * (ac / av) }
-      sw /= z
-      sh /= z
-      c.crop = [cx + (cw - sw) * d.pan[0], cy + (ch - sh) * d.pan[1], sw, sh]
+      coverCrop(d.content, d.pan, (c.w / c.h) * outAspect, c.rot, z, c.crop, 0)
     }
     this.cropsDirty = false
   }
@@ -1414,7 +1876,7 @@ export class CollageSource {
     const vary = clampf(num(inputs.vary, 0), 0, 1)
     const freeze = num(inputs.freeze, 0) >= 0.5
     const rate = clampf(num(inputs.rate, 0), 0, 60)
-    const shape = Math.round(clampf(num(inputs.shape, 0), 0, 1))
+    const shape = Math.round(clampf(num(inputs.shape, 0), 0, 3))
     const xfadeDur = clampf(num(inputs.xfade, 0), 0, 4)
     const mask = clampf(num(inputs.mask, 0), 0, 1)
     this.xfadeDur = xfadeDur
@@ -1770,13 +2232,83 @@ export class CollageSource {
       return
     }
 
-    // 3) The collage uniforms.
+    // 3) The collage uniforms. With STACK every piece grows past its cut (a
+    //    cut-up piece by its own draw on each side, a mosaic shard all round),
+    //    up to a share of its smaller side and of the mean piece, and its film is
+    //    cover-cropped to the grown shape, so it frames the whole piece unstretched.
+    //    A torn or shaped piece is its own scrap around its cell instead (below).
+    const live = this.live
+    const stack = clampf(num(live.stack, 0), 0, 1)
+    const shape = this.lastShape
+    const tornOn = num(live.torn, 0) > 0.001
+    // (the shapes pass draws what the films pass drew, even on the frame the
+    // pile program comes ready between the two)
+    const sg = (stack > 0.001 || shape >= 2) && (pass !== 2 || this.stackOn) ? pileGL(gl, g, shape, tornOn) : null
+    if (pass !== 2) this.stackOn = !!sg
+    const aspect = this.w / this.h
+    const mean = Math.sqrt(aspect / n) // a piece's mean side, height units
+    const zoomNow = Math.max(1, this.lastZoom > 0 ? this.lastZoom : 1)
     for (let i = 0; i < n; i++) {
       const c = this.cells[i]
-      this.cellArr[i * 4] = c.x; this.cellArr[i * 4 + 1] = c.y
-      this.cellArr[i * 4 + 2] = c.w; this.cellArr[i * 4 + 3] = c.h
-      this.cropArr[i * 4] = c.crop[0]; this.cropArr[i * 4 + 1] = c.crop[1]
-      this.cropArr[i * 4 + 2] = c.crop[2]; this.cropArr[i * 4 + 3] = c.crop[3]
+      let x = c.x, y = c.y, w = c.w, h = c.h
+      const dk = this.decks[c.deck]
+      if (sg && dk && shape >= 2) {
+        // The tilted piece's covering rect : the cell, turned, still inside it.
+        const ang = (c.form[0] - 0.5) * (shape === 2 ? 0.84 : 0.6)
+        const cs = Math.abs(Math.cos(ang)), sn = Math.abs(Math.sin(ang))
+        const cw = c.w * aspect, ch = c.h
+        const W = cw * cs + ch * sn, H = cw * sn + ch * cs
+        let rx: number, ry: number
+        if (shape === 2) {
+          // TORN : the paper past the cell by its deepest bite (some scraps
+          // bigger than they need be), the film rect past the paper by the
+          // widened end and the rag's outward reach. Must match sdPiece.
+          const ks = clampf(Math.min(W, H) / 0.35, 0.3, 1)
+          const taper = (c.form[1] - 0.5) * 0.5
+          const extra = 1 + 0.25 * c.form[2]
+          const px = (W / 2) * extra + 0.055 * ks, py = (H / 2) * extra + 0.055 * ks
+          rx = px * (1 + Math.abs(taper)) + 0.02 * ks
+          ry = py + 0.02 * ks
+          this.formArr.set([ang, taper, ks, c.form[3]], i * 4)
+        } else {
+          // SHAPED : an ellipse around the turned rect (a little more for the
+          // lobes' dips), the film rect out to the lobes' furthest reach.
+          const fy = c.form[1], fz = c.form[2], fw = c.form[3]
+          const a2 = 0.05 + 0.15 * (fy * 7.13 - Math.floor(fy * 7.13)), a3 = 0.15 * fz, a5 = 0.08 * fw
+          const sum = a2 + a3 + a5
+          const k = Math.SQRT2 * (1 + 0.5 * sum) * (1 + sum)
+          rx = (W / 2) * k
+          ry = (H / 2) * k
+          this.formArr.set([ang, fy, fz, fw], i * 4)
+        }
+        const cx = c.x + c.w / 2, cy = c.y + c.h / 2
+        x = cx - rx / aspect; y = cy - ry; w = (2 * rx) / aspect; h = 2 * ry
+        coverCrop(dk.content, dk.pan, rx / ry, c.rot, zoomNow, this.cropArr, i * 4)
+      } else if (sg && dk) {
+        if (shape === 1) {
+          const gr = stack * mean * 0.24 * (0.35 + 0.65 * c.grow[0])
+          this.siteArr[i * 4 + 2] = gr
+          // The shard's box, padded past the growth (its edge bows out a little
+          // between seeds); the film read mirrors anything beyond.
+          const gx = (1.5 * gr) / aspect, gy = 1.5 * gr
+          const x0 = Math.max(0, x - gx), x1 = Math.min(1, x + w + gx)
+          const y0 = Math.max(0, y - gy), y1 = Math.min(1, y + h + gy)
+          x = x0; y = y0; w = x1 - x0; h = y1 - y0
+        } else {
+          const m = Math.min(w * aspect, h)
+          const side = (k: number): number => stack * Math.min(m * (0.12 + 0.3 * c.grow[k]), 0.4 * mean)
+          // Clamped to the frame : the outer edges stay the frame's cut.
+          const x0 = Math.max(0, x - side(0) / aspect), x1 = Math.min(1, x + w + side(1) / aspect)
+          const y0 = Math.max(0, y - side(2)), y1 = Math.min(1, y + h + side(3))
+          x = x0; y = y0; w = x1 - x0; h = y1 - y0
+        }
+        coverCrop(dk.content, dk.pan, (w / h) * aspect, c.rot, zoomNow, this.cropArr, i * 4)
+      } else {
+        this.cropArr[i * 4] = c.crop[0]; this.cropArr[i * 4 + 1] = c.crop[1]
+        this.cropArr[i * 4 + 2] = c.crop[2]; this.cropArr[i * 4 + 3] = c.crop[3]
+      }
+      this.cellArr[i * 4] = x; this.cellArr[i * 4 + 1] = y
+      this.cellArr[i * 4 + 2] = w; this.cellArr[i * 4 + 3] = h
       // The deck's picture rect : the shader mirrors its film read inside it so
       // an over-running / frayed shape samples real film, never the padding.
       const ct = this.decks[c.deck] ? this.decks[c.deck].content : [0, 0, 1, 1]
@@ -1785,12 +2317,11 @@ export class CollageSource {
       this.metaArr[i * 4] = c.deck
       this.metaArr[i * 4 + 1] = c.rot
       this.metaArr[i * 4 + 2] = this.rank[i]
-      this.metaArr[i * 4 + 3] = 0
+      this.metaArr[i * 4 + 3] = c.z
     }
-    const live = this.live
-    const tg = num(live.torn, 0) > 0.001 ? g.torn : g
-    const prog = this.lastShape === 1 ? tg.mosaic : tg.collage
-    const U = this.lastShape === 1 ? tg.uMos : tg.uColl
+    const tg = tornOn ? g.torn : g
+    const prog = sg ? sg.prog : shape === 1 ? tg.mosaic : tg.collage
+    const U = sg ? sg.u : shape === 1 ? tg.uMos : tg.uColl
     gl.useProgram(prog)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.arr)
@@ -1812,6 +2343,9 @@ export class CollageSource {
     gl.uniform1f(U('uCurve'), clampf(num(live.curve, 0.3), 0, 1))
     gl.uniform1f(U('uTorn'), clampf(num(live.torn, 0), 0, 2))
     gl.uniform1f(U('uMask'), clampf(num(live.mask, 0), 0, 1))
+    gl.uniform1f(U('uWarp'), clampf(num(live.warp, 0), 0, 1))
+    if (sg) gl.uniform1f(U('uStack'), stack)
+    if (sg && shape >= 2) gl.uniform4fv(U('uForm'), this.formArr)
     gl.uniform1i(U('uContourMode'), Math.round(clampf(num(live.contourMode, 1), 0, 1)))
     gl.uniform1i(U('uPass'), pass)
     gl.uniform1i(U('uFx'), 1) // its own unit, never the deck array's
