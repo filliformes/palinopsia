@@ -3,7 +3,7 @@
 All notable changes to Palinopsia. Dates are ISO. Versions follow the `v*` tags
 that CI builds into cross-platform releases.
 
-## Unreleased
+## v1.2.7 — 2026-10-13
 
 ### Added
 
@@ -380,7 +380,8 @@ that CI builds into cross-platform releases.
   Randomize and Vary fired over OSC and dataflou (every scope now, at the Transport's
   intensity); what a session file carries (output transform, framing and mirror, the
   optional projector warp); `outXform.ts` in the architecture map; the OSC reference's
-  randomize rows.
+  randomize rows. The site gets its **New in 1.2.7** section, 109 recipes and the
+  1.2.7 release notes link.
 
 - **Caught up with v1.2.6** : the README's source and effect counts (43 / 53, the
   Sources heading and its anchor), the modulation-target list (the layer Vary, the
