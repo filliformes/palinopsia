@@ -115,7 +115,8 @@ export const DF_DESTS: DfDest[] = [
   ...range(4).flatMap((l) => [
     { path: `layer/${l}/opacity`, label: `L${l} opacity`, osc: `/opsia/layer${l}/opacity`, type: 'number' as const },
     { path: `layer/${l}/speed`, label: `L${l} speed`, osc: `/opsia/layer${l}/speed`, type: 'number' as const },
-    { path: `layer/${l}/mix`, label: `L${l} A/B mix`, osc: `/opsia/layer${l}/mix`, type: 'number' as const }
+    { path: `layer/${l}/mix`, label: `L${l} A/B mix`, osc: `/opsia/layer${l}/mix`, type: 'number' as const },
+    { path: `layer/${l}/vary`, label: `L${l} vary`, osc: `/opsia/layer${l}/vary`, type: 'bool' as const }
   ]),
   { path: 'feel/density', label: 'density', osc: '/opsia/density', type: 'number', init: 0.5 },
   { path: 'feel/proximity', label: 'proximity', osc: '/opsia/proximity', type: 'number', init: 0.5 },
@@ -126,6 +127,7 @@ export const DF_DESTS: DfDest[] = [
   { path: 'scene/recall', label: 'scene (1-9)', osc: '/opsia/scene', type: 'number', min: 0, max: 9 },
   { path: 'scene/next', label: 'next scene', osc: '/opsia/seq/skip', type: 'bool' },
   { path: 'scene/randomize', label: 'randomize', osc: '/opsia/randomize', type: 'bool' },
+  { path: 'scene/vary', label: 'vary (global)', osc: '/opsia/vary', type: 'bool' },
   { path: 'bpm', label: 'BPM', osc: '/opsia/bpm', type: 'number', min: 20, max: 300, init: 120 }
 ]
 

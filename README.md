@@ -1912,6 +1912,7 @@ another protocol and is not shown.
 | `…/blend` | i / f / s | Layer blend mode (index, 0..1 across 19, or name) |
 | `…/sourceblend` | i / f / s | A/B blend mode |
 | `…/mute` · `…/solo` · `…/feedback` | bool | Toggles (≥ 0.5) |
+| `…/vary` | trigger | **Vary** this layer : a variant at its own amount (its Vary button) |
 | `…/source/{A\|B}` | s | Set source shader (id / name / `none`) |
 | `…/source/{A\|B}/{input}` | f · color · point2D | A source shader input |
 | `…/source/{A\|B}/fx/{i}/{input}` | f · color · point2D | A Source-FX unit input |
@@ -1969,6 +1970,7 @@ unless the slot actually holds a video.
 | `/opsia/scene/{n}` | trigger | Recall scene *n* (1-based) |
 | `/opsia/randomize[/{scope}]` | trigger | Fire Randomize (scope defaults to `all`; `sources`, `sourceparams`, `sourcefx`, `sourcefxonly`, `layer`, `layerfxonly`, `master`, `finishing`, `modulators`) |
 | `/opsia/panic` | trigger | **Panic flush** : drop every self-feeding buffer (same as key `0` / the ⚡ Flush button); advertised over OSCQuery |
+| `/opsia/vary` | trigger | **Vary** : a variant of the whole scene at the Transport's spread (its Vary button); advertised over OSCQuery |
 | `/opsia/surface` | f f | **Metasurface** cursor : two `0..1` floats (x, y) on the scene plane; sending it turns the surface on (Pandore's Trill Square) |
 | `/opsia/surface/active` | bool | Enable / disable the Metasurface |
 | `/opsia/surface/play` | bool | **Draw sequencer** : auto-trace the drawn path |
@@ -2069,12 +2071,12 @@ tab has the whole setup :
   the other nodes announce), with ✕ to unwire. The header shows the values received and
   sent per second.
 
-What Palinopsia declares (81 entries, about 7 KB, small enough for microcontroller
-nodes) :
+What Palinopsia declares (86 entries, 7.3 KB, small enough for microcontroller
+nodes, whose frames stop at 8 KB) :
 
 | | Paths | Notes |
 |---|---|---|
-| ↙ destinations | `meta/1..16` (also sources), `layer/1..4/opacity · speed · mix`, `feel/density · proximity · gesture · coalesce · flow · drift`, `scene/recall` (0 to 9), `scene/next`, `scene/randomize` (bools), `bpm` (20 to 300) | each plays exactly like its `/opsia` OSC address, once per change |
+| ↙ destinations | `meta/1..16` (also sources), `layer/1..4/opacity · speed · mix`, `layer/1..4/vary` (bools : that layer's Vary), `feel/density · proximity · gesture · coalesce · flow · drift`, `scene/recall` (0 to 9), `scene/next`, `scene/randomize`, `scene/vary` (bools : the global Vary), `bpm` (20 to 300) | each plays exactly like its `/opsia` OSC address, once per change |
 | ↗ sources | `audio/level · flux · transient · centroid · pitch · noisiness`, `vision/brightness · contrast · motion · edges · warmth · saturation · hue · centroidX · centroidY`, `body/bodyPresent · bodyMotion · handLeftHeight · handRightHeight · handLeftX · handRightX · handsApart · moveEnergy`, `mod/1..8` | 0 to 1, sent 30 times a second, only while a node listens |
 
 dataflou maps every value from its source's range onto its destination's, so a 0..1

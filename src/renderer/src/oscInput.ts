@@ -13,6 +13,7 @@
 //   /opsia/layer{1..4}/opacity|speed|mix|trail        f 0..1
 //   /opsia/layer{n}/blend|sourceblend                 i index | f 0..1
 //   /opsia/layer{n}/mute|solo|feedback                >= 0.5
+//   /opsia/layer{n}/vary                               trigger (that layer's Vary, at its own amount)
 //   /opsia/layer{n}/source/{A|B}                       s shaderId | name | "none"
 //   /opsia/layer{n}/source/{A|B}/{input}              f 0..1 → range
 //   /opsia/layer{n}/source/{A|B}/fx/{i}/{input}       f 0..1 → range
@@ -56,6 +57,7 @@
 //   /opsia/scene/{n}                                    trigger
 //   /opsia/randomize[/{scope}]                          trigger
 //   /opsia/panic                                        trigger (flush self-feeding buffers)
+//   /opsia/vary                                         trigger (the Transport's Vary, at its spread)
 //   /opsia/surface x y                                  two 0..1 floats : the Metasurface cursor
 //   /opsia/surface/active {0|1}                         bool : enable the Metasurface
 //   /opsia/surface/play {0|1}                           bool : auto-trace the drawn path
@@ -79,7 +81,7 @@ import { useStore } from './store'
 import { sendOsc } from './oscMonitor'
 import type { RandomizeScope } from './randomize'
 import { setKnobTarget } from './metaSmooth'
-import { firePanic } from './commands'
+import { firePanic, fireVariation } from './commands'
 import { GENERATORS, SHADER_BY_ID } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
 import { audioBus, type AudioFeatureName } from './engine/audioIn'
@@ -246,6 +248,12 @@ function route(address: string, args: Args): void {
       const li = parseInt(segs[2], 10) - 1
       if (!(li >= 0 && li < 4)) return
       const ctl = segs[3]
+
+      // That layer's Vary button : a variant at its own amount (rising edge).
+      if (ctl === 'vary') {
+        if (rising(address, n)) st.varyLayer(li)
+        return
+      }
 
       if (ctl === 'source') {
         const slot: 'A' | 'B' = segs[4] === 'B' ? 'B' : 'A'
@@ -798,6 +806,14 @@ function route(address: string, args: Args): void {
       return
     }
 
+    case 'vary': {
+      // The Transport's Vary : a variant of the whole scene at its spread (rising
+      // edge, so a held value fires once).
+      if (segs[2] !== undefined || !rising(address, n)) return
+      fireVariation()
+      return
+    }
+
     case 'panic': {
       // The remote panic flush : drop every self-feeding buffer (same as key 0 /
       // the ⚡ Flush button). A rising-edge trigger, so a held value fires once.
@@ -954,6 +970,7 @@ function enumerateLeaves(): Leaf[] {
     add(`/opsia/layer${n}/mute`, 0, 1, l?.mute ? 1 : 0, 'Mute (>= 0.5)')
     add(`/opsia/layer${n}/solo`, 0, 1, l?.solo ? 1 : 0, 'Solo (>= 0.5)')
     add(`/opsia/layer${n}/feedback`, 0, 1, l?.feedback ? 1 : 0, 'Feedback on (>= 0.5)')
+    add(`/opsia/layer${n}/vary`, 0, 1, 0, 'Vary this layer : a variant at its own amount (trigger)', false)
     const cm = Math.max(0, COUPLING_MODES.indexOf(l?.coupling?.mode ?? 'off'))
     add(`/opsia/layer${n}/coupling/mode`, 0, 1, cm / (COUPLING_MODES.length - 1), 'A/B coupling mode (index: off·lean·hocket·cut·gate·drift)')
     add(`/opsia/layer${n}/coupling/amount`, 0, 1, l?.coupling?.amount ?? 0.5, 'A/B coupling depth')
@@ -1174,6 +1191,7 @@ function enumerateLeaves(): Leaf[] {
   add('/opsia/seq/run', 0, 1, st.sequence.running ? 1 : 0, 'Sequencer running (>= 0.5)')
   add('/opsia/seq/skip', 0, 1, 0, 'Advance to the next scene (trigger)', false)
   add('/opsia/panic', 0, 1, 0, 'Panic flush : drop every self-feeding buffer (trigger)', false)
+  add('/opsia/vary', 0, 1, 0, 'Vary : a variant of the whole scene at the Transport spread (trigger)', false)
   add('/opsia/surface', 0, 1, st.surface.x, 'Metasurface cursor X (send x y together; turns it on)')
   add('/opsia/surface/active', 0, 1, st.surface.active ? 1 : 0, 'Enable the Metasurface (>= 0.5)')
   add('/opsia/surface/play', 0, 1, st.surface.play ? 1 : 0, 'Auto-trace the drawn path (>= 0.5)')

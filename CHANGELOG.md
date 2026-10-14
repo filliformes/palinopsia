@@ -7,6 +7,16 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Vary over OSC and dataflou.** `/opsia/vary` fires the global Vary (the Transport's,
+  at its spread) and `/opsia/layer{1..4}/vary` a layer's Vary (at its own amount), on
+  the rising edge like the other triggers (a held value fires once), each listed in
+  the OSCQuery tree. The dataflou node declares them as Palinopsia destinations,
+  `scene/vary` and `layer/1..4/vary` (bools), so any node on the mesh can vary the
+  whole scene or one layer. The DECLARE grows from 81 entries / 6,932 bytes to 86 /
+  7,316 (measured with the node's own encoder), still under the 8 KB a
+  microcontroller node takes. Tested : two `/opsia/vary` presses fired the global
+  Vary twice and a held value once, `/opsia/layer2/vary` varied layer 2 alone.
+
 - **Collage : two new shapes, `stack` and `warp`.** `shape` gains **torn** (ragged
   paper scraps, tilted up to 24°, each around its cell of the cut-up partition and
   padded past it by its deepest bite so the wall stays covered; the outline is a
