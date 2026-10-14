@@ -17,6 +17,7 @@ import { modTargetKey, useStore } from '../store'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { SonifyKeySequencer } from './SonifyKeySequencer'
 import { AudioOutputSelect } from './AudioOutputSelect'
+import { EqCard } from './SonifyEq'
 import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, CardGrip, useCardSpace, spaceGap, SUB_GAP, chip, pill } from './sonifyUi'
 import { SONI_RATES, RATE_LABEL } from '../audio/soniClock'
 import { warnModMatrixFull } from './AutoControls'
@@ -559,7 +560,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
     return () => window.removeEventListener('keydown', onKey, true)
   }, [])
   const diceWhole = (): void => setSonify({ ...randomSonify(cfg), on: cfg.on, sinkId: cfg.sinkId })
-  const resetDefault = (): void => setSonify({ ...defaultSoniConfig(), on: cfg.on, sinkId: cfg.sinkId })
+  // The output EQ stays : it tunes the room, not the sound.
+  const resetDefault = (): void => setSonify({ ...defaultSoniConfig(), on: cfg.on, sinkId: cfg.sinkId, eq: cfg.eq })
   const diceVoice = (k: SoniVoiceKey): void => setSonify(randomizeVoice(cfg, k))
   const savePreset = (): void => {
     const n = presetName.trim()
@@ -569,7 +571,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   }
   const loadPreset = (n: string): void => {
     const c = n ? loadSoniPreset(n) : null
-    if (c) setSonify({ ...c, on: cfg.on, sinkId: cfg.sinkId })
+    // A preset is a sound : the room EQ stays this room's
+    if (c) setSonify({ ...c, on: cfg.on, sinkId: cfg.sinkId, eq: cfg.eq })
     setPresetName(n)
   }
   const delPreset = (n: string): void => {
@@ -869,7 +872,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
         <button
           onClick={resetDefault}
           className="relative rounded px-2 py-0.5 font-mono text-[11px] text-muted ring-1 ring-border transition-colors hover:text-accent hover:ring-accent/60"
-          title="Reset every Sonify voice / FX / mixer setting back to the defaults (keeps sound on/off + output device)"
+          title="Reset every Sonify voice / FX / mixer setting back to the defaults (keeps sound on/off, the output device and the room EQ)"
         >
           ↺
           <Blink />
@@ -1107,6 +1110,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 <Slider label="delay" value={cfg.fx.dlyMix} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ dlyMix: v })} title="How loud the delay is in the FX tail" />
                 <Slider label="reverb" value={cfg.fx.rvMix} min={0} max={1} neutral={0.6} onChange={(v) => pfx({ rvMix: v })} title="How loud the reverb is in the FX tail" />
               </Shell>
+              <EqCard />
             </div>
           )}
           {/* The sequencers have their own view (they used to sit under the mixer). */}

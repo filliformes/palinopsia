@@ -1195,6 +1195,24 @@ cards as the voices). The mixer shows all ten voices as
 channel cards : on/off, **volume**, and a per-voice **HP/LP filter** (a DJ-style
 tilt, ported from the Essaim instrument : one knob sweeps a 3-stage lowpass down or
 a highpass up, centre = bypass), plus the FX-tail send / delay / reverb mix.
+**Output EQ** : under the FX tail in the mixer, a twelve-band parametric EQ after
+everything in Sonify, to **tune the room** it plays in : a **low cut**, a **low shelf**,
+**eight bells**, a **high shelf** and a **high cut**, each with its frequency, gain (the
+cuts have none), **Q** and **slope** (6, 12, 24 or 36 dB per octave : one first-order
+section, one, two or three second-order sections; a steeper shelf or bell keeps its gain
+and steepens its skirt, and a bell at 6 is a gentler, wider one). The card shows the
+curve in miniature with the **input** and **output** meters (the same meters as the
+master's); **⤢ edit** pops it out into a large editor : the curve over the live
+spectrum (before the EQ as a faint line, after it filled), a point per band to
+drag (frequency and gain), the **wheel** for Q, a **double-click** on a point to switch
+its band on or off or on an empty spot to bring the nearest free bell there,
+**Delete** to switch the selected band off, a strip of the twelve bands, number fields
+for the selected one, a **flat** reset, and the **input / output gain** (±24 dB each)
+beside their meters. The output never passes 0 dB : above -1 dB a soft ceiling holds it
+(the output meter turns orange). It plays to the speakers only : recordings are taken
+before it, so a take stays the piece and not the room. The EQ is saved with the Sonify
+settings, and **↺ default**, a loaded preset and the sequencer's preset steps all leave
+it as it is (it belongs to the room, not to the patch).
 **Presets** : name + save + a load dropdown keep whole Sonify patches. **🎲 dice** :
 one in the header re-rolls the whole instrument (always keeping at least one voice
 that sings on a still frame); one at the top-right of each voice box re-rolls just

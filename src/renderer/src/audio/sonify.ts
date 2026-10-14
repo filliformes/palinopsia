@@ -18,6 +18,7 @@ import { registerSonifyModBase, sonifyModValues } from '../engine/modulation'
 import { soniBeats } from './soniClock'
 import { SONI_WORKLET_URL } from './soniWorklet'
 import { CollageVoice, type CollageSoundSet } from './collageVoice'
+import { defaultEq, normalizeEq, type SoniEq } from './eqMath'
 
 export const GRID = 96
 // Signal's grains play this long after their step : a fixed latency, longer
@@ -191,6 +192,9 @@ export interface SoniConfig {
   // lowpass sweep, >0.5 highpass sweep. Volume is each voice's own `gain`.
   mixFilter: number[]
   taps: [SoniTap, SoniTap]
+  // The output EQ (eqMath.ts) : after everything, on the way to the speakers
+  // only (recordings are taken before it), to tune the room.
+  eq: SoniEq
 }
 
 export function defaultSoniConfig(): SoniConfig {
@@ -223,7 +227,8 @@ export function defaultSoniConfig(): SoniConfig {
       rvCross: 0.3, rvLowMult: 1, rvHighMult: 1
     },
     mixFilter: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
-    taps: [{ kind: 'master', layer: 0 }, { kind: 'layer', layer: 0 }]
+    taps: [{ kind: 'master', layer: 0 }, { kind: 'layer', layer: 0 }],
+    eq: defaultEq()
   }
 }
 
@@ -380,6 +385,16 @@ class SonifyEngine {
   private ctxReady: Promise<AudioContext> | null = null
   private node: AudioWorkletNode | null = null
   private recDest: MediaStreamAudioDestinationNode | null = null
+  // The output EQ : its node (between the Sonify node and the speakers), the
+  // spectrum before and after it, and its meters (after the input gain, and
+  // what leaves). `eqSent` is the last config posted, so a frame posts nothing.
+  private eqNode: AudioWorkletNode | null = null
+  private anPre: AnalyserNode | null = null
+  private anPost: AnalyserNode | null = null
+  private eqSent = ''
+  eqMeterIn = { l: { peak: 0, rms: 0 }, r: { peak: 0, rms: 0 } }
+  eqMeterOut = { l: { peak: 0, rms: 0 }, r: { peak: 0, rms: 0 } }
+  eqCeiling = false
   // THE SOUND BUS for recordings : a take holds Sonify's audio context open
   // (bus > 0) so its sound track lives for the whole take, Sonify on or off,
   // and a DXV3 take reads the sound as PCM through the tap.
@@ -487,6 +502,16 @@ class SonifyEngine {
 
   /** The recorder mixes this stream's audio track into captures (null = off). */
   recordStream(): MediaStream | null { return this.recDest?.stream ?? null }
+
+  /** The output EQ's spectrum, before (`post` false) or after it, into `out`
+   *  (dB per bin, fftSize / 2 bins). False while Sonify is off. */
+  eqSpectrum(post: boolean, out: Float32Array<ArrayBuffer>): { sampleRate: number; bins: number } | null {
+    const a = post ? this.anPost : this.anPre
+    if (!a || !this.ctx) return null
+    if (out.length < a.frequencyBinCount) return null
+    a.getFloatFrequencyData(out.subarray(0, a.frequencyBinCount))
+    return { sampleRate: this.ctx.sampleRate, bins: a.frequencyBinCount }
+  }
 
   /** The audio context, its worklet module and the recording destination,
    *  created once and shared by the sound and by a recording's sound bus. */
@@ -613,7 +638,26 @@ class SonifyEngine {
           if (m.scan) this.scan = { ...m.scan, recv: performance.now() }
         }
       }
-      node.connect(ctx.destination)
+      // To the speakers through the output EQ; the recordings (recDest, the DXV3
+      // tap) take the sound before it : the EQ tunes the room, not the take.
+      const eq = new AudioWorkletNode(ctx, 'soni-eq', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] })
+      eq.port.onmessage = (e): void => {
+        const m = e.data
+        if (m?.t !== 'eqm') return
+        this.eqMeterIn = { l: { peak: m.inL[0], rms: m.inL[1] }, r: { peak: m.inR[0], rms: m.inR[1] } }
+        this.eqMeterOut = { l: { peak: m.outL[0], rms: m.outL[1] }, r: { peak: m.outR[0], rms: m.outR[1] } }
+        this.eqCeiling = !!m.ceil
+      }
+      node.connect(eq).connect(ctx.destination)
+      // The spectrum the EQ page draws, before and after it (native FFTs, read
+      // only while the page asks).
+      const an = (): AnalyserNode => { const a = ctx.createAnalyser(); a.fftSize = 8192; a.smoothingTimeConstant = 0.8; return a }
+      this.anPre = an()
+      this.anPost = an()
+      node.connect(this.anPre)
+      eq.connect(this.anPost)
+      this.eqNode = eq
+      this.eqSent = ''
       if (this.recDest) node.connect(this.recDest)
       if (this.tap) node.connect(this.tap)
       this.node = node
@@ -756,6 +800,13 @@ class SonifyEngine {
     this.lineReq++
     this.node?.disconnect()
     this.node = null
+    try { this.eqNode?.disconnect(); this.anPre?.disconnect(); this.anPost?.disconnect() } catch { /* gone */ }
+    this.eqNode = null
+    this.anPre = null
+    this.anPost = null
+    this.eqSent = ''
+    this.eqMeterIn = { l: { peak: 0, rms: 0 }, r: { peak: 0, rms: 0 } }
+    this.eqMeterOut = { l: { peak: 0, rms: 0 }, r: { peak: 0, rms: 0 } }
     this.meterPeak = 0
     this.meterL = { peak: 0, rms: 0 }
     this.meterR = { peak: 0, rms: 0 }
@@ -790,6 +841,15 @@ class SonifyEngine {
   }
 
   pushConfig(cfg: SoniConfig): void {
+    // The output EQ, when it changed (its own node, its own message).
+    if (this.eqNode) {
+      const eq = normalizeEq(cfg.eq)
+      const key = JSON.stringify(eq)
+      if (key !== this.eqSent) {
+        this.eqSent = key
+        this.eqNode.port.postMessage({ t: 'eq', eq })
+      }
+    }
     // Deep-fill against the defaults so no voice — or voice FIELD — is ever
     // missing (old localStorage / sessions / scenes / presets saved before a
     // voice or param existed). A partial config used to silence the whole engine

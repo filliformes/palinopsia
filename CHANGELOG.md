@@ -7,6 +7,15 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Sonify output EQ** (mixer view, under the FX tail) : twelve bands after all of
+  Sonify, to tune the room : low cut, low shelf, eight bells, high shelf, high cut,
+  each with frequency, gain, Q and a slope of 6, 12, 24 or 36 dB per octave. A
+  miniature curve on the card with input and output meters, and a pop-out editor :
+  the curve over the live spectrum before and after, points to drag, the wheel for Q,
+  input and output gain (±24 dB) with their meters. A soft ceiling keeps the output
+  under 0 dB. Speakers only (recordings are taken before it); presets, the
+  sequencer and ↺ default leave it alone. Measured against the curve it draws :
+  within 0.4 dB across nine settings, bypass exact.
 - **Feather for the projection warp** (Output → Mapping) : the warped frame's edges
   fade into the black over 0 to 200 projector pixels, rounded at the corners. Saved
   with the warp (this computer's, or the session's when the warp travels with it),

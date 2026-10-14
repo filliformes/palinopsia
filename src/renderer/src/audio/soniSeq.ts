@@ -127,12 +127,12 @@ function applyStep(i: number): void {
   const cur = st.sonify
   runSilently(() => {
     if (step.preset) {
-      // A whole preset : keep the machine-local on-state + output device, and
-      // the key while the key sequencer composes it.
+      // A whole preset : keep the machine-local on-state + output device, the
+      // room EQ, and the key while the key sequencer composes it.
       const cfg = loadSoniPreset(step.preset)
       if (cfg) {
         const key = st.soniKeySeq.on ? { root: cur.root, scale: cur.scale, rootOct: cur.rootOct } : {}
-        useStore.getState().setSonify({ ...cfg, ...key, on: cur.on, sinkId: cur.sinkId } as SoniConfig)
+        useStore.getState().setSonify({ ...cfg, ...key, on: cur.on, sinkId: cur.sinkId, eq: cur.eq } as SoniConfig)
         return
       }
       // Deleted, or not on this machine (presets are local, steps travel with

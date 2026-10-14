@@ -1789,3 +1789,148 @@ class SoniTap extends AudioWorkletProcessor {
   }
 }
 registerProcessor('soni-tap', SoniTap);
+
+// ── The output EQ : twelve bands after everything in Sonify, to tune the room
+// (low cut, low shelf, eight bells, high shelf, high cut). Its own node between
+// the Sonify node and the speakers; recordings are taken before it. The maths is
+// eqMath.ts's (the page draws its curve from that), copied line for line : keep
+// the two alike.
+const EQ_KINDS_W = ['lowcut', 'lowshelf', 'bell', 'bell', 'bell', 'bell', 'bell', 'bell', 'bell', 'bell', 'highshelf', 'highcut'];
+const EQ_BW4 = [0.5412, 1.3066];
+const EQ_BW6 = [0.5176, 0.7071, 1.9319];
+function eqRbj(kind, f, q, gainDb, sr) {
+  const w0 = (2 * Math.PI * Math.min(f, sr * 0.49)) / sr;
+  const cs = Math.cos(w0), sn = Math.sin(w0);
+  const alpha = sn / (2 * q);
+  const A = Math.pow(10, gainDb / 40);
+  let b0, b1, b2, a0, a1, a2;
+  if (kind === 'lowcut') {
+    b0 = (1 + cs) / 2; b1 = -(1 + cs); b2 = (1 + cs) / 2; a0 = 1 + alpha; a1 = -2 * cs; a2 = 1 - alpha;
+  } else if (kind === 'highcut') {
+    b0 = (1 - cs) / 2; b1 = 1 - cs; b2 = (1 - cs) / 2; a0 = 1 + alpha; a1 = -2 * cs; a2 = 1 - alpha;
+  } else if (kind === 'bell') {
+    b0 = 1 + alpha * A; b1 = -2 * cs; b2 = 1 - alpha * A; a0 = 1 + alpha / A; a1 = -2 * cs; a2 = 1 - alpha / A;
+  } else {
+    const sq = 2 * Math.sqrt(A) * alpha;
+    if (kind === 'lowshelf') {
+      b0 = A * ((A + 1) - (A - 1) * cs + sq); b1 = 2 * A * ((A - 1) - (A + 1) * cs); b2 = A * ((A + 1) - (A - 1) * cs - sq);
+      a0 = (A + 1) + (A - 1) * cs + sq; a1 = -2 * ((A - 1) + (A + 1) * cs); a2 = (A + 1) + (A - 1) * cs - sq;
+    } else {
+      b0 = A * ((A + 1) + (A - 1) * cs + sq); b1 = -2 * A * ((A - 1) + (A + 1) * cs); b2 = A * ((A + 1) + (A - 1) * cs - sq);
+      a0 = (A + 1) - (A - 1) * cs + sq; a1 = 2 * ((A - 1) - (A + 1) * cs); a2 = (A + 1) - (A - 1) * cs - sq;
+    }
+  }
+  return [b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0];
+}
+function eqFirst(kind, f, gainDb, sr) {
+  const k = Math.tan((Math.PI * Math.min(f, sr * 0.49)) / sr);
+  const n = 1 / (1 + k);
+  if (kind === 'lowcut') return [n, -n, 0, (k - 1) * n, 0];
+  if (kind === 'highcut') return [k * n, k * n, 0, (k - 1) * n, 0];
+  const G = Math.pow(10, gainDb / 20);
+  if (kind === 'lowshelf') return [(1 + G * k) * n, (G * k - 1) * n, 0, (k - 1) * n, 0];
+  return [(G + k) * n, (k - G) * n, 0, (k - 1) * n, 0];
+}
+function eqSectionsW(kind, b, sr) {
+  if (!b || !b.on) return [];
+  const isCut = kind === 'lowcut' || kind === 'highcut';
+  if (!isCut && Math.abs(b.gain) < 0.01) return [];
+  const q = Math.max(0.1, Math.min(18, b.q));
+  if (isCut) {
+    if (b.slope === 6) return [eqFirst(kind, b.freq, 0, sr)];
+    if (b.slope === 12) return [eqRbj(kind, b.freq, q, 0, sr)];
+    const qs = b.slope === 24 ? EQ_BW4 : EQ_BW6;
+    return qs.map((bq, i) => eqRbj(kind, b.freq, i === qs.length - 1 ? bq * (q / 0.7071) : bq, 0, sr));
+  }
+  if (kind === 'bell') {
+    if (b.slope === 6) return [eqRbj('bell', b.freq, q * 0.5, b.gain, sr)];
+    const n = b.slope === 12 ? 1 : b.slope === 24 ? 2 : 3;
+    const out = []; for (let i = 0; i < n; i++) out.push(eqRbj('bell', b.freq, q, b.gain / n, sr)); return out;
+  }
+  if (b.slope === 6) return [eqFirst(kind, b.freq, b.gain, sr)];
+  const n = b.slope === 12 ? 1 : b.slope === 24 ? 2 : 3;
+  const out = []; for (let i = 0; i < n; i++) out.push(eqRbj(kind, b.freq, q, b.gain / n, sr)); return out;
+}
+// The ceiling after the output gain : untouched up to -1 dBFS, then a soft knee
+// that never passes 0 dBFS. The EQ comes after Sonify's own limiter, so a boost
+// here could otherwise clip the speakers.
+const EQ_KNEE = 0.891;
+function eqCeil(x) {
+  const a = x < 0 ? -x : x;
+  if (a <= EQ_KNEE) return x;
+  const y = EQ_KNEE + (1 - EQ_KNEE) * Math.tanh((a - EQ_KNEE) / (1 - EQ_KNEE));
+  return x < 0 ? -y : y;
+}
+class SoniEqProc extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.on = false;
+    this.inG = 1; this.outG = 1; this.inT = 1; this.outT = 1;
+    this.secs = [];
+    // meters : peak and sum of squares, in (after the input gain) and out (what leaves)
+    this.m = new Float64Array(8); // pkInL pkInR ssInL ssInR pkOutL pkOutR ssOutL ssOutR
+    this.mN = 0;
+    this.mEvery = Math.round(sampleRate / 24);
+    this.ceilHit = 0;
+    this.port.onmessage = (e) => { const m = e.data; if (m && m.t === 'eq' && m.eq) this.set(m.eq); };
+  }
+  set(eq) {
+    this.on = !!eq.on;
+    this.inT = Math.pow(10, (eq.inGain || 0) / 20);
+    this.outT = Math.pow(10, (eq.outGain || 0) / 20);
+    const next = [];
+    const bands = Array.isArray(eq.bands) ? eq.bands : [];
+    for (let i = 0; i < 12; i++) { const cs = eqSectionsW(EQ_KINDS_W[i], bands[i], sampleRate); for (let k = 0; k < cs.length; k++) next.push(cs[k]); }
+    // A drag keeps the chain's shape : new coefficients, the filters' memory kept
+    // (no click). A band switched on or off, a slope changed : start clean.
+    if (next.length === this.secs.length) {
+      for (let i = 0; i < next.length; i++) { const s = this.secs[i], c = next[i]; s.b0 = c[0]; s.b1 = c[1]; s.b2 = c[2]; s.a1 = c[3]; s.a2 = c[4]; }
+    } else {
+      this.secs = next.map((c) => ({ b0: c[0], b1: c[1], b2: c[2], a1: c[3], a2: c[4], l1: 0, l2: 0, r1: 0, r2: 0 }));
+    }
+  }
+  process(inputs, outputs) {
+    const inp = inputs[0], out = outputs[0];
+    const oL = out[0], oR = out.length > 1 ? out[1] : out[0];
+    const n = oL.length;
+    const iL = inp && inp.length ? inp[0] : null;
+    const iR = inp && inp.length > 1 ? inp[1] : iL;
+    const m = this.m;
+    const on = this.on;
+    // gains ramp across the block : no zipper on a slider move
+    const gi0 = this.inG, gi1 = on ? this.inT : 1, go0 = this.outG, go1 = on ? this.outT : 1;
+    const secs = this.secs, ns = secs.length;
+    for (let s = 0; s < n; s++) {
+      const t = (s + 1) / n;
+      const gi = gi0 + (gi1 - gi0) * t, go = go0 + (go1 - go0) * t;
+      let l = (iL ? iL[s] : 0) * gi, r = (iR ? iR[s] : 0) * gi;
+      const al = l < 0 ? -l : l, ar = r < 0 ? -r : r;
+      if (al > m[0]) m[0] = al; if (ar > m[1]) m[1] = ar; m[2] += l * l; m[3] += r * r;
+      if (on) {
+        for (let k = 0; k < ns; k++) {
+          const q = secs[k];
+          const yl = q.b0 * l + q.l1; q.l1 = q.b1 * l - q.a1 * yl + q.l2; q.l2 = q.b2 * l - q.a2 * yl; l = yl;
+          const yr = q.b0 * r + q.r1; q.r1 = q.b1 * r - q.a1 * yr + q.r2; q.r2 = q.b2 * r - q.a2 * yr; r = yr;
+        }
+        l *= go; r *= go;
+        const cl = eqCeil(l), cr = eqCeil(r);
+        if (cl !== l || cr !== r) this.ceilHit = 1;
+        l = cl; r = cr;
+      }
+      oL[s] = l; if (oR !== oL) oR[s] = r;
+      const bl = l < 0 ? -l : l, br = r < 0 ? -r : r;
+      if (bl > m[4]) m[4] = bl; if (br > m[5]) m[5] = br; m[6] += l * l; m[7] += r * r;
+    }
+    this.inG = gi1; this.outG = go1;
+    // denormals out of the filters' memory between blocks
+    for (let k = 0; k < ns; k++) { const q = secs[k]; if (Math.abs(q.l1) < 1e-25) q.l1 = 0; if (Math.abs(q.l2) < 1e-25) q.l2 = 0; if (Math.abs(q.r1) < 1e-25) q.r1 = 0; if (Math.abs(q.r2) < 1e-25) q.r2 = 0; }
+    this.mN += n;
+    if (this.mN >= this.mEvery) {
+      const k = 1 / this.mN;
+      this.port.postMessage({ t: 'eqm', inL: [m[0], Math.sqrt(m[2] * k)], inR: [m[1], Math.sqrt(m[3] * k)], outL: [m[4], Math.sqrt(m[6] * k)], outR: [m[5], Math.sqrt(m[7] * k)], ceil: this.ceilHit });
+      m.fill(0); this.mN = 0; this.ceilHit = 0;
+    }
+    return true;
+  }
+}
+registerProcessor('soni-eq', SoniEqProc);
