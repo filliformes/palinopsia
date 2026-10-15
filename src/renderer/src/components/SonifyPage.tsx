@@ -177,12 +177,29 @@ function RateRow({ label, rate, sync, onRate, onSync, title }: {
 }
 const RING_VOICINGS = ['Clean', 'SEM', 'MS-20', 'Steiner', 'K35']
 
+/** A typed frequency : "4250", "4.25k", "4.25 kHz", "250 Hz"; "off" → `off`. */
+function parseHz(text: string, off: number): number | null {
+  const t = text.trim().toLowerCase().replace(',', '.')
+  if (t === 'off') return off
+  const m = /^([0-9]*\.?[0-9]+)\s*(k|khz)?\s*(hz)?$/.exec(t)
+  if (!m) return null
+  const v = Number(m[1]) * (m[2] ? 1000 : 1)
+  return Number.isFinite(v) ? v : null
+}
+/** A typed level in dB : "-6", "+3.5 dB". */
+function parseDb(text: string): number | null {
+  const m = /^([+-]?[0-9]*\.?[0-9]+)\s*(db)?$/i.exec(text.trim().replace(',', '.'))
+  return m ? Number(m[1]) : null
+}
+
 function Slider({
-  label, value, min, max, step = 0.01, neutral, fmt, onChange, title, mod
+  label, value, min, max, step = 0.01, neutral, fmt, onChange, title, mod, parse
 }: {
   label: string; value: number; min: number; max: number; step?: number
   neutral?: number; fmt?: (v: number) => string; onChange: (v: number) => void; title?: string
   mod?: ReactNode
+  /** The readout can be typed into : the text → the slider's value (null : not understood). */
+  parse?: (text: string) => number | null
 }): JSX.Element {
   // The `mod` node (when present) is a <ModChip param=… inactive=…/>, so read its
   // param straight off the element : no call-site needs to repeat it. A slider
@@ -201,19 +218,72 @@ function Slider({
     if (!live || !modParam || !ref.current) return
     return registerLiveOverlay({ el: ref.current, key: modTargetKey({ kind: 'sonify', param: modParam }), format: (x) => String(x) })
   }, [live, modParam])
+  const shown = fmt ? fmt(value) : value.toFixed(2)
+  const [typing, setTyping] = useState<string | null>(null)
+  // Shift-drag : a tenth of the speed, relative to where the drag starts (the
+  // track is a hundred-odd pixels : too coarse to dial a frequency by hand)
+  const onPointerDown = (e: ReactPointerEvent<HTMLInputElement>): void => {
+    if (!e.shiftKey || e.button !== 0) return
+    e.preventDefault()
+    const el = e.currentTarget
+    el.setPointerCapture(e.pointerId)
+    const w = Math.max(1, el.getBoundingClientRect().width)
+    const x0 = e.clientX, v0 = value
+    const move = (ev: PointerEvent): void => {
+      let v = v0 + ((ev.clientX - x0) / w) * (max - min) * 0.1
+      v = Math.max(min, Math.min(max, Math.round((v - min) / step) * step + min))
+      onChange(v)
+    }
+    const up = (): void => {
+      el.removeEventListener('pointermove', move)
+      el.removeEventListener('pointerup', up)
+      el.removeEventListener('pointercancel', up)
+    }
+    el.addEventListener('pointermove', move)
+    el.addEventListener('pointerup', up)
+    el.addEventListener('pointercancel', up)
+  }
+  const commit = (): void => {
+    if (typing !== null && parse) {
+      const v = parse(typing)
+      if (v !== null && Number.isFinite(v)) onChange(Math.max(min, Math.min(max, v)))
+    }
+    setTyping(null)
+  }
   return (
     <Row label={label} hint={title}>
       <input
         ref={ref}
         type="range" min={min} max={max} step={step} value={value}
         onChange={(e) => onChange(Number(e.target.value))}
+        onPointerDown={onPointerDown}
         onDoubleClick={() => neutral !== undefined && onChange(neutral)}
         className={`min-w-0 flex-1 ${live ? 'accent-accent2' : 'accent-accent'}`}
-        title={title ?? `${label} ${fmt ? fmt(value) : value.toFixed(2)}${live ? ' : modulated (drag sets the base)' : ''}`}
+        title={`${title ?? `${label} ${shown}`}${live ? ' : modulated (drag sets the base)' : ''} · Shift-drag : finer${parse ? ' · click the value to type it' : ''}`}
       />
-      <span className={`w-12 shrink-0 text-right font-mono text-[9px] ${live ? 'text-accent2' : 'text-muted'}`}>
-        {fmt ? fmt(value) : value.toFixed(2)}
-      </span>
+      {typing !== null ? (
+        <input
+          autoFocus
+          className="input w-12 shrink-0 !px-0.5 text-right font-mono !text-[9px]"
+          value={typing}
+          onChange={(e) => setTyping(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit()
+            else if (e.key === 'Escape') { e.stopPropagation(); setTyping(null) }
+          }}
+        />
+      ) : parse ? (
+        <button
+          onClick={() => setTyping(shown)}
+          className={`w-12 shrink-0 cursor-text text-right font-mono text-[9px] underline decoration-dotted underline-offset-2 ${live ? 'text-accent2' : 'text-muted'} hover:text-text`}
+          title="Click to type the value"
+        >
+          {shown}
+        </button>
+      ) : (
+        <span className={`w-12 shrink-0 text-right font-mono text-[9px] ${live ? 'text-accent2' : 'text-muted'}`}>{shown}</span>
+      )}
       {mod}
     </Row>
   )
@@ -1648,9 +1718,9 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                     : 'no Collage playing : add a Collage source with a folder of films'}
             </div>
             {/* The films in, before everything : a windy or hot recording. */}
-            <Slider label="films in" value={cfg.collage.inGain ?? 0} min={-24} max={12} neutral={0} fmt={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} onChange={(v) => pv('collage', { inGain: Math.round(v * 2) / 2 })} title="The films' level into the voice, before the resonators : turn a windy or hot recording down here (the resonators and the Ring bank then ring cleaner)" />
-            <Slider label="hp" value={Math.log((cfg.collage.hp ?? 20) / 20) / Math.log(50)} min={0} max={1} step={0.001} neutral={0} fmt={() => ((cfg.collage.hp ?? 20) <= 20.5 ? 'off' : `${Math.round(cfg.collage.hp ?? 20)} Hz`)} onChange={(v) => pv('collage', { hp: Math.round(20 * Math.pow(50, v)) })} title="A high-pass on every film, 24 dB per octave, before the resonators : wind rumble and handling noise go (20 Hz = off, up to 1 kHz)" />
-            <Slider label="lp" value={Math.log((cfg.collage.lp ?? 20000) / 1000) / Math.log(20)} min={0} max={1} step={0.001} neutral={1} fmt={() => { const f = cfg.collage.lp ?? 20000; return f >= 19950 ? 'off' : f < 10000 ? `${(f / 1000).toFixed(2)} kHz` : `${(f / 1000).toFixed(1)} kHz` }} onChange={(v) => pv('collage', { lp: Math.round(1000 * Math.pow(20, v) / 10) * 10 })} title="A low-pass on every film, 24 dB per octave (flat to the corner, then steep), before the resonators : crackle, hiss and the wind's top go (20 kHz = off, down to 1 kHz). Fine steps : the arrow keys move it 0.3 % at a time." />
+            <Slider label="films in" value={cfg.collage.inGain ?? 0} min={-24} max={12} neutral={0} fmt={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} onChange={(v) => pv('collage', { inGain: Math.round(v * 2) / 2 })} title="The films' level into the voice, before the resonators : turn a windy or hot recording down here (the resonators and the Ring bank then ring cleaner)" parse={(t) => parseDb(t)} />
+            <Slider label="hp" value={Math.log((cfg.collage.hp ?? 20) / 20) / Math.log(50)} min={0} max={1} step={0.001} neutral={0} fmt={() => ((cfg.collage.hp ?? 20) <= 20.5 ? 'off' : `${Math.round(cfg.collage.hp ?? 20)} Hz`)} onChange={(v) => pv('collage', { hp: Math.round(20 * Math.pow(50, v)) })} title="A high-pass on every film, 24 dB per octave, before the resonators : wind rumble and handling noise go (20 Hz = off, up to 1 kHz)" parse={(t) => { const f = parseHz(t, 20); return f === null ? null : Math.log(Math.max(20, Math.min(1000, f)) / 20) / Math.log(50) }} />
+            <Slider label="lp" value={Math.log((cfg.collage.lp ?? 20000) / 1000) / Math.log(20)} min={0} max={1} step={0.001} neutral={1} fmt={() => { const f = cfg.collage.lp ?? 20000; return f >= 19950 ? 'off' : f < 10000 ? `${(f / 1000).toFixed(2)} kHz` : `${(f / 1000).toFixed(1)} kHz` }} onChange={(v) => pv('collage', { lp: Math.round(1000 * Math.pow(20, v) / 10) * 10 })} title="A low-pass on every film, 24 dB per octave (flat to the corner, then steep), before the resonators : crackle, hiss and the wind's top go (20 kHz = off, down to 1 kHz). Fine steps : the arrow keys move it 0.3 % at a time." parse={(t) => { const f = parseHz(t, 20000); return f === null ? null : Math.log(Math.max(1000, Math.min(20000, f)) / 1000) / Math.log(20) }} />
             <Slider label="resonance" value={cfg.collage.reso} min={0} max={1} neutral={0.5} onChange={(v) => pv('collage', { reso: v })} mod={chip('collageReso')} title="0 = the plain films · 1 = only the tuned resonances" />
             <Slider label="ring" value={cfg.collage.ring} min={0} max={1} neutral={0.5} onChange={(v) => pv('collage', { ring: v })} mod={chip('collageRing')} title="How sharply each piece's resonator rings : a broad color → a pitched, singing tone" />
             <Slider label="harmonics" value={cfg.collage.bright} min={0} max={1} neutral={0.5} onChange={(v) => pv('collage', { bright: v })} title="How much the 2nd and 3rd harmonics ring with each note" />
@@ -1681,28 +1751,31 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 title="sustain : the shape (cutoff, waves, noise) acts before the ring, which decays on its own · choke : it acts after, so it cuts the ring"
               >{cfg.collage.choke ? 'choke' : 'sustain'}</button>
             </div>
-            <Slider label="ring in" value={cfg.collage.ringIn ?? 0} min={-24} max={12} neutral={0} fmt={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} onChange={(v) => pv('collage', { ringIn: Math.round(v * 2) / 2 })} title="How hard the films drive the Ring bank : down, its wet is quieter and its bands clip less (a windy film distorts less); up, it rings and clips harder. The plain films are not touched." />
             <Slider label="wet" value={cfg.collage.bank ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('collage', { bank: v })} mod={chip('collageBank')} title="0 = the plain voice (as before) · up = the ring bank" />
-            <Slider label="decay" value={cfg.collage.decay ?? 0.5} min={0} max={1} neutral={0.5} fmt={(v) => { const t = 0.012 * Math.pow(10 / 0.012, v); return t < 1 ? Math.round(t * 1000) + 'ms' : t.toFixed(1) + 's' }} onChange={(v) => pv('collage', { decay: v })} mod={chip('collageDecay')} title="How long every band rings : short = a filterbank shaping the films, long = a tuned resonance that sings" />
-            <Slider label="cutoff" value={cfg.collage.cutoff ?? 1} min={0} max={1} neutral={1} onChange={(v) => pv('collage', { cutoff: v })} mod={chip('collageCutoff')} title="Where the bank's slope sits across its bands" />
-            <Slider label="peak" value={cfg.collage.peak ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('collage', { peak: v })} title="A boost of the bands at the cutoff" />
-            <Slider label="slope" value={cfg.collage.slope ?? 0} min={0} max={1} neutral={0} fmt={(v) => (v < 0.2 ? 'LP' : v < 0.4 ? 'LP-BP' : v < 0.6 ? 'BP' : v < 0.8 ? 'BP-HP' : 'HP')} onChange={(v) => pv('collage', { slope: v })} title="Low-pass → band-pass → high-pass around the cutoff" />
-            <Slider label="tone" value={cfg.collage.tone ?? 0} min={-1} max={1} neutral={0} onChange={(v) => pv('collage', { tone: v })} title="Tilts the bank : − darker, + brighter" />
-            <Slider label="tilt" value={cfg.collage.tilt ?? 0} min={-1} max={1} neutral={0} onChange={(v) => pv('collage', { tilt: v })} title="+ the high bands ring longer and the low ones fade · − the opposite" />
-            <Slider label="waves" value={cfg.collage.waves ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('collage', { waves: v })} mod={chip('collageWaves')} title="A sine of level travelling across the bands (past 65 % it speeds up)" />
-            {(cfg.collage.waves ?? 0) > 0 && (
-              <RateRow label="w rate" rate={cfg.collage.wavesRate ?? 0.5} sync={cfg.collage.wavesSync ?? 0} onRate={(v) => pv('collage', { wavesRate: v })} onSync={(v) => pv('collage', { wavesSync: v })} title="How fast the waves travel" />
-            )}
-            <Slider label="noise" value={cfg.collage.noise ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('collage', { noise: v })} title="A random level for each band, drawn again at the noise rate" />
-            {(cfg.collage.noise ?? 0) > 0 && (
-              <RateRow label="n rate" rate={cfg.collage.noiseRate ?? 0.5} sync={cfg.collage.noiseSync ?? 0} onRate={(v) => pv('collage', { noiseRate: v })} onSync={(v) => pv('collage', { noiseSync: v })} title="How often the bands draw a new level" />
-            )}
-            <Slider label="detune" value={cfg.collage.detune ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('collage', { detune: v })} mod={chip('collageDetune')} title="The bands wander off their notes, the left and right sides in opposite directions : beating, width" />
-            <Row label="voicing">
-              <select className="input select-compact min-w-0 flex-1 text-[10px]" value={cfg.collage.voicing ?? 0} onChange={(e) => pv('collage', { voicing: Number(e.target.value) })} title="The filters' character : Clean, SEM (broader, rounder), and three driven ones whose ring clips (MS-20, Steiner, K35)">
-                {RING_VOICINGS.map((v, i) => <option key={v} value={i}>{v}</option>)}
-              </select>
-            </Row>
+            {/* Everything below acts on the bank only : greyed while wet is 0 (still playable). */}
+            <div className={`flex flex-col gap-1 transition-opacity ${(cfg.collage.bank ?? 0) <= 0 ? 'opacity-45' : ''}`} title={(cfg.collage.bank ?? 0) <= 0 ? 'The Ring bank is out (wet 0) : these shape it, so they are heard once wet is up' : undefined}>
+              <Slider label="ring in" value={cfg.collage.ringIn ?? 0} min={-24} max={12} neutral={0} fmt={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} onChange={(v) => pv('collage', { ringIn: Math.round(v * 2) / 2 })} title="How hard the films drive the Ring bank : down, its wet is quieter and its bands clip less (a windy film distorts less); up, it rings and clips harder. The plain films are not touched." parse={(t) => parseDb(t)} />
+              <Slider label="decay" value={cfg.collage.decay ?? 0.5} min={0} max={1} neutral={0.5} fmt={(v) => { const t = 0.012 * Math.pow(10 / 0.012, v); return t < 1 ? Math.round(t * 1000) + 'ms' : t.toFixed(1) + 's' }} onChange={(v) => pv('collage', { decay: v })} mod={chip('collageDecay')} title="How long every band rings : short = a filterbank shaping the films, long = a tuned resonance that sings" />
+              <Slider label="cutoff" value={cfg.collage.cutoff ?? 1} min={0} max={1} neutral={1} onChange={(v) => pv('collage', { cutoff: v })} mod={chip('collageCutoff')} title="Where the bank's slope sits across its bands" />
+              <Slider label="peak" value={cfg.collage.peak ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('collage', { peak: v })} title="A boost of the bands at the cutoff" />
+              <Slider label="slope" value={cfg.collage.slope ?? 0} min={0} max={1} neutral={0} fmt={(v) => (v < 0.2 ? 'LP' : v < 0.4 ? 'LP-BP' : v < 0.6 ? 'BP' : v < 0.8 ? 'BP-HP' : 'HP')} onChange={(v) => pv('collage', { slope: v })} title="Low-pass → band-pass → high-pass around the cutoff" />
+              <Slider label="tone" value={cfg.collage.tone ?? 0} min={-1} max={1} neutral={0} onChange={(v) => pv('collage', { tone: v })} title="Tilts the bank : − darker, + brighter" />
+              <Slider label="tilt" value={cfg.collage.tilt ?? 0} min={-1} max={1} neutral={0} onChange={(v) => pv('collage', { tilt: v })} title="+ the high bands ring longer and the low ones fade · − the opposite" />
+              <Slider label="waves" value={cfg.collage.waves ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('collage', { waves: v })} mod={chip('collageWaves')} title="A sine of level travelling across the bands (past 65 % it speeds up)" />
+              {(cfg.collage.waves ?? 0) > 0 && (
+                <RateRow label="w rate" rate={cfg.collage.wavesRate ?? 0.5} sync={cfg.collage.wavesSync ?? 0} onRate={(v) => pv('collage', { wavesRate: v })} onSync={(v) => pv('collage', { wavesSync: v })} title="How fast the waves travel" />
+              )}
+              <Slider label="noise" value={cfg.collage.noise ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('collage', { noise: v })} title="A random level for each band, drawn again at the noise rate" />
+              {(cfg.collage.noise ?? 0) > 0 && (
+                <RateRow label="n rate" rate={cfg.collage.noiseRate ?? 0.5} sync={cfg.collage.noiseSync ?? 0} onRate={(v) => pv('collage', { noiseRate: v })} onSync={(v) => pv('collage', { noiseSync: v })} title="How often the bands draw a new level" />
+              )}
+              <Slider label="detune" value={cfg.collage.detune ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('collage', { detune: v })} mod={chip('collageDetune')} title="The bands wander off their notes, the left and right sides in opposite directions : beating, width" />
+              <Row label="voicing">
+                <select className="input select-compact min-w-0 flex-1 text-[10px]" value={cfg.collage.voicing ?? 0} onChange={(e) => pv('collage', { voicing: Number(e.target.value) })} title="The filters' character : Clean, SEM (broader, rounder), and three driven ones whose ring clips (MS-20, Steiner, K35)">
+                  {RING_VOICINGS.map((v, i) => <option key={v} value={i}>{v}</option>)}
+                </select>
+              </Row>
+            </div>
           </VoiceShell>
 
           <VoiceShell

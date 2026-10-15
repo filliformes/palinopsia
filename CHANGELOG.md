@@ -85,6 +85,19 @@ that CI builds into cross-platform releases.
   with the warp (this computer's, or the session's when the warp travels with it),
   applied on the projector window and on the control window's own warped preview.
 
+### Changed
+
+- **Sonify's sliders dial finely** : Shift-drag moves any of them at a tenth of the
+  speed (relative to where the drag starts; a track is a hundred-odd pixels, about 2 %
+  of a log frequency range per pixel). The Collage voice's films in, hp, lp and ring in
+  take a **typed** value (click the readout : `4250`, `4.2k`, `4.25 kHz`, `off`, `-6 dB`;
+  the shortcuts stay quiet while typing). Measured with real input at UI zoom 115 % :
+  Shift-drag 60 px, lp 2000 → 2220 Hz (a plain drag : 6450); typed `4250` → 4250,
+  `3.1k` → 3100.
+- **The Collage's Ring bank controls grey out while its wet is 0** (they shape the
+  bank, so nothing changes until it is up; still playable), and **wet** now heads the
+  section.
+
 ### Fixed
 
 - **Space on headphones no longer distorts.** The binaural sum of the virtual speakers
