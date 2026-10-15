@@ -15,7 +15,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useStore } from '../store'
 import { visionBus } from '../engine/visionIn'
 import { NOTE_NAMES, BRIGHT, DIATONIC, affinity, degreeNumeral, diatonicRing, fifthsPos, minorish, rootAtFifths, keyId, mod12, isScale, type Key } from '../audio/soniKeyModel'
-import { affinityWeight, keySeqMemory, pictureKey, pictureView, pool } from '../audio/soniKeySeq'
+import { affinityWeight, keySeqMemory, pictureKey, pictureList, pictureView, pool } from '../audio/soniKeySeq'
 import { SCALE_ABBR, SCALE_LABEL, SCALE_STEPS, sameNotes, type SoniScale } from '../audio/sonify'
 import type { SoniKeySeq } from '@shared/types'
 import { sonifyCovered } from './sonifyUi'
@@ -336,15 +336,18 @@ function PictureVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): J
   const v = pictureView(range)
   const hue = v.effHue, sat = v.sat, bri = v.effBri
   const pk = has ? pictureKey(ks, cur) : null
+  // its own keys (KEYS list) : each drawn where its root sits on the wheel, and
+  // the moods among them; else the pool's moods
+  const list = ks.picKeys === 'list' ? pictureList(ks) : null
   const { scales } = pool(ks)
-  const moods = BRIGHT.filter((s) => s !== 'chromatic' && scales.includes(s))
+  const moods = list ? list.moods : BRIGHT.filter((s) => s !== 'chromatic' && scales.includes(s))
   const grey = sat <= 0.08
   const ma = hue * TAU - Math.PI / 2
   const mr = R * (0.25 + 0.7 * Math.min(1, sat))
   const cuts = ks.picSource === 'cuts'
   const thr = Math.max(0.12, avg.current * 3 + 0.02)
   return (
-    <Stage caption={has ? (cuts ? 'a new key at each scene cut (the spikes past the line)' : range > 0.01 ? "its color picks the root, its light the mood, within the piece's own (the arc : its palette, the tick : its color now)" : 'its color picks the root, its brightness the mood') : 'the picture is read while the sequencer plays or this page is open'}>
+    <Stage caption={has ? (cuts ? 'a new key at each scene cut (the spikes past the line)' : list ? 'its color picks the nearest of your keys on the wheel (the dots), its light the mood among theirs' : range > 0.01 ? "its color picks the root, its light the mood, within the piece's own (the arc : its palette, the tick : its color now)" : 'its color picks the root, its brightness the mood') : 'the picture is read while the sequencer plays or this page is open'}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
         {/* the hue wheel */}
         {Array.from({ length: 24 }, (_, i) => {
@@ -369,6 +372,21 @@ function PictureVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): J
             <circle cx={cx + mr * Math.cos(ma)} cy={cy + mr * Math.sin(ma)} r={4.5} fill={grey ? MUTED : `hsl(${hue * 360} 85% 60%)`} stroke="#fff" strokeWidth={1.2} style={{ filter: grey ? undefined : `drop-shadow(0 0 4px hsl(${hue * 360} 90% 60%))` }} />
           </>
         )}
+        {/* the written keys, at their roots' places on the wheel (the circle of fifths) */}
+        {list && list.keys.map((k, i) => {
+          const a = (fifthsPos(k.root) / 12) * TAU - Math.PI / 2
+          const here = !!pk && pk.root === k.root && pk.scale === k.scale
+          // keys sharing a root stack inward
+          const depth = list.keys.slice(0, i).filter((o) => o.root === k.root).length
+          const rr = R - 13 - depth * 7
+          return (
+            <g key={i}>
+              <circle cx={cx + rr * Math.cos(a)} cy={cy + rr * Math.sin(a)} r={here ? 3.6 : 2.6} fill={col(keyHue(k.root), here ? 1 : 0.55)} stroke={here ? TEXT : 'none'} strokeWidth={0.8}>
+                <title>{`${NOTE_NAMES[k.root]} ${lab(k.scale)}`}</title>
+              </circle>
+            </g>
+          )
+        })}
         <text x={cx} y={cy + 4} textAnchor="middle" fontSize={11} fontWeight={700} fontFamily="ui-monospace, monospace" fill={pk ? col(keyHue(pk.root)) : MUTED}>{pk ? NOTE_NAMES[pk.root] : '·'}</text>
         {grey && has && <text x={cx} y={cy + 15} textAnchor="middle" fontSize={6.5} fontFamily="ui-monospace, monospace" fill={MUTED}>grey : keeps root</text>}
         {/* the brightness against the moods */}

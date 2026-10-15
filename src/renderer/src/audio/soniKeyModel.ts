@@ -72,6 +72,16 @@ export function affinity(a: Key, b: Key): number {
 export const fifthsPos = (root: number): number => mod12(root * 7)
 export const rootAtFifths = (pos: number): number => mod12(pos * 7)
 
+// Every, the free-time period : 250 ms to 5 min, log-mapped. Its slider and a
+// modulator (the keyEvery target, 0..1) both move along this map.
+const EVERY_MIN = 250
+const EVERY_SPAN = 300000 / EVERY_MIN
+export const everyToPos = (ms: number): number => Math.max(0, Math.min(1, Math.log(ms / EVERY_MIN) / Math.log(EVERY_SPAN)))
+export const posToEvery = (t: number): number => EVERY_MIN * Math.pow(EVERY_SPAN, Math.max(0, Math.min(1, t)))
+/** VARY : one wait's factor, drawn evenly in log between 1 / 4^vary and 4^vary
+ *  (as many halvings as doublings). */
+export const varyFactor = (vary: number): number => (vary > 0 ? Math.pow(4, Math.min(1, vary) * (2 * Math.random() - 1)) : 1)
+
 export function makeDefaultKeySeq(): SoniKeySeq {
   const step = (root: number, scale: SoniScale): SoniKeyStep => ({ root, scale, oct: 3 })
   return {
@@ -79,6 +89,7 @@ export function makeDefaultKeySeq(): SoniKeySeq {
     mode: 'circle',
     rate: 'free',
     freeMs: 5000,
+    freeVary: 0,
     chance: 1,
     glide: 1,
     returnHome: false,
@@ -103,7 +114,13 @@ export function makeDefaultKeySeq(): SoniKeySeq {
     pivDir: 'random',
     picSource: 'color',
     picHold: 8,
-    picRange: 1
+    picRange: 1,
+    // The diatonic modes of one family around the circle (F lydian, C major,
+    // G mixolydian, D dorian, A minor, E phrygian, B locrian) and a flat
+    // neighbor : bright to dark, colors spread, every key sharing notes.
+    picKeys: 'pool',
+    picSteps: [step(5, 'lydian'), step(0, 'major'), step(7, 'mixolydian'), step(2, 'dorian'), step(9, 'minor'), step(4, 'phrygian'), step(11, 'locrian'), step(10, 'major')],
+    picLen: 4
   }
 }
 
@@ -117,14 +134,15 @@ export function sanitizeKeySeq(raw: unknown, fallback: SoniKeySeq): SoniKeySeq {
   if (!raw || typeof raw !== 'object') return { ...fallback, on: false }
   const d = makeDefaultKeySeq()
   const s = raw as Partial<SoniKeySeq>
-  const steps = d.steps.map((ds, i) => {
-    const st = Array.isArray(s.steps) ? (s.steps[i] as Partial<SoniKeyStep> | undefined) : undefined
+  const keys = (saved: unknown, defs: SoniKeyStep[]): SoniKeyStep[] => defs.map((ds, i) => {
+    const st = Array.isArray(saved) ? (saved[i] as Partial<SoniKeyStep> | undefined) : undefined
     return {
       root: int(st?.root, 0, 11, ds.root),
       scale: isScale(st?.scale) ? st!.scale! : ds.scale,
       oct: int(st?.oct, 1, 6, ds.oct)
     }
   })
+  const steps = keys(s.steps, d.steps)
   const poolScales = Array.isArray(s.poolScales) ? s.poolScales.filter(isScale) : d.poolScales
   const poolRoots = Array.isArray(s.poolRoots) && s.poolRoots.length === 12 ? s.poolRoots.map(Boolean) : d.poolRoots
   return {
@@ -132,6 +150,7 @@ export function sanitizeKeySeq(raw: unknown, fallback: SoniKeySeq): SoniKeySeq {
     mode: (KEY_MODES as string[]).includes(s.mode as string) ? (s.mode as SoniKeyMode) : d.mode,
     rate: isSoniRate(s.rate) ? s.rate : d.rate,
     freeMs: num(s.freeMs, 250, 300000, d.freeMs),
+    freeVary: num(s.freeVary, 0, 1, d.freeVary),
     chance: num(s.chance, 0, 1, d.chance),
     glide: num(s.glide, 0, 4, d.glide),
     returnHome: typeof s.returnHome === 'boolean' ? s.returnHome : d.returnHome,
@@ -155,7 +174,10 @@ export function sanitizeKeySeq(raw: unknown, fallback: SoniKeySeq): SoniKeySeq {
     pivDir: s.pivDir === 'up' || s.pivDir === 'down' ? s.pivDir : 'random',
     picSource: s.picSource === 'cuts' ? 'cuts' : 'color',
     picHold: num(s.picHold, 0, 120, d.picHold),
-    picRange: num(s.picRange, 0, 1, d.picRange)
+    picRange: num(s.picRange, 0, 1, d.picRange),
+    picKeys: s.picKeys === 'list' ? 'list' : 'pool',
+    picSteps: keys(s.picSteps, d.picSteps),
+    picLen: int(s.picLen, 1, 8, d.picLen)
   }
 }
 

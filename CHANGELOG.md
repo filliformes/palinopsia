@@ -5,6 +5,44 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Added
+
+- **The key sequencer's Every can move.** In free time, **every** has Sonify's M (a
+  modulator or a Meta knob : the `keyEvery` target, 0..1 on the slider's own log map,
+  250 ms to 5 min, so a swing moves it by ratios) and its readout and thumb follow the
+  modulation; **vary** (`freeVary`, 0..1) draws each wait between Every / 4^vary and
+  Every x 4^vary, even in log (as many shorter waits as longer). A modulated Every
+  stretches the wait running from the last change. The wait running shows beside the
+  key. Measured, Every 1 s : vary off 0.97 to 1.04 s (frame grain); vary 1, twenty waits
+  from 0.32 to 3.77 s (mean 1.16 s); M1 bound : readout 2.0 → 6.4 → 4.8 s, waits down
+  to 0.3 s as it swung. OSC `/opsia/sonify/keyseq/every` (seconds) and `/vary`.
+- **Picture on your own keys** (Picture → **keys** : pool · list) : up to 8 written keys
+  (`picSteps`, `picLen`, their own list, apart from List mode's), the picture picking
+  the nearest : each key where its root sits on the circle of fifths (its color) and
+  its scale among the list's moods, spread bright to dark (its light); a grey picture
+  keeps the root where the list allows; the key it is on stays until another is
+  clearly nearer (0.08). Drawn as dots on Picture's wheel. The dice draws new keys for
+  it from the pool. Measured, four written keys over 40 s : 11 changes, all four
+  visited, none outside the list. OSC `/opsia/sonify/keyseq/keys`.
+- **The sequencers fold** : a chevron left of each sequencer's play button folds the
+  card to its header (it keeps playing); remembered on this machine (`Shell`'s
+  `collapsed` / `onCollapse`, the store's `collapsed` sections `soni-fxseq`,
+  `soni-keyseq`).
+
+### Changed
+
+- **Sonify's modulation works like the Inspector's.** The M chip shows the modulators
+  bound (M1·3) and a right-click clears all its modulation (bindings and Meta knobs);
+  a click opens the Inspector's own binding row (`AssignRow` : M1–8 with depth and
+  mode, the Meta knobs) right under its parameter, where the old mini panel opened at
+  the top of the column, out of sight under a long voice or a sequencer. A modulated
+  slider's number now moves with the modulation (`LiveNum`, on the shared live loop;
+  only its thumb did), so does the Transmission's line rate. A new Sonify binding
+  still swings around the value (replace : `assignMod` picks it for Sonify targets,
+  which a multiply on a zero base would leave still).
+- **The Modulation strip's count** (bindings in use of 32) sits under its name, so the
+  bindings start at the row's left edge; red when the matrix is full.
+
 ### Docs
 
 - The site's **New in 1.2.9** (no more clicks, sharp enlargement, empty layers, steadier

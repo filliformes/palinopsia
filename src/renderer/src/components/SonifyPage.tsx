@@ -8,7 +8,7 @@
 
 import { isValidElement, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
 import { Blink } from './Blink'
-import type { ModTarget, SonifyModParam } from '@shared/types'
+import type { SonifyModParam } from '@shared/types'
 import { registerLiveOverlay } from './liveOverlay'
 import { randomSonify, randomizeVoice, suggestSonify, type SoniVoiceKey } from '../audio/autoSonify'
 import { defaultSoniConfig, ringFreqs, SCALE_LABEL, SCALE_ORDER, SCALE_SHORT, sonifyEngine, type SoniConfig } from '../audio/sonify'
@@ -26,9 +26,9 @@ function spaceLabel(param: string): string {
   return p ? `${SPACE_VOICE_LABEL[p.voice]} ${SPACE_FIELD_RANGE[p.field].label} in the room` : param
 }
 import { EqCard, GlueCard } from './SonifyEq'
-import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, CardGrip, useCardSpace, spaceGap, SUB_GAP, chip, pill, GrMeter, parseHz, parseDb, sonifyCovered } from './sonifyUi'
+import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, CardGrip, useCardSpace, spaceGap, SUB_GAP, chip, pill, GrMeter, parseHz, parseDb, sonifyCovered, LiveNum } from './sonifyUi'
 import { SONI_RATES, RATE_LABEL } from '../audio/soniClock'
-import { warnModMatrixFull } from './AutoControls'
+import { AssignRow, useBound } from './AutoControls'
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 // Voice order matches the worklet's render/filter order (mixFilter indices).
@@ -221,7 +221,7 @@ function Slider({
   // whose param has a live mod assignment turns accent2 + its thumb tracks the
   // modulator's live value (via the shared liveOverlay rAF), exactly like the
   // Inspector's modulated controls.
-  const modProps = isValidElement(mod) ? (mod.props as { param?: SonifyModParam; inactive?: boolean }) : null
+  const modProps = isValidElement(mod) ? (mod.props as { param?: SonifyModParam; inactive?: boolean; open?: boolean }) : null
   const modParam = modProps?.param
   const modInactive = !!modProps?.inactive
   const modulated = useStore((st) =>
@@ -234,6 +234,8 @@ function Slider({
     return registerLiveOverlay({ el: ref.current, key: modTargetKey({ kind: 'sonify', param: modParam }), format: (x) => String(x) })
   }, [live, modParam])
   const shown = fmt ? fmt(value) : value.toFixed(2)
+  const fmtShown = fmt ?? ((v: number): string => v.toFixed(2))
+  const modKey = modParam ? modTargetKey({ kind: 'sonify', param: modParam }) : undefined
   const [typing, setTyping] = useState<string | null>(null)
   // Shift-drag : a tenth of the speed, relative to where the drag starts (the
   // track is a hundred-odd pixels : too coarse to dial a frequency by hand)
@@ -273,7 +275,7 @@ function Slider({
     }
     setTyping(null)
   }
-  return (
+  return (<>
     <div className="flex min-w-0 items-center gap-1.5">
       {/* the label column (the Row's width) : a `lead` sits inside it, right of the
           label, so every track still starts at the same place */}
@@ -308,12 +310,25 @@ function Slider({
           className={`w-12 shrink-0 cursor-text text-right font-mono text-[9px] underline decoration-dotted underline-offset-2 ${live ? 'text-accent2' : 'text-muted'} hover:text-text`}
           title="Click to type the value"
         >
-          {shown}
+          <LiveNum liveKey={modKey} value={value} fmt={fmtShown} />
         </button>
       ) : (
-        <span className={`w-12 shrink-0 text-right font-mono text-[9px] ${live ? 'text-accent2' : 'text-muted'}`}>{shown}</span>
+        <LiveNum liveKey={modKey} value={value} fmt={fmtShown} className={`w-12 shrink-0 text-right font-mono text-[9px] ${live ? 'text-accent2' : 'text-muted'}`} />
       )}
       {mod}
+    </div>
+    {modParam && modProps?.open && !modInactive && <SonifyAssign param={modParam} />}
+  </>)
+}
+
+/** The binding row under a Sonify parameter, the Inspector's own (M1-8 with
+ *  depth and mode, the Meta knobs) : it opens where the parameter is. */
+function SonifyAssign({ param }: { param: SonifyModParam }): JSX.Element {
+  const target = { kind: 'sonify', param } as const
+  const bound = useBound(modTargetKey(target))
+  return (
+    <div className="pb-0.5">
+      <AssignRow target={target} bound={bound} />
     </div>
   )
 }
@@ -340,26 +355,36 @@ function TapSelect({ cfg, voice, onChange }: {
   )
 }
 
-/** M-binding chip for a sonify probe/pitch param : shows the bound modulator
- *  (M1..M8) or a hollow M; click opens the mini assign panel below. */
-function ModChip({ param, open, onOpen, inactive = false }: {
+/** The M chip of a Sonify parameter, the Inspector's own : the modulators bound
+ *  (M1·3), click opens the binding row under the parameter, right-click clears
+ *  every modulation on it (modulators and Meta knobs). */
+export function ModChip({ param, open, onOpen, inactive = false }: {
   param: SonifyModParam; open: boolean; onOpen: (p: SonifyModParam) => void; inactive?: boolean
 }): JSX.Element {
-  const matrix = useStore((st) => st.composition.modMatrix)
-  const key = modTargetKey({ kind: 'sonify', param })
-  const a = matrix.find((x) => modTargetKey(x.target) === key)
+  const target = { kind: 'sonify', param } as const
+  const key = modTargetKey(target)
+  const bound = useBound(key)
+  const label = PARAM_LABELS[param] ?? spaceLabel(param)
+  const clearAll = (): void => {
+    const st = useStore.getState()
+    for (const b of bound) st.removeAssignment(b.id)
+    st.composition.metaKnobs.forEach((k, i) => {
+      if (k.destinations.some((d) => modTargetKey(d) === key)) st.toggleMetaDest(i, target)
+    })
+  }
   return (
     <button
       onClick={() => { if (!inactive) onOpen(param) }}
+      onContextMenu={(e) => { e.preventDefault(); clearAll() }}
       disabled={inactive}
-      className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] transition-colors ${
+      className={`shrink-0 rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
         inactive
           ? 'bg-panel3/30 text-muted/40 cursor-default'
-          : a ? 'bg-accent/25 text-accent ring-1 ring-accent' : open ? 'bg-panel3 text-text ring-1 ring-border' : 'bg-panel3/60 text-muted hover:text-text'
+          : bound.length ? 'bg-accent/20 text-accent ring-1 ring-accent' : open ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2' : 'bg-panel3/60 text-muted hover:text-text'
       }`}
-      title={inactive ? 'Inactive while sweeping : the scan column is driven by the sweep, not this bind' : a ? `Modulated by M${a.mod + 1} (depth ${a.depth.toFixed(2)}) : click to edit` : 'Bind a modulator to this parameter'}
+      title={inactive ? 'Inactive while sweeping : the scan column is driven by the sweep, not this bind' : `Modulate ${label} : right-click clears all its modulation`}
     >
-      {a ? `M${a.mod + 1}` : 'M'}
+      M{bound.length ? bound.map((b) => b.mod + 1).join('·') : ''}
     </button>
   )
 }
@@ -384,59 +409,8 @@ const PARAM_LABELS: Partial<Record<SonifyModParam, string>> = {
   collageBank: 'Collage ring bank wet', collageDecay: 'Collage ring bank decay', collageCutoff: 'Collage ring bank cutoff',
   collageWaves: 'Collage ring bank waves', collageDetune: 'Collage ring bank detune', chordWaves: 'Chord waves',
   chordNoise: 'Chord noise', chordAir: 'Chord air',
-  fxSend: 'FX send', fxReverb: 'FX reverb mix', fxDelay: 'FX delay mix'
-}
-
-/** Mini assign panel : modulator select + depth + mode + clear, writing the
- *  same mod-matrix the Inspector's M buttons use. */
-function AssignMini({ param, onClose }: { param: SonifyModParam; onClose: () => void }): JSX.Element {
-  const matrix = useStore((st) => st.composition.modMatrix)
-  const assignMod = useStore((st) => st.assignMod)
-  const removeAssignment = useStore((st) => st.removeAssignment)
-  const setAssignmentDepth = useStore((st) => st.setAssignmentDepth)
-  const setAssignmentMode = useStore((st) => st.setAssignmentMode)
-  const target: ModTarget = { kind: 'sonify', param }
-  const key = modTargetKey(target)
-  const a = matrix.find((x) => modTargetKey(x.target) === key)
-  return (
-    <section className="rounded border border-accent/40 bg-panel2 px-2 py-1.5">
-      <div className="mb-1 flex items-center gap-2">
-        <span className="text-[10px] font-semibold">modulate</span>
-        <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted">{PARAM_LABELS[param] ?? spaceLabel(param)}</span>
-        <button onClick={onClose} className="text-[11px] text-muted hover:text-text" title="Close">x</button>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <select
-          className="input select-compact text-[10px]"
-          value={a ? a.mod : -1}
-          onChange={(e) => {
-            const mi = Number(e.target.value)
-            if (a) removeAssignment(a.id)
-            // Matrix cap reached : the select snaps back, and says why.
-            if (mi >= 0 && !assignMod(mi, target, a?.depth ?? 0.5, a?.mode ?? 'replace')) warnModMatrixFull()
-          }}
-          title="Which modulator drives this parameter"
-        >
-          <option value={-1}>off</option>
-          {[0, 1, 2, 3, 4, 5, 6, 7].map((m) => <option key={m} value={m}>M{m + 1}</option>)}
-        </select>
-        <input
-          type="range" min={-1} max={1} step={0.01} value={a?.depth ?? 0.5}
-          disabled={!a}
-          onChange={(e) => a && setAssignmentDepth(a.id, Number(e.target.value))}
-          onDoubleClick={() => a && setAssignmentDepth(a.id, 0.5)}
-          className="min-w-0 flex-1 accent-accent"
-          title={`Depth ${(a?.depth ?? 0.5).toFixed(2)} (negative inverts). Double-click : 0.5`}
-        />
-        <button
-          disabled={!a}
-          onClick={() => a && setAssignmentMode(a.id, a.mode === 'multiply' ? 'replace' : 'multiply')}
-          className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${a?.mode === 'multiply' ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
-          title="Replace = swing around the base value; Multiply = VCA-scale it"
-        >{a?.mode === 'multiply' ? 'mult' : 'swing'}</button>
-      </div>
-    </section>
-  )
+  fxSend: 'FX send', fxReverb: 'FX reverb mix', fxDelay: 'FX delay mix',
+  keyEvery: 'Key sequencer every'
 }
 
 function VoiceShell({ title, on, hint, onToggle, onDice, children }: {
@@ -484,8 +458,12 @@ function SonifySequencer({ presets, onWidth }: { presets: string[]; onWidth: (dx
   const msToT = (ms: number): number => Math.max(0, Math.min(1, Math.log(ms / 80) / Math.log(R)))
   const fmtMs = (ms: number): string => (ms >= 1000 ? (ms / 1000).toFixed(ms >= 3000 ? 1 : 2) + 's' : Math.round(ms) + 'ms')
   const free = (sq.rate ?? 'free') === 'free'
+  const folded = useStore((s) => !!s.collapsed['soni-fxseq'])
+  const toggleSection = useStore((s) => s.toggleSection)
   return (
     <Shell
+      collapsed={folded}
+      onCollapse={() => toggleSection('soni-fxseq')}
       title="Effects sequencer"
       hint="Steps through the sound : each step sets which voices play, or loads a whole saved Sonify preset. On the composition tempo (in phase with the key sequencer) or free time."
       on={sq.on}
@@ -619,6 +597,9 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   const chip = (p: SonifyModParam, inactive = false): JSX.Element => (
     <ModChip param={p} open={assign === p} onOpen={(x) => setAssign(assign === x ? null : x)} inactive={inactive} />
   )
+  // The binding row for chips that sit in a row of their own (not a slider's) :
+  // under that row, when one of its chips is open.
+  const assignBox = (...ps: SonifyModParam[]): JSX.Element | null => (assign && ps.includes(assign) ? <SonifyAssign param={assign} /> : null)
 
   const set = (next: SoniConfig): void => setSonify(next)
   // Every write starts from the store as it is NOW, not from this render's
@@ -1192,8 +1173,6 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             cfg.on ? '' : 'opacity-[0.65]'
           }`}
         >
-          {/* (a Space voice's assign box opens under that voice, in the space view) */}
-          {assign && !(view === 'space' && assign.startsWith('space.')) && <AssignMini param={assign} onClose={() => setAssign(null)} />}
           {view === 'mixer' && (
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-1.5 px-2">
@@ -1235,11 +1214,11 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             </div>
           )}
           {/* The sequencers have their own view (they used to sit under the mixer). */}
-          {view === 'space' && <SpacePanel chip={(p) => chip(p)} assign={assign} renderAssign={(p) => <AssignMini param={p} onClose={() => setAssign(null)} />} />}
+          {view === 'space' && <SpacePanel chip={(p) => chip(p)} assign={assign} renderAssign={(p) => <SonifyAssign param={p} />} />}
           {view === 'seq' && (
             <div className="flex flex-col gap-2.5">
               <SonifySequencer presets={presetList} onWidth={onSeqWidth} />
-              <SonifyKeySequencer onWidth={onSeqWidth} />
+              <SonifyKeySequencer onWidth={onSeqWidth} chip={(p) => chip(p)} assignBox={assignBox} />
             </div>
           )}
           {view === 'voices' && (<>
@@ -1264,6 +1243,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
               <span className="ml-auto" />
               {chip('spectraX', cfg.spectra.sweepOn)}
             </Row>
+            {assignBox('spectraX')}
             {!cfg.spectra.sync && cfg.spectra.sweepOn && (
               <Slider label="rate" value={cfg.spectra.sweepHz} min={0.02} max={4} neutral={0.25} fmt={(v) => v.toFixed(2) + 'Hz'} onChange={(v) => pv('spectra', { sweepHz: v })} mod={chip('spectraSweep')} title="How fast the scan line sweeps across the frame (sweeps per second)" />
             )}
@@ -1481,12 +1461,14 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
               >&#9834;</button>
               {chip('rasterPitch')}
             </Row>
+            {assignBox('rasterPitch')}
             <Row label="rect">
               <span className="font-mono text-[9px] text-muted">x</span>{chip('rasterX')}
               <span className="font-mono text-[9px] text-muted">y</span>{chip('rasterY')}
               <span className="font-mono text-[9px] text-muted">w</span>{chip('rasterW')}
               <span className="font-mono text-[9px] text-muted">h</span>{chip('rasterH')}
             </Row>
+            {assignBox('rasterX', 'rasterY', 'rasterW', 'rasterH')}
             <Slider label="smooth" value={cfg.raster.smooth} min={0} max={1} neutral={0} onChange={(v) => pv('raster', { smooth: v })} mod={chip('rasterSmooth')} title="Rounds the scanned waveform : 0 = the hard, aliased digital register, higher = softer" />
             <Slider
               label="tone" value={cfg.raster.tone ?? 0.6} min={0} max={1} neutral={0.6}
@@ -1516,7 +1498,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 />
               )}
               {!cfg.sstv.sync && (
-                <span className="w-10 shrink-0 text-right font-mono text-[9px] text-muted">{cfg.sstv.lineHz.toFixed(1)}/s</span>
+                <LiveNum liveKey={modTargetKey({ kind: 'sonify', param: 'sstvLine' })} value={cfg.sstv.lineHz} fmt={(v) => `${v.toFixed(1)}/s`} className="w-10 shrink-0 text-right font-mono text-[9px] text-muted" />
               )}
               {!cfg.sstv.sync && chip('sstvLine')}
               <button
@@ -1525,6 +1507,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 title={`Sync : one scan line per 16th note @ ${bpm} BPM (the sync tick becomes the clock)`}
               >{cfg.sstv.sync ? `sync 1/16 @ ${bpm}` : 'sync'}</button>
             </Row>
+            {assignBox('sstvLine')}
             <Slider label="transpose" value={cfg.sstv.dev} min={0.25} max={2} neutral={1} fmt={(v) => v.toFixed(2) + 'x'} onChange={(v) => pv('sstv', { dev: v })} mod={chip('sstvDev')} title="Scales every frequency of the transmission : 1 = the real slow-scan TV pitches (black 1500 Hz to white 2300 Hz)" />
             <Slider label="tick" value={cfg.sstv.syncLev} min={0} max={1} neutral={0.5} onChange={(v) => pv('sstv', { syncLev: v })} title="How loud the 1200 Hz sync tick is : the transmission's metronome between lines" />
             <Slider label="gain" value={cfg.sstv.gain} min={0} max={1} neutral={0.4} onChange={(v) => pv('sstv', { gain: v })} title="How loud the Transmission voice is (before its mixer channel)" />
@@ -1567,6 +1550,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
               )}
               {cfg.filter.sweepOn && chip('filterSweep')}
             </Row>
+            {assignBox('filterX', 'filterSweep')}
             <Row label="path">
               <select
                 className="input select-compact min-w-0 flex-1 text-[10px]"

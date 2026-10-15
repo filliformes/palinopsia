@@ -582,7 +582,7 @@ slider (rotate, spin, feather, the panorama's and the screen's own; see
 is written straight to the compositor at frame rate, never through React re-renders.
 
 The matrix holds **32** bindings (bounded, so a patch stays readable; the Meta
-knobs are outside it). Randomize, Generate and a World's audio route use at most 12
+knobs are outside it); how many are in use shows under the Modulation strip's name. Randomize, Generate and a World's audio route use at most 12
 of them, so a randomized session keeps the motion it always had and the rest is
 yours. Binding a new one when it is full first lets go of
 bindings left pointing at a removed effect or an emptied source; if it is still
@@ -1280,7 +1280,8 @@ play/stop is MIDI-learnable (the Sonify-sequence transport).
 Both sequencer cards resize : drag the bar at a card's foot down for more air between
 its rows (up for less; double-click goes back), and its left corner sideways to widen the
 sequencers' column, which keeps its own width apart from the voices' (the column's
-edge handle works too). Remembered on this machine.
+edge handle works too). Each folds to its header with the chevron left of its play
+button, and keeps playing folded. Remembered on this machine.
 
 **Key sequencer** : under it, a second sequencer composes the **root, scale and
 octave** of the whole instrument over time, so a piece can modulate on its own. Each
@@ -1290,7 +1291,12 @@ the affinity constellation (closer = more shared notes, bigger = likelier), the 
 note clock and degrees, the picture's hue wheel and moods. On
 each tick of its clock (**rate** : 1 beat … 16 bars of the composition tempo, or free
 time : 250 ms to 5 min, 5 s by default, the default rate), a **chance** decides whether the key changes, and an optional **Euclid** rhythm
-(pulses / steps / rotation) decides which ticks may change it. Five **modes** :
+(pulses / steps / rotation) decides which ticks may change it. In free time, **every**
+has its M (a modulator or a Meta knob swings it, along its own log scale, and its
+number moves with it) and **vary** draws each wait at random around it, from a
+quarter of Every to four times it at full (as many shorter waits as longer ones) :
+the changes stop falling at a steady pace. The wait running shows beside the key
+while either is on. Five **modes** :
 
 | Mode | The next key |
 |---|---|
@@ -1298,7 +1304,7 @@ time : 250 ms to 5 min, 5 s by default, the default rate), a **chance** decides 
 | **Circle** | a walk on the circle of fifths : **flats ↔ sharps** lean, a **leap** of 1 to 3 fifths, and a **relative** % of hops to the relative major / minor |
 | **Affinity** | chosen by the notes it shares with this one, **jarring ↔ smooth**; **no repeat** skips the last few keys, **tour** visits the whole pool before anything comes back |
 | **Pivot** | **same notes** on a new tonic (C major, D dorian, E phrygian, F lydian, G mixolydian, A minor, B locrian) or the **same tonic** in a **brighter** / **darker** scale (all 18, by brightness, from lydian to the diminished) |
-| **Picture** | read off the picture : its **color** picks the root around the circle of fifths (a grey picture keeps it), its brightness the mood (bright lydian … dark locrian and the diminished), on the clock or at each scene **cut**, never faster than **hold**. **range** reads them against the piece's own : a frame's overall color is its footage's cast and hardly moves (a warm piece sat on C, G and D), so at 100 % the colors and light of the last 40 s or so are remembered and where the picture sits within them is spread over every root and every mood (a still picture stays, a shift of color walks the circle, a new palette moves far); 0 = the color wheel and the light as they are. A key changes only once the reading is clearly past the border between two. The visual shows the palette as an arc, the picture's own color as a tick, and the dot where the key reads it |
+| **Picture** | read off the picture : its **color** picks the root around the circle of fifths (a grey picture keeps it), its brightness the mood (bright lydian … dark locrian and the diminished), on the clock or at each scene **cut**, never faster than **hold**. **range** reads them against the piece's own : a frame's overall color is its footage's cast and hardly moves (a warm piece sat on C, G and D), so at 100 % the colors and light of the last 40 s or so are remembered and where the picture sits within them is spread over every root and every mood (a still picture stays, a shift of color walks the circle, a new palette moves far); 0 = the color wheel and the light as they are. A key changes only once the reading is clearly past the border between two. The visual shows the palette as an arc, the picture's own color as a tick, and the dot where the key reads it. **keys** : the **pool** (every root ticked with every scale ticked), or a **list** of up to 8 keys you write (root, scale, octave) : the picture then picks the nearest of them, each one where its root sits on the circle of fifths and its scale among the list's moods (spread from bright to dark), drawn as dots on the wheel |
 
 The generative modes choose from a **pool** of roots (12 toggles) and scales (8 chips).
 **Glide** (0 … 4 s) slides every pitch to the new key instead of jumping : Spectra,
@@ -1310,7 +1316,8 @@ sequencer's preset steps keep the key. Both sequencers read **one Sonify beat
 clock** : one started while the other runs on the beat waits for the next bar, so
 they stay in phase. The key sequence travels with the session (an installation
 starts it again), its play/stop is MIDI-learnable, and OSC drives it :
-`/opsia/sonify/keyseq/on`, `/next` (a change now), `/mode`, `/glide`, `/chance`.
+`/opsia/sonify/keyseq/on`, `/next` (a change now), `/mode`, `/glide`, `/chance`,
+`/every` (seconds) and `/vary`, and Picture's `/keys` (pool or list).
 
 **✨ Auto-voice** : one button reads the session's actual vocabulary : which
 generators, nodes and FX are live on which layers, and picks the fitting
@@ -1329,17 +1336,21 @@ radius/pitch, the raster rect and its pitch) but **most timbre & motion params**
 decay, raster smooth/tone, SSTV line/transpose, filter resonance/sweep, chord voices/
 tone/spread/swell/waves/noise/air, the Collage voice's resonance/ring/width and its Ring bank's
 wet/decay/cutoff/waves/detune, the FX send/reverb/delay, and where every voice sits in
-the room ([Space](#space--the-voices-in-the-room) : az, el, width, span, spin) : are **modulation targets**. Bind M1–M8
+the room ([Space](#space--the-voices-in-the-room) : az, el, width, span, spin), and the key sequencer's **every** : are **modulation targets**. Bind M1–M8
 or a Meta knob via the M chips on the Sonify strips, and the mod-matrix stirs the
 listening the same way it stirs the image (overlays show the modulated probes
-live). The sound patch **travels with sessions and scenes** : recalling a scene
+live). The chips are the Inspector's : one shows the modulators bound (M1·3), a click
+opens the same binding row (M1–8 with depth and mode, the Meta knobs) right under its
+parameter, a right-click clears all its modulation; a modulated slider's number moves
+with the modulation. A new binding swings around the value (replace), as Sonify
+always bound them. The sound patch **travels with sessions and scenes** : recalling a scene
 switches the sonification with it (the on-switch and output device stay
 machine-local). And the whole page speaks **OSC** under `/opsia/sonify/…`
 (on/master/root/**rootoct**/scale + per-voice on·gain·pan·probes·pitches·params,
 the **Signal** voice `/signal/{on,gain,pan,wave,decay,tone,fm,heads,rate,sync,steps,spread,thresh,density,path,snap}`, the **Chord** bank, the **Collage** voice `/collage/{on,gain,resonance,ring,harmonics,width,input,hp,lp,hpslope,lpslope,comp,ringin}` and its Ring bank `/collage/{bank,send,decay,choke,cutoff,peak,slope,tone,tilt,waves,wavesrate,wavessync,noise,noiserate,noisesync,detune,voicing}`, the Chord's `/chord/{waves,wavesrate,wavessync,noise,air}`, and the **FX** tail `/fx/{send,delaytime,feedback,size,decay,
 damp,reverbmode,freeze,…}`, plus the taps `/tap/{a,b}` (0 master, 1-4 a layer), each
 voice's `/tap` and `/looct` `/hioct`, `/spectra/sync`, `/orbit/shape`, `/filter/loop`, the
-output **glue** `/glue/{on,amount,voice}` and the key sequencer `/keyseq/{on,next,mode,glide,chance,range,hold}`;
+output **glue** `/glue/{on,amount,voice}` and the key sequencer `/keyseq/{on,next,mode,glide,chance,range,hold,every,vary,keys}`;
 `/scale` takes a name (`harmonic minor`, `dimwh`) or an index, the first eight as they always were) :
 advertised over OSCQuery and streamed outbound like everything else. Index addresses
 (the root octave, the reading paths, the Orbit shape, the chord's voices, the delay and

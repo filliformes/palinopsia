@@ -13,23 +13,26 @@
 //   picture  the picture's color picks the root around the circle and its
 //            brightness the mood (bright lydian … dark diminished), read
 //            against the piece's own palette and light (RANGE), on the clock
-//            or at each scene cut
+//            or at each scene cut; from the pool, or from keys written for it
 // The change is applied like any key change (setSonify, never in undo), with a
 // glide : the engine slides its pitches to the new key (sonifyEngine.glideNext).
 // A key changed by hand (or OSC, or a preset) while it runs becomes its new
-// home and the walk carries on from there.
+// home and the walk carries on from there. In free time, EVERY can be swung by
+// a modulator (the keyEvery target) and VARY draws each wait around it.
 
 import { useStore } from '../store'
 import { runSilently } from '../undo'
 import { visionBus } from '../engine/visionIn'
+import { registerKeyEveryBase, sonifyModValues } from '../engine/modulation'
 import { sameNotes, sonifyEngine, type SoniConfig } from './sonify'
 import { RATE_BEATS, soniClockStart } from './soniClock'
 import { advanceDrift } from './soniSeq'
 import {
   BRIGHT, DIATONIC, affinity, diatonicRing, fifthsPos, isScale, keyId, mod12, rootAtFifths, sameKey, euclidHit,
-  type Key
+  everyToPos, posToEvery, varyFactor, type Key
 } from './soniKeyModel'
-import type { SoniKeySeq } from '@shared/types'
+import type { SoniKeySeq, SoniKeyStep } from '@shared/types'
+import type { SoniScale } from './sonify'
 
 const rt = {
   started: false,
@@ -39,6 +42,7 @@ const rt = {
   nextMs: 0,
   periodBeats: 0, // the tick period last used (a rate change re-aligns)
   periodMs: 0,
+  jit: 1, // VARY : this wait's factor on EVERY
   tick: 0, // ticks since start (the Euclidean rhythm counts them)
   cur: -1, // List : the step playing
   dir: 1, // List bounce : the direction
@@ -52,6 +56,20 @@ const rt = {
 }
 
 const keyOf = (c: SoniConfig): Key => ({ root: mod12(c.root), scale: c.scale, oct: c.rootOct ?? 3 })
+
+// A modulator on EVERY swings it around the slider's place (the mod matrix reads
+// that place here), along the slider's log map.
+registerKeyEveryBase(() => everyToPos(useStore.getState().soniKeySeq.freeMs))
+/** EVERY now (ms) : the slider's, or where a modulator has swung it. */
+function everyMs(ks: SoniKeySeq): number {
+  const m = sonifyModValues.get('keyEvery')
+  return m !== undefined && Number.isFinite(m) ? posToEvery(m) : ks.freeMs
+}
+
+/** The first `len` written keys (List's, or Picture's own). */
+export function listKeys(steps: SoniKeyStep[], len: number): Key[] {
+  return steps.slice(0, Math.max(1, Math.min(8, len))).map((s) => ({ root: mod12(s.root), scale: isScale(s.scale) ? s.scale : 'minor', oct: s.oct }))
+}
 
 /** The pool's roots (all twelve if none is ticked) and its scales. */
 export function pool(ks: SoniKeySeq): { roots: number[]; scales: Key['scale'][] } {
@@ -271,8 +289,9 @@ export function pictureView(range: number): PictureView {
  *  past the middle between two (no flicker on a border). */
 export function pictureKey(ks: SoniKeySeq, cur: Key): Key | null {
   if (!visionBus.hasData() || !pic.init) return null
-  const { roots, scales } = pool(ks)
   const v = pictureView(ks.picRange ?? 1)
+  if (ks.picKeys === 'list') return pictureListKey(ks, cur, v)
+  const { roots, scales } = pool(ks)
   let root = cur.root
   if (v.sat > 0.08) {
     const pos = v.effHue * 12
@@ -289,6 +308,46 @@ export function pictureKey(ks: SoniKeySeq, cur: Key): Key | null {
     scale = ic >= 0 && x > ic - 0.3 && x < ic + 1.3 ? cur.scale : moods[Math.max(0, Math.min(moods.length - 1, Math.floor(x)))]
   }
   return { root, scale, oct: cur.oct }
+}
+
+/** Picture's own keys, the moods among them from bright to dark (chromatic has
+ *  none), and where each mood sits on the light : spread evenly over it, like
+ *  the pool's moods. */
+export function pictureList(ks: SoniKeySeq): { keys: Key[]; moods: SoniScale[]; light: (s: SoniScale) => number } {
+  const keys = listKeys(ks.picSteps, ks.picLen)
+  const moods = BRIGHT.filter((s) => s !== 'chromatic' && keys.some((k) => k.scale === s))
+  const light = (s: SoniScale): number => {
+    const i = moods.indexOf(s)
+    return i < 0 ? 0.5 : 1 - (i + 0.5) / moods.length
+  }
+  return { keys, moods, light }
+}
+
+/** Picture from written keys (KEYS list) : only the keys written, each one where
+ *  its root sits on the circle of fifths (the color) and where its scale sits
+ *  among the list's moods (the light); the reading picks the nearest. A grey
+ *  picture keeps the root where the list allows, and the key it is on stays
+ *  until another is clearly nearer (no flicker between two). */
+function pictureListKey(ks: SoniKeySeq, cur: Key, v: PictureView): Key | null {
+  const { keys, light } = pictureList(ks)
+  if (!keys.length) return null
+  const colored = v.sat > 0.08
+  const dist = (k: Key): number => {
+    let dh: number
+    if (colored) {
+      let x = fifthsPos(k.root) / 12 - v.effHue
+      x -= Math.round(x)
+      dh = Math.abs(x) * 2 // 0 (its color) .. 1 (the far side of the wheel)
+    } else dh = k.root === cur.root ? 0 : 0.5
+    return Math.hypot(dh, light(k.scale) - v.effBri)
+  }
+  let best = keys[0], bestD = Infinity
+  for (const k of keys) {
+    const d = dist(k)
+    if (d < bestD) { bestD = d; best = k }
+  }
+  const here = keys.find((k) => k.root === cur.root && k.scale === cur.scale)
+  return here && dist(here) < bestD + 0.08 ? here : best
 }
 
 function choose(ks: SoniKeySeq, cur: Key): Key | null {
@@ -322,8 +381,9 @@ function start(ks: SoniKeySeq, cur: Key, now: number): void {
     const sq = useStore.getState().soniSeq
     rt.startBeat = soniClockStart(sq.on && (sq.rate ?? 'free') !== 'free')
   } else {
-    rt.nextMs = now + ks.freeMs
-    rt.periodMs = ks.freeMs
+    rt.jit = varyFactor(ks.freeVary)
+    rt.periodMs = everyMs(ks) * rt.jit
+    rt.nextMs = now + rt.periodMs
     if (ks.mode === 'list') apply(nextList(ks), ks.glide)
   }
 }
@@ -342,13 +402,19 @@ function due(ks: SoniKeySeq, now: number, beats: number): boolean {
   if (ks.rate === 'free') {
     rt.periodBeats = 0
     rt.waiting = false
-    if (rt.periodMs !== ks.freeMs) {
-      // a new period stretches the one running; from a beat rate, it starts now
-      rt.nextMs = rt.periodMs ? rt.nextMs - rt.periodMs + ks.freeMs : now + ks.freeMs
-      rt.periodMs = ks.freeMs
+    const want = everyMs(ks) * rt.jit
+    if (rt.periodMs !== want) {
+      // a new period (the slider, a modulator) stretches the wait running, from
+      // the last change; from a beat rate, it starts now
+      rt.nextMs = rt.periodMs ? rt.nextMs - rt.periodMs + want : now + want
+      rt.periodMs = want
     }
     if (now < rt.nextMs) return false
-    rt.nextMs = now - rt.nextMs > ks.freeMs * 2 ? now + ks.freeMs : rt.nextMs + ks.freeMs
+    // the next wait draws its own length (VARY)
+    rt.jit = varyFactor(ks.freeVary)
+    const next = everyMs(ks) * rt.jit
+    rt.nextMs = now - rt.nextMs > next * 2 ? now + next : rt.nextMs + next
+    rt.periodMs = next
     return true
   }
   rt.periodMs = 0
@@ -424,9 +490,15 @@ export function keySeqNext(fresh = false): void {
   if (fresh) {
     rt.recent = [keyId(cur)]
     rt.visited = new Set([keyId(cur)])
-    const { roots, scales } = pool(ks)
-    next = { root: pick(roots), scale: pick(scales), oct: cur.oct }
-    if (sameKey(next, cur)) next = nextAffinity({ ...ks, affSmooth: 0 }, cur)
+    if (ks.mode === 'picture' && ks.picKeys === 'list') {
+      // Picture on its own keys : any other one of them
+      const others = pictureList(ks).keys.filter((k) => !sameKey(k, cur))
+      next = others.length ? pick(others) : null
+    } else {
+      const { roots, scales } = pool(ks)
+      next = { root: pick(roots), scale: pick(scales), oct: cur.oct }
+      if (sameKey(next, cur)) next = nextAffinity({ ...ks, affSmooth: 0 }, cur)
+    }
   } else next = choose(ks, cur)
   if (next && !sameKey(next, cur)) apply(next, ks.glide)
 }
@@ -434,6 +506,13 @@ export function keySeqNext(fresh = false): void {
 /** What the walk remembers (the visual's trail and the keys it rules out). */
 export function keySeqMemory(): { recent: string[]; visited: ReadonlySet<string>; started: boolean } {
   return { recent: rt.recent, visited: rt.visited, started: rt.started }
+}
+
+/** The wait running now in free time (ms : EVERY as modulated, times VARY's
+ *  draw), or 0 when the clock is not on free time. */
+export function keySeqWaitMs(): number {
+  const ks = useStore.getState().soniKeySeq
+  return ks.on && rt.started && ks.rate === 'free' ? rt.periodMs : 0
 }
 
 /** The page's readout : where the clock stands toward the next change (0..1),

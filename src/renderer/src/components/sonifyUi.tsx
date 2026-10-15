@@ -4,9 +4,10 @@
 // readout, a −/+ stepper and the little icon buttons (dice, reset). The Voices
 // view is the reference look : change it here, every view follows.
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useStore } from '../store'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { registerLiveOverlay } from './liveOverlay'
 
 /** A theme color variable ("r g b"), read once per theme : read every frame,
  *  getComputedStyle forced a style recalculation after the meters had written
@@ -201,7 +202,7 @@ export function Row({ label, children, hint }: { label: string; children: ReactN
  *  card's own buttons on the right. `open` shows the body (a voice hides it
  *  while off; a sequencer keeps it open to be edited while stopped). */
 export function Shell({
-  title, hint, on, onToggle, toggleText = ['● on', '○ off'], toggleTitle, midiId, lead, right, open, roomy, space, foot, children
+  title, hint, on, onToggle, toggleText = ['● on', '○ off'], toggleTitle, midiId, lead, right, open, roomy, space, foot, collapsed = false, onCollapse, children
 }: {
   title: string
   hint?: string
@@ -219,12 +220,20 @@ export function Shell({
   space?: number
   // Under the rows : the sequencer's resize grip.
   foot?: ReactNode
+  // A card that folds to its header (the sequencers) : the chevron left of the pill.
+  collapsed?: boolean
+  onCollapse?: () => void
   children?: ReactNode
 }): JSX.Element {
-  const gap = space !== undefined ? spaceGap(space) : undefined
+  const gap = space !== undefined && !collapsed ? spaceGap(space) : undefined
   return (
     <section className={`rounded border transition-colors ${roomy ? 'px-3 pt-2.5 pb-1' : 'px-2 py-1.5'} ${on ? 'border-accent/40 bg-panel2' : 'border-border bg-panel2/40'}`}>
-      <div className={`flex min-w-0 items-center gap-2 ${roomy ? 'mb-2.5' : 'mb-1'}`} style={gap !== undefined ? { marginBottom: Math.max(6, gap + 2) } : undefined}>
+      <div className={`flex min-w-0 items-center gap-2 ${collapsed ? (roomy ? 'mb-1.5' : '') : roomy ? 'mb-2.5' : 'mb-1'}`} style={gap !== undefined ? { marginBottom: Math.max(6, gap + 2) } : undefined}>
+        {onCollapse && (
+          <button onClick={onCollapse} className="-mr-1 shrink-0 px-0.5 font-mono text-[9px] text-muted hover:text-accent" title={collapsed ? `Show the ${title}` : `Fold the ${title} to its header (it keeps playing)`}>
+            <span className={`inline-block transition-transform ${collapsed ? '' : 'rotate-90'}`}>▶</span>
+          </button>
+        )}
         {onToggle && (
           <span className="relative flex shrink-0">
             {midiId && <MidiLearnOverlay id={midiId} />}
@@ -239,10 +248,10 @@ export function Shell({
         <span className="min-w-0 flex-1" />
         {right}
       </div>
-      {(open ?? on) && children && (
+      {!collapsed && (open ?? on) && children && (
         <div data-rows className={`flex flex-col ${roomy ? 'gap-2' : 'gap-1'}`} style={gap !== undefined ? { gap } : undefined}>{children}</div>
       )}
-      {foot}
+      {!collapsed && foot}
     </section>
   )
 }
@@ -326,4 +335,39 @@ export function Stepper({ value, min, max, onChange, title, suffix }: {
       <button onClick={() => onChange(Math.min(max, value + 1))} className="rounded bg-panel3/60 px-1 font-mono text-[10px] leading-4 text-muted hover:text-text">+</button>
     </span>
   )
+}
+
+/** A readout that follows its parameter's live modulation (a modulator or a Meta
+ *  knob : the number moves with it, as in the Inspector), and shows the stored
+ *  value otherwise. `liveKey` : the parameter's key in the live map (soni:<param>).
+ *  Written straight to the DOM by the shared live loop, never through React. */
+export function LiveNum({ liveKey, value, fmt, className, title }: {
+  liveKey?: string; value: number; fmt: (v: number) => string; className?: string; title?: string
+}): JSX.Element {
+  const ref = useRef<HTMLSpanElement>(null)
+  const st = useRef({ value, fmt, live: false })
+  st.current.value = value
+  st.current.fmt = fmt
+  // the stored value, whenever it changes and nothing modulates it
+  useLayoutEffect(() => {
+    if (ref.current && !st.current.live) ref.current.textContent = fmt(value)
+  })
+  useEffect(() => {
+    const el = ref.current
+    if (!liveKey || !el) return
+    return registerLiveOverlay({
+      key: liveKey,
+      apply: (v) => {
+        st.current.live = true
+        const t = st.current.fmt(v)
+        if (el.textContent !== t) el.textContent = t
+      },
+      idle: () => {
+        if (!st.current.live) return
+        st.current.live = false
+        el.textContent = st.current.fmt(st.current.value)
+      }
+    })
+  }, [liveKey])
+  return <span ref={ref} className={className} title={title} />
 }

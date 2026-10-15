@@ -1019,7 +1019,10 @@ export const SONIFY_MOD_DESCS: Record<string, { min: number; max: number; def: n
   chordAir: { min: 0, max: 1, def: 0.4 },
   fxSend: { min: 0, max: 1, def: 0 },
   fxReverb: { min: 0, max: 1, def: 0.6 },
-  fxDelay: { min: 0, max: 1, def: 0.35 }
+  fxDelay: { min: 0, max: 1, def: 0.35 },
+  // the key sequencer's Every on its slider's log map (0 = 250 ms, 1 = 5 min;
+  // the default 0.42 is 5 s) : a swing moves it by ratios, as the ear hears time
+  keyEvery: { min: 0, max: 1, def: 0.4225 }
 }
 // Space : each voice's place (space.<voice>.<field>), in the same overlay. The
 // space engine reads the values and registers the bases (store.space).
@@ -1039,6 +1042,11 @@ export function registerSonifyModBase(fn: (param: string) => number | undefined)
 let spaceModBase: ((param: string) => number | undefined) | null = null
 export function registerSpaceModBase(fn: (param: string) => number | undefined): void {
   spaceModBase = fn
+}
+// The key sequencer's Every : its base is the slider's place (soniKeySeq.ts).
+let keyEveryBase: (() => number) | null = null
+export function registerKeyEveryBase(fn: () => number): void {
+  keyEveryBase = fn
 }
 
 function liveKey(t: import('@shared/types').ModTarget): string {
@@ -1442,7 +1450,7 @@ export function applyModulation(
     if (a.target.kind === 'sonify') {
       const d = SONIFY_MOD_DESCS[a.target.param]
       if (!d) continue
-      const stored = a.target.param.startsWith('space.') ? spaceModBase?.(a.target.param) : sonifyModBase?.(a.target.param)
+      const stored = a.target.param.startsWith('space.') ? spaceModBase?.(a.target.param) : a.target.param === 'keyEvery' ? keyEveryBase?.() : sonifyModBase?.(a.target.param)
       // A voice's azimuth goes round : a turn of ±180° × depth around its place,
       // never clamped (depth 1 = once round, more = more turns; the space engine
       // wraps it). Clamped like any other range, a sweep stopped at the back.

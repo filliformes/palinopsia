@@ -1,18 +1,57 @@
 // The key sequencer's card (Sonify seq view, under the effects sequencer) :
 // play / dice / reset and the key now in its header, then the mode, the clock
-// (rate, chance, glide), the optional Euclidean rhythm, the pool of keys the
-// generative modes choose from and the chosen mode's own rows. Built from the
-// Voices view's parts (sonifyUi.tsx). Engine : audio/soniKeySeq.ts.
+// (rate, every with its M and vary, chance, glide), the optional Euclidean
+// rhythm, the pool of keys the generative modes choose from and the chosen
+// mode's own rows (List's keys, Picture's own keys). Folds to its header. Built
+// from the Voices view's parts (sonifyUi.tsx). Engine : audio/soniKeySeq.ts.
 
 import { useEffect, useRef, type ReactNode } from 'react'
-import type { SoniKeyMode, SoniKeySeq } from '@shared/types'
-import { useStore } from '../store'
+import type { SoniKeyMode, SoniKeySeq, SoniKeyStep, SonifyModParam } from '@shared/types'
+import { modTargetKey, useStore } from '../store'
 import { SCALE_ABBR, SCALE_LABEL, SCALE_ORDER } from '../audio/sonify'
-import { NOTE_NAMES, KEY_MODES, euclidHit, isScale } from '../audio/soniKeyModel'
+import { NOTE_NAMES, KEY_MODES, euclidHit, everyToPos, isScale, posToEvery } from '../audio/soniKeyModel'
 import { SONI_RATES, RATE_LABEL, soniBeats } from '../audio/soniClock'
-import { keySeqNext, keySeqPhase } from '../audio/soniKeySeq'
-import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, Toggle, CardGrip, useCardSpace, chipBig, sonifyCovered } from './sonifyUi'
+import { keySeqNext, keySeqPhase, keySeqWaitMs } from '../audio/soniKeySeq'
+import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, Toggle, CardGrip, useCardSpace, chipBig, sonifyCovered, LiveNum } from './sonifyUi'
 import { KeySeqVisual } from './KeySeqVisual'
+import { registerLiveOverlay } from './liveOverlay'
+
+const EVERY_KEY = modTargetKey({ kind: 'sonify', param: 'keyEvery' })
+const fmtMs = (ms: number): string => {
+  if (ms >= 60000) {
+    const s = Math.round(ms / 1000)
+    return `${Math.floor(s / 60)}m${s % 60 ? String(s % 60).padStart(2, '0') : ''}`
+  }
+  return ms >= 1000 ? (ms / 1000).toFixed(ms >= 10000 ? 0 : 1) + 's' : Math.round(ms) + 'ms'
+}
+/** VARY's reach as shown : off, else the span of a wait in Everys (0.50–2.0×). */
+const fmtVary = (v: number): string => {
+  if (v <= 0.005) return 'off'
+  const n = Math.pow(4, v)
+  return `${(1 / n).toFixed(2)}–${n.toFixed(1)}×`
+}
+
+/** Written keys (List's, or Picture's own) : root, scale, octave each; the key
+ *  playing ringed. */
+function KeyRows({ steps, len, list, playing }: { steps: SoniKeyStep[]; len: number; list: 'steps' | 'picSteps'; playing: (i: number) => boolean }): JSX.Element {
+  const setStep = useStore((s) => s.setSoniKeyStep)
+  return (
+    <>
+      {steps.slice(0, len).map((st, i) => (
+        <div key={i} className={`flex min-w-0 items-center gap-1.5 rounded px-0.5 py-0.5 ${playing(i) ? 'bg-accent/20 ring-1 ring-accent' : ''}`}>
+          <span className="w-[52px] shrink-0 font-mono text-[9px] uppercase text-muted">key {i + 1}</span>
+          <select className="input select-compact w-12 text-[10px]" value={st.root} onChange={(e) => setStep(i, { root: Number(e.target.value) }, list)} title="The root">
+            {NOTE_NAMES.map((n, r) => <option key={n} value={r}>{n}</option>)}
+          </select>
+          <select className="input select-compact min-w-0 flex-1 text-[10px]" value={st.scale} onChange={(e) => setStep(i, { scale: e.target.value }, list)} title="The scale">
+            {SCALE_ORDER.map((sc) => <option key={sc} value={sc}>{SCALE_LABEL[sc]}</option>)}
+          </select>
+          <Stepper value={st.oct} min={1} max={6} onChange={(v) => setStep(i, { oct: v }, list)} title="The root octave (3 = no shift) : the whole instrument moves up or down" />
+        </div>
+      ))}
+    </>
+  )
+}
 
 
 const MODE_INFO: Record<SoniKeyMode, { name: string; hint: string; icon: ReactNode }> = {
@@ -45,12 +84,25 @@ const MODE_INFO: Record<SoniKeyMode, { name: string; hint: string; icon: ReactNo
 
 /** The key sequencer : composes the root, scale and octave of the whole Sonify
  *  instrument over time. */
-export function SonifyKeySequencer({ onWidth }: { onWidth: (dx: number, done: boolean) => void }): JSX.Element {
+export function SonifyKeySequencer({ onWidth, chip, assignBox }: {
+  onWidth: (dx: number, done: boolean) => void
+  /** Sonify's M chip for a parameter, and the binding row it opens (SonifyPage). */
+  chip?: (p: SonifyModParam) => JSX.Element
+  assignBox?: (...ps: SonifyModParam[]) => JSX.Element | null
+}): JSX.Element {
   const [space, setSpace, resetSpace] = useCardSpace('key')
+  const folded = useStore((s) => !!s.collapsed['soni-keyseq'])
+  const toggleSection = useStore((s) => s.toggleSection)
+  // EVERY swung by a modulator : its thumb follows (its readout too, LiveNum)
+  const everyModulated = useStore((s) => s.composition.modMatrix.some((a) => a.target.kind === 'sonify' && a.target.param === 'keyEvery'))
+  const everyRef = useRef<HTMLInputElement | null>(null)
+  useEffect(() => {
+    if (!everyModulated || !everyRef.current) return
+    return registerLiveOverlay({ el: everyRef.current, key: EVERY_KEY, format: (x) => String(x) })
+  }, [everyModulated, folded])
   const ks = useStore((s) => s.soniKeySeq)
   const set = useStore((s) => s.setSoniKeySeq)
   const setOn = useStore((s) => s.setSoniKeySeqOn)
-  const setStep = useStore((s) => s.setSoniKeyStep)
   const randomizeSteps = useStore((s) => s.randomizeSoniKeySteps)
   const reset = useStore((s) => s.resetSoniKeySeq)
   const curStep = useStore((s) => s.soniKeyCur)
@@ -58,8 +110,10 @@ export function SonifyKeySequencer({ onWidth }: { onWidth: (dx: number, done: bo
   const scale = useStore((s) => s.sonify.scale)
   const oct = useStore((s) => s.sonify.rootOct ?? 3)
 
-  // The clock's progress toward the next change (a thin bar under the key).
+  // The clock's progress toward the next change (a thin bar under the key), and
+  // in free time the wait running (EVERY as modulated, times VARY's draw).
   const barRef = useRef<HTMLDivElement | null>(null)
+  const waitRef = useRef<HTMLSpanElement | null>(null)
   useEffect(() => {
     let id = 0
     const f = (): void => {
@@ -67,22 +121,21 @@ export function SonifyKeySequencer({ onWidth }: { onWidth: (dx: number, done: bo
       if (sonifyCovered()) return
       const p = keySeqPhase(performance.now(), soniBeats())
       if (barRef.current) barRef.current.style.width = p < 0 ? '0%' : `${(p * 100).toFixed(1)}%`
+      if (waitRef.current) {
+        const w = keySeqWaitMs()
+        const t = w > 0 ? fmtMs(w) : ''
+        if (waitRef.current.textContent !== t) waitRef.current.textContent = t
+      }
     }
     id = requestAnimationFrame(f)
     return () => cancelAnimationFrame(id)
-  }, [])
+  }, [folded])
 
   const p = (patch: Partial<SoniKeySeq>): void => set(patch)
-  const generative = ks.mode !== 'list'
+  const picList = ks.mode === 'picture' && ks.picKeys === 'list'
+  // the pool : what the generative modes choose from (not List, nor Picture on its own keys)
+  const generative = ks.mode !== 'list' && !picList
   const onCuts = ks.mode === 'picture' && ks.picSource === 'cuts'
-  const fmtMs = (ms: number): string => {
-    if (ms >= 60000) {
-      const s = Math.round(ms / 1000)
-      return `${Math.floor(s / 60)}m${s % 60 ? String(s % 60).padStart(2, '0') : ''}`
-    }
-    return ms >= 1000 ? (ms / 1000).toFixed(ms >= 10000 ? 0 : 1) + 's' : Math.round(ms) + 'ms'
-  }
-  const R = 300000 / 250 // the free period : 250 ms … 5 min, log-mapped
   const toggleScale = (sc: string): void => {
     const has = ks.poolScales.includes(sc)
     if (has && ks.poolScales.length === 1) return // a pool always keeps one scale
@@ -96,6 +149,8 @@ export function SonifyKeySequencer({ onWidth }: { onWidth: (dx: number, done: bo
 
   return (
     <Shell
+      collapsed={folded}
+      onCollapse={() => toggleSection('soni-keyseq')}
       title="Key sequencer"
       hint="Composes the root, scale and octave of every Sonify voice over time, on the composition tempo (in phase with the effects sequencer) or free time."
       on={ks.on}
@@ -110,8 +165,8 @@ export function SonifyKeySequencer({ onWidth }: { onWidth: (dx: number, done: bo
       right={(
         <>
           <IconBtn
-            onClick={() => (ks.mode === 'list' ? randomizeSteps() : keySeqNext(true))}
-            title={ks.mode === 'list' ? 'New keys for the list, drawn from the pool' : 'A fresh key from the pool now, and the walk forgets where it has been'}
+            onClick={() => (ks.mode === 'list' ? randomizeSteps('steps') : picList ? randomizeSteps('picSteps') : keySeqNext(true))}
+            title={ks.mode === 'list' ? 'New keys for the list, drawn from the pool' : picList ? "New keys for the picture's list, drawn from the pool" : 'A fresh key from the pool now, and the walk forgets where it has been'}
           >🎲</IconBtn>
           <IconBtn onClick={reset} title="Reset the key sequencer to its defaults">↺</IconBtn>
         </>
@@ -123,6 +178,9 @@ export function SonifyKeySequencer({ onWidth }: { onWidth: (dx: number, done: bo
         <span className="h-[3px] min-w-[32px] flex-1 overflow-hidden rounded bg-panel3/60">
           <span ref={barRef} className="block h-full bg-accent2" style={{ width: '0%' }} />
         </span>
+        {ks.rate === 'free' && !onCuts && (ks.freeVary > 0 || everyModulated) && (
+          <span ref={waitRef} className="w-9 shrink-0 text-right font-mono text-[9px] text-accent2" title="This wait : Every as a modulator has it now, times the draw of vary" />
+        )}
       </Row>
       {/* the five modes, the card's full width (a tab strip) */}
       <div className="grid grid-cols-5 gap-1" title="How the next key is chosen">
@@ -151,15 +209,26 @@ export function SonifyKeySequencer({ onWidth }: { onWidth: (dx: number, done: bo
         </select>
       </Row>
       {ks.rate === 'free' && !onCuts && (
-        <Row label="every" hint="How often a change may fall, in free time (250 ms to 5 min)">
-          <input
-            type="range" min={0} max={1} step={0.002} value={Math.log(ks.freeMs / 250) / Math.log(R)}
-            onChange={(e) => p({ freeMs: Math.round(250 * Math.pow(R, Number(e.target.value))) })}
-            onDoubleClick={() => p({ freeMs: 5000 })}
-            className="min-w-0 flex-1 accent-accent" title={`Every ${fmtMs(ks.freeMs)} (double-click : 5 s)`}
+        <>
+          <Row label="every" hint="How often a change may fall, in free time (250 ms to 5 min). Its M binds a modulator or a Meta knob : the time between changes then moves with it">
+            <input
+              ref={everyRef}
+              type="range" min={0} max={1} step={0.002} value={everyToPos(ks.freeMs)}
+              onChange={(e) => p({ freeMs: Math.round(posToEvery(Number(e.target.value))) })}
+              onDoubleClick={() => p({ freeMs: 5000 })}
+              className={`min-w-0 flex-1 ${everyModulated ? 'accent-accent2' : 'accent-accent'}`}
+              title={`Every ${fmtMs(ks.freeMs)} (double-click : 5 s)${everyModulated ? ' : modulated (drag sets the base)' : ''}`}
+            />
+            <LiveNum liveKey={EVERY_KEY} value={everyToPos(ks.freeMs)} fmt={(v) => fmtMs(posToEvery(v))} className={`w-12 shrink-0 text-right font-mono text-[9px] ${everyModulated ? 'text-accent2' : 'text-muted'}`} />
+            {chip?.('keyEvery')}
+          </Row>
+          {assignBox?.('keyEvery')}
+          <RangeRow
+            label="vary" value={ks.freeVary} min={0} max={1} step={0.01} neutral={0} onChange={(v) => p({ freeVary: v })}
+            shown={fmtVary(ks.freeVary)}
+            title="Each wait drawn at random around Every, between Every divided and multiplied by this (as many shorter waits as longer ones) : the changes stop falling at a steady pace. Off = always Every"
           />
-          <span className="w-12 shrink-0 text-right font-mono text-[9px] text-muted">{fmtMs(ks.freeMs)}</span>
-        </Row>
+        </>
       )}
       <RangeRow
         label="chance" value={ks.chance} min={0} max={1} step={0.01} neutral={1} onChange={(v) => p({ chance: v })}
@@ -229,18 +298,7 @@ export function SonifyKeySequencer({ onWidth }: { onWidth: (dx: number, done: bo
           {ks.order === 'drift' && (
             <RangeRow label="bias" value={ks.bias} min={-100} max={100} step={1} neutral={0} onChange={(v) => p({ bias: v })} shown={ks.bias > 0 ? `+${ks.bias}` : `${ks.bias}`} title="The walk's lean : − toward earlier keys, + toward later ones, 0 = an even wander" />
           )}
-          {ks.steps.slice(0, ks.len).map((st, i) => (
-            <div key={i} className={`flex min-w-0 items-center gap-1.5 rounded px-0.5 py-0.5 ${ks.on && curStep === i ? 'bg-accent/20 ring-1 ring-accent' : ''}`}>
-              <span className="w-[52px] shrink-0 font-mono text-[9px] uppercase text-muted">key {i + 1}</span>
-              <select className="input select-compact w-12 text-[10px]" value={st.root} onChange={(e) => setStep(i, { root: Number(e.target.value) })} title="The root">
-                {NOTE_NAMES.map((n, r) => <option key={n} value={r}>{n}</option>)}
-              </select>
-              <select className="input select-compact min-w-0 flex-1 text-[10px]" value={st.scale} onChange={(e) => setStep(i, { scale: e.target.value })} title="The scale">
-                {SCALE_ORDER.map((sc) => <option key={sc} value={sc}>{SCALE_LABEL[sc]}</option>)}
-              </select>
-              <Stepper value={st.oct} min={1} max={6} onChange={(v) => setStep(i, { oct: v })} title="The root octave (3 = no shift) : the whole instrument moves up or down" />
-            </div>
-          ))}
+          <KeyRows steps={ks.steps} len={ks.len} list="steps" playing={(i) => ks.on && curStep === i} />
         </>
       )}
       {ks.mode === 'circle' && (
@@ -293,6 +351,14 @@ export function SonifyKeySequencer({ onWidth }: { onWidth: (dx: number, done: bo
       )}
       {ks.mode === 'picture' && (
         <>
+          <Row label="keys" hint="What the picture chooses from : the pool (every root ticked with every scale ticked), or only the keys you write below">
+            <Seg
+              options={['pool', 'list'] as const} value={ks.picKeys} onChange={(v) => p({ picKeys: v })}
+              title={(v) => (v === 'pool' ? "The pool : the picture's color picks a root among the roots ticked, its light a mood among the scales ticked" : 'A list : only the keys written below. Its color picks the one whose root sits nearest on the circle of fifths, its light the one whose mood fits (the list\'s moods spread from bright to dark)')}
+            />
+            {picList && <Stepper value={ks.picLen} min={1} max={8} onChange={(v) => p({ picLen: v })} title="How many keys the picture chooses from" />}
+          </Row>
+          {picList && <KeyRows steps={ks.picSteps} len={ks.picLen} list="picSteps" playing={(i) => ks.on && ks.picSteps[i].root === root && ks.picSteps[i].scale === scale && ks.picSteps[i].oct === oct} />}
           <Row label="reads" hint="When the picture is read">
             <Seg
               options={['color', 'cuts'] as const} value={ks.picSource} onChange={(v) => p({ picSource: v })}

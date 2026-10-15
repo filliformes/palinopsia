@@ -52,6 +52,8 @@
 //   /opsia/sonify/keyseq/mode                           s name | i index (list circle affinity pivot picture)
 //   /opsia/sonify/keyseq/glide|chance                   f 0..1 (glide over 0..4 s)
 //   /opsia/sonify/keyseq/range · hold                   f 0..1 · f seconds (Picture : how far its colors reach, the shortest a key stays)
+//   /opsia/sonify/keyseq/every · vary                   f seconds (0.25..300, free time) · f 0..1 (each wait drawn around Every)
+//   /opsia/sonify/keyseq/keys                           s pool|list | i 0..1 (Picture : the pool, or its own written keys)
 //   /opsia/sonify/{voice}/on|gain|pan + voice params    f 0..1 (see case below)
 //   /opsia/sonify/glue/on|amount                        >= 0.5 | f 0..1 (the output glue, after the EQ)
 //   /opsia/sonify/glue/voice                            s name | i index (clean warm punch bite slow)
@@ -579,6 +581,9 @@ function route(address: string, args: Args): void {
         else if (ctl === 'chance') st.setSoniKeySeq({ chance: clamp01(n) })
         else if (ctl === 'range') st.setSoniKeySeq({ picRange: clamp01(n) })
         else if (ctl === 'hold') st.setSoniKeySeq({ picHold: Math.max(0, Math.min(60, n)) })
+        else if (ctl === 'every') st.setSoniKeySeq({ freeMs: Math.round(Math.max(0.25, Math.min(300, n)) * 1000) })
+        else if (ctl === 'vary') st.setSoniKeySeq({ freeVary: clamp01(n) })
+        else if (ctl === 'keys') { const k = enumFrom(args, ['pool', 'list'] as const); if (k) st.setSoniKeySeq({ picKeys: k }) }
         return
       }
       // /opsia/sonify/glue/* : the compressor after the output EQ
@@ -1134,6 +1139,9 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/keyseq/chance', 0, 1, ks.chance, 'Key sequencer chance of a change')
     add('/opsia/sonify/keyseq/range', 0, 1, ks.picRange ?? 1, "Key sequencer, Picture : 0 the color wheel as it is · 1 the piece's own range of colors and light")
     add('/opsia/sonify/keyseq/hold', 0, 60, ks.picHold, 'Key sequencer, Picture : the shortest a key stays, in seconds')
+    add('/opsia/sonify/keyseq/every', 0.25, 300, ks.freeMs / 1000, 'Key sequencer, free time : how often a change may fall, in seconds')
+    add('/opsia/sonify/keyseq/vary', 0, 1, ks.freeVary, 'Key sequencer, free time : each wait drawn between Every / 4^vary and Every x 4^vary')
+    addI('/opsia/sonify/keyseq/keys', 0, 1, ks.picKeys === 'list' ? 1 : 0, 'Key sequencer, Picture : 0 the pool · 1 its own written keys')
     const tapIdx = (t: SoniConfig['taps'][number]): number => (t.kind === 'master' ? 0 : t.layer + 1)
     addI('/opsia/sonify/tap/a', 0, 4, tapIdx(so.taps[0]), 'Tap A reads : 0 master · 1..4 a layer')
     addI('/opsia/sonify/tap/b', 0, 4, tapIdx(so.taps[1]), 'Tap B reads : 0 master · 1..4 a layer')

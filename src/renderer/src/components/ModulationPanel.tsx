@@ -39,6 +39,7 @@ export function ModulationPanel(): JSX.Element {
   const toggleSection = useStore((s) => s.toggleSection)
   const modBypass = useStore((s) => s.modBypass)
   const toggleModBypass = useStore((s) => s.toggleModBypass)
+  const used = useStore((s) => s.composition.modMatrix.length)
   return (
     <div className="flex min-w-0 flex-col gap-2 border-t border-border bg-panel px-3 py-1.5">
       <div className="flex items-center gap-3">
@@ -52,8 +53,18 @@ export function ModulationPanel(): JSX.Element {
           >
             ▶
           </span>
-          <span className="font-mono text-[10px] uppercase tracking-wide text-muted">
-            Modulation
+          {/* the bindings in use under the name, so the bindings themselves
+              start at the left edge of the row, like the other live sections */}
+          <span className="flex flex-col items-start leading-none">
+            <span className="font-mono text-[10px] uppercase tracking-wide text-muted">
+              Modulation
+            </span>
+            <span
+              className={`mt-0.5 font-mono text-[9px] ${used >= MAX_MOD_ASSIGNMENTS ? 'text-danger' : 'text-muted/80'}`}
+              title={`${used} of the ${MAX_MOD_ASSIGNMENTS} modulation bindings in use`}
+            >
+              {used}/{MAX_MOD_ASSIGNMENTS}
+            </span>
           </span>
         </button>
         <MatrixSummary />
@@ -899,9 +910,6 @@ function MatrixSummary(): JSX.Element {
 
   return (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-      <span className="font-mono text-[9px] text-muted">
-        {matrix.length}/{MAX_MOD_ASSIGNMENTS}
-      </span>
       {matrix.map((a) => (
         <span
           key={a.id}

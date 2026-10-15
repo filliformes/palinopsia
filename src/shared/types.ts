@@ -635,6 +635,8 @@ export type SonifyModParam =
   | 'collageReso' | 'collageRing' | 'collageWidth'
   | 'collageBank' | 'collageDecay' | 'collageCutoff' | 'collageWaves' | 'collageDetune' | 'chordWaves' | 'chordNoise' | 'chordAir'
   | 'fxSend' | 'fxReverb' | 'fxDelay'
+  // The key sequencer's Every (free time), log-mapped 0..1 like its slider
+  | 'keyEvery'
   // Space : where each voice sits in the room (shared/spatial.ts)
   | import('./spatial').SpaceModParam
 export const SONIFY_MOD_PARAMS: SonifyModParam[] = [
@@ -646,7 +648,7 @@ export const SONIFY_MOD_PARAMS: SonifyModParam[] = [
   'sstvLine', 'sstvDev', 'filterQ', 'filterSweep',
   'chordTone', 'chordSpread', 'chordAttack', 'chordVoices', 'collageReso', 'collageRing', 'collageWidth',
   'collageBank', 'collageDecay', 'collageCutoff', 'collageWaves', 'collageDetune', 'chordWaves', 'chordNoise', 'chordAir',
-  'fxSend', 'fxReverb', 'fxDelay'
+  'fxSend', 'fxReverb', 'fxDelay', 'keyEvery'
 ]
 
 export type ModTarget =
@@ -926,6 +928,7 @@ export interface SoniKeySeq {
   mode: SoniKeyMode
   rate: SoniSeqRate // how often a change may fall
   freeMs: number // the period when rate is 'free'
+  freeVary: number // 0..1 : each free-time wait drawn between Every / 4^vary and Every x 4^vary (0 = always Every)
   chance: number // 0..1 : the odds a change falls when it may
   glide: number // seconds : the pitches slide to the new key (0 = they jump)
   returnHome: boolean // on stop : back to the key it started from
@@ -955,6 +958,9 @@ export interface SoniKeySeq {
   picSource: 'color' | 'cuts' // the picture's color on the clock · a scene cut
   picHold: number // seconds : the shortest a key stays
   picRange: number // 0..1 : 0 = the color wheel and the light as they are · 1 = the piece's own range of them spread over every key and mood
+  picKeys: 'pool' | 'list' // what the picture chooses from : the pool's roots x scales, or the keys written for it
+  picSteps: SoniKeyStep[] // 8 (the first picLen are Picture's keys)
+  picLen: number
 }
 
 export interface Session {

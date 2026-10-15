@@ -1673,9 +1673,10 @@ interface StoreState {
   soniKeyCur: number // runtime : the List step playing (-1 = none)
   setSoniKeySeq: (patch: Partial<SoniKeySeq>) => void
   setSoniKeySeqOn: (on: boolean) => void
-  setSoniKeyStep: (i: number, patch: Partial<SoniKeyStep>) => void
+  /** A written key : List's (steps) or Picture's own (picSteps). */
+  setSoniKeyStep: (i: number, patch: Partial<SoniKeyStep>, list?: 'steps' | 'picSteps') => void
   setSoniKeyCur: (i: number) => void
-  randomizeSoniKeySteps: () => void
+  randomizeSoniKeySteps: (list?: 'steps' | 'picSteps') => void
   resetSoniKeySeq: () => void
 
   // ── Assemble : the corpus-based automatic editor ──────────────────────
@@ -3233,8 +3234,10 @@ export const useStore = create<StoreState>((set, get) => ({
     // 0 (a fresh FX's torn/contour/mask, any zeroed slider) and nothing can
     // ever happen, which reads as "modulation is broken". Near-zero bases get
     // Replace (bipolar swing around base : immediately audible); the chip can
-    // still flip it after.
-    mode = mode ?? (baseNormForTarget(get(), target) < 0.05 ? 'replace' : 'multiply')
+    // still flip it after. A Sonify parameter swings around its place (a probe's
+    // position, a pitch, a time : a multiple of them means little, and many sit
+    // at 0), as its own assign panel always bound them.
+    mode = mode ?? (target.kind === 'sonify' || baseNormForTarget(get(), target) < 0.05 ? 'replace' : 'multiply')
     const key = modTargetKey(target)
     // Check existence + cap AND append inside ONE set() updater : otherwise two
     // assignMod calls in the same tick (an OSC burst) both pass a stale cap
@@ -4074,26 +4077,27 @@ export const useStore = create<StoreState>((set, get) => ({
       return { soniKeySeq }
     }),
   setSoniKeySeqOn: (on) => set((s) => ({ soniKeySeq: { ...s.soniKeySeq, on } })),
-  setSoniKeyStep: (i, patch) =>
+  setSoniKeyStep: (i, patch, list = 'steps') =>
     set((s) => {
-      const steps = s.soniKeySeq.steps.map((st, j) => (j === i ? { ...st, ...patch } : st))
-      const soniKeySeq = { ...sanitizeKeySeq({ ...s.soniKeySeq, steps }, s.soniKeySeq), on: s.soniKeySeq.on }
+      const steps = s.soniKeySeq[list].map((st, j) => (j === i ? { ...st, ...patch } : st))
+      const soniKeySeq = { ...sanitizeKeySeq({ ...s.soniKeySeq, [list]: steps }, s.soniKeySeq), on: s.soniKeySeq.on }
       persistSoniKeySeq(soniKeySeq)
       return { soniKeySeq }
     }),
   setSoniKeyCur: (i) => set({ soniKeyCur: i }),
-  randomizeSoniKeySteps: () =>
+  randomizeSoniKeySteps: (list = 'steps') =>
     set((s) => {
-      // Fresh keys for the List from the pool (roots + scales), octaves kept.
+      // Fresh keys for the List (or Picture's own keys) from the pool (roots +
+      // scales), octaves kept.
       const ks = s.soniKeySeq
       const roots = ks.poolRoots.map((on, i) => (on ? i : -1)).filter((i) => i >= 0)
       const scales = ks.poolScales.length ? ks.poolScales : ['major', 'minor']
-      const steps = ks.steps.map((st) => ({
+      const steps = ks[list].map((st) => ({
         ...st,
         root: roots.length ? roots[Math.floor(Math.random() * roots.length)] : Math.floor(Math.random() * 12),
         scale: scales[Math.floor(Math.random() * scales.length)]
       }))
-      const soniKeySeq = { ...ks, steps }
+      const soniKeySeq = { ...ks, [list]: steps }
       persistSoniKeySeq(soniKeySeq)
       return { soniKeySeq }
     }),

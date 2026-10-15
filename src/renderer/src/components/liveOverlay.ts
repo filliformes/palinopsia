@@ -9,8 +9,10 @@ import { liveModValues } from '../engine/modulation'
 
 type LiveSub =
   | { el: HTMLInputElement | HTMLSelectElement; key: string; format: (v: number) => string }
-  // Anything else (a toggle button showing its live ON / OFF) : paint it yourself.
-  | { key: string; apply: (v: number) => void }
+  // Anything else (a toggle button showing its live ON / OFF, a readout) : paint
+  // it yourself. `idle` runs on the frames nothing modulates it (put the stored
+  // value back once the modulation stops).
+  | { key: string; apply: (v: number) => void; idle?: () => void }
 
 const subs = new Set<LiveSub>()
 let raf = 0
@@ -18,7 +20,10 @@ let raf = 0
 function tick(): void {
   for (const s of subs) {
     const live = liveModValues.get(s.key)
-    if (live === undefined) continue
+    if (live === undefined) {
+      if ('idle' in s) s.idle?.()
+      continue
+    }
     if ('apply' in s) {
       s.apply(live)
       continue
