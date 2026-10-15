@@ -153,6 +153,22 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The key sequencer's Picture follows the picture.** It read the root off a frame's
+  chroma-weighted mean hue, and that hardly moves : it is the footage's cast (measured
+  over time on eight generated looks : 5 to 30° of drift in 12 s, 1 to 4 roots; a
+  Collage of one clip 2° in 20 s; the same for the most present hue, the hue that
+  stands out and the hue of what moves), so a piece sat on one or two roots, a warm one
+  on C, G and D, flickering between neighbours. It now reads against the piece's own
+  palette (`soniKeySeq.ts` `updatePicture` / `pictureView`) : the reading smoothed over
+  0.6 s, a 40 s memory of the palette (its circular mean and spread, saturation
+  weighted : a grey picture moves neither) and of the light (mean and deviation), the
+  distance from the palette's centre stretched so two deviations fill the half circle
+  (never squeezed; a still picture's jitter never past 12°), the light's in its own
+  deviations; **range** (`picRange`, default 1) blends from the plain wheel (0). A root
+  or a mood changes only past 0.4 of a step beyond the border. One look for 60 s, range
+  0 → 1 : hand-painted 2 → 6 roots, datamosh 2 → 3; no back-and-forth in either. The
+  visual draws the palette's arc, the picture's own color as a tick, the dot where the
+  key reads it. OSC `/opsia/sonify/keyseq/range · hold`.
 - **The Chord's spread no longer leans left.** Its notes alternated up from the bass with
   every left note wider than its right neighbour and the top note (often the brightest
   band, a sky) hard left at 7 voices : one bright top band sat 19 dB left at full

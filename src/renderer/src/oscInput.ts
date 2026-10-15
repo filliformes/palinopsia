@@ -51,6 +51,7 @@
 //   /opsia/sonify/keyseq/on|next                        >= 0.5 (run · a key change now)
 //   /opsia/sonify/keyseq/mode                           s name | i index (list circle affinity pivot picture)
 //   /opsia/sonify/keyseq/glide|chance                   f 0..1 (glide over 0..4 s)
+//   /opsia/sonify/keyseq/range · hold                   f 0..1 · f seconds (Picture : how far its colors reach, the shortest a key stays)
 //   /opsia/sonify/{voice}/on|gain|pan + voice params    f 0..1 (see case below)
 //   /opsia/sonify/glue/on|amount                        >= 0.5 | f 0..1 (the output glue, after the EQ)
 //   /opsia/sonify/glue/voice                            s name | i index (clean warm punch bite slow)
@@ -576,6 +577,8 @@ function route(address: string, args: Args): void {
         else if (ctl === 'mode') { const m = enumFrom(args, KEY_MODES); if (m) st.setSoniKeySeq({ mode: m }) }
         else if (ctl === 'glide') st.setSoniKeySeq({ glide: clamp01(n) * 4 })
         else if (ctl === 'chance') st.setSoniKeySeq({ chance: clamp01(n) })
+        else if (ctl === 'range') st.setSoniKeySeq({ picRange: clamp01(n) })
+        else if (ctl === 'hold') st.setSoniKeySeq({ picHold: Math.max(0, Math.min(60, n)) })
         return
       }
       // /opsia/sonify/glue/* : the compressor after the output EQ
@@ -1129,6 +1132,8 @@ function enumerateLeaves(): Leaf[] {
     addI('/opsia/sonify/keyseq/mode', 0, KEY_MODES.length - 1, KEY_MODES.indexOf(ks.mode), 'Key sequencer mode : 0 list · 1 circle · 2 affinity · 3 pivot · 4 picture')
     add('/opsia/sonify/keyseq/glide', 0, 1, ks.glide / 4, 'Key sequencer glide (0..4 s)')
     add('/opsia/sonify/keyseq/chance', 0, 1, ks.chance, 'Key sequencer chance of a change')
+    add('/opsia/sonify/keyseq/range', 0, 1, ks.picRange ?? 1, "Key sequencer, Picture : 0 the color wheel as it is · 1 the piece's own range of colors and light")
+    add('/opsia/sonify/keyseq/hold', 0, 60, ks.picHold, 'Key sequencer, Picture : the shortest a key stays, in seconds')
     const tapIdx = (t: SoniConfig['taps'][number]): number => (t.kind === 'master' ? 0 : t.layer + 1)
     addI('/opsia/sonify/tap/a', 0, 4, tapIdx(so.taps[0]), 'Tap A reads : 0 master · 1..4 a layer')
     addI('/opsia/sonify/tap/b', 0, 4, tapIdx(so.taps[1]), 'Tap B reads : 0 master · 1..4 a layer')

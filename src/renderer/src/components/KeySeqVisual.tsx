@@ -15,7 +15,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useStore } from '../store'
 import { visionBus } from '../engine/visionIn'
 import { NOTE_NAMES, BRIGHT, DIATONIC, affinity, degreeNumeral, diatonicRing, fifthsPos, minorish, rootAtFifths, keyId, mod12, isScale, type Key } from '../audio/soniKeyModel'
-import { affinityWeight, keySeqMemory, pictureKey, pool } from '../audio/soniKeySeq'
+import { affinityWeight, keySeqMemory, pictureKey, pictureView, pool } from '../audio/soniKeySeq'
 import { SCALE_ABBR, SCALE_LABEL, SCALE_STEPS, sameNotes, type SoniScale } from '../audio/sonify'
 import type { SoniKeySeq } from '@shared/types'
 
@@ -329,7 +329,10 @@ function PictureVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): J
     return () => window.clearInterval(id)
   }, [])
   const has = visionBus.hasData()
-  const hue = visionBus.feature('hue'), sat = visionBus.feature('saturation'), bri = visionBus.feature('brightness')
+  // where the key reads the picture (RANGE applied), and the picture itself
+  const range = ks.picRange ?? 1
+  const v = pictureView(range)
+  const hue = v.effHue, sat = v.sat, bri = v.effBri
   const pk = has ? pictureKey(ks, cur) : null
   const { scales } = pool(ks)
   const moods = BRIGHT.filter((s) => s !== 'chromatic' && scales.includes(s))
@@ -339,7 +342,7 @@ function PictureVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): J
   const cuts = ks.picSource === 'cuts'
   const thr = Math.max(0.12, avg.current * 3 + 0.02)
   return (
-    <Stage caption={has ? (cuts ? 'a new key at each scene cut (the spikes past the line)' : 'its color picks the root, its brightness the mood') : 'the picture is read while the sequencer plays or this page is open'}>
+    <Stage caption={has ? (cuts ? 'a new key at each scene cut (the spikes past the line)' : range > 0.01 ? "its color picks the root, its light the mood, within the piece's own (the arc : its palette, the tick : its color now)" : 'its color picks the root, its brightness the mood') : 'the picture is read while the sequencer plays or this page is open'}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
         {/* the hue wheel */}
         {Array.from({ length: 24 }, (_, i) => {
@@ -348,6 +351,16 @@ function PictureVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): J
           const d = `M ${cx + r0 * Math.cos(a0)} ${cy + r0 * Math.sin(a0)} L ${cx + r1 * Math.cos(a0)} ${cy + r1 * Math.sin(a0)} A ${r1} ${r1} 0 0 1 ${cx + r1 * Math.cos(a1)} ${cy + r1 * Math.sin(a1)} L ${cx + r0 * Math.cos(a1)} ${cy + r0 * Math.sin(a1)} A ${r0} ${r0} 0 0 0 ${cx + r0 * Math.cos(a0)} ${cy + r0 * Math.sin(a0)} Z`
           return <path key={i} d={d} fill={`hsl(${i * 15} 70% 55% / 0.75)`} />
         })}
+        {/* the piece's palette (its colors over the last 40 s or so) and the picture's own color now */}
+        {has && !grey && range > 0.01 && (() => {
+          const a0 = (v.mu - v.spread) * TAU - Math.PI / 2, a1 = (v.mu + v.spread) * TAU - Math.PI / 2, rr = R + 7
+          const large = v.spread * 2 > 0.5 ? 1 : 0
+          return <path d={`M ${cx + rr * Math.cos(a0)} ${cy + rr * Math.sin(a0)} A ${rr} ${rr} 0 ${large} 1 ${cx + rr * Math.cos(a1)} ${cy + rr * Math.sin(a1)}`} fill="none" stroke={TEXT} strokeOpacity={0.45} strokeWidth={1.4} strokeLinecap="round" />
+        })()}
+        {has && !grey && range > 0.01 && (() => {
+          const a = v.hue * TAU - Math.PI / 2
+          return <line x1={cx + (R + 3) * Math.cos(a)} y1={cy + (R + 3) * Math.sin(a)} x2={cx + (R + 11) * Math.cos(a)} y2={cy + (R + 11) * Math.sin(a)} stroke={`hsl(${v.hue * 360} 90% 65%)`} strokeWidth={2} strokeLinecap="round" />
+        })()}
         {has && (
           <>
             <line x1={cx} y1={cy} x2={cx + mr * Math.cos(ma)} y2={cy + mr * Math.sin(ma)} stroke={grey ? MUTED : `hsl(${hue * 360} 80% 60%)`} strokeWidth={1.2} opacity={0.7} />
@@ -365,6 +378,7 @@ function PictureVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): J
         </defs>
         <rect x={120} y={16} width={8} height={92} rx={3} fill="url(#ksBri)" stroke={BORDER} strokeWidth={0.6} />
         {has && <polygon points={`${116},${16 + (1 - bri) * 92} ${120},${16 + (1 - bri) * 92 - 3} ${120},${16 + (1 - bri) * 92 + 3}`} fill={TEXT} />}
+        {has && range > 0.01 && <line x1={128} x2={131} y1={16 + (1 - v.bri) * 92} y2={16 + (1 - v.bri) * 92} stroke={TEXT} strokeOpacity={0.5} strokeWidth={1.2} />}
         {moods.map((m, i) => {
           const y = 22 + (moods.length > 1 ? (i / (moods.length - 1)) * 80 : 40)
           const here = pk?.scale === m

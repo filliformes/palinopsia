@@ -11,7 +11,8 @@
 //   pivot    the same notes on a new tonic (C major → D dorian), or the same
 //            tonic in a new mode (brighter / darker)
 //   picture  the picture's color picks the root around the circle and its
-//            brightness the mood (bright lydian … dark phrygian), on the clock
+//            brightness the mood (bright lydian … dark diminished), read
+//            against the piece's own palette and light (RANGE), on the clock
 //            or at each scene cut
 // The change is applied like any key change (setSonify, never in undo), with a
 // glide : the engine slides its pitches to the new key (sonifyEngine.glideNext).
@@ -189,25 +190,99 @@ function nextPivot(ks: SoniKeySeq, cur: Key): Key | null {
   return { root: cur.root, scale: order[j], oct: cur.oct }
 }
 
-/** The key the picture asks for : its hue around the circle of fifths (a grey
- *  picture keeps the root), its brightness for the mood. */
+// ── Picture : the piece's own range ───────────────────────────────────────
+// A frame's overall color hardly moves : it is the footage's cast, not what
+// happens in it (measured : 2 to 30° of drift over 12 s on every look tried,
+// and a Collage of one clip 2° in 20 s, whether the color is read as the
+// mean, the most present hue, the hue that stands out or the hue of what
+// moves). Read on the plain wheel, a piece sat on one or two roots (a warm one
+// on C, G and D) and flickered between neighbours. So the picture is read
+// against its own palette : a slow memory (PIC_SLOW) of its color (where it
+// sits on the wheel and how far it spreads) and of its light, and where the
+// picture is within them is spread over every root and every mood (RANGE 1;
+// 0 = the wheel and the light as they are). A still picture stays put, a
+// shift of color walks the circle, a new palette makes a big move and then
+// settles as the memory catches up.
+const TAU = Math.PI * 2
+const PIC_FAST = 0.6 // s : the reading's own smoothing
+const PIC_SLOW = 40 // s : the palette's memory
+const PIC_MIN_SPREAD = 12 / 360 // turns : a still picture's jitter is never stretched past this
+const pic = { at: 0, hx: 1, hy: 0, b: 0, px: 0, py: 0, pw: 0, pb: 0, pb2: 0, sat: 0, init: false }
+
+function updatePicture(now: number): void {
+  if (!visionBus.hasData()) return
+  const dt = pic.at ? Math.min(0.5, Math.max(0, (now - pic.at) / 1000)) : 0
+  pic.at = now
+  const sat = visionBus.feature('saturation'), h = visionBus.feature('hue') * TAU, bri = visionBus.feature('brightness')
+  const cx = Math.cos(h), cy = Math.sin(h)
+  // a grey picture carries no color : it moves neither the hue nor the palette
+  const w = Math.min(1, sat / 0.25)
+  if (!pic.init) {
+    Object.assign(pic, { hx: cx, hy: cy, b: bri, px: cx * w, py: cy * w, pw: w, pb: bri, pb2: bri * bri, sat, init: true })
+    return
+  }
+  const kf = 1 - Math.exp(-dt / PIC_FAST), kl = 1 - Math.exp(-dt / PIC_SLOW)
+  pic.hx += (cx - pic.hx) * kf * w; pic.hy += (cy - pic.hy) * kf * w
+  pic.b += (bri - pic.b) * kf
+  pic.sat += (sat - pic.sat) * kf
+  pic.px += (cx * w - pic.px) * kl; pic.py += (cy * w - pic.py) * kl; pic.pw += (w - pic.pw) * kl
+  pic.pb += (bri - pic.pb) * kl; pic.pb2 += (bri * bri - pic.pb2) * kl
+}
+
+export interface PictureView {
+  hue: number // 0..1 : the picture's color (smoothed)
+  bri: number // 0..1 : its light (smoothed)
+  sat: number
+  mu: number // 0..1 : the palette's centre on the wheel
+  spread: number // turns : the palette's reach either side (two deviations)
+  effHue: number // where the key reads the color (RANGE applied)
+  effBri: number // where the mood reads the light
+}
+
+/** The picture as Picture reads it, at a RANGE (0..1). */
+export function pictureView(range: number): PictureView {
+  const r = Math.max(0, Math.min(1, range))
+  const hue = ((Math.atan2(pic.hy, pic.hx) / TAU) + 1) % 1
+  const R = pic.pw > 1e-6 ? Math.min(1, Math.hypot(pic.px, pic.py) / pic.pw) : 1
+  const mu = pic.pw > 1e-6 && R > 1e-6 ? ((Math.atan2(pic.py, pic.px) / TAU) + 1) % 1 : hue
+  const sd = Math.max(PIC_MIN_SPREAD, Math.sqrt(-2 * Math.log(Math.max(1e-6, R))) / TAU)
+  // the color : its distance from the palette's centre, stretched so the
+  // palette's reach (two deviations) fills the half circle (never squeezed)
+  let d = hue - mu
+  d -= Math.round(d)
+  const g = Math.max(1, 0.5 / (2 * sd))
+  const ds = Math.max(-0.5, Math.min(0.5, d * g))
+  const effHue = (((mu + d + r * (ds - d)) % 1) + 1) % 1
+  // the light : its distance from the piece's usual light, in its own deviations
+  const bsd = Math.max(0.04, Math.sqrt(Math.max(0, pic.pb2 - pic.pb * pic.pb)))
+  const zb = Math.max(-1, Math.min(1, (pic.b - pic.pb) / (2 * bsd)))
+  const effBri = pic.b + r * (0.5 + 0.5 * zb - pic.b)
+  return { hue, bri: pic.b, sat: pic.sat, mu, spread: Math.min(0.5, 2 * sd), effHue, effBri }
+}
+
+/** The key the picture asks for : its color around the circle of fifths (a
+ *  grey picture keeps the root), its light for the mood, both read against the
+ *  piece's own (pictureView). A key only changes once the reading is clearly
+ *  past the middle between two (no flicker on a border). */
 export function pictureKey(ks: SoniKeySeq, cur: Key): Key | null {
-  if (!visionBus.hasData()) return null
+  if (!visionBus.hasData() || !pic.init) return null
   const { roots, scales } = pool(ks)
+  const v = pictureView(ks.picRange ?? 1)
   let root = cur.root
-  if (visionBus.feature('saturation') > 0.08) {
-    const pos = Math.round(visionBus.feature('hue') * 12)
+  if (v.sat > 0.08) {
+    const pos = v.effHue * 12
+    const dist = (r: number): number => { const d0 = Math.abs(fifthsPos(r) - pos) % 12; return Math.min(d0, 12 - d0) }
     let best = roots[0], bestD = 99
-    for (const r of roots) {
-      const d0 = Math.abs(mod12(fifthsPos(r) - pos))
-      const d = Math.min(d0, 12 - d0)
-      if (d < bestD) { bestD = d; best = r }
-    }
-    root = best
+    for (const r of roots) { const d = dist(r); if (d < bestD) { bestD = d; best = r } }
+    root = roots.includes(cur.root) && dist(cur.root) < bestD + 0.4 ? cur.root : best
   }
   const moods = BRIGHT.filter((s) => s !== 'chromatic' && scales.includes(s))
-  const bri = visionBus.feature('brightness')
-  const scale = moods.length ? moods[Math.min(moods.length - 1, Math.floor((1 - bri) * moods.length))] : cur.scale
+  let scale = cur.scale
+  if (moods.length) {
+    const x = (1 - v.effBri) * moods.length
+    const ic = moods.indexOf(cur.scale)
+    scale = ic >= 0 && x > ic - 0.3 && x < ic + 1.3 ? cur.scale : moods[Math.max(0, Math.min(moods.length - 1, Math.floor(x)))]
+  }
   return { root, scale, oct: cur.oct }
 }
 
@@ -309,6 +384,9 @@ export function tickKeySeq(now: number, beats: number): void {
   const st = useStore.getState()
   const ks = st.soniKeySeq
   const cur = keyOf(st.sonify)
+  // Picture's memory of the piece keeps learning while it is read (the
+  // sequencer playing, or its visual on screen)
+  if (ks.mode === 'picture') updatePicture(now)
   if (!ks.on) {
     if (rt.started) stop(cur)
     return

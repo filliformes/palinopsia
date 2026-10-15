@@ -102,7 +102,8 @@ export function makeDefaultKeySeq(): SoniKeySeq {
     pivKind: 'modes',
     pivDir: 'random',
     picSource: 'color',
-    picHold: 8
+    picHold: 8,
+    picRange: 1
   }
 }
 
@@ -153,7 +154,8 @@ export function sanitizeKeySeq(raw: unknown, fallback: SoniKeySeq): SoniKeySeq {
     pivKind: s.pivKind === 'tonic' ? 'tonic' : 'modes',
     pivDir: s.pivDir === 'up' || s.pivDir === 'down' ? s.pivDir : 'random',
     picSource: s.picSource === 'cuts' ? 'cuts' : 'color',
-    picHold: num(s.picHold, 0, 120, d.picHold)
+    picHold: num(s.picHold, 0, 120, d.picHold),
+    picRange: num(s.picRange, 0, 1, d.picRange)
   }
 }
 

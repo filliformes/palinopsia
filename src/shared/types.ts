@@ -954,6 +954,7 @@ export interface SoniKeySeq {
   // Picture
   picSource: 'color' | 'cuts' // the picture's color on the clock · a scene cut
   picHold: number // seconds : the shortest a key stays
+  picRange: number // 0..1 : 0 = the color wheel and the light as they are · 1 = the piece's own range of them spread over every key and mood
 }
 
 export interface Session {

@@ -297,6 +297,10 @@ export function SonifyKeySequencer({ onWidth }: { onWidth: (dx: number, done: bo
             />
           </Row>
           <RangeRow
+            label="range" value={ks.picRange ?? 1} min={0} max={1} step={0.01} neutral={1} onChange={(v) => p({ picRange: v })}
+            shown={`${Math.round((ks.picRange ?? 1) * 100)}%`} title="How far the picture's colors and light reach : 0 = the color wheel and the light as they are (a warm piece stays on the warm roots), 100 % = the piece's own range of colors and light, remembered over the last 40 s or so, spread over every root and every mood : a still picture stays, a shift of color walks the circle, a new palette moves far"
+          />
+          <RangeRow
             label="hold" value={ks.picHold} min={0} max={60} step={0.5} neutral={8} onChange={(v) => p({ picHold: v })}
             shown={`${ks.picHold}s`} title="The shortest a key stays : a busy picture cannot change it more often than this"
           />
