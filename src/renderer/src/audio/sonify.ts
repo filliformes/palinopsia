@@ -316,6 +316,22 @@ const effRoot = (cfg: SoniConfig): number => cfg.root + 12 * ((cfg.rootOct ?? 3)
 // directly onto a config field (unlike the probe positions / pitches, which have
 // custom handling). Drives withSonifyParam, the base getter, and the tick overlay,
 // so adding a modulatable param is one line here (+ a DESC + a chip in the UI).
+/** A note table read at `n` evenly spaced places (log-interpolated). */
+function resampleNotes(src: Float32Array, n: number): Float32Array {
+  const m = src.length, out = new Float32Array(n)
+  for (let i = 0; i < n; i++) {
+    const p = n > 1 ? (i * (m - 1)) / (n - 1) : 0
+    const k = Math.min(m - 1, Math.floor(p)), f = p - k
+    const a = src[k], b = src[Math.min(m - 1, k + 1)]
+    out[i] = a > 0 && b > 0 ? a * Math.pow(b / a, f) : a
+  }
+  return out
+}
+
+/** Spectra synced : one sweep a bar. SSTV synced : one line a 16th note. */
+const syncSweepHz = (bpm: number): number => bpm / 60 / 4
+const syncLineHz = (bpm: number): number => (bpm / 60) * 4
+
 const SONI_SIMPLE_MODS: Record<string, [keyof SoniConfig, string]> = {
   spectraGain: ['spectra', 'gain'], spectraGamma: ['spectra', 'gamma'], spectraSweep: ['spectra', 'sweepHz'], spectraBreath: ['spectra', 'breath'],
   orbitDrive: ['orbit', 'drive'], orbitSmooth: ['orbit', 'smooth'],
@@ -521,6 +537,11 @@ class SonifyEngine {
   private warm = false // keepWarm : the context stays open between takes and plays
   // Self-healing (heal()) : a device error or a stalled clock rebuilds the context.
   private healing = false
+  // a device that stays dead : the rebuilds space out (5, 10, 20 s), and the
+  // count resets once the clock has run 30 s (every 5 s it rebuilt and logged)
+  private healFails = 0
+  private healNextAt = 0
+  private healOkSince = 0
   private healAfterTake = false // a rebuild waits for the take holding the bus
   private watchTimer = 0
   private lastClock = -1
@@ -709,7 +730,15 @@ class SonifyEngine {
     const ctx = this.ctx
     if (!ctx || !this.wanted() || this.healing) return
     const t = ctx.currentTime
-    if (ctx.state === 'running' && this.lastClock >= 0 && t <= this.lastClock) void this.heal('the audio clock stopped')
+    const stalled = ctx.state === 'running' && this.lastClock >= 0 && t <= this.lastClock
+    const now = performance.now()
+    if (!stalled) {
+      if (!this.healOkSince) this.healOkSince = now
+      else if (now - this.healOkSince > 30000) this.healFails = 0
+    } else {
+      this.healOkSince = 0
+      if (now >= this.healNextAt) void this.heal('the audio clock stopped')
+    }
     this.lastClock = t
   }
 
@@ -737,6 +766,8 @@ class SonifyEngine {
         this.healAfterTake = true
         return
       }
+      this.healNextAt = performance.now() + 5000 * Math.pow(2, Math.min(2, this.healFails))
+      this.healFails++
       await this.rebuild()
     } finally {
       this.healing = false
@@ -1247,8 +1278,12 @@ class SonifyEngine {
     const notes = scaleTable(effRoot(cfg), cfg.scale, cfg.collage.loOct, Math.max(cfg.collage.loOct + 1, cfg.collage.hiOct))
     const sameNotes = notes.length === this.collageNotes.length && notes.every((f, i) => f === this.collageNotes[i])
     if (!sameNotes) {
-      if (glide > 0 && notes.length === this.collageNotes.length && notes.length) {
-        this.colFrom = Float32Array.from(this.collageNotesNow())
+      if (glide > 0 && notes.length && this.collageNotes.length) {
+        // a scale of another length (minor's 7 notes to a pentatonic's 5) : the
+        // notes now, read at each new note's place across the range, so they
+        // glide like every other voice's (they jumped)
+        const cur = this.collageNotesNow()
+        this.colFrom = cur.length === notes.length ? Float32Array.from(cur) : resampleNotes(cur, notes.length)
         this.colT0 = performance.now()
         this.colDur = glide * 1000
       } else this.colFrom = null
@@ -1267,7 +1302,7 @@ class SonifyEngine {
         master: cfg.master,
         spectra: {
           on: cfg.spectra.on, tap: cfg.spectra.tap, gain: cfg.spectra.gain, pan: cfg.spectra.pan,
-          sweepOn: cfg.spectra.sweepOn, sweepHz: cfg.spectra.sweepHz, x: cfg.spectra.x, gamma: cfg.spectra.gamma,
+          sweepOn: cfg.spectra.sweepOn, sweepHz: cfg.spectra.sync ? syncSweepHz(this.bpm) : cfg.spectra.sweepHz, x: cfg.spectra.x, gamma: cfg.spectra.gamma,
           breath: cfg.spectra.breath ?? 0, path: cfg.spectra.path ?? 0, pace: cfg.spectra.pace ?? 0
         },
         orbit: {
@@ -1294,7 +1329,7 @@ class SonifyEngine {
         },
         sstv: {
           on: cfg.sstv.on, tap: cfg.sstv.tap, gain: cfg.sstv.gain, pan: cfg.sstv.pan,
-          lineHz: cfg.sstv.lineHz, dev: cfg.sstv.dev, syncLev: cfg.sstv.syncLev
+          lineHz: cfg.sstv.sync ? syncLineHz(this.bpm) : cfg.sstv.lineHz, dev: cfg.sstv.dev, syncLev: cfg.sstv.syncLev
         },
         filter: {
           on: cfg.filter.on, tap: cfg.filter.tap, gain: cfg.filter.gain, pan: cfg.filter.pan,
@@ -1422,6 +1457,12 @@ class SonifyEngine {
         if (typeof base !== 'number') continue // defensive : partial config → skip
         ;(mm[voice] ??= {})[field] = g(param, base)
       }
+      // Synced rates follow the tempo here, every tick (tap tempo, an OSC tempo
+      // stream). They used to be written into the config and the whole config
+      // pushed at every tempo step (30 a second from a tempo stream), and the
+      // user's own rate was lost to the last synced one.
+      if (c.spectra.sync) (mm.spectra ??= {}).sweepHz = syncSweepHz(this.bpm)
+      if (c.sstv.sync) (mm.sstv ??= {}).lineHz = syncLineHz(this.bpm)
       node.port.postMessage({ t: 'mod', m, bpm: this.bpm })
       // A modulator on the Chord's note count : its notes again when it moves
       // (and back to the slider's when the modulator lets go).
@@ -1490,25 +1531,7 @@ class SonifyEngine {
       console.warn('[sonify] collage voice', err?.name ? `${err.name}: ${err.message}\n${String(err.stack ?? '').split('\n').slice(1, 4).join('\n')}` : e)
     }
 
-    // BPM-synced sweep : re-derive sweepHz continuously so tap-tempo follows.
-    if (this.cfg.spectra.sync && this.cfg.spectra.on) {
-      const barsPerSweep = 1 // one sweep per bar
-      const hz = bpm / 60 / 4 / barsPerSweep
-      if (Math.abs(hz - this.cfg.spectra.sweepHz) > 1e-4) {
-        this.cfg.spectra.sweepHz = hz
-        this.pushConfig(this.cfg)
-      }
-    }
-
-    // SSTV sync : one scan line per 16th note, following tap-tempo live.
-    if (this.cfg.sstv.sync && this.cfg.sstv.on) {
-      const hz = (bpm / 60) * 4
-      if (Math.abs(hz - this.cfg.sstv.lineHz) > 1e-3) {
-        this.cfg.sstv.lineHz = hz
-        this.pushConfig(this.cfg)
-      }
-    }
-
+    // (the synced Spectra sweep and SSTV line rate follow the tempo in postMod)
     this.postMod()
 
     const need = [false, false]

@@ -81,6 +81,15 @@ that CI builds into cross-platform releases.
   - **The key sequencer's Picture mode** learns only from frames really read : when
     nothing samples the picture, the last one was learned over and over and the palette
     shrank onto it.
+  - **Tempo sync** (Spectra's sweep, SSTV's line rate) follows the tempo in the per-tick
+    overlay : each tempo step pushed the whole config (30 a second from an OSC tempo
+    stream; measured after, 60 steps, no push), and the rate you had set was lost to the
+    last synced one (now it comes back when sync goes off).
+  - **The Collage voice's notes glide** when the key sequencer moves to a scale of
+    another length (minor's 7 notes to a pentatonic's 5) : they jumped, every other
+    voice glided.
+  - **Self-heal** spaces out its rebuilds when a device stays dead (5, then 10, then
+    20 s; it rebuilt and logged every 5 s), and starts over once the sound runs.
 - **The audit of everything added since v1.2.7, the GUI** :
   - **The EQ editor** no longer costs the picture : its curves are worked out once per
     change of the EQ instead of every frame (up to 9 ms a frame with steep bands, on the
