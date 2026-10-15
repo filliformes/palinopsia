@@ -103,7 +103,7 @@ let lastDomePreview = 0
 let lastStreamOn = false
 // what the output window was last sent (compared value by value : a string
 // built every frame to spot a change)
-const lastWarp = { on: false, grid: false, feather: -1, corners: new Float64Array(8).fill(NaN) }
+const lastWarp = { on: false, grid: false, feather: -1, sharp: false, corners: new Float64Array(8).fill(NaN) }
 let lastWarpSent = 0
 // A per-frame tick's error, logged once every few seconds (not 30 times a second).
 const loggedAt = new Map<string, number>()
@@ -1651,15 +1651,17 @@ export default function App(): JSX.Element {
           // frame (and a domemaster's rim) with the warp off, unseen here
           const warpFeather = warpEnabled ? st.warpFeather : 0
           const lc = lastWarp.corners, wc = st.warpCorners
-          let same = lastWarp.on === warpEnabled && lastWarp.grid === warpGrid && lastWarp.feather === warpFeather && wc.length === 8
+          const outSharp = st.outSharp
+          let same = lastWarp.on === warpEnabled && lastWarp.grid === warpGrid && lastWarp.feather === warpFeather && lastWarp.sharp === outSharp && wc.length === 8
           for (let k = 0; same && k < 8; k++) same = lc[k] === wc[k]
           if (!same || now - lastWarpSent > 500) {
             lastWarp.on = warpEnabled
             lastWarp.grid = warpGrid
             lastWarp.feather = warpFeather
+            lastWarp.sharp = outSharp
             for (let k = 0; k < 8; k++) lc[k] = wc[k] ?? NaN
             lastWarpSent = now
-            window.api.outputFrame({ warpEnabled, warpCorners: wc, warpGrid, warpFeather })
+            window.api.outputFrame({ warpEnabled, warpCorners: wc, warpGrid, warpFeather, outSharp })
           }
         }
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to

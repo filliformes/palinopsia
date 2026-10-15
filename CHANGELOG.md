@@ -5,6 +5,30 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Added
+
+- **Sharp enlargement** (Output → Render scale, off by default) : the projector window
+  enlarges a frame rendered below its size through a Catmull-Rom cubic over the 4x4
+  texels around each point, instead of the bilinear blend of 4, clamped to the 4 nearest
+  texels so a hard edge never rings (a dark line inside a white surround). The warp,
+  its anti-aliased edges and the feather are unchanged; the compositor never uses it,
+  and off, the window draws exactly as before. Measured on an M2 at render scale 0.75
+  to a 1920x1080 projector : 41.6 fps off, 40.9 on (noise). `WARP_SHARP_FS`
+  (warpQuad.ts), `OutputPresenter.setSharp`, `outSharp` in the store (localStorage
+  `opsia.outSharp`) and in the output window's warp message.
+- **A ¾ render scale preset** beside ½, 1×, 1⅓× and 2×.
+
+### Changed
+
+- **An empty layer costs nothing.** A layer with no source, no effect switched on and
+  no trail drew transparent black every frame : a clear, a persist and a blend into the
+  stack that changed nothing (mix(B, c, 0) is B). Once both of its persisted buffers
+  hold that black (two frames), the three passes are skipped (`ISFLayer.skipBlank`,
+  `drawLayer`; Consume still runs, it keeps a field). Verified on an installation
+  session at 1440x810 : both empty layers skipped, their texture all zeros, and the
+  skipped blend reproduces the real composite to the bit in add, normal, multiply and
+  screen (0 of 4,665,600 values). 40.1 → 41.6 fps (M2, GPU 99 → 97 %).
+
 ### Fixed
 
 - **Sonify's clicks are gone** (measured on its output, 10 s per case, a click = the

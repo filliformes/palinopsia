@@ -1075,7 +1075,7 @@ export interface RecordingFolderInfo {
 
 /** What the output window reads per frame now : the keystone it applies to the
  *  streamed picture (it no longer renders the composition itself). */
-export type OutputWarp = Pick<OutputFrame, 'warpEnabled' | 'warpCorners' | 'warpGrid' | 'warpFeather'>
+export type OutputWarp = Pick<OutputFrame, 'warpEnabled' | 'warpCorners' | 'warpGrid' | 'warpFeather' | 'outSharp'>
 
 export interface OutputFrame {
   c: CompositionState
@@ -1087,6 +1087,8 @@ export interface OutputFrame {
   warpGrid: boolean
   /** Output pixels the warped frame's edge fades over (0 : crisp, anti-aliased). */
   warpFeather?: number
+  /** The projector window enlarges the frame through a cubic instead of bilinear. */
+  outSharp?: boolean
   time: number
   // Per-layer coupled A/B mix (audio-driven) so the output window matches the
   // control window; absent when no layer is coupled.

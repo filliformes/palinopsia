@@ -1451,6 +1451,10 @@ interface StoreState {
   /** Output pixels the warped frame's edge fades over (0 : crisp, anti-aliased). */
   warpFeather: number
   setWarpFeather: (px: number) => void
+  /** The projector window enlarges the frame through a cubic, not bilinear :
+   *  per machine (it follows the render scale and the projector), off by default. */
+  outSharp: boolean
+  setOutSharp: (on: boolean) => void
   setWarpCorner: (corner: number, x: number, y: number) => void
   resetWarp: () => void
   // The warp travels with the session : saved into it, restored from it. A
@@ -3398,6 +3402,11 @@ export const useStore = create<StoreState>((set, get) => ({
       }, 300)
     }
     set({ warpFeather: v })
+  },
+  outSharp: (() => { try { return localStorage.getItem('opsia.outSharp') === '1' } catch { return false } })(),
+  setOutSharp: (on) => {
+    try { localStorage.setItem('opsia.outSharp', on ? '1' : '0') } catch { /* quota */ }
+    set({ outSharp: on })
   },
   setWarpCorner: (corner, x, y) =>
     set((s) => {

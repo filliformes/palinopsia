@@ -10,17 +10,23 @@
 // composite (GL bottom-up), which is precisely the orientation those UVs assume,
 // so the result is pixel-for-pixel what the compositor presents.
 
-import { IDENTITY_CORNERS, WARP_FS, WARP_VS, computeWarpVerts } from './warpQuad'
+import { IDENTITY_CORNERS, WARP_FS, WARP_SHARP_FS, WARP_VS, computeWarpVerts } from './warpQuad'
+
+interface WarpProgram {
+  prog: WebGLProgram
+  uTex: WebGLUniformLocation
+  uGrid: WebGLUniformLocation
+  uFeather: WebGLUniformLocation
+}
 
 export class OutputPresenter {
   private gl: WebGL2RenderingContext
-  private prog: WebGLProgram
+  private plain: WarpProgram
+  private sharpProg: WarpProgram | null = null // made the first time Sharp enlargement is on
+  private sharp = false
   private vao: WebGLVertexArrayObject
   private buf: WebGLBuffer
   private tex: WebGLTexture
-  private uTex: WebGLUniformLocation
-  private uGrid: WebGLUniformLocation
-  private uFeather: WebGLUniformLocation
   private feather = 0
   private vertsW = 0 // the drawn size the quad was built for (its margin is in pixels)
   private vertsH = 0
@@ -33,24 +39,8 @@ export class OutputPresenter {
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: false, powerPreference: 'high-performance' })
     if (!gl) throw new Error('WebGL2 unavailable for output presenter')
     this.gl = gl
-    const mk = (t: number, src: string): WebGLShader => {
-      const sh = gl.createShader(t)!
-      gl.shaderSource(sh, src)
-      gl.compileShader(sh)
-      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS))
-        throw new Error(gl.getShaderInfoLog(sh) || 'output shader')
-      return sh
-    }
-    const prog = gl.createProgram()!
-    gl.attachShader(prog, mk(gl.VERTEX_SHADER, WARP_VS))
-    gl.attachShader(prog, mk(gl.FRAGMENT_SHADER, WARP_FS))
-    gl.linkProgram(prog)
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS))
-      throw new Error(gl.getProgramInfoLog(prog) || 'output link')
-    this.prog = prog
-    this.uTex = gl.getUniformLocation(prog, 'tex')!
-    this.uGrid = gl.getUniformLocation(prog, 'grid')!
-    this.uFeather = gl.getUniformLocation(prog, 'feather')!
+    this.plain = this.build(WARP_FS)
+    const prog = this.plain.prog
     const aPos = gl.getAttribLocation(prog, 'pos')
     const aUvq = gl.getAttribLocation(prog, 'uvq')
     this.vao = gl.createVertexArray()!
@@ -70,6 +60,45 @@ export class OutputPresenter {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
     gl.bindTexture(gl.TEXTURE_2D, null)
+  }
+
+  private build(fs: string): WarpProgram {
+    const gl = this.gl
+    const mk = (t: number, src: string): WebGLShader => {
+      const sh = gl.createShader(t)!
+      gl.shaderSource(sh, src)
+      gl.compileShader(sh)
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS))
+        throw new Error(gl.getShaderInfoLog(sh) || 'output shader')
+      return sh
+    }
+    const prog = gl.createProgram()!
+    const vs = mk(gl.VERTEX_SHADER, WARP_VS), f = mk(gl.FRAGMENT_SHADER, fs)
+    gl.attachShader(prog, vs)
+    gl.attachShader(prog, f)
+    // both programs read the one VAO : the attributes sit where the first one put them
+    gl.bindAttribLocation(prog, 0, 'pos')
+    gl.bindAttribLocation(prog, 1, 'uvq')
+    gl.linkProgram(prog)
+    gl.deleteShader(vs)
+    gl.deleteShader(f)
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS))
+      throw new Error(gl.getProgramInfoLog(prog) || 'output link')
+    return {
+      prog,
+      uTex: gl.getUniformLocation(prog, 'tex')!,
+      uGrid: gl.getUniformLocation(prog, 'grid')!,
+      uFeather: gl.getUniformLocation(prog, 'feather')!
+    }
+  }
+
+  /** Sharp enlargement on / off (Output page) : the cubic warp program, else the
+   *  plain bilinear one. A failed compile leaves the plain one in place. */
+  setSharp(on: boolean): void {
+    if (on && !this.sharpProg && !this.disposed) {
+      try { this.sharpProg = this.build(WARP_SHARP_FS) } catch (e) { console.warn('[output] sharp enlargement unavailable', e); this.sharp = false; return }
+    }
+    this.sharp = on
   }
 
   /** Set the projection warp. `corners` = 8 normalized numbers (TL,TR,BR,BL x,y)
@@ -133,12 +162,13 @@ export class OutputPresenter {
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, computeWarpVerts(this.lastCorners, vw, vh))
       gl.bindVertexArray(null)
     }
-    gl.useProgram(this.prog)
+    const wp = this.sharp && this.sharpProg ? this.sharpProg : this.plain
+    gl.useProgram(wp.prog)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.tex)
-    gl.uniform1i(this.uTex, 0)
-    gl.uniform1f(this.uGrid, this.gridOn ? 1 : 0)
-    gl.uniform1f(this.uFeather, this.feather)
+    gl.uniform1i(wp.uTex, 0)
+    gl.uniform1f(wp.uGrid, this.gridOn ? 1 : 0)
+    gl.uniform1f(wp.uFeather, this.feather)
     gl.bindVertexArray(this.vao)
     gl.drawArrays(gl.TRIANGLES, 0, 6)
     gl.bindVertexArray(null)
@@ -151,6 +181,7 @@ export class OutputPresenter {
     gl.deleteTexture(this.tex)
     gl.deleteBuffer(this.buf)
     gl.deleteVertexArray(this.vao)
-    gl.deleteProgram(this.prog)
+    gl.deleteProgram(this.plain.prog)
+    if (this.sharpProg) gl.deleteProgram(this.sharpProg.prog)
   }
 }

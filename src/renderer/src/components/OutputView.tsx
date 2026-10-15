@@ -160,6 +160,7 @@ export function OutputView(): JSX.Element {
     // Warp corners + grid ride the small composition push (cheap metadata).
     const off = window.api.onOutputFrame((f: OutputWarp) => {
       presenter?.setWarp(f.warpEnabled ? f.warpCorners : null, !!f.warpGrid, f.warpEnabled ? f.warpFeather ?? 0 : 0)
+      presenter?.setSharp(!!f.outSharp)
     })
 
     return () => {

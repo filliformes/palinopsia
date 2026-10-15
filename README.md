@@ -879,7 +879,12 @@ bottom:
   projectors show one continuous picture. The size lives on the machine, not in the
   session, so a show file stays resolution-independent.
 - **Render scale** : a quality multiplier (0.1–2×) on the composition size (½ lo-fi /
-  1× / 1⅓× / 2×; the readout shows the real render resolution; rebuilds the engine).
+  ¾ / 1× / 1⅓× / 2×; the readout shows the real render resolution; rebuilds the engine).
+  **Sharp enlargement** (off by default) : the projector window enlarges a frame rendered
+  below its size through a cubic filter instead of a bilinear blend, so edges, grain and
+  dust stay crisp on the projector. Only the enlargement changes, never the rendered
+  frame or a recording; clamped, so a hard edge never rings. Per computer, like the
+  render scale.
 - **Mapping** : a live keystone editor (drag four corner handles over a mirror of
   the output) + alignment grid + reset. The warp belongs to the computer (its
   projector) and survives restarts; **save with session** makes it travel with the

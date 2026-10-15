@@ -63,6 +63,8 @@ export function OutputPage({
   const setWarpGrid = useStore((s) => s.setWarpGrid)
   const warpFeather = useStore((s) => s.warpFeather)
   const setWarpFeather = useStore((s) => s.setWarpFeather)
+  const outSharp = useStore((s) => s.outSharp)
+  const setOutSharp = useStore((s) => s.setOutSharp)
   const setWarpCorner = useStore((s) => s.setWarpCorner)
   const resetWarp = useStore((s) => s.resetWarp)
   const warpInSession = useStore((s) => s.warpInSession)
@@ -565,6 +567,7 @@ export function OutputPage({
             <div className="flex flex-wrap gap-1.5">
               {[
                 ['½ (lo-fi)', 0.5],
+                ['¾', 0.75],
                 ['1×', 1],
                 ['1⅓×', 1.3333],
                 ['2×', 2]
@@ -577,6 +580,15 @@ export function OutputPage({
                   {lbl}
                 </button>
               ))}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setOutSharp(!outSharp)}
+                className={btn(outSharp)}
+                title="The projector window enlarges the rendered frame through a sharper (cubic) filter instead of a bilinear blend : below 1× edges, grain and dust stay crisp on the projector. Only the enlargement changes, never the rendered frame or a recording; it costs next to nothing. Clamped, so a hard edge never rings"
+              >
+                sharp enlargement {outSharp ? 'on' : 'off'}
+              </button>
             </div>
           </Section>
 

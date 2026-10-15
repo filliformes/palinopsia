@@ -49,6 +49,42 @@ void main(){
   o = vec4(c.rgb * cov, 1.0);
 }`
 
+// The projector window's sharper enlargement (Output → Sharp enlargement) : the
+// same warp, sampled through a cubic (Catmull-Rom) over the 4x4 texels around
+// each point instead of the bilinear blend of 4. Below render scale 1 the
+// projector shows the frame enlarged, and bilinear softens every edge and grain
+// speck by the enlargement. The cubic overshoots at hard edges : clamped to the
+// 4 nearest texels, so a dark rim never rings inside a white surround. The
+// compositor never uses it, and off, the window draws WARP_FS as before.
+const BILINEAR_TAP = 'vec4 c = texture(tex, clamp(uv, 0.0, 1.0));'
+const SHARP_TAP_FN = `vec4 sharpTap(sampler2D t, vec2 uv){
+  ivec2 sz = textureSize(t, 0);
+  vec2 p = clamp(uv, 0.0, 1.0) * vec2(sz) - 0.5;
+  vec2 f = fract(p);
+  ivec2 i0 = ivec2(floor(p)) - 1;
+  ivec2 mx = sz - 1;
+  vec2 w0 = f * (-0.5 + f * (1.0 - 0.5 * f));
+  vec2 w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+  vec2 w2 = f * (0.5 + f * (2.0 - 1.5 * f));
+  vec2 w3 = f * f * (-0.5 + 0.5 * f);
+  float wx[4] = float[4](w0.x, w1.x, w2.x, w3.x);
+  float wy[4] = float[4](w0.y, w1.y, w2.y, w3.y);
+  vec4 sum = vec4(0.0), lo = vec4(1e9), hi = vec4(-1e9);
+  for (int y = 0; y < 4; y++){
+    for (int x = 0; x < 4; x++){
+      vec4 s = texelFetch(t, clamp(i0 + ivec2(x, y), ivec2(0), mx), 0);
+      sum += s * (wx[x] * wy[y]);
+      if (x == 1 || x == 2) if (y == 1 || y == 2) { lo = min(lo, s); hi = max(hi, s); }
+    }
+  }
+  return clamp(sum, lo, hi);
+}
+void main(){`
+export const WARP_SHARP_FS = (() => {
+  if (!WARP_FS.includes(BILINEAR_TAP) || !WARP_FS.includes('void main(){')) throw new Error('warpQuad : WARP_FS changed, update WARP_SHARP_FS')
+  return WARP_FS.replace('void main(){', SHARP_TAP_FN).replace(BILINEAR_TAP, 'vec4 c = sharpTap(tex, uv);')
+})()
+
 /** How far past the frame the quad reaches, in output pixels : enough for the
  *  anti-aliased half pixel outside the edge. */
 const MARGIN_PX = 2
