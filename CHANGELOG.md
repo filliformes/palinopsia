@@ -94,6 +94,16 @@ that CI builds into cross-platform releases.
   the shortcuts stay quiet while typing). Measured with real input at UI zoom 115 % :
   Shift-drag 60 px, lp 2000 → 2220 Hz (a plain drag : 6450); typed `4250` → 4250,
   `3.1k` → 3100.
+- **The Collage filters' slope is a choice : 12 or 24 dB/oct** (a chip right of the hp
+  and lp labels, inside the label column so every track still lines up; 24 by default).
+  12 = one Butterworth section (Q -3.01 dB) and the second section an all-pass (flat :
+  the films' audio is never rewired, so a switch never clicks). Measured : lp 2 kHz at
+  12, -3.0 dB at 2 k, -12.6 at 4 k, -25.7 at 8 k; hp 200 Hz at 12, -12.3 at 100. OSC
+  `/opsia/sonify/collage/hpslope · lpslope` (12 / 24, or >= 0.5 = 24). A Sonify slider
+  takes a `lead` (shown inside its label column).
+- **The Prism reverb's crossover reads in Hz** : its low split (400 Hz at the default,
+  `400 x 4^(x - 0.3)`, as the worklet computes it), both splits on hover, and a typed
+  frequency (`250`) sets it.
 - **The Collage's Ring bank controls grey out while its wet is 0** (they shape the
   bank, so nothing changes until it is up; still playable), and **wet** now heads the
   section.

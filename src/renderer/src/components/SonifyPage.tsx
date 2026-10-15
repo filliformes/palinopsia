@@ -177,6 +177,16 @@ function RateRow({ label, rate, sync, onRate, onSync, title }: {
 }
 const RING_VOICINGS = ['Clean', 'SEM', 'MS-20', 'Steiner', 'K35']
 
+/** The Prism reverb's two crossovers for its `crossover` (0..1), as the worklet
+ *  sets them (FDNReverb : 400 / 5500 Hz at 0.3, x4 per unit, clamped). */
+function prismSplits(c: number): [number, number] {
+  const k = Math.pow(4, c - 0.3)
+  return [Math.max(60, Math.min(3000, 400 * k)), Math.max(1500, Math.min(14000, 5500 * k))]
+}
+function hzLabel(f: number): string {
+  return f >= 1000 ? `${(f / 1000).toFixed(f >= 10000 ? 1 : 2)} kHz` : `${Math.round(f)} Hz`
+}
+
 /** A typed frequency : "4250", "4.25k", "4.25 kHz", "250 Hz"; "off" → `off`. */
 function parseHz(text: string, off: number): number | null {
   const t = text.trim().toLowerCase().replace(',', '.')
@@ -193,11 +203,13 @@ function parseDb(text: string): number | null {
 }
 
 function Slider({
-  label, value, min, max, step = 0.01, neutral, fmt, onChange, title, mod, parse
+  label, value, min, max, step = 0.01, neutral, fmt, onChange, title, mod, parse, lead
 }: {
   label: string; value: number; min: number; max: number; step?: number
   neutral?: number; fmt?: (v: number) => string; onChange: (v: number) => void; title?: string
   mod?: ReactNode
+  /** Right after the label, before the track (a filter's slope chip). */
+  lead?: ReactNode
   /** The readout can be typed into : the text → the slider's value (null : not understood). */
   parse?: (text: string) => number | null
 }): JSX.Element {
@@ -251,7 +263,13 @@ function Slider({
     setTyping(null)
   }
   return (
-    <Row label={label} hint={title}>
+    <div className="flex min-w-0 items-center gap-1.5">
+      {/* the label column (the Row's width) : a `lead` sits inside it, right of the
+          label, so every track still starts at the same place */}
+      <span className="flex w-14 shrink-0 items-center gap-1 font-mono text-[9px] uppercase text-muted" title={title}>
+        <span className="min-w-0 truncate">{label}</span>
+        {lead}
+      </span>
       <input
         ref={ref}
         type="range" min={min} max={max} step={step} value={value}
@@ -285,7 +303,7 @@ function Slider({
         <span className={`w-12 shrink-0 text-right font-mono text-[9px] ${live ? 'text-accent2' : 'text-muted'}`}>{shown}</span>
       )}
       {mod}
-    </Row>
+    </div>
   )
 }
 
@@ -1719,8 +1737,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             </div>
             {/* The films in, before everything : a windy or hot recording. */}
             <Slider label="films in" value={cfg.collage.inGain ?? 0} min={-24} max={12} neutral={0} fmt={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} onChange={(v) => pv('collage', { inGain: Math.round(v * 2) / 2 })} title="The films' level into the voice, before the resonators : turn a windy or hot recording down here (the resonators and the Ring bank then ring cleaner)" parse={(t) => parseDb(t)} />
-            <Slider label="hp" value={Math.log((cfg.collage.hp ?? 20) / 20) / Math.log(50)} min={0} max={1} step={0.001} neutral={0} fmt={() => ((cfg.collage.hp ?? 20) <= 20.5 ? 'off' : `${Math.round(cfg.collage.hp ?? 20)} Hz`)} onChange={(v) => pv('collage', { hp: Math.round(20 * Math.pow(50, v)) })} title="A high-pass on every film, 24 dB per octave, before the resonators : wind rumble and handling noise go (20 Hz = off, up to 1 kHz)" parse={(t) => { const f = parseHz(t, 20); return f === null ? null : Math.log(Math.max(20, Math.min(1000, f)) / 20) / Math.log(50) }} />
-            <Slider label="lp" value={Math.log((cfg.collage.lp ?? 20000) / 1000) / Math.log(20)} min={0} max={1} step={0.001} neutral={1} fmt={() => { const f = cfg.collage.lp ?? 20000; return f >= 19950 ? 'off' : f < 10000 ? `${(f / 1000).toFixed(2)} kHz` : `${(f / 1000).toFixed(1)} kHz` }} onChange={(v) => pv('collage', { lp: Math.round(1000 * Math.pow(20, v) / 10) * 10 })} title="A low-pass on every film, 24 dB per octave (flat to the corner, then steep), before the resonators : crackle, hiss and the wind's top go (20 kHz = off, down to 1 kHz). Fine steps : the arrow keys move it 0.3 % at a time." parse={(t) => { const f = parseHz(t, 20000); return f === null ? null : Math.log(Math.max(1000, Math.min(20000, f)) / 1000) / Math.log(20) }} />
+            <Slider label="hp" lead={<button onClick={() => pv('collage', { hpSlope: (cfg.collage.hpSlope ?? 24) === 24 ? 12 : 24 })} className={`w-[22px] shrink-0 rounded px-0 py-0.5 text-center font-mono text-[8px] transition-colors ${(cfg.collage.hpSlope ?? 24) === 24 ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'}`} title={`The high-pass's slope : ${(cfg.collage.hpSlope ?? 24) === 24 ? '24 dB per octave (steep : two Butterworth sections)' : '12 dB per octave (gentle : one section)'}. Click : ${(cfg.collage.hpSlope ?? 24) === 24 ? '12' : '24'}`}>{cfg.collage.hpSlope ?? 24}</button>} value={Math.log((cfg.collage.hp ?? 20) / 20) / Math.log(50)} min={0} max={1} step={0.001} neutral={0} fmt={() => ((cfg.collage.hp ?? 20) <= 20.5 ? 'off' : `${Math.round(cfg.collage.hp ?? 20)} Hz`)} onChange={(v) => pv('collage', { hp: Math.round(20 * Math.pow(50, v)) })} title="A high-pass on every film, before the resonators : wind rumble and handling noise go (20 Hz = off, up to 1 kHz). Its slope (12 or 24 dB per octave) is the chip beside the label." parse={(t) => { const f = parseHz(t, 20); return f === null ? null : Math.log(Math.max(20, Math.min(1000, f)) / 20) / Math.log(50) }} />
+            <Slider label="lp" lead={<button onClick={() => pv('collage', { lpSlope: (cfg.collage.lpSlope ?? 24) === 24 ? 12 : 24 })} className={`w-[22px] shrink-0 rounded px-0 py-0.5 text-center font-mono text-[8px] transition-colors ${(cfg.collage.lpSlope ?? 24) === 24 ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'}`} title={`The low-pass's slope : ${(cfg.collage.lpSlope ?? 24) === 24 ? '24 dB per octave (steep : two Butterworth sections)' : '12 dB per octave (gentle : one section)'}. Click : ${(cfg.collage.lpSlope ?? 24) === 24 ? '12' : '24'}`}>{cfg.collage.lpSlope ?? 24}</button>} value={Math.log((cfg.collage.lp ?? 20000) / 1000) / Math.log(20)} min={0} max={1} step={0.001} neutral={1} fmt={() => { const f = cfg.collage.lp ?? 20000; return f >= 19950 ? 'off' : f < 10000 ? `${(f / 1000).toFixed(2)} kHz` : `${(f / 1000).toFixed(1)} kHz` }} onChange={(v) => pv('collage', { lp: Math.round(1000 * Math.pow(20, v) / 10) * 10 })} title="A low-pass on every film, before the resonators : crackle, hiss and the wind's top go (20 kHz = off, down to 1 kHz). Its slope (12 or 24 dB per octave) is the chip beside the label." parse={(t) => { const f = parseHz(t, 20000); return f === null ? null : Math.log(Math.max(1000, Math.min(20000, f)) / 1000) / Math.log(20) }} />
             <Slider label="resonance" value={cfg.collage.reso} min={0} max={1} neutral={0.5} onChange={(v) => pv('collage', { reso: v })} mod={chip('collageReso')} title="0 = the plain films · 1 = only the tuned resonances" />
             <Slider label="ring" value={cfg.collage.ring} min={0} max={1} neutral={0.5} onChange={(v) => pv('collage', { ring: v })} mod={chip('collageRing')} title="How sharply each piece's resonator rings : a broad color → a pitched, singing tone" />
             <Slider label="harmonics" value={cfg.collage.bright} min={0} max={1} neutral={0.5} onChange={(v) => pv('collage', { bright: v })} title="How much the 2nd and 3rd harmonics ring with each note" />
@@ -1817,7 +1835,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
               </>
             ) : (
               <>
-                <Slider label="crossover" value={cfg.fx.rvCross} min={0} max={1} neutral={0.3} onChange={(v) => pfx({ rvCross: v })} title="Prism : band-split frequency" />
+                <Slider label="crossover" value={cfg.fx.rvCross} min={0} max={1} step={0.002} neutral={0.3} fmt={(v) => hzLabel(prismSplits(v)[0])} parse={(t) => { const f = parseHz(t, 400); return f === null ? null : 0.3 + Math.log(f / 400) / Math.log(4) }} onChange={(v) => pfx({ rvCross: v })} title={`Prism : where its three bands split, the low and the high crossover moving together : now ${hzLabel(prismSplits(cfg.fx.rvCross)[0])} and ${hzLabel(prismSplits(cfg.fx.rvCross)[1])} (the readout is the low one; click it to type a frequency)`} />
                 <Slider label="low ×" value={cfg.fx.rvLowMult} min={0.05} max={4} neutral={1} fmt={(v) => v.toFixed(2)} onChange={(v) => pfx({ rvLowMult: v })} title="Prism : low-band decay multiplier" />
                 <Slider label="high ×" value={cfg.fx.rvHighMult} min={0.05} max={4} neutral={1} fmt={(v) => v.toFixed(2)} onChange={(v) => pfx({ rvHighMult: v })} title="Prism : high-band decay multiplier" />
               </>

@@ -162,7 +162,9 @@ export interface SoniConfig {
     // THE FILMS IN, before everything (a windy or hot recording) :
     inGain: number // dB, -24..+12 : the films' level into the resonators (and the voice)
     hp: number // Hz, 20..1000 : a high-pass on every film, 24 dB/oct (20 = off) : wind rumble
-    lp: number // Hz, 1000..20000 : a low-pass, 24 dB/oct (20000 = off) : crackle, hiss
+    lp: number // Hz, 1000..20000 : a low-pass (20000 = off) : crackle, hiss
+    hpSlope: 12 | 24 // dB/oct of the high-pass (one Butterworth section, or two)
+    lpSlope: 12 | 24 // dB/oct of the low-pass
     ringIn: number // dB, -24..+12 : how hard the films drive the Ring bank (its wet and its clip)
     loOct: number; hiOct: number
     // RING BANK : a 48-band resonant filterbank on the whole voice,
@@ -221,7 +223,7 @@ export function defaultSoniConfig(): SoniConfig {
     signal: { on: false, tap: 0, gain: 0.6, pan: 0, wave: 0, decay: 0.3, tone: 0.6, fm: 0.4, heads: 2, rate: 8, sync: false, steps: 16, spread: 0.5, thresh: 0.5, density: 0.35, path: 0, loOct: 4, hiOct: 8, snap: 1 },
     chord: { on: false, tap: 0, gain: 0.6, pan: 0, voices: 7, loOct: 2, hiOct: 6, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3, waves: 0, wavesRate: 0.4, wavesSync: 0, noise: 0, air: 0.4 },
     collage: {
-      on: false, gain: 0.7, pan: 0, reso: 0.5, ring: 0.5, bright: 0.5, width: 1, inGain: 0, hp: 20, lp: 20000, ringIn: 0, loOct: 2, hiOct: 6,
+      on: false, gain: 0.7, pan: 0, reso: 0.5, ring: 0.5, bright: 0.5, width: 1, inGain: 0, hp: 20, lp: 20000, hpSlope: 24, lpSlope: 24, ringIn: 0, loOct: 2, hiOct: 6,
       bank: 0, bankSend: false, decay: 0.5, choke: false, cutoff: 1, peak: 0, slope: 0, tone: 0, tilt: 0,
       waves: 0, wavesRate: 0.5, wavesSync: 0, noise: 0, noiseRate: 0.5, noiseSync: 0, detune: 0, voicing: 0
     },
@@ -1283,7 +1285,9 @@ class SonifyEngine {
           width: mv.get('collageWidth') ?? c.width,
           inGain: Math.pow(10, (c.inGain ?? 0) / 20),
           hp: c.hp ?? 20,
-          lp: c.lp ?? 20000
+          lp: c.lp ?? 20000,
+          hpSlope: c.hpSlope === 12 ? 12 : 24,
+          lpSlope: c.lpSlope === 12 ? 12 : 24
         }, this.collageNotesNow())
       } else if (this.collage) {
         this.collage.dispose()

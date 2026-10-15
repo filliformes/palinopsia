@@ -96,8 +96,10 @@ export interface CollageVoiceCfg {
   bright: number // weight of the 2nd and 3rd harmonics
   width: number // stereo spread of the pan
   inGain?: number // linear : the films' level into the resonators (a windy film)
-  hp?: number // Hz : each film's high-pass (24 dB/oct), before the resonators
-  lp?: number // Hz : each film's low-pass (24 dB/oct)
+  hp?: number // Hz : each film's high-pass, before the resonators
+  lp?: number // Hz : each film's low-pass
+  hpSlope?: 12 | 24 // dB/oct
+  lpSlope?: 12 | 24
 }
 
 /** One <audio> playing one file into its deck's bus. */
@@ -137,6 +139,21 @@ interface PieceChain {
   used: boolean
   tg: Float64Array // the target each glide was last sent (see glide)
   slot: number // Space : the piece group it sounds in as a source of its own (-1 : none)
+}
+
+/** A film filter's slope : 24 dB/oct = two Butterworth sections (Q -5.33 and
+ *  +2.32 dB : Web Audio reads a low- / high-pass Q in decibels); 12 dB/oct = one
+ *  (Q -3.01 dB, Butterworth 0.7071) and the other an all-pass (flat : the films'
+ *  audio is never rewired, so a switch never clicks off the sound). */
+function setSlope(f: BiquadFilterNode[], type: 'highpass' | 'lowpass', slope: 12 | 24): void {
+  if (slope === 24) {
+    f[0].Q.value = -5.3329
+    f[1].type = type
+    f[1].Q.value = 2.3226
+  } else {
+    f[0].Q.value = -3.0103
+    f[1].type = 'allpass'
+  }
 }
 
 /** Space : the Collage pieces as sources of their own (shared/spatial.ts). The
@@ -205,6 +222,8 @@ export class CollageVoice {
   // the films' filters (every deck follows them)
   private hpHz = 20
   private lpHz = 20000
+  private hpSlope: 12 | 24 = 24
+  private lpSlope: 12 | 24 = 24
   private groupCount = new Int32Array(PIECE_GROUPS)
   readonly groupPos = new Float32Array(PIECE_GROUPS * 3)
 
@@ -322,6 +341,8 @@ export class CollageVoice {
         [-5.3329, 2.3226].map((q) => { const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.value = hz; return f })
       const hp = bw('highpass', this.hpHz)
       const lp = bw('lowpass', Math.min(this.lpHz, ctx.sampleRate * 0.45))
+      setSlope(hp, 'highpass', this.hpSlope)
+      setSlope(lp, 'lowpass', this.lpSlope)
       const out = ctx.createGain()
       bus.connect(hp[0]).connect(hp[1]).connect(lp[0]).connect(lp[1]).connect(out)
       const dp: DeckPlayer = {
@@ -499,6 +520,11 @@ export class CollageVoice {
         d.hp.forEach((f) => f.frequency.setTargetAtTime(hpHz, now, 0.03))
         d.lp.forEach((f) => f.frequency.setTargetAtTime(Math.min(lpHz, this.ctx.sampleRate * 0.45), now, 0.03))
       }
+    }
+    const hpS = cfg.hpSlope === 12 ? 12 : 24, lpS = cfg.lpSlope === 12 ? 12 : 24
+    if (hpS !== this.hpSlope || lpS !== this.lpSlope) {
+      this.hpSlope = hpS; this.lpSlope = lpS
+      for (const d of this.decks.values()) { setSlope(d.hp, 'highpass', hpS); setSlope(d.lp, 'lowpass', lpS) }
     }
     const inLin = Math.max(0, cfg.inGain ?? 1)
     for (const d of this.decks.values()) d.used = false
