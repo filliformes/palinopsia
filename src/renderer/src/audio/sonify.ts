@@ -81,6 +81,15 @@ export const SCALE_STEPS: Record<SoniScale, number[]> = {
   dimwh: [0, 2, 3, 5, 6, 8, 9, 11], // whole, half, ...
   dimhw: [0, 1, 3, 4, 6, 7, 9, 10] // half, whole, ...
 }
+/** Ten characters at most : the Sonify bar's menu, which a native select sizes
+ *  to its longest option (the full names pushed the bar onto two rows; the old
+ *  ids topped out at ten, "pentatonic"). */
+export const SCALE_SHORT: Record<SoniScale, string> = {
+  chromatic: 'chromatic', major: 'major', minor: 'minor', pentatonic: 'min pent', wholetone: 'wholetone',
+  dorian: 'dorian', phrygian: 'phrygian', lydian: 'lydian', harmonicminor: 'harmonic', ionian: 'ionian',
+  mixolydian: 'mixolydian', aeolian: 'aeolian', locrian: 'locrian', majorpentatonic: 'maj pent',
+  majorblues: 'maj blues', minorblues: 'min blues', dimwh: 'dim W-H', dimhw: 'dim H-W'
+}
 /** Five characters at most : the key sequencer's chips and steps (M major, m minor). */
 export const SCALE_ABBR: Record<SoniScale, string> = {
   chromatic: 'chr', major: 'maj', minor: 'min', pentatonic: 'm.pnt', wholetone: 'whole',

@@ -11,7 +11,7 @@ import { Blink } from './Blink'
 import type { ModTarget, SonifyModParam } from '@shared/types'
 import { registerLiveOverlay } from './liveOverlay'
 import { randomSonify, randomizeVoice, suggestSonify, type SoniVoiceKey } from '../audio/autoSonify'
-import { defaultSoniConfig, ringFreqs, SCALE_LABEL, SCALE_ORDER, sonifyEngine, type SoniConfig } from '../audio/sonify'
+import { defaultSoniConfig, ringFreqs, SCALE_LABEL, SCALE_ORDER, SCALE_SHORT, sonifyEngine, type SoniConfig } from '../audio/sonify'
 import { deleteSoniPreset, listSoniPresets, loadSoniPreset, saveSoniPreset } from '../audio/soniPresets'
 import { modTargetKey, useStore } from '../store'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
@@ -965,7 +965,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-bg">
       {/* Header : wraps gracefully on a narrow window instead of pushing controls off. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border px-3 py-2">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border-b border-border px-3 py-2">
         <span className="text-[13px] font-semibold">Sonify</span>
         <button
           onClick={() => {
@@ -999,12 +999,12 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             onChange={(e) => setPresetName(e.target.value)}
             placeholder="preset"
             spellCheck={false}
-            className="input h-[22px] w-20 px-1.5 text-[10px]"
+            className="input h-[22px] w-14 px-1.5 text-[10px]"
             title="Name for saving the current Sonify patch"
           />
           <button onClick={savePreset} className="rounded px-1.5 py-0.5 font-mono text-[10px] text-muted ring-1 ring-border hover:text-accent hover:ring-accent/60" title="Save the current Sonify patch under this name">save</button>
           <select
-            className="input select-compact max-w-[110px] text-[10px]"
+            className="input select-compact max-w-[96px] text-[10px]"
             value=""
             onChange={(e) => { if (e.target.value) loadPreset(e.target.value) }}
             title="Load a saved Sonify preset"
@@ -1040,13 +1040,13 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             type="range" min={0} max={1} step={0.01} value={cfg.master}
             onChange={(e) => patch({ master: Number(e.target.value) })}
             onDoubleClick={() => patch({ master: 0.8 })}
-            className="w-28 accent-accent"
+            className="w-20 accent-accent"
             title={`Master gain ${cfg.master.toFixed(2)} : double-click resets to 0.80 (a peak limiter always guards the output)`}
           />
         </span>
         <span className="w-7 shrink-0 text-right font-mono text-[9px] text-muted">{cfg.master.toFixed(2)}</span>
         <div className="flex shrink-0 items-center gap-1" title="Output level after the master and the limiter, per channel (L above, R below) : the bar is the average (RMS) level, the tick the peak, on a dB scale from -54 to 0 (lines at -36, -18, -6 dB). Yellow above -9 dB, orange while the limiter works (it holds the peak under -1 dB).">
-          <div ref={meterRef} className="relative flex h-[9px] w-28 flex-col justify-between overflow-hidden rounded-sm bg-panel3">
+          <div ref={meterRef} className="relative flex h-[9px] w-[72px] flex-col justify-between overflow-hidden rounded-sm bg-panel3">
             {[0, 1].map((c) => (
               <div key={c} className="relative h-[4px] w-full">
                 <div data-m={`b${c}`} className="absolute inset-y-0 left-0 w-0" />
@@ -1060,7 +1060,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           <span data-m="db" className="w-6 text-right font-mono text-[9px] tabular-nums text-muted">-∞</span>
         </div>
         {/* Quantizer */}
-        <span className="ml-2 font-mono text-[9px] uppercase text-muted">key</span>
+        <span className="font-mono text-[9px] uppercase text-muted">key</span>
         <select
           className="input select-compact text-[10px]"
           value={cfg.root}
@@ -1081,20 +1081,20 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           className="input select-compact text-[10px]"
           value={cfg.scale}
           onChange={(e) => patch({ scale: e.target.value as SoniConfig['scale'] })}
-          title="Quantizer scale (each voice can snap to it or run free)"
+          title={`Quantizer scale : ${SCALE_LABEL[cfg.scale] ?? cfg.scale} (each voice can snap to it or run free)`}
         >
-          {SCALE_ORDER.map((s) => <option key={s} value={s}>{SCALE_LABEL[s]}</option>)}
+          {SCALE_ORDER.map((s) => <option key={s} value={s} title={SCALE_LABEL[s]}>{SCALE_SHORT[s]}</option>)}
         </select>
         {/* Output device (the same setting as Sonify's row in the audio/midi/osc tab) */}
         <AudioOutputSelect
-          className="input select-compact max-w-[180px] text-[10px]"
+          className="input select-compact max-w-[150px] truncate text-[10px]"
           value={cfg.sinkId}
           onChange={(id) => patch({ sinkId: id })}
           title="Which output device Sonify plays to (also in the audio/midi/osc tab)"
         />
         <div className="flex-1" />
-        <span className="font-mono text-[9px] text-muted">S / Esc closes</span>
-        <button onClick={() => setOpen(false)} className="rounded px-2 py-0.5 text-[12px] text-muted hover:text-text" title="Close (Esc)">✕</button>
+        {/* (the "S / Esc closes" hint lives in the button's tooltip : the bar holds one row at 100 % down to a 1,400 px window) */}
+        <button onClick={() => setOpen(false)} className="rounded px-2 py-0.5 text-[12px] text-muted hover:text-text" title="Close (S or Esc)">✕</button>
       </div>
 
       <div className="flex min-h-0 flex-1">

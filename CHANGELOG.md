@@ -153,6 +153,14 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The Sonify bar holds one row again at 100 %.** The 18 scales' full names widened the
+  scale menu (a native select is as wide as its longest option : 121 px), which pushed
+  the bar onto two rows. The menu now shows short names no wider than the old ones
+  (`SCALE_SHORT` : 85 px against the old 86; the full name in its tooltip and in the
+  key sequencer), and the bar is tighter : "S / Esc closes" moved into the close
+  button's tooltip, shorter master slider and meter, the output menu capped at 150 px
+  (ellipsis), narrower preset box and gaps. Measured with a 25-character output name :
+  one row down to a 1,420 px window (it needed about 1,625).
 - **The key sequencer's Picture follows the picture.** It read the root off a frame's
   chroma-weighted mean hue, and that hardly moves : it is the footage's cast (measured
   over time on eight generated looks : 5 to 30° of drift in 12 s, 1 to 4 roots; a
