@@ -1250,8 +1250,10 @@ that voice. **↺ default** resets every voice / FX / mixer setting to the facto
 patch. Each voice box carries an **ⓘ** with its full description. The whole audio
 path is NaN-safe : a wild random patch, or a NaN arriving over OSC, can't get the
 reverb/delay stuck or mute a voice. Switching a voice on or off (by hand or from the
-sequencer) fades it over 5 ms instead of cutting mid-cycle, and every gain glides : no
-clicks, no zipper. The probes are drawn and dragged on the picture itself (the mirror
+sequencer) fades it over 15 ms instead of cutting mid-cycle (and a voice whose mixer
+filter is engaged rings that filter out before it stops), every gain glides, the Chord's
+notes ramp sample by sample and glide to a new count, and the Collage's films fade in
+and out whenever they start, stop, change or loop : no clicks, no zipper. The probes are drawn and dragged on the picture itself (the mirror
 letterboxes it), where the engine really reads : a held line follows its own reading
 path, the Orbit shows its true Lissajous shape, the sweeps run at their real rate.
 

@@ -3,6 +3,37 @@
 All notable changes to Palinopsia. Dates are ISO. Versions follow the `v*` tags
 that CI builds into cross-platform releases.
 
+## Unreleased
+
+### Fixed
+
+- **Sonify's clicks are gone** (measured on its output, 10 s per case, a click = the
+  waveform's curvature jumping far over its local level; Collage cases on two test films,
+  the test clip with a steady tone : the worst case for hearing a step) :
+  - **The Chord** (122 clicks while still, 129 with its count modulated, 30 at on / off;
+    now 0, 0, 0) : each note's level and pan ramp sample by sample instead of stepping once
+    a block; a smaller count fades the notes it leaves out (30 ms) instead of cutting
+    them, and the notes that stay glide to their new pitch (60 ms); `setChordFreqs` takes
+    both the config's and the modulator's counts.
+  - **A voice switching off rang its mixer filter's tail out abruptly** : the engine
+    stopped running a voice the moment its fade ended, cutting the filter's ring (a step
+    at off, and another at the next on from its stale state, on any voice whose mixer
+    filter is engaged). `DJFilter.busy()` keeps the voice running until the filter is
+    silent; the on / off fade is 15 ms (5 ms thumped on a low note).
+  - **The Collage voice** (82 clicks on a wall doing nothing, 32 muting its layer on and
+    off, 279 with every film re-cut every 1.2 s and a deal every 1.6 s; now 0, 0, about
+    10 rare decoder-level glitches) : a film's sound starts silent and fades in once its
+    position has really moved on (the ready state said "sounding" ~30 ms after play(),
+    before the sound reached the graph); it fades out before it pauses (its picture
+    paused or hidden); a piece that changes films outside a deal crossfades instead of
+    being rewired mid-wave; the speed follows the picture's but never in small nudges
+    (each playbackRate change restarts the element's time-stretch : a click per nudge),
+    drift being pulled in by a crossfaded re-sync past 0.15 s; the file's own loop point
+    ducks; the voice switching off fades before it is released. Every fade is a
+    `setTargetAtTime` scheduled 10 ms ahead : a curve started from `param.value` (which
+    lags the audio thread) jumped by the difference, and a linear ramp on a gain with no
+    automation event yet ramps from time 0 (an instant jump).
+
 ## v1.2.8 — 2026-10-15
 
 ### Added

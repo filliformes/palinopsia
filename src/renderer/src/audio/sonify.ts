@@ -535,6 +535,7 @@ class SonifyEngine {
   private lineReq = 0 // the latest line-in request (an older one resolving late is dropped)
   private lastTick = 0
   private chordSentN = -1 // the Chord note count the worklet has
+  private collageOffAt = 0 // the Collage voice fading out before it is released (ms)
   private bpm = 120 // the tempo, for the synced modulation rates (sent with the mod overlay)
   private lastFrameAt = [0, 0]
   private tapKey = ['', ''] // what each tap read last (a new source = no motion against the old)
@@ -1375,6 +1376,7 @@ class SonifyEngine {
     // whole graph goes (its players stop decoding).
     try {
       if (this.cfg.collage.on && this.ctx) {
+        this.collageOffAt = 0
         if (!this.collage) {
           this.collage = new CollageVoice(this.ctx)
           this.collage.out.connect(node, 0, 1) // the bus on 0-1, Space's piece groups on 2..
@@ -1394,8 +1396,9 @@ class SonifyEngine {
           lpSlope: c.lpSlope === 12 ? 12 : 24
         }, this.collageNotesNow())
       } else if (this.collage) {
-        this.collage.dispose()
-        this.collage = null
+        // fade it out, then release it (at once, the films stopped mid-wave)
+        if (!this.collageOffAt) { this.collage.silence(); this.collageOffAt = nowMs }
+        else if (nowMs - this.collageOffAt > 80) { this.collage.dispose(); this.collage = null; this.collageOffAt = 0 }
       }
     } catch (e) {
       // by name : the log file printed a DOMException as [object DOMException]

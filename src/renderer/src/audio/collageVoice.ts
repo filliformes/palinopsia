@@ -109,6 +109,10 @@ interface Player {
   g: GainNode // its crossfade gain
   started: boolean // positioned and playing at least once
   path: string
+  wantIn: boolean // to fade in once it really sounds (a film starting or coming back)
+  pos0: number // where it was last positioned or resumed (media s) : sounding once it has moved on
+  stopAt: number // ctx time to pause it at, once faded out (0 : not stopping)
+  dipAt: number // ctx time its loop-point dip ends (0 : none running)
 }
 
 interface DeckPlayer {
@@ -176,8 +180,8 @@ function glide(p: PieceChain, k: number, param: AudioParam, v: number, now: numb
 }
 
 const HARM = [1, 2, 3]
-const SEEK_S = 0.25 // past this the audio jumps to the video
-const LOCK_S = 0.02 // under this it simply plays along
+const SEEK_S = 0.15 // past this the audio re-syncs to the video (a crossfaded splice)
+const FADE_S = 0.03 // a film's sound starting, stopping, coming back : never a hard edge
 const SMOOTH = 0.04 // param glide (s) : no zipper, no clicks
 const MIN_XF = 0.03 // the shortest crossfade : a cut, without the click
 const SWITCH_XF = 0.08 // a film taking a new clip outside a deal (churn)
@@ -185,22 +189,19 @@ const SPLICE_XF = 0.04 // a film jumping within its clip (window loop, re-cue)
 const NEXT_WAIT_S = 1.5 // a new player that never sounds still takes over
 const RETIRE_MAX = 192 // fading-out piece chains kept at most
 
-// Equal-power fade curve (sin of a quarter turn) : two uncorrelated films
-// crossfaded with it keep their summed loudness all the way through.
-const CURVE_N = 33
-const QUARTER = Float32Array.from({ length: CURVE_N }, (_, i) => Math.sin(((i / (CURVE_N - 1)) * Math.PI) / 2))
+// A fade is scheduled a little ahead (AHEAD) and approaches its target from
+// whatever the gain really holds then (setTargetAtTime starts from the live
+// value), never from one read back on this thread : param.value lags the audio
+// thread by a block or more, so a curve started from it jumped by the
+// difference. And never a linear ramp : on a gain with no automation event yet
+// it ramps from time 0, so it lands almost at its target at once (measured :
+// a click at every takeover). The approach reaches 98 % at T.
+const AHEAD = 0.01
 
 function fade(param: AudioParam, now: number, T: number, dir: 'in' | 'out'): void {
-  const dur = Math.max(0.01, T)
-  try {
-    param.cancelAndHoldAtTime(now)
-    const v0 = param.value
-    const c = new Float32Array(CURVE_N)
-    for (let i = 0; i < CURVE_N; i++) c[i] = dir === 'in' ? v0 + (1 - v0) * QUARTER[i] : v0 * QUARTER[CURVE_N - 1 - i]
-    param.setValueCurveAtTime(c, now, dur)
-  } catch {
-    param.setTargetAtTime(dir === 'in' ? 1 : 0, now, dur / 3)
-  }
+  const dur = Math.max(0.01, T), t0 = now + AHEAD
+  try { param.cancelAndHoldAtTime(t0) } catch { /* nothing to hold */ }
+  param.setTargetAtTime(dir === 'in' ? 1 : 0, t0, dur / 4)
 }
 
 export class CollageVoice {
@@ -288,7 +289,25 @@ export class CollageVoice {
     const g = this.ctx.createGain()
     g.gain.value = gain
     src.connect(g).connect(out)
-    return { audio, src, g, started: false, path }
+    return { audio, src, g, started: false, path, wantIn: false, stopAt: 0, dipAt: 0, pos0: 0 }
+  }
+
+  /** Really sounding : positioned, playing, not seeking, with data, AND its
+   *  position has moved on (60 ms of the film played). The ready state alone
+   *  said so ~30 ms after play(), before its sound reached the graph : the
+   *  film then started abruptly halfway into its fade-in (measured : a click at
+   *  every takeover, 26 in 10 s on one churning deck). */
+  private sounding(p: Player): boolean {
+    const a = p.audio
+    return p.started && !a.paused && !a.seeking && a.readyState >= 3 && Math.abs(a.currentTime - p.pos0) > 0.06
+  }
+
+  /** Its picture paused or hidden : fade the sound out, pause it after
+   *  (pausing cut it mid-wave : a click every time a Collage went off). */
+  private stopPlayer(p: Player, now: number): void {
+    if (p.audio.paused || p.stopAt) return
+    fade(p.g.gain, now, FADE_S, 'out')
+    p.stopAt = now + AHEAD + 2 * FADE_S + 0.02 // eight time constants : silent when it pauses
   }
 
   /** The player for a jump within the deck's clip : its spare, silent and
@@ -300,6 +319,7 @@ export class CollageVoice {
     p.g.gain.cancelScheduledValues(0)
     p.g.gain.value = 0
     p.started = false
+    p.wantIn = false; p.stopAt = 0; p.dipAt = 0
     return p
   }
 
@@ -345,8 +365,13 @@ export class CollageVoice {
       setSlope(lp, 'lowpass', this.lpSlope)
       const out = ctx.createGain()
       bus.connect(hp[0]).connect(hp[1]).connect(lp[0]).connect(lp[1]).connect(out)
+      // The first player starts silent and fades in once it sounds : at gain 1
+      // it started at full level whenever its file had loaded, long after its
+      // pieces had faded in (a click each time a Collage came on).
+      const first = this.makePlayer(path, bus, 0)
+      first.wantIn = true
       const dp: DeckPlayer = {
-        bus, hp, lp, out, cur: this.makePlayer(path, bus, 1), next: null, nextT: 0, nextSince: 0, fading: [], spare: null,
+        bus, hp, lp, out, cur: first, next: null, nextT: 0, nextSince: 0, fading: [], spare: null,
         path, video: null, onSeek: () => {}, used: true
       }
       dp.onSeek = (): void => this.resyncDeck(dp, true)
@@ -365,24 +390,25 @@ export class CollageVoice {
     const dur = a.duration
     const t = Number.isFinite(dur) && dur > 0 ? v.currentTime % dur : v.currentTime
     if (!Number.isFinite(t)) return true
-    let nudge = 1
     if (!p.started) {
-      try { a.currentTime = t } catch { /* not seekable yet */ }
+      try { a.currentTime = t; p.pos0 = t } catch { /* not seekable yet */ }
     } else {
       let d = t - a.currentTime
       if (Number.isFinite(dur) && dur > 0 && Math.abs(d) > dur / 2) d -= Math.sign(d) * dur // across the loop point
       if (force || Math.abs(d) > SEEK_S) {
         if (audible) return false
-        try { a.currentTime = t } catch { /* not seekable yet */ }
-      } else if (Math.abs(d) > LOCK_S) nudge = 1 + Math.max(-0.06, Math.min(0.06, d * 0.6))
+        try { a.currentTime = t; p.pos0 = t } catch { /* not seekable yet */ }
+      }
     }
-    // Small drift is pulled in by nudging the speed a few percent (inaudible,
-    // pitch held); a large one, a seek or a re-cue jumps.
-    const want = v.playbackRate * nudge
-    if (want > 0.0625 && want <= 16 && Math.abs(a.playbackRate - want) > 0.002) {
+    // The speed follows the picture's, but never in small nudges : every change
+    // of an element's playbackRate restarts its pitch-keeping time-stretch, and
+    // that clicks (measured : a click at each nudge, ~14 a second on a still
+    // Collage). Drift is pulled in by a crossfaded re-sync past SEEK_S instead.
+    const want = v.playbackRate
+    if (want > 0.0625 && want <= 16 && Math.abs(a.playbackRate - want) > 0.01 * want) {
       try { a.playbackRate = want } catch { /* out-of-band rate */ }
     }
-    if (a.paused) void a.play().catch(() => {})
+    if (a.paused) { if (p.started) p.pos0 = a.currentTime; void a.play().catch(() => {}) }
     p.started = true
     return true
   }
@@ -399,10 +425,13 @@ export class CollageVoice {
       if (v && !v.paused && !v.ended && v.readyState >= 2) this.resyncPlayer(d.next.audio, d.next, v, force, false)
       return
     }
+    const now = this.ctx.currentTime
     if (!v || v.paused || v.ended) {
-      if (!d.cur.audio.paused) d.cur.audio.pause()
+      this.stopPlayer(d.cur, now)
       return
     }
+    // back before it had stopped : fade in again from where the fade-out is
+    if (d.cur.stopAt) { d.cur.stopAt = 0; d.cur.wantIn = true }
     // The video is seeking (a re-cue, a window loop) : the sound plays on as it
     // is until the picture runs again.
     if (v.readyState < 2) return
@@ -424,14 +453,42 @@ export class CollageVoice {
         return false
       })
     }
+    const c = d.cur
+    // stopping : paused once faded out (and faded in when it plays again)
+    if (c.stopAt && now >= c.stopAt) { c.audio.pause(); c.stopAt = 0; c.wantIn = true }
+    // starting or back : faded in once it really sounds
+    if (c.wantIn && !c.stopAt && this.sounding(c)) { fade(c.g.gain, now, FADE_S, 'in'); c.wantIn = false }
+    // The file's own loop point is a hard seam (its last sample against its
+    // first) : the sound ducks across it, out 30 ms before, back 60 ms after.
+    const a = c.audio
+    if (!d.next && !c.wantIn && !c.stopAt && c.started && !a.paused && a.loop && !(c.dipAt > now)) {
+      const dur = a.duration
+      if (Number.isFinite(dur) && dur > 1) {
+        const left = (dur - a.currentTime) / Math.max(0.0625, a.playbackRate)
+        if (left > 0 && left < 0.15) {
+          const g = c.g.gain
+          const t0 = now + AHEAD, t1 = Math.max(t0 + 0.01, now + left - 0.01), t2 = now + left + 0.04
+          try {
+            try { g.cancelAndHoldAtTime(t0) } catch { /* nothing to hold */ }
+            g.setTargetAtTime(0, t0, Math.max(0.003, (t1 - t0) / 4))
+            g.setTargetAtTime(1, t2, 0.008)
+          } catch { /* the duck is a nicety */ }
+          c.dipAt = t2 + 0.05
+        }
+      }
+    }
     const nx = d.next
     if (!nx) return
     // (not while it seeks : a reused player still holds its old position)
-    const sounding = nx.started && !nx.audio.paused && !nx.audio.seeking && nx.audio.readyState >= 3
+    const sounding = this.sounding(nx)
     if (sounding || now - d.nextSince > NEXT_WAIT_S || !d.video) {
       fade(d.cur.g.gain, now, d.nextT, 'out')
-      d.fading.push({ p: d.cur, until: now + d.nextT + 0.1 })
-      fade(nx.g.gain, now, d.nextT, 'in')
+      d.cur.stopAt = 0
+      d.fading.push({ p: d.cur, until: now + AHEAD + 2 * d.nextT + 0.1 })
+      // one that has not sounded yet fades in when it does (faded in while
+      // silent, it started at full level whenever its file loaded : a click)
+      if (sounding) fade(nx.g.gain, now, d.nextT, 'in')
+      else nx.wantIn = true
       d.cur = nx
       d.next = null
     }
@@ -555,7 +612,7 @@ export class CollageVoice {
         for (const [k, p] of this.pieces) {
           if (!k.startsWith(pre)) continue
           fade(p.xf.gain, now, T, 'out')
-          this.retiring.push({ p, until: now + T + 0.05 })
+          this.retiring.push({ p, until: now + AHEAD + 2 * T + 0.03 })
           this.pieces.delete(k)
         }
         // a hard ceiling on chains still fading (each is ~9 audio nodes)
@@ -593,8 +650,19 @@ export class CollageVoice {
         const dkey = deckKeys.get(pc.deck)
         if (!dkey || pc.keep <= 0.001) return
         const key = `${set.id}:p${i}`
+        // The piece shows another film now (outside a deal) : the old chain fades
+        // out on its film while a new one fades in on the new film. Rewiring the
+        // chain from one film to the other switched its sound mid-wave (a click
+        // at every such change, the most frequent under churn).
+        const was = this.pieces.get(key)
+        const handover = !dealt && !!was && !!was.deckKey && was.deckKey !== dkey
+        if (handover) {
+          fade(was!.xf.gain, now, SWITCH_XF, 'out')
+          this.retiring.push({ p: was!, until: now + AHEAD + 2 * SWITCH_XF + 0.03 })
+          this.pieces.delete(key)
+        }
         const fresh = !this.pieces.has(key)
-        const p = this.pieceChain(key, dealt ? T : 0)
+        const p = this.pieceChain(key, dealt ? T : handover ? SWITCH_XF : 0)
         p.used = true
         if (p.deckKey !== dkey) {
           if (p.deckKey) { const old = this.decks.get(p.deckKey); try { old?.out.disconnect(p.inG) } catch { /* not connected */ } }
@@ -608,7 +676,7 @@ export class CollageVoice {
         const n = notes.length
         const f0 = n ? notes[Math.min(n - 1, Math.round(r * (n - 1)))] : 220
         const panV = Math.max(-1, Math.min(1, (pc.x - 0.5) * 2 * cfg.width))
-        if (fresh && dealt) {
+        if (fresh && (dealt || handover)) {
           // A deal's new piece starts AT its note and place (the crossfade is
           // the transition, not a glide from wherever the chain began).
           for (let h = 0; h < HARM.length; h++) p.bp[h].frequency.value = Math.min(nyq, f0 * HARM[h])
@@ -663,6 +731,18 @@ export class CollageVoice {
       if (gw[g] > 1e-6) { this.groupPos[o] = gx[g] / gw[g]; this.groupPos[o + 1] = gy[g] / gw[g]; this.groupPos[o + 2] = gw[g] }
       else this.groupPos[o + 2] = 0 // empty : it keeps its last place, silent
     }
+  }
+
+  /** The voice switching off : every piece fades out (the engine disposes it
+   *  a moment later; disposing at once cut the films mid-wave). */
+  silence(): void {
+    const now = this.ctx.currentTime
+    const quiet = (p: PieceChain): void => {
+      try { p.inG.gain.cancelAndHoldAtTime(now + AHEAD); p.inG.gain.setTargetAtTime(0, now + AHEAD, 0.008) } catch { /* gone */ }
+      p.tg[TG_IN] = 0 // the next glide back up is applied, not skipped as unchanged
+    }
+    for (const p of this.pieces.values()) quiet(p)
+    for (const r of this.retiring) quiet(r.p)
   }
 
   /** The voice switched off, or Sonify stopped : silence and release everything. */

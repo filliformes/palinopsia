@@ -27,7 +27,7 @@ const NVOICE = 10;
 const NYQ_FRAC = 0.45;
 // A switched voice fades in / out over this long instead of cutting mid-cycle
 // (the sequencer toggles voices in rhythm : every step used to click).
-const GATE_S = 0.005;
+const GATE_S = 0.015; // a voice on / off fades over this (5 ms thumped on a low Chord note)
 
 // NaN-safe : a NaN (say from an OSC float) lands on `lo` instead of passing
 // through and latching a voice to silence.
@@ -553,6 +553,15 @@ class DJFilter {
     this.b0 = (1 + cw) * 0.5 * a0i; this.b1 = -(1 + cw) * a0i; this.b2 = this.b0; this.a1 = -2 * cw * a0i; this.a2 = (1 - alpha) * a0i;
   }
   setX(x, sr) { this.tx = x; this.sr = sr || this.sr; }
+  /** Still ringing out (its last outputs not yet silent) : a voice switched off
+   *  keeps running through it until it is, or its tail is cut (a step : a
+   *  click at every off on a voice whose mixer filter is engaged). */
+  busy() {
+    for (let s = 0; s < 3; s++) {
+      if (Math.abs(this.y1L[s]) > 1e-6 || Math.abs(this.y2L[s]) > 1e-6 || Math.abs(this.y1R[s]) > 1e-6 || Math.abs(this.y2R[s]) > 1e-6) return true;
+    }
+    return false;
+  }
   update() {
     // One-pole glide toward the target (~27ms to 90% at 128-sample blocks / 48k).
     this.cx += (this.tx - this.cx) * 0.2;
@@ -855,6 +864,11 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.cPhase = new Float32Array(NCHORD);
     this.cAmp = new Float32Array(NCHORD);
     this.cOff = new Float32Array(NCHORD); // each note's place in the SPREAD fan (-1 left .. 1 right)
+    // each note's gains at the end of the last block (its level and its pan ramp
+    // from there, sample by sample : a step per block was a click), and how many
+    // notes still sound (a note left out by a smaller count fades out)
+    this.cGL = new Float32Array(NCHORD).fill(-1); this.cGR = new Float32Array(NCHORD).fill(-1);
+    this.chordM = 0;
     this.cCtr = 0; this.cCtrT = 0; this.cCtrK = 0; // the fan's balancing centre (glided), its target, the blocks to its next solve
     this.cWt = new Float32Array(NCHORD); // each note's power, for that solve
     this.cTarget = new Float32Array(NCHORD);
@@ -959,14 +973,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       const gl = m.glide > 0 ? Math.min(8, m.glide) : 0;
       if (m.spectraFreqs) this.retune('sp', this.spectraFreqs, m.spectraFreqs, gl);
       if (m.filterFreqs && this.retune('fl', this.fFreqs, m.filterFreqs, gl)) this.rebuildFilterCoefs();
-      if (m.chordFreqs) {
-        const n = Math.min(NCHORD, m.chordFreqs.length);
-        if (n !== this.chordN) {
-          // a new voice count : a new chord, at once
-          delete this.glides.ch;
-          this.chordN = n; this.chordFreqs.set(m.chordFreqs.subarray(0, n));
-        } else this.retune('ch', this.chordFreqs.subarray(0, n), m.chordFreqs, gl);
-      }
+      if (m.chordFreqs) this.setChordFreqs(m.chordFreqs, gl);
       if (m.ringFreqs && this.retune('rg', this.ringF, m.ringFreqs, gl)) this.ring.setFreqs(this.ringF);
       // Orbit / Raster : a key change slides their pitch from where it is.
       if (gl > 0 && (m.cfg.orbit.freq !== prev.orbit.freq || m.cfg.raster.freq !== prev.raster.freq)) {
@@ -977,12 +984,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       return;
     }
     // The Chord's notes alone : a modulated note count (a new chord, at once)
-    if (m.t === 'chord') {
-      const n = Math.min(NCHORD, m.freqs.length);
-      delete this.glides.ch;
-      this.chordN = n; this.chordFreqs.set(m.freqs.subarray(0, n));
-      return;
-    }
+    if (m.t === 'chord') { this.setChordFreqs(m.freqs, 0); return; }
     if (m.t === 'mod') {
       // Per-tick probe overlay : shallow-merge effective values into the live
       // voice configs (sent every tick, so releases revert cleanly).
@@ -1079,6 +1081,21 @@ class SoniProcessor extends AudioWorkletProcessor {
   /** A pitch table's new values : at once (no glide, a first fill), or sliding
    *  over `gl` seconds. True when `cur` changed now. The tables come with every
    *  config (any slider move) : one re-sent unchanged leaves a glide alone. */
+  /** The Chord's notes. A new count is a new chord, but nothing jumps : the
+   *  notes that stay glide to their new places (60 ms at least), new ones start
+   *  at theirs (silent, they swell in), and the ones left out fade out at
+   *  their own pitch (chordM keeps them rendered until they are silent). */
+  setChordFreqs(fr, gl) {
+    const n = Math.min(NCHORD, fr.length), old = this.chordN;
+    if (n !== old) {
+      delete this.glides.ch;
+      for (let i = old; i < n; i++) this.chordFreqs[i] = fr[i];
+      this.chordM = Math.max(this.chordM, old);
+      this.chordN = n;
+      this.retune('ch', this.chordFreqs.subarray(0, n), fr, Math.max(0.06, gl));
+    } else this.retune('ch', this.chordFreqs.subarray(0, n), fr, gl);
+  }
+
   retune(key, cur, next, gl) {
     const n = cur.length;
     if (next.length < n) return false;
@@ -1176,7 +1193,7 @@ class SoniProcessor extends AudioWorkletProcessor {
   // is still fading out after it went off. A voice coming back from silence
   // starts clean (voiceStart).
   voiceLive(idx, on) {
-    const live = on || this.gate[idx] > 0;
+    const live = on || this.gate[idx] > 0 || this.djf[idx].busy();
     if (live && !this.gateLive[idx]) this.voiceStart(idx);
     this.gateLive[idx] = live ? 1 : 0;
     return live;
@@ -1188,7 +1205,7 @@ class SoniProcessor extends AudioWorkletProcessor {
     if (idx === 0) this.sAmp.fill(0);
     else if (idx === 2) { for (let g = 0; g < NGRAIN; g++) this.grains[g].on = false; dropStale(this.pending, now); }
     else if (idx === 3) { for (let k = 0; k < NEVENT; k++) this.notes[k].on = false; dropStale(this.evPending, now); this.evDcL = this.evDcR = 0; }
-    else if (idx === 7) this.cAmp.fill(0);
+    else if (idx === 7) { this.cAmp.fill(0); this.cGL.fill(-1); this.cGR.fill(-1); this.chordM = this.chordN; }
     else if (idx === 9) { for (let k = 0; k < NSIG; k++) this.sig[k].on = false; dropStale(this.sigPending, now); this.sgDcL = this.sgDcR = 0; }
   }
 
@@ -1754,23 +1771,40 @@ class SoniProcessor extends AudioWorkletProcessor {
       }
       this.cCtr += (this.cCtrT - this.cCtr) * (1 - Math.exp(-n * dt / 0.3));
       if (!(Math.abs(this.cCtr) <= 1)) this.cCtr = 0; // NaN guard
-      for (let i = 0; i < N; i++) {
-        const cw1 = cwv > 0.001 ? 1 - cwA * (0.5 - 0.5 * Math.cos(TAU * ((i / N) * (1 + cwFast) - this.cwPh))) : 1;
+      // the notes a smaller count left out fade out (30 ms), at their pitch and place
+      const M = Math.max(N, Math.min(NCHORD, this.chordM));
+      const dnOut = 1 - Math.exp(-n * dt / 0.03);
+      let mLive = N;
+      for (let i = 0; i < M; i++) {
+        const gone = i >= N;
         const cw0 = this.cW[i];
+        const cw1 = gone ? cw0 : cwv > 0.001 ? 1 - cwA * (0.5 - 0.5 * Math.cos(TAU * ((i / N) * (1 + cwFast) - this.cwPh))) : 1;
         this.cW[i] = cw1;
-        const tgt = this.cTarget[i], cur = this.cAmp[i];
-        let a0 = cur + (tgt - cur) * (tgt > cur ? up : dn);
-        if (!(a0 > 1e-12)) a0 = 0; // NaN and denormals → 0
+        const tgt = gone ? 0 : this.cTarget[i], cur = this.cAmp[i];
+        let a0 = cur + (tgt - cur) * (tgt > cur ? up : gone ? dnOut : dn);
+        if (!(a0 > 1e-12) || a0 < 0.003) a0 = 0; // NaN, denormals and the last whisper → 0
         this.cAmp[i] = a0;
-        if (a0 < 0.003) {
+        if (a0 > 0 && gone) mLive = i + 1;
+        if (a0 === 0 && !(cur > 0)) {
           this.cPhase[i] = (this.cPhase[i] + this.chordFreqs[i] * n * dt) % 1;
           this.cZ1L[i] = this.cZ2L[i] = this.cZ1R[i] = this.cZ2R[i] = 0; // a silent band starts clean
+          this.cGL[i] = this.cGR[i] = -1;
           continue;
         }
         // SPREAD (the fan above) : this note's place, around the chord's centre
-        let pan = panBase + spread * 0.5 * (offs[i] - this.cCtr);
-        pan = pan < 0 ? 0 : pan > 1 ? 1 : pan;
-        const gL = gBase * panGL(pan), gR = gBase * panGR(pan);
+        // (a note fading out keeps its last place). Level and gains ramp across
+        // the block from where the last one ended.
+        let gL1, gR1;
+        if (gone && this.cGL[i] >= 0) { gL1 = this.cGL[i]; gR1 = this.cGR[i]; }
+        else {
+          let pan = panBase + spread * 0.5 * (offs[i] - this.cCtr);
+          pan = pan < 0 ? 0 : pan > 1 ? 1 : pan;
+          gL1 = gBase * panGL(pan); gR1 = gBase * panGR(pan);
+        }
+        const gL0 = this.cGL[i] >= 0 ? this.cGL[i] : gL1, gR0 = this.cGR[i] >= 0 ? this.cGR[i] : gR1;
+        this.cGL[i] = gL1; this.cGR[i] = gR1;
+        const dgL = (gL1 - gL0) / n, dgR = (gR1 - gR0) / n, da = (a0 - cur) / n;
+        let gL = gL0, gR = gR0, ac = cur;
         let ph = this.cPhase[i];
         const inc = this.chordFreqs[i] * dt;
         let wv = cw0;
@@ -1788,7 +1822,8 @@ class SoniProcessor extends AudioWorkletProcessor {
             if (tone > 0.001) v = v * (1 - tone) + tab(SH3_T, ph) * tone * 0.9; // tanh(3·sin)
             wv += dwv;
             ng += dng;
-            const amp = a0 * wv;
+            ac += da; gL += dgL; gR += dgR;
+            const amp = ac * wv;
             let v3 = nl[s] - z2l; let v1 = A1 * z1l + A2 * v3; let v2 = z2l + A2 * z1l + A3 * v3; z1l = 2 * v1 - z1l; z2l = 2 * v2 - z2l;
             const bl = v1 * ng;
             v3 = nr[s] - z2r; v1 = A1 * z1r + A2 * v3; v2 = z2r + A2 * z1r + A3 * v3; z1r = 2 * v1 - z1r; z2r = 2 * v2 - z2r;
@@ -1803,13 +1838,15 @@ class SoniProcessor extends AudioWorkletProcessor {
             let v = sinT(ph);
             if (tone > 0.001) v = v * (1 - tone) + tab(SH3_T, ph) * tone * 0.9; // tanh(3·sin)
             wv += dwv;
-            v *= a0 * wv;
+            ac += da; gL += dgL; gR += dgR;
+            v *= ac * wv;
             L[s] += v * gL; R[s] += v * gR;
             ph += inc;
           }
         }
         this.cPhase[i] = ph % 1;
       }
+      this.chordM = mLive;
     }
 
     if (chLive) this.mixVoice(7, ch.on && this.chordN > 0, ch.gain, L, R, outL, outR, n);
