@@ -7,6 +7,36 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **The Collage voice's comp** (Sonify → Collage, after lp) : ONE leveler on the films'
+  whole bus inside the worklet (`Leveler`), before the Ring bank, its gain applied to the
+  Space piece groups too : never one per film. A power detector over both sides (30 ms up,
+  400 ms down), a 10 dB soft knee, one knob taking the threshold from -8 to -30 dB and the
+  ratio from 1.5:1 to 6:1, the makeup 80 % of what a -16 dB film loses; the gain is
+  computed every 16 samples and smoothed per sample. Measured in the test build : two
+  films 26 dB apart come out 22.7 dB apart off, 16.1 at 50 %, 6.4 at 100 %; 0.02 % THD on
+  a 40 Hz sine (wind never ripples it); 0.12 % of one core. A ported freeware bus
+  compressor (MIT) was measured first and turned down : settled, it over-compresses (louder in,
+  quieter out above about -12 dB) and takes one to two seconds to catch a loud film. Its
+  reduction is live beside the label (`collageCompGr`). OSC `/opsia/sonify/collage/comp`.
+- **Glue** (Sonify → mixer, under the output EQ) : one compressor on the whole Sonify
+  mix in the `soni-eq` worklet, after the EQ's bands and before its output gain and the
+  soft ceiling, running with the EQ bypassed too : the port of Loopex's master glue
+  (peak detector, threshold 0 to -12 dB and ratio 1.5:1 to 4:1 on one knob, soft knee,
+  automatic makeup) with five voicings from its EQ table : **clean** 3 / 300 ms, 5 dB
+  knee; **warm** 3 / 400, a drive that grows with the reduction; **punch** 3 / 200, the
+  detector's thrust tilt (the highs over the lows at 632 Hz) and an odd-sided drive;
+  **bite** 1 / 200, a 2 dB knee; **slow** 30 / 600, a 10 dB knee. The gain is computed
+  every 8 samples (it was 0.9 to 4.5 % of a core per sample, now 0.1 to 0.55 %), the
+  drive is the rational tanh, and on / off crossfades over 20 ms. Saved in `SoniEq.glue`
+  (`normalizeEq` fills it, the EQ's reset keeps it). A GR bar on the card (`glueGr`).
+  OSC `/opsia/sonify/glue/on · amount · voice`. Measured (amount 1, clean) : -30 dB in
+  → -25.9 out, -3 → -6.4.
+- **The Chord's voices are a modulation target** (`chordVoices`, 2..16, whole notes) :
+  a modulated count reaches the worklet as the chord's notes alone (`t: 'chord'`), only
+  when the count changes, and the slider's count comes back when the modulator lets go.
+  Measured : an LFO walked it 2..16 and back; released, 7 again.
+- **The Collage Ring bank's cutoff reads in Hz** (the worklet's own mapping : half an
+  octave under the lowest band to one over the highest, on the key), and can be typed.
 - **The Collage voice's films in** (Sonify → Collage), for windy or hot recordings :
   **films in** (-24..+12 dB on each piece's input, before the resonators), **hp** (each
   film's deck bus → two Butterworth high-pass sections, 24 dB/oct, 20 Hz..1 kHz) and
@@ -110,6 +140,15 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Switching Sonify off no longer leaves it running.** Its two worklets were only
+  disconnected; with the audio context kept warm between takes, each off / on left the
+  whole last patch playing to nobody in the audio thread, and its meter messages landed
+  on the new engine's (the glue's reading flickered to "off", the EQ meters to zero).
+  `stop()` now sends both processors `end` (their `process` returns false) and drops
+  their ports' handlers. Measured : 68 messages in 2 s from a stopped engine before, 0
+  after.
+- **A typed Sonify value commits the field's own text** : Enter right after the last
+  keystroke could commit the text from before it.
 - **Space on headphones no longer distorts.** The binaural sum of the virtual speakers
   went straight to the device : the speakers near a voice add up almost in phase at the
   ears, so it ran 7.7 dB over the stereo mix with peaks to 1.13 to 1.41, clipped by the

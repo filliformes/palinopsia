@@ -166,6 +166,7 @@ export interface SoniConfig {
     hpSlope: 12 | 24 // dB/oct of the high-pass (one Butterworth section, or two)
     lpSlope: 12 | 24 // dB/oct of the low-pass
     ringIn: number // dB, -24..+12 : how hard the films drive the Ring bank (its wet and its clip)
+    comp: number // 0..1 : ONE leveler on all the films (0 = off) : the loud ones down, the quiet up
     loOct: number; hiOct: number
     // RING BANK : a 48-band resonant filterbank on the whole voice,
     // its bands on the key / scale over loOct..hiOct. bank = wet (0 = the plain
@@ -223,7 +224,7 @@ export function defaultSoniConfig(): SoniConfig {
     signal: { on: false, tap: 0, gain: 0.6, pan: 0, wave: 0, decay: 0.3, tone: 0.6, fm: 0.4, heads: 2, rate: 8, sync: false, steps: 16, spread: 0.5, thresh: 0.5, density: 0.35, path: 0, loOct: 4, hiOct: 8, snap: 1 },
     chord: { on: false, tap: 0, gain: 0.6, pan: 0, voices: 7, loOct: 2, hiOct: 6, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3, waves: 0, wavesRate: 0.4, wavesSync: 0, noise: 0, air: 0.4 },
     collage: {
-      on: false, gain: 0.7, pan: 0, reso: 0.5, ring: 0.5, bright: 0.5, width: 1, inGain: 0, hp: 20, lp: 20000, hpSlope: 24, lpSlope: 24, ringIn: 0, loOct: 2, hiOct: 6,
+      on: false, gain: 0.7, pan: 0, reso: 0.5, ring: 0.5, bright: 0.5, width: 1, inGain: 0, hp: 20, lp: 20000, hpSlope: 24, lpSlope: 24, ringIn: 0, comp: 0, loOct: 2, hiOct: 6,
       bank: 0, bankSend: false, decay: 0.5, choke: false, cutoff: 1, peak: 0, slope: 0, tone: 0, tilt: 0,
       waves: 0, wavesRate: 0.5, wavesSync: 0, noise: 0, noiseRate: 0.5, noiseSync: 0, detune: 0, voicing: 0
     },
@@ -299,11 +300,19 @@ function spectraFreqs(cfg: SoniConfig, sr: number): Float32Array {
   return out
 }
 
+/** The Chord's note count now : a modulator's (whole notes), or the slider's. */
+function chordCount(cfg: SoniConfig): number {
+  const v = sonifyModValues.get('chordVoices')
+  return v !== undefined && Number.isFinite(v)
+    ? Math.max(2, Math.min(16, Math.round(v)))
+    : Math.max(1, Math.min(16, cfg.chord.voices | 0))
+}
+
 /** The Chord bank's note frequencies : `voices` scale notes spread evenly from
  *  the lowest to the highest of the octave range (always scale-tuned). */
 function chordFreqs(cfg: SoniConfig): Float32Array {
   const tab = scaleTable(effRoot(cfg), cfg.scale, cfg.chord.loOct, cfg.chord.hiOct)
-  const N = Math.max(1, Math.min(16, cfg.chord.voices | 0))
+  const N = chordCount(cfg)
   const out = new Float32Array(N)
   for (let i = 0; i < N; i++) {
     out[i] = tab[Math.min(tab.length - 1, Math.round((i * (tab.length - 1)) / Math.max(1, N - 1)))]
@@ -361,6 +370,8 @@ export function withSonifyParam(c: SoniConfig, param: string, v: number): SoniCo
       return c.orbit.quantize
         ? { ...c, orbit: { ...c.orbit, note: Math.round(v) } }
         : { ...c, orbit: { ...c.orbit, freq: noteFreq(v) } }
+    // the Chord's note count : whole notes only (a new count re-spreads the chord)
+    case 'chordVoices': return { ...c, chord: { ...c.chord, voices: Math.max(2, Math.min(16, Math.round(v))) } }
     case 'rasterX': return { ...c, raster: { ...c.raster, rx: v } }
     case 'rasterY': return { ...c, raster: { ...c.raster, ry: v } }
     case 'rasterW': return { ...c, raster: { ...c.raster, rw: v } }
@@ -433,6 +444,10 @@ class SonifyEngine {
   eqMeterIn = { l: { peak: 0, rms: 0 }, r: { peak: 0, rms: 0 } }
   eqMeterOut = { l: { peak: 0, rms: 0 }, r: { peak: 0, rms: 0 } }
   eqCeiling = false
+  // The two compressors' deepest gain reduction over the last meter period, in
+  // dB (-1 : bypassed) : the Collage comp (on the films' bus) and the glue.
+  collageCompGr = -1
+  glueGr = -1
   // THE SOUND BUS for recordings : a take holds Sonify's audio context open
   // (bus > 0) so its sound track lives for the whole take, Sonify on or off,
   // and a DXV3 take reads the sound as PCM through the tap.
@@ -453,6 +468,7 @@ class SonifyEngine {
   private lineWanted = false
   private lineReq = 0 // the latest line-in request (an older one resolving late is dropped)
   private lastTick = 0
+  private chordSentN = -1 // the Chord note count the worklet has
   private bpm = 120 // the tempo, for the synced modulation rates (sent with the mod overlay)
   private lastFrameAt = [0, 0]
   private tapKey = ['', ''] // what each tap read last (a new source = no motion against the old)
@@ -690,6 +706,7 @@ class SonifyEngine {
           }
           if (m.scan) this.scan = { ...m.scan, recv: performance.now() }
           this.spaceMeter = m.spk ?? null
+          this.collageCompGr = typeof m.lvGr === 'number' ? m.lvGr : -1
         }
       }
       // To the speakers through the output EQ; the recordings (recDest, the DXV3
@@ -701,6 +718,7 @@ class SonifyEngine {
         this.eqMeterIn = { l: { peak: m.inL[0], rms: m.inL[1] }, r: { peak: m.inR[0], rms: m.inR[1] } }
         this.eqMeterOut = { l: { peak: m.outL[0], rms: m.outL[1] }, r: { peak: m.outR[0], rms: m.outR[1] } }
         this.eqCeiling = !!m.ceil
+        this.glueGr = typeof m.gr === 'number' ? m.gr : -1
       }
       node.connect(eq).connect(ctx.destination)
       // The spectrum the EQ page draws, before and after it (native FFTs, read
@@ -854,10 +872,21 @@ class SonifyEngine {
     // it was still open and the Filter voice came back nearly silent)
     this.lineWanted = false
     this.lineReq++
+    // End both processors, not only disconnect them : the context stays open
+    // between takes, and a disconnected worklet kept running (the whole last
+    // config, every voice, in the audio thread) and kept posting its meters
+    // over the next engine's (the glue's reading flickered to "off").
+    for (const n of [this.node, this.eqNode]) {
+      if (!n) continue
+      n.port.onmessage = null
+      try { n.port.postMessage({ t: 'end' }) } catch { /* gone */ }
+    }
     this.node?.disconnect()
     this.node = null
     try { this.eqNode?.disconnect(); this.anPre?.disconnect(); this.anPost?.disconnect() } catch { /* gone */ }
     this.eqNode = null
+    this.collageCompGr = -1
+    this.glueGr = -1
     this.anPre = null
     this.anPost = null
     this.eqSent = ''
@@ -1139,7 +1168,8 @@ class SonifyEngine {
           cutoff: cfg.collage.cutoff, peak: cfg.collage.peak, slope: cfg.collage.slope, tone: cfg.collage.tone,
           tilt: cfg.collage.tilt, waves: cfg.collage.waves, wavesRate: cfg.collage.wavesRate, wavesSync: cfg.collage.wavesSync,
           noise: cfg.collage.noise, noiseRate: cfg.collage.noiseRate, noiseSync: cfg.collage.noiseSync,
-          detune: cfg.collage.detune, voicing: cfg.collage.voicing, ringIn: cfg.collage.ringIn ?? 0
+          detune: cfg.collage.detune, voicing: cfg.collage.voicing, ringIn: cfg.collage.ringIn ?? 0,
+          comp: cfg.collage.comp ?? 0
         },
         fx: { ...cfg.fx },
         mixFilter: cfg.mixFilter
@@ -1150,6 +1180,7 @@ class SonifyEngine {
       ringFreqs: ringFreqs(cfg),
       glide
     })
+    this.chordSentN = chordCount(cfg)
     // The config replaced the worklet's whole state, modulation included :
     // put the modulated values straight back (waiting for the next tick left a
     // modulated pitch or probe snapping to its base for up to 50 ms on every
@@ -1241,6 +1272,13 @@ class SonifyEngine {
         ;(mm[voice] ??= {})[field] = g(param, base)
       }
       node.port.postMessage({ t: 'mod', m, bpm: this.bpm })
+      // A modulator on the Chord's note count : its notes again when it moves
+      // (and back to the slider's when the modulator lets go).
+      const cn = chordCount(c)
+      if (cn !== this.chordSentN) {
+        this.chordSentN = cn
+        node.port.postMessage({ t: 'chord', freqs: chordFreqs(c) })
+      }
       this.liveProbes = {
         spectraX: m.spectra.x, filterX: m.filter.x,
         orbitX: m.orbit.cx, orbitY: m.orbit.cy, orbitR: m.orbit.rx, orbitRY: m.orbit.ry,

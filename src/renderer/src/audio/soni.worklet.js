@@ -252,6 +252,68 @@ const RB_VOICE = [
 // Loopex's rational tanh (exact enough, cheap enough to run per band).
 function rtanh(x) { if (x < -3) return -1; if (x > 3) return 1; const x2 = x * x; return x * (27 + x2) / (27 + 9 * x2); }
 
+// The Collage voice's comp : ONE leveler on the films' whole bus (never one per
+// film), so a loud film comes down and a quiet one comes up a little. The
+// detector is the bus's power (both sides), 30 ms up and 400 ms down : slow
+// enough that wind and rumble never ripple the gain (0.02 % at 40 Hz), fast
+// enough that a gust is caught. One knob : the threshold falls (-8 to -30 dB)
+// while the ratio rises (1.5:1 to 6:1), over a 10 dB soft knee, and the makeup
+// gives back most of what a -16 dB film loses. The gain is computed every 16
+// samples, smoothed per sample. Measured (amount 1) : films from -40 to 0 dB
+// come out between -31 and -15 dB.
+class Leveler {
+  constructor(sr) {
+    this.aA = 1 - Math.exp(-1 / (sr * 0.03));
+    this.aR = 1 - Math.exp(-1 / (sr * 0.4));
+    this.aG = 1 - Math.exp(-1 / (sr * 0.012));
+    this.env = 0; this.g = 1; this.gt = 1; this.k = 0; this.live = false;
+    this.amt = -1; this.th = 0; this.sl = 0; this.w = 0; this.mk = 0;
+    this.grMax = 0; // the deepest reduction since the last meter message (dB)
+  }
+  set(a) {
+    this.amt = a;
+    this.w = a < 0.05 ? a / 0.05 : 1; // the knob leaving 0 : no step
+    this.th = -8 - 22 * a;
+    this.sl = 1 - 1 / (1.5 + 4.5 * a);
+    this.mk = this.curve(-16) * 0.8;
+  }
+  curve(db) {
+    const over = db - this.th;
+    if (over >= 5) return over * this.sl * this.w;
+    if (over > -5) return ((over + 5) * (over + 5) / 20) * this.sl * this.w;
+    return 0;
+  }
+  // iL/iR in, oL/oR out, oG the gain per sample (for the Space pieces).
+  // False : bypassed (nothing written; the input passes as it is).
+  run(iL, iR, oL, oR, oG, n, amt) {
+    const a = amt > 1 ? 1 : amt > 0 ? amt : 0;
+    if (a < 0.001) {
+      if (!this.live) return false;
+      if (Math.abs(this.g - 1) < 1e-4) { this.live = false; return false; }
+    } else if (!this.live) { this.live = true; this.env = 0; this.g = 1; this.gt = 1; this.k = 0; }
+    if (a !== this.amt) this.set(a);
+    const aA = this.aA, aR = this.aR, aG = this.aG;
+    let env = this.env, g = this.g, gt = this.gt, k = this.k;
+    for (let s = 0; s < n; s++) {
+      const l = iL[s], r = iR[s], p = 0.5 * (l * l + r * r);
+      env += (p - env) * (p > env ? aA : aR);
+      if (--k <= 0) {
+        k = 16;
+        if (a < 0.001) gt = 1;
+        else {
+          const gr = this.curve(10 * Math.log10(env + 1e-12));
+          if (gr > this.grMax) this.grMax = gr;
+          gt = Math.pow(10, (this.mk - gr) / 20);
+        }
+      }
+      g += (gt - g) * aG;
+      oL[s] = l * g; oR[s] = r * g; oG[s] = g;
+    }
+    this.env = env < 1e-20 ? 0 : env; this.g = g; this.gt = gt; this.k = k;
+    return true;
+  }
+}
+
 class RingBank {
   constructor(sr) {
     this.sr = sr > 0 ? sr : 48000;
@@ -852,10 +914,17 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.rgWL = new Float32Array(128); this.rgWR = new Float32Array(128);
     this.rgDK = new Float32Array(128); this.pcBuf = new Float32Array(128);
     this.coK = -1; // the Collage voice's gate × gain at the last block (ramped)
+    // The Collage comp (one, on the whole bus) and where it writes
+    this.lev = new Leveler(sampleRate);
+    this.lvL = new Float32Array(128); this.lvR = new Float32Array(128); this.lvG = new Float32Array(128);
     this.port.onmessage = (e) => this.onMsg(e.data);
   }
 
   onMsg(m) {
+    // Sonify stopped : end for good. A processor whose node is only
+    // disconnected keeps running (the context stays open between takes), and
+    // every off / on used to leave one more engine playing to nobody.
+    if (m.t === 'end') { this.ended = true; return; }
     if (m.t === 'space') { this.space.set(m); return; }
     if (m.t === 'grid') {
       const tap = this.taps[m.tap];
@@ -902,6 +971,13 @@ class SoniProcessor extends AudioWorkletProcessor {
       }
       if (m.cfg.fx) this.applyFx(m.cfg.fx);
       if (m.cfg.mixFilter) for (let i = 0; i < NVOICE; i++) this.djf[i].setX(m.cfg.mixFilter[i] != null ? m.cfg.mixFilter[i] : 0.5, sampleRate);
+      return;
+    }
+    // The Chord's notes alone : a modulated note count (a new chord, at once)
+    if (m.t === 'chord') {
+      const n = Math.min(NCHORD, m.freqs.length);
+      delete this.glides.ch;
+      this.chordN = n; this.chordFreqs.set(m.freqs.subarray(0, n));
       return;
     }
     if (m.t === 'mod') {
@@ -1150,6 +1226,7 @@ class SoniProcessor extends AudioWorkletProcessor {
   }
 
   process(_inputs, outputs) {
+    if (this.ended) return false;
     const out = outputs[0];
     const outL = out[0], outR = out[1] || out[0];
     const n = outL.length;
@@ -1702,7 +1779,10 @@ class SoniProcessor extends AudioWorkletProcessor {
     if (this.voiceLive(8, coOn)) {
       const inp = _inputs[1];
       const has = inp && inp.length;
-      const iL = has ? inp[0] : this.ring.zero, iR = has ? inp[1] || inp[0] : this.ring.zero;
+      let iL = has ? inp[0] : this.ring.zero, iR = has ? inp[1] || inp[0] : this.ring.zero;
+      // the comp : the films leveled before the Ring bank (and the pieces below)
+      const lv = has && this.lev.run(iL, iR, this.lvL, this.lvR, this.lvG, n, co.comp || 0);
+      if (lv) { iL = this.lvL; iR = this.lvR; }
       const gL = 1.6 * (1 - Math.max(0, co.pan)), gR = 1.6 * (1 + Math.min(0, co.pan));
       const pieces = spc.on && spc.out ? spc.pieces : 0;
       if (pieces > 0) this.ring.process(iL, iR, L, R, n, co, this.bpm, gL, gR, this.rgWL, this.rgWR, this.rgDK);
@@ -1722,7 +1802,8 @@ class SoniProcessor extends AudioWorkletProcessor {
         const nch = has ? inp.length : 0;
         for (let j = 0; j < pieces && 2 + j < nch; j++) {
           const x = inp[2 + j];
-          for (let s = 0; s < n; s++) pc[s] = x[s] * 1.6 * dK[s] * (k0 + dk * (s + 1));
+          if (lv) { const lg = this.lvG; for (let s = 0; s < n; s++) pc[s] = x[s] * 1.6 * dK[s] * lg[s] * (k0 + dk * (s + 1)); }
+          else for (let s = 0; s < n; s++) pc[s] = x[s] * 1.6 * dK[s] * (k0 + dk * (s + 1));
           spc.add(SPACE_PIECE0 + j, pc, null, n);
         }
       } else this.coK = -1;
@@ -1933,8 +2014,11 @@ class SoniProcessor extends AudioWorkletProcessor {
         rmsL: Math.sqrt(this.ssL / Math.max(1, this.nMeter)), rmsR: Math.sqrt(this.ssR / Math.max(1, this.nMeter)),
         scan: { at: currentTime, sp: this.sweepPos, spHz: sp.sweepOn ? sp.sweepHz : 0, fi: this.fSweep, fiHz: fi.sweepOn ? fi.sweepHz : 0, tv: (this.tLine + this.tX) / GRID, tvHz: tv.lineHz / GRID },
         // Space : each output channel's peak (after its limiter)
-        spk: spc.on ? spc.pk.slice(0, spc.nch) : null
+        spk: spc.on ? spc.pk.slice(0, spc.nch) : null,
+        // the Collage comp's deepest reduction (dB), -1 : bypassed
+        lvGr: this.lev.live ? this.lev.grMax : -1
       });
+      this.lev.grMax = 0;
       if (spc.on) spc.pk.fill(0);
       this.peak = 0; this.limMin = 1; this.lastMeter = currentTime;
       this.pkL = 0; this.pkR = 0; this.ssL = 0; this.ssR = 0; this.nMeter = 0;
@@ -2062,9 +2146,30 @@ function eqCeil(x) {
   const y = EQ_KNEE + (1 - EQ_KNEE) * Math.tanh((a - EQ_KNEE) / (1 - EQ_KNEE));
   return x < 0 ? -y : y;
 }
+// The glue : one bus compressor after the EQ's bands, before its output gain
+// and the soft ceiling (the port of Loopex's master glue). One knob : the
+// threshold falls to -12 dB and the ratio rises to 4:1 (soft knee), with an
+// automatic makeup. A voicing sets the rest : attack and release (ms), knee
+// (dB), drive (the saturation that grows with the reduction; < 0 leans it
+// odd-sided) and thrust (the detector tilted toward the highs, so the bass
+// stops pumping the mix).
+const GLUE_VOICES = {
+  clean: [3, 300, 5, 0, 0],
+  warm: [3, 400, 6, 0.35, 0],
+  punch: [3, 200, 6, -0.05, 1],
+  bite: [1, 200, 2, 0.15, 0],
+  slow: [30, 600, 10, 0, 0]
+};
 class SoniEqProc extends AudioWorkletProcessor {
   constructor() {
     super();
+    // the glue's state
+    this.gOn = false; this.gMix = 0; this.gEnv = 0; this.gThrLp = 0; this.gMk = 1; this.gMkT = 1;
+    this.gG = 1; this.gDg = 0; this.gK = 0; this.gGrNow = 0; // the gain, its ramp, the count to the next computation
+    this.gAtk = 0; this.gRel = 0; this.gKn = 5; this.gDist = 0; this.gThrust = 0; this.gThDb = 0; this.gThLin = 1; this.gSlope = 0;
+    this.gThrK = 1 - Math.exp(-2 * Math.PI * 632 / sampleRate);
+    this.gMixK = 1 - Math.exp(-1 / (sampleRate * 0.02));
+    this.gGr = 0;
     this.on = false;
     this.inG = 1; this.outG = 1; this.inT = 1; this.outT = 1;
     this.secs = [];
@@ -2073,9 +2178,21 @@ class SoniEqProc extends AudioWorkletProcessor {
     this.mN = 0;
     this.mEvery = Math.round(sampleRate / 24);
     this.ceilHit = 0;
-    this.port.onmessage = (e) => { const m = e.data; if (m && m.t === 'eq' && m.eq) this.set(m.eq); };
+    this.port.onmessage = (e) => { const m = e.data; if (m && m.t === 'eq' && m.eq) this.set(m.eq); else if (m && m.t === 'end') this.ended = true; };
   }
   set(eq) {
+    const gl = eq.glue || {};
+    const amt = Math.max(0, Math.min(1, +gl.amount || 0));
+    this.gOn = !!gl.on && amt > 0.001;
+    const v = GLUE_VOICES[gl.voice] || GLUE_VOICES.clean;
+    this.gAtk = Math.exp(-1 / (sampleRate * v[0] * 0.001));
+    this.gRel = Math.exp(-1 / (sampleRate * v[1] * 0.001));
+    this.gKn = v[2]; this.gDist = v[3]; this.gThrust = v[4];
+    this.gThDb = -12 * amt;
+    this.gThLin = Math.pow(10, this.gThDb / 20);
+    const ratio = 1.5 + amt * 2.5;
+    this.gSlope = 1 - 1 / ratio;
+    this.gMkT = Math.pow(10, (-this.gThDb) * (1 - 1 / ratio) * 0.45 * amt / 20);
     this.on = !!eq.on;
     this.inT = Math.pow(10, (eq.inGain || 0) / 20);
     this.outT = Math.pow(10, (eq.outGain || 0) / 20);
@@ -2091,6 +2208,7 @@ class SoniEqProc extends AudioWorkletProcessor {
     }
   }
   process(inputs, outputs) {
+    if (this.ended) return false; // Sonify stopped (see the engine's 'end')
     const inp = inputs[0], out = outputs[0];
     const oL = out[0], oR = out.length > 1 ? out[1] : out[0];
     const n = oL.length;
@@ -2101,6 +2219,17 @@ class SoniEqProc extends AudioWorkletProcessor {
     // gains ramp across the block : no zipper on a slider move
     const gi0 = this.inG, gi1 = on ? this.inT : 1, go0 = this.outG, go1 = on ? this.outT : 1;
     const secs = this.secs, ns = secs.length;
+    // the glue runs while it is on or still fading out (20 ms : no click)
+    const glue = this.gOn || this.gMix > 1e-4;
+    if (!glue) { this.gMix = 0; this.gEnv = 0; this.gThrLp = 0; this.gG = 1; this.gDg = 0; this.gK = 0; this.gGrNow = 0; }
+    const gMixT = this.gOn ? 1 : 0, gMixK = this.gMixK;
+    const mk0 = this.gMk, mk1 = this.gMkT;
+    const gAtk = this.gAtk, gRel = this.gRel, gKn = this.gKn, gThrust = this.gThrust;
+    const gThDb = this.gThDb, gThLin = this.gThLin, gSlope = this.gSlope, thrK = this.gThrK;
+    let env = this.gEnv, thrLp = this.gThrLp, gMix = this.gMix, gGr = this.gGr;
+    let gG = this.gG, gDg = this.gDg, gK = this.gK, grNow = this.gGrNow;
+    const dAbs = Math.abs(this.gDist), dBias = this.gDist < 0 ? 0.18 : 0;
+    const dT0 = dBias * (27 + dBias * dBias) / (27 + 9 * dBias * dBias);
     for (let s = 0; s < n; s++) {
       const t = (s + 1) / n;
       const gi = gi0 + (gi1 - gi0) * t, go = go0 + (go1 - go0) * t;
@@ -2113,6 +2242,45 @@ class SoniEqProc extends AudioWorkletProcessor {
           const yl = q.b0 * l + q.l1; q.l1 = q.b1 * l - q.a1 * yl + q.l2; q.l2 = q.b2 * l - q.a2 * yl; l = yl;
           const yr = q.b0 * r + q.r1; q.r1 = q.b1 * r - q.a1 * yr + q.r2; q.r2 = q.b2 * r - q.a2 * yr; r = yr;
         }
+      }
+      if (glue) {
+        let det = l < 0 ? -l : l; const dr = r < 0 ? -r : r; if (dr > det) det = dr;
+        if (gThrust > 0.001) {
+          const mm = 0.5 * (l + r); thrLp += (mm - thrLp) * thrK;
+          const tl = (mm - thrLp) * 2.37 + thrLp * 0.42;
+          det += ((tl < 0 ? -tl : tl) - det) * gThrust;
+        }
+        env = det > env ? gAtk * env + (1 - gAtk) * det : gRel * env + (1 - gRel) * det;
+        // The gain computer every 8 samples (0.17 ms : finer than the 1 ms
+        // attack), a straight ramp between : the log and the pow were most of
+        // the glue's cost when run per sample. Under the threshold, neither.
+        if (--gK <= 0) {
+          gK = 8;
+          let grDb = 0;
+          if (env > gThLin) {
+            const over = 20 * Math.log10(env + 1e-9) - gThDb;
+            grDb = gKn > 0.01 ? (over >= gKn ? (over - gKn * 0.5) * gSlope : (over * over / (2 * gKn)) * gSlope) : over * gSlope;
+          }
+          grNow = grDb;
+          if (grDb > gGr) gGr = grDb;
+          gDg = ((grDb > 0 ? Math.pow(10, -grDb / 20) : 1) - gG) * 0.125;
+        }
+        gG += gDg;
+        gMix += (gMixT - gMix) * gMixK;
+        const gg = gG * (mk0 + (mk1 - mk0) * t);
+        let wl = l * gg, wr = r * gg;
+        if (dAbs > 0.001 && grNow > 0.05) {
+          // the drive grows with the reduction (Loopex's rational tanh, inline)
+          const d = Math.min(dAbs, dAbs * (grNow / 10));
+          let xa = wl * 1.6 + dBias, xb = wr * 1.6 + dBias;
+          xa = xa < -3 ? -1 : xa > 3 ? 1 : xa * (27 + xa * xa) / (27 + 9 * xa * xa);
+          xb = xb < -3 ? -1 : xb > 3 ? 1 : xb * (27 + xb * xb) / (27 + 9 * xb * xb);
+          wl += ((xa - dT0) * 0.92 - wl) * d;
+          wr += ((xb - dT0) * 0.92 - wr) * d;
+        }
+        l += (wl - l) * gMix; r += (wr - r) * gMix;
+      }
+      if (on || glue) {
         l *= go; r *= go;
         const cl = eqCeil(l), cr = eqCeil(r);
         if (cl !== l || cr !== r) this.ceilHit = 1;
@@ -2123,13 +2291,18 @@ class SoniEqProc extends AudioWorkletProcessor {
       if (bl > m[4]) m[4] = bl; if (br > m[5]) m[5] = br; m[6] += l * l; m[7] += r * r;
     }
     this.inG = gi1; this.outG = go1;
+    if (glue) {
+      this.gEnv = env < 1e-20 ? 0 : env; this.gThrLp = Math.abs(thrLp) < 1e-20 ? 0 : thrLp; this.gMix = gMix; this.gGr = gGr;
+      this.gG = gG; this.gDg = gDg; this.gK = gK; this.gGrNow = grNow;
+    }
+    this.gMk = mk1;
     // denormals out of the filters' memory between blocks
     for (let k = 0; k < ns; k++) { const q = secs[k]; if (Math.abs(q.l1) < 1e-25) q.l1 = 0; if (Math.abs(q.l2) < 1e-25) q.l2 = 0; if (Math.abs(q.r1) < 1e-25) q.r1 = 0; if (Math.abs(q.r2) < 1e-25) q.r2 = 0; }
     this.mN += n;
     if (this.mN >= this.mEvery) {
       const k = 1 / this.mN;
-      this.port.postMessage({ t: 'eqm', inL: [m[0], Math.sqrt(m[2] * k)], inR: [m[1], Math.sqrt(m[3] * k)], outL: [m[4], Math.sqrt(m[6] * k)], outR: [m[5], Math.sqrt(m[7] * k)], ceil: this.ceilHit });
-      m.fill(0); this.mN = 0; this.ceilHit = 0;
+      this.port.postMessage({ t: 'eqm', inL: [m[0], Math.sqrt(m[2] * k)], inR: [m[1], Math.sqrt(m[3] * k)], outL: [m[4], Math.sqrt(m[6] * k)], outR: [m[5], Math.sqrt(m[7] * k)], ceil: this.ceilHit, gr: glue ? this.gGr : -1 });
+      m.fill(0); this.mN = 0; this.ceilHit = 0; this.gGr = 0;
     }
     return true;
   }

@@ -11,7 +11,7 @@ import { Blink } from './Blink'
 import type { ModTarget, SonifyModParam } from '@shared/types'
 import { registerLiveOverlay } from './liveOverlay'
 import { randomSonify, randomizeVoice, suggestSonify, type SoniVoiceKey } from '../audio/autoSonify'
-import { defaultSoniConfig, SONI_SCALES, sonifyEngine, type SoniConfig } from '../audio/sonify'
+import { defaultSoniConfig, ringFreqs, SONI_SCALES, sonifyEngine, type SoniConfig } from '../audio/sonify'
 import { deleteSoniPreset, listSoniPresets, loadSoniPreset, saveSoniPreset } from '../audio/soniPresets'
 import { modTargetKey, useStore } from '../store'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
@@ -25,8 +25,8 @@ function spaceLabel(param: string): string {
   const p = parseSpaceModParam(param)
   return p ? `${SPACE_VOICE_LABEL[p.voice]} ${SPACE_FIELD_RANGE[p.field].label} in the room` : param
 }
-import { EqCard } from './SonifyEq'
-import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, CardGrip, useCardSpace, spaceGap, SUB_GAP, chip, pill } from './sonifyUi'
+import { EqCard, GlueCard } from './SonifyEq'
+import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, CardGrip, useCardSpace, spaceGap, SUB_GAP, chip, pill, GrMeter } from './sonifyUi'
 import { SONI_RATES, RATE_LABEL } from '../audio/soniClock'
 import { warnModMatrixFull } from './AutoControls'
 
@@ -177,6 +177,23 @@ function RateRow({ label, rate, sync, onRate, onSync, title }: {
 }
 const RING_VOICINGS = ['Clean', 'SEM', 'MS-20', 'Steiner', 'K35']
 
+/** The Ring bank's cutoff (0..1) in Hz, as the worklet places it : on the bands'
+ *  own semitone scale, from half an octave under the lowest band (0) to half an
+ *  octave over the highest (1). It follows the key and the octave range. */
+// The Collage comp's reduction, for its GrMeter (stable : the meter's effect keys on it).
+const collageGr = (): number => sonifyEngine.collageCompGr
+
+function ringCutoffHz(cfg: SoniConfig, c: number): number {
+  const f = ringFreqs(cfg)
+  const f0 = Math.max(10, f[0]), span = Math.max(1, 12 * Math.log2(Math.max(10, f[47]) / f0))
+  return f0 * Math.pow(2, (-6 + Math.max(0, Math.min(1, c)) * (span + 12)) / 12)
+}
+function ringCutoffOf(cfg: SoniConfig, hz: number): number {
+  const f = ringFreqs(cfg)
+  const f0 = Math.max(10, f[0]), span = Math.max(1, 12 * Math.log2(Math.max(10, f[47]) / f0))
+  return Math.max(0, Math.min(1, (12 * Math.log2(Math.max(1, hz) / f0) + 6) / (span + 12)))
+}
+
 /** The Prism reverb's two crossovers for its `crossover` (0..1), as the worklet
  *  sets them (FDNReverb : 400 / 5500 Hz at 0.3, x4 per unit, clamped). */
 function prismSplits(c: number): [number, number] {
@@ -255,9 +272,11 @@ function Slider({
     el.addEventListener('pointerup', up)
     el.addEventListener('pointercancel', up)
   }
-  const commit = (): void => {
-    if (typing !== null && parse) {
-      const v = parse(typing)
+  // the field's own text when given (Enter can land before React has re-rendered the last keystroke)
+  const commit = (text?: string): void => {
+    const t = text ?? typing
+    if (t !== null && parse) {
+      const v = parse(t)
       if (v !== null && Number.isFinite(v)) onChange(Math.max(min, Math.min(max, v)))
     }
     setTyping(null)
@@ -285,9 +304,9 @@ function Slider({
           className="input w-12 shrink-0 !px-0.5 text-right font-mono !text-[9px]"
           value={typing}
           onChange={(e) => setTyping(e.target.value)}
-          onBlur={commit}
+          onBlur={(e) => commit(e.currentTarget.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') commit()
+            if (e.key === 'Enter') commit(e.currentTarget.value)
             else if (e.key === 'Escape') { e.stopPropagation(); setTyping(null) }
           }}
         />
@@ -368,7 +387,7 @@ const PARAM_LABELS: Partial<Record<SonifyModParam, string>> = {
   rasterSmooth: 'Raster smooth', rasterTone: 'Raster tone',
   sstvLine: 'Transmission line rate', sstvDev: 'Transmission transpose',
   filterQ: 'Filter resonance', filterSweep: 'Filter sweep rate',
-  chordTone: 'Chord tone', chordSpread: 'Chord spread', chordAttack: 'Chord swell',
+  chordTone: 'Chord tone', chordSpread: 'Chord spread', chordAttack: 'Chord swell', chordVoices: 'Chord voices',
   collageReso: 'Collage resonance', collageRing: 'Collage ring', collageWidth: 'Collage width',
   collageBank: 'Collage ring bank wet', collageDecay: 'Collage ring bank decay', collageCutoff: 'Collage ring bank cutoff',
   collageWaves: 'Collage ring bank waves', collageDetune: 'Collage ring bank detune', chordWaves: 'Chord waves',
@@ -1209,6 +1228,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 <Slider label="reverb" value={cfg.fx.rvMix} min={0} max={1} neutral={0.6} onChange={(v) => pfx({ rvMix: v })} title="How loud the reverb is in the FX tail" />
               </Shell>
               <EqCard />
+              <GlueCard />
             </div>
           )}
           {/* The sequencers have their own view (they used to sit under the mixer). */}
@@ -1685,15 +1705,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             onDice={() => diceVoice('chord')}
           >
             <TapSelect cfg={cfg} voice={cfg.chord} onChange={(tap) => pv('chord', { tap })} />
-            <Row label="voices">
-              <input
-                type="range" min={2} max={16} step={1} value={cfg.chord.voices}
-                onChange={(e) => pv('chord', { voices: Number(e.target.value) })}
-                className="min-w-0 flex-1 accent-accent"
-                title="How many scale notes in the chord (spread over the range)"
-              />
-              <span className="w-12 shrink-0 text-right font-mono text-[9px] text-muted">{cfg.chord.voices}</span>
-            </Row>
+            <Slider label="voices" value={cfg.chord.voices} min={2} max={16} step={1} neutral={7} fmt={(v) => String(Math.round(v))} onChange={(v) => pv('chord', { voices: Math.round(v) })} mod={chip('chordVoices')} title="How many scale notes in the chord, spread over the range (modulated : the chord re-spreads at each new count)" />
             <Row label="range">
               <select className="input select-compact text-[10px]" value={cfg.chord.loOct} onChange={(e) => pv('chord', { loOct: Math.min(Number(e.target.value), cfg.chord.hiOct - 1) })} title="Lowest octave">
                 {[0, 1, 2, 3, 4].map((o) => <option key={o} value={o}>oct {o}</option>)}
@@ -1739,6 +1751,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             <Slider label="films in" value={cfg.collage.inGain ?? 0} min={-24} max={12} neutral={0} fmt={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} onChange={(v) => pv('collage', { inGain: Math.round(v * 2) / 2 })} title="The films' level into the voice, before the resonators : turn a windy or hot recording down here (the resonators and the Ring bank then ring cleaner)" parse={(t) => parseDb(t)} />
             <Slider label="hp" lead={<button onClick={() => pv('collage', { hpSlope: (cfg.collage.hpSlope ?? 24) === 24 ? 12 : 24 })} className={`w-[22px] shrink-0 rounded px-0 py-0.5 text-center font-mono text-[8px] transition-colors ${(cfg.collage.hpSlope ?? 24) === 24 ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'}`} title={`The high-pass's slope : ${(cfg.collage.hpSlope ?? 24) === 24 ? '24 dB per octave (steep : two Butterworth sections)' : '12 dB per octave (gentle : one section)'}. Click : ${(cfg.collage.hpSlope ?? 24) === 24 ? '12' : '24'}`}>{cfg.collage.hpSlope ?? 24}</button>} value={Math.log((cfg.collage.hp ?? 20) / 20) / Math.log(50)} min={0} max={1} step={0.001} neutral={0} fmt={() => ((cfg.collage.hp ?? 20) <= 20.5 ? 'off' : `${Math.round(cfg.collage.hp ?? 20)} Hz`)} onChange={(v) => pv('collage', { hp: Math.round(20 * Math.pow(50, v)) })} title="A high-pass on every film, before the resonators : wind rumble and handling noise go (20 Hz = off, up to 1 kHz). Its slope (12 or 24 dB per octave) is the chip beside the label." parse={(t) => { const f = parseHz(t, 20); return f === null ? null : Math.log(Math.max(20, Math.min(1000, f)) / 20) / Math.log(50) }} />
             <Slider label="lp" lead={<button onClick={() => pv('collage', { lpSlope: (cfg.collage.lpSlope ?? 24) === 24 ? 12 : 24 })} className={`w-[22px] shrink-0 rounded px-0 py-0.5 text-center font-mono text-[8px] transition-colors ${(cfg.collage.lpSlope ?? 24) === 24 ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'}`} title={`The low-pass's slope : ${(cfg.collage.lpSlope ?? 24) === 24 ? '24 dB per octave (steep : two Butterworth sections)' : '12 dB per octave (gentle : one section)'}. Click : ${(cfg.collage.lpSlope ?? 24) === 24 ? '12' : '24'}`}>{cfg.collage.lpSlope ?? 24}</button>} value={Math.log((cfg.collage.lp ?? 20000) / 1000) / Math.log(20)} min={0} max={1} step={0.001} neutral={1} fmt={() => { const f = cfg.collage.lp ?? 20000; return f >= 19950 ? 'off' : f < 10000 ? `${(f / 1000).toFixed(2)} kHz` : `${(f / 1000).toFixed(1)} kHz` }} onChange={(v) => pv('collage', { lp: Math.round(1000 * Math.pow(20, v) / 10) * 10 })} title="A low-pass on every film, before the resonators : crackle, hiss and the wind's top go (20 kHz = off, down to 1 kHz). Its slope (12 or 24 dB per octave) is the chip beside the label." parse={(t) => { const f = parseHz(t, 20000); return f === null ? null : Math.log(Math.max(1000, Math.min(20000, f)) / 1000) / Math.log(20) }} />
+            <Slider label="comp" lead={<GrMeter get={collageGr} title="The comp's gain reduction now, in dB (off : at 0)" />} value={cfg.collage.comp ?? 0} min={0} max={1} step={0.01} neutral={0} fmt={(v) => (v < 0.005 ? 'off' : `${Math.round(v * 100)}%`)} onChange={(v) => pv('collage', { comp: v })} title="One compressor on all the films together (not one per film : it costs next to nothing) : a loud film comes down, a quiet one comes up a little, so the wall's sound holds one level. It sits after the filters, before the resonators' Ring bank. One knob : the threshold falls and the ratio rises as it turns (1.5:1 to 6:1, a soft knee), with the makeup automatic. The number beside the label is how much it is taking off now." />
             <Slider label="resonance" value={cfg.collage.reso} min={0} max={1} neutral={0.5} onChange={(v) => pv('collage', { reso: v })} mod={chip('collageReso')} title="0 = the plain films · 1 = only the tuned resonances" />
             <Slider label="ring" value={cfg.collage.ring} min={0} max={1} neutral={0.5} onChange={(v) => pv('collage', { ring: v })} mod={chip('collageRing')} title="How sharply each piece's resonator rings : a broad color → a pitched, singing tone" />
             <Slider label="harmonics" value={cfg.collage.bright} min={0} max={1} neutral={0.5} onChange={(v) => pv('collage', { bright: v })} title="How much the 2nd and 3rd harmonics ring with each note" />
@@ -1774,7 +1787,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             <div className={`flex flex-col gap-1 transition-opacity ${(cfg.collage.bank ?? 0) <= 0 ? 'opacity-45' : ''}`} title={(cfg.collage.bank ?? 0) <= 0 ? 'The Ring bank is out (wet 0) : these shape it, so they are heard once wet is up' : undefined}>
               <Slider label="ring in" value={cfg.collage.ringIn ?? 0} min={-24} max={12} neutral={0} fmt={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} onChange={(v) => pv('collage', { ringIn: Math.round(v * 2) / 2 })} title="How hard the films drive the Ring bank : down, its wet is quieter and its bands clip less (a windy film distorts less); up, it rings and clips harder. The plain films are not touched." parse={(t) => parseDb(t)} />
               <Slider label="decay" value={cfg.collage.decay ?? 0.5} min={0} max={1} neutral={0.5} fmt={(v) => { const t = 0.012 * Math.pow(10 / 0.012, v); return t < 1 ? Math.round(t * 1000) + 'ms' : t.toFixed(1) + 's' }} onChange={(v) => pv('collage', { decay: v })} mod={chip('collageDecay')} title="How long every band rings : short = a filterbank shaping the films, long = a tuned resonance that sings" />
-              <Slider label="cutoff" value={cfg.collage.cutoff ?? 1} min={0} max={1} neutral={1} onChange={(v) => pv('collage', { cutoff: v })} mod={chip('collageCutoff')} title="Where the bank's slope sits across its bands" />
+              <Slider label="cutoff" value={cfg.collage.cutoff ?? 1} min={0} max={1} step={0.002} neutral={1} fmt={(v) => hzLabel(ringCutoffHz(cfg, v))} parse={(t) => { const f = parseHz(t, ringCutoffHz(cfg, 1)); return f === null ? null : ringCutoffOf(cfg, f) }} onChange={(v) => pv('collage', { cutoff: v })} mod={chip('collageCutoff')} title={`Where the bank's slope sits across its bands : now ${hzLabel(ringCutoffHz(cfg, cfg.collage.cutoff ?? 1))} (the bands run ${hzLabel(ringFreqs(cfg)[0])} to ${hzLabel(ringFreqs(cfg)[47])} on the key; click the value to type a frequency)`} />
               <Slider label="peak" value={cfg.collage.peak ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('collage', { peak: v })} title="A boost of the bands at the cutoff" />
               <Slider label="slope" value={cfg.collage.slope ?? 0} min={0} max={1} neutral={0} fmt={(v) => (v < 0.2 ? 'LP' : v < 0.4 ? 'LP-BP' : v < 0.6 ? 'BP' : v < 0.8 ? 'BP-HP' : 'HP')} onChange={(v) => pv('collage', { slope: v })} title="Low-pass → band-pass → high-pass around the cutoff" />
               <Slider label="tone" value={cfg.collage.tone ?? 0} min={-1} max={1} neutral={0} onChange={(v) => pv('collage', { tone: v })} title="Tilts the bank : − darker, + brighter" />

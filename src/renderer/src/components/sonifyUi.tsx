@@ -4,7 +4,7 @@
 // readout, a −/+ stepper and the little icon buttons (dice, reset). The Voices
 // view is the reference look : change it here, every view follows.
 
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 
 /** The on / play pill of a card's header. */
@@ -233,6 +233,45 @@ export function RangeRow({ label, value, min, max, step, onChange, shown, title,
       />
       <span className="w-12 shrink-0 text-right font-mono text-[9px] text-muted">{shown}</span>
     </Row>
+  )
+}
+
+/** A compressor's gain reduction, live (rAF, no React render) : `get` returns
+ *  dB, -1 while bypassed. Narrow : a number the size of a slope chip, before a
+ *  slider's track. Wide : a bar over 0..12 dB and the number. */
+export function GrMeter({ get, wide, title }: { get: () => number; wide?: boolean; title: string }): JSX.Element {
+  const barRef = useRef<HTMLDivElement | null>(null)
+  const numRef = useRef<HTMLSpanElement | null>(null)
+  useEffect(() => {
+    let raf = 0, shown = -2, held = 0, at = performance.now()
+    const tick = (now: number): void => {
+      const dt = Math.min(0.25, (now - at) / 1000)
+      at = now
+      const g = get()
+      // fast down, slow back (12 dB/s) : a reduction stays readable
+      held = g < 0 ? -1 : g >= held ? g : Math.max(g, held - 12 * dt)
+      if (barRef.current) barRef.current.style.width = `${Math.min(100, Math.max(0, held / 12) * 100).toFixed(1)}%`
+      const v = held < 0 ? -1 : Math.round(held * 10) / 10
+      if (v !== shown && numRef.current) {
+        shown = v
+        numRef.current.textContent = v < 0 ? 'off' : v < 0.1 ? '0' : `-${v < 10 ? v.toFixed(1) : v.toFixed(0)}`
+        numRef.current.style.color = v >= 0.1 ? 'rgb(var(--c-accent2))' : ''
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [get])
+  if (!wide) {
+    return <span ref={numRef} title={title} className="w-[22px] shrink-0 text-center font-mono text-[8px] tabular-nums text-muted">off</span>
+  }
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-1.5" title={title}>
+      <div className="relative h-[6px] min-w-[40px] flex-1 overflow-hidden rounded-sm bg-panel3">
+        <div ref={barRef} className="absolute inset-y-0 left-0 w-0 bg-accent2/80" />
+      </div>
+      <span ref={numRef} className="w-12 shrink-0 text-right font-mono text-[9px] tabular-nums text-muted">off</span>
+    </div>
   )
 }
 

@@ -27,6 +27,18 @@ export interface SoniEq {
   inGain: number // dB, into the bands
   outGain: number // dB, after them (before the safety ceiling)
   bands: SoniEqBand[] // 12, in the order of EQ_KINDS
+  glue: SoniGlue // after the bands, before the output gain and the ceiling
+}
+
+/** The glue : one compressor on the whole Sonify mix (soni.worklet.js, the
+ *  port of Loopex's master glue). Its own on / off : it runs with the EQ
+ *  bypassed too. A voicing sets attack, release, knee, drive and thrust. */
+export type GlueVoice = 'clean' | 'warm' | 'punch' | 'bite' | 'slow'
+export const GLUE_VOICES: GlueVoice[] = ['clean', 'warm', 'punch', 'bite', 'slow']
+export interface SoniGlue {
+  on: boolean
+  amount: number // 0..1 : threshold 0 to -12 dB, ratio 1.5:1 to 4:1, makeup automatic
+  voice: GlueVoice
 }
 
 export const EQ_KINDS: EqKind[] = ['lowcut', 'lowshelf', 'bell', 'bell', 'bell', 'bell', 'bell', 'bell', 'bell', 'bell', 'highshelf', 'highcut']
@@ -47,6 +59,7 @@ export function defaultEq(): SoniEq {
     on: true,
     inGain: 0,
     outGain: 0,
+    glue: { on: false, amount: 0.4, voice: 'clean' },
     bands: EQ_KINDS.map((k) => {
       if (k === 'lowcut') return { on: false, freq: 30, gain: 0, q: 0.71, slope: 24 }
       if (k === 'highcut') return { on: false, freq: 18000, gain: 0, q: 0.71, slope: 24 }
@@ -77,10 +90,16 @@ export function normalizeEq(e: Partial<SoniEq> | null | undefined): SoniEq {
       slope
     }
   })
+  const gl = (src.glue && typeof src.glue === 'object' ? src.glue : {}) as Partial<SoniGlue>
   return {
     on: typeof src.on === 'boolean' ? src.on : d.on,
     inGain: clamp(num(src.inGain, 0), -EQ_IO_MAX, EQ_IO_MAX),
     outGain: clamp(num(src.outGain, 0), -EQ_IO_MAX, EQ_IO_MAX),
+    glue: {
+      on: typeof gl.on === 'boolean' ? gl.on : d.glue.on,
+      amount: clamp(num(gl.amount, d.glue.amount), 0, 1),
+      voice: GLUE_VOICES.includes(gl.voice as GlueVoice) ? (gl.voice as GlueVoice) : d.glue.voice
+    },
     bands
   }
 }

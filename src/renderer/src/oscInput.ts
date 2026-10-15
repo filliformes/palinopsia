@@ -52,6 +52,8 @@
 //   /opsia/sonify/keyseq/mode                           s name | i index (list circle affinity pivot picture)
 //   /opsia/sonify/keyseq/glide|chance                   f 0..1 (glide over 0..4 s)
 //   /opsia/sonify/{voice}/on|gain|pan + voice params    f 0..1 (see case below)
+//   /opsia/sonify/glue/on|amount                        >= 0.5 | f 0..1 (the output glue, after the EQ)
+//   /opsia/sonify/glue/voice                            s name | i index (clean warm punch bite slow)
 //   /opsia/meta/{1..16}                                f 0..1 (drives the knob)
 //   /opsia/bpm                                          f 20..800 (raw)
 //   /opsia/scene/{n}                                    trigger
@@ -86,6 +88,7 @@ import { bodyBus } from './engine/bodyIn'
 import { videoKey, videoSeekRequests } from './engine/videoState'
 import { SONI_SCALES, withSonifyParam, type SoniConfig } from './audio/sonify'
 import { KEY_MODES } from './audio/soniKeyModel'
+import { GLUE_VOICES, normalizeEq, type SoniGlue } from './audio/eqMath'
 import { keySeqNext } from './audio/soniKeySeq'
 import { SONIFY_MOD_DESCS } from './engine/modulation'
 import { useStore } from './store'
@@ -573,6 +576,15 @@ function route(address: string, args: Args): void {
         else if (ctl === 'chance') st.setSoniKeySeq({ chance: clamp01(n) })
         return
       }
+      // /opsia/sonify/glue/* : the compressor after the output EQ
+      if (g === 'glue') {
+        const eq = normalizeEq(c.eq)
+        const G = (p: Partial<SoniGlue>): void => apply({ ...c, eq: { ...eq, glue: { ...eq.glue, ...p } } })
+        if (ctl === 'on') G({ on: n >= 0.5 })
+        else if (ctl === 'amount') G({ amount: clamp01(n) })
+        else if (ctl === 'voice') { const v = enumFrom(args, GLUE_VOICES); if (v) G({ voice: v }) }
+        return
+      }
       // /opsia/sonify/tap/a|b : what each image tap reads (0 master · 1..4 a layer)
       if (g === 'tap') {
         const t = ctl === 'b' ? 1 : 0
@@ -746,6 +758,7 @@ function route(address: string, args: Args): void {
           else if (ctl === 'hp') V('collage', { hp: Math.round(20 * Math.pow(50, clamp01(n))) })
           else if (ctl === 'lp') V('collage', { lp: Math.round(1000 * Math.pow(20, clamp01(n))) })
           else if (ctl === 'ringin') V('collage', { ringIn: -24 + clamp01(n) * 36 })
+          else if (ctl === 'comp') V('collage', { comp: clamp01(n) })
           // a filter's slope : 12 or 24 (an int as it is; a float, >= 0.5 = 24)
           else if (ctl === 'hpslope' || ctl === 'lpslope') {
             const v = args[0]?.type === 'i' ? (n >= 18 ? 24 : 12) : n >= 0.5 ? 24 : 12
@@ -1105,6 +1118,10 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/root', 0, 1, so.root / 11, 'Quantizer root (index over C..B)')
     addI('/opsia/sonify/rootoct', 1, 6, so.rootOct ?? 3, 'Root octave (global transpose)')
     const ks = st.soniKeySeq
+    const gl = normalizeEq(so.eq).glue
+    add('/opsia/sonify/glue/on', 0, 1, gl.on ? 1 : 0, 'Output glue on (the compressor after the EQ, >= 0.5)')
+    add('/opsia/sonify/glue/amount', 0, 1, gl.amount, 'Output glue amount (threshold 0..-12 dB, ratio 1.5..4:1)')
+    addI('/opsia/sonify/glue/voice', 0, GLUE_VOICES.length - 1, GLUE_VOICES.indexOf(gl.voice), 'Output glue voicing : 0 clean · 1 warm · 2 punch · 3 bite · 4 slow')
     add('/opsia/sonify/keyseq/on', 0, 1, ks.on ? 1 : 0, 'Key sequencer running (>= 0.5)')
     add('/opsia/sonify/keyseq/next', 0, 1, 0, 'Key sequencer : a key change now (>= 0.5)')
     addI('/opsia/sonify/keyseq/mode', 0, KEY_MODES.length - 1, KEY_MODES.indexOf(ks.mode), 'Key sequencer mode : 0 list · 1 circle · 2 affinity · 3 pivot · 4 picture')
@@ -1166,6 +1183,7 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/collage/hp', 0, 1, Math.log((co.hp ?? 20) / 20) / Math.log(50), 'Collage : the films high-pass, 20 Hz (off)..1 kHz, 24 dB/oct')
     add('/opsia/sonify/collage/lp', 0, 1, Math.log((co.lp ?? 20000) / 1000) / Math.log(20), 'Collage : the films low-pass, 1 kHz..20 kHz (off), 24 dB/oct')
     add('/opsia/sonify/collage/ringin', 0, 1, ((co.ringIn ?? 0) + 24) / 36, 'Collage : how hard the films drive the Ring bank, -24..+12 dB')
+    add('/opsia/sonify/collage/comp', 0, 1, co.comp ?? 0, 'Collage : one compressor on all the films (0 = off), so they hold one level')
     add('/opsia/sonify/collage/hpslope', 0, 1, co.hpSlope === 12 ? 0 : 1, 'Collage : the high-pass slope, 12 or 24 dB/oct (int 12 / 24, or >= 0.5 = 24)')
     add('/opsia/sonify/collage/lpslope', 0, 1, co.lpSlope === 12 ? 0 : 1, 'Collage : the low-pass slope, 12 or 24 dB/oct (int 12 / 24, or >= 0.5 = 24)')
     add('/opsia/sonify/collage/width', 0, 1, co.width, 'Collage stereo width')

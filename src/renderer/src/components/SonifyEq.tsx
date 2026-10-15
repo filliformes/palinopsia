@@ -14,10 +14,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { sonifyEngine } from '../audio/sonify'
 import {
-  EQ_FREQ_MAX, EQ_FREQ_MIN, EQ_GAIN_MAX, EQ_IO_MAX, EQ_KINDS, EQ_Q_MAX, EQ_Q_MIN, EQ_SLOPES,
-  bandDb, defaultEq, eqDb, normalizeEq, type EqSlope, type SoniEq, type SoniEqBand
+  EQ_FREQ_MAX, EQ_FREQ_MIN, EQ_GAIN_MAX, EQ_IO_MAX, EQ_KINDS, EQ_Q_MAX, EQ_Q_MIN, EQ_SLOPES, GLUE_VOICES,
+  bandDb, defaultEq, eqDb, normalizeEq, type EqSlope, type GlueVoice, type SoniEq, type SoniEqBand, type SoniGlue
 } from '../audio/eqMath'
-import { Shell } from './sonifyUi'
+import { GrMeter, RangeRow, Row, Seg, Shell } from './sonifyUi'
 
 const LABEL = ['LC', 'LS', '1', '2', '3', '4', '5', '6', '7', '8', 'HS', 'HC']
 const NAME = ['Low cut', 'Low shelf', 'Bell 1', 'Bell 2', 'Bell 3', 'Bell 4', 'Bell 5', 'Bell 6', 'Bell 7', 'Bell 8', 'High shelf', 'High cut']
@@ -312,6 +312,46 @@ export function EqCard(): JSX.Element {
   )
 }
 
+// ── The glue (Mixer view, under the EQ) ──────────────────────────────────────
+
+const GLUE_HINT: Record<GlueVoice, string> = {
+  clean: 'clean : 3 ms attack, 300 ms release, a 5 dB knee, no color',
+  warm: 'warm : 3 ms / 400 ms, a 6 dB knee, and a saturation that grows as it compresses',
+  punch: 'punch : 3 ms / 200 ms, the detector tilted toward the highs (the bass stops pumping the mix), a touch of odd-sided drive',
+  bite: 'bite : 1 ms / 200 ms, a hard 2 dB knee, a little drive : fast and forward',
+  slow: 'slow : 30 ms / 600 ms, a wide 10 dB knee : the transients through, the body held'
+}
+const glueGr = (): number => sonifyEngine.glueGr
+
+export function GlueCard(): JSX.Element {
+  const [eq, setEq] = useEq()
+  const g = eq.glue
+  const setGlue = (p: Partial<SoniGlue>): void => setEq({ ...eq, glue: { ...g, ...p } })
+  return (
+    <Shell
+      title="Glue"
+      hint="One compressor on the whole Sonify mix, after the output EQ's bands and before its output gain and the soft ceiling : it holds the voices together. It runs with the EQ bypassed too. One knob (the threshold falls to -12 dB, the ratio rises to 4:1, the makeup is automatic); the voicing sets its speed and color. Like the EQ it is on the way to the speakers : recordings are taken before it."
+      on={g.on}
+      onToggle={() => setGlue({ on: !g.on })}
+      toggleTitle={g.on ? 'Glue on (click : off)' : 'Glue off (click : on)'}
+      open
+    >
+      <RangeRow
+        label="amount" value={g.amount} min={0} max={1} step={0.01} neutral={0.4}
+        shown={`${Math.round(g.amount * 100)}%`}
+        onChange={(v) => setGlue({ amount: v })}
+        title={`How hard it glues : the threshold at ${(-12 * g.amount).toFixed(1)} dB, the ratio ${(1.5 + g.amount * 2.5).toFixed(1)}:1 (double-click : 40 %)`}
+      />
+      <Row label="voicing" hint="Its speed and color">
+        <Seg options={GLUE_VOICES} value={g.voice} onChange={(v) => setGlue({ voice: v })} title={(v) => GLUE_HINT[v]} />
+      </Row>
+      <Row label="reduction" hint="How much it is taking off now">
+        <GrMeter get={glueGr} wide title="The glue's gain reduction now (0 to 12 dB)" />
+      </Row>
+    </Shell>
+  )
+}
+
 // ── The editor (pop-out) ─────────────────────────────────────────────────────
 
 function EqEditor({ onClose }: { onClose: () => void }): JSX.Element {
@@ -442,7 +482,7 @@ function EqEditor({ onClose }: { onClose: () => void }): JSX.Element {
           <span className="font-mono text-[10px] text-muted">after all of Sonify · to the speakers only · drag a point · wheel : Q · double-click : on / off or a new bell · Delete : off</span>
           <span className="flex-1" />
           <button
-            onClick={() => setEq({ ...defaultEq(), on: eq.on })}
+            onClick={() => setEq({ ...defaultEq(), on: eq.on, glue: eq.glue })}
             className="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-muted hover:text-accent"
             title="Every band back to off and flat, both gains to 0 dB"
           >
