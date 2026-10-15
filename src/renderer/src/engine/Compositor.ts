@@ -2318,15 +2318,15 @@ export class Compositor {
     this.soniStripKey = key;
     this.soniStripAt = now;
     this.soniStripFrame = this.frameNo;
-    strip.kickStrip(size, size, texs, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
+    // as many cells as taps, whatever is in use : a stable size
+    strip.kickStrip(size, size, texs, this.copyProg, this.uCTex, this.vao, !this.paintingClock, taps.length);
     const got = strip.takeLatest();
-    if (got && got.w === size * keys.length) {
-      const W = got.w;
+    if (got && got.w === size && got.h >= size * keys.length) {
+      const cell = size * size * 4;
       taps.forEach((_, i) => {
         const c = cellOf[i];
         if (c < 0) return;
-        const out = outs[i];
-        for (let y = 0; y < size; y++) out.set(got.grid.subarray((y * W + c * size) * 4, (y * W + c * size + size) * 4), y * size * 4);
+        outs[i].set(got.grid.subarray(c * cell, c * cell + cell)); // stacked : one run per cell
         res[i] = true;
       });
     }

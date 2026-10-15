@@ -181,13 +181,14 @@ export class GridReadback {
     return true
   }
 
-  /** Several sources side by side, `cellW` x `h` each, in ONE readback : one
-   *  read to collect instead of one per source. On a GPU that shares memory with
-   *  the processor, collecting a read is a synchronous round trip to the GPU
-   *  process that waits behind everything queued before it, whatever its size
-   *  (the two 96x96 Sonify taps blocked an installation's window ~90 ms a
-   *  second). Same ring, same rules as kick(); a different count of sources is
-   *  a size change, which drops what is in flight. */
+  /** Several sources stacked, `cellW` x `h` each, in ONE readback : one read to
+   *  collect instead of one per source. On a GPU that shares memory with the
+   *  processor, collecting a read is a synchronous round trip to the GPU process
+   *  that waits behind everything queued before it, whatever its size (the two
+   *  96x96 Sonify taps blocked an installation's window ~90 ms a second). Same
+   *  ring, same rules as kick(). The strip is `cells` tall whatever the count of
+   *  sources (a source more or less resized it : the whole ring made again), and
+   *  stacked, each cell is one run of the grid (cell i : rows i·h to i·h + h). */
   kickStrip(
     cellW: number,
     h: number,
@@ -195,10 +196,11 @@ export class GridReadback {
     prog: WebGLProgram,
     uTex: WebGLUniformLocation | null,
     vao: WebGLVertexArrayObject,
-    flush = true
+    flush = true,
+    cells = srcs.length
   ): boolean {
     const gl = this.gl
-    this.ensure(cellW * srcs.length, h)
+    this.ensure(cellW, h * Math.max(cells, srcs.length))
     const wi = this.phase
     if (this.fences[wi]) return false
     gl.bindVertexArray(vao)
@@ -207,7 +209,7 @@ export class GridReadback {
     gl.activeTexture(gl.TEXTURE0)
     gl.uniform1i(uTex, 0)
     for (let i = 0; i < srcs.length; i++) {
-      gl.viewport(i * cellW, 0, cellW, h)
+      gl.viewport(0, i * h, cellW, h)
       gl.bindTexture(gl.TEXTURE_2D, srcs[i])
       gl.drawArrays(gl.TRIANGLES, 0, 3)
     }

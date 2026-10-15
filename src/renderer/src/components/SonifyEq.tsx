@@ -10,14 +10,15 @@
 // off. Behind the curve, the sound's spectrum before the EQ (a line) and after
 // it (filled).
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useStore } from '../store'
 import { sonifyEngine } from '../audio/sonify'
 import {
   EQ_FREQ_MAX, EQ_FREQ_MIN, EQ_GAIN_MAX, EQ_IO_MAX, EQ_KINDS, EQ_Q_MAX, EQ_Q_MIN, EQ_SLOPES, GLUE_VOICES,
-  bandDb, defaultEq, eqDb, normalizeEq, type EqSlope, type GlueVoice, type SoniEq, type SoniEqBand, type SoniGlue
+  bandDb, defaultEq, eqSections, normalizeEq, sectionsDb, type EqSlope, type GlueVoice, type SoniEq, type SoniEqBand, type SoniGlue
 } from '../audio/eqMath'
-import { GrMeter, RangeRow, Row, Seg, Shell } from './sonifyUi'
+import { GrMeter, RangeRow, Row, Seg, Shell, parseHz, sonifyCovered, themeVar } from './sonifyUi'
 
 const LABEL = ['LC', 'LS', '1', '2', '3', '4', '5', '6', '7', '8', 'HS', 'HC']
 const NAME = ['Low cut', 'Low shelf', 'Bell 1', 'Bell 2', 'Bell 3', 'Bell 4', 'Bell 5', 'Bell 6', 'Bell 7', 'Bell 8', 'High shelf', 'High cut']
@@ -31,16 +32,11 @@ const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > 
 const fmtHz = (f: number): string => (f >= 1000 ? `${(f / 1000).toFixed(f >= 10000 ? 1 : 2)}k` : `${Math.round(f)}`)
 const isCut = (i: number): boolean => EQ_KINDS[i] === 'lowcut' || EQ_KINDS[i] === 'highcut'
 
-/** The theme's colors for a canvas (the CSS variables hold "r g b"). */
-function themeRgb(name: string, fallback: string): string {
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-  return v ? v : fallback
-}
-
-/** The EQ in the store, normalized, and a writer that keeps the rest of Sonify. */
+/** The EQ in the store, normalized (once per change : a new object every render
+ *  redrew the card on every one), and a writer that keeps the rest of Sonify. */
 function useEq(): [SoniEq, (next: SoniEq) => void] {
   const raw = useStore((s) => s.sonify.eq)
-  const eq = normalizeEq(raw)
+  const eq = useMemo(() => normalizeEq(raw), [raw])
   const set = useCallback((next: SoniEq): void => {
     const st = useStore.getState()
     st.setSonify({ ...st.sonify, eq: next })
@@ -86,15 +82,51 @@ function drawSpectrum(g: CanvasRenderingContext2D, w: number, h: number, data: F
   }
 }
 
-function drawEq(cv: HTMLCanvasElement, eq: SoniEq, o: DrawOpts): void {
+/** The curves as drawn, one y per column (each band on its own, and the whole
+ *  EQ), worked out once per EQ and size. Per frame, every column rebuilt every
+ *  band's filters : up to 9 ms a frame with steep bands, on the thread that
+ *  drives the picture. */
+interface Curves { eq: SoniEq; w: number; h: number; step: number; bands: Array<Float32Array | null>; total: Float32Array }
+const curveCache = new WeakMap<HTMLCanvasElement, Curves>()
+function curvesFor(cv: HTMLCanvasElement, eq: SoniEq, w: number, h: number, step: number): Curves {
+  const c = curveCache.get(cv)
+  if (c && c.eq === eq && c.w === w && c.h === h && c.step === step) return c
+  const range = EQ_GAIN_MAX, n = Math.floor(w / step) + 1
+  const sum = new Float64Array(n)
+  const bands = eq.bands.map((b, i) => {
+    if (!b.on) return null
+    const secs = eqSections(EQ_KINDS[i], b, SR)
+    const ys = new Float32Array(n)
+    for (let j = 0; j < n; j++) {
+      const db = sectionsDb(secs, xf(j * step, w), SR)
+      sum[j] += db
+      ys[j] = yOf(clamp(db, -range - 6, range + 6), h, range)
+    }
+    return ys
+  })
+  const total = new Float32Array(n)
+  for (let j = 0; j < n; j++) total[j] = yOf(clamp(sum[j], -range - 6, range + 6), h, range)
+  const out = { eq, w, h, step, bands, total }
+  curveCache.set(cv, out)
+  return out
+}
+
+/** Device pixels per CSS pixel of the canvas as shown : the screen's ratio times
+ *  the UI zoom (a CSS zoom : sized from clientWidth alone, it was blurry). */
+function canvasScale(cv: HTMLCanvasElement): number {
   const dpr = window.devicePixelRatio || 1
-  const w = Math.max(1, Math.round(cv.clientWidth * dpr)), h = Math.max(1, Math.round(cv.clientHeight * dpr))
+  return cv.clientWidth > 0 ? (cv.getBoundingClientRect().width * dpr) / cv.clientWidth : dpr
+}
+
+function drawEq(cv: HTMLCanvasElement, eq: SoniEq, o: DrawOpts, u = canvasScale(cv)): void {
+  const dpr = u
+  const w = Math.max(1, Math.round(cv.clientWidth * u)), h = Math.max(1, Math.round(cv.clientHeight * u))
   if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h }
   const g = cv.getContext('2d')
   if (!g) return
   const range = EQ_GAIN_MAX
-  const accent = themeRgb('--c-accent', '255 140 60')
-  const text = themeRgb('--c-text', '230 230 230')
+  const accent = themeVar('--c-accent', '255 140 60')
+  const text = themeVar('--c-text', '230 230 230')
   g.fillStyle = 'rgb(14, 15, 18)'
   g.fillRect(0, 0, w, h)
   // grid : decades and the octave marks, the dB lines
@@ -124,13 +156,14 @@ function drawEq(cv: HTMLCanvasElement, eq: SoniEq, o: DrawOpts): void {
   if (o.pre && o.bins && o.sr) drawSpectrum(g, w, h, o.pre, o.bins, o.sr, null, 'rgba(255,255,255,0.22)')
   // each band on its own, faint; the selected one filled
   const step = o.compact ? 3 : 2
+  const cur = curvesFor(cv, eq, w, h, step)
   eq.bands.forEach((b, i) => {
-    if (!b.on) return
+    const ys = cur.bands[i]
+    if (!b.on || !ys) return
     g.beginPath()
-    for (let x = 0; x <= w; x += step) {
-      const y = yOf(clamp(bandDb(i, b, xf(x, w), SR), -range - 6, range + 6), h, range)
-      if (x === 0) g.moveTo(x, y)
-      else g.lineTo(x, y)
+    for (let j = 0; j < ys.length; j++) {
+      if (j === 0) g.moveTo(0, ys[0])
+      else g.lineTo(j * step, ys[j])
     }
     if (i === o.selected && !o.compact) {
       const y0 = yOf(0, h, range)
@@ -145,10 +178,9 @@ function drawEq(cv: HTMLCanvasElement, eq: SoniEq, o: DrawOpts): void {
   })
   // the whole EQ
   g.beginPath()
-  for (let x = 0; x <= w; x += step) {
-    const y = yOf(clamp(eqDb(eq, xf(x, w), SR), -range - 6, range + 6), h, range)
-    if (x === 0) g.moveTo(x, y)
-    else g.lineTo(x, y)
+  for (let j = 0; j < cur.total.length; j++) {
+    if (j === 0) g.moveTo(0, cur.total[0])
+    else g.lineTo(j * step, cur.total[j])
   }
   g.strokeStyle = eq.on ? `rgb(${text})` : 'rgba(255,255,255,0.35)'
   g.lineWidth = (o.compact ? 1.5 : 2) * dpr
@@ -195,9 +227,14 @@ function EqMeter({ which, label }: { which: 'in' | 'out'; label: string }): JSX.
   useEffect(() => {
     const st = { at: performance.now(), rms: [-120, -120], pk: [-120, -120], held: [0, 0] }
     let raf = 0
+    const el = ref.current
+    const bars = [0, 1].map((c) => el?.querySelector<HTMLElement>(`[data-m="b${c}"]`) ?? null)
+    const ticks = [0, 1].map((c) => el?.querySelector<HTMLElement>(`[data-m="t${c}"]`) ?? null)
     const tick = (now: number): void => {
+      raf = requestAnimationFrame(tick)
       const dt = Math.min(0.25, (now - st.at) / 1000)
       st.at = now
+      if (sonifyCovered()) return
       const run = sonifyEngine.isRunning()
       const m = which === 'in' ? sonifyEngine.eqMeterIn : sonifyEngine.eqMeterOut
       const chans = [m.l, m.r]
@@ -208,8 +245,7 @@ function EqMeter({ which, label }: { which: 'in' | 'out'; label: string }): JSX.
         st.rms[c] = rms >= st.rms[c] ? rms : Math.max(rms, st.rms[c] - 24 * dt)
         if (pk >= st.pk[c]) { st.pk[c] = pk; st.held[c] = 1.2 } else if ((st.held[c] -= dt) <= 0) st.pk[c] = Math.max(pk, st.pk[c] - 24 * dt)
         read = Math.max(read, st.pk[c])
-        const el = ref.current
-        const bar = el?.querySelector<HTMLElement>(`[data-m="b${c}"]`), tk = el?.querySelector<HTMLElement>(`[data-m="t${c}"]`)
+        const bar = bars[c], tk = ticks[c]
         if (bar) {
           bar.style.width = `${(mx(st.rms[c]) * 100).toFixed(1)}%`
           bar.style.background = ceil ? 'rgb(230,120,60)' : st.rms[c] > -9 ? 'rgb(214,196,90)' : 'rgb(120,200,140)'
@@ -220,8 +256,8 @@ function EqMeter({ which, label }: { which: 'in' | 'out'; label: string }): JSX.
           tk.style.background = st.pk[c] > -1.5 ? 'rgb(230,120,60)' : 'rgb(230,230,230)'
         }
       }
-      if (dbRef.current) dbRef.current.textContent = read > M_FLOOR ? read.toFixed(0) : '-∞'
-      raf = requestAnimationFrame(tick)
+      const txt = read > M_FLOOR ? read.toFixed(0) : '-∞'
+      if (dbRef.current && dbRef.current.textContent !== txt) dbRef.current.textContent = txt
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
@@ -265,18 +301,23 @@ function GainRow({ which, value, onChange }: { which: 'in' | 'out'; value: numbe
 
 // ── The miniature (Mixer view) ───────────────────────────────────────────────
 
-export function EqCard(): JSX.Element {
+// (memo : the page re-renders on every Sonify change, the card only on the EQ's)
+export const EqCard = memo(function EqCard(): JSX.Element {
   const [eq, setEq] = useEq()
   const [open, setOpen] = useState(false)
   const cvRef = useRef<HTMLCanvasElement | null>(null)
+  const eqRef = useRef(eq)
+  eqRef.current = eq
+  // observed once (a new observer per change painted twice each time)
   useEffect(() => {
     const cv = cvRef.current
     if (!cv) return
-    const paint = (): void => drawEq(cv, eq, { selected: -1, compact: true })
-    paint()
-    const ro = new ResizeObserver(paint)
+    const ro = new ResizeObserver(() => drawEq(cv, eqRef.current, { selected: -1, compact: true }))
     ro.observe(cv)
     return () => ro.disconnect()
+  }, [])
+  useEffect(() => {
+    if (cvRef.current) drawEq(cvRef.current, eq, { selected: -1, compact: true })
   }, [eq])
   const active = eq.bands.filter((b) => b.on).length
   return (
@@ -310,7 +351,7 @@ export function EqCard(): JSX.Element {
       {open && <EqEditor onClose={() => setOpen(false)} />}
     </>
   )
-}
+})
 
 // ── The glue (Mixer view, under the EQ) ──────────────────────────────────────
 
@@ -323,7 +364,7 @@ const GLUE_HINT: Record<GlueVoice, string> = {
 }
 const glueGr = (): number => sonifyEngine.glueGr
 
-export function GlueCard(): JSX.Element {
+export const GlueCard = memo(function GlueCard(): JSX.Element {
   const [eq, setEq] = useEq()
   const g = eq.glue
   const setGlue = (p: Partial<SoniGlue>): void => setEq({ ...eq, glue: { ...g, ...p } })
@@ -350,7 +391,7 @@ export function GlueCard(): JSX.Element {
       </Row>
     </Shell>
   )
-}
+})
 
 // ── The editor (pop-out) ─────────────────────────────────────────────────────
 
@@ -362,7 +403,13 @@ function EqEditor({ onClose }: { onClose: () => void }): JSX.Element {
   eqRef.current = eq
   const selRef = useRef(sel)
   selRef.current = sel
-  const drag = useRef<{ i: number; id: number } | null>(null)
+  // A drag : the band, the pointer, where it was pressed, the offset from the
+  // point's centre (a grab a few pixels off jumped it), and whether it has left
+  // the dead zone yet (a plain click moved the band, or switched it on).
+  const drag = useRef<{ i: number; id: number; x0: number; y0: number; ox: number; oy: number; moved: boolean } | null>(null)
+  // The editor sits over the whole app (a portal) : hidden while another page
+  // covers Sonify.
+  const covered = useStore((s) => s.worldPageOpen || s.sequencePageOpen || s.bodyPageOpen || s.resolumePageOpen)
 
   const setBand = (i: number, patch: Partial<SoniEqBand>): void => {
     const cur = eqRef.current
@@ -373,23 +420,35 @@ function EqEditor({ onClose }: { onClose: () => void }): JSX.Element {
   useEffect(() => {
     let raf = 0
     const pre = new Float32Array(8192), post = new Float32Array(8192)
+    // its scale is read when its box changes, not every frame (a layout read
+    // after the meters' writes)
+    let u = 0
+    const ro = new ResizeObserver(() => { if (cvRef.current) u = canvasScale(cvRef.current) })
+    if (cvRef.current) ro.observe(cvRef.current)
     const tick = (): void => {
-      const cv = cvRef.current
-      if (cv) {
-        const a = sonifyEngine.eqSpectrum(false, pre), b = sonifyEngine.eqSpectrum(true, post)
-        drawEq(cv, eqRef.current, { selected: selRef.current, compact: false, pre: a ? pre : null, post: b ? post : null, bins: a?.bins ?? b?.bins, sr: a?.sampleRate ?? b?.sampleRate })
-      }
       raf = requestAnimationFrame(tick)
+      const cv = cvRef.current
+      if (!cv || sonifyCovered()) return
+      if (!u) u = canvasScale(cv)
+      const a = sonifyEngine.eqSpectrum(false, pre), b = sonifyEngine.eqSpectrum(true, post)
+      drawEq(cv, eqRef.current, { selected: selRef.current, compact: false, pre: a ? pre : null, post: b ? post : null, bins: a?.bins ?? b?.bins, sr: a?.sampleRate ?? b?.sampleRate }, u)
     }
     raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
+    return () => { cancelAnimationFrame(raf); ro.disconnect() }
   }, [])
 
-  // Esc closes; Delete turns the selected band off
+  // Esc closes; Delete turns the selected band off; every other plain key stays
+  // here (the app's one-key shortcuts fired under the editor : S closed Sonify,
+  // M unmounted the editor, 1 to 9 recalled scenes, 0 flushed)
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose() }
-      else if ((e.key === 'Delete' || e.key === 'Backspace') && !(e.target instanceof HTMLInputElement)) {
+      if (sonifyCovered()) return
+      const t = e.target as HTMLElement | null
+      const field = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose(); return }
+      if (field || e.ctrlKey || e.metaKey || e.altKey) return
+      e.stopPropagation()
+      if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault()
         setBand(selRef.current, { on: false })
       }
@@ -409,9 +468,9 @@ function EqEditor({ onClose }: { onClose: () => void }): JSX.Element {
     const kx = cv.width / Math.max(1, r.width), ky = cv.height / Math.max(1, r.height)
     return { x: (e.clientX - r.left) * kx, y: (e.clientY - r.top) * ky, w: cv.width, h: cv.height }
   }
-  const hit = (x: number, y: number, w: number, h: number): number => {
-    const dpr = window.devicePixelRatio || 1
-    let best = -1, bd = 12 * dpr
+  const hit = (x: number, y: number, w: number, h: number, radius = 12): number => {
+    const cv = cvRef.current
+    let best = -1, bd = radius * (cv ? cv.width / Math.max(1, cv.clientWidth) : 1)
     eqRef.current.bands.forEach((_, i) => {
       const p = handleXY(eqRef.current, i, w, h)
       const d = Math.hypot(p.x - x, p.y - y)
@@ -426,18 +485,27 @@ function EqEditor({ onClose }: { onClose: () => void }): JSX.Element {
   }
 
   const onDown = (e: React.PointerEvent<HTMLCanvasElement>): void => {
+    if (e.button !== 0) return
     const p = local(e)
     const i = hit(p.x, p.y, p.w, p.h)
     if (i < 0) return
     setSel(i)
-    drag.current = { i, id: e.pointerId }
+    const c = handleXY(eqRef.current, i, p.w, p.h)
+    drag.current = { i, id: e.pointerId, x0: p.x, y0: p.y, ox: c.x - p.x, oy: c.y - p.y, moved: false }
     e.currentTarget.setPointerCapture(e.pointerId)
   }
   const onMove = (e: React.PointerEvent<HTMLCanvasElement>): void => {
     const d = drag.current
     if (!d || d.id !== e.pointerId) return
+    if (!(e.buttons & 1)) { drag.current = null; return } // released elsewhere
     const p = local(e)
-    moveTo(d.i, p.x, p.y, p.w, p.h)
+    if (!d.moved) {
+      const cv = cvRef.current
+      const k = cv ? cv.width / Math.max(1, cv.clientWidth) : 1
+      if (Math.hypot(p.x - d.x0, p.y - d.y0) < 3 * k) return
+      d.moved = true
+    }
+    moveTo(d.i, p.x + d.ox, p.y + d.oy, p.w, p.h)
   }
   const onUp = (e: React.PointerEvent<HTMLCanvasElement>): void => {
     if (drag.current?.id === e.pointerId) drag.current = null
@@ -456,20 +524,42 @@ function EqEditor({ onClose }: { onClose: () => void }): JSX.Element {
     })
     if (best >= 0) { setSel(best); moveTo(best, p.x, p.y, p.w, p.h) }
   }
-  const onWheel = (e: React.WheelEvent<HTMLCanvasElement>): void => {
+  // The wheel over a point sets its Q (elsewhere the editor scrolls, and with
+  // Ctrl the UI zooms). A native listener : React's is passive, and the editor
+  // scrolled while Q changed.
+  const wheelRef = useRef<(e: WheelEvent) => void>(() => {})
+  wheelRef.current = (e: WheelEvent): void => {
+    if (e.ctrlKey) return
     const p = local(e)
-    const i = hit(p.x, p.y, p.w, p.h)
-    const k = i >= 0 ? i : selRef.current
-    const b = eqRef.current.bands[k]
+    const i = hit(p.x, p.y, p.w, p.h, 24)
+    const b = i >= 0 ? eqRef.current.bands[i] : null
     if (!b) return
-    if (i >= 0) setSel(i)
-    setBand(k, { q: Math.round(clamp(b.q * Math.exp(-e.deltaY * 0.0015), EQ_Q_MIN, EQ_Q_MAX) * 100) / 100 })
+    e.preventDefault()
+    setSel(i)
+    setBand(i, { q: Math.round(clamp(b.q * Math.exp(-e.deltaY * 0.0015), EQ_Q_MIN, EQ_Q_MAX) * 100) / 100 })
   }
+  useEffect(() => {
+    const cv = cvRef.current
+    if (!cv) return
+    const on = (e: WheelEvent): void => wheelRef.current(e)
+    cv.addEventListener('wheel', on, { passive: false })
+    return () => cv.removeEventListener('wheel', on)
+  }, [])
+  // The backdrop closes it only when the press began there too (a selection
+  // dragged out of a number box closed it).
+  const downOnBackdrop = useRef(false)
 
   const b = eq.bands[sel]
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="flex max-h-full w-full max-w-[1100px] flex-col gap-2 overflow-y-auto rounded border border-border bg-panel p-3" onClick={(e) => e.stopPropagation()}>
+  // A portal : inside the voice column it took the column's dimming (65 % while
+  // the sound is off) and the page showed through.
+  return createPortal(
+    <div
+      data-soni-modal
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6 ${covered ? 'hidden' : ''}`}
+      onPointerDown={(e) => { downOnBackdrop.current = e.target === e.currentTarget }}
+      onClick={(e) => { if (downOnBackdrop.current && e.target === e.currentTarget) onClose() }}
+    >
+      <div className="flex max-h-full w-full max-w-[1100px] flex-col gap-2 overflow-y-auto rounded border border-border bg-panel p-3">
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => setEq({ ...eq, on: !eq.on })}
@@ -479,7 +569,7 @@ function EqEditor({ onClose }: { onClose: () => void }): JSX.Element {
             {eq.on ? '● on' : '○ bypass'}
           </button>
           <span className="text-[13px] font-semibold">Output EQ</span>
-          <span className="font-mono text-[10px] text-muted">after all of Sonify · to the speakers only · drag a point · wheel : Q · double-click : on / off or a new bell · Delete : off</span>
+          <span className="font-mono text-[10px] text-muted">after all of Sonify · to the speakers only · drag a point · wheel over a point : Q · double-click : on / off or a new bell · Delete : off</span>
           <span className="flex-1" />
           <button
             onClick={() => setEq({ ...defaultEq(), on: eq.on, glue: eq.glue })}
@@ -496,8 +586,8 @@ function EqEditor({ onClose }: { onClose: () => void }): JSX.Element {
           onPointerMove={onMove}
           onPointerUp={onUp}
           onPointerCancel={onUp}
+          onLostPointerCapture={onUp}
           onDoubleClick={onDouble}
-          onWheel={onWheel}
           className="h-[340px] w-full cursor-crosshair touch-none rounded"
         />
         <div className="grid grid-cols-6 gap-1 lg:grid-cols-12">
@@ -527,7 +617,7 @@ function EqEditor({ onClose }: { onClose: () => void }): JSX.Element {
               {b.on ? '● on' : '○ off'}
             </button>
             <span className="w-20 text-[12px] font-semibold" style={{ color: bandColor(sel) }}>{NAME[sel]}</span>
-            <NumField label="freq" unit="Hz" value={b.freq} min={EQ_FREQ_MIN} max={EQ_FREQ_MAX} step={1} onChange={(v) => setBand(sel, { freq: v, on: true })} />
+            <NumField label="freq" unit="Hz" value={b.freq} min={EQ_FREQ_MIN} max={EQ_FREQ_MAX} step={1} parse={(t) => parseHz(t, NaN)} onChange={(v) => setBand(sel, { freq: v, on: true })} />
             {!isCut(sel) && <NumField label="gain" unit="dB" value={b.gain} min={-EQ_GAIN_MAX} max={EQ_GAIN_MAX} step={0.1} onChange={(v) => setBand(sel, { gain: v, on: true })} />}
             <NumField label="Q" unit="" value={b.q} min={EQ_Q_MIN} max={EQ_Q_MAX} step={0.01} onChange={(v) => setBand(sel, { q: v })} />
             <label className="flex items-center gap-1 font-mono text-[10px] text-muted">
@@ -551,19 +641,29 @@ function EqEditor({ onClose }: { onClose: () => void }): JSX.Element {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
-/** A number box with its label, committed on every change (clamped). */
-function NumField({ label, unit, value, min, max, step, onChange }: {
+/** A number box with its label, committed on Enter or on leaving it (clamped).
+ *  An empty or unreadable entry goes back to the value (Number('') is 0 : a
+ *  cleared frequency jumped to 20 Hz), and the box always shows what was kept. */
+function NumField({ label, unit, value, min, max, step, onChange, parse }: {
   label: string; unit: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void
+  parse?: (t: string) => number | null
 }): JSX.Element {
-  const [text, setText] = useState(String(value))
-  useEffect(() => { setText(step >= 1 ? String(Math.round(value)) : String(+value.toFixed(2))) }, [value, step])
+  const show = (v: number): string => (step >= 1 ? String(Math.round(v)) : String(+v.toFixed(2)))
+  const [text, setText] = useState(show(value))
+  useEffect(() => { setText(show(value)) }, [value, step]) // eslint-disable-line react-hooks/exhaustive-deps
   const commit = (t: string): void => {
-    const n = Number(t)
-    if (Number.isFinite(n)) onChange(clamp(n, min, max))
+    const tt = t.trim()
+    const n = tt === '' ? NaN : parse ? parse(tt) ?? NaN : Number(tt.replace(',', '.'))
+    if (Number.isFinite(n)) {
+      const v = clamp(n, min, max)
+      if (v !== value) onChange(v)
+      setText(show(v))
+    } else setText(show(value))
   }
   return (
     <label className="flex items-center gap-1 font-mono text-[10px] text-muted">

@@ -5,7 +5,46 @@
 // view is the reference look : change it here, every view follows.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useStore } from '../store'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+
+/** A theme color variable ("r g b"), read once per theme : read every frame,
+ *  getComputedStyle forced a style recalculation after the meters had written
+ *  theirs. */
+const themeVars = new Map<string, string>()
+let themeKey: string | null = null
+export function themeVar(name: string, fallback: string): string {
+  const k = document.documentElement.getAttribute('data-theme')
+  if (k !== themeKey) { themeKey = k; themeVars.clear() }
+  let v = themeVars.get(name)
+  if (v === undefined) {
+    v = getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
+    themeVars.set(name, v)
+  }
+  return v
+}
+
+/** A typed frequency : "4250", "4.25k", "4.25 kHz", "250 Hz"; "off" → `off`. */
+export function parseHz(text: string, off: number): number | null {
+  const t = text.trim().toLowerCase().replace(',', '.')
+  if (t === 'off') return off
+  const m = /^([0-9]*\.?[0-9]+)\s*(k|khz)?\s*(hz)?$/.exec(t)
+  if (!m) return null
+  const v = Number(m[1]) * (m[2] ? 1000 : 1)
+  return Number.isFinite(v) ? v : null
+}
+/** A typed level in dB : "-6", "+3.5 dB". */
+export function parseDb(text: string): number | null {
+  const m = /^([+-]?[0-9]*\.?[0-9]+)\s*(db)?$/i.exec(text.trim().replace(',', '.'))
+  return m ? Number(m[1]) : null
+}
+
+/** Something hides the Sonify page (another full page over it, the window
+ *  minimized) : its drawing loops skip the frame. */
+export function sonifyCovered(): boolean {
+  const s = useStore.getState()
+  return document.hidden || s.worldPageOpen || s.sequencePageOpen || s.bodyPageOpen || s.resolumePageOpen
+}
 
 /** The on / play pill of a card's header. */
 export const pill = (on: boolean): string =>
@@ -245,8 +284,10 @@ export function GrMeter({ get, wide, title }: { get: () => number; wide?: boolea
   useEffect(() => {
     let raf = 0, shown = -2, held = 0, at = performance.now()
     const tick = (now: number): void => {
+      raf = requestAnimationFrame(tick)
       const dt = Math.min(0.25, (now - at) / 1000)
       at = now
+      if (sonifyCovered()) return
       const g = get()
       // fast down, slow back (12 dB/s) : a reduction stays readable
       held = g < 0 ? -1 : g >= held ? g : Math.max(g, held - 12 * dt)
@@ -257,7 +298,6 @@ export function GrMeter({ get, wide, title }: { get: () => number; wide?: boolea
         numRef.current.textContent = v < 0 ? 'off' : v < 0.1 ? '0' : `-${v < 10 ? v.toFixed(1) : v.toFixed(0)}`
         numRef.current.style.color = v >= 0.1 ? 'rgb(var(--c-accent2))' : ''
       }
-      raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)

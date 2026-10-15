@@ -24,13 +24,14 @@ import {
   placeField,
   placePatch,
   spaceModParam,
+  validSpaceHost,
   wrap180,
   type SpaceMode,
   type SpaceVoice
 } from '@shared/spatial'
 import type { SonifyModParam } from '@shared/types'
 import { BoundedNumberInput } from './BoundedNumberInput'
-import { Row, RangeRow, Seg, Shell, Stepper, chip } from './sonifyUi'
+import { Row, RangeRow, Seg, Shell, Stepper, chip, sonifyCovered, themeVar } from './sonifyUi'
 import { showToast } from './Toast'
 
 const MODE_HINT: Record<SpaceMode, string> = {
@@ -56,7 +57,7 @@ export function SpacePanel({ chip: modChip, assign, renderAssign }: {
   const domeOn = useStore((s) => s.dome.enabled)
   const [, setTick] = useState(0)
   useEffect(() => {
-    const id = window.setInterval(() => setTick((t) => t + 1), 300)
+    const id = window.setInterval(() => { if (!sonifyCovered()) setTick((t) => t + 1) }, 300)
     return () => window.clearInterval(id)
   }, [])
   const fileRef = useRef<HTMLInputElement>(null)
@@ -170,7 +171,18 @@ export function SpacePanel({ chip: modChip, assign, renderAssign }: {
                 className="input min-w-0 flex-1 font-mono text-[10px]"
                 defaultValue={space.host}
                 key={space.host}
-                onBlur={(e) => setSpace({ host: e.target.value.trim() })}
+                onBlur={(e) => {
+                  const typed = e.target.value.trim()
+                  if (typed === space.host) return
+                  // refused (not an IPv4 address) : the address before stays, and
+                  // the field says so (it kept the text, or fell to the default)
+                  if (!validSpaceHost(typed)) {
+                    e.target.value = space.host
+                    showToast(`Space : "${typed}" is not an IPv4 address (like 10.0.0.20) or localhost. The positions still go to ${space.host}.`, 'warn', 6000)
+                    return
+                  }
+                  setSpace({ host: typed })
+                }}
                 onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
                 placeholder="10.0.0.20"
               />
@@ -229,7 +241,7 @@ export function SpacePanel({ chip: modChip, assign, renderAssign }: {
         <Shell title="Voices" hint="Where each voice sits. Follow : where it plays in the picture (az then turns it from there). Fixed : at az / el. Width : how far apart its own left and right are. Span : how big a patch of the room it fills. Spin : turns it around the zenith, degrees a second. Drag a number up or down to change it (Shift : finer), click it to type. Click a voice's name (▸) for its sliders, each with an M to bind a modulator or a Meta knob." on open>
           <div className="font-mono text-[9px] text-muted">▸ a voice : its sliders, each with an <b>M</b> for a modulator or a Meta knob</div>
           <div className="flex items-center gap-1 font-mono text-[8px] uppercase text-muted">
-            <span className="w-[62px] shrink-0" />
+            <span className="w-[54px] shrink-0" />
             <span className="w-[18px] shrink-0 text-center" title="Lit : the voice follows where it plays in the picture. Dark : a fixed place.">fol</span>
             {['az', 'el', 'width', 'span', 'spin'].map((h) => <span key={h} className="min-w-0 flex-1 text-center">{h}</span>)}
           </div>
@@ -261,7 +273,7 @@ function VoiceRow({ voice, index, setVoice, open, onOpen, modChip, assignBox }: 
   return (
     <>
     <div className={`flex items-center gap-1 ${live ? '' : 'opacity-60'}`}>
-      <button onClick={onOpen} className={`flex w-[62px] shrink-0 items-center gap-0.5 text-left text-[10px] hover:text-accent ${open ? 'text-accent' : ''}`} title={`${SPACE_VOICE_LABEL[voice]} : ${live ? 'playing' : 'off'}. Click : its sliders, each with an M to bind a modulator or a Meta knob${bound ? ' (one is bound now)' : ''}`}>
+      <button onClick={onOpen} className={`flex w-[54px] shrink-0 items-center gap-0.5 text-left text-[10px] hover:text-accent ${open ? 'text-accent' : ''}`} title={`${SPACE_VOICE_LABEL[voice]} : ${live ? 'playing' : 'off'}. Click : its sliders, each with an M to bind a modulator or a Meta knob${bound ? ' (one is bound now)' : ''}`}>
         <span className="w-2 shrink-0 text-[8px] text-muted">{open ? '▾' : '▸'}</span>
         <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: voiceColor(index) }} />
         <span className="min-w-0 truncate">{SPACE_VOICE_LABEL[voice]}</span>
@@ -318,6 +330,8 @@ function ScrubBox({ value, min, max, perPx, wrap, dim, liveKey, onChange, title 
   title: string
 }): JSX.Element {
   const ref = useRef<HTMLSpanElement>(null)
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
   const onPointerDown = (e: RPointerEvent<HTMLSpanElement>): void => {
     if (e.button !== 0 || dim) return
     const input = ref.current?.querySelector('input')
@@ -325,29 +339,43 @@ function ScrubBox({ value, min, max, perPx, wrap, dim, liveKey, onChange, title 
     e.preventDefault() // no focus yet : this may be a drag
     const el = e.currentTarget
     el.setPointerCapture(e.pointerId)
+    // The change is added up move by move, each at its own speed : Shift pressed
+    // mid-drag slows what comes next (applied to the whole distance, the value
+    // jumped back toward the start).
     const y0 = e.clientY, v0 = value
-    let moved = false
+    let moved = false, lastY = y0, acc = 0
     const move = (ev: PointerEvent): void => {
-      const dy = y0 - ev.clientY
-      if (!moved && Math.abs(dy) < 3) return
+      if (!(ev.buttons & 1)) { up(); return } // released elsewhere (a window switch)
+      if (!moved && Math.abs(y0 - ev.clientY) < 3) return
       moved = true
-      let v = v0 + dy * perPx * (ev.shiftKey ? 0.2 : 1)
+      acc += (lastY - ev.clientY) * perPx * (ev.shiftKey ? 0.2 : 1)
+      lastY = ev.clientY
+      let v = v0 + acc
       v = wrap ? wrap180(v) : Math.max(min, Math.min(max, v))
-      onChange(Math.round(v))
+      if (!wrap) acc = v - v0 // held at the end : coming back moves at once
+      onChangeRef.current(Math.round(v))
     }
+    let done = false
     const up = (): void => {
+      if (done) return
+      done = true
       el.removeEventListener('pointermove', move)
       el.removeEventListener('pointerup', up)
       el.removeEventListener('pointercancel', up)
+      el.removeEventListener('lostpointercapture', up)
       if (!moved && input) { input.focus(); input.select() }
     }
     el.addEventListener('pointermove', move)
     el.addEventListener('pointerup', up)
     el.addEventListener('pointercancel', up)
+    el.addEventListener('lostpointercapture', up)
   }
+  const hint = `${title} : drag up or down (Shift : finer), click to type`
+  // (the box carries the whole hint : its own title covered the drag hint; a
+  // dimmed box lets the pointer through to the span, whose title then shows)
   return (
-    <span ref={ref} onPointerDown={onPointerDown} className={`min-w-0 flex-1 ${dim ? 'pointer-events-none opacity-40' : 'cursor-ns-resize'}`} title={`${title} : drag up or down (Shift : finer), click to type`}>
-      <BoundedNumberInput className="input w-full !px-0 text-center" value={Math.round(value)} min={min} max={max} integer liveKey={liveKey} onChange={onChange} title={title} />
+    <span ref={ref} onPointerDown={onPointerDown} className={`min-w-0 flex-1 ${dim ? 'opacity-40' : 'cursor-ns-resize'}`} title={hint}>
+      <BoundedNumberInput className={`input w-full !px-0 text-center !text-[9px] ${dim ? 'pointer-events-none' : ''}`} value={Math.round(value)} min={min} max={max} integer liveKey={liveKey} onChange={onChange} title={hint} />
     </span>
   )
 }
@@ -388,25 +416,43 @@ function SpaceMap({ setVoice }: { setVoice: (v: SpaceVoice, p: Partial<import('@
     setVoice(SPACE_VOICES[v], { follow: false, az: Math.round(spaceEngine.storedAz(v, az)), el: Math.round(el) })
     spaceEngine.snap(v)
   }
+  // A voice moves only once dragged past 3 px, held where it was grabbed : a
+  // click (to see which voice a dot is) stopped it following and jumped it.
   const onDown = (e: RPointerEvent<HTMLCanvasElement>): void => {
+    if (e.button !== 0) return
     const p = at(e)
-    if (!p) return
+    const g = geom()
+    if (!p || !g) return
     const v = voiceAt(p.x, p.y)
     if (v < 0) return
     const el = e.currentTarget
     el.setPointerCapture(e.pointerId)
     el.style.cursor = 'grabbing'
-    placeAt(v, p.x, p.y)
-    const move = (ev: PointerEvent): void => { const q = at(ev); if (q) placeAt(v, q.x, q.y) }
+    const pt = spaceEngine.points[v]
+    const a = (pt.az * Math.PI) / 180, rr = (g.R * (90 - pt.el)) / 105
+    const ox = g.c + rr * Math.sin(a) - p.x, oy = g.c + rr * Math.cos(a) - p.y
+    let moved = false, done = false
+    const move = (ev: PointerEvent): void => {
+      if (!(ev.buttons & 1)) { up(); return }
+      const q = at(ev)
+      if (!q) return
+      if (!moved && Math.hypot(q.x - p.x, q.y - p.y) < 3 * g.k) return
+      moved = true
+      placeAt(v, q.x + ox, q.y + oy)
+    }
     const up = (): void => {
+      if (done) return
+      done = true
       el.style.cursor = ''
       el.removeEventListener('pointermove', move)
       el.removeEventListener('pointerup', up)
       el.removeEventListener('pointercancel', up)
+      el.removeEventListener('lostpointercapture', up)
     }
     el.addEventListener('pointermove', move)
     el.addEventListener('pointerup', up)
     el.addEventListener('pointercancel', up)
+    el.addEventListener('lostpointercapture', up)
   }
   const onHover = (e: RPointerEvent<HTMLCanvasElement>): void => {
     if (e.buttons) return
@@ -415,16 +461,22 @@ function SpaceMap({ setVoice }: { setVoice: (v: SpaceVoice, p: Partial<import('@
   }
   useEffect(() => {
     let raf = 0
-    const rgb = (name: string): string => {
-      const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim().split(/\s+/).join(',')
-      return `rgb(${v || '128,128,128'})`
-    }
+    // the theme's colors, read once per theme (every frame forced a style recalc)
+    const rgb = (name: string): string => `rgb(${themeVar(name, '128 128 128').split(/\s+/).join(',')})`
+    // Its size from its box on screen (under the UI zoom, clientWidth is not what
+    // it shows), read when the box changes, not every frame; at least twice its
+    // CSS size, as before.
+    let size = 0
+    const ro = new ResizeObserver(() => {
+      const cv = ref.current
+      if (cv) size = Math.round(Math.max(2 * cv.clientWidth, cv.getBoundingClientRect().width * (window.devicePixelRatio || 1)))
+    })
+    if (ref.current) ro.observe(ref.current)
     const draw = (): void => {
       raf = requestAnimationFrame(draw)
       const cv = ref.current
-      if (!cv) return
-      const W = cv.clientWidth
-      if (cv.width !== W * 2) { cv.width = W * 2; cv.height = W * 2 }
+      if (!cv || !size || sonifyCovered()) return
+      if (cv.width !== size) { cv.width = size; cv.height = size }
       const g = cv.getContext('2d')
       if (!g) return
       const S = cv.width, c = S / 2, R = S * 0.46
@@ -504,7 +556,7 @@ function SpaceMap({ setVoice }: { setVoice: (v: SpaceVoice, p: Partial<import('@
       g.globalAlpha = 1
     }
     draw()
-    return () => cancelAnimationFrame(raf)
+    return () => { cancelAnimationFrame(raf); ro.disconnect() }
   }, [])
   return <canvas ref={ref} onPointerDown={onDown} onPointerMove={onHover} className="mx-auto aspect-square w-full max-w-[320px]" style={{ touchAction: 'none' }} />
 }

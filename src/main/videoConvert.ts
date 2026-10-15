@@ -60,12 +60,15 @@ export function resolveFfmpeg(): string | null {
 }
 
 /** Run ffmpeg, resolving with its stderr text (ffmpeg logs info to stderr). */
-function runFfmpeg(args: string[], onStderr?: (chunk: string) => void): Promise<{ code: number; err: string }> {
+/** `timeoutMs` : killed past it (a file on an offline share or a cloud
+ *  placeholder can hang ffmpeg for ever). */
+function runFfmpeg(args: string[], onStderr?: (chunk: string) => void, timeoutMs = 0): Promise<{ code: number; err: string }> {
   return new Promise((resolve, reject) => {
     const bin = resolveFfmpeg()
     if (!bin) return reject(new Error('ffmpeg not found'))
     const child = spawn(bin, args, { windowsHide: true })
     children.add(child)
+    const timer = timeoutMs > 0 ? setTimeout(() => { try { child.kill() } catch { /* gone */ } }, timeoutMs) : null
     let err = ''
     // An EPIPE on either pipe (most likely when killAllConverts reaps this
     // child on quit, mid-scan) arrives as an unhandled 'error' event, which
@@ -78,8 +81,8 @@ function runFfmpeg(args: string[], onStderr?: (chunk: string) => void): Promise<
       if (err.length > 65536) err = err.slice(-32768)
       onStderr?.(s)
     })
-    child.on('error', (e) => { children.delete(child); reject(e) })
-    child.on('close', (code) => { children.delete(child); resolve({ code: code ?? -1, err }) })
+    child.on('error', (e) => { if (timer) clearTimeout(timer); children.delete(child); reject(e) })
+    child.on('close', (code) => { if (timer) clearTimeout(timer); children.delete(child); resolve({ code: code ?? -1, err }) })
   })
 }
 
@@ -399,6 +402,8 @@ function audioPathsFor(src: string): { out: string; none: string } {
 const audioInflight = new Map<string, Promise<{ ok: boolean; path?: string; silent?: boolean; error?: string }>>()
 
 /** The audio-only copy of `src` for the Collage voice : made once, then found. */
+const AUDIO_PROBE_MS = 60000
+const AUDIO_COPY_MS = 600000 // an hour-long film's sound re-encoded, with room to spare
 export function audioForCollage(src: string): Promise<{ ok: boolean; path?: string; silent?: boolean; error?: string }> {
   let paths: { out: string; none: string }
   try {
@@ -414,9 +419,14 @@ export function audioForCollage(src: string): Promise<{ ok: boolean; path?: stri
   const job = (async (): Promise<{ ok: boolean; path?: string; silent?: boolean; error?: string }> => {
     const tmp = `${out}.tmp`
     try {
-      const { err } = await runFfmpeg(['-hide_banner', '-i', src])
+      // (each run bounded : a hung probe held the one-at-a-time queue, and every
+      // film after it, for ever)
+      const { err } = await runFfmpeg(['-hide_banner', '-i', src], undefined, AUDIO_PROBE_MS)
       const codec = err.match(/Stream #\d+:\d+[^\n]*?: Audio:\s*([a-z0-9_]+)/i)?.[1]?.toLowerCase() ?? null
       if (!codec) {
+        // silent only when ffmpeg did read the file (could not open it : no
+        // marker, so the next time asks again)
+        if (!/Input #0/.test(err)) return { ok: false, error: 'could not read the file' }
         writeFileSync(none, '')
         return { ok: true, silent: true }
       }
@@ -425,7 +435,7 @@ export function audioForCollage(src: string): Promise<{ ok: boolean; path?: stri
         '-map', '0:a:0', '-vn', '-sn', '-dn',
         ...(codec === 'aac' ? ['-c:a', 'copy'] : ['-c:a', 'aac', '-b:a', '192k']),
         '-movflags', '+faststart', '-f', 'mp4', tmp
-      ])
+      ], undefined, AUDIO_COPY_MS)
       if (code !== 0 || !existsSync(tmp) || statSync(tmp).size === 0) {
         try { if (existsSync(tmp)) unlinkSync(tmp) } catch { /* best effort */ }
         return { ok: false, error: `ffmpeg exited ${code}` }

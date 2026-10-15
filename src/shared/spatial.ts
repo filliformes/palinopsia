@@ -203,6 +203,14 @@ function sanitizeLayout(raw: unknown): SpeakerLayout | null {
   return speakers.length ? { name: typeof r.name === 'string' ? r.name.slice(0, 120) : 'imported', speakers } : null
 }
 
+/** A renderer's address the OSC sender takes : an IPv4 address (each part up
+ *  to 255) or localhost. */
+export function validSpaceHost(h: unknown): h is string {
+  if (typeof h !== 'string') return false
+  const t = h.trim()
+  return t === 'localhost' || (/^(\d{1,3}\.){3}\d{1,3}$/.test(t) && t.split('.').every((p) => Number(p) <= 255))
+}
+
 export function sanitizeSpaceConfig(raw: unknown): SpaceConfig {
   const d = defaultSpaceConfig()
   const r = (raw && typeof raw === 'object' ? raw : {}) as Partial<SpaceConfig>
@@ -214,7 +222,7 @@ export function sanitizeSpaceConfig(raw: unknown): SpaceConfig {
     layout,
     firstChannel: Math.round(num(r.firstChannel, d.firstChannel, 1, SPACE_MAX_CH)),
     protocol: r.protocol === 'adm' ? 'adm' : 'spatgris',
-    host: typeof r.host === 'string' && /^(\d{1,3}\.){3}\d{1,3}$|^localhost$/.test(r.host.trim()) ? r.host.trim() : d.host,
+    host: validSpaceHost(r.host) ? r.host.trim() : d.host,
     port: Math.round(num(r.port, d.port, 1, 65535)),
     firstSource: Math.round(num(r.firstSource, d.firstSource, 1, 128)),
     pairs: typeof r.pairs === 'boolean' ? r.pairs : d.pairs,

@@ -81,6 +81,69 @@ that CI builds into cross-platform releases.
   - **The key sequencer's Picture mode** learns only from frames really read : when
     nothing samples the picture, the last one was learned over and over and the palette
     shrank onto it.
+- **The audit of everything added since v1.2.7, the GUI** :
+  - **The EQ editor** no longer costs the picture : its curves are worked out once per
+    change of the EQ instead of every frame (up to 9 ms a frame with steep bands, on the
+    thread that drives the picture). It opens over the whole app (it took the voice
+    column's 65 % dimming while the sound was off), hides while another page covers
+    Sonify, and keeps the keyboard : `M` switched the view and closed it, `S` closed
+    Sonify, `1` to `9` recalled scenes, `0` flushed. A point moves only once dragged past
+    3 px, held where it was grabbed (a click a few pixels off moved it, or switched it on
+    between the two clicks of a double-click); the right button no longer drags; the
+    wheel sets Q over a point only and never scrolls the editor too (elsewhere it
+    scrolls, with Ctrl it zooms the UI); `Backspace` in the slope menu no longer turns
+    the band off; a press in the panel released on the backdrop no longer closes it.
+    The number boxes go back to the value on an empty or unreadable entry (a cleared
+    frequency jumped to 20 Hz) and take "1.5k". The card redraws only when the EQ
+    changes; the meters stop drawing while the page is covered; the canvases are sharp
+    at any UI zoom.
+  - **A Shift-drag on a Sonify slider** wrote back the whole config of its grab on
+    every move, undoing whatever changed meanwhile (the key sequencer, a Meta knob,
+    MIDI; switching the sound back on). Every write now starts from the config as it is.
+  - **Space** : clicking a voice on the room map no longer stops it following and
+    jumps it (it moves once dragged, held where grabbed, left button only); Shift
+    pressed mid-drag on a number box slows what comes next instead of jumping the value
+    back; a refused host (a name, not an IPv4 address) keeps the address before and
+    says so (it fell back to this computer, silently); the number boxes keep their
+    figures in a narrow column and show their drag hint; the map reads the theme once
+    per theme and rests while covered; a modulation box no longer follows to another
+    view.
+  - **The key sequencer** shows the scale's name, cut short before the progress bar
+    is squeezed, and its scale chips keep their names whole in a narrow column.
+  - **Arrow keys** move the Collage's "films in", "ring in" and "hp" sliders (each
+    press snapped back).
+  - **The warp feather** is saved once the slider rests, and a full storage no longer
+    stops the slider. **A session saved before the output EQ** keeps this room's EQ and
+    glue instead of flattening them.
+- **The audit of everything added since v1.2.7, the picture** (measured on the test
+  copy with the window never throttled : a 12-piece Collage wall with every Sonify voice,
+  the EQ and the glue on, the page closed or open in every view, the EQ editor open,
+  Space on a dome over headphones : 60 fps, the 99th percentile frame at 16.9 ms, the
+  worst at 18.5 ms, no long task) :
+  - **The warp feather** only applies with the warp on : left set, it faded the
+    projector's frame, and a domemaster's rim, with the warp off or the dome on, while
+    the control window showed sharp edges.
+  - **The Collage's lazy films** : a piece on a film still loading (a jump in `cuts`
+    from a knob, OSC, a morph) shows a loaded film until its own first frame lands,
+    instead of black or a frozen frame of the deck's previous film at the wrong crop
+    (measured : 2 to 12 pieces at once, no black). A churning film that has just lost
+    its piece is dealt, not loaded and let go 1.5 s later. The pile's piece-ID target is
+    freed after 5 s unused (33 MB at 4K, 67 on the dome) and its draw buffers are no
+    longer rebuilt each frame.
+  - **The warp** : corners crossed or pushed in fall back to the plain corners instead
+    of drawing a stretched double wedge through infinity, and a side of a few pixels no
+    longer smears the edge.
+  - **The Sonify taps** read one stacked strip of a fixed size : a voice switching its
+    second tap on or off resized it, and the whole readback ring was made again.
+  - **The render loop** : the Sonify and Space ticks are each guarded (a throw skipped
+    the shader warm-up and the FPS meter, and flooded the log 30 times a second); the
+    warp sent to the output window is compared value by value (a string was built every
+    frame).
+  - **Performance** : a **Frame capture** row (recording, NDI, Spout, the projector
+    stream, the dome preview) apart from **GPU wait**, where a whole 4K frame's copy hid.
+  - **Collage films' sound copies** : each ffmpeg run has a time limit (a film on an
+    offline share held the queue, and every film after it, for ever), and a film
+    ffmpeg could not open is no longer marked silent for good.
 
 ## v1.2.8 — 2026-10-15
 

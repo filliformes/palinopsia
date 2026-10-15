@@ -33,10 +33,11 @@ class PerfMeter {
       this.open[k] = undefined as unknown as number
     }
   }
-  /** A readback's wait for the GPU, in ms : its own row, out of the open sections. */
-  wait(ms: number): void {
+  /** A readback's wait for the GPU, in ms : its own row (`row`, 'gpuwait' unless
+   *  said), out of the open sections. */
+  wait(ms: number, row = 'gpuwait'): void {
     this.waited += ms
-    this.acc.gpuwait = (this.acc.gpuwait ?? 0) + ms
+    this.acc[row] = (this.acc[row] ?? 0) + ms
   }
   /** Add pre-measured ms (for work on a separate loop, e.g. the MediaPipe rAF). */
   add(k: string, ms: number): void {

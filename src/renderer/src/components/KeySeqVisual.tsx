@@ -18,6 +18,7 @@ import { NOTE_NAMES, BRIGHT, DIATONIC, affinity, degreeNumeral, diatonicRing, fi
 import { affinityWeight, keySeqMemory, pictureKey, pictureView, pool } from '../audio/soniKeySeq'
 import { SCALE_ABBR, SCALE_LABEL, SCALE_STEPS, sameNotes, type SoniScale } from '../audio/sonify'
 import type { SoniKeySeq } from '@shared/types'
+import { sonifyCovered } from './sonifyUi'
 
 const TAU = Math.PI * 2
 // The minor-colored scales (a minor third, no major one : soniKeyModel's
@@ -96,7 +97,7 @@ function ListVis({ ks, curStep, col }: { ks: SoniKeySeq; curStep: number; col: C
                 boxShadow: now ? `0 0 10px ${col(h, 0.85)}, 0 0 22px ${col(h, 0.4)}` : past ? `0 0 5px ${col(h, 0.3)}` : 'none',
                 transform: now ? 'scale(1.14)' : 'none'
               }}
-              title={`Key ${i + 1} : ${NOTE_NAMES[st.root]} ${st.scale}, octave ${st.oct}`}
+              title={`Key ${i + 1} : ${NOTE_NAMES[st.root]} ${isScale(st.scale) ? SCALE_LABEL[st.scale] : st.scale}, octave ${st.oct}`}
             >
               <span className="text-[11px] font-semibold leading-none" style={{ color: now ? TEXT : col(h) }}>{NOTE_NAMES[st.root]}</span>
               <span className="mt-0.5 text-[7.5px] leading-none text-muted">{isScale(st.scale) ? SCALE_ABBR[st.scale] : st.scale}</span>
@@ -235,8 +236,8 @@ function AffinityVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): 
           const pr = c.out ? 0 : c.w / total
           const rad = 1.4 + 5.6 * Math.sqrt(pr / maxP)
           return c.out
-            ? <circle key={i} cx={q.x} cy={q.y} r={2.4} fill="none" stroke={col(hh, 0.6)} strokeWidth={0.9} strokeDasharray="1.5 1.5"><title>{`${NOTE_NAMES[c.k.root]} ${c.k.scale} : ruled out for now`}</title></circle>
-            : <circle key={i} cx={q.x} cy={q.y} r={rad} fill={col(hh, 0.75)} style={{ transition: 'r 220ms ease-out' }}><title>{`${NOTE_NAMES[c.k.root]} ${c.k.scale} : ${Math.round(c.a * 100)}% shared notes, ${Math.round(pr * 100)}% likely`}</title></circle>
+            ? <circle key={i} cx={q.x} cy={q.y} r={2.4} fill="none" stroke={col(hh, 0.6)} strokeWidth={0.9} strokeDasharray="1.5 1.5"><title>{`${NOTE_NAMES[c.k.root]} ${SCALE_LABEL[c.k.scale] ?? c.k.scale} : ruled out for now`}</title></circle>
+            : <circle key={i} cx={q.x} cy={q.y} r={rad} fill={col(hh, 0.75)} style={{ transition: 'r 220ms ease-out' }}><title>{`${NOTE_NAMES[c.k.root]} ${SCALE_LABEL[c.k.scale] ?? c.k.scale} : ${Math.round(c.a * 100)}% shared notes, ${Math.round(pr * 100)}% likely`}</title></circle>
         })}
         {top.map((c, i) => {
           const q = pt(c)
@@ -319,6 +320,7 @@ function PictureVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): J
   const [, setTick] = useState(0)
   useEffect(() => {
     const id = window.setInterval(() => {
+      if (sonifyCovered()) return
       if (visionBus.hasData()) {
         const m = visionBus.feature('motion')
         hist.current = [...hist.current, m].slice(-56)

@@ -131,17 +131,28 @@ export function computeWarpVerts(c: number[], pxW: number, pxH: number): Float32
   const grown = inv ? grow(px, MARGIN_PX) : null
   // The corners to draw (normalized), and the inverse map at each : linear in
   // screen space, so the interpolation is exact, the divide in the shader.
-  const pts = (grown ?? px).map((q) => [q[0] / W, q[1] / Hh])
-  let uvw = pts.map((q) => {
-    if (!inv) return [0, 0, 1]
-    return [
-      inv[0] * q[0] + inv[1] * q[1] + inv[2],
-      inv[3] * q[0] + inv[4] * q[1] + inv[5],
-      inv[6] * q[0] + inv[7] * q[1] + inv[8]
-    ]
-  })
-  if (!inv || !grown) {
+  const norm = (ps: number[][]): number[][] => ps.map((q) => [q[0] / W, q[1] / Hh])
+  const mapAt = (ps: number[][]): number[][] =>
+    ps.map((q) => (inv
+      ? [inv[0] * q[0] + inv[1] * q[1] + inv[2], inv[3] * q[0] + inv[4] * q[1] + inv[5], inv[6] * q[0] + inv[7] * q[1] + inv[8]]
+      : [0, 0, 1]))
+  // w changing sign (or reaching 0) across the corners : they are not all on one
+  // side of the perspective's vanishing line (corners crossed, a corner pushed
+  // in, a side a few pixels long). The divide then runs through infinity : a
+  // stretched double wedge, the edge smeared.
+  const crosses = (u: number[][]): boolean => Math.min(...u.map((v) => v[2])) <= 0 && Math.max(...u.map((v) => v[2])) >= 0
+  let pts = norm(grown ?? px)
+  let uvw = mapAt(pts)
+  let plain = !inv || !grown
+  if (!plain && crosses(uvw)) {
+    // without the margin first, else the plain corners
+    pts = norm(px)
+    uvw = mapAt(pts)
+    plain = crosses(uvw)
+  }
+  if (plain) {
     // A degenerate quad (corners crossed or collapsed) : the plain corners, no margin.
+    pts = norm(px)
     const uv = [[0, 1], [1, 1], [1, 0], [0, 0]]
     uvw = uv.map((u) => [u[0], u[1], 1])
   } else if (uvw.every((v) => v[2] < 0)) {

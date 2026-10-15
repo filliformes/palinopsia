@@ -14,6 +14,10 @@
 #
 # Drive it over CDP (http://127.0.0.1:<port>/json). Close it as soon as a test
 # run is done : several app instances at once starve the GPU.
+#
+# OPSIA_UNTHROTTLED=1 builds a copy Chromium never slows down when its window is
+# covered or in the background : a covered window's frames drop to 1 a second,
+# which makes any frame-pacing measurement meaningless.
 set -e
 PORT="${1:-9555}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -50,7 +54,10 @@ node - "$OUT" "$ROOT/node_modules" "$UD" "$PORT" <<'JS'
 const fs = require('fs'), path = require('path')
 const [out, mods, ud, port] = process.argv.slice(2)
 const paths = `process.env.NODE_PATH = ${JSON.stringify(mods)}; require('module').Module._initPaths();\n`
-const extra = `{ const __e = require('electron'); __e.app.setPath('userData', ${JSON.stringify(ud)}); __e.app.commandLine.appendSwitch('remote-debugging-port', '${port}'); }\n`
+const unthrottled = process.env.OPSIA_UNTHROTTLED === '1'
+  ? ['disable-backgrounding-occluded-windows', 'disable-renderer-backgrounding', 'disable-background-timer-throttling'].map((f) => `__e.app.commandLine.appendSwitch('${f}');`).join(' ')
+  : ''
+const extra = `{ const __e = require('electron'); __e.app.setPath('userData', ${JSON.stringify(ud)}); __e.app.commandLine.appendSwitch('remote-debugging-port', '${port}'); ${unthrottled} }\n`
 const files = [path.join(out, 'main/index.js'), ...fs.readdirSync(path.join(out, 'preload')).filter((f) => f.endsWith('.js')).map((f) => path.join(out, 'preload', f))]
 for (const f of files) {
   let s = fs.readFileSync(f, 'utf8')

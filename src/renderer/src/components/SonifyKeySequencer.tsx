@@ -8,10 +8,10 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import type { SoniKeyMode, SoniKeySeq } from '@shared/types'
 import { useStore } from '../store'
 import { SCALE_ABBR, SCALE_LABEL, SCALE_ORDER } from '../audio/sonify'
-import { NOTE_NAMES, KEY_MODES, euclidHit } from '../audio/soniKeyModel'
+import { NOTE_NAMES, KEY_MODES, euclidHit, isScale } from '../audio/soniKeyModel'
 import { SONI_RATES, RATE_LABEL, soniBeats } from '../audio/soniClock'
 import { keySeqNext, keySeqPhase } from '../audio/soniKeySeq'
-import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, Toggle, CardGrip, useCardSpace, chipBig } from './sonifyUi'
+import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, Toggle, CardGrip, useCardSpace, chipBig, sonifyCovered } from './sonifyUi'
 import { KeySeqVisual } from './KeySeqVisual'
 
 
@@ -63,9 +63,10 @@ export function SonifyKeySequencer({ onWidth }: { onWidth: (dx: number, done: bo
   useEffect(() => {
     let id = 0
     const f = (): void => {
+      id = requestAnimationFrame(f)
+      if (sonifyCovered()) return
       const p = keySeqPhase(performance.now(), soniBeats())
       if (barRef.current) barRef.current.style.width = p < 0 ? '0%' : `${(p * 100).toFixed(1)}%`
-      id = requestAnimationFrame(f)
     }
     id = requestAnimationFrame(f)
     return () => cancelAnimationFrame(id)
@@ -117,8 +118,9 @@ export function SonifyKeySequencer({ onWidth }: { onWidth: (dx: number, done: bo
       )}
     >
       <Row label="key" hint="The key every Sonify voice plays in now (root, scale, octave). The thin bar fills toward the next change.">
-        <span className="shrink-0 font-mono text-[10px] text-accent">{NOTE_NAMES[root]} {scale} <span className="text-muted">· oct {oct}</span></span>
-        <span className="h-[3px] min-w-0 flex-1 overflow-hidden rounded bg-panel3/60">
+        {/* the scale's name (not its id), cut short before the bar is squeezed */}
+        <span className="min-w-0 shrink truncate font-mono text-[10px] text-accent" title={`${NOTE_NAMES[root]} ${isScale(scale) ? SCALE_LABEL[scale] : scale}, octave ${oct}`}>{NOTE_NAMES[root]} {isScale(scale) ? SCALE_LABEL[scale] : scale} <span className="text-muted">· oct {oct}</span></span>
+        <span className="h-[3px] min-w-[32px] flex-1 overflow-hidden rounded bg-panel3/60">
           <span ref={barRef} className="block h-full bg-accent2" style={{ width: '0%' }} />
         </span>
       </Row>
@@ -202,7 +204,8 @@ export function SonifyKeySequencer({ onWidth }: { onWidth: (dx: number, done: bo
             </div>
           </Row>
           <Row label="scales" hint="The scales the sequencer may choose">
-            <div className="grid min-w-0 flex-1 grid-cols-6 gap-1">
+            {/* as many columns as keep a name whole ("dimWH" spilled past a 25 px chip) */}
+            <div className="grid min-w-0 flex-1 grid-cols-[repeat(auto-fill,minmax(32px,1fr))] gap-1">
               {SCALE_ORDER.map((sc) => (
                 <button key={sc} onClick={() => toggleScale(sc)} title={SCALE_LABEL[sc]} className={`${chipBig(ks.poolScales.includes(sc))} px-0`}>{SCALE_ABBR[sc]}</button>
               ))}

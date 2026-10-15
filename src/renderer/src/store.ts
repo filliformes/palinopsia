@@ -40,7 +40,7 @@ import type { NdiConfig, NdiStatus } from '@shared/ndi'
 import { sanitizeNdiConfig, idleNdiStatus } from '@shared/ndi'
 import { DOME_MOD_RANGE, sanitizeDome } from '@shared/dome'
 import { OUT_IDENTITY, OUTX_MOD_RANGE, sanitizeOutXform, type OutXform } from '@shared/outXform'
-import { defaultVoicePlaces, sanitizeSpaceConfig, sanitizeVoicePlaces, type SpaceConfig, type SpaceVoice, type VoicePlace } from '@shared/spatial'
+import { defaultVoicePlaces, sanitizeSpaceConfig, sanitizeVoicePlaces, validSpaceHost, type SpaceConfig, type SpaceVoice, type VoicePlace } from '@shared/spatial'
 import { inputsForShader } from './shaders/isf/inputs'
 import { SHADER_BY_ID } from './shaders/isf'
 import { canHostFx } from './fxScopes'
@@ -1893,6 +1893,7 @@ function storedWarpFeather(): number {
   return Number.isFinite(n) ? Math.max(0, Math.min(WARP_FEATHER_MAX, n)) : 0
 }
 const WARP_FEATHER_MAX = 200
+let featherSave = 0
 
 /** Back to this computer's own warp (localStorage) after a session's. */
 function restoreMachineWarp(
@@ -3389,7 +3390,13 @@ export const useStore = create<StoreState>((set, get) => ({
   warpFeather: storedWarpFeather(),
   setWarpFeather: (px) => {
     const v = Math.max(0, Math.min(WARP_FEATHER_MAX, Number.isFinite(px) ? px : 0))
-    if (!get().warpFromSession) localStorage.setItem('opsia.warpFeather', String(v))
+    // written once the slider rests, and a full storage never stops the slider
+    if (!get().warpFromSession) {
+      window.clearTimeout(featherSave)
+      featherSave = window.setTimeout(() => {
+        try { localStorage.setItem('opsia.warpFeather', String(v)) } catch { /* quota */ }
+      }, 300)
+    }
     set({ warpFeather: v })
   },
   setWarpCorner: (corner, x, y) =>
@@ -3647,7 +3654,12 @@ export const useStore = create<StoreState>((set, get) => ({
   outXformReset: 0,
   resetOutXform: () => set((s) => ({ outXform: OUT_IDENTITY, outXformReset: s.outXformReset + 1 })),
   space: loadSpace(),
-  setSpace: (patch) => set((s) => ({ space: persistSpace(sanitizeSpaceConfig({ ...s.space, ...patch })) })),
+  // (a refused host, from OSC or the page, leaves the one before : it fell back
+  // to the default and the positions went to this computer)
+  setSpace: (patch) =>
+    set((s) => ({
+      space: persistSpace(sanitizeSpaceConfig({ ...s.space, ...patch, ...('host' in patch && !validSpaceHost(patch.host) ? { host: s.space.host } : {}) }))
+    })),
   setSpaceVoice: (voice, patch) =>
     set((s) => ({
       space: persistSpace(sanitizeSpaceConfig({ ...s.space, voices: { ...s.space.voices, [voice]: { ...s.space.voices[voice], ...patch } } }))
@@ -4729,11 +4741,15 @@ export const useStore = create<StoreState>((set, get) => ({
     // The session's sound patch (post-set so setSonify's engine push sees it).
     if (s.sonify) {
       const curSoni = get().sonify
+      // a session saved before the output EQ existed keeps this room's (it
+      // brought back a flat EQ with the glue off)
+      const hasEq = !!(s.sonify as Partial<SoniConfig>).eq
       get().setSonify({
         ...defaultSoniConfig(),
         ...(s.sonify as Partial<SoniConfig>),
         on: curSoni.on,
-        sinkId: curSoni.sinkId
+        sinkId: curSoni.sinkId,
+        ...(hasEq ? {} : { eq: curSoni.eq })
       } as SoniConfig)
     }
   },

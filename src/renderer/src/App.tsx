@@ -101,8 +101,18 @@ let contextPresetIndex = -1
 let depthModePrev = ''
 let lastDomePreview = 0
 let lastStreamOn = false
-let lastWarpKey = ''
+// what the output window was last sent (compared value by value : a string
+// built every frame to spot a change)
+const lastWarp = { on: false, grid: false, feather: -1, corners: new Float64Array(8).fill(NaN) }
 let lastWarpSent = 0
+// A per-frame tick's error, logged once every few seconds (not 30 times a second).
+const loggedAt = new Map<string, number>()
+function logOnce(what: string, e: unknown): void {
+  const t = performance.now()
+  if (t - (loggedAt.get(what) ?? -1e9) < 5000) return
+  loggedAt.set(what, t)
+  console.error(`[${what}]`, e)
+}
 let lastDepthSample = 0 // throttles the depth-estimator frame readback (~11 Hz)
 let lastVisionSample = 0 // throttles the vision-bus readback (~30 Hz)
 let lastLightSample = 0 // throttles the light-output zone readback (config fps cap)
@@ -1637,11 +1647,19 @@ export default function App(): JSX.Element {
           // its grid sat over the master on the output window with nothing in the
           // Fulldome section to take it off (the dome has its own, `grid on output`).
           const warpGrid = st.warpGrid && !st.dome.enabled
-          const key = `${warpEnabled}|${warpGrid}|${st.warpFeather}|${st.warpCorners.join(',')}`
-          if (key !== lastWarpKey || now - lastWarpSent > 500) {
-            lastWarpKey = key
+          // the feather belongs to the warp : left set, it faded the projector's
+          // frame (and a domemaster's rim) with the warp off, unseen here
+          const warpFeather = warpEnabled ? st.warpFeather : 0
+          const lc = lastWarp.corners, wc = st.warpCorners
+          let same = lastWarp.on === warpEnabled && lastWarp.grid === warpGrid && lastWarp.feather === warpFeather && wc.length === 8
+          for (let k = 0; same && k < 8; k++) same = lc[k] === wc[k]
+          if (!same || now - lastWarpSent > 500) {
+            lastWarp.on = warpEnabled
+            lastWarp.grid = warpGrid
+            lastWarp.feather = warpFeather
+            for (let k = 0; k < 8; k++) lc[k] = wc[k] ?? NaN
             lastWarpSent = now
-            window.api.outputFrame({ warpEnabled, warpCorners: st.warpCorners, warpGrid, warpFeather: st.warpFeather })
+            window.api.outputFrame({ warpEnabled, warpCorners: wc, warpGrid, warpFeather })
           }
         }
         // 5. HIVE output: encode the composite canvas to HEVC and fan it out to
@@ -1649,7 +1667,12 @@ export default function App(): JSX.Element {
         if (st.hiveOutActive) hiveEncoder.encode(canvas, now * 1000)
         // 5b. Sonify : ship the image taps to the audio engine (~30Hz; no-op
         //     while the sound engine is off).
-        perfMeter.begin('sonify'); sonifyEngine.tick(comp!, now, c.bpm); spaceEngine.tick(comp!, now); perfMeter.end('sonify')
+        // (each in its own guard : a throw skipped the meter's end, the shader
+        // warm-up and the FPS meter, and flooded the log 30 times a second)
+        perfMeter.begin('sonify')
+        try { sonifyEngine.tick(comp!, now, c.bpm) } catch (e) { logOnce('sonify tick', e) }
+        try { spaceEngine.tick(comp!, now) } catch (e) { logOnce('space tick', e) }
+        perfMeter.end('sonify')
         // 6. Shader warm-up : one registry compile per frame, in the background,
         //    after launch settles. First-ever run pays the compiles here (a few
         //    seconds of background work); afterwards the GPU disk cache makes

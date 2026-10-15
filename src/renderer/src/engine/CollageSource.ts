@@ -60,6 +60,11 @@ import { glGeneration } from './glGeneration'
 
 /** Same piece cap as the Autocutter : the shader's uniform arrays are sized 64. */
 const MAX_CELLS = 64
+// The films pass's draw buffers (made once : new arrays each frame, twice)
+const DRAW_WITH_ID = [0x8ce0, 0x8ce1] // COLOR_ATTACHMENT0, COLOR_ATTACHMENT1
+const DRAW_PLAIN = [0x8ce0]
+// The top-piece target goes after this long unused (33 MB at 4K, 67 on the dome)
+const ID_IDLE_MS = 5000
 /** Hard ceiling on simultaneous decoders (Vincent, 2026-10-13 : 50 → 100). */
 export const MAX_DECKS = 100
 /** Mosaic rows the shader's neighbour search can index. */
@@ -1211,6 +1216,7 @@ export class CollageSource {
   // by the shapes pass of the same frame (see the shader's oId).
   private idTex: WebGLTexture | null = null
   private idReady = false
+  private idUsedAt = 0
   private siteArr = new Float32Array(MAX_CELLS * 4)
   private rowsArr = new Float32Array(MAX_ROWS * 4)
   private rowCount = 0
@@ -1524,6 +1530,22 @@ export class CollageSource {
       /* best-effort */
     }
     d.src = ''
+    // its layer holds the last frame of the film it let go : a piece dealt onto
+    // it before its next film lands shows a stand-in (shownDeck), not that
+    d.blitted = false
+  }
+
+  /** The deck a piece shows : its own once its film has a frame; until then a
+   *  loaded one stands in (a piece on a film still loading drew black, or a
+   *  frozen frame of the deck's previous film at the wrong crop). */
+  private shownDeck(i: number): number {
+    const nd = this.decks.length
+    if (nd === 0 || this.decks[i]?.blitted) return i
+    for (let k = 1; k < nd; k++) {
+      const j = (i + k) % nd
+      if (this.decks[j].blitted) return j
+    }
+    return i
   }
 
   /** Load a released deck's film at its cue, as cue() would have. */
@@ -1849,7 +1871,7 @@ export class CollageSource {
     const outAspect = this.w / this.h
     const z = Math.max(1, this.lastZoom > 0 ? this.lastZoom : 1)
     for (const c of this.cells) {
-      const d = this.decks[c.deck]
+      const d = this.decks[this.shownDeck(c.deck)] // (a stand-in's picture while its film loads)
       if (!d) continue
       coverCrop(d.content, d.pan, (c.w / c.h) * outAspect, c.rot, z, c.crop, 0)
     }
@@ -2245,7 +2267,9 @@ export class CollageSource {
           // this cell becomes its own little montage.
           const clip = this.pickOther(d.clip)
           if (clip) {
-            this.cue(d, clip, hold, this.rollRnd, true)
+            // (a film that just lost its piece is dealt, not loaded : it was
+            // loaded only to be let go 1.5 s later)
+            this.cue(d, clip, hold, this.rollRnd, true, false, this.wants(i))
             d.panNext = [this.rollRnd(), this.rollRnd()]
           }
           d.nextRoll = (0.25 + this.rollRnd() * 1.2) / Math.max(0.15, churn)
@@ -2373,6 +2397,7 @@ export class CollageSource {
           this.cropsDirty = true
         }
         d.needFrame = false
+        if (!d.blitted) this.cropsDirty = true // its pieces leave their stand-in
         d.blitAt = now
         d.blitT = d.asm ? -1 : d.el.currentTime
         if (!bound) {
@@ -2426,7 +2451,8 @@ export class CollageSource {
     for (let i = 0; i < n; i++) {
       const c = this.cells[i]
       let x = c.x, y = c.y, w = c.w, h = c.h
-      const dk = this.decks[c.deck]
+      const di = this.shownDeck(c.deck)
+      const dk = this.decks[di]
       if (sg && dk && shape >= 2) {
         // The tilted piece's covering rect : the cell, turned, still inside it.
         const ang = (c.form[0] - 0.5) * (shape === 2 ? 0.84 : 0.6)
@@ -2486,10 +2512,10 @@ export class CollageSource {
       this.cellArr[i * 4 + 2] = w; this.cellArr[i * 4 + 3] = h
       // The deck's picture rect : the shader mirrors its film read inside it so
       // an over-running / frayed shape samples real film, never the padding.
-      const ct = this.decks[c.deck] ? this.decks[c.deck].content : [0, 0, 1, 1]
+      const ct = dk ? dk.content : [0, 0, 1, 1]
       this.contentArr[i * 4] = ct[0]; this.contentArr[i * 4 + 1] = ct[1]
       this.contentArr[i * 4 + 2] = ct[2]; this.contentArr[i * 4 + 3] = ct[3]
-      this.metaArr[i * 4] = c.deck
+      this.metaArr[i * 4] = di
       this.metaArr[i * 4 + 1] = c.rot
       this.metaArr[i * 4 + 2] = this.rank[i]
       this.metaArr[i * 4 + 3] = c.z
@@ -2529,6 +2555,11 @@ export class CollageSource {
     // feedback loop).
     const useId = !!sg && shape !== 0
     const readId = useId && pass === 2 && this.idReady
+    if (useId) this.idUsedAt = performance.now()
+    else if (this.idTex && performance.now() - this.idUsedAt > ID_IDLE_MS) {
+      gl.deleteTexture(this.idTex)
+      this.idTex = null
+    }
     if (useId) {
       gl.uniform1i(U('uId'), 2)
       gl.uniform1i(U('uHasId'), readId ? 1 : 0)
@@ -2557,11 +2588,11 @@ export class CollageSource {
         // the layer's own target keeps its color; the top-piece target rides
         // along as a second attachment for this one draw
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, this.idTarget(), 0)
-        gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1])
+        gl.drawBuffers(DRAW_WITH_ID)
       }
       gl.drawArrays(gl.TRIANGLES, 0, 3)
       if (writeId) {
-        gl.drawBuffers([gl.COLOR_ATTACHMENT0])
+        gl.drawBuffers(DRAW_PLAIN)
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, null, 0)
         this.idReady = true
       }

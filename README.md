@@ -219,7 +219,7 @@ In **Sonify** (also in the cheat-sheet) :
 |---|---|
 | `Shift`+drag a slider | Finer : a tenth of the speed, from where the drag starts |
 | Click a value | Type it : the Collage's films in, hp, lp, ring in and Ring cutoff, the Prism crossover (`4250`, `4.2k`, `off`, `-6`) |
-| Drag an output-EQ point | Frequency across, gain up and down; the wheel sets its Q, a double-click switches its band, `Delete` turns the selected band off |
+| Drag an output-EQ point | Frequency across, gain up and down (it moves once dragged past 3 px, so a click only selects it); the wheel over a point sets its Q, a double-click switches its band, `Delete` turns the selected band off. While the editor is open the app's one-key shortcuts wait; `Esc` closes it |
 | Drag a Space number | Up or down to change it; drag a voice's dot on the Room map to place it |
 | `Ctrl/Cmd+Z` · `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` | Undo · Redo (100 levels) |
 | `Ctrl/Cmd+S` | Save session |
@@ -697,8 +697,10 @@ The **audio/midi/osc** right-column tab (key `A`) holds the control panels
   shown) : a per-section load monitor : each part of the instrument
   (render, output, vision, depth, lights, sonify, audio, modulation, MediaPipe)
   with its CPU frame-budget share, plus a **GPU wait** row : the time the window sits
-  waiting for the GPU to hand back pictures it already drew (the projector stream, the
-  Sonify taps, the other reads). That wait is taken out of the rows it happened in, so
+  waiting for the GPU to hand back small pictures it already drew (the Sonify taps, the
+  vision, depth, light and mark reads), and a **Frame capture** row : collecting whole
+  finished frames for the recording, NDI, Spout, the projector stream and the dome
+  preview (the wait plus copying each frame out). Both are taken out of the rows they happened in, so
   each of them shows only its own work and a full GPU reads as a full GPU, estimated VRAM, and active-feature chips, so you
   can see what a heavy session is spending, with units and hover tooltips on every
   figure. The header reads the frame rate against the display's refresh rate, and
@@ -887,7 +889,7 @@ bottom:
   with New, or when the option is turned off. The choice is this computer's : off,
   sessions neither save nor change its warp. Its edges are anti-aliased (a keystoned
   side no longer steps), and **feather** softens them into the black over up to 200
-  projector pixels. A Finalizer output shape with **post warp**
+  projector pixels (with the warp on; off, or under the dome, the edges stay sharp). A Finalizer output shape with **post warp**
   on is measured on the projector after this warp (a circle stays round there).
   Recordings, NDI and Spout get the picture before the warp, so there the shape is
   pre-bent to come out right on the projector.
@@ -1225,7 +1227,7 @@ and steepens its skirt, and a bell at 6 is a gentler, wider one). The card shows
 curve in miniature with the **input** and **output** meters (the same meters as the
 master's); **⤢ edit** pops it out into a large editor : the curve over the live
 spectrum (before the EQ as a faint line, after it filled), a point per band to
-drag (frequency and gain), the **wheel** for Q, a **double-click** on a point to switch
+drag (frequency and gain), the **wheel** over a point for its Q, a **double-click** on a point to switch
 its band on or off or on an empty spot to bring the nearest free bell there,
 **Delete** to switch the selected band off, a strip of the twelve bands, number fields
 for the selected one, a **flat** reset, and the **input / output gain** (±24 dB each)
@@ -1233,7 +1235,8 @@ beside their meters. The output never passes 0 dB : above -1 dB a soft ceiling h
 (the output meter turns orange). It plays to the speakers only : recordings are taken
 before it, so a take stays the piece and not the room. The EQ is saved with the Sonify
 settings, and **↺ default**, a loaded preset, a recalled scene and the sequencer's preset
-steps all leave it as it is (it belongs to the room, not to the patch).
+steps all leave it as it is (it belongs to the room, not to the patch); a session saved
+before the EQ existed leaves it too.
 **Glue** : under the EQ, one compressor on the whole Sonify mix, after the EQ's bands
 and before its output gain and the soft ceiling, to hold the voices together (it runs
 with the EQ bypassed too). One knob, **amount** : the threshold falls to -12 dB and the

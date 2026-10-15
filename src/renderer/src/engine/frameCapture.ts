@@ -334,7 +334,9 @@ export class FrameCapture {
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbos![ri])
     const t0 = performance.now()
     gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, new Uint8Array(buf))
-    perfMeter.wait(performance.now() - t0)
+    // its own row : a whole frame copied out (33 MB at 4K) is not only the GPU's
+    // wait, and it hid the recording's and the NDI / Spout cost inside GPU wait
+    perfMeter.wait(performance.now() - t0, 'capture')
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null)
     return { ...meta, buf }
   }
