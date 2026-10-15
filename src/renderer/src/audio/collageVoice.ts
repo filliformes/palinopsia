@@ -95,6 +95,9 @@ export interface CollageVoiceCfg {
   ring: number // resonator sharpness (Q)
   bright: number // weight of the 2nd and 3rd harmonics
   width: number // stereo spread of the pan
+  inGain?: number // linear : the films' level into the resonators (a windy film)
+  hp?: number // Hz : each film's high-pass (24 dB/oct), before the resonators
+  lp?: number // Hz : each film's low-pass (12 dB/oct)
 }
 
 /** One <audio> playing one file into its deck's bus. */
@@ -107,7 +110,10 @@ interface Player {
 }
 
 interface DeckPlayer {
-  bus: GainNode // the pieces listen here : stable across clip switches
+  bus: GainNode // the film's players sound here : stable across clip switches
+  hp: BiquadFilterNode[] // the film's high-pass (two sections : 24 dB/oct) …
+  lp: BiquadFilterNode // … and low-pass (12 dB/oct), before every piece of it
+  out: GainNode // the pieces listen here
   cur: Player
   next: Player | null // a new clip, or a jump, waiting to sound before it takes over
   nextT: number // the crossfade time it will use
@@ -196,6 +202,9 @@ export class CollageVoice {
   // Space's piece groups : how many, who sits in each, and where each sounds
   // from (x, y, weight per group, the pieces' own frame coordinates).
   private groups = 0
+  // the films' filters (every deck follows them)
+  private hpHz = 20
+  private lpHz = 20000
   private groupCount = new Int32Array(PIECE_GROUPS)
   readonly groupPos = new Float32Array(PIECE_GROUPS * 3)
 
@@ -303,9 +312,16 @@ export class CollageVoice {
       d.nextSince = this.ctx.currentTime
     }
     if (!d) {
-      const bus = this.ctx.createGain()
+      const ctx = this.ctx
+      const bus = ctx.createGain()
+      // bus → high-pass ×2 (Butterworth 4th order) → low-pass → the pieces
+      const hp = [0.5412, 1.3066].map((q) => { const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.Q.value = q; f.frequency.value = this.hpHz; return f })
+      const lp = ctx.createBiquadFilter()
+      lp.type = 'lowpass'; lp.Q.value = 0.7071; lp.frequency.value = this.lpHz
+      const out = ctx.createGain()
+      bus.connect(hp[0]).connect(hp[1]).connect(lp).connect(out)
       const dp: DeckPlayer = {
-        bus, cur: this.makePlayer(path, bus, 1), next: null, nextT: 0, nextSince: 0, fading: [], spare: null,
+        bus, hp, lp, out, cur: this.makePlayer(path, bus, 1), next: null, nextT: 0, nextSince: 0, fading: [], spare: null,
         path, video: null, onSeek: () => {}, used: true
       }
       dp.onSeek = (): void => this.resyncDeck(dp, true)
@@ -449,7 +465,7 @@ export class CollageVoice {
     try {
       // off its film's bus too : the bus outlives the piece, and an input left
       // hanging there piled up with every mask peel-and-return
-      if (p.deckKey) this.decks.get(p.deckKey)?.bus.disconnect(p.inG)
+      if (p.deckKey) this.decks.get(p.deckKey)?.out.disconnect(p.inG)
     } catch { /* not connected */ }
     try {
       p.inG.disconnect(); p.dry.disconnect(); p.pan.disconnect(); p.xf.disconnect()
@@ -463,7 +479,7 @@ export class CollageVoice {
     if (d.next) this.killPlayer(d.next)
     if (d.spare) this.killPlayer(d.spare)
     for (const f of d.fading) this.killPlayer(f.p)
-    try { d.bus.disconnect() } catch { /* already gone */ }
+    try { d.bus.disconnect(); d.hp.forEach((f) => f.disconnect()); d.lp.disconnect(); d.out.disconnect() } catch { /* already gone */ }
     this.decks.delete(key)
   }
 
@@ -471,6 +487,16 @@ export class CollageVoice {
    *  scale table (ascending Hz) the distance from the centre picks from. */
   update(sets: CollageSoundSet[], cfg: CollageVoiceCfg, notes: Float32Array): void {
     const now = this.ctx.currentTime
+    // the films in : every deck's filters follow the voice's hp / lp
+    const hpHz = Math.max(20, Math.min(1000, cfg.hp ?? 20)), lpHz = Math.max(1000, Math.min(20000, cfg.lp ?? 20000))
+    if (hpHz !== this.hpHz || lpHz !== this.lpHz) {
+      this.hpHz = hpHz; this.lpHz = lpHz
+      for (const d of this.decks.values()) {
+        d.hp.forEach((f) => f.frequency.setTargetAtTime(hpHz, now, 0.03))
+        d.lp.frequency.setTargetAtTime(Math.min(lpHz, this.ctx.sampleRate * 0.45), now, 0.03)
+      }
+    }
+    const inLin = Math.max(0, cfg.inGain ?? 1)
     for (const d of this.decks.values()) d.used = false
     for (const p of this.pieces.values()) p.used = false
     let nPieces = 0
@@ -541,8 +567,8 @@ export class CollageVoice {
         const p = this.pieceChain(key, dealt ? T : 0)
         p.used = true
         if (p.deckKey !== dkey) {
-          if (p.deckKey) { const old = this.decks.get(p.deckKey); try { old?.bus.disconnect(p.inG) } catch { /* not connected */ } }
-          this.decks.get(dkey)!.bus.connect(p.inG)
+          if (p.deckKey) { const old = this.decks.get(p.deckKey); try { old?.out.disconnect(p.inG) } catch { /* not connected */ } }
+          this.decks.get(dkey)!.out.connect(p.inG)
           p.deckKey = dkey
         }
         // Note : distance from the frame centre (aspect-true) → scale step.
@@ -557,7 +583,7 @@ export class CollageVoice {
           // the transition, not a glide from wherever the chain began).
           for (let h = 0; h < HARM.length; h++) p.bp[h].frequency.value = Math.min(nyq, f0 * HARM[h])
           p.pan.pan.value = panV
-          p.inG.gain.value = norm * pc.keep
+          p.inG.gain.value = norm * pc.keep * inLin
         }
         for (let h = 0; h < HARM.length; h++) {
           glide(p, TG_F + h, p.bp[h].frequency, Math.min(nyq, f0 * HARM[h]), now)
@@ -566,7 +592,7 @@ export class CollageVoice {
         }
         glide(p, TG_DRY, p.dry.gain, 1 - cfg.reso, now)
         glide(p, TG_PAN, p.pan.pan, panV, now)
-        glide(p, TG_IN, p.inG.gain, norm * pc.keep, now)
+        glide(p, TG_IN, p.inG.gain, norm * pc.keep * inLin, now)
         if (this.groups > 0) {
           this.seat(p, pc.x, pc.y, gx, gy, gw)
           if (p.slot >= 0) {

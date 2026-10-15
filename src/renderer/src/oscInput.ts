@@ -741,6 +741,11 @@ function route(address: string, args: Args): void {
           else if (ctl === 'ring') V('collage', { ring: clamp01(n) })
           else if (ctl === 'harmonics' || ctl === 'bright') V('collage', { bright: clamp01(n) })
           else if (ctl === 'width') V('collage', { width: clamp01(n) })
+          // the films in : level, high-pass, low-pass, and how hard they drive the Ring bank
+          else if (ctl === 'input') V('collage', { inGain: -24 + clamp01(n) * 36 })
+          else if (ctl === 'hp') V('collage', { hp: Math.round(20 * Math.pow(50, clamp01(n))) })
+          else if (ctl === 'lp') V('collage', { lp: Math.round(1000 * Math.pow(20, clamp01(n))) })
+          else if (ctl === 'ringin') V('collage', { ringIn: -24 + clamp01(n) * 36 })
           // the Ring bank
           else if (ctl === 'bank' || ctl === 'wet') V('collage', { bank: clamp01(n) })
           else if (ctl === 'send') V('collage', { bankSend: n >= 0.5 })
@@ -1152,6 +1157,10 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/collage/resonance', 0, 1, co.reso, 'Collage resonance (plain films ↔ tuned resonances)')
     add('/opsia/sonify/collage/ring', 0, 1, co.ring, 'Collage ring (resonator sharpness)')
     add('/opsia/sonify/collage/harmonics', 0, 1, co.bright, 'Collage harmonics (2nd + 3rd)')
+    add('/opsia/sonify/collage/input', 0, 1, ((co.inGain ?? 0) + 24) / 36, 'Collage : the films in, -24..+12 dB (before the resonators)')
+    add('/opsia/sonify/collage/hp', 0, 1, Math.log((co.hp ?? 20) / 20) / Math.log(50), 'Collage : the films high-pass, 20 Hz (off)..1 kHz, 24 dB/oct')
+    add('/opsia/sonify/collage/lp', 0, 1, Math.log((co.lp ?? 20000) / 1000) / Math.log(20), 'Collage : the films low-pass, 1 kHz..20 kHz (off), 12 dB/oct')
+    add('/opsia/sonify/collage/ringin', 0, 1, ((co.ringIn ?? 0) + 24) / 36, 'Collage : how hard the films drive the Ring bank, -24..+12 dB')
     add('/opsia/sonify/collage/width', 0, 1, co.width, 'Collage stereo width')
     add('/opsia/sonify/collage/bank', 0, 1, co.bank ?? 0, 'Collage ring bank wet (0 = the plain voice)')
     add('/opsia/sonify/collage/decay', 0, 1, co.decay ?? 0.5, 'Collage ring bank decay (12 ms .. 10 s)')

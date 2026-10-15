@@ -388,6 +388,10 @@ class RingBank {
     }
     const M = this.makeup(T60, tilt, vo.kmul) * this.agc;
     let dryB = 0, wetB = 0;
+    // RING IN : how hard the films drive the bank. It scales the bank's input AND
+    // the dry level its follower matches the wet to, so the wet and the bands'
+    // clip both follow it (scaled on the input alone, the follower undid it).
+    const rin = Math.pow(10, clampf(co.ringIn || 0, -24, 12) / 20);
     const sat = vo.sat;
     // The voicing's DRIVE pushes each band's own clip (kd), never a waveshaper on
     // the input : that one clipped the whole mix of pieces before the bank, and the
@@ -401,7 +405,7 @@ class RingBank {
     // and the clipping voicings cost 3.6 ms of a 2.7 ms block. Measured.)
     for (let s = 0; s < n; s++) {
       const xl = iL[s] * gL, xr = iR[s] * gR;
-      const dl = xl, dr = xr;
+      const dl = xl * rin, dr = xr * rin;
       let accL = 0, accR = 0;
       for (let b = 0; b < RB_N; b++) {
         const gb = (G[b] += GD[b]);
@@ -424,7 +428,7 @@ class RingBank {
         ic1[i] = c1; ic2[i] = 2 * v2 - ic2[i];
         accR += choke ? v1 * K[i] * gb : v1 * K[i];
       }
-      dryB += xl * xl + xr * xr; wetB += accL * accL + accR * accR;
+      dryB += dl * dl + dr * dr; wetB += accL * accL + accR * accR;
       // soft ceiling on the wet (a very sharp bank on a loud film)
       let bl = accL * M * 0.5, br = accR * M * 0.5;
       bl = (bl > 3 ? 1 : bl < -3 ? -1 : bl * (27 + bl * bl) / (27 + 9 * bl * bl)) * 2;
@@ -717,7 +721,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       filter:  { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, loop: 0, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0 },
       chord:   { on: false, tap: 0, gain: 0.6, pan: 0, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3, waves: 0, wavesRate: 0.4, wavesSync: 0, noise: 0, air: 0.4 },
       signal:  { on: false, gain: 0.6, pan: 0, wave: 0, decay: 0.3, tone: 0.6, fm: 0.4 },
-      collage: { on: false, gain: 0.7, pan: 0, bank: 0, bankSend: false, decay: 0.5, choke: false, cutoff: 1, peak: 0, slope: 0, tone: 0, tilt: 0, waves: 0, wavesRate: 0.5, wavesSync: 0, noise: 0, noiseRate: 0.5, noiseSync: 0, detune: 0, voicing: 0 },
+      collage: { on: false, gain: 0.7, pan: 0, bank: 0, bankSend: false, decay: 0.5, choke: false, cutoff: 1, peak: 0, slope: 0, tone: 0, tilt: 0, waves: 0, wavesRate: 0.5, wavesSync: 0, noise: 0, noiseRate: 0.5, noiseSync: 0, detune: 0, voicing: 0, ringIn: 0 },
       fx:      { send: 0, dlyMix: 0.35, dlyTime: 0.3, dlyFb: 0.35, dlyTone: 0.5, dlyMode: 1, rvMode: 0, rvMix: 0.6, rvSize: 0.6, rvDecay: 0.6, rvDamp: 0.3, rvPre: 20, rvMod: 6, rvModRate: 0.5, rvWidth: 1, rvLocut: 220, rvFreeze: false, rvDiff: 0.85, rvLowDamp: 0.5, rvCross: 0.3, rvLowMult: 1, rvHighMult: 1 }
     };
     this.spectraFreqs = new Float32Array(NPART); // filled by cfg

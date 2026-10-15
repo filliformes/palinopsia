@@ -7,6 +7,16 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **The Collage voice's films in** (Sonify → Collage), for windy or hot recordings :
+  **films in** (-24..+12 dB on each piece's input, before the resonators), **hp** (each
+  film's deck bus → two Butterworth high-pass sections, 24 dB/oct, 20 Hz..1 kHz) and
+  **lp** (one section, 12 dB/oct, 1..20 kHz) before every piece of that film, and **ring
+  in** (-24..+12 dB into the Ring bank : it scales the bank's input and the dry level its
+  follower matches, so the wet and the bands' clip both follow it; scaled on the input
+  alone, the follower undid it). OSC `/opsia/sonify/collage/input · hp · lp · ringin`.
+  Measured on the test clip : films in -12 dB, the voice -12 dB; hp 300 Hz, -12 dB (its
+  energy is low rumble); ring in -12 dB at full wet, the bank off its clip.
+
 - **Space : Sonify in the room** (Sonify → ◎ space). The worklet gains a second output
   of up to 32 channels fed by a gain matrix (each voice's left and right, and the FX
   tail's return, to every channel), with the subwoofers' low end (two cascaded
@@ -71,6 +81,14 @@ that CI builds into cross-platform releases.
   applied on the projector window and on the control window's own warped preview.
 
 ### Fixed
+
+- **Space on headphones no longer distorts.** The binaural sum of the virtual speakers
+  went straight to the device : the speakers near a voice add up almost in phase at the
+  ears, so it ran 7.7 dB over the stereo mix with peaks to 1.13 to 1.41, clipped by the
+  sound card (the engine's limiter sits before the panners). It is now trimmed to the
+  stereo mix's level (0.41, measured on a Dome 25 with Orbit, Chord and the Collage :
+  0.7 dB over stereo, peak 0.64) and limited (a `DynamicsCompressorNode`, -1.5 dB,
+  20 : 1) before the device.
 
 - **The output EQ's points drag again** (at any UI zoom). The editor turned the pointer
   into canvas pixels with the device pixel ratio, but the UI zoom is a CSS zoom, under

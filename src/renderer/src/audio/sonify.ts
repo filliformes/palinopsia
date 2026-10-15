@@ -159,6 +159,11 @@ export interface SoniConfig {
     ring: number // how sharply each resonator rings (Q)
     bright: number // weight of the 2nd and 3rd harmonics
     width: number // stereo spread (0 = all centre · 1 = the frame's width)
+    // THE FILMS IN, before everything (a windy or hot recording) :
+    inGain: number // dB, -24..+12 : the films' level into the resonators (and the voice)
+    hp: number // Hz, 20..1000 : a high-pass on every film, 24 dB/oct (20 = off) : wind rumble
+    lp: number // Hz, 1000..20000 : a low-pass, 12 dB/oct (20000 = off) : crackle, hiss
+    ringIn: number // dB, -24..+12 : how hard the films drive the Ring bank (its wet and its clip)
     loOct: number; hiOct: number
     // RING BANK : a 48-band resonant filterbank on the whole voice,
     // its bands on the key / scale over loOct..hiOct. bank = wet (0 = the plain
@@ -216,7 +221,7 @@ export function defaultSoniConfig(): SoniConfig {
     signal: { on: false, tap: 0, gain: 0.6, pan: 0, wave: 0, decay: 0.3, tone: 0.6, fm: 0.4, heads: 2, rate: 8, sync: false, steps: 16, spread: 0.5, thresh: 0.5, density: 0.35, path: 0, loOct: 4, hiOct: 8, snap: 1 },
     chord: { on: false, tap: 0, gain: 0.6, pan: 0, voices: 7, loOct: 2, hiOct: 6, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3, waves: 0, wavesRate: 0.4, wavesSync: 0, noise: 0, air: 0.4 },
     collage: {
-      on: false, gain: 0.7, pan: 0, reso: 0.5, ring: 0.5, bright: 0.5, width: 1, loOct: 2, hiOct: 6,
+      on: false, gain: 0.7, pan: 0, reso: 0.5, ring: 0.5, bright: 0.5, width: 1, inGain: 0, hp: 20, lp: 20000, ringIn: 0, loOct: 2, hiOct: 6,
       bank: 0, bankSend: false, decay: 0.5, choke: false, cutoff: 1, peak: 0, slope: 0, tone: 0, tilt: 0,
       waves: 0, wavesRate: 0.5, wavesSync: 0, noise: 0, noiseRate: 0.5, noiseSync: 0, detune: 0, voicing: 0
     },
@@ -376,6 +381,11 @@ export interface SoniScan {
   tv: number; tvHz: number // Transmission row
 }
 
+/** The headphone preview's level against the stereo mix : the HRTF sum of the
+ *  virtual speakers around a voice ran 7.7 dB over it (peaks to 1.13 : the device
+ *  clipped them). Measured on a Dome 25 with Orbit, Chord and the Collage. */
+const PREVIEW_TRIM = 0.41
+
 /** A preview panner at (az, el) on the unit sphere (SpatGRIS's convention : az
  *  clockwise from the front, el above the horizon; Web Audio : x right, y up,
  *  the listener facing -z). */
@@ -503,7 +513,7 @@ class SonifyEngine {
   private spaceMsg: SpaceMsg | null = null
   // the headphone preview : output 1 split, each channel through an HRTF panner
   // at its speaker's (or object's) direction, summed to stereo
-  private spacePreview: { split: ChannelSplitterNode; pans: Array<PannerNode | null>; sum: GainNode } | null = null
+  private spacePreview: { split: ChannelSplitterNode; pans: Array<PannerNode | null>; sum: GainNode; trim: GainNode; lim: DynamicsCompressorNode } | null = null
   private previewDirs: Array<[number, number] | null> = []
   private previewKey = ''
   // Space's Collage piece groups (0 : the voice is one pair)
@@ -927,7 +937,7 @@ class SonifyEngine {
     const old = this.spacePreview
     if (old) {
       try { node.disconnect(old.split) } catch { /* not connected */ }
-      try { old.split.disconnect(); old.pans.forEach((p) => p?.disconnect()); old.sum.disconnect() } catch { /* gone */ }
+      try { old.split.disconnect(); old.pans.forEach((p) => p?.disconnect()); old.sum.disconnect(); old.trim.disconnect(); old.lim.disconnect() } catch { /* gone */ }
       this.spacePreview = null
     }
     try {
@@ -954,8 +964,20 @@ class SonifyEngine {
           pans.push(p)
         }
         node.connect(split, 1)
-        sum.connect(dst)
-        this.spacePreview = { split, pans, sum }
+        // The virtual speakers near a voice add up almost in phase at the ears, so
+        // the binaural sum runs hotter than the stereo mix (and nothing held it :
+        // the engine's limiter sits before the panners). Trimmed to the stereo
+        // mix's level, then a limiter, before the device clips it.
+        const trim = ctx.createGain()
+        trim.gain.value = PREVIEW_TRIM
+        const lim = ctx.createDynamicsCompressor()
+        lim.threshold.value = -1.5
+        lim.knee.value = 0
+        lim.ratio.value = 20
+        lim.attack.value = 0.002
+        lim.release.value = 0.15
+        sum.connect(trim).connect(lim).connect(dst)
+        this.spacePreview = { split, pans, sum, trim, lim }
       } else if (this.spaceRoute.on) {
         dst.channelCount = Math.max(1, Math.min(this.spaceRoute.nch, dst.maxChannelCount, SPACE_MAX_CH))
         dst.channelCountMode = 'explicit'
@@ -1115,7 +1137,7 @@ class SonifyEngine {
           cutoff: cfg.collage.cutoff, peak: cfg.collage.peak, slope: cfg.collage.slope, tone: cfg.collage.tone,
           tilt: cfg.collage.tilt, waves: cfg.collage.waves, wavesRate: cfg.collage.wavesRate, wavesSync: cfg.collage.wavesSync,
           noise: cfg.collage.noise, noiseRate: cfg.collage.noiseRate, noiseSync: cfg.collage.noiseSync,
-          detune: cfg.collage.detune, voicing: cfg.collage.voicing
+          detune: cfg.collage.detune, voicing: cfg.collage.voicing, ringIn: cfg.collage.ringIn ?? 0
         },
         fx: { ...cfg.fx },
         mixFilter: cfg.mixFilter
@@ -1258,7 +1280,10 @@ class SonifyEngine {
           reso: mv.get('collageReso') ?? c.reso,
           ring: mv.get('collageRing') ?? c.ring,
           bright: c.bright,
-          width: mv.get('collageWidth') ?? c.width
+          width: mv.get('collageWidth') ?? c.width,
+          inGain: Math.pow(10, (c.inGain ?? 0) / 20),
+          hp: c.hp ?? 20,
+          lp: c.lp ?? 20000
         }, this.collageNotesNow())
       } else if (this.collage) {
         this.collage.dispose()
