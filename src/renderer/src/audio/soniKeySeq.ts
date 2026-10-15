@@ -21,11 +21,11 @@
 import { useStore } from '../store'
 import { runSilently } from '../undo'
 import { visionBus } from '../engine/visionIn'
-import { sonifyEngine, type SoniConfig } from './sonify'
+import { sameNotes, sonifyEngine, type SoniConfig } from './sonify'
 import { RATE_BEATS, soniClockStart } from './soniClock'
 import { advanceDrift } from './soniSeq'
 import {
-  BRIGHT, DIATONIC, affinity, fifthsPos, isScale, keyId, mod12, rootAtFifths, sameKey, euclidHit,
+  BRIGHT, DIATONIC, affinity, diatonicRing, fifthsPos, isScale, keyId, mod12, rootAtFifths, sameKey, euclidHit,
   type Key
 } from './soniKeyModel'
 import type { SoniKeySeq } from '@shared/types'
@@ -58,6 +58,9 @@ export function pool(ks: SoniKeySeq): { roots: number[]; scales: Key['scale'][] 
   if (!roots.length) roots = Array.from({ length: 12 }, (_, i) => i)
   let scales = ks.poolScales.filter(isScale)
   if (!scales.length) scales = ['major', 'minor']
+  // one name per set of notes (major and ionian, minor and aeolian) : a change
+  // to the same notes under another name is no change
+  scales = scales.filter((s, i) => scales.findIndex((t) => sameNotes(s, t)) === i)
   return { roots, scales }
 }
 
@@ -99,12 +102,14 @@ function nextList(ks: SoniKeySeq): Key {
 
 function nextCircle(ks: SoniKeySeq, cur: Key): Key | null {
   const { roots, scales } = pool(ks)
-  const scale = scales.includes(cur.scale) ? cur.scale : scales[0]
-  // The relative major / minor : the same notes, the other tonic.
-  if ((scale === 'major' || scale === 'minor') && Math.random() < ks.circRel) {
-    const other = scale === 'major' ? 'minor' : 'major'
-    const r = mod12(cur.root + (scale === 'major' ? 9 : 3))
-    if (scales.includes(other) && roots.includes(r)) return { root: r, scale: other, oct: cur.oct }
+  const scale = scales.includes(cur.scale) ? cur.scale : scales.find((t) => sameNotes(t, cur.scale)) ?? scales[0]
+  // The relative major / minor : the same notes, the other tonic (ionian and
+  // aeolian too, by their notes).
+  const isMaj = sameNotes(scale, 'major'), isMin = sameNotes(scale, 'minor')
+  if ((isMaj || isMin) && Math.random() < ks.circRel) {
+    const other = scales.find((t) => sameNotes(t, isMaj ? 'minor' : 'major'))
+    const r = mod12(cur.root + (isMaj ? 9 : 3))
+    if (other && roots.includes(r)) return { root: r, scale: other, oct: cur.oct }
   }
   const dir = Math.random() < (1 + ks.circBias) / 2 ? 1 : -1
   const leap = 1 + Math.floor(Math.random() * Math.max(1, Math.min(3, ks.circLeap)))
@@ -132,7 +137,7 @@ function nextAffinity(ks: SoniKeySeq, cur: Key): Key | null {
       for (const scale of scales) {
         const k = { root, scale, oct: cur.oct }
         const id = keyId(k)
-        if (sameKey(k, cur)) continue
+        if (sameKey(k, cur) || (root === cur.root && sameNotes(scale, cur.scale))) continue
         if (useRecent && rt.recent.includes(id)) continue
         if (useTour && rt.visited.has(id)) continue
         out.push(k)
@@ -165,19 +170,19 @@ function nextPivot(ks: SoniKeySeq, cur: Key): Key | null {
     if (ks.pivDir === 'down') return (i - 1 + n) % n
     return (i + 1 + Math.floor(Math.random() * (n - 1))) % n
   }
-  const dia = DIATONIC.find(([s]) => s === cur.scale)
+  const dia = DIATONIC.find(([s]) => sameNotes(s, cur.scale))
   if (ks.pivKind === 'modes' && dia) {
     // The same seven notes from another of their degrees : C major → D dorian →
-    // E phrygian → F lydian → A minor (the modes the instrument has).
+    // E phrygian → F lydian → G mixolydian → A minor → B locrian.
     const parent = mod12(cur.root - dia[1])
-    const ring = DIATONIC.filter(([s, off]) => s === cur.scale || (scales.includes(s) && roots.includes(mod12(parent + off))))
+    const ring = diatonicRing(cur.scale, scales).filter(([s, off]) => s === cur.scale || roots.includes(mod12(parent + off)))
     if (ring.length < 2) return null
     const i = ring.findIndex(([s]) => s === cur.scale)
     const [s, off] = ring[step(ring.length, i)]
     return { root: mod12(parent + off), scale: s, oct: cur.oct }
   }
   // The same tonic in the next mode by brightness (up = brighter).
-  const order = BRIGHT.filter((s) => s === cur.scale || scales.includes(s))
+  const order = BRIGHT.filter((s) => s === cur.scale || (scales.includes(s) && !sameNotes(s, cur.scale)))
   if (order.length < 2) return null
   const i = order.indexOf(cur.scale)
   const j = ks.pivDir === 'up' ? (i - 1 + order.length) % order.length : ks.pivDir === 'down' ? (i + 1) % order.length : step(order.length, i)

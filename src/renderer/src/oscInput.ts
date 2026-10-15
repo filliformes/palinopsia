@@ -86,7 +86,7 @@ import { BLEND_MODES, BODY_FEATURES, BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@sha
 import { BG_SOURCES } from './bgPresets'
 import { bodyBus } from './engine/bodyIn'
 import { videoKey, videoSeekRequests } from './engine/videoState'
-import { SONI_SCALES, withSonifyParam, type SoniConfig } from './audio/sonify'
+import { SONI_SCALES, scaleFromName, withSonifyParam, type SoniConfig } from './audio/sonify'
 import { KEY_MODES } from './audio/soniKeyModel'
 import { GLUE_VOICES, normalizeEq, type SoniGlue } from './audio/eqMath'
 import { keySeqNext } from './audio/soniKeySeq'
@@ -556,7 +556,9 @@ function route(address: string, args: Args): void {
         return
       }
       if (g === 'scale') {
-        const sc = enumFrom(args, SONI_SCALES)
+        // a name ("harmonic minor", "dimwh") or an index (the ids' order : the
+        // first eight as they always were, the ten new ones after)
+        const sc = typeof args[0]?.value === 'string' ? scaleFromName(String(args[0].value)) : enumFrom(args, SONI_SCALES)
         if (sc) apply({ ...c, scale: sc })
         return
       }
@@ -1144,7 +1146,7 @@ function enumerateLeaves(): Leaf[] {
     addI('/opsia/sonify/orbit/shape', 0, ORBIT_RATIOS.length - 1, Math.max(0, ORBIT_RATIOS.findIndex((r) => Math.abs(r - so.orbit.ratio) < 1e-3)), 'Orbit shape : 0 circle · 1 1:2 · 2 2:3 · 3 3:4 · 4 1:3')
     add('/opsia/sonify/filter/loop', 0, 1, so.filter.loop ?? 0, 'Filter noise loop : 0 free noise · up = a frozen stretch replayed (flutter, then buzz)')
     const si = Math.max(0, SONI_SCALES.indexOf(so.scale))
-    add('/opsia/sonify/scale', 0, 1, si / (SONI_SCALES.length - 1), 'Quantizer scale (index)')
+    add('/opsia/sonify/scale', 0, 1, si / (SONI_SCALES.length - 1), `Quantizer scale : a name, or an index ${SONI_SCALES.map((s, i) => `${i} ${s}`).join(' · ')}`)
     const norm = (param: string, v: number): number => {
       const d = SONIFY_MOD_DESCS[param]
       return d ? Math.max(0, Math.min(1, (v - d.min) / (d.max - d.min))) : 0

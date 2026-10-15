@@ -7,6 +7,19 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **18 scales** (Sonify's key, the key sequencer's pool and steps) : the set of Berklee's
+  scale reference. New : harmonic minor, ionian, mixolydian, aeolian, locrian, major
+  pentatonic, major blues (1 2 b3 3 5 6), minor blues (1 b3 4 b5 5 b7), diminished W-H
+  and H-W; `pentatonic` (its id kept) shows as the minor pentatonic it always was. The
+  ids keep their old indices over OSC (0..7), the new ones follow (8..17); a name can be
+  sent as its id or its label (`scaleFromName`). Menus follow the reference's order
+  (`SCALE_ORDER`, `SCALE_LABEL`), the pool's chips sit six to a row (`SCALE_ABBR`).
+  Major / ionian and minor / aeolian are the same notes : the sequencer's pool keeps one
+  name per set of notes and its modes compare scales by their notes (`sameNotes`), so a
+  change is never to the same notes under another name (0 in 48 steps over OSC). Pivot
+  walks all seven degrees (mixolydian V and locrian VII join), the brightness order holds
+  all 17 sounds (`BRIGHT`), the dice draws from the new ones too, and the Pivot ladder
+  and the Picture moods shrink to fit 17.
 - **The Collage voice's comp** (Sonify → Collage, after lp) : ONE leveler on the films'
   whole bus inside the worklet (`Leveler`), before the Ring bank, its gain applied to the
   Space piece groups too : never one per film. A power detector over both sides (30 ms up,
@@ -140,6 +153,16 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The Chord's spread no longer leans left.** Its notes alternated up from the bass with
+  every left note wider than its right neighbour and the top note (often the brightest
+  band, a sky) hard left at 7 voices : one bright top band sat 19 dB left at full
+  spread, a sky 3.8 dB. The notes now open in mirrored pairs counted from the top (the
+  bass, and for an even count the note above it, in the middle), and the fan is
+  recentred on the notes' levels : the centre that balances the two sides' power, the
+  pans' hard edges included, found by halving about 90 times a second and glided over
+  0.3 s. Measured in the worklet : every single bright band and a sky at 0.0 dB, the
+  width kept (side / mid -5.2 dB at full spread, -6.2 before), the voice's own pan the
+  same at any spread.
 - **Switching Sonify off no longer leaves it running.** Its two worklets were only
   disconnected; with the audio context kept warm between takes, each off / on left the
   whole last patch playing to nobody in the audio thread, and its meter messages landed

@@ -14,17 +14,15 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useStore } from '../store'
 import { visionBus } from '../engine/visionIn'
-import { NOTE_NAMES, BRIGHT, DIATONIC, affinity, fifthsPos, rootAtFifths, keyId, mod12, isScale, type Key } from '../audio/soniKeyModel'
+import { NOTE_NAMES, BRIGHT, DIATONIC, affinity, degreeNumeral, diatonicRing, fifthsPos, minorish, rootAtFifths, keyId, mod12, isScale, type Key } from '../audio/soniKeyModel'
 import { affinityWeight, keySeqMemory, pictureKey, pool } from '../audio/soniKeySeq'
-import { SCALE_STEPS, type SoniScale } from '../audio/sonify'
+import { SCALE_ABBR, SCALE_LABEL, SCALE_STEPS, sameNotes, type SoniScale } from '../audio/sonify'
 import type { SoniKeySeq } from '@shared/types'
 
 const TAU = Math.PI * 2
-const SCALE_ABBR: Record<string, string> = {
-  chromatic: 'chr', major: 'maj', minor: 'min', pentatonic: 'pent', wholetone: 'whole', dorian: 'dor', phrygian: 'phr', lydian: 'lyd'
-}
-// The minor-colored scales sit on the inner ring, under their relative major.
-const MINORISH = new Set<string>(['minor', 'dorian', 'phrygian', 'pentatonic'])
+// The minor-colored scales (a minor third, no major one : soniKeyModel's
+// minorish) sit on the inner ring, under their relative major.
+const lab = (s: SoniScale): string => SCALE_LABEL[s] ?? s
 
 const keyHue = (root: number): number => (fifthsPos(root) * 30 + 18) % 360
 const parseKey = (id: string): Key | null => {
@@ -101,7 +99,7 @@ function ListVis({ ks, curStep, col }: { ks: SoniKeySeq; curStep: number; col: C
               title={`Key ${i + 1} : ${NOTE_NAMES[st.root]} ${st.scale}, octave ${st.oct}`}
             >
               <span className="text-[11px] font-semibold leading-none" style={{ color: now ? TEXT : col(h) }}>{NOTE_NAMES[st.root]}</span>
-              <span className="mt-0.5 text-[7.5px] leading-none text-muted">{SCALE_ABBR[st.scale] ?? st.scale}</span>
+              <span className="mt-0.5 text-[7.5px] leading-none text-muted">{isScale(st.scale) ? SCALE_ABBR[st.scale] : st.scale}</span>
             </div>
           )
         })}
@@ -114,10 +112,10 @@ function ListVis({ ks, curStep, col }: { ks: SoniKeySeq; curStep: number; col: C
 function CircleVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): JSX.Element {
   const W = 240, H = 140, cx = 120, cy = 70, R = 50, Ri = 32
   const { roots } = pool(ks)
-  const inner = MINORISH.has(cur.scale)
+  const inner = minorish(cur.scale)
   // where a key sits : a major-ish on its own place, a minor-ish under its relative major
   const place = (k: Key): { x: number; y: number; ring: 'o' | 'i'; pos: number } => {
-    const minor = MINORISH.has(k.scale)
+    const minor = minorish(k.scale)
     const pos = fifthsPos(minor ? k.root + 3 : k.root)
     const a = (pos / 12) * TAU - Math.PI / 2
     const r = minor ? Ri : R
@@ -145,8 +143,9 @@ function CircleVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): JS
     )
   }
   const lean = ks.circBias
-  const rel = cur.scale === 'major' || cur.scale === 'minor'
-  const relKey: Key = { root: mod12(cur.root + (cur.scale === 'major' ? 9 : 3)), scale: cur.scale === 'major' ? 'minor' : 'major', oct: cur.oct }
+  const isMaj = sameNotes(cur.scale, 'major')
+  const rel = isMaj || sameNotes(cur.scale, 'minor')
+  const relKey: Key = { root: mod12(cur.root + (isMaj ? 9 : 3)), scale: isMaj ? 'minor' : 'major', oct: cur.oct }
   const rp = place(relKey)
   return (
     <Stage caption={`${lean === 0 ? 'wanders around home' : lean > 0 ? 'leans toward the sharps' : 'leans toward the flats'} · up to ${ks.circLeap} fifth${ks.circLeap > 1 ? 's' : ''}${ks.circRel > 0 ? ` · ${Math.round(ks.circRel * 100)}% to the relative` : ''}`}>
@@ -192,7 +191,7 @@ function CircleVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): JS
           <circle cx={p.x} cy={p.y} r={inner ? 5.5 : 7.5} fill={col(h, 0.95)} className="ks-pop" style={{ filter: `drop-shadow(0 0 5px ${col(h, 0.9)})` }} />
         </g>
         <text x={cx} y={cy - 3} textAnchor="middle" fontSize={9.5} fontWeight={600} fontFamily="ui-monospace, monospace" fill={col(h)}>{NOTE_NAMES[cur.root]}</text>
-        <text x={cx} y={cy + 8} textAnchor="middle" fontSize={7.5} fontFamily="ui-monospace, monospace" fill={MUTED}>{cur.scale}</text>
+        <text x={cx} y={cy + 8} textAnchor="middle" fontSize={lab(cur.scale).length > 10 ? 6 : 7.5} fontFamily="ui-monospace, monospace" fill={MUTED}>{lab(cur.scale)}</text>
       </svg>
     </Stage>
   )
@@ -207,7 +206,7 @@ function AffinityVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): 
   for (const root of roots) {
     scales.forEach((scale, si) => {
       const k = { root, scale, oct: cur.oct }
-      if (root === cur.root && scale === cur.scale) return
+      if (root === cur.root && sameNotes(scale, cur.scale)) return
       const id = keyId(k)
       const out = (ks.affNoRepeat && mem.recent.includes(id)) || (ks.affTour && mem.started && mem.visited.has(id))
       const a = affinity(cur, k)
@@ -259,15 +258,17 @@ function PivotVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): JSX
   const { roots, scales } = pool(ks)
   const set = new Set(SCALE_STEPS[cur.scale].map((s) => mod12(cur.root + s)))
   const h = keyHue(cur.root)
-  const dia = DIATONIC.find(([s]) => s === cur.scale)
+  const dia = DIATONIC.find(([s]) => sameNotes(s, cur.scale))
   const modes = ks.pivKind === 'modes' && !!dia
   // the places it may go : the other degrees (same notes) or the other modes (same tonic)
   const parent = dia ? mod12(cur.root - dia[1]) : cur.root
   const ladder: Array<{ label: string; scale: SoniScale; root: number; here: boolean }> = modes
-    ? DIATONIC.filter(([s, off]) => s === cur.scale || (scales.includes(s) && roots.includes(mod12(parent + off))))
-        .map(([s, off]) => ({ label: `${['I', 'II', 'III', 'IV', '', 'VI'][[0, 2, 4, 5, 7, 9].indexOf(off)] || ''} ${NOTE_NAMES[mod12(parent + off)]} ${s}`, scale: s, root: mod12(parent + off), here: s === cur.scale }))
-    : BRIGHT.filter((s) => s === cur.scale || scales.includes(s)).map((s) => ({ label: `${NOTE_NAMES[cur.root]} ${s}`, scale: s, root: cur.root, here: s === cur.scale }))
+    ? diatonicRing(cur.scale, scales).filter(([s, off]) => s === cur.scale || roots.includes(mod12(parent + off)))
+        .map(([s, off]) => ({ label: `${degreeNumeral(off)} ${NOTE_NAMES[mod12(parent + off)]} ${lab(s)}`, scale: s, root: mod12(parent + off), here: s === cur.scale }))
+    : BRIGHT.filter((s) => s === cur.scale || (scales.includes(s) && !sameNotes(s, cur.scale))).map((s) => ({ label: `${NOTE_NAMES[cur.root]} ${lab(s)}`, scale: s, root: cur.root, here: s === cur.scale }))
   const way = ks.pivDir === 'random' ? 'any other' : modes ? `the next degree ${ks.pivDir}` : ks.pivDir === 'up' ? 'brighter' : 'darker'
+  // the ladder fits the frame : 15 apart up to seven rungs, closer beyond (17 scales)
+  const lStep = Math.min(15, 104 / Math.max(1, ladder.length)), lH = Math.min(13, lStep - 1.2), lFs = Math.min(7.5, lStep * 0.88)
   return (
     <Stage caption={`${modes ? 'same notes, a new tonic' : 'same tonic, a new mode'} · ${way}`}>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
@@ -290,20 +291,20 @@ function PivotVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): JSX
           )
         })}
         <text x={cx} y={cy - 2} textAnchor="middle" fontSize={9} fontWeight={600} fontFamily="ui-monospace, monospace" fill={col(h)}>{NOTE_NAMES[cur.root]}</text>
-        <text x={cx} y={cy + 9} textAnchor="middle" fontSize={7} fontFamily="ui-monospace, monospace" fill={MUTED}>{cur.scale}</text>
+        <text x={cx} y={cy + 9} textAnchor="middle" fontSize={lab(cur.scale).length > 10 ? 5.5 : 7} fontFamily="ui-monospace, monospace" fill={MUTED}>{lab(cur.scale)}</text>
         {/* where it may go */}
         <text x={136} y={12} fontSize={7} fontFamily="ui-monospace, monospace" fill={MUTED}>{modes ? 'the degrees' : 'bright'}</text>
         {ladder.map((l, i) => {
-          const y = 24 + i * 15
+          const y = 24 + i * lStep
           const hh = keyHue(l.root)
           return (
             <g key={l.label}>
-              <rect x={134} y={y - 8} width={100} height={13} rx={4} fill={l.here ? col(hh, 0.5) : col(hh, 0.1)} stroke={col(hh, l.here ? 1 : 0.4)} strokeWidth={l.here ? 1.4 : 0.8} style={l.here ? { filter: `drop-shadow(0 0 4px ${col(hh, 0.7)})` } : undefined} />
-              <text x={140} y={y + 1.5} fontSize={7.5} fontFamily="ui-monospace, monospace" fill={l.here ? TEXT : MUTED}>{l.label}</text>
+              <rect x={134} y={y - lH * 0.62} width={100} height={lH} rx={Math.min(4, lH / 3)} fill={l.here ? col(hh, 0.5) : col(hh, 0.1)} stroke={col(hh, l.here ? 1 : 0.4)} strokeWidth={l.here ? 1.4 : 0.8} style={l.here ? { filter: `drop-shadow(0 0 4px ${col(hh, 0.7)})` } : undefined} />
+              <text x={140} y={y + lFs * 0.2} fontSize={lFs} fontFamily="ui-monospace, monospace" fill={l.here ? TEXT : MUTED}>{l.label}</text>
             </g>
           )
         })}
-        {!modes && <text x={136} y={24 + ladder.length * 15} fontSize={7} fontFamily="ui-monospace, monospace" fill={MUTED}>dark</text>}
+        {!modes && <text x={136} y={24 + (ladder.length - 1) * lStep + lH * 0.4 + 7.5} fontSize={7} fontFamily="ui-monospace, monospace" fill={MUTED}>dark</text>}
       </svg>
     </Stage>
   )
@@ -367,13 +368,15 @@ function PictureVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): J
         {moods.map((m, i) => {
           const y = 22 + (moods.length > 1 ? (i / (moods.length - 1)) * 80 : 40)
           const here = pk?.scale === m
+          // up to 17 moods in 80 px : the lines shrink to fit
+          const fs = Math.min(7.5, moods.length > 1 ? (80 / (moods.length - 1)) * 0.95 : 7.5)
           return (
             <g key={m}>
-              <text x={134} y={y + 2.5} fontSize={here ? 8.5 : 7.5} fontWeight={here ? 700 : 400} fontFamily="ui-monospace, monospace" fill={here ? col(keyHue(pk!.root)) : MUTED}>{m}</text>
+              <text x={134} y={y + 2.5} fontSize={here ? fs + 1 : fs} fontWeight={here ? 700 : 400} fontFamily="ui-monospace, monospace" fill={here ? col(keyHue(pk!.root)) : MUTED}>{lab(m)}</text>
             </g>
           )
         })}
-        {pk && <text x={234} y={130} textAnchor="end" fontSize={8} fontFamily="ui-monospace, monospace" fill={col(keyHue(pk.root))}>{`→ ${NOTE_NAMES[pk.root]} ${pk.scale}`}</text>}
+        {pk && <text x={234} y={130} textAnchor="end" fontSize={8} fontFamily="ui-monospace, monospace" fill={col(keyHue(pk.root))}>{`→ ${NOTE_NAMES[pk.root]} ${lab(pk.scale)}`}</text>}
         {/* the motion, for cuts */}
         {cuts && (
           <g>

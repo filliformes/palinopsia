@@ -226,7 +226,10 @@ export function randomSonify(cur: SoniConfig): SoniConfig {
   // MOTION, so a dice that picks only those would be silent on a still image.
   const alwaysAudible: SoniVoiceKey[] = ['spectra', 'orbit', 'raster', 'sstv', 'filter', 'chord']
   if (![...chosen].some((v) => alwaysAudible.includes(v))) chosen.add(pick(alwaysAudible))
-  const scales = ['minor', 'major', 'pentatonic', 'dorian', 'phrygian', 'lydian', 'wholetone'] as const
+  const scales = [
+    'minor', 'major', 'pentatonic', 'dorian', 'phrygian', 'lydian', 'wholetone',
+    'harmonicminor', 'mixolydian', 'locrian', 'majorpentatonic', 'majorblues', 'minorblues', 'dimwh', 'dimhw'
+  ] as const
   const V = (k: SoniVoiceKey): Record<string, unknown> => ({ ...R_PARAMS[k](cur), on: chosen.has(k), tap: 0 })
   return {
     ...cur,

@@ -7,16 +7,13 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { SoniKeyMode, SoniKeySeq } from '@shared/types'
 import { useStore } from '../store'
-import { SONI_SCALES } from '../audio/sonify'
+import { SCALE_ABBR, SCALE_LABEL, SCALE_ORDER } from '../audio/sonify'
 import { NOTE_NAMES, KEY_MODES, euclidHit } from '../audio/soniKeyModel'
 import { SONI_RATES, RATE_LABEL, soniBeats } from '../audio/soniClock'
 import { keySeqNext, keySeqPhase } from '../audio/soniKeySeq'
 import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, Toggle, CardGrip, useCardSpace, chipBig } from './sonifyUi'
 import { KeySeqVisual } from './KeySeqVisual'
 
-const SCALE_ABBR: Record<string, string> = {
-  chromatic: 'chr', major: 'maj', minor: 'min', pentatonic: 'pent', wholetone: 'whole', dorian: 'dor', phrygian: 'phr', lydian: 'lyd'
-}
 
 const MODE_INFO: Record<SoniKeyMode, { name: string; hint: string; icon: ReactNode }> = {
   list: {
@@ -205,9 +202,9 @@ export function SonifyKeySequencer({ onWidth }: { onWidth: (dx: number, done: bo
             </div>
           </Row>
           <Row label="scales" hint="The scales the sequencer may choose">
-            <div className="grid min-w-0 flex-1 grid-cols-4 gap-1">
-              {SONI_SCALES.map((sc) => (
-                <button key={sc} onClick={() => toggleScale(sc)} title={sc} className={`${chipBig(ks.poolScales.includes(sc))} px-0`}>{SCALE_ABBR[sc]}</button>
+            <div className="grid min-w-0 flex-1 grid-cols-6 gap-1">
+              {SCALE_ORDER.map((sc) => (
+                <button key={sc} onClick={() => toggleScale(sc)} title={SCALE_LABEL[sc]} className={`${chipBig(ks.poolScales.includes(sc))} px-0`}>{SCALE_ABBR[sc]}</button>
               ))}
             </div>
           </Row>
@@ -236,7 +233,7 @@ export function SonifyKeySequencer({ onWidth }: { onWidth: (dx: number, done: bo
                 {NOTE_NAMES.map((n, r) => <option key={n} value={r}>{n}</option>)}
               </select>
               <select className="input select-compact min-w-0 flex-1 text-[10px]" value={st.scale} onChange={(e) => setStep(i, { scale: e.target.value })} title="The scale">
-                {SONI_SCALES.map((sc) => <option key={sc} value={sc}>{sc}</option>)}
+                {SCALE_ORDER.map((sc) => <option key={sc} value={sc}>{SCALE_LABEL[sc]}</option>)}
               </select>
               <Stepper value={st.oct} min={1} max={6} onChange={(v) => setStep(i, { oct: v })} title="The root octave (3 = no shift) : the whole instrument moves up or down" />
             </div>

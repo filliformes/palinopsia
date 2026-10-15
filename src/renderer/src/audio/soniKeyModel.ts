@@ -4,17 +4,38 @@
 // store and the sequencer (soniKeySeq.ts) both import it.
 
 import type { SoniKeySeq, SoniKeyStep, SoniKeyMode } from '@shared/types'
-import { SONI_SCALES, SCALE_STEPS, type SoniScale } from './sonify'
+import { SONI_SCALES, SCALE_LABEL, SCALE_STEPS, sameNotes, type SoniScale } from './sonify'
 import { isSoniRate } from './soniClock'
 
 export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 export const KEY_MODES: SoniKeyMode[] = ['list', 'circle', 'affinity', 'pivot', 'picture']
-// The modes from brightest to darkest (Pivot's "tonic" walk, Picture's mood).
-// Pentatonic is the minor pentatonic here ([0 3 5 7 10]); chromatic has no mood.
-export const BRIGHT: SoniScale[] = ['lydian', 'major', 'wholetone', 'dorian', 'pentatonic', 'minor', 'phrygian', 'chromatic']
-// The diatonic modes we have, by their tonic's distance above the parent major :
-// I major (ionian), II dorian, III phrygian, IV lydian, VI minor (aeolian).
-export const DIATONIC: Array<[SoniScale, number]> = [['major', 0], ['dorian', 2], ['phrygian', 4], ['lydian', 5], ['minor', 9]]
+// The scales from brightest to darkest (Pivot's "tonic" walk, Picture's mood) :
+// the modes by their raised degrees, the others where their thirds and sixths
+// put them. Pentatonic is the minor pentatonic ([0 3 5 7 10]); chromatic has
+// no mood. Same-note pairs sit side by side (the pool keeps only one).
+export const BRIGHT: SoniScale[] = [
+  'lydian', 'major', 'ionian', 'majorpentatonic', 'wholetone', 'mixolydian', 'majorblues',
+  'dorian', 'pentatonic', 'minorblues', 'minor', 'aeolian', 'harmonicminor', 'phrygian',
+  'locrian', 'dimwh', 'dimhw', 'chromatic'
+]
+// The diatonic modes, by their tonic's distance above the parent major : I major
+// (ionian), II dorian, III phrygian, IV lydian, V mixolydian, VI minor
+// (aeolian), VII locrian. Ionian and aeolian are found through sameNotes.
+export const DIATONIC: Array<[SoniScale, number]> = [['major', 0], ['dorian', 2], ['phrygian', 4], ['lydian', 5], ['mixolydian', 7], ['minor', 9], ['locrian', 11]]
+/** A diatonic degree's roman numeral, from its distance above the parent major. */
+export const degreeNumeral = (off: number): string => ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][[0, 2, 4, 5, 7, 9, 11].indexOf(off)] ?? ''
+/** The ring of modes a pivot walks : DIATONIC by sound, each named as the
+ *  current key or the pool names it (null where the pool has no such mode). */
+export function diatonicRing(cur: SoniScale, scales: SoniScale[]): Array<[SoniScale, number]> {
+  const out: Array<[SoniScale, number]> = []
+  for (const [s, off] of DIATONIC) {
+    const name = sameNotes(s, cur) ? cur : scales.find((t) => sameNotes(t, s))
+    if (name) out.push([name, off])
+  }
+  return out
+}
+/** Does a scale lean minor (a minor third, no major third) : the visual's tint. */
+export const minorish = (s: SoniScale): boolean => SCALE_STEPS[s].includes(3) && !SCALE_STEPS[s].includes(4)
 
 export interface Key {
   root: number
@@ -26,7 +47,7 @@ export const mod12 = (n: number): number => ((n % 12) + 12) % 12
 export const keyId = (k: Key): string => `${k.root}:${k.scale}:${k.oct}`
 export const sameKey = (a: Key | null, b: Key | null): boolean =>
   !!a && !!b && a.root === b.root && a.scale === b.scale && a.oct === b.oct
-export const keyName = (k: Key): string => `${NOTE_NAMES[mod12(k.root)]} ${k.scale}`
+export const keyName = (k: Key): string => `${NOTE_NAMES[mod12(k.root)]} ${SCALE_LABEL[k.scale] ?? k.scale}`
 export const isScale = (s: unknown): s is SoniScale => typeof s === 'string' && (SONI_SCALES as string[]).includes(s)
 
 /** The key's pitch classes as a 12-bit mask. */

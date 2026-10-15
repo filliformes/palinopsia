@@ -854,6 +854,9 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.chordN = 0;
     this.cPhase = new Float32Array(NCHORD);
     this.cAmp = new Float32Array(NCHORD);
+    this.cOff = new Float32Array(NCHORD); // each note's place in the SPREAD fan (-1 left .. 1 right)
+    this.cCtr = 0; this.cCtrT = 0; this.cCtrK = 0; // the fan's balancing centre (glided), its target, the blocks to its next solve
+    this.cWt = new Float32Array(NCHORD); // each note's power, for that solve
     this.cTarget = new Float32Array(NCHORD);
     this.cW = new Float32Array(NCHORD).fill(1); // each note's WAVES level (ramped per block)
     this.cwPh = 0;
@@ -1706,6 +1709,51 @@ class SoniProcessor extends AudioWorkletProcessor {
         pk[0] = l0; pk[1] = l1; pk[2] = l2; pk[3] = r0; pk[4] = r1; pk[5] = r2;
         this.cSeedL = sl; this.cSeedR = sr;
       }
+      // SPREAD : the notes fan out in mirrored pairs counted from the top (the
+      // highest pair widest, right then left), the bass in the middle (and, for
+      // an even count, the note above it too) : as much on each side. It used
+      // to alternate up from the bass with every left note wider than its right
+      // neighbour and the top note (often the brightest band : a sky) hard
+      // left, so raising spread leaned the chord left. And the fan is centred
+      // on the chord's loudness (each note's offset weighed by its level, that
+      // mean taken away, glided over 0.3 s) : whichever bands are bright, the
+      // chord stays in the middle and only widens. The centre is the one that
+      // balances the sides' POWER (L² − R² of a note at pan p is cos(π p)·
+      // level²), the pans' hard edges included : found by halving, about 90
+      // times a second (a closed form without the edges left a sky, whose
+      // loudest note pushes its partner past the edge, 2 dB to one side).
+      const offs = this.cOff, wts = this.cWt, P = (N - 1) >> 1;
+      let W = 0;
+      for (let i = 0; i < N; i++) {
+        let o = 0;
+        if (N === 2) o = i ? 1 : -1;
+        else { const j = N - 1 - i, p = j >> 1; if (p < P) o = (j & 1 ? -1 : 1) * (P - p) / P; }
+        offs[i] = o;
+        const a = this.cAmp[i] * this.cW[i];
+        wts[i] = a * a; W += a * a;
+      }
+      if (--this.cCtrK <= 0) {
+        this.cCtrK = 4;
+        let ctr = 0;
+        if (spread > 1e-4 && W > 1e-12) {
+          const T = W * Math.cos(Math.PI * panBase), hw = spread * 0.5; // the voice's own pan is the balance aimed at
+          let lo = -2, hi = 2;
+          for (let it = 0; it < 12; it++) {
+            const c = 0.5 * (lo + hi);
+            let f = -T;
+            for (let i = 0; i < N; i++) {
+              let pp = panBase + hw * (offs[i] - c);
+              pp = pp < 0 ? 0 : pp > 1 ? 1 : pp;
+              f += wts[i] * Math.cos(Math.PI * pp);
+            }
+            if (f > 0) hi = c; else lo = c; // f rises with c (every pan moves left)
+          }
+          ctr = 0.5 * (lo + hi);
+        }
+        this.cCtrT = ctr;
+      }
+      this.cCtr += (this.cCtrT - this.cCtr) * (1 - Math.exp(-n * dt / 0.3));
+      if (!(Math.abs(this.cCtr) <= 1)) this.cCtr = 0; // NaN guard
       for (let i = 0; i < N; i++) {
         const cw1 = cwv > 0.001 ? 1 - cwA * (0.5 - 0.5 * Math.cos(TAU * ((i / N) * (1 + cwFast) - this.cwPh))) : 1;
         const cw0 = this.cW[i];
@@ -1719,11 +1767,8 @@ class SoniProcessor extends AudioWorkletProcessor {
           this.cZ1L[i] = this.cZ2L[i] = this.cZ1R[i] = this.cZ2R[i] = 0; // a silent band starts clean
           continue;
         }
-        // SPREAD : the bass stays in the middle and the notes above fan out,
-        // alternating right / left, wider as they rise (the top note widest). It
-        // used to fan low → left, high → right, which put the root hard LEFT.
-        const off = N > 1 && i > 0 ? (i % 2 ? 1 : -1) * (i / (N - 1)) : 0;
-        let pan = panBase + spread * 0.5 * off;
+        // SPREAD (the fan above) : this note's place, around the chord's centre
+        let pan = panBase + spread * 0.5 * (offs[i] - this.cCtr);
         pan = pan < 0 ? 0 : pan > 1 ? 1 : pan;
         const gL = gBase * panGL(pan), gR = gBase * panGR(pan);
         let ph = this.cPhase[i];

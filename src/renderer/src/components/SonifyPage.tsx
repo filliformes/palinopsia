@@ -11,7 +11,7 @@ import { Blink } from './Blink'
 import type { ModTarget, SonifyModParam } from '@shared/types'
 import { registerLiveOverlay } from './liveOverlay'
 import { randomSonify, randomizeVoice, suggestSonify, type SoniVoiceKey } from '../audio/autoSonify'
-import { defaultSoniConfig, ringFreqs, SONI_SCALES, sonifyEngine, type SoniConfig } from '../audio/sonify'
+import { defaultSoniConfig, ringFreqs, SCALE_LABEL, SCALE_ORDER, sonifyEngine, type SoniConfig } from '../audio/sonify'
 import { deleteSoniPreset, listSoniPresets, loadSoniPreset, saveSoniPreset } from '../audio/soniPresets'
 import { modTargetKey, useStore } from '../store'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
@@ -1083,7 +1083,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           onChange={(e) => patch({ scale: e.target.value as SoniConfig['scale'] })}
           title="Quantizer scale (each voice can snap to it or run free)"
         >
-          {SONI_SCALES.map((s) => <option key={s} value={s}>{s}</option>)}
+          {SCALE_ORDER.map((s) => <option key={s} value={s}>{SCALE_LABEL[s]}</option>)}
         </select>
         {/* Output device (the same setting as Sonify's row in the audio/midi/osc tab) */}
         <AudioOutputSelect

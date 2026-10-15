@@ -30,17 +30,74 @@ const FLOW_BLOCK = 8 // grid px per flow block → 12×12 blocks
 const FLOW_BLOCKS = GRID / FLOW_BLOCK
 
 export type SoniEventMode = 'spatial' | 'motion' | 'blend'
-export type SoniScale = 'chromatic' | 'major' | 'minor' | 'pentatonic' | 'wholetone' | 'dorian' | 'phrygian' | 'lydian'
-export const SONI_SCALES: SoniScale[] = ['chromatic', 'major', 'minor', 'pentatonic', 'wholetone', 'dorian', 'phrygian', 'lydian']
+// The eighteen scales of Berklee's scale reference (major, minor, harmonic
+// minor, the seven modes, the major and minor pentatonics and blues, whole
+// tone, the two diminished, chromatic). Major and ionian are the same notes,
+// as are minor and aeolian : both names are kept (the key sequencer compares
+// scales by their notes, see sameNotes). The ids are saved and sent over OSC
+// (an int is an index here) : the first eight keep their places, new ones
+// come after. 'pentatonic' is the MINOR pentatonic (its old id). Menus show
+// SCALE_ORDER, with SCALE_LABEL.
+export type SoniScale =
+  | 'chromatic' | 'major' | 'minor' | 'pentatonic' | 'wholetone' | 'dorian' | 'phrygian' | 'lydian'
+  | 'harmonicminor' | 'ionian' | 'mixolydian' | 'aeolian' | 'locrian'
+  | 'majorpentatonic' | 'majorblues' | 'minorblues' | 'dimwh' | 'dimhw'
+export const SONI_SCALES: SoniScale[] = [
+  'chromatic', 'major', 'minor', 'pentatonic', 'wholetone', 'dorian', 'phrygian', 'lydian',
+  'harmonicminor', 'ionian', 'mixolydian', 'aeolian', 'locrian',
+  'majorpentatonic', 'majorblues', 'minorblues', 'dimwh', 'dimhw'
+]
+/** The menus' order : the reference's. */
+export const SCALE_ORDER: SoniScale[] = [
+  'major', 'minor', 'harmonicminor',
+  'ionian', 'dorian', 'phrygian', 'lydian', 'mixolydian', 'aeolian', 'locrian',
+  'majorpentatonic', 'pentatonic', 'majorblues', 'minorblues',
+  'wholetone', 'dimwh', 'dimhw', 'chromatic'
+]
+export const SCALE_LABEL: Record<SoniScale, string> = {
+  chromatic: 'chromatic', major: 'major', minor: 'minor', pentatonic: 'minor pentatonic',
+  wholetone: 'whole tone', dorian: 'dorian', phrygian: 'phrygian', lydian: 'lydian',
+  harmonicminor: 'harmonic minor', ionian: 'ionian', mixolydian: 'mixolydian', aeolian: 'aeolian',
+  locrian: 'locrian', majorpentatonic: 'major pentatonic', majorblues: 'major blues',
+  minorblues: 'minor blues', dimwh: 'diminished W-H', dimhw: 'diminished H-W'
+}
 export const SCALE_STEPS: Record<SoniScale, number[]> = {
   chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
   major: [0, 2, 4, 5, 7, 9, 11],
   minor: [0, 2, 3, 5, 7, 8, 10],
-  pentatonic: [0, 3, 5, 7, 10],
+  pentatonic: [0, 3, 5, 7, 10], // the minor pentatonic
   wholetone: [0, 2, 4, 6, 8, 10],
   dorian: [0, 2, 3, 5, 7, 9, 10],
   phrygian: [0, 1, 3, 5, 7, 8, 10],
-  lydian: [0, 2, 4, 6, 7, 9, 11]
+  lydian: [0, 2, 4, 6, 7, 9, 11],
+  harmonicminor: [0, 2, 3, 5, 7, 8, 11],
+  ionian: [0, 2, 4, 5, 7, 9, 11],
+  mixolydian: [0, 2, 4, 5, 7, 9, 10],
+  aeolian: [0, 2, 3, 5, 7, 8, 10],
+  locrian: [0, 1, 3, 5, 6, 8, 10],
+  majorpentatonic: [0, 2, 4, 7, 9],
+  majorblues: [0, 2, 3, 4, 7, 9], // 1 2 b3 3 5 6
+  minorblues: [0, 3, 5, 6, 7, 10], // 1 b3 4 b5 5 b7
+  dimwh: [0, 2, 3, 5, 6, 8, 9, 11], // whole, half, ...
+  dimhw: [0, 1, 3, 4, 6, 7, 9, 10] // half, whole, ...
+}
+/** Five characters at most : the key sequencer's chips and steps (M major, m minor). */
+export const SCALE_ABBR: Record<SoniScale, string> = {
+  chromatic: 'chr', major: 'maj', minor: 'min', pentatonic: 'm.pnt', wholetone: 'whole',
+  dorian: 'dor', phrygian: 'phr', lydian: 'lyd', harmonicminor: 'h.min', ionian: 'ion',
+  mixolydian: 'mix', aeolian: 'aeo', locrian: 'loc', majorpentatonic: 'M.pnt',
+  majorblues: 'M.blu', minorblues: 'm.blu', dimwh: 'dimWH', dimhw: 'dimHW'
+}
+/** Two scales with the same notes (major and ionian, minor and aeolian). */
+export const sameNotes = (a: SoniScale, b: SoniScale): boolean => a === b || SCALE_STEPS[a].join() === SCALE_STEPS[b].join()
+/** A scale from a typed or sent name : its id or its label, any case, spaces
+ *  and dashes ignored ("harmonic minor", "Diminished W-H", "minorpentatonic"). */
+export function scaleFromName(text: string): SoniScale | null {
+  const t = text.toLowerCase().replace(/[\s_-]/g, '')
+  for (const s of SONI_SCALES) if (s === t || SCALE_LABEL[s].replace(/[\s_-]/g, '').toLowerCase() === t) return s
+  if (t === 'diminishedwh' || t === 'wholehalf') return 'dimwh'
+  if (t === 'diminishedhw' || t === 'halfwhole') return 'dimhw'
+  return null
 }
 
 export interface SoniTap {
