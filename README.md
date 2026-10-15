@@ -2384,6 +2384,9 @@ reconcile into the engine through `syncFromState`, so nothing races. Per-frame
 overlays (modulation, Feel macros, Meta-knob gestures, the sequencer's long-forms)
 write **straight into the compositor** through a shared frame-value bus, so
 co-engaged systems stack on the same parameter instead of clobbering each other, and none of it ever re-renders React.
+A layer with nothing in it (no source, no effect switched on, no trail) costs nothing :
+once its buffers hold black, its passes are skipped, and the picture is the same to the
+last bit (`ISFLayer.skipBlank`).
 
 ---
 

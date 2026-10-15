@@ -3,6 +3,15 @@
 All notable changes to Palinopsia. Dates are ISO. Versions follow the `v*` tags
 that CI builds into cross-platform releases.
 
+## Unreleased
+
+### Docs
+
+- The site's **New in 1.2.9** (no more clicks, sharp enlargement, empty layers, steadier
+  controls, the Collage stand-in, the measured frame rate) and its links to the 1.2.9
+  notes; the README's Architecture says an empty layer costs nothing; the OSC reference
+  says a synced Spectra gives its own rate back when sync goes off.
+
 ## v1.2.9 — 2026-10-15
 
 ### Added
