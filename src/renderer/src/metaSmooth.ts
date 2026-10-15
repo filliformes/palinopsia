@@ -22,6 +22,7 @@ import { useStore } from './store'
 import { BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
 import { DOME_MOD_RANGE } from '@shared/dome'
 import { OUTX_MOD_RANGE } from '@shared/outXform'
+import { parseSpaceModParam, placePatch } from '@shared/spatial'
 
 const knobDisplay: number[] = []
 const tweens: Array<{ from: number; to: number; startedAt: number; ms: number } | null> = []
@@ -62,7 +63,9 @@ function applyDest(target: ModTarget, shaped: number): void {
     const d = SONIFY_MOD_DESCS[target.param]
     if (!d) return
     const v = d.min + Math.max(0, Math.min(1, shaped)) * (d.max - d.min)
-    st.setSonify(withSonifyParam(st.sonify, target.param, v))
+    const sp = parseSpaceModParam(target.param)
+    if (sp) st.setSpaceVoice(sp.voice, placePatch(sp.field, v)) // a voice's place in the room
+    else st.setSonify(withSonifyParam(st.sonify, target.param, v))
     return
   }
   // Layer opacity / A-B mix / blend : commit into the store (compositor reads it).

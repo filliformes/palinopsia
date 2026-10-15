@@ -1356,6 +1356,28 @@ room, **mirror** swaps left and right, **glide** softens a voice that jumps. The
 map draws it all as the domemaster does (the zenith in the middle, the front at the
 bottom), with the speakers lit by their level.
 
+**Played, not only placed.** Click a voice's name : its place opens as five sliders
+(**az**, **el**, **width**, **span**, **spin**), each with Sonify's **M** to bind a modulator
+or a Meta knob, like any other Sonify parameter (the table shows the moving value).
+Azimuth goes round : a modulator or a knob gets two full turns that wrap, so a sweep
+spins a voice around the room instead of stopping at the back. Over **OSC** :
+`/opsia/space/{voice}/az · el · width · span · spin` (0..1 over each range; az 0.5 =
+straight ahead), `/follow` (≥ 0.5), and for the scene `/opsia/space/mode`, `/turn`,
+`/glide`, `/mirror`, `/headphones`, `/pieces` (all in OSCQuery).
+
+**🎧 headphones** hears the room in stereo : every channel (each speaker of the layout,
+or each object at its place) goes around your head through the HRTF (Chromium's own
+binaural panner) and leaves on Sonify's output as two channels. Prepare a dome piece at
+home, check a SpatGRIS scene before the venue, then switch it off to send the channels.
+
+**Collage pieces** (0 to 30) : the Collage voice's pieces as sources of their own, each
+sounding where it is in the picture (on the dome, through the mapping) instead of the
+voice as one pair. Past the count, a piece joins the group of pieces nearest to it, so
+none is left out. On speakers they are panned like the voices; as objects each takes a
+channel after the voices (and its own SpatGRIS source), as many as the 32 channels
+allow. The Collage voice's own pair then carries only its Ring bank (its resonances), so
+nothing is heard twice; its az, spin and span move the pieces too.
+
 Directions follow SpatGRIS : azimuth clockwise from the front (90 = the audience's
 right), elevation above the horizon. Choose a multichannel output in the Sonify bar (a
 sound card, or a **Dante Virtual Soundcard** to reach a venue's Dante network); the page
@@ -2129,6 +2151,12 @@ unless the slot actually holds a video.
 | `/opsia/output/flipx · flipy` | bool | Flips (≥ 0.5) |
 | `/opsia/output/edge` | i / f / s | `black` · `repeat` · `mirror` |
 | `/opsia/output/reset` | trigger | Back to the frame as it is |
+| `/opsia/space/mode` | i / f / s | **Space** : `stereo` · `speakers` · `objects` |
+| `/opsia/space/turn · glide` | f 0..1 | Turn the sound scene (0.5 = none) · how softly a following voice moves (0..2 s) |
+| `/opsia/space/mirror · headphones` | bool | Swap left and right · hear the room on headphones (≥ 0.5) |
+| `/opsia/space/pieces` | i / f | Collage pieces as sources of their own (an integer count, or 0..1 of 30) |
+| `/opsia/space/{voice}/az · el · width · span · spin` | f 0..1 | Where a Sonify voice sits (`spectra` `orbit` `flow` `events` `raster` `sstv` `filter` `chord` `collage` `signal`), 0..1 over each range (az 0.5 = straight ahead) |
+| `/opsia/space/{voice}/follow` | bool | It follows the picture (≥ 0.5), else it stays at its fixed place |
 | `/opsia/panic` | trigger | **Panic flush** : drop every self-feeding buffer (same as key `0` / the ⚡ Flush button); advertised over OSCQuery |
 | `/opsia/vary` | trigger | **Vary** : a variant of the whole scene at the Transport's spread (its Vary button); advertised over OSCQuery |
 | `/opsia/surface` | f f | **Metasurface** cursor : two `0..1` floats (x, y) on the scene plane; sending it turns the surface on (Pandore's Trill Square) |

@@ -31,6 +31,28 @@ that CI builds into cross-platform releases.
   back to stereo → the EQ path and 2 channels again. On the Satosphère's own setup (93 +
   5 subs) : 185 triangles in 53 ms, every speaker alone at its own direction, unit
   power to 1e-15, a voice under the horizon on the lowest ring.
+- **Space, played** : each voice's place (az, el, width, span, spin) is a Sonify
+  modulation target (`space.<voice>.<field>`, a `SonifyModParam`) : modulators, Meta
+  knobs (their commit lands in `store.space`), the M chips of the Space view's voice
+  sliders, labeled `SPACE <voice> <field>` in the matrix. Azimuth modulates over two
+  turns and wraps (a sweep spins a voice instead of clamping at 180; measured : an
+  LFO on the Chord's azimuth turned it round). OSC `/opsia/space/mode · turn · glide ·
+  mirror · headphones · pieces` and `/opsia/space/{voice}/az · el · width · span · spin ·
+  follow`, in OSCQuery. The venue setup is saved a moment after the last change.
+- **Space : headphones** : the worklet's spatial output split per channel, each through
+  a Web Audio `PannerNode` (HRTF) at its speaker's or object's direction, summed to
+  stereo on Sonify's output (`sonify.ts` `setSpacePreviewDirs`). Measured : a voice at
+  90° right, 0.17 / 0.07 right / left; at -90°, 0.18 / 0.07; at the zenith even.
+- **Space : Collage pieces as sources** (0 to 30) : the Collage voice's output is now a
+  32-channel merger (its stereo bus on 0-1, piece groups on 2..31), each piece chain's
+  deal crossfade moved before its panner so its mono can be tapped; a piece takes an
+  empty group or joins the nearest one (by this update's running centroids). In the
+  worklet the Ring bank gives its wet alone and the dry's share per sample, so the
+  voice's own pair keeps only the bank and every group leaves at the dry's share,
+  through the voice's gate and gain. Each group sounds where its pieces are, through the
+  dome mapping. Measured : 8 groups on a Dome 25 reach 8 speakers (the voice as one
+  pair : 6); as objects, the 8 piece channels after the voices all sound and the
+  voice's pair is silent with the bank off.
 - **Satosphère** in the Fulldome section : 4096², 210°, full dome (fill), NDI at 60 fps
   (UYVY, native size), Sonify as objects to SpatGRIS. Dome and NDI on / off untouched.
 

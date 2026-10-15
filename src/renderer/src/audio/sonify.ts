@@ -376,11 +376,25 @@ export interface SoniScan {
   tv: number; tvHz: number // Transmission row
 }
 
+/** A preview panner at (az, el) on the unit sphere (SpatGRIS's convention : az
+ *  clockwise from the front, el above the horizon; Web Audio : x right, y up,
+ *  the listener facing -z). */
+function placePanner(p: PannerNode, d: [number, number], t: number, now = false): void {
+  const a = (d[0] * Math.PI) / 180, e = (d[1] * Math.PI) / 180
+  const x = Math.sin(a) * Math.cos(e), y = Math.sin(e), z = -Math.cos(a) * Math.cos(e)
+  if (now) { p.positionX.value = x; p.positionY.value = y; p.positionZ.value = z; return }
+  p.positionX.setTargetAtTime(x, t, 0.03)
+  p.positionY.setTargetAtTime(y, t, 0.03)
+  p.positionZ.setTargetAtTime(z, t, 0.03)
+}
+
 /** Space : one matrix for the worklet's second output (see SpaceBus there). */
 export interface SpaceMsg {
   t: 'space'
   on: boolean
   nch: number // output channels used (≤ SPACE_MAX_CH)
+  preview?: boolean // headphones : the channels rendered binaurally to stereo
+  pieces?: number // Collage pieces as up to this many sources of their own
   gains?: Float32Array // (sources × 2 sides × SPACE_MAX_CH)
   subs?: number[] // 0-based channels fed the low end
   subGain?: number
@@ -485,8 +499,15 @@ class SonifyEngine {
   spaceMeter: Float32Array | null = null
   // Space : the worklet's second output to the device instead of the stereo EQ
   // path, and the last matrix (re-sent to a rebuilt node).
-  private spaceRoute = { on: false, nch: 0 }
+  private spaceRoute = { on: false, nch: 0, preview: false }
   private spaceMsg: SpaceMsg | null = null
+  // the headphone preview : output 1 split, each channel through an HRTF panner
+  // at its speaker's (or object's) direction, summed to stereo
+  private spacePreview: { split: ChannelSplitterNode; pans: Array<PannerNode | null>; sum: GainNode } | null = null
+  private previewDirs: Array<[number, number] | null> = []
+  private previewKey = ''
+  // Space's Collage piece groups (0 : the voice is one pair)
+  private collageGroups = 0
 
   constructor() {
     // The mod-matrix swings around each param's BASE : the current config.
@@ -856,11 +877,40 @@ class SonifyEngine {
     this.spaceMsg = msg
     this.node?.port.postMessage(msg)
     const on = msg.on && msg.nch > 0
-    if (on !== this.spaceRoute.on || (on && msg.nch !== this.spaceRoute.nch)) {
-      this.spaceRoute = { on, nch: msg.nch }
+    const preview = on && !!msg.preview
+    if (on !== this.spaceRoute.on || preview !== this.spaceRoute.preview || (on && msg.nch !== this.spaceRoute.nch)) {
+      this.spaceRoute = { on, nch: msg.nch, preview }
       this.applySpaceRoute()
     }
     if (!on) this.spaceMeter = null
+    this.setCollageGroups(on ? msg.pieces ?? 0 : 0)
+  }
+
+  /** The headphone preview's directions, one per output channel (az, el in
+   *  degrees, SpatGRIS's convention; null : nothing on that channel). */
+  setSpacePreviewDirs(dirs: Array<[number, number] | null>): void {
+    this.previewDirs = dirs
+    const key = dirs.map((d) => (d ? 1 : 0)).join('')
+    const pv = this.spacePreview
+    if (!pv || key !== this.previewKey) {
+      this.previewKey = key
+      if (this.spaceRoute.preview) this.applySpaceRoute()
+      return
+    }
+    const t = this.ctx?.currentTime ?? 0
+    dirs.forEach((d, i) => { const p = pv.pans[i]; if (d && p) placePanner(p, d, t) })
+  }
+
+  /** Space : sound the Collage pieces as up to `n` sources of their own. */
+  setCollageGroups(n: number): void {
+    this.collageGroups = n
+    this.collage?.setGroups(n)
+  }
+
+  /** Where each Collage piece group sounds from : (x, y, weight) × groups, in
+   *  the pieces' own frame coordinates (null : no Collage voice). */
+  collageGroupPos(): Float32Array | null {
+    return this.collage?.groupPos ?? null
   }
 
   /** The most channels the output device takes (Web Audio stops at 32). */
@@ -874,8 +924,39 @@ class SonifyEngine {
     const dst = ctx.destination
     try { node.disconnect(dst) } catch { /* not connected */ }
     try { this.eqNode?.disconnect(dst) } catch { /* not connected */ }
+    const old = this.spacePreview
+    if (old) {
+      try { node.disconnect(old.split) } catch { /* not connected */ }
+      try { old.split.disconnect(); old.pans.forEach((p) => p?.disconnect()); old.sum.disconnect() } catch { /* gone */ }
+      this.spacePreview = null
+    }
     try {
-      if (this.spaceRoute.on) {
+      if (this.spaceRoute.on && this.spaceRoute.preview) {
+        // headphones : every channel at its place, heard through the HRTF
+        dst.channelCount = Math.min(2, dst.maxChannelCount)
+        dst.channelInterpretation = 'speakers'
+        const n = Math.max(1, Math.min(this.spaceRoute.nch, SPACE_MAX_CH))
+        const split = ctx.createChannelSplitter(n)
+        const sum = ctx.createGain()
+        const pans: Array<PannerNode | null> = []
+        const t = ctx.currentTime
+        for (let i = 0; i < n; i++) {
+          const d = this.previewDirs[i]
+          if (!d) { pans.push(null); continue }
+          const p = ctx.createPanner()
+          p.panningModel = 'HRTF'
+          p.distanceModel = 'inverse'
+          p.refDistance = 1
+          p.rolloffFactor = 0
+          placePanner(p, d, t, true)
+          split.connect(p, i)
+          p.connect(sum)
+          pans.push(p)
+        }
+        node.connect(split, 1)
+        sum.connect(dst)
+        this.spacePreview = { split, pans, sum }
+      } else if (this.spaceRoute.on) {
         dst.channelCount = Math.max(1, Math.min(this.spaceRoute.nch, dst.maxChannelCount, SPACE_MAX_CH))
         dst.channelCountMode = 'explicit'
         dst.channelInterpretation = 'discrete'
@@ -1168,7 +1249,8 @@ class SonifyEngine {
       if (this.cfg.collage.on && this.ctx) {
         if (!this.collage) {
           this.collage = new CollageVoice(this.ctx)
-          this.collage.bus.connect(node, 0, 1)
+          this.collage.out.connect(node, 0, 1) // the bus on 0-1, Space's piece groups on 2..
+          this.collage.setGroups(this.collageGroups)
         }
         const mv = sonifyModValues
         const c = this.cfg.collage

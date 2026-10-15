@@ -317,12 +317,15 @@ class RingBank {
   }
   reset() { this.ic1.fill(0); this.ic2.fill(0); this.dryP = 0; this.wetP = 0; this.agc = 1; }
   /** Add the voice (dry and bank) into L/R. `iL/iR` the Collage bus, `gL/gR`
-   *  its balance. */
-  process(iL, iR, L, R, n, co, bpm, gL, gR) {
+   *  its balance. Space's Collage pieces (optional) : `wL/wR` receive the bank's
+   *  wet alone and `dK` the dry's share per sample, so the pieces can leave as
+   *  sources of their own while the bank stays with the voice. */
+  process(iL, iR, L, R, n, co, bpm, gL, gR, wL, wR, dK) {
     const sr = this.sr, dt = 1 / sr;
     const wetT = clampf(co.bank || 0, 0, 1);
     if (wetT <= 0.0005 && this.wet <= 0.0005) {
       for (let s = 0; s < n; s++) { L[s] += iL[s] * gL; R[s] += iR[s] * gR; }
+      if (wL) { wL.fill(0, 0, n); wR.fill(0, 0, n); dK.fill(1, 0, n); }
       this.wet = 0; this.idle = true;
       return;
     }
@@ -429,6 +432,7 @@ class RingBank {
       const w = w0 + dw * (s + 1);
       L[s] += send ? xl + bl * w : xl * (1 - w) + bl * w;
       R[s] += send ? xr + br * w : xr * (1 - w) + br * w;
+      if (wL) { wL[s] = bl * w; wR[s] = br * w; dK[s] = send ? 1 : 1 - w; }
     }
     // the level follower (see the constructor)
     if (dryB > 1e-7 * n) {
@@ -545,12 +549,15 @@ const PENDING_CAP = 512;
 // block; the subwoofers get the low end of every source (two cascaded
 // Butterworth low-passes : 24 dB/oct); one limiter holds all the channels.
 const SPACE_CH = 32;
-const SPACE_SRC = NVOICE + 1;
+const SPACE_PIECES = 30; // Collage piece groups on input 1, channels 2..31
+const SPACE_SRC = NVOICE + 1 + SPACE_PIECES;
 const SPACE_FX = NVOICE;
+const SPACE_PIECE0 = NVOICE + 1;
 class SpaceBus {
   constructor(sr) {
     this.sr = sr;
     this.on = false;
+    this.pieces = 0; // Collage pieces as sources (0 : the voice is one pair like the others)
     this.nch = 0;
     this.dirty = 0; // channels to clear once after switching off (no stale buffer)
     this.tgt = new Float32Array(SPACE_SRC * 2 * SPACE_CH);
@@ -579,6 +586,7 @@ class SpaceBus {
     const was = this.on, wasN = this.nch;
     this.on = !!m.on && m.nch > 0;
     this.nch = Math.max(0, Math.min(SPACE_CH, m.nch | 0));
+    this.pieces = this.on ? Math.max(0, Math.min(SPACE_PIECES, m.pieces | 0)) : 0;
     if (!this.on) { this.dirty = Math.max(was ? wasN : 0, this.dirty); return; }
     if (m.gains && m.gains.length === this.tgt.length) {
       for (let i = 0; i < this.tgt.length; i++) { const g = m.gains[i]; this.tgt[i] = Number.isFinite(g) ? g : 0; }
@@ -613,7 +621,7 @@ class SpaceBus {
   add(src, pL, pR, n) {
     const out = this.out;
     if (!out) return;
-    for (let side = 0; side < 2; side++) {
+    for (let side = 0; side < (pR ? 2 : 1); side++) {
       const k = src * 2 + side, base = k * SPACE_CH, list = this.lists[k], cnt = this.listN[k];
       const x = side ? pR : pL;
       for (let i = 0; i < cnt; i++) {
@@ -628,7 +636,11 @@ class SpaceBus {
         }
       }
     }
-    if (this.subN > 0) { const m = this.mono; for (let s = 0; s < n; s++) m[s] += (pL[s] + pR[s]) * 0.5; }
+    if (this.subN > 0) {
+      const m = this.mono;
+      if (pR) for (let s = 0; s < n; s++) m[s] += (pL[s] + pR[s]) * 0.5;
+      else for (let s = 0; s < n; s++) m[s] += pL[s] * 0.7071067811865476;
+    }
   }
   finish(master, n) {
     const out = this.out;
@@ -832,6 +844,10 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.space = new SpaceBus(sampleRate);
     this.pL = new Float32Array(128); this.pR = new Float32Array(128);
     this.fxL = new Float32Array(128); this.fxR = new Float32Array(128);
+    // Collage pieces as sources : the bank's wet, the dry's share, one piece
+    this.rgWL = new Float32Array(128); this.rgWR = new Float32Array(128);
+    this.rgDK = new Float32Array(128); this.pcBuf = new Float32Array(128);
+    this.coK = -1; // the Collage voice's gate × gain at the last block (ramped)
     this.port.onmessage = (e) => this.onMsg(e.data);
   }
 
@@ -1116,7 +1132,8 @@ class SoniProcessor extends AudioWorkletProcessor {
       this.pL[s] = l; this.pR[s] = r;
     }
     this.gate[idx] = g; this.vGain[idx] = v1;
-    if (this.space.on) this.space.add(idx, this.pL, this.pR, n);
+    // (the Collage voice with its pieces as sources : sent by its own block)
+    if (this.space.on && !(idx === 8 && this.space.pieces > 0)) this.space.add(idx, this.pL, this.pR, n);
   }
 
   // Nearest-pixel read of a tap's CURRENT grid (the Raster voice wants the
@@ -1683,8 +1700,28 @@ class SoniProcessor extends AudioWorkletProcessor {
       const has = inp && inp.length;
       const iL = has ? inp[0] : this.ring.zero, iR = has ? inp[1] || inp[0] : this.ring.zero;
       const gL = 1.6 * (1 - Math.max(0, co.pan)), gR = 1.6 * (1 + Math.min(0, co.pan));
-      this.ring.process(iL, iR, L, R, n, co, this.bpm, gL, gR);
+      const pieces = spc.on && spc.out ? spc.pieces : 0;
+      if (pieces > 0) this.ring.process(iL, iR, L, R, n, co, this.bpm, gL, gR, this.rgWL, this.rgWR, this.rgDK);
+      else this.ring.process(iL, iR, L, R, n, co, this.bpm, gL, gR);
       this.mixVoice(8, coOn, co.gain, L, R, outL, outR, n);
+      if (pieces > 0) {
+        // Space : the bank's wet stays the voice's own pair; every piece group
+        // (input 1, channel 2+j : mono, its films' resonators and deal fades
+        // already in) leaves as a source of its own at the dry's share, at the
+        // voice's gate and gain (the voice's DJ filter is the stereo mix's).
+        const k1 = this.gate[8] * this.vGain[8];
+        const k0 = this.coK < 0 ? k1 : this.coK, dk = (k1 - k0) / n;
+        this.coK = k1;
+        const wl = this.rgWL, wr = this.rgWR, dK = this.rgDK, pc = this.pcBuf;
+        for (let s = 0; s < n; s++) { const k = k0 + dk * (s + 1); wl[s] *= k; wr[s] *= k; }
+        spc.add(8, wl, wr, n);
+        const nch = has ? inp.length : 0;
+        for (let j = 0; j < pieces && 2 + j < nch; j++) {
+          const x = inp[2 + j];
+          for (let s = 0; s < n; s++) pc[s] = x[s] * 1.6 * dK[s] * (k0 + dk * (s + 1));
+          spc.add(SPACE_PIECE0 + j, pc, null, n);
+        }
+      } else this.coK = -1;
     }
 
     // ── SIGNAL : the scan heads' micro-grains (the test-equipment register) ──

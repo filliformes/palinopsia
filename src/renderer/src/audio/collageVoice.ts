@@ -127,10 +127,16 @@ interface PieceChain {
   bp: BiquadFilterNode[]
   bpG: GainNode[]
   pan: StereoPannerNode
-  xf: GainNode // the deal crossfade
+  xf: GainNode // the deal crossfade (mono, before the panner : Space taps it here)
   used: boolean
   tg: Float64Array // the target each glide was last sent (see glide)
+  slot: number // Space : the piece group it sounds in as a source of its own (-1 : none)
 }
+
+/** Space : the Collage pieces as sources of their own (shared/spatial.ts). The
+ *  voice's output carries its stereo bus on channels 0-1 and up to this many
+ *  mono piece groups on 2.. (one channel each); the worklet places each group. */
+export const PIECE_GROUPS = 30
 
 // The glide slots of a piece's targets (PieceChain.tg).
 const TG_F = 0, TG_Q = 3, TG_G = 6, TG_DRY = 9, TG_PAN = 10, TG_IN = 11
@@ -182,11 +188,65 @@ export class CollageVoice {
   private dealAt = new Map<string, number>()
   private filesSeen = new Map<string, string[]>()
   readonly bus: GainNode
+  /** What the Sonify node hears on its input 1 : the bus on channels 0-1, the
+   *  piece groups on 2.. (silent while Space keeps the voice as one pair). */
+  readonly out: ChannelMergerNode
   /** For the page : what the voice is playing right now. */
   status = { sets: 0, pieces: 0, films: 0 }
+  // Space's piece groups : how many, who sits in each, and where each sounds
+  // from (x, y, weight per group, the pieces' own frame coordinates).
+  private groups = 0
+  private groupCount = new Int32Array(PIECE_GROUPS)
+  readonly groupPos = new Float32Array(PIECE_GROUPS * 3)
 
   constructor(private ctx: AudioContext) {
     this.bus = ctx.createGain()
+    this.out = ctx.createChannelMerger(2 + PIECE_GROUPS)
+    const split = ctx.createChannelSplitter(2)
+    this.bus.connect(split)
+    split.connect(this.out, 0, 0)
+    split.connect(this.out, 1, 1)
+  }
+
+  /** Space : sound the pieces as up to `n` sources of their own (0 : off). */
+  setGroups(n: number): void {
+    n = Math.max(0, Math.min(PIECE_GROUPS, Math.round(n)))
+    if (n === this.groups) return
+    this.groups = n
+    // every piece re-seats (the next update), from empty groups
+    const all = [...this.pieces.values(), ...this.retiring.map((r) => r.p)]
+    for (const p of all) this.unseat(p)
+    this.groupCount.fill(0)
+    this.groupPos.fill(0)
+  }
+
+  private unseat(p: PieceChain): void {
+    if (p.slot < 0) return
+    try { p.xf.disconnect(this.out, 0, 2 + p.slot) } catch { /* not connected */ }
+    if (this.groupCount[p.slot] > 0) this.groupCount[p.slot]--
+    p.slot = -1
+  }
+
+  /** A piece takes an empty group, or joins the group nearest to it (where its
+   *  pieces are : this update's running sums `sx/sy/sw`, else its last place). */
+  private seat(p: PieceChain, x: number, y: number, sx: Float32Array, sy: Float32Array, sw: Float32Array): void {
+    if (this.groups === 0 || p.slot >= 0) return
+    let slot = -1
+    for (let g = 0; g < this.groups; g++) if (this.groupCount[g] === 0) { slot = g; break }
+    if (slot < 0) {
+      let best = Infinity
+      for (let g = 0; g < this.groups; g++) {
+        const o = g * 3
+        const gx = sw[g] > 0 ? sx[g] / sw[g] : this.groupPos[o + 2] > 0 ? this.groupPos[o] : 0.5
+        const gy = sw[g] > 0 ? sy[g] / sw[g] : this.groupPos[o + 2] > 0 ? this.groupPos[o + 1] : 0.5
+        const d = (gx - x) * (gx - x) + (gy - y) * (gy - y)
+        if (d < best) { best = d; slot = g }
+      }
+    }
+    if (slot < 0) return
+    try { p.xf.connect(this.out, 0, 2 + slot) } catch { return }
+    p.slot = slot
+    this.groupCount[slot]++
   }
 
   private makePlayer(path: string, out: GainNode, gain: number): Player {
@@ -360,28 +420,32 @@ export class CollageVoice {
     const xf = ctx.createGain()
     const bp: BiquadFilterNode[] = []
     const bpG: GainNode[] = []
-    inG.connect(dry).connect(pan)
+    // dry + resonators → the deal crossfade (mono) → the panner → the bus.
+    // (The crossfade sits before the panner so Space can take each piece mono,
+    // already fading in and out with the deals.)
+    inG.connect(dry).connect(xf)
     for (let h = 0; h < HARM.length; h++) {
       const f = ctx.createBiquadFilter()
       f.type = 'bandpass'
       const g = ctx.createGain()
-      inG.connect(f).connect(g).connect(pan)
+      inG.connect(f).connect(g).connect(xf)
       bp.push(f)
       bpG.push(g)
     }
-    pan.connect(xf).connect(this.bus)
+    xf.connect(pan).connect(this.bus)
     inG.gain.value = 0
     if (fadeIn > 0) {
       // Born in a deal : it comes in over the crossfade as the old piece goes.
       xf.gain.value = 0
       fade(xf.gain, ctx.currentTime, fadeIn, 'in')
     }
-    p = { deckKey: '', inG, dry, bp, bpG, pan, xf, used: true, tg: new Float64Array(12).fill(NaN) }
+    p = { deckKey: '', inG, dry, bp, bpG, pan, xf, used: true, tg: new Float64Array(12).fill(NaN), slot: -1 }
     this.pieces.set(key, p)
     return p
   }
 
   private dropPiece(p: PieceChain): void {
+    this.unseat(p)
     try {
       // off its film's bus too : the bus outlives the piece, and an input left
       // hanging there piled up with every mask peel-and-return
@@ -411,6 +475,8 @@ export class CollageVoice {
     for (const p of this.pieces.values()) p.used = false
     let nPieces = 0
     let nFilms = 0
+    // Space : where each piece group sounds from, this update
+    const gx = new Float32Array(PIECE_GROUPS), gy = new Float32Array(PIECE_GROUPS), gw = new Float32Array(PIECE_GROUPS)
     for (const set of sets) {
       // the whole pool's audio-only copies, made ahead of the deals that need them
       if (set.files && set.files !== this.filesSeen.get(set.id)) {
@@ -501,6 +567,13 @@ export class CollageVoice {
         glide(p, TG_DRY, p.dry.gain, 1 - cfg.reso, now)
         glide(p, TG_PAN, p.pan.pan, panV, now)
         glide(p, TG_IN, p.inG.gain, norm * pc.keep, now)
+        if (this.groups > 0) {
+          this.seat(p, pc.x, pc.y, gx, gy, gw)
+          if (p.slot >= 0) {
+            const w = set.level * pc.keep
+            gx[p.slot] += pc.x * w; gy[p.slot] += pc.y * w; gw[p.slot] += w
+          }
+        }
         nPieces++
       })
     }
@@ -529,6 +602,11 @@ export class CollageVoice {
       else this.dropDeck(k, d)
     }
     this.status = { sets: sets.filter((s) => s.level > 0.001).length, pieces: nPieces, films: nFilms }
+    for (let g = 0; g < PIECE_GROUPS; g++) {
+      const o = g * 3
+      if (gw[g] > 1e-6) { this.groupPos[o] = gx[g] / gw[g]; this.groupPos[o + 1] = gy[g] / gw[g]; this.groupPos[o + 2] = gw[g] }
+      else this.groupPos[o + 2] = 0 // empty : it keeps its last place, silent
+    }
   }
 
   /** The voice switched off, or Sonify stopped : silence and release everything. */
@@ -539,6 +617,8 @@ export class CollageVoice {
     this.retiring = []
     for (const [k, d] of this.decks) this.dropDeck(k, d)
     try { this.bus.disconnect() } catch { /* already gone */ }
+    try { this.out.disconnect() } catch { /* already gone */ }
+    this.groupCount.fill(0)
     this.status = { sets: 0, pieces: 0, films: 0 }
   }
 }

@@ -61,6 +61,12 @@
 //   /opsia/output/flipx|flipy                           >= 0.5
 //   /opsia/output/edge                                  i index | f 0..1 | s black|repeat|mirror
 //   /opsia/output/reset                                 trigger (back to the frame as it is)
+//   /opsia/space/mode                                   i index | f 0..1 | s stereo|speakers|objects
+//   /opsia/space/turn|glide                             f 0..1 (turn : -180..180, 0.5 = none; glide 0..2 s)
+//   /opsia/space/mirror|headphones                      >= 0.5
+//   /opsia/space/pieces                                 i count | f 0..1 (of 30) : Collage pieces as sources
+//   /opsia/space/{voice}/az|el|width|span|spin          f 0..1 over the field's range (az 0.5 = 0)
+//   /opsia/space/{voice}/follow                         >= 0.5 (follow the picture, else fixed)
 //   /opsia/panic                                        trigger (flush self-feeding buffers)
 //   /opsia/vary                                         trigger (the Transport's Vary, at its spread)
 //   /opsia/surface x y                                  two 0..1 floats : the Metasurface cursor
@@ -91,6 +97,7 @@ import { fireTrigger, randIntensity } from './midi'
 import { OUT_EDGES, OUTX_MOD_RANGE, type OutXformField } from '@shared/outXform'
 import { GENERATORS, SHADER_BY_ID } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
+import { SPACE_FIELDS, SPACE_FIELD_RANGE, SPACE_PIECES, SPACE_VOICES, placeField, placePatch, type SpaceField, type SpaceMode, type SpaceVoice } from '@shared/spatial'
 import { audioBus, type AudioFeatureName } from './engine/audioIn'
 import { visionBus, VISION_FEATURES } from './engine/visionIn'
 import { sequencerSkip } from './engine/sequencer'
@@ -828,6 +835,34 @@ function route(address: string, args: Args): void {
       return
     }
 
+    case 'space': {
+      // Space : where Sonify's voices sit in the room (shared/spatial.ts)
+      const a = segs[2]
+      if (a === 'mode') {
+        const m = enumFrom(args, ['stereo', 'speakers', 'objects'] as readonly SpaceMode[])
+        if (m) st.setSpace({ mode: m })
+        return
+      }
+      if (a === 'turn') { st.setSpace({ rotate: -180 + clamp01(n) * 360 }); return }
+      if (a === 'glide') { st.setSpace({ glide: clamp01(n) * 2 }); return }
+      if (a === 'mirror') { st.setSpace({ mirror: n >= 0.5 }); return }
+      if (a === 'headphones') { st.setSpace({ preview: n >= 0.5 }); return }
+      if (a === 'pieces') {
+        st.setSpace({ pieces: args[0]?.type === 'i' ? Math.round(n) : Math.round(clamp01(n) * SPACE_PIECES) })
+        return
+      }
+      if ((SPACE_VOICES as readonly string[]).includes(a)) {
+        const voice = a as SpaceVoice
+        const f = segs[3]
+        if (f === 'follow') { st.setSpaceVoice(voice, { follow: n >= 0.5 }); return }
+        if ((SPACE_FIELDS as string[]).includes(f)) {
+          const r = SPACE_FIELD_RANGE[f as SpaceField]
+          st.setSpaceVoice(voice, placePatch(f as SpaceField, r.min + clamp01(n) * (r.max - r.min)))
+        }
+      }
+      return
+    }
+
     case 'output': {
       // The output transform : the whole frame moved as one picture.
       const ctl = segs[2]
@@ -1252,6 +1287,23 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/output/flipy', 0, 1, ox.flipY ? 1 : 0, 'Output transform : flip y (>= 0.5)')
     add('/opsia/output/edge', 0, 1, OUT_EDGES.indexOf(ox.edge) / 2, 'Output transform : edge (black · repeat · mirror)')
     add('/opsia/output/reset', 0, 1, 0, 'Output transform : back to the frame as it is (trigger)', false)
+  }
+  {
+    const sp = st.space
+    add('/opsia/space/mode', 0, 1, ['stereo', 'speakers', 'objects'].indexOf(sp.mode) / 2, 'Space : stereo · speakers · objects')
+    add('/opsia/space/turn', 0, 1, (sp.rotate + 180) / 360, 'Space : turn the sound scene (0.5 = none)')
+    add('/opsia/space/glide', 0, 1, sp.glide / 2, 'Space : glide of a following voice (0..2 s)')
+    add('/opsia/space/mirror', 0, 1, sp.mirror ? 1 : 0, 'Space : swap left and right (>= 0.5)')
+    add('/opsia/space/headphones', 0, 1, sp.preview ? 1 : 0, 'Space : hear the room on headphones (>= 0.5)')
+    add('/opsia/space/pieces', 0, 1, sp.pieces / SPACE_PIECES, 'Space : Collage pieces as sources of their own (int count, or 0..1 of 30)')
+    for (const v of SPACE_VOICES) {
+      const pl = sp.voices[v]
+      add(`/opsia/space/${v}/follow`, 0, 1, pl.follow ? 1 : 0, `Space : ${v} follows the picture (>= 0.5), else fixed`)
+      for (const f of SPACE_FIELDS) {
+        const r = SPACE_FIELD_RANGE[f]
+        add(`/opsia/space/${v}/${f}`, 0, 1, (placeField(pl, f) - r.min) / (r.max - r.min), `Space : ${v} ${r.label} (${r.min}..${r.max})`)
+      }
+    }
   }
   add('/opsia/surface', 0, 1, st.surface.x, 'Metasurface cursor X (send x y together; turns it on)')
   add('/opsia/surface/active', 0, 1, st.surface.active ? 1 : 0, 'Enable the Metasurface (>= 0.5)')

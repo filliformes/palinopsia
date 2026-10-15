@@ -18,6 +18,13 @@ import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { SonifyKeySequencer } from './SonifyKeySequencer'
 import { AudioOutputSelect } from './AudioOutputSelect'
 import { SpacePanel } from './SpacePanel'
+import { SPACE_FIELD_RANGE, SPACE_VOICE_LABEL, parseSpaceModParam } from '@shared/spatial'
+
+/** A Space parameter's name in the assign panel ("Orbit azimuth in the room"). */
+function spaceLabel(param: string): string {
+  const p = parseSpaceModParam(param)
+  return p ? `${SPACE_VOICE_LABEL[p.voice]} ${SPACE_FIELD_RANGE[p.field].label} in the room` : param
+}
 import { EqCard } from './SonifyEq'
 import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, CardGrip, useCardSpace, spaceGap, SUB_GAP, chip, pill } from './sonifyUi'
 import { SONI_RATES, RATE_LABEL } from '../audio/soniClock'
@@ -258,7 +265,7 @@ function ModChip({ param, open, onOpen, inactive = false }: {
   )
 }
 
-const PARAM_LABELS: Record<SonifyModParam, string> = {
+const PARAM_LABELS: Partial<Record<SonifyModParam, string>> = {
   spectraX: 'Spectra scan column', filterX: 'Filter scan column',
   orbitX: 'Orbit center x', orbitY: 'Orbit center y', orbitR: 'Orbit radius', orbitPitch: 'Orbit pitch',
   rasterX: 'Raster rect x', rasterY: 'Raster rect y', rasterW: 'Raster rect width', rasterH: 'Raster rect height',
@@ -296,7 +303,7 @@ function AssignMini({ param, onClose }: { param: SonifyModParam; onClose: () => 
     <section className="rounded border border-accent/40 bg-panel2 px-2 py-1.5">
       <div className="mb-1 flex items-center gap-2">
         <span className="text-[10px] font-semibold">modulate</span>
-        <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted">{PARAM_LABELS[param]}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted">{PARAM_LABELS[param] ?? spaceLabel(param)}</span>
         <button onClick={onClose} className="text-[11px] text-muted hover:text-text" title="Close">x</button>
       </div>
       <div className="flex items-center gap-1.5">
@@ -1116,7 +1123,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             </div>
           )}
           {/* The sequencers have their own view (they used to sit under the mixer). */}
-          {view === 'space' && <SpacePanel />}
+          {view === 'space' && <SpacePanel chip={(p) => chip(p)} />}
           {view === 'seq' && (
             <div className="flex flex-col gap-2.5">
               <SonifySequencer presets={presetList} onWidth={onSeqWidth} />

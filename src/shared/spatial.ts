@@ -35,6 +35,40 @@ export const SPACE_VOICES = ['spectra', 'orbit', 'flow', 'events', 'raster', 'ss
 export type SpaceVoice = (typeof SPACE_VOICES)[number]
 export const SPACE_FX = SPACE_VOICES.length // the FX tail's return : source 10
 export const SPACE_SOURCES = SPACE_VOICES.length + 1
+/** Collage pieces as sources of their own : the Collage voice's films arrive on
+ *  the worklet's input 1 as the stereo bus (channels 0-1) and up to this many
+ *  mono piece groups (channels 2-31). Sources 11.. in the matrix. */
+export const SPACE_PIECES = 30
+export const SPACE_PIECE0 = SPACE_SOURCES
+export const SPACE_SRC_ALL = SPACE_SOURCES + SPACE_PIECES
+
+/** What a modulator, a Meta knob or OSC can move on a voice's place. `span`
+ *  sets both spreads; az is an offset while the voice follows the picture. */
+export type SpaceField = 'az' | 'el' | 'width' | 'span' | 'spin'
+export const SPACE_FIELDS: SpaceField[] = ['az', 'el', 'width', 'span', 'spin']
+export const SPACE_FIELD_RANGE: Record<SpaceField, { min: number; max: number; def: number; label: string }> = {
+  az: { min: -180, max: 180, def: 0, label: 'azimuth' },
+  el: { min: -15, max: 90, def: 30, label: 'elevation' },
+  width: { min: 0, max: 180, def: 60, label: 'width' },
+  span: { min: 0, max: 1, def: 0.08, label: 'span' },
+  spin: { min: -360, max: 360, def: 0, label: 'spin' }
+}
+export type SpaceModParam = `space.${SpaceVoice}.${SpaceField}`
+export const spaceModParam = (v: SpaceVoice, f: SpaceField): SpaceModParam => `space.${v}.${f}`
+export function parseSpaceModParam(p: string): { voice: SpaceVoice; field: SpaceField } | null {
+  const m = /^space\.([a-z]+)\.([a-z]+)$/.exec(p)
+  if (!m) return null
+  const voice = m[1] as SpaceVoice, field = m[2] as SpaceField
+  return (SPACE_VOICES as readonly string[]).includes(voice) && SPACE_FIELDS.includes(field) ? { voice, field } : null
+}
+/** A place's value for a field (span reads the horizontal spread). */
+export function placeField(p: VoicePlace, f: SpaceField): number {
+  return f === 'span' ? p.hspan : p[f]
+}
+/** The patch that sets a field (span sets both spreads). */
+export function placePatch(f: SpaceField, v: number): Partial<VoicePlace> {
+  return f === 'span' ? { hspan: v, vspan: v } : f === 'az' ? { az: wrap180(v) } : { [f]: v }
+}
 
 export const SPACE_VOICE_LABEL: Record<SpaceVoice, string> = {
   spectra: 'Spectra', orbit: 'Orbit', flow: 'Flow', events: 'Events', raster: 'Raster',
@@ -83,6 +117,8 @@ export interface SpaceConfig {
   subLevel: number // 0..1 : the low end sent to the subwoofers
   subXover: number // Hz
   glide: number // seconds : how softly a followed voice moves
+  preview: boolean // headphones : the speakers (or objects) rendered binaurally to stereo
+  pieces: number // 0 = off; else the Collage pieces as up to this many sources of their own
   voices: Record<SpaceVoice, VoicePlace>
 }
 
@@ -122,6 +158,8 @@ export function defaultSpaceConfig(): SpaceConfig {
     subLevel: 0.5,
     subXover: 90,
     glide: 0.25,
+    preview: false,
+    pieces: 0,
     voices: defaultVoicePlaces()
   }
 }
@@ -188,6 +226,8 @@ export function sanitizeSpaceConfig(raw: unknown): SpaceConfig {
     subLevel: num(r.subLevel, d.subLevel, 0, 1),
     subXover: num(r.subXover, d.subXover, 40, 200),
     glide: num(r.glide, d.glide, 0, 2),
+    preview: !!r.preview,
+    pieces: Math.round(num(r.pieces, d.pieces, 0, SPACE_PIECES)),
     voices: sanitizeVoicePlaces(r.voices)
   }
 }

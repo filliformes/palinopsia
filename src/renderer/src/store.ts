@@ -283,8 +283,13 @@ function loadSpace(): SpaceConfig {
   }
   return sanitizeSpaceConfig(null)
 }
+// Saved a moment after the last change : OSC and the sliders move it often.
+let spaceSave = 0
 function persistSpace(c: SpaceConfig): SpaceConfig {
-  try { localStorage.setItem('opsia.space', JSON.stringify(c)) } catch { /* quota */ }
+  window.clearTimeout(spaceSave)
+  spaceSave = window.setTimeout(() => {
+    try { localStorage.setItem('opsia.space', JSON.stringify(c)) } catch { /* quota */ }
+  }, 300)
   return c
 }
 function loadDome(): DomeConfig {

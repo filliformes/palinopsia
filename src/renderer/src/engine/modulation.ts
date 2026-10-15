@@ -19,6 +19,7 @@ import { bodyBus } from './bodyIn'
 import { BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
 import { DOME_MOD_RANGE, type DomeModField } from '@shared/dome'
 import { OUTX_MOD_RANGE, type OutXformField } from '@shared/outXform'
+import { SPACE_FIELDS, SPACE_FIELD_RANGE, SPACE_VOICES } from '@shared/spatial'
 
 const TWO_PI = Math.PI * 2
 // The 60fps reference frame time (ms). The picture / audio one-pole followers
@@ -1019,11 +1020,24 @@ export const SONIFY_MOD_DESCS: Record<string, { min: number; max: number; def: n
   fxReverb: { min: 0, max: 1, def: 0.6 },
   fxDelay: { min: 0, max: 1, def: 0.35 }
 }
+// Space : each voice's place (space.<voice>.<field>), in the same overlay. The
+// space engine reads the values and registers the bases (store.space).
+for (const v of SPACE_VOICES)
+  for (const f of SPACE_FIELDS) {
+    const r = SPACE_FIELD_RANGE[f]
+    // azimuth goes round : a modulator gets two full turns (the engine wraps
+    // them), so a sweep spins a voice round the room instead of stopping at 180
+    SONIFY_MOD_DESCS[`space.${v}.${f}`] = f === 'az' ? { min: -360, max: 360, def: 0 } : { min: r.min, max: r.max, def: r.def }
+  }
 export const sonifyModValues = new Map<string, number>()
 // The engine registers a getter for each param's BASE value (swing centre).
 export let sonifyModBase: ((param: string) => number | undefined) | null = null
 export function registerSonifyModBase(fn: (param: string) => number | undefined): void {
   sonifyModBase = fn
+}
+let spaceModBase: ((param: string) => number | undefined) | null = null
+export function registerSpaceModBase(fn: (param: string) => number | undefined): void {
+  spaceModBase = fn
 }
 
 function liveKey(t: import('@shared/types').ModTarget): string {
@@ -1427,12 +1441,17 @@ export function applyModulation(
     if (a.target.kind === 'sonify') {
       const d = SONIFY_MOD_DESCS[a.target.param]
       if (!d) continue
-      const stored = sonifyModBase?.(a.target.param)
-      const final = inputValueForMode(
-        { type: 'float', min: d.min, max: d.max, def: d.def },
-        stored, v, a.depth, a.mode
-      )
-      if (final === null || typeof final !== 'number') continue
+      const stored = a.target.param.startsWith('space.') ? spaceModBase?.(a.target.param) : sonifyModBase?.(a.target.param)
+      // A voice's azimuth goes round : a turn of ±180° × depth around its place,
+      // never clamped (depth 1 = once round, more = more turns; the space engine
+      // wraps it). Clamped like any other range, a sweep stopped at the back.
+      const final = a.target.param.startsWith('space.') && a.target.param.endsWith('.az')
+        ? (stored ?? 0) + (v * 2 - 1) * 180 * a.depth
+        : inputValueForMode(
+          { type: 'float', min: d.min, max: d.max, def: d.def },
+          stored, v, a.depth, a.mode
+        )
+      if (final === null || typeof final !== 'number' || !Number.isFinite(final)) continue
       sonifyModValues.set(a.target.param, final)
       liveModValues.set(liveKey(a.target), final)
       continue

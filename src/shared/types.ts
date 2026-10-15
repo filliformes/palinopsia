@@ -635,6 +635,8 @@ export type SonifyModParam =
   | 'collageReso' | 'collageRing' | 'collageWidth'
   | 'collageBank' | 'collageDecay' | 'collageCutoff' | 'collageWaves' | 'collageDetune' | 'chordWaves' | 'chordNoise' | 'chordAir'
   | 'fxSend' | 'fxReverb' | 'fxDelay'
+  // Space : where each voice sits in the room (shared/spatial.ts)
+  | import('./spatial').SpaceModParam
 export const SONIFY_MOD_PARAMS: SonifyModParam[] = [
   'spectraX', 'filterX', 'orbitX', 'orbitY', 'orbitR', 'orbitPitch',
   'rasterX', 'rasterY', 'rasterW', 'rasterH', 'rasterPitch',

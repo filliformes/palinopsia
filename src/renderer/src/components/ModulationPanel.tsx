@@ -869,7 +869,7 @@ function MatrixSummary(): JSX.Element {
       const name = composition.metaKnobs[t.knob]?.name ?? `Knob ${t.knob + 1}`
       return `META K${t.knob + 1} (${name})`
     }
-    if (t.kind === 'sonify') return `SONIFY ${t.param}`
+    if (t.kind === 'sonify') return t.param.startsWith('space.') ? `SPACE ${t.param.slice(6).replace('.', ' ')}` : `SONIFY ${t.param}`
     if (t.kind === 'layer') {
       // `vary` is a trigger, so it is named as one : the row fires on a
       // crossing rather than holding a value, which the panel should not hide.
