@@ -48,6 +48,15 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
     ]
   },
   {
+    title: 'In Sonify',
+    rows: [
+      ['⇧ drag a slider', 'Finer : a tenth of the speed'],
+      ['Click a value', "Type it (the Collage's levels and filters, the Ring cutoff, the Prism crossover : 4250, 4.2k, -6)"],
+      ['Drag an EQ point', 'Frequency across, gain up and down · wheel : Q · double-click : band on / off · Delete : band off'],
+      ['Drag a Space number', 'Up / down to change it · drag a voice on the Room map to place it']
+    ]
+  },
+  {
     title: 'Session & zoom',
     rows: [
       ['Ctrl S', 'Save session'],

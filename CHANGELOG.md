@@ -326,6 +326,13 @@ that CI builds into cross-platform releases.
   stay out of the media keys and Now Playing; the release notes get their intro, the
   older-sessions note, the install table, the notes on the 32 channels and the venue,
   and the developer notes for Space. The site's "New in 1.2.8" waits for the release.
+- **The documentation catches up with the late 1.2.8 work** : the cheat-sheet (`?`) and
+  the README's shortcuts get the Sonify gestures (Shift-drag, typed values, the EQ's
+  points, the Space drags); the README's contents name the 18 scales and the glue, the
+  Chord's voices, noise and air join the Sonify modulation targets, and its OSC list
+  gains the glue, the key sequencer and the scale by name; a brand name leaves the
+  release notes. The site's "New in 1.2.8" (held for the release) names the comp, the
+  glue, the 18 scales, the Chord's modulated voices and the Picture that follows.
 
 ## v1.2.7 — 2026-10-13
 

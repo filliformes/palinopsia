@@ -60,7 +60,7 @@ Lowercase's slant, each straight from its Space theme. The older shots stay in
 - [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix)
 - [Sequencer](#sequencer-key-q) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) · [Output & mapping](#output--mapping-key-o) : **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
-- [Sonify : image to sound](#sonify--image-to-sound-key-s) : ten voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Signal · Chord · Collage) · quantizer · output EQ · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
+- [Sonify : image to sound](#sonify--image-to-sound-key-s) : ten voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Signal · Chord · Collage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
@@ -212,6 +212,15 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `?` | Keyboard **cheat-sheet** : this table, in-app (Esc closes) |
 | `0` | **Panic flush** : clear every self-feeding buffer (feedback / trails / rings / accumulators) at once |
 | `Esc` | Close the cheat-sheet, then MIDI Learn; otherwise close Resolume / World / Sonify / Body / Output / Sequence. On a **fullscreen output** over the control window (not an installation), a tap of `Esc` closes the output itself; on any other output it hands focus back to the controls |
+
+In **Sonify** (also in the cheat-sheet) :
+
+| Gesture | Action |
+|---|---|
+| `Shift`+drag a slider | Finer : a tenth of the speed, from where the drag starts |
+| Click a value | Type it : the Collage's films in, hp, lp, ring in and Ring cutoff, the Prism crossover (`4250`, `4.2k`, `off`, `-6`) |
+| Drag an output-EQ point | Frequency across, gain up and down; the wheel sets its Q, a double-click switches its band, `Delete` turns the selected band off |
+| Drag a Space number | Up or down to change it; drag a voice's dot on the Room map to place it |
 | `Ctrl/Cmd+Z` · `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` | Undo · Redo (100 levels) |
 | `Ctrl/Cmd+S` | Save session |
 | `Ctrl/Cmd+F` | **Fulldome** output on / off (a toast says which) |
@@ -1307,8 +1316,8 @@ probes are kept. Deterministic : the same session always suggests the same setup
 
 **Fully integrated** : not just every probe and pitch (scan columns, orbit centre/
 radius/pitch, the raster rect and its pitch) but **most timbre & motion params** : Spectra gain/contrast/sweep/breath, orbit drive/smooth, flow grain/colour, events
-decay, raster smooth/tone, SSTV line/transpose, filter resonance/sweep, chord tone/
-spread/swell/waves, the Collage voice's resonance/ring/width and its Ring bank's
+decay, raster smooth/tone, SSTV line/transpose, filter resonance/sweep, chord voices/
+tone/spread/swell/waves/noise/air, the Collage voice's resonance/ring/width and its Ring bank's
 wet/decay/cutoff/waves/detune, the FX send/reverb/delay, and where every voice sits in
 the room ([Space](#space--the-voices-in-the-room) : az, el, width, span, spin) : are **modulation targets**. Bind M1–M8
 or a Meta knob via the M chips on the Sonify strips, and the mod-matrix stirs the
@@ -1319,7 +1328,9 @@ machine-local). And the whole page speaks **OSC** under `/opsia/sonify/…`
 (on/master/root/**rootoct**/scale + per-voice on·gain·pan·probes·pitches·params,
 the **Signal** voice `/signal/{on,gain,pan,wave,decay,tone,fm,heads,rate,sync,steps,spread,thresh,density,path,snap}`, the **Chord** bank, the **Collage** voice `/collage/{on,gain,resonance,ring,harmonics,width,input,hp,lp,hpslope,lpslope,comp,ringin}` and its Ring bank `/collage/{bank,send,decay,choke,cutoff,peak,slope,tone,tilt,waves,wavesrate,wavessync,noise,noiserate,noisesync,detune,voicing}`, the Chord's `/chord/{waves,wavesrate,wavessync,noise,air}`, and the **FX** tail `/fx/{send,delaytime,feedback,size,decay,
 damp,reverbmode,freeze,…}`, plus the taps `/tap/{a,b}` (0 master, 1-4 a layer), each
-voice's `/tap` and `/looct` `/hioct`, `/spectra/sync`, `/orbit/shape`, `/filter/loop`) :
+voice's `/tap` and `/looct` `/hioct`, `/spectra/sync`, `/orbit/shape`, `/filter/loop`, the
+output **glue** `/glue/{on,amount,voice}` and the key sequencer `/keyseq/{on,next,mode,glide,chance,range,hold}`;
+`/scale` takes a name (`harmonic minor`, `dimwh`) or an index, the first eight as they always were) :
 advertised over OSCQuery and streamed outbound like everything else. Index addresses
 (the root octave, the reading paths, the Orbit shape, the chord's voices, the delay and
 events modes, the octaves) are advertised and sent as **integers** and read raw; a
