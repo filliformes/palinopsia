@@ -14,7 +14,11 @@ that CI builds into cross-platform releases.
     now 0, 0, 0) : each note's level and pan ramp sample by sample instead of stepping once
     a block; a smaller count fades the notes it leaves out (30 ms) instead of cutting
     them, and the notes that stay glide to their new pitch (60 ms); `setChordFreqs` takes
-    both the config's and the modulator's counts.
+    both the config's and the modulator's counts. (Its first version also zeroed a RISING note
+    under 0.003, which kept quiet bands from ever starting and the whole Chord silent at
+    swell >= 0.9 s : the floor now applies only to a note fading out; measured, the
+    levels are v1.2.8's to the tenth of a dB. And the spread's centre is searched within
+    [-1, 1] : at a hard voice pan it drifted to the edge and snapped back to 0.)
   - **A voice switching off rang its mixer filter's tail out abruptly** : the engine
     stopped running a voice the moment its fade ended, cutting the filter's ring (a step
     at off, and another at the next on from its stale state, on any voice whose mixer

@@ -1754,7 +1754,9 @@ class SoniProcessor extends AudioWorkletProcessor {
         let ctr = 0;
         if (spread > 1e-4 && W > 1e-12) {
           const T = W * Math.cos(Math.PI * panBase), hw = spread * 0.5; // the voice's own pan is the balance aimed at
-          let lo = -2, hi = 2;
+          // within [-1, 1] : at a hard voice pan every centre past the edge
+          // balances equally, and the search drifted out to ±2
+          let lo = -1, hi = 1;
           for (let it = 0; it < 12; it++) {
             const c = 0.5 * (lo + hi);
             let f = -T;
@@ -1770,7 +1772,7 @@ class SoniProcessor extends AudioWorkletProcessor {
         this.cCtrT = ctr;
       }
       this.cCtr += (this.cCtrT - this.cCtr) * (1 - Math.exp(-n * dt / 0.3));
-      if (!(Math.abs(this.cCtr) <= 1)) this.cCtr = 0; // NaN guard
+      if (this.cCtr !== this.cCtr) this.cCtr = 0; // NaN guard (only : ±1 is a valid centre)
       // the notes a smaller count left out fade out (30 ms), at their pitch and place
       const M = Math.max(N, Math.min(NCHORD, this.chordM));
       const dnOut = 1 - Math.exp(-n * dt / 0.03);
@@ -1782,7 +1784,11 @@ class SoniProcessor extends AudioWorkletProcessor {
         this.cW[i] = cw1;
         const tgt = gone ? 0 : this.cTarget[i], cur = this.cAmp[i];
         let a0 = cur + (tgt - cur) * (tgt > cur ? up : gone ? dnOut : dn);
-        if (!(a0 > 1e-12) || a0 < 0.003) a0 = 0; // NaN, denormals and the last whisper → 0
+        // NaN and denormals → 0; and a note FADING to silence ends at 0 rather than
+        // whispering on. Only on the way down : zeroing a rising note's first steps
+        // (under 0.003 while its target was higher) kept quiet bands from ever
+        // starting, and at swell >= 0.9 s the whole Chord silent (a5ca7f0).
+        if (!(a0 > 1e-12) || (a0 < 0.003 && tgt < 0.003)) a0 = 0;
         this.cAmp[i] = a0;
         if (a0 > 0 && gone) mLive = i + 1;
         if (a0 === 0 && !(cur > 0)) {
