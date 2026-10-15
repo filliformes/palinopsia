@@ -97,6 +97,12 @@ class SpaceEngine {
   points: SpacePoint[] = []
   /** How many Collage piece groups play as sources of their own now. */
   groups = 0
+  /** Every Collage piece playing now, where it sounds from : (az, el, level) ×
+   *  pieces (the page draws them as small dots around the Collage voice). */
+  pieceDots = new Float32Array(0)
+  pieceN = 0
+  // the Collage walls seen this tick (read once, used twice)
+  private sets: CollageSoundSet[] = []
   /** Why Space cannot play as set (shown on the page), or ''. */
   problem = ''
   /** Channels the current setup uses on the output. */
@@ -189,6 +195,28 @@ class SpaceEngine {
     // Collage voice's az offset, spin and span apply to them all)
     const gp = this.groups > 0 ? sonifyEngine.collageGroupPos() : null
     const cp = places[COLLAGE]
+    // every piece playing, for the map (no glide : they sit where their pieces are)
+    let n = 0
+    if (soni.on && soni.collage?.on) {
+      for (const set of this.sets) n += set.level > 0.001 ? set.pieces.length : 0
+      if (this.pieceDots.length < n * 3) this.pieceDots = new Float32Array(Math.max(n, 32) * 3)
+      let i = 0
+      for (const set of this.sets) {
+        if (set.level <= 0.001) continue
+        for (const pc of set.pieces) {
+          if (pc.keep <= 0.001) continue
+          const d = pictureToDirection(pc.x, 1 - pc.y, dome, aspect, spinDeg, flat) // pieces are GL (y up)
+          let az = d.az + cp.az + this.spin[COLLAGE]
+          if (cfg.mirror) az = -az
+          this.pieceDots[i * 3] = wrap180(az + cfg.rotate)
+          this.pieceDots[i * 3 + 1] = d.el
+          this.pieceDots[i * 3 + 2] = set.level * pc.keep
+          i++
+        }
+      }
+      n = i
+    }
+    this.pieceN = n
     for (let j = 0; j < this.groups; j++) {
       const s = SPACE_PIECE0 + j
       const w = gp ? gp[j * 3 + 2] : 0
@@ -236,6 +264,7 @@ class SpaceEngine {
     // Collage : the pieces it plays, weighted by how much each wall shows
     try {
       const sets = comp.collageSounds?.() ?? []
+      this.sets = sets
       let sx = 0, sy = 0, sw = 0
       for (const s of sets)
         for (const pc of s.pieces) {
@@ -416,6 +445,20 @@ class SpaceEngine {
     if (this.on) sonifyEngine.setSpace({ t: 'space', on: false, nch: 0 })
     this.on = false
     this.sentKey = ''
+  }
+
+  /** A place seen in the room (after the turn, the mirror and the voice's spin)
+   *  back to the azimuth the voice stores : the Room map drags with it. */
+  storedAz(v: number, roomAz: number): number {
+    const cfg = useStore.getState().space
+    let a = wrap180(roomAz - cfg.rotate)
+    if (cfg.mirror) a = -a
+    return wrap180(a - (this.spin[v] ?? 0))
+  }
+
+  /** A voice set down by hand : it jumps there (no glide). */
+  snap(v: number): void {
+    this.hasDir[v] = 0
   }
 
   /** The layout the speakers mode is using now (for the page's map). */

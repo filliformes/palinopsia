@@ -4,7 +4,7 @@
 // middle, the front at the bottom), and where each voice sits.
 // Engine : audio/space.ts. Conventions and panning : shared/spatial.ts.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import { useStore } from '../store'
 import { sonifyEngine } from '../audio/sonify'
 import { spaceEngine } from '../audio/space'
@@ -24,6 +24,7 @@ import {
   placeField,
   placePatch,
   spaceModParam,
+  wrap180,
   type SpaceMode,
   type SpaceVoice
 } from '@shared/spatial'
@@ -42,8 +43,13 @@ const MODE_HINT: Record<SpaceMode, string> = {
 const HUES = [28, 200, 120, 330, 52, 265, 175, 0, 300, 90]
 const voiceColor = (s: number, a = 1): string => (s === SPACE_FX ? `rgba(160,160,160,${a})` : `hsla(${HUES[s]},80%,60%,${a})`)
 
-/** `chip` : Sonify's own M button (the page's assign panel opens above). */
-export function SpacePanel({ chip: modChip }: { chip?: (p: SonifyModParam) => JSX.Element }): JSX.Element {
+/** `chip` : Sonify's own M button; `assign` / `renderAssign` : the page's assign
+ *  box, shown right under the voice whose M was clicked. */
+export function SpacePanel({ chip: modChip, assign, renderAssign }: {
+  chip?: (p: SonifyModParam) => JSX.Element
+  assign?: string | null
+  renderAssign?: (p: SonifyModParam) => JSX.Element
+}): JSX.Element {
   const space = useStore((s) => s.space)
   const setSpace = useStore((s) => s.setSpace)
   const setVoice = useStore((s) => s.setSpaceVoice)
@@ -103,18 +109,29 @@ export function SpacePanel({ chip: modChip }: { chip?: (p: SonifyModParam) => JS
           <Seg<SpaceMode> options={['stereo', 'speakers', 'objects']} value={space.mode} onChange={(m) => setSpace({ mode: m })} title={(m) => MODE_HINT[m]} />
         </Row>
         {on && (
+          <Row label="hear on" hint="Headphones : every channel (each speaker of the layout, or each object at its place) is placed around your head (binaural, through the HRTF) and played in stereo on Sonify's output. The output : the channels go out as they are, to a multichannel sound card or a Dante Virtual Soundcard.">
+            <Seg
+              options={['headphones', 'output'] as const}
+              value={space.preview ? 'headphones' : 'output'}
+              onChange={(v) => setSpace({ preview: v === 'headphones' })}
+              label={(v) => (v === 'headphones' ? '🎧 headphones' : `the output (${outCh} ch)`)}
+              title={(v) => (v === 'headphones' ? 'Hear the room in stereo, around your head' : 'Send the channels to the output device as they are')}
+            />
+          </Row>
+        )}
+        {on && (
           <div className="pl-[62px] font-mono text-[9px] leading-snug text-muted">
-            {spaceEngine.problem ? (
-              <span className="text-[rgb(var(--c-danger))]">{spaceEngine.problem}</span>
+            {space.preview ? (
+              <>{spaceEngine.channels} channels heard around your head, in stereo on Sonify's output.</>
+            ) : spaceEngine.problem ? (
+              <>
+                <span className="text-[rgb(var(--c-danger))]">{spaceEngine.problem}</span>
+                {outCh <= 2 && spaceEngine.channels > outCh && (
+                  <button onClick={() => setSpace({ preview: true })} className={`${chip(false)} ml-1`} title="Hear the room in stereo, around your head (binaural)">🎧 hear it on headphones</button>
+                )}
+              </>
             ) : (
-              space.preview ? (
-                <>{spaceEngine.channels} channels, heard on headphones (two channels out)</>
-              ) : (
-                <>
-                  {spaceEngine.channels} channels on an output of {outCh}
-                  {outCh <= 2 && ' : pick a multichannel output in the bar above'}
-                </>
-              )
+              <>{spaceEngine.channels} channels on an output of {outCh}</>
             )}
           </div>
         )}
@@ -181,7 +198,6 @@ export function SpacePanel({ chip: modChip }: { chip?: (p: SonifyModParam) => JS
               <Stepper value={space.firstChannel} min={1} max={32} onChange={(v) => setSpace({ firstChannel: v })} title="The first output channel" />
               <span className="flex-1" />
               <button onClick={() => setSpace({ mirror: !space.mirror })} className={chip(space.mirror)} title="Swap left and right (a room or a renderer numbered the other way round)">mirror</button>
-              <button onClick={() => setSpace({ preview: !space.preview })} className={chip(space.preview)} title="Headphones : hear the room in stereo. Every channel (each speaker of the layout, or each object) is placed around your head (binaural, through the HRTF) and played on Sonify's output as two channels. Turn it off to send the channels to the speakers or the renderer.">🎧 headphones</button>
             </Row>
             <Row label="pieces" hint="The Collage voice's pieces as sources of their own : each piece (or, past the count, each group of nearby pieces) sounds where it is in the picture, on the dome. 0 : the voice is one pair like the others. As objects, each takes a channel after the voices.">
               <Stepper value={Math.min(space.pieces, pieceMax)} min={0} max={pieceMax} onChange={(v) => setSpace({ pieces: v })} title="How many Collage piece sources (0 = off)" />
@@ -204,20 +220,24 @@ export function SpacePanel({ chip: modChip }: { chip?: (p: SonifyModParam) => JS
       </Shell>
 
       {on && (
-        <Shell title="Room" hint="Seen like the domemaster : the zenith in the middle, the front at the bottom, the audience's right on the right; the rim is 15° under the horizon. Each voice is a dot (its left and right joined by a line, its span a halo); speakers light with their level." on open>
-          <SpaceMap />
+        <Shell title="Room" hint="Seen like the domemaster : the zenith in the middle, the front at the bottom, the audience's right on the right; the rim is 15° under the horizon. Each voice is a dot (its left and right joined by a line, its span a halo); the small pink dots are the Collage pieces playing; speakers light with their level. Drag a voice to place it (a voice that followed the picture stays where you put it)." on open>
+          <SpaceMap setVoice={setVoice} />
         </Shell>
       )}
 
       {on && (
-        <Shell title="Voices" hint="Where each voice sits. Follow : where it plays in the picture (az then turns it from there). Fixed : at az / el. Width : how far apart its own left and right are. Span : how big a patch of the room it fills. Spin : turns it around the zenith, degrees a second." on open>
+        <Shell title="Voices" hint="Where each voice sits. Follow : where it plays in the picture (az then turns it from there). Fixed : at az / el. Width : how far apart its own left and right are. Span : how big a patch of the room it fills. Spin : turns it around the zenith, degrees a second. Drag a number up or down to change it (Shift : finer), click it to type. Click a voice's name (▸) for its sliders, each with an M to bind a modulator or a Meta knob." on open>
+          <div className="font-mono text-[9px] text-muted">▸ a voice : its sliders, each with an <b>M</b> for a modulator or a Meta knob</div>
           <div className="flex items-center gap-1 font-mono text-[8px] uppercase text-muted">
             <span className="w-[62px] shrink-0" />
             <span className="w-[18px] shrink-0 text-center" title="Lit : the voice follows where it plays in the picture. Dark : a fixed place.">fol</span>
             {['az', 'el', 'width', 'span', 'spin'].map((h) => <span key={h} className="min-w-0 flex-1 text-center">{h}</span>)}
           </div>
           {SPACE_VOICES.map((v, i) => (
-            <VoiceRow key={v} voice={v} index={i} setVoice={setVoice} open={open === v} onOpen={() => setOpen(open === v ? null : v)} modChip={modChip} />
+            <VoiceRow
+              key={v} voice={v} index={i} setVoice={setVoice} open={open === v} onOpen={() => setOpen(open === v ? null : v)} modChip={modChip}
+              assignBox={assign && assign.startsWith(`space.${v}.`) && renderAssign ? renderAssign(assign as SonifyModParam) : null}
+            />
           ))}
         </Shell>
       )}
@@ -225,36 +245,36 @@ export function SpacePanel({ chip: modChip }: { chip?: (p: SonifyModParam) => JS
   )
 }
 
-function VoiceRow({ voice, index, setVoice, open, onOpen, modChip }: {
+function VoiceRow({ voice, index, setVoice, open, onOpen, modChip, assignBox }: {
   voice: SpaceVoice
   index: number
   setVoice: (v: SpaceVoice, p: Partial<import('@shared/spatial').VoicePlace>) => void
   open: boolean
   onOpen: () => void
   modChip?: (p: SonifyModParam) => JSX.Element
+  assignBox?: JSX.Element | null
 }): JSX.Element {
   const p = useStore((s) => s.space.voices[voice])
+  const bound = useStore((s) => s.composition.modMatrix.some((a) => a.target.kind === 'sonify' && a.target.param.startsWith(`space.${voice}.`)))
   const live = !!spaceEngine.points[index]?.live
-  const box = 'input w-full !px-0 text-center'
-  const cell = 'min-w-0 flex-1'
   const lk = (f: string): string => `soni:space.${voice}.${f}` // the live (modulated) value
   return (
     <>
     <div className={`flex items-center gap-1 ${live ? '' : 'opacity-60'}`}>
-      <button onClick={onOpen} className="flex w-[62px] shrink-0 items-center gap-1 text-left text-[10px] hover:text-accent" title={`${SPACE_VOICE_LABEL[voice]} : ${live ? 'playing' : 'off'}. Click : its sliders, each with an M to bind a modulator or a Meta knob`}>
+      <button onClick={onOpen} className={`flex w-[62px] shrink-0 items-center gap-0.5 text-left text-[10px] hover:text-accent ${open ? 'text-accent' : ''}`} title={`${SPACE_VOICE_LABEL[voice]} : ${live ? 'playing' : 'off'}. Click : its sliders, each with an M to bind a modulator or a Meta knob${bound ? ' (one is bound now)' : ''}`}>
+        <span className="w-2 shrink-0 text-[8px] text-muted">{open ? '▾' : '▸'}</span>
         <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: voiceColor(index) }} />
-        <span className="truncate">{SPACE_VOICE_LABEL[voice]}</span>
+        <span className="min-w-0 truncate">{SPACE_VOICE_LABEL[voice]}</span>
+        {bound && <span className="shrink-0 rounded bg-accent/25 px-0.5 font-mono text-[7px] text-accent">M</span>}
       </button>
       <button onClick={() => setVoice(voice, { follow: !p.follow })} className={`${chip(p.follow)} w-[18px] shrink-0 px-0 text-center`} title={p.follow ? 'Follows where it plays in the picture (click : a fixed place)' : 'At a fixed place (click : follow the picture)'}>
         {p.follow ? '◉' : '○'}
       </button>
-      <span className={cell}><BoundedNumberInput className={box} value={Math.round(p.az)} min={-180} max={180} integer liveKey={lk('az')} onChange={(v) => setVoice(voice, { az: v })} title={p.follow ? 'Azimuth added to where the picture puts it, degrees (clockwise)' : 'Azimuth, degrees : 0 front, 90 right, -90 left'} /></span>
-      <span className={`${cell} ${p.follow ? 'pointer-events-none opacity-40' : ''}`}>
-        <BoundedNumberInput className={box} value={Math.round(p.el)} min={-15} max={90} integer liveKey={lk('el')} onChange={(v) => setVoice(voice, { el: v })} title={p.follow ? 'While following, the picture sets the elevation' : 'Elevation, degrees : 0 the horizon, 90 the zenith'} />
-      </span>
-      <span className={cell}><BoundedNumberInput className={box} value={Math.round(p.width)} min={0} max={180} integer liveKey={lk('width')} onChange={(v) => setVoice(voice, { width: v })} title="Degrees between the voice's left and right" /></span>
-      <span className={cell}><BoundedNumberInput className={box} value={Math.round(p.hspan * 100)} min={0} max={100} integer onChange={(v) => setVoice(voice, { hspan: v / 100, vspan: v / 100 })} title="Span, % : how big a patch of the room the voice fills (0 = a point)" /></span>
-      <span className={cell}><BoundedNumberInput className={box} value={Math.round(p.spin)} min={-360} max={360} integer liveKey={lk('spin')} onChange={(v) => setVoice(voice, { spin: v })} title="Spin, degrees a second around the zenith (0 = still)" /></span>
+      <ScrubBox value={p.az} min={-180} max={180} perPx={1} wrap liveKey={lk('az')} onChange={(v) => setVoice(voice, { az: v })} title={p.follow ? 'Azimuth added to where the picture puts it, degrees (clockwise)' : 'Azimuth, degrees : 0 front, 90 right, -90 left'} />
+      <ScrubBox value={p.el} min={-15} max={90} perPx={0.5} liveKey={lk('el')} dim={p.follow} onChange={(v) => setVoice(voice, { el: v })} title={p.follow ? 'While following, the picture sets the elevation' : 'Elevation, degrees : 0 the horizon, 90 the zenith'} />
+      <ScrubBox value={p.width} min={0} max={180} perPx={1} liveKey={lk('width')} onChange={(v) => setVoice(voice, { width: v })} title="Degrees between the voice's left and right" />
+      <ScrubBox value={p.hspan * 100} min={0} max={100} perPx={0.5} onChange={(v) => setVoice(voice, { hspan: v / 100, vspan: v / 100 })} title="Span, % : how big a patch of the room the voice fills (0 = a point)" />
+      <ScrubBox value={p.spin} min={-360} max={360} perPx={2} liveKey={lk('spin')} onChange={(v) => setVoice(voice, { spin: v })} title="Spin, degrees a second around the zenith (0 = still)" />
     </div>
     {open && (
       // the voice's place as sliders, each with Sonify's M (a modulator or a Meta knob)
@@ -277,15 +297,122 @@ function VoiceRow({ voice, index, setVoice, open, onOpen, modChip }: {
             </div>
           )
         })}
+        {assignBox}
       </div>
     )}
     </>
   )
 }
 
-/** The room from inside, as the domemaster draws it. */
-function SpaceMap(): JSX.Element {
+/** A number box you can drag, like the Meta dials : up / down changes it
+ *  (Shift : finer); a click without moving types into it. */
+function ScrubBox({ value, min, max, perPx, wrap, dim, liveKey, onChange, title }: {
+  value: number
+  min: number
+  max: number
+  perPx: number // units per pixel of drag
+  wrap?: boolean // an angle : past one end comes back at the other
+  dim?: boolean
+  liveKey?: string
+  onChange: (v: number) => void
+  title: string
+}): JSX.Element {
+  const ref = useRef<HTMLSpanElement>(null)
+  const onPointerDown = (e: RPointerEvent<HTMLSpanElement>): void => {
+    if (e.button !== 0 || dim) return
+    const input = ref.current?.querySelector('input')
+    if (input && document.activeElement === input) return // typing : the box is a text box
+    e.preventDefault() // no focus yet : this may be a drag
+    const el = e.currentTarget
+    el.setPointerCapture(e.pointerId)
+    const y0 = e.clientY, v0 = value
+    let moved = false
+    const move = (ev: PointerEvent): void => {
+      const dy = y0 - ev.clientY
+      if (!moved && Math.abs(dy) < 3) return
+      moved = true
+      let v = v0 + dy * perPx * (ev.shiftKey ? 0.2 : 1)
+      v = wrap ? wrap180(v) : Math.max(min, Math.min(max, v))
+      onChange(Math.round(v))
+    }
+    const up = (): void => {
+      el.removeEventListener('pointermove', move)
+      el.removeEventListener('pointerup', up)
+      el.removeEventListener('pointercancel', up)
+      if (!moved && input) { input.focus(); input.select() }
+    }
+    el.addEventListener('pointermove', move)
+    el.addEventListener('pointerup', up)
+    el.addEventListener('pointercancel', up)
+  }
+  return (
+    <span ref={ref} onPointerDown={onPointerDown} className={`min-w-0 flex-1 ${dim ? 'pointer-events-none opacity-40' : 'cursor-ns-resize'}`} title={`${title} : drag up or down (Shift : finer), click to type`}>
+      <BoundedNumberInput className="input w-full !px-0 text-center" value={Math.round(value)} min={min} max={max} integer liveKey={liveKey} onChange={onChange} title={title} />
+    </span>
+  )
+}
+
+/** The room from inside, as the domemaster draws it. Drag a voice to place it. */
+function SpaceMap({ setVoice }: { setVoice: (v: SpaceVoice, p: Partial<import('@shared/spatial').VoicePlace>) => void }): JSX.Element {
   const ref = useRef<HTMLCanvasElement>(null)
+  // canvas pixels ↔ the room (the drawing's own geometry : rim at -15°)
+  const geom = (): { S: number; c: number; R: number; k: number; r: DOMRect } | null => {
+    const cv = ref.current
+    if (!cv) return null
+    const r = cv.getBoundingClientRect()
+    return { S: cv.width, c: cv.width / 2, R: cv.width * 0.46, k: cv.width / Math.max(1, r.width), r }
+  }
+  const at = (e: { clientX: number; clientY: number }): { x: number; y: number } | null => {
+    const g = geom()
+    return g ? { x: (e.clientX - g.r.left) * g.k, y: (e.clientY - g.r.top) * g.k } : null
+  }
+  const voiceAt = (x: number, y: number): number => {
+    const g = geom()
+    if (!g) return -1
+    let best = -1, bd = g.S * 0.05
+    spaceEngine.points.forEach((p, s) => {
+      if (s >= SPACE_VOICES.length) return // the FX return and the pieces stay put
+      const a = (p.az * Math.PI) / 180, rr = (g.R * (90 - p.el)) / 105
+      const d = Math.hypot(g.c + rr * Math.sin(a) - x, g.c + rr * Math.cos(a) - y)
+      if (d < bd) { bd = d; best = s }
+    })
+    return best
+  }
+  const placeAt = (v: number, x: number, y: number): void => {
+    const g = geom()
+    if (!g) return
+    const dx = x - g.c, dy = y - g.c
+    const el = Math.max(-15, Math.min(90, 90 - (Math.hypot(dx, dy) / g.R) * 105))
+    const az = Math.hypot(dx, dy) < 1e-6 ? 0 : (Math.atan2(dx, dy) * 180) / Math.PI
+    // a voice that followed the picture is set down where it is dropped
+    setVoice(SPACE_VOICES[v], { follow: false, az: Math.round(spaceEngine.storedAz(v, az)), el: Math.round(el) })
+    spaceEngine.snap(v)
+  }
+  const onDown = (e: RPointerEvent<HTMLCanvasElement>): void => {
+    const p = at(e)
+    if (!p) return
+    const v = voiceAt(p.x, p.y)
+    if (v < 0) return
+    const el = e.currentTarget
+    el.setPointerCapture(e.pointerId)
+    el.style.cursor = 'grabbing'
+    placeAt(v, p.x, p.y)
+    const move = (ev: PointerEvent): void => { const q = at(ev); if (q) placeAt(v, q.x, q.y) }
+    const up = (): void => {
+      el.style.cursor = ''
+      el.removeEventListener('pointermove', move)
+      el.removeEventListener('pointerup', up)
+      el.removeEventListener('pointercancel', up)
+    }
+    el.addEventListener('pointermove', move)
+    el.addEventListener('pointerup', up)
+    el.addEventListener('pointercancel', up)
+  }
+  const onHover = (e: RPointerEvent<HTMLCanvasElement>): void => {
+    if (e.buttons) return
+    const p = at(e)
+    e.currentTarget.style.cursor = p && voiceAt(p.x, p.y) >= 0 ? 'grab' : ''
+  }
   useEffect(() => {
     let raf = 0
     const rgb = (name: string): string => {
@@ -338,16 +465,22 @@ function SpaceMap(): JSX.Element {
         }
         g.globalAlpha = 1
       }
+      // the Collage pieces playing : small pink dots, brighter as they show more
+      const pd = spaceEngine.pieceDots
+      for (let i = 0; i < spaceEngine.pieceN; i++) {
+        const [x, y] = xy(pd[i * 3], pd[i * 3 + 1])
+        g.fillStyle = voiceColor(SPACE_VOICES.indexOf('collage'), 0.35 + 0.65 * Math.min(1, pd[i * 3 + 2]))
+        g.beginPath(); g.arc(x, y, S * 0.006, 0, Math.PI * 2); g.fill()
+      }
       // the voices : left — dot — right, with the span as a halo
       spaceEngine.points.forEach((p, s) => {
         if (s >= SPACE_SOURCES) {
-          // a Collage piece group : a small dot in the Collage's color
+          // a Collage piece group (a source of its own) : a pink ring
           if (!p.live) return
           const [x, y] = xy(p.az, p.el)
-          g.globalAlpha = 0.85
-          g.fillStyle = voiceColor(SPACE_VOICES.indexOf('collage'))
-          g.beginPath(); g.arc(x, y, S * 0.009, 0, Math.PI * 2); g.fill()
-          g.globalAlpha = 1
+          g.strokeStyle = voiceColor(SPACE_VOICES.indexOf('collage'), 0.9)
+          g.lineWidth = 2
+          g.beginPath(); g.arc(x, y, S * 0.014, 0, Math.PI * 2); g.stroke()
           return
         }
         const h = p.width * 0.5 * (st.mirror ? -1 : 1)
@@ -373,5 +506,5 @@ function SpaceMap(): JSX.Element {
     draw()
     return () => cancelAnimationFrame(raf)
   }, [])
-  return <canvas ref={ref} className="mx-auto aspect-square w-full max-w-[320px]" />
+  return <canvas ref={ref} onPointerDown={onDown} onPointerMove={onHover} className="mx-auto aspect-square w-full max-w-[320px]" style={{ touchAction: 'none' }} />
 }

@@ -1082,7 +1082,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             cfg.on ? '' : 'opacity-[0.65]'
           }`}
         >
-          {assign && <AssignMini param={assign} onClose={() => setAssign(null)} />}
+          {/* (a Space voice's assign box opens under that voice, in the space view) */}
+          {assign && !(view === 'space' && assign.startsWith('space.')) && <AssignMini param={assign} onClose={() => setAssign(null)} />}
           {view === 'mixer' && (
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-1.5 px-2">
@@ -1123,7 +1124,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             </div>
           )}
           {/* The sequencers have their own view (they used to sit under the mixer). */}
-          {view === 'space' && <SpacePanel chip={(p) => chip(p)} />}
+          {view === 'space' && <SpacePanel chip={(p) => chip(p)} assign={assign} renderAssign={(p) => <AssignMini param={p} onClose={() => setAssign(null)} />} />}
           {view === 'seq' && (
             <div className="flex flex-col gap-2.5">
               <SonifySequencer presets={presetList} onWidth={onSeqWidth} />

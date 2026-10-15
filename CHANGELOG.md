@@ -72,6 +72,22 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The output EQ's points drag again** (at any UI zoom). The editor turned the pointer
+  into canvas pixels with the device pixel ratio, but the UI zoom is a CSS zoom, under
+  which the canvas (sized from `clientWidth`) and the pointer disagree : every grab
+  landed beside its point, and only the wheel, which falls back to the selected band,
+  still worked. It now maps through the canvas's box on screen. Measured with real
+  mouse input at UI zoom 115 % : the 1 kHz bell dragged right and up came on at
+  1995 Hz, +9.7 dB; the wheel took its Q to 1.57.
+- **Space, easier to play** : the numbers in the voices' table drag (up / down, Shift
+  finer; a click types : 40 px up = +40° measured); a voice's dot drags on the Room
+  map (the Chord from the zenith to the right edge : fixed at 90°, 0°); the Collage
+  pieces playing show as small pink dots there (`spaceEngine.pieceDots`). "hear on :
+  headphones · the output" sits under the output (the headphones toggle was easy to
+  miss), and the too-few-channels warning offers headphones in one click. A voice's
+  name has a ▸, an M badge when something is bound, and its assign box opens right
+  under it (it opened at the top of the column, often scrolled away).
+
 - **The piled Collage walls draw in about half the GPU time, bit for bit the same
   picture.** With the FX before the shapes, torn, shaped and stacked walls tested
   every piece's outline at every pixel in both passes. Now the films-only pass skips

@@ -1356,19 +1356,30 @@ room, **mirror** swaps left and right, **glide** softens a voice that jumps. The
 map draws it all as the domemaster does (the zenith in the middle, the front at the
 bottom), with the speakers lit by their level.
 
-**Played, not only placed.** Click a voice's name : its place opens as five sliders
-(**az**, **el**, **width**, **span**, **spin**), each with Sonify's **M** to bind a modulator
-or a Meta knob, like any other Sonify parameter (the table shows the moving value).
+**By hand.** Every number in the voices' table **drags** : up or down (Shift : finer),
+or click it to type. On the **Room** map, **drag a voice's dot** where you want it in the
+room : its numbers follow (a voice that followed the picture is set down there, fixed).
+The **small pink dots** are the Collage pieces playing, each where it sounds from.
+
+**Played, not only placed.** Click a voice's name (**▸**) : its place opens as five
+sliders (**az**, **el**, **width**, **span**, **spin**), each with Sonify's **M** : click it
+and the box to choose a modulator (or a Meta knob), its depth and its mode opens right
+under the voice. A voice with something bound shows a small **M** beside its name, and
+the table shows the moving value.
 Azimuth goes round : a modulator or a knob gets two full turns that wrap, so a sweep
 spins a voice around the room instead of stopping at the back. Over **OSC** :
 `/opsia/space/{voice}/az · el · width · span · spin` (0..1 over each range; az 0.5 =
 straight ahead), `/follow` (≥ 0.5), and for the scene `/opsia/space/mode`, `/turn`,
 `/glide`, `/mirror`, `/headphones`, `/pieces` (all in OSCQuery).
 
-**🎧 headphones** hears the room in stereo : every channel (each speaker of the layout,
-or each object at its place) goes around your head through the HRTF (Chromium's own
-binaural panner) and leaves on Sonify's output as two channels. Prepare a dome piece at
-home, check a SpatGRIS scene before the venue, then switch it off to send the channels.
+**hear on : 🎧 headphones · the output.** Headphones hears the room in stereo : every
+channel (each speaker of the layout, or each object at its place) goes around your head
+through the HRTF (Chromium's own binaural panner) and leaves on Sonify's output as two
+channels, so any output (a laptop's, a pair of headphones) plays it. The output sends the
+channels as they are, to a multichannel sound card or a Dante Virtual Soundcard. Prepare a
+dome piece at home, check a SpatGRIS scene before the venue, then switch to the output.
+When the output has fewer channels than the setup, the page says so and offers
+headphones in one click.
 
 **Collage pieces** (0 to 30) : the Collage voice's pieces as sources of their own, each
 sounding where it is in the picture (on the dome, through the mapping) instead of the

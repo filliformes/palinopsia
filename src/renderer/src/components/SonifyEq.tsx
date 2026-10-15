@@ -358,11 +358,16 @@ function EqEditor({ onClose }: { onClose: () => void }): JSX.Element {
     return () => window.removeEventListener('keydown', onKey, true)
   }, [onClose])
 
+  // The pointer in the canvas's own pixels, through its box on screen : the UI
+  // zoom is a CSS zoom, under which clientWidth (what the canvas is sized from)
+  // and the pointer's coordinates disagree, so scaling by the device pixel ratio
+  // put every grab beside its point (only the wheel, which falls back to the
+  // selected band, kept working).
   const local = (e: { clientX: number; clientY: number }): { x: number; y: number; w: number; h: number } => {
     const cv = cvRef.current!
     const r = cv.getBoundingClientRect()
-    const dpr = window.devicePixelRatio || 1
-    return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr, w: cv.width, h: cv.height }
+    const kx = cv.width / Math.max(1, r.width), ky = cv.height / Math.max(1, r.height)
+    return { x: (e.clientX - r.left) * kx, y: (e.clientY - r.top) * ky, w: cv.width, h: cv.height }
   }
   const hit = (x: number, y: number, w: number, h: number): number => {
     const dpr = window.devicePixelRatio || 1
