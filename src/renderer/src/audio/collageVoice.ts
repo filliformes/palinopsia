@@ -40,6 +40,9 @@ const mediaUrlForPath = (path: string): string => `opsia-media://local/${encodeU
 // there is none (no sound, a failed copy) : the original plays meanwhile. Made
 // one at a time in the background, the whole pool as soon as the voice sees it.
 const audioCopy = new Map<string, string | null>()
+// Films with no sound at all : no player for them (one decoded the whole original
+// video, 15 to 36 Mbit/s, all show long, to play silence)
+const silentFilms = new Set<string>()
 const audioQueue: string[] = []
 let audioBusy = false
 async function pumpAudioCopies(): Promise<void> {
@@ -51,6 +54,7 @@ async function pumpAudioCopies(): Promise<void> {
       try {
         const r = await window.api.collageAudio(p)
         if (r?.ok && r.path) audioCopy.set(p, r.path)
+        else if (r?.ok && r.silent) silentFilms.add(p)
       } catch { /* the original keeps playing */ }
     }
   } finally {
@@ -345,10 +349,13 @@ export class CollageVoice {
     if (d && d.path !== path) {
       d.path = path
       if (d.spare) { this.killPlayer(d.spare); d.spare = null }
+      // (a waiting one replaced keeps its start : re-rolls faster than a film
+      // loads restarted the 1.5 s timeout for ever, the deck stuck on its old clip)
+      const waiting = !!d.next
       if (d.next) this.killPlayer(d.next)
       d.next = this.makePlayer(path, d.bus, 0)
       d.nextT = T
-      d.nextSince = this.ctx.currentTime
+      if (!waiting) d.nextSince = this.ctx.currentTime
     }
     if (!d) {
       const ctx = this.ctx
@@ -404,9 +411,13 @@ export class CollageVoice {
     // of an element's playbackRate restarts its pitch-keeping time-stretch, and
     // that clicks (measured : a click at each nudge, ~14 a second on a still
     // Collage). Drift is pulled in by a crossfaded re-sync past SEEK_S instead.
+    // A new speed (a modulated film speed) : an audible player is never re-rated
+    // (that clicks) but spliced to a fresh one at the new speed past 3 %; under
+    // that, the drift re-sync above takes it along at its next splice.
     const want = v.playbackRate
     if (want > 0.0625 && want <= 16 && Math.abs(a.playbackRate - want) > 0.01 * want) {
-      try { a.playbackRate = want } catch { /* out-of-band rate */ }
+      if (!audible) { try { a.playbackRate = want } catch { /* out-of-band rate */ } }
+      else if (Math.abs(a.playbackRate - want) > 0.03 * want) return false
     }
     if (a.paused) { if (p.started) p.pos0 = a.currentTime; void a.play().catch(() => {}) }
     p.started = true
@@ -616,7 +627,12 @@ export class CollageVoice {
           this.pieces.delete(k)
         }
         // a hard ceiling on chains still fading (each is ~9 audio nodes)
-        while (this.retiring.length > RETIRE_MAX) this.dropPiece(this.retiring.shift()!.p)
+        while (this.retiring.length > RETIRE_MAX) {
+          // the oldest goes : a 3 ms fade first (dropped mid-crossfade, it clicked)
+          const r = this.retiring.shift()!.p
+          try { r.xf.gain.cancelAndHoldAtTime(now + AHEAD); r.xf.gain.setTargetAtTime(0, now + AHEAD, 0.003) } catch { /* gone */ }
+          window.setTimeout(() => this.dropPiece(r), 60)
+        }
       }
       const shown = set.pieces.filter((pc) => pc.keep > 0.001 && set.decks[pc.deck]?.path && set.decks[pc.deck]?.el)
       if (!shown.length) continue
@@ -625,6 +641,7 @@ export class CollageVoice {
       for (const pc of shown) {
         if (deckKeys.has(pc.deck)) continue
         const dk = set.decks[pc.deck]
+        if (silentFilms.has(dk.path!)) continue // nothing to hear : no player
         const key = `${set.id}:${pc.deck}`
         const d = this.deckPlayer(key, dk.path!, dealt ? T : SWITCH_XF)
         this.bindVideo(d, dk.el)
@@ -676,12 +693,19 @@ export class CollageVoice {
         const n = notes.length
         const f0 = n ? notes[Math.min(n - 1, Math.round(r * (n - 1)))] : 220
         const panV = Math.max(-1, Math.min(1, (pc.x - 0.5) * 2 * cfg.width))
-        if (fresh && (dealt || handover)) {
-          // A deal's new piece starts AT its note and place (the crossfade is
-          // the transition, not a glide from wherever the chain began).
-          for (let h = 0; h < HARM.length; h++) p.bp[h].frequency.value = Math.min(nyq, f0 * HARM[h])
+        if (fresh) {
+          // A new piece starts AT its note, Q and place (silent then : it fades in).
+          // Left at Web Audio's defaults (350 Hz, Q 1, centre) it glided from
+          // there while fading in, a chirp at every piece that appeared.
+          for (let h = 0; h < HARM.length; h++) {
+            p.bp[h].frequency.value = Math.min(nyq, f0 * HARM[h])
+            p.bp[h].Q.value = Q
+            p.bpG[h].gain.value = wet * hw[h]
+          }
+          p.dry.gain.value = 1 - cfg.reso
           p.pan.pan.value = panV
-          p.inG.gain.value = norm * pc.keep * inLin
+          // a deal's or a handover's piece crossfades in (xf) at its level
+          if (dealt || handover) p.inG.gain.value = norm * pc.keep * inLin
         }
         for (let h = 0; h < HARM.length; h++) {
           glide(p, TG_F + h, p.bp[h].frequency, Math.min(nyq, f0 * HARM[h]), now)
@@ -701,11 +725,14 @@ export class CollageVoice {
         nPieces++
       })
     }
-    // Whatever is no longer shown fades out, then goes.
+    // Whatever is no longer shown fades out, then goes. The fade is AFTER the
+    // resonators (xf) : faded before them, the chain was dropped while they
+    // still rang (up to ~0.3 s at a high ring), a click on every hidden piece.
     for (const [k, p] of this.pieces) {
       if (p.used) continue
-      if (p.inG.gain.value > 0.001) glide(p, TG_IN, p.inG.gain, 0, now)
-      else { this.dropPiece(p); this.pieces.delete(k) }
+      fade(p.xf.gain, now, 0.06, 'out')
+      this.retiring.push({ p, until: now + AHEAD + 0.2 })
+      this.pieces.delete(k)
     }
     // A deal's outgoing pieces, once faded.
     if (this.retiring.length) {

@@ -4373,7 +4373,8 @@ export const useStore = create<StoreState>((set, get) => ({
       // Recall the scene's sound patch too (keep the local on-state + device).
       if (scene.sonify) {
         const cur = s.sonify
-        const next = { ...defaultSoniConfig(), ...(scene.sonify as Partial<SoniConfig>), on: cur.on, sinkId: cur.sinkId } as SoniConfig
+        // (and the room's EQ and glue : they tune the room, not the patch, like presets)
+        const next = { ...defaultSoniConfig(), ...(scene.sonify as Partial<SoniConfig>), on: cur.on, sinkId: cur.sinkId, eq: cur.eq } as SoniConfig
         queueMicrotask(() => useStore.getState().setSonify(next))
       }
       return { composition, activeSceneId: id, worlds, world, variationBaseline: null }
@@ -4495,7 +4496,8 @@ export const useStore = create<StoreState>((set, get) => ({
       // a sequencer-driven set played every scene with the wrong (frozen) sound.
       if (scene.sonify) {
         const cur = s.sonify
-        const next = { ...defaultSoniConfig(), ...(scene.sonify as Partial<SoniConfig>), on: cur.on, sinkId: cur.sinkId } as SoniConfig
+        // (and the room's EQ and glue : they tune the room, not the patch, like presets)
+        const next = { ...defaultSoniConfig(), ...(scene.sonify as Partial<SoniConfig>), on: cur.on, sinkId: cur.sinkId, eq: cur.eq } as SoniConfig
         queueMicrotask(() => useStore.getState().setSonify(next))
       }
       return { composition, activeSceneId: id, worlds, world, variationBaseline: null }

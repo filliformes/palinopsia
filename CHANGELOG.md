@@ -37,6 +37,50 @@ that CI builds into cross-platform releases.
     `setTargetAtTime` scheduled 10 ms ahead : a curve started from `param.value` (which
     lags the audio thread) jumped by the difference, and a linear ramp on a gain with no
     automation event yet ramps from time 0 (an instant jump).
+- **The audit of everything added since v1.2.7, the sound** (each measured the same way,
+  on the output, before and after) :
+  - **The output EQ and the glue no longer click** when a band moves, changes type or
+    slope, or the EQ is bypassed (25 clicks in a Node run of the worklet, now 0) : a
+    band's coefficients glide sample by sample across the block, a new band layout
+    crossfades from the old one over 20 ms (the sections that stay keep their state),
+    the bypass crossfades, and the input / output gains and the glue's gain are smoothed
+    (they stepped once a block).
+  - **Every path to the speakers goes through one output gain** that ducks around a
+    change : Space on / off, the headphones preview, a new channel count, the Collage's
+    piece groups, another output device. Rewired live, each one clicked. **Sonify off**
+    fades out (15 ms) before the engine ends, instead of cutting the sound mid-wave.
+  - **Space** : a new speaker matrix glides in over 12 blocks (about one update of the
+    places) instead of one, then held : a moving voice's gains stepped 30 times a second,
+    a buzz on held notes. Switched on, its sub filter and limiter start clean (not from
+    the last time); the sub level ramps; a gain under -80 dB no longer counts as a
+    speaker (the dust of a wide spread filled every list). An imported setup with a gap
+    of 180° or more sends a voice outside every pair to the nearest speaker instead of
+    silencing it. The headphones preview re-aims only the virtual speakers that moved
+    (each one was re-automated 30 times a second) and its limiter sits at -3 dB (peaks
+    near 0 dBFS got through). The speaker layout is looked up only when it changes (it
+    was rebuilt and stringified 30 times a second), and a new OSC renderer (host, port,
+    protocol, numbering) hears every object at once instead of only the moving ones.
+  - **The Chord** : each note's place in the spread fan glides (60 ms) when the count
+    changes, instead of jumping to its new place.
+  - **The Collage voice** : a film with no sound at all gets no player (one decoded the
+    whole video, all show long, to play silence); a modulated film speed splices to a
+    fresh player instead of re-rating an audible one (a click per change); a piece that
+    appears starts at its note, Q and place (it glided from 350 Hz while fading in : a
+    chirp); a hidden piece fades after its resonators, not before them (dropped while
+    they still rang : a click per hidden piece); the oldest retiring piece, past the cap,
+    fades for 3 ms before it goes; a re-roll faster than the films load no longer
+    restarts the wait for ever (the deck stuck on its old clip). Its leveler starts at
+    the film's level when switched on (from 0 it let a loud film through 1 to 3 dB over)
+    and a stray NaN no longer sticks it at full makeup. **Ring In** ramps across the
+    block.
+  - **Sound device** : a device picked while Sonify was off is applied (it came back on
+    the old one); after the sound card restarts, the line-in opens again on the new
+    context (it stayed held by the dead one, the Filter voice nearly silent).
+  - **A recalled scene keeps the room's EQ and glue**, like a preset (a scene saved
+    before the EQ existed reset it to flat).
+  - **The key sequencer's Picture mode** learns only from frames really read : when
+    nothing samples the picture, the last one was learned over and over and the palette
+    shrank onto it.
 
 ## v1.2.8 — 2026-10-15
 

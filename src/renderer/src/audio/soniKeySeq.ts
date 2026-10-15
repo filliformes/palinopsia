@@ -207,10 +207,15 @@ const TAU = Math.PI * 2
 const PIC_FAST = 0.6 // s : the reading's own smoothing
 const PIC_SLOW = 40 // s : the palette's memory
 const PIC_MIN_SPREAD = 12 / 360 // turns : a still picture's jitter is never stretched past this
-const pic = { at: 0, hx: 1, hy: 0, b: 0, px: 0, py: 0, pw: 0, pb: 0, pb2: 0, sat: 0, init: false }
+const pic = { at: 0, hx: 1, hy: 0, b: 0, px: 0, py: 0, pw: 0, pb: 0, pb2: 0, sat: 0, init: false, seen: -1 }
 
 function updatePicture(now: number): void {
+  // only a frame really read : when nobody samples the picture (the sequencer
+  // off, the page closed) the last one stays put, and was learned over and over
   if (!visionBus.hasData()) return
+  const seen = visionBus.ingests()
+  if (seen === pic.seen) return
+  pic.seen = seen
   const dt = pic.at ? Math.min(0.5, Math.max(0, (now - pic.at) / 1000)) : 0
   pic.at = now
   const sat = visionBus.feature('saturation'), h = visionBus.feature('hue') * TAU, bri = visionBus.feature('brightness')

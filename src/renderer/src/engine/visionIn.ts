@@ -80,6 +80,7 @@ class VisionBus {
   private flow: FlowField | null = null
   private flowSize = 0
   private lastIngest = 0
+  private nIngest = 0
   private gray: Float32Array | null = null
   private prev: Float32Array | null = null
   private ready = false
@@ -199,6 +200,7 @@ class VisionBus {
     const now = performance.now()
     const dt = this.lastIngest ? (now - this.lastIngest) / 1000 : 1 / 30
     this.lastIngest = now
+    this.nIngest++
     const fl = this.flow.push(gray, dt, true, false)
     this.f.flowX = fl.dirX
     this.f.flowY = fl.dirY
@@ -233,6 +235,10 @@ class VisionBus {
   }
   hasData(): boolean {
     return this.ready
+  }
+  /** How many frames have been read so far (a reader can tell a fresh one). */
+  ingests(): number {
+    return this.nIngest
   }
 
   /** The live image on the Assemble corpus's axes, or null before the first

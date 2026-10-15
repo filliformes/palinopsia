@@ -77,6 +77,8 @@ class SpaceEngine {
   private on = false
   private vbap: Vbap | null = null
   private vbapKey = ''
+  private vbapFor = '' // the layout key the cached VBAP was looked up for
+  private vbapSrc: unknown = null // … and the imported setup it came from
   private layout: SpeakerLayout | null = null
   private gains = new Float32Array(SPACE_SRC_ALL * 2 * SPACE_MAX_CH)
   private sentGains = new Float32Array(SPACE_SRC_ALL * 2 * SPACE_MAX_CH)
@@ -91,6 +93,7 @@ class SpaceEngine {
   private pt = new Float64Array(NV * 2).fill(0.5)
   // OSC : what was sent per object (az, el, hs, vs) and when everything was
   private oscSent = new Float64Array(64 * 4).fill(NaN)
+  private oscTarget = ''
   private oscAll = 0
   /** The sources as placed now, for the page : the voices, the FX return, then
    *  the Collage piece groups in use. */
@@ -287,13 +290,21 @@ class SpaceEngine {
 
   // ── 2a. speakers : VBAP onto the layout ──
   private speakers(cfg: SpaceConfig): void {
-    const layout = activeLayout(cfg)
-    const key = cfg.layoutKey + ':' + JSON.stringify(layout.speakers)
-    if (key !== this.vbapKey) {
-      this.vbap = buildVbap(layout)
-      this.vbapKey = key
-      this.layout = layout
+    // the layout is looked at again only when its key or its imported setup
+    // changed (it was rebuilt and stringified 30 times a second)
+    const src = cfg.layoutKey === 'file' ? cfg.layout ?? null : null
+    if (!this.vbap || cfg.layoutKey !== this.vbapFor || src !== this.vbapSrc) {
+      this.vbapFor = cfg.layoutKey
+      this.vbapSrc = src
+      const layout = activeLayout(cfg)
+      const key = cfg.layoutKey + ':' + JSON.stringify(layout.speakers)
+      if (key !== this.vbapKey) {
+        this.vbap = buildVbap(layout)
+        this.vbapKey = key
+        this.layout = layout
+      }
     }
+    const layout = this.layout!
     const vb = this.vbap!
     const first = cfg.firstChannel - 1
     const need = first + layoutChannels(layout)
@@ -396,6 +407,10 @@ class SpaceEngine {
 
   private sendOsc(cfg: SpaceConfig, nowMs: number, objs: ReturnType<SpaceEngine['objectList']>): void {
     if (!cfg.host) return
+    // a new renderer (host, port, protocol, numbering) hears every object at once,
+    // not only the ones that move until the next full refresh
+    const target = `${cfg.host}:${cfg.port}:${cfg.protocol}:${cfg.firstSource}`
+    if (target !== this.oscTarget) { this.oscTarget = target; this.oscSent.fill(NaN); this.oscAll = 0 }
     const all = nowMs - this.oscAll > 2000
     if (all) this.oscAll = nowMs
     const msgs: Array<{ address: string; args: Array<{ type: string; value: number | string }> }> = []

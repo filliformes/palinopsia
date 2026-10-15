@@ -290,7 +290,12 @@ class Leveler {
     if (a < 0.001) {
       if (!this.live) return false;
       if (Math.abs(this.g - 1) < 1e-4) { this.live = false; return false; }
-    } else if (!this.live) { this.live = true; this.env = 0; this.g = 1; this.gt = 1; this.k = 0; }
+    } else if (!this.live) {
+      // switched on : the detector starts at this block's level (from 0 it let a
+      // loud film through for a moment, 1 to 3 dB over)
+      let pw = 0; for (let s = 0; s < n; s++) pw += 0.5 * (iL[s] * iL[s] + iR[s] * iR[s]);
+      this.live = true; this.env = pw / n; this.g = 1; this.gt = 1; this.k = 0;
+    }
     if (a !== this.amt) this.set(a);
     const aA = this.aA, aR = this.aR, aG = this.aG;
     let env = this.env, g = this.g, gt = this.gt, k = this.k;
@@ -309,7 +314,7 @@ class Leveler {
       g += (gt - g) * aG;
       oL[s] = l * g; oR[s] = r * g; oG[s] = g;
     }
-    this.env = env < 1e-20 ? 0 : env; this.g = g; this.gt = gt; this.k = k;
+    this.env = env >= 1e-20 ? env : 0; this.g = g; this.gt = gt; this.k = k; // (a NaN goes to 0 too : it stuck the gain at full makeup)
     return true;
   }
 }
@@ -318,6 +323,7 @@ class RingBank {
   constructor(sr) {
     this.sr = sr > 0 ? sr : 48000;
     this.freq = new Float64Array(RB_N);
+    this.rin = 0; // Ring In as last applied (linear)
     this.pos = new Float64Array(RB_N); // each band's place in semitones above the lowest
     for (let b = 0; b < RB_N; b++) { this.freq[b] = 110 * Math.pow(2, b / 12); this.pos[b] = b; }
     const M = RB_N * 2; // [band·2 + side]
@@ -453,7 +459,10 @@ class RingBank {
     // RING IN : how hard the films drive the bank. It scales the bank's input AND
     // the dry level its follower matches the wet to, so the wet and the bands'
     // clip both follow it (scaled on the input alone, the follower undid it).
-    const rin = Math.pow(10, clampf(co.ringIn || 0, -24, 12) / 20);
+    // Ring In ramps across the block (a slider move, a modulator : a step otherwise)
+    const rin1 = Math.pow(10, clampf(co.ringIn || 0, -24, 12) / 20);
+    const rin0 = this.rin > 0 ? this.rin : rin1, drin = (rin1 - rin0) / n;
+    this.rin = rin1;
     const sat = vo.sat;
     // The voicing's DRIVE pushes each band's own clip (kd), never a waveshaper on
     // the input : that one clipped the whole mix of pieces before the bank, and the
@@ -467,6 +476,7 @@ class RingBank {
     // and the clipping voicings cost 3.6 ms of a 2.7 ms block. Measured.)
     for (let s = 0; s < n; s++) {
       const xl = iL[s] * gL, xr = iR[s] * gR;
+      const rin = rin0 + drin * (s + 1);
       const dl = xl * rin, dr = xr * rin;
       let accL = 0, accR = 0;
       for (let b = 0; b < RB_N; b++) {
@@ -624,6 +634,7 @@ const PENDING_CAP = 512;
 // block; the subwoofers get the low end of every source (two cascaded
 // Butterworth low-passes : 24 dB/oct); one limiter holds all the channels.
 const SPACE_CH = 32;
+const SPACE_RAMP = 12; // blocks a new speaker matrix glides over (32 ms at 48 kHz)
 const SPACE_PIECES = 30; // Collage piece groups on input 1, channels 2..31
 const SPACE_SRC = NVOICE + 1 + SPACE_PIECES;
 const SPACE_FX = NVOICE;
@@ -638,6 +649,8 @@ class SpaceBus {
     this.tgt = new Float32Array(SPACE_SRC * 2 * SPACE_CH);
     this.cur = new Float32Array(SPACE_SRC * 2 * SPACE_CH);
     this.ramp = false;
+    this.rampLeft = 0; // blocks left in the matrix's glide
+    this.subG = 0; // the sub level as applied (ramped)
     this.lists = [];
     for (let i = 0; i < SPACE_SRC * 2; i++) this.lists.push(new Int16Array(SPACE_CH));
     this.listN = new Int16Array(SPACE_SRC * 2);
@@ -666,13 +679,24 @@ class SpaceBus {
     if (m.gains && m.gains.length === this.tgt.length) {
       for (let i = 0; i < this.tgt.length; i++) { const g = m.gains[i]; this.tgt[i] = Number.isFinite(g) ? g : 0; }
     }
-    if (!was) this.cur.set(this.tgt); // switched on : no glide from silence's matrix
+    if (!was) {
+      // switched on : no glide from silence's matrix, and the sub filter, the
+      // limiter and the master ramp start clean (not from the last time)
+      this.cur.set(this.tgt);
+      this.lpS.fill(0); this.limEnv = 1; this.mgS = -1; this.subG = 0;
+    }
+    // A new matrix glides in over SPACE_RAMP blocks (about one update of the
+    // places, 30 a second) : over one block, then held, a moving voice's gains
+    // stepped 30 times a second (a buzz on held notes).
     this.ramp = true;
+    this.rampLeft = SPACE_RAMP;
     this.relist(true);
+    const hadSubs = this.subN;
     this.subN = 0;
     if (m.subs) for (let i = 0; i < m.subs.length && this.subN < SPACE_CH; i++) {
       const c = m.subs[i] | 0; if (c >= 0 && c < this.nch) this.subs[this.subN++] = c;
     }
+    if (!hadSubs && this.subN) this.lpS.fill(0);
     this.subGain = clampf(m.subGain || 0, 0, 2);
     if (m.xover > 0) this.setXover(m.xover);
   }
@@ -681,8 +705,11 @@ class SpaceBus {
     for (let k = 0; k < SPACE_SRC * 2; k++) {
       const base = k * SPACE_CH, list = this.lists[k];
       let c = 0;
-      for (let ch = 0; ch < this.nch; ch++)
-        if (this.tgt[base + ch] !== 0 || (withCur && this.cur[base + ch] !== 0)) list[c++] = ch;
+      // (a gain under 1e-4, -80 dB, is no gain : a wide matrix's dust filled every list)
+      for (let ch = 0; ch < this.nch; ch++) {
+        const t = this.tgt[base + ch], u = withCur ? this.cur[base + ch] : 0;
+        if (t > 1e-4 || t < -1e-4 || u > 1e-4 || u < -1e-4) list[c++] = ch;
+      }
       this.listN[k] = c;
     }
   }
@@ -704,7 +731,7 @@ class SpaceBus {
         if (ch >= out.length) continue;
         const o = out[ch], g1 = this.tgt[base + ch];
         if (this.ramp) {
-          const g0 = this.cur[base + ch], dg = (g1 - g0) / n;
+          const g0 = this.cur[base + ch], dg = (g1 - g0) / (this.rampLeft * n);
           for (let s = 0; s < n; s++) o[s] += x[s] * (g0 + dg * (s + 1));
         } else {
           for (let s = 0; s < n; s++) o[s] += x[s] * g1;
@@ -722,15 +749,19 @@ class SpaceBus {
     if (!out) return;
     const nch = Math.min(this.nch, out.length);
     // subwoofers : the low end of everything
-    if (this.subN > 0 && this.subGain > 0) {
-      const a = this.lpA, z = this.lpS, m = this.mono, g = this.subGain;
+    if (this.subN > 0 && (this.subGain > 0 || this.subG > 0)) {
+      const a = this.lpA, z = this.lpS, m = this.mono;
+      // the sub level ramps across the block (a slider move zippered)
+      const g0 = this.subG, dg = (this.subGain - g0) / n;
+      this.subG = this.subGain;
       for (let s = 0; s < n; s++) {
         let x = m[s];
         let y = a[0] * x + z[0]; z[0] = a[1] * x - a[3] * y + z[1]; z[1] = a[2] * x - a[4] * y; x = y;
         y = a[0] * x + z[2]; z[2] = a[1] * x - a[3] * y + z[3]; z[3] = a[2] * x - a[4] * y;
         if (!Number.isFinite(y)) { z.fill(0); y = 0; }
-        m[s] = y * g;
+        m[s] = y * (g0 + dg * (s + 1));
       }
+      for (let i = 0; i < 4; i++) if (z[i] < 1e-25 && z[i] > -1e-25) z[i] = 0;
       for (let i = 0; i < this.subN; i++) { const ch = this.subs[i]; if (ch < nch) { const o = out[ch]; for (let s = 0; s < n; s++) o[s] += m[s]; } }
     }
     // master gain (ramped) + one limiter for every channel (-1 dBFS, linked)
@@ -761,7 +792,17 @@ class SpaceBus {
       for (let s = 0; s < n; s++) { const v = o[s] * pkS[s]; o[s] = v; const a = v < 0 ? -v : v; if (a > pk) pk = a; }
       this.pk[ch] = pk;
     }
-    if (this.ramp) { this.cur.set(this.tgt); this.ramp = false; this.relist(false); }
+    if (this.ramp) {
+      // this block's share of the glide; the last one lands on the target
+      if (--this.rampLeft <= 0) { this.cur.set(this.tgt); this.ramp = false; this.relist(false); }
+      else {
+        const f = 1 / (this.rampLeft + 1);
+        for (let k = 0; k < SPACE_SRC * 2; k++) {
+          const base = k * SPACE_CH, list = this.lists[k], cnt = this.listN[k];
+          for (let i = 0; i < cnt; i++) { const j = base + list[i]; this.cur[j] += (this.tgt[j] - this.cur[j]) * f; }
+        }
+      }
+    }
   }
 }
 
@@ -864,6 +905,7 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.cPhase = new Float32Array(NCHORD);
     this.cAmp = new Float32Array(NCHORD);
     this.cOff = new Float32Array(NCHORD); // each note's place in the SPREAD fan (-1 left .. 1 right)
+    this.cOffS = new Float32Array(NCHORD); // … as it glides there (60 ms : a new count re-spreads smoothly)
     // each note's gains at the end of the last block (its level and its pan ramp
     // from there, sample by sample : a step per block was a click), and how many
     // notes still sound (a note left out by a smaller count fades out)
@@ -1739,13 +1781,16 @@ class SoniProcessor extends AudioWorkletProcessor {
       // level²), the pans' hard edges included : found by halving, about 90
       // times a second (a closed form without the edges left a sky, whose
       // loudest note pushes its partner past the edge, 2 dB to one side).
-      const offs = this.cOff, wts = this.cWt, P = (N - 1) >> 1;
+      const offs = this.cOff, wts = this.cWt, P = (N - 1) >> 1, fanK = 1 - Math.exp(-n * dt / 0.06);
       let W = 0;
       for (let i = 0; i < N; i++) {
         let o = 0;
         if (N === 2) o = i ? 1 : -1;
         else { const j = N - 1 - i, p = j >> 1; if (p < P) o = (j & 1 ? -1 : 1) * (P - p) / P; }
-        offs[i] = o;
+        // a silent note starts at its place, a sounding one glides to it
+        const os = this.cAmp[i] > 0 ? this.cOffS[i] + (o - this.cOffS[i]) * fanK : o;
+        this.cOffS[i] = os;
+        offs[i] = os;
         const a = this.cAmp[i] * this.cW[i];
         wts[i] = a * a; W += a * a;
       }
@@ -2253,14 +2298,22 @@ class SoniEqProc extends AudioWorkletProcessor {
     super();
     // the glue's state
     this.gOn = false; this.gMix = 0; this.gEnv = 0; this.gThrLp = 0; this.gMk = 1; this.gMkT = 1;
-    this.gG = 1; this.gDg = 0; this.gK = 0; this.gGrNow = 0; // the gain, its ramp, the count to the next computation
+    this.gG = 1; this.gT = 1; this.gK = 0; this.gGrNow = 0; // the gain, its target, the count to the next computation
+    this.gGK = 1 - Math.exp(-1 / (sampleRate * 0.002)); // the gain glides to its target (2 ms) : a voicing or amount change never ticks
     this.gAtk = 0; this.gRel = 0; this.gKn = 5; this.gDist = 0; this.gThrust = 0; this.gThDb = 0; this.gThLin = 1; this.gSlope = 0;
     this.gThrK = 1 - Math.exp(-2 * Math.PI * 632 / sampleRate);
     this.gMixK = 1 - Math.exp(-1 / (sampleRate * 0.02));
     this.gGr = 0;
     this.on = false;
     this.inG = 1; this.outG = 1; this.inT = 1; this.outT = 1;
+    this.gainK = 1 - Math.exp(-1 / (sampleRate * 0.02)); // input / output gains glide (20 ms)
     this.secs = [];
+    // A change of the chain's shape (a band on / off, a slope, a bell through
+    // 0 dB) crossfades the old chain into the new one (XF samples); the bypass
+    // crossfades too (wet). Rebuilding at once zeroed every band's memory and
+    // switching in one sample : a click at each.
+    this.old = null; this.xfPos = 0; this.xfN = Math.round(sampleRate * 0.02);
+    this.wet = 0; this.wetStep = 1 / Math.round(sampleRate * 0.02);
     // meters : peak and sum of squares, in (after the input gain) and out (what leaves)
     this.m = new Float64Array(8); // pkInL pkInR ssInL ssInR pkOutL pkOutR ssOutL ssOutR
     this.mN = 0;
@@ -2286,14 +2339,26 @@ class SoniEqProc extends AudioWorkletProcessor {
     this.outT = Math.pow(10, (eq.outGain || 0) / 20);
     const next = [];
     const bands = Array.isArray(eq.bands) ? eq.bands : [];
-    for (let i = 0; i < 12; i++) { const cs = eqSectionsW(EQ_KINDS_W[i], bands[i], sampleRate); for (let k = 0; k < cs.length; k++) next.push(cs[k]); }
-    // A drag keeps the chain's shape : new coefficients, the filters' memory kept
-    // (no click). A band switched on or off, a slope changed : start clean.
-    if (next.length === this.secs.length) {
-      for (let i = 0; i < next.length; i++) { const s = this.secs[i], c = next[i]; s.b0 = c[0]; s.b1 = c[1]; s.b2 = c[2]; s.a1 = c[3]; s.a2 = c[4]; }
-    } else {
-      this.secs = next.map((c) => ({ b0: c[0], b1: c[1], b2: c[2], a1: c[3], a2: c[4], l1: 0, l2: 0, r1: 0, r2: 0 }));
+    for (let i = 0; i < 12; i++) { const cs = eqSectionsW(EQ_KINDS_W[i], bands[i], sampleRate); for (let k = 0; k < cs.length; k++) next.push({ band: i, k, c: cs[k] }); }
+    const cur = this.secs;
+    let same = next.length === cur.length;
+    for (let j = 0; same && j < next.length; j++) if (cur[j].band !== next[j].band || cur[j].k !== next[j].k) same = false;
+    if (same) {
+      // A drag keeps the chain's shape : the coefficients ramp to their new values
+      // across the next block, the filters' memory kept.
+      for (let j = 0; j < next.length; j++) { const s = cur[j], c = next[j].c; s.t0 = c[0]; s.t1 = c[1]; s.t2 = c[2]; s.t3 = c[3]; s.t4 = c[4]; s.mv = true; }
+      return;
     }
+    // A new shape : a new chain whose sections already in the old one (same band,
+    // same place) start from its memory, crossfaded in while the old one plays out.
+    const fresh = next.map((x) => {
+      let o = null; for (let j = 0; j < cur.length; j++) if (cur[j].band === x.band && cur[j].k === x.k) { o = cur[j]; break; }
+      const c = x.c;
+      return { band: x.band, k: x.k, b0: c[0], b1: c[1], b2: c[2], a1: c[3], a2: c[4], t0: c[0], t1: c[1], t2: c[2], t3: c[3], t4: c[4], mv: false,
+        l1: o ? o.l1 : 0, l2: o ? o.l2 : 0, r1: o ? o.r1 : 0, r2: o ? o.r2 : 0 };
+    });
+    if (this.wet > 0) { this.old = cur; this.xfPos = 0; }
+    this.secs = fresh;
   }
   process(inputs, outputs) {
     if (this.ended) return false; // Sonify stopped (see the engine's 'end')
@@ -2304,32 +2369,60 @@ class SoniEqProc extends AudioWorkletProcessor {
     const iR = inp && inp.length > 1 ? inp[1] : iL;
     const m = this.m;
     const on = this.on;
-    // gains ramp across the block : no zipper on a slider move
-    const gi0 = this.inG, gi1 = on ? this.inT : 1, go0 = this.outG, go1 = on ? this.outT : 1;
+    // the bypass : the EQ fades in and out (wet), the gains glide to theirs
+    const wetT = on ? 1 : 0, wetStep = this.wetStep;
+    let wet = this.wet;
+    if (wet === 0 && on) { const s0 = this.secs; for (let k = 0; k < s0.length; k++) { const q = s0[k]; q.l1 = q.l2 = q.r1 = q.r2 = 0; } this.old = null; }
+    const gainK = this.gainK, giT = on ? this.inT : 1, goT = on ? this.outT : 1;
+    let gi = this.inG, go = this.outG;
     const secs = this.secs, ns = secs.length;
+    // the coefficients a drag moved ramp across this block
+    const inv = 1 / n;
+    for (let k = 0; k < ns; k++) {
+      const q = secs[k];
+      if (q.mv) { q.d0 = (q.t0 - q.b0) * inv; q.d1 = (q.t1 - q.b1) * inv; q.d2 = (q.t2 - q.b2) * inv; q.d3 = (q.t3 - q.a1) * inv; q.d4 = (q.t4 - q.a2) * inv; }
+    }
+    const old = this.old, nOld = old ? old.length : 0, xfN = this.xfN;
+    let xfPos = this.xfPos;
     // the glue runs while it is on or still fading out (20 ms : no click)
     const glue = this.gOn || this.gMix > 1e-4;
-    if (!glue) { this.gMix = 0; this.gEnv = 0; this.gThrLp = 0; this.gG = 1; this.gDg = 0; this.gK = 0; this.gGrNow = 0; }
+    if (!glue) { this.gMix = 0; this.gEnv = 0; this.gThrLp = 0; this.gG = 1; this.gT = 1; this.gK = 0; this.gGrNow = 0; }
     const gMixT = this.gOn ? 1 : 0, gMixK = this.gMixK;
     const mk0 = this.gMk, mk1 = this.gMkT;
     const gAtk = this.gAtk, gRel = this.gRel, gKn = this.gKn, gThrust = this.gThrust;
     const gThDb = this.gThDb, gThLin = this.gThLin, gSlope = this.gSlope, thrK = this.gThrK;
     let env = this.gEnv, thrLp = this.gThrLp, gMix = this.gMix, gGr = this.gGr;
-    let gG = this.gG, gDg = this.gDg, gK = this.gK, grNow = this.gGrNow;
+    let gG = this.gG, gT = this.gT, gK = this.gK, grNow = this.gGrNow;
+    const gGK = this.gGK;
     const dAbs = Math.abs(this.gDist), dBias = this.gDist < 0 ? 0.18 : 0;
     const dT0 = dBias * (27 + dBias * dBias) / (27 + 9 * dBias * dBias);
     for (let s = 0; s < n; s++) {
       const t = (s + 1) / n;
-      const gi = gi0 + (gi1 - gi0) * t, go = go0 + (go1 - go0) * t;
+      gi += (giT - gi) * gainK; go += (goT - go) * gainK;
       let l = (iL ? iL[s] : 0) * gi, r = (iR ? iR[s] : 0) * gi;
       const al = l < 0 ? -l : l, ar = r < 0 ? -r : r;
       if (al > m[0]) m[0] = al; if (ar > m[1]) m[1] = ar; m[2] += l * l; m[3] += r * r;
-      if (on) {
+      if (wet > 0 || on) {
+        wet = wet < wetT ? Math.min(wetT, wet + wetStep) : Math.max(wetT, wet - wetStep);
+        let el = l, er = r;
         for (let k = 0; k < ns; k++) {
           const q = secs[k];
-          const yl = q.b0 * l + q.l1; q.l1 = q.b1 * l - q.a1 * yl + q.l2; q.l2 = q.b2 * l - q.a2 * yl; l = yl;
-          const yr = q.b0 * r + q.r1; q.r1 = q.b1 * r - q.a1 * yr + q.r2; q.r2 = q.b2 * r - q.a2 * yr; r = yr;
+          if (q.mv) { q.b0 += q.d0; q.b1 += q.d1; q.b2 += q.d2; q.a1 += q.d3; q.a2 += q.d4; }
+          const yl = q.b0 * el + q.l1; q.l1 = q.b1 * el - q.a1 * yl + q.l2; q.l2 = q.b2 * el - q.a2 * yl; el = yl;
+          const yr = q.b0 * er + q.r1; q.r1 = q.b1 * er - q.a1 * yr + q.r2; q.r2 = q.b2 * er - q.a2 * yr; er = yr;
         }
+        if (nOld) {
+          // the old chain plays out under the new one
+          let ol = l, or = r;
+          for (let k = 0; k < nOld; k++) {
+            const q = old[k];
+            const yl = q.b0 * ol + q.l1; q.l1 = q.b1 * ol - q.a1 * yl + q.l2; q.l2 = q.b2 * ol - q.a2 * yl; ol = yl;
+            const yr = q.b0 * or + q.r1; q.r1 = q.b1 * or - q.a1 * yr + q.r2; q.r2 = q.b2 * or - q.a2 * yr; or = yr;
+          }
+          const x = xfPos < xfN ? ++xfPos / xfN : 1;
+          el = ol + (el - ol) * x; er = or + (er - or) * x;
+        }
+        l += (el - l) * wet; r += (er - r) * wet;
       }
       if (glue) {
         let det = l < 0 ? -l : l; const dr = r < 0 ? -r : r; if (dr > det) det = dr;
@@ -2351,9 +2444,9 @@ class SoniEqProc extends AudioWorkletProcessor {
           }
           grNow = grDb;
           if (grDb > gGr) gGr = grDb;
-          gDg = ((grDb > 0 ? Math.pow(10, -grDb / 20) : 1) - gG) * 0.125;
+          gT = grDb > 0 ? Math.pow(10, -grDb / 20) : 1;
         }
-        gG += gDg;
+        gG += (gT - gG) * gGK;
         gMix += (gMixT - gMix) * gMixK;
         const gg = gG * (mk0 + (mk1 - mk0) * t);
         let wl = l * gg, wr = r * gg;
@@ -2368,20 +2461,24 @@ class SoniEqProc extends AudioWorkletProcessor {
         }
         l += (wl - l) * gMix; r += (wr - r) * gMix;
       }
-      if (on || glue) {
+      if (wet > 0 || glue) {
         l *= go; r *= go;
-        const cl = eqCeil(l), cr = eqCeil(r);
-        if (cl !== l || cr !== r) this.ceilHit = 1;
-        l = cl; r = cr;
+        // the soft ceiling, inline (a helper per sample is a known cost here)
+        const cl = l < 0 ? -l : l;
+        if (cl > EQ_KNEE) { const y = EQ_KNEE + (1 - EQ_KNEE) * Math.tanh((cl - EQ_KNEE) / (1 - EQ_KNEE)); l = l < 0 ? -y : y; this.ceilHit = 1; }
+        const cr = r < 0 ? -r : r;
+        if (cr > EQ_KNEE) { const y = EQ_KNEE + (1 - EQ_KNEE) * Math.tanh((cr - EQ_KNEE) / (1 - EQ_KNEE)); r = r < 0 ? -y : y; this.ceilHit = 1; }
       }
       oL[s] = l; if (oR !== oL) oR[s] = r;
       const bl = l < 0 ? -l : l, br = r < 0 ? -r : r;
       if (bl > m[4]) m[4] = bl; if (br > m[5]) m[5] = br; m[6] += l * l; m[7] += r * r;
     }
-    this.inG = gi1; this.outG = go1;
+    this.inG = gi; this.outG = go; this.wet = wet;
+    for (let k = 0; k < ns; k++) { const q = secs[k]; if (q.mv) { q.b0 = q.t0; q.b1 = q.t1; q.b2 = q.t2; q.a1 = q.t3; q.a2 = q.t4; q.mv = false; } }
+    if (nOld) { this.xfPos = xfPos; if (xfPos >= xfN) this.old = null; }
     if (glue) {
       this.gEnv = env < 1e-20 ? 0 : env; this.gThrLp = Math.abs(thrLp) < 1e-20 ? 0 : thrLp; this.gMix = gMix; this.gGr = gGr;
-      this.gG = gG; this.gDg = gDg; this.gK = gK; this.gGrNow = grNow;
+      this.gG = gG; this.gT = gT; this.gK = gK; this.gGrNow = grNow;
     }
     this.gMk = mk1;
     // denormals out of the filters' memory between blocks

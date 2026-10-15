@@ -601,6 +601,14 @@ class SonifyEngine {
   private spacePreview: { split: ChannelSplitterNode; pans: Array<PannerNode | null>; sum: GainNode; trim: GainNode; lim: DynamicsCompressorNode } | null = null
   private previewDirs: Array<[number, number] | null> = []
   private previewKey = ''
+  private previewLast: Array<[number, number] | null> = [] // the directions the panners were last sent
+  // Every path to the speakers goes through this gain : a reroute (Space on / off,
+  // the headphones, a channel count, a device) and Sonify switching off duck it
+  // around the change. Rewired live, each was a click.
+  private outG: GainNode | null = null
+  private routeTimer = 0
+  private routeChanges: Array<() => void> = []
+  private groupsWanted = 0 // the Collage piece groups Space asked for (applied under the duck)
   // Space's Collage piece groups (0 : the voice is one pair)
   private collageGroups = 0
 
@@ -724,6 +732,7 @@ class SonifyEngine {
           return
         }
       }
+      if (this.ctx !== ctx) return // replaced meanwhile : nothing left to heal
       if (this.bus > 0) {
         this.healAfterTake = true
         return
@@ -739,6 +748,15 @@ class SonifyEngine {
     const wasOn = !!this.node
     this.collage?.dispose()
     this.collage = null
+    // the line-in starts over on the new context (kept, it stayed captured by
+    // the dead one : the Filter voice nearly silent, the mic light on)
+    this.lineSrc?.disconnect()
+    this.lineSrc = null
+    this.lineStream?.getTracks().forEach((t) => t.stop())
+    this.lineStream = null
+    this.lineWanted = false
+    this.lineReq++
+    this.outG = null
     try { this.node?.disconnect() } catch { /* gone */ }
     this.node = null
     window.clearInterval(this.watchTimer)
@@ -787,7 +805,10 @@ class SonifyEngine {
         this.eqCeiling = !!m.ceil
         this.glueGr = typeof m.gr === 'number' ? m.gr : -1
       }
-      node.connect(eq).connect(ctx.destination)
+      const outG = ctx.createGain()
+      outG.connect(ctx.destination)
+      this.outG = outG
+      node.connect(eq).connect(outG)
       // The spectrum the EQ page draws, before and after it (native FFTs, read
       // only while the page asks).
       const an = (): AnalyserNode => { const a = ctx.createAnalyser(); a.fftSize = 8192; a.smoothingTimeConstant = 0.8; return a }
@@ -806,7 +827,7 @@ class SonifyEngine {
       if (ctx.state !== 'running') await ctx.resume()
     } catch (e) {
       console.error('[sonify] start failed', e)
-      this.stop()
+      this.stop(true)
     } finally {
       this.starting = false
     }
@@ -924,34 +945,55 @@ class SonifyEngine {
     this.warm = false
     this.bus = 0
     this.healAfterTake = false
-    this.stop()
+    this.stop(true)
     this.closeCtx()
   }
 
-  stop(): void {
-    this.collage?.dispose()
+  /** Sonify off : the sound fades out (the output gain, 15 ms), then the engine
+   *  ends 50 ms later (ending at once cut it mid-wave : a click every time).
+   *  `now` (a dev hot update, a failed start) tears it down at once. */
+  stop(now = false): void {
+    const collage = this.collage, lineSrc = this.lineSrc, lineStream = this.lineStream
+    const node = this.node, eqNode = this.eqNode, anPre = this.anPre, anPost = this.anPost, outG = this.outG, ctx = this.ctx
     this.collage = null
-    this.lineSrc?.disconnect()
     this.lineSrc = null
-    this.lineStream?.getTracks().forEach((t) => t.stop())
     this.lineStream = null
     // forget the line-in : the next start must open it again (it used to think
     // it was still open and the Filter voice came back nearly silent)
     this.lineWanted = false
     this.lineReq++
-    // End both processors, not only disconnect them : the context stays open
-    // between takes, and a disconnected worklet kept running (the whole last
-    // config, every voice, in the audio thread) and kept posting its meters
-    // over the next engine's (the glue's reading flickered to "off").
-    for (const n of [this.node, this.eqNode]) {
-      if (!n) continue
-      n.port.onmessage = null
-      try { n.port.postMessage({ t: 'end' }) } catch { /* gone */ }
-    }
-    this.node?.disconnect()
     this.node = null
-    try { this.eqNode?.disconnect(); this.anPre?.disconnect(); this.anPost?.disconnect() } catch { /* gone */ }
     this.eqNode = null
+    this.outG = null
+    window.clearTimeout(this.routeTimer)
+    this.routeTimer = 0
+    this.routeChanges = []
+    collage?.silence()
+    const teardown = (): void => {
+      collage?.dispose()
+      lineSrc?.disconnect()
+      lineStream?.getTracks().forEach((t) => t.stop())
+      // End both processors, not only disconnect them : the context stays open
+      // between takes, and a disconnected worklet kept running (the whole last
+      // config, every voice, in the audio thread) and kept posting its meters
+      // over the next engine's (the glue's reading flickered to "off").
+      for (const n of [node, eqNode]) {
+        if (!n) continue
+        n.port.onmessage = null
+        try { n.port.postMessage({ t: 'end' }) } catch { /* gone */ }
+      }
+      try { node?.disconnect(); eqNode?.disconnect(); anPre?.disconnect(); anPost?.disconnect(); outG?.disconnect() } catch { /* gone */ }
+      // A recording holding the sound bus keeps the context (and its sound
+      // track) alive; it plays silence until the sound comes back. (Not if
+      // Sonify was switched back on meanwhile : it plays on this context.)
+      if (this.ctx === ctx && !this.node && !this.starting && this.bus === 0 && !this.warm) this.closeCtx()
+    }
+    if (outG && ctx && !now && ctx.state === 'running') {
+      const t = ctx.currentTime + 0.005
+      try { outG.gain.cancelAndHoldAtTime(t) } catch { /* nothing to hold */ }
+      outG.gain.setTargetAtTime(0, t, 0.004)
+      window.setTimeout(teardown, 50)
+    } else teardown()
     this.collageCompGr = -1
     this.glueGr = -1
     this.anPre = null
@@ -964,9 +1006,6 @@ class SonifyEngine {
     this.meterR = { peak: 0, rms: 0 }
     this.flowDots = new Float32Array(0)
     this.scan = null
-    // A recording holding the sound bus keeps the context (and its sound track)
-    // alive; it plays silence until the sound comes back.
-    if (this.bus === 0 && !this.warm) this.closeCtx()
   }
 
   private applySink(sinkId: string): void {
@@ -974,8 +1013,30 @@ class SonifyEngine {
     if (ctx?.setSinkId)
       ctx
         .setSinkId(sinkId)
-        .then(() => this.applySpaceRoute()) // another device : another channel count
+        .then(() => this.reroute(() => this.applySpaceRoute())) // another device : another channel count
         .catch((e) => console.warn('[sonify] setSinkId', e))
+  }
+
+  /** Duck the output (15 ms), make the change, bring it back : a live rewire of
+   *  the paths to the speakers clicked. */
+  private reroute(change: () => void): void {
+    const ctx = this.ctx, g = this.outG
+    if (!ctx || !g || ctx.state !== 'running') { change(); return }
+    this.routeChanges.push(change)
+    if (this.routeTimer) return // a duck already running : this change joins it
+    const t = ctx.currentTime + 0.005
+    try { g.gain.cancelAndHoldAtTime(t) } catch { /* nothing to hold */ }
+    g.gain.setTargetAtTime(0, t, 0.004)
+    this.routeTimer = window.setTimeout(() => {
+      this.routeTimer = 0
+      const all = this.routeChanges
+      this.routeChanges = []
+      for (const c of all) { try { c() } catch (e) { console.warn('[sonify] reroute', e) } }
+      if (this.outG !== g) return
+      const t2 = ctx.currentTime + 0.005
+      try { g.gain.cancelAndHoldAtTime(t2) } catch { /* nothing to hold */ }
+      g.gain.setTargetAtTime(1, t2, 0.01)
+    }, 50)
   }
 
   /** Space : the worklet's matrix (see soni.worklet.js SpaceBus) and whether its
@@ -983,15 +1044,22 @@ class SonifyEngine {
    *  stereo path through the EQ. The recordings keep the stereo mix either way. */
   setSpace(msg: SpaceMsg): void {
     this.spaceMsg = msg
-    this.node?.port.postMessage(msg)
     const on = msg.on && msg.nch > 0
     const preview = on && !!msg.preview
-    if (on !== this.spaceRoute.on || preview !== this.spaceRoute.preview || (on && msg.nch !== this.spaceRoute.nch)) {
-      this.spaceRoute = { on, nch: msg.nch, preview }
-      this.applySpaceRoute()
-    }
+    const pieces = on ? msg.pieces ?? 0 : 0
+    const route = on !== this.spaceRoute.on || preview !== this.spaceRoute.preview || (on && msg.nch !== this.spaceRoute.nch)
+    if (route || pieces !== this.groupsWanted) {
+      // the route, the worklet's switch and the Collage's piece groups change
+      // together, under the duck (the piece groups rewired live clicked too)
+      if (route) this.spaceRoute = { on, nch: msg.nch, preview }
+      this.groupsWanted = pieces
+      this.reroute(() => {
+        if (this.spaceMsg) this.node?.port.postMessage(this.spaceMsg)
+        if (route) this.applySpaceRoute()
+        this.setCollageGroups(this.groupsWanted)
+      })
+    } else this.node?.port.postMessage(msg)
     if (!on) this.spaceMeter = null
-    this.setCollageGroups(on ? msg.pieces ?? 0 : 0)
   }
 
   /** The headphone preview's directions, one per output channel (az, el in
@@ -1002,11 +1070,20 @@ class SonifyEngine {
     const pv = this.spacePreview
     if (!pv || key !== this.previewKey) {
       this.previewKey = key
-      if (this.spaceRoute.preview) this.applySpaceRoute()
+      // a new set of virtual speakers : rebuilt under the duck too (rebuilt live,
+      // right after the headphones came on, it ticked)
+      if (this.spaceRoute.preview) this.reroute(() => this.applySpaceRoute())
       return
     }
+    // only the directions that moved (a fixed speaker was re-automated 30 times a
+    // second, three events per panner)
     const t = this.ctx?.currentTime ?? 0
-    dirs.forEach((d, i) => { const p = pv.pans[i]; if (d && p) placePanner(p, d, t) })
+    dirs.forEach((d, i) => {
+      const p = pv.pans[i], last = this.previewLast[i]
+      if (!d || !p || (last && last[0] === d[0] && last[1] === d[1])) return
+      placePanner(p, d, t)
+      this.previewLast[i] = [d[0], d[1]]
+    })
   }
 
   /** Space : sound the Collage pieces as up to `n` sources of their own. */
@@ -1027,11 +1104,20 @@ class SonifyEngine {
   }
 
   private applySpaceRoute(): void {
-    const ctx = this.ctx, node = this.node
-    if (!ctx || !node) return
+    const ctx = this.ctx, node = this.node, out = this.outG
+    if (!ctx || !node || !out) return
     const dst = ctx.destination
-    try { node.disconnect(dst) } catch { /* not connected */ }
-    try { this.eqNode?.disconnect(dst) } catch { /* not connected */ }
+    try { node.disconnect(out) } catch { /* not connected */ }
+    try { this.eqNode?.disconnect(out) } catch { /* not connected */ }
+    this.previewLast = []
+    // the output gain carries the channels as the device takes them
+    const layout = (n: number, discrete: boolean): void => {
+      for (const x of [dst, out] as AudioNode[]) {
+        x.channelCount = n
+        x.channelCountMode = 'explicit'
+        x.channelInterpretation = discrete ? 'discrete' : 'speakers'
+      }
+    }
     const old = this.spacePreview
     if (old) {
       try { node.disconnect(old.split) } catch { /* not connected */ }
@@ -1041,8 +1127,7 @@ class SonifyEngine {
     try {
       if (this.spaceRoute.on && this.spaceRoute.preview) {
         // headphones : every channel at its place, heard through the HRTF
-        dst.channelCount = Math.min(2, dst.maxChannelCount)
-        dst.channelInterpretation = 'speakers'
+        layout(Math.min(2, dst.maxChannelCount), false)
         const n = Math.max(1, Math.min(this.spaceRoute.nch, SPACE_MAX_CH))
         const split = ctx.createChannelSplitter(n)
         const sum = ctx.createGain()
@@ -1069,26 +1154,23 @@ class SonifyEngine {
         const trim = ctx.createGain()
         trim.gain.value = PREVIEW_TRIM
         const lim = ctx.createDynamicsCompressor()
-        lim.threshold.value = -1.5
+        lim.threshold.value = -3 // its makeup and finite ratio : a -1.5 threshold let peaks near 0 dBFS through
         lim.knee.value = 0
         lim.ratio.value = 20
         lim.attack.value = 0.002
         lim.release.value = 0.15
-        sum.connect(trim).connect(lim).connect(dst)
+        sum.connect(trim).connect(lim).connect(out)
         this.spacePreview = { split, pans, sum, trim, lim }
       } else if (this.spaceRoute.on) {
-        dst.channelCount = Math.max(1, Math.min(this.spaceRoute.nch, dst.maxChannelCount, SPACE_MAX_CH))
-        dst.channelCountMode = 'explicit'
-        dst.channelInterpretation = 'discrete'
-        node.connect(dst, 1)
+        layout(Math.max(1, Math.min(this.spaceRoute.nch, dst.maxChannelCount, SPACE_MAX_CH)), true)
+        node.connect(out, 1)
       } else {
-        dst.channelCount = Math.min(2, dst.maxChannelCount)
-        dst.channelInterpretation = 'speakers'
-        this.eqNode?.connect(dst)
+        layout(Math.min(2, dst.maxChannelCount), false)
+        this.eqNode?.connect(out)
       }
     } catch (e) {
       console.warn('[sonify] space route', e)
-      this.eqNode?.connect(dst)
+      this.eqNode?.connect(out)
     }
   }
 
@@ -1151,8 +1233,10 @@ class SonifyEngine {
     this.cfg = cfg
     const glide = this.glideOnce
     this.glideOnce = 0
-    if (!this.node) return
+    // (before the node check : picked while Sonify was off, on a context kept
+    // warm, the device was never applied and Sonify came back on the old one)
     if (sinkChanged) this.applySink(cfg.sinkId)
+    if (!this.node) return
     // grain pitch table for the flow voice
     this.grainFreqs = cfg.flow.quantize
       ? scaleTable(effRoot(cfg), cfg.scale, cfg.flow.loOct, cfg.flow.hiOct)

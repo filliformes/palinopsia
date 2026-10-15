@@ -541,7 +541,8 @@ function addPoint(v: Vbap, az: number, el: number, w: number, out: Float64Array)
     if (mn > bestMin) { bestMin = mn; best = t; g[0] = g0; g[1] = g1; g[2] = g2 }
     if (mn >= -EPS) break
   }
-  if (best < 0) return
+  // no base at all (two opposite speakers) : the nearest one
+  if (best < 0) { out[nearestSpeaker(v, p)] += w; return }
   const idx = best * stride
   let pw = 0
   const real = [false, false, false]
@@ -551,8 +552,24 @@ function addPoint(v: Vbap, az: number, el: number, w: number, out: Float64Array)
     if (s < n) { real[k] = true; pw += gk * gk }
   }
   // the virtual nadir's share is dropped and the rest brought back to unit power
-  const norm = pw > 1e-12 ? 1 / Math.sqrt(pw) : 0
-  for (let k = 0; k < stride; k++) if (real[k]) out[v.sets[idx + k]] += Math.max(0, g[k]) * norm * w
+  if (pw > 1e-12) {
+    const norm = 1 / Math.sqrt(pw)
+    for (let k = 0; k < stride; k++) if (real[k]) out[v.sets[idx + k]] += Math.max(0, g[k]) * norm * w
+    return
+  }
+  // Outside every speaker pair or triangle (an imported setup with a gap of 180°
+  // or more, every speaker on one side) : the nearest speaker, never silence.
+  out[nearestSpeaker(v, p)] += w
+}
+
+function nearestSpeaker(v: Vbap, p: number[]): number {
+  let near = 0, dot = -Infinity
+  for (let i = 0; i < v.speakers.length; i++) {
+    const q = azElToVec(v.speakers[i].az, v.speakers[i].el)
+    const d = q[0] * p[0] + q[1] * p[1] + q[2] * p[2]
+    if (d > dot) { dot = d; near = i }
+  }
+  return near
 }
 
 /** The gains for a voice at (az, el) spread by (hspan, vspan) : one per panned

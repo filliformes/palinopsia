@@ -1232,8 +1232,8 @@ for the selected one, a **flat** reset, and the **input / output gain** (±24 dB
 beside their meters. The output never passes 0 dB : above -1 dB a soft ceiling holds it
 (the output meter turns orange). It plays to the speakers only : recordings are taken
 before it, so a take stays the piece and not the room. The EQ is saved with the Sonify
-settings, and **↺ default**, a loaded preset and the sequencer's preset steps all leave
-it as it is (it belongs to the room, not to the patch).
+settings, and **↺ default**, a loaded preset, a recalled scene and the sequencer's preset
+steps all leave it as it is (it belongs to the room, not to the patch).
 **Glue** : under the EQ, one compressor on the whole Sonify mix, after the EQ's bands
 and before its output gain and the soft ceiling, to hold the voices together (it runs
 with the EQ bypassed too). One knob, **amount** : the threshold falls to -12 dB and the
