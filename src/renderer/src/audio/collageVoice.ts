@@ -97,7 +97,7 @@ export interface CollageVoiceCfg {
   width: number // stereo spread of the pan
   inGain?: number // linear : the films' level into the resonators (a windy film)
   hp?: number // Hz : each film's high-pass (24 dB/oct), before the resonators
-  lp?: number // Hz : each film's low-pass (12 dB/oct)
+  lp?: number // Hz : each film's low-pass (24 dB/oct)
 }
 
 /** One <audio> playing one file into its deck's bus. */
@@ -112,7 +112,7 @@ interface Player {
 interface DeckPlayer {
   bus: GainNode // the film's players sound here : stable across clip switches
   hp: BiquadFilterNode[] // the film's high-pass (two sections : 24 dB/oct) …
-  lp: BiquadFilterNode // … and low-pass (12 dB/oct), before every piece of it
+  lp: BiquadFilterNode[] // … and low-pass (two sections : 24 dB/oct), before every piece of it
   out: GainNode // the pieces listen here
   cur: Player
   next: Player | null // a new clip, or a jump, waiting to sound before it takes over
@@ -314,12 +314,16 @@ export class CollageVoice {
     if (!d) {
       const ctx = this.ctx
       const bus = ctx.createGain()
-      // bus → high-pass ×2 (Butterworth 4th order) → low-pass → the pieces
-      const hp = [0.5412, 1.3066].map((q) => { const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.Q.value = q; f.frequency.value = this.hpHz; return f })
-      const lp = ctx.createBiquadFilter()
-      lp.type = 'lowpass'; lp.Q.value = 0.7071; lp.frequency.value = this.lpHz
+      // bus → high-pass ×2 → low-pass ×2 (Butterworth 4th order each : 24 dB/oct,
+      // flat to the corner, -3 dB at it) → the pieces. Web Audio reads a low- or
+      // high-pass Q in DECIBELS : the Butterworth Qs 0.5412 and 1.3066 are -5.33
+      // and +2.32 dB (given as plain numbers they rang, +3.8 dB below the corner).
+      const bw = (type: BiquadFilterType, hz: number): BiquadFilterNode[] =>
+        [-5.3329, 2.3226].map((q) => { const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.value = hz; return f })
+      const hp = bw('highpass', this.hpHz)
+      const lp = bw('lowpass', Math.min(this.lpHz, ctx.sampleRate * 0.45))
       const out = ctx.createGain()
-      bus.connect(hp[0]).connect(hp[1]).connect(lp).connect(out)
+      bus.connect(hp[0]).connect(hp[1]).connect(lp[0]).connect(lp[1]).connect(out)
       const dp: DeckPlayer = {
         bus, hp, lp, out, cur: this.makePlayer(path, bus, 1), next: null, nextT: 0, nextSince: 0, fading: [], spare: null,
         path, video: null, onSeek: () => {}, used: true
@@ -479,7 +483,7 @@ export class CollageVoice {
     if (d.next) this.killPlayer(d.next)
     if (d.spare) this.killPlayer(d.spare)
     for (const f of d.fading) this.killPlayer(f.p)
-    try { d.bus.disconnect(); d.hp.forEach((f) => f.disconnect()); d.lp.disconnect(); d.out.disconnect() } catch { /* already gone */ }
+    try { d.bus.disconnect(); d.hp.forEach((f) => f.disconnect()); d.lp.forEach((f) => f.disconnect()); d.out.disconnect() } catch { /* already gone */ }
     this.decks.delete(key)
   }
 
@@ -493,7 +497,7 @@ export class CollageVoice {
       this.hpHz = hpHz; this.lpHz = lpHz
       for (const d of this.decks.values()) {
         d.hp.forEach((f) => f.frequency.setTargetAtTime(hpHz, now, 0.03))
-        d.lp.frequency.setTargetAtTime(Math.min(lpHz, this.ctx.sampleRate * 0.45), now, 0.03)
+        d.lp.forEach((f) => f.frequency.setTargetAtTime(Math.min(lpHz, this.ctx.sampleRate * 0.45), now, 0.03))
       }
     }
     const inLin = Math.max(0, cfg.inGain ?? 1)

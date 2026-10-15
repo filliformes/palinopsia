@@ -10,12 +10,17 @@ that CI builds into cross-platform releases.
 - **The Collage voice's films in** (Sonify → Collage), for windy or hot recordings :
   **films in** (-24..+12 dB on each piece's input, before the resonators), **hp** (each
   film's deck bus → two Butterworth high-pass sections, 24 dB/oct, 20 Hz..1 kHz) and
-  **lp** (one section, 12 dB/oct, 1..20 kHz) before every piece of that film, and **ring
+  **lp** (two Butterworth low-pass sections, 24 dB/oct, 1..20 kHz, its slider in 0.3 %
+  steps and its readout to 10 Hz) before every piece of that film, and **ring
   in** (-24..+12 dB into the Ring bank : it scales the bank's input and the dry level its
   follower matches, so the wet and the bands' clip both follow it; scaled on the input
   alone, the follower undid it). OSC `/opsia/sonify/collage/input · hp · lp · ringin`.
   Measured on the test clip : films in -12 dB, the voice -12 dB; hp 300 Hz, -12 dB (its
-  energy is low rumble); ring in -12 dB at full wet, the bank off its clip.
+  energy is low rumble); ring in -12 dB at full wet, the bank off its clip. Web Audio
+  reads a low- or high-pass `Q` in DECIBELS : the Butterworth sections take -5.33 and
+  +2.32 dB (0.5412 and 1.3066 given as plain numbers rang, +3.8 dB below the corner).
+  Measured (`getFrequencyResponse`) : lp 2 kHz flat to 1 kHz, -3.0 dB at 2, -24.7 at 4,
+  -51.4 at 8; hp 200 Hz flat from 400, -3.0 at 200, -24.1 at 100, -48.2 at 50.
 
 - **Space : Sonify in the room** (Sonify → ◎ space). The worklet gains a second output
   of up to 32 channels fed by a gain matrix (each voice's left and right, and the FX

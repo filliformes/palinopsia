@@ -162,7 +162,7 @@ export interface SoniConfig {
     // THE FILMS IN, before everything (a windy or hot recording) :
     inGain: number // dB, -24..+12 : the films' level into the resonators (and the voice)
     hp: number // Hz, 20..1000 : a high-pass on every film, 24 dB/oct (20 = off) : wind rumble
-    lp: number // Hz, 1000..20000 : a low-pass, 12 dB/oct (20000 = off) : crackle, hiss
+    lp: number // Hz, 1000..20000 : a low-pass, 24 dB/oct (20000 = off) : crackle, hiss
     ringIn: number // dB, -24..+12 : how hard the films drive the Ring bank (its wet and its clip)
     loOct: number; hiOct: number
     // RING BANK : a 48-band resonant filterbank on the whole voice,
