@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Palinopsia — a visual instrument you play</title>
-<meta name="description" content="Palinopsia (Opsia): an OSC-controlled ISF/WebGL visual instrument. A four-layer compositor you perform, with a modulation brain, image-to-sound, an automatic video editor, embodied webcam control, fulldome output and a seat on the dataflou mesh. Free and open source for Windows, macOS and Linux.">
+<meta name="description" content="Palinopsia (Opsia): an OSC-controlled ISF/WebGL visual instrument. A four-layer compositor you perform, with a modulation brain, image-to-sound placed around a speaker dome, an automatic video editor, embodied webcam control, fulldome output and a seat on the dataflou mesh. Free and open source for Windows, macOS and Linux.">
 <meta property="og:title" content="Palinopsia — a visual instrument you play">
 <meta property="og:description" content="A four-layer WebGL compositor you perform, not a tool you wire. Played by hand, by an internal modulation brain, over OSC/MIDI, or with your body.">
 <meta property="og:image" content="https://filliformes.github.io/palinopsia/images/interface-compositor.jpg">
@@ -138,7 +138,7 @@
   <div class="wrap">
     <span class="brand">Palinopsia<span class="dot">.</span></span>
     <a class="link" href="#download">Download</a>
-    <a class="link" href="#new-127">What's new</a>
+    <a class="link" href="#new-128">What's new</a>
     <a class="link" href="#quickstart">Quickstart</a>
     <a class="link" href="#highlights">Highlights</a>
     <a class="link" href="#faq">FAQ</a>
@@ -215,6 +215,21 @@
       <figure><img src="images/shot-line-wall.jpg" alt="Line Wall"><figcaption><b>Line Wall.</b> Machine-cut bars laid on a wall that runs off to the side.</figcaption></figure>
       <figure><img src="images/shot-crossing.jpg" alt="Crossing"><figcaption><b>Crossing.</b> Full-height bars, each leaning its own way.</figcaption></figure>
     </div>
+  </section>
+
+  <section id="new-128">
+    <h2>New in 1.2.8</h2>
+    <p class="section-lede">Sound in the dome. The voices leave the stereo pair and take their places in the room, the way the picture takes its place on the dome.</p>
+    <ul class="new">
+      <li><b>Space</b> <kbd>S</kbd> : every Sonify voice sounds where it plays in the picture, carried through the fulldome mapping, on your own speakers (rings and domes built in, or any SpatGRIS speaker setup, up to 32 channels) or as objects for <b>SpatGRIS</b>, the renderer of the SAT Satosphère's 93 speakers (ADM-OSC too).</li>
+      <li><b>Played, not only placed</b> : drag a voice on the room map or its numbers up and down, bind its place to a modulator or a Meta knob, move it over OSC. An LFO on the azimuth spins a voice round and round the dome.</li>
+      <li><b>Hear the dome on headphones</b> : the speakers (or SpatGRIS's objects) placed around your head, in stereo, so a dome piece can be prepared anywhere.</li>
+      <li><b>The Collage, piece by piece</b> : each piece of a wall of films can be a sound of its own, from where it is on the dome, and every piece playing shows on the map.</li>
+      <li><b>Satosphère in one click</b> : a 210° domemaster at 4096 × 4096, the whole picture over the whole dome, NDI at 60 fps and the voices for the venue's SpatGRIS.</li>
+      <li><b>An output EQ for Sonify</b> : twelve bands to tune the room, drawn over the live spectrum, each point dragged like a Pro-Q. And a <b>feather</b> for the projection warp.</li>
+      <li><b>Lighter</b> : piled Collage walls in about half the GPU time, Toile 60 % lighter, the Collage loading only the films its pieces show.</li>
+    </ul>
+    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.8.md">release notes</a>.</p>
   </section>
 
   <section id="new-127">
@@ -307,7 +322,7 @@
         <img src="images/interface-sonify.jpg" alt="The Sonify page: the composite mirrored large with sound probes drawn on it, and the voice strips on the right.">
         <div class="body">
           <h3>Sonify<span class="k">S</span></h3>
-          <p>The image itself synthesizes audio in real time, inside the app, no external software. Ten voices (a scanning spectrogram, the frame as an oscillator, grain clouds off motion, struck edges, raster audification, SSTV, resonant filters, read heads that play the picture as data, a chord bank, and a Collage's own films heard as a tuned sound collage through a Ring bank inspired by the S-4) with a shared reverb/delay tail, an effects sequencer, and a key sequencer that composes the key of the whole instrument over time.</p>
+          <p>The image itself synthesizes audio in real time, inside the app, no external software. Ten voices (a scanning spectrogram, the frame as an oscillator, grain clouds off motion, struck edges, raster audification, SSTV, resonant filters, read heads that play the picture as data, a chord bank, and a Collage's own films heard as a tuned sound collage through a Ring bank inspired by the S-4) with a shared reverb/delay tail, an output EQ, an effects sequencer, and a key sequencer that composes the key of the whole instrument over time. And every voice can take its place in the room : around a speaker dome, or as objects for SpatGRIS.</p>
         </div>
       </div>
       <div class="card">
@@ -419,7 +434,7 @@
 
   <section>
     <h2>Where to go next</h2>
-    <p>When you want the full vocabulary (43 sources, 53 effects, 25 native nodes, the modulation matrix, the sequencers, the Sonify voices and the dataflou mesh), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>, and the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.7.md">1.2.7 release notes</a> for what changed. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
+    <p>When you want the full vocabulary (43 sources, 53 effects, 25 native nodes, the modulation matrix, the sequencers, the Sonify voices and the dataflou mesh), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>, and the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.8.md">1.2.8 release notes</a> for what changed. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
   </section>
 
   <footer>
