@@ -186,6 +186,15 @@ that CI builds into cross-platform releases.
   its cell. Measured : both taps update every tick (21 of 21), each with its own picture
   (all 9216 cells differ between a master tap and a layer tap).
 
+### Docs
+
+- **The documentation catches up with v1.2.8** : the README opens on the sound and the
+  dome, Space's places join the list of Sonify modulation targets, the contents name
+  the output EQ, the Collage voice's row says its films play from audio-only copies and
+  stay out of the media keys and Now Playing; the release notes get their intro, the
+  older-sessions note, the install table, the notes on the 32 channels and the venue,
+  and the developer notes for Space. The site's "New in 1.2.8" waits for the release.
+
 ## v1.2.7 — 2026-10-13
 
 ### Added
