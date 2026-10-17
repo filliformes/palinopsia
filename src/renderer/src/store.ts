@@ -1557,7 +1557,10 @@ interface StoreState {
   audioSource: 'both' | 'osc' | 'local'
   setAudioSource: (s: 'both' | 'osc' | 'local') => void
   audioDeviceId: string | null
-  setAudioDeviceId: (id: string | null) => void
+  /** The chosen input's name, to find it again when its id changed (another
+   *  build of the app, the interface in another port). */
+  audioDeviceLabel: string | null
+  setAudioDeviceId: (id: string | null, label?: string | null) => void
   // Monitoring / passthrough : hear the local input through an output device
   // while it also drives reactivity. Machine-local (venue rig), persisted.
   audioMonitor: boolean
@@ -3486,10 +3489,14 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ audioSource: s })
   },
   audioDeviceId: localStorage.getItem('opsia.audioDeviceId') || null,
-  setAudioDeviceId: (id) => {
+  audioDeviceLabel: localStorage.getItem('opsia.audioDeviceLabel') || null,
+  setAudioDeviceId: (id, label) => {
+    const name = id ? label ?? null : null
     if (id) localStorage.setItem('opsia.audioDeviceId', id)
     else localStorage.removeItem('opsia.audioDeviceId')
-    set({ audioDeviceId: id })
+    if (name) localStorage.setItem('opsia.audioDeviceLabel', name)
+    else localStorage.removeItem('opsia.audioDeviceLabel')
+    set({ audioDeviceId: id, audioDeviceLabel: name })
   },
   audioMonitor: localStorage.getItem('opsia.audioMonitor') === '1',
   setAudioMonitor: (on) => {

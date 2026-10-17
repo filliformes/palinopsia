@@ -23,6 +23,7 @@ export function AudioPanel(): JSX.Element {
   const source = useStore((s) => s.audioSource)
   const setSource = useStore((s) => s.setAudioSource)
   const deviceId = useStore((s) => s.audioDeviceId)
+  const deviceLabel = useStore((s) => s.audioDeviceLabel)
   const setDeviceId = useStore((s) => s.setAudioDeviceId)
   const showCoupling = useStore((s) => s.showCoupling)
   const setShowCoupling = useStore((s) => s.setShowCoupling)
@@ -35,6 +36,10 @@ export function AudioPanel(): JSX.Element {
   const monitorSink = useStore((s) => s.audioMonitorSink)
   const setMonitorSink = useStore((s) => s.setAudioMonitorSink)
   const sonify = useStore((s) => s.sonify)
+  // Sound going on in the app (Sonify, the Audio Layer) : the dot lights for it
+  // too, the input analysis on or off, so it is clear something sounds.
+  const layerSound = useStore((s) => !!(s.audioLayer.A || s.audioLayer.B) && !s.audioLayer.mute)
+  const playing = [sonify.on ? 'Sonify' : '', layerSound ? 'Audio Layer' : ''].filter(Boolean)
   const setSonify = useStore((s) => s.setSonify)
   const denoise = useStore((s) => s.audioDenoise)
   const setDenoise = useStore((s) => s.setAudioDenoise)
@@ -67,13 +72,21 @@ export function AudioPanel(): JSX.Element {
         <button
           onClick={() => setEnabled(!enabled)}
           className={`flex shrink-0 items-center gap-1.5`}
-          title={enabled ? 'Audio ingest on' : 'Audio ingest off'}
+          title={`${playing.length ? `Sound is going on (${playing.join(', ')}). ` : ''}The input analysis is ${enabled ? 'on' : 'off'} : click to turn it ${enabled ? 'off' : 'on'} (it listens to an input for the audio modulators and the reactivity).`}
         >
           <span
-            className={`h-2.5 w-2.5 rounded-full transition-colors ${enabled ? 'bg-accent' : 'bg-panel3'}`}
+            className={`h-2.5 w-2.5 rounded-full transition-colors ${enabled || playing.length ? 'bg-accent' : 'bg-panel3'}`}
           />
           <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Audio</span>
         </button>
+        {playing.length > 0 && (
+          <span
+            className="min-w-0 truncate font-mono text-[9px] text-accent"
+            title="What is sounding in the app now"
+          >
+            {playing.join(' · ')}
+          </span>
+        )}
 
         {enabled && (
           <>
@@ -117,7 +130,10 @@ export function AudioPanel(): JSX.Element {
             <select
               className="input select-compact w-full min-w-0 text-[10px]"
               value={deviceId ?? ''}
-              onChange={(e) => setDeviceId(e.target.value || null)}
+              onChange={(e) => {
+                const id = e.target.value || null
+                setDeviceId(id, id ? devices.find((d) => d.deviceId === id)?.label || null : null)
+              }}
               title="Local audio input device"
             >
               <option value="">Default input</option>
@@ -126,6 +142,13 @@ export function AudioPanel(): JSX.Element {
                   {d.label || `Input ${d.deviceId.slice(0, 6)}`}
                 </option>
               ))}
+              {/* The remembered device is not in the list : say so (the menu
+                  read "Default input" while it listened to nothing). */}
+              {deviceId && devices.length > 0 && !devices.some((d) => d.deviceId === deviceId) && (
+                <option value={deviceId}>
+                  {`${deviceLabel ?? 'The chosen input'} (not here : the default input plays)`}
+                </option>
+              )}
             </select>
           )}
           <AudioOutputSelect

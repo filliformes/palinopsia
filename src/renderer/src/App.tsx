@@ -741,6 +741,7 @@ export default function App(): JSX.Element {
   const audioEnabled = useStore((s) => s.audioEnabled)
   const audioSource = useStore((s) => s.audioSource)
   const audioDeviceId = useStore((s) => s.audioDeviceId)
+  const audioDeviceLabel = useStore((s) => s.audioDeviceLabel)
   useEffect(() => {
     if (!audioEnabled) {
       audioBus.mode = 'off'
@@ -750,11 +751,17 @@ export default function App(): JSX.Element {
     audioBus.mode = audioSource
     // The local Web Audio input runs when the source uses it (local or both).
     const wantLocal = audioSource === 'local' || audioSource === 'both'
-    if (wantLocal && !audioBus.localActive) {
-      void audioBus.startLocal(audioDeviceId).then((ok) => {
-        if (!ok && audioSource === 'local') {
-          showToast('Could not open the audio input : check the device / OS permissions', 'warn', 6000)
-        }
+    // (a device picked while the input runs reopens it : it used to wait for
+    // the input to be switched off and on)
+    const want = audioDeviceId ?? ''
+    if (wantLocal && (!audioBus.localActive || audioBus.requested !== want)) {
+      void audioBus.startLocal(audioDeviceId, audioDeviceLabel).then((ok) => {
+        // (said in Both too : there it fell back to nothing, silently)
+        if (!ok) showToast('Could not open the audio input : check the device and the system\'s microphone permission', 'warn', 6000)
+        else if (audioBus.opened === 'default')
+          showToast(`The audio input you chose${audioDeviceLabel ? ` (${audioDeviceLabel})` : ''} is not here : listening to the default input`, 'warn', 6000)
+        // found again by its name under a new id : remember that one
+        else if (audioBus.requested !== want && audioBus.requested) useStore.getState().setAudioDeviceId(audioBus.requested, audioDeviceLabel)
       })
     } else if (!wantLocal) {
       audioBus.stopLocal()
@@ -762,7 +769,7 @@ export default function App(): JSX.Element {
     return () => {
       audioBus.mode = 'off'
     }
-  }, [audioEnabled, audioSource, audioDeviceId])
+  }, [audioEnabled, audioSource, audioDeviceId, audioDeviceLabel])
 
   // ── Audio monitoring / passthrough : push the (machine-local) monitor config
   //    to the bus. It re-applies to a fresh input on its own (startLocal reads

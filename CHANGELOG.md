@@ -7,6 +7,17 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The audio input no longer goes silent on a remembered device that is gone.** The
+  audio tab kept the chosen input by its id only; an id that changed (the installed app
+  and the dev app number devices differently, another USB port) or a device unplugged
+  left the analyser silent, with no message in Both mode, the menu reading "Default
+  input" : the audio modulators read nothing, even from the laptop's microphone. Now
+  the device is remembered with its name (`audioDeviceLabel`) and found again by it, else
+  the default input plays, said in a message and in the menu (`… (not here : the default
+  input plays)`); a failure to open anything is said in every mode. Picking another
+  device while the input runs reopens it (it waited for the input to be switched off and
+  on).
+
 - **Import audio plays AIFF files** (and WMA / CAF). The player can't decode them, and
   their audio-only copy was asked through the Collage's handler, which takes films only :
   the slot stayed silent. A sound file now has its own path (`audio:playable` : the file
@@ -15,6 +26,9 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **The audio section's dot lights while sound is going on** (Sonify on, or something in
+  the Audio Layer, unmuted), with what plays named beside it. Clicking it still toggles
+  the input analysis only : it never opens the microphone by itself.
 - **The Audio Layer** (`AU`, the layers tab, under Layer 4; `audio/audioLayer.ts`,
   `components/AudioLayerPanel.tsx`) : two slots, each a sound file or a live audio input,
   its own volume (to 2×), pan and mute, the A/B mix (the middle plays both whole :

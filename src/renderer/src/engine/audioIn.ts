@@ -167,9 +167,20 @@ class AudioBus {
     return this.localOn
   }
 
+  /** What the last startLocal opened : 'chosen' (the device asked for, by its
+   *  id or found again by its name), 'default' (the chosen one is not here : the
+   *  default input instead), or 'none'. */
+  opened: 'chosen' | 'default' | 'none' = 'none'
+  /** The device id the last startLocal was for ('' : the default input); the id
+   *  it was found again under when its name matched. A different id asked for
+   *  reopens the input. */
+  requested = ''
+
   // ── Local Web Audio ────────────────────────────────────────────────
-  async startLocal(deviceId?: string | null): Promise<boolean> {
+  async startLocal(deviceId?: string | null, label?: string | null): Promise<boolean> {
     this.stopLocal()
+    this.opened = 'none'
+    this.requested = deviceId ?? ''
     try {
       // Disable the browser's voice processing : an interface / line input (a
       // Move on inputs 1&2) wants the RAW signal, and AGC would flatten the very
@@ -179,8 +190,28 @@ class AudioBus {
         noiseSuppression: false,
         autoGainControl: false
       }
-      if (deviceId) audioC.deviceId = { exact: deviceId }
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: audioC, video: false })
+      // The chosen device by its id; else found again by its name (an id is
+      // not stable : another build of the app, another USB port); else the
+      // default input, said so (a remembered device that was gone left the
+      // input silent, the menu reading "Default input", no word of it).
+      const md = navigator.mediaDevices
+      let stream: MediaStream | null = null
+      let opened: 'chosen' | 'default' = 'chosen'
+      if (deviceId) {
+        try {
+          stream = await md.getUserMedia({ audio: { ...audioC, deviceId: { exact: deviceId } }, video: false })
+        } catch {
+          const same = label ? (await md.enumerateDevices()).find((d) => d.kind === 'audioinput' && d.label === label) : undefined
+          if (same) {
+            try {
+              stream = await md.getUserMedia({ audio: { ...audioC, deviceId: { exact: same.deviceId } }, video: false })
+              this.requested = same.deviceId
+            } catch { /* below */ }
+          }
+          if (!stream) opened = 'default'
+        }
+      }
+      if (!stream) stream = await md.getUserMedia({ audio: audioC, video: false })
       const ctx = new AudioContext()
       const src = ctx.createMediaStreamSource(stream)
       const analyser = ctx.createAnalyser()
@@ -218,9 +249,10 @@ class AudioBus {
       this.timeF = new Float32Array(analyser.fftSize)
       this.prevMag = new Float32Array(analyser.frequencyBinCount)
       this.localOn = true
+      this.opened = opened
       return true
     } catch (e) {
-      console.error('[audio] local input failed:', (e as Error).message)
+      console.error('[audio] local input failed:', (e as Error).name, (e as Error).message)
       this.localOn = false
       return false
     }

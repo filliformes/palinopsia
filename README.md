@@ -748,6 +748,14 @@ The **audio/midi/osc** right-column tab (key `A`) holds the control panels
   features over OSC from an audio brain (`/opsia/audio/*`). The **coupling**
   master switch (pinned right) reveals each layer's CPL row. Live meters show
   level / flux / transient / centroid / **noisiness** (spectral flatness) / bands.
+  The section's **dot** also lights while sound is going on in the app (Sonify on,
+  something in the [Audio Layer](#the-audio-layer)), named beside it; clicking it
+  still turns the input analysis on and off (it never opens the microphone by
+  itself). The input device is remembered with its name : a device whose id
+  changed (another build of the app, another USB port) is found again by name; one
+  that is not there plays the **default input** instead, said in a message and in
+  the menu (it used to stay silent). Picking another device while the input runs
+  switches to it at once.
   - **Monitoring / passthrough** : route the input through to a chosen output
     device (its own **sink** picker), so you can hear a source (e.g. the sound of
     an Ableton Move on interface inputs 1&2) while it drives the visuals. The
