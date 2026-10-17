@@ -34,6 +34,7 @@ export class ClipPlayer {
   private loopInMod: number | null = null
   private loopOutMod: number | null = null
   private pos = 0 // the playhead, seconds (the element's, or where a seek is going)
+  private held = false // cued for a synced start : kept paused until released
 
   /** `toDevice` : the element plays itself, on Sonify's device (the visual
    *  source); otherwise its sound is taken into a Web Audio graph. */
@@ -136,6 +137,10 @@ export class ClipPlayer {
     const spMod = this.speedMod ?? 1
     this.speedMod = null
     if (d <= 0 || a.readyState < 1) return
+    if (this.held) {
+      if (!a.paused) a.pause()
+      return
+    }
     const lo = Math.max(0, Math.min(1, Math.min(inN, outN))) * d
     const hi = Math.max(lo + 0.04, Math.max(0, Math.min(1, Math.max(inN, outN))) * d)
     const seek = (t: number): void => {
@@ -165,6 +170,46 @@ export class ClipPlayer {
       else { a.pause(); this.pos = hi }
     } else if (ct < lo - 0.05) seek(lo)
     else if (posN === null) this.pos = ct
+  }
+
+  /** Cued for a synced start : paused at its in point until `start()`. */
+  hold(on: boolean): void {
+    this.held = on
+  }
+
+  /** Go to the in point, paused; resolves once it can play from there (or
+   *  after 2 s, whatever it has). */
+  cue(): Promise<void> {
+    const a = this.audio
+    return new Promise<void>((done) => {
+      let over = false
+      const finish = (): void => { if (!over) { over = true; window.clearTimeout(t); done() } }
+      const t = window.setTimeout(finish, 2000)
+      const go = (): void => {
+        const d = this.duration()
+        const inN = Math.max(0, Math.min(1, Math.min(this.pb.inN, this.pb.outN)))
+        const at = d > 0 ? inN * d : 0
+        a.pause()
+        this.pos = at
+        const ready = (): void => {
+          if (a.readyState >= 3) finish()
+          else a.addEventListener('canplay', finish, { once: true })
+        }
+        if (Math.abs(a.currentTime - at) < 1e-3) { ready(); return }
+        a.addEventListener('seeked', ready, { once: true })
+        try { a.currentTime = at } catch { finish() }
+      }
+      if (a.readyState >= 1) go()
+      else a.addEventListener('loadedmetadata', go, { once: true })
+    })
+  }
+
+  /** Start now (a synced start calls each player's in the same moment). */
+  start(): void {
+    this.held = false
+    const a = this.audio
+    // (a pause meanwhile : the next tick pauses it again)
+    void a.play().catch(() => { /* the next tick tries again */ })
   }
 
   dispose(): void {

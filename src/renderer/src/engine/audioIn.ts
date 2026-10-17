@@ -34,7 +34,7 @@ export const AUDIO_FEATURES: AudioFeatureName[] = [
 
 export type AudioMode = 'off' | 'osc' | 'local' | 'both'
 
-interface Features {
+export interface AudioFeatures {
   level: number // RMS loudness 0..1
   flux: number // spectral flux 0..1 (onset energy)
   transient: number // gated onset impulse, decays 0..1
@@ -44,7 +44,14 @@ interface Features {
   noisiness: number // spectral flatness 0..1 : 0 tonal / pitched, 1 noise-like (hiss, breath)
 }
 
-function zero(): Features {
+type Features = AudioFeatures
+/** One feature (0..1) off a frame. */
+export function readFeature(c: AudioFeatures, name: AudioFeatureName, band = 0): number {
+  if (name === 'band') return c.bands[Math.max(0, Math.min(BANDS - 1, band))] ?? 0
+  return c[name] as number
+}
+
+export function zero(): Features {
   return { level: 0, flux: 0, transient: 0, centroid: 0, bands: new Array(BANDS).fill(0), pitch: 0, noisiness: 0 }
 }
 
@@ -114,6 +121,99 @@ function autoCorrelate(buf: Float32Array, sampleRate: number): number {
   return T0 > 0 ? sampleRate / T0 : -1
 }
 
+/** The buffers one analyser's frames need (and its pitch throttle). */
+export interface FrameBufs {
+  freq: Uint8Array<ArrayBuffer>
+  time: Uint8Array<ArrayBuffer>
+  timeF: Float32Array<ArrayBuffer> // float waveform (pitch)
+  prev: Float32Array<ArrayBuffer>
+  n: number
+}
+export function frameBufs(an: AnalyserNode): FrameBufs {
+  return {
+    freq: new Uint8Array(an.frequencyBinCount),
+    time: new Uint8Array(an.fftSize),
+    timeF: new Float32Array(an.fftSize),
+    prev: new Float32Array(an.frequencyBinCount),
+    n: 0
+  }
+}
+
+/** One frame of features off an AnalyserNode (2048 points, smoothing 0.5) into
+ *  `L` : the live input's maths, shared by the Audio Layer's mix so a modulator
+ *  reacts to it exactly as to the same sound coming in. */
+export function analyseFrame(an: AnalyserNode, fb: FrameBufs, L: AudioFeatures, dt: number, sampleRate: number): void {
+  const freq = fb.freq
+  const time = fb.time
+  const prev = fb.prev
+  an.getByteTimeDomainData(time)
+  an.getByteFrequencyData(freq)
+
+  // level : RMS of the centred time-domain waveform, lightly gained.
+  let sum = 0
+  for (let i = 0; i < time.length; i++) {
+    const x = (time[i] - 128) / 128
+    sum += x * x
+  }
+  L.level = Math.min(1, Math.sqrt(sum / time.length) * 2.5)
+
+  const N = freq.length
+  // bands : log-spaced groups across the spectrum.
+  for (let b = 0; b < BANDS; b++) {
+    const lo = Math.floor(Math.pow(N, b / BANDS))
+    const hi = Math.max(lo + 1, Math.floor(Math.pow(N, (b + 1) / BANDS)))
+    let s = 0
+    for (let i = lo; i < hi && i < N; i++) s += freq[i]
+    L.bands[b] = Math.min(1, (s / ((hi - lo) * 255)) * 1.5)
+  }
+  // centroid : energy-weighted mean bin, normalized.
+  let num = 0
+  let den = 0
+  for (let i = 0; i < N; i++) {
+    const m = freq[i]
+    num += i * m
+    den += m
+  }
+  L.centroid = den > 0 ? Math.min(1, (num / den / N) * 2) : 0
+  // noisiness : spectral flatness (geometric mean / arithmetic mean of the
+  // magnitude spectrum). ~0 for a pitched tone, ~1 for broadband hiss. Gated by
+  // level so silence reads 0 (empty bins would otherwise flatten to ~1).
+  let logSum = 0, linSum = 0
+  for (let i = 1; i < N; i++) {
+    const m = freq[i] / 255 + 1e-6
+    logSum += Math.log(m)
+    linSum += m
+  }
+  const cnt = N - 1
+  const flat = linSum > 1e-6 ? Math.exp(logSum / cnt) / (linSum / cnt) : 0
+  L.noisiness = L.level > 0.02 ? Math.min(1, flat * 2) : 0
+  // flux : sum of positive magnitude increases vs the previous frame.
+  let flux = 0
+  for (let i = 0; i < N; i++) {
+    const m = freq[i] / 255
+    const d = m - prev[i]
+    if (d > 0) flux += d
+    prev[i] = m
+  }
+  L.flux = Math.min(1, flux / (N * 0.15))
+  // transient : pulse on an onset (flux over threshold), else decay. The
+  // decay is normalized to 60fps (^(dt·60)) so it falls at the same wall-clock
+  // rate regardless of the actual frame rate.
+  L.transient = L.flux > 0.32 ? 1 : L.transient * Math.pow(0.82, dt * 60)
+  // pitch : autocorrelation on the float waveform, throttled (pitch moves
+  // slowly, and the ACF is the heaviest step). Held across unvoiced frames.
+  if (++fb.n % 3 === 0) {
+    an.getFloatTimeDomainData(fb.timeF)
+    const hz = autoCorrelate(fb.timeF, sampleRate)
+    if (hz > 0) {
+      // Log-map the fundamental over a musical span (A1 55 Hz → A6 1760 Hz).
+      const t = (Math.log2(hz) - LOG_FMIN) / (LOG_FMAX - LOG_FMIN)
+      L.pitch = Math.max(0, Math.min(1, t))
+    }
+    // Unvoiced (hz <= 0): hold the last pitch rather than flicker to 0.
+  }
+}
+
 class AudioBus {
   /** Ingest mode : set by the App effect from the store. */
   mode: AudioMode = 'off'
@@ -129,14 +229,8 @@ class AudioBus {
   private ctx: AudioContext | null = null
   private analyser: AnalyserNode | null = null
   private stream: MediaStream | null = null
-  // Explicit ArrayBuffer backing so the AnalyserNode byte-data calls typecheck
-  // (TS 5.7 typed-array generics reject the ArrayBufferLike default).
-  private freq: Uint8Array<ArrayBuffer> | null = null
-  private time: Uint8Array<ArrayBuffer> | null = null
-  private timeF: Float32Array<ArrayBuffer> | null = null // float waveform (pitch)
-  private prevMag: Float32Array<ArrayBuffer> | null = null
+  private bufs: FrameBufs | null = null
   private sampleRate = 44100
-  private pitchCounter = 0
   private lastTick = 0 // wall-clock of the previous tick(), for dt-aware decays
 
   // Monitoring / passthrough : route the local input straight to the output so
@@ -244,10 +338,7 @@ class AudioBus {
       this.analyser = analyser
       this.rebuildFilter() // wire src → [denoise?] → preSplit
       this.sampleRate = ctx.sampleRate
-      this.freq = new Uint8Array(analyser.frequencyBinCount)
-      this.time = new Uint8Array(analyser.fftSize)
-      this.timeF = new Float32Array(analyser.fftSize)
-      this.prevMag = new Float32Array(analyser.frequencyBinCount)
+      this.bufs = frameBufs(analyser)
       this.localOn = true
       this.opened = opened
       return true
@@ -271,10 +362,7 @@ class AudioBus {
     this.learnAnalyser = null
     this.learnBuf = null
     this.filterNodes = []
-    this.freq = this.time = null
-    this.timeF = null
-    this.prevMag = null
-    this.pitchCounter = 0
+    this.bufs = null
     this.localOn = false
     this.local = zero()
   }
@@ -447,78 +535,7 @@ class AudioBus {
   }
 
   private computeLocal(dt: number): void {
-    const an = this.analyser
-    const freq = this.freq
-    const time = this.time
-    const prev = this.prevMag
-    if (!an || !freq || !time || !prev) return
-    an.getByteTimeDomainData(time)
-    an.getByteFrequencyData(freq)
-    const L = this.local
-
-    // level : RMS of the centred time-domain waveform, lightly gained.
-    let sum = 0
-    for (let i = 0; i < time.length; i++) {
-      const x = (time[i] - 128) / 128
-      sum += x * x
-    }
-    L.level = Math.min(1, Math.sqrt(sum / time.length) * 2.5)
-
-    const N = freq.length
-    // bands : log-spaced groups across the spectrum.
-    for (let b = 0; b < BANDS; b++) {
-      const lo = Math.floor(Math.pow(N, b / BANDS))
-      const hi = Math.max(lo + 1, Math.floor(Math.pow(N, (b + 1) / BANDS)))
-      let s = 0
-      for (let i = lo; i < hi && i < N; i++) s += freq[i]
-      L.bands[b] = Math.min(1, (s / ((hi - lo) * 255)) * 1.5)
-    }
-    // centroid : energy-weighted mean bin, normalized.
-    let num = 0
-    let den = 0
-    for (let i = 0; i < N; i++) {
-      const m = freq[i]
-      num += i * m
-      den += m
-    }
-    L.centroid = den > 0 ? Math.min(1, (num / den / N) * 2) : 0
-    // noisiness : spectral flatness (geometric mean / arithmetic mean of the
-    // magnitude spectrum). ~0 for a pitched tone, ~1 for broadband hiss. Gated by
-    // level so silence reads 0 (empty bins would otherwise flatten to ~1).
-    let logSum = 0, linSum = 0
-    for (let i = 1; i < N; i++) {
-      const m = freq[i] / 255 + 1e-6
-      logSum += Math.log(m)
-      linSum += m
-    }
-    const cnt = N - 1
-    const flat = linSum > 1e-6 ? Math.exp(logSum / cnt) / (linSum / cnt) : 0
-    L.noisiness = L.level > 0.02 ? Math.min(1, flat * 2) : 0
-    // flux : sum of positive magnitude increases vs the previous frame.
-    let flux = 0
-    for (let i = 0; i < N; i++) {
-      const m = freq[i] / 255
-      const d = m - prev[i]
-      if (d > 0) flux += d
-      prev[i] = m
-    }
-    L.flux = Math.min(1, flux / (N * 0.15))
-    // transient : pulse on an onset (flux over threshold), else decay. The
-    // decay is normalized to 60fps (^(dt·60)) so it falls at the same wall-clock
-    // rate regardless of the actual frame rate.
-    L.transient = L.flux > 0.32 ? 1 : L.transient * Math.pow(0.82, dt * 60)
-    // pitch : autocorrelation on the float waveform, throttled (pitch moves
-    // slowly, and the ACF is the heaviest step). Held across unvoiced frames.
-    if (this.timeF && ++this.pitchCounter % 3 === 0) {
-      this.analyser!.getFloatTimeDomainData(this.timeF)
-      const hz = autoCorrelate(this.timeF, this.sampleRate)
-      if (hz > 0) {
-        // Log-map the fundamental over a musical span (A1 55 Hz → A6 1760 Hz).
-        const t = (Math.log2(hz) - LOG_FMIN) / (LOG_FMAX - LOG_FMIN)
-        L.pitch = Math.max(0, Math.min(1, t))
-      }
-      // Unvoiced (hz <= 0): hold the last pitch rather than flicker to 0.
-    }
+    if (this.analyser && this.bufs) analyseFrame(this.analyser, this.bufs, this.local, dt, this.sampleRate)
   }
 
   // ── OSC source ─────────────────────────────────────────────────────
@@ -564,16 +581,14 @@ class AudioBus {
 
   /** Read one feature (0..1) : the mod engine calls this per audio modulator. */
   feature(name: AudioFeatureName, band = 0): number {
-    const c = this.current
-    if (name === 'band') return c.bands[Math.max(0, Math.min(BANDS - 1, band))] ?? 0
-    return c[name] as number
+    return readFeature(this.current, name, band)
   }
 
   /** Live spectrum magnitudes (0..255) : null unless LOCAL audio is running
    *  (OSC mode carries only reduced features, not the buffer). For the
    *  Parametric generator's audio-buffer→texture read. */
   spectrumBytes(): Uint8Array | null {
-    return this.localOn ? this.freq : null
+    return this.localOn ? this.bufs?.freq ?? null : null
   }
   /** The live input's sample rate (Hz) : what the spectrum bins are in. */
   sampleRateHz(): number {
@@ -581,7 +596,7 @@ class AudioBus {
   }
   /** Live time-domain waveform (0..255, centred at 128) : local only. */
   waveformBytes(): Uint8Array | null {
-    return this.localOn ? this.time : null
+    return this.localOn ? this.bufs?.time ?? null : null
   }
 }
 

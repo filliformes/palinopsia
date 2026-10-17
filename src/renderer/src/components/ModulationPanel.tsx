@@ -690,7 +690,9 @@ function ClipFromRow({ value, onChange }: { value: ClipAudioSrc | undefined; onC
           return x && (x.kind === 'video' || x.kind === 'audio') ? [`${li}:${sl}:${x.kind}:${x.mediaName ?? ''}`] : []
         })
       ),
-      // the Audio Layer's files (layer -1; a live input has no file to read)
+      // the Audio Layer : its whole sound (live input included), then its files
+      // (a live input alone has no file to read at a playhead)
+      ...(s.audioLayer.A || s.audioLayer.B ? ['-1:all:mix:the whole layer'] : []),
       ...(['A', 'B'] as const).flatMap((sl) => {
         const x = s.audioLayer[sl]
         return x?.kind === 'file' ? [`-1:${sl}:audio:${x.mediaName ?? ''}`] : []
@@ -701,7 +703,7 @@ function ClipFromRow({ value, onChange }: { value: ClipAudioSrc | undefined; onC
   const cur = value ? `${value.layer}:${value.slot}` : ''
   const known = !value || slots.some((k) => k.startsWith(cur + ':'))
   return (
-    <Row label="FROM" title="Where it listens : the audio input (the audio tab), or the sound of a film or an audio file on a layer or on the Audio Layer (AU), read where its playhead is (at any speed, reversed or scrubbed; a stopped clip is silent)">
+    <Row label="FROM" title="Where it listens : the audio input (the audio tab); the sound of a film or an audio file on a layer or on the Audio Layer (AU A / B), read where its playhead is (at any speed, reversed or scrubbed; a stopped clip is silent); or the Audio Layer's whole sound (AU all : both slots mixed, a live input too, after their volumes, analysed as it plays)">
       <select
         className="input select-compact min-w-0 flex-1 text-[10px]"
         value={cur}
@@ -709,7 +711,7 @@ function ClipFromRow({ value, onChange }: { value: ClipAudioSrc | undefined; onC
           const v = e.target.value
           if (!v) return onChange(undefined)
           const [l, s] = v.split(':')
-          onChange({ layer: Number(l), slot: s === 'B' ? 'B' : 'A' })
+          onChange({ layer: Number(l), slot: s === 'B' ? 'B' : s === 'all' ? 'all' : 'A' })
         }}
       >
         <option value="">audio input</option>
@@ -717,7 +719,7 @@ function ClipFromRow({ value, onChange }: { value: ClipAudioSrc | undefined; onC
           const [l, s, kind, ...name] = k.split(':')
           return (
             <option key={k} value={`${l}:${s}`}>
-              {`${where(Number(l), s)} ${kind === 'audio' ? '🔊' : '🎞'} ${name.join(':') || kind}`}
+              {`${where(Number(l), s)} ${kind === 'mix' ? '🎚' : kind === 'audio' ? '🔊' : '🎞'} ${name.join(':') || kind}`}
             </option>
           )
         })}

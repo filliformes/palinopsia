@@ -11,6 +11,7 @@
 
 import type { AudioLayerSlot, AudioLayerState } from '@shared/types'
 import { ClipPlayer } from '../engine/clipPlayer'
+import { analyseFrame, frameBufs, readFeature, zero, type AudioFeatureName, type AudioFeatures, type FrameBufs } from '../engine/audioIn'
 import { videoKey, videoPlayheads } from '../engine/videoState'
 import { sonifyEngine } from './sonify'
 
@@ -127,7 +128,14 @@ class AudioLayerEngine {
   private resumeAt: Record<AudioSlotName, number> = { A: 0, B: 0 } // a rebuilt file starts here
   private live: Record<AudioSlotName, LiveInfo> = { A: { channels: 0, label: '', error: '' }, B: { channels: 0, label: '', error: '' } }
   private listeners = new Set<() => void>()
-  private buf = new Float32Array(1024)
+  private buf = new Float32Array(2048)
+  // The whole layer's sound as features (a modulator FROM "AU all") : the live
+  // input's own maths on the layer's analyser, run only while someone reads.
+  private feats: AudioFeatures = zero()
+  private fbufs: FrameBufs | null = null
+  private featWantedAt = 0
+  private featAt = 0
+  private syncReq = 0
   private offCtx: (() => void) | null = null
 
   constructor() {
@@ -166,9 +174,12 @@ class AudioLayerEngine {
   private buildOn(ctx: AudioContext): void {
     this.ctx = ctx
     const out = ctx.createGain()
+    // the audio input's analyser settings, so its features read alike
     const an = ctx.createAnalyser()
-    an.fftSize = 1024
+    an.fftSize = 2048
+    an.smoothingTimeConstant = 0.5
     out.connect(an)
+    this.fbufs = frameBufs(an)
     this.out = out
     this.outAn = an
     sonifyEngine.setExternalInput(out)
@@ -190,6 +201,8 @@ class AudioLayerEngine {
     }
     this.out = null
     this.outAn = null
+    this.fbufs = null
+    this.feats = zero()
     this.ctx = null
   }
 
@@ -349,6 +362,13 @@ class AudioLayerEngine {
    *  ignoring it plays at its own). Publishes the playheads for the timeline, the
    *  level meter and the modulators listening to a slot. */
   tick(globalSpeed: number): void {
+    // the whole layer's features, while a modulator reads them (half a second)
+    const now = performance.now()
+    if (this.outAn && this.fbufs && now - this.featWantedAt < 500) {
+      const dt = this.featAt ? Math.min(0.1, (now - this.featAt) / 1000) : 1 / 60
+      this.featAt = now
+      analyseFrame(this.outAn, this.fbufs, this.feats, dt, this.ctx?.sampleRate ?? 48000)
+    } else this.featAt = 0
     for (const s of SLOTS) {
       const c = this.chains[s], cfg = this.st[s]
       const p = c?.player
@@ -374,11 +394,33 @@ class AudioLayerEngine {
   meter(s: AudioSlotName | null): { rms: number; peak: number } {
     const an = s ? this.chains[s]?.an : this.outAn
     if (!an) return { rms: 0, peak: 0 }
-    const b = this.buf
+    const b = this.buf.subarray(0, Math.min(this.buf.length, an.fftSize))
     an.getFloatTimeDomainData(b)
     let sum = 0, pk = 0
     for (let i = 0; i < b.length; i++) { const x = b[i]; sum += x * x; const a = x < 0 ? -x : x; if (a > pk) pk = a }
     return { rms: Math.sqrt(sum / b.length), peak: pk }
+  }
+
+  /** One feature of the whole layer's sound (the mix, live input included, after
+   *  its volume), 0..1 : what a modulator FROM "AU all" reads. Silence while the
+   *  layer is empty. */
+  mixFeature(name: AudioFeatureName, band: number): number {
+    this.featWantedAt = performance.now()
+    if (!this.outAn) return 0
+    return readFeature(this.feats, name, band)
+  }
+
+  /** Every file slot from its in point at the same moment : each cued (paused
+   *  there, ready to play), then all started together. */
+  syncStart(): void {
+    const ps = SLOTS.map((s) => this.chains[s]?.player).filter((p): p is ClipPlayer => !!p)
+    if (!ps.length) return
+    const req = ++this.syncReq
+    for (const p of ps) p.hold(true)
+    void Promise.all(ps.map((p) => p.cue())).then(() => {
+      if (req !== this.syncReq) return
+      for (const p of ps) p.start()
+    })
   }
 
   /** The file a slot plays, and its playhead (the modulators read its sound). */

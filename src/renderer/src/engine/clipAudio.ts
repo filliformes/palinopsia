@@ -29,6 +29,8 @@ export type ClipAudioState = 'pending' | 'ready' | 'silent' | 'failed'
 
 /** Where a slot's clip is now : its file and its playhead in seconds. */
 export type PlayheadReader = (layer: number, slot: 'A' | 'B') => { path: string; time: number } | null
+/** The Audio Layer's whole sound, live (a modulator FROM "AU all"). */
+export type MixReader = (name: AudioFeature, band: number) => number
 
 /** One reader's memory (a modulator's) : the last playhead, the transient. */
 export interface ClipReadState {
@@ -45,6 +47,11 @@ class ClipAudio {
   private listeners = new Set<() => void>()
   /** Bumped when an analysis lands (the UI re-reads its state). */
   version = 0
+
+  private mix: MixReader | null = null
+  setMixReader(fn: MixReader): void {
+    this.mix = fn
+  }
 
   setPlayheads(fn: PlayheadReader): void {
     this.playheads = fn
@@ -72,7 +79,7 @@ class ClipAudio {
 
   /** Where a slot's clip is now (null : no clip there). */
   playhead(src: ClipAudioSrc): { path: string; time: number } | null {
-    return this.playheads(src.layer, src.slot)
+    return src.slot === 'all' ? null : this.playheads(src.layer, src.slot)
   }
 
   private request(path: string): void {
@@ -110,6 +117,7 @@ class ClipAudio {
    *  own memory (flux is the most the playhead crossed since its last read : a
    *  fast clip skips no onset; the transient decays in real time, as live). */
   feature(src: ClipAudioSrc, name: AudioFeature, band: number, st: ClipReadState, nowMs: number): number {
+    if (src.slot === 'all') return this.mix ? this.mix(name, band) : 0
     const ph = this.playheads(src.layer, src.slot)
     const dt = st.at ? Math.min(0.1, (nowMs - st.at) / 1000) : 1 / 60
     st.at = nowMs

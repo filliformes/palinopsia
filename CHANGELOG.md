@@ -26,6 +26,17 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Audio Layer : play both together, and `AU all`.** A **▶** in the MIX row (between
+  the A and B buttons) starts both file slots from their in points at the same moment :
+  each player is held, cued (paused at its in point until it can play,
+  `ClipPlayer.cue`), then all started in the same task (`audioLayer.syncStart`); ⏸
+  pauses both; OSC `/opsia/audiolayer/play`. Measured over 4 starts : 13 to 31 ms after
+  the press, the two playheads equal to the millisecond a second later. A modulator's
+  FROM offers **`AU all`** (`src {layer: -1, slot: 'all'}`) : the layer's whole sound,
+  analysed live on its output (an AnalyserNode with the audio input's settings) by the
+  audio input's own maths, now one shared function (`analyseFrame` in `audioIn.ts`, the
+  bus refactored onto it), run only while a modulator reads it. The same tone read 0.442
+  through the audio input and 0.443 through `AU all`; 0 muted or empty.
 - **The audio section's dot lights while sound is going on** (Sonify on, or something in
   the Audio Layer, unmuted), with what plays named beside it. Clicking it still toggles
   the input analysis only : it never opens the microphone by itself.

@@ -305,8 +305,8 @@ export type ModulatorType =
 export type AudioFeature = 'level' | 'flux' | 'transient' | 'centroid' | 'band' | 'pitch' | 'noisiness'
 /** Where an audio modulator listens instead of the audio input : a layer slot's
  *  clip (a film's soundtrack or an audio file), read at its playhead. Layer -1 :
- *  the Audio Layer's file slots. */
-export interface ClipAudioSrc { layer: number; slot: 'A' | 'B' }
+ *  the Audio Layer's file slots, or `slot: 'all'` its whole sound, live. */
+export interface ClipAudioSrc { layer: number; slot: 'A' | 'B' | 'all' }
 
 /** One of the Audio Layer's two slots (the layers tab, under L4) : a sound file,
  *  played like an Import Audio slot (the same transport fields), or a live audio

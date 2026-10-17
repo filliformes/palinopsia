@@ -52,7 +52,7 @@ import { beginSceneMorph, beginRelayMorph, cancelMorph, requestSceneChange } fro
 import { DEFAULT_LIGHT_PATH } from './lightPath'
 import { autoSurfacePos } from './surface'
 import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify'
-import { defaultAudioLayer, sanitizeAudioLayer } from './audio/audioLayer'
+import { audioLayer, defaultAudioLayer, sanitizeAudioLayer } from './audio/audioLayer'
 import { makeDefaultKeySeq, sanitizeKeySeq } from './audio/soniKeyModel'
 import { isSoniRate } from './audio/soniClock'
 import { resetCouplingState } from './engine/coupling'
@@ -1670,6 +1670,9 @@ interface StoreState {
   patchAudioLayerSlot: (slot: 'A' | 'B', patch: Partial<AudioLayerSlot>) => void
   clearAudioLayerSlot: (slot: 'A' | 'B') => void
   patchAudioLayer: (patch: Partial<Pick<AudioLayerState, 'mix' | 'volume' | 'mute'>>) => void
+  /** Both file slots : true = from their in points, together (a synced start);
+   *  false = paused. */
+  playAudioLayer: (on: boolean) => void
   // Sonify step sequencer (Mixer page) : evolves the sound over time.
   soniSeq: SoniSeq
   setSoniSeqOn: (on: boolean) => void
@@ -4046,6 +4049,18 @@ export const useStore = create<StoreState>((set, get) => ({
       selection: s.selection?.type === 'audio' && s.selection.slot === slot ? null : s.selection
     })),
   patchAudioLayer: (patch) => set((s) => ({ audioLayer: { ...s.audioLayer, ...patch } })),
+  playAudioLayer: (on) => {
+    // cued first, so no frame starts one before the other is ready
+    if (on) audioLayer.syncStart()
+    set((s) => {
+      const al = { ...s.audioLayer }
+      for (const sl of ['A', 'B'] as const) {
+        const x = al[sl]
+        if (x?.kind === 'file') al[sl] = { ...x, videoPlaying: on }
+      }
+      return { audioLayer: al }
+    })
+  },
 
   soniSeq: loadSoniSeq(),
   setSoniSeqOn: (on) =>

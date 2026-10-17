@@ -284,7 +284,9 @@ device in the list : an interface, a microphone, a loopback device). Its header 
 layer's **volume** (0 to 200 %, 100 % in the middle), its **meter** and its **mute**;
 each slot's row has its own meter and mute; **MIX** goes from A to B (the middle plays
 both whole, toward an end the other one fades out, so a live input and a file blended
-both stay at their own level).
+both stay at their own level). The **▶** left of MIX, between the A and B buttons,
+plays both files **together** from their in points (each is cued, then both start at
+the same moment, measured in step to the millisecond); **⏸** pauses both.
 
 Select a slot (its **A** / **B** button) for its controls in the Inspector :
 
@@ -302,7 +304,9 @@ The layer plays **into Sonify's mix**, after Sonify's own volume : the output EQ
 limiter, the recordings and [Space](#space--the-voices-in-the-room) all have it (in Space it
 sits with the effects return for now). Sonify off, its engine still runs for the layer,
 its voices silent. A modulator can listen **FROM** a file slot (`AU A`, `AU B`) like
-from a layer's clip. The layer is saved with the session (an older session opens with it
+from a layer's clip, or from **`AU all`** : the layer's whole sound (both slots mixed, a
+live input too, after their volumes), analysed as it plays with the audio input's own
+maths. The layer is saved with the session (an older session opens with it
 empty) and answers to `/opsia/audiolayer/…` (see [OSC](#osc-implementation)). The Import
 audio source in a layer still plays its own file, as before.
 
@@ -2291,6 +2295,7 @@ unless the slot actually holds a video.
 | `/opsia/output/edge` | i / f / s | `black` · `repeat` · `mirror` |
 | `/opsia/output/reset` | trigger | Back to the frame as it is |
 | `/opsia/audiolayer/volume · mix · mute` | f / bool | The **Audio Layer** : its volume (a gain, 0..2, 1 = as it comes), A to B (0.5 = both whole), mute (≥ 0.5) |
+| `/opsia/audiolayer/play` | bool | Both files from their in points together (≥ 0.5), or both paused |
 | `/opsia/audiolayer/{A\|B}/volume · pan · mute` | f / bool | A slot's volume (a gain, 0..2), pan (-1..1), mute (≥ 0.5) |
 | `/opsia/audiolayer/{A\|B}/play · loop · ignoreglobal · keeppitch · speed · position · in · out` | f / bool | A file slot's transport, the video transport's conventions (speed 0..1 log, position a one-shot seek) |
 | `/opsia/space/mode` | i / f / s | **Space** : `stereo` · `speakers` · `objects` |

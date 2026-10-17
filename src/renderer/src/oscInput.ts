@@ -885,6 +885,7 @@ function route(address: string, args: Args): void {
       if (a === 'volume') { st.patchAudioLayer({ volume: Math.max(0, Math.min(2, n)) }); return }
       if (a === 'mix') { st.patchAudioLayer({ mix: clamp01(n) }); return }
       if (a === 'mute') { st.patchAudioLayer({ mute: n >= 0.5 }); return }
+      if (a === 'play') { st.playAudioLayer(n >= 0.5); return }
       if (a !== 'A' && a !== 'B') return
       const sl = a
       const x = al[sl]
@@ -1384,6 +1385,8 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/audiolayer/volume', 0, 2, al.volume, 'The Audio Layer : its volume (a gain, 1 = as it comes)')
     add('/opsia/audiolayer/mix', 0, 1, al.mix, 'The Audio Layer : A to B (0.5 = both whole)')
     add('/opsia/audiolayer/mute', 0, 1, al.mute ? 1 : 0, 'The Audio Layer : mute (>= 0.5)')
+    const filesPlay = (['A', 'B'] as const).some((sl) => al[sl]?.kind === 'file' && al[sl]?.videoPlaying !== false)
+    add('/opsia/audiolayer/play', 0, 1, filesPlay ? 1 : 0, 'The Audio Layer : both files from their in points together (>= 0.5), or paused')
     for (const sl of ['A', 'B'] as const) {
       const x = al[sl]
       if (!x) continue

@@ -164,7 +164,8 @@ export function AudioLayerPanel(): JSX.Element {
         <>
           <SlotRow slot="A" />
           <div className="flex min-w-0 items-center gap-1.5">
-            <span className="w-[34px] shrink-0 font-mono text-[9px] uppercase text-muted">mix</span>
+            <PlayBoth />
+            <span className="shrink-0 font-mono text-[9px] uppercase text-muted">mix</span>
             <span className="shrink-0 font-mono text-[9px] text-muted">A</span>
             <input
               type="range" min={0} max={1} step={0.01} value={al.mix}
@@ -179,6 +180,27 @@ export function AudioLayerPanel(): JSX.Element {
         </>
       )}
     </div>
+  )
+}
+
+/** Both files from their in points at the same moment (a synced start), or
+ *  both paused. In the column of the A and B buttons, between them. */
+function PlayBoth(): JSX.Element {
+  const files = useStore((st) => (['A', 'B'] as const).filter((sl) => st.audioLayer[sl]?.kind === 'file').length)
+  const playing = useStore((st) => (['A', 'B'] as const).some((sl) => st.audioLayer[sl]?.kind === 'file' && st.audioLayer[sl]?.videoPlaying !== false))
+  const play = useStore((st) => st.playAudioLayer)
+  return (
+    <button
+      type="button"
+      disabled={!files}
+      onClick={() => play(!playing)}
+      className={`flex h-[22px] w-[34px] shrink-0 items-center justify-center rounded border font-mono text-[11px] leading-none transition-colors ${
+        !files ? 'border-border bg-panel2 text-muted/40' : playing ? 'border-accent bg-accent/20 text-accent' : 'border-border bg-panel2 text-text hover:border-accent/50 hover:text-accent'
+      }`}
+      title={!files ? 'Play both files together (load a sound file in A or B)' : playing ? 'Pause both files' : `Play ${files > 1 ? 'both files' : 'the file'} from ${files > 1 ? 'their' : 'its'} in point${files > 1 ? 's' : ''}, together : each is cued, then all start at the same moment`}
+    >
+      {playing ? '⏸' : '▶'}
+    </button>
   )
 }
 
