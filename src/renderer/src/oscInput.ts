@@ -743,6 +743,7 @@ function route(address: string, args: Args): void {
           else if (ctl === 'loop') V('filter', { loop: clamp01(n) })
           else if (ctl === 'contrast') V('filter', { gamma: 0.5 + clamp01(n) * 3.5 })
           else if (ctl === 'linein') V('filter', { lineIn: n >= 0.5 })
+          else if (ctl === 'linefrom') { const f = enumFrom(args, ['input', 'layer'] as const); if (f) V('filter', { lineFrom: f }) }
           else if (ctl === 'path') V('filter', { path: idx(0, 3) })
           else if (ctl === 'breathe' || ctl === 'pace') V('filter', { pace: clamp01(n) * 0.95 })
           else if (ctl === 'quantize') V('filter', { quantize: n >= 0.5 })

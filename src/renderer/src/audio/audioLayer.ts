@@ -122,6 +122,8 @@ class AudioLayerEngine {
   private ctx: AudioContext | null = null
   private opening = false
   private out: GainNode | null = null // the layer's volume, into Sonify
+  private bus: GainNode | null = null // the slots mixed, before the layer's volume
+  private send: GainNode | null = null // that, in mono : the Filter voice's line-in
   private outAn: AnalyserNode | null = null
   private chains: Record<AudioSlotName, Chain | null> = { A: null, B: null }
   private seeks: Record<AudioSlotName, number | null> = { A: null, B: null }
@@ -174,6 +176,17 @@ class AudioLayerEngine {
   private buildOn(ctx: AudioContext): void {
     this.ctx = ctx
     const out = ctx.createGain()
+    // the slots meet here, then the layer's volume; a mono copy of the sum (before
+    // the volume and the mute) is what Sonify's Filter voice can play through
+    const bus = ctx.createGain()
+    bus.connect(out)
+    const send = ctx.createGain()
+    send.channelCount = 1
+    send.channelCountMode = 'explicit'
+    send.channelInterpretation = 'speakers'
+    bus.connect(send)
+    this.bus = bus
+    this.send = send
     // the audio input's analyser settings, so its features read alike
     const an = ctx.createAnalyser()
     an.fftSize = 2048
@@ -183,6 +196,7 @@ class AudioLayerEngine {
     this.out = out
     this.outAn = an
     sonifyEngine.setExternalInput(out)
+    sonifyEngine.setLayerSend(send)
     this.apply()
   }
 
@@ -197,9 +211,12 @@ class AudioLayerEngine {
     for (const s of SLOTS) this.dropChain(s)
     if (this.out) {
       sonifyEngine.setExternalInput(null)
-      try { this.out.disconnect(); this.outAn?.disconnect() } catch { /* gone */ }
+      sonifyEngine.setLayerSend(null)
+      try { this.out.disconnect(); this.outAn?.disconnect(); this.bus?.disconnect(); this.send?.disconnect() } catch { /* gone */ }
     }
     this.out = null
+    this.bus = null
+    this.send = null
     this.outAn = null
     this.fbufs = null
     this.feats = zero()
@@ -232,8 +249,8 @@ class AudioLayerEngine {
   /** The state onto the graph : sources (only when what a slot plays changed),
    *  then the gains and pans, gliding. */
   private apply(): void {
-    const ctx = this.ctx, out = this.out
-    if (!ctx || !out) return
+    const ctx = this.ctx, out = this.out, bus = this.bus
+    if (!ctx || !out || !bus) return
     const t = ctx.currentTime
     for (const s of SLOTS) {
       const cfg = this.st[s]
@@ -250,7 +267,7 @@ class AudioLayerEngine {
         an.fftSize = 1024
         const mixG = ctx.createGain()
         vol.gain.value = 0 // it fades in (below)
-        vol.connect(pan).connect(mixG).connect(out)
+        vol.connect(pan).connect(mixG).connect(bus)
         pan.connect(an)
         c = { key: '', vol, pan, an, mixG, player: null, elSrc: null, stream: null, streamSrc: null, split: null, merge: null, req: 0 }
         this.chains[s] = c

@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { audioBus, AUDIO_BANDS, LAYER_INPUT } from '../engine/audioIn'
+import { EqCard, GlueCard } from './SonifyEq'
 import { useStore } from '../store'
 import { AudioOutputSelect } from './AudioOutputSelect'
 
@@ -36,6 +37,8 @@ export function AudioPanel(): JSX.Element {
   const monitorSink = useStore((s) => s.audioMonitorSink)
   const setMonitorSink = useStore((s) => s.setAudioMonitorSink)
   const sonify = useStore((s) => s.sonify)
+  const audioLayer = useStore((s) => s.audioLayer)
+  const patchAudioLayer = useStore((s) => s.patchAudioLayer)
   // Sound going on in the app (Sonify, the Audio Layer) : the dot lights for it
   // too, the input analysis on or off, so it is clear something sounds.
   const layerSound = useStore((s) => !!(s.audioLayer.A || s.audioLayer.B) && !s.audioLayer.mute)
@@ -183,6 +186,16 @@ export function AudioPanel(): JSX.Element {
           onLevel={(v) => setSonify({ ...sonify, master: v })}
           title="The Sonify engine's sound (image → sound). Build its voices on the Sonify page (S)."
         />
+        <LevelRow
+          label="Audio Layer"
+          on={!audioLayer.mute}
+          onToggle={() => patchAudioLayer({ mute: !audioLayer.mute })}
+          level={audioLayer.volume}
+          onLevel={(v) => patchAudioLayer({ volume: v })}
+          max={2}
+          reset={1}
+          title="The Audio Layer's volume and mute : the same as its strip in the layers tab (under L4), to 200 % (double-click : 100 %)."
+        />
 
         <LevelRow
           label="Input monitor"
@@ -260,13 +273,22 @@ export function AudioPanel(): JSX.Element {
           </p>
         )}
       </div>
+
+      {/* The output stage : the EQ and the glue shape everything that leaves
+          (Sonify and the Audio Layer), on the way to the speakers. */}
+      <div className="mt-0.5 flex flex-col gap-1.5 border-t border-border/50 pt-1">
+        <div className="font-mono text-[9px] uppercase tracking-wide text-muted">Output EQ &amp; glue</div>
+        <EqCard />
+        <GlueCard />
+      </div>
     </div>
   )
 }
 
-// One on/off + level fader (Sonify · input monitor).
+// One on/off + level fader (Sonify · Audio Layer · input monitor). `max` : the
+// fader's top (the Audio Layer's volume runs to 200 %).
 function LevelRow({
-  label, on, onToggle, level, onLevel, disabled, title
+  label, on, onToggle, level, onLevel, disabled, title, max = 1, reset
 }: {
   label: string
   on: boolean
@@ -275,6 +297,8 @@ function LevelRow({
   onLevel: (v: number) => void
   disabled?: boolean
   title?: string
+  max?: number
+  reset?: number
 }): JSX.Element {
   return (
     <div className={`flex items-center gap-2 ${disabled ? 'opacity-50' : ''}`} title={title}>
@@ -283,8 +307,9 @@ function LevelRow({
         <span className="font-mono text-[10px] text-muted">{label}</span>
       </button>
       <input
-        type="range" min={0} max={1} step={0.01} value={level}
+        type="range" min={0} max={max} step={0.01} value={level}
         onChange={(e) => onLevel(Number(e.target.value))}
+        onDoubleClick={reset !== undefined ? () => onLevel(reset) : undefined}
         disabled={disabled}
         className="min-w-0 flex-1"
       />

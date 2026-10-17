@@ -324,7 +324,7 @@ export const EqCard = memo(function EqCard(): JSX.Element {
     <>
       <Shell
         title="Output EQ"
-        hint="Twelve bands after everything in Sonify, on the way to the speakers only (recordings are taken before it) : to tune the room. Low cut, low shelf, eight bells, high shelf, high cut, each with its Q and a slope of 6, 12, 24 or 36 dB per octave. Click the curve to open the editor."
+        hint="Twelve bands after everything (Sonify and the Audio Layer), on the way to the speakers only (recordings are taken before it) : to tune the room. Low cut, low shelf, eight bells, high shelf, high cut, each with its Q and a slope of 6, 12, 24 or 36 dB per octave. Click the curve to open the editor."
         on={eq.on}
         onToggle={() => setEq({ ...eq, on: !eq.on })}
         toggleTitle={eq.on ? 'EQ on (click : bypass)' : 'EQ bypassed (click : on)'}
@@ -371,7 +371,7 @@ export const GlueCard = memo(function GlueCard(): JSX.Element {
   return (
     <Shell
       title="Glue"
-      hint="One compressor on the whole Sonify mix, after the output EQ's bands and before its output gain and the soft ceiling : it holds the voices together. It runs with the EQ bypassed too. One knob (the threshold falls to -12 dB, the ratio rises to 4:1, the makeup is automatic); the voicing sets its speed and color. Like the EQ it is on the way to the speakers : recordings are taken before it."
+      hint="One compressor on everything that leaves (Sonify and the Audio Layer), after the output EQ's bands and before its output gain and the soft ceiling : it holds the voices together. It runs with the EQ bypassed too. One knob (the threshold falls to -12 dB, the ratio rises to 4:1, the makeup is automatic); the voicing sets its speed and color. Like the EQ it is on the way to the speakers : recordings are taken before it."
       on={g.on}
       onToggle={() => setGlue({ on: !g.on })}
       toggleTitle={g.on ? 'Glue on (click : off)' : 'Glue off (click : on)'}

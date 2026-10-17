@@ -26,6 +26,19 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Sonify's Filter voice can play the Audio Layer.** Its source is now **noise ·
+  line-in · AU** (`filter.lineFrom: 'layer'`, OSC `/opsia/sonify/filter/linefrom
+  input|layer`) : the layer's slots summed before its volume and mute, downmixed to mono
+  (a `send` GainNode off the layer's new `bus`), into the worklet's input 0 in place of a
+  microphone (`setLayerSend` / `syncLayerLine`, relinked on every start and on a healed
+  context). Measured : with the layer muted the Filter still plays it (0.098 RMS against
+  0), no getUserMedia; muting the slot leaves only the Filter's own quarter noise.
+- **The output EQ and the glue moved to the audio tab** (Audio section, an **Output EQ &
+  glue** part under USB denoise; the Sonify mixer points there) : they shape everything
+  that leaves, Sonify and the Audio Layer. The Output levels gained an **Audio Layer** row
+  (its volume to 200 % and its mute, the same as its strip). Hints say what they process
+  now. Verified : the Audio Layer joins after Sonify's delay and reverb (dry) : the gaps
+  of a click track stayed as silent with the FX tail at full as with it off.
 - **The Audio Layer as the audio tab's input.** The input menu offers **Audio Layer
   (what it plays)** (`LAYER_INPUT`) : the audio bus reads the layer's analyser (its whole
   sound after its volume, `audioLayer.analyser()`, re-found when the layer rebuilds) with

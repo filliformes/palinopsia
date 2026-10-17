@@ -168,6 +168,8 @@ export interface SoniConfig {
   filter: {
     on: boolean; tap: number; gain: number; pan: number
     q: number; noise: number; lineIn: boolean
+    // what the line-in is : an audio input (the default), or the Audio Layer
+    lineFrom?: 'input' | 'layer'
     // 0 = free noise · up = a frozen stretch of noise replayed, ~400 ms (a
     // flutter) down to 5 ms (a buzz)
     loop: number
@@ -637,6 +639,11 @@ class SonifyEngine {
   // voices silent, so the layer has the EQ, the limiter, Space and the takes).
   private extIn: AudioNode | null = null
   private extWanted = false
+  // The Audio Layer as the Filter voice's line-in : its slots mixed to mono,
+  // before the layer's volume and mute (muted, it can still play through the
+  // filters), into input 0 instead of a microphone.
+  private layerSend: AudioNode | null = null
+  private layerSendTo: AudioNode | null = null
   private ctxListeners = new Set<(ctx: AudioContext) => void>()
 
   constructor() {
@@ -683,6 +690,31 @@ class SonifyEngine {
     this.extIn = n
     if (old && node) { try { old.disconnect(node) } catch { /* not connected */ } }
     if (n && node) { try { n.connect(node, 0, 2) } catch (e) { console.warn('[sonify] audio layer input', e) } }
+  }
+
+  /** The Audio Layer's send for the Filter voice's line-in (null : none). */
+  setLayerSend(n: AudioNode | null): void {
+    if (n === this.layerSend) return
+    this.unlinkLayerSend()
+    this.layerSend = n
+    this.syncLayerLine()
+  }
+
+  private syncLayerLine(): void {
+    const c = this.cfg
+    const want = !!c.on && c.filter.on && c.filter.lineIn && c.filter.lineFrom === 'layer' && !!this.node && !!this.layerSend
+    if (want && this.layerSendTo !== this.node) {
+      this.unlinkLayerSend()
+      try {
+        this.layerSend!.connect(this.node!, 0, 0)
+        this.layerSendTo = this.node
+      } catch (e) { console.warn('[sonify] audio layer line-in', e) }
+    } else if (!want) this.unlinkLayerSend()
+  }
+
+  private unlinkLayerSend(): void {
+    if (this.layerSend && this.layerSendTo) { try { this.layerSend.disconnect(this.layerSendTo) } catch { /* not connected */ } }
+    this.layerSendTo = null
   }
 
   /** The Audio Layer plays (or stops) : the engine runs for it, Sonify on or off. */
@@ -1030,6 +1062,8 @@ class SonifyEngine {
     const collage = this.collage, lineSrc = this.lineSrc, lineStream = this.lineStream
     const node = this.node, eqNode = this.eqNode, anPre = this.anPre, anPost = this.anPost, outG = this.outG, ctx = this.ctx
     const ext = this.extIn
+    const ls = this.layerSend, lsTo = this.layerSendTo
+    this.layerSendTo = null
     this.collage = null
     this.lineSrc = null
     this.lineStream = null
@@ -1059,6 +1093,7 @@ class SonifyEngine {
       }
       try { node?.disconnect(); eqNode?.disconnect(); anPre?.disconnect(); anPost?.disconnect(); outG?.disconnect() } catch { /* gone */ }
       if (ext && node) { try { ext.disconnect(node) } catch { /* not connected */ } }
+      if (ls && lsTo) { try { ls.disconnect(lsTo) } catch { /* not connected */ } }
       // A recording holding the sound bus keeps the context (and its sound
       // track) alive; it plays silence until the sound comes back. (Not if
       // Sonify was switched back on meanwhile : it plays on this context.)
@@ -1419,7 +1454,10 @@ class SonifyEngine {
     // modulated pitch or probe snapping to its base for up to 50 ms on every
     // slider move, OSC message and sequencer step).
     if (cfg.on) this.postMod()
-    this.syncLineIn(!!cfg.on && cfg.filter.on && cfg.filter.lineIn)
+    // the line-in : a microphone / interface, or the Audio Layer
+    const lineIn = !!cfg.on && cfg.filter.on && cfg.filter.lineIn
+    this.syncLineIn(lineIn && cfg.filter.lineFrom !== 'layer')
+    this.syncLayerLine()
   }
 
   /** Open/close the line-in tap for the Filter voice (mic/line via WebRTC). */

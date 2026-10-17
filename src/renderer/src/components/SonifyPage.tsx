@@ -25,7 +25,6 @@ function spaceLabel(param: string): string {
   const p = parseSpaceModParam(param)
   return p ? `${SPACE_VOICE_LABEL[p.voice]} ${SPACE_FIELD_RANGE[p.field].label} in the room` : param
 }
-import { EqCard, GlueCard } from './SonifyEq'
 import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, CardGrip, useCardSpace, spaceGap, SUB_GAP, chip, pill, GrMeter, parseHz, parseDb, sonifyCovered, LiveNum } from './sonifyUi'
 import { SONI_RATES, RATE_LABEL } from '../audio/soniClock'
 import { AssignRow, useBound } from './AutoControls'
@@ -1209,8 +1208,10 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 <Slider label="delay" value={cfg.fx.dlyMix} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ dlyMix: v })} title="How loud the delay is in the FX tail" />
                 <Slider label="reverb" value={cfg.fx.rvMix} min={0} max={1} neutral={0.6} onChange={(v) => pfx({ rvMix: v })} title="How loud the reverb is in the FX tail" />
               </Shell>
-              <EqCard />
-              <GlueCard />
+              <p className="px-1 font-mono text-[9px] leading-tight text-muted">
+                The output EQ and the glue are in the audio tab (A), Audio section : they shape
+                everything that leaves, Sonify and the Audio Layer.
+              </p>
             </div>
           )}
           {/* The sequencers have their own view (they used to sit under the mixer). */}
@@ -1528,10 +1529,15 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 title="Internal noise through the image's bands (wide resonance = wind, narrow = flute)"
               >noise</button>
               <button
-                onClick={() => pv('filter', { lineIn: true })}
-                className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.filter.lineIn ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
+                onClick={() => pv('filter', { lineIn: true, lineFrom: 'input' })}
+                className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.filter.lineIn && cfg.filter.lineFrom !== 'layer' ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
                 title="Live line/mic input filtered by the frame"
               >line-in</button>
+              <button
+                onClick={() => pv('filter', { lineIn: true, lineFrom: 'layer' })}
+                className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.filter.lineIn && cfg.filter.lineFrom === 'layer' ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
+                title="The Audio Layer filtered by the frame : its slots mixed (to mono), before its own volume and mute, so a muted Audio Layer can play only through the filters. No microphone."
+              >AU</button>
             </Row>
             <Row label="sweep">
               <button
