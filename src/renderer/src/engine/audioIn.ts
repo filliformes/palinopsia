@@ -34,6 +34,12 @@ export const AUDIO_FEATURES: AudioFeatureName[] = [
 
 export type AudioMode = 'off' | 'osc' | 'local' | 'both'
 
+/** The input menu's Audio Layer entry : the local input is then the layer's own
+ *  sound (its analyser, after its volume), no microphone opened. */
+export const LAYER_INPUT = 'opsia:audio-layer'
+/** The Audio Layer's analyser, as it stands (null : the layer is empty). */
+export type LayerAnalyser = () => { an: AnalyserNode; sampleRate: number } | null
+
 export interface AudioFeatures {
   level: number // RMS loudness 0..1
   flux: number // spectral flux 0..1 (onset energy)
@@ -265,6 +271,18 @@ class AudioBus {
    *  id or found again by its name), 'default' (the chosen one is not here : the
    *  default input instead), or 'none'. */
   opened: 'chosen' | 'default' | 'none' = 'none'
+  // The input set to the Audio Layer : its analyser read in place of a device's.
+  private layerSrc: LayerAnalyser | null = null
+  private layerIn = false
+  private layerAn: AnalyserNode | null = null
+  /** Where the Audio Layer's analyser is found (App registers it). */
+  setLayerSource(fn: LayerAnalyser): void {
+    this.layerSrc = fn
+  }
+  /** Is the local input the Audio Layer (no device, nothing to monitor)? */
+  get fromLayer(): boolean {
+    return this.layerIn
+  }
   /** The device id the last startLocal was for ('' : the default input); the id
    *  it was found again under when its name matched. A different id asked for
    *  reopens the input. */
@@ -275,6 +293,14 @@ class AudioBus {
     this.stopLocal()
     this.opened = 'none'
     this.requested = deviceId ?? ''
+    // The Audio Layer : no microphone, its analyser is read each frame (the
+    // layer empty, the input is silence until something plays there).
+    if (deviceId === LAYER_INPUT) {
+      this.layerIn = true
+      this.localOn = true
+      this.opened = 'chosen'
+      return true
+    }
     try {
       // Disable the browser's voice processing : an interface / line input (a
       // Move on inputs 1&2) wants the RAW signal, and AGC would flatten the very
@@ -363,6 +389,8 @@ class AudioBus {
     this.learnBuf = null
     this.filterNodes = []
     this.bufs = null
+    this.layerIn = false
+    this.layerAn = null
     this.localOn = false
     this.local = zero()
   }
@@ -535,6 +563,18 @@ class AudioBus {
   }
 
   private computeLocal(dt: number): void {
+    if (this.layerIn) {
+      const L = this.layerSrc?.() ?? null
+      if (!L) {
+        if (this.layerAn) { this.layerAn = null; this.local = zero() }
+        return
+      }
+      // the layer rebuilt (a new audio context) : its new analyser
+      if (L.an !== this.layerAn || !this.bufs) { this.layerAn = L.an; this.bufs = frameBufs(L.an) }
+      this.sampleRate = L.sampleRate
+      analyseFrame(L.an, this.bufs, this.local, dt, L.sampleRate)
+      return
+    }
     if (this.analyser && this.bufs) analyseFrame(this.analyser, this.bufs, this.local, dt, this.sampleRate)
   }
 
@@ -588,7 +628,7 @@ class AudioBus {
    *  (OSC mode carries only reduced features, not the buffer). For the
    *  Parametric generator's audio-buffer→texture read. */
   spectrumBytes(): Uint8Array | null {
-    return this.localOn ? this.bufs?.freq ?? null : null
+    return this.localOn && (!this.layerIn || this.layerAn) ? this.bufs?.freq ?? null : null
   }
   /** The live input's sample rate (Hz) : what the spectrum bins are in. */
   sampleRateHz(): number {
@@ -596,7 +636,7 @@ class AudioBus {
   }
   /** Live time-domain waveform (0..255, centred at 128) : local only. */
   waveformBytes(): Uint8Array | null {
-    return this.localOn ? this.bufs?.time ?? null : null
+    return this.localOn && (!this.layerIn || this.layerAn) ? this.bufs?.time ?? null : null
   }
 }
 

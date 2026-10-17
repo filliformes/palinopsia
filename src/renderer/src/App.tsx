@@ -175,8 +175,10 @@ import { AudioLayerPanel } from './components/AudioLayerPanel'
 // An audio modulator listening to a slot's clip reads its file and its playhead
 // here : the playhead the engine publishes each frame, the ORIGINAL file (a
 // converted video plays from a cache copy that has no sound).
-// "AU all" : the Audio Layer's whole sound, analysed live.
+// "AU all" : the Audio Layer's whole sound, analysed live; and the audio tab's
+// input set to the Audio Layer reads its analyser.
 clipAudio.setMixReader((name, band) => audioLayer.mixFeature(name, band))
+audioBus.setLayerSource(() => audioLayer.analyser())
 clipAudio.setPlayheads((layer, slot) => {
   if (layer === AUDIO_LAYER) return audioLayer.playhead(slot)
   const ph = videoPlayheads.get(videoKey(layer, slot))

@@ -7,7 +7,7 @@
 // discipline as the modulator meters.
 
 import { useEffect, useRef, useState } from 'react'
-import { audioBus, AUDIO_BANDS } from '../engine/audioIn'
+import { audioBus, AUDIO_BANDS, LAYER_INPUT } from '../engine/audioIn'
 import { useStore } from '../store'
 import { AudioOutputSelect } from './AudioOutputSelect'
 
@@ -49,7 +49,9 @@ export function AudioPanel(): JSX.Element {
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const showDevice = source === 'local' || source === 'both'
-  const monitorReady = enabled && showDevice // the input monitor needs local input
+  // the input monitor needs a local device (the Audio Layer already plays)
+  const fromLayer = deviceId === LAYER_INPUT
+  const monitorReady = enabled && showDevice && !fromLayer
 
   // Enumerate input devices (labels populate once the input has been opened).
   useEffect(() => {
@@ -132,11 +134,12 @@ export function AudioPanel(): JSX.Element {
               value={deviceId ?? ''}
               onChange={(e) => {
                 const id = e.target.value || null
-                setDeviceId(id, id ? devices.find((d) => d.deviceId === id)?.label || null : null)
+                setDeviceId(id, id === LAYER_INPUT ? 'Audio Layer' : id ? devices.find((d) => d.deviceId === id)?.label || null : null)
               }}
-              title="Local audio input device"
+              title="What the audio tab listens to : an input device, or the Audio Layer (its whole sound, both slots mixed after their volumes : the coupling and every audio modulator listening to the audio input react to it; no microphone is opened)"
             >
               <option value="">Default input</option>
+              <option value={LAYER_INPUT}>Audio Layer (what it plays)</option>
               {devices.map((d) => (
                 <option key={d.deviceId} value={d.deviceId}>
                   {d.label || `Input ${d.deviceId.slice(0, 6)}`}
@@ -144,7 +147,7 @@ export function AudioPanel(): JSX.Element {
               ))}
               {/* The remembered device is not in the list : say so (the menu
                   read "Default input" while it listened to nothing). */}
-              {deviceId && devices.length > 0 && !devices.some((d) => d.deviceId === deviceId) && (
+              {deviceId && !fromLayer && devices.length > 0 && !devices.some((d) => d.deviceId === deviceId) && (
                 <option value={deviceId}>
                   {`${deviceLabel ?? 'The chosen input'} (not here : the default input plays)`}
                 </option>
@@ -191,7 +194,9 @@ export function AudioPanel(): JSX.Element {
           title={
             monitorReady
               ? 'Hear the local input through the output (passthrough) while it also drives reactivity (e.g. monitor a Move on the interface inputs).'
-              : 'Turn Audio on with a Local (or Both) source first.'
+              : fromLayer && enabled
+                ? 'The input is the Audio Layer, which already plays through Sonify\'s output : nothing to monitor.'
+                : 'Turn Audio on with a Local (or Both) source first.'
           }
         />
         {monitor && monitorReady && (

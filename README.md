@@ -760,6 +760,13 @@ The **audio/midi/osc** right-column tab (key `A`) holds the control panels
   that is not there plays the **default input** instead, said in a message and in
   the menu (it used to stay silent). Picking another device while the input runs
   switches to it at once.
+  - **Audio Layer** as the input (its entry in the input menu, under Default input) :
+    the analyser listens to the [Audio Layer](#the-audio-layer)'s whole sound (both
+    slots mixed, after their volumes) instead of a device, so the coupling rows and
+    every audio modulator on the audio input react to what the layer plays. No
+    microphone is opened; an empty or muted layer reads silence; in **Both** mode OSC
+    features still come first. The input monitor and the denoiser have nothing to do
+    there and stay off.
   - **Monitoring / passthrough** : route the input through to a chosen output
     device (its own **sink** picker), so you can hear a source (e.g. the sound of
     an Ableton Move on interface inputs 1&2) while it drives the visuals. The

@@ -26,6 +26,14 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **The Audio Layer as the audio tab's input.** The input menu offers **Audio Layer
+  (what it plays)** (`LAYER_INPUT`) : the audio bus reads the layer's analyser (its whole
+  sound after its volume, `audioLayer.analyser()`, re-found when the layer rebuilds) with
+  the shared `analyseFrame` instead of opening a device, so the coupling and every audio
+  modulator on the audio input follow the layer; the spectrum and waveform bytes (the
+  Parametric generator) come from it too. No getUserMedia (counted : 0); an empty or muted
+  layer reads 0; Both mode keeps OSC first; the input monitor and the denoiser are greyed
+  (the layer already plays). Back on a device, the microphone opens as before.
 - **Audio Layer : play both together, and `AU all`.** A **▶** in the MIX row (between
   the A and B buttons) starts both file slots from their in points at the same moment :
   each player is held, cued (paused at its in point until it can play,

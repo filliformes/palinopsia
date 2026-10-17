@@ -401,6 +401,12 @@ class AudioLayerEngine {
     return { rms: Math.sqrt(sum / b.length), peak: pk }
   }
 
+  /** The layer's analyser (its whole sound, after its volume), for the audio
+   *  tab's input set to the Audio Layer. Null while the layer is empty. */
+  analyser(): { an: AnalyserNode; sampleRate: number } | null {
+    return this.outAn && this.ctx ? { an: this.outAn, sampleRate: this.ctx.sampleRate } : null
+  }
+
   /** One feature of the whole layer's sound (the mix, live input included, after
    *  its volume), 0..1 : what a modulator FROM "AU all" reads. Silence while the
    *  layer is empty. */
