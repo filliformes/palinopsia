@@ -881,6 +881,30 @@ export const MASTER_PRESETS: MasterPreset[] = [
   // ── Space : the picture laid on a plane in space (Perspective), and the
   // chains that flatter points of light (Lattice, Lowercase). No mixSrc : a
   // Generate scene keeps its palette mapping.
+  // Sound : chains that flatter a waveform (the Import Audio source, Parametric).
+  {
+    name: 'Sound · Phosphor', group: 'Sound',
+    fx: [
+      { shaderId: 'fx-light-trails', inputs: { decay: 0.93, drift: 0, angle: 1.5708, knee: 0.1 } },
+      { shaderId: 'fx-crt-screen', inputs: { curve: 0.12, aberration: 0.006, scanline: 0.35, vignette: 0.45, corner: 0.05, lines: 540, moire: 0.6 } }
+    ],
+    vibe: { contrast: 1.1, saturation: 1.05, gamma: 1, autoLevel: 0.15 }
+  },
+  {
+    name: 'Sound · Tape Floor', group: 'Sound',
+    fx: [
+      { shaderId: 'fx-perspective', inputs: { tilt: 0.62, turn: 0, roll: 0, lens: 0.6, zoom: 1.15, posX: 0, posY: 0, axis: 0, bend: 0, wave: 0, waves: 1.5, waveRate: 0, repeat: 1, travel: 0, drift: 0, fog: 0.45, shade: 0, soften: 0.6 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.08, size: 1.5, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 1, gamma: 1, autoLevel: 0.2 }
+  },
+  {
+    name: 'Sound · Relief', group: 'Sound',
+    fx: [
+      { shaderId: 'fx-rutt', inputs: { lines: 90, amp: 0.12, width: 0.22, color: 0.7, relief: 1 } }
+    ],
+    vibe: { contrast: 1.1, saturation: 1, gamma: 1, autoLevel: 0.15 }
+  },
   {
     name: 'Space · Floor', group: 'Space',
     fx: [

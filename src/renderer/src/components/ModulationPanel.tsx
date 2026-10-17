@@ -14,6 +14,8 @@ import { AUDIO_BANDS, AUDIO_FEATURES } from '../engine/audioIn'
 import { VISION_FEATURES } from '../engine/visionIn'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { modTargetKey, useStore } from '../store'
+import { useShallow } from 'zustand/react/shallow'
+import type { ClipAudioSrc } from '@shared/types'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { modulatorBlurb } from '../shaders/isf/sourceBlurbs'
 
@@ -538,6 +540,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
           <SliderRow label="SMOOTH" value={a.smooth} min={0} max={0.99}
             title="One-pole smoothing : 0 snaps to the signal, →1 glides"
             onChange={(v) => update(index, { audio: { ...a, smooth: v } })} />
+          <ClipFromRow value={a.src} onChange={(src) => update(index, { audio: { ...a, src } })} />
         </>
       )
     }
@@ -676,6 +679,48 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
 }
 
 // ── Small row helpers ─────────────────────────────────────────────────
+// Where an audio modulator listens : the audio input (the audio tab), or a
+// layer slot's clip, a film's soundtrack or an audio file, read at its playhead.
+function ClipFromRow({ value, onChange }: { value: ClipAudioSrc | undefined; onChange: (v: ClipAudioSrc | undefined) => void }): JSX.Element {
+  const slots = useStore(
+    useShallow((s) =>
+      s.composition.layers.flatMap((l, li) =>
+        (['A', 'B'] as const).flatMap((sl) => {
+          const x = sl === 'A' ? l.sourceA : l.sourceB
+          return x && (x.kind === 'video' || x.kind === 'audio') ? [`${li}:${sl}:${x.kind}:${x.mediaName ?? ''}`] : []
+        })
+      )
+    )
+  )
+  const cur = value ? `${value.layer}:${value.slot}` : ''
+  const known = !value || slots.some((k) => k.startsWith(cur + ':'))
+  return (
+    <Row label="FROM" title="Where it listens : the audio input (the audio tab), or the sound of a film or an audio file on a layer, read where its playhead is (at any speed, reversed or scrubbed; a stopped clip is silent)">
+      <select
+        className="input select-compact min-w-0 flex-1 text-[10px]"
+        value={cur}
+        onChange={(e) => {
+          const v = e.target.value
+          if (!v) return onChange(undefined)
+          const [l, s] = v.split(':')
+          onChange({ layer: Number(l), slot: s === 'B' ? 'B' : 'A' })
+        }}
+      >
+        <option value="">audio input</option>
+        {slots.map((k) => {
+          const [l, s, kind, ...name] = k.split(':')
+          return (
+            <option key={k} value={`${l}:${s}`}>
+              {`L${Number(l) + 1}${s} ${kind === 'audio' ? '🔊' : '🎞'} ${name.join(':') || kind}`}
+            </option>
+          )
+        })}
+        {!known && value && <option value={cur}>{`L${value.layer + 1}${value.slot} (no clip there now)`}</option>}
+      </select>
+    </Row>
+  )
+}
+
 function Row({
   label,
   title,

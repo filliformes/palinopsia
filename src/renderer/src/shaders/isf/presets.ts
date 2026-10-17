@@ -389,6 +389,17 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Spectrogram fast', values: { mode: 3, gain: 1.2, scale: 0.4, scan: 0.7, mono: 1 } },
     { name: 'Test pattern', values: { mode: 0, gain: 1.6, scale: 0.8, scan: 0.6, mono: 1, color: [1, 1, 1, 1] } }
   ],
+  // ── Audio (an imported sound file's waveform). Looks only : the volume and
+  // keep pitch are the sound's, never touched by a preset.
+  'gen-audio': [
+    { name: 'Amber whole', values: { view: 0, window: 4, style: 0, amp: 1, dim: 0.55, playhead: 1, color: [0.95, 0.75, 0.35, 1], ground: [0, 0, 0, 1] } },
+    { name: 'Mint scroll', values: { view: 2, window: 6, style: 0, amp: 1.4, dim: 0.6, playhead: 1, color: [0.55, 0.95, 0.7, 1], ground: [0, 0, 0, 1] } },
+    { name: 'Bars on the beat', values: { view: 2, window: 3, style: 2, amp: 1.8, dim: 0.7, playhead: 1, color: [1, 0.35, 0.55, 1], ground: [0, 0, 0, 1] } },
+    { name: 'Ghost outline', values: { view: 0, window: 4, style: 1, amp: 1.6, dim: 0.3, playhead: 0, color: [0.85, 0.9, 1, 1], ground: [0, 0, 0, 1] } },
+    { name: 'Loop window', values: { view: 1, window: 4, style: 0, amp: 1.2, dim: 0.65, playhead: 1, color: [0.4, 0.75, 1, 1], ground: [0.02, 0.03, 0.06, 1] } },
+    { name: 'Tape (no ground)', values: { view: 2, window: 10, style: 0, amp: 2.2, dim: 0.5, playhead: 0, color: [1, 0.85, 0.6, 1], ground: [0, 0, 0, 0] } },
+    { name: 'Paper', values: { view: 0, window: 4, style: 0, amp: 1.1, dim: 0.75, playhead: 1, color: [0.12, 0.12, 0.14, 1], ground: [0.93, 0.91, 0.86, 1] } }
+  ],
   // ── Collage (a wall of films cut up) ──
   'gen-collage': [
     { name: 'Contact sheet', values: { shape: 0, stack: 0, warp: 0, cuts: 12, films: 12, hold: 0, churn: 0, speed: 1, vary: 0, freeze: 0, zoom: 1.05, rotate: 0, gap: 0, contour: 0, curve: 0.3, contourMode: 1, torn: 0, mask: 0, rate: 0, xfade: 0 } },

@@ -46,6 +46,7 @@ export const GENERATOR_BLURBS: Record<string, string> = {
   'organic': 'Living elemental matter (fire, water or nature) carried by a real swirling flow rather than scrolling noise, so it billows and grows instead of sliding. A season control shifts its palette and behavior. Moving matter, never a still image.',
   'gen-text': 'Turns typed words into a picture: choose the font, size, weight and placement in the Inspector. Lines can step one at a time as cues, crawl like a ticker, or type themselves on. Another layer can fill the letters, so the type becomes a window onto that image. Typography used as a visual source.',
   'gen-collage': 'A wall of films cut up like torn paper : point it at a folder and every piece plays a different clip, each cropped to fit its own shape. Portrait, landscape and 4K all mix freely. The Autocutter\'s collage, but with real video in every fragment.',
+  'gen-audio': 'A sound file played in the layer like a film : play, loop, the in and out points, speed, a playhead you can scrub or modulate. The layer shows its waveform, the part played lit. It plays on Sonify\'s output device, and its sound, read at the playhead, can drive any audio modulator.',
   'gen-parametric': 'Reads the live audio and draws it directly as a picture: a hard raster, a waveform trace, spectrum bars, or a scrolling spectrogram. Local audio input shows the real sound, OSC audio its six bands, and with no audio it runs a test signal. Sound turned literally into image.',
 }
 

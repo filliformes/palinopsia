@@ -60,6 +60,9 @@ export type SourceKind =
   | 'hive'
   | 'feedback'
   | 'assemble'
+  // An imported sound file : played like a film (the video* transport fields),
+  // the layer showing its waveform (shaderId 'gen-audio' holds the look).
+  | 'audio'
 
 // A live shader instance: which ISF shader, and the current value of each
 // of its declared INPUTS (float → number, color/point2D → number[]).
@@ -93,6 +96,7 @@ export interface SourceSlot extends ShaderInstance {
   videoLoop?: boolean // default true
   videoIn?: number // normalized start point 0..1, default 0
   videoOut?: number // normalized stop point 0..1, default 1
+  videoVolume?: number // the film's own sound, 0..1, default 0 (silent : films always were)
   // Video granulation (multi-voice) : 3 seek-head voices scattering grains
   // around the (modulatable) playhead, crossfaded with raised-cosine envelopes.
   grainOn?: boolean // default false
@@ -296,6 +300,9 @@ export type ModulatorType =
 // `noisiness` (spectral flatness) is the crossmodal partner of image saturation :
 // bind sound noisiness → a layer's tint saturation to make the sound colour the picture.
 export type AudioFeature = 'level' | 'flux' | 'transient' | 'centroid' | 'band' | 'pitch' | 'noisiness'
+/** Where an audio modulator listens instead of the audio input : a layer slot's
+ *  clip (a film's soundtrack or an audio file), read at its playhead. */
+export interface ClipAudioSrc { layer: number; slot: 'A' | 'B' }
 
 // Which picture feature a `vision` modulator follows (bus in engine/visionIn.ts) :
 // the RETURN PATH — the composited image drives control.
@@ -582,7 +589,7 @@ export interface ModulatorConfig {
   sh: { probability: number; smooth: boolean; distribution: number }
   slew: { riseMs: number; fallMs: number; randomTarget: boolean }
   chaos: { r: number } // logistic-map r in [3.4, 4.0]
-  audio: { feature: AudioFeature; band: number; smooth: number } // follows the audio bus
+  audio: { feature: AudioFeature; band: number; smooth: number; src?: ClipAudioSrc } // follows the audio bus, or a slot's clip
   organic: { variation: number } // 0 = near-LFO, 1 = very irregular (never repeats)
   physics: { motion: PhysicsMotion; damping: number } // force-driven motion
   motion: { shape: MotionShape } // named motion archetype / force behaviour
@@ -1286,7 +1293,7 @@ export interface ExposedApi {
   /** The all-intra cache directory — a clip whose path is under it already scrubs smoothly. */
   videoCacheDir: () => Promise<string>
   /** The videos in a folder (natural order), for switching a video slot to its neighbours. */
-  videoListFolder: (dir: string) => Promise<{ ok: boolean; files: Array<{ name: string; path: string }>; error?: string }>
+  videoListFolder: (dir: string, kind?: 'audio') => Promise<{ ok: boolean; files: Array<{ name: string; path: string }>; error?: string }>
   /** A clip's keyframe times (s, sorted), or null : lets the player seek keyframe to keyframe. */
   videoKeyframes: (path: string) => Promise<number[] | null>
   // Collage : pick a folder, then reduce it to a pool of playable clips (one
@@ -1302,6 +1309,13 @@ export interface ExposedApi {
   // Sonify's Collage voice : a film's audio-only copy (made once, cached), or
   // `silent` when the film has no sound.
   collageAudio: (path: string) => Promise<{ ok: boolean; path?: string; silent?: boolean; error?: string }>
+  // A sound's analysis (a film's soundtrack or an audio file) : 60 feature frames
+  // a second (level, flux, centroid, six bands, pitch, noisiness; bytes) then the
+  // waveform's min / max (int8) at 400 a second. Made once, cached.
+  audioAnalysis: (path: string) => Promise<{
+    ok: boolean; silent?: boolean; error?: string; duration?: number; frames?: number
+    rate?: number; peakRate?: number; data?: Uint8Array; peaks?: number
+  }>
   onCollageProgress: (
     cb: (p: { done: number; total: number; file: string }) => void
   ) => () => void

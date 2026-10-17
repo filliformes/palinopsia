@@ -45,6 +45,7 @@ import { StrobeLimiter } from './strobeLimit';
 import { PbrLib } from './pbrTextures';
 import type { SidechainRef } from '@shared/types';
 import { VideoSource } from './VideoSource';
+import { AudioSource } from './AudioSource';
 import { AssembleSource } from './AssembleSource';
 import { CaptureSource } from './CaptureSource';
 import { PersonMask } from './personMask';
@@ -907,6 +908,11 @@ export class ISFLayer {
   private videoB: VideoSource | null = null;
   private mediaIdA: string | null = null;
   private mediaIdB: string | null = null;
+  // Import Audio slots (kind:'audio') : a sound file played, its waveform drawn.
+  private audioA: AudioSource | null = null;
+  private audioB: AudioSource | null = null;
+  private audioIdA: string | null = null;
+  private audioIdB: string | null = null;
   /** Modulation seam for video slots : `position` (normalized playhead) and
    *  `speed` (rate multiplier) overrides, consumed by the source's next tick. */
   setVideoInput(slot: 'A' | 'B', name: string, v: number): void {
@@ -918,11 +924,37 @@ export class ISFLayer {
       else if (name === 'speed') as.setSpeedMod(v);
       return;
     }
+    const au = slot === 'A' ? this.audioA : this.audioB;
+    if (au) {
+      if (name === 'position') au.setPosMod(v);
+      else if (name === 'speed') au.setSpeedMod(v);
+      else au.setMod(name, v);
+      return;
+    }
     const vs = slot === 'A' ? this.videoA : this.videoB;
     if (!vs) return;
     if (name === 'position') vs.setPosMod(v);
     else if (name === 'speed') vs.setSpeedMod(v);
+    else if (name === 'vol') vs.setVolMod(v);
     else vs.setGrainMod(name, v);
+  }
+
+  /** Load/swap/clear an AUDIO slot (cheap when the file is unchanged). */
+  setAudio(slot: 'A' | 'B', cfg: { url: string; path: string; inputs: Record<string, number | number[]> } | null): void {
+    const id = cfg ? cfg.url : null;
+    const curId = slot === 'A' ? this.audioIdA : this.audioIdB;
+    let cur = slot === 'A' ? this.audioA : this.audioB;
+    if (id !== curId) {
+      try { cur?.dispose(); } catch (e) { console.warn('[audio] dispose failed:', e); }
+      cur = null;
+      if (cfg) {
+        cur = new AudioSource(this.shared.gl, this.w, this.h);
+        cur.load(cfg.url, cfg.path);
+      }
+      if (slot === 'A') { this.audioA = cur; this.audioIdA = id; }
+      else { this.audioB = cur; this.audioIdB = id; }
+    }
+    if (cur && cfg) cur.update(cfg.inputs);
   }
   // Assemble slots (kind:'assemble') : an edit decision list played live.
   private assembleA: AssembleSource | null = null;
@@ -1243,6 +1275,17 @@ export class ISFLayer {
       a.setRate(s.videoSpeed ?? 1);
       return;
     }
+    const au = slot === 'A' ? this.audioA : this.audioB;
+    if (au && s) {
+      au.setPlayback({
+        playing: s.videoPlaying ?? true,
+        speed: s.videoSpeed ?? 1,
+        loop: s.videoLoop ?? true,
+        inN: s.videoIn ?? 0,
+        outN: s.videoOut ?? 1
+      });
+      return;
+    }
     const v = slot === 'A' ? this.videoA : this.videoB;
     if (!v || !s) return;
     v.setPlayback({
@@ -1251,7 +1294,8 @@ export class ISFLayer {
       direction: s.videoDirection ?? (s.videoReverse ? 'reverse' : 'forward'),
       loop: s.videoLoop ?? true,
       inN: s.videoIn ?? 0,
-      outN: s.videoOut ?? 1
+      outN: s.videoOut ?? 1,
+      volume: s.videoVolume ?? 0
     });
     v.setGrain({
       on: s.grainOn ?? false,
@@ -1266,13 +1310,20 @@ export class ISFLayer {
   /** Drive video playheads and publish them for the Inspector timeline.
    *  `rawDt` is the real frame delta; `mul` is this layer's speed × global speed
    *  (the rate over realtime) : so both scale the clip on top of its own speed. */
-  tickVideos(layerIndex: number, rawDt: number, mul: number, bpm = 120): void {
+  tickVideos(layerIndex: number, rawDt: number, mul: number, bpm = 120, audible = true): void {
     for (const slot of ['A', 'B'] as const) {
       const v = slot === 'A' ? this.videoA : this.videoB;
+      const au = slot === 'A' ? this.audioA : this.audioB;
       const key = videoKey(layerIndex, slot);
       if (v) {
+        v.setAudible(audible);
         v.tick(rawDt, mul, bpm);
         videoPlayheads.set(key, { time: v.time(), duration: v.duration() });
+      } else if (au) {
+        // a muted layer (or another one soloed) plays on, silent
+        au.setMuted(!audible);
+        au.tick(rawDt, mul);
+        videoPlayheads.set(key, { time: au.time(), duration: au.duration() });
       } else {
         videoPlayheads.delete(key);
       }
@@ -1286,10 +1337,11 @@ export class ISFLayer {
     (slot === 'A' ? this.natA : this.natB)?.src.setInput(name, value); // modulation on registry engines
     (slot === 'A' ? this.silA : this.silB)?.setInput(name, value); // modulation on silhouette params
     (slot === 'A' ? this.collageA : this.collageB)?.setInput(name, value); // modulation on collage params
+    (slot === 'A' ? this.audioA : this.audioB)?.setInput(name, value); // modulation on the waveform / volume
   }
 
-  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null || this.textB !== null || this.paramB !== null || this.natB !== null || this.silB !== null || this.collageB !== null || this.assembleB !== null; }
-  private hasA(): boolean { return this.isfA !== null || this.videoA !== null || this.captureA !== null || this.hiveA !== null || this.textA !== null || this.paramA !== null || this.natA !== null || this.silA !== null || this.collageA !== null || this.assembleA !== null; }
+  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null || this.textB !== null || this.paramB !== null || this.natB !== null || this.silB !== null || this.collageB !== null || this.assembleB !== null || this.audioB !== null; }
+  private hasA(): boolean { return this.isfA !== null || this.videoA !== null || this.captureA !== null || this.hiveA !== null || this.textA !== null || this.paramA !== null || this.natA !== null || this.silA !== null || this.collageA !== null || this.assembleA !== null || this.audioA !== null; }
 
   // An empty layer (no source, no effect switched on, no trail) draws transparent
   // black every frame : a clear, a persist and a blend that changes nothing (the
@@ -1362,6 +1414,13 @@ export class ISFLayer {
         nat.src.feed(this.shared.audioTex?.texture ?? null, sidechainTex && ref ? sidechainTex(ref) : null);
       }
       nat.src.render(scratch.fbo, this.clockSec);
+      return;
+    }
+
+    // Import Audio : the sound file's waveform.
+    const audio = slot === 'A' ? this.audioA : this.audioB;
+    if (audio) {
+      audio.render(scratch.fbo);
       return;
     }
 
@@ -1514,6 +1573,8 @@ export class ISFLayer {
     this.isfB?.cleanup();
     this.videoA?.dispose();
     this.videoB?.dispose();
+    this.audioA?.dispose();
+    this.audioB?.dispose();
     this.assembleA?.dispose();
     this.assembleB?.dispose();
     this.collageA?.dispose();
@@ -2743,6 +2804,7 @@ export class Compositor {
       L.setNative('A', natA, natA ? l.sourceA.inputs : null);
       L.setSilhouette('A', l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-silhouette' ? { inputs: l.sourceA.inputs } : null);
       L.setCollage('A', isCollA ? { pool: l.sourceA.collagePool ?? [], edls: l.sourceA.collageEdls ?? [], inputs: l.sourceA.inputs, folder: l.sourceA.collageFolder } : null);
+      L.setAudio('A', l.sourceA.kind === 'audio' && l.sourceA.mediaId ? { url: l.sourceA.mediaId, path: l.sourceA.mediaPath ?? '', inputs: l.sourceA.inputs } : null);
       const nativeB = !!l.sourceB && l.sourceB.kind === 'generator' && NATIVE_SOURCE_IDS.has(l.sourceB.shaderId ?? '');
       const isTextB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-text';
       const isParamB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-parametric';
@@ -2765,6 +2827,7 @@ export class Compositor {
       L.setNative('B', natB, natB && l.sourceB ? l.sourceB.inputs : null);
       L.setSilhouette('B', !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-silhouette' ? { inputs: l.sourceB.inputs } : null);
       L.setCollage('B', isCollB && l.sourceB ? { pool: l.sourceB.collagePool ?? [], edls: l.sourceB.collageEdls ?? [], inputs: l.sourceB.inputs, folder: l.sourceB.collageFolder } : null);
+      L.setAudio('B', l.sourceB?.kind === 'audio' && l.sourceB.mediaId ? { url: l.sourceB.mediaId, path: l.sourceB.mediaPath ?? '', inputs: l.sourceB.inputs } : null);
       L.setVideoPlayback('A', l.sourceA);
       L.setVideoPlayback('B', l.sourceB);
       L.setFraming('A', l.sourceA, i);
@@ -3152,7 +3215,8 @@ export class Compositor {
         L.advanceClock(dtSec);
         // Video: pass the REAL delta + the layer×global rate multiplier so the
         // clip plays natively (smooth) at speed·layer·global over realtime.
-        L.tickVideos(li, rawDt, this.globalSpeed * L.speed, this.bpm);
+        // (an audio slot sounds only while its layer would show : not muted, or soloed)
+        L.tickVideos(li, rawDt, this.globalSpeed * L.speed, this.bpm, this.layers.some((x) => x.solo) ? L.solo : !L.mute);
         L.tickAssemble(li, rawDt, this.globalSpeed * L.speed);
         if (L.skipBlank()) continue;
         gl.bindVertexArray(null); // ISF draws own the default VAO

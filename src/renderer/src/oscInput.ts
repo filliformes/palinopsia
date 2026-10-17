@@ -324,13 +324,19 @@ function route(address: string, args: Args): void {
           slot = which
           which = segs[5]
         } else {
-          slot = layer.sourceA?.kind === 'video' ? 'A' : layer.sourceB?.kind === 'video' ? 'B' : null
+          const playable = (k?: string): boolean => k === 'video' || k === 'audio'
+          slot = playable(layer.sourceA?.kind) ? 'A' : playable(layer.sourceB?.kind) ? 'B' : null
         }
         if (!slot || !which) return
         const s = slot === 'A' ? layer.sourceA : layer.sourceB
-        if (s?.kind !== 'video') return
+        if (s?.kind !== 'video' && s?.kind !== 'audio') return
         switch (which) {
           case 'play': st.setVideoPlayback(li, slot, { videoPlaying: n >= 0.5 }); return
+          case 'volume':
+            // a film's own sound, or the audio file's volume (0..1)
+            if (s.kind === 'audio') st.setSourceInput(li, slot, 'volume', Math.max(0, Math.min(1, n)))
+            else st.setVideoPlayback(li, slot, { videoVolume: Math.max(0, Math.min(1, n)) })
+            return
           case 'loop': st.setVideoPlayback(li, slot, { videoLoop: n >= 0.5 }); return
           case 'direction': {
             const d = enumFrom(args, VIDEO_DIRECTIONS)
@@ -1095,9 +1101,10 @@ function enumerateLeaves(): Leaf[] {
     // but never echoed outbound (the playhead flies at frame rate).
     for (const sl of ['A', 'B'] as const) {
       const s = sl === 'A' ? l?.sourceA : l?.sourceB
-      if (s?.kind !== 'video') continue
+      if (s?.kind !== 'video' && s?.kind !== 'audio') continue
       const p = `/opsia/layer${n}/video/${sl}`
       add(`${p}/play`, 0, 1, (s.videoPlaying ?? true) ? 1 : 0, 'Video play (>= 0.5) / pause')
+      add(`${p}/volume`, 0, 1, s.kind === 'audio' ? (typeof s.inputs.volume === 'number' ? s.inputs.volume : 0.8) : s.videoVolume ?? 0, 'The film\'s own sound, or the audio file\'s volume (0..1)')
       const di = Math.max(0, VIDEO_DIRECTIONS.indexOf((s.videoDirection ?? 'forward') as (typeof VIDEO_DIRECTIONS)[number]))
       add(`${p}/direction`, 0, 1, di / (VIDEO_DIRECTIONS.length - 1), 'Play mode (index: forward·reverse·pendulum)')
       add(`${p}/loop`, 0, 1, (s.videoLoop ?? true) ? 1 : 0, 'Loop between in/out (>= 0.5)')

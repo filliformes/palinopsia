@@ -181,6 +181,8 @@ export function Inspector(): JSX.Element {
     pool: import('@shared/collage').CollageClip[]
     edls: import('@shared/collage').CollageEdl[]
   } | null = null
+  // An Import Audio slot : its transport (the video's, in audio mode) under its look.
+  let audioCfg: { layer: number; slot: 'A' | 'B'; state: SourceSlot } | null = null
   // The FX the header is showing, if any : right-clicking its title offers the
   // same copy/paste menu as right-clicking its chip in the rack.
   const fxHere: { scope: FxScope; instId: string } | null =
@@ -239,6 +241,7 @@ export function Inspector(): JSX.Element {
               : 'A layer this source reads where each point appears : on a plane its brightness lifts the dots, so the picture stands up out of the field as the camera sees it; in a volume it lights and grows the points. Raise the sidechain control to use it. None = the field on its own.'
         }
       }
+      if (slot.kind === 'audio') audioCfg = { layer: li, slot: sl, state: slot }
       if (slot.shaderId === 'gen-text') {
         textCfg = {
           text: slot.text ?? 'OPSIA',
@@ -630,6 +633,7 @@ export function Inspector(): JSX.Element {
       </div>
       {/* Native Silhouette source : camera status + the explicit turn-on. */}
       {shaderId === 'gen-silhouette' && <SilhouetteStrip />}
+      {audioCfg && <VideoTransport layer={audioCfg.layer} slot={audioCfg.slot} state={audioCfg.state} audio />}
       {/* Native Collage source : the folder / assemblage picker strip. */}
       {collageCfg && (
         <CollageStrip

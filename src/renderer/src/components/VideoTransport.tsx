@@ -10,6 +10,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { videoKey, videoPlayheads, videoSeekRequests } from '../engine/videoState'
 import { showToast } from './Toast'
 import { pathFromMediaUrl, playableVideoUrl } from './videoImport'
+import { clipAudio } from '../engine/clipAudio'
 import { modTargetKey, useStore } from '../store'
 import { AssignRow } from './AutoControls'
 
@@ -40,11 +41,15 @@ function loadCacheDir(): Promise<string> {
 export function VideoTransport({
   layer,
   slot,
-  state
+  state,
+  audio = false
 }: {
   layer: number
   slot: 'A' | 'B'
   state: SourceSlot
+  /** An Import Audio slot : no direction, smooth copy or grain (an <audio> plays
+   *  forward only); its folder lists sound files; its timeline shows the wave. */
+  audio?: boolean
 }): JSX.Element {
   const setVideoPlayback = useStore((s) => s.setVideoPlayback)
   const swapVideoSource = useStore((s) => s.swapVideoSource)
@@ -70,7 +75,7 @@ export function VideoTransport({
   const [files, setFiles] = useState<Array<{ name: string; path: string }>>([])
   const relist = (): void => {
     if (!folder) return
-    void window.api.videoListFolder(folder).then((r) => setFiles(r.ok ? r.files : []))
+    void window.api.videoListFolder(folder, audio ? 'audio' : undefined).then((r) => setFiles(r.ok ? r.files : []))
   }
   useEffect(() => {
     if (!folder) {
@@ -78,11 +83,11 @@ export function VideoTransport({
       return
     }
     let alive = true
-    void window.api.videoListFolder(folder).then((r) => alive && setFiles(r.ok ? r.files : []))
+    void window.api.videoListFolder(folder, audio ? 'audio' : undefined).then((r) => alive && setFiles(r.ok ? r.files : []))
     return () => {
       alive = false
     }
-  }, [folder])
+  }, [folder, audio])
   const same = (a: string, b: string): boolean => a.replace(/\\/g, '/').toLowerCase() === b.replace(/\\/g, '/').toLowerCase()
   const clipIdx = origPath ? files.findIndex((f) => same(f.path, origPath)) : -1
   const [switchPct, setSwitchPct] = useState<number | null>(null)
@@ -91,7 +96,7 @@ export function VideoTransport({
     if (switching.current) return
     switching.current = true
     try {
-      const url = await playableVideoUrl(f.path, f.name, setSwitchPct)
+      const url = audio ? `opsia-media://local/${encodeURIComponent(f.path)}` : await playableVideoUrl(f.path, f.name, setSwitchPct)
       if (url) swapVideoSource(layer, slot, url, f.name, { mediaPath: f.path, resetTrim: true })
     } finally {
       switching.current = false
@@ -209,7 +214,7 @@ export function VideoTransport({
         >
           ■
         </button>
-        <button
+        {!audio && <button
           onClick={() =>
             set({
               videoDirection:
@@ -220,7 +225,7 @@ export function VideoTransport({
           title={`Play mode: ${direction} : click to cycle forward → reverse → pendulum`}
         >
           {direction === 'forward' ? 'fwd ▶' : direction === 'reverse' ? '◀ rev' : '⇄ pend'}
-        </button>
+        </button>}
         <button
           onClick={() => set({ videoLoop: !loop })}
           className={btn(loop)}
@@ -230,7 +235,7 @@ export function VideoTransport({
         </button>
         {/* Smooth scrub : convert a native clip to all-intra so reverse / high-speed
             are smooth. Only meaningful for on-disk clips. */}
-        {vidPath &&
+        {vidPath && !audio &&
           (smoothPct !== null ? (
             <span
               className="rounded border border-accent2 px-1.5 py-0.5 font-mono text-[10px] text-accent2"
@@ -284,6 +289,7 @@ export function VideoTransport({
           onPointerCancel={endDrag}
           title="Click or drag to move the playhead (within the in/out trim) : drag the handles to trim"
         >
+        {audio && origPath && <WaveStrip path={origPath} />}
         <div
           className="absolute inset-y-0 bg-accent/15"
           style={{ left: `${inN * 100}%`, right: `${(1 - outN) * 100}%` }}
@@ -327,7 +333,7 @@ export function VideoTransport({
             onClick={() => step(-1)}
             disabled={files.length < 2 || switchPct !== null}
             className={btn(false)}
-            title="Previous video in this folder"
+            title={audio ? 'Previous sound in this folder' : 'Previous video in this folder'}
           >
             ◀
           </button>
@@ -340,9 +346,9 @@ export function VideoTransport({
               if (f) void switchTo(f)
             }}
             disabled={switchPct !== null}
-            title={`Videos in ${folder} : pick one to swap it in (speed, direction, loop and grain stay)`}
+            title={audio ? `Sounds in ${folder} : pick one to swap it in (speed and loop stay)` : `Videos in ${folder} : pick one to swap it in (speed, direction, loop and grain stay)`}
           >
-            {clipIdx < 0 && <option value="">{state.mediaName ?? 'pick a video'}</option>}
+            {clipIdx < 0 && <option value="">{state.mediaName ?? (audio ? 'pick a sound' : 'pick a video')}</option>}
             {files.map((f) => (
               <option key={f.path} value={f.path}>
                 {f.name}
@@ -353,7 +359,7 @@ export function VideoTransport({
             onClick={() => step(1)}
             disabled={files.length < 2 || switchPct !== null}
             className={btn(false)}
-            title="Next video in this folder"
+            title={audio ? 'Next sound in this folder' : 'Next video in this folder'}
           >
             ▶
           </button>
@@ -375,17 +381,27 @@ export function VideoTransport({
           onChange={(e) => set({ videoSpeed: speedFromT(Number(e.target.value)) })}
           onDoubleClick={() => set({ videoSpeed: 1 })}
           className="min-w-0 flex-1 accent-accent"
-          title={`Clip speed ${fmtSpeed(speed)} : double-click to reset (×layer ×global)`}
+          title={audio ? `Speed ${fmtSpeed(speed)} : like tape, the pitch moves with it (keep pitch holds it); 1/16 to 16x, slower is silent; double-click to reset (×layer ×global)` : `Clip speed ${fmtSpeed(speed)} : double-click to reset (×layer ×global)`}
         />
         <span className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">
           {fmtSpeed(speed)}
         </span>
       </div>
 
+      {/* The sound : its level at the playhead (RMS), and how loud it plays. */}
+      <LevelRow
+        layer={layer}
+        slot={slot}
+        path={origPath ?? ''}
+        volume={audio ? (typeof state.inputs.volume === 'number' ? state.inputs.volume : 0.8) : state.videoVolume ?? 0}
+        onVolume={(v) => (audio ? useStore.getState().setSourceInput(layer, slot, 'volume', v) : set({ videoVolume: v }))}
+        audio={audio}
+      />
+
       {/* Granular : 3 seek-head voices scattering grains around the playhead.
           Toggle + BPM sync on one line, the 4 grain sliders in a 2×2 grid
           below so each gets a readable width. */}
-      <div className="flex flex-col gap-1">
+      {!audio && <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
           <button
             onClick={() => set({ grainOn: !(state.grainOn ?? false) })}
@@ -435,25 +451,155 @@ export function VideoTransport({
             )}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Modulation : playhead / speed / grain params as mod targets. */}
-      <VideoModRow layer={layer} slot={slot} grainOn={state.grainOn ?? false} />
+      <VideoModRow layer={layer} slot={slot} grainOn={!audio && (state.grainOn ?? false)} audio={audio} />
     </div>
   )
+}
+
+// The clip's sound at its playhead : a meter (RMS bar, held peak, -60..0 dBFS)
+// and its RMS as a number, read from the file's analysis, so it shows whether
+// the clip has sound right there even while the film plays muted. A stopped
+// playhead reads silence. Then its volume : 0 keeps a film silent.
+const M_FLOOR = -60
+function LevelRow({ layer, slot, path, volume, onVolume, audio }: {
+  layer: number; slot: 'A' | 'B'; path: string; volume: number; onVolume: (v: number) => void; audio: boolean
+}): JSX.Element {
+  const barRef = useRef<HTMLDivElement | null>(null)
+  const tickRef = useRef<HTMLDivElement | null>(null)
+  const numRef = useRef<HTMLSpanElement | null>(null)
+  const [, bump] = useState(0)
+  useEffect(() => clipAudio.subscribe(() => bump((n) => n + 1)), [])
+  const st = path ? clipAudio.state(path) : undefined
+  if (path && st === undefined) clipAudio.get(path) // ask for it once
+  useEffect(() => {
+    let raf = 0, lastT = -1, movedAt = 0, at = performance.now()
+    let rmsDb = -120, pkDb = -120, held = 0, shown = ''
+    const key = videoKey(layer, slot)
+    const tick = (now: number): void => {
+      raf = requestAnimationFrame(tick)
+      const dt = Math.min(0.25, (now - at) / 1000)
+      at = now
+      const an = path ? clipAudio.get(path) : null
+      const ph = videoPlayheads.get(key)
+      let rms = 0, peak = 0
+      if (an && ph) {
+        if (Math.abs(ph.time - lastT) > 1e-4) movedAt = now
+        lastT = ph.time
+        if (now - movedAt < 150) ({ rms, peak } = clipAudio.meterAt(an, ph.time))
+      }
+      const toDb = (x: number): number => (x > 1e-6 ? 20 * Math.log10(x) : -120)
+      const r = toDb(rms), p = toDb(peak)
+      rmsDb = r >= rmsDb ? r : Math.max(r, rmsDb - 24 * dt) // a meter's fall, 24 dB/s
+      if (p >= pkDb) { pkDb = p; held = 1 } else if ((held -= dt) <= 0) pkDb = Math.max(p, pkDb - 24 * dt)
+      const x = (db: number): number => Math.max(0, Math.min(1, (db - M_FLOOR) / -M_FLOOR))
+      if (barRef.current) {
+        barRef.current.style.width = `${(x(rmsDb) * 100).toFixed(1)}%`
+        barRef.current.style.background = rmsDb > -9 ? 'rgb(214,196,90)' : 'rgb(120,200,140)'
+      }
+      if (tickRef.current) {
+        tickRef.current.style.left = `calc(${(x(pkDb) * 100).toFixed(1)}% - 1px)`
+        tickRef.current.style.opacity = pkDb > M_FLOOR ? '1' : '0'
+        tickRef.current.style.background = pkDb > -1 ? 'rgb(230,120,60)' : 'rgb(230,230,230)'
+      }
+      const lin = rmsDb > -119 ? Math.pow(10, rmsDb / 20) : 0
+      const txt = lin.toFixed(3)
+      if (numRef.current && txt !== shown) {
+        shown = txt
+        numRef.current.textContent = txt
+        numRef.current.title = `RMS ${txt} (${rmsDb > -119 ? rmsDb.toFixed(1) : '-∞'} dBFS) at the playhead`
+      }
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [layer, slot, path])
+  const status = !path ? 'no file' : st === 'silent' ? 'no sound' : st === 'failed' ? 'unread' : st === 'pending' || st === undefined ? 'reading…' : null
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-10 shrink-0 font-mono text-[9px] uppercase text-muted">level</span>
+      <div
+        className="relative h-[7px] min-w-[40px] flex-1 overflow-hidden rounded-sm bg-panel3"
+        title={`The clip's sound where the playhead is : the bar is its RMS, the tick its peak (${M_FLOOR} to 0 dBFS). Read from the file${audio ? '' : ', so it shows even while the film plays silent (volume 0)'}; a stopped playhead reads nothing.`}
+      >
+        <div ref={barRef} className="absolute inset-y-0 left-0 w-0" />
+        <div ref={tickRef} className="absolute inset-y-0 w-[2px] opacity-0" />
+        {[-48, -36, -24, -12, -6].map((db) => (
+          <div key={db} className="pointer-events-none absolute inset-y-0 w-px bg-black/40" style={{ left: `${(((db - M_FLOOR) / -M_FLOOR) * 100).toFixed(1)}%` }} />
+        ))}
+      </div>
+      {status ? (
+        <span className="w-12 shrink-0 text-right font-mono text-[9px] text-muted">{status}</span>
+      ) : (
+        <span ref={numRef} className="w-12 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted">0.000</span>
+      )}
+      <span className="shrink-0 font-mono text-[9px] uppercase text-muted">vol</span>
+      <input
+        type="range" min={0} max={1} step={0.01} value={volume}
+        onChange={(e) => onVolume(Number(e.target.value))}
+        onDoubleClick={() => onVolume(audio ? 0.8 : 0)}
+        className="w-16 shrink-0 accent-accent"
+        title={audio
+          ? `Volume ${Math.round(volume * 100)} % (double-click : 80 %), on Sonify's output device`
+          : `The film's own sound : ${volume > 0 ? `${Math.round(volume * 100)} %` : 'silent'} (double-click : silent), on Sonify's output device. Heard while it plays forward at its own pace (reverse, the grains or a modulated playhead stay silent); a muted layer is silent.`}
+      />
+      <span className="w-8 shrink-0 text-right font-mono text-[9px] tabular-nums text-muted">{volume > 0 ? Math.round(volume * 100) : 'off'}</span>
+    </div>
+  )
+}
+
+// The sound's waveform under an audio slot's timeline (its analysis's peaks,
+// drawn once when they land and when the strip changes size).
+function WaveStrip({ path }: { path: string }): JSX.Element {
+  const ref = useRef<HTMLCanvasElement | null>(null)
+  useEffect(() => {
+    const cv = ref.current
+    if (!cv) return
+    const draw = (): void => {
+      const an = clipAudio.get(path)
+      const r = cv.getBoundingClientRect()
+      const w = Math.max(1, Math.round(r.width * (window.devicePixelRatio || 1))), h = Math.max(1, Math.round(r.height * (window.devicePixelRatio || 1)))
+      if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h }
+      const g = cv.getContext('2d')
+      if (!g) return
+      g.clearRect(0, 0, w, h)
+      if (!an || an.peakCount < 1) return
+      g.fillStyle = 'rgba(255,255,255,0.28)'
+      const n = an.peakCount
+      for (let x = 0; x < w; x++) {
+        const i0 = Math.floor((x / w) * n), i1 = Math.max(i0 + 1, Math.floor(((x + 1) / w) * n))
+        let mn = 127, mx = -127
+        for (let i = i0; i < Math.min(n, i1); i += Math.max(1, Math.floor((i1 - i0) / 64))) {
+          mn = Math.min(mn, an.peaks[i * 2]); mx = Math.max(mx, an.peaks[i * 2 + 1])
+        }
+        if (mx < mn) continue
+        const y0 = h / 2 - (mx / 127) * (h / 2), y1 = h / 2 - (mn / 127) * (h / 2)
+        g.fillRect(x, y0, 1, Math.max(1, y1 - y0))
+      }
+    }
+    draw()
+    const off = clipAudio.subscribe(draw)
+    const ro = new ResizeObserver(draw)
+    ro.observe(cv)
+    return () => { off(); ro.disconnect() }
+  }, [path])
+  return <canvas ref={ref} className="pointer-events-none absolute inset-0 h-full w-full rounded" />
 }
 
 // Bind a modulator to the video PLAYHEAD (position 0..1 within the trim : a saw
 // LFO = a loop, S&H = jump-cuts, audio = a sound-driven scrub) or to the clip
 // SPEED (rate multiplier). On imported/converted all-intra clips the seeks are
 // frame-accurate, so a modulated playhead reads smooth.
-function VideoModRow({ layer, slot, grainOn }: { layer: number; slot: 'A' | 'B'; grainOn: boolean }): JSX.Element {
+function VideoModRow({ layer, slot, grainOn, audio = false }: { layer: number; slot: 'A' | 'B'; grainOn: boolean; audio?: boolean }): JSX.Element {
   const [open, setOpen] = useState<string | null>(null)
   const inputs: Array<[string, string]> = [
     ['playhead', 'position'],
     ['speed', 'speed'],
     ['in', 'loopIn'],
     ['out', 'loopOut'],
+    // the film's volume (an audio slot's is its `volume` control, with its own M)
+    ...(audio ? [] : ([['vol', 'vol']] as Array<[string, string]>)),
     ...(grainOn ? ([['gr·size', 'grainSize'], ['gr·spray', 'grainSpray']] as Array<[string, string]>) : [])
   ]
   const targets: Record<string, ModTarget> = {}

@@ -1881,7 +1881,36 @@ export const FINALIZER_SHADER: IsfShader = {
   }
 }
 
+// The Import Audio source's look (engine/AudioSource.ts) : a slot of kind
+// 'audio' carries this id, so the Inspector, presets, modulation and OSC reach
+// its inputs. Not in GENERATORS : it needs a file, never a dice or a theme.
+export const AUDIO_SOURCE_SHADER: IsfShader = {
+  id: 'gen-audio',
+  name: 'Audio',
+  category: 'Generator',
+  native: true,
+  source: `/*${JSON.stringify({
+    DESCRIPTION:
+      'Audio : a sound file played in the layer like a film (play, loop, the in / out trim, speed, the playhead scrubbed or modulated), the layer showing its waveform. VIEW : the whole file, the loop, or a window scrolling past the playhead. STYLE : filled, outlined or bars. The part already played is lit, the rest dimmed. It plays on Sonify\'s output device; its sound, read at the playhead, can drive any audio modulator (FROM).',
+    CATEGORIES: ['Generator'],
+    INPUTS: [
+      { NAME: 'view', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['whole', 'loop', 'scroll'], DEFAULT: 0, LABEL: 'view' },
+      { NAME: 'window', TYPE: 'float', MIN: 0.25, MAX: 30, DEFAULT: 4, LABEL: 'scroll window (s)' },
+      { NAME: 'style', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['filled', 'outline', 'bars'], DEFAULT: 0, LABEL: 'style' },
+      { NAME: 'amp', TYPE: 'float', MIN: 0.25, MAX: 4, DEFAULT: 1, LABEL: 'height' },
+      { NAME: 'dim', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.55, LABEL: 'unplayed dim' },
+      { NAME: 'playhead', TYPE: 'bool', DEFAULT: true, LABEL: 'playhead' },
+      { NAME: 'color', TYPE: 'color', DEFAULT: [0.95, 0.75, 0.35, 1.0], LABEL: 'color' },
+      { NAME: 'ground', TYPE: 'color', DEFAULT: [0.0, 0.0, 0.0, 1.0], LABEL: 'ground' },
+      { NAME: 'volume', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.8, LABEL: 'volume' },
+      { NAME: 'keepPitch', TYPE: 'bool', DEFAULT: false, LABEL: 'keep pitch' }
+    ]
+  })}*/`,
+  curated: { amp: [0.7, 2.2], dim: [0.3, 0.8], window: [1.5, 10] }
+}
+
 export const ALL_SHADERS: IsfShader[] = [
+  AUDIO_SOURCE_SHADER,
   ...GENERATORS,
   ...FX_SHADERS,
   ...NATIVE_NODES,

@@ -6,6 +6,8 @@
 // luma/edge key → chroma shift → optional feedback) runs as ISF FX on top of
 // this texture : it lives in the FX rack, not here. No Hap dependency.
 
+import { trackMediaSink, untrackMediaSink } from './mediaSink'
+
 /** Upload the current frame of a <video> into a GL texture (creating it on
  *  first use), matching the engine's bottom-left orientation. Returns the
  *  texture, or the passed-in one unchanged if no frame is decodable yet. Shared
@@ -40,6 +42,7 @@ export interface VideoPlayback {
   loop: boolean
   inN: number // normalized start 0..1
   outN: number // normalized stop 0..1
+  volume?: number // the film's own sound, 0 (silent, the default) .. 1
 }
 
 export class VideoSource {
@@ -92,6 +95,18 @@ export class VideoSource {
   // keyframe, so the override-seek lands frame-accurately at speed.
   private posMod: number | null = null
   private speedMod: number | null = null
+  // The film's sound : heard at `volume` while it plays natively forward (a seek
+  // pump, a reverse, the grains or a held playhead would only stutter), its
+  // layer not muted. Silent (muted) otherwise, as every film was before.
+  private volMod: number | null = null
+  private audible = true
+  private nativeNow = false
+  setVolMod(v: number): void {
+    this.volMod = Math.max(0, Math.min(1, v))
+  }
+  setAudible(on: boolean): void {
+    this.audible = on
+  }
   setPosMod(v: number): void {
     this.posMod = Math.max(0, Math.min(1, v))
   }
@@ -336,6 +351,7 @@ void main(){
     // "tainted" and WebGL refuses every frame (a SecurityError on upload, the
     // layer black). The scheme answers every request with Access-Control-Allow-Origin.
     this.video.crossOrigin = 'anonymous'
+    trackMediaSink(this.video) // its sound (volume up) plays on Sonify's device
     // Surface a failed load instead of a silent black frame (protocol 404, moved
     // file, unsupported codec) so "the video won't play" is diagnosable.
     this.video.addEventListener('error', () => {
@@ -467,6 +483,19 @@ void main(){
    *  runs on the element's own clock (smoothest); reverse, pendulum-reverse, and
    *  above-cap speed keep playing but OVERRIDE currentTime each frame. */
   tick(rawDt: number, mul: number, bpm = 120): void {
+    this.nativeNow = false
+    try {
+      this.tickInner(rawDt, mul, bpm)
+    } finally {
+      const vol = this.volMod ?? this.pb.volume ?? 0
+      this.volMod = null
+      const hear = vol > 0.001 && this.audible && this.nativeNow && this.pb.playing && !this.grain.on
+      if (this.video.muted === hear) this.video.muted = !hear
+      if (hear && Math.abs(this.video.volume - vol) > 1e-3) this.video.volume = vol
+    }
+  }
+
+  private tickInner(rawDt: number, mul: number, bpm: number): void {
     const v = this.video
     const d = this.duration()
     if (d <= 0) return
@@ -529,6 +558,7 @@ void main(){
     // Pure-native forward: follow the element's own clock (no per-frame seeking).
     const pureNative = dir > 0 && rate >= NATIVE_MIN && rate <= this.nativeCap
     if (pureNative) {
+      this.nativeNow = true
       const pr = rate
       if (v.playbackRate !== pr) v.playbackRate = pr
       // Stall watchdog : if it claims to be playing but currentTime stops moving,
@@ -658,6 +688,7 @@ void main(){
 
   dispose(): void {
     const v = this.video
+    untrackMediaSink(v)
     if (this.rvfcOn && typeof v.cancelVideoFrameCallback === 'function' && this.rvfcId) {
       v.cancelVideoFrameCallback(this.rvfcId)
     }

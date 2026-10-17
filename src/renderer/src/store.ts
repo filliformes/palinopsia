@@ -41,7 +41,7 @@ import { sanitizeNdiConfig, idleNdiStatus } from '@shared/ndi'
 import { DOME_MOD_RANGE, sanitizeDome } from '@shared/dome'
 import { OUT_IDENTITY, OUTX_MOD_RANGE, sanitizeOutXform, type OutXform } from '@shared/outXform'
 import { defaultVoicePlaces, sanitizeSpaceConfig, sanitizeVoicePlaces, validSpaceHost, type SpaceConfig, type SpaceVoice, type VoicePlace } from '@shared/spatial'
-import { inputsForShader } from './shaders/isf/inputs'
+import { defaultInputs, inputsForShader } from './shaders/isf/inputs'
 import { SHADER_BY_ID } from './shaders/isf'
 import { canHostFx } from './fxScopes'
 import { defaultAssembleParams } from '@shared/assemble'
@@ -1197,6 +1197,8 @@ interface StoreState {
   // Point a slot at an imported video clip (kind:'video'). mediaId is the clip's
   // object URL; mediaName is shown in the picker.
   setSourceVideo: (layer: number, slot: 'A' | 'B', mediaId: string, mediaName: string, mediaPath?: string) => void
+  // Point a slot at an imported sound file (kind:'audio', its waveform drawn).
+  setSourceAudio: (layer: number, slot: 'A' | 'B', mediaId: string, mediaName: string, mediaPath: string) => void
   /** Swap ONLY the clip path/name on a video slot (the smooth-scrub transcode),
    *  preserving transport (play/dir/speed/loop/in-out/grain), FX, and modulation. */
   swapVideoSource: (
@@ -1256,7 +1258,7 @@ interface StoreState {
     patch: Partial<
       Pick<
         SourceSlot,
-        | 'videoPlaying' | 'videoSpeed' | 'videoDirection' | 'videoLoop' | 'videoIn' | 'videoOut'
+        | 'videoPlaying' | 'videoSpeed' | 'videoDirection' | 'videoLoop' | 'videoIn' | 'videoOut' | 'videoVolume'
         | 'grainOn' | 'grainSize' | 'grainSpray' | 'grainReverse' | 'grainJitter' | 'grainSync'
       >
     >
@@ -2423,13 +2425,43 @@ export const useStore = create<StoreState>((set, get) => ({
       ),
       selection: { type: 'source', layer, slot }
     })),
+  setSourceAudio: (layer, slot, mediaId, mediaName, mediaPath) =>
+    set((s) => ({
+      composition: dropSlotTargets(
+        {
+          ...s.composition,
+          layers: updateLayer(s.composition.layers, layer, (l) => {
+            const au = {
+              kind: 'audio' as const,
+              shaderId: 'gen-audio',
+              inputs: defaultInputs('gen-audio'),
+              mediaId,
+              mediaName,
+              mediaPath,
+              videoPlaying: true,
+              videoSpeed: 1,
+              videoLoop: true,
+              videoIn: 0,
+              videoOut: 1
+            }
+            if (slot === 'A') return { ...l, sourceA: au, sourceAFx: [] }
+            return { ...l, sourceB: au, sourceBFx: [] }
+          })
+        },
+        layer,
+        slot,
+        slotOf(s.composition, layer, slot),
+        true
+      ),
+      selection: { type: 'source', layer, slot }
+    })),
   swapVideoSource: (layer, slot, mediaId, mediaName, opts) =>
     set((s) => ({
       composition: {
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => {
           const cur = slot === 'A' ? l.sourceA : l.sourceB
-          if (!cur || cur.kind !== 'video') return l
+          if (!cur || (cur.kind !== 'video' && cur.kind !== 'audio')) return l
           // Another clip keeps the transport (speed, direction, loop, grain); its
           // trim starts whole, since the old in/out belonged to another length.
           const vid = {
@@ -2680,8 +2712,8 @@ export const useStore = create<StoreState>((set, get) => ({
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => {
           const cur = slot === 'A' ? l.sourceA : l.sourceB
-          // Assemble slots share the play/loop/speed fields with video.
-          if (!cur || (cur.kind !== 'video' && cur.kind !== 'assemble')) return l
+          // Assemble and audio slots share the play/loop/speed fields with video.
+          if (!cur || (cur.kind !== 'video' && cur.kind !== 'assemble' && cur.kind !== 'audio')) return l
           const next = { ...cur, ...patch }
           return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
         })

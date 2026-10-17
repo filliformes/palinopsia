@@ -23,14 +23,26 @@ const MIME: Record<string, string> = {
   avi: 'video/x-msvideo',
   ogv: 'video/ogg',
   dxv: 'video/quicktime', // DXV3 clips are MOV containers (converted on import)
-  m4a: 'audio/mp4' // the Collage voice's audio-only copies (videoConvert.audioForCollage)
+  m4a: 'audio/mp4', // the Collage voice's audio-only copies (videoConvert.audioForCollage)
+  // the Import Audio source (an AIFF or a WMA plays from its m4a copy)
+  wav: 'audio/wav',
+  mp3: 'audio/mpeg',
+  flac: 'audio/flac',
+  ogg: 'audio/ogg',
+  oga: 'audio/ogg',
+  opus: 'audio/ogg',
+  aac: 'audio/aac',
+  aif: 'audio/aiff',
+  aiff: 'audio/aiff',
+  wma: 'audio/x-ms-wma',
+  caf: 'audio/x-caf'
 }
 const extOf = (path: string): string => path.split('.').pop()?.toLowerCase() ?? ''
 const mimeFor = (path: string): string => MIME[extOf(path)] ?? 'video/mp4'
 // Only these extensions may be streamed. The scheme addresses clips by absolute
 // path, so without this any renderer request could read an arbitrary file
-// (~/.ssh/id_rsa, .env, …); restricting to known video containers keeps the
-// blast radius to video files, which is all this scheme is ever asked to serve.
+// (~/.ssh/id_rsa, .env, …); restricting to known video and sound containers
+// keeps the blast radius to media files, which is all this scheme serves.
 const ALLOWED_EXT = new Set(Object.keys(MIME))
 // CORS : the Collage, Assemble and the Sonify Collage voice load their films with
 // crossOrigin='anonymous' (a WebGL upload or an audio graph needs an untainted

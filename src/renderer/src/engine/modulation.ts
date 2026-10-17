@@ -14,6 +14,7 @@
 import type { CompositionState, LfoShape, ModCurve, ModulatorConfig } from '@shared/types'
 import { BLEND_MODES, FX_OPACITY_INPUT } from '@shared/types'
 import { audioBus } from './audioIn'
+import { clipAudio, newClipReadState, type ClipReadState } from './clipAudio'
 import { visionBus } from './visionIn'
 import { bodyBus } from './bodyIn'
 import { BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
@@ -228,6 +229,7 @@ interface SlotState {
   arpDir: 1 | -1
   arpLastAdvanceAt: number
   audioValue: number // one-pole smoothed audio feature (audio type)
+  clipRead: ClipReadState // a clip's playhead as last read (audio type, from a clip)
   visionValue: number // one-pole smoothed picture feature (vision type)
   bodyValue: number // one-pole smoothed body feature (body type)
   homeoFeat: number // one-pole smoothed feature (homeostat type)
@@ -269,6 +271,7 @@ function makeSlot(now: number): SlotState {
     arpDir: 1,
     arpLastAdvanceAt: now,
     audioValue: 0,
+    clipRead: newClipReadState(),
     visionValue: 0,
     bodyValue: 0,
     homeoFeat: 0.5,
@@ -663,11 +666,14 @@ export class ModEngine {
           break
         }
         case 'audio': {
-          // Follow one feature off the audio bus (OSC/local). Unclocked : the
-          // signal IS the clock. One-pole smoothing tames it toward the value.
+          // Follow one feature off the audio bus (OSC/local), or off a slot's
+          // clip at its playhead (clipAudio.ts). Unclocked : the signal IS the
+          // clock. One-pole smoothing tames it toward the value.
           const a = cfg.audio
           if (a) {
-            const raw = audioBus.feature(a.feature, a.band)
+            const raw = a.src
+              ? clipAudio.feature(a.src, a.feature, a.band, s.clipRead, performance.now())
+              : audioBus.feature(a.feature, a.band)
             const sm = Math.max(0, Math.min(0.99, a.smooth ?? 0))
             // dt-normalized one-pole : retain `sm` per 60fps frame, then scale by
             // the real dt so the follower's speed doesn't ride the frame rate
@@ -1221,6 +1227,7 @@ function inputValueForMode(
 const VIDEO_MOD_DESCS: Record<string, ModDesc> = {
   position: { type: 'float', min: 0, max: 1, def: 0.5 },
   speed: { type: 'float', min: 0, max: 4, def: 1 },
+  vol: { type: 'float', min: 0, max: 1, def: 0 }, // the film's sound (video slots; an audio slot's is its `volume` input)
   grainSize: { type: 'float', min: 0.05, max: 1, def: 0.25 },
   grainSpray: { type: 'float', min: 0, max: 1, def: 0.15 },
   loopIn: { type: 'float', min: 0, max: 1, def: 0 },
@@ -1330,7 +1337,7 @@ export function writeModTarget(
     const layer = c.layers[t.layer]
     const slot = t.slot === 'A' ? layer?.sourceA : layer?.sourceB
     // Video slot : route position/speed through the video seam (no shader).
-    if (slot?.kind === 'video' && VIDEO_MOD_DESCS[t.input]) {
+    if ((slot?.kind === 'video' || (slot?.kind === 'audio' && t.input !== 'vol')) && VIDEO_MOD_DESCS[t.input]) {
       const value = inputValueFrom01(VIDEO_MOD_DESCS[t.input], shaped01)
       if (value === null || typeof value !== 'number') return
       liveModValues.set(liveKey(t), value)
@@ -1529,9 +1536,10 @@ export function applyModulation(
       if (!layer) continue
       const slot = a.target.slot === 'A' ? layer.sourceA : layer.sourceB
       // Video slot : position/speed modulate through the video seam.
-      if (slot?.kind === 'video' && VIDEO_MOD_DESCS[a.target.input]) {
+      if ((slot?.kind === 'video' || (slot?.kind === 'audio' && a.target.input !== 'vol')) && VIDEO_MOD_DESCS[a.target.input]) {
         const d = VIDEO_MOD_DESCS[a.target.input]
-        const final = inputValueForMode(d, undefined, v, a.depth, a.mode)
+        // the film's volume swings around the slot's own setting
+        const final = inputValueForMode(d, a.target.input === 'vol' ? slot.videoVolume ?? 0 : undefined, v, a.depth, a.mode)
         if (final === null || typeof final !== 'number') continue
         liveModValues.set(liveKey(a.target), final)
         comp.layers[a.target.layer]?.setVideoInput?.(a.target.slot, a.target.input, final)

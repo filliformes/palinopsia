@@ -109,6 +109,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   erosion: ['erosion', 'streaks', 'noise', 'geological', 'flow'],
   filaments: ['strands', 'kelp', 'lines', 'sway', 'organic', 'audio'],
   'gen-collage': ['collage', 'video wall', 'cut-up', 'montage', 'grid', 'mosaic', 'voronoi', 'torn paper', 'films', 'multi-video'],
+  'gen-audio': ['audio', 'sound', 'file', 'waveform', 'player', 'mp3', 'wav', 'music'],
   'gen-parametric': ['audio', 'waveform', 'spectrum', 'oscilloscope', 'scope', 'spectrogram', 'bars'],
   'gen-text': ['text', 'typography', 'words', 'title', 'font', 'type', 'lettering', 'caption', 'lyrics', 'matte', 'ticker'],
   'grid-drift': ['grid', 'lines', 'geometry', 'drift', 'matrix'],

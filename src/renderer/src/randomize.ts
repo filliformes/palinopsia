@@ -178,6 +178,8 @@ const RANDOMIZE_SKIP: Record<string, RegExp> = {
   // Text : the crawl, fitting, typewriter reveal and line-cue mode are staging
   // intent (a dice must not start a ticker or hide the words).
   'gen-text': /^(scroll|fit|reveal|lines)$/,
+  // Audio : the volume and the pitch are the sound's, the view is staging.
+  'gen-audio': /^(volume|keepPitch|view|window)$/,
   // Dark grounds : a mid-bright random color would lose the near-black paper.
   'direct-marks': /^paper$/,
   // Black and white with one accent : the accent rolls, the ink and the

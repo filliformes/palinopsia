@@ -247,7 +247,7 @@ Each of the **4 layers** carries:
 
 | Element | What it does |
 |---|---|
-| **Source A / B** | Two source slots; the **A** / **B** buttons (and **BG** on the background) show that source's controls in the Inspector. Each holds a generator, an imported video (`🎞`), a capture (webcam `📷` / screen `🖥` / device `🎥` / an iPhone by USB `📱` / NDI® source `📶`), a HIVE network stream (`📡`), or nothing. |
+| **Source A / B** | Two source slots; the **A** / **B** buttons (and **BG** on the background) show that source's controls in the Inspector. Each holds a generator, an imported video (`🎞`), an imported sound file (`🔊`, its waveform), a capture (webcam `📷` / screen `🖥` / device `🎥` / an iPhone by USB `📱` / NDI® source `📶`), a HIVE network stream (`📡`), or nothing. |
 | **A/B mix** (`MIX`) | `sourceBlend` (how B combines with A, incl. the relation modes Weave / Lumakey / Consume) · `sourceMix` (0 = A only … 1 = full B) · `harmony` (⚖ consonant → dissonant B hue). Inert until B has a source. |
 | **Source FX** | A separate effect rack under **each** source slot (`sourceAFx`, `sourceBFx`). |
 | **Layer FX** (`FX`) | The layer's own effect rack : the only rack that accepts the **sidechain** [native nodes](#native-nodes) (Transfert, Convolution, Mosaïque); the self-contained nodes run in any rack, and so do the TouchDesigner recipes (Remap, Luma Blur, Gooey, Matte, Lookup), whose other-layer inputs are optional. |
@@ -366,9 +366,17 @@ The selected video slot shows a full **transport** in the Inspector:
   (natural order, wraps at the ends). Swapping keeps speed, direction, loop and
   grain and resets the trim; a clip in a codec the player can't read is converted
   first, like an import.
-- **`M` targets** : the playhead position, speed, and loop in/out are modulation
-  targets like any shader param: a saw LFO loops, S&H jump-cuts, an audio
-  follower scrubs, chaos wanders the trim window.
+- A **level** row : a small meter of the clip's **sound where the playhead is** (the
+  bar its RMS, a tick its held peak, -60 to 0 dBFS) with its RMS as a number, read from
+  the file's analysis, so it shows whether the clip has sound right there even while the
+  film plays silent; a stopped playhead reads nothing. Then **vol** : the film's own
+  sound, **off by default** (films play silent, as they always have), heard on Sonify's
+  output device while it plays forward at its own pace (reverse, pendulum, the grains
+  or a modulated playhead stay silent : they would only stutter), and silent while its
+  layer is muted. OSC `/opsia/layerN/video/{A|B}/volume`.
+- **`M` targets** : the playhead position, speed, loop in/out and the volume (`vol`)
+  are modulation targets like any shader param: a saw LFO loops, S&H jump-cuts, an
+  audio follower scrubs, chaos wanders the trim window.
 - **⌗ grain : video granulation.** Three grain voices scatter short windowed
   reads around the (still-moving) playhead: **size** (grain length), **spray**
   (scatter distance), **rev** (probability a grain plays backward), **jit**
@@ -376,6 +384,26 @@ The selected video slot shows a full **transport** in the Inspector:
   division (1/16 · 1/8 · 1/4 · 1/2) that retriggers grains on the beat grid.
   With grain on, `gr·size` and `gr·spray` also become modulation targets.
   Granulation is at its best on imported/converted (all-intra) clips.
+
+### Audio sources
+
+**Import audio…** (`🔊`, in the source picker beside Import video) puts a **sound file**
+in a slot (`.wav .mp3 .flac .ogg .opus .aac .m4a .aif .aiff .wma .caf`; a format the
+player can't read, AIFF or WMA, plays from an audio-only copy made once by ffmpeg). It
+plays like a film, with the same transport : play / pause, stop, loop, the **in / out**
+trim, **speed** (1/16× to 16×; like tape, the pitch moves with it unless **keep pitch**
+is on; slower is silent), the playhead scrubbed or modulated, the level meter and the
+volume, the folder's other sound files one click away, and the same OSC addresses as a
+video (`/opsia/layerN/video/{A|B}/…`). The timeline shows the sound's waveform.
+
+The layer shows its **waveform** : **view** the whole file (the part outside the loop
+dimmer), the loop, or a window **scrolling** past the playhead; **style** filled,
+outlined or bars; the part already played lit and the rest dimmed (**unplayed dim**), a
+**playhead** line, a **color** and a **ground** (its alpha at 0 lets the layers
+underneath through). Drawn from the file's analysis as a pyramid of its peaks, so an
+hour-long file costs the same as a short one. Presets, and three master chains that
+flatter it (**Sound** : Phosphor, Tape Floor, Relief). It plays on Sonify's output
+device (recordings do not carry it yet), and a muted layer is silent.
 
 Live **captures** (webcam / screen / device), [NDI](#ndi) sources and **HIVE**
 (HEVC-over-TCP network streams) fill slots the same way, and every video/capture slot
@@ -552,6 +580,14 @@ One type follows the **live performer** instead of the picture:
   instrument. The `audio` follower also gained a **`noisiness`** feature (spectral
   flatness) : bind a sound's noise to a layer's tint saturation and the *sound
   colours the picture* (the other direction of the same crossmodal table).
+
+The **`audio`** follower listens **FROM** the audio input (the audio tab), or from a
+**layer's clip** : the soundtrack of an imported film or an imported sound file, **read
+at its playhead**. The sound is analysed once (the same analysis the live input runs,
+60 times a second, cached on disk) and read wherever the playhead is, so it follows the
+clip at any speed, reversed, scrubbed or in grains, while the film itself plays silent;
+a stopped clip reads silence, and flux takes the most of what the playhead crossed (a
+fast clip skips no onset).
 
 **SLIP** (on `arp`, `random`, `chaos`, and the LFO's stepped shapes) makes a
 stepped modulator's rhythm impossible to feel. The clock keeps ticking, but some
@@ -1863,15 +1899,16 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   an empty rack. An effect a rack can't host (a layer-only node into the Master, say) is
   refused with a popup saying why, and the drop marker turns red while you hover.
 - **Master chain presets** : the `chain presets…` box in the Master FX strip replaces the
-  whole master chain with one of **109** designed chains and sets the Vibe to match (the
-  finalizers stay). The newer ones sit in four groups : **Time & memory** (Réponse,
+  whole master chain with one of **112** designed chains and sets the Vibe to match (the
+  finalizers stay). The newer ones sit in five groups : **Time & memory** (Réponse,
   Sediment, Chronoscan, Eternalism, Afterimage, Decimate, Corrode, Feedback on the master
   bus), **Node recipes** (a node that reads another layer is wired, when the preset is
   applied, to a layer in use), **Dome** (dome-safe : Context's vignette off, nothing
   framing the edges) and **Space** (the whole picture laid on a plane by Perspective : a
   floor, a corridor wall, a ribbon, a horizon, a curved screen, a thresholded data wall, a
-  halftone or scan-relief floor; and Starlight, light trails that flatter points);
-  they keep the scene's palette mix. The `chain on/off` pill beside
+  halftone or scan-relief floor; and Starlight, light trails that flatter points) and
+  **Sound** (made for a waveform : Phosphor, Tape Floor, Relief); they keep the scene's
+  palette mix. The `chain on/off` pill beside
   it bypasses every master effect except the finalizers.
 - **The source pickers have sections** : **Organic** (living matter : reaction, growth,
   water, fire, ground), **Analog** (the analog video-synth lineage : RGB Oscillators, Sync

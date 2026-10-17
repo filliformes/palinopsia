@@ -3,6 +3,47 @@
 All notable changes to Palinopsia. Dates are ISO. Versions follow the `v*` tags
 that CI builds into cross-platform releases.
 
+## Unreleased
+
+### Added
+
+- **An audio modulator listens FROM a layer's clip.** Its new FROM row offers the audio
+  input (as before) or any slot holding a film or a sound file : the clip's sound is read
+  at its **playhead**. Main analyses the sound once (`main/audioAnalysis.ts` : ffmpeg
+  decodes mono 48 kHz floats on a pipe; a copy of the live analyser, 2048-point Blackman
+  FFT, smoothing 0.5, the byte dB scale -100..-30, its bands, flux, centroid, noisiness and
+  pitch, the correlation by FFT, 60 frames a second; cached as `<key>.aa` in the video
+  cache, 13 bytes a frame + the waveform's min / max at 400 a second, about 2.8 MB an
+  hour), and `engine/clipAudio.ts` reads it where the playhead is : flux is the most of
+  what the playhead crossed since the last read (a fast clip skips no onset), a jump reads
+  the new place, a playhead still for 150 ms is silence, the transient decays in real time.
+  Measured against Chromium's own AnalyserNode on the same file as it plays : mean level,
+  centroid and the six bands equal to the third decimal, correlation 0.95-0.99 on music;
+  a 26 s film analysed in 0.39 s (about 1.5 % of real time), a cached one back in 2 ms.
+  In the app, a film with bursts twice a second gave a level of 0.041 (0.040 expected),
+  0.036 reversed, 8 onsets in 4 s, 0 paused.
+- **Import audio** (`🔊`, kind `audio`, `engine/AudioSource.ts`) : a sound file played in
+  the layer like a film (the video transport : play, stop, loop, in / out, speed 1/16× to
+  16×, tape-like unless `keep pitch`, the playhead scrubbed or modulated, the folder's
+  other sound files, the same OSC addresses), its waveform drawn from the analysis's peak
+  pyramid (one RG8 texture, each level an eighth of the one below : a column reads at most
+  8 texels however long the file) : view whole / loop / scroll, style filled / outline /
+  bars, the played part lit. Its look is the `gen-audio` header (presets, modulation, OSC
+  reach it; kept out of the generator pools : it needs a file). Seven presets, three master
+  chains in a new **Sound** group (Phosphor, Tape Floor, Relief). Plays on Sonify's output
+  device through its own `<audio>`; a muted (or soloed-out) layer is silent; a format
+  Chromium can't decode plays from its audio-only m4a copy. The media scheme now serves
+  sound files. Not in recordings yet (the Live Audio Input job brings outside sound into
+  Sonify's mix and its recordings). 60 fps with it on screen.
+- **The film's level and volume** (the transport's new **level** row) : a meter of the
+  clip's sound at the playhead (RMS bar, held peak, -60..0 dBFS) and its RMS as a number,
+  read from the analysis (its new true RMS / peak bytes), so it shows whether the clip has
+  sound right there even while the film plays silent. **vol** (`videoVolume`, 0 = silent,
+  the default : films stay as they were) lets the film's own sound play on Sonify's device
+  while it plays natively forward (reverse, pendulum, the grains or a modulated playhead
+  stay silent : they would stutter), silent with its layer muted. A modulation target
+  (`vol`) and OSC `/opsia/layerN/video/{A|B}/volume` (an audio slot's sets its volume).
+
 ## v1.2.10 — 2026-10-15
 
 ### Added

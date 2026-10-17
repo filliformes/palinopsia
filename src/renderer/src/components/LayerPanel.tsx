@@ -725,13 +725,29 @@ function SourceRow({
     const url = await playableVideoUrl(path, file.name, setConverting)
     if (url) onPickVideo(url, file.name, path)
   }
+  // Import audio : the file plays straight from disk (Chromium decodes WAV, MP3,
+  // FLAC, Ogg, AAC; an AIFF falls back to its m4a copy in the engine).
+  const audioRef = useRef<HTMLInputElement | null>(null)
+  function importAudio(file: File): void {
+    let path = ''
+    try {
+      path = window.api.getMediaPath(file)
+    } catch {
+      /* getMediaPath unavailable */
+    }
+    if (!path || (scope.kind !== 'sourceA' && scope.kind !== 'sourceB')) return
+    useStore.getState().setSourceAudio(scope.layer, scope.kind === 'sourceA' ? 'A' : 'B', `opsia-media://local/${encodeURIComponent(path)}`, file.name, path)
+  }
+  const isAudio = sourceKind === 'audio'
   const isVideo = sourceKind === 'video'
   const isCapture = sourceKind === 'capture'
   const isHive = sourceKind === 'hive'
   const isAsm = sourceKind === 'assemble'
   // The select's value: a generator id, or a sentinel for the active video /
   // capture / assemble source, or '' for none.
-  const value = isAsm
+  const value = isAudio
+    ? '__audio__'
+    : isAsm
     ? '__assemble__'
     : isVideo
     ? '__video__'
@@ -746,7 +762,7 @@ function SourceRow({
               ? '__cap_ndi__'
             : '__cap_screen__'
         : (shaderId ?? '')
-  const active = isVideo || isCapture || isHive || isAsm || !!shaderId
+  const active = isVideo || isAudio || isCapture || isHive || isAsm || !!shaderId
   return (
     <>
       <div className="flex min-w-0 items-center gap-1.5" onClick={onSelect}>
@@ -770,6 +786,17 @@ function SourceRow({
             e.target.value = '' // allow re-picking the same file
           }}
         />
+        <input
+          ref={audioRef}
+          type="file"
+          accept="audio/*,.wav,.mp3,.flac,.ogg,.oga,.opus,.aac,.m4a,.aif,.aiff,.wma,.caf"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) importAudio(file)
+            e.target.value = ''
+          }}
+        />
         {converting !== null && (
           <span
             className="shrink-0 animate-pulse font-mono text-[9px] text-accent"
@@ -791,7 +818,11 @@ function SourceRow({
             ...(isAsm
               ? [{ value: '__assemble__', label: mediaName ?? 'assemblage', prefix: '🎬 ', group: 'live' }]
               : []),
+            ...(isAudio
+              ? [{ value: '__audio__', label: mediaName ?? 'audio', prefix: '🔊 ', group: 'live' }]
+              : []),
             { value: '__video_pick__', label: 'Import video…', prefix: '🎞 ', group: 'live' },
+            { value: '__audio_pick__', label: 'Import audio…', prefix: '🔊 ', group: 'live', title: 'A sound file played in the layer like a film, its waveform on screen; its sound can drive any audio modulator (FROM)' },
             { value: '__assemble_pick__', label: 'Assemblage…', prefix: '🎬 ', group: 'live' },
             { value: '__cap_webcam__', label: 'Webcam', prefix: '📷 ', group: 'live' },
             { value: '__cap_live__', label: 'Live Input…', prefix: '🎥 ', group: 'live' },
@@ -812,6 +843,7 @@ function SourceRow({
           ]}
           onChange={(v) => {
             if (v === '__video_pick__') fileRef.current?.click()
+            else if (v === '__audio_pick__') audioRef.current?.click()
             else if (v === '__cap_webcam__') onPickCapture('webcam', 'Webcam')
             else if (v === '__cap_screen__') setShowCapture(true)
             else if (v === '__cap_live__') setShowDevices(true)
@@ -821,7 +853,7 @@ function SourceRow({
             // from the assemble tab (it needs the corpus), so selecting either
             // one just opens that tab rather than silently doing nothing.
             else if (v === '__assemble_pick__') useStore.getState().setRightView('assemble')
-            else if (v !== '__video__' && v !== '__assemble__') onPick(v || null)
+            else if (v !== '__video__' && v !== '__assemble__' && v !== '__audio__') onPick(v || null)
           }}
         />
         {/* +fx always present : the layout never shifts when sources load.

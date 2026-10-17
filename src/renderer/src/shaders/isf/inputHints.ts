@@ -1105,6 +1105,18 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     line: 'NEXT LINE ▸ : show the next line, wrapping after the last (one at a time only). Rising edge : over OSC send 1 then 0.',
     color: 'Letter color; its alpha fades the letters. With a fill layer chosen, the color tints that layer inside the letters.'
   },
+  'gen-audio': {
+    view: 'WHOLE = the whole file, the part outside the loop dimmer. LOOP = only the in / out window. SCROLL = a window that runs past the playhead (the playhead is the middle).',
+    window: 'Scroll view : how many seconds the frame spans.',
+    style: 'FILLED = the waveform as a solid shape. OUTLINE = only its edges. BARS = one bar every few pixels, the loudest of the sound it covers.',
+    amp: 'How tall the waveform is drawn (a quiet file, a loud one).',
+    dim: 'How much darker the part still to come is (0 = the same as the part played).',
+    playhead: 'A line where the playhead is.',
+    color: 'The waveform.',
+    ground: 'Behind it. Its alpha at 0 leaves the layers underneath showing.',
+    volume: "How loud the file plays, on Sonify's output device (a muted layer is silent).",
+    keepPitch: 'Off : like tape, the pitch moves with the speed. On : the pitch holds, the tempo moves.'
+  },
   'gen-parametric': {
     mode: 'RASTER = columns that light when their band is loud enough, with scanning seams. WAVEFORM = the wave as a trace. BARS = the spectrum as bars. SPECTROGRAM = the spectrum over time, newest row at the top. Frequencies run bass (left) to treble (right).',
     gain: 'Input amplification before drawing.',

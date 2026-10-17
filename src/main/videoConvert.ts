@@ -458,6 +458,7 @@ export function audioForCollage(src: string): Promise<{ ok: boolean; path?: stri
 // BACKGROUND, sequentially (one ffmpeg at a time : no CPU spike), so by the time
 // the performer reaches for a clip it imports instantly. Fire-and-forget.
 const VIDEO_EXTS = /\.(mp4|m4v|mov|dxv|webm|mkv|avi|mpg|mpeg|mxf|m2v)$/i
+const AUDIO_EXTS = /\.(wav|mp3|flac|ogg|oga|opus|aac|m4a|aif|aiff|wma|caf)$/i
 let warming = false
 let warmingDir: string | null = null
 // Folders requested while a sweep is in flight : queued (deduped) to run after,
@@ -498,6 +499,16 @@ export async function warmVideoFolder(dir: string): Promise<void> {
 }
 
 export function registerVideoConvert(): void {
+  // A sound's analysis for the audio modulators and the audio player (made once,
+  // cached; audioAnalysis.ts).
+  ipcMain.handle('audio:analysis', async (_e, path: string) => {
+    try {
+      const { analyseAudio } = await import('./audioAnalysis')
+      return await analyseAudio(path)
+    } catch (e) {
+      return { ok: false, error: (e as Error).message }
+    }
+  })
   ipcMain.handle('video:probe', async (_e, path: string) => {
     try {
       return await probe(path)
@@ -533,17 +544,18 @@ export function registerVideoConvert(): void {
   // level, hidden files skipped (a Mac's `._name.mp4` stubs), natural order (so
   // 2 sorts before 10). Warms the folder's non-Chromium codecs in the background
   // so the next clip is ready by the time it's picked.
-  ipcMain.handle('video:listFolder', async (_e, dir: string) => {
+  ipcMain.handle('video:listFolder', async (_e, dir: string, kind?: string) => {
     try {
       const { readdirSync, statSync: st } = await import('fs')
+      const exts = kind === 'audio' ? AUDIO_EXTS : VIDEO_EXTS
       const files = readdirSync(dir)
-        .filter((f) => !f.startsWith('.') && VIDEO_EXTS.test(f))
+        .filter((f) => !f.startsWith('.') && exts.test(f))
         .filter((f) => {
           try { return st(join(dir, f)).isFile() } catch { return false }
         })
         .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
         .map((name) => ({ name, path: join(dir, name) }))
-      void warmVideoFolder(dir)
+      if (kind !== 'audio') void warmVideoFolder(dir)
       return { ok: true, files }
     } catch (err) {
       return { ok: false, files: [], error: (err as Error).message }

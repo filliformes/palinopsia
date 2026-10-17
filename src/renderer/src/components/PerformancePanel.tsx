@@ -62,6 +62,7 @@ function estimateVram(renderPx: number, layers: LayerLike[], hands: boolean, pos
     for (const slot of [L.sourceA, L.sourceB]) {
       if (!slot) continue
       if (slot.kind === 'video' || slot.kind === 'capture' || slot.kind === 'hive' || slot.kind === 'assemble') srcBytes += NOMINAL
+      else if (slot.kind === 'audio') srcBytes += 4 * 1024 * 1024 // its waveform pyramid (about an hour of sound)
       else if (slot.kind === 'generator' && slot.shaderId === 'gen-collage') collage += 8 * NOMINAL // a decoded pool
     }
   }

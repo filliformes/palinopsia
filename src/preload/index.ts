@@ -81,7 +81,7 @@ const api: ExposedApi = {
   videoProbe: (path: string) => ipcRenderer.invoke('video:probe', path),
   videoConvert: (path: string) => ipcRenderer.invoke('video:convert', path),
   videoCacheDir: () => ipcRenderer.invoke('video:cacheDir') as Promise<string>,
-  videoListFolder: (dir: string) => ipcRenderer.invoke('video:listFolder', dir),
+  videoListFolder: (dir: string, kind?: 'audio') => ipcRenderer.invoke('video:listFolder', dir, kind),
   videoKeyframes: (path: string) => ipcRenderer.invoke('video:keyframes', path),
   onVideoConvertProgress: (cb: (p: { path: string; pct: number }) => void) => {
     const h = (_e: Electron.IpcRendererEvent, p: { path: string; pct: number }): void => cb(p)
@@ -111,6 +111,7 @@ const api: ExposedApi = {
   collageScan: (folder: string) => ipcRenderer.invoke('collage:scan', folder),
   collageOptimise: (folder: string) => ipcRenderer.invoke('collage:optimise', folder),
   collageAudio: (path: string) => ipcRenderer.invoke('collage:audio', path),
+  audioAnalysis: (path: string) => ipcRenderer.invoke('audio:analysis', path),
   onCollageProgress: (cb: (p: { done: number; total: number; file: string }) => void) => {
     const h = (_e: Electron.IpcRendererEvent, p: { done: number; total: number; file: string }): void => cb(p)
     ipcRenderer.on('collage:progress', h)
