@@ -683,19 +683,25 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
 // layer slot's clip, a film's soundtrack or an audio file, read at its playhead.
 function ClipFromRow({ value, onChange }: { value: ClipAudioSrc | undefined; onChange: (v: ClipAudioSrc | undefined) => void }): JSX.Element {
   const slots = useStore(
-    useShallow((s) =>
-      s.composition.layers.flatMap((l, li) =>
+    useShallow((s) => [
+      ...s.composition.layers.flatMap((l, li) =>
         (['A', 'B'] as const).flatMap((sl) => {
           const x = sl === 'A' ? l.sourceA : l.sourceB
           return x && (x.kind === 'video' || x.kind === 'audio') ? [`${li}:${sl}:${x.kind}:${x.mediaName ?? ''}`] : []
         })
-      )
-    )
+      ),
+      // the Audio Layer's files (layer -1; a live input has no file to read)
+      ...(['A', 'B'] as const).flatMap((sl) => {
+        const x = s.audioLayer[sl]
+        return x?.kind === 'file' ? [`-1:${sl}:audio:${x.mediaName ?? ''}`] : []
+      })
+    ])
   )
+  const where = (l: number, s: string): string => (l < 0 ? `AU ${s}` : `L${l + 1}${s}`)
   const cur = value ? `${value.layer}:${value.slot}` : ''
   const known = !value || slots.some((k) => k.startsWith(cur + ':'))
   return (
-    <Row label="FROM" title="Where it listens : the audio input (the audio tab), or the sound of a film or an audio file on a layer, read where its playhead is (at any speed, reversed or scrubbed; a stopped clip is silent)">
+    <Row label="FROM" title="Where it listens : the audio input (the audio tab), or the sound of a film or an audio file on a layer or on the Audio Layer (AU), read where its playhead is (at any speed, reversed or scrubbed; a stopped clip is silent)">
       <select
         className="input select-compact min-w-0 flex-1 text-[10px]"
         value={cur}
@@ -711,11 +717,11 @@ function ClipFromRow({ value, onChange }: { value: ClipAudioSrc | undefined; onC
           const [l, s, kind, ...name] = k.split(':')
           return (
             <option key={k} value={`${l}:${s}`}>
-              {`L${Number(l) + 1}${s} ${kind === 'audio' ? '🔊' : '🎞'} ${name.join(':') || kind}`}
+              {`${where(Number(l), s)} ${kind === 'audio' ? '🔊' : '🎞'} ${name.join(':') || kind}`}
             </option>
           )
         })}
-        {!known && value && <option value={cur}>{`L${value.layer + 1}${value.slot} (no clip there now)`}</option>}
+        {!known && value && <option value={cur}>{`${where(value.layer, value.slot)} (no clip there now)`}</option>}
       </select>
     </Row>
   )

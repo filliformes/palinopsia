@@ -304,8 +304,46 @@ export type ModulatorType =
 // bind sound noisiness → a layer's tint saturation to make the sound colour the picture.
 export type AudioFeature = 'level' | 'flux' | 'transient' | 'centroid' | 'band' | 'pitch' | 'noisiness'
 /** Where an audio modulator listens instead of the audio input : a layer slot's
- *  clip (a film's soundtrack or an audio file), read at its playhead. */
+ *  clip (a film's soundtrack or an audio file), read at its playhead. Layer -1 :
+ *  the Audio Layer's file slots. */
 export interface ClipAudioSrc { layer: number; slot: 'A' | 'B' }
+
+/** One of the Audio Layer's two slots (the layers tab, under L4) : a sound file,
+ *  played like an Import Audio slot (the same transport fields), or a live audio
+ *  input. */
+export interface AudioLayerSlot {
+  kind: 'file' | 'live'
+  // a file : what plays (opsia-media://…), its name, the file on disk
+  mediaId?: string
+  mediaName?: string
+  mediaPath?: string
+  videoPlaying?: boolean // default true
+  videoSpeed?: number // 1/16..16 for sound, default 1 (× the global speed)
+  videoLoop?: boolean // default true
+  videoIn?: number // the trim, 0..1
+  videoOut?: number
+  ignoreGlobalSpeed?: boolean
+  keepPitch?: boolean // a changed speed keeps the pitch (default : like tape)
+  // a live input : the device (its label finds it again if its id changed) and
+  // the channels taken, 0-based; chR < 0 : one channel (mono, on both sides)
+  deviceId?: string
+  deviceLabel?: string
+  chL?: number
+  chR?: number
+  volume: number // 0..2 (1 = as it comes)
+  pan: number // -1..1
+  mute?: boolean
+}
+
+/** The Audio Layer : two slots, the mix between them (0 = A only, 0.5 = both
+ *  whole, 1 = B only), its volume, its mute. */
+export interface AudioLayerState {
+  A: AudioLayerSlot | null
+  B: AudioLayerSlot | null
+  mix: number
+  volume: number // 0..2
+  mute: boolean
+}
 
 // Which picture feature a `vision` modulator follows (bus in engine/visionIn.ts) :
 // the RETURN PATH — the composited image drives control.
@@ -1021,6 +1059,8 @@ export interface Session {
   // Space : where each Sonify voice sits in the room (the venue setup itself,
   // speakers / objects / OSC, belongs to the computer, not the piece).
   spaceVoices?: Record<string, import('./spatial').VoicePlace>
+  // The Audio Layer's slots, mix and volume (absent in older files : none)
+  audioLayer?: AudioLayerState
   // The projector warp (Output → Mapping), written only when "save with the
   // session" is on, and applied on load only where that option is on : the
   // warp is otherwise the computer's (its projector), not the piece's.

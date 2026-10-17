@@ -53,7 +53,7 @@ Lowercase's slant, each straight from its Space theme. The older shots stay in
 - [Keyboard shortcuts](#keyboard-shortcuts)
 
 **The instrument**
-- [The layer stack](#the-layer-stack) : sources · A/B mix · racks · blends · masks · coupling
+- [The layer stack](#the-layer-stack) : sources · A/B mix · racks · blends · masks · coupling · [the Audio Layer](#the-audio-layer) : sound files and live inputs into Sonify's mix
 - [Video sources](#video-sources) : import (DXV/HAP/ProRes…) · transport · modulatable playhead · granulation
 - [Collage](#collage--a-wall-of-films-key-source-gen-collage) : a wall of films cut up by the Autocutter partition · four shapes (cut-up, mosaic, torn, shaped) · stack · warp · folder or Assemble-bank feed
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
@@ -241,7 +241,8 @@ that couldn't start *and why* (permission denied / no device / cancelled).
 
 Bottom → top: **Background → Layer 1 → Layer 2 → Layer 3 → Layer 4.** Four layers
 composite over one background "ground." The Layers column reads in that order, top
-down : the Background strip first, then Layer 1 to Layer 4.
+down : the Background strip first, then Layer 1 to Layer 4, then the
+[Audio Layer](#the-audio-layer) (the sound).
 
 Each of the **4 layers** carries:
 
@@ -273,6 +274,37 @@ signal; the blend dropdown cycles its modes. Per-FX **dry/wet opacity** is
 modulatable too : select a loaded effect and its opacity slider grows the same
 **M** pill. (These are compositor-level, so they apply as a final per-frame
 override with the base value preserved, and they travel with sessions.)
+
+### The Audio Layer
+
+Under Layer 4 sits the **Audio Layer** (`AU`) : the composition's sound, beside the
+picture's stack. It has two slots, **A** and **B**, like a layer, each holding a
+**sound file** (Import audio…) or a **live audio input** (the default input or any
+device in the list : an interface, a microphone, a loopback device). Its header has the
+layer's **volume** (0 to 200 %, 100 % in the middle), its **meter** and its **mute**;
+each slot's row has its own meter and mute; **MIX** goes from A to B (the middle plays
+both whole, toward an end the other one fades out, so a live input and a file blended
+both stay at their own level).
+
+Select a slot (its **A** / **B** button) for its controls in the Inspector :
+
+- a **file** has the Import audio transport (play, stop, loop, the in / out trim on its
+  waveform, speed 1/16× to 16×, `global` to ignore the global speed, `♪ tape` / `♪ kept`
+  for the pitch, the folder's other sounds one click away), its level and volume, and a
+  **pan**;
+- a **live input** has its **device** and its **channels** (a stereo pair, or one channel
+  alone, mono on both sides, that the pan places; most drivers give one or two channels,
+  and an interface often shows its inputs as several devices, one per pair), its level
+  and volume (to 200 %), and a **pan**. A device saved with a session is found again by
+  its name if its id changed.
+
+The layer plays **into Sonify's mix**, after Sonify's own volume : the output EQ, the
+limiter, the recordings and [Space](#space--the-voices-in-the-room) all have it (in Space it
+sits with the effects return for now). Sonify off, its engine still runs for the layer,
+its voices silent. A modulator can listen **FROM** a file slot (`AU A`, `AU B`) like
+from a layer's clip. The layer is saved with the session (an older session opens with it
+empty) and answers to `/opsia/audiolayer/…` (see [OSC](#osc-implementation)). The Import
+audio source in a layer still plays its own file, as before.
 
 The **Background** has one source (from a curated set of grounds), its own full FX
 rack, opacity, its own clock (**SPEED**, 0 to 4×, 0.25× by default : its source, its
@@ -2250,6 +2282,9 @@ unless the slot actually holds a video.
 | `/opsia/output/flipx · flipy` | bool | Flips (≥ 0.5) |
 | `/opsia/output/edge` | i / f / s | `black` · `repeat` · `mirror` |
 | `/opsia/output/reset` | trigger | Back to the frame as it is |
+| `/opsia/audiolayer/volume · mix · mute` | f / bool | The **Audio Layer** : its volume (a gain, 0..2, 1 = as it comes), A to B (0.5 = both whole), mute (≥ 0.5) |
+| `/opsia/audiolayer/{A\|B}/volume · pan · mute` | f / bool | A slot's volume (a gain, 0..2), pan (-1..1), mute (≥ 0.5) |
+| `/opsia/audiolayer/{A\|B}/play · loop · ignoreglobal · keeppitch · speed · position · in · out` | f / bool | A file slot's transport, the video transport's conventions (speed 0..1 log, position a one-shot seek) |
 | `/opsia/space/mode` | i / f / s | **Space** : `stereo` · `speakers` · `objects` |
 | `/opsia/space/turn · glide` | f 0..1 | Turn the sound scene (0.5 = none) · how softly a following voice moves (0..2 s) |
 | `/opsia/space/mirror · headphones` | bool | Swap left and right · hear the room on headphones (≥ 0.5) |

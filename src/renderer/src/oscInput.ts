@@ -89,6 +89,7 @@ import { BLEND_MODES, BODY_FEATURES, BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@sha
 import { BG_SOURCES } from './bgPresets'
 import { bodyBus } from './engine/bodyIn'
 import { videoKey, videoSeekRequests } from './engine/videoState'
+import { AUDIO_LAYER } from './audio/audioLayer'
 import { SONI_SCALES, scaleFromName, withSonifyParam, type SoniConfig } from './audio/sonify'
 import { KEY_MODES } from './audio/soniKeyModel'
 import { GLUE_VOICES, normalizeEq, type SoniGlue } from './audio/eqMath'
@@ -875,6 +876,38 @@ function route(address: string, args: Args): void {
       return
     }
 
+    case 'audiolayer': {
+      // The Audio Layer : /opsia/audiolayer/{volume|mix|mute} and
+      // /opsia/audiolayer/{A|B}/{ctl}. Volumes are gains (0..2, 1 = as it
+      // comes), pan -1..1, the rest the video transport's conventions.
+      const al = st.audioLayer
+      const a = segs[2]
+      if (a === 'volume') { st.patchAudioLayer({ volume: Math.max(0, Math.min(2, n)) }); return }
+      if (a === 'mix') { st.patchAudioLayer({ mix: clamp01(n) }); return }
+      if (a === 'mute') { st.patchAudioLayer({ mute: n >= 0.5 }); return }
+      if (a !== 'A' && a !== 'B') return
+      const sl = a
+      const x = al[sl]
+      if (!x) return
+      switch (segs[3]) {
+        case 'volume': st.patchAudioLayerSlot(sl, { volume: Math.max(0, Math.min(2, n)) }); return
+        case 'pan': st.patchAudioLayerSlot(sl, { pan: Math.max(-1, Math.min(1, n)) }); return
+        case 'mute': st.patchAudioLayerSlot(sl, { mute: n >= 0.5 }); return
+      }
+      if (x.kind !== 'file') return
+      switch (segs[3]) {
+        case 'play': st.patchAudioLayerSlot(sl, { videoPlaying: n >= 0.5 }); return
+        case 'loop': st.patchAudioLayerSlot(sl, { videoLoop: n >= 0.5 }); return
+        case 'ignoreglobal': st.patchAudioLayerSlot(sl, { ignoreGlobalSpeed: n >= 0.5 }); return
+        case 'keeppitch': st.patchAudioLayerSlot(sl, { keepPitch: n >= 0.5 }); return
+        case 'speed': st.patchAudioLayerSlot(sl, { videoSpeed: VSMIN * Math.pow(VSMAX / VSMIN, clamp01(n)) }); return
+        case 'position': videoSeekRequests.set(videoKey(AUDIO_LAYER, sl), clamp01(n)); return
+        case 'in': st.patchAudioLayerSlot(sl, { videoIn: Math.min(clamp01(n), (x.videoOut ?? 1) - 0.01) }); return
+        case 'out': st.patchAudioLayerSlot(sl, { videoOut: Math.max(clamp01(n), (x.videoIn ?? 0) + 0.01) }); return
+      }
+      return
+    }
+
     case 'space': {
       // Space : where Sonify's voices sit in the room (shared/spatial.ts)
       const a = segs[2]
@@ -1345,6 +1378,30 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/output/flipy', 0, 1, ox.flipY ? 1 : 0, 'Output transform : flip y (>= 0.5)')
     add('/opsia/output/edge', 0, 1, OUT_EDGES.indexOf(ox.edge) / 2, 'Output transform : edge (black · repeat · mirror)')
     add('/opsia/output/reset', 0, 1, 0, 'Output transform : back to the frame as it is (trigger)', false)
+  }
+  {
+    const al = st.audioLayer
+    add('/opsia/audiolayer/volume', 0, 2, al.volume, 'The Audio Layer : its volume (a gain, 1 = as it comes)')
+    add('/opsia/audiolayer/mix', 0, 1, al.mix, 'The Audio Layer : A to B (0.5 = both whole)')
+    add('/opsia/audiolayer/mute', 0, 1, al.mute ? 1 : 0, 'The Audio Layer : mute (>= 0.5)')
+    for (const sl of ['A', 'B'] as const) {
+      const x = al[sl]
+      if (!x) continue
+      const p = `/opsia/audiolayer/${sl}`
+      add(`${p}/volume`, 0, 2, x.volume, `Audio Layer ${sl} : volume (a gain)`)
+      add(`${p}/pan`, -1, 1, x.pan, `Audio Layer ${sl} : pan (-1 left .. 1 right)`)
+      add(`${p}/mute`, 0, 1, x.mute ? 1 : 0, `Audio Layer ${sl} : mute (>= 0.5)`)
+      if (x.kind !== 'file') continue
+      add(`${p}/play`, 0, 1, (x.videoPlaying ?? true) ? 1 : 0, `Audio Layer ${sl} : play (>= 0.5) / pause`)
+      add(`${p}/loop`, 0, 1, (x.videoLoop ?? true) ? 1 : 0, `Audio Layer ${sl} : loop between in/out (>= 0.5)`)
+      add(`${p}/ignoreglobal`, 0, 1, x.ignoreGlobalSpeed ? 1 : 0, `Audio Layer ${sl} : its own speed, whatever the global speed (>= 0.5)`)
+      add(`${p}/keeppitch`, 0, 1, x.keepPitch ? 1 : 0, `Audio Layer ${sl} : keep the pitch when the speed changes (>= 0.5)`)
+      const sp = Math.max(VSMIN, Math.min(VSMAX, x.videoSpeed ?? 1))
+      add(`${p}/speed`, 0, 1, Math.log(sp / VSMIN) / Math.log(VSMAX / VSMIN), `Audio Layer ${sl} : speed (0..1 log across 1/64x..128x; a sound plays 1/16x to 16x)`)
+      add(`${p}/position`, 0, 1, 0, `Audio Layer ${sl} : one-shot seek (0..1 within the in/out trim)`, false)
+      add(`${p}/in`, 0, 1, x.videoIn ?? 0, `Audio Layer ${sl} : trim in point`)
+      add(`${p}/out`, 0, 1, x.videoOut ?? 1, `Audio Layer ${sl} : trim out point`)
+    }
   }
   {
     const sp = st.space

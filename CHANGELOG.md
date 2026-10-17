@@ -15,6 +15,29 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **The Audio Layer** (`AU`, the layers tab, under Layer 4; `audio/audioLayer.ts`,
+  `components/AudioLayerPanel.tsx`) : two slots, each a sound file or a live audio input,
+  its own volume (to 2×), pan and mute, the A/B mix (the middle plays both whole :
+  `min(1, 2(1-m))` / `min(1, 2m)`), the layer's volume and mute, meters (AnalyserNodes
+  after each slot and on the layer). It plays into Sonify's worklet as a **third input**,
+  joined after Sonify's master and before the limiter, so the output EQ, the limiter, the
+  recordings and Space have it (Space : with the FX return for now). Sonify off, the
+  engine runs for it with every voice masked off (`setLayerWanted`); Sonify's context
+  rebuilt (a heal), the layer starts over on the new one, its files where they were. A
+  file plays through `engine/clipPlayer.ts` (the Import audio transport, now shared :
+  `AudioSource` runs on it too) into a MediaElementSource; a live input opens with no voice
+  processing, as many channels as the driver gives, a splitter / merger taking a pair or
+  one channel (mono on both sides), found again by its name when its id changed. The file
+  slots reuse the video transport (`VideoTransport` `ops`), publish their playheads under
+  layer -1 (seeks, the level meter, a modulator FROM `AU A/B`). Saved with the session
+  (`audioLayer`, sanitized; an older file : empty). OSC `/opsia/audiolayer/volume · mix ·
+  mute` and `/opsia/audiolayer/{A|B}/volume · pan · mute · play · loop · ignoreglobal ·
+  keeppitch · speed · position · in · out`, advertised in OSCQuery. Measured : 60 fps
+  steady with a file and a live input playing, no frame over 30 ms when loading,
+  selecting or clearing a slot; a file at 1.00 s/s, the global speed followed or ignored,
+  the layer and slot mutes and the mix ends silent, a modulator FROM the layer's file
+  0.61 on a song; a fake stereo input with a silent right channel read 0 on channel 2
+  alone and the tone on channel 1.
 - **Ignore global speed** (the transport's `global` toggle, `ignoreGlobalSpeed`, video and
   audio slots) : the clip plays at its own speed × its layer's, whatever the global speed,
   so a sound keeps its pitch and tempo while the composition slows or rushes. OSC

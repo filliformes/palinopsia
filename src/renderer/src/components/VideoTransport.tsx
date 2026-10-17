@@ -4,7 +4,7 @@
 // The playhead is painted straight from the engine's videoPlayheads map in a
 // rAF loop (no React re-renders), like the modulated sliders.
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import type { ModTarget, SourceSlot } from '@shared/types'
 import { useShallow } from 'zustand/react/shallow'
 import { videoKey, videoPlayheads, videoSeekRequests } from '../engine/videoState'
@@ -38,11 +38,24 @@ function loadCacheDir(): Promise<string> {
   return (cacheDirPromise ??= window.api.videoCacheDir().then((d) => (cacheDirCache = d)))
 }
 
+/** The Audio Layer's file slots : the same transport on their own state (their
+ *  own store actions; their playhead under layer -1). No modulation row yet. */
+export interface TransportOps {
+  patch: (p: TransportPatch) => void
+  swap: (url: string, name: string, path: string) => void
+  volume: number
+  setVolume: (v: number) => void
+  /** more buttons at the end of the transport row */
+  extra?: ReactNode
+}
+type TransportPatch = Parameters<ReturnType<typeof useStore.getState>['setVideoPlayback']>[2]
+
 export function VideoTransport({
   layer,
   slot,
   state,
-  audio = false
+  audio = false,
+  ops
 }: {
   layer: number
   slot: 'A' | 'B'
@@ -50,11 +63,12 @@ export function VideoTransport({
   /** An Import Audio slot : no direction, smooth copy or grain (an <audio> plays
    *  forward only); its folder lists sound files; its timeline shows the wave. */
   audio?: boolean
+  ops?: TransportOps
 }): JSX.Element {
   const setVideoPlayback = useStore((s) => s.setVideoPlayback)
   const swapVideoSource = useStore((s) => s.swapVideoSource)
-  const set = (patch: Parameters<typeof setVideoPlayback>[2]): void =>
-    setVideoPlayback(layer, slot, patch)
+  const set = (patch: TransportPatch): void =>
+    ops ? ops.patch(patch) : setVideoPlayback(layer, slot, patch)
 
   // Smooth-scrub : native H.264/VP9/AV1 seek only to keyframes, so reverse /
   // pendulum / high-speed jump keyframe-to-keyframe. Transcoding the clip once to
@@ -97,7 +111,10 @@ export function VideoTransport({
     switching.current = true
     try {
       const url = audio ? `opsia-media://local/${encodeURIComponent(f.path)}` : await playableVideoUrl(f.path, f.name, setSwitchPct)
-      if (url) swapVideoSource(layer, slot, url, f.name, { mediaPath: f.path, resetTrim: true })
+      if (url) {
+        if (ops) ops.swap(url, f.name, f.path)
+        else swapVideoSource(layer, slot, url, f.name, { mediaPath: f.path, resetTrim: true })
+      }
     } finally {
       switching.current = false
     }
@@ -242,6 +259,7 @@ export function VideoTransport({
         >
           {state.ignoreGlobalSpeed ? '⊘ global' : 'global'}
         </button>
+        {ops?.extra}
         {/* Smooth scrub : convert a native clip to all-intra so reverse / high-speed
             are smooth. Only meaningful for on-disk clips. */}
         {vidPath && !audio &&
@@ -402,8 +420,8 @@ export function VideoTransport({
         layer={layer}
         slot={slot}
         path={origPath ?? ''}
-        volume={audio ? (typeof state.inputs.volume === 'number' ? state.inputs.volume : 0.8) : state.videoVolume ?? 0}
-        onVolume={(v) => (audio ? useStore.getState().setSourceInput(layer, slot, 'volume', v) : set({ videoVolume: v }))}
+        volume={ops ? ops.volume : audio ? (typeof state.inputs.volume === 'number' ? state.inputs.volume : 0.8) : state.videoVolume ?? 0}
+        onVolume={(v) => (ops ? ops.setVolume(v) : audio ? useStore.getState().setSourceInput(layer, slot, 'volume', v) : set({ videoVolume: v }))}
         audio={audio}
       />
 
@@ -463,7 +481,7 @@ export function VideoTransport({
       </div>}
 
       {/* Modulation : playhead / speed / grain params as mod targets. */}
-      <VideoModRow layer={layer} slot={slot} grainOn={!audio && (state.grainOn ?? false)} audio={audio} />
+      {!ops && <VideoModRow layer={layer} slot={slot} grainOn={!audio && (state.grainOn ?? false)} audio={audio} />}
     </div>
   )
 }
@@ -550,7 +568,7 @@ function LevelRow({ layer, slot, path, volume, onVolume, audio }: {
         onDoubleClick={() => onVolume(audio ? 0.8 : 0)}
         className="w-16 shrink-0 accent-accent"
         title={audio
-          ? `Volume ${Math.round(volume * 100)} % (double-click : 80 %), on Sonify's output device`
+          ? `Volume ${Math.round(volume * 100)} % (double-click : 80 %)${layer < 0 ? ', into the Audio Layer\'s mix' : ", on Sonify's output device"}`
           : `The film's own sound : ${volume > 0 ? `${Math.round(volume * 100)} %` : 'silent'} (double-click : silent), on Sonify's output device. Heard while it plays forward at its own pace (reverse, the grains or a modulated playhead stay silent); a muted layer is silent.`}
       />
       <span className="w-8 shrink-0 text-right font-mono text-[9px] tabular-nums text-muted">{volume > 0 ? Math.round(volume * 100) : 'off'}</span>

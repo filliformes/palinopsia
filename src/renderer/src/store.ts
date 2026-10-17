@@ -30,7 +30,7 @@ import type {
   SidechainRef,
   SourceSlot,
   World, LightPath } from '@shared/types'
-import type { MetaKnobState, MidiBinding, LightConfig, BodyControlConfig } from '@shared/types'
+import type { MetaKnobState, MidiBinding, LightConfig, BodyControlConfig, AudioLayerSlot, AudioLayerState } from '@shared/types'
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
 import type { ResolumeMap, ResoOutput, ResoInput, ResoCell, ResoSession } from '@shared/resolume'
 import { DF_DEFAULT_CONFIG, type DfConfig } from '@shared/dataflou'
@@ -52,6 +52,7 @@ import { beginSceneMorph, beginRelayMorph, cancelMorph, requestSceneChange } fro
 import { DEFAULT_LIGHT_PATH } from './lightPath'
 import { autoSurfacePos } from './surface'
 import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify'
+import { defaultAudioLayer, sanitizeAudioLayer } from './audio/audioLayer'
 import { makeDefaultKeySeq, sanitizeKeySeq } from './audio/soniKeyModel'
 import { isSoniRate } from './audio/soniClock'
 import { resetCouplingState } from './engine/coupling'
@@ -1153,6 +1154,7 @@ export type Selection =
   | { type: 'source'; layer: number; slot: 'A' | 'B' }
   | { type: 'fx'; scope: FxScope; instId: string }
   | { type: 'background' } // the Background slab's source params
+  | { type: 'audio'; slot: 'A' | 'B' } // an Audio Layer slot (the layers tab, under L4)
   | null
 
 /** Stable identity for a mod target : used to find existing assignments. */
@@ -1654,6 +1656,17 @@ interface StoreState {
   setRecordPrefs: (patch: Partial<RecordPrefs>) => void
   sonify: SoniConfig
   setSonify: (next: SoniConfig) => void
+  // The Audio Layer (the layers tab, under L4) : two slots, a sound file or a
+  // live input each, mixed into Sonify's output (saved with the session).
+  audioLayer: AudioLayerState
+  /** A file into a slot. `keep` keeps the slot's transport, volume and pan (the
+   *  clip row stepping through a folder); else a fresh slot (its volume kept). */
+  setAudioLayerFile: (slot: 'A' | 'B', mediaId: string, mediaName: string, mediaPath: string, keep?: boolean) => void
+  /** A live input into a slot ('' : the default device); its channels stay. */
+  setAudioLayerLive: (slot: 'A' | 'B', deviceId: string, deviceLabel: string) => void
+  patchAudioLayerSlot: (slot: 'A' | 'B', patch: Partial<AudioLayerSlot>) => void
+  clearAudioLayerSlot: (slot: 'A' | 'B') => void
+  patchAudioLayer: (patch: Partial<Pick<AudioLayerState, 'mix' | 'volume' | 'mute'>>) => void
   // Sonify step sequencer (Mixer page) : evolves the sound over time.
   soniSeq: SoniSeq
   setSoniSeqOn: (on: boolean) => void
@@ -3981,16 +3994,51 @@ export const useStore = create<StoreState>((set, get) => ({
     // The engine starts asynchronously : read the state again once it has, so
     // an off that arrived meanwhile (a double tap, a momentary OSC button) stops
     // it instead of leaving it running under a page that says "sound off".
+    // (The Audio Layer keeps the engine running with Sonify off : its voices
+    // then fall silent and the layer plays on through the same output.)
     if (next.on && !sonifyEngine.isRunning())
       void sonifyEngine.start().then(() => {
         const s = useStore.getState().sonify
-        if (s.on) sonifyEngine.pushConfig(s)
+        if (s.on || sonifyEngine.layerWanted()) sonifyEngine.pushConfig(s)
         else sonifyEngine.stop()
       })
-    else if (!next.on && sonifyEngine.isRunning()) sonifyEngine.stop()
+    else if (!next.on && sonifyEngine.isRunning() && !sonifyEngine.layerWanted()) sonifyEngine.stop()
     else sonifyEngine.pushConfig(next)
     set({ sonify: next })
   },
+
+  audioLayer: defaultAudioLayer(),
+  setAudioLayerFile: (slot, mediaId, mediaName, mediaPath, keep) =>
+    set((s) => {
+      const prev = s.audioLayer[slot]
+      const base: AudioLayerSlot = keep && prev?.kind === 'file'
+        ? { ...prev, videoIn: 0, videoOut: 1 }
+        : { kind: 'file', volume: prev?.kind === 'file' ? prev.volume : 0.8, pan: prev?.pan ?? 0, videoPlaying: true, videoLoop: true, videoSpeed: 1 }
+      return {
+        audioLayer: { ...s.audioLayer, [slot]: { ...base, kind: 'file', mediaId, mediaName, mediaPath } },
+        selection: { type: 'audio', slot }
+      }
+    }),
+  setAudioLayerLive: (slot, deviceId, deviceLabel) =>
+    set((s) => {
+      const prev = s.audioLayer[slot]
+      const next: AudioLayerSlot = prev?.kind === 'live'
+        ? { ...prev, deviceId: deviceId || undefined, deviceLabel: deviceLabel || undefined }
+        : { kind: 'live', deviceId: deviceId || undefined, deviceLabel: deviceLabel || undefined, chL: 0, chR: 1, volume: 1, pan: prev?.pan ?? 0 }
+      return { audioLayer: { ...s.audioLayer, [slot]: next }, selection: { type: 'audio', slot } }
+    }),
+  patchAudioLayerSlot: (slot, patch) =>
+    set((s) => {
+      const cur = s.audioLayer[slot]
+      if (!cur) return {}
+      return { audioLayer: { ...s.audioLayer, [slot]: { ...cur, ...patch, kind: cur.kind } } }
+    }),
+  clearAudioLayerSlot: (slot) =>
+    set((s) => ({
+      audioLayer: { ...s.audioLayer, [slot]: null },
+      selection: s.selection?.type === 'audio' && s.selection.slot === slot ? null : s.selection
+    })),
+  patchAudioLayer: (patch) => set((s) => ({ audioLayer: { ...s.audioLayer, ...patch } })),
 
   soniSeq: loadSoniSeq(),
   setSoniSeqOn: (on) =>
@@ -4768,6 +4816,11 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ outXform: sanitizeOutXform(s.outXform ?? null), outXformReset: get().outXformReset + 1 })
     // Where the voices sit is the piece's too (an older file : where they start).
     set({ space: persistSpace({ ...get().space, voices: sanitizeVoicePlaces(s.spaceVoices ?? null) }) })
+    // So is the Audio Layer's sound (an older file : none).
+    set((st) => ({
+      audioLayer: sanitizeAudioLayer(s.audioLayer ?? null),
+      selection: st.selection?.type === 'audio' ? null : st.selection
+    }))
     // The projector warp, when the session carries one AND this computer lets
     // sessions bring theirs (Output → Mapping : save with the session). It is the
     // session's : this computer's own warp stays stored and comes back with a
@@ -4829,6 +4882,7 @@ export const useStore = create<StoreState>((set, get) => ({
       dome: s.dome,
       outXform: s.outXform,
       spaceVoices: s.space.voices,
+      audioLayer: s.audioLayer,
       ...(s.warpInSession ? { warp: { enabled: s.warpEnabled, corners: [...s.warpCorners], feather: s.warpFeather } } : {}),
       ui: { theme: s.theme }
     }

@@ -169,11 +169,14 @@ import { clipAudio } from './engine/clipAudio'
 import { setMediaSink } from './engine/mediaSink'
 import { videoKey, videoPlayheads } from './engine/videoState'
 import { pathFromMediaUrl } from './components/videoImport'
+import { AUDIO_LAYER, audioLayer } from './audio/audioLayer'
+import { AudioLayerPanel } from './components/AudioLayerPanel'
 
 // An audio modulator listening to a slot's clip reads its file and its playhead
 // here : the playhead the engine publishes each frame, the ORIGINAL file (a
 // converted video plays from a cache copy that has no sound).
 clipAudio.setPlayheads((layer, slot) => {
+  if (layer === AUDIO_LAYER) return audioLayer.playhead(slot)
   const ph = videoPlayheads.get(videoKey(layer, slot))
   if (!ph) return null
   const L = useStore.getState().composition.layers[layer]
@@ -186,6 +189,12 @@ clipAudio.setPlayheads((layer, slot) => {
 // Sonify's output device.
 setMediaSink(useStore.getState().sonify.sinkId ?? '')
 useStore.subscribe((st) => setMediaSink(st.sonify.sinkId ?? ''))
+// The Audio Layer follows its state (the store can't import it : it imports
+// Sonify's engine, which the store imports first).
+audioLayer.sync(useStore.getState().audioLayer)
+useStore.subscribe((st, prev) => {
+  if (st.audioLayer !== prev.audioLayer) audioLayer.sync(st.audioLayer)
+})
 
 // The global REC pill : visible in the top bar while a take is rolling, so you
 // can leave the Output page and tweak live. Click ■ to stop + save the take.
@@ -1106,7 +1115,7 @@ export default function App(): JSX.Element {
       compositorRef.current = comp
       // Isolated test builds only (built with VITE_OPSIA_TEST=1) : hand the
       // store and the engine to a debugger. Compiled out of real builds.
-      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio })
+      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer })
       // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
       // capture from the render loop (Compositor.captureKick) : a rebuilt engine
       // needs no re-attaching. A real-time recording finds it through this.
@@ -1374,7 +1383,9 @@ export default function App(): JSX.Element {
           for (const [k, v] of videoSeeks) {
             const ci = k.indexOf(':')
             const li = Number(k.slice(0, ci))
-            comp!.layers[li]?.setVideoInput(k.slice(ci + 1) === 'B' ? 'B' : 'A', 'position', v)
+            const sl = k.slice(ci + 1) === 'B' ? 'B' : 'A'
+            if (li === AUDIO_LAYER) audioLayer.seek(sl, v)
+            else comp!.layers[li]?.setVideoInput(sl, 'position', v)
           }
         }
         // 2b. Coupling: audio binds each layer's A/B balance (post-sync so it
@@ -1694,6 +1705,7 @@ export default function App(): JSX.Element {
         // warm-up and the FPS meter, and flooded the log 30 times a second)
         perfMeter.begin('sonify')
         try { sonifyEngine.tick(comp!, now, c.bpm) } catch (e) { logOnce('sonify tick', e) }
+        try { audioLayer.tick(st.globalSpeed) } catch (e) { logOnce('audio layer tick', e) }
         try { spaceEngine.tick(comp!, now) } catch (e) { logOnce('space tick', e) }
         perfMeter.end('sonify')
         // 6. Shader warm-up : one registry compile per frame, in the background,
@@ -2155,6 +2167,8 @@ export default function App(): JSX.Element {
               {[0, 1, 2, 3].map((i) => (
                 <LayerPanel key={i} index={i} />
               ))}
+              {/* The Audio Layer : the sound, over the picture's stack. */}
+              <AudioLayerPanel />
               {/* Metasurface : the scene bank as a continuous 2D plane you play
                   by dragging (Bencina 2005). Collapsed by default. */}
               <Collapsible sectionKey="surface" title="surface" extra={<SurfaceOnToggle />}>

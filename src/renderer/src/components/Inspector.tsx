@@ -28,6 +28,7 @@ import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 import { SourceFraming } from './SourceFraming'
 import { VideoTransport } from './VideoTransport'
+import { AudioLayerInspector } from './AudioLayerPanel'
 import { AssembleTransport } from './AssembleTransport'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { registerInspectorRandomize } from '../commands'
@@ -383,6 +384,7 @@ export function Inspector(): JSX.Element {
       : undefined)
 
   if (!shaderId) {
+    if (selection?.type === 'audio') return <AudioLayerInspector slot={selection.slot} />
     if (videoName && selection?.type === 'source') {
       const vslot =
         selection.slot === 'A'

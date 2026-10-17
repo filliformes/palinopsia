@@ -969,6 +969,7 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.space = new SpaceBus(sampleRate);
     this.pL = new Float32Array(128); this.pR = new Float32Array(128);
     this.fxL = new Float32Array(128); this.fxR = new Float32Array(128);
+    this.exL = new Float32Array(128); this.exR = new Float32Array(128); // the Audio Layer, for Space
     // Collage pieces as sources : the bank's wet, the dry's share, one piece
     this.rgWL = new Float32Array(128); this.rgWR = new Float32Array(128);
     this.rgDK = new Float32Array(128); this.pcBuf = new Float32Array(128);
@@ -2115,10 +2116,23 @@ class SoniProcessor extends AudioWorkletProcessor {
     const mg1 = clampf(cfg.master, 0, 2);
     const mg0 = this.mgS < 0 ? mg1 : this.mgS, dmg = (mg1 - mg0) / n;
     this.mgS = mg1;
+    // Input 2 : the Audio Layer (a sound file, a live input), already at its own
+    // levels : joined AFTER Sonify's master (its volume is its own) and BEFORE the
+    // limiter, so the EQ, the glue, the recordings and Space all have it. In
+    // Space it sits with the FX return for now (scaled back from the master the
+    // Space stage applies to everything).
+    const ex = _inputs[2];
+    const exL = ex && ex[0] ? ex[0] : null, exR = ex && ex[1] ? ex[1] : exL;
+    if (exL && spc.on && spc.out && mg1 > 1e-3) {
+      const k = 1 / mg1;
+      for (let s = 0; s < n; s++) { this.exL[s] = exL[s] * k; this.exR[s] = exR[s] * k; }
+      spc.add(SPACE_FX, this.exL, this.exR, n);
+    }
     let peak = this.peak, limMin = this.limMin;
     for (let s = 0; s < n; s++) {
       const mg = mg0 + dmg * (s + 1); // ramped : a stepped master zippered
       let l = outL[s] * mg, r = outR[s] * mg;
+      if (exL) { l += exL[s]; r += exR[s]; }
       if (!Number.isFinite(l)) l = 0;
       if (!Number.isFinite(r)) r = 0;
       const p = Math.max(Math.abs(l), Math.abs(r));

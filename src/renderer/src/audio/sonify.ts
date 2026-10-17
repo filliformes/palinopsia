@@ -632,6 +632,12 @@ class SonifyEngine {
   private groupsWanted = 0 // the Collage piece groups Space asked for (applied under the duck)
   // Space's Collage piece groups (0 : the voice is one pair)
   private collageGroups = 0
+  // The Audio Layer (audio/audioLayer.ts) : its mix into the worklet's third
+  // input, and whether it is playing (the engine then runs with Sonify off, its
+  // voices silent, so the layer has the EQ, the limiter, Space and the takes).
+  private extIn: AudioNode | null = null
+  private extWanted = false
+  private ctxListeners = new Set<(ctx: AudioContext) => void>()
 
   constructor() {
     // The mod-matrix swings around each param's BASE : the current config.
@@ -657,6 +663,40 @@ class SonifyEngine {
   }
 
   isRunning(): boolean { return !!this.node }
+
+  /** The audio context (opened if needed) : the Audio Layer builds on it. */
+  context(): Promise<AudioContext> {
+    return this.ensureCtx()
+  }
+
+  /** Called with every new audio context (a heal rebuilds it) : whatever was
+   *  built on the old one starts over on it. Returns the unsubscribe. */
+  onContext(fn: (ctx: AudioContext) => void): () => void {
+    this.ctxListeners.add(fn)
+    return () => { this.ctxListeners.delete(fn) }
+  }
+
+  /** The Audio Layer's mix, joined after Sonify's master (null : none). */
+  setExternalInput(n: AudioNode | null): void {
+    if (n === this.extIn) return
+    const old = this.extIn, node = this.node
+    this.extIn = n
+    if (old && node) { try { old.disconnect(node) } catch { /* not connected */ } }
+    if (n && node) { try { n.connect(node, 0, 2) } catch (e) { console.warn('[sonify] audio layer input', e) } }
+  }
+
+  /** The Audio Layer plays (or stops) : the engine runs for it, Sonify on or off. */
+  setLayerWanted(on: boolean): void {
+    if (on === this.extWanted) return
+    this.extWanted = on
+    if (on && !this.node) void this.start().then(() => { if (!this.cfg.on && !this.extWanted) this.stop() })
+    else if (!on && this.node && !this.cfg.on) this.stop()
+  }
+
+  /** Is the Audio Layer holding the engine (the store asks before stopping it)? */
+  layerWanted(): boolean {
+    return this.extWanted
+  }
 
   /** The Collage voice's live state for the page (walls heard, pieces, films). */
   collageStatus(): { sets: number; pieces: number; films: number } | null {
@@ -700,6 +740,7 @@ class SonifyEngine {
       hush.start()
       this.ctx = ctx
       if (this.cfg.sinkId) this.applySink(this.cfg.sinkId)
+      for (const fn of this.ctxListeners) { try { fn(ctx) } catch (e) { console.warn('[sonify] context listener', e) } }
       // An audio device error (an interface unplugged, the default output
       // switched, a driver hiccup) can leave the context closed, suspended or
       // silently stalled. Kept open for days now, it must heal by itself.
@@ -721,7 +762,7 @@ class SonifyEngine {
 
   /** Is the context supposed to be running (the sound, a take, or kept warm)? */
   private wanted(): boolean {
-    return !!this.node || this.bus > 0 || this.warm
+    return !!this.node || this.bus > 0 || this.warm || this.extWanted
   }
 
   /** Every 5 s : a running context whose clock no longer moves is stalled (a
@@ -776,7 +817,7 @@ class SonifyEngine {
 
   /** A fresh context, and the sound restarted on it if it was playing. */
   private async rebuild(): Promise<void> {
-    const wasOn = !!this.node
+    const wasOn = !!this.node || this.extWanted
     this.collage?.dispose()
     this.collage = null
     // the line-in starts over on the new context (kept, it stayed captured by
@@ -808,9 +849,10 @@ class SonifyEngine {
     try {
       const ctx = await this.ensureCtx()
       // Input 0 : the Filter voice's line-in. Input 1 : the Collage voice's films.
-      // Output 0 : the stereo mix. Output 1 : Space (the voices placed on
-      // speakers or sent as objects), only connected while Space is on.
-      const node = new AudioWorkletNode(ctx, 'soni', { numberOfInputs: 2, numberOfOutputs: 2, outputChannelCount: [2, SPACE_MAX_CH] })
+      // Input 2 : the Audio Layer. Output 0 : the stereo mix. Output 1 : Space
+      // (the voices placed on speakers or sent as objects), only connected while
+      // Space is on.
+      const node = new AudioWorkletNode(ctx, 'soni', { numberOfInputs: 3, numberOfOutputs: 2, outputChannelCount: [2, SPACE_MAX_CH] })
       node.port.onmessage = (e): void => {
         const m = e.data
         if (m?.t === 'meter') {
@@ -851,6 +893,7 @@ class SonifyEngine {
       this.eqSent = ''
       if (this.recDest) node.connect(this.recDest)
       if (this.tap) node.connect(this.tap)
+      if (this.extIn) { try { this.extIn.connect(node, 0, 2) } catch (e) { console.warn('[sonify] audio layer input', e) } }
       this.node = node
       this.pushConfig(this.cfg)
       if (this.spaceMsg) node.port.postMessage(this.spaceMsg)
@@ -986,6 +1029,7 @@ class SonifyEngine {
   stop(now = false): void {
     const collage = this.collage, lineSrc = this.lineSrc, lineStream = this.lineStream
     const node = this.node, eqNode = this.eqNode, anPre = this.anPre, anPost = this.anPost, outG = this.outG, ctx = this.ctx
+    const ext = this.extIn
     this.collage = null
     this.lineSrc = null
     this.lineStream = null
@@ -1014,6 +1058,7 @@ class SonifyEngine {
         try { n.port.postMessage({ t: 'end' }) } catch { /* gone */ }
       }
       try { node?.disconnect(); eqNode?.disconnect(); anPre?.disconnect(); anPost?.disconnect(); outG?.disconnect() } catch { /* gone */ }
+      if (ext && node) { try { ext.disconnect(node) } catch { /* not connected */ } }
       // A recording holding the sound bus keeps the context (and its sound
       // track) alive; it plays silence until the sound comes back. (Not if
       // Sonify was switched back on meanwhile : it plays on this context.)
@@ -1296,17 +1341,19 @@ class SonifyEngine {
     this.eventFreqs = cfg.events.quantize
       ? scaleTable(effRoot(cfg), cfg.scale, cfg.events.loOct, cfg.events.hiOct)
       : new Float32Array(0)
+    // Sonify off, the engine running for the Audio Layer : every voice silent.
+    const live = !!cfg.on
     this.node.port.postMessage({
       t: 'cfg',
       cfg: {
         master: cfg.master,
         spectra: {
-          on: cfg.spectra.on, tap: cfg.spectra.tap, gain: cfg.spectra.gain, pan: cfg.spectra.pan,
+          on: live && cfg.spectra.on, tap: cfg.spectra.tap, gain: cfg.spectra.gain, pan: cfg.spectra.pan,
           sweepOn: cfg.spectra.sweepOn, sweepHz: cfg.spectra.sync ? syncSweepHz(this.bpm) : cfg.spectra.sweepHz, x: cfg.spectra.x, gamma: cfg.spectra.gamma,
           breath: cfg.spectra.breath ?? 0, path: cfg.spectra.path ?? 0, pace: cfg.spectra.pace ?? 0
         },
         orbit: {
-          on: cfg.orbit.on, tap: cfg.orbit.tap, gain: cfg.orbit.gain, pan: cfg.orbit.pan,
+          on: live && cfg.orbit.on, tap: cfg.orbit.tap, gain: cfg.orbit.gain, pan: cfg.orbit.pan,
           freq: cfg.orbit.quantize
             ? (this.snapNote(cfg.orbit.note))
             : cfg.orbit.freq,
@@ -1314,42 +1361,42 @@ class SonifyEngine {
           drive: cfg.orbit.drive, smooth: cfg.orbit.smooth
         },
         flow: {
-          on: cfg.flow.on, tap: cfg.flow.tap, gain: cfg.flow.gain, pan: cfg.flow.pan,
+          on: live && cfg.flow.on, tap: cfg.flow.tap, gain: cfg.flow.gain, pan: cfg.flow.pan,
           dur: cfg.flow.dur, noise: cfg.flow.noise, colour: cfg.flow.colour ?? 0
         },
         events: {
-          on: cfg.events.on, gain: cfg.events.gain, pan: cfg.events.pan,
+          on: live && cfg.events.on, gain: cfg.events.gain, pan: cfg.events.pan,
           wave: cfg.events.wave, decay: cfg.events.decay, highs: cfg.events.highs
         },
         raster: {
-          on: cfg.raster.on, tap: cfg.raster.tap, gain: cfg.raster.gain, pan: cfg.raster.pan,
+          on: live && cfg.raster.on, tap: cfg.raster.tap, gain: cfg.raster.gain, pan: cfg.raster.pan,
           freq: cfg.raster.quantize ? this.snapNote(cfg.raster.note) : cfg.raster.freq,
           rx: cfg.raster.rx, ry: cfg.raster.ry, rw: cfg.raster.rw, rh: cfg.raster.rh,
           smooth: cfg.raster.smooth, tone: cfg.raster.tone ?? 0.6
         },
         sstv: {
-          on: cfg.sstv.on, tap: cfg.sstv.tap, gain: cfg.sstv.gain, pan: cfg.sstv.pan,
+          on: live && cfg.sstv.on, tap: cfg.sstv.tap, gain: cfg.sstv.gain, pan: cfg.sstv.pan,
           lineHz: cfg.sstv.sync ? syncLineHz(this.bpm) : cfg.sstv.lineHz, dev: cfg.sstv.dev, syncLev: cfg.sstv.syncLev
         },
         filter: {
-          on: cfg.filter.on, tap: cfg.filter.tap, gain: cfg.filter.gain, pan: cfg.filter.pan,
+          on: live && cfg.filter.on, tap: cfg.filter.tap, gain: cfg.filter.gain, pan: cfg.filter.pan,
           q: cfg.filter.q, noise: cfg.filter.lineIn ? cfg.filter.noise * 0.25 : cfg.filter.noise,
           sweepOn: cfg.filter.sweepOn, sweepHz: cfg.filter.sweepHz, x: cfg.filter.x, gamma: cfg.filter.gamma,
           path: cfg.filter.path ?? 0, pace: cfg.filter.pace ?? 0, loop: cfg.filter.loop ?? 0
         },
         signal: {
-          on: cfg.signal.on, gain: cfg.signal.gain, pan: cfg.signal.pan,
+          on: live && cfg.signal.on, gain: cfg.signal.gain, pan: cfg.signal.pan,
           wave: cfg.signal.wave, decay: cfg.signal.decay, tone: cfg.signal.tone, fm: cfg.signal.fm
         },
         chord: {
-          on: cfg.chord.on, tap: cfg.chord.tap, gain: cfg.chord.gain, pan: cfg.chord.pan,
+          on: live && cfg.chord.on, tap: cfg.chord.tap, gain: cfg.chord.gain, pan: cfg.chord.pan,
           gamma: cfg.chord.gamma, spread: cfg.chord.spread, attack: cfg.chord.attack,
           release: cfg.chord.release, tone: cfg.chord.tone,
           waves: cfg.chord.waves, wavesRate: cfg.chord.wavesRate, wavesSync: cfg.chord.wavesSync,
           noise: cfg.chord.noise, air: cfg.chord.air
         },
         collage: {
-          on: cfg.collage.on, gain: cfg.collage.gain, pan: cfg.collage.pan,
+          on: live && cfg.collage.on, gain: cfg.collage.gain, pan: cfg.collage.pan,
           bank: cfg.collage.bank, bankSend: cfg.collage.bankSend, decay: cfg.collage.decay, choke: cfg.collage.choke,
           cutoff: cfg.collage.cutoff, peak: cfg.collage.peak, slope: cfg.collage.slope, tone: cfg.collage.tone,
           tilt: cfg.collage.tilt, waves: cfg.collage.waves, wavesRate: cfg.collage.wavesRate, wavesSync: cfg.collage.wavesSync,
@@ -1372,7 +1419,7 @@ class SonifyEngine {
     // modulated pitch or probe snapping to its base for up to 50 ms on every
     // slider move, OSC message and sequencer step).
     if (cfg.on) this.postMod()
-    this.syncLineIn(cfg.filter.on && cfg.filter.lineIn)
+    this.syncLineIn(!!cfg.on && cfg.filter.on && cfg.filter.lineIn)
   }
 
   /** Open/close the line-in tap for the Filter voice (mic/line via WebRTC). */

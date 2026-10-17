@@ -1,0 +1,407 @@
+// The Audio Layer strip (the layers tab, under L4) : the layer's volume, meter
+// and mute on its header, then slot A, the A/B mix and slot B, each a sound file
+// or a live input. And the Inspector's page for a selected slot : a file's
+// transport (the Import Audio one), a live input's device and channels, and the
+// slot's volume and pan.
+
+import { useEffect, useRef, useState } from 'react'
+import type { AudioLayerSlot, SourceSlot } from '@shared/types'
+import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT } from './buttonStyles'
+import { SearchSelect, type SearchOption } from './SearchSelect'
+import { VideoTransport } from './VideoTransport'
+import { useStore } from '../store'
+import { AUDIO_LAYER, audioLayer, type AudioSlotName } from '../audio/audioLayer'
+
+const AUDIO_ACCEPT = 'audio/*,.wav,.mp3,.flac,.ogg,.oga,.opus,.aac,.m4a,.aif,.aiff,.wma,.caf'
+const M_FLOOR = -60
+
+/** The audio inputs (their names show once one has been opened). */
+function useAudioInputs(): Array<{ id: string; label: string }> {
+  const [list, setList] = useState<Array<{ id: string; label: string }>>([])
+  useEffect(() => {
+    let alive = true
+    const md = navigator.mediaDevices
+    const read = (): void => {
+      void md?.enumerateDevices().then((ds) => {
+        if (!alive) return
+        setList(
+          ds
+            .filter((d) => d.kind === 'audioinput' && d.deviceId !== 'default' && d.deviceId !== 'communications')
+            .map((d, i) => ({ id: d.deviceId, label: d.label || `input ${i + 1}` }))
+        )
+      }).catch(() => {})
+    }
+    read()
+    md?.addEventListener?.('devicechange', read)
+    const off = audioLayer.subscribe(read) // a device opened : the names are readable now
+    return () => {
+      alive = false
+      md?.removeEventListener?.('devicechange', read)
+      off()
+    }
+  }, [])
+  return list
+}
+
+/** A live slot's device as it opened (its channel count, or its error). */
+function useLiveInfo(slot: AudioSlotName): ReturnType<typeof audioLayer.liveInfo> {
+  const [info, setInfo] = useState(() => audioLayer.liveInfo(slot))
+  useEffect(() => {
+    setInfo(audioLayer.liveInfo(slot))
+    return audioLayer.subscribe(() => setInfo(audioLayer.liveInfo(slot)))
+  }, [slot])
+  return info
+}
+
+/** A level meter (RMS bar, held peak, -60..0 dBFS) on a slot after its volume,
+ *  or on the whole layer (`which` null). Painted from the analyser each frame. */
+function Meter({ which, className = '', number = false }: { which: AudioSlotName | null; className?: string; number?: boolean }): JSX.Element {
+  const barRef = useRef<HTMLDivElement | null>(null)
+  const tickRef = useRef<HTMLDivElement | null>(null)
+  const numRef = useRef<HTMLSpanElement | null>(null)
+  useEffect(() => {
+    let raf = 0, at = performance.now(), rmsDb = -120, pkDb = -120, held = 0, shown = ''
+    const toDb = (x: number): number => (x > 1e-6 ? 20 * Math.log10(x) : -120)
+    const x = (db: number): number => Math.max(0, Math.min(1, (db - M_FLOOR) / -M_FLOOR))
+    const tick = (now: number): void => {
+      raf = requestAnimationFrame(tick)
+      const dt = Math.min(0.25, (now - at) / 1000)
+      at = now
+      const m = audioLayer.meter(which)
+      const r = toDb(m.rms), p = toDb(m.peak)
+      rmsDb = r >= rmsDb ? r : Math.max(r, rmsDb - 24 * dt) // a meter's fall, 24 dB/s
+      if (p >= pkDb) { pkDb = p; held = 1 } else if ((held -= dt) <= 0) pkDb = Math.max(p, pkDb - 24 * dt)
+      if (barRef.current) {
+        barRef.current.style.width = `${(x(rmsDb) * 100).toFixed(1)}%`
+        barRef.current.style.background = rmsDb > -9 ? 'rgb(214,196,90)' : 'rgb(120,200,140)'
+      }
+      if (tickRef.current) {
+        tickRef.current.style.left = `calc(${(x(pkDb) * 100).toFixed(1)}% - 1px)`
+        tickRef.current.style.opacity = pkDb > M_FLOOR ? '1' : '0'
+        tickRef.current.style.background = pkDb > -1 ? 'rgb(230,120,60)' : 'rgb(230,230,230)'
+      }
+      if (numRef.current) {
+        const txt = (rmsDb > -119 ? Math.pow(10, rmsDb / 20) : 0).toFixed(3)
+        if (txt !== shown) {
+          shown = txt
+          numRef.current.textContent = txt
+          numRef.current.title = `RMS ${txt} (${rmsDb > -119 ? rmsDb.toFixed(1) : '-∞'} dBFS)`
+        }
+      }
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [which])
+  return (
+    <>
+      <div
+        className={`relative h-[7px] overflow-hidden rounded-sm bg-panel3 ${className}`}
+        title={`${which ? `Slot ${which}` : 'The layer'}'s sound${which ? ' after its volume and pan' : ', what goes into the mix'} : the bar is its RMS, the tick its peak (${M_FLOOR} to 0 dBFS)`}
+      >
+        <div ref={barRef} className="absolute inset-y-0 left-0 w-0" />
+        <div ref={tickRef} className="absolute inset-y-0 w-[2px] opacity-0" />
+      </div>
+      {number && <span ref={numRef} className="w-10 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted">0.000</span>}
+    </>
+  )
+}
+
+function Chip({ label, active, onClick, title }: { label: string; active: boolean; onClick: () => void; title: string }): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
+        active ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted hover:text-text'
+      }`}
+    >
+      {label}
+    </button>
+  )
+}
+
+function slotName(s: AudioLayerSlot | null): string | null {
+  if (!s) return null
+  if (s.kind === 'file') return s.mediaName ?? 'sound file'
+  return s.deviceLabel ?? 'default input'
+}
+
+/** The layer strip. */
+export function AudioLayerPanel(): JSX.Element {
+  const al = useStore((s) => s.audioLayer)
+  const patch = useStore((s) => s.patchAudioLayer)
+  const collapsed = useStore((s) => !!s.collapsed.audioLayer)
+  const toggleSection = useStore((s) => s.toggleSection)
+  const a = slotName(al.A), b = slotName(al.B)
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5 rounded-md border border-border bg-panel p-2">
+      {/* Header : chevron · AU · volume · meter · mute */}
+      <div className="flex min-w-0 items-center gap-2">
+        <button
+          onClick={() => toggleSection('audioLayer')}
+          className="flex shrink-0 items-center gap-1"
+          title={collapsed ? 'Expand the Audio Layer' : 'Collapse the Audio Layer'}
+        >
+          <span className={`font-mono text-[9px] text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}>▶</span>
+          <span className="font-mono text-[11px] text-muted">AU</span>
+        </button>
+        <input
+          type="range" min={0} max={2} step={0.01} value={al.volume}
+          onChange={(e) => patch({ volume: Number(e.target.value) })}
+          onDoubleClick={() => patch({ volume: 1 })}
+          className="min-w-0 flex-1 accent-accent"
+          title={`The Audio Layer's volume ${Math.round(al.volume * 100)} % (double-click : 100 %). It plays into Sonify's mix (after Sonify's own volume) : the output EQ, the limiter, the recordings and Space have it, Sonify on or off.`}
+        />
+        <Meter which={null} className="w-12 shrink-0" />
+        <Chip label="⊘" active={al.mute} onClick={() => patch({ mute: !al.mute })} title="Mute the Audio Layer" />
+      </div>
+      {collapsed ? (
+        <div className="flex min-w-0 items-center gap-1 px-1 font-mono text-[9px] text-muted" title="What the collapsed Audio Layer holds (expand to edit)">
+          <span className="min-w-0 truncate">{a && b ? `${a} + ${b}` : (a ?? b ?? 'empty')}</span>
+          {al.mute && <span className="shrink-0 text-danger/80">· muted</span>}
+        </div>
+      ) : (
+        <>
+          <SlotRow slot="A" />
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="w-[34px] shrink-0 font-mono text-[9px] uppercase text-muted">mix</span>
+            <span className="shrink-0 font-mono text-[9px] text-muted">A</span>
+            <input
+              type="range" min={0} max={1} step={0.01} value={al.mix}
+              onChange={(e) => patch({ mix: Number(e.target.value) })}
+              onDoubleClick={() => patch({ mix: 0.5 })}
+              className="min-w-0 flex-1 accent-accent"
+              title={`A and B : the middle plays both whole, toward an end the other one fades out (${al.mix.toFixed(2)}; double-click : the middle)`}
+            />
+            <span className="shrink-0 font-mono text-[9px] text-muted">B</span>
+          </div>
+          <SlotRow slot="B" />
+        </>
+      )}
+    </div>
+  )
+}
+
+function SlotRow({ slot }: { slot: AudioSlotName }): JSX.Element {
+  const s = useStore((st) => st.audioLayer[slot])
+  const selected = useStore((st) => st.selection?.type === 'audio' && st.selection.slot === slot)
+  const setSelection = useStore((st) => st.setSelection)
+  const setFile = useStore((st) => st.setAudioLayerFile)
+  const setLive = useStore((st) => st.setAudioLayerLive)
+  const clear = useStore((st) => st.clearAudioLayerSlot)
+  const patchSlot = useStore((st) => st.patchAudioLayerSlot)
+  const inputs = useAudioInputs()
+  const fileRef = useRef<HTMLInputElement | null>(null)
+  const pick = (file: File): void => {
+    let path = ''
+    try { path = window.api.getMediaPath(file) } catch { /* unavailable */ }
+    if (path) setFile(slot, `opsia-media://local/${encodeURIComponent(path)}`, file.name, path)
+  }
+  const liveVal = (id: string): string => `__live__:${id}`
+  const value = !s ? '' : s.kind === 'file' ? '__file__' : liveVal(s.deviceId ?? '')
+  const known = !s || s.kind !== 'live' || !s.deviceId || inputs.some((d) => d.id === s.deviceId)
+  const options: SearchOption[] = [
+    { value: '', label: 'none' },
+    ...(s?.kind === 'file' ? [{ value: '__file__', label: s.mediaName ?? 'sound file', prefix: '🔊 ', group: 'file' }] : []),
+    { value: '__file_pick__', label: 'Import audio…', prefix: '🔊 ', group: 'file', title: 'A sound file (WAV, AIFF, MP3, FLAC, Ogg, AAC…) played like a film : its transport and waveform in the Inspector' },
+    { value: liveVal(''), label: 'default input', prefix: '🎙 ', group: 'live input', title: "The system's default audio input, live" },
+    ...inputs.map((d): SearchOption => ({ value: liveVal(d.id), label: d.label, prefix: '🎙 ', group: 'live input', title: `${d.label}, live : its channels in the Inspector` })),
+    ...(!known && s?.kind === 'live' ? [{ value: liveVal(s.deviceId ?? ''), label: `${s.deviceLabel ?? 'input'} (not found)`, prefix: '🎙 ', group: 'live input' }] : [])
+  ]
+  return (
+    <div className="flex min-w-0 items-center gap-1.5" onClick={() => s && setSelection({ type: 'audio', slot })}>
+      <button
+        type="button"
+        className={`${TBTN} w-[34px] px-0 text-center ${selected ? TBTN_LIT : s ? TBTN_IDLE_ON : TBTN_IDLE}`}
+        title={`Slot ${slot} : show its controls in the Inspector`}
+      >
+        {slot}
+      </button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept={AUDIO_ACCEPT}
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) pick(f)
+          e.target.value = ''
+        }}
+      />
+      <SearchSelect
+        className={`min-w-0 flex-1 text-[11px] ${selected ? 'border-accent' : ''}`}
+        value={value}
+        menuWidth={248}
+        title={`What slot ${slot} plays : a sound file, or a live audio input`}
+        options={options}
+        onChange={(v) => {
+          if (v === '') clear(slot)
+          else if (v === '__file_pick__') fileRef.current?.click()
+          else if (v.startsWith('__live__:')) {
+            const id = v.slice('__live__:'.length)
+            setLive(slot, id, id ? (inputs.find((d) => d.id === id)?.label ?? '') : '')
+          }
+        }}
+      />
+      {s && <Meter which={slot} className="w-10 shrink-0" />}
+      {s && (
+        <span onClick={(e) => e.stopPropagation()}>
+          <Chip label="⊘" active={!!s.mute} onClick={() => patchSlot(slot, { mute: !s.mute })} title={`Mute slot ${slot}`} />
+        </span>
+      )}
+    </div>
+  )
+}
+
+/** The Inspector's page for a selected Audio Layer slot. */
+export function AudioLayerInspector({ slot }: { slot: AudioSlotName }): JSX.Element {
+  const s = useStore((st) => st.audioLayer[slot])
+  const patchSlot = useStore((st) => st.patchAudioLayerSlot)
+  const setFile = useStore((st) => st.setAudioLayerFile)
+  if (!s) {
+    return (
+      <div className="rounded-md border border-border bg-panel p-3 text-[11px] text-muted">
+        Audio Layer, slot {slot} : empty. Pick a sound file or a live input in its row (layers tab).
+      </div>
+    )
+  }
+  const asSlot = {
+    kind: 'audio', shaderId: null, inputs: {},
+    mediaId: s.mediaId, mediaName: s.mediaName, mediaPath: s.mediaPath,
+    videoPlaying: s.videoPlaying, videoSpeed: s.videoSpeed, videoLoop: s.videoLoop,
+    videoIn: s.videoIn, videoOut: s.videoOut, ignoreGlobalSpeed: s.ignoreGlobalSpeed
+  } as unknown as SourceSlot
+  return (
+    <div className="rounded-md border border-border bg-panel">
+      <div className="flex items-start gap-2 px-3 py-2">
+        <span className="min-w-0 truncate text-[12px] font-semibold">
+          {s.kind === 'file' ? '🔊' : '🎙'} {slotName(s)}
+        </span>
+        <span className="whitespace-nowrap pt-0.5 font-mono text-[9px] uppercase tracking-wide text-muted">audio layer · {slot}</span>
+        <p className="ml-auto max-w-[50%] text-right text-[10px] leading-tight text-muted">
+          {s.kind === 'file' ? 'A sound file' : 'A live input'}, into Sonify&apos;s mix (Sonify on or off) : the output EQ, the limiter, the recordings and Space have it.
+        </p>
+      </div>
+      {s.kind === 'file' ? (
+        <>
+          <VideoTransport
+            layer={AUDIO_LAYER}
+            slot={slot}
+            state={asSlot}
+            audio
+            ops={{
+              patch: (p) => patchSlot(slot, p as Partial<AudioLayerSlot>),
+              swap: (url, name, path) => setFile(slot, url, name, path, true),
+              volume: s.volume,
+              setVolume: (v) => patchSlot(slot, { volume: v }),
+              extra: (
+                <button
+                  onClick={() => patchSlot(slot, { keepPitch: !s.keepPitch })}
+                  className={`rounded border px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
+                    s.keepPitch ? 'border-accent bg-accent/15 text-accent' : 'border-border text-muted hover:text-text'
+                  }`}
+                  title={s.keepPitch ? 'Keep pitch : the speed changes the tempo, the pitch stays. Click : like tape (the pitch moves with the speed)' : 'Like tape : the pitch moves with the speed. Click to keep the pitch'}
+                >
+                  {s.keepPitch ? '♪ kept' : '♪ tape'}
+                </button>
+              )
+            }}
+          />
+          <div className="px-2 pb-2">
+            <PanRow slot={slot} pan={s.pan} />
+          </div>
+        </>
+      ) : (
+        <LiveControls slot={slot} s={s} />
+      )}
+    </div>
+  )
+}
+
+function PanRow({ slot, pan }: { slot: AudioSlotName; pan: number }): JSX.Element {
+  const patchSlot = useStore((st) => st.patchAudioLayerSlot)
+  const txt = Math.abs(pan) < 0.005 ? 'C' : pan < 0 ? `L${Math.round(-pan * 100)}` : `R${Math.round(pan * 100)}`
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-10 shrink-0 font-mono text-[9px] uppercase text-muted">pan</span>
+      <input
+        type="range" min={-1} max={1} step={0.01} value={pan}
+        onChange={(e) => patchSlot(slot, { pan: Number(e.target.value) })}
+        onDoubleClick={() => patchSlot(slot, { pan: 0 })}
+        className="min-w-0 flex-1 accent-accent"
+        title={`Pan ${txt} : left to right (double-click : centre)`}
+      />
+      <span className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">{txt}</span>
+    </div>
+  )
+}
+
+function LiveControls({ slot, s }: { slot: AudioSlotName; s: AudioLayerSlot }): JSX.Element {
+  const patchSlot = useStore((st) => st.patchAudioLayerSlot)
+  const setLive = useStore((st) => st.setAudioLayerLive)
+  const inputs = useAudioInputs()
+  const info = useLiveInfo(slot)
+  const n = Math.max(2, info.channels)
+  const chL = s.chL ?? 0, chR = s.chR ?? 1
+  const chOpts: Array<{ v: string; label: string }> = []
+  for (let i = 0; i + 1 < n; i += 2) chOpts.push({ v: `${i}:${i + 1}`, label: `${i + 1}+${i + 2} stereo` })
+  for (let i = 0; i < n; i++) chOpts.push({ v: `${i}:-1`, label: `${i + 1} mono` })
+  const chVal = `${chL}:${chR}`
+  if (!chOpts.some((o) => o.v === chVal)) chOpts.unshift({ v: chVal, label: chR < 0 ? `${chL + 1} mono` : `${chL + 1}+${chR + 1}` })
+  const known = !s.deviceId || inputs.some((d) => d.id === s.deviceId)
+  return (
+    <div className="flex flex-col gap-2 border-t border-border px-2 py-2">
+      <div className="flex items-center gap-2">
+        <span className="w-10 shrink-0 font-mono text-[9px] uppercase text-muted">input</span>
+        <select
+          className="input select-compact min-w-0 flex-1 text-[10px]"
+          value={s.deviceId ?? ''}
+          onChange={(e) => {
+            const id = e.target.value
+            setLive(slot, id, id ? (inputs.find((d) => d.id === id)?.label ?? '') : '')
+          }}
+          title="The audio input it listens to, live (an interface's inputs, a microphone, a loopback device)"
+        >
+          <option value="">default input</option>
+          {inputs.map((d) => (
+            <option key={d.id} value={d.id}>{d.label}</option>
+          ))}
+          {!known && <option value={s.deviceId}>{`${s.deviceLabel ?? 'input'} (not found)`}</option>}
+        </select>
+        <select
+          className="input select-compact w-28 shrink-0 text-[10px]"
+          value={chVal}
+          onChange={(e) => {
+            const [l, r] = e.target.value.split(':').map(Number)
+            patchSlot(slot, { chL: l, chR: r })
+          }}
+          title="Which of the device's channels : a stereo pair, or one channel (mono, on both sides; pan places it)"
+        >
+          {chOpts.map((o) => (
+            <option key={o.v} value={o.v}>{o.label}</option>
+          ))}
+        </select>
+        <span
+          className={`w-12 shrink-0 text-right font-mono text-[9px] ${info.error ? 'text-danger' : 'text-muted'}`}
+          title={info.error ? `It could not open : ${info.error}` : 'The channels the device delivers (most drivers give one or two; an interface often shows its inputs as several devices, one per pair)'}
+        >
+          {info.error ? "can't open" : info.channels ? `${info.channels} ch` : 'opening…'}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="w-10 shrink-0 font-mono text-[9px] uppercase text-muted">level</span>
+        <Meter which={slot} className="min-w-[40px] flex-1" number />
+        <span className="shrink-0 font-mono text-[9px] uppercase text-muted">vol</span>
+        <input
+          type="range" min={0} max={2} step={0.01} value={s.volume}
+          onChange={(e) => patchSlot(slot, { volume: Number(e.target.value) })}
+          onDoubleClick={() => patchSlot(slot, { volume: 1 })}
+          className="w-16 shrink-0 accent-accent"
+          title={`Volume ${Math.round(s.volume * 100)} % (double-click : 100 %, as it comes in)`}
+        />
+        <span className="w-8 shrink-0 text-right font-mono text-[9px] tabular-nums text-muted">{Math.round(s.volume * 100)}</span>
+      </div>
+      <PanRow slot={slot} pan={s.pan} />
+    </div>
+  )
+}

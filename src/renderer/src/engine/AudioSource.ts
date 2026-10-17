@@ -16,22 +16,12 @@
 
 import { clipAudio, type ClipAnalysis } from './clipAudio'
 import { glGeneration } from './glGeneration'
-import { trackMediaSink, untrackMediaSink } from './mediaSink'
+import { ClipPlayer, type ClipPlayback } from './clipPlayer'
 
-export interface AudioPlayback {
-  playing: boolean
-  speed: number
-  loop: boolean
-  inN: number
-  outN: number
-  /** play at its own speed (× the layer's), whatever the global speed */
-  ignoreGlobal?: boolean
-}
+export type AudioPlayback = ClipPlayback
 
 const TEX_W = 4096
 const MAX_LEVELS = 8
-const RATE_MIN = 0.0625 // the slowest an <audio> plays (and below it, silence)
-const RATE_MAX = 16
 
 const VS = `#version 300 es
 layout(location = 0) in vec2 p; out vec2 vUV;
@@ -153,7 +143,7 @@ const num = (v: number | number[] | undefined, d: number): number => (typeof v =
 const col = (v: number | number[] | undefined, d: number[]): number[] => (Array.isArray(v) && v.length >= 3 ? [v[0], v[1], v[2], v[3] ?? 1] : d)
 
 export class AudioSource {
-  readonly audio: HTMLAudioElement
+  private player = new ClipPlayer(true)
   private vao: WebGLVertexArrayObject
   private quad: WebGLBuffer
   private peakTex: WebGLTexture | null = null
@@ -162,26 +152,11 @@ export class AudioSource {
   private rowOff = new Int32Array(MAX_LEVELS)
   private count = new Int32Array(MAX_LEVELS)
   private path = ''
-  private url = ''
-  private triedCopy = false
   private disposed = false
   private inputs: Record<string, number | number[]> = {}
-  private pb: AudioPlayback = { playing: true, speed: 1, loop: true, inN: 0, outN: 1 }
-  private posMod: number | null = null
-  private speedMod: number | null = null
-  private loopInMod: number | null = null
-  private loopOutMod: number | null = null
-  private pos = 0 // the playhead, seconds (the element's, or where a seek is going)
   private muted = false
 
   constructor(private gl: WebGL2RenderingContext, private w: number, private h: number) {
-    const a = document.createElement('audio')
-    a.preload = 'auto'
-    a.crossOrigin = 'anonymous'
-    a.loop = false // the trim loops it (below)
-    a.preservesPitch = false
-    a.addEventListener('error', () => this.onError())
-    this.audio = a
     this.vao = gl.createVertexArray()!
     gl.bindVertexArray(this.vao)
     this.quad = gl.createBuffer()!
@@ -190,57 +165,32 @@ export class AudioSource {
     gl.enableVertexAttribArray(0)
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
     gl.bindVertexArray(null)
-    trackMediaSink(a)
+  }
+
+  /** The element (the tests read it). */
+  get audio(): HTMLAudioElement {
+    return this.player.audio
   }
 
   /** `url` : what the element plays (opsia-media://…); `path` : the file on disk
    *  (its analysis, its waveform). */
   load(url: string, path: string): void {
-    this.url = url
     this.path = path
-    this.triedCopy = false
-    this.pos = 0
-    // A format the player can't decode (AIFF, WMA, CAF) plays from its audio-only
-    // copy (made once by ffmpeg, then instant) : asked for before playing, not
-    // after a refusal. (The copy used to be asked through the Collage's handler,
-    // which takes films only : an AIFF never played.)
-    if (path && !/\.(wav|mp3|flac|ogg|oga|opus|aac|m4a|webm)$/i.test(path)) this.playCopy(false)
-    else {
-      this.audio.src = url
-      this.audio.load()
-    }
-  }
-
-  private playCopy(force: boolean): void {
-    const api = (window as unknown as { api?: { audioPlayable?: (p: string, f?: boolean) => Promise<{ ok: boolean; path?: string; error?: string }> } }).api
-    void api?.audioPlayable?.(this.path, force).then((r) => {
-      if (this.disposed) return
-      if (!r?.ok || !r.path) { console.warn('[audio source] cannot play', this.path, r?.error); return }
-      this.audio.src = `opsia-media://local/${encodeURIComponent(r.path)}`
-      this.audio.load()
-    })
-  }
-
-  /** The player refused the file (an odd codec in a common container) : its copy. */
-  private onError(): void {
-    if (this.disposed || this.triedCopy || !this.path) return
-    this.triedCopy = true
-    this.playCopy(true)
+    this.player.load(url, path)
   }
 
   setPlayback(p: AudioPlayback): void {
-    this.pb = p
+    this.player.setPlayback(p)
   }
   setPosMod(v: number): void {
-    this.posMod = Math.max(0, Math.min(1, v))
+    this.player.setPosMod(v)
   }
   setSpeedMod(v: number): void {
-    this.speedMod = Math.max(0, v)
+    this.player.setSpeedMod(v)
   }
   /** The loop's in / out under modulation (the video's names). */
   setMod(name: string, v: number): void {
-    if (name === 'loopIn') this.loopInMod = Math.max(0, Math.min(1, v))
-    else if (name === 'loopOut') this.loopOutMod = Math.max(0, Math.min(1, v))
+    this.player.setMod(name, v)
   }
   update(inputs: Record<string, number | number[]>): void {
     this.inputs = { ...inputs }
@@ -254,12 +204,10 @@ export class AudioSource {
   }
 
   duration(): number {
-    const d = this.audio.duration
-    if (Number.isFinite(d) && d > 0) return d
-    return clipAudio.get(this.path)?.duration ?? 0
+    return this.player.duration()
   }
   time(): number {
-    return this.pos
+    return this.player.time()
   }
   /** The file on disk (the modulators read its sound at the playhead). */
   file(): string {
@@ -267,50 +215,10 @@ export class AudioSource {
   }
 
   /** The transport, once a frame : `mul` is the layer's speed × the global one. */
-  tick(rawDt: number, mul: number): void {
-    const a = this.audio
-    const vol = Math.max(0, Math.min(1, num(this.inputs.volume, 0.8)))
-    a.muted = this.muted
-    if (Math.abs(a.volume - vol) > 1e-3) a.volume = vol
-    const keep = num(this.inputs.keepPitch, 0) > 0.5
-    if (a.preservesPitch !== keep) a.preservesPitch = keep
-    const d = this.duration()
-    const inN = this.loopInMod ?? this.pb.inN, outN = this.loopOutMod ?? this.pb.outN
-    this.loopInMod = this.loopOutMod = null
-    const posN = this.posMod
-    this.posMod = null
-    const spMod = this.speedMod ?? 1
-    this.speedMod = null
-    if (d <= 0 || a.readyState < 1) return
-    const lo = Math.max(0, Math.min(1, Math.min(inN, outN))) * d
-    const hi = Math.max(lo + 0.04, Math.max(0, Math.min(1, Math.max(inN, outN))) * d)
-    const seek = (t: number): void => {
-      this.pos = t
-      try { a.currentTime = t } catch { /* a reload races it */ }
-    }
-    // A position given this frame (the timeline, Stop, OSC, a modulator) : the
-    // playhead goes there; a modulated one that moves smoothly is followed by
-    // the element's own playback, a jump seeks (a scratch, a stutter).
-    if (posN !== null) {
-      const t = lo + posN * Math.max(0, hi - lo - 0.02)
-      if (Math.abs(a.currentTime - t) > 0.08 || !this.pb.playing) seek(t)
-      else this.pos = t
-    }
-    const rate = Math.max(0, mul * this.pb.speed * spMod)
-    if (!this.pb.playing || rate < RATE_MIN) {
-      if (!a.paused) a.pause()
-      if (posN === null) this.pos = a.currentTime
-      return
-    }
-    const r = Math.min(RATE_MAX, rate)
-    if (Math.abs(a.playbackRate - r) > 1e-3) a.playbackRate = r
-    if (a.paused) void a.play().catch(() => { /* not ready yet */ })
-    const ct = a.currentTime
-    if (ct >= hi - 0.02 || a.ended) {
-      if (this.pb.loop) seek(lo)
-      else { a.pause(); this.pos = hi }
-    } else if (ct < lo - 0.05) seek(lo)
-    else if (posN === null) this.pos = ct
+  tick(_rawDt: number, mul: number): void {
+    this.player.setVolume(num(this.inputs.volume, 0.8), this.muted)
+    this.player.setKeepPitch(num(this.inputs.keepPitch, 0) > 0.5)
+    this.player.tick(mul)
   }
 
   /** The waveform into the slot's target. */
@@ -330,11 +238,12 @@ export class AudioSource {
     gl.bindTexture(gl.TEXTURE_2D, this.peakTex)
     gl.uniform1i(p.u.uPeaks, 0)
     const d = this.duration() || an?.duration || 1
-    const inN = this.pb.inN, outN = this.pb.outN
+    const pb = this.player.playback()
+    const inN = pb.inN, outN = pb.outN
     const lo = Math.min(inN, outN) * d, hi = Math.max(inN, outN) * d
     const view = Math.round(num(this.inputs.view, 0))
     const win = Math.max(0.05, num(this.inputs.window, 4))
-    const play = this.pos
+    const play = this.player.time()
     let t0 = 0, t1 = d
     if (view === 1) { t0 = lo; t1 = Math.max(lo + 0.05, hi) }
     else if (view === 2) { t0 = play - win / 2; t1 = play + win / 2 }
@@ -404,12 +313,7 @@ export class AudioSource {
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
-    untrackMediaSink(this.audio)
-    try {
-      this.audio.pause()
-      this.audio.removeAttribute('src')
-      this.audio.load()
-    } catch { /* best effort */ }
+    this.player.dispose()
     const gl = this.gl
     if (this.peakTex) gl.deleteTexture(this.peakTex)
     // The quad dies inside our own VAO, never the default one (deleting a buffer
