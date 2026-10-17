@@ -97,6 +97,9 @@ export interface SourceSlot extends ShaderInstance {
   videoIn?: number // normalized start point 0..1, default 0
   videoOut?: number // normalized stop point 0..1, default 1
   videoVolume?: number // the film's own sound, 0..1, default 0 (silent : films always were)
+  // The clip plays at its own speed (× its layer's) whatever the global speed :
+  // a sound kept at pitch and tempo while the composition slows or rushes.
+  ignoreGlobalSpeed?: boolean
   // Video granulation (multi-voice) : 3 seek-head voices scattering grains
   // around the (modulatable) playhead, crossfaded with raised-cosine envelopes.
   grainOn?: boolean // default false
@@ -1309,6 +1312,9 @@ export interface ExposedApi {
   // Sonify's Collage voice : a film's audio-only copy (made once, cached), or
   // `silent` when the film has no sound.
   collageAudio: (path: string) => Promise<{ ok: boolean; path?: string; silent?: boolean; error?: string }>
+  // The Import Audio source : the file to play (the original, or for a format the
+  // player can't decode, AIFF / WMA / CAF, its audio-only copy, made once).
+  audioPlayable: (path: string, force?: boolean) => Promise<{ ok: boolean; path?: string; error?: string }>
   // A sound's analysis (a film's soundtrack or an audio file) : 60 feature frames
   // a second (level, flux, centroid, six bands, pitch, noisiness; bytes) then the
   // waveform's min / max (int8) at 400 a second. Made once, cached.

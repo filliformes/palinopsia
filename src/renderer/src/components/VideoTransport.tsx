@@ -233,6 +233,15 @@ export function VideoTransport({
         >
           ⟲ loop
         </button>
+        <button
+          onClick={() => set({ ignoreGlobalSpeed: !state.ignoreGlobalSpeed })}
+          className={btn(!!state.ignoreGlobalSpeed)}
+          title={state.ignoreGlobalSpeed
+            ? 'Its own speed : the global speed (the Transport) is ignored, so it plays at its speed × the layer\'s whatever the composition does. Click to follow the global speed again'
+            : 'Follows the global speed (the Transport) like the rest of the composition. Click to ignore it : a sound stays at its pitch and tempo while the picture slows or rushes'}
+        >
+          {state.ignoreGlobalSpeed ? '⊘ global' : 'global'}
+        </button>
         {/* Smooth scrub : convert a native clip to all-intra so reverse / high-speed
             are smooth. Only meaningful for on-disk clips. */}
         {vidPath && !audio &&

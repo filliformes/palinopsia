@@ -1282,8 +1282,10 @@ export class ISFLayer {
         speed: s.videoSpeed ?? 1,
         loop: s.videoLoop ?? true,
         inN: s.videoIn ?? 0,
-        outN: s.videoOut ?? 1
+        outN: s.videoOut ?? 1,
+        ignoreGlobal: !!s.ignoreGlobalSpeed
       });
+      if (slot === 'A') this.ownSpeedA = !!s.ignoreGlobalSpeed; else this.ownSpeedB = !!s.ignoreGlobalSpeed;
       return;
     }
     const v = slot === 'A' ? this.videoA : this.videoB;
@@ -1295,8 +1297,10 @@ export class ISFLayer {
       loop: s.videoLoop ?? true,
       inN: s.videoIn ?? 0,
       outN: s.videoOut ?? 1,
-      volume: s.videoVolume ?? 0
+      volume: s.videoVolume ?? 0,
+      ignoreGlobal: !!s.ignoreGlobalSpeed
     });
+    if (slot === 'A') this.ownSpeedA = !!s.ignoreGlobalSpeed; else this.ownSpeedB = !!s.ignoreGlobalSpeed;
     v.setGrain({
       on: s.grainOn ?? false,
       size: s.grainSize ?? 0.25,
@@ -1310,8 +1314,12 @@ export class ISFLayer {
   /** Drive video playheads and publish them for the Inspector timeline.
    *  `rawDt` is the real frame delta; `mul` is this layer's speed × global speed
    *  (the rate over realtime) : so both scale the clip on top of its own speed. */
-  tickVideos(layerIndex: number, rawDt: number, mul: number, bpm = 120, audible = true): void {
+  // A clip that ignores the global speed plays at the layer's speed alone.
+  private ownSpeedA = false;
+  private ownSpeedB = false;
+  tickVideos(layerIndex: number, rawDt: number, mulAll: number, bpm = 120, audible = true): void {
     for (const slot of ['A', 'B'] as const) {
+      const mul = (slot === 'A' ? this.ownSpeedA : this.ownSpeedB) ? this.speed : mulAll;
       const v = slot === 'A' ? this.videoA : this.videoB;
       const au = slot === 'A' ? this.audioA : this.audioB;
       const key = videoKey(layerIndex, slot);

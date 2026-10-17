@@ -43,6 +43,7 @@ export interface VideoPlayback {
   inN: number // normalized start 0..1
   outN: number // normalized stop 0..1
   volume?: number // the film's own sound, 0 (silent, the default) .. 1
+  ignoreGlobal?: boolean // its own speed (× the layer's), whatever the global speed
 }
 
 export class VideoSource {

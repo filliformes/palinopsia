@@ -5,7 +5,20 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Fixed
+
+- **Import audio plays AIFF files** (and WMA / CAF). The player can't decode them, and
+  their audio-only copy was asked through the Collage's handler, which takes films only :
+  the slot stayed silent. A sound file now has its own path (`audio:playable` : the file
+  itself, or the copy made once by ffmpeg), asked before playing for those formats, and
+  forced for a file the player refuses anyway (ALAC in an m4a).
+
 ### Added
+
+- **Ignore global speed** (the transport's `global` toggle, `ignoreGlobalSpeed`, video and
+  audio slots) : the clip plays at its own speed × its layer's, whatever the global speed,
+  so a sound keeps its pitch and tempo while the composition slows or rushes. OSC
+  `/opsia/layerN/video/{A|B}/ignoreglobal`.
 
 - **An audio modulator listens FROM a layer's clip.** Its new FROM row offers the audio
   input (as before) or any slot holding a film or a sound file : the clip's sound is read

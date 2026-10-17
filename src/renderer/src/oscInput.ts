@@ -338,6 +338,7 @@ function route(address: string, args: Args): void {
             else st.setVideoPlayback(li, slot, { videoVolume: Math.max(0, Math.min(1, n)) })
             return
           case 'loop': st.setVideoPlayback(li, slot, { videoLoop: n >= 0.5 }); return
+          case 'ignoreglobal': st.setVideoPlayback(li, slot, { ignoreGlobalSpeed: n >= 0.5 }); return
           case 'direction': {
             const d = enumFrom(args, VIDEO_DIRECTIONS)
             if (d) st.setVideoPlayback(li, slot, { videoDirection: d })
@@ -1108,6 +1109,7 @@ function enumerateLeaves(): Leaf[] {
       const di = Math.max(0, VIDEO_DIRECTIONS.indexOf((s.videoDirection ?? 'forward') as (typeof VIDEO_DIRECTIONS)[number]))
       add(`${p}/direction`, 0, 1, di / (VIDEO_DIRECTIONS.length - 1), 'Play mode (index: forward·reverse·pendulum)')
       add(`${p}/loop`, 0, 1, (s.videoLoop ?? true) ? 1 : 0, 'Loop between in/out (>= 0.5)')
+      add(`${p}/ignoreglobal`, 0, 1, s.ignoreGlobalSpeed ? 1 : 0, 'Its own speed, whatever the global speed (>= 0.5)')
       const sp = Math.max(VSMIN, Math.min(VSMAX, s.videoSpeed ?? 1))
       add(`${p}/speed`, 0, 1, Math.log(sp / VSMIN) / Math.log(VSMAX / VSMIN), 'Clip speed (0..1 log across 1/64×..128×)')
       add(`${p}/position`, 0, 1, 0, 'One-shot seek (0..1 within the in/out trim)', false)

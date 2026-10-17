@@ -458,7 +458,10 @@ export function audioForCollage(src: string): Promise<{ ok: boolean; path?: stri
 // BACKGROUND, sequentially (one ffmpeg at a time : no CPU spike), so by the time
 // the performer reaches for a clip it imports instantly. Fire-and-forget.
 const VIDEO_EXTS = /\.(mp4|m4v|mov|dxv|webm|mkv|avi|mpg|mpeg|mxf|m2v)$/i
-const AUDIO_EXTS = /\.(wav|mp3|flac|ogg|oga|opus|aac|m4a|aif|aiff|wma|caf)$/i
+export const AUDIO_EXTS = /\.(wav|mp3|flac|ogg|oga|opus|aac|m4a|aif|aiff|wma|caf)$/i
+// what the player decodes itself; anything else (AIFF, WMA, CAF) plays from an
+// audio-only copy made once by ffmpeg (audioForCollage)
+const NATIVE_AUDIO = /\.(wav|mp3|flac|ogg|oga|opus|aac|m4a)$/i
 let warming = false
 let warmingDir: string | null = null
 // Folders requested while a sweep is in flight : queued (deduped) to run after,
@@ -499,6 +502,14 @@ export async function warmVideoFolder(dir: string): Promise<void> {
 }
 
 export function registerVideoConvert(): void {
+  // The Import Audio source : the file it plays. `force` : the player refused it
+  // (an odd codec in a common container, ALAC in an m4a) : the copy.
+  ipcMain.handle('audio:playable', async (_e, path: string, force?: boolean) => {
+    if (typeof path !== 'string' || !AUDIO_EXTS.test(path)) return { ok: false, error: 'not a sound file' }
+    if (!force && NATIVE_AUDIO.test(path)) return { ok: true, path }
+    const r = await audioForCollage(path)
+    return r.ok && r.path ? { ok: true, path: r.path } : { ok: false, error: r.error ?? (r.silent ? 'no sound in the file' : 'no copy') }
+  })
   // A sound's analysis for the audio modulators and the audio player (made once,
   // cached; audioAnalysis.ts).
   ipcMain.handle('audio:analysis', async (_e, path: string) => {

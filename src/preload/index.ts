@@ -112,6 +112,7 @@ const api: ExposedApi = {
   collageOptimise: (folder: string) => ipcRenderer.invoke('collage:optimise', folder),
   collageAudio: (path: string) => ipcRenderer.invoke('collage:audio', path),
   audioAnalysis: (path: string) => ipcRenderer.invoke('audio:analysis', path),
+  audioPlayable: (path: string, force?: boolean) => ipcRenderer.invoke('audio:playable', path, force),
   onCollageProgress: (cb: (p: { done: number; total: number; file: string }) => void) => {
     const h = (_e: Electron.IpcRendererEvent, p: { done: number; total: number; file: string }): void => cb(p)
     ipcRenderer.on('collage:progress', h)

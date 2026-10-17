@@ -345,7 +345,9 @@ The selected video slot shows a full **transport** in the Inspector:
 
 - **Play/pause** · **■ stop** (pause and back to the in point) · play mode
   **forward → reverse → pendulum** · **loop** (or play-once-and-hold) · **speed**
-  1/64×–128× (log slider). The browser plays a clip natively from 1/16× up to 8×;
+  1/64×–128× (log slider), and **global** : lit (`⊘ global`), the clip ignores the
+  global speed and plays at its own speed × its layer's, so a sound keeps its pitch and
+  tempo while the composition slows or rushes (OSC `…/video/{A|B}/ignoreglobal`). The browser plays a clip natively from 1/16× up to 8×;
   slower and faster speeds step the frames by seeking, and a clip whose decoder
   stalls at speed drops to that path on its own instead of freezing. On an ordinary
   clip a seek decodes from the last keyframe (seconds on heavy footage), so when its
@@ -389,7 +391,8 @@ The selected video slot shows a full **transport** in the Inspector:
 
 **Import audio…** (`🔊`, in the source picker beside Import video) puts a **sound file**
 in a slot (`.wav .mp3 .flac .ogg .opus .aac .m4a .aif .aiff .wma .caf`; a format the
-player can't read, AIFF or WMA, plays from an audio-only copy made once by ffmpeg). It
+player can't read, AIFF, WMA or CAF, plays from an audio-only copy made once by ffmpeg,
+then instantly). It
 plays like a film, with the same transport : play / pause, stop, loop, the **in / out**
 trim, **speed** (1/16× to 16×; like tape, the pitch moves with it unless **keep pitch**
 is on; slower is silent), the playhead scrubbed or modulated, the level meter and the

@@ -24,6 +24,8 @@ export interface AudioPlayback {
   loop: boolean
   inN: number
   outN: number
+  /** play at its own speed (× the layer's), whatever the global speed */
+  ignoreGlobal?: boolean
 }
 
 const TEX_W = 4096
@@ -198,21 +200,32 @@ export class AudioSource {
     this.path = path
     this.triedCopy = false
     this.pos = 0
-    this.audio.src = url
-    this.audio.load()
+    // A format the player can't decode (AIFF, WMA, CAF) plays from its audio-only
+    // copy (made once by ffmpeg, then instant) : asked for before playing, not
+    // after a refusal. (The copy used to be asked through the Collage's handler,
+    // which takes films only : an AIFF never played.)
+    if (path && !/\.(wav|mp3|flac|ogg|oga|opus|aac|m4a|webm)$/i.test(path)) this.playCopy(false)
+    else {
+      this.audio.src = url
+      this.audio.load()
+    }
   }
 
-  /** A file Chromium cannot decode (AIFF, WMA…) : played from its audio-only
-   *  copy (the Collage voice's, made once by ffmpeg). */
-  private onError(): void {
-    if (this.disposed || this.triedCopy || !this.path) return
-    this.triedCopy = true
-    const api = (window as unknown as { api?: { collageAudio?: (p: string) => Promise<{ ok: boolean; path?: string }> } }).api
-    void api?.collageAudio?.(this.path).then((r) => {
-      if (this.disposed || !r?.ok || !r.path) return
+  private playCopy(force: boolean): void {
+    const api = (window as unknown as { api?: { audioPlayable?: (p: string, f?: boolean) => Promise<{ ok: boolean; path?: string; error?: string }> } }).api
+    void api?.audioPlayable?.(this.path, force).then((r) => {
+      if (this.disposed) return
+      if (!r?.ok || !r.path) { console.warn('[audio source] cannot play', this.path, r?.error); return }
       this.audio.src = `opsia-media://local/${encodeURIComponent(r.path)}`
       this.audio.load()
     })
+  }
+
+  /** The player refused the file (an odd codec in a common container) : its copy. */
+  private onError(): void {
+    if (this.disposed || this.triedCopy || !this.path) return
+    this.triedCopy = true
+    this.playCopy(true)
   }
 
   setPlayback(p: AudioPlayback): void {

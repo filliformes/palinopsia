@@ -1258,7 +1258,7 @@ interface StoreState {
     patch: Partial<
       Pick<
         SourceSlot,
-        | 'videoPlaying' | 'videoSpeed' | 'videoDirection' | 'videoLoop' | 'videoIn' | 'videoOut' | 'videoVolume'
+        | 'videoPlaying' | 'videoSpeed' | 'videoDirection' | 'videoLoop' | 'videoIn' | 'videoOut' | 'videoVolume' | 'ignoreGlobalSpeed'
         | 'grainOn' | 'grainSize' | 'grainSpray' | 'grainReverse' | 'grainJitter' | 'grainSync'
       >
     >
