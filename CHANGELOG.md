@@ -26,6 +26,15 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Output EQ presets.** A menu on the EQ card and in its editor (`EqPresetMenu`) :
+  flat, the saved EQs, save as (a name; an existing one asks before replacing), delete
+  the one in use. A preset is the twelve bands + the input and output gains
+  (`audio/eqPresets.ts`, localStorage `opsia.eqPresets`, machine-local like the EQ);
+  a recall keeps the bypass switch and the glue; the menu names the preset while the EQ
+  matches it exactly. OSC `/opsia/sonify/eq/preset <name | n>` (case-insensitive name,
+  1-based index, 0 / flat). Verified through the menu itself : save, flat, recall (40 Hz
+  low cut, -4.5 dB bell, -2 / +1.5 dB gains back, bypass and glue kept), the name
+  dropping after an edit, replace asked, delete leaving the EQ; OSC by name and by 0.
 - **Sonify's Filter voice can play the Audio Layer.** Its source is now **noise ·
   line-in · AU** (`filter.lineFrom: 'layer'`, OSC `/opsia/sonify/filter/linefrom
   input|layer`) : the layer's slots summed before its volume and mute, downmixed to mono

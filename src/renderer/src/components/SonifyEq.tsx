@@ -19,6 +19,8 @@ import {
   bandDb, defaultEq, eqSections, normalizeEq, sectionsDb, type EqSlope, type GlueVoice, type SoniEq, type SoniEqBand, type SoniGlue
 } from '../audio/eqMath'
 import { GrMeter, RangeRow, Row, Seg, Shell, parseHz, sonifyCovered, themeVar } from './sonifyUi'
+import { eqPresets } from '../audio/eqPresets'
+import { ConfirmModal, PromptModal } from './PromptModal'
 
 const LABEL = ['LC', 'LS', '1', '2', '3', '4', '5', '6', '7', '8', 'HS', 'HC']
 const NAME = ['Low cut', 'Low shelf', 'Bell 1', 'Bell 2', 'Bell 3', 'Bell 4', 'Bell 5', 'Bell 6', 'Bell 7', 'Bell 8', 'High shelf', 'High cut']
@@ -299,6 +301,77 @@ function GainRow({ which, value, onChange }: { which: 'in' | 'out'; value: numbe
   )
 }
 
+// ── Saved EQs (the card's and the editor's menu) ─────────────────────────────
+
+// A name being typed for a preset : the editor's keys (Esc closes it) wait.
+let eqPromptOpen = false
+
+/** A little menu : flat, the saved EQs (recall keeps the bypass switch and the
+ *  glue), save the current one under a name, delete the one in use. */
+function EqPresetMenu({ eq, setEq, className = '' }: { eq: SoniEq; setEq: (next: SoniEq) => void; className?: string }): JSX.Element {
+  const [, bump] = useState(0)
+  useEffect(() => eqPresets.subscribe(() => bump((n) => n + 1)), [])
+  const [ask, setAsk] = useState<null | { kind: 'save' } | { kind: 'replace'; name: string } | { kind: 'delete'; name: string }>(null)
+  useEffect(() => { eqPromptOpen = !!ask; return () => { eqPromptOpen = false } }, [ask])
+  const list = eqPresets.list()
+  const cur = eqPresets.matching(eq)
+  const save = (name: string): void => {
+    if (eqPresets.get(name) && name !== cur) { setAsk({ kind: 'replace', name }); return }
+    eqPresets.save(name, eq)
+    setAsk(null)
+  }
+  return (
+    <>
+      <select
+        className={`input select-compact text-[10px] ${cur ? 'text-accent' : ''} ${className}`}
+        value={cur ?? ''}
+        onChange={(e) => {
+          const v = e.target.value
+          if (v === '__flat') setEq({ ...defaultEq(), on: eq.on, glue: eq.glue })
+          else if (v === '__save') setAsk({ kind: 'save' })
+          else if (v === '__delete' && cur) setAsk({ kind: 'delete', name: cur })
+          else { const p = eqPresets.get(v); if (p) setEq(eqPresets.applied(eq, p)) }
+        }}
+        title={cur
+          ? `The EQ is set to "${cur}". Recall another saved EQ, save this one under a name, or delete "${cur}". A recall keeps the bypass switch and the glue. Saved on this computer.`
+          : 'Saved EQs : recall one (its bands and its input and output gains; the bypass switch and the glue stay), or save this one under a name. Saved on this computer.'}
+      >
+        <option value="">{list.length ? 'presets' : 'no presets'}</option>
+        <option value="__flat">flat</option>
+        {list.map((p) => (
+          <option key={p.name} value={p.name}>{p.name}</option>
+        ))}
+        <option value="__save">＋ save as…</option>
+        {cur && <option value="__delete">{`✕ delete "${cur}"`}</option>}
+      </select>
+      {ask?.kind === 'save' && (
+        <PromptModal
+          title="Save this EQ as"
+          placeholder="e.g. Studio, the SAT, headphones"
+          confirmLabel="Save"
+          initial={cur ?? ''}
+          onConfirm={save}
+          onCancel={() => setAsk(null)}
+        />
+      )}
+      {ask?.kind === 'replace' && (
+        <ConfirmModal
+          title={`Replace the saved EQ "${ask.name}" with this one?`}
+          onYes={() => { eqPresets.save(ask.name, eq); setAsk(null) }}
+          onNo={() => setAsk(null)}
+        />
+      )}
+      {ask?.kind === 'delete' && (
+        <ConfirmModal
+          title={`Delete the saved EQ "${ask.name}"? (The EQ itself stays as it is.)`}
+          onYes={() => { eqPresets.remove(ask.name); setAsk(null) }}
+          onNo={() => setAsk(null)}
+        />
+      )}
+    </>
+  )
+}
+
 // ── The miniature (Mixer view) ───────────────────────────────────────────────
 
 // (memo : the page re-renders on every Sonify change, the card only on the EQ's)
@@ -330,13 +403,16 @@ export const EqCard = memo(function EqCard(): JSX.Element {
         toggleTitle={eq.on ? 'EQ on (click : bypass)' : 'EQ bypassed (click : on)'}
         open
         right={
-          <button
-            onClick={() => setOpen(true)}
-            className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted transition-colors hover:border-accent/60 hover:text-accent"
-            title="Open the EQ editor : the whole curve, every point, the spectrum"
-          >
-            ⤢ edit
-          </button>
+          <span className="flex items-center gap-1.5">
+            <EqPresetMenu eq={eq} setEq={setEq} className="w-[7.5rem]" />
+            <button
+              onClick={() => setOpen(true)}
+              className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted transition-colors hover:border-accent/60 hover:text-accent"
+              title="Open the EQ editor : the whole curve, every point, the spectrum"
+            >
+              ⤢ edit
+            </button>
+          </span>
         }
       >
         <canvas
@@ -442,7 +518,7 @@ function EqEditor({ onClose }: { onClose: () => void }): JSX.Element {
   // M unmounted the editor, 1 to 9 recalled scenes, 0 flushed)
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (sonifyCovered()) return
+      if (sonifyCovered() || eqPromptOpen) return
       const t = e.target as HTMLElement | null
       const field = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose(); return }
@@ -569,8 +645,9 @@ function EqEditor({ onClose }: { onClose: () => void }): JSX.Element {
             {eq.on ? '● on' : '○ bypass'}
           </button>
           <span className="text-[13px] font-semibold">Output EQ</span>
-          <span className="font-mono text-[10px] text-muted">after all of Sonify · to the speakers only · drag a point · wheel over a point : Q · double-click : on / off or a new bell · Delete : off</span>
+          <span className="font-mono text-[10px] text-muted">after everything (Sonify and the Audio Layer) · to the speakers only · drag a point · wheel over a point : Q · double-click : on / off or a new bell · Delete : off</span>
           <span className="flex-1" />
+          <EqPresetMenu eq={eq} setEq={setEq} className="w-[9rem]" />
           <button
             onClick={() => setEq({ ...defaultEq(), on: eq.on, glue: eq.glue })}
             className="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-muted hover:text-accent"

@@ -57,6 +57,7 @@
 //   /opsia/sonify/{voice}/on|gain|pan + voice params    f 0..1 (see case below)
 //   /opsia/sonify/glue/on|amount                        >= 0.5 | f 0..1 (the output glue, after the EQ)
 //   /opsia/sonify/glue/voice                            s name | i index (clean warm punch bite slow)
+//   /opsia/sonify/eq/preset                             s name | i n (a saved output EQ, 1-based; 0 / flat)
 //   /opsia/meta/{1..16}                                f 0..1 (drives the knob)
 //   /opsia/bpm                                          f 20..800 (raw)
 //   /opsia/scene/{n}                                    trigger
@@ -92,7 +93,8 @@ import { videoKey, videoSeekRequests } from './engine/videoState'
 import { AUDIO_LAYER } from './audio/audioLayer'
 import { SONI_SCALES, scaleFromName, withSonifyParam, type SoniConfig } from './audio/sonify'
 import { KEY_MODES } from './audio/soniKeyModel'
-import { GLUE_VOICES, normalizeEq, type SoniGlue } from './audio/eqMath'
+import { GLUE_VOICES, defaultEq, normalizeEq, type SoniGlue } from './audio/eqMath'
+import { eqPresets, type EqPreset } from './audio/eqPresets'
 import { keySeqNext } from './audio/soniKeySeq'
 import { SONIFY_MOD_DESCS } from './engine/modulation'
 import { useStore } from './store'
@@ -592,6 +594,26 @@ function route(address: string, args: Args): void {
         else if (ctl === 'every') st.setSoniKeySeq({ freeMs: Math.round(Math.max(0.25, Math.min(300, n)) * 1000) })
         else if (ctl === 'vary') st.setSoniKeySeq({ freeVary: clamp01(n) })
         else if (ctl === 'keys') { const k = enumFrom(args, ['pool', 'list'] as const); if (k) st.setSoniKeySeq({ picKeys: k }) }
+        return
+      }
+      // /opsia/sonify/eq/preset <name | n> : recall a saved output EQ (1-based in
+      // the menu's order; 0 or "flat" : flat). The bypass switch and the glue stay.
+      if (g === 'eq' && ctl === 'preset') {
+        const eq = normalizeEq(c.eq)
+        const a0 = args[0]
+        if (!a0) return
+        const list = eqPresets.list()
+        let p: EqPreset | undefined
+        if (typeof a0.value === 'string') {
+          const nm = a0.value.trim()
+          if (nm.toLowerCase() === 'flat') { apply({ ...c, eq: { ...defaultEq(), on: eq.on, glue: eq.glue } }); return }
+          p = eqPresets.get(nm) ?? list.find((x) => x.name.toLowerCase() === nm.toLowerCase())
+        } else {
+          const i = Math.round(Number(a0.value))
+          if (i === 0) { apply({ ...c, eq: { ...defaultEq(), on: eq.on, glue: eq.glue } }); return }
+          p = list[i - 1]
+        }
+        if (p) apply({ ...c, eq: eqPresets.applied(eq, p) })
         return
       }
       // /opsia/sonify/glue/* : the compressor after the output EQ

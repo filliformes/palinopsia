@@ -1324,7 +1324,13 @@ cuts have none), **Q** and **slope** (6, 12, 24 or 36 dB per octave : one first-
 section, one, two or three second-order sections; a steeper shelf or bell keeps its gain
 and steepens its skirt, and a bell at 6 is a gentler, wider one). The card shows the
 curve in miniature with the **input** and **output** meters (the same meters as the
-master's); **⤢ edit** pops it out into a large editor : the curve over the live
+master's), and a **presets** menu (also in the editor) : **flat**, the EQs you saved,
+**＋ save as…** (a name; the same name asks before replacing) and **✕ delete** for the
+one in use. A saved EQ is its twelve bands and its input and output gains; recalling
+one keeps the bypass switch and the glue as they are. The menu shows the preset's name
+while the EQ is set to it. They are kept on this computer (the EQ belongs to the room),
+and `/opsia/sonify/eq/preset` recalls one over OSC (a name, or its number in the menu;
+0 or `flat` : flat). **⤢ edit** pops it out into a large editor : the curve over the live
 spectrum (before the EQ as a faint line, after it filled), a point per band to
 drag (frequency and gain), the **wheel** over a point for its Q, a **double-click** on a point to switch
 its band on or off or on an empty spot to bring the nearest free bell there,
@@ -2310,6 +2316,7 @@ unless the slot actually holds a video.
 | `/opsia/audiolayer/play` | bool | Both files from their in points together (≥ 0.5), or both paused |
 | `/opsia/audiolayer/{A\|B}/volume · pan · mute` | f / bool | A slot's volume (a gain, 0..2), pan (-1..1), mute (≥ 0.5) |
 | `/opsia/audiolayer/{A\|B}/play · loop · ignoreglobal · keeppitch · speed · position · in · out` | f / bool | A file slot's transport, the video transport's conventions (speed 0..1 log, position a one-shot seek) |
+| `/opsia/sonify/eq/preset` | s / i | Recall a saved **output EQ** : its name, or its number in the menu (0 or `flat` : flat); the bypass switch and the glue stay |
 | `/opsia/space/mode` | i / f / s | **Space** : `stereo` · `speakers` · `objects` |
 | `/opsia/space/turn · glide` | f 0..1 | Turn the sound scene (0.5 = none) · how softly a following voice moves (0..2 s) |
 | `/opsia/space/mirror · headphones` | bool | Swap left and right · hear the room on headphones (≥ 0.5) |
