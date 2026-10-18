@@ -1343,6 +1343,8 @@ export interface ExposedApi {
   // entry per file, non-Chromium codecs converted through the same cache the
   // single-clip import uses).
   collagePickFolder: () => Promise<string | null>
+  /** A path on disk : a folder, a file, or nothing there. */
+  pathKind: (path: string) => Promise<'dir' | 'file' | 'none'>
   collageScan: (folder: string) => Promise<import('./collage').CollageScanResult>
   // The same scan, except EVERY clip is force-transcoded to 720p all-intra : the
   // wall seeks on every loop and every cut, and long-GOP files stutter it. One-

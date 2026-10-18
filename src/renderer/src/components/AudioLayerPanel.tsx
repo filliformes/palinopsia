@@ -11,6 +11,8 @@ import { SearchSelect, type SearchOption } from './SearchSelect'
 import { VideoTransport } from './VideoTransport'
 import { useStore } from '../store'
 import { AUDIO_LAYER, audioLayer, type AudioSlotName } from '../audio/audioLayer'
+import { droppedPaths, dropKind, isFileDrag } from './fileDrop'
+import { showToast } from './Toast'
 
 const AUDIO_ACCEPT = 'audio/*,.wav,.mp3,.flac,.ogg,.oga,.opus,.aac,.m4a,.aif,.aiff,.wma,.caf'
 const M_FLOOR = -60
@@ -219,6 +221,16 @@ function SlotRow({ slot }: { slot: AudioSlotName }): JSX.Element {
     try { path = window.api.getMediaPath(file) } catch { /* unavailable */ }
     if (path) setFile(slot, `opsia-media://local/${encodeURIComponent(path)}`, file.name, path)
   }
+  // A sound file dragged in from the desktop (a film plays its soundtrack).
+  const [dropOver, setDropOver] = useState(false)
+  const dropIn = (e: React.DragEvent): void => {
+    const items = droppedPaths(e)
+    if (!items.length) return
+    const { path, name } = items[0]
+    const kind = dropKind(path)
+    if (kind === 'audio' || kind === 'video') setFile(slot, `opsia-media://local/${encodeURIComponent(path)}`, name, path)
+    else showToast(`${name} : an Audio Layer slot takes a sound file (or a film, for its soundtrack)`, 'warn', 5000)
+  }
   const liveVal = (id: string): string => `__live__:${id}`
   const value = !s ? '' : s.kind === 'file' ? '__file__' : liveVal(s.deviceId ?? '')
   const known = !s || s.kind !== 'live' || !s.deviceId || inputs.some((d) => d.id === s.deviceId)
@@ -231,7 +243,26 @@ function SlotRow({ slot }: { slot: AudioSlotName }): JSX.Element {
     ...(!known && s?.kind === 'live' ? [{ value: liveVal(s.deviceId ?? ''), label: `${s.deviceLabel ?? 'input'} (not found)`, prefix: '🎙 ', group: 'live input' }] : [])
   ]
   return (
-    <div className="flex min-w-0 items-center gap-1.5" onClick={() => s && setSelection({ type: 'audio', slot })}>
+    <div
+      className={`flex min-w-0 items-center gap-1.5 rounded transition-shadow ${dropOver ? 'ring-2 ring-accent' : ''}`}
+      onClick={() => s && setSelection({ type: 'audio', slot })}
+      onDragOver={(e) => {
+        if (!isFileDrag(e)) return
+        e.preventDefault()
+        e.stopPropagation()
+        e.dataTransfer.dropEffect = 'copy'
+        if (!dropOver) setDropOver(true)
+      }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropOver(false) }}
+      onDrop={(e) => {
+        if (!isFileDrag(e)) return
+        e.preventDefault()
+        e.stopPropagation()
+        setDropOver(false)
+        dropIn(e)
+      }}
+      title={`Slot ${slot} : drop a sound file here`}
+    >
       <button
         type="button"
         className={`${TBTN} w-[34px] px-0 text-center ${selected ? TBTN_LIT : s ? TBTN_IDLE_ON : TBTN_IDLE}`}

@@ -176,7 +176,12 @@ first-ever launch pays this once; it persists on disk afterwards.
    **M** button to bind a modulator. The busiest sources and effects sort their
    controls into titled columns, and a control that does nothing in the current
    setting (a keyer that is off, the light angle of a flat relief) is greyed out,
-   with the reason on hover; it still works.
+   with the reason on hover; it still works. The bar under the preview sizes it (the
+   panels below then scroll; double-click : automatic again, never under 160 px), and
+   **V** (or **⤢ big** on the preview) folds the panels away for a big picture.
+   **Drag files in from the desktop** : a film, a sound file or a folder (a Collage of
+   its films) onto a layer's **A** or **B** row, a sound onto an Audio Layer slot (a
+   film there plays its soundtrack), a session file anywhere.
 4. **Save a scene**: get something you like, click `+` in the Scene bank, then
    press `1`–`9` to recall it live (recalls morph over MORPH).
 5. **Go fullscreen**: press **`O`**, pick a display, hit fullscreen. Or try
@@ -1702,7 +1707,10 @@ sit in four columns : **films** (what plays), **pieces** (how the frame is cut),
 ## Sessions, scenes & themes
 
 Sessions are `.opsia.json` files: **New / Open / Save / Save As** in the toolbar,
-plus **Ctrl/Cmd+S** (overwrites the current file, Save-As the first time). Theme,
+beside the session list and **Load** (one group), plus **Ctrl/Cmd+S** (overwrites the
+current file, Save-As the first time). **Open ▾** lists the sessions opened or saved
+lately (the newest ten, on this computer; × takes one off the list, a file that is gone
+leaves it), and a session file **dropped on the window** opens too. Theme,
 worlds, scenes and the sequencer all travel inside the session file, and so do the
 [output transform](#output-transform), each source's framing (its mirror included) and,
 when you ask for it, the [projector warp](#output--mapping-key-o).

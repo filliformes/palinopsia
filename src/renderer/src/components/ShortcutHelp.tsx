@@ -25,7 +25,8 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['A', 'Audio · MIDI · OSC · Resolume · dataflou tab'],
       ['D', 'Fold Modulation'],
       ['X', 'Fold Master FX'],
-      ['I', 'Fold Inspector']
+      ['I', 'Fold Inspector'],
+      ['V', 'Big preview : fold the panels under it (and back)']
     ]
   },
   {

@@ -12,6 +12,7 @@ import { showToast } from './Toast'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { registerLoadSession } from '../commands'
 import { leaveSession, markClean, markDirty } from '../sessionGuard'
+import { recentSessions } from '../recentSessions'
 
 type SessionEntry = { name: string; path: string; mtime: number; group?: string }
 
@@ -53,6 +54,7 @@ export function SessionLoader(): JSX.Element {
         // Remember the file so a later plain Save overwrites it in place.
         useStore.setState({ sessionPath: sel })
         markClean()
+        recentSessions.touch(sel)
         showToast(`Loaded · ${label}`)
       }
     } catch (e) {

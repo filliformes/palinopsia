@@ -84,6 +84,9 @@ import { Transport } from './components/Transport'
 import { SessionLoader, GenerateMenu } from './components/TopBarMenus'
 import { ConfirmModal, SaveChangesModal } from './components/PromptModal'
 import { leaveSession, markClean, markDirty, registerSessionAsker, type LeaveChoice } from './sessionGuard'
+import { recentSessions } from './recentSessions'
+import { baseName, droppedPaths, dropKind, isFileDrag } from './components/fileDrop'
+import { ContextMenu as RecentMenu } from './components/ContextMenu'
 import type { AutosaveEntry } from '@shared/types'
 import { initMidi, fireTrigger, midi } from './midi'
 import { FX_SHADERS, GENERATORS, NATIVE_NODES, shaderSourceById } from './shaders/isf'
@@ -278,6 +281,15 @@ function BodyPip(): JSX.Element | null {
 
 export default function App(): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  // The preview's height when you set it (drag the bar under it; null : it takes
+  // what the panels below leave, as it always did), and the big preview (V : the
+  // panels under it folded away).
+  const [previewH, setPreviewH] = useState<number | null>(() => {
+    try { const n = Number(localStorage.getItem('opsia.previewH')); return Number.isFinite(n) && n >= 80 ? n : null } catch { return null }
+  })
+  const [bigPreview, setBigPreview] = useState(false)
+  const previewRef = useRef<HTMLDivElement | null>(null)
+  const previewColRef = useRef<HTMLElement | null>(null)
   const compositorRef = useRef<Compositor | null>(null)
   // Metasurface : last-nearest scene index, so a structure jump (a new nearest)
   // crossfades instead of snapping. -1 = surface inactive / nothing placed.
@@ -849,6 +861,12 @@ export default function App(): JSX.Element {
         e.preventDefault()
         if (e.shiftKey) cycleContextPreset()
         else openContextInInspector()
+        return
+      }
+      // V: the big preview (the panels under it folded away), and back.
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'v') {
+        e.preventDefault()
+        setBigPreview((b) => !b)
         return
       }
       // M: swap the layer strips for the compact Mixer surface (and back).
@@ -1874,12 +1892,65 @@ export default function App(): JSX.Element {
         useStore.getState().loadSession(res.session)
         useStore.getState().setSessionPath(res.path) // Save now overwrites this file
         markClean()
+        recentSessions.touch(res.path)
         showToast(`Opened · ${res.path.split(/[\\/]/).pop() ?? 'session'}`)
       } catch (e) {
         console.error('[session] load failed:', (e as Error).message)
       }
     }
   }
+
+  // Open a session by its path (a recent one, a file dropped on the window) :
+  // asked about the one being left, like Open. A file that is gone (or not a
+  // session) leaves the recent list.
+  async function openSessionPath(path: string): Promise<void> {
+    const label = baseName(path)
+    let session: unknown = null
+    try { session = await window.api.sessionLoad(path) } catch { session = null }
+    if (!session) {
+      showToast(`Couldn't open ${label} : the file is gone or is not a session`, 'warn', 6000)
+      recentSessions.remove(path)
+      return
+    }
+    if (!(await leaveSession(`opening ${label}`))) return
+    try {
+      useStore.getState().loadSession(session as Parameters<ReturnType<typeof useStore.getState>['loadSession']>[0])
+      useStore.getState().setSessionPath(path)
+      markClean()
+      recentSessions.touch(path)
+      showToast(`Opened · ${label}`)
+    } catch (e) {
+      console.error('[session] load failed:', (e as Error).message)
+    }
+  }
+  const openPathRef = useRef(openSessionPath)
+  openPathRef.current = openSessionPath
+
+  // Files dropped anywhere on the window (not on a layer row or an Audio Layer
+  // slot, which take their own) : a session opens; anything else says where it
+  // goes. The page never navigates to a dropped file (main blocks that too).
+  useEffect(() => {
+    const over = (e: DragEvent): void => {
+      if (!isFileDrag(e)) return
+      e.preventDefault()
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+    }
+    const drop = (e: DragEvent): void => {
+      if (!isFileDrag(e)) return
+      e.preventDefault()
+      const items = droppedPaths(e)
+      if (!items.length) return
+      const session = items.find((it) => dropKind(it.path) === 'session')
+      if (session) { void openPathRef.current(session.path); return }
+      showToast("Drop a film, a sound file or a folder on a layer's A or B row, a sound on an Audio Layer slot, or a session file anywhere", 'ok', 6000)
+    }
+    window.addEventListener('dragover', over)
+    window.addEventListener('drop', drop)
+    return () => {
+      window.removeEventListener('dragover', over)
+      window.removeEventListener('drop', drop)
+    }
+  }, [])
 
   // New session. The button asks about unsaved changes; a learned MIDI pad
   // (session:new) never stops the show : it keeps a recovery copy instead.
@@ -1916,6 +1987,7 @@ export default function App(): JSX.Element {
       st.setSessionPath(path)
       st.setName(path.split(/[\\/]/).pop()?.replace(/\.opsia\.json$/i, '').replace(/\.json$/i, '') ?? st.name)
       markClean()
+      recentSessions.touch(path)
     }
     return path != null
   }
@@ -1927,6 +1999,7 @@ export default function App(): JSX.Element {
     if (st.sessionPath) {
       await window.api.sessionSave(st.exportSession(), st.sessionPath)
       markClean()
+      recentSessions.touch(st.sessionPath)
       flashSave()
     } else if (await saveSessionAs()) {
       // First-time save promotes Save As → Save; confirm that one too.
@@ -1962,6 +2035,40 @@ export default function App(): JSX.Element {
           title="Session name"
         />
         <SessionLoader />
+        <div className="flex items-center gap-1">
+          <span className="relative inline-flex">
+            <MidiLearnOverlay id="session:new" />
+            <button
+              className="btn text-[12px]"
+              onClick={() => void doNewSession()}
+              title="New blank session (undoable; the current session is saved first) · MIDI-learnable"
+            >
+              New
+            </button>
+          </span>
+          <span className="relative inline-flex">
+            <MidiLearnOverlay id="session:open" />
+            <button className="btn rounded-r-none text-[12px]" onClick={openSession} title="Open a session from a file dialog (or drop a session file on the window) · MIDI-learnable">
+              Open
+            </button>
+            <RecentButton onOpen={(p) => void openSessionPath(p)} />
+          </span>
+          <button
+            ref={saveBtnRef}
+            className="btn text-[12px]"
+            onClick={saveSession}
+            title="Save (Ctrl+S) : overwrites the current file (Save As the first time)"
+          >
+            Save
+          </button>
+          <button
+            className="btn text-[12px]"
+            onClick={() => void saveSessionAs()}
+            title="Save As : choose a new file"
+          >
+            Save<span className="tb-long"> As</span>
+          </button>
+        </div>
         <GenerateMenu />
         {/* Right-side controls as one ml-auto group : they wrap together (still
             right-aligned) instead of the old flex-1 spacer stranding them on a
@@ -2013,37 +2120,6 @@ export default function App(): JSX.Element {
             +
           </button>
         </div>
-        <span className="relative inline-flex">
-          <MidiLearnOverlay id="session:new" />
-          <button
-            className="btn text-[12px]"
-            onClick={() => void doNewSession()}
-            title="New blank session (undoable; the current session is saved first) · MIDI-learnable"
-          >
-            New
-          </button>
-        </span>
-        <span className="relative inline-flex">
-          <MidiLearnOverlay id="session:open" />
-          <button className="btn text-[12px]" onClick={openSession} title="Open a session from a file dialog · MIDI-learnable">
-            Open
-          </button>
-        </span>
-        <button
-          ref={saveBtnRef}
-          className="btn text-[12px]"
-          onClick={saveSession}
-          title="Save (Ctrl+S) : overwrites the current file (Save As the first time)"
-        >
-          Save
-        </button>
-        <button
-          className="btn text-[12px]"
-          onClick={() => void saveSessionAs()}
-          title="Save As : choose a new file"
-        >
-          Save As
-        </button>
         <select
           className="input select-compact w-24 shrink-0 text-[11px]"
           style={{ paddingLeft: 6 }}
@@ -2089,8 +2165,12 @@ export default function App(): JSX.Element {
       {/* ── Body: preview + layer strips ────────────────────────── */}
       <main className="flex min-h-0 flex-1 gap-2 overflow-hidden p-3">
         {/* Output preview : the live composite, front and centre (brief §10.1) */}
-        <section className="flex min-w-0 flex-1 flex-col gap-2">
-          <div className="relative flex-1 overflow-hidden rounded-md border border-border bg-black">
+        <section ref={previewColRef} className="flex min-w-0 flex-1 flex-col gap-2">
+          <div
+            ref={previewRef}
+            className={`relative overflow-hidden rounded-md border border-border bg-black ${bigPreview ? 'min-h-0 flex-1' : previewH === null ? 'min-h-[160px] flex-1' : 'shrink-0'}`}
+            style={!bigPreview && previewH !== null ? { height: previewH } : undefined}
+          >
             <canvas
               ref={canvasRef}
               width={1920}
@@ -2111,7 +2191,27 @@ export default function App(): JSX.Element {
                 ? `dome · ${domeRes}² master from ${Math.round(compW * renderScale)}×${Math.round(compH * renderScale)}`
                 : `output · ${Math.round(compW * renderScale)}×${Math.round(compH * renderScale)}`}
             </div>
+            <button
+              onClick={() => setBigPreview((b) => !b)}
+              className="absolute right-2 top-2 rounded border border-border/60 bg-black/50 px-1.5 py-0.5 font-mono text-[10px] text-muted opacity-60 transition-opacity hover:text-text hover:opacity-100"
+              title={bigPreview ? 'Bring the panels back under the preview (V)' : 'Big preview : fold the panels under it away (V)'}
+            >
+              {bigPreview ? '⤡ panels' : '⤢ big'}
+            </button>
           </div>
+          {!bigPreview && (
+            <PreviewSizer
+              previewRef={previewRef}
+              colRef={previewColRef}
+              onSize={(h) => setPreviewH(h)}
+              onCommit={(h) => { try { if (h === null) localStorage.removeItem('opsia.previewH'); else localStorage.setItem('opsia.previewH', String(Math.round(h))) } catch { /* blocked */ } }}
+              set={previewH !== null}
+            />
+          )}
+          {/* the panels under the preview : they scroll when they don't fit (the
+              preview keeps at least 160 px : a tall Inspector once squeezed it to
+              nothing), and fill what's left once you size the preview */}
+          <div className={bigPreview ? 'hidden' : previewH === null ? 'flex min-h-0 shrink flex-col gap-2 overflow-y-auto' : 'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto'}>
 
           {/* Scene bank : recallable full-instrument states (brief §10.7) */}
           <Collapsible sectionKey="scenes" title="scenes">
@@ -2129,7 +2229,7 @@ export default function App(): JSX.Element {
           <Collapsible sectionKey="master" title="master fx">
             <MasterRackStrip />
           </Collapsible>
-
+          </div>
         </section>
 
         {/* Drag handle : the layers column is resizable */}
@@ -2484,6 +2584,102 @@ function MasterRackStrip(): JSX.Element {
       {/* The chain's effects : their own rows, wrapping across the full width. */}
       {rackFx.length > 0 && <FxChips scope={{ kind: 'master' }} fx={rackFx} />}
     </div>
+  )
+}
+
+/** The bar under the preview : drag to size the preview (the panels below then
+ *  scroll), double-click to let it take what the panels leave again. Pointer
+ *  deltas go through the preview's own box, so the UI zoom (CSS zoom) is right. */
+function PreviewSizer({
+  previewRef,
+  colRef,
+  onSize,
+  onCommit,
+  set
+}: {
+  previewRef: React.RefObject<HTMLDivElement | null>
+  colRef: React.RefObject<HTMLElement | null>
+  onSize: (h: number | null) => void
+  onCommit: (h: number | null) => void
+  set: boolean
+}): JSX.Element {
+  const drag = useRef<{ y: number; h: number; k: number; max: number; id: number; last: number } | null>(null)
+  return (
+    <div
+      className="group -my-1.5 flex h-3 shrink-0 cursor-row-resize items-center justify-center"
+      style={{ touchAction: 'none' }}
+      title={set ? 'Drag to size the preview · double-click : back to automatic' : 'Drag to size the preview (the panels below then scroll)'}
+      onPointerDown={(e) => {
+        const pv = previewRef.current, col = colRef.current
+        if (!pv || !col) return
+        const r = pv.getBoundingClientRect()
+        const k = pv.offsetHeight > 0 ? r.height / pv.offsetHeight : 1
+        drag.current = { y: e.clientY, h: pv.offsetHeight, k, max: Math.max(120, col.offsetHeight - 70), id: e.pointerId, last: pv.offsetHeight }
+        ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+      }}
+      onPointerMove={(e) => {
+        const d = drag.current
+        if (!d || e.pointerId !== d.id) return
+        const h = Math.max(80, Math.min(d.max, d.h + (e.clientY - d.y) / d.k))
+        d.last = h
+        onSize(h)
+      }}
+      onPointerUp={(e) => {
+        const d = drag.current
+        if (!d || e.pointerId !== d.id) return
+        drag.current = null
+        onCommit(d.last)
+      }}
+      onDoubleClick={() => { onSize(null); onCommit(null) }}
+    >
+      <span className={`h-1 w-16 rounded-full transition-colors ${set ? 'bg-accent/50' : 'bg-border'} group-hover:bg-accent`} />
+    </div>
+  )
+}
+
+/** Open ▾ : the sessions opened or saved lately (× takes one off the list). */
+function RecentButton({ onOpen }: { onOpen: (path: string) => void }): JSX.Element {
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const list = menu ? recentSessions.list() : []
+  // the same name twice : the folder tells them apart
+  const label = (p: string, name: string): string =>
+    list.filter((r) => r.name === name).length > 1 ? `${name}  (${baseName(p.replace(/[\\/][^\\/]*$/, ''))})` : name
+  return (
+    <>
+      <button
+        className="btn rounded-l-none border-l-0 px-1.5 text-[11px]"
+        onClick={(e) => {
+          const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+          setMenu((m) => (m ? null : { x: r.left, y: r.bottom + 2 }))
+        }}
+        title="Recent sessions"
+        aria-label="Recent sessions"
+      >
+        ▾
+      </button>
+      {menu && (
+        <RecentMenu
+          x={menu.x}
+          y={menu.y}
+          header={<span className="font-mono text-[10px] text-muted">Recent sessions</span>}
+          items={
+            list.length
+              ? [
+                  ...list.map((r) => ({
+                    label: label(r.path, r.name),
+                    onClick: () => { setMenu(null); onOpen(r.path) },
+                    onDelete: () => { recentSessions.remove(r.path); setMenu({ ...menu }) },
+                    deleteTitle: `Take ${r.name} off the list (the file stays)`
+                  })),
+                  { label: '', divider: true },
+                  { label: 'Clear the list', onClick: () => { recentSessions.clear(); setMenu(null) } }
+                ]
+              : [{ label: 'No recent sessions yet', disabled: true }]
+          }
+          onClose={() => setMenu(null)}
+        />
+      )}
+    </>
   )
 }
 

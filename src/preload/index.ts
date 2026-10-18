@@ -26,6 +26,7 @@ const api: ExposedApi = {
   sessionOpenVersion: (path: string) => ipcRenderer.invoke('session:openVersion', path),
   sessionVersionCount: (path: string) => ipcRenderer.invoke('session:versionCount', path),
   sessionLoad: (path: string) => ipcRenderer.invoke('session:load', path),
+  pathKind: (path: string) => ipcRenderer.invoke('path:kind', path),
 
   // ── Autosave / crash recovery ────────────────────────────────────
   autosaveCrashCheck: () => ipcRenderer.invoke('autosave:crashCheck'),

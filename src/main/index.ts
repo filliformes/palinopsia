@@ -1096,6 +1096,16 @@ app.whenReady().then(async () => {
   safeHandle('session:folders', () => sessionIO.linkedFolders())
   safeHandle('session:folderAdd', () => sessionIO.addFolder(mainWindow))
   safeHandle('session:folderRemove', (_e, folder) => sessionIO.removeFolder(folder as string))
+  // A dropped path : a folder, a file, or gone (a drop onto a layer row takes a
+  // folder as a Collage's).
+  safeHandle('path:kind', async (_e, p) => {
+    try {
+      const st = await import('fs').then((m) => m.promises.stat(String(p)))
+      return st.isDirectory() ? 'dir' : 'file'
+    } catch {
+      return 'none'
+    }
+  })
   safeHandle('session:load', (_e, path) => {
     // Warm the session folder's clips in the background (pre-convert DXV/HAP/
     // ProRes into the all-intra cache) so every clip beside the session is

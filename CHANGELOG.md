@@ -5,7 +5,28 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Added
+
+- **Drag and drop from the desktop** (`components/fileDrop.ts`) : a film onto a layer's A
+  or B row imports it (converted if it must be), a sound file there is Import audio, a
+  folder makes the slot a Collage of its films (`collageFromFolder` : the Collage's own
+  scan, `path:kind` IPC tells a folder from a file); a sound (or a film, for its
+  soundtrack) onto an Audio Layer slot; a session file anywhere on the window opens it
+  (with the Save changes? question); anything else says where things go. The target
+  lights while a file is over it; effect-chip drags are untouched. Verified with real
+  file drops (CDP `Input.dispatchDragEvent`) : all six cases.
+- **Open ▾ : recent sessions** (`recentSessions.ts`, localStorage, the newest ten) :
+  every open, load, save and drop puts the file on top; × takes one off; a file that is
+  gone when picked is said and removed.
+- **The preview can be sized and made big** : a bar under it to drag (remembered;
+  double-click : automatic), the panels below scrolling; **V** or **⤢ big** folds them
+  away. In automatic mode the preview keeps at least 160 px (a video's tall Inspector had
+  squeezed it to 2 px).
+
 ### Changed
+
+- **The top bar's session controls are one group** : the session list and Load, then
+  New, Open ▾, Save, Save As (New / Open / Save / Save As used to sit at the far right).
 
 - **More "does nothing right now" graying in Vibe and Context**, read from the shaders :
   the chord's hue / chroma / spread with the chord off; at source mix 1, everything that

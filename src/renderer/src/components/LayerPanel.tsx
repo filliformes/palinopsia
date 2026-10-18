@@ -4,7 +4,7 @@
 // space. Right-click anywhere on the strip: Init, Randomize layer, layer
 // presets (save/apply/delete : app-persistent).
 
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT, TBTN_MOD } from './buttonStyles'
 import type { AudioFeature, BlendMode, CouplingMode, LayerMask, ModTarget, SourceKind, SourceSlot } from '@shared/types'
 import { BLEND_MODES, DEFAULT_LAYER_VARY } from '@shared/types'
@@ -17,6 +17,7 @@ import { AssignRow } from './AutoControls'
 import { registerLiveOverlay } from './liveOverlay'
 import { showToast } from './Toast'
 import { playableVideoUrl } from './videoImport'
+import { collageFromFolder, droppedPaths, dropKind, isFileDrag } from './fileDrop'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { CapturePicker } from './CapturePicker'
 import { DevicePicker } from './DevicePicker'
@@ -738,6 +739,31 @@ function SourceRow({
     if (!path || (scope.kind !== 'sourceA' && scope.kind !== 'sourceB')) return
     useStore.getState().setSourceAudio(scope.layer, scope.kind === 'sourceA' ? 'A' : 'B', `opsia-media://local/${encodeURIComponent(path)}`, file.name, path)
   }
+  // Files dragged in from the desktop : a film (imported, converted if it
+  // must be), a sound (Import audio), or a folder (a Collage of its films).
+  const [dropOver, setDropOver] = useState(false)
+  async function onDropFiles(e: DragEvent): Promise<void> {
+    const items = droppedPaths(e)
+    if (!items.length || (scope.kind !== 'sourceA' && scope.kind !== 'sourceB')) return
+    const layer = scope.layer, slotName = scope.kind === 'sourceA' ? 'A' : 'B'
+    const { path, name } = items[0]
+    if (items.length > 1) showToast(`${items.length} files dropped : slot ${slotName} took the first (${name})`)
+    const kind = dropKind(path)
+    if (kind === 'video') {
+      const url = await playableVideoUrl(path, name, setConverting)
+      if (url) onPickVideo(url, name, path)
+      return
+    }
+    if (kind === 'audio') {
+      useStore.getState().setSourceAudio(layer, slotName, `opsia-media://local/${encodeURIComponent(path)}`, name, path)
+      return
+    }
+    if ((await window.api.pathKind(path)) === 'dir') {
+      await collageFromFolder(layer, slotName, path)
+      return
+    }
+    showToast(`${name} : a layer slot takes a film, a sound file or a folder (a Collage of its films)`, 'warn', 5000)
+  }
   const isAudio = sourceKind === 'audio'
   const isVideo = sourceKind === 'video'
   const isCapture = sourceKind === 'capture'
@@ -765,7 +791,26 @@ function SourceRow({
   const active = isVideo || isAudio || isCapture || isHive || isAsm || !!shaderId
   return (
     <>
-      <div className="flex min-w-0 items-center gap-1.5" onClick={onSelect}>
+      <div
+        className={`flex min-w-0 items-center gap-1.5 rounded transition-shadow ${dropOver ? 'ring-2 ring-accent' : ''}`}
+        onClick={onSelect}
+        onDragOver={(e) => {
+          if (!isFileDrag(e)) return
+          e.preventDefault()
+          e.stopPropagation()
+          e.dataTransfer.dropEffect = 'copy'
+          if (!dropOver) setDropOver(true)
+        }}
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropOver(false) }}
+        onDrop={(e) => {
+          if (!isFileDrag(e)) return
+          e.preventDefault()
+          e.stopPropagation()
+          setDropOver(false)
+          void onDropFiles(e)
+        }}
+        title={`Source ${label} : drop a film, a sound file or a folder here`}
+      >
         {/* A real button (it selects this source : its controls go to the
             Inspector); the click bubbles to the row's onSelect. */}
         <button
