@@ -13,7 +13,7 @@ import {
 } from 'react'
 import type { ModCurve } from '@shared/types'
 import { META_KNOB_COUNT } from '@shared/types'
-import { metaLiveValues } from '../engine/modulation'
+import { metaLiveValues, shapeCurve } from '../engine/modulation'
 import {
   commitKnob,
   knobDisplayValue,
@@ -334,6 +334,19 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
         title={`${knob.name} : drag vertically · Shift = fine · double-click resets`}
       >
         <MidiLearnOverlay id={`meta:${index}`} />
+        {/* What the knob sends at its bottom and at its top, through its curve,
+            under each end of the arc (inside the knob's square : a tile can be
+            as narrow as the knob). */}
+        {(['lo', 'hi'] as const).map((end) => (
+          <span
+            key={end}
+            className="pointer-events-none absolute font-mono text-[8px] leading-none tabular-nums text-muted"
+            style={{ top: KNOB_PX - 8, ...(end === 'lo' ? { left: 0 } : { right: 0 }) }}
+            title={`The output at the knob's ${end === 'lo' ? 'bottom' : 'top'}, through its curve (${knob.curve})`}
+          >
+            {shapeCurve(end === 'lo' ? 0 : 1, knob.curve).toFixed(2)}
+          </span>
+        ))}
         <svg width={KNOB_PX} height={KNOB_PX} className="absolute inset-0">
           <path
             d={`M ${cx + radius * Math.cos(arcStart)} ${cy + radius * Math.sin(arcStart)}

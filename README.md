@@ -568,7 +568,9 @@ mood into a near/far depth zone, optionally following audio brightness.
 A flat bank of 16 macro knobs. Each tile is a 270° dial (drag vertically, Shift =
 fine, double-click resets), with a destination count, a rename, an output **curve**
 (linear / log / exp / eases / sigmoid / smoothstep / db / gamma / step / invert), a
-**CC** MIDI-learn, and an **M** button binding one modulator to the knob. Each knob
+**CC** MIDI-learn, and an **M** button binding one modulator to the knob. Under each end
+of the dial's arc, the output at the knob's bottom and at its top through its curve
+(`0.00` and `1.00`; `1.00` and `0.00` with **invert**). Each knob
 can drive up to 8 destinations. `⚄` shuffles knob positions while keeping bindings.
 
 The **`⊞ XY` toggle** (Meta title bar) turns **knobs 13–16 into two XY
@@ -1963,6 +1965,10 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   (or Alt) to **copy** instead. Right-click the `+ fx` box to paste a copied effect into
   an empty rack. An effect a rack can't host (a layer-only node into the Master, say) is
   refused with a popup saying why, and the drop marker turns red while you hover.
+- **The Master FX strip** : one header line holds the chain's controls (**chain on**,
+  the dice, **chain presets…** and **+ fx**, the two menus the same size) with the
+  finishing units at its end; the chain's effects run underneath across the whole width,
+  wrapping under the finishing too when the chain is long (an empty chain : one line).
 - **Master chain presets** : the `chain presets…` box in the Master FX strip replaces the
   whole master chain with one of **112** designed chains and sets the Vibe to match (the
   finalizers stay). The newer ones sit in five groups : **Time & memory** (Réponse,

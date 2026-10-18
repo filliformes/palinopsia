@@ -5,6 +5,16 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Changed
+
+- **The Master FX strip's layout** : a header line (chain on, the dice, chain presets and
+  + fx, the two menus now the same width) with the finishing units at its right end, and
+  the effects underneath across the whole width, under the finishing too (they used to
+  share one wrapping row with the menus, which drifted apart as it wrapped).
+- **Meta knobs show their endpoints** : the output at the knob's bottom and top through
+  its curve (`shapeCurve(0 | 1)`, 0.00 format), under each end of the arc.
+- The audio tab's hint lost its "prefer transient / flux over level" advice.
+
 ### Fixed
 
 - **The audio input no longer goes silent on a remembered device that is gone.** The

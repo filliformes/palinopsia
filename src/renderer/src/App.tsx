@@ -38,7 +38,7 @@ import { tickSonifySeq } from './audio/soniSeq'
 import { tickKeySeq } from './audio/soniKeySeq'
 import { soniClockTick } from './audio/soniClock'
 import { Collapsible } from './components/Collapsible'
-import { FxRackPanel, FxChips } from './components/FxRackPanel'
+import { FxAddSelect, FxChips } from './components/FxRackPanel'
 import { SearchSelect } from './components/SearchSelect'
 import { FinishingTouches, FinishingToggle } from './components/FinishingTouches'
 import { Inspector } from './components/Inspector'
@@ -2407,12 +2407,15 @@ function MasterRackStrip(): JSX.Element {
   // The "chain" On/Off state : on when every user FX is enabled.
   const chainOn = rackFx.length > 0 && rackFx.every((f) => f.enabled)
   return (
-    // Line 1: chain label · dice · preset box · + fx; the regular FX chips wrap.
+    // A header line : the chain's controls (on, dice, presets, + fx, the two
+    // menus alike) and the finishing at its end; the effects underneath, across
+    // the whole width (a long chain runs under the finishing too).
     <div
-      className={`flex min-w-0 flex-wrap items-center gap-1.5 rounded-md border bg-panel2/40 p-2 transition-colors ${
+      className={`flex min-w-0 flex-col gap-1.5 rounded-md border bg-panel2/40 p-2 transition-colors ${
         flashing ? 'animate-pulse border-danger ring-1 ring-danger' : 'border-border'
       }`}
     >
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
       <span className="relative inline-flex shrink-0">
         <MidiLearnOverlay id="master:chain" />
         <button
@@ -2465,10 +2468,7 @@ function MasterRackStrip(): JSX.Element {
         }}
         title="Master chain presets : replaces the chain and sets the Vibe accordingly"
       />
-      {/* Regular FX rack : wraps to more rows if the chain is deep */}
-      <div className="ml-3 flex min-w-0 flex-1 items-center">
-        <FxRackPanel scope={{ kind: 'master' }} fx={rackFx} label="" />
-      </div>
+      <FxAddSelect scope={{ kind: 'master' }} className="w-32 shrink-0" />
       {/* Pinned finalizers : clustered at the rightmost, never wrapping apart.
           A global finishing on/off pill mirrors the one in the Finishing view. */}
       {lockedFx.length > 0 && (
@@ -2480,6 +2480,9 @@ function MasterRackStrip(): JSX.Element {
           <FxChips scope={{ kind: 'master' }} fx={lockedFx} nowrap />
         </div>
       )}
+      </div>
+      {/* The chain's effects : their own rows, wrapping across the full width. */}
+      {rackFx.length > 0 && <FxChips scope={{ kind: 'master' }} fx={rackFx} />}
     </div>
   )
 }

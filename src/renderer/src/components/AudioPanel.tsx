@@ -170,7 +170,7 @@ export function AudioPanel(): JSX.Element {
       {enabled && (
         <p className="font-mono text-[9px] leading-tight text-muted">
           Assign to parameters via the <span className="text-accent">audio</span> modulator type
-          (Modulation ▸ M· ▸ audio). Prefer transient / flux over level.
+          (Modulation ▸ M· ▸ audio).
         </p>
       )}
 
