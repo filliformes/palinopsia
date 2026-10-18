@@ -104,7 +104,8 @@ export function AutoControls({
   modTargetFor,
   layout = 'wrap',
   dim,
-  bare = false
+  bare = false,
+  rgbOnly = false
 }: {
   inputs: IsfInputDesc[]
   values: Record<string, Value>
@@ -125,6 +126,9 @@ export function AutoControls({
   layout?: 'wrap' | 'twoRow' | 'vertical'
   // Vertical : no padding of its own (it sits in a column that has it).
   bare?: boolean
+  // The shader reads its colors' RGB only (the Finishing stages) : a color row
+  // is its swatch and its hex value, no transparency slider doing nothing.
+  rgbOnly?: boolean
 }): JSX.Element {
   if (inputs.length === 0) {
     return <div className="p-2 text-[11px] text-muted">This shader exposes no controls.</div>
@@ -151,6 +155,7 @@ export function AutoControls({
         onChange={onChange}
         modTargetFor={modTargetFor}
         dense={dense}
+        rgbOnly={rgbOnly}
         labelExtra={
           hasLightOrder && inp.name === 'lightGlow' ? (
             <LightOrderToggle values={values} onChange={onChange} />
@@ -317,7 +322,8 @@ function Control({
   onChange,
   modTargetFor,
   dense = false,
-  labelExtra
+  labelExtra,
+  rgbOnly = false
 }: {
   inp: IsfInputDesc
   value: Value | undefined
@@ -325,6 +331,7 @@ function Control({
   modTargetFor?: (inputName: string) => ModTarget
   dense?: boolean
   labelExtra?: JSX.Element
+  rgbOnly?: boolean
 }): JSX.Element | null {
   switch (inp.type) {
     case 'float':
@@ -335,7 +342,7 @@ function Control({
     case 'long':
       return <EnumControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} dense={dense} />
     case 'color':
-      return <ColorControl inp={inp} value={value} onChange={onChange} dense={dense} />
+      return <ColorControl inp={inp} value={value} onChange={onChange} dense={dense} rgbOnly={rgbOnly} />
     case 'point2D':
       return <XYControl inp={inp} value={value} onChange={onChange} />
     default:
@@ -1107,16 +1114,33 @@ function ColorControl({
   inp,
   value,
   onChange,
-  dense = false
+  dense = false,
+  rgbOnly = false
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
   dense?: boolean
+  rgbOnly?: boolean
 }): JSX.Element {
   const def = Array.isArray(inp.def) ? inp.def : [1, 1, 1, 1]
   const v = Array.isArray(value) && value.length >= 3 ? value : def
   const alpha = v[3] ?? 1
+  if (dense && rgbOnly) {
+    return (
+      <div className="flex min-w-0 items-center gap-1.5">
+        {denseLabel(inp)}
+        <input
+          type="color"
+          value={toHex(v)}
+          onChange={(e) => onChange(inp.name, fromHex(e.target.value, alpha))}
+          className="h-4 w-10 shrink-0 cursor-pointer rounded border border-border bg-panel2"
+          title={`${inp.label} : ${toHex(v)} : click to pick`}
+        />
+        <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-muted">{toHex(v)}</span>
+      </div>
+    )
+  }
   if (dense) {
     return (
       <div className="flex min-w-0 items-center gap-1.5">

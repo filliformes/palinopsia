@@ -2038,7 +2038,7 @@ FX treat the whole composite before the finalizers.
 | **Sharpen** | 3×3 unsharp mask : makes dithers bite and posterized bands snap. |
 | **Fold** | A single-axis mirror at a movable seam with a slide offset : one deliberate fold, kept asymmetric. |
 | **Transform** | Zoom / pan / rotate the sampling frame (wrap or clamp), with **edge crop** (independent up / down / left / right insets); with Shape set, clips the layer into a geometric silhouette. |
-| **Stutter** | Probabilistic frame holds : horizontal bands freeze independently on their own irregular clocks, with optional blackout. |
+| **Stutter** | Probabilistic frame holds : horizontal bands freeze independently on their own irregular clocks, with optional blackout (no manual fire : it runs on its own clock). |
 | **Sync Loss** | Vertical hold rolling away plus horizontal tear bands on a stepped clock : the broken-monitor register. |
 | **Row Echo** | Chance-selected row bands freeze onto their top line and repeat downward : a line-hold smear. |
 | **Byte Corrupt** | Bit-depth crush plus per-block arithmetic scrambling that folds channels into each other : data damage, with a warped block grid. |
@@ -2135,8 +2135,17 @@ In the **Finishing** view (key `F`) each stage is split into labeled sections : 
 Palette (palette · color chord · tone · split-tone), Context (softness · distance ·
 light · surface material), Finalizer (grade · character · 3D · hand-made film · film
 damage · output shape). A section's on/off switch sits in its header, and a section
-switched off folds away until you turn it on (or click its header); rows that do nothing
-right now are grayed, with the reason in their tooltip. Each stage's **↺** puts it back
+switched off folds away until you turn it on (or click its header); a section without a
+switch says its state in its header instead (`3 stops · smooth · 50% source`, `neutral`,
+`trails · bloom`, `clear`, `glow 40% · post`, `off`…), so a folded stage still reads at a
+glance. Rows that do nothing right now are grayed, with the reason in their tooltip. A
+color row is its swatch and its hex value (the stages read only a color's RGB).
+
+The Vibe's **palette** is one **strip** : the gradient the picture's light is mapped into
+(darks at the left, lights at the right), drawn with the shader's own maths, so bands,
+smooth and anything between look as they will; its stops sit under it at their places
+(click one to pick its color), and **stops used** is **2 · 3 · 4 · 5** (with its M). A
+color chord shows the colors it makes there (the stops can't be picked while it is on). Each stage's **↺** puts it back
 as a New session starts it, every parameter included (modulators stay bound).
 
 `toggleFinishing` bypasses/enables the three as one bank; they are excluded from

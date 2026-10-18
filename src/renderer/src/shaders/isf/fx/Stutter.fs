@@ -9,8 +9,7 @@
     { "NAME": "chance",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.4 },
     { "NAME": "bands",    "TYPE": "float", "MIN": 1.0, "MAX": 24.0, "DEFAULT": 1.0 },
     { "NAME": "jitter",   "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0 },
-    { "NAME": "blackout", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0 },
-    { "NAME": "trig", "TYPE": "event", "DEFAULT": false, "LABEL": "fire ▸" }
+    { "NAME": "blackout", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0 }
   ],
   "PASSES": [
     { "TARGET": "held", "PERSISTENT": true },
@@ -51,7 +50,7 @@ void main() {
   // the runtime left it LAST frame (targets flip after all passes), which is
   // exactly what pass 0 reads as `prev`, so recomputing here shows this frame's
   // result with no frame of latency.
-  float freeze = max(step(1.0 - chance, hash(vec2(seg, band * 31.7 + 7.0))), float(trig)); // trig = punch-in
+  float freeze = step(1.0 - chance, hash(vec2(seg, band * 31.7 + 7.0)));
   vec4 live = IMG_NORM_PIXEL(inputImage, uv);
   vec4 prev = IMG_NORM_PIXEL(held, uv);
   // An EMPTY buffer (alpha exactly 0 : first frame after insert or resize, or

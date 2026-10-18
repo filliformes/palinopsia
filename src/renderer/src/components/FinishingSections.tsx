@@ -14,6 +14,7 @@ import type { ModTarget } from '@shared/types'
 import { inputsForShader, type IsfInputDesc } from '../shaders/isf/inputs'
 import { useStore } from '../store'
 import { AutoControls, EnumSwitch } from './AutoControls'
+import { HARMONIES } from './VibePaletteStrip'
 
 type Values = Record<string, number | number[]>
 /** What a dim rule may need beyond the unit's own values. */
@@ -34,6 +35,8 @@ export interface FinishingSection {
   /** The switch value that means "off" : the section folds itself while it holds. */
   offValue?: number
   inputs: string[]
+  /** Inputs the section draws with its own control (its `lead`), not as rows. */
+  own?: string[]
   /** Row labels inside this section (only where the header says the rest). */
   labels?: Record<string, string>
   /** Rows that do nothing right now : name → why (grayed, reason in the tooltip). */
@@ -187,6 +190,14 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       title: 'softness',
       color: C.neutral,
       inputs: ['trails', 'blur', 'bloom', 'smoothing'],
+      summary: (v) => {
+        const on = [
+          num(v, 'trails', 0.2) > 0.001 && 'trails',
+          num(v, 'blur', 0) > 0.001 && 'blur',
+          num(v, 'bloom', 0.3) > 0.001 && 'bloom'
+        ].filter(Boolean)
+        return on.length ? on.join(' · ') : 'clean'
+      },
       dim: (v): Record<string, string> =>
         num(v, 'blur', 0) <= 0.0005 && num(v, 'bloom', 0.3) <= 0.0005
           ? { smoothing: 'Blur and bloom are 0 : there is no ring to smooth.' }
@@ -197,7 +208,15 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       title: 'distance',
       color: C.accent2,
       inputs: ['depth', 'haze', 'atmosphere', 'voidEdge'],
-      labels: { atmosphere: 'haze color' }
+      labels: { atmosphere: 'haze color' },
+      summary: (v) => {
+        const on = [
+          num(v, 'depth', 0.35) > 0.001 && 'depth',
+          num(v, 'haze', 0.15) > 0.001 && 'haze',
+          num(v, 'voidEdge', 0) > 0.001 && 'void'
+        ].filter(Boolean)
+        return on.length ? on.join(' · ') : 'clear'
+      }
     },
     {
       id: 'light',
@@ -205,6 +224,12 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       color: C.amber,
       inputs: ['lightGlow', 'lightOrder', 'lightSize', 'lightColor'],
       labels: { lightGlow: 'glow', lightSize: 'size', lightColor: 'color' },
+      summary: (v) => {
+        const g = num(v, 'lightGlow', 0.1)
+        if (g <= 0.001) return 'off'
+        const post = typeof v.lightOrder === 'number' ? v.lightOrder >= 0.5 : true
+        return `glow ${Math.round(g * 100)}% · ${post ? 'post' : 'pre'}`
+      },
       // lightColor stays live : the surface relief's rim and sheen use it too.
       dim: (v): Record<string, string> => {
         if (num(v, 'lightGlow', 0.1) > 0.001) return {}
@@ -228,18 +253,19 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       id: 'palette',
       title: 'palette',
       color: C.accent,
-      inputs: ['colorA', 'colorB', 'colorC', 'colorD', 'colorE', 'stops', 'blend', 'dither', 'mixSrc'],
-      labels: { colorA: 'stop 1 (darks)', colorB: 'stop 2', colorC: 'stop 3', colorD: 'stop 4', colorE: 'stop 5 (lights)', stops: 'stops used' },
-      dim: (v) => {
-        const out: Record<string, string> = {}
-        const chord = Math.round(num(v, 'harmony', 0)) >= 1
-        const n = Math.round(num(v, 'stops', 2))
-        const keys = ['colorA', 'colorB', 'colorC', 'colorD', 'colorE']
-        keys.forEach((k, i) => {
-          if (chord) out[k] = 'A color chord is on : it sets the palette instead of these stops.'
-          else if (i >= n) out[k] = `Only ${n} stops are used (see "stops used").`
-        })
-        return out
+      // the stops and their count are the palette strip (VibePaletteStrip)
+      own: ['colorA', 'colorB', 'colorC', 'colorD', 'colorE', 'stops'],
+      inputs: ['blend', 'dither', 'mixSrc'],
+      summary: (v) => {
+        const h = Math.round(num(v, 'harmony', 0))
+        const b = num(v, 'blend', 1)
+        const mix = num(v, 'mixSrc', 0.5)
+        return [
+          h >= 1 ? `${HARMONIES[h]} chord` : `${Math.round(num(v, 'stops', 2))} stops`,
+          b >= 0.999 ? 'smooth' : b <= 0.001 ? 'bands' : 'soft bands',
+          num(v, 'dither', 0) > 0.001 && 'dither',
+          mix > 0.001 && `${Math.round(mix * 100)}% source`
+        ].filter(Boolean).join(' · ')
       }
     },
     {
@@ -258,7 +284,17 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       title: 'tone',
       color: C.neutral,
       inputs: ['autoLevel', 'gamma', 'contrast', 'saturation', 'sharpen'],
-      labels: { gamma: 'gamma' }
+      labels: { gamma: 'gamma' },
+      summary: (v) => {
+        const on = [
+          num(v, 'autoLevel', 0) > 0.001 && 'auto-levels',
+          !near(num(v, 'gamma', 1), 1) && 'gamma',
+          !near(num(v, 'contrast', 1), 1) && 'contrast',
+          !near(num(v, 'saturation', 1), 1) && (num(v, 'saturation', 1) < 1 ? 'desaturated' : 'saturated'),
+          num(v, 'sharpen', 0) > 0.001 && 'sharpened'
+        ].filter(Boolean)
+        return on.length ? on.join(' · ') : 'neutral'
+      }
     },
     {
       id: 'split',
@@ -266,6 +302,7 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       color: C.accent2,
       inputs: ['splitTone', 'shadowTint', 'highTint'],
       labels: { splitTone: 'amount' },
+      summary: (v) => (num(v, 'splitTone', 0) > 0.001 ? `${Math.round(num(v, 'splitTone', 0) * 100)}%` : 'off'),
       dim: (v): Record<string, string> => {
         if (num(v, 'splitTone', 0) > 0.001) return {}
         const why = 'Split-tone amount is 0 : the tints are off.'
@@ -286,19 +323,22 @@ export function SectionedControls({
   values,
   onChange,
   modTargetFor,
-  extras
+  extras,
+  leads
 }: {
   shaderId: string
   values: Values
   onChange: (name: string, value: number | number[]) => void
   modTargetFor: (input: string) => ModTarget
   extras?: Record<string, JSX.Element>
+  /** Content at the top of a section's body (the Vibe's palette strip). */
+  leads?: Record<string, JSX.Element>
 }): JSX.Element {
   const sections = FINISHING_SECTIONS[shaderId] ?? []
   const all = inputsForShader(shaderId)
   const byName = new Map(all.map((i) => [i.name, i]))
   // Anything a section list forgot (a future input) still shows, at the end.
-  const listed = new Set(sections.flatMap((s) => [...s.inputs, ...(s.switchInput ? [s.switchInput] : [])]))
+  const listed = new Set(sections.flatMap((s) => [...s.inputs, ...(s.own ?? []), ...(s.switchInput ? [s.switchInput] : [])]))
   const rest = all.filter((i) => !listed.has(i.name) && i.type !== 'point2D' && i.type !== 'image')
   return (
     <div className="flex flex-col">
@@ -312,10 +352,11 @@ export function SectionedControls({
           onChange={onChange}
           modTargetFor={modTargetFor}
           extra={extras?.[s.id]}
+          lead={leads?.[s.id]}
         />
       ))}
       {rest.length > 0 && (
-        <AutoControls inputs={rest} values={values} onChange={onChange} modTargetFor={modTargetFor} layout="vertical" />
+        <AutoControls inputs={rest} values={values} onChange={onChange} modTargetFor={modTargetFor} layout="vertical" rgbOnly />
       )}
     </div>
   )
@@ -328,7 +369,8 @@ function Section({
   values,
   onChange,
   modTargetFor,
-  extra
+  extra,
+  lead
 }: {
   shaderId: string
   section: FinishingSection
@@ -337,6 +379,7 @@ function Section({
   onChange: (name: string, value: number | number[]) => void
   modTargetFor: (input: string) => ModTarget
   extra?: JSX.Element
+  lead?: JSX.Element
 }): JSX.Element {
   const key = `fzs-${shaderId}-${s.id}`
   const stored = useStore((st) => st.collapsed[key])
@@ -383,6 +426,7 @@ function Section({
       </div>
       {!folded && (
         <div className="border-l-2" style={{ borderLeftColor: s.color }}>
+          {lead}
           <AutoControls
             inputs={inputs}
             values={values}
@@ -390,6 +434,7 @@ function Section({
             modTargetFor={modTargetFor}
             layout="vertical"
             dim={dim}
+            rgbOnly
           />
           {extra}
         </div>

@@ -19,6 +19,7 @@ import { SectionedControls } from './FinishingSections'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 import { ContextLightPad } from './ContextLightPad'
+import { VibePaletteStrip } from './VibePaletteStrip'
 
 const AC: Record<string, string> = { 'fx-vibe': 'accent2', 'fx-context': 'accent', 'fx-finalizer': 'active' }
 
@@ -323,6 +324,7 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
             onChange={onChange}
             modTargetFor={modTargetFor}
             extras={isContext ? { light: <ContextLightPad inst={inst} onChange={onChange} /> } : undefined}
+            leads={isVibe ? { palette: <VibePaletteStrip values={values} onChange={onChange} modTargetFor={modTargetFor} /> } : undefined}
           />
         </div>
       )}

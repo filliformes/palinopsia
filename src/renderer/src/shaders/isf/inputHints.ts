@@ -663,8 +663,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
   'fx-stutter': {
     bands: 'Splits the screen into this many horizontal bands that freeze independently. 1 = the whole frame holds at once.',
     jitter: 'Gives each band its own slightly faster or slower clock, so the freezes stop lining up. 0 = every band steps together.',
-    blackout: 'Share of segments where a band goes black instead of playing or holding : the screen switching off region by region.',
-    trig: 'PUNCH-IN : while fired, every band freezes (full stutter). Press, OSC, or bind a modulator (M) to glitch on the beat. 0 = the base `chance` applies.'
+    blackout: 'Share of segments where a band goes black instead of playing or holding : the screen switching off region by region.'
   },
   'fx-mosh-blocks': {
     freak: 'A minority of blocks that break the family : content grabbed from anywhere in the frame, zoomed, mirrored, sometimes inverted, held on a slower clock. 0 = none.',
