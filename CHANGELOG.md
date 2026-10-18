@@ -7,6 +7,18 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Vibe and Context read at a glance** : every Finishing section without a switch now
+  says its state in its header (palette, tone, split-tone; softness, distance, light),
+  like the Finalizer's. Color rows across the three stages are a swatch and its hex value
+  (`AutoControls rgbOnly` : the transparency slider beside each did nothing, the shaders
+  read RGB only).
+- **The Vibe's palette is one strip** (`VibePaletteStrip`) : its gradient drawn with
+  Vibe.fs's own palette map (stops, bands↔smooth, a chord's colors via a port of
+  `chordColor`), the stops as swatches at their places (click to pick), stops used as
+  2 · 3 · 4 · 5 with its M. It replaces the five stop rows and the stops slider.
+- **Stutter has no fire button** : its punch-in event (`trig`) is gone from the effect;
+  saved values for it are ignored.
+
 - **The Master FX strip's layout** : a header line (chain on, the dice, chain presets and
   + fx, the two menus now the same width) with the finishing units at its right end, and
   the effects underneath across the whole width, under the finishing too (they used to
