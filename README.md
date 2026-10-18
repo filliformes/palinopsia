@@ -568,9 +568,9 @@ mood into a near/far depth zone, optionally following audio brightness.
 A flat bank of 16 macro knobs. Each tile is a 270° dial (drag vertically, Shift =
 fine, double-click resets), with a destination count, a rename, an output **curve**
 (linear / log / exp / eases / sigmoid / smoothstep / db / gamma / step / invert), a
-**CC** MIDI-learn, and an **M** button binding one modulator to the knob. Under each end
-of the dial's arc, the output at the knob's bottom and at its top through its curve
-(`0.00` and `1.00`; `1.00` and `0.00` with **invert**). Each knob
+**CC** MIDI-learn, and an **M** button binding one modulator to the knob. In the gap at
+the bottom of the dial, what the knob sends **now** through its curve (`0.00` to `1.00`),
+live as you drag, as it glides, from MIDI or a modulator (in the modulated color then). Each knob
 can drive up to 8 destinations. `⚄` shuffles knob positions while keeping bindings.
 
 The **`⊞ XY` toggle** (Meta title bar) turns **knobs 13–16 into two XY

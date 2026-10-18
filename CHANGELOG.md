@@ -11,8 +11,9 @@ that CI builds into cross-platform releases.
   + fx, the two menus now the same width) with the finishing units at its right end, and
   the effects underneath across the whole width, under the finishing too (they used to
   share one wrapping row with the menus, which drifted apart as it wrapped).
-- **Meta knobs show their endpoints** : the output at the knob's bottom and top through
-  its curve (`shapeCurve(0 | 1)`, 0.00 format), under each end of the arc.
+- **Meta knobs show their value live** : what the knob sends now through its curve
+  (`shapeCurve(display, curve)`, 0.00 format), in the gap at the bottom of the dial,
+  following drags, glides, MIDI and modulators (accent2 while modulated).
 - The audio tab's hint lost its "prefer transient / flux over level" advice.
 
 ### Fixed
