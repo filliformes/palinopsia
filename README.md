@@ -2138,7 +2138,12 @@ damage · output shape). A section's on/off switch sits in its header, and a sec
 switched off folds away until you turn it on (or click its header); a section without a
 switch says its state in its header instead (`3 stops · smooth · 50% source`, `neutral`,
 `trails · bloom`, `clear`, `glow 40% · post`, `off`…), so a folded stage still reads at a
-glance. Rows that do nothing right now are grayed, with the reason in their tooltip. A
+glance. Rows that do nothing right now are grayed, with the reason in their tooltip : the
+chord's hue, chroma and spread while the chord is off; everything that only shapes the
+Vibe's palette (the strip, bands↔smooth, dither, auto-levels, gamma, sharpen) at source
+mix 1; haze color while haze is 0; the light's size and color while glow is 0 (its color
+stays live while the surface material uses it); the surface's controls at relief 0. A
+parameter a modulator, a Meta knob or a performance macro is moving is never grayed. A
 color row is its swatch and its hex value (the stages read only a color's RGB).
 
 The Vibe's **palette** is one **strip** : the gradient the picture's light is mapped into

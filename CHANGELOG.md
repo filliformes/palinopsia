@@ -7,6 +7,16 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **More "does nothing right now" graying in Vibe and Context**, read from the shaders :
+  the chord's hue / chroma / spread with the chord off; at source mix 1, everything that
+  only shapes the palette (the strip, bands↔smooth, dither, auto-levels, gamma, sharpen;
+  contrast and saturation stay live); haze color with haze 0 (unless the surface material
+  is tinted by it through its field depth); light color with glow 0 and no surface
+  material; the surface's raking, scale, field depth and evolution at relief 0. Every
+  rule (the Finalizer's too) now counts a parameter a modulator, a Meta knob or a Context
+  performance macro is driving as live (`DimCtx.driven` : the matrix and Meta targets,
+  plus Context's macro values polled off the engine).
+
 - **Vibe and Context read at a glance** : every Finishing section without a switch now
   says its state in its header (palette, tone, split-tone; softness, distance, light),
   like the Finalizer's. Color rows across the three stages are a swatch and its hex value

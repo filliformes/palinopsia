@@ -10,9 +10,11 @@
 // "dust" under FILM DAMAGE). The full label stays everywhere else (M panel,
 // modulation lists, OSC).
 
+import { useEffect, useMemo, useState } from 'react'
 import type { ModTarget } from '@shared/types'
 import { inputsForShader, type IsfInputDesc } from '../shaders/isf/inputs'
-import { useStore } from '../store'
+import { modTargetKey, useStore } from '../store'
+import { frameVals } from '../engine/frameVals'
 import { AutoControls, EnumSwitch } from './AutoControls'
 import { HARMONIES } from './VibePaletteStrip'
 
@@ -23,6 +25,9 @@ export interface DimCtx {
   bgEmpty: boolean
   /** The fulldome output is on (no projector warp : post warp waits). */
   dome: boolean
+  /** Inputs something drives on top of their slider (a modulator, a Meta knob,
+   *  Context's performance macros) : a rule never takes one of those as off. */
+  driven: Set<string>
 }
 
 export interface FinishingSection {
@@ -57,6 +62,15 @@ const C = {
 
 const num = (v: Values, k: string, d: number): number => (typeof v[k] === 'number' ? (v[k] as number) : d)
 const near = (a: number, b: number): boolean => Math.abs(a - b) < 1e-3
+/** Is this amount doing something : above 0, or driven by something else. */
+const live = (v: Values, ctx: DimCtx, k: string, d: number): boolean => ctx.driven.has(k) || num(v, k, d) > 0.001
+/** Vibe : source mix at 1 (and nothing moving it) : the picture's own colors
+ *  replace the palette, so everything that only shapes the palette is idle. */
+const allSource = (v: Values, ctx: DimCtx): boolean => !ctx.driven.has('mixSrc') && num(v, 'mixSrc', 0.5) >= 0.999
+const ALL_SOURCE = 'Source mix is at 1 : the picture keeps its own colors, so the palette (and what shapes it) is not seen.'
+/** Context : the surface material is drawn (its switch on and relief above 0). */
+const pbrOn = (v: Values, ctx: DimCtx): boolean =>
+  (ctx.driven.has('pbrTexture') || Math.round(num(v, 'pbrTexture', 0)) > 0) && live(v, ctx, 'pbrAmount', 0.5)
 
 export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
   'fx-finalizer': [
@@ -84,10 +98,10 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       switchInput: 'character',
       inputs: ['grain', 'grainSize', 'chroma', 'parasites'],
       labels: { grainSize: 'grain size' },
-      dim: (v): Record<string, string> => {
+      dim: (v, ctx): Record<string, string> => {
         const c = Math.round(num(v, 'character', 1))
         const out: Record<string, string> = {}
-        if (num(v, 'grain', 0) <= 0.001) {
+        if (!live(v, ctx, 'grain', 0)) {
           const why = 'Grain amount is 0 : there is no grain to shape.'
           out.grainSize = why
           out.chroma = why
@@ -115,8 +129,8 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       switchInput: 'filmHold',
       offValue: 0,
       inputs: ['filmRate', 'filmJitter', 'filmBoil', 'filmFlutter', 'filmBlank', 'filmBlankMode', 'filmGranule', 'filmSplice', 'filmGrab'],
-      dim: (v): Record<string, string> =>
-        num(v, 'filmBlank', 0) <= 0.001 ? { filmBlankMode: 'Blanks are at 0 : no leader frames to color.' } : {},
+      dim: (v, ctx): Record<string, string> =>
+        !live(v, ctx, 'filmBlank', 0) ? { filmBlankMode: 'Blanks are at 0 : no leader frames to color.' } : {},
       labels: {
         filmRate: 'draw fps',
         filmJitter: 'draw timing',
@@ -134,8 +148,8 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       color: C.earth,
       inputs: ['filmDust', 'filmScratch', 'filmHair', 'filmGauge', 'filmDirt', 'filmBurst'],
       labels: { filmDust: 'dust', filmScratch: 'scratch', filmGauge: 'gauge', filmBurst: 'burst ▸' },
-      dim: (v): Record<string, string> => {
-        const any = num(v, 'filmDust', 0) > 0.001 || num(v, 'filmScratch', 0) > 0.001 || num(v, 'filmHair', 0) > 0.001
+      dim: (v, ctx): Record<string, string> => {
+        const any = live(v, ctx, 'filmDust', 0) || live(v, ctx, 'filmScratch', 0) || live(v, ctx, 'filmHair', 0)
         if (any) return {}
         const why = 'Dust, scratch and hair are all 0 : there is no damage to size or place.'
         return { filmGauge: why, filmDirt: why }
@@ -175,7 +189,7 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
           out.outBgColor = 'The outside is filled by the Background layer, not this color.'
         if (ctx.dome)
           out.outPostWarp = 'The fulldome output is on : a domemaster has no projector warp, so the shape stays in the picture.'
-        if (num(v, 'outDepth', 0) <= 0.001) {
+        if (!live(v, ctx, 'outDepth', 0)) {
           const why = 'Shadow is 0 : there is no shadow to angle or rake.'
           out.outShadowAngle = why
           out.outPerspective = why
@@ -198,8 +212,8 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
         ].filter(Boolean)
         return on.length ? on.join(' · ') : 'clean'
       },
-      dim: (v): Record<string, string> =>
-        num(v, 'blur', 0) <= 0.0005 && num(v, 'bloom', 0.3) <= 0.0005
+      dim: (v, ctx): Record<string, string> =>
+        !live(v, ctx, 'blur', 0) && !live(v, ctx, 'bloom', 0.3)
           ? { smoothing: 'Blur and bloom are 0 : there is no ring to smooth.' }
           : {}
     },
@@ -209,6 +223,11 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       color: C.accent2,
       inputs: ['depth', 'haze', 'atmosphere', 'voidEdge'],
       labels: { atmosphere: 'haze color' },
+      // the haze color also tints the surface material as its field depth rises
+      dim: (v, ctx): Record<string, string> =>
+        !live(v, ctx, 'haze', 0.15) && !(pbrOn(v, ctx) && live(v, ctx, 'pbrDepth', 0))
+          ? { atmosphere: 'Haze is 0 : there is no haze to color.' }
+          : {},
       summary: (v) => {
         const on = [
           num(v, 'depth', 0.35) > 0.001 && 'depth',
@@ -230,11 +249,13 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
         const post = typeof v.lightOrder === 'number' ? v.lightOrder >= 0.5 : true
         return `glow ${Math.round(g * 100)}% · ${post ? 'post' : 'pre'}`
       },
-      // lightColor stays live : the surface relief's rim and sheen use it too.
-      dim: (v): Record<string, string> => {
-        if (num(v, 'lightGlow', 0.1) > 0.001) return {}
+      // The light color also lights the surface material's rim and sheen.
+      dim: (v, ctx): Record<string, string> => {
+        if (live(v, ctx, 'lightGlow', 0.1)) return {}
         const why = 'Glow is 0 : the key light is off.'
-        return { lightSize: why, lightOrder: why }
+        return pbrOn(v, ctx)
+          ? { lightSize: why, lightOrder: why }
+          : { lightSize: why, lightOrder: why, lightColor: 'Glow is 0 and there is no surface material : nothing is lit in this color.' }
       }
     },
     {
@@ -245,7 +266,12 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       switchInput: 'pbrTexture',
       offValue: 0,
       inputs: ['pbrAmount', 'pbrLight', 'pbrScale', 'pbrDepth', 'pbrEvolve'],
-      labels: { pbrScale: 'texture scale' }
+      labels: { pbrScale: 'texture scale' },
+      dim: (v, ctx): Record<string, string> => {
+        if (live(v, ctx, 'pbrAmount', 0.5)) return {}
+        const why = 'Relief is 0 : the surface material is not drawn.'
+        return { pbrLight: why, pbrScale: why, pbrDepth: why, pbrEvolve: why }
+      }
     }
   ],
   'fx-vibe': [
@@ -256,6 +282,8 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       // the stops and their count are the palette strip (VibePaletteStrip)
       own: ['colorA', 'colorB', 'colorC', 'colorD', 'colorE', 'stops'],
       inputs: ['blend', 'dither', 'mixSrc'],
+      dim: (v, ctx): Record<string, string> =>
+        allSource(v, ctx) ? { stops: ALL_SOURCE, blend: ALL_SOURCE, dither: ALL_SOURCE } : {},
       summary: (v) => {
         const h = Math.round(num(v, 'harmony', 0))
         const b = num(v, 'blend', 1)
@@ -276,8 +304,15 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       offValue: 0,
       inputs: ['baseHue', 'chroma', 'spread'],
       labels: { baseHue: 'hue', chroma: 'chroma', spread: 'spread' },
-      dim: (v): Record<string, string> =>
-        Math.round(num(v, 'harmony', 0)) === 1 ? {} : { spread: 'Spread only acts on the analogous chord.' }
+      dim: (v, ctx): Record<string, string> => {
+        const h = Math.round(num(v, 'harmony', 0))
+        if (h === 0 && !ctx.driven.has('harmony')) {
+          const why = 'The chord is off : the palette uses its own stops.'
+          return { baseHue: why, chroma: why, spread: why }
+        }
+        if (allSource(v, ctx)) return { baseHue: ALL_SOURCE, chroma: ALL_SOURCE, spread: ALL_SOURCE }
+        return h === 1 || ctx.driven.has('harmony') ? {} : { spread: 'Spread only acts on the analogous chord.' }
+      }
     },
     {
       id: 'tone',
@@ -285,6 +320,10 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       color: C.neutral,
       inputs: ['autoLevel', 'gamma', 'contrast', 'saturation', 'sharpen'],
       labels: { gamma: 'gamma' },
+      // auto-levels, gamma and sharpen shape the light that is mapped into the
+      // palette; contrast and saturation act after the source mix
+      dim: (v, ctx): Record<string, string> =>
+        allSource(v, ctx) ? { autoLevel: ALL_SOURCE, gamma: ALL_SOURCE, sharpen: ALL_SOURCE } : {},
       summary: (v) => {
         const on = [
           num(v, 'autoLevel', 0) > 0.001 && 'auto-levels',
@@ -303,13 +342,45 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       inputs: ['splitTone', 'shadowTint', 'highTint'],
       labels: { splitTone: 'amount' },
       summary: (v) => (num(v, 'splitTone', 0) > 0.001 ? `${Math.round(num(v, 'splitTone', 0) * 100)}%` : 'off'),
-      dim: (v): Record<string, string> => {
-        if (num(v, 'splitTone', 0) > 0.001) return {}
+      dim: (v, ctx): Record<string, string> => {
+        if (live(v, ctx, 'splitTone', 0)) return {}
         const why = 'Split-tone amount is 0 : the tints are off.'
         return { shadowTint: why, highTint: why }
       }
     }
   ]
+}
+
+/** The inputs something drives on top of their slider : a modulator or a Meta
+ *  knob (from the matrix), or a performance macro adding onto Context (read off
+ *  the engine a few times a second). A grey-out rule never takes these as off. */
+function useDriven(names: string[], modTargetFor: (input: string) => ModTarget): Set<string> {
+  const bound = useStore((s) => {
+    const keys = new Set<string>()
+    for (const a of s.composition.modMatrix) keys.add(modTargetKey(a.target))
+    for (const k of s.composition.metaKnobs) for (const d of k.destinations) keys.add(modTargetKey(d))
+    return names.filter((n) => keys.has(modTargetKey(modTargetFor(n)))).join(',')
+  })
+  const [macro, setMacro] = useState('')
+  const namesKey = names.join(',')
+  useEffect(() => {
+    const read = (): void => {
+      const on: string[] = []
+      for (const n of names) {
+        const t = modTargetFor(n)
+        if (t.kind !== 'fx' || t.scope.kind !== 'master') continue
+        const fv = frameVals.get(`fx:master:${t.instId}:${n}`)
+        if (fv !== undefined && fv > 0.001) on.push(n)
+      }
+      const k = on.join(',')
+      setMacro((prev) => (prev === k ? prev : k))
+    }
+    read()
+    const id = window.setInterval(read, 400)
+    return () => window.clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [namesKey])
+  return useMemo(() => new Set([...bound.split(','), ...macro.split(',')].filter(Boolean)), [bound, macro])
 }
 
 export function hasSections(shaderId: string): boolean {
@@ -337,6 +408,7 @@ export function SectionedControls({
   const sections = FINISHING_SECTIONS[shaderId] ?? []
   const all = inputsForShader(shaderId)
   const byName = new Map(all.map((i) => [i.name, i]))
+  const driven = useDriven(all.map((i) => i.name), modTargetFor)
   // Anything a section list forgot (a future input) still shows, at the end.
   const listed = new Set(sections.flatMap((s) => [...s.inputs, ...(s.own ?? []), ...(s.switchInput ? [s.switchInput] : [])]))
   const rest = all.filter((i) => !listed.has(i.name) && i.type !== 'point2D' && i.type !== 'image')
@@ -353,6 +425,7 @@ export function SectionedControls({
           modTargetFor={modTargetFor}
           extra={extras?.[s.id]}
           lead={leads?.[s.id]}
+          driven={driven}
         />
       ))}
       {rest.length > 0 && (
@@ -370,7 +443,8 @@ function Section({
   onChange,
   modTargetFor,
   extra,
-  lead
+  lead,
+  driven
 }: {
   shaderId: string
   section: FinishingSection
@@ -380,6 +454,7 @@ function Section({
   modTargetFor: (input: string) => ModTarget
   extra?: JSX.Element
   lead?: JSX.Element
+  driven: Set<string>
 }): JSX.Element {
   const key = `fzs-${shaderId}-${s.id}`
   const stored = useStore((st) => st.collapsed[key])
@@ -395,7 +470,9 @@ function Section({
     .map((n) => byName.get(n))
     .filter((i): i is IsfInputDesc => !!i)
     .map((i) => (s.labels?.[i.name] ? { ...i, display: s.labels[i.name] } : i))
-  const dim = s.dim?.(values, { bgEmpty, dome })
+  const dim = s.dim?.(values, { bgEmpty, dome, driven })
+  // the section's own control (the palette strip) greys out with its inputs
+  const leadDim = s.own?.map((n) => dim?.[n]).find(Boolean)
   return (
     <div>
       <div
@@ -426,7 +503,7 @@ function Section({
       </div>
       {!folded && (
         <div className="border-l-2" style={{ borderLeftColor: s.color }}>
-          {lead}
+          {lead && (leadDim ? <div className="opacity-40" title={leadDim}>{lead}</div> : lead)}
           <AutoControls
             inputs={inputs}
             values={values}
