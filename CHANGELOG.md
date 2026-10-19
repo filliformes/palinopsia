@@ -31,6 +31,10 @@ that CI builds into cross-platform releases.
   Verified : the summary, L2 left alone, M8 kept (the routing took M6), base captured,
   changed / reset, take (haze 0.42), film hold applied, arrows + Enter, your-layers
   material, live sound, trails 0.22 → 0 → 0.11 at amount 1 / 0 / 0.5, the morph running.
+  The editor sits in three columns (coupling + film · Context + audio routing · the
+  preview + JSON) so it fits a screen with no scrollbar (measured : 0 px overflow with a
+  film World open); a column that still runs long scrolls with the wheel, no bar shown
+  (`.no-scrollbar`).
 
 - **Codec Mosh** (`engine/codecMosh.ts`, `node-codecmosh`) : a native node that runs the
   layer through a real H.264 round trip (WebCodecs : baseline `avc1.42001f`, annexb,

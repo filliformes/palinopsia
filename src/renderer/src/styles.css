@@ -459,6 +459,10 @@ textarea {
   background: transparent;
 }
 
+/* A pane that scrolls with the wheel but shows no bar (the World editor). */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 /* Strip the native up/down spinner arrows from all number inputs. */
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {

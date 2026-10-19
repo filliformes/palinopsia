@@ -262,8 +262,8 @@ export function WorldPage(): JSX.Element {
             ))}
           </div>
 
-          <div className="grid min-h-0 max-w-6xl flex-1 grid-cols-[360px_minmax(0,1fr)] gap-6">
-           <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
+          <div className="grid min-h-0 max-w-6xl flex-1 grid-cols-[minmax(260px,320px)_minmax(260px,320px)_minmax(0,1fr)] gap-4">
+           <div className="no-scrollbar flex min-h-0 flex-col gap-3 overflow-y-auto">
             {/* Coupling */}
             <Section title="A/B Coupling : how the two voices bond">
               <SelRow label="mode" value={w.coupling.mode} options={COUPLING_MODES}
@@ -294,16 +294,6 @@ export function WorldPage(): JSX.Element {
               </div>
             </Section>
 
-            {/* Context mood */}
-            <Section title="Context mood : depth finalizer">
-              {WORLD_CONTEXT_KEYS.map(({ k, label, hint }) => (
-                <SlideRow key={k} label={label} value={typeof w.context[k] === 'number' ? w.context[k] : 0} title={hint}
-                  dim={!(k in w.context)}
-                  onChange={(v) => setContext(k, v)} />
-              ))}
-              <p className="font-mono text-[9px] leading-tight text-muted">A dim key is not part of this World yet : move it to make it one. Blur stays yours.</p>
-            </Section>
-
             {/* Film character */}
             <Section title="Film character : the Finalizer's film">
               <div className="flex items-center gap-2">
@@ -328,6 +318,18 @@ export function WorldPage(): JSX.Element {
                       onChange={(v) => setFilm(f.k, v)} />
                   )
                 )}
+            </Section>
+
+           </div>
+           <div className="no-scrollbar flex min-h-0 flex-col gap-3 overflow-y-auto">
+            {/* Context mood */}
+            <Section title="Context mood : depth finalizer">
+              {WORLD_CONTEXT_KEYS.map(({ k, label, hint }) => (
+                <SlideRow key={k} label={label} value={typeof w.context[k] === 'number' ? w.context[k] : 0} title={hint}
+                  dim={!(k in w.context)}
+                  onChange={(v) => setContext(k, v)} />
+              ))}
+              <p className="font-mono text-[9px] leading-tight text-muted">A dim key is not part of this World yet : move it to make it one. Blur stays yours.</p>
             </Section>
 
             {/* Audio routing */}
@@ -362,7 +364,7 @@ export function WorldPage(): JSX.Element {
 
            {/* right column : the visualizer + its audio driver, then the JSON
                (folded by default; open, it takes the remaining height) */}
-           <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
+           <div className="no-scrollbar flex min-h-0 flex-col gap-3 overflow-y-auto">
               <Section title="World Visualizer : real generators · simulated or live audio · A/B">
                 <div className="mx-auto w-full max-w-[380px]">
                   <WorldVisualizer
@@ -638,7 +640,7 @@ function VuMeter({ audio }: { audio: SimAudio }): JSX.Element {
 // ── small form helpers ──────────────────────────────────────────────────
 function Section({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }): JSX.Element {
   return (
-    <div className={`flex flex-col gap-2 rounded border border-border bg-panel2/30 p-3 ${className}`}>
+    <div className={`flex flex-col gap-1.5 rounded border border-border bg-panel2/30 p-2.5 ${className}`}>
       <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{title}</span>
       {children}
     </div>
