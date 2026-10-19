@@ -1068,12 +1068,12 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
         >
           {SCALE_ORDER.map((s) => <option key={s} value={s} title={SCALE_LABEL[s]}>{SCALE_SHORT[s]}</option>)}
         </select>
-        {/* Output device (the same setting as Sonify's row in the audio/midi/osc tab) */}
+        {/* Output device (the same setting as Sonify's row in the Connect tab) */}
         <AudioOutputSelect
           className="input select-compact max-w-[150px] truncate text-[10px]"
           value={cfg.sinkId}
           onChange={(id) => patch({ sinkId: id })}
-          title="Which output device Sonify plays to (also in the audio/midi/osc tab)"
+          title="Which output device Sonify plays to (also in the Connect tab)"
         />
         <div className="flex-1" />
         {/* (the "S / Esc closes" hint lives in the button's tooltip : the bar holds one row at 100 % down to a 1,400 px window) */}

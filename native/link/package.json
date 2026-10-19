@@ -1,0 +1,10 @@
+{
+  "name": "palinopsia-link",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ableton Link addon for Palinopsia : vendored Ableton/link SDK (GPL-2.0-or-later) and asio (Boost).",
+  "gypfile": true,
+  "dependencies": {
+    "node-addon-api": "^8.3.0"
+  }
+}

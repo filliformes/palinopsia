@@ -1,4 +1,4 @@
-// OSC section of the audio/midi/osc tab, in two clear halves and a monitor :
+// OSC section of the Connect tab, in two clear halves and a monitor :
 //   ↙ IN   what plays Palinopsia : listen on/off, the port, where to send
 //   ↗ OUT  what Palinopsia sends : the destination, FEEDBACK (mirror the live
 //          state), MARK (the output as sound); the body rules' OSC goes there too

@@ -7,6 +7,27 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Ableton Link** (`native/link`, `src/main/link.ts`, `src/renderer/src/link.ts`,
+  `components/LinkSection.tsx`). The Ableton Link SDK 4.1.1 (and asio 1.38.2), vendored
+  and compiled into a small N-API addon in the main process : one Link instance, polled
+  (`state(quantum)` → peers, tempo, beat, phase) and pushed to the page 30 times a
+  second, stamped on the shared `performance.timeOrigin + now()` clock; the page
+  extrapolates the beat between reads, with a latency lead. Tempo : with peers, Link's
+  wins every frame over anything but a deliberate edit (`tempoEvents.ts` : the BPM box,
+  tap, MIDI tap / `transport:bpm`, `setBpm` for OSC and dataflou), which is proposed to
+  the session; alone, Opsia leads. Phase : `modEngine.tick(…, linkBeats)` nudges every
+  BPM-synced clock onto the grid (`lockToLink` : lfo / motion phases, the
+  `*LastAdvanceAt` step clocks, ~0.3 s settle) and pins the Euclid step index; the
+  Sonify beat clock becomes Link's beats (a whole-bar offset keeps the count) and
+  starts sequencers on the next Link bar. The session guard ignores a tempo set by
+  peers. The Connect tab's **Ableton Link** section (Enabled / Disabled per Ableton's
+  integration guidelines, apps linked, tempo, bar dots, bar 2·3·4·6·8, latency) and a
+  **LINK n** badge beside the BPM. CI builds the addon on all three platforms
+  (non-blocking), electron-builder ships it unpacked; the test build copies built
+  addons in. Verified against a second Link peer : phases within ~1 ms, peer tempo →
+  Opsia, Opsia's BPM edit → peer, a non-deliberate tempo change pulled back, a 1/1 LFO
+  and the Sonify clock on the Link bar.
+
 - **Drag and drop from the desktop** (`components/fileDrop.ts`) : a film onto a layer's A
   or B row imports it (converted if it must be), a sound file there is Import audio, a
   folder makes the slot a Collage of its films (`collageFromFolder` : the Collage's own
@@ -40,6 +61,13 @@ that CI builds into cross-platform releases.
   duplicates).
 
 ### Changed
+
+- **License : GPL-3.0-or-later** (was MIT), with an additional permission for the NDI®
+  runtime (`LICENSE-EXCEPTIONS.md`); bundling Ableton Link needs it. Releases up to
+  v1.2.10 keep MIT. `package.json`, README, the site and `THIRD_PARTY_NOTICES.md`
+  (Ableton Link, asio) follow.
+- **The audio/midi/osc tab is now "Connect"** (key `A` unchanged), with Ableton Link
+  under dataflou.
 
 - **The top bar's session controls are one group** : the session list and Load, then
   New, Open ▾, Save, Save As (New / Open / Save / Save As used to sit at the far right).

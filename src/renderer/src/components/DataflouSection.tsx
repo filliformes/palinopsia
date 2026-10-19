@@ -1,4 +1,4 @@
-// dataflou section of the audio/midi/osc tab : Palinopsia as a node of the
+// dataflou section of the Connect tab : Palinopsia as a node of the
 // dataflou mesh. The ON pill joins or leaves it; the name and universe are the
 // only settings (only nodes of the same universe see each other). Below, the
 // monitor : every node on the network (online or remembered), the connections

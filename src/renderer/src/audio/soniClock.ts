@@ -17,10 +17,24 @@ export const isSoniRate = (r: unknown): r is SoniSeqRate => typeof r === 'string
 
 let beats = 0
 let last = 0
+// Ableton Link : beats = Link's + this offset (whole bars, chosen when Link
+// comes on so the count barely moves); null while Link is off.
+let linkOffset: number | null = null
+let quantum = 4
 
 /** Advance the clock (once per frame). A stall (a hidden window) counts as a
- *  quarter second at most : the sequencers carry on instead of catching up. */
-export function soniClockTick(now: number, bpm: number): number {
+ *  quarter second at most : the sequencers carry on instead of catching up.
+ *  With Ableton Link on (`link` = its beat now), the clock IS Link's, so the
+ *  bars fall where every linked app's do. */
+export function soniClockTick(now: number, bpm: number, link: number | null = null, q = 4): number {
+  if (link != null) {
+    quantum = Math.max(1, q)
+    if (linkOffset == null) linkOffset = Math.round((beats - link) / quantum) * quantum
+    beats = link + linkOffset
+    last = now
+    return beats
+  }
+  linkOffset = null
   if (last) beats += (Math.min(250, Math.max(0, now - last)) * Math.max(1, bpm)) / 60000
   last = now
   return beats
@@ -32,6 +46,8 @@ export const soniBeats = (): number => beats
  *  other one already runs on the beat (they stay in phase), else right now,
  *  which becomes the top of a bar. */
 export function soniClockStart(otherOnBeat: boolean): number {
+  // Ableton Link : always the next Link bar (the count is shared, never reset)
+  if (linkOffset != null) return Math.ceil(beats / quantum - 1e-6) * quantum
   if (otherOnBeat) return Math.ceil(beats / 4 - 1e-6) * 4
   beats = 0
   return 0

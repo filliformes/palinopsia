@@ -74,6 +74,15 @@ const api: ExposedApi = {
     ipcRenderer.on('dataflou:in', h)
     return () => ipcRenderer.off('dataflou:in', h)
   },
+
+  // ── Ableton Link ─────────────────────────────────────────────────
+  linkConfigure: (cfg) => ipcRenderer.invoke('link:configure', cfg),
+  linkSetTempo: (bpm) => ipcRenderer.send('link:tempo', bpm),
+  onLinkState: (cb) => {
+    const h = (_e: Electron.IpcRendererEvent, s: Parameters<typeof cb>[0]): void => cb(s)
+    ipcRenderer.on('link:state', h)
+    return () => ipcRenderer.off('link:state', h)
+  },
   onOscQueryWsActive: (cb) => {
     const h = (_e: Electron.IpcRendererEvent, active: boolean): void => cb(active)
     ipcRenderer.on('oscquery:ws-active', h)

@@ -15,6 +15,8 @@ import { useSyncExternalStore } from 'react'
 import { randomizeMetaKnobs } from '../metaSmooth'
 import type { RandomizeScope } from '../randomize'
 import { useStore } from '../store'
+import { tempoEdited } from '../tempoEvents'
+import { LinkBadge } from './LinkSection'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { ToastDock } from './Toast'
@@ -129,6 +131,7 @@ export function Transport(): JSX.Element {
 
   function setBpm(v: number): void {
     setComposition((s) => ({ composition: { ...s.composition, bpm: v } }))
+    tempoEdited(v)
   }
 
   // Tap tempo : each click on BPM records a beat; the average of the last few
@@ -193,6 +196,7 @@ export function Transport(): JSX.Element {
             className="input w-full px-1 py-0.5 text-right text-[11px]"
           />
         </div>
+        <LinkBadge />
       </div>
 
       {/* Global speed : scales every visual clock, 1/64×…64× (log). */}

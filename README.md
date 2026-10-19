@@ -73,6 +73,7 @@ Lowercase's slant, each straight from its Space theme. The older shots stay in
 - [Resolume OSC mapper](#resolume-osc-mapper-key-k) : Palinopsia signals × any Resolume address, read from a composition
 - [OSC implementation](#osc-implementation) : inbound · outbound · OSCQuery · setup
 - [dataflou mesh](#dataflou-mesh) : Palinopsia as a node on the mesh, its sources and destinations
+- [Ableton Link](#ableton-link) : the tempo and the bar shared with every Link app on the network
 - [Stack & architecture](#stack) · [Aesthetic guardrails](#aesthetic-guardrails) · [Credits & license](#credits--license)
 
 ---
@@ -209,7 +210,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `B` | **Body** page : embodied control (a camera → gestures + modulators) |
 | `K` | **Resolume OSC mapper** page : drive any Resolume address from Palinopsia's signals |
 | `E` | Right column → **assemble** (the automatic editor) |
-| `A` | Right column → **audio/midi/osc** setup tab |
+| `A` | Right column → **Connect** tab |
 | `D` / `X` / `I` | Collapse Modulation / Master-FX / Inspector |
 | `R` | Fire the Transport's selected Randomize |
 | `H` | **Freeze / hold** the output (the ❄ latch : the Transport button lights while held) |
@@ -347,7 +348,7 @@ The right column switches between **seven views** (tabs, or keys `M` / `F` / `G`
 `E` / `A`): **Layers** (the strips + background), **Mixer** (tall
 opacity/speed faders + blend for all four), **Finishing** (the Vibe · Context ·
 Finalizer stack), **Feel** (the global macros), **assemble** (the automatic
-editor), **audio/midi/osc** (the Audio, MIDI and OSC panels) and **performance**
+editor), **Connect** (the Audio, MIDI, OSC, Resolume, dataflou and Ableton Link panels) and **performance**
 (the live load meter). The column is exactly as wide as its seven tabs on one line,
 measured on your computer's own font : drag its edge to make it wider (the width is
 kept), double-click the edge to fit it again.
@@ -754,8 +755,8 @@ composite live.
 
 ## Audio in
 
-The **audio/midi/osc** right-column tab (key `A`) holds the control panels
-(**Audio · MIDI · OSC**), and the **performance** tab beside it the load meter:
+The **Connect** right-column tab (key `A`) holds the control panels
+(**Audio · MIDI · OSC · Resolume · dataflou · Ableton Link**), and the **performance** tab beside it the load meter:
 
 - **Audio** : enable the local analyser (input device picker), or receive
   features over OSC from an audio brain (`/opsia/audio/*`). The **coupling**
@@ -792,7 +793,7 @@ The **audio/midi/osc** right-column tab (key `A`) holds the control panels
   **MIDI output** controls (see [MIDI](#midi)).
 - **OSC** : inbound listener (port, on/off, this machine's IPs), outbound
   feedback (host/port/interval), and the OSCQuery status.
-- **Performance** (its own tab, right of audio/midi/osc; it meters only while
+- **Performance** (its own tab, right of Connect; it meters only while
   shown) : a per-section load monitor : each part of the instrument
   (render, output, vision, depth, lights, sonify, audio, modulation, MediaPipe)
   with its CPU frame-budget share, plus a **GPU wait** row : the time the window sits
@@ -852,7 +853,7 @@ Learnable targets:
   pad can also step **scene next / prev**.
 
 Everything except the Meta-knob CCs is machine-local (survives restarts,
-doesn't travel with sessions). The **MIDI** section of the audio/midi/osc tab
+doesn't travel with sessions). The **MIDI** section of the Connect tab
 (key `A`) has the **input dropdown** (all controllers, or just one : hot-plug
 is handled), a **live-activity readout** (last message + how many controls are
 wired, so you can confirm the port is really talking), and the full bindings
@@ -1312,7 +1313,7 @@ Flash-safety) + a level meter (left and right : the bar is the average level, th
 the peak held a moment, on a dB scale from -54 to 0 with lines at -36, -18 and -6, the
 peak in dB beside it; yellow above -9 dB, orange while the limiter works; measured
 after the master and the limiter, so it is what reaches the speakers), and an
-**output-device picker** (also in the audio/midi/osc tab, under the input device
+**output-device picker** (also in the Connect tab, under the input device
 menu : the same setting). While the engine
 plays, **recordings carry the sound** (DXV3 included), even when you switch it on
 mid-take : exports become true audiovisual pieces.
@@ -2251,7 +2252,7 @@ It grew out of a Max patch built for the same job (`udpreceive` → per-feature 
 
 Sending runs at the chosen **rate** (5–60 Hz); only connected columns send, a float only
 when it moved, all in one batched message per tick. The **Resolume** section of the
-audio/midi/osc tab shows whether it is sending (where, how many pins, messages a second),
+Connect tab shows whether it is sending (where, how many pins, messages a second),
 turns it on and off, and opens the mapper. In Resolume : Preferences › OSC ›
 **Input** on (port 7000 by default); set the same host and port on the page.
 
@@ -2265,7 +2266,7 @@ Enums accept a name (`s`), an int index (`i`), or a `0..1` float across members.
 Bools/toggles are true at `≥ 0.5`. Triggers fire on the **rising edge**. **BPM is
 the only raw value.** All indices in addresses are **1-based**.
 
-The **OSC** section of the audio/midi/osc tab is in two halves : **↙ IN** (listen on/off,
+The **OSC** section of the Connect tab is in two halves : **↙ IN** (listen on/off,
 the port, the address to send to, the last message) and **↗ OUT** (the destination,
 **FEEDBACK** and **MARK**; the body rules' OSC goes there too), each with a light that
 blinks with its traffic and its messages a second, also shown in the folded header.
@@ -2449,7 +2450,7 @@ config persists to `localStorage`.
 Palinopsia can be a **node of a dataflou mesh**, the decentralized parameter network
 its sibling instruments speak : nodes on the same local network find each other (mDNS),
 exchange what parameters they have, and wire any node's sources to any node's
-destinations, with no central controller. The **dataflou** section of the audio/midi/osc
+destinations, with no central controller. The **dataflou** section of the Connect
 tab has the whole setup :
 
 - **ON THE MESH / OFF** joins or leaves (off by default, remembered on this machine).
@@ -2482,6 +2483,42 @@ dataflou's reference core, message for message : mDNS `_dataflou._tcp` with the 
 `univ` TXT keys, the CBOR topology protocol over TCP (HELLO, DECLARE, DIGEST, SUBREQ,
 STREAMREQ…) and the UDP data plane on the TCP port + 1. It was tested against the
 reference C++ node in both directions.
+
+## Ableton Link
+
+Palinopsia has **Ableton Link** built in : it shares its tempo and its bar with every
+Link app on the same network (Live, DJ software, phone apps), with no setup. The
+**Ableton Link** section of the Connect tab (key `A`, under dataflou) :
+
+- **ENABLED / DISABLED** joins or leaves the Link session (disabled by default,
+  remembered on this machine, never in a session). Beside it : how many other apps
+  are linked, the session's tempo and where the bar is (a dot per beat, the first one
+  the top of the bar).
+- **bar** : the beats per bar every app aligns its phase to (Live calls it the
+  quantum; 4 unless the music is in 3 or 6…).
+- **latency** : the picture reaches the screen this late (a projector, a capture
+  card) : Palinopsia runs this far ahead so its beats land with the sound (-200 to
+  +400 ms, double-click : 0).
+
+While Link is enabled :
+
+- **The BPM is shared.** With other apps linked, their tempo is Palinopsia's : a
+  session, a scene, Randomize or a morph can't move it. Changing the BPM yourself
+  (the box, tap tempo, a MIDI control, OSC `/opsia/bpm`, dataflou) changes it for every
+  app. Alone, Palinopsia leads. A **LINK n** badge beside the BPM says the tempo is
+  the session's, and a tempo set that way doesn't ask "Save changes?".
+- **The bar is shared.** Modulators synced to the BPM slide onto the shared grid
+  (in about a third of a second, never a jump) : a 1/1 LFO peaks where every app's
+  bar starts, an arp, S&H, random, chaos, Euclid, Turing, cellular or physics clock
+  steps on the shared beats, and a Euclid pattern starts on everyone's grid (unless
+  SLIP holds its steps). The Sonify sequencers count Link's beats and, started on the
+  beat, wait for the top of the next Link bar. The MIDI clock out follows the tempo.
+- Organic stays free (its wobble is the point), and so do modulators on Hz.
+
+Link runs in the main process (`native/link`, the Ableton Link SDK, GPL-2.0-or-later,
+compiled in; `src/main/link.ts`); the page reads it 30 times a second and carries the
+beat on between reads (`src/renderer/src/link.ts`). Tested against a second Link peer :
+the bars agreed within about a millisecond, and tempo changes went both ways.
 
 ---
 
@@ -2575,4 +2612,8 @@ relations; the durational and afterimage families draw on the ecological-media
 lineage (Jacobs' Eternalism, Lowder's frame-weaving, Goethe's complements, the
 Pulfrich effect).
 
-MIT : see [LICENSE](LICENSE).
+Palinopsia is free software : **GPL-3.0-or-later** (see [LICENSE](LICENSE)), with an
+additional permission for the NDI® runtime ([LICENSE-EXCEPTIONS.md](LICENSE-EXCEPTIONS.md)).
+Releases up to v1.2.10 were MIT and keep that license. It compiles in the
+[Ableton Link](https://github.com/Ableton/link) SDK (GPL-2.0-or-later) and asio
+(Boost); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

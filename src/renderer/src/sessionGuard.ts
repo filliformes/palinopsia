@@ -26,12 +26,21 @@ function fnv(s: string): string {
   return `${(h >>> 0).toString(36)}:${s.length}`
 }
 
+// Ableton Link with other apps linked : the tempo is the session's (./link.ts
+// registers the test; no import, which would loop through the store).
+let tempoShared: () => boolean = () => false
+export function setTempoShared(fn: () => boolean): void {
+  tempoShared = fn
+}
+
 function fingerprint(): string {
   // The warp counts only when it is the session's own : turning "save with
   // session" on or off, or nudging this computer's warp, changes no piece.
+  // Nor does a tempo other linked apps set.
   const st = useStore.getState()
   const { warp, ...rest } = st.exportSession()
-  return fnv(JSON.stringify(st.warpFromSession ? { ...rest, warp } : rest))
+  const own = tempoShared() && rest.composition ? { ...rest, composition: { ...rest.composition, bpm: 0 } } : rest
+  return fnv(JSON.stringify(st.warpFromSession ? { ...own, warp } : own))
 }
 
 let baseline: string | null = null

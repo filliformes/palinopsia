@@ -34,6 +34,7 @@ import { registerMediaRefs } from './mediaRefs'
 import { installAvcaptureHost } from './avcaptureHost'
 import { registerResolume } from './resolume'
 import { initDataflou } from './dataflou'
+import { initLink } from './link'
 import { hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
 import { hiveSendStart, hiveSendChunk, hiveSendStop } from './hiveSend'
 import { OutputSender } from './output'
@@ -720,6 +721,7 @@ app.whenReady().then(async () => {
   registerMediaRefs()
   registerResolume()
   initDataflou(() => (mainWindow && !mainWindow.isDestroyed() ? mainWindow : null))
+  initLink(() => (mainWindow && !mainWindow.isDestroyed() ? mainWindow : null))
 
   // Allow Web MIDI + camera/mic/screen capture in the renderer (all local,
   // user-initiated: MIDI-CC learn and video-capture sources). Screen capture asks

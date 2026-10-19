@@ -1,4 +1,4 @@
-// Resolume section of the audio/midi/osc tab : is the Resolume mapper (K) on,
+// Resolume section of the Connect tab : is the Resolume mapper (K) on,
 // where it sends and how much, and a button into it. The SENDING pill turns the
 // stream on and off from here, like OSC's LISTENING pill.
 

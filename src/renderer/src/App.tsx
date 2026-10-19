@@ -36,7 +36,8 @@ import { GRID } from '@shared/assemble'
 import { tickSequencer } from './engine/sequencer'
 import { tickSonifySeq } from './audio/soniSeq'
 import { tickKeySeq } from './audio/soniKeySeq'
-import { soniClockTick } from './audio/soniClock'
+import { soniBeats, soniClockTick } from './audio/soniClock'
+import { linkBeats, linkQuantum, linkSettings, setLinkSettings, tickLink } from './link'
 import { Collapsible } from './components/Collapsible'
 import { FxAddSelect, FxChips } from './components/FxRackPanel'
 import { SearchSelect } from './components/SearchSelect'
@@ -63,6 +64,7 @@ import { BodyPage } from './components/BodyPage'
 import { ResolumePage } from './components/ResolumePage'
 import { ResolumeSection } from './components/ResolumeSection'
 import { DataflouSection } from './components/DataflouSection'
+import { LinkSection } from './components/LinkSection'
 import { applyResolume } from './resolume'
 import { initDataflou, applyDataflou, dataflouWantsVision } from './dataflou'
 import { domePreview, DOME_PREVIEW } from './engine/domePreview'
@@ -949,7 +951,7 @@ export default function App(): JSX.Element {
           st.setRightView(st.rightView === 'assemble' ? 'layers' : 'assemble')
           return
         }
-        // A: show/hide the audio/midi/osc setup tab.
+        // A: show/hide the Connect tab.
         if (k === 'a') {
           e.preventDefault()
           const st = useStore.getState()
@@ -1147,7 +1149,7 @@ export default function App(): JSX.Element {
       compositorRef.current = comp
       // Isolated test builds only (built with VITE_OPSIA_TEST=1) : hand the
       // store and the engine to a debugger. Compiled out of real builds.
-      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __eqPresets: eqPresets, __sessionMedia: sessionMedia })
+      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats } })
       // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
       // capture from the render loop (Compositor.captureKick) : a rebuilt engine
       // needs no re-attaching. A real-time recording finds it through this.
@@ -1381,7 +1383,9 @@ export default function App(): JSX.Element {
         //    values : straight into the Compositor, never through React.
         perfMeter.begin('audio'); audioBus.tick(now); perfMeter.end('audio')
         perfMeter.begin('modulation')
-        const modValues = modEngine.tick(now, c.modulators, c.bpm)
+        tickLink(now)
+        const linkNow = linkBeats(now)
+        const modValues = modEngine.tick(now, c.modulators, c.bpm, linkNow)
         applyModulation(comp!, c, modValues, inputsForShader, st.modBypass)
         perfMeter.end('modulation')
         // 2a½. Meta-knob glides/drags : in-flight positions fan out to their
@@ -1449,7 +1453,7 @@ export default function App(): JSX.Element {
         // sequence its root / scale, both on one Sonify beat clock (independent
         // of the scene sequencer above). No-ops unless started in the seq view.
         {
-          const beats = soniClockTick(now, c.bpm)
+          const beats = soniClockTick(now, c.bpm, linkNow, linkQuantum())
           tickSonifySeq(now, beats)
           tickKeySeq(now, beats)
         }
@@ -2266,6 +2270,7 @@ export default function App(): JSX.Element {
               <OscPanel />
               <ResolumeSection />
               <DataflouSection />
+              <LinkSection />
             </>
           ) : rightView === 'perf' ? (
             // The live load meter, on its own tab : it only meters while shown.
@@ -2302,7 +2307,7 @@ export default function App(): JSX.Element {
       {/* ── Meta Controller: 32 macro knobs / 4 banks (brief §6) ── */}
       <MetaBar />
 
-      {/* Audio + MIDI + OSC setup lives in the right column's `audio/midi/osc`
+      {/* Audio + MIDI + OSC + Link setup lives in the right column's Connect
           tab (A) : performance space stays for creation, setup out of the way. */}
 
       {/* ── Transport (BPM + Randomize) ───────────────────────────── */}
@@ -2469,7 +2474,7 @@ function RightViewTabs({ onNeed }: { onNeed: (w: number | ((prev: number) => num
       title:
         'Assemble (E) : the automatic editor. Analyze a folder of video into a descriptor point cloud, then generate an edit from it'
     },
-    { id: 'io', label: 'audio/midi/osc', title: 'Setup (A) : the audio bus, MIDI (controller input + learned bindings + output) and OSC input/OSCQuery, each a collapsible section' },
+    { id: 'io', label: 'connect', title: 'Connect (A) : the audio bus, MIDI (controller input + learned bindings + output), OSC input/OSCQuery, Resolume, dataflou and Ableton Link, each a collapsible section' },
     {
       id: 'perf',
       label: 'performance',

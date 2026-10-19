@@ -1,4 +1,4 @@
-// Performance tab (right of audio/midi/osc) : the whole instrument's load at a
+// Performance tab (right of Connect) : the whole instrument's load at a
 // glance. Three readings :
 //   · Top line : host totals from main's sampler (FPS and the display's refresh
 //     rate, guard skips, frame ms, whole-GPU util/VRAM, app CPU/RAM). The GPU

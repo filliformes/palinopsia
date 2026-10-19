@@ -77,6 +77,23 @@ jobs:
         continue-on-error: true
         shell: bash
         run: sh native/avcapture/build.sh
+      - name: Build Ableton Link addon
+        # native/link : the vendored Ableton Link SDK (header-only), every
+        # platform. A failure here only leaves Link reported missing in the
+        # Connect tab, never blocks a release (see native/link/README.md).
+        continue-on-error: true
+        shell: bash
+        working-directory: native/link
+        run: |
+          npm install --ignore-scripts
+          ARCH=x64; [ "${{ matrix.platform }}" = mac ] && ARCH=arm64
+          npx --yes node-gyp@11 rebuild \
+            --target=$(node -p "require('electron/package.json').version") \
+            --dist-url=https://electronjs.org/headers \
+            --arch=$ARCH
+          # arm64 code must carry a signature to load at all : an ad-hoc one is enough.
+          if [ "$(uname)" = Darwin ]; then codesign --force --sign - build/Release/link.node; fi
+          node -e "const l = require('./build/Release/link.node'); l.setTempo(123); console.log(JSON.stringify(l.state(4))); l.close()"
       - run: npm run typecheck
       - run: npm run ${{ matrix.script }}
       # The mac app must carry an ad-hoc signature, its ffmpeg included : an

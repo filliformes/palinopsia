@@ -250,6 +250,40 @@ interface SlotState {
   startedAt: number // ramp/adsr time base (reset by retrigger)
 }
 
+// Ableton Link : the clocks a BPM-synced modulator keeps (its last step's
+// time), nudged onto the shared grid. lfo and motion keep a phase instead.
+const LINK_CLOCKS: Partial<Record<ModulatorConfig['type'], keyof SlotState>> = {
+  arp: 'arpLastAdvanceAt',
+  random: 'randomLastAdvanceAt',
+  sh: 'shLastAdvanceAt',
+  slew: 'slewLastAdvanceAt',
+  chaos: 'chaosLastAdvanceAt',
+  euclid: 'euclidLastAdvanceAt',
+  turing: 'turingLastAdvanceAt',
+  cellular: 'cellLastAdvanceAt',
+  physics: 'physLastAdvanceAt'
+}
+
+/** The signed distance to the nearest whole number, in (-0.5, 0.5]. */
+const nearestWhole = (x: number): number => x - Math.round(x)
+
+/** Slide a clock toward the Link grid : `cycles` is how many of its cycles
+ *  the Link beats say have passed. About 0.3 s to settle, a nudge a frame,
+ *  never a jump (organic stays free : its wobble is the point). */
+function lockToLink(type: ModulatorConfig['type'], s: SlotState, cycles: number, hz: number, now: number, dt: number): void {
+  const k = Math.min(1, dt / 0.3)
+  if (type === 'lfo' || type === 'motion') {
+    s.phase -= nearestWhole(s.phase - cycles) * k
+    return
+  }
+  const field = LINK_CLOCKS[type]
+  if (!field) return
+  const period = 1000 / hz
+  const gridLast = now - (cycles - Math.floor(cycles)) * period
+  const cur = s[field] as number
+  ;(s as unknown as Record<string, number>)[field] = cur - nearestWhole((cur - gridLast) / period) * period * k
+}
+
 function makeSlot(now: number): SlotState {
   return {
     phase: 0,
@@ -354,8 +388,10 @@ export class ModEngine {
     }
   }
 
-  /** Advance every enabled modulator to `now` and return post-curve values. */
-  tick(now: number, cfgs: ModulatorConfig[], bpm: number): number[] {
+  /** Advance every enabled modulator to `now` and return post-curve values.
+   *  `linkBeats` : Ableton Link's beat now (null while Link is off), which the
+   *  BPM-synced ones lock to. */
+  tick(now: number, cfgs: ModulatorConfig[], bpm: number, linkBeats: number | null = null): number[] {
     while (this.slots.length < SLOTS) this.slots.push(makeSlot(now))
     const dtMs = this.lastNow > 0 ? Math.min(200, now - this.lastNow) : 16
     this.lastNow = now
@@ -371,6 +407,10 @@ export class ModEngine {
       }
       const hz = effectiveHz(cfg, bpm)
       let v01 = 0
+      // Ableton Link : how many of this clock's cycles the shared beats say
+      // have passed (null : free, or Link off)
+      const linkCycles = linkBeats != null && cfg.sync === 'bpm' && hz > 0 ? (linkBeats * hz * 60) / Math.max(1, bpm) : null
+      if (linkCycles != null) lockToLink(cfg.type, s, linkCycles, hz, now, dt)
 
       // SLIP : the clock still ticks, some ticks just don't fire. Keeping the
       // GRID while dropping the EVENT is what reads as cross-rhythm instead of
@@ -608,6 +648,9 @@ export class ModEngine {
               if (slipSkip()) continue // a skipped tick holds the gate an extra step
               s.euclidStep = (s.euclidStep + 1) % steps
             }
+            // Ableton Link : the pattern starts where everyone's grid does
+            // (SLIP's held steps would be undone, so it stays free then)
+            if (linkCycles != null && !((cfg.slip ?? 0) > 0)) s.euclidStep = ((Math.floor(linkCycles + 0.001) % steps) + steps) % steps
             // The raw gate rises instantly on a pulse step; `decay` gives it a
             // release once the pulse ends, so the output rides continuously
             // between beats instead of snapping 1→0 (decay 0 = a hard gate).

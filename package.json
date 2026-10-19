@@ -7,7 +7,7 @@
     "name": "Vincent Fillion",
     "email": "vfillion.av@gmail.com"
   },
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",

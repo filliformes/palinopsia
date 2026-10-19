@@ -54,6 +54,7 @@ import { autoSurfacePos } from './surface'
 import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify'
 import { audioLayer, defaultAudioLayer, sanitizeAudioLayer } from './audio/audioLayer'
 import { emitSessionLoaded } from './sessionEvents'
+import { tempoEdited } from './tempoEvents'
 import { makeDefaultKeySeq, sanitizeKeySeq } from './audio/soniKeyModel'
 import { isSoniRate } from './audio/soniClock'
 import { resetCouplingState } from './engine/coupling'
@@ -2763,10 +2764,12 @@ export const useStore = create<StoreState>((set, get) => ({
         }))
       }
     })),
-  setBpm: (bpm) =>
+  setBpm: (bpm) => {
     set((s) => ({
       composition: { ...s.composition, bpm: Math.max(20, Math.min(800, bpm)) }
-    })),
+    }))
+    tempoEdited(get().composition.bpm)
+  },
   // Performance dials : persisted to localStorage so a plain restart (which
   // seeds a fresh session, not the last one) keeps the feel set for a show, and
   // round-tripped through the session file so saved sessions carry it too.

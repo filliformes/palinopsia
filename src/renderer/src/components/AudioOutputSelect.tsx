@@ -1,5 +1,5 @@
 // The audio output picker, one for the whole app : the Sonify page's header,
-// Sonify's row in the audio/midi/osc tab (both drive the same setting, Sonify's
+// Sonify's row in the Connect tab (both drive the same setting, Sonify's
 // sinkId, so they always agree) and the input monitor's row. The device list
 // follows plugging and unplugging (devicechange).
 

@@ -3,7 +3,7 @@
 // declares a small tree of parameters (what it senses as SOURCES, what can play
 // it as DESTINATIONS), and every other node on the same universe sees them and
 // can wire them to its own. Shared between main (the node) and the renderer
-// (the section in the audio/midi/osc tab, the value bridge).
+// (the section in the Connect tab, the value bridge).
 
 export type DfType = 'bool' | 'number' | 'string' | 'v2' | 'v3' | 'v4' | 'blob' | 'colour'
 export type DfMode = 'streaming' | 'discrete' | 'polling'

@@ -27,6 +27,7 @@ import { setKnobTarget, shuffleMetaValues } from './metaSmooth'
 import { randomSonify } from './audio/autoSonify'
 import { undo, redo } from './undo'
 import { useStore } from './store'
+import { tempoEdited } from './tempoEvents'
 import type { SoniConfig } from './audio/sonify'
 
 const SONI_VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal'] as const
@@ -61,6 +62,7 @@ function tapTempo(): void {
   for (let i = 1; i < tapTimes.length; i++) sum += tapTimes[i] - tapTimes[i - 1]
   const bpm = Math.max(20, Math.min(800, Math.round(60000 / (sum / (tapTimes.length - 1)))))
   useStore.setState((s) => ({ composition: { ...s.composition, bpm } }))
+  tempoEdited(bpm)
 }
 
 /** Recall the scene `dir` steps from the active one (wraps); no active → scene 0. */
@@ -527,6 +529,7 @@ class MidiManager {
       const map = st.midiMap
       if (matches(map['transport:bpm'], binding)) {
         useStore.setState((s) => ({ composition: { ...s.composition, bpm: Math.round(40 + t * 200) } }))
+        tempoEdited(Math.round(40 + t * 200))
         ccHandled = true
       }
       if (matches(map['transport:speed'], binding)) { st.setGlobalSpeed(Math.pow(2, -6 + t * 12)); ccHandled = true }

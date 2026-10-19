@@ -74,6 +74,13 @@ JS
 # the rm -rf above must never reach through into the repo.
 mkdir -p "$OUT/resources"
 cp -r "$ROOT/resources/mediapipe" "$OUT/resources/"
+# The native addons built in this checkout (Ableton Link, Spout…) : copied where
+# the app looks for them (its own folder's native/<name>/build/Release).
+for d in "$ROOT"/native/*/build/Release; do
+  [ -d "$d" ] || continue
+  rel="${d#$ROOT/}"
+  mkdir -p "$OUT/$rel" && cp "$d"/*.node "$OUT/$rel/" 2>/dev/null || true
+done
 
 cd "$OUT"
 ("$ELECTRON" . > "$OUT.log" 2>&1 &)

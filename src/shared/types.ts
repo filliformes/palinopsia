@@ -1312,6 +1312,10 @@ export interface ExposedApi {
   dataflouForget: (sku: string) => Promise<boolean>
   onDataflouStatus: (cb: (s: import('./dataflou').DfStatus) => void) => () => void
   onDataflouIn: (cb: (batch: Array<{ path: string; value: import('./dataflou').DfValue }>) => void) => () => void
+  // Ableton Link (src/main/link.ts)
+  linkConfigure: (cfg: Partial<LinkConfig>) => Promise<LinkState>
+  linkSetTempo: (bpm: number) => void
+  onLinkState: (cb: (s: LinkState) => void) => () => void
 
   // App lifecycle : save-before-quit handshake
   appCloseProceed: () => Promise<void>
@@ -1518,4 +1522,23 @@ export interface PerfStats {
   // vsync-locked to it, so it is the ceiling the FPS readout should be read
   // against : 24 fps on a 24 Hz display is every frame, not a dropped one.
   hz: number | null
+}
+/** Ableton Link, per machine (like OSC) : on or off, and the quantum (beats
+ *  per bar the phase is aligned to). */
+export interface LinkConfig {
+  enabled: boolean
+  quantum: number
+}
+
+/** The Link session as read in the main process, stamped with when (`at`, ms
+ *  on the shared performance.timeOrigin + now() clock). */
+export interface LinkState {
+  available: boolean
+  error?: string
+  enabled: boolean
+  peers: number
+  tempo: number
+  beat: number
+  phase: number
+  at: number
 }
