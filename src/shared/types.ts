@@ -209,13 +209,18 @@ export interface World {
   // Audio routing default: an audio modulator the World can install on apply,
   // driving one common target. null = none.
   autoMod: { feature: AudioFeature; target: WorldAudioTarget; depth: number } | null
+  // Which layers its coupling goes to (L1..L4); absent = all four. A layer left
+  // out keeps its own coupling.
+  layers?: boolean[]
 }
 
 // Where a World's default audio modulator lands. Kept to a few safe Context
 // inputs (all valid mod targets); the World reserves modulator slot 8 for it.
-export type WorldAudioTarget = 'none' | 'haze' | 'bloom' | 'trails'
-export const WORLD_AUDIO_TARGETS: WorldAudioTarget[] = ['none', 'haze', 'bloom', 'trails']
-// Modulator slot the World manages for its audio-routing default (0-based).
+export type WorldAudioTarget = 'none' | 'haze' | 'bloom' | 'trails' | 'depth' | 'lightGlow' | 'voidEdge'
+export const WORLD_AUDIO_TARGETS: WorldAudioTarget[] = ['none', 'haze', 'bloom', 'trails', 'depth', 'lightGlow', 'voidEdge']
+// Modulator slot the World prefers for its audio-routing default (0-based) : it
+// takes the first FREE slot from there down (a modulator it installed carries
+// `fromWorld`), never one of yours.
 export const WORLD_AUTOMOD_SLOT = 7
 export interface LayerCoupling {
   mode: CouplingMode
@@ -588,6 +593,8 @@ export type ArpMode = 'up' | 'down' | 'upDown' | 'random' | 'drunk'
 export interface ModulatorConfig {
   type: ModulatorType
   enabled: boolean
+  // Installed by a World's audio routing : the next World replaces it (yours never)
+  fromWorld?: boolean
   // Clock : shared vocabulary with dataFLOU: free Hz or BPM-synced division.
   sync: 'free' | 'bpm'
   rateHz: number
@@ -720,6 +727,9 @@ export type ModTarget =
   // The output transform's sliders (shared/outXform.ts OUTX_MOD_RANGE) : a final
   // override on the transform stage (flat output only).
   | { kind: 'outx'; field: import('./outXform').OutXformField }
+  // The World amount : how much of the active World's mood is on (0 = the mood
+  // it found, 1 = all of it). A final override like the Background's.
+  | { kind: 'world'; field: 'amount' }
 
 // The Background's clock : grounds move slowly by default, up to 4× (every
 // path : the slider, the store, OSC, modulation, the Meta knobs).
@@ -825,6 +835,9 @@ export interface CompositionState {
   modulators: ModulatorConfig[]
   modMatrix: ModAssignment[]
   metaKnobs: MetaKnobState[]
+  // The mood a World found when it was applied (its Context / film keys, as they
+  // were) : the World amount blends from these to the World's own.
+  worldBase?: Record<string, number>
 }
 
 // ── Scenes (brief §7, §10.7) : recallable full-instrument states ──────

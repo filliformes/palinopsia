@@ -175,59 +175,196 @@ export function cloneWorld(src: World, name: string): World {
     coupling: { ...src.coupling },
     context: { ...src.context },
     finalizer: src.finalizer ? { ...src.finalizer } : undefined,
-    autoMod: src.autoMod ? { ...src.autoMod } : null
+    autoMod: src.autoMod ? { ...src.autoMod } : null,
+    layers: src.layers ? [...src.layers] : undefined
   }
 }
 
-/** Apply a World's bias to a composition: set every layer's coupling, nudge the
- *  Context finalizer's mood, and install (or clear) the World's audio-routing
- *  modulator on the reserved slot. Returns a new composition (Vibe untouched). */
+/** The Context keys a World sets (its mood), in the editor's order, with what
+ *  each does. Blur is never one (sansBlur). */
+export const WORLD_CONTEXT_KEYS: Array<{ k: string; label: string; hint: string }> = [
+  { k: 'trails', label: 'trails', hint: 'Temporal color bleed : past frames linger and drift into the distance.' },
+  { k: 'bloom', label: 'bloom', hint: 'Highlights glow / bleed light : dreamier, more luminous.' },
+  { k: 'depth', label: 'depth', hint: 'Vignette + aerial recession that seats the image in a volume.' },
+  { k: 'haze', label: 'haze', hint: 'Atmospheric veil toward the atmosphere color : distance, air.' },
+  { k: 'lightGlow', label: 'light', hint: 'The key light : a soft glow and its volumetric bloom.' },
+  { k: 'voidEdge', label: 'void', hint: 'The frame\u2019s edges eaten toward black, ragged and breathing.' },
+  { k: 'pbrAmount', label: 'material', hint: 'How much the picture lies on the surface material picked in Context.' }
+]
+
+/** The film character a World can carry (the Finalizer's film inputs) : what the
+ *  editor shows, with their ranges. Absent from a World = film off. */
+export const WORLD_FILM_KEYS: Array<{ k: string; label: string; min: number; max: number; step?: number; labels?: string[] }> = [
+  { k: 'filmHold', label: 'hold', min: 0, max: 2, step: 1, labels: ['off', 'film-hold', 'freeze'] },
+  { k: 'filmRate', label: 'draw fps', min: 1, max: 60, step: 1 },
+  { k: 'filmJitter', label: 'timing', min: 0, max: 1 },
+  { k: 'filmBoil', label: 'boil', min: 0, max: 1 },
+  { k: 'filmFlutter', label: 'flutter', min: 0, max: 1 },
+  { k: 'filmBlank', label: 'blanks', min: 0, max: 1 },
+  { k: 'filmDust', label: 'dust', min: 0, max: 1 },
+  { k: 'filmScratch', label: 'scratch', min: 0, max: 1 },
+  { k: 'filmHair', label: 'gate hair', min: 0, max: 1 },
+  { k: 'filmGranule', label: 'granulation', min: 0, max: 1 },
+  { k: 'filmSplice', label: 'splice', min: 0, max: 1 }
+]
+// What a World without film puts back : the hold and the damage off.
+const FILM_OFF: Record<string, number> = { filmHold: 0, filmDust: 0, filmScratch: 0, filmHair: 0 }
+
+const num = (v: unknown, d: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : d)
+const CONTEXT_DEFAULTS: Record<string, number> = { trails: 0.2, bloom: 0.3, depth: 0.35, haze: 0.15, lightGlow: 0.1, voidEdge: 0, pbrAmount: 0 }
+
+/** Which layers a World couples (L1..L4). */
+export const worldLayers = (w: World): boolean[] => [0, 1, 2, 3].map((i) => w.layers?.[i] ?? true)
+
+/** The modulator a World installed (its flag), or, in a session from before the
+ *  flag, slot 8 when it looks like one (an audio modulator on one Context row). */
+function worldSlotOf(c: CompositionState): number {
+  const flagged = c.modulators.findIndex((m) => m?.fromWorld)
+  if (flagged >= 0) return flagged
+  const m = c.modulators[WORLD_AUTOMOD_SLOT]
+  const rows = c.modMatrix.filter((a) => a.mod === WORLD_AUTOMOD_SLOT)
+  const ctx = c.master.find((f) => f.shaderId === 'fx-context')
+  if (m && m.enabled && m.type === 'audio' && rows.length === 1 && ctx && rows[0].target.kind === 'fx' && rows[0].target.instId === ctx.id) return WORLD_AUTOMOD_SLOT
+  return -1
+}
+
+/** Where a World's audio modulator goes : the one it installed before, else the
+ *  first free slot from M8 down (free = off and driving nothing); -1 = none free. */
+export function worldModSlot(c: CompositionState): number {
+  const own = worldSlotOf(c)
+  if (own >= 0) return own
+  for (let i = WORLD_AUTOMOD_SLOT; i >= 0; i--) {
+    const m = c.modulators[i]
+    if ((!m || !m.enabled) && !c.modMatrix.some((a) => a.mod === i)) return i
+  }
+  return -1
+}
+
+/** Apply a World's bias to a composition : the coupling of the layers it picks,
+ *  the Context mood, the film character, and its audio modulator in a free slot
+ *  (replacing only the one a World installed). The mood it finds is kept as
+ *  `worldBase` (the first World's find stays, so switching Worlds never loses
+ *  yours), which the World amount blends from. Returns a new composition. */
 export function applyWorldToComposition(c: CompositionState, world: World): CompositionState {
   const contextInst = c.master.find((f) => f.shaderId === 'fx-context')
+  const finInst = c.master.find((f) => f.shaderId === 'fx-finalizer')
+  const use = worldLayers(world)
+  // The mood as found, for every key this World touches (kept from an earlier World).
+  const base: Record<string, number> = { ...(c.worldBase ?? {}) }
+  for (const k of Object.keys(sansBlur(world.context)))
+    if (!(k in base) && contextInst) base[k] = num(contextInst.inputs[k], CONTEXT_DEFAULTS[k] ?? 0)
+  for (const k of Object.keys({ ...FILM_OFF, ...(world.finalizer ?? {}) }))
+    if (!(k in base) && finInst) base[k] = num(finInst.inputs[k], 0)
   let next: CompositionState = {
     ...c,
-    layers: c.layers.map((l) => ({ ...l, coupling: { ...world.coupling } })),
+    worldBase: base,
+    layers: c.layers.map((l, i) => (use[i] ? { ...l, coupling: { ...world.coupling } } : l)),
     master: c.master.map((f) => {
       if (f.shaderId === 'fx-context') return { ...f, inputs: { ...f.inputs, ...sansBlur(world.context) } }
       // Finalizer: reset the Cameraless hold and the film damage OFF as a baseline
       // (so a non-film World clears drawn-film : dust no longer needs the hold),
       // then apply this World's film character if any.
       if (f.shaderId === 'fx-finalizer')
-        return {
-          ...f,
-          inputs: { ...f.inputs, filmHold: 0, filmDust: 0, filmScratch: 0, filmHair: 0, ...(world.finalizer ?? {}) }
-        }
+        return { ...f, inputs: { ...f.inputs, ...FILM_OFF, ...(world.finalizer ?? {}) } }
       return f
     })
   }
 
-  // Audio routing default : the World manages ONLY the reserved slot
-  // WORLD_AUTOMOD_SLOT and the single matrix row keyed to it. Dropping every row
-  // on that slot first means a World switch REPLACES its own previous auto-mod row
-  // rather than stacking a duplicate, and never touches a user's slots/rows.
-  const slot = WORLD_AUTOMOD_SLOT
-  const matrix = next.modMatrix.filter((a) => a.mod !== slot)
+  // Audio routing : a World only ever replaces the modulator a World installed.
+  const old = worldSlotOf(c)
+  let matrix = next.modMatrix
   const modulators = next.modulators.slice()
+  if (old >= 0) {
+    matrix = matrix.filter((a) => a.mod !== old)
+    modulators[old] = { ...makeDefaultModulator(), ...modulators[old], enabled: false, fromWorld: false }
+  }
   const am = world.autoMod
+  const slot = worldModSlot({ ...next, modulators, modMatrix: matrix })
   // Only install the row if the matrix has room for it (never past the cap).
-  if (am && am.target !== 'none' && contextInst && matrix.length < MAX_MOD_ASSIGNMENTS) {
+  if (am && am.target !== 'none' && contextInst && slot >= 0 && matrix.length < MAX_MOD_ASSIGNMENTS) {
     modulators[slot] = {
       ...makeDefaultModulator(),
       type: 'audio',
       enabled: true,
+      fromWorld: true,
       audio: { feature: am.feature, band: 0, smooth: 0.2 }
     }
-    matrix.push({
-      id: uid(),
-      mod: slot,
-      target: { kind: 'fx', scope: { kind: 'master' }, instId: contextInst.id, input: am.target },
-      depth: am.depth
-    })
-  } else {
-    // No routing (or no room within the cap) : leave the slot a full, disabled
-    // modulator so it drives nothing and can never be a partial object.
-    modulators[slot] = { ...makeDefaultModulator(), ...modulators[slot], enabled: false }
+    matrix = [
+      ...matrix,
+      {
+        id: uid(),
+        mod: slot,
+        target: { kind: 'fx', scope: { kind: 'master' }, instId: contextInst.id, input: am.target },
+        depth: am.depth
+      }
+    ]
   }
   next = { ...next, modulators, modMatrix: matrix }
   return next
+}
+
+/** What applying `world` to `c` changes, line by line (the editor shows it
+ *  under Apply). */
+export function worldEffects(world: World, c: CompositionState): string[] {
+  const out: string[] = []
+  const use = worldLayers(world)
+  const ls = use.map((u, i) => (u ? `L${i + 1}` : '')).filter(Boolean)
+  out.push(
+    ls.length
+      ? `coupling ${world.coupling.mode}${world.coupling.mode === 'off' ? '' : ` ${world.coupling.amount.toFixed(2)} on ${world.coupling.feature}`} → ${ls.join(' ')}`
+      : 'coupling : no layer'
+  )
+  const ctx = Object.entries(sansBlur(world.context)) as Array<[string, number]>
+  if (ctx.length) {
+    const label = (k: string): string => WORLD_CONTEXT_KEYS.find((x) => x.k === k)?.label ?? k
+    out.push('Context ' + ctx.map(([k, v]) => `${label(k)} ${Number(v).toFixed(2)}`).join(' · '))
+  }
+  const film = world.finalizer
+  out.push(film && Object.keys(film).length ? `film : hold ${['off', 'on', 'freeze'][Math.round(num(film.filmHold, 0))] ?? 'off'} · dust ${num(film.filmDust, 0).toFixed(2)} · scratch ${num(film.filmScratch, 0).toFixed(2)}` : 'film off')
+  const am = world.autoMod
+  if (am && am.target !== 'none') {
+    const ctxInst = c.master.find((f) => f.shaderId === 'fx-context')
+    const own = worldSlotOf(c)
+    const freeC = own >= 0 ? { ...c, modulators: c.modulators.map((m, i) => (i === own ? { ...m, enabled: false } : m)), modMatrix: c.modMatrix.filter((a) => a.mod !== own) } : c
+    const slot = worldModSlot(freeC)
+    if (!ctxInst) out.push('audio routing skipped : no Context')
+    else if (slot < 0) out.push('audio routing skipped : no free modulator (all 8 are yours)')
+    else out.push(`audio : M${slot + 1} ← ${am.feature} → ${am.target} ${am.depth.toFixed(2)}${own >= 0 && own !== slot ? '' : own === slot ? ' (replaces the World\u2019s own)' : ' (a free slot)'}`)
+  } else out.push('no audio routing (a World\u2019s earlier one is removed)')
+  return out
+}
+
+/** A World's settings read back from a composition : the coupling of the first
+ *  coupled layer (and which layers share it), the Context mood, the film
+ *  character, the audio routing a World installed. The reverse of Apply. */
+export function worldFromComposition(c: CompositionState): Pick<World, 'coupling' | 'context' | 'finalizer' | 'autoMod' | 'layers'> {
+  const first = c.layers.find((l) => l.coupling && l.coupling.mode !== 'off') ?? c.layers[0]
+  const coupling = { ...first.coupling }
+  const layers = c.layers.slice(0, 4).map((l) => !!l.coupling && JSON.stringify(l.coupling) === JSON.stringify(coupling))
+  const ctxInst = c.master.find((f) => f.shaderId === 'fx-context')
+  const context: Record<string, number> = {}
+  for (const { k } of WORLD_CONTEXT_KEYS) context[k] = Math.round(num(ctxInst?.inputs[k], CONTEXT_DEFAULTS[k] ?? 0) * 1000) / 1000
+  const finInst = c.master.find((f) => f.shaderId === 'fx-finalizer')
+  let finalizer: Record<string, number> | undefined
+  if (finInst && (num(finInst.inputs.filmHold, 0) > 0 || num(finInst.inputs.filmDust, 0) > 0 || num(finInst.inputs.filmScratch, 0) > 0)) {
+    finalizer = {}
+    for (const { k } of WORLD_FILM_KEYS) if (typeof finInst.inputs[k] === 'number') finalizer[k] = finInst.inputs[k] as number
+  }
+  const slot = worldSlotOf(c)
+  let autoMod: World['autoMod'] = null
+  if (slot >= 0) {
+    const m = c.modulators[slot]
+    const row = c.modMatrix.find((a) => a.mod === slot)
+    if (m?.audio && row && row.target.kind === 'fx')
+      autoMod = { feature: m.audio.feature, target: row.target.input as World['autoMod'] extends infer T ? T extends { target: infer U } ? U : never : never, depth: row.depth }
+  }
+  return { coupling, layers, context, finalizer, autoMod }
+}
+
+/** A built-in edited this session differs from how it ships. */
+export function builtinChanged(w: World): boolean {
+  const o = BUILTIN_WORLDS.find((x) => x.id === w.id)
+  if (!o) return false
+  const pick = (x: World): string => JSON.stringify([x.name, x.blurb, x.coupling, x.context, x.finalizer ?? null, x.autoMod, worldLayers(x)])
+  return pick(o) !== pick(w)
 }

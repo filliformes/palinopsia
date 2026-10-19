@@ -58,7 +58,8 @@ import { tempoEdited } from './tempoEvents'
 import { makeDefaultKeySeq, sanitizeKeySeq } from './audio/soniKeyModel'
 import { isSoniRate } from './audio/soniClock'
 import { resetCouplingState } from './engine/coupling'
-import { applyWorldToComposition, BUILTIN_WORLDS, cloneWorld, deriveSceneTags, sansBlur } from './worlds'
+import { applyWorldToComposition, BUILTIN_WORLDS, cloneWorld, deriveSceneTags, sansBlur, worldFromComposition } from './worlds'
+import { setWorldAmountBase } from './engine/worldAmount'
 
 // User worlds (builtin === false) persist to localStorage; built-ins ship in code.
 function saveUserWorlds(worlds: World[]): void {
@@ -705,7 +706,7 @@ export function isToggleTarget(st: { composition: CompositionState }, t: ModTarg
 
 /** Normalized (0..1) CURRENT base of a mod target, for assignMod's automatic
  *  mode choice. 0.5 (→ multiply) wherever the base can't be resolved. */
-function baseNormForTarget(st: { composition: CompositionState; dome?: DomeConfig; outXform?: OutXform }, t: ModTarget): number {
+function baseNormForTarget(st: { composition: CompositionState; dome?: DomeConfig; outXform?: OutXform; worldAmount?: number }, t: ModTarget): number {
   try {
     if (t.kind === 'meta') return st.composition.metaKnobs[t.knob]?.value ?? 0.5
     if (t.kind === 'dome') {
@@ -713,6 +714,7 @@ function baseNormForTarget(st: { composition: CompositionState; dome?: DomeConfi
       const r = DOME_MOD_RANGE[t.field]
       return (st.dome[t.field] - r.min) / (r.max - r.min)
     }
+    if (t.kind === 'world') return st.worldAmount ?? 1
     if (t.kind === 'outx') {
       if (!st.outXform) return 0.5
       const r = OUTX_MOD_RANGE[t.field]
@@ -1169,6 +1171,7 @@ export function modTargetKey(t: ModTarget): string {
   if (t.kind === 'bg') return `bg:${t.field}`
   if (t.kind === 'dome') return `dome:${t.field}`
   if (t.kind === 'outx') return `outx:${t.field}`
+  if (t.kind === 'world') return 'world:amount'
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
@@ -1619,6 +1622,15 @@ interface StoreState {
   worlds: World[]
   world: string // active world id
   setWorld: (id: string) => void
+  // How much of the active World's mood is on (engine/worldAmount.ts) : 0..1,
+  // per machine like the field macros. Modulatable, OSC /opsia/world/amount.
+  worldAmount: number
+  setWorldAmount: (v: number) => void
+  // A built-in edited this session back to how it ships.
+  resetWorld: (id: string) => void
+  // The composition's coupling / Context mood / film / audio routing into a
+  // World : a built-in gets a new user World; returns the World edited.
+  takeWorldFromComposition: (id: string) => string
   addWorld: (fromId?: string) => string // clone → new user world; returns its id
   updateWorld: (id: string, partial: Partial<World>) => void
   deleteWorld: (id: string) => void
@@ -3595,9 +3607,50 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const w = s.worlds.find((x) => x.id === id) ?? s.worlds[0]
       localStorage.setItem('opsia.world', w.id)
-      // Applying a World biases the current composition (undoable).
-      return { world: w.id, composition: applyWorldToComposition(s.composition, w) }
+      // Applying a World biases the current composition (undoable), over the
+      // MORPH time like a scene recall.
+      const composition = applyWorldToComposition(s.composition, w)
+      beginSceneMorph(s.composition, composition, s.morphMs, performance.now())
+      return { world: w.id, composition }
     }),
+  worldAmount: (() => {
+    const v = lsNum('opsia.worldAmount')
+    const a = Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1
+    setWorldAmountBase(a)
+    return a
+  })(),
+  setWorldAmount: (v) => {
+    const a = Math.max(0, Math.min(1, Number.isFinite(v) ? v : 1))
+    try { localStorage.setItem('opsia.worldAmount', String(a)) } catch { /* private storage */ }
+    setWorldAmountBase(a)
+    set({ worldAmount: a })
+  },
+  resetWorld: (id) =>
+    set((s) => {
+      const o = BUILTIN_WORLDS.find((x) => x.id === id)
+      if (!o) return {}
+      const worlds = s.worlds.map((w) => (w.id === id ? structuredClone(o) : w))
+      saveUserWorlds(worlds)
+      const fresh = worlds.find((w) => w.id === id)!
+      return s.world === id ? { worlds, composition: applyWorldToComposition(s.composition, fresh) } : { worlds }
+    }),
+  takeWorldFromComposition: (id) => {
+    const s = get()
+    const w = s.worlds.find((x) => x.id === id)
+    if (!w) return id
+    const got = worldFromComposition(s.composition)
+    if (w.builtin) {
+      const nw = { ...cloneWorld(w, uniqueWorldName(s.worlds, `${w.name} (taken)`)), ...got }
+      const worlds = [...s.worlds, nw]
+      saveUserWorlds(worlds)
+      set({ worlds })
+      return nw.id
+    }
+    const worlds = s.worlds.map((x) => (x.id === id ? { ...x, ...got } : x))
+    saveUserWorlds(worlds)
+    set({ worlds })
+    return id
+  },
   addWorld: (fromId) => {
     const s = get()
     const src = s.worlds.find((x) => x.id === (fromId ?? s.world)) ?? BUILTIN_WORLDS[0]

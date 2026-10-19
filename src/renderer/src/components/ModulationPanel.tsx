@@ -944,6 +944,7 @@ function MatrixSummary(): JSX.Element {
     if (t.kind === 'bg') return `BG ${t.field === 'depth' ? 'shadow' : t.field}`
     if (t.kind === 'dome') return `Dome ${DOME_MOD_RANGE[t.field].label}`
     if (t.kind === 'outx') return `Output ${OUTX_MOD_RANGE[t.field].label}`
+    if (t.kind === 'world') return 'World amount'
     const inst =
       t.scope.kind === 'master'
         ? composition.master.find((f) => f.id === t.instId)

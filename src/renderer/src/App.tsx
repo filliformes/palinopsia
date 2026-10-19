@@ -38,6 +38,7 @@ import { tickSonifySeq } from './audio/soniSeq'
 import { tickKeySeq } from './audio/soniKeySeq'
 import { soniBeats, soniClockTick } from './audio/soniClock'
 import { linkBeats, linkQuantum, linkSettings, setLinkSettings, tickLink } from './link'
+import { applyWorldAmount } from './engine/worldAmount'
 import { Collapsible } from './components/Collapsible'
 import { FxAddSelect, FxChips } from './components/FxRackPanel'
 import { SearchSelect } from './components/SearchSelect'
@@ -1460,6 +1461,8 @@ export default function App(): JSX.Element {
         }
         // 2e. Field macros: Density / Gesture⇄Texture / Coalesce (post-mod, 0.5 deadzone).
         applyFieldMacros(comp!, c, st.density, st.gestureTexture, st.coalesce)
+        // 2e'. The World amount : the active World's mood blended from what it found.
+        applyWorldAmount(comp!, c, st.worlds.find((w) => w.id === st.world))
         // 2f. Temperament: Tonicity (tonal audio → colour) + Drift
         //     (analog-instability wander). Shutter (stop-motion stepping) freezes
         //     the output on held frames.

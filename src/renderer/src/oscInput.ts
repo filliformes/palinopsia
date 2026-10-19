@@ -481,6 +481,8 @@ function route(address: string, args: Args): void {
     case 'superflicker': st.setSuperFlicker(clamp01(n)); return
 
     case 'world': {
+      // /opsia/world/amount f 0..1 : how much of the World's mood is on
+      if (segs[2] === 'amount') { st.setWorldAmount(clamp01(n)); return }
       const str = firstStr(args)
       if (str !== null) {
         const w = st.worlds.find((x) => x.id === str || x.name.toLowerCase() === str.trim().toLowerCase())
@@ -1383,6 +1385,7 @@ function enumerateLeaves(): Leaf[] {
   // World selection (accepts a string id/name, or a 1-based index) + transport.
   const worldIdx = Math.max(1, st.worlds.findIndex((w) => w.id === st.world) + 1)
   add('/opsia/world', 1, Math.max(1, st.worlds.length), worldIdx, 'Active World (send an id/name string, or a 1-based index)')
+  add('/opsia/world/amount', 0, 1, st.worldAmount, "World amount : how much of the active World's mood is on (0 = the mood it found)")
   add('/opsia/seq/run', 0, 1, st.sequence.running ? 1 : 0, 'Sequencer running (>= 0.5)')
   add('/opsia/seq/skip', 0, 1, 0, 'Advance to the next scene (trigger)', false)
   add('/opsia/panic', 0, 1, 0, 'Panic flush : drop every self-feeding buffer (trigger)', false)

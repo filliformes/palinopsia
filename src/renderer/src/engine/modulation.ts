@@ -11,6 +11,7 @@
 // mouth). Values are applied straight to the Compositor each frame and never
 // touch the React store, so nothing re-renders at 60 Hz.
 
+import { setWorldAmountMod, worldAmountBase } from './worldAmount'
 import type { CompositionState, LfoShape, ModCurve, ModulatorConfig } from '@shared/types'
 import { BLEND_MODES, FX_OPACITY_INPUT } from '@shared/types'
 import { audioBus } from './audioIn'
@@ -1107,6 +1108,7 @@ function liveKey(t: import('@shared/types').ModTarget): string {
   if (t.kind === 'bg') return `bg:${t.field}`
   if (t.kind === 'dome') return `dome:${t.field}`
   if (t.kind === 'outx') return `outx:${t.field}`
+  if (t.kind === 'world') return 'world:amount'
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
@@ -1328,6 +1330,13 @@ export function writeModTarget(
     liveModValues.set(liveKey(t), v)
     return
   }
+  // The World amount : absolute 0..1.
+  if (t.kind === 'world') {
+    const v = Math.max(0, Math.min(1, shaped01))
+    liveModValues.set(liveKey(t), v)
+    setWorldAmountMod(v)
+    return
+  }
   // An output-transform slider : absolute over its span.
   if (t.kind === 'outx') {
     const r = OUTX_MOD_RANGE[t.field]
@@ -1513,6 +1522,14 @@ export function applyModulation(
       if (final === null || typeof final !== 'number' || !Number.isFinite(final)) continue
       sonifyModValues.set(a.target.param, final)
       liveModValues.set(liveKey(a.target), final)
+      continue
+    }
+    if (a.target.kind === 'world') {
+      const base = worldAmountBase()
+      const final = inputValueForMode({ type: 'float', min: 0, max: 1, def: base }, base, v, a.depth, a.mode)
+      if (final === null || typeof final !== 'number') continue
+      liveModValues.set(liveKey(a.target), final)
+      setWorldAmountMod(final)
       continue
     }
     if (a.target.kind === 'outx') {

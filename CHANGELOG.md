@@ -5,36 +5,33 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
-### Fixed
-
-- **The dome, from a fulldome audit of every source and effect** :
-  - a **square composition** for full-dome fill : `dome 2048²` / `dome 2880²` sizes, and
-    the **Satosphère** button sets 2048² (fill spreads width and height over the same
-    diameter, so 16:9 drew circles as ovals 1.78× longer front to back);
-  - **`DOME_FILL`** (`engine/domeSignal.ts`) : a plain uniform uploaded beside the
-    integrated phases (the horizon's radius on the disc, 180 / aperture, while fisheye +
-    fill, else 0). **Context**'s depth now falls from just above the horizon to the rim
-    and its void erodes from the rim, measured on the disc (Fong square→disc) : round,
-    the walls keep their light. **CRT Screen** drops its bezel and corners and moves its
-    vignette below the horizon. Verified on a 210° master : round, no ring;
-  - a **film on the default fit covers** the frame under full-dome fill (stretched into a
-    square composition it came out squashed);
-  - the **panorama's back seam** blends over 12° (each side toward the other, halfway at
-    the seam) when the turns don't land the picture back on itself; `top` resets to 90
-    like its default.
-
-- **The ADSR modulator's times read in full** (`ModulationPanel.tsx` MiniSlider) : their
-  boxes were 36 px against SUS's 40, so "0.96" or "3.45" clipped. Same width as SUS now,
-  and one decimal from 10 s ("45.2"); measured : every readout fits its box.
-
-- **A moved full-dome fill stays perfectly round** (`engine/dome.ts`). Fill's offset was a
-  plain shift of the picture's disc, so any offset (or a modulator on it) slid that disc
-  off the rim and the two circles cut the dome into a lens, pointed at the sides. It is
-  now a disc automorphism (complex `(z − a) / (1 − conj(a)·z)`, |a| ≤ 0.9) : the
-  picture's centre moves to the offset, the rim stays the rim. Verified at offset y 0.27 :
-  a full round master. Cover and contain still slide the frame. The offset sliders say so.
 
 ### Added
+
+- **The World page, ten ways better** (`components/WorldPage.tsx`, `worlds.ts`,
+  `engine/worldAmount.ts`) :
+  1. an **apply sets** line (`worldEffects`) saying what Apply changes;
+  2. Apply **morphs** over MORPH (`beginSceneMorph`), like a scene recall;
+  3. **take from composition** (`worldFromComposition`, store `takeWorldFromComposition`;
+     a built-in gets a new World);
+  4. **layers** L1..L4 (`World.layers`; a layer left out keeps its coupling);
+  5. everything a World holds is editable : the **film character** (`WORLD_FILM_KEYS`)
+     and Context's light, void and material beside trails/bloom/depth/haze
+     (`WORLD_CONTEXT_KEYS`); audio routing targets gain depth, light, void;
+  6. the visualizer reads **your layers**' generators and the **live sound**;
+  7. edited built-ins show **● changed** with **save as mine** and **reset**
+     (`builtinChanged`, `resetWorld`);
+  8. a **filter**, descriptions in the list, **arrow keys** + **Enter**, double-click
+     applies;
+  9. the JSON folded by default (remembered), now with layers and film;
+  10. the **World amount** (store `worldAmount`, `ModTarget {kind:'world'}`, Meta knobs,
+     OSC `/opsia/world/amount`) : blends the World's Context and film keys from
+     `composition.worldBase` (the mood the first World found) frame by frame after the
+     field macros. The World's audio modulator now goes to the first free slot from M8
+     down (`fromWorld` flag; an older session's M8 routing is recognized), never a user's.
+  Verified : the summary, L2 left alone, M8 kept (the routing took M6), base captured,
+  changed / reset, take (haze 0.42), film hold applied, arrows + Enter, your-layers
+  material, live sound, trails 0.22 → 0 → 0.11 at amount 1 / 0 / 0.5, the morph running.
 
 - **Codec Mosh** (`engine/codecMosh.ts`, `node-codecmosh`) : a native node that runs the
   layer through a real H.264 round trip (WebCodecs : baseline `avc1.42001f`, annexb,
@@ -108,78 +105,6 @@ that CI builds into cross-platform releases.
   (5 missing, banner), relink (0 missing, film still playing, scenes rewired), a missing
   converted copy remade, collect (4 files copied, paths rewritten), collect again (no
   duplicates).
-
-### Changed
-
-- **Assemblage from the source menu stays on the layers** (`assemble/place.ts`) : it puts
-  the latest saved edit on the slot (or a fresh cut when the corpus is in memory) and
-  selects it, instead of jumping to the assemble tab. The Inspector gains an **edit**
-  picker (the bank), **new** / **vary** (greyed, with why, until the corpus is loaded)
-  and an **assemble tab ▸** button. Tested : placed and selected with the view
-  unchanged, the button opens the tab, an empty bank says so.
-- **The side tabs run layers · mixer · finishing · feel · connect · performance ·
-  assemble** (assemble moved to the end).
-- **License : GPL-3.0-or-later** (was MIT), with an additional permission for the NDI®
-  runtime (`LICENSE-EXCEPTIONS.md`); bundling Ableton Link needs it. Releases up to
-  v1.2.10 keep MIT. `package.json`, README, the site and `THIRD_PARTY_NOTICES.md`
-  (Ableton Link, asio) follow.
-- **The audio/midi/osc tab is now "Connect"** (key `A` unchanged), with Ableton Link
-  under dataflou.
-
-- **The top bar's session controls are one group** : the session list and Load, then
-  New, Open ▾, Save, Save As (New / Open / Save / Save As used to sit at the far right).
-
-- **More "does nothing right now" graying in Vibe and Context**, read from the shaders :
-  the chord's hue / chroma / spread with the chord off; at source mix 1, everything that
-  only shapes the palette (the strip, bands↔smooth, dither, auto-levels, gamma, sharpen;
-  contrast and saturation stay live); haze color with haze 0 (unless the surface material
-  is tinted by it through its field depth); light color with glow 0 and no surface
-  material; the surface's raking, scale, field depth and evolution at relief 0. Every
-  rule (the Finalizer's too) now counts a parameter a modulator, a Meta knob or a Context
-  performance macro is driving as live (`DimCtx.driven` : the matrix and Meta targets,
-  plus Context's macro values polled off the engine).
-
-- **Vibe and Context read at a glance** : every Finishing section without a switch now
-  says its state in its header (palette, tone, split-tone; softness, distance, light),
-  like the Finalizer's. Color rows across the three stages are a swatch and its hex value
-  (`AutoControls rgbOnly` : the transparency slider beside each did nothing, the shaders
-  read RGB only).
-- **The Vibe's palette is one strip** (`VibePaletteStrip`) : its gradient drawn with
-  Vibe.fs's own palette map (stops, bands↔smooth, a chord's colors via a port of
-  `chordColor`), the stops as swatches at their places (click to pick), stops used as
-  2 · 3 · 4 · 5 with its M. It replaces the five stop rows and the stops slider.
-- **Stutter has no fire button** : its punch-in event (`trig`) is gone from the effect;
-  saved values for it are ignored.
-
-- **The Master FX strip's layout** : a header line (chain on, the dice, chain presets and
-  + fx, the two menus now the same width) with the finishing units at its right end, and
-  the effects underneath across the whole width, under the finishing too (they used to
-  share one wrapping row with the menus, which drifted apart as it wrapped).
-- **Meta knobs show their value live** : what the knob sends now through its curve
-  (`shapeCurve(display, curve)`, 0.00 format), in the gap at the bottom of the dial,
-  following drags, glides, MIDI and modulators (accent2 while modulated).
-- The audio tab's hint lost its "prefer transient / flux over level" advice.
-
-### Fixed
-
-- **The audio input no longer goes silent on a remembered device that is gone.** The
-  audio tab kept the chosen input by its id only; an id that changed (the installed app
-  and the dev app number devices differently, another USB port) or a device unplugged
-  left the analyser silent, with no message in Both mode, the menu reading "Default
-  input" : the audio modulators read nothing, even from the laptop's microphone. Now
-  the device is remembered with its name (`audioDeviceLabel`) and found again by it, else
-  the default input plays, said in a message and in the menu (`… (not here : the default
-  input plays)`); a failure to open anything is said in every mode. Picking another
-  device while the input runs reopens it (it waited for the input to be switched off and
-  on).
-
-- **Import audio plays AIFF files** (and WMA / CAF). The player can't decode them, and
-  their audio-only copy was asked through the Collage's handler, which takes films only :
-  the slot stayed silent. A sound file now has its own path (`audio:playable` : the file
-  itself, or the copy made once by ffmpeg), asked before playing for those formats, and
-  forced for a file the player refuses anyway (ALAC in an m4a).
-
-### Added
 
 - **Output EQ presets.** A menu on the EQ card and in its editor (`EqPresetMenu`) :
   flat, the saved EQs, save as (a name; an existing one asks before replacing), delete
@@ -289,6 +214,103 @@ that CI builds into cross-platform releases.
   while it plays natively forward (reverse, pendulum, the grains or a modulated playhead
   stay silent : they would stutter), silent with its layer muted. A modulation target
   (`vol`) and OSC `/opsia/layerN/video/{A|B}/volume` (an audio slot's sets its volume).
+
+### Changed
+
+- **Assemblage from the source menu stays on the layers** (`assemble/place.ts`) : it puts
+  the latest saved edit on the slot (or a fresh cut when the corpus is in memory) and
+  selects it, instead of jumping to the assemble tab. The Inspector gains an **edit**
+  picker (the bank), **new** / **vary** (greyed, with why, until the corpus is loaded)
+  and an **assemble tab ▸** button. Tested : placed and selected with the view
+  unchanged, the button opens the tab, an empty bank says so.
+- **The side tabs run layers · mixer · finishing · feel · connect · performance ·
+  assemble** (assemble moved to the end).
+- **License : GPL-3.0-or-later** (was MIT), with an additional permission for the NDI®
+  runtime (`LICENSE-EXCEPTIONS.md`); bundling Ableton Link needs it. Releases up to
+  v1.2.10 keep MIT. `package.json`, README, the site and `THIRD_PARTY_NOTICES.md`
+  (Ableton Link, asio) follow.
+- **The audio/midi/osc tab is now "Connect"** (key `A` unchanged), with Ableton Link
+  under dataflou.
+
+- **The top bar's session controls are one group** : the session list and Load, then
+  New, Open ▾, Save, Save As (New / Open / Save / Save As used to sit at the far right).
+
+- **More "does nothing right now" graying in Vibe and Context**, read from the shaders :
+  the chord's hue / chroma / spread with the chord off; at source mix 1, everything that
+  only shapes the palette (the strip, bands↔smooth, dither, auto-levels, gamma, sharpen;
+  contrast and saturation stay live); haze color with haze 0 (unless the surface material
+  is tinted by it through its field depth); light color with glow 0 and no surface
+  material; the surface's raking, scale, field depth and evolution at relief 0. Every
+  rule (the Finalizer's too) now counts a parameter a modulator, a Meta knob or a Context
+  performance macro is driving as live (`DimCtx.driven` : the matrix and Meta targets,
+  plus Context's macro values polled off the engine).
+
+- **Vibe and Context read at a glance** : every Finishing section without a switch now
+  says its state in its header (palette, tone, split-tone; softness, distance, light),
+  like the Finalizer's. Color rows across the three stages are a swatch and its hex value
+  (`AutoControls rgbOnly` : the transparency slider beside each did nothing, the shaders
+  read RGB only).
+- **The Vibe's palette is one strip** (`VibePaletteStrip`) : its gradient drawn with
+  Vibe.fs's own palette map (stops, bands↔smooth, a chord's colors via a port of
+  `chordColor`), the stops as swatches at their places (click to pick), stops used as
+  2 · 3 · 4 · 5 with its M. It replaces the five stop rows and the stops slider.
+- **Stutter has no fire button** : its punch-in event (`trig`) is gone from the effect;
+  saved values for it are ignored.
+
+- **The Master FX strip's layout** : a header line (chain on, the dice, chain presets and
+  + fx, the two menus now the same width) with the finishing units at its right end, and
+  the effects underneath across the whole width, under the finishing too (they used to
+  share one wrapping row with the menus, which drifted apart as it wrapped).
+- **Meta knobs show their value live** : what the knob sends now through its curve
+  (`shapeCurve(display, curve)`, 0.00 format), in the gap at the bottom of the dial,
+  following drags, glides, MIDI and modulators (accent2 while modulated).
+- The audio tab's hint lost its "prefer transient / flux over level" advice.
+
+### Fixed
+
+- **The dome, from a fulldome audit of every source and effect** :
+  - a **square composition** for full-dome fill : `dome 2048²` / `dome 2880²` sizes, and
+    the **Satosphère** button sets 2048² (fill spreads width and height over the same
+    diameter, so 16:9 drew circles as ovals 1.78× longer front to back);
+  - **`DOME_FILL`** (`engine/domeSignal.ts`) : a plain uniform uploaded beside the
+    integrated phases (the horizon's radius on the disc, 180 / aperture, while fisheye +
+    fill, else 0). **Context**'s depth now falls from just above the horizon to the rim
+    and its void erodes from the rim, measured on the disc (Fong square→disc) : round,
+    the walls keep their light. **CRT Screen** drops its bezel and corners and moves its
+    vignette below the horizon. Verified on a 210° master : round, no ring;
+  - a **film on the default fit covers** the frame under full-dome fill (stretched into a
+    square composition it came out squashed);
+  - the **panorama's back seam** blends over 12° (each side toward the other, halfway at
+    the seam) when the turns don't land the picture back on itself; `top` resets to 90
+    like its default.
+
+- **The ADSR modulator's times read in full** (`ModulationPanel.tsx` MiniSlider) : their
+  boxes were 36 px against SUS's 40, so "0.96" or "3.45" clipped. Same width as SUS now,
+  and one decimal from 10 s ("45.2"); measured : every readout fits its box.
+
+- **A moved full-dome fill stays perfectly round** (`engine/dome.ts`). Fill's offset was a
+  plain shift of the picture's disc, so any offset (or a modulator on it) slid that disc
+  off the rim and the two circles cut the dome into a lens, pointed at the sides. It is
+  now a disc automorphism (complex `(z − a) / (1 − conj(a)·z)`, |a| ≤ 0.9) : the
+  picture's centre moves to the offset, the rim stays the rim. Verified at offset y 0.27 :
+  a full round master. Cover and contain still slide the frame. The offset sliders say so.
+
+- **The audio input no longer goes silent on a remembered device that is gone.** The
+  audio tab kept the chosen input by its id only; an id that changed (the installed app
+  and the dev app number devices differently, another USB port) or a device unplugged
+  left the analyser silent, with no message in Both mode, the menu reading "Default
+  input" : the audio modulators read nothing, even from the laptop's microphone. Now
+  the device is remembered with its name (`audioDeviceLabel`) and found again by it, else
+  the default input plays, said in a message and in the menu (`… (not here : the default
+  input plays)`); a failure to open anything is said in every mode. Picking another
+  device while the input runs reopens it (it waited for the input to be switched off and
+  on).
+
+- **Import audio plays AIFF files** (and WMA / CAF). The player can't decode them, and
+  their audio-only copy was asked through the Collage's handler, which takes films only :
+  the slot stayed silent. A sound file now has its own path (`audio:playable` : the file
+  itself, or the copy made once by ffmpeg), asked before playing for those formats, and
+  forced for a file the player refuses anyway (ALAC in an m4a).
 
 ## v1.2.10 — 2026-10-15
 

@@ -748,10 +748,36 @@ Repose–Disturbance–Repose climate arc, and the punctuation toggles.*
 ## Worlds / diegesis (key `W`)
 
 A global "proposed world" biases the whole composition : A/B coupling character,
-Context mood, and audio routing (which feeds modulator slot 8). The editor holds a
-world bank (built-ins + saved), coupling settings, Context mood sliders, an
-audio-routing binding, and a live visualiser. Editing the active world updates the
-composite live.
+Context mood, film character and an audio routing. Editing the active world updates
+the composite live.
+
+- **The bank** : built-ins and yours, each with its one-line description; a **filter**
+  box; **← → / ↑ ↓** step through them, **Enter** applies, a double-click too.
+- **Apply** morphs over the MORPH time like a scene recall. The **apply sets** line
+  above the editor says exactly what it will change : the coupling and its layers, the
+  Context keys, the film, and where the audio routing goes.
+- **Coupling** : mode, feature, amount, tightness, and **layers L1 to L4** (a layer left
+  out keeps its own coupling).
+- **Context mood** : trails, bloom, depth, haze, light, void, material (a dim key is not
+  part of the World until you move it; blur stays yours).
+- **Film character** : on or off, then hold, draw fps, timing, boil, flutter, blanks,
+  dust, scratch, gate hair, granulation, splice (the Finalizer's film). A World without
+  film switches the film off.
+- **Audio routing** : an audio modulator on a Context key (haze, bloom, trails, depth,
+  light, void), installed in the **first free modulator slot from M8 down**, or the one
+  a World installed before : never one of yours (a session from before keeps working).
+- **Take from composition** reads a World back from what is on screen (the coupling and
+  the layers sharing it, the Context mood, the film, the World's audio routing); on a
+  built-in it makes a new World.
+- **Built-ins** you edit show **● changed** (this session only) with **save as mine**
+  and **reset**.
+- **The visualizer** reads the World on real generators, **your layers** included, driven
+  by simulated audio or the **live sound** (the audio tab's input).
+- **The live code (JSON)** is folded until you open it (remembered).
+- **World amount** (the header, with its **M**, and OSC `/opsia/world/amount`) : how much
+  of the active World's mood is on, 0 = the mood it found before the first World, 1 =
+  all of it. It fades the Context mood and the film the World set, frame by frame
+  (`engine/worldAmount.ts`); per machine, like the field macros.
 
 ## Audio in
 
@@ -2361,6 +2387,7 @@ unless the slot actually holds a video.
 | `/opsia/meta/{1..16}` | f | Drives meta knob *n* (smoothed) |
 | `/opsia/bpm` | f | Tempo : **raw**, clamped 20..800 |
 | `/opsia/world` | s / i | Select World (name, or 1-based index) |
+| `/opsia/world/amount` | f 0..1 | World amount : how much of the active World's mood is on (0 = the mood it found) |
 | `/opsia/seq/run` | level | Run (≥ 0.5) / stop the sequencer |
 | `/opsia/seq/skip` | trigger | Advance to next scene |
 | `/opsia/scene/{n}` | trigger | Recall scene *n* (1-based) |

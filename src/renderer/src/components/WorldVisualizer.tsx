@@ -9,6 +9,7 @@
 // this widget's own WebGL2 context : a self-contained preview needing no audio
 // input and no live layers.
 
+import { audioBus } from '../engine/audioIn'
 import { useEffect, useRef } from 'react'
 import type { LayerCoupling } from '@shared/types'
 import { Renderer as ISFRenderer } from 'interactive-shader-format'
@@ -20,6 +21,18 @@ export interface SimAudio {
   freqHz: number // 0.2 .. 8
   rhythmic: boolean
   gain: number // 0..1
+  live?: boolean // the real sound instead (the audio tab's input : a device, OSC, the Audio Layer)
+}
+
+/** The live features in the simulator's shape (the real sound, when live is on). */
+export function liveAudio(): { level: number; transient: number; flux: number; centroid: number; pitch: number } {
+  return {
+    level: audioBus.feature('level'),
+    transient: audioBus.feature('transient'),
+    flux: audioBus.feature('flux'),
+    centroid: audioBus.feature('centroid'),
+    pitch: audioBus.feature('pitch')
+  }
 }
 
 // Five source PAIRS of real generators, each chosen to read DISTINCTLY so the
@@ -130,12 +143,14 @@ export function WorldVisualizer({
   coupling,
   context,
   audio,
-  sourceIdx
+  sourceIdx,
+  mine
 }: {
   coupling: LayerCoupling
   context: Record<string, number>
   audio: SimAudio
-  sourceIdx: number
+  sourceIdx: number // -1 : your own layers' generators (`mine`)
+  mine?: { a: string; b: string } | null
 }): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const paramsRef = useRef<Params>({ coupling, context, audio })
@@ -205,7 +220,7 @@ export function WorldVisualizer({
 
     // ── Two real ISF generators through the redirect proxy ────────────
     const { gl: rgl, state } = makeRedirectableGL(gl)
-    const pair = WORLD_SOURCE_PAIRS[sourceIdx % WORLD_SOURCE_PAIRS.length]
+    const pair = sourceIdx < 0 && mine ? { name: 'yours', a: mine.a, b: mine.b } : WORLD_SOURCE_PAIRS[Math.max(0, sourceIdx) % WORLD_SOURCE_PAIRS.length]
     const loadGen = (id: string): ISFRenderer | null => {
       const src = SHADER_BY_ID[id]?.source
       if (!src) return null
@@ -258,7 +273,7 @@ export function WorldVisualizer({
       const { coupling: cp, context: ctx, audio: aud } = paramsRef.current
 
       // Simulated audio → the coupling feature → the A/B mix.
-      const feat = simAudio(aud, time)
+      const feat = aud.live ? liveAudio() : simAudio(aud, time)
       const raw = (feat as Record<string, number>)[cp.feature] ?? feat.level
       mix = couplingMix(cp, raw, 0.5, st)
 
@@ -309,7 +324,7 @@ export function WorldVisualizer({
         gl.deleteFramebuffer(t.fbo)
       }
     }
-  }, [sourceIdx])
+  }, [sourceIdx, mine?.a, mine?.b])
 
   return (
     <canvas

@@ -84,6 +84,10 @@ function applyDest(target: ModTarget, shaped: number): void {
     return
   }
   // An output-transform slider : committed into the session's transform.
+  if (target.kind === 'world') {
+    st.setWorldAmount(Math.max(0, Math.min(1, shaped)))
+    return
+  }
   if (target.kind === 'outx') {
     const r = OUTX_MOD_RANGE[target.field]
     st.setOutXform({ [target.field]: r.min + Math.max(0, Math.min(1, shaped)) * (r.max - r.min) })
