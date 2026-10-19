@@ -116,7 +116,7 @@ type Args = OscInEvent['args']
 // octave span [lo min, lo max, hi min, hi max], and the Orbit shapes in UI order.
 const SONI_TAP_VOICES = { spectra: 1, orbit: 1, flow: 1, events: 1, raster: 1, sstv: 1, filter: 1, chord: 1, signal: 1 } as const
 const SONI_OCT_SPAN: Record<string, [number, number, number, number] | undefined> = {
-  spectra: [0, 4, 4, 8], flow: [1, 4, 4, 7], events: [1, 4, 4, 7], chord: [0, 4, 3, 8], collage: [0, 4, 3, 8], assemblage: [0, 4, 3, 8], filter: [0, 4, 4, 8],
+  spectra: [0, 4, 4, 8], flow: [1, 4, 4, 7], events: [1, 4, 4, 7], chord: [0, 4, 3, 8], collage: [0, 4, 3, 9], assemblage: [0, 4, 3, 9], filter: [0, 4, 4, 8],
   signal: [1, 6, 4, 9]
 }
 const ORBIT_RATIOS = [1, 2, 1.5, 1.3333333, 3]

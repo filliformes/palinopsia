@@ -187,12 +187,12 @@ const asmGr = (): number => sonifyEngine.asmCompGr
 function ringCutoffHz(cfg: SoniConfig, c: number, part: { loOct: number; hiOct: number } = cfg.collage): number {
   const f = ringFreqs(cfg, part)
   const f0 = Math.max(10, f[0]), span = Math.max(1, 12 * Math.log2(Math.max(10, f[47]) / f0))
-  return f0 * Math.pow(2, (-6 + Math.max(0, Math.min(1, c)) * (span + 12)) / 12)
+  return f0 * Math.pow(2, (-6 + Math.max(0, Math.min(1, c)) * (span + 18)) / 12)
 }
 function ringCutoffOf(cfg: SoniConfig, hz: number, part: { loOct: number; hiOct: number } = cfg.collage): number {
   const f = ringFreqs(cfg, part)
   const f0 = Math.max(10, f[0]), span = Math.max(1, 12 * Math.log2(Math.max(10, f[47]) / f0))
-  return Math.max(0, Math.min(1, (12 * Math.log2(Math.max(1, hz) / f0) + 6) / (span + 12)))
+  return Math.max(0, Math.min(1, (12 * Math.log2(Math.max(1, hz) / f0) + 6) / (span + 18)))
 }
 
 /** The Prism reverb's two crossovers for its `crossover` (0..1), as the worklet
@@ -1772,7 +1772,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
               </select>
               <span className="text-[9px] text-muted">→</span>
               <select className="input select-compact text-[10px]" value={cfg.collage.hiOct} onChange={(e) => pv('collage', { hiOct: Math.max(Number(e.target.value), cfg.collage.loOct + 1) })} title="The frame edge's octave (the highest note)">
-                {[3, 4, 5, 6, 7, 8].map((o) => <option key={o} value={o}>oct {o}</option>)}
+                {[3, 4, 5, 6, 7, 8, 9].map((o) => <option key={o} value={o}>oct {o}</option>)}
               </select>
             </Row>
             <Slider label="width" value={cfg.collage.width} min={0} max={1} neutral={1} onChange={(v) => pv('collage', { width: v })} mod={chip('collageWidth')} title="Stereo spread : 0 = every piece in the center · 1 = left to right across the frame" />
@@ -1798,7 +1798,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             <div className={`flex flex-col gap-1 transition-opacity ${(cfg.collage.bank ?? 0) <= 0 ? 'opacity-45' : ''}`} title={(cfg.collage.bank ?? 0) <= 0 ? 'The Ring bank is out (wet 0) : these shape it, so they are heard once wet is up' : undefined}>
               <Slider label="ring in" value={cfg.collage.ringIn ?? 0} min={-24} max={12} step={0.5} neutral={0} fmt={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} onChange={(v) => pv('collage', { ringIn: Math.round(v * 2) / 2 })} title="How hard the films drive the Ring bank : down, its wet is quieter and its bands clip less (a windy film distorts less); up, it rings and clips harder. The plain films are not touched." parse={(t) => parseDb(t)} />
               <Slider label="decay" value={cfg.collage.decay ?? 0.5} min={0} max={1} neutral={0.5} fmt={(v) => { const t = 0.012 * Math.pow(10 / 0.012, v); return t < 1 ? Math.round(t * 1000) + 'ms' : t.toFixed(1) + 's' }} onChange={(v) => pv('collage', { decay: v })} mod={chip('collageDecay')} title="How long every band rings : short = a filterbank shaping the films, long = a tuned resonance that sings" />
-              <Slider label="cutoff" value={cfg.collage.cutoff ?? 1} min={0} max={1} step={0.002} neutral={1} fmt={(v) => hzLabel(ringCutoffHz(cfg, v))} parse={(t) => { const f = parseHz(t, ringCutoffHz(cfg, 1)); return f === null ? null : ringCutoffOf(cfg, f) }} onChange={(v) => pv('collage', { cutoff: v })} mod={chip('collageCutoff')} title={`Where the bank's slope sits across its bands : now ${hzLabel(ringCutoffHz(cfg, cfg.collage.cutoff ?? 1))} (the bands run ${hzLabel(ringFreqs(cfg)[0])} to ${hzLabel(ringFreqs(cfg)[47])} on the key; click the value to type a frequency)`} />
+              <Slider label="cutoff" value={cfg.collage.cutoff ?? 1} min={0} max={1} step={0.002} neutral={1} fmt={(v) => (ringCutoffHz(cfg, v) >= 20000 ? 'open' : hzLabel(ringCutoffHz(cfg, v)))} parse={(t) => { const f = parseHz(t, ringCutoffHz(cfg, 1)); return f === null ? null : ringCutoffOf(cfg, f) }} onChange={(v) => pv('collage', { cutoff: v })} mod={chip('collageCutoff')} title={`Where the bank's slope sits across its bands : now ${hzLabel(ringCutoffHz(cfg, cfg.collage.cutoff ?? 1))} (the bands run ${hzLabel(ringFreqs(cfg)[0])} to ${hzLabel(ringFreqs(cfg)[47])} on the key; click the value to type a frequency)`} />
               <Slider label="peak" value={cfg.collage.peak ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('collage', { peak: v })} title="A boost of the bands at the cutoff" />
               <Slider label="slope" value={cfg.collage.slope ?? 0} min={0} max={1} neutral={0} fmt={(v) => (v < 0.2 ? 'LP' : v < 0.4 ? 'LP-BP' : v < 0.6 ? 'BP' : v < 0.8 ? 'BP-HP' : 'HP')} onChange={(v) => pv('collage', { slope: v })} title="Low-pass → band-pass → high-pass around the cutoff" />
               <Slider label="tone" value={cfg.collage.tone ?? 0} min={-1} max={1} neutral={0} onChange={(v) => pv('collage', { tone: v })} title="Tilts the bank : − darker, + brighter" />
@@ -1860,7 +1860,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
               </select>
               <span className="text-[9px] text-muted">→</span>
               <select className="input select-compact text-[10px]" value={cfg.assemblage.hiOct} onChange={(e) => pv('assemblage', { hiOct: Math.max(Number(e.target.value), cfg.assemblage.loOct + 1) })} title="The map edge's octave (the highest note)">
-                {[3, 4, 5, 6, 7, 8].map((o) => <option key={o} value={o}>oct {o}</option>)}
+                {[3, 4, 5, 6, 7, 8, 9].map((o) => <option key={o} value={o}>oct {o}</option>)}
               </select>
             </Row>
             <Slider label="width" value={cfg.assemblage.width} min={0} max={1} neutral={1} onChange={(v) => pv('assemblage', { width: v })} mod={chip('asmWidth')} title="Stereo spread : 0 = every cut in the center · 1 = left to right across the Assemble map" />
@@ -1886,7 +1886,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             <div className={`flex flex-col gap-1 transition-opacity ${(cfg.assemblage.bank ?? 0) <= 0 ? 'opacity-45' : ''}`} title={(cfg.assemblage.bank ?? 0) <= 0 ? 'The Ring bank is out (wet 0) : these shape it, so they are heard once wet is up' : undefined}>
               <Slider label="ring in" value={cfg.assemblage.ringIn ?? 0} min={-24} max={12} step={0.5} neutral={0} fmt={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} onChange={(v) => pv('assemblage', { ringIn: Math.round(v * 2) / 2 })} title="How hard the films drive the Ring bank : down, its wet is quieter and its bands clip less (a windy film distorts less); up, it rings and clips harder. The plain films are not touched." parse={(t) => parseDb(t)} />
               <Slider label="decay" value={cfg.assemblage.decay ?? 0.5} min={0} max={1} neutral={0.5} fmt={(v) => { const t = 0.012 * Math.pow(10 / 0.012, v); return t < 1 ? Math.round(t * 1000) + 'ms' : t.toFixed(1) + 's' }} onChange={(v) => pv('assemblage', { decay: v })} title="How long every band rings : short = a filterbank shaping the films, long = a tuned resonance that sings" />
-              <Slider label="cutoff" value={cfg.assemblage.cutoff ?? 1} min={0} max={1} step={0.002} neutral={1} fmt={(v) => hzLabel(ringCutoffHz(cfg, v, cfg.assemblage))} parse={(t) => { const f = parseHz(t, ringCutoffHz(cfg, 1, cfg.assemblage)); return f === null ? null : ringCutoffOf(cfg, f, cfg.assemblage) }} onChange={(v) => pv('assemblage', { cutoff: v })} title={`Where the bank's slope sits across its bands : now ${hzLabel(ringCutoffHz(cfg, cfg.assemblage.cutoff ?? 1, cfg.assemblage))} (the bands run ${hzLabel(ringFreqs(cfg, cfg.assemblage)[0])} to ${hzLabel(ringFreqs(cfg, cfg.assemblage)[47])} on the key; click the value to type a frequency)`} />
+              <Slider label="cutoff" value={cfg.assemblage.cutoff ?? 1} min={0} max={1} step={0.002} neutral={1} fmt={(v) => (ringCutoffHz(cfg, v, cfg.assemblage) >= 20000 ? 'open' : hzLabel(ringCutoffHz(cfg, v, cfg.assemblage)))} parse={(t) => { const f = parseHz(t, ringCutoffHz(cfg, 1, cfg.assemblage)); return f === null ? null : ringCutoffOf(cfg, f, cfg.assemblage) }} onChange={(v) => pv('assemblage', { cutoff: v })} title={`Where the bank's slope sits across its bands : now ${hzLabel(ringCutoffHz(cfg, cfg.assemblage.cutoff ?? 1, cfg.assemblage))} (the bands run ${hzLabel(ringFreqs(cfg, cfg.assemblage)[0])} to ${hzLabel(ringFreqs(cfg, cfg.assemblage)[47])} on the key; click the value to type a frequency)`} />
               <Slider label="peak" value={cfg.assemblage.peak ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('assemblage', { peak: v })} title="A boost of the bands at the cutoff" />
               <Slider label="slope" value={cfg.assemblage.slope ?? 0} min={0} max={1} neutral={0} fmt={(v) => (v < 0.2 ? 'LP' : v < 0.4 ? 'LP-BP' : v < 0.6 ? 'BP' : v < 0.8 ? 'BP-HP' : 'HP')} onChange={(v) => pv('assemblage', { slope: v })} title="Low-pass → band-pass → high-pass around the cutoff" />
               <Slider label="tone" value={cfg.assemblage.tone ?? 0} min={-1} max={1} neutral={0} onChange={(v) => pv('assemblage', { tone: v })} title="Tilts the bank : − darker, + brighter" />

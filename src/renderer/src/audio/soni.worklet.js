@@ -414,7 +414,10 @@ class RingBank {
     const nA = clampf(co.noise || 0, 0, 1);
     const nHz = lfoHz(co.noiseRate != null ? co.noiseRate : 0.5, co.noiseSync | 0, bpm);
     const span = this.pos[RB_N - 1] > 1 ? this.pos[RB_N - 1] : 1;
-    const cn = -6 + clampf(co.cutoff != null ? co.cutoff : 1, 0, 1) * (span + 12);
+    // the cutoff runs from half an octave under the lowest band to a whole octave
+    // over the highest : at the top the bank is open (its top band ~94 %; half an
+    // octave over it, the old top, left it at 80 %, never quite flat)
+    const cn = -6 + clampf(co.cutoff != null ? co.cutoff : 1, 0, 1) * (span + 18);
     const slope = clampf(co.slope || 0, 0, 1), peak = clampf(co.peak || 0, 0, 1), tone = clampf(co.tone || 0, -1, 1);
     const nyqF = NYQ_FRAC * sr;
     const dmax = det * 30; // ± cents of random walk

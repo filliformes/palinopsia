@@ -240,6 +240,13 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **The Ring bank's cutoff reaches an octave over its highest band** (Collage and
+  Assemblage; worklet `cn = -6 + cutoff · (span + 18)`, was `span + 12`) : at the top
+  the bank is open (its top band ~94 %; the old top, half an octave over, left it at
+  80 %). The reach follows the range, whose top now goes to **oct 9** for both voices
+  (OSC octave span too); a cutoff past 20 kHz reads `open`. Measured : the default
+  range's top reads 4.98 kHz (2.79 before), oct 9 reads open. A saved cutoff below the
+  top now sits a few semitones higher.
 - **Assemblage from the source menu stays on the layers** (`assemble/place.ts`) : it puts
   the latest saved edit on the slot (or a fresh cut when the corpus is in memory) and
   selects it, instead of jumping to the assemble tab. The Inspector gains an **edit**
