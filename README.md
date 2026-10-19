@@ -345,11 +345,11 @@ fill color) and goes through Vibe, Context and the Finalizer like the rest of th
 picture; only the film dust stays inside the shape.
 
 The right column switches between **seven views** (tabs, or keys `M` / `F` / `G` /
-`E` / `A`): **Layers** (the strips + background), **Mixer** (tall
+`E` / `A`), in this order : **Layers** (the strips + background), **Mixer** (tall
 opacity/speed faders + blend for all four), **Finishing** (the Vibe · Context ·
-Finalizer stack), **Feel** (the global macros), **assemble** (the automatic
-editor), **Connect** (the Audio, MIDI, OSC, Resolume, dataflou and Ableton Link panels) and **performance**
-(the live load meter). The column is exactly as wide as its seven tabs on one line,
+Finalizer stack), **Feel** (the global macros), **Connect** (the Audio, MIDI, OSC,
+Resolume, dataflou and Ableton Link panels), **performance** (the live load meter) and
+**assemble** (the automatic editor). The column is exactly as wide as its seven tabs on one line,
 measured on your computer's own font : drag its edge to make it wider (the width is
 kept), double-click the edge to fit it again.
 The main Inspector's FX-controls band **auto-fits its parameters** : selecting any
@@ -1156,7 +1156,9 @@ recordings and stills. Keystone warp is off in dome mode (a dome is mapped by it
     the frame and leaves no black anywhere inside the dome (a square-to-disc projection
     curves the frame to the circle); **cover** spans the dome with the frame's height and
     crops its sides; **contain** keeps the whole frame inside with black around it.
-    **scale** and **offset** move it on the master.
+    **scale** and **offset** move it on the master. With **fill**, offset moves the
+    picture's centre while the whole dome stays covered and perfectly round (the picture
+    gathers toward one side and spreads on the other); cover and contain slide the frame.
   - **panorama** : the picture wrapped around the room. **turns** (how many times it goes
     around; fewer = more horizontal stretch), **mirror seams** (alternate copies mirror so
     the repeats join), **top / bottom** (the elevations its edges reach : 90° is the

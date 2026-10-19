@@ -1554,8 +1554,8 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
             ))}
           </div>
           <DomeSlider label="scale" value={dome.scale} min={0.2} max={3} step={0.01} reset={1} onChange={(v) => setDome({ scale: v })} {...mp('scale')} />
-          <DomeSlider label="offset x" value={dome.offsetX} min={-1} max={1} step={0.01} reset={0} onChange={(v) => setDome({ offsetX: v })} {...mp('offsetX')} />
-          <DomeSlider label="offset y" value={dome.offsetY} min={-1} max={1} step={0.01} reset={0} onChange={(v) => setDome({ offsetY: v })} {...mp('offsetY')} />
+          <DomeSlider label="offset x" value={dome.offsetX} min={-1} max={1} step={0.01} reset={0} onChange={(v) => setDome({ offsetX: v })} title={dome.fit === 'fill' ? 'Move the picture’s center sideways : the whole dome stays covered and perfectly round, the picture gathers toward one side and spreads on the other' : 'Slide the frame sideways inside the dome'} {...mp('offsetX')} />
+          <DomeSlider label="offset y" value={dome.offsetY} min={-1} max={1} step={0.01} reset={0} onChange={(v) => setDome({ offsetY: v })} title={dome.fit === 'fill' ? 'Move the picture’s center up or down : the whole dome stays covered and perfectly round, the picture gathers toward one side and spreads on the other' : 'Slide the frame up or down inside the dome'} {...mp('offsetY')} />
         </>
       )}
       <DomeSlider label="rotate" value={dome.rotate} min={-180} max={180} step={1} unit="°" reset={0} onChange={(v) => setDome({ rotate: v })} title="Turn the whole mapping around the dome" {...mp('rotate')} />

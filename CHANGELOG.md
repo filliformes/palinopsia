@@ -5,6 +5,15 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Fixed
+
+- **A moved full-dome fill stays perfectly round** (`engine/dome.ts`). Fill's offset was a
+  plain shift of the picture's disc, so any offset (or a modulator on it) slid that disc
+  off the rim and the two circles cut the dome into a lens, pointed at the sides. It is
+  now a disc automorphism (complex `(z − a) / (1 − conj(a)·z)`, |a| ≤ 0.9) : the
+  picture's centre moves to the offset, the rim stays the rim. Verified at offset y 0.27 :
+  a full round master. Cover and contain still slide the frame. The offset sliders say so.
+
 ### Added
 
 - **Codec Mosh** (`engine/codecMosh.ts`, `node-codecmosh`) : a native node that runs the
@@ -82,6 +91,8 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **The side tabs run layers · mixer · finishing · feel · connect · performance ·
+  assemble** (assemble moved to the end).
 - **License : GPL-3.0-or-later** (was MIT), with an additional permission for the NDI®
   runtime (`LICENSE-EXCEPTIONS.md`); bundling Ableton Link needs it. Releases up to
   v1.2.10 keep MIT. `package.json`, README, the site and `THIRD_PARTY_NOTICES.md`

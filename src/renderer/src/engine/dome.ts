@@ -43,6 +43,17 @@ vec2 discToSquare(vec2 d){
   return clamp(vec2(x, y), -1.0, 1.0);
 }
 
+// A disc automorphism, z → (z − a) / (1 − conj(a)·z) in complex numbers : it
+// carries the picture's centre to a and keeps the rim on the rim. A FILL moved
+// with it still covers the whole dome, perfectly round; the plain shift it
+// replaces slid the picture's disc off the rim, and the two circles cut the
+// dome into a lens.
+vec2 discShift(vec2 z, vec2 a){
+  vec2 n = z - a;
+  vec2 d = vec2(1.0 - (a.x * z.x + a.y * z.y), -(a.x * z.y - a.y * z.x));
+  return vec2(n.x * d.x + n.y * d.y, n.y * d.x - n.x * d.y) / max(dot(d, d), 1e-6);
+}
+
 vec3 wrapAt(float az, float el){
   float u = az / (2.0 * PI) * uTurns + 0.5;          // the front lands on the picture's centre
   float k = floor(u);
@@ -104,7 +115,9 @@ void main(){
     vec2 qq = mat2(c, s, -s, c) * q / uScale - uOffset;
     vec2 p;
     if (uFit == 0) {
-      p = length(qq) <= 1.0 ? discToSquare(qq) * 0.5 + 0.5 : vec2(-1.0);
+      vec2 z = mat2(c, s, -s, c) * q / uScale;
+      vec2 a = uOffset * min(1.0, 0.9 / max(length(uOffset), 1e-6)); // never onto the rim itself
+      p = length(z) <= 1.0 ? discToSquare(discShift(z, a)) * 0.5 + 0.5 : vec2(-1.0);
     } else if (uFit == 1) {
       p = vec2(qq.x / uAspect, qq.y) * 0.5 + 0.5;       // the height spans the circle
     } else {

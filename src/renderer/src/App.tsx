@@ -2468,17 +2468,17 @@ function RightViewTabs({ onNeed }: { onNeed: (w: number | ((prev: number) => num
     { id: 'mixer', label: 'mixer', title: 'Compact opacity/speed/blend for all 4 layers (M)' },
     { id: 'finishing', label: 'finishing', title: 'Finishing Touches : Vibe Palette · Context · Finalizer' },
     { id: 'feel', label: 'feel', title: 'Feel : the global macros, Field + Temperament (G)' },
-    {
-      id: 'assemble',
-      label: 'assemble',
-      title:
-        'Assemble (E) : the automatic editor. Analyze a folder of video into a descriptor point cloud, then generate an edit from it'
-    },
     { id: 'io', label: 'connect', title: 'Connect (A) : the audio bus, MIDI (controller input + learned bindings + output), OSC input/OSCQuery, Resolume, dataflou and Ableton Link, each a collapsible section' },
     {
       id: 'perf',
       label: 'performance',
       title: 'Performance : the whole instrument\'s live load (fps, GPU, VRAM, CPU per section, estimated memory, what is running)'
+    },
+    {
+      id: 'assemble',
+      label: 'assemble',
+      title:
+        'Assemble (E) : the automatic editor. Analyze a folder of video into a descriptor point cloud, then generate an edit from it'
     }
   ]
   return (
