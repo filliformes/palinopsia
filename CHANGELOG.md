@@ -5,7 +5,6 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
-
 ### Added
 
 - **The World page, ten ways better** (`components/WorldPage.tsx`, `worlds.ts`,
