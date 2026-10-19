@@ -53,6 +53,7 @@ import { DEFAULT_LIGHT_PATH } from './lightPath'
 import { autoSurfacePos } from './surface'
 import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify'
 import { audioLayer, defaultAudioLayer, sanitizeAudioLayer } from './audio/audioLayer'
+import { emitSessionLoaded } from './sessionEvents'
 import { makeDefaultKeySeq, sanitizeKeySeq } from './audio/soniKeyModel'
 import { isSoniRate } from './audio/soniClock'
 import { resetCouplingState } from './engine/coupling'
@@ -4872,6 +4873,8 @@ export const useStore = create<StoreState>((set, get) => ({
         ...(hasEq ? {} : { eq: curSoni.eq })
       } as SoniConfig)
     }
+    // what wants to know (the session's media check) hears it loaded
+    emitSessionLoaded()
   },
   exportSession: () => {
     const s = get()

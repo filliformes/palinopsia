@@ -1729,6 +1729,17 @@ also **pre-converts every video in its folder** in the background. A session als
 whether Sonify and its step sequence were playing, so switching Sonify on or off counts
 as a change; only [Installation mode](#output--mapping-key-o) acts on it.
 
+**Session media.** A session points at its films, sound files and Collage folders where
+they are on disk. When it opens and some of them are gone (another computer, a renamed
+drive), an amber banner names them : **Relink…** asks for a folder and finds the missing
+files in it by name (in the folders under it too); what sat beside a found file follows
+it. **Details** (also **Open ▾ → Session media…**) lists every file the session uses with
+a green or red dot, and offers **Make converted copies again** (a converted copy of a film
+the player can't read, missing on this computer, is made again from its original) and
+**Collect into the session's folder** : every file is copied into a `<session> media`
+folder beside the session file, nothing overwritten, and the session points at the
+copies. Save afterwards and the session plus that folder open on any computer.
+
 The file pickers (Open, Link a folder of sessions, a Collage or Assemble folder) open
 where they were last used, remembered across launches.
 

@@ -87,6 +87,8 @@ import { leaveSession, markClean, markDirty, registerSessionAsker, type LeaveCho
 import { recentSessions } from './recentSessions'
 import { baseName, droppedPaths, dropKind, isFileDrag } from './components/fileDrop'
 import { ContextMenu as RecentMenu } from './components/ContextMenu'
+import { MediaBanner, SessionMediaDialog, openSessionMedia } from './components/SessionMedia'
+import { sessionMedia } from './sessionMedia'
 import type { AutosaveEntry } from '@shared/types'
 import { initMidi, fireTrigger, midi } from './midi'
 import { FX_SHADERS, GENERATORS, NATIVE_NODES, shaderSourceById } from './shaders/isf'
@@ -1145,7 +1147,7 @@ export default function App(): JSX.Element {
       compositorRef.current = comp
       // Isolated test builds only (built with VITE_OPSIA_TEST=1) : hand the
       // store and the engine to a debugger. Compiled out of real builds.
-      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __eqPresets: eqPresets })
+      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __eqPresets: eqPresets, __sessionMedia: sessionMedia })
       // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
       // capture from the render loop (Compositor.captureKick) : a rebuilt engine
       // needs no re-attaching. A real-time recording finds it through this.
@@ -2161,6 +2163,9 @@ export default function App(): JSX.Element {
         </div>
       </div>
       </header>
+      {/* files the session plays that are missing on this computer */}
+      <MediaBanner />
+      <SessionMediaDialog />
 
       {/* ── Body: preview + layer strips ────────────────────────── */}
       <main className="flex min-h-0 flex-1 gap-2 overflow-hidden p-3">
@@ -2672,9 +2677,10 @@ function RecentButton({ onOpen }: { onOpen: (path: string) => void }): JSX.Eleme
                     deleteTitle: `Take ${r.name} off the list (the file stays)`
                   })),
                   { label: '', divider: true },
-                  { label: 'Clear the list', onClick: () => { recentSessions.clear(); setMenu(null) } }
+                  { label: 'Clear the list', onClick: () => { recentSessions.clear(); setMenu(null) } },
+                  { label: 'Session media…', onClick: () => { setMenu(null); openSessionMedia() } }
                 ]
-              : [{ label: 'No recent sessions yet', disabled: true }]
+              : [{ label: 'No recent sessions yet', disabled: true }, { label: '', divider: true }, { label: 'Session media…', onClick: () => { setMenu(null); openSessionMedia() } }]
           }
           onClose={() => setMenu(null)}
         />

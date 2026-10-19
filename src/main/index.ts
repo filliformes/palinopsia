@@ -30,6 +30,7 @@ import { registerAssetScheme, handleAssetProtocol } from './assets'
 import { killAllConverts, registerVideoConvert, warmVideoFolder } from './videoConvert'
 import { registerAssemble } from './assemble'
 import { registerCollage } from './collage'
+import { registerMediaRefs } from './mediaRefs'
 import { installAvcaptureHost } from './avcaptureHost'
 import { registerResolume } from './resolume'
 import { initDataflou } from './dataflou'
@@ -716,6 +717,7 @@ app.whenReady().then(async () => {
   registerVideoConvert()
   registerAssemble()
   registerCollage()
+  registerMediaRefs()
   registerResolume()
   initDataflou(() => (mainWindow && !mainWindow.isDestroyed() ? mainWindow : null))
 

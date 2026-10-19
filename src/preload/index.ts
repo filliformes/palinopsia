@@ -27,6 +27,15 @@ const api: ExposedApi = {
   sessionVersionCount: (path: string) => ipcRenderer.invoke('session:versionCount', path),
   sessionLoad: (path: string) => ipcRenderer.invoke('session:load', path),
   pathKind: (path: string) => ipcRenderer.invoke('path:kind', path),
+  mediaCheck: (paths: string[]) => ipcRenderer.invoke('media:check', paths),
+  mediaFind: (root: string, names: string[]) => ipcRenderer.invoke('media:find', root, names),
+  mediaPickFolder: (title: string) => ipcRenderer.invoke('media:pickFolder', title),
+  mediaCollect: (items: Array<{ src: string; dest: string }>) => ipcRenderer.invoke('media:collect', items),
+  onMediaCollectProgress: (fn: (p: { done: number; total: number; bytes: number }) => void) => {
+    const h = (_e: unknown, p: { done: number; total: number; bytes: number }): void => fn(p)
+    ipcRenderer.on('media:collectProgress', h)
+    return () => { ipcRenderer.removeListener('media:collectProgress', h) }
+  },
 
   // ── Autosave / crash recovery ────────────────────────────────────
   autosaveCrashCheck: () => ipcRenderer.invoke('autosave:crashCheck'),

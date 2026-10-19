@@ -1345,6 +1345,13 @@ export interface ExposedApi {
   collagePickFolder: () => Promise<string | null>
   /** A path on disk : a folder, a file, or nothing there. */
   pathKind: (path: string) => Promise<'dir' | 'file' | 'none'>
+  /** The session's media : what each path is now, files found by name under a
+   *  folder, a folder picker, and copies made next to the session. */
+  mediaCheck: (paths: string[]) => Promise<Record<string, 'dir' | 'file' | 'none'>>
+  mediaFind: (root: string, names: string[]) => Promise<Record<string, string>>
+  mediaPickFolder: (title: string) => Promise<string | null>
+  mediaCollect: (items: Array<{ src: string; dest: string }>) => Promise<{ ok: boolean; map: Record<string, string>; bytes: number; error?: string }>
+  onMediaCollectProgress: (fn: (p: { done: number; total: number; bytes: number }) => void) => () => void
   collageScan: (folder: string) => Promise<import('./collage').CollageScanResult>
   // The same scan, except EVERY clip is force-transcoded to 720p all-intra : the
   // wall seeks on every loop and every cut, and long-GOP files stutter it. One-

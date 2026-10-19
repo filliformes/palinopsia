@@ -22,6 +22,22 @@ that CI builds into cross-platform releases.
   double-click : automatic), the panels below scrolling; **V** or **⤢ big** folds them
   away. In automatic mode the preview keeps at least 160 px (a video's tall Inspector had
   squeezed it to 2 px).
+- **Session media : missing files found again, everything collected beside the session**
+  (`sessionMedia.ts`, `components/SessionMedia.tsx`, `main/mediaRefs.ts`). A loaded
+  session's files (films, sound files, Collage folders and clips, Audio Layer files,
+  the scenes' copies included) are checked on disk; when some are gone an amber banner
+  under the top bar names them (Relink… · Details · ✕). **Relink** : pick a folder, the
+  missing files are found in it by name (a bounded walk of the folders under it, case
+  ignored), and whatever sat in the same folder as a found file follows it. **Make
+  converted copies again** : a converted copy (a film the player can't read) missing on
+  this computer is remade from its original, a Collage's clips rescanned. **Collect into
+  the session's folder** copies every original into `<session> media` beside the session
+  file (a Collage folder keeps its own subfolder), never overwriting (" (2)" on a name
+  clash, a copy already there is reused) and points the session at the copies; save to
+  keep. Open ▾ → Session media… opens the list. Verified end to end : a moved media folder
+  (5 missing, banner), relink (0 missing, film still playing, scenes rewired), a missing
+  converted copy remade, collect (4 files copied, paths rewritten), collect again (no
+  duplicates).
 
 ### Changed
 
