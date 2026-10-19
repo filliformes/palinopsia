@@ -12,6 +12,8 @@ import { edlDuration } from '../assemble/match'
 import { videoKey, videoPlayheads } from '../engine/videoState'
 import { modTargetKey, useStore } from '../store'
 import { AssignRow } from './AutoControls'
+import { freshAssemblage } from '../assemble/place'
+import { showToast } from './Toast'
 
 const SMIN = 1 / 16
 const SMAX = 16
@@ -83,8 +85,59 @@ export function AssembleTransport({
 
   const set = (patch: Partial<SourceSlot>): void => setSourceVideoPlayback(layer, slot, patch)
 
+  // Which edit plays, and new / vary, without leaving the Inspector.
+  const bank = useStore((s) => s.assemblages)
+  const corpus = useStore((s) => s.assembleCorpus)
+  const setSourceAssemble = useStore((s) => s.setSourceAssemble)
+  const own = bank.find((a) => a.id === state.mediaId)
+  const fmtD = (s: number): string => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+  const noCorpus = 'The corpus is not loaded in this run : open the assemble tab once (it analyzes its folder again)'
+  const cut = (vary: boolean): void => {
+    const a = vary && own
+      ? freshAssemblage((own.seed + 1 + ((Math.random() * 1000) | 0)) >>> 0, own.name, own.params)
+      : freshAssemblage()
+    if (!a) return void showToast(corpus ? 'The recipe found no clips : loosen the matching in the assemble tab.' : noCorpus + '.', 'warn', 5000)
+    setSourceAssemble(layer, slot, a)
+  }
+
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
+      {/* The edit : the bank's, or this slot's own (a new or a varied cut). */}
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span className="w-10 shrink-0 font-mono text-[9px] uppercase text-muted">edit</span>
+        <select
+          className="input select-compact min-w-0 flex-1 text-[11px]"
+          value={own ? own.id : '__slot__'}
+          onChange={(e) => {
+            const a = bank.find((x) => x.id === e.target.value)
+            if (a) setSourceAssemble(layer, slot, a)
+          }}
+          title="Which saved edit this slot plays (the assemble tab's bank)"
+        >
+          {!own && <option value="__slot__">{state.mediaName || 'this slot\u2019s edit'} (not saved)</option>}
+          {bank.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name || 'untitled'} · {fmtD(edlDuration(a.clips))}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => cut(false)}
+          disabled={!corpus}
+          className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted transition-colors hover:text-accent disabled:opacity-40"
+          title={corpus ? 'Cut a new edit from the corpus with the assemble tab\u2019s recipe' : noCorpus}
+        >
+          new
+        </button>
+        <button
+          onClick={() => cut(true)}
+          disabled={!corpus}
+          className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted transition-colors hover:text-accent disabled:opacity-40"
+          title={corpus ? (own ? 'The same recipe, new dice : a sibling of this edit' : 'A new edit (this one is not in the bank : its recipe is unknown)') : noCorpus}
+        >
+          vary
+        </button>
+      </div>
       {/* Transport row. */}
       <div className="flex min-w-0 items-center gap-1.5">
         <button
@@ -159,8 +212,8 @@ export function AssembleTransport({
       <div className="font-mono text-[9px] text-muted">
         {clips.length} clips ·{' '}
         {new Set(clips.map((c) => c.fileName)).size} source file
-        {new Set(clips.map((c) => c.fileName)).size === 1 ? '' : 's'} · edit it in the{' '}
-        <span className="text-accent">assemble</span> tab
+        {new Set(clips.map((c) => c.fileName)).size === 1 ? '' : 's'} · the recipe, the corpus and
+        saving are in the <span className="text-accent">assemble</span> tab
       </div>
 
       <AssembleModRow layer={layer} slot={slot} />

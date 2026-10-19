@@ -1612,6 +1612,12 @@ other picture.
   renders it to `Recorded/` via ffmpeg. Assemblages travel with sessions and
   scenes, and the Inspector shows a cut-timeline transport with `position` /
   `speed` as mod targets.
+- **From a layer's source menu**, **Assemblage…** puts your latest saved edit on that
+  slot right there (or cuts a fresh one when the corpus is loaded) and selects it : the
+  tab stays where it is. The Inspector then has the **edit** picker (any saved edit),
+  **new** (a fresh cut with the tab's recipe) and **vary** (same recipe, new dice),
+  the transport, and **assemble tab ▸** for the corpus, the recipe and saving. With
+  nothing saved yet it says so.
 
 ## Collage : a wall of films (key source `gen-collage`)
 

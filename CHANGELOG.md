@@ -111,6 +111,12 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Assemblage from the source menu stays on the layers** (`assemble/place.ts`) : it puts
+  the latest saved edit on the slot (or a fresh cut when the corpus is in memory) and
+  selects it, instead of jumping to the assemble tab. The Inspector gains an **edit**
+  picker (the bank), **new** / **vary** (greyed, with why, until the corpus is loaded)
+  and an **assemble tab ▸** button. Tested : placed and selected with the view
+  unchanged, the button opens the tab, an empty bank says so.
 - **The side tabs run layers · mixer · finishing · feel · connect · performance ·
   assemble** (assemble moved to the end).
 - **License : GPL-3.0-or-later** (was MIT), with an additional permission for the NDI®

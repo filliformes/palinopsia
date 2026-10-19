@@ -436,11 +436,21 @@ export function Inspector(): JSX.Element {
                 🎥 Switch input
               </button>
             )}
-            <p className="ml-auto max-w-[50%] text-right text-[10px] leading-tight text-muted">
-              {isCap ? 'Live capture source' : 'Video source'}. Add FX to this
-              source&apos;s rack to synthify it (posterize · dither · key ·
-              chroma-shift · feedback).
-            </p>
+            {isAsm ? (
+              <button
+                onClick={() => useStore.getState().setRightView('assemble')}
+                className="ml-auto shrink-0 rounded border border-accent/50 bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent transition-colors hover:bg-accent/20"
+                title="Open the assemble tab on this slot : its corpus, the recipe, every saved edit, export"
+              >
+                assemble tab ▸
+              </button>
+            ) : (
+              <p className="ml-auto max-w-[50%] text-right text-[10px] leading-tight text-muted">
+                {isCap ? 'Live capture source' : 'Video source'}. Add FX to this
+                source&apos;s rack to synthify it (posterize · dither · key ·
+                chroma-shift · feedback).
+              </p>
+            )}
           </div>
           {isNdi && <NdiInReadout name={capId.slice(4)} />}
           {capId.startsWith('device:avf:') && <AvfReadout id={capId.slice('device:avf:'.length)} />}

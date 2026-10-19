@@ -16,6 +16,7 @@ import { makeDefaultMask, modTargetKey, useStore } from '../store'
 import { AssignRow } from './AutoControls'
 import { registerLiveOverlay } from './liveOverlay'
 import { showToast } from './Toast'
+import { placeAssemblage } from '../assemble/place'
 import { playableVideoUrl } from './videoImport'
 import { collageFromFolder, droppedPaths, dropKind, isFileDrag } from './fileDrop'
 import { BoundedNumberInput } from './BoundedNumberInput'
@@ -894,10 +895,14 @@ function SourceRow({
             else if (v === '__cap_live__') setShowDevices(true)
             else if (v === '__cap_ndi__') setShowNdi(true)
             else if (v === '__cap_hive__') setShowHive(true)
-            // The assemble entries are informational : an assemblage is placed
-            // from the assemble tab (it needs the corpus), so selecting either
-            // one just opens that tab rather than silently doing nothing.
-            else if (v === '__assemble_pick__') useStore.getState().setRightView('assemble')
+            // Assemblage… : the latest saved edit (or a fresh one from the corpus)
+            // right here, selected so the Inspector shows how it plays; the tab
+            // stays where it is (its button is in the Inspector).
+            else if (v === '__assemble_pick__') {
+              const ly = 'layer' in scope ? scope.layer : 0
+              if (!placeAssemblage(ly, scope.kind === 'sourceB' ? 'B' : 'A'))
+                showToast('No assemblage yet : make one from a folder of films in the assemble tab (E).', 'warn', 6000)
+            }
             else if (v !== '__video__' && v !== '__assemble__' && v !== '__audio__') onPick(v || null)
           }}
         />
