@@ -801,17 +801,18 @@ function MiniSlider({
         className="min-w-0 flex-1 accent-accent"
         title={help}
       />
-      {/* Two decimals (display only) : maxFrac shows 0.01 s and drops trailing
-          zeros, so 0.55 s reads "0.55" instead of rounding up to "0.6". A raw
-          ms/1000 would read "1.073" and clip in a cell this narrow; the row's
-          tooltip keeps the exact figure. */}
+      {/* Four characters at most, in a box as wide as SUS's beside it (w-9 cut
+          "0.96" and "3.45") : two decimals under 10 s (maxFrac drops trailing
+          zeros, so 0.55 s reads "0.55", not "0.6"), one from 10 s ("12.5"). A raw
+          ms/1000 would read "1.073" and clip; the row's tooltip keeps the exact
+          figure. */}
       <BoundedNumberInput
         value={value / 1000}
         min={min / 1000}
         max={max / 1000}
-        maxFrac={2}
+        maxFrac={value >= 10000 ? 1 : 2}
         onChange={(v) => onChange(Math.round(v * 1000))}
-        className="input w-9 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+        className="input w-10 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
       />
     </div>
   )

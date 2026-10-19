@@ -7,6 +7,10 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The ADSR modulator's times read in full** (`ModulationPanel.tsx` MiniSlider) : their
+  boxes were 36 px against SUS's 40, so "0.96" or "3.45" clipped. Same width as SUS now,
+  and one decimal from 10 s ("45.2"); measured : every readout fits its box.
+
 - **A moved full-dome fill stays perfectly round** (`engine/dome.ts`). Fill's offset was a
   plain shift of the picture's disc, so any offset (or a modulator on it) slid that disc
   off the rim and the two circles cut the dome into a lens, pointed at the sides. It is
