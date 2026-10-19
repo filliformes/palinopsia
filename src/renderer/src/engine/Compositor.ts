@@ -670,6 +670,12 @@ class FxRack {
 
   constructor(private shared: SharedGL) {}
 
+  /** A shader's source changed under the same id : its units load it again on
+   *  the next sync (they only reload on an id change otherwise). */
+  forget(shaderId: string): void {
+    for (const u of this.units) if (u.shaderId === shaderId) u.shaderId = '';
+  }
+
   sync(instances: FxInstance[], sourceById: (id: string) => string | null) {
     const byInst = this.index; // holds last frame's units : exactly the reconcile set
     const next = this.scratch;
@@ -1024,6 +1030,15 @@ export class ISFLayer {
    *  syncFromState would see the id still unmatched and re-attempt the load
    *  every frame (a 60 Hz shader-compile storm that stalls the driver). A
    *  failed shader just renders transparent until a different one is chosen. */
+  /** Its source changed under the same id : load it again on the next sync. */
+  forgetShader(id: string): void {
+    if (this.shaderIdA === id) this.shaderIdA = null;
+    if (this.shaderIdB === id) this.shaderIdB = null;
+    this.rackA.forget(id);
+    this.rackB.forget(id);
+    this.rackLayer.forget(id);
+  }
+
   setShader(slot: 'A' | 'B', id: string | null, source: string | null): void {
     // A real compile costs from the per-frame budget; if it's spent, defer —
     // leave the id unrecorded so syncFromState retries next frame.
@@ -2623,6 +2638,15 @@ export class Compositor {
   /** The mark signal was switched off : forget the rows it left in flight. */
   dropMarkStrip(): void {
     this.markRead?.dropInFlight();
+  }
+
+  /** Your shader's source changed (the Source Editor saved it again) : every
+   *  slot, rack and the background playing it load the new one. */
+  reloadShader(id: string): void {
+    for (const L of this.layers) L.forgetShader(id);
+    this.masterRack.forget(id);
+    this.bgRack.forget(id);
+    if (this.bgShaderId === id) this.bgShaderId = null;
   }
 
   /** Fulldome on (a config) or off (null). Resizes the canvas backing store to

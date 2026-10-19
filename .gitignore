@@ -26,6 +26,9 @@ dist-tsc/
 # Output recordings + screenshots — local artifacts, not part of the repo.
 /Recorded/
 
+# Your own shaders (the Source Editor), saved at the repo root when run from source.
+/Shaders/
+
 # The NDI runtime a build ships (see resources/ndi/README.md) : a licensed
 # binary put there per machine, never committed.
 /resources/ndi/*/*

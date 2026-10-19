@@ -112,6 +112,7 @@ export interface IsfShader {
    *  `source` is a header-only stub so the auto-UI/presets/randomize still parse
    *  its INPUTS. Excluded from the Randomize FX pool (needs a sidechain). */
   native?: boolean
+  user?: boolean // one of yours (the Source Editor), entered at run time
   /** A native GENERATOR that needs nothing from the user (no text, film pool or
    *  camera) : it stays in Randomize's source pool like an ISF generator. */
   dice?: boolean

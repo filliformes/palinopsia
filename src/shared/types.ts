@@ -1076,6 +1076,9 @@ export interface Session {
   spaceVoices?: Record<string, import('./spatial').VoicePlace>
   // The Audio Layer's slots, mix and volume (absent in older files : none)
   audioLayer?: AudioLayerState
+  // Your own shaders the session plays (Source Editor), by id : their source
+  // travels with the session, so it opens where the files are not.
+  userShaders?: Record<string, { name: string; source: string; category: 'Generator' | 'FX' }>
   // The projector warp (Output → Mapping), written only when "save with the
   // session" is on, and applied on load only where that option is on : the
   // warp is otherwise the computer's (its projector), not the piece's.
@@ -1364,6 +1367,12 @@ export interface ExposedApi {
   collagePickFolder: () => Promise<string | null>
   /** A path on disk : a folder, a file, or nothing there. */
   pathKind: (path: string) => Promise<'dir' | 'file' | 'none'>
+  shadersList: () => Promise<Array<{ name: string; file: string; source: string; mtime: number }>>
+  shadersSave: (name: string, source: string) => Promise<{ ok: boolean; name: string; file: string; error?: string }>
+  shadersDelete: (name: string) => Promise<boolean>
+  shadersOpenFile: () => Promise<{ name: string; source: string } | null>
+  shadersReveal: () => Promise<string>
+  onAppShortcut: (cb: (name: string) => void) => () => void
   /** The session's media : what each path is now, files found by name under a
    *  folder, a folder picker, and copies made next to the session. */
   mediaCheck: (paths: string[]) => Promise<Record<string, 'dir' | 'file' | 'none'>>

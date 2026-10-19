@@ -31,6 +31,7 @@ import { killAllConverts, registerVideoConvert, warmVideoFolder } from './videoC
 import { registerAssemble } from './assemble'
 import { registerCollage } from './collage'
 import { registerMediaRefs } from './mediaRefs'
+import { registerUserShaders } from './userShaders'
 import { installAvcaptureHost } from './avcaptureHost'
 import { registerResolume } from './resolume'
 import { initDataflou } from './dataflou'
@@ -447,6 +448,13 @@ function createWindow(): void {
     if (outputWindow && !outputWindow.isDestroyed()) wirePixelPort()
   })
   if (kioskActive()) guardKioskKeys(mainWindow)
+  // Alt+E opens the Source Editor. Taken here, before the page : on Windows the
+  // hidden default menu would otherwise open its Edit menu on Alt+E.
+  mainWindow.webContents.on('before-input-event', (e, input) => {
+    if (input.type !== 'keyDown' || !input.alt || input.control || input.meta || input.key.toLowerCase() !== 'e') return
+    e.preventDefault()
+    mainWindow?.webContents.send('app:shortcut', 'sourceEditor')
+  })
 
   // Close intercept : ask the renderer to run its Save-before-quit modal
   // first; it replies via `app:close-proceed` which flips appQuitting and
@@ -719,6 +727,7 @@ app.whenReady().then(async () => {
   registerAssemble()
   registerCollage()
   registerMediaRefs()
+  registerUserShaders()
   registerResolume()
   initDataflou(() => (mainWindow && !mainWindow.isDestroyed() ? mainWindow : null))
   initLink(() => (mainWindow && !mainWindow.isDestroyed() ? mainWindow : null))

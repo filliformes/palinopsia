@@ -17,8 +17,14 @@ declare module 'interactive-shader-format' {
     valid: boolean
     error: unknown
     errorLine: unknown
+    /** The GLSL the runtime built and compiled (set before compiling). */
+    fragmentShader?: string
+    /** The parser : its uniform declarations, for mapping error lines. */
+    model?: { uniformDefs?: string }
   }
   export class Parser {
+    /** The fragment template : [[uniforms]] then [[main]] (the user's code). */
+    static fragmentShaderSkeleton: string
     parse(fragmentISF: string, vertexISFOpt?: string): void
     inputs: Array<Record<string, unknown>>
     valid: boolean

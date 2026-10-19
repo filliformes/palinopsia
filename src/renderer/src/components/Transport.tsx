@@ -107,6 +107,7 @@ export function Transport(): JSX.Element {
   const world = useStore((s) => s.world)
   const setWorld = useStore((s) => s.setWorld)
   const worldPageOpen = useStore((s) => s.worldPageOpen)
+  const sourceEditorOpen = useStore((s) => s.sourceEditorOpen)
   const setWorldPageOpen = useStore((s) => s.setWorldPageOpen)
   const activeWorld = worlds.find((w) => w.id === world)
   const setComposition = useStore.setState
@@ -272,6 +273,14 @@ export function Transport(): JSX.Element {
         </button>
       </div>
 
+      {/* The Source Editor (Alt+E) : your own shaders */}
+      <button
+        onClick={() => useStore.getState().setSourceEditorOpen(!useStore.getState().sourceEditorOpen)}
+        className={`${TBTN} ml-3 ${sourceEditorOpen ? TBTN_LIT : TBTN_IDLE}`}
+        title="Source Editor (Alt+E) : write a shader, or start from a copy of any built-in one, and keep it as your own (my shaders, in the source and FX menus)"
+      >
+        {'{ }'}
+      </button>
       {/* World : the active-World editor (label toggles it, also W) + the World
           selector. Moved down from the top bar; ml-3 keeps it off the Prox slider. */}
       <button

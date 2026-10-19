@@ -485,7 +485,7 @@ function EqEditor({ onClose }: { onClose: () => void }): JSX.Element {
   const drag = useRef<{ i: number; id: number; x0: number; y0: number; ox: number; oy: number; moved: boolean } | null>(null)
   // The editor sits over the whole app (a portal) : hidden while another page
   // covers Sonify.
-  const covered = useStore((s) => s.worldPageOpen || s.sequencePageOpen || s.bodyPageOpen || s.resolumePageOpen)
+  const covered = useStore((s) => s.worldPageOpen || s.sequencePageOpen || s.bodyPageOpen || s.resolumePageOpen || s.sourceEditorOpen)
 
   const setBand = (i: number, patch: Partial<SoniEqBand>): void => {
     const cur = eqRef.current

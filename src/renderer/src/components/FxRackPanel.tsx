@@ -56,9 +56,14 @@ export function FxAddSelect({ scope, className = '' }: { scope: FxScope; classNa
           ...g,
           shaders: g.shaders.filter((f) => canHostFx(scope, f.id))
         })).filter((g) => g.shaders.length > 0)
-  const options: SearchOption[] = groups.flatMap((grp) =>
-    grp.shaders.map((f) => ({ value: f.id, label: f.name, group: grp.group, keywords: keywordsFor(f.id), title: blurbFor(f.id) }))
-  )
+  // Your own effects (the Source Editor), first
+  const mine = useStore((s) => s.userShaders)
+  const options: SearchOption[] = [
+    ...mine.filter((u) => u.category === 'FX').map((u) => ({ value: u.id, label: u.name, group: 'my shaders', title: 'One of your shaders (the Source Editor, Alt+E)' })),
+    ...groups.flatMap((grp) =>
+      grp.shaders.map((f) => ({ value: f.id, label: f.name, group: grp.group, keywords: keywordsFor(f.id), title: blurbFor(f.id) }))
+    )
+  ]
   return (
     <span
       className={`flex min-w-0 rounded ${className || 'w-20 shrink-0'} ${over ? 'ring-1 ring-accent' : ''}`}

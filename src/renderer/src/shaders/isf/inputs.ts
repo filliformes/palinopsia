@@ -47,6 +47,11 @@ interface RawInput {
 
 const cache = new Map<string, IsfInputDesc[]>()
 
+/** A shader's source changed (one of yours, saved again) : read its controls anew. */
+export function invalidateInputs(shaderId: string): void {
+  cache.delete(shaderId)
+}
+
 function parseHeader(source: string): RawInput[] {
   const m = source.match(/\/\*\s*(\{[\s\S]*?\})\s*\*\//)
   if (!m) return []

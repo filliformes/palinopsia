@@ -50,6 +50,8 @@ export function canHostFx(scope: FxScope, shaderId: string | null | undefined): 
   const def = SHADER_BY_ID[shaderId]
   if (!def) return false
   // Locked finalizers are excluded from FX_SHADERS, which is exactly the test.
+  // Your own effects (the Source Editor) are plain ISF : every rack takes them.
+  if (def.user) return def.category === 'FX'
   const addable = FX_SHADERS.some((f) => f.id === shaderId) || NATIVE_NODES.some((f) => f.id === shaderId)
   if (!addable) return false
   if (!def.native) return true

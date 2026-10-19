@@ -68,6 +68,7 @@ Lowercase's slant, each straight from its Space theme. The older shots stay in
 - [Sources](#sources-43-generators) (43 generators) · [Effects](#effects) (53 FX) ·
   [Native nodes](#native-nodes) (26) · [Master finalizers](#master-finalizers--pinned-always-last)
 - [Blend modes](#blend-modes) (19)
+- [Source Editor](#source-editor--your-own-shaders-alte) : write your own generators and effects, or start from a copy of any built-in one
 
 **Control & internals**
 - [Resolume OSC mapper](#resolume-osc-mapper-key-k) : Palinopsia signals × any Resolume address, read from a composition
@@ -210,6 +211,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `B` | **Body** page : embodied control (a camera → gestures + modulators) |
 | `K` | **Resolume OSC mapper** page : drive any Resolume address from Palinopsia's signals |
 | `E` | Right column → **assemble** (the automatic editor) |
+| `Alt+E` | **Source Editor** : write a shader of your own, or a copy of a built-in one |
 | `A` | Right column → **Connect** tab |
 | `D` / `X` / `I` | Collapse Modulation / Master-FX / Inspector |
 | `R` | Fire the Transport's selected Randomize |
@@ -217,7 +219,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `L` | **MIDI Learn** on/off : from any tab or full-page view |
 | `?` | Keyboard **cheat-sheet** : this table, in-app (Esc closes) |
 | `0` | **Panic flush** : clear every self-feeding buffer (feedback / trails / rings / accumulators) at once |
-| `Esc` | Close the cheat-sheet, then MIDI Learn; otherwise close Resolume / World / Sonify / Body / Output / Sequence. On a **fullscreen output** over the control window (not an installation), a tap of `Esc` closes the output itself; on any other output it hands focus back to the controls |
+| `Esc` | Close the cheat-sheet, then MIDI Learn; otherwise close the Source Editor / Resolume / World / Sonify / Body / Output / Sequence. On a **fullscreen output** over the control window (not an installation), a tap of `Esc` closes the output itself; on any other output it hands focus back to the controls |
 
 In **Sonify** (also in the cheat-sheet) :
 
@@ -228,7 +230,7 @@ In **Sonify** (also in the cheat-sheet) :
 | Drag an output-EQ point | Frequency across, gain up and down (it moves once dragged past 3 px, so a click only selects it); the wheel over a point sets its Q, a double-click switches its band, `Delete` turns the selected band off. While the editor is open the app's one-key shortcuts wait; `Esc` closes it |
 | Drag a Space number | Up or down to change it; drag a voice's dot on the Room map to place it |
 | `Ctrl/Cmd+Z` · `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` | Undo · Redo (100 levels) |
-| `Ctrl/Cmd+S` | Save session |
+| `Ctrl/Cmd+S` | Save session (the shader instead, while the Source Editor is open) |
 | `Ctrl/Cmd+F` | **Fulldome** output on / off (a toast says which) |
 | `Ctrl/Cmd` `+` / `-` / `0` · `Ctrl`+wheel | UI zoom in / out / reset (menus stay anchored at any zoom) |
 
@@ -511,7 +513,8 @@ Left → right:
   **SPD** global speed (1/64×–64×, log; double-click → 1×) · **MORPH** time (0–30 s,
   default 1 s : scene recalls, Randomize, Variation, the sequencer, sessions, New and
   Generate all morph over this, live) · **PROX** proximity (far ↔ close depth zone) + `◑` audio-brightness follow.
-- **World** (opens the World editor, also key `W`) + the World selector · **❄ Freeze** :
+- **`{ }`** (opens the [Source Editor](#source-editor--your-own-shaders-alte), also
+  `Alt+E`) · **World** (opens the World editor, also key `W`) + the World selector · **❄ Freeze** :
   hold the output on the current frame (the button lights while held; also key `H` or a
   learned pad). Messages (a refused effect drop, a saved recording) appear in the
   toolbar's empty middle, always in the same place, over nothing; a long instruction
@@ -2250,6 +2253,46 @@ and the stack (the brighter side eats).
 
 ---
 
+## Source Editor : your own shaders (`Alt+E`)
+
+`Alt+E` (or **`{ }`** in the Transport bar) opens a page for writing shaders : the code
+in the middle, your shaders and every built-in one on the left, a live preview on the
+right. They are ISF, the format every generator and effect in Palinopsia is written in :
+a JSON header between `/*` and `*/` declares the controls, the GLSL below draws the
+picture (an image input named `inputImage` makes it an effect).
+
+- **Start from something.** `new from…` gives a generator, an effect, or a feedback
+  template (a persistent buffer that keeps the last frame); any built-in generator or
+  effect on the left opens as a copy (the built-in is never written over); `open file…`
+  reads an ISF file from anywhere (`.fs`, `.frag`, `.glsl`, `.isf`).
+- **It compiles as you type.** A moment after you stop, the preview plays the new
+  version. While it does not compile, the last good one keeps playing and the error is
+  marked on its own line (header included); the problems list goes there in a click. A
+  few ISF traps are caught before the compiler sees them : `IMG_NORM_PIXEL` given a
+  computed coordinate, an `event` compared with a number, no `gl_FragColor`.
+- **Try it.** The controls the header declares appear under the preview (sliders,
+  menus, toggles, colors, points, a fire button for an event) and play it there. An
+  effect reads a built-in generator, or the live picture.
+- **Keep it.** **Save** (or `Ctrl/Cmd+S`) writes `<name>.fs` into the **Shaders** folder
+  beside your Sessions and Recorded folders (`folder` shows it). Saved, it is one of **my
+  shaders** : listed first in the source menus (a generator) or the effect menus (an
+  effect), with its controls in the Inspector, modulatable like any built-in. The **use**
+  buttons save it and put it to work at once : on the selected source slot (a
+  generator), on the selected layer's effects or the master effects (an effect). Saving
+  a new version while it plays reloads it live, everywhere it plays.
+- **Sessions carry them.** A session keeps the source of every shader of yours it plays
+  (in its layers and its scenes), so it opens the same on another computer; a shader
+  restored that way is marked as coming from the session until you save it.
+- Closing (`Esc`, `Alt+E`, **Close**) keeps what you were writing for next time, quit
+  included. **delete** removes the shader from your folder (a second click confirms); it
+  stays open, unsaved.
+
+Shaders made with other ISF hosts mostly open as they are. Palinopsia's own extras work
+in yours too : `uniform float PH_speed;` is `TIME` integrated at the control called
+`speed`, so moving it never makes the picture jump.
+
+---
+
 ## Resolume OSC mapper (key `K`)
 
 A matrix to drive **any Resolume address from Palinopsia's signals**, sketched and
@@ -2660,6 +2703,7 @@ Pulfrich effect).
 
 Palinopsia is free software : **GPL-3.0-or-later** (see [LICENSE](LICENSE)), with an
 additional permission for the NDI® runtime ([LICENSE-EXCEPTIONS.md](LICENSE-EXCEPTIONS.md)).
-Releases up to v1.2.10 were MIT and keep that license. It compiles in the
+Releases up to v1.2.10 were MIT and keep that license. The Source Editor is built on
+[CodeMirror](https://codemirror.net) (MIT). It compiles in the
 [Ableton Link](https://github.com/Ableton/link) SDK (GPL-2.0-or-later) and asio
 (Boost); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

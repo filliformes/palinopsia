@@ -55,6 +55,7 @@ import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify
 import { audioLayer, defaultAudioLayer, sanitizeAudioLayer } from './audio/audioLayer'
 import { emitSessionLoaded } from './sessionEvents'
 import { tempoEdited } from './tempoEvents'
+import { registerUserShader, userShaderIdsIn, type UserShaderInfo } from './shaders/userShaders'
 import { makeDefaultKeySeq, sanitizeKeySeq } from './audio/soniKeyModel'
 import { isSoniRate } from './audio/soniClock'
 import { resetCouplingState } from './engine/coupling'
@@ -1664,6 +1665,15 @@ interface StoreState {
   // every write : one write path, same as everything else.
   sonifyPageOpen: boolean
   setSonifyPageOpen: (on: boolean) => void
+  // The Source Editor (Alt+E) : a full-page takeover. Transient.
+  sourceEditorOpen: boolean
+  setSourceEditorOpen: (on: boolean) => void
+  // Your own shaders (the Source Editor) : what the menus list as "my shaders"
+  // (the sources themselves are in SHADER_BY_ID, shaders/userShaders.ts).
+  userShaders: UserShaderInfo[]
+  setUserShaders: (list: UserShaderInfo[]) => void
+  upsertUserShader: (info: UserShaderInfo) => void
+  removeUserShader: (id: string) => void
   // Live recording state (set by the global recorder) : drives the REC pill.
   recording: boolean
   recordingSince: number
@@ -4020,6 +4030,15 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   sonifyPageOpen: false,
   setSonifyPageOpen: (on) => set({ sonifyPageOpen: on }),
+  sourceEditorOpen: false,
+  setSourceEditorOpen: (on) => set({ sourceEditorOpen: on }),
+  userShaders: [],
+  setUserShaders: (list) => set({ userShaders: [...list].sort((a, b) => a.name.localeCompare(b.name)) }),
+  upsertUserShader: (info) =>
+    set((s) => ({
+      userShaders: [...s.userShaders.filter((u) => u.id !== info.id), info].sort((a, b) => a.name.localeCompare(b.name))
+    })),
+  removeUserShader: (id) => set((s) => ({ userShaders: s.userShaders.filter((u) => u.id !== id) })),
   recording: false,
   recordingSince: 0,
   setRecording: (on) => set({ recording: on, recordingSince: on ? performance.now() : 0 }),
@@ -4816,6 +4835,17 @@ export const useStore = create<StoreState>((set, get) => ({
       console.warn('[session] ignored a malformed session (missing composition.layers)')
       return
     }
+    // Your own shaders it plays, from the session itself : entered before the
+    // composition syncs (one already here keeps its file; the session's version
+    // plays, as it was made with it).
+    if (s.userShaders && typeof s.userShaders === 'object') {
+      for (const u of Object.values(s.userShaders)) {
+        if (!u || typeof u.name !== 'string' || typeof u.source !== 'string') continue
+        const known = get().userShaders.find((x) => x.name === u.name && !x.fromSession)
+        const info = registerUserShader(u.name, u.source, !known)
+        get().upsertUserShader(known ? { ...info, fromSession: false } : info)
+      }
+    }
     // Another session over the Morph time, layer by layer and live (morph.ts
     // relay : each new layer fades in once compiled, the old ones out). At Morph
     // 0 : hold the last frame until the new one is ready, then dissolve.
@@ -4967,6 +4997,18 @@ export const useStore = create<StoreState>((set, get) => ({
       dome: s.dome,
       outXform: s.outXform,
       spaceVoices: s.space.voices,
+      // your own shaders it plays (the composition, the scenes), with their source
+      userShaders: (() => {
+        const ids = userShaderIdsIn(s.composition)
+        userShaderIdsIn(s.scenes, ids)
+        if (!ids.size) return undefined
+        const out: Record<string, { name: string; source: string; category: 'Generator' | 'FX' }> = {}
+        for (const id of ids) {
+          const d = SHADER_BY_ID[id]
+          if (d) out[id] = { name: d.name, source: d.source, category: d.category === 'FX' ? 'FX' : 'Generator' }
+        }
+        return out
+      })(),
       audioLayer: s.audioLayer,
       ...(s.warpInSession ? { warp: { enabled: s.warpEnabled, corners: [...s.warpCorners], feather: s.warpFeather } } : {}),
       ui: { theme: s.theme }

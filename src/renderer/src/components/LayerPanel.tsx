@@ -704,6 +704,7 @@ function SourceRow({
   onPickCapture: (spec: string, name: string) => void
   onPickHive: (host: string, port: number) => void
 }): JSX.Element {
+  const userGens = useStore((s) => s.userShaders).filter((u) => u.category === 'Generator')
   const fileRef = useRef<HTMLInputElement | null>(null)
   const [showCapture, setShowCapture] = useState(false)
   const [showDevices, setShowDevices] = useState(false)
@@ -877,6 +878,7 @@ function SourceRow({
             { value: '__cap_hive__', label: 'HIVE stream…', prefix: '📡 ', group: 'live' },
             // The body silhouette joins the live entries, then living matter, then
             // analog video, then every other generator.
+            ...userGens.map((u) => ({ value: u.id, label: u.name, group: 'my shaders', title: 'One of your shaders (the Source Editor, Alt+E)' })),
             ...inPickerOrder(GENERATORS_ALPHA).map(
               (g): SearchOption => ({
                 value: g.id,

@@ -7,6 +7,36 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **The Source Editor** (`Alt+E`, caught in the main process's `before-input-event` so the
+  default menu's Alt+E (Edit) never opens; or `{ }` in the Transport) : a full page
+  (`components/SourceEditor.tsx`) to write ISF shaders. CodeMirror 6 (pinned :
+  `codemirror` 6.0.2, `@codemirror/view` 6.43.13, `state` 6.7.6, `language` 6.12.4,
+  `legacy-modes` 6.5.4 for GLSL, `lint` 6.9.7, `search` 6.7.2, `commands` 6.11.1,
+  `autocomplete` 6.20.3, `@lezer/lr` 1.4.10, `@lezer/highlight` 1.2.5) with the app's
+  colors; templates (generator with `PH_speed`, effect, feedback with a persistent pass);
+  any built-in opens as a copy; open any ISF file. Compiles 400 ms after typing on its own
+  WebGL2 preview (`makeRedirectableGL`), the last good renderer keeps playing. The ISF
+  runtime throws the GLSL log away, so a failed build is recompiled by hand and its lines
+  mapped back through `ISFParser.fragmentShaderSkeleton` + the model's `uniformDefs`; a
+  header JSON error is placed on its line; lints for `IMG_NORM_PIXEL` with a computed
+  coordinate, an event compared with a number, no `gl_FragColor`. Header controls play
+  the preview; an effect reads a generator or the live picture (~15 fps). The draft
+  persists (`opsia.sourceDraft`). Saving (button or `Ctrl/Cmd+S`, which the App then leaves
+  to the editor) writes `<name>.fs` to `Shaders/` beside Sessions and Recorded
+  (`main/userShaders.ts` : `shaders:list/save/delete/openFile/reveal`); each one is
+  registered in `SHADER_BY_ID` as `user-<slug>` (`shaders/userShaders.ts`,
+  `IsfShader.user`), listed under "my shaders" in the source menu and the FX add menu
+  (`canHostFx` takes user effects in every rack), its inputs re-read
+  (`invalidateInputs`). A new version of one that plays reloads it everywhere
+  (`takeShaderReloads` → `Compositor.reloadShader` : slots, racks, master, background).
+  Sessions carry the sources of the user shaders they play (`Session.userShaders`, from
+  the composition and the scenes) and register them on load (marked `fromSession` when
+  not in the folder). Use buttons : the selected source slot, the selected layer's FX,
+  the master FX. Verified : error on its exact line, recovery, save + list + play on L1 A,
+  a new version reloads the playing layer, an effect into the master rack, a session
+  restoring a shader this computer lacks, Alt+E, Ctrl+S saving the shader (no session
+  dialog).
+
 - **Sonify's Assemblage voice** (voice 10, `cfg.assemblage`, a second `CollageVoice` on the
   worklet's new input 3 with its own `Leveler` + `RingBank`; `NVOICE` 11) : each Assemblage
   source is one piece whose film is the clip on screen (`AssembleSource.soundInfo` : the

@@ -27,6 +27,17 @@ const api: ExposedApi = {
   sessionVersionCount: (path: string) => ipcRenderer.invoke('session:versionCount', path),
   sessionLoad: (path: string) => ipcRenderer.invoke('session:load', path),
   pathKind: (path: string) => ipcRenderer.invoke('path:kind', path),
+  // ── Your own shaders (the Source Editor, src/main/userShaders.ts) ──
+  shadersList: () => ipcRenderer.invoke('shaders:list'),
+  shadersSave: (name: string, source: string) => ipcRenderer.invoke('shaders:save', name, source),
+  shadersDelete: (name: string) => ipcRenderer.invoke('shaders:delete', name),
+  shadersOpenFile: () => ipcRenderer.invoke('shaders:openFile'),
+  shadersReveal: () => ipcRenderer.invoke('shaders:reveal'),
+  onAppShortcut: (cb: (name: string) => void) => {
+    const h = (_e: Electron.IpcRendererEvent, n: string): void => cb(n)
+    ipcRenderer.on('app:shortcut', h)
+    return () => { ipcRenderer.off('app:shortcut', h) }
+  },
   mediaCheck: (paths: string[]) => ipcRenderer.invoke('media:check', paths),
   mediaFind: (root: string, names: string[]) => ipcRenderer.invoke('media:find', root, names),
   mediaPickFolder: (title: string) => ipcRenderer.invoke('media:pickFolder', title),

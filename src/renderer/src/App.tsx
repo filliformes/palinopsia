@@ -67,6 +67,8 @@ import { ResolumeSection } from './components/ResolumeSection'
 import { DataflouSection } from './components/DataflouSection'
 import { LinkSection } from './components/LinkSection'
 import { placeAssemblage, unitPlace } from './assemble/place'
+import { registerUserShader, takeShaderReloads } from './shaders/userShaders'
+import { SourceEditor } from './components/SourceEditor'
 import { applyResolume } from './resolume'
 import { initDataflou, applyDataflou, dataflouWantsVision } from './dataflou'
 import { domePreview, DOME_PREVIEW } from './engine/domePreview'
@@ -264,7 +266,7 @@ function RecPill(): JSX.Element | null {
 function BodyPip(): JSX.Element | null {
   const enabled = useStore((s) => s.bodyControl.enabled)
   const pageOpen = useStore((s) => s.bodyPageOpen)
-  const overPage = useStore((s) => s.sonifyPageOpen || s.outputPageOpen || s.worldPageOpen || s.sequencePageOpen || s.resolumePageOpen)
+  const overPage = useStore((s) => s.sonifyPageOpen || s.outputPageOpen || s.worldPageOpen || s.sequencePageOpen || s.resolumePageOpen || s.sourceEditorOpen)
   const setPage = useStore((s) => s.setBodyPageOpen)
   const [live, setLive] = useState(false)
   useEffect(() => {
@@ -561,6 +563,23 @@ export default function App(): JSX.Element {
   const compW = useStore((s) => s.compW)
   const compH = useStore((s) => s.compH)
   const worldPageOpen = useStore((s) => s.worldPageOpen)
+  const sourceEditorOpen = useStore((s) => s.sourceEditorOpen)
+  // Your own shaders (the Shaders folder) : entered at start, the menus list them;
+  // Alt+E (caught in the main process) opens the Source Editor.
+  useEffect(() => {
+    let alive = true
+    void window.api.shadersList?.().then((list) => {
+      if (!alive || !Array.isArray(list)) return
+      const st = useStore.getState()
+      const infos = list.map((f) => registerUserShader(f.name, f.source))
+      const sessionOnly = st.userShaders.filter((u) => u.fromSession && !infos.some((i) => i.id === u.id))
+      st.setUserShaders([...infos, ...sessionOnly])
+    })
+    const off = window.api.onAppShortcut?.((n) => {
+      if (n === 'sourceEditor') { const st = useStore.getState(); st.setSourceEditorOpen(!st.sourceEditorOpen) }
+    })
+    return () => { alive = false; off?.() }
+  }, [])
   const sequencePageOpen = useStore((s) => s.sequencePageOpen)
   const bodyPageOpen = useStore((s) => s.bodyPageOpen)
   const resolumePageOpen = useStore((s) => s.resolumePageOpen)
@@ -1011,6 +1030,11 @@ export default function App(): JSX.Element {
       // close them in that reverse (topmost-first) order.
       if (e.key === 'Escape' && !inField) {
         const st = useStore.getState()
+        if (st.sourceEditorOpen) {
+          e.preventDefault()
+          st.setSourceEditorOpen(false)
+          return
+        }
         if (st.resolumePageOpen) {
           e.preventDefault()
           st.setResolumePageOpen(false)
@@ -1056,6 +1080,8 @@ export default function App(): JSX.Element {
       } else if (e.key === 's' || e.key === 'S') {
         // Save the session in place (Save As the first time). Global : Ctrl/Cmd+S
         // is universally "save", so it fires even while an input is focused.
+        // The Source Editor open : it saves the shader instead (its own key).
+        if (useStore.getState().sourceEditorOpen) return
         e.preventDefault()
         void saveSession()
       } else if (!inField && (e.key === 'f' || e.key === 'F')) {
@@ -1375,6 +1401,8 @@ export default function App(): JSX.Element {
         // A New / Generate relay hands a layer played in a free slot over to its
         // own slot : swap the engine Layers first, so the sync finds it loaded.
         for (const [si, sj] of consumeLayerSwaps()) comp!.swapLayerSlots(si, sj)
+        // your shaders saved again (the Source Editor) : their players reload
+        for (const id of takeShaderReloads()) comp!.reloadShader(id)
         comp!.syncFromState(c, shaderSourceById)
         // A New / Generate relay fades each layer's new content in only once the
         // engine has compiled it : tell it what this sync left pending.
@@ -2325,6 +2353,7 @@ export default function App(): JSX.Element {
       {outputPageOpen && <OutputPage canvasRef={canvasRef} />}
       {sonifyPageOpen && <SonifyPage canvasRef={canvasRef} />}
       {worldPageOpen && <WorldPage />}
+      {sourceEditorOpen && <SourceEditor />}
       {sequencePageOpen && <SequencePage canvasRef={canvasRef} />}
       {bodyPageOpen && <BodyPage />}
       {resolumePageOpen && <ResolumePage />}

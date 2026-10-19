@@ -22,6 +22,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['F', 'Finishing'],
       ['G', 'Feel (global macros)'],
       ['E', 'Assemble tab'],
+      ['Alt+E', 'Source Editor : write a shader, or a copy of any one, as your own'],
       ['A', 'Connect tab : audio · MIDI · OSC · Resolume · dataflou · Ableton Link'],
       ['D', 'Fold Modulation'],
       ['X', 'Fold Master FX'],
@@ -60,7 +61,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
   {
     title: 'Session & zoom',
     rows: [
-      ['Ctrl S', 'Save session'],
+      ['Ctrl S', 'Save session (the shader, in the Source Editor)'],
       ['Ctrl F', 'Fulldome output on / off'],
       ['Ctrl Z', 'Undo  ·  Ctrl ⇧Z / Ctrl Y redo'],
       ['Ctrl + / −', 'Zoom UI  ·  Ctrl 0 resets'],
