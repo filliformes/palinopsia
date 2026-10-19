@@ -61,6 +61,7 @@ import type { BlendMode, LayerMask } from '@shared/types';
 import type { DomeConfig, DomeModField } from '@shared/dome';
 import { DOME_MOD_RANGE } from '@shared/dome';
 import { DomeStage } from './dome';
+import { domeFill, setDomeFill } from './domeSignal';
 import { OutXformStage, outXformActive } from './outXform';
 import type { OutXform, OutXformField } from '@shared/outXform';
 import { OUT_IDENTITY, OUTX_MOD_RANGE } from '@shared/outXform';
@@ -1249,7 +1250,9 @@ export class ISFLayer {
       cropR: s.cropR ?? 0,
       cropT: s.cropT ?? 0,
       cropB: s.cropB ?? 0,
-      fit: s.fit ?? 'stretch',
+      // under full-dome fill (a square composition) a film left on the default
+      // covers the frame : stretched, a 16:9 film came out squashed
+      fit: s.fit ?? (domeFill() > 0 ? 'cover' : 'stretch'),
       feather: s.feather ?? 0,
       mirror: s.mirror ?? 'off',
       // People only where there is a picture of the world to look at.
@@ -2606,6 +2609,10 @@ export class Compositor {
    *  the square master and back; the internal render size never changes. */
   setDome(cfg: DomeConfig | null): void {
     this.domeCfg = cfg && cfg.enabled ? cfg : null;
+    // The shaders' DOME_FILL : the horizon's radius on the disc while full-dome
+    // fill spreads the frame over it (domeSignal.ts).
+    const d = this.domeCfg;
+    setDomeFill(d && d.mode === 'fisheye' && d.fit === 'fill' ? 180 / Math.max(90, d.aperture) : 0);
     const cw = this.domeCfg ? this.domeCfg.res : this.w;
     const ch = this.domeCfg ? this.domeCfg.res : this.h;
     if (this.canvas.width !== cw || this.canvas.height !== ch) {

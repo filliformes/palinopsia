@@ -88,7 +88,16 @@ void main(){
   float el = 0.5 * PI - theta;
   vec3 col = vec3(0.0);
   if (uMode == 0) {
-    col = wrapAt(az - uRot, el);
+    // The BACK SEAM : unless the turns land the picture back on itself (whole
+    // turns, even ones with mirror seams), the frame's two edges meet behind
+    // the audience in a hard cut. Within 12° of it, each side blends toward
+    // the other, so they meet halfway. Where the seam was already clean both
+    // samples are the same picture and nothing changes.
+    float a = mod(az - uRot + PI, 2.0 * PI) - PI;
+    col = wrapAt(a, el);
+    float toSeam = PI - abs(a);
+    float sw = radians(12.0);
+    if (toSeam < sw) col = mix(col, wrapAt(a > 0.0 ? a - 2.0 * PI : a + 2.0 * PI, el), 0.5 * (1.0 - toSeam / sw));
   } else if (uMode == 1) {
     vec3 D = vec3(sin(theta) * sin(az), cos(theta), -sin(theta) * cos(az));
     vec3 back = uSurround > 0.001 ? wrapAt(az - uRot, el) * uSurround : vec3(0.0);

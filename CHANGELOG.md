@@ -7,6 +7,22 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The dome, from a fulldome audit of every source and effect** :
+  - a **square composition** for full-dome fill : `dome 2048²` / `dome 2880²` sizes, and
+    the **Satosphère** button sets 2048² (fill spreads width and height over the same
+    diameter, so 16:9 drew circles as ovals 1.78× longer front to back);
+  - **`DOME_FILL`** (`engine/domeSignal.ts`) : a plain uniform uploaded beside the
+    integrated phases (the horizon's radius on the disc, 180 / aperture, while fisheye +
+    fill, else 0). **Context**'s depth now falls from just above the horizon to the rim
+    and its void erodes from the rim, measured on the disc (Fong square→disc) : round,
+    the walls keep their light. **CRT Screen** drops its bezel and corners and moves its
+    vignette below the horizon. Verified on a 210° master : round, no ring;
+  - a **film on the default fit covers** the frame under full-dome fill (stretched into a
+    square composition it came out squashed);
+  - the **panorama's back seam** blends over 12° (each side toward the other, halfway at
+    the seam) when the turns don't land the picture back on itself; `top` resets to 90
+    like its default.
+
 - **The ADSR modulator's times read in full** (`ModulationPanel.tsx` MiniSlider) : their
   boxes were 36 px against SUS's 40, so "0.96" or "3.45" clipped. Same width as SUS now,
   and one decimal from 10 s ("45.2"); measured : every readout fits its box.

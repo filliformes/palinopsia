@@ -21,6 +21,7 @@
 // (a feedback loop). So every image input is bound at draw time instead, on
 // units B.. : the handle's texture, a loaded image, or a blank texel if unfed.
 
+import { domeFill } from './domeSignal'
 import { Renderer } from 'interactive-shader-format'
 import { tickPhases } from './phases'
 import { glGeneration } from './glGeneration'
@@ -122,6 +123,8 @@ export function installTextureBridge(): void {
       ? this.__opsiaTimeSec
       : Number(self.uniforms?.TIME?.value ?? 0)
     tickPhases(self, t)
+    // The dome as the shaders see it (domeSignal.ts) : only where declared.
+    if (self.uniforms && 'DOME_FILL' in self.uniforms) this.setValue('DOME_FILL', domeFill())
   }
 
   // ── Program leak fix + shared-attribute quarantine ──────────────────

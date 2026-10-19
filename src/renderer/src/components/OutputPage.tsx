@@ -511,7 +511,9 @@ export function OutputPage({
                 ['4K UHD', 3840, 2160],
                 ['2×1 · 3840×1080', 3840, 1080],
                 ['3×1 · 5760×1080', 5760, 1080],
-                ['2×1 · 7680×2160', 7680, 2160]
+                ['2×1 · 7680×2160', 7680, 2160],
+                ['dome 2048²', 2048, 2048],
+                ['dome 2880²', 2880, 2880]
               ].map(([lbl, w, h]) => (
                 <button
                   key={lbl as string}
@@ -1453,7 +1455,7 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
   const wrapControls = (
     <>
       <DomeSlider label="turns" value={dome.turns} min={1} max={6} step={0.25} reset={2} onChange={(v) => setDome({ turns: v })} title="How many times the picture goes around the dome (fewer = more horizontal stretch)" {...mp('turns')} />
-      <DomeSlider label="top" value={dome.top} min={0} max={90} step={1} unit="°" reset={70} onChange={(v) => setDome({ top: v })} title="Elevation the picture's top edge reaches (90° = the zenith)" {...mp('top')} />
+      <DomeSlider label="top" value={dome.top} min={0} max={90} step={1} unit="°" reset={90} onChange={(v) => setDome({ top: v })} title="Elevation the picture's top edge reaches (90° = the zenith)" {...mp('top')} />
       <DomeSlider label="bottom" value={dome.bottom} min={-25} max={80} step={1} unit="°" reset={-15} onChange={(v) => setDome({ bottom: v })} title="Elevation of the picture's bottom edge (−15° = the rim of a 210° dome)" {...mp('bottom')} />
       <div className="flex flex-wrap items-center gap-1.5">
         <button onClick={() => setDome({ mirrorSeams: !dome.mirrorSeams })} className={btn(dome.mirrorSeams)} title="Alternate copies mirror, so repeats join without a seam">mirror seams</button>
@@ -1506,12 +1508,16 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
             // speakers are SpatGRIS's (Space : objects). The mapping fills the dome.
             const st = useStore.getState()
             setDome({ res: 4096, aperture: 210, mode: 'fisheye', fit: 'fill' })
+            // A square composition : fill spreads the frame's width and height over
+            // the same diameter, so a 16:9 one drew every circle as an oval
+            // stretched front to back.
+            st.setCompSize(2048, 2048)
             st.setNdi({ fps: 60, format: 'uyvy', maxSize: 0 })
             st.setSpace({ mode: 'objects', protocol: 'spatgris', port: 18032, firstSource: 1, firstChannel: 1, pairs: true })
-            showToast('Satosphère : 4096² · 210° · full dome · NDI 60 fps · Sonify as objects to SpatGRIS (port 18032 : set the address of the venue audio server in Sonify → space).', 'ok', 8000)
+            showToast('Satosphère : 4096² · 210° · full dome · a 2048² square composition · NDI 60 fps · Sonify as objects to SpatGRIS (port 18032 : set the address of the venue audio server in Sonify → space).', 'ok', 8000)
           }}
           className={btn(false)}
-          title="Set everything the SAT Satosphère asks for : a 210° equidistant domemaster at 4096², the whole picture over the whole dome, NDI at 60 fps, and Sonify's voices as objects for the venue's SpatGRIS (its 93 speakers and 5 subwoofers). Dome on/off and NDI on/off stay yours."
+          title="Set everything the SAT Satosphère asks for : a 210° equidistant domemaster at 4096², the whole picture over the whole dome from a square 2048² composition (round things stay round), NDI at 60 fps, and Sonify's voices as objects for the venue's SpatGRIS (its 93 speakers and 5 subwoofers). Dome on/off and NDI on/off stay yours."
         >
           Satosphère
         </button>

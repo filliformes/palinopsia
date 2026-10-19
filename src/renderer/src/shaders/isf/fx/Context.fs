@@ -37,6 +37,8 @@
   ]
 }*/
 
+uniform float DOME_FILL; // the horizon's radius on the disc under full-dome fill, else 0 (engine/domeSignal.ts)
+
 // Void / edge-dissolve noise (a ragged erosion boundary, not a clean vignette).
 float vHash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 float vNoise(vec2 p) {
@@ -362,9 +364,19 @@ void main() {
   col = mix(col, atmosphere.rgb, atmoAmt);
 
   // ── DEPTH vignette : a lifted, luminous center falling to a darker,
-  //    receding rim, seating the frame in a volume. ──
+  //    receding rim, seating the frame in a volume. In a full-dome fill the
+  //    frame's edges are the dome's rim all around : there the recession falls
+  //    from just above the horizon to the rim, round, and the walls the audience
+  //    looks at keep their light (a flat vignette darkened them to a square). ──
   vec2 dv = (uv - 0.5) * vec2(aspect, 1.0);
-  float vig = 1.0 - smoothstep(0.35, 0.95, length(dv));
+  float domeRr = 0.0;
+  if (DOME_FILL > 0.0) {
+    vec2 sq = uv * 2.0 - 1.0;
+    domeRr = length(vec2(sq.x * sqrt(1.0 - 0.5 * sq.y * sq.y), sq.y * sqrt(1.0 - 0.5 * sq.x * sq.x)));
+  }
+  float vig = DOME_FILL > 0.0
+    ? 1.0 - smoothstep(0.9, 1.0 / DOME_FILL + 0.02, domeRr / DOME_FILL)
+    : 1.0 - smoothstep(0.35, 0.95, length(dv));
   col *= mix(1.0, 0.35 + 0.65 * vig, depth);
 
   if (lightOrder) col += keyLight; // POST (default)
@@ -373,7 +385,8 @@ void main() {
   //    breathing boundary (an erosion eating inward, not a clean vignette).
   //    0 = exact passthrough; up = the void reaches deeper into the frame. ──
   if (voidEdge > 0.001) {
-    float vd = length(dv);
+    // the dome : measured on the disc, so the erosion comes in from the rim, round
+    float vd = DOME_FILL > 0.0 ? domeRr * 0.95 : length(dv);
     float n = vFbm(vec2(uv.x * aspect, uv.y) * 6.0 + TIME * 0.03);
     float reach = mix(0.95, 0.2, voidEdge); // where the erosion begins
     float diss = smoothstep(reach, reach + 0.4, vd + (n - 0.5) * 0.45);

@@ -15,6 +15,8 @@
   ]
 }*/
 
+uniform float DOME_FILL; // the horizon's radius on the disc under full-dome fill, else 0 (engine/domeSignal.ts)
+
 const float TAU = 6.2831853;
 
 void main() {
@@ -60,14 +62,22 @@ void main() {
   float line = mix(lineC, lineR, moire);
   col *= 1.0 - scanline * line * 0.5;
 
-  // Corner vignette.
-  col *= 1.0 - vignette * smoothstep(0.15, 0.5, r2);
+  // Corner vignette; in a full-dome fill it falls below the horizon instead,
+  // round (the frame's corners are four points on the dome's rim).
+  float dr = 0.0;
+  if (DOME_FILL > 0.0) {
+    vec2 sq = uv * 2.0 - 1.0;
+    dr = length(vec2(sq.x * sqrt(1.0 - 0.5 * sq.y * sq.y), sq.y * sqrt(1.0 - 0.5 * sq.x * sq.x))) / DOME_FILL;
+  }
+  col *= 1.0 - vignette * (DOME_FILL > 0.0 ? smoothstep(0.9, 1.0 / DOME_FILL + 0.02, dr) : smoothstep(0.15, 0.5, r2));
 
   // Rounded bezel : black outside the glass (on the warped coords). Kept in UV,
   // so at 16:9 the corners stretch like a 4:3 tube's bezel.
   vec2 q = abs(warped - 0.5) - (0.5 - corner);
   float bezel = length(max(q, 0.0)) - corner;
-  float glass = 1.0 - smoothstep(0.0, 0.004, bezel);
+  // On the dome there is no tube to frame : the bezel would draw a black ring
+  // with four notches around the rim.
+  float glass = DOME_FILL > 0.0 ? 1.0 : 1.0 - smoothstep(0.0, 0.004, bezel);
   col *= glass;
 
   // Straight alpha : the glass carries the warped content's coverage; the black

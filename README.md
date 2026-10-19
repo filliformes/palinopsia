@@ -1141,7 +1141,10 @@ preview, the projector window (letterboxed, never stretched), NDI, Spout / Sypho
 recordings and stills. Keystone warp is off in dome mode (a dome is mapped by its own media server).
 
 - **Satosphère** (beside 2K / 4K) sets everything the SAT asks for in one click : an
-  equidistant 210° master at **4096 × 4096**, the whole picture over the whole dome,
+  equidistant 210° master at **4096 × 4096**, the whole picture over the whole dome
+  from a **square 2048² composition** (fill spreads the frame's width and height over
+  the same diameter : a 16:9 composition drew every circle as an oval stretched front to
+  back; **dome 2048²** and **dome 2880²** are also in the composition sizes),
   **NDI at 60 fps** (its guide : 4096 × 4096 at 60 fps, live over NDI), and Sonify's
   voices as objects for the venue's SpatGRIS (see [Space](#space--the-voices-in-the-room)).
   Dome on / off and NDI on / off stay yours.
@@ -1159,11 +1162,17 @@ recordings and stills. Keystone warp is off in dome mode (a dome is mapped by it
     **scale** and **offset** move it on the master. With **fill**, offset moves the
     picture's centre while the whole dome stays covered and perfectly round (the picture
     gathers toward one side and spreads on the other); cover and contain slide the frame.
+    Under fill, the shaders that frame things know the dome : **Context**'s depth
+    darkens from just above the horizon to the rim and its void eats in from the rim,
+    both round (a flat vignette darkened the walls into a square), **CRT Screen** drops
+    its bezel ring, and a film left on its default fit **covers** the frame (any shader
+    can ask : `uniform float DOME_FILL;`, the horizon's radius on the disc, else 0).
   - **panorama** : the picture wrapped around the room. **turns** (how many times it goes
     around; fewer = more horizontal stretch), **mirror seams** (alternate copies mirror so
     the repeats join), **top / bottom** (the elevations its edges reach : 90° is the
     zenith, −15° the rim of a 210° dome), and what fills the **zenith** above a lower top
-    (fade / stretch / black).
+    (fade / stretch / black). Where the picture's two edges meet behind the audience
+    (turns that don't land it back on itself) they blend over 12° instead of cutting.
   - **screen** : the picture hung on the dome as a flat virtual screen, re-projected so it
     reads **undistorted from the centre** (a giant cinema screen) : **azimuth, elevation,
     width, roll**, with a dim wrapped **surround** so the dome is never black. The
