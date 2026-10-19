@@ -73,7 +73,8 @@ const NODE_INPUTS: Record<string, { label: string; hint: string; none: string; l
     { label: 'input 2', hint: 'shown where the matte is dark', none: 'black' },
     { label: 'matte', hint: 'bright = this layer, dark = input 2', none: 'self' }
   ],
-  'node-lookup': [{ label: 'palette', hint: 'a line across it is the color table', none: 'self' }]
+  'node-lookup': [{ label: 'palette', hint: 'a line across it is the color table', none: 'self' }],
+  'node-codecmosh': [{ label: 'motion from', hint: 'its movement paints this layer (with motion from sidechain on)', none: 'none' }]
 }
 
 export function Inspector(): JSX.Element {

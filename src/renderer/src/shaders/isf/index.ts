@@ -813,6 +813,30 @@ export const NATIVE_NODES: IsfShader[] = [
       ]
     }*/`,
     curated: { rate: [1, 12], sync: [0, 0], smooth: [0, 0.6], mix: [0.7, 1] }
+  },
+  {
+    id: 'node-codecmosh',
+    name: 'Codec Mosh',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Codec Mosh : the real datamosh. The picture goes through an actual H.264 video encoder and decoder (the graphics card's own), and the stream between them is broken on purpose. At a cut (or mosh ▸) the new picture's keyframe is withheld : the new motion drags the OLD picture around, and only the blocks the encoder repaints let the new one through, until a clean keyframe comes back (refresh, clean ▸). BLOOM repeats each motion frame so the smear compounds; DROP loses some, so the next ones land on the wrong picture. MOTION FROM SIDECHAIN paints another layer's movement onto this one. BLOCKS is the size it is encoded at (the smaller, the bigger the blocks on screen), QUALITY starves or feeds it. It runs a few frames behind its input, and each Codec Mosh uses one of the graphics card's encoders.",
+      "CATEGORIES": ["FX", "Glitch"],
+      "INPUTS": [
+        { "NAME": "mosh", "TYPE": "event", "DEFAULT": false, "LABEL": "mosh ▸" },
+        { "NAME": "clean", "TYPE": "event", "DEFAULT": false, "LABEL": "clean ▸" },
+        { "NAME": "cuts", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "mosh on cuts" },
+        { "NAME": "pulse", "TYPE": "float", "MIN": 0.0, "MAX": 8.0, "DEFAULT": 0.0, "LABEL": "mosh rate (Hz)" },
+        { "NAME": "refresh", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "refresh" },
+        { "NAME": "bloom", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "bloom" },
+        { "NAME": "drop", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "drop" },
+        { "NAME": "quality", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.55, "LABEL": "quality" },
+        { "NAME": "size", "TYPE": "long", "VALUES": [0, 1, 2, 3], "LABELS": ["fine", "medium", "coarse", "huge"], "DEFAULT": 1, "LABEL": "blocks" },
+        { "NAME": "motionFrom", "TYPE": "bool", "DEFAULT": false, "LABEL": "motion from sidechain", "COMPACT": true },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
+      ]
+    }*/`,
+    curated: { cuts: [0.3, 0.9], pulse: [0, 1], refresh: [0.1, 0.6], bloom: [0, 0.6], drop: [0, 0.3], quality: [0.25, 0.75], size: [0, 3], mix: [0.8, 1] }
   }
 ]
 

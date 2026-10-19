@@ -810,6 +810,17 @@ export const THEMES: Theme[] = [
 
   // ── Datamosh & Compression (from the glitch research) ─────────────────
   mk({
+    id: 'codec-rot', name: 'Codec Rot', family: 'Datamosh & Compression',
+    blurb: 'A real video codec starved of keyframes : every change drags the last picture through the next.',
+    world: 'presse',
+    palette: [K, [0.12, 0.3, 0.42, 1], [0.6, 0.18, 0.3, 1], [0.92, 0.86, 0.62, 1]],
+    sources: ['organic', 'shapes', 'murmuration', 'swell', 'dye-field'],
+    layerFx: ['fx-grade', 'fx-chroma-shift'],
+    nativeNodes: ['node-codecmosh'], nativeChance: 0.85,
+    pickInputs: { 'node-codecmosh': { pulse: [0.25, 0.5, 1], refresh: [0, 0.15, 0.3], size: [1, 2, 3] } },
+    blends: ['screen', 'lighten', 'difference'], layers: [1, 2], feedback: 0.2, drift: 0.3, density: 0.4
+  }),
+  mk({
     id: 'melt', name: 'Melt', family: 'Datamosh & Compression',
     blurb: 'The datamosh bloom : new motion drags the old texture, figures melt into a soup of colour.',
     world: 'sublimated',
@@ -884,7 +895,7 @@ export const THEMES: Theme[] = [
     palette: [INK, [0.24, 0.14, 0.08, 1], [0.82, 0.7, 0.5, 1]],
     sources: ['organic', 'swell', 'dye-field'],
     layerFx: ['fx-compress', 'fx-grade'],
-    nativeNodes: ['node-datamosh'], nativeChance: 0.9,
+    nativeNodes: ['node-datamosh', 'node-codecmosh'], nativeChance: 0.9,
     blends: ['screen', 'lighten'], layers: [1, 2], feedback: 0.3, drift: 0.35, coalesce: 0.4, density: 0.4
   }),
   mk({
@@ -894,7 +905,7 @@ export const THEMES: Theme[] = [
     palette: [K, [0.4, 0.1, 0.3, 1], [0.1, 0.45, 0.55, 1], [0.9, 0.82, 0.5, 1]],
     sources: ['organic', 'shapes', 'dye-field', 'murmuration'],
     layerFx: ['fx-grade', 'fx-chroma-shift'],
-    nativeNodes: ['node-datamosh', 'node-transfert'], nativeChance: 0.7,
+    nativeNodes: ['node-datamosh', 'node-transfert', 'node-codecmosh'], nativeChance: 0.7,
     blends: ['screen', 'difference', 'consume'], layers: [2, 2], useB: 0.4, feedback: 0.25, drift: 0.3,
     mixBlends: ['consume', 'screen', 'difference']
   }),

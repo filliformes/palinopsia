@@ -11,6 +11,7 @@
 // M factor of Filter Flow's T = MK, run forward (synthesis).
 
 import { glGeneration } from './glGeneration'
+import { CodecMoshNode } from './codecMosh'
 
 export interface ChainLike {
   next(): { fbo: WebGLFramebuffer; tex: WebGLTexture }
@@ -5198,6 +5199,7 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   if (shaderId === 'node-reponse') return new ReponseNode(gl)
   if (shaderId === 'node-feedback') return new FeedbackNode(gl)
   if (shaderId === 'node-datamosh') return new DatamoshNode(gl)
+  if (shaderId === 'node-codecmosh') return new CodecMoshNode(gl)
   if (shaderId === 'node-scanner') return new ScannerNode(gl)
   if (shaderId === 'node-autocutter') return new AutocutterNode(gl)
   if (shaderId === 'node-chronoscan') return new ChronoscanNode(gl)
@@ -5205,6 +5207,6 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-remap', 'node-lumablur', 'node-gooey', 'node-matte', 'node-lookup']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-codecmosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-remap', 'node-lumablur', 'node-gooey', 'node-matte', 'node-lookup']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

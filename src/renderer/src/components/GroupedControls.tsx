@@ -120,6 +120,11 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('trails', 'blur', 'hue', 'hueCurve', 'sat', 'delayMix', 'delay', 'rgbDelay', 'route'),
     g('key', 'keyMode', 'keyThresh', 'keySoft', 'border', 'borderHue')
   ],
+  'node-codecmosh': [
+    g('mosh', 'mosh', 'clean', 'cuts', 'pulse', 'refresh'),
+    g('damage', 'bloom', 'drop', 'motionFrom'),
+    g('codec', 'quality', 'size', 'mix')
+  ],
   'node-datamosh': [
     g('mosh', 'mode', 'decay', 'refresh', 'residual', 'reseed', 'manifest', 'moshGate'),
     g('motion', 'motion', 'thresh', 'swirl', 'edgeRepel', 'flowInvert', 'sidechainFlow', 'flowRes'),

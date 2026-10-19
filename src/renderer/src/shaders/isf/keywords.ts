@@ -17,6 +17,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   'node-reponse': ['delay', 'echo', 'reverb', 'trails', 'temporal'],
   'node-feedback': ['feedback', 'reverb', 'trails', 'tunnel', 'recursion'],
   'node-datamosh': ['datamosh', 'glitch', 'codec', 'smear', 'motion'],
+  'node-codecmosh': ['datamosh', 'codec', 'glitch', 'h264', 'keyframe', 'compression', 'mosh', 'real'],
   'node-scanner': ['slit scan', 'scan', 'smear', 'glitch', 'capture'],
   'node-autocutter': ['cut-up', 'collage', 'glitch', 'shuffle', 'mosaic'],
   'node-chronoscan': ['time warp', 'delay', 'slit scan', 'echo', 'temporal'],

@@ -142,6 +142,8 @@ export const SHADER_BLURBS: Record<string, string> = {
     'Sums this layer’s last several frames through a shaped envelope, so trails swell and fade with a rhythm instead of decaying evenly. It is the visual equivalent of a reverb tail. Uses only its own history, so it needs no other layer.',
   'node-feedback':
     'Points the layer at its own previous frame through a slowly drifting zoom and rotation, which is how tunnels, trails and living textures appear out of nothing. An automatic gain control holds the loop at the brightness of the live layer, so it neither dies out nor runs away to white, and a dark picture stays dark. Deliberately off-center, so it stays organic instead of becoming a symmetrical mandala.',
+  'node-codecmosh':
+    'A real datamosh: the picture goes through an actual video encoder and decoder, and the keyframes between them are withheld on purpose. When the picture cuts, the new motion drags the old image around until a clean frame returns, the way a broken video file smears. Repeat or drop motion frames for more damage, or borrow the movement of another layer.',
   'node-datamosh':
     'Makes the picture slide along its own movement, the way a broken video file smears when its keyframes are missing. Turn the refresh down and a new scene drags the previous one around, so figures melt into and out of the image. It rebuilds that compression behavior in real time from the motion itself, with no codec involved.',
   'node-scanner':

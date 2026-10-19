@@ -23,7 +23,7 @@ type Voice = 'raster' | 'flow' | 'orbit' | 'spectra' | 'sstv' | 'filter' | 'even
 // Register tables : shader/node id → (voice, weight). Weights are taste.
 const AFFINITY: Array<[RegExp, Voice, number]> = [
   // glitch / data damage → Raster
-  [/^(node-datamosh|fx-databend|fx-pixelsort|fx-compress|fx-byte-corrupt|fx-mosh-blocks)$/, 'raster', 3],
+  [/^(node-datamosh|node-codecmosh|fx-databend|fx-pixelsort|fx-compress|fx-byte-corrupt|fx-mosh-blocks)$/, 'raster', 3],
   [/^(node-decimate|node-autocutter|fx-slice-shuffle|fx-stutter|fx-sync-loss|fx-row-echo|fx-ringing)$/, 'raster', 2],
   // motion → Flow
   [/^(murmuration|particle-drift|ash|metamorph|reaction|node-transfert)$/, 'flow', 3],

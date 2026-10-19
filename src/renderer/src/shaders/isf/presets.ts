@@ -230,6 +230,19 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Coupled chaos', values: { feedback: 0.94, gain: 1.07, zoom: 0.03, rotate: 0.04, driftX: 0.01, driftY: 0.006, pivot: 0.72, warp: 0.7, hue: 0.03, hueCurve: 0.5, sat: 0, blur: 0.12, blend: 0, keyMode: 0, keyThresh: 0.4, keySoft: 0.1, border: 0, borderHue: 0.6, delay: 6, delayMix: 0.4, rgbDelay: 3, route: 0, placement: 0, couple: 0.5, couple2: 1.6, agc: 0.35, noise: 0.1 } }
   ],
   // ── Datamosh (real-time faux-codec mosh) ──
+  'node-codecmosh': [
+    // Every preset sets every input (presets are partial merges).
+    { name: 'Cut melt', values: { cuts: 0.6, pulse: 0, refresh: 0.35, bloom: 0, drop: 0, quality: 0.55, size: 1, motionFrom: 0, mix: 1 } },
+    { name: 'Never clean', values: { cuts: 0.7, pulse: 0, refresh: 0, bloom: 0.1, drop: 0, quality: 0.5, size: 1, motionFrom: 0, mix: 1 } },
+    { name: 'Bloom smear', values: { cuts: 0.5, pulse: 0, refresh: 0.3, bloom: 0.7, drop: 0, quality: 0.5, size: 1, motionFrom: 0, mix: 1 } },
+    { name: 'Starved', values: { cuts: 0.5, pulse: 0, refresh: 0.4, bloom: 0.2, drop: 0, quality: 0.1, size: 2, motionFrom: 0, mix: 1 } },
+    { name: 'Huge blocks', values: { cuts: 0.6, pulse: 0, refresh: 0.3, bloom: 0.3, drop: 0.1, quality: 0.35, size: 3, motionFrom: 0, mix: 1 } },
+    { name: 'Fine grain', values: { cuts: 0.6, pulse: 0, refresh: 0.45, bloom: 0.15, drop: 0, quality: 0.7, size: 0, motionFrom: 0, mix: 1 } },
+    { name: 'Pulse mosh', values: { cuts: 0.3, pulse: 1, refresh: 0.55, bloom: 0.3, drop: 0, quality: 0.5, size: 1, motionFrom: 0, mix: 1 } },
+    { name: 'Broken stream', values: { cuts: 0.5, pulse: 0, refresh: 0.25, bloom: 0.2, drop: 0.5, quality: 0.4, size: 1, motionFrom: 0, mix: 1 } },
+    { name: 'Borrowed motion', values: { cuts: 0, pulse: 0, refresh: 0.15, bloom: 0.2, drop: 0, quality: 0.5, size: 1, motionFrom: 1, mix: 1 } },
+    { name: 'Ghost mix', values: { cuts: 0.6, pulse: 0, refresh: 0.3, bloom: 0.4, drop: 0, quality: 0.5, size: 1, motionFrom: 0, mix: 0.55 } }
+  ],
   'node-datamosh': [
     // Every preset sets every input (presets are partial merges : motion transfer,
     // the gates or actants left over from the previous pick would carry over).

@@ -12,6 +12,7 @@ import { FX_SHADERS, NATIVE_NODES, SHADER_BY_ID } from './shaders/isf'
 // background all get a node context.
 const SELF_CONTAINED = new Set([
   'node-datamosh',
+  'node-codecmosh',
   'node-feedback',
   'node-reponse',
   'node-chronoscan',

@@ -646,6 +646,25 @@ export const MASTER_PRESETS: MasterPreset[] = [
     vibe: { mixSrc: 1, contrast: 1, saturation: 0.85, gamma: 1, autoLevel: 0.2, splitTone: 0.2, shadowTint: [0.47, 0.49, 0.53, 1], highTint: [0.54, 0.52, 0.48, 1] }
   },
   {
+    name: 'Codec Rot',
+    group: 'Node recipes',
+    fx: [
+      { shaderId: 'node-codecmosh', inputs: { cuts: 0.75, pulse: 0, refresh: 0.2, bloom: 0.45, drop: 0.05, quality: 0.35, size: 2, motionFrom: 0, mix: 1 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 1.05, lift: 0.02 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 1.05, gamma: 1, autoLevel: 0.15, splitTone: 0.15, shadowTint: [0.44, 0.48, 0.55, 1], highTint: [0.56, 0.52, 0.45, 1] }
+  },
+  {
+    name: 'Keyframe Hunger',
+    group: 'Node recipes',
+    fx: [
+      { shaderId: 'node-codecmosh', inputs: { cuts: 0.85, pulse: 0.25, refresh: 0, bloom: 0.2, drop: 0.15, quality: 0.12, size: 1, motionFrom: 0, mix: 1 } },
+      { shaderId: 'fx-compress', inputs: { block: 16, quality: 0.3, ring: 0.4, chroma: 0.5, grid: 0.1 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.15, saturation: 0.9, lift: 0.04 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.1, saturation: 0.9, gamma: 1, autoLevel: 0.2, splitTone: 0.2, shadowTint: [0.5, 0.47, 0.44, 1], highTint: [0.5, 0.52, 0.56, 1] }
+  },
+  {
     name: 'Liquid Mosh',
     fx: [
       { shaderId: 'node-datamosh', inputs: { mode: 0, motion: 1.2, block: 20, decay: 0.95, refresh: 0.02, moshGate: 0.4, edgeRepel: 0.5, resharp: 0.45, bleed: 0.3, autoBloom: 0.8 } },

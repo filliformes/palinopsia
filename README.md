@@ -66,7 +66,7 @@ Lowercase's slant, each straight from its Space theme. The older shots stay in
 
 **The vocabulary**
 - [Sources](#sources-43-generators) (43 generators) · [Effects](#effects) (53 FX) ·
-  [Native nodes](#native-nodes) (25) · [Master finalizers](#master-finalizers--pinned-always-last)
+  [Native nodes](#native-nodes) (26) · [Master finalizers](#master-finalizers--pinned-always-last)
 - [Blend modes](#blend-modes) (19)
 
 **Control & internals**
@@ -186,7 +186,7 @@ first-ever launch pays this once; it persists on disk afterwards.
 4. **Save a scene**: get something you like, click `+` in the Scene bank, then
    press `1`–`9` to recall it live (recalls morph over MORPH).
 5. **Go fullscreen**: press **`O`**, pick a display, hit fullscreen. Or try
-   **Generate** in the toolbar : 109 themed recipes that build a coherent
+   **Generate** in the toolbar : 110 themed recipes that build a coherent
    session (visuals + World + palette + macro biases + motion) in one click.
 
 **Lost?** Press **`?`** anytime for the full keyboard cheat-sheet.
@@ -1769,7 +1769,7 @@ subfolders) joins the dropdown under the folder's name, in name order (number th
 saved there later appears too. The same menu lists the linked folders : click one to
 jump to its first session, × to unlink it (the files are never touched).
 
-**Generate** (toolbar) : a dropdown of **109 visual themes** in 17 families
+**Generate** (toolbar) : a dropdown of **110 visual themes** in 17 families
 (Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,
 Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage,
 Cinematic/Atmospheric, Retro Screen, Minimal/Structural, Datamosh & Compression,
@@ -1990,7 +1990,7 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   finishing units at its end; the chain's effects run underneath across the whole width,
   wrapping under the finishing too when the chain is long (an empty chain : one line).
 - **Master chain presets** : the `chain presets…` box in the Master FX strip replaces the
-  whole master chain with one of **112** designed chains and sets the Vibe to match (the
+  whole master chain with one of **114** designed chains and sets the Vibe to match (the
   finalizers stay). The newer ones sit in five groups : **Time & memory** (Réponse,
   Sediment, Chronoscan, Eternalism, Afterimage, Decimate, Corrode, Feedback on the master
   bus), **Node recipes** (a node that reads another layer is wired, when the preset is
@@ -2111,7 +2111,7 @@ labelled picker in the Inspector (**map**, **control**, **palette**; the three-i
 none is picked, so all five run in any rack.
 
 <details>
-<summary><b>The full node catalogue (25)</b> (click to expand)</summary>
+<summary><b>The full node catalogue (26)</b> (click to expand)</summary>
 
 | Node | Description |
 |---|---|
@@ -2120,6 +2120,7 @@ none is picked, so all five run in any rack.
 | **Mosaïque** | **Spatial concatenative synthesis** ([Assemble](#assemble--the-automatic-editor-key-e)'s sibling on the other axis; after CIS + Image-Melding). The frame is cut into patches, and each is replaced by the **corpus tile** (from the sidechain layer) whose colour + structure match best : tiles flip/rotate and **re-tint** to fit, matches **hold** across frames so it doesn't boil. Cell **shape** goes grid → **brick** → **voronoi** (organic polygons of varying size) → **warp** (a noise-bent grid), with an **irregular** amount and a **drift** that slowly evolves the shapes; **melt** softens the seams. |
 | **Réponse** | Temporal convolution : the layer's last 16 frames summed through a shaped attack/decay envelope (reversible): a convolution-reverb for image. |
 | **Feedback** | A full video-feedback engine (LZX-Memory-Palace-class) : the last frame re-sampled through a drifting off-centre transform + self-displacement, held at the edge of chaos by AGC + a noise floor. **Couple** runs a second buffer under a diverged transform and cross-mixes it (emergent behaviour no single loop shows); a delay-tap ring with **RGB delay** (channels sheared in time) and an echo **route** (back into the loop, or feedforward onto the output only); blend modes. A **keyer** gates what re-enters : on **luma** (key black / white) or **chroma** (key desaturated / colourful), so only the keyed region trails; a **placement** switch puts the spatial process on the recirculating buffer (*feedback* : a wandering tunnel) or on the incoming live image (*painting* : the source smeared into a still accumulator that holds its shape); and a per-repeat **hue cycle** and **sat drift** bleach the trails toward grey or intensify them toward neon as they age. |
+| **Codec Mosh** | The real datamosh, through an actual H.264 encoder and decoder (the graphics card's own, the processor's when it has none free) with the stream broken on purpose. At a cut in the layer (**mosh on cuts**), on **mosh ▸** or on the **mosh rate** clock, the new picture's keyframe is **withheld** : the new motion drags the old picture around and only the blocks the encoder repaints let the new one through, until a clean keyframe returns (**refresh** : never … a quarter second, or **clean ▸**). **Bloom** repeats each motion frame (the smear compounds), **drop** loses some (errors pile up), **motion from sidechain** paints another layer's movement onto this one (it re-seats this layer's picture first, and on mosh ▸). **Blocks** is the encoded size (fine 960 · medium 640 · coarse 416 · huge 256 px long edge : the 16-pixel macroblocks grow on screen as it shrinks) and **quality** the per-frame quantizer (starved … clean, no restart). Runs a few frames behind its input; each one holds an encoder, so keep a handful at most. 10 presets, the **Codec Rot** and **Keyframe Hunger** master chains, the **Codec Rot** Generate theme. |
 | **Datamosh** | The codec-mosh look, real-time and codec-free: optical flow quantised to macroblocks advects a feedback buffer (the P-frame smear). Refresh (the I-frame) down + a scene cut = the bloom; **sticky/melt/fluid** modes; **actants** : sparse autonomous frozen patches that drift along the flow; **manifest** reveals a new source only where there's motion; auto-bloom on detected cuts; motion-transfer from a sidechain; **flow-shaping** : a **mosh gate** restricts the smear to moving or to still regions, **edge-repel** pushes the flow off the image's own contours, and **re-sharpen** claws back the mush. |
 | **Scanner** | A flatbed-scanner slit-scan : a head sweeps the frame, capturing each line at a different instant; anything moving mid-sweep smears and tears across the scanlines. |
 | **Autocutter** | A cut-up collage : the frame recursively split into pieces, shuffled among their slots (and optionally rotated); the layout holds while live video keeps playing inside every piece, and re-cuts on `cut ▸` or an **auto cut** rate. Four dials shape the cut itself: **contour** bends the straight seams into uneven curves that still tessellate perfectly (past 1 it shreds), **curve length** trades many small wiggles for a few long, simple curves, **torn paper** tears the cuts like a torn-magazine collage (one piece over the other, the white core of the paper showing only along the upper piece's ragged edge, loose fibers, a soft shadow; the frame's own edges stay clean cuts), and **mask** peels pieces away into transparent holes : at full mask a single piece survives, and each new cut elects a different one. **Shape** switches between the rectangles and an irregular **Voronoi mosaic** (denser, more organic : every dial behaves the same in both). Set an **auto rate** and a **crossfade** to dissolve one cut layout into the next instead of snapping. Ships 9 presets from *Clean cut-up* to *Last piece*. |

@@ -7,6 +7,26 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Codec Mosh** (`engine/codecMosh.ts`, `node-codecmosh`) : a native node that runs the
+  layer through a real H.264 round trip (WebCodecs : baseline `avc1.42001f`, annexb,
+  realtime, per-frame `quantizer` when the encoder takes it, else a bitrate; graphics card
+  first, the processor after a hardware refusal). The input is read back through a
+  `GridReadback` ring (premultiplied over black; a second cell for the sidechain), encoded
+  at a small size, decoded, and the newest frame uploaded (rows stay bottom-up end to
+  end : no flip). Each encode carries an intent (clean / mosh / normal) matched to its
+  chunk : mosh keyframes, and the encoder's own keyframes while a mosh holds, are
+  withheld from the decoder; bloom re-decodes each delta up to 3 more times; drop skips
+  deltas; motion-from encodes the sidechain after a clean keyframe of the host (and
+  re-seats on a mode change or mosh ▸). Triggers : mosh ▸ / clean ▸ (rising edges), cuts
+  (a sparse luma diff on the readback, 0.3 s cooldown), a pulse clock, the hold timer
+  (refresh). Size / bitrate changes restart the codec at most every 0.4 s, a broken codec
+  retries after 1 s. Verified live : 640x368 on the graphics card with per-frame quality,
+  60 fps; a cut with refresh 0 carves the new generator out of the old one's colors until
+  clean ▸; bloom + drop tear into macroblocks; motion from another layer drags this one.
+  10 presets, master chains **Codec Rot** and **Keyframe Hunger**, Generate theme **Codec
+  Rot** (and in Bitrate Starve, Discorrelated), Inspector groups, hints, blurb, keywords,
+  Sonify affinity. Not in the Randomize pools (each instance holds an encoder).
+
 - **Ableton Link** (`native/link`, `src/main/link.ts`, `src/renderer/src/link.ts`,
   `components/LinkSection.tsx`). The Ableton Link SDK 4.1.1 (and asio 1.38.2), vendored
   and compiled into a small N-API addon in the main process : one Link instance, polled

@@ -633,6 +633,19 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     noise: 'A faint grain injected every pass so the loop never settles into a dead flat image.',
     clear: 'Restarts the loop from the live frame (the rising edge), for this node only.'
   },
+  'node-codecmosh': {
+    mosh: 'Withhold the next keyframe : the encoder starts over from the picture as it is now, the decoder keeps the old one, and the motion from here on drags the old picture around. Press it, send OSC, or bind a modulator (a square LFO, an audio onset) with M to mosh on the beat.',
+    clean: 'Send a clean keyframe now : the picture comes back whole.',
+    cuts: 'Mosh by itself on a cut in this layer (a sudden change of the whole picture : a new clip, a scene). Higher hears smaller cuts; 0 = only by hand.',
+    pulse: 'Mosh on a clock (Hz), hands-free. 0 = off.',
+    refresh: 'How soon a clean keyframe comes back after a mosh : 0 = never (until clean ▸), low = up to half a minute, high = a quarter second.',
+    bloom: 'Repeat each motion frame up to three more times : the same movement applied again and again, so the smear compounds outward.',
+    drop: 'Lose some motion frames : the next ones land on the wrong picture and the errors pile up.',
+    quality: 'How much the encoder may spend on each frame : low starves it into blocks and smudges, high keeps it close to clean.',
+    size: 'The size the picture is encoded at. The codec works in 16-pixel blocks, so the smaller the size, the bigger the blocks on screen. Changing it starts the stream over.',
+    motionFrom: 'Take the motion from the sidechain layer : the encoder watches it while the decoder holds this layer\u2019s picture, so its movement paints this layer around. mosh ▸ puts this layer\u2019s picture back under the motion.',
+    mix: 'How much of the moshed picture covers the input.'
+  },
   'node-datamosh': {
     motion: 'How far the picture slides along the measured motion each frame.',
     block: 'Macroblock size in pixels at 1080p (it scales with the render size) : the grain of the sticky tearing.',
