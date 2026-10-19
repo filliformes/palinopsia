@@ -34,13 +34,13 @@ const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 
 // BY INDEX. A voice's index is what a session saves : its mixer channel, its DJ
 // filter, its sequencer mask, its MIDI on/off binding (`sonify:voice:i`). So a
 // new voice is APPENDED, and VOICE_ORDER below is where the page SHOWS it.
-const VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal'] as const
-const VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord', 'Collage', 'Signal']
+const VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal', 'assemblage'] as const
+const VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord', 'Collage', 'Signal', 'Assemblage']
 // The order the mixer and the sequencer list the voices in : Signal (9) before
 // Chord (7), as its card sits, without moving anything a session stored.
-const VOICE_ORDER = [0, 1, 2, 3, 4, 5, 6, 9, 7, 8]
+const VOICE_ORDER = [0, 1, 2, 3, 4, 5, 6, 9, 7, 8, 10]
 // Two letters each : one letter made Flow/Filter and Chord/Collage twins.
-const VOICE_ABBR = ['Sp', 'Or', 'Fl', 'Ev', 'Ra', 'Tr', 'Fi', 'Ch', 'Co', 'Sg']
+const VOICE_ABBR = ['Sp', 'Or', 'Fl', 'Ev', 'Ra', 'Tr', 'Fi', 'Ch', 'Co', 'Sg', 'As']
 // Each voice's mark on the mirror, as a coloured GLYPH that hints its SHAPE as
 // well as its hue (matches the overlay painter below), so a strip tells you
 // which mark is yours even when two share a color (Spectra's line vs Flow's
@@ -55,7 +55,8 @@ const PROBE_MARK: Record<string, { glyph: string; color: string; hint: string }>
   Filter: { glyph: '─', color: 'rgb(120,200,255)', hint: 'a blue scan line' },
   Chord: { glyph: '≡', color: 'rgb(160,160,175)', hint: 'horizontal bands, no spatial probe' },
   Collage: { glyph: '▦', color: 'rgb(220,190,255)', hint: 'the Collage\'s own pieces : center low, edges high' },
-  Signal: { glyph: '▪', color: 'rgb(40,255,215)', hint: 'cyan read bars, and a square at every mark it fires' }
+  Signal: { glyph: '▪', color: 'rgb(40,255,215)', hint: 'cyan read bars, and a square at every mark it fires' },
+  Assemblage: { glyph: '▶', color: 'rgb(255,190,140)', hint: 'not drawn : it hears the edit on screen, each cut its own film' }
 }
 const filterTag = (x: number): string => (x < 0.49 ? 'LP' : x > 0.51 ? 'HP' : 'off')
 
@@ -181,14 +182,15 @@ const RING_VOICINGS = ['Clean', 'SEM', 'MS-20', 'Steiner', 'K35']
  *  octave over the highest (1). It follows the key and the octave range. */
 // The Collage comp's reduction, for its GrMeter (stable : the meter's effect keys on it).
 const collageGr = (): number => sonifyEngine.collageCompGr
+const asmGr = (): number => sonifyEngine.asmCompGr
 
-function ringCutoffHz(cfg: SoniConfig, c: number): number {
-  const f = ringFreqs(cfg)
+function ringCutoffHz(cfg: SoniConfig, c: number, part: { loOct: number; hiOct: number } = cfg.collage): number {
+  const f = ringFreqs(cfg, part)
   const f0 = Math.max(10, f[0]), span = Math.max(1, 12 * Math.log2(Math.max(10, f[47]) / f0))
   return f0 * Math.pow(2, (-6 + Math.max(0, Math.min(1, c)) * (span + 12)) / 12)
 }
-function ringCutoffOf(cfg: SoniConfig, hz: number): number {
-  const f = ringFreqs(cfg)
+function ringCutoffOf(cfg: SoniConfig, hz: number, part: { loOct: number; hiOct: number } = cfg.collage): number {
+  const f = ringFreqs(cfg, part)
   const f0 = Math.max(10, f[0]), span = Math.max(1, 12 * Math.log2(Math.max(10, f[47]) / f0))
   return Math.max(0, Math.min(1, (12 * Math.log2(Math.max(1, hz) / f0) + 6) / (span + 12)))
 }
@@ -405,6 +407,8 @@ const PARAM_LABELS: Partial<Record<SonifyModParam, string>> = {
   filterQ: 'Filter resonance', filterSweep: 'Filter sweep rate',
   chordTone: 'Chord tone', chordSpread: 'Chord spread', chordAttack: 'Chord swell', chordVoices: 'Chord voices',
   collageReso: 'Collage resonance', collageRing: 'Collage ring', collageWidth: 'Collage width',
+  asmReso: 'Assemblage resonance', asmRing: 'Assemblage ring', asmWidth: 'Assemblage width',
+  asmAccent: 'Assemblage cut accent', asmBank: 'Assemblage ring bank wet',
   collageBank: 'Collage ring bank wet', collageDecay: 'Collage ring bank decay', collageCutoff: 'Collage ring bank cutoff',
   collageWaves: 'Collage ring bank waves', collageDetune: 'Collage ring bank detune', chordWaves: 'Chord waves',
   chordNoise: 'Chord noise', chordAir: 'Chord air',
@@ -585,14 +589,27 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   const [assign, setAssign] = useState<SonifyModParam | null>(null)
   // What the Collage voice is playing (walls heard · pieces · films), polled.
   const [colStat, setColStat] = useState<{ sets: number; pieces: number; films: number } | null>(null)
+  const [asmStat, setAsmStat] = useState<{ sets: number; pieces: number; films: number } | null>(null)
   useEffect(() => {
     const t = window.setInterval(() => {
       const n = sonifyEngine.collageStatus()
       // same numbers : keep the same object (a new one re-rendered the page)
       setColStat((p) => (p && n && p.sets === n.sets && p.pieces === n.pieces && p.films === n.films ? p : n))
+      const a = sonifyEngine.asmStatus()
+      setAsmStat((p) => (p && a && p.sets === a.sets && p.pieces === a.pieces && p.films === a.films ? p : a))
     }, 500)
     return () => window.clearInterval(t)
   }, [])
+  // Is there anything for the film voices to hear : a Collage source, an
+  // Assemblage source, on a layer (or the background, for the Collage)?
+  const hasCollage = useStore((s) =>
+    s.composition.layers.some((l) => l.sourceA?.shaderId === 'gen-collage' || l.sourceB?.shaderId === 'gen-collage') ||
+    s.composition.background?.source?.shaderId === 'gen-collage')
+  const hasAsm = useStore((s) => s.composition.layers.some((l) => l.sourceA?.kind === 'assemble' || l.sourceB?.kind === 'assemble'))
+  const voiceIdle = (k: string): string | null =>
+    k === 'collage' && !hasCollage ? 'No Collage source on a layer or the background : this voice has nothing to hear (it stays playable).'
+      : k === 'assemblage' && !hasAsm ? 'No Assemblage source on a layer : this voice has nothing to hear (it stays playable).'
+        : null
   const chip = (p: SonifyModParam, inactive = false): JSX.Element => (
     <ModChip param={p} open={assign === p} onOpen={(x) => setAssign(assign === x ? null : x)} inactive={inactive} />
   )
@@ -683,7 +700,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
     mf[i] = v
     patch({ mixFilter: mf })
   }
-  const pv = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'signal'>(k: K, p: Partial<SoniConfig[K]>): void =>
+  const pv = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'signal' | 'assemblage'>(k: K, p: Partial<SoniConfig[K]>): void =>
     { const c = now(); set({ ...c, [k]: { ...c[k], ...p } }) }
   const pfx = (p: Partial<SoniConfig['fx']>): void => { const c = now(); set({ ...c, fx: { ...c.fx, ...p } }) }
 
@@ -1184,7 +1201,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 const vv = cfg[k]
                 const fx = cfg.mixFilter?.[i] ?? 0.5
                 return (
-                  <section key={k} className={`flex min-w-0 items-center gap-1.5 rounded border px-2 py-1 transition-colors ${vv.on ? 'border-accent/40 bg-panel2' : 'border-border bg-panel2/40'}`}>
+                  <section key={k} title={voiceIdle(k) ?? undefined} className={`flex min-w-0 items-center gap-1.5 rounded border px-2 py-1 transition-colors ${vv.on ? 'border-accent/40 bg-panel2' : 'border-border bg-panel2/40'} ${voiceIdle(k) ? 'opacity-45' : ''}`}>
                     <span className="relative flex shrink-0">
                       <MidiLearnOverlay id={`sonify:voice:${i}`} />
                       <button onClick={() => pv(k, { on: !vv.on })} className={`${pill(vv.on)} w-[22px] px-0 text-center`} title={vv.on ? 'on' : 'off'}>
@@ -1725,6 +1742,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
             <Slider label="pan" value={cfg.chord.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('chord', { pan: v })} title="Places the Chord voice left (-1) or right (+1)" />
           </VoiceShell>
 
+          <div className={`transition-opacity ${hasCollage ? '' : 'opacity-45'}`} title={hasCollage ? undefined : voiceIdle('collage') ?? undefined}>
           <VoiceShell
             title="Collage" on={cfg.collage.on}
             hint="The films of a Collage source, heard all at once in their own loops and speeds : each piece is panned by its place in the frame and rings through a harmonic resonator tuned to the key/scale, the center low, rising to the frame's edges in every direction (up to 64 pieces, 64 resonances). A new deal crossfades over the Collage's own crossfade time."
@@ -1801,6 +1819,95 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
               </Row>
             </div>
           </VoiceShell>
+          </div>
+
+          <div className={`transition-opacity ${hasAsm ? '' : 'opacity-45'}`} title={hasAsm ? undefined : voiceIdle('assemblage') ?? undefined}>
+          <VoiceShell
+            title="Assemblage" on={cfg.assemblage.on}
+            hint="The sound of an Assemblage source, cut with the picture : each cut plays its clip's own film from its in point (the original file, even when the picture plays a converted copy), a short crossfade at the cut. The clip's place on the Assemble map gives its note (the map's center low, its edges high) and its pan, so look-alike clips sing alike; a strike of the resonators marks every cut."
+            onToggle={() => pv('assemblage', { on: !cfg.assemblage.on })}
+            onDice={() => diceVoice('assemblage')}
+          >
+            <div className="mb-0.5 font-mono text-[9px] text-muted">
+              {!cfg.assemblage.on
+                ? 'off'
+                : !cfg.on
+                  ? 'turn Sonify on to hear the edit'
+                  : asmStat && asmStat.films > 0
+                    ? `${asmStat.sets} assemblage${asmStat.sets === 1 ? '' : 's'} heard`
+                    : 'no Assemblage playing : put one on a layer (its source menu, Assemblage…)'}
+            </div>
+            {/* The films in, before everything : a windy or hot recording. */}
+            <Slider label="films in" value={cfg.assemblage.inGain ?? 0} min={-24} max={12} step={0.5} neutral={0} fmt={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} onChange={(v) => pv('assemblage', { inGain: Math.round(v * 2) / 2 })} title="The films' level into the voice, before the resonators : turn a windy or hot recording down here (the resonators and the Ring bank then ring cleaner)" parse={(t) => parseDb(t)} />
+            <Slider label="hp" lead={<button onClick={() => pv('assemblage', { hpSlope: (cfg.assemblage.hpSlope ?? 24) === 24 ? 12 : 24 })} className={`w-[22px] shrink-0 rounded px-0 py-0.5 text-center font-mono text-[8px] transition-colors ${(cfg.assemblage.hpSlope ?? 24) === 24 ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'}`} title={`The high-pass's slope : ${(cfg.assemblage.hpSlope ?? 24) === 24 ? '24 dB per octave (steep : two Butterworth sections)' : '12 dB per octave (gentle : one section)'}. Click : ${(cfg.assemblage.hpSlope ?? 24) === 24 ? '12' : '24'}`}>{cfg.assemblage.hpSlope ?? 24}</button>} value={Math.log((cfg.assemblage.hp ?? 20) / 20) / Math.log(50)} min={0} max={1} step={0.001} neutral={0} fmt={() => ((cfg.assemblage.hp ?? 20) <= 20.5 ? 'off' : `${Math.round(cfg.assemblage.hp ?? 20)} Hz`)} onChange={(v) => pv('assemblage', { hp: Math.round(20 * Math.pow(50, v) * 10) / 10 })} title="A high-pass on every film, before the resonators : wind rumble and handling noise go (20 Hz = off, up to 1 kHz). Its slope (12 or 24 dB per octave) is the chip beside the label." parse={(t) => { const f = parseHz(t, 20); return f === null ? null : Math.log(Math.max(20, Math.min(1000, f)) / 20) / Math.log(50) }} />
+            <Slider label="lp" lead={<button onClick={() => pv('assemblage', { lpSlope: (cfg.assemblage.lpSlope ?? 24) === 24 ? 12 : 24 })} className={`w-[22px] shrink-0 rounded px-0 py-0.5 text-center font-mono text-[8px] transition-colors ${(cfg.assemblage.lpSlope ?? 24) === 24 ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-text'}`} title={`The low-pass's slope : ${(cfg.assemblage.lpSlope ?? 24) === 24 ? '24 dB per octave (steep : two Butterworth sections)' : '12 dB per octave (gentle : one section)'}. Click : ${(cfg.assemblage.lpSlope ?? 24) === 24 ? '12' : '24'}`}>{cfg.assemblage.lpSlope ?? 24}</button>} value={Math.log((cfg.assemblage.lp ?? 20000) / 1000) / Math.log(20)} min={0} max={1} step={0.001} neutral={1} fmt={() => { const f = cfg.assemblage.lp ?? 20000; return f >= 19950 ? 'off' : f < 10000 ? `${(f / 1000).toFixed(2)} kHz` : `${(f / 1000).toFixed(1)} kHz` }} onChange={(v) => pv('assemblage', { lp: Math.round(1000 * Math.pow(20, v) / 10) * 10 })} title="A low-pass on every film, before the resonators : crackle, hiss and the wind's top go (20 kHz = off, down to 1 kHz). Its slope (12 or 24 dB per octave) is the chip beside the label." parse={(t) => { const f = parseHz(t, 20000); return f === null ? null : Math.log(Math.max(1000, Math.min(20000, f)) / 1000) / Math.log(20) }} />
+            <Slider label="comp" lead={<GrMeter get={asmGr} title="The comp's gain reduction now, in dB (off : at 0)" />} value={cfg.assemblage.comp ?? 0} min={0} max={1} step={0.01} neutral={0} fmt={(v) => (v < 0.005 ? 'off' : `${Math.round(v * 100)}%`)} onChange={(v) => pv('assemblage', { comp: v })} title="One compressor on the edit's sound : a loud clip comes down, a quiet one comes up a little, so the cuts hold one level. It sits after the filters, before the resonators' Ring bank. One knob : the threshold falls and the ratio rises as it turns (1.5:1 to 6:1, a soft knee), with the makeup automatic. The number beside the label is how much it is taking off now." />
+            <Slider label="resonance" value={cfg.assemblage.reso} min={0} max={1} neutral={0.5} onChange={(v) => pv('assemblage', { reso: v })} mod={chip('asmReso')} title="0 = the plain films · 1 = only the tuned resonances" />
+            <Slider label="ring" value={cfg.assemblage.ring} min={0} max={1} neutral={0.5} onChange={(v) => pv('assemblage', { ring: v })} mod={chip('asmRing')} title="How sharply each cut's resonator rings : a broad color → a pitched, singing tone" />
+            <Slider label="harmonics" value={cfg.assemblage.bright} min={0} max={1} neutral={0.5} onChange={(v) => pv('assemblage', { bright: v })} title="How much the 2nd and 3rd harmonics ring with each note" />
+            <Slider label="cut accent" value={cfg.assemblage.accent ?? 0.4} min={0} max={1} neutral={0} onChange={(v) => pv('assemblage', { accent: v })} mod={chip('asmAccent')} title="A strike of the resonators at every cut : the note of the new clip rings out, so the edit's rhythm is heard even over a quiet clip (0 = none; needs some resonance)" />
+            <Row label="pitch">
+              <button
+                onClick={() => pv('assemblage', { tape: !(cfg.assemblage.tape ?? true) })}
+                className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${(cfg.assemblage.tape ?? true) ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
+                title="tape : a clip's speed changes its pitch (slowed = lower, like tape) · keep : the pitch stays, only the time stretches"
+              >{(cfg.assemblage.tape ?? true) ? 'tape' : 'keep'}</button>
+              <span className="text-[9px] text-muted">{(cfg.assemblage.tape ?? true) ? 'speed changes the pitch' : 'the pitch holds'}</span>
+            </Row>
+            <Row label="range">
+              <select className="input select-compact text-[10px]" value={cfg.assemblage.loOct} onChange={(e) => pv('assemblage', { loOct: Math.min(Number(e.target.value), cfg.assemblage.hiOct - 1) })} title="The map center's octave (the lowest note)">
+                {[0, 1, 2, 3, 4].map((o) => <option key={o} value={o}>oct {o}</option>)}
+              </select>
+              <span className="text-[9px] text-muted">→</span>
+              <select className="input select-compact text-[10px]" value={cfg.assemblage.hiOct} onChange={(e) => pv('assemblage', { hiOct: Math.max(Number(e.target.value), cfg.assemblage.loOct + 1) })} title="The map edge's octave (the highest note)">
+                {[3, 4, 5, 6, 7, 8].map((o) => <option key={o} value={o}>oct {o}</option>)}
+              </select>
+            </Row>
+            <Slider label="width" value={cfg.assemblage.width} min={0} max={1} neutral={1} onChange={(v) => pv('assemblage', { width: v })} mod={chip('asmWidth')} title="Stereo spread : 0 = every cut in the center · 1 = left to right across the Assemble map" />
+            <Slider label="gain" value={cfg.assemblage.gain} min={0} max={1} neutral={0.7} onChange={(v) => pv('assemblage', { gain: v })} title="How loud the Assemblage voice is (before its mixer channel)" />
+            <Slider label="pan" value={cfg.assemblage.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('assemblage', { pan: v })} title="Places the Assemblage voice left (-1) or right (+1)" />
+            {/* The Ring bank : a resonant filterbank over the whole voice. */}
+            <div className="mt-1 flex items-center gap-1.5">
+              <span className="font-mono text-[8px] uppercase tracking-wide text-muted/70" title="A 48-band resonant filterbank over the whole voice, its bands on the key / scale across the range : the films ring as a tuned instrument">ring bank</span>
+              <span className="min-w-0 flex-1" />
+              <button
+                onClick={() => pv('assemblage', { bankSend: !cfg.assemblage.bankSend })}
+                className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.assemblage.bankSend ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
+                title="mix : wet crossfades from the plain voice to the bank · send : the bank is added on top of the plain voice"
+              >{cfg.assemblage.bankSend ? 'send' : 'mix'}</button>
+              <button
+                onClick={() => pv('assemblage', { choke: !cfg.assemblage.choke })}
+                className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.assemblage.choke ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
+                title="sustain : the shape (cutoff, waves, noise) acts before the ring, which decays on its own · choke : it acts after, so it cuts the ring"
+              >{cfg.assemblage.choke ? 'choke' : 'sustain'}</button>
+            </div>
+            <Slider label="wet" value={cfg.assemblage.bank ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('assemblage', { bank: v })} mod={chip('asmBank')} title="0 = the plain voice (as before) · up = the ring bank" />
+            {/* Everything below acts on the bank only : greyed while wet is 0 (still playable). */}
+            <div className={`flex flex-col gap-1 transition-opacity ${(cfg.assemblage.bank ?? 0) <= 0 ? 'opacity-45' : ''}`} title={(cfg.assemblage.bank ?? 0) <= 0 ? 'The Ring bank is out (wet 0) : these shape it, so they are heard once wet is up' : undefined}>
+              <Slider label="ring in" value={cfg.assemblage.ringIn ?? 0} min={-24} max={12} step={0.5} neutral={0} fmt={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`} onChange={(v) => pv('assemblage', { ringIn: Math.round(v * 2) / 2 })} title="How hard the films drive the Ring bank : down, its wet is quieter and its bands clip less (a windy film distorts less); up, it rings and clips harder. The plain films are not touched." parse={(t) => parseDb(t)} />
+              <Slider label="decay" value={cfg.assemblage.decay ?? 0.5} min={0} max={1} neutral={0.5} fmt={(v) => { const t = 0.012 * Math.pow(10 / 0.012, v); return t < 1 ? Math.round(t * 1000) + 'ms' : t.toFixed(1) + 's' }} onChange={(v) => pv('assemblage', { decay: v })} title="How long every band rings : short = a filterbank shaping the films, long = a tuned resonance that sings" />
+              <Slider label="cutoff" value={cfg.assemblage.cutoff ?? 1} min={0} max={1} step={0.002} neutral={1} fmt={(v) => hzLabel(ringCutoffHz(cfg, v, cfg.assemblage))} parse={(t) => { const f = parseHz(t, ringCutoffHz(cfg, 1, cfg.assemblage)); return f === null ? null : ringCutoffOf(cfg, f, cfg.assemblage) }} onChange={(v) => pv('assemblage', { cutoff: v })} title={`Where the bank's slope sits across its bands : now ${hzLabel(ringCutoffHz(cfg, cfg.assemblage.cutoff ?? 1, cfg.assemblage))} (the bands run ${hzLabel(ringFreqs(cfg, cfg.assemblage)[0])} to ${hzLabel(ringFreqs(cfg, cfg.assemblage)[47])} on the key; click the value to type a frequency)`} />
+              <Slider label="peak" value={cfg.assemblage.peak ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('assemblage', { peak: v })} title="A boost of the bands at the cutoff" />
+              <Slider label="slope" value={cfg.assemblage.slope ?? 0} min={0} max={1} neutral={0} fmt={(v) => (v < 0.2 ? 'LP' : v < 0.4 ? 'LP-BP' : v < 0.6 ? 'BP' : v < 0.8 ? 'BP-HP' : 'HP')} onChange={(v) => pv('assemblage', { slope: v })} title="Low-pass → band-pass → high-pass around the cutoff" />
+              <Slider label="tone" value={cfg.assemblage.tone ?? 0} min={-1} max={1} neutral={0} onChange={(v) => pv('assemblage', { tone: v })} title="Tilts the bank : − darker, + brighter" />
+              <Slider label="tilt" value={cfg.assemblage.tilt ?? 0} min={-1} max={1} neutral={0} onChange={(v) => pv('assemblage', { tilt: v })} title="+ the high bands ring longer and the low ones fade · − the opposite" />
+              <Slider label="waves" value={cfg.assemblage.waves ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('assemblage', { waves: v })} title="A sine of level travelling across the bands (past 65 % it speeds up)" />
+              {(cfg.assemblage.waves ?? 0) > 0 && (
+                <RateRow label="w rate" rate={cfg.assemblage.wavesRate ?? 0.5} sync={cfg.assemblage.wavesSync ?? 0} onRate={(v) => pv('assemblage', { wavesRate: v })} onSync={(v) => pv('assemblage', { wavesSync: v })} title="How fast the waves travel" />
+              )}
+              <Slider label="noise" value={cfg.assemblage.noise ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('assemblage', { noise: v })} title="A random level for each band, drawn again at the noise rate" />
+              {(cfg.assemblage.noise ?? 0) > 0 && (
+                <RateRow label="n rate" rate={cfg.assemblage.noiseRate ?? 0.5} sync={cfg.assemblage.noiseSync ?? 0} onRate={(v) => pv('assemblage', { noiseRate: v })} onSync={(v) => pv('assemblage', { noiseSync: v })} title="How often the bands draw a new level" />
+              )}
+              <Slider label="detune" value={cfg.assemblage.detune ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('assemblage', { detune: v })} title="The bands wander off their notes, the left and right sides in opposite directions : beating, width" />
+              <Row label="voicing">
+                <select className="input select-compact min-w-0 flex-1 text-[10px]" value={cfg.assemblage.voicing ?? 0} onChange={(e) => pv('assemblage', { voicing: Number(e.target.value) })} title="The filters' character : Clean, SEM (broader, rounder), and three driven ones whose ring clips (MS-20, Steiner, K35)">
+                  {RING_VOICINGS.map((v, i) => <option key={v} value={i}>{v}</option>)}
+                </select>
+              </Row>
+            </div>
+          </VoiceShell>
+          </div>
 
           <VoiceShell
             title="Reverb / Delay" on={cfg.fx.send > 0.0001}

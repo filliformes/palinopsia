@@ -30,7 +30,7 @@ import { useStore } from './store'
 import { tempoEdited } from './tempoEvents'
 import type { SoniConfig } from './audio/sonify'
 
-const SONI_VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal'] as const
+const SONI_VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal', 'assemblage'] as const
 // Field-macro CC targets → their store setters. These "feel" dials aren't
 // mod-matrix destinations, so the Meta knobs can't reach them : MIDI is the
 // only way to bind hardware to them.

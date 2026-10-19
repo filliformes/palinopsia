@@ -116,7 +116,7 @@ type Args = OscInEvent['args']
 // octave span [lo min, lo max, hi min, hi max], and the Orbit shapes in UI order.
 const SONI_TAP_VOICES = { spectra: 1, orbit: 1, flow: 1, events: 1, raster: 1, sstv: 1, filter: 1, chord: 1, signal: 1 } as const
 const SONI_OCT_SPAN: Record<string, [number, number, number, number] | undefined> = {
-  spectra: [0, 4, 4, 8], flow: [1, 4, 4, 7], events: [1, 4, 4, 7], chord: [0, 4, 3, 8], collage: [0, 4, 3, 8], filter: [0, 4, 4, 8],
+  spectra: [0, 4, 4, 8], flow: [1, 4, 4, 7], events: [1, 4, 4, 7], chord: [0, 4, 3, 8], collage: [0, 4, 3, 8], assemblage: [0, 4, 3, 8], filter: [0, 4, 4, 8],
   signal: [1, 6, 4, 9]
 }
 const ORBIT_RATIOS = [1, 2, 1.5, 1.3333333, 3]
@@ -636,7 +636,7 @@ function route(address: string, args: Args): void {
         apply({ ...c, taps })
         return
       }
-      const V = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'signal' | 'fx'>(
+      const V = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'signal' | 'assemblage' | 'fx'>(
         k: K, patch: Partial<SoniConfig[K]>
       ): void => apply({ ...c, [k]: { ...c[k], ...patch } })
       // Every voice that reads the picture : which tap it listens to (0 A · 1 B).
@@ -788,44 +788,50 @@ function route(address: string, args: Args): void {
           else if (ctl === 'noise') V('chord', { noise: clamp01(n) })
           else if (ctl === 'air') V('chord', { air: clamp01(n) })
           return
+        // the Assemblage voice takes the Collage's controls, + accent and tape
         case 'collage':
-          if (ctl === 'on') V('collage', { on: n >= 0.5 })
-          else if (ctl === 'gain') V('collage', { gain: clamp01(n) })
-          else if (ctl === 'pan') V('collage', { pan: clamp01(n) * 2 - 1 })
-          else if (ctl === 'resonance' || ctl === 'reso') V('collage', { reso: clamp01(n) })
-          else if (ctl === 'ring') V('collage', { ring: clamp01(n) })
-          else if (ctl === 'harmonics' || ctl === 'bright') V('collage', { bright: clamp01(n) })
-          else if (ctl === 'width') V('collage', { width: clamp01(n) })
+        case 'assemblage': {
+          const fv = g as 'collage' | 'assemblage'
+          if (fv === 'assemblage' && ctl === 'accent') { V('assemblage', { accent: clamp01(n) }); return }
+          if (fv === 'assemblage' && ctl === 'tape') { V('assemblage', { tape: n >= 0.5 }); return }
+          if (ctl === 'on') V(fv, { on: n >= 0.5 })
+          else if (ctl === 'gain') V(fv, { gain: clamp01(n) })
+          else if (ctl === 'pan') V(fv, { pan: clamp01(n) * 2 - 1 })
+          else if (ctl === 'resonance' || ctl === 'reso') V(fv, { reso: clamp01(n) })
+          else if (ctl === 'ring') V(fv, { ring: clamp01(n) })
+          else if (ctl === 'harmonics' || ctl === 'bright') V(fv, { bright: clamp01(n) })
+          else if (ctl === 'width') V(fv, { width: clamp01(n) })
           // the films in : level, high-pass, low-pass, and how hard they drive the Ring bank
-          else if (ctl === 'input') V('collage', { inGain: -24 + clamp01(n) * 36 })
-          else if (ctl === 'hp') V('collage', { hp: Math.round(20 * Math.pow(50, clamp01(n))) })
-          else if (ctl === 'lp') V('collage', { lp: Math.round(1000 * Math.pow(20, clamp01(n))) })
-          else if (ctl === 'ringin') V('collage', { ringIn: -24 + clamp01(n) * 36 })
-          else if (ctl === 'comp') V('collage', { comp: clamp01(n) })
+          else if (ctl === 'input') V(fv, { inGain: -24 + clamp01(n) * 36 })
+          else if (ctl === 'hp') V(fv, { hp: Math.round(20 * Math.pow(50, clamp01(n))) })
+          else if (ctl === 'lp') V(fv, { lp: Math.round(1000 * Math.pow(20, clamp01(n))) })
+          else if (ctl === 'ringin') V(fv, { ringIn: -24 + clamp01(n) * 36 })
+          else if (ctl === 'comp') V(fv, { comp: clamp01(n) })
           // a filter's slope : 12 or 24 (an int as it is; a float, >= 0.5 = 24)
           else if (ctl === 'hpslope' || ctl === 'lpslope') {
             const v = args[0]?.type === 'i' ? (n >= 18 ? 24 : 12) : n >= 0.5 ? 24 : 12
-            V('collage', ctl === 'hpslope' ? { hpSlope: v } : { lpSlope: v })
+            V(fv, ctl === 'hpslope' ? { hpSlope: v } : { lpSlope: v })
           }
           // the Ring bank
-          else if (ctl === 'bank' || ctl === 'wet') V('collage', { bank: clamp01(n) })
-          else if (ctl === 'send') V('collage', { bankSend: n >= 0.5 })
-          else if (ctl === 'decay') V('collage', { decay: clamp01(n) })
-          else if (ctl === 'choke') V('collage', { choke: n >= 0.5 })
-          else if (ctl === 'cutoff') V('collage', { cutoff: clamp01(n) })
-          else if (ctl === 'peak') V('collage', { peak: clamp01(n) })
-          else if (ctl === 'slope') V('collage', { slope: clamp01(n) })
-          else if (ctl === 'tone') V('collage', { tone: clamp01(n) * 2 - 1 })
-          else if (ctl === 'tilt') V('collage', { tilt: clamp01(n) * 2 - 1 })
-          else if (ctl === 'waves') V('collage', { waves: clamp01(n) })
-          else if (ctl === 'wavesrate') V('collage', { wavesRate: clamp01(n) })
-          else if (ctl === 'wavessync') V('collage', { wavesSync: idx(0, 3) })
-          else if (ctl === 'noise') V('collage', { noise: clamp01(n) })
-          else if (ctl === 'noiserate') V('collage', { noiseRate: clamp01(n) })
-          else if (ctl === 'noisesync') V('collage', { noiseSync: idx(0, 3) })
-          else if (ctl === 'detune') V('collage', { detune: clamp01(n) })
-          else if (ctl === 'voicing') V('collage', { voicing: idx(0, 4) })
+          else if (ctl === 'bank' || ctl === 'wet') V(fv, { bank: clamp01(n) })
+          else if (ctl === 'send') V(fv, { bankSend: n >= 0.5 })
+          else if (ctl === 'decay') V(fv, { decay: clamp01(n) })
+          else if (ctl === 'choke') V(fv, { choke: n >= 0.5 })
+          else if (ctl === 'cutoff') V(fv, { cutoff: clamp01(n) })
+          else if (ctl === 'peak') V(fv, { peak: clamp01(n) })
+          else if (ctl === 'slope') V(fv, { slope: clamp01(n) })
+          else if (ctl === 'tone') V(fv, { tone: clamp01(n) * 2 - 1 })
+          else if (ctl === 'tilt') V(fv, { tilt: clamp01(n) * 2 - 1 })
+          else if (ctl === 'waves') V(fv, { waves: clamp01(n) })
+          else if (ctl === 'wavesrate') V(fv, { wavesRate: clamp01(n) })
+          else if (ctl === 'wavessync') V(fv, { wavesSync: idx(0, 3) })
+          else if (ctl === 'noise') V(fv, { noise: clamp01(n) })
+          else if (ctl === 'noiserate') V(fv, { noiseRate: clamp01(n) })
+          else if (ctl === 'noisesync') V(fv, { noiseSync: idx(0, 3) })
+          else if (ctl === 'detune') V(fv, { detune: clamp01(n) })
+          else if (ctl === 'voicing') V(fv, { voicing: idx(0, 4) })
           return
+        }
         case 'fx':
           // shared reverb / delay tail
           if (ctl === 'send') V('fx', { send: clamp01(n) })
@@ -1279,6 +1285,17 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/collage/noise', 0, 1, co.noise ?? 0, 'Collage ring bank noise')
     add('/opsia/sonify/collage/detune', 0, 1, co.detune ?? 0, 'Collage ring bank detune')
     addI('/opsia/sonify/collage/voicing', 0, 4, co.voicing ?? 0, 'Collage ring bank voicing : 0 Clean · 1 SEM · 2 MS-20 · 3 Steiner · 4 K35')
+    const as = so.assemblage ?? { on: false, gain: 0.7, reso: 0.3, ring: 0.5, bright: 0.5, width: 0.8, accent: 0.4, tape: true, comp: 0, bank: 0 }
+    add('/opsia/sonify/assemblage/on', 0, 1, as.on ? 1 : 0, 'Assemblage voice on (an edit’s own sound, cut with the picture)')
+    add('/opsia/sonify/assemblage/gain', 0, 1, as.gain, 'Assemblage gain')
+    add('/opsia/sonify/assemblage/resonance', 0, 1, as.reso, 'Assemblage resonance (plain films ↔ tuned resonances)')
+    add('/opsia/sonify/assemblage/ring', 0, 1, as.ring, 'Assemblage ring (resonator sharpness)')
+    add('/opsia/sonify/assemblage/harmonics', 0, 1, as.bright, 'Assemblage harmonics (2nd + 3rd)')
+    add('/opsia/sonify/assemblage/width', 0, 1, as.width, 'Assemblage stereo width (pan by the clip’s place on the map)')
+    add('/opsia/sonify/assemblage/accent', 0, 1, as.accent ?? 0.4, 'Assemblage cut accent (a strike of the resonators at every cut)')
+    add('/opsia/sonify/assemblage/tape', 0, 1, as.tape === false ? 0 : 1, 'Assemblage pitch : tape (>= 0.5, speed changes the pitch) or keep')
+    add('/opsia/sonify/assemblage/comp', 0, 1, as.comp ?? 0, 'Assemblage : one compressor on the edit’s sound (0 = off)')
+    add('/opsia/sonify/assemblage/bank', 0, 1, as.bank ?? 0, 'Assemblage ring bank wet (0 = the plain voice)')
     add('/opsia/sonify/chord/waves', 0, 1, so.chord.waves ?? 0, 'Chord waves (a travelling level across the notes)')
     add('/opsia/sonify/chord/noise', 0, 1, so.chord.noise ?? 0, 'Chord noise (a pink noise band on every note)')
     add('/opsia/sonify/chord/air', 0, 1, so.chord.air ?? 0.4, 'Chord air (the noise bands, narrow to wide)')

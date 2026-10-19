@@ -66,7 +66,7 @@ import { ResolumePage } from './components/ResolumePage'
 import { ResolumeSection } from './components/ResolumeSection'
 import { DataflouSection } from './components/DataflouSection'
 import { LinkSection } from './components/LinkSection'
-import { placeAssemblage } from './assemble/place'
+import { placeAssemblage, unitPlace } from './assemble/place'
 import { applyResolume } from './resolume'
 import { initDataflou, applyDataflou, dataflouWantsVision } from './dataflou'
 import { domePreview, DOME_PREVIEW } from './engine/domePreview'
@@ -181,6 +181,9 @@ import { pathFromMediaUrl } from './components/videoImport'
 import { AUDIO_LAYER, audioLayer } from './audio/audioLayer'
 import { eqPresets } from './audio/eqPresets'
 import { AudioLayerPanel } from './components/AudioLayerPanel'
+
+// Sonify's Assemblage voice : a clip's place on the Assemble map (its note, its pan)
+sonifyEngine.setUnitPlace(unitPlace)
 
 // An audio modulator listening to a slot's clip reads its file and its playhead
 // here : the playhead the engine publishes each frame, the ORIGINAL file (a

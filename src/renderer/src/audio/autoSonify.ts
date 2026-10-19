@@ -114,6 +114,8 @@ export function suggestSonify(c: CompositionState, cur: SoniConfig): SoniConfig 
   const hasCollage =
     c.layers.some((l) => !l.mute && (filmed(l.sourceA) || filmed(l.sourceB))) ||
     (!!c.background && c.background.opacity > 0 && filmed(c.background.source))
+  // An Assemblage on a layer : its edit's own sound.
+  const hasAsm = c.layers.some((l) => !l.mute && (l.sourceA?.kind === 'assemble' || l.sourceB?.kind === 'assemble'))
   // Master rack shapes everything : half weight.
   rack(c.master.filter((f) => !f.locked), total, 0.5)
 
@@ -169,7 +171,8 @@ export function suggestSonify(c: CompositionState, cur: SoniConfig): SoniConfig 
     chord: { ...cur.chord, on: chosen.has('chord'), tap: tapFor('chord') },
     signal: { ...cur.signal, on: chosen.has('signal'), tap: tapFor('signal') },
     // A Collage with films : hear them (the voice's own sound, on top of the rest).
-    collage: { ...cur.collage, on: hasCollage }
+    collage: { ...cur.collage, on: hasCollage },
+    assemblage: { ...cur.assemblage, on: hasAsm }
   }
 }
 
@@ -183,7 +186,7 @@ const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(rnd() * arr.length)]
  *  the dice re-voices the instrument, it never blasts or silences it. */
 // Per-voice parameter randomizers (character only — `on`/`tap` set by the caller).
 // Shared by the whole-instrument dice and the per-voice dice.
-export type SoniVoiceKey = 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'signal'
+export type SoniVoiceKey = 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'signal' | 'assemblage'
 const R_PARAMS: Record<SoniVoiceKey, (c: SoniConfig) => Record<string, unknown>> = {
   spectra: (c) => ({ ...c.spectra, quantize: rnd() < 0.85, sweepOn: rnd() < 0.75, sync: rnd() < 0.3, sweepHz: rr(0.06, 0.8), x: rr(0.2, 0.8), path: pick([0, 0, 0, 1, 2, 3]), pace: rnd() < 0.4 ? rr(0.2, 0.8) : 0, gamma: rr(1.2, 2.6), breath: rnd() < 0.4 ? rr(0.2, 0.7) : 0, loOct: pick([1, 2, 2, 3]), hiOct: pick([6, 7, 7, 8]) }),
   orbit: (c) => ({ ...c.orbit, quantize: rnd() < 0.85, note: 33 + Math.floor(rnd() * 28), cx: rr(0.3, 0.7), cy: rr(0.3, 0.7), rx: rr(0.08, 0.35), ry: rr(0.08, 0.35), ratio: pick([1, 2, 1.5, 3]), drive: rr(0.6, 2), smooth: rr(0.2, 0.8) }),
@@ -195,6 +198,14 @@ const R_PARAMS: Record<SoniVoiceKey, (c: SoniConfig) => Record<string, unknown>>
   collage: (c) => ({
     ...c.collage, reso: rr(0.3, 0.85), ring: rr(0.2, 0.8), bright: rr(0.2, 0.8), width: rr(0.6, 1), loOct: pick([1, 2, 2, 3]), hiOct: pick([5, 6, 6, 7]),
     // the Ring bank half the time, in its musical middle
+    bank: rnd() < 0.5 ? 0 : rr(0.4, 1), bankSend: rnd() < 0.3, decay: rr(0.3, 0.85), choke: rnd() < 0.3,
+    cutoff: rr(0.5, 1), peak: rr(0, 0.5), slope: pick([0, 0, 0.5, 0.25]), tone: rr(-0.4, 0.4), tilt: rr(-0.4, 0.4),
+    waves: rnd() < 0.5 ? 0 : rr(0.2, 0.8), wavesRate: rr(0.2, 0.7), noise: rnd() < 0.6 ? 0 : rr(0.1, 0.5), detune: rr(0, 0.4),
+    voicing: pick([0, 0, 1, 2, 3, 4])
+  }),
+  assemblage: (c) => ({
+    ...c.assemblage, reso: rr(0.15, 0.7), ring: rr(0.2, 0.8), bright: rr(0.2, 0.8), width: rr(0.5, 1), loOct: pick([1, 2, 2, 3]), hiOct: pick([5, 6, 6, 7]),
+    accent: rr(0.15, 0.8), tape: rnd() < 0.75,
     bank: rnd() < 0.5 ? 0 : rr(0.4, 1), bankSend: rnd() < 0.3, decay: rr(0.3, 0.85), choke: rnd() < 0.3,
     cutoff: rr(0.5, 1), peak: rr(0, 0.5), slope: pick([0, 0, 0.5, 0.25]), tone: rr(-0.4, 0.4), tilt: rr(-0.4, 0.4),
     waves: rnd() < 0.5 ? 0 : rr(0.2, 0.8), wavesRate: rr(0.2, 0.7), noise: rnd() < 0.6 ? 0 : rr(0.1, 0.5), detune: rr(0, 0.4),

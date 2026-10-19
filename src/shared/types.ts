@@ -689,6 +689,7 @@ export type SonifyModParam =
   | 'chordTone' | 'chordSpread' | 'chordAttack' | 'chordVoices'
   | 'collageReso' | 'collageRing' | 'collageWidth'
   | 'collageBank' | 'collageDecay' | 'collageCutoff' | 'collageWaves' | 'collageDetune' | 'chordWaves' | 'chordNoise' | 'chordAir'
+  | 'asmReso' | 'asmRing' | 'asmWidth' | 'asmAccent' | 'asmBank'
   | 'fxSend' | 'fxReverb' | 'fxDelay'
   // The key sequencer's Every (free time), log-mapped 0..1 like its slider
   | 'keyEvery'
@@ -703,6 +704,7 @@ export const SONIFY_MOD_PARAMS: SonifyModParam[] = [
   'sstvLine', 'sstvDev', 'filterQ', 'filterSweep',
   'chordTone', 'chordSpread', 'chordAttack', 'chordVoices', 'collageReso', 'collageRing', 'collageWidth',
   'collageBank', 'collageDecay', 'collageCutoff', 'collageWaves', 'collageDetune', 'chordWaves', 'chordNoise', 'chordAir',
+  'asmReso', 'asmRing', 'asmWidth', 'asmAccent', 'asmBank',
   'fxSend', 'fxReverb', 'fxDelay', 'keyEvery'
 ]
 

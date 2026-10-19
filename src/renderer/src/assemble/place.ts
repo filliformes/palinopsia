@@ -32,3 +32,23 @@ export function placeAssemblage(layer: number, slot: 'A' | 'B'): boolean {
   st.setSelection({ type: 'source', layer, slot })
   return true
 }
+
+// Where each corpus unit sits on the Assemble map, 0..1 both ways (the map's
+// own bounds), for Sonify's Assemblage voice : its note and its pan. Rebuilt
+// when the corpus or the map changes; null without one (a stable place is used).
+let placeCache: { units: unknown; map: unknown; byId: Map<string, [number, number]> } | null = null
+export function unitPlace(unitId: string): [number, number] | null {
+  const st = useStore.getState()
+  const corpus = st.assembleCorpus
+  const map = st.assembleMap
+  if (!corpus || !map?.length || map.length !== corpus.units.length) return null
+  if (!placeCache || placeCache.units !== corpus.units || placeCache.map !== map) {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity
+    for (const [x, y] of map) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y) }
+    const sx = x1 > x0 ? 1 / (x1 - x0) : 0, sy = y1 > y0 ? 1 / (y1 - y0) : 0
+    const byId = new Map<string, [number, number]>()
+    corpus.units.forEach((u, i) => byId.set(u.id, [sx ? (map[i][0] - x0) * sx : 0.5, sy ? (map[i][1] - y0) * sy : 0.5]))
+    placeCache = { units: corpus.units, map, byId }
+  }
+  return placeCache.byId.get(unitId) ?? null
+}

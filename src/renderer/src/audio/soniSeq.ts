@@ -16,7 +16,7 @@ import { RATE_BEATS, soniClockStart } from './soniClock'
 
 // BY INDEX : a saved sequencer step's voice mask is a boolean per position, so a
 // new voice is APPENDED (a mask saved before Signal reads it as off).
-const VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal'] as const
+const VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal', 'assemblage'] as const
 
 let lastStepAt = 0 // ms (free rate) or beats (beat rates)
 let wasOn = false

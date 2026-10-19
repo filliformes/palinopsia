@@ -1066,12 +1066,13 @@ export class ISFLayer {
   /** Activate/refresh/clear an ASSEMBLE slot. Keyed by the assemblage id, which
    *  changes on every generate and Variation — so a re-roll swaps the edit and
    *  an untouched one is a cheap no-op every frame. */
-  setAssemble(slot: 'A' | 'B', id: string | null, edl: AssembleClip[] | undefined, loop: boolean): void {
+  setAssemble(slot: 'A' | 'B', id: string | null, edl: AssembleClip[] | undefined, loop: boolean, folder: string | null = null): void {
     const curId = slot === 'A' ? this.assembleIdA : this.assembleIdB;
     const cur = slot === 'A' ? this.assembleA : this.assembleB;
     if (id === curId) {
-      // Same edit : `loop` is the only thing that can change without a re-id.
+      // Same edit : `loop` (and the corpus folder) can change without a re-id.
       cur?.setLoop(loop);
+      cur?.setFolder(folder);
       return;
     }
     try { cur?.dispose(); } catch (e) { console.warn('[assemble] dispose failed:', e); }
@@ -1079,6 +1080,7 @@ export class ISFLayer {
     if (id && edl && edl.length) {
       next = new AssembleSource(this.shared.gl);
       next.setPlaylist(edl, loop);
+      next.setFolder(folder);
     }
     if (slot === 'A') { this.assembleA = next; this.assembleIdA = id; }
     else { this.assembleB = next; this.assembleIdB = id; }
@@ -2044,6 +2046,24 @@ export class Compositor {
     return out;
   }
 
+  /** Every Assemblage source playing on a layer, for Sonify's Assemblage voice :
+   *  the video on screen, its clip's original file, its corpus unit, the cut
+   *  serial, and how visible it is (like the Collage walls). */
+  assembleSounds(): Array<{ id: string; level: number; el: HTMLVideoElement | null; path: string | null; unitId: string; cut: number }> {
+    const out: Array<{ id: string; level: number; el: HTMLVideoElement | null; path: string | null; unitId: string; cut: number }> = [];
+    const anySolo = this.layers.some((l) => l.solo);
+    this.layers.forEach((L, i) => {
+      const vis = (anySolo ? L.solo : !L.mute) ? L.opacity : 0;
+      for (const slot of ['A', 'B'] as const) {
+        const info = L.assemble(slot)?.soundInfo();
+        if (!info) continue;
+        const w = slot === 'A' ? (L.hasB() ? 1 - L.sourceMix : 1) : L.sourceMix;
+        out.push({ id: `A${i}${slot}`, level: Math.max(0, Math.min(1, vis * w)), ...info });
+      }
+    });
+    return out;
+  }
+
   /** True when the last syncFromState deferred no load : every shader the
    *  composition asks for is compiled and in place. */
   loadsSettled(): boolean {
@@ -2811,7 +2831,7 @@ export class Compositor {
       L.setVideo('A', wantVidA);
       L.setCapture('A', wantCapA, l.sourceA.mediaName);
       L.setHive('A', wantHiveA);
-      L.setAssemble('A', wantAsmA, l.sourceA.edl, l.sourceA.videoLoop ?? true);
+      L.setAssemble('A', wantAsmA, l.sourceA.edl, l.sourceA.videoLoop ?? true, l.sourceA.mediaPath ?? null);
       L.setText('A', isTextA
         ? { text: l.sourceA.text ?? 'OPSIA', inputs: l.sourceA.inputs, sidechain: l.sourceA.sidechain ?? null }
         : null);
@@ -2834,7 +2854,7 @@ export class Compositor {
       L.setVideo('B', wantVidB);
       L.setCapture('B', wantCapB, l.sourceB?.mediaName);
       L.setHive('B', wantHiveB);
-      L.setAssemble('B', wantAsmB, l.sourceB?.edl, l.sourceB?.videoLoop ?? true);
+      L.setAssemble('B', wantAsmB, l.sourceB?.edl, l.sourceB?.videoLoop ?? true, l.sourceB?.mediaPath ?? null);
       L.setText('B', isTextB && l.sourceB
         ? { text: l.sourceB.text ?? 'OPSIA', inputs: l.sourceB.inputs, sidechain: l.sourceB.sidechain ?? null }
         : null);

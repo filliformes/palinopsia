@@ -1285,6 +1285,7 @@ export class CollageSource {
   private makeAsmDeck(edl: CollageEdl, rnd: () => number): Deck {
     const asm = new AssembleSource(this.gl)
     asm.setPlaylist(edl.clips, true)
+    asm.setFolder(edl.folder ?? null)
     asm.setPlaying(true)
     return {
       asm, el: document.createElement('video'), src: edl.id, clip: null,
@@ -1943,6 +1944,10 @@ export class CollageSource {
       if (d.asm) {
         // An assemblage deck : follow whichever of its players is on screen,
         // and hear that file.
+        // (the clip's ORIGINAL file when the edit knows its corpus folder : a
+        // converted copy has no sound)
+        const si = d.asm.soundInfo()
+        if (si && si.el) return { el: si.el, path: si.path }
         const a = d.asm as unknown as { decks?: Array<{ el?: HTMLVideoElement }>; live?: number }
         const el = a.decks?.[a.live ?? 0]?.el ?? null
         const p = el ? pathFromMediaUrl(el.currentSrc || el.src) : null

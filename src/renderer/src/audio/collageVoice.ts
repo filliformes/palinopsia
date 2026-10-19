@@ -92,6 +92,7 @@ export interface CollageSoundSet {
   deal?: number // changes on every re-cut of the wall
   xfade?: number // the wall's crossfade time between deals (s)
   files?: string[] // every film the wall may deal, as heard (one array until the pool changes)
+  cut?: number // an edit's cut serial (Assemblage) : changes at every cut, for the accent
 }
 
 export interface CollageVoiceCfg {
@@ -104,6 +105,8 @@ export interface CollageVoiceCfg {
   lp?: number // Hz : each film's low-pass
   hpSlope?: 12 | 24 // dB/oct
   lpSlope?: 12 | 24
+  accent?: number // 0..1 : a strike of the resonators at every cut (set.cut)
+  tape?: boolean // a clip's speed changes its pitch (tape), instead of keeping it
 }
 
 /** One <audio> playing one file into its deck's bus. */
@@ -215,6 +218,9 @@ export class CollageVoice {
   private dealOf = new Map<string, number>()
   private dealAt = new Map<string, number>()
   private filesSeen = new Map<string, string[]>()
+  private cutOf = new Map<string, number>()
+  private tape = false
+  private burst: AudioBuffer | null = null
   readonly bus: GainNode
   /** What the Sonify node hears on its input 1 : the bus on channels 0-1, the
    *  piece groups on 2.. (silent while Space keeps the voice as one pair). */
@@ -288,6 +294,7 @@ export class CollageVoice {
     audio.preload = 'auto'
     audio.loop = true
     audio.src = mediaUrlForPath(soundFileFor(path))
+    audio.preservesPitch = !this.tape // tape : a slowed clip sounds slowed
     // Routed into the graph BEFORE it ever plays : never a blip on the speakers.
     const src = this.ctx.createMediaElementSource(audio)
     const g = this.ctx.createGain()
@@ -553,6 +560,30 @@ export class CollageVoice {
     return p
   }
 
+  /** A short noise burst into a piece's resonators only (not its dry film) : the
+   *  cut is heard as the note ringing, even over a quiet clip. */
+  private strike(p: PieceChain, level: number): void {
+    const ctx = this.ctx
+    if (!this.burst) {
+      const n = Math.round(ctx.sampleRate * 0.012)
+      this.burst = ctx.createBuffer(1, n, ctx.sampleRate)
+      const d = this.burst.getChannelData(0)
+      let seed = 12345
+      for (let i = 0; i < n; i++) {
+        seed = (Math.imul(seed, 1103515245) + 12345) | 0
+        d[i] = ((seed >>> 8) / 8388608 - 1) * Math.exp(-i / (n * 0.18)) // a 12 ms decaying click
+      }
+    }
+    const src = ctx.createBufferSource()
+    src.buffer = this.burst
+    const g = ctx.createGain()
+    g.gain.value = Math.max(0, Math.min(1, level)) * 1.8
+    src.connect(g)
+    for (const f of p.bp) g.connect(f)
+    src.onended = (): void => { try { src.disconnect(); g.disconnect() } catch { /* gone */ } }
+    src.start(ctx.currentTime + AHEAD)
+  }
+
   private dropPiece(p: PieceChain): void {
     this.unseat(p)
     try {
@@ -595,6 +626,11 @@ export class CollageVoice {
       for (const d of this.decks.values()) { setSlope(d.hp, 'highpass', hpS); setSlope(d.lp, 'lowpass', lpS) }
     }
     const inLin = Math.max(0, cfg.inGain ?? 1)
+    if (!!cfg.tape !== this.tape) {
+      this.tape = !!cfg.tape
+      for (const d of this.decks.values())
+        for (const p of [d.cur, d.next, d.spare, ...d.fading.map((f) => f.p)]) if (p) p.audio.preservesPitch = !this.tape
+    }
     for (const d of this.decks.values()) d.used = false
     for (const p of this.pieces.values()) p.used = false
     let nPieces = 0
@@ -636,6 +672,10 @@ export class CollageVoice {
       }
       const shown = set.pieces.filter((pc) => pc.keep > 0.001 && set.decks[pc.deck]?.path && set.decks[pc.deck]?.el)
       if (!shown.length) continue
+      // An edit's cut since last time : its pieces' resonators get a strike.
+      const lastCut = this.cutOf.get(set.id)
+      const struck = set.cut !== undefined && lastCut !== undefined && set.cut !== lastCut && (cfg.accent ?? 0) > 0.001
+      if (set.cut !== undefined) this.cutOf.set(set.id, set.cut)
       // Films : one player per deck that a shown piece plays.
       const deckKeys = new Map<number, string>()
       for (const pc of shown) {
@@ -712,6 +752,7 @@ export class CollageVoice {
           glide(p, TG_Q + h, p.bp[h].Q, Q, now)
           glide(p, TG_G + h, p.bpG[h].gain, wet * hw[h], now)
         }
+        if (struck) this.strike(p, (cfg.accent ?? 0) * set.level)
         glide(p, TG_DRY, p.dry.gain, 1 - cfg.reso, now)
         glide(p, TG_PAN, p.pan.pan, panV, now)
         glide(p, TG_IN, p.inG.gain, norm * pc.keep * inLin, now)

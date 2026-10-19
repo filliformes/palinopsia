@@ -7,6 +7,26 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Sonify's Assemblage voice** (voice 10, `cfg.assemblage`, a second `CollageVoice` on the
+  worklet's new input 3 with its own `Leveler` + `RingBank`; `NVOICE` 11) : each Assemblage
+  source is one piece whose film is the clip on screen (`AssembleSource.soundInfo` : the
+  live deck's video, the clip's ORIGINAL file = the slot's corpus folder (`mediaPath`, now
+  set by `setSourceAssemble`) + its file name, its unit, a cut serial; `Compositor.
+  assembleSounds`). Placed by its unit on the Assemble map (`assemble/place.ts unitPlace`,
+  registered with `sonifyEngine.setUnitPlace`; a hash place without the corpus) : note from
+  the map centre distance, pan from x. `CollageVoiceCfg` gains `accent` (a 12 ms noise strike
+  into the piece's band-passes at every `set.cut`) and `tape` (`preservesPitch` off). Card
+  built from the Collage's (+ cut accent, pitch tape/keep), mixer / sequencer / MIDI / Body /
+  Performance lists, mods `asmReso · asmRing · asmWidth · asmAccent · asmBank`, OSC
+  `/opsia/sonify/assemblage/*` (the Collage's controls + accent, tape) and OSCQuery, the dice,
+  the suggestion (on when an Assemblage plays). Space : voice index 10, source 11 from 1 (the FX return and the
+  pieces move up one). A Collage fed by saved edits now hears their original files too
+  (`CollageEdl.folder`). Measured with three tone films : the players walk the three files at
+  their in points (tape pitch), the voice alone peaks 0.22, off releases them.
+- **The film voices grey out with nothing to hear** : the Collage card and mixer row while
+  no Collage source is on a layer or the background, the Assemblage's while no Assemblage is
+  on a layer (still playable). Verified both ways.
+
 - **The World page, ten ways better** (`components/WorldPage.tsx`, `worlds.ts`,
   `engine/worldAmount.ts`) :
   1. an **apply sets** line (`worldEffects`) saying what Apply changes;

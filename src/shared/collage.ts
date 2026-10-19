@@ -38,4 +38,5 @@ export interface CollageScanResult {
 export interface CollageEdl {
   id: string
   clips: import('./assemble').AssembleClip[]
+  folder?: string // the corpus folder : the clips' original files (their sound)
 }

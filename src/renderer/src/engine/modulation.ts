@@ -1057,6 +1057,11 @@ export const SONIFY_MOD_DESCS: Record<string, { min: number; max: number; def: n
   chordAttack: { min: 0.02, max: 3, def: 0.4 },
   chordVoices: { min: 2, max: 16, def: 7 }, // a whole number of notes (sonify.ts rounds it)
   collageReso: { min: 0, max: 1, def: 0.5 },
+  asmReso: { min: 0, max: 1, def: 0.3 },
+  asmRing: { min: 0, max: 1, def: 0.5 },
+  asmWidth: { min: 0, max: 1, def: 0.8 },
+  asmAccent: { min: 0, max: 1, def: 0.4 },
+  asmBank: { min: 0, max: 1, def: 0 },
   collageRing: { min: 0, max: 1, def: 0.5 },
   collageWidth: { min: 0, max: 1, def: 1 },
   collageBank: { min: 0, max: 1, def: 0 },

@@ -250,6 +250,15 @@ export interface SoniConfig {
     detune: number // band wobble + random walk, the two sides opposite (stereo)
     voicing: number // 0 Clean · 1 SEM · 2 MS-20 · 3 Steiner · 4 K35
   }
+  // Assemblage : an edit's own sound, cut with the picture (a second
+  // collageVoice.ts). Each cut plays its clip's ORIGINAL file from its in
+  // point; the clip's place in the corpus map gives its note (the map's centre
+  // = loOct's root, the edge = hiOct's top) and its pan. The Collage chain :
+  // in, filters, comp, resonators, Ring bank; and a strike at every cut.
+  assemblage: SoniConfig['collage'] & {
+    accent: number // 0..1 : the resonators struck at every cut
+    tape: boolean // a clip's speed changes its pitch (tape) instead of keeping it
+  }
   // Shared FX tail (send/return) : the whole mix feeds an analog delay → the
   // Quartz/Prism FDN reverb, ported from Essaim/Res. `send` scales the input.
   fx: {
@@ -296,6 +305,12 @@ export function defaultSoniConfig(): SoniConfig {
       bank: 0, bankSend: false, decay: 0.5, choke: false, cutoff: 1, peak: 0, slope: 0, tone: 0, tilt: 0,
       waves: 0, wavesRate: 0.5, wavesSync: 0, noise: 0, noiseRate: 0.5, noiseSync: 0, detune: 0, voicing: 0
     },
+    assemblage: {
+      on: false, gain: 0.7, pan: 0, reso: 0.3, ring: 0.5, bright: 0.5, width: 0.8, inGain: 0, hp: 20, lp: 20000, hpSlope: 24, lpSlope: 24, ringIn: 0, comp: 0, loOct: 2, hiOct: 6,
+      bank: 0, bankSend: false, decay: 0.5, choke: false, cutoff: 1, peak: 0, slope: 0, tone: 0, tilt: 0,
+      waves: 0, wavesRate: 0.5, wavesSync: 0, noise: 0, noiseRate: 0.5, noiseSync: 0, detune: 0, voicing: 0,
+      accent: 0.4, tape: true
+    },
     fx: {
       send: 0,
       dlyMix: 0.35, dlyTime: 0.3, dlyFb: 0.35, dlyTone: 0.5, dlyMode: 1,
@@ -303,7 +318,7 @@ export function defaultSoniConfig(): SoniConfig {
       rvWidth: 1, rvLocut: 220, rvFreeze: false, rvDiff: 0.85, rvLowDamp: 0.5,
       rvCross: 0.3, rvLowMult: 1, rvHighMult: 1
     },
-    mixFilter: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+    mixFilter: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
     taps: [{ kind: 'master', layer: 0 }, { kind: 'layer', layer: 0 }],
     eq: defaultEq()
   }
@@ -347,6 +362,8 @@ const SONI_SIMPLE_MODS: Record<string, [keyof SoniConfig, string]> = {
   filterQ: ['filter', 'q'], filterSweep: ['filter', 'sweepHz'],
   chordTone: ['chord', 'tone'], chordSpread: ['chord', 'spread'], chordAttack: ['chord', 'attack'],
   collageReso: ['collage', 'reso'], collageRing: ['collage', 'ring'], collageWidth: ['collage', 'width'],
+  asmReso: ['assemblage', 'reso'], asmRing: ['assemblage', 'ring'], asmWidth: ['assemblage', 'width'],
+  asmAccent: ['assemblage', 'accent'], asmBank: ['assemblage', 'bank'],
   collageBank: ['collage', 'bank'], collageDecay: ['collage', 'decay'], collageCutoff: ['collage', 'cutoff'],
   collageWaves: ['collage', 'waves'], collageDetune: ['collage', 'detune'], chordWaves: ['chord', 'waves'],
   chordNoise: ['chord', 'noise'], chordAir: ['chord', 'air'],
@@ -421,8 +438,8 @@ function filterFreqs(cfg: SoniConfig): Float32Array {
  *  bottom of loOct to the top of hiOct (one per semitone over the default four
  *  octaves), each snapped to the nearest note of the scale. Notes
  *  shared by several bands are kept : they ring louder, which is the scale. */
-export function ringFreqs(cfg: SoniConfig): Float32Array {
-  const lo = cfg.collage.loOct, hi = Math.max(cfg.collage.loOct + 1, cfg.collage.hiOct)
+export function ringFreqs(cfg: SoniConfig, part: { loOct: number; hiOct: number } = cfg.collage): Float32Array {
+  const lo = part.loOct, hi = Math.max(part.loOct + 1, part.hiOct)
   const tab = scaleTable(effRoot(cfg), cfg.scale, lo, hi)
   const out = new Float32Array(48)
   if (!tab.length) return out.fill(220)
@@ -511,6 +528,15 @@ export interface SpaceMsg {
 interface GridReader {
   readSonifyGrids: (taps: Array<{ kind: 'master' | 'layer'; layer: number } | null>, outs: Uint8Array[]) => boolean[]
   collageSounds?: () => CollageSoundSet[]
+  assembleSounds?: () => Array<{ id: string; level: number; el: HTMLVideoElement | null; path: string | null; unitId: string; cut: number }>
+}
+
+/** A clip's place when the corpus map isn't known : stable per clip. */
+function hashPlace(id: string): [number, number] {
+  let h = 2166136261
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619)
+  const u = h >>> 0
+  return [(u % 997) / 996, ((u >>> 10) % 991) / 990]
 }
 
 class SonifyEngine {
@@ -531,6 +557,7 @@ class SonifyEngine {
   // The two compressors' deepest gain reduction over the last meter period, in
   // dB (-1 : bypassed) : the Collage comp (on the films' bus) and the glue.
   collageCompGr = -1
+  asmCompGr = -1 // the Assemblage voice's comp, its deepest reduction (dB), -1 : bypassed
   glueGr = -1
   // THE SOUND BUS for recordings : a take holds Sonify's audio context open
   // (bus > 0) so its sound track lives for the whole take, Sonify on or off,
@@ -566,6 +593,11 @@ class SonifyEngine {
   // worklet's second input, alive while the voice is on.
   private collage: CollageVoice | null = null
   private collageNotes: Float32Array = new Float32Array(0)
+  // The Assemblage voice : a second CollageVoice on the worklet's fourth input.
+  private asm: CollageVoice | null = null
+  private asmNotes: Float32Array = new Float32Array(0)
+  private asmOffAt = 0
+  private unitPlace: ((unitId: string) => [number, number] | null) | null = null
   // Key glide (the key sequencer) : the next config's pitches slide over this
   // many seconds instead of jumping (one shot, see glideNext). The worklet glides
   // its own tables; the Collage resonators' notes glide here.
@@ -730,6 +762,17 @@ class SonifyEngine {
     return this.extWanted
   }
 
+  /** The Assemblage voice's live state for the page (edits heard, films). */
+  asmStatus(): { sets: number; pieces: number; films: number } | null {
+    return this.asm ? { ...this.asm.status } : null
+  }
+
+  /** Where a corpus unit sits on the Assemble map (0..1 both ways; null :
+   *  unknown, a stable place per clip is used). The renderer sets it. */
+  setUnitPlace(fn: ((unitId: string) => [number, number] | null) | null): void {
+    this.unitPlace = fn
+  }
+
   /** The Collage voice's live state for the page (walls heard, pieces, films). */
   collageStatus(): { sets: number; pieces: number; films: number } | null {
     return this.collage ? { ...this.collage.status } : null
@@ -852,6 +895,8 @@ class SonifyEngine {
     const wasOn = !!this.node || this.extWanted
     this.collage?.dispose()
     this.collage = null
+    this.asm?.dispose()
+    this.asm = null
     // the line-in starts over on the new context (kept, it stayed captured by
     // the dead one : the Filter voice nearly silent, the mic light on)
     this.lineSrc?.disconnect()
@@ -884,7 +929,8 @@ class SonifyEngine {
       // Input 2 : the Audio Layer. Output 0 : the stereo mix. Output 1 : Space
       // (the voices placed on speakers or sent as objects), only connected while
       // Space is on.
-      const node = new AudioWorkletNode(ctx, 'soni', { numberOfInputs: 3, numberOfOutputs: 2, outputChannelCount: [2, SPACE_MAX_CH] })
+      // Input 3 : the Assemblage voice's films.
+      const node = new AudioWorkletNode(ctx, 'soni', { numberOfInputs: 4, numberOfOutputs: 2, outputChannelCount: [2, SPACE_MAX_CH] })
       node.port.onmessage = (e): void => {
         const m = e.data
         if (m?.t === 'meter') {
@@ -897,6 +943,7 @@ class SonifyEngine {
           if (m.scan) this.scan = { ...m.scan, recv: performance.now() }
           this.spaceMeter = m.spk ?? null
           this.collageCompGr = typeof m.lvGr === 'number' ? m.lvGr : -1
+          this.asmCompGr = typeof m.lv2Gr === 'number' ? m.lv2Gr : -1
         }
       }
       // To the speakers through the output EQ; the recordings (recDest, the DXV3
@@ -1059,12 +1106,13 @@ class SonifyEngine {
    *  ends 50 ms later (ending at once cut it mid-wave : a click every time).
    *  `now` (a dev hot update, a failed start) tears it down at once. */
   stop(now = false): void {
-    const collage = this.collage, lineSrc = this.lineSrc, lineStream = this.lineStream
+    const collage = this.collage, asm = this.asm, lineSrc = this.lineSrc, lineStream = this.lineStream
     const node = this.node, eqNode = this.eqNode, anPre = this.anPre, anPost = this.anPost, outG = this.outG, ctx = this.ctx
     const ext = this.extIn
     const ls = this.layerSend, lsTo = this.layerSendTo
     this.layerSendTo = null
     this.collage = null
+    this.asm = null
     this.lineSrc = null
     this.lineStream = null
     // forget the line-in : the next start must open it again (it used to think
@@ -1078,8 +1126,10 @@ class SonifyEngine {
     this.routeTimer = 0
     this.routeChanges = []
     collage?.silence()
+    asm?.silence()
     const teardown = (): void => {
       collage?.dispose()
+      asm?.dispose()
       lineSrc?.disconnect()
       lineStream?.getTracks().forEach((t) => t.stop())
       // End both processors, not only disconnect them : the context stays open
@@ -1106,6 +1156,7 @@ class SonifyEngine {
       window.setTimeout(teardown, 50)
     } else teardown()
     this.collageCompGr = -1
+    this.asmCompGr = -1
     this.glueGr = -1
     this.anPre = null
     this.anPost = null
@@ -1330,14 +1381,15 @@ class SonifyEngine {
       signal: { ...d.signal, ...cfg.signal },
       chord: { ...d.chord, ...cfg.chord },
       collage: { ...d.collage, ...cfg.collage },
+      assemblage: { ...d.assemblage, ...cfg.assemblage },
       fx: { ...d.fx, ...cfg.fx },
       // Older presets/scenes carried 7 (pre-Chord), 8 (pre-Collage) or 9
       // (pre-Signal) entries : keep their filter positions and pad the newer
       // channels to bypass (0.5) instead of discarding the whole array. Any
       // other shape → default.
       mixFilter:
-        Array.isArray(cfg.mixFilter) && cfg.mixFilter.length >= 7 && cfg.mixFilter.length <= 10
-          ? [...cfg.mixFilter, 0.5, 0.5, 0.5].slice(0, 10)
+        Array.isArray(cfg.mixFilter) && cfg.mixFilter.length >= 7 && cfg.mixFilter.length <= 11
+          ? [...cfg.mixFilter, 0.5, 0.5, 0.5, 0.5].slice(0, 11)
           : d.mixFilter
     }
     const sinkChanged = cfg.sinkId !== this.cfg.sinkId
@@ -1369,6 +1421,8 @@ class SonifyEngine {
       } else this.colFrom = null
       this.collageNotes = notes
     }
+    // the Assemblage resonators' notes : the map's centre = the lowest
+    this.asmNotes = scaleTable(effRoot(cfg), cfg.scale, cfg.assemblage.loOct, Math.max(cfg.assemblage.loOct + 1, cfg.assemblage.hiOct))
     // Signal's scale table. Built whatever `snap` says : snap BLENDS the free
     // frequency with this one, so the quantized end must always exist.
     this.signalFreqs = scaleTable(effRoot(cfg), cfg.scale, cfg.signal.loOct, cfg.signal.hiOct)
@@ -1439,6 +1493,15 @@ class SonifyEngine {
           detune: cfg.collage.detune, voicing: cfg.collage.voicing, ringIn: cfg.collage.ringIn ?? 0,
           comp: cfg.collage.comp ?? 0
         },
+        assemblage: {
+          on: live && cfg.assemblage.on, gain: cfg.assemblage.gain, pan: cfg.assemblage.pan,
+          bank: cfg.assemblage.bank, bankSend: cfg.assemblage.bankSend, decay: cfg.assemblage.decay, choke: cfg.assemblage.choke,
+          cutoff: cfg.assemblage.cutoff, peak: cfg.assemblage.peak, slope: cfg.assemblage.slope, tone: cfg.assemblage.tone,
+          tilt: cfg.assemblage.tilt, waves: cfg.assemblage.waves, wavesRate: cfg.assemblage.wavesRate, wavesSync: cfg.assemblage.wavesSync,
+          noise: cfg.assemblage.noise, noiseRate: cfg.assemblage.noiseRate, noiseSync: cfg.assemblage.noiseSync,
+          detune: cfg.assemblage.detune, voicing: cfg.assemblage.voicing, ringIn: cfg.assemblage.ringIn ?? 0,
+          comp: cfg.assemblage.comp ?? 0
+        },
         fx: { ...cfg.fx },
         mixFilter: cfg.mixFilter
       },
@@ -1446,6 +1509,7 @@ class SonifyEngine {
       filterFreqs: filterFreqs(cfg),
       chordFreqs: chordFreqs(cfg),
       ringFreqs: ringFreqs(cfg),
+      asmRingFreqs: ringFreqs(cfg, cfg.assemblage),
       glide
     })
     this.chordSentN = chordCount(cfg)
@@ -1574,6 +1638,7 @@ class SonifyEngine {
     const node = this.node
     if (!node || !this.cfg.on) {
       if (this.collage) { this.collage.dispose(); this.collage = null }
+      if (this.asm) { this.asm.dispose(); this.asm = null }
       return
     }
     // ~30 Hz. (33 against a two-frame period of 33.3 ms at 60 Hz let frame
@@ -1614,6 +1679,45 @@ class SonifyEngine {
       // by name : the log file printed a DOMException as [object DOMException]
       const err = e as Error
       console.warn('[sonify] collage voice', err?.name ? `${err.name}: ${err.message}\n${String(err.stack ?? '').split('\n').slice(1, 4).join('\n')}` : e)
+    }
+
+    // Assemblage voice : each Assemblage on a layer, one piece whose film is the
+    // clip on screen (a cut = a crossfade to the next clip's original file),
+    // placed by its corpus unit on the Assemble map.
+    try {
+      const a = this.cfg.assemblage
+      if (a.on && this.ctx) {
+        this.asmOffAt = 0
+        if (!this.asm) {
+          this.asm = new CollageVoice(this.ctx)
+          this.asm.out.connect(node, 0, 3)
+        }
+        const mv = sonifyModValues
+        const rows = comp.assembleSounds?.() ?? []
+        const sets: CollageSoundSet[] = rows.map((r) => {
+          const [x, y] = this.unitPlace?.(r.unitId) ?? hashPlace(r.unitId)
+          return { id: r.id, level: r.level, aspect: 1, pieces: [{ x, y, deck: 0, keep: 1 }], decks: [{ el: r.el, path: r.path }], cut: r.cut }
+        })
+        this.asm.update(sets, {
+          reso: mv.get('asmReso') ?? a.reso,
+          ring: mv.get('asmRing') ?? a.ring,
+          bright: a.bright,
+          width: mv.get('asmWidth') ?? a.width,
+          inGain: Math.pow(10, (a.inGain ?? 0) / 20),
+          hp: a.hp ?? 20,
+          lp: a.lp ?? 20000,
+          hpSlope: a.hpSlope === 12 ? 12 : 24,
+          lpSlope: a.lpSlope === 12 ? 12 : 24,
+          accent: mv.get('asmAccent') ?? a.accent,
+          tape: a.tape
+        }, this.asmNotes)
+      } else if (this.asm) {
+        if (!this.asmOffAt) { this.asm.silence(); this.asmOffAt = nowMs }
+        else if (nowMs - this.asmOffAt > 80) { this.asm.dispose(); this.asm = null; this.asmOffAt = 0 }
+      }
+    } catch (e) {
+      const err = e as Error
+      console.warn('[sonify] assemblage voice', err?.name ? `${err.name}: ${err.message}` : e)
     }
 
     // (the synced Spectra sweep and SSTV line rate follow the tempo in postMod)

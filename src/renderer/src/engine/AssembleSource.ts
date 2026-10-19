@@ -41,6 +41,8 @@ export class AssembleSource {
   private posMod: number | null = null
   private rate = 1
   private finished = false
+  private cutSerial = 0 // bumps at every cut (Sonify's Assemblage voice strikes on it)
+  private folder: string | null = null // the corpus folder : the clips' ORIGINAL files are in it
   // Live (target-driven) mode : instead of walking a fixed list, ask for the
   // next clip one clip ahead of the cut. The lag is deliberate — the match then
   // reflects the image as it looked DURING the previous shot, which is exactly
@@ -175,6 +177,7 @@ export class AssembleSource {
     const deck = this.decks[this.live]
     if (idx !== this.idx) {
       this.idx = idx
+      this.cutSerial++
       this.primedFor = -1
       this.finished = false
       this.cue(deck, this.clips[idx], this.playing)
@@ -280,6 +283,7 @@ export class AssembleSource {
         if (acc + d > target || i === this.clips.length - 1) {
           if (i !== this.idx) {
             this.idx = i
+            this.cutSerial++
             this.primedFor = -1
             this.cue(deck, this.clips[i], this.playing)
           }
@@ -342,6 +346,7 @@ export class AssembleSource {
       }
       this.live = 1 - this.live
       this.idx = nextIdx
+      this.cutSerial++
       this.elapsed = Math.min(carry, this.clips[nextIdx].durSec * 0.5)
       this.primedFor = -1
       const nd = this.decks[this.live]
@@ -352,6 +357,27 @@ export class AssembleSource {
       nd.pending = true
       this.trimHistory()
     }
+  }
+
+  /** The corpus folder, where each clip's original file (with its sound) is :
+   *  a clip may play from a converted copy, which has none. */
+  setFolder(folder: string | null): void {
+    this.folder = folder || null
+  }
+
+  /** For Sonify's Assemblage voice : the video on screen, the clip's ORIGINAL
+   *  file, its corpus unit, and a serial that changes at every cut. */
+  soundInfo(): { el: HTMLVideoElement | null; path: string | null; unitId: string; cut: number } | null {
+    const clip = this.clips[this.idx]
+    if (!clip) return null
+    const el = this.decks[this.live]?.el ?? null
+    let path = clip.file
+    const base = clip.file.split(/[\\/]/).pop() ?? ''
+    if (this.folder && clip.fileName && base !== clip.fileName) {
+      const sep = this.folder.includes('\\') ? '\\' : '/'
+      path = this.folder.replace(/[\\/]+$/, '') + sep + clip.fileName
+    }
+    return { el, path, unitId: clip.unitId, cut: this.cutSerial }
   }
 
   private nextIndex(): number {

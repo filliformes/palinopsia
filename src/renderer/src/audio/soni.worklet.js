@@ -20,8 +20,9 @@ const TAU = 6.283185307179586;
 // Voices are addressed BY INDEX (the DJ filters, the gates, the mixer and the
 // sequencer masks a session saves), so a new voice is APPENDED : Signal is 9,
 // and only the UI shows it before Chord. Inserting it at 7 would have moved
-// Chord and the Collage, and every saved mixer setting with them.
-const NVOICE = 10;
+// Chord and the Collage, and every saved mixer setting with them. The
+// Assemblage (an edit's own sound, cut with the picture) is 10.
+const NVOICE = 11;
 // Above this fraction of the sample rate a partial can't be played : it would
 // fold back as an out-of-key whistle (and an Events phase would run away).
 const NYQ_FRAC = 0.45;
@@ -834,6 +835,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       chord:   { on: false, tap: 0, gain: 0.6, pan: 0, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3, waves: 0, wavesRate: 0.4, wavesSync: 0, noise: 0, air: 0.4 },
       signal:  { on: false, gain: 0.6, pan: 0, wave: 0, decay: 0.3, tone: 0.6, fm: 0.4 },
       collage: { on: false, gain: 0.7, pan: 0, bank: 0, bankSend: false, decay: 0.5, choke: false, cutoff: 1, peak: 0, slope: 0, tone: 0, tilt: 0, waves: 0, wavesRate: 0.5, wavesSync: 0, noise: 0, noiseRate: 0.5, noiseSync: 0, detune: 0, voicing: 0, ringIn: 0 },
+      assemblage: { on: false, gain: 0.7, pan: 0, bank: 0, bankSend: false, decay: 0.5, choke: false, cutoff: 1, peak: 0, slope: 0, tone: 0, tilt: 0, waves: 0, wavesRate: 0.5, wavesSync: 0, noise: 0, noiseRate: 0.5, noiseSync: 0, detune: 0, voicing: 0, ringIn: 0 },
       fx:      { send: 0, dlyMix: 0.35, dlyTime: 0.3, dlyFb: 0.35, dlyTone: 0.5, dlyMode: 1, rvMode: 0, rvMix: 0.6, rvSize: 0.6, rvDecay: 0.6, rvDamp: 0.3, rvPre: 20, rvMod: 6, rvModRate: 0.5, rvWidth: 1, rvLocut: 220, rvFreeze: false, rvDiff: 0.85, rvLowDamp: 0.5, rvCross: 0.3, rvLowMult: 1, rvHighMult: 1 }
     };
     this.spectraFreqs = new Float32Array(NPART); // filled by cfg
@@ -926,6 +928,11 @@ class SoniProcessor extends AudioWorkletProcessor {
     // ── the Collage voice's Ring bank ──
     this.ring = new RingBank(sampleRate);
     this.ringF = new Float32Array(RB_N); // the Ring bank's band centres (glided here)
+    // The Assemblage voice's own Ring bank, band centres and comp (input 3)
+    this.ring2 = new RingBank(sampleRate);
+    this.ringF2 = new Float32Array(RB_N);
+    this.lev2 = new Leveler(sampleRate);
+    this.lv2L = new Float32Array(128); this.lv2R = new Float32Array(128); this.lv2G = new Float32Array(128);
     // ── Key glide (the key sequencer's glide) : a pitch table slides to its new
     // values over `glide` seconds (eased, in log frequency) instead of jumping.
     // One entry per table : { cur, from, to, lr, t, dur }. Orbit and Raster have
@@ -1018,6 +1025,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       if (m.filterFreqs && this.retune('fl', this.fFreqs, m.filterFreqs, gl)) this.rebuildFilterCoefs();
       if (m.chordFreqs) this.setChordFreqs(m.chordFreqs, gl);
       if (m.ringFreqs && this.retune('rg', this.ringF, m.ringFreqs, gl)) this.ring.setFreqs(this.ringF);
+      if (m.asmRingFreqs && this.retune('ra', this.ringF2, m.asmRingFreqs, gl)) this.ring2.setFreqs(this.ringF2);
       // Orbit / Raster : a key change slides their pitch from where it is.
       if (gl > 0 && (m.cfg.orbit.freq !== prev.orbit.freq || m.cfg.raster.freq !== prev.raster.freq)) {
         this.pg = { t: 0, dur: gl, ob: this.obF || prev.orbit.freq, ra: this.raF || prev.raster.freq };
@@ -1943,6 +1951,22 @@ class SoniProcessor extends AudioWorkletProcessor {
       } else this.coK = -1;
     }
 
+    // ── ASSEMBLAGE : an edit's own sound, each cut its clip's original file
+    // from its in point (collageVoice.ts, a second instance), arriving on
+    // input 3. Its own comp and Ring bank, then its mixer channel. ──
+    const as = cfg.assemblage;
+    const asOn = !!(as && as.on);
+    if (this.voiceLive(10, asOn)) {
+      const inp = _inputs[3];
+      const has = inp && inp.length;
+      let iL = has ? inp[0] : this.ring2.zero, iR = has ? inp[1] || inp[0] : this.ring2.zero;
+      const lv = has && this.lev2.run(iL, iR, this.lv2L, this.lv2R, this.lv2G, n, as.comp || 0);
+      if (lv) { iL = this.lv2L; iR = this.lv2R; }
+      const gL = 1.6 * (1 - Math.max(0, as.pan)), gR = 1.6 * (1 + Math.min(0, as.pan));
+      this.ring2.process(iL, iR, L, R, n, as, this.bpm, gL, gR);
+      this.mixVoice(10, asOn, as.gain, L, R, outL, outR, n);
+    }
+
     // ── SIGNAL : the scan heads' micro-grains (the test-equipment register) ──
     // Every helper the per-sample loop needs is written INLINE : a helper called
     // per sample was once left un-inlined (boxed doubles, 3.6 ms per block).
@@ -2162,10 +2186,12 @@ class SoniProcessor extends AudioWorkletProcessor {
         scan: { at: currentTime, sp: this.sweepPos, spHz: sp.sweepOn ? sp.sweepHz : 0, fi: this.fSweep, fiHz: fi.sweepOn ? fi.sweepHz : 0, tv: (this.tLine + this.tX) / GRID, tvHz: tv.lineHz / GRID },
         // Space : each output channel's peak (after its limiter)
         spk: spc.on ? spc.pk.slice(0, spc.nch) : null,
-        // the Collage comp's deepest reduction (dB), -1 : bypassed
-        lvGr: this.lev.live ? this.lev.grMax : -1
+        // the Collage comp's deepest reduction (dB), -1 : bypassed; the Assemblage's
+        lvGr: this.lev.live ? this.lev.grMax : -1,
+        lv2Gr: this.lev2.live ? this.lev2.grMax : -1
       });
       this.lev.grMax = 0;
+      this.lev2.grMax = 0;
       if (spc.on) spc.pk.fill(0);
       this.peak = 0; this.limMin = 1; this.lastMeter = currentTime;
       this.pkL = 0; this.pkR = 0; this.ssL = 0; this.ssR = 0; this.nMeter = 0;

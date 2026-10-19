@@ -103,7 +103,7 @@ export function CollageStrip({
     writeEdls(
       chosen.has(id)
         ? edls.filter((e) => e.id !== id)
-        : [...edls, { id: hit.id, clips: hit.clips }]
+        : [...edls, { id: hit.id, clips: hit.clips, folder: hit.folder }]
     )
   }
 

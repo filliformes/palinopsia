@@ -548,7 +548,7 @@ function makeDefaultSoniSeq(): SoniSeq {
     bias: 0,
     edge: 'wrap',
     steps: Array.from({ length: 16 }, () => ({
-      voices: [false, false, false, false, false, false, false, false, false, false],
+      voices: [false, false, false, false, false, false, false, false, false, false, false],
       preset: ''
     }))
   }
@@ -576,8 +576,9 @@ function sanitizeSoniSeq(raw: unknown, fallback: SoniSeq): SoniSeq {
         return {
           // 8 = saved before the Collage voice, 9 before Signal : padded, the
           // newer voices stay off in those steps.
-          voices: Array.isArray(st?.voices) && st!.voices.length >= 8 && st!.voices.length <= 10
-            ? [...st!.voices.map(Boolean), false, false].slice(0, 10)
+          // 10 before the Assemblage voice.
+          voices: Array.isArray(st?.voices) && st!.voices.length >= 8 && st!.voices.length <= 11
+            ? [...st!.voices.map(Boolean), false, false, false].slice(0, 11)
             : ds.voices,
           preset: typeof st?.preset === 'string' ? st!.preset : ''
         }
@@ -4148,7 +4149,7 @@ export const useStore = create<StoreState>((set, get) => ({
   toggleSoniSeqVoice: (step, voice) =>
     set((s) => {
       const steps = s.soniSeq.steps.map((st, i) =>
-        i === step ? { ...st, voices: [...st.voices, false, false].slice(0, 10).map((v, vi) => (vi === voice ? !v : v)) } : st
+        i === step ? { ...st, voices: [...st.voices, false, false, false].slice(0, 11).map((v, vi) => (vi === voice ? !v : v)) } : st
       )
       const soniSeq = { ...s.soniSeq, steps }
       persistSoniSeq(soniSeq)
@@ -4164,7 +4165,7 @@ export const useStore = create<StoreState>((set, get) => ({
   clearSoniSeqStep: (step) =>
     set((s) => {
       const steps = s.soniSeq.steps.map((st, i) =>
-        i === step ? { voices: [false, false, false, false, false, false, false, false, false, false], preset: '' } : st
+        i === step ? { voices: [false, false, false, false, false, false, false, false, false, false, false], preset: '' } : st
       )
       const soniSeq = { ...s.soniSeq, steps }
       persistSoniSeq(soniSeq)
@@ -4333,6 +4334,9 @@ export const useStore = create<StoreState>((set, get) => ({
                     inputs: {},
                     mediaId: a.id,
                     mediaName: a.name,
+                    // the corpus folder : the clips' original files, with their sound
+                    // (Sonify's Assemblage voice; a converted copy has none)
+                    mediaPath: a.folder,
                     edl: a.clips,
                     videoPlaying: true,
                     videoLoop: a.params.loop
