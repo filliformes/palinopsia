@@ -1510,14 +1510,15 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
             setDome({ res: 4096, aperture: 210, mode: 'fisheye', fit: 'fill' })
             // A square composition : fill spreads the frame's width and height over
             // the same diameter, so a 16:9 one drew every circle as an oval
-            // stretched front to back.
-            st.setCompSize(2048, 2048)
+            // stretched front to back. Only while the dome is on (now, or when it
+            // goes on) : turning it off gives this computer's own size back.
+            st.squareCompForDome(2048, 2048)
             st.setNdi({ fps: 60, format: 'uyvy', maxSize: 0 })
             st.setSpace({ mode: 'objects', protocol: 'spatgris', port: 18032, firstSource: 1, firstChannel: 1, pairs: true })
-            showToast('Satosphère : 4096² · 210° · full dome · a 2048² square composition · NDI 60 fps · Sonify as objects to SpatGRIS (port 18032 : set the address of the venue audio server in Sonify → space).', 'ok', 8000)
+            showToast(`Satosphère : 4096² · 210° · full dome · a 2048² square composition ${st.dome.enabled ? 'while the dome is on' : 'once the dome is on'} (your own size comes back when it goes off) · NDI 60 fps · Sonify as objects to SpatGRIS (port 18032 : set the address of the venue audio server in Sonify → space).`, 'ok', 8000)
           }}
           className={btn(false)}
-          title="Set everything the SAT Satosphère asks for : a 210° equidistant domemaster at 4096², the whole picture over the whole dome from a square 2048² composition (round things stay round), NDI at 60 fps, and Sonify's voices as objects for the venue's SpatGRIS (its 93 speakers and 5 subwoofers). Dome on/off and NDI on/off stay yours."
+          title="Set everything the SAT Satosphère asks for : a 210° equidistant domemaster at 4096², the whole picture over the whole dome from a square 2048² composition while the dome is on (round things stay round; your own size comes back when it goes off), NDI at 60 fps, and Sonify's voices as objects for the venue's SpatGRIS (its 93 speakers and 5 subwoofers). Dome on/off and NDI on/off stay yours."
         >
           Satosphère
         </button>

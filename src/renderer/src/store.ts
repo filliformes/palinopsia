@@ -1673,6 +1673,9 @@ interface StoreState {
   compW: number
   compH: number
   setCompSize: (w: number, h: number) => void
+  // The Satosphère button : a w × h composition while the dome is on (now, or
+  // when it goes on), this computer's own size back when it goes off.
+  squareCompForDome: (w: number, h: number) => void
   // Strobe-safety limiter (photosensitive) : 0 = off, higher = tighter flash cap.
   strobeSafe: number
   setStrobeSafe: (v: number) => void
@@ -2129,6 +2132,73 @@ function lsNum(key: string): number {
   const raw = localStorage.getItem(key)
   return raw === null ? NaN : Number(raw)
 }
+
+// The Satosphère button's square composition (Output → dome). Once ARMED it
+// squares the composition while the dome is on and gives this computer's own
+// size back when the dome goes off, but only when the composition is still that
+// square (a size picked since stays). A size picked while the dome is on disarms
+// it. Machine-local like the size itself; the dome always starts off, so a
+// square left from the last run is given back at launch (and comes again with
+// the dome).
+interface DomeSquare {
+  w: number
+  h: number
+  prev?: [number, number] // the size it replaced, while it is in force
+}
+function loadDomeSquare(): DomeSquare | null {
+  try {
+    const r = JSON.parse(localStorage.getItem('opsia.domeSquare') ?? 'null') as DomeSquare | null
+    if (r && Number.isFinite(r.w) && Number.isFinite(r.h)) {
+      const p = Array.isArray(r.prev) && r.prev.length === 2 && r.prev.every(Number.isFinite) ? r.prev : undefined
+      return { w: r.w, h: r.h, prev: p }
+    }
+  } catch {
+    /* none */
+  }
+  return null
+}
+function persistDomeSquare(d: DomeSquare | null): void {
+  try {
+    if (d) localStorage.setItem('opsia.domeSquare', JSON.stringify(d))
+    else localStorage.removeItem('opsia.domeSquare')
+  } catch {
+    /* quota : the size just won't come back by itself */
+  }
+}
+type CompSizeSet = (p: { compW: number; compH: number }) => void
+function writeCompSize(set: CompSizeSet, w: number, h: number): void {
+  localStorage.setItem('opsia.compW', String(w))
+  localStorage.setItem('opsia.compH', String(h))
+  set({ compW: w, compH: h })
+}
+/** The dome went on (or the button was pressed with it on) : the armed square
+ *  replaces the composition's size, which is kept to give back. */
+function enterDomeSquare(st: { compW: number; compH: number }, set: CompSizeSet): void {
+  const d = loadDomeSquare()
+  if (!d || (st.compW === d.w && st.compH === d.h)) return // nothing armed, or square already
+  persistDomeSquare({ w: d.w, h: d.h, prev: d.prev ?? [st.compW, st.compH] })
+  writeCompSize(set, d.w, d.h)
+}
+/** The dome went off : the size the square replaced comes back, if the
+ *  composition is still that square. It stays armed for the next time. */
+function leaveDomeSquare(st: { compW: number; compH: number }, set: CompSizeSet): void {
+  const d = loadDomeSquare()
+  if (!d?.prev) return
+  if (st.compW === d.w && st.compH === d.h) writeCompSize(set, d.prev[0], d.prev[1])
+  persistDomeSquare({ w: d.w, h: d.h })
+}
+;(function giveBackDomeSquareAtLaunch(): void {
+  // the control window only : the projector window loads this same bundle
+  // (#output), and opening it mid-show must not touch the size
+  if (typeof window === 'undefined' || window.location.hash.replace('#', '') === 'output') return
+  const d = loadDomeSquare()
+  if (!d?.prev) return
+  if (lsNum('opsia.compW') === d.w && lsNum('opsia.compH') === d.h) {
+    localStorage.setItem('opsia.compW', String(d.prev[0]))
+    localStorage.setItem('opsia.compH', String(d.prev[1]))
+  }
+  persistDomeSquare({ w: d.w, h: d.h })
+})()
 
 export const useStore = create<StoreState>((set, get) => ({
   theme: loadTheme(),
@@ -3807,7 +3877,14 @@ export const useStore = create<StoreState>((set, get) => ({
       return { dataflou }
     }),
   dome: loadDome(),
-  setDome: (patch) => set((s) => ({ dome: persistDome(sanitizeDome({ ...s.dome, ...patch })) })),
+  setDome: (patch) => {
+    const was = get().dome.enabled
+    set((s) => ({ dome: persistDome(sanitizeDome({ ...s.dome, ...patch })) }))
+    const on = get().dome.enabled
+    // the Satosphère square (if armed) comes with the dome and goes with it
+    if (on && !was) enterDomeSquare(get(), set)
+    else if (!on && was) leaveDomeSquare(get(), set)
+  },
   outXform: OUT_IDENTITY,
   setOutXform: (patch) => set((s) => ({ outXform: sanitizeOutXform({ ...s.outXform, ...patch }) })),
   outXformReset: 0,
@@ -4037,9 +4114,19 @@ export const useStore = create<StoreState>((set, get) => ({
   setCompSize: (w, h) => {
     const cw = Math.max(320, Math.min(15360, Math.round(w)))
     const ch = Math.max(240, Math.min(8640, Math.round(h)))
+    // A size picked while the dome is on is the one wanted there : the armed
+    // square stands down (and gives nothing back when the dome goes off).
+    const sq = loadDomeSquare()
+    if (sq && get().dome.enabled && (cw !== sq.w || ch !== sq.h)) persistDomeSquare(null)
     localStorage.setItem('opsia.compW', String(cw))
     localStorage.setItem('opsia.compH', String(ch))
     set({ compW: cw, compH: ch })
+  },
+  squareCompForDome: (w, h) => {
+    const cw = Math.max(320, Math.min(15360, Math.round(w)))
+    const ch = Math.max(240, Math.min(8640, Math.round(h)))
+    persistDomeSquare({ w: cw, h: ch, prev: loadDomeSquare()?.prev })
+    if (get().dome.enabled) enterDomeSquare(get(), set)
   },
   // Flash safety : mild ON by default (0.35) : it barely touches normal content
   // (only >~17% full-field mean-luminance jumps get damped) but nets real strobes.
