@@ -53,7 +53,8 @@ export function Blink({ n, color = 'text' }: { n?: number; color?: BlinkColor })
 function flashOver(btn: HTMLElement, color: BlinkColor): void {
   const r = btn.getBoundingClientRect()
   if (r.width <= 0 || r.height <= 0) return
-  const el = document.createElement('span')
+  const doc = btn.ownerDocument // the button's own window (the Output page can have one)
+  const el = doc.createElement('span')
   el.className = `fire-blink c-${color}`
   el.setAttribute('aria-hidden', 'true')
   Object.assign(el.style, {
@@ -63,11 +64,11 @@ function flashOver(btn: HTMLElement, color: BlinkColor): void {
     top: `${r.top}px`,
     width: `${r.width}px`,
     height: `${r.height}px`,
-    borderRadius: getComputedStyle(btn).borderRadius,
+    borderRadius: (doc.defaultView ?? window).getComputedStyle(btn).borderRadius,
     zIndex: '9999'
   })
   const done = (): void => el.remove()
   el.addEventListener('animationend', done)
   window.setTimeout(done, 600) // the animation is 280 ms : a backstop
-  document.body.appendChild(el)
+  doc.body.appendChild(el)
 }

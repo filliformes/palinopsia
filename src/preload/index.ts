@@ -176,6 +176,7 @@ const api: ExposedApi = {
   outputIsOpen: () => ipcRenderer.invoke('output:isOpen'),
   outputSize: () => ipcRenderer.invoke('output:size'),
   outputClose: () => ipcRenderer.invoke('output:close'),
+  outputPageFocus: () => ipcRenderer.invoke('outputPage:focus'),
   outputEscMode: () => ipcRenderer.invoke('output:escMode'),
   outputEscape: () => ipcRenderer.invoke('output:escape'),
   onOutputClosed: (cb: () => void) => {

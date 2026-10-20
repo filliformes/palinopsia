@@ -72,10 +72,13 @@ export function ToastDock({ className }: { className?: string }): JSX.Element {
 
 const DOCK_MIN_W = 180 // narrower than this, the toast would be a sliver : use the window
 
-/** Mount once near the app root. Renders the current toast (or nothing). */
-export function Toaster(): JSX.Element | null {
+/** Mount once near the app root. Renders the current toast (or nothing).
+ *  `undocked` : at the bottom of its own window (the Output page's window,
+ *  which has no toolbar dock), the same toast as the instrument's. */
+export function Toaster({ undocked = false }: { undocked?: boolean } = {}): JSX.Element | null {
   const msg = useSyncExternalStore(subscribe, snapshot)
-  const dock = useSyncExternalStore(subscribe, dockSnapshot)
+  const dockEl0 = useSyncExternalStore(subscribe, dockSnapshot)
+  const dock = undocked ? null : dockEl0
   if (!msg) return null
   const tint = msg.kind === 'warn' ? 'border-danger/70 text-danger' : 'border-accent/70 text-text'
   const docked = !!dock && dock.isConnected && dock.clientWidth >= DOCK_MIN_W

@@ -30,11 +30,15 @@ import { NDI_FPS, NDI_MAX_EDGE, NDI_REDIST_URL, NDI_LINUX_SDK_URL, type NdiConfi
 const CORNER_LABELS = ['TL', 'TR', 'BR', 'BL']
 
 export function OutputPage({
-  canvasRef
+  canvasRef,
+  inWindow = false
 }: {
   canvasRef: RefObject<HTMLCanvasElement | null>
+  /** Drawn in its own window (OutputPageWindow.tsx), not over the instrument. */
+  inWindow?: boolean
 }): JSX.Element {
   const setOutputPageOpen = useStore((s) => s.setOutputPageOpen)
+  const setOutputPageWindow = useStore((s) => s.setOutputPageWindow)
   // Fulldome : the master mapping + the simulator's camera (a ref, so orbiting
   // never re-renders the page).
   const dome = useStore((s) => s.dome)
@@ -340,11 +344,25 @@ export function OutputPage({
           Output · Mapping
         </span>
         <div className="flex-1" />
+        {/* Out to a window of its own (beside the instrument, on another
+            screen), or back in over the instrument. Remembered : O opens it
+            where you left it. */}
+        <button
+          onClick={() => setOutputPageWindow(!inWindow)}
+          className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
+          title={
+            inWindow
+              ? 'Put the Output page back over the instrument'
+              : 'Open the Output page in a window of its own, beside the instrument (another screen, or moved aside) : every control stays live while you play'
+          }
+        >
+          {inWindow ? '⇲ back into the app' : '↗ open in a window'}
+        </button>
         <button
           onClick={() => setOutputPageOpen(false)}
           className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
         >
-          ← back to instrument
+          {inWindow ? 'close' : '← back to instrument'}
         </button>
       </header>
 

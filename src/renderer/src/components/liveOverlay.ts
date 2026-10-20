@@ -28,7 +28,7 @@ function tick(): void {
       s.apply(live)
       continue
     }
-    if (document.activeElement === s.el) continue // don't clobber a drag/edit
+    if (s.el.ownerDocument.activeElement === s.el) continue // don't clobber a drag/edit (its own window's focus)
     const next = s.format(live)
     if (s.el.value !== next) s.el.value = next
   }

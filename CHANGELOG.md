@@ -49,6 +49,22 @@ that CI builds into cross-platform releases.
   in a window (main's `openOutputWindow(-1, true)` : the screen the control window is on),
   Close Output while one is open, Output page…. Verified : the menu, the window opening
   (`#output` target) and closing.
+- **The Output page in a window of its own** (`OutputPageWindow.tsx`) : the control
+  window opens a blank page of its own (`window.open('', OUTPUT_PAGE_FRAME)`, the only
+  window main's open handler allows) and draws `OutputPage` into it through a React
+  portal : one store, one engine, every control live. It copies the control window's
+  styles (again on every head change : hot updates), its theme attributes and its UI
+  zoom, forwards keys not typed into a field to the instrument, and shows the toast at
+  its own bottom (`Toaster undocked`). The window survives a remount (StrictMode, hot
+  updates : its close waits a tick), remembers its place (`opsia.outputPageBounds`;
+  main puts it back on a screen if that one is gone), closes with the control window or
+  on its reload, and denies navigation. Store : `outputPageWindow` (remembered), with
+  `outputPageOpen` still meaning "the page shows"; O / Output page… raise its window
+  (`outputPage:focus`). Header buttons ↗ open in a window / ⇲ back into the app, a menu
+  item on the Output button. `liveOverlay` and `Blink` work in the element's own
+  document. Verified in a test copy : styles, live mirror, HUD, dome simulator, a click
+  and a forwarded key (M), dock back and out again, closing from the window, O reopening
+  it, a reload closing it.
 
 - **The modulator type menu in five families** (`MOD_GROUPS` in `ModulationPanel.tsx`,
   `<optgroup>`s) : waves (lfo, ramp, adsr), rhythms (arp, euclid, turing, cellular), random

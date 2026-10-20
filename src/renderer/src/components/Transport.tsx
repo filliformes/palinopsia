@@ -114,7 +114,15 @@ export function Transport(): JSX.Element {
       ? [{ label: 'Close Output', onClick: () => { void window.api.outputClose().then(() => useStore.getState().setOutputActive(false)) } }]
       : []),
     { label: '', divider: true },
-    { label: 'Output page…', onClick: () => setOutputPageOpen(true) }
+    { label: 'Output page…', onClick: () => setOutputPageOpen(true) },
+    {
+      label: 'Output page in a window',
+      onClick: () => {
+        const st = useStore.getState()
+        st.setOutputPageWindow(true)
+        st.setOutputPageOpen(true)
+      }
+    }
   ]
   const setBodyPageOpen = useStore((s) => s.setBodyPageOpen)
   const bodyOn = useStore((s) => s.bodyControl.enabled)

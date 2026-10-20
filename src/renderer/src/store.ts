@@ -1716,6 +1716,10 @@ interface StoreState {
   // The full-page Output / Mapping view is showing. Transient.
   outputPageOpen: boolean
   setOutputPageOpen: (on: boolean) => void
+  // ...in its own window rather than over the instrument (OutputPageWindow.tsx).
+  // Remembered : once you have taken it out, O opens it in its window.
+  outputPageWindow: boolean
+  setOutputPageWindow: (on: boolean) => void
   // Global modulation mute (transient) : freezes every modulator output.
   modBypass: boolean
   toggleModBypass: () => void
@@ -4201,7 +4205,16 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ hiveOutPort: p })
   },
   outputPageOpen: false,
-  setOutputPageOpen: (on) => set({ outputPageOpen: on }),
+  setOutputPageOpen: (on) => {
+    // Already open in its window : bring that window up instead.
+    if (on && get().outputPageOpen && get().outputPageWindow) void window.api.outputPageFocus().catch(() => {})
+    set({ outputPageOpen: on })
+  },
+  outputPageWindow: (() => { try { return localStorage.getItem('opsia.outputPageWindow') === '1' } catch { return false } })(),
+  setOutputPageWindow: (on) => {
+    try { localStorage.setItem('opsia.outputPageWindow', on ? '1' : '0') } catch { /* a blocked storage : not remembered */ }
+    set({ outputPageWindow: on })
+  },
 
   // Global modulation mute (transient) : one click freezes every modulator's
   // output so all sliders revert to their base values. Not persisted — a live

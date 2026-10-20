@@ -58,6 +58,7 @@ import { PictureReadout } from './components/PictureReadout'
 import { AssemblePanel } from './components/AssemblePanel'
 import { BackgroundPanel } from './components/BackgroundPanel'
 import { OutputPage } from './components/OutputPage'
+import { OutputPageWindow } from './components/OutputPageWindow'
 import { SonifyPage } from './components/SonifyPage'
 import { WorldPage } from './components/WorldPage'
 import { SequencePage } from './components/SequencePage'
@@ -269,7 +270,7 @@ function RecPill(): JSX.Element | null {
 function BodyPip(): JSX.Element | null {
   const enabled = useStore((s) => s.bodyControl.enabled)
   const pageOpen = useStore((s) => s.bodyPageOpen)
-  const overPage = useStore((s) => s.sonifyPageOpen || s.outputPageOpen || s.worldPageOpen || s.sequencePageOpen || s.resolumePageOpen || s.sourceEditorOpen)
+  const overPage = useStore((s) => s.sonifyPageOpen || (s.outputPageOpen && !s.outputPageWindow) || s.worldPageOpen || s.sequencePageOpen || s.resolumePageOpen || s.sourceEditorOpen)
   const setPage = useStore((s) => s.setBodyPageOpen)
   const [live, setLive] = useState(false)
   useEffect(() => {
@@ -564,6 +565,7 @@ export default function App(): JSX.Element {
   const ndiActive = useStore((s) => s.ndiActive)
   const shareActive = useStore((s) => s.shareActive)
   const outputPageOpen = useStore((s) => s.outputPageOpen)
+  const outputPageWindow = useStore((s) => s.outputPageWindow)
   const sonifyPageOpen = useStore((s) => s.sonifyPageOpen)
   const renderScale = useStore((s) => s.renderScale)
   const compW = useStore((s) => s.compW)
@@ -920,11 +922,12 @@ export default function App(): JSX.Element {
         useStore.getState().toggleMixerView()
         return
       }
-      // O: open/close the Output / Mapping view.
+      // O: open/close the Output / Mapping view. In its own window, O brings
+      // that window up (it closes from its title bar or its close button).
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'o') {
         e.preventDefault()
         const st = useStore.getState()
-        st.setOutputPageOpen(!st.outputPageOpen)
+        st.setOutputPageOpen(st.outputPageWindow || !st.outputPageOpen)
         return
       }
       // W: open/close the World editor.
@@ -1077,7 +1080,7 @@ export default function App(): JSX.Element {
           st.setSonifyPageOpen(false)
           return
         }
-        if (st.outputPageOpen) {
+        if (st.outputPageOpen && !st.outputPageWindow) {
           e.preventDefault()
           st.setOutputPageOpen(false)
           return
@@ -2376,7 +2379,8 @@ export default function App(): JSX.Element {
 
       {/* ── Output / Mapping page : full-screen takeover (canvas keeps
              rendering underneath so the live mirror + engine never stop) ── */}
-      {outputPageOpen && <OutputPage canvasRef={canvasRef} />}
+      {outputPageOpen && !outputPageWindow && <OutputPage canvasRef={canvasRef} />}
+      {outputPageOpen && outputPageWindow && <OutputPageWindow canvasRef={canvasRef} />}
       {sonifyPageOpen && <SonifyPage canvasRef={canvasRef} />}
       {worldPageOpen && <WorldPage />}
       {sourceEditorOpen && <SourceEditor />}

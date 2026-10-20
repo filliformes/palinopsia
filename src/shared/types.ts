@@ -805,6 +805,11 @@ export const DEFAULT_LAYER_VARY = 0.15
 // outside it). It was 12, which a hand-built patch filled quickly (Vincent,
 // 2026-10-13 : raise it to 32).
 export const MAX_MOD_ASSIGNMENTS = 32
+
+/** The window.open name of the Output page in its own window : a blank page the
+ *  control window draws the page into (renderer OutputPageWindow.tsx), which
+ *  main lets open (and only that one). */
+export const OUTPUT_PAGE_FRAME = 'opsia-output-page'
 // What the AUTOMATIC binders may use (Randomize, Generate, a World's audio
 // route) : the old 12, so a randomized session keeps the amount of motion it
 // always had and the rest of the room stays for the hand.
@@ -1481,6 +1486,7 @@ export interface ExposedApi {
   // union bounds (each projector a separate, adjacent monitor).
   outputOpenSpan: (displayIds: number[]) => Promise<boolean>
   outputClose: () => Promise<boolean>
+  outputPageFocus: () => Promise<boolean>
   // What Esc does in the output window : 'hold' (an installation : held 1.5 s),
   // 'close' (a fullscreen output covering the control window : a tap closes it)
   // or 'return' (the control window is reachable : focus goes back to it).
