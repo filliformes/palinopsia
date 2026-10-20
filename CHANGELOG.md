@@ -7,6 +7,9 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Solid Color greys out what it is not using** (`DIMS['solid-color']`) : gradient off, the
+  three stops, angle, midpoint and dither; gradient on, the flat color.
+
 - **The Source Editor** (`Alt+E`, caught in the main process's `before-input-event` so the
   default menu's Alt+E (Edit) never opens; or `{ }` in the Transport) : a full page
   (`components/SourceEditor.tsx`) to write ISF shaders. CodeMirror 6 (pinned :

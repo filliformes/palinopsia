@@ -192,6 +192,13 @@ const NO_RELIEF = 'Relief is at 0 : no light to angle.'
 /** One input greyed out when `on`. */
 const one = (on: boolean, name: string, why: string): Why => (on ? { [name]: why } : {})
 const DIMS: Record<string, (q: Dim) => Why> = {
+  // one flat color, or the gradient's three stops : never both
+  'solid-color': ({ zero, is }) => {
+    const d: Why = {}
+    if (zero('gradient')) put(d, ['colA', 'colB', 'colC', 'angle', 'midpoint', 'dither'], 'Gradient is off : the one flat color (color) fills the frame.')
+    else if (is('gradient', 1)) put(d, ['color'], 'Gradient is on : colA, colB and colC paint it.')
+    return d
+  },
   'gen-collage': ({ zero, isnt }) => {
     const d: Why = {}
     if (!zero('contour')) return d
