@@ -878,7 +878,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     audioLight: 'Each band lights more of its cells as its own frequency band gets loud (bass at the bottom, treble at the top) : a spectrum-analyzer reading. 0 = off.',
     reseed: 'RESEED ▸ : re-deal every band (widths, picks, accents) at once. Press it, send OSC, or bind a modulator.'
   },
-  impasto: {
+  'cloud-study': {
     coverage: 'How much of the sky the cloud covers : a few clouds, toward an overcast.',
     scale: 'The size of the billows : low for one great mass, high for a sky of small puffs (a mackerel sky).',
     detail: 'How eroded the billows are : smooth soft masses at 0, torn, wispy edges at 1.',

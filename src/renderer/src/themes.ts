@@ -665,11 +665,11 @@ export const THEMES: Theme[] = [
     world: 'synthetic',
     context: { haze: 0, bloom: 0.08, trails: 0 },
     palette: [K, [0.3, 0.32, 0.45, 1], [1.0, 0.86, 0.66, 1]],
-    sources: ['impasto'],
-    stack: [['impasto']],
+    sources: ['cloud-study'],
+    stack: [['cloud-study']],
     bgSources: ['solid-color'], bgOpacity: 0,
     pickInputs: {
-      impasto: {
+      'cloud-study': {
         coverage: [0.45, 0.55, 0.65], scale: [0.8, 1, 1.4], detail: [0.4, 0.6, 0.8], drift: [0.08, 0.15, -0.1],
         evolve: [0.1, 0.2], horizon: [0.45, 0.65, 0.8], sun: [-0.4, 0.25, 0.5], sunHeight: [0.15, 0.3, 0.45],
         glow: [0.4, 0.6], shadow: [0.55, 0.75], brush: [0.4, 0.6, 0.8], mixing: [0.25, 0.45, 0.65],

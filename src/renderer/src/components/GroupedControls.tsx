@@ -43,7 +43,7 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('edges', 'gap', 'torn', 'contour', 'curve', 'contourMode', 'fxFirst'),
     g('deal', 'deal', 'rate', 'xfade', 'churn', 'freeze')
   ],
-  impasto: [
+  'cloud-study': [
     g('cloud', 'coverage', 'scale', 'detail', 'drift', 'evolve', 'horizon', 'audio'),
     g('light', 'sun', 'sunHeight', 'glow', 'shadow', 'sky', 'light', 'shade'),
     g('paint', 'brush', 'mixing', 'impasto', 'canvas')

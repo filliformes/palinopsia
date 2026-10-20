@@ -1230,7 +1230,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Spectrum stack', values: { rate: 0.4, bands: 32, density: 0.08, jitter: 0.2, drift: 0.15, accent: 0.15, chaos: 0, nonlinear: 0.2, audioScatter: 0, audioLight: 0.8 } }
   ],
 
-  impasto: [
+  'cloud-study': [
     { name: 'Golden hour', values: { coverage: 0.5, scale: 1, detail: 0.55, drift: 0.12, evolve: 0.15, horizon: 0.78, sun: 0.45, sunHeight: 0.12, glow: 0.8, shadow: 0.65, brush: 0.55, mixing: 0.45, impasto: 0.55, canvas: 0.25, audio: 0, sky: [0.36, 0.42, 0.58, 1], light: [1, 0.78, 0.5, 1], shade: [0.42, 0.32, 0.4, 1] } },
     { name: 'Storm front', values: { coverage: 0.74, scale: 0.8, detail: 0.75, drift: 0.3, evolve: 0.35, horizon: 0.7, sun: -0.35, sunHeight: 0.25, glow: 0.5, shadow: 0.95, brush: 0.7, mixing: 0.3, impasto: 0.75, canvas: 0.15, audio: 0, sky: [0.3, 0.34, 0.4, 1], light: [0.95, 0.92, 0.85, 1], shade: [0.2, 0.2, 0.25, 1] } },
     { name: 'Mackerel sky', values: { coverage: 0.48, scale: 2.2, detail: 0.85, drift: 0.08, evolve: 0.1, horizon: 0.7, sun: 0.4, sunHeight: 0.45, glow: 0.4, shadow: 0.5, brush: 0.4, mixing: 0.55, impasto: 0.45, canvas: 0.3, audio: 0, sky: [0.3, 0.45, 0.66, 1], light: [1, 0.96, 0.9, 1], shade: [0.55, 0.6, 0.72, 1] } },

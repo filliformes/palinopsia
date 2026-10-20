@@ -7,7 +7,7 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
-- **Impasto source** (`shaders/isf/Impasto.fs`, an ISF generator in two passes) : a
+- **Cloud Study source** (`shaders/isf/CloudStudy.fs`, an ISF generator in two passes) : a
   volumetric cloud ray-marched at half resolution into the `cloud` target (30 steps,
   longer strides through open sky, 4 octaves of value noise normalized so COVERAGE is
   the share of sky; one look toward the sun for the shade plus a multiple-scattering

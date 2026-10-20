@@ -5,7 +5,7 @@
 
 export const GENERATOR_BLURBS: Record<string, string> = {
   'drift-field': 'A slow directional drift of soft noise, flattened into a few matte bands over near-black. One accent color rides through it with a faint color split at the edges. The quiet default backdrop : motion you feel rather than watch.',
-  'impasto': 'A ray-traced sky of billowing cloud, lit by a low sun with a silver lining, repainted in thick oil : strokes that follow the forms, a mixed palette, ridges of paint catching the light, the canvas showing through the thin sky. The clouds drift and churn; the view runs from a wall of cloud to a deck reaching the horizon.',
+  'cloud-study': 'A ray-traced sky of billowing cloud, lit by a low sun with a silver lining, repainted in thick oil : strokes that follow the forms, a mixed palette, ridges of paint catching the light, the canvas showing through the thin sky. The clouds drift and churn; the view runs from a wall of cloud to a deck reaching the horizon.',
   'contour': 'Slow topographic contour lines march across a drifting noise basin, like a living height map. Matte line-work rather than filled shapes, sitting close to black. Good as a calm, map-like ground under busier layers.',
   'grid-drift': 'A flat grid whose rows and columns breathe gently out of alignment. Every so often the clock slips a whole lane sideways, and a few cells light up. Structure that stays legible while never quite holding still.',
   'particle-drift': 'Sparse points drift along a shared flow, each trailing a short capsule and wandering inside its own cell. A generative point-field rather than a particle explosion. Reads as dust or sparks carried on a current.',
