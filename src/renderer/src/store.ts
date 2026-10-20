@@ -777,6 +777,22 @@ function persistAssemblages(list: Assemblage[]): void {
   }
 }
 
+// Every edit put on a slot this run, saved or not (newest last, a few dozen) :
+// the slot only carries the edit's clips, so an edit cut from the Inspector is
+// found here again with its seed, recipe and folder (the assemble tab saves,
+// varies and exports it). Not persisted : after a restart the slot's own fields
+// are all there is (place.ts : assemblageOfSlot).
+const placedEdits = new Map<string, Assemblage>()
+function rememberPlacedEdit(a: Assemblage): void {
+  placedEdits.delete(a.id)
+  placedEdits.set(a.id, a)
+  while (placedEdits.size > 24) placedEdits.delete(placedEdits.keys().next().value as string)
+}
+/** An edit placed on a slot this run (saved or not), by id. */
+export function placedAssemblage(id: string | null | undefined): Assemblage | null {
+  return (id && placedEdits.get(id)) || null
+}
+
 function persistMacro(key: string, v: number): void {
   const t = persistTimers.get(key)
   if (t) clearTimeout(t)
@@ -4374,40 +4390,74 @@ export const useStore = create<StoreState>((set, get) => ({
       return { assemblages }
     }),
   setSourceAssemble: (layer, slot, a) =>
-    set((s) => ({
-      composition: dropSlotTargets(
-        {
-          ...s.composition,
-          layers: s.composition.layers.map((l, i) =>
-            i !== layer
-              ? l
-              : {
-                  ...l,
-                  [slot === 'A' ? 'sourceA' : 'sourceB']: {
-                    kind: 'assemble' as const,
-                    shaderId: null,
-                    inputs: {},
-                    mediaId: a.id,
-                    mediaName: a.name,
-                    // the corpus folder : the clips' original files, with their sound
-                    // (Sonify's Assemblage voice; a converted copy has none)
-                    mediaPath: a.folder,
-                    edl: a.clips,
-                    videoPlaying: true,
-                    videoLoop: a.params.loop
-                  },
-                  // A source swap clears that slot's FX rack, matching video/capture.
-                  [slot === 'A' ? 'sourceAFx' : 'sourceBFx']: []
-                }
-          )
-        },
-        layer,
-        slot,
-        slotOf(s.composition, layer, slot),
-        true
-      ),
-      selection: { type: 'source', layer, slot }
-    })),
+    set((s) => {
+      rememberPlacedEdit(a)
+      const prev = slotOf(s.composition, layer, slot)
+      const slotKey = slot === 'A' ? 'sourceA' : 'sourceB'
+      // Already an assemblage here (new / vary / another edit) : only the EDIT
+      // changes. The slot keeps its framing, speed and transport, its FX rack
+      // and its modulation : it is the same instrument playing another cut.
+      // The same edit again (saved under a name) : only its name changes, and
+      // the selection stays where it is.
+      if (prev?.kind === 'assemble') {
+        const same = prev.mediaId === a.id
+        return {
+          composition: {
+            ...s.composition,
+            layers: s.composition.layers.map((l, i) =>
+              i !== layer
+                ? l
+                : {
+                    ...l,
+                    [slotKey]: {
+                      ...prev,
+                      mediaId: a.id,
+                      mediaName: a.name,
+                      mediaPath: a.folder,
+                      edl: a.clips,
+                      videoLoop: same ? prev.videoLoop : a.params.loop
+                    }
+                  }
+            )
+          },
+          selection: same ? s.selection : { type: 'source' as const, layer, slot }
+        }
+      }
+      return {
+        composition: dropSlotTargets(
+          {
+            ...s.composition,
+            layers: s.composition.layers.map((l, i) =>
+              i !== layer
+                ? l
+                : {
+                    ...l,
+                    [slotKey]: {
+                      kind: 'assemble' as const,
+                      shaderId: null,
+                      inputs: {},
+                      mediaId: a.id,
+                      mediaName: a.name,
+                      // the corpus folder : the clips' original files, with their sound
+                      // (Sonify's Assemblage voice; a converted copy has none)
+                      mediaPath: a.folder,
+                      edl: a.clips,
+                      videoPlaying: true,
+                      videoLoop: a.params.loop
+                    },
+                    // A source swap clears that slot's FX rack, matching video/capture.
+                    [slot === 'A' ? 'sourceAFx' : 'sourceBFx']: []
+                  }
+            )
+          },
+          layer,
+          slot,
+          prev,
+          true
+        ),
+        selection: { type: 'source' as const, layer, slot }
+      }
+    }),
 
   depthMode: ((): 'off' | 'synth' | 'estimate' => {
     const m = localStorage.getItem('opsia.depthMode')

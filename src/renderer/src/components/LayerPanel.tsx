@@ -251,7 +251,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           const srcLabel = (slot?: SourceSlot | null): string | null => {
             if (!slot || slot.kind === 'none') return null
             if (slot.shaderId) return SHADER_BY_ID[slot.shaderId]?.name ?? slot.shaderId
-            return slot.mediaName ?? slot.kind
+            return slot.mediaName || slot.kind
           }
           const a = srcLabel(layer.sourceA)
           const b = srcLabel(layer.sourceB)
@@ -860,13 +860,13 @@ function SourceRow({
           options={[
             { value: '', label: 'none' },
             ...(isVideo
-              ? [{ value: '__video__', label: mediaName ?? 'video', prefix: '🎞 ', group: 'live' }]
+              ? [{ value: '__video__', label: mediaName || 'video', prefix: '🎞 ', group: 'live' }]
               : []),
             ...(isAsm
-              ? [{ value: '__assemble__', label: mediaName ?? 'assemblage', prefix: '🎬 ', group: 'live' }]
+              ? [{ value: '__assemble__', label: mediaName || 'assemblage', prefix: '🎬 ', group: 'live' }]
               : []),
             ...(isAudio
-              ? [{ value: '__audio__', label: mediaName ?? 'audio', prefix: '🔊 ', group: 'live' }]
+              ? [{ value: '__audio__', label: mediaName || 'audio', prefix: '🔊 ', group: 'live' }]
               : []),
             { value: '__video_pick__', label: 'Import video…', prefix: '🎞 ', group: 'live' },
             { value: '__audio_pick__', label: 'Import audio…', prefix: '🔊 ', group: 'live', title: 'A sound file played in the layer like a film, its waveform on screen; its sound can drive any audio modulator (FROM)' },

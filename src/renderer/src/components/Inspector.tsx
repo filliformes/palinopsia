@@ -259,7 +259,7 @@ export function Inspector(): JSX.Element {
       slot?.kind === 'hive' ||
       slot?.kind === 'assemble'
     ) {
-      videoName = slot.mediaName ?? slot.kind
+      videoName = slot.mediaName || slot.kind
       context = `layer ${selection.layer + 1} · src ${selection.slot}`
     }
   } else if (selection?.type === 'background') {

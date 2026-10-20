@@ -18,8 +18,10 @@ import {
 } from '@shared/assemble'
 import { curveAt, edlDuration, generate } from '../assemble/match'
 import { liveDescriptor } from '../assemble/liveMatch'
+import { assemblageOfSlot, NEW_EDIT_NAME, sameFolder } from '../assemble/place'
 import { useStore } from '../store'
 import { ConfirmModal } from './PromptModal'
+import { showToast } from './Toast'
 
 const fmt = (s: number): string =>
   s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${s.toFixed(1)}s`
@@ -61,6 +63,25 @@ export function AssemblePanel(): JSX.Element {
   // one is a source, so "select a slot, hit generate" does the obvious thing.
   const target =
     selection?.type === 'source' ? { layer: selection.layer, slot: selection.slot } : { layer: 0, slot: 'A' as const }
+
+  // The bench follows the edit the target slot plays : one cut from the
+  // Inspector (new / vary, or the menu) lands here too, so it can be named,
+  // saved, varied and exported like one generated here.
+  const slotEditId = useStore((s) => {
+    const l = s.composition.layers[target.layer]
+    const sl = target.slot === 'A' ? l?.sourceA : l?.sourceB
+    return sl?.kind === 'assemble' ? (sl.mediaId ?? null) : null
+  })
+  useEffect(() => {
+    if (!slotEditId || draft?.id === slotEditId) return
+    const l = useStore.getState().composition.layers[target.layer]
+    const a = assemblageOfSlot(target.slot === 'A' ? l?.sourceA : l?.sourceB)
+    if (!a) return
+    setDraft(a)
+    setName(a.name === NEW_EDIT_NAME ? '' : a.name)
+    setErr('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slotEditId])
 
   // ── Corpus ────────────────────────────────────────────────────────────
   async function pickFolder(): Promise<void> {
@@ -125,7 +146,8 @@ export function AssemblePanel(): JSX.Element {
     }
     const a: Assemblage = {
       id: `asm-${seed.toString(36)}-${Date.now().toString(36)}`,
-      name: label ?? name ?? '',
+      // Never blank : the Inspector and the layer list show it.
+      name: label || name.trim() || NEW_EDIT_NAME,
       clips,
       seed,
       params: { ...params },
@@ -144,7 +166,22 @@ export function AssemblePanel(): JSX.Element {
   // instrument's Vary button : same intent, new siblings.
   const doVary = (): void => {
     if (!draft) return void doGenerate()
-    void build((draft.seed + 1 + ((Math.random() * 1000) | 0)) >>> 0, draft.name)
+    // A sibling only comes from the edit's own folder : with another one loaded
+    // the cut is a new edit (it does not take the old name), and says so.
+    const elsewhere = !!corpus && !sameFolder(draft.folder, corpus.folder)
+    if (elsewhere) setName('')
+    const a = build((draft.seed + 1 + ((Math.random() * 1000) | 0)) >>> 0, elsewhere ? NEW_EDIT_NAME : draft.name)
+    if (a && elsewhere) showToast('That edit comes from another folder : this is a new edit cut from the loaded one.', 'ok', 5000)
+  }
+
+  // Into the bank under the typed name; the slot playing it takes the name too
+  // (the Inspector and the layer list show it).
+  function saveDraft(): void {
+    if (!draft || !name.trim()) return
+    const a = { ...draft, name: name.trim() }
+    saveAssemblage(a)
+    setDraft(a)
+    if (slotEditId === a.id) setSourceAssemble(target.layer, target.slot, a)
   }
 
   async function doExport(): Promise<void> {
@@ -356,7 +393,7 @@ export function AssemblePanel(): JSX.Element {
             className="shrink-0 rounded border border-accent2/60 bg-accent2/10 px-2.5 py-1 text-[11.5px] font-semibold text-accent2 transition-colors hover:bg-accent2/20 disabled:opacity-40"
             onClick={doVary}
             disabled={!units || !!busy}
-            title="Same recipe, new dice : a sibling edit"
+            title="The recipe above, new dice : a sibling of this edit (the Inspector's vary keeps the edit's own recipe)"
           >
             Vary
           </button>
@@ -377,19 +414,13 @@ export function AssemblePanel(): JSX.Element {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && name.trim()) {
-                    saveAssemblage({ ...draft, name: name.trim() })
-                    setDraft({ ...draft, name: name.trim() })
-                  }
+                  if (e.key === 'Enter' && name.trim()) saveDraft()
                 }}
               />
               <button
                 className="btn shrink-0 px-2 py-0.5 text-[11px]"
                 disabled={!name.trim()}
-                onClick={() => {
-                  saveAssemblage({ ...draft, name: name.trim() })
-                  setDraft({ ...draft, name: name.trim() })
-                }}
+                onClick={saveDraft}
                 title="Keep this edit in the bank"
               >
                 save

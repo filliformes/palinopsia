@@ -10,10 +10,12 @@ import { useEffect, useRef, useState } from 'react'
 import type { SourceSlot } from '@shared/types'
 import { edlDuration } from '../assemble/match'
 import { videoKey, videoPlayheads } from '../engine/videoState'
-import { modTargetKey, useStore } from '../store'
+import { modTargetKey, placedAssemblage, useStore } from '../store'
 import { AssignRow } from './AutoControls'
-import { freshAssemblage } from '../assemble/place'
+import { assemblageOfSlot, freshAssemblage, NEW_EDIT_NAME, sameFolder } from '../assemble/place'
 import { showToast } from './Toast'
+
+const folderName = (p: string): string => p.split(/[\\/]/).filter(Boolean).pop() || p
 
 const SMIN = 1 / 16
 const SMAX = 16
@@ -90,13 +92,24 @@ export function AssembleTransport({
   const corpus = useStore((s) => s.assembleCorpus)
   const setSourceAssemble = useStore((s) => s.setSourceAssemble)
   const own = bank.find((a) => a.id === state.mediaId)
+  // Its recipe is known when it is saved or was cut this run.
+  const recipeKnown = !!(own ?? placedAssemblage(state.mediaId))
   const fmtD = (s: number): string => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
   const noCorpus = 'The corpus is not loaded in this run : open the assemble tab once (it analyzes its folder again)'
+  const noVideo = 'No usable video in the loaded folder : pick another one in the assemble tab'
+  const usable = !!corpus && corpus.units.length > 0
   const cut = (vary: boolean): void => {
-    const a = vary && own
-      ? freshAssemblage((own.seed + 1 + ((Math.random() * 1000) | 0)) >>> 0, own.name, own.params)
+    if (!corpus) return void showToast(noCorpus + '.', 'warn', 5000)
+    if (!corpus.units.length) return void showToast(noVideo + '.', 'warn', 5000)
+    // Vary : this edit's own recipe, new dice. A sibling only comes from the
+    // edit's own folder : with another one loaded it is a new edit, said so.
+    const edit = vary ? assemblageOfSlot(state) : null
+    const elsewhere = !!edit && !sameFolder(edit.folder, corpus.folder)
+    const a = edit
+      ? freshAssemblage((edit.seed + 1 + ((Math.random() * 1000) | 0)) >>> 0, elsewhere ? NEW_EDIT_NAME : edit.name, edit.params)
       : freshAssemblage()
-    if (!a) return void showToast(corpus ? 'The recipe found no clips : loosen the matching in the assemble tab.' : noCorpus + '.', 'warn', 5000)
+    if (!a) return void showToast('The recipe found no clips : loosen the matching in the assemble tab.', 'warn', 5000)
+    if (elsewhere) showToast(`This edit comes from another folder : a new edit cut from ${folderName(corpus.folder)} instead.`, 'ok', 5000)
     setSourceAssemble(layer, slot, a)
   }
 
@@ -123,17 +136,25 @@ export function AssembleTransport({
         </select>
         <button
           onClick={() => cut(false)}
-          disabled={!corpus}
+          disabled={!usable}
           className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted transition-colors hover:text-accent disabled:opacity-40"
-          title={corpus ? 'Cut a new edit from the corpus with the assemble tab\u2019s recipe' : noCorpus}
+          title={!corpus ? noCorpus : !usable ? noVideo : 'Cut a new edit from the corpus with the assemble tab\u2019s recipe'}
         >
           new
         </button>
         <button
           onClick={() => cut(true)}
-          disabled={!corpus}
+          disabled={!usable}
           className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted transition-colors hover:text-accent disabled:opacity-40"
-          title={corpus ? (own ? 'The same recipe, new dice : a sibling of this edit' : 'A new edit (this one is not in the bank : its recipe is unknown)') : noCorpus}
+          title={
+            !corpus
+              ? noCorpus
+              : !usable
+                ? noVideo
+                : recipeKnown
+                  ? 'This edit\u2019s own recipe, new dice : a sibling of this edit'
+                  : 'New dice on the assemble tab\u2019s recipe (this edit\u2019s own recipe is not known after a restart)'
+          }
         >
           vary
         </button>
