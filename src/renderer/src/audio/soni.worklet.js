@@ -748,10 +748,24 @@ class SpaceBus {
       else for (let s = 0; s < n; s++) m[s] += pL[s] * 0.7071067811865476;
     }
   }
-  finish(master, n) {
+  // `xL`, `xR` : the Audio Layer, joined after the master (its volume is its own)
+  // and before the subs and the limiter, with the FX return for now. (Scaled back
+  // from the master instead, it jumped for a block on a sharp master pull and
+  // was gone at master 0.)
+  finish(master, n, xL, xR) {
     const out = this.out;
     if (!out) return;
     const nch = Math.min(this.nch, out.length);
+    // master gain (ramped) on what Sonify placed, its low end for the subs too
+    const mg1 = clampf(master, 0, 2);
+    const mg0 = this.mgS < 0 ? mg1 : this.mgS, dmg = (mg1 - mg0) / n;
+    this.mgS = mg1;
+    for (let ch = 0; ch < nch; ch++) {
+      const o = out[ch];
+      for (let s = 0; s < n; s++) o[s] *= mg0 + dmg * (s + 1);
+    }
+    if (this.subN > 0) { const m = this.mono; for (let s = 0; s < n; s++) m[s] *= mg0 + dmg * (s + 1); }
+    if (xL) this.add(SPACE_FX, xL, xR, n);
     // subwoofers : the low end of everything
     if (this.subN > 0 && (this.subGain > 0 || this.subG > 0)) {
       const a = this.lpA, z = this.lpS, m = this.mono;
@@ -768,16 +782,13 @@ class SpaceBus {
       for (let i = 0; i < 4; i++) if (z[i] < 1e-25 && z[i] > -1e-25) z[i] = 0;
       for (let i = 0; i < this.subN; i++) { const ch = this.subs[i]; if (ch < nch) { const o = out[ch]; for (let s = 0; s < n; s++) o[s] += m[s]; } }
     }
-    // master gain (ramped) + one limiter for every channel (-1 dBFS, linked)
-    const mg1 = clampf(master, 0, 2);
-    const mg0 = this.mgS < 0 ? mg1 : this.mgS, dmg = (mg1 - mg0) / n;
-    this.mgS = mg1;
+    // one limiter for every channel (-1 dBFS, linked)
     const pkS = this.peakS;
     pkS.fill(0, 0, n);
     for (let ch = 0; ch < nch; ch++) {
       const o = out[ch];
       for (let s = 0; s < n; s++) {
-        let v = o[s] * (mg0 + dmg * (s + 1));
+        let v = o[s];
         if (!Number.isFinite(v)) v = 0;
         o[s] = v;
         const a = v < 0 ? -v : v; if (a > pkS[s]) pkS[s] = a;
@@ -979,7 +990,6 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.space = new SpaceBus(sampleRate);
     this.pL = new Float32Array(128); this.pR = new Float32Array(128);
     this.fxL = new Float32Array(128); this.fxR = new Float32Array(128);
-    this.exL = new Float32Array(128); this.exR = new Float32Array(128); // the Audio Layer, for Space
     // Collage pieces as sources : the bank's wet, the dry's share, one piece
     this.rgWL = new Float32Array(128); this.rgWR = new Float32Array(128);
     this.rgDK = new Float32Array(128); this.pcBuf = new Float32Array(128);
@@ -2146,15 +2156,10 @@ class SoniProcessor extends AudioWorkletProcessor {
     // Input 2 : the Audio Layer (a sound file, a live input), already at its own
     // levels : joined AFTER Sonify's master (its volume is its own) and BEFORE the
     // limiter, so the EQ, the glue, the recordings and Space all have it. In
-    // Space it sits with the FX return for now (scaled back from the master the
-    // Space stage applies to everything).
+    // Space it sits with the FX return for now, joined after the Space stage's
+    // own master (spc.finish, below).
     const ex = _inputs[2];
     const exL = ex && ex[0] ? ex[0] : null, exR = ex && ex[1] ? ex[1] : exL;
-    if (exL && spc.on && spc.out && mg1 > 1e-3) {
-      const k = 1 / mg1;
-      for (let s = 0; s < n; s++) { this.exL[s] = exL[s] * k; this.exR[s] = exR[s] * k; }
-      spc.add(SPACE_FX, this.exL, this.exR, n);
-    }
     let peak = this.peak, limMin = this.limMin;
     for (let s = 0; s < n; s++) {
       const mg = mg0 + dmg * (s + 1); // ramped : a stepped master zippered
@@ -2176,7 +2181,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       if (ar > this.pkR) this.pkR = ar;
       this.ssL += l * l; this.ssR += r * r;
     }
-    if (spc.on && spc.out) spc.finish(cfg.master, n);
+    if (spc.on && spc.out) spc.finish(cfg.master, n, exL, exR);
     this.nMeter += n;
     this.peak = peak; this.limMin = limMin;
     if (currentTime - this.lastMeter > 0.1) {
