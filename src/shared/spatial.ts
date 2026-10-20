@@ -19,8 +19,10 @@
 // Written for Palinopsia from the published methods : VBAP (Pulkki 1997, vector
 // base amplitude panning), its spread (MDAP, Pulkki 1999), the speaker hull as
 // the convex hull of the speaker directions. The speaker-setup reader reads
-// SpatGRIS's documented file format; no SpatGRIS code is used (it is GPL, this
-// app is MIT).
+// SpatGRIS's documented file format; no SpatGRIS code is used. This app is
+// GPL-3.0-or-later too, but with a section 7 permission of its own (NDI,
+// LICENSE-EXCEPTIONS.md) that SpatGRIS's code does not carry, so none of it
+// can come in.
 
 import type { DomeConfig } from './dome'
 

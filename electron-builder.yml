@@ -44,6 +44,15 @@ extraResources:
     to: icon.ico
   - from: build/icon.png
     to: icon.png
+  # The license the app is conveyed under (GPL-3.0-or-later), its section 7
+  # permission (NDI), and the credits of the third-party code it carries : a
+  # copy travels with every build, in resources/ beside the app.
+  - from: LICENSE
+    to: LICENSE
+  - from: LICENSE-EXCEPTIONS.md
+    to: LICENSE-EXCEPTIONS.md
+  - from: THIRD_PARTY_NOTICES.md
+    to: THIRD_PARTY_NOTICES.md
   # MediaPipe embodied-control assets (Hands + Pose). Self-hosted so tracking
   # works OFFLINE and in a kiosk install : the renderer loads them over the
   # opsia-asset:// scheme (main/assets.ts), never Google's CDN. wasm is the SIMD

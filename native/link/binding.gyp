@@ -16,7 +16,14 @@
       ],
       "conditions": [
         [ "OS=='win'", {
+          # Electron's common.gypi builds addons with _HAS_EXCEPTIONS=0 : the
+          # standard library then aborts the process where it would throw, and
+          # the catch (...) around every Link call never sees it. Link and asio
+          # use exceptions, so turn the library's back on (as node-addon-api's
+          # except.gypi does), with /EHsc (ExceptionHandling 1) below.
+          "defines!": [ "_HAS_EXCEPTIONS=0" ],
           "defines": [
+            "_HAS_EXCEPTIONS=1",
             "LINK_PLATFORM_WINDOWS=1",
             "INCL_EXTRA_HTON_FUNCTIONS=1",
             "_WIN32_WINNT=0x0601",
